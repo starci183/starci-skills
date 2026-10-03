@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnAgent, loadAdapter } from '../../scripts/agent/lib.mjs';
+import { spawnAgent, startAgent, loadAdapter } from '../../scripts/agent/lib.mjs';
 import { ensureLaunchTrust, projectTargets, claudeKeyForms } from '../../scripts/agent/trust.mjs';
+import { fakeAdmission } from '../helpers/fake-admission.mjs';
 
 // Launch preconditions per provider card (owner order 2026-10-02: no first-run dialog, no approval prompt, the command guard
 // stays on). Bypass itself is Orca's (settings.agentDefaultArgs); the runtime's part is trust, the guard hook and the model.
@@ -30,21 +31,68 @@ test('a fresh worktree path gets its trust and the command guard hook before lau
   }
 });
 
-test('a launch that names no model starts the card\'s model, so a dead default in the user\'s own config can never be used', () => {
+test('an eligible Op that names no model starts the card\'s admitted model, never the user\'s default', () => {
   const calls = [];
-  const io = { assignee: () => ({ ok: true, assigneeHandle: 'term' }), trust: () => ({ status: 'ok', paths: [] }),
+  const io = { admission: fakeAdmission(), assignee: () => ({ ok: true, assigneeHandle: 'term' }), trust: () => ({ status: 'ok', paths: [] }),
     start: (a) => { calls.push(a); return { ok: true, outcome: 'ok', dispatchId: 'd1', taskId: 't1', agentTerminalHandle: 'term' }; },
     rename: () => ({ ok: true }),
     show: () => ({ ok: true, state: 'ready', dispatch: { depth: 1 }, effective: { agent: 'codex', model: 'gpt-6-luna' } }) };
   const card = loadAdapter('codex').card;
   // The card's `defaultModel: pool` resolves through the provider pool's registry.yaml defaultModel.
   assert.equal(card.start.defaultModel, 'pool');
-  const r = spawnAgent({ provider: 'codex', worktree: 'x', title: 't', spec: 's', task: 't1', run: 'run_1', request: { a: 1 }, io });
+  const eligible = (model) => [{ provider: 'codex', model, eligibility: { eligible: true, mode: 'operation-policy', reasons: [] } }];
+  const r = spawnAgent({ provider: 'codex', role: 'op', allowGroup: eligible('gpt-6-luna'), worktree: 'x', title: 't', spec: 's', task: 't1', run: 'run_1', request: { a: 1 }, io });
   assert.equal(r.ok, true, r.error);
   assert.equal(calls[0].model, 'gpt-6-luna');
-  const named = spawnAgent({ provider: 'codex', model: 'gpt-6.1-sol', worktree: 'x', title: 't', spec: 's', task: 't1', run: 'run_1', request: { a: 2 }, io: { ...io, show: () => ({ ok: true, state: 'ready', dispatch: { depth: 1 }, effective: { agent: 'codex', model: 'gpt-6.1-sol' } }) } });
+  assert.equal(r.admission.receipt.model, 'gpt-6-luna', 'the resolved default passes the common gate as a concrete model');
+  const named = spawnAgent({ provider: 'codex', model: 'gpt-6.1-sol', role: 'op', allowGroup: eligible('gpt-6.1-sol'), worktree: 'x', title: 't', spec: 's', task: 't1', run: 'run_1', request: { a: 2 }, io: { ...io, show: () => ({ ok: true, state: 'ready', dispatch: { depth: 1 }, effective: { agent: 'codex', model: 'gpt-6.1-sol' } }) } });
   assert.equal(calls.at(-1).model, 'gpt-6.1-sol', 'a named model is kept');
   assert.equal(named.ok, true, named.error);
+});
+
+test('startAgent admits a declared default before creating its Run; blocked quota still refuses before any host effect', () => {
+  const calls = [], admission = fakeAdmission();
+  const io = { admission, runCreate: () => { calls.push('run'); return { ok: true, runId: 'run_default' }; }, spawn: {
+    trust: () => ({ status: 'ok', paths: [] }), rename: () => ({ ok: true }),
+    start: (args) => { calls.push(args); return { ok: true, dispatchId: 'ctx_default', taskId: 'task_default', agentTerminalHandle: 'term_default' }; },
+    show: () => ({ ok: true, state: 'ready', effective: { agent: 'codex', model: 'gpt-6-luna' } }),
+  } };
+  const options = { provider: 'codex', role: 'op', allowGroup: [{ provider: 'codex', model: 'gpt-6-luna', eligibility: { eligible: true, mode: 'operation-policy', reasons: [] } }],
+    worktree: 'x', title: 't', prompt: 's', objective: 'default', request: { cardDefault: 1 }, io };
+  const launched = startAgent(options);
+  assert.equal(launched.ok, true, launched.error);
+  assert.equal(admission.calls.find(([name]) => name === 'reserve')[1].model, 'gpt-6-luna');
+  assert.equal(calls[1].model, 'gpt-6-luna');
+  assert.equal(calls[1].request.model, 'gpt-6-luna', 'immutable host replay uses the admitted model');
+  calls.length = 0;
+  const refused = startAgent({ ...options, request: { cardDefault: 2 }, io: { ...io, admission: fakeAdmission({ used: { codex: 100 } }) } });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.effectState, 'none');
+  assert.deepEqual(calls, [], 'an explicit default does not bypass quota admission');
+});
+
+test('the card default cannot lower a generic worker\'s quality floor', () => {
+  const calls = [];
+  const refused = spawnAgent({ provider: 'codex', run: 'run_1', request: { cardDefault: 'worker' }, io: {
+    admission: fakeAdmission(), trust: () => calls.push('trust'), start: () => calls.push('start'),
+  } });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.effectState, 'none');
+  assert.equal(refused.decision.rejected[0].model, 'gpt-6-luna');
+  assert.ok(refused.decision.rejected[0].codes.includes('quality-floor-not-met'));
+  assert.deepEqual(calls, []);
+});
+
+test('an omitted model on a card without a declared default is refused before trust or worker-start', () => {
+  const calls = [];
+  assert.equal(loadAdapter('claude').card.start.defaultModel, undefined);
+  const refused = spawnAgent({ provider: 'claude', run: 'run_1', request: { cardDefault: 3 }, io: {
+    admission: fakeAdmission(), trust: () => calls.push('trust'), start: () => calls.push('start'),
+  } });
+  assert.equal(refused.step, 'admission');
+  assert.equal(refused.effectState, 'none');
+  assert.match(refused.error, /concrete model/);
+  assert.deepEqual(calls, []);
 });
 
 test('a card that takes no model flag gets none (Devin)', () => {

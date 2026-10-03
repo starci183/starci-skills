@@ -11,7 +11,7 @@ import { releaseSyncRuntime } from '../../scripts/supervisor/release-sync-runtim
 import { SRC_CSS } from '../fixtures/grammar-dist.mjs';
 
 function fixture(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'grammar-prepare-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-grammar-prepare-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const packageRoot = path.join(root, 'packages', 'grammar');
   const write = (relative, body) => {

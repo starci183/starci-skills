@@ -41,9 +41,9 @@ test('missing, invalid or unreadable resource evidence visibly falls back to one
     host({ freeRamBytes: -1 }), host({ freeRamBytes: 65 * 1024 ** 3 })]) {
     const result = choose(sample);
     assert.equal(result.concurrency, 1);
-    assert.equal(result.reason, 'resources-unavailable');
+    assert.match(result.reason, /measurements unavailable/);
   }
-  assert.equal(resolveTestConcurrency(undefined, { hostSample: () => { throw new Error('probe unavailable'); } }).reason, 'resources-unavailable');
+  assert.match(resolveTestConcurrency(undefined, { hostSample: () => { throw new Error('probe unavailable'); } }).reason, /measurements unavailable/);
 });
 
 test('an explicit limit bypasses the host probe and rejects invalid integers', () => {

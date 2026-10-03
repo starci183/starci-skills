@@ -80,7 +80,7 @@ export function ownedPathsLine({ paths, repo = null, workflowId = null, jobId = 
   const file = ownedPathsFileOf(repo, workflowId, jobId, scratchDir);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${paths.join('\n')}\n`, 'utf8');
-  return `owned_paths: ${paths.length} paths, one per line in ${file} (read it before any write; it is also your git pathspec list: git add --pathspec-from-file=<it>). First 10: ${head}`;
+  return `owned_paths: ${paths.length} paths, one per line in ${file} (read it before any write; the runtime uses this list to checkpoint your owned changes at green settle). First 10: ${head}`;
 }
 
 // packet: the dispatch packet both callers build ({op, brief, params?, context{...}, constraints}).

@@ -8,6 +8,7 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {spawnAgent} from '../../scripts/agent/lib.mjs';
+import {fakeAdmission} from '../helpers/fake-admission.mjs';
 
 // nivo inc-c1d5bdbea173 (2026-09-25, Collab): the Kernel wrapped `starci kernel dispatch --job
 // op-backend.implement-dd957e8395 --spawn` in a shell `timeout 115`, which killed the api mid-spawn. The row
@@ -122,7 +123,7 @@ test('spawnAgent hands the caller the worker terminal before it attests the laun
   // The handle is recorded durably the moment the assignee is known: an attestation that then fails still leaves
   // the caller the handle (and the Dispatch) to account for (nivo inc-e523617a3c31).
   const seen=[];
-  const io={trust:()=>({status:'ok'}),start:()=>({ok:true,outcome:'ok',dispatchId:'ctx_1',taskId:'task_1',agentTerminalHandle:'term_1',state:'ready'}),
+  const io={admission:fakeAdmission(),trust:()=>({status:'ok'}),start:()=>({ok:true,outcome:'ok',dispatchId:'ctx_1',taskId:'task_1',agentTerminalHandle:'term_1',state:'ready'}),
     rename:()=>({ok:true}),
     show:()=>({ok:true,state:'ready',effective:{agent:'claude',model:'another-model'}}),stop:()=>({ok:true}),release:()=>({ok:true})};
   const out=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'t',spec:'s',run:'run_1',request:{job:'j'},

@@ -25,6 +25,7 @@ import { resolveGrammarContext, grammarInputsOf } from '../../scripts/kernel/gra
 import { withRationale } from '../helpers/draw-rationale-fixture.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
+const DRAWER = { provider: 'claude', model: 'claude-opus-5-5' };
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-real-')); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return d; };
 const write = (root, rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); return path.join(root, rel); };
 const codes = (list) => [...new Set(list.map((f) => f.code))].sort();
@@ -232,7 +233,7 @@ test('a component round keeps source.tsx, fixtures and the grammar resolution, j
   const probes = { geometry: async () => ({ findings: [] }), score: async (html, viewport) => ({ schema: 'starci/ui-proof-score@1', viewport, summary: { pass: 5, fail: 0, unmeasurable: 0 }, cases: [], spacing: [] }) };
   const critic = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9) });
   const base = { source, fixtures: fixturesByWidth([fixture]), product: dir, base: 'LedgerBase', state: 'installed', viewports: [{ width: 1184, height: 60 }, { width: 390, height: 60 }],
-    repo: dir, out, render, probes, criticOrca: critic, sourceCheck: async () => ({ findings: [], grammar }) };
+    repo: dir, out, render, probes, drawer: DRAWER, criticOrca: critic, sourceCheck: async () => ({ findings: [], grammar }) };
   const r1 = await runRound(base);
   assert.equal(r1.round.mode, 'component');
   assert.equal(r1.round.grammarSource, 'claude-dist@0.5.2');
@@ -336,12 +337,13 @@ test('a component round picks an independent critic; finish critiques an uncriti
   const seen = [];
   const critic = (beauty) => fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, beauty), onStart: (a) => { seen.push([a.agent, a.model]); assert.ok(fs.existsSync(path.join(a.worktree, 'screen.html'))); } });
   const base = { source, fixtures: fixturesByWidth([fixture]), product: dir, base: 'LedgerBase', state: 'installed', viewports: [{ width: 1184, height: 60 }, { width: 390, height: 60 }],
-    repo: dir, render, probes, sourceCheck: async () => ({ findings: [], grammar }) };
+    repo: dir, render, probes, drawer: DRAWER, sourceCheck: async () => ({ findings: [], grammar }) };
 
   // Codex drawing (the draw order's fallback): the component round is judged by criticWhenDrawer.codex, never Codex.
-  const judged = await runRound({ ...base, out: path.join(dir, 'loop-a'), drawer: 'codex', criticOrca: critic(9) });
+  const judged = await runRound({ ...base, out: path.join(dir, 'loop-a'), drawer: { provider: 'codex', model: 'gpt-6.1-sol' }, criticOrca: critic(9) });
   assert.deepEqual(seen.at(-1), ['claude', 'claude-opus-5-5'], 'the claude critic worker');
   assert.equal(judged.critique.critic.provider, 'claude');
+  assert.equal(judged.critique.critic.effective.model, 'claude-opus-5-5');
   assert.equal(judged.critique.critic.drawer, 'codex');
   assert.equal(judged.stop.reason, 'passed');
 
@@ -350,7 +352,7 @@ test('a component round picks an independent critic; finish critiques an uncriti
   const r = await runRound({ ...base, out, critic: false });
   assert.equal(r.round.beauty, null);
   assert.equal(r.stop, null);
-  const late = await critiqueBest({ out, orca: critic(9) });
+  const late = await critiqueBest({ out, drawer: DRAWER, orca: critic(9) });
   assert.equal(late.ran, true);
   assert.equal(readLoop(out).rounds[0].beauty, 9);
   assert.equal(readLoop(out).rounds[0].critic.late, true);
@@ -361,7 +363,7 @@ test('a component round picks an independent critic; finish critiques an uncriti
   // A critic that cannot answer leaves no beauty: DRAW_CRITIC_MISSING with its error, never DRAW_BEAUTY_BELOW.
   const out3 = path.join(dir, 'loop-c');
   await runRound({ ...base, out: out3, critic: false });
-  const failed = await critiqueBest({ out: out3, orca: fakeCriticOrca({ mode: 'done-no-verdict' }) });
+  const failed = await critiqueBest({ out: out3, drawer: DRAWER, orca: fakeCriticOrca({ mode: 'done-no-verdict' }) });
   assert.equal(failed.critique.outcome, 'verdict-missing');
   assert.match(failed.critique.error, /without a verdict/);
   const done = finishLoop({ out: out3, parts: path.join(dir, 'parts-c'), force: true });
@@ -403,7 +405,7 @@ test('a component draw installed by finish passes settle draw-acceptance on ever
   const probes = { geometry: async () => ({ findings: [] }), score: async (html, viewport) => ({ schema: 'starci/ui-proof-score@1', htmlSha256: 'harness', viewport, summary: { pass: 5, fail: 0, unmeasurable: 0 }, cases: [], spacing: [] }) };
   const out = path.join(uiDir, 'assets', 'directions', 'draw-loop', 'LedgerBase--installed');
   await runRound({ source, fixtures: fixturesByWidth([fixture]), product: src, ui: uiDir, base: 'LedgerBase', state: 'installed', viewports: [{ width: 1184, height: 60 }, { width: 390, height: 60 }],
-    repo, out, render, probes, sourceCheck: async () => ({ findings: [], grammar }),
+    repo, out, render, probes, drawer: DRAWER, sourceCheck: async () => ({ findings: [], grammar }),
     criticOrca: fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9) }) });
   const done = finishLoop({ out, parts: path.join(uiDir, 'assets', 'directions') });
   assert.equal(done.outcome, 'passed');

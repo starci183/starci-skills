@@ -1,0 +1,7 @@
+id: integration-admission-boundaries
+effectiveAt: 2026-10-03
+summary: Raw script remedies name the owned runtime preparation command, and an unverified Kernel seat retains its singleton until exact closure is reconciled.
+reach: new-legs
+paths:
+  - modules/kernel/command-policy.yaml
+  - modules/kernel/start-workflow.yaml

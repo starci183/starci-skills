@@ -341,17 +341,19 @@ test('a repair tick renames a drifted Kernel tab title through Orca', async (t) 
   assert.equal(renames[0][renames[0].indexOf('--title') + 1], expected);
 });
 
-// A seat whose signal names no worker Dispatch is replaced through start-workflow, launched-by the
-// watchdog: the kernel-restarted event and starci kernel status kernel.launchedBy name it.
-test('a repair replaces a seat with no worker under the watchdog launcher', async (t) => {
+test('a repair retains a seat whose missing worker Dispatch leaves its execution identity unverified', async (t) => {
   const fx = await watchdogWorld(t, { signalValue: { terminal: KERNEL, host: 'orca', agent: 'claude', launch: 'worker' } });
   const { status, result, stderr, stdout } = fx.tick();
-  assert.equal(status, 0, stderr || stdout);
-  assert.equal(result.action, 'restarted', JSON.stringify(result));
+  t.diagnostic(JSON.stringify({ status, result, stderr, stdout }));
+  assert.equal(status, 1, JSON.stringify({ status, result, stderr, stdout }));
+  assert.equal(result.action, 'restart-failed', JSON.stringify(result));
+  assert.equal(result.ok, false);
+  assert.equal(result.detail?.step, 'kernel-terminal-unverified');
+  assert.equal(result.terminal, KERNEL);
   const restarts = fx.eventsOf('kernel-restarted');
-  assert.equal(restarts.length, 1);
-  assert.equal(restarts[0].launchedBy, 'watchdog', 'the repair named its launcher');
-  assert.equal(fx.api('status').kernel.launchedBy, 'watchdog');
+  assert.equal(restarts.length, 0, 'unknown identity does not authorize a replacement');
+  assert.equal(fx.eventsOf('kernel-stale-cleared').length, 0, 'the original singleton remains bound');
+  assert.equal(fx.orcaCalls().filter(a=>a[0]==='orchestration'&&a[1]==='worker-start').length, 0);
 });
 
 // An idle Kernel due for replacement (3 delivered wakes with no move, the first past the window)

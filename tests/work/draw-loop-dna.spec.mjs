@@ -262,14 +262,15 @@ function product(t) {
   });
   const probes = { geometry: async () => ({ findings: [] }), score: async (html, viewport) => ({ schema: 'starci/ui-proof-score@1', htmlSha256: sha256(fs.readFileSync(html)), viewport, summary: { pass: 5, fail: 0, unmeasurable: 0 }, cases: [], spacing: [] }) };
   const critic = (beauty) => fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, beauty) });
-  return { repo, ui, directions, source, render, probes, critic, why };
+  return { repo, ui, directions, source, render, probes, critic, why,
+    drawer: { provider: 'claude', model: 'claude-opus-5-5' } };
 }
 const VIEWPORTS = [{ width: 800, height: 60 }, { width: 390, height: 60 }];
 
 test('a loop that never passes stops without progress and finishes blocked with the remaining failures and its best round', async (t) => {
   const p = product(t);
   fs.writeFileSync(p.source, p.why.html.replace('<h1 data-grammar-component="Heading"', '<h1'));
-  const base = { ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes };
+  const base = { ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes, drawer: p.drawer };
   const r1 = await runRound({ ...base, criticOrca: p.critic(6) });
   assert.equal(r1.round.n, 1);
   assert.deepEqual(r1.round.codes, [DRAW_OFF_GRAMMAR_COMPONENT]);
@@ -291,7 +292,9 @@ test('a loop that never passes stops without progress and finishes blocked with 
 
 test('a passing loop installs its best round; the record binds generation.loop; settle re-measures every part itself', async (t) => {
   const p = product(t);
-  const r = await runRound({ ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes, criticOrca: p.critic(9) });
+  const r = await runRound({ ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes, drawer: p.drawer, criticOrca: p.critic(9) });
+  assert.equal(r.critique.outcome, 'judged', r.critique.error);
+  assert.equal(r.critique.critic.effective.model, 'gpt-6.1-sol');
   assert.equal(r.stop.reason, STOP.passed);
   const done = finishLoop({ out: r.out });
   assert.equal(done.outcome, 'passed');
@@ -367,7 +370,7 @@ test('starci kernel settle re-measures the drawn parts itself: a loop-passed dra
   fs.writeFileSync(path.join(p.repo, 'src', 'a.ts'), 'export const a = 1;\n');
   fs.appendFileSync(path.join(p.repo, '.git', 'info', 'exclude'), '.starciwork/\n');
   git('add', '.'); git('commit', '--quiet', '-m', 'init');
-  const r = await runRound({ ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes, criticOrca: p.critic(9) });
+  const r = await runRound({ ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes, drawer: p.drawer, criticOrca: p.critic(9) });
   const done = finishLoop({ out: r.out });
   const record = parseYaml(fs.readFileSync(path.join(p.ui, 'index.yaml'), 'utf8'));
   record.assets = done.assets;

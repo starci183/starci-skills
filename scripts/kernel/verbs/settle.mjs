@@ -143,7 +143,7 @@ export default {
   if (hygiene) {
     const codes = [...new Set(hygiene.findings.map((f) => f.code))];
     emit({ ok: false, jobId, op: hygiene.op, reason: 'work-hygiene-red', codes, findings: hygiene.findings.slice(0, 50), findingCount: hygiene.findings.length, files: hygiene.files },
-      `settle REFUSED for ${jobId} (${hygiene.op}): work-hygiene-red - ${codes.join(', ')} (${hygiene.findings.length} finding(s); first: ${hygiene.findings[0].file} - ${hygiene.findings[0].detail}); the job stays ${hygiene.status}. Fix the named Work files (a YAML that parses, records that pass starci runtime validate --strict, no literal password or token outside an .enc file; starci work hygiene files --repo <repo> <file>...), commit them, then settle again`, args.json);
+      `settle REFUSED for ${jobId} (${hygiene.op}): work-hygiene-red - ${codes.join(', ')} (${hygiene.findings.length} finding(s); first: ${hygiene.findings[0].file} - ${hygiene.findings[0].detail}); the job stays ${hygiene.status}. Fix the named Work files (a YAML that parses, records that pass starci runtime validate --strict, no literal password or token outside an .enc file; starci work hygiene files --repo <repo> <file>...), rerun the applicable checks and settle again; the runtime checkpoints owned changes after green settle`, args.json);
     process.exit(1);
   }
 

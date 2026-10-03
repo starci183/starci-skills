@@ -45,19 +45,31 @@ test('the explicit test registry wins; inside node --test a live runtime root fa
   assert.equal(machineFileFor({LOCALAPPDATA:moved,NODE_TEST_CONTEXT:'child-v8'}),path.join(moved,'StarCi','machine.sqlite'));
 });
 
-test('this spec, and a process it spawns with the inherited env, resolve a registry under the OS temp directory',()=>{
-  assert.ok(isUnderTempDir(machineFileFor()),`in-process ${machineFileFor()}`);
-  const child=spawnSync(process.execPath,['--input-type=module','-e',`import {machineFileFor} from ${JSON.stringify(machineDb)};process.stdout.write(machineFileFor());`],{encoding:'utf8',env:{...process.env}});
+test('this spec and its child inherit the explicit private registry or use the isolated temp fallback',t=>{
+  const file=machineFileFor(),explicit=process.env[TEST_REGISTRY_ENV];
+  if(explicit)assert.equal(file,path.resolve(explicit),'the runner may place its private registry outside TEMP');
+  else assert.ok(isUnderTempDir(file),`fallback ${file}`);
+  const hostFile=machineFileFor({LOCALAPPDATA:process.env.LOCALAPPDATA});
+  assert.notEqual(path.resolve(file).toLowerCase(),path.resolve(hostFile).toLowerCase(),'the spec does not open the host registry');
+  const registry=openMachine();
+  t.after(()=>registry.close());
+  assert.equal(registry.live,false,'the inherited registry is treated as test state regardless of its location');
+  const child=spawnSync(process.execPath,['--input-type=module','-e',`import {machineFileFor,openMachine,TEST_REGISTRY_ENV} from ${JSON.stringify(machineDb)};const m=openMachine();process.stdout.write(JSON.stringify({file:machineFileFor(),explicit:process.env[TEST_REGISTRY_ENV]??null,live:m.live}));m.close();`],{encoding:'utf8',env:{...process.env}});
   assert.equal(child.status,0,child.stderr);
-  assert.ok(isUnderTempDir(child.stdout),`spawned ${child.stdout}`);
+  assert.deepEqual(JSON.parse(child.stdout),{file,explicit:explicit??null,live:false},'the child resolves the same isolated registry');
 });
 
 test('npm test and the land gate load the per-run registry preload',t=>{
   const pkg=JSON.parse(fs.readFileSync(path.join(runtimeRoot,'package.json'),'utf8'));
   assert.match(pkg.scripts.test,/--import \.\/tests\/setup\/isolated-temp\.mjs --import \.\/tests\/setup\/isolated-registry\.mjs --import \.\/tests\/setup\/runtime-copies\.mjs --test /,'the temp-root guard loads first so the per-run registry lands inside it');
   const probeRoot=tempWorld(t),landProbe=path.join(probeRoot,'land-registry.spec.mjs');
-  fs.writeFileSync(landProbe,`import assert from 'node:assert/strict';import test from 'node:test';test('land preload',()=>assert.ok(process.env.${TEST_REGISTRY_ENV}?.endsWith('machine.sqlite')));\n`);
-  const landed=runSpecFiles({dir:runtimeRoot,files:[landProbe],concurrency:1});
+  const preload=path.join(probeRoot,'tests','setup','isolated-registry.mjs');
+  fs.mkdirSync(path.dirname(preload),{recursive:true});
+  const ownedPreload=pathToFileURL(path.join(runtimeRoot,'tests','setup','isolated-registry.mjs')).href;
+  fs.writeFileSync(preload,`import ${JSON.stringify(ownedPreload)};process.env.STARCI_REGISTRY_PRELOAD_PROBE='loaded';\n`);
+  fs.writeFileSync(landProbe,`import assert from 'node:assert/strict';import test from 'node:test';test('land preload',()=>{assert.equal(process.env.STARCI_REGISTRY_PRELOAD_PROBE,'loaded');assert.ok(process.env.${TEST_REGISTRY_ENV}?.endsWith('machine.sqlite'));});\n`);
+  // Exercise the real land runner and registry preload in a tree with no generated runtime copies to write.
+  const landed=runSpecFiles({dir:probeRoot,files:[landProbe],concurrency:1});
   assert.equal(landed.ok,true,landed.stderr||landed.stdout);
   const probe=spawnSync(process.execPath,['--import',pathToFileURL(path.join(runtimeRoot,'tests','setup','isolated-registry.mjs')).href,'-e',`process.stdout.write(process.env.${TEST_REGISTRY_ENV})`],
     {encoding:'utf8',env:Object.fromEntries(Object.entries(process.env).filter(([key])=>key!==TEST_REGISTRY_ENV&&key!=='NODE_TEST_CONTEXT'))});

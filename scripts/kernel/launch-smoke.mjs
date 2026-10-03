@@ -25,7 +25,7 @@
 //                      the host-side controller must then remove it (gone from `orca worktree list`, its directory and
 //                      branch gone); only then main's checkout holds exactly the two green files more, every other file unchanged.
 //
-// Every agent is a no-op on the cheapest model modules/models/registry.yaml pins (priced by its models.<id>.price):
+// Every agent is a no-op on a priced model meeting its role floor; the Critic uses the independent draw-loop route:
 // a leaf writes its result line (`mark`; an op also writes its owned file in the workflow worktree) and reports
 // worker_done; a parent first runs its `stage` (which starts its children from the parent's own terminal, the way the
 // runtime does) and then does the same. The smoke reads each worker back (worker-read), checks the depth and the creator
@@ -52,8 +52,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runtimeProfile } from '../../engine/config.mjs';
-import { loadPrices, priceOf } from '../lib/llm-usage.mjs';
+import { noopAgent, smokeCriticOf } from './launch-smoke-models.mjs';
+export { noopAgent } from './launch-smoke-models.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { show as gitShow } from '../api/git/show.mjs'; import { branchList } from '../api/git/branch-list.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs'; import { gitResultOf } from '../lib/git.mjs';
@@ -95,25 +95,6 @@ const CLEANUP_ORDER = Object.freeze(['critic', 'op', 'opFe', 'opFail', 'worker',
 const SETTLED_STATUS = new Set(['completed', 'succeeded', 'failed', 'cancelled']);
 const ENDED_STATE = new Set(['done', 'completed', 'succeeded', 'failed', 'stopped', 'released', 'exited']);
 const GREEN_STATUS = new Set(['completed', 'succeeded']);
-const TIER_ORDER = ['easy', 'medium', 'hard', 'insane'];
-
-/**
- * The no-op agent: the cheapest model a registry.yaml pool pins at any tier (input + output list price per 1M tokens;
- * an unpriced model is never picked), with that tier's effort. {provider, model, effort, pool, tier, usdPerMTok} | {error}.
- */
-export function noopAgent({ runtimes = runtimeProfile(), prices = loadPrices() } = {}) {
-  const found = [];
-  for (const [pool, def] of Object.entries(runtimes?.runtimes ?? {})) {
-    for (const [tier, model] of Object.entries(def?.models ?? {})) {
-      const price = priceOf(model, prices);
-      if (!price || !Number.isFinite(Number(price.input)) || !Number.isFinite(Number(price.output)) || price.input == null || price.output == null) continue;
-      found.push({ provider: def.provider, model, effort: def.effort?.[tier] ?? null, pool, tier, usdPerMTok: Number(price.input) + Number(price.output) });
-    }
-  }
-  const rank = (t) => { const i = TIER_ORDER.indexOf(t); return i < 0 ? TIER_ORDER.length : i; };
-  found.sort((a, b) => a.usdPerMTok - b.usdPerMTok || rank(a.tier) - rank(b.tier) || a.pool.localeCompare(b.pool));
-  return found[0] ?? { error: 'no registry.yaml pool pins a priced model (modules/models/registry.yaml models.<id>.price)' };
-}
 
 /**
  * The Orca client: the runtime's own launchers, the scripts/api/orca wrappers and the workflow-worktree runtime
@@ -246,12 +227,13 @@ function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script = SCRI
     launched = orca.startWorkerAgent({ route: { agent: noop.provider, model: noop.model, effort: noop.effort }, worktree: root, title, prompt, objective, entry, request, onCreated });
   } else if (role === 'critic') {
     // draw-critic's own placement, in the runtime repository (no op job owns it: the smoke removes it).
-    const placed = orca.criticWorkspace({ repoRoot: root, context: null });
+    const selected = smokeCriticOf(noop);
+    const placed = selected.critic ? orca.criticWorkspace({ repoRoot: root, context: null }) : { ok: false, error: selected.error };
     if (!placed?.ok) {
       launched = { ok: false, step: 'placement', error: `criticWorkspace: ${placed?.error ?? 'no placement'}` };
     } else {
       record({ workspace: placed.dir, workspaceRepo: placed.repoRoot ?? null, workspaceOrcaId: placed.orcaId ?? null, workspaceBranch: placed.branch ?? null });
-      launched = orca.launchCriticWorker({ critic: { provider: noop.provider, model: noop.model, effort: noop.effort }, dir: placed.dir, prompt, entry });
+      launched = orca.launchCriticWorker({ critic: selected.critic, dir: placed.dir, prompt, entry });
     }
   } else if (role === 'kernel') {
     // The workflow worktree exists before the Kernel starts (ensureWorkflowWorktree): an existing tree takes launch trust.

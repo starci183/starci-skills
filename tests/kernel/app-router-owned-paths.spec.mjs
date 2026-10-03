@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
-import {inspectLedger,ledgerFileFor,openLedger,reserveTwoPhase} from '../../engine/db/ledger.mjs';
+import {inspectLedger,ledgerFileFor,reserveTwoPhase} from '../../engine/db/ledger.mjs';
 import {isGlobSegment,normalizeOwnedPath,normalizeOwnedPaths,ownedPathLeaseRequests,ownedPathsIntersect,ownedPathspec} from '../../engine/admission.mjs';
 import {ownedPathEffects} from '../../scripts/kernel/owned-path-effects.mjs';
 import {resolveReadPath} from '../../scripts/kernel/prerequisites.mjs';
@@ -160,11 +160,9 @@ test('prerequisites bind a placeholder to an App Router owned path; report files
 
 /* ------------------------------------------------ api end to end: enqueue -> dispatch -> settle */
 
-const apiFixture=t=>{
-  const root=tempDir(t,'starci-approuter-api-');
+const apiFixture=t=>withLedger(t,({root,repoRoot:repo,ledger,ledgerFile})=>{
   // The spawned api mints the attempt scratch under STARCI_TEST_TEMP_DIR (inherited env); this fixture owns its removal.
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');
   routeCheckout(repo);
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,
@@ -175,20 +173,15 @@ const apiFixture=t=>{
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     // Two dispatches in one workflow need distinct handles: op_attempts keys (workflow_id,dispatch_id).
     STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',
-    LOCALAPPDATA:path.join(root,'localappdata'),
   };
   const run=(...args)=>spawnSync(process.execPath,[API,...placeOnRepo(args,repo),'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
-  // The spawned api resolves the ledger under ITS env's projects root (LOCALAPPDATA), not the test process's.
-  const ledgerFile=ledgerFileFor(repo,{env});
-  const ledger=openLedger({file:ledgerFile});
-  try{
-    // A unit belongs to an approved goal revision; the goal's opChain carries the leg's granted paths.
-    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'queued',job:'app router routes'},
-      goal:{revision:1,markdown:'# goal',json:{opChain:{legs:[{op:OP,paths:['src/']}]}}}});
-  }finally{ledger.close();}
+  assert.equal(ledgerFileFor(repo,{env}),ledgerFile,'the child API resolves the fixture-owned project ledger');
+  // A unit belongs to an approved goal revision; the goal's opChain carries the leg's granted paths.
+  seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'queued',job:'app router routes'},
+    goal:{revision:1,markdown:'# goal',json:{opChain:{legs:[{op:OP,paths:['src/']}]}}}});
   const inspect=fn=>{const l=inspectLedger({file:ledgerFile});try{return fn(l.db);}finally{l.close();}};
   return {root,repo,env,run,inspect};
-};
+});
 const leading=stdout=>{
   const open=stdout.indexOf('{'),close=stdout.indexOf('\n}');
   return JSON.parse(close<0?stdout.slice(open):stdout.slice(open,close+2));

@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { closeWorker, survivorsOf, terminalTree } from '../../scripts/machine/worker-close.mjs';
+import { closeWorker, survivorsOf, terminalTree, workerClosureProven, workerExitProven } from '../../scripts/machine/worker-close.mjs';
 import { processEnv } from '../../scripts/api/process/process-env.mjs';
 
 const HANDLE = 'term_worker_1';
@@ -59,6 +59,21 @@ test('a worker stopped first: stop, release, then close, in that order', () => {
   const out = closeWorker({ dispatch: DISPATCH, stopFirst: true, deps: w.deps, env: {} });
   assert.deepEqual(w.calls.filter((c) => !c.startsWith('log')), ['show', 'stop', 'release', `close:${HANDLE}`]);
   assert.equal(out.stop.ok, true);
+});
+
+test('physical exit proof keeps refused release bookkeeping separate and rejects uncertain or mismatched closure', () => {
+  const w = world({ releaseOk: false });
+  const out = closeWorker({ dispatch: DISPATCH, deps: w.deps, env: {} });
+  assert.equal(out.ok, false);
+  assert.equal(workerExitProven(out, HANDLE), true);
+  assert.equal(workerClosureProven(out, HANDLE), false);
+  for (const receipt of [
+    { ...out, handle: 'another-terminal' },
+    { ...out, closed: { ok: true, proof: null } },
+    { ...out, closed: { ok: false, proof: 'gone' } },
+    { ...out, processes: { verdict: 'unverifiable' } },
+    { ...out, processes: { verdict: 'survived' } },
+  ]) assert.equal(workerExitProven(receipt, HANDLE), false);
 });
 
 test('a process of the closed terminal that survives is stopped by its pid, re-verified, and the outcome stays the release\'s', () => {

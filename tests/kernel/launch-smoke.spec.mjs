@@ -13,6 +13,8 @@ import { launchCriticWorker } from '../../scripts/work/draw-critic.mjs';
 import { runGit } from '../../scripts/api/git/lib.mjs';
 import { gitResultOf } from '../../scripts/lib/git.mjs';
 import { buildAppFixture } from '../helpers/app-fixture.mjs';
+import { fakeAdmission } from '../helpers/fake-admission.mjs';
+import { runtimeProfile } from '../../engine/config.mjs';
 
 const gitResult = (args, options) => gitResultOf(runGit(args, options));
 
@@ -132,6 +134,7 @@ function fakeWorkflowRuntime(tmp, { sameSideConcurrent = false, finishTouchesMai
 
 function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, unlisted = false, controllerStuck = false, runtime = {} } = {}) {
   const calls = [];
+  const admission = fakeAdmission(), criticLaunches = [];
   const tasks = new Map();
   const workers = new Map();
   const byTerminal = new Map();
@@ -144,6 +147,8 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
   const rec = (name, fn) => (args = {}) => { calls.push([name, args]); return fn(args); };
   const placements = new Map();
   const wrappers = {
+    admission,
+    workerList: () => ({ ok: true, workers: [...workers.values()].map((worker) => ({ dispatchId: worker.id, agentTerminalHandle: worker.terminal })) }),
     runShow: rec('run-show', () => ({ ok: false })),
     runCreate: rec('run-create', ({ from }) => { runs += 1; return { ok: true, runId: `run_${runs}`, from }; }),
     trust: rec('trust', () => ({ status: 'already', paths: [] })),
@@ -178,7 +183,7 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
     taskUpdate: rec('task-update', ({ id, status }) => ({ ok: true, taskId: id, status })),
     worktreeList: rec('worktree-list', () => ({ ok: true, worktrees: [...wfr.listed.values()] })),
   };
-  const io = { runShow: wrappers.runShow, runCreate: wrappers.runCreate,
+  const io = { admission, workerList: wrappers.workerList, runShow: wrappers.runShow, runCreate: wrappers.runCreate,
     spawn: { trust: wrappers.trust, start: wrappers.workerStart, rename: wrappers.terminalRename,
       show: wrappers.workerShow, stop: wrappers.workerStop, release: wrappers.workerRelease } };
   const launches = [];
@@ -203,7 +208,7 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
       fs.rmSync(dir, { recursive: true, force: true });
       return { ok: true };
     }),
-    launchCriticWorker: (opts) => launchCriticWorker({ ...opts, orca: { ...wrappers } }),
+    launchCriticWorker: (opts) => { criticLaunches.push(opts); return launchCriticWorker({ ...opts, orca: { ...wrappers } }); },
     workerShow: wrappers.workerShow, workerRead: wrappers.workerRead, workerStop: wrappers.workerStop,
     // The runtime's one close path (scripts/machine/worker-close.mjs closeWorker) repeats a refused release once on `retryRelease`: so does this stand-in.
     workerRelease: (opts) => { const first = wrappers.workerRelease(opts); if (!opts.retryRelease || first?.ok === true) return first; const again = wrappers.workerRelease(opts); return { ...again, retryRelease: again }; },
@@ -230,11 +235,11 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
       if (row.releasePending && !controllerStuck && [...workers.values()].every((w) => w.released)) wfr.workflow.release({ controller: true }, row.workflowId);
     }
   };
-  return { client, calls, workers, tmp, app, wfr, launches, placements, tick, names: () => calls.map((c) => c[0]) };
+  return { client, calls, workers, tmp, app, wfr, launches, criticLaunches, placements, tick, names: () => calls.map((c) => c[0]) };
 }
 
 const clock = (fake) => { let now = 0; return { now: () => now, sleep: async (ms) => { now += ms; await fake.tick(); } }; };
-const noop = { provider: 'codex', model: 'gpt-6-luna', effort: 'low' };
+const noop = { provider: 'codex', model: 'gpt-6.1-sol', effort: 'low' };
 const smoke = (fake, extra = {}) => runSmoke({ entry: 'term_entry', orca: fake.client, appRepo: fake.app, noop, stateRoot: fake.tmp, root: fake.tmp,
   pollMs: 1000, timeoutMs: 60000, workflowId: 'smoke-t', ...clock(fake), ...extra });
 
@@ -263,13 +268,18 @@ test('every nesting path starts through the runtime launchers at the depth Orca 
   assert.deepEqual(r.paths['workflow-worktree'], { status: 'ok', depths: { kernel: 1, op: 2, opFe: 2, opFail: 2 } });
   const starts = fake.calls.filter((c) => c[0] === 'worker-start').map((c) => c[1]);
   assert.equal(starts.length, 7, 'one worker-start per agent');
-  for (const s of starts) assert.deepEqual([s.agent, s.model, s.effort], ['codex', 'gpt-6-luna', 'low'], 'every no-op agent runs the cheapest model');
+  for (const s of starts.filter((start) => titleRole(start.displayName) !== 'critic'))
+    assert.deepEqual([s.agent, s.model, s.effort], [noop.provider, noop.model, noop.effort], 'every control-plane no-op attests the qualifying route');
   const startOf = (role) => starts.find((s) => fake.workers.get(`ctx_${role}`).task === `task_${titleRole(s.displayName)}`);
   assert.equal(startOf('supervisor').from, 'term_entry');
   assert.equal(startOf('kernel').from, 'term_entry');
   assert.equal(startOf('worker').from, 'term_supervisor', 'the [Worker] is started from the Supervisor terminal, in its Run');
   for (const op of ['op', 'opFe', 'opFail']) assert.equal(startOf(op).from, 'term_kernel', `${op} is started from the Kernel terminal (worker-start --spec --run --from)`);
   assert.equal(startOf('critic').from, 'term_op', 'the critic is started from the Op terminal');
+  const critic = fake.criticLaunches[0].critic;
+  assert.deepEqual([critic.author.provider, critic.author.model], [noop.provider, noop.model], 'the actual Op route supplies the Critic author');
+  assert.notEqual(critic.provider, noop.provider, 'the Critic remains independent by provider');
+  assert.deepEqual([startOf('critic').agent, startOf('critic').model, startOf('critic').effort], [critic.provider, critic.model, critic.effort]);
   const runFroms = fake.calls.filter((c) => c[0] === 'run-create').map((c) => c[1].from).sort();
   assert.deepEqual(runFroms, ['term_entry', 'term_entry', 'term_kernel', 'term_kernel', 'term_kernel', 'term_op', 'term_supervisor'], 'each parent creates and coordinates the Run of its child');
   assert.equal(fake.calls.some(([n]) => n === 'task-create' || n === 'dispatch-show'), false, 'worker-start --spec files every Task: no task-create, no dispatch-show');
@@ -471,16 +481,20 @@ test('a stage refuses to start a child from a terminal that is not the one launc
   assert.equal(fake.names().includes('worker-start'), false);
 });
 
-test('the no-op agent is the cheapest priced model a registry.yaml pool pins, with that tier effort', () => {
-  const runtimes = { runtimes: {
+test('the no-op agent is the cheapest priced model meeting the real role floors, with that tier effort', () => {
+  const runtimes = { ...runtimeProfile(), models: { big: { tier: 'frontier' }, mid: { tier: 'standard' }, small: { tier: 'economy' }, unpriced: { tier: 'standard' } }, runtimes: {
     a: { provider: 'claude', models: { easy: 'big', hard: 'big' } },
     b: { provider: 'codex', models: { easy: 'small', hard: 'mid' }, effort: { easy: 'low', hard: 'high' } },
     c: { provider: 'devin', models: { medium: 'unpriced' } } } };
   const prices = { models: { big: { input: 4, output: 20 }, mid: { input: 2, output: 10 }, small: { input: 0.1, output: 0.5 }, unpriced: { input: null, output: null } } };
-  assert.deepEqual(noopAgent({ runtimes, prices }), { provider: 'codex', model: 'small', effort: 'low', pool: 'b', tier: 'easy', usdPerMTok: 0.6 });
-  assert.match(noopAgent({ runtimes: { runtimes: { c: runtimes.runtimes.c } }, prices }).error, /no registry\.yaml pool pins a priced model/);
+  assert.deepEqual(noopAgent({ runtimes, prices }), { provider: 'codex', model: 'mid', effort: 'high', pool: 'b', tier: 'hard', usdPerMTok: 12 });
+  assert.match(noopAgent({ runtimes: { ...runtimes, runtimes: { c: runtimes.runtimes.c } }, prices }).error, /no registry\.yaml pool pins a priced model/);
+  const raised = structuredClone(runtimes);
+  raised.allocation.admission.roles.worker.qualityFloor = 'frontier';
+  assert.equal(noopAgent({ runtimes: raised, prices }).model, 'big', 'the declared role floor controls the cheapest permitted model');
   const live = noopAgent();
   assert.ok(live.provider && live.model, 'the shipped registry.yaml has a priced no-op model');
+  assert.notEqual(runtimeProfile().models[live.model].tier, 'economy', 'the default smoke cannot launch below its control-plane floor');
 });
 
 test('a parent spec runs its stage then worker_done; a leaf spec marks its line then worker_done', () => {

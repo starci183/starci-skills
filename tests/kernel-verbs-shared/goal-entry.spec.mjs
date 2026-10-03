@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -7,10 +7,23 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {JOB_ROW} from '../../scripts/machine/job-row.mjs';
+import {openMachine} from '../../engine/db/machine.mjs';
+import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
 const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
+const ENTRY_ROOT=fs.mkdtempSync(path.join(os.tmpdir(),'starci-goal-'));
+after(()=>fs.rmSync(ENTRY_ROOT,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+const ENTRY_HOST=path.join(ENTRY_ROOT,'fake-orca.mjs');fs.writeFileSync(ENTRY_HOST,FAKE_ORCA);
+const ENTRY_OWNER=path.join(ENTRY_ROOT,'owner');fs.mkdirSync(ENTRY_OWNER);
+fs.copyFileSync(path.join(ROOT,'config.example.yaml'),path.join(ENTRY_OWNER,'config.yaml'));
+Object.assign(process.env,{STARCI_TEST_MACHINE_FILE:path.join(ENTRY_ROOT,'machine.sqlite'),
+  STARCI_PROJECTS_ROOT:path.join(ENTRY_ROOT,'projects'),STARCI_OWNER_ROOT:ENTRY_OWNER,
+  APPDATA:path.join(ENTRY_ROOT,'appdata'),
+  STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([ENTRY_HOST]),
+  STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_STATE:path.join(ENTRY_ROOT,'state.json')});
+const entryMachine=openMachine({file:process.env.STARCI_TEST_MACHINE_FILE});entryMachine.close();
 // Lane k7: the owner->goal->kernel entry path. define-goal queues (workflows +
 // goals rev 0 + pending inbox row); start-workflow claims. --plan on either is
 // read-only by contract (modules/goal/define-goal.yaml, modules/kernel/

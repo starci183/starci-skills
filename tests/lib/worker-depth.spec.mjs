@@ -14,6 +14,7 @@ import { guardsRoot } from '../../scripts/guards/guards-root.mjs';
 import { depthItems } from '../../scripts/reconciler/depth-items.mjs';
 import { DEFAULT_RUBRIC, runCritic } from '../../scripts/work/draw-critic.mjs';
 import { fakeCriticOrca } from '../helpers/fake-critic-orca.mjs';
+import { fakeAdmission } from '../helpers/fake-admission.mjs';
 import { spawnSync } from 'node:child_process';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { openLedger, inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
@@ -63,17 +64,18 @@ test('depth arithmetic: chat-rooted launches are depth 1, a nested one its paren
 const fakeSpawnIo = (parentDepth, calls = []) => {
   const rec = (name, fn) => (a = {}) => { calls.push(name); return fn(a); };
   return { calls, io: {
+    admission: fakeAdmission(),
     trust: rec('trust', () => ({ status: 'ok', paths: [] })),
     start: rec('worker-start', () => ({ ok: true, outcome: 'ok', dispatchId: 'ctx_child', taskId: 'task_1', agentTerminalHandle: 'term_child' })),
     rename: rec('terminal-rename', () => ({ ok: true })),
     show: rec('worker-show', ({ dispatch }) => dispatch === 'ctx_parent'
       ? (parentDepth == null ? { ok: false, error: 'host unavailable' } : { ok: true, dispatch: { depth: parentDepth } })
-      : { ok: true, state: 'ready', dispatch: { depth: (parentDepth ?? 0) + 1 }, effective: { agent: 'claude', model: 'claude-opus-4-7' } }),
+      : { ok: true, state: 'ready', dispatch: { depth: (parentDepth ?? 0) + 1 }, effective: { agent: 'claude', model: 'claude-opus-5-5' } }),
     stop: rec('worker-stop', () => ({ ok: true })),
     release: rec('worker-release', () => ({ ok: true })),
   } };
 };
-const launch = (io, extra = {}) => spawnAgent({ provider: 'claude', model: 'claude-opus-4-7', worktree: ROOT, title: '[Op] depth', spec: 'judge', run: 'run_1', request: { job: 'depth' },
+const launch = (io, extra = {}) => spawnAgent({ provider: 'claude', model: 'claude-opus-5-5', worktree: ROOT, title: '[Op] depth', spec: 'judge', run: 'run_1', request: { job: 'depth' },
   parentDispatch: 'ctx_parent', io, ...extra });
 
 test('spawnAgent refuses a worker nested past orca.maxWorkerDepth before anything is trusted or started', () => {
@@ -105,7 +107,7 @@ test('startAgent refuses before its Run and Task exist, so a refused launch leav
   const calls = [];
   const { io } = fakeSpawnIo(4, calls);
   const rec = (name) => () => { calls.push(name); return { ok: true, runId: 'run_x', taskId: 'task_x' }; };
-  const r = startAgent({ provider: 'claude', model: 'claude-opus-4-7', worktree: ROOT, title: '[Critic] depth', prompt: 'judge', objective: 'depth', request: { critic: 'depth' },
+  const r = startAgent({ provider: 'claude', model: 'claude-opus-5-5', worktree: ROOT, title: '[Critic] depth', prompt: 'judge', objective: 'depth', request: { critic: 'depth' },
     parentDispatch: 'ctx_parent', maxDepth: 4, io: { runShow: rec('run-show'), runCreate: rec('run-create'), spawn: io } });
   assert.equal(r.step, 'depth');
   assert.equal(r.errorCode, 'worker-depth-exceeded');
@@ -124,7 +126,7 @@ test('the draw critic nests under its op: an op already at the deepest depth get
   // The op's Dispatch sits at the ceiling of any valid orca.maxWorkerDepth, so its critic is always one too deep.
   orca.workerShow = (a) => (a?.dispatch === 'ctx_op' ? (orca.calls.push(['worker-show', a]), { ok: true, dispatch: { depth: 16 } }) : show(a));
   const critique = await runCritic({ images: [{ path: png, label: 'd' }], html, rubric: DEFAULT_RUBRIC,
-    critic: { provider: 'claude', model: 'claude-opus-4-7', timeoutMs: 1000 }, orca, placement: { tmpRoot: tmp }, parentDispatch: 'ctx_op', entry: 'term_op' });
+    critic: { provider: 'claude', model: 'claude-opus-5-5', author: { provider: 'codex', model: 'gpt-6.1-sol' }, timeoutMs: 1000 }, orca, placement: { tmpRoot: tmp }, parentDispatch: 'ctx_op', entry: 'term_op' });
   assert.equal(critique.outcome, 'launch-failed');
   assert.match(critique.error, /\(depth worker-depth-exceeded\)/);
   for (const name of ['run-create', 'task-create', 'worker-start']) assert.equal(orca.names().includes(name), false, `${name} never ran`);
@@ -236,7 +238,7 @@ test('a launching terminal that is itself a worker maps to its Dispatch through 
   const calls = [];
   const { io } = fakeSpawnIo(4, calls);
   const rec = (name, out) => () => { calls.push(name); return out; };
-  const refused = startAgent({ provider: 'claude', model: 'claude-opus-4-7', worktree: ROOT, title: '[Kernel] depth', prompt: 'x', objective: 'depth', request: { kernel: 'depth' },
+  const refused = startAgent({ provider: 'claude', model: 'claude-opus-5-5', worktree: ROOT, title: '[Kernel] depth', prompt: 'x', objective: 'depth', request: { kernel: 'depth' },
     entry: 'term_parent', maxDepth: 4, io: { runShow: rec('run-show', { ok: false }), runCreate: rec('run-create', { ok: true, runId: 'r' }),
       workerList: rec('worker-list', { ok: true, workers: [{ dispatchId: 'ctx_parent', resource: { terminalHandle: 'term_parent' } }] }), spawn: io } });
   assert.equal(refused.step, 'depth');

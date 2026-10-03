@@ -251,12 +251,15 @@ function envelopeOf(verb, entry, { r, receipt }, request = null, override = null
   };
 }
 
-/** request-show for one id: its state (completed | pending | absent) or null when Orca gave no readable answer. */
-export function requestStateOf(id) {
-  const entry = entryOf('request-show');
-  const { receipt } = issue('request-show', entry, buildArgv('request-show', entry, { request: id }));
-  const state = receipt?.result?.state;
-  return ['completed', 'pending', 'absent'].includes(state) ? state : null;
+/** The declared request state from a successful read envelope, else null. */
+export function requestStateFrom(envelope) {
+  const state = envelope?.result?.state;
+  return envelope?.outcome === 'ok' && entryOf('request-show').allowedValues.state.includes(state) ? state : null;
+}
+
+/** request-show for one id, through the same declared read as its public wrapper. */
+function requestStateOf(id) {
+  return requestStateFrom(orcaCall('request-show', { request: id }));
 }
 
 /**

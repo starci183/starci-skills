@@ -57,11 +57,14 @@ const rootsOf = (survivors) => survivors.filter((s) => !survivors.some((o) => o.
 
 const members = (list) => list.map((m) => ({ pid: m.pid, name: m.name ?? null }));
 
-/** The exact worker terminal and its captured process tree are affirmatively closed. Pure. */
-export const workerClosureProven = (receipt, handle) => Boolean(handle) && receipt?.ok === true
-  && receipt.handle === handle && receipt.closed?.ok === true
+/** The exact worker terminal and its captured process tree have ended, independently of release bookkeeping. Pure. */
+export const workerExitProven = (receipt, handle) => Boolean(handle)
+  && receipt?.handle === handle && receipt.closed?.ok === true
   && ['gone', 'disconnected'].includes(receipt.closed.proof)
   && ['none', 'stopped'].includes(receipt.processes?.verdict);
+
+/** The worker's release succeeded and its exact terminal and process tree have ended. Pure. */
+export const workerClosureProven = (receipt, handle) => receipt?.ok === true && workerExitProven(receipt, handle);
 
 /** Wait for every process of `tree` to end: {gone, table, left[]} or {unreadable}. */
 function waitGone(tree, { read, sleep, ms, pollMs }) {

@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { hostAgentVerdict, orcaSettingsFile, modelsOfProvider } from '../../scripts/agent/host-agents.mjs';
 import { spawnAgent } from '../../scripts/agent/lib.mjs';
+import { fakeAdmission } from '../helpers/fake-admission.mjs';
 
 // The host-agent preflight: an agent the host does not enable (Orca settings), cannot run (binary missing) or a model nobody
 // declares is refused before any trust or worker-start. The specs use a FAKE agent, `ghost-agent`, and a temp Orca userData.
@@ -76,7 +77,7 @@ test('spawnAgent refuses before trust and worker-start, and starts when the host
   const calls = [];
   const rec = (name, out) => () => { calls.push(name); return out; };
   const base = { provider: 'claude', model: 'claude-opus-5-5', worktree: 'x', title: 't', spec: 's', run: 'run_1', request: { a: 1 } };
-  const io = (hostAgent) => ({ hostAgent, trust: rec('trust', { status: 'ok', paths: [] }), start: rec('worker-start', { ok: true, outcome: 'ok', dispatchId: 'd1', taskId: 't1', agentTerminalHandle: 'term' }),
+  const io = (hostAgent) => ({ admission: fakeAdmission(), hostAgent, trust: rec('trust', { status: 'ok', paths: [] }), start: rec('worker-start', { ok: true, outcome: 'ok', dispatchId: 'd1', taskId: 't1', agentTerminalHandle: 'term' }),
     rename: rec('rename', { ok: true }), show: rec('show', { ok: true, state: 'ready', dispatch: { depth: 1 }, effective: { agent: 'claude', model: 'claude-opus-5-5' } }) });
   const refused = spawnAgent({ ...base, io: io(() => ({ ok: false, code: 'agent-disabled-on-host', error: 'ghost' })) });
   assert.deepEqual([refused.ok, refused.step, refused.code, refused.effectState], [false, 'host-agent', 'agent-disabled-on-host', 'none']);

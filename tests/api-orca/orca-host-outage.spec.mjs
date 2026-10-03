@@ -83,7 +83,10 @@ const createFixture=()=>{
   fs.writeFileSync(fake,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,
-    STARCI_HOST_WAIT_MS:'0',STARCI_KERNEL_DEATH_SETTLE_MS:'0',LOCALAPPDATA:path.join(root,'localappdata')};
+    STARCI_HOST_WAIT_MS:'0',STARCI_KERNEL_DEATH_SETTLE_MS:'0',LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_PROJECTS_ROOT:path.join(root,'projects')};
+  const closureImport=`data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});`)}`;
+  env.NODE_OPTIONS=[env.NODE_OPTIONS,`--import=${closureImport}`].filter(Boolean).join(' ');
   const run=(script,args,more={})=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...more}});
   const calls=()=>fs.existsSync(log)?fs.readFileSync(log,'utf8').trim().split('\n').filter(Boolean).map(l=>json(l).argv.slice(0,2).join(' ')):[];
   const readState=()=>json(fs.readFileSync(state,'utf8'));
@@ -105,6 +108,8 @@ const createFixture=()=>{
   if(fs.existsSync(log))fs.copyFileSync(log,path.join(baseline,'calls.jsonl'));
   const ledgerFile=ledgerFileFor(repo,{env});
   fs.copyFileSync(ledgerFile,path.join(baseline,'runtime.sqlite'));
+  for(const suffix of ['','-wal','-shm'])if(fs.existsSync(`${env.STARCI_TEST_MACHINE_FILE}${suffix}`))
+    fs.copyFileSync(`${env.STARCI_TEST_MACHINE_FILE}${suffix}`,path.join(baseline,`machine.sqlite${suffix}`));
   const reset=()=>{
     for(const name of ['repo','owner']){
       fs.rmSync(path.join(root,name),{recursive:true,force:true,maxRetries:20,retryDelay:25});
@@ -115,6 +120,11 @@ const createFixture=()=>{
     if(fs.existsSync(baselineLog))fs.copyFileSync(baselineLog,log);else fs.rmSync(log,{force:true});
     for(const suffix of ['','-wal','-shm'])fs.rmSync(`${ledgerFile}${suffix}`,{force:true});
     fs.copyFileSync(path.join(baseline,'runtime.sqlite'),ledgerFile);
+    for(const suffix of ['','-wal','-shm']){
+      fs.rmSync(`${env.STARCI_TEST_MACHINE_FILE}${suffix}`,{force:true});
+      const saved=path.join(baseline,`machine.sqlite${suffix}`);
+      if(fs.existsSync(saved))fs.copyFileSync(saved,`${env.STARCI_TEST_MACHINE_FILE}${suffix}`);
+    }
   };
   const ledgerRows=()=>{
     // The spawned verbs resolve the ledger under the fixture's LOCALAPPDATA; the
@@ -236,12 +246,32 @@ test('watchdog: a kernel a responding Orca proves dead is fenced and replaced',t
   const f=fixture(t);
   f.writeState(s=>{s.terminals[f.kernel].connected=false;s.terminals[f.kernel].writable=false;});
   const {status,result,stderr}=tick(f);
-  assert.equal(status,0,stderr||JSON.stringify(result));
+  t.diagnostic(JSON.stringify({status,result,stderr}));
+  assert.equal(status,0,JSON.stringify({status,result,stderr}));
   assert.equal(result.action,'restarted',JSON.stringify(result));
   assert.equal(result.fenced?.ok,true,'the dead Kernel\'s Dispatch is stopped and released before the replacement');
+  assert.equal(result.fenced?.handle,f.kernel);
+  assert.equal(result.fenced?.closed?.ok,true);
+  assert.ok(['gone','disconnected'].includes(result.fenced?.closed?.proof),JSON.stringify(result.fenced));
+  assert.equal(result.fenced?.processes?.verdict,'none',JSON.stringify(result.fenced));
   assert.notEqual(result.replacementTerminal,f.kernel);
   const rows=f.ledgerRows();
   assert.deepEqual([rows.job.status,rows.job.worker_id,rows.job.attempt],['running',result.replacementTerminal,2]);
+});
+
+test('watchdog: an unproven process tree retains the disconnected Kernel singleton',t=>{
+  const f=fixture(t),starts=f.calls().filter(c=>c==='orchestration worker-start').length;
+  f.writeState(s=>{s.terminals[f.kernel].connected=false;s.terminals[f.kernel].writable=false;});
+  const {status,result,stderr}=tick(f,{STARCI_FAKE_CLOSURE_UNPROVEN:'1'});
+  t.diagnostic(JSON.stringify({status,result,stderr}));
+  assert.equal(status,1,JSON.stringify({status,result,stderr}));
+  assert.equal(result.ok,false);
+  assert.equal(result.action,'restart-failed');
+  assert.equal(result.detail?.step,'kernel-stale-terminal-unclosed');
+  assert.equal(result.detail?.effectState,'unknown');
+  assert.equal(result.detail?.closure?.processes?.verdict,'survived',JSON.stringify(result));
+  assert.equal(f.ledgerRows().signal.terminal,f.kernel);
+  assert.equal(f.calls().filter(c=>c==='orchestration worker-start').length,starts,'no worker beside an unproven process tree');
 });
 
 /* ------------------------------------------------ kernel agent exited */
@@ -259,9 +289,14 @@ test('watchdog: a kernel whose agent exited to a shell is fenced and replaced by
   const f=fixture(t);
   exitKernel(f);
   const {status,result,stderr}=tick(f);
-  assert.equal(status,0,stderr||JSON.stringify(result));
+  t.diagnostic(JSON.stringify({status,result,stderr}));
+  assert.equal(status,0,JSON.stringify({status,result,stderr}));
   assert.deepEqual([result.action,result.state,result.shellPrompt],['restarted','agent-exited',`PS ${path.join(os.tmpdir(), 'shop-be')}>`],JSON.stringify(result));
   assert.equal(result.fenced?.ok,true);
+  assert.equal(result.fenced?.handle,f.kernel);
+  assert.equal(result.fenced?.closed?.ok,true);
+  assert.ok(['gone','disconnected'].includes(result.fenced?.closed?.proof),JSON.stringify(result.fenced));
+  assert.equal(result.fenced?.processes?.verdict,'none',JSON.stringify(result.fenced));
   const next=result.replacementTerminal;
   assert.ok(next&&next!==f.kernel);
   assert.equal(f.readState().workerStates['dispatch-fake-1'],'released','the exited Kernel\'s worker is released');

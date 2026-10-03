@@ -223,7 +223,8 @@ test('a circuit opened after planning refuses consumption using the strict canon
 });
 
 test('actual SQLite cleanup binds the positively observed terminal before closure and holds mismatched or uncertain proof', t => {
-  for (const failure of ['missing-task', 'wrong-model', 'show-only', 'wrong-closure', 'unknown-process', 'unproven-terminal', 'contradictory-show']) {
+  for (const custom of [false, true]) {
+  for (const failure of ['missing-task', 'wrong-model', 'show-only', 'retained-exit', 'wrong-closure', 'unknown-process', 'unproven-terminal', 'contradictory-show']) {
     const { env } = isolatedMachine(t), fake = fakeAdmission();
     let cleanups = 0;
     const io = { admission: { quota: fake.quota, circuit: () => null }, runCreate: () => ({ ok: true, runId: 'cleanup-run' }), spawn: {
@@ -237,17 +238,19 @@ test('actual SQLite cleanup binds the positively observed terminal before closur
         const row = providerBudgetUsage('codex', 'default', { env }).reservations[0];
         assert.equal(row.handle, 'cleanup-terminal', 'host closure sees the original fence already bound');
         assert.equal(row.state, 'unknown', 'unattested model is never marked live');
-        return { ok: true, handle: failure === 'wrong-closure' ? 'other-terminal' : handle,
+        return { ok: failure !== 'retained-exit', handle: failure === 'wrong-closure' ? 'other-terminal' : handle,
           closed: { ok: true, proof: failure === 'unproven-terminal' ? null : 'gone' }, processes: { verdict: failure === 'unknown-process' ? 'unverifiable' : 'none' } };
       },
     } };
+    if (custom) io.spawn.cleanup = () => ({ effectState: 'none', release: io.spawn.release({ handle: 'cleanup-terminal' }) });
     const result = startAgent({ provider: 'codex', model: 'gpt-6.1-sol', role: 'worker', env,
       worktree: 'fixture', title: '[Worker] fixture', prompt: 'fixture', objective: 'fixture', request: { attempt: 1 }, io });
     assert.equal(result.ok, false, JSON.stringify({ failure, result }));
-    const proved = ['missing-task', 'wrong-model', 'show-only'].includes(failure);
-    assert.equal(result.effectState, proved ? 'none' : failure === 'contradictory-show' ? 'unknown' : 'partial', JSON.stringify({ failure, result }));
+    const proved = ['missing-task', 'wrong-model', 'show-only'].includes(failure) || (custom && failure === 'retained-exit');
+    assert.equal(result.effectState, proved ? 'none' : custom || failure === 'contradictory-show' ? 'unknown' : 'partial', JSON.stringify({ failure, result }));
     assert.equal(providerBudgetUsage('codex', 'default', { env }).running, proved ? 0 : 1);
     assert.equal(cleanups, failure === 'contradictory-show' ? 0 : 1);
+  }
   }
 });
 

@@ -18,6 +18,7 @@ import { isPendingRow } from '../../scripts/machine/worktree-registry.mjs';
 import { gcWorktrees } from '../../scripts/machine/worktrees.mjs';
 import { workflowWorktreeAt, workflowWorktreeOf } from '../../scripts/machine/workflow-tree.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
+import { fakeAdmission } from '../helpers/fake-admission.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
@@ -303,6 +304,7 @@ test('startAgent threads a new worktree\'s creation flags to worker-start, and n
   const { startAgent } = await import('../../scripts/agent/lib.mjs');
   const starts = [];
   const io = {
+    admission: fakeAdmission(),
     runShow: () => ({ ok: false }), runCreate: () => ({ ok: true, runId: 'run_1' }),
     spawn: {
       trust: () => ({ status: 'skipped', paths: [] }),

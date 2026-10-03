@@ -112,7 +112,7 @@ npm:
     uninstall: {code: RIGHTS_RAW_TOOL, use: starci npm install is the owner-controlled dependency-change path using canon pins}
     test: {code: RIGHTS_RAW_TOOL, use: starci test run --level L1|L2 in the runtime or starci gate unit --root <app> in an app}
     t: {code: RIGHTS_RAW_TOOL, use: starci test run --level L1|L2 in the runtime or starci gate unit --root <app> in an app}
-    run: {code: RIGHTS_RAW_TOOL, use: 'starci test run runs tests; use starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
+    run: {code: RIGHTS_RAW_TOOL, use: 'starci test run runs tests; use starci release sync-runtime for package runtime copies and grammar preparation, or starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
     run-script: {code: RIGHTS_RAW_TOOL, use: 'starci test run runs tests; use starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
     start: {code: RIGHTS_RAW_TOOL, use: 'starci app stack'}
     exec: {code: RIGHTS_RAW_TOOL, use: 'starci check run, starci lint run, starci typecheck run, or starci gate run for that tool'}

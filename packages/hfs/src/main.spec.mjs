@@ -18,7 +18,7 @@ test('the app implementation loads with no installed dependency and refuses a mi
   assert.deepEqual(VERBS, ['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'explain', 'emit', 'new', 'secret', 'hygiene']);
 });
 
-test('global options use cwd, accept only the full edition and keep the three exit classes', async (t) => {
+test('global options use cwd and upgrade refuses a lite target with its typed usage exit', async (t) => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-app-main-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const wanted = path.join(base, 'app');
@@ -29,8 +29,14 @@ test('global options use cwd, accept only the full edition and keep the three ex
   assert.deepEqual(call, { argv: ['status'], cwd: wanted });
   let err = '';
   assert.equal(await main(['upgrade', '--edition', 'lite'], { stderr: (text) => { err += text; } }), 2);
-  assert.match(err, /--edition accepts only full/);
-  assert.equal(await main(['upgrade', '--edition', 'full'], { stdout: () => {} }), 0);
+  assert.match(err, /^HFS_UPGRADE_TARGET_INVALID: .*--edition full\n$/);
+  const declaration = { hfs: 2, kind: 'app', project: 'app', sides: { be: { apps: [{ name: 'core', kind: 'api' }] }, fe: { apps: [{ name: 'landing', kind: 'next' }], reads: ['be/contracts/'] } } };
+  const declared = JSON.stringify(declaration);
+  fs.writeFileSync(path.join(wanted, 'hfs.json'), declared);
+  err = '';
+  assert.equal(await main(['upgrade', '--edition', 'full', '--plan', '--cwd', wanted], { stderr: (text) => { err += text; } }), 2);
+  assert.match(err, /^HFS_UPGRADE_ALREADY_FULL:/);
+  assert.equal(fs.readFileSync(path.join(wanted, 'hfs.json'), 'utf8'), declared);
 });
 
 test('stack refuses with exit 2 and an install hint when the app has no test-world package', async (t) => {

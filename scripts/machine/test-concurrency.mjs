@@ -2,6 +2,8 @@ import os from 'node:os';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { machineLoad, memoryProbe } from './host-resources.mjs';
 
+const UNAVAILABLE_REASON = 'CPU or RAM measurements unavailable';
+
 /** Resolve an explicit file limit or a fresh host budget immediately before the spec process starts. */
 export function resolveTestConcurrency(explicit, deps = {}) {
   if (explicit != null) {
@@ -19,13 +21,13 @@ export function resolveTestConcurrency(explicit, deps = {}) {
     sample = (deps.hostSample ?? (() => ({ ...machineLoad({ sampleMs: policy.sampleMs }),
       ...memoryProbe(), logicalThreads: os.availableParallelism() })))();
   } catch {
-    return { concurrency: 1, mode: 'auto', reason: 'resources-unavailable', sample: null };
+    return { concurrency: 1, mode: 'auto', reason: UNAVAILABLE_REASON, sample: null };
   }
   const { logicalThreads, cpuBusy, totalRamBytes, freeRamBytes } = sample ?? {};
   const resources = { logicalThreads, cpuBusy, totalRamBytes, freeRamBytes };
   if (!Object.values(resources).every(Number.isFinite) || !Number.isSafeInteger(logicalThreads) || logicalThreads < 1
     || cpuBusy < 0 || cpuBusy > 1 || totalRamBytes <= 0 || freeRamBytes < 0 || freeRamBytes > totalRamBytes) {
-    return { concurrency: 1, mode: 'auto', reason: 'resources-unavailable', sample: resources };
+    return { concurrency: 1, mode: 'auto', reason: UNAVAILABLE_REASON, sample: resources };
   }
   const reserveRamBytes = Math.max(policy.minimumReserveGiB * 1024 ** 3, totalRamBytes * policy.reserveRamPct / 100);
   const cpuLimit = Math.max(1, Math.floor(logicalThreads * (1 - cpuBusy) / policy.logicalThreadsPerFile));

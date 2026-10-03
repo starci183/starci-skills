@@ -23,8 +23,16 @@ const FAKE=path.join(FAKE_DIR,'fake-orca.mjs');fs.writeFileSync(FAKE,FAKE_ORCA);
 // after(), not process.on('exit'): the suite's temp-root guard reads the root at 'exit' before any later
 // 'exit' listener could remove this, while a test-runner after-hook has already run by then.
 after(()=>{try{fs.rmSync(FAKE_DIR,{recursive:true,force:true,maxRetries:20,retryDelay:25});}catch{/* a spawned child may still hold it */}});
-const run=(args,cwd=ROOT,env={})=>spawnSync(process.execPath,[ROUTE,...args],{cwd,encoding:'utf8',windowsHide:true,timeout:60000,
-  env:{...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([FAKE]),...env}});
+let runSequence=0;
+const run=(args,cwd=ROOT,env={})=>{
+  const scopedEnv={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([FAKE]),
+    APPDATA:path.join(FAKE_DIR,'appdata'),...env};
+  if(!Object.hasOwn(env,'STARCI_TEST_MACHINE_FILE')){
+    scopedEnv.STARCI_TEST_MACHINE_FILE=path.join(FAKE_DIR,`machine-${++runSequence}.sqlite`);
+    const machine=openMachine({file:scopedEnv.STARCI_TEST_MACHINE_FILE,env:scopedEnv});machine.close();
+  }
+  return spawnSync(process.execPath,[ROUTE,...args],{cwd,encoding:'utf8',windowsHide:true,timeout:60000,env:scopedEnv});
+};
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 
 const fixture=t=>{
@@ -84,16 +92,31 @@ test('the unpinned --risk high kernel route resolves through the sol-think order
   assert.equal(body.availability['codex-agent'].state,'available');
 });
 
-test('Sol limited or dead routes the kernel to Claude Opus 5.5',t=>{
+test('Sol reserve-window or dead quota excludes it from the kernel admission group',t=>{
   const limited=kernelRoute(t,{STARCI_FAKE_ORCA_LIMITED:'codex'});
   assert.equal(limited.r.status,0,limited.r.stderr);
   assert.deepEqual([limited.body.pick.target,limited.body.pick.model],['claude-agent','claude-opus-5-5']);
-  assert.deepEqual(limited.body.fallbackChain.map(f=>f.target),['codex-agent'],'a limited member stays launchable, last');
+  assert.deepEqual(limited.body.fallbackChain,[],'a reserve window cannot authorize an ordinary fallback launch');
+  assert.ok(limited.body.admission.rejected.find(row=>row.provider==='codex').codes.includes('quota-reserved'));
   const dead=kernelRoute(t,{STARCI_FAKE_ORCA_DEAD:'codex'});
   assert.equal(dead.r.status,0,dead.r.stderr);
   assert.deepEqual([dead.body.pick.target,dead.body.pick.model],['claude-agent','claude-opus-5-5']);
   assert.deepEqual(dead.body.fallbackChain,[]);
   assert.match(dead.body.rejected.find(x=>x.target==='codex-agent').reasons[0],/provider codex unavailable: quota probe dead/);
+});
+
+test('actual shared reservations change the fresh kernel admission ranking',t=>{
+  const machineFile=path.join(fixture(t).dir(),'machine.sqlite');
+  const machine=openMachine({file:machineFile});
+  try{
+    for(let slot=0;slot<3;slot++)assert.equal(machine.reserveProvider({provider:'codex',account:'default',
+      model:'gpt-6.1-sol',role:'worker',attemptId:`route-pressure-${slot}`,maxParallel:10}).ok,true);
+  }finally{machine.close();}
+  const {r,body}=kernelRoute(t,{STARCI_TEST_MACHINE_FILE:machineFile});
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  assert.equal(body.pick.target,'claude-agent','the lower admitted-slot pressure wins at equal quota headroom');
+  assert.equal(body.admission.eligible.find(row=>row.provider==='codex').capacity.running,3);
+  assert.equal(body.admission.selected.capacity.running,0);
 });
 
 test('an open provider circuit in the --repo ledger routes the kernel to Claude Opus 5.5',t=>{
@@ -234,13 +257,15 @@ test('the unpinned kernel route resolves to GPT-6.1 Sol',t=>{
   assert.equal(body.workload.work,'think');
 });
 
-test('backend.implement measured medium routes to Devin, and grammar.update at its hard floor starts at Devin',t=>{
+test('operation routes exclude unknown Devin quota and preserve the remaining difficulty pins',t=>{
   const body=pick(t,['--kind','backend.implement','--difficulty','medium']);
-  assert.equal(body.pick.target,'devin-agent');
-  assert.deepEqual(body.fallbackChain.slice(-2).map(f=>f.target),['codex-agent','claude-agent']);
+  assert.deepEqual([body.pick.target,body.pick.model],['codex-agent','gpt-6-luna']);
+  assert.ok(body.admission.rejected.find(row=>row.provider==='devin').codes.includes('quota-unknown'));
+  assert.deepEqual(body.fallbackChain.map(f=>f.target),['claude-agent']);
   const hard=pick(t,['--kind','grammar.update','--difficulty','easy']);
-  assert.deepEqual([hard.pick.target,hard.pick.model],['devin-agent','swe-2-max']);
-  assert.equal(hard.fallbackChain[0]?.target,'codex-agent','Codex follows Devin on the scaffold order');
+  assert.deepEqual([hard.pick.target,hard.pick.model],['codex-agent','gpt-6.1-sol']);
+  assert.ok(hard.admission.rejected.find(row=>row.provider==='devin').codes.includes('quota-unknown'));
+  assert.equal(hard.fallbackChain[0]?.target,'claude-agent');
 });
 
 test('preferredProvider never moves strategy work onto a non-frontier pool',t=>{
@@ -250,8 +275,8 @@ test('preferredProvider never moves strategy work onto a non-frontier pool',t=>{
   assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
   const devin=body.rejected.find(r=>r.target==='devin-agent');
   assert.match(devin?.reasons?.[0]??'',/think work runs only on runtimes.yaml allocation.preference.think/);
-  // A verdict walks the review order (owner decision 2026-09-25 review-hands): the review chain lists the hands first, so the preferred Devin leads it.
   const review=pick(t,['--kind','review.verify','--difficulty','easy'],config);
-  assert.equal(review.pick.target,'devin-agent');
+  assert.equal(review.pick.target,'claude-agent','preference cannot manufacture Devin quota evidence');
+  assert.ok(review.admission.rejected.find(row=>row.provider==='devin').codes.includes('quota-unknown'));
   assert.match(review.orderSource,/registry.yaml operators.review.verify.chain/);
 });

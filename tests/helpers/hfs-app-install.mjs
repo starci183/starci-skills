@@ -5,6 +5,7 @@
 // so no delete ever walks through a junction into the install it points at.
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 
 export const RUNTIME = path.resolve(import.meta.dirname, '..', '..');
 
@@ -14,24 +15,39 @@ const isUnder = (root, dir) => { const rel = path.relative(root, dir); return re
 /**
  * The installs a spec may borrow packages from: first the node_modules folders STARCI_APP_INSTALLS lists (path-delimiter separated:
  * a product app's install, one coherent set of versions where the runtime holds no copy of a framework the skeleton imports), then
- * the runtime's own, the packages', every example's. The first install that holds a package wins. A spec that finds a package in
- * none of them skips and names it.
+ * the runtime's own, the packages', every example's. Automatic candidates prefer physical resolution of the spec's required peers,
+ * then the number of required packages held. Explicit entries retain their order. A spec that finds a package in none skips and names it.
+ * `root` and `env` let the helper's behavior be proved with small isolated package layouts.
  */
-export function runtimeInstalls() {
-  const examples = path.join(RUNTIME, 'examples');
+export function runtimeInstalls({ root = RUNTIME, env = process.env, required = LINT_DEPENDENCIES } = {}) {
+  const examples = path.join(root, 'examples');
   const nested = fs.existsSync(examples) ? fs.readdirSync(examples, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => path.join(examples, entry.name, 'node_modules')) : [];
-  const extra = (process.env.STARCI_APP_INSTALLS ?? '').split(path.delimiter).filter(Boolean).map((dir) => path.resolve(dir));
-  const outside = extra.filter((dir) => !isUnder(RUNTIME, dir));
+  const extra = (env.STARCI_APP_INSTALLS ?? '').split(path.delimiter).filter(Boolean).map((dir) => path.resolve(dir));
+  const outside = extra.filter((dir) => !isUnder(root, dir));
   if (outside.length) {
-    throw new Error(`STARCI_APP_INSTALLS must name installs under the checkout ${RUNTIME}: ${outside.join(', ')} lies outside it. The scaffold build widens Turbopack's root to the checkout, and an install elsewhere panics the fe build `
+    throw new Error(`STARCI_APP_INSTALLS must name installs under the checkout ${root}: ${outside.join(', ')} lies outside it. The scaffold build widens Turbopack's root to the checkout, and an install elsewhere panics the fe build `
       + '("Expected to inject all imports ... incrementalCacheHandler"): install the app under the checkout (`starci release app-installs` does) or leave the variable unset.');
   }
-  const own = [path.join(RUNTIME, 'node_modules'), path.join(RUNTIME, 'packages', 'node_modules'), ...nested].filter((dir) => fs.existsSync(dir));
-  // The first install that holds a package wins, so the install that holds the most of what a scaffold imports goes first: a framework
-  // package is then linked from the one install that also holds its adapters (@nestjs/core resolves @nestjs/platform-express from its own
-  // folder, never from the app), not from the runtime's partial copy.
-  const held = (dir) => LINT_DEPENDENCIES.filter((name) => has(dir, name)).length;
-  return [...extra.filter((dir) => fs.existsSync(dir)), ...own.sort((a, b) => held(b) - held(a))];
+  const own = [path.join(root, 'node_modules'), path.join(root, 'packages', 'node_modules'), ...nested].filter((dir) => fs.existsSync(dir));
+  // Frameworks resolve peers from their physical package directory, not from the fixture's adjacent package junctions. Optional
+  // peers still matter when the scaffold explicitly requires them (Nest's validation pipe), while undeclared optional peers do not.
+  const needed = new Set(required);
+  const scores = new Map(own.map((dir) => {
+    let held = 0;
+    let unresolved = 0;
+    for (const name of needed) {
+      if (!has(dir, name)) continue;
+      held += 1;
+      const file = fs.realpathSync(path.join(dir, ...name.split('/'), 'package.json'));
+      const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const require = createRequire(file);
+      for (const peer of Object.keys(manifest.peerDependencies ?? {}).filter((peer) => needed.has(peer))) {
+        try { require.resolve(peer); } catch { unresolved += 1; }
+      }
+    }
+    return [dir, { held, unresolved }];
+  }));
+  return [...extra.filter((dir) => fs.existsSync(dir)), ...own.sort((a, b) => scores.get(a).unresolved - scores.get(b).unresolved || scores.get(b).held - scores.get(a).held)];
 }
 
 /** The @starci packages an app installs, from the runtime's own source: package name -> folder under packages/. */

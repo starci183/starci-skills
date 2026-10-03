@@ -37,7 +37,12 @@ const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 const MANIFEST = loadSlotManifest();
 const COVERAGE_SCOPE = coverageScope(MANIFEST).codecovPaths;
 const LCOV = 'be/coverage/lcov.info';
-const installs = runtimeInstalls();
+const VALIDATION_DEPENDENCIES = Object.freeze(['class-transformer', 'class-validator']);
+/** What the boot smoke runs besides the lint set: the be build, the HTTP platform and the global validation pipe. */
+const BOOT_DEPENDENCIES = Object.freeze(['tsc-alias', '@nestjs/platform-express', 'express', 'rxjs', 'reflect-metadata', 'pg', ...VALIDATION_DEPENDENCIES]);
+/** What the be unit run loads besides the lint set: the runner, its TypeScript transform and the decorator helpers. */
+const UNIT_DEPENDENCIES = Object.freeze(['jest', 'ts-jest', 'tslib', ...VALIDATION_DEPENDENCIES]);
+const installs = runtimeInstalls({ required: [...LINT_DEPENDENCIES, ...BOOT_DEPENDENCIES, ...UNIT_DEPENDENCIES] });
 const missing = missingFrom(installs);
 const skipReason = missing.length ? `no install holds ${missing.join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
 // A skip must never pass silently. Locally it prints one SKIPPED line. The release verification and CI set
@@ -51,6 +56,51 @@ function gate(name, reason) {
   return { skip: reason, required: null };
 }
 const lintGate = gate('scaffold lint', skipReason);
+
+test('fixture installs prefer physical resolution of required framework peers over package count', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-install-coherence-'));
+  const links = [];
+  t.after(() => {
+    for (const link of links) fs.unlinkSync(link);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+  const partial = path.join(root, 'node_modules');
+  const linked = path.join(root, 'packages', 'node_modules');
+  const coherent = path.join(root, 'examples', 'coherent', 'node_modules');
+  const put = (install, name, manifest = {}) => {
+    const dir = path.join(install, ...name.split('/'));
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, version: '1.0.0', main: 'index.cjs', ...manifest }));
+    fs.writeFileSync(path.join(dir, 'index.cjs'), 'module.exports = {};\n');
+    return path.join(dir, 'package.json');
+  };
+  const peers = Object.fromEntries(VALIDATION_DEPENDENCIES.map(name => [name, '*']));
+  // Nest marks validation peers optional, but the scaffold's validation pipe declares and needs them.
+  const manifest = { peerDependencies: { ...peers, '@nestjs/microservices': '*' }, peerDependenciesMeta: Object.fromEntries([...VALIDATION_DEPENDENCIES, '@nestjs/microservices'].map(name => [name, { optional: true }])) };
+  const partialPackage = put(partial, '@nestjs/common', manifest);
+  const coherentPackage = put(coherent, '@nestjs/common', manifest);
+  for (const peer of VALIDATION_DEPENDENCIES) {
+    put(coherent, peer);
+    put(linked, peer);
+  }
+  const extraTools = LINT_DEPENDENCIES.slice(0, 6);
+  for (const tool of extraTools) put(partial, tool);
+  const link = path.join(linked, '@nestjs', 'common');
+  fs.mkdirSync(path.dirname(link), { recursive: true });
+  fs.symlinkSync(path.dirname(partialPackage), link, 'junction');
+  links.push(link);
+  const required = ['@nestjs/common', ...VALIDATION_DEPENDENCIES, ...extraTools];
+  const physicalRequire = file => createRequire(fs.realpathSync(file));
+  for (const peer of VALIDATION_DEPENDENCIES) {
+    assert.throws(() => physicalRequire(partialPackage).resolve(peer), { code: 'MODULE_NOT_FOUND' });
+    assert.throws(() => physicalRequire(path.join(link, 'package.json')).resolve(peer), { code: 'MODULE_NOT_FOUND' }, 'adjacent peer links cannot repair the framework junction target');
+    assert.equal(physicalRequire(coherentPackage).resolve(peer), path.join(coherent, peer, 'index.cjs'));
+  }
+  assert.equal(runtimeInstalls({ root, env: {}, required })[0], coherent, 'a coherent framework install precedes one with more tools or only adjacent peers');
+  for (const explicit of [[partial, coherent], [coherent, partial], [linked, partial]]) {
+    assert.deepEqual(runtimeInstalls({ root, env: { STARCI_APP_INSTALLS: explicit.join(path.delimiter) }, required }).slice(0, explicit.length), explicit, 'explicit installs retain their supplied precedence');
+  }
+});
 
 /** The checkout's @starci packages as a registry, started once by the first test that scaffolds and stopped after the file. */
 let registry = null;
@@ -138,9 +188,15 @@ function buildPackages(app) {
   }
 }
 
-/** What the boot smoke runs besides the lint set: the be build (`build:be`: tsc, tsc-alias) and the HTTP platform the api serves on. */
-const BOOT_DEPENDENCIES = Object.freeze(['tsc-alias', '@nestjs/platform-express', 'express', 'rxjs', 'reflect-metadata', 'pg']);
 const bootGate = gate('scaffold api boot', skipReason || (missingFrom(installs, BOOT_DEPENDENCIES).length ? `no install holds ${missingFrom(installs, BOOT_DEPENDENCIES).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false));
+
+function assertValidationPeers(app) {
+  const common = fs.realpathSync(path.join(app, 'node_modules', '@nestjs', 'common', 'package.json'));
+  const require = createRequire(common);
+  for (const dependency of VALIDATION_DEPENDENCIES) {
+    assert.doesNotThrow(() => require.resolve(dependency), `the selected Nest install resolves ${dependency} from its physical directory`);
+  }
+}
 
 /** The bin script of an installed package (`tsc` of typescript, `tsc-alias`), read from its package.json. */
 function binOf(app, pkg, name) {
@@ -268,7 +324,7 @@ test('a scaffolded app imports the be lcov into Sonar and Codecov with exactly t
   for (const file of ['sonar-project.properties', 'codecov.yml', '.github/workflows/ci.yml']) assert.ok(files.includes(file), `${file} is scaffolded`);
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   assert.deepEqual(scaffoldBinGaps(root), [], 'every bin the scaffolded scripts call is installed by a dependency');
-  for (const dependency of ['class-transformer', 'class-validator']) {
+  for (const dependency of VALIDATION_DEPENDENCIES) {
     assert.equal(typeof manifest.dependencies[dependency], 'string', `the validation pipe installs ${dependency}`);
   }
   assertCoverageContract(root);
@@ -477,6 +533,7 @@ test('the scaffolded be core api builds with build:be and boots with start:core 
   const { peerIntegrationFindings } = await import('../../scripts/hfs/rules/peer-integrations.mjs');
   assert.deepEqual(peerIntegrationFindings({ repoRoot: app, files: ['package.json'] }), []);
   links = installInto(app, installs);
+  assertValidationPeers(app);
 
   runScript(app, 'build:be');
   const start = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts['start:core'];
@@ -500,8 +557,6 @@ test('the scaffolded be core api builds with build:be and boots with start:core 
   await boot.exited;
 });
 
-/** What the be unit run loads besides the lint set: the runner, its TypeScript transform and the decorator helpers. */
-const UNIT_DEPENDENCIES = Object.freeze(['jest', 'ts-jest', 'tslib']);
 const unitGate = gate('scaffold be unit run', missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
 
 test('the scaffolded be unit run (the test script) writes the lcov Sonar and Codecov import, naming the logic files of be/src/modules only', { skip: unitGate.skip, timeout: 600_000 }, async (t) => {
@@ -513,6 +568,7 @@ test('the scaffolded be unit run (the test script) writes the lcov Sonar and Cod
   assert.equal((await scaffoldBaseline.cloneInto(into)).root, app);
   assertCoverageContract(app);
   links = installInto(app, installs);
+  assertValidationPeers(app);
   // The root `test` script, as npm runs it: `cd be && jest --selectProjects unit --coverage` (plus --ci, like the managed CI).
   const script = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts.test;
   assert.equal(script, 'cd be && jest --selectProjects unit --coverage');

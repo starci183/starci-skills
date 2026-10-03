@@ -322,6 +322,8 @@ const unwritableWorld=t=>{
   fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
   w.env.STARCI_FAKE_ORCA_UNIQUE_TERMINALS='1';
   w.env.STARCI_OWNER_ROOT=ownerRoot;
+  const closureImport=`data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});`)}`;
+  w.env.NODE_OPTIONS=[w.env.NODE_OPTIONS,`--import=${closureImport}`].filter(Boolean).join(' ');
   const run=(script,args,more={})=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...w.env,...more}});
   const defined=run(DEFINE_GOAL,['--repo',w.repo,'--text','refactor the stale architecture','--json']);
   assert.equal(defined.status,0,defined.stderr);
@@ -343,7 +345,8 @@ test('watchdog --repair: a refused wake on a frozen Kernel releases its worker w
   // The Kernel's frame froze 19 minutes ago and Orca refuses every write to the terminal.
   fx.writeState(s=>{Object.assign(s.terminals[terminal],{screen:FROZEN_KERNEL,lastOutputAt:Date.now()-19*60000,sendRefused:'terminal_not_writable'});});
   const first=fx.tick();
-  assert.equal(first.status,0,first.stderr||first.stdout);
+  t.diagnostic(JSON.stringify(first));
+  assert.equal(first.status,0,JSON.stringify(first));
   assert.equal(first.result.action,'restarted',JSON.stringify(first.result));
   assert.equal(first.result.sendRefused,true);
   assert.equal(first.result.sendErrorCode,'terminal_not_writable');
@@ -355,6 +358,11 @@ test('watchdog --repair: a refused wake on a frozen Kernel releases its worker w
   assert.deepEqual(fx.events('kernel-wake-unwritable').map(e=>[e.terminal,e.errorCode]),
     [[terminal,'terminal_not_writable']],'the refused wake send is recorded once');
   assert.ok(fx.events('kernel-stale-cleared').length>=1,'start-workflow cleared the stale seat');
+  const closure=fx.events('kernel-stale-cleared').at(-1).terminalClosed;
+  assert.equal(closure?.handle,terminal);
+  assert.equal(closure?.closed?.ok,true);
+  assert.ok(['gone','disconnected'].includes(closure?.closed?.proof),JSON.stringify(closure));
+  assert.equal(closure?.processes?.verdict,'none',JSON.stringify(closure));
   assert.ok(fx.events('kernel-restarted').length>=1,'the replacement kernel booted');
   // The replacement's signal names the new terminal; a fresh tick does not wake it.
   const signal=fx.events('kernel-restarted').at(-1);

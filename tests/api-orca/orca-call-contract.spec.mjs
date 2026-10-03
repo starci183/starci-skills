@@ -6,7 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
-import {uuidv5,orcaRequestIdOf} from '../../scripts/api/orca/lib.mjs';
+import {uuidv5,orcaRequestIdOf,requestStateFrom} from '../../scripts/api/orca/lib.mjs';
 
 // scripts/api/orca/lib.mjs is the whole host boundary: argv comes from
 // modules/host/orca/calls.yaml and, before the first mutation, the verb about
@@ -34,7 +34,8 @@ const stubEnv=(t,extra={})=>{
 const call=(fx,body)=>{
   const script=path.join(fx.root,`case-${Math.random().toString(36).slice(2)}.mjs`);
   fs.writeFileSync(script,`import {orcaCall} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','lib.mjs')).href)};\n`+
-    `console.log(JSON.stringify((${body})(orcaCall)));\n`);
+    `import {requestShow} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','request-show.mjs')).href)};\n`+
+    `console.log(JSON.stringify((${body})(orcaCall,requestShow)));\n`);
   const r=spawnSync(process.execPath,[script],{encoding:'utf8',env:fx.env,timeout:60000,windowsHide:true});
   assert.equal(r.status,0,`case process failed: ${r.stderr}`);
   return JSON.parse(r.stdout.trim().split(/\r?\n/).at(-1));
@@ -96,6 +97,18 @@ test('a read-only process never spends a call on agent-context',t=>{
   const fx=stubEnv(t);
   call(fx,`c=>c('terminal-show',{terminal:'t1'}).outcome`);
   assert.equal(logged(fx).some(argv=>argv[0]==='agent-context'),false);
+});
+
+test('request-show wrapper issues one declared read and rejects unreadable states',t=>{
+  for(const state of ['completed','pending','absent','garbled']) {
+    const fx=stubEnv(t,{STARCI_FAKE_ORCA_REQUEST_STATE:state});
+    const out=call(fx,`(c,show)=>show({request:'request-fixture'})`);
+    assert.deepEqual(out,state==='garbled'?{ok:false,state:null}:{ok:true,state});
+    assert.equal(logged(fx).length,1,'the wrapper issues exactly one read');
+    assert.deepEqual(logged(fx)[0],['orchestration','request-show','--request','request-fixture','--json']);
+  }
+  assert.equal(requestStateFrom({outcome:'failed',result:{state:'completed'}}),null,
+    'a failed read cannot reconcile a lost mutation receipt');
 });
 
 test('a flag the live binary does not offer refuses the mutation and allows the read',t=>{

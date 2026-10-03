@@ -74,9 +74,9 @@ claim:
     cleared, and a replacement kernel starts for the same workflow (kernel
     attempt+1; workflow generation is unchanged).
   onSeatWithoutWorker: >-
-    A signal with no Dispatch is not a worker-start worker (every Kernel is
-    one). It is never live: the next start clears the seat and a worker takes
-    it (kernel-stale-cleared).
+    A seat naming a terminal without a Dispatch retains the singleton. Start refuses with
+    kernel-terminal-unverified until the exact worker identity and definitive
+    closure are reconciled; that seat's missing Dispatch alone never authorizes replacement.
   onUnsettledLaunch: >-
     A partial or unknown launch effect keeps an identity-bound launch-unknown
     signal and provider reservation. A later boot refuses before replacement,

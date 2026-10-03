@@ -7,7 +7,7 @@ import { requestShow } from '../api/orca/request-show.mjs';
 import { orcaRequestIdOf } from '../lib/orca-request-id.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
-import { closeWorker, workerClosureProven } from '../machine/worker-close.mjs';
+import { closeWorker, workerClosureProven, workerExitProven } from '../machine/worker-close.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { runShow } from '../api/orca/run-show.mjs';
@@ -19,6 +19,10 @@ import { recordLaunchedTerminal } from './launched-terminals.mjs';
 import { addStarciShimToPath } from './starci-shim.mjs';
 import { loadModelRegistry, loadAdapter, adapterModelAuthority } from './model-registry.mjs';
 import { admitAgent, consumeAgentAdmission, observeAgentAdmission, releaseAgentAdmission, reconcileAdmissionNoEffect, launchScopeId } from './admission.mjs';
+
+// Only a card's declared pool default may resolve an omitted model; model-less cards still need a budget identity.
+const launchModelOf = (provider, model, card) => model ?? (card?.start?.defaultModel === 'pool' || card?.start?.modelArgument === false
+  ? Object.values(loadModelRegistry()?.pools ?? {}).find((pool) => pool?.provider === provider)?.defaultModel ?? null : null);
 
 // ---- the one agent launch --------------------------------------------------
 // Every agent - Kernel, [Supervisor], [Worker], [Op] - starts through `orca orchestration worker-start --agent
@@ -58,14 +62,15 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
   };
   const { card, error: cardError } = loadAdapter(provider);
   if (cardError) return noEffect('card', cardError);
+  model = launchModelOf(provider, model, card);
   const host = (io?.hostAgent ?? hostAgentVerdict)({ provider, model, card });
   if (!host.ok) return noEffect('host-agent', host.error, { code: host.code, errorCode: host.code, taskId: null, runId: run ?? null });
   const { depth, limit, refusal } = preflight ?? depthPreflight({ parentDispatch, maxDepth, show: orca.show });
   if (refusal) return noEffect(refusal.step, refusal.error, { ...refusal, taskId: null, runId: run ?? null });
   const takesModel = card?.start?.modelArgument !== false;
-  // Every model-capable launch names its actual model; a provider default cannot silently lower a role's floor.
+  // Resolve the card's declared default before the common gate evaluates this concrete model's role floor.
   if (takesModel && !model) return noEffect('admission', 'a concrete model is required');
-  const budgetModel = model ?? Object.values(loadModelRegistry()?.pools ?? {}).find((p) => p?.provider === provider)?.defaultModel;
+  const budgetModel = model;
   admission ??= admitAgent({ role, scopeId: scopeId ?? launchScopeId(role, request), attemptId: launchScopeId(role, request), allowGroup: allowGroup ?? [{ provider, model: budgetModel, effort }],
     bias, ownerGrant, author, qualityFloor, kind, difficulty, scope: { jobId: request?.job ?? request?.workerJob ?? null, runId: run ?? null, seat: request?.seat ?? null } }, { io: io?.admission, env });
   if (!admission.ok) return { ...admission, provider };
@@ -131,16 +136,21 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
     ?? shown.result?.worker?.agentTerminalHandle ?? null : null;
   // A failed start is reconciled before it returns (Orca's safety floor: only proof of exit authorizes a stop): no effect -> nothing; unknown
   // -> worker-show first, cleaned only when Orca shows the worker ended; a partial effect -> cleaned. `io.cleanup(dispatchId)` -> {effectState, ...} replaces the default stop + release.
-  const cleanupOf = io?.cleanup ?? ((id) => {
+  const cleanupOf = (id) => {
     const observed = bestEffortCall(() => orca.show({ dispatch: id }));
     bindHandle(shownHandle(observed));
     if (!boundHandle || handleConflict) return { effectState: 'unknown', observation: observed,
       providerBudget: handleBinding, error: 'cleanup terminal identity is unproven' };
+    if (io?.cleanup) {
+      const cleanup = io.cleanup(id);
+      return cleanup?.effectState !== 'none' || workerExitProven(cleanup.release, boundHandle)
+        ? cleanup : { ...cleanup, effectState: 'unknown' };
+    }
     const stop = bestEffortCall(() => orca.stop({ dispatch: id }));
     const release = bestEffortCall(() => orca.release({ dispatch: id, handle: boundHandle, env }));
     const closed = workerClosureProven(release, boundHandle);
     return { effectState: closed ? 'none' : 'partial', stop, release };
-  });
+  };
   const reconcile = (effectState) => {
     if (effectState === 'none' || !dispatchId) return { effectState, observation: null, cleanup: null };
     if (effectState === 'unknown') {
@@ -230,7 +240,7 @@ export function startAgent({ provider, model = null, effort = null, worktree, re
   const preflight = depthPreflight({ parentDispatch, maxDepth, show: io?.spawn?.show ?? workerShow });
   if (preflight.refusal) return { ...preflight.refusal, provider };
   const { card } = loadAdapter(provider);
-  const budgetModel = model ?? (card?.start?.modelArgument === false ? Object.values(loadModelRegistry()?.pools ?? {}).find((p) => p?.provider === provider)?.defaultModel : null);
+  const budgetModel = launchModelOf(provider, model, card);
   admission ??= admitAgent({ role, scopeId: scopeId ?? launchScopeId(role, request), attemptId: launchScopeId(role, request), allowGroup: allowGroup ?? [{ provider, model: budgetModel, effort }],
     bias, ownerGrant, author, qualityFloor, kind, difficulty, scope: { jobId: request?.workerJob ?? (request?.workflow ? `kernel-${request.workflow}` : null),
       runId: null, seat: request?.seat ?? null } }, { io: io?.admission ?? io?.spawn?.admission, env });

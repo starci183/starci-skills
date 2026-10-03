@@ -39,7 +39,17 @@ const fixture=(t,{dead=[],stale=[]}={})=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-managed-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
-  const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
+  // These refused starts leave the exact residual terminal that closure must prove away.
+  const startBranch="else if (verb === 'orchestration worker-start') {";
+  const stalledDispatch="last_failure: 'agent_prompt_stalled' }";
+  assert.ok(FAKE_ORCA.includes(startBranch)&&FAKE_ORCA.includes(stalledDispatch),'private worker fixture anchors must exist');
+  const managedFake=FAKE_ORCA.replace(startBranch,`${startBranch}
+  if (['auth-partial', 'prompt-stalled'].includes(mode)) {
+    const handle = 'fake-terminal-1';
+    state.terminals = { ...(state.terminals || {}), [handle]: { handle, connected: mode === 'auth-partial', writable: mode === 'auth-partial' } };
+    state.assignees = { ...(state.assignees || {}), 'dispatch-fake-1': handle }; save();
+  }`).replace(stalledDispatch,"last_failure: 'agent_prompt_stalled', assigneeHandle: state.assignees?.[arg('dispatch')] ?? null }");
+  const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,managedFake);
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot,{recursive:true});
   const env={...process.env,
     STARCI_ORCA_COMMAND:process.execPath,
@@ -50,6 +60,7 @@ const fixture=(t,{dead=[],stale=[]}={})=>{
     STARCI_FAKE_ORCA_DEAD:dead.join(','),
     STARCI_FAKE_ORCA_STALE:stale.join(','),
     STARCI_OWNER_ROOT:ownerRoot,
+    APPDATA:path.join(root,'appdata'),
     LOCALAPPDATA:path.join(root,'localappdata'),
     STARCI_PROJECTS_ROOT:path.join(root,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
@@ -65,7 +76,8 @@ const fixture=(t,{dead=[],stale=[]}={})=>{
     assert.match(body,/^kernel:/m,'fixture config keeps the kernel: line');
     fs.writeFileSync(path.join(ownerRoot,'config.yaml'),body);
   };
-  const run=(script,...args)=>new Promise(resolve=>execFile(process.execPath,[script,...args],
+  const run=(script,...args)=>new Promise(resolve=>execFile(process.execPath,
+    ['--import',`data:text/javascript,import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});`,script,...args],
     {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env},
     (error,stdout,stderr)=>resolve({status:error?.code??0,signal:error?.signal??null,error,stdout,stderr})));
   const callArgv=()=>fs.existsSync(path.join(root,'calls.jsonl'))
@@ -383,7 +395,7 @@ test('finish closes the kernel terminal and never issues task-update (the Task o
 });
 
 test('Claude auth rejection circuits the shared-auth provider for every job and reuses the logical operation attempt',async t=>{
-  const fx=fixture(t,{stale:['claude']});
+  const fx=fixture(t);
   fx.env.STARCI_FAKE_ORCA_MODE='auth';
   const jobId='job-claude-auth-circuit';
   const siblingJobId='job-claude-prerouted-sibling';
@@ -398,12 +410,13 @@ test('Claude auth rejection circuits the shared-auth provider for every job and 
     enqueueFixtureJob(ledger,{jobId:siblingJobId,workflowId:'wf-claude-auth',opId:'architecture.decide',kind:'op',
       payload:{opId:'architecture.decide',owned_paths:['docs/sibling/'],difficulty:'hard'}});
   }finally{ledger.close();}
+  seedGoalBias(fx,'wf-claude-auth',{prefer:[{provider:'claude'}]});
 
   const firstRoute=await fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard',
     '--json');
   assert.equal(firstRoute.status,0,firstRoute.stderr||firstRoute.stdout);
   assert.equal(json(firstRoute.stdout)?.decision?.model,'claude-agent',
-    'a refreshable stale token is allowed one real launch attempt');
+    'fresh authenticated quota permits the owner-preferred provider to reach launch attestation');
   const siblingRoute=await fx.run(API,'route','--repo',fx.repo,'--job',siblingJobId,'--difficulty','hard',
     '--json');
   assert.equal(siblingRoute.status,0,siblingRoute.stderr||siblingRoute.stdout);
@@ -471,9 +484,10 @@ test('historical workflow incident text cannot poison provider routing',async t=
 });
 
 test('Claude auth fallback advances only after partial effects reconcile and never on unknown effects',async t=>{
-  const exercise=async(mode,suffix)=>{
-    const fx=fixture(t,{stale:['claude']});
+  const exercise=async(mode,suffix,unverifiedClosure=false)=>{
+    const fx=fixture(t);
     fx.env.STARCI_FAKE_ORCA_MODE=mode;
+    if(unverifiedClosure)fx.env.STARCI_FAKE_CLOSURE_UNPROVEN='1';
     const workflowId=`wf-claude-${suffix}`;
     const jobId=`job-claude-${suffix}`;
     const ledger=openLedger({file:fx.ledgerFile});
@@ -483,6 +497,7 @@ test('Claude auth fallback advances only after partial effects reconcile and nev
       enqueueFixtureJob(ledger,{jobId,workflowId,opId:'architecture.decide',kind:'op',
         payload:{opId:'architecture.decide',owned_paths:['docs/'],difficulty:'hard'}});
     }finally{ledger.close();}
+    seedGoalBias(fx,workflowId,{prefer:[{provider:'claude'}]});
     const routed=await fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json');
     assert.equal(routed.status,0,routed.stderr||routed.stdout);
     const rejected=await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json');
@@ -502,6 +517,11 @@ test('Claude auth fallback advances only after partial effects reconcile and nev
   // A refusal leaves nothing running, and says so on the record.
   assert.equal(json(partial.result.job.result_json)?.terminalClosed,true);
   assert.equal(json(partial.result.job.result_json)?.closed?.dispatchId,'dispatch-fake-1');
+
+  const unverified=await exercise('auth-partial','unverified-process',true);
+  assert.equal(unverified.result.job.status,'effect_unknown','terminal closure alone cannot release an unproven process tree');
+  assert.equal(json(unverified.result.job.result_json)?.effectState,'unknown');
+  assert.equal(unverified.result.leases,1,'unproven process exit retains the operation fence');
 
   const unknown=await exercise('auth-unknown','unknown');
   assert.equal(unknown.result.job.status,'effect_unknown','a ready worker observation blocks provider fallback');
@@ -703,6 +723,7 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
       enqueueFixtureJob(ledger,{jobId:`job-ws-${n}`,workflowId,opId:'architecture.decide',kind:'op',
         payload:{opId:'architecture.decide',owned_paths:[`docs/ws-${n}/`],difficulty:'hard'}});
   }finally{ledger.close();}
+  seedGoalBias(fx,workflowId,{prefer:[{provider:'claude'}]});
 
   const dispatchClaude=async jobId=>{
     const routed=await fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json');
@@ -764,6 +785,7 @@ test('a circuit that reopens for the same failure waits longer each time (circui
       enqueueFixtureJob(ledger,{jobId:`job-bo-${n}`,workflowId,opId:'architecture.decide',kind:'op',
         payload:{opId:'architecture.decide',owned_paths:[`docs/bo-${n}/`],difficulty:'hard'}});
   }finally{ledger.close();}
+  seedGoalBias(fx,workflowId,{prefer:[{provider:'claude'}]});
   const refuse=async jobId=>{
     const routed=await fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json');
     assert.equal(routed.status,0,routed.stderr||routed.stdout);

@@ -74,7 +74,7 @@ test('a finished draw loop installs JSON that cites no scratch path and passes t
   const probes = { geometry: async () => ({ findings: [] }), score: async (html, viewport) => ({ schema: 'starci/ui-proof-score@1', ok: true, file: html, viewport, summary: { pass: 5, fail: 0, unmeasurable: 0 }, cases: [], spacing: [] }) };
   const critic = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9) });
   const r = await runRound({ source, fixtures: fixturesByWidth([fixture]), product: repo, base: 'SignInBase', state: 'sign-in-ready', viewports: [{ width: 1440, height: 900 }, { width: 390, height: 844 }],
-    repo, out, render, probes, criticOrca: critic, sourceCheck: async () => ({ findings: [], grammar }) });
+    repo, out, render, probes, drawer: { provider: 'claude', model: 'claude-opus-5-5' }, criticOrca: critic, sourceCheck: async () => ({ findings: [], grammar }) });
   assert.equal(r.stop?.reason, 'passed', JSON.stringify(r.round.codes));
   // The round itself is scratch and may cite scratch: that is the defect's precondition.
   const roundRecord = fs.readFileSync(path.join(out, 'round-1', 'SignInBase#sign-in-ready--390x844--light.json'), 'utf8');

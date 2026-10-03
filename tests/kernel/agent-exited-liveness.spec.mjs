@@ -162,7 +162,7 @@ const APP_TRANSCRIPT=['    … +18 lines (ctrl + t to view transcript)','      }
   't change at any time','    (Use `node --trace-warnings ...` to show where the warning was created)',
   '• Working (10m 46s • esc to interrupt) · 1 background terminal running · /ps to','view · /stop to close',
   '› Ask Codex to do anything'];
-const APP_PS=`PS ${BE}>`;
+const APP_PS=`PS ${DRIVE}shop-be>`;
 const APP_WAKE='Operation liveness wake for durable job op-architecture.decide-e64bfaaea3 (architecture.decide) attempt 11. Your accepted contract remains running but no durable report is filed. Re-read the exact contract with starci kernel op-contract, continue only inside its existing authority, and file exactly one starci kernel report. Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.';
 const wrap80=line=>{const rows=[];for(let i=0;i<line.length;i+=80)rows.push(line.slice(i,i+80));return rows;};
 const APP_AFTER=[...APP_TRANSCRIPT,...wrap80(`${APP_PS} ${APP_WAKE}`),'At line:1 char:366',
@@ -191,7 +191,7 @@ test('a Codex frame frozen at Working with a shell prompt under its input row is
   assert.equal(exitedAgentPromptRow([...APP_TRANSCRIPT,`${APP_PS} $env:DISABLE_AUTOUPDATER='1'; & claude --model 'claude-opus-5-5' --dangerously-skip-permissions`].join('\n')),null);
   assert.equal(exitedAgentPromptRow([...APP_TRANSCRIPT,`${APP_PS} $env:DISABLE_AUTOUPDATER='1'; Get-ChildItem`].join('\n')),`${APP_PS} $env:DISABLE_AUTOUPDATER='1'; Get-ChildItem`,'an env statement alone is no launch');
   for(const frame of [LIVE_DEVIN,IDLE_CLAUDE,IDLE_CODEX,APP_FROZEN]) assert.equal(exitedAgentPromptRow(frame),null);
-  assert.equal(shellPromptPrefix(`PS ${BE}> Operation liveness`),APP_PS);
+  assert.equal(shellPromptPrefix(`${APP_PS} Operation liveness`),APP_PS);
   assert.equal(shellPromptPrefix(`  └ PS ${DRIVE}x> git status`),null,'a transcript row is not the shell');
 });
 
@@ -199,6 +199,10 @@ test('text a shell received is never a delivered wake',()=>{
   assert.deepEqual(shellReceivedText(APP_AFTER,APP_WAKE,APP_FROZEN)?.evidence,'shell-echo');
   assert.deepEqual(shellReceivedText(APP_TYPING,APP_WAKE,APP_FROZEN)?.evidence,'shell-echo','wrapped at 80 columns mid-word');
   assert.equal(shellReceivedText([APP_FROZEN,'Missing statement body in do loop.','    + FullyQualifiedErrorId : MissingLoopStatement'].join('\n'),'x',APP_FROZEN)?.evidence,'shell-error');
+  const wrappedPrompt=[...APP_TRANSCRIPT,...wrap80(`PS ${DRIVE}${'a'.repeat(120)}> ${APP_WAKE}`),
+    '    + CategoryInfo : ParserError: (:) [], ParentContainsErrorRecordException'].join('\n');
+  assert.equal(shellReceivedText(wrappedPrompt,APP_WAKE,APP_FROZEN)?.evidence,'shell-error',
+    'a parser error proves shell execution when the long prompt itself wrapped out of recognition');
   // An agent that echoes the wake in its own input row or transcript is the delivery, not a shell.
   const landed=[...APP_TRANSCRIPT,`› ${APP_WAKE.slice(0,76)}`,'• Working (1s • esc to interrupt)','› Ask Codex to do anything'].join('\n');
   assert.equal(shellReceivedText(landed,APP_WAKE,APP_FROZEN),null);
