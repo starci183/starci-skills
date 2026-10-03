@@ -474,7 +474,7 @@ allocation:
       work-acceptance-, work-brand-test-, work-core-test-, work-custody-test-, work-external-,
       work-index-md-, work-module-spec-, example-critique-, example-derive-, example-evidence-, example-verify-,
       example-work-gate-, work-artifacts-, work-consistency-, work-surfaces-,
-      grammar-land-, kernel-replace-close-, nm-link-, rc-job-, rc-health-, release-gate-, seat-titles-, slice-typecheck-, unit-roles-]
+      grammar-land-, kernel-replace-close-, nm-link-, rc-job-, rc-health-, release-gate-, seat-titles-, slice-typecheck-, unit-roles-, l4-, policy-, rights-]
     sessionArchiveAfterMs: 259200000
     claudeTranscriptArchiveAfterMs: 604800000
     archiveMaxAgeMs: 2592000000
