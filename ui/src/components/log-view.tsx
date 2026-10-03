@@ -31,8 +31,8 @@ export function LogRowItem({ row, fresh = false }: { row: LogRow; fresh?: boolea
   const Icon = kindIcon(row.kind);
   const wfRef = row.refs.find((ref) => ref.kind === 'workflow');
   const attemptRef = row.refs.find((ref) => ref.kind === 'attempt');
-  const { rows: attempts, forJob } = useAttemptAgents();
-  const linked = row.actor === 'op' ? (attemptRef ? attempts.find((item) => String(item.id) === attemptRef.id && item.project === (attemptRef.project ?? row.project)) : forJob(row.project, row.job)) : undefined;
+  const { forAttempt } = useAttemptAgents();
+  const linked = row.actor === 'op' && attemptRef ? forAttempt(attemptRef.project ?? row.project, attemptRef.id) : undefined;
   return <details className={`group border-b border-b-border/60 last:border-b-0 ${row.level === 'error' ? 'bg-[color:var(--tone-bg)]' : ''} ${fresh ? 'log-row-new' : ''}`} data-tone={tone} data-level={row.level}>
     <summary className="grid min-h-12 cursor-pointer list-none grid-cols-[4rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-4 py-2 text-[13px] hover:bg-muted/40 md:grid-cols-[4.75rem_3.5rem_minmax(0,1fr)_10.5rem] md:gap-x-4 [&::-webkit-details-marker]:hidden">
       <time className="font-mono text-xs tabular-nums text-muted-foreground" dateTime={new Date(row.at).toISOString()} title={formatAbsolute(row.at)}>{timeFormat.format(row.at)}</time>
@@ -56,6 +56,7 @@ export function LogRowItem({ row, fresh = false }: { row: LogRow; fresh?: boolea
       <div><h3 className="mb-2 font-medium">{t('References')}</h3><RefLinks refs={row.refs} /></div>
       <Advanced summary={t('Source, workflow, job, trace and raw data')}>
         <div className="flex flex-col gap-3">
+          {row.job && <p className="text-muted-foreground">{t('Job context can span several dispatches; only an exact Op attempt reference identifies the emitting agent.')}</p>}
           <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <div><dt className="text-muted-foreground">{t('At')}</dt><dd>{formatAbsolute(row.at)}</dd></div>
             <div><dt className="text-muted-foreground">{t('Level · actor')}</dt><dd>{levelLabels[row.level]} · {row.actor}{row.controller ? ` · ${row.controller}` : ''}</dd></div>

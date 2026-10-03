@@ -35,8 +35,9 @@ export const stepLabels = {
   run: t('Run step'),
   report: t('Report'),
   checks: t('Checks'),
+  commit: t('Runtime checkpoint'),
   verdict: t('Verdict'),
-  land: t('Land'),
+  land: t('Workflow integration'),
 } as const;
 
 export const learningKindLabels: Record<string, string> = {
@@ -115,8 +116,12 @@ export function formatReason(reason: Reason | null | undefined): string {
   return `${title} · ${params.map(([key, value]) => `${reasonParamLabels[key] ?? key}: ${reasonParamValues[String(value)] ?? value}`).join(' · ')}`;
 }
 
+function validTimestamp(at: unknown): at is number {
+  return typeof at === 'number' && Number.isFinite(at) && Number.isFinite(new Date(at).getTime());
+}
+
 export function formatAbsolute(at: number | null | undefined): string {
-  if (at == null || !Number.isFinite(at)) return t('No timestamp recorded');
+  if (!validTimestamp(at)) return t('No timestamp recorded');
   return new Intl.DateTimeFormat('vi-VN', {
     timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
@@ -124,8 +129,9 @@ export function formatAbsolute(at: number | null | undefined): string {
 }
 
 export function formatRelative(at: number | null | undefined, now = Date.now()): string {
-  if (at == null || !Number.isFinite(at)) return t('No timestamp recorded');
-  const delta = Math.max(0, now - at);
+  if (!validTimestamp(at) || !validTimestamp(now)) return t('No timestamp recorded');
+  if (at > now) return t('Future timestamp: {at}', { at: formatAbsolute(at) });
+  const delta = now - at;
   if (delta < 60_000) return t('just now');
   if (delta < 3_600_000) return t('{n} minutes ago', { n: Math.floor(delta / 60_000) });
   if (delta < 86_400_000) return t('{n} hours ago', { n: Math.floor(delta / 3_600_000) });

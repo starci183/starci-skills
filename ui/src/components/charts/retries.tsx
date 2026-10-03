@@ -30,11 +30,11 @@ function Bars({ bars, width, aria }: { bars: Bar[]; width: number; aria: string 
 export function Retries({ rows }: { rows: AttemptRow[] }) {
   const [ref, width] = useWidth();
   const dist = [...triesPerUnit(rows).entries()].sort((a, b) => a[0] - b[0]);
-  const tryBars: Bar[] = dist.map(([tries, n]) => ({ key: `t${tries}`, label: tries === 1 ? t('Done on try 1') : t('Needed {n} tries', { n: tries }), n, tone: tries === 1 ? 'success' : tries === 2 ? 'warning' : 'failed',
-    title: t('{n} units needed {tries} tries', { n, tries }) }));
+  const tryBars: Bar[] = dist.map(([tries, n]) => ({ key: `t${tries}`, label: t('Highest observed try: {n}', { n: tries }), n, tone: tries === 1 ? 'success' : tries === 2 ? 'warning' : 'failed',
+    title: t('{n} units have observed try {tries} in this cohort', { n, tries }) }));
   const classes = [...groupBy(rows.filter(r => r.failureClass), r => failureName(r.failureClass as string)).entries()].map(([k, list]) => ({ k, n: list.length })).sort((a, b) => b.n - a.n).slice(0, 6);
   const failBars: Bar[] = classes.map(c => ({ key: c.k, label: c.k, n: c.n, tone: 'failed', title: t('{kind}: {n} attempts', { kind: c.k, n: c.n }) }));
-  return <ChartCard title={t('Retries')} hint={t('How many tries each unit needed, and the most common failure classes.')}
+  return <ChartCard title={t('Retries')} hint={t('Highest recorded try per unit in the dispatch cohort; not completion or spent retry budget.')}
     legend={[{ tone: 'success', label: t('Try 1') }, { tone: 'warning', label: t('Try 2') }, { tone: 'failed', label: t('Try 3 and up / failure classes') }]}
     empty={!tryBars.length && !failBars.length && t('No unit was tried in this range yet.')}>
     <div ref={ref}>

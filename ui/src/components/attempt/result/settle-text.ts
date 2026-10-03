@@ -1,5 +1,6 @@
 import type { AttemptDetailV3 } from '../../../contract';
 import { t } from '../../../i18n/t';
+import { runtimeObservation, verificationSummary } from '../verification';
 
 const obj = (value: unknown): Record<string, unknown> | null => (value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null);
 const list = (value: unknown): string[] => (Array.isArray(value) ? value.map(item => (typeof item === 'string' ? item : JSON.stringify(item))) : []);
@@ -20,24 +21,24 @@ export function settleView(attempt: AttemptDetailV3): SettleView {
   const lines: string[] = [];
   const failureRaw = attempt.failureClass ?? attempt.retry.class ?? (typeof json.failureClass === 'string' ? json.failureClass : null);
   const failureClass = attempt.verdict === 'pass' ? null : failureRaw;
-  const failedChecks = [...new Set(attempt.checks.filter(check => check.status === 'fail' || check.status === 'error').map(check => check.name))];
+  const failedChecks = verificationSummary(attempt).pairs.filter(pair => runtimeObservation(pair.runtime) === 'fail').map(pair => pair.name);
   const evidence = obj(json.checkEvidence);
   if (typeof json.reason === 'string' && json.reason) lines.push(json.reason);
   if (evidence) {
-    const observed = Number(evidence.observed ?? 0); const passed = Number(evidence.passed ?? 0); const failed = Number(evidence.failed ?? 0);
-    if (observed === 0) lines.push(t('The kernel could not observe any check to cross-check.'));
-    else lines.push(t('The kernel cross-checked {observed} checks: {passed} passed, {failed} failed.', { observed, passed, failed }));
+    const observed = evidence.observed; const passed = evidence.passed; const failed = evidence.failed;
+    if (observed === 0) lines.push(t('No checks were observed by the verdict runner.'));
+    else if (typeof observed === 'number' && typeof passed === 'number' && typeof failed === 'number') lines.push(t('The verdict runner cross-checked {observed} checks: {passed} passed, {failed} failed.', { observed, passed, failed }));
   }
   if (failedChecks.length) lines.push(t('Failed checks: {list}.', { list: failedChecks.join(', ') }));
-  if (json.claimOverruled === true) lines.push(t('The op self-reported done but the kernel rejected that report because the checks are not green.'));
+  if (json.claimOverruled === true) lines.push(t('The op self-reported done but runtime verification rejected that claim.'));
   const landed = obj(json.landed);
   if (landed) {
     const missing = list(landed.missing); const dirty = list(landed.dirty);
     if (missing.length) lines.push(t('Still missing in the repo: {list}.', { list: missing.join(', ') }));
     if (dirty.length) lines.push(t('Uncommitted files remain: {list}.', { list: dirty.join(', ') }));
-    if (typeof landed.headCheck === 'string') lines.push(landed.headCheck === 'verified' ? t('The last commit the op reported was verified by the kernel in the repo.') : t('Last-commit check: {result}.', { result: landed.headCheck }));
+    if (typeof landed.headCheck === 'string') lines.push(landed.headCheck === 'verified' ? t('The reported commit was verified; integration is recorded separately.') : t('Last-commit check: {result}.', { result: landed.headCheck }));
   }
-  if (attempt.verdict === 'blocked' && !lines.length) lines.push(t('The op reported blocked and the kernel kept that conclusion.'));
+  if (attempt.verdict === 'blocked' && !lines.length) lines.push(t('The recorded verdict is blocked.'));
   const blocker = obj(obj(attempt.report?.json)?.blocker);
   if (attempt.verdict === 'blocked' && typeof blocker?.detail === 'string') lines.push(t('Blocker the op raised: {detail}', { detail: blocker.detail }));
   if (failureClass) lines.unshift(t('Failure class: {text}.', { text: failureClassText(failureClass) }));

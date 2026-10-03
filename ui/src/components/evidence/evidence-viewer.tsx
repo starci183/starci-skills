@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Copy, Download, ExternalLink, Search } from 'lucide-react';
+import { Download, ExternalLink, Search } from 'lucide-react';
 import type { EvidenceFile } from '../../contract';
 import { FileTypeBadge } from '../status-chip';
 import { PathLink } from '../path-link';
@@ -8,18 +8,15 @@ import { encodingNotes, formatBytes, isPlainEncoding, shortSha } from './format'
 import { TEXT_KINDS, useBlobText, type BlobText } from './use-blob-text';
 import type { Concept } from '../concept';
 import { t } from '../../i18n/t';
+import { CopyButton } from './renderers/common';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { TimeAgo } from '../time-ago';
 
 export const concept: Concept = 'C8';
 
 const SEARCHABLE = new Set(['text', 'json', 'diff']);
 const btn = 'inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs hover:bg-muted disabled:opacity-50';
-
-function CopyButton({ value, label, disabled }: { value: string; label: string; disabled?: boolean }) {
-  const [done, setDone] = useState(false);
-  return <button type="button" className={btn} disabled={disabled} onClick={() => {
-    void navigator.clipboard?.writeText(value).then(() => { setDone(true); setTimeout(() => setDone(false), 1400); }, () => undefined);
-  }}><Copy className="size-3.5" aria-hidden="true" />{done ? t('Copied') : label}</button>;
-}
 
 function Note({ children, tone }: { children: ReactNode; tone?: 'warning' | 'failed' }) {
   return <div className="rounded-md border border-border px-3 py-2 text-sm" data-tone={tone}
@@ -27,6 +24,7 @@ function Note({ children, tone }: { children: ReactNode; tone?: 'warning' | 'fai
 }
 
 function Body({ file, query, blob }: { file: EvidenceFile; query: string; blob: BlobText }) {
+  if (blob.status === 'error' && blob.httpStatus === 410) return <Note tone="warning">{t('Archived evidence is unavailable.')}</Note>;
   if (file.kind === 'image') return <ImageView file={file} />;
   if (file.kind === 'video') return <VideoView file={file} />;
   if (file.kind === 'audio') return <audio src={file.href} controls preload="metadata" className="w-full" />;
@@ -71,18 +69,23 @@ export function EvidenceViewer({ file }: { file: EvidenceFile }) {
     <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
       {canSearch ? <label className="relative flex min-w-40 flex-1 items-center">
         <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" aria-hidden="true" />
-        <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t('Search the content')}
+        <Input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t('Search the content')}
           className="w-full rounded-md border border-border bg-background py-1 pl-7 pr-2 text-sm" aria-label={t('Search the content')} />
       </label> : <span className="flex-1" />}
-      {TEXT_KINDS.has(file.kind) ? <CopyButton value={blob.text} label={t('Copy text')} disabled={blob.status !== 'ready'} /> : null}
-      <a className={btn} href={file.href} target="_blank" rel="noreferrer"><ExternalLink className="size-3.5" aria-hidden="true" />{t('Open raw ↗')}</a>
-      <a className={btn} href={`${file.href}?download=1`} download><Download className="size-3.5" aria-hidden="true" />{t('Download')}</a>
+      {TEXT_KINDS.has(file.kind) ? <CopyButton value={blob.text} label={blob.truncated ? t('Copy loaded preview') : t('Copy text')} disabled={blob.status !== 'ready'} /> : null}
+      <Button variant="outline" size="xs" asChild className={btn}><a href={file.href} target="_blank" rel="noreferrer"><ExternalLink className="size-3.5" aria-hidden="true" />{t('Open raw ↗')}</a></Button>
+      <Button variant="outline" size="xs" asChild className={btn}><a href={`${file.href}?download=1`} download><Download className="size-3.5" aria-hidden="true" />{t('Download')}</a></Button>
     </div>
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-2 text-xs text-muted-foreground">
       <span className="inline-flex items-center gap-1">sha256 <code className="font-mono" title={file.sha}>{sha}</code><CopyButton value={file.sha} label={t('Copy')} /></span>
+      <span>{t('Origin: {origin}', { origin: file.origin })}</span>
+      <span>{file.project}{file.scopeRef ? ` · ${file.scopeRef}` : ''}</span>
+      <TimeAgo at={file.createdAt} />
+      {file.archived ? <span>{t('Archived')}</span> : null}
       {file.redaction ? <span data-tone="warning" className="rounded border px-2" style={{ borderColor: 'var(--tone-line)', background: 'var(--tone-bg)' }} title={t('The server redacted sensitive information')}>{t('Redacted: {detail}', { detail: file.redaction })}</span> : null}
       <span className="inline-flex min-w-0 flex-wrap items-center gap-1">{t('On the machine:')} <PathLink path={file.hostPath} kind="file" /></span>
     </div>
+    {blob.truncated && canSearch ? <p className="m-0 border-b px-3 py-2 text-xs text-muted-foreground">{t('Search and copy apply to the loaded preview only.')}</p> : null}
     <div className="max-h-[70vh] min-w-0 overflow-auto p-3"><Body file={file} query={query} blob={blob} /></div>
   </section>;
 }

@@ -40,7 +40,7 @@ export function DiffTextView({ text }: { text: string }) {
   const dels = rows.filter(r => r.kind === 'del').length;
   const num = (n: number | null): ReactNode => <span className="w-10 shrink-0 select-none pr-2 text-right tabular-nums text-muted-foreground/70">{n ?? ''}</span>;
   return (
-    <Frame>
+    <Frame className="evidence-code-frame">
       <Toolbar right={<><span data-tone="success" className="text-[var(--tone)]">+{adds}</span><span data-tone="failed" className="text-[var(--tone)]">−{dels}</span></>}>
         <CopyButton value={text} label={t('Copy all')} />
       </Toolbar>

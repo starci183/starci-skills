@@ -2,17 +2,19 @@ import type { UiState } from '../contract';
 import { t } from '../i18n/t';
 
 /** Status vocabulary produced by ui/api/pipeline.mjs and used by every surface. */
-export type Status = 'success' | 'running' | 'settling' | 'queued' | 'retry' | 'failed' | 'blocked' | 'awaiting-owner' | 'planned' | 'deferred' | 'external' | 'dropped' | 'rejected' | 'warning' | 'unknown';
+export type Status = 'success' | 'running' | 'settling' | 'queued' | 'paused' | 'stopped' | 'retry' | 'failed' | 'blocked' | 'awaiting-owner' | 'planned' | 'deferred' | 'external' | 'dropped' | 'rejected' | 'warning' | 'unknown';
 /** Colour family. One tone = one token set in style.css ([data-tone=…]). */
 export type Tone = 'success' | 'running' | 'queued' | 'failed' | 'warning' | 'skipped' | 'owner';
 
 export const statusTone: Record<Status, Tone> = {
   success: 'success', running: 'running', settling: 'running', queued: 'queued', retry: 'warning',
+  paused: 'warning', stopped: 'skipped',
   failed: 'failed', blocked: 'failed', 'awaiting-owner': 'owner', planned: 'queued', deferred: 'skipped', external: 'skipped', dropped: 'skipped', rejected: 'skipped', warning: 'warning', unknown: 'queued',
 };
 
 export const statusLabels: Record<Status, string> = {
   success: t('Passed'), running: t('Running'), settling: t('settling'), queued: t('Queued'), retry: t('Waiting to retry'),
+  paused: t('Paused'), stopped: t('Stopped'),
   failed: t('Failed'), blocked: t('Blocked'), 'awaiting-owner': t('Awaiting the owner'), planned: t('Not reached yet'), deferred: t('Deferred'), external: t('External'), dropped: t('Dropped'), rejected: t('Rejected at handoff'), warning: t('Warning'), unknown: t('Unknown'),
 };
 
@@ -68,7 +70,8 @@ export function statusFromUnit(state: string): Status {
     case 'failed': return 'failed';
     case 'dropped': return 'dropped';
     case 'planned': return 'planned';
-    default: return 'queued';
+    case 'queued': return 'queued';
+    default: return 'unknown';
   }
 }
 

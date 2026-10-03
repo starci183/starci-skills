@@ -99,7 +99,7 @@ export function YamlView({ text }: { text: string }) {
     return <Line key={i} n={i + 1}>{t.nodes}</Line>;
   });
   return (
-    <Frame>
+    <Frame className="evidence-code-frame">
       <Toolbar right={<span>{t('YAML · {n} lines', { n: lines.length })}</span>}><CopyButton value={text} label={t('Copy all')} /></Toolbar>
       <div className="max-h-[70vh] overflow-auto bg-background py-1">{rows}</div>
     </Frame>

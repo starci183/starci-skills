@@ -11,6 +11,10 @@ import { transcriptWindow } from '../transcript-search.mjs';
 import { sendJson, sendError } from '../envelope.mjs';
 import { source, many, one, parse, staleOf, page } from '../query.mjs';
 import { whyFor } from '../why.mjs';
+import { admissionObserved, attemptAdmission } from '../admission-read.mjs';
+import { attemptRow, checkKey, checkObservation, checkPairsOf, dispatchCapture, currentInputOf } from '../attempt-read.mjs';
+import { workflowCheckpoint, workflowLand } from '../land-read.mjs';
+import { actionRow } from '../action-read.mjs';
 
 const DAY = 86_400_000;
 const slaCatalogue = parseYaml(readFileSync(new URL('../../../modules/reconciler/sla.yaml', import.meta.url), 'utf8'));
@@ -36,16 +40,6 @@ function blobLink(db, sha) {
   return row ? { sha: row.sha256, bytes: row.bytes, mediaType: row.media_type,
     href: `/api/blob/${row.sha256}`, archived: row.archived_at != null } : null;
 }
-function attemptRow(row, project) {
-  return { project, id: row.attempt_id, wf: row.workflow_id, unit: row.unit_id, job: row.job_id, op: row.op_id,
-    attempt: row.try_no, dispatchSeq: row.dispatch_seq, agent: row.agent, model: row.model, pool: row.pool, effort: row.effort,
-    dispatchedAt: row.dispatched_at, reportedAt: row.reported_at, settledAt: row.settled_at, cycleMs: row.cycle_ms,
-    reportOutcome: row.report_outcome, verdict: row.verdict, settledBy: row.settled_by,
-    failureClass: row.failure_class, endState: row.end_state, ui: row.ui,
-    checks: row.checks, checksRed: row.checks_red, artifacts: row.artifacts,
-    tokensIn: row.tokens_in, tokensOut: row.tokens_out, costUsd: row.cost_usd,
-    summary: row.report_summary, href: ref('attempt', row.attempt_id, project).href };
-}
 function mediaItem(item, project) {
   return { artifactId: item.artifact_id, project, wf: item.workflow_id, job: item.job_id,
     attempt: item.attempt_id, role: item.role, kind: item.kind, subkind: item.subkind,
@@ -53,27 +47,19 @@ function mediaItem(item, project) {
     blob: { sha: item.sha256, bytes: item.bytes, mediaType: item.media_type, href: item.http_path, archived: item.archived_at != null },
     createdAt: item.created_at };
 }
-function checkRow(db, check, root) {
-  return { id: check.check_id, name: check.name, phase: check.phase, runner: check.runner, authority: check.authority,
-    runSeq: check.run_seq, command: check.command ?? null, cwd: safePath(check.cwd ?? root), exitCode: check.exit_code,
+function checkRow(db, check) {
+  const result = { id: check.check_id, name: check.name, phase: check.phase, runner: check.runner, authority: check.authority,
+    inputDigest: check.input_digest ?? null,
+    runSeq: check.run_seq, command: check.command ?? null, cwd: safePath(check.cwd), exitCode: check.exit_code,
     declaredExitCode: check.declared_exit_code, status: check.status, ui: check.ui,
     startedAt: check.started_at, finishedAt: check.finished_at, wallMs: check.wall_ms,
     stdout: blobLink(db, check.stdout_sha), stderr: blobLink(db, check.stderr_sha), output: blobLink(db, check.output_sha),
     summary: parse(check.summary_json), attribution: parse(check.attribution_json), note: check.note };
+  return { ...result, key: checkKey(result), observation: checkObservation(result) };
 }
 function tail(db, sha) {
-  if (!sha || !blobLink(db, sha)) return '';
-  try { return redactText(decodeText(getBlob(sha)).split(/\r?\n/).slice(-200).join('\n')); } catch { return ''; }
-}
-function actionRow(machine, action) {
-  return { id: action.id, controller: action.controller, duty: action.duty, key: action.key, verb: action.verb,
-    state: action.state, ui: action.ui, mode: action.mode, epoch: action.epoch,
-    startedAt: action.started_at, finishedAt: action.finished_at, exitCode: action.exit_code,
-    errorSignature: action.error_signature, target: action.attempt_id ? ref('attempt', action.attempt_id) : action.job_id ? ref('workflow', action.workflow_id) : null,
-    result: parse(action.result_json), resultBlob: blobLink(machine, action.result_sha),
-    stdout: blobLink(machine, action.stdout_sha), stderr: blobLink(machine, action.stderr_sha),
-    steps: many(machine, 'SELECT * FROM action_steps WHERE action_id=? ORDER BY step_no', action.id).map(step => ({
-      stepNo: step.step_no, step: step.step, startedAt: step.started_at, ms: step.ms, ok: step.ok == null ? null : Boolean(step.ok) })) };
+  if (!sha || !blobLink(db, sha)) return null;
+  try { return redactText(decodeText(getBlob(sha)).split(/\r?\n/).slice(-200).join('\n')); } catch { return null; }
 }
 function timeline(attempt) {
   const steps = [
@@ -91,34 +77,23 @@ function timeline(attempt) {
     return { step, at, ...(max ? { slaMs: max, late: at != null && previous != null ? at - previous > max : false } : {}) };
   });
 }
-function latestLand(db, wf) {
-  const land = one(db, 'SELECT * FROM product_lands WHERE workflow_id=? ORDER BY land_id DESC LIMIT 1', wf);
-  return land ? { result: land.result, mergedSha: land.merged_sha, reason: land.reason,
-    output: blobLink(db, land.output_sha), at: land.finished_at ?? land.started_at } : null;
-}
 const RUNTIME_ROOT = fileURLToPath(new URL('../../../', import.meta.url)).replace(/[\\/]$/, '');
 const joinHost = (root, rel) => root && rel ? path.join(root, rel) : null;
 const hostNorm = value => value ? path.normalize(String(value)) : null;
-function whereOf(ledger, raw, job, payload) {
-  const runtime = payload?.hierarchy?.runtime ?? {};
-  const repoRoot = raw.repo_root ?? ledger.repoRoot ?? null;
-  return { repo: hostNorm(repoRoot), worktree: hostNorm(raw.worktree_path), mainCheckout: !raw.worktree_path || hostNorm(raw.worktree_path) === hostNorm(repoRoot), branch: raw.branch,
+function whereOf(ledger, raw, job, capture) {
+  const hierarchy = capture.dispatchContext?.hierarchy, runtime = hierarchy?.runtime ?? {};
+  const repoRoot = raw.repo_root ?? null;
+  return { repo: hostNorm(repoRoot), worktree: hostNorm(raw.worktree_path), mainCheckout: raw.worktree_path && repoRoot ? hostNorm(raw.worktree_path) === hostNorm(repoRoot) : null, branch: raw.branch,
     baseSha: raw.base_sha, headSha: raw.head_sha, integratedSha: raw.integrated_sha, worktreeRemovedAt: raw.worktree_removed_at,
-    ownedPaths: (payload?.owned_paths ?? []).map(rel => ({ rel, abs: joinHost(raw.worktree_path ?? repoRoot, rel) })),
+    scopeSource: capture.ownedPaths == null ? 'unobserved' : 'contract',
+    ownedPaths: (capture.ownedPaths ?? []).map(item => ({ rel: item.rel, abs: item.unresolved ? null : joinHost(item.root ?? raw.worktree_path ?? repoRoot, item.rel) })),
     ledgerFile: ledger.file ?? null, blobRoot: artifactRoot(), runtimeRoot: RUNTIME_ROOT,
-    host: runtime.host ?? null, agent: runtime.agent ?? null, provider: runtime.provider ?? null, profile: runtime.profile ?? null, pool: runtime.runtimePool ?? null,
-    terminalHandle: runtime.terminalHandle ?? null, runId: runtime.runId ?? null, taskId: runtime.taskId ?? null, dispatchId: runtime.dispatchId ?? null,
-    parentAgent: payload?.hierarchy?.parentNodeId ?? null, agentNode: payload?.hierarchy?.nodeId ?? null,
-    traceSpan: raw.span_id ?? null, job: job?.job_id ?? null, jobStatus: job?.status ?? null };
-}
-function inputOf(payload, job) {
-  if (!payload) return null;
-  return { what: payload.displayWhat ?? payload.title ?? null, op: payload.opId ?? job?.op_id ?? null,
-    records: payload.records ?? [], ownedPaths: payload.owned_paths ?? [], params: payload.params ?? null,
-    goal: payload.goal_binding ?? null, cut: payload.cut ?? null, after: payload.after ?? null, risk: payload.risk ?? null,
-    model: payload.modelId ?? null, profile: payload.model ?? null, effort: payload.effort ?? null, difficulty: payload.difficulty ?? null,
-    route: { chain: payload.routeChain ?? [], rejected: payload.routeRejected ?? [], order: payload.routeOrder ?? null, policy: payload.routePolicy ?? null,
-      balance: payload.routeBalance ?? null, crossFamily: payload.routeCrossFamily ?? null, at: payload.routedAt ?? null } };
+    host: raw.host ?? runtime.host ?? null, agent: raw.agent ?? runtime.agent ?? null, provider: raw.provider ?? runtime.provider ?? null,
+    profile: raw.model_profile ?? runtime.profile ?? null, pool: raw.pool ?? runtime.runtimePool ?? null,
+    terminalHandle: raw.terminal_handle ?? runtime.terminalHandle ?? null, runId: raw.run_id ?? runtime.runId ?? null,
+    taskId: raw.task_id ?? runtime.taskId ?? null, dispatchId: raw.dispatch_id ?? runtime.dispatchId ?? null,
+    parentAgent: hierarchy?.parentNodeId ?? null, agentNode: hierarchy?.nodeId ?? null,
+    traceSpan: raw.span_id ?? null, job: raw.job_id ?? null, jobStatus: job?.status ?? null, currentJobStatus: job?.status ?? null };
 }
 // Evidence files grouped by what they are, not by raw prefix. 'evidence' is the op's submitted
 // evidence folder (attachments/evidence/, formerly attachments/E/).
@@ -156,7 +131,7 @@ function blobText(sha, limit) {
   let text = null;
   try { const bytes = getBlob(sha); if (bytes.length <= limit) text = decodeText(bytes); } catch { /* archived or missing blob */ }
   if (textBySha.size > 300) textBySha.delete(textBySha.keys().next().value);
-  textBySha.set(key, text);
+  if (text != null) textBySha.set(key, text);
   return text;
 }
 const schemaBySha = new Map();
@@ -172,13 +147,15 @@ function jsonSchemaOf(sha) {
 function manifestOf(artifactRows) {
   const item = artifactRows.find(x => /^attachments\/(evidence|E)\/manifest\.ya?ml$/.test(x.name));
   if (!item) return null;
+  const base = { folder: path.posix.dirname(item.name), manifest: null,
+    read: { state: 'unavailable', artifactId: item.artifact_id, sha: item.sha256 } };
   const text = blobText(item.sha256, 512 * 1024);
-  if (text == null) return null;
+  if (text == null) return base;
   let doc;
-  try { doc = parseYaml(publicText(text)); } catch { return null; }
-  if (!doc || typeof doc !== 'object') return null;
+  try { doc = parseYaml(publicText(text)); } catch { return { ...base, read: { ...base.read, state: 'invalid' } }; }
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return { ...base, read: { ...base.read, state: 'invalid' } };
   const outcomeOf = a => a.outcome ?? (a.passed === true ? 'passed' : a.passed === false ? 'failed' : null);
-  return { folder: path.posix.dirname(item.name), manifest: {
+  return { ...base, read: { ...base.read, state: 'ready' }, manifest: {
     outcome: doc.outcome ?? null,
     assertions: (Array.isArray(doc.assertions) ? doc.assertions : []).filter(a => a && typeof a === 'object')
       .map(a => ({ id: String(a.id ?? ''), outcome: outcomeOf(a), ...(a.detail != null ? { detail: String(a.detail) } : {}) })),
@@ -187,13 +164,13 @@ function manifestOf(artifactRows) {
 }
 const VALIDATOR_SCHEMA = /validat|starci\/[a-z-]*report@/i;
 function filesOf(db, artifactRows, checks, project, manifestInfo) {
-  const byName = new Map(checks.map(c => [c.name, c]));
   const firstBySha = new Map();
-  const assetNames = manifestInfo ? new Set(manifestInfo.manifest.assets.map(a => path.posix.normalize(`${manifestInfo.folder}/${a.replaceAll('\\', '/')}`))) : null;
+  const assetNames = manifestInfo?.manifest ? new Set(manifestInfo.manifest.assets.map(a => path.posix.normalize(`${manifestInfo.folder}/${a.replaceAll('\\', '/')}`))) : null;
   return artifactRows.map(x => {
     const group = groupOf(x.name, x.role);
     const checkName = group === 'check' ? (x.name.match(/^checks\/(?:\d+-)?([^/]+)\//)?.[1] ?? null) : null;
-    const check = checkName ? byName.get(checkName) ?? null : null;
+    const bound = checks.filter(check => [check.stdout?.sha, check.stderr?.sha, check.output?.sha].includes(x.sha256));
+    const check = bound.length === 1 ? bound[0] : null;
     const blob = one(db, 'SELECT file_uri,redaction FROM blobs WHERE sha256=?', x.sha256);
     const kind = kindOf(x.name, x.media_type);
     const schema = kind === 'json' && x.bytes > 0 && x.bytes <= 2 * 1024 * 1024 && blobPath(x.sha256) ? jsonSchemaOf(x.sha256) : null;
@@ -205,7 +182,8 @@ function filesOf(db, artifactRows, checks, project, manifestInfo) {
     return { artifactId: x.artifact_id, name: x.name, base: x.name.split('/').pop(), group, role: x.role, kind, subkind: x.subkind,
       mediaType: x.media_type, bytes: x.bytes, sha: x.sha256, href: `/api/blob/${x.sha256}`, hostPath: hostNorm(blob?.file_uri ?? blobPath(x.sha256)),
       encoding: encodingOf(x.sha256, x.media_type), redaction: blob?.redaction ?? null, origin: x.origin, label: x.label, scopeRef: x.scope_ref, round: x.round,
-      check: check ? { id: check.id, name: check.name, status: check.status, ui: check.ui } : checkName ? { id: null, name: checkName, status: null, ui: 'unknown' } : null,
+      check: check ? { id: check.id, name: check.name, status: check.status, ui: check.ui, binding: 'sha', runner: check.runner, phase: check.phase, authority: check.authority }
+        : checkName || bound.length ? { id: null, name: checkName ?? bound[0].name, status: null, ui: 'unknown', binding: bound.length ? 'sha' : 'unbound', runner: null, phase: null, authority: null } : null,
       archived: x.archived_at != null, createdAt: x.created_at, project,
       dupOf: first ?? null, empty: x.bytes === 0, key, schema };
   });
@@ -220,30 +198,22 @@ function priorOf(db, raw, project) {
     settleReason: reason == null ? null : publicJson(reason), nextStep: settle?.next_step == null ? null : publicText(String(settle.next_step)),
     href: ref('attempt', row.attempt_id, project).href };
 }
-function checkPairsOf(checks) {
-  const pairs = new Map();
-  for (const check of checks) {
-    if (!pairs.has(check.name)) pairs.set(check.name, { name: check.name, op: null, runtime: null });
-    const pair = pairs.get(check.name);
-    if (check.runner === 'op') pair.op ??= check;
-    else if (['settler', 'kernel', 'parity', 'integrate'].includes(check.runner)) pair.runtime ??= check;
-  }
-  return [...pairs.values()];
-}
 function attemptDetail(store, ledger, db, row) {
   const machine = store.machine.db;
   const raw = one(db, 'SELECT * FROM op_attempts WHERE attempt_id=?', row.attempt_id);
   const job = one(db, 'SELECT * FROM jobs WHERE job_id=?', row.job_id);
   const report = one(db, 'SELECT * FROM reports WHERE attempt_id=?', row.attempt_id);
   const payload = parse(job?.payload_json, {}) ?? {};
-  const checks = many(db, 'SELECT * FROM v_checks WHERE attempt_id=? ORDER BY created_at,check_id', row.attempt_id).map(c => checkRow(db, c, raw.repo_root));
+  const capture = dispatchCapture(db, row.attempt_id);
+  const checks = many(db, 'SELECT * FROM v_checks WHERE attempt_id=? ORDER BY created_at,check_id', row.attempt_id).map(c => checkRow(db, c));
   const artifactRows = many(db, 'SELECT x.*,b.http_path,b.archived_at FROM job_artifacts x JOIN blobs b ON b.sha256=x.sha256 WHERE x.attempt_id=? ORDER BY x.created_at,x.artifact_id', row.attempt_id);
   const mediaRows = many(db, 'SELECT * FROM v_media WHERE attempt_id=? ORDER BY created_at,artifact_id', row.attempt_id).map(x => mediaItem(x, ledger.name));
   const mediaIds = new Set(mediaRows.map(x => x.artifactId));
   const nonMedia = artifactRows.filter(x => !mediaIds.has(x.artifact_id)).map(x => mediaItem(x, ledger.name));
-  const actions = many(machine, 'SELECT * FROM v_engine_actions WHERE ledger_id=? AND workflow_id=? AND job_id=? ORDER BY started_at', ledger.ledgerId, row.workflow_id, row.job_id).map(x => actionRow(machine, x));
-  const decisions = many(db, 'SELECT * FROM decisions WHERE workflow_id=? AND (subject_id=? OR subject_id=? OR di_id IN (SELECT di_id FROM decision_items WHERE attempt_id=? OR job_id=?)) ORDER BY decided_at DESC', row.workflow_id, String(row.attempt_id), row.job_id, row.attempt_id, row.job_id)
-    .map(d => ({ id: d.decision_id, decider: d.decider, choice: d.choice, rationale: d.rationale, result: parse(d.result_json), at: d.decided_at }));
+  const actions = many(machine, 'SELECT * FROM v_engine_actions WHERE ledger_id=? AND workflow_id=? AND job_id=? ORDER BY started_at', ledger.ledgerId, row.workflow_id, row.job_id).map(x => actionRow(machine, x, { project: ledger.name, ref, blob: blobLink }));
+  const decisions = many(db, "SELECT d.*,di.attempt_id AS di_attempt FROM decisions d LEFT JOIN decision_items di ON di.di_id=d.di_id AND di.workflow_id=d.workflow_id WHERE d.workflow_id=? AND ((d.subject_type='attempt' AND d.subject_id=?) OR (d.subject_type='job' AND d.subject_id=?) OR di.attempt_id=? OR di.job_id=?) ORDER BY d.decided_at DESC", row.workflow_id, String(row.attempt_id), row.job_id, row.attempt_id, row.job_id)
+    .map(d => ({ id: d.decision_id, decider: d.decider, choice: d.choice, rationale: d.rationale, result: parse(d.result_json), at: d.decided_at,
+      association: d.di_attempt === row.attempt_id || (d.subject_type === 'attempt' && d.subject_id === String(row.attempt_id)) ? 'attempt' : 'job' }));
   // The attempt's agent terminal is the ledger's own record of its dispatch (op_attempts); Orca accounts for the worker.
   const terminal = raw?.terminal_handle ? { handle: raw.terminal_handle, closed_at: raw.terminal_closed_at ?? null } : null;
   const snapshots = one(db, 'SELECT count(*) AS n,max(at) AS last_at FROM attempt_transcript_snapshots WHERE attempt_id=?', row.attempt_id);
@@ -252,32 +222,40 @@ function attemptDetail(store, ledger, db, row) {
     .filter(item => [item.source_ref, item.item_id, item.title, item.detail_json].some(value => value && [row.op_id, row.failure_class].filter(Boolean).some(key => String(value).includes(key))))
     .map(item => ({ id: item.item_id, title: item.title, state: item.state, landedSha: item.landed_sha }));
   const manifest = manifestOf(artifactRows);
-  const next = one(db, 'SELECT attempt_id FROM op_attempts WHERE job_id IN (SELECT job_id FROM jobs WHERE retry_of=? OR resume_of=?) ORDER BY attempt_id LIMIT 1', job?.job_id, job?.job_id);
-  return { ...attemptRow(row, ledger.name), timeline: timeline(raw),
+  const previousJobAttempt = jobId => jobId ? one(db, 'SELECT attempt_id FROM op_attempts WHERE workflow_id=? AND job_id=? AND attempt_id<? ORDER BY dispatch_seq DESC,attempt_id DESC LIMIT 1', row.workflow_id, jobId, row.attempt_id) : null;
+  const retryOf = previousJobAttempt(job?.retry_of), resumeOf = previousJobAttempt(job?.resume_of);
+  const redispatchOf = previousJobAttempt(row.job_id);
+  const next = one(db, 'SELECT attempt_id FROM op_attempts WHERE workflow_id=? AND attempt_id>? AND (job_id=? OR job_id IN (SELECT job_id FROM jobs WHERE workflow_id=? AND (retry_of=? OR resume_of=?))) ORDER BY attempt_id LIMIT 1', row.workflow_id, row.attempt_id, row.job_id, row.workflow_id, row.job_id, row.job_id);
+  return { ...attemptRow(row, ledger.name, db, ledger.ledgerId), timeline: timeline(raw),
+    requestedModel: raw.request_model ?? null, attestedAt: raw.attested_at ?? null,
+    modelAuthority: raw.model != null && raw.attested_at != null ? 'attested' : 'unobserved',
+    admission: attemptAdmission(db, machine, row.attempt_id),
     route: { by: raw.routed_by, chain: parse(raw.route_chain_json), rejected: parse(raw.route_rejected_json) },
-    where: whereOf(ledger, raw, job, payload),
-    input: inputOf(payload, job),
+    where: whereOf(ledger, raw, job, capture), input: capture.input, dispatchContext: capture.dispatchContext,
+    currentInput: currentInputOf(payload, job), capturedGoal: capture.capturedGoal,
     files: filesOf(db, artifactRows, checks, ledger.name, manifest),
-    manifest: manifest?.manifest ?? null, prior: priorOf(db, raw, ledger.name), checkPairs: checkPairsOf(checks),
+    manifest: manifest?.manifest ?? null, manifestRead: manifest?.read ?? { state: 'missing', artifactId: null, sha: null },
+    prior: priorOf(db, raw, ledger.name), checkPairs: checkPairsOf(checks),
     usage: usageDetail(db, { attempt: row.attempt_id }),
     why: whyFor(db, row), usageSource: raw.usage_source ?? null, usageReason: raw.usage_reason == null ? null : publicText(String(raw.usage_reason)),
     tryBudget: row.unit_id ? one(db, 'SELECT try_budget FROM work_units WHERE workflow_id=? AND unit_id=?', row.workflow_id, row.unit_id)?.try_budget ?? null : null,
-    land: latestLand(db, row.workflow_id),
+    checkpoint: workflowCheckpoint(db, raw), land: workflowLand(db, raw, blobLink),
     report: report ? { id: report.report_id, outcome: report.outcome, json: parse(report.report_json),
       attachments: many(db, 'SELECT m.* FROM v_media m JOIN report_attachments ra ON ra.artifact_id=m.artifact_id WHERE ra.report_id=?', report.report_id).map(m => mediaItem(m, ledger.name)) } : null,
     checks, artifacts: mediaRows, nonMedia,
     settle: raw.settled_at ? { by: raw.settled_by, json: parse(raw.settle_json), decision: raw.decision_id ? ref('di', raw.decision_id, ledger.name) : null, nextStep: raw.next_step } : null,
-    lessons, decisions, actions,
+    lessons, decisions, actions, relatedScope: { actions: 'job', decisions: 'mixed', lessons: 'global-heuristic', logs: 'job' },
     terminal: terminal ? { handle: terminal.handle, live: terminal.closed_at == null,
       transcript: blobLink(db, transcript), snapshots: snapshots?.n ?? 0, lastSnapshotAt: snapshots?.last_at ?? null,
       href: `#/a/${encodeURIComponent(ledger.name)}/${row.attempt_id}?step=run` } : null,
-    retry: { retryOf: job?.retry_of ? ref('attempt', job.retry_of, ledger.name) : null,
-      resumeOf: job?.resume_of ? ref('attempt', job.resume_of, ledger.name) : null,
+    retry: { retryOf: retryOf ? ref('attempt', retryOf.attempt_id, ledger.name) : null,
+      resumeOf: resumeOf ? ref('attempt', resumeOf.attempt_id, ledger.name) : null,
+      redispatchOf: redispatchOf ? ref('attempt', redispatchOf.attempt_id, ledger.name) : null,
       class: job?.retry_class ?? null, next: next ? ref('attempt', next.attempt_id, ledger.name) : null },
   };
 }
 function allLedgers(store, project, fn) {
-  return store.forEachLedger(({ row, db }) => project && row.name !== project ? [] : fn(row, db))
+  return store.forEachLedger(({ row, db }) => project && row.name !== project && row.ledgerId !== project ? [] : fn(row, db))
     .flatMap(entry => entry.error ? [] : entry.result ?? []);
 }
 function listedAttempts(store, url) {
@@ -289,7 +267,7 @@ function listedAttempts(store, url) {
     until: Number(url.searchParams.get('until')) || null };
   const rows = allLedgers(store, filters.project, (ledger, db) => many(db, active
     ? 'SELECT * FROM v_op_history WHERE dispatched_at IS NOT NULL AND settled_at IS NULL AND end_state IS NULL ORDER BY attempt_id DESC'
-    : 'SELECT * FROM v_op_history ORDER BY attempt_id DESC').map(row => attemptRow(row, ledger.name)));
+    : 'SELECT * FROM v_op_history ORDER BY attempt_id DESC').map(row => attemptRow(row, ledger.name, db, ledger.ledgerId)));
   return rows.filter(row => (!filters.wf || row.wf === filters.wf) && (!filters.unit || row.unit === filters.unit)
     && (!filters.op || row.op === filters.op) && (!filters.agent || row.agent === filters.agent)
     && (!filters.model || row.model === filters.model) && (!filters.verdict || row.verdict === filters.verdict)
@@ -312,8 +290,8 @@ function listedMedia(store, url) {
 const quantile = (values, ratio) => values.length ? values[Math.min(values.length - 1, Math.floor((values.length - 1) * ratio))] : null;
 function metricsOps(store, url) {
   const project = url.searchParams.get('project');
-  const since = Date.now() - (url.searchParams.get('window') === '24h' ? DAY : 7 * DAY);
-  const rows = allLedgers(store, project, (_ledger, db) => many(db, 'SELECT * FROM v_op_history WHERE dispatched_at>=?', since));
+  const until = Date.now(), since = until - (url.searchParams.get('window') === '24h' ? DAY : 7 * DAY);
+  const rows = allLedgers(store, project, (_ledger, db) => many(db, 'SELECT * FROM v_op_history WHERE dispatched_at>=? AND dispatched_at<=?', since, until));
   const buckets = new Map();
   for (const row of rows) {
     const key = `${row.op_id}\u0000${row.agent}\u0000${row.model}`;
@@ -321,18 +299,23 @@ function metricsOps(store, url) {
     buckets.get(key).push(row);
   }
   return [...buckets.values()].map(group => {
+    const settled = group.filter(row => ['pass', 'fail', 'partial', 'blocked'].includes(row.verdict));
+    const measured = key => group.map(row => row[key]).filter(Number.isFinite);
+    const sum = key => { const values = measured(key); return values.length ? values.reduce((total, value) => total + value, 0) : null; };
     const cycles = group.map(x => x.cycle_ms).filter(Number.isFinite).sort((a, b) => a - b);
     const queues = group.map(x => x.dispatched_at != null && x.routed_at != null ? x.dispatched_at - x.routed_at : null).filter(Number.isFinite).sort((a, b) => a - b);
-    const failures = new Map(); for (const x of group) if (x.failure_class) failures.set(x.failure_class, (failures.get(x.failure_class) ?? 0) + 1);
+    const failures = new Map(); for (const x of settled) if (x.verdict !== 'pass' && x.failure_class) failures.set(x.failure_class, (failures.get(x.failure_class) ?? 0) + 1);
     return { op: group[0].op_id, agent: group[0].agent, model: group[0].model,
       attempts: group.length, pass: group.filter(x => x.verdict === 'pass').length,
       fail: group.filter(x => x.verdict === 'fail').length, blocked: group.filter(x => x.verdict === 'blocked').length,
       workerDead: group.filter(x => x.end_state === 'worker-dead').length,
-      passRate: group.filter(x => x.verdict != null).length ? group.filter(x => x.verdict === 'pass').length / group.filter(x => x.verdict != null).length : null,
+      settled: settled.length, passRate: settled.length ? settled.filter(x => x.verdict === 'pass').length / settled.length : null,
+      cohort: { since, until, basis: 'dispatch' },
       p50CycleMs: quantile(cycles, 0.5), p90QueueMs: quantile(queues, 0.9),
       topFailure: [...failures].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([failureClass, count]) => ({ class: failureClass, n: count })),
-      tokensIn: group.reduce((sum, x) => sum + (x.tokens_in ?? 0), 0), tokensOut: group.reduce((sum, x) => sum + (x.tokens_out ?? 0), 0),
-      costUsd: group.some(x => x.cost_usd != null) ? group.reduce((sum, x) => sum + (x.cost_usd ?? 0), 0) : null };
+      tokensIn: sum('tokens_in'), tokensOut: sum('tokens_out'), costUsd: sum('cost_usd'),
+      usageCoverage: { rows: group.length, tokensIn: measured('tokens_in').length, tokensOut: measured('tokens_out').length,
+        costUsd: measured('cost_usd').length, complete: ['tokens_in', 'tokens_out', 'cost_usd'].every(key => measured(key).length === group.length) } };
   });
 }
 
@@ -360,7 +343,7 @@ export async function handleAttempt(request, response, store, url) {
   }
   if (pathname === '/api/attempts') {
     const result = page(listedAttempts(store, url), url);
-    sendJson(request, response, result.rows, { sources: store.projects().flatMap(ledger => source(ledger.name, 'v_op_history')), stale: staleOf(store), next: result.next }); return true;
+    sendJson(request, response, result.rows, { sources: store.projects().flatMap(ledger => source(ledger.name, 'v_op_history', 'op_attempts', 'check_runs')), stale: staleOf(store), next: result.next }); return true;
   }
   if (pathname === '/api/media') {
     const result = page(listedMedia(store, url), url);
@@ -370,7 +353,7 @@ export async function handleAttempt(request, response, store, url) {
     sendJson(request, response, metricsUsage(store, url), { sources: store.projects().flatMap(ledger => source(ledger.name, 'llm_usage', 'op_attempts')), stale: staleOf(store) }); return true;
   }
   if (pathname === '/api/metrics/ops') {
-    sendJson(request, response, metricsOps(store, url), { sources: store.projects().flatMap(ledger => source(ledger.name, 'v_model_scorecard', 'v_op_history')), stale: staleOf(store) }); return true;
+    sendJson(request, response, metricsOps(store, url), { sources: store.projects().flatMap(ledger => source(ledger.name, 'v_op_history')), stale: staleOf(store) }); return true;
   }
   const match = /^\/api\/attempts\/([^/]+)\/(\d+)(?:\/(checks\/(\d+)|diff|products|transcript(?:\/snapshots)?))?$/.exec(pathname);
   if (!match) return false;
@@ -385,34 +368,41 @@ export async function handleAttempt(request, response, store, url) {
   const route = match[3] ?? 'detail';
   if (route === 'detail') {
     sendJson(request, response, attemptDetail(store, ledger, db, row), { sources: [
-      ...source(ledger.name, 'v_op_history', 'op_attempts', 'jobs', 'contracts', 'reports', 'v_checks', 'v_media', 'job_artifacts', 'blobs', 'report_attachments', 'artifact_proofs', 'v_decision_rows', 'decisions', 'conditions', 'settle_tails', 'product_lands', 'llm_usage'),
-      ...source('machine', 'worktrees', 'v_engine_actions', 'action_steps', 'sup_learning')], stale: staleOf(store) }); return true;
+      ...source(ledger.name, 'v_op_history', 'op_attempts', 'jobs', 'contracts', 'reports', 'check_runs', 'v_checks', 'v_media', 'job_artifacts', 'blobs', 'report_attachments', 'decisions', 'decision_items', 'work_units', 'attempt_transcript_snapshots', 'product_lands', 'events', 'llm_usage'),
+      ...source('machine', 'v_engine_actions', 'action_steps', 'sup_learning'),
+      ...source('runtime', 'modules/reconciler/sla.yaml', 'modules/models/runtimes.yaml', 'modules/kernel/failure-codes.yaml'),
+      ...(admissionObserved(store.machine.db) ? source('machine', 'provider_reservations') : [])], stale: staleOf(store) }); return true;
   }
   if (route.startsWith('checks/')) {
     const check = one(db, 'SELECT * FROM v_checks WHERE check_id=? AND attempt_id=?', Number(match[4]), id);
     if (!check) { sendError(request, response, 404, 'NOT_FOUND', 'Check not found'); return true; }
-    const root = one(db, 'SELECT repo_root FROM op_attempts WHERE attempt_id=?', id)?.repo_root;
-    sendJson(request, response, { ...checkRow(db, check, root), stdoutTail: tail(db, check.stdout_sha), stderrTail: tail(db, check.stderr_sha) },
+    sendJson(request, response, { ...checkRow(db, check), stdoutTail: tail(db, check.stdout_sha), stderrTail: tail(db, check.stderr_sha) },
       { sources: source(ledger.name, 'v_checks', 'blobs'), stale: staleOf(store) }); return true;
   }
   if (route === 'products') {
-    const raw = one(db, 'SELECT repo_root FROM op_attempts WHERE attempt_id=?', id);
+    const raw = one(db, 'SELECT * FROM op_attempts WHERE attempt_id=?', id);
     const report = parse(one(db, 'SELECT report_json FROM reports WHERE attempt_id=?', id)?.report_json);
-    sendJson(request, response, await attemptProducts(raw?.repo_root ?? ledger.repoRoot ?? null, report),
-      { sources: source(ledger.name, 'op_attempts', 'reports'), stale: staleOf(store) }); return true;
+    const products = await attemptProducts(raw?.repo_root ?? null, report, { checkpoint: workflowCheckpoint(db, raw) });
+    sendJson(request, response, products,
+      { sources: [...source(ledger.name, 'op_attempts', 'reports', 'events'), ...(products.head ? [{ db: 'git', rel: `${products.repo ?? ''}@${products.head}` }] : [])], stale: staleOf(store) }); return true;
   }
   if (route === 'diff') {
     const artifact = one(db, "SELECT * FROM job_artifacts WHERE attempt_id=? AND role='diff' AND subkind='patch-json' ORDER BY artifact_id DESC LIMIT 1", id);
     let diff = null;
-    if (artifact) { try { diff = parse(getBlob(artifact.sha256).toString('utf8')); } catch { /* missing archived blob */ } }
+    if (artifact) {
+      try { diff = parse(decodeText(getBlob(artifact.sha256))); }
+      catch { sendError(request, response, 410, 'DIFF_UNAVAILABLE', 'Recorded diff bytes unavailable'); return true; }
+      if (!diff || !Array.isArray(diff.files)) { sendError(request, response, 422, 'DIFF_INVALID', 'Recorded diff payload is invalid'); return true; }
+    }
     if (diff && Array.isArray(diff.files)) {
       const assets = new Map(many(db, "SELECT name,sha256 FROM job_artifacts WHERE attempt_id=? AND role='diff' AND name LIKE 'patch.assets/%'", id)
         .map(item => [item.name, item.sha256]));
+      const indexed = new Set(many(db, 'SELECT sha256 FROM job_artifacts WHERE attempt_id=?', id).map(item => item.sha256));
       diff = { ...diff, files: diff.files.map(file => {
         const resolveSide = side => {
           if (!side) return null;
           const assetName = typeof side.asset === 'string' ? `patch.assets/${path.posix.basename(side.asset.replaceAll('\\', '/'))}` : null;
-          const sha = assetName ? assets.get(assetName) : /^[a-f0-9]{64}$/i.test(side.blob ?? '') ? side.blob : null;
+          const sha = assetName ? assets.get(assetName) : indexed.has(side.blob) ? side.blob : null;
           return sha ? blobLink(db, sha) : null;
         };
         return { ...file, before: resolveSide(file.before), after: resolveSide(file.after) };
@@ -443,7 +433,7 @@ export async function handleAttempt(request, response, store, url) {
       from: url.searchParams.get('from'), to: url.searchParams.get('to') }); }
     catch (error) { sendError(request, response, 400, error.code ?? 'BAD_REGEX', error.message); return true; }
     sendJson(request, response, { final, snapshotId: final ? null : snapshot.snapshot_id,
-      at: final ? raw.settled_at ?? snapshot?.at ?? Date.now() : snapshot.at,
+      at: final ? blob.created_at ?? null : snapshot.at, timeSource: final ? blob.created_at == null ? null : 'blob' : 'snapshot',
       totalLines: window.totalLines, bytes: blob.bytes, blob: blobLink(db, sha), redaction: blob.redaction ?? 'stream-v1',
       lines: window.lines, hits: window.hits, hitCount: window.hitCount },
     { sources: source(ledger.name, 'op_attempts', 'attempt_transcript_snapshots', 'blobs'), stale: staleOf(store) }); return true;

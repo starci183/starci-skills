@@ -2,7 +2,7 @@ import type { Concept } from '../concept';
 export const concept: Concept = 'C16';
 import type { AttemptRow } from '../../contract';
 import { toneVar } from '../status';
-import { attemptState, fmtMin, groupBy, median, minutes, num } from './analytics-data';
+import { attemptState, fmtMin, groupBy, isVerdictSettled, median, minutes, num } from './analytics-data';
 import { ChartCard } from './chart-card';
 import { useWidth } from './use-width';
 import { AgentMark, familyTint, tintStyle } from '../agent/agent-marks';
@@ -20,13 +20,13 @@ function AgentGlyph({ model, pool, agent: agentId }: { model: string; pool: stri
 export function ModelRates({ rows }: { rows: AttemptRow[] }) {
   const [ref, width] = useWidth();
   const models = [...groupBy(rows, row => row.model ?? t('model unknown')).entries()].map(([model, list]) => {
-    const first = list.filter(r => (r.attempt || 1) <= 1 && r.verdict != null && attemptState(r) !== 'dropped');
+    const first = list.filter(r => r.attempt === 1 && isVerdictSettled(r));
     const pass = first.filter(r => r.verdict === 'pass').length;
     const running = list.filter(r => attemptState(r) === 'run').length;
-    const p50 = median(list.map(r => r.cycleMs).filter((v): v is number => v != null));
-    return { model, pool: list.find(r => r.pool)?.pool ?? null, agent: list.find(r => r.agent)?.agent ?? null, total: list.length, settled: list.length - running, running, first: first.length, pass, rate: first.length ? pass / first.length : null, p50 };
+    const p50 = median(list.flatMap(r => isVerdictSettled(r) && r.settledAt != null && r.dispatchedAt != null && r.settledAt >= r.dispatchedAt ? [r.settledAt - r.dispatchedAt] : []));
+    return { model, pool: list.find(r => r.pool)?.pool ?? null, agent: list.find(r => r.agent)?.agent ?? null, total: list.length, settled: list.filter(isVerdictSettled).length, running, first: first.length, pass, rate: first.length ? pass / first.length : null, p50 };
   }).sort((a, b) => b.total - a.total);
-  return <ChartCard title={t('Models: first-try pass')} hint={t("The share of each unit's first attempt settled as passed, per model.")}
+  return <ChartCard title={t('Models: first-try pass')} hint={t('Recorded model field: first dispatches with a settlement receipt. No execution attestation is inferred.')}
     legend={[{ tone: 'success', label: t('Passed on the first try') }, { label: t('The rest') }]} empty={!models.length && t('No attempts in this range yet.')}>
     <div ref={ref}><svg width={width} height={models.length * ROW} role="img" aria-label={t('First-try pass rate by model')} className="block max-w-full">
       {models.map((m, i) => <g key={m.model} transform={`translate(0 ${i * ROW})`}>

@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { ConceptBlock, type Concept } from '../../concept';
 import { FeedbackState } from '../../feedback-state';
+import { Card as Surface, CardContent, CardHeader } from '../../ui/card';
 
 export const concept: Concept = 'frame';
 
@@ -20,13 +21,15 @@ export function Card({ id, title, hint, right, concept: c, children, className =
       <div className="min-w-0">{children}</div>
     </ConceptBlock>;
   }
-  return <ConceptBlock concept={c} as="section" id={id} className={`min-w-0 scroll-mt-4 rounded-xl border bg-card shadow-sm ${className}`}>
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-4 min-[760px]:px-6">
-      <h2 className="m-0 font-semibold">{title}</h2>
-      {hint ? <span className="min-w-0 text-xs text-muted-foreground">{hint}</span> : null}
-      {right ? <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div> : null}
-    </div>
-    <div className="min-w-0 p-4 min-[760px]:p-6">{children}</div>
+  return <ConceptBlock concept={c} as="section" id={id} className={`min-w-0 scroll-mt-4 ${className}`}>
+    <Surface className="min-w-0 shadow-none [--card-spacing:--spacing(4)] min-[760px]:[--card-spacing:--spacing(6)]">
+      <CardHeader className="flex flex-row flex-wrap items-center gap-x-3 gap-y-1 border-b">
+        <h2 className="m-0 font-semibold">{title}</h2>
+        {hint ? <span className="min-w-0 text-xs text-muted-foreground">{hint}</span> : null}
+        {right ? <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div> : null}
+      </CardHeader>
+      <CardContent className="min-w-0">{children}</CardContent>
+    </Surface>
   </ConceptBlock>;
 }
 

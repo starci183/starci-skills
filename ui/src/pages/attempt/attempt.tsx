@@ -7,7 +7,8 @@ import { FeedbackState, PageSkeleton } from '../../components/feedback-state';
 import { ConceptBlock, type Concept } from '../../components/concept';
 import { Advanced, Enter, Stagger, StaggerItem } from '../../components/motion';
 import { AttemptInputContext, AttemptOpGoal, useOpInfo } from '../../components/attempt/io-panels';
-import { CheckList, derivePairs } from '../../components/attempt/check-list';
+import { CheckList } from '../../components/attempt/check-list';
+import { verificationSummary } from '../../components/attempt/verification';
 import { ResultCard } from '../../components/attempt/result/result-card';
 import { ProductsCard } from '../../components/attempt/products/products-card';
 import { compactVi } from '../../components/usage-view';
@@ -19,15 +20,18 @@ import { AttemptDecisions, DiffSection, LandSection, TimelineCard, TranscriptSec
 import { stepItems } from '../../components/attempt/frame/steps';
 import { formatBytes, formatSpan, hashParam, setHashParam } from '../../components/attempt/frame/util';
 import { t } from '../../i18n/t';
+import { formatAbsolute } from '../../i18n/vi';
 
 export const concept: Concept = 'C7';
 const baseOf = (project: string, id: string) => `/api/attempts/${encodeURIComponent(project)}/${encodeURIComponent(id)}`;
 /** Where each step lives on the page; every step scrolls to its own section. Run/checks/land sections live under "Advanced" and open when targeted. */
-const anchors: Record<AttemptStep, string> = { dispatch: 'attempt-op-goal', run: 'attempt-step-run', report: 'attempt-result', checks: 'attempt-step-checks', verdict: 'attempt-result', land: 'attempt-step-land' };
+const anchors: Record<AttemptStep, string> = { dispatch: 'attempt-op-goal', run: 'attempt-step-run', report: 'attempt-result', checks: 'attempt-step-checks', commit: 'attempt-step-commit', verdict: 'attempt-result', land: 'attempt-step-land' };
 const advancedIds = new Set(['attempt-input', 'attempt-step-checks', 'attempt-where', 'attempt-evidence', 'attempt-step-run', 'attempt-step-diff', 'attempt-step-land', 'attempt-timeline', 'attempt-decisions']);
 
 function initialStep(attempt: AttemptDetailV3): AttemptStep {
-  if (attempt.checksRed > 0) return 'checks';
+  if (verificationSummary(attempt).failed > 0) return 'checks';
+  if (attempt.ui === 'awaiting-owner' || attempt.ui === 'rejected') return 'verdict';
+  if (attempt.reportedAt && attempt.verdict == null) return 'verdict';
   if (attempt.verdict === null) return 'run';
   return 'verdict';
 }
@@ -36,7 +40,8 @@ function initialStep(attempt: AttemptDetailV3): AttemptStep {
 function costSummary(a: AttemptDetailV3): string {
   const end = a.settledAt ?? a.reportedAt;
   const total = a.usage?.total;
-  return [a.model, a.agent ?? a.where?.agent, a.dispatchedAt && end ? formatSpan(end - a.dispatchedAt) : null, total ? t('{n} tokens', { n: compactVi(total.input + total.output) }) : t('tokens not recorded')].filter(Boolean).join(' · ');
+  const complete = total?.completeness?.fields.input.complete && total.completeness.fields.output.complete;
+  return [a.modelAuthority === 'attested' ? a.model : t('model not observed'), a.agent ?? a.where?.agent, a.dispatchedAt && end ? formatSpan(end - a.dispatchedAt) : null, complete && total?.input != null && total.output != null ? t('{n} tokens', { n: compactVi(total.input + total.output) }) : total?.input != null || total?.output != null ? t('tokens partially recorded') : t('tokens not recorded')].filter(Boolean).join(' · ');
 }
 
 /** One "Advanced" card. `nonce` > 0 means a deep link / step click asked for it open; a new nonce remounts it open. */
@@ -85,7 +90,7 @@ function AttemptDetailPage({ project, attemptId, routeStep }: { project: string;
     if (target) window.requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ block: 'start' }));
   }, [data, picked, fileId]);
 
-  if (attempt.error) return <div className="mx-auto max-w-6xl p-6"><a href="#/" className="text-sm hover:underline">{t('← Overview')}</a><div className="mt-4"><FeedbackState error onRetry={() => refreshQuery(baseOf(project, attemptId))}>{attempt.error}</FeedbackState></div></div>;
+  if (attempt.error && !data) return <div className="mx-auto max-w-6xl p-6"><a href="#/" className="text-sm hover:underline">{t('← Overview')}</a><div className="mt-4"><FeedbackState error onRetry={() => refreshQuery(baseOf(project, attemptId))}>{attempt.error}</FeedbackState></div></div>;
   if (!data) return <div className="mx-auto max-w-6xl p-6"><PageSkeleton label={t('Reading the attempt…')} /></div>;
 
   const step = picked ?? initialStep(data);
@@ -97,17 +102,18 @@ function AttemptDetailPage({ project, attemptId, routeStep }: { project: string;
   const selectFile = (artifactId: number) => { setFileId(artifactId); setHashParam('file', String(artifactId)); };
   const openFile = (file: EvidenceFile) => { selectFile(file.artifactId); reveal('attempt-evidence'); };
   const totalBytes = data.files.reduce((sum, file) => sum + file.bytes, 0);
-  const pairs = derivePairs(data);
-  const confirmed = pairs.filter(pair => pair.runtime && (pair.runtime.status === 'pass' || (pair.runtime.status == null && pair.runtime.exitCode === 0))).length;
+  const checks = verificationSummary(data);
   const terminal = data.terminal;
   const where = data.where;
   const n = (id: string) => nonce[id] ?? 0;
 
   return <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 pb-8 min-[760px]:gap-8">
+    {attempt.error ? <FeedbackState error onRetry={() => refreshQuery(baseOf(project, attemptId))}>{t('Refresh failed; showing the last recorded snapshot.')} {attempt.observedAt != null ? t('Last successful API read at {at}', { at: formatAbsolute(attempt.observedAt) }) : null} · {attempt.error}</FeedbackState> : null}
+    {attempt.meta?.stale?.length ? <FeedbackState error onRetry={() => refreshQuery(baseOf(project, attemptId))}>{t('Some sources could not be refreshed: {sources}', { sources: attempt.meta.stale.join(' · ') })}</FeedbackState> : null}
     <Stagger className="flex min-w-0 flex-col gap-6 min-[760px]:gap-8">
       <StaggerItem><AttemptHeader attempt={data} project={project} /></StaggerItem>
       <StaggerItem><StepBar steps={stepItems(data)} selected={step} onSelect={selectStep} /></StaggerItem>
-      <StaggerItem><AttemptOpGoal attempt={data} info={info.info} loading={info.loading} /></StaggerItem>
+      <StaggerItem><AttemptOpGoal attempt={data} info={info.info} loading={info.loading} reference={info} /></StaggerItem>
       <StaggerItem><ResultCard attempt={data} /></StaggerItem>
       <StaggerItem><ProductsCard project={project} attempt={data} /></StaggerItem>
     </Stagger>
@@ -119,12 +125,12 @@ function AttemptDetailPage({ project, attemptId, routeStep }: { project: string;
       </div>
       <Stagger className="flex min-w-0 flex-col gap-4">
         <AdvancedSection id="attempt-input" title={t('Inputs & context')} summary={t('what the kernel hands over, what the op must read')} concept="C8" nonce={n('attempt-input')}><AttemptInputContext attempt={data} info={info.info} /></AdvancedSection>
-        <AdvancedSection id="attempt-step-checks" title={t('Verification')} summary={pairs.length ? `${pairs.length} check${data.checks.length > pairs.length ? t(' · {n} runs', { n: data.checks.length }) : ''}${t(' · runtime confirmed {done}/{total}', { done: confirmed, total: pairs.length })}${data.checksRed ? t(' · {n} failed', { n: data.checksRed }) : ''}` : t('no checks yet')} concept="C9" nonce={n('attempt-step-checks')}><CheckList attempt={data} onOpenFile={openFile} /></AdvancedSection>
+        <AdvancedSection id="attempt-step-checks" title={t('Verification')} summary={checks.total ? t('{checks} check identities · {runs} recorded runs · runtime confirmed {done}/{total}', { checks: checks.total, runs: checks.runs, done: checks.passed, total: checks.runtimeTotal }) : t('no checks yet')} concept="C9" nonce={n('attempt-step-checks')}><CheckList attempt={data} onOpenFile={openFile} /></AdvancedSection>
         <AdvancedSection id="attempt-where" title={t('Cost & where it ran')} summary={costSummary(data)} concept="C6" nonce={n('attempt-where')}><AttemptWhereCard attempt={data} /></AdvancedSection>
         <AdvancedSection id="attempt-evidence" title={t('Raw files')} summary={`${t('{n} files', { n: data.files.length })}${data.files.length ? ` · ${formatBytes(totalBytes)}` : ''}`} concept="C8" nonce={n('attempt-evidence')}><EvidenceBrowser files={data.files} selected={fileId} onSelect={selectFile} /></AdvancedSection>
         <AdvancedSection id="attempt-step-run" title="Transcript" summary={terminal?.transcript ? `${formatBytes(terminal.transcript.bytes)}${terminal.live ? t(' · open') : ''}` : t('No transcript yet')} concept="C7" nonce={n('attempt-step-run')}><TranscriptSection project={project} attemptId={attemptId} attempt={data} /></AdvancedSection>
         <AdvancedSection id="attempt-step-diff" title="Diff" summary={where.baseSha || where.headSha ? `${where.baseSha?.slice(0, 8) ?? '—'} → ${where.headSha?.slice(0, 8) ?? '—'}` : t('changes the op wrote to the repo')} concept="C11" nonce={n('attempt-step-diff')}><DiffSection project={project} attemptId={attemptId} attempt={data} /></AdvancedSection>
-        <AdvancedSection id="attempt-step-land" title="Land" summary={data.land ? data.land.result : t('no land record yet')} concept="C11" nonce={n('attempt-step-land')}><LandSection attempt={data} /></AdvancedSection>
+        <AdvancedSection id="attempt-step-land" title={t('Workflow integration (Land)')} summary={data.land ? data.land.result : t('No workflow land record')} concept="C11" nonce={n('attempt-step-land')}><LandSection attempt={data} /></AdvancedSection>
         <AdvancedSection id="attempt-timeline" title={t('Timeline')} summary={t('{n}/{total} marks', { n: data.timeline.filter(item => item.at).length, total: data.timeline.length })} concept="C7" nonce={n('attempt-timeline')}><TimelineCard attempt={data} /></AdvancedSection>
         <AdvancedSection id="attempt-decisions" title={t('Decisions')} summary={t('{actions} actions · {decisions} decisions · {lessons} lessons', { actions: data.actions.length, decisions: data.decisions.length, lessons: data.lessons.length })} concept="C12" nonce={n('attempt-decisions')}><AttemptDecisions attempt={data} /></AdvancedSection>
       </Stagger>

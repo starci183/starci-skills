@@ -5,19 +5,27 @@ import type { Tone } from '../status';
 import { t } from '../../i18n/t';
 
 /** Chart-level state of an attempt. `dropped` = cancelled/dropped (shown apart from red). */
-export type AttemptState = 'pass' | 'bad' | 'run' | 'dropped';
+export type AttemptState = 'pass' | 'bad' | 'run' | 'settling' | 'retry' | 'dropped' | 'unknown';
+
+export const isVerdictSettled = (row: AttemptRow): boolean => Number.isFinite(row.settledAt) && ['pass', 'fail', 'partial', 'blocked'].includes(row.verdict ?? '') && (row.endState == null || row.endState === 'settled');
 
 export const attemptState = (row: AttemptRow): AttemptState => {
-  if (row.verdict === 'pass') return 'pass';
-  if (row.verdict === 'fail' || row.verdict === 'partial' || row.verdict === 'blocked') return 'bad';
-  if (row.verdict === 'dropped' || row.verdict === 'cancelled') return 'dropped';
+  if (row.endState === 'worker-dead' || row.endState === 'effect-unknown') return 'bad';
+  if (row.endState === 'requeued') return 'retry';
+  if (row.endState === 'cancelled') return 'dropped';
+  if (row.settledAt != null) {
+    if (row.verdict === 'pass') return 'pass';
+    if (row.verdict === 'fail' || row.verdict === 'partial' || row.verdict === 'blocked') return 'bad';
+    if (row.verdict === 'dropped' || row.verdict === 'cancelled') return 'dropped';
+    return 'unknown';
+  }
   // Ended without a verdict (refused launch, dead worker, unknown effect) is not running.
-  if (row.endState === 'worker-dead') return 'bad';
-  if (row.endState != null && row.endState !== 'settled') return 'dropped';
-  return 'run';
+  if (row.endState != null) return 'unknown';
+  if (row.reportedAt != null || row.reportOutcome != null) return 'settling';
+  return row.dispatchedAt != null ? 'run' : 'unknown';
 };
-export const stateTone: Record<AttemptState, Tone> = { pass: 'success', bad: 'failed', run: 'running', dropped: 'skipped' };
-export const stateLabel: Record<AttemptState, string> = { pass: t('Passed'), bad: t('Failed/blocked'), run: t('Running'), dropped: t('Dropped') };
+export const stateTone: Record<AttemptState, Tone> = { pass: 'success', bad: 'failed', run: 'running', settling: 'warning', retry: 'warning', dropped: 'skipped', unknown: 'skipped' };
+export const stateLabel: Record<AttemptState, string> = { pass: t('Passed'), bad: t('Failed/blocked'), run: t('Running'), settling: t('Settling'), retry: t('Requeued'), dropped: t('Dropped'), unknown: t('Unknown') };
 
 export const num = (value: number, digits = 1) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: digits }).format(value);
 export const minutes = (ms: number) => ms / 60_000;
@@ -34,7 +42,7 @@ export const median = (values: number[]) => {
 };
 
 export const counts = (rows: AttemptRow[]) => {
-  const out = { pass: 0, bad: 0, run: 0, dropped: 0, total: rows.length };
+  const out = { pass: 0, bad: 0, run: 0, settling: 0, retry: 0, dropped: 0, unknown: 0, total: rows.length };
   for (const row of rows) out[attemptState(row)] += 1;
   return out;
 };
@@ -66,7 +74,7 @@ export function throughput(rows: AttemptRow[], since: number, now: number, maxBu
   const at = (t: number) => buckets[Math.floor((t - first) / step)];
   for (const row of rows) {
     if (row.dispatchedAt != null && row.dispatchedAt >= since) { const b = at(row.dispatchedAt); if (b) b.dispatched += 1; }
-    if (row.settledAt != null && row.settledAt >= since) { const b = at(row.settledAt); if (b) b.settled += 1; }
+    if (isVerdictSettled(row) && row.settledAt != null && row.settledAt >= since) { const b = at(row.settledAt); if (b) b.settled += 1; }
   }
   return { step, buckets };
 }
@@ -77,7 +85,8 @@ export function triesPerUnit(rows: AttemptRow[]): Map<number, number> {
   for (const row of rows) {
     if (!row.unit) continue;
     const key = `${row.project}\u0000${row.wf}\u0000${row.unit}`;
-    perUnit.set(key, Math.max(perUnit.get(key) ?? 0, row.attempt || 1));
+    if (!Number.isInteger(row.attempt) || row.attempt < 1) continue;
+    perUnit.set(key, Math.max(perUnit.get(key) ?? 0, row.attempt));
   }
   const dist = new Map<number, number>();
   for (const tries of perUnit.values()) dist.set(tries, (dist.get(tries) ?? 0) + 1);

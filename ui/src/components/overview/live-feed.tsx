@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { useApiQuery } from '../../api/query';
+import { refreshQuery, useApiQuery } from '../../api/query';
 import type { LogRow } from '../../contract';
 import { statusTone, type Status } from '../status';
 import { TimeAgo } from '../time-ago';
 import type { Concept } from '../concept';
-import { AgentAvatar } from '../agent/agent-avatar';
-import { attemptAgent, useAttemptAgents } from '../agent/use-running-agents';
+import { AgentAvatar, agentOf } from '../agent/agent-avatar';
+import { useAttemptAgents } from '../agent/use-running-agents';
+import { FeedbackState } from '../feedback-state';
+import { hasUnavailableSources } from './read-state';
 import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C7';
@@ -20,8 +22,9 @@ export function logHref(row: LogRow): string | null {
 }
 
 function FeedRow({ row, fresh }: { row: LogRow; fresh: boolean }) {
-  const { forJob } = useAttemptAgents();
-  const attempt = forJob(row.project, row.job);
+  const { forAttempt } = useAttemptAgents();
+  const attemptRef = row.refs.find(item => item.kind === 'attempt');
+  const attempt = row.actor === 'op' && attemptRef ? forAttempt(attemptRef.project ?? row.project, attemptRef.id) : undefined;
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     if (fresh && ref.current && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -31,7 +34,7 @@ function FeedRow({ row, fresh }: { row: LogRow; fresh: boolean }) {
   const href = logHref(row);
   const body = <>
     <span className="w-14 shrink-0 text-xs text-muted-foreground"><TimeAgo at={row.at} /></span>
-    {attempt ? <AgentAvatar agent={attemptAgent(attempt)} size={20} /> : null}
+    {attempt ? <AgentAvatar agent={agentOf(attempt)} size={20} /> : null}
     <span className="min-w-0 flex-1">
       <span className="line-clamp-2 break-words text-[13px]">{row.msg}</span>
       <span className="block truncate text-[11.5px] text-muted-foreground">{[row.project, row.wf, row.job, row.actor].filter(Boolean).join(' · ')}</span>
@@ -44,16 +47,21 @@ function FeedRow({ row, fresh }: { row: LogRow; fresh: boolean }) {
 
 /** Live feed from /api/logs, newest first; rows that arrive after the first load flash once. */
 export function LiveFeed({ limit = 30 }: { limit?: number }) {
-  const logs = useApiQuery<LogRow[]>(`/api/logs?limit=${limit}`, { topics: ['logs'], intervalMs: 15_000 });
+  const url = `/api/logs?limit=${limit}`;
+  const logs = useApiQuery<LogRow[]>(url, { topics: ['logs'], intervalMs: 15_000 });
   const seen = useRef<Set<string> | null>(null);
   const rows = logs.data ?? [];
+  const partial = hasUnavailableSources(logs.meta);
   const fresh = new Set<string>();
   if (logs.data && seen.current) for (const row of rows) if (!seen.current.has(row.key)) fresh.add(row.key);
   useEffect(() => {
     if (logs.data) seen.current = new Set(logs.data.map(row => row.key));
   }, [logs.data]);
   return <div className="max-h-[32rem] overflow-y-auto">
+    <p className="px-4 py-2 text-xs text-muted-foreground">{t('Latest {n} loaded events · host scope', { n: logs.data == null ? '—' : rows.length })}{logs.meta?.next ? ` · ${t('More events are available in Logs.')}` : ''}</p>
+    {logs.error && rows.length > 0 && <p className="shell-error m-3" role="status">{t('The source is failing; showing the last read. {error}', { error: logs.error })}</p>}
+    {partial ? <p className="shell-error m-3" role="status">{t('Some sources are unavailable; showing the recorded part.')}</p> : null}
     {rows.map(row => <FeedRow key={row.key} row={row} fresh={fresh.has(row.key)} />)}
-    {!rows.length && <p className="px-4 py-3 text-sm text-muted-foreground">{logs.error ?? (logs.loading ? t('Loading…') : t('No events yet.'))}</p>}
+    {!rows.length && <div className="px-4 py-3"><FeedbackState error={Boolean(logs.error)} onRetry={logs.error ? () => refreshQuery(url) : undefined}>{logs.error ? t('The source is unavailable.') : logs.data == null ? logs.meta ? t('Event observations have not been recorded.') : t('Loading…') : partial ? t('No events were observed in the last read.') : t('No events yet.')}</FeedbackState></div>}
   </div>;
 }

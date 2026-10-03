@@ -5,6 +5,7 @@ import { PathLink } from '../path-link';
 import { UsageView } from '../usage-view';
 import { CopyId, InfoChip, InfoRow, ShaId } from '../infra/rows';
 import { t } from '../../i18n/t';
+import { AdmissionDetails } from './admission';
 
 export const concept: Concept = 'C6';
 
@@ -25,7 +26,7 @@ export function AttemptWhereCard({ attempt }: { attempt: AttemptDetailV2 }) {
         </InfoRow>
         <InfoRow label="Worktree">
           {w.worktree ? <span className="inline-flex flex-wrap items-center gap-2"><PathLink path={w.worktree} kind="dir" />{w.worktreeRemovedAt ? <InfoChip tone="skipped">{t('removed')}</InfoChip> : null}</span>
-            : <span className="text-muted-foreground">{t('no dedicated worktree — the op ran on the main checkout')}</span>}
+            : <span className="text-muted-foreground">{t('Checkout location not recorded')}</span>}
         </InfoRow>
         <InfoRow label={t('Assigned paths')}>
           {w.ownedPaths.length ? <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -33,7 +34,7 @@ export function AttemptWhereCard({ attempt }: { attempt: AttemptDetailV2 }) {
               <code className="font-mono text-[11px] text-muted-foreground [overflow-wrap:anywhere]">{p.rel}</code>
               <PathLink path={p.abs} kind={isFile(p.rel) ? 'file' : 'dir'} />
             </li>)}
-          </ul> : <span className="text-muted-foreground">—</span>}
+          </ul> : <span className="text-muted-foreground">{w.scopeSource === 'contract' ? t('Captured write scope is empty') : t('Write scope not recorded')}</span>}
         </InfoRow>
         <InfoRow label={t('Ledger file')}><PathLink path={w.ledgerFile} kind="file" /></InfoRow>
         <InfoRow label={t('Blob store')}><PathLink path={w.blobRoot} kind="dir" /></InfoRow>
@@ -57,7 +58,7 @@ export function AttemptWhereCard({ attempt }: { attempt: AttemptDetailV2 }) {
         <InfoRow label="Agent node"><CopyId value={w.agentNode} /></InfoRow>
         <InfoRow label={t('Parent agent')}><CopyId value={w.parentAgent} /></InfoRow>
         <InfoRow label="Trace span"><CopyId value={w.traceSpan} /></InfoRow>
-        <InfoRow label="Job">
+        <InfoRow label={t('Job · current status')}>
           <span className="inline-flex flex-wrap items-center gap-2"><CopyId value={w.job} />{w.jobStatus ? <InfoChip tone={w.jobStatus === 'failed' ? 'failed' : w.jobStatus === 'awaiting_owner' ? 'owner' : w.jobStatus === 'succeeded' || w.jobStatus === 'passed' ? 'success' : undefined}>{w.jobStatus}</InfoChip> : null}</span>
         </InfoRow>
         <InfoRow label={t('Session record')}>
@@ -68,6 +69,8 @@ export function AttemptWhereCard({ attempt }: { attempt: AttemptDetailV2 }) {
         </InfoRow>
       </dl>
     </div>
+    <p className="mt-2 text-xs text-muted-foreground">{t('Locations and launch IDs come from this dispatch; assigned paths come from its captured contract. Job status is current.')}</p>
+    <AdmissionDetails attempt={attempt} />
     <div className="mt-3 border-t border-border pt-3">
       <h4 className="m-0 mb-2 text-[13px] font-semibold">{t('Tokens & cost')}</h4>
       <UsageView usage={attempt.usage} />

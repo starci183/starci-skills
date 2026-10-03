@@ -8,6 +8,7 @@ import { StatusChip } from '../status-chip';
 import { Card, Empty } from './frame/card';
 import { formatSpan } from './frame/util';
 import { t } from '../../i18n/t';
+import { runtimeObservation, verificationSummary } from './verification';
 
 export const concept: Concept = 'C9';
 
@@ -31,24 +32,8 @@ function CopyButton({ value }: { value: string }) {
 
 function matchFile(files: EvidenceFile[], check: CheckRow): EvidenceFile | null {
   return files.find(file => file.check?.id === check.id)
-    ?? files.find(file => file.group === 'check' && file.check?.name === check.name)
-    ?? files.find(file => file.check?.name === check.name)
+    ?? files.find(file => [check.output?.sha, check.stdout?.sha, check.stderr?.sha].includes(file.sha))
     ?? null;
-}
-
-/** Server `checkPairs` when present; otherwise pair rows by name (op-declared vs runtime-run). */
-export function derivePairs(attempt: AttemptDetailV2): CheckPair[] {
-  const served = (attempt as { checkPairs?: CheckPair[] }).checkPairs;
-  if (Array.isArray(served)) return served;
-  const pairs = new Map<string, CheckPair>();
-  for (const check of attempt.checks) {
-    const pair = pairs.get(check.name) ?? { name: check.name, op: null, runtime: null };
-    const isOp = check.authority === 'declared' || check.runner === 'op';
-    const slot = isOp ? 'op' : 'runtime';
-    if (!pair[slot] || check.runSeq >= (pair[slot] as CheckRow).runSeq) pair[slot] = check;
-    pairs.set(check.name, pair);
-  }
-  return [...pairs.values()];
 }
 
 type Verdict = 'pass' | 'fail' | null;
@@ -70,7 +55,8 @@ function opSide(pair: CheckPair): { verdict: Verdict; exit: number | null } {
 function runtimeSide(pair: CheckPair): { verdict: Verdict; exit: number | null } {
   const row = pair.runtime;
   if (!row) return { verdict: null, exit: null };
-  return { verdict: verdictOf(row.status, row.exitCode), exit: row.exitCode };
+  const observation = runtimeObservation(row);
+  return { verdict: observation === 'pass' || observation === 'fail' ? observation : null, exit: row.exitCode };
 }
 
 function Mark({ verdict, exit, extra }: { verdict: Verdict; exit: number | null; extra?: string | null }) {
@@ -101,14 +87,14 @@ function PairRow({ pair, files, onOpenFile }: { pair: CheckPair; files: Evidence
   const command = main?.command ?? rows.find(row => row.command)?.command ?? null;
   const cwd = main?.cwd ?? rows.find(row => row.cwd)?.cwd ?? null;
   const file = rows.map(row => matchFile(files, row)).find(Boolean) ?? null;
-  const tone = rt.verdict === 'fail' || op.verdict === 'fail' ? 'failed' : mismatch ? 'warning' : rt.verdict === 'pass' ? 'success' : 'queued';
+  const tone = rt.verdict === 'fail' ? 'failed' : mismatch ? 'warning' : rt.verdict === 'pass' ? 'success' : 'queued';
   return <li className="min-w-0" data-tone={tone}>
     <button type="button" aria-expanded={open} onClick={() => setOpen(v => !v)} className="grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-1 py-2 text-left hover:bg-muted/40 sm:grid-cols-[auto_minmax(0,1fr)_9rem_13rem_auto]">
       <ChevronRight className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
-      <strong className="min-w-0 break-words text-sm">{pair.name}</strong>
+      <span className="min-w-0"><strong className="block break-words text-sm">{pair.name}</strong><span className="block break-words text-[11px] text-muted-foreground">{pair.runner} · {pair.authority} · {pair.phase}</span></span>
       <span className="col-start-2 flex flex-wrap items-center gap-x-4 gap-y-1 sm:col-auto sm:contents">
         <span className="inline-flex items-center gap-1"><span className="text-[11px] text-muted-foreground sm:hidden">{t('Op declared')}</span><Mark verdict={op.verdict} exit={op.exit} /></span>
-        <span className="inline-flex items-center gap-1"><span className="text-[11px] text-muted-foreground sm:hidden">{t('Runtime ran')}</span><Mark verdict={rt.verdict} exit={rt.exit} extra={pair.runtime?.wallMs != null ? formatSpan(pair.runtime.wallMs) : null} /></span>
+        <span className="inline-flex flex-wrap items-center gap-1"><span className="text-[11px] text-muted-foreground sm:hidden">{t('Runtime ran')}</span><Mark verdict={rt.verdict} exit={rt.verdict == null ? null : rt.exit} extra={pair.runtime?.wallMs != null ? formatSpan(pair.runtime.wallMs) : null} />{rt.verdict == null ? <span className="text-[11px] text-muted-foreground">{pair.runtime?.status === 'unavailable' ? t('Unavailable') : pair.runtime?.status === 'skipped' ? t('Skipped') : t('Not confirmed')}</span> : null}</span>
         {mismatch ? <span className="inline-flex items-center gap-1 text-[11px] font-medium" data-tone="warning" style={{ color: 'var(--tone)' }} title={t('Op-declared and runtime-run do not match')}><TriangleAlert className="size-3.5" aria-hidden="true" />{t('Mismatch')}</span> : <span className="hidden sm:block" />}
       </span>
     </button>
@@ -121,21 +107,24 @@ function PairRow({ pair, files, onOpenFile }: { pair: CheckPair; files: Evidence
         {file ? <button type="button" className="font-medium text-primary hover:underline" onClick={() => onOpenFile(file)}>{t('View output →')}</button> : <span className="text-muted-foreground">{t('No output file yet')}</span>}
       </div>
       {rows.map(row => <Tails key={row.id} check={row} />)}
+      {rows.map(row => <p key={`identity-${row.id}`} className="m-0 break-all font-mono text-[11px] text-muted-foreground">#{row.id} · {t('run {n}', { n: row.runSeq })} · {t('Input digest')}: {row.inputDigest ?? t('Not recorded')}</p>)}
     </div> : null}
   </li>;
 }
 
-/** Compact matrix, one row per check name: what the op declared vs what the runtime ran. */
+/** One latest run per exact runner/authority/phase/name, selected by the read API. */
 export function CheckList({ attempt, onOpenFile }: { attempt: AttemptDetailV2; onOpenFile: (file: EvidenceFile) => void }) {
-  const pairs = derivePairs(attempt);
-  const confirmed = pairs.filter(pair => runtimeSide(pair).verdict === 'pass').length;
-  const red = pairs.filter(pair => runtimeSide(pair).verdict === 'fail' || opSide(pair).verdict === 'fail').length;
+  const summary = verificationSummary(attempt);
+  const pairs = summary.pairs;
+  const confirmed = summary.passed;
+  const red = summary.failed;
   const lech = pairs.filter(pair => { const o = opSide(pair); const r = runtimeSide(pair); return (o.verdict != null && r.verdict != null && o.verdict !== r.verdict) || (o.exit != null && r.exit != null && o.exit !== r.exit); }).length;
-  return <Card id="attempt-step-checks" concept="C9" title={t('Verification')} hint={pairs.length ? t('{n} checks{runs} · runtime confirmed {done}/{total}', { n: pairs.length, runs: attempt.checks.length > pairs.length ? t(' · {n} runs', { n: attempt.checks.length }) : '', done: confirmed, total: pairs.length }) : undefined}
+  return <Card id="attempt-step-checks" concept="C9" title={t('Verification')} hint={pairs.length ? t('{checks} check identities · {runs} recorded runs · runtime confirmed {done}/{total}', { checks: pairs.length, runs: summary.runs, done: confirmed, total: summary.runtimeTotal }) : undefined}
     right={pairs.length ? <>{red ? <StatusChip status="failed" label={t('{n} failed', { n: red })} /> : null}{lech ? <StatusChip status="retry" label={t('{n} mismatched', { n: lech })} /> : null}</> : null}>
     {pairs.length ? <>
       <div className="hidden grid-cols-[auto_minmax(0,1fr)_9rem_13rem_auto] gap-x-3 border-b px-1 pb-2 text-[11px] uppercase tracking-wide text-muted-foreground sm:grid"><span className="w-4" /><span>Check</span><span>{t('Op declared')}</span><span>{t('Runtime ran')}</span><span /></div>
-      <ul className="divide-y">{pairs.map(pair => <PairRow key={pair.name} pair={pair} files={attempt.files} onOpenFile={onOpenFile} />)}</ul>
+      <p className="my-2 text-xs text-muted-foreground">{t('Check runs, Op-declared criteria and recorded conditions have separate scopes.')}</p>
+      <ul className="divide-y">{pairs.map(pair => <PairRow key={pair.key} pair={pair} files={attempt.files} onOpenFile={onOpenFile} />)}</ul>
     </> : <Empty>{t('No checks recorded for this attempt yet.')}</Empty>}
   </Card>;
 }

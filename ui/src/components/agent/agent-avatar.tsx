@@ -7,21 +7,26 @@ export const concept: Concept = 'C6';
 
 const PROVIDER_FAMILY: Record<string, AgentFamily> = { claude: 'claude', anthropic: 'claude', codex: 'codex', openai: 'codex', devin: 'devin', cognition: 'devin' };
 
+type ModelObservation = { requestedModel?: string | null; attestedAt?: number | null; modelAuthority?: 'attested' | 'unobserved' };
+export type LinkedAgent = AgentRef & ModelObservation & { href?: string; live?: boolean };
+
 /** Maps agent/provider/pool/model fields to an agent family. The declared `provider` (the registry.yaml
  * provider family the attempt row carries) wins; the agent/pool/model strings are the fallback
  * (pool `devin-agent`, model `swe-2-max`, `gpt-6.1-sol`, `claude-opus-5-5`…). */
-export function agentOf(input: { agent?: string | null; provider?: string | null; pool?: string | null; model?: string | null }): AgentRef {
+export function agentOf(input: { agent?: string | null; provider?: string | null; pool?: string | null; model?: string | null } & ModelObservation): LinkedAgent {
   const family: AgentFamily = PROVIDER_FAMILY[(input.provider ?? '').toLowerCase()]
     ?? PROVIDER_FAMILY[(input.agent ?? '').toLowerCase()]
     ?? (() => { const text = `${input.pool ?? ''} ${input.model ?? ''}`.toLowerCase();
       return /claude|anthropic|opus|sonnet|haiku|fable/.test(text) ? 'claude' : /codex|gpt|openai/.test(text) ? 'codex'
         : /devin|swe-|cognition/.test(text) ? 'devin' : 'unknown'; })();
-  return { family, pool: input.pool ?? null, model: input.model ?? null, label: input.model ?? input.pool ?? input.agent ?? input.provider ?? t('unknown') };
+  return { family, pool: input.pool ?? null, model: input.model ?? null, label: input.model ?? input.pool ?? input.agent ?? input.provider ?? t('unknown'),
+    requestedModel: input.requestedModel, attestedAt: input.attestedAt, modelAuthority: input.modelAuthority };
 }
 
-export type LinkedAgent = AgentRef & { href?: string; live?: boolean };
-
-const tooltip = (agent: AgentRef) => [familyTint[agent.family].name, agent.pool, agent.model].filter(Boolean).join(' · ');
+const tooltip = (agent: LinkedAgent) => [familyTint[agent.family].name, agent.pool,
+  agent.requestedModel ? t('Requested model: {model}', { model: agent.requestedModel }) : null,
+  agent.model ? t(agent.modelAuthority === 'attested' ? 'Attested model: {model}' : 'Recorded model: {model}', { model: agent.model }) : null,
+  agent.modelAuthority !== 'attested' ? t('Model attestation has not been observed.') : null].filter(Boolean).join(' · ');
 
 /** Round family mark on a tinted circle. `live` adds a pulsing ring; `href` makes it a link. Tooltip: agent · pool · model. */
 export function AgentAvatar({ agent, size = 20, withLabel = false, live = false, href }: { agent: LinkedAgent; size?: number; withLabel?: boolean; live?: boolean; href?: string }) {
