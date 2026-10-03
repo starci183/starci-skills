@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { main } from '../../packages/hfs/src/main.mjs';
-import { appHasDbTypes, dbTypesEmitter, dbTypesPath, emitDbTypes, generateDbTypes, writeDbTypes } from '../../packages/hfs/emit/db-types.mjs';
+import { TYPES_STAMP, appHasDbTypes, dbTypesEmitter, dbTypesPath, emitDbTypes, generateDbTypes, migrationsDigest, writeDbTypes } from '../../packages/hfs/emit/db-types.mjs';
 import { emitContracts } from '../../packages/hfs/emit/contracts.mjs';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { openHfs } from '../../packages/hfs/runtime/scripts/hfs/slots.mjs';
@@ -20,6 +20,8 @@ const made = [];
 test.after(() => { for (const dir of made) fs.rmSync(dir, { recursive: true, force: true }); });
 
 const GENERATED = 'export type Database = { public: { Tables: {} } };\n';
+/** The text an emit writes: the generated types under the stamp of the migrations of the app at `root`. */
+const stamped = (root) => `${TYPES_STAMP}${migrationsDigest(root)}\n${GENERATED}`;
 const CONFIG = '[api]\nenabled = true\nschemas = ["public", "storage"]\n';
 const TYPESCRIPT_ENTRY = createRequire(import.meta.url).resolve('typescript');
 
@@ -54,14 +56,14 @@ function appRoot(files, provider = null) {
 test('emitDbTypes returns the generated text and narrows it to the [api] schemas of config.toml', () => {
   const dir = appRoot({ 'supabase/config.toml': CONFIG }, null);
   const calls = [];
-  assert.equal(emitDbTypes({ root: dir, run: fakeRun(calls) }), GENERATED);
+  assert.equal(emitDbTypes({ root: dir, run: fakeRun(calls) }), stamped(dir));
   assert.deepEqual(calls, [{ file: 'supabase', args: ['gen', 'types', 'typescript', '--local', '--schema', 'public,storage'], cwd: dir }]);
 });
 
 test('emitDbTypes passes no --schema without a config.toml, and a failing run raises HFS_EMIT_DB_TYPES_FAILED naming the first stderr line', () => {
   const dir = appRoot({}, null);
   const calls = [];
-  assert.equal(emitDbTypes({ root: dir, run: fakeRun(calls) }), GENERATED);
+  assert.equal(emitDbTypes({ root: dir, run: fakeRun(calls) }), stamped(dir));
   assert.deepEqual(calls[0].args, ['gen', 'types', 'typescript', '--local']);
   const failing = () => ({ status: 1, stdout: '', stderr: 'docker is not running\nmore detail here\n' });
   const thrown = (fn) => { try { fn(); } catch (e) { return e; } return null; };
@@ -78,7 +80,7 @@ test('writeDbTypes writes the file and a re-run over the same text is a no-op on
   const calls = [];
   const run = fakeRun(calls);
   assert.deepEqual(writeDbTypes({ root: dir, run }), { path: dbTypesPath, changed: true });
-  assert.equal(fs.readFileSync(path.join(dir, dbTypesPath), 'utf8'), GENERATED);
+  assert.equal(fs.readFileSync(path.join(dir, dbTypesPath), 'utf8'), stamped(dir));
   assert.deepEqual(writeDbTypes({ root: dir, run }), { path: dbTypesPath, changed: false }, 'the second emit regenerates but does not rewrite');
   assert.equal(calls.length, 2, 'the text is regenerated, the write is skipped');
 });
@@ -117,12 +119,12 @@ test('emitContracts: an app with provider supabase gets supabase/types/database.
   const run = fakeRun(calls);
   const first = emitContracts({ repoRoot: path.join(dir, 'be'), declaration: { apps: [] }, run });
   assert.deepEqual(first.types, { path: dbTypesPath, changed: true });
-  assert.equal(fs.readFileSync(path.join(dir, dbTypesPath), 'utf8'), GENERATED);
+  assert.equal(fs.readFileSync(path.join(dir, dbTypesPath), 'utf8'), stamped(dir));
   assert.deepEqual(calls.map((c) => [c.file, c.cwd]), [['supabase', dir]]);
   assert.deepEqual(calls[0].args, ['gen', 'types', 'typescript', '--local', '--schema', 'public,storage']);
   const second = emitContracts({ repoRoot: path.join(dir, 'be'), declaration: { apps: [] }, run });
   assert.deepEqual(second.types, { path: dbTypesPath, changed: false });
-  assert.equal(fs.readFileSync(path.join(dir, dbTypesPath), 'utf8'), GENERATED);
+  assert.equal(fs.readFileSync(path.join(dir, dbTypesPath), 'utf8'), stamped(dir));
 });
 
 test('emit-contracts CLI regenerates database types for a scaffolded lite app through its injected runner', async () => {
@@ -149,7 +151,7 @@ test('emit-contracts CLI regenerates database types for a scaffolded lite app th
   const run = fakeRun(calls);
 
   assert.equal(await main(['emit', '--cwd', root], { run, stdout: text => stdout.push(text) }), 0);
-  assert.equal(fs.readFileSync(path.join(root, dbTypesPath), 'utf8'), GENERATED);
+  assert.equal(fs.readFileSync(path.join(root, dbTypesPath), 'utf8'), stamped(root));
   assert.deepEqual(calls, [{
     file: 'supabase',
     args: ['gen', 'types', 'typescript', '--local', '--schema', 'public,graphql_public'],
@@ -163,7 +165,7 @@ test('dbTypesEmitter is the emitTypes of checkDatabase: drift and emit-failed ar
   const dir = appRoot({ 'supabase/config.toml': CONFIG, [dbTypesPath]: 'export type Database = { old: true };\n' }, 'supabase');
   const stale = await checkDatabase({ repoRoot: dir, files: [dbTypesPath], git: noRemote, emitTypes: dbTypesEmitter({ run: fakeRun([]) }) });
   assert.deepEqual(stale.map((f) => [f.code, f.drift]), [['DB_TYPES_DRIFT', 'stale']]);
-  fs.writeFileSync(path.join(dir, dbTypesPath), GENERATED);
+  fs.writeFileSync(path.join(dir, dbTypesPath), stamped(dir));
   assert.deepEqual(await checkDatabase({ repoRoot: dir, files: [dbTypesPath], git: noRemote, emitTypes: dbTypesEmitter({ run: fakeRun([]) }) }), []);
   const failed = await checkDatabase({ repoRoot: dir, files: [dbTypesPath], git: noRemote, emitTypes: dbTypesEmitter({ run: () => ({ status: 1, stdout: '', stderr: 'no stack\n' }) }) });
   assert.deepEqual(failed.map((f) => [f.code, f.drift]), [['DB_TYPES_DRIFT', 'emit-failed']]);
@@ -180,11 +182,11 @@ test('generateDbTypes: starts the app stack, emits, stops what it started; a sta
     calls.push([file, args[0], options.cwd]);
     return args[0] === 'gen' ? { status: 0, stdout: GENERATED, stderr: '' } : { status: 0, stdout: '', stderr: '' };
   };
-  assert.equal(generateDbTypes({ root: dir, run }), GENERATED);
+  assert.equal(generateDbTypes({ root: dir, run }), stamped(dir));
   assert.deepEqual(calls.map((c) => c[1]), ['start', 'gen', 'stop']);
   const up = [];
   const alreadyUp = (file, args) => { up.push(args[0]); return args[0] === 'start' ? { status: 1, stdout: '', stderr: 'supabase start is already running.\n' } : { status: 0, stdout: GENERATED, stderr: '' }; };
-  assert.equal(generateDbTypes({ root: dir, run: alreadyUp }), GENERATED);
+  assert.equal(generateDbTypes({ root: dir, run: alreadyUp }), stamped(dir));
   assert.deepEqual(up, ['start', 'gen'], 'a stack the call did not start is not stopped');
   assert.throws(() => generateDbTypes({ root: dir, run: () => ({ status: 1, stdout: '', stderr: 'Cannot connect to the Docker daemon\n' }) }), /HFS_EMIT_DB_TYPES_FAILED.*start.*Docker daemon/);
   const stops = [];
@@ -206,7 +208,7 @@ test('generateDbTypes falls back from a missing supabase binary to the canon-pin
         : { status: 0, stdout: '', stderr: '' };
     };
 
-    assert.equal(generateDbTypes({ root: dir, run, platform }), GENERATED);
+    assert.equal(generateDbTypes({ root: dir, run, platform }), stamped(dir));
     assert.deepEqual(calls.filter((call) => call.file === 'supabase').map((call) => call.args[0]), ['start', 'gen', 'stop']);
     const fallbacks = calls.filter((call) => call.file !== 'supabase');
     assert.deepEqual(fallbacks.map((call) => call.file), Array(3).fill(platform === 'win32' ? 'cmd.exe' : 'npx'));

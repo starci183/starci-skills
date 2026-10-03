@@ -26,6 +26,9 @@ The app is still one monorepo. The `app.sides` slot contains a back-end side and
 Supabase is an app-level concern because both sides depend on it. `app.supabase.migrations` is the schema authority and
 `app.supabase.types` is the committed generated contract. Front-end access belongs to `fe.modules.db`; back-end administrative
 integration belongs to `be.integrations.supabase`. The slot manifest remains the source for every concrete location.
+The types file starts with the digest of the migrations it was generated from. The managed codegen step is offline: it
+only compares that digest with the migrations and refuses missing or stale types, so lint, typecheck, build and CI need no stack.
+Regenerating the types (`starci app emit`) is the one step that starts the local stack.
 
 ## Database, authentication and storage
 

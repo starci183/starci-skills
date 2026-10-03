@@ -10,6 +10,7 @@
  * the default spawns the `supabase` binary with an argument array, never a shell string and never printing env; a spec's fake
  * keeps Docker out of the suite. A run that cannot produce the text throws DbTypesError (HFS_EMIT_DB_TYPES_FAILED).
  */
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,6 +19,23 @@ import { parseYaml } from '../runtime/engine/yaml.mjs';
 
 /** The repository-relative path of the generated types (the path of slot `app.supabase.types`). */
 export const dbTypesPath = 'supabase/types/database.types.ts';
+
+/** The folder of the app's migrations, and the first line of the committed types: the digest of the migrations they were generated from. */
+const MIGRATIONS_DIR = 'supabase/migrations';
+export const TYPES_STAMP = '// migrations-sha256: ';
+
+/**
+ * The sha256 of the app's migrations, hex: every `supabase/migrations/*.sql` by name, each as name, NUL, its text with LF line ends,
+ * NUL. The offline codegen hook of a lite app (templates/app/codegen-lite) computes the same digest and refuses types stamped with another.
+ */
+export function migrationsDigest(root) {
+  const dir = path.join(root, MIGRATIONS_DIR);
+  const hash = createHash('sha256');
+  for (const name of (fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((file) => file.endsWith('.sql')).sort()) {
+    hash.update(`${name}\0${fs.readFileSync(path.join(dir, name), 'utf8').replace(/\r\n/g, '\n')}\0`);
+  }
+  return hash.digest('hex');
+}
 
 /** The slot that owns the generated types; enabled by a connection declaring provider supabase. */
 const DB_TYPES_SLOT = 'app.supabase.types';
@@ -91,7 +109,7 @@ function emitDbTypesWithRunner({ root, run }) {
     const cause = firstLine(stderr) ?? firstLine(result?.error?.message ?? result?.error) ?? 'no output';
     throw new DbTypesError(`\`${command}\` failed${result?.status !== undefined && result?.status !== null ? ` (exit ${result.status})` : ''}: ${cause}; the local Supabase stack must be up (supabase start)`, { file: dbTypesPath, stderr });
   }
-  return stdout;
+  return `${TYPES_STAMP}${migrationsDigest(root)}\n${stdout}`;
 }
 
 export function emitDbTypes({ root, run = spawn, platform = process.platform } = {}) {

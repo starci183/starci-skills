@@ -92,8 +92,8 @@ test('the lite managed set has no test or coverage world and carries the databas
   assert.match(sonar, /^sonar\.exclusions=\*\*\/\.next\/\*\*,\*\*\/node_modules\/\*\*,\*\*\/src\/messages\/\*\*,supabase\/types\/\*\*$/m);
   assert.doesNotMatch(sonar, /coverage|lcov|sonar\.tests|test\.inclusions/i);
   const codegen = targets['scripts/codegen.mjs'].content;
-  assert.equal((codegen.match(/execFileSync\(/g) ?? []).length, 1);
-  assert.match(codegen, /["']db:types["']/);
+  assert.doesNotMatch(codegen, /child_process/, 'the lite codegen is offline: it reads the committed types and starts nothing');
+  assert.match(codegen, /migrations-sha256/);
 });
 
 test('lite render needs no Jest preset, writeTargets reaches a no-op, and managed drift uses the same render', async t => {
