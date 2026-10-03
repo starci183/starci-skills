@@ -41,7 +41,9 @@ function laneApp(t) {
 
 test('packages/hfs declares no bin: the only bin is @starci/cli `starci`, and it is the runtime fallback', () => {
   assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', 'hfs', 'package.json'), 'utf8')).bin, undefined);
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', 'cli', 'package.json'), 'utf8')).bin, { starci: './bin/starci.mjs' });
+  const { bin } = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', 'cli', 'package.json'), 'utf8'));
+  assert.deepEqual(Object.keys(bin), ['starci']);
+  assert.equal(path.join(ROOT, 'packages', 'cli', bin.starci), RUNTIME_STARCI_BIN);
   assert.ok(fs.existsSync(RUNTIME_STARCI_BIN));
 });
 
@@ -56,8 +58,8 @@ test('an app that installs @starci/cli runs its own bin and the @starci/hfs besi
   const root = tmp(t, 'starci-gate-install-');
   put(root, 'package.json', '{ "name": "app", "private": true }\n');
   const cli = path.join(root, 'node_modules', '@starci', 'cli');
-  put(cli, 'package.json', JSON.stringify({ name: '@starci/cli', version: '1.0.0', bin: { starci: './bin/starci.mjs' } }));
-  const bin = put(cli, 'bin/starci.mjs', '');
+  put(cli, 'package.json', JSON.stringify({ name: '@starci/cli', version: '1.0.0', bin: { starci: './cli-entry.mjs' } }));
+  const bin = put(cli, 'cli-entry.mjs', '');
   const nested = path.join(cli, 'node_modules', '@starci', 'hfs');
   put(nested, 'package.json', JSON.stringify({ name: '@starci/hfs', version: '4.0.9' }));
   assert.deepEqual(hfsEntry(root), { dir: nested, bin });
