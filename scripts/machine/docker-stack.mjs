@@ -10,6 +10,7 @@ import { composePs as realComposePs } from '../api/docker/compose-ps.mjs';
 import { ps as realDockerPs } from '../api/docker/ps.mjs';
 import { resourceList as realResourceList } from '../api/docker/resource-list.mjs';
 import { resourceRemove as realResourceRemove } from '../api/docker/resource-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { resultDetail as detail, resultOk as ok } from '../lib/verb-call.mjs';
 import { underHostLock } from './verb-lock.mjs';
 import {
@@ -104,7 +105,7 @@ const withOverride = async (model, project, fn, deps) => {
   try {
     fs.writeFileSync(file, `${JSON.stringify(labelsOverride(model, project), null, 2)}\n`);
     return await fn(file);
-  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  } finally { safeRemove(dir); }
 };
 
 /** Start one app stack after rendering and checking the Compose model, then map its waited health result. */

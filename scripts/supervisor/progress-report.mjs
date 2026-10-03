@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// starci supervisor report — the supervisor's periodic progress report, sent to the
+// progress-report.mjs — the supervisor's periodic progress report, sent to the
 // owner's Telegram.
 //   starci supervisor report [--repo <path>]... [--send] [--json]
 // Owner, 2026-09-23: "every 10 minutes the supervisor draws a progress table with the
@@ -199,20 +199,20 @@ export function workflowSection(r, { now = Date.now(), language = ownerLanguage(
   const failed = r.legs.filter((l) => l.state === 'failed').map((l) => legLabel(l.op, language));
   const todo = r.legs.filter((l) => l.state === 'todo').map((l) => legLabel(l.op, language));
   if (doneLegs.length) line.push(tr('✅ Done: {legs}', { legs: escapeHtml(doneLegs.join(', ')) }));
-  for (const l of active) line.push(`${tr('�� In progress: <b>{op}</b>', { op: escapeHtml(legLabel(l.op, language)) })}${l.rework ? tr(' (rework)') : ''}${l.count > 1 ? tr(' — {count} ops in parallel', { count: l.count }) : ''}${l.since ? tr(', running for {ago}', { ago: escapeHtml(dur(now - l.since, tr)) }) : ''}`);
+  for (const l of active) line.push(`${tr('🔄 In progress: <b>{op}</b>', { op: escapeHtml(legLabel(l.op, language)) })}${l.rework ? tr(' (rework)') : ''}${l.count > 1 ? tr(' — {count} ops in parallel', { count: l.count }) : ''}${l.since ? tr(', running for {ago}', { ago: escapeHtml(dur(now - l.since, tr)) }) : ''}`);
   if (queued.length) line.push(tr('⏳ Waiting its turn: {legs}', { legs: escapeHtml(queued.join(', ')) }));
   if (failed.length) line.push(tr('⚠️ The last run failed; the kernel will retry: {legs}', { legs: escapeHtml(failed.join(', ')) }));
   if (todo.length) line.push(tr('⬜ Remaining: {legs}', { legs: escapeHtml(todo.join(' → ')) }));
-  if (r.lastReport) line.push(tr('�� Latest report ({op}, {outcome}, {at}): {summary}', { op: escapeHtml(legLabel(r.lastReport.op, language)), outcome: escapeHtml(outcomeText(r.lastReport.outcome, tr)), at: escapeHtml(clock(r.lastReport.at)), summary: escapeHtml(r.lastReport.summary) }));
+  if (r.lastReport) line.push(tr('📝 Latest report ({op}, {outcome}, {at}): {summary}', { op: escapeHtml(legLabel(r.lastReport.op, language)), outcome: escapeHtml(outcomeText(r.lastReport.outcome, tr)), at: escapeHtml(clock(r.lastReport.at)), summary: escapeHtml(r.lastReport.summary) }));
   for (const a of r.asks.filter((ask) => ask.askClass !== 'credential')) line.push(`${tr('❓ Waiting on your answer ({op}): {text}', { op: escapeHtml(legLabel(a.op, language)), text: escapeHtml(a.text) })}${a.link ? `\n   ${escapeHtml(a.link)}` : `\n   ${tr('(press /asks for an answer link)')}`}`);
   for (const h of r.holds ?? []) line.push(holdLine(h, { now, language }));
-  for (const g of r.ownerGates) line.push(tr('�� Waiting on you: {gate}', { gate: escapeHtml(g) }));
+  for (const g of r.ownerGates) line.push(tr('🔒 Waiting on you: {gate}', { gate: escapeHtml(g) }));
   for (const b of r.blocking ?? []) line.push(`${tr('⛓ Blocking other workflows: <b>{op}</b> ({jobId}) — {count} workflow(s) waiting ({workflows}), for {ago}', { op: escapeHtml(legLabel(b.op, language)), jobId: escapeHtml(b.jobId), count: b.workflows.length, workflows: escapeHtml(b.workflows.join(', ')), ago: escapeHtml(dur(now - b.since, tr)) })}${b.status === 'queued' ? tr(', not yet dispatched') : ''}`);
-  if (r.runtime.length) line.push(tr('�� Open runtime defects: {count} (the supervisor is on them)', { count: r.runtime.length }));
+  if (r.runtime.length) line.push(tr('🐞 Open runtime defects: {count} (the supervisor is on them)', { count: r.runtime.length }));
   line.push(r.etaAt == null
-    ? tr('�� ETA: cannot estimate yet (no leg done)')
-    : r.etaMs <= 0 ? tr('�� All legs done, waiting for handover')
-    : tr('�� ETA: ~{dur} more (around {etaAt}), at the pace since it started ({startedAt})', { dur: escapeHtml(dur(r.etaMs, tr)), etaAt: escapeHtml(clock(r.etaAt)), startedAt: escapeHtml(clock(r.startedAt)) }));
+    ? tr('🕒 ETA: cannot estimate yet (no leg done)')
+    : r.etaMs <= 0 ? tr('🕒 All legs done, waiting for handover')
+    : tr('🕒 ETA: ~{dur} more (around {etaAt}), at the pace since it started ({startedAt})', { dur: escapeHtml(dur(r.etaMs, tr)), etaAt: escapeHtml(clock(r.etaAt)), startedAt: escapeHtml(clock(r.startedAt)) }));
   return line.join('\n');
 }
 
@@ -228,10 +228,10 @@ export function progressMessages(rows, { now = Date.now(), language = ownerLangu
     tr('<b>[StarCi] Progress report at {now}</b>', { now: escapeHtml(clock(now)) }),
     tr('{running} workflow(s) running · {done}/{total} legs done', { running: ok.length, done: ok.reduce((n, r) => n + r.done, 0), total: ok.reduce((n, r) => n + r.total, 0) }),
     asks ? tr('❓ {count} question(s) waiting on you (/asks sends each with a link button)', { count: asks }) : tr('❓ No questions waiting on you'),
-    ...(creds ? [tr('�� {count} credential request(s) waiting, not blocking the main work: /creds', { count: creds })] : []),
-    tr('�� {count} open runtime defect(s)', { count: runtime }),
+    ...(creds ? [tr('🔑 {count} credential request(s) waiting, not blocking the main work: /creds', { count: creds })] : []),
+    tr('🐞 {count} open runtime defect(s)', { count: runtime }),
     ...(ok.some((r) => r.holds?.length) ? [tr('⏸ {count} done job(s) waiting on another workflow or on you before settling (see ⏸ per workflow)', { count: ok.reduce((n, r) => n + (r.holds?.length ?? 0), 0) })] : []),
-    etas.length ? tr('�� All done by: around {eta}', { eta: escapeHtml(clock(Math.max(...etas))) }) : '',
+    etas.length ? tr('🕒 All done by: around {eta}', { eta: escapeHtml(clock(Math.max(...etas))) }) : '',
     ...rows.filter((r) => r.error).map((r) => tr('⚠️ Cannot read ledger {repo}: {error}', { repo: escapeHtml(r.repo), error: escapeHtml(r.error) })),
   ].filter(Boolean).join('\n');
   const messages = [];
@@ -254,7 +254,7 @@ async function main() {
   // One model-scorecard line (pool shares/pass rates) over the same repos, last 24h; a failure adds nothing.
   try {
     const sc = await import('../agent/model-scorecard.mjs');
-    const line = `\n�� ${escapeHtml(sc.summaryLine(sc.scorecardFor({ repos: reportRepos(repos), sinceHours: 24 })))}`;
+    const line = `\n📊 ${escapeHtml(sc.summaryLine(sc.scorecardFor({ repos: reportRepos(repos), sinceHours: 24 })))}`;
     const at = messages[0].indexOf('\n\n'); // end of the header block
     messages[0] = at < 0 ? messages[0] + line : messages[0].slice(0, at) + line + messages[0].slice(at);
   } catch { /* optional line */ }
