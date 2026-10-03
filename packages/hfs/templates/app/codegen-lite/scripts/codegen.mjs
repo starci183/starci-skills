@@ -16,11 +16,17 @@ const fail = (message) => {
 }
 
 const hash = createHash("sha256")
-for (const name of (fs.existsSync(MIGRATIONS) ? fs.readdirSync(MIGRATIONS) : []).filter((file) => file.endsWith(".sql")).sort()) {
+for (const name of (fs.existsSync(MIGRATIONS) ? fs.readdirSync(MIGRATIONS) : [])
+    .filter((file) => file.endsWith(".sql"))
+    .sort()) {
     hash.update(`${name}\0${fs.readFileSync(path.join(MIGRATIONS, name), "utf8").replace(/\r\n/g, "\n")}\0`)
 }
 const digest = hash.digest("hex")
 
-if (!fs.existsSync(TYPES)) fail(`${TYPES} is missing; start the local stack and run \`npm run contract:emit\`, then commit it`)
+if (!fs.existsSync(TYPES))
+    fail(`${TYPES} is missing; start the local stack and run \`npm run contract:emit\`, then commit it`)
 const stamped = STAMP.exec(fs.readFileSync(TYPES, "utf8").split(/\r?\n/, 1)[0])?.[1]
-if (stamped !== digest) fail(`${TYPES} is ${stamped === undefined ? "not stamped" : "older than the migrations"}; run \`npm run contract:emit\` and commit the regenerated types`)
+if (stamped !== digest)
+    fail(
+        `${TYPES} is ${stamped === undefined ? "not stamped" : "older than the migrations"}; run \`npm run contract:emit\` and commit the regenerated types`,
+    )

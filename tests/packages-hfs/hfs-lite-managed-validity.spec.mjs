@@ -4,6 +4,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import prettier from 'prettier';
+import prettierConfig from '../../packages/prettier-config/index.cjs';
 import { TYPES_STAMP, migrationsDigest } from '../../packages/hfs/emit/db-types.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
@@ -125,6 +127,10 @@ test('lite package scripts exclude tests and use only the approved database comm
   }
   assert.equal(databaseScripts['db:types'], 'npm run contract:emit');
   assert.equal(databaseScripts['db:lint'], 'starci app check --fast');
+});
+
+test('the generated lite codegen passes the app formatter before any scaffold install', async () => {
+  assert.equal(await prettier.check(targets['scripts/codegen.mjs'].content, { ...prettierConfig, parser: 'babel' }), true);
 });
 
 test('the generated codegen is offline: it spawns nothing and needs no stack, npm or Docker', () => {
