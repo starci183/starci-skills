@@ -1,0 +1,66 @@
+{{header}}
+name: ci
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run per ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: {{nodeMajor}}
+          cache: npm
+      - run: npm ci
+      - name: lint
+        if: env.SONAR_TOKEN == ''
+        run: npm run lint
+      - name: lint with Sonar import
+        if: env.SONAR_TOKEN != ''
+        run: npm run lint -- --sonar reports/lint.sonar.json
+      - name: format
+        run: npm run format:check
+      - name: typecheck
+        run: npm run typecheck
+      - name: build be
+        run: npm run build:be
+      - name: build fe
+        run: npm run build:fe
+      - name: database migration checks
+        run: npm run db:lint
+{{> app/ci-workflows/sonar-steps.yml}}
+
+  db-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: {{nodeMajor}}
+          cache: npm
+      - run: npm ci
+      - name: start Supabase
+        run: npm run db:start
+      - name: apply migrations
+        run: npm run db:reset
+      - name: regenerate database types
+        run: npm run db:types
+      - name: database types are committed
+        run: git diff --exit-code -- supabase/types/database.types.ts
+      - name: stop Supabase
+        if: always()
+        run: npm run db:stop

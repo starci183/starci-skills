@@ -10,6 +10,7 @@ import { OriginGuard } from "./origin.guard"
 const options: HttpSecurityOptions = {
     allowedOrigins: ["https://app.test"],
     rateLimit: { windowMs: 60_000, defaultLimit: 100, strictLimit: 10 },
+    webhooks: {},
 }
 
 const build = async (method: string, headers: Request["headers"]) => {

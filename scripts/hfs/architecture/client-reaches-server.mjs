@@ -1,5 +1,6 @@
 import { builtinModules } from 'node:module';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
+import { isServerActionModule } from './server-action.mjs';
 
 /**
  * R55 `client-reaches-server` (FE_CLIENT_REACHES_SERVER), the repository half of the eslint rule `client-no-server-import`,
@@ -75,6 +76,7 @@ export function checkClientReachesServer({ graph, context }) {
     const queue = [entry.rel];
     for (let head = 0; head < queue.length; head += 1) {
       const rel = queue[head];
+      if (isServerActionModule(ts, graph.files.get(rel).sourceFile)) continue;
       const state = seen.get(rel);
       for (const hit of serverOf(rel)) {
         const at = state.first ?? sourceLocation(graph.files.get(rel).sourceFile, hit.node);

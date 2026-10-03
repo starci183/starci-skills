@@ -23,11 +23,12 @@ export const SECRET_PATTERNS = [
   { name: 'telegram-bot-token', re: /\b\d{8,10}:AA[0-9A-Za-z_-]{33}\b/ },
   { name: 'stripe-secret', re: /\b(?:sk|rk)_live_[0-9A-Za-z]{20,}\b/ },
   { name: 'jwt', re: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/ },
+  // A value written `env(NAME)` (the Supabase config.toml reference form) names a variable, not a secret.
   // A keyword-assigned value that names itself a stand-in (a test stub's `accessToken: "fixture-..."`) is no
   // candidate; only this heuristic takes the exemption, never a provider-shaped token above.
   // A spec file's keyword-assigned values are test inputs (a spec's sign-in
   // form password and a mocked accessToken once refused a push): the heuristic skips spec files too.
-  { name: 'assigned-secret', re: /\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\b\s*[:=]\s*['"]([^'"\s$<{]{12,})['"]/i, placeholder: /fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock/i,
+  { name: 'assigned-secret', re: /\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\b\s*[:=]\s*['"](?!env\([A-Z_][A-Z0-9_]*\)['"])([^'"\s$<{]{12,})['"]/i, placeholder: /fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock/i,
     skipFile: /\.(?:spec|test|e2e-spec)\.[cm]?[jt]sx?$/ },
 ];
 

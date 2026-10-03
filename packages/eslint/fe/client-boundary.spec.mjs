@@ -150,6 +150,8 @@ test("FE-CLIENT-2b: a module that uses the server marks itself server-only", () 
       { filename: MODULE, code: MARKED + 'import { getTranslations } from "next-intl/server"\nexport const t = () => getTranslations()' },
       { filename: MODULE, code: MARKED + 'import { readFile } from "node:fs/promises"\nexport const r = readFile' },
       { filename: MODULE, code: '/** The reader. */\nimport "server-only"\nimport { NextResponse } from "next/server"\nexport const r = NextResponse' },
+      // a file-level "use server" directive is the prologue: the marker follows it (Next requires the directive at the top of a Server Action module)
+      { filename: MODULE, code: '"use server"\nimport "server-only"\nimport { headers } from "next/headers"\nexport const read = async () => headers()' },
       // importing a marked module from a marked module
       { filename: MODULE, code: MARKED + 'import { readMarked } from "../marked/read-marked"\nexport const r = readMarked' },
       // a module with no server import needs no marker; importing an unmarked module does not make one
@@ -182,6 +184,7 @@ test("FE-CLIENT-2b: a module that uses the server marks itself server-only", () 
       { filename: MODULE, code: 'import { readFile } from "node:fs/promises"\nexport const r = readFile', errors: [{ messageId: "mark" }] },
       { filename: MODULE, code: 'import fs from "fs"\nexport const r = fs', errors: [{ messageId: "mark" }] },
       // the marker must come first: after other imports it is not "starts with"
+      { filename: MODULE, code: '"use server"\nimport { headers } from "next/headers"\nimport "server-only"\nexport const read = async () => headers()', errors: [{ messageId: "mark" }] },
       { filename: MODULE, code: 'import { headers } from "next/headers"\nimport "server-only"\nexport const r = headers', errors: [{ messageId: "mark" }] },
       // a module reached through a resolved import that is itself server-only
       { filename: MODULE, code: 'import { readMarked } from "../marked/read-marked"\nexport const r = readMarked', errors: [{ messageId: "mark" }] },

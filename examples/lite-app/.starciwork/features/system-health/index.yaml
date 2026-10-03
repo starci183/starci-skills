@@ -1,0 +1,4 @@
+schema: work/feature@1
+id: system-health
+title: The liveness probe the platform asks before it routes traffic to the app.
+description: The API reports its liveness so the platform can check the application before routing traffic.

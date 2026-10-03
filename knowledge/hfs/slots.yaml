@@ -7,7 +7,7 @@
 # catalog READ this file through scripts/hfs/slots.mjs; none of them hardcodes a path.
 # Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
 schema: starci/hfs-slots@2
-version: 2.0.0
+version: 2.1.0
 
 versioning:
   # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 2).
@@ -24,6 +24,9 @@ versioning:
     a slot is never edited in place; it gets retiredIn (a major) and a successor slot id. After that major a
     path matching a retired slot is HFS_SLOT_RETIRED (error).
   pins: knowledge/hfs/canon-pins.yaml carries the exact versions of every @starci/* package and framework this MAJOR supports.
+# 2.1.0 is such a minor: it ADDS the edition mechanism (the `editions` list, the per-slot `editions`, `litePresence`, `lite`
+# overlays and `provider`, and `sides.<side>.reads` of an app-root tree) and the lite slots; an app without `edition` in its
+# hfs.json is edition full and every answer for it is unchanged.
 
 # Field meaning, per slot.
 #   id          stable name, never changes meaning inside a major.
@@ -38,6 +41,13 @@ versioning:
 #   tier        node of the import direction matrix (tiers below); none = takes no part in import checks;
 #               inherit = the tier of the enclosing owner.
 #   owner       true when every directory matching the slot is an owner: the unit cross-owner imports and cycles use.
+#   anonymousActions  on a directory slot: the Server Action files (relative to it) that authenticate or end a session and so run for an anonymous principal (FE_AUTH_SESSION_TRUST exempts them from refusing it; they still parse their input).
+#   entries     on a directory slot that sits inside an owner (not an owner itself): the files, besides the owner's index.ts, an importer
+#               outside the owner may enter through (a client-safe entry of a module whose barrel is server-only). Each is a relative
+#               path the slot allows. Everything else of the owner is entered through index.ts only (ARCH_OWNER_EXPORT_BYPASS).
+#   outcomeHome true on a file slot: the one file that declares the repository's Outcome union. A repository holds exactly one such
+#               file (modules/api/outcome.ts, the api package's outcome.ts, or modules/db/outcome.ts of a lite app),
+#               and no other file declares an Outcome union (one-outcome-union, FE_TRANSPORT_OWNER).
 #   requires    files or directories that must exist inside each instance; <var> is replaced by the bound name,
 #               a leading / means repository root; a trailing / means directory.
 #   requiredInstances  variable -> names that must exist as instances (config, logging ... of platform).
@@ -60,19 +70,34 @@ versioning:
 #   appKind     the app kind of hfs.json apps[].kind whose directory this slot describes.
 #   managedBy   the template directory starci app sync renders this slot's files from. The slot path then lists literal files
 #               only, and each is rendered from templates/<profile or common>/<managedBy>/<path, leading dots dropped>;
+#   liteManagedBy  the template directory starci app sync renders under edition lite (default: managedBy). A slot with only
+#               liteManagedBy is managed only in lite; its effective lite.path still lists literal files;
 #               the managed file list lives here and nowhere in code. A difference is HFS_MANAGED_FILE_DRIFT (a
 #               back end's tsconfig.json: HFS_TS_STRICT when a flag or an option was added).
 #   rules       rule ids (the catalog lands with knowledge/hfs/rules.yaml).
+#   editions    the editions (below) the slot exists in; default all of them. A slot outside the declared edition owns
+#               no path - under lite, what full keeps absent is removed, and what lite forbids is a finding.
+#   litePresence  the presence under edition lite (default: presence): a bare value, or {be, fe} for a both-sides slot.
+#               A slot forbidden in lite is external there and must name its goesTo.
+#   lite        the fields the slot carries under lite only (path, requires, allows, forbids, minInstances,
+#               requiredInstances), each shaped as the same field in the slot body; every other field is the edition's.
+#               Under lite `tests` is none on every slot: a lite app has no test world.
+#   provider    the hfs.json connections[].provider that enables this opt-in slot (supabase); never an app kind.
 #   since / retiredIn / successor   lifecycle.
 presenceValues: [required, optional, opt-in, forbidden]
 trackedValues: [tracked, ignored, external]
 testValues: [unit-beside, e2e, none]
 
+# The editions a repository declares in hfs.json `edition` (absent means full). Lite is this same manifest filtered: a slot
+# whose `editions` lacks lite does not exist for a lite app, `litePresence` replaces presence and a `lite` map replaces the
+# fields it names. Upgrade lite -> full adds only (the forbidden test world becomes legal again); downgrade is not supported.
+editions: [full, lite]
+
 # The two sides of an app: the folder of each is its profile name (be/, fe/). `reads` lists the only paths of the OTHER side a side
-# may read (hfs.json sides.<side>.reads names a subset); nothing else crosses sides.
+# may read (hfs.json sides.<side>.reads names a subset), or a tree an app-root slot owns (supabase/types/); nothing else crosses sides.
 sides:
-  be: {reads: []}
-  fe: {reads: [be/contracts/]}     # the back end's committed contract snapshots, the input of the front end's codegen
+  be: {reads: [supabase/types/]}   # the generated Database types of a Supabase connection (server code types its PostgREST calls)
+  fe: {reads: [be/contracts/, supabase/types/]}     # be/contracts/: the committed contract snapshots, the input of the front end's codegen; supabase/types/: the same generated types
 
 # The trigger kinds of the back end's features: what starts the work of a feature. A feature slot names its kind in `trigger`; no kind imports another
 # (BE_KIND_ISOLATION), every cross-kind call is an event on the bus, and only be/apps/* compose features.
@@ -279,6 +304,10 @@ ruleParams:
       api: {topic: api, variable: feature, trigger: api, patterns: [], needs: [service], defaults: {action: "@name"}}
       cli: {topic: cli, variable: group, trigger: cli, patterns: [], needs: [service], wire: {file: src/features/cli/cli.module.ts, import: "./@@group@@/@@group@@.module", symbol: "@@Group@@Module"}}
     bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, job, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
+    # Edition lite (ruleParams(manifest, 'be', 'lite') merges these keys over the base): the schema authority is the Supabase
+    # migration tree (supabase/migrations/*.sql, forward-only), so a lite back end holds no TypeORM migration or entity under
+    # be/ (R34/R35 read schemaAuthority; be.persistence's lite overlay allows neither).
+    lite: {schemaAuthority: supabase, unitRoles: []}     # lite has no test world: no service or cli command owes a unit spec
 
 slots:
 
@@ -309,6 +338,7 @@ slots:
     tier: none
     tests: none
     managedBy: package-scripts     # the `scripts` block only; the rest of the file is the repository's
+    liteManagedBy: package-scripts-lite
     rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT, HFS_MANAGED_FILE_DRIFT, HFS_MONO_WORKSPACES, HFS_MONO_WORKSPACE_DEP]
   - id: app.task-graph
     profiles: [app]
@@ -355,6 +385,7 @@ slots:
     tier: none
     tests: none
     managedBy: tool-config
+    liteManagedBy: tool-config-lite     # the same files plus the generated supabase/types, which the Supabase CLI writes unformatted
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL]
   - id: app.tool-config-optional
     profiles: [app]
@@ -379,7 +410,9 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    lite: {path: sonar-project.properties}
     managedBy: quality-config
+    liteManagedBy: quality-config-lite
     rules: [HFS_SONAR_CONFIG, HFS_MANAGED_FILE_DRIFT]
   - id: app.hooks
     profiles: [app]
@@ -398,14 +431,17 @@ slots:
     tier: none
     tests: none
     managedBy: ci-workflows
+    liteManagedBy: ci-workflows-lite
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_CI_MISSING_CANON, HFS_MANAGED_FILE_DRIFT]
   - id: app.ci-e2e
     profiles: [app]
     path: ".github/workflows/e2e.yml"
     presence: optional     # on: workflow_dispatch only
+    litePresence: forbidden     # a lite app has no e2e run
     tracked: tracked
     tier: none
     tests: none
+    goesTo: "the full edition: a lite app has no e2e workflow (no tests, nothing to run)"
     managedBy: ci-workflows
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
   - id: app.ci-images
@@ -417,7 +453,19 @@ slots:
     tier: none
     tests: none
     managedBy: ci-workflows
+    liteManagedBy: ci-workflows-lite
     rules: [HFS_MANAGED_FILE_DRIFT]
+  - id: app.ci-db
+    profiles: [app]
+    # The database deploy workflow: workflow_dispatch only (like app.ci-e2e); starci app sync renders it under the managed ci group.
+    path: ".github/workflows/db-deploy.yml"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    liteManagedBy: ci-workflows-lite
+    rules: [HFS_MANAGED_FILE_DRIFT]
+    since: 2.1.0
   - id: app.dockerignore
     profiles: [app]
     # The one build-context filter of every image (the context is the app root): rendered by starci app sync; it keeps secrets and build output out.
@@ -457,6 +505,9 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    lite:
+      path: scripts/codegen.mjs
+    liteManagedBy: codegen-lite
     rules: [HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]     # one-off codemods and fix-* scripts are agent output, not tooling
   - id: app.sides
     profiles: [app]
@@ -474,13 +525,29 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    requires: [.gitignore, workspace.yaml, features/index.yaml]
-    allows: [workspace.yaml, "brand/**", shell/index.yaml, "features/<feature>/index.yaml",
+    requires: [.gitignore, workspace.yaml, index.yaml]
+    allows: [workspace.yaml, index.yaml, "brand/**", shell/index.yaml, "features/<feature>/index.yaml",
              "features/<feature>/<family>/<name>/index.yaml", "features/<feature>/br/<rule>/ac/<name>/index.yaml",
              "features/<feature>/ui/<name>/assets/<approved-file>", "features/<feature>/uat/<name>/{index,accounts,fixtures}.yaml",
              "features/<feature>/uat/<name>/{seed,cleanup}.sql", "_resources/{identities,environments,fixtures}/<slug>/resource.yaml"]
     forbids: [evidence/, logs/, reports/, captures/, runs/, "kernel-*/", "*.sqlite*", _derived/, "work/node records"]
+    # Lite keeps the product catalog, feature overviews, grammar and brand drawing records; UAT records belong to the forbidden slot below.
+    lite:
+      requires: [.gitignore, workspace.yaml, index.yaml]
+      allows: [workspace.yaml, index.yaml, "brand/**", shell/index.yaml, "features/<feature>/index.yaml", "features/<feature>/ui/<name>/index.yaml", "features/<feature>/ui/<name>/assets/<approved-file>"]
     rules: [HFS_AGENT_DATA_TRACKED, HFS_WORK_NODE_RETIRED, HFS_IDENTITY_CUSTODY]
+  - id: app.starciwork.uat
+    profiles: [app]
+    # The UAT records of the full edition: a lite app has no UAT (no tests, no record of one), so the trees are forbidden paths
+    # under lite only. In full this slot does not exist and .starciwork answers for them.
+    editions: [lite]
+    path: ".starciwork/{_resources/identities,_resources/fixtures,features/<feature>/uat,features/<feature>/br}/"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "the full edition: a lite app has no UAT records (no identities or fixtures resources, no br/ac evidence, no uat directories)"
+    since: 2.1.0
   - id: app.starcistacks
     profiles: [app]
     # The stack declarations and the sealed custody of the app, at the app root beside be/, fe/ and .starciwork (never under a side).
@@ -491,8 +558,14 @@ slots:
     tests: none
     requires: [application-stacks.yaml]
     allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/infra/{compose,k8s,terraform}/**", "<env>/infra/metadata.json",
-             "<env>/runtime/{config,env}/**", "<env>/runtime/env/KEYS.md", "<env>/secrets/<slug>.enc", "<env>/seeds/**"]
+             "<env>/runtime/{config,env}/**", "<env>/runtime/env/KEYS.md", "<env>/secrets/<slug>.enc", "<env>/secrets/.gitkeep", "<env>/seeds/**"]
     forbids: ["<env>/runtime/files/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
+    # Lite runs one managed host: the reduced shape keeps the stack declaration, the environment descriptor and the sealed
+    # secrets; infra/, runtime/ and seeds/ are the full edition's.
+    lite:
+      requires: []
+      allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/secrets/<slug>.enc", "<env>/secrets/.gitkeep"]
+      forbids: ["<env>/runtime/files/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
     rules: [HFS_STACKS_SHAPE, HFS_STACKS_IN_SIDE, HFS_PLAINTEXT_SECRET, HFS_IDENTITY_CUSTODY]
   - id: app.sops
     profiles: [app]
@@ -544,10 +617,92 @@ slots:
     goesTo: ".starcistacks/<env>/secrets/<slug>.enc (at the app root); decrypted values only in memory or under %LOCALAPPDATA%/StarCi/secrets/<project>/<env>/ via *_FILE"
     rules: [HFS_PLAINTEXT_SECRET]
 
+  # ----- app root: the Supabase project of an app whose connection declares provider: supabase (every lite app) -------
+  - id: app.supabase
+    profiles: [app]
+    # The one Supabase project directory, at the app root beside be/, fe/ and .starcistacks (never under a side).
+    path: "supabase/"
+    presence: opt-in              # enabled by a connection with provider: supabase; required under edition lite
+    provider: supabase
+    litePresence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    since: 2.1.0
+  - id: app.supabase.config
+    profiles: [app]
+    # The project configuration: auth keys are env(NAME) references, never literals (L08 judges its policy keys).
+    path: "supabase/config.toml"
+    presence: opt-in
+    provider: supabase
+    litePresence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    since: 2.1.0
+  - id: app.supabase.migrations
+    profiles: [app]
+    # The schema authority of an app on Supabase: forward-only SQL migrations named <timestamp14>_<kebab-name>.sql,
+    # one file per change, immutable once on origin/main (L02-L08 judge them).
+    path: "supabase/migrations/<stamp>_<name>.sql"
+    presence: opt-in
+    provider: supabase
+    litePresence: required
+    lite: {minInstances: 1}
+    tracked: tracked
+    tier: none
+    tests: none
+    since: 2.1.0
+  - id: app.supabase.seed
+    profiles: [app]
+    path: "supabase/seed.sql"
+    presence: optional            # synthetic dev data only; a lite app seeds nothing it cannot regenerate
+    tracked: tracked
+    tier: none
+    tests: none
+    since: 2.1.0
+  - id: app.supabase.types
+    profiles: [app]
+    # The generated Database types (database.types.ts) contract:emit writes from the migrations; both sides read it
+    # (sides.<side>.reads supabase/types/); drift against regeneration is L09.
+    path: "supabase/types/database.types.ts"
+    presence: opt-in
+    provider: supabase
+    litePresence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    since: 2.1.0
+  - id: app.supabase.templates
+    profiles: [app]
+    path: "supabase/templates/*.html"
+    presence: optional            # the auth e-mail templates Supabase serves
+    tracked: tracked
+    tier: none
+    tests: none
+    since: 2.1.0
+  - id: app.supabase.local-state
+    profiles: [app]
+    path: "supabase/{.temp,.branches}/"
+    presence: optional
+    tracked: ignored              # the local CLI's working state: exists, never committed
+    tier: none
+    tests: none
+    since: 2.1.0
+  - id: app.supabase.functions
+    profiles: [app]
+    path: "supabase/functions/"
+    presence: forbidden           # a Deno runtime is a second language runtime outside the lint canon and the slot machine (lite v1)
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "a be feature: webhooks/<provider> for a third-party callback, api for an endpoint, a cli command on a schedule (pg_cron / pg_net)"
+    since: 2.1.0
+
   # ----- side root (both sides): what the old standalone repository root held, less the app-root files ----------
   - id: repo.side-root-forbidden
     profiles: [be, fe]
-    path: "{package.json,package-lock.json,hfs.json,README.md,.gitignore,.gitattributes,.husky/,.github/,.starciwork/,.starcistacks/,.sops.yaml,sonar-project.properties,codecov.yml,.prettierrc,.prettierignore,scripts/}"
+    path: "{package.json,package-lock.json,hfs.json,README.md,.gitignore,.gitattributes,.husky/,.github/,.starciwork/,.starcistacks/,supabase/,.sops.yaml,sonar-project.properties,codecov.yml,.prettierrc,.prettierignore,scripts/}"
     presence: forbidden
     tracked: external
     tier: none
@@ -569,6 +724,8 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    # Lite: no test tsconfig (no test tree) and no jest configuration; both are forbidden paths there (repo.tests-forbidden).
+    lite: {path: "{tsconfig.json,tsconfig.build.json,eslint.config.mjs}"}
     coverage: none
     managedBy: tool-config
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL, HFS_TS_STRICT]
@@ -651,6 +808,7 @@ slots:
     # A Dockerfile anywhere else is owned by no slot.
     path: "apps/<app>/Dockerfile"
     presence: required
+    litePresence: {fe: optional}     # lite: a Next app may be built by its host (Netlify, Vercel); a be image stays required
     tracked: tracked
     tier: none
     tests: none
@@ -709,6 +867,21 @@ slots:
     tests: none
     goesTo: ".starcistacks/<env>/secrets/<slug>.enc (at the app root); decrypted values only in memory or under %LOCALAPPDATA%/StarCi/secrets/<project>/<env>/ via *_FILE"
     rules: [HFS_PLAINTEXT_SECRET]
+  - id: repo.tests-forbidden
+    profiles: [be, fe]
+    # Edition lite has no test world, on either side: a spec file, a test directory or a test-tool configuration anywhere in
+    # a side is a forbidden path (a finding, not an ignored file). In full this slot does not exist and each test file is
+    # judged by its own slot (the be tests tree, FE_NO_TESTS on the fe side).
+    editions: [lite]
+    # No nested braces: braceVariants expands each inner group per outer option. `**/e2e/` also matches a root e2e/ but
+    # be.root-e2e wins that on specificity; both are forbidden.
+    path: "{**/*.spec.*,**/*.test.*,**/*-spec.*,src/tests/,**/__tests__/,**/e2e/,**/test-support/,**/__mocks__/,**/jest.*,**/vitest.*,**/playwright.*,**/cypress.config.*,**/tsconfig.e2e.json,**/e2e.yml,**/e2e.yaml}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "the full edition: a lite repository holds no spec, test directory or jest/vitest/playwright configuration"
+    since: 2.1.0
   - id: be.root-e2e
     profiles: [be]
     path: "e2e/"
@@ -743,21 +916,25 @@ slots:
     profiles: [be]
     path: "contracts/<app>/events.json"
     presence: opt-in
+    litePresence: forbidden         # lite has no event bus, so no async contract to emit
     tracked: tracked
     tier: none
     tests: none
     coverage: none
     why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`starci app emit`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R166 HFS_EVENT_CONTRACT)
+    goesTo: "the full edition: a lite app has no event bus (no Kafka, no outbox), so no async contract exists to emit"
     rules: [HFS_EVENT_CONTRACT]
   - id: be.contract.events.pin
     profiles: [be]
     path: "contracts/<app>/events.pin.json"
     presence: opt-in
+    litePresence: forbidden
     tracked: tracked
     tier: none
     tests: none
     coverage: none
     why: the previously published event contract of a service, the same format as its events.json (copied over when the contract is published, never edited); the current events.json may only extend it additively, a breaking change is a new `<event>.v2` key (R177 BE_CONTRACT_BREAKING)
+    goesTo: "the full edition: a lite app has no event bus, so no published event contract to pin"
     rules: [BE_CONTRACT_BREAKING]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
@@ -781,12 +958,14 @@ slots:
     path: "apps/<app>/src/"
     appKind: worker               # composes transport/message modules and job processors only (an api app may compose them too: a worker app is for separate scaling)
     presence: opt-in
+    litePresence: forbidden       # lite has no queue or event bus to consume; background work is a cli command on a schedule
     tracked: tracked
     tier: app
     owner: true
     requires: [main.ts, app.module.ts]
     allows: [main.ts, app.module.ts, "<app>.options.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
+    goesTo: "the full edition: a lite app has no worker (scheduled work is a cli command invoked by pg_cron / pg_net or a platform cron)"
     coverage: none
     rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED, BE_CONTEXT_OWNER]
   - id: be.app.cli
@@ -799,6 +978,7 @@ slots:
     path: "apps/<app>/src/"
     appKind: cli
     presence: opt-in
+    litePresence: optional        # lite: schema migration is the Supabase CLI's job; a cli app exists only when the app declares one
     tracked: tracked
     tier: app
     owner: true
@@ -830,6 +1010,7 @@ slots:
   - id: be.feature.application
     profiles: [be]
     path: "src/features/{api/,jobs/,reactors/,saga/}<feature>/application/"     # inside a trigger kind (jobs, reactors, saga) the feature folder is one level down
+    lite: {path: "src/features/api/<feature>/application/"}                    # lite has only the api kind; the other roots are forbidden slots
     presence: required
     tracked: tracked
     tier: feature
@@ -843,6 +1024,7 @@ slots:
     path: "src/features/saga/<saga>/"
     pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R169 to R173); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
     presence: opt-in              # a saga: the orchestrator of a business flow that crosses services, started and advanced only by events (knowledge/patterns/be/saga.yaml)
+    litePresence: forbidden
     trigger: saga
     tracked: tracked
     tier: feature
@@ -850,6 +1032,7 @@ slots:
     requires: [index.ts, "<saga>.module.ts", "<saga>.saga.service.ts", "<saga>.saga-state.ts", steps/, compensations/, transport/]
     allows: [index.ts, "<saga>.module.ts", "<saga>.saga.service.ts", "<saga>.saga.service.spec.ts", "<saga>.saga-state.ts", "<saga>.saga.log-events.ts", application/, steps/, compensations/, transport/]   # the orchestrator is a `*.service.ts` because a handler injects only services; unit-tested beside it
     tests: unit-beside            # <saga>.saga.service.spec.ts beside the orchestrator; the state machine and its fence are platform/saga's service; each compensation path has an e2e spec
+    goesTo: "the full edition: a lite app has no saga (no event bus to advance it)"
     coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED, BE_SAGA_STEP_COMPENSATION, BE_SAGA_STATE_VERSIONED, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
   - id: be.feature.saga.steps
@@ -857,10 +1040,12 @@ slots:
     path: "src/features/saga/<saga>/steps/"
     pattern: saga
     presence: opt-in
+    litePresence: forbidden
     tracked: tracked
     tier: feature
     allows: ["<step>.saga-step.ts"]    # one step of the flow: its name and the event it puts on the wire (the contract); its work is done by the domain, not by the step
     tests: none
+    goesTo: "the full edition: a lite app has no saga"
     coverage: none
     rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT]
   - id: be.feature.saga.compensations
@@ -868,15 +1053,18 @@ slots:
     path: "src/features/saga/<saga>/compensations/"
     pattern: saga
     presence: opt-in
+    litePresence: forbidden
     tracked: tracked
     tier: feature
     allows: ["<step>.compensation.ts"]   # REQUIRED for every step: the command that undoes it, naming the failure event that triggers it
     tests: none
+    goesTo: "the full edition: a lite app has no saga"
     coverage: none
     rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
   - id: be.feature.application.support
     profiles: [be]
     path: "src/features/{api/,jobs/,reactors/,saga/}<feature>/application/support/"
+    lite: {path: "src/features/api/<feature>/application/support/"}
     presence: optional            # helpers and types local to ONE feature; same tier as application, never a shared home
     tracked: tracked
     tier: feature                 # feature tier: another feature cannot import it (features never import features)
@@ -914,6 +1102,7 @@ slots:
     profiles: [be]
     path: "src/features/{api/,reactors/,saga/}<feature>/transport/message/"
     presence: opt-in              # queue consumer: composed by the service that owns it (an api app) or by a worker app scaled apart
+    litePresence: forbidden       # a consumer reads the event bus, which lite does not have
     pattern: event-bus            # a consumer reads the event bus; declaring the pattern enables the slot
     tracked: tracked
     tier: feature
@@ -922,6 +1111,7 @@ slots:
     tests: none
     coverage: none
     composedBy: [api, worker]
+    goesTo: "the full edition: a lite app has no event bus, so no message transport (a third-party callback is a webhooks feature)"
     rules: [BE_BACKGROUND_UNOWNED, BE_SAGA_CONSUMER_DEDUPE]
   # ----- BE: feature kinds that are not an api: a webhook door and a realtime door. Each kind is a folder of src/features/ named by
   # the kind and holds one folder per provider or channel; a kind imports only modules/* (never another kind) and only an
@@ -952,6 +1142,9 @@ slots:
     requires: ["<provider>-http.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts"]
     allows: ["<provider>-http.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts", dto/]
     tests: unit-beside            # the door's own spec (<provider>.webhook.spec.ts) beside the door: the one non-service unit spec of this kind
+    lite:                         # a lite app has no test world: the door and its module only
+      requires: ["<provider>-http.module.ts", "<provider>.webhook.ts"]
+      allows: ["<provider>-http.module.ts", "<provider>.webhook.ts", dto/]
     coverage: none
     composedBy: [api]
     rules: [BE_WEBHOOK_SHAPE, BE_WEBHOOK_UNVERIFIED, BE_DEFAULT_DENY, BE_INPUT_BOUNDED]
@@ -973,6 +1166,7 @@ slots:
     profiles: [be]
     path: "src/features/realtime/<channel>/"
     presence: opt-in              # a push channel: reads and pushes only (a socket gateway or a GraphQL subscription), no domain write
+    litePresence: forbidden       # under lite realtime is Supabase Realtime (the client subscribes to channels; nothing serves them in be/)
     pattern: realtime             # declaring the pattern (hfs.json sides.be.patterns) enables the kind (knowledge/patterns/be/realtime.yaml)
     trigger: realtime
     tracked: tracked
@@ -981,6 +1175,7 @@ slots:
     requires: [index.ts, transport/]
     allows: [index.ts, transport/]
     tests: none
+    goesTo: "the full edition: under lite realtime is Supabase Realtime (RLS-governed), not a be kind"
     coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
     since: 1.0.0
@@ -988,9 +1183,11 @@ slots:
     profiles: [be]
     path: "src/features/realtime/<channel>/transport/graphql/"
     presence: opt-in              # a GraphQL subscription over graphql-ws
+    litePresence: forbidden
     pattern: realtime
     tracked: tracked
     tier: feature
+    goesTo: "the full edition: under lite realtime is Supabase Realtime, not a be kind"
     requires: ["<channel>-graphql.module.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts"]
     allows: ["<channel>-graphql.module.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts", dto/]
     tests: unit-beside            # the door's own spec beside the door (a subscription has no service of its own)
@@ -1002,9 +1199,11 @@ slots:
     profiles: [be]
     path: "src/features/realtime/<channel>/transport/graphql/dto/"
     presence: opt-in
+    litePresence: forbidden
     pattern: realtime
     tracked: tracked
     tier: feature
+    goesTo: "the full edition: under lite realtime is Supabase Realtime, not a be kind"
     allows: ["<name>.{input,type,args}.ts"]
     tests: none
     coverage: none
@@ -1015,9 +1214,11 @@ slots:
     profiles: [be]
     path: "src/features/realtime/<channel>/transport/websocket/"
     presence: opt-in              # a socket gateway
+    litePresence: forbidden
     pattern: realtime
     tracked: tracked
     tier: feature
+    goesTo: "the full edition: under lite realtime is Supabase Realtime, not a be kind"
     requires: ["<channel>-websocket.module.ts", "<channel>.gateway.ts", "<channel>.gateway.spec.ts"]
     allows: ["<channel>-websocket.module.ts", "<channel>.gateway.ts", "<channel>.gateway.spec.ts"]
     tests: unit-beside            # the door's own spec beside the door (a gateway has no service of its own)
@@ -1107,6 +1308,12 @@ slots:
     requires: [connection.ts]     # the capability's <c>Entities / <c>Migrations arrays (the owner index re-exports the two arrays by name); no CONNECTION alias: the connection is the one the apps register the arrays on
     allows: ["entities/<table>.entity.ts", "migrations/<epochMs13>-<kebab-name>.ts", "<name>.sql.ts", "<name>.rows.ts", connection.ts]
     forbids: [index.ts, "<name>.repository.ts"]
+    # Lite keeps the shared-EntityManager persistence (raw SqlText + rows types over the generated Database row types) but the
+    # schema authority is supabase/migrations (ruleParams.be.lite.schemaAuthority): no TypeORM entity and no be migration.
+    lite:
+      requires: []                 # no TypeORM arrays to re-export: the persistence of a lite capability is its sql and rows files
+      allows: ["<name>.sql.ts", "<name>.rows.ts", connection.ts]
+      forbids: [index.ts, "<name>.repository.ts", entities/, migrations/]
     tests: none
     coverage: none
     rules: [BE_SCHEMA_OWNER, BE_SCHEMA_AUTHORITY, BE_SQL_OUTSIDE_PERSISTENCE, BE_SQL_TABLE_OWNER, BE_SQL_RETURNING_SHAPE, BE_CONTEXT_COUPLING, BE_CONTEXT_PLATFORM_TABLES]
@@ -1136,10 +1343,12 @@ slots:
     profiles: [be]
     path: "src/modules/platform/event-bus/"
     presence: opt-in
+    litePresence: forbidden       # Kafka is exactly the footprint lite removes
     pattern: event-bus            # the ONE durable event transport: transactional outbox, relay, Kafka, inbox, retry and dead letter (knowledge/patterns/be/event-bus.yaml)
     tracked: tracked
     tier: platform
     owner: true
+    goesTo: "the full edition: a lite app has no event bus (no Kafka, no outbox)"
     requires: [index.ts, event-bus.module.ts, event-bus.port.ts, event-bus.contracts.ts, event-bus.service.ts, event-bus.service.spec.ts]
     tests: unit-beside
     coverage: required
@@ -1149,10 +1358,12 @@ slots:
     profiles: [be]
     path: "src/modules/platform/queue/"
     presence: opt-in
+    litePresence: forbidden       # BullMQ/Redis is exactly the footprint lite removes
     pattern: queue                # the ONE BullMQ owner: the outbox relay into queues (jobId = outbox id) and job schedulers (knowledge/patterns/be/queues.yaml)
     tracked: tracked
     tier: platform
     owner: true
+    goesTo: "the full edition: a lite app has no job queue (a scheduled action is a cli command; pg_cron / pg_net fires it)"
     requires: [index.ts, queue.module.ts, queue.port.ts, queue.contracts.ts, queue-outbox.service.ts, queue-outbox.service.spec.ts]
     tests: unit-beside
     coverage: required
@@ -1162,10 +1373,12 @@ slots:
     profiles: [be]
     path: "src/modules/events/<service>/"
     presence: opt-in
+    litePresence: forbidden       # no event bus, so no typed events
     pattern: event-bus            # typed event classes of one service; each equals an entry of be/contracts/<service>/events.json
     tracked: tracked
     tier: events
     owner: true
+    goesTo: "the full edition: a lite app has no event bus, so no modules/events"
     requires: [index.ts]
     allows: ["<event>.event.ts", index.ts]
     tests: none
@@ -1175,10 +1388,12 @@ slots:
     profiles: [be]
     path: "src/modules/queues/<queue>/"
     presence: opt-in
+    litePresence: forbidden       # no queue, so no typed producers
     pattern: queue                # a typed producer of one queue: enqueueX(payload, tx) writes the outbox; its schedulers live beside it
     tracked: tracked
     tier: queues
     owner: true
+    goesTo: "the full edition: a lite app has no job queue, so no modules/queues"
     requires: [index.ts, "<queue>.queue.ts"]   # the module exists when a domain module imports the producer; a scheduler-only queue has none
     allows: ["<queue>.queue.ts", "<queue>.module.ts", "<queue>.contracts.ts", index.ts]
     tests: none
@@ -1188,6 +1403,7 @@ slots:
     profiles: [be]
     path: "src/features/reactors/<reactor>/"
     presence: opt-in
+    litePresence: forbidden       # no event bus, so nothing reacts to a domain event
     pattern: event-bus            # a reactor consumes events of another context and keeps a local copy or triggers a projection
     trigger: reactors
     tracked: tracked
@@ -1196,12 +1412,14 @@ slots:
     requires: [index.ts, "<reactor>.module.ts", transport/]
     allows: [index.ts, "<reactor>.module.ts", application/, transport/]
     tests: none
+    goesTo: "the full edition: a lite app has no event bus, so no reactors (a third-party callback is a webhooks feature)"
     coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.jobs
     profiles: [be]
     path: "src/features/jobs/<job>/"
     presence: opt-in
+    litePresence: forbidden       # no fenced-job platform, so no job tree
     pattern: fenced-job           # a background job: a processor with a fenced claim, steps and the application it dispatches to
     trigger: jobs
     tracked: tracked
@@ -1210,12 +1428,14 @@ slots:
     requires: [index.ts, "<job>.module.ts", steps/, transport/]
     allows: [index.ts, "<job>.module.ts", application/, steps/, transport/]
     tests: none
+    goesTo: "the full edition: a lite app has no job queue (a scheduled action is a cli command; pg_cron / pg_net fires it)"
     coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.jobs.queue
     profiles: [be]
     path: "src/features/jobs/<job>/transport/queue/"
     presence: opt-in              # the queue transport of the job: its module and the processor the job runner hands the fenced claim to
+    litePresence: forbidden
     pattern: fenced-job
     tracked: tracked
     tier: feature
@@ -1224,26 +1444,31 @@ slots:
     tests: none
     coverage: none
     composedBy: [api, worker]
+    goesTo: "the full edition: a lite app has no job queue"
     rules: [BE_BACKGROUND_UNOWNED]
   - id: be.feature.jobs.steps
     profiles: [be]
     path: "src/features/jobs/<job>/steps/"
     presence: opt-in
+    litePresence: forbidden
     pattern: fenced-job           # one external effect per step; it takes the claimed job and writes through the guarded methods
     tracked: tracked
     tier: feature
     allows: ["<step>.step.ts"]
     tests: none
+    goesTo: "the full edition: a lite app has no job queue"
     coverage: none
     rules: [BE_JOB_SHAPE, BE_JOB_RUN_KEY]
   - id: be.platform.jobs
     profiles: [be]
     path: "src/modules/platform/jobs/"
     presence: opt-in
+    litePresence: forbidden       # no fenced-job primitive without a queue
     pattern: fenced-job           # the ONE fencing primitive: the job entity, the claim that bumps the token, guarded writes (knowledge/patterns/be/jobs.yaml)
     tracked: tracked
     tier: platform
     owner: true
+    goesTo: "the full edition: a lite app has no job queue (a scheduled action is a cli command)"
     requires: [index.ts, jobs.module.ts, jobs.port.ts, jobs.contracts.ts, job-claim.service.ts, job-claim.service.spec.ts, fenced.processor.ts]
     tests: unit-beside
     coverage: required
@@ -1253,10 +1478,12 @@ slots:
     profiles: [be]
     path: "src/modules/projections/<name>/"
     presence: opt-in
+    litePresence: forbidden       # a read model replayed off an event stream needs the event bus lite does not have
     pattern: projection           # a read model: only its projection writes its table; recompute is idempotent and replayable; readers use get*
     tracked: tracked
     tier: projections
     owner: true
+    goesTo: "the full edition: a lite app has no event stream to project; a read shape is a view or a read-* in fe modules/db"
     requires: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts"]
     allows: [index.ts, "<name>.module.ts", "<name>.module-definition.ts", "<name>.options.ts", "<name>.projection.ts", "<name>.projection-entity.ts", "<name>.contracts.ts", persistence/]
     tests: unit-beside            # a measured slot: <name>.projection.spec.ts beside its projection is legal (the file owes 100 per file; a spec of its own is optional)
@@ -1283,6 +1510,24 @@ slots:
     tests: none
     coverage: required
     why: an ML or LLM model client is an integration; weights and datasets are never in git
+  - id: be.integrations.supabase
+    profiles: [be]
+    # The only be import of @supabase/* (L10): the Auth admin and Storage admin client, plus the JWKS-based verification of
+    # the Supabase access token the guard chain reads (L16). The connection itself is ordinary Postgres (the shared
+    # EntityManager of the declared connection); what lives here are the service calls no database role covers.
+    path: "src/modules/integrations/supabase/"
+    presence: opt-in              # enabled by a connection with provider: supabase; required under edition lite
+    provider: supabase
+    litePresence: required
+    tracked: tracked
+    tier: integrations
+    owner: true
+    requires: [index.ts, supabase.config.ts, supabase.options.ts, supabase.decorators.ts, supabase.client.ts, supabase.jwks.ts]   # Secrets, no defaults (R44); the options and the named injector (R83); the admin client; the token verification
+    allows: [index.ts, supabase.config.ts, supabase.options.ts, supabase.decorators.ts, supabase.client.ts, supabase.jwks.ts, errors/]
+    tests: unit-beside
+    rules: [BE_TIER_DIRECTION, BE_ERROR_HOME, BE_SECRET_DEFAULT]
+    coverage: required
+    since: 2.1.0
 
   # ----- BE: tests (owner test layout 2026-09-30). Unit specs are <name>.service.spec.ts beside their service and nothing else; everything else
   # lives under src/tests/, one folder per kind, and the folder and the file suffix always agree (a file whose suffix does
@@ -1291,8 +1536,10 @@ slots:
     profiles: [be]
     path: "src/tests/world/"
     presence: optional
+    litePresence: forbidden       # a lite app has no test world
     tracked: tracked
     tier: e2e
+    goesTo: "the full edition: a lite app has no test world (no containers, fakes or useTestWorld)"
     allows: [global-setup.ts, global-teardown.ts, use-test-world.ts, "fakes/<provider>/server.ts", fakes/]   # jest globalSetup/globalTeardown default-export (Jest API); fakes/<provider>/server.ts is the fake server of a provider, a literal file name BE_SOURCE_FORM reads as its role; plus root files with a role suffix (test-world-files, R47)
     tests: none
     coverage: none
@@ -1309,8 +1556,10 @@ slots:
     profiles: [be]
     path: "src/tests/world/kit/"
     presence: optional
+    litePresence: forbidden
     tracked: tracked
     tier: e2e
+    goesTo: "the full edition: a lite app has no test world"
     allows: ["<name>.ts"]    # plain kebab names, like platform/primitives (BE-CONVENTION 1.11 names primitives/time.ts): the world's inlined test helpers (poll, free-ports)
     tests: none
     coverage: none
@@ -1319,8 +1568,10 @@ slots:
     profiles: [be]
     path: "src/tests/fixtures/"
     presence: optional
+    litePresence: forbidden
     tracked: tracked
     tier: fixtures
+    goesTo: "the full edition: a lite app has no test fixtures"
     allows: [i18n/]   # i18n/ is the one folder that may carry localized text
     tests: none
     coverage: none
@@ -1329,8 +1580,10 @@ slots:
     profiles: [be]
     path: "src/tests/fixtures/builders/*.builder.ts"
     presence: optional
+    litePresence: forbidden
     tracked: tracked
     tier: fixtures
+    goesTo: "the full edition: a lite app has no test fixtures"
     tests: none
     coverage: none
     why: >-
@@ -1343,8 +1596,10 @@ slots:
     profiles: [be]
     path: "src/tests/fixtures/i18n/"
     presence: optional
+    litePresence: forbidden
     tracked: tracked
     tier: fixtures
+    goesTo: "the full edition: a lite app has no test fixtures"
     allows: ["<name>.<role>.ts"]   # data files that deliberately carry localized text (a real Vietnamese string a parser or formatter must accept); no specs here
     tests: none
     coverage: none
@@ -1353,9 +1608,11 @@ slots:
     profiles: [be]
     path: "src/tests/integration/<capability>/*.integration-spec.ts"
     presence: optional
+    litePresence: forbidden
     tracked: tracked
     tier: e2e
     tests: e2e
+    goesTo: "the full edition: a lite app has no test tree"
     coverage: none
     why: one capability module through useTestWorld({ modules }), no HTTP door of ours (SQL, transactions, concurrency, inbox claims on the real database; and every integration client, `<capability>` being its provider folder, against our real infra, a real peer app or the library fake at the network edge, with its success, its ErrorCode refusal mapping and an outage through the world, R112); run by test:integration
     rules: [BE_TEST_TOPOLOGY, BE_INTEGRATION_SPEC_MISSING]
@@ -1363,9 +1620,11 @@ slots:
     profiles: [be]
     path: "src/tests/e2e/<area>/*.e2e-spec.ts"
     presence: optional
+    litePresence: forbidden
     tracked: tracked
     tier: e2e
     tests: e2e
+    goesTo: "the full edition: a lite app has no test tree"
     coverage: none
     why: flow e2e through useTestWorld({ apps }); external services are the world's network fakes; run by test:e2e
     rules: [HFS_CI_E2E_AUTOMATIC, BE_TEST_TOPOLOGY, BE_E2E_FLOW]
@@ -1373,9 +1632,11 @@ slots:
     profiles: [be]
     path: "src/tests/contract/<provider>/*.contract-spec.ts"
     presence: optional
+    litePresence: forbidden
     tracked: tracked
     tier: e2e
     tests: e2e
+    goesTo: "the full edition: a lite app has no test tree"
     coverage: none
     why: provider sandbox contracts, skipped without sandbox config; run only by test:contract, never part of test or test:e2e
     rules: [BE_TEST_TOPOLOGY]
@@ -1443,6 +1704,18 @@ slots:
     tests: none
     goesTo: "apps/<app>/src/proxy.ts: Next >= 16 renamed middleware to proxy and refuses the old name"
     rules: [FE_NEXT_CONVENTIONS]
+  - id: fe.route.callback
+    profiles: [fe]
+    # The auth callback of a Supabase session (the PKCE code exchange): the one non-health route handler of an app with a Supabase
+    # connection, in either edition (an upgrade lite -> full leaves it as it is, fe/** is never touched); an app without one has no
+    # route handler in fe/ (L15).
+    path: "apps/<app>/src/app/auth/callback/route.ts"
+    presence: opt-in
+    provider: supabase
+    tracked: tracked
+    tier: route
+    tests: none
+    since: 2.1.0
   - id: fe.feature
     profiles: [fe]
     path: "apps/<app>/src/features/{pages,layouts,overlays}/<name>/"
@@ -1525,6 +1798,7 @@ slots:
     presence: optional
     tracked: tracked
     tier: transport
+    outcomeHome: true
     tests: none
     why: the one Outcome union of a one-app repository; a shared union is fe.package.api.outcome
     rules: [FE_HTTP_STATUS_COLLAPSE]
@@ -1573,10 +1847,47 @@ slots:
     tier: foundation
     tests: none
     why: shared types with no runtime behaviour; a component may import them
+  - id: fe.modules.db
+    profiles: [fe]
+    # The db transport of an app on Supabase (the ONLY place that imports @supabase/ssr or @supabase/supabase-js, L10): the
+    # server client factory (cookies, anon key, RLS applies), the browser client factory, getPrincipal() (React cache,
+    # auth.getClaims()) and toOutcome() mapping {data, error} into the same Outcome vocabulary modules/api uses. Readers
+    # live in <domain>/read-*.ts, Server Actions (schema-parsed input) in <domain>/write-*.ts; the row types come from
+    # supabase/types/database.types.ts (sides.fe.reads). The barrel index.ts is server-only (it re-exports server code), so
+    # browser.ts, the browser client factory a client hook imports, is a second public entry of the owner (`entries`).
+    path: "apps/<app>/src/modules/db/"
+    presence: opt-in              # enabled by a connection with provider: supabase; required under edition lite
+    provider: supabase
+    litePresence: required
+    tracked: tracked
+    tier: transport
+    requires: [index.ts, server.ts, browser.ts, principal.ts]
+    allows: [index.ts, server.ts, browser.ts, principal.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/write-*.ts", "<domain>/<domain>.mapper.ts"]
+    entries: [browser.ts]
+    anonymousActions: [auth/write-sign-in.ts, auth/write-sign-out.ts]     # the Server Actions that run for an anonymous principal by design (FE_AUTH_SESSION_TRUST)
+    tests: none
+    since: 2.1.0
+  - id: fe.modules.db.outcome
+    profiles: [fe]
+    # A lite app has no modules/api: its db transport is the transport, so the one Outcome union lives here (toOutcome maps
+    # {data, error} into it). Under full the union stays fe.transport.outcome / fe.package.api.outcome.
+    editions: [lite]
+    path: "apps/<app>/src/modules/db/outcome.ts"
+    presence: opt-in
+    provider: supabase
+    litePresence: optional
+    tracked: tracked
+    tier: transport
+    outcomeHome: true
+    tests: none
+    why: the one Outcome union of a lite app; its db owner is the transport
+    rules: [FE_HTTP_STATUS_COLLAPSE]
+    since: 2.1.0
   - id: fe.package.ui
     profiles: [fe]
     path: "packages/<family>-ui/"
     presence: opt-in
+    litePresence: optional        # a lite app scaffolds no packages; one appears by need, without an optionalSlots entry
     tracked: tracked
     tier: package
     owner: true
@@ -1591,6 +1902,7 @@ slots:
     profiles: [fe]
     path: "packages/<family>-api/"
     presence: opt-in
+    litePresence: optional
     tracked: tracked
     tier: package
     owner: true
@@ -1613,6 +1925,7 @@ slots:
     presence: optional     # enabled with its package (fe.package.api is the opt-in)
     tracked: tracked
     tier: package
+    outcomeHome: true
     tests: none
     why: the repository's one Outcome union
     rules: [FE_HTTP_STATUS_COLLAPSE]
@@ -1620,6 +1933,7 @@ slots:
     profiles: [fe]
     path: "packages/<family>-i18n/"
     presence: opt-in
+    litePresence: optional
     tracked: tracked
     tier: package
     owner: true
@@ -1627,6 +1941,20 @@ slots:
     tests: none
     why: the next-intl stack (routing, navigation, request config) written once, exported as the createAppI18n factory every app calls
     rules: [FE_I18N_PLACEMENT, FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
+  - id: fe.package.db
+    profiles: [fe]
+    # The shared Supabase client factories once a second fe app needs them (server, browser, principal, toOutcome) -
+    # mirroring fe.transport.client vs fe.package.api.client; the one Outcome union is re-exported from
+    # fe.package.api.outcome when the api package exists.
+    path: "packages/<family>-db/"
+    presence: opt-in
+    provider: supabase
+    tracked: tracked
+    tier: package
+    owner: true
+    requires: [package.json, src/index.ts, tsconfig.json]
+    tests: none
+    since: 2.1.0
 
 # Checks that read this manifest (all ship from .claude; none keeps its own path list)
 consumers:

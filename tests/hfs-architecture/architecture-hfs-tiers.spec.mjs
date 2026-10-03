@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
+import { appDeclaration, archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
 import { stronglyConnected } from '../../scripts/hfs/architecture/tiers.mjs';
 
 // HFS checks 1 and 2: the tier direction matrix of knowledge/hfs/slots.yaml and owner cycles.
@@ -179,6 +179,24 @@ test('FE: a component may import config but not the api transport; a hook reache
   assert.deepEqual(hits, ['apps/web/src/components/leaves/Btn/index.tsx -> apps/web/src/modules/api/index.ts']);
   const bypass = findings(report, 'ARCH_OWNER_EXPORT_BYPASS').map(item => `${item.path} -> ${item.resolvedPath}`);
   assert.deepEqual(bypass, ['apps/web/src/hooks/orders/index.ts -> apps/web/src/hooks/cart/useDeep.ts']);
+});
+
+test('FE: a connected block may import a db Server Action directly, but not a non-action db transport', t => {
+  const declaration = appDeclaration('fe', { apps: [{ name: 'web', kind: 'next' }] });
+  declaration.edition = 'lite';
+  declaration.sides.be.connections = [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'schema', provider: 'supabase' }];
+  const root = archFixture(t, {
+    profile: 'fe',
+    files: {
+      '../hfs.json': `${JSON.stringify(declaration, null, 2)}\n`,
+      'apps/web/src/components/blocks/Order/index.tsx': "import { writeOrder } from '../../../modules/db/orders/write-order';\nimport { readOrder } from '../../../modules/db/orders/read-order';\nexport const Order = [writeOrder, readOrder];\n",
+      'apps/web/src/modules/db/index.ts': "export { readOrder } from './orders/read-order';\n",
+      'apps/web/src/modules/db/orders/write-order.ts': "'use server';\nimport 'server-only';\nexport const writeOrder = async () => 1;\n",
+      'apps/web/src/modules/db/orders/read-order.ts': 'export const readOrder = async () => 1;\n',
+    },
+  });
+  const found = findings(runArch(root), 'FE_TIER_DIRECTION');
+  assert.deepEqual(found.map(item => item.resolvedPath), ['apps/web/src/modules/db/orders/read-order.ts']);
 });
 
 test('stronglyConnected finds only multi-node components', () => {

@@ -678,7 +678,7 @@ const literalsOf = (checker, type, name, location) => {
 }
 
 /**
- * A result union is declared once per repository: `Outcome<T>` in the `fe.transport.outcome` / `fe.package.api.outcome` file.
+ * A result union is declared once per repository: `Outcome<T>` in the file of the slot the manifest marks `outcomeHome` (`fe.transport.outcome`, `fe.package.api.outcome`, or `fe.modules.db.outcome` in a lite app).
  *
  * A union type alias is a result union when its members are object types that ALL carry the same literal-typed discriminant, in the
  * result vocabulary: `ok` (both `true` and `false` among the members) or `kind` (a member of kind `"ok"` beside at least one failure
@@ -696,7 +696,7 @@ export const oneOutcomeUnion = {
     schema: [],
     messages: {
       second:
-        "`{{name}}` is a second result union ({{discriminant}}). The repository has one vocabulary, `Outcome<T>`, declared in `modules/api/outcome.ts` (or the api package's `src/outcome.ts`); a bespoke union here is a result shape the client, the status mapping and `outcome-kinds-exhaustive` know nothing about. Compose `Outcome<T>` (add the domain detail as its second parameter) instead of declaring another.",
+        "`{{name}}` is a second result union ({{discriminant}}). The repository has one vocabulary, `Outcome<T>`, declared in the one Outcome home of the repository (`modules/api/outcome.ts`, the api package's `src/outcome.ts`, or `modules/db/outcome.ts` in a lite app); a bespoke union here is a result shape the client, the status mapping and `outcome-kinds-exhaustive` know nothing about. Compose `Outcome<T>` (add the domain detail as its second parameter) instead of declaring another.",
     },
   },
   create(context) {

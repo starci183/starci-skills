@@ -45,6 +45,10 @@
   "publishConfig": {
     "access": "public"
   },
+  "dependencies": {
+    "libpg-query": "18.1.5",
+    "smol-toml": "1.9.0"
+  },
   "scripts": {
     "check": "node packages/cli/bin/starci.mjs runtime check",
     "test": "node --import ./tests/setup/low-priority.mjs --import ./tests/setup/isolated-temp.mjs --import ./tests/setup/isolated-registry.mjs --import ./tests/setup/runtime-copies.mjs --test \"tests/**/*.spec.mjs\"",

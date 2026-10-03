@@ -6,7 +6,8 @@ import { machineKit } from './machine-ast.mjs';
  * `client-fetch-has-signal`. ESLint judges one file at a time by the spelling of a call; the machine judges the repository by
  * what the checker resolves. A repository has exactly ONE transport client and ONE Outcome union, both named by slot (never
  * by a path spelled here): the api package's (`fe.package.api.client`, `fe.package.api.outcome`) when the repository shares
- * it, or the only app's (`fe.transport.client`, `fe.transport.outcome`) when the repository declares exactly one app.
+ * it, or the only app's (`fe.transport.client`, `fe.transport.outcome`) when the repository declares exactly one app. The
+ * Outcome homes are the slots the manifest marks `outcomeHome` (the lite edition adds `fe.modules.db.outcome`), not a list kept here.
  *
  *   - two or more clients, or two or more Outcome unions, in the repository (two apps each keeping one, or a package one plus
  *     an app one) are findings on every copy;
@@ -30,7 +31,6 @@ const APP_CLIENT_SLOT = 'fe.transport.client';
 const APP_OUTCOME_SLOT = 'fe.transport.outcome';
 const PACKAGE_API_SLOT = 'fe.package.api';
 const CLIENT_SLOTS = new Set([APP_CLIENT_SLOT, 'fe.package.api.client']);
-const OUTCOME_SLOTS = new Set([APP_OUTCOME_SLOT, 'fe.package.api.outcome']);
 const NO_CLIENT = "the repository has no transport client. Create the one client (packages/<family>-api/src/client.ts, or the only app's modules/api/client.ts) and call it.";
 
 export function checkTransportOwner(input) {
@@ -60,7 +60,7 @@ export function checkTransportOwner(input) {
 
   const files = [...graph.files.values()].filter(file => file.slot && file.tier !== 'e2e');
   const clients = files.filter(file => CLIENT_SLOTS.has(file.slot));
-  const outcomes = files.filter(file => OUTCOME_SLOTS.has(file.slot));
+  const outcomes = files.filter(file => resolver.slot(file.slot)?.outcomeHome === true);
   const clientRels = new Set(clients.map(file => file.rel));
   const list = items => items.map(item => item.rel).join(', ');
   const owned = clients.length ? `the repository has one transport (${list(clients)}). Call the client and take its Outcome.` : NO_CLIENT;

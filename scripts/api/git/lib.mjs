@@ -7,6 +7,7 @@
 // (diff.mjs, ls-files.mjs, worktree-*.mjs, ...), and a caller folds the spawn result it gets back with the pure
 // helpers of scripts/lib/git.mjs (gitResultOf, gitOutputOf).
 import { spawnSync } from 'node:child_process';
+import { withoutGitLocalEnv } from '../../lib/git.mjs';
 
 /**
  * Spawn `file` (the git binary) once with `args`: utf8 text, a hidden window, never a shell.
@@ -22,10 +23,14 @@ export const gitSpawn = (file, args, options = {}) => {
 
 /**
  * `git args` in `cwd`, or `git -C dir args` when `dir` is given. `git` overrides the binary; `config` ({key: value})
- * prefixes one `-c key=value` per entry (core.quotepath=off, a committer identity).
+ * prefixes one `-c key=value` per entry (core.quotepath=off, a committer identity). Scoped calls discard ambient
+ * hook repository variables; an explicit env remains authoritative, including an intentional temporary index.
  */
 export const runGit = (args, { cwd = null, dir = null, git = 'git', config = null, ...options } = {}) =>
-  gitSpawn(git, [...(dir ? ['-C', dir] : []), ...Object.entries(config ?? {}).flatMap(([key, value]) => ['-c', `${key}=${value}`]), ...args], cwd ? { cwd, ...options } : options);
+  gitSpawn(git, [...(dir ? ['-C', dir] : []), ...Object.entries(config ?? {}).flatMap(([key, value]) => ['-c', `${key}=${value}`]), ...args], {
+    ...(cwd ? { cwd } : {}), ...options,
+    ...((cwd || dir) && options.env === undefined ? { env: withoutGitLocalEnv(process.env) } : {}),
+  });
 
 /**
  * A caller's git runner folded to (args, opts) -> {ok, stdout, stderr}. `git`: the caller's runner (args, {cwd}) ->

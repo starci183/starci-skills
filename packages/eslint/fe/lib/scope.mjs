@@ -63,8 +63,12 @@ export const isConfigModule = (context) => inSlot(context, "fe.modules.config")
 /** The one place that may call `fetch`: slot `fe.transport.client` (one-app repository) or `fe.package.api.client` (shared package). */
 export const isApiClient = (context) => inSlot(context, "fe.transport.client", "fe.package.api.client")
 
-/** The file that may declare the one Outcome union: slot `fe.transport.outcome` or `fe.package.api.outcome`. */
-export const isOutcomeModule = (context) => inSlot(context, "fe.transport.outcome", "fe.package.api.outcome")
+/** The file that may declare the one Outcome union: the file of the slot the manifest marks `outcomeHome`. */
+export const isOutcomeModule = (context) => {
+  const hfs = hfsOf(context)
+  const slot = slotOfFile(context)
+  return slot !== null && hfs.slot(slot)?.outcomeHome === true
+}
 
 /** The basename of a path without directories. */
 export const baseName = (filename) => normalizePath(filename).split("/").pop() ?? ""

@@ -55,6 +55,11 @@ topics:
     path: pins.yaml
     decides: Exact versions from canon-pins, one version per dependency, @starci/grammar from the registry, other packages from the runtime checkout
     rules: REPO-PINS-1 … REPO-PINS-3
+  - id: repo.lite
+    title: Lite edition
+    path: lite.yaml
+    decides: One edition and one engine, migrations a parser reads, configuration and types as checked facts, one door to the database, no secret material in the tree
+    rules: REPO-LITE-1 … REPO-LITE-5
   - id: repo.size-budgets
     title: Size budgets
     path: size-budgets.yaml

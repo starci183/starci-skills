@@ -6,6 +6,7 @@ import { braceVariants } from '../../lib/glob.mjs';
 import { createSlotResolver, loadSlotManifest, openHfs } from '../slots.mjs';
 import { isFeTestPath } from '../rules/fe-no-tests.mjs';
 import { readTextFile } from '../../lib/read-text.mjs';
+import { managedScriptNames } from './managed-scripts.mjs';
 
 /**
  * HFS repository-tree check (knowledge/hfs/README.md): every StarCi repository is an
@@ -198,20 +199,6 @@ function privateHost(hostname) {
 // The scripts the README Development section shows; each is required only when the managed package-scripts template of the
 // profile (packages/hfs/templates/<profile>/package-scripts/package.json, the one source of the managed script names) has it.
 const DEVELOPMENT_SCRIPTS = ['typecheck', 'lint', 'build', 'test'];
-// The templates sit beside the runtime in a checkout (packages/hfs/templates) and one level above the bundled runtime of @starci/hfs.
-const TEMPLATE_ROOTS = [path.resolve(import.meta.dirname, '..', '..', '..', 'packages', 'hfs', 'templates'), path.resolve(import.meta.dirname, '..', '..', '..', '..', 'templates')];
-const managedScriptCache = new Map();
-
-/** The script names of the managed package-scripts template of a profile. The template holds a {{appScripts}} placeholder, so it is read by key, not parsed as JSON. */
-function managedScriptNames(profile) {
-  if (!managedScriptCache.has(profile)) {
-    const file = TEMPLATE_ROOTS.map(dir => path.join(dir, profile, 'package-scripts', 'package.json')).find(candidate => fs.existsSync(candidate));
-    if (!file) throw Error(`The managed package-scripts template of profile ${profile} cannot be found next to the runtime.`);
-    managedScriptCache.set(profile, new Set([...fs.readFileSync(file, 'utf8').matchAll(/^\s*"([A-Za-z0-9:_.-]+)":\s*"/gmu)].map(match => match[1])));
-  }
-  return managedScriptCache.get(profile);
-}
-
 /** The README command that runs a managed script: `npm test` for test, `npm run <name>` for the others (never a longer script name that starts with it). */
 function scriptCommand(name) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
@@ -219,7 +206,7 @@ function scriptCommand(name) {
 }
 
 /** Presentation checks shared by the product HFS gate and this runtime's own standalone gate. */
-export function checkRepoPresentation({ root, runtime = false, tree = treeView(root), profile = 'app' }) {
+export function checkRepoPresentation({ root, runtime = false, tree = treeView(root), profile = 'app', edition = 'full' }) {
   const violations = [];
   const finding = (ruleId, entry, message, line = 1) => violations.push({ ruleId, path: entry, line, column: 1, message });
   for (const entry of tree.top) {
@@ -269,7 +256,7 @@ export function checkRepoPresentation({ root, runtime = false, tree = treeView(r
   };
   if (!runtime && headings.some(item => item.name === 'Development')) {
     const development = sectionBody('Development');
-    const scripts = DEVELOPMENT_SCRIPTS.filter(name => managedScriptNames(profile).has(name));
+    const scripts = DEVELOPMENT_SCRIPTS.filter(name => managedScriptNames(profile, edition).has(name));
     const commands = [/npm (?:ci|install)/u, ...scripts.map(scriptCommand)];
     if (commands.some(command => !command.test(development)))
       finding('HFS_README_DEVELOPMENT_INCOMPLETE', 'README.md',
@@ -515,7 +502,7 @@ export function checkHfs(config) {
 export function checkAppRoot({ root, resolver, tree = treeView(root) }) {
   const violations = [];
   const finding = (ruleId, entry, message) => violations.push({ ruleId, path: entry, line: 1, column: 1, message });
-  violations.push(...checkRepoPresentation({ root, tree, profile: 'app' }).violations);
+  violations.push(...checkRepoPresentation({ root, tree, profile: 'app', edition: resolver.repo?.edition ?? 'full' }).violations);
   const allowed = slotRootEntries(resolver, 'app');
   for (const entry of [...tree.top].sort()) {
     if (NON_NPM_ENTRIES.has(entry) || /\.md$/iu.test(entry)) continue;

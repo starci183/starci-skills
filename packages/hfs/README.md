@@ -8,11 +8,11 @@ checkout. The machine loads `typescript` from the app it checks (never its own c
 Every command runs at the app root. A side is judged with its folder as the root it was when products were split in two repositories (the "side view" of `scripts/hfs/slots.mjs`): the root slots (`app.*`) are judged once, the `be.*` slots under `be/` and the `fe.*` slots under `fe/`, and nothing crosses sides except `sides.fe.reads` (the `be.contract.*` slots, the input of the front end's codegen). Every finding path is app-relative (`be/...`, `fe/...`).
 
 ```sh
-starci app scaffold <name> [--into <dir>] [--cwd <dir>]
-starci app add <api|job|reactor|queue|projection|webhook|realtime|saga> <name> [options] [--cwd <dir>]
+starci app scaffold <name> [--into <dir>] [--edition full|lite] [--cwd <dir>]
+starci app add <api|webhook|realtime|saga|job|reactor|queue|projection|cli|table|app> <name> [--fe] [--no-types] [options] [--cwd <dir>]
 starci app lint [--cwd <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
 starci app sync (--check | --write) [--cwd <dir>]
-starci app check [--cwd <dir>] [--json] [--fast] [--base <ref>]
+starci app check [--cwd <dir>] [--json] [--fast] [--base <ref>] [--edition full] [--db-types]
 starci app upgrade [--edition full] [--plan]
 starci app stack <up|down|status> [--stack <dir>] [--services <list>] [--k3d] [--force] [--json] [--cwd <dir>]
 starci app explain <path> [--cwd <dir>] [--json]
@@ -23,6 +23,33 @@ starci app new image [--cwd <dir>]
 starci app secret list|show|set|gen ... [--cwd <dir>]
 starci app hygiene [--cwd <dir>]
 ```
+
+## Lite edition
+
+Lite is the smaller edition of the same HFS standard, not another profile or engine. The declaration sets `edition` to `lite`;
+the same slot manifest, rule catalog, lint canons, grammar, security rules and Docker rules apply, while edition fields filter
+out the test world and event machinery.
+
+`starci app scaffold <name> --edition lite` creates the minimum single-api, single-Next-app Supabase product. It generates the
+`app.supabase.types` artifact from the app's local Supabase stack; if that generation cannot run, scaffolding fails and removes
+the app it began instead of leaving a partial tree.
+
+The lite additions are deliberately narrow:
+
+- `starci app add table <name> [--fe] [--no-types]` adds the migration and matching back-end capability. `--fe` also adds typed readers
+  and writers through the front-end database owner; types regenerate by default, while `--no-types` is the explicit opt-out.
+- `starci app add cli <group>` creates the optional cli app on first use, including its built-in migration and seed groups, then adds
+  the requested group without full-edition specs.
+- `starci app add app <name>` refuses in lite because lite has exactly one front-end app. Upgrade before adding another.
+- An `add` or `new` whose target slot is unavailable in lite stops before writing with `<verb> <noun>: full edition only`.
+
+`starci app emit` continues to emit the enabled back-end snapshots and also writes `supabase/types/database.types.ts` when
+the `app.supabase.types` slot is enabled. The local Supabase stack must be running for generation.
+
+Plan the transition with `starci app upgrade --edition full --plan`, then use `starci app check --edition full [--db-types]` to judge the
+unchanged lite tree through the full-edition view. The check is read-only; `--db-types` includes a fresh generated-types
+comparison when the local stack is available. Applying `starci app upgrade --edition full` adds the full-only managed configuration,
+test layers and cli requirements without rewriting product code. Downgrade to lite is not supported.
 
 ## Creating a service
 

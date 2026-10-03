@@ -1,0 +1,41 @@
+project_id = "{{project}}"
+
+[api]
+enabled = true
+port = {{supabasePortApi}}
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = {{supabasePortDb}}
+shadow_port = {{supabasePortShadow}}
+major_version = 17
+
+[db.pooler]
+enabled = false
+port = {{supabasePortPooler}}
+
+[studio]
+port = {{supabasePortStudio}}
+
+[inbucket]
+port = {{supabasePortInbucket}}
+
+[analytics]
+port = {{supabasePortAnalytics}}
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000/auth/callback"]
+enable_signup = false
+jwt_expiry = 3600
+
+[auth.email]
+enable_signup = false
+
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"

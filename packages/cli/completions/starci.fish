@@ -312,6 +312,8 @@ complete -c starci -n '__starci_using_command app add' -l connection -r -d 'decl
 complete -c starci -n '__starci_using_command app add' -l owner -r -d 'service that owns a saga'
 complete -c starci -n '__starci_using_command app add' -l failed -r -d 'failure event consumed by a saga'
 complete -c starci -n '__starci_using_command app add' -l done -r -d 'completion event consumed by a saga'
+complete -c starci -n '__starci_using_command app add' -l fe -d 'add the typed front-end database modules of a lite table'
+complete -c starci -n '__starci_using_command app add' -l no-types -d 'skip regenerating the Supabase database types of a lite table'
 complete -c starci -n '__starci_using_command app check' -l fast -d 'judge only paths changed since the merge base'
 complete -c starci -n '__starci_using_command app check' -l base -r -d 'merge-base ref used by --fast (refused without it)'
 complete -c starci -n '__starci_using_command app lint' -l changed -r -d 'app-relative files to judge (space-separated; not with --workspace)'

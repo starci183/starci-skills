@@ -32,10 +32,29 @@ $defs:
         minimum: 1
         description: The pinned manifest MAJOR. A repository always follows the latest minor of that major; another major than the manifest's is refused.
       kind: {const: app}
+      edition:
+        enum: [full, lite]
+        description: >-
+          The edition of the standard the app follows (L01). Absent means full. `lite` is the same manifest and the same
+          check filtered to the smaller shape: the slots lite excludes are forbidden paths, the test world is absent, and a
+          Supabase connection provides the persistence a lite back end owns no migration tree for.
       project:
         type: string
         pattern: '^[a-z][a-z0-9-]*$'
         description: Binds .workspaces/projects/<project>/work.json.
+      supabase:
+        type: object
+        additionalProperties: false
+        description: >-
+          The auth posture the app declares for its Supabase project (L08): supabase/config.toml must equal what is stated here (a
+          key left out is not compared), and `jwtExpiry` is 3600 at most. `forceRls` lists the tables a definer role owns, which
+          also need `force row level security`.
+        properties:
+          enableSignup: {type: boolean}
+          jwtExpiry: {type: integer, minimum: 1, maximum: 3600}
+          siteUrl: {type: string, minLength: 1}
+          redirectUrls: {type: array, items: {type: string, minLength: 1}}
+          forceRls: {type: array, items: {type: string, minLength: 1}}
       browser:
         const: true
         description: "The app has a browser journey (slot app.browser at the app root; browser/playwright.config.ts, browser/journeys/*.ts and browser/stack.mjs; the managed script test:browser). Left out when it has none. A front end itself has no tests (FE_NO_TESTS); the journey is the product, not the front end."
@@ -65,6 +84,7 @@ $defs:
                         envPrefix: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$'}
                         owner: {type: string, pattern: '^[a-z][a-z0-9-]*$', description: 'The api or worker app that owns this bounded context (the connection is the context): only it composes the connection (R174).'}
                         isolation: {enum: [database, schema], description: 'The context is its own logical database, or its own schema of a shared database (<PREFIX>_SCHEMA); splitting a schema out into a database is an env-only change.'}
+                        provider: {enum: [postgres, supabase], description: 'The database product behind the connection; absent means the app-managed default. the value supabase enables the opt-in app.supabase* and be.integrations.supabase slots (the supabase/ tree Supabase owns, the schema authority a lite app reads instead of a migration tree).'}
           fe:
             allOf:
               - {$ref: '#/$defs/side'}

@@ -1,0 +1,7 @@
+export const ident = (name: string, allowed: ReadonlyArray<string>): SqlIdent => {
+    if (!IDENT_PATTERN.test(name) || !allowed.includes(name)) {
+        throw new DatabaseError({ code: DatabaseErrorCode.IdentifierRejected })
+    }
+    assertSqlIdent(name)
+    return name
+}

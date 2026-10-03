@@ -33,7 +33,7 @@
 //                                            a back-end `<name>.service.ts` and its `<name>.service.spec.ts` skeleton (scaffold/service.mjs; <dir> is
 //                                            relative to be/): the spec is built
 //                                            with Test.createTestingModule, one provider per constructor dependency (kit doubles from @starci/jest-preset),
-//                                            one placeholder it per public method. Never overwrites a file.
+//                                            one placeholder it per public method. Never overwrites a file. In a lite app `new service` and `new spec` refuse (full edition only: the unit spec they write has no test world).
 //   starci app new image [--cwd <dir>]                  the Dockerfile of every declared app that has none, from the image canon (scaffold/image.mjs); never overwrites
 //   starci app new spec <file>.service.ts [--cwd <dir>]  the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
 //   starci app secret list | show <slug> | set <slug> | gen <slug> [--key NAME] [--env NAME] [--age RECIPIENT] [--bytes N] [--cwd DIR]
@@ -42,7 +42,7 @@
 //   starci app add <api|webhook|realtime|saga|job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--owner <service> --failed <event> --done <event>] [--connection <name>] [--cwd <dir>]
 //                                            exactly that kind's file tree, generated FROM the files: tree of its pattern topic (knowledge/patterns/be) with the
 //                                            one template body of each entry (templates/be/patterns), plus the platform capabilities it needs when they are missing;
-//                                            it registers the patterns and the trigger kind in hfs.json (sides.be.patterns, sides.be.kinds). Never overwrites a file (scaffold/add.mjs).
+//                                            it registers the patterns and the trigger kind in hfs.json (sides.be.patterns, sides.be.kinds). Never overwrites a file (scaffold/add.mjs). In a lite app a noun whose slots lite does not have refuses: `add <noun>: full edition only`.
 // Every finding names a why code and carries its Vietnamese text. check, lint and explain read the app, never write to it. Exit codes:
 // 0 clean, 1 error findings, 2 a refusal or bad usage.
 import fs from 'node:fs';
@@ -50,7 +50,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isMain } from '../runtime/scripts/lib/is-main.mjs';
-import { checkRepository, explainPath, trackedFiles } from '../runtime/scripts/hfs/check.mjs';
+import { checkDatabase, checkRepository, explainPath, trackedFiles } from '../runtime/scripts/hfs/check.mjs';
 import { secretMain } from '../runtime/scripts/hfs/secret.mjs';
 import { HFS_DECLARATION_FILE, HfsSlotsError, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { formatFindings } from '../sync/format.mjs';
@@ -58,22 +58,26 @@ import { main as syncMain } from '../sync/cli.mjs';
 import { SyncError, loadPresets } from '../sync/index.mjs';
 import { managedFindings } from '../sync/managed.mjs';
 import { emitContracts } from '../emit/contracts.mjs';
+import { dbTypesEmitter } from '../emit/db-types.mjs';
 import { ScaffoldError, newService, newSpec } from '../scaffold/service.mjs';
+import { EditionRefusal } from '../scaffold/edition-gate.mjs';
 import { addKind } from '../scaffold/add.mjs';
 import { scaffoldApp } from '../scaffold/app.mjs';
 import { newImages } from '../scaffold/image.mjs';
 import { contractEmitFindings } from '../runtime/scripts/hfs/rules/contract.mjs';
 import { lintRepository, parseLintArgs, printLintText } from '../lint/run.mjs';
 import { writeReport } from '../report/sonar.mjs';
+import { checkEdition } from '../upgrade/check.mjs';
+import { UpgradeError, upgradeMain } from '../upgrade/index.mjs';
 
 export const VERBS = Object.freeze(['scaffold', 'add', 'lint', 'sync', 'check', 'upgrade', 'stack', 'explain', 'emit', 'new', 'secret', 'hygiene']);
 
 const USAGE = `starci app scaffold <name> [--into <dir>] [--cwd <dir>]
-starci app add <api|webhook|realtime|saga|job|reactor|queue|projection> <name> [options] [--cwd <dir>]
+starci app add <api|webhook|realtime|saga|job|reactor|queue|projection|cli|table|app> <name> [options] [--cwd <dir>]
 starci app lint [--cwd <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
 starci app sync (--check | --write) [--cwd <dir>]
-starci app check [--cwd <dir>] [--json] [--fast] [--base <ref>]
-starci app upgrade [--edition full] [--plan]
+starci app check [--cwd <dir>] [--json] [--fast] [--base <ref>] [--edition full] [--db-types]
+starci app upgrade --edition full [--plan] [--cwd <dir>]
 starci app stack <up|down|status> [--stack <dir>] [--services <list>] [--k3d] [--force] [--json] [--cwd <dir>]
 starci app explain <path> [--cwd <dir>] [--json]
 starci app emit [--cwd <dir>]
@@ -87,7 +91,7 @@ const PER_CODE_LIMIT = 25;
 const VALUE_FLAGS = new Set(['--base', '--inject', '--into', '--event', '--from', '--service', '--connection', '--owner', '--failed', '--done']);
 /** Flags that may repeat: their values are collected in order. */
 const LIST_FLAGS = new Set(['--inject']);
-const BOOL_FLAGS = new Set(['--json', '--fast']);
+const BOOL_FLAGS = new Set(['--json', '--fast', '--fe', '--no-types', '--db-types']);
 
 function parse(argv) {
   const opts = { positional: [] };
@@ -144,11 +148,11 @@ function printExplain(e, out) {
  * The app pass: slots, managed files, formatter, contract snapshots and the architecture machine's check surface, root and sides.
  * `only` limits the formatter to those (app-relative) files.
  */
-async function runCheck({ repoRoot, fast = false, base, only, presets, prettier }) {
+async function runCheck({ repoRoot, fast = false, base, only, presets, prettier, dbTypes = false }) {
   const tracked = trackedFiles(repoRoot);
   // Managed files of the root and both sides, the .gitignore block and sonar against their render (R04, R05, R11, ...), and prettier
   // through the app's own install (R19, never under --fast).
-  const extraFindings = [...await managedFindings({ repoRoot, tracked, presets }), ...(fast ? [] : await formatFindings({ repoRoot, files: only ?? tracked, prettier }))];
+  const extraFindings = [...await managedFindings({ repoRoot, tracked, presets }), ...await checkDatabase({ repoRoot, files: tracked, base, ...(dbTypes ? { emitTypes: dbTypesEmitter() } : {}) }), ...(fast ? [] : await formatFindings({ repoRoot, files: only ?? tracked, prettier }))];
   // R23 against the be side itself (full pass only): committed snapshots equal what `starci app emit` writes now.
   let contracts = null;
   let be = null;
@@ -208,6 +212,7 @@ function globalOptions(argv, baseCwd) {
   let cwd = baseCwd;
   let quiet = false;
   let help = false;
+  let edition;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     const inline = arg.startsWith('--cwd=') || arg.startsWith('--edition=') ? arg.slice(arg.indexOf('=') + 1) : null;
@@ -215,13 +220,14 @@ function globalOptions(argv, baseCwd) {
     if (flag === '--cwd' || flag === '--edition') {
       const value = inline ?? argv[++i];
       if (!value || value.startsWith('--')) throw new Error(`${flag} needs a value`);
-      if (flag === '--edition' && value !== 'full') throw new Error(`--edition accepts only full`);
+      if (flag === '--edition' && !['full', 'lite'].includes(value)) throw new Error('--edition accepts full or lite');
+      if (flag === '--edition') edition = value;
       if (flag === '--cwd') cwd = path.resolve(baseCwd, value);
     } else if (flag === '--quiet') quiet = true;
     else if (flag === '--help') help = true;
     else rest.push(arg);
   }
-  return { argv: rest, cwd, quiet, help };
+  return { argv: rest, cwd, quiet, help, edition };
 }
 
 async function installedStackMain(cwd) {
@@ -236,9 +242,9 @@ async function installedStackMain(cwd) {
   return candidate;
 }
 
-/** `cwd`, `presets`, `prettier`, `lock` and `stackMain` are test seams; stdout and stderr never have to be process globals. */
+/** `cwd`, `presets`, `prettier`, `lock`, `run` and `stackMain` are test seams (`run` is the Supabase types command runner); stdout and stderr never have to be process globals. */
 export async function main(argv, {
-  cwd: baseCwd = process.cwd(), stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier, lock, stackMain,
+  cwd: baseCwd = process.cwd(), stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier, lock, run, stackMain,
 } = {}) {
   try {
     const global = globalOptions(argv, path.resolve(baseCwd));
@@ -249,11 +255,7 @@ export async function main(argv, {
     if (verb === 'sync' || verb === 'hygiene') return await syncMain([verb, ...rest], { cwd: global.cwd, stdout: out });
     if (verb === 'lint') return await lintMain(rest, { cwd: global.cwd, stdout: out, presets, prettier });
     if (verb === 'secret') return secretMain(rest, { stdout: out, stderr, cwd: global.cwd });
-    if (verb === 'upgrade') {
-      if (rest.length > 1 || (rest.length === 1 && rest[0] !== '--plan')) throw new Error('starci app upgrade takes only --edition full and --plan');
-      out('already full; nothing to upgrade\n');
-      return 0;
-    }
+    if (verb === 'upgrade') return await upgradeMain(['--repo', global.cwd, ...(global.edition ? ['--edition', global.edition] : []), ...rest], { stdout: out, presets });
     if (verb === 'stack') {
       const run = stackMain ?? await installedStackMain(global.cwd);
       return await run(rest, { cwd: global.cwd, out, err: stderr });
@@ -263,7 +265,7 @@ export async function main(argv, {
     if (verb === 'check') {
       if (opts.positional.length) throw new Error('starci app check takes no path');
       if (opts.base !== undefined && opts.fast !== true) throw new Error('--base names the ref --fast compares with; it needs --fast');
-      const result = await runCheck({ repoRoot, fast: opts.fast === true, base: opts.base, presets, prettier });
+      const result = await checkEdition({ repoRoot, edition: global.edition, normal: () => runCheck({ repoRoot, fast: opts.fast === true, base: opts.base, presets, prettier, dbTypes: opts['db-types'] === true }), presets, prettier });
       if (opts.json) out(`${JSON.stringify(result, null, 2)}\n`); else printCheck(result, out);
       return result.ok ? 0 : 1;
     }
@@ -271,7 +273,7 @@ export async function main(argv, {
       if (opts.positional.length) throw new Error('starci app emit takes no path');
       const be = readRepoDeclaration(loadSlotManifest(), repoRoot).sides?.be;
       if (!be) throw new Error('starci app emit runs at the app root (the folder of hfs.json)');
-      const { written, skipped, standIns } = emitContracts({ repoRoot: path.join(repoRoot, 'be'), declaration: be });
+      const { written, skipped, standIns } = emitContracts({ repoRoot: path.join(repoRoot, 'be'), declaration: be, run });
       for (const file of written) out(`wrote be/${file}
 `);
       out(`starci app emit: ${written.length} written${skipped.length ? `, ${skipped.join(', ')} serve no GraphQL` : ''}
@@ -296,7 +298,7 @@ export async function main(argv, {
     if (verb === 'add') {
       const [noun, name, ...extra] = opts.positional;
       if (!noun || !name || extra.length) throw new Error('starci app add takes `<noun> <name>` and the options of the noun');
-      const { created, registered } = addKind({ repoRoot, noun, name, options: { event: opts.event, from: opts.from, service: opts.service, connection: opts.connection, owner: opts.owner, failed: opts.failed, done: opts.done } });
+      const { created, registered } = addKind({ repoRoot, noun, name, options: { event: opts.event, from: opts.from, service: opts.service, connection: opts.connection, owner: opts.owner, failed: opts.failed, done: opts.done, fe: opts.fe, noTypes: opts['no-types'] } });
       for (const file of created) out(`created ${file}
 `);
       out(`starci app add ${noun}: registered patterns ${registered.patterns.join(', ')}${registered.kinds.length ? `; kinds ${registered.kinds.join(', ')}` : ''}
@@ -305,8 +307,9 @@ export async function main(argv, {
     }
     if (verb === 'scaffold') {
       const [name, ...extra] = opts.positional;
-      if (!name || extra.length) throw new Error('starci app scaffold takes `<name> [--into <dir>]`');
-      const { root: created, files } = scaffoldApp({ name, into: path.resolve(global.cwd, opts.into ?? '.'), presets: presets ?? await scaffoldPresets(), ...(lock ? { lock } : {}) });
+      if (!name || extra.length) throw new Error('starci app scaffold takes `<name> [--into <dir>] [--edition full|lite]`');
+      const edition = global.edition ?? 'full';
+      const { root: created, files } = scaffoldApp({ name, into: path.resolve(global.cwd, opts.into ?? '.'), edition, presets: presets ?? (edition === 'lite' ? undefined : await scaffoldPresets()), ...(lock ? { lock } : {}) });
       out(`starci app scaffold: created ${created} (${files.length} files); next: npm ci, then starci app lint\n`);
       return 0;
     }
@@ -315,7 +318,7 @@ export async function main(argv, {
     if (opts.json) out(`${JSON.stringify(explained, null, 2)}\n`); else printExplain(explained, out);
     return explained.status === 'no-slot' || explained.status === 'ambiguous' ? 1 : 0;
   } catch (error) {
-    stderr(error instanceof HfsSlotsError || error instanceof SyncError ? `${error.message}\n` : error instanceof ScaffoldError ? `${error.code}: ${error.message}\n` : `starci app: ${error.message}\n${USAGE}`);
+    stderr(error instanceof EditionRefusal || error instanceof UpgradeError ? `${error.message}\n` : error instanceof HfsSlotsError || error instanceof SyncError ? `${error.message}\n` : error instanceof ScaffoldError ? `${error.code}: ${error.message}\n` : `starci app: ${error.message}\n${USAGE}`);
     return 2;
   }
 }

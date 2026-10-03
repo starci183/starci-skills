@@ -471,6 +471,7 @@ rules:
     kinds: [lint, design]
     gates: [land, ci]
     failureCodes: ["BE_BACKGROUND_UNOWNED"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: background-unowned}
   - id: R47
@@ -479,6 +480,7 @@ rules:
     kinds: [check, codemod, lint]
     gates: [land, ci]
     failureCodes: ["BE_TEST_TOPOLOGY", "BE_CONTRACT_UNGUARDED"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: test-topology, at: scripts/hfs/rules/test-topology.mjs}
       - {kind: machine, id: test-kind-retired, at: scripts/hfs/architecture/hfs.mjs}
@@ -494,6 +496,7 @@ rules:
     kinds: [lint, design]
     gates: [settle, land, ci]
     failureCodes: ["BE_SPEC_QUALITY"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: spec-no-source-read}
       - {kind: eslint-be, id: e2e-uses-production-transport}
@@ -906,7 +909,7 @@ rules:
     enforcers:
       - {kind: eslint-be, id: door-lives-in-features}
       - {kind: eslint-be, id: no-capability-imports-features}
-      - {kind: eslint-be, id: rest-door-needs-a-reason}
+      - {kind: eslint-be, id: rest-door-needs-a-reason, editions: [full]}
       - {kind: eslint-be, id: transport-is-thin}
       - {kind: eslint-be, id: no-response-envelope}
       - {kind: eslint-be, id: no-graphql-json}
@@ -1045,6 +1048,7 @@ rules:
     kinds: [lint]
     gates: [pre-push, settle, land, ci]
     failureCodes: ["BE_TEST_BUILDER_HOME"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: persisting-builder-in-builders-slot}
   - id: R99
@@ -1053,6 +1057,7 @@ rules:
     kinds: [lint]
     gates: [pre-push, settle, land, ci]
     failureCodes: ["BE_TEST_ROW_BY_BUILDER"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: spec-no-raw-insert}
       - {kind: eslint-be, id: spec-no-repeated-row-literal}
@@ -1062,6 +1067,7 @@ rules:
     kinds: [lint]
     gates: [pre-push, settle, land, ci]
     failureCodes: ["BE_TEST_CONSTRAINTS_ON"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: tests-keep-constraints}
   - id: R101
@@ -1070,6 +1076,7 @@ rules:
     kinds: [lint]
     gates: [pre-push, settle, land, ci]
     failureCodes: ["BE_TEST_BUILDER_ARRANGES"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: builder-arranges-only}
   - id: R102
@@ -1078,6 +1085,7 @@ rules:
     kinds: [check, lint]
     gates: [land, ci]
     failureCodes: ["BE_SPEC_PLACEMENT"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: spec-placement, at: scripts/hfs/rules/spec-placement.mjs}
       - {kind: eslint-be, id: spec-placement}
@@ -1159,6 +1167,7 @@ rules:
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_INTEGRATION_SPEC_MISSING"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: integration-specs, at: scripts/hfs/rules/integration-specs.mjs}
   - id: R113
@@ -1374,6 +1383,7 @@ rules:
     kinds: [check, codemod]
     gates: [settle, land, ci]
     failureCodes: ["BE_EVENT_CLASS_CONTRACT"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: event-class-contract, at: scripts/hfs/rules/event-bus.mjs}
   - id: R152
@@ -1382,6 +1392,7 @@ rules:
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_OUTBOX_WRITE_TX"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: outbox-write-tx}
   - id: R153
@@ -1390,6 +1401,7 @@ rules:
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_EVENT_CONSUMER_SHAPE"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: event-consumer-shape}
   - id: R154
@@ -1398,6 +1410,7 @@ rules:
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_QUEUE_PRODUCER_SHAPE"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: queue-producer-shape}
   - id: R155
@@ -1406,6 +1419,7 @@ rules:
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_PATTERN_SPEC_MISSING"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: pattern-spec-missing, at: scripts/hfs/rules/event-bus.mjs}
   - id: R156
@@ -1423,6 +1437,7 @@ rules:
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_JOB_WRITE_OUTSIDE_OWNER"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: job-write-owner}
   - id: R158
@@ -1431,6 +1446,7 @@ rules:
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_JOB_FENCE_REQUIRED"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: job-fence-required}
   - id: R159
@@ -1439,6 +1455,7 @@ rules:
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_JOB_RUN_KEY"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: job-run-key}
   - id: R160
@@ -1447,6 +1464,7 @@ rules:
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_JOB_SHAPE"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: job-shape}
   - id: R161
@@ -1455,6 +1473,7 @@ rules:
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_PROJECTION_WRITE_OWNER"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: projection-write-owner}
   - id: R162
@@ -1463,6 +1482,7 @@ rules:
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_PROJECTION_SHAPE"]
+    editions: [full]
     enforcers:
       - {kind: eslint-be, id: projection-shape}
   - id: R163
@@ -1495,6 +1515,7 @@ rules:
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["HFS_EVENT_CONTRACT"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: services-event-contract, at: scripts/hfs/rules/services.mjs}
   - id: R167
@@ -1503,6 +1524,7 @@ rules:
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_ASYNC_SPEC_MISSING"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: services-async-specs, at: scripts/hfs/rules/services.mjs}
   - id: R168
@@ -1519,6 +1541,7 @@ rules:
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_SAGA_STEP_COMPENSATION"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: saga-step-compensation, at: scripts/hfs/rules/saga.mjs}
   - id: R170
@@ -1527,6 +1550,7 @@ rules:
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_SAGA_STATE_VERSIONED"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: saga-state-versioned, at: scripts/hfs/rules/saga.mjs}
   - id: R171
@@ -1535,6 +1559,7 @@ rules:
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_SAGA_EVENT_CONTRACT"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: saga-event-contract, at: scripts/hfs/rules/saga.mjs}
   - id: R172
@@ -1543,6 +1568,7 @@ rules:
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_SAGA_CONSUMER_DEDUPE"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: saga-consumer-dedupe, at: scripts/hfs/rules/saga.mjs}
   - id: R173
@@ -1551,6 +1577,7 @@ rules:
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_SAGA_E2E_MISSING"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: saga-e2e, at: scripts/hfs/rules/saga.mjs}
   - id: R174
@@ -1583,6 +1610,7 @@ rules:
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["BE_CONTRACT_BREAKING"]
+    editions: [full]
     enforcers:
       - {kind: hfs, id: contract-compat, at: scripts/hfs/rules/contract-compat.mjs}
   - id: R178
@@ -1875,6 +1903,80 @@ rules:
     failureCodes: ["RT_SLOT_ID_SHAPE"]
     enforcers:
       - {kind: runtime, id: slot-id-shape, at: scripts/checks/check-slot-id-shape.mjs}
+  - id: R212
+    code: "HFS_EDITION_INVALID"
+    law: "hfs.json names an edition the manifest knows (full, or lite; absent means full), and a lite app holds none of what lite does not have: no spec or test file, test script, test dependency or test-tool config, no UAT record, no supabase/functions, no worker app, no event, queue, job, projection or saga pattern, no saga, reactors, jobs or realtime kind."
+    kinds: [check]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["HFS_EDITION_INVALID", "HFS_EDITION_FORBIDDEN_PRESENT"]
+    enforcers:
+      - {kind: hfs, id: edition, at: scripts/hfs/rules/edition.mjs}
+  - id: R213
+    code: "DB_MIGRATION_SHAPE"
+    law: "A migration is `supabase/migrations/<ts14>_<kebab>.sql`; the stamp is a valid UTC instant not in the future, new migrations sort strictly after every migration on the base branch, and a migration already on the base is immutable (a diff or a removal is a finding); a file that does not parse as PostgreSQL is a shape failure."
+    kinds: [check]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["DB_MIGRATION_SHAPE"]
+    enforcers:
+      - {kind: hfs, id: db-migration-shape, at: scripts/hfs/rules/database.mjs}
+  - id: R214
+    code: "DB_RLS_REQUIRED"
+    law: "Row level security is code a parser can read: every `create table` (or `create table as`) in an exposed schema (`public` plus the config.toml `[api] schemas`) is followed, in the same migration, by `alter table <t> enable row level security` (and `force` for a table hfs.json `supabase.forceRls` declares); no `DO` block or function runs dynamic SQL that builds DDL or grants; a write or `for all` policy never uses `(true)`, `to anon`/`to public` is legal only on a `for select` policy named `*_public_read`, every policy is named `<table>_<role>_<action>`, and `service_role` is never granted."
+    kinds: [check, codemod]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["DB_RLS_REQUIRED", "DB_DYNAMIC_DDL", "DB_POLICY_SHAPE"]
+    enforcers:
+      - {kind: hfs, id: db-rls, at: scripts/hfs/rules/database.mjs}
+  - id: R215
+    code: "DB_DEFINER_SAFE"
+    law: "Privileged database objects are declared safely: a `security definer` function pins `search_path` (never `from current`), lives outside the exposed schemas or is `revoke execute ... from public` in the same migration, declares a return type and interpolates parameters into dynamic SQL only through `format('%I/%L')`; a bucket inserted into `storage.buckets` declares `public = false` (true only for an id ending `_public`), `file_size_limit` and `allowed_mime_types`, and has a `storage.objects` policy naming its `bucket_id` in the same migration."
+    kinds: [check]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["DB_DEFINER_SAFE", "DB_STORAGE_POLICY"]
+    enforcers:
+      - {kind: hfs, id: db-privileged-objects, at: scripts/hfs/rules/database.mjs}
+  - id: R216
+    code: "DB_CONFIG_POLICY"
+    law: "The database configuration and its types are checked facts: `supabase/config.toml` carries no literal value under a credential key (the value is `env(NAME)`), `auth.jwt_expiry` is at most 3600, and signup, site url and redirect urls equal the Supabase block of hfs.json where it declares them; `supabase/types/database.types.ts` is committed and equals the text `contract:emit` regenerates from the migrations."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["DB_CONFIG_POLICY", "DB_TYPES_DRIFT"]
+    enforcers:
+      - {kind: hfs, id: db-config-types, at: scripts/hfs/rules/database.mjs}
+  - id: R217
+    code: "FE_SUPABASE_CLIENT_OWNER"
+    law: "The database has one door per side: `@supabase/ssr` and `@supabase/supabase-js` are imported and called only by the fe db owner (`fe.modules.db`, `fe.package.db`) and, on the back end, by `be.integrations.supabase`, and every client carries the committed `Database` type; the front end has no route handler beyond health/live and the auth callback slot, and holds no credential: `fe/` names no service-role or `*_SECRET`, `*_PRIVATE`, `*_TOKEN`, `*_PASSWORD` value (public configuration is read once by `modules/config`)."
+    kinds: [check, design]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["FE_SUPABASE_CLIENT_OWNER", "BE_SUPABASE_CLIENT_OWNER", "FE_ROUTE_HANDLER_FORBIDDEN", "FE_SERVICE_ROLE_FORBIDDEN"]
+    enforcers:
+      - {kind: machine, id: supabase-client-owner, at: scripts/hfs/architecture/supabase.mjs}
+      - {kind: machine, id: supabase-service-role, at: scripts/hfs/architecture/supabase.mjs}
+  - id: R218
+    code: "FE_DB_RESULT_TYPED"
+    law: "A Supabase result is typed by `Database` inference and never swallowed: no explicit generic on `single`/`maybeSingle`/`returns`, no cast or non-null assertion on a result, every list read carries `.limit()` or a keyset bound, every awaited call reads `error` or hands the whole result to `toOutcome`, and a failure never becomes empty data."
+    kinds: [check, design]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["FE_DB_RESULT_TYPED", "FE_DB_ERROR_HANDLED"]
+    enforcers:
+      - {kind: machine, id: supabase-result, at: scripts/hfs/architecture/supabase.mjs}
+  - id: R219
+    code: "FE_AUTH_SESSION_TRUST"
+    law: "The principal is verified, never trusted: server code never calls `auth.getSession()` (`getClaims()` through `getPrincipal()`, `auth.getUser()` for money, account security and role changes); a `write-*.ts` Server Action awaits `getPrincipal()` first, refuses an anonymous principal (the sign-in action is the one exception) and parses its input by a schema before any use; a back-end principal comes only from a Supabase access token verified against the project JWKS (signature, issuer, audience, expiry, pinned algorithm), never decoded unverified and never from the request body."
+    kinds: [check, design]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["FE_AUTH_SESSION_TRUST", "FE_DB_WRITE_SHAPE", "BE_SUPABASE_JWT_VERIFIED"]
+    enforcers:
+      - {kind: machine, id: supabase-principal, at: scripts/hfs/architecture/supabase.mjs}
+  - id: R220
+    code: "HFS_LITE_SECRET_CUSTODY"
+    editions: [lite]
+    law: "A lite app holds no secret material in the tree: root `.env*`, `secrets.env`, `.secrets/` and an `.enc` file outside `.starcistacks/<env>/secrets` are forbidden, and `fe/` and `supabase/` hold no Supabase token, JWT or connection string with a password; the one custody is the sealed `.starcistacks/<env>/secrets/<slug>.enc`."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_LITE_SECRET_CUSTODY"]
+    enforcers:
+      - {kind: hfs, id: lite-secret-custody, at: scripts/hfs/rules/supabase-secrets.mjs}
   - id: R221
     code: "CI_TRIGGERS_RELEASE_ONLY"
     law: "The only workflow triggers are a push of release tags and a person dispatching it: every tracked workflow of the runtime, its examples and the hfs app templates (so every scaffolded app inherits it) declares an `on` that holds only `push` filtered to `tags: ['v*']` (no branches, paths or ignore filter beside it) and `workflow_dispatch`. A branch push, a pull_request, a schedule, a workflow_call or any other event refuses the workflow: CI runs once per release, on its tag, and Codecov and Sonar upload only from that run."
@@ -1939,15 +2041,6 @@ rules:
     enforcers:
       - {kind: runtime, id: syntax, at: scripts/hfs/runtime-rules/syntax.mjs}
 retired:
-  - {id: R212, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R213, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R214, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R215, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R216, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R217, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R218, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R219, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R220, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R123, reason: "RT_PENDING_STALE retired with the pending list itself: ruleParams.runtime.pending and its pending-ratchet enforcer are gone; nothing ratchets a tolerated-finding list"}

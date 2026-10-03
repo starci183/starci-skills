@@ -1,0 +1,68 @@
+{
+  "app": {
+    "title": "lite-app",
+    "shell": {
+      "brand": "lite-app"
+    },
+    "home": {
+      "title": "Home",
+      "signedIn": "Signed in",
+      "resources": "Resources: {count}",
+      "calendars": "Calendars: {count}",
+      "bookings": "Bookings: {count}",
+      "unavailable": "unavailable"
+    },
+    "booking": {
+      "title": "Booking workspace",
+      "resource": "Resource UUID",
+      "booking": "Booking UUID",
+      "bookingResource": "Resource UUID for this booking",
+      "startsAt": "Starts at (UTC ISO timestamp)",
+      "endsAt": "Ends at (UTC ISO timestamp)",
+      "addResource": "Add resource",
+      "addBooking": "Add booking",
+      "working": "Saving",
+      "created": "Created.",
+      "refused": "The request was refused.",
+      "not-found": "The resource was not found.",
+      "invalid": "Use valid UUIDs and a start time before the end time.",
+      "unavailable": "The booking service is unavailable. Try again shortly."
+    },
+    "signIn": {
+      "title": "Sign in",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Continue",
+      "working": "Signing in",
+      "refused": "The credentials were refused.",
+      "not-found": "The credentials were refused.",
+      "invalid": "Enter a valid email and password.",
+      "unavailable": "Sign-in is unavailable. Try again shortly."
+    },
+    "signOut": {
+      "submit": "Sign out",
+      "working": "Signing out",
+      "refused": "The session has already ended.",
+      "not-found": "The session has already ended.",
+      "invalid": "The session could not be ended.",
+      "unavailable": "Sign-out is unavailable. Try again shortly."
+    },
+    "loading": {
+      "message": "Loading"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "home": "Return home"
+    },
+    "errors": {
+      "page": {
+        "title": "Something went wrong",
+        "retry": "Try again"
+      },
+      "global": {
+        "title": "The application could not continue",
+        "retry": "Try again"
+      }
+    }
+  }
+}

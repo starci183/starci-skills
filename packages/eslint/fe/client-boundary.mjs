@@ -139,7 +139,8 @@ const isMarkerStatement = (statement) =>
 
 /** True when a TypeScript source file opens with `import "server-only"`. */
 const tsFileIsMarked = (file) => {
-  const first = file.statements[0]
+  // a file-level directive ("use server") is the prologue: the marker is the first statement after it
+  const first = file.statements.find((statement) => !(ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression)))
   return Boolean(first) && ts.isImportDeclaration(first) && !first.importClause && ts.isStringLiteral(first.moduleSpecifier) && first.moduleSpecifier.text === "server-only"
 }
 
@@ -183,7 +184,8 @@ export const serverModuleMarksServerOnly = {
     return {
       Program(program) {
         client = clientDirective(program) !== null
-        marked = isMarkerStatement(program.body[0])
+        // a file-level directive ("use server") is the prologue, not a statement: the marker is the first statement after it
+        marked = isMarkerStatement(program.body.find((statement) => !(statement.type === "ExpressionStatement" && typeof statement.directive === "string")))
       },
       "ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration"(node) {
         if (!node.source || node.importKind === "type" || node.exportKind === "type") return

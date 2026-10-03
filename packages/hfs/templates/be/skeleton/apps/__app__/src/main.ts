@@ -15,17 +15,4 @@ const bootstrap = async (): Promise<void> => {
         httpSecurity: parseHttpSecurityConfig(env),
         database: parsePrimaryDatabaseConfig(env),
     }
-    const app = await NestFactory.create(AppModule.register(options))
-    app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
-    app.enableShutdownHooks()
-    await app.listen(options.server.port)
-    createJsonLogger(new SystemClockService()).info(LoggingLogEvent.ServerStarted, {
-        service: "{{app}}",
-        port: options.server.port,
-    })
-}
-
-bootstrap().catch((error: unknown) => {
-    createJsonLogger(new SystemClockService()).error(LoggingLogEvent.StartupFailed, error, { service: "{{app}}" })
-    process.exitCode = 1
-})
+{{> be/common/main-listen.ts.partial}}

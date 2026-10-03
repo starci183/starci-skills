@@ -47,6 +47,7 @@ import { checkPackageShape, PACKAGE_SHAPE_RULE_IDS } from './package-shape.mjs';
 import { checkFeSlotAllows, FE_SLOT_ALLOWS_RULE_IDS } from './fe-slot-allows.mjs';
 import { checkI18nKeys, I18N_KEYS_RULE_IDS } from './i18n-keys.mjs';
 import { checkDocLanguage, DOC_LANGUAGE_RULE_IDS } from './doc-language.mjs';
+import { checkBackendSupabase, checkFrontendSupabase, BACKEND_SUPABASE_RULE_IDS, FRONTEND_SUPABASE_RULE_IDS } from './supabase.mjs';
 import { LINT_CODES, onLintSurface } from './surface.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
@@ -82,6 +83,7 @@ const BACKEND_MACHINE = {
   backgroundUnowned: [checkBackgroundUnowned, BACKGROUND_UNOWNED_RULE_IDS],
   testWorldFiles: [checkTestWorldFiles, TEST_WORLD_FILES_RULE_IDS],
   contractFixtureGuard: [checkContractFixtureGuard, CONTRACT_FIXTURE_GUARD_RULE_IDS],
+  supabaseBackend: [checkBackendSupabase, BACKEND_SUPABASE_RULE_IDS],
 };
 
 // The frontend repository machine (R21, R50, R54, R55, R56, R63, R94, R106): same shape, run for a front-end repository only.
@@ -94,6 +96,7 @@ const FRONTEND_MACHINE = {
   crossAppDuplicate: [checkCrossAppDuplicate, CROSS_APP_DUPLICATE_RULE_IDS],
   feSlotAllows: [checkFeSlotAllows, FE_SLOT_ALLOWS_RULE_IDS],
   i18nKeys: [checkI18nKeys, I18N_KEYS_RULE_IDS],
+  supabaseFrontend: [checkFrontendSupabase, FRONTEND_SUPABASE_RULE_IDS],
 };
 
 /** Errors the machine reports when a program cannot be built or an edge cannot be proven: it cannot judge, so it refuses. */

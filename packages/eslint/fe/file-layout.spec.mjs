@@ -24,6 +24,7 @@ import {
 
 const tester = slotTester()
 const NO_PACKAGE = slotTester({ declaration: { ...FE_DECLARATION, optionalSlots: [] } })
+const ONE_APP_WITH_PACKAGE = slotTester({ declaration: { ...FE_DECLARATION, apps: [{ name: "web", kind: "next" }] } })
 
 const R = "apps/web/src/components"
 const F = "apps/web/src/features"
@@ -199,6 +200,14 @@ test("FILE-5: each tier sits on its own side of the feature line", () => {
     valid: [
       { filename: at("apps/web/src/components/leaves/Badge/index.tsx"), code: "export const Badge = () => null" },
       { filename: at("apps/web/src/components/branches/Modal/index.tsx"), code: "export const Modal = () => null" },
+    ],
+    invalid: [],
+  })
+  // With one app there is no cross-app sharing boundary, even when the optional package slot is declared.
+  ONE_APP_WITH_PACKAGE.run("monorepo-tier-belongs-to-its-side (one app)", monorepoTierBelongsToItsSide, {
+    valid: [
+      { filename: at("apps/web/src/components/composites/SiteShell/index.tsx"), code: "export const SiteShell = () => null" },
+      { filename: at("packages/nivo-ui/src/blocks/FleetRow/index.tsx"), code: "export const FleetRow = () => null" },
     ],
     invalid: [],
   })

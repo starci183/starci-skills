@@ -31,8 +31,11 @@ function nested(inner, outer) {
 /** The directory patterns (be-relative, placeholders as `*`, trailing slash) of a slot's path variants; a file pattern keeps its name. */
 const variantsOf = (slot) => braceVariants(slot.path).map(star);
 
-/** The tracked slots of the be profile, in manifest order. */
-const beSlots = (manifest) => manifest.slots.filter((slot) => slot.profiles.includes('be') && slot.tracked === 'tracked');
+/**
+ * The tracked slots of the be profile, in manifest order. A slot gated by a connection provider (be.integrations.supabase) holds files only in an
+ * app whose connection declares that provider (`providers`), so it takes no part in the scope of any other app.
+ */
+const beSlots = (manifest, providers) => manifest.slots.filter((slot) => slot.profiles.includes('be') && slot.tracked === 'tracked' && (slot.provider === undefined || providers.includes(slot.provider)));
 
 /** The directory a path pattern lives in (itself when it is one). */
 const dirOf = (path) => (isDir(path) ? path : path.slice(0, path.lastIndexOf('/') + 1));
@@ -52,9 +55,9 @@ const minimal = (patterns) => {
  *   sonar     sonar.coverage.exclusions, repository-relative from the app root, sorted;
  *   codecovPaths  the measured roots as `be/<root>**`.
  */
-export function coverageScope(manifest) {
+export function coverageScope(manifest, providers = []) {
   const roles = [...logicRolesOf(manifest)];
-  const slots = beSlots(manifest);
+  const slots = beSlots(manifest, providers);
   const required = slots.filter((slot) => slot.coverage === 'required');
   const none = slots.filter((slot) => slot.coverage === 'none');
   const requiredDirs = required.flatMap((slot) => variantsOf(slot).map((dir) => {
@@ -88,16 +91,16 @@ export function coverageScope(manifest) {
 export const rootGlob = (root, roles) => `${root}**/*.${roles.length === 1 ? roles[0] : `{${roles.join(',')}}`}.ts`;
 
 /** The jest coverage options of the rendered be/jest.config.js: { roots, roles, excludes }. */
-export function jestCoverage(manifest) {
-  const { roots, roles, excludes } = coverageScope(manifest);
+export function jestCoverage(manifest, providers = []) {
+  const { roots, roles, excludes } = coverageScope(manifest, providers);
   return { roots, roles, excludes: excludes.map((dir) => `${dir}**`) };
 }
 
 /** Sonar's sonar.coverage.exclusions of an app: the complement of the measured files, repository-relative from the app root. */
-export const sonarCoverageExclusions = (manifest) => coverageScope(manifest).sonar;
+export const sonarCoverageExclusions = (manifest, providers = []) => coverageScope(manifest, providers).sonar;
 
 /** The Codecov paths of an app: the measured roots, repository-relative from the app root. */
-export const codecovPaths = (manifest) => coverageScope(manifest).codecovPaths;
+export const codecovPaths = (manifest, providers = []) => coverageScope(manifest, providers).codecovPaths;
 
 /**
  * The capability a be-relative file belongs to inside a root, or null: the folder the root's last `*` stands for
@@ -121,8 +124,8 @@ function capabilityOf(root, file) {
  * @param {object} manifest the slot manifest
  * @param {{ files: string[], read: (file: string) => string, apps: Array<{name: string, kind: string}> }} source be-relative source files, a reader, the declared be apps
  */
-export function coverageComponents(manifest, { files, read, apps }) {
-  const { roots } = coverageScope(manifest);
+export function coverageComponents(manifest, { files, read, apps, providers = [] }) {
+  const { roots } = coverageScope(manifest, providers);
   const services = apps.filter((app) => SERVICE_APP_KINDS.has(app.kind));
   const imports = new Map(services.map((app) => [app.name, files.filter((file) => file.startsWith(`apps/${app.name}/`) && /\.[cm]?ts$/.test(file)).map((file) => read(file)).join('\n')]));
   const platformPaths = [];

@@ -10,6 +10,12 @@ schema: starci/allowlist@1
 # env names, schema ids, event kinds, labels. Anything a checker or verb can emit as a reason belongs in
 # modules/kernel/failure-codes.yaml instead.
 not-codes:
+  - literal: ACL_TARGET_ALL_IN_SCHEMA
+    reason: "PostgreSQL parser enum name (libpg-query), not an emitted code"
+  - literal: ACL_TARGET_OBJECT
+    reason: "PostgreSQL parser enum name (libpg-query), not an emitted code"
+  - literal: AEXPR_IN
+    reason: "PostgreSQL parser enum name (libpg-query), not an emitted code"
   - literal: APP_FILTER
     reason: "NestJS framework token name the checker looks for, not a code"
   - literal: APP_GUARD
@@ -40,8 +46,24 @@ not-codes:
     reason: "schema id constant, not a code"
   - literal: MACHINE_VERSION
     reason: "schema version constant, not a code"
+  - literal: NEXT_PUBLIC_SITE_URL
+    reason: "public environment variable name the front-end config rule allows, not a code"
+  - literal: NEXT_PUBLIC_SUPABASE_ANON_KEY
+    reason: "public environment variable name the front-end config rule allows, not a code"
+  - literal: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+    reason: "public environment variable name the front-end config rule allows, not a code"
+  - literal: NEXT_PUBLIC_SUPABASE_URL
+    reason: "public environment variable name the front-end config rule allows, not a code"
+  - literal: OBJECT_FUNCTION
+    reason: "PostgreSQL parser enum name (libpg-query ObjectType), not an emitted code"
+  - literal: OBJECT_POLICY
+    reason: "PostgreSQL parser enum name (libpg-query), not an emitted code"
+  - literal: OBJECT_TABLE
+    reason: "PostgreSQL parser enum name (libpg-query), not an emitted code"
   - literal: PROJECT_ANALYSIS_TOKEN
     reason: "SonarQube token type label passed when minting a token"
+  - literal: ROLESPEC_PUBLIC
+    reason: "PostgreSQL parser enum name (libpg-query RoleSpecType), not an emitted code"
   - literal: STARCI_API_CHILD
     reason: "env var name marking api child processes"
   - literal: STARCI_ENGINE_START_REASON
@@ -68,6 +90,10 @@ not-codes:
     reason: "env var name"
   - literal: STRICT_MODE
     reason: "info label on a strict schema validation count line, not a failure"
+  - literal: VAR_RESET
+    reason: "PostgreSQL parser enum name (libpg-query), not an emitted code"
+  - literal: VAR_SET_VALUE
+    reason: "PostgreSQL parser enum name (libpg-query VariableSetKind), not an emitted code"
   - literal: artifacts-indexed
     reason: "ten su kien (event kind) ghi nhan da lap chi muc artifact, khong phai loi"
   - literal: ask-answered
@@ -337,6 +363,42 @@ json-exceptions:
     - path: examples/ecommerce-app/turbo.json
       reason: >
         The managed turbo task graph rendered by starci app sync; turbo reads only JSON.
+    - path: examples/lite-app/.starcistacks/dev/environment.json
+      reason: >
+        The lite example's checked development environment descriptor; the stack tooling reads JSON.
+    - path: examples/lite-app/be/nest-cli.json
+      reason: >
+        Nest CLI monorepo map inside the lite-app back end; the Nest toolchain reads JSON.
+    - path: examples/lite-app/be/tsconfig.build.json
+      reason: >
+        TypeScript build config inside the lite-app back end; tsc reads JSON (with comments).
+    - path: examples/lite-app/be/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the lite-app back end; tsc reads JSON (with comments).
+    - path: examples/lite-app/fe/apps/web/package.json
+      reason: >
+        npm workspace manifest of the lite-app product front end; npm requires JSON.
+    - path: examples/lite-app/fe/apps/web/src/modules/i18n/messages/vi.json
+      reason: >
+        i18n message catalog inside the lite-app product source; next-intl consumes JSON.
+    - path: examples/lite-app/fe/apps/web/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the lite-app product front end; tsc reads JSON (with comments).
+    - path: examples/lite-app/fe/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the lite-app front end; tsc reads JSON (with comments).
+    - path: examples/lite-app/hfs.json
+      reason: >
+        HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the lite-app example; the architecture machine reads hfs.json as JSON.
+    - path: examples/lite-app/package-lock.json
+      reason: >
+        npm lockfile of the lite-app root; npm writes JSON by contract.
+    - path: examples/lite-app/package.json
+      reason: >
+        npm package manifest of the lite-app root; the npm toolchain requires JSON.
+    - path: examples/lite-app/turbo.json
+      reason: >
+        The managed turbo task graph rendered by starci app sync; turbo reads only JSON.
     - path: examples/shape-slot/be/nest-cli.json
       reason: >
         Nest CLI monorepo map inside the shape-slot back end; the nest toolchain reads JSON.
@@ -431,12 +493,24 @@ json-exceptions:
     - path: packages/hfs/package.json
       reason: >
         npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+    - path: packages/hfs/templates/app/package-scripts-lite/package.json
+      reason: >
+        Managed lite app-root package-scripts template @starci/hfs writes into a lite product repository (README script names the architecture machine reads); npm requires JSON.
+    - path: packages/hfs/templates/app/package-scripts/core.json
+      reason: >
+        Partial of the managed app-root package-scripts templates (the scripts both editions share); expanded into package.json by starci app sync, so it is JSON fragment text npm reads after the render.
     - path: packages/hfs/templates/app/package-scripts/package.json
       reason: >
         Managed app-root package-scripts template @starci/hfs writes into a product repository (README script names the architecture machine reads); npm requires JSON.
+    - path: packages/hfs/templates/app/skeleton-lite/.starcistacks/dev/environment.json
+      reason: >
+        Environment descriptor template of the lite scaffold (.starcistacks/dev/environment.json); the stack tooling reads JSON.
     - path: packages/hfs/templates/app/task-graph/turbo.json
       reason: >
         Managed app-root turbo task graph template @starci/hfs writes into a product repository (slot app.task-graph); turbo reads only turbo.json.
+    - path: packages/hfs/templates/app/upgrade-full/.starcistacks/dev/infra/metadata.json
+      reason: >
+        Infra metadata template starci app upgrade --edition full adds to a lite app (.starcistacks/dev/infra/metadata.json); the stack tooling reads JSON.
     - path: packages/hfs/templates/be/tool-config/src/tests/tsconfig.json
       reason: >
         TypeScript config template for the back-end test tree (src/tests) @starci/hfs writes into a product repository; tsc reads JSON (with comments).
@@ -446,6 +520,12 @@ json-exceptions:
     - path: packages/hfs/templates/be/tool-config/tsconfig.json
       reason: >
         TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
+    - path: packages/hfs/templates/fe/app/tsconfig.json
+      reason: >
+        TypeScript config template of a front-end app starci app add app writes into a product repository; tsc reads JSON (with comments).
+    - path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/modules/i18n/messages/vi.json
+      reason: >
+        next-intl message catalogue template for the lite scaffold app (fe/apps/web); next-intl requires JSON.
     - path: packages/hfs/templates/fe/skeleton/apps/app/src/modules/i18n/messages/vi.json
       reason: >
         next-intl message catalogue template for the scaffolded product app (fe/apps/app); next-intl requires JSON.

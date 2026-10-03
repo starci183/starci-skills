@@ -36,7 +36,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'explain' = @('app','check','connect','debug','docker','gate','git','guard','harness','kernel','lint','machine','npm','orca','reconciler','release','route','runtime','smoke','supabase','supervisor','task','test','typecheck','uat','work','worker','workflow')
     }
     $flags = @{
-        'app add' = @('--event','--from','--service','--connection','--owner','--failed','--done','--json','--cwd','--quiet','--help','--edition')
+        'app add' = @('--event','--from','--service','--connection','--owner','--failed','--done','--fe','--no-types','--json','--cwd','--quiet','--help','--edition')
         'app check' = @('--fast','--base','--json','--cwd','--quiet','--help','--edition')
         'app emit' = @('--json','--cwd','--quiet','--help','--edition')
         'app explain' = @('--json','--cwd','--quiet','--help','--edition')

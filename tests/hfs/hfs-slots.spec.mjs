@@ -29,9 +29,9 @@ const APP = app();
 const refusal = (fn, code) => assert.throws(fn, (error) => error instanceof HfsSlotsError && error.code === code, `expected ${code}`);
 const sideOf = (declaration, side, options = {}) => openHfs({ declaration, side, ...options });
 
-test('the shipped manifest is 2.0.0 and validates against its JSON schema and the loader', () => {
+test('the shipped manifest is 2.1.0 and validates against its JSON schema and the loader', () => {
   const doc = parseYaml(manifestText);
-  assert.equal(doc.version, '2.0.0');
+  assert.equal(doc.version, '2.1.0');
   assert.equal(validateManifestSchema(doc), true, JSON.stringify(validateManifestSchema.errors));
   const manifest = loadSlotManifest();
   assert.equal(manifest.major, 2);
@@ -160,7 +160,7 @@ test('a manifest major mismatch is refused, in either direction, with no compati
     assert.equal(error.code, 'HFS_MANIFEST_MAJOR_MISMATCH');
     assert.deepEqual([error.details.pinned, error.details.manifestMajor], [1, 2]);
   }
-  const next = loadSlotManifest({ text: manifestText.replace('schema: starci/hfs-slots@2', 'schema: starci/hfs-slots@3').replace('version: 2.0.0', 'version: 3.0.0') });
+  const next = loadSlotManifest({ text: manifestText.replace('schema: starci/hfs-slots@2', 'schema: starci/hfs-slots@3').replace('version: 2.1.0', 'version: 3.0.0') });
   assert.equal(next.major, 3);
   refusal(() => resolveRepoDeclaration(next, APP), 'HFS_MANIFEST_MAJOR_MISMATCH');           // an app pinned to the old major
   assert.equal(resolveRepoDeclaration(next, { ...APP, hfs: 3 }).hfs, 3);
@@ -461,7 +461,7 @@ test('be.cli is the cli feature root: a feature-tier owner at src/features/cli/,
 });
 
 test('growth is a minor: adding a slot changes no existing answer; every slot pattern owns its own sample', () => {
-  const grown = loadSlotManifest({ text: manifestText.replace('version: 2.0.0', 'version: 2.1.0').replace('\n# Checks that read this manifest', `
+  const grown = loadSlotManifest({ text: manifestText.replace('version: 2.1.0', 'version: 2.2.0').replace('\n# Checks that read this manifest', `
   - id: be.transport.grpc
     profiles: [be]
     path: "src/features/api/<feature>/transport/grpc/"
@@ -470,10 +470,10 @@ test('growth is a minor: adding a slot changes no existing answer; every slot pa
     tier: feature
     tests: unit-beside
     coverage: none
-    since: 2.1.0
+    since: 2.2.0
 
 # Checks that read this manifest`) });
-  assert.equal(grown.minor, 1);
+  assert.equal(grown.minor, 2);
   const before = sideOf(APP, 'be');
   const after = sideOf(app({ be: { ...BE_SIDE, optionalSlots: [...BE_SIDE.optionalSlots, 'be.transport.grpc'] } }), 'be', { manifest: grown });
   for (const p of ['src/features/api/orders/index.ts', 'apps/core/src/main.ts', 'src/modules/domain/a/errors/x.error.ts', 'tsconfig.json', '.env'])
@@ -490,7 +490,8 @@ test('growth is a minor: adding a slot changes no existing answer; every slot pa
     const apps = profile === 'app' ? [] : bare.sides[profile].apps;
     const kindOf = (slot) => apps.find((a) => a.kind === slot.appKind)?.name;
     // app.sides answers only for the side folders themselves; what lies below them is the sides' (sampled under be and fe).
-    for (const slot of manifest.slots.filter((s) => s.profiles.includes(profile) && s.id !== 'app.sides')) {
+    // bare declares no edition, so it is full: a slot lite-only (editions) does not exist for it and is not sampled here.
+    for (const slot of manifest.slots.filter((s) => s.profiles.includes(profile) && s.id !== 'app.sides' && (s.editions ?? ['full', 'lite']).includes('full'))) {
       for (const variant of braceVariants(slot.path)) {
         const sample = variant.replace(/<app>/g, kindOf(slot) ?? 'core').replace(/<[^>]+>/g, 'sample').replace(/\*\*\//g, '').replace(/\*\*/g, 'a/b').replace(/\*/g, 'x') + (variant.endsWith('/') ? 'file.ts' : '');
         const c = resolver.classifyPath(sample);
@@ -504,7 +505,7 @@ test('growth is a minor: adding a slot changes no existing answer; every slot pa
 
 test('the failure catalog explains the new codes in Vietnamese', () => {
   const catalog = parseYaml(fs.readFileSync(path.join(root, 'modules/kernel/failure-codes.yaml'), 'utf8'));
-  for (const code of ['HFS_SLOT_UNDECLARED', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID', 'HFS_DECLARATION_INVALID']) {
+  for (const code of ['HFS_SLOT_UNDECLARED', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID', 'HFS_DECLARATION_INVALID', 'HFS_EDITION_INVALID', 'HFS_EDITION_FORBIDDEN_PRESENT']) {
     assert.ok(catalog[code], `${code} has no catalog entry`);
     for (const field of ['title_vi', 'meaning_vi', 'nextStep_vi']) assert.match(catalog[code][field], /[\u00c0-\u1ef9]/, `${code}.${field} is not Vietnamese`);
   }

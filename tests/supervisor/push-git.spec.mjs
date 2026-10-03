@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { render } from '../../packages/hfs/sync/index.mjs';
 import { planFor, failuresOf, mainState, pushGitRepo, pushGit, describeRun, selectRepos } from '../../scripts/supervisor/push-git.mjs';
 
 const RUNTIME = path.resolve('/x/runtime');
@@ -26,7 +27,12 @@ const fakeGit = ({ branch = 'main', dirty = [], ahead = 2, heads = ['aaa111'] } 
 const greenStep = () => ({ ok: true, exit: 0, ms: 5, log: 'l.log', text: '' });
 
 // The managed scripts every app carries (starci app sync writes them from this template); {{appScripts}} is the per-app run lines.
-const MANAGED = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'packages', 'hfs', 'templates', 'app', 'package-scripts', 'package.json'), 'utf8')
+// The template composes partials ({{> app/package-scripts/core.json}}): the sync renderer expands them, every other placeholder stays for the line below.
+const KEEP_PLACEHOLDERS = new Proxy(Object.create(null), {
+  get: (_target, key) => `{{${String(key)}}}`,
+  getOwnPropertyDescriptor: (_target, key) => ({ configurable: true, value: `{{${String(key)}}}` }),
+});
+const MANAGED = JSON.parse(render(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'packages', 'hfs', 'templates', 'app', 'package-scripts', 'package.json'), 'utf8'), KEEP_PLACEHOLDERS)
   .replace(/^\s*\{\{appScripts\}\}\s*$/m, '').replace(/\{\{\w+\}\}/g, 'x')).scripts;
 
 test('planFor: runtime = npm test + npm run check; an app = its managed typecheck, lint, test, build:be, build:fe, canon-scan; never e2e', () => {

@@ -462,7 +462,7 @@ describe('the package.json scripts of the app', () => {
     const typecheck = 'npm run codegen --silent && tsc -p be/tsconfig.json && turbo run typecheck';
     assert.equal(scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }], optionalSlots: ['fe.package.ui'] } })).typecheck, typecheck);
     assert.equal(scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }] } })).typecheck, typecheck, 'with or without packages: the task graph decides');
-    const graph = JSON.parse(rendered()['turbo.json']);
+    const graph = JSON.parse(rendered()['turbo.json'].replace(/^\s*\/\/.*$/gm, ''));
     assert.deepEqual(graph.tasks.typecheck.dependsOn, ['^build']);
     assert.deepEqual(graph.tasks.build.dependsOn, ['^build']);
     assert.deepEqual(Object.keys(graph.tasks).sort(), ['build', 'dev', 'lint', 'typecheck']);
@@ -581,7 +581,7 @@ describe('starci app scaffold: the first tree', () => {
   it('writes the root, the be side and the fe side, already in sync, with one package.json at the root and the lockfile left to npm', async t => {
     const { root } = scaffold(t);
     const files = filesUnder(root);
-    for (const file of ['hfs.json', 'package.json', 'README.md', '.gitignore', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/features/index.yaml', '.starcistacks/application-stacks.yaml', '.sops.yaml', 'scripts/codegen.mjs',
+    for (const file of ['hfs.json', 'package.json', 'README.md', '.gitignore', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/index.yaml', '.starciwork/features/system-health/index.yaml', '.starcistacks/application-stacks.yaml', '.sops.yaml', 'scripts/codegen.mjs',
       'be/nest-cli.json', 'be/tsconfig.json', 'be/apps/core/src/main.ts', 'be/apps/core/src/app.module.ts', 'be/apps/core/src/core.options.ts',
       'be/apps/cli/Dockerfile', 'be/apps/cli/src/main.ts', 'be/apps/cli/src/app.module.ts', 'be/apps/cli/src/cli.options.ts',
       'be/src/features/cli/index.ts', 'be/src/features/cli/cli.module.ts',
