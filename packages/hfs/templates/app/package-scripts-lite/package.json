@@ -10,6 +10,6 @@
     "db:push": "supabase db push",
     "db:types": "npm run contract:emit",
     "db:lint": "{{appBinary}} check --fast",
-    "contract:emit": "{{appBinary}} emit-contracts"
+    "contract:emit": "{{appBinary}} emit"
   }
 }

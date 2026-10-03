@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
+import { scaffoldBinGaps } from '../helpers/scaffold-bins.mjs';
 import { checkTargets, renderTargets } from '../../packages/hfs/sync/index.mjs';
 import { checkRepository } from '../../scripts/hfs/check.mjs';
 import { checkDatabase } from '../../scripts/hfs/rules/database.mjs';
@@ -179,6 +180,7 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
   for (const forbidden of ['@nestjs/testing', '@starci/jest-preset', '@starci/test-world', '@types/jest', 'jest', 'nest-commander', 'ts-jest']) {
     assert.equal(pkg.dependencies[forbidden] ?? pkg.devDependencies[forbidden], undefined, `${forbidden} is full-only`);
   }
+  assert.deepEqual(scaffoldBinGaps(root), [], 'every bin the scaffolded scripts call is installed by a dependency');
   const web = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'apps', 'web', 'package.json'), 'utf8'));
   assert.deepEqual(Object.keys(web.dependencies).sort(), [
     '@heroui/react', '@heroui/styles', '@starci/grammar', '@supabase/ssr', '@supabase/supabase-js',

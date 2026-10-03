@@ -140,3 +140,10 @@ test('the one Sonar gate document carries a readable lite gate with no coverage 
   assert.equal('coverage' in document.lite.newCode, false);
   assert.equal('coverage' in document.lite.overall, false);
 });
+
+test('the managed turbo.json passes the SWC cache variable through to task processes in both editions', () => {
+  for (const hfs of [LITE, JSON.parse(fs.readFileSync(path.join(ROOT, 'examples', 'shape-slot', 'hfs.json'), 'utf8'))]) {
+    const turbo = JSON.parse(targetMap(hfs)['turbo.json'].content.replace(/^\s*\/\/.*$/gm, ''));
+    assert.ok(turbo.globalPassThroughEnv.includes('SWC_NATIVE_BINDING_CACHE'), `${hfs.edition ?? 'full'}: turbo strips undeclared env, so next would lose the runtime-managed SWC cache`);
+  }
+});

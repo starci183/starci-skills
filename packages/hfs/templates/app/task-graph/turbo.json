@@ -2,6 +2,8 @@
   "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
   "agentGuidance": false,
+  // Turbo strips undeclared env from task processes: the SWC cache variable must pass so next finds its native-binding cache when the default cache root has a host ACL @swc/core refuses (a Windows AppContainer grant).
+  "globalPassThroughEnv": ["SWC_NATIVE_BINDING_CACHE", "NEXT_TELEMETRY_DISABLED"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

@@ -76,6 +76,6 @@
     "db:push": "supabase db push",
     "db:types": "npm run contract:emit",
     "db:lint": "starci app check --fast",
-    "contract:emit": "starci app emit-contracts"
+    "contract:emit": "starci app emit"
   }
 }

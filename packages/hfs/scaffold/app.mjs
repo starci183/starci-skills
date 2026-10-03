@@ -127,7 +127,7 @@ const LITE_STARTER_DEPENDENCIES = Object.freeze({
     'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
   },
   devDependencies: {
-    turbo: null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/hfs': null,
+    turbo: null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/cli': null,
     '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/tsconfig': null, '@tailwindcss/postcss': null,
     '@types/express': null, '@types/node': null, '@types/react': null, '@types/react-dom': null,
     eslint: null, 'eslint-plugin-react-hooks': null, husky: null, 'postcss-value-parser': null, prettier: null,
