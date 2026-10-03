@@ -9,7 +9,7 @@ description: >-
   (scripts/checks/check-one-allowlist.mjs).
 type: object
 additionalProperties: false
-required: [schema, not-codes, json-exceptions, dead-script-entries, export-used, heavy-specs]
+required: [schema, not-codes, json-exceptions, dead-script-entries, export-used]
 properties:
   schema:
     const: starci/allowlist@1
@@ -42,14 +42,6 @@ properties:
     description: >-
       The scripts check-dead-scripts keeps despite having no reader (spec utilities, generated-baseline
       recorders, deliberate touch points), each as {path, reason}; shrink-only.
-    items:
-      $ref: '#/$defs/pathReason'
-  heavy-specs:
-    type: array
-    description: >-
-      The spec files check-spec-budget lets exceed the per-file land budget because their real cost cannot be shared
-      (a real package install, a real database), each as {path, reason}; shrink-only: an entry whose spec fits the budget
-      or no longer exists is stale.
     items:
       $ref: '#/$defs/pathReason'
   export-used:

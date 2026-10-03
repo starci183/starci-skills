@@ -1,7 +1,6 @@
 # The measured seconds of each spec file (serial proof runs of the test-speed lane; refreshed from the land pre-verify record) and the one
-# per-file budget scripts/checks/check-spec-budget.mjs judges. A row over limitSeconds is a finding unless modules/kernel/allowlist.yaml
-# heavy-specs declares the spec with its reason. The target for a whole land run is 15 minutes (docs/source-process.md, Test budget).
-schema: starci/spec-durations@1
+# per-file budget scripts/checks/check-spec-budget.mjs judges. A row over limitSeconds is an advisory INFO finding ranked by its excess (alpha.4; it turns
+# blocking in alpha.5). The target for a whole land run is 15 minutes (docs/source-process.md, Test budget).
 limitSeconds: 60
 rows:
   - {spec: tests/api-orca/orca-host-outage.spec.mjs, seconds: 41}
