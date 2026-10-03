@@ -8,7 +8,7 @@ rows:
   - {spec: tests/engine-db/cut-set-integration.spec.mjs, seconds: 9}
   - {spec: tests/engine-db/kernel-api.spec.mjs, seconds: 69}
   - {spec: tests/engine-db/orchestration-question-bridge.spec.mjs, seconds: 66}
-  - {spec: tests/engine-db/peer-messages.spec.mjs, seconds: 64}
+  - {spec: tests/engine-db/peer-messages.spec.mjs, seconds: 89}
   - {spec: tests/gates/op-gate-loop.spec.mjs, seconds: 33}
   - {spec: tests/gates/sonar-local.spec.mjs, seconds: 117}
   - {spec: tests/hfs-architecture/architecture-hfs-layout.spec.mjs, seconds: 39}
