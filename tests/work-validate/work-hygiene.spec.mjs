@@ -18,6 +18,7 @@ import {
 } from '../../scripts/work/validate/work-hygiene.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { withoutGitLocalEnv } from '../../scripts/lib/git.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_PREFIX']) delete process.env[key];
 
@@ -41,6 +42,30 @@ const repoOf = (t) => {
   return repo;
 };
 const codes = (result) => [...new Set(result.findings.map((f) => f.code))].sort();
+
+test('actual commit --only validates its temporary staged blob and foreign hygiene ignores that index', (t) => {
+  const repo = repoOf(t), foreign = repoOf(t);
+  const record = `${FLOW}/accounts.yaml`;
+  for (const target of [repo, foreign]) {
+    put(target, record, CLEAN_ACCOUNTS);
+    gitOk(target, 'add', record);
+    gitOk(target, 'commit', '--quiet', '-m', 'valid Work record');
+  }
+  assert.equal(ensureWorkHook(repo, { skillRoot: ROOT }).installed, true);
+  put(repo, record, BROKEN_YAML);
+  const refused = git(repo, 'commit', '--quiet', '--only', '-m', 'broken temporary staged blob', '--', record);
+  assert.notEqual(refused.status, 0, refused.stdout + refused.stderr);
+  assert.match(refused.stderr, /WORK_YAML_UNPARSEABLE/);
+  assert.equal(gitOk(repo, 'show', `:${record}`), CLEAN_ACCOUNTS.trim(), 'the ordinary index remained valid while the selected commit blob was broken');
+  const env = { ...withoutGitLocalEnv(process.env), GIT_INDEX_FILE: path.join(repo, 'temporary.index') };
+  for (const args of [['read-tree', 'HEAD'], ['add', record]]) {
+    const staged = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8', windowsHide: true, env });
+    assert.equal(staged.status, 0, staged.stderr);
+  }
+  const checked = spawnSync(process.execPath, [path.join(ROOT, 'packages/cli/bin/starci.mjs'), 'work', 'hygiene', 'staged', '--repo', foreign, '--json'], {cwd:repo,env,encoding:'utf8',windowsHide:true});
+  assert.equal(checked.status, 0, checked.stdout + checked.stderr);
+  assert.equal(JSON.parse(checked.stdout).ok, true, 'a foreign repository must not read the origin hook temporary index');
+});
 
 test('the check refuses an unparseable Work YAML and a literal login and password, and passes a clean record', (t) => {
   const repo = repoOf(t);
