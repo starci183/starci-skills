@@ -22,6 +22,24 @@ purpose: |-
 # route/dispatch with `max-ops` at it.
 maxParallelOps: 20
 allocation:
+  # Common new-admission thresholds, consumed by the pure selector and runtime reservation adapter.
+  admission:
+    schema: starci/agent-admission-policy@1
+    version: 1
+    reservePercent: 90
+    exhaustedPercent: 100
+    maxAgeMs: 300000
+    qualityOrder: [economy, standard, frontier]
+    ownerBiasRoles: [op]
+    eligibilityModes: [qualified, probation, kernel-function, scoped-control-plane, operation-policy]
+    roles:
+      kernel: {qualityFloor: standard}
+      op:
+        qualityFloor: economy
+        difficultyFloors: {easy: economy, medium: economy, hard: frontier, insane: frontier}
+      supervisor: {qualityFloor: standard}
+      worker: {qualityFloor: standard}
+      critic: {qualityFloor: standard, independence: provider}
   # The default policy. config.yaml allocation.policy overrides it for `starci kernel route` (engine/config.mjs
   # configuredAllocationPolicy): prefer-then-overflow takes the first eligible pool of the tier order below;
   # balanced walks the eligible pools of that order and takes the FIRST one still below its config.yaml
@@ -470,6 +488,7 @@ allocation:
   housekeeping:
     tmpMaxAgeMs: 172800000
     tmpPrefixes: [policy-, rights-, l4-, starci, starci-w2, evidence, sup-k, work-v3, scoped-lint, si-, w1-, nivo-, orca-spec,
+      owner-bias-cli-, admission-runtime-, agent-launch-, starci-provider-budget-, starci-provider-schema-,
       codex-, deps-, direction-part-, draw-layer-, footprint-, grammar-pin-, guard-, literal-argv-, module-yaml-,
       doc-language-, guidance-, hk-, hfs-, install-link-, kernel-check-, kguard-, sup-orca, land-, op-manifest-, path-key-, pathspec-, push-scan-spec-, rename-over-, sbl-, serve-ask-, sup-chat, sup-repo, sup-src, sup-wd,
       work-acceptance-, work-brand-test-, work-core-test-, work-custody-test-, work-external-,

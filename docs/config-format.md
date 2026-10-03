@@ -77,20 +77,15 @@ Optional keys:
 
 ## Kernel group
 
-The kernel is a model group, not a single model. The shipped default is
-`kernel: {group: [{agent: claude, model: claude-opus-5-5}, {agent: codex, model: gpt-6.1-sol}], effort: high}`:
-`scripts/kernel/start-workflow.mjs` tries the members in order, skips one whose provider quota probe reads
-`dead` or whose machine provider-health circuit is open, puts a `limited` one last, and — when a member's
-launch is refused before the model took any input (an interactive gate such as the Claude first-run screen,
-an auth screen, a readiness or model-attestation failure) — closes that terminal and boots the next member in
-the same start (the rule and its step list are `modules/kernel/start-workflow.yaml` `spawn.fallThrough`).
-`engine/config.mjs` refuses an empty group, an agent named twice, an unknown agent, a model not declared
-for that agent by the model catalog or its pool, and a group mixed with `agent`/`model` keys. A concrete
-catalog model such as `claude-sonnet-5-5` can be a Kernel group member without changing the Claude
-operation pool's Opus pins. A single pin `{agent, model, effort}` keeps
-its meaning: it is authoritative and fails closed rather than substituting. With no `kernel` key the unpinned
-route is the `sol-think` order - Sol first, Opus as overflow - resolved by `scripts/route/route-model.mjs`
-(`modules/models/selection.yaml` `decisionFlow` `kernel-function` and `kernel-availability`).
+`kernel` accepts a concrete `{group: [{agent, model}, ...], effort}` or a single `{agent, model, effort}`
+pin; the shipped group lives in `config.example.yaml`. `engine/config.mjs` validates each member against
+the model catalog and refuses empty groups, repeated agents, unsupported identities and mixed group/pin
+forms. A catalog model can serve the Kernel without changing its provider's operation-pool pins.
+`scripts/kernel/start-workflow.mjs` applies `modules/models/selection.yaml` `newAgentAdmission` to the
+resolved group before launch. A single pin constrains that selection to its identity. Eligible group
+members may fall through only after the prior attempt has definitive no-effect evidence, as specified
+by `modules/kernel/start-workflow.yaml` `spawn.fallThrough`. An absent `kernel` key uses the unpinned
+model-function route in `scripts/route/route-model.mjs`.
 
 ## Parallelism
 
@@ -134,39 +129,23 @@ required role. The kernel's own model call kinds are
 
 ## Model routing
 
-Model routing holds the owner's rules as data. The `[Kernel]` seat is the Claude Opus 5.5 then GPT-6.1 Sol
-group ([Kernel group](#kernel-group)). Every kind has one
-entry in `modules/models/runtimes.yaml` `roleOfKind` — its role, whether its work is `think` or `hands-on`,
-and the difficulty `floor` read from what its op does. Think work is any op whose output is a canonical
-record (SRS, SDS, scope, goal, decision, brand, UI, Work, workspace, rule) or a verdict about quality; it
-runs only on `allocation.preference.think`, Claude Opus 5.5 and GPT-6.1 Sol, at a hard floor where
-`codex-agent` pins Sol, and neither `allocation.preferredProvider` nor `--prefer` can add a pool to that
-order; under `balanced` Opus takes it until it reaches its share and Sol after. Review is the exception:
-the verify kinds still declared on it and `work.author` walk the `review` order - Devin,
-with Opus and Sol as overflow only (`allocation.overflowByOrder`, under either policy) - and a
-verify kind goes to another audit family than the op whose output it reads (`allocation.frontier` and
-`allocation.hands`): what Devin implemented is reviewed by Opus or Sol. Owner routing
-2026-09-26 adds two more orders: the UI verifications (`interface.audit`, `e2e.verify`, `security.verify`,
-`uat.assisted.verify`) walk `ui` - Sol first, Devin behind it - and the mechanical ops
-(`provision.ask`, `workspace.manage`, `task.execute`, `knowledge.repair`) walk `implement`, which the hands
-serve whatever the kind's role. `interface.draw` and
-`interface.asset` walk the `draw` order, Codex only (the image tool). Hands-on work — implementing, testing,
-refactoring, running and measuring under a settled record — walks the `allocation.tiers` implement, write
-and verify orders: Devin first, then Codex, at medium and hard, Codex first at
-easy, Opus as overflow. Scaffold, docs, content and grammar work and every hands-on cut slice walk the
-`scaffold` order, Devin first. Source setup (`backend.scaffold`, `interface.scaffold`, `package.scaffold`) keeps the difficulty
-its scope measures. A floor raises a measured difficulty and never lowers it
-(`scripts/agent/models.mjs` `selectPool`). The non-operation pool lists its members in route order; with no
-`kernel` key the kernel's own model calls walk `sol-think`, Sol first, and Devin carries neither
-`plan` nor `decide`, so those functions never reach them. Functions
-retain separate typed inputs and independent contexts even though they share a pool.
+Model routing reads each kind's role, order and difficulty floor from
+`modules/models/runtimes.yaml` `roleOfKind`. A floor raises measured difficulty and never lowers it.
+`config.example.yaml` owns the default `[Kernel]` group; the owner config selects its concrete allowed
+members ([Kernel group](#kernel-group)). The non-operation pools remain typed functions with separate
+inputs and independent contexts.
 
-Operation candidates still come from the operation policy and runtime catalog, but adaptive allocation treats
-catalog order as eligibility/suitability rather than sequential fallback. It groups candidates by provider
-family so several models do not multiply one family's quota, and combines fresh quota with atomic admitted
-family load. The runtime pin seals the accepted `config.yaml` digest, so config changes apply to future
-assignments only after a new pin and an orderly same-id restart/retry boundary; a running dispatch never changes
-identity.
+Operation policy supplies the concrete candidate group. `modules/models/selection.yaml` owns common
+admission for all agent roles: quality and eligibility, every fresh quota window, authentication,
+provider circuit, shared capacity and Critic independence. Scoped owner preferences rank eligible
+members and never add a provider or model to the allowed group. A hard requirement preserves the
+requested identity; it cannot manufacture eligibility or authority to spend reserved quota.
+`allocation.admission` owns thresholds and role floors. Existing allocation orders and shares distribute
+work only among candidates that pass admission; catalog order alone is not launch permission.
+See [agent admission](agent-admission.md) for the reservation and uncertain-launch lifecycle.
+
+The runtime pin seals the accepted `config.yaml` digest. Config changes apply to future assignments
+through a new pin and an orderly same-id restart or retry boundary; a running dispatch keeps its identity.
 
 ## Runtime naming
 

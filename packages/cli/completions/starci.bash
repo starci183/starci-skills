@@ -1032,7 +1032,7 @@ _starci() {
         release:launch-smoke) COMPREPLY=( $(compgen -W "--app-repo --entry --timeout-ms --out --as --json --cwd --quiet --help --edition" -- "$cur") );;
         release:proof) COMPREPLY=( $(compgen -W "--repo --base --main --out --json --cwd --quiet --help --edition" -- "$cur") );;
         release:publish) COMPREPLY=( $(compgen -W "--publish --npm-user --poll-minutes --pre-land-ref --expect-sha --examples --json --cwd --quiet --help --edition" -- "$cur") );;
-        release:sync-runtime) COMPREPLY=( $(compgen -W "--check --json --cwd --quiet --help --edition" -- "$cur") );;
+        release:sync-runtime) COMPREPLY=( $(compgen -W "--check --prepare-grammar --json --cwd --quiet --help --edition" -- "$cur") );;
         route:op) COMPREPLY=( $(compgen -W "--kind --node-kind --phase --intent --ops-dir --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:architecture) COMPREPLY=( $(compgen -W "--base --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:benchmark-snapshot) COMPREPLY=( $(compgen -W "--since-hours --repo --date --dir --json --cwd --quiet --help --edition" -- "$cur") );;

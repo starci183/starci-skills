@@ -77,6 +77,11 @@ claim:
     A signal with no Dispatch is not a worker-start worker (every Kernel is
     one). It is never live: the next start clears the seat and a worker takes
     it (kernel-stale-cleared).
+  onUnsettledLaunch: >-
+    A partial or unknown launch effect keeps an identity-bound launch-unknown
+    signal and provider reservation. A later boot refuses before replacement,
+    including when no Dispatch was returned. Elapsed time is not worker-exit
+    proof; the prior effect must be definitively reconciled before clearing it.
   onHostOutage: >-
     Orca not answering - runtime_unavailable, orca.exe ENOENT while an update
     replaces it, a timed-out call - says nothing about any terminal. It is
@@ -102,20 +107,21 @@ spawn:
     --kind model.manageWorkflow --risk high --repo <repo>. A config single pin
     or launcher override is an explicit Kernel identity pin and fails closed
     when unavailable; it is never silently replaced by Devin or another agent.
-    A config kernel group and the unpinned think-group route are an ordered
-    member list (docs/config-format.md "Kernel group"). Operation jobs retain
-    their own independent profile/runtime-pool routing and fallback policy.
+    A config kernel group and the unpinned think-group route declare concrete
+    members admitted by modules/models/selection.yaml newAgentAdmission through
+    scripts/agent/admission.mjs. Operation jobs resolve their own declared groups.
   fallThrough:
     rule: >-
-      A group boot (config kernel group or unpinned route) launches its members
-      in order within one boot and one startup reservation. A member whose start
+      A group boot selects among its admitted members within one boot and one
+      startup reservation. A member whose start
       left no effect (effectState none: worker-start refused before a Dispatch
       existed, or its Dispatch was proven ended and released) is recorded as one
       kernel-start-failed event (fellThroughTo names the next member) and the next
-      member launches. A start with partial or unknown effect never falls through,
+      admitted member launches with its own fenced provider reservation. A start with partial or unknown effect never falls through,
       so a boot never leaves a worker beside a new kernel. The last member's
       refusal, a single pin and an --agent override end the boot as before.
-      Success records kernel-booted/kernel-restarted with fellThrough.
+      Success records kernel-booted/kernel-restarted with fellThrough and the
+      attested provider reservation receipt. Existing live workers keep their admission.
   launch: >-
     Every Kernel is an Orca worker (contract-changes/launch-through-worker-start.yaml;
     scripts/agent/lib.mjs startAgent). The launching terminal (ORCA_TERMINAL_HANDLE:

@@ -14,7 +14,8 @@ import { enqueueRepository, ownedPathPlacements } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
 import { workflowAppRepo, opWorktreeArgs, sideOf, workflowSideWait, workflowWorktreePromptRules, WORKFLOW_WORKTREE_MISSING } from '../workflow-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
-import { spawnAgent, loadAdapter } from '../../agent/lib.mjs';
+import { loadAdapter } from '../../agent/lib.mjs';
+import { spawnOperationAgent } from './shared/dispatch-agent.mjs';
 import { DISPATCHES, requirePhase } from './shared/workflow-transitions.mjs';
 import { depthPreflight } from '../../agent/depth-preflight.mjs';
 import { markRunning, runningOrAbandon } from './shared/dispatch-running.mjs';
@@ -37,7 +38,7 @@ import { productLocaleFor } from '../product-locale.mjs';
 import { isSeamCut, seamStubForDispatch, cutManifestOf } from '../seam-policy.mjs';
 import { kernelOverrideFor } from '../kernel-authority.mjs';
 import { jobDirOf } from '../job-artifacts.mjs';
-import { packetFileOf, taskSpecOf } from '../../machine/task-spec.mjs';
+import { packetFileOf } from '../../machine/task-spec.mjs';
 import { ENV_GATED_OPS } from '../verify-failure.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { bindGuardTerminal } from '../../guards/hook-install.mjs';
@@ -469,18 +470,8 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   const preflight = depthPreflight({ parentDispatch: run.kernelPayload?.managed?.dispatchId ?? null });
   if (preflight.refusal) return reject({ step: 'depth', code: preflight.refusal.code, error: preflight.refusal.error });
 
-  // 3-6. The one agent launch (scripts/agent/lib.mjs spawnAgent): pre-trust, then worker-start --spec on the op's
-  // worktree - Orca files the operation Task (the rendered packet prompt) in the workflow Run from the CURRENT kernel
-  // terminal and starts its worker in one call, so a refused start leaves no orphan Task - then the agent terminal
-  // (the start receipt, else worker-show), its [Op] title, and the attestation that the worker's EFFECTIVE agent/model
-  // equal the route - a mismatch is a provider-side defect, rejected with the typed infra-provider incident. No
-  // `--parent`: the Run's coordinator places the op under the Kernel (smoke 2026-10-01, launch.report.md). A packet
-  // longer than the host's argv takes is written to the job's evidence directory and the spec points at it
-  // (task-spec.mjs; inc-826e077777de). The start's ledger identity is the job and its lease token (calls.yaml
-  // worker-start replay: request): a lost receipt replays this start, and a new lease is a new start.
-  const spec = taskSpecOf({ prompt, file: packetFile, op, jobId, attempt: job.try_no }).spec;
-  const launched = spawnAgent({ provider: model.provider, model: modelId, effort, worktree: checkoutRoot, title, spec, taskTitle: `${op} #${job.try_no}`,
-    run: runId, from: kernelHandle, preflight, request: { job: jobId, lease: reserve.leaseToken },
+  const launched = spawnOperationAgent({ ledger, job, op, model, launchModel, payload, jobId, prompt, packetFile,
+    worktree: checkoutRoot, title, run: runId, from: kernelHandle, preflight, request: { job: jobId, lease: reserve.leaseToken },
     onCreated: (handle, dispatchId) => recordLaunchTerminal(ledger, jobId, handle, dispatchId), io: { cleanup: cleanupManagedWorker } });
   trust = launched.trust ?? null;
   if (!launched.ok) {
@@ -498,6 +489,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   // 7. Running — worker_id is the Dispatch id (managed workers have no
   // command-terminal handle); payload.managed carries the Orca ids settle needs.
   payload.managed = { runId, taskId, dispatchId, agentTerminalHandle: launched.terminal,
+    admission: launched.admission ?? null,
     terminalTitle: title, terminalTitleApplied: launched.titleApplied };
   payload.agent = model.provider;
   payload.provider = model.provider;

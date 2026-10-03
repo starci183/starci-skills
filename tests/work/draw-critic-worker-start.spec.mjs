@@ -19,7 +19,8 @@ import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 // to a fake client; nothing reaches a host.
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const settings = allocationSettings().drawLoop;
+const configured = allocationSettings().drawLoop;
+const settings = { ...configured, critic: { ...configured.critic, author: { provider: 'devin', model: 'swe-2-max' } } };
 
 const round = (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-critic-worker-'));
@@ -64,6 +65,18 @@ test('the critic is started through worker-start with the configured provider, m
   assert.deepEqual(critique.critic.cleanup, { stopped: true, released: true, taskClosed: true });
   assert.equal(critique.critic.launch, 'orchestration worker-start');
   assert.deepEqual(cleanDirsLeft(r.dir), [], 'the clean dir is removed');
+});
+
+test('an unknown critic launch retains its placement until the worker exit is proven', async t => {
+  const r = round(t), orca = fakeCriticOrca();
+  orca.workerStart = () => ({ ok: false, effectState: 'unknown', dispatchId: 'uncertain-critic', error: 'receipt missing' });
+  orca.workerShow = () => ({ ok: false });
+  const critique = await runCritic({ ...r, rubric: DEFAULT_RUBRIC, critic: settings.critic, orca, placement: { tmpRoot: r.dir }, ...clock() });
+  assert.equal(critique.outcome, 'launch-failed');
+  assert.equal(critique.critic.independent, false);
+  assert.equal(orca.names().includes('critic-workspace-remove'), false);
+  assert.equal(critique.critic.placementRetained.dispatchId, 'uncertain-critic');
+  assert.ok(fs.existsSync(critique.critic.placementRetained.dir));
 });
 
 test('a Codex drawer is judged by the Claude worker of criticWhenDrawer.codex', async (t) => {

@@ -52,6 +52,7 @@ import { normalizeDifficulty, chainFor, resolveLaunchModel, kindRoute, orderKeyO
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { readEnv } from '../lib/env.mjs';
+import { admittedModelSet } from './admitted-model-set.mjs';
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) : null);
 
@@ -587,27 +588,7 @@ async function main() {
   });
   availability?.close();
 
-  // Quota-aware order among the eligible of one mode: available before limited,
-  // declared order otherwise (a stable sort).
-  const availabilityRank = e => (e.availability?.state === 'limited' ? 1 : 0);
-  const byMode = mode => evaluated.filter(e => e.eligible && e.mode === mode)
-    .map((e, i) => ({ e, i })).sort((a, b) => availabilityRank(a.e) - availabilityRank(b.e) || a.i - b.i).map(x => x.e);
-  const qualified = byMode('qualified');
-  const probationEligible = byMode('probation');
-  const kernelFunctionEligible = byMode('kernel-function');
-  // providerFilter: qualified set wins outright; else probation admits exactly
-  // ONE target per durable job (non-kernel) — the declared chain is still the
-  // fallback order — while kernel functions keep all eligible members.
-  let pickedSet, rule;
-  if (qualified.length) { pickedSet = qualified; rule = 'decisionFlow.qualified-first: measured qualification passed'; }
-  else if (probationEligible.length) {
-    pickedSet = probationEligible;
-    rule = 'decisionFlow.probation-fallback: no qualification evidence; scoped probation admitted';
-  } else if (kernelFunctionEligible.length) {
-    pickedSet = kernelFunctionEligible;
-    rule = 'decisionFlow.kernel-function: kernel function on the sol-think order; no qualification record required';
-  } else { pickedSet = []; rule = 'decisionFlow.verdict: no eligible model'; }
-
+  const { pickedSet, rule, admission } = admittedModelSet({ evaluated, w, args, difficulty, registry, runtimes, effort });
   const pick = pickedSet[0] ?? null;
   const modelFor = c => resolveLaunchModel(c.id, difficulty, { runtimes }).modelId ?? c.target;
   const result = {
@@ -630,6 +611,7 @@ async function main() {
     orderSource,
     fallbackChain: pickedSet.slice(1).map(e => ({ target: e.c.target, model: modelFor(e.c), mode: e.mode })),
     fallbackPolicy: rules.fallbackAdvanceWhen,
+    admission,
     rejected: evaluated.filter(e => !e.eligible).map(e => ({ target: e.c.target, reasons: e.reasons })),
     ...(availability ? { availability: Object.fromEntries(evaluated.filter(e => e.availability)
       .map(e => [e.c.target, { provider: e.availability.provider, state: e.availability.state, quota: e.availability.quota, reason: e.availability.reason }])) } : {}),

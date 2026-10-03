@@ -30,21 +30,25 @@
 //
 // A replacement needs a kernel proven dead: worker-show on its Dispatch. An Orca outage is refused with step
 // host-unavailable and exit 75, touching nothing; a kernel job whose own Dispatch is still alive while its signal is gone
-// is refused with step kernel-worker-alive (exit 3) - never a second Kernel beside it. A seat launched by terminal
-// create (no Dispatch) is retired: its terminal is closed and a worker takes the seat.
+// is refused with step kernel-worker-alive (exit 3) - never a second Kernel beside it. A terminal without its immutable
+// Dispatch identity remains unverified until affirmative reconciliation.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, releaseKernelJob, recordJobResult, setSignal, clearSignal, updateSignal, openIncident, setInboxStatus } from '../../engine/db/ledger.mjs';
+import { openMachineReader } from '../../engine/db/machine.mjs';
 // The kernel seat's boot count lives in its payload (hierarchy.attempt); jobs.try_no is the op-try ordinal only.
 const kernelAttemptOf = (row) => parseJsonOr(row?.payload_json)?.hierarchy?.attempt ?? 0;
 import { inspectOwnerConfig, loadConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { startAgent, loadAdapter } from '../agent/lib.mjs';
+import { loadAdapter } from '../agent/lib.mjs';
+import { launchKernelGroup } from './launch-kernel-group.mjs';
+import { ownerReserveGrant, planAgentAdmission } from '../agent/admission.mjs';
+import { prepareProviderBudget } from '../agent/provider-budget.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
-import { stopAndRelease } from '../machine/worker-close.mjs';
+import { stopAndRelease, workerClosureProven } from '../machine/worker-close.mjs';
 import { DEFAULT_OWNER_LANGUAGE } from '../machine/home.mjs'; import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability, loadModelRegistry } from '../agent/models.mjs';
 import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
@@ -375,16 +379,27 @@ const renderKernelPrompt = ({ workflowId, inboxId, goalRevision, launchAuthority
 const MANAGED_DEAD_STATE = /stop|fail|dead|exit|release|abandon/i;
 
 // A live signal is proven, not assumed: worker-show reports a non-terminal worker state for the seat's Dispatch.
-// Nothing that cannot be proven live blocks a restart — but a restart first stops and releases the old Dispatch so a
-// zombie worker is never left running beside its successor.
+// An unknown execution remains fenced; a restart first proves the old Dispatch's terminal and process tree closed.
 async function signalHealth(signal) {
   if (!signal) return { live: false, reason: 'absent', terminal: null };
-  if (signal.expires_at !== null && signal.expires_at <= Date.now()) {
-    return { live: false, reason: 'startup reservation expired', terminal: null };
-  }
   const value = parseJson(signal.value_json, {});
+  if (value.state === 'launch-unknown') return { live: false, hostUnavailable: true,
+    reason: 'prior Kernel launch effect requires definitive reconciliation', terminal: value.terminal ?? null, value };
   if (value.state === 'starting' && signal.expires_at > Date.now()) {
     return { live: true, reason: 'startup reservation active', terminal: null, value };
+  }
+  if (value.state === 'starting') {
+    let machine=null;
+    try {
+      machine=openMachineReader();
+      const scopePrefix=`${ledger.ledgerId ?? ledger.path}:${signal.key}:kernel-attempt:`;
+      const held=machine?.providerReservations({activeOnly:true}).find(row=>row.role==='kernel'
+        && row.scope?.scopeId?.startsWith(scopePrefix) && ['launching','live','unknown'].includes(row.state));
+      if (held) return {live:false,unverified:true,reason:'startup reservation expired with an unsettled launch receipt',
+        terminal:held.handle ?? null,value};
+    } catch (error) { return {live:false,unverified:true,reason:`startup capacity could not be verified: ${error.message}`,terminal:null,value}; }
+    finally { machine?.close(); }
+    return {live:false,reason:'startup reservation expired before any launch effect',terminal:null,value};
   }
   if (value.dispatch) {
     const shown = workerShow({ dispatch: value.dispatch });
@@ -397,7 +412,7 @@ async function signalHealth(signal) {
       reason: live ? `worker ${state ?? 'ready'}` : (shown?.error || `worker state ${state ?? 'unreadable'}`),
     };
   }
-  // A seat without a Dispatch is not a worker-start worker (every Kernel is one): never live, replaced by the next start.
+  if (value.terminal) return {live:false,unverified:true,reason:'the terminal has no immutable worker Dispatch identity',terminal:value.terminal,value};
   return { live: false, reason: 'seat has no worker', terminal: value.terminal ?? null, value };
 }
 
@@ -418,11 +433,13 @@ const EXIT_HOST_UNAVAILABLE = 75;
 const EXIT_KERNEL_ALIVE = 3;
 
 // Settlement of a stale Kernel's Dispatch: worker-stop then worker-release (calls.yaml settle-dispatch), recorded as
-// the seat's terminalClosed receipt - release is what closes a worker's terminal. A refused release is the
+// the seat's terminalClosed receipt, including verified terminal and process-tree exit. A refused release is the
 // kernel-stale-terminal-unclosed residue, never silence. Never throws.
 function releaseManagedWorker(dispatchId, handle = null) {
-  const released = stopAndRelease(dispatchId);
-  return { handle, dispatch: dispatchId, ok: released.ok, ...(released.ok ? {} : { error: released.release.error ?? released.stop.error ?? 'worker-release refused' }) };
+  const released = stopAndRelease(dispatchId, { handle });
+  const proven = workerClosureProven(released, handle);
+  return { ...released, handle, dispatch: dispatchId, ok: proven,
+    ...(proven ? {} : { error: released.release?.error ?? released.stop?.error ?? 'worker terminal or process exit is unproven' }) };
 }
 
 const ledger = openLedger({ file: ledgerFileFor(repo) });
@@ -442,18 +459,23 @@ try {
     const wf = ledger.db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(target);
     // A finished or archived workflow's goal is closed — even --plan refuses to plan a restart.
     refuseClosedGoal(target, wf);
-    const g = ledger.db.prepare('SELECT revision,goal_identity,json FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(target);
+    const g = ledger.db.prepare('SELECT revision,goal_identity,json,approved_by FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(target);
     const inbox = ledger.db.prepare("SELECT inbox_id,status FROM inbox WHERE kind='goal' AND workflow_id=?").get(target);
     const signal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(target);
     const health = await signalHealth(signal);
     const chain = parseJson(g?.json)?.opChain?.legs?.map(l => l.op) ?? null;
     const route = await resolveKernelRoute(ledger.db);
+    const priorKernel = ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(`kernel-${target}`);
+    const admission = planAgentAdmission({ role: 'kernel', scopeId: `${ledger.ledgerId ?? ledger.path}:${target}:kernel-attempt:${kernelAttemptOf(priorKernel) + 1}`,
+      bias: parseJsonOr(g?.json)?.routing_bias, ownerGrant: ownerReserveGrant(g),
+      allowGroup: (route.members ?? [route]).map((member) => ({ provider: member.agent, model: member.model, effort: member.effort })) });
     const out = {
       plan: true, workflowId: target, title: workflowDisplayName(wf), slug: wf?.title ?? null, phase: wf?.phase,
       goalRevision: g?.revision ?? null, goalIdentity: g?.goal_identity ?? null,
       opChain: chain, inbox: inbox?.status ?? 'none',
       host: 'orca', executionHost: 'orca', agent: route.agent ?? null, routedBy: route.routedBy,
       launch: 'worker',
+      admission,
       ...(route.model ? { model: route.model } : {}),
       ...(route.effort ? { effort: route.effort } : {}),
       ...(route.route?.profile ? { profile: route.route.profile } : {}),
@@ -536,6 +558,17 @@ try {
     const at = Date.now();
     const unclosed = staleKernel.terminalClosed && staleKernel.terminalClosed.ok !== true
       ? staleKernel.terminalClosed : null;
+    if (unclosed) {
+      ledger.transaction(() => {
+        ledger.appendEvent({ workflowId: target, entityType: 'kernel', entityId: target,
+          generation: workflow?.generation ?? 0, kind: 'kernel-stale-terminal-unclosed',
+          payload: { ...unclosed, reason: priorHealth.reason }, createdAt: at });
+        openIncident(ledger.db, { incidentId: `inc-${crypto.randomBytes(6).toString('hex')}`, workflowId: target, kind: 'runtime-defect', owner: 'supervisor', at,
+          lastProgress: `[orca-tree] ${JSON.stringify({ code: 'kernel-stale-terminal-unclosed', ...unclosed })}` });
+      });
+      refuse('kernel-stale-terminal-unclosed', { workflowId: target, terminal: staleKernel.terminal,
+        effectState: 'unknown', error: unclosed.error, closure: unclosed });
+    }
     ledger.transaction(() => {
       clearSignal(ledger.db, { scope: 'kernel', key: target, token: priorSignal.token });
       // The dead kernel's seat is released (running -> ready); the replacement below binds it again.
@@ -543,19 +576,7 @@ try {
         recordJobResult(ledger.db, { jobId: `kernel-${target}`, result: { reason: priorHealth.reason, terminal: staleKernel.terminal }, at });
       ledger.appendEvent({ workflowId: target, entityType: 'kernel', entityId: target,
         generation: workflow?.generation ?? 0, kind: 'kernel-stale-cleared', payload: staleKernel, createdAt: at });
-      // A terminal the host refused to close outlives this restart and becomes
-      // the duplicate kernel nobody owns. The restart still proceeds — a dead
-      // kernel must be replaced — but the residue is an open incident, so
-      // survey and check-orca-tree both see it.
-      if (unclosed) {
-        ledger.appendEvent({ workflowId: target, entityType: 'kernel', entityId: target,
-          generation: workflow?.generation ?? 0, kind: 'kernel-stale-terminal-unclosed',
-          payload: { ...unclosed, reason: priorHealth.reason }, createdAt: at });
-        openIncident(ledger.db, { incidentId: `inc-${crypto.randomBytes(6).toString('hex')}`, workflowId: target, kind: 'runtime-defect', owner: 'supervisor', at,
-          lastProgress: `[orca-tree] ${JSON.stringify({ code: 'kernel-stale-terminal-unclosed', ...unclosed })}` });
-      }
     });
-    if (unclosed) console.error(`start-workflow: warning: stale kernel terminal ${unclosed.handle} could not be closed (${unclosed.error ?? 'no reason given'}) — incident opened`);
   }
 
   // 1. Claim the goal atomically — the named one, or the oldest pending.
@@ -596,15 +617,12 @@ try {
     process.exit(0);
   }
 
-  // 3. Launch one dedicated [Kernel] Orca terminal. A Kernel is not an Orca
-  // operation worker, so boot performs no run/task/dispatch mutation.
-  let route = await resolveKernelRoute(ledger.db);
-  for (const warning of route.warnings ?? []) console.error(`start-workflow: warning: ${warning}`);
+  let route;
   // The tab title a person reads: the workflow's display name (starci kernel rename; define-goal derives it), the
   // goal slug before one exists. workflow_id stays the key (the signal, the kernel job, the ledger).
   const kernelName = workflowNameOf(ledger.db, workflowId);
   const title = `[Kernel] ${kernelName}`;
-  const goal = ledger.db.prepare('SELECT revision,goal_identity,json FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
+  const goal = ledger.db.prepare('SELECT revision,goal_identity,json,approved_by FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
   const goalBridge = (() => { const j = parseJson(goal?.json, {}) ?? {}; return j.definedBy === 'supervisor' ? (j.bridge ?? { bridgeId: null }) : null; })();
   const firstBoot = ledger.db.prepare("SELECT created_at FROM events WHERE workflow_id=? AND kind='kernel-booted' ORDER BY seq LIMIT 1").get(workflowId);
   const priorKernelJob = ledger.db.prepare('SELECT payload_json,worker_id FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
@@ -623,13 +641,23 @@ try {
     const at = Date.now();
     const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
     ledger.transaction(() => {
-      clearSignal(ledger.db, { scope: 'kernel', key: workflowId, token });
+      if (['partial', 'unknown'].includes(extra.effectState)) setSignal(ledger.db, { scope: 'kernel', key: workflowId, workflowId,
+        holderPid: process.pid, token, value: { state: 'launch-unknown', terminal: handle, dispatch: extra.dispatch ?? null,
+          admission: extra.admission ?? null, effectState: extra.effectState }, at, expiresAt: null });
+      else clearSignal(ledger.db, { scope: 'kernel', key: workflowId, token });
       ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId,
         generation: workflow?.generation ?? 0, kind: 'kernel-start-failed', payload: { step, error, terminal: handle, ...extra }, createdAt: at });
     });
     console.error(JSON.stringify({ ok: false, workflowId, step, error, terminal: handle, ...extra }));
     process.exit(exitCode);
   };
+  try {
+    prepareProviderBudget();
+    route = await resolveKernelRoute(ledger.db);
+  } catch (error) {
+    failStart('admission', `provider store preparation failed: ${error.message}`);
+  }
+  for (const warning of route.warnings ?? []) console.error(`start-workflow: warning: ${warning}`);
   if (route.error)
     failStart(route.errorStep ?? 'kernel-route', route.error, null, { agent: route.agent ?? null, requestedModel: route.model ?? null });
   // modules/kernel/start-workflow.yaml spawn.fallThrough: a group member whose start left no effect (worker-start
@@ -675,42 +703,19 @@ try {
     try { kernelGuard.terminal = bindGuardTerminal({ skillRoot, handle, jobFile: kernelGuard.jobFile }); }
     catch (e) { kernelGuard.terminal = { error: String(e?.message ?? e) }; }
   };
-  const fellThrough = [];
-  let spawned = null;
   // The Kernel is a worker of its own entry Run (scripts/agent/lib.mjs startAgent; the launching terminal is its
   // coordinator). worker-start blocks until the agent is ready, so the reservation is stretched past its timeout first.
   const priorManaged = parseJsonOr(priorKernelJob?.payload_json)?.managed ?? null;
   const entry = readEnv('ORCA_TERMINAL_HANDLE') || null;
   const specFile = path.join(path.dirname(ledgerFileFor(repo)), 'kernel', `${workflowId}.a${kernelAttemptOf(priorKernelJob) + 1}.prompt.md`);
-  for (const [index, member] of members.entries()) {
-    updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, expiresAt: Date.now() + KERNEL_START_RESERVATION_MS });
-    spawned = startAgent({ provider: member.agent, model: member.model, effort: member.effort, worktree: kernelWorktree, title, prompt, specFile,
-      objective: `[Kernel] ${kernelName} — ${workflowId}`, entry, priorRunId: priorManaged?.runId ?? null, onCreated: bindKernelGuard, request: { workflow: workflowId, kernelAttempt: kernelAttemptOf(priorKernelJob) + 1, reservation: token } });
-    if (spawned.ok) {
-      route = { ...member, warnings: route.warnings, members: route.members, fallThrough: route.fallThrough };
-      break;
-    }
-    const failure = { agent: member.agent, requestedModel: member.model, effectState: spawned.effectState ?? null,
-      ...(spawned.errorCode ? { errorCode: spawned.errorCode } : {}), ...(spawned.dispatchId ? { dispatch: spawned.dispatchId } : {}),
-      ...(spawned.cleanup ? { cleanup: spawned.cleanup } : {}), ...(spawned.observation ? { observation: spawned.observation } : {}),
-      ...(spawned.trust ? { trust: spawned.trust } : {}) };
-    // An Orca that stopped answering mid-boot proves nothing about any member: host-unavailable (exit 75), no fall-through.
-    if (spawned.hostUnavailable) failStart('host-unavailable', spawned.error, spawned.terminal ?? null, { ...failure, launchStep: spawned.step }, EXIT_HOST_UNAVAILABLE);
-    const next = members[index + 1] ?? null;
-    if (!route.fallThrough || !next || spawned.effectState !== 'none')
-      failStart(spawned.step, spawned.error, spawned.terminal ?? null,
-        { ...failure, ...(fellThrough.length ? { fellThrough } : {}),
-          ...(route.fallThrough && next ? { fallThroughRefused: `the start left effect '${spawned.effectState ?? 'unknown'}'` } : {}) });
-    const at = Date.now();
-    const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
-    ledger.transaction(() => {
-      ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: workflow?.generation ?? 0,
-        kind: 'kernel-start-failed', createdAt: at,
-        payload: { step: spawned.step, error: spawned.error, ...failure, fellThroughTo: { agent: next.agent, model: next.model ?? null } } });
-    });
-    fellThrough.push({ agent: member.agent, model: member.model ?? null, step: spawned.step, error: spawned.error });
-    console.error(`start-workflow: warning: kernel member ${memberLabel(member)} refused at ${spawned.step} (${spawned.error}) — falling through to ${memberLabel(next)}`);
-  }
+  const kernelLaunch = launchKernelGroup({ ledger, workflowId, token, route, members, reservationMs: KERNEL_START_RESERVATION_MS,
+    hostUnavailableExit: EXIT_HOST_UNAVAILABLE, memberLabel, failStart, launch: { worktree: kernelWorktree, title, prompt, specFile,
+      role: 'kernel', scopeId: `${ledger.ledgerId ?? ledger.path}:${workflowId}:kernel-attempt:${kernelAttemptOf(priorKernelJob) + 1}`,
+      bias: parseJsonOr(goal?.json)?.routing_bias, ownerGrant: ownerReserveGrant(goal),
+      objective: `[Kernel] ${kernelName} — ${workflowId}`, entry, priorRunId: priorManaged?.runId ?? null, onCreated: bindKernelGuard,
+      request: { workflow: workflowId, kernelAttempt: kernelAttemptOf(priorKernelJob) + 1, reservation: token } } });
+  const { spawned, fellThrough } = kernelLaunch;
+  route = kernelLaunch.route;
   const handle = spawned.terminal;
   const workerId = handle;
   // The replaced Kernel's terminal no longer carries this workflow's guard.
@@ -732,6 +737,7 @@ try {
   const routeInfo = { host: 'orca', agent: route.agent, routedBy: route.routedBy, model: kernelModel,
     effort: kernelEffort, profile: route.route?.profile ?? null, runtimePool: route.runtimePool ?? null, launch: 'worker' };
   const managed = { runId: spawned.runId, taskId: spawned.taskId, dispatchId: spawned.dispatchId, agentTerminalHandle: handle,
+    admission: spawned.admission ?? null,
     terminalTitle: title, terminalTitleApplied: spawned.titleApplied === true };
 
   ledger.transaction(() => {

@@ -159,7 +159,7 @@ export function supervisorMode({ env = process.env, config = undefined } = {}) {
 /** config.yaml supervisor block with defaults: {mode, agent, model, effort, repos, pollIntervalMs, workers, landGate, frozenMinutes}. */
 export function supervisorSettings({ config = undefined } = {}) {
   let cfg = config;
-  if (cfg === undefined) { try { cfg = loadConfig(); } catch { cfg = null; } }
+  if (cfg === undefined) cfg = loadConfig();
   const sup = cfg?.supervisor ?? {};
   const kernel = cfg?.kernel ?? {};
   const seat = sup.kernel ?? {};
@@ -168,6 +168,7 @@ export function supervisorSettings({ config = undefined } = {}) {
     mode: SUPERVISOR_MODES.includes(sup.mode) ? sup.mode : DEFAULT_SUPERVISOR_MODE,
     agent: pick(seat.agent, kernel.agent, DEFAULT_AGENT),
     model: pick(seat.model, seat.agent ? null : kernel.model),
+    group: Array.isArray(seat.group) ? seat.group : !seat.agent && !seat.model && Array.isArray(kernel.group) ? kernel.group : null,
     effort: pick(seat.effort, seat.agent ? null : kernel.effort, cfg?.effort),
     repos: Array.isArray(sup.repos) ? sup.repos : [],
     pollIntervalMs: Number.isInteger(sup.pollIntervalMs) ? sup.pollIntervalMs : DEFAULTS.pollIntervalMs,

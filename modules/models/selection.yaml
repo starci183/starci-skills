@@ -23,6 +23,44 @@ sources:
   - modules/models/capabilities.yaml
   - modules/models/qualifications.yaml
 
+# One admission contract for every new Kernel, Op, Supervisor, worker and Critic.
+# Structural model tier is separate from the measured qualification ladder below.
+newAgentAdmission:
+  owner: modules/models/selection.yaml
+  implementation: scripts/lib/agent-admission.mjs
+  adapter: scripts/agent/admission.mjs
+  thresholds: modules/models/runtimes.yaml allocation.admission
+  roles: modules/models/runtimes.yaml allocation.admission.roles
+  request:
+    identity: [attemptId, scopeId, role]
+    allowGroup: Concrete provider/model pairs resolved from the caller's declared role or operation group; null models are invalid.
+    difficulty: The caller's measured operation difficulty after its declared kind floor is applied; allocation.admission.roles supplies any difficulty floor.
+    qualityFloor: Registry model tier; the greater of the declared role and difficulty floors is the minimum and a caller may only raise it. Qualification/probation remains a separate prerequisite.
+    constraints: Ordered prefer and avoid selectors plus an optional hard require selector. Each selector contains only nonempty pool/provider/model fields, matched together.
+    reserveOverride: A trusted owner authorization for one exact scopeId, role, provider and model, optional account, and nonempty reason. The owner extraction path supplies provenance; workers cannot grant themselves an override.
+    ownerScope: Owner bias is applied only to its roles, defaulted through allocation.admission.ownerBiasRoles. A pure request has already been scoped; an Op require is not inherited by its Critic or Kernel.
+  candidate:
+    concrete: [id, provider, account, model, modelAuthority, effort, qualityFloor]
+    modelAuthority: Canonical agent-card projection through model-registry.adapterModelAuthority; a logical runtime identity does not attest the provider CLI's underlying default model.
+    eligibility: Existing measured qualification, scoped probation, kernel-function or explicit control-plane/operation-policy gate; model names or registry tiers are never qualification receipts.
+    quota: Provider/account-bound fresh envelope with auth ok and every known short/long window, or a fresh explicit owner grant bound to scope and roles.
+    capacity: Known running count and maxParallel including reserved, launching, live and uncertain starts; zero slots refuses.
+  hardFilters:
+    - Validate policy version, role floor, concrete group and caller constraints before ranking.
+    - Require group membership, model floor, existing eligibility, caller require, caller avoid, live capacity and closed incident/cooldown.
+    - Missing, stale, invalid or mismatched quota/auth identity refuses every new normal admission; unknown is never presented as verified availability.
+    - Every available quota window participates; any window at or above reservePercent blocks normal admission.
+    - Only a matching scoped reserve override admits a fresh known reserve window below exhaustedPercent; bad auth, exhausted, stale and unknown cannot be overridden.
+    - Owner-grant providers have scoped finite slots and fresh owner authority; no window percentages are invented for them.
+    - A Critic must have a known author provider and select another provider. A caller may tighten independence to both provider and model, never relax the role rule.
+    - Prefer ranks only candidates that passed every hard filter; require unavailability is a refusal with no silent fallback.
+    - A concrete require.model or model-level critic independence requires supported-model-argument authority; opaque or unknown model authority refuses that constraint.
+  ranking: Scoped preference, then the greater of real worst-window pressure and admitted-slot pressure, then declaration order. Owner-grant candidates contribute only admitted-slot pressure, never an invented quota percentage. Existing share/overflow/lineage rules may order only this eligible set; no synthetic quality score is used.
+  result: Policy-versioned starci/agent-admission@1 plan with the exact request identity, selected concrete candidate, ordered eligible set, and per-candidate typed rejection codes.
+  reservation: The pure plan owns no runtime state. The adapter atomically reserves a provider/account slot with attemptId and fence before launch; downstream launchers consume and revalidate the same receipt without double reservation.
+  uncertainLaunch: Live or uncertain reservations retain capacity until a matching attempt and fence carry authoritative no-effect or closure/process-exit evidence. An unknown launch requires the exact host-request replay proving no effect or closure evidence bound to its stored execution identity.
+  reach: New admissions only. Existing running work is reconciled through its original receipt rather than retroactively reselected.
+
 # ---------------------------------------------------------------------------
 # 1. Vocabularies and ladders
 # ---------------------------------------------------------------------------
@@ -226,10 +264,9 @@ decisionFlow:
     do: "eligible = reasons empty; on success return qualification {provider, model, evidenceId, scopeId?}"
   - step: kernel-availability
     do: >-
-      Kernel functions select quota-aware (config.yaml models.selection): a provider whose quota probe reads
-      'dead' or whose ledger provider-health circuit is open is rejected by name; a 'limited' provider stays
-      eligible but is ordered behind every available member; 'unknown' never blocks
-      (scripts/agent/models.mjs providerAvailability). Every member unavailable → the typed verdict refusal.
+      Kernel functions use newAgentAdmission after scoped eligibility. Fresh identity-bound quota and all-window
+      reserve/exhaustion rules apply before ranking. A provider circuit, missing or stale observation, exhausted
+      window or ordinary reserve window rejects the member by name. No eligible member produces a typed refusal.
   # createWorkflowModelEligibility wraps this per workflow:
   - "callback(job, runtime): derive workload via workloadFor, lazily CREATE a probation record when none exists and admission+budgets allow, then evaluate. Ineligible with no evidence prepends 'model qualification evidence is missing' plus the probation-unavailable detail."
   - "providerFilter(job): if ANY runtime is qualified → return exactly those targets. Else walk candidates via callback; collect eligible — but STOP after the first for non-kernel work ('probation admits exactly one target for one durable job so an internal fallback can never execute an unconsumed probation candidate'). Kernel functions keep all eligible members (per-call selection)."
@@ -269,10 +306,8 @@ allocationFacts:
   # over) does (runtimes.yaml allocation.balanced; scripts/agent/balance.mjs counts, models.mjs selectPool
   # picks).
   balancedPolicy: modules/models/runtimes.yaml allocation.balanced
-  # Concurrency is not restated here. modules/models/runtimes.yaml owns every
-  # slot count: maxParallelOps is the worker ceiling, runtimes.<pool>.maxParallel
-  # the enforced per-pool limit.
-  concurrency: modules/models/runtimes.yaml
+  concurrency: modules/models/registry.yaml executionModel.concurrency
+  workerCeiling: modules/models/runtimes.yaml maxParallelOps
   difficultyVocabulary:               # pool models/effort maps and tier keys
     canonical: [easy, medium, hard, insane]
     aliases: "S|M|L|XL map to easy|medium|hard|insane; 'high' reads as 'hard'. Resolvers normalize both spellings."
@@ -288,9 +323,8 @@ allocationFacts:
       floor (a floor never lowers it). Tier position is the outer sort; the preference order breaks
       ties. A pool missing from either list is not on the chain at all.
     bias: >-
-      {prefer: [pools], avoid: [pools]} — prefer hoists the named pools to the front preserving their
-      relative chain order; avoid removes them. Bias is applied AFTER the chain is built and NEVER
-      bypasses eligibility: a preferred pool that fails a gate is still rejected with its typed reason.
+      newAgentAdmission request.constraints supplies concrete prefer, avoid and require selectors.
+      Legacy pool strings normalize to pool selectors. Hard eligibility precedes preference and live pressure ranking.
     overflow: >-
       runtimes.yaml allocation.overflowByOrder[key] names pools the chain takes only when no other eligible
       pool remains, under either policy - the review order's Opus and Sol (owner decision 2026-09-25
@@ -302,14 +336,17 @@ allocationFacts:
       Per candidate, in order: pool exists in runtimes.yaml; role ∈ pool.roles OR the kind's order names a role the pool serves (the implement order carries the mechanical ops whatever their kind role — owner routing 2026-09-26); an explicit-workflow-quota
       pool holds an owner grant covering the role with running < granted slots (when config.yaml declares
       allocation.grants); pool.models[difficulty]
-      exists (no silent cross-difficulty fallback); provider-wide durable capacity.auth ≠ 'dead'; capacity.quota.state ≠
-      'dead' (unknown/limited pass); capacity.running < pool.maxParallel; capacity.openIncident ≠ true.
-      Every skipped pool is reported in rejected[] with its typed reason. A refreshable stale-token
-      preflight is limited rather than dead and may receive one real launch, but a confirmed auth
+      exists (no silent cross-difficulty fallback); then newAgentAdmission enforces fresh provider/account quota,
+      all-window reserve rules, concrete owner constraints, known capacity and no open incident. Missing/unknown
+      evidence refuses live routing. A selectPool call without a capacity map is only a static policy plan and
+      reports live-evidence-required; it is not an admission receipt and cannot authorize launch.
+      Every skipped pool is reported with its typed reason. A stale token can undergo the provider's
+      refresh attempt before admission, which still requires fresh authenticated evidence. A confirmed auth
       rejection opens the provider circuit and excludes every pool sharing that credential.
     modelRule: >-
-      The model is pinned per pool per difficulty (runtimes.yaml models/effort maps) — selection picks
-      the POOL by role+tier+bias+capacity, then resolves the MODEL by difficulty inside that pool.
+      Each pool's registry.yaml difficulty pin resolves to a declared model identity and effort before common
+      admission; candidate.modelAuthority determines whether it names a selectable launch model or a configured
+      logical runtime. The selector evaluates that declared provider/model pair inside the kind group.
   note: >-
     Tier/preference lists are within-family suitability for direct consumers,
     NOT a provider fallback chain in a workflow (runtimes.yaml purpose). In a

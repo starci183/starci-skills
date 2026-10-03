@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadModelRegistry } from '../agent/model-registry.mjs';
-import { workerStart } from '../api/orca/worker-start.mjs';
+import { spawnAgent } from '../agent/lib.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { registeredWorktree } from './worker-verbs-list.mjs';
@@ -83,7 +83,8 @@ export async function workerStartVerb(ctx, deps = {}) {
   const allowedModels = modelsOf(registry, agent);
   if (args.model && allowedModels.size && !allowedModels.has(String(args.model)))
     return refusal(`model '${args.model}' is not registered for agent '${agent}'`);
-  const model = args.model ?? (agent === 'devin' ? null : defaultModelOf(registry, agent));
+  const model = args.model ?? (agent === 'devin' ? defaultModelOf(registry, agent) : null);
+  if (!model) return refusal('--model must name a concrete registered model');
   const title = clean(args['task-title']);
   if (!title) return refusal('--task-title is required');
   const spec = resolveWorkerSpec(args.spec, cwd, deps);
@@ -99,14 +100,20 @@ export async function workerStartVerb(ctx, deps = {}) {
   const target = registeredWorktree(ps.worktrees ?? [], requested, cwd);
   if (!target) return refusal(`worktree is not registered for this repository: ${requested}`);
 
-  const started = await (deps.workerStart ?? workerStart)({
-    agent, ...(model ? { model } : {}), worktree: `path:${target.path}`, spec: spec.spec, taskTitle: title,
+  const started = await (deps.spawnAgent ?? spawnAgent)({
+    env: ctx?.env ?? process.env,
+    provider: agent, model, worktree: target.path, spec: spec.spec, taskTitle: title, title,
+    role: 'worker', allowGroup: [{ provider: agent, model }],
     run: args.run, from: readEnv('ORCA_TERMINAL_HANDLE', ctx?.env),
+    request: { run: args.run, worktree: target.path, title, spec: spec.spec },
+    io: { start: deps.workerStart, show: deps.workerShow, trust: deps.trust, hostAgent: deps.hostAgent,
+      rename: deps.terminalRename, admission: deps.admission, recordLaunch: deps.recordLaunch },
   });
   if (consumerFenced(started)) return refusal('caller is not bound to this Run; run orca orchestration run-create in this same terminal, then retry');
   if (!started?.ok) return { code: 1, text: `starci worker start: ${started?.error ?? started?.errorCode ?? 'worker-start failed'}`,
     data: { schema: 'starci/worker-start@1', ok: false, outcome: started?.outcome ?? null, effectState: started?.effectState ?? null } };
-  const data = { schema: 'starci/worker-start@1', ok: true, dispatchId: started.dispatchId, terminalHandle: started.agentTerminalHandle,
-    taskId: started.taskId ?? null, runId: started.runId ?? args.run ?? null, agent, model, worktree: target.path };
+  const data = { schema: 'starci/worker-start@1', ok: true, dispatchId: started.dispatchId, terminalHandle: started.terminal,
+    taskId: started.taskId ?? null, runId: started.runId ?? args.run ?? null, agent, model, worktree: target.path,
+    admission: started.admission ?? null, effective: started.effective ?? null };
   return { code: 0, text: `started ${data.dispatchId} on ${data.terminalHandle}`, data };
 }

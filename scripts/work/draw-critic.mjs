@@ -36,6 +36,9 @@ import { opContextOf } from '../guards/op-context.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { ownerRubricChecks } from './draw-feedback.mjs';
 import { startAgent } from '../agent/lib.mjs';
+import { loadAdapter, adapterModelAuthority } from '../agent/model-registry.mjs';
+import { releaseAgentAdmission } from '../agent/admission.mjs';
+import { workerClosureProven } from '../machine/worker-close.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { closeWorker } from '../machine/worker-close.mjs';
@@ -175,11 +178,23 @@ export function criticFor(settings, drawer = null) {
   const main = settings?.critic ?? null;
   if (!main) return { error: 'modules/models/runtimes.yaml allocation.drawLoop.critic is not configured' };
   const providerOf = (c) => String(c?.provider ?? '').toLowerCase();
-  const d = drawer ? String(drawer).toLowerCase() : null;
-  if (!d || providerOf(main) !== d) return { critic: main };
+  const identity = typeof drawer === 'string' ? { provider: drawer.toLowerCase(), model: null } : drawer;
+  const author = identity ? { ...identity, modelAuthority: adapterModelAuthority(loadAdapter(identity.provider).card) } : null;
+  const d = author?.provider?.toLowerCase() ?? null;
+  if (!d) return { error: 'the drawer provider is unknown; independent critique cannot be admitted' };
+  const group = [main, ...Object.values(settings?.criticWhenDrawer ?? {})].filter((member, index, all) => member?.provider && member?.model
+    && all.findIndex((other) => other.provider === member.provider && other.model === member.model) === index);
+  if (providerOf(main) !== d) return { critic: { ...main, author, allowGroup: group } };
   const alt = settings?.criticWhenDrawer?.[d] ?? null;
-  if (alt && providerOf(alt) !== d) return { critic: alt, replaced: main.provider };
+  if (alt && providerOf(alt) !== d) return { critic: { ...alt, author, allowGroup: group }, replaced: main.provider };
   return { error: `the drawer (${d}) is the critic's model (${main.model}) and allocation.drawLoop.criticWhenDrawer.${d} names no other: the critic must be a different model from the drawer` };
+}
+
+/** The current Op supplies author identity only when the caller did not name the drawer. */
+export function contextualCriticFor(settings, drawer = undefined) {
+  const context = opContextOf();
+  const author = drawer ?? (context?.provider ? { provider: context.provider, model: context.modelId ?? context.model ?? null } : null);
+  return { drawer: author, ...criticFor(settings, author) };
 }
 
 // worker-show states after which the worker does nothing more.
@@ -198,6 +213,7 @@ function clientOf(orca) {
   const o = orca ?? {};
   return {
     launch: (opts) => startAgent({ ...opts, io: orca ? { runShow: o.runShow, runCreate: o.runCreate,
+      admission: o.admission,
       workerList: o.workerList ?? (() => ({ ok: false, error: 'the fake client lists no workers' })),
       spawn: { trust: o.trust, start: o.workerStart, rename: o.terminalRename, show: o.workerShow, stop: o.workerStop, release: o.workerRelease } } : null }),
     show: o.workerShow ?? workerShow,
@@ -242,6 +258,7 @@ const gitRootOf = (cwd) => { const r = gitResultOf(revParseQuery(['--show-toplev
  */
 export function launchCriticWorker({ critic, dir, prompt, entry = null, parentDispatch = null, orca = null }) {
   return clientOf(orca).launch({ provider: critic.provider, model: critic.model, effort: critic.effort ?? null, worktree: dir,
+    role: 'critic', author: critic.author, allowGroup: critic.allowGroup ?? [{ provider: critic.provider, model: critic.model, effort: critic.effort }],
     title: `[Critic] draw ${critic.model}`, prompt, objective: 'independent critique of one draw-loop round', entry, parentDispatch,
     // Its clean directory is made once per round (criticWorkspace): the launch's ledger identity.
     request: { critic: dir } });
@@ -295,12 +312,14 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
     return { schema: CRITIQUE_SCHEMA, outcome: 'not-configured', critic: { independent: false }, rubric: rubricInfo, verdict: null,
       error: 'no critic is configured (modules/models/runtimes.yaml allocation.drawLoop.critic needs provider, model and timeoutMs)' };
   }
+  if (!critic.author?.provider) return { schema: CRITIQUE_SCHEMA, outcome: 'not-configured', critic: { independent: false }, rubric: rubricInfo,
+    verdict: null, error: 'the drawer provider is unknown; independent critique cannot be verified' };
   const client = clientOf(orca);
   const place = orca?.criticWorkspace ?? criticWorkspace;
   const unplace = orca?.removeCriticWorkspace ?? removeCriticWorkspace;
   const files = images.map((img, i) => ({ file: `render-${i + 1}${path.extname(img.path) || '.png'}`, label: img.label, from: img.path }));
   const base = { schema: CRITIQUE_SCHEMA, critic: { provider: critic.provider, model: critic.model, effort: critic.effort ?? null, timeoutMs: Number(critic.timeoutMs),
-    launch: 'orchestration worker-start', independent: !orca, cleanDir: true }, rubric: rubricInfo };
+    launch: 'orchestration worker-start', independent: false, cleanDir: true, author: critic.author }, rubric: rubricInfo };
   const failed = (outcome, error) => ({ ...base, outcome, verdict: null, error });
   let launched = null;
   const workspace = place(placement);
@@ -318,7 +337,9 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
     if (!launched?.ok) {
       return failed('launch-failed', `the critic worker did not start (${launched?.step ?? 'worker-start'}${launched?.errorCode ? ` ${launched.errorCode}` : ''}): ${launched?.error ?? 'no receipt'}`);
     }
-    Object.assign(base.critic, { dispatchId: launched.dispatchId, taskId: launched.taskId, runId: launched.runId, effective: launched.effective ?? null });
+    Object.assign(base.critic, { provider: launched.provider, model: launched.admission?.selected?.model ?? launched.model,
+      admission: launched.admission ?? null, independent: !orca && launched.effective?.agent !== critic.author.provider,
+      dispatchId: launched.dispatchId, taskId: launched.taskId, runId: launched.runId, effective: launched.effective ?? null });
     const waited = await awaitCritic({ client, runId: launched.runId, entry, dispatchId: launched.dispatchId, terminal: launched.terminal, taskId: launched.taskId,
       timeoutMs: Number(critic.timeoutMs), pollMs, sleep, now });
     base.critic.ms = now() - started;
@@ -334,14 +355,24 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
   } catch (error) {
     return failed(launched?.ok ? 'refused' : 'launch-failed', String(error?.message ?? error));
   } finally {
+    let placementSafe = !launched || launched.effectState === 'none';
     if (launched?.ok) {
       // Stop is a no-op for a worker that already settled; release frees its seat; the Task closes.
       const stop = settle(() => client.stop({ dispatch: launched.dispatchId }));
       const release = settle(() => client.release({ dispatch: launched.dispatchId }));
+      placementSafe = workerClosureProven(release, launched.terminal);
+      if (placementSafe
+        && launched.admission) base.critic.providerBudget = settle(() => releaseAgentAdmission(launched.admission,
+        { kind: 'closed', confirmed: true, handle: launched.terminal, terminalProof: release.closed.proof,
+          processVerdict: release.processes.verdict }, { io: orca?.admission }));
       const task = settle(() => client.taskUpdate({ id: launched.taskId, status: TASK_CLOSED, run: launched.runId, ...(entry ? { from: entry } : {}) }));
       base.critic.cleanup = { stopped: stop?.ok === true, released: release?.ok === true, taskClosed: task?.ok === true };
     }
-    const removed = settle(() => unplace({ dir, repoRoot: workspace.repoRoot, orcaId: workspace.orcaId, branch: workspace.branch ?? null }));
-    if (removed?.ok !== true) base.critic.placementRemoveError = removed?.reason ?? removed?.error ?? 'not removed';
+    if (placementSafe) {
+      const removed = settle(() => unplace({ dir, repoRoot: workspace.repoRoot, orcaId: workspace.orcaId, branch: workspace.branch ?? null }));
+      if (removed?.ok !== true) base.critic.placementRemoveError = removed?.reason ?? removed?.error ?? 'not removed';
+    } else {
+      base.critic.placementRetained = { reason: 'worker exit is unproven', dir, dispatchId: launched?.dispatchId ?? null };
+    }
   }
 }

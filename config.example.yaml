@@ -9,20 +9,20 @@ effort: medium
 # kernel — the long-lived [Kernel] agent's route, in one of two shapes
 # (docs/config-format.md "Kernel group"):
 #   group form (the default below): {group: [{agent, model?}, ...], effort?}.
-#     start-workflow tries the members in order; a member whose provider is
-#     unavailable (quota dead, provider circuit open) is skipped, a limited one
-#     goes last, and a launch refused before the model took any input (an
-#     interactive gate, an auth screen, a readiness or model-attestation
-#     failure) falls through to the next member in the same boot.
+#     Common admission filters the concrete group using the role floor, fresh
+#     quota and live reservations declared by modules/models/selection.yaml.
+#     Scoped owner preference and observed pressure rank eligible members.
+#     A proven failed-before-launch refusal may try another eligible member;
+#     uncertain effects keep their fenced reservation for reconciliation.
 #   single pin: {agent?, model?, effort?} — agent is an execution-agent id
 #     (claude|codex|devin), model a modules/models/registry.yaml model id
 #     (without agent, the pool that carries it supplies the agent). A pin is
-#     authoritative: a dead probe, unknown model, unsupported CLI flag or
-#     model-attestation mismatch fails closed instead of substituting.
+#     authoritative: common admission or a launch-guard refusal fails closed
+#     instead of substituting an identity outside the pin.
 #   effort: effort for the kernel seat (same vocabulary as `effort` above);
 #     null inherits `effort`.
-# Owner default: Claude Opus 5.5 first, GPT-6.1 Sol when Claude is unavailable.
-kernel: {group: [{agent: claude, model: claude-opus-5-5}, {agent: codex, model: gpt-6.1-sol}], effort: high}
+# modules/models/selection.yaml allocation.admission owns eligibility and ranking.
+kernel: {group: [{agent: claude, model: claude-sonnet-5-5}, {agent: codex, model: gpt-6.1-sol}], effort: high}
 # parallel — the one knob for how wide the workers run. `gear` indexes the agent
 # table in modules/models/runtimes.yaml allocation.slicing.size: a long (`l`)
 # operation asks for the `l.agents[gear]` agents, an extra-long (`xl`) one for

@@ -10,6 +10,8 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {findHostBoundaryViolations} from '../../scripts/checks/check-host-boundary.mjs';
 import {spawnAgent,startAgent} from '../../scripts/agent/lib.mjs';
 import {pathToFileURL} from 'node:url';
+import {fakeAdmission} from '../helpers/fake-admission.mjs';
+import { DatabaseSync } from 'node:sqlite';
 
 // Every agent launch goes through orchestration worker-start (modules/kernel/contract-changes/
 // launch-through-worker-start.yaml): the Kernel, the [Supervisor], every [Worker] and every [Op]. This spec fails when
@@ -105,13 +107,14 @@ const seams=({start=null,show=null,handle='term_1'}={})=>{
   const calls=[];
   const rec=(name,fn)=>(args)=>{calls.push([name,args]);return fn(args);};
   const io={
+    admission:fakeAdmission(),
     trust:rec('trust',()=>({status:'ok',paths:[]})),
     start:rec('start',start??(({agent,model,run})=>({ok:true,outcome:'ok',effectState:'committed',dispatchId:'ctx_1',taskId:`task_${run}`,agentTerminalHandle:handle,state:'ready',agent,model}))),
     rename:rec('rename',()=>({ok:true})),
-    show:rec('show',show??(()=>({ok:true,state:'ready',dispatch:{id:'ctx_1',assigneeHandle:'term_shown'},
+    show:rec('show',show??(()=>({ok:true,state:'ready',dispatch:{id:'ctx_1',assigneeHandle:handle??'term_shown'},
       effective:{agent:calls.find(c=>c[0]==='start')[1].agent,model:calls.find(c=>c[0]==='start')[1].model??null}}))),
     stop:rec('stop',()=>({ok:true})),
-    release:rec('release',()=>({ok:true})),
+    release:rec('release',({handle})=>({ok:true,handle,closed:{ok:true,proof:'gone'},processes:{verdict:'none'}})),
   };
   return {io,calls,names:()=>calls.map(c=>c[0])};
 };
@@ -140,8 +143,8 @@ test('a start receipt without the agent terminal takes it from worker-show; neit
   assert.equal(r.terminal,'term_shown');
   const none=seams({handle:null,show:()=>({ok:true,state:'ready',dispatch:{id:'ctx_1'},effective:{agent:'claude',model:'claude-opus-5-5'}})});
   const n=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:none.io});
-  assert.deepEqual([n.ok,n.step,n.code,n.effectState],[false,'worker-show','worker-terminal-unknown','none']);
-  assert.ok(none.names().includes('stop')&&none.names().includes('release'),'the nameless worker is stopped and released');
+  assert.deepEqual([n.ok,n.step,n.code,n.effectState],[false,'worker-show','worker-terminal-unknown','unknown']);
+  assert.equal(none.names().includes('release'),false,'missing terminal identity cannot prove matching closure');
   const noTask=seams({start:({agent,model})=>({ok:true,outcome:'ok',effectState:'committed',dispatchId:'ctx_1',taskId:null,agentTerminalHandle:'term_1',agent,model})});
   const t=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:noTask.io});
   assert.deepEqual([t.ok,t.step,t.code],[false,'worker-start','worker-start-no-task']);
@@ -168,11 +171,11 @@ test('an attestation mismatch fences and releases the worker it started and neve
 
 test('a start refused before any effect is not cleaned; an unknown effect is left fenced while worker-show says live',()=>{
   const refused=seams({start:()=>({ok:false,outcome:'failed',effectState:'none',dispatchId:null,error:'worker_start_failed'})});
-  const a=spawnAgent({provider:'claude',model:'m',worktree:'w',title:'t',spec:'s',run:'r',request:{job:'j'},io:refused.io});
+  const a=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'t',spec:'s',run:'r',request:{job:'j'},io:refused.io});
   assert.deepEqual([a.ok,a.step,a.effectState],[false,'worker-start','none']);
   assert.equal(refused.names().some(n=>['stop','release','show'].includes(n)),false);
   const unknown=seams({start:()=>({ok:false,outcome:'unknown',effectState:'unknown',dispatchId:'ctx_9'}),show:()=>({ok:true,state:'ready'})});
-  const b=spawnAgent({provider:'claude',model:'m',worktree:'w',title:'t',spec:'s',run:'r',request:{job:'j'},io:unknown.io});
+  const b=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'t',spec:'s',run:'r',request:{job:'j'},io:unknown.io});
   assert.deepEqual([b.ok,b.effectState],[false,'unknown']);
   assert.equal(unknown.names().includes('stop'),false,'absence of exit proof never authorizes a stop');
 });
@@ -224,6 +227,9 @@ const fixture=t=>{
     STARCI_OWNER_ROOT:ownerRoot,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_PROJECTS_ROOT:path.join(root,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),USERPROFILE:path.join(root,'home'),HOME:path.join(root,'home'),
     CODEX_HOME:path.join(root,'home','.codex'),ORCA_TERMINAL_HANDLE:''};
+  const savedMachine = process.env.STARCI_TEST_MACHINE_FILE;
+  process.env.STARCI_TEST_MACHINE_FILE = env.STARCI_TEST_MACHINE_FILE;
+  t.after(() => { if (savedMachine === undefined) delete process.env.STARCI_TEST_MACHINE_FILE; else process.env.STARCI_TEST_MACHINE_FILE = savedMachine; });
   fs.mkdirSync(path.join(root,'home'),{recursive:true});
   const run=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const callArgv=()=>fs.existsSync(env.STARCI_FAKE_ORCA_LOG)
@@ -244,6 +250,53 @@ const seedOp=(fx,{jobId,model})=>{
       payload:{opId:'code.refactor',owned_paths:['docs/'],model,difficulty:'hard'}});
   }finally{ledger.close();}
 };
+
+const makeUnprepared = (file, legacy) => {
+  if (!legacy) { fs.rmSync(file); return; }
+  const raw = new DatabaseSync(file);
+  raw.exec('DROP TABLE provider_reservation_events; DROP TABLE provider_reservations; DELETE FROM schema_migrations WHERE version=2; PRAGMA user_version=1;');
+  raw.close();
+};
+
+test('authorized Op routing prepares missing and compatible v1 capacity before its actual pool decision', t => {
+  for (const legacy of [false, true]) {
+    const fx = fixture(t), jobId = `route-startup-${legacy}`;
+    seedOp(fx, { jobId, model: 'codex-agent' });
+    makeUnprepared(fx.env.STARCI_TEST_MACHINE_FILE, legacy);
+    const routed = fx.run(API, 'route', '--repo', fx.repo, '--job', jobId, '--json');
+    assert.equal(routed.status, 0, routed.stderr || routed.stdout);
+    assert.equal(json(routed.stdout).decision.admission.ok, true);
+    assert.equal(fx.calls().includes('orchestration worker-start'), false, 'routing alone starts no agent');
+    const raw = new DatabaseSync(fx.env.STARCI_TEST_MACHINE_FILE, { readOnly: true });
+    assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 2);
+    assert.equal(raw.prepare('SELECT COUNT(*) n FROM provider_reservations').get().n, 0);
+    raw.close();
+  }
+});
+
+test('actual unpinned Kernel boot prepares missing and compatible v1 stores after its read-only plan', t => {
+  for (const legacy of [false, true]) {
+    const fx = fixture(t), config = path.join(fx.env.STARCI_OWNER_ROOT, 'config.yaml');
+    fs.writeFileSync(config, fs.readFileSync(config, 'utf8').replace(/^kernel:.*\r?\n/m, ''));
+    const goal = fx.run(DEFINE_GOAL, '--repo', fx.repo, '--text', 'first unpinned kernel startup', '--json');
+    assert.equal(goal.status, 0, goal.stderr);
+    makeUnprepared(fx.env.STARCI_TEST_MACHINE_FILE, legacy);
+    const workflowId = json(goal.stdout).workflowId;
+    fx.run(START_WORKFLOW, '--repo', fx.repo, '--goal', workflowId, '--plan', '--json');
+    if (legacy) {
+      const raw = new DatabaseSync(fx.env.STARCI_TEST_MACHINE_FILE, { readOnly: true });
+      assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 1); raw.close();
+    } else assert.equal(fs.existsSync(fx.env.STARCI_TEST_MACHINE_FILE), false);
+    const boot = fx.run(START_WORKFLOW, '--repo', fx.repo, '--goal', workflowId, '--json');
+    assert.equal(boot.status, 0, boot.stderr || boot.stdout);
+    assert.equal(json(boot.stdout).routedBy, 'route-model');
+    assert.ok(['gpt-6.1-sol', 'claude-opus-5-5'].includes(json(boot.stdout).model), boot.stdout);
+    const raw = new DatabaseSync(fx.env.STARCI_TEST_MACHINE_FILE, { readOnly: true });
+    assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 2);
+    assert.equal(raw.prepare("SELECT COUNT(*) n FROM provider_reservations WHERE state='live'").get().n, 1);
+    raw.close();
+  }
+});
 
 for(const [model,agent,takesModel] of [['claude-agent','claude',true],['codex-agent','codex',true],['devin-agent','devin',false]]){
   test(`starci kernel dispatch --spawn launches a ${model} op through worker-start --agent ${agent}, never a terminal create`,t=>{

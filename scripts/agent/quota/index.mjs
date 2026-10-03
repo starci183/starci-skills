@@ -1,28 +1,13 @@
-// scripts/agent/quota/index.mjs — per-provider quota/viability probe dispatch.
-//
-// Pinned contract (o2 consumes):
-//   probeQuota(provider, opts?) -> { state, usedPercent, detail, auth?, failureKind?,
-//                                   allowLaunchAttempt?, resetsAt? }
-//     state: 'ok' | 'limited' | 'dead' | 'unknown'
-//       'dead'    = hard-ineligible, router must not select the provider
-//       'limited' = usable but constrained (near cap / refreshable auth fault)
-//       'unknown' = probe could not decide; NEVER blocks routing
-//     A refreshable stale token reports limited/auth=refreshable and may receive
-//     one real launch. A confirmed launch auth rejection is persisted by the
-//     kernel's provider-health circuit, which overrides this preflight probe
-//     for every pool sharing the provider credential.
-//     usedPercent: number | null (weekly window percent when the probe sees it)
-//     resetsAt: ISO string | null — the next quota reset the probe saw; /status shows it
-//     detail: human-readable reason string
-//     opts: per-probe injectables (endpoint/credentials for devin, env/home/config
-//       for the others); production callers pass nothing and get the defaults.
-//
-// Provider names are normalized: lowercase, '-agent' suffix stripped.
+// Quota dispatch returns a normalized provider/account observation. All available windows and
+// their freshness participate in allocation.admission; unknown is never normal admission.
+// Direct probes preserve their external API contracts; this dispatch adds no token estimates.
 import { isMain } from '../../lib/is-main.mjs';
 import { probe as probeClaude } from './claude.mjs';
 import { probe as probeCodex } from './codex.mjs';
 import { probe as probeDevin } from './devin.mjs';
 import { normalizeProvider } from '../../lib/provider.mjs';
+import { allocationSettings } from '../../../engine/config.mjs';
+import { normalizeQuotaSnapshot } from './snapshot.mjs';
 
 const PROBES = {
   claude: probeClaude,
@@ -32,14 +17,20 @@ const PROBES = {
 
 export function probeQuota(provider, opts = {}) {
   const key = normalizeProvider(provider);
+  const policy = opts.policy ?? allocationSettings()?.admission;
+  const clock = typeof opts.now === 'function' ? opts.now : () => opts.now ?? Date.now();
+  const normalized = (result) => {
+    const now = clock();
+    return normalizeQuotaSnapshot({ provider: key, account: opts.account ?? 'default', observedAt: now, ...result }, { policy, now });
+  };
   const fn = PROBES[key];
   if (!fn) {
-    return { state: 'unknown', usedPercent: null, detail: `no quota probe registered for provider '${provider}'` };
+    return normalized({ state: 'unknown', detail: `no quota probe registered for provider '${provider}'` });
   }
   try {
-    return fn(opts);
+    return normalized(fn(opts));
   } catch (e) {
-    return { state: 'unknown', usedPercent: null, detail: `quota probe for '${key}' threw: ${e?.message ?? e}` };
+    return normalized({ state: 'unknown', detail: `quota probe for '${key}' threw: ${e?.message ?? e}` });
   }
 }
 

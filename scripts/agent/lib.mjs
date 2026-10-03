@@ -9,8 +9,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
@@ -18,33 +16,7 @@ import { classifyAgentScreen, stagedInputRegion, DEFAULT_STAGED_PATTERN, frameWi
   WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS } from '../lib/terminal-liveness.mjs';
 import { squash } from '../lib/clip.mjs';
 import { INPUT_GLYPH_CHARS, INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
-import { ensureLaunchTrust } from './trust.mjs';
-import { hostAgentVerdict } from './host-agents.mjs';
-import { workerStart } from '../api/orca/worker-start.mjs';
-import { workerShow } from '../api/orca/worker-show.mjs';
-import { workerStop } from '../api/orca/worker-stop.mjs';
-import { closeWorker } from '../machine/worker-close.mjs';
-import { terminalRename } from '../api/orca/terminal-rename.mjs';
-import { runCreate } from '../api/orca/run-create.mjs';
-import { runShow } from '../api/orca/run-show.mjs';
-import { taskSpecOf } from '../machine/task-spec.mjs';
-import { dispatchDepthOf } from '../lib/worker-depth.mjs';
-import { bestEffortCall } from './best-effort-call.mjs';
-import { depthPreflight, entryDispatchOf } from './depth-preflight.mjs';
-import { recordLaunchedTerminal } from './launched-terminals.mjs';
-import { loadModelRegistry } from './models.mjs'; import { addStarciShimToPath } from './starci-shim.mjs';
-
-const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-
-export function loadAdapter(provider) {
-  const file = path.join(skillRoot, 'modules', 'models', 'agents', `${provider}.yaml`);
-  if (!fs.existsSync(file)) return { provider, error: `no adapter card modules/models/agents/${provider}.yaml` };
-  try {
-    return { provider, card: parseYaml(fs.readFileSync(file, 'utf8')), file: `modules/models/agents/${provider}.yaml` };
-  } catch (e) {
-    return { provider, error: `adapter card ${provider}.yaml unparsable: ${e.message}` };
-  }
-}
+export { loadAdapter } from './model-registry.mjs';
 
 const regexp = (source, fallback) => {
   try { return new RegExp(source || fallback, 'i'); } catch { return new RegExp(fallback, 'i'); }
@@ -358,142 +330,4 @@ function sendPrompt(handle, text, adapter, io) {
   }
 }
 
-// ---- the one agent launch --------------------------------------------------
-// Every agent - Kernel, [Supervisor], [Worker], [Op] - starts through `orca orchestration worker-start --agent
-// <provider> [--model <id> --effort <level>]` (modules/kernel/contract-changes/launch-through-worker-start.yaml).
-// Orca composes the launch (placement, the owner's per-agent default args, readiness, the Task from --spec) and owns
-// the worker's lifecycle; the runtime pre-trusts the directory, starts the worker with its spec (no task-create: a
-// failed start leaves no orphan Task), takes the agent terminal from worker-show (result.dispatch.assigneeHandle; live Orca 1.4.209
-// has no result.worker in the start receipt, 2026-10-02) or from result.worker.agentTerminalHandle when present, gives it its
-// semantic title and attests the EFFECTIVE agent and model (worker-show) against what was routed. A card whose
-// `start.modelArgument` is false (devin) takes no model flag and is attested on its agent alone.
-// `request` is the launch's ledger identity (calls.yaml worker-start replay: request): the start's --retry-request id
-// is derived from it plus the Run, agent and model, so a lost receipt replays this start instead of a second worker.
-// Returns {ok:true, terminal, dispatchId, taskId, runId, provider, model, effort, effective, trust, titleApplied} or
-// {ok:false, step, error, code, errorCode, effectState, dispatchId, terminal, observation, cleanup, trust}. A start that
-// left an effect is reconciled before the failure returns, so no caller ever owns a half launch.
-// `onCreated(handle, dispatchId)` runs the moment the agent terminal is known (before attestation when the start
-// receipt names it): the caller records it durably (inc-e523617a3c31).
-// Depth preflight (contract change worker-depth-limit): `parentDispatch` is the Dispatch of the runtime-launched worker
-// this one nests under (an op under its Kernel, the critic under its op), none under the owner's chat. Its depth
-// (worker-show) + 1 deeper than config.yaml orca.maxWorkerDepth (`maxDepth` overrides it) is refused at step 'depth'
-// with worker-depth-exceeded before anything is trusted or started (effectState none). An unreadable parent depth
-// proves nothing: the launch goes on and Orca stays the authority. The receipt carries the attested `depth`.
-export function spawnAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, spec, taskTitle = null,
-  run, from = null, request, onCreated = null, parentDispatch = null, maxDepth = null, preflight = null, io = null } = {}) {
-  addStarciShimToPath();
-  const orca = { start: io?.start ?? workerStart, show: io?.show ?? workerShow,
-    rename: io?.rename ?? terminalRename, stop: io?.stop ?? workerStop, release: io?.release ?? closeWorker,
-    trust: io?.trust ?? ensureLaunchTrust };
-  const { card, error: cardError } = loadAdapter(provider);
-  if (cardError) return { ok: false, step: 'card', error: cardError, provider };
-  const host = (io?.hostAgent ?? hostAgentVerdict)({ provider, model, card });
-  if (!host.ok) return { ok: false, step: 'host-agent', error: host.error, code: host.code, errorCode: host.code, effectState: 'none', provider, taskId: null, runId: run ?? null };
-  const { depth, limit, refusal } = preflight ?? depthPreflight({ parentDispatch, maxDepth, show: orca.show });
-  if (refusal) return { ...refusal, provider, taskId: null, runId: run ?? null };
-  const takesModel = card?.start?.modelArgument !== false;
-  // A card's `start.defaultModel: pool` names the provider pool's registry.yaml defaultModel; a concrete id pins itself.
-  if (takesModel && !model) model = card?.start?.defaultModel === 'pool' ? Object.values(loadModelRegistry()?.pools ?? {}).find((p) => p?.provider === provider)?.defaultModel ?? null : card?.start?.defaultModel ?? null;
-  if (effort === 'none') effort = null;
-  let trust = null;
-  // A card that takes no model flag (Devin) has no per-worker model: Orca refuses a launch-time model for it and Devin ignores a project config pin (live E7).
-  try { trust = orca.trust({ agent: provider, cwd: worktree }); }
-  catch (e) { trust = { agent: provider, paths: [], status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
-  // A new worktree (`worktree: 'new-child' | 'new-top-level'`) carries Orca's creation flags (--repo, --base-branch,
-  // --name, --setup); an existing worktree takes none (Orca refuses them there).
-  const creates = worktree === 'new-child' || worktree === 'new-top-level';
-  const creation = creates ? { ...(repo ? { repo } : {}), ...(baseBranch ? { baseBranch } : {}), ...(name ? { name } : {}), ...(setup ? { setup } : {}) } : {};
-  const agent = card?.start?.agentArgument ?? provider;
-  const started = orca.start({ spec, taskTitle: taskTitle ?? title, worktree, ...creation, agent,
-    ...(takesModel && model ? { model, ...(effort ? { effort } : {}) } : {}), displayName: title, run, from,
-    request: request ? { ...request, run, agent, model: takesModel ? model : null } : request });
-  const dispatchId = started?.dispatchId ?? null;
-  const taskId = started?.taskId ?? null;
-  // A failed start is reconciled before it returns (Orca's safety floor: only proof of exit authorizes a stop): no effect -> nothing; unknown
-  // -> worker-show first, cleaned only when Orca shows the worker ended; a partial effect -> cleaned. `io.cleanup(dispatchId)` -> {effectState, ...} replaces the default stop + release.
-  const cleanupOf = io?.cleanup ?? ((id) => {
-    const stop = bestEffortCall(() => orca.stop({ dispatch: id }));
-    const release = bestEffortCall(() => orca.release({ dispatch: id }));
-    return { effectState: release?.ok === true ? 'none' : 'partial', stop, release };
-  });
-  const reconcile = (effectState) => {
-    if (effectState === 'none' || !dispatchId) return { effectState, observation: null, cleanup: null };
-    if (effectState === 'unknown') {
-      const observation = bestEffortCall(() => orca.show({ dispatch: dispatchId }));
-      if (!observation?.ok || !['failed', 'stopped', 'released'].includes(observation.state)) return { effectState: 'unknown', observation, cleanup: null };
-      const cleanup = cleanupOf(dispatchId);
-      return { effectState: cleanup.effectState, observation, cleanup };
-    }
-    const cleanup = cleanupOf(dispatchId);
-    return { effectState: cleanup.effectState, observation: null, cleanup };
-  };
-  const fail = (step, error, { effectState = 'partial', ...extra } = {}) => {
-    const reconciled = reconcile(effectState);
-    return { ok: false, step, error, provider, dispatchId, taskId, runId: run ?? null, ...extra, ...(trust ? { trust } : {}),
-      effectState: reconciled.effectState, ...(reconciled.observation ? { observation: reconciled.observation } : {}),
-      ...(reconciled.cleanup ? { cleanup: reconciled.cleanup } : {}) };
-  };
-  if (started?.ok !== true || (started.outcome != null && started.outcome !== 'ok') || !dispatchId) {
-    return fail('worker-start', started?.error ?? `worker-start outcome=${started?.outcome ?? 'none'} state=${started?.state ?? 'none'} effect=${started?.effectState ?? 'none'}`,
-      { effectState: started?.effectState ?? 'unknown', errorCode: started?.errorCode ?? null, details: started ?? null,
-        ...(started?.hostUnavailable ? { hostUnavailable: true } : {}) });
-  }
-  // --spec made the Task: a ready start that names none is a receipt the runtime cannot settle.
-  if (!taskId) return fail('worker-start', 'worker-start --spec answered ready without result.taskId', { code: 'worker-start-no-task', details: started });
-  let terminal = started.agentTerminalHandle ?? null;
-  const created = (handle) => { if (onCreated) { try { onCreated(handle, dispatchId); } catch { /* the receipt still names the handle */ } } };
-  if (terminal) created(terminal);
-  const attest = orca.show({ dispatch: dispatchId });
-  if (!terminal) {
-    terminal = attest?.ok ? attest.dispatch?.assigneeHandle ?? null : null;
-    if (!terminal) return fail('worker-show', attest?.error ?? 'neither the worker-start receipt nor worker-show names the agent terminal',
-      { code: 'worker-terminal-unknown', details: attest ?? null, ...(attest?.hostUnavailable ? { hostUnavailable: true } : {}) });
-    created(terminal);
-  }
-  // A worker in an existing worktree gets Orca's default tab title; the semantic title is presentation only.
-  const renamed = title ? bestEffortCall(() => orca.rename({ terminal, title })) : null;
-  const eff = attest?.effective ?? {};
-  const effAgent = eff.agent ?? eff.provider ?? null;
-  const effModel = eff.model ?? eff.modelId ?? null;
-  const agentOk = effAgent === agent;
-  const modelOk = !takesModel || !model || effModel === model;
-  if (attest?.ok !== true || !agentOk || !modelOk) {
-    return fail('attestation', `worker attest failed: expected agent=${provider} model=${takesModel ? model : '(agent default)'}, got agent=${effAgent} model=${effModel} state=${attest?.state ?? 'none'}`,
-      { terminal, incident: true, details: attest ?? null });
-  }
-  (io?.recordLaunch ?? recordLaunchedTerminal)({ terminal, dispatchId });
-  return { ok: true, terminal, dispatchId, taskId, runId: run ?? null, provider, model: takesModel ? model : null,
-    effort: takesModel && model ? effort : null, effective: { agent: effAgent, model: effModel }, titleApplied: renamed?.ok === true,
-    depth: dispatchDepthOf(attest) ?? depth, maxDepth: limit, ...(trust ? { trust } : {}) };
-}
-
-
-// An agent that is not an operation - the Kernel, the [Supervisor], a [Worker] - is a worker of its own Run: the
-// entry terminal (the owner's chat, the Supervisor, whoever ran the launcher; `entry`, Orca's ORCA_TERMINAL_HANDLE)
-// is that Run's coordinator. `priorRunId` is reused while Orca still knows it and accepts the start; a start the prior
-// Run refuses before any effect (a Run another entry coordinates) moves to a fresh Run (a Run's coordinator is the
-// terminal that created it). The Task spec is the prompt, spilled to `specFile` past the host's argv (task-spec.mjs);
-// worker-start --spec files it. `request` is the launch's ledger identity (the caller's attempt, token or placement):
-// run-create and worker-start derive their --retry-request ids from it (calls.yaml replay: request).
-// Returns spawnAgent's receipt (runId/taskId on it), or {ok:false, step:'run-create', effectState:'none'}.
-export function startAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, prompt, specFile = null,
-  heading = null, objective, entry = null, priorRunId = null, request, onCreated = null, parentDispatch = null, maxDepth = null, io = null } = {}) {
-  if (!request || typeof request !== 'object') throw new Error('startAgent needs request: the ledger identity of this launch (calls.yaml replay: request)');
-  const orca = { runShow: io?.runShow ?? runShow, runCreate: io?.runCreate ?? runCreate };
-  // The depth preflight runs before the Run exists, so a refused launch leaves nothing behind in Orca. With no parent named,
-  // the entry terminal's own Dispatch (worker-list) is the parent: a Kernel started from a worker nests.
-  if (!parentDispatch && entry) parentDispatch = entryDispatchOf(entry, io?.workerList ? { list: io.workerList } : {});
-  const preflight = depthPreflight({ parentDispatch, maxDepth, show: io?.spawn?.show ?? workerShow });
-  if (preflight.refusal) return { ...preflight.refusal, provider };
-  const spec = taskSpecOf({ prompt, file: specFile, heading: heading ?? title }).spec;
-  const launch = (runId) => spawnAgent({ provider, model, effort, worktree, repo, baseBranch, name, setup, title, spec, taskTitle: title, run: runId, from: entry,
-    request, onCreated, parentDispatch, maxDepth, preflight, io: io?.spawn ?? null });
-  if (priorRunId && orca.runShow({ id: priorRunId })?.ok) {
-    const reused = launch(priorRunId);
-    if (reused.ok || reused.step !== 'worker-start' || reused.effectState !== 'none' || reused.hostUnavailable) return reused;
-  }
-  const created = orca.runCreate({ objective, ...(entry ? { from: entry } : {}), request: { ...request, entry, replaces: priorRunId } });
-  if (!created?.ok || !created.runId) return { ok: false, step: 'run-create', error: created?.error ?? 'run-create returned no runId', provider, effectState: 'none',
-    ...(created?.hostUnavailable ? { hostUnavailable: true } : {}) };
-  return launch(created.runId);
-}
+export { spawnAgent, startAgent } from './launch.mjs';

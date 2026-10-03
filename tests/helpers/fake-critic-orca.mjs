@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fakeAdmission } from './fake-admission.mjs';
 
 export function fakeCriticOrca({ verdict = null, mode = 'judge', onStart = null } = {}) {
   const calls = [];
@@ -23,6 +24,7 @@ export function fakeCriticOrca({ verdict = null, mode = 'judge', onStart = null 
   let n = 0;
   const rec = (name, fn) => (args = {}) => { calls.push([name, args]); return fn(args); };
   const client = {
+    admission: fakeAdmission(),
     calls,
     names: () => calls.map((c) => c[0]),
     criticWorkspace: rec('critic-workspace', (p) => ({ ok: true, dir: fs.mkdtempSync(path.join(p?.tmpRoot ?? os.tmpdir(), 'starci-draw-critic-')), repoRoot: null })),
@@ -53,7 +55,8 @@ export function fakeCriticOrca({ verdict = null, mode = 'judge', onStart = null 
       return { ok: true, state, effective: { agent: w.agent, model: w.model } };
     }),
     workerStop: rec('worker-stop', () => ({ ok: true })),
-    workerRelease: rec('worker-release', () => ({ ok: true })),
+    workerRelease: rec('worker-release', ({ dispatch }) => ({ ok: true, handle: `term_critic_${String(dispatch).replace('ctx_critic_', '')}`,
+      closed: { ok: true, proof: 'gone' }, processes: { verdict: 'none' } })),
     // Orca's consuming check: every unacknowledged message is one Delivery, replayed until --ack names it.
     check: rec('check', ({ ack = null }) => {
       if (ack && delivery?.id === ack) { for (const m of delivery.messages) acked.add(m.id); delivery = null; }

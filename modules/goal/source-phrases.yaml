@@ -19,7 +19,7 @@ phrases:
   # prompt types before a pool alias. Regex alternatives; syllables join with \s*.
   bias:
     prefer: ['ưu\s*tiên', 'uu\s*tien', 'u-u\s*tien', prefer]
-    avoid: ['không\s*dùng', 'khong\s*dung', 'tránh', 'tranh', avoid]
+    avoid: ['không\s*dùng', 'khong\s*dung', 'tránh', 'tranh', avoid, 'don''t\s+use']
 
   # scripts/checks/check-guidance-commands.mjs excusedBy - a negation or a
   # refusal verb, in either language, excuses a refused command in guidance.

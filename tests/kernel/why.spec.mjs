@@ -8,6 +8,9 @@ import {changeWorkflowPhase,ledgerFileFor,openLedger,recordCheckRun,recordJobRes
 import {catalogProblems,emittedCodes,readCatalog} from '../../scripts/checks/check-failure-codes.mjs';
 import {buildWhy,checkFacts,explainCode,kernelNotesOf,loadCatalog,whyOf,WHY_SCHEMA} from '../../scripts/kernel/why.mjs';
 import {recordWhy} from '../../scripts/kernel/why-record.mjs';
+import {loadAdapter,adapterModelAuthority,loadModelRegistry,loadRuntimes} from '../../scripts/agent/model-registry.mjs';
+import {selectAdmission} from '../../scripts/lib/agent-admission.mjs';
+import {fakeAdmission} from '../helpers/fake-admission.mjs';
 
 // Every failed / blocked / refused / waiting attempt explains itself in the owner's language: the catalog
 // (modules/kernel/failure-codes.yaml) names every code the runtime emits, the checker refuses an uncatalogued one, and
@@ -50,6 +53,42 @@ test('the checker refuses an emitted code missing from the catalog, and a retire
 const catalog=readCatalog();
 const attemptRow=over=>({attempt_id:13,workflow_id:'wf',op_id:'scope.define',try_no:2,verdict:'fail',report_outcome:'done',end_state:'settled',settled_at:1,reported_at:1,head_sha:'abc123',next_step:null,settle_json:null,...over});
 const scratch=path.join(os.tmpdir(),'starci-job-scratch','4a40','iso','.starciwork','features','collab');
+
+test('actual admission floor, required identity, outside-group and opaque-model refusals have public owner explanations',()=>{
+  const now=Date.parse('2026-10-03T08:00:00Z');
+  const policy=loadRuntimes().allocation.admission,registry=loadModelRegistry(),io=fakeAdmission();
+  const candidate=(id,provider,model)=>({id,provider,model,account:'default',
+    modelAuthority:adapterModelAuthority(loadAdapter(provider).card),qualityFloor:registry.models[model].tier,
+    eligibility:{eligible:true,mode:'operation-policy'},quota:io.quota(provider,{now}),capacity:{running:0,maxParallel:1}});
+  const sonnet=candidate('sonnet','claude','claude-sonnet-5-5');
+  const sol=candidate('sol','codex','gpt-6.1-sol');
+  const devin=candidate('devin','devin','swe-2-max');
+  const pair=c=>({provider:c.provider,model:c.model});
+  const choose=(candidates,extra={})=>selectAdmission({policy,now,candidates,request:{role:'op',scopeId:'why/op',
+    attemptId:'why-attempt',difficulty:'easy',allowGroup:[pair(sonnet)],...extra}});
+  const cases=[
+    {receipt:choose([sonnet],{difficulty:'hard',qualityFloor:'standard'}),reason:'quality-floor-invalid',code:'quality-floor-invalid'},
+    {receipt:choose([sonnet],{require:pair(sol)}),reason:'required-unavailable',code:'required-unavailable'},
+    {receipt:choose([sol]),reason:'no-eligible-candidate',code:'outside-allow-group'},
+    {receipt:choose([devin],{allowGroup:[pair(devin)],require:{model:devin.model}}),reason:'required-unavailable',code:'required-model-unverifiable'},
+  ];
+  for(const {receipt,reason,code} of cases){
+    assert.equal(receipt.ok,false,code);
+    assert.equal(receipt.reason,reason,code);
+    assert.ok([receipt.reason,...receipt.rejected.flatMap(row=>row.codes)].includes(code),'the selector actually emitted the explained code');
+    const explanation=explainCode(code,catalog);
+    assert.equal(explanation.known,true,code);
+    assert.ok(explanation.meaning_vi?.trim(),code);
+    assert.ok(explanation.nextStep_vi?.trim(),code);
+    assert.notEqual(explanation.title_vi,code,'the public explanation is not a raw code fallback');
+    const why=buildWhy({attempt:attemptRow({verdict:null,report_outcome:null,end_state:'requeued',settled_at:null}),
+      settle:{reason:'dispatch-rejected',step:'admission',signal:code},catalog});
+    assert.equal(why.state,'dispatch-rejected',code);
+    assert.ok(why.codes.includes(code),code);
+    assert.ok(why.cause.includes(explanation.meaning_vi),code);
+    assert.equal(why.owner,explanation.owner,code);
+  }
+});
 
 test('an op that claimed done but whose re-run check is red: headline, cause, disagreement, next in Vietnamese',()=>{
   const blob=json({refused:[`${scratch}: target does not exist [TARGET_MISSING]`]});

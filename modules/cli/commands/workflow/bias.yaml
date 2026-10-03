@@ -6,7 +6,7 @@ impl: {script: scripts/agent/bias.mjs}
 positional:
   - {name: text, required: false, variadic: true}
 flags:
-  - {name: normalize, type: string, summary: "a JSON bias object {prefer, avoid}: aliases canonicalized, unknown pools dropped, avoid wins"}
+  - {name: normalize, type: string, summary: "owner bias JSON: prefer/avoid, role-scoped concrete require and explicit attempt reserveOverride; invalid hard constraints are refused"}
 exit: {"0": printed the JSON, "2": bad usage}
 json: always
 examples:

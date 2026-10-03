@@ -15,6 +15,12 @@ import { probeQuota } from '../../scripts/agent/quota/index.mjs';
 // live in a worker thread: the main thread's event loop is blocked while the
 // probe's child is in flight. The fake key must never appear in any output.
 
+const FIXED_NOW = 1758500000000;
+const futurePlan = (plan) => plan && typeof plan === 'object' ? {
+  dailyQuotaResetAtUnix: (FIXED_NOW + 86400000) / 1000,
+  weeklyQuotaResetAtUnix: (FIXED_NOW + 604800000) / 1000,
+  ...plan,
+} : plan;
 const KEY = 'wsk-spec-FAKE-key-9f8e7d6c5b4a-never-in-output';
 const tmp = (t, prefix) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return dir; };
 
@@ -43,7 +49,7 @@ parentPort.on('message', (m) => { if (m === 'report') parentPort.postMessage({ r
 
 /** A fake GetUserStatus endpoint in a worker thread: records requests, replies `json` (or echoes the body). */
 async function fakeSeat(t, { planStatus, status = 200, json = undefined, echo = false, strict = false } = {}) {
-  const worker = new Worker(SERVER_SOURCE, { eval: true, workerData: { status, json: json ?? { userStatus: { planStatus } }, echo, strict } });
+  const worker = new Worker(SERVER_SOURCE, { eval: true, workerData: { status, json: json ?? { userStatus: { planStatus: futurePlan(planStatus) } }, echo, strict } });
   t.after(() => worker.terminate());
   const [{ port }] = await once(worker, 'message');
   return {
@@ -72,7 +78,7 @@ test('the probe POSTs Connect-JSON GetUserStatus and maps planStatus to the pinn
       billingStrategy: 'seat', planEnd: 1765000000, overageBalanceMicros: 0,
     },
   });
-  const r = noKey(probe({ endpoint: seat.endpoint, credentialsFile: credFile(t), cacheMs: 0, timeoutMs: 8000 }));
+  const r = noKey(probe({ now: FIXED_NOW, endpoint: seat.endpoint, credentialsFile: credFile(t), cacheMs: 0, timeoutMs: 8000 }));
   assert.equal(r.state, 'ok');
   assert.equal(r.usedPercent, 57.5, 'usedPercent = 100 - min(daily 42.5, weekly 60)');
   assert.equal(r.resetsAt, new Date(1758700000 * 1000).toISOString(), 'the soonest reset shows');
@@ -87,37 +93,43 @@ test('the probe POSTs Connect-JSON GetUserStatus and maps planStatus to the pinn
   assert.ok('ideVersion' in sent.metadata && 'extensionName' in sent.metadata && 'extensionVersion' in sent.metadata && 'locale' in sent.metadata);
 });
 
-test('limited under 10% remaining; dead only at 0% with no overage balance', async (t) => {
+test('reserve quota blocks normal admission; exhausted windows remain dead even with billable overage', async (t) => {
   const limited = await fakeSeat(t, { planStatus: { dailyQuotaRemainingPercent: 8, weeklyQuotaRemainingPercent: 50 } });
-  assert.equal(noKey(probe({ endpoint: limited.endpoint, credentialsFile: credFile(t), cacheMs: 0 })).state, 'limited');
+  assert.equal(noKey(probe({ now: FIXED_NOW, endpoint: limited.endpoint, credentialsFile: credFile(t), cacheMs: 0 })).state, 'limited');
   const dead = await fakeSeat(t, { planStatus: { dailyQuotaRemainingPercent: 0, weeklyQuotaRemainingPercent: 0, overageBalanceMicros: 0 } });
-  const d = noKey(probe({ endpoint: dead.endpoint, credentialsFile: credFile(t), cacheMs: 0 }));
+  const d = noKey(probe({ now: FIXED_NOW, endpoint: dead.endpoint, credentialsFile: credFile(t), cacheMs: 0 }));
   assert.equal(d.state, 'dead');
   assert.equal(d.usedPercent, 100);
   const overage = await fakeSeat(t, { planStatus: { dailyQuotaRemainingPercent: 0, weeklyQuotaRemainingPercent: 0, overageBalanceMicros: 5000000 } });
-  assert.equal(noKey(probe({ endpoint: overage.endpoint, credentialsFile: credFile(t), cacheMs: 0 })).state, 'limited', 'an overage balance keeps calls billable');
+  assert.equal(noKey(probe({ now: FIXED_NOW, endpoint: overage.endpoint, credentialsFile: credFile(t), cacheMs: 0 })).state, 'dead', 'billable overage does not bypass a hard quota limit');
 });
 
 test('every API or credential failure is unknown, never dead; the key never surfaces', async (t) => {
   const dir = tmp(t, 'starci-devin-missing-');
-  assert.equal(probe({ endpoint: 'http://127.0.0.1:1/x', credentialsFile: path.join(dir, 'absent.toml'), cacheMs: 0 }).state, 'unknown', 'no credentials.toml');
+  assert.equal(probe({ now: FIXED_NOW, endpoint: 'http://127.0.0.1:1/x', credentialsFile: path.join(dir, 'absent.toml'), cacheMs: 0 }).state, 'unknown', 'no credentials.toml');
   const http500 = await fakeSeat(t, { echo: true, status: 500 });
-  const r5 = noKey(probe({ endpoint: http500.endpoint, credentialsFile: credFile(t), cacheMs: 0 }));
+  const r5 = noKey(probe({ now: FIXED_NOW, endpoint: http500.endpoint, credentialsFile: credFile(t), cacheMs: 0 }));
   assert.equal(r5.state, 'unknown');
   assert.match(r5.detail, /HTTP 500/);
   assert.equal((await http500.requests()).length, 1);
-  const r0 = noKey(probe({ endpoint: 'http://127.0.0.1:1/no-listener', credentialsFile: credFile(t), cacheMs: 0, timeoutMs: 5000 }));
+  const r0 = noKey(probe({ now: FIXED_NOW, endpoint: 'http://127.0.0.1:1/no-listener', credentialsFile: credFile(t), cacheMs: 0, timeoutMs: 5000 }));
   assert.equal(r0.state, 'unknown', 'an unreachable endpoint is unknown, not dead');
   const noPlan = await fakeSeat(t, { planStatus: null });
-  assert.equal(noKey(probe({ endpoint: noPlan.endpoint, credentialsFile: credFile(t), cacheMs: 0 })).state, 'unknown', 'no planStatus');
+  assert.equal(noKey(probe({ now: FIXED_NOW, endpoint: noPlan.endpoint, credentialsFile: credFile(t), cacheMs: 0 })).state, 'unknown', 'no planStatus');
   const bare = await fakeSeat(t, { planStatus: { billingStrategy: 'seat' } });
-  assert.equal(noKey(probe({ endpoint: bare.endpoint, credentialsFile: credFile(t), cacheMs: 0 })).state, 'unknown', 'no percentages');
+  const bareResult = noKey(probe({ now: FIXED_NOW, endpoint: bare.endpoint, credentialsFile: credFile(t), cacheMs: 0 }));
+  assert.equal(bareResult.state, 'unknown', 'no percentages');
+  assert.equal(bareResult.auth, 'ok', 'successful authenticated plan response proves auth, not quota capacity');
+  assert.equal(bareResult.observedAt, FIXED_NOW);
+  assert.deepEqual(bareResult.windows, []);
+  assert.equal(bareResult.normalAdmission, false);
+  assert.notEqual(r5.auth, 'ok');
 });
 
 test('planToResult is the pure mapping; readWindsurfApiKey parses the toml value only', (t) => {
-  assert.equal(planToResult({ dailyQuotaRemainingPercent: 100, weeklyQuotaRemainingPercent: 100 }).state, 'ok');
-  assert.equal(planToResult({ dailyQuotaRemainingPercent: 10, weeklyQuotaRemainingPercent: 90 }).state, 'limited');
-  assert.equal(planToResult({ dailyQuotaRemainingPercent: null, weeklyQuotaRemainingPercent: 33 }).usedPercent, 67);
+  assert.equal(planToResult(futurePlan({ dailyQuotaRemainingPercent: 100, weeklyQuotaRemainingPercent: 100 }), { now: FIXED_NOW }).state, 'ok');
+  assert.equal(planToResult(futurePlan({ dailyQuotaRemainingPercent: 10, weeklyQuotaRemainingPercent: 90 }), { now: FIXED_NOW }).state, 'limited');
+  assert.equal(planToResult(futurePlan({ dailyQuotaRemainingPercent: null, weeklyQuotaRemainingPercent: 33 }), { now: FIXED_NOW }).usedPercent, 67);
   assert.equal(planToResult({}).state, 'unknown');
   const file = credFile(t);
   assert.equal(readWindsurfApiKey(file), KEY);
@@ -133,7 +145,7 @@ test('probeQuota("devin") dispatches the seat probe through the pinned interface
   process.env.APPDATA = path.dirname(dir); // credentialsFile resolves <APPDATA>/devin/credentials.toml
   fs.mkdirSync(path.join(process.env.APPDATA, 'devin'), { recursive: true });
   fs.renameSync(dir, path.join(process.env.APPDATA, 'devin', 'credentials.toml'));
-  const r = noKey(probeQuota('devin-agent', { cacheMs: 0 }));
+  const r = noKey(probeQuota('devin-agent', { now: FIXED_NOW, cacheMs: 0 }));
   assert.equal(r.state, 'ok');
   assert.equal(r.usedPercent, 29);
   assert.equal(typeof r.detail, 'string');
@@ -146,9 +158,9 @@ test('probeQuota("devin") dispatches the seat probe through the pinned interface
 // mirrors that rule.
 test('the probe sends the CLI seat shape: devin-cli names and semver versions, never "unknown"', async (t) => {
   const seat = await fakeSeat(t, { strict: true, planStatus: { dailyQuotaRemainingPercent: 100, weeklyQuotaRemainingPercent: 100 } });
-  const r = noKey(probe({ endpoint: seat.endpoint, credentialsFile: credFile(t), cacheMs: 0 }));
+  const r = noKey(probe({ now: FIXED_NOW, endpoint: seat.endpoint, credentialsFile: credFile(t), cacheMs: 0 }));
   assert.equal(r.state, 'ok', `the strict seat API accepts the request: ${r.detail}`);
-  const bad = noKey(probe({ endpoint: seat.endpoint, credentialsFile: credFile(t), cacheMs: 0, metadata: { ideVersion: 'unknown', extensionVersion: '' } }));
+  const bad = noKey(probe({ now: FIXED_NOW, endpoint: seat.endpoint, credentialsFile: credFile(t), cacheMs: 0, metadata: { ideVersion: 'unknown', extensionVersion: '' } }));
   assert.equal(bad.state, 'ok', 'a non-version metadata override falls back to the CLI version');
   for (const req of await seat.requests()) {
     const m = JSON.parse(req.body).metadata;
@@ -163,7 +175,7 @@ test('the probe sends the CLI seat shape: devin-cli names and semver versions, n
 test('STARCI_DEVIN_SEAT_ENDPOINT only redirects the key to a loopback URL', async (t) => {
   const seat = await fakeSeat(t, { planStatus: { dailyQuotaRemainingPercent: 50, weeklyQuotaRemainingPercent: 50 } });
   const cred = credFile(t);
-  const local = noKey(probe({ credentialsFile: cred, cacheMs: 0, env: { STARCI_DEVIN_SEAT_ENDPOINT: seat.endpoint.replace('127.0.0.1', 'localhost') } }));
+  const local = noKey(probe({ now: FIXED_NOW, credentialsFile: cred, cacheMs: 0, env: { STARCI_DEVIN_SEAT_ENDPOINT: seat.endpoint.replace('127.0.0.1', 'localhost') } }));
   assert.equal(local.state, 'ok', `a localhost override is honoured: ${local.detail}`);
   for (const foreign of [
     'https://evil.example/exa.seat_management_pb.SeatManagementService/GetUserStatus',
@@ -173,11 +185,11 @@ test('STARCI_DEVIN_SEAT_ENDPOINT only redirects the key to a loopback URL', asyn
     'file:///etc/passwd',
     'not a url',
   ]) {
-    const r = noKey(probe({ credentialsFile: cred, cacheMs: 0, timeoutMs: 2000, env: { STARCI_DEVIN_SEAT_ENDPOINT: foreign } }));
+    const r = noKey(probe({ now: FIXED_NOW, credentialsFile: cred, cacheMs: 0, timeoutMs: 2000, env: { STARCI_DEVIN_SEAT_ENDPOINT: foreign } }));
     assert.equal(r.state, 'unknown', foreign);
     assert.match(r.detail, /loopback/, `${foreign} is refused, not called: ${r.detail}`);
   }
-  const opt = noKey(probe({ endpoint: 'https://evil.example/x', credentialsFile: cred, cacheMs: 0, timeoutMs: 2000 }));
+  const opt = noKey(probe({ now: FIXED_NOW, endpoint: 'https://evil.example/x', credentialsFile: cred, cacheMs: 0, timeoutMs: 2000 }));
   assert.match(opt.detail, /loopback/, 'the endpoint option obeys the same rule');
   assert.equal((await seat.requests()).length, 1, 'only the loopback override reached a server');
 });

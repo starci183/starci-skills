@@ -32,6 +32,7 @@ import { readEnv } from '../lib/env.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { closeAndVerify } from './close-verify.mjs';
 import { supLog } from './sup-log.mjs';
+import { releaseProviderBudgetByHandle } from '../agent/provider-budget.mjs';
 
 const HANDLE_ENV = 'ORCA_TERMINAL_HANDLE';
 
@@ -55,6 +56,12 @@ export const survivorsOf = (members, table) => members.filter((m) => (table ?? [
 const rootsOf = (survivors) => survivors.filter((s) => !survivors.some((o) => o.pid === s.ppid));
 
 const members = (list) => list.map((m) => ({ pid: m.pid, name: m.name ?? null }));
+
+/** The exact worker terminal and its captured process tree are affirmatively closed. Pure. */
+export const workerClosureProven = (receipt, handle) => Boolean(handle) && receipt?.ok === true
+  && receipt.handle === handle && receipt.closed?.ok === true
+  && ['gone', 'disconnected'].includes(receipt.closed.proof)
+  && ['none', 'stopped'].includes(receipt.processes?.verdict);
 
 /** Wait for every process of `tree` to end: {gone, table, left[]} or {unreadable}. */
 function waitGone(tree, { read, sleep, ms, pollMs }) {
@@ -146,15 +153,23 @@ export function closeWorker({ dispatch, handle = null, stopFirst = false, retryR
         data: { class: 'worker-close', action: 'worker-process', target: terminal, dispatch, verdict: processes.verdict, ...(hygiene ? { code: 'worker-process-survived' } : {}) } });
     } catch { /* the log is best effort; the finding is in the result */ }
   }
-  return { ...last, ok: last?.ok === true, handle: terminal, closed, processes, hygiene, ...(stopped ? { stop: stopped } : {}), ...(retry ? { retryRelease: retry } : {}) };
+  let providerBudget = null;
+  if (workerClosureProven({ ...last, handle: terminal, closed, processes }, terminal)) {
+    try {
+      const result = (deps.releaseBudget ?? releaseProviderBudgetByHandle)(terminal,
+        { kind: 'closed', confirmed: true, handle: terminal, source: 'worker-close', terminalProof: closed.proof ?? null, processVerdict: processes.verdict }, { env: { ...process.env, ...env } });
+      if (!result.ok || result.released > 0) providerBudget = result;
+    } catch (error) { providerBudget = { ok: false, reason: 'store-unavailable', error: String(error?.message ?? error) }; }
+  }
+  return { ...last, ok: last?.ok === true, handle: terminal, closed, processes, hygiene, ...(providerBudget ? { providerBudget } : {}), ...(stopped ? { stop: stopped } : {}), ...(retry ? { retryRelease: retry } : {}) };
 }
 
 
 const isOwnTerminal = (handle, env = process.env) => Boolean(handle) && env[HANDLE_ENV] === handle;
 
 /** Fence and release worker `dispatch` through closeWorker (worker-stop first on the caller's proof, then release, close, verify). {dispatch, ok, stop, release, ...}. */
-export function stopAndRelease(dispatch, { env = process.env, deps = {} } = {}) {
-  const r = closeWorker({ dispatch, stopFirst: true, env, deps });
+export function stopAndRelease(dispatch, { handle = null, env = process.env, deps = {} } = {}) {
+  const r = closeWorker({ dispatch, handle, stopFirst: true, env, deps });
   return { dispatch, ok: r.ok, stop: { ok: r.stop?.ok === true, error: r.stop?.error ?? null }, release: { ok: r.ok, error: r.error ?? null },
     handle: r.handle, closed: r.closed, processes: r.processes, hygiene: r.hygiene };
 }

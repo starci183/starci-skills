@@ -8,8 +8,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { selectPool, hostToolsRequired, hostToolsOf } from '../../scripts/agent/models.mjs';
+import { hostToolsRequired, hostToolsOf } from '../../scripts/agent/models.mjs';
+import { fakePoolSelection as selectPool } from '../helpers/fake-admission.mjs';
 import { criticFor } from '../../scripts/work/draw-critic.mjs';
+import { fakeAdmission } from '../helpers/fake-admission.mjs';
+import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
+import { withMachine } from '../../engine/db/machine.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const read = (rel) => parseYaml(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
@@ -47,20 +51,30 @@ test('brand.decide walks the brand order: Claude first, Codex the fallback; inte
   assert.ok(selectPool({ kind: 'interface.asset', difficulty: 'medium', runtimes, capacity: { 'codex-agent': { auth: 'dead' } } }).error, 'no image tool, no asset');
 });
 
-test('the dry route prints the same picks (route-model.mjs)', () => {
-  const route = (kind) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'route', 'route-model.mjs'), '--kind', kind], { cwd: ROOT, encoding: 'utf8', windowsHide: true });
+test('the route excludes unknown provider evidence and keeps eligible fallback models', (t) => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-route-quota-'));
+  t.after(() => fs.rmSync(fixture, { recursive: true, force: true, maxRetries: 10, retryDelay: 25 }));
+  const stub = path.join(fixture, 'orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
+  const env = { ...process.env, APPDATA: fixture, LOCALAPPDATA: fixture, STARCI_OWNER_ROOT: fixture,
+    STARCI_TEST_MACHINE_FILE: path.join(fixture, 'machine.sqlite'), STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
+    STARCI_FAKE_ORCA_LOG: path.join(fixture, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: path.join(fixture, 'state.json') };
+  withMachine(() => {}, { env });
+  const route = (kind) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'route', 'route-model.mjs'), '--kind', kind, '--json'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true });
   const draw = route('interface.draw');
-  assert.equal(draw.status, 0, draw.stderr);
-  assert.match(draw.stdout, /PICK devin-agent\s+model=swe-2-max/);
-  assert.match(draw.stdout, /-> codex-agent \(gpt-6\.1-sol\)/);
-  assert.match(route('brand.decide').stdout, /PICK claude-agent\s+model=claude-opus-5-5[\s\S]*-> codex-agent/);
+  assert.equal(draw.status, 0, draw.stderr + draw.stdout);
+  const decision = JSON.parse(draw.stdout);
+  assert.equal(decision.pick.model, 'gpt-6.1-sol');
+  assert.ok(decision.admission.rejected.some((candidate) => candidate.provider === 'devin' && candidate.codes.includes('quota-unknown')));
+  const brand = JSON.parse(route('brand.decide').stdout);
+  assert.equal(brand.pick.model, 'claude-opus-5-5');
+  assert.equal(brand.fallbackChain[0].model, 'gpt-6.1-sol');
 });
 
 test('the critic is a different model from the drawer: Codex when Devin draws, Claude when Codex draws', async (t) => {
   const s = runtimes.allocation.drawLoop;
   assert.equal(s.critic.provider, 'codex');
   assert.equal(criticFor(s, 'devin').critic.provider, 'codex');
-  assert.equal(criticFor(s, null).critic.provider, 'codex');
+  assert.match(criticFor(s, null).error, /unknown/);
   const alt = criticFor(s, 'codex');
   assert.equal(alt.critic.provider, 'claude');
   assert.notEqual(alt.critic.provider, 'codex');
@@ -89,6 +103,7 @@ test('the critic is a different model from the drawer: Codex when Devin draws, C
     fs.writeFileSync(html, '<p>x</p>');
     const started = [];
     const critique = await critiqueRound({ loop: {}, n: 1, roundDir: dir, captures: [], html, settings: s, orca: {
+      admission: fakeAdmission(),
       criticWorkspace: () => ({ ok: true, dir }), removeCriticWorkspace: () => ({ ok: true }),
       runCreate: () => ({ ok: true, runId: 'run-critic' }), runShow: () => ({ ok: false, error: 'none' }), workerList: () => ({ ok: true, workers: [] }),
       trust: () => ({ ok: true }), terminalRename: () => ({ ok: true }), workerShow: () => ({ ok: false, error: 'none' }),

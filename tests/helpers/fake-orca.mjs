@@ -777,6 +777,8 @@ else if (verb === 'account list') {
   //   result.rateLimits.<provider> = {status, weekly:{usedPercent,...}, error,
   //   usageMetadata:{failureKind}} — 'unavailable' / missing-credentials → dead.
   const rateLimits = {};
+  const quotaObservedAt = Date.now();
+  const weeklyWindow = (usedPercent) => ({ id: 'weekly', usedPercent, windowMinutes: 10080, observedAt: quotaObservedAt, resetsAt: quotaObservedAt + 10080 * 60000 });
   for (const p of ['claude', 'codex', 'devin'])
     rateLimits[p] = deadProviders.has(p)
       ? { status: 'unavailable', error: 'not authenticated',
@@ -787,8 +789,8 @@ else if (verb === 'account list') {
             weekly: { usedPercent: null, windowMinutes: 10080, resetsAt: null },
             usageMetadata: { failureKind: 'stale-token' } }
       : limitedProviders.has(p)
-        ? { status: 'ok', weekly: { usedPercent: 96, windowMinutes: 10080, resetsAt: null } }
-      : { status: 'ok', weekly: { usedPercent: 12, windowMinutes: 10080, resetsAt: null } };
+        ? { status: 'ok', observedAt: quotaObservedAt, weekly: weeklyWindow(96), ...(state.quotaWindows?.[p] ?? {}) }
+      : { status: 'ok', observedAt: quotaObservedAt, weekly: weeklyWindow(12), ...(state.quotaWindows?.[p] ?? {}) };
   out({ ok: true, result: { rateLimits } });
 }
 else { out({ ok: false, error: 'fake-orca: unhandled ' + argv.join(' ') }); process.exit(1); }

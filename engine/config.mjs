@@ -285,6 +285,26 @@ function validateAllocationBalance(allocation,runtimes){
     }
   }
 }
+/** Kernel and Supervisor seats share one authoritative pin/group grammar. */
+function validateAgentSeat(seat,name,profile){
+  const runtimes=profile?.runtimes??{},knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
+  if(plain(seat)&&Object.hasOwn(seat,'group')){
+    const group=seat.group;
+    if(Object.keys(seat).some(key=>!['group','effort'].includes(key))||!Array.isArray(group)||!group.length||group.some(member=>!plain(member)||Object.keys(member).some(key=>!['agent','model'].includes(key))||typeof member.agent!=='string'||!member.agent.trim()||!(member.model===undefined||member.model===null||typeof member.model==='string'&&member.model.trim())))
+      throw Error(`Invalid config.yaml: ${name} group must be {group: [{agent, model?}, ...], effort?} with at least one member.`);
+    if(new Set(group.map(member=>member.agent)).size!==group.length)throw Error(`Invalid config.yaml: ${name}.group names each agent once — availability is per provider.`);
+    for(const {agent,model} of group){
+      if(!knownProviders.has(agent))throw Error(`Invalid config.yaml: ${name}.group agent ${agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
+      if(typeof model==='string'&&profile.models?.[model]?.provider!==agent&&!Object.values(runtimes).some(runtime=>runtime?.provider===agent&&(runtime.target===model||Object.values(runtime.models??{}).includes(model))))
+        throw Error(`Invalid config.yaml: ${name}.group model ${model} is not declared by a ${agent} runtime.`);
+    }
+  }else{
+    if(!plain(seat)||Object.keys(seat).some(key=>!['agent','model','effort'].includes(key))||Object.values(seat).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
+      throw Error(`Invalid config.yaml: ${name} must be {agent?, model?, effort?} with string-or-null values, or {group: [{agent, model?}, ...], effort?}.`);
+    if(typeof seat.agent==='string'&&!knownProviders.has(seat.agent))throw Error(`Invalid config.yaml: ${name}.agent ${seat.agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
+  }
+  if(seat.effort!==undefined&&seat.effort!==null&&!EFFORT_LEVELS.includes(seat.effort))throw Error(`Invalid config.yaml: ${name}.effort must use the effort vocabulary.`);
+}
 export function validateConfig(config){
   const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','claudeDebug','orca','roots'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
@@ -310,27 +330,7 @@ export function validateConfig(config){
     if(typeof preferred==='string'&&!knownProviders.has(preferred))throw Error(`Invalid config.yaml: allocation.preferredProvider ${preferred} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
     validateAllocationBalance(allocation,runtimes);
   }
-  if(plain(config?.kernel)&&Object.hasOwn(config.kernel,'group')){
-    const kernel=config.kernel,group=kernel.group;
-    if(Object.keys(kernel).some(key=>!['group','effort'].includes(key))||!Array.isArray(group)||!group.length||group.some(member=>!plain(member)||Object.keys(member).some(key=>!['agent','model'].includes(key))||typeof member.agent!=='string'||!member.agent.trim()||!(member.model===undefined||member.model===null||typeof member.model==='string'&&member.model.trim())))
-      throw Error('Invalid config.yaml: kernel group must be {group: [{agent, model?}, ...], effort?} with at least one member.');
-    if(new Set(group.map(member=>member.agent)).size!==group.length)throw Error('Invalid config.yaml: kernel.group names each agent once — availability is per provider.');
-    for(const {agent,model} of group){
-      if(!knownProviders.has(agent))throw Error(`Invalid config.yaml: kernel.group agent ${agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
-      if(typeof model==='string'&&profile.models?.[model]?.provider!==agent&&!Object.values(runtimes).some(runtime=>runtime?.provider===agent&&(runtime.target===model||Object.values(runtime.models??{}).includes(model))))
-        throw Error(`Invalid config.yaml: kernel.group model ${model} is not declared by a ${agent} runtime.`);
-    }
-    if(kernel.effort!==undefined&&kernel.effort!==null&&!EFFORT_LEVELS.includes(kernel.effort))
-      throw Error('Invalid config.yaml: kernel.effort must use the effort vocabulary.');
-  }else if(config?.kernel!==undefined){
-    const kernel=config.kernel;
-    if(!plain(kernel)||Object.keys(kernel).some(key=>!['agent','model','effort'].includes(key))||Object.values(kernel).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
-      throw Error('Invalid config.yaml: kernel must be {agent?, model?, effort?} with string-or-null values, or {group: [{agent, model?}, ...], effort?}.');
-    if(typeof kernel.agent==='string'&&!knownProviders.has(kernel.agent))
-      throw Error(`Invalid config.yaml: kernel.agent ${kernel.agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
-    if(typeof kernel.effort==='string'&&!EFFORT_LEVELS.includes(kernel.effort))
-      throw Error('Invalid config.yaml: kernel.effort must use the effort vocabulary.');
-  }
+  if(config?.kernel!==undefined)validateAgentSeat(config.kernel,'kernel',profile);
   if(config?.parallel!==undefined){
     const parallel=config.parallel,gears=slicingGears();
     if(!plain(parallel)||Object.keys(parallel).some(key=>key!=='gear')||!Number.isInteger(parallel.gear))
@@ -350,8 +350,7 @@ export function validateConfig(config){
     // pins its agent (default: the kernel pin), workers {base?, max?} its adaptive [Worker] cap (max <= 10),
     // landGate {mode?: shared|exclusive, push?} the land gate (scripts/supervisor/land.mjs).
     const seat=supervisor.kernel,workers=supervisor.workers,gate=supervisor.landGate;
-    if(!(seat===undefined||seat===null||(plain(seat)&&Object.keys(seat).every(key=>['agent','model','effort'].includes(key)&&(seat[key]===null||typeof seat[key]==='string')))))
-      throw Error('Invalid config.yaml: supervisor.kernel must be {agent?, model?, effort?} strings, or null.');
+    if(seat!==undefined&&seat!==null)validateAgentSeat(seat,'supervisor.kernel',profile);
     if(!(workers===undefined||workers===null||(plain(workers)&&Object.keys(workers).every(key=>['base','max'].includes(key)&&Number.isInteger(workers[key])&&workers[key]>=1&&workers[key]<=10))))
       throw Error('Invalid config.yaml: supervisor.workers must be {base?, max?} integers from 1 to 10, or null.');
     if(!(gate===undefined||gate===null||(plain(gate)&&Object.keys(gate).every(key=>(key==='mode'&&['shared','exclusive'].includes(gate.mode))||(key==='push'&&typeof gate.push==='boolean')))))

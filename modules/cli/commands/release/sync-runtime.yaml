@@ -1,18 +1,26 @@
 group: release
 verb: sync-runtime
 owner: runtime
-summary: refresh or check the runtime copies bundled in published packages
-impl: {script: scripts/hfs/sync-runtime.mjs}
+summary: refresh or check package runtime copies and optionally prepare grammar
+impl: {module: scripts/supervisor/release-sync-runtime.mjs, export: releaseSyncRuntime}
+effect: host
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - ordinary sync and check retain their existing copy behavior
+  - prepare-grammar installs and builds ignored grammar output and refreshes knowledge under the host lock before syncing copies
+  - check and prepare-grammar cannot be combined
 flags:
   - {name: check, type: boolean, summary: report drift without writing copies}
+  - {name: prepare-grammar, type: boolean, summary: install and build grammar under the host lock before syncing copies; cannot combine with check}
 exit:
-  "0": copies were refreshed or already agree
-  "1": bundled copies drift in check mode
+  "0": copies were refreshed or already agree and requested grammar preparation passed
+  "1": copy drift, grammar preparation or host lock failure
   "2": bad usage
-json: none
+json: starci/release-sync-runtime@1
 examples:
   - starci release sync-runtime
   - starci release sync-runtime --check
+  - starci release sync-runtime --prepare-grammar
 editions: [full]
 since: 1.0.0-alpha.4
 removed:

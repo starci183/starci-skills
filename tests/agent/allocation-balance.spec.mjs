@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {configuredAllocationPolicy,parseAllocationGrant,validateConfig} from '../../engine/config.mjs';
-import {balanceDeficits,selectPool,loadRuntimes} from '../../scripts/agent/models.mjs';
+import {balanceDeficits,loadRuntimes} from '../../scripts/agent/models.mjs';
+import {fakePoolSelection as selectPool} from '../helpers/fake-admission.mjs';
 import {auditAuthorOf,recentDispatchCounts,recentPoolCounts,thinkAuthorOf} from '../../scripts/agent/balance.mjs';
 import {isFixtureLedgerPath,machineLedgerFiles} from '../../scripts/machine/ledger-files.mjs';
 import {openLedger} from '../../engine/db/ledger.mjs';
@@ -34,6 +35,17 @@ const STRATEGY_KINDS=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==
 const UI_KINDS=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.order==='ui').map(([k])=>k);
 const KERNEL_KINDS=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.order==='sol-think').map(([k])=>k);
 const MECHANICAL_KINDS=['provision.ask','workspace.manage','task.execute','knowledge.repair'];
+
+test('live pool selection refuses a concrete opaque model requirement and accepts the provider alone',()=>{
+  const options={kind:'backend.implement',difficulty:'medium',runtimes,capacity:{},scopeId:'pool-authority-proof'};
+  const required=selectPool({...options,bias:{require:{provider:'devin',model:'swe-2-max'}}});
+  assert.equal(required.admission.reason,'required-unavailable');
+  assert.ok(required.error&&!required.target,'another available provider cannot satisfy a hard requirement');
+  assert.ok(required.admission.rejected.find(row=>row.id==='devin-agent').codes.includes('required-model-unverifiable'));
+  const provider=selectPool({...options,bias:{require:{provider:'devin'}}});
+  assert.equal(provider.target,'devin-agent');
+  assert.equal(provider.admission.selected.modelAuthority,'configured-logical-runtime');
+});
 
 test('balanced: the order ranks and the share caps - the first eligible pool still below its share wins',()=>{
   // medium implementation: Devin leads its order and sits below its share, so it takes it although Codex is further below.

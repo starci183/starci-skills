@@ -38,7 +38,22 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 2. **Extract routing bias** — read the owner prompt yourself and write
    `{prefer:[], avoid:[]}` from its intent (e.g. "prefer codex", "use claude",
    "don't use codex" → prefer/avoid those pools, in whatever language the owner
-   wrote it; aliases: codex/claude/devin → `<name>-agent`). Then
+   wrote it; aliases: codex/claude/devin → `<name>-agent`). Distinguish a preference
+   from an explicit requirement: "must use Claude" becomes `require:{provider:claude}`,
+   never a soft preference. Concrete selectors may name `pool`, `provider` and/or `model`.
+   `roles` declares the affected actors (`kernel`, `op`, `supervisor`, `worker`, `critic`);
+   without it the bias applies only to `op`. A constraint on an Op does not silently pin
+   its Critic. Questions or hypothetical examples are not routing instructions.
+
+   A requirement does not authorize using the provider reserve. Only an explicit owner
+   instruction to exceed the internal reserve for a specific attempt can supply
+   `reserveOverride:{authorized:true,scopeId,role,provider,model,reason}` (and optional
+   `account`). Never invent that permission, infer it from "must use", or use a blanket
+   future-task scope. Record the exact owner grant in the goal approval provenance; the
+   admission adapter must independently verify it. If the task/attempt identity is not
+   known at intake, preserve the owner's intent for its later approval rather than
+   manufacturing a runnable override. Auth, provider exhaustion and quality restrictions
+   remain in force. Then
    normalize it through the canonicalizer (casing/aliases cleaned, `avoid`
    wins conflicts):
 
@@ -46,7 +61,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    starci workflow bias --normalize '{"prefer":["<agents>"],"avoid":["<agents>"]}'
    ```
 
-   `bias.mjs "<text>"` is the no-agent fallback for automation. Keep the JSON:
+   `starci workflow bias "<text>"` is the no-agent fallback for automation. Keep the JSON:
    it lands as `routing_bias` at the persist step. An empty
    `{prefer:[], avoid:[]}` is valid — persist it anyway.
 3. **Assess BEFORE drafting** — cold-scan the bound app (its root, `be/` and `fe/`):
@@ -88,7 +103,8 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 
    The IMPACT line is the planner's survey of the project's `.starciwork` (`route-plan --state`, `modules/goal/existing.yaml`): a goal that names an existing feature is an EXTEND, plans only the delta (done records of other features and specs the feature already settled are not re-planned), and keeps the backend lane when the feature holds backend records.
 
-   Add the step-2 bias (`prefer=[…] avoid=[…]`) in your own words — the planner
+   Add the step-2 bias (preferences, exclusions, concrete requirement, affected roles and
+   any exact-scope owner reserve grant) in your own words — the planner
    does not print it. Per-leg estimate and tier come from the planner
    (`.claude/scripts/route/route-plan.mjs` +
    `.claude/modules/models/selection.yaml`). An underivable chain prints as

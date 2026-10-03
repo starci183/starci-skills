@@ -1,0 +1,53 @@
+// Normalize provider observations without inventing unobserved quota, spend or reset values.
+import { quotaTimestamp as timestamp, inspectQuotaEvidence } from '../../lib/quota-evidence.mjs';
+const observedOrParent = (value, parent) => value == null ? parent : timestamp(value) ?? value;
+/** All percentage windows supplied by one provider/account response, including short windows. */
+export function quotaWindows(entry, observedAt) {
+  const windows = [];
+  const visit = (value, id) => {
+    if (!value || typeof value !== 'object') return;
+    if (Object.hasOwn(value, 'usedPercent')) windows.push({ id: value.id ?? id,
+      usedPercent: typeof value.usedPercent === 'number' ? value.usedPercent : null,
+      resetsAt: timestamp(value.resetsAt ?? value.resetAt),
+      observedAt: observedOrParent(value.observedAt ?? value.updatedAt, observedAt),
+      windowMinutes: value.windowMinutes ?? value.windowDurationMins ?? null });
+    for (const [key, nested] of Object.entries(value)) if (nested && typeof nested === 'object') visit(nested, id ? `${id}.${key}` : key);
+  };
+  visit(entry, '');
+  return windows;
+}
+/** Policy numbers come from allocation.admission; unknown/stale evidence never becomes available. */
+export function normalizeQuotaSnapshot(input = {}, { policy, now = Date.now() } = {}) {
+  const observedAt = timestamp(input.observedAt), auth = input.auth ?? 'unknown';
+  const parsedExpiry = timestamp(input.expiresAt);
+  const expiresAt = input.expiresAt != null && parsedExpiry === null ? input.expiresAt : parsedExpiry;
+  const base = { schema: 'starci/quota-snapshot@1', policyVersion: policy?.version ?? null, provider: input.provider ?? null, account: input.account ?? 'default',
+    authority: input.authority ?? 'provider-windows', auth, failureKind: input.failureKind ?? null,
+    observedAt, expiresAt, windows: [], fresh: false, normalAdmission: false, allowLaunchAttempt: false,
+    usedPercent: null, resetsAt: null, state: 'unknown', detail: input.detail ?? 'quota observation unknown' };
+  const windows = Array.isArray(input.windows) ? input.windows.map((window) => ({
+    id: window?.id, usedPercent: typeof window?.usedPercent === 'number' ? window.usedPercent : null,
+    resetsAt: timestamp(window?.resetsAt ?? window?.resetAt), observedAt: observedOrParent(window?.observedAt, observedAt),
+    windowMinutes: window?.windowMinutes ?? null,
+  })) : quotaWindows(input.entry, observedAt);
+  const evidence = { ...base, windows, ...(input.authority === 'owner-grant' ? { grant: input.grant ?? null } : {}) };
+  const inspected = inspectQuotaEvidence(evidence, { policy, now });
+  const valid = inspected.codes.length === 0;
+  if (input.authority === 'owner-grant') {
+    const available = valid && input.fresh !== false && !['dead', 'unknown'].includes(input.state) && input.normalAdmission !== false && input.allowLaunchAttempt !== false;
+    return { ...evidence, fresh: inspected.fresh && valid, state: available ? 'ok' : 'unknown', normalAdmission: available, allowLaunchAttempt: available };
+  }
+  const usedPercent = inspected.pressure;
+  const resets = windows.map((window) => window.resetsAt).filter((at) => at !== null).sort((a, b) => a - b);
+  const result = { ...base, windows, usedPercent, resetsAt: resets.length ? new Date(resets[0]).toISOString() : null,
+    fresh: inspected.fresh && inspected.codes.every((code) => code === 'quota-exhausted') };
+  if (input.state === 'dead' || auth === 'unavailable') return { ...result, state: 'dead', detail: input.detail ?? 'provider authentication unavailable' };
+  if ((!valid && inspected.codes.some((code) => code !== 'quota-exhausted')) || input.state === 'unknown' || input.fresh === false)
+    return { ...result, fresh: false, detail: input.detail ?? 'quota missing, stale or invalid' };
+  if (inspected.exhausted) return { ...result, state: 'dead', detail: 'a provider quota window is exhausted' };
+  if (!inspected.limited && (input.normalAdmission === false || input.allowLaunchAttempt === false))
+    return { ...result, detail: input.detail ?? 'provider observation blocks normal admission' };
+  const limited = inspected.limited;
+  return { ...result, state: limited ? 'limited' : 'ok', normalAdmission: !limited, allowLaunchAttempt: !limited,
+    detail: input.detail ?? (limited ? 'a quota window is reserved for scoped recovery' : 'all observed quota windows have normal headroom') };
+}

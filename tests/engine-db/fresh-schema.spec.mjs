@@ -20,22 +20,23 @@ const tmp = (t) => {
 };
 const columns = (db, table) => db.prepare(`SELECT name FROM pragma_table_info('${table}')`).all().map((r) => r.name);
 const views = (db) => db.prepare("SELECT name FROM sqlite_master WHERE type='view' ORDER BY name").all().map((r) => r.name);
-const common = (db, version) => {
+const common = (db, version, journal = [[1, '0001-init']]) => {
   assert.equal(Number(db.prepare('PRAGMA user_version').get().user_version), version);
-  assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations').all().map((r) => [r.version, r.name]), [[1, '0001-init']]);
+  assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map((r) => [r.version, r.name]), journal);
   assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
   assert.equal(db.prepare('PRAGMA foreign_key_check').all().length, 0);
   for (const view of views(db)) assert.doesNotThrow(() => db.prepare(`SELECT * FROM ${view} LIMIT 1`).all(), `${view} answers`);
 };
 
-test('each database has one schema file and no migration chain', () => {
-  for (const dir of ['machine', 'runtime']) assert.deepEqual(fs.readdirSync(path.join(MIGRATIONS, dir)), ['0001-init.sql'], dir);
+test('runtime keeps its init schema; machine carries the additive provider receipt upgrade', () => {
+  assert.deepEqual(fs.readdirSync(path.join(MIGRATIONS, 'runtime')), ['0001-init.sql']);
+  assert.deepEqual(fs.readdirSync(path.join(MIGRATIONS, 'machine')).sort(), ['0001-init.sql', '0002-provider-reservations.sql']);
 });
 
 test('a fresh machine.sqlite has the columns, kinds and views the runtime queries need', (t) => {
   const m = openMachine({ file: path.join(tmp(t), 'machine.sqlite') });
   try {
-    common(m.db, MACHINE_VERSION);
+    common(m.db, MACHINE_VERSION, [[1, '0001-init'], [2, '0002-provider-reservations']]);
     assert.deepEqual(columns(m.db, 'terminals'), ['handle', 'title', 'role', 'opened_at', 'closed_at', 'close_verified_at', 'closed_by']);
     const worktrees = columns(m.db, 'worktrees');
     for (const column of ['path', 'kind', 'orca_id', 'checkpoint_sha', 'release_pending_at', 'removed_at']) assert.ok(worktrees.includes(column), `worktrees.${column}`);

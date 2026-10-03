@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {hostToolsRequired,kindRoute,raiseToFloor,selectPool,loadRuntimes} from '../../scripts/agent/models.mjs';
+import {hostToolsRequired,kindRoute,raiseToFloor,loadRuntimes} from '../../scripts/agent/models.mjs';
+import {fakePoolSelection as selectPool} from '../helpers/fake-admission.mjs';
 import {loadPrices,priceOf,costOfRow} from '../../scripts/lib/llm-usage.mjs';
 
 // runtimes.yaml roleOfKind is the allocator's reading of every kind: role, think/hands-on work and the
