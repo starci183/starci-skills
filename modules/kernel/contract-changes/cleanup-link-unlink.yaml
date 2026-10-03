@@ -1,0 +1,12 @@
+id: cleanup-link-unlink
+effectiveAt: 2026-10-03T19:41:14.738Z
+summary: >-
+  Existing unlinkOnly removes each discovered link directly. Link enumeration never follows
+  targets, partial errors remain visible, and the final rescan requires zero remaining links.
+  Windows link cleanup avoids a separate cmd process per link. Native worktree owners retain
+  their placement, ownership, hold and Source integrity gates.
+reach: new-legs
+paths:
+  - scripts/api/fs/remove-links-under.mjs
+  - tests/api-fs/remove-links-under.spec.mjs
+  - modules/kernel/contract-changes/cleanup-link-unlink.yaml
