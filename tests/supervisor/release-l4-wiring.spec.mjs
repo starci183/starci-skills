@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { parityOutcome, parityPlan, parityScript, readWorkflows, runParity } from '../../scripts/supervisor/release-linux-parity.mjs';
 import { sonarSupplier } from '../../scripts/supervisor/release-l4-sonar.mjs';
 import { sonarUp } from '../../scripts/gates/sonar-status.mjs';
-import { exampleApps, planL4, runL4 } from '../../scripts/supervisor/release-l4.mjs';
+import { exampleApps, planL4, runL4, scriptsOf, specEnv } from '../../scripts/supervisor/release-l4.mjs';
 import { cutRelease } from '../../scripts/supervisor/release-cut.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -249,6 +249,51 @@ test('L4: the installs run first as a real npm ci (a node_modules link is remove
   assert.equal(closed, 2, 'the stack is put back even when a step throws');
   const stuck = (await runL4(base, { plan, supplier, unlink: () => false, parity: null, step: () => ({ ok: true, log: 'x', ms: 1, text: '' }) }));
   assert.deepEqual([stuck.find((s) => s.name === 'shop: npm ci').ok, stuck.find((s) => s.name === 'shop: npm ci').why], [false, 'a node_modules link could not be removed']);
+});
+
+test('L4: the runtime spec step runs on the example installs with STARCI_REQUIRE_APP_INSTALLS=1, so a scaffold spec fails instead of skipping; no other step carries that env', async (t) => {
+  const base = tmp(t, 'specenv');
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: 'x', check: 'x' } }));
+  for (const name of ['shop', 'blog']) {
+    const dir = path.join(base, 'examples', name);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify({ kind: 'app' }));
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, scripts: {} }));
+    fs.writeFileSync(path.join(dir, 'package-lock.json'), '{}');
+  }
+  const apps = exampleApps(base);
+  const plan = planL4(base, { runtimeRoot: base });
+  const spec = plan.steps.find((s) => s.name === 'npm test');
+  assert.deepEqual(spec.env, specEnv(apps));
+  assert.equal(spec.env.STARCI_REQUIRE_APP_INSTALLS, '1');
+  assert.deepEqual(spec.env.STARCI_APP_INSTALLS.split(path.delimiter), apps.map((a) => path.join(a.dir, 'node_modules')), 'every example install, in example order');
+  assert.deepEqual(plan.steps.filter((s) => s.env).map((s) => s.name), ['npm test'], 'only the spec run is handed the env');
+  const seen = {};
+  await runL4(base, { plan, supplier: { proofs: {}, close: () => {} }, unlink: () => true, parity: null, step: (s, o) => { seen[s.name] = o.env; return { ok: true, log: 'x', ms: 1, text: '' }; } });
+  assert.equal(seen['npm test'].STARCI_REQUIRE_APP_INSTALLS, '1');
+  assert.ok(Object.keys(seen['npm test']).length > 2, 'the process env is kept under the two variables');
+  assert.equal(seen['npm run check'], undefined, 'the other steps run on the default env');
+});
+
+test('L4: a lite app is planned without the test scripts it cannot have, a full app that lacks one is absent and fails the row, and the edition comes from hfs.json', (t) => {
+  const base = tmp(t, 'lite');
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: 'x', check: 'x' } }));
+  const lite = ['typecheck', 'lint', 'format:check', 'build:be', 'build:fe', 'docker:build'];
+  const full = [...lite, 'typecheck:tests', 'test', 'test:contract', 'test:integration', 'test:e2e'];
+  for (const [name, edition, scripts] of [['tiny', 'lite', lite], ['big', undefined, full.filter((s) => s !== 'test:e2e')]]) {
+    const dir = path.join(base, 'examples', name);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify({ kind: 'app', ...(edition ? { edition } : {}) }));
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, scripts: Object.fromEntries(scripts.map((s) => [s, 'x'])) }));
+    fs.writeFileSync(path.join(dir, 'package-lock.json'), '{}');
+  }
+  assert.deepEqual(exampleApps(base).map((a) => [a.name, a.edition]), [['big', 'full'], ['tiny', 'lite']]);
+  const plan = planL4(base, { runtimeRoot: base });
+  const rows = (app) => plan.steps.filter((s) => s.name.startsWith(`${app}: npm run `)).map((s) => [s.name.replace(`${app}: npm run `, ''), s.absent ?? false]);
+  assert.deepEqual(rows('tiny'), lite.map((s) => [s, false]), 'the lite row has the six scripts and no absent step');
+  assert.deepEqual(rows('big').filter(([, absent]) => absent), [['test:e2e', true]], 'a full app that lacks a script is absent, never skipped by silence');
+  assert.equal(rows('big').length, 11);
+  assert.deepEqual(scriptsOf({ edition: 'full' }).length, 11);
 });
 
 test('the cut runs the default L4 row with its wiring: a red Linux step is a red suite and blocks the cut; the heavy part runs inside the host lock', async (t) => {

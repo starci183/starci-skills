@@ -317,7 +317,7 @@ async function clockTruth(row, code, src, { now = Date.now() } = {}) {
 // capture (a3-3: close-op-terminal.mjs, orca-runs.mjs) may take. A ledger or state DB without those tables (the old
 // schema) is skipped. The truth check clears the clock once the transcript exists.
 
-export const TRANSCRIPT_CODE = 'TRANSCRIPT_MISSING';
+const TRANSCRIPT_CODE = 'TRANSCRIPT_MISSING';
 const TRANSCRIPT_WINDOW_MS = 86_400_000;
 const TRANSCRIPT_LIMIT = 200;
 const hasTable = (db, name) => sqliteHasTable(db, name, { views: true });

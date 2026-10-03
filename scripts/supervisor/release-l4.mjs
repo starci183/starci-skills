@@ -21,6 +21,9 @@ import { sonarSupplier } from './release-l4-sonar.mjs';
 const BROWSER_SKIPS = Object.freeze(['draw-render', 'draw-rationale', 'draw-layer']);
 const INFRASTRUCTURE = /\b(?:docker|postgres(?:ql)?|supabase|kafka|redis|minio|keycloak|compose|stack|orca|port|socket|network|database|infrastructure|unavailable|not installed|not reachable)\b/i;
 const EXAMPLE_SCRIPTS = Object.freeze(['typecheck', 'typecheck:tests', 'lint', 'format:check', 'test', 'test:contract', 'test:integration', 'test:e2e', 'build:be', 'build:fe', 'docker:build']);
+/** A lite app holds no tests (lite holds no tests): its row is the full row without them; the lite scaffold e2e inside the spec run is its behaviour proof. */
+const LITE_NO_SCRIPTS = Object.freeze(['typecheck:tests', 'test', 'test:contract', 'test:integration', 'test:e2e']);
+export const scriptsOf = (app) => (app.edition === 'lite' ? EXAMPLE_SCRIPTS.filter((script) => !LITE_NO_SCRIPTS.includes(script)) : EXAMPLE_SCRIPTS);
 /** The proofs of the checks column that only a tool outside npm scripts can give (Sonar: release-l4-sonar.mjs): each must answer {ok, log}. */
 const L4_PROOFS = Object.freeze(['sonar']);
 const STEP_TIMEOUT_MS = 60 * 60_000;
@@ -51,14 +54,23 @@ export function skipReport(steps, opts) {
   return { skips, failures, declared: [...new Set(skips.filter((k) => k.class === 'declared').map((k) => k.name))].sort() };
 }
 
-/** The example apps of `repo` (examples/<name>/hfs.json of kind app): [{name, dir}]. */
+/** The example apps of `repo` (examples/<name>/hfs.json of kind app): [{name, dir, edition}], the edition `lite` or `full`. */
 export function exampleApps(repo) {
   const root = path.join(repo, 'examples');
   if (!fs.existsSync(root)) return [];
   return fs.readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory()).flatMap((e) => {
-    try { return JSON.parse(fs.readFileSync(path.join(root, e.name, 'hfs.json'), 'utf8')).kind === 'app' ? [{ name: e.name, dir: path.join(root, e.name) }] : []; } catch { return []; }
+    try {
+      const hfs = JSON.parse(fs.readFileSync(path.join(root, e.name, 'hfs.json'), 'utf8'));
+      return hfs.kind === 'app' ? [{ name: e.name, dir: path.join(root, e.name), edition: hfs.edition === 'lite' ? 'lite' : 'full' }] : [];
+    } catch { return []; }
   });
 }
+
+/**
+ * The env of the runtime's own spec run (`npm test`): the example apps' installs (the real `npm ci` steps that run first) are what the scaffold specs borrow their framework packages from
+ * (STARCI_APP_INSTALLS), and a missing install fails the spec instead of skipping it (STARCI_REQUIRE_APP_INSTALLS=1): the scaffold lint, typecheck and api boot proofs never pass silently.
+ */
+export const specEnv = (apps) => ({ STARCI_REQUIRE_APP_INSTALLS: '1', STARCI_APP_INSTALLS: apps.map((app) => path.join(app.dir, 'node_modules')).join(path.delimiter) });
 
 /** The L4 plan of `repo`: {steps: [{name, cmd, args, cwd, absent?, install?}], proofs: [names], linux: true}: the installs first, then the npm steps, the proofs and the Linux step. */
 export function planL4(repo, { runtimeRoot } = {}) {
@@ -67,11 +79,12 @@ export function planL4(repo, { runtimeRoot } = {}) {
     const name = `${app.name}: npm ci`;
     return fs.existsSync(path.join(app.dir, 'package-lock.json')) ? { name, cmd: 'npm', args: ['ci', '--no-audit', '--no-fund'], cwd: app.dir, install: true } : { name, absent: true, cwd: app.dir };
   });
-  const steps = [...installs, ...planFor(repo, runtimeRoot ? { runtimeRoot } : {}).steps.map((s) => ({ ...s, cwd: repo }))];
+  const env = specEnv(apps);
+  const steps = [...installs, ...planFor(repo, runtimeRoot ? { runtimeRoot } : {}).steps.map((s) => ({ ...s, cwd: repo, ...(s.name === 'npm test' && !s.absent ? { env } : {}) }))];
   for (const app of apps) {
     let scripts = {};
     try { scripts = JSON.parse(fs.readFileSync(path.join(app.dir, 'package.json'), 'utf8')).scripts ?? {}; } catch { scripts = {}; }
-    for (const script of EXAMPLE_SCRIPTS) {
+    for (const script of scriptsOf(app)) {
       const name = `${app.name}: npm run ${script}`;
       steps.push(scripts[script] ? { name, cmd: 'npm', args: ['run', script], cwd: app.dir } : { name, absent: true, cwd: app.dir });
     }
@@ -90,7 +103,7 @@ export async function runL4(repo, { proofs, parity = runParity, step = runStep, 
       if (s.absent) return { name: s.name, ok: false, absent: true, log: null, ms: 0, skips: [] };
       // A real install, never through a link into another checkout: a node_modules link is removed as a link first.
       if (s.install && !unlink(s.cwd)) return { name: s.name, ok: false, log: null, ms: 0, skips: [], why: 'a node_modules link could not be removed' };
-      const r = step(s, { cwd: s.cwd, timeoutMs: STEP_TIMEOUT_MS, tag: 'release' });
+      const r = step(s, { cwd: s.cwd, timeoutMs: STEP_TIMEOUT_MS, tag: 'release', ...(s.env ? { env: { ...process.env, ...s.env } } : {}) });
       return { name: s.name, ok: r.ok, log: r.log, ms: r.ms, skips: skipsOf(r.text) };
     });
     const proved = [];

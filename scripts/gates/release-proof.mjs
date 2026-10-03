@@ -40,6 +40,15 @@ const isApp = (repo) => readJsonFile(path.join(repo, 'hfs.json'))?.kind === 'app
 const defaultNode = (args, opts) => runNode(args, { maxBuffer: 512 * 1024 * 1024, ...opts });
 const defaultNpm = (args, opts) => runNpm(args, { maxBuffer: 512 * 1024 * 1024, ...opts });
 
+/**
+ * The npx arguments that scaffold the release app from the PUBLISHED packages at their canon pins: the one `starci` bin is @starci/cli's (the hfs package has no bin), and the scaffold
+ * writes the app with @starci/jest-preset beside it. `pins` is the pins map of knowledge/hfs/canon-pins.yaml; a pin that is missing throws.
+ */
+export function scaffoldInvocation(pins, into) {
+  const pinned = (name) => { if (!pins?.[name]?.version) throw new Error(`no canon pin for ${name}`); return `${name}@${pins[name].version}`; };
+  return ['-y', '-p', pinned('@starci/cli'), '-p', pinned('@starci/jest-preset'), 'starci', 'app', 'scaffold', 'release-app', '--into', into];
+}
+
 export function appInstallsStep({ runtime = runtimeRoot, node = defaultNode } = {}) {
   const run = node([path.join(runtime, 'scripts', 'gates', 'release-app-installs.mjs')], { cwd: runtime });
   const output = `${run.stdout ?? ''}\n${run.stderr ?? ''}`;
