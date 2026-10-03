@@ -41,7 +41,13 @@ validates a supported schema without upgrading it. These writers and their SQL f
 "Single writer" means one module, not one process: several processes write, and SQLite serializes
 them. Everything else calls named business functions of the writer; the land gate refuses
 `new DatabaseSync` on a ledger outside `engine/`. Readers (the harness UI, `poll.mjs`, CLI
-inspection) open read-only handles.
+inspection) open read-only handles. For public host observation, `openMachineObserver` exposes a handle with
+the read connection, metadata, in-memory recovery notices and close. Its typed queries reuse the operational
+registry, service, seat, provider, log, metric and resource projections. It validates
+supported host schemas and retains bounded retries and visible coded corruption diagnostics without
+persisting incidents or recovery notices. `openMachineReader` and `readMachine` retain operational incident
+and deferred recovery reporting. Project observers use `openLedgerReader` and must verify registry identity
+at their consuming boundary.
 
 ### Connection policy
 

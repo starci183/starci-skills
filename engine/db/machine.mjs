@@ -22,11 +22,11 @@
 //              or the outbox when the store refuses it). Never swallowed: readMachine rethrows it too.
 //   outbox   : <machine.sqlite>.outbox.jsonl, append-only: a typed write the store refused (writeOrDefer) waits there
 //              and the next flushOutbox (the land gate) applies it. Only idempotent writers are deferrable (DEFERRABLE).
-//   reader   : readOnly, query_only=ON, busy_timeout=15000
+//   reader   : readOnly, query_only=ON, busy_timeout=15000; observer diagnostics never persist
 //   startup  : sqlite_version, node_version, journal_mode and user_version are recorded in machine_meta; a file that is
 //              not 'starci/machine@1' at user_version MACHINE_VERSION is refused — a fresh machine.sqlite is created by
 //              openMachine on first use from engine/db/migrations/machine/0001-init.sql. The one supported v1-to-v2 additive provider receipt upgrade preserves all host rows; other versions refuse.
-// Nothing outside engine/ opens machine.sqlite with `new DatabaseSync`: callers use openMachine / openMachineReader /
+// Nothing outside engine/ opens machine.sqlite with `new DatabaseSync`: callers use openMachine / openMachineReader / openMachineObserver /
 // withMachine / readMachine and the typed functions on the handle.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -150,11 +150,8 @@ const isCorruptError = (error) => {
   return /database disk image is malformed|file is not a database|SQLITE_CORRUPT|SQLITE_NOTADB/i.test(String(error.message ?? error));
 };
 const errText = (error) => String(error?.message ?? error).slice(0, 500);
-/**
- * A corrupt error that survived every retry: say it on stderr, record it (machine_logs error row on a fresh connection,
- * or the outbox when the store refuses even that), and return the error to throw. Never swallowed.
- */
-function corruptIncident(file, error, { retries, where }) {
+/** A persistent corrupt error with read-only quick_check and visible stderr diagnostics. */
+function corruptDiagnostic(file, error, { retries, where }) {
   if (error?.code === MACHINE_CORRUPT_CODE) return error;
   const out = Object.assign(Error(`machine-db-corrupt: ${file} ${where}: SQLITE_CORRUPT persisted after ${retries} reopen(s): ${errText(error)}`),
     { code: MACHINE_CORRUPT_CODE, cause: error, file, retries, where });
@@ -166,8 +163,15 @@ function corruptIncident(file, error, { retries, where }) {
   } catch (e) { check = [`quick_check failed: ${errText(e)}`]; }
   out.quickCheck = check;
   process.stderr.write(`[machine-db] INCIDENT ${out.message} (quick_check: ${JSON.stringify(check)})\n`);
+  return out;
+}
+/** Operational failures also persist their incident through a fresh writer or the deferred outbox. */
+function corruptIncident(file, error, details) {
+  const out = corruptDiagnostic(file, error, details);
+  if (out === error) return out;
+  const { retries, where } = details;
   const row = { actor: 'harness', kind: 'machine-db.corrupt', level: 'error', msg: out.message,
-    data: { file, where, retries, error: errText(error), errcode: error?.errcode ?? null, quickCheck: check, pid: process.pid, sqlite: process.versions.sqlite, node: process.version } };
+    data: { file, where, retries, error: errText(error), errcode: error?.errcode ?? null, quickCheck: out.quickCheck, pid: process.pid, sqlite: process.versions.sqlite, node: process.version } };
   try {
     const { DatabaseSync } = require('node:sqlite');
     const db = new DatabaseSync(file, { timeout: MACHINE_BUSY_TIMEOUT_MS });
@@ -186,7 +190,7 @@ function corruptIncident(file, error, { retries, where }) {
  * retry is exact). Inside a transaction it is rethrown for handle.transaction() to retry the whole unit. Everything else
  * (isTransaction, function, close ...) is the live DatabaseSync's.
  */
-function resilientConnection(openRaw, { file, inTransaction, onRecovered }) {
+function resilientConnection(openRaw, { file, inTransaction, onRecovered, onCorrupt = corruptIncident }) {
   let raw = openRaw();
   let generation = 0;
   const reopen = () => { try { raw.close(); } catch { /* closed */ } raw = openRaw(); generation += 1; };
@@ -205,7 +209,7 @@ function resilientConnection(openRaw, { file, inTransaction, onRecovered }) {
         }
         if (!isCorruptError(error) || error.code === MACHINE_CORRUPT_CODE) throw error;
         if (inTransaction() || raw.isTransaction) throw error;
-        if (retries >= CORRUPT_RETRY_DELAYS_MS.length) throw corruptIncident(file, error, { retries, where });
+        if (retries >= CORRUPT_RETRY_DELAYS_MS.length) throw onCorrupt(file, error, { retries, where });
         sleepSync(CORRUPT_RETRY_DELAYS_MS[retries]);
         try { reopen(); } catch (openError) { if (!isCorruptError(openError)) throw openError; }
       }
@@ -255,7 +259,7 @@ const compareRevs = (a, b) => { const t = (r) => (/^\d{13}:/.test(String(r ?? ''
 
 const { refuseOld, checkSchema, createSchema, upgradeProviderSchema } = machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_VERSION, initSqlFile: INIT_SQL_FILE, controllers: CONTROLLERS, runtimeRev, pragma });
 
-function openConnection(file, { readOnly = false, env = process.env, now = Date.now } = {}) {
+function openConnection(file, { readOnly = false, env = process.env, now = Date.now, onCorrupt = corruptIncident } = {}) {
   const { DatabaseSync } = require('node:sqlite');
   need(typeof file === 'string' && file.trim(), 'openMachine needs a file');
   if (!readOnly) fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
@@ -300,7 +304,7 @@ function openConnection(file, { readOnly = false, env = process.env, now = Date.
       else if ((failures += 1) >= OPEN_RETRY_DELAYS_MS.length) break;
     }
   }
-  if (isCorruptError(lastError)) throw corruptIncident(path.resolve(file), lastError, { retries: OPEN_RETRY_DELAYS_MS.length - 1, where: 'open' });
+  if (isCorruptError(lastError)) throw onCorrupt(path.resolve(file), lastError, { retries: OPEN_RETRY_DELAYS_MS.length - 1, where: 'open' });
   throw lastError;
 }
 
@@ -374,6 +378,17 @@ export function openMachineReader({ file = null, env = process.env, now = Date.n
   if (!fs.existsSync(resolved)) return null;
   return makeHandle(() => openConnection(resolved, { readOnly: true }), { file: resolved, env, now, live: false, readOnly: true, checkpointer: false, tempDirs: [] });
 }
+/** Observation-only reads: supported schemas, bounded retries and diagnostics without incident or recovery writes. */
+export function openMachineObserver({ file = null, env = process.env, now = Date.now } = {}) {
+  const resolved = path.resolve(file ?? machineFileFor(env));
+  if (!fs.existsSync(resolved)) return null;
+  const { db, recovered, close } = connectionState(() => openConnection(resolved, { readOnly: true, env, now, onCorrupt: corruptDiagnostic }),
+    { file: resolved, onCorrupt: corruptDiagnostic });
+  const observer = { schema: MACHINE_SCHEMA, file: resolved, path: resolved, readOnly: true, db, recovered, close };
+  for (const [name, fn] of Object.entries({ listLedgers, services, seats, providerHealth, logs, latestMetrics, throttleState, poolBackoff, quotas, hostLeases, budgets }))
+    observer[name] = (...args) => fn(observer, ...args);
+  return observer;
+}
 /** fn(handle) over a writer, closed afterwards. */
 export function withMachine(fn, options = {}) {
   const m = openMachine(options);
@@ -387,15 +402,20 @@ export function readMachine(fn, fallback = null, options = {}) {
   finally { try { m?.close(); } catch { /* closed */ } }
 }
 
-function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tempDirs }) {
-  let depth = 0;
+function connectionState(openRaw, { file, inTransaction = () => false, onCorrupt = corruptIncident }) {
   const recovered = [];
   const noteRecovered = (r) => {
     recovered.push({ ...r, at: Date.now() });
     process.stderr.write(`[machine-db] transient SQLITE_CORRUPT recovered after ${r.retries} reopen(s) at ${r.where} (${file})
 `);
   };
-  const db = resilientConnection(openRaw, { file, inTransaction: () => depth > 0, onRecovered: noteRecovered });
+  const db = resilientConnection(openRaw, { file, inTransaction, onRecovered: noteRecovered, onCorrupt });
+  return { db, recovered, noteRecovered, close() { try { db.close(); } catch { /* closed */ } } };
+}
+
+function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tempDirs }) {
+  let depth = 0;
+  const { db, recovered, noteRecovered, close } = connectionState(openRaw, { file, inTransaction: () => depth > 0 });
   /**
    * BEGIN IMMEDIATE … COMMIT (nested calls join the open one). A transient corrupt error anywhere in the unit rolls it
    * back, reopens the connection and runs the unit again (bodies are DB-only, RESEARCH-STORAGE §3 rule 3, so a re-run is
@@ -431,7 +451,7 @@ function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tem
         // a reader cannot write: its notice waits in the outbox for the next flush
         try { if (readOnly) throw Error('read-only handle'); API.log(m, row); } catch (error) { try { deferWrite({ op: 'log', args: [row], file, error }); } catch { /* stderr already has it */ } }
       }
-      try { db.close(); } catch { /* closed */ }
+      close();
     } };
   for (const [name, fn] of Object.entries(API)) m[name] = (...args) => fn(m, ...args);
   m.tempDirs = tempDirs;
