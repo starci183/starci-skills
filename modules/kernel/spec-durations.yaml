@@ -1,27 +1,46 @@
-# Source: the TAP/spec-reporter output of the exact-head land run used for the test-speed audit.
-# The land workflow refreshes this record after the slow specs have been repaired.
+# The measured seconds of each spec file (serial proof runs of the test-speed lane; refreshed from the land pre-verify record) and the one
+# per-file budget scripts/checks/check-spec-budget.mjs judges. A row over limitSeconds is a finding unless modules/kernel/allowlist.yaml
+# heavy-specs declares the spec with its reason. The target for a whole land run is 15 minutes (docs/source-process.md, Test budget).
 schema: starci/spec-durations@1
 limitSeconds: 60
 rows:
-  - {spec: tests/engine-db/kernel-api.spec.mjs, seconds: 274}
-  - {spec: tests/gates/sonar-local.spec.mjs, seconds: 68}
-  - {spec: tests/hfs/architecture.spec.mjs, seconds: 105}
-  - {spec: tests/hfs/hfs-docker-rules.spec.mjs, seconds: 80}
-  - {spec: tests/hfs/hfs-scaffold-app.e2e.spec.mjs, seconds: 243}
-  - {spec: tests/kernel/cut-seam-stub.spec.mjs, seconds: 81}
-  - {spec: tests/kernel/gate-conditions.spec.mjs, seconds: 85}
-  - {spec: tests/kernel/handover.spec.mjs, seconds: 88}
-  - {spec: tests/kernel/kernel-wake-delivery-proof.spec.mjs, seconds: 78}
-  - {spec: tests/kernel/launch-smoke.spec.mjs, seconds: 74}
-  - {spec: tests/kernel/stale-input.spec.mjs, seconds: 75}
-  - {spec: tests/kernel-verbs-shared/managed-dispatch.spec.mjs, seconds: 121}
-  - {spec: tests/kernel-verbs-shared/op-ipc.spec.mjs, seconds: 88}
-  - {spec: tests/packages-hfs/hfs-cli.spec.mjs, seconds: 176}
-  - {spec: tests/packages-hfs/hfs-scaffold-app.spec.mjs, seconds: 944}
-  - {spec: tests/repo/architecture-default-deny.spec.mjs, seconds: 187}
-  - {spec: tests/repo/architecture-error-masked.spec.mjs, seconds: 99}
-  - {spec: tests/repo/architecture-hfs-dead-exports.spec.mjs, seconds: 124}
-  - {spec: tests/repo/architecture-hfs-redundancy.spec.mjs, seconds: 111}
-  - {spec: tests/repo/architecture-hfs-required-files.spec.mjs, seconds: 72}
-  - {spec: tests/supervisor/peer-wait.spec.mjs, seconds: 67}
-  - {spec: tests/supervisor/supervisor-kernel.spec.mjs, seconds: 189}
+  - {spec: tests/api-orca/orca-host-outage.spec.mjs, seconds: 41}
+  - {spec: tests/engine-db/cut-set-integration.spec.mjs, seconds: 9}
+  - {spec: tests/engine-db/kernel-api.spec.mjs, seconds: 69}
+  - {spec: tests/engine-db/orchestration-question-bridge.spec.mjs, seconds: 66}
+  - {spec: tests/engine-db/peer-messages.spec.mjs, seconds: 64}
+  - {spec: tests/gates/op-gate-loop.spec.mjs, seconds: 33}
+  - {spec: tests/gates/sonar-local.spec.mjs, seconds: 117}
+  - {spec: tests/hfs-architecture/architecture-hfs-layout.spec.mjs, seconds: 39}
+  - {spec: tests/hfs/architecture.spec.mjs, seconds: 109}
+  - {spec: tests/hfs/hfs-docker-rules.spec.mjs, seconds: 90}
+  - {spec: tests/hfs/hfs-repo-scripts-rules.spec.mjs, seconds: 60}
+  - {spec: tests/hfs/hfs-scaffold-app.e2e.spec.mjs, seconds: 282}
+  - {spec: tests/hfs/hfs-tree-rules.spec.mjs, seconds: 57}
+  - {spec: tests/kernel-verbs-shared/managed-dispatch.spec.mjs, seconds: 80}
+  - {spec: tests/kernel-verbs-shared/op-ipc.spec.mjs, seconds: 45}
+  - {spec: tests/kernel/cut-seam-stub.spec.mjs, seconds: 66}
+  - {spec: tests/kernel/dead-worker-self-heal.spec.mjs, seconds: 24}
+  - {spec: tests/kernel/gate-conditions.spec.mjs, seconds: 31}
+  - {spec: tests/kernel/handover.spec.mjs, seconds: 57}
+  - {spec: tests/kernel/kernel-wake-delivery-proof.spec.mjs, seconds: 64}
+  - {spec: tests/kernel/launch-smoke.spec.mjs, seconds: 69}
+  - {spec: tests/kernel/nudge-delivery-proof.spec.mjs, seconds: 43}
+  - {spec: tests/kernel/settle-next-step.spec.mjs, seconds: 46}
+  - {spec: tests/kernel/stale-active-unreachable.spec.mjs, seconds: 41}
+  - {spec: tests/kernel/stale-input.spec.mjs, seconds: 56}
+  - {spec: tests/kernel/waiter-priority.spec.mjs, seconds: 25}
+  - {spec: tests/kernel/workflow-checkpoint.spec.mjs, seconds: 93}
+  - {spec: tests/packages-hfs/hfs-cli.spec.mjs, seconds: 336}
+  - {spec: tests/packages-hfs/hfs-scaffold-app.spec.mjs, seconds: 333}
+  - {spec: tests/repo/architecture-default-deny.spec.mjs, seconds: 9}
+  - {spec: tests/repo/architecture-entrypoint.spec.mjs, seconds: 6}
+  - {spec: tests/repo/architecture-error-masked.spec.mjs, seconds: 11}
+  - {spec: tests/repo/architecture-fe-route-boundary.spec.mjs, seconds: 4}
+  - {spec: tests/repo/architecture-hfs-dead-exports.spec.mjs, seconds: 9}
+  - {spec: tests/repo/architecture-hfs-reachability.spec.mjs, seconds: 11}
+  - {spec: tests/repo/architecture-hfs-redundancy.spec.mjs, seconds: 19}
+  - {spec: tests/repo/architecture-hfs-required-files.spec.mjs, seconds: 40}
+  - {spec: tests/supervisor/peer-wait.spec.mjs, seconds: 44}
+  - {spec: tests/supervisor/supervisor-kernel.spec.mjs, seconds: 190}
+  - {spec: tests/supervisor/supervisor-push.spec.mjs, seconds: 46}

@@ -518,4 +518,35 @@ dead-script-entries:
 
 # Reserved: the export-to-reader exceptions of the symbol-graph check land here; shrink-only once populated.
 export-used: []
-heavy-specs: []
+# Specs over the per-file land budget (modules/kernel/spec-durations.yaml) whose real cost the lane could not share; shrink-only.
+heavy-specs:
+  - path: tests/engine-db/kernel-api.spec.mjs
+    reason: "real kernel CLI verbs over fresh ledgers, process-spawn bound"
+  - path: tests/engine-db/orchestration-question-bridge.spec.mjs
+    reason: "real CLI-dispatched bridge scenarios, process-spawn bound"
+  - path: tests/engine-db/peer-messages.spec.mjs
+    reason: "real kernel CLI message scenarios, process-spawn bound"
+  - path: tests/gates/sonar-local.spec.mjs
+    reason: "real git child processes and a real Sonar listener per case; the shared-fixture attempt showed no measured gain"
+  - path: tests/hfs/architecture.spec.mjs
+    reason: "the full architecture machine over 43 distinct repository states"
+  - path: tests/hfs/hfs-docker-rules.spec.mjs
+    reason: "the full repository check over the docker rule states"
+  - path: tests/hfs/hfs-scaffold-app.e2e.spec.mjs
+    reason: "real npm ci, generated-app lint/typecheck/test/build and a real Postgres in one end-to-end test"
+  - path: tests/kernel-verbs-shared/managed-dispatch.spec.mjs
+    reason: "real kernel CLI dispatch scenarios, process-spawn bound"
+  - path: tests/kernel/cut-seam-stub.spec.mjs
+    reason: "real kernel CLI cut-seam scenarios, process-spawn bound"
+  - path: tests/kernel/kernel-wake-delivery-proof.spec.mjs
+    reason: "real fake-host delivery worlds, process-spawn bound"
+  - path: tests/kernel/launch-smoke.spec.mjs
+    reason: "real launch smoke runs, process-spawn bound"
+  - path: tests/kernel/workflow-checkpoint.spec.mjs
+    reason: "real git workflow checkpoints, process-spawn bound"
+  - path: tests/packages-hfs/hfs-cli.spec.mjs
+    reason: "packs and starts the real hfs CLI in fresh processes per contract; measured under host contention, re-measure on a quiet host"
+  - path: tests/packages-hfs/hfs-scaffold-app.spec.mjs
+    reason: "real registry lock, scaffold, npm ci, hfs lint, backend build and fe build of one generated app: the install and build are the behaviour under test"
+  - path: tests/supervisor/supervisor-kernel.spec.mjs
+    reason: "real git, worktree and land-gate subprocesses are the behaviour under test"
