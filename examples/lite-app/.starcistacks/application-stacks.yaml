@@ -1,14 +1,13 @@
-# The stack declaration of the app, at the app root beside be/, fe/ and .starciwork (never under a side).
+# Local release analysis uses the shared host SonarQube extension and its sealed custody.
 schema: starci/application-stacks@1
 services:
   sonar:
     provider: sonarqube
     mode: local
-    purpose: Local release analysis for the shape-slot app example.
+    purpose: Local release analysis for the lite app example.
     host:
       local: http://localhost:9010
       public: https://sonar.starci.org
-    qualityGate: starci-quality
     stack:
       owner: host
       root: .claude/ext/sonar
@@ -17,17 +16,18 @@ services:
       container: starci-sonarqube
       publishedBy: cloudflared.yaml
     auth: token
+    qualityGate: starci-quality
     projects:
-      - {repository: shape-slot, key: shape-slot}
+      - {repository: lite-app, key: lite-app}
     credentials:
       - id: admin
         purpose: Host project provisioning through the existing Sonar gate.
         env: SONAR_TOKEN
         custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-admin-token.key}
-      - id: shape-slot
+      - id: lite-app
         purpose: Project analysis token provisioned and sealed by the existing Sonar gate before release analysis.
         env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-shape-slot-token.key}
+        custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-lite-app-token.key}
     ci:
       workflow: .github/workflows/examples.yml
       wiring: optional-follow-up

@@ -10,10 +10,11 @@ import { fileURLToPath } from 'node:url';
 import { parityOutcome, parityPlan, parityScript, readWorkflows, runParity } from '../../scripts/supervisor/release-linux-parity.mjs';
 import { sonarSupplier } from '../../scripts/supervisor/release-l4-sonar.mjs';
 import { sonarUp } from '../../scripts/gates/sonar-status.mjs';
-import { exampleApps, passesOf, planL4, runL4, scriptsOf, sectionOf, skipReport, specEnv, specFilesFor } from '../../scripts/supervisor/release-l4.mjs';
+import { exampleApps, passesOf, planL4, runL4, runtimeSpecStep, scriptsOf, sectionOf, skipReport, specEnv, specFilesFor } from '../../scripts/supervisor/release-l4.mjs';
 import { cutRelease } from '../../scripts/supervisor/release-cut.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const NODE_TEST = 'node --import ./tests/setup/low-priority.mjs --import ./tests/setup/isolated-temp.mjs --import ./tests/setup/isolated-registry.mjs --import ./tests/setup/runtime-copies.mjs --test "tests/**/*.spec.mjs"';
 const tmp = (t, label) => {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `starci-l4-${label}-`)));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
@@ -218,7 +219,7 @@ test('sonar: a red scan fails the proof without reading the dashboard; a missing
 
 test('L4: the installs run first as a real npm ci (a node_modules link is removed as a link first, a missing lockfile is absent), the Sonar supplier closes after the proofs even when a step throws, and the Linux step ends the row', async (t) => {
   const base = tmp(t, 'wire');
-  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: 'x', check: 'x' } }));
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: NODE_TEST, check: 'x' } }));
   for (const [name, lock] of [['shop', true], ['blog', false]]) {
     const dir = path.join(base, 'examples', name);
     fs.mkdirSync(dir, { recursive: true });
@@ -253,7 +254,7 @@ test('L4: the installs run first as a real npm ci (a node_modules link is remove
 
 test('L4: the runtime spec step runs on the example installs with STARCI_REQUIRE_APP_INSTALLS=1, so a scaffold spec fails instead of skipping; no other step carries that env', async (t) => {
   const base = tmp(t, 'specenv');
-  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: 'x', check: 'x' } }));
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: NODE_TEST, check: 'x' } }));
   for (const name of ['shop', 'blog']) {
     const dir = path.join(base, 'examples', name);
     fs.mkdirSync(dir, { recursive: true });
@@ -275,9 +276,70 @@ test('L4: the runtime spec step runs on the example installs with STARCI_REQUIRE
   assert.equal(seen['npm run check'], undefined, 'the other steps run on the default env');
 });
 
+test('L4: a fresh CPU and RAM decision reaches the actual runtime process after installs; the package leg is unchanged and the decision is recorded', async (t) => {
+  const base = tmp(t, 'concurrency');
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ scripts: { test: NODE_TEST } }));
+  const plan = { steps: [
+    { name: 'app: npm ci', cmd: 'npm', args: ['ci'], cwd: base, install: true },
+    { name: 'npm test', cmd: 'npm', args: ['test'], cwd: base, env: specEnv([]), evidence: true },
+    { name: 'package: npm test', cmd: 'npm', args: ['test'], cwd: base },
+  ], proofs: [], linux: false };
+  const events = [], seen = [];
+  let probes = 0;
+  const run = () => runL4(base, {
+    plan, proofs: {}, unlink: () => true, parity: null,
+    concurrencyDeps: { hostSample: () => {
+      events.push('probe');
+      probes += 1;
+      return { logicalThreads: 12, cpuBusy: probes === 1 ? 0.25 : 0.75, totalRamBytes: 32 * 1024 ** 3, freeRamBytes: 12 * 1024 ** 3 };
+    } },
+    step: (s, options) => {
+      events.push(s.name);
+      seen.push({ step: s, options });
+      const log = path.join(base, `${seen.length}.log`);
+      fs.writeFileSync(log, '✔ runtime proof (1ms)\n');
+      return { ok: true, log, ms: 1, text: '✔ runtime proof (1ms)\n' };
+    },
+  });
+  const first = await run();
+  assert.deepEqual(events, ['app: npm ci', 'probe', 'npm test', 'package: npm test']);
+  assert.equal(probes, 1, 'exactly one fresh probe for the actual runtime spec process');
+  assert.equal(seen[1].step.cmd, 'node');
+  assert.deepEqual(seen[1].step.args, [
+    '--import', './tests/setup/low-priority.mjs', '--import', './tests/setup/isolated-temp.mjs',
+    '--import', './tests/setup/isolated-registry.mjs', '--import', './tests/setup/runtime-copies.mjs',
+    '--test', '--test-concurrency=4', 'tests/**/*.spec.mjs',
+  ], 'the owning script retains its actual preloads and glob, with the selected limit before file arguments');
+  assert.equal(seen[1].options.env.STARCI_REQUIRE_ORCA_LIVE, '1');
+  assert.equal(seen[2].step, plan.steps[2], 'the existing package leg receives its original command');
+  assert.deepEqual(first[1].command, { cmd: 'node', args: seen[1].step.args });
+  assert.equal(first[1].concurrency.concurrency, 4);
+  assert.deepEqual(first[1].passes, ['runtime proof']);
+  assert.match(fs.readFileSync(first[1].log, 'utf8'), /\[concurrency\]\n\{"concurrency":4,"mode":"auto"/);
+  const second = await run();
+  assert.equal(probes, 2, 'a later spec start samples again instead of reusing the first budget');
+  assert.ok(seen[4].step.args.includes('--test-concurrency=1'));
+  assert.equal(second[1].concurrency.concurrency, 1);
+});
+
+test('L4: runtime binding fails closed for shell commands, lifecycle hooks, and a script that overrides the host budget', (t) => {
+  const base = tmp(t, 'script');
+  const bind = (scripts) => {
+    fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ scripts }));
+    return runtimeSpecStep(base, { cmd: 'npm', args: ['test'] }, { concurrency: 4 });
+  };
+  assert.throws(() => bind({ test: 'node --test "tests/**/*.spec.mjs" && echo done' }), /without shell composition/);
+  assert.throws(() => bind({ test: 'node --test\necho done' }), /shell line breaks/);
+  assert.throws(() => bind({ test: NODE_TEST, pretest: 'node setup.mjs' }), /lifecycle hooks/);
+  assert.throws(() => bind({ test: NODE_TEST, posttest: 'node cleanup.mjs' }), /lifecycle hooks/);
+  assert.throws(() => bind({ test: 'node --test --test-concurrency=2 "tests/**/*.spec.mjs"' }), /release host budget/);
+  assert.throws(() => bind({ test: 'node --test --test-isolation=none "tests/**/*.spec.mjs"' }), /release host budget/);
+  assert.throws(() => bind({ test: 'echo test' }), /direct node --test command/);
+});
+
 test('L4: a lite app is planned without the test scripts it cannot have, a full app that lacks one is absent and fails the row, and the edition comes from hfs.json', (t) => {
   const base = tmp(t, 'lite');
-  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: 'x', check: 'x' } }));
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: NODE_TEST, check: 'x' } }));
   const lite = ['codegen', 'typecheck', 'lint', 'format:check', 'build:be', 'build:fe', 'docker:build'];
   const full = [...lite, 'typecheck:tests', 'test', 'test:contract', 'test:integration', 'test:e2e'];
   for (const [name, edition, scripts] of [['tiny', 'lite', lite], ['big', undefined, full.filter((s) => s !== 'test:e2e')]]) {
@@ -347,7 +409,7 @@ test('specFilesFor finds the spec files that hold a test title as literal text a
 
 test('L4 evidence: the Linux leg is handed the spec files of the host run\'s skipped tests, its log is read back, and a test that ran in neither leg fails the row', async (t) => {
   const base = tmp(t, 'evidence');
-  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: 'x', check: 'x' } }));
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: NODE_TEST, check: 'x' } }));
   fs.mkdirSync(path.join(base, 'tests', 'cli'), { recursive: true });
   fs.writeFileSync(path.join(base, 'tests', 'cli', 'completions.spec.mjs'), "test('zsh completion has valid syntax', () => {});\ntest('a title only the host skipped', () => {});\n");
   const plan = planL4(base, { runtimeRoot: base });

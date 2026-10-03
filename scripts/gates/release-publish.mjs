@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// release-publish.mjs - publish the @starci packages whose local version is not on the npm registry: leaves first, the
-// packages that bundle the runtime's canon-pins copy last, each after its clean proof, each confirmed on the registry with a
-// matching shasum, then the canon binding must be green. The ONE publishing path of the runtime, and a human step.
+// release-publish.mjs - publish the @starci packages whose local version is not on the npm registry in dependency-first
+// order (release-plan.mjs publishOrder). Packages without bundled canon pins win only among ready ties; dependency cycles
+// refuse the plan. Each publication follows its clean proof and registry confirmation with a matching shasum, then the canon
+// binding must be green. The ONE publishing path of the runtime, and a human step.
 //
 //   starci release publish                              the plan only (default): registry state, blockers, steps
 //   starci release publish --publish --npm-user <name>  runs the plan; <name> must be the logged-in npm account

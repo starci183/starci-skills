@@ -89,6 +89,10 @@ _starci() {
         connect:telegram-media:--verdict) COMPREPLY=( $(compgen -W "pass fail blocked" -- "$cur") ); return 0;;
         connect:telegram-media:--dispatch) return 0;;
         connect:tunnel:--port) return 0;;
+        debug:pass:--loop-id) return 0;;
+        debug:pass:--scheduler) COMPREPLY=( $(compgen -W "codex-heartbeat claude-loop" -- "$cur") ); return 0;;
+        debug:pass:--scheduler-id) return 0;;
+        debug:pass:--confirmation) COMPREPLY=( $(compgen -W "cancelled ended not-created" -- "$cur") ); return 0;;
         debug:pass:--snapshot) return 0;;
         debug:pass:--child-timeout) return 0;;
         debug:pass:--token-window) return 0;;
@@ -920,7 +924,7 @@ _starci() {
         connect:telegram) COMPREPLY=( $(compgen -W "--discover-chat --ledger --repo --workflow --dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
         connect:telegram-media) COMPREPLY=( $(compgen -W "--ledger --repo --workflow --job --attempt --op --verdict --dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
         connect:tunnel) COMPREPLY=( $(compgen -W "--port --fast --json --cwd --quiet --help --edition" -- "$cur") );;
-        debug:pass) COMPREPLY=( $(compgen -W "--snapshot --child-timeout --token-window --token-spike --key --lane --reason --json --cwd --quiet --help --edition" -- "$cur") );;
+        debug:pass) COMPREPLY=( $(compgen -W "--loop-id --scheduler --scheduler-id --confirmation --confirmed --snapshot --child-timeout --token-window --token-spike --key --lane --reason --json --cwd --quiet --help --edition" -- "$cur") );;
         debug:run) COMPREPLY=( $(compgen -W "--repo --since-hours --child-timeout --token-window --token-spike --json --cwd --quiet --help --edition" -- "$cur") );;
         docker:build) COMPREPLY=( $(compgen -W "--tag --no-cache --json --cwd --quiet --help --edition" -- "$cur") );;
         docker:down) COMPREPLY=( $(compgen -W "--env --volumes --json --cwd --quiet --help --edition" -- "$cur") );;

@@ -15,7 +15,9 @@
 //      packages' own tests read - the proof regenerates them first (the runtime copy generator) and carries what
 //      the fresh sync wrote;
 //   2. installs it from its own manifest: `npm ci` on its own lockfile, or `npm install` when it carries none (the
-//      report says `npm install (no lockfile)`, so a package that ships without a lock is visible);
+//      report says `npm install (no lockfile)`, so a package that ships without a lock is visible). Exact declared local
+//      dependencies use their candidate tarballs in the scratch manifest; installed regular files must match the pack.
+//      A locked unit needing that substitution refuses instead of altering its lockfile;
 //   3. runs its declared `test` script there. A package that declares none is red (PACKAGE_NO_TEST): a published
 //      package proves itself.
 // A workspace member (a folder some ancestor package.json lists in `workspaces`, the eslint canons of
@@ -34,17 +36,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runNpm } from '../api/npm/run-npm.mjs';
+import { pack as packNpm } from '../api/npm/pack.mjs';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../lib/is-main.mjs';
 import { loadPins } from './canon-pins.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { runScript } from '../api/node/run-script.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
+import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { diff } from '../api/git/diff.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { tailLines } from '../lib/clip.mjs';
+import { tarFiles } from '../lib/tar-files.mjs';
 
 export const PROOF_EXIT = Object.freeze({ green: 0, red: 1, unrun: 2 });
 export const PROOF_CODES = Object.freeze({ install: 'PACKAGE_INSTALL_RED', test: 'PACKAGE_TEST_RED', noTest: 'PACKAGE_NO_TEST', unrun: 'PACKAGE_PROOF_UNRUN' });
@@ -175,11 +180,76 @@ const npmRun = (args, { cwd, env, timeout }) => {
   return { status: r.status, error: r.error ?? null, timedOut: r.error?.code === 'ETIMEDOUT' || (r.signal && r.status === null), output: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 };
 
+function preparePackedDependencies({ dirs, own, temp, locked, env, pack }) {
+  const candidates = new Map();
+  for (const dir of dirs) {
+    const manifest = readJson(path.join(dir, 'package.json'));
+    if (candidates.has(manifest.name)) return { status: 'unrun', output: `duplicate local package ${manifest.name}` };
+    candidates.set(manifest.name, { dir, manifest });
+  }
+  const requested = new Map();
+  const changes = [];
+  const sections = ['dependencies', 'devDependencies', 'optionalDependencies'];
+  for (const dir of own) {
+    const manifest = readJson(path.join(dir, 'package.json'));
+    for (const section of [...sections, 'peerDependencies']) for (const [name, version] of Object.entries(manifest[section] ?? {})) {
+      const candidate = candidates.get(name);
+      if (!name.startsWith('@starci/') || !candidate || own.includes(candidate.dir)) continue;
+      if (version !== candidate.manifest.version) return { status: 'red', output: `${manifest.name} declares ${name}@${version}, but the candidate is ${candidate.manifest.version}: no tarball substitution` };
+      if (locked || section === 'peerDependencies') return { status: 'unrun', output: `${manifest.name} needs local ${name}@${version}, but ${locked ? 'a locked install' : 'a peer dependency'} cannot substitute a candidate tarball without changing its dependency contract` };
+      requested.set(name, candidate);
+      changes.push({ dir, section, name });
+    }
+  }
+  const payloads = [];
+  if (!requested.size) return { payloads };
+  const destination = path.join(temp, 'packed-dependencies');
+  fs.mkdirSync(destination);
+  for (const [name, candidate] of requested) {
+    for (const [nested, version] of Object.entries({ ...candidate.manifest.dependencies, ...candidate.manifest.optionalDependencies, ...candidate.manifest.peerDependencies })) {
+      if (nested.startsWith('@starci/') && candidates.has(nested)) return { status: 'unrun', output: `${name} declares transitive local ${nested}@${version}: a direct tarball substitution cannot prove that install` };
+    }
+    const packed = pack(candidate.dir, destination, { cwd: candidate.dir, run: (args, options) => runNpm(args, { ...options, env }) });
+    if (!packed.ok) return { status: NETWORK.test(packed.detail ?? '') ? 'unrun' : 'red', output: `candidate pack ${name} failed: ${packed.detail}` };
+    if (!packed.file || path.basename(packed.file) !== packed.file) return { status: 'red', output: `candidate pack ${name} returned an unsafe tarball path` };
+    const archive = path.join(destination, packed.file);
+    if (!fs.lstatSync(archive).isFile()) return { status: 'red', output: `candidate pack ${name} is not a regular tarball file` };
+    const files = tarFiles(fs.readFileSync(archive));
+    if ([...files.keys()].some((file) => !file.startsWith('package/') || file.includes('\\') || file.split('/').some((part) => !part || part === '.' || part === '..'))) return { status: 'red', output: `candidate pack ${name} contains an unsafe payload path` };
+    const identity = JSON.parse(files.get('package/package.json')?.toString('utf8') ?? 'null');
+    if (identity?.name !== name || identity?.version !== candidate.manifest.version) return { status: 'red', output: `candidate pack ${name} has a different package name or version` };
+    payloads.push({ name, version: identity.version, archive, files });
+  }
+  for (const { dir, section, name } of changes) {
+    const file = path.join(dir, 'package.json');
+    const manifest = readJson(file);
+    manifest[section][name] = `file:${posixPath(payloads.find((payload) => payload.name === name).archive)}`;
+    fs.writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  return { payloads };
+}
+
+function verifyPackedDependencies(payloads, installRoot) {
+  for (const { name, version, files } of payloads) {
+    for (const [file, expected] of files) {
+      let target = installRoot;
+      const parts = ['node_modules', ...name.split('/'), ...file.slice('package/'.length).split('/')];
+      for (const [index, part] of parts.entries()) {
+        target = path.join(target, part);
+        const stat = fs.lstatSync(target, { throwIfNoEntry: false });
+        if (!stat || isLinkLike(target, { stat }) || (index === parts.length - 1 ? !stat.isFile() : !stat.isDirectory())) return `${name}@${version}: installed payload ${file} is missing or linked`;
+      }
+      if (!fs.readFileSync(target).equals(expected)) return `${name}@${version}: installed payload differs from the candidate tarball at ${file}`;
+    }
+  }
+  return null;
+}
+
 /**
  * Prove one install unit in a fresh temp directory. Returns one result per published package:
  * {name, dir, status: 'green'|'red'|'unrun', code, install, ms, output}.
  */
-function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, sources = [] } = {}) {
+function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, pack = packNpm, sources = [] } = {}) {
   const started = Date.now();
   const result = (pkg, status, code, extra = {}) => ({ name: pkg.name, dir: pkg.dir, status, code, ms: Date.now() - started, ...extra });
   const every = (status, code, extra) => unit.packages.map((pkg) => result(pkg, status, code, extra));
@@ -211,12 +281,17 @@ function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, 
     const locked = LOCKFILES.some((name) => fs.existsSync(path.join(installRoot, name)));
     const install = locked ? 'npm ci' : 'npm install (no lockfile)';
     const childEnv = { ...cleanEnv(env), npm_config_update_notifier: 'false' };
+    const prepared = preparePackedDependencies({ dirs: copied.map(at), own: [...new Set([installRoot, ...own.map(at)])], temp, locked, env: childEnv, pack });
+    if (prepared.status) return every(prepared.status, prepared.status === 'red' ? PROOF_CODES.install : PROOF_CODES.unrun, { install, output: prepared.output });
+    const localDependencies = prepared.payloads.map(({ name, version, files }) => ({ name, version, packedFiles: [...files.keys()].sort() }));
     const installed = npm([locked ? 'ci' : 'install', '--no-audit', '--no-fund'], { cwd: installRoot, env: childEnv, timeout: INSTALL_TIMEOUT_MS });
     if (installed.error && !installed.timedOut) return every('unrun', PROOF_CODES.unrun, { install, output: `npm could not start: ${installed.error.message}` });
     if (installed.status !== 0) {
       const unrun = installed.timedOut || NETWORK.test(installed.output);
       return every(unrun ? 'unrun' : 'red', unrun ? PROOF_CODES.unrun : PROOF_CODES.install, { install, output: tail(installed.output) });
     }
+    const dependencyFailure = verifyPackedDependencies(prepared.payloads, installRoot);
+    if (dependencyFailure) return every('red', PROOF_CODES.install, { install, localDependencies, output: dependencyFailure });
     return unit.packages.map((pkg) => {
       const dir = placed.get(pkg.name);
       const manifest = readJson(path.join(dir, 'package.json'));
@@ -224,7 +299,7 @@ function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, 
       const tested = npm(['test'], { cwd: dir, env: childEnv, timeout: TEST_TIMEOUT_MS });
       if (tested.error && !tested.timedOut) return result(pkg, 'unrun', PROOF_CODES.unrun, { install, output: `npm could not start: ${tested.error.message}` });
       if (tested.status !== 0) return result(pkg, 'red', PROOF_CODES.test, { install, output: tail(tested.output.split(/\r?\n/).filter((l) => !/^\s+at /.test(l)).join('\n'), 60) });
-      return result(pkg, 'green', null, { install });
+      return result(pkg, 'green', null, { install, ...(localDependencies.length ? { localDependencies } : {}) });
     });
   } catch (error) {
     return every('unrun', PROOF_CODES.unrun, { output: String(error?.stack ?? error) });
@@ -234,11 +309,11 @@ function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, 
 }
 
 /** Prove `packages` ([{name, dir}]); `sources` are the package folders (root-relative) copied beside each one. {exit, results} */
-export function provePackages(packages, { root = runtimeRoot, env = process.env, npm = npmRun, log = () => {}, sources = packages.map((p) => p.dir) } = {}) {
+export function provePackages(packages, { root = runtimeRoot, env = process.env, npm = npmRun, pack = packNpm, log = () => {}, sources = packages.map((p) => p.dir) } = {}) {
   const results = [];
   for (const unit of installUnits(packages, root)) {
     log(`package-clean-test: installing ${unit.packages.map((p) => p.name).join(', ')} (${unit.kind}) from ${posixPath(path.relative(root, unit.dir)) || '.'}`);
-    for (const r of proveUnit(unit, { root, env, npm, sources })) { results.push(r); log(line(r)); }
+    for (const r of proveUnit(unit, { root, env, npm, pack, sources })) { results.push(r); log(line(r)); }
   }
   const exit = results.some((r) => r.status === 'unrun') ? PROOF_EXIT.unrun : results.some((r) => r.status === 'red') ? PROOF_EXIT.red : PROOF_EXIT.green;
   return { exit, results };

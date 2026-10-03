@@ -151,13 +151,18 @@ Replaces: `hfs new`, `npx hfs new`
 
 ### starci app scaffold
 
-create a full or lite StarCi app repository from the canonical skeleton (--edition)
+create a full or lite StarCi app, including an empty unborn main Git repository
 
 | flag | type | |
 | --- | --- | --- |
 | `--into` | string |  |
 
 Positionals: name
+
+Conventions:
+
+- packages/hfs/scaffold/app.mjs accepts a new path or a plain .git-only repository with unborn main, no refs and an empty index.
+- Scaffold preserves Git metadata and configuration. Failure unlinks its own entries; replaced or occupied entries remain with a visible cleanup message.
 
 exit: 0 app created; 2 refusal or bad usage
 
@@ -398,6 +403,11 @@ run or maintain the debug loop; writes only its own debug-loop state
 
 | flag | type | |
 | --- | --- | --- |
+| `--loop-id` | string |  |
+| `--scheduler` | enum codex-heartbeat|claude-loop |  |
+| `--scheduler-id` | string |  |
+| `--confirmation` | enum cancelled|ended|not-created |  |
+| `--confirmed` | boolean |  |
 | `--snapshot` | string |  |
 | `--child-timeout` | number |  |
 | `--token-window` | number |  |
@@ -3180,7 +3190,8 @@ Roles: release, owner
 Conventions:
 
 - plan mode is read-only and reports registry blockers, canon rebind drift and example pin drift
-- publication uses the existing clean proof, leaf-first order, registry confirmation and shasum verification
+- publication uses the existing clean proof, registry confirmation and shasum verification
+- scripts/gates/release-plan.mjs publishOrder puts dependencies first and refuses cycles; packages without bundled canon pins win only among ready ties
 - after publication the flow rebinds code patterns, re-pins and installs examples, syncs them and proves every binding
 - publication never commits, pushes or tags; release cut owns those effects
 

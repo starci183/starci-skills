@@ -14,22 +14,7 @@ import { classifyContent } from '../../scripts/gates/release-registry.mjs';
 import { buildPlan, publishOrder, readRows } from '../../scripts/gates/release-plan.mjs';
 import { FINAL_PROOFS, PROOFS, parseArgs, runProofs, verdictOf } from '../../scripts/gates/release-check.mjs';
 import { EXIT, releasePublish } from '../../scripts/gates/release-publish.mjs';
-
-/** A one-file-per-entry ustar gzip, the shape `npm pack` writes. */
-function tgz(files) {
-  const blocks = [];
-  for (const [name, text] of Object.entries(files)) {
-    const body = Buffer.from(text);
-    const header = Buffer.alloc(512);
-    header.write(name, 0, 100, 'utf8');
-    header.write('0000644\0', 100);
-    header.write(`${body.length.toString(8).padStart(11, '0')}\0`, 124);
-    header.write('0', 156);
-    blocks.push(header, body, Buffer.alloc((512 - (body.length % 512)) % 512));
-  }
-  blocks.push(Buffer.alloc(1024));
-  return zlib.gzipSync(Buffer.concat(blocks));
-}
+import { tgz } from '../helpers/npm-tarball.mjs';
 
 const PIN = (name, dir, version) => `  '${name}':\n    version: ${version}\n    group: starci\n    install: registry\n    source: ${dir}/package.json\n`;
 
@@ -98,6 +83,29 @@ test('the plan reads the publish set from canon-pins, orders leaves by dependenc
   const plan = buildPlan({ root, registry: fakeRegistry() });
   assert.equal(plan.toPublish.length, 3);
   assert.deepEqual(plan.blockers, []);
+});
+
+test('a bundling dependency publishes before its leaf consumer and cycles across bundlers refuse', (t) => {
+  const root = tree(t);
+  const file = path.join(root, 'packages/leaf-b/package.json');
+  const consumer = JSON.parse(fs.readFileSync(file, 'utf8'));
+  consumer.dependencies['@starci/canon'] = '2.0.0';
+  fs.writeFileSync(file, JSON.stringify(consumer));
+  assert.deepEqual(publishOrder(readRows(root)).map((row) => row.name), ['@starci/leaf-a', '@starci/canon', '@starci/leaf-b']);
+  const bundled = path.join(root, 'packages/canon/package.json');
+  const dependency = JSON.parse(fs.readFileSync(bundled, 'utf8'));
+  dependency.dependencies = { '@starci/leaf-b': consumer.version };
+  fs.writeFileSync(bundled, JSON.stringify(dependency));
+  assert.throws(() => publishOrder(readRows(root)), /dependency cycle.*@starci\/canon.*@starci\/leaf-b/);
+});
+
+test('optional in-set dependencies also precede their consumers', (t) => {
+  const root = tree(t);
+  const file = path.join(root, 'packages/leaf-a/package.json');
+  const consumer = JSON.parse(fs.readFileSync(file, 'utf8'));
+  consumer.optionalDependencies = { '@starci/canon': '2.0.0' };
+  fs.writeFileSync(file, JSON.stringify(consumer));
+  assert.deepEqual(publishOrder(readRows(root)).map((row) => row.name), ['@starci/canon', '@starci/leaf-a', '@starci/leaf-b']);
 });
 
 test('plan blockers: a pin mismatch, an unreachable registry, content drift and the canon cascade', (t) => {

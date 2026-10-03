@@ -18,6 +18,7 @@ import { planFor, runStep } from './push-git.mjs';
 import { unlinkNodeModulesLink } from '../api/fs/unlink-node-modules-link.mjs';
 import { LINUX_SPECS_LABEL, runParity } from './release-linux-parity.mjs';
 import { sonarSupplier } from './release-l4-sonar.mjs';
+import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
 
 /** The only skips a release may keep: tests that need a browser the host may lack, matched by name. */
 const BROWSER_SKIPS = Object.freeze(['draw-render', 'draw-rationale', 'draw-layer']);
@@ -134,6 +135,28 @@ export function exampleApps(repo) {
  */
 export const specEnv = (apps) => ({ STARCI_REQUIRE_APP_INSTALLS: '1', STARCI_REQUIRE_ORCA_LIVE: '1', STARCI_APP_INSTALLS: apps.map((app) => path.join(app.dir, 'node_modules')).join(path.delimiter) });
 
+/** Bind the host budget to the owning direct Node test script, retaining its preloads and file selection. Pure apart from reading package.json. */
+export function runtimeSpecStep(repo, step, decision) {
+  const { scripts = {} } = JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8'));
+  if (scripts.pretest || scripts.posttest) throw new Error('L4 runtime test script has unsupported pretest/posttest lifecycle hooks');
+  const words = [];
+  let rest = String(scripts.test ?? '').trim();
+  if (/[\r\n]/u.test(rest)) throw new Error('L4 runtime test script must not contain shell line breaks');
+  while (rest) {
+    const token = /^(?:"([^"\r\n\\`$]*)"|'([^'\r\n\\`$]*)'|([^\s"'\\;&|<>`$]+))(?:\s+|$)/u.exec(rest);
+    if (!token) throw new Error('L4 runtime test script must be a direct Node command without shell composition');
+    words.push(token[1] ?? token[2] ?? token[3]);
+    rest = rest.slice(token[0].length);
+  }
+  const [command, ...args] = words;
+  if (command !== 'node' || !args.includes('--test')) throw new Error('L4 runtime test script must be a direct node --test command');
+  if (args.some((arg) => arg === '--test-concurrency' || arg.startsWith('--test-concurrency=') || arg === '--test-isolation=none')) {
+    throw new Error('L4 runtime test script must leave file concurrency to the release host budget');
+  }
+  args.splice(args.indexOf('--test') + 1, 0, `--test-concurrency=${decision.concurrency}`);
+  return { ...step, cmd: 'node', args };
+}
+
 /** The L4 plan of `repo`: {steps: [{name, cmd, args, cwd, absent?, install?}], proofs: [names], linux: true}: the installs first, then the npm steps, the proofs and the Linux step. */
 export function planL4(repo, { runtimeRoot } = {}) {
   const apps = exampleApps(repo);
@@ -172,15 +195,19 @@ async function linuxLeg(repo, { parity, apps, ran, parityDeps }) {
  * Run the L4 plan once (async: the Sonar gate is): a Promise of [{name, ok, log, ms, skips, absent?}]. `proofs` supplies the {ok, log} of each proof by name (default: the Sonar gate of every example, the stack
  * brought up and put back by `supplier.close`); a missing one is absent and fails. `parity` runs the Linux step (default runParity); `parity: null` leaves it out of a stand-in run.
  */
-export async function runL4(repo, { proofs, parity = runParity, step = runStep, plan = planL4(repo), apps = exampleApps(repo), supplier = null, unlink = unlinkNodeModulesLink, parityDeps = {} } = {}) {
+export async function runL4(repo, { proofs, parity = runParity, step = runStep, plan = planL4(repo), apps = exampleApps(repo), supplier = null, unlink = unlinkNodeModulesLink, parityDeps = {}, concurrencyDeps = {} } = {}) {
   const sup = proofs === undefined ? (supplier ?? sonarSupplier(apps)) : { proofs, close: () => {} };
   try {
     const ran = plan.steps.map((s) => {
       if (s.absent) return { name: s.name, ok: false, absent: true, log: null, ms: 0, skips: [] };
       // A real install, never through a link into another checkout: a node_modules link is removed as a link first.
       if (s.install && !unlink(s.cwd)) return { name: s.name, ok: false, log: null, ms: 0, skips: [], why: 'a node_modules link could not be removed' };
-      const r = step(s, { cwd: s.cwd, timeoutMs: STEP_TIMEOUT_MS, tag: 'release', ...(s.env ? { env: { ...process.env, ...s.env } } : {}) });
-      return { name: s.name, ok: r.ok, log: r.log, ms: r.ms, skips: skipsOf(r.text), ...(s.evidence ? { passes: passesOf(r.text) } : {}) };
+      // cutRelease already holds the release host lock. Probe afresh here, after installs, for this actual spec process only.
+      const decision = s.evidence ? resolveTestConcurrency(undefined, concurrencyDeps) : null;
+      const actual = decision ? runtimeSpecStep(s.cwd ?? repo, s, decision) : s;
+      const r = step(actual, { cwd: s.cwd, timeoutMs: STEP_TIMEOUT_MS, tag: 'release', ...(s.env ? { env: { ...process.env, ...s.env } } : {}) });
+      if (decision && r.log && fs.existsSync(r.log)) fs.appendFileSync(r.log, `\n[concurrency]\n${JSON.stringify(decision)}\n`);
+      return { name: s.name, ok: r.ok, log: r.log, ms: r.ms, skips: skipsOf(r.text), ...(s.evidence ? { passes: passesOf(r.text), concurrency: decision, command: { cmd: actual.cmd, args: actual.args } } : {}) };
     });
     const proved = [];
     for (const name of plan.proofs) {

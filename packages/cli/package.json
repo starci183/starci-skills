@@ -14,6 +14,9 @@
   "dependencies": {
     "@starci/hfs": "4.0.9"
   },
+  "scripts": {
+    "test": "node --test src/*.spec.mjs"
+  },
   "files": [
     "bin/",
     "src/",

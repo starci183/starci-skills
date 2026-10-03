@@ -1,6 +1,6 @@
 // release-plan.mjs - what a release would publish, decided from the tree and the registry's answers: the publish set (every
-// `group: starci` pin of knowledge/hfs/canon-pins.yaml that names a source), its order (leaves by @starci dependency, then
-// the packages that bundle the runtime's canon-pins copy, last), and the blockers. No process is started here: the registry
+// `group: starci` pin of knowledge/hfs/canon-pins.yaml that names a source), its dependency order (preferring packages
+// that do not bundle the runtime's canon-pins copy when both are ready), and the blockers. No process is started here: the registry
 // is a seam (release-registry.mjs), so the plan is judged on fakes in specs.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,7 +8,7 @@ import { loadPins } from './canon-pins.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 
 const SKIP = new Set(['node_modules', 'dist', 'storybook-static', 'reference-renders', 'coverage', '.git']);
-/** The file a package carries when it bundles the runtime's canon-pins copy: such a package is published after every other one. */
+/** The file a package carries when it bundles the runtime's canon-pins copy. */
 const BUNDLED_PINS = 'runtime/knowledge/hfs/canon-pins.yaml';
 
 /** Every package folder under packages/ (runtime-relative, posix); the walk stops at a package, so templates inside one are not packages. */
@@ -40,27 +40,26 @@ export function readRows(root) {
     rows.push({ name: manifest.name, dir, version: manifest.version, pin: entry?.pin ?? '-', kind,
       prepack: Boolean(manifest.scripts?.prepack), lock: fs.existsSync(path.join(root, dir, 'package-lock.json')),
       last: fs.existsSync(path.join(root, dir, BUNDLED_PINS)),
-      deps: Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies, ...manifest.devDependencies }).filter((k) => k.startsWith('@starci/')) });
+      deps: Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies, ...manifest.devDependencies, ...manifest.optionalDependencies }).filter((k) => k.startsWith('@starci/')) });
   }
   for (const [name, entry] of set) if (!rows.some((r) => r.name === name)) rows.push({ name, dir: entry.dir, version: '-', pin: entry.pin, kind: 'missing', prepack: false, lock: false, last: false, deps: [] });
   return rows;
 }
 
-/** The publish order of the rows in the set: leaves by @starci dependency (name order breaks ties), then the bundling packages by name. */
+/** Dependencies precede consumers; ready leaves precede ready bundlers and name order breaks ties. */
 export function publishOrder(rows) {
   const inPlan = rows.filter((r) => r.kind === 'set' || r.kind === 'pin-mismatch');
-  const leaves = inPlan.filter((r) => !r.last).sort((a, b) => a.name.localeCompare(b.name));
+  const pending = new Map(inPlan.map((row) => [row.name, row]));
   const ordered = [];
-  const seen = new Set();
-  const visit = (row, trail = []) => {
-    if (seen.has(row.name)) return;
-    if (trail.includes(row.name)) throw new Error(`dependency cycle ${[...trail, row.name].join(' > ')}`);
-    for (const dep of row.deps) { const found = leaves.find((x) => x.name === dep); if (found) visit(found, [...trail, row.name]); }
-    seen.add(row.name);
+  while (pending.size) {
+    const ready = [...pending.values()].filter((row) => !row.deps.some((name) => pending.has(name)))
+      .sort((a, b) => Number(a.last) - Number(b.last) || a.name.localeCompare(b.name));
+    if (!ready.length) throw new Error(`dependency cycle among ${[...pending.keys()].sort().join(', ')}`);
+    const row = ready[0];
     ordered.push(row);
-  };
-  leaves.forEach((row) => visit(row));
-  return [...ordered, ...inPlan.filter((r) => r.last).sort((a, b) => a.name.localeCompare(b.name))];
+    pending.delete(row.name);
+  }
+  return ordered;
 }
 
 /** One ordered row judged against the registry: {...row, registry, action: publish | published | drift | blocked | unreachable, note, blocker?}. */

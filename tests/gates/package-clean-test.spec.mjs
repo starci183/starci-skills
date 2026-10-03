@@ -8,6 +8,8 @@ import { loadPins } from '../../scripts/gates/canon-pins.mjs';
 import { spawnSync } from 'node:child_process';
 import { withoutGitLocalEnv } from '../../scripts/lib/git.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
+import { tgz } from '../helpers/npm-tarball.mjs';
+import { tarFiles } from '../../scripts/lib/tar-files.mjs';
 
 // scripts/gates/package-clean-test.mjs: a published package proves itself from a clean install. The fixture packages
 // install offline (npm_config_offline, one local file: dependency), so the spec needs no network.
@@ -129,4 +131,135 @@ test('a package outside a git work tree is a proof that did not run', (t) => {
   const { exit, results } = provePackages([{ name: 'p', dir: 'pkg' }], { root: dir, env: OFFLINE });
   assert.equal(exit, PROOF_EXIT.unrun, JSON.stringify(results));
   assert.match(results[0].output, /not inside a git work tree/);
+});
+
+function packedFixture(t, { declared = true, locked = false, version = '1.0.0' } = {}) {
+  const root = mkdtemp(t, 'starci-pkg-proof-fixture-');
+  gitIn(root, 'init', '-q');
+  for (const dir of ['consumer', 'dependency']) fs.mkdirSync(path.join(root, dir));
+  fs.writeFileSync(path.join(root, 'consumer/package.json'), JSON.stringify({ name: '@starci/consumer', version: '1.0.0', scripts: { test: 'node --test' },
+    ...(declared ? { dependencies: { '@starci/dependency': version } } : {}) }));
+  fs.writeFileSync(path.join(root, 'dependency/package.json'), JSON.stringify({ name: '@starci/dependency', version: '1.0.0', main: 'index.js' }));
+  fs.writeFileSync(path.join(root, 'dependency/index.js'), 'module.exports = 42;\n');
+  if (locked) fs.writeFileSync(path.join(root, 'consumer/package-lock.json'), '{}\n');
+  gitIn(root, 'add', 'consumer', 'dependency');
+  return { root, packages: [{ name: '@starci/consumer', dir: 'consumer' }], sources: ['consumer', 'dependency'] };
+}
+
+const successfulNpm = { status: 0, error: null, timedOut: false, output: '' };
+
+function packedSeams({ mutate = null, identity = null, linked = null } = {}) {
+  const calls = [];
+  const pack = (spec, destination) => {
+    calls.push('pack');
+    assert.equal(fs.existsSync(path.join(spec, 'untracked.js')), false);
+    assert.equal(fs.existsSync(path.join(spec, 'node_modules')), false);
+    const manifest = fs.readFileSync(path.join(spec, 'package.json'), 'utf8');
+    const file = 'dependency.tgz';
+    fs.writeFileSync(path.join(destination, file), tgz({ 'package/package.json': identity ?? manifest, 'package/index.js': fs.readFileSync(path.join(spec, 'index.js')) }));
+    return { ok: true, file, detail: '' };
+  };
+  const npm = (args, { cwd }) => {
+    calls.push(args[0]);
+    const dir = path.join(cwd, 'node_modules/@starci/dependency');
+    if (args[0] === 'install') {
+      const spec = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8')).dependencies['@starci/dependency'];
+      assert.match(spec, /^file:.*\.tgz$/);
+      fs.mkdirSync(path.dirname(dir), { recursive: true });
+      if (linked) fs.symlinkSync(linked, dir, process.platform === 'win32' ? 'junction' : 'dir');
+      else {
+        for (const [file, body] of tarFiles(fs.readFileSync(spec.slice('file:'.length)))) {
+          const target = path.join(dir, file.slice('package/'.length));
+          fs.mkdirSync(path.dirname(target), { recursive: true });
+          fs.writeFileSync(target, body);
+        }
+        mutate?.(dir);
+      }
+    } else {
+      assert.equal(args[0], 'test');
+      assert.equal(fs.lstatSync(dir).isDirectory(), true);
+      assert.equal(fs.readFileSync(path.join(dir, 'index.js'), 'utf8'), 'module.exports = 42;\n');
+    }
+    return successfulNpm;
+  };
+  return { pack, npm, calls };
+}
+
+test('a declared unpublished local dependency installs its actual pack, without changing the source manifest', (t) => {
+  const f = packedFixture(t);
+  const original = fs.readFileSync(path.join(f.root, 'consumer/package.json'));
+  fs.writeFileSync(path.join(f.root, 'dependency/untracked.js'), 'not packed');
+  fs.mkdirSync(path.join(f.root, 'dependency/node_modules'), { recursive: true });
+  const seams = packedSeams();
+  const proof = provePackages(f.packages, { ...f, ...seams });
+  assert.equal(proof.exit, PROOF_EXIT.green, JSON.stringify(proof.results));
+  assert.deepEqual(seams.calls, ['pack', 'install', 'test']);
+  assert.deepEqual(proof.results[0].localDependencies, [{ name: '@starci/dependency', version: '1.0.0', packedFiles: ['package/index.js', 'package/package.json'] }]);
+  assert.deepEqual(fs.readFileSync(path.join(f.root, 'consumer/package.json')), original);
+});
+
+test('an install whose local dependency bytes differ from the pack is red before its test runs', (t) => {
+  const f = packedFixture(t);
+  const seams = packedSeams({ mutate: (dir) => fs.writeFileSync(path.join(dir, 'index.js'), 'borrowed output') });
+  const proof = provePackages(f.packages, { ...f, ...seams });
+  assert.equal(proof.exit, PROOF_EXIT.red);
+  assert.equal(proof.results[0].code, PROOF_CODES.install);
+  assert.match(proof.results[0].output, /differs from the candidate tarball/);
+  assert.deepEqual(seams.calls, ['pack', 'install']);
+});
+
+test('a dependency linked back to its source cannot satisfy a clean packed install', (t) => {
+  const f = packedFixture(t);
+  const seams = packedSeams({ linked: path.join(f.root, 'dependency') });
+  const proof = provePackages(f.packages, { ...f, ...seams });
+  assert.equal(proof.exit, PROOF_EXIT.red);
+  assert.match(proof.results[0].output, /missing or linked/);
+  assert.deepEqual(seams.calls, ['pack', 'install']);
+  assert.equal(fs.readFileSync(path.join(f.root, 'dependency/index.js'), 'utf8'), 'module.exports = 42;\n');
+});
+
+test('a tarball with another package identity refuses before install', (t) => {
+  const f = packedFixture(t);
+  const seams = packedSeams({ identity: '{"name":"@starci/other","version":"1.0.0"}' });
+  const proof = provePackages(f.packages, { ...f, ...seams });
+  assert.equal(proof.exit, PROOF_EXIT.red);
+  assert.match(proof.results[0].output, /different package name or version/);
+  assert.deepEqual(seams.calls, ['pack']);
+});
+
+test('a different declared version or a locked local substitution never changes the install contract', (t) => {
+  for (const options of [{ version: '0.9.0' }, { locked: true }]) {
+    const f = packedFixture(t, options);
+    const original = fs.readFileSync(path.join(f.root, 'consumer/package.json'));
+    const seams = packedSeams();
+    const proof = provePackages(f.packages, { ...f, ...seams });
+    assert.equal(proof.exit, options.locked ? PROOF_EXIT.unrun : PROOF_EXIT.red);
+    assert.match(proof.results[0].output, options.locked ? /locked install/ : /declares.*candidate/);
+    assert.deepEqual(seams.calls, []);
+    assert.deepEqual(fs.readFileSync(path.join(f.root, 'consumer/package.json')), original);
+    if (options.locked) assert.equal(fs.readFileSync(path.join(f.root, 'consumer/package-lock.json'), 'utf8'), '{}\n');
+  }
+});
+
+test('an undeclared local sibling is never added to make its consumer test pass', (t) => {
+  const f = packedFixture(t, { declared: false });
+  let packs = 0;
+  const proof = provePackages(f.packages, { ...f, pack: () => { packs += 1; throw new Error('undeclared pack'); }, npm: (args, { cwd }) => {
+    assert.equal(JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8')).dependencies, undefined);
+    assert.equal(fs.existsSync(path.join(cwd, 'node_modules/@starci/dependency')), false);
+    return args[0] === 'test' ? { ...successfulNpm, status: 1, output: 'ERR_MODULE_NOT_FOUND @starci/dependency' } : successfulNpm;
+  } });
+  assert.equal(proof.exit, PROOF_EXIT.red);
+  assert.equal(proof.results[0].code, PROOF_CODES.test);
+  assert.equal(packs, 0);
+});
+
+test('unpublished registry install failures retain E404 and ETARGET as red findings', (t) => {
+  const f = packedFixture(t, { declared: false });
+  for (const code of ['E404', 'ETARGET']) {
+    const proof = provePackages(f.packages, { ...f, npm: () => ({ ...successfulNpm, status: 1, output: `npm error code ${code}\nunpublished candidate` }) });
+    assert.equal(proof.exit, PROOF_EXIT.red);
+    assert.equal(proof.results[0].code, PROOF_CODES.install);
+    assert.match(proof.results[0].output, new RegExp(code));
+  }
 });
