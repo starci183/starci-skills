@@ -1,11 +1,11 @@
-// example-repin.spec.mjs - the example re-pin of `starci release publish` (scripts/lib/example-repin.mjs): the only `starci` bin is @starci/cli's (the hfs package has no bin), so an example that
+// example-repin.spec.mjs - the example re-pin of `starci release publish` (scripts/supervisor/example-repin.mjs): the only `starci` bin is @starci/cli's (the hfs package has no bin), so an example that
 // still declares @starci/hfs is moved to @starci/cli at its pin, its section stays sorted, and every other pin is set to knowledge/hfs/canon-pins.yaml. Nothing is installed or published here.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { repinExample } from '../../scripts/lib/example-repin.mjs';
+import { repinExample } from '../../scripts/supervisor/example-repin.mjs';
 
 const PINS = { '@starci/cli': { version: '1.0.0' }, '@starci/hfs': { version: '4.0.9' }, '@starci/jest-preset': { version: '2.2.4' }, '@starci/test-world': { version: '1.2.0' } };
 const tmp = (t) => {

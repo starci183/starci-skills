@@ -55,6 +55,8 @@ Every commit message is `type(scope): summary` with one of the types `feat`, `fi
 - main moved while L4 ran, or the pushed range holds a secret;
 - the remote refuses either ref (the push is atomic).
 
+A parked remote is not a refusal: while lands stay local the owner may park the remote's push url (a `pushurl` that reads `DISABLED-<reason>`) so that nothing but the release can push. The release cut pushes through the remote's fetch url for its one push, moves the remote-tracking ref itself and never writes the configuration; any other push url is the owner's choice and is used as set.
+
 L4 runs once per release. Landing runs only the dependent specs, so a red can surface at the release: the lands are merge commits on local main, which keeps a
 bisection over them cheap, and a red found after the push is fixed forward with the next tag and recorded under Known limitations, never by moving a tag.
 

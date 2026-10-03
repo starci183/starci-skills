@@ -1,4 +1,4 @@
-// example-repin.mjs - the re-pin of an example app's package.json files to knowledge/hfs/canon-pins.yaml (`starci release publish`, scripts/supervisor/release-publish-flow.mjs).
+// example-repin.mjs - the re-pin of an example app's package.json files to knowledge/hfs/canon-pins.yaml (`starci release publish`: release-publish-flow.mjs).
 // The only `starci` bin is @starci/cli's (the hfs package has no bin), so an example that still declares @starci/hfs is moved to @starci/cli at its pin.
 import fs from 'node:fs';
 import path from 'node:path';

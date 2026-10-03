@@ -10,7 +10,7 @@ import { canonContentDigest, packedFiles } from '../gates/canon-digest.mjs';
 import { loadPins } from '../gates/canon-pins.mjs';
 import { releasePublish } from '../gates/release-publish.mjs';
 import { discoverExampleApps } from '../lib/example-refs.mjs';
-import { repinExample } from '../lib/example-repin.mjs';
+import { repinExample } from './example-repin.mjs';
 import { resultDetail, resultOk } from '../lib/verb-call.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
 

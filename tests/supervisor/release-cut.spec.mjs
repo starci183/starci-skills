@@ -240,6 +240,35 @@ test('a held host lock refuses the cut naming its owner: the suite never runs an
   untouched(fx);
 });
 
+test('a push lock parked as DISABLED... on the remote pushurl is lifted for the release push only: main and the tag move, the config stays as the owner set it, the remote-tracking ref follows', async (t) => {
+  const fx = fixture(t);
+  const lock = 'DISABLED-local-main-until-the-release-push';
+  git(fx.repo, 'config', 'remote.origin.pushurl', lock);
+  const out = (await cut(fx));
+  assert.deepEqual([out.ok, out.verdict], [true, 'pushed'], JSON.stringify(out));
+  assert.equal(fx.remoteMain(), git(fx.repo, 'rev-parse', 'HEAD'));
+  assert.deepEqual(fx.remoteTags(), [TAG]);
+  assert.equal(git(fx.repo, 'config', '--get', 'remote.origin.pushurl'), lock, "the owner's lock is not rewritten");
+  assert.equal(git(fx.repo, 'rev-parse', 'refs/remotes/origin/main'), git(fx.repo, 'rev-parse', 'HEAD'), 'the remote-tracking ref moved with the push');
+  const plain = fixture(t);
+  git(plain.repo, 'config', 'remote.origin.pushurl', path.join(plain.base, 'does-not-exist.git'));
+  const refused = (await cut(plain));
+  assert.equal(refused.verdict, 'push-refused', 'a pushurl that is not a parked lock is left alone: a broken one fails the push');
+  untouched(plain);
+});
+
+test("a pushurl that is a real url is the owner's choice: the release pushes there, never to the fetch url", async (t) => {
+  const fx = fixture(t);
+  const other = path.join(fx.base, 'other.git');
+  git(fx.base, 'init', '-q', '--bare', '-b', 'main', other);
+  git(fx.repo, 'config', 'remote.origin.pushurl', other);
+  const out = (await cut(fx));
+  assert.equal(out.ok, true, JSON.stringify(out));
+  untouched(fx);
+  assert.equal(git(other, 'rev-parse', 'refs/heads/main'), git(fx.repo, 'rev-parse', 'HEAD'));
+  assert.equal(git(other, 'tag', '-l'), TAG);
+});
+
 test('the pre-push hook lets exactly the release the cut made through: a push of main without the L4 record is refused, with it the atomic push passes', async (t) => {
   const fx = fixture(t);
   const hooks = path.join(fx.repo, '.git', 'hooks');
