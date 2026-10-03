@@ -525,17 +525,16 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    requires: [.gitignore, workspace.yaml, features/index.yaml]
-    allows: [workspace.yaml, "brand/**", shell/index.yaml, "features/<feature>/index.yaml",
+    requires: [.gitignore, workspace.yaml, index.yaml]
+    allows: [workspace.yaml, index.yaml, "brand/**", shell/index.yaml, "features/<feature>/index.yaml",
              "features/<feature>/<family>/<name>/index.yaml", "features/<feature>/br/<rule>/ac/<name>/index.yaml",
              "features/<feature>/ui/<name>/assets/<approved-file>", "features/<feature>/uat/<name>/{index,accounts,fixtures}.yaml",
              "features/<feature>/uat/<name>/{seed,cleanup}.sql", "_resources/{identities,environments,fixtures}/<slug>/resource.yaml"]
     forbids: [evidence/, logs/, reports/, captures/, runs/, "kernel-*/", "*.sqlite*", _derived/, "work/node records"]
-    # Lite keeps the grammar and brand drawing records only (workspace.yaml, brand/, shell/ and the ui screens of a feature); the UAT records are
-    # the forbidden slot below and a lite scaffold holds no features/ at all.
+    # Lite keeps the product catalog, feature overviews, grammar and brand drawing records; UAT records belong to the forbidden slot below.
     lite:
-      requires: [.gitignore, workspace.yaml]
-      allows: [workspace.yaml, "brand/**", shell/index.yaml, "features/<feature>/index.yaml", "features/<feature>/ui/<name>/index.yaml", "features/<feature>/ui/<name>/assets/<approved-file>"]
+      requires: [.gitignore, workspace.yaml, index.yaml]
+      allows: [workspace.yaml, index.yaml, "brand/**", shell/index.yaml, "features/<feature>/index.yaml", "features/<feature>/ui/<name>/index.yaml", "features/<feature>/ui/<name>/assets/<approved-file>"]
     rules: [HFS_AGENT_DATA_TRACKED, HFS_WORK_NODE_RETIRED, HFS_IDENTITY_CUSTODY]
   - id: app.starciwork.uat
     profiles: [app]

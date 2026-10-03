@@ -12,7 +12,7 @@ import {
   resolveRepoDeclaration,
 } from "../runtime/scripts/hfs/slots.mjs";
 import { managedScriptNames } from "../runtime/scripts/hfs/architecture/managed-scripts.mjs";
-import { LOCK_STEP, npmLock } from "../scaffold/app.mjs";
+import { LOCK_STEP, npmLock, scaffoldWorkSeeds } from "../scaffold/app.mjs";
 import {
   TEMPLATES_DIR,
   appSource,
@@ -223,10 +223,13 @@ function templateFiles(group, prefix, variables) {
   }));
 }
 
-function additions(full, hadCli, manifest) {
+function additions(root, full, hadCli, manifest) {
   const variables = { project: full.project, app: "cli", appPascal: "Cli" };
   const files = [
     ...templateFiles("app/upgrade-full", "", variables),
+    ...(fs.existsSync(path.join(root, ".starciwork", "index.yaml"))
+      ? []
+      : scaffoldWorkSeeds(full.project).filter((file) => !fs.existsSync(path.join(root, file.path)))),
     ...(!hadCli
       ? [
           ...STANDARD_CLI_FILES.map((file) => ({
@@ -278,7 +281,7 @@ async function model({ root, to, presets, manifest }) {
     (app) => app.kind === "cli" && app.name === "cli",
   );
   const full = fullEditionDeclaration(declaration, manifest);
-  const desired = additions(full, hadCli, manifest);
+  const desired = additions(root, full, hadCli, manifest);
   const pins = parseYaml(fs.readFileSync(PINS_FILE, "utf8")).pins;
   const upgradedPackage = pinnedPackage(root, pins);
   const resolvedPresets = presets ?? UPGRADE_PRESETS;
@@ -362,7 +365,9 @@ async function model({ root, to, presets, manifest }) {
       path: file.path,
       why: file.path.startsWith(".starcistacks/")
         ? "Add the pinned Supabase/Postgres and api full-stack skeleton."
-        : file.path.includes("/tests/")
+        : file.path.startsWith(".starciwork/")
+          ? "Add the canonical product catalog and existing liveness feature overview."
+          : file.path.includes("/tests/")
           ? "Open the full test layer without inventing a spec."
           : "Add the full-only cli or image scaffold.",
       content: file.content,

@@ -159,6 +159,7 @@ function syntheticLite(t, name = "demo") {
     const file = entry.path;
     if (
       file.endsWith("/") ||
+      file === ".starciwork/index.yaml" ||
       fs.existsSync(path.join(root, ...file.split("/")))
     )
       continue;
@@ -300,7 +301,8 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
     "sonar-project.properties",
     ".starcistacks/application-stacks.yaml",
     ".starcistacks/dev/infra/compose/compose.yaml",
-    ".starciwork/features/index.yaml",
+    ".starciwork/index.yaml",
+    ".starciwork/features/system-health/index.yaml",
     "be/apps/cli/src/main.ts",
     "be/src/features/cli/migrate/subs/run.cli.ts",
     "be/src/tests/tsconfig.json",

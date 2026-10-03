@@ -1,6 +1,6 @@
 schema: work/catalog@1
-id: {{project}}
-description: Product catalog of the features directory. One entry per feature; every record of a feature lives under its directory.
+id: "{{project}}"
+description: The application's product feature catalog.
 features:
   - id: system-health
     directory: features/system-health
