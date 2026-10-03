@@ -27,7 +27,7 @@ validates a supported schema without upgrading it. These writers and their SQL f
   `projectsRootFor`) — both `projects/` and `machine.sqlite` move under it. Narrower seams still win when set:
   `STARCI_PROJECTS_ROOT` (just the `projects/` directory), `STARCI_TEST_MACHINE_FILE` (the exact `machine.sqlite`
   file), `STARCI_ARTIFACT_ROOT` (the blob store, independent of the state base). A debug probe or throwaway repo
-  that would otherwise leave a fake ledger in the real store (`skills/claude-debug/SKILL.md` §5) must set
+  that would otherwise leave a fake ledger in the real store (`skills/debug/SKILL.md` §5) must set
   `STARCI_LOCAL_ROOT` to a temp directory for its whole process tree.
 
 ## 2. One writer per database

@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { CLAIM_TTL_MS, LOOP_GRACE_MS, fixOwnerOf, loadState, loopLive, runPass, setupLoop, settleFix, statePath } from '../../scripts/reconciler/debug-pass.mjs';
+import { CLAIM_TTL_MS, LOOP_GRACE_MS, bindLoop, blockLoop, fixOwnerOf, loadState, loopLive, requireScheduledLoop, runPass, setupLoop, settleFix, statePath, stopLoop } from '../../scripts/reconciler/debug-pass.mjs';
 import { integrityFacts, worktreeFacts } from '../../scripts/reconciler/core-watch.mjs';
-import { claudeDebugSettings, durationMs } from '../../engine/config.mjs';
+import { coreDebugSettings, durationMs } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -15,46 +15,93 @@ const FIXTURE = path.join(ROOT, 'tests', 'fixtures', 'core-watch-snapshot.json')
 const SNAP = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
 const T0 = Date.UTC(2026, 9, 1, 3, 10);
 const empty = () => ({ loop: null, fixes: {} });
-const SETTINGS = claudeDebugSettings({ claudeDebug: { interval: '10m', worktreeLimit: 40 } });
+const SETTINGS = coreDebugSettings({ coreDebug: { interval: '10m', worktreeLimit: 40 } });
 
-test('the loop interval and worktree limit come from config.yaml claudeDebug, validated; the default lives only in config.example.yaml', () => {
+test('the loop interval and worktree limit come from config.yaml coreDebug, validated; the default lives only in config.example.yaml', () => {
   assert.deepEqual(SETTINGS, { interval: '10m', intervalMs: 600_000, worktreeLimit: 40 });
-  assert.deepEqual(claudeDebugSettings({ claudeDebug: { interval: '90s', worktreeLimit: 3 } }), { interval: '90s', intervalMs: 90_000, worktreeLimit: 3 });
-  assert.throws(() => claudeDebugSettings({}), /claudeDebug is missing/);
-  assert.throws(() => claudeDebugSettings({ claudeDebug: { interval: 'soon', worktreeLimit: 40 } }), /interval must be/);
-  assert.throws(() => claudeDebugSettings({ claudeDebug: { interval: '0m', worktreeLimit: 40 } }), /interval must be/);
-  assert.throws(() => claudeDebugSettings({ claudeDebug: { interval: '10m', worktreeLimit: 0 } }), /worktreeLimit/);
-  assert.throws(() => claudeDebugSettings({ claudeDebug: { interval: '10m', worktreeLimit: 40, every: 1 } }), /unknown key every/);
+  assert.deepEqual(coreDebugSettings({ coreDebug: { interval: '90s', worktreeLimit: 3 } }), { interval: '90s', intervalMs: 90_000, worktreeLimit: 3 });
+  assert.throws(() => coreDebugSettings({}), /coreDebug is missing/);
+  assert.throws(() => coreDebugSettings({ coreDebug: { interval: 'soon', worktreeLimit: 40 } }), /interval must be/);
+  assert.throws(() => coreDebugSettings({ coreDebug: { interval: '0m', worktreeLimit: 40 } }), /interval must be/);
+  assert.throws(() => coreDebugSettings({ coreDebug: { interval: '10m', worktreeLimit: 0 } }), /worktreeLimit/);
+  assert.throws(() => coreDebugSettings({ coreDebug: { interval: '10m', worktreeLimit: 40, every: 1 } }), /unknown key every/);
   const example = parseYaml(fs.readFileSync(path.join(ROOT, 'config.example.yaml'), 'utf8'));
-  assert.deepEqual(claudeDebugSettings(example).intervalMs, durationMs(example.claudeDebug.interval));
-  const setup = setupLoop(empty(), { now: T0, settings: claudeDebugSettings({ claudeDebug: { interval: '15m', worktreeLimit: 40 } }) });
+  assert.deepEqual(coreDebugSettings(example).intervalMs, durationMs(example.coreDebug.interval));
+  const setup = setupLoop(empty(), { now: T0, settings: coreDebugSettings({ coreDebug: { interval: '15m', worktreeLimit: 40 } }) });
   assert.equal(setup.loop.interval, '15m', 'setup takes the interval from config');
   assert.equal(setup.loop.intervalMs, 900_000);
 });
 
-test('setup creates exactly one loop; a second setup creates none', () => {
+test('setup reserves exactly one slot without pretending a native scheduler started', () => {
   const state = empty();
-  const started = [];
-  const first = setupLoop(state, { now: T0, settings: SETTINGS, startLoop: (l) => started.push(l.id) });
-  const second = setupLoop(state, { now: T0 + 60_000, settings: SETTINGS, startLoop: (l) => started.push(l.id) });
+  const first = setupLoop(state, { now: T0, settings: SETTINGS });
+  const second = setupLoop(state, { now: T0 + 60_000, settings: SETTINGS });
   assert.equal(first.created, true);
+  assert.equal(first.scheduled, false);
+  assert.equal(first.live, false);
+  assert.equal(first.loop.scheduler, null);
+  assert.equal(first.loop.status, 'reserved');
   assert.equal(second.created, false);
   assert.equal(second.loop.id, first.loop.id);
-  assert.deepEqual(started, [first.loop.id]);
+  assert.equal(setupLoop(state, { now: T0 + 7 * 86400_000, settings: SETTINGS }).created, false, 'unknown create outcome never expires into a repeated creation');
 });
 
-test('a loop that stopped passing is stale and the next setup replaces it; a passing loop stays live', () => {
+test('a stale durable heartbeat remains held until its exact native cancellation is confirmed', () => {
   const state = empty();
   const { loop } = setupLoop(state, { now: T0, settings: SETTINGS });
+  const bind = { now: T0, loopId: loop.id, scheduler: 'codex-heartbeat', schedulerId: 'automation-one', confirmed: true };
+  assert.throws(() => bindLoop(state, { ...bind, confirmed: false }), /confirmed native/);
+  assert.throws(() => bindLoop(state, { ...bind, loopId: 'foreign' }), /ID does not match/);
+  assert.throws(() => bindLoop(state, { ...bind, scheduler: 'devin-loop' }), /confirmed native/);
+  assert.equal(bindLoop(state, bind).bound, true);
+  assert.equal(bindLoop(state, bind).bound, false, 'exact binding replay is idempotent');
+  assert.throws(() => bindLoop(state, { ...bind, schedulerId: 'automation-two' }), /binding already exists/);
+  assert.equal(loopLive(loop, T0), false, 'accepted scheduler creation is not proof a tick ran');
+  runPass(state, { alerts: [] }, { now: T0, loopId: loop.id, dispatch: () => null });
   const deadline = T0 + 2 * loop.intervalMs + LOOP_GRACE_MS;
   assert.equal(loopLive(loop, deadline), true);
   assert.equal(loopLive(loop, deadline + 1), false);
-  runPass(state, { alerts: [] }, { now: deadline, dispatch: () => null });
-  assert.equal(loopLive(state.loop, deadline + 1), true, 'a pass keeps the loop live');
-  const later = deadline + 2 * loop.intervalMs + LOOP_GRACE_MS + 1;
+  runPass(state, { alerts: [] }, { now: deadline + 1, dispatch: () => null });
+  assert.equal(loop.lastPassAt, T0, 'a manual pass does not renew another scheduler');
+  assert.equal(loopLive(loop, deadline + 1), false);
+  const later = deadline + 2 * loop.intervalMs + LOOP_GRACE_MS;
+  assert.equal(setupLoop(state, { now: later, settings: SETTINGS }).created, false);
+  const stop = { loopId: loop.id, schedulerId: 'automation-one', confirmation: 'cancelled', confirmed: true };
+  assert.throws(() => stopLoop(state, { ...stop, confirmed: false }), /native cancellation/);
+  assert.throws(() => stopLoop(state, { ...stop, schedulerId: 'automation-two' }), /does not match/);
+  assert.throws(() => stopLoop(state, { ...stop, confirmation: 'ended' }), /does not match/, 'a durable heartbeat needs cancellation, not an absent chat process');
+  assert.equal(state.loop.id, loop.id);
+  assert.equal(stopLoop(state, stop).stopped, loop.id);
   const again = setupLoop(state, { now: later, settings: SETTINGS });
   assert.equal(again.created, true);
-  assert.equal(again.replaced.id, loop.id);
+  assert.notEqual(again.loop.id, loop.id);
+  assert.throws(() => requireScheduledLoop(state, loop.id), /ID does not match/, 'a cancelled scheduler tick cannot reach its replacement');
+  assert.throws(() => runPass(state, SNAP, { now: later, loopId: loop.id, dispatch: () => assert.fail('stale tick dispatched') }), /ID does not match/);
+  assert.deepEqual(state.fixes, {});
+});
+
+test('an ended native Claude loop can release its slot only with exact confirmed closure', () => {
+  const state = empty();
+  const { loop } = setupLoop(state, { now: T0, settings: SETTINGS });
+  bindLoop(state, { now: T0, loopId: loop.id, scheduler: 'claude-loop', schedulerId: 'claude-task-one', confirmed: true });
+  assert.throws(() => stopLoop(state, { loopId: loop.id, schedulerId: 'claude-task-one', confirmation: 'ended' }), /native cancellation/);
+  assert.equal(stopLoop(state, { loopId: loop.id, schedulerId: 'claude-task-one', confirmation: 'ended', confirmed: true }).stopped, loop.id);
+  assert.equal(setupLoop(state, { now: T0, settings: SETTINGS }).created, true, 'known authoritative closure does not leave an ended loop held forever');
+});
+
+test('unsupported local recurrence is visibly blocked and an uncertain create cannot be cleared by age', () => {
+  const state = empty();
+  const { loop } = setupLoop(state, { now: T0, settings: SETTINGS });
+  const out = blockLoop(state, { loopId: loop.id, reason: 'local Devin recurrence has no verified native facility' });
+  assert.equal(out.blocked, true);
+  assert.equal(out.scheduled, false);
+  assert.equal(out.live, false);
+  runPass(state, { alerts: [] }, { now: T0, dispatch: () => null });
+  assert.equal(loop.lastPassAt, null);
+  assert.equal(setupLoop(state, { now: T0 + 7 * 86400_000, settings: SETTINGS }).created, false);
+  assert.throws(() => stopLoop(state, { loopId: loop.id, confirmation: 'not-created', confirmed: false }), /native cancellation/);
+  assert.throws(() => stopLoop(state, { loopId: loop.id, confirmation: 'cancelled', confirmed: true }), /uncertain/);
+  assert.equal(stopLoop(state, { loopId: loop.id, confirmation: 'not-created', confirmed: true }).stopped, loop.id);
 });
 
 test('a pass dispatches each alert of the recorded snapshot exactly once', () => {
@@ -137,7 +184,7 @@ test('worktrees (Orca worktree ps): over the limit, a vanished directory or an u
   const down = worktreeFacts(['r'], { ps: () => ({ ok: false, error: 'orca runtime not reachable' }), registered: () => new Set() });
   assert.equal(down.get('worktrees:orca'), 'orca worktree ps failed: orca runtime not reachable');
   assert.equal(fixOwnerOf('wf:nivo:auth:owner'), 'owner');
-  assert.equal(fixOwnerOf('config:claudeDebug'), 'owner');
+  assert.equal(fixOwnerOf('config:coreDebug'), 'owner');
   assert.equal(fixOwnerOf('integrity:node_modules'), 'core');
 });
 
@@ -152,7 +199,55 @@ test('CLI: pass twice over the recorded snapshot dispatches once, in a temp stat
     assert.equal(loadState(statePath(env)).fixes.engine.state, 'dispatching');
     assert.deepEqual(run('pass', '--snapshot', FIXTURE).dispatched, []);
     assert.equal(run('claim', '--key', 'engine', '--lane', 'fix-engine').state, 'fixing');
-    assert.equal(run('stop').stopped, null);
+    assert.throws(() => run('stop'), /ID does not match/, 'stop without a held identity cannot clear custody');
     assert.equal(run('status').loop, null);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('CLI binding, cancellation and scheduled-pass fencing use a private durable state file', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-debug-binding-'));
+  const env = { ...process.env, STARCI_LOCAL_ROOT: root };
+  const run = (...args) => JSON.parse(execFileSync(process.execPath, ['scripts/reconciler/debug-pass.mjs', ...args], { cwd: ROOT, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+  try {
+    const setup = run('setup');
+    assert.equal(setup.live, false);
+    assert.equal(run('status').scheduled, false);
+    assert.equal(run('setup').created, false);
+    const id = setup.loop.id;
+    assert.throws(() => run('pass', '--loop-id', id, '--snapshot', 'must-not-be-read.json'), /no confirmed native scheduler/);
+    assert.equal(run('bind', '--loop-id', id, '--scheduler', 'codex-heartbeat', '--scheduler-id', 'fixture-heartbeat', '--confirmed').bound, true);
+    assert.equal(run('status').live, false);
+    assert.throws(() => run('pass', '--loop-id', 'foreign', '--snapshot', 'must-not-be-read.json'), /ID does not match/, 'fencing precedes snapshot collection');
+    assert.equal(run('pass', '--loop-id', id, '--snapshot', FIXTURE).dispatched.length, 3);
+    assert.equal(run('status').live, true);
+    assert.throws(() => run('stop', '--loop-id', id, '--scheduler-id', 'foreign', '--confirmation', 'cancelled', '--confirmed'), /does not match/);
+    assert.equal(run('status').loop.scheduler.id, 'fixture-heartbeat');
+    assert.equal(run('stop', '--loop-id', id, '--scheduler-id', 'fixture-heartbeat', '--confirmation', 'cancelled', '--confirmed').stopped, id);
+    assert.equal(run('status').loop, null);
+    assert.equal(run('status').fixes.engine.state, 'dispatching', 'cancelled scheduling preserves alert ownership');
+    fs.writeFileSync(statePath(env), '{broken');
+    assert.throws(() => run('setup'), /JSON|Unexpected/, 'unreadable existing custody cannot authorize creation');
+    assert.equal(fs.readFileSync(statePath(env), 'utf8'), '{broken');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('concurrent CLI setup contenders create one durable scheduler reservation', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-debug-concurrent-'));
+  const env = { ...process.env, STARCI_LOCAL_ROOT: root };
+  const setup = () => new Promise((resolve, reject) => {
+    execFile(process.execPath, ['scripts/reconciler/debug-pass.mjs', 'setup'], { cwd: ROOT, env, encoding: 'utf8' }, (error, stdout, stderr) => {
+      try { resolve({ exit: error?.code ?? 0, out: JSON.parse(stdout) }); } catch (failure) { reject(new Error(`${failure.message}: ${stderr}`)); }
+    });
+  });
+  try {
+    const results = await Promise.all([setup(), setup(), setup()]);
+    assert.equal(results.filter(({ out }) => out.created === true).length, 1);
+    const id = loadState(statePath(env)).loop.id;
+    for (const { exit, out } of results) {
+      if (exit === 0) assert.equal(out.loop.id, id);
+      else { assert.equal(exit, 1); assert.equal(out.reason, 'held'); }
+    }
+    assert.equal(loadState(statePath(env)).loop.status, 'reserved');
+    assert.deepEqual(loadState(statePath(env)).fixes, {});
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

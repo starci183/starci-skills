@@ -8,4 +8,4 @@ summary: >-
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/claude-debug-skill.yaml
-  - skills/claude-debug/SKILL.md
+  - skills/debug/SKILL.md

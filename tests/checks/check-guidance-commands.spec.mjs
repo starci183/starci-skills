@@ -18,7 +18,7 @@ test('a refused command in an instruction is caught, in every command form', asy
     'a runtime/Source defect gate or OWED cluster: open a fix - an Opus lane (git worktree add <lanesRoot>/<name> -b lane/<name> main; land.mjs --commit <sha> --lane <name>) or ONE [Worker] job per cluster.',
     // The original chatSeat line.
     'fixes through Opus lanes: an ephemeral worktree (git worktree add <lanesRoot>/<name> -b lane/<name> main; <lanesRoot> is the owner config roots.lanes), commits there.',
-    // The original claude-debug step: backticked commands.
+    // The original debug step: backticked commands.
     'Worktree under `<lanesRoot>/<lane>`: `git -C ../.claude worktree add <lanesRoot>/<lane> -b lane/<lane> origin/main`; junction `node_modules` with `cmd /c mklink /J`.',
     'Clean the scratch tree with `rm -rf <dir>` before the next run.',
     'If the tree is stuck, run taskkill /F /IM node.exe and start again.',
@@ -103,7 +103,7 @@ test('markdown: fenced lines stand under their lead-in sentence, table cells are
 test('scope: module yaml and prompts and skill files; never the refusal catalog or contract-change history', () => {
   assert.ok(isGuidanceFile('modules/supervisor/supervise.yaml'));
   assert.ok(isGuidanceFile('modules/kernel/kernel-prompt.md'));
-  assert.ok(isGuidanceFile('skills/claude-debug/SKILL.md'));
+  assert.ok(isGuidanceFile('skills/debug/SKILL.md'));
   assert.ok(!isGuidanceFile('modules/kernel/failure-codes.yaml'));
   assert.ok(!isGuidanceFile('modules/kernel/contract-changes/x.yaml'));
   assert.ok(!isGuidanceFile('docs/verify-proof.md'));

@@ -181,10 +181,14 @@ pin registry semver, never a `file:` link.
 
 ## Core debugging from a chat
 
-A chat that supervises and debugs the core while workflows run follows `skills/claude-debug` (`/claude-debug`). Invoked
-once, it records one loop with `starci debug pass setup` and starts Claude Code's `/loop <interval>
-/claude-debug pass`, the interval read from `config.yaml` `claudeDebug.interval` (a second invocation finds the live loop
-and starts none). Each tick is one pass: `debug-pass.mjs pass` takes the read-only snapshot of
+A chat that supervises and debugs the core while workflows run follows `skills/debug` (`/debug`), retaining its
+calling agent and concrete model. It reserves one host slot with `starci debug pass setup`, using
+`config.yaml` `coreDebug.interval`. Codex in the desktop app schedules a heartbeat in the current chat; Claude Code
+uses its native `/loop`. A CLI host without verified native recurrence, including the current local Devin CLI, runs
+one manual pass and reports recurrence blocked. No caller switches to Claude to obtain a scheduler.
+The actual native scheduler ID binds the reserved loop; each scheduled pass supplies its exact loop ID. A stale tick
+or uncertain creation keeps the slot held until exact native cancellation is confirmed (a Claude loop may instead
+prove its instance ended). Setup never replaces such a slot by age. Each tick is one pass: `debug-pass.mjs pass` takes the read-only snapshot of
 `scripts/reconciler/core-watch.mjs` (engine, controllers and queues, services and seats, every running workflow and leg of
 every registered ledger, orphan ledgers, token spikes, worktree counts and orphans, main-checkout integrity, failing land
 and push gates; it never restarts anything), the chat diagnoses each new alert with the read-only playbook and dispatches

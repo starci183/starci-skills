@@ -14,7 +14,7 @@ summary: >-
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/claude-debug-loop.yaml
-  - skills/claude-debug/SKILL.md
+  - skills/debug/SKILL.md
   - scripts/supervisor/core-watch.mjs
   - scripts/supervisor/debug-pass.mjs
   - engine/config.mjs

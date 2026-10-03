@@ -14,15 +14,15 @@
 //   TOKENS    input+output tokens of the last window above --token-spike (machine.sqlite llm_usage; there is no `starci kernel usage` verb)
 //   LEDGER    a registered ledger whose state directory or every source root is gone (hk-orphan-ledgers)
 //   WORKTREE  per repository (the runtime and every active ledger's repo), from Orca's `worktree ps`: more than
-//             claudeDebug.worktreeLimit worktrees, a tree whose directory is gone, or a tree carrying the runtime's
+//             coreDebug.worktreeLimit worktrees, a tree whose directory is gone, or a tree carrying the runtime's
 //             ownership stamp with no registry row (the GC adopts or removes it)
 //   INTEGRITY the runtime's main checkout: tracked files deleted, node_modules or packages/node_modules missing or empty
 //   GATE      in the last day: a lane whose latest land run did not pass, a repository whose latest push failed
-//   CONFIG    config.yaml claudeDebug missing or invalid
+//   CONFIG    config.yaml coreDebug missing or invalid
 //
 // It never restarts, writes, dispatches or types into anything: machine.sqlite and every ledger are opened read-only, the
 // only children are read-only verbs, every one with a timeout. Auto-restart made crash-loop safe mode worse; the fix path
-// is a lane. Repetition is the chat's `/loop` over scripts/reconciler/debug-pass.mjs (skills/claude-debug), never a
+// is a lane. Repetition is the caller's verified native scheduler over scripts/reconciler/debug-pass.mjs (skills/debug), never a
 // scheduler in this script.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { probe } from '../api/http/probe.mjs';
 import { readMachine } from '../../engine/db/machine.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
-import { claudeDebugSettings } from '../../engine/config.mjs';
+import { coreDebugSettings } from '../../engine/config.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { worktreeListQuery } from '../api/git/worktree-list-query.mjs';
 import { gitResultOf } from '../lib/git.mjs';
@@ -213,7 +213,7 @@ const registeredOrcaIds = () => new Set(readMachine((m) => m.db.prepare('SELECT 
  * Worktree count and orphans per repository (the runtime and every active ledger's repo), from Orca's `worktree ps`
  * (the source of truth for worktrees): more than `worktreeLimit` worktrees, a tree whose directory is gone, or a tree
  * stamped as the runtime's (scripts/lib/orca-orphans.mjs) with no live registry row. A repository Orca does not know has
- * no Orca tree to judge. Read only. `worktreeLimit` null (config.yaml has no claudeDebug block) checks orphans only.
+ * no Orca tree to judge. Read only. `worktreeLimit` null (config.yaml has no coreDebug block) checks orphans only.
  */
 export function worktreeFacts(repos, { worktreeLimit = null, ps = worktreePs, registered = registeredOrcaIds, exists = fs.existsSync } = {}) {
   const facts = new Map();
@@ -282,9 +282,9 @@ function gateFacts() {
   return facts;
 }
 
-/** config.yaml claudeDebug for this tick; a missing or invalid block is itself an alert (the worktree limit is then skipped). */
+/** config.yaml coreDebug for this tick; a missing or invalid block is itself an alert (the worktree limit is then skipped). */
 function debugSettings(facts) {
-  try { const s = claudeDebugSettings(); facts.set('config:claudeDebug', null); return s; } catch (e) { facts.set('config:claudeDebug', String(e.message).slice(0, 200)); return { worktreeLimit: null }; }
+  try { const s = coreDebugSettings(); facts.set('config:coreDebug', null); return s; } catch (e) { facts.set('config:coreDebug', String(e.message).slice(0, 200)); return { worktreeLimit: null }; }
 }
 
 function hostFacts() {

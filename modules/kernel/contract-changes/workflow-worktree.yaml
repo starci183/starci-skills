@@ -74,7 +74,7 @@ paths:
   - skills/start-kernel/SKILL.md
   - skills/orchestration/SKILL.md
   - skills/define-goal/SKILL.md
-  - skills/claude-debug/SKILL.md
+  - skills/debug/SKILL.md
   - skills/push-git/SKILL.md
   - CHANGELOG.md
   - tests/launch-smoke.spec.mjs

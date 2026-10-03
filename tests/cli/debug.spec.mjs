@@ -11,7 +11,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 
 test('debug catalog resolves both handlers and their exact local flags', () => {
   const expected = {
-    pass: ['child-timeout', 'key', 'lane', 'reason', 'snapshot', 'token-spike', 'token-window'],
+    pass: ['child-timeout', 'confirmation', 'confirmed', 'key', 'lane', 'loop-id', 'reason', 'scheduler', 'scheduler-id', 'snapshot', 'token-spike', 'token-window'],
     run: ['child-timeout', 'repo', 'since-hours', 'token-spike', 'token-window'],
   };
   for (const [verb, flags] of Object.entries(expected)) {
@@ -44,4 +44,18 @@ test('debug run refuses missing, unknown and extra input', () => {
   assert.equal(main(['debug', 'run'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
   assert.equal(main(['debug', 'run', 'ledger'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
   assert.equal(main(['debug', 'run', 'orca-status', 'extra'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
+});
+
+test('debug lifecycle routes exact native binding, fenced pass and cancellation arguments unchanged', () => {
+  const calls = [];
+  const runScript = (script, args) => { calls.push(args); return 0; };
+  const commands = [
+    ['bind', '--loop-id', 'loop-one', '--scheduler', 'codex-heartbeat', '--scheduler-id', 'native-one', '--confirmed'],
+    ['pass', '--loop-id', 'loop-one'],
+    ['stop', '--loop-id', 'loop-one', '--scheduler-id', 'native-one', '--confirmation', 'cancelled', '--confirmed'],
+    ['block', '--loop-id', 'loop-one', '--reason', 'local recurrence unverified'],
+  ];
+  for (const args of commands) assert.equal(main(['debug', 'pass', ...args], { catalog, runScript }), 0);
+  assert.deepEqual(calls, commands);
+  assert.equal(main(['debug', 'pass', 'bind', '--scheduler', 'devin-loop'], { catalog, runScript, stderr: () => {} }), 2);
 });

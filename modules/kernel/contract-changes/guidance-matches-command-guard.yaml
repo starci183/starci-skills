@@ -15,7 +15,7 @@ paths:
   - modules/kernel/contract-changes/guidance-matches-command-guard.yaml
   - modules/supervisor/supervise.yaml
   - modules/kernel/failure-codes.yaml
-  - skills/claude-debug/SKILL.md
+  - skills/debug/SKILL.md
   - skills/push-git/SKILL.md
   - docs/verify-proof.md
   - scripts/checks/check-guidance-commands.mjs

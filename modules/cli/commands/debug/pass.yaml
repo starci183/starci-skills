@@ -5,8 +5,13 @@ summary: run or maintain the debug loop; writes only its own debug-loop state
 impl:
   script: scripts/reconciler/debug-pass.mjs
 positional:
-  - {name: action, enum: [setup, pass, claim, note, release, stop, status], required: true, variadic: false}
+  - {name: action, enum: [setup, bind, block, pass, claim, note, release, stop, status], required: true, variadic: false}
 flags:
+  - {name: loop-id, type: string, summary: exact held loop identity for binding or a scheduled pass}
+  - {name: scheduler, type: enum, enum: [codex-heartbeat, claude-loop], summary: verified native recurrence facility}
+  - {name: scheduler-id, type: string, summary: exact native scheduler identity from its receipt}
+  - {name: confirmation, type: enum, enum: [cancelled, ended, not-created], summary: authoritative native cancellation or creation outcome}
+  - {name: confirmed, type: boolean, summary: caller verified the exact native receipt before recording it}
   - {name: snapshot, type: string, summary: saved core-watch snapshot for a pass}
   - {name: child-timeout, type: number, summary: child call timeout in seconds}
   - {name: token-window, type: number, summary: token-spike window in minutes}

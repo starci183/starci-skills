@@ -1,45 +1,55 @@
 #!/usr/bin/env node
 // starci debug pass — debug-loop state: one loop per host, one pass per tick, one lane per alert.
 //
-//   starci debug pass setup                     record the chat's /loop unless a live one exists
+//   starci debug pass setup                     reserve the host slot; never starts a scheduler
+//   starci debug pass bind --loop-id <id> --scheduler <kind> --scheduler-id <id> --confirmed
+//   starci debug pass block --loop-id <id> --reason <text>  report unsupported native recurrence
 //   starci debug pass pass [--snapshot <file>]  one pass: core-watch snapshot -> alerts to dispatch
 //     [--child-timeout <sec>] [--token-window <min>] [--token-spike <n>]   passed to the core-watch snapshot
 //   starci debug pass claim --key <alert> --lane <lane>     a lane now fixes that alert
 //   starci debug pass note --key <alert> --reason <text>    diagnosed, no core fix owed while it lasts
 //   starci debug pass release --key <alert>                 forget a fix (lane died, fix did not help)
-//   starci debug pass stop                                  forget the loop (after the chat ends its /loop)
+//   starci debug pass stop --loop-id <id> --scheduler-id <id> --confirmation cancelled|ended --confirmed
 //   starci debug pass status
-// Every verb prints one JSON object. The loop interval is config.yaml claudeDebug.interval (engine/config.mjs
-// claudeDebugSettings); code carries no default.
+// Every verb prints one JSON object. The loop interval is config.yaml coreDebug.interval (engine/config.mjs
+// coreDebugSettings); code carries no default.
 //
-// State: <state root>/claude-debug/state.json (engine/db/machine.mjs starciLocalRoot, so STARCI_LOCAL_ROOT moves it). It is
+// State: <state root>/debug/state.json (engine/db/machine.mjs starciLocalRoot, so STARCI_LOCAL_ROOT moves it). It is
 // chat-side bookkeeping, not engine state, so it stays out of machine.sqlite (whose writers are the engine's own):
-//   loop   {id, intervalMs, startedAt, lastPassAt} — live while the newer of startedAt/lastPassAt is younger than
-//          2 x intervalMs + LOOP_GRACE_MS; a loop whose chat died stops passing and turns stale, and the next setup replaces it.
+//   loop   {id, intervalMs, status, scheduler, lastPassAt} — the slot stays held until exact native cancellation or
+//          closure is confirmed. Only a matching scheduled pass renews liveness; stale ticks never authorize replacement.
 //   fixes  {<alert key>: {state: dispatching|fixing|noted, text, since, lane?, reason?}} — keyed by the core-watch fact key
 //          (its text carries changing numbers). An alert with a fix is never dispatched again; a fix closes when its alert
 //          clears; a `dispatching` reservation nobody claimed within CLAIM_TTL_MS is dispatched again.
 // It never restarts, fixes or types into anything; dispatch is the chat's (a lane agent), recorded here with `claim`.
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { isMain } from '../lib/is-main.mjs';
 import { starciLocalRoot } from '../../engine/db/machine.mjs';
-import { claudeDebugSettings } from '../../engine/config.mjs';
-import { readJsonFile } from '../lib/json.mjs';
+import { coreDebugSettings } from '../../engine/config.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
 import { renameOver } from '../api/fs/rename-over.mjs';
+import { withHostLock } from '../machine/host-lock.mjs';
 import { snapshot, watchOptions } from './core-watch.mjs';
 
 export const LOOP_GRACE_MS = 5 * 60_000;
 export const CLAIM_TTL_MS = 30 * 60_000;
 
 /** The state file of this host (or of STARCI_LOCAL_ROOT). */
-export const statePath = (env = process.env) => path.join(starciLocalRoot(env), 'claude-debug', 'state.json');
+export const statePath = (env = process.env) => path.join(starciLocalRoot(env), 'debug', 'state.json');
 
 /** The state in `file`, or an empty one. */
 export function loadState(file) {
-  const s = readJsonFile(file, null);
-  return { loop: s?.loop ?? null, fixes: s?.fixes && typeof s.fixes === 'object' ? s.fixes : {} };
+  let s;
+  try { s = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) {
+    if (error.code === 'ENOENT') return { loop: null, fixes: {} };
+    throw error;
+  }
+  if (!s || typeof s !== 'object' || Array.isArray(s) || !Object.hasOwn(s, 'loop') ||
+      (s.loop !== null && (typeof s.loop !== 'object' || Array.isArray(s.loop))) ||
+      !s.fixes || typeof s.fixes !== 'object' || Array.isArray(s.fixes)) throw new Error('invalid debug state; existing scheduler custody is unknown');
+  return { loop: s.loop, fixes: s.fixes };
 }
 
 /** Replace `file` whole with `state`. */
@@ -60,21 +70,70 @@ export function fixOwnerOf(key) {
 
 /** True while the loop record still passes on time. */
 export function loopLive(loop, now) {
-  if (!loop?.id || !(loop.intervalMs > 0)) return false;
-  return now - Math.max(Number(loop.startedAt) || 0, Number(loop.lastPassAt) || 0) <= 2 * loop.intervalMs + LOOP_GRACE_MS;
+  if (loop?.status !== 'scheduled' || !loop.scheduler?.id || !(loop.intervalMs > 0) || !Number.isFinite(loop.lastPassAt)) return false;
+  const age = now - loop.lastPassAt;
+  return age >= 0 && age <= 2 * loop.intervalMs + LOOP_GRACE_MS;
 }
 
 /**
- * Setup (`settings` = claudeDebugSettings(): {interval, intervalMs}): a live loop is kept and nothing is created; otherwise `startLoop(loop)` runs once and the new record replaces
- * a stale one. Returns {created, loop, replaced}. Mutates `state`.
+ * Reserve a host slot. Any existing reservation, including stale or uncertain creation, is held.
+ * No external scheduler is called here; its actual receipt must later bind the reservation.
  */
-export function setupLoop(state, { now, settings, startLoop = () => {} }) {
-  if (loopLive(state.loop, now)) return { created: false, loop: state.loop, replaced: null };
-  const replaced = state.loop ?? null;
-  const loop = { id: `loop-${now.toString(36)}`, interval: settings.interval, intervalMs: settings.intervalMs, startedAt: now, lastPassAt: null };
-  startLoop(loop);
+export function setupLoop(state, { now, settings }) {
+  if (state.loop) return { created: false, loop: state.loop, scheduled: state.loop.status === 'scheduled', live: loopLive(state.loop, now) };
+  const loop = { id: `loop-${randomUUID()}`, interval: settings.interval, intervalMs: settings.intervalMs, reservedAt: now, status: 'reserved', scheduler: null, lastPassAt: null };
   state.loop = loop;
-  return { created: true, loop, replaced };
+  return { created: true, loop, scheduled: false, live: false };
+}
+
+function matchingLoop(state, loopId) {
+  if (!loopId || !state.loop?.id || state.loop.id !== loopId) throw new Error('debug loop ID does not match the held reservation');
+  return state.loop;
+}
+
+/** Bind only a confirmed receipt from a supported native scheduler; retries cannot change its identity. */
+export function bindLoop(state, { now, loopId, scheduler, schedulerId, confirmed }) {
+  const loop = matchingLoop(state, loopId);
+  if (confirmed !== true || !['codex-heartbeat', 'claude-loop'].includes(scheduler) || typeof schedulerId !== 'string' || !schedulerId.trim()) {
+    throw new Error('bind needs a confirmed native codex-heartbeat or claude-loop scheduler ID');
+  }
+  if (loop.scheduler) {
+    if (loop.status !== 'scheduled' || loop.scheduler.kind !== scheduler || loop.scheduler.id !== schedulerId) throw new Error('debug scheduler binding already exists; confirm its cancellation before replacement');
+    return { bound: false, loop };
+  }
+  if (loop.status !== 'reserved') throw new Error('debug recurrence is blocked; resolve the reservation before binding');
+  loop.scheduler = { kind: scheduler, id: schedulerId, boundAt: now };
+  loop.status = 'scheduled';
+  return { bound: true, loop };
+}
+
+/** An unsupported local scheduler is visible and retains the slot without pretending recurrence started. */
+export function blockLoop(state, { loopId, reason }) {
+  const loop = matchingLoop(state, loopId);
+  if (loop.scheduler || !['reserved', 'blocked'].includes(loop.status) || typeof reason !== 'string' || !reason.trim()) throw new Error('block needs an unbound reservation and a reason');
+  loop.status = 'blocked';
+  loop.reason = reason;
+  return { blocked: true, loop, scheduled: false, live: false };
+}
+
+/** A scheduled tick must match the current bound loop before collecting anything or recording fixes. */
+export function requireScheduledLoop(state, loopId) {
+  const loop = matchingLoop(state, loopId);
+  if (loop.status !== 'scheduled' || !loop.scheduler?.id) throw new Error('debug loop has no confirmed native scheduler');
+  return loop;
+}
+
+/** Only exact native confirmation releases custody; a durable heartbeat requires cancellation. */
+export function stopLoop(state, { loopId, schedulerId, confirmation, confirmed }) {
+  const loop = matchingLoop(state, loopId);
+  if (confirmed !== true) throw new Error('stop needs exact native cancellation or closure confirmation');
+  if (loop.scheduler) {
+    if (schedulerId !== loop.scheduler.id || !(confirmation === 'cancelled' || (loop.scheduler.kind === 'claude-loop' && confirmation === 'ended'))) {
+      throw new Error('stop confirmation does not match the bound native scheduler');
+    }
+  } else if (confirmation !== 'not-created' || schedulerId) throw new Error('unbound creation remains uncertain until native not-created confirmation');
+  state.loop = null;
+  return { stopped: loop.id, scheduler: loop.scheduler, confirmation };
 }
 
 /**
@@ -82,8 +141,8 @@ export function setupLoop(state, { now, settings, startLoop = () => {} }) {
  * with no open fix (or an unclaimed reservation past CLAIM_TTL_MS) and records what it returns ({lane} fixing,
  * {reason} noted, anything else a `dispatching` reservation). Returns {dispatched, rows}. Mutates `state`.
  */
-export function runPass(state, snap, { now, dispatch }) {
-  if (state.loop) state.loop.lastPassAt = now;
+export function runPass(state, snap, { now, dispatch, loopId = null }) {
+  if (loopId !== null) requireScheduledLoop(state, loopId).lastPassAt = now;
   const alerts = new Map((snap?.alerts ?? []).map((a) => [a.key, a.text]));
   const rows = [];
   for (const [key, fix] of Object.entries(state.fixes)) {
@@ -123,24 +182,43 @@ function flag(argv, name) { return valueAfter(argv, name); }
 async function main(argv = process.argv.slice(2)) {
   const verb = argv[0];
   const file = statePath();
-  const state = loadState(file);
-  const now = Date.now();
-  let out;
-  if (verb === 'setup') out = setupLoop(state, { now, settings: claudeDebugSettings() });
-  else if (verb === 'pass') {
-    const fixture = flag(argv, '--snapshot');
-    const snap = fixture ? JSON.parse(fs.readFileSync(fixture, 'utf8')) : await snapshot(watchOptions(argv));
-    out = { at: snap.at, ok: snap.ok, facts: snap.facts, loop: state.loop?.id ?? null, ...runPass(state, snap, { now, dispatch: (a) => (a.fixOwner === 'owner' ? { reason: 'fix owner: the owner' } : null) }) };
-  } else if (verb === 'claim' || verb === 'note' || verb === 'release') {
-    const key = flag(argv, '--key');
-    if (!key) throw new Error(`${verb} needs --key <alert>`);
-    const lane = verb === 'claim' ? flag(argv, '--lane') : null;
-    if (verb === 'claim' && !lane) throw new Error('claim needs --lane <lane>');
-    out = settleFix(state, key, { now, lane, reason: flag(argv, '--reason') ?? 'no core fix owed', release: verb === 'release' });
-  } else if (verb === 'stop') { out = { stopped: state.loop?.id ?? null }; state.loop = null; }
-  else if (verb === 'status') out = { loop: state.loop, live: loopLive(state.loop, now), fixes: state.fixes };
-  else { console.log('usage: starci debug pass setup | pass [--snapshot <file>] | claim --key <k> --lane <lane> | note --key <k> --reason <text> | release --key <k> | stop | status'); process.exitCode = verb ? 2 : 0; return; }
-  if (verb !== 'status') saveState(file, state);
+  if (verb === 'status') {
+    const state = loadState(file);
+    console.log(JSON.stringify({ loop: state.loop, scheduled: state.loop?.status === 'scheduled', live: loopLive(state.loop, Date.now()), fixes: state.fixes }));
+    return;
+  }
+  if (!['setup', 'bind', 'block', 'pass', 'claim', 'note', 'release', 'stop'].includes(verb)) {
+    console.log('usage: starci debug pass setup | bind --loop-id <id> --scheduler <kind> --scheduler-id <id> --confirmed | block --loop-id <id> --reason <text> | pass [--loop-id <id>] [--snapshot <file>] | claim --key <k> --lane <lane> | note --key <k> --reason <text> | release --key <k> | stop --loop-id <id> --scheduler-id <id> --confirmation <outcome> --confirmed | status');
+    process.exitCode = verb ? 2 : 0;
+    return;
+  }
+  // Use the existing lock primitive under debug's own directory, never the heavy-runtime host lock.
+  const out = await withHostLock({ role: 'lead', purpose: 'debug-state', dir: path.join(path.dirname(file), 'state-lock') }, async () => {
+    const state = loadState(file);
+    const now = Date.now();
+    const loopId = flag(argv, '--loop-id');
+    const confirmed = argv.includes('--confirmed');
+    let result;
+    if (verb === 'setup') result = setupLoop(state, { now, settings: coreDebugSettings() });
+    else if (verb === 'bind') result = bindLoop(state, { now, loopId, scheduler: flag(argv, '--scheduler'), schedulerId: flag(argv, '--scheduler-id'), confirmed });
+    else if (verb === 'block') result = blockLoop(state, { loopId, reason: flag(argv, '--reason') });
+    else if (verb === 'stop') result = stopLoop(state, { loopId, schedulerId: flag(argv, '--scheduler-id'), confirmation: flag(argv, '--confirmation'), confirmed });
+    else if (verb === 'pass') {
+      if (argv.includes('--loop-id')) requireScheduledLoop(state, loopId);
+      const fixture = flag(argv, '--snapshot');
+      const snap = fixture ? JSON.parse(fs.readFileSync(fixture, 'utf8')) : await snapshot(watchOptions(argv));
+      result = { at: snap.at, ok: snap.ok, facts: snap.facts, loop: state.loop?.id ?? null, ...runPass(state, snap, { now, loopId: loopId ?? null, dispatch: (a) => (a.fixOwner === 'owner' ? { reason: 'fix owner: the owner' } : null) }) };
+    } else if (verb === 'claim' || verb === 'note' || verb === 'release') {
+      const key = flag(argv, '--key');
+      if (!key) throw new Error(`${verb} needs --key <alert>`);
+      const lane = verb === 'claim' ? flag(argv, '--lane') : null;
+      if (verb === 'claim' && !lane) throw new Error('claim needs --lane <lane>');
+      result = settleFix(state, key, { now, lane, reason: flag(argv, '--reason') ?? 'no core fix owed', release: verb === 'release' });
+    }
+    saveState(file, state);
+    return result;
+  });
+  if (out?.ok === false && out.reason === 'held') process.exitCode = 1;
   console.log(JSON.stringify(out));
 }
 

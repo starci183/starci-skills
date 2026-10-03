@@ -38,7 +38,7 @@ paths:
   - scripts/supervisor/core-watch.mjs
   - modules/host/orca/calls.yaml
   - modules/kernel/failure-codes.yaml
-  - skills/claude-debug/SKILL.md
+  - skills/debug/SKILL.md
   - CHANGELOG.md
   - tests/orca-orphans.spec.mjs
   - tests/helpers/fake-orca-worktrees.mjs

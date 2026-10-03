@@ -1,0 +1,40 @@
+id: debug-caller-native-scheduler
+effectiveAt: 2026-10-03T19:38:15.190Z
+summary: >-
+  The owner requests generic debug in the invoking Codex, Claude or Devin chat, retaining the calling agent and
+  concrete model or its existing same-agent owner route. skills/debug replaces skills/claude-debug; coreDebug owns
+  interval and worktreeLimit without colliding with the existing boolean debug setting or retaining a config alias.
+  Setup reserves one host slot without calling a scheduler. An actual native Codex current-chat heartbeat or Claude
+  loop receipt binds its exact loop ID and scheduler ID. Matching scheduled passes renew liveness; manual passes do
+  not. Pending or uncertain creation and stale registered heartbeats remain held until exact confirmed native
+  cancellation; a Claude instance may alternatively prove it ended, and an unbound attempt requires definitive
+  not-created proof. The existing host lock primitive serializes state actions under debug's private state-lock
+  directory, separate from the heavy-runtime lock. Unsupported or unverified local recurrence stays visibly blocked
+  and permits only a manual one-shot. Local Devin CLI recurrence is unverified; cloud schedules do not prove a local
+  facility. No Claude fallback, model default table, Kernel or Op setting change, custom watcher or LLM-call library
+  is introduced. Core-only authority, alert ownership and disjoint repair lanes remain in force.
+reach: new-legs
+paths:
+  - skills/debug/SKILL.md
+  - config.example.yaml
+  - engine/config.mjs
+  - scripts/reconciler/debug-pass.mjs
+  - scripts/reconciler/core-watch.mjs
+  - tests/reconciler/supervisor-debug-pass.spec.mjs
+  - tests/engine/config.spec.mjs
+  - modules/cli/commands/debug/pass.yaml
+  - tests/cli/debug.spec.mjs
+  - docs/supervisor.md
+  - docs/ledger-db.md
+  - engine/db/machine.mjs
+  - scripts/housekeeping/hk-logs.mjs
+  - tests/checks/check-guidance-commands.spec.mjs
+  - modules/kernel/contract-changes/claude-debug-skill.yaml
+  - modules/kernel/contract-changes/claude-debug-loop.yaml
+  - modules/kernel/contract-changes/guidance-matches-command-guard.yaml
+  - modules/kernel/contract-changes/ledger-hygiene.yaml
+  - modules/kernel/contract-changes/workflow-worktree.yaml
+  - modules/kernel/contract-changes/hfs-unversion.yaml
+  - modules/kernel/contract-changes/orca-orphan-worktrees.yaml
+  - skills/claude-debug/SKILL.md
+  - modules/kernel/contract-changes/debug-caller-native-scheduler.yaml

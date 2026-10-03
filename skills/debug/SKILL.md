@@ -1,30 +1,53 @@
 ---
-name: claude-debug
+name: debug
 description: >-
-  Supervise and debug the StarCi CORE (the .claude runtime, reconciler engine, services, harness UI, checkers) from a
-  chat while workflows run: invoked once it starts one Claude Code `/loop <config claudeDebug.interval>` (never a second one); each
-  tick is one pass (a read-only check of everything, diagnosis, one lane per new core alert, a Vietnamese diagnosis table), plus the fix
-  loop through disjoint Claude Sonnet lanes landed through the gate, hard rules and the known failure signatures. Kernels and the
-  Supervisor seat run the workflows; this chat only fixes the core. Use when the owner says claude-debug, "debug
-  core", "monitor core", "fix core while a workflow runs", or runs /claude-debug. Owner-facing replies in Vietnamese.
-user-invocable: true
+  Debug the StarCi CORE from the invoking Codex, Claude or Devin chat: read-only diagnosis, one disjoint fix lane per
+  new core alert, and verified native recurrence when the caller supports it. Kernels and the Supervisor seat run
+  workflows; this chat fixes only the runtime, reconciler, services, harness UI and checkers. Use for /debug,
+  "debug core", "monitor core", or "fix core while a workflow runs". Owner-facing replies in Vietnamese.
 ---
 
-# claude-debug
+# debug
 
-**Invoke once; it loops by itself.** `/claude-debug` (no argument) is the setup:
+**Keep the invoking agent and model.** `/debug` (no argument) prepares one native recurring pass for this host.
+Retain the caller's concrete model when known; otherwise resolve the same agent through the existing registered
+agent/model routing and owner config. Do not change Kernel, Op or global model settings. A Codex request remains
+Codex; never launch Claude to obtain `/loop`. A manual `/debug pass` needs no scheduler.
 
 1. Run `node --no-warnings scripts/reconciler/debug-pass.mjs setup`. It reads the interval from `config.yaml`
-   `claudeDebug.interval` (default in `config.example.yaml`; a missing block is refused with the line to copy, which the
-   owner adds) and prints `{created, loop: {id, interval, ...}}`.
-2. `{"created": false}`: a live loop already runs on this host (in this chat or another). Start nothing; tell the owner
-   in Vietnamese which loop (`loop.id`, last pass) and stop here.
-3. `{"created": true}`: start Claude Code's built-in loop with the loop skill: `/loop <loop.interval> /claude-debug pass`,
-   using the printed `loop.interval` verbatim. That is the only scheduler; never write a watcher, a sleep loop or a
-   Monitor stream instead.
+   `coreDebug.interval` (default in `config.example.yaml`; a missing block is refused with the line to copy, which the
+   owner adds) and prints `{created, loop: {id, interval, status, scheduler, ...}, scheduled, live}`. This reserves a
+   slot; it does not create or prove a running scheduler.
+2. `{"created": false}`: this host already holds a slot, including a stale scheduler or uncertain creation. Start
+   nothing; report its ID, status and last pass in Vietnamese. Never repeat native creation after a timeout or unknown
+   result. Read that exact native attempt's status before binding it or proving it was not created.
+3. `{"created": true}`: use the caller's verified native facility, with `loop.interval` verbatim:
+   - **Codex desktop app:** discover `automation_update`, inspect existing automations for this debug loop, and create
+     one heartbeat attached to the current chat. Use the configured interval and a prompt that invokes `$debug pass`
+     with `--loop-id <loop.id>`. It retains this chat's model and tools. Keep unchanged or non-actionable state quiet;
+     notify on a meaningful change, completion, failure or required owner action. Do not create a cron task, a new
+     chat or another provider worker. Capture the returned native automation ID.
+   - **Claude Code:** use its built-in loop, `/loop <loop.interval> /debug pass --loop-id <loop.id>`, and capture that
+     native loop task's exact ID from its accepted receipt.
+   - **Codex CLI or local Devin:** verify a supported native periodic facility from current official documentation and
+     actual CLI capabilities before recurrence. Current local Devin recurrence is unverified; cloud schedules are
+     not proof of a local session loop. If unavailable or unverified, run one manual pass, then record
+     `starci debug pass block --loop-id <loop.id> --reason "native local recurrence unavailable or unverified"` and
+     report recurrence blocked. Do not claim a started loop, change provider, or manufacture a watcher.
+4. Only after the native create receipt confirms the exact scheduler, run
+   `starci debug pass bind --loop-id <loop.id> --scheduler <codex-heartbeat|claude-loop> --scheduler-id <native id> --confirmed`.
+   Record the actual receipt. Identical binding is idempotent; another scheduler ID is refused. A tick arriving before
+   binding is refused, and the next native tick can run once binding succeeds. Never write a watcher, sleep loop,
+   Monitor stream or separate LLM-call library.
 
-`/claude-debug pass` is one tick (section 2): exactly one pass, then the turn ends. To stop, end the `/loop` and run
-`starci debug pass stop`.
+`/debug pass --loop-id <loop.id>` is one scheduled tick (section 2): exactly one pass, then the turn ends.
+To stop, first cancel the exact native heartbeat or loop and verify its successful cancellation; then run
+`starci debug pass stop --loop-id <loop.id> --scheduler-id <native id> --confirmation cancelled --confirmed`.
+A Claude loop whose exact native instance authoritatively ended may use `--confirmation ended`. A durable Codex
+heartbeat requires cancellation even when its chat is absent. `--confirmed` records verified native evidence, never
+an assumption from stale ticks, a missing process, or a timed-out create. An unbound reservation is released only
+after definitive native proof that its attempt was not created, with
+`starci debug pass stop --loop-id <loop.id> --confirmation not-created --confirmed`; unknown creation stays held.
 
 Reply to the owner in Vietnamese; every file, commit and lane prompt is English.
 
@@ -37,16 +60,17 @@ Reply to the owner in Vietnamese; every file, commit and lane prompt is English.
 - Reading a Kernel screen is allowed (read only, section 3). Restarting the engine or the host is the owner's
   `/start`, not this chat's reflex.
 
-## 2. One pass (`/claude-debug pass`)
+## 2. One pass (`/debug pass`)
 
 Commands run from the runtime root (`.claude`). One pass, then stop:
 
-1. `node --no-warnings scripts/reconciler/debug-pass.mjs pass` takes one read-only core snapshot
+1. `node --no-warnings scripts/reconciler/debug-pass.mjs pass --loop-id <loop.id>` takes one read-only core snapshot
    of everything (`scripts/reconciler/core-watch.mjs --json` in process) and prints `{ok, loop, dispatched[], rows[]}`.
    It closes the fixes whose alert cleared and records every alert that has no open fix; `dispatched` lists only those
    new alerts, each with its default `fixOwner` (`owner` for an open owner ask or the owner's `config.yaml`, noted at
    once; `core` for everything else, reserved for a lane). An alert that already has a lane (or a note) is never in
-   `dispatched` again, so a pass is idempotent.
+   `dispatched` again, so a pass is idempotent. A scheduled pass is fenced against the bound loop before collecting the
+   snapshot; a stale loop ID is refused. For a manual one-shot pass omit `--loop-id`; it does not renew any scheduler.
 2. Diagnose each `dispatched` core alert read-only with section 3 until you can name its cause.
 3. A core defect: dispatch one lane (section 4), then
    `starci debug pass claim --key <alert key> --lane <lane>`. Not a core defect (an owner ask, a
@@ -71,7 +95,7 @@ Commands run from the runtime root (`.claude`). One pass, then stop:
   `starci kernel usage` verb).
 - `ledger:orphan:<id>`: a registered ledger whose state directory or every source root is gone.
 - `worktrees:<repo>`: for the runtime and every active ledger's repo, read from Orca's `worktree ps`: more worktrees than
-  `claudeDebug.worktreeLimit`, a tree whose directory is gone, or a tree carrying the runtime's ownership stamp
+  `coreDebug.worktreeLimit`, a tree whose directory is gone, or a tree carrying the runtime's ownership stamp
   (`starci:<kind>:<slot>`) with no registry row, which the worktree GC adopts or removes. `worktrees:orca`: the ps read
   itself failed. A product repository's
   registered worktrees are workflow worktrees (kind `workflow`, one per Kernel workflow, keyed by Orca's worktree id,
@@ -82,11 +106,12 @@ Commands run from the runtime root (`.claude`). One pass, then stop:
   a worktree removed through a junction).
 - `gate:land:<lane>`, `gate:push:<repo>`: in the last day, a lane whose latest land run did not pass, a repository whose
   latest push failed or was refused (`machine.sqlite` `land_runs`, `pushes`).
-- `config:claudeDebug`: the `claudeDebug` block of `config.yaml` is missing or invalid (fix owner: the owner).
+- `config:coreDebug`: the `coreDebug` block of `config.yaml` is missing or invalid (fix owner: the owner).
 - `collector:<name>`: a collector crashed; the rest of the snapshot still counts.
 
-State: `<StarCi state root>/claude-debug/state.json` (`%LOCALAPPDATA%/StarCi`, moved by `STARCI_LOCAL_ROOT`), holding the
-loop record (live while it passed within 2 x interval + 5 min) and the open fixes keyed by alert key. The snapshot never
+State: `<StarCi state root>/debug/state.json` (`%LOCALAPPDATA%/StarCi`, moved by `STARCI_LOCAL_ROOT`), holding the
+loop reservation and exact native scheduler ID, plus the open fixes keyed by alert key. Live means a matching scheduled
+pass ran within 2 x interval + 5 min; accepted creation alone is not liveness, and staleness never releases custody. The snapshot never
 restarts, writes or dispatches anything. Auto-restart made the crash-loop safe mode worse; do not add it. An alert is a
 trigger for section 3, not for a restart.
 
@@ -139,9 +164,12 @@ Also: `starci reconciler status`, `starci reconciler up --check`,
    `config.yaml` already in place, and prints its path; copy `packages/grammar/dist` from the live checkout. A lane never
    makes its own worktree or link and never deletes a tree recursively; a missing `packages/node_modules` is reported as
    a blocked environment.
-3. Start one Claude Sonnet worker per lane through Orca:
-   `orca orchestration worker-start --agent claude --model <Sonnet model id> --worktree path:<staged path> --spec "<brief>" --task-title "sonnet · .claude · <lane>"`,
-   supervised with worker-show / worker-read / worker-stop / worker-release. The brief is self-contained: the evidence,
+3. Before dispatch, coordinate with any existing maintenance lead and its protected write ownership; claim an existing
+   lane for the same alert rather than duplicating it. Start one worker per disjoint lane through the native owning
+   launcher API, using this chat's calling agent and concrete model (or the existing same-agent route when unknown).
+   Use that registered agent's supported model/effort flags; do not pass a model flag to an opaque provider that does
+   not accept one. Read the version-matched `orca-cli`/orchestration guidance for the actual worker interface, then
+   supervise through worker-show / worker-read / worker-stop / worker-release. The brief is self-contained: the evidence,
    the scope (files it may touch), the hard rules of section 5 verbatim, the deliverable (commit shas, touching-spec
    counts, `starci check run --level L1 --changed <files>` exit 0, a report). Lanes never edit the same file.
 4. Land as soon as a lane's touching specs are green; never hold a ready lane waiting for others (owner 2026-09-29:

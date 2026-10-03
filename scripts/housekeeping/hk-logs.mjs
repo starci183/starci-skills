@@ -6,7 +6,7 @@
 //
 // Roots:
 //   <LOCALAPPDATA>/StarCi     (starciLocalRoot: machine.sqlite, projects/, archive/ — STARCI_LOCAL_ROOT
-//                             overrides this whole base for one process tree, e.g. a claude-debug probe
+//                             overrides this whole base for one process tree, e.g. a debug probe
 //                             that must never leak a throwaway ledger into the real store; engine/db/machine.mjs
 //                             LOCAL_ROOT_ENV, also honored by engine/db/ledger.mjs projectsRootFor)
 //   <USERPROFILE>/.starci     (redundancy handoffs, backups; lanes/ and supervisor staging/land

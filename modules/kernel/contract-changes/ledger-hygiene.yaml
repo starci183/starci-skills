@@ -34,7 +34,7 @@ paths:
   - scripts/supervisor/housekeeping.mjs
   - scripts/lib/hk-logs.mjs
   - packages/hfs/sync/hygiene.mjs
-  - skills/claude-debug/SKILL.md
+  - skills/debug/SKILL.md
   - docs/ledger-db.md
   - docs/architecture.md
   - tests/machine-registry-isolation.spec.mjs
