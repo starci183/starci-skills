@@ -903,7 +903,7 @@ _starci() {
         workflow:stop:--by) COMPREPLY=( $(compgen -W "owner supervisor" -- "$cur") ); return 0;;
     esac
     case "$group:$verb" in
-        app:add) COMPREPLY=( $(compgen -W "--event --from --service --connection --owner --failed --done --json --cwd --quiet --help --edition" -- "$cur") );;
+        app:add) COMPREPLY=( $(compgen -W "--event --from --service --connection --owner --failed --done --fe --no-types --json --cwd --quiet --help --edition" -- "$cur") );;
         app:check) COMPREPLY=( $(compgen -W "--fast --base --json --cwd --quiet --help --edition" -- "$cur") );;
         app:emit) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         app:explain) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;

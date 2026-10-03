@@ -930,7 +930,7 @@ _starci() {
     'workflow:stop:--by') _values 'values' 'owner' 'supervisor'; return 0 ;;
     esac
     case "$words[2]:$words[3]" in
-    'app:add') _values 'flags' '--event' '--from' '--service' '--connection' '--owner' '--failed' '--done' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'app:add') _values 'flags' '--event' '--from' '--service' '--connection' '--owner' '--failed' '--done' '--fe' '--no-types' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:check') _values 'flags' '--fast' '--base' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:emit') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'app:explain') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

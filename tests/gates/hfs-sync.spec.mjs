@@ -462,7 +462,7 @@ describe('the package.json scripts of the app', () => {
     const typecheck = 'npm run codegen --silent && tsc -p be/tsconfig.json && turbo run typecheck';
     assert.equal(scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }], optionalSlots: ['fe.package.ui'] } })).typecheck, typecheck);
     assert.equal(scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }] } })).typecheck, typecheck, 'with or without packages: the task graph decides');
-    const graph = JSON.parse(rendered()['turbo.json']);
+    const graph = JSON.parse(rendered()['turbo.json'].replace(/^\s*\/\/.*$/gm, ''));
     assert.deepEqual(graph.tasks.typecheck.dependsOn, ['^build']);
     assert.deepEqual(graph.tasks.build.dependsOn, ['^build']);
     assert.deepEqual(Object.keys(graph.tasks).sort(), ['build', 'dev', 'lint', 'typecheck']);

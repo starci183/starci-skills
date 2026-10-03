@@ -24,6 +24,8 @@ add one canonical backend capability and register its patterns
 | `--owner` | string |  |
 | `--failed` | string |  |
 | `--done` | string |  |
+| `--fe` | boolean |  |
+| `--no-types` | boolean |  |
 
 Positionals: noun, name
 

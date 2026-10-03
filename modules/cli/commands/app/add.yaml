@@ -4,7 +4,7 @@ owner: "@starci/hfs"
 summary: add one canonical backend capability and register its patterns
 impl: null
 positional:
-  - {name: noun, enum: [api, webhook, realtime, saga, job, reactor, queue, projection, cli], required: true, variadic: false}
+  - {name: noun, enum: [api, webhook, realtime, saga, job, reactor, queue, projection, cli, table, app], required: true, variadic: false}
   - {name: name, required: true, variadic: false}
 flags:
   - {name: event, type: string, summary: event consumed by a reactor}
@@ -14,6 +14,8 @@ flags:
   - {name: owner, type: string, summary: service that owns a saga}
   - {name: failed, type: string, summary: failure event consumed by a saga}
   - {name: done, type: string, summary: completion event consumed by a saga}
+  - {name: fe, type: boolean, summary: add the typed front-end database modules of a lite table}
+  - {name: no-types, type: boolean, summary: skip regenerating the Supabase database types of a lite table}
 exit: {"0": capability created, "2": refusal or bad usage}
 json: none
 examples: ['starci app add api checkout --service CheckoutService=@modules/domain/order']
