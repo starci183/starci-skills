@@ -270,7 +270,8 @@ const PARTIAL_VARIABLES = new Proxy(Object.create(null), {
 const CLI_APP_DIR = 'apps/cli/';
 const declaresCliApp = app => app.sides.be.apps.some(entry => entry.kind === 'cli' && entry.name === 'cli');
 
-const LITE_APP_REUSED = new Set(['.editorconfig', '.gitattributes', '.nvmrc', '.starciwork/workspace.yaml']);
+const LITE_APP_REUSED = new Set(['.editorconfig', '.gitattributes', '.nvmrc', '.starciwork/workspace.yaml',
+  '.starciwork/index.yaml', '.starciwork/features/system-health/index.yaml']);
 const LITE_DEFERRED_GENERATOR_FILES = new Set([
   'src/modules/platform/database/database.sql.ts',
   'src/modules/platform/database/migration-runner.service.ts',
@@ -313,6 +314,12 @@ function skeletonDirectory(scope, directory, app, vars, include = () => true) {
     for (const entry of apps) files.push({ path: `${prefix}${output(rel.split(APP_DIR).join(entry.name))}`, content: fill(source, { ...once, app: entry.name, appPascal: pascal(entry.name) }, `${directory}/${rel}`) });
   }
   return files;
+}
+
+/** The canonical product catalog and feature nodes shared by scaffold and upgrades of older lite apps. */
+export function scaffoldWorkSeeds(project) {
+  return skeletonDirectory('app', 'skeleton', { project }, {},
+    rel => rel === '.starciwork/index.yaml' || rel.startsWith('.starciwork/features/'));
 }
 
 /**

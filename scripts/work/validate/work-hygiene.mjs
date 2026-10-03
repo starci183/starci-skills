@@ -23,6 +23,9 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../../lib/secret-patterns.mjs';
 import { scopeToOwned, validateWork } from './work-validate.mjs';
 import { isMain } from '../../lib/is-main.mjs';
+import { withoutGitLocalEnv } from '../../lib/git.mjs';
+import { samePath } from '../../lib/path-key.mjs';
+import { readEnv } from '../../lib/env.mjs';
 
 export const WORK_YAML_UNPARSEABLE = 'WORK_YAML_UNPARSEABLE';
 export const WORK_VALIDATE_REFUSED = 'WORK_VALIDATE_REFUSED';
@@ -127,7 +130,13 @@ export function scanSecrets(rel, text) {
 
 // ------------------------------------------------------------------------------------------------- the check
 const relTo = (root, abs) => slashed(path.relative(root, abs));
-const gitOut = (call, root, args) => call(args, { dir: root, maxBuffer: 64 * 1024 * 1024, timeout: 30_000 });
+const gitOut = (call, root, args, env) => call(args, { dir: root, maxBuffer: 64 * 1024 * 1024, timeout: 30_000, ...(env ? { env } : {}) });
+const stagedGitEnv = (root) => {
+  const env = withoutGitLocalEnv(process.env);
+  const index = readEnv('GIT_INDEX_FILE');
+  if (index && samePath(root, path.resolve(process.cwd()))) env.GIT_INDEX_FILE = path.resolve(process.cwd(), index);
+  return env;
+};
 
 /**
  * checkWorkFiles({repo, files, read, strict}) -> {ok, findings[], files: n, checked: {parse, validate, secrets}}
@@ -194,14 +203,15 @@ export function checkWorkFilesAbs(files, options = {}) {
 /** The staged (added, copied, modified, renamed) files of `repo`, read from the index. */
 export function stagedFiles(repo) {
   const root = path.resolve(repo);
-  const out = gitOut(gitDiff, root, ['--cached', '--name-only', '--diff-filter=ACMR', '-z']);
+  const out = gitOut(gitDiff, root, ['--cached', '--name-only', '--diff-filter=ACMR', '-z'], stagedGitEnv(root));
   if (out.status !== 0) throw new Error(`git diff --cached failed: ${(out.stderr || '').trim().slice(0, 200)}`);
   return out.stdout.split('\0').filter(Boolean).map(slashed);
 }
 function stagedCheck(repo, options = {}) {
   const root = path.resolve(repo);
   const files = stagedFiles(root).filter(inSecretScope);
-  const read = (rel) => { const r = gitOut(gitShow, root, [`:${rel}`]); return r.status === 0 ? r.stdout : null; };
+  const env = stagedGitEnv(root);
+  const read = (rel) => { const r = gitOut(gitShow, root, [`:${rel}`], env); return r.status === 0 ? r.stdout : null; };
   return checkWorkFiles({ repo: root, files, read, ...options });
 }
 
