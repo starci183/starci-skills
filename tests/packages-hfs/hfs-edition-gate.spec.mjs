@@ -14,6 +14,7 @@ import { cleanup, installTypeScript } from '../helpers/hfs-cli-fixture.mjs';
 // and "<verb> <noun>: full edition only; run starci app upgrade --edition full" on stderr, nothing written. The slot
 // resolver of the app decides - never a noun list.
 
+const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const made = [];
 test.after(() => cleanup(made));
 
@@ -101,6 +102,24 @@ test('a lite app refuses `new service` and `new spec` - the unit spec they write
 
 test('the nouns lite keeps are untouched: add api, add webhook and add cli still write their trees', async () => {
   const dir = repo(LITE);
+  // the lite scaffold's barrels the generated transports register their exports in
+  for (const relative of ['domain/identity/index.ts', 'platform/cqrs/index.ts', 'platform/database/database.module.ts', 'platform/database/index.ts', 'platform/http-security/index.ts']) {
+    const target = path.join(dir, 'be', 'src', 'modules', ...relative.split('/'));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(ROOT, 'packages', 'hfs', 'templates', 'be', 'skeleton-lite', 'src', 'modules', ...relative.split('/')), target);
+  }
+  const databaseErrors = path.join(dir, 'be', 'src', 'modules', 'platform', 'database', 'errors');
+  fs.mkdirSync(databaseErrors, { recursive: true });
+  fs.copyFileSync(path.join(ROOT, 'packages', 'hfs', 'templates', 'be', 'skeleton', 'src', 'modules', 'platform', 'database', 'errors', 'database.error.ts'), path.join(databaseErrors, 'database.error.ts'));
+  for (const [domain, service] of [['order', 'checkout'], ['order', 'dead-letter'], ['payment', 'payment']]) {
+    const folder = path.join(dir, 'be', 'src', 'modules', 'domain', domain);
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(path.join(folder, 'index.ts'), '');
+    const name = service.split('-').map((word) => word[0].toUpperCase() + word.slice(1)).join('');
+    fs.writeFileSync(path.join(folder, service + '.service.ts'), service === 'payment'
+      ? 'import type { EntityManager } from "typeorm"\n\ninterface PaymentGatewayDelivery { readonly id: string }\n\nexport class PaymentService {\n  constructor(private readonly entityManager: EntityManager) {}\n\n  async acceptPaymentGatewayDelivery(delivery: PaymentGatewayDelivery): Promise<void> {\n    await Promise.resolve(delivery.id)\n  }\n}\n'
+      : `export class ${name}Service {}\n`);
+  }
   // the lite api app the transports are composed into (the shapes add api / add webhook wire: the imports array and the parsed http-security options)
   fs.mkdirSync(path.join(dir, 'be', 'apps', 'core', 'src'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'be', 'apps', 'core', 'src', 'app.module.ts'), ['import { Module } from "@nestjs/common"', '', '@Module({', '  imports: [', '  ],', '})', 'export class AppModule {}', ''].join('\n'));

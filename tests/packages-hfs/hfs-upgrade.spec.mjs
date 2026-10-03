@@ -295,7 +295,6 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
   );
   for (const file of [
     ".github/workflows/ci.yml",
-    ".husky/pre-push",
     "be/jest.config.js",
     "codecov.yml",
     "sonar-project.properties",
