@@ -10,6 +10,7 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
 import {openMachine,TEST_REGISTRY_ENV} from '../../engine/db/machine.mjs';
+import {startKernelApiCli} from '../helpers/engine-db-kernel-api-fixture.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -22,10 +23,20 @@ const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 //   [--verdict pass|fail] [--report <file>] --json
 // wrapping kernel/ledger-db.mjs tables (workflows, goals, inbox, jobs,
 // signals, incidents, events).
-const runApi=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
+const CLI=startKernelApiCli();
+test.after(()=>CLI.close());
+const cliEnv=ownerRoot=>({
+  [TEST_REGISTRY_ENV]:process.env[TEST_REGISTRY_ENV]??null,
+  STARCI_PROJECTS_ROOT:process.env.STARCI_PROJECTS_ROOT??null,
+  STARCI_OWNER_ROOT:ownerRoot??null,
+  STARCI_AUTOPILOT:process.env.STARCI_AUTOPILOT??null,
+});
+const runApiFresh=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
+const runApi=(...args)=>CLI.run(args,cliEnv());
 /** The same call with an owner-config root: STARCI_OWNER_ROOT is the one seam engine/config.mjs reads config.yaml through. */
-const runApiAsOwner=(ownerRoot,...args)=>spawnSync(process.execPath,[API,...args],
+const runApiAsOwnerFresh=(ownerRoot,...args)=>spawnSync(process.execPath,[API,...args],
   {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_OWNER_ROOT:ownerRoot}});
+const runApiAsOwner=(ownerRoot,...args)=>CLI.run(args,cliEnv(ownerRoot));
 /** A temp owner root holding a valid config.yaml — the shipped example with `patch` merged over it. */
 const ownerConfig=(t,patch)=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-'));
@@ -345,7 +356,7 @@ test('an owner-gate incident holds the jobs it names until the Kernel resolves i
   assert.equal(fr.readyOperations,1);
 
   for(const verb of ['route','dispatch']){
-    const refused=api(verb,'--job',held);
+    const refused=runApiAsOwnerFresh(owner,verb,'--job',held,'--repo',repo,'--json');
     assert.notEqual(refused.status,0,`${verb} refuses a held job before any pool or Orca call`);
     assert.equal(out(refused).reason,'owner-gate');
   }
@@ -357,7 +368,8 @@ test('an owner-gate incident holds the jobs it names until the Kernel resolves i
   assert.deepEqual(fr.queuedCauses,{'owner-gate':1});
 
   // An owner-gate resolves as the owner unless the resolver says otherwise: no owner answer, no owner resolution.
-  const unanswered=api('incident','--workflow',wf,'--resolve',incidentId,'--detail','assisted run receipt landed');
+  const unanswered=runApiAsOwnerFresh(owner,'incident','--workflow',wf,'--resolve',incidentId,
+    '--detail','assisted run receipt landed','--repo',repo,'--json');
   assert.notEqual(unanswered.status,0);
   assert.match(unanswered.stderr,/owner-claim-unproven/);
   const resolved=api('incident','--workflow',wf,'--resolve',incidentId,'--detail','assisted run receipt landed','--by','kernel');
@@ -376,7 +388,8 @@ test('an owner-gate incident holds the jobs it names until the Kernel resolves i
   api('incident','--workflow',wf,'--resolve',plain.incidentId,'--by','kernel');
   api('incident','--workflow',wf,'--kind','infra-provider','--op','integration.verify','--detail','not a gate');
   assert.equal(because(held,frontier()).queuedBecause,'ready');
-  assert.notEqual(api('incident','--workflow',wf,'--resolve','inc-nope').status,0,'an unknown incident is refused');
+  assert.notEqual(runApiAsOwnerFresh(owner,'incident','--workflow',wf,'--resolve','inc-nope','--repo',repo,'--json').status,0,
+    'an unknown incident is refused');
 });
 
 // Live Modules ran three provision.ask jobs at once (Chatbot, Shell, Accounting);
@@ -415,7 +428,8 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
   assert.equal(because(member).queuedBecause,'dependency');
   assert.deepEqual(because(member).blockedBy,{op:'docs.author',job:composition});
   assert.equal(because(composition).queuedBecause,'ready','the job it waits on is itself ready');
-  assert.notEqual(api('enqueue','--workflow',wf,'--op','docs.author','--paths','docs/x','--after','op-nope').status,0,'an unknown --after job is refused');
+  assert.notEqual(runApiAsOwnerFresh(owner,'enqueue','--workflow',wf,'--op','docs.author','--paths','docs/x',
+    '--after','op-nope','--repo',repo,'--json').status,0,'an unknown --after job is refused');
 
   const seam=enq('--op','docs.author','--paths','docs/cut-1','--cut-id','c1','--cut-ordinal','1','--cut-total','2');
   const second=enq('--op','docs.author','--paths','docs/cut-2','--cut-id','c1','--cut-ordinal','2','--cut-total','2');
@@ -463,7 +477,8 @@ test('reconcile --drop retires a never-dispatched queued job and names what wait
   const seam=enq('--op','docs.author','--paths','docs/cut-1','--cut-id','c1','--cut-ordinal','1','--cut-total','2');
   const second=enq('--op','docs.author','--paths','docs/cut-2','--cut-id','c1','--cut-ordinal','2','--cut-total','2');
   const third=enq('--op','docs.author','--paths','docs/after','--after',second);
-  assert.notEqual(api('reconcile','--job',second,'--drop').status,0,'a drop keeps its reason');
+  assert.notEqual(runApiAsOwnerFresh(owner,'reconcile','--job',second,'--drop','--repo',repo,'--json').status,0,
+    'a drop keeps its reason');
   const dropped=api('reconcile','--job',second,'--drop','--reason','cut grants break the Work layout');
   assert.equal(dropped.status,0,dropped.stderr);
   assert.deepEqual([out(dropped).status,out(dropped).waiting],['cancelled',[third]]);
@@ -472,7 +487,7 @@ test('reconcile --drop retires a never-dispatched queued job and names what wait
   assert.equal(q.find(x=>x.jobId===third).queuedBecause,'dependency-failed','its dependant is the Kernel\'s to move now');
   assert.equal(q.some(x=>x.jobId===second),false);
   seed(repo,ledger=>moveJob(ledger,seam,'running',{workerId:'w-1'}));
-  const refused=api('reconcile','--job',seam,'--drop','--reason','x');
+  const refused=runApiAsOwnerFresh(owner,'reconcile','--job',seam,'--drop','--reason','x','--repo',repo,'--json');
   assert.notEqual(refused.status,0,'a dispatched job settles through settle');
   assert.match(refused.stderr,/drop-not-queued/);
 });
@@ -664,10 +679,10 @@ test('status projects exact host liveness and live jobs cannot route or dispatch
   assert.equal(worker?.liveness,'active');
   assert.equal(worker?.connected,true);
   assert.equal(worker?.writable,true);
-  const route=runApi('route','--repo',repo,'--job',jobId,'--json');
+  const route=runApiFresh('route','--repo',repo,'--job',jobId,'--json');
   assert.notEqual(route.status,0,'a live job must never be rerouted');
   assert.match(`${route.stdout}${route.stderr}`,/job-not-queued/);
-  const dispatch=runApi('dispatch','--repo',repo,'--job',jobId,'--json');
+  const dispatch=runApiFresh('dispatch','--repo',repo,'--job',jobId,'--json');
   assert.notEqual(dispatch.status,0,'a live job must never be dispatched twice');
   assert.match(`${dispatch.stdout}${dispatch.stderr}`,/job-not-queued/);
 
@@ -783,7 +798,7 @@ test('budgets.maxOps refuses the second concurrent operation with max-ops and le
 
   // The first operation now holds the workflow's one slot.
   seed(repo,ledger=>moveJob(ledger,jobA,'running'));
-  const refused=runApiAsOwner(owner,'dispatch','--repo',repo,'--job',jobB,'--json');
+  const refused=runApiAsOwnerFresh(owner,'dispatch','--repo',repo,'--job',jobB,'--json');
   assert.notEqual(refused.status,0,'a second dispatch at budgets.maxOps:1 must refuse');
   const body=out(refused);
   assert.equal(body?.ok,false);
@@ -794,7 +809,7 @@ test('budgets.maxOps refuses the second concurrent operation with max-ops and le
   assert.equal(read(repo,l=>l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobB)).status,'queued',
     'a refused dispatch reserves nothing — the job stays queued for the next slot');
   // route spends a model decision on a slot that does not exist; it refuses first.
-  const routed=runApiAsOwner(owner,'route','--repo',repo,'--job',jobB,'--json');
+  const routed=runApiAsOwnerFresh(owner,'route','--repo',repo,'--job',jobB,'--json');
   assert.notEqual(routed.status,0);
   assert.equal(out(routed)?.reason,'max-ops');
 
@@ -849,7 +864,7 @@ test('cut pass requires the cut-aware green check names before settlement',t=>{
     fileFixtureReport(ledger,jobId,{outcome:'done',summary:'cut done',files:writeGreenProofs(proofDir)});
     ledger.write.recordCheckRun({attemptId,name:'generic-green',phase:'verify',runner:'kernel',status:'pass',exitCode:0});
   });
-  const refused=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
+  const refused=runApiFresh('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
   assert.notEqual(refused.status,0,'generic green evidence must not settle a cut pass');
   assert.match(`${refused.stdout}${refused.stderr}`,/cut-checks-missing/);
   seed(repo,ledger=>{
@@ -928,7 +943,7 @@ test('estimate sizes same-op slices from measured counts, never a guess',t=>{
   const small=runApi('estimate','--repo',repo,'--files','3','--json');
   assert.equal(small.status,0,small.stderr);
   assert.equal(out(small).slices,1,'a 12-minute measure never cuts');
-  const empty=runApi('estimate','--repo',repo,'--json');
+  const empty=runApiFresh('estimate','--repo',repo,'--json');
   assert.notEqual(empty.status,0,'estimate with no measured count must refuse');
   assert.match(`${empty.stdout}${empty.stderr}`,/estimate-no-measure/);
 });
@@ -971,7 +986,7 @@ test('estimate classifies s/m/l/xl and scales only l/xl by gear',t=>{
   assert.equal(standing.gearSource,'config');
   assert.ok(standing.gears.includes(standing.gear),'the gear must come from the declared gears list');
   // An undeclared gear fails closed exactly like an undeclared config key.
-  const bad=runApi('estimate','--repo',repo,'--files','12','--gear','7','--json');
+  const bad=runApiFresh('estimate','--repo',repo,'--files','12','--gear','7','--json');
   assert.notEqual(bad.status,0);
   assert.match(`${bad.stdout}${bad.stderr}`,/gear-undeclared/);
 });
@@ -998,7 +1013,7 @@ test('estimate bounds agentsAchievable by the disjoint path partition the closur
   assert.equal(unbounded.achievableBasis,'unbounded-no-path-closure');
   assert.equal(unbounded.reason,null);
   // A glob is not a concrete ownership boundary and never becomes a slice.
-  const glob=runApi('estimate','--repo',repo,'--files','40','--paths','src/**/*.ts','--json');
+  const glob=runApiFresh('estimate','--repo',repo,'--files','40','--paths','src/**/*.ts','--json');
   assert.notEqual(glob.status,0);
   assert.match(`${glob.stdout}${glob.stderr}`,/estimate-paths-invalid/);
 });
@@ -1009,23 +1024,23 @@ test('enqueue refuses an unbounded grant, an op with no brief, and a finished wo
   const rows=()=>read(repo,l=>l.db.prepare('SELECT count(*) n FROM jobs WHERE workflow_id=?').get(wf).n);
   const refusal=r=>JSON.parse(r.stderr.trim().split('\n').at(-1));
 
-  const noPaths=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths',' , ','--json');
+  const noPaths=runApiFresh('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths',' , ','--json');
   assert.equal(noPaths.status,1,'an op with no owned_paths must not enqueue');
   assert.deepEqual([refusal(noPaths).ok,refusal(noPaths).code],[false,'empty-paths']);
   assert.equal(rows(),0,'a refused enqueue writes no jobs row');
 
-  const custody=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/,.starciwork/kernel-evidence/'+wf+'/round2','--json');
+  const custody=runApiFresh('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/,.starciwork/kernel-evidence/'+wf+'/round2','--json');
   assert.equal(custody.status,1,'an op never owns kernel custody');
   assert.deepEqual([refusal(custody).ok,refusal(custody).code],[false,'path-kernel-custody']);
   assert.equal(rows(),0);
 
-  const unknown=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/','--json');
+  const unknown=runApiFresh('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/','--json');
   assert.equal(unknown.status,1,'an op with no brief must not enqueue');
   assert.deepEqual([refusal(unknown).ok,refusal(unknown).code],[false,'unknown-op']);
   assert.equal(rows(),0);
 
   seed(repo,ledger=>setPhase(ledger,wf,'finished'));
-  const finished=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/','--json');
+  const finished=runApiFresh('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/','--json');
   assert.equal(finished.status,1,'a finished phase takes no new work');
   assert.deepEqual([refusal(finished).ok,refusal(finished).code],[false,'workflow-finished']);
   assert.equal(rows(),0);

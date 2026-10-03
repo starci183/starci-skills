@@ -1,10 +1,10 @@
-import test from 'node:test';
+import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {spawn,spawnSync} from 'node:child_process';
+import {spawn} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
@@ -28,14 +28,40 @@ const RULES='knowledge/coding-reference.yaml';
 const FR_DIR='.starciwork/features/task/fr/list';
 const require=createRequire(import.meta.url);
 const sha=text=>crypto.createHash('sha256').update(text).digest('hex');
+if(process.env.STARCI_TEST_TEMP_DIR){
+  const scratch=path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch');
+  after(()=>fs.rmSync(scratch,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+}
+
+// The scenarios own disjoint runtime copies and ledgers. Let two of them overlap so the
+// many real CLI entries do not pay their process-start cost strictly in series, while
+// keeping the test's subprocess load bounded.
+let activeScenarios=0;
+const scenarioWaiters=[];
+const runScenario=async fn=>{
+  if(activeScenarios>=2)await new Promise(resolve=>scenarioWaiters.push(resolve));
+  activeScenarios++;
+  try{return await fn();}
+  finally{activeScenarios--;scenarioWaiters.shift()?.();}
+};
+const selectiveRun=[...process.execArgv,...process.argv].some(arg=>arg==='--test-name-pattern'||arg.startsWith('--test-name-pattern='));
+const scenario=(title,fn)=>{
+  // Mutation proofs select one catching test; leave those runs lazy so Node does
+  // not start work belonging to tests it will skip.
+  if(selectiveRun){test(title,t=>runScenario(()=>fn(t)));return;}
+  const cleanups=[];
+  // Start independent work while the serial test runner is still registering the
+  // file, then attribute its result to the unchanged test title when Node reaches it.
+  const execution=runScenario(async()=>{
+    try{await fn({after:cleanup=>cleanups.push(cleanup)});}
+    finally{for(const cleanup of cleanups.reverse())await cleanup();}
+  }).then(()=>({error:null}),error=>({error}));
+  test(title,async()=>{const result=await execution;if(result.error)throw result.error;});
+};
 
 const fixture=(t,{registry=null}={})=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stale-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  if(process.env.STARCI_TEST_TEMP_DIR){
-    const scratch=path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch');
-    t.after(()=>fs.rmSync(scratch,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  }
   const skill=path.join(root,'skill'),repo=path.join(root,'repo');
   for(const dir of ['scripts','engine','modules',path.join('packages','cli')])fs.cpSync(path.join(ROOT,dir),path.join(skill,dir),{recursive:true});
   fs.cpSync(path.join(ROOT,'packages','grammar','scripts'),path.join(skill,'packages','grammar','scripts'),{recursive:true});
@@ -49,10 +75,18 @@ const fixture=(t,{registry=null}={})=>{
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     STARCI_OWNER_ROOT:ROOT,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
-    STARCI_PROJECTS_ROOT:path.join(root,'projects'),...(registry?{STARCI_CONTRACT_CHANGES:registry}:{})};
+    STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_TEST_TEMP_DIR:path.join(root,'tmp'),...(registry?{STARCI_CONTRACT_CHANGES:registry}:{})};
   if(!registry)delete env.STARCI_CONTRACT_CHANGES;
   const api=path.join(skill,'scripts','kernel','cli.mjs');
-  const run=(...args)=>spawnSync(process.execPath,[api,...args,'--repo',repo,'--json'],{cwd:skill,encoding:'utf8',windowsHide:true,timeout:180000,env});
+  const run=(...args)=>new Promise(resolve=>{
+    const child=spawn(process.execPath,[api,...args,'--repo',repo,'--json'],{cwd:skill,windowsHide:true,env});
+    let stdout='',stderr='',timedOut=false;
+    const timeout=setTimeout(()=>{timedOut=true;child.kill();},180000);
+    child.stdout.on('data',chunk=>{stdout+=chunk;});
+    child.stderr.on('data',chunk=>{stderr+=chunk;});
+    child.on('error',error=>{stderr+=String(error?.stack??error);});
+    child.on('close',(status,signal)=>{clearTimeout(timeout);resolve({status,signal,stdout,stderr,...(timedOut?{error:new Error('ETIMEDOUT')}: {})});});
+  });
   const write=(rel,text)=>{const file=path.join(skill,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
   const work=(rel,text)=>{const file=path.join(repo,'.starciwork',rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
   return {root,skill,repo,env,api,run,write,work};
@@ -74,8 +108,8 @@ const enqueueSeed=(ledger,args)=>{
   return ledger.enqueueJob({...args,unitId,tryNo:1});
 };
 const inspect=(fx,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(fx.repo,{env:fx.env})});try{return fn(ledger.db);}finally{ledger.close();}};
-const status=fx=>{const r=fx.run('status','--workflow',WORKFLOW);assert.equal(r.status,0,r.stderr||r.stdout);return json(r);};
-const survey=fx=>{const r=fx.run('survey','--workflow',WORKFLOW);assert.equal(r.status,0,r.stderr||r.stdout);return json(r);};
+const status=async fx=>{const r=await fx.run('status','--workflow',WORKFLOW);assert.equal(r.status,0,r.stderr||r.stdout);return json(r);};
+const survey=async fx=>{const r=await fx.run('survey','--workflow',WORKFLOW);assert.equal(r.status,0,r.stderr||r.stdout);return json(r);};
 
 /** A running operation with no exact terminal keeps the frontier `engaged` and not actionable by itself. */
 const holdEngaged=(ledger,jobId='job-engaged',opId='docs.author')=>{
@@ -122,7 +156,7 @@ test('digests: a file is sha256 of its bytes, a directory or glob the digest of 
   assert.equal(digest('knowledge/none/*'),'absent');
 });
 
-test('dispatch records Source and Work digests by kind; settle re-baselines Work; a knowledge edit is advisory sourceDrift, never stale',t=>{
+scenario('dispatch records Source and Work digests by kind; settle re-baselines Work; a knowledge edit is advisory sourceDrift, never stale',async t=>{
   const fx=fixture(t);
   fx.write(RULES,'rules: v1\n');
   fx.write('knowledge/patterns/be/index.yaml','be: v1\n');
@@ -131,7 +165,7 @@ test('dispatch records Source and Work digests by kind; settle re-baselines Work
   withLedger(fx,ledger=>{
     enqueueSeed(ledger,{jobId:'job-refactor',workflowId:WORKFLOW,opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/refactor/'],model:'devin-agent',records:[FR_DIR,'src/refactor/a.ts']}});
   });
-  const dispatched=fx.run('dispatch','--job','job-refactor','--model','devin-agent','--spawn');
+  const dispatched=await fx.run('dispatch','--job','job-refactor','--model','devin-agent','--spawn');
   assert.equal(dispatched.status,0,dispatched.stderr||dispatched.stdout);
   const inputsOf=()=>inspect(fx,db=>JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE workflow_id=?').get(WORKFLOW).context_json).inputs);
   const inputs=inputsOf();
@@ -146,9 +180,9 @@ test('dispatch records Source and Work digests by kind; settle re-baselines Work
 
   const report=inspect(fx,db=>path.join(db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=?').get('job-refactor').scratch_dir,'report.json'));
   fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'refactor done',head:'abc1234def',files:['src/refactor/a.ts',...(writeGreenProofs(path.join(fx.repo,'src','refactor')),['src/refactor/sonar.json','src/refactor/gate.json','src/refactor/read-digest.json'])],checks:[{name:'self',command:'true',exitCode:0}]}));
-  const reported=fx.run('report','--job','job-refactor','--report',report);
+  const reported=await fx.run('report','--job','job-refactor','--report',report);
   assert.equal(reported.status,0,reported.stderr||reported.stdout);
-  const checked=fx.run('record-checks','--job','job-refactor','--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}));
+  const checked=await fx.run('record-checks','--job','job-refactor','--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}));
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
   withLedger(fx,ledger=>{
     const attempt=ledger.db.prepare('SELECT attempt_id,span_id FROM op_attempts WHERE job_id=?').get('job-refactor');
@@ -156,46 +190,46 @@ test('dispatch records Source and Work digests by kind; settle re-baselines Work
       VALUES(?,?,?,?,?,?,'verify','settler','runtime',0,'pass',?)`)
       .run(WORKFLOW,attempt.attempt_id,'job-refactor',OP,attempt.span_id,'validator',Date.now());
   });
-  const settled=fx.run('settle','--job','job-refactor','--verdict','pass');
+  const settled=await fx.run('settle','--job','job-refactor','--verdict','pass');
   assert.equal(settled.status,0,settled.stderr||settled.stdout);
   const work=inputsOf().digests.find(d=>d.path===FR_DIR);
   assert.equal(work.settled.digest,recorded[FR_DIR].digest);
   assert.deepEqual(Object.keys(work.settled.files),[`${FR_DIR}/index.yaml`]);
   withLedger(fx,ledger=>holdEngaged(ledger));
 
-  const quiet=status(fx);
+  const quiet=await status(fx);
   assert.deepEqual(quiet.staleInput,[],'unchanged inputs are not stale');
   assert.deepEqual(quiet.sourceDrift,[]);
   assert.equal(quiet.frontier.sourceDrift,undefined,'the advisory key is present only when there is drift');
   assert.equal(quiet.frontier.actionable,false,'precondition: nothing else makes the frontier actionable');
 
   fx.write(RULES,'rules: v2\n');
-  const edited=status(fx);
+  const edited=await status(fx);
   assert.deepEqual(edited.staleInput,[],'a Source knowledge edit never makes a settled job stale');
   assert.deepEqual(edited.frontier.staleOperations,[]);
   assert.equal(edited.frontier.actionable,false,'nor actionable');
   assert.equal(edited.frontier.reason,quiet.frontier.reason);
   assert.deepEqual(edited.sourceDrift.map(s=>[s.jobId,s.path,s.kind,s.recorded,s.current,s.unregistered]),[['job-refactor',RULES,'source',sha('rules: v1\n'),sha('rules: v2\n'),true]]);
   assert.deepEqual(edited.frontier.sourceDrift,{advisory:true,jobs:1,paths:[{path:RULES,jobs:1,changes:[],followUp:[],unregistered:true}]});
-  assert.deepEqual(survey(fx).sourceDrift,edited.sourceDrift);
-  assert.deepEqual(survey(fx).staleInput,[]);
+  assert.deepEqual((await survey(fx)).sourceDrift,edited.sourceDrift);
+  assert.deepEqual((await survey(fx)).staleInput,[]);
 
   fx.work('features/task/fr/list/evidence/run.txt','more noise\n');
-  assert.deepEqual(status(fx).staleInput,[],'evidence beside a record is not the record');
+  assert.deepEqual((await status(fx)).staleInput,[],'evidence beside a record is not the record');
   fx.work('features/task/fr/list/index.yaml','fr: v2 (owner edit)\n');
-  const loud=status(fx);
+  const loud=await status(fx);
   assert.deepEqual(loud.staleInput.map(s=>[s.jobId,s.path,s.kind,s.changed]),[['job-refactor',FR_DIR,'work',[`${FR_DIR}/index.yaml`]]],'a product record the job read, changed from outside its workflow, is stale');
   assert.deepEqual(loud.frontier.staleOperations,[{jobId:'job-refactor',op:OP,attempt:1,paths:[FR_DIR]}]);
   assert.equal(loud.frontier.actionable,true);
   assert.match(loud.frontier.reason,/job-refactor.*product records/);
 
   withLedger(fx,ledger=>enqueueSeed(ledger,{jobId:'job-refactor-redo',workflowId:WORKFLOW,opId:OP,attempt:2,kind:'op',payload:{opId:OP,owned_paths:['src/refactor/']}}));
-  const redo=status(fx);
+  const redo=await status(fx);
   assert.deepEqual(redo.staleInput,[],'a newer attempt of the same op supersedes the stale one');
   assert.deepEqual(redo.sourceDrift,[],'and its drift');
 });
 
-test('Work: the job\'s own writes and its workflow\'s later legs are progress, not staleness; another workflow\'s write is advisory peerDrift',t=>{
+scenario('Work: the job\'s own writes and its workflow\'s later legs are progress, not staleness; another workflow\'s write is advisory peerDrift',async t=>{
   const fx=fixture(t);
   const REC='.starciwork/features/task/ui/list';
   fx.work('features/task/ui/list/index.yaml','ui: v1\n');
@@ -209,21 +243,21 @@ test('Work: the job\'s own writes and its workflow\'s later legs are progress, n
     holdEngaged(ledger);
   });
   fx.work('features/task/ui/list/index.yaml','ui: v2 by the draw itself or its audit\n');
-  assert.deepEqual(status(fx).staleInput,[],'a write inside the job\'s own or a later same-workflow leg\'s owned paths is planned progress');
+  assert.deepEqual((await status(fx)).staleInput,[],'a write inside the job\'s own or a later same-workflow leg\'s owned paths is planned progress');
   withLedger(fx,ledger=>{
     ledger.db.prepare("UPDATE jobs SET payload_json=? WHERE job_id='job-draw'").run(JSON.stringify({opId:'interface.draw',owned_paths:['src/elsewhere/']}));
     ledger.db.prepare("UPDATE jobs SET status='cancelled',updated_at=0 WHERE job_id='job-audit'").run();
   });
   // The record's one owner is wf-peer (its job owns it); its change is
   // judged against the revision the draw read and is advisory until wf-peer declares it breaking.
-  const drift=status(fx);
+  const drift=await status(fx);
   assert.deepEqual(drift.staleInput,[],'a peer workflow owning the record rewrote it: never staleInput, never a redo');
   assert.deepEqual(drift.peerDrift.map(p=>[p.jobId,p.files.map(f=>[f.file,f.owner,f.ownerBy])]),[['job-draw',[[`${REC}/index.yaml`,'wf-peer','cut']]]]);
   assert.deepEqual(drift.frontier.peerDrift,{advisory:true,jobs:1,records:[{file:`${REC}/index.yaml`,owner:'wf-peer',ownerBy:'cut',writers:[],jobs:1,foreignWrite:false}]});
   assert.equal(drift.frontier.actionable,false,'advisory drift never wakes the Kernel');
 });
 
-test('a contract without recorded digests never reports stale input and leaves actionable as it was',t=>{
+scenario('a contract without recorded digests never reports stale input and leaves actionable as it was',async t=>{
   const fx=fixture(t);
   fx.write(RULES,'rules: v1\n');
   withLedger(fx,ledger=>{
@@ -232,18 +266,18 @@ test('a contract without recorded digests never reports stale input and leaves a
     ledger.db.prepare("UPDATE contracts SET context_json=NULL WHERE job_id='job-legacy-null'").run();
     holdEngaged(ledger);
   });
-  const before=status(fx);
+  const before=await status(fx);
   fx.write(RULES,'rules: v2\n');
-  const after=status(fx);
+  const after=await status(fx);
   assert.deepEqual(after.staleInput,[]);
   assert.equal(after.staleInputError,undefined);
   assert.equal(after.frontier.actionable,before.frontier.actionable);
   assert.equal(after.frontier.actionable,false);
   assert.equal(after.frontier.reason,before.frontier.reason);
-  assert.deepEqual(survey(fx).staleInput,[]);
+  assert.deepEqual((await survey(fx)).staleInput,[]);
 });
 
-test('a finished workflow reports no stale input',t=>{
+scenario('a finished workflow reports no stale input',async t=>{
   const fx=fixture(t);
   fx.write(RULES,'rules: v1\n');
   withLedger(fx,ledger=>{
@@ -251,8 +285,8 @@ test('a finished workflow reports no stale input',t=>{
     ledger.write.changeWorkflowPhase({workflowId:WORKFLOW,to:'finished',by:'test',reason:'finished'});
   });
   fx.write(RULES,'rules: v2\n');
-  assert.deepEqual(status(fx).staleInput,[]);
-  assert.deepEqual(survey(fx).staleInput,[]);
+  assert.deepEqual((await status(fx)).staleInput,[]);
+  assert.deepEqual((await survey(fx)).staleInput,[]);
 });
 
 /* ------------------------------ the churn the live ledgers hit */
@@ -276,7 +310,7 @@ const churnRegistry=(t,{followUp=false}={})=>{
   return file;
 };
 
-test('churn: repeated knowledge edits under many settled legs stale none of them; each is advisory drift naming its registered change',t=>{
+scenario('churn: repeated knowledge edits under many settled legs stale none of them; each is advisory drift naming its registered change',async t=>{
   const fx=fixture(t,{registry:churnRegistry(t)});
   fx.write(STACKS,'stacks: v1\n');fx.write(BASELINE,'baseline: v1\n');fx.write('knowledge/unrelated.yaml','x: 1\n');
   const legs=[['interface.draw',8],['backend.implement',5]];
@@ -289,28 +323,28 @@ test('churn: repeated knowledge edits under many settled legs stale none of them
     }
     holdEngaged(ledger);
   });
-  const quiet=status(fx);
+  const quiet=await status(fx);
   for(const [edit,text] of [[STACKS,'stacks: v2 (16:52)\n'],[BASELINE,'baseline: v2\n'],[STACKS,'stacks: v3 (17:09)\n'],[STACKS,'stacks: v4 (18:37)\n']]){
     fx.write(edit,text);
-    const now=status(fx);
+    const now=await status(fx);
     assert.deepEqual(now.staleInput,[],`${edit} edit: no settled leg is stale`);
     assert.deepEqual(now.frontier.staleOperations,[]);
     assert.equal(now.frontier.actionable,quiet.frontier.actionable,'the frontier does not wake the Kernel for a knowledge edit');
     assert.equal(now.frontier.reason,quiet.frontier.reason);
   }
-  const final=status(fx);
+  const final=await status(fx);
   assert.deepEqual(final.frontier.sourceDrift,{advisory:true,jobs:13,paths:[{path:STACKS,jobs:13,changes:['starcistacks-services'],followUp:[],unregistered:false}]},
     'only what the legs read drifts, and the change that registered it is named');
   assert.equal(final.sourceDrift.length,13);
   assert.ok(final.sourceDrift.every(s=>s.admittedAt>=T_ADMIT&&s.recorded===sha('stacks: v1\n')&&s.current===sha('stacks: v4 (18:37)\n')),'judged against the bytes it was admitted under');
 
   fx.write('knowledge/unrelated.yaml','x: 2\n');
-  const unregistered=status(fx).frontier.sourceDrift.paths.find(p=>p.path==='knowledge/unrelated.yaml');
+  const unregistered=(await status(fx)).frontier.sourceDrift.paths.find(p=>p.path==='knowledge/unrelated.yaml');
   assert.deepEqual(unregistered,{path:'knowledge/unrelated.yaml',jobs:13,changes:[],followUp:[],unregistered:true},'an edit nobody registered is flagged for the supervisor, still not stale');
-  assert.deepEqual(status(fx).staleInput,[]);
+  assert.deepEqual((await status(fx)).staleInput,[]);
 });
 
-test('mia churn: a cut set admitted before a registered reach follow-up baseline change owes follow-up legs, never a seam-first redo',t=>{
+scenario('mia churn: a cut set admitted before a registered reach follow-up baseline change owes follow-up legs, never a seam-first redo',async t=>{
   const fx=fixture(t,{registry:churnRegistry(t,{followUp:true})});
   fx.write(BASELINE,'baseline: v1\n');
   withLedger(fx,ledger=>{
@@ -319,7 +353,7 @@ test('mia churn: a cut set admitted before a registered reach follow-up baseline
     holdEngaged(ledger);
   });
   fx.write(BASELINE,'baseline: v2 (17:09)\n');
-  const now=status(fx);
+  const now=await status(fx);
   assert.deepEqual(now.staleInput,[],'the redo is a follow-up leg, not a stale seam');
   assert.deepEqual(now.frontier.staleOperations,[]);
   assert.deepEqual(now.frontier.contractFollowUps.map(f=>[f.change,f.jobId,f.followUpOp]),
@@ -328,7 +362,7 @@ test('mia churn: a cut set admitted before a registered reach follow-up baseline
   assert.equal(now.frontier.actionable,true,'owed follow-ups are actionable, as before');
 });
 
-test('cut: Work-stale slices list their ordinals; while the seam redo is open the other slices wait on it',t=>{
+scenario('cut: Work-stale slices list their ordinals; while the seam redo is open the other slices wait on it',async t=>{
   const fx=fixture(t);
   fx.work('features/task/fr/list/index.yaml','fr: v1\n');
   const cut=ordinal=>({id:'root-configs',ordinal,total:3});
@@ -344,14 +378,14 @@ test('cut: Work-stale slices list their ordinals; while the seam redo is open th
     holdEngaged(ledger,'job-engaged-cut','business.analyze');
   });
   fx.work('features/task/fr/list/index.yaml','fr: v2\n');
-  const all=status(fx);
+  const all=await status(fx);
   assert.deepEqual(all.frontier.staleOperations.map(s=>[s.jobId,s.cut?.ordinal??null,s.heldBy??null]),
     [['job-cut-1',1,null],['job-cut-2',2,null],['job-cut-3',3,null],['job-partial',null,null]],'partial counts, a plain failure does not');
   assert.deepEqual(all.staleInput.find(s=>s.jobId==='job-cut-2').cut,cut(2));
   assert.equal(all.frontier.actionable,true);
 
   withLedger(fx,ledger=>enqueueSeed(ledger,{jobId:'job-cut-1-redo',workflowId:WORKFLOW,opId:OP,attempt:4,kind:'op',payload:{opId:OP,owned_paths:['src/job-cut-1/'],cut:cut(1)}}));
-  const seam=status(fx);
+  const seam=await status(fx);
   assert.deepEqual(seam.frontier.staleOperations.filter(s=>s.op===OP).map(s=>[s.jobId,s.heldBy]),[['job-cut-2','job-cut-1-redo'],['job-cut-3','job-cut-1-redo']]);
   assert.doesNotMatch(seam.frontier.reason,/job-cut-2/);
 
@@ -362,7 +396,7 @@ test('cut: Work-stale slices list their ordinals; while the seam redo is open th
     ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
       .run(attempt.attempt_id,WORKFLOW,'job-cut-1-redo','# contract',JSON.stringify({inputs:baseline()}),Date.now());
   });
-  const rest=status(fx);
+  const rest=await status(fx);
   assert.deepEqual(rest.frontier.staleOperations.filter(s=>s.op===OP).map(s=>[s.jobId,s.heldBy??null]),[['job-cut-2',null],['job-cut-3',null]]);
   assert.match(rest.frontier.reason,/job-cut-2 \(code\.refactor a1 cut root-configs 2\/3\)/);
 });
@@ -401,7 +435,7 @@ const openRace=(file,root,env)=>new Promise(resolve=>{
   child.on('close',status=>resolve({status,out,err}));
 });
 
-test('an existing ledger: no schema change, legacy rows never stale, new dispatches record digests, concurrent opens succeed',async t=>{
+scenario('an existing ledger: no schema change, legacy rows never stale, new dispatches record digests, concurrent opens succeed',async t=>{
   const fx=fixture(t);
   fx.write(RULES,'rules: v1\n');
   const file=ledgerFileFor(fx.repo,{env:fx.env});
@@ -409,10 +443,10 @@ test('an existing ledger: no schema change, legacy rows never stale, new dispatc
   const pristine=schemaOf(file);
 
   withLedger(fx,ledger=>holdEngaged(ledger));
-  const before=status(fx);
+  const before=await status(fx);
   assert.deepEqual(before.staleInput,[]);
   fx.write(RULES,'rules: v2\n');
-  const after=status(fx);
+  const after=await status(fx);
   assert.deepEqual(after.staleInput,[],'a legacy contract row carries no digests and is never stale');
   assert.equal(after.frontier.actionable,before.frontier.actionable);
   assert.equal(after.frontier.actionable,false);
@@ -421,7 +455,7 @@ test('an existing ledger: no schema change, legacy rows never stale, new dispatc
     ledger.write.createUnit({workflowId:WORKFLOW,unitId:'job-new',opId:OP,subjectKey:'job-new',goalRevision:1});
     enqueueSeed(ledger,{jobId:'job-new',workflowId:WORKFLOW,unitId:'job-new',opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/new/'],model:'devin-agent'}});
   });
-  const dispatched=fx.run('dispatch','--job','job-new','--model','devin-agent','--spawn');
+  const dispatched=await fx.run('dispatch','--job','job-new','--model','devin-agent','--spawn');
   assert.equal(dispatched.status,0,dispatched.stderr||dispatched.stdout);
   const reopened=inspect(fx,db=>db.prepare('SELECT a.op_id,a.try_no,c.context_json FROM contracts c JOIN op_attempts a ON a.attempt_id=c.attempt_id WHERE c.workflow_id=? ORDER BY a.op_id,a.attempt_id').all(WORKFLOW)
     .map(r=>[r.op_id,r.try_no,JSON.parse(r.context_json).inputs?.schema??null]));

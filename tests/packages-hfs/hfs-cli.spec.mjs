@@ -4,15 +4,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { ALL_CHECK_CODES, CHECK_CODES, checkRepo, checkRepository, explainPath, readWhy } from '../../scripts/hfs/check.mjs';
+import { ALL_CHECK_CODES, CHECK_CODES, checkRepo as checkRepoWith, checkRepository as checkRepositoryWith, explainPath as explainPathWith, readWhy } from '../../scripts/hfs/check.mjs';
 import { ARCHITECTURE_RULE_IDS } from '../../scripts/hfs/architecture/index.mjs';
-import { HfsSlotsError } from '../../scripts/hfs/slots.mjs';
+import { HfsSlotsError, loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 import { main } from '../../packages/hfs/src/main.mjs';
 import { BUNDLES, driftOfRuntime, importClosure } from '../../scripts/hfs/sync-runtime.mjs';
 import { APP, TWO_FE_APPS, FORMATTED, PRESETS, appOf, cleanup, gitAdd, installPresets, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const pins = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins;
+const manifest = loadSlotManifest();
+const checkRepo = (options) => checkRepoWith({ ...options, manifest });
+const checkRepository = (options) => checkRepositoryWith({ ...options, manifest });
+const explainPath = (options) => explainPathWith({ ...options, manifest });
 const made = [];
 const repoOf = (declaration = APP, mutate, options) => {
   const dir = writeCleanRepo(declaration, options);

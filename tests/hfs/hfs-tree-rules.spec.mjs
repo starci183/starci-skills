@@ -10,19 +10,18 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { braceVariants } from '../../scripts/lib/glob.mjs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { checkRepo } from '../../scripts/hfs/check.mjs';
-import { APP, TWO_FE_APPS, STACKS_DECLARATION, appOf, cleanup, gitAdd, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
+import { APP, TWO_FE_APPS, STACKS_DECLARATION, appOf } from '../helpers/hfs-cli-fixture.mjs';
+import { hfsTreeRulesFixture } from '../helpers/hfs-hfs-tree-rules-fixture.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const pins = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins;
 const made = [];
-const repoOf = (declaration = APP, mutate, options) => {
-  const dir = writeCleanRepo(declaration, options);
-  made.push(dir);
-  if (mutate) mutate(dir);
-  return gitAdd(dir);
-};
-test.after(() => cleanup(made));
+const fixture = hfsTreeRulesFixture();
+const { checkRepo, repoOf } = fixture;
+test.after(() => {
+  fixture.cleanup();
+  for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
+});
 
 const put = (dir, relative, text = 'export {};\n') => {
   const target = path.join(dir, ...relative.split('/'));

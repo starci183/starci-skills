@@ -101,7 +101,7 @@ const fixture = (t) => {
   const commit = (rel, body, message = `edit ${rel}`) => { write(rel, body); gitOk(repo, 'add', rel); gitOk(repo, 'commit', '--quiet', '-m', message); return gitOk(repo, 'rev-parse', 'HEAD'); };
   return {
     root, origin, repo, marker, write, commit,
-    baseline: () => { gitOk(repo, 'add', '.'); gitOk(repo, 'commit', '--quiet', '-m', 'init'); gitOk(repo, 'push', '--quiet', '-u', 'origin', 'main'); },
+    baseline: () => { gitOk(repo, 'add', '.'); gitOk(repo, 'commit', '--quiet', '-m', 'init'); gitOk(repo, 'push', '--quiet', '--no-verify', '-u', 'origin', 'main'); },
     hookRuns: () => { try { return fs.readFileSync(marker, 'utf8').split(/\r?\n/).filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } }); } catch { return []; } },
     worktrees: () => gitOk(repo, 'worktree', 'list', '--porcelain').split(/\r?\n/).filter((l) => l.startsWith('worktree ')).length,
   };
@@ -278,4 +278,3 @@ test('push-mains --hooks-only: the pre-push hook runs in the scratch of main wit
   assertScratchRemoved(red);
   assert.ok(fx.liveIntact());
 });
-

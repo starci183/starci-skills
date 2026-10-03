@@ -14526,6 +14526,28 @@ RT_PORT_RESTATED:
   owner: supervisor
   kind: check-finding
 
+RT_SPEC_OVER_BUDGET:
+  title: "A spec exceeds the land duration budget"
+  title_vi: "Một tệp spec vượt quá ngân sách thời gian của lần land"
+  meaning_vi: "Thời lượng đã ghi của một tệp spec còn tồn tại vượt quá giới hạn chung trong modules/kernel/spec-durations.yaml. Tệp chậm làm kéo dài lần land và phải giảm chi phí thiết lập mà vẫn giữ nguyên từng test, assertion và đường vào production."
+  causes_vi:
+    - "Mỗi test lặp lại việc cài đặt, khởi động tiến trình hoặc dựng fixture nặng"
+    - "Test chờ đồng hồ thật thay vì dùng đồng hồ được tiêm vào"
+  nextStep_vi: "Người giám sát làm theo speed.md: dùng fixture dùng chung trong một tiến trình spec, bỏ cài đặt hoặc khởi động theo từng test, tiêm đồng hồ và không tăng timeout; sau lần land cuối thì làm mới bản ghi thời lượng."
+  owner: supervisor
+  kind: check-finding
+
+RT_SPEC_BUDGET_STALE:
+  title: "A recorded spec duration names a missing file"
+  title_vi: "Một thời lượng spec đã ghi trỏ tới tệp không còn tồn tại"
+  meaning_vi: "Một hàng trong modules/kernel/spec-durations.yaml đặt tên tệp spec không còn tồn tại, nên bản ghi thời lượng của lần land đã cũ và không thể dùng làm ngân sách hiện hành."
+  causes_vi:
+    - "Tệp spec được đổi tên hoặc xóa sau lần làm mới bản ghi gần nhất"
+    - "Bản ghi thời lượng được chép từ một revision khác"
+  nextStep_vi: "Người giám sát làm mới bản ghi từ kết quả land của revision hiện tại để mỗi hàng trỏ tới một tệp spec đang tồn tại."
+  owner: supervisor
+  kind: check-finding
+
 RT_CONFIG_DEFAULT_TWICE:
   title: "A documented default is restated outside its owner"
   title_vi: "Một giá trị mặc định được khai báo lại ngoài tệp chủ"
@@ -14659,6 +14681,16 @@ RT_DOC_NO_OWNER:
   owner: supervisor
   kind: check-finding
 
+RT_SYNTAX_INVALID:
+  title: "Tracked JavaScript has invalid syntax"
+  title_vi: "Tệp JavaScript được theo dõi có cú pháp không hợp lệ"
+  meaning_vi: "Một tệp .mjs, .cjs hoặc .js được git theo dõi không thể được trình phân tích cú pháp JavaScript của TypeScript đọc. Luật áp dụng cả tests/ và nguồn packages/, trừ các gốc được sinh và cây đầu ra build của bên thứ ba. Một tệp không phân tích được không thể chạy tin cậy dù kiểm tra Node trong các thư mục runtime vẫn xanh."
+  causes_vi:
+    - "Biểu thức chính quy chứa xuống dòng thô, hoặc chuỗi hay template chưa đóng"
+    - "Thiếu dấu ngoặc nhọn, ngoặc tròn hoặc ngoặc vuông đóng"
+  nextStep_vi: "Người giám sát sửa cú pháp tại dòng được báo và chạy lại cổng runtime; không bỏ qua tệp hoặc thêm ngoại lệ."
+  owner: supervisor
+  kind: check-finding
 DOCKER_PORT_POLICY:
   title: "Docker ownership or published-port policy was refused"
   title_vi: "Chính sách sở hữu Docker hoặc cổng công bố đã từ chối thao tác"

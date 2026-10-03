@@ -4,7 +4,7 @@
 // release-pending: the finish never removes its own worktree). Only the runtime commits on the workflow branch, whose name
 // (Orca's wf-<id>) the runtime only ever reads from the registry.
 // Temp git repos and a fake part-A registry with a fake Orca client: no live Orca call, no real origin.
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -46,10 +46,18 @@ function fakeDb(jobs, reports = {}, settled = reports) {
 }
 const job = (id, op, ownedPaths, extra = {}) => ({ job_id: id, op_id: op, workflow_id: WF, status: 'running', updated_at: 0, payload_json: JSON.stringify({ owned_paths: ownedPaths }), ...extra });
 
-/** A product repo on main (checked out), a bare origin, and the workflow worktree on Orca's branch wf-<id> registered in a fake part A. */
-function fixture(t, { jobs = [], orca = fakeOrca(), pendingFails = false, ...seams } = {}) {
+/** One product repo, bare origin, and workflow worktree shared by this serial spec process. */
+let sharedGit = null;
+function sharedWorkflow() {
+  if (sharedGit) {
+    git(sharedGit.dir, 'reset', '-q', '--hard', sharedGit.seed);
+    git(sharedGit.dir, 'clean', '-q', '-d', '-f', '-x');
+    git(sharedGit.repo, 'reset', '-q', '--hard', sharedGit.seed);
+    git(sharedGit.origin, 'update-ref', 'refs/heads/main', sharedGit.seed);
+    git(sharedGit.repo, 'update-ref', '-d', `refs/heads/preserved/${WF}/op-fe-9`);
+    return sharedGit;
+  }
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-wf-cp-')));
-  t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(base, 'nivo'), origin = path.join(base, 'nivo.git'), dir = path.join(base, 'wf');
   fs.mkdirSync(repo);
   git(base, 'init', '-q', '--bare', '-b', 'main', origin);
@@ -64,6 +72,16 @@ function fixture(t, { jobs = [], orca = fakeOrca(), pendingFails = false, ...sea
   git(repo, 'remote', 'add', 'origin', origin);
   git(repo, 'push', '-q', 'origin', 'main');
   git(repo, 'worktree', 'add', '-q', '-b', BRANCH, dir, 'main');
+  sharedGit = { base, repo, origin, dir, seed: git(repo, 'rev-parse', 'HEAD') };
+  return sharedGit;
+}
+after(() => {
+  if (sharedGit) fs.rmSync(sharedGit.base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
+});
+
+/** A reset registry and ledger view over the shared workflow checkout. */
+function fixture(_t, { jobs = [], orca = fakeOrca(), pendingFails = false, ...seams } = {}) {
+  const { base, repo, origin, dir } = sharedWorkflow();
   const registry = new Map([[WF, { workflowId: WF, orcaWorktreeId: 'orca-wt-1', path: dir, branch: BRANCH, checkpoint: null }]]);
   const checkpoints = [], pending = [], reports = {};
   const worktree = {

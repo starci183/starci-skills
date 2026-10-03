@@ -56,4 +56,3 @@ export async function harnessOpenVerb(_ctx, deps = {}) {
     return { code: 1, stderr: errorText('open', error) };
   }
 }
-

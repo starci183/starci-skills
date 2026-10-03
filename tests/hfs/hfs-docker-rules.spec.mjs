@@ -11,19 +11,16 @@ import { NODE_IMAGE } from '../../scripts/hfs/rules/docker.mjs';
 import { checkTargets, renderTargets } from '../../packages/hfs/sync/index.mjs';
 import { newImages } from '../../packages/hfs/scaffold/image.mjs';
 import { execForm, parseDockerfile, shellCommands, words } from '../../scripts/lib/dockerfile.mjs';
-import { APP, PRESETS, appOf, cleanup, gitAdd, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
+import { APP, PRESETS, appOf } from '../helpers/hfs-cli-fixture.mjs';
+import { cleanupDockerRuleFixtures, dockerRuleFixtureFiles, dockerRulesRepoOf, DOCKER_RULES_MANIFEST } from '../helpers/hfs-hfs-docker-rules-fixture.mjs';
 
-const made = [];
-test.after(() => cleanup(made));
+test.after(cleanupDockerRuleFixtures);
 const MIXED = appOf({
   be: { apps: [{ name: 'core', kind: 'api' }, { name: 'jobs', kind: 'worker' }, { name: 'cli', kind: 'cli' }] },
   fe: { apps: [{ name: 'landing', kind: 'next' }, { name: 'app', kind: 'next' }] },
 });
 const repoOf = (declaration, mutate) => {
-  const dir = installTypeScript(writeCleanRepo(declaration));
-  made.push(dir);
-  if (mutate) mutate(dir);
-  return gitAdd(dir);
+  return dockerRulesRepoOf(declaration, mutate);
 };
 const at = (dir, relative) => path.join(dir, ...relative.split('/'));
 const put = (dir, relative, text) => { fs.mkdirSync(path.dirname(at(dir, relative)), { recursive: true }); fs.writeFileSync(at(dir, relative), text); };
@@ -31,36 +28,37 @@ const edit = (relative, change) => (dir) => put(dir, relative, change(fs.readFil
 const replace = (from, to) => (text) => { assert.ok(text.includes(from), `the template no longer contains ${from}`); return text.replace(from, to); };
 const withoutLines = (prefix) => (text) => text.split('\n').filter((line) => !line.startsWith(prefix)).join('\n');
 const only = (result, code) => result.findings.filter((f) => f.code === code);
+const checked = (dir) => checkRepo({ repoRoot: dir, files: dockerRuleFixtureFiles(dir), manifest: DOCKER_RULES_MANIFEST });
 const CODES = ['HFS_DOCKER_BUILD_CONTEXT', 'HFS_DOCKER_STAGES', 'HFS_DOCKER_ENTRY', 'HFS_DOCKER_BASE_PIN', 'HFS_DOCKER_SECRETS'];
 const BE = 'be/apps/core/Dockerfile';
 const FE = 'fe/apps/web/Dockerfile';
 /** The findings of `code` after `change` is applied to the Dockerfile `relative` of the clean app (or of the app `declaration`). */
-const judged = (code, relative, change, declaration = APP) => only(checkRepo({ repoRoot: repoOf(declaration, edit(relative, change)) }), code);
+const judged = (code, relative, change, declaration = APP) => only(checked(repoOf(declaration, edit(relative, change))), code);
 
 test('the clean app, one api and one Next app, is clean to every docker rule and holds its managed .dockerignore and images workflow', () => {
-  const result = checkRepo({ repoRoot: repoOf(APP) });
+  const result = checked(repoOf(APP));
   for (const code of CODES) assert.deepEqual(only(result, code), [], code);
   assert.deepEqual(result.findings.filter((f) => ['HFS_SLOT_REQUIRED_MISSING', 'HFS_MANAGED_FILE_DRIFT'].includes(f.code)), []);
 });
 
 test('every kind of be app and several fe apps are clean: api, worker, cli and two Next apps', () => {
-  const result = checkRepo({ repoRoot: repoOf(MIXED) });
+  const result = checked(repoOf(MIXED));
   for (const code of CODES) assert.deepEqual(only(result, code), [], code);
 });
 
 // ------------------------------------------------------------------------------------------------ the slot: one Dockerfile per app
 
 test('repo.app-image: an app without its Dockerfile is refused, and so is a Dockerfile outside apps/<app>/', () => {
-  const missing = checkRepo({ repoRoot: repoOf(APP, (dir) => fs.rmSync(at(dir, BE))) });
+  const missing = checked(repoOf(APP, (dir) => fs.rmSync(at(dir, BE))));
   assert.ok(missing.findings.some((f) => f.code === 'HFS_SLOT_REQUIRED_MISSING' && f.path === BE));
-  const outside = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, 'be/Dockerfile', 'FROM scratch\n')) });
+  const outside = checked(repoOf(APP, (dir) => put(dir, 'be/Dockerfile', 'FROM scratch\n')));
   assert.ok(outside.findings.some((f) => f.path === 'be/Dockerfile'), JSON.stringify(outside.findings.map((f) => [f.code, f.path])));
-  const stray = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, 'fe/apps/web/src/Dockerfile', 'FROM scratch\n')) });
+  const stray = checked(repoOf(APP, (dir) => put(dir, 'fe/apps/web/src/Dockerfile', 'FROM scratch\n')));
   assert.ok(stray.findings.some((f) => f.path === 'fe/apps/web/src/Dockerfile'));
 });
 
 test('the managed .dockerignore and images workflow are required at the app root and judged for drift', () => {
-  const bare = checkRepo({ repoRoot: repoOf(APP, (dir) => { fs.rmSync(at(dir, '.dockerignore')); fs.rmSync(at(dir, '.github/workflows/images.yml')); }) });
+  const bare = checked(repoOf(APP, (dir) => { fs.rmSync(at(dir, '.dockerignore')); fs.rmSync(at(dir, '.github/workflows/images.yml')); }));
   for (const file of ['.dockerignore', '.github/workflows/images.yml']) assert.ok(bare.findings.some((f) => f.code === 'HFS_SLOT_REQUIRED_MISSING' && f.path === file), file);
   const statusOf = (dir, file) => checkTargets(dir, renderTargets(APP, PRESETS)).find((item) => item.path === file)?.status;
   assert.equal(statusOf(repoOf(APP), '.dockerignore'), 'ok');
@@ -74,7 +72,7 @@ test('starci app new image writes the Dockerfile of every declared app that has 
   assert.deepEqual(newImages({ repoRoot: dir }).sort(), ['be/apps/jobs/Dockerfile', 'fe/apps/app/Dockerfile']);
   assert.equal(fs.readFileSync(at(dir, 'be/apps/cli/Dockerfile'), 'utf8'), EDITED);
   assert.deepEqual(newImages({ repoRoot: dir }), []);
-  const result = checkRepo({ repoRoot: gitAdd(dir) });
+  const result = checked(dir);
   for (const file of ['be/apps/jobs/Dockerfile', 'fe/apps/app/Dockerfile']) assert.deepEqual(result.findings.filter((f) => f.path === file), [], file);
 });
 
@@ -154,10 +152,10 @@ test('HFS_DOCKER_ENTRY: a worker has a process healthcheck and listens on nothin
 
 test('HFS_DOCKER_ENTRY: a Next image builds its own workspace through turbo and its config ships the standalone output', () => {
   assert.equal(judged('HFS_DOCKER_ENTRY', FE, replace('--filter=@demo/web', '--filter=@demo/other')).length, 1);
-  const config = only(checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, 'fe/apps/web/next.config.ts', 'export default { reactStrictMode: true };\n')) }), 'HFS_DOCKER_ENTRY');
+  const config = only(checked(repoOf(APP, (dir) => put(dir, 'fe/apps/web/next.config.ts', 'export default { reactStrictMode: true };\n'))), 'HFS_DOCKER_ENTRY');
   assert.deepEqual(config.map((f) => f.path), ['fe/apps/web/next.config.ts']);
   const standalone = 'const config = { output: "standalone", reactStrictMode: true };\nexport default config;\n';
-  assert.deepEqual(only(checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, 'fe/apps/web/next.config.ts', standalone)) }), 'HFS_DOCKER_ENTRY'), []);
+  assert.deepEqual(only(checked(repoOf(APP, (dir) => put(dir, 'fe/apps/web/next.config.ts', standalone))), 'HFS_DOCKER_ENTRY'), []);
 });
 
 // ------------------------------------------------------------------------------------------------ R190 HFS_DOCKER_BASE_PIN

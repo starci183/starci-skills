@@ -2022,6 +2022,24 @@ rules:
     failureCodes: ["RT_HOOK_SHAPE", "RIGHTS_PUSH_NOT_RELEASE"]
     enforcers:
       - {kind: runtime, id: hook-shape, at: scripts/hfs/runtime-rules/hook-shape.mjs}
+  - id: R226
+    code: "RT_SPEC_OVER_BUDGET"
+    law: "Every recorded spec duration should stay within the shared per-file land budget in modules/kernel/spec-durations.yaml: for alpha.4 an over-budget spec is an advisory info finding ranked by its excess (it does not fail the check stage; the budget turns blocking in alpha.5), and every recorded spec path must still exist. An over-budget spec is repaired without removing tests or assertions: share a per-process fixture, remove per-test install or boot, inject the clock and never lengthen a timeout; stale rows are refreshed from the current land record."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_SPEC_OVER_BUDGET", "RT_SPEC_BUDGET_STALE"]
+    enforcers:
+      - {kind: runtime, id: spec-budget, at: scripts/checks/check-spec-budget.mjs}
+  - id: R227
+    code: "RT_SYNTAX_INVALID"
+    law: "Every git-tracked .mjs, .cjs and .js file parses as JavaScript, including tests and package sources; node_modules, generated roots of ruleParams.runtime.generated and vendored build output are outside the authored-source scope. The runtime folder's Node-exact syntax pass remains in place, while this batched in-process pass extends coverage to the whole tracked repository and reports every parser diagnostic at its file and line."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_SYNTAX_INVALID"]
+    enforcers:
+      - {kind: runtime, id: syntax, at: scripts/hfs/runtime-rules/syntax.mjs}
 retired:
   - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}

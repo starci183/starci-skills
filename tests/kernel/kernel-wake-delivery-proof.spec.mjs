@@ -29,7 +29,7 @@ const world=(t,prefix)=>{
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stubFile]),
     STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,LOCALAPPDATA:path.join(root,'localappdata'),
-    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};  // every fixture registers a repo named 'repo' — a private registry per world
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_SLEEP_SCALE:'0'};  // every fixture registers a repo named 'repo' — a private registry per world
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   // The runtime.sqlite every spawned child resolves (projectsRootFor(env)/<ledgerId>/runtime.sqlite);
   // in-process handles must name the same env or they open a different ledger.

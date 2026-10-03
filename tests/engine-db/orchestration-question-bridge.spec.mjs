@@ -20,21 +20,22 @@ const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 
-const fixture=t=>{
+let sharedFixture=null;
+const createSharedFixture=()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-question-bridge-'));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json');
+  const callsFile=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:stateFile,
+    STARCI_FAKE_ORCA_LOG:callsFile,STARCI_FAKE_ORCA_STATE:stateFile,
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db')};  // every fixture registers a repo named 'repo' — isolate the registry
-  const api=(args,more={})=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...more}});
+  const rawApi=(args,more={})=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...more}});
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
   const workflowId='wf-question-bridge',jobId='job-question-bridge';
-  const ledger=openLedger({file:ledgerFileFor(repo)});
+  const ledgerFile=ledgerFileFor(repo);
+  const ledger=openLedger({file:ledgerFile});
   try{
     const at=Date.now();
     ledger.transaction(db=>{
@@ -54,8 +55,36 @@ const fixture=t=>{
     });
   }finally{ledger.close();}
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
-  return {repo,workflowId,jobId,api,orcaState,writeState,read};
+  const snapshot=()=>{
+    const checkpointer=openLedger({file:ledgerFile,checkpointer:true});
+    try{checkpointer.checkpoint();}finally{checkpointer.close();}
+    return {
+      ledger:fs.readFileSync(ledgerFile),
+      state:fs.existsSync(stateFile)?fs.readFileSync(stateFile):null,
+      calls:fs.existsSync(callsFile)?fs.readFileSync(callsFile):null,
+    };
+  };
+  const restore=saved=>{
+    for(const file of [ledgerFile,`${ledgerFile}-shm`,`${ledgerFile}-wal`,`${ledgerFile}-journal`])fs.rmSync(file,{force:true});
+    fs.writeFileSync(ledgerFile,saved.ledger);
+    for(const [file,content] of [[stateFile,saved.state],[callsFile,saved.calls]]){
+      if(content===null)fs.rmSync(file,{force:true});else fs.writeFileSync(file,content);
+    }
+    if(process.env.STARCI_TEST_TEMP_DIR)fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),{recursive:true,force:true,maxRetries:20,retryDelay:25});
+  };
+  const beforeDispatch=snapshot();
+  const dispatch=rawApi(['dispatch','--job',jobId,'--model','codex-agent','--spawn']);
+  const afterDispatch=snapshot();
+  return {repo,workflowId,jobId,rawApi,orcaState,writeState,read,restore,beforeDispatch,afterDispatch,dispatch,
+    cleanup:()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25})};
 };
+const fixture=(_t,{dispatched=true}={})=>{
+  sharedFixture??=createSharedFixture();
+  sharedFixture.restore(dispatched?sharedFixture.afterDispatch:sharedFixture.beforeDispatch);
+  const api=(args,more={})=>args[0]==='dispatch'?sharedFixture.dispatch:sharedFixture.rawApi(args,more);
+  return {...sharedFixture,api};
+};
+test.after(()=>sharedFixture?.cleanup());
 
 // Orca's message row for a worker ask (the shape `orchestration check --json` delivers).
 const question=(id,{run='run-fake-1',dispatch,text,options=[]})=>({id,run_id:run,delivery_contract:'current_delivery',
@@ -207,7 +236,7 @@ test('a worker escalation is surfaced and answered through starci kernel reply',
 });
 
 test('reply refuses an unknown question and a missing body before any host call',t=>{
-  const fx=fixture(t);
+  const fx=fixture(t,{dispatched:false});
   const noBody=fx.api(['reply','--workflow',fx.workflowId,'--message','msg_x']);
   assert.equal(noBody.status,1);
   assert.equal(json(noBody.stderr.trim().split('\n').at(-1)).code,'reply-body-missing');

@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
+import {startOpIpcCli} from '../helpers/kernel-verbs-shared-op-ipc-fixture.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {jobRowOf} from '../../scripts/kernel/verbs/shared/rows.mjs';
 
@@ -38,31 +38,50 @@ import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
 // The ask here exercises the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is on
 // by default, so this spec runs with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
+const CLI=startOpIpcCli({fakeOrca:FAKE_ORCA});
+test.after(()=>CLI.close());
 
 const fixture=(t,{mode='healthy'}={})=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-op-ipc-'));
+  const root=fs.mkdtempSync(path.join(CLI.workspaceRoot,'case-'));
   const savedProjects=process.env.STARCI_PROJECTS_ROOT;
-  process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
+  process.env.STARCI_PROJECTS_ROOT=CLI.projectsRoot;
   t.after(()=>{if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;});
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ['docs','src'])fs.mkdirSync(path.join(repo,d),{recursive:true});
-  const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
+  // The resident entry keeps environment-derived roots. Reset their persisted
+  // rows between cases, while each case gets independent fake-Orca log/state.
+  for(const dir of [CLI.projectsRoot,CLI.localAppData,path.join(CLI.workspaceRoot,'repo')])
+    fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});
+  for(const file of [CLI.machineFile,`${CLI.machineFile}-shm`,`${CLI.machineFile}-wal`])fs.rmSync(file,{force:true});
+  const repo=path.join(CLI.workspaceRoot,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ['docs','src'])fs.mkdirSync(path.join(repo,d),{recursive:true});
   const env={...process.env,
     STARCI_ORCA_COMMAND:process.execPath,
-    STARCI_ORCA_ARGS:JSON.stringify([stub]),
+    STARCI_ORCA_ARGS:CLI.orcaArgs,
     STARCI_FAKE_ORCA_MODE:mode,
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     // machine.sqlite (the settle path's best-effort paired release) stays inside
     // the temp world — never the real arbiter.
-    LOCALAPPDATA:path.join(root,'localappdata'),
-    STARCI_PROJECTS_ROOT:path.join(root,'projects'),
-    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
+    LOCALAPPDATA:CLI.localAppData,
+    STARCI_PROJECTS_ROOT:CLI.projectsRoot,
+    STARCI_TEST_MACHINE_FILE:CLI.machineFile,
   };
-  const run=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
-  return {root,repo,env,run};
+  const runFresh=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
+  const cliEnv=()=>({
+    STARCI_ORCA_COMMAND:env.STARCI_ORCA_COMMAND,
+    STARCI_ORCA_ARGS:env.STARCI_ORCA_ARGS,
+    STARCI_FAKE_ORCA_MODE:env.STARCI_FAKE_ORCA_MODE,
+    STARCI_FAKE_ORCA_LOG:env.STARCI_FAKE_ORCA_LOG,
+    STARCI_FAKE_ORCA_STATE:env.STARCI_FAKE_ORCA_STATE,
+    LOCALAPPDATA:env.LOCALAPPDATA,
+    STARCI_PROJECTS_ROOT:env.STARCI_PROJECTS_ROOT,
+    STARCI_TEST_MACHINE_FILE:env.STARCI_TEST_MACHINE_FILE,
+    STARCI_AUTOPILOT:env.STARCI_AUTOPILOT,
+    STARCI_CALLER:env.STARCI_CALLER??null,
+  });
+  const run=(script,...args)=>CLI.run(args,cliEnv());
+  return {root,repo,env,mode,run,runFresh};
 };
 
 // Every handle is opened and closed inside the helper — a leaked sqlite handle
@@ -95,7 +114,9 @@ const leaseRows=(fx,jobId)=>inspect(fx,db=>db.prepare('SELECT * FROM leases WHER
 const eventKinds=(fx,wf=WORKFLOW)=>inspect(fx,db=>db.prepare('SELECT kind FROM events WHERE workflow_id=? ORDER BY seq').all(wf).map(r=>r.kind));
 const phaseOf=(fx,wf=WORKFLOW)=>inspect(fx,db=>db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(wf)?.phase??null);
 
-const dispatch=(fx,jobId)=>fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','devin-agent','--spawn','--json');
+// Successful dispatches reuse the file-level entry process and its stable Orca
+// channel. The rejection contract keeps a fresh process so its exit is visible.
+const dispatch=(fx,jobId)=>(fx.mode==='healthy'?fx.run:fx.runFresh)(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','devin-agent','--spawn','--json');
 const independentCheck=(fx,jobId,checks)=>{
   fx.env.STARCI_CALLER='runtime-settler';
   try{return fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(checks),'--json');}
@@ -197,7 +218,7 @@ test('starci kernel report keeps the first dispatch report immutable; starci ker
 
   // One dispatch may file only one immutable report. A different second body
   // is refused without replacing the worker's original claim.
-  const second=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',writeEnvelope(fx,{outcome:'partial',sentinel:'SENTINEL-BETA',name:'report-2.md'}),'--json');
+  const second=fx.runFresh(API,'report','--repo',fx.repo,'--job',jobId,'--report',writeEnvelope(fx,{outcome:'partial',sentinel:'SENTINEL-BETA',name:'report-2.md'}),'--json');
   assert.notEqual(second.status,0);
   assert.match(second.stdout+second.stderr,/report-already-filed/);
   rows=reportRows(fx);
@@ -208,7 +229,7 @@ test('starci kernel report keeps the first dispatch report immutable; starci ker
   assert.ok(eventKinds(fx).includes('report-filed'),'starci kernel report must emit the report-filed event');
 
   // starci kernel op-contract is the worker's read of its own contract: the row markdown.
-  const oc=fx.run(API,'op-contract','--repo',fx.repo,'--job',jobId);
+  const oc=fx.runFresh(API,'op-contract','--repo',fx.repo,'--job',jobId);
   assert.equal(oc.status,0,`starci kernel op-contract failed: ${oc.stderr||oc.stdout}`);
   assert.equal(oc.stdout.trim(),contract.markdown.trim(),'op-contract must print the stored contract markdown verbatim');
 });
@@ -281,7 +302,7 @@ test('starci kernel record-checks rejects scalar and double-encoded payloads bef
   const valid=checkEnvelope({name:'validator',command:'validator --check',exitCode:0,evidence:'green'});
 
   for(const malformed of [JSON.stringify('pass'),JSON.stringify(JSON.stringify(valid))]){
-    const refused=fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',malformed,'--json');
+    const refused=fx.runFresh(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',malformed,'--json');
     assert.notEqual(refused.status,0,'scalar and double-encoded JSON must be refused');
     assert.match(`${refused.stderr}${refused.stdout}`,/checks-invalid/);
     assert.equal(checkRows(fx).length,0,'a refused check payload must not mutate the checks row');
@@ -303,17 +324,17 @@ test('queued jobs cannot self-file reports, record green checks, or settle pass 
   const report=writeEnvelope(fx,{outcome:'done',name:'undispatched-report.json'});
   const checks=JSON.stringify(checkEnvelope({name:'validator',command:'starci runtime validate',exitCode:0,evidence:'green'}));
 
-  const filed=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
+  const filed=fx.runFresh(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
   assert.notEqual(filed.status,0,'a queued job must not impersonate its missing Op worker');
   assert.match(`${filed.stderr}${filed.stdout}`,/report-job-not-active/);
   assert.equal(reportRows(fx).length,0,'a refused queued report must not create a report row');
 
-  const checked=fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',checks,'--json');
+  const checked=fx.runFresh(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',checks,'--json');
   assert.notEqual(checked.status,0,'Kernel checks cannot manufacture a worker report boundary');
   assert.match(`${checked.stderr}${checked.stdout}`,/checks-report-missing/);
   assert.equal(checkRows(fx).length,0,'a refused queued check must not create check evidence');
 
-  const settled=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
+  const settled=fx.runFresh(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
   assert.notEqual(settled.status,0,'an undispatched queued job cannot settle pass');
   assert.match(`${settled.stderr}${settled.stdout}`,/job-not-dispatched/);
   assert.equal(jobRow(fx,jobId)?.status,'queued');
@@ -367,27 +388,27 @@ test('starci kernel report enforces the starci/op-report@1 envelope',t=>{
 
   // A bare markdown dump is not an answer — the envelope is the only shape.
   const bad=scratchPath(fx,'bad.md');fs.writeFileSync(bad,'# op report\nlooks done\n');
-  let r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',bad,'--json');
+  let r=fx.runFresh(API,'report','--repo',fx.repo,'--job',jobId,'--report',bad,'--json');
   assert.notEqual(r.status,0,'a non-envelope report must be refused');
   assert.match(`${r.stderr}${r.stdout}`,/report-invalid/);
 
   // Conditional payloads: partial without open[], files outside owned_paths.
   const noOpen=scratchPath(fx,'noopen.json');fs.writeFileSync(noOpen,JSON.stringify({outcome:'partial',summary:'x'}));
-  r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',noOpen,'--json');
+  r=fx.runFresh(API,'report','--repo',fx.repo,'--job',jobId,'--report',noOpen,'--json');
   assert.notEqual(r.status,0);assert.match(`${r.stderr}${r.stdout}`,/report-invalid/);assert.match(`${r.stderr}${r.stdout}`,/open\[\]/);
 
   const escaped=scratchPath(fx,'escaped.json');fs.writeFileSync(escaped,JSON.stringify({outcome:'done',summary:'x',files:['../outside.txt']}));
-  r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',escaped,'--json');
+  r=fx.runFresh(API,'report','--repo',fx.repo,'--job',jobId,'--report',escaped,'--json');
   assert.notEqual(r.status,0);assert.match(`${r.stderr}${r.stdout}`,/report-invalid/);assert.match(`${r.stderr}${r.stdout}`,/outside owned_paths/);
 
   // Identity is the job's, not the worker's claim.
   const forged=scratchPath(fx,'forged.json');fs.writeFileSync(forged,JSON.stringify({outcome:'done',summary:'x',dispatch:'someone-else'}));
-  r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',forged,'--json');
+  r=fx.runFresh(API,'report','--repo',fx.repo,'--job',jobId,'--report',forged,'--json');
   assert.notEqual(r.status,0);assert.match(`${r.stderr}${r.stdout}`,/report-invalid/);assert.match(`${r.stderr}${r.stdout}`,/identity 'dispatch'/);
 
   // A --outcome flag contradicting the envelope is refused.
   const good=writeEnvelope(fx,{outcome:'done',name:'good.json'});
-  r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',good,'--outcome','blocked','--json');
+  r=fx.runFresh(API,'report','--repo',fx.repo,'--job',jobId,'--report',good,'--outcome','blocked','--json');
   assert.notEqual(r.status,0);assert.match(`${r.stderr}${r.stdout}`,/outcome-mismatch/);
 
   // The row carries the stamped identity + the exact outcome the kernel reads.
@@ -416,7 +437,7 @@ test('starci kernel status projects filed reports; settle works row-first withou
   assert.ok(reports.some(r=>r.job_id===jobId&&r.outcome==='done'&&!r.consumed_at),`status must surface the filed unconsumed report — got ${JSON.stringify(reports)}`);
 
   // A verdict that contradicts the filed outcome is refused.
-  const bad=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','blocked','--json');
+  const bad=fx.runFresh(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','blocked','--json');
   assert.notEqual(bad.status,0,'verdict blocked cannot settle a done report');
   assert.match(`${bad.stderr}${bad.stdout}`,/verdict-outcome-mismatch/);
 
@@ -518,7 +539,7 @@ test('A7: a job whose only dispatch was rejected binds nothing at all',t=>{
   });
 
   const report=writeEnvelope(fx,{outcome:'done',name:'a7-unbound.json'});
-  const refused=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
+  const refused=fx.runFresh(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
   assert.notEqual(refused.status,0,'a refused launch is not a binding to file against');
   assert.match(`${refused.stderr}${refused.stdout}`,/report-dispatch-unbound/);
   assert.equal(reportRows(fx).length,0);

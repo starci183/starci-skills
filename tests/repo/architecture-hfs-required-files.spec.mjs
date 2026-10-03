@@ -1,6 +1,7 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
+import { appDeclarationText, DEFAULT_APPS, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
+import { reusableArchFixture } from '../helpers/repo-architecture-hfs-required-files-fixture.mjs';
 
 // HFS check 5: the `requires`, `requiredInstances` and `minInstances` of knowledge/hfs/slots.yaml must exist.
 // HFS_REQUIRED_FILE_MISSING (backend app, feature, domain, integrations, platform), FE_ERROR_BOUNDARY_MISSING
@@ -15,10 +16,23 @@ const FEATURE = {
   'src/features/api/a/a.module.ts': 'export const AModule = 1;\n',
   'src/features/api/a/application/run.use-case.ts': 'export const run = 1;\n',
 };
+const PACKAGE = {
+  'packages/kit/package.json': '{"name":"@x/kit"}',
+  'packages/kit/tsconfig.json': '{}',
+  'packages/kit/src/index.ts': 'export * from \'./util\';\n',
+  'packages/kit/src/util.ts': 'export const u = 1;\n',
+};
+const VARIANT_FILES = {
+  'src/modules/platform/logging/logger.ts': 'export const l = 1;\n',
+  'src/modules/domain/x/index.ts': 'export * from \'./x.service\';\n',
+  'src/modules/domain/x/x.service.ts': 'export const s = 1;\n',
+};
+const BE_FIXTURE = reusableArchFixture({ files: { ...platformFiles(), ...FEATURE, ...PACKAGE, ...VARIANT_FILES } });
+const runBe = (files = {}) => BE_FIXTURE.withFiles(files, runArch);
+after(() => BE_FIXTURE.close());
 
-test('BE: a complete platform set, app module and feature raise nothing', t => {
-  const root = archFixture(t, { files: { ...platformFiles(), ...FEATURE } });
-  const report = runArch(root);
+test('BE: a complete platform set, app module and feature raise nothing', () => {
+  const report = runBe();
   assert.deepEqual(findings(report, 'HFS_REQUIRED_FILE_MISSING'), []);
   assert.deepEqual(findings(report, 'HFS_REQUIRED_FILE_MISSING'), []);
   assert.equal(report.coverage.hfsMachine.requiredFiles.status, 'checked');
@@ -27,55 +41,44 @@ test('BE: a complete platform set, app module and feature raise nothing', t => {
   assert.ok(report.coverage.checkedRuleIds.includes('HFS_REQUIRED_FILE_MISSING'));
 });
 
-test('BE: a missing required platform instance is flagged once', t => {
-  const root = archFixture(t, { files: { ...platformFiles(['primitives']), ...FEATURE } });
-  const hits = findings(runArch(root), 'HFS_REQUIRED_FILE_MISSING');
+test('BE: a missing required platform instance is flagged once', () => {
+  const hits = findings(runBe({ 'src/modules/platform/primitives': null }), 'HFS_REQUIRED_FILE_MISSING');
   assert.deepEqual(hits.map(item => item.path), ['src/modules/platform/primitives']);
   assert.equal(hits[0].slot, 'be.platform');
 });
 
-test('BE: with no platform module at all all six are missing; one lacking index.ts names the file', t => {
-  const none = archFixture(t, { files: { ...FEATURE } });
-  assert.deepEqual(paths(runArch(none), 'HFS_REQUIRED_FILE_MISSING'), PLATFORM.map(name => `src/modules/platform/${name}`).sort());
-  const noIndex = archFixture(t, { files: { ...platformFiles(['logging']), 'src/modules/platform/logging/logger.ts': 'export const l = 1;\n', ...FEATURE } });
-  assert.deepEqual(paths(runArch(noIndex), 'HFS_REQUIRED_FILE_MISSING'), ['src/modules/platform/logging/index.ts']);
+test('BE: with no platform module at all all six are missing; one lacking index.ts names the file', () => {
+  assert.deepEqual(paths(runBe({ 'src/modules/platform': null }), 'HFS_REQUIRED_FILE_MISSING'), PLATFORM.map(name => `src/modules/platform/${name}`).sort());
+  assert.deepEqual(paths(runBe({ 'src/modules/platform/logging/index.ts': null }), 'HFS_REQUIRED_FILE_MISSING'), ['src/modules/platform/logging/index.ts']);
 });
 
-test('BE: a feature missing index.ts and application/ is flagged, a domain without index.ts too', t => {
-  const root = archFixture(t, {
-    files: {
-      ...platformFiles(),
-      'src/features/api/a/a.module.ts': 'export const AModule = 1;\n',
-      'src/modules/domain/x/x.service.ts': 'export const s = 1;\n',
-    },
-  });
-  assert.deepEqual(paths(runArch(root), 'HFS_REQUIRED_FILE_MISSING'), ['src/features/api/a/application', 'src/features/api/a/index.ts', 'src/modules/domain/x/index.ts']);
+test('BE: a feature missing index.ts and application/ is flagged, a domain without index.ts too', () => {
+  assert.deepEqual(paths(runBe({
+    'src/features/api/a/index.ts': null,
+    'src/features/api/a/application': null,
+    'src/modules/domain/x/index.ts': null,
+  }), 'HFS_REQUIRED_FILE_MISSING'), ['src/features/api/a/application', 'src/features/api/a/index.ts', 'src/modules/domain/x/index.ts']);
 });
 
-test('BE: a feature folder without its <feature>.module.ts is flagged', t => {
-  const root = archFixture(t, {
-    files: { ...platformFiles(), 'src/features/api/a/index.ts': 'export const a = 1;\n', 'src/features/api/a/application/run.use-case.ts': 'export const run = 1;\n' },
-  });
-  assert.deepEqual(paths(runArch(root), 'HFS_REQUIRED_FILE_MISSING'), ['src/features/api/a/a.module.ts']);
+test('BE: a feature folder without its <feature>.module.ts is flagged', () => {
+  assert.deepEqual(paths(runBe({ 'src/features/api/a/a.module.ts': null }), 'HFS_REQUIRED_FILE_MISSING'), ['src/features/api/a/a.module.ts']);
 });
 
-test('BE: minInstances - no feature at all is one finding at hfs.json', t => {
-  const root = archFixture(t, { files: { ...platformFiles() } });
-  const hits = findings(runArch(root), 'HFS_REQUIRED_FILE_MISSING').filter(item => item.path === 'hfs.json');
+test('BE: minInstances - no feature at all is one finding at hfs.json', () => {
+  const hits = findings(runBe({ 'src/features/api/a': null }), 'HFS_REQUIRED_FILE_MISSING').filter(item => item.path === 'hfs.json');
   assert.equal(hits.length, 1, JSON.stringify(hits));
   assert.equal(hits[0].slot, 'be.feature');
   assert.equal(hits[0].minimum, 1);
   assert.equal(hits[0].found, 0);
-  const withFeature = archFixture(t, { files: { ...platformFiles(), ...FEATURE } });
-  assert.deepEqual(findings(runArch(withFeature), 'HFS_REQUIRED_FILE_MISSING').filter(item => item.path === 'hfs.json'), []);
+  assert.deepEqual(findings(runBe(), 'HFS_REQUIRED_FILE_MISSING').filter(item => item.path === 'hfs.json'), []);
 });
 
-test('BE: a package without src/index.ts is an HFS_REQUIRED_FILE_MISSING', t => {
-  const root = archFixture(t, {
-    files: { ...platformFiles(), ...FEATURE, 'packages/kit/package.json': '{"name":"@x/kit"}', 'packages/kit/tsconfig.json': '{}', 'packages/kit/src/util.ts': 'export const u = 1;\n' },
-    declaration: { optionalSlots: ['repo.packages'] },
-  });
-  assert.deepEqual(paths(runArch(root), 'HFS_REQUIRED_FILE_MISSING').filter(item => item.startsWith('packages/')), ['packages/kit/src/index.ts']);
+test('BE: a package without src/index.ts is an HFS_REQUIRED_FILE_MISSING', () => {
+  const files = {
+    '../hfs.json': appDeclarationText('be', { apps: DEFAULT_APPS.be, optionalSlots: ['repo.packages'] }),
+    'packages/kit/src/index.ts': null,
+  };
+  assert.deepEqual(paths(runBe(files), 'HFS_REQUIRED_FILE_MISSING').filter(item => item.startsWith('packages/')), ['packages/kit/src/index.ts']);
 });
 
 const NEXT = {
@@ -101,31 +104,33 @@ const BOUNDARIES = {
   'apps/web/src/app/[locale]/not-found.tsx': 'export {};\n',
   'apps/web/src/app/[locale]/loading.tsx': 'export {};\n',
 };
+const FE_FIXTURE = reusableArchFixture({ profile: 'fe', files: { ...NEXT, ...BOUNDARIES } });
+const runFe = (files = {}) => FE_FIXTURE.withFiles(files, runArch);
+after(() => FE_FIXTURE.close());
 
-test('FE: a Next app missing error.tsx, not-found.tsx and loading.tsx is flagged FE_ERROR_BOUNDARY_MISSING', t => {
-  const report = runArch(archFixture(t, { profile: 'fe', files: NEXT }));
+test('FE: a Next app missing error.tsx, not-found.tsx and loading.tsx is flagged FE_ERROR_BOUNDARY_MISSING', () => {
+  const report = runFe(Object.fromEntries(Object.keys(BOUNDARIES).map(file => [file, null])));
   assert.deepEqual(paths(report, 'FE_ERROR_BOUNDARY_MISSING'), [
     'apps/web/src/app/[locale]/error.tsx', 'apps/web/src/app/[locale]/loading.tsx', 'apps/web/src/app/[locale]/not-found.tsx',
   ]);
   assert.ok(report.coverage.checkedRuleIds.includes('FE_ERROR_BOUNDARY_MISSING'));
 });
 
-test('FE: a complete Next app raises no required-file finding', t => {
-  const report = runArch(archFixture(t, { profile: 'fe', files: { ...NEXT, ...BOUNDARIES } }));
+test('FE: a complete Next app raises no required-file finding', () => {
+  const report = runFe();
   assert.deepEqual(findings(report, 'FE_ERROR_BOUNDARY_MISSING'), []);
   assert.deepEqual(findings(report, 'HFS_REQUIRED_FILE_MISSING'), []);
   assert.deepEqual(findings(report, 'HFS_REQUIRED_FILE_MISSING'), []);
 });
 
-test('FE: a missing layout.tsx is HFS_REQUIRED_FILE_MISSING; api client.ts and i18n request.ts are optional (shared by a package) and raise nothing', t => {
-  const files = { ...NEXT, ...BOUNDARIES, 'apps/web/src/app/[locale]/layout.tsx': null, 'apps/web/src/modules/api/client.ts': null, 'apps/web/src/modules/i18n/request.ts': null };
-  const report = runArch(archFixture(t, { profile: 'fe', files }));
+test('FE: a missing layout.tsx is HFS_REQUIRED_FILE_MISSING; api client.ts and i18n request.ts are optional (shared by a package) and raise nothing', () => {
+  const files = { 'apps/web/src/app/[locale]/layout.tsx': null, 'apps/web/src/modules/api/client.ts': null, 'apps/web/src/modules/i18n/request.ts': null };
+  const report = runFe(files);
   assert.deepEqual(paths(report, 'HFS_REQUIRED_FILE_MISSING'), ['apps/web/src/app/[locale]/layout.tsx']);
   assert.deepEqual(findings(report, 'FE_ERROR_BOUNDARY_MISSING'), []);
 });
 
-test('FE: a required module instance that does not exist is one finding', t => {
-  const files = Object.fromEntries(Object.entries({ ...NEXT, ...BOUNDARIES }).filter(([file]) => !file.startsWith('apps/web/src/modules/routes/')));
-  const hits = findings(runArch(archFixture(t, { profile: 'fe', files })), 'HFS_REQUIRED_FILE_MISSING');
+test('FE: a required module instance that does not exist is one finding', () => {
+  const hits = findings(runFe({ 'apps/web/src/modules/routes': null }), 'HFS_REQUIRED_FILE_MISSING');
   assert.deepEqual(hits.map(item => item.path), ['apps/web/src/modules/routes']);
 });

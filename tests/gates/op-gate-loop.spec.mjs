@@ -3,13 +3,13 @@
 // re-reads both (scripts/kernel/gate-settle.mjs) and refuses a done that is red, could not run a tool, or skipped READ. The gate
 // blocks only findings the op's base does not have, measured read-only, and its MERGE GUARD refuses a merge that took the lane
 // side over main (merge 9958cce38).
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileReport, inspectLedger, ledgerFileFor, openLedger, writeContract, recordCheckRun } from '../../engine/db/ledger.mjs';
 import { GATE_EXIT, GATE_SCHEMA, appRootOf, droppedMainChanges, mergeGuard, newLintFindings, newTscFindings, parseGateArgs, runGate } from '../../scripts/gates/gate.mjs';
 import { DIGEST_SCHEMA, patternsForSlot, slotTopicMap } from '../../scripts/gates/read-digest.mjs';
@@ -23,8 +23,29 @@ const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const ts = createRequire(path.join(ROOT, 'package.json'))('typescript');
 const tmp = (t, prefix = 'starci-op-gate-') => { const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix))); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return dir; };
 const put = (root, rel, body) => { const abs = path.join(root, rel); fs.mkdirSync(path.dirname(abs), { recursive: true }); fs.writeFileSync(abs, body); return rel; };
-const gitIn = (cwd) => (...args) => { const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true }); assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`); return r.stdout.trim(); };
+const GIT_TIME = '2026-10-01T00:00:00Z';
+const gitIn = (cwd) => (...args) => { const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true,
+  env: { ...process.env, GIT_AUTHOR_DATE: GIT_TIME, GIT_COMMITTER_DATE: GIT_TIME } }); assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`); return r.stdout.trim(); };
 const SHA = 'a'.repeat(64);
+
+// One process-local app keeps the immutable canon install and gate caches warm. Every appFixture call replaces the complete
+// tracked tree and history before returning, so no test observes another test's branch, files or installed `leaky` package.
+let appHarness = null;
+let fixtureNo = 0;
+function harness() {
+  if (appHarness) return appHarness;
+  const host = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-op-gate-harness-')));
+  const root = path.join(host, 'app');
+  fs.mkdirSync(root, { recursive: true });
+  put(host, 'package-lock.json', '{}\n');
+  installLeaky(host);
+  const git = gitIn(root);
+  git('init', '-q', '-b', 'main');
+  for (const [k, v] of [['user.email', 'spec@starci.test'], ['user.name', 'spec'], ['core.autocrlf', 'false'], ['commit.gpgsign', 'false']]) git('config', k, v);
+  appHarness = { host, root, git, parkedModules: path.join(host, 'app-node-modules') };
+  return appHarness;
+}
+after(() => { if (appHarness) fs.rmSync(appHarness.host, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); });
 
 /** An `hfs` whose `lint` prints a fixed starci/lint@1 report (the ESLint canon is judged by its own specs). */
 function hfsStub(t, findings = []) {
@@ -39,24 +60,35 @@ function hfsStub(t, findings = []) {
  * published canons are installed under node_modules (ignored), as the registry installs them; the gate judges that install.
  */
 function appFixture(t, { baseFiles = {}, within = null, install = true } = {}) {
-  const root = within ? path.join(within, 'app') : tmp(t);
-  fs.mkdirSync(root, { recursive: true });
-  const git = gitIn(root);
-  git('init', '-q', '-b', 'main');
-  for (const [k, v] of [['user.email', 'spec@starci.test'], ['user.name', 'spec'], ['core.autocrlf', 'false'], ['commit.gpgsign', 'false']]) git('config', k, v);
-  const strict = { strict: true, noEmit: true, target: 'es2022', module: 'commonjs', skipLibCheck: true, types: [] };
+  const shared = harness();
+  const { root, git, parkedModules } = shared;
+  if (within && path.resolve(within) !== path.resolve(shared.host)) throw new Error('nested app must use the process-local host repository');
+  if (fs.existsSync(parkedModules) && !fs.existsSync(path.join(root, 'node_modules'))) fs.renameSync(parkedModules, path.join(root, 'node_modules'));
+  fs.rmSync(path.join(root, 'node_modules', 'leaky'), { recursive: true, force: true });
+  git('checkout', '-q', '--orphan', `fixture-${++fixtureNo}`);
+  git('read-tree', '--empty');
+  for (const entry of fs.readdirSync(root)) if (!['.git', 'node_modules'].includes(entry))
+    fs.rmSync(path.join(root, entry), { recursive: true, force: true });
+  const strict = { strict: true, noEmit: true, noLib: true, target: 'es2022', module: 'commonjs', skipLibCheck: true, types: [] };
+  const globals = 'interface Array<T> {}\ninterface Boolean {}\ninterface CallableFunction {}\ninterface Function {}\ninterface IArguments {}\ninterface NewableFunction {}\ninterface Number {}\ninterface Object {}\ninterface RegExp {}\ninterface String {}\n';
   put(root, '.gitignore', 'node_modules/\n');
   put(root, 'package.json', JSON.stringify({ name: 'app', private: true, workspaces: ['be', 'fe/apps/*'] }, null, 2));
   put(root, 'hfs.json', JSON.stringify({ kind: 'app' }, null, 2));
   put(root, 'be/package.json', JSON.stringify({ name: '@app/be', private: true }));
   put(root, 'be/tsconfig.json', JSON.stringify({ compilerOptions: strict, include: ['src'] }));
+  put(root, 'be/src/lib.d.ts', globals);
   put(root, 'be/src/a.ts', 'export const a: number = 1;\n');
   put(root, 'fe/apps/web/package.json', JSON.stringify({ name: '@app/web', private: true }));
   put(root, 'fe/apps/web/tsconfig.json', JSON.stringify({ compilerOptions: { ...strict, jsx: 'preserve' }, include: ['src'] }));
+  put(root, 'fe/apps/web/src/lib.d.ts', globals);
   put(root, 'fe/apps/web/src/page.tsx', 'export const title: string = "home";\n');
   for (const [rel, body] of Object.entries(baseFiles)) put(root, rel, body);
-  if (install) installCanons(root);
+  if (install) {
+    if (!fs.existsSync(path.join(root, 'node_modules'))) installCanons(root);
+  } else if (fs.existsSync(path.join(root, 'node_modules'))) fs.renameSync(path.join(root, 'node_modules'), parkedModules);
   git('add', '-A'); git('commit', '-q', '-m', 'scaffold');
+  git('branch', '-M', 'main');
+  if (spawnSync('git', ['show-ref', '--verify', '--quiet', 'refs/heads/lane'], { cwd: root, windowsHide: true }).status === 0) git('branch', '-D', 'lane');
   const base = git('rev-parse', 'HEAD');
   git('checkout', '-q', '-b', 'lane');
   return { root, git, base };
@@ -108,10 +140,10 @@ test('lint is judged per (file, rule) against the base: only a grown count is ne
 
 test('a tool that could not run is exit 2, never a pass', async (t) => {
   const { root, git, base } = appFixture(t);
-  put(root, 'be/src/a.ts', 'export const a: number = 4;\n');
-  git('commit', '-qam', 'slice');
+  put(root, 'README.md', '# changed\n');
+  git('add', '-A'); git('commit', '-qm', 'slice');
   const broken = { dir: tmp(t, 'starci-hfs-broken-'), bin: path.join(ROOT, 'tests', 'no-such-hfs.mjs') };
-  const report = await runGate({ root, base, changed: ['be/src/a.ts'], hfs: broken, ts });
+  const report = await runGate({ root, base, changed: ['README.md'], hfs: broken, ts });
   assert.equal(report.exit, GATE_EXIT.toolFailed);
   assert.equal(report.ok, false);
   assert.match(report.errors.join(' '), /starci app lint produced no starci\/lint@1 report/);
@@ -125,7 +157,7 @@ const installLeaky = (dir) => {
   put(dir, 'node_modules/leaky/index.d.ts', 'export declare const leak: number;\n');
 };
 /** A directory standing for the enclosing repository: its own lockfile and node_modules holding `leaky`. */
-const hostRepo = (t) => { const host = tmp(t, 'starci-op-gate-host-'); put(host, 'package-lock.json', '{}\n'); installLeaky(host); return host; };
+const hostRepo = () => harness().host;
 const IMPORTS_LEAKY = "import { leak } from 'leaky';\nexport const a: number = leak;\n";
 
 test('BOUND: an app nested in a repository whose node_modules holds a package the app does not install gets TS2307 for it', async (t) => {
@@ -195,7 +227,7 @@ test('MERGE GUARD: a merge that kept the lane side over main is recomputed with 
   const guard = mergeGuard(root, { base, mainTip });
   assert.deepEqual(guard.checked, [merge]);
   assert.equal(guard.findings.length, 2);
-  const report = await runGate({ root, base, changed: ['be/src/lane.ts'], hfs: hfsStub(t), ts });
+  const report = await runGate({ root, base, changed: [], hfs: hfsStub(t), ts });
   assert.equal(report.exit, GATE_EXIT.findings);
   assert.deepEqual(report.findings.filter((f) => f.engine === 'merge').map((f) => f.rule), ['dropped-main-change', 'dropped-main-change']);
   assert.equal(report.steps.merges.dropped, 2);
@@ -260,54 +292,76 @@ test('the READ topic map derives from the topics\' own slots fields, in index.ya
 });
 
 const effectiveOf = (id) => loadContractChanges(ROOT).changes.find((c) => c.id === id).effectiveAt;
-function seedOp(t, { label, gate, digest, op = 'test.author' }) {
+function seedOps(t, cases) {
   const repo = tmp(t, 'starci-op-gate-settle-');
   const git = gitIn(repo);
   git('init', '--quiet', '-b', 'main');
   for (const [k, v] of [['user.email', 'lane@starci.test'], ['user.name', 'lane'], ['core.autocrlf', 'false'], ['commit.gpgsign', 'false']]) git('config', k, v);
   put(repo, 'src/a.ts', 'export const a = 1;\n');
   git('add', '.'); git('commit', '--quiet', '-m', 'init');
-  const files = ['src/a.ts'];
-  if (gate) files.push(put(repo, 'src/checks/gate.json', JSON.stringify({ ...gate, root: repo.replace(/\\/g, '/') })));
-  if (digest) files.push(put(repo, 'src/checks/read-digest.json', JSON.stringify(digest)));
+  const prepared = cases.map(({ label, gate, digest, op = 'test.author' }) => {
+    const files = ['src/a.ts'];
+    if (gate) files.push(put(repo, `src/checks/${label}/gate.json`, JSON.stringify({ ...gate, root: repo.replace(/\\/g, '/') })));
+    if (digest) files.push(put(repo, `src/checks/${label}/read-digest.json`, JSON.stringify(digest)));
+    return { label, op, files, jobId: `op-${op}-${label}` };
+  });
   git('add', '.'); git('commit', '--quiet', '-m', 'slice');
-  const jobId = `op-${op}-${label}`;
   const ledger = openLedger({ file: ledgerFileFor(repo) });
   try {
-    seedWorkflow(ledger, { id: `wf-${label}`, state: { phase: 'running', job: 'impl' },
-      jobs: [{ jobId, opId: op, dispatchId: `ctx-${jobId}`, terminalHandle: `term-${jobId}`, status: 'running',
-        payload: { opId: op, owned_paths: ['src/'], orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
-    const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
-    ledger.transaction((db) => {
-      writeContract(db, { attemptId, markdown: '# contract', context: { worktree: repo }, createdAt: effectiveOf(OP_GATE_CHANGE) + 1000 });
-      fileReport(db, { attemptId, outcome: 'done', createdAt: Date.now(),
-        report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'slice', files, head: git('rev-parse', 'HEAD') } });
-      for (const check of [{ name: 'owned-paths-committed', command: 'git show' }, { name: 'owned-paths-clean', command: 'git status' }, { name: 'head-ancestor', command: 'git merge-base' }])
-        recordCheckRun(db, { attemptId, name: check.name, phase: 'verify', runner: 'kernel', authority: 'runtime', status: 'pass', exitCode: 0, command: check.command });
-    });
+    for (const { label, op, files, jobId } of prepared) {
+      seedWorkflow(ledger, { id: `wf-${label}`, state: { phase: 'running', job: 'impl' },
+        jobs: [{ jobId, opId: op, dispatchId: `ctx-${jobId}`, terminalHandle: `term-${jobId}`, status: 'running',
+          payload: { opId: op, owned_paths: ['src/'], orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
+      const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+      ledger.transaction((db) => {
+        writeContract(db, { attemptId, markdown: '# contract', context: { worktree: repo }, createdAt: effectiveOf(OP_GATE_CHANGE) + 1000 });
+        fileReport(db, { attemptId, outcome: 'done', createdAt: Date.parse('2026-10-01T09:00:00.000Z'),
+          report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'slice', files, head: git('rev-parse', 'HEAD') } });
+        for (const check of [{ name: 'owned-paths-committed', command: 'git show' }, { name: 'owned-paths-clean', command: 'git status' }, { name: 'head-ancestor', command: 'git merge-base' }])
+          recordCheckRun(db, { attemptId, name: check.name, phase: 'verify', runner: 'kernel', authority: 'runtime', status: 'pass', exitCode: 0, command: check.command });
+      });
+    }
   } finally { ledger.close(); }
-  return { repo, jobId };
+  return { repo, jobs: new Map(prepared.map(({ label, jobId }) => [label, jobId])) };
 }
-const settle = (repo, jobId) => { const r = spawnSync(process.execPath, [API, 'settle', '--repo', repo, '--job', jobId, '--verdict', 'pass', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 }); let body = null; try { body = JSON.parse(r.stdout); } catch { /* judged below */ } return { r, body }; };
+const settle = (repo, jobId) => new Promise((resolve) => {
+  const child = spawn(process.execPath, [API, 'settle', '--repo', repo, '--job', jobId, '--verdict', 'pass', '--json'], { cwd: ROOT, windowsHide: true });
+  let stdout = '', stderr = '';
+  child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
+  child.stdout.on('data', (chunk) => { stdout += chunk; }); child.stderr.on('data', (chunk) => { stderr += chunk; });
+  const timer = setTimeout(() => child.kill(), 120000);
+  child.on('error', (error) => { clearTimeout(timer); resolve({ r: { status: null, stdout, stderr, error }, body: null }); });
+  child.on('close', (status, signal) => {
+    clearTimeout(timer);
+    let body = null; try { body = JSON.parse(stdout); } catch { /* judged below */ }
+    resolve({ r: { status, stdout, stderr, signal }, body });
+  });
+});
 const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
 
-test('starci kernel settle refuses a done on a new lint finding, a new tsc error or a skipped READ; accepts findings that only pre-exist on base', (t) => {
+test('starci kernel settle refuses a done on a new lint finding, a new tsc error or a skipped READ; accepts findings that only pre-exist on base', async (t) => {
   const cases = [
     ['lint', gateDoc(LINT_NEW), digestDoc(), 'op-gate-new-findings'],
     ['tsc', gateDoc(TSC_NEW), digestDoc(), 'op-gate-new-findings'],
     ['noread', gateDoc(PREEXISTING_ONLY), null, 'op-read-digest-missing'],
   ];
+  const seeded = seedOps(t, [...cases.map(([label, gate, digest]) => ({ label, gate, digest })),
+    { label: 'base-only', gate: gateDoc(PREEXISTING_ONLY), digest: digestDoc() }]);
+  const labels = [...cases.map(([label]) => label), 'base-only'];
+  const settled = new Map();
+  for (let i = 0; i < labels.length; i += 2) for (const [label, result] of await Promise.all(labels.slice(i, i + 2).map(async (label) =>
+    [label, await settle(seeded.repo, seeded.jobs.get(label))]))) settled.set(label, result);
   for (const [label, gate, digest, code] of cases) {
-    const { repo, jobId } = seedOp(t, { label, gate, digest });
-    const refused = settle(repo, jobId);
+    const jobId = seeded.jobs.get(label);
+    const refused = settled.get(label);
     assert.equal(refused.r.status, 1, refused.r.stdout || refused.r.stderr);
     assert.equal(refused.body?.reason, code, `${label}: ${refused.r.stdout}`);
-    assert.equal(read(repo, (db) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status), 'running', 'a refused settle changes no job');
-    assert.equal(read(repo, (db) => db.prepare("SELECT status FROM check_runs WHERE name='op-gate' ORDER BY check_id DESC").get().status), 'fail', `${label}: the refusal is the runtime check op-gate`);
+    assert.equal(read(seeded.repo, (db) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status), 'running', 'a refused settle changes no job');
+    assert.equal(read(seeded.repo, (db) => db.prepare("SELECT status FROM check_runs WHERE attempt_id=(SELECT attempt_id FROM op_attempts WHERE job_id=?) AND name='op-gate' ORDER BY check_id DESC").get(jobId).status), 'fail', `${label}: the refusal is the runtime check op-gate`);
   }
-  const { repo, jobId } = seedOp(t, { label: 'base-only', gate: gateDoc(PREEXISTING_ONLY), digest: digestDoc() });
-  const ok = settle(repo, jobId);
+  const jobId = seeded.jobs.get('base-only');
+  const ok = settled.get('base-only');
   assert.equal(ok.r.status, 0, ok.r.stderr || ok.r.stdout);
-  assert.equal(read(repo, (db) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status), 'succeeded');
-  assert.equal(read(repo, (db) => db.prepare("SELECT status FROM check_runs WHERE name='op-gate' ORDER BY check_id DESC").get().status), 'pass');
+  assert.equal(read(seeded.repo, (db) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status), 'succeeded');
+  assert.equal(read(seeded.repo, (db) => db.prepare("SELECT status FROM check_runs WHERE attempt_id=(SELECT attempt_id FROM op_attempts WHERE job_id=?) AND name='op-gate' ORDER BY check_id DESC").get(jobId).status), 'pass');
 });

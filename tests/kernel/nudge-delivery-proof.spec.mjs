@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test,{after,before,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -85,10 +85,8 @@ test('sendWakeWithProof: a wake left in the input row gets one Enter-only send',
 
 /* ------------------------------------------------------------ fake Orca */
 
-const fixture=t=>{
+const fixture=()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-nudge-proof-'));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stubFile=path.join(root,'fake-orca.mjs');fs.writeFileSync(stubFile,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
@@ -127,11 +125,33 @@ const fixture=t=>{
   endLaunchGrace(ledgerFileFor(repo),{workflowId,jobId}); // these specs exercise nudge delivery, not the launch grace
   // The worker sits at its prompt: status calls it turn-idle and nudge wakes it.
   writeState(s=>{s.terminals['fake-terminal-1'].screen=IDLE;});
-  return {repo,workflowId,jobId,run,events,orcaState};
+  const baselineState=fs.readFileSync(stateFile,'utf8');
+  const ledgerFile=ledgerFileFor(repo),baselineLedger=path.join(root,'baseline-ledger.db');
+  const snapshot=openLedger({file:ledgerFile});
+  try{snapshot.db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').get();}
+  finally{snapshot.close();}
+  fs.copyFileSync(ledgerFile,baselineLedger);
+  const reset=()=>{
+    fs.writeFileSync(stateFile,baselineState);
+    if(fs.existsSync(logFile))fs.writeFileSync(logFile,'');
+    fs.rmSync(`${ledgerFile}-wal`,{force:true});
+    fs.rmSync(`${ledgerFile}-shm`,{force:true});
+    fs.copyFileSync(baselineLedger,ledgerFile);
+  };
+  const cleanup=()=>{
+    fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25});
+    if(process.env.STARCI_TEST_TEMP_DIR)fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),{recursive:true,force:true,maxRetries:20,retryDelay:25});
+  };
+  return {repo,workflowId,jobId,run,events,orcaState,reset,cleanup};
 };
 
+let deliveryFixture;
+before(()=>{deliveryFixture=fixture();});
+beforeEach(()=>{deliveryFixture.reset();});
+after(()=>{deliveryFixture?.cleanup();});
+
 test('nudge: agent_prompt_stalled with the wake queued on screen is a queued nudge with its event',t=>{
-  const fx=fixture(t);
+  const fx=deliveryFixture;
   const status=json(fx.run(['status','--repo',fx.repo,'--workflow',fx.workflowId,'--json']).stdout);
   assert.equal(status.workers.find(w=>w.jobId===fx.jobId).liveness,'turn-idle');
   const r=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json'],{STARCI_FAKE_ORCA_SEND_STALLED:'queued'});
@@ -143,13 +163,14 @@ test('nudge: agent_prompt_stalled with the wake queued on screen is a queued nud
 });
 
 test('nudge: agent_prompt_stalled with the wake landed is delivered; with nothing on screen it fails truthfully',t=>{
-  const fx=fixture(t);
+  const fx=deliveryFixture;
   const landed=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json'],{STARCI_FAKE_ORCA_SEND_STALLED:'landed'});
   assert.equal(landed.status,0,landed.stderr||landed.stdout);
   assert.deepEqual([json(landed.stdout).delivery,json(landed.stdout).evidence],['delivered','wake-text']);
   assert.equal(fx.events('op-worker-nudged').length,1);
 
-  const lost=fixture(t);
+  fx.reset();
+  const lost=fx;
   const r=lost.run(['nudge','--repo',lost.repo,'--job',lost.jobId,'--json'],{STARCI_FAKE_ORCA_SEND_STALLED:'lost'});
   assert.equal(r.status,1);
   const out=json(r.stdout);
@@ -158,7 +179,7 @@ test('nudge: agent_prompt_stalled with the wake landed is delivered; with nothin
 });
 
 test('nudge: agent_prompt_blocked followed by a confirmed Enter-only send is delivered',t=>{
-  const fx=fixture(t);
+  const fx=deliveryFixture;
   const r=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json'],{STARCI_FAKE_ORCA_STUCK_PASTE:'blocked'});
   assert.equal(r.status,0,r.stderr||r.stdout);
   const out=json(r.stdout);
@@ -211,7 +232,7 @@ test('sendWakeWithProof: a split that never stages or never submits still fails 
 });
 
 test('nudge: a dropped text+Enter send is recovered through the split retry and says so',t=>{
-  const fx=fixture(t);
+  const fx=deliveryFixture;
   const r=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json'],{STARCI_FAKE_ORCA_DROP_ENTER_SEND:'1'});
   assert.equal(r.status,0,r.stderr||r.stdout);
   const out=json(r.stdout);
@@ -224,7 +245,7 @@ test('nudge: a dropped text+Enter send is recovered through the split retry and 
 });
 
 test('nudge: when even the split does not stage, the nudge fails with no event',t=>{
-  const fx=fixture(t);
+  const fx=deliveryFixture;
   const r=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json'],{STARCI_FAKE_ORCA_DROP_ENTER_SEND:'all'});
   assert.equal(r.status,1);
   const out=json(r.stdout);

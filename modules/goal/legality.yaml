@@ -164,7 +164,7 @@ forwardEdges:
   - id: draw-before-ui-build
     if: "any frontend/UI build leg is proposed (interface.implement)"
     thenRequired: "interface.draw done for that feature's ui node"
-    enforcement: designGate - the kernel holds a frontend build until the feature's ui node is done and asks the user when the feature has none; starci kernel dispatch refuses interface.implement itself (prerequisite-unmet DESIGN_NOT_SETTLED, reads.draws designDrawn) until the ui record it proves has a settled interface.draw; interface.draw never waits for a layout - it starts from a todo shell and draws the parents itself 
+    enforcement: designGate - the kernel holds a frontend build until the feature's ui node is done and asks the user when the feature has none; starci kernel dispatch refuses interface.implement itself (prerequisite-unmet DESIGN_NOT_SETTLED, reads.draws designDrawn) until the ui record it proves has a settled interface.draw; interface.draw never waits for a layout - it starts from a todo shell and draws the parents itself
     why: "interface code is built against the drawing of its feature (modules/models/kinds.yaml implementation/frontend lane purpose)"
     illegal: "UI work without interface.draw first is ILLEGAL"
 

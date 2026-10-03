@@ -884,6 +884,9 @@ moduleLocalDocumentKinds:
   - id: starci/module-kernel-driver-loop@1
     governs: "The tick the kernel agent runs."
     files: [modules/kernel/driver-loop.yaml]
+  - id: starci/spec-durations@1
+    governs: "The measured seconds of each slow spec file and the per-file land budget scripts/checks/check-spec-budget.mjs judges."
+    files: [modules/kernel/spec-durations.yaml]
   - id: starci/contract-changes@1
     governs: "The registry of contract changes (one entry file per change under modules/kernel/contract-changes/, fields in contract-changes-format.yaml): what each added (checks, finding codes), when, and whether it reaches in-flight work (scripts/machine/contract-version.mjs)."
     files: [modules/kernel/contract-changes-format.yaml]

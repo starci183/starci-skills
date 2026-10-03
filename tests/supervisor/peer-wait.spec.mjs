@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {changeWorkflowPhase,inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {stallFindings,peerWaits,judgePeerWait} from '../../scripts/supervisor/stall.mjs';
+import {startPeerWaitCli} from '../helpers/supervisor-peer-wait-fixture.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -24,6 +25,8 @@ const lastLine=text=>json(String(text).trim().split('\n').at(-1));
 
 const WORK='wf-shop-work-and-stacks-mud7kjun',BASE='wf-shop-base-repos-mud7kk5c',DONE='wf-shop-finished',OTHER='wf-shop-other';
 const DETAIL='brand.decide preflight needs installed @starci/grammar 0.5.0 in FE; peer owns the FE upgrade (pm-ab67deff28d8)';
+const CLI=startPeerWaitCli();
+test.after(()=>CLI.close());
 
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-peer-wait-'));
@@ -31,7 +34,10 @@ const fixture=t=>{
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const base={...process.env};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete base[key];
-  const api=args=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:base});
+  // Successful commands reuse one runtime but still execute the real CLI entry. Commands whose
+  // contract is process exit keep their isolated OS process so exit status remains observable.
+  const freshApi=args=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:base});
+  const api=args=>['dispatch','route'].includes(args[0])?freshApi(args):CLI.run([...args,'--repo',repo,'--json']);
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     const at=Date.now();
@@ -46,7 +52,7 @@ const fixture=t=>{
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
   const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
   const ok=args=>{const r=api(args);assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
-  const refused=(args,code)=>{const r=api(args);assert.equal(r.status,1,`${args.join(' ')} must be refused: ${r.stdout}`);assert.equal(lastLine(r.stderr)?.code,code,r.stderr);return lastLine(r.stderr);};
+  const refused=(args,code)=>{const r=freshApi(args);assert.equal(r.status,1,`${args.join(' ')} must be refused: ${r.stdout}`);assert.equal(lastLine(r.stderr)?.code,code,r.stderr);return lastLine(r.stderr);};
   const frontier=wf=>ok(['status','--workflow',wf]).frontier;
   const wait=(extra=[])=>ok(['incident','--workflow',WORK,'--kind','peer-wait','--peer',BASE,'--op','brand.decide','--detail',DETAIL,...extra]);
   return {repo,api,ok,refused,read,seed,frontier,wait};

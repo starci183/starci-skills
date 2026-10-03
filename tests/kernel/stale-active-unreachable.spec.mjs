@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -34,11 +34,18 @@ const FROZEN_CODEX=[
   `  gpt-6-sol high · ${path.join(os.tmpdir(), 'shop-be')} · Report task outcome`,
 ].join('\n');
 
-const fixture=t=>{
+let sharedFixture;
+after(()=>{
+  if(!sharedFixture)return;
+  fs.rmSync(sharedFixture.root,{recursive:true,force:true,maxRetries:20,retryDelay:25});
+  if(process.env.STARCI_TEST_TEMP_DIR)for(const name of ['starci-job-scratch','starci-git-memo'])
+    fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,name),{recursive:true,force:true,maxRetries:20,retryDelay:25});
+  if(sharedFixture.savedRegistry===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;
+  else process.env.STARCI_TEST_MACHINE_FILE=sharedFixture.savedRegistry;
+});
+
+const makeFixture=()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stale-unreachable-'));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
-    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   fs.writeFileSync(path.join(repo,'docs','a.md'),'# a\n');fs.writeFileSync(path.join(repo,'.gitignore'),'.starciwork/\n');
   const git=(...a)=>spawnSync('git',['-C',repo,'-c','user.email=spec@starci','-c','user.name=spec',...a],{encoding:'utf8',windowsHide:true,env:{...process.env,GIT_AUTHOR_DATE:'2026-01-01T00:00:00Z',GIT_COMMITTER_DATE:'2026-01-01T00:00:00Z'}});
@@ -53,7 +60,6 @@ const fixture=t=>{
   const machineFile=path.join(root,'machine.sqlite');
   const savedRegistry=process.env.STARCI_TEST_MACHINE_FILE;
   process.env.STARCI_TEST_MACHINE_FILE=machineFile;
-  t.after(()=>{if(savedRegistry===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=savedRegistry;});
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_ORCA_SKIP_LIVE_CHECK:'1',STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,STARCI_TEST_MACHINE_FILE:machineFile};
   const api=args=>spawnSync(process.execPath,[API,...placeOnRepo(args,repo),'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
@@ -70,6 +76,7 @@ const fixture=t=>{
       enqueueJob(db,{jobId,workflowId,unitId:`unit-${jobId}`,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
     });
   }finally{ledger.close();}
+  const ledgerFile=ledgerFileFor(repo);
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
   const events=kind=>read(db=>db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(jobId,kind).map(r=>json(r.payload_json)));
   // Dispatch, then freeze the frame 19 minutes ago and age the dispatch past any launch grace.
@@ -85,8 +92,25 @@ const fixture=t=>{
     UPDATE events SET created_at=created_at-3600000 WHERE entity_id='${jobId}' AND kind='op-dispatched';
     CREATE TRIGGER events_append_only BEFORE UPDATE ON events BEGIN SELECT RAISE(ABORT,'events are append-only'); END;`);}finally{l.close();}
   writeState(s=>{Object.assign(s.terminals[handle],{screen:FROZEN_CODEX,lastOutputAt:Date.now()-19*60000,sendRefused:'terminal_not_writable'});});
+  const checkpoint=openLedger({file:ledgerFile});
+  try{checkpoint.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');}finally{checkpoint.close();}
+  const ledgerBaseline=path.join(root,'runtime-baseline.sqlite');
+  fs.copyFileSync(ledgerFile,ledgerBaseline);
+  const stateBaseline=fs.readFileSync(stateFile);
+  const reset=()=>{
+    fs.rmSync(`${ledgerFile}-wal`,{force:true});
+    fs.rmSync(`${ledgerFile}-shm`,{force:true});
+    fs.copyFileSync(ledgerBaseline,ledgerFile);
+    fs.writeFileSync(stateFile,stateBaseline);
+    fs.writeFileSync(logFile,'');
+  };
   const status=()=>{const out=json(api(['status','--workflow',workflowId]).stdout);return {out,worker:out.workers.find(w=>w.jobId===jobId)};};
-  return {api,workflowId,jobId,handle,orcaState,writeState,read,events,status};
+  return {root,savedRegistry,reset,api,workflowId,jobId,handle,orcaState,writeState,read,events,status};
+};
+const fixture=()=>{
+  sharedFixture??=makeFixture();
+  sharedFixture.reset();
+  return sharedFixture;
 };
 
 test('a frozen Working frame whose dispatch still heartbeats is active: no nudge, no dead-worker recovery',t=>{

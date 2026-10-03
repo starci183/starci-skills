@@ -11,7 +11,7 @@
 // STARCI_APP_INSTALLS may add a product app's node_modules when the runtime holds no copy of a framework the skeleton imports).
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -27,6 +27,7 @@ import { scaffoldBinGaps } from '../helpers/scaffold-bins.mjs';
 import { loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { LINT_DEPENDENCIES, RUNTIME, installInto, missingFrom, runtimeInstalls, uninstall } from '../helpers/hfs-app-install.mjs';
+import { createScaffoldAppBaseline, SERVER_READY_IMPORT } from '../helpers/scaffold-app-baseline.mjs';
 import { startSourceCanonRegistry } from '../helpers/source-canon-registry.mjs';
 
 const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
@@ -53,7 +54,6 @@ const lintGate = gate('scaffold lint', skipReason);
 
 /** The checkout's @starci packages as a registry, started once by the first test that scaffolds and stopped after the file. */
 let registry = null;
-after(async () => { if (registry) await (await registry).close(); });
 /** `starci app scaffold demo --into <into>` through the app implementation, with the real lock step and local @starci registry. */
 async function scaffold(into) {
   registry ??= startSourceCanonRegistry();
@@ -63,6 +63,8 @@ async function scaffold(into) {
   assert.match(result.out, /^starci app scaffold: created /);
   return { root };
 }
+const scaffoldBaseline = createScaffoldAppBaseline({ create: scaffold });
+after(async () => { await scaffoldBaseline.close(); if (registry) await (await registry).close(); });
 
 async function run(argv, seams = {}) {
   let out = '';
@@ -162,12 +164,63 @@ function runScript(app, name) {
   }
 }
 
-/** A free TCP port on the loopback interface. */
-const freePort = () => new Promise((resolve, reject) => {
-  const server = net.createServer();
-  server.once('error', reject);
-  server.listen(0, '127.0.0.1', () => { const { port } = server.address(); server.close(() => resolve(port)); });
-});
+/**
+ * Boots the generated API on port 0. A preload in the child reports the operating system's chosen
+ * port over IPC; readiness also requires the app's own server.started event before this resolves.
+ * The one retry is reserved for EADDRINUSE, and every readiness failure carries process output.
+ */
+async function startCoreApi({ app, entry, origin, databaseUrl }) {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const startedAt = Date.now();
+    const child = spawn(process.execPath, ['--import', SERVER_READY_IMPORT, entry], {
+      cwd: app,
+      env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('STARCI_'))), PORT: '0', HTTP_SECURITY_ALLOWED_ORIGINS: origin, PRIMARY_DB_URL: databaseUrl },
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+    });
+    const state = { output: '', port: null, started: false };
+    const exited = new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
+    const ready = new Promise((resolve, reject) => {
+      let settled = false;
+      const settle = (complete) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        complete();
+      };
+      const maybeReady = () => {
+        if (state.port !== null && state.started) settle(() => resolve(state.port));
+      };
+      const capture = (chunk) => {
+        state.output += chunk;
+        state.started ||= /"event":"server\.started"/.test(state.output);
+        maybeReady();
+      };
+      child.stdout.on('data', capture);
+      child.stderr.on('data', capture);
+      child.on('message', (message) => {
+        if (message?.type === 'server-ready' && Number.isInteger(message.port)) state.port = message.port;
+        maybeReady();
+      });
+      child.once('error', (error) => settle(() => reject(new Error(`the api child failed to spawn (exitCode=${child.exitCode}, signalCode=${child.signalCode}): ${error.message}\n${state.output}`))));
+      child.once('close', (code, signal) => settle(() => reject(new Error(`the api child exited before readiness (exitCode=${code}, signalCode=${signal}):\n${state.output}`))));
+      const timer = setTimeout(() => settle(() => reject(new Error(`the api readiness event timed out after 30000ms (exitCode=${child.exitCode}, signalCode=${child.signalCode}):\n${state.output}`))), 30_000);
+    });
+    try {
+      const port = await ready;
+      console.log(`# scaffold api ready on port ${port} in ${Date.now() - startedAt}ms`);
+      return { child, exited, output: () => state.output, port };
+    } catch (error) {
+      if (child.exitCode === null) child.kill();
+      await exited;
+      if (attempt < 2 && /\bEADDRINUSE\b/.test(`${error.message}\n${state.output}`)) {
+        console.log('# scaffold api bind raced with EADDRINUSE; retrying once');
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error('the api did not start');
+}
 
 /** A .properties text as a map (key=value lines; comments and blank lines left out). */
 const propertiesOf = (text) => Object.fromEntries(text.split(/\r?\n/).filter((line) => line && !line.startsWith('#')).map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
@@ -247,9 +300,9 @@ test('starci app scaffold writes the app shape and starci app lint finds nothing
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-app-'));
   const app = path.join(into, 'demo');
   let links = [];
-  t.after(() => { uninstall(app, links); fs.rmSync(into, { recursive: true, force: true }); });
+  t.after(() => scaffoldBaseline.reset(into, () => uninstall(app, links)));
 
-  const scaffolded = await scaffold(into);
+  const scaffolded = await scaffoldBaseline.cloneInto(into);
   assert.equal(scaffolded.root, app);
   const declaration = JSON.parse(fs.readFileSync(path.join(app, 'hfs.json'), 'utf8'));
   assert.equal(declaration.kind, 'app');
@@ -417,9 +470,9 @@ test('the scaffolded be core api builds with build:be and boots with start:core 
   let links = [];
   let child = null;
   let database = null;
-  t.after(async () => { if (child && child.exitCode === null) child.kill(); await database?.close(); uninstall(app, links); fs.rmSync(into, { recursive: true, force: true }); });
+  t.after(async () => { if (child && child.exitCode === null) child.kill(); await database?.close(); scaffoldBaseline.reset(into, () => uninstall(app, links)); });
 
-  assert.equal((await scaffold(into)).root, app);
+  assert.equal((await scaffoldBaseline.cloneInto(into)).root, app);
   // The scaffold declares the runtime peer of every driver integration pair it depends on (R111): nothing to add.
   const { peerIntegrationFindings } = await import('../../scripts/hfs/rules/peer-integrations.mjs');
   assert.deepEqual(peerIntegrationFindings({ repoRoot: app, files: ['package.json'] }), []);
@@ -429,27 +482,22 @@ test('the scaffolded be core api builds with build:be and boots with start:core 
   const start = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts['start:core'];
   const [tool, entry] = start.split(/\s+/);
   assert.equal(tool, 'node', `start:core runs the built api with node: ${start}`);
-  const port = await freePort();
   const origin = 'http://localhost:3000';
   database = await fakePostgres();
-  const { spawn } = await import('node:child_process');
-  child = spawn(process.execPath, [entry], { cwd: app, env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('STARCI_'))), PORT: String(port), HTTP_SECURITY_ALLOWED_ORIGINS: origin, PRIMARY_DB_URL: database.url }, stdio: ['ignore', 'pipe', 'pipe'] });
-  let output = '';
-  child.stdout.on('data', (chunk) => { output += chunk; });
-  child.stderr.on('data', (chunk) => { output += chunk; });
-  const exited = new Promise((resolve) => child.once('exit', (code) => resolve(code)));
+  const boot = await startCoreApi({ app, entry, origin, databaseUrl: database.url });
+  child = boot.child;
+  const { port } = boot;
 
   let live = null;
-  for (let attempt = 0; attempt < 120 && live === null && child.exitCode === null; attempt += 1) {
-    try { live = await fetch(`http://127.0.0.1:${port}/health/live`, { headers: { origin } }); } catch { await new Promise((resolve) => setTimeout(resolve, 250)); }
-  }
+  try { live = await fetch(`http://127.0.0.1:${port}/health/live`, { headers: { origin } }); } catch {}
+  const output = boot.output();
   assert.ok(live, `the api answered on port ${port}: ${output}`);
   assert.equal(live.status, 200, `GET /health/live: ${live.status} ${await live.text()} ${output}`);
   assert.match(output, /"event":"server\.started"/, 'the api logged its start');
   assert.ok(database.statements.some((statement) => /version\(\)|server_version/.test(statement)), `the api opened its primary connection at boot: ${database.statements.join(' | ')}`);
   assert.ok(!database.statements.some((statement) => /\b(CREATE|ALTER|DROP) TABLE\b/i.test(statement)), 'the api never changes the schema: migrations run only in the cli');
   child.kill();
-  await exited;
+  await boot.exited;
 });
 
 /** What the be unit run loads besides the lint set: the runner, its TypeScript transform and the decorator helpers. */
@@ -461,8 +509,8 @@ test('the scaffolded be unit run (the test script) writes the lcov Sonar and Cod
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-unit-'));
   const app = path.join(into, 'demo');
   let links = [];
-  t.after(() => { uninstall(app, links); fs.rmSync(into, { recursive: true, force: true }); });
-  assert.equal((await scaffold(into)).root, app);
+  t.after(() => scaffoldBaseline.reset(into, () => uninstall(app, links)));
+  assert.equal((await scaffoldBaseline.cloneInto(into)).root, app);
   assertCoverageContract(app);
   links = installInto(app, installs);
   // The root `test` script, as npm runs it: `cd be && jest --selectProjects unit --coverage` (plus --ci, like the managed CI).
@@ -495,8 +543,8 @@ test('the scaffolded fe builds with the root build:fe script: next-intl finds it
   const into = fs.mkdtempSync(path.join(RUNTIME, '.tmp-hfs-fe-build-'));
   const app = path.join(into, 'demo');
   let links = [];
-  t.after(() => { uninstall(app, links); fs.rmSync(into, { recursive: true, force: true }); });
-  assert.equal((await scaffold(into)).root, app);
+  t.after(() => scaffoldBaseline.reset(into, () => uninstall(app, links)));
+  assert.equal((await scaffoldBaseline.cloneInto(into)).root, app);
   links = installInto(app, installs);
   for (const name of ['landing', 'app']) {
     const toRuntime = path.relative(path.join(app, 'fe', 'apps', name), RUNTIME).split(path.sep).join('/');

@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,setJobStatus} from '../../engine/db/ledger.mjs';
 import {BLOCKING_HEADS_UP_MS,blockingJobs,blockingLines,orderQueuedByBlocking} from '../../scripts/kernel/waiter-priority.mjs';
 import {workflowProgress,workflowSection} from '../../scripts/supervisor/progress-report.mjs';
+import {runKernelCli} from '../helpers/kernel-waiter-priority-fixture.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -28,7 +28,7 @@ const fixture=t=>{
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ["src"])fs.mkdirSync(path.join(repo,d),{recursive:true});
   const env={...process.env,STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db')};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete env[key];
-  const api=args=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
+  const api=args=>runKernelCli({args,repo,env,cwd:ROOT});
   const ledger=openLedger({file:ledgerFileFor(repo,{env})});
   try{
     const at=Date.now();
@@ -42,9 +42,9 @@ const fixture=t=>{
   }finally{ledger.close();}
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo,{env})});try{return fn(l.db);}finally{l.close();}};
   const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(l);}finally{l.close();}};
-  const ok=args=>{const r=api(args);assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
+  const ok=async args=>{const r=await api(args);assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
   const status=wf=>ok(['status','--workflow',wf]);
-  const enqueue=(wf,op,paths,extra=[])=>ok(['enqueue','--workflow',wf,'--op',op,'--paths',paths,...extra]).job_id;
+  const enqueue=async(wf,op,paths,extra=[])=>(await ok(['enqueue','--workflow',wf,'--op',op,'--paths',paths,...extra])).job_id;
   // Age an incident's raise (and so its waiters) by `ms`.
   // events are append-only in the migrated schema (events_append_only trigger): the backdate suspends
   // the trigger for this one write and restores it verbatim.
@@ -66,62 +66,62 @@ test('orderQueuedByBlocking puts the heaviest blocking job first and keeps the r
   assert.deepEqual(withFoundation.map(q=>q.jobId),['f','y','x'],'foundation legs keep leading; weight orders the rest');
 });
 
-test('a typed --until-job wait makes the awaited job blocking: blockingOthers, queued order and route advice',t=>{
+test('a typed --until-job wait makes the awaited job blocking: blockingOthers, queued order and route advice',{concurrency:true},async t=>{
   const fx=fixture(t);
-  const first=fx.enqueue(OWNER,'backend.scaffold','src/a');
-  const awaited=fx.enqueue(OWNER,'backend.implement','src/b');
-  const {incidentId}=fx.ok(['incident','--workflow',WAITER,'--kind','peer-wait','--peer',OWNER,'--op','brand.decide','--until-job',awaited,'--detail','needs the owner module']);
-  const owner=fx.status(OWNER).frontier;
+  const first=await fx.enqueue(OWNER,'backend.scaffold','src/a');
+  const awaited=await fx.enqueue(OWNER,'backend.implement','src/b');
+  const {incidentId}=await fx.ok(['incident','--workflow',WAITER,'--kind','peer-wait','--peer',OWNER,'--op','brand.decide','--until-job',awaited,'--detail','needs the owner module']);
+  const owner=(await fx.status(OWNER)).frontier;
   assert.deepEqual(owner.queued.map(q=>q.jobId),[awaited,first],'the job another workflow waits on ranks first although it was enqueued later');
   assert.deepEqual(owner.queued[0].blocking.workflows,[WAITER]);
   assert.equal(owner.blockingOthers.length,1);
   const [b]=owner.blockingOthers;
   assert.deepEqual([b.jobId,b.opId,b.status,b.waiters,b.workflows,b.via.map(({since,...v})=>v)],[awaited,'backend.implement','queued',1,[WAITER],[{workflowId:WAITER,via:'until-job',ref:incidentId}]]);
-  assert.equal(fx.status(WAITER).frontier.blockingOthers,undefined,'the waiter blocks nobody');
+  assert.equal((await fx.status(WAITER)).frontier.blockingOthers,undefined,'the waiter blocks nobody');
 
-  const route=json(fx.api(['route','--job',first]).stdout);
+  const route=json((await fx.api(['route','--job',first])).stdout);
   assert.deepEqual(route?.blocking?.outrankedBy?.map(o=>o.jobId),[awaited],JSON.stringify(route));
 });
 
-test('an --until-job wait on a failed job blocks through its retry: the open retry ranks first',t=>{
+test('an --until-job wait on a failed job blocks through its retry: the open retry ranks first',{concurrency:true},async t=>{
   const fx=fixture(t);
-  const awaited=fx.enqueue(OWNER,'backend.implement','src/b');
-  const {incidentId}=fx.ok(['incident','--workflow',WAITER,'--kind','peer-wait','--peer',OWNER,'--op','brand.decide','--until-job',awaited,'--detail','needs the owner module']);
+  const awaited=await fx.enqueue(OWNER,'backend.implement','src/b');
+  const {incidentId}=await fx.ok(['incident','--workflow',WAITER,'--kind','peer-wait','--peer',OWNER,'--op','brand.decide','--until-job',awaited,'--detail','needs the owner module']);
   fx.seed(l=>l.transaction(db=>{
     const at=Date.now();
     // queued→failed is not a job_transitions edge: walk the job to running, then fail it.
     for(const to of ['ready','leased','running','failed'])setJobStatus(db,{jobId:awaited,to,reason:'seed',at});
   }));
-  const first=fx.enqueue(OWNER,'backend.scaffold','src/a');
-  const retry=fx.enqueue(OWNER,'backend.implement','src/b');
+  const first=await fx.enqueue(OWNER,'backend.scaffold','src/a');
+  const retry=await fx.enqueue(OWNER,'backend.implement','src/b');
   assert.equal(fx.read(db=>db.prepare('SELECT retry_of FROM jobs WHERE job_id=?').get(retry).retry_of),awaited);
-  const owner=fx.status(OWNER).frontier;
+  const owner=(await fx.status(OWNER)).frontier;
   assert.deepEqual(owner.queued.map(q=>q.jobId),[retry,first]);
   assert.deepEqual(owner.blockingOthers.map(b=>[b.jobId,b.via.map(v=>v.ref)]),[[retry,[incidentId]]]);
 });
 
-test('free-text gates of another workflow naming a job id, peer requests naming its op or record, and --after count as waiters',t=>{
+test('free-text gates of another workflow naming a job id, peer requests naming its op or record, and --after count as waiters',{concurrency:true},async t=>{
   const fx=fixture(t);
-  const scaffold=fx.enqueue(OWNER,'interface.scaffold','.starciwork/shell');
-  fx.ok(['incident','--workflow',WAITER,'--kind','owner-gate','--op','interface.draw','--detail',`Ch\u1edd job ${scaffold} settle + sha r\u1ed3i m\u1edbi v\u1ebd l\u1ea1i`]);
-  fx.ok(['notify','--workflow',THIRD,'--to',OWNER,'--kind','request','--subject','need the new shell','--body','please land .starciwork/shell rev 18 (interface.scaffold)']);
-  const dependant=fx.enqueue(OWNER,'interface.implement','src/ui',['--after',scaffold]);
+  const scaffold=await fx.enqueue(OWNER,'interface.scaffold','.starciwork/shell');
+  await fx.ok(['incident','--workflow',WAITER,'--kind','owner-gate','--op','interface.draw','--detail',`Ch\u1edd job ${scaffold} settle + sha r\u1ed3i m\u1edbi v\u1ebd l\u1ea1i`]);
+  await fx.ok(['notify','--workflow',THIRD,'--to',OWNER,'--kind','request','--subject','need the new shell','--body','please land .starciwork/shell rev 18 (interface.scaffold)']);
+  const dependant=await fx.enqueue(OWNER,'interface.implement','src/ui',['--after',scaffold]);
   const entry=fx.read(db=>blockingJobs(db).get(scaffold));
   assert.deepEqual(entry.waiters.map(w=>[w.workflowId,w.via]).sort(),[[OWNER,'dependency'],[THIRD,'peer-request'],[WAITER,'gate-names']].sort());
   assert.deepEqual(entry.waitingWorkflows.sort(),[THIRD,WAITER].sort());
   assert.equal(fx.read(db=>blockingJobs(db).get(dependant)),undefined);
   // A gate naming its OWN workflow's job holds it; it does not wait on it.
-  fx.ok(['incident','--workflow',OWNER,'--kind','owner-gate','--holds',dependant,'--detail',`owner signs ${dependant}`]);
+  await fx.ok(['incident','--workflow',OWNER,'--kind','owner-gate','--holds',dependant,'--detail',`owner signs ${dependant}`]);
   assert.equal(fx.read(db=>blockingJobs(db).get(dependant)),undefined);
 });
 
-test('a queued job blocking another workflow past the threshold gets its Kernel one heads-up per newly waiting workflow',t=>{
+test('a queued job blocking another workflow past the threshold gets its Kernel one heads-up per newly waiting workflow',{concurrency:true},async t=>{
   const fx=fixture(t);
-  const awaited=fx.enqueue(OWNER,'backend.implement','src/b');
-  const first=fx.ok(['incident','--workflow',WAITER,'--kind','peer-wait','--peer',OWNER,'--op','brand.decide','--until-job',awaited,'--detail','x']).incidentId;
-  assert.equal(fx.status(OWNER).frontier.peerMessageKeys.length,0,'a young wait is not yet a heads-up');
+  const awaited=await fx.enqueue(OWNER,'backend.implement','src/b');
+  const first=(await fx.ok(['incident','--workflow',WAITER,'--kind','peer-wait','--peer',OWNER,'--op','brand.decide','--until-job',awaited,'--detail','x'])).incidentId;
+  assert.equal((await fx.status(OWNER)).frontier.peerMessageKeys.length,0,'a young wait is not yet a heads-up');
   fx.age(first,BLOCKING_HEADS_UP_MS+60_000);
-  const told=fx.status(OWNER);
+  const told=await fx.status(OWNER);
   assert.equal(told.frontier.state,'peer-message');
   assert.equal(told.frontier.actionable,true,'the watchdog wakes the owning Kernel');
   const [message]=told.peerMessages;
@@ -129,25 +129,25 @@ test('a queued job blocking another workflow past the threshold gets its Kernel 
   assert.match(message.subject,new RegExp(`1 workflow\\(s\\) wait on ${awaited} \\(backend.implement\\)`));
   const payload=fx.read(db=>JSON.parse(db.prepare('SELECT payload_json FROM inbox WHERE key=?').get(message.key).payload_json));
   assert.deepEqual([payload.auto,payload.blockingJob,payload.waitingWorkflows],['blocking-waiters',awaited,[WAITER]]);
-  assert.equal(fx.status(OWNER).peerMessages.length,1,'told once');
+  assert.equal((await fx.status(OWNER)).peerMessages.length,1,'told once');
 
   // A second waiting workflow is news: one more heads-up. A dispatched job is not.
-  const second=fx.ok(['incident','--workflow',THIRD,'--kind','owner-gate','--op','x','--until-job',awaited,'--detail','x']).incidentId;
+  const second=(await fx.ok(['incident','--workflow',THIRD,'--kind','owner-gate','--op','x','--until-job',awaited,'--detail','x'])).incidentId;
   fx.age(second,BLOCKING_HEADS_UP_MS+60_000);
-  assert.equal(fx.status(OWNER).peerMessages.length,2);
+  assert.equal((await fx.status(OWNER)).peerMessages.length,2);
   fx.seed(l=>l.transaction(db=>{
     const at=Date.now();
     for(const to of ['ready','leased','running'])setJobStatus(db,{jobId:awaited,to,reason:'seed',at});
   }));
-  const third=fx.ok(['incident','--workflow',WAITER,'--kind','owner-gate','--op','y','--until-job',awaited,'--detail','y']).incidentId;
+  const third=(await fx.ok(['incident','--workflow',WAITER,'--kind','owner-gate','--op','y','--until-job',awaited,'--detail','y'])).incidentId;
   fx.age(third,BLOCKING_HEADS_UP_MS+60_000);
-  assert.equal(fx.status(OWNER).peerMessages.length,2);
+  assert.equal((await fx.status(OWNER)).peerMessages.length,2);
 });
 
-test('the supervisor prints one BLOCKING line per job and the progress report names it',t=>{
+test('the supervisor prints one BLOCKING line per job and the progress report names it',{concurrency:true},async t=>{
   const fx=fixture(t);
-  const awaited=fx.enqueue(OWNER,'backend.implement','src/b');
-  const {incidentId}=fx.ok(['incident','--workflow',WAITER,'--kind','peer-wait','--peer',OWNER,'--op','brand.decide','--until-job',`${awaited}:succeeded`,'--detail','x']);
+  const awaited=await fx.enqueue(OWNER,'backend.implement','src/b');
+  const {incidentId}=await fx.ok(['incident','--workflow',WAITER,'--kind','peer-wait','--peer',OWNER,'--op','brand.decide','--until-job',`${awaited}:succeeded`,'--detail','x']);
   const lines=fx.read(db=>blockingLines(db));
   assert.equal(lines.length,1);
   assert.match(lines[0],new RegExp(`^BLOCKING wp-owner ${awaited} \\(backend.implement, queued\\) blocks 1 workflow\\(s\\) \\[wp-waiter\\] for 0m via until-job ${incidentId}; not dispatched yet`));

@@ -2,10 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
-import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {JOB_ROW} from '../../scripts/machine/job-row.mjs';
+import {createKernelDeadWorkerSelfHealFixture} from '../helpers/kernel-dead-worker-self-heal-fixture.mjs';
+import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 
 // Twenty-nine op workers died or went quiet without a report (codex and claude
 // exited to a bare PowerShell prompt, some workers sat nudged and silent), and each became a
@@ -26,56 +25,19 @@ const WF='wf-self-heal',JOB='job-self-heal',HANDLE='term-self-heal',OP='docs.aut
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 const HOUR=3600*1000,MIN=60*1000;
 
-const git=(cwd,args,env={})=>{
-  const r=spawnSync('git',['-C',cwd,...args],{encoding:'utf8',windowsHide:true,env:{...process.env,
-    GIT_AUTHOR_NAME:'spec',GIT_AUTHOR_EMAIL:'spec@example.invalid',GIT_COMMITTER_NAME:'spec',GIT_COMMITTER_EMAIL:'spec@example.invalid',...env}});
-  assert.equal(r.status,0,`git ${args.join(' ')}: ${r.stderr}`);
-  return r.stdout.trim();
-};
+let fixture;
+test.before(()=>{fixture=createKernelDeadWorkerSelfHealFixture({api:API,fakeOrca:FAKE_ORCA,root:ROOT,wf:WF,jobId:JOB,handle:HANDLE,op:OP,hour:HOUR,minute:MIN});});
+test.after(async()=>{await fixture?.close();});
 
-// One world: a git repo that owns the ledger, docs/ committed an hour before the dispatch, the
-// fake Orca with the op's terminal record in `terminal` ({connected:false} dead, null live).
-const world=(t,fn,{terminal={connected:false,writable:false},dispatchedAgo=MIN,leaseExpiresIn=HOUR,op=OP,payloadExtra={}}={})=>withLedger(t,({root,repoRoot,machineHome,ledger})=>{
-  git(repoRoot,['init','-q']);
-  fs.writeFileSync(path.join(repoRoot,'.gitignore'),'.starciwork/\n');
-  fs.mkdirSync(path.join(repoRoot,'docs'),{recursive:true});
-  fs.writeFileSync(path.join(repoRoot,'docs','readme.md'),'# docs\n');
-  const past=new Date(Date.now()-2*HOUR).toISOString();
-  git(repoRoot,['add','-A']);
-  git(repoRoot,['commit','-q','-m','seed'],{GIT_AUTHOR_DATE:past,GIT_COMMITTER_DATE:past});
-  const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
-  const stateFile=path.join(root,'orca-state.json');
-  fs.writeFileSync(stateFile,JSON.stringify({sends:0,terminals:terminal?{[HANDLE]:{handle:HANDLE,...terminal}}:{}}));
-  const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
-    LOCALAPPDATA:machineHome};
-  delete env.ORCA_TERMINAL_HANDLE;
-  const run=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repoRoot,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
-  const dispatchedAt=Date.now()-dispatchedAgo;
-  seedWorkflow(ledger,{id:WF,state:{phase:'running'},goal:{revision:1,markdown:'# self-heal',json:{}},
-    jobs:[{jobId:JOB,opId:op,kind:'op',status:'running',dispatchId:HANDLE,workerId:HANDLE,leaseToken:'tok-self-heal',createdAt:dispatchedAt,
-      payload:{opId:op,title:'author the docs',records:['docs/readme.md'],owned_paths:['docs/'],orca:{dispatchId:HANDLE,agentTerminalHandle:HANDLE},
-        hierarchy:{runtime:{host:'orca',agent:'codex',dispatchId:HANDLE,terminalHandle:HANDLE}},...payloadExtra}}],
-    leases:[{resourceKey:'path:docs/',jobId:JOB,expiresAt:Date.now()+leaseExpiresIn}]});
-  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(JOB).attempt_id;
-  ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
-    .run(attemptId,WF,JOB,'# self-heal contract','{}',dispatchedAt);
-  ledger.appendEvent({workflowId:WF,entityType:'job',entityId:JOB,kind:'op-dispatched',payload:{op,dispatch:HANDLE,terminal:HANDLE},createdAt:dispatchedAt});
-  const job=(id=JOB)=>ledger.db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(id);
-  const jobs=()=>ledger.db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? ORDER BY created_at`).all(WF);
-  const leases=()=>ledger.db.prepare('SELECT * FROM leases WHERE job_id=?').all(JOB);
-  const events=kind=>ledger.db.prepare('SELECT entity_id,payload_json FROM events WHERE workflow_id=? AND kind=?').all(WF,kind);
-  const incidents=()=>ledger.db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open'").all(WF);
-  const orcaState=()=>JSON.parse(fs.readFileSync(stateFile,'utf8'));
-  const writeOrca=mutate=>{const s=orcaState();mutate(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
-  return fn({repoRoot,ledger,run,job,jobs,leases,events,incidents,orcaState,writeOrca,dispatchedAt});
-});
-const status=run=>{const r=run('status','--workflow',WF);assert.equal(r.status,0,r.stderr||r.stdout);return out(r);};
+// One reusable world: the migrated ledgers and committed Git baseline are copied back before every
+// case, then only that case's worker state and timestamps are injected. No test sees prior state.
+const world=async(t,fn,{op=OP,...options}={})=>fn(fixture.reset({...options,operation:op}));
+const status=async run=>{const r=await run('status','--workflow',WF);assert.equal(r.status,0,r.stderr||r.stdout);return out(r);};
 
-test('--settle-failed settles a dead worker with owned-path effects failed-no-report and queues one retry',t=>world(t,({repoRoot,run,job,jobs,leases,events,orcaState})=>{
+test('--settle-failed settles a dead worker with owned-path effects failed-no-report and queues one retry',t=>world(t,async({repoRoot,run,job,jobs,leases,events,orcaState})=>{
   fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
-  assert.deepEqual(status(run).frontier.deadWorkerJobs,[JOB]);
-  const r=run('reconcile','--job',JOB,'--dead-worker','--settle-failed');
+  assert.deepEqual((await status(run)).frontier.deadWorkerJobs,[JOB]);
+  const r=await run('reconcile','--job',JOB,'--dead-worker','--settle-failed');
   assert.equal(r.status,0,r.stderr||r.stdout);
   const body=out(r);
   assert.deepEqual([body.recovery,body.status,body.reason,body.reportFiled,body.effectState],['settled-failed','failed','failed-no-report',false,'partial']);
@@ -98,11 +60,11 @@ test('--settle-failed settles a dead worker with owned-path effects failed-no-re
   const settled=events('op-settled').map(e=>JSON.parse(e.payload_json));
   assert.deepEqual([settled.length,settled[0].reason,settled[0].auto,settled[0].reportFiled],[1,'failed-no-report',true,false]);
   assert.equal(events('worker-failed-no-report').length,1);
-  const after=status(run);
+  const after=await status(run);
   assert.deepEqual(after.frontier.deadWorkerJobs,[]);
   assert.ok(after.frontier.queued.some(q=>q.jobId===retry.job_id),'the retry waits on the Kernel to route it');
   // A repeat writes nothing and names the retry.
-  const again=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+  const again=out(await run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
   assert.deepEqual([again.alreadyRecovered,again.retry.jobId],[true,retry.job_id]);
   assert.equal(jobs().length,2);
   assert.equal(events('worker-failed-no-report').length,1);
@@ -111,12 +73,12 @@ test('--settle-failed settles a dead worker with owned-path effects failed-no-re
 // An attempt (a8, order-input-contract) died, and its auto-retry chained to a7, a queued
 // dead-code-proof job of the same op enqueued in between, so the lineage crossed units and read as
 // a false retry-loop. The dead attempt itself is the retry's predecessor.
-test('a no-report retry chains to the dead attempt, never to a later unrelated job of the same op',t=>world(t,({ledger,repoRoot,run,jobs})=>{
+test('a no-report retry chains to the dead attempt, never to a later unrelated job of the same op',t=>world(t,async({ledger,repoRoot,run,jobs})=>{
   fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
   const other='job-self-heal-other',at=Date.now();
   seedWorkflow(ledger,{id:WF,jobs:[{jobId:other,opId:OP,status:'queued',createdAt:at,
     payload:{opId:OP,title:'another unit',records:['notes/other.md'],owned_paths:['notes/']}}]});
-  const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+  const body=out(await run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
   assert.equal(body.recovery,'settled-failed');
   const retry=jobs().find(j=>j.job_id===body.retry.jobId);
   const payload=JSON.parse(retry.payload_json);
@@ -124,35 +86,35 @@ test('a no-report retry chains to the dead attempt, never to a later unrelated j
   assert.equal(retry.retry_of,JOB);
 }));
 
-test('without --settle-failed the recovery keeps its fence; --settle-failed later settles that fence',t=>world(t,({repoRoot,run,job,jobs})=>{
+test('without --settle-failed the recovery keeps its fence; --settle-failed later settles that fence',t=>world(t,async({repoRoot,run,job,jobs})=>{
   fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
-  assert.equal(out(run('reconcile','--job',JOB,'--dead-worker')).recovery,'fenced');
+  assert.equal(out(await run('reconcile','--job',JOB,'--dead-worker')).recovery,'fenced');
   assert.equal(job().status,'effect_unknown');
-  const r=run('reconcile','--job',JOB,'--dead-worker','--settle-failed');
+  const r=await run('reconcile','--job',JOB,'--dead-worker','--settle-failed');
   assert.equal(r.status,0,r.stderr||r.stdout);
   assert.equal(out(r).recovery,'settled-failed');
   assert.equal(job().status,'failed');
   assert.equal(jobs().filter(j=>j.status==='queued').length,1);
 }));
 
-test('a provably no-effect death is still the same attempt requeued, not a spent attempt',t=>world(t,({run,job,jobs})=>{
-  const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+test('a provably no-effect death is still the same attempt requeued, not a spent attempt',t=>world(t,async({run,job,jobs})=>{
+  const body=out(await run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
   assert.equal(body.recovery,'requeued');
   assert.deepEqual([job().status,job().attempt,jobs().length],['queued',1,1]);
 }));
 
-test('evidence the owned paths cannot bound stays fenced for the Kernel',t=>world(t,({run,job,jobs})=>{
-  const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+test('evidence the owned paths cannot bound stays fenced for the Kernel',t=>world(t,async({run,job,jobs})=>{
+  const body=out(await run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
   assert.equal(body.recovery,'fenced');
   assert.ok(body.evidence.some(e=>e.startsWith('risk:')),JSON.stringify(body.evidence));
   assert.deepEqual([job().status,jobs().length],['effect_unknown',1]);
 },{op:'release.deliver'}));
 
-test('the third no-report death of one op raises one pattern incident, and only one',t=>world(t,({ledger,repoRoot,run,incidents})=>{
+test('the third no-report death of one op raises one pattern incident, and only one',t=>world(t,async({ledger,repoRoot,run,incidents})=>{
   for(const id of ['job-earlier-1','job-earlier-2'])
     ledger.appendEvent({workflowId:WF,entityType:'job',entityId:id,kind:'worker-failed-no-report',payload:{opId:OP,attempt:1,liveness:'agent-exited'}});
   fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
-  const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+  const body=out(await run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
   assert.deepEqual([body.pattern.raised,body.pattern.count],[true,3]);
   const open=incidents();
   assert.equal(open.length,1);
@@ -165,7 +127,7 @@ test('the third no-report death of one op raises one pattern incident, and only 
   // The retry's own effect: a file the first attempt left, written before this job existed, is debris the
   // retry found (owned-path-effects.mjs ownedPathEffects preexisting), never this attempt's evidence.
   fs.writeFileSync(path.join(repoRoot,'docs','half-written-again.md'),'partial\n');
-  const again=out(run('reconcile','--job',second,'--dead-worker','--settle-failed'));
+  const again=out(await run('reconcile','--job',second,'--dead-worker','--settle-failed'));
   assert.equal(again.recovery,'settled-failed',JSON.stringify(again));
   assert.deepEqual([again.pattern.raised,again.pattern.existing],[false,true]);
   assert.equal(incidents().length,1);
@@ -189,8 +151,8 @@ test('a worker gone with its Kernel terminal in a host terminal wipe settles as 
     ledger.appendEvent({workflowId:WF,entityType:'job',entityId:id,kind:'worker-failed-no-report',payload:{opId:OP,attempt:1,liveness:'gone'}});
   ledger.db.prepare("UPDATE jobs SET payload_json=json_set(payload_json,'$.model','devin-agent') WHERE job_id=?").run(JOB);
   fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
-  assert.deepEqual(status(run).frontier.deadWorkerJobs,[JOB]);
-  const r=run('reconcile','--job',JOB,'--dead-worker','--settle-failed');
+  assert.deepEqual((await status(run)).frontier.deadWorkerJobs,[JOB]);
+  const r=await run('reconcile','--job',JOB,'--dead-worker','--settle-failed');
   assert.equal(r.status,0,r.stderr||r.stdout);
   const body=out(r);
   assert.deepEqual([body.recovery,body.liveness,body.effectState,body.attemptConsumed,body.environment],['settled-failed','gone','partial',false,'host-terminal-wipe'],JSON.stringify(body));
@@ -207,21 +169,21 @@ test('a worker gone with its Kernel terminal in a host terminal wipe settles as 
   assert.deepEqual([adjust.attempts[0].cause,adjust.attempts[0].attributable,adjust.demote,adjust.exclude],['host-terminal-wipe',false,[],[]]);
 },{terminal:WIPED}));
 
-test('a Kernel seat already cleared for a gone terminal since the dispatch is the same host wipe',t=>world(t,({ledger,repoRoot,run,job,writeOrca})=>{
+test('a Kernel seat already cleared for a gone terminal since the dispatch is the same host wipe',t=>world(t,async({ledger,repoRoot,run,job,writeOrca})=>{
   seatKernel(ledger,'term-kernel-replacement');
   writeOrca(s=>{s.terminals['term-kernel-replacement']={handle:'term-kernel-replacement',connected:true,writable:true};});
   ledger.appendEvent({workflowId:WF,entityType:'workflow',entityId:WF,kind:'kernel-stale-cleared',payload:{terminal:KERNEL_HANDLE,reason:'terminal_handle_stale'}});
   fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
-  const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+  const body=out(await run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
   assert.deepEqual([body.environment,body.hostWipe?.proof,body.hostWipe?.kernelTerminal],['host-terminal-wipe','kernel-stale-cleared',KERNEL_HANDLE],JSON.stringify(body));
   assert.equal(JSON.parse(job().result_json).attemptConsumed,false);
 },{terminal:WIPED}));
 
-test('a worker gone while its Kernel terminal lives is its own death: a spent business attempt',t=>world(t,({ledger,repoRoot,run,job,jobs,writeOrca})=>{
+test('a worker gone while its Kernel terminal lives is its own death: a spent business attempt',t=>world(t,async({ledger,repoRoot,run,job,jobs,writeOrca})=>{
   seatKernel(ledger);
   writeOrca(s=>{s.terminals[KERNEL_HANDLE]={handle:KERNEL_HANDLE,connected:true,writable:true};});
   fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
-  const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+  const body=out(await run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
   assert.deepEqual([body.recovery,body.liveness,body.attemptConsumed,body.environment],['settled-failed','gone',true,undefined],JSON.stringify(body));
   const result=JSON.parse(job().result_json);
   assert.deepEqual([result.attemptConsumed,result.retryClass],[true,undefined]);
@@ -230,26 +192,26 @@ test('a worker gone while its Kernel terminal lives is its own death: a spent bu
 
 // A worker nudged once, then silent at its prompt with a lease and no report.
 const IDLE={connected:true,writable:true,screen:['• Report pending.','› Ask Codex to do anything','  gpt-6-sol high · 62% left'].join('\n'),lastOutputAt:Date.now()-45*MIN};
-test('a worker quiet past its provider timeout after a nudge is dead: nudge refuses, the recovery requeues it',t=>world(t,({ledger,repoRoot,run,job,orcaState})=>{
+test('a worker quiet past its provider timeout after a nudge is dead: nudge refuses, the recovery requeues it',t=>world(t,async({ledger,repoRoot,run,runFailure,job,orcaState})=>{
   ledger.appendEvent({workflowId:WF,entityType:'job',entityId:JOB,kind:'op-worker-nudged',payload:{opId:OP,attempt:1},createdAt:Date.now()-30*MIN});
-  const worker=status(run).workers.find(w=>w.jobId===JOB);
+  const worker=(await status(run)).workers.find(w=>w.jobId===JOB);
   assert.equal(worker.liveness,'quiet');
   assert.ok(worker.quiet.quietMs>0);
-  assert.deepEqual(status(run).frontier.deadWorkerJobs,[JOB]);
-  const nudge=run('nudge','--job',JOB);
+  assert.deepEqual((await status(run)).frontier.deadWorkerJobs,[JOB]);
+  const nudge=runFailure('nudge','--job',JOB);
   assert.equal(nudge.status,1);
   assert.equal(out(nudge).reason,'worker-quiet');
   fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
-  const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+  const body=out(await run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
   assert.equal(body.recovery,'settled-failed',JSON.stringify(body));
   assert.equal(body.liveness,'quiet');
   assert.equal(job().status,'failed');
 },{terminal:IDLE,dispatchedAgo:HOUR}));
 
-test('a worker nudged a moment ago, or never nudged, is not quiet',t=>world(t,({ledger,run})=>{
-  assert.equal(status(run).workers.find(w=>w.jobId===JOB).liveness,'turn-idle','never nudged: the Kernel nudges first');
+test('a worker nudged a moment ago, or never nudged, is not quiet',t=>world(t,async({ledger,run})=>{
+  assert.equal((await status(run)).workers.find(w=>w.jobId===JOB).liveness,'turn-idle','never nudged: the Kernel nudges first');
   ledger.appendEvent({workflowId:WF,entityType:'job',entityId:JOB,kind:'op-worker-nudged',payload:{opId:OP,attempt:1},createdAt:Date.now()-2*MIN});
-  assert.equal(status(run).workers.find(w=>w.jobId===JOB).liveness,'turn-idle','nudged 2 minutes ago');
+  assert.equal((await status(run)).workers.find(w=>w.jobId===JOB).liveness,'turn-idle','nudged 2 minutes ago');
 },{terminal:IDLE,dispatchedAgo:HOUR}));
 
 // A worker sat 34+ minutes on one shell command with no output - its moving
@@ -259,21 +221,21 @@ test('a worker nudged a moment ago, or never nudged, is not quiet',t=>world(t,({
 // report - but it is not a dead-liveness state: it recovers only through
 // `reconcile --dead-worker --settle-failed`, which settles it like the quiet path.
 const WEDGED={connected:true,writable:true,command:'codex',screen:['• Working (45m 12s • esc to interrupt)',' │ No output yet (still running)','› Ask Codex to do anything'].join('\n')};
-test('a wedged worker: nudge refuses worker-wedged, plain --dead-worker refuses, --settle-failed settles failed',t=>world(t,({repoRoot,run,job,jobs,events,orcaState})=>{
-  assert.equal(status(run).workers.find(w=>w.jobId===JOB).liveness,'wedged');
-  assert.deepEqual(status(run).frontier.wedgedJobs,[JOB]);
-  assert.deepEqual(status(run).frontier.deadWorkerJobs,[],'wedged is not a dead-liveness state');
-  const nudge=run('nudge','--job',JOB);
+test('a wedged worker: nudge refuses worker-wedged, plain --dead-worker refuses, --settle-failed settles failed',t=>world(t,async({repoRoot,run,runFailure,job,jobs,events,orcaState})=>{
+  assert.equal((await status(run)).workers.find(w=>w.jobId===JOB).liveness,'wedged');
+  assert.deepEqual((await status(run)).frontier.wedgedJobs,[JOB]);
+  assert.deepEqual((await status(run)).frontier.deadWorkerJobs,[],'wedged is not a dead-liveness state');
+  const nudge=runFailure('nudge','--job',JOB);
   assert.equal(nudge.status,1);
   assert.equal(out(nudge).reason,'worker-wedged');
   assert.equal(orcaState().sends??0,0,'nothing was typed');
   assert.equal(events('op-worker-nudged').length,0);
-  const plain=run('reconcile','--job',JOB,'--dead-worker');
+  const plain=runFailure('reconcile','--job',JOB,'--dead-worker');
   assert.equal(plain.status,1);
   assert.equal(out(plain).reason,'worker-wedged','the refusal names the settle-failed route');
   assert.equal(job().status,'running','nothing written');
   fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
-  const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+  const body=out(await run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
   assert.equal(body.recovery,'settled-failed',JSON.stringify(body));
   assert.equal(body.liveness,'wedged');
   assert.equal(job().status,'failed');
@@ -283,13 +245,13 @@ test('a wedged worker: nudge refuses worker-wedged, plain --dead-worker refuses,
 },{terminal:WEDGED,dispatchedAgo:HOUR,payloadExtra:{provider:'codex'}}));
 
 test('status renews the path lease of a live running worker and never the lease of a dead one',async t=>{
-  await world(t,({run,leases})=>{
-    const body=status(run);
+  await world(t,async({run,leases})=>{
+    const body=await status(run);
     assert.equal(body.activeLeases.length,1,'the expiring lease is listed');
     assert.ok(leases()[0].expires_at>Date.now()+15*MIN,'renewed to a full dispatch TTL');
   },{terminal:{connected:true,writable:true,screen:'• Working (40m 3s • esc to interrupt)\n› Ask Codex to do anything'},leaseExpiresIn:2*MIN});
-  await world(t,({run,leases})=>{
-    status(run);
+  await world(t,async({run,leases})=>{
+    await status(run);
     assert.ok(leases()[0].expires_at<Date.now()+3*MIN,'a disconnected worker keeps its old expiry');
   },{leaseExpiresIn:2*MIN});
 });

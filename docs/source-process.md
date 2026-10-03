@@ -79,6 +79,14 @@ the test policy (spec selection, budgets, the `specs.*` switches), the host lock
 self-upgrade that needs a change there files a proposal for the owner. Path 3 never edits `.claude`: an op that finds a harness defect records a lesson or an upgrade request, which
 path 2 or 1 picks up.
 
+## Test budget
+
+A land run targets 15 minutes end to end, and each spec file has a 60-second budget. The measured seconds of every slow spec live in `modules/kernel/spec-durations.yaml` with the one limit; a spec over the limit is reported as an advisory INFO finding ranked by its excess (rule R226, `RT_SPEC_OVER_BUDGET`) in the check stage and listed in the release record. It does not fail the check in alpha.4; the budget becomes blocking once the heavy specs are sped up (alpha.5).
+
+A file goes over budget by repeating setup that one process can share. Reduce it without weakening a test: build one fixture per spec process and reset it between cases, copy a template instead of re-seeding, keep one resident real entry instead of a process per call, inject the clock the production code already accepts, and never hide the cost with a longer timeout. Every test, every assertion and every production entry stays; a speed-up is accepted only with equal test and assertion counts and the mutations of the original spec still caught.
+
+Every tracked JavaScript file must parse (rule R227, `RT_SYNTAX_INVALID`): a spec with a syntax error fails the check stage instead of a land run.
+
 ## Enforcement
 
 Shipped, as checks and code:
