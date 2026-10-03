@@ -63,7 +63,7 @@ const fixture=(t,{registry=null}={})=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stale-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const skill=path.join(root,'skill'),repo=path.join(root,'repo');
-  for(const dir of ['scripts','engine','modules','bin'])fs.cpSync(path.join(ROOT,dir),path.join(skill,dir),{recursive:true});
+  for(const dir of ['scripts','engine','modules',path.join('packages','cli')])fs.cpSync(path.join(ROOT,dir),path.join(skill,dir),{recursive:true});
   fs.cpSync(path.join(ROOT,'packages','grammar','scripts'),path.join(skill,'packages','grammar','scripts'),{recursive:true});
   for(const file of ['CONTEXT.md','package.json'])fs.copyFileSync(path.join(ROOT,file),path.join(skill,file));
   fs.mkdirSync(path.join(skill,'knowledge'),{recursive:true});
@@ -182,7 +182,7 @@ scenario('dispatch records Source and Work digests by kind; settle re-baselines 
   fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'refactor done',head:'abc1234def',files:['src/refactor/a.ts',...(writeGreenProofs(path.join(fx.repo,'src','refactor')),['src/refactor/sonar.json','src/refactor/gate.json','src/refactor/read-digest.json'])],checks:[{name:'self',command:'true',exitCode:0}]}));
   const reported=await fx.run('report','--job','job-refactor','--report',report);
   assert.equal(reported.status,0,reported.stderr||reported.stdout);
-  const checked=await fx.run('check','--job','job-refactor','--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}));
+  const checked=await fx.run('record-checks','--job','job-refactor','--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}));
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
   withLedger(fx,ledger=>{
     const attempt=ledger.db.prepare('SELECT attempt_id,span_id FROM op_attempts WHERE job_id=?').get('job-refactor');

@@ -1,4 +1,4 @@
-// hfs-scaffold-app.spec.mjs - `starci app scaffold demo` makes the one shape of a StarCi product, and `starci app lint` at its root judges it
+// hfs-scaffold-app.spec.mjs - `starci app scaffold demo` makes the one shape of a StarCi product, and `starci app lint` judges it
 // with both canons: ESLint with the BE canon over be/ only and with the FE canon over fe/ only, stylelint over fe/, the app check.
 // A fresh scaffold has 0 findings and 0 tool errors; a violation planted on each side is reported by its own side's canon alone, and
 // every path a finding names, in its path and in its message, is app-relative. The scaffold also type-checks with its own root
@@ -17,7 +17,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { main } from '../../packages/hfs/bin/hfs.mjs';
+import { main } from '../../packages/hfs/src/main.mjs';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { jestCoverageSource } from '../../packages/hfs/sync/index.mjs';
 import { coverageScope, jestCoverage, sonarCoverageExclusions } from '../../scripts/hfs/coverage-scope.mjs';
@@ -53,23 +53,27 @@ const lintGate = gate('scaffold lint', skipReason);
 
 /** The checkout's @starci packages as a registry, started once by the first test that scaffolds and stopped after the file. */
 let registry = null;
-/** `starci app scaffold demo --into <into>` with the real lock step, the @starci scope resolved from this checkout. */
+/** `starci app scaffold demo --into <into>` through the app implementation, with the real lock step and local @starci registry. */
 async function scaffold(into) {
   registry ??= startSourceCanonRegistry();
-  return scaffoldApp({ name: 'demo', into, presets: PRESETS, lock: (await registry).lock });
+  const root = path.join(into, 'demo');
+  const result = await run(['scaffold', 'demo', '--into', into], { lock: (await registry).lock });
+  assert.equal(result.code, 0, result.out);
+  assert.match(result.out, /^starci app scaffold: created /);
+  return { root };
 }
 const scaffoldBaseline = createScaffoldAppBaseline({ create: scaffold });
 after(async () => { await scaffoldBaseline.close(); if (registry) await (await registry).close(); });
 
-async function run(argv) {
+async function run(argv, seams = {}) {
   let out = '';
-  const code = await main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { out += s; }, presets: PRESETS });
+  const code = await main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { out += s; }, presets: PRESETS, ...seams });
   return { code, out };
 }
 
 async function lint(app) {
   execFileSync('git', ['-c', 'core.autocrlf=false', 'add', '-A'], { cwd: app });
-  const { code, out } = await run(['lint', '--repo', app, '--format', 'json']);
+  const { code, out } = await run(['lint', '--cwd', app, '--format', 'json']);
   return { code, report: JSON.parse(out) };
 }
 
@@ -285,7 +289,7 @@ test('a scaffolded app has one Dockerfile per app, the managed .dockerignore and
   for (const secret of ['.starcistacks', '**/.env', '.secrets', 'node_modules']) assert.ok(ignore.includes(secret), `.dockerignore excludes ${secret}`);
 });
 
-test('starci app scaffold writes the app shape and starci app lint at its root finds nothing, each side judged by its own canon', { skip: lintGate.skip, timeout: 600_000 }, async (t) => {
+test('starci app scaffold writes the app shape and starci app lint finds nothing, each side judged by its own canon', { skip: lintGate.skip, timeout: 600_000 }, async (t) => {
   if (lintGate.required) assert.fail(lintGate.required);
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-app-'));
   const app = path.join(into, 'demo');
@@ -312,6 +316,8 @@ test('starci app scaffold writes the app shape and starci app lint at its root f
   // The lockfile is npm's own (the scaffold runs `npm install --package-lock-only`): it resolves every dependency of the root and
   // of every workspace, and `npm ci` accepts it. Checked before any node_modules exists, so the dry run touches no link.
   const manifest = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8'));
+  assert.equal(manifest.devDependencies['@starci/cli'], '1.0.0', 'the app installs the exact public CLI pin');
+  assert.equal(manifest.devDependencies['@starci/hfs'], undefined, '@starci/hfs stays a transitive implementation dependency');
   const lock = JSON.parse(fs.readFileSync(path.join(app, 'package-lock.json'), 'utf8'));
   assert.equal(lock.lockfileVersion, 3);
   assert.deepEqual(lock.packages[''].dependencies, manifest.dependencies, 'the lock root holds the package.json dependencies');

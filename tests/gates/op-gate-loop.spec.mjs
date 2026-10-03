@@ -146,7 +146,7 @@ test('a tool that could not run is exit 2, never a pass', async (t) => {
   const report = await runGate({ root, base, changed: ['README.md'], hfs: broken, ts });
   assert.equal(report.exit, GATE_EXIT.toolFailed);
   assert.equal(report.ok, false);
-  assert.match(report.errors.join(' '), /hfs lint produced no starci\/lint@1 report/);
+  assert.match(report.errors.join(' '), /starci app lint produced no starci\/lint@1 report/);
 });
 
 /* --------------------------------------------- the bound: no type-check resolves above the app root */

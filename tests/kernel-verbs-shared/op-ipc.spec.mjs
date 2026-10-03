@@ -119,7 +119,7 @@ const phaseOf=(fx,wf=WORKFLOW)=>inspect(fx,db=>db.prepare('SELECT phase FROM wor
 const dispatch=(fx,jobId)=>(fx.mode==='healthy'?fx.run:fx.runFresh)(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','devin-agent','--spawn','--json');
 const independentCheck=(fx,jobId,checks)=>{
   fx.env.STARCI_CALLER='runtime-settler';
-  try{return fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(checks),'--json');}
+  try{return fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(checks),'--json');}
   finally{delete fx.env.STARCI_CALLER;}
 };
 const dispatchRunning=(fx,jobId)=>{
@@ -275,7 +275,7 @@ test('starci kernel consume-report marks the dispatch report consumed; starci ke
     {name:'lint',command:'npm run lint',exitCode:0,evidence:'lint passed'},
     {name:'tests',command:'npm test',exitCode:0,evidence:'tests passed'},
   );
-  const k1=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(first),'--json');
+  const k1=fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(first),'--json');
   assert.equal(k1.status,0,`starci kernel record-checks failed: ${k1.stderr||k1.stdout}`);
   let rows=checkRows(fx);
   assert.equal(rows.length,2,'starci kernel record-checks records one row per check');
@@ -288,7 +288,7 @@ test('starci kernel consume-report marks the dispatch report consumed; starci ke
     {name:'lint',command:'npm run lint',exitCode:0,evidence:'lint passed'},
     {name:'tests',command:'npm test',exitCode:1,evidence:'tests failed'},
   );
-  const k2=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(rerun),'--json');
+  const k2=fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(rerun),'--json');
   assert.equal(k2.status,0,`starci kernel record-checks (re-run) failed: ${k2.stderr||k2.stdout}`);
   rows=checkRows(fx);
   assert.equal(rows.length,4,'a second check run appends without erasing the first');
@@ -299,10 +299,10 @@ test('starci kernel consume-report marks the dispatch report consumed; starci ke
 test('starci kernel record-checks rejects scalar and double-encoded payloads before recording evidence',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx,'job-op-ipc-check-shape');
-  const valid=checkEnvelope({name:'validator',command:'starci runtime validate',exitCode:0,evidence:'green'});
+  const valid=checkEnvelope({name:'validator',command:'validator --check',exitCode:0,evidence:'green'});
 
   for(const malformed of [JSON.stringify('pass'),JSON.stringify(JSON.stringify(valid))]){
-    const refused=fx.runFresh(API,'check','--repo',fx.repo,'--job',jobId,'--checks',malformed,'--json');
+    const refused=fx.runFresh(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',malformed,'--json');
     assert.notEqual(refused.status,0,'scalar and double-encoded JSON must be refused');
     assert.match(`${refused.stderr}${refused.stdout}`,/checks-invalid/);
     assert.equal(checkRows(fx).length,0,'a refused check payload must not mutate the checks row');
@@ -310,7 +310,7 @@ test('starci kernel record-checks rejects scalar and double-encoded payloads bef
 
   dispatchRunning(fx,jobId);
   fileReport(fx,jobId,{outcome:'done',name:'check-shape-report.json'});
-  const accepted=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(valid),'--json');
+  const accepted=fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(valid),'--json');
   assert.equal(accepted.status,0,accepted.stderr||accepted.stdout);
   const body=JSON.parse(accepted.stdout);
   assert.equal(body.checks,1);
@@ -329,7 +329,7 @@ test('queued jobs cannot self-file reports, record green checks, or settle pass 
   assert.match(`${filed.stderr}${filed.stdout}`,/report-job-not-active/);
   assert.equal(reportRows(fx).length,0,'a refused queued report must not create a report row');
 
-  const checked=fx.runFresh(API,'check','--repo',fx.repo,'--job',jobId,'--checks',checks,'--json');
+  const checked=fx.runFresh(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',checks,'--json');
   assert.notEqual(checked.status,0,'Kernel checks cannot manufacture a worker report boundary');
   assert.match(`${checked.stderr}${checked.stdout}`,/checks-report-missing/);
   assert.equal(checkRows(fx).length,0,'a refused queued check must not create check evidence');
@@ -459,7 +459,7 @@ test('a red Kernel check overrules an Op done claim, settles fail, and releases 
   const jobId=enqueue(fx,'job-op-ipc-red-done');
   dispatchRunning(fx,jobId);
   fileReport(fx,jobId,{outcome:'done',name:'red-done.json'});
-  const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(checkEnvelope(
+  const checked=fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(checkEnvelope(
     {name:'required-validator',command:'starci runtime validate',exitCode:1,evidence:'failed'},
     {name:'bounded-assertion',exitCode:0,evidence:'passed'},
   )),'--json');
