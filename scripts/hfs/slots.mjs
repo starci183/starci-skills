@@ -27,8 +27,11 @@ import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { captureNames } from '../lib/i18n.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
-import { APP_KIND, connectionShapeProblems, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
-import { declaredSlotEnabled, kindShapeProblems, optionalSlotProblems, patternShapeProblems, triggerProblems } from './declaration-slots.mjs';
+import { APP_KIND, EDITIONS, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems } from './manifest-shape.mjs';
+import { declaredSlotEnabled, optionalSlotProblems, triggerProblems } from './declaration-slots.mjs';
+import { declarationShapeProblems } from './declaration-shape.mjs';
+import { declarationEdition, editionRuleParams, effectiveSlot, enforcerJudgedInEdition, judgedInEdition, litePresenceOf, ruleEditionProblems, slotInEdition } from './edition-slots.mjs';
+export { litePresenceOf, slotInEdition } from './edition-slots.mjs';
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
 export const RUNTIME_MANIFEST_FILE = 'knowledge/hfs/runtime-slots.yaml';
@@ -153,7 +156,7 @@ function manifestShapeProblems(m) {
   if (!isPlainObject(m)) return ['the manifest is not a map'];
   if (!MANIFEST_KINDS.includes(manifestKind(m))) return [`kind must be one of ${MANIFEST_KINDS.join(', ')}`];
   if (manifestKind(m) === RUNTIME_KIND) return runtimeShapeProblems(m);
-  const allowed = new Set(['schema', 'kind', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'sides', 'appKinds', 'triggerKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers', 'naming']);
+  const allowed = new Set(['schema', 'kind', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'editions', 'sides', 'appKinds', 'triggerKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers', 'naming']);
   for (const key of Object.keys(m)) if (!allowed.has(key)) bad.push(`unknown top-level key ${key}`);
   if (!/^starci\/hfs-slots@\d+$/.test(String(m.schema))) bad.push('schema must be starci/hfs-slots@<major>');
   if (!SEMVER.test(String(m.version))) bad.push('version must be MAJOR.MINOR.PATCH');
@@ -161,10 +164,11 @@ function manifestShapeProblems(m) {
   if (JSON.stringify(m.presenceValues) !== JSON.stringify(PRESENCE)) bad.push(`presenceValues must be ${PRESENCE.join(', ')}`);
   if (JSON.stringify(m.trackedValues) !== JSON.stringify(TRACKED)) bad.push(`trackedValues must be ${TRACKED.join(', ')}`);
   if (JSON.stringify(m.testValues) !== JSON.stringify(TESTS)) bad.push(`testValues must be ${TESTS.join(', ')}`);
+  if (JSON.stringify(m.editions) !== JSON.stringify(EDITIONS)) bad.push(`editions must be ${EDITIONS.join(', ')}`);
   if (!isPlainObject(m.sides) || Object.keys(m.sides).sort().join() !== PROFILES.join()) bad.push('sides must be a map with exactly be and fe');
   else for (const side of PROFILES) {
     const def = m.sides[side];
-    if (!isPlainObject(def) || Object.keys(def).join() !== 'reads' || !Array.isArray(def.reads) || !def.reads.every((r) => typeof r === 'string' && /^(be|fe)\/([^/]+\/)+$/.test(r)) || new Set(def.reads).size !== def.reads.length) bad.push(`sides.${side} must be {reads: [unique <side>/<dir>/ paths]}`);
+    if (!isPlainObject(def) || Object.keys(def).join() !== 'reads' || !Array.isArray(def.reads) || !def.reads.every((r) => typeof r === 'string' && /^[a-z][a-z0-9-]*\/([^/]+\/)+$/.test(r)) || new Set(def.reads).size !== def.reads.length) bad.push(`sides.${side} must be {reads: [unique <owner>/<dir>/ paths]}`);
   }
   if (m.triggerKinds !== undefined && (!Array.isArray(m.triggerKinds) || !m.triggerKinds.length || !m.triggerKinds.every((k) => NAME.test(String(k))) || new Set(m.triggerKinds).size !== m.triggerKinds.length)) bad.push('triggerKinds must be a non-empty list of unique names');
   for (const key of ['appKinds', 'tiers']) {
@@ -215,6 +219,15 @@ function manifestSemanticProblems(m) {
     }
     if (slot.appKind !== undefined && !pathVars.has('app')) bad.push(`slot ${slot.id}: an app-kind slot binds <app> in its path`);
     if (slot.requiredWhen !== undefined && slot.presence !== 'required') bad.push(`slot ${slot.id}: requiredWhen belongs to a required slot`);
+    if (!slotInEdition(m, slot, 'lite') && (slot.litePresence !== undefined || slot.lite !== undefined)) bad.push(`slot ${slot.id}: litePresence/lite on a slot lite never sees (editions)`);
+    if (isPlainObject(slot.litePresence) && slot.profiles.includes(APP_SCOPE)) bad.push(`slot ${slot.id}: an app-root slot takes a bare litePresence, not a per-side map`);
+    for (const profile of slot.profiles) if (litePresenceOf(slot, profile) === 'forbidden' && typeof slot.goesTo !== 'string') bad.push(`slot ${slot.id}: forbidden in lite for ${profile}, so it says where the content goes (goesTo)`);
+    if (slot.lite?.path !== undefined) {
+      for (const name of varsOf(slot.lite.path)) if (!pathVars.has(name)) bad.push(`slot ${slot.id}: lite.path binds <${name}>, which the path does not`);
+      for (const variant of braceVariants(slot.lite.path)) {
+        try { compileVariant(slot, variant); } catch (error) { bad.push(`slot ${slot.id}: lite.path ${variant} does not compile (${error.message})`); }
+      }
+    }
     for (const name of Object.keys(slot.requiredInstances ?? {})) if (!pathVars.has(name)) bad.push(`slot ${slot.id}: requiredInstances names <${name}>, which the path does not bind`);
     for (const file of Object.values(slot.roles ?? {})) for (const name of varsOf(file)) if (!pathVars.has(name)) bad.push(`slot ${slot.id}: roles names <${name}> in ${file}, which the path does not bind`);
     for (const entry of slot.requires ?? []) for (const name of varsOf(entry)) if (!pathVars.has(name)) bad.push(`slot ${slot.id}: requires ${entry} uses <${name}>, which the path does not bind`);
@@ -230,7 +243,10 @@ function manifestSemanticProblems(m) {
     const [owner, ...rest] = read.split('/');
     const below = rest.join('/');
     if (owner === side) bad.push(`sides.${side}.reads names ${read}, which is its own side`);
-    else if (!m.slots.some((s) => s.profiles.includes(owner) && s.presence !== 'forbidden' && braceVariants(s.path).some((v) => v.startsWith(below)))) bad.push(`sides.${side}.reads names ${read}, which no ${owner} slot owns`);
+    // A side read is a path of the other side (be/contracts/); an app-root read (supabase/types/) names a tree an app slot owns.
+    else if (PROFILES.includes(owner)) {
+      if (!m.slots.some((s) => s.profiles.includes(owner) && s.presence !== 'forbidden' && braceVariants(s.path).some((v) => v.startsWith(below)))) bad.push(`sides.${side}.reads names ${read}, which no ${owner} slot owns`);
+    } else if (!m.slots.some((s) => s.profiles.includes(APP_SCOPE) && s.presence !== 'forbidden' && braceVariants(s.path).some((v) => v.startsWith(read)))) bad.push(`sides.${side}.reads names ${read}, which no app-root slot owns`);
   }
   for (const profile of PROFILES) {
     for (const [tier, def] of Object.entries(m.tiers[profile])) {
@@ -262,50 +278,6 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
 
 // ------------------------------------------------------------------------------------- declaration
 
-/** Shape problems of a parsed hfs.json, in the words of modules/schemas/hfs-repo.schema.yaml. */
-function declarationShapeProblems(d) {
-  const bad = [];
-  if (!isPlainObject(d)) return ['hfs.json is not an object'];
-  if (!(Number.isInteger(d.hfs) && d.hfs >= 1)) bad.push('hfs must be the pinned manifest major (an integer, 1 or more)');
-  if (!NAME.test(String(d.project))) bad.push('project must be a project name');
-  if (d.kind === RUNTIME_KIND) {
-    // The StarCi runtime repository: no sides and no apps; its tree is the runtime manifest's.
-    for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project'].includes(key)) bad.push(`unknown key ${key} (a runtime declaration is {hfs, kind, project})`);
-    return bad;
-  }
-  for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project', 'sides', 'browser'].includes(key)) bad.push(`unknown key ${key}`);
-  if (d.browser !== undefined && d.browser !== true) bad.push('browser is `true` when the app has a browser journey (slot app.browser), and is left out otherwise');
-  if (d.kind !== APP_KIND) bad.push(`kind must be ${APP_KIND} (a product is one app repository with a be and an fe side) or ${RUNTIME_KIND} (the StarCi runtime repository)`);
-  if (!isPlainObject(d.sides) || Object.keys(d.sides).sort().join() !== PROFILES.join()) { bad.push('sides must declare exactly be and fe'); return bad; }
-  const names = new Map();
-  for (const side of PROFILES) {
-    const s = d.sides[side];
-    const at = `sides.${side}`;
-    if (!isPlainObject(s)) { bad.push(`${at} must be an object`); continue; }
-    for (const key of Object.keys(s)) if (!['apps', 'optionalSlots', 'patterns', 'kinds', 'connections', 'reads'].includes(key)) bad.push(`${at} has unknown key ${key}`);
-    if (!Array.isArray(s.apps) || !s.apps.length) bad.push(`${at}.apps must list every ${side}/apps/<name> with its kind`);
-    else s.apps.forEach((app, i) => {
-      if (!isPlainObject(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((k) => k !== 'name' && k !== 'kind')) bad.push(`${at}.apps[${i}] must be {name, kind}`);
-      // The root scripts name every app (start:<app>), so an app name is unique across both sides.
-      else if (names.has(app.name)) bad.push(`app ${app.name} is declared twice (${names.get(app.name)} and ${side})`);
-      else names.set(app.name, side);
-    });
-    if (s.optionalSlots !== undefined && (!Array.isArray(s.optionalSlots) || !s.optionalSlots.every((v) => SLOT_ID.test(String(v))) || new Set(s.optionalSlots).size !== s.optionalSlots.length)) bad.push(`${at}.optionalSlots must be a unique list of slot ids`);
-    bad.push(...patternShapeProblems(s, at, NAME), ...kindShapeProblems(s, at, NAME));
-    if (s.reads !== undefined && (!Array.isArray(s.reads) || !s.reads.every((r) => typeof r === 'string' && r.length > 0) || new Set(s.reads).size !== s.reads.length)) bad.push(`${at}.reads must be a unique list of paths`);
-    if (s.connections !== undefined) {
-      if (side !== 'be') { bad.push('connections belong to the be side'); continue; }
-      const list = Array.isArray(s.connections) ? s.connections : null; const shape = connectionShapeProblems(list, s.apps);
-      if (shape.length) bad.push(...shape);
-      else {
-        if (new Set(list.map((c) => c.name)).size !== list.length) bad.push('connections names must be unique');
-        for (const a of list) for (const b of list) if (a !== b && `${b.envPrefix}_`.startsWith(`${a.envPrefix}_`)) bad.push(`connections ${a.name} and ${b.name} share env keys (${a.envPrefix}_ covers ${b.envPrefix}_)`);
-      }
-    }
-  }
-  return bad;
-}
-
 const declarationInvalid = (problems, file) => fail('HFS_DECLARATION_INVALID', `hfs.json is refused: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? `; and ${problems.length - 5} more` : ''}`, { file, problems });
 
 /** One side of a declaration checked against the manifest: app kinds of the profile, opt-in slots, required app kinds, reads. */
@@ -330,7 +302,7 @@ function sideProblems(manifest, side, s) {
  * its two sides under `sides`), or with `side` that side's view: the declaration a check of the side folder runs under.
  */
 export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLARATION_FILE, side = null } = {}) {
-  const problems = declarationShapeProblems(declaration);
+  const problems = declarationShapeProblems(declaration, PROFILES);
   if (problems.length) declarationInvalid(problems, file);
   if (declaration.kind !== manifestKind(manifest)) declarationInvalid([`hfs.json is of kind ${declaration.kind}, but the manifest it is judged by is of kind ${manifestKind(manifest)}`], file);
   if (declaration.hfs !== manifest.major)
@@ -350,21 +322,27 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
       manifestVersion: manifest.version,
     });
   }
+  const { edition, known, valid } = declarationEdition(manifest, declaration);
+  if (!valid) fail('HFS_EDITION_INVALID', `hfs.json edition is ${JSON.stringify(declaration.edition)}; the editions this manifest knows are ${known.join(', ')} (absent means full)`, { file, edition: declaration.edition });
   const bad = PROFILES.flatMap((name) => sideProblems(manifest, name, declaration.sides[name]));
   if (bad.length) declarationInvalid(bad, file);
   if (side !== null && !PROFILES.includes(side)) fail('HFS_DECLARATION_INVALID', `${side} is not a side of an app (be, fe)`, { file, side });
+  // A provider declared on any connection enables the provider slots of every profile (a fe side declares none): each view carries the union.
+  const providers = Object.freeze([...new Set(PROFILES.flatMap((name) => (declaration.sides[name].connections ?? []).map((c) => c.provider).filter((p) => p !== undefined)))]);
   const sides = Object.fromEntries(PROFILES.map((name) => {
     const s = declaration.sides[name];
     return [name, Object.freeze({
       hfs: declaration.hfs,
       kind: APP_KIND,
       project: declaration.project,
+      edition,
       side: name,
       profile: name,
       apps: Object.freeze(s.apps.map((a) => Object.freeze({ name: a.name, kind: a.kind }))),
       optionalSlots: Object.freeze([...(s.optionalSlots ?? [])]),
       patterns: Object.freeze([...(s.patterns ?? [])]), kinds: Object.freeze([...(s.kinds ?? [])]),
-      connections: Object.freeze((s.connections ?? []).map((c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix, owner: c.owner, isolation: c.isolation }))),
+      connections: Object.freeze((s.connections ?? []).map((c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix, owner: c.owner, isolation: c.isolation, ...(c.provider !== undefined ? { provider: c.provider } : {}) }))),
+      providers,
       reads: Object.freeze([...(s.reads ?? [])]),
       manifestVersion: manifest.version,
     })];
@@ -374,12 +352,14 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
     hfs: declaration.hfs,
     kind: APP_KIND,
     project: declaration.project,
+    edition,
     side: null,
     profile: APP_SCOPE,
     // The root declares no app or connection of its own (each side does); its one opt-in slot is the browser journey (`browser: true`).
     apps: Object.freeze([]),
     optionalSlots: Object.freeze(declaration.browser === true ? ['app.browser'] : []),
     connections: Object.freeze([]),
+    providers,
     reads: Object.freeze([]),
     sides: Object.freeze(sides),
     manifestVersion: manifest.version,
@@ -421,12 +401,16 @@ const isEntryFile = (name) => name === 'index.ts' || name === 'index.tsx';
  */
 function createScopeResolver(manifest, repo) {
   const profile = repo.profile;
-  const slots = manifest.slots.filter((s) => s.profiles.includes(profile));
+  const edition = repo.edition ?? 'full';
+  const slots = manifest.slots.filter((s) => s.profiles.includes(profile) && slotInEdition(manifest, s, edition)).map((s) => effectiveSlot(s, profile, edition));
   const byId = new Map(slots.map((s) => [s.id, s]));
   const variants = slots.flatMap(variantsOf);
   const appKind = new Map(repo.apps.map((a) => [a.name, a.kind]));
 
   const slotEnabled = (slot) => {
+    // A provider slot is gated by its provider in every edition: litePresence may lift it to required, but it still
+    // exists for this repository only while a connection declares the provider.
+    if (slot.provider !== undefined) return declaredSlotEnabled(slot, repo);
     if (slot.presence !== 'opt-in') return true;
     return declaredSlotEnabled(slot, repo);
   };
@@ -569,8 +553,8 @@ function createScopeResolver(manifest, repo) {
     // A runtime owner is imported file by file (crossOwner of knowledge/hfs/runtime-slots.yaml): no public entry.
     if (toOwner && repo.kind !== RUNTIME_KIND) {
       const relative = to.path === toOwner.root ? '' : to.path.slice(toOwner.root.length + 1);
-      const ownerTier = byId.get(toOwner.slot).tier;
-      const entry = isEntryFile(relative) || (ownerTier === 'package' && relative === 'src/index.ts') || (ownerTier === 'app' && relative === 'app.module.ts');
+      const ownerSlot = byId.get(toOwner.slot);
+      const entry = isEntryFile(relative) || (byId.get(to.slot).entries ?? []).includes(to.path.slice(to.root.length + 1)) || (ownerSlot.tier === 'package' && relative === 'src/index.ts') || (ownerSlot.tier === 'app' && relative === 'app.module.ts');
       if (!entry) return { allowed: false, reason: 'notPublicEntry', owner: toOwner.root, path: to.path };
     }
     return { allowed: true, reason: 'allowed', fromTier, toTier };
@@ -599,7 +583,7 @@ function createScopeResolver(manifest, repo) {
     const minimums = [];
     const expandApps = (slot) => repo.apps.filter((a) => slot.appKind === undefined || a.kind === slot.appKind);
     for (const slot of slots) {
-      if (slot.presence !== 'required') continue;
+      if (slot.presence !== 'required' || !slotEnabled(slot)) continue;
       if (slot.requiredWhen === 'connections' && !repo.connections.length) continue;
       if (slot.minInstances) minimums.push({ slot: slot.id, min: slot.minInstances, ...(slot.appKind ? { appKind: slot.appKind } : {}) });
       for (const variant of braceVariants(slot.path)) {
@@ -647,7 +631,7 @@ function createScopeResolver(manifest, repo) {
     requiredPaths,
     trackingOf,
     isTracked,
-    ruleParams: () => ruleParams(manifest, profile),
+    ruleParams: () => ruleParams(manifest, profile, edition),
     allowedImports: (tier) => manifest.tiers[profile]?.[tier]?.mayImport ?? null,
   });
 }
@@ -661,7 +645,9 @@ function createScopeResolver(manifest, repo) {
  */
 export function createSlotResolver(manifest, repo) {
   if (repo.profile !== APP_SCOPE) return createScopeResolver(manifest, repo);
-  const root = createScopeResolver(manifest, repo);
+  // The root declares no connection of its own, yet a provider slot of the app profile (app.supabase*) is enabled by a
+  // side's connection with that provider: the root scope reads the union of the sides' connections.
+  const root = createScopeResolver(manifest, { ...repo, connections: SIDES.flatMap((side) => repo.sides[side].connections) });
   const sides = Object.fromEntries(PROFILES.map((side) => [side, createScopeResolver(manifest, repo.sides[side])]));
   const clean = (p) => posixPath(p).replace(/\/+$/, '');
   /** { side, rest } when `p` lies below a side folder, else null. */
@@ -708,6 +694,10 @@ export function createSlotResolver(manifest, repo) {
       if (from && to && from.side !== to.side) {
         return reads(from.side, toPath) ? { allowed: true, reason: 'sideRead', fromSide: from.side, toSide: to.side } : { allowed: false, reason: 'crossSide', fromSide: from.side, toSide: to.side, reads: repo.sides[from.side].reads };
       }
+      // A side file may read an app-root path (supabase/types/) only through a declared read, exactly as it reads the other side.
+      if (from && !to) {
+        return reads(from.side, toPath) ? { allowed: true, reason: 'sideRead', fromSide: from.side, toSide: null } : { allowed: false, reason: 'crossSide', fromSide: from.side, toSide: null, reads: repo.sides[from.side].reads };
+      }
       if (from && to) return sides[from.side].importAllowed(from.rest, to.rest);
       return root.importAllowed(fromPath, toPath);
     },
@@ -731,12 +721,11 @@ export function createSlotResolver(manifest, repo) {
   });
 }
 
-/** The rule parameters of one profile (be: infraOwners, suffixes, bannedSuffixes and the rest over the shared ruleParams.common fileLines and duplicateBlock; fe: common alone or with its overrides; runtime: ruleParams.runtime of a runtime manifest), as a frozen deep copy. A profile key overrides the same key of common. */
-export function ruleParams(manifest, profile) {
+/** The rule parameters of one profile (be: infraOwners, suffixes, bannedSuffixes and the rest over the shared ruleParams.common fileLines and duplicateBlock; fe: common alone or with its overrides; runtime: ruleParams.runtime of a runtime manifest), as a frozen deep copy. Under `edition` lite the `lite` overrides of ruleParams.<profile> merge over the base (the `lite` key itself is never returned). */
+export function ruleParams(manifest, profile, edition = 'full') {
   const profiles = manifestKind(manifest) === RUNTIME_KIND ? [RUNTIME_KIND] : PROFILES;
   if (!profiles.includes(profile)) fail('HFS_MANIFEST_INVALID', `ruleParams has no profile ${profile}`, { profile });
-  const deepFreeze = (v) => { if (v && typeof v === 'object') Object.values(v).forEach(deepFreeze); return Object.freeze(v); };
-  return deepFreeze(structuredClone({ ...manifest.ruleParams.common, ...manifest.ruleParams[profile] }));
+  return editionRuleParams({ ...manifest.ruleParams.common, ...manifest.ruleParams[profile] }, edition);
 }
 
 /**
@@ -780,7 +769,7 @@ function ruleCatalogProblems(d) {
     const at = `rules[${index}]`;
     if (!isPlainObject(r)) { bad.push(`${at} is not a map`); return; }
     const label = typeof r.id === 'string' ? r.id : at;
-    for (const key of Object.keys(r)) if (!['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
+    for (const key of Object.keys(r)) if (!['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
     // A retired rule leaves its id unused for good (never reused), so ids only have to increase.
     if (!/^R\d{2,3}$/.test(String(r.id))) bad.push(`${at}.id must be R<two or three digits>`);
     else if (index > 0 && typeof d.rules[index - 1]?.id === 'string' && Number(r.id.slice(1)) <= Number(d.rules[index - 1].id.slice(1))) bad.push(`${label} is out of order: ids must increase, and ${d.rules[index - 1].id} comes before it`);
@@ -795,6 +784,7 @@ function ruleCatalogProblems(d) {
       return r[key];
     };
     enumList('kinds', RULE_KINDS);
+    bad.push(...ruleEditionProblems(r, label));
     const gates = enumList('gates', RULE_GATES);
     if (gates.length) {
       if (!gates.includes('land')) bad.push(`${label} must run at the land gate (every rule does)`);
@@ -814,7 +804,8 @@ function ruleCatalogProblems(d) {
     r.enforcers.forEach((e, n) => {
       const eat = `${label}.enforcers[${n}]`;
       if (!isPlainObject(e)) { bad.push(`${eat} is not a map`); return; }
-      for (const key of Object.keys(e)) if (!['kind', 'id', 'status', 'at'].includes(key)) bad.push(`${eat} has unknown key ${key}`);
+      for (const key of Object.keys(e)) if (!['kind', 'id', 'status', 'at', 'editions'].includes(key)) bad.push(`${eat} has unknown key ${key}`);
+      bad.push(...ruleEditionProblems(e, eat));
       if (!ENFORCER_FAMILIES.includes(e.kind)) bad.push(`${eat}.kind must be one of ${ENFORCER_FAMILIES.join(', ')}`);
       if (!ENFORCER_ID.test(String(e.id))) bad.push(`${eat}.id must be kebab-case`);
       if (seen.has(`${e.kind}:${e.id}`)) bad.push(`${eat} repeats ${e.kind}:${e.id}`);
@@ -861,6 +852,9 @@ export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_R
     rule: (id) => byId.get(id) ?? null,
     /** The rule that owns this failure code (its own or a sub-check code), or null. */
     byCode: (code) => byCode.get(code) ?? null,
+    /** Whether a finding code is judged under `edition`: a code of a rule that names `editions` without it is not (a code outside the catalog always is). */
+    judgedIn: (code, edition = 'full') => judgedInEdition(byCode.get(code), edition),
+    enforcerJudgedIn: (kind, id, edition = 'full') => enforcerJudgedInEdition(list, kind, id, edition),
     /** The rules that run at a gate. */
     forGate: (gate) => list.filter((r) => r.gates.includes(gate)),
     /** The catalogued why code of a lint finding's rule id (`starci-be/<id>`, `starci-fe/<id>`), or undefined. */

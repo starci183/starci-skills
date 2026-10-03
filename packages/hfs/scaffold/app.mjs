@@ -29,23 +29,27 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { parseYaml } from '../runtime/engine/yaml.mjs';
-import { TEMPLATES_DIR, appSource, imageFiles, renderTargets, writeTargets } from '../sync/index.mjs';
+import { dbTypesPath, generateDbTypes } from '../emit/db-types.mjs';
+import { TEMPLATES_DIR, appSource, imageFiles, render, renderTargets, writeTargets } from '../sync/index.mjs';
 import { ScaffoldError } from './service.mjs';
+import { SUPABASE_PORT_VARIABLES, supabasePortVars } from './supabase-ports.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, WORKSPACE_LINT, feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 
 const NAME = /^[a-z][a-z0-9-]*$/;
 const APP_DIR = '__app__';
 /** The path variable of the project name: `packages/__project__-ui` is written as `packages/<project>-ui`. */
 const PROJECT_DIR = '__project__';
+const TIMESTAMP = '__timestamp__';
 const PINS_FILE = path.join(import.meta.dirname, '..', 'runtime', 'knowledge', 'hfs', 'canon-pins.yaml');
 const SONAR_GATE_FILE = path.join(import.meta.dirname, '..', 'runtime', 'knowledge', 'sonar-gate.yaml');
 const pascal = name => name.split('-').map(part => part[0].toUpperCase() + part.slice(1)).join('');
+const bundledPins = () => parseYaml(fs.readFileSync(PINS_FILE, 'utf8')).pins;
 
 /**
  * A JSON file as prettier prints it (the app's format check judges every file the scaffold writes): an object one key per line, an
  * array of plain values on one line, any other array one item per line.
  */
-function jsonText(value) {
+export function jsonText(value) {
   const print = (item, indent) => {
     const inner = `${indent}  `;
     if (Array.isArray(item)) {
@@ -62,6 +66,9 @@ function jsonText(value) {
   return `${print(value, '')}\n`;
 }
 
+/** A package.json as Prettier prints it (notably, package workspaces stay one entry per line). */
+export const packageJsonText = value => `${JSON.stringify(value, null, 2)}\n`;
+
 /**
  * The apps a new app starts with: on the be side the `core` api app and the `cli` app over one `primary` connection, two Next apps
  * (landing, app) on the fe side, which read the be contracts for their codegen.
@@ -70,6 +77,25 @@ export const STARTER_SIDES = Object.freeze({
   be: Object.freeze({ apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], kinds: ['api', 'cli'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }] }),
   // fe: the landing and the product app, over the shared ui and i18n packages (both opt-in slots, enabled here).
   fe: Object.freeze({ apps: [{ name: 'landing', kind: 'next' }, { name: 'app', kind: 'next' }], reads: ['be/contracts/'], optionalSlots: ['fe.package.ui', 'fe.package.i18n'] }),
+});
+
+/** The lite starter is the upgrade-safe subset: one API, one web app and one Supabase schema authority. */
+const LITE_STARTER_SIDES = Object.freeze({
+  be: Object.freeze({
+    apps: [{ name: 'api', kind: 'api' }],
+    kinds: ['api'],
+    connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'api', isolation: 'schema', provider: 'supabase' }],
+    reads: ['supabase/types/'],
+  }),
+  fe: Object.freeze({ apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/', 'supabase/types/'] }),
+});
+
+/** The checked local Supabase auth posture of every newly scaffolded lite app. */
+const LITE_STARTER_SUPABASE = Object.freeze({
+  enableSignup: false,
+  jwtExpiry: 3600,
+  siteUrl: 'http://127.0.0.1:3000',
+  redirectUrls: ['http://127.0.0.1:3000/auth/callback'],
 });
 
 /**
@@ -81,7 +107,7 @@ const STARTER_DEPENDENCIES = Object.freeze({
   dependencies: {
     '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': null,
     '@nestjs/platform-express': null, '@nestjs/typeorm': null, 'nest-commander': null, pg: null,
-    'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
+    'class-transformer': null, 'class-validator': null, 'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
   },
   devDependencies: {
     turbo: null, '@nestjs/testing': null, '@starci/cli': null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/jest-preset': null,
@@ -89,6 +115,24 @@ const STARTER_DEPENDENCIES = Object.freeze({
     '@types/jest': null, '@types/node': null, '@types/react': null, '@types/react-dom': null, eslint: null, 'eslint-plugin-react-hooks': null,
     husky: null, jest: null, 'postcss-value-parser': null, prettier: null, stylelint: null, tailwindcss: null, 'ts-jest': null,
     'ts-node-dev': null, 'tsc-alias': null, 'tsconfig-paths': null, typescript: null,
+  },
+});
+
+/** Lite keeps the production stack and canon tools, but has no test runtime or test types. */
+const LITE_STARTER_DEPENDENCIES = Object.freeze({
+  dependencies: {
+    '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': null,
+    '@nestjs/platform-express': null, '@nestjs/typeorm': null, '@supabase/supabase-js': null,
+    'class-transformer': null, 'class-validator': null, jose: null, pg: null,
+    'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
+  },
+  devDependencies: {
+    turbo: null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/cli': null,
+    '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/tsconfig': null, '@tailwindcss/postcss': null,
+    '@types/express': null, '@types/node': null, '@types/react': null, '@types/react-dom': null,
+    eslint: null, 'eslint-plugin-react-hooks': null, husky: null, 'postcss-value-parser': null, prettier: null,
+    stylelint: null, supabase: null, tailwindcss: null, 'ts-node-dev': null, 'tsc-alias': null,
+    'tsconfig-paths': null, typescript: null,
   },
 });
 
@@ -100,6 +144,12 @@ const STARTER_DEPENDENCIES = Object.freeze({
 const FE_APP_DEPENDENCIES = Object.freeze({
   '@<project>/i18n': '*', '@<project>/ui': '*',
   '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, next: null, 'next-intl': null, react: null, 'react-dom': null,
+});
+
+/** The sole lite FE workspace owns its Supabase clients directly; no shared FE package is emitted. */
+const LITE_FE_APP_DEPENDENCIES = Object.freeze({
+  '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, '@supabase/ssr': null,
+  '@supabase/supabase-js': null, next: null, 'next-intl': null, react: null, 'react-dom': null, 'server-only': null,
 });
 
 /**
@@ -116,8 +166,15 @@ const FE_PACKAGES = Object.freeze({
 /** The scripts of every fe package workspace: tsc builds it to dist and type-checks it; it lints with the workspace lint. */
 const PACKAGE_WORKSPACE_SCRIPTS = Object.freeze({ build: 'tsc -p tsconfig.build.json', lint: WORKSPACE_LINT, typecheck: 'tsc --noEmit -p tsconfig.json' });
 
-/** The app hfs.json of a new app called `name`. */
-const starterDeclaration = (name, manifest = loadSlotManifest()) => ({ hfs: manifest.major, kind: 'app', project: name, sides: structuredClone(STARTER_SIDES) });
+/** The app hfs.json of a new app called `name`; full remains the byte-for-byte default declaration. */
+const starterDeclaration = (name, manifest = loadSlotManifest(), edition = 'full') => ({
+  hfs: manifest.major,
+  kind: 'app',
+  ...(edition === 'full' ? {} : { edition }),
+  project: name,
+  ...(edition === 'lite' ? { supabase: structuredClone(LITE_STARTER_SUPABASE) } : {}),
+  sides: structuredClone(edition === 'lite' ? LITE_STARTER_SIDES : STARTER_SIDES),
+});
 
 /** A dependency section at the canon pins (a null range takes the pin, which must exist; every pinned name is null). */
 function pinnedSection(entries, pins) {
@@ -129,17 +186,19 @@ function pinnedSection(entries, pins) {
   return Object.fromEntries(Object.entries(entries).sort(([a], [b]) => a.localeCompare(b)).map(([dependency, range]) => [dependency, pinned(dependency, range)]));
 }
 
-/** The root package.json of a new app, the monorepo root: name, the workspaces, npm, the dependencies at their pins; the managed scripts are sync's. */
-function packageManifest(name, pins) {
-  return { name, version: '0.0.0', private: true, packageManager: PACKAGE_MANAGER, workspaces: [...WORKSPACES], dependencies: pinnedSection(STARTER_DEPENDENCIES.dependencies, pins), devDependencies: pinnedSection(STARTER_DEPENDENCIES.devDependencies, pins) };
+/** The root package.json of a new app, the monorepo root: name, workspaces, npm and its edition's dependencies at canon pins. */
+function packageManifest(name, pins, edition) {
+  const dependencies = edition === 'lite' ? LITE_STARTER_DEPENDENCIES : STARTER_DEPENDENCIES;
+  return { name, version: '0.0.0', private: true, packageManager: PACKAGE_MANAGER, workspaces: [...WORKSPACES], dependencies: pinnedSection(dependencies.dependencies, pins), devDependencies: pinnedSection(dependencies.devDependencies, pins) };
 }
 
 /** A dependency section of an fe workspace with `@<project>/` names filled and the canon pins taken. */
 const workspaceSection = (entries, project, pins) => pinnedSection(Object.fromEntries(Object.entries(entries).map(([name, range]) => [name.replace('@<project>/', `@${project}/`), range])), pins);
 
 /** The package.json of the fe app workspace `app` of the app `project`: @<project>/<app>, private, the workspace scripts, its own dependencies. */
-function feAppManifest(project, app, pins) {
-  return { name: feAppPackageName(project, app), version: '0.0.0', private: true, scripts: { ...FE_APP_SCRIPTS }, dependencies: workspaceSection(FE_APP_DEPENDENCIES, project, pins) };
+function feAppManifest(project, app, pins, edition) {
+  const dependencies = edition === 'lite' ? LITE_FE_APP_DEPENDENCIES : FE_APP_DEPENDENCIES;
+  return { name: feAppPackageName(project, app), version: '0.0.0', private: true, scripts: { ...FE_APP_SCRIPTS }, dependencies: workspaceSection(dependencies, project, pins) };
 }
 
 /** The package.json of the fe package workspace `name` (FE_PACKAGES) of the app `project`: @<project>/<name>, private, built to dist. */
@@ -187,8 +246,8 @@ function nextAppTsconfig() {
   };
 }
 
-/** The names a skeleton file may fill: {{project}}, {{app}}, {{appPascal}} (the side's app) and {{sonarGate}}. */
-const SKELETON_VARIABLES = Object.freeze(['project', 'app', 'appPascal', 'sonarGate']);
+/** The names a skeleton file may fill: {{project}}, {{app}}, {{appPascal}} (the side's app), {{sonarGate}} and the lite Supabase port block ({{supabasePort<Section>}}, supabase-ports.mjs). */
+const SKELETON_VARIABLES = Object.freeze(['project', 'app', 'appPascal', 'sonarGate', ...SUPABASE_PORT_VARIABLES]);
 
 /**
  * A skeleton file with its variables filled. Only the skeleton names are variables: every other `{{name}}` is source the app keeps
@@ -201,9 +260,60 @@ function fill(source, vars, file) {
   });
 }
 
+/** Let sync's renderer expand partials first while leaving every source placeholder for `fill` to validate or preserve. */
+const PARTIAL_VARIABLES = new Proxy(Object.create(null), {
+  get: (_target, key) => `{{${String(key)}}}`,
+  getOwnPropertyDescriptor: (_target, key) => ({ configurable: true, value: `{{${String(key)}}}` }),
+});
+
 /** The be skeleton folder of the one cli app (slot be.app.cli: always named `cli`), written only when hfs.json declares it. */
 const CLI_APP_DIR = 'apps/cli/';
 const declaresCliApp = app => app.sides.be.apps.some(entry => entry.kind === 'cli' && entry.name === 'cli');
+
+const LITE_APP_REUSED = new Set(['.editorconfig', '.gitattributes', '.nvmrc', '.starciwork/workspace.yaml']);
+const LITE_DEFERRED_GENERATOR_FILES = new Set([
+  'src/modules/platform/database/database.sql.ts',
+  'src/modules/platform/database/migration-runner.service.ts',
+  'src/modules/platform/database/seed-runner.service.ts',
+]);
+const liteBaseFile = (scope, rel) => {
+  if (scope === 'app') return LITE_APP_REUSED.has(rel);
+  if (scope === 'fe') return false;
+  return !rel.startsWith('apps/cli/')
+    && !rel.startsWith('src/features/cli/')
+    && !rel.startsWith('src/modules/domain/note/')
+    && rel !== 'src/modules/platform/database/connection-source.client.ts'
+    && rel !== 'src/modules/platform/database/migrate-connections.client.ts'
+    && rel !== 'src/modules/platform/database/seed-connections.client.ts'
+    && !LITE_DEFERRED_GENERATOR_FILES.has(rel)
+    && !rel.startsWith('src/tests/')
+    && !rel.endsWith('.spec.ts');
+};
+const liteOverlayFile = (scope, rel) => scope !== 'be' || !LITE_DEFERRED_GENERATOR_FILES.has(rel);
+
+/** One skeleton directory rendered to app-relative files; `include` filters source-relative paths before variables are expanded. */
+function skeletonDirectory(scope, directory, app, vars, include = () => true) {
+  const dir = path.join(TEMPLATES_DIR, scope, directory);
+  if (!fs.existsSync(dir)) throw new ScaffoldError('HFS_SCAFFOLD_SKELETON_MISSING', `no skeleton templates in templates/${scope}/${directory}`);
+  const apps = scope === 'app' ? [] : app.sides[scope].apps.filter(entry => scope === 'fe' || entry.kind === 'api');
+  const prefix = scope === 'app' ? '' : `${scope}/`;
+  const files = [];
+  for (const rel of listFiles(dir).filter(include)) {
+    const source = render(fs.readFileSync(path.join(dir, rel), 'utf8').replace(/\r\n/g, '\n'), PARTIAL_VARIABLES);
+    const once = { project: app.project, ...vars };
+    const output = candidate => candidate.split(PROJECT_DIR).join(app.project).split(TIMESTAMP).join(vars.timestamp);
+    if (!rel.includes(APP_DIR)) {
+      if (scope === 'be' && rel.startsWith(CLI_APP_DIR) && !declaresCliApp(app)) continue;
+      const fixedApp = apps.find(entry => rel.startsWith(`apps/${entry.name}/`));
+      if (scope === 'fe' && rel.startsWith('apps/') && !fixedApp) continue;
+      const appVars = fixedApp ? { app: fixedApp.name, appPascal: pascal(fixedApp.name) } : {};
+      files.push({ path: `${prefix}${output(rel)}`, content: fill(source, { ...once, ...appVars }, `${directory}/${rel}`) });
+      continue;
+    }
+    for (const entry of apps) files.push({ path: `${prefix}${output(rel.split(APP_DIR).join(entry.name))}`, content: fill(source, { ...once, app: entry.name, appPascal: pascal(entry.name) }, `${directory}/${rel}`) });
+  }
+  return files;
+}
 
 /**
  * The skeleton files of one scope (app root, be, fe): [{ path, content }], app-relative; a `__app__` file once per api app of the
@@ -211,30 +321,15 @@ const declaresCliApp = app => app.sides.be.apps.some(entry => entry.kind === 'cl
  * once for the declared fe app <name> (none other), `__project__` in a path replaced by the project name.
  */
 function skeletonOf(scope, app, vars) {
-  const dir = path.join(TEMPLATES_DIR, scope, 'skeleton');
-  if (!fs.existsSync(dir)) throw new ScaffoldError('HFS_SCAFFOLD_SKELETON_MISSING', `no skeleton templates in templates/${scope}/skeleton`);
-  const apps = scope === 'app' ? [] : app.sides[scope].apps.filter(entry => scope === 'fe' || entry.kind === 'api');
-  const prefix = scope === 'app' ? '' : `${scope}/`;
-  const files = [];
-  for (const rel of listFiles(dir)) {
-    const source = fs.readFileSync(path.join(dir, rel), 'utf8').replace(/\r\n/g, '\n');
-    const once = { project: app.project, ...vars };
-    if (!rel.includes(APP_DIR)) {
-      if (scope === 'be' && rel.startsWith(CLI_APP_DIR) && !declaresCliApp(app)) continue;
-      // An fe apps/<name>/ folder is the skeleton of the declared fe app <name> alone.
-      const feApp = scope === 'fe' ? apps.find(entry => rel.startsWith(`apps/${entry.name}/`)) : undefined;
-      if (scope === 'fe' && rel.startsWith('apps/') && !feApp) continue;
-      const appVars = feApp ? { app: feApp.name, appPascal: pascal(feApp.name) } : {};
-      files.push({ path: `${prefix}${rel.split(PROJECT_DIR).join(app.project)}`, content: fill(source, { ...once, ...appVars }, rel) });
-      continue;
-    }
-    for (const entry of apps) files.push({ path: `${prefix}${rel.split(APP_DIR).join(entry.name)}`, content: fill(source, { ...once, app: entry.name, appPascal: pascal(entry.name) }, rel) });
-  }
+  const files = app.edition === 'lite'
+    ? [...skeletonDirectory(scope, 'skeleton', app, vars, rel => liteBaseFile(scope, rel)), ...skeletonDirectory(scope, 'skeleton-lite', app, vars, rel => liteOverlayFile(scope, rel))]
+    : skeletonDirectory(scope, 'skeleton', app, vars);
+  const unique = [...new Map(files.map(file => [file.path, file])).values()];
   // Every declared fe app has a skeleton: its own apps/<name>/ folder or the shared __app__ one.
-  for (const entry of scope === 'fe' ? apps : []) {
-    if (!files.some(file => file.path.startsWith(`fe/apps/${entry.name}/`))) throw new ScaffoldError('HFS_SCAFFOLD_SKELETON_MISSING', `no skeleton templates for the fe app ${entry.name} in templates/fe/skeleton/apps/${entry.name}`);
+  for (const entry of scope === 'fe' ? app.sides.fe.apps : []) {
+    if (!unique.some(file => file.path.startsWith(`fe/apps/${entry.name}/`))) throw new ScaffoldError('HFS_SCAFFOLD_SKELETON_MISSING', `no skeleton templates for the fe app ${entry.name}`);
   }
-  return files;
+  return unique;
 }
 
 /** The npm step that resolves the lockfile of a new app, exactly as the error names it. */
@@ -260,27 +355,27 @@ export function npmLock(root) {
  * `{ root, files }` (app-relative paths, sorted). `presets` is what sync loads from the installed @starci/jest-preset (the Sonar
  * exclusions); the CLI passes the one it resolves. A failed lock step removes the app and throws HFS_SCAFFOLD_LOCK_FAILED.
  */
-export function scaffoldApp({ name, into, presets, manifest = loadSlotManifest(), lock = npmLock }) {
+export function scaffoldApp({ name, into, presets, edition = 'full', manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, now = () => new Date() }) {
   if (!NAME.test(String(name))) throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', `the app name ${name} must be kebab-case (a project name: ${NAME})`);
   const root = path.join(into, name);
   if (fs.existsSync(root)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; starci app scaffold never writes into an existing directory`);
-  const declaration = starterDeclaration(name, manifest);
+  const declaration = starterDeclaration(name, manifest, edition);
   const app = resolveRepoDeclaration(manifest, declaration);
-  const pins = parseYaml(fs.readFileSync(PINS_FILE, 'utf8')).pins;
-  const pkg = packageManifest(name, pins);
+  const pkg = packageManifest(name, pins, app.edition);
+  const timestamp = now().toISOString().replace(/\D/g, '').slice(0, 14);
   const files = [
     { path: 'hfs.json', content: jsonText(declaration) },
-    { path: 'package.json', content: jsonText(pkg) },
+    { path: 'package.json', content: packageJsonText(pkg) },
     { path: 'be/nest-cli.json', content: jsonText(nestCli(app)) },
     ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/tsconfig.json`, content: jsonText(nextAppTsconfig()) })),
-    ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: jsonText(feAppManifest(name, entry.name, pins)) })),
+    ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: packageJsonText(feAppManifest(name, entry.name, pins, app.edition)) })),
     ...imageFiles(app),
-    ...Object.keys(FE_PACKAGES).flatMap(pkg => [
-      { path: `fe/packages/${name}-${pkg}/package.json`, content: jsonText(fePackageManifest(name, pkg, pins)) },
+    ...(app.edition === 'lite' ? [] : Object.keys(FE_PACKAGES).flatMap(pkg => [
+      { path: `fe/packages/${name}-${pkg}/package.json`, content: packageJsonText(fePackageManifest(name, pkg, pins)) },
       { path: `fe/packages/${name}-${pkg}/tsconfig.json`, content: jsonText(fePackageTsconfig()) },
       { path: `fe/packages/${name}-${pkg}/tsconfig.build.json`, content: jsonText(fePackageBuildTsconfig()) },
-    ]),
-    ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name })),
+    ])),
+    ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name, timestamp, ...supabasePortVars(name) })),
   ];
   for (const file of files) {
     const target = path.join(root, ...file.path.split('/'));
@@ -289,10 +384,22 @@ export function scaffoldApp({ name, into, presets, manifest = loadSlotManifest()
   }
   const targets = renderTargets(declaration, presets, { manifest, source: appSource(root) });
   writeTargets(root, targets);
+  if (app.edition === 'lite') {
+    try {
+      const text = emitTypes({ root });
+      if (typeof text !== 'string' || !text.trim()) throw new Error('the Supabase CLI returned no database types');
+      const target = path.join(root, ...dbTypesPath.split('/'));
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, text);
+    } catch (error) {
+      fs.rmSync(root, { recursive: true, force: true });
+      throw new ScaffoldError('HFS_SCAFFOLD_TYPES_FAILED', `Supabase database types could not be generated for ${root} (${String(error?.message ?? error)}); the app was removed. Start the local Supabase stack and run hfs scaffold app ${name} --edition lite again`);
+    }
+  }
   const locked = lock(root);
   if (!locked.ok) {
     fs.rmSync(root, { recursive: true, force: true });
     throw new ScaffoldError('HFS_SCAFFOLD_LOCK_FAILED', `\`${LOCK_STEP}\` could not resolve the lockfile of ${root} (${locked.detail}); the app was removed. Check the network and the npm registry, then run starci app scaffold ${name} again`);
   }
-  return { root, files: [...new Set([...files.map(file => file.path), ...targets.map(target => target.path), 'package-lock.json'])].sort() };
+  return { root, files: [...new Set([...files.map(file => file.path), ...targets.map(target => target.path), ...(app.edition === 'lite' ? [dbTypesPath] : []), 'package-lock.json'])].sort() };
 }

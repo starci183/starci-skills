@@ -23,6 +23,7 @@ import { jestCoverageSource } from '../../packages/hfs/sync/index.mjs';
 import { coverageScope, jestCoverage, sonarCoverageExclusions } from '../../scripts/hfs/coverage-scope.mjs';
 import { dockerFindings } from '../../scripts/hfs/rules/docker.mjs';
 import { nextBuildEnv } from '../../scripts/gates/build-env.mjs';
+import { scaffoldBinGaps } from '../helpers/scaffold-bins.mjs';
 import { loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { LINT_DEPENDENCIES, RUNTIME, installInto, missingFrom, runtimeInstalls, uninstall } from '../helpers/hfs-app-install.mjs';
@@ -265,6 +266,11 @@ test('a scaffolded app imports the be lcov into Sonar and Codecov with exactly t
   t.after(() => fs.rmSync(into, { recursive: true, force: true }));
   const { root, files } = scaffoldApp({ name: 'demo', into, presets: PRESETS, lock: () => ({ ok: true }) });
   for (const file of ['sonar-project.properties', 'codecov.yml', '.github/workflows/ci.yml']) assert.ok(files.includes(file), `${file} is scaffolded`);
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  assert.deepEqual(scaffoldBinGaps(root), [], 'every bin the scaffolded scripts call is installed by a dependency');
+  for (const dependency of ['class-transformer', 'class-validator']) {
+    assert.equal(typeof manifest.dependencies[dependency], 'string', `the validation pipe installs ${dependency}`);
+  }
   assertCoverageContract(root);
   // The be unit run is the preset's: it writes lcov into be/coverage, the path both imports read.
   assert.equal(fs.readFileSync(path.join(root, 'be', 'jest.config.js'), 'utf8'), `module.exports = require("@starci/jest-preset").starciJestConfig({\n    coverage: ${jestCoverageSource(jestCoverage(MANIFEST))},\n})\n`);

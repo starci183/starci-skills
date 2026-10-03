@@ -1,0 +1,13 @@
+services:
+  api:
+    image: "{{project}}/api:0.0.0"
+    build:
+      context: ../../../..
+      dockerfile: be/apps/api/Dockerfile
+    environment:
+      PRIMARY_DB_URL: postgres://postgres@supabase-postgres:5432/postgres
+    ports:
+      - "3001:3000"
+    depends_on:
+      supabase-postgres:
+        condition: service_healthy

@@ -10,7 +10,7 @@ import { APP, writeCleanRepo } from './hfs-cli-fixture.mjs';
 const manifest = loadSlotManifest();
 const slash = (value) => value.replaceAll(path.sep, '/');
 const projectRoot = path.resolve(import.meta.dirname, '..', '..');
-const IMMUTABLE_CATALOGS = ['knowledge/hfs/canon-pins.yaml', 'modules/kernel/failure-codes.yaml'];
+const IMMUTABLE_CATALOGS = ['knowledge/hfs/canon-pins.yaml', 'knowledge/hfs/rules.yaml', 'modules/kernel/failure-codes.yaml'];
 
 function cachedCatalogRoot() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-tree-rule-catalogs-'));

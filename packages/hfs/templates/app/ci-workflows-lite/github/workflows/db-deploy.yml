@@ -1,0 +1,31 @@
+{{header}}
+name: deploy database
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub environment whose Supabase secrets will be used
+        required: true
+        type: environment
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: {{nodeMajor}}
+          cache: npm
+      - run: npm ci
+      - name: push migrations
+        run: npm run db:push

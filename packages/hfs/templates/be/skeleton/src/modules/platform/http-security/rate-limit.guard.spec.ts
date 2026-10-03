@@ -14,6 +14,7 @@ const AT = "2026-02-03T04:05:06.000Z"
 const options: HttpSecurityOptions = {
     allowedOrigins: [],
     rateLimit: { windowMs: 60_000, defaultLimit: 2, strictLimit: 1 },
+    webhooks: {},
 }
 
 const build = async (reflector: Reflector, clock: FakeClock) => {

@@ -1,0 +1,48 @@
+{
+  "app": {
+    "title": "{{project}}",
+    "shell": {
+      "brand": "{{project}}"
+    },
+    "home": {
+      "title": "Home",
+      "signedIn": "Signed in"
+    },
+    "signIn": {
+      "title": "Sign in",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Continue",
+      "working": "Signing in",
+      "refused": "The credentials were refused.",
+      "not-found": "The credentials were refused.",
+      "invalid": "Enter a valid email and password.",
+      "unavailable": "Sign-in is unavailable. Try again shortly."
+    },
+    "signOut": {
+      "submit": "Sign out",
+      "working": "Signing out",
+      "refused": "The session has already ended.",
+      "not-found": "The session has already ended.",
+      "invalid": "The session could not be ended.",
+      "unavailable": "Sign-out is unavailable. Try again shortly."
+    },
+    "loading": {
+      "message": "Loading"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "home": "Return home"
+    },
+    "errors": {
+      "page": {
+        "title": "Something went wrong",
+        "retry": "Try again"
+      },
+      "global": {
+        "title": "The application could not continue",
+        "retry": "Try again"
+      }
+    }
+  }
+}

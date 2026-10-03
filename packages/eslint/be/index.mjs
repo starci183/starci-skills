@@ -17,6 +17,7 @@
  * leave two names for one rule and no way to tell which a message came from.
  */
 import { buildBeConfig } from "./lib/config.mjs"
+import { pluginForEdition } from "./lib/edition.mjs"
 import { recommended as ambientIdRecommended, rules as ambientIdRules } from "./ambient-id.mjs"
 import { recommended as asyncDisciplineRecommended, rules as asyncDisciplineRules } from "./async-discipline.mjs"
 import { recommended as authorizationRecommended, rules as authorizationRules } from "./authorization.mjs"
@@ -174,7 +175,7 @@ export default plugin
  * @param {{ hfs: object }} input - The HFS view of the repository.
  * @returns {Promise<Array<object>>} The flat config.
  */
-export const starciBeConfig = ({ hfs }) => buildBeConfig({ hfs, plugin, recommended })
+export const starciBeConfig = ({ hfs }) => buildBeConfig({ hfs, plugin: pluginForEdition({ plugin, hfs }), recommended })
 
 export { linterOptions } from "./lib/config.mjs"
 export { loadHfs } from "./lib/hfs.mjs"

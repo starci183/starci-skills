@@ -15,11 +15,4 @@ export const appLayoutMetadata = async (locale: string): Promise<Metadata> => {
 }
 
 /** The product app's chrome, resolved on the server: the shared brand shell with the wordmark linking home, around the routed body. */
-export const AppLayout = async (props: AppLayoutProps) => {
-    const t = await getTranslations("app.shell")
-    return (
-        <SiteShell brand={t("brand")} homeHref={APP_ROUTES.home}>
-            {props.content}
-        </SiteShell>
-    )
-}
+{{> fe/common/app-layout.tsx.partial}}

@@ -13,6 +13,12 @@ export const ENV_PREFIX = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
 const CONTEXT_ISOLATIONS = Object.freeze(["database", "schema"]);
 /** The app kinds that may own a context: the services, never the migrate or cli apps that only run migrations. */
 const CONTEXT_OWNER_KINDS = Object.freeze(["api", "worker"]);
+/** The database engines a connection may run on: a self-described Postgres, or the Postgres of a Supabase project. */
+const CONNECTION_PROVIDERS = Object.freeze(["postgres", "supabase"]);
+/** The editions an app repository may declare in hfs.json (`full` when absent): the filter slots.mjs applies. */
+export const EDITIONS = Object.freeze(["full", "lite"]);
+/** What decides where schema changes live (ruleParams.<side>.schemaAuthority): TypeORM migrations under persistence/, or the Supabase migration tree. */
+export const SCHEMA_AUTHORITIES = Object.freeze(["typeorm", "supabase"]);
 /**
  * The shape problems of the `connections` of one side: a list of {name, envPrefix, owner, isolation}, the owner an api or worker app
  * of the same side (a connection is a bounded context and one service owns it), isolation `database` or `schema`.
@@ -22,8 +28,10 @@ const CONTEXT_OWNER_KINDS = Object.freeze(["api", "worker"]);
  * @returns {string[]} The problems, none when the shape is right.
  */
 export function connectionShapeProblems(list, apps) {
-  const keys = (c) => isPlainObject(c) && NAME.test(String(c.name)) && ENV_PREFIX.test(String(c.envPrefix)) && NAME.test(String(c.owner)) && CONTEXT_ISOLATIONS.includes(c.isolation) && Object.keys(c).length === 4;
-  if (!list || !list.every(keys)) return [`connections must be a list of {name: kebab-case context name, envPrefix: UPPER_SNAKE prefix of its env keys, owner: the service app that owns the context, isolation: ${CONTEXT_ISOLATIONS.join(' | ')}}`];
+  const keys = (c) => isPlainObject(c) && NAME.test(String(c.name)) && ENV_PREFIX.test(String(c.envPrefix)) && NAME.test(String(c.owner)) && CONTEXT_ISOLATIONS.includes(c.isolation)
+    && (c.provider === undefined || CONNECTION_PROVIDERS.includes(c.provider))
+    && Object.keys(c).every((k) => ['name', 'envPrefix', 'owner', 'isolation', 'provider'].includes(k)) && ['name', 'envPrefix', 'owner', 'isolation'].every((k) => k in c);
+  if (!list || !list.every(keys)) return [`connections must be a list of {name: kebab-case context name, envPrefix: UPPER_SNAKE prefix of its env keys, owner: the service app that owns the context, isolation: ${CONTEXT_ISOLATIONS.join(' | ')}, provider?: ${CONNECTION_PROVIDERS.join(' | ')}}`];
   const owns = (c) => Array.isArray(apps) && apps.some((app) => isPlainObject(app) && app.name === c.owner && CONTEXT_OWNER_KINDS.includes(app.kind));
   return list.filter((c) => !owns(c)).map((c) => `connections ${c.name} is owned by ${c.owner}, which is not a ${CONTEXT_OWNER_KINDS.join(' or ')} app declared in the same side`);
 }
@@ -78,7 +86,9 @@ export const MANIFEST_KINDS = [APP_KIND, RUNTIME_KIND];
 export const manifestKind = (m) => (isPlainObject(m) && m.kind !== undefined ? m.kind : APP_KIND);
 const strList = (v) => stringList(v);
 
-const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'perConnection', 'parent', 'coverage'];
+const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'liteManagedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'perConnection', 'parent', 'editions', 'litePresence', 'lite', 'provider', 'coverage', 'entries', 'outcomeHome', 'anonymousActions'];
+/** The fields a slot's `lite` overlay may hold: the same keys it would carry in the slot body, resolved under edition lite. */
+const LITE_OVERLAY_KEYS = ['path', 'requires', 'allows', 'forbids', 'minInstances', 'requiredInstances'];
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */
 const RUNTIME_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'minInstances', 'requires', 'allows', 'forbids', 'budget', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'generatedBy', 'parent'];
 
@@ -126,6 +136,31 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   if (slot.composedBy !== undefined && !(strList(slot.composedBy) && slot.composedBy.length && new Set(slot.composedBy).size === slot.composedBy.length)) bad.push(`${at}: composedBy must be a non-empty list of unique app kinds`);
   if (slot.budget !== undefined && !(isPlainObject(slot.budget) && Object.keys(slot.budget).length && Object.values(slot.budget).every((v) => Number.isInteger(v) && v >= 1))) bad.push(`${at}: budget must map names to positive integers`);
   if (slot.managedBy !== undefined && !NAME.test(String(slot.managedBy))) bad.push(`${at}: managedBy must be a template id`);
+  if (slot.liteManagedBy !== undefined && !NAME.test(String(slot.liteManagedBy))) bad.push(`${at}: liteManagedBy must be a template id`);
+  if (!runtime) {
+    if (slot.editions !== undefined && !(Array.isArray(slot.editions) && slot.editions.length && slot.editions.every((e) => EDITIONS.includes(e)) && new Set(slot.editions).size === slot.editions.length)) bad.push(`${at}: editions must be a non-empty subset of ${EDITIONS.join(', ')}`);
+    if (slot.litePresence !== undefined && !(PRESENCE.includes(slot.litePresence) || (isPlainObject(slot.litePresence) && Object.keys(slot.litePresence).length && Object.entries(slot.litePresence).every(([side, value]) => ['be', 'fe'].includes(side) && PRESENCE.includes(value))))) bad.push(`${at}: litePresence must be a presence value or map sides to presence values`);
+    if (slot.provider !== undefined) {
+      if (!CONNECTION_PROVIDERS.includes(slot.provider)) bad.push(`${at}: provider must be one of ${CONNECTION_PROVIDERS.join(' | ')}`);
+      else if (slot.presence !== 'opt-in' || slot.appKind !== undefined) bad.push(`${at}: provider belongs to an opt-in slot that is not an app kind (a connection with that provider enables it)`);
+    }
+    if (slot.lite !== undefined) {
+      const ok = isPlainObject(slot.lite) && Object.keys(slot.lite).length && Object.keys(slot.lite).every((key) => LITE_OVERLAY_KEYS.includes(key))
+        && (slot.lite.path === undefined || (typeof slot.lite.path === 'string' && slot.lite.path))
+        && ['requires', 'allows', 'forbids'].every((key) => slot.lite[key] === undefined || strList(slot.lite[key]))
+        && (slot.lite.minInstances === undefined || (Number.isInteger(slot.lite.minInstances) && slot.lite.minInstances >= 1))
+        && (slot.lite.requiredInstances === undefined || (isPlainObject(slot.lite.requiredInstances) && Object.values(slot.lite.requiredInstances).every((v) => strList(v) && v.length)));
+      if (!ok) bad.push(`${at}: lite may hold only ${LITE_OVERLAY_KEYS.join(', ')}, each shaped as in the slot body`);
+    }
+  }
+  if (slot.entries !== undefined) {
+    const listed = strList(slot.entries) && slot.entries.length > 0 && new Set(slot.entries).size === slot.entries.length && slot.entries.every(relPath);
+    if (!listed) bad.push(`${at}: entries must be a non-empty list of unique relative file paths`);
+    else if (typeof slot.path !== 'string' || !slot.path.endsWith('/') || slot.owner === true) bad.push(`${at}: entries belong to a directory slot that is not an owner (they name extra public entries of the owner that holds it)`);
+    else if (Array.isArray(slot.allows) && slot.entries.some((entry) => !slot.allows.includes(entry))) bad.push(`${at}: every entry must be one of the names the slot allows`);
+  }
+  if (slot.anonymousActions !== undefined && !(strList(slot.anonymousActions) && slot.anonymousActions.length > 0 && new Set(slot.anonymousActions).size === slot.anonymousActions.length && slot.anonymousActions.every(relPath) && typeof slot.path === 'string' && slot.path.endsWith('/'))) bad.push(`${at}: anonymousActions must be a non-empty list of unique relative file paths of a directory slot`);
+  if (slot.outcomeHome !== undefined && !(slot.outcomeHome === true && typeof slot.path === 'string' && slot.path && !slot.path.endsWith('/'))) bad.push(`${at}: outcomeHome is true and belongs to a file slot (the one file that declares the repository's Outcome union)`);
   if (slot.rules !== undefined && !(Array.isArray(slot.rules) && slot.rules.every((r) => /^[A-Z][A-Z0-9_]*\*?$/.test(String(r))) && new Set(slot.rules).size === slot.rules.length)) bad.push(`${at}: rules must be unique rule ids`);
   if (slot.perConnection !== undefined && !(slot.id === 'be.persistence' && strList(slot.perConnection) && slot.perConnection.length && new Set(slot.perConnection).size === slot.perConnection.length && slot.perConnection.every((name) => NAME.test(name)))) bad.push(`${at}: perConnection is a unique list of capability names, only on be.persistence (the platform capabilities whose tables exist on every connection that uses them)`);
   if (slot.since !== undefined && !SEMVER.test(String(slot.since))) bad.push(`${at}: since must be a version`);

@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "@heroui/styles/css";
+@import "@starci/grammar/common.css";
+
+/* Grammar's renderers contain Tailwind utilities outside the app source tree. */
+@source "../../../../../node_modules/@starci/grammar/dist";

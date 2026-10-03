@@ -1,0 +1,37 @@
+{{header}}
+# Builds each image declared by the lite app. The API image is required; a front-end image is emitted only when declared.
+# It runs on the release tag, so every image is built there, and never pushes.
+name: images
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run per ref.
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+{{imageMatrix}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          push: false
+          tags: {{imageProject}}/${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max

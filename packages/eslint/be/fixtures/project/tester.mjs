@@ -21,14 +21,14 @@ const RUNTIME = path.join(import.meta.dirname, "..", "..", "runtime")
 const DEFAULT_APPS = { be: [{ name: "core", kind: "api" }], fe: [{ name: "web", kind: "next" }] }
 
 /**
- * @param {{ profile?: "be" | "fe", files?: Record<string, string | null>, rootFiles?: Record<string, string>, declaration?: object, apps?: object[] }} input
+ * @param {{ profile?: "be" | "fe", edition?: "full" | "lite", files?: Record<string, string | null>, rootFiles?: Record<string, string>, declaration?: object, apps?: object[] }} input
  * @returns {{ root: string, at: (rel: string) => string, tester: RuleTester, cleanup: () => void }}
  */
-export const projectFixture = ({ profile = "be", files = {}, rootFiles = {}, declaration = {}, apps = DEFAULT_APPS[profile] } = {}) => {
+export const projectFixture = ({ profile = "be", edition, files = {}, rootFiles = {}, declaration = {}, apps = DEFAULT_APPS[profile] } = {}) => {
     const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), `starci-project-${profile}-`))
     const root = path.join(appRoot, profile)
     const app = apps[0].name
-    const hfsJson = appDeclaration(profile, { apps, ...declaration })
+    const hfsJson = { ...appDeclaration(profile, { apps, ...declaration }), ...(edition ? { edition } : {}) }
     const baseline = {
         "tsconfig.json": `${JSON.stringify({
             compilerOptions: { target: "ES2022", module: "ESNext", moduleResolution: "Bundler", jsx: "preserve", allowJs: true, skipLibCheck: true, noEmit: true, experimentalDecorators: true },

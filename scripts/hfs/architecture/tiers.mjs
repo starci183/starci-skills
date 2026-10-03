@@ -1,3 +1,5 @@
+import { isServerActionModule } from './server-action.mjs';
+
 /**
  * HFS checks 1 and 2 (knowledge/hfs/slots.yaml `tiers`):
  *   1. the tier direction matrix: every import, re-export and type-only import between two owners must go from a tier to
@@ -78,6 +80,21 @@ const triggerOf = (resolver, file) => {
   return owner ? (resolver.slot(owner.slot)?.trigger ?? null) : null;
 };
 
+/** The db Server Action an edge targets, or null. */
+const serverActionTarget = (graph, edge) => {
+  if (graph.profile !== 'fe') return null;
+  const to = graph.resolver.classifyPath(edge.to);
+  return to.slot === 'fe.modules.db' && /^write-[^/]+\.ts$/u.test(edge.to.split('/').at(-1))
+    && isServerActionModule(null, graph.files.get(edge.to).sourceFile) ? to : null;
+};
+
+/** A connected block may call a db writer directly when that writer is a file-level Next Server Action. */
+const blockCallsServerAction = (graph, edge) => {
+  if (!serverActionTarget(graph, edge)) return false;
+  const from = graph.resolver.classifyPath(edge.from);
+  return from.slot === 'fe.components' && from.kind === 'blocks' && from.role === 'entry';
+};
+
 export function checkTiers(graph) {
   const { resolver, profile } = graph;
   const violations = [];
@@ -89,7 +106,19 @@ export function checkTiers(graph) {
     const verdict = resolver.importAllowed(edge.from, edge.to);
     if (verdict.reason === 'unowned' || verdict.reason?.startsWith('slot')) { unclassified += 1; continue; }
     edgesChecked += 1;
-    if (verdict.allowed || !REASON_TEXT[verdict.reason]) continue;
+    const actionTarget = serverActionTarget(graph, edge);
+    if ((verdict.allowed || verdict.reason === 'notPublicEntry') && actionTarget && graph.unit(edge.from) !== graph.unit(edge.to) && !blockCallsServerAction(graph, edge)) {
+      counts.tierDirection += 1;
+      violations.push({
+        ruleId: tierRule,
+        path: edge.from, line: edge.line, column: edge.column,
+        specifier: edge.specifier, resolvedPath: edge.to, typeOnly: !edge.runtime,
+        fromTier: resolver.tierOf(edge.from), toTier: resolver.tierOf(edge.to),
+        message: `${edge.from} -> ${edge.to}: a db Server Action is called directly only by a connected block entry; hooks and other tiers use their declared data path${edge.runtime ? '' : ' (type-only imports count)'}.`,
+      });
+      continue;
+    }
+    if (verdict.allowed || (verdict.reason === 'tierDirection' && blockCallsServerAction(graph, edge)) || !REASON_TEXT[verdict.reason]) continue;
     counts[verdict.reason] += 1;
     const featureToFeature = profile === 'be' && verdict.reason === 'tierDirection' && verdict.fromTier === 'feature' && verdict.toTier === 'feature';
     const fromKind = featureToFeature ? triggerOf(resolver, edge.from) : null;

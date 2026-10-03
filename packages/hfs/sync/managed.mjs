@@ -32,7 +32,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { SyncError, checkTargets, renderRepo } from './index.mjs';
 import { parseYaml as bundledParseYaml } from '../runtime/engine/yaml.mjs';
-import { readDeclaredSonarGate } from './sonar-key.mjs';
+import { readDeclaredSonarGate, sonarGateName } from './sonar-key.mjs';
 import { TS_STRICT_FILE, tsStrictFindings } from './ts-strict.mjs';
 
 // The managed one-liners whose difference from the render is the proof that no rule is off, warned or redefined (R17).
@@ -97,10 +97,10 @@ function driftFindings(repoRoot, targets) {
 }
 
 /** R11: the quality gate the be side's stack declaration names is the one gate of the bundled knowledge/sonar-gate.yaml. */
-function sonarGateFindings(repoRoot, parseYaml) {
+function sonarGateFindings(repoRoot, parseYaml, edition) {
   const declared = readDeclaredSonarGate(repoRoot, { parseYaml });
   if (declared === null) return [];
-  const gate = (parseYaml ?? bundledParseYaml)(fs.readFileSync(SONAR_GATE_FILE, 'utf8'))?.gate?.name;
+  const gate = sonarGateName((parseYaml ?? bundledParseYaml)(fs.readFileSync(SONAR_GATE_FILE, 'utf8')), edition);
   if (declared.qualityGate === gate) return [];
   return [{ code: 'HFS_SONAR_CONFIG', level: 'error', path: declared.file, message: `${declared.file} services.sonar.qualityGate is ${declared.qualityGate ?? 'absent'}; every product names the one gate ${gate} of knowledge/sonar-gate.yaml and states no threshold of its own` }];
 }
@@ -161,17 +161,17 @@ function flagFindings(repoRoot, tracked, managed) {
  * is unreadable has none: the slot check reports the declaration. A missing preset or an unreadable stack declaration is
  * a SyncError the caller reports as a refusal.
  */
-export async function managedFindings({ repoRoot, tracked, presets, parseYaml }) {
+export async function managedFindings({ repoRoot, tracked, presets, parseYaml, manifest }) {
   let rendered;
   try {
-    rendered = await renderRepo(repoRoot, { presets, parseYaml });
+    rendered = await renderRepo(repoRoot, { presets, parseYaml, ...(manifest ? { manifest } : {}) });
   } catch (error) {
     if (error instanceof SyncError && error.code === 'HFS_SYNC_HFS_INVALID') return [];
     throw error;
   }
   const { targets } = rendered;
   const findings = driftFindings(repoRoot, targets);
-  findings.push(...sonarGateFindings(repoRoot, parseYaml));
+  findings.push(...sonarGateFindings(repoRoot, parseYaml, rendered.hfs.edition ?? 'full'));
   findings.push(...ruleFileFindings(repoRoot, tracked));
   findings.push(...toolKeyFindings(repoRoot, tracked));
   findings.push(...flagFindings(repoRoot, tracked, new Set(targets.map(target => target.path))));

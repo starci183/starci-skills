@@ -12,11 +12,12 @@ import { found, readJson } from './read.mjs';
 export const FE_NO_TESTS = 'FE_NO_TESTS';
 const SPEC_FILE = /(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$/;
 const TEST_DIRECTORY = /(?:^|\/)(?:e2e|__tests__|__mocks__|test-support)\//;
-const TEST_TOOL_FILE = /(?:^|\/)(?:(?:vitest|jest|playwright)\.[^/]+|cypress\.config\.[^/]+|tsconfig\.e2e\.json|e2e\.ya?ml)$/;
-const TEST_SCRIPT_NAME = /^(?:pre|post)?test(?::|$)/;
-const TEST_RUNNER_COMMAND = /(?:^|[\s&|;(])(?:npx\s+)?(?:vitest|jest|playwright|cypress|mocha)(?=$|[\s&|;)])|\bnode\s+(?:--\S+\s+)*--test\b/;
-const TEST_DEPENDENCY = /^(?:vitest|@vitest\/.+|playwright|playwright-core|@playwright\/.+|jest|@jest\/.+|ts-jest|babel-jest|@types\/jest|jest-[\w-]+|mocha|@types\/mocha|cypress|@testing-library\/.+|jsdom|@types\/jsdom|happy-dom|axe-core|@axe-core\/.+|vitest-axe|@starci\/(?:vitest|jest|playwright)-preset)$/;
-const DEPENDENCY_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
+export const TEST_TOOL_FILE = /(?:^|\/)(?:(?:vitest|jest|playwright)\.[^/]+|cypress\.config\.[^/]+|tsconfig\.e2e\.json|e2e\.ya?ml)$/;
+// The edition rule (rules/edition.mjs, L01) applies the same lists to the whole app tree in lite: they are the test vocabulary.
+export const TEST_SCRIPT_NAME = /^(?:pre|post)?test(?::|$)/;
+export const TEST_RUNNER_COMMAND = /(?:^|[\s&|;(])(?:npx\s+)?(?:vitest|jest|playwright|cypress|mocha)(?=$|[\s&|;)])|\bnode\s+(?:--\S+\s+)*--test\b/;
+export const TEST_DEPENDENCY = /^(?:vitest|@vitest\/.+|playwright|playwright-core|@playwright\/.+|jest|@jest\/.+|ts-jest|babel-jest|@types\/jest|jest-[\w-]+|mocha|@types\/mocha|cypress|@testing-library\/.+|jsdom|@types\/jsdom|happy-dom|axe-core|@axe-core\/.+|vitest-axe|@starci\/(?:vitest|jest|playwright)-preset)$/;
+export const DEPENDENCY_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
 
 /** True for a path FE_NO_TESTS owns: a spec file, a test directory or a test-tool file. */
 export const isFeTestPath = (file) => SPEC_FILE.test(file) || TEST_DIRECTORY.test(file) || TEST_TOOL_FILE.test(file);

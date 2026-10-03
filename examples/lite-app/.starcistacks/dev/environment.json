@@ -1,0 +1,5 @@
+{
+  "environment": "dev",
+  "provider": "supabase",
+  "project": "lite-app"
+}

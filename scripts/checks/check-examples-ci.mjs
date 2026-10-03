@@ -2,21 +2,22 @@
 // examples-ci.mjs - the example apps of this repository in its own CI, derived, never listed by hand.
 //
 // GitHub runs only the repository-root workflows and Codecov reads one root config, so an example app's own ci.yml and
-// codecov.yml (the app-repository form `starci app sync` renders and the scaffold teaches) never run here. The root carries:
+// codecov.yml (the full app-repository form `starci app sync` renders) never run here. Lite apps intentionally carry no test or
+// coverage world, so they run the build/lint gates but are absent from Codecov and every test step. The root carries:
 //   .github/workflows/examples.yml  one workflow whose job matrix is THIS module's `--matrix` output (every examples/*
 //                                   folder whose hfs.json is of kind app): install, typecheck, lint, unit with coverage,
 //                                   the Codecov upload under the app's flag, the front-end build and the Sonar gate on
 //                                   push and pull_request; integration and e2e on workflow_dispatch only (owner ruling).
 //   codecov.yml                     one flag per example app, and one component per service app plus platform, rendered here from the
 //                                   same coverage scope as the app's own codecov.yml, be/jest.config.js and sonar.coverage.exclusions (the
-//                                   slot manifest's `coverage` field, derived once by scripts/hfs/coverage-scope.mjs), each held at 100
+//                                   slot manifest's \`coverage\` field, derived once by scripts/hfs/coverage-scope.mjs), each held at 100
 //                                   on the project and the patch.
 //
 //   starci runtime check --only examples-ci              check: the workflow derives its matrix from --matrix, no other root
 //                                                  workflow runs an example on its own, codecov.yml is its render (exit 1)
 //   starci runtime check --only examples-ci -- --matrix   the matrix as JSON (["<app>"]) for $GITHUB_OUTPUT
-//   starci runtime check --only examples-ci -- --images   every image of every example as JSON ([{app, name, file}], one per be and fe app of hfs.json)
-//   starci runtime check --only examples-ci -- --write    rewrite codecov.yml and each example's own codecov.yml, sonar-project.properties and be/jest.config.js from the render
+//   starci runtime check --only examples-ci -- --images   every image of every example as JSON ([{app, name, file}], one per be and fe app of hfs.json); lite owns back-end images only
+//   starci runtime check --only examples-ci -- --write    rewrite codecov.yml and each example's own edition-matched quality files (codecov.yml, sonar-project.properties, be/jest.config.js) from the render
 //
 // The quality files of each example (codecov.yml, sonar-project.properties, be/jest.config.js) are rendered here from the SOURCE slot manifest of this
 // repository, the one the root codecov.yml flags and components already read, so the root flag, the app's jest scope, coverage paths and
@@ -51,6 +52,15 @@ export function exampleApps(root = ROOT) {
   return discoverExampleApps(root);
 }
 
+/** Whether an example declares the full edition whose generated contract includes tests and coverage. */
+export function exampleHasTests(app, root = ROOT) {
+  try { return JSON.parse(fs.readFileSync(path.join(root, 'examples', app, 'hfs.json'), 'utf8')).edition !== 'lite'; }
+  catch { return false; }
+}
+
+/** Example apps that own the test/coverage contract; lite apps are deliberately absent. */
+export const coverageExampleApps = (root = ROOT) => exampleApps(root).filter(app => exampleHasTests(app, root));
+
 /** The coverage paths of one example app from the repository root: the measured roots of its be side under examples/<app>/. */
 export function appCoverageScope(app, root = ROOT) {
   return codecovPaths(loadSlotManifest()).map((glob) => `examples/${app}/${glob}`);
@@ -83,11 +93,13 @@ export function appQualityTargets(app, root = ROOT) {
 }
 export const APP_QUALITY_FILES = Object.freeze(['codecov.yml', 'sonar-project.properties', 'be/jest.config.js']);
 
-/** Every image of every example app, from its hfs.json: [{ app, name, file }] (be apps, then fe apps). */
+/** Every deployable image of every example app, from its hfs.json: full owns be+fe; lite owns be only. */
 export function exampleImages(root = ROOT) {
   return exampleApps(root).flatMap((app) => {
-    const sides = JSON.parse(fs.readFileSync(path.join(root, 'examples', app, 'hfs.json'), 'utf8')).sides ?? {};
-    return ['be', 'fe'].flatMap((side) => (sides[side]?.apps ?? []).map((entry) => ({ app, name: entry.name, file: dockerfilePath(side, entry.name) })));
+    const declaration = JSON.parse(fs.readFileSync(path.join(root, 'examples', app, 'hfs.json'), 'utf8'));
+    const sides = declaration.sides ?? {};
+    const deployableSides = declaration.edition === 'lite' ? ['be'] : ['be', 'fe'];
+    return deployableSides.flatMap((side) => (sides[side]?.apps ?? []).map((entry) => ({ app, name: entry.name, file: dockerfilePath(side, entry.name) })));
   });
 }
 const IMAGES_COMMAND = 'starci runtime check --only examples-ci -- --images';
@@ -95,10 +107,10 @@ const IMAGES_JOB = 'images';
 
 /** The root codecov.yml: one flag per example app over its measured roots and one component per service app plus platform, project and patch at 100 per flag and component. */
 export function renderCodecov(root = ROOT) {
-  const flags = exampleApps(root).map((app) => [`    - name: ${app}`, '      paths:', ...appCoverageScope(app, root).map((glob) => `        - ${JSON.stringify(glob)}`)].join('\n'));
-  const components = exampleApps(root).flatMap((app) => appComponents(app, root));
+  const flags = coverageExampleApps(root).map((app) => [`    - name: ${app}`, '      paths:', ...appCoverageScope(app, root).map((glob) => `        - ${JSON.stringify(glob)}`)].join('\n'));
+  const components = coverageExampleApps(root).flatMap((app) => appComponents(app, root));
   return `# Generated by scripts/checks/check-examples-ci.mjs --write. Do not edit: npm run check fails on any difference.
-# One flag per example app (examples/*/hfs.json of kind app), uploaded by .github/workflows/examples.yml. The paths are the app's coverage
+# One flag per full-edition example app (lite has no tests or coverage), uploaded by .github/workflows/examples.yml. The paths are the app's coverage
 # scope (the logic of be/src/modules/**: the slot manifest's \`coverage\` field, derived once by scripts/hfs/coverage-scope.mjs, the same scope the
 # app's own codecov.yml, be/jest.config.js and sonar.coverage.exclusions render); every flag is held at 100 on the project and on the patch,
 # and so is every component (one per service app of each example, plus its platform).
@@ -214,12 +226,13 @@ export function examplesCiMain(argv = [], { root = ROOT, out = (s) => process.st
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, target.content);
     }
-    out(`examples-ci: wrote ${CODECOV} (${exampleApps(root).length} flags) and each example's ${APP_QUALITY_FILES.join(', ')}\n`);
+    out(`examples-ci: wrote ${CODECOV} (${coverageExampleApps(root).length} flags) and each example's edition-matched quality files
+`);
     return 0;
   }
   const { apps, findings } = checkExamplesCi(root);
   for (const finding of findings) out(`${finding.code} ${finding.path}: ${finding.message}\n`);
-  out(findings.length ? `examples-ci: ${findings.length} finding(s)\n` : `OK: ${apps.length} example app(s) (${apps.join(', ')}) run in ${WORKFLOW} and have a flag in ${CODECOV}\n`);
+  out(findings.length ? `examples-ci: ${findings.length} finding(s)\n` : `OK: ${apps.length} example app(s) (${apps.join(', ')}) run in ${WORKFLOW}; ${coverageExampleApps(root).length} full app(s) have flags in ${CODECOV}\n`);
   return findings.length ? 1 : 0;
 }
 

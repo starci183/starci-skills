@@ -2565,6 +2565,28 @@ HFS_E2E_IN_AUTOMATIC_GATE:
   owner: other-op:backend.scaffold
   kind: check-finding
 
+HFS_EDITION_INVALID:
+  title: "hfs.json edition is not one the manifest knows"
+  title_vi: "Ấn bản HFS trong hfs.json không hợp lệ"
+  meaning_vi: "Trường edition của hfs.json chỉ nhận một giá trị thuộc danh sách editions của bảng kê ô (full, lite); vắng mặt nghĩa là full. Một giá trị khác là lỗi khai báo, kiểm tra bị từ chối."
+  causes_vi:
+    - "hfs.json ghi edition với giá trị ngoài full/lite (gõ sai, hoặc một ấn bản bảng kê không biết)"
+  nextStep_vi: "Sửa edition thành một giá trị trong danh sách editions của bảng kê, hoặc bỏ trường để về full. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_EDITION_FORBIDDEN_PRESENT:
+  title: "Content the lite edition does not have"
+  title_vi: "Nội dung ấn bản lite không có"
+  meaning_vi: "Kho ghim edition lite nhưng vẫn giữ thứ chỉ ấn bản full mới có: script hay dependency kiểm thử, cấu hình jest/vitest/playwright, ứng dụng worker, pattern sự kiện (event-bus, queue, fenced-job, projection, saga) hay các loại trigger saga/reactors/jobs/realtime. Lite không có thế giới kiểm thử và không có bus sự kiện."
+  causes_vi:
+    - "package.json còn script test*, typecheck:tests hoặc dependency jest/vitest/playwright"
+    - "Tệp cấu hình công cụ kiểm thử không ô nào cấm riêng vẫn nằm trong cây"
+    - "hfs.json khai ứng dụng worker, một pattern sự kiện hoặc một loại trigger mà lite đã bỏ"
+  nextStep_vi: "Xoá phần thuộc ấn bản full (không có gì thay thế trong lite), hoặc nâng kho lên edition full khi nội dung này là thật. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_FORBIDDEN_PRESENT:
   title: "Tracked path in a forbidden slot"
   title_vi: "Có tệp bị cấm trong cây mã nguồn"
@@ -4679,7 +4701,7 @@ RT_HOOK_SHAPE:
   causes_vi:
     - "Thêm lại npm run typecheck hoặc test:affected vào pre-commit"
     - "Đưa typecheck, lint hay test vào pre-push, hoặc xóa các dấu mốc cổng phát hành khỏi pre-push"
-  nextStep_vi: "Người giám sát trả template về đúng mô hình (pre-commit L0, pre-push chỉ kiểm cổng phát hành) rồi render lại hook các ví dụ bằng hfs sync --write, qua một lane đã land."
+  nextStep_vi: "Người giám sát trả template về đúng mô hình (pre-commit L0, pre-push chỉ kiểm cổng phát hành) rồi render lại hook các ví dụ bằng starci app sync --write, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -14678,3 +14700,182 @@ DOCKER_PORT_POLICY:
   nextStep_vi: "Đổi tên container sang tên thuộc dự án, lấy cổng trong dải 41000-44999 của dự án, rồi chạy lại lệnh starci docker; không sửa hay dừng container nivo-lite."
   owner: runtime-core
   kind: verb-refusal
+DB_MIGRATION_SHAPE:
+  title: "A migration is named `<ts14>_<kebab>.sql`, stamped in valid past UTC, ordered after the base's migrations, and immutable once on the base"
+  title_vi: "Migration sai hình dạng hoặc bị sửa"
+  meaning_vi: "`<path>` vi phạm luật migration: tên phải là `<ts14>_<kebab>.sql`, stamp là thời điểm UTC thật không ở tương lai, migration mới xếp sau mọi migration trên base, và migration đã lên base là bất biến (sửa hay xoá đều là finding)."
+  causes_vi:
+    - "Vi phạm luật L02: `supabase/migrations/<ts14>_<kebab>.sql`; stamp tăng nghiêm ngặt so với base; file đã lên base không được đổi."
+  nextStep_vi: "Tạo migration mới bằng the Supabase CLI new-migration command, không sửa/đổi tên/xoá migration đã lên base; nếu cần đổi nội dung, viết migration mới."
+  owner: op-retry
+  kind: check-finding
+
+DB_RLS_REQUIRED:
+  title: "Every `create table` in an exposed schema is followed by `enable row level security` in the same migration"
+  title_vi: "Bảng trong schema public thiếu RLS"
+  meaning_vi: "`<path>` tạo bảng trong schema exposed (`public` và `[api] schemas` của config.toml) mà không có `alter table ... enable row level security` ngay trong cùng migration; bảng khai báo `forceRls` cần cả `force row level security`."
+  causes_vi:
+    - "Vi phạm luật L03: mọi `create table`/`create table as` trong schema exposed phải có enable (và force khi hfs.json `supabase.forceRls` khai báo) trong cùng migration; partition con và bảng temp được miễn."
+  nextStep_vi: "Viết `alter table <schema>.<table> enable row level security;` ngay sau create trong cùng migration; không dùng vòng lặp dynamic SQL."
+  owner: op-retry
+  kind: check-finding
+
+DB_DYNAMIC_DDL:
+  title: "No dynamic SQL builds DDL - every statement a migration runs is visible to the parser"
+  title_vi: "DDL động trong migration"
+  meaning_vi: "`<path>` có `EXECUTE`/dynamic `FOR`/`OPEN` trong DO block hoặc function build create/alter/drop table|policy|function hay grant/revoke, hoặc một dynamic statement mà parser không đọc được."
+  causes_vi:
+    - "Vi phạm luật L04: DDL viết tường minh từng câu; dynamic DDL làm L03/L05/L06 không quyết định được bằng AST."
+  nextStep_vi: "Viết thẳng các câu create/alter/drop/grant (codemod sinh nếu cần lặp); dynamic SQL chỉ còn DML thuần."
+  owner: op-retry
+  kind: check-finding
+
+DB_POLICY_SHAPE:
+  title: "Policies are named `<table>_<role>_<action>`, write/FOR ALL never uses (true), anon/public only on `for select` `*_public_read`, no grant to anon without that policy, never `service_role`"
+  title_vi: "Policy sai hình dạng"
+  meaning_vi: "`<path>` có policy vi phạm L05: write hoặc FOR ALL với using (true)/with check (true), `to anon`/`to public` ngoài FOR SELECT `*_public_read`, select using (true) không hậu tố `_public_read`, tên sai `<table>_<role>_<action>`, grant tới anon/public không có policy `_public_read` kèm, hoặc grant tới `service_role`."
+  causes_vi:
+    - "Vi phạm luật L05: service_role vượt RLS nên không bao giờ được grant; anon chỉ đọc qua policy `_public_read` được khai báo."
+  nextStep_vi: "Đổi tên policy theo `<table>_<role>_<action>`, thay using (true) trên write bằng điều kiện thật, bỏ grant tới service_role/anon hoặc thêm policy `<table>_public_read` cho select."
+  owner: op-retry
+  kind: check-finding
+
+DB_DEFINER_SAFE:
+  title: "A `security definer` function pins `search_path`, lives outside exposed schemas (or is revoked from public in the same migration), declares a return type, and interpolates parameters only through `format('%I/%L')`"
+  title_vi: "Function security definer không an toàn"
+  meaning_vi: "`<path>` có function `security definer` thiếu `set search_path` (trên create hoặc `alter function` cùng migration - `from current` không tính), nằm trong schema exposed mà không `revoke execute ... from public`, không khai báo return type, hoặc build dynamic SQL qua tham số không qua `format('%I/%L')`."
+  causes_vi:
+    - "Vi phạm luật L06: search_path không pin là lỗ hổng leo quyền; `security invoker` được miễn."
+  nextStep_vi: "Thêm `set search_path = ''` (hoặc danh sách schema cố định), chuyển function sang schema `private` hoặc `revoke execute on function ... from public, anon`, và chỉ interpolate qua `format('%I'/'%L')`."
+  owner: op-retry
+  kind: check-finding
+
+DB_STORAGE_POLICY:
+  title: "A bucket insert declares `public = false` (true only for an id ending `_public`), `file_size_limit`, `allowed_mime_types`, and a `storage.objects` policy naming its `bucket_id` in the same migration"
+  title_vi: "Bucket storage thiếu khai báo hoặc policy"
+  meaning_vi: "`<path>` insert vào `storage.buckets` thiếu `public`/`file_size_limit`/`allowed_mime_types`, đặt `public = true` cho id không kết thúc `_public`, hoặc không có policy trên `storage.objects` nhắc `bucket_id` của nó trong cùng migration."
+  causes_vi:
+    - "Vi phạm luật L07: bucket là private mặc định; giới hạn size/mime và policy objects đi cùng khai báo bucket."
+  nextStep_vi: "Khai báo đủ `public = false`, `file_size_limit`, `allowed_mime_types` và viết `create policy ... on storage.objects ... (bucket_id = '<id>')` trong cùng migration."
+  owner: op-retry
+  kind: check-finding
+
+DB_CONFIG_POLICY:
+  title: "`supabase/config.toml` holds no literal credential (`env(NAME)` only), `auth.jwt_expiry <= 3600`, and signup/site_url/redirects equal the Supabase block of hfs.json"
+  title_vi: "config.toml lệch policy"
+  meaning_vi: "`<path>` (supabase/config.toml) chứa giá trị literal dưới key credential (secret|password|token|client_id|*_key trừ anon/publishable), `auth.jwt_expiry` quá 3600, hoặc `enable_signup`/`site_url`/`additional_redirect_urls` khác với block Supabase mà hfs.json khai báo."
+  causes_vi:
+    - "Vi phạm luật L08: secret trong config.toml viết `env(NAME)`; jwt_expiry tối đa 3600; posture auth là fact được check, không phải claim trong doc."
+  nextStep_vi: "Đổi credential thành `env(TEN_BIEN)`, hạ `jwt_expiry` về <= 3600, và chỉnh block Supabase của hfs.json hoặc config.toml cho khớp nhau."
+  owner: op-retry
+  kind: check-finding
+
+DB_TYPES_DRIFT:
+  title: "`supabase/types/database.types.ts` is committed and equals what `contract:emit` regenerates from the migrations"
+  title_vi: "database.types.ts lệch với migrations"
+  meaning_vi: "`supabase/types/database.types.ts` chưa được commit, hoặc khác với text mà `contract:emit` sinh lại từ migrations hiện tại (hoặc emit thất bại). Pattern giống R23 HFS_CONTRACT_SNAPSHOT_DRIFT."
+  causes_vi:
+    - "Vi phạm luật L09: file types là artefact sinh; commit bản mới nhất, không sửa tay."
+  nextStep_vi: "Chạy `starci app emit` và commit `supabase/types/database.types.ts` kết quả."
+  owner: op-retry
+  kind: check-finding
+
+FE_SUPABASE_CLIENT_OWNER:
+  title: "A front-end Supabase client, import or call is outside the db owner, or is not typed with `Database`"
+  title_vi: "Supabase client phía front end sai chủ sở hữu hoặc thiếu kiểu Database"
+  meaning_vi: "Import/call Supabase ở `<path>` không thuộc ô `fe.modules.db`/`fe.package.db`, hoặc client được tạo mà không mang kiểu `Database` đã sinh."
+  causes_vi:
+    - "Vi phạm L10: chỉ các ô db được import/call `@supabase/ssr` hay `@supabase/supabase-js`; mọi client là `SupabaseClient<Database>`/`create*Client<Database>`."
+  nextStep_vi: "Chuyển factory và truy vấn vào ô db đúng của app/gói, import API công khai của ô đó, và thêm kiểu `Database`; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
+BE_SUPABASE_CLIENT_OWNER:
+  title: "A back-end Supabase client, import or call is outside `be.integrations.supabase`, or is not typed with `Database`"
+  title_vi: "Supabase client phía back end sai chủ sở hữu hoặc thiếu kiểu Database"
+  meaning_vi: "Import/call Supabase ở `<path>` không thuộc `be.integrations.supabase`, hoặc client được tạo mà không mang kiểu `Database`."
+  causes_vi:
+    - "Vi phạm L10: back end dùng EntityManager cho dữ liệu; chỉ integration Supabase sở hữu Auth/Storage client và kiểu Database."
+  nextStep_vi: "Chuyển Auth/Storage client vào `be.integrations.supabase`, dùng API công khai của integration và thêm kiểu `Database`; dữ liệu thường đi qua EntityManager."
+  owner: op-retry
+  kind: check-finding
+
+FE_DB_RESULT_TYPED:
+  title: "A Supabase result is cast, explicitly generic, or an unbounded list read"
+  title_vi: "Kết quả Supabase bị ép kiểu hoặc truy vấn danh sách không giới hạn"
+  meaning_vi: "Truy vấn ở `<path>` dùng generic trên `single/maybeSingle/returns`, ép kiểu/non-null assertion, hoặc đọc danh sách không có `limit` hay biên keyset."
+  causes_vi:
+    - "Vi phạm L11: kiểu hàng phải suy ra từ `Database`; mọi đọc nhiều dòng phải có giới hạn tĩnh."
+  nextStep_vi: "Bỏ generic/cast/assertion, sửa type nguồn trong `database.types.ts`, và thêm `.limit()` hoặc biên keyset."
+  owner: op-retry
+  kind: check-finding
+
+FE_DB_ERROR_HANDLED:
+  title: "An awaited Supabase result drops `error` or collapses failure to empty data"
+  title_vi: "Kết quả Supabase bỏ qua error hoặc gộp lỗi thành dữ liệu rỗng"
+  meaning_vi: "Kết quả await ở `<path>` không đọc `error`, không được truyền nguyên vẹn vào `toOutcome`, hoặc dùng `data ?? []` nên `refused`/`unavailable` biến thành dữ liệu rỗng."
+  causes_vi:
+    - "Vi phạm L12: mọi `{data,error}` đi qua một Outcome có kiểu; không destructure chỉ data và không nuốt lỗi."
+  nextStep_vi: "Đọc và ánh xạ `error`, hoặc truyền toàn bộ result vào `toOutcome(result)` rồi xử lý đủ các nhánh Outcome."
+  owner: op-retry
+  kind: check-finding
+
+FE_SERVICE_ROLE_FORBIDDEN:
+  title: "A service-role or credential-shaped environment value enters the front end"
+  title_vi: "Service role hoặc biến môi trường bí mật đi vào front end"
+  meaning_vi: "`<path>` chứa identifier/string service_role hoặc đọc biến `*_SECRET`, `*_PRIVATE`, `*_TOKEN`, `*_PASSWORD`; public config không được khai báo qua chủ `modules/config`."
+  causes_vi:
+    - "Vi phạm L13: front end chỉ giữ URL, anon/publishable key và public config; service role luôn ở back end."
+  nextStep_vi: "Xóa credential khỏi fe/, chuyển thao tác đặc quyền qua use case back end, và khai báo public config tại `modules/config`."
+  owner: op-retry
+  kind: check-finding
+
+FE_AUTH_SESSION_TRUST:
+  title: "Server code trusts `getSession`, or a Server Action does not establish and refuse an anonymous principal"
+  title_vi: "Mã server tin getSession hoặc Server Action không xác thực principal"
+  meaning_vi: "`<path>` gọi `auth.getSession()` trên server, write action không bắt đầu bằng `await getPrincipal()`, không trả Outcome `refused` cho anonymous (trừ `fe.modules.db/auth/write-sign-in.ts` đang xác thực chính caller anonymous), hoặc mutation nhạy cảm không gọi `auth.getUser()`."
+  causes_vi:
+    - "Vi phạm L14: server dùng claims đã kiểm tra; write action xác thực principal trước mọi việc và mutation nhạy cảm kiểm tra user từ Auth server."
+  nextStep_vi: "Dùng `getPrincipal()`/`getClaims()`, từ chối anonymous bằng Outcome có kiểu, và gọi `auth.getUser()` cho tiền, bảo mật tài khoản hay đổi role."
+  owner: op-retry
+  kind: check-finding
+
+FE_DB_WRITE_SHAPE:
+  title: "A Supabase Server Action uses input before schema parsing, or a write module exports no action"
+  title_vi: "Server Action dùng input trước khi schema parse"
+  meaning_vi: "Write module ở `<path>` không export Server Action, hoặc tham số được dùng trước lần gọi `schema.parse`/`schema.safeParse` đầu tiên."
+  causes_vi:
+    - "Vi phạm phần write-shape của L14: input không được tin trước validation."
+  nextStep_vi: "Export action async trong `write-*.ts` và để lần dùng input đầu tiên là `schema.parse(input)` hoặc `schema.safeParse(input)`."
+  owner: op-retry
+  kind: check-finding
+
+FE_ROUTE_HANDLER_FORBIDDEN:
+  title: "A front-end route handler is not health/live or the Supabase auth callback slot"
+  title_vi: "Route handler phía front end không thuộc hai cửa được phép"
+  meaning_vi: "`<path>` là `route.ts` phía fe nhưng không phải `health/live` và không thuộc ô `fe.route.callback`."
+  causes_vi:
+    - "Vi phạm L15: webhook, cron, public API và callback bên thứ ba là feature của back end."
+  nextStep_vi: "Chuyển handler sang feature back end; chỉ giữ health/live và callback PKCE trong ô `fe.route.callback`."
+  owner: op-retry
+  kind: check-finding
+
+BE_SUPABASE_JWT_VERIFIED:
+  title: "A Supabase principal is derived without pinned JWKS verification, or authorization claims come from the request body"
+  title_vi: "JWT Supabase chưa được xác minh đầy đủ hoặc claim lấy từ request body"
+  meaning_vi: "`<path>` decode JWT không verify, gọi `jwtVerify` ngoài integration/thiếu JWKS, issuer, audience `authenticated` hay algorithm pin, hoặc đọc role/membership từ body."
+  causes_vi:
+    - "Vi phạm L16: principal chỉ đến từ access token đã verify signature/iss/aud/exp/algorithm hoặc được đọc lại từ DB."
+  nextStep_vi: "Dùng `createRemoteJWKSet` + `jwtVerify` trong `be.integrations.supabase`, pin issuer/audience/algorithms và bỏ mọi authorization claim từ body."
+  owner: op-retry
+  kind: check-finding
+
+HFS_LITE_SECRET_CUSTODY:
+  title: "Lite secret material or a forbidden custody path is present"
+  title_vi: "Bí mật hoặc đường dẫn lưu bí mật bị cấm trong edition lite"
+  meaning_vi: "`<path>` là root `.env*`, `secrets.env`, `.secrets/`, file `.enc` ngoài `.starcistacks/<env>/secrets`, hoặc fe/supabase chứa token Supabase/JWT hay connection string có mật khẩu."
+  causes_vi:
+    - "Vi phạm L17: lite có đúng một đường custody đã mã hóa và browser/Supabase tree không giữ secret literal."
+  nextStep_vi: "Không đọc hay in giá trị. Gỡ secret khỏi cây, xoay secret nếu đã lộ, rồi niêm phong bằng sops tại `.starcistacks/<env>/secrets/<slug>.enc`."
+  owner: owner
+  kind: check-finding

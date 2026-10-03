@@ -15,7 +15,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { explainPath } from '../runtime/scripts/hfs/check.mjs';
-import { loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
+import { createSlotResolver, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
+import { refuseInEdition } from './edition-gate.mjs';
 
 export class ScaffoldError extends Error {
   constructor(code, message) {
@@ -287,12 +288,12 @@ const loadTypeScript = repoRoot => {
 
 const BE = 'be';
 
-/** The be side folder of the app at `appRoot`: starci app new runs at the app root and writes into be/ only. */
-const backEndOf = appRoot => {
+/** The declaration of the app at `appRoot` and its be side folder: starci app new runs at the app root and writes into be/ only. */
+const backEndOf = (appRoot, manifest = loadSlotManifest()) => {
   let repo;
-  try { repo = readRepoDeclaration(loadSlotManifest(), appRoot); } catch (error) { throw new ScaffoldError('HFS_NEW_NO_HFS', `${appRoot} has no valid app hfs.json (${error.message})`); }
+  try { repo = readRepoDeclaration(manifest, appRoot); } catch (error) { throw new ScaffoldError('HFS_NEW_NO_HFS', `${appRoot} has no valid app hfs.json (${error.message})`); }
   if (!repo.sides) throw new ScaffoldError('HFS_NEW_NO_HFS', `${appRoot} is not the app root; run starci app new at the folder of hfs.json`);
-  return path.join(appRoot, BE);
+  return { repo, beRoot: path.join(appRoot, BE) };
 };
 
 /** An app-relative path below be/ as a be-relative one; a path of the root or of fe/ is refused. */
@@ -317,28 +318,32 @@ const writeNew = (repoRoot, relative, text) => {
 };
 
 /** `starci app new spec be/<file>.service.ts` at the app root: writes the spec skeleton of an existing service; returns the created app-relative paths. */
-export function newSpec({ repoRoot: appRoot, file, ts = loadTypeScript(appRoot), manifest = loadSlotManifest() }) {
-  const repoRoot = backEndOf(appRoot);
+export function newSpec({ repoRoot: appRoot, file, ts, manifest = loadSlotManifest() }) {
+  const { repo, beRoot: repoRoot } = backEndOf(appRoot, manifest);
+  // `new spec` writes a unit spec: the test world it belongs to (be.tests.*) is a full-edition capability.
+  refuseInEdition({ resolver: createSlotResolver(manifest, repo), slotIds: ['be.tests.world'], command: 'new spec' });
   const relative = belowBackEnd(file);
   if (!relative.endsWith('.service.ts')) throw new ScaffoldError('HFS_NEW_NOT_A_SERVICE', `${relative} is not a *.service.ts file: only services have a unit spec`);
   const absolute = path.join(repoRoot, relative);
   if (!fs.existsSync(absolute)) throw new ScaffoldError('HFS_NEW_NO_SERVICE', `${relative} does not exist`);
   const specPath = relative.replace(/\.ts$/, '.spec.ts');
   requireSlot(repoRoot, specPath);
-  const shape = readServiceShape({ ts, fileName: absolute, text: fs.readFileSync(absolute, 'utf8') });
+  const shape = readServiceShape({ ts: ts ?? loadTypeScript(appRoot), fileName: absolute, text: fs.readFileSync(absolute, 'utf8') });
   return [writeNew(repoRoot, specPath, specSkeleton({ shape, serviceFile: relative, manifest }))].map(created => `${BE}/${created}`);
 }
 
 /** `starci app new service be/<dir> <name> [--inject ...]` at the app root: writes the service and its spec skeleton; returns the created app-relative paths. */
-export function newService({ repoRoot: appRoot, dir, name, inject = [], ts = loadTypeScript(appRoot), manifest = loadSlotManifest() }) {
-  const repoRoot = backEndOf(appRoot);
+export function newService({ repoRoot: appRoot, dir, name, inject = [], ts, manifest = loadSlotManifest() }) {
+  const { repo, beRoot: repoRoot } = backEndOf(appRoot, manifest);
+  // `new service` writes the service and its unit spec: the test world (be.tests.*) is a full-edition capability.
+  refuseInEdition({ resolver: createSlotResolver(manifest, repo), slotIds: ['be.tests.world'], command: 'new service' });
   if (!SERVICE_NAME.test(name)) throw new ScaffoldError('HFS_NEW_NAME_INVALID', `the service name ${name} must be kebab-case (member-profile), without the .service suffix`);
   const relative = path.posix.join(belowBackEnd(dir), `${name}.service.ts`);
   requireSlot(repoRoot, relative);
   requireSlot(repoRoot, relative.replace(/\.ts$/, '.spec.ts'));
   for (const target of [relative, relative.replace(/\.ts$/, '.spec.ts')]) if (fs.existsSync(path.join(repoRoot, target))) throw new ScaffoldError('HFS_NEW_EXISTS', `${target} already exists; starci app new never overwrites`);
   const text = serviceSource({ name, dependencies: inject.map(parseInject) });
-  const shape = readServiceShape({ ts, fileName: path.join(repoRoot, relative), text });
+  const shape = readServiceShape({ ts: ts ?? loadTypeScript(appRoot), fileName: path.join(repoRoot, relative), text });
   const spec = specSkeleton({ shape, serviceFile: relative, manifest });
   return [writeNew(repoRoot, relative, text), writeNew(repoRoot, relative.replace(/\.ts$/, '.spec.ts'), spec)].map(created => `${BE}/${created}`);
 }

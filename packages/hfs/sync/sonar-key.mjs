@@ -52,3 +52,8 @@ export function readDeclaredSonarGate(root, { parseYaml } = {}) {
   if (!sonar || sonar.mode === 'disabled') return null;
   return { file: path.relative(root, file).split(path.sep).join('/'), qualityGate: typeof sonar.qualityGate === 'string' ? sonar.qualityGate : null };
 }
+
+/** The quality-gate name for an app edition from the one sonar-gate document. */
+export function sonarGateName(document, edition = 'full') {
+  return (edition === 'lite' ? document?.lite : document)?.gate?.name ?? null;
+}

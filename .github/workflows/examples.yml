@@ -11,7 +11,8 @@ name: examples
 #                         upload under the app's flag, the be build (tsc and tsc-alias) and the fe build (turbo, the packages first, then
 #                         every Next app), and the Sonar scan and quality gate where a server is configured
 #                         (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN; otherwise the job notes the skip). A second job, `images`, builds the
-#                         Docker image of every be and fe app of every example (the matrix is `check-examples-ci.mjs --images`) and never pushes
+#                         deployable images declared by every example (full: be+fe; lite: be only; the matrix is
+#                         `check-examples-ci.mjs --images`) and never pushes
 #   workflow_dispatch     the same, plus the layers that start the docker stack through the test world, chosen by the
 #                         `layers` input: integration, e2e, or both. They never run on a tag push (npm run check
 #                         refuses an integration or e2e step that is not gated on workflow_dispatch). A third manual job,
@@ -113,6 +114,15 @@ jobs:
         run: npm ci
       - name: Install app dependencies
         run: npm ci
+      - name: Read generated test policy
+        id: policy
+        working-directory: .
+        run: |
+          if [ -f "$APP_DIR/codecov.yml" ]; then
+            echo "tests=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tests=false" >> "$GITHUB_OUTPUT"
+          fi
       # The generated inputs (gitignored) first: the fe apps import the typed document table codegen writes, before any type-check or lint.
       - name: Codegen
         run: npm run codegen --silent
@@ -124,10 +134,10 @@ jobs:
         working-directory: .
         run: npm run starci --silent -- app lint --cwd "$APP_DIR" --sonar "$APP_DIR/reports/lint.sonar.json"
       - name: Unit tests with coverage (per-file 100 on the logic of be/src/modules/**; writes be/coverage/lcov.info)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.policy.outputs.tests == 'true' }}
         run: npm test -- --ci
       - name: Coverage upload (Codecov, flag ${{ matrix.app }})
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
+        if: ${{ !cancelled() && steps.policy.outputs.tests == 'true' && startsWith(github.ref, 'refs/tags/v') }}
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
@@ -148,10 +158,10 @@ jobs:
         run: npm run build:fe
       # Manual only: the docker-stack layers run on workflow_dispatch, never on the tag push.
       - name: Integration tests (test world, manual)
-        if: ${{ github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'integration') }}
+        if: ${{ steps.policy.outputs.tests == 'true' && github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'integration') }}
         run: npm run test:integration -- --ci
       - name: E2E tests (test world, manual)
-        if: ${{ github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'e2e') }}
+        if: ${{ steps.policy.outputs.tests == 'true' && github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'e2e') }}
         run: npm run test:e2e -- --ci
       - name: Sonar scan
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
@@ -192,21 +202,33 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - name: Install app dependencies
         run: npm ci
+      - name: Read generated test policy
+        id: policy
+        working-directory: .
+        run: |
+          if [ -f "examples/${{ matrix.app }}/codecov.yml" ]; then
+            echo "tests=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tests=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Back-end build (tsc, tsc-alias)
         run: npm run build:be
       - name: Front-end build
         run: npm run build:fe
       - name: Browser stack up (ephemeral env, infra, migrate, seed, apis)
+        if: ${{ steps.policy.outputs.tests == 'true' }}
         run: node browser/stack.mjs up
       - name: Install Chromium
+        if: ${{ steps.policy.outputs.tests == 'true' }}
         run: npx playwright install --with-deps chromium
       - name: Browser journey
+        if: ${{ steps.policy.outputs.tests == 'true' }}
         run: npm run test:browser
       - name: Browser stack down
-        if: ${{ always() }}
+        if: ${{ always() && steps.policy.outputs.tests == 'true' }}
         run: node browser/stack.mjs down
 
-  # Every image of every example app, built and never pushed: the matrix is derived from the examples' hfs.json (one entry per be and fe app).
+  # Every deployable image, built and never pushed: full examples own be+fe images; lite examples own be images only.
   images:
     name: image ${{ matrix.app }}/${{ matrix.name }}
     needs: apps

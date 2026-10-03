@@ -16,10 +16,17 @@
 // `@@vCamel@@` its camelCase, `@@vUpper@@` its UPPER_SNAKE and `@@vSnake@@` its snake_case; the option `--service Class=module` gives `@@service@@` (the class) and `@@serviceModule@@`.
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadSlotManifest, readRepoDeclaration, ruleParams } from '../runtime/scripts/hfs/slots.mjs';
+import { createSlotResolver, loadSlotManifest, readRepoDeclaration, ruleParams } from '../runtime/scripts/hfs/slots.mjs';
 import { parseYaml } from '../runtime/engine/yaml.mjs';
 import { TEMPLATES_DIR } from '../sync/index.mjs';
 import { ScaffoldError, pascalOf } from './service.mjs';
+import { refuseInEdition } from './edition-gate.mjs';
+import { addTable } from './add-table.mjs';
+import { addApp } from './add-app.mjs';
+import { ensureLiteCli, selectLiteCliEntries } from './add-cli-lite.mjs';
+import { addLiteWebhookInbox, selectLiteWebhookEntries } from './add-inbox-lite.mjs';
+import { jsonText } from './app.mjs';
+import { registerLiteDomainService, registerLiteExports } from './lite-exports.mjs';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const VARIABLE = /<([A-Za-z][A-Za-z0-9]*)>/g;
@@ -38,6 +45,23 @@ function readTree(topic) {
   if (!Array.isArray(doc?.files)) throw new ScaffoldError('HFS_ADD_TREE_MISSING', `knowledge/patterns/be/${topic}.yaml has no files tree`);
   return doc.files;
 }
+
+const selectLiteApiEntries = entries => [
+  ...entries.filter(entry => !entry.path.includes('/transport/graphql/')).map(entry => {
+    if (entry.path === 'src/features/api/<feature>/index.ts') return { ...entry, template: 'api/feature.index.http.ts.tpl' };
+    if (entry.path === 'src/features/api/<feature>/application/<action>.command.ts') return { ...entry, template: 'api/application.command.http.ts.tpl' };
+    if (entry.path === 'src/features/api/<feature>/application/<action>.handler.ts') return { ...entry, template: 'api/application.handler.http.ts.tpl' };
+    return entry;
+  }),
+  { path: 'src/features/api/<feature>/transport/http/<action>.controller.ts', slot: 'be.transport.http', template: 'api/http.controller.ts.tpl' },
+  { path: 'src/features/api/<feature>/transport/http/<action>.mapper.ts', slot: 'be.transport.http', template: 'api/http.mapper.ts.tpl' },
+  { path: 'src/features/api/<feature>/transport/http/dto/<action>.request.ts', slot: 'be.transport.http', template: 'api/http.request.ts.tpl' },
+  { path: 'src/features/api/<feature>/transport/http/dto/<action>.response.ts', slot: 'be.transport.http', template: 'api/http.response.ts.tpl' },
+  { path: 'src/features/api/<feature>/transport/http/<feature>-http.module.ts', slot: 'be.transport.http', template: 'api/http.module.ts.tpl' },
+];
+
+/** The templates the lite api tree names beyond the pattern topic's own files tree (the HTTP door replaces the GraphQL one): the template set stays one set with the topics' (tests/packages-hfs/hfs-add.spec.mjs). */
+export const liteApiTemplates = () => selectLiteApiEntries(readTree('api')).map(entry => entry.template).filter(Boolean);
 
 /** Fills the `<name>` variables of a path; returns null when a variable has no value. */
 const fillPath = (text, values) => {
@@ -94,6 +118,14 @@ function variablesOf({ spec, noun, name, options }) {
  * @returns {{ created: Array<string>, registered: { patterns: Array<string>, kinds: Array<string> } }} The files written (app-root relative) and what hfs.json gained.
  */
 export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) {
+  if (noun === 'table') {
+    const result = addTable({ root: repoRoot, name, fe: options.fe === true, emitTypes: options.noTypes === true ? false : options.emitTypes, now });
+    return { ...result, registered: { patterns: [], kinds: [] } };
+  }
+  if (noun === 'app') {
+    const result = addApp({ root: repoRoot, name });
+    return { ...result, registered: { patterns: [], kinds: [] } };
+  }
   const manifest = loadSlotManifest();
   const params = ruleParams(manifest, 'be');
   const spec = params.addKinds[noun];
@@ -102,8 +134,28 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
   if (!fs.existsSync(declarationFile)) throw new ScaffoldError('HFS_ADD_NOT_AN_APP', 'starci app add runs at the app root (the folder of hfs.json)');
   const repo = readRepoDeclaration(manifest, repoRoot);
   if (!repo.sides?.be) throw new ScaffoldError('HFS_ADD_NO_BACK_END', 'this app has no back-end side');
+  const liteCliBuiltIn = noun === 'cli' && repo.edition === 'lite' && (name === 'migrate' || name === 'seed');
+  if (liteCliBuiltIn) {
+    if (repo.sides.be.apps.some(app => app.kind === 'cli'))
+      throw new ScaffoldError('HFS_ADD_EXISTS', `the lite cli already carries its built-in ${name} group`);
+    return { created: ensureLiteCli({ root: repoRoot, manifest, repo }), registered: { patterns: [], kinds: ['cli'] } };
+  }
   const nouns = [noun, ...(spec.also ?? [])];
   const specs = nouns.map((each) => [each, params.addKinds[each]]);
+  const patterns = [...new Set(specs.flatMap(([, eachSpec]) => eachSpec.patterns))];
+  const topics = new Set([...specs.map(([, eachSpec]) => eachSpec.topic), ...topicsOfPatterns(patterns)]);
+  const liteCli = noun === 'cli' && repo.edition === 'lite';
+  const liteApi = noun === 'api' && repo.edition === 'lite';
+  const trees = new Map([...topics].map((topic) => {
+    const entries = repo.edition === 'lite' ? selectLiteWebhookEntries(selectLiteCliEntries(readTree(topic))) : readTree(topic);
+    return [topic, liteApi && topic === spec.topic ? selectLiteApiEntries(entries) : entries];
+  }));
+  // The slots the noun's trees name decide whether the edition has the noun (a slot lite does not carry or forbids
+  // makes it a full-edition capability); never the noun's name. Optional entries are never generated, so they gate nothing.
+  const writtenSlots = new Set();
+  for (const [each, eachSpec] of specs) for (const entry of trees.get(eachSpec.topic)) if (!entry.path.startsWith(PLATFORM_PREFIX) && entry.optional !== true && entry.slot) writtenSlots.add(entry.slot);
+  for (const topic of topics) for (const entry of trees.get(topic)) if (entry.path.startsWith(PLATFORM_PREFIX) && entry.optional !== true && entry.slot) writtenSlots.add(entry.slot);
+  refuseInEdition({ resolver: createSlotResolver(manifest, repo), slotIds: [...writtenSlots], command: `add ${noun}` });
   const values = Object.assign({}, ...specs.map(([each, eachSpec]) => variablesOf({ spec: eachSpec, noun: each, name, options })), variablesOf({ spec, noun, name, options }));
   const stamp = String(now()).padStart(13, '0').slice(0, 13);
   const withStamp = { ...values, epochMs13: stamp };
@@ -125,20 +177,83 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
     planned.push({ target, absolute, body: renderBody(fs.readFileSync(templateFile, 'utf8'), withStamp, forms, entry.template), instance });
   };
 
-  for (const [each, eachSpec] of specs) for (const entry of readTree(eachSpec.topic)) if (!entry.path.startsWith(PLATFORM_PREFIX)) consider(entry, eachSpec.topic, true, each !== noun);
-  const patterns = [...new Set(specs.flatMap(([, eachSpec]) => eachSpec.patterns))];
-  for (const topic of new Set([...specs.map(([, eachSpec]) => eachSpec.topic), ...topicsOfPatterns(patterns)])) for (const entry of readTree(topic)) if (entry.path.startsWith(PLATFORM_PREFIX)) consider(entry, topic, false);
+  for (const [each, eachSpec] of specs) for (const entry of trees.get(eachSpec.topic)) if (!entry.path.startsWith(PLATFORM_PREFIX)) consider(entry, eachSpec.topic, true, each !== noun);
+  for (const topic of topics) for (const entry of trees.get(topic)) if (entry.path.startsWith(PLATFORM_PREFIX)) consider(entry, topic, false);
 
   const clash = planned.filter((file) => file.instance && fs.existsSync(file.absolute)).map((file) => file.target);
   if (clash.length) throw new ScaffoldError('HFS_ADD_EXISTS', `${noun} ${name} already exists: ${clash.join(', ')}`);
 
+  const bootstrapCreated = liteCli ? ensureLiteCli({ root: repoRoot, manifest, repo }) : [];
   for (const file of planned) {
     fs.mkdirSync(path.dirname(file.absolute), { recursive: true });
     fs.writeFileSync(file.absolute, file.body);
   }
+  if (noun === 'webhook' || (repo.edition === 'lite' && noun === 'api')) {
+    registerLiteExports({ root: repoRoot, generator: repo.edition === 'lite' ? noun : 'webhook-full' });
+  }
+  if (repo.edition === 'lite' && (noun === 'api' || noun === 'webhook')) {
+    registerLiteDomainService({ root: repoRoot, moduleSpecifier: values.serviceModule, service: values.service });
+  }
   if (spec.wire) wire({ beRoot, wire: spec.wire, forms, noun, name });
+  if (repo.edition === 'lite' && (noun === 'api' || noun === 'webhook')) wireLiteFeature({ repoRoot, repo, noun, name });
+  const inboxCreated = addLiteWebhookInbox({ root: repoRoot, repo, noun, provider: name, values, now });
   const registered = register({ declarationFile, spec: { patterns, trigger: spec.trigger } });
-  return { created: planned.map((file) => `be/${file.target}`), registered };
+  return { created: [...bootstrapCreated, ...planned.map((file) => `be/${file.target}`), ...inboxCreated], registered };
+}
+
+/** Lite has one API app; compose each generated API or webhook transport into that app immediately. */
+function wireLiteFeature({ repoRoot, repo, noun, name }) {
+  const app = repo.sides.be.apps.find(entry => entry.kind === 'api');
+  if (!app) throw new ScaffoldError('HFS_ADD_NO_API_OWNER', `add ${noun} needs a declared lite api app`);
+  const relative = `be/apps/${app.name}/src/app.module.ts`;
+  const file = path.join(repoRoot, ...relative.split('/'));
+  if (!fs.existsSync(file)) throw new ScaffoldError('HFS_ADD_WIRE_MISSING', `add ${noun} registers its transport in ${relative}, which does not exist`);
+  const symbol = `${pascalOf(name)}HttpModule`;
+  const owner = noun === 'api' ? 'api' : 'webhooks';
+  const importLine = `import { ${symbol} } from "@features/${owner}/${name}"`;
+  const lines = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n').split('\n');
+  const lastImport = lines.reduce((last, line, index) => line.startsWith('import ') ? index : last, -1);
+  const imports = lines.findIndex(line => /^\s*imports: \[$/.test(line));
+  if (lastImport < 0 || imports < 0) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add ${noun} could not find the imports array in ${relative}`);
+  if (!lines.includes(importLine)) {
+    lines.splice(lastImport + 1, 0, importLine);
+    const shiftedImports = imports > lastImport ? imports + 1 : imports;
+    const indent = /^(\s*)/.exec(lines[shiftedImports])?.[1] ?? '';
+    lines.splice(shiftedImports + 1, 0, `${indent}    ${symbol},`);
+  }
+  fs.writeFileSync(file, `${lines.join('\n').replace(/\n+$/, '')}\n`);
+  if (noun === 'webhook') wireLiteWebhookConfig({ repoRoot, app: app.name, provider: name });
+}
+
+/** Adds one generated webhook provider to the lite API's parsed options and enables exact raw-body verification. */
+function wireLiteWebhookConfig({ repoRoot, app, provider }) {
+  const relative = `be/apps/${app}/src/main.ts`;
+  const file = path.join(repoRoot, ...relative.split('/'));
+  let text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+  const httpSecurityImport = /^import \{ ([^}]+) \} from "@modules\/platform\/http-security"$/m;
+  const importMatch = httpSecurityImport.exec(text);
+  if (!importMatch) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add webhook could not find the HTTP security import in ${relative}`);
+  const imported = importMatch[1].split(',').map(symbol => symbol.trim()).filter(Boolean);
+  if (!imported.includes('parseWebhookProviderConfig')) {
+    const configIndex = imported.indexOf('parseHttpSecurityConfig');
+    imported.splice(configIndex < 0 ? imported.length : configIndex + 1, 0, 'parseWebhookProviderConfig');
+    text = text.replace(httpSecurityImport, `import { ${imported.join(', ')} } from "@modules/platform/http-security"`);
+  }
+  const providerKey = /^[a-z][a-z0-9]*$/.test(provider) ? provider : JSON.stringify(provider);
+  const providerLine = `                ${providerKey}: parseWebhookProviderConfig(env, ${JSON.stringify(formsOf({ provider }).providerUpper)}),`;
+  if (!text.includes(providerLine)) {
+    const empty = /httpSecurity:\s*parseHttpSecurityConfig\(env\)/;
+    if (empty.test(text)) {
+      text = text.replace(empty, ['httpSecurity: {', '            ...parseHttpSecurityConfig(env),', '            webhooks: {', providerLine, '            },', '        }'].join('\n'));
+    } else {
+      const found = /^\s*webhooks: \{$/m.exec(text);
+      if (!found) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add webhook could not find httpSecurity options in ${relative}`);
+      const insertAt = found.index + found[0].length;
+      text = `${text.slice(0, insertAt)}\n${providerLine}${text.slice(insertAt)}`;
+    }
+  }
+  text = text.replace('NestFactory.create(AppModule.register(options))', 'NestFactory.create(AppModule.register(options), { rawBody: true })');
+  fs.writeFileSync(file, text);
 }
 
 /**
@@ -179,6 +294,6 @@ function register({ declarationFile, spec }) {
   const kinds = [...new Set([...(be.kinds ?? []), ...(spec.trigger ? [spec.trigger] : [])])].sort();
   be.patterns = patterns;
   if (kinds.length) be.kinds = kinds;
-  fs.writeFileSync(declarationFile, `${JSON.stringify(declaration, null, 2)}\n`);
+  fs.writeFileSync(declarationFile, jsonText(declaration));
   return { patterns, kinds };
 }

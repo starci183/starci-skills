@@ -1,0 +1,31 @@
+import type { Metadata } from "next"
+import { getTranslations } from "next-intl/server"
+import type { ReactNode } from "react"
+import { SiteShell } from "@/components/composites/SiteShell"
+import { siteUrl } from "@/modules/config"
+import { APP_ROUTES } from "@/modules/routes"
+
+type AppLayoutProps = {
+    readonly locale: string
+    readonly content: ReactNode
+}
+
+/** The document title and absolute metadata base for the requested locale. */
+export const appLayoutMetadata = async (locale: string): Promise<Metadata> => {
+    const t = await getTranslations({ locale, namespace: "app" })
+    return { title: t("title"), metadataBase: new URL(siteUrl()) }
+}
+
+/** The server-resolved app chrome around the routed body. */
+export const AppLayout = async (props: AppLayoutProps) => {
+    const t = await getTranslations("app.shell")
+    return (
+        <html lang={props.locale}>
+            <body>
+                <SiteShell brand={t("brand")} homeHref={APP_ROUTES.home}>
+                    {props.content}
+                </SiteShell>
+            </body>
+        </html>
+    )
+}
