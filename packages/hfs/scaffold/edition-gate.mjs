@@ -1,7 +1,7 @@
-// The edition gate of `hfs add` and `hfs new` (design 8.6 R8): a verb whose file tree lands in a slot the app's
+// The edition gate of `starci app add` and `starci app new` (design 8.6 R8): a verb whose file tree lands in a slot the app's
 // edition does not have - the slot's `editions` exclude it, or its `litePresence` is forbidden - is a full-edition
 // capability and refuses before anything is planned or written. The slot resolver of the app answers, the same
-// view `hfs check` reads; the noun's name is never the test, so a slot the lite manifest forbids refuses every
+// view `starci app check` reads; the noun's name is never the test, so a slot the lite manifest forbids refuses every
 // verb that writes into it, with no noun list kept anywhere. The refusal carries no failure code by design: the
 // scaffolders of packages/hfs keep their codes out of the runtime catalog (like HFS_SCAFFOLD_LOCK_FAILED).
 

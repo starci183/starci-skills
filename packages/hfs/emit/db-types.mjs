@@ -1,6 +1,6 @@
 /**
  * `supabase/types/database.types.ts` (slot `app.supabase.types`): the Database types the Supabase CLI generates from an app's
- * local stack, written by `npm run contract:emit` (`hfs emit-contracts`) beside the be contract snapshots and judged for drift
+ * local stack, written by `npm run contract:emit` (`starci app emit`) beside the be contract snapshots and judged for drift
  * by DB_TYPES_DRIFT (L09, scripts/hfs/rules/database.mjs) - the rule compares the committed file with the text `emitTypes()`
  * produces, and `dbTypesEmitter` below is that callback.
  *
@@ -101,7 +101,7 @@ export function emitDbTypes({ root, run = spawn, platform = process.platform } =
 /**
  * The types of an app that has no stack yet (a fresh scaffold): start the app's own local stack (its project id and ports from
  * supabase/config.toml; every migration of supabase/migrations is applied on start), emit the types, and stop the stack again when
- * this call started it. The slow, Docker-reaching path `hfs scaffold --edition lite` takes; `emitDbTypes` alone is the fast one for a stack that is up.
+ * this call started it. The slow, Docker-reaching path `starci app scaffold --edition lite` takes; `emitDbTypes` alone is the fast one for a stack that is up.
  */
 export function generateDbTypes({ root, run = spawn, platform = process.platform } = {}) {
   const execute = withNpxFallback(run, platform);

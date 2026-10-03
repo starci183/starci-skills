@@ -60,8 +60,8 @@ test('the lite managed set has no test or coverage world and carries the databas
   const scripts = targets['package.json'].scripts;
   assert.deepEqual(['db:start', 'db:stop', 'db:reset', 'db:new', 'db:push', 'db:types', 'db:lint'].filter(name => !(name in scripts)), []);
   assert.equal(scripts['db:types'], 'npm run contract:emit');
-  assert.equal(scripts['db:lint'], 'hfs check --fast');
-  assert.equal(scripts.lint, 'hfs lint');
+  assert.equal(scripts['db:lint'], 'starci app check --fast');
+  assert.equal(scripts.lint, 'starci app lint');
   assert.equal(scripts.typecheck, 'tsc -p be/tsconfig.json && turbo run typecheck');
   assert.equal(scripts['build:fe'], 'turbo run build --filter=./fe/apps/*');
   assert.equal(scripts['dev:fe'], 'turbo run dev --filter=@demo/web');

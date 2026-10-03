@@ -4701,7 +4701,7 @@ RT_HOOK_SHAPE:
   causes_vi:
     - "Thêm lại npm run typecheck hoặc test:affected vào pre-commit"
     - "Đưa typecheck, lint hay test vào pre-push, hoặc xóa các dấu mốc cổng phát hành khỏi pre-push"
-  nextStep_vi: "Người giám sát trả template về đúng mô hình (pre-commit L0, pre-push chỉ kiểm cổng phát hành) rồi render lại hook các ví dụ bằng hfs sync --write, qua một lane đã land."
+  nextStep_vi: "Người giám sát trả template về đúng mô hình (pre-commit L0, pre-push chỉ kiểm cổng phát hành) rồi render lại hook các ví dụ bằng starci app sync --write, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -14674,7 +14674,7 @@ DB_MIGRATION_SHAPE:
   meaning_vi: "`<path>` vi phạm luật migration: tên phải là `<ts14>_<kebab>.sql`, stamp là thời điểm UTC thật không ở tương lai, migration mới xếp sau mọi migration trên base, và migration đã lên base là bất biến (sửa hay xoá đều là finding)."
   causes_vi:
     - "Vi phạm luật L02: `supabase/migrations/<ts14>_<kebab>.sql`; stamp tăng nghiêm ngặt so với base; file đã lên base không được đổi."
-  nextStep_vi: "Tạo migration mới bằng `supabase migration new`, không sửa/đổi tên/xoá migration đã lên base; nếu cần đổi nội dung, viết migration mới."
+  nextStep_vi: "Tạo migration mới bằng the Supabase CLI new-migration command, không sửa/đổi tên/xoá migration đã lên base; nếu cần đổi nội dung, viết migration mới."
   owner: op-retry
   kind: check-finding
 
@@ -14729,12 +14729,12 @@ DB_STORAGE_POLICY:
   kind: check-finding
 
 DB_CONFIG_POLICY:
-  title: "`supabase/config.toml` holds no literal credential (`env(NAME)` only), `auth.jwt_expiry <= 3600`, and signup/site_url/redirects equal the hfs.json `supabase` block"
+  title: "`supabase/config.toml` holds no literal credential (`env(NAME)` only), `auth.jwt_expiry <= 3600`, and signup/site_url/redirects equal the Supabase block of hfs.json"
   title_vi: "config.toml lệch policy"
-  meaning_vi: "`<path>` (supabase/config.toml) chứa giá trị literal dưới key credential (secret|password|token|client_id|*_key trừ anon/publishable), `auth.jwt_expiry` quá 3600, hoặc `enable_signup`/`site_url`/`additional_redirect_urls` khác với block `supabase` mà hfs.json khai báo."
+  meaning_vi: "`<path>` (supabase/config.toml) chứa giá trị literal dưới key credential (secret|password|token|client_id|*_key trừ anon/publishable), `auth.jwt_expiry` quá 3600, hoặc `enable_signup`/`site_url`/`additional_redirect_urls` khác với block Supabase mà hfs.json khai báo."
   causes_vi:
     - "Vi phạm luật L08: secret trong config.toml viết `env(NAME)`; jwt_expiry tối đa 3600; posture auth là fact được check, không phải claim trong doc."
-  nextStep_vi: "Đổi credential thành `env(TEN_BIEN)`, hạ `jwt_expiry` về <= 3600, và chỉnh hfs.json `supabase` hoặc config.toml cho khớp nhau."
+  nextStep_vi: "Đổi credential thành `env(TEN_BIEN)`, hạ `jwt_expiry` về <= 3600, và chỉnh block Supabase của hfs.json hoặc config.toml cho khớp nhau."
   owner: op-retry
   kind: check-finding
 
@@ -14744,7 +14744,7 @@ DB_TYPES_DRIFT:
   meaning_vi: "`supabase/types/database.types.ts` chưa được commit, hoặc khác với text mà `contract:emit` sinh lại từ migrations hiện tại (hoặc emit thất bại). Pattern giống R23 HFS_CONTRACT_SNAPSHOT_DRIFT."
   causes_vi:
     - "Vi phạm luật L09: file types là artefact sinh; commit bản mới nhất, không sửa tay."
-  nextStep_vi: "Chạy `npm run contract:emit` và commit `supabase/types/database.types.ts` kết quả."
+  nextStep_vi: "Chạy `starci app emit` và commit `supabase/types/database.types.ts` kết quả."
   owner: op-retry
   kind: check-finding
 

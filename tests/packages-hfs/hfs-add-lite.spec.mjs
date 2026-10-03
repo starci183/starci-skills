@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { addTable } from "../../packages/hfs/scaffold/add-table.mjs";
 import { addApp } from "../../packages/hfs/scaffold/add-app.mjs";
 import { addKind } from "../../packages/hfs/scaffold/add.mjs";
-import { main } from "../../packages/hfs/bin/hfs.mjs";
+import { main } from "../../packages/hfs/src/main.mjs";
 import { checkDatabase } from "../../scripts/hfs/rules/database.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
@@ -212,7 +212,7 @@ test("the add table CLI accepts --fe and --no-types and reports its created file
   let out = "";
   let err = "";
   const code = await main(
-    ["add", "table", "audit-events", "--fe", "--no-types", "--repo", root],
+    ["add", "table", "audit-events", "--fe", "--no-types", "--cwd", root],
     {
       stdout: (text) => {
         out += text;
@@ -247,7 +247,7 @@ test("add app refuses a second lite front end and keeps full add-app behavior", 
     (error) =>
       error?.code === "HFS_ADD_LITE_SINGLE_APP" &&
       error.message ===
-        "a lite app has one front-end app; a second app needs the shared <project>-ui and <project>-i18n packages: run hfs upgrade --edition full",
+        "a lite app has one front-end app; a second app needs the shared <project>-ui and <project>-i18n packages: run starci app upgrade --edition full",
   );
   assert.equal(has(root, "fe/apps/admin"), false);
 

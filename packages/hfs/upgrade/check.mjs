@@ -1,4 +1,4 @@
-// The `hfs check --edition full` view of a lite app. The app stays byte-for-byte untouched: its declaration is cloned without
+// The `starci app check --edition full` view of a lite app. The app stays byte-for-byte untouched: its declaration is cloned without
 // `edition`, then passed to the existing slot resolver, rule filter and architecture engine as an injected declaration.
 import fs from "node:fs";
 import path from "node:path";
@@ -44,7 +44,7 @@ function fullManagedFindings(repoRoot, targets) {
       code,
       level: "error",
       path: result.path,
-      message: `${result.path} is not its full-edition render (expected sha256 ${result.expectedHash.slice(0, 12)}${result.actualHash ? `, found ${result.actualHash.slice(0, 12)}` : ""}); run hfs upgrade --edition full`,
+      message: `${result.path} is not its full-edition render (expected sha256 ${result.expectedHash.slice(0, 12)}${result.actualHash ? `, found ${result.actualHash.slice(0, 12)}` : ""}); run starci app upgrade --edition full`,
     });
   }
   return findings;

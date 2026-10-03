@@ -55,15 +55,18 @@
     "dev:be": "cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/api/src/main.ts",
     "dev:fe": "turbo run dev --filter=@lite-app/web",
     "start:api": "node be/dist/apps/api/src/main.js",
+    "cli": "node be/dist/apps/cli/src/main.js",
+    "migrate": "node be/dist/apps/cli/src/main.js migrate run",
     "start:web": "npm run start -w @lite-app/web",
     "docker:build": "npm run docker:build:api && npm run docker:build:cli",
     "docker:build:api": "docker build -f be/apps/api/Dockerfile -t lite-app/api:dev .",
+    "docker:build:cli": "docker build -f be/apps/cli/Dockerfile -t lite-app/cli:dev .",
     "build:be": "cd be && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "build:fe": "turbo run build --filter=./fe/apps/*",
     "codegen": "node scripts/codegen.mjs",
     "typecheck": "tsc -p be/tsconfig.json && turbo run typecheck",
-    "lint": "hfs lint",
-    "lint:fix": "hfs lint --fix",
+    "lint": "starci app lint",
+    "lint:fix": "starci app lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:start": "supabase start",
@@ -72,10 +75,7 @@
     "db:new": "supabase migration new",
     "db:push": "supabase db push",
     "db:types": "npm run contract:emit",
-    "db:lint": "hfs check --fast",
-    "contract:emit": "hfs emit-contracts",
-    "cli": "node be/dist/apps/cli/src/main.js",
-    "migrate": "node be/dist/apps/cli/src/main.js migrate run",
-    "docker:build:cli": "docker build -f be/apps/cli/Dockerfile -t lite-app/cli:dev ."
+    "db:lint": "starci app check --fast",
+    "contract:emit": "starci app emit-contracts"
   }
 }

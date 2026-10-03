@@ -5,7 +5,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-    "lint": "hfs lint --workspace .",
+    "lint": "starci app lint --workspace .",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },

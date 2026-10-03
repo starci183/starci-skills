@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { main } from '../../packages/hfs/bin/hfs.mjs';
+import { main } from '../../packages/hfs/src/main.mjs';
 import { appHasDbTypes, dbTypesEmitter, dbTypesPath, emitDbTypes, generateDbTypes, writeDbTypes } from '../../packages/hfs/emit/db-types.mjs';
 import { emitContracts } from '../../packages/hfs/emit/contracts.mjs';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
@@ -148,14 +148,14 @@ test('emit-contracts CLI regenerates database types for a scaffolded lite app th
   const stdout = [];
   const run = fakeRun(calls);
 
-  assert.equal(await main(['emit-contracts', '--repo', root], { run, stdout: text => stdout.push(text) }), 0);
+  assert.equal(await main(['emit', '--cwd', root], { run, stdout: text => stdout.push(text) }), 0);
   assert.equal(fs.readFileSync(path.join(root, dbTypesPath), 'utf8'), GENERATED);
   assert.deepEqual(calls, [{
     file: 'supabase',
     args: ['gen', 'types', 'typescript', '--local', '--schema', 'public,graphql_public'],
     cwd: root,
   }]);
-  assert.match(stdout.join(''), /hfs emit-contracts: 0 written/);
+  assert.match(stdout.join(''), /starci app emit: 0 written/);
 });
 
 test('dbTypesEmitter is the emitTypes of checkDatabase: drift and emit-failed are findings, identical text is clean', async () => {

@@ -70,7 +70,7 @@ versioning:
 #   appKind     the app kind of hfs.json apps[].kind whose directory this slot describes.
 #   managedBy   the template directory starci app sync renders this slot's files from. The slot path then lists literal files
 #               only, and each is rendered from templates/<profile or common>/<managedBy>/<path, leading dots dropped>;
-#   liteManagedBy  the template directory hfs sync renders under edition lite (default: managedBy). A slot with only
+#   liteManagedBy  the template directory starci app sync renders under edition lite (default: managedBy). A slot with only
 #               liteManagedBy is managed only in lite; its effective lite.path still lists literal files;
 #               the managed file list lives here and nowhere in code. A difference is HFS_MANAGED_FILE_DRIFT (a
 #               back end's tsconfig.json: HFS_TS_STRICT when a flag or an option was added).
@@ -457,7 +457,7 @@ slots:
     rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.ci-db
     profiles: [app]
-    # The database deploy workflow: workflow_dispatch only (like app.ci-e2e); hfs sync renders it under the managed ci group.
+    # The database deploy workflow: workflow_dispatch only (like app.ci-e2e); starci app sync renders it under the managed ci group.
     path: ".github/workflows/db-deploy.yml"
     presence: optional
     tracked: tracked

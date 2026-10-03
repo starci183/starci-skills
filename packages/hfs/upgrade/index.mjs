@@ -1,4 +1,4 @@
-// hfs upgrade --edition full: the additive edition migration from a lite app to the full HFS tree.
+// starci app upgrade --edition full: the additive edition migration from a lite app to the full HFS tree.
 //
 // The upgrade is deliberately assembled from the same full-edition render and scaffold templates as a new full app. It never
 // rewrites an existing product source file. A dry run returns the exact ordered operations; apply performs those operations and
@@ -508,12 +508,12 @@ export async function upgradeMain(
   if (to === undefined)
     throw new UpgradeError(
       "HFS_UPGRADE_USAGE",
-      "hfs upgrade needs --edition full",
+      "starci app upgrade needs --edition full",
     );
   const steps = await upgradeEdition({ root, to, plan, presets });
   for (const step of steps) stdout(`${step.op} ${step.path}: ${step.why}\n`);
   stdout(
-    `hfs upgrade --edition full${plan ? " --plan" : ""}: ${steps.length} step${steps.length === 1 ? "" : "s"} ${plan ? "planned; no file written" : "applied"}\n`,
+    `starci app upgrade --edition full${plan ? " --plan" : ""}: ${steps.length} step${steps.length === 1 ? "" : "s"} ${plan ? "planned; no file written" : "applied"}\n`,
   );
   return 0;
 }

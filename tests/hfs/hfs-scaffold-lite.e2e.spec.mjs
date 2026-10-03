@@ -169,7 +169,7 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
   });
   const beforePlan = gitStatus(app);
   const plan = runAppCli(['upgrade', '--edition', 'full', '--plan']);
-  assert.equal(plan.status, 0, `hfs upgrade plan failed (${plan.status ?? plan.error?.message}):\n${tail(plan)}`);
+  assert.equal(plan.status, 0, `starci app upgrade plan failed (${plan.status ?? plan.error?.message}):\n${tail(plan)}`);
   assert.match(plan.stdout, /(?:add|remove-field|rewrite-managed) /, 'the upgrade printed its operations');
   assert.match(plan.stdout, /planned; no file written/, 'the upgrade identified itself as a dry plan');
   assert.equal(gitStatus(app), beforePlan, 'the full-edition upgrade plan wrote nothing');

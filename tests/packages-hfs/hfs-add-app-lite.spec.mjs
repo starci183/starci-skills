@@ -65,7 +65,7 @@ test("addApp refuses the second lite front end with the single-app message and c
     (error) =>
       error?.code === "HFS_ADD_LITE_SINGLE_APP" &&
       error.message ===
-        "a lite app has one front-end app; a second app needs the shared <project>-ui and <project>-i18n packages: run hfs upgrade --edition full",
+        "a lite app has one front-end app; a second app needs the shared <project>-ui and <project>-i18n packages: run starci app upgrade --edition full",
   );
   assert.equal(fs.existsSync(path.join(root, "fe", "apps", "admin")), false);
   assert.equal(read(root, "hfs.json"), declarationBefore);

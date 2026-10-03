@@ -7,7 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parseYaml } from "../../engine/yaml.mjs";
-import { main } from "../../packages/hfs/bin/hfs.mjs";
+import { main } from "../../packages/hfs/src/main.mjs";
 import { scaffoldApp } from "../../packages/hfs/scaffold/app.mjs";
 import {
   checkTargets,
@@ -280,7 +280,7 @@ test("a real lite scaffold plans and applies the additive full upgrade", async (
     "upgrade",
     "--edition",
     "full",
-    "--repo",
+    "--cwd",
     root,
   ]);
   assert.equal(repeated.code, 2);
@@ -303,7 +303,7 @@ test("upgrade refuses a real full scaffold with exit 2 and the documented messag
     "upgrade",
     "--edition",
     "full",
-    "--repo",
+    "--cwd",
     root,
   ]);
   assert.equal(result.code, 2);

@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { main } from "../../packages/hfs/bin/hfs.mjs";
+import { main } from "../../packages/hfs/src/main.mjs";
 import {
   UpgradeError,
   fullEditionDeclaration,
@@ -321,7 +321,7 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
     "--edition",
     "full",
     "--plan",
-    "--repo",
+    "--cwd",
     root,
   ]);
   assert.equal(cli.code, 0, cli.err);
@@ -434,7 +434,7 @@ test("the full-edition override judges a lite tree without writing it, and the a
     "check",
     "--edition",
     "full",
-    "--repo",
+    "--cwd",
     root,
     "--json",
   ]);
@@ -489,7 +489,7 @@ test("already-full and invalid targets refuse with exit 2, and a failed lock res
     "upgrade",
     "--edition",
     "full",
-    "--repo",
+    "--cwd",
     root,
   ]);
   assert.equal(second.code, 2);
@@ -498,7 +498,7 @@ test("already-full and invalid targets refuse with exit 2, and a failed lock res
     "check",
     "--edition",
     "lite",
-    "--repo",
+    "--cwd",
     root,
     "--fast",
   ]);

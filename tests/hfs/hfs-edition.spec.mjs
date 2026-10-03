@@ -49,7 +49,7 @@ test('edition: absent means full, full and lite resolve, every view carries it',
     assert.equal(validateRepoSchema(JSON.parse(JSON.stringify(app({ edition })))), false, `schema accepted edition ${edition}`);
     refusal(() => resolveRepoDeclaration(manifest, app({ edition })), 'HFS_EDITION_INVALID');
   }
-  // hfs check reports an invalid edition as one hfs.json finding, never an exception
+  // starci app check reports an invalid edition as one hfs.json finding, never an exception
   const bad = checkRepo({ repoRoot: root, declaration: app({ edition: 'basic' }), files: ['hfs.json'], tree: false });
   assert.deepEqual(bad.findings.map((f) => [f.code, f.path]), [['HFS_EDITION_INVALID', 'hfs.json']]);
 });

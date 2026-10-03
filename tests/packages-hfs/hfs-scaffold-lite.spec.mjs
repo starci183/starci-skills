@@ -210,7 +210,7 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
     status: 'ok',
     expectedHash: target.hash,
     actualHash: target.hash,
-  })), 'hfs sync is a no-op immediately after scaffold');
+  })), 'starci app sync is a no-op immediately after scaffold');
   execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
   execFileSync('git', ['-c', 'core.autocrlf=false', 'add', '-A'], { cwd: root, stdio: 'ignore' });
   assert.deepEqual(await checkDatabase({ repoRoot: root, files, emitTypes: async () => GENERATED_TYPES }), []);

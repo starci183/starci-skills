@@ -24,7 +24,7 @@ export function effectiveSlot(slot, profile, edition) {
   return { ...base, ...(lite ?? {}), presence, tracked, tests: 'none' };
 }
 
-/** The template group hfs sync renders `slot` from under `edition`: `liteManagedBy` (else `managedBy`) in lite, `managedBy` otherwise; undefined when unmanaged. */
+/** The template group starci app sync renders `slot` from under `edition`: `liteManagedBy` (else `managedBy`) in lite, `managedBy` otherwise; undefined when unmanaged. */
 export function managedGroupOf(slot, edition) {
   return edition === 'lite' ? (slot.liteManagedBy ?? slot.managedBy) : slot.managedBy;
 }

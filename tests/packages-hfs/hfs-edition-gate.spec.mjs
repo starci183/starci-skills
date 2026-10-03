@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { main } from '../../packages/hfs/bin/hfs.mjs';
+import { main } from '../../packages/hfs/src/main.mjs';
 import { addKind } from '../../packages/hfs/scaffold/add.mjs';
 import { EditionRefusal, refuseInEdition } from '../../packages/hfs/scaffold/edition-gate.mjs';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 import { cleanup, installTypeScript } from '../helpers/hfs-cli-fixture.mjs';
 
-// The edition gate of `hfs add` and `hfs new` (design 8.6 R8): in a lite app a noun whose file tree lands in a slot the
+// The edition gate of `starci app add` and `starci app new` (design 8.6 R8): in a lite app a noun whose file tree lands in a slot the
 // lite edition does not have (the slot's `editions` exclude it, or its `litePresence` is forbidden) refuses with exit 2
 // and "<verb> <noun>: full edition only; run starci app upgrade --edition full" on stderr, nothing written. The slot
 // resolver of the app decides - never a noun list.
@@ -75,17 +75,17 @@ test('a lite app refuses every add noun whose tree writes a slot lite does not h
   ];
   for (const [noun, name, ...opts] of cases) {
     const dir = repo(LITE);
-    const result = await cli(['add', noun, name, ...opts, '--repo', dir]);
+    const result = await cli(['add', noun, name, ...opts, '--cwd', dir]);
     assert.deepEqual([result.code, result.out, result.err], [2, '', `add ${noun}: full edition only; run starci app upgrade --edition full\n`], noun);
     assert.deepEqual(tree(dir), ['hfs.json'], `${noun}: nothing written, no partial state`);
     assert.throws(() => addKind({ repoRoot: dir, noun, name }), EditionRefusal, `${noun}: the exported function refuses, not only the CLI`);
   }
   // the refusal precedes the noun's option validation: a saga without its --owner answers the same
   const dir = repo(LITE);
-  assert.equal((await cli(['add', 'saga', 'fulfil', '--repo', dir])).err, 'add saga: full edition only; run starci app upgrade --edition full\n');
+  assert.equal((await cli(['add', 'saga', 'fulfil', '--cwd', dir])).err, 'add saga: full edition only; run starci app upgrade --edition full\n');
   assert.deepEqual(tree(dir), ['hfs.json']);
   // `event` is no noun in any edition: the unknown-noun refusal stays as before
-  const event = await cli(['add', 'event', 'order-paid', '--repo', repo(LITE)]);
+  const event = await cli(['add', 'event', 'order-paid', '--cwd', repo(LITE)]);
   assert.equal(event.code, 2);
   assert.match(event.err, /HFS_ADD_NOUN_UNKNOWN/);
 });
@@ -94,7 +94,7 @@ test('a lite app refuses `new service` and `new spec` - the unit spec they write
   // No node_modules: the refusal precedes even the repository's own TypeScript load.
   const dir = repo(LITE);
   for (const args of [['service', 'be/src/modules/domain/commission', 'commission'], ['spec', 'be/src/modules/domain/commission/commission.service.ts']]) {
-    const result = await cli(['new', ...args, '--repo', dir]);
+    const result = await cli(['new', ...args, '--cwd', dir]);
     assert.deepEqual([result.code, result.out, result.err], [2, '', `new ${args[0]}: full edition only; run starci app upgrade --edition full\n`], args[0]);
   }
   assert.deepEqual(tree(dir), ['hfs.json'], 'nothing written');
@@ -124,31 +124,31 @@ test('the nouns lite keeps are untouched: add api, add webhook and add cli still
   fs.mkdirSync(path.join(dir, 'be', 'apps', 'core', 'src'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'be', 'apps', 'core', 'src', 'app.module.ts'), ['import { Module } from "@nestjs/common"', '', '@Module({', '  imports: [', '  ],', '})', 'export class AppModule {}', ''].join('\n'));
   fs.writeFileSync(path.join(dir, 'be', 'apps', 'core', 'src', 'main.ts'), ['import { parseHttpSecurityConfig } from "@modules/platform/http-security"', 'const options = { httpSecurity: parseHttpSecurityConfig(env) }', 'NestFactory.create(AppModule.register(options))', ''].join('\n'));
-  const api = await cli(['add', 'api', 'checkout', '--service', 'CheckoutService=@modules/domain/order', '--repo', dir]);
+  const api = await cli(['add', 'api', 'checkout', '--service', 'CheckoutService=@modules/domain/order', '--cwd', dir]);
   assert.equal(api.code, 0, api.err);
   assert.ok(exists(dir, 'be/src/features/api/checkout/transport/http/checkout-http.module.ts'));
-  const webhook = await cli(['add', 'webhook', 'payment-gateway', '--service', 'PaymentService=@modules/domain/payment', '--repo', dir]);
+  const webhook = await cli(['add', 'webhook', 'payment-gateway', '--service', 'PaymentService=@modules/domain/payment', '--cwd', dir]);
   assert.equal(webhook.code, 0, webhook.err);
   assert.ok(exists(dir, 'be/src/features/webhooks/payment-gateway/transport/http/payment-gateway.webhook.ts'));
   // a lite app has no cli app until the first `add cli`, which bootstraps apps/cli and its static cli feature root, then wires the group in
   fs.mkdirSync(path.join(dir, 'be'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'be', 'nest-cli.json'), JSON.stringify({ collection: '@nestjs/schematics', monorepo: true, root: 'apps/api', sourceRoot: 'apps/api/src', projects: { api: { type: 'application', root: 'apps/api', entryFile: 'main', sourceRoot: 'apps/api/src' } } }));
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', private: true, scripts: {}, dependencies: {}, devDependencies: {} }));
-  const addCli = await cli(['add', 'cli', 'requeue', '--service', 'DeadLetterService=@modules/domain/order', '--repo', dir]);
+  const addCli = await cli(['add', 'cli', 'requeue', '--service', 'DeadLetterService=@modules/domain/order', '--cwd', dir]);
   assert.equal(addCli.code, 0, addCli.err);
   assert.ok(exists(dir, 'be/src/features/cli/requeue/requeue.cli.ts'));
   assert.ok(exists(dir, 'be/apps/cli/src/main.ts'), 'the first add cli of a lite app creates be/apps/cli');
   // and `new image` is untouched
-  assert.equal((await cli(['new', 'image', '--repo', repo(LITE)])).code, 0);
+  assert.equal((await cli(['new', 'image', '--cwd', repo(LITE)])).code, 0);
 });
 
 test('a full app is unaffected: the nouns lite refuses write as before', async () => {
   const dir = repo(FULL);
-  const queue = await cli(['add', 'queue', 'receipt', '--repo', dir]);
+  const queue = await cli(['add', 'queue', 'receipt', '--cwd', dir]);
   assert.equal(queue.code, 0, queue.err);
   assert.ok(exists(dir, 'be/src/modules/queues/receipt/receipt.queue.ts'));
   installTypeScript(dir);
-  const service = await cli(['new', 'service', 'be/src/modules/domain/commission', 'commission', '--repo', dir]);
+  const service = await cli(['new', 'service', 'be/src/modules/domain/commission', 'commission', '--cwd', dir]);
   assert.equal(service.code, 0, service.err);
   assert.ok(exists(dir, 'be/src/modules/domain/commission/commission.service.spec.ts'));
 });

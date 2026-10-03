@@ -79,7 +79,7 @@ import { checkAppRoot, trackedTreeView } from './architecture/hfs.mjs';
 import { testTopologyFindings } from './rules/test-topology.mjs';
 import { feNoTestsFindings, isFeTestPath } from './rules/fe-no-tests.mjs';
 import { editionFindings } from './rules/edition.mjs';
-// The database rules (R213-R216) read SQL through a WASM parser, so they are async: `hfs check` calls them beside the other emitters and passes the findings in as `extraFindings`.
+// The database rules (R213-R216) read SQL through a WASM parser, so they are async: `starci app check` calls them beside the other emitters and passes the findings in as `extraFindings`.
 export { checkDatabase } from './rules/database.mjs';
 
 const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';

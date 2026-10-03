@@ -1937,7 +1937,7 @@ rules:
       - {kind: hfs, id: db-privileged-objects, at: scripts/hfs/rules/database.mjs}
   - id: R216
     code: "DB_CONFIG_POLICY"
-    law: "The database configuration and its types are checked facts: `supabase/config.toml` carries no literal value under a credential key (the value is `env(NAME)`), `auth.jwt_expiry` is at most 3600, and signup, site url and redirect urls equal the `supabase` block of hfs.json where it declares them; `supabase/types/database.types.ts` is committed and equals the text `contract:emit` regenerates from the migrations."
+    law: "The database configuration and its types are checked facts: `supabase/config.toml` carries no literal value under a credential key (the value is `env(NAME)`), `auth.jwt_expiry` is at most 3600, and signup, site url and redirect urls equal the Supabase block of hfs.json where it declares them; `supabase/types/database.types.ts` is committed and equals the text `contract:emit` regenerates from the migrations."
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["DB_CONFIG_POLICY", "DB_TYPES_DRIFT"]

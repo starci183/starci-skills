@@ -128,7 +128,7 @@ export const write=async(input:unknown)=>{const parsed=schema.parse(input);const
 export const write=async(input:unknown)=>{const principal=await getPrincipal();if(principal.kind==='anonymous')return {kind:'refused' as const};return {kind:'ok' as const,data:String(input)}};`, expected: ['FE_DB_WRITE_SHAPE'] },
     { name: 'health live route is allowed', path: 'apps/web/src/app/health/live/route.ts', source: `export const GET=()=>new Response('ok');`, expected: [] },
     { name: 'auth callback slot is allowed', path: 'apps/web/src/app/auth/callback/route.ts', source: `export const GET=()=>new Response('ok');`, expected: [] },
-    { name: 'api route is refused', path: 'apps/web/src/app/api/export/route.ts', source: `export const GET=()=>new Response('no');`, expected: ['FE_ROUTE_HANDLER_FORBIDDEN'] },
+    { name: 'a route handler under app/api is refused', path: 'apps/web/src/app/api/export/route.ts', source: `export const GET=()=>new Response('no');`, expected: ['FE_ROUTE_HANDLER_FORBIDDEN'] },
     { name: 'route tsx is not a Next route handler', path: 'apps/web/src/app/api/export/route.tsx', source: `export const Route=()=>null;`, expected: [] },
     { name: 'getPrincipal uses getClaims', path: 'apps/web/src/modules/db/principal.ts', source: `import {client} from './server';export const getPrincipal=async()=>{const result=await client.auth.getClaims();if(result.error)return {kind:'anonymous' as const};return {kind:'member' as const,claims:result.data.claims}};`, expected: [] },
     { name: 'product public config is accepted by config owner', path: 'apps/web/src/modules/config/index.ts', source: `export const analytics=process.env.NEXT_PUBLIC_ANALYTICS_ID;`, expected: [] },

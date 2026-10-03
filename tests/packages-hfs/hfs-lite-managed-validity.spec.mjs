@@ -120,7 +120,7 @@ test('lite package scripts exclude tests and use only the approved database comm
     assert.ok(allowedSupabaseSubcommands.has(command.slice('supabase '.length)), `${name}: ${command}`);
   }
   assert.equal(databaseScripts['db:types'], 'npm run contract:emit');
-  assert.equal(databaseScripts['db:lint'], 'hfs check --fast');
+  assert.equal(databaseScripts['db:lint'], 'starci app check --fast');
 });
 
 test('lite codegen is JavaScript with exactly one database-types hook call site', () => {

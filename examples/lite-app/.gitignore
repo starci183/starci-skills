@@ -1,4 +1,4 @@
-# >>> hfs sync (managed block; do not edit) >>>
+# >>> starci app sync (managed block; do not edit) >>>
 # Build output and tool output the tools need in place.
 node_modules/
 dist/
@@ -65,4 +65,4 @@ next-env.d.ts
 .starcistacks/*/infra/terraform/files/
 .starcistacks/*/infra/terraform/*.tar.gz
 !.starcistacks/**/*.enc
-# <<< hfs sync <<<
+# <<< starci app sync <<<

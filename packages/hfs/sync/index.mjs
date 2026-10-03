@@ -28,7 +28,7 @@ import { readDeclaredSonarKey } from './sonar-key.mjs';
 
 export const TEMPLATES_DIR = path.join(import.meta.dirname, '..', 'templates');
 const NODE_MAJOR = 22;
-const APP_BINARY = 'hfs';
+const APP_BINARY = 'starci app';
 /** The scopes a target is rendered for: the app root, then each side. */
 export const SCOPES = Object.freeze([APP_SCOPE, ...SIDES]);
 export const BLOCK_BEGIN = '# >>> starci app sync (managed block; do not edit) >>>';

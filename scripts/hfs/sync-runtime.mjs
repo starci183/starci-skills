@@ -69,7 +69,7 @@ function patternTopicFiles() {
 }
 
 export const CATALOG = 'modules/kernel/failure-codes.yaml';
-/** The rule catalog the edition filter of hfs check reads (check.mjs judgedFindings), so the bundled runtime carries it. */
+/** The rule catalog the edition filter of starci app check reads (check.mjs judgedFindings), so the bundled runtime carries it. */
 const RULE_CATALOG_FILE = 'knowledge/hfs/rules.yaml';
 /**
  * Data files the architecture machine reads at run time beside its code, which a canon bundle must carry because the

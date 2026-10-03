@@ -73,7 +73,7 @@ rules:
     kind: mandatory
     hfsRules: [R216]
     requirement: |
-      `supabase/config.toml` carries no literal credential and mirrors the `supabase` block of hfs.json (signup, token lifetime, site
+      `supabase/config.toml` carries no literal credential and mirrors the Supabase block of hfs.json (signup, token lifetime, site
       and redirect urls). The generated database types equal what the local stack produces; a drift is a finding.
     rationale: |
       A client typed by stale generated types compiles against a schema that no longer exists.

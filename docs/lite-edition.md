@@ -11,7 +11,7 @@ workers or event-driven infrastructure. Start with full when those capabilities 
 ## Create a lite app
 
 ```sh
-npx hfs scaffold app <name> --edition lite
+npx starci app scaffold <name> --edition lite
 ```
 
 The scaffold creates the minimum live product and generates the `app.supabase.types` artifact from the app's local Supabase
@@ -50,12 +50,12 @@ explicit public name. Supabase Edge Functions are not part of lite.
 
 ## Add product capabilities
 
-- `hfs add table <name> [--fe] [--no-types]` adds a migration and the matching back-end capability. `--fe` adds typed
+- `starci app add table <name> [--fe] [--no-types]` adds a migration and the matching back-end capability. `--fe` adds typed
   front-end readers and writers. Types regenerate by default; `--no-types` deliberately skips that step.
-- `hfs add cli <group>` creates the optional cli app on first use, including the built-in migration and seed groups, and then
+- `starci app add cli <group>` creates the optional cli app on first use, including the built-in migration and seed groups, and then
   adds the requested group without test files.
-- `hfs add app <name>` refuses in lite because lite has exactly one front-end app. Upgrade before adding another.
-- `hfs emit-contracts` writes the enabled back-end snapshots and the `app.supabase.types` artifact. The local Supabase stack
+- `starci app add app <name>` refuses in lite because lite has exactly one front-end app. Upgrade before adding another.
+- `starci app emit` writes the enabled back-end snapshots and the `app.supabase.types` artifact. The local Supabase stack
   must be running for type generation.
 
 An `add` or `new` command whose target slot is unavailable in lite stops before writing with `<verb> <noun>: full edition only`.
@@ -66,8 +66,8 @@ This is a capability boundary, not an allowlist of command names.
 First inspect the additions and the remaining full-edition findings:
 
 ```sh
-npx hfs upgrade --edition full --plan
-npx hfs check --edition full
+starci app upgrade --edition full --plan
+npx starci app check --edition full
 ```
 
 The plan is read-only. The check also writes nothing; add `--db-types` when a local Supabase stack is running and a fresh types
@@ -76,7 +76,7 @@ comparison is required.
 Apply the plan with:
 
 ```sh
-npx hfs upgrade --edition full
+starci app upgrade --edition full
 ```
 
 The upgrade adds the full-only managed configuration, test layers and required cli support. It does not rewrite product source

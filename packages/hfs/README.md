@@ -30,25 +30,25 @@ Lite is the smaller edition of the same HFS standard, not another profile or eng
 the same slot manifest, rule catalog, lint canons, grammar, security rules and Docker rules apply, while edition fields filter
 out the test world and event machinery.
 
-`hfs scaffold app <name> --edition lite` creates the minimum single-api, single-Next-app Supabase product. It generates the
+`starci app scaffold <name> --edition lite` creates the minimum single-api, single-Next-app Supabase product. It generates the
 `app.supabase.types` artifact from the app's local Supabase stack; if that generation cannot run, scaffolding fails and removes
 the app it began instead of leaving a partial tree.
 
 The lite additions are deliberately narrow:
 
-- `hfs add table <name> [--fe] [--no-types]` adds the migration and matching back-end capability. `--fe` also adds typed readers
+- `starci app add table <name> [--fe] [--no-types]` adds the migration and matching back-end capability. `--fe` also adds typed readers
   and writers through the front-end database owner; types regenerate by default, while `--no-types` is the explicit opt-out.
-- `hfs add cli <group>` creates the optional cli app on first use, including its built-in migration and seed groups, then adds
+- `starci app add cli <group>` creates the optional cli app on first use, including its built-in migration and seed groups, then adds
   the requested group without full-edition specs.
-- `hfs add app <name>` refuses in lite because lite has exactly one front-end app. Upgrade before adding another.
+- `starci app add app <name>` refuses in lite because lite has exactly one front-end app. Upgrade before adding another.
 - An `add` or `new` whose target slot is unavailable in lite stops before writing with `<verb> <noun>: full edition only`.
 
-`hfs emit-contracts` continues to emit the enabled back-end snapshots and also writes `supabase/types/database.types.ts` when
+`starci app emit` continues to emit the enabled back-end snapshots and also writes `supabase/types/database.types.ts` when
 the `app.supabase.types` slot is enabled. The local Supabase stack must be running for generation.
 
-Plan the transition with `hfs upgrade --edition full --plan`, then use `hfs check --edition full [--db-types]` to judge the
+Plan the transition with `starci app upgrade --edition full --plan`, then use `starci app check --edition full [--db-types]` to judge the
 unchanged lite tree through the full-edition view. The check is read-only; `--db-types` includes a fresh generated-types
-comparison when the local stack is available. Applying `hfs upgrade --edition full` adds the full-only managed configuration,
+comparison when the local stack is available. Applying `starci app upgrade --edition full` adds the full-only managed configuration,
 test layers and cli requirements without rewriting product code. Downgrade to lite is not supported.
 
 ## Creating a service

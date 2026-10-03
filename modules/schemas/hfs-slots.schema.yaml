@@ -588,7 +588,7 @@ $defs:
       liteManagedBy:
         type: string
         pattern: '^[a-z][a-z0-9-]*$'
-        description: 'the template directory hfs sync renders under edition lite (default: managedBy); without managedBy the slot is managed only in lite'
+        description: 'the template directory starci app sync renders under edition lite (default: managedBy); without managedBy the slot is managed only in lite'
       perConnection:
         type: array
         minItems: 1

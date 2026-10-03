@@ -155,7 +155,7 @@ export function ensureLiteCli({ root, manifest, repo }) {
   ) {
     throw new ScaffoldError(
       "HFS_ADD_EXISTS",
-      "a cli tree exists but hfs.json does not declare it; hfs add never adopts an unowned tree",
+      "a cli tree exists but hfs.json does not declare it; starci app add never adopts an unowned tree",
     );
   }
 

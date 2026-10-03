@@ -84,7 +84,7 @@ $defs:
                         envPrefix: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$'}
                         owner: {type: string, pattern: '^[a-z][a-z0-9-]*$', description: 'The api or worker app that owns this bounded context (the connection is the context): only it composes the connection (R174).'}
                         isolation: {enum: [database, schema], description: 'The context is its own logical database, or its own schema of a shared database (<PREFIX>_SCHEMA); splitting a schema out into a database is an env-only change.'}
-                        provider: {enum: [postgres, supabase], description: 'The database product behind the connection; absent means the app-managed default. `supabase` enables the opt-in app.supabase* and be.integrations.supabase slots (the supabase/ tree Supabase owns, the schema authority a lite app reads instead of a migration tree).'}
+                        provider: {enum: [postgres, supabase], description: 'The database product behind the connection; absent means the app-managed default. the value supabase enables the opt-in app.supabase* and be.integrations.supabase slots (the supabase/ tree Supabase owns, the schema authority a lite app reads instead of a migration tree).'}
           fe:
             allOf:
               - {$ref: '#/$defs/side'}
