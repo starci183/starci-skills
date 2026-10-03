@@ -54,7 +54,8 @@ const cli=(t,args,env={})=>{
   t.after(()=>fs.rmSync(scratch,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const result=spawnSync(process.execPath,[path.join(root,'packages/cli/bin/starci.mjs'),...(typeof args==='function'?args(scratch):args)],{
     cwd:root,encoding:'utf8',windowsHide:true,timeout:30000,
-    env:{...process.env,...env,STARCI_LOCAL_ROOT:scratch,STARCI_TEST_MACHINE_FILE:path.join(scratch,'machine.sqlite')}
+    env:{...process.env,...env,STARCI_LOCAL_ROOT:scratch,STARCI_PROJECTS_ROOT:path.join(scratch,'projects'),
+      STARCI_TEST_MACHINE_FILE:path.join(scratch,'machine.sqlite'),STARCI_ARTIFACT_ROOT:path.join(scratch,'artifacts')}
   });
   return {result,scratch};
 };
