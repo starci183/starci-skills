@@ -11,6 +11,7 @@ import path from 'node:path';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { supabasePortVars } from '../../packages/hfs/scaffold/supabase-ports.mjs';
 import { runNpm } from '../../scripts/api/npm/run-npm.mjs';
+import { nextBuildEnv } from '../../scripts/gates/build-env.mjs';
 import { runNpx } from '../../scripts/api/npm/run-npx.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 import { startSourceCanonRegistry } from '../helpers/source-canon-registry.mjs';
@@ -117,7 +118,7 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
   step('npm run typecheck', ['run', 'typecheck']);
   step('npm run lint', ['run', 'lint']);
   step('npm run build:be', ['run', 'build:be']);
-  step('npm run build:fe', ['run', 'build:fe'], { timeout: 900_000 });
+  step('npm run build:fe', ['run', 'build:fe'], { timeout: 900_000, env: nextBuildEnv() });
 
   // Keep the scaffold's own stack alive through the data proof, type drift check and full-edition view; always stop it
   // before mkdtemp removes the app (its callback owns teardown ordering on every failure path).
