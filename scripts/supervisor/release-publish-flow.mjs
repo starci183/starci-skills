@@ -10,6 +10,7 @@ import { canonContentDigest, packedFiles } from '../gates/canon-digest.mjs';
 import { loadPins } from '../gates/canon-pins.mjs';
 import { releasePublish } from '../gates/release-publish.mjs';
 import { discoverExampleApps } from '../lib/example-refs.mjs';
+import { repinExample } from './example-repin.mjs';
 import { resultDetail, resultOk } from '../lib/verb-call.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
 
@@ -47,40 +48,6 @@ function rebindCodePatterns(root, write, deps) {
     fs.writeFileSync(file, output);
   }
   return { changed: changed.length, rows };
-}
-
-function repinExample(root, name, pins, write) {
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) throw new Error(`invalid example name ${name}`);
-  const directory = path.join(root, 'examples', name);
-  if (!fs.existsSync(path.join(directory, 'package.json'))) return { name, directory, present: false, changed: 0 };
-  const files = [];
-  const skip = new Set(['node_modules', 'dist', '.next', '.turbo', '.git', 'coverage']);
-  const visit = (dir, depth) => {
-    if (depth > 6) return;
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (skip.has(entry.name)) continue;
-      const target = path.join(dir, entry.name);
-      if (entry.isDirectory()) visit(target, depth + 1); else if (entry.name === 'package.json') files.push(target);
-    }
-  };
-  visit(directory, 0);
-  let changed = 0;
-  for (const file of files) {
-    const original = fs.readFileSync(file, 'utf8'), pkg = JSON.parse(original);
-    let output = original;
-    for (const key of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
-      for (const [dependency, spec] of Object.entries(pkg[key] ?? {})) {
-        const pin = pins[dependency];
-        if (!pin || spec === pin.version || /^(workspace:|file:)/.test(String(spec))) continue;
-        changed += 1;
-        const escaped = dependency.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const version = String(spec).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        output = output.replace(new RegExp(`("${escaped}"\\s*:\\s*")${version}(")`), `$1${pin.version}$2`);
-      }
-    }
-    if (write && output !== original) fs.writeFileSync(file, output);
-  }
-  return { name, directory, present: true, changed };
 }
 
 /** `starci release publish`: existing registry publication plus the final binding and example refresh flow. */

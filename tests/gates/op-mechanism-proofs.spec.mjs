@@ -14,7 +14,7 @@ import { DOC_PROFILE, GATE_SCHEMA, LINT_SCHEMA, parseGateArgs, runDocGate } from
 import { DIGEST_SCHEMA, buildReadDigest, judgeKnowledgeDigest, loadOpGate } from '../../scripts/gates/read-digest.mjs';
 import { TEST_WORLD_RUN_SCHEMA, buildTestWorldRun, judgeSpec, testWorldRules } from '../../scripts/gates/test-world-run.mjs';
 import { UNIT_RUN_SCHEMA, judgeServices, unitFindings, unitKitRules } from '../../scripts/gates/unit-run.mjs';
-import { RELEASE_PROOF_SCHEMA, RELEASE_STEPS, appInstallsStep, buildReleaseProof } from '../../scripts/gates/release-proof.mjs';
+import { RELEASE_PROOF_SCHEMA, RELEASE_STEPS, appInstallsStep, buildReleaseProof, scaffoldInvocation } from '../../scripts/gates/release-proof.mjs';
 import {
   OP_PROOF_CHANGE, REVIEW_DEFECTS_SCHEMA, SECURITY_FINDINGS_SCHEMA, judgeDocGate, judgeJobProofs, judgeKnowledgeRead, judgeLint, judgeRelease, judgeReviewDefects,
   judgeReviewGate, judgeSecurityLint, judgeTestWorld, judgeTestWorlds, judgeUnitRun, feRelevant, proofsOf, securityRelevant,
@@ -281,6 +281,12 @@ test('review-defects: missing, an unclassified defect and an uncaught non-busine
 });
 
 // ---- release ----
+
+test('release: the app-installs proof scaffolds through the published @starci/cli bin at its pin (the hfs package has no bin) and refuses a missing pin', () => {
+  const pins = { '@starci/cli': { version: '1.0.0' }, '@starci/hfs': { version: '4.0.9' }, '@starci/jest-preset': { version: '2.2.4' } };
+  assert.deepEqual(scaffoldInvocation(pins, '/tmp/into'), ['-y', '-p', '@starci/cli@1.0.0', '-p', '@starci/jest-preset@2.2.4', 'starci', 'app', 'scaffold', 'release-app', '--into', '/tmp/into']);
+  assert.throws(() => scaffoldInvocation({ '@starci/jest-preset': { version: '2.2.4' } }, '/tmp/into'), /no canon pin for @starci[/]cli/);
+});
 
 test('release: missing, a missing or skipped step and a red step refuse; release-proof.mjs reads a SKIPPED line as a skip', (t) => {
   assert.equal(codeOf(judgeRelease(null)), 'op-release-proof-missing');

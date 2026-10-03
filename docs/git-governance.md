@@ -50,10 +50,12 @@ Every commit message is `type(scope): summary` with one of the types `feat`, `fi
 - the checkout is not on `main`, or has a tracked change (nothing is stashed, reset or cleaned);
 - the tag is not named, is not `v<version>`, is lightweight, sits on another commit, or already exists on the remote (a tag is never moved or re-pushed: cut the next version);
 - the release notes are unfinished (R222);
-- an L4 step is red or absent, a skipped test comes from missing infrastructure on the release host, or any skip other than the declared browser-conditional ones remains (every skip
-  is reported with its reason and the kept ones are listed by name);
+- an L4 step is red or absent, or a test executed in no leg: every test must have passed on the host run or in the Linux container run, a skip that passed in the other leg is listed with the leg
+  where it passed, and a skip nothing covered (missing infrastructure, a platform no leg has, any undeclared skip) fails L4, except the declared browser-conditional ones, which are listed by name;
 - main moved while L4 ran, or the pushed range holds a secret;
 - the remote refuses either ref (the push is atomic).
+
+A parked remote is not a refusal: while lands stay local the owner may park the remote's push url (a `pushurl` that reads `DISABLED-<reason>`) so that nothing but the release can push. The release cut pushes through the remote's fetch url for its one push, moves the remote-tracking ref itself and never writes the configuration; any other push url is the owner's choice and is used as set.
 
 L4 runs once per release. Landing runs only the dependent specs, so a red can surface at the release: the lands are merge commits on local main, which keeps a
 bisection over them cheap, and a red found after the push is fixed forward with the next tag and recorded under Known limitations, never by moving a tag.

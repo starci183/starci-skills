@@ -169,7 +169,7 @@ test('the L4 row: the runtime suite and check, every example script (lint, tsc, 
   const plan = planL4(base, { runtimeRoot: base });
   const names = plan.steps.map((s) => s.name);
   for (const expected of ['shop: npm run lint', 'shop: npm run typecheck', 'shop: npm run test', 'shop: npm run test:e2e', 'shop: npm run docker:build', 'shop: npm run build:be']) assert.ok(names.includes(expected), expected);
-  assert.deepEqual(plan.steps.filter((s) => s.absent).map((s) => s.name).sort(), ['shop: npm ci', 'shop: npm run build:be', 'shop: npm run build:fe', 'shop: npm run docker:build', 'shop: npm run format:check', 'shop: npm run test:contract', 'shop: npm run test:integration', 'shop: npm run typecheck:tests']);
+  assert.deepEqual(plan.steps.filter((s) => s.absent).map((s) => s.name).sort(), ['shop: npm ci', 'shop: npm run build:be', 'shop: npm run build:fe', 'shop: npm run codegen', 'shop: npm run docker:build', 'shop: npm run format:check', 'shop: npm run test:contract', 'shop: npm run test:integration', 'shop: npm run typecheck:tests']);
   assert.deepEqual(plan.proofs, ['shop: sonar']);
   const ran = [];
   const out = (await runL4(base, { plan, step: (s, o) => { ran.push([s.name, o.cwd]); return { ok: true, log: 'x.log', ms: 1, text: '﹣ draw-layer (1ms) # no browser\n' }; }, proofs: {}, parity: null }));
@@ -238,6 +238,35 @@ test('a held host lock refuses the cut naming its owner: the suite never runs an
   assert.equal(suites, 0);
   assert.equal(git(fx.repo, 'tag', '-l'), '', 'no tag was created');
   untouched(fx);
+});
+
+test('a push lock parked as DISABLED... on the remote pushurl is lifted for the release push only: main and the tag move, the config stays as the owner set it, the remote-tracking ref follows', async (t) => {
+  const fx = fixture(t);
+  const lock = 'DISABLED-local-main-until-the-release-push';
+  git(fx.repo, 'config', 'remote.origin.pushurl', lock);
+  const out = (await cut(fx));
+  assert.deepEqual([out.ok, out.verdict], [true, 'pushed'], JSON.stringify(out));
+  assert.equal(fx.remoteMain(), git(fx.repo, 'rev-parse', 'HEAD'));
+  assert.deepEqual(fx.remoteTags(), [TAG]);
+  assert.equal(git(fx.repo, 'config', '--get', 'remote.origin.pushurl'), lock, "the owner's lock is not rewritten");
+  assert.equal(git(fx.repo, 'rev-parse', 'refs/remotes/origin/main'), git(fx.repo, 'rev-parse', 'HEAD'), 'the remote-tracking ref moved with the push');
+  const plain = fixture(t);
+  git(plain.repo, 'config', 'remote.origin.pushurl', path.join(plain.base, 'does-not-exist.git'));
+  const refused = (await cut(plain));
+  assert.equal(refused.verdict, 'push-refused', 'a pushurl that is not a parked lock is left alone: a broken one fails the push');
+  untouched(plain);
+});
+
+test("a pushurl that is a real url is the owner's choice: the release pushes there, never to the fetch url", async (t) => {
+  const fx = fixture(t);
+  const other = path.join(fx.base, 'other.git');
+  git(fx.base, 'init', '-q', '--bare', '-b', 'main', other);
+  git(fx.repo, 'config', 'remote.origin.pushurl', other);
+  const out = (await cut(fx));
+  assert.equal(out.ok, true, JSON.stringify(out));
+  untouched(fx);
+  assert.equal(git(other, 'rev-parse', 'refs/heads/main'), git(fx.repo, 'rev-parse', 'HEAD'));
+  assert.equal(git(other, 'tag', '-l'), TAG);
 });
 
 test('the pre-push hook lets exactly the release the cut made through: a push of main without the L4 record is refused, with it the atomic push passes', async (t) => {

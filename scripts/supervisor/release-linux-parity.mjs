@@ -22,6 +22,10 @@ import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
 const STEP_NAME = 'linux-parity';
+/** The label of the spec step the container runs for the tests the host run skipped (read back by release-l4.mjs through the `##STEP` marker). */
+export const LINUX_SPECS_LABEL = 'linux-specs';
+/** The spec setup the root `npm test` runs under (package.json scripts.test): the same isolation for the files the container runs. */
+const SPEC_IMPORTS = ['low-priority', 'isolated-temp', 'isolated-registry', 'runtime-copies'].map((name) => `--import ./tests/setup/${name}.mjs`).join(' ');
 const DEFAULT_NODE = '22';
 const RUN_TIMEOUT_MS = 90 * 60_000;
 /** The spec suites: the root `npm test` and an example app's npm test / test:<layer> runs. The host ran them in this L4 row. */
@@ -113,6 +117,13 @@ export function parityScript(plan) {
     const exports = Object.entries(s.env).map(([k, v]) => `export ${k}=${quote(v)}`).join('\n');
     lines.push(`run_step ${quote(s.name)} ${quote(s.dir)} <<'__STEP_${i}__'`, ...(exports ? [exports] : []), s.run, `__STEP_${i}__`);
   });
+  if (plan.specs?.length) {
+    // The tests the host run could not execute (a shell it lacks, a link privilege it will not grant): their spec files run here, the shells installed INSIDE the container only.
+    lines.push(`run_step ${quote(`${LINUX_SPECS_LABEL}: ${plan.specs.length} spec file(s) the host run skipped tests of`)} . <<'__STEP_SPECS__'`,
+      'apt-get update -qq && apt-get install -y -qq zsh fish > /dev/null',
+      `node ${SPEC_IMPORTS} --test --test-reporter=spec ${plan.specs.map(quote).join(' ')}`,
+      '__STEP_SPECS__');
+  }
   lines.push('echo "##DONE"');
   return `${lines.join('\n')}\n`;
 }
@@ -136,7 +147,7 @@ export function runParity(repo, deps = {}) {
   const logDir = (deps.logDir ?? (() => { const dir = path.join(os.tmpdir(), 'starci-release-l4'); fs.mkdirSync(dir, { recursive: true }); return dir; }))();
   const log = path.join(logDir, `${STEP_NAME}-${t0}.log`);
   const docker = deps.docker ?? { version: dockerVersion, run: dockerRun, rm: containerRm };
-  const plan = parityPlan({ workflows: (deps.workflows ?? readWorkflows)(repo), apps: (deps.apps ?? (() => []))(repo) });
+  const plan = { ...parityPlan({ workflows: (deps.workflows ?? readWorkflows)(repo), apps: (deps.apps ?? (() => []))(repo) }), specs: [...(deps.specs ?? [])] };
   const result = (ok, why, extra = {}) => ({ name: STEP_NAME, ok, log, ms: now() - t0, skips: [], image: plan.image, steps: plan.steps.map((s) => s.name), skipped: plan.skipped, ...(why ? { why } : {}), ...extra });
   const refuse = (why) => { fs.writeFileSync(log, `${why}\n`); return result(false, why); };
 

@@ -34,7 +34,8 @@ the cause. There are no skip lists, no allowlists and no weakened specs.
 | L5 tag CI (Linux, once) | as L4 | as L4 | as L4 | as L4 |
 
 Checks run in full from L2 because they are fast and catch structure errors early; the specs are the expensive part, so only L4 runs all of them. L4 is exactly the row above, each
-step to a recorded log; every skipped test is reported with its reason, a skip from missing infrastructure (Docker, Postgres, Supabase, a port) fails it, and only the declared
+step to a recorded log; every skipped test is reported with its reason and every test must have passed in at least one leg, the host run or the Linux container run (the host-skipped spec files run in the container,
+whose shells are installed inside it only): a skip that passed in the other leg is listed with that leg, a skip nothing covered (missing infrastructure, a platform no leg has) fails it, and only the declared
 browser-conditional skips (draw-render, draw-rationale, draw-layer) may remain, listed by name. On demand: `unit.verify` (all unit specs of an app) and `e2e.verify` (all e2e of an app).
 
 ## Rights by role

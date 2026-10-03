@@ -11,7 +11,6 @@
 // CI (.github/workflows/ci.yml) and the release checklist both run it. It needs the network and the published
 // @starci packages the scaffold pins.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { runNpx } from '../api/npm/run-npx.mjs';
@@ -21,10 +20,15 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { nextBuildEnv } from './build-env.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
+import { scaffoldInvocation } from './release-proof.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const keep = process.argv.includes('--keep');
-const into = fs.mkdtempSync(path.join(os.tmpdir(), 'release-app-'));
+// The app is made UNDER the checkout (its scratch folder ex-testing/, never committed): the scaffold spec widens Turbopack's root to the checkout, and an install elsewhere
+// panics the fe build. It is removed link-safe afterwards.
+const scratch = path.join(root, 'ex-testing');
+fs.mkdirSync(scratch, { recursive: true });
+const into = fs.mkdtempSync(path.join(scratch, 'release-app-'));
 const app = path.join(into, 'release-app');
 const step = (label, run, args, opts = {}) => {
   console.log(`release-app-installs: ${label}`);
@@ -37,11 +41,10 @@ const step = (label, run, args, opts = {}) => {
 
 let exit = 1;
 try {
-  // Scaffold with the PUBLISHED hfs, the way a user does (npx -p @starci/hfs -p @starci/jest-preset), at the canon-pins
+  // Scaffold with the PUBLISHED cli, the way a user does (npx -p @starci/cli -p @starci/jest-preset starci app scaffold), at the canon-pins
   // versions: this proves the registry packages, not the runtime's source copy.
   const pins = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins;
-  const pinned = (name) => `${name}@${pins[name].version}`;
-  step(`npx ${pinned('@starci/hfs')} scaffold app release-app`, runNpx, ['-y', '-p', pinned('@starci/hfs'), '-p', pinned('@starci/jest-preset'), 'hfs', 'scaffold', 'app', 'release-app', '--into', into], { cwd: into });
+  step(`npx @starci/cli@${pins['@starci/cli'].version} app scaffold release-app`, runNpx, scaffoldInvocation(pins, into), { cwd: into });
   const lock = fs.existsSync(path.join(app, 'package-lock.json'));
   step(lock ? 'npm ci (registry)' : 'npm install (registry)', runNpm, [lock ? 'ci' : 'install', '--no-audit', '--no-fund'], { cwd: app });
   const env = { ...nextBuildEnv(), STARCI_APP_INSTALLS: path.join(app, 'node_modules'), STARCI_REQUIRE_APP_INSTALLS: '1' };

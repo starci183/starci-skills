@@ -5,7 +5,7 @@ import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { writeRuntimeShim } from './shim.mjs';
 
-export const RUNTIME_VERSION = '1.0.0-alpha.3';
+export const RUNTIME_VERSION = '1.0.0-alpha.4';
 
 const writeTo = (target, text) => {
   if (typeof target === 'function') target(text);
