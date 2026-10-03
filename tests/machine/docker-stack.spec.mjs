@@ -49,6 +49,7 @@ test('docker up refuses a protected port before any mutating Docker call', async
   const cwd = app(t);
   let mutated = false;
   const result = await dockerUp({ cwd, role: 'worker', positionals: ['api'], args: {} }, {
+    underHostLock: async (options, fn) => ({ ok: true, locked: true, value: await fn() }),
     composeConfig: () => success(JSON.stringify({ services: { api: { ports: [{ published: 3100, target: 3000 }] } } })),
     composeUp: () => { mutated = true; return success(); },
   });
@@ -62,6 +63,7 @@ test('docker down queries both labels and removes only selected non-foreign ids'
   const calls = [];
   const filters = ['label=starci.project=shop', 'label=com.docker.compose.project=starci-shop-api'];
   const result = await dockerDown({ cwd, role: 'worker', positionals: ['api'], args: { volumes: true } }, {
+    underHostLock: async (options, fn) => ({ ok: true, locked: true, value: await fn() }),
     dockerPs: (request) => { calls.push(['ps', request]); return success([
       JSON.stringify({ ID: 'ours-id', Names: 'starci-shop-api-api-1' }),
       JSON.stringify({ ID: 'foreign-id', Names: 'nivo-lite-db' }),
@@ -89,6 +91,7 @@ test('docker down never invokes a removal for empty labelled selections', async 
   const cwd = app(t);
   let removed = false;
   const result = await dockerDown({ cwd, role: 'worker', positionals: ['api'], args: {} }, {
+    underHostLock: async (options, fn) => ({ ok: true, locked: true, value: await fn() }),
     dockerPs: () => success(),
     resourceList: () => success(),
     composeDown: () => { removed = true; },
