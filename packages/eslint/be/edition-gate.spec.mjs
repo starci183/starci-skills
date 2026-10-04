@@ -3,13 +3,13 @@ import { fileURLToPath } from "node:url"
 import test from "node:test"
 import plugin from "./index.mjs"
 import { pluginForEdition } from "./lib/edition.mjs"
-import { enforcerJudgedInEdition } from "../../../scripts/hfs/edition-slots.mjs"
-import { loadRuleCatalog } from "../../../scripts/hfs/slots.mjs"
+import { enforcerJudgedInEdition } from "./runtime/scripts/hfs/edition-slots.mjs"
+import { loadRuleCatalog } from "./runtime/scripts/hfs/slots.mjs"
 
-const REPOSITORY = fileURLToPath(new URL("../../../", import.meta.url))
-const catalog = loadRuleCatalog({ root: REPOSITORY })
+const RUNTIME = fileURLToPath(new URL("./runtime/", import.meta.url))
+const catalog = loadRuleCatalog({ root: RUNTIME })
 
-test("every published back-end rule follows the source catalog in both editions", () => {
+test("every published back-end rule follows the bundled catalog in both editions", () => {
     for (const edition of ["full", "lite"]) {
         const gated = pluginForEdition({ plugin, hfs: { edition }, catalog })
         for (const [id, rule] of Object.entries(plugin.rules)) {
