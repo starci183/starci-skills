@@ -69,7 +69,8 @@ export function layoutPipeline(pipeline: PipelineView, availWidth = 1050) {
 }
 
 export const legTries = (leg: LegRow) => {
-  const budget = Math.max(0, ...leg.units.map(unit => unit.tryBudget));
-  const max = Math.max(0, ...leg.units.map(unit => unit.tries), ...(leg.units.length ? [] : [leg.attempts.length]));
-  return { tries: max, budget: budget || 5 };
+  const budgets = [...new Set(leg.units.map(unit => unit.tryBudget))];
+  const budget = budgets.length === 1 && budgets[0] > 0 ? budgets[0] : null;
+  const max = Math.max(0, ...leg.units.map(unit => unit.tries), ...(leg.units.length ? [] : leg.attempts.map(attempt => attempt.try)));
+  return { tries: max, budget };
 };

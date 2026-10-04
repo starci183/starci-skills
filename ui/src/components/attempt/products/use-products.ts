@@ -1,6 +1,7 @@
 import { useApiQuery } from '../../../api/query';
 import type { AttemptDetailV3, AttemptProducts, EvidenceKind, ProductFile } from '../../../contract';
 import { useBlobText } from '../../evidence/use-blob-text';
+import type { ReadState } from '../frame/read-warning';
 
 const obj = (value: unknown): Record<string, unknown> | null => (value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null);
 
@@ -24,15 +25,16 @@ const joinHost = (repo: string | null, rel: string) => (repo ? `${repo.replace(/
  * `/api/attempts/:p/:id/products`; when the server has no such route yet, the same shape is built from
  * `report.json.files` and the attempt's `patch.diff` attachment (paths and diffs only, no file content).
  */
-export function useProducts(project: string, attempt: AttemptDetailV3): { products: AttemptProducts | null; loading: boolean; fallback: boolean } {
+export function useProducts(project: string, attempt: AttemptDetailV3): { products: AttemptProducts | null; loading: boolean; fallback: boolean; error: string | null; url: string; read: ReadState } {
   const url = `/api/attempts/${encodeURIComponent(project)}/${encodeURIComponent(String(attempt.id))}/products`;
   const query = useApiQuery<AttemptProducts>(url, { topics: [`attempt:${project}:${attempt.id}`] });
-  const failed = !query.data && !!query.error;
-  const patchFile = failed ? attempt.files.find(file => file.name === 'patch.diff' || file.base === 'patch.diff') ?? null : null;
+  const unsupported = !query.data && ['PRODUCTS_UNSUPPORTED', 'UNSUPPORTED_ROUTE', 'NOT_IMPLEMENTED'].includes(query.errorCode ?? '');
+  const read = { error: unsupported ? null : query.error, meta: query.meta, observedAt: query.observedAt };
+  const patchFile = unsupported ? attempt.files.find(file => file.name === 'patch.diff' || file.base === 'patch.diff') ?? null : null;
   const patch = useBlobText(patchFile);
-  if (query.data) return { products: query.data, loading: false, fallback: false };
-  if (!failed) return { products: null, loading: true, fallback: false };
-  if (patchFile && (patch.status === 'idle' || patch.status === 'loading')) return { products: null, loading: true, fallback: true };
+  if (query.data) return { products: query.data, loading: false, fallback: false, error: query.error, url, read };
+  if (!unsupported) return { products: null, loading: !query.error && !query.meta, fallback: false, error: query.error, url, read };
+  if (patchFile && !patchFile.archived && (patch.status === 'idle' || patch.status === 'loading')) return { products: null, loading: true, fallback: true, error: null, url, read };
   const report = obj(attempt.report?.json);
   const paths = Array.isArray(report?.files) ? (report.files as unknown[]).filter((p): p is string => typeof p === 'string') : [];
   const diffs = patch.status === 'ready' ? splitDiff(patch.text) : new Map<string, string>();
@@ -43,7 +45,9 @@ export function useProducts(project: string, attempt: AttemptDetailV3): { produc
   });
   const head = typeof report?.head === 'string' ? report.head : null;
   return {
-    fallback: true, loading: false,
-    products: { head, parent: null, repo: attempt.where.repo, files, otherChanged: [...diffs.keys()].filter(p => !paths.includes(p)).map(path => ({ path, status: 'modified' })), claims: [], error: null },
+    fallback: true, loading: false, error: patchFile?.archived ? 'Recorded patch bytes are archived' : patch.status === 'error' ? patch.error : null, url, read,
+    products: { head, headSource: head ? 'report-tested' : null, headAt: null, reportHead: head,
+      parent: null, repo: attempt.where.repo, files, otherChanged: [...diffs.keys()].filter(p => !paths.includes(p)).map(path => ({ path, status: 'modified' })), claims: [], error: null, errorCode: null,
+      scope: { listed: paths.length, returned: files.length, truncated: false } },
   };
 }

@@ -10,9 +10,11 @@ applyPreferences(initialTheme(), initialLanguage());
 // Reload once to pick up the new index.html (guarded so a real outage does not loop).
 window.addEventListener('vite:preloadError', (event) => {
   let last = 0;
-  try { last = Number(sessionStorage.getItem('starci-chunk-reload') ?? 0); } catch { /* storage blocked */ }
+  try { last = Number(sessionStorage.getItem('starci-chunk-reload') ?? 0); }
+  catch { return; }
   if (Date.now() - last < 60_000) return;
-  try { sessionStorage.setItem('starci-chunk-reload', String(Date.now())); } catch { /* storage blocked */ }
+  try { sessionStorage.setItem('starci-chunk-reload', String(Date.now())); }
+  catch { return; }
   event.preventDefault();
   window.location.reload();
 });

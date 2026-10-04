@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 export const workflowTabs = ['units', 'graph', 'attempts', 'decisions', 'why', 'timeline', 'evidence', 'infra'] as const;
 export type WorkflowTab = (typeof workflowTabs)[number];
-export const attemptSteps = ['dispatch', 'run', 'report', 'checks', 'verdict', 'land'] as const;
+export const attemptSteps = ['dispatch', 'run', 'report', 'checks', 'commit', 'verdict', 'land'] as const;
 export type AttemptStep = (typeof attemptSteps)[number];
 export const systemTabs = ['engine', 'sla', 'resources', 'services', 'cleanup', 'land', 'supervisor', 'learning'] as const;
 export type SystemTab = (typeof systemTabs)[number];

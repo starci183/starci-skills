@@ -1,26 +1,20 @@
 import { ArrowUpRight, Check, Clock3, Star } from 'lucide-react';
-import { refreshQuery, useApiQuery } from '../../api/query';
+import { useApiQuery } from '../../api/query';
 import { ConceptBlock, type Concept } from '../../components/concept';
 import { Advanced } from '../../components/motion';
 import { Drawer } from '../../components/drawer';
-import { FeedbackState, PageSkeleton } from '../../components/feedback-state';
 import { StateChip } from '../../components/state-chip';
 import { TimeAgo } from '../../components/time-ago';
-import type { DecisionRow, Ref } from '../../contract';
+import type { DecisionRow, Ref, DecisionDetail } from '../../contract';
 import { formatAbsolute } from '../../i18n/vi';
 import { t } from '../../i18n/t';
+import { Badge } from '../../components/ui/badge';
+import { Button } from '../../components/ui/button';
+import { ReadQuality } from '../../components/charts/chart-card';
 
 export const concept: Concept = 'C12';
 
 type Evidence = Ref | { text: string };
-type DecisionDetail = DecisionRow & {
-  evidence: Evidence[];
-  options: { key: string; verb: string; recommended: boolean }[];
-  allowedVerbs: string[];
-  history: { kind: string; at: number; by: string | null; from?: string | null; to?: string | null }[];
-  resolution: { by: string | null; verb: string | null; decision: Ref | null; result: unknown } | null;
-  payload: unknown;
-};
 
 const actor = (value: string | null | undefined) => value === 'owner' ? t('The owner') : value === 'kernel' ? 'Kernel' : value === 'supervisor' ? 'Supervisor' : value ?? t('Unknown');
 const channel = (value: DecisionRow['channel']) => ({ 'kernel-seat': t('Kernel seat'), 'supervisor-seat': t('Supervisor seat'), telegram: 'Telegram', 'serve-ask': t('the ask channel') } as Record<string, string>)[value ?? ''] ?? t('Unknown');
@@ -35,23 +29,26 @@ function EvidenceList({ items, credential }: { items: Evidence[]; credential: bo
   </li>)}</ul>;
 }
 
-export function DecisionDrawer({ id, onClose }: { id: string | null; onClose: () => void }) {
-  const detail = useApiQuery<DecisionDetail>(`/api/decisions/${encodeURIComponent(id ?? '')}`, { topics: ['decisions'], enabled: Boolean(id), intervalMs: 20_000 });
+export function DecisionDrawer({ id, store, ledger, onClose }: { id: string | null; store: string | null; ledger: string | null; onClose: () => void }) {
+  const params = new URLSearchParams();
+  if (store) params.set('store', store);
+  if (ledger) params.set('ledger', ledger);
+  const url = `/api/decisions/${encodeURIComponent(id ?? '')}${params.size ? `?${params}` : ''}`;
+  const detail = useApiQuery<DecisionDetail>(url, { topics: ['decisions'], enabled: Boolean(id), intervalMs: 20_000 });
   const row = detail.data;
   const credential = row?.kind === 'credential-missing';
   return <Drawer open={Boolean(id)} onOpenChange={open => { if (!open) onClose(); }} title={id ? t('Decision {id}', { id }) : t('Decision')} description={t('Read-only record · answer through the shown channel')}>
     <ConceptBlock concept="C12" className="flex flex-col gap-6" aria-live="polite">
-      {detail.loading && <PageSkeleton label={t('Reading the decision…')} />}
-      {detail.error && <FeedbackState error onRetry={() => refreshQuery(`/api/decisions/${encodeURIComponent(id ?? '')}`)}>{detail.error}</FeedbackState>}
+      {id ? <ReadQuality query={detail} url={url} /> : null}
       {row && <>
-        <div className="flex flex-wrap items-center gap-2"><StateChip state={row.ui} /><span className="text-xs font-medium">{row.kind}</span><span className="text-xs text-muted-foreground">{row.status}</span></div>
+        <div className="flex flex-wrap items-center gap-2"><StateChip state={row.ui} /><Badge variant="outline">{row.kind}</Badge><span className="text-xs text-muted-foreground">{row.status}</span></div>
         <div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('Summary')}</p>
           <p className="mt-2 break-words text-sm leading-relaxed">{credential ? t('Credential request · content hidden.') : row.summary}</p></div>
         <dl className="grid grid-cols-1 gap-4 border-y py-4 text-sm sm:grid-cols-2">
           <div><dt className="text-muted-foreground">{t('Decider')}</dt><dd className="font-medium">{actor(row.decider)}</dd></div>
           <div><dt className="text-muted-foreground">{t('Due')}</dt><dd className={row.overdue ? 'font-medium text-destructive' : ''}>{formatAbsolute(row.dueAt)}</dd></div>
         </dl>
-        {row.project && row.wf && <a href={`#/w/${encodeURIComponent(row.project)}/${encodeURIComponent(row.wf)}?tab=decisions`} className="inline-flex items-center gap-1 text-sm text-primary hover:underline">{t('View workflow {wf}', { wf: row.wf })}<ArrowUpRight className="size-3.5" aria-hidden="true" /></a>}
+        {row.project && row.wf && <Button variant="link" size="sm" asChild className="h-auto justify-start self-start px-0"><a href={`#/w/${encodeURIComponent(row.project)}/${encodeURIComponent(row.wf)}?tab=decisions`}>{t('View workflow {wf}', { wf: row.wf })}<ArrowUpRight className="size-3.5" aria-hidden="true" /></a></Button>}
         <section className="flex flex-col gap-2"><h3 className="font-semibold">{t('Recorded options')}</h3>
           {row.options?.length ? <ul className="flex flex-col divide-y">{row.options.map((option, index) => <li key={`${option.key}-${index}`} className="flex flex-wrap items-center gap-2 py-3 text-sm">
             {option.recommended && <Star className="size-4 text-muted-foreground" fill="currentColor" aria-label={t('Recommended')} />}

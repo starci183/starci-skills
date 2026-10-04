@@ -9,6 +9,9 @@ import { useManifest } from './manifest';
 import { settleView } from './settle-text';
 import { WhyBlock } from '../../why/why-block';
 import { t } from '../../../i18n/t';
+import { refreshQuery } from '../../../api/query';
+import { FeedbackState } from '../../feedback-state';
+import { CheckpointReceipt } from '../checkpoint';
 
 export const concept: Concept = 'C10';
 
@@ -49,7 +52,7 @@ function Assertions({ manifest }: { manifest: AttemptManifest }) {
     <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
       <h3 className="m-0 font-medium">{t('The op\'s assertion list')}</h3>
       {manifest.outcome ? <span className="text-xs text-muted-foreground">{t('manifest concludes: {outcome}', { outcome: manifest.outcome })}</span> : null}
-      <span className="ml-auto text-xs text-muted-foreground">{t('{pass}/{total} passed', { pass, total: rows.length })}{fail ? t(' · {n} failed', { n: fail }) : ''}</span>
+      <span className="ml-auto text-xs text-muted-foreground">{t('{pass}/{total} Op-declared criteria passed', { pass, total: rows.length })}{fail ? t(' · {n} failed', { n: fail }) : ''}</span>
     </div>
     <div className="mb-3 flex h-2 w-full gap-1 overflow-hidden rounded-full" role="img" aria-label={t('{pass} passed, {fail} failed, {other} other', { pass, fail, other: rows.length - pass - fail })}>
       {rows.map((r, i) => <span key={`${r.id}-${i}`} data-tone={toneOf(r.status)} className="flex h-full min-w-1 flex-1"><Grow className="block size-full bg-[var(--tone)]" delay={i * 0.02} title={`${r.id}: ${r.label}`} /></span>)}
@@ -72,45 +75,50 @@ function Assertions({ manifest }: { manifest: AttemptManifest }) {
 export function ResultCard({ attempt }: { attempt: AttemptDetailV3 }) {
   const manifest = useManifest(attempt);
   const opStatus = statusFromOutcome(attempt.reportOutcome);
-  const verdictStatus = statusFromVerdict(attempt.verdict, attempt.settledAt == null && attempt.endState == null, attempt.ui);
+  const verdictStatus = statusFromVerdict(attempt.verdict, attempt.reportedAt != null && attempt.settledAt == null && attempt.endState == null, attempt.ui);
   const settle = settleView(attempt);
   const claims = claimsOf(attempt);
   const reportSummary = obj(attempt.report?.json)?.summary;
   const summary = typeof reportSummary === 'string' && reportSummary ? reportSummary : attempt.summary;
   const nextAttempt = attempt.retry.next;
   const opTone = opStatus === 'success' ? 'success' : opStatus === 'blocked' || opStatus === 'failed' ? 'failed' : 'warning';
-  const verdictTone = verdictStatus === 'success' ? 'success' : verdictStatus === 'blocked' || verdictStatus === 'failed' ? 'failed' : verdictStatus === 'dropped' ? 'skipped' : 'queued';
+  const verdictTone = verdictStatus === 'success' ? 'success' : verdictStatus === 'blocked' || verdictStatus === 'failed' ? 'failed' : verdictStatus === 'awaiting-owner' ? 'owner' : verdictStatus === 'running' ? 'running' : verdictStatus === 'dropped' || verdictStatus === 'rejected' ? 'skipped' : 'queued';
   const hasAssertions = Boolean(manifest?.assertions.length);
   const failed = manifest ? manifest.assertions.filter(r => assertionStatus(r.outcome).status === 'failed').length : 0;
   const hasMore = hasAssertions || claims.frs.length > 0 || claims.paths.length > 0;
-  const moreSummary = [hasAssertions && manifest ? `${manifest.assertions.filter(r => assertionStatus(r.outcome).status === 'success').length}/${manifest.assertions.length} ${t('assertions passed')}${failed ? ` · ${t('{n} failed', { n: failed })}` : ''}` : null, claims.frs.length ? `${claims.frs.length} FR` : null].filter(Boolean).join(' · ');
-  return <Card id="attempt-result" concept="C10" title={t('Outcome')} hint={t('what the op reported, what the kernel decided, and why')}>
+  const moreSummary = [hasAssertions && manifest ? `${t('{pass}/{total} Op-declared criteria passed', { pass: manifest.assertions.filter(r => assertionStatus(r.outcome).status === 'success').length, total: manifest.assertions.length })}${failed ? ` · ${t('{n} failed', { n: failed })}` : ''}` : null, claims.frs.length ? `${claims.frs.length} FR` : null].filter(Boolean).join(' · ');
+  return <Card id="attempt-result" concept="C10" title={t('Outcome')} hint={t('what the op reported, the recorded verdict, and why')}>
     <div className="grid min-w-0 gap-6">
       <section className="min-w-0" data-tone={attempt.reportOutcome ? opTone : 'queued'}>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <h3 className="m-0 text-sm font-medium">{t('Op report')}</h3>
-          {attempt.reportOutcome ? <StatusChip status={opStatus} label={outcomeLabels[attempt.reportOutcome] ?? attempt.reportOutcome} /> : <StatusChip status="queued" label={t('No report yet')} />}
+          {attempt.reportOutcome ? <StatusChip status={opStatus} label={outcomeLabels[attempt.reportOutcome] ?? attempt.reportOutcome} /> : <StatusChip status={attempt.reportedAt ? 'unknown' : 'queued'} label={attempt.reportedAt ? t('Report outcome not recorded') : t('No report yet')} />}
         </div>
         {summary ? <p className="m-0 max-w-[72ch] whitespace-pre-line break-words rounded-lg border-l-4 border-[var(--tone-line)] bg-[var(--tone-bg)] px-4 py-3 text-[15px] leading-relaxed">{summary}</p>
           : <p className="m-0 rounded-lg border p-3 text-sm text-muted-foreground">{t('The op has not written a result summary.')}</p>}
       </section>
 
+      <CheckpointReceipt attempt={attempt} />
+
       <section className="min-w-0 border-t pt-6" data-tone={verdictTone}>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <Gavel className="size-4 text-[var(--tone)]" aria-hidden="true" />
-          <h3 className="m-0 text-sm font-medium">{t('Kernel verdict')}</h3>
-          <StatusChip status={verdictStatus} label={attempt.verdict ? (verdictLabels[attempt.verdict] ?? attempt.verdict) : t('Not settled')} />
+          <h3 className="m-0 text-sm font-medium">{t('Recorded verdict')}</h3>
+          <StatusChip status={verdictStatus} label={verdictStatus === 'awaiting-owner' ? t('Awaiting the owner') : verdictStatus === 'rejected' ? t('Rejected at dispatch') : attempt.verdict ? (verdictLabels[attempt.verdict] ?? attempt.verdict) : verdictStatus === 'running' ? t('Settling') : t('Not settled')} />
           {attempt.settledBy ? <span className="text-xs text-muted-foreground">{t('by {actor}', { actor: attempt.settledBy })}</span> : null}
         </div>
         {attempt.why ? <WhyBlock why={attempt.why} className="mb-4 max-w-[80ch]" /> : null}
+        {attempt.why?.provenance?.source === 'computed' ? <p className="text-xs text-muted-foreground">{t('Explanation computed from current reference data; it is not a stored settlement receipt.')}</p> : null}
         {settle.lines.length ? <ul className="m-0 flex max-w-[72ch] list-disc flex-col gap-1 pl-6 text-sm">{settle.lines.map((line, i) => <li key={i} className="break-words">{line}</li>)}</ul>
-          : <p className="m-0 text-sm text-muted-foreground">{attempt.verdict ? t('The kernel recorded no reason beyond the verdict.') : t('The kernel has not settled this attempt yet.')}</p>}
+          : <p className="m-0 text-sm text-muted-foreground">{attempt.verdict ? t('No additional verdict reason was recorded.') : t('No verdict has been recorded for this attempt yet.')}</p>}
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-4 text-sm">
           <span className="text-muted-foreground">{t('Next step:')}</span>
-          <span className="min-w-0 break-words">{settle.nextStep ?? (attempt.verdict === 'pass' ? t('No rework needed; the kernel moves to the next leg.') : nextAttempt ? t('Run the next attempt.') : t('No next step recorded yet.'))}</span>
+          <span className="min-w-0 break-words">{settle.nextStep ?? (nextAttempt ? t('Run the next attempt.') : t('No next step recorded yet.'))}</span>
           {nextAttempt ? <a href={nextAttempt.href} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">{t('Next attempt #{id}', { id: nextAttempt.id })}<ArrowRight className="size-3.5" aria-hidden="true" /></a> : null}
         </div>
       </section>
+
+      {attempt.manifestRead?.state === 'unavailable' || attempt.manifestRead?.state === 'invalid' ? <FeedbackState error onRetry={() => refreshQuery(`/api/attempts/${encodeURIComponent(attempt.project)}/${attempt.id}`)}>{t('The submitted manifest could not be read; its criteria are unknown.')} · {attempt.manifestRead.state}</FeedbackState> : null}
 
       {hasMore ? <Advanced summary={moreSummary || undefined} defaultOpen={failed > 0}>
         <div className="grid min-w-0 gap-6">

@@ -1,21 +1,10 @@
 import { sendError } from '../envelope.mjs';
+import { topicsOf, related } from '../live-read.mjs';
 
 const MAX_PER_IP = 3;
 const MAX_TOTAL = 200;
 const perIp = new Map();
 let total = 0;
-
-function topicsOf(store, url) {
-  const requested = (url.searchParams.get('topics') ?? 'workers,decisions,system,logs').split(',').map(x => x.trim());
-  const names = new Set(store.projects().map(row => row.name));
-  if (!requested.length || requested.length > 30) return null;
-  for (const topic of requested) {
-    if (['workers', 'decisions', 'system', 'logs'].includes(topic)) continue;
-    const match = /^(wf|attempt):([^:]+):([^:]+)$/.exec(topic);
-    if (!match || !names.has(match[2]) || !match[3]) return null;
-  }
-  return [...new Set(requested)];
-}
 
 function readMarks(store) {
   const marks = new Map();
@@ -31,19 +20,9 @@ function readMarks(store) {
   return marks;
 }
 
-function related(topic, key) {
-  if (topic === 'system') return key.startsWith('machine:');
-  if (topic === 'workers') return !key.startsWith('machine:') || key === 'machine:data_version';
-  if (topic === 'decisions') return key.endsWith(':decisions') || key === 'machine:sup_decisions'
-    || key === 'machine:deliveries' || key.endsWith(':data_version');
-  if (topic === 'logs') return key.endsWith(':logs') || key === 'machine:machine_logs' || key.endsWith(':data_version');
-  const match = /^(wf|attempt):([^:]+):/.exec(topic);
-  return Boolean(match && key.startsWith(`${match[2]}:`));
-}
-
-function markFor(topic, marks) {
+function markFor(topic, marks, projects) {
   let max = 0;
-  for (const [key, mark] of marks) if (related(topic, key)) max = Math.max(max, Number(mark) || 0);
+  for (const [key, mark] of marks) if (related(topic, key, projects)) max = Math.max(max, Number(mark) || 0);
   return max;
 }
 
@@ -52,6 +31,7 @@ export function handleLive(request, response, store, url) {
   if (url.pathname !== '/api/live') return false;
   if (!store.machine) { sendError(request, response, 503, 'MACHINE_UNAVAILABLE', 'Machine database unavailable'); return true; }
   const topics = topicsOf(store, url);
+  const projects = store.projects();
   if (!topics) { sendError(request, response, 400, 'BAD_TOPICS', 'Invalid topics'); return true; }
   if (request.method === 'HEAD') {
     response.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache' });
@@ -68,7 +48,7 @@ export function handleLive(request, response, store, url) {
   response.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
   let seq = 0, closed = false;
   const emit = topic => {
-    const frame = { topic, key: topic, seq: markFor(topic, previous), at: Date.now() };
+    const frame = { topic, key: topic, seq: markFor(topic, previous, projects), at: Date.now() };
     response.write(`id: ${++seq}\nevent: invalidate\ndata: ${JSON.stringify(frame)}\n\n`);
   };
   // Last-Event-ID cannot describe every independent DB. A fresh subscription invalidates all requested topics.
@@ -78,7 +58,7 @@ export function handleLive(request, response, store, url) {
       const current = readMarks(store);
       const changed = new Set([...current.keys(), ...previous.keys()].filter(key => current.get(key) !== previous.get(key)));
       previous = current;
-      for (const topic of topics) if ([...changed].some(key => related(topic, key))) emit(topic);
+      for (const topic of topics) if ([...changed].some(key => related(topic, key, projects))) emit(topic);
     } catch { for (const topic of topics) emit(topic); }
   };
   const interval = setInterval(poll, 2000);

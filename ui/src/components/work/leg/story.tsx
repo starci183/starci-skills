@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { ArrowRight } from 'lucide-react';
-import { useApiQuery } from '../../../api/query';
+import { refreshQuery, useApiQuery } from '../../../api/query';
 import type { AttemptDetailV2, LegRow, PipelineView } from '../../../contract';
 import { StatusChip } from '../../status-chip';
 import { statusFromOutcome } from '../../status';
@@ -8,6 +8,8 @@ import { PathLink } from '../../path-link';
 import type { Concept } from '../../concept';
 import { legInfo } from '../pipeline/node/op-identity';
 import { t } from '../../../i18n/t';
+import { FeedbackState } from '../../feedback-state';
+import { formatAbsolute } from '../../../i18n/vi';
 
 export const concept: Concept = 'C4';
 
@@ -20,13 +22,13 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
 const muted = (text: string) => <p className="text-xs text-muted-foreground">{text}</p>;
 
 /** Token total across the leg's attempts, or null when none recorded any. */
-export function legTokens(leg: LegRow): { input: number; output: number } | null {
-  let input = 0; let output = 0; let seen = false;
+export function legTokens(leg: LegRow): { input: number | null; output: number | null; inputKnown: number; outputKnown: number } | null {
+  let input: number | null = null; let output: number | null = null; let inputKnown = 0; let outputKnown = 0;
   for (const a of leg.attempts) {
-    if (a.tokensIn != null) { input += a.tokensIn; seen = true; }
-    if (a.tokensOut != null) { output += a.tokensOut; seen = true; }
+    if (a.tokensIn != null) { input = (input ?? 0) + a.tokensIn; inputKnown++; }
+    if (a.tokensOut != null) { output = (output ?? 0) + a.tokensOut; outputKnown++; }
   }
-  return seen ? { input, output } : null;
+  return inputKnown || outputKnown ? { input, output, inputKnown, outputKnown } : null;
 }
 
 /** Essentials: "What it does" — what the op does (Vietnamese first, English original on demand) and its side effects. */
@@ -35,6 +37,8 @@ export function LegAbout({ leg }: { leg: LegRow }) {
   const [en, setEn] = useState(false);
   const goal = info?.goal.vi ?? info?.goal.en ?? null;
   return <div>
+    <p className="mb-2 text-xs text-muted-foreground">{t('Current runtime YAML reference; historical dispatch metadata is separate.')}</p>
+    {info?.readError && <p className="shell-error mb-2 break-words text-xs">{t('Operation reference unavailable: {error}', { error: info.readError })}</p>}
     <p className="text-sm">{goal ?? t('No description for this op yet.')}</p>
     {info?.goal.en && info.goal.vi ? <div className="mt-2">
       <button type="button" className="text-xs font-medium text-primary hover:underline" aria-expanded={en} onClick={() => setEn(v => !v)}>{en ? t('Hide the English original') : t('View the English original')}</button>
@@ -45,10 +49,11 @@ export function LegAbout({ leg }: { leg: LegRow }) {
 }
 
 /** Advanced part of the op story: input, output, tokens. Reads the latest attempt for the real hand-over. */
-export function LegStory({ project, leg, pipeline }: { project: string; leg: LegRow; pipeline: PipelineView }) {
+export function LegStory({ project, wf, leg, pipeline }: { project: string; wf: string; leg: LegRow; pipeline: PipelineView }) {
   const info = legInfo(leg);
   const latest = [...leg.attempts].sort((a, b) => b.id - a.id)[0] ?? null;
-  const detail = useApiQuery<AttemptDetailV2>(latest ? `/api/attempts/${encodeURIComponent(project)}/${latest.id}` : '/api/attempts/none', { enabled: Boolean(latest), intervalMs: 60_000 });
+  const url = latest ? `/api/attempts/${encodeURIComponent(project)}/${latest.id}` : '';
+  const detail = useApiQuery<AttemptDetailV2>(url, { enabled: Boolean(latest), topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 60_000 });
   const attempt = latest ? detail.data : null;
   const files = attempt?.report?.json && typeof attempt.report.json === 'object' ? (attempt.report.json as { files?: unknown }).files : undefined;
   const fileCount = Array.isArray(files) ? files.length : null;
@@ -60,19 +65,22 @@ export function LegStory({ project, leg, pipeline }: { project: string; leg: Leg
   const input = attempt?.input ?? null;
   const reads = info?.reads ?? [];
   return <div>
+    {latest && detail.error && <FeedbackState error onRetry={() => refreshQuery(url)}>{detail.meta ? t('The source is failing; showing the last read. {error}', { error: detail.error }) : detail.error}</FeedbackState>}
+    {latest && detail.meta?.stale?.length ? <p className="shell-error text-xs" role="status">{t('Source out of sync: {list}', { list: detail.meta.stale.join(', ') })}</p> : null}
+    {latest && detail.meta && <p className="mb-3 text-xs text-muted-foreground">{t('Read observed {at}', { at: formatAbsolute(detail.observedAt) })}</p>}
     <Block title={t('Inputs')}>
-      {reads.length ? <ul className="space-y-2">{reads.map(r => <li key={r.id} className="text-xs"><span className="font-mono font-semibold">{r.id}</span>{r.purpose ? <span className="block text-muted-foreground">{r.purpose}</span> : null}</li>)}</ul> : muted(t('The op declares no read data.'))}
+      {reads.length ? <ul className="space-y-2">{reads.map(r => <li key={r.id} className="text-xs"><span className="font-mono font-semibold">{r.id}</span>{r.purpose ? <span className="block text-muted-foreground">{r.purpose}</span> : null}</li>)}</ul> : muted(info?.declarations?.reads ? t('The op declares no read data.') : t('Input declaration unknown.'))}
       {upstream.length ? <div className="mt-2"><p className="mb-1 text-[11px] text-muted-foreground">{t('Waiting on ops')}</p><ul className="space-y-1">{upstream.map(chip)}</ul></div> : null}
       {leg.needs.length ? <ul className="mt-2 space-y-1">{leg.needs.map(n => <li key={n} className="break-all font-mono text-[11px] text-muted-foreground">{n}</li>)}</ul> : null}
       <div className="mt-2 rounded-md border bg-muted/20 p-3 text-xs">
-        <p className="mb-1 font-medium">{latest ? t('What the Kernel hands to each unit (attempt #{id})', { id: latest.id }) : t('What the Kernel hands to each unit')}</p>
+        <p className="mb-1 font-medium">{latest ? input?.source === 'contract' ? t('Contract context · attempt #{id}', { id: latest.id }) : t('Current job reference · attempt #{id}', { id: latest.id }) : t('No dispatched input yet')}</p>
         {input ? <ul className="space-y-1 text-muted-foreground">
           {input.what ? <li className="break-words">{input.what}</li> : null}
-          {input.goal ? <li>{t('Workflow goal, revision {n}', { n: input.goal.revision })}</li> : null}
+          {input.goal ? <li>{t('Workflow goal, revision {n}', { n: input.goal.revision ?? '—' })}</li> : null}
           <li>{input.ownedPaths.length ? t('{n} paths may be written:', { n: input.ownedPaths.length }) : t('{n} paths may be written', { n: input.ownedPaths.length })}</li>
           {input.ownedPaths.length ? <li><ul className="ml-2 space-y-1">{input.ownedPaths.slice(0, 6).map(p => <li key={p} className="break-all font-mono text-[11px]">{p}</li>)}{input.ownedPaths.length > 6 ? <li>{t('… and {n} more paths', { n: input.ownedPaths.length - 6 })}</li> : null}</ul></li> : null}
           {input.records.length ? <li>{t('{n} attached records', { n: input.records.length })}</li> : null}
-        </ul> : <p className="text-muted-foreground">{latest ? (detail.loading ? t('Loading…') : t('Could not read the dispatched data yet.')) : t('No attempts yet, nothing dispatched.')}</p>}
+        </ul> : <p className="text-muted-foreground">{latest ? (!detail.meta && !detail.error ? t('Loading…') : t('Could not read the dispatched data yet.')) : t('No attempts yet, nothing dispatched.')}</p>}
       </div>
     </Block>
     <Block title={t('Outputs')}>
@@ -82,13 +90,13 @@ export function LegStory({ project, leg, pipeline }: { project: string; leg: Leg
         <p className="mb-1 flex flex-wrap items-center gap-2 font-medium">{t('Latest attempt #{id}', { id: latest.id })}
           <StatusChip status={statusFromOutcome(latest.reportOutcome)} label={latest.reportOutcome ? outcomeLabel[latest.reportOutcome] : t('Op has not reported')} /></p>
         {latest.summary ? <p className="line-clamp-4 whitespace-pre-wrap break-words">{latest.summary}</p> : null}
-        <p className="mt-1 text-muted-foreground">{fileCount == null ? (detail.loading ? t('Counting files…') : t('No file report yet.')) : t('{n} files written to the repo', { n: fileCount })}</p>
+        <p className="mt-1 text-muted-foreground">{fileCount == null ? (!detail.meta && !detail.error ? t('Counting files…') : detail.data ? t('No file report yet.') : t('Could not read the dispatched data yet.')) : t('{n} files declared in the Op report', { n: fileCount })}</p>
         <a href={`${latest.href}?step=report`} className="mt-2 inline-flex items-center gap-1 font-medium text-primary hover:underline">{t('View Products')} <ArrowRight className="size-3" aria-hidden="true" /></a>
       </div> : null}
       {downstream.length ? <div className="mt-2"><p className="mb-1 text-[11px] text-muted-foreground">{t('Unblocks')}</p><ul className="space-y-1">{downstream.map(chip)}</ul></div> : null}
     </Block>
     <Block title="Token">
-      {tokens ? <p className="font-mono text-sm">{t('{input} in · {output} out', { input: fmt(tokens.input), output: fmt(tokens.output) })} <span className="font-sans text-xs text-muted-foreground">{t('({n} attempts)', { n: leg.attempts.length })}</span></p> : muted(t('not recorded'))}
+      {tokens ? <p className="font-mono text-sm">{t('{input} in · {output} out', { input: tokens.input == null ? '—' : fmt(tokens.input), output: tokens.output == null ? '—' : fmt(tokens.output) })} <span className="font-sans text-xs text-muted-foreground">{t('Recorded part · input {input}/{total}, output {output}/{total}', { input: tokens.inputKnown, output: tokens.outputKnown, total: leg.attempts.length })}</span></p> : muted(t('not recorded'))}
     </Block>
     {leg.conditions.length ? <details className="mt-6"><summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">{t('Conditions · {n}', { n: leg.conditions.length })}</summary>
       <ul className="mt-2 space-y-1">{leg.conditions.map(n => <li key={n} className="break-words text-xs">{n}</li>)}</ul></details> : null}

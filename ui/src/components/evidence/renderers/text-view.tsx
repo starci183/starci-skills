@@ -5,6 +5,8 @@ import { ChevronDownIcon, ChevronUpIcon, SearchIcon, WrapTextIcon } from 'lucide
 import type { Tone } from '../../status';
 import { CopyButton, Frame, Line, stripAnsi, Toolbar, toolbarBtn } from './common';
 import { t } from '../../../i18n/t';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
 
 const ERROR_RE = /error|fail|✗|SCHEMA_VIOLATION|exception|fatal|panic/i;
 const WARN_RE = /warn|⚠|deprecated/i;
@@ -105,18 +107,18 @@ export function TextView({ text, query, className = '' }: { text: string; query:
   }
 
   return (
-    <Frame className={className}>
+    <Frame className={`evidence-code-frame ${className}`}>
       <Toolbar right={<><span>{t('{n} lines', { n: lines.length.toLocaleString('vi-VN') })}</span>{windowed ? <span>{t('(windowed, no wrapping)')}</span> : null}</>}>
         <label className="flex min-w-0 items-center gap-1 rounded-md border bg-background px-2 py-0.5 focus-within:outline-2 focus-within:outline-ring">
           <SearchIcon className="size-3 shrink-0 text-muted-foreground" />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder={t('Search in file')} aria-label={t('Search in file')}
+          <Input value={q} onChange={e => setQ(e.target.value)} placeholder={t('Search in file')} aria-label={t('Search in file')}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); step(e.shiftKey ? -1 : 1); } }}
             className="w-32 min-w-0 bg-transparent text-xs outline-none sm:w-44" />
         </label>
         {q ? <span className="text-[11px] tabular-nums text-muted-foreground" aria-live="polite">{hits.length ? `${current + 1}/${hits.length}${capped ? '+' : ''}` : t('None')}</span> : null}
-        <button type="button" className={toolbarBtn} onClick={() => step(-1)} disabled={!hits.length} aria-label={t('Previous result')} title={t('Previous result (Shift+Enter)')}><ChevronUpIcon className="size-3" /></button>
-        <button type="button" className={toolbarBtn} onClick={() => step(1)} disabled={!hits.length} aria-label={t('Next result')} title={t('Next result (Enter)')}><ChevronDownIcon className="size-3" /></button>
-        <button type="button" className={toolbarBtn} onClick={() => setWrap(w => !w)} aria-pressed={effectiveWrap} disabled={windowed}><WrapTextIcon className="size-3" />{effectiveWrap ? t('Wrap') : t('One line')}</button>
+        <Button variant="outline" size="xs" type="button" className={toolbarBtn} onClick={() => step(-1)} disabled={!hits.length} aria-label={t('Previous result')} title={t('Previous result (Shift+Enter)')}><ChevronUpIcon className="size-3" /></Button>
+        <Button variant="outline" size="xs" type="button" className={toolbarBtn} onClick={() => step(1)} disabled={!hits.length} aria-label={t('Next result')} title={t('Next result (Enter)')}><ChevronDownIcon className="size-3" /></Button>
+        <Button variant="outline" size="xs" type="button" className={toolbarBtn} onClick={() => setWrap(w => !w)} aria-pressed={effectiveWrap} disabled={windowed}><WrapTextIcon className="size-3" />{effectiveWrap ? t('Wrap') : t('One line')}</Button>
         <CopyButton value={() => lines.join('\n')} label={t('Copy all')} />
       </Toolbar>
       <div ref={box} onScroll={windowed ? e => setScrollTop(e.currentTarget.scrollTop) : undefined}

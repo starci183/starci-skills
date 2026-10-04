@@ -1,25 +1,28 @@
-import type { ReactNode } from 'react';
-import { motion } from 'motion/react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { DURATION, EASE } from './motion';
+import { useRef, type ReactNode } from 'react';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
 import type { Concept } from './concept';
+import { t } from '../i18n/t';
 
 export const concept: Concept = 'frame';
-
-/** Slides the drawer's header + body in from the right (fade + 32 px). The panel itself stays pinned. */
-export function DrawerSlide({ children }: { children: ReactNode }) {
-  return <motion.div className="flex min-h-0 flex-1 flex-col" initial={{ opacity: 0, x: 32 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: DURATION.enter, ease: EASE }}>{children}</motion.div>;
-}
 
 export function Drawer({ open, onOpenChange, title, description, children }: {
   open: boolean; onOpenChange: (open: boolean) => void; title: ReactNode; description?: ReactNode; children: ReactNode;
 }) {
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="drawer-panel">
-      <DrawerSlide>
-        <DialogHeader><DialogTitle>{title}</DialogTitle>{description && <DialogDescription>{description}</DialogDescription>}</DialogHeader>
-        <div className="drawer-body">{children}</div>
-      </DrawerSlide>
-    </DialogContent>
-  </Dialog>;
+  const returnFocus = useRef<HTMLElement | SVGElement | null>(null);
+  return <Sheet open={open} onOpenChange={onOpenChange}>
+    <SheetContent side="right" className="drawer-panel"
+      onOpenAutoFocus={event => {
+        const target = document.activeElement;
+        if (event.currentTarget instanceof HTMLElement && event.currentTarget.contains(target)) return;
+        returnFocus.current = (target instanceof HTMLElement || target instanceof SVGElement)
+          && typeof target.focus === 'function' && target !== document.body && target !== document.documentElement ? target : null;
+      }}
+      onCloseAutoFocus={event => {
+        const target = returnFocus.current?.isConnected ? returnFocus.current : document.getElementById('main-content');
+        if (target) { event.preventDefault(); target.focus(); }
+      }}>
+      <SheetHeader className="drawer-header"><SheetTitle>{title}</SheetTitle><SheetDescription>{description ?? t('Read-only technical details')}</SheetDescription></SheetHeader>
+      <div className="drawer-body">{children}</div>
+    </SheetContent>
+  </Sheet>;
 }

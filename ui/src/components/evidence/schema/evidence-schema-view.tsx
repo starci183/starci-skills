@@ -19,13 +19,25 @@ export const SCHEMA_LABELS: Record<string, string> = { 'starci/scope-evidence@1'
 /** A work-graph evidence file → the WorkGraphView the shared slice diagram draws. */
 export function workGraphFromFile(data: unknown, file: EvidenceFile, authorOp: string): WorkGraphView | null {
   const root = rec(data); if (!root) return null;
+  if (!Array.isArray(root.nodes)) return null;
   const nodes = arr(root.nodes).map(rec).filter((n): n is Rec => n != null && str(n.id) != null);
-  if (!nodes.length) return null;
+  const strings = (value: unknown) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : undefined;
+  const sizeOf = (value: unknown): NonNullable<WorkGraphView['nodes'][number]['size']> | undefined => {
+    const size = rec(value); if (!size) return undefined;
+    return Object.fromEntries(['files', 'assertions', 'components', 'records'].flatMap(key => typeof size[key] === 'number' && Number.isInteger(size[key]) && Number(size[key]) >= 0 ? [[key, size[key]]] : []));
+  };
   return {
-    version: typeof root.version === 'number' ? root.version : 0, event: t('op evidence file'), reason: str(root.reason) ?? '', authorOp, at: file.createdAt,
-    domains: arr(root.domains).map(rec).filter((d): d is Rec => d != null).map(d => ({ id: String(d.id), ...(str(d.title) ? { title: String(d.title) } : {}) })),
-    nodes: nodes.map(n => ({ id: String(n.id), title: str(n.title) ?? String(n.id), domain: str(n.domain), kind: str(n.kind), ownedPaths: arr(n.ownedPaths).filter((p): p is string => typeof p === 'string'), color: str(n.color) })),
-    edges: arr(root.edges).map(rec).filter((e): e is Rec => e != null).map(e => ({ from: String(e.from), to: String(e.to), kind: str(e.kind), reason: str(e.reason) })),
+    version: typeof root.version === 'number' && Number.isInteger(root.version) && root.version >= 0 ? root.version : null,
+    event: t('op evidence file'), reason: str(root.reason) ?? '', authorOp, at: file.createdAt,
+    digest: str(root.digest), authorJob: str(root.authorJob), colorSource: 'artifact',
+    domains: arr(root.domains).map(rec).filter((d): d is Rec => d != null && str(d.id) != null).map(d => ({ id: String(d.id), ...(str(d.title) ? { title: String(d.title) } : {}) })),
+    nodes: nodes.map(n => ({ id: String(n.id), title: str(n.title) ?? String(n.id), domain: str(n.domain), kind: str(n.kind),
+      ...(n.slice !== undefined ? { slice: str(n.slice) } : {}), ...(n.parent !== undefined ? { parent: str(n.parent) } : {}),
+      ...(n.rollbackTo !== undefined ? { rollbackTo: str(n.rollbackTo) } : {}), reads: strings(n.reads), size: sizeOf(n.size),
+      frs: strings(n.frs), shapes: strings(n.shapes), inferred: strings(n.inferred),
+      ownedPaths: strings(n.ownedPaths) ?? null, color: str(n.color) })),
+    edges: arr(root.edges).map(rec).filter((e): e is Rec => e != null).map(e => ({ from: str(e.from) ?? '', to: str(e.to) ?? '', kind: str(e.kind), reason: str(e.reason),
+      ...(typeof e.inferred === 'boolean' ? { inferred: e.inferred } : {}) })),
   };
 }
 

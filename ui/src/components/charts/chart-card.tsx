@@ -6,6 +6,9 @@ import { DURATION, EASE } from '../motion';
 import { toneVar, type Tone } from '../status';
 import { FeedbackState } from '../feedback-state';
 import { t } from '../../i18n/t';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { refreshQuery, type QuerySnapshot } from '../../api/query';
+import { PageSkeleton } from '../feedback-state';
 
 export type LegendItem = { tone?: Tone; label: string; hollow?: boolean; neutral?: boolean };
 
@@ -23,10 +26,25 @@ export function Legend({ items }: { items: LegendItem[] }) {
 /** One analytics chart: title, one-line explanation, legend, body or empty state. */
 export function ChartCard({ title, hint, legend, empty, className = '', children }: { title: string; hint: string; legend?: LegendItem[];
   empty?: string | false; className?: string; children?: ReactNode }) {
-  return <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DURATION.enter, ease: EASE }} className={`chart-card min-w-0 rounded-xl border bg-card p-4 text-card-foreground min-[760px]:p-6 ${className}`} aria-label={title}>
-    <h2 className="text-base font-semibold">{title}</h2>
-    <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-    {legend && !empty ? <div className="mt-2"><Legend items={legend} /></div> : null}
-    <div className="mt-4 min-w-0">{empty ? <FeedbackState>{empty}</FeedbackState> : children}</div>
+  return <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DURATION.enter, ease: EASE }} className={`min-w-0 ${className}`} aria-label={title}>
+    <Card className="chart-card min-w-0"><CardHeader>
+      <CardTitle><h2>{title}</h2></CardTitle>
+      <CardDescription className="text-xs">{hint}</CardDescription>
+      {legend && !empty ? <div className="mt-2"><Legend items={legend} /></div> : null}
+    </CardHeader><CardContent className="min-w-0">{empty ? <FeedbackState>{empty}</FeedbackState> : children}</CardContent></Card>
   </motion.section>;
+}
+
+/** Availability belongs to the query; an unread source is never an empty chart. */
+export function ReadQuality<T>({ query, url, onRetry }: { query: QuerySnapshot<T>; url?: string; onRetry?: () => void }) {
+  const retry = onRetry ?? (url ? () => refreshQuery(url) : undefined);
+  return <>
+    {query.error ? <FeedbackState error onRetry={retry}>{query.data !== null ? t('The source is failing; showing the last read. {error}', { error: query.error }) : t('Could not read the source: {error}', { error: query.error })}</FeedbackState> : null}
+    {partialSources(query).length ? <p className="shell-error" role="status">{t('Source out of sync: {list}', { list: partialSources(query).join(', ') })}</p> : null}
+    {query.data === null && !query.error ? query.meta ? <FeedbackState>{t('Unknown')}</FeedbackState> : <PageSkeleton label={t('Reading the data…')} /> : null}
+  </>;
+}
+
+export function partialSources<T>(query: QuerySnapshot<T>): string[] {
+  return [...new Set([...(query.meta?.stale ?? []), ...(query.errorMeta?.stale ?? []), ...[...(query.meta?.sources ?? []), ...(query.errorMeta?.sources ?? [])].filter(source => source.availability && source.availability !== 'available').map(source => `${source.db}:${source.rel}`)])];
 }

@@ -53,6 +53,14 @@ export default function KitPage() {
             <div className="flex flex-wrap gap-2">{allStatuses.map((status) => <StatusChip status={status} key={status} />)}</div>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">{allStatuses.map((status) => <span key={status} className="inline-flex items-center gap-1.5"><StatusDot status={status} />{statusTone[status]}</span>)}</div>
             <div className="mt-3 grid gap-2">{(['success', 'running', 'queued', 'failed', 'warning', 'skipped'] as const).map((tone) => <Progress key={tone} tone={tone} value={tone === 'queued' ? 8 : 64} className="h-2" aria-label={tone} />)}</div>
+            <div className="mt-3 grid gap-3 text-xs text-muted-foreground">
+              {[
+                { key: 'unknown', label: t('Unknown progress'), value: null, max: 100 },
+                { key: 'nan', label: t('Non-finite progress'), value: Number.NaN, max: 100 },
+                { key: 'invalid-maximum', label: t('Invalid progress maximum'), value: 50, max: 0 },
+                { key: 'known-zero', label: t('Known zero progress'), value: 0, max: 100 },
+              ].map(sample => <div key={sample.key} className="grid gap-1"><span>{sample.label}</span><Progress value={sample.value} max={sample.max} aria-label={`${sample.label} · ${theme}`} data-demo-progress={sample.key} className="h-2" /></div>)}
+            </div>
           </ConceptBlock>
           <ConceptBlock concept="frame"><h2 className="mb-2 text-sm font-medium">{t('File types and paths')}</h2>
             <div className="mb-3 flex flex-wrap gap-2">{fileKinds.map((kind) => <FileTypeBadge kind={kind} key={kind} />)}</div>

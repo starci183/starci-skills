@@ -10,7 +10,9 @@ export function TimeAgo({ at, className = '' }: { at: number | null | undefined;
     const timer = setInterval(() => { if (!document.hidden) setNow(Date.now()); }, 60_000);
     return () => clearInterval(timer);
   }, []);
-  return <time className={className} dateTime={at == null ? undefined : new Date(at).toISOString()} title={`${formatAbsolute(at)} (UTC+7)`}>
-    {formatRelative(at, now)}
+  const date = at == null ? null : new Date(at);
+  const validAt = date && Number.isFinite(date.getTime()) ? at : null;
+  return <time className={className} dateTime={validAt == null ? undefined : date!.toISOString()} title={`${formatAbsolute(validAt)} (UTC+7)`}>
+    {formatRelative(validAt, now)}
   </time>;
 }

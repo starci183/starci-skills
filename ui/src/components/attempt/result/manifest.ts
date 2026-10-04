@@ -51,7 +51,7 @@ export const isManifestFile = (file: EvidenceFile) => /(^|\/)manifest\.ya?ml$/i.
 
 /** The server's manifest, or (older server) the manifest.yaml attachment parsed here. */
 export function useManifest(attempt: AttemptDetailV3): AttemptManifest | null {
-  const file = attempt.manifest ? null : attempt.files.find(isManifestFile) ?? null;
+  const file = Object.hasOwn(attempt, 'manifest') ? null : attempt.files.find(file => /^attachments\/(evidence|E)\/manifest\.ya?ml$/i.test(file.name)) ?? null;
   const blob = useBlobText(file);
   if (attempt.manifest) return attempt.manifest;
   if (blob.status === 'ready') return parseManifestYaml(blob.text);

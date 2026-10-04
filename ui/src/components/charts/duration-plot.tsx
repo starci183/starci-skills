@@ -15,8 +15,9 @@ export function DurationPlot({ rows, now }: { rows: AttemptRow[]; now: number })
   const [ref, width] = useWidth();
   const dots = useMemo(() => rows.map(row => {
     const state = attemptState(row);
-    const min = row.cycleMs != null ? minutes(row.cycleMs) : row.dispatchedAt != null && state === 'run' ? minutes(now - row.dispatchedAt) : null;
-    return min == null ? null : { row, state, min, open: row.cycleMs == null };
+    const elapsed = row.settledAt != null ? row.dispatchedAt != null ? row.settledAt - row.dispatchedAt : null : row.dispatchedAt != null && (state === 'run' || state === 'settling') ? now - row.dispatchedAt : null;
+    const min = elapsed != null && Number.isFinite(elapsed) && elapsed >= 0 ? minutes(elapsed) : null;
+    return min == null ? null : { row, state, min, open: row.settledAt == null };
   }).filter((d): d is NonNullable<typeof d> => d != null), [rows, now]);
   const ops = [...groupBy(dots, d => d.row.op).entries()].sort((a, b) => b[1].length - a[1].length);
   const max = Math.max(1, ...dots.map(d => d.min)), step = niceStep(max, width < 500 ? 3 : 5), top = Math.ceil(max / step) * step;
@@ -24,7 +25,7 @@ export function DurationPlot({ rows, now }: { rows: AttemptRow[]; now: number })
   const ticks = Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step);
   const height = ops.length * ROW + 26;
   return <ChartCard title={t('Duration per attempt (minutes)')} hint={t('Each dot is one attempt, from dispatch to settle. A hollow dot is an open attempt, counted up to now.')}
-    legend={[{ tone: 'success', label: t('Passed') }, { tone: 'failed', label: t('Failed/blocked') }, { tone: 'running', label: t('Open (hollow)'), hollow: true }]}
+    legend={[{ tone: 'success', label: t('Passed') }, { tone: 'failed', label: t('Failed/blocked') }, { tone: 'running', label: t('Open (hollow)'), hollow: true }, ...(dots.some(dot => dot.state === 'settling') ? [{ tone: 'warning' as const, label: t('Settling'), hollow: true }] : [])]}
     empty={!dots.length && t('No attempt has a timestamp in this range yet.')}>
     <div ref={ref}><svg width={width} height={height} role="img" aria-label={t('Attempt duration by op')} className="block max-w-full">
       {ticks.map(t => <g key={t}><line x1={x(t)} x2={x(t)} y1={0} y2={ops.length * ROW} className="stroke-border" />

@@ -10,12 +10,16 @@ import { handleSystem } from './routes/system.mjs';
 import { handleLogs } from './routes/logs.mjs';
 import { handleLive } from './routes/live.mjs';
 import { handleHost } from './routes/host.mjs';
+import { bindProvenance } from './provenance.mjs';
+import { ReadCursorError } from './query.mjs';
 
 export function createApiHandler({ handlers = [handleWork, handleAttempt, handleDecisions, handleSystem, handleLogs, handleLive, handleHost], env = process.env } = {}) {
   const store = openUiDb({ env });
   initializeReadRedaction(store.projects());
 
   async function handle(request, response, url) {
+    const scope = store.request();
+    bindProvenance(request, scope);
     if (!['GET', 'HEAD'].includes(request.method)) {
       response.setHeader('Allow', 'GET, HEAD');
       sendError(request, response, 405, 'METHOD_NOT_ALLOWED', 'Only GET and HEAD are supported');
@@ -23,13 +27,19 @@ export function createApiHandler({ handlers = [handleWork, handleAttempt, handle
     }
     const pathname = url.pathname;
     if (pathname !== '/healthz' && !pathname.startsWith('/api/')) return false;
-    const isBlob = pathname.startsWith('/api/blob/');
-    if (pathname === '/healthz') { healthz(request, response, store); return true; }
-    if (pathname === '/api/contract') { contract(request, response, store); return true; }
-    if (pathname === '/api/search') { search(request, response, store, url); return true; }
-    if (isBlob) { await blob(request, response, store, url, pathname.slice('/api/blob/'.length)); return true; }
-    for (const handler of handlers) {
-      if (await handler(request, response, store, url)) return true;
+    try {
+      const isBlob = pathname.startsWith('/api/blob/');
+      if (pathname === '/healthz') { healthz(request, response, scope); return true; }
+      if (pathname === '/api/contract') { contract(request, response, scope); return true; }
+      if (pathname === '/api/search') { search(request, response, scope, url); return true; }
+      if (isBlob) { await blob(request, response, scope, url, pathname.slice('/api/blob/'.length)); return true; }
+      for (const handler of handlers) {
+        if (await handler(request, response, scope, url)) return true;
+      }
+    } catch (error) {
+      if (error instanceof ReadCursorError) sendError(request, response, 400, 'BAD_CURSOR', 'Cursor does not match this query');
+      else { scope.failSource('api', url.pathname); sendError(request, response, 503, 'READ_FAILED', 'Source read unavailable'); }
+      return true;
     }
     if (pathname.startsWith('/api/')) {
       sendError(request, response, 404, 'NOT_FOUND', 'Route not found');

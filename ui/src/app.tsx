@@ -1,8 +1,9 @@
-import { Suspense, lazy, useEffect, useState, type ComponentType } from 'react';
-import { Activity, BarChart3, BookOpen, CircleHelp, Moon, PanelsTopLeft, ScrollText, Sun } from 'lucide-react';
+import { Suspense, lazy, useEffect, useState, type ComponentType, type CSSProperties } from 'react';
+import { Activity, BarChart3, BookOpen, CircleAlert, CircleHelp, Moon, PanelsTopLeft, ScrollText, Sun } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Enter } from './components/motion';
 import { Badge } from './components/ui/badge';
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider } from './components/ui/sidebar';
 import { SearchBox } from './components/search-box';
 import { FeedbackState, PageSkeleton } from './components/feedback-state';
 import { useApiQuery, useLiveStatus, useQueryHealth } from './api/query';
@@ -24,6 +25,8 @@ const navigation = [
   { kind: 'logs', href: '#/logs', label: navLabels.logs, icon: ScrollText },
   { kind: 'analytics', href: '#/analytics', label: navLabels.analytics, icon: BarChart3 },
 ] as const;
+
+const shellStyle: CSSProperties & { '--sidebar-width': string } = { '--sidebar-width': 'var(--shell-sidebar-width)' };
 
 function routePage(route: Route): string | null {
   switch (route.kind) {
@@ -103,37 +106,48 @@ export default function App() {
     document.querySelector('meta[property="og:description"]')?.setAttribute('content', t('StarCi · Workflow monitoring and operations hub.'));
   }, [route]);
 
-  const observedAt = health.latestAt ?? contract.meta?.at ?? null;
-  const age = useAgeSeconds(health.latestAt);
-  const isStale = health.staleCount > 0 || health.errorCount > 0 || Boolean(contract.error);
-  const provenance = [health.sources.length ? t('Sources: {list}', { list: `${health.sources.slice(0, 8).join(', ')}${health.sources.length > 8 ? ` +${health.sources.length - 8}` : ''}` }) : t('No sources'), health.stale.length ? t('Stale: {list}', { list: health.stale.join(', ') }) : '', health.errorCount ? t('{n} failing sources', { n: health.errorCount }) : ''].filter(Boolean).join(' · ');
-  return <div className="app-shell">
-    <aside className="shell-sidebar" aria-label={t('Main navigation')}>
-      <a className="shell-brand" href="#/" aria-label={t('StarCi · Overview')}>
-        <span className="shell-brand-mark"><img src="/logos/starci-blue.png" alt="" aria-hidden="true" /></span>
-        <span><strong>StarCi</strong><small>AI Operations Center</small></span>
-      </a>
-      <nav className="shell-nav" aria-label={t('Pages')}>
-        {navigation.map(({ kind, href, label, icon: Icon }) => <a className="shell-nav-link" key={kind} href={href} aria-current={selected === kind ? 'page' : undefined}>
-          <Icon aria-hidden="true" />{label}
-        </a>)}
-      </nav>
-      <div className="shell-sidebar-footer">
+  const observedAt = health.latestSuccessfulReadAt ?? contract.observedAt;
+  const age = useAgeSeconds(observedAt);
+  const hasReadIssues = health.staleCount > 0 || health.errorCount > 0 || Boolean(contract.error);
+  const readTime = observedAt == null ? t('No data yet') : t('Last successful API read: {at}', { at: formatAbsolute(observedAt) });
+  const provenance = [health.sources.length ? t('Sources: {list}', { list: `${health.sources.slice(0, 8).join(', ')}${health.sources.length > 8 ? ` +${health.sources.length - 8}` : ''}` }) : t('No sources'), health.stale.length ? t('Unavailable sources: {list}', { list: health.stale.join(', ') }) : '', health.errorCount ? t('{n} failing queries', { n: health.errorCount }) : ''].filter(Boolean).join(' · ');
+  return <SidebarProvider className="app-shell" style={shellStyle} enableKeyboardShortcut={false}>
+    <a href="#main-content" className="shell-skip-link" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>{t('Skip to main content')}</a>
+    <Sidebar collapsible="none" className="shell-sidebar" role="complementary" aria-label={t('Main navigation')}>
+      <SidebarHeader className="shell-sidebar-heading">
+        <a className="shell-brand" href="#/" aria-label={t('StarCi · Overview')}>
+          <span className="shell-brand-mark"><img src="/logos/starci-blue.png" alt="" aria-hidden="true" /></span>
+          <span><strong>StarCi</strong><small>AI Operations Center</small></span>
+        </a>
+      </SidebarHeader>
+      <SidebarContent className="shell-sidebar-navigation">
+        <nav className="shell-nav" aria-label={t('Pages')}>
+          <SidebarMenu>{navigation.map(({ kind, href, label, icon: Icon }) => <SidebarMenuItem key={kind}>
+            <SidebarMenuButton asChild isActive={selected === kind} className="shell-nav-link">
+              <a href={href} aria-current={selected === kind ? 'page' : undefined}><Icon aria-hidden="true" /><span>{label}</span></a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>)}</SidebarMenu>
+        </nav>
+      </SidebarContent>
+      <SidebarFooter className="shell-sidebar-footer">
         <div className="flex items-center gap-2"><BookOpen size={14} aria-hidden="true" /><span>{t('Read-only UI')}</span></div>
         <div className="mt-2">{contract.data ? t('{n} projects from sources', { n: contract.data.projects.length }) : contract.error ? t('Could not read the API contract') : t('Reading the API contract…')}</div>
-      </div>
-    </aside>
+      </SidebarFooter>
+    </Sidebar>
 
     <div className="shell-content">
       <header className="shell-header">
         <div className="shell-header-left">
-          <span className="shell-live" role="status" data-status={live} title={`${isStale ? `${t('A data source is stale or failing')} ` : ''}${live === 'live' ? t('Receiving live updates (SSE)') : live === 'hidden' ? t('Tab hidden, updates paused') : t('Polling periodically')} · ${provenance}`}>
+          <span className="shell-live" role="status" data-status={live} title={live === 'live' ? t('SSE connection established') : live === 'hidden' ? t('Tab hidden, updates paused') : t('Polling periodically')}>
             <span className="shell-live-dot" aria-hidden="true" />
-            <span>{live === 'live' ? t('Live') : live === 'hidden' ? t('Paused') : t('Polling')}</span>
-            {age != null && live !== 'hidden' ? <span className="shell-live-age">· {formatAge(age)}</span> : null}
+            <span>{live === 'live' ? t('SSE connected') : live === 'hidden' ? t('Paused') : t('Polling')}</span>
           </span>
           <span className="shell-header-separator" aria-hidden="true" />
-          <span className="shell-last-updated" title={provenance}>{observedAt == null ? t('No data yet') : t('Source: {at}', { at: formatAbsolute(observedAt) })}</span>
+          <span className="shell-last-updated min-w-0 truncate" title={[readTime, age == null ? '' : formatAge(age), provenance].filter(Boolean).join(' · ')}>{readTime}</span>
+          {hasReadIssues && <span className="shell-source-health" data-status={health.errorCount || contract.error ? 'error' : 'stale'} role="status" title={provenance}>
+            <CircleAlert size={14} aria-hidden="true" />
+            <span>{health.errorCount ? t('{n} failing queries', { n: health.errorCount }) : contract.error ? t('Could not read the API contract') : t('{n} unavailable sources', { n: health.staleCount })}</span>
+          </span>}
         </div>
         <div className="shell-header-right">
           <SearchBox />
@@ -143,7 +157,7 @@ export default function App() {
           </Button>
         </div>
       </header>
-      <main className="shell-main" id="main-content"><PageSlot route={route} /></main>
+      <main className="shell-main" id="main-content" tabIndex={-1} aria-label={routeTitle(route)}><PageSlot route={route} /></main>
     </div>
 
     <nav className="shell-bottom-nav" aria-label={t('Mobile navigation')}>
@@ -151,5 +165,5 @@ export default function App() {
         <Icon aria-hidden="true" />{label}
       </a>)}
     </nav>
-  </div>;
+  </SidebarProvider>;
 }

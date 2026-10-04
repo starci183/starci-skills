@@ -2,12 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDownToLine, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Search, X } from 'lucide-react';
 import { useApiQuery } from '../../api/query';
 import type { Transcript } from '../../contract';
+import { ReadWarning } from './frame/read-warning';
 import { formatAbsolute } from '../../i18n/vi';
 import { t } from '../../i18n/t';
 import { ConceptBlock, type Concept } from '../concept';
 import { stripAnsi } from '../logs/kinds';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '../ui/input-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { FeedbackState } from '../feedback-state';
 
 export const concept: Concept = 'C7';
 type Snapshot = { id: number; at: number; lines: number; bytes: number };
@@ -30,7 +34,8 @@ export function TranscriptViewer({ project, attemptId, live }: { project: string
   else { params.set('from', String(from)); params.set('to', String(from + PAGE - 1)); }
   if (snapshot) params.set('snapshot', snapshot);
   const following = live && !snapshot;
-  const transcript = useApiQuery<Transcript>(`${base}?${params}`, { topics: [`attempt:${project}:${attemptId}`], intervalMs: following ? 15_000 : 60_000 });
+  const transcriptUrl = `${base}?${params}`;
+  const transcript = useApiQuery<Transcript>(transcriptUrl, { topics: [`attempt:${project}:${attemptId}`], intervalMs: following ? 15_000 : 60_000 });
   const data = transcript.data;
   const hits = data?.hits ?? [];
   const activeHit = hits[hitIndex] ?? null;
@@ -55,12 +60,12 @@ export function TranscriptViewer({ project, attemptId, live }: { project: string
 
   return <ConceptBlock concept="C7" className="min-w-0 space-y-3">
     <div className="flex flex-wrap items-center gap-2">
-      <form className="flex min-w-0 flex-1 items-center gap-2" onSubmit={event => { event.preventDefault(); runSearch(draft); }}>
-        <div className="relative min-w-[10rem] flex-1"><Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input value={draft} onChange={event => setDraft(event.target.value)} placeholder={t('Find text or /regex/')} className="pl-8" aria-label={t('Search the transcript')} /></div>
+      <form className="flex w-full min-w-0 flex-none items-center gap-2 min-[760px]:w-auto min-[760px]:flex-1" onSubmit={event => { event.preventDefault(); runSearch(draft); }}>
+        <InputGroup className="h-8 min-w-0 flex-1"><InputGroupInput value={draft} onChange={event => setDraft(event.target.value)} placeholder={t('Find text or /regex/')} aria-label={t('Search the transcript')} /><InputGroupAddon><Search className="size-4" aria-hidden="true" /></InputGroupAddon></InputGroup>
         <Button type="submit" variant="outline">{t('Search')}</Button>
         {search && <Button type="button" variant="ghost" size="icon" aria-label={t('Clear search')} onClick={() => { setDraft(''); runSearch(''); }}><X className="size-4" /></Button>}
       </form>
-      <form className="flex items-center gap-1.5" onSubmit={event => { event.preventDefault(); goToLine(); }}>
+      <form className="flex shrink-0 items-center gap-1.5" onSubmit={event => { event.preventDefault(); goToLine(); }}>
         <Input inputMode="numeric" value={jump} onChange={event => setJump(event.target.value.replace(/\D/g, ''))} placeholder={t('Line…')} className="w-20" aria-label={t('Jump to line')} /><Button type="submit" variant="outline" disabled={!jump}>{t('Go')}</Button>
       </form>
       <Button type="button" variant="outline" onClick={copy} disabled={!lines.length}>{copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? t('Copied') : t('Copy')}</Button>
@@ -68,14 +73,17 @@ export function TranscriptViewer({ project, attemptId, live }: { project: string
     </div>
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
       <span className="flex flex-wrap items-center gap-2">
-        {following && <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-medium" data-tone="running" style={{ color: 'var(--tone)', background: 'var(--tone-bg)', borderColor: 'var(--tone-line)' }}><span className="status-dot" data-tone="running" aria-hidden="true" /> {t('Live')}</span>}
-        <span>{data ? t('{lines} lines · {kind} · {at}', { lines: total.toLocaleString('vi-VN'), kind: data.final ? t('final copy') : 'snapshot', at: formatAbsolute(data.at) }) : t('No transcript yet')}</span>
+        {following && data && !transcript.error && !transcript.meta?.stale?.length && <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-medium" data-tone="running" style={{ color: 'var(--tone)', background: 'var(--tone-bg)', borderColor: 'var(--tone-line)' }}><span className="status-dot" data-tone="running" aria-hidden="true" /> {t('Live')}</span>}
+        <span>{data ? t('{lines} lines · {kind}', { lines: total.toLocaleString('vi-VN'), kind: data.final ? t('final copy') : 'snapshot' }) : transcript.error ? t('Transcript unavailable') : t('Reading transcript…')}</span>
+        {data ? <span>· {data.timeSource === 'blob' ? t('Blob storage time') : data.timeSource === 'snapshot' ? t('Snapshot capture time') : t('Source time not recorded')}: {formatAbsolute(data.at)}</span> : null}
         {data && <span>· {t('sensitive data redacted, ANSI colour codes stripped')}</span>}
       </span>
-      <div className="flex items-center gap-2"><label htmlFor={`snapshot-${attemptId}`}>{t('At time')}</label><select id={`snapshot-${attemptId}`} value={snapshot} onChange={event => { setSnapshot(event.target.value); setFrom(1); setTarget(null); }} className="max-w-44 rounded-md border bg-background px-2 py-1 text-foreground"><option value="">{live ? t('Follow live') : t('Final copy')}</option>{snapshots.data?.map(item => <option key={item.id} value={item.id}>{formatAbsolute(item.at)} · {t('{n} lines', { n: item.lines })}</option>)}</select></div>
+      <div className="flex min-w-0 items-center gap-2"><label htmlFor={`snapshot-${attemptId}`}>{t('At time')}</label><Select value={snapshot || 'latest'} onValueChange={value => { setSnapshot(value === 'latest' ? '' : value); setFrom(1); setTarget(null); }}><SelectTrigger id={`snapshot-${attemptId}`} size="sm" className="max-w-44"><SelectValue /></SelectTrigger><SelectContent position="popper"><SelectItem value="latest">{live ? t('Follow live') : t('Final copy')}</SelectItem>{snapshots.data?.map(item => <SelectItem key={item.id} value={String(item.id)}>{formatAbsolute(item.at)} · {t('{n} lines', { n: item.lines })}</SelectItem>)}</SelectContent></Select></div>
     </div>
-    {search && <div className="flex items-center gap-2 text-xs"><span aria-live="polite">{hits.length ? t('{at}/{total} results', { at: hitIndex + 1, total: data?.hitCount ?? hits.length }) : t('No results')}</span><Button type="button" size="icon-xs" variant="outline" disabled={!hits.length} aria-label={t('Previous result')} onClick={() => setHitIndex(index => (index - 1 + hits.length) % hits.length)}><ChevronLeft className="size-3" /></Button><Button type="button" size="icon-xs" variant="outline" disabled={!hits.length} aria-label={t('Next result')} onClick={() => setHitIndex(index => (index + 1) % hits.length)}><ChevronRight className="size-3" /></Button>{activeHit && <span className="truncate text-muted-foreground">{t('line {n}', { n: activeHit.n })}</span>}</div>}
-    {transcript.error && <p role="status" className="rounded-lg border p-3 text-sm text-muted-foreground">{transcript.error}</p>}
+    {search && <div className="flex items-center gap-2 text-xs"><span aria-live="polite">{hits.length ? t('{at}/{total} results', { at: hitIndex + 1, total: data?.hitCount ?? hits.length }) : data ? t('No results') : transcript.error ? t('Transcript unavailable') : t('Searching…')}</span><Button type="button" size="icon-xs" variant="outline" disabled={!hits.length} aria-label={t('Previous result')} onClick={() => setHitIndex(index => (index - 1 + hits.length) % hits.length)}><ChevronLeft className="size-3" /></Button><Button type="button" size="icon-xs" variant="outline" disabled={!hits.length} aria-label={t('Next result')} onClick={() => setHitIndex(index => (index + 1) % hits.length)}><ChevronRight className="size-3" /></Button>{activeHit && <span className="truncate text-muted-foreground">{t('line {n}', { n: activeHit.n })}</span>}</div>}
+    <ReadWarning read={transcript} url={transcriptUrl} retained={Boolean(data)} />
+    <ReadWarning read={snapshots} url={`${base}/snapshots`} retained={Boolean(snapshots.data)} />
+    {!data && !transcript.error ? <FeedbackState>{t('Reading transcript…')}</FeedbackState> : null}
     {data && <div className="max-h-[32rem] min-w-0 overflow-auto rounded-lg border bg-muted/20 font-mono text-xs" role="log" aria-label={t('Transcript with sensitive data redacted')}>
       {lines.map((line, index) => {
         const gap = search && index > 0 && line.n !== lines[index - 1].n + 1;

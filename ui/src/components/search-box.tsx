@@ -1,78 +1,184 @@
-import { useEffect, useState } from 'react';
-import { ArrowRight, Search } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowRight, CircleAlert, ExternalLink, LoaderCircle, Search } from 'lucide-react';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { Input } from './ui/input';
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList, CommandLoading } from './ui/command';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { StateChip } from './state-chip';
-import { navigate } from '../router';
+import { FeedbackState } from './feedback-state';
+import { readEnvelope, readErrorEnvelope } from '../api/query';
+import { navigate, parseRoute } from '../router';
+import { formatAbsolute } from '../i18n/vi';
 import { t } from '../i18n/t';
-import type { Ref, UiState } from '../contract';
+import { UI_STATES, type Envelope, type ReadErrorMeta, type SearchHit, type SearchIdentity, type SearchView } from '../contract';
 import type { Concept } from './concept';
 
 export const concept: Concept = 'frame';
-type Hit = Ref & { title: string; ui: UiState };
+type SearchResult = {
+  query: string; data: SearchView | null; meta: Envelope<SearchView>['meta'] | null;
+  loading: boolean; error: string | null; errorCode: string | null; errorMeta: ReadErrorMeta | null; observedAt: number | null;
+};
+
+function isIdentity(value: unknown): value is SearchIdentity {
+  return value !== null && typeof value === 'object'
+    && 'store' in value && (value.store === 'machine' || value.store === 'ledger')
+    && 'ledgerId' in value && (value.ledgerId === null || typeof value.ledgerId === 'string')
+    && 'workflow' in value && (value.workflow === null || typeof value.workflow === 'string')
+    && 'kind' in value && typeof value.kind === 'string'
+    && 'id' in value && typeof value.id === 'string';
+}
+
+function isSearchRef(value: unknown): value is NonNullable<SearchHit['ref']> {
+  return isIdentity(value) && 'href' in value && typeof value.href === 'string';
+}
+
+function isHit(value: unknown): value is SearchHit {
+  return value !== null && typeof value === 'object'
+    && 'kind' in value && typeof value.kind === 'string'
+    && 'id' in value && typeof value.id === 'string'
+    && 'href' in value && (value.href === null || typeof value.href === 'string')
+    && 'title' in value && typeof value.title === 'string'
+    && (!('project' in value) || value.project === undefined || value.project === null || typeof value.project === 'string')
+    && 'ui' in value && UI_STATES.some(state => state === value.ui)
+    && 'matched' in value && isIdentity(value.matched)
+    && 'ref' in value && (value.ref === null || isSearchRef(value.ref));
+}
+
+function isSearchView(value: unknown): value is SearchView {
+  return value !== null && typeof value === 'object'
+    && 'hits' in value && Array.isArray(value.hits) && value.hits.every(isHit)
+    && 'limit' in value && typeof value.limit === 'number' && Number.isSafeInteger(value.limit) && value.limit > 0
+    && 'truncated' in value && typeof value.truncated === 'boolean';
+}
+
+function hitKey(hit: SearchHit): string {
+  const { store, ledgerId, workflow, kind, id } = hit.matched;
+  return JSON.stringify([store, ledgerId, workflow, kind, id]);
+}
+
+function targetOf(hit: SearchHit): 'route' | 'blob' | null {
+  if (!hit.ref || hit.href !== hit.ref.href) return null;
+  if (/^\/api\/blob\/[a-f0-9]{64}$/.test(hit.ref.href)) return 'blob';
+  return hit.ref.href.startsWith('#/') && parseRoute(hit.ref.href).kind !== 'not-found' ? 'route' : null;
+}
+
+function initialResult(query: string): SearchResult {
+  return { query, data: null, meta: null, loading: false, error: null, errorCode: null, errorMeta: null, observedAt: null };
+}
 
 export function SearchBox() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [hits, setHits] = useState<Hit[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState(0);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); setOpen((value) => !value); }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+  const [retry, setRetry] = useState(0);
+  const [result, setResult] = useState<SearchResult>(() => initialResult(''));
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const needle = query.trim();
+  const current = result.query === needle ? result : null;
+  const hits = current?.data?.hits ?? [];
+  const loading = Boolean(needle) && (!current || current.loading);
+  const error = current?.error;
+  const meta = current?.errorMeta ?? current?.meta;
+  const partial = Boolean(meta?.stale?.length || meta?.sources.some(source => source.availability && source.availability !== 'available'));
+  const provenance = [
+    current?.observedAt == null ? '' : t('Last successful API read: {at}', { at: formatAbsolute(current.observedAt) }),
+    meta?.sources.length ? t('Sources: {list}', { list: meta.sources.map(source => `${source.db}:${source.rel}`).join(', ') }) : '',
+    meta?.stale?.length ? t('Unavailable sources: {list}', { list: meta.stale.join(', ') }) : '',
+  ].filter(Boolean).join(' · ');
+  const shortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K';
+  const changeOpen = useCallback((next: boolean) => {
+    if (next) {
+      const target = document.activeElement;
+      returnFocus.current = target instanceof HTMLElement && target !== document.body && target !== document.documentElement ? target : null;
+    }
+    setOpen(next);
   }, []);
 
   useEffect(() => {
-    if (!open || !query.trim()) { setHits([]); setLoading(false); setError(null); return; }
+    const onKey = (event: KeyboardEvent) => {
+      if (!event.defaultPrevented && !event.repeat && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        changeOpen(!open);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, changeOpen]);
+
+  useEffect(() => {
+    if (!open || !needle) { setResult(initialResult(needle)); return; }
     const controller = new AbortController();
+    setResult(previous => ({ ...(previous.query === needle ? previous : initialResult(needle)), loading: true, error: null, errorCode: null, errorMeta: null }));
     const timer = setTimeout(async () => {
-      setLoading(true);
+      let errorCode = 'READ_FAILED';
+      let errorMeta: ReadErrorMeta | null = null;
       try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const body = await response.json() as { data: { hits: Hit[] } };
-        setHits(body.data.hits.filter((hit) => hit.href.startsWith('#/')));
-        setSelected(0);
-        setError(null);
-      } catch (cause) {
-        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Could not find the id.'));
-      } finally { if (!controller.signal.aborted) setLoading(false); }
+        const response = await fetch(`/api/search?q=${encodeURIComponent(needle)}`, { signal: controller.signal });
+        if (!response.ok) {
+          errorCode = `HTTP_${response.status}`;
+          const payload: unknown = await response.json();
+          const failure = readErrorEnvelope(payload);
+          errorCode = failure.error.code;
+          errorMeta = failure.meta ?? null;
+          throw new Error('Search read failed');
+        }
+        errorCode = 'INVALID_RESPONSE';
+        const payload: unknown = await response.json();
+        const envelope = readEnvelope(payload, isSearchView);
+        const data = { ...envelope.data, hits: [...new Map(envelope.data.hits.map(hit => [hitKey(hit), hit])).values()] };
+        if (!controller.signal.aborted) setResult({ query: needle, data, meta: envelope.meta, loading: false, error: null, errorCode: null, errorMeta: null, observedAt: Date.now() });
+      } catch {
+        if (!controller.signal.aborted) setResult(previous => ({
+          ...(previous.query === needle ? previous : initialResult(needle)), loading: false, error: t('Could not read the search.'), errorCode, errorMeta,
+        }));
+      }
     }, 180);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [open, query]);
+  }, [open, needle, retry]);
 
-  const choose = (hit: Hit) => { navigate(hit.href); setOpen(false); };
-  return <>
-    <Button variant="outline" className="shell-search-trigger" onClick={() => setOpen(true)} aria-label={t('Search an id or evidence')}>
-      <Search className="size-4" aria-hidden="true" /><span>{t('Search an id or evidence')}</span><kbd>⌘ K</kbd>
-    </Button>
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="search-dialog">
-        <DialogHeader><DialogTitle>{t('Search in StarCi')}</DialogTitle><DialogDescription>{t('Paste a workflow, unit, attempt, decision or blob id.')}</DialogDescription></DialogHeader>
-        <Input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Enter an id or keyword…')} aria-label={t('Search keywords')}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowDown') { event.preventDefault(); setSelected((value) => Math.min(value + 1, hits.length - 1)); }
-            if (event.key === 'ArrowUp') { event.preventDefault(); setSelected((value) => Math.max(0, value - 1)); }
-            if (event.key === 'Enter' && hits[selected]) { event.preventDefault(); choose(hits[selected]); }
-          }} />
-        <div className="search-results" role="listbox" aria-label={t('Search results')}>
-          {!query.trim() && <p>{t('Enter an id to open its evidence.')}</p>}
-          {loading && <p>{t('Searching…')}</p>}
-          {error && <p role="alert">{t('Could not read the search: {error}', { error })}</p>}
-          {!loading && !error && query.trim() && hits.length === 0 && <p>{t('No matching results.')}</p>}
-          {hits.map((hit, index) => <button key={`${hit.kind}:${hit.project ?? ''}:${hit.id}`} type="button" role="option" aria-selected={index === selected}
-            className="search-hit" onMouseEnter={() => setSelected(index)} onClick={() => choose(hit)}>
-            <span><strong>{hit.title}</strong><small>{hit.kind} · {hit.id}</small></span>
-            <StateChip state={hit.ui} compact /><ArrowRight className="size-4" aria-hidden="true" />
-          </button>)}
-        </div>
-      </DialogContent>
-    </Dialog>
-  </>;
+  const choose = (hit: SearchHit) => {
+    const target = targetOf(hit);
+    if (!target || !hit.ref) return;
+    if (target === 'blob') window.open(hit.ref.href, '_blank', 'noopener,noreferrer');
+    else navigate(hit.ref.href);
+    changeOpen(false);
+  };
+  return <Dialog open={open} onOpenChange={changeOpen}>
+    <DialogTrigger asChild>
+      <Button ref={trigger} variant="outline" className="shell-search-trigger" aria-label={t('Search an id or evidence')} aria-keyshortcuts="Meta+K Control+K">
+        <Search className="size-4" aria-hidden="true" /><span>{t('Search an id or evidence')}</span><kbd>{shortcut}</kbd>
+      </Button>
+    </DialogTrigger>
+    <DialogContent className="search-dialog command-dialog gap-0 overflow-hidden" onCloseAutoFocus={event => {
+      const target = returnFocus.current?.isConnected ? returnFocus.current : trigger.current;
+      if (target) { event.preventDefault(); target.focus(); }
+    }}>
+      <DialogHeader className="px-6 pt-6 pb-2 pr-14"><DialogTitle>{t('Search in StarCi')}</DialogTitle><DialogDescription>{t('Paste a workflow, unit, attempt, decision or blob id.')}</DialogDescription></DialogHeader>
+      <Command className="rounded-none! px-5 pb-5 pt-0" shouldFilter={false} label={t('Search results')}>
+        <CommandInput autoFocus value={query} onValueChange={setQuery} placeholder={t('Enter an id or keyword…')} aria-label={t('Search keywords')} />
+        <CommandList className="search-results" aria-busy={loading}>
+          {!needle && <p role="status">{t('Enter an id to open its evidence.')}</p>}
+          {partial && !error && <div className="flex items-center gap-2 py-2 text-xs text-[var(--status-warning)]" role="status" title={provenance}>
+            <CircleAlert className="size-4 shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1">{t('Some search sources could not be read.')}</span>
+            <Button variant="ghost" size="sm" disabled={loading} onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>
+          </div>}
+          {loading && <CommandLoading><span className="flex items-center gap-2 px-3 py-4"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{t('Searching…')}</span></CommandLoading>}
+          {error && <div title={provenance}><FeedbackState error onRetry={() => setRetry(value => value + 1)}>{current?.data ? t('Could not refresh the search. Showing the last successful results.') : error}</FeedbackState></div>}
+          {!loading && !error && needle && hits.length === 0 && <CommandEmpty>{partial ? t('No matching results from the available sources.') : t('No matching results.')}</CommandEmpty>}
+          {hits.map(hit => {
+            const target = targetOf(hit);
+            const identity = hit.ref ?? hit.matched;
+            const alias = hit.ref && (hit.matched.kind !== hit.ref.kind || hit.matched.id !== hit.ref.id);
+            return <CommandItem key={hitKey(hit)} value={hitKey(hit)} className="search-hit" disabled={target === null} onSelect={() => choose(hit)} title={target === 'blob' ? t('Open evidence') : undefined}>
+              <span><strong>{hit.title}</strong><small className="break-all">{identity.kind} · {identity.id}{hit.project ? ` · ${hit.project}` : ''}{identity.workflow ? ` · ${identity.workflow}` : ''}</small>
+                {alias && <small className="break-all">{t('Matched {kind}: {id}', { kind: hit.matched.kind, id: hit.matched.id })}</small>}
+                {!target && <small>{t('No supported page for this result.')}</small>}
+              </span>
+              <StateChip state={hit.ui} compact />{target === 'blob' ? <ExternalLink className="size-4" aria-hidden="true" /> : target === 'route' ? <ArrowRight className="size-4" aria-hidden="true" /> : null}
+            </CommandItem>;
+          })}
+          {current?.data?.truncated && <p role="status" title={provenance}>{t('Showing the first {n} search results.', { n: hits.length })}</p>}
+        </CommandList>
+      </Command>
+    </DialogContent>
+  </Dialog>;
 }

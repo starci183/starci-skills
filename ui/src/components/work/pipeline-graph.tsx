@@ -28,8 +28,9 @@ const dashed = (status: Status) => statusTone[status] === 'skipped';
 export function legSummary(leg: LegRow): string {
   if (leg.status === 'deferred') return leg.deferred ?? t('Deferred by configuration');
   if (leg.status === 'external') return leg.deferred ?? t('Handled externally');
+  if (leg.inPlan && leg.binding === 'unbound') return t('No revision-bound runtime units');
   if (leg.units.length > 1) return t('{units} units · {done} passed', { units: leg.units.length, done: leg.units.filter(unit => unit.state === 'done').length });
-  if (leg.units.length === 1 || leg.attempts.length) { const { tries, budget } = legTries(leg); return t('try {tries}/{budget}', { tries, budget }); }
+  if (leg.units.length === 1 || leg.attempts.length) { const { tries, budget } = legTries(leg); return budget == null ? t('try {n}', { n: tries }) : t('try {tries}/{budget}', { tries, budget }); }
   return leg.status === 'planned' ? t('not dispatched') : t('no attempts yet');
 }
 
@@ -52,11 +53,15 @@ const activate = (leg: LegRow, onSelect: (leg: LegRow) => void) => (event: Keybo
 /** S3: the whole planned op chain as a pipeline (columns = levels, stacked = parallel). */
 export function PipelineGraph({ pipeline, selected, onSelect }: { pipeline: PipelineView; selected: string | null; onSelect: (leg: LegRow) => void }) {
   const narrow = useNarrow();
-  if (!pipeline.legs.length) return <p className="text-sm text-muted-foreground">{t('This workflow has no planned op chain yet.')}</p>;
-  return narrow ? <PipelineList pipeline={pipeline} selected={selected} onSelect={onSelect} /> : <PipelineSvg pipeline={pipeline} selected={selected} onSelect={onSelect} />;
+  const planned = { ...pipeline, legs: pipeline.legs.filter(leg => leg.inPlan) };
+  const history = pipeline.legs.filter(leg => !leg.inPlan);
+  return <div className="space-y-4">
+    {!planned.legs.length ? <p className="text-sm text-muted-foreground">{t('This workflow has no planned op chain yet.')}</p> : pipeline.anomalies.length ? <div className="space-y-2 rounded-md border p-3"><p className="text-sm text-muted-foreground">{t('Recorded graph anomalies; dependency ordering is unavailable.')}</p>{pipeline.anomalies.map((anomaly, index) => <p key={index} className="break-all font-mono text-xs">{anomaly.kind} · {anomaly.from ?? '—'} → {anomaly.to ?? '—'}</p>)}<div className="flex flex-wrap gap-2">{planned.legs.map(leg => <button key={leg.op} type="button" onClick={() => onSelect(leg)} className="rounded-md border px-3 py-2 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">{legName(leg)} · {leg.op}</button>)}</div></div> : narrow ? <PipelineList pipeline={planned} selected={selected} onSelect={onSelect} /> : <PipelineSvg pipeline={planned} selected={selected} onSelect={onSelect} />}
+    {history.length > 0 && <div className="border-t pt-3"><h3 className="text-sm font-semibold">{t('Recorded operation history')}</h3><p className="mt-1 text-xs text-muted-foreground">{t('Operation scope; excluded from plan progress. Instance association is unproven.')}</p><div className="mt-2 flex flex-wrap gap-2">{history.map(leg => <button key={leg.op} type="button" aria-pressed={selected === leg.op} onClick={() => onSelect(leg)} className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"><StatusChip status={leg.status} /><span>{legName(leg)} <span className="font-mono text-xs text-muted-foreground">{leg.op}</span></span><span className="text-xs text-muted-foreground">{t('{n} attempts', { n: leg.attempts.length })}</span></button>)}</div></div>}
+  </div>;
 }
 
-const edgeStroke = (tone: 'current' | 'done' | 'plain') => tone === 'current' ? toneVar('running') : tone === 'done' ? toneVar('success', '-line') : toneVar('skipped');
+const edgeStroke = (tone: 'current' | 'done' | 'plain') => tone === 'current' ? toneVar('running') : tone === 'done' ? toneVar('success', '-line') : 'var(--muted-foreground)';
 
 function PipelineSvg({ pipeline, selected, onSelect }: { pipeline: PipelineView; selected: string | null; onSelect: (leg: LegRow) => void }) {
   const holder = useRef<HTMLDivElement>(null);
@@ -81,7 +86,7 @@ function PipelineSvg({ pipeline, selected, onSelect }: { pipeline: PipelineView;
       </defs>
       {columns.map(col => <text key={col.level} x={placed.get(col.legs[0].op)!.x} y={18} fontSize="11" fontWeight="600" letterSpacing=".04em" className="fill-muted-foreground"><title>{`${col.index + 1}. ${col.label}`}</title>{clip(`${col.index + 1}. ${col.label.split(' · ')[0]}`, chars + 3)}</text>)}
       <g fill="none">{edges.map(edge => <path key={`${edge.from}>${edge.to}`} d={edge.path} markerEnd={`url(#pg-arrow-${edge.tone})`}
-        stroke={edgeStroke(edge.tone)} strokeWidth={edge.tone === 'current' ? 1.8 : 1.2} opacity={edge.tone === 'plain' ? 0.42 : 0.8}><title>{`${edge.from} → ${edge.to}`}</title></path>)}</g>
+        stroke={edgeStroke(edge.tone)} strokeWidth={edge.tone === 'current' ? 1.8 : 1.2} opacity={edge.tone === 'plain' ? 1 : 0.8}><title>{`${edge.from} → ${edge.to}`}</title></path>)}</g>
       {[...placed.values()].map(({ leg, x, y }) => {
         const tone = statusTone[leg.status], isSel = selected === leg.op;
         const name = legName(leg), goal = legGoal(leg), agents = legAgents(leg);
@@ -91,9 +96,9 @@ function PipelineSvg({ pipeline, selected, onSelect }: { pipeline: PipelineView;
           <motion.g initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: EASE, delay: 0.04 * (placed.get(leg.op)?.col ?? 0) }}>
           <title>{`${name} (${leg.op}) · ${statusLabels[leg.status]}${leg.deferred ? ` · ${leg.deferred}` : ''}${goal ? `
 ${goal}` : ''}`}</title>
-          {leg.current && <rect x={-3} y={-3} width={nodeW + 6} height={NODE_H + 6} rx={12} fill="none" stroke={toneVar('running')} strokeWidth={2} />}
-          <rect width={nodeW} height={NODE_H} rx={9} fill="var(--card)" stroke={isSel ? 'var(--ring)' : 'var(--border)'} strokeWidth={isSel ? 2 : 1.2} strokeDasharray={dashed(leg.status) ? '5 4' : undefined} />
-          <rect x={-3} y={-3} width={nodeW + 6} height={NODE_H + 6} rx={11} fill="none" stroke="var(--primary)" strokeWidth={2} className="opacity-0 group-focus-visible:opacity-100" />
+          {leg.current && <rect x={-3} y={-3} width={nodeW + 6} height={NODE_H + 6} rx={8} fill="none" stroke={toneVar('running')} strokeWidth={1.5} />}
+          <rect width={nodeW} height={NODE_H} rx={6} fill="var(--card)" stroke={isSel ? 'var(--ring)' : 'var(--border)'} strokeWidth={isSel ? 1.5 : 1} strokeDasharray={dashed(leg.status) ? '5 4' : undefined} />
+          <rect x={-3} y={-3} width={nodeW + 6} height={NODE_H + 6} rx={8} fill="none" stroke="var(--ring)" strokeWidth={2} className="opacity-0 group-focus-visible:opacity-100" />
           <text x={8} y={19} fontSize="13" fontWeight="650" className="fill-foreground">{wrap2(name, Math.floor(chars * 0.9)).map((line, i) => <tspan key={i} x={8} dy={i ? 15 : 0}>{line}</tspan>)}</text>
           <circle cx={12} cy={55} r={3.5} fill="var(--tone)" />
           <text x={20} y={59} fontSize="11.5" fontWeight="600" fill="var(--tone)">{clip(statusLabels[leg.status], chars - 2)}</text>
@@ -115,7 +120,7 @@ function PipelineList({ pipeline, selected, onSelect }: { pipeline: PipelineView
     <p className="mb-2 text-xs font-semibold text-muted-foreground">{col.index + 1}. {col.label}{col.legs.length > 1 && <span className="font-normal normal-case"> · {t('parallel')}</span>}</p>
     <ul className="flex flex-col gap-2">{col.legs.map(leg => <li key={leg.op}>
       <button type="button" data-tone={statusTone[leg.status]} data-leg={leg.op} aria-pressed={selected === leg.op} onClick={() => onSelect(leg)}
-        className={`flex w-full min-w-0 flex-col gap-2 rounded-lg border bg-card px-4 py-3 text-left ${dashed(leg.status) ? 'border-dashed' : ''} ${leg.current ? 'ring-1 ring-[var(--status-running)]' : ''} ${selected === leg.op ? 'border-ring' : 'border-border'}`}>
+        className={`flex w-full min-w-0 flex-col gap-2 rounded-md border bg-card px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-ring ${dashed(leg.status) ? 'border-dashed' : ''} ${leg.current ? 'ring-1 ring-[var(--status-running)]' : ''} ${selected === leg.op ? 'border-ring' : 'border-border'}`}>
         <span className="flex w-full min-w-0 items-start justify-between gap-2"><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold" title={legGoal(leg) ?? undefined}>{legName(leg)}</span>
           <span className="block truncate text-xs text-muted-foreground" title={leg.op}>{leg.op}</span></span><StatusChip status={leg.status} /></span>
         <span className="block w-full truncate text-xs text-muted-foreground">{legSummary(leg)}</span>

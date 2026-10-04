@@ -120,7 +120,7 @@ export function JsonView({ text }: { text: string }) {
   }
   const single = !parsed.jsonl;
   return (
-    <Frame>
+    <Frame className="evidence-code-frame">
       <Toolbar right={<span>{parsed.jsonl ? t('JSONL · {n} lines', { n: parsed.docs.length }) : 'JSON'}</span>}>
         {!raw ? <>
           <button type="button" className={toolbarBtn} onClick={() => setMode(s => ({ m: 'all', n: s.n + 1 }))}>{t('Expand all')}</button>

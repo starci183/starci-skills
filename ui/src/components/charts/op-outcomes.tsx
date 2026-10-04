@@ -10,7 +10,7 @@ import { useWidth } from './use-width';
 import { t } from '../../i18n/t';
 
 const ROW = 46;
-const order: AttemptState[] = ['pass', 'bad', 'run', 'dropped'];
+const order: AttemptState[] = ['pass', 'bad', 'run', 'settling', 'retry', 'dropped', 'unknown'];
 
 export function OpOutcomes({ rows }: { rows: AttemptRow[] }) {
   const [ref, width] = useWidth();
@@ -18,7 +18,7 @@ export function OpOutcomes({ rows }: { rows: AttemptRow[] }) {
   const max = Math.max(1, ...groups.map(g => g.total));
   const hasDropped = groups.some(g => g.dropped > 0);
   return <ChartCard title={t('Outcomes by op')} hint={t('Each bar is one op. Length follows the attempt count; the k/n label is passes over total attempts.')}
-    legend={[{ tone: 'success', label: t('Passed') }, { tone: 'failed', label: t('Failed/blocked') }, { tone: 'running', label: t('Running') }, ...(hasDropped ? [{ tone: 'skipped' as const, label: t('Dropped') }] : [])]}
+    legend={[{ tone: 'success', label: t('Passed') }, { tone: 'failed', label: t('Failed/blocked') }, { tone: 'running', label: t('Running') }, ...(groups.some(g => g.settling) ? [{ tone: 'warning' as const, label: t('Settling') }] : []), ...(groups.some(g => g.retry) ? [{ tone: 'warning' as const, label: t('Requeued') }] : []), ...(hasDropped ? [{ tone: 'skipped' as const, label: t('Dropped') }] : []), ...(groups.some(g => g.unknown) ? [{ tone: 'skipped' as const, label: t('Unknown') }] : [])]}
     empty={!groups.length && t('No attempts in this range yet.')}>
     <div ref={ref}><svg width={width} height={groups.length * ROW} role="img" aria-label={t('Outcomes by op')} className="block max-w-full">
       {groups.map((g, i) => {

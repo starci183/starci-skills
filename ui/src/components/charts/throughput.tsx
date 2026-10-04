@@ -21,7 +21,7 @@ export function Throughput({ rows, since, now }: { rows: AttemptRow[]; since: nu
   const every = Math.max(1, Math.ceil(buckets.length / Math.max(2, Math.floor(plotW / (step >= 86_400e3 ? 44 : 60)))));
   const label = (at: number) => step >= 86_400e3 ? fmtDay(at) : step >= 6 * 3600e3 ? fmtDayClock(at) : fmtClock(at);
   const stepText = step >= 86_400e3 ? t('day') : step >= 3600e3 ? t('{n} hours', { n: step / 3600e3 }) : t('{n} min', { n: step / 60e3 });
-  return <ChartCard title={t('Throughput')} hint={t('Attempts dispatched and attempts settled, per {step}.', { step: stepText })}
+  return <ChartCard title={t('Throughput')} hint={t('Dispatches and settlements within the dispatch cohort, per {step}.', { step: stepText })}
     legend={[{ neutral: true, label: t('Dispatched') }, { tone: 'queued', label: t('Settled') }]} empty={!rows.length && t('No attempts in this range yet.')}>
     <div ref={ref}><svg width={width} height={H} role="img" aria-label={t('Throughput over time')} className="block max-w-full">
       {Array.from({ length: Math.round(top / tick) + 1 }, (_, i) => i * tick).map(v => <g key={v}>
