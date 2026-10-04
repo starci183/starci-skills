@@ -19,7 +19,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.66.0",
-    "server-only": "^0.0.1",
+    "server-only": "0.0.1",
     "swr": "^2.4.0",
     "zod": "^4.1.12"
   }
