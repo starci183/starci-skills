@@ -12,9 +12,9 @@ import path from 'node:path';
 import { SKILL_ROOT } from '../machine/home.mjs';
 
 /** Every terminal handle sup_events records as a seat session: Set<string>. */
-export function recordedSeatTerminals(m, { limit = 500 } = {}) {
+export function recordedSeatTerminals(m, { limit = 500, eventPrefix = 'supervisor' } = {}) {
   const handles = new Set();
-  for (const e of m.supEvents({ kinds: ['supervisor-booted', 'supervisor-restarted'], limit })) {
+  for (const e of m.supEvents({ kinds: [`${eventPrefix}-booted`, `${eventPrefix}-restarted`], limit })) {
     for (const h of [e.payload?.terminal, e.payload?.previous?.terminal]) if (h) handles.add(h);
   }
   return handles;

@@ -8,6 +8,8 @@ import {inspectLedger,openLedger,ledgerFileFor} from '../../engine/db/ledger.mjs
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import { readMachine } from '../../engine/db/machine.mjs';
+import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
+import { ensureWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
@@ -35,13 +37,25 @@ const fixture=t=>{
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,
     // The machine registry is worker-wide: fixture repos all basename to 'repo' and collide on ledgers.name.
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
-  const run=(script,...args)=>spawnSync(process.execPath,['--loader',new URL('../helpers/worker-close-loader.mjs',import.meta.url).href,script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...(f.closeFails?{STARCI_FAKE_ORCA_CLOSE_FAILS:f.closeFails}:{}),...(f.releaseFails?{STARCI_FAKE_ORCA_RELEASE_FAILS:'1'}:{}),...(f.unverifiedClosure?{STARCI_FAKE_CLOSURE_UNPROVEN:'1'}:{})}});
+  const run=(script,...args)=>spawnSync(process.execPath,['--loader',new URL('../helpers/worker-close-loader.mjs',import.meta.url).href,'--loader',new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href,script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...(f.closeFails?{STARCI_FAKE_ORCA_CLOSE_FAILS:f.closeFails}:{}),...(f.releaseFails?{STARCI_FAKE_ORCA_RELEASE_FAILS:'1'}:{}),...(f.unverifiedClosure?{STARCI_FAKE_CLOSURE_UNPROVEN:'1'}:{})}});
   const f={};
   const callArgv=()=>fs.existsSync(log)
     ?fs.readFileSync(log,'utf8').trim().split('\n').filter(Boolean).map(l=>JSON.parse(l).argv)
     :[];
   const calls=()=>callArgv().map(argv=>argv.slice(0,2).join(' '));
-  return Object.assign(f,{repo,state,run,calls,callArgv,env});
+  return Object.assign(f,{root,repo,state,run,calls,callArgv,env});
+};
+
+const prepareWorkflowTree=(f,workflowId)=>{
+  for(const args of [['init','--initial-branch=main'],['config','user.name','Startup Fixture'],['config','user.email','startup-fixture@example.invalid'],
+    ['commit','--allow-empty','-m','native startup fixture']]){
+    const result=spawnSync('git',args,{cwd:f.repo,encoding:'utf8',windowsHide:true,timeout:60000});
+    assert.equal(result.status,0,result.stderr||result.error?.message);
+  }
+  const orca=fakeOrcaWorktrees({root:path.join(f.root,'trees')});
+  const result=ensureWorkflowWorktree({env:f.env,orca},{workflowId,appRepo:f.repo});
+  assert.equal(result.ok,true,result.detail);
+  return result.record;
 };
 
 const readState=f=>json(fs.readFileSync(f.state,'utf8'));
@@ -66,6 +80,60 @@ const payloadOf=(repo,jobId)=>{
   try{return json(ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json);}
   finally{ledger.close();}
 };
+
+test('a native owner-approved goal revision during installation refuses the old Kernel and clears only its unused reservation',t=>{
+  const f=fixture(t);
+  const defined=f.run(DEFINE_GOAL,'--repo',f.repo,'--text','refactor the enrolment module','--json');
+  assert.equal(defined.status,0,defined.stderr);
+  const workflowId=json(defined.stdout).workflowId;
+  const tree=prepareWorkflowTree(f,workflowId);
+  const preview=f.run(DEFINE_GOAL,'--repo',f.repo,'--revise',workflowId,'--text',
+    'refactor and canonicalize .starciwork and .starcistacks against the current contracts','--plan','--json');
+  assert.equal(preview.status,0,preview.stderr);
+  const approval=json(preview.stdout).revisionPreview.approval;
+  assert.ok(approval.token);
+  // The test is the owner of this fixture and approves the exact native preview command. The install seam executes it.
+  f.env.STARCI_FAKE_INSTALL_OWNER_COMMAND=JSON.stringify(approval.command);
+  const started=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
+  assert.equal(started.status,1,started.stderr);
+  const failed=json(started.stderr.trim().split(/\r?\n/).at(-1));
+  assert.equal(failed?.reason,'workflow-goal-unverified');
+  assert.equal(failed?.install?.installed,true);
+  assert.equal(failed?.install?.receipt?.revision?.goalRevision,1);
+  assert.equal(failed?.workflowWorktree?.orcaWorktreeId,tree.orcaWorktreeId);
+  assert.equal(readState(f).workerStarts?.length??0,0,'no worker-start uses the superseded goal');
+  assert.equal(fs.existsSync(tree.path),true,'the installed workflow tree is retained');
+  const ledger=inspectLedger({file:ledgerFileFor(f.repo)});
+  try{
+    const goal=ledger.db.prepare('SELECT revision,approved_by,approval_ref FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
+    assert.equal(goal.revision,1);
+    assert.equal(goal.approved_by,'owner');
+    assert.equal(goal.approval_ref,approval.token,'the native goal API persisted the actual fixture preview approval');
+    assert.equal(ledger.db.prepare("SELECT token FROM signals WHERE scope='kernel' AND key=?").get(workflowId),undefined);
+    assert.equal(ledger.db.prepare("SELECT COUNT(*) n FROM events WHERE workflow_id=? AND kind='kernel-booted'").get(workflowId).n,0);
+  }finally{ledger.close();}
+});
+
+test('a refused native install retains the registered workflow tree and creates no Kernel worker',t=>{
+  const f=fixture(t);
+  const defined=f.run(DEFINE_GOAL,'--repo',f.repo,'--text','refactor the enrolment module','--json');
+  assert.equal(defined.status,0,defined.stderr);
+  const workflowId=json(defined.stdout).workflowId;
+  const tree=prepareWorkflowTree(f,workflowId);
+  f.env.STARCI_FAKE_INSTALL_FAIL='1';
+  const started=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
+  assert.equal(started.status,1,started.stderr);
+  const failed=json(started.stderr.trim().split(/\r?\n/).at(-1));
+  assert.equal(failed?.reason,'workflow-worktree-install-failed');
+  assert.equal(failed?.install?.installed,false);
+  assert.equal(failed?.workflowWorktree?.orcaWorktreeId,tree.orcaWorktreeId);
+  assert.equal(readState(f).workerStarts?.length??0,0);
+  assert.equal(fs.existsSync(tree.path),true);
+  const ledger=inspectLedger({file:ledgerFileFor(f.repo)});
+  try{assert.equal(ledger.db.prepare("SELECT token FROM signals WHERE scope='kernel' AND key=?").get(workflowId),undefined);}
+  finally{ledger.close();}
+  assert.equal(readMachine(m=>m.worktreeRow(tree.path),null,{env:f.env})?.orca_id,tree.orcaWorktreeId);
+});
 
 test('a disconnected kernel restarts from the durable ledger with absolute host context',t=>{
   const f=fixture(t);

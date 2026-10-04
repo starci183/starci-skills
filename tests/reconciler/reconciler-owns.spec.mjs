@@ -12,5 +12,6 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 test('CONCERN_OWNER is the concerns map of modules/reconciler/reconciler.yaml', () => {
   const contract = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'reconciler', 'reconciler.yaml'), 'utf8'));
   assert.deepEqual(contract.concerns, { ...CONCERN_OWNER });
-  assert.equal(CONCERNS.length, 24);
+  assert.equal(CONCERNS.length, 25);
+  assert.equal(CONCERN_OWNER['host.core-debug-seat'], 'host');
 });

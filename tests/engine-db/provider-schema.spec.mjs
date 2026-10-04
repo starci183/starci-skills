@@ -14,7 +14,7 @@ const fixture = (t) => {
   const options = { file, env: { ...process.env, STARCI_TEST_MACHINE_FILE: file } };
   openMachine(options).close();
   const raw = new DatabaseSync(file);
-  raw.exec("DROP TABLE provider_reservation_events; DROP TABLE provider_reservations; DELETE FROM schema_migrations WHERE version=2; PRAGMA user_version=1; INSERT INTO machine_meta VALUES('test-preserved','live-host-data');");
+  raw.exec("DROP TABLE provider_reservation_events; DROP TABLE provider_reservations; DELETE FROM schema_migrations WHERE version>=2; PRAGMA user_version=1; INSERT INTO machine_meta VALUES('test-preserved','live-host-data');");
   raw.close();
   return options;
 };

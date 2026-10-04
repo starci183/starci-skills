@@ -12,8 +12,9 @@ import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { fakeAdmission } from '../helpers/fake-admission.mjs';
+import { restoreMachineV1Fixture } from '../helpers/machine-v1-fixture.mjs';
 
-import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, SEAT_DENIED_TOOLS } from '../../scripts/supervisor/start-supervisor.mjs';
+import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, SEAT_DENIED_TOOLS, seatHealth } from '../../scripts/supervisor/start-supervisor.mjs';
 import { seatToolDecision } from '../../scripts/guards/seat-tools.mjs';
 import { withSupervisor, readSupervisor, seatOf, enabledOf, writeSeat, supervisorEvent, SUPERVISOR_ID, SKILL_ROOT } from '../../scripts/machine/home.mjs';
 import {
@@ -93,15 +94,21 @@ function fakeHost({ terminals = [], live = new Set(), screens = {}, spawnOk = tr
 const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
 const launch = (env, host, extra = {}) => launchSupervisor({ env, deps: host, settings, template: '{launchAuthority}\n{doctrine}', doc: { kernelSeat: { does: ['x'] } }, ...extra });
 
+test('a refused worker observation is unverified rather than affirmative death', () => {
+  const seat = { value: { terminal: 'owned-terminal', dispatch: 'owned-dispatch' } };
+  const refused = seatHealth(seat, { show: () => ({ ok: false, error: 'host contract unavailable', hostUnavailable: false }) });
+  assert.equal(refused.unverified, true);
+  assert.equal(refused.dead, undefined);
+  assert.equal(seatHealth(seat, { show: () => ({ ok: true, state: 'released' }) }).dead, true);
+});
+
 test('Supervisor plans neither create an absent machine store nor upgrade a compatible v1 store', async t => {
   for (const legacy of [false, true]) {
     const env = envOf(t), file = env.STARCI_TEST_MACHINE_FILE;
     if (legacy) {
       const machine = openMachine({ env });
       machine.meta(); machine.close();
-      const raw = new DatabaseSync(file);
-      raw.exec("DROP TABLE provider_reservation_events; DROP TABLE provider_reservations; DELETE FROM schema_migrations WHERE version=2; PRAGMA user_version=1;");
-      raw.close();
+      restoreMachineV1Fixture(file);
     }
     const before = legacy ? crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
     const host = fakeHost(), observations = fakeAdmission();
@@ -114,7 +121,8 @@ test('Supervisor plans neither create an absent machine store nor upgrade a comp
     if (legacy) {
       assert.equal(crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'), before, 'planning preserves all v1 bytes');
       const raw = new DatabaseSync(file, { readOnly: true });
-      assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 1); raw.close();
+      try { assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 1); }
+      finally { raw.close(); }
     } else assert.equal(fs.existsSync(file), false, 'planning creates no machine database');
   }
 });

@@ -3,9 +3,11 @@ Task: read the runtime's storage
 
 The executed schemas live under `engine/db/migrations/runtime/` and `engine/db/migrations/machine/`.
 `engine/db/ledger.mjs` owns project schema validation; `engine/db/machine.mjs` owns host schema validation
-and the additive provider-reservation upgrade. The host upgrade preserves existing rows and records its
-DDL digest in `schema_migrations` in the same transaction as the version change. Read-only host access
-validates a supported schema without upgrading it. These writers and their SQL files own the storage rules.
+and the supported provider-reservation and core-maintenance signal upgrades. The host upgrade preserves
+existing rows and records each DDL digest in `schema_migrations` in the same transaction as its version
+change. Machine writers upgrade v1/v2 stores to v3; readers validate v1, v2 or v3 without upgrading them.
+The signal upgrade admits the distinct core-debug enabled and diagnostic scopes while preserving existing
+Supervisor signal keys, tokens, values and expiries. These writers and their SQL files own the storage rules.
 
 ## 1. The layout
 
@@ -27,7 +29,7 @@ validates a supported schema without upgrading it. These writers and their SQL f
   `projectsRootFor`) — both `projects/` and `machine.sqlite` move under it. Narrower seams still win when set:
   `STARCI_PROJECTS_ROOT` (just the `projects/` directory), `STARCI_TEST_MACHINE_FILE` (the exact `machine.sqlite`
   file), `STARCI_ARTIFACT_ROOT` (the blob store, independent of the state base). A debug probe or throwaway repo
-  that would otherwise leave a fake ledger in the real store (`skills/debug/SKILL.md` §5) must set
+  that would otherwise leave a fake ledger in the real store (`.starci/host/maintenance.md` §5) must set
   `STARCI_LOCAL_ROOT` to a temp directory for its whole process tree.
 
 ## 2. One writer per database

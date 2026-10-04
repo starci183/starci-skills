@@ -2,7 +2,7 @@
 // projection). modules/kernel/start-workflow.yaml orcaTree states the rule. scripts/supervisor/poll.mjs runs it every
 // cycle against the listing it already fetches; scripts/checks/check-orca-tree.mjs is its self-check CLI.
 import { workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
-import { supervisorRead } from '../machine/home.mjs';
+import { supervisorRead, supervisedSeatHandles } from '../machine/home.mjs';
 import { openWorkerHandles } from './workers.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder, WORKER_HOLDING_STATUSES } from '../machine/terminal-ledger.mjs';
 
@@ -78,7 +78,7 @@ function projectLedger(db) {
 }
 
 /** The terminals the open [Worker] jobs own (machine.sqlite sup_jobs; empty when there is no store yet). */
-export const supervisorWorkerHandles = supervisorRead((m) => openWorkerHandles(m), () => new Set());
+export const supervisorWorkerHandles = supervisorRead((m) => new Set([...openWorkerHandles(m), ...supervisedSeatHandles(m)]), () => new Set());
 
 /** Every finding the ledger and the listing disagree on, in code order. */
 // The owner reads the Orca sidebar: every live terminal in a project must be

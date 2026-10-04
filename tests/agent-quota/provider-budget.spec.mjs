@@ -12,6 +12,7 @@ import { closeWorker } from '../../scripts/machine/worker-close.mjs';
 import { planAgentAdmission } from '../../scripts/agent/admission.mjs';
 import { spawnAgent } from '../../scripts/agent/lib.mjs';
 import { fakeAdmission } from '../helpers/fake-admission.mjs';
+import { restoreMachineV1Fixture } from '../helpers/machine-v1-fixture.mjs';
 
 const now = Date.parse('2026-10-03T08:00:00Z'), policy = allocationSettings().admission;
 const root = path.resolve(import.meta.dirname, '../..');
@@ -46,9 +47,7 @@ const legacyStore = (options) => {
   const machine = openMachine(options);
   try { machine.setService({ name: 'preserved-service', kind: 'http', state: 'healthy', port: 41001 }); }
   finally { machine.close(); }
-  const raw = new DatabaseSync(options.file);
-  try { raw.exec("DROP TABLE provider_reservation_events; DROP TABLE provider_reservations; DELETE FROM schema_migrations WHERE version=2; PRAGMA user_version=1; INSERT INTO machine_meta VALUES('test-preserved','host-data');"); }
-  finally { raw.close(); }
+  restoreMachineV1Fixture(options.file, { meta: { 'test-preserved': 'host-data' } });
 };
 
 test('the first actual worker launch prepares an absent store while its plan remains read-only', (t) => {

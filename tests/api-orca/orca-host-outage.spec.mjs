@@ -85,7 +85,8 @@ const createFixture=()=>{
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,
     STARCI_HOST_WAIT_MS:'0',STARCI_KERNEL_DEATH_SETTLE_MS:'0',LOCALAPPDATA:path.join(root,'localappdata'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_PROJECTS_ROOT:path.join(root,'projects')};
-  const closureImport=`data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});`)}`;
+  // Both external boundaries belong to every descendant, including watchdog -> start-workflow.
+  const closureImport=`data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});register(${JSON.stringify(new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href)});`)}`;
   env.NODE_OPTIONS=[env.NODE_OPTIONS,`--import=${closureImport}`].filter(Boolean).join(' ');
   const run=(script,args,more={})=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...more}});
   const calls=()=>fs.existsSync(log)?fs.readFileSync(log,'utf8').trim().split('\n').filter(Boolean).map(l=>json(l).argv.slice(0,2).join(' ')):[];
@@ -139,6 +140,7 @@ const createFixture=()=>{
         // payload.hierarchy.attempt (start-workflow.mjs kernelAttemptOf).
         job:jobRow?{status:jobRow.status,worker_id:jobRow.worker_id,attempt:json(jobRow.payload_json)?.hierarchy?.attempt??null}:{},
         kinds:ledger.db.prepare('SELECT kind FROM events WHERE workflow_id=? ORDER BY seq').all(workflowId).map(r=>r.kind),
+        boots:ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind IN ('kernel-booted','kernel-restarted') ORDER BY seq").all(workflowId).map(r=>json(r.payload_json)),
         incidents:ledger.db.prepare('SELECT incident_id,status FROM incidents WHERE workflow_id=?').all(workflowId).map(r=>({...r})),
       };
     }finally{ledger.close();}
@@ -257,6 +259,7 @@ test('watchdog: a kernel a responding Orca proves dead is fenced and replaced',t
   assert.notEqual(result.replacementTerminal,f.kernel);
   const rows=f.ledgerRows();
   assert.deepEqual([rows.job.status,rows.job.worker_id,rows.job.attempt],['running',result.replacementTerminal,2]);
+  assert.equal(rows.boots.at(-1)?.startup?.host?.fixture,true,'the grandchild native boot retains the external host boundary');
 });
 
 test('watchdog: an unproven process tree retains the disconnected Kernel singleton',t=>{

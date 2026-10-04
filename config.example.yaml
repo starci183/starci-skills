@@ -6,6 +6,10 @@
 language: vi
 model: null
 effort: medium
+# debug — automatically pair an approved workflow start with the native core-maintenance seat.
+# false (or absent) starts the workflow without that pairing. The caller route is supplied by the
+# single public /starci entry; it never changes the Supervisor, Kernel or operation model pins.
+debug: false
 # kernel — the long-lived [Kernel] agent's route, in one of two shapes
 # (docs/config-format.md "Kernel group"):
 #   group form (the default below): {group: [{agent, model?}, ...], effort?}.
@@ -164,9 +168,10 @@ uat:
 # real limit and turns red when the two differ.
 orca:
   maxWorkerDepth: 4
-# coreDebug — the core-debug chat (skills/debug). `/debug` reserves one native caller-owned scheduler
-# per host; Codex app heartbeat or Claude Code /loop runs one fenced read-only pass per tick.
-# (scripts/reconciler/debug-pass.mjs). worktreeLimit: more registered worktrees than this in one repository is an alert.
+# coreDebug — the native core-maintenance parameters used when debug is true. /starci resolves the
+# declared caller agent/model separately from Kernel routing; the actual worker launch attests its
+# supported identity. The reconciler maintains this host seat after the invoking chat closes.
+# interval is its cadence; worktreeLimit is the per-repository core-watch alert threshold.
 coreDebug:
   interval: 10m
   worktreeLimit: 40

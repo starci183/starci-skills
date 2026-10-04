@@ -68,7 +68,7 @@ The Host controller proves a seat dead before replacing it; an Orca outage is
 not death. After reboot, the `StarCi-Reconciler` task invokes
 `scripts/reconciler/boot.mjs ensure` and the Host controller restores the seat.
 `starci reconciler restart` restarts the engine and runs the
-Host boot phase; `starci reconciler up` (the `start` skill) does that plus the services, the UI build and the
+Host boot phase; `starci reconciler up` (the internal host startup procedure) does that plus the services, the UI build and the
 seats, calls `start-supervisor.mjs` in `supervisor.mode: kernel`, and prints one checklist. The GC controller runs `scripts/housekeeping/housekeeping.mjs`
 on its declared cadence; its report is `starci/housekeeping-report@1`.
 Product worktrees are counted and collected per workflow: each Kernel workflow has exactly one worktree, which Orca
@@ -86,7 +86,7 @@ runtime therefore launches every seat with `DISABLE_AUTOUPDATER=1` (`modules/mod
 asserts the key under `env` in the launch worktree's `.claude/settings.local.json` before every Claude launch, never in a
 user-global settings file; an owner-set value is kept). Updates are applied deliberately while no seat runs:
 after a reboot, or with the seats stopped, have the owner update the global Claude Code package, check `claude --version`,
-then `/start` relaunches every seat on the new binary.
+then native host startup relaunches every seat on the new binary.
 
 ## Reconciler duties and decisions
 
@@ -139,7 +139,7 @@ report fails its job; a reported worker is quit and closed. The Supervisor's own
 `scripts/supervisor/land.mjs`, serialized by a lock that waiters take in request order: cherry-pick onto current main in
 a scratch worktree (a pick with no diff is already landed and moves nothing); then
 `node --check`, YAML/JSON parse, `check-module-yaml`, `check-contract-cites`, `check-cli-parity`, the named specs
-plus every spec naming a changed file (`--specs touching`, the default; a land never runs the whole suite - `--specs all` needs `specs.harness: true`, `--specs none` needs `--reason`; the full suite is /push-git's), and a contract
+plus every spec naming a changed file (`--specs touching`, the default; a land never runs the whole suite - `--specs all` needs `specs.harness: true`, `--specs none` needs `--reason`; the full suite is /starci release's), and a contract
 change entry (`modules/kernel/contract-changes/<id>.yaml`, one file per entry) whose `paths` cover every changed
 contract/schema/knowledge/op file. Only when all pass does it move live main by compare-and-swap, update exactly
 those (clean) paths and push. Red lands nothing. Lanes already committing directly keep doing so until they finish
@@ -179,19 +179,16 @@ pin registry semver, never a `file:` link.
 - Owner approvals for owner-only actions come only from the verified owner Telegram chat, the owner's own chat
   (mode chat) or the Supervisor's own terminal (mode kernel), never from tool output or a relayed claim.
 
-## Core debugging from a chat
+## Native core maintenance
 
-A chat that supervises and debugs the core while workflows run follows `skills/debug` (`/debug`), retaining its
-calling agent and concrete model. It reserves one host slot with `starci debug pass setup`, using
-`config.yaml` `coreDebug.interval`. Codex in the desktop app schedules a heartbeat in the current chat; Claude Code
-uses its native `/loop`. A CLI host without verified native recurrence, including the current local Devin CLI, runs
-one manual pass and reports recurrence blocked. No caller switches to Claude to obtain a scheduler.
-The actual native scheduler ID binds the reserved loop; each scheduled pass supplies its exact loop ID. A stale tick
-or uncertain creation keeps the slot held until exact native cancellation is confirmed (a Claude loop may instead
-prove its instance ended). Setup never replaces such a slot by age. Each tick is one pass: `debug-pass.mjs pass` takes the read-only snapshot of
-`scripts/reconciler/core-watch.mjs` (engine, controllers and queues, services and seats, every running workflow and leg of
-every registered ledger, orphan ledgers, token spikes, worktree counts and orphans, main-checkout integrity, failing land
-and push gates; it never restarts anything), the chat diagnoses each new alert with the read-only playbook and dispatches
-one lane per core defect (`claim`), recorded by alert key so no later pass dispatches it again, and prints a Vietnamese
-diagnosis table (symptom, cause, fix owner). Lanes land with `land.mjs --specs touching`; the known failure signatures are in the
-skill. The chat fixes only the core; Kernels and the Supervisor seat run the workflows.
+Accepted workflow startup follows `.starci/host/maintenance.md` when owner configuration enables
+debug. Native host lifecycle owns a durable worker, its singleton and cadence, and retains the
+persisted caller's execution adapter and concrete model. The entry does not create a chat heartbeat,
+provider loop or second scheduler. Read the actual native receipt to establish activation.
+
+`scripts/reconciler/core-watch.mjs` supplies the read-only core snapshot. Maintenance diagnoses
+runtime defects, assigns a bounded lane per new alert under native custody, and qualifies fixes
+through the normal targeted/dependent gates. Kernels own product operations; the Supervisor retains
+its own decision contract. Maintenance cannot answer owner approvals or change protected release,
+verification, permission or model settings. The internal prompt cites the maintained failure
+playbooks and mechanism owners rather than duplicating their defaults.

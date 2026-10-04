@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {configuredAllocationPolicy,DEFAULT_MODEL_POOLS,defaultParallelGear,effectiveNonOperationModels,loadConfig,nonOperationModels,parallelGear,slicingGears,validateConfig} from '../../engine/config.mjs';
+import {configuredAllocationPolicy,coreDebugSettings,DEFAULT_MODEL_POOLS,defaultParallelGear,durationMs,effectiveNonOperationModels,loadConfig,nonOperationModels,parallelGear,slicingGears,validateConfig} from '../../engine/config.mjs';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
 // config.example.yaml is the shipped default — the installer seeds config.yaml from it verbatim, so it
 // is what the seeded config.yaml (the installer copies the example) must produce. The spec reads it rather than keeping a copy.
@@ -12,7 +12,8 @@ const EXAMPLE_NON_OPERATION={...parseYaml(fs.readFileSync(new URL('../../config.
 const EXAMPLE_CONNECTORS=parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8')).connectors;
 // reconciler is its own closed block too (controller shadow modes are reconciler specs' contract); read it shipped.
 const EXAMPLE_RECONCILER=parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8')).reconciler;
-const expected=()=>({language:'vi',model:null,effort:'medium',kernel:{group:[{agent:'claude',model:'claude-sonnet-5-5'},{agent:'codex',model:'gpt-6.1-sol'}],effort:'high'},parallel:{gear:1},supervisor:{pollIntervalMs:null,repos:[]},delegation:null,budgets:{maxOps:null},allocation:{mode:'adaptive',preferredProvider:null,policy:'balanced',shares:{'devin-agent':35,'claude-agent':20,'codex-agent':10},windowHours:24,grants:['devin-agent=10@implement+verify+write']},models:{selection:'quota-aware',pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...EXAMPLE_NON_OPERATION}},connectors:structuredClone(EXAMPLE_CONNECTORS),asks:{autoAcceptRecommended:false,excludes:['credential','irreversible-confirmation','handover']},uat:{maxConcurrent:10},orca:{maxWorkerDepth:4},coreDebug:{interval:"10m",worktreeLimit:40},reconciler:structuredClone(EXAMPLE_RECONCILER)});
+const EXAMPLE_CORE_DEBUG=parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8')).coreDebug;
+const expected=()=>({language:'vi',model:null,effort:'medium',debug:false,kernel:{group:[{agent:'claude',model:'claude-sonnet-5-5'},{agent:'codex',model:'gpt-6.1-sol'}],effort:'high'},parallel:{gear:1},supervisor:{pollIntervalMs:null,repos:[]},delegation:null,budgets:{maxOps:null},allocation:{mode:'adaptive',preferredProvider:null,policy:'balanced',shares:{'devin-agent':35,'claude-agent':20,'codex-agent':10},windowHours:24,grants:['devin-agent=10@implement+verify+write']},models:{selection:'quota-aware',pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...EXAMPLE_NON_OPERATION}},connectors:structuredClone(EXAMPLE_CONNECTORS),asks:{autoAcceptRecommended:false,excludes:['credential','irreversible-confirmation','handover']},uat:{maxConcurrent:10},orca:{maxWorkerDepth:4},coreDebug:structuredClone(EXAMPLE_CORE_DEBUG),reconciler:structuredClone(EXAMPLE_RECONCILER)});
 test('coreDebug owns cadence while debug remains boolean and the retired provider-specific key is refused',()=>{
   assert.doesNotThrow(()=>validateConfig({...expected(),debug:true}));
   assert.throws(()=>validateConfig({...expected(),debug:{interval:'10m',worktreeLimit:40}}),/debug must be true or false/);
@@ -20,6 +21,30 @@ test('coreDebug owns cadence while debug remains boolean and the retired provide
   assert.throws(()=>validateConfig({...expected(),coreDebug:{interval:'10m',worktreeLimit:0}}),/coreDebug.worktreeLimit/);
   const retired=expected();delete retired.coreDebug;retired.claudeDebug={interval:'10m',worktreeLimit:40};
   assert.throws(()=>validateConfig(retired),{name:'Error',message:/^Invalid config\.yaml:.*closed quota-aware/});
+});
+
+test('debug accepts only the master boolean without changing independent Kernel or Supervisor pins',()=>{
+  const base=expected();
+  base.supervisor.kernel={agent:'claude',model:'claude-opus-5-5',effort:'high'};
+  for(const debug of [true,false,undefined]){
+    const config=structuredClone(base);
+    if(debug===undefined)delete config.debug;else config.debug=debug;
+    const pins={kernel:structuredClone(config.kernel),supervisor:structuredClone(config.supervisor)};
+    assert.equal(validateConfig(config),config);
+    assert.deepEqual({kernel:config.kernel,supervisor:config.supervisor},pins);
+  }
+  for(const debug of ['true',1,null,{},[]])assert.throws(()=>validateConfig({...base,debug}),/debug must be true or false/);
+});
+
+test('core maintenance reads authored parameters and refuses a missing or unrelated parameter owner',()=>{
+  const example=expected();
+  assert.deepEqual(coreDebugSettings(example),{...EXAMPLE_CORE_DEBUG,intervalMs:durationMs(EXAMPLE_CORE_DEBUG.interval)});
+  assert.deepEqual(coreDebugSettings({...example,coreDebug:{interval:'7s',worktreeLimit:2}}),{interval:'7s',intervalMs:7000,worktreeLimit:2});
+  const absent=structuredClone(example);delete absent.coreDebug;
+  assert.doesNotThrow(()=>validateConfig({...absent,debug:false}));
+  assert.throws(()=>coreDebugSettings({...absent,debug:true}),/coreDebug is missing/);
+  for(const coreDebug of [{interval:'7s'}, {worktreeLimit:2}, {interval:'7s',worktreeLimit:2,model:'gpt-6.1-sol'}])
+    assert.throws(()=>coreDebugSettings({...example,coreDebug}),/coreDebug/);
 });
 test('local config initializes the three canonical quota-aware non-operation roles and rejects unknown roles, models and shapes',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-'));try{fs.copyFileSync(new URL('../../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));assert.deepEqual((fs.copyFileSync(path.join(root,'config.example.yaml'),path.join(root,'config.yaml')),loadConfig(root)),expected());assert.deepEqual(effectiveNonOperationModels(loadConfig(root)).kernelManager,{pool:'sol-opus',runtimes:['claude-agent','codex-agent'],selection:'quota-aware'});const badRole=expected();badRole.models.nonOperation.rescuer='sol-opus';assert.throws(()=>validateConfig(badRole),/closed quota-aware/);fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(badRole));assert.throws(()=>loadConfig(root),/closed quota-aware/,'loadConfig must not reinterpret an unknown non-operation role');const badModel=expected();badModel.models.pools['sol-opus']=['unknown-model','codex-agent'];assert.throws(()=>validateConfig(badModel),/sol-opus/);const reordered=expected();reordered.models.pools['sol-opus']=['codex-agent','claude-agent'];assert.deepEqual(effectiveNonOperationModels(reordered).validator.runtimes,['codex-agent','claude-agent'],'member order is the owner route order');const duplicate=expected();duplicate.models.pools['sol-opus']=['claude-agent','claude-agent'];assert.throws(()=>validateConfig(duplicate),/canonical pair/);assert.throws(()=>nonOperationModels('ownerAuthority',expected()),/Unknown non-operation/);const custom={...expected(),language:'en',model:'test-host-model'};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(custom));assert.deepEqual(loadConfig(root),custom);fs.writeFileSync(path.join(root,'config.yaml'),'null\n');assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('top-level supervisor/validator/critique sections are refused as unknown keys',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-old-'));try{const old=expected();old.supervisor={runtimes:['codex-agent','claude-agent']};old.critique={runtimes:['claude-agent','codex-agent']};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(old));assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});

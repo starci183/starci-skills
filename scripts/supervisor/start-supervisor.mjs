@@ -36,7 +36,7 @@ import { agentOfTerminal } from '../kernel/quit-agent.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_TITLE, STARTUP_RESERVATION_MS,
   readSupervisor, seatOf, writeSeat, clearSeat, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog,
-  DEFAULT_OWNER_LANGUAGE,
+  DEFAULT_OWNER_LANGUAGE, SUPERVISOR_SEAT, supervisedSeatHandles,
 } from '../machine/home.mjs';
 import { openWorkerHandles } from './workers.mjs';
 import { recordedSeatTerminals, seatSessions, entryTerminalOf, NO_ENTRY_REMEDY } from './seat-sessions.mjs';
@@ -130,9 +130,9 @@ async function orcaDeps() {
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
 
 // A startup timer cannot retire a receipt that crossed the worker-start boundary.
-const unsettledStartup = (machine, seat) => seat?.value?.state === 'starting' && machine
+const unsettledStartup = (machine, seat, profile = SUPERVISOR_SEAT) => seat?.value?.state === 'starting' && machine
   ? machine.providerReservations({activeOnly:true}).find(row=>row.role==='supervisor'
-    && row.scope?.scopeId===`${SUPERVISOR_ID}:attempt:${seat.value.attempt}`
+    && row.scope?.scopeId===`${profile.id}:attempt:${seat.value.attempt}`
     && ['launching','live','unknown'].includes(row.state)) : null;
 
 /**
@@ -154,6 +154,7 @@ export function seatHealth(seat, deps) {
   try { shown = deps.show(dispatch); } catch (e) { shown = { ok: false, error: String(e?.message ?? e) }; }
   if (shown?.hostUnavailable) return { live: false, hostUnavailable: true, reason: shown.error ?? 'worker-show did not answer', terminal, dispatch };
   const state = shown?.state ?? null;
+  if (shown?.ok !== true) return { live: false, unverified: true, reason: shown?.error || 'worker-show refusal does not prove worker death', terminal, dispatch };
   if (shown?.ok === true && !(state && DEAD_WORKER_STATE.test(state))) return { live: true, reason: `worker ${state ?? 'ready'}`, terminal, dispatch };
   return { live: false, dead: true, reason: shown?.ok ? `worker ${state}` : (shown?.error || 'worker-show refused'), terminal, dispatch };
 }
@@ -196,12 +197,13 @@ const START_LOCK = 'supervisor-start';
  * The launcher lock (host_locks 'supervisor-start', TTL the startup reservation): {ok, release} or {ok:false, holder}.
  * A holder whose process is gone never blocks the next launcher.
  */
-function claimStartLock(m) {
-  const take = () => m.acquireHostLock({ name: START_LOCK, holder: 'start-supervisor', ttlMs: STARTUP_RESERVATION_MS });
+function claimStartLock(m, profile) {
+  const name = profile === SUPERVISOR_SEAT ? START_LOCK : `${profile.seatId}-start`;
+  const take = () => m.acquireHostLock({ name, holder: name, ttlMs: STARTUP_RESERVATION_MS });
   let got = take();
-  if (!got.ok && !pidAlive(got.holder?.holder_pid)) { m.releaseHostLock({ name: START_LOCK, force: true }); got = take(); }
+  if (!got.ok && !pidAlive(got.holder?.holder_pid)) { m.releaseHostLock({ name, force: true }); got = take(); }
   if (!got.ok) return { ok: false, holder: { pid: got.holder?.holder_pid ?? null } };
-  return { ok: true, release: () => { try { m.releaseHostLock({ name: START_LOCK }); } catch { /* expires */ } } };
+  return { ok: true, release: () => { try { m.releaseHostLock({ name }); } catch { /* expires */ } } };
 }
 
 /**
@@ -210,22 +212,26 @@ function claimStartLock(m) {
  * process exit code it maps to.
  */
 export async function launchSupervisor({ mode = 'start', reason = null, plan: planOnly = false,
-  env = process.env, deps = null, settings = supervisorSettings(), template = null, doc = null, now = Date.now } = {}) {
+  env = process.env, deps = null, settings = supervisorSettings(), template = null, doc = null, now = Date.now,
+  profile = SUPERVISOR_SEAT, route = null } = {}) {
   // Chat mode never starts a seat: not the owner's start, not the watchdog's replace.
-  if (supervisorMode({ env }) === 'chat') {
+  if (profile === SUPERVISOR_SEAT && supervisorMode({ env }) === 'chat') {
     return { ok: planOnly || mode === 'replace', exit: planOnly || mode === 'replace' ? 0 : 1, action: 'chat-mode', supervisorMode: 'chat', reason: CHAT_MODE_REASON, wouldLaunch: false };
   }
   const d = deps ?? await orcaDeps();
   // A long-lived writer handle: the spawn below waits for the agent's readiness (no transaction is held meanwhile).
   const m = planOnly ? openMachineReader({ env }) : openMachine({ env });
-  const lock = planOnly ? { ok: true, release() {} } : claimStartLock(m);
+  const lock = planOnly ? { ok: true, release() {} } : claimStartLock(m, profile);
   if (!lock.ok) { m.close(); return { ok: true, exit: 0, action: 'start-in-progress', holder: lock.holder?.pid ?? null }; }
   try {
-    if (mode === 'start' && !planOnly) setEnabled(m, true, { by: 'start-supervisor', now: now() });
-    const enabled = m ? enabledOf(m) : null;
+    let enabled = m ? enabledOf(m, profile) : null;
     if (mode === 'replace' && enabled !== true) return { ok: true, exit: 0, action: 'disabled', reason: 'the seat is disabled (start-supervisor --stop); nothing launched' };
-    const seat = m ? seatOf(m, now()) : null;
-    const unfinished = !seat?.starting && unsettledStartup(m, seat);
+    const seat = m ? seatOf(m, now(), profile) : null;
+    if (route && seat?.value?.route && ['agent', 'model', 'effort'].some(key => (route[key] ?? null) !== (seat.value.route[key] ?? null))) {
+      return { ok: false, exit: 1, action: 'route-conflict', reason: 'the held maintenance seat has a different caller route', route: seat.value.route };
+    }
+    if (mode === 'start' && !planOnly) { setEnabled(m, true, { by: `${profile.eventPrefix}-start`, now: now(), profile, route }); enabled = true; }
+    const unfinished = !seat?.starting && unsettledStartup(m, seat, profile);
     const health = unfinished ? {live:false,unverified:true,reason:'startup reservation expired with an unsettled launch receipt',
       terminal:unfinished.handle ?? null} : seatHealth(seat, d, now());
     if (health.hostUnavailable) return { ok: false, exit: EXIT_HOST_UNAVAILABLE, action: 'host-unavailable', reason: health.reason };
@@ -234,7 +240,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     let listing = null;
     try { listing = d.list(); } catch (e) { listing = { ok: false, error: String(e?.message ?? e) }; }
     if (listing?.hostUnavailable) return { ok: false, exit: EXIT_HOST_UNAVAILABLE, action: 'host-unavailable', reason: listing.error ?? 'terminal list did not answer' };
-    const recorded = m ? recordedSeatTerminals(m) : new Set();
+    const recorded = m ? recordedSeatTerminals(m, { eventPrefix: profile.eventPrefix }) : new Set();
     const marked = listing?.ok ? seatSessions(listing, recorded, d.tabTitles) : [];
     const dedupe = planSupervisorDedupe({ marked, seatTerminal: health.terminal, screenOf: d.screen, exitedRow: d.exitedRow });
 
@@ -245,7 +251,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
         effort: settings.effort };
     });
     if (planOnly) {
-      const admission = planAgentAdmission({ role: 'supervisor', scopeId: `${SUPERVISOR_ID}:attempt:${(seat?.value?.attempt ?? 0) + 1}`,
+      const admission = planAgentAdmission({ role: 'supervisor', scopeId: `${profile.id}:attempt:${(seat?.value?.attempt ?? 0) + 1}`,
         allowGroup: group, env, io: d.admission });
       return { ok: true, exit: 0, action: 'plan', enabled, seat: seat?.value ?? null, health, dedupe, admission,
         wouldLaunch: !health.live && admission.ok, agent: admission.selected?.provider ?? group[0].provider,
@@ -257,10 +263,10 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
       return { ok: true, exit: 0, action: health.starting ? 'starting' : 'already-live', terminal: health.terminal, reason: health.reason, ...(closed.length ? { closedDuplicates: closed } : {}) };
     }
 
-    const entry = entryTerminalOf({ env, listing, recorded, owned: openWorkerHandles(m) });
+    const entry = entryTerminalOf({ env, listing, recorded, owned: new Set([...openWorkerHandles(m), ...supervisedSeatHandles(m)]) });
     if (!entry) return { ok: false, exit: 1, action: 'launch-failed', step: 'run-create', error: NO_ENTRY_REMEDY, effectState: 'none' };
 
-    const token = `supervisor-${crypto.randomBytes(6).toString('hex')}`;
+    const token = `${profile.eventPrefix}-${crypto.randomBytes(6).toString('hex')}`;
     const at = now();
     const attempt = (seat?.value?.attempt ?? 0) + 1;
     const previous = seat?.value?.terminal || seat?.value?.dispatch
@@ -278,9 +284,9 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
 
     // Reserve the seat: a concurrent launcher that got past the lock (a stale lock) still meets this row.
     const reserved = m.transaction(() => {
-      const row = seatOf(m, at);
+      const row = seatOf(m, at, profile);
       if (row && (row.starting || (row.token !== seat?.token))) return false;
-      writeSeat(m, { token, value: { state: 'starting', attempt }, expiresAt: at + STARTUP_RESERVATION_MS, now: at });
+      writeSeat(m, { token, value: { state: 'starting', attempt, ...(route ? { route } : {}) }, expiresAt: at + STARTUP_RESERVATION_MS, now: at, profile });
       return true;
     });
     if (!reserved) return { ok: true, exit: 0, action: 'starting', reason: 'another launcher holds the startup reservation' };
@@ -293,17 +299,18 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
       doc: doc ?? parseYaml(fs.readFileSync(DOCTRINE_FILE, 'utf8')),
       settings, restart: previous ? (reason ?? `the previous Supervisor terminal ${previous.terminal} failed its liveness check (${previous.reason})`) : null,
     });
-    const spawned = d.start({ provider: group[0].provider, model: group[0].model, effort: settings.effort, worktree: SKILL_ROOT, title: SUPERVISOR_TITLE, prompt, env,
-      role: 'supervisor', scopeId: `${SUPERVISOR_ID}:attempt:${attempt}`, allowGroup: group,
-      specFile: path.join(starciLocalRoot(), 'supervisor', `prompt.a${attempt}.md`), objective: `${SUPERVISOR_TITLE} — ${SUPERVISOR_ID}`,
+    const spawned = d.start({ provider: group[0].provider, model: group[0].model, effort: settings.effort, worktree: SKILL_ROOT, title: profile.title, prompt, env,
+      role: 'supervisor', scopeId: `${profile.id}:attempt:${attempt}`, allowGroup: group,
+      specFile: path.join(starciLocalRoot(env), profile.seatId, `prompt.a${attempt}.md`), objective: `${profile.title} — ${profile.id}`,
       entry, priorRunId: seat?.value?.runId ?? null,
-      request: { seat: SUPERVISOR_ID, attempt, token } });
+      request: { seat: profile.id, attempt, token } });
     if (!spawned?.ok) {
       m.transaction(() => {
-        if (spawned?.effectState === 'none') clearSeat(m, { token });
+        if (spawned?.effectState === 'none') clearSeat(m, { token, profile });
         else writeSeat(m, { token, value: { state: 'launch-unknown', attempt, terminal: spawned?.terminal ?? null,
-          dispatch: spawned?.dispatchId ?? null, runId: spawned?.runId ?? null, admission: spawned?.admission ?? null }, now: now() });
-        supervisorEvent(m, { kind: 'supervisor-start-failed', payload: { step: spawned?.step ?? null, error: spawned?.error ?? null, terminal: spawned?.terminal ?? null,
+          dispatch: spawned?.dispatchId ?? null, runId: spawned?.runId ?? null, admission: spawned?.admission ?? null,
+          ...(route ? { route } : {}) }, now: now(), profile });
+        supervisorEvent(m, { entityId: profile.id, kind: `${profile.eventPrefix}-start-failed`, payload: { step: spawned?.step ?? null, error: spawned?.error ?? null, terminal: spawned?.terminal ?? null,
           dispatch: spawned?.dispatchId ?? null, effectState: spawned?.effectState ?? null, agent: settings.agent }, now: now() });
       });
       return { ok: false, exit: 1, action: 'launch-failed', step: spawned?.step ?? null, error: spawned?.error ?? 'spawn failed', terminal: spawned?.terminal ?? null,
@@ -313,10 +320,10 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     const value = { terminal: spawned.terminal, dispatch: spawned.dispatchId, runId: spawned.runId, taskId: spawned.taskId, agent: spawned.provider ?? group[0].provider,
       model: spawned.admission?.selected?.model ?? spawned.model ?? group[0].model, effort: spawned.effort ?? settings.effort,
       admission: spawned.admission ?? null, startedAt: new Date(now()).toISOString(), attempt, effective: spawned.effective ?? null,
-      seatGuard: typeof guard === 'string' ? guard : (guard?.error ?? null) };
+      seatGuard: typeof guard === 'string' ? guard : (guard?.error ?? null), ...(route ? { route } : {}) };
     m.transaction(() => {
-      writeSeat(m, { token, value, now: now() });
-      supervisorEvent(m, { kind: previous ? 'supervisor-restarted' : 'supervisor-booted', payload: { ...value, previous, reason }, now: now() });
+      writeSeat(m, { token, value, now: now(), profile });
+      supervisorEvent(m, { entityId: profile.id, kind: `${profile.eventPrefix}-${previous ? 'restarted' : 'booted'}`, payload: { ...value, previous, reason }, now: now() });
     });
     return { ok: true, exit: 0, action: previous ? 'restarted' : 'booted', terminal: spawned.terminal, dispatch: spawned.dispatchId, agent: value.agent, model: value.model,
       admission: spawned.admission ?? null,
@@ -328,12 +335,12 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
 }
 
 /** Disable the seat, fence and release its worker (worker-stop + worker-release). The watchdog then leaves it down. */
-export async function stopSupervisor({ env = process.env, deps = null, now = Date.now } = {}) {
+export async function stopSupervisor({ env = process.env, deps = null, now = Date.now, profile = SUPERVISOR_SEAT } = {}) {
   const d = deps ?? await orcaDeps();
   const m = openMachine({ env });
   try {
-    setEnabled(m, false, { by: 'start-supervisor --stop', now: now() });
-    const seat = seatOf(m, now());
+    setEnabled(m, false, { by: `${profile.eventPrefix}-stop`, now: now(), profile });
+    const seat = seatOf(m, now(), profile);
     const terminal = seat?.value?.terminal ?? null;
     const dispatch = seat?.value?.dispatch ?? null;
     let stopped = null, released = null, closed = null;
@@ -341,11 +348,11 @@ export async function stopSupervisor({ env = process.env, deps = null, now = Dat
       stopped = bestEffort(() => d.stop(dispatch));
       released = bestEffort(() => d.release(dispatch, terminal));
     } else if (terminal) closed = bestEffort(() => d.close(terminal));
-    const proven = !seat || (seat.value?.state === 'starting' && !terminal && !dispatch && !unsettledStartup(m, seat))
+    const proven = !seat || (seat.value?.state === 'starting' && !terminal && !dispatch && !unsettledStartup(m, seat, profile))
       || workerClosureProven(released, terminal);
     m.transaction(() => {
-      if (proven) clearSeat(m);
-      supervisorEvent(m, { kind: 'supervisor-stopped', payload: { terminal, dispatch, stopped: stopped?.ok ?? null, released: released?.ok ?? null, closed: closed?.ok ?? null }, now: now() });
+      if (proven) clearSeat(m, { profile });
+      supervisorEvent(m, { entityId: profile.id, kind: `${profile.eventPrefix}-stopped`, payload: { terminal, dispatch, stopped: stopped?.ok ?? null, released: released?.ok ?? null, closed: closed?.ok ?? null }, now: now() });
     });
     return { ok: proven, action: proven ? 'stopped' : 'stop-unproven', ...(proven ? {} : { effectState: 'unknown' }), terminal, dispatch, stopped: stopped?.ok === true, released: released?.ok === true,
       closed: closed?.ok === true || released?.ok === true };

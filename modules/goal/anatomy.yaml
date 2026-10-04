@@ -16,9 +16,9 @@
 #                                  the kernel reasons through
 #   modules/goal/define-goal.yaml — the goal contract (starci/goal@1 record shape)
 #   modules/schemas/goal-plan.yaml — the starci kernel plan --file shape {legs:[{op,paths?,notes?}]}
-#   engine/db/ledger.mjs           — the .starciwork/runtime.sqlite goal/job rows
+#   engine/db/ledger.mjs           — the external project runtime ledger's goal/job rows
 #   docs/workflow-kernel.md        — goal phase narrative
-#   skills/define-goal/SKILL.md    — the owner-only approval gate (exact `ok`)
+#   skills/starci/references/define-goal.md    — the scope-bound owner approval gate (revisions retain exact `ok`)
 #   modules/models/kinds.yaml      — lanes (nodeKind -> ordered steps), routes, kinds
 #   modules/ops/registry.yaml      — generated stage/coarsePhase index (read-only)
 #
@@ -151,7 +151,7 @@ decomposition:
 identity:
   record: starci/goal@1
   files:
-    goalRow: .starciwork/runtime.sqlite goals/inbox rows  # the durable record (engine/db/ledger.mjs)
+    goalRow: external project runtime ledger goals/inbox rows  # the durable record (engine/db/ledger.mjs)
     goalMd:  rendered for humans only — never a store     # runtime.sqlite is the store
   writer: scripts/goal/define-goal.mjs  # the goal row and its json (modules/goal/define-goal.yaml writes)
   rev: >-
@@ -248,7 +248,7 @@ critique:
 # ----------------------------------------------------------------------------
 approval:
   gate: >-
-    `approve` is the owner-only gate (skills/define-goal/SKILL.md). It freezes
+    `approve` is the owner-only gate (skills/starci/references/define-goal.md). It freezes
     the goal at `state.goalRev`, evaluates the done metrics, and refuses when
     they are unevaluable.
   blocks:  # goalApprovalBlocks 
@@ -262,7 +262,7 @@ approval:
     upstream.
   sources:
     - this file (approve, goalApprovalBlocks are its rules)
-    - skills/define-goal/SKILL.md
+    - skills/starci/references/define-goal.md
 
 # ----------------------------------------------------------------------------
 # REVISION — goal.revise: the typed way a frozen goal changes.

@@ -1,17 +1,13 @@
 group: debug
 verb: pass
 owner: runtime
-summary: run or maintain the debug loop; writes only its own debug-loop state
+summary: inspect core health and maintain diagnostic custody in the machine ledger
 impl:
   script: scripts/reconciler/debug-pass.mjs
 positional:
-  - {name: action, enum: [setup, bind, block, pass, claim, note, release, stop, status], required: true, variadic: false}
+  - {name: action, enum: [pass, claim, note, release, status], required: true, variadic: false}
 flags:
-  - {name: loop-id, type: string, summary: exact held loop identity for binding or a scheduled pass}
-  - {name: scheduler, type: enum, enum: [codex-heartbeat, claude-loop], summary: verified native recurrence facility}
-  - {name: scheduler-id, type: string, summary: exact native scheduler identity from its receipt}
-  - {name: confirmation, type: enum, enum: [cancelled, ended, not-created], summary: authoritative native cancellation or creation outcome}
-  - {name: confirmed, type: boolean, summary: caller verified the exact native receipt before recording it}
+  - {name: dispatch, type: string, summary: immutable native maintenance Dispatch that fences a worker pass}
   - {name: snapshot, type: string, summary: saved core-watch snapshot for a pass}
   - {name: child-timeout, type: number, summary: child call timeout in seconds}
   - {name: token-window, type: number, summary: token-spike window in minutes}
@@ -19,10 +15,9 @@ flags:
   - {name: key, type: string, summary: debug alert key}
   - {name: lane, type: string, summary: lane fixing the alert}
   - {name: reason, type: string, summary: reason no core fix is owed}
-exit: {"0": debug-loop state action completed, "1": state action failed, "2": bad usage}
+exit: {"0": diagnostic state action completed, "1": state action failed, "2": bad usage}
 json: always
 examples:
-  - starci debug pass setup
   - starci debug pass pass
   - starci debug pass claim --key <alert> --lane <lane>
   - starci debug pass status

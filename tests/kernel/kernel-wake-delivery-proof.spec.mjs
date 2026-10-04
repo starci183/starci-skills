@@ -322,7 +322,8 @@ const unwritableWorld=t=>{
   fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
   w.env.STARCI_FAKE_ORCA_UNIQUE_TERMINALS='1';
   w.env.STARCI_OWNER_ROOT=ownerRoot;
-  const closureImport=`data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});`)}`;
+  // The repair invokes start-workflow in a grandchild; carry only the private external boundaries to it.
+  const closureImport=`data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});register(${JSON.stringify(new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href)});`)}`;
   w.env.NODE_OPTIONS=[w.env.NODE_OPTIONS,`--import=${closureImport}`].filter(Boolean).join(' ');
   const run=(script,args,more={})=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...w.env,...more}});
   const defined=run(DEFINE_GOAL,['--repo',w.repo,'--text','refactor the stale architecture','--json']);
@@ -367,6 +368,7 @@ test('watchdog --repair: a refused wake on a frozen Kernel releases its worker w
   // The replacement's signal names the new terminal; a fresh tick does not wake it.
   const signal=fx.events('kernel-restarted').at(-1);
   assert.equal(signal.terminal,first.result.replacementTerminal);
+  assert.equal(signal.startup?.host?.fixture,true,'the actual replacement boot uses the descendant external host fixture');
 });
 
 test('watchdog wake: a dropped send to a Codex Kernel is woken after the split retry; an unstaged split is wake-failed',t=>{

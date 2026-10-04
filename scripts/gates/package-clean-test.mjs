@@ -229,11 +229,17 @@ function preparePackedDependencies({ dirs, own, temp, locked, env, pack }) {
   return { payloads };
 }
 
-function verifyPackedDependencies(payloads, installRoot) {
+export function verifyPackedDependencies(payloads, installRoot, { packageRoots = new Map() } = {}) {
   for (const { name, version, files } of payloads) {
+    const packageRoot = packageRoots.get(name);
+    if (packageRoot) {
+      const stat = fs.lstatSync(packageRoot, { throwIfNoEntry: false });
+      if (!stat?.isDirectory() || isLinkLike(packageRoot, { stat })) return `${name}@${version}: installed package root is missing or linked`;
+    }
     for (const [file, expected] of files) {
-      let target = installRoot;
-      const parts = ['node_modules', ...name.split('/'), ...file.slice('package/'.length).split('/')];
+      if (!file.startsWith('package/') || file.includes('\\') || file.includes(':') || file.split('/').some((part) => !part || part === '.' || part === '..')) return `${name}@${version}: invalid packed path ${file}`;
+      let target = packageRoot ?? installRoot;
+      const parts = [...(packageRoot ? [] : ['node_modules', ...name.split('/')]), ...file.slice('package/'.length).split('/')];
       for (const [index, part] of parts.entries()) {
         target = path.join(target, part);
         const stat = fs.lstatSync(target, { throwIfNoEntry: false });

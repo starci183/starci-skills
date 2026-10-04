@@ -399,15 +399,11 @@ run a fixed read-only inspector against the StarCi runtime
 
 ### starci debug pass
 
-run or maintain the debug loop; writes only its own debug-loop state
+inspect core health and maintain diagnostic custody in the machine ledger
 
 | flag | type | |
 | --- | --- | --- |
-| `--loop-id` | string |  |
-| `--scheduler` | enum codex-heartbeat|claude-loop |  |
-| `--scheduler-id` | string |  |
-| `--confirmation` | enum cancelled|ended|not-created |  |
-| `--confirmed` | boolean |  |
+| `--dispatch` | string |  |
 | `--snapshot` | string |  |
 | `--child-timeout` | number |  |
 | `--token-window` | number |  |
@@ -418,12 +414,11 @@ run or maintain the debug loop; writes only its own debug-loop state
 
 Positionals: action
 
-exit: 0 debug-loop state action completed; 1 state action failed; 2 bad usage
+exit: 0 diagnostic state action completed; 1 state action failed; 2 bad usage
 
 json: always
 
 ```sh
-starci debug pass setup
 starci debug pass pass
 starci debug pass claim --key <alert> --lane <lane>
 starci debug pass status
@@ -2992,6 +2987,9 @@ bring the runtime host services and live seats up and print one checklist
 | `--no-build` | boolean |  |
 | `--retire-stale-ledgers` | boolean |  |
 | `--set-profile` | enum operational|observe |  |
+| `--caller-agent` | enum codex|claude|devin |  |
+| `--caller-model` | string |  |
+| `--caller-effort` | string |  |
 
 exit: 0 every required checklist row is green; 1 one or more required checklist rows are red; 2 bad usage
 
@@ -3000,6 +2998,7 @@ json: flag
 ```sh
 starci reconciler up
 starci reconciler up --check --json
+starci reconciler up --caller-agent codex --caller-model gpt-6.1-sol --caller-effort high --json
 ```
 
 Replaces: `node scripts/reconciler/start.mjs`
@@ -3177,6 +3176,7 @@ plan or perform the owner-run package publication sequence
 | flag | type | |
 | --- | --- | --- |
 | `--publish` | boolean |  |
+| `--runtime-package` | boolean |  |
 | `--npm-user` | string |  |
 | `--poll-minutes` | number (default 15) |  |
 | `--pre-land-ref` | string |  |
@@ -3192,7 +3192,9 @@ Conventions:
 - plan mode is read-only and reports registry blockers, canon rebind drift and example pin drift
 - publication uses the existing clean proof, registry confirmation and shasum verification
 - scripts/gates/release-plan.mjs publishOrder puts dependencies first and refuses cycles; packages without bundled canon pins win only among ready ties
-- after publication the flow rebinds code patterns, re-pins and installs examples, syncs them and proves every binding
+- the package phase rebinds code patterns, re-pins and installs examples, syncs them and proves every binding
+- runtime-package publishes root package.json after package publication, committed bindings and finished notes; it proves the real archive and private install
+- runtime-package refuses changed inputs or registry state after its cold proof and never performs rebind or example writes
 - publication never commits, pushes or tags; release cut owns those effects
 
 exit: 0 plan is clear or publication completed; 1 a plan blocker, publication, rebind, example or binding step failed; 2 bad usage or environment
@@ -3202,6 +3204,7 @@ json: starci/release-publish-flow@1
 ```sh
 starci release publish
 starci release publish --publish --npm-user <name> --expect-sha <sha>
+starci release publish --runtime-package --publish --npm-user <name> --expect-sha <sha>
 ```
 
 Replaces: `node scripts/gates/release-publish.mjs`, `node .claude/scripts/gates/release-publish.mjs`, `npm run release:publish`, `bash publish-final.sh`
@@ -5514,23 +5517,27 @@ Replaces: `starci goal`, `node scripts/goal/define-goal.mjs`
 
 ### starci workflow start
 
-claim the oldest queued goal and boot its one long-lived Kernel agent
+ensure the host and optional core maintenance, then claim an approved goal and boot its Kernel
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--goal` | string |  |
 | `--agent` | string |  |
+| `--caller-agent` | enum codex|claude|devin |  |
+| `--caller-model` | string |  |
+| `--caller-effort` | string |  |
 | `--launched-by` | enum watchdog|supervisor (default supervisor) |  |
 | `--plan` | boolean |  |
 
-exit: 0 kernel booted or already live; 1 refusal or launch failure; 2 bad usage; 3 the previous Kernel dispatch is still alive; 75 Orca is not answering (host unavailable)
+exit: 0 approved Kernel booted or already live, or a non-actuating plan; 1 goal approval, host readiness, maintenance admission or Kernel launch refused; 2 bad usage; 3 the previous Kernel dispatch is still alive; 75 Orca is not answering (host unavailable)
 
 json: flag
 
 ```sh
 starci workflow start
 starci workflow start --repo <path> --goal <workflow_id>
+starci workflow start --repo <path> --goal <workflow_id> --caller-agent codex --caller-model gpt-6.1-sol --caller-effort high
 ```
 
 Replaces: `starci start`, `node scripts/kernel/start-workflow.mjs`

@@ -1,0 +1,22 @@
+id: runtime-package-publication
+effectiveAt: '2026-10-03T21:30:29Z'
+summary: >-
+  Release publication selects the final root runtime after canon packages and committed bindings.
+  The root version belongs to package.json; its real archive and private native install are proved
+  before publication, and final publish-plan includes immutable root registry availability.
+  Public installation binds the launcher to the invoking CLI and its declared app dependency.
+reach: new-legs
+paths:
+  - scripts/gates/release-plan.mjs
+  - scripts/gates/release-publish.mjs
+  - scripts/supervisor/release-publish-flow.mjs
+  - modules/cli/commands/release/publish.yaml
+  - scripts/gates/package-clean-test.mjs
+  - scripts/gates/runtime-package-clean.mjs
+  - tests/gates/release-gate.spec.mjs
+  - tests/gates/runtime-package-clean.spec.mjs
+  - modules/kernel/contract-changes/runtime-package-publication.yaml
+  - packages/cli/src/shim.mjs
+  - packages/cli/src/runtime-install.mjs
+  - tests/cli/runtime-install.spec.mjs
+  - tests/cli/shim-wrappers.spec.mjs

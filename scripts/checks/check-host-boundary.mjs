@@ -9,9 +9,8 @@
 //            node path that is not a scripts/api/orca/<verb>.mjs wrapper, or to
 //            load/read modules/host/orca/*.
 //
-// modules/host/orca/** is the contract itself and skills/{orca-cli,
-// orchestration,computer-use} are the owner's own chat tools, so both quote
-// orca commands on purpose and are not agent-facing prose.
+// modules/host/orca/** is the contract itself. The owner-chat host tool references under
+// skills/starci/references name Orca commands and are outside Kernel/Op agent-facing prose.
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import fs from 'node:fs';
@@ -27,13 +26,19 @@ const ALLOW_SELF='scripts/checks/check-host-boundary.mjs';
 
 // Agent-facing prose: what a kernel, op, chat or supervisor agent is told to do.
 const PROSE_ROOTS=['CONTEXT.md','modules/kernel','modules/ops','modules/supervisor',
-  'skills/define-goal','skills/start-kernel','skills/workflow-chat','init'];
+  'skills/starci/SKILL.md','skills/starci/references/define-goal.md',
+  'skills/starci/references/start-workflow.md','skills/starci/references/workflow-chat.md',
+  'skills/starci/references/assisted-uat.md','skills/starci/references/release.md','.starci/host','init'];
 const PROSE_EXT=new Set(['.md','.yaml','.yml','.txt']);
 const CODE_ROOTS=['engine','scripts','modules','bin','init','tests','packages'];
 
 const rel=(root,file)=>path.relative(root,file).replaceAll('\\','/');
 
 function walk(dir,keep,out=[]){
+  if(fs.existsSync(dir)&&fs.statSync(dir).isFile()){
+    if(keep(dir))out.push(dir);
+    return out;
+  }
   out.push(...walkFiles(dir,{filter:(_,full)=>keep(full),exclude:name=>name==='node_modules'||name.startsWith('.'),ignoreReadErrors:true}));
   return out;
 }

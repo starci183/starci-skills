@@ -1,6 +1,6 @@
 // scripts/api/fs/lib.mjs — what the fs call files beside it share: the error codes Windows returns while another
 // process holds a path open, and the verified unlink of one link. The call files (safe-remove.mjs, remove-links-under.mjs,
-// rename-over.mjs, rmdir-link.mjs, zip-write.mjs, ...) each name one filesystem use.
+// rename-over.mjs, zip-write.mjs, ...) each name one filesystem use.
 import fs from 'node:fs';
 
 /** The rename and unlink errors Windows returns while another process holds the target open: retried, never final. */

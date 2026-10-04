@@ -103,10 +103,28 @@ test('markdown: fenced lines stand under their lead-in sentence, table cells are
 test('scope: module yaml and prompts and skill files; never the refusal catalog or contract-change history', () => {
   assert.ok(isGuidanceFile('modules/supervisor/supervise.yaml'));
   assert.ok(isGuidanceFile('modules/kernel/kernel-prompt.md'));
-  assert.ok(isGuidanceFile('skills/debug/SKILL.md'));
+  assert.ok(isGuidanceFile('skills/starci/SKILL.md'));
+  assert.ok(isGuidanceFile('skills/starci/references/release.md'));
+  assert.ok(isGuidanceFile('.starci/host/maintenance.md'));
   assert.ok(!isGuidanceFile('modules/kernel/failure-codes.yaml'));
   assert.ok(!isGuidanceFile('modules/kernel/contract-changes/x.yaml'));
   assert.ok(!isGuidanceFile('docs/verify-proof.md'));
+});
+
+test('internalized reference and host prompt instructions are still judged by the actual guard', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'guidance-internal-'));
+  const files = ['skills/starci/references/release.md', '.starci/host/maintenance.md'];
+  try {
+    for (const relative of files) {
+      const file = path.join(root, relative);
+      fs.mkdirSync(path.dirname(file), {recursive: true});
+      fs.writeFileSync(file, 'Open a lane with `git worktree add <d> -b lane/x main`.\n');
+    }
+    const report = await scanGuidance(root, {files});
+    assert.equal(report.ok, false);
+    assert.deepEqual(report.findings.map(({file, code}) => [file, code]).sort(),
+      files.map(file => [file, 'WORKTREE_NOT_OPS']).sort());
+  } finally { fs.rmSync(root, {recursive: true, force: true}); }
 });
 
 test('a tree scan reports the yaml field and the guard code; the live tree is clean', async () => {

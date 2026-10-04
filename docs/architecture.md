@@ -9,7 +9,7 @@ Kernel reasons; small executables transact; one host engine does the mechanical 
 
 ```text
                      owner (chat, Telegram)
-                         │  define-goal / start-kernel / answers
+                         │  /starci → approved native goal / workflow / answers
                          ▼
    ┌────────────── Kernel seat (one per workflow) ─────────────┐
    │  reads Decision Items, decides, calls scripts/kernel/cli.mjs│
@@ -59,7 +59,7 @@ The schema itself is data: `engine/db/migrations/runtime/0001-init.sql` and
 
 | Actor | Lifetime | What it does | What it never does |
 | --- | --- | --- | --- |
-| Owner / chat | — | Creates the goal (`define-goal`), starts the Kernel (`start-kernel`), answers asks, approves. As the workflow monitor a chat relays; asked to supervise, it works as the Supervisor. See `CONTEXT.md`. | Never plans, enqueues, dispatches, settles or answers an ask on the owner's behalf inside the Kernel's loop. |
+| Owner / chat | — | Explicitly selects `/starci`, approves the exact goal and intended actions, starts an accepted native workflow, answers asks. As the workflow monitor a chat relays; asked to supervise, it works as the Supervisor. See `CONTEXT.md`. | Never plans, enqueues, dispatches, settles or answers an ask on the owner's behalf inside the Kernel's loop. |
 | `[Kernel] <workflow>` | One per workflow, long-lived | Decides the plan, non-green verdicts, incidents and the finish. Reads its Decision Items first on every wake, acts through `scripts/kernel/cli.mjs`, then yields. | Never opens a database, spawns a terminal or calls Orca directly. Never raises a unit's try budget. |
 | `[Op] <op-id>` | One per dispatch, ephemeral | A `worker-start` worker in its workflow's worktree (one per Kernel workflow, shared by its ops: serial per side, parallel across sides). Reads its contract (`starci kernel op-contract`), runs the op loop (READ, CODE, `gate.mjs`, FIX) inside its `owned_paths`, logs with `starci kernel log`, files one `starci kernel report` with the gate JSON and READ digest, and is released (`worker-stop`, `worker-release`). | Never sees the ledger beyond its own attempt; its report is its only channel back. |
 | Reconciler controllers | One host engine | Mechanical, idempotent work: settle green reports, recover dead workers, dispatch ready work, keep seats and services alive, GC, land and owner digests. Open a Decision Item when judgment is needed. | Never make a business or workflow decision; never resume a `stopped` workflow. |
@@ -126,7 +126,7 @@ op declared (`declared_exit_code`), and only the raw one decides a verdict.
 
 `scripts/reconciler/engine.mjs` is the one host runtime loop. The scheduled task
 `StarCi-Reconciler` runs `starci reconciler start` at logon and periodically;
-`starci reconciler restart` is the restart entry; the `start` skill brings the
+`starci reconciler restart` is the restart entry; native host readiness brings the
 whole host up and prints one green/red checklist (see "Start"). Every engine start, exit and cause is a
 `process_runs` row; every leadership epoch is a `leader_history` row. Each controller runs
 `off`, `shadow` or `active` (`controller_modes`, with every change recorded in `mode_changes`
@@ -164,7 +164,8 @@ repeatedly is replaced.
 
 ### Start
 
-`starci reconciler up` (skill `start`, the one start skill; `starci reconciler restart` is the restart lever) runs, in order: preflight (Node bundles
+`starci reconciler up` (`scripts/reconciler/start.mjs`, with `.starci/host/startup.md` as its internal
+procedure; `starci reconciler restart` is the restart lever) runs, in order: preflight (Node bundles
 SQLite >= 3.51.3, `machine.sqlite` quick_check, every registered ledger's quick_check, ledgers on temp/test paths or with a missing repo or file, legacy
 in-repo `.starciwork/runtime.sqlite`, kernel/supervisor pins whose agent card cannot attest the model, Orca reachable);
 reports a `reconciler.profile` other than operational as red (`config.yaml` is never rewritten by a plain run; `--set-profile operational|observe` writes that one block, backup first);
@@ -176,6 +177,12 @@ is on record; starts every registry service that is down (never Orca); runs `sta
 (harness UI local and public `/healthz`, tunnels, Telegram, ask gateway), the Supervisor seat, each running workflow's
 Kernel seat, open violations and the preflight rows, and exits 0 only when every required row is green. `--check`
 changes nothing.
+
+Accepted workflow startup uses this shared native host readiness before launching its Kernel and
+configuration-selected maintenance. It validates persisted goal acceptance before host or agent
+effects. The ingress does not recursively repair Kernel seats while preparing a new launch; the
+standalone host entry retains repair of already-running workflows. `.starci/host/maintenance.md`
+contains the core-only maintenance instructions; native lifecycle code owns its worker and cadence.
 
 ## Ownership
 

@@ -71,6 +71,30 @@ test('removeToolWrappers removes only tool wrappers and tolerates an already abs
   assert.ok(!calls.includes(path.join(bin, 'starci.cmd')));
 });
 
+test('an explicit installed CLI owns every launcher while the runtime record retains the fetched root', () => {
+  const root = path.resolve('fetched runtime');
+  const home = path.resolve('private home');
+  const cli = path.resolve('installed cli', 'bin', 'starci.mjs');
+  for (const platform of ['win32', 'linux']) {
+    const writes = new Map();
+    const node = path.resolve('node', platform === 'win32' ? 'node.exe' : 'node');
+    const result = writeRuntimeShim({ root, home, cli }, {
+      platform, node, mkdir: () => {}, chmod: () => {}, write: (file, text) => writes.set(file, text),
+    });
+    assert.deepEqual(JSON.parse(writes.get(result.runtimeJson)), { root });
+    assert.equal(result.root, root);
+    assert.equal(writes.get(result.shim), platform === 'win32'
+      ? `@echo off\r\n"${node}" "${cli}" %*\r\n`
+      : `#!/bin/sh\nexec "${node}" "${cli}" "$@"\n`);
+    for (const program of TOOL_WRAPPERS) {
+      const file = path.join(home, '.starci', 'bin', platform === 'win32' ? `${program}.cmd` : program);
+      assert.equal(writes.get(file), platform === 'win32'
+        ? `@echo off\r\n"${node}" "${cli}" guard raw ${program} -- %*\r\n`
+        : `#!/bin/sh\nexec "${node}" "${cli}" guard raw ${program} -- "$@"\n`);
+    }
+  }
+});
+
 test('runtimeEnv removes only the wrapper directory from PATH, whatever the case, and keeps the rest', async () => {
   const { runtimeEnv } = await import('../../packages/cli/src/shim.mjs');
   const home = path.resolve('home');

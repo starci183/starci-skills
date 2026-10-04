@@ -1,7 +1,6 @@
-// release-plan.mjs - what a release would publish, decided from the tree and the registry's answers: the publish set (every
-// `group: starci` pin of knowledge/hfs/canon-pins.yaml that names a source), its dependency order (preferring packages
-// that do not bundle the runtime's canon-pins copy when both are ready), and the blockers. No process is started here: the registry
-// is a seam (release-registry.mjs), so the plan is judged on fakes in specs.
+// Publication planning reads canon package pins and the final root version from package.json.
+// Dependencies precede consumers; the root runtime follows the committed package binding phase.
+// The registry is an owned API seam, allowing focused specs without provider effects.
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadPins } from './canon-pins.mjs';
@@ -67,13 +66,17 @@ function judge(row, registry) {
   const out = { ...row, registry: registry.state(row.name, row.version), action: 'publish', note: '' };
   if (row.kind === 'pin-mismatch') return { ...out, action: 'blocked', blocker: `${row.name}: local ${row.version} differs from its canon-pins version ${row.pin} (bump the pin first)` };
   if (out.registry.state === 'unreachable') return { ...out, action: 'unreachable', blocker: `${row.name}: registry unreachable (${out.registry.detail ?? 'no answer'})` };
+  if (row.runtimePackage && !['absent', 'present'].includes(out.registry.state)) return { ...out, action: 'blocked', blocker: `${row.name}@${row.version}: unknown runtime registry state` };
   if (out.registry.state !== 'present') return out;
+  if (row.runtimePackage && !/^[0-9a-f]{40}$/.test(String(out.registry.shasum ?? ''))) return { ...out, action: 'blocked', blocker: `${row.name}@${row.version}: registry returned no immutable runtime shasum` };
   out.action = 'published';
   const local = registry.localShasum(row.dir);
+  if (row.runtimePackage && !local) return { ...out, action: 'blocked', blocker: `${row.name}@${row.version}: local runtime pack could not be listed` };
   if (!local) return { ...out, note: 'local pack could not be listed' };
   if (local === out.registry.shasum) return { ...out, note: 'shasum matches' };
   const content = registry.contentClass(row.name, row.version, row.dir);
   if (content === 'same') return { ...out, note: 'every file is identical; only the pack metadata differs' };
+  if (row.runtimePackage) return { ...out, action: 'blocked', note: content, blocker: `${row.name}@${row.version}: published runtime bytes differ or cannot be proved (${content}); its version is immutable` };
   if (content.startsWith('crlf')) return { ...out, note: 'differs only by CRLF line endings of the working tree' };
   if (content.startsWith('dist')) return { ...out, note: `WARN ${content}: stale build output here; publish rebuilds` };
   if (content.startsWith('drift')) return { ...out, action: 'drift', note: content, blocker: `${row.name}@${row.version} is on the registry but the source differs (${content}): bump it, republish, rebind` };
@@ -84,8 +87,16 @@ function judge(row, registry) {
  * The plan: {rows, others, blockers, toPublish}. Each ordered row carries its registry answer and action; `blockers` are the
  * reasons a release must not go on. registry: the seam of release-registry.mjs.
  */
-export function buildPlan({ root, registry }) {
+export function buildPlan({ root, registry, scope = 'all' }) {
+  if (!['all', 'packages', 'runtime'].includes(scope)) throw new Error(`unknown publication scope ${scope}`);
   const rows = readRows(root);
+  if (scope !== 'packages') {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+    if (manifest.name !== 'starci' || manifest.private || typeof manifest.version !== 'string' || !manifest.version) throw new Error('root package.json must declare the public starci runtime version');
+    rows.push({ name: manifest.name, dir: '.', version: manifest.version, pin: '-', kind: 'set', runtimePackage: true,
+      prepack: Boolean(manifest.scripts?.prepack), lock: fs.existsSync(path.join(root, 'package-lock.json')), last: true,
+      deps: rows.filter((row) => ['set', 'pin-mismatch'].includes(row.kind)).map((row) => row.name) });
+  }
   const blockers = [];
   const others = rows.filter((r) => !['set', 'pin-mismatch'].includes(r.kind));
   for (const row of others) {
@@ -96,9 +107,14 @@ export function buildPlan({ root, registry }) {
   for (const row of ordered) if (row.blocker) blockers.push(row.blocker);
   // A publish (or a forced bump) changes the canon-pins copy the bundling packages carry: each must carry a new version too.
   if (ordered.some((r) => !r.last && (r.action === 'publish' || r.action === 'drift'))) {
-    for (const row of ordered.filter((r) => r.last && r.action === 'published')) {
+    for (const row of ordered.filter((r) => r.last && !r.runtimePackage && r.action === 'published')) {
       blockers.push(`${row.name}@${row.version} is already published, but a publish or version bump of another package changes the canon-pins copy it bundles: bump it, resync its runtime copy, rebind`);
     }
   }
-  return { rows: ordered, others, blockers, toPublish: ordered.filter((r) => r.action === 'publish') };
+  const runtime = ordered.find((row) => row.runtimePackage);
+  const upstream = ordered.filter((row) => !row.runtimePackage);
+  if (runtime?.action === 'published' && upstream.some((row) => ['publish', 'drift'].includes(row.action))) blockers.push(`${runtime.name}@${runtime.version} is already published before final package bindings; changed runtime payload needs a new root package version`);
+  if (scope === 'runtime') for (const row of upstream.filter((entry) => entry.action !== 'published')) blockers.push(`${runtime.name}: publish and bind ${row.name}@${row.version} before the runtime package phase`);
+  const selected = scope === 'runtime' ? ordered.filter((row) => row.runtimePackage) : ordered;
+  return { rows: selected, others, blockers, toPublish: selected.filter((r) => r.action === 'publish') };
 }

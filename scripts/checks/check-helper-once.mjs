@@ -2,13 +2,12 @@
 // check-helper-once.mjs - one home per shared helper (redundancy RED15 and RED17; part of `npm run check`).
 //   starci runtime check --only helper-once -- [--json]
 //
-// RT_HELPER_REDEFINED: every tracked `.mjs` under scripts/, engine/, modules/, bin/ and ext/ is parsed with acorn. The
+// RT_HELPER_REDEFINED: every indexed or new nonignored `.mjs` present under scripts/, engine/, modules/, bin/ and ext/ is parsed with acorn. The
 // helper table is DERIVED from the exports of the shared libs (scripts/lib/*.mjs, scripts/api/<system>/lib.mjs, engine/*.mjs and the check kit
 // scripts/lib/walk.mjs): each exported function/const gets a normalised token sequence (parameters plus body,
 // declared names renamed by first use, comments, whitespace and semicolons dropped). A top-level function/const of any
 // other place whose sequence equals an exported helper's is a copy: import the lib one. A copy with a different body is a
 // different contract and is not flagged. Two libs that export one NAME with different contracts are reported for a rename.
-import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { lsFiles } from '../api/git/ls-files.mjs';
@@ -16,6 +15,7 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { runCheckCli } from '../lib/check-cli.mjs';
 import { boundNames } from '../lib/ast-names.mjs';
+import { workingTreeFiles } from '../lib/tracked-text-scan.mjs';
 
 // acorn lives in packages/node_modules (a dev dependency of the packages workspace); no other path is tried.
 const acorn = createRequire(path.join(skillRoot, 'packages', 'node_modules', 'x.js'))('acorn');
@@ -241,9 +241,6 @@ function nearCopyFindings(parsed, reported) {
 }
 
 /** Run the check on the runtime at `root`. */
-function checkHelperOnce(root = skillRoot) {
-  const tracked = lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
-  return helperOnceFindings({ tracked, read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') });
-}
+export const checkHelperOnce = (root = skillRoot) => helperOnceFindings(workingTreeFiles(root, lsFiles));
 
 if (isMain(import.meta.url)) runCheckCli(checkHelperOnce(), 'OK: every shared helper has one home.');

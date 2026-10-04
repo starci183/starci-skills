@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { helperOnceFindings } from '../../scripts/checks/check-helper-once.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { helperOnceFindings, checkHelperOnce } from '../../scripts/checks/check-helper-once.mjs';
+import { runGit } from '../../scripts/api/git/lib.mjs';
+import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 // RED15 and RED17: a shared helper has one home (where git may be spawned is RT_EXTERNAL_OWNER of scripts/hfs/runtime-rules/external-owner.mjs).
 const run = (files) => helperOnceFindings({ tracked: Object.keys(files), read: (rel) => files[rel] });
@@ -103,4 +107,33 @@ test('two different long helpers are not near copies', () => {
     'scripts/kernel/group.mjs': LONG_HELPER('groupBy'),
     'scripts/work/other.mjs': "export const total = (rows) => {\n  let sum = 0;\n  for (const row of rows) {\n    if (typeof row.amount !== 'number') throw new Error('amount missing');\n    sum += row.amount * (row.quantity ?? 1);\n  }\n  return Math.round(sum * 100) / 100;\n};\n",
   }), []);
+});
+
+test('the real working-tree check skips indexed deletions but detects a new nonignored helper copy', t => {
+  const root = mkdtemp(t, 'starci-helper-current-');
+  const git = args => {
+    const result = runGit(args, {cwd: root});
+    assert.equal(result.status, 0, String(result.stderr ?? result.error));
+  };
+  git(['init', '--quiet']);
+  fs.mkdirSync(path.join(root, 'scripts/lib'), {recursive: true});
+  fs.mkdirSync(path.join(root, 'scripts/work'));
+  const home = path.join(root, 'scripts/lib/home.mjs');
+  fs.writeFileSync(home, PATH_KEY);
+  const copy = "const toSlash = value => String(value ?? '').replaceAll('-', '/');\n";
+  fs.writeFileSync(path.join(root, 'scripts/work/gone.mjs'), copy);
+  fs.writeFileSync(path.join(root, '.gitignore'), '/scripts/work/ignored.mjs\n');
+  git(['add', '--', '.gitignore', 'scripts']);
+  fs.unlinkSync(path.join(root, 'scripts/work/gone.mjs'));
+  fs.writeFileSync(path.join(root, 'scripts/work/current.mjs'), copy);
+  fs.writeFileSync(path.join(root, 'scripts/work/ignored.mjs'), copy);
+  assert.deepEqual(summary(checkHelperOnce(root)), [['RT_HELPER_REDEFINED', 'scripts/work/current.mjs']]);
+
+  const read = fs.readFileSync;
+  const denied = Object.assign(new Error('fixture helper read denied'), {code: 'EACCES'});
+  t.mock.method(fs, 'readFileSync', (file, ...args) => {
+    if (path.resolve(file) === home) throw denied;
+    return read(file, ...args);
+  });
+  assert.throws(() => checkHelperOnce(root), error => error === denied);
 });

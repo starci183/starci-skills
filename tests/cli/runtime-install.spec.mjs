@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
 import { installRuntime, resolveNpmEntry, RUNTIME_VERSION } from '../../packages/cli/src/runtime-install.mjs';
+import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 const fakeInstall = ({ cwd = path.resolve('fake-repo'), home = path.resolve('fake-home'), ...deps } = {}) => {
   const installRoot = path.join(home, '.starci', 'runtime');
@@ -103,6 +107,84 @@ test('npm and runtime installer spawn errors and signals are printed', async (t)
       assert.match(errors.join(''), /runtime installer/);
     });
   }
+});
+
+test('offline runtime installation binds the real shim to the installed CLI and its physical HFS dependency', { timeout: 60_000 }, async (t) => {
+  const fixture = mkdtemp(t, 'starci-shim-home-');
+  const home = path.join(fixture, 'home');
+  const cwd = path.join(fixture, 'app');
+  const cli = path.join(fixture, 'installed', 'node_modules', '@starci', 'cli');
+  const hfs = path.join(cli, 'node_modules', '@starci', 'hfs');
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  for (const [name, destination] of [['cli', cli], ['hfs', hfs]]) {
+    const source = path.join(root, 'packages', name);
+    fs.cpSync(source, destination, {
+      recursive: true,
+      filter: (file) => !path.relative(source, file).split(path.sep).includes('node_modules'),
+    });
+  }
+  fs.mkdirSync(cwd, { recursive: true });
+  const declaration = JSON.stringify({ hfs: 2, kind: 'app', project: 'installed-shim', sides: {
+    be: { apps: [{ name: 'api', kind: 'api' }] },
+    fe: { apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/'] },
+  } });
+  fs.writeFileSync(path.join(cwd, 'hfs.json'), declaration);
+  const runtimeRoot = path.join(home, '.starci', 'runtime', 'node_modules', 'starci');
+  const installer = path.join(runtimeRoot, 'scripts', 'install', 'install.mjs');
+  fs.mkdirSync(path.dirname(installer), { recursive: true });
+  fs.writeFileSync(installer, 'export {};\n');
+  const installedCli = await import(pathToFileURL(path.join(cli, 'src', 'runtime-install.mjs')).href);
+  const calls = [];
+  assert.equal(installedCli.installRuntime({ cwd, home, noBootstrap: true }, {
+    fetchRuntime: () => ({ status: 0 }),
+    runNode: (args) => { calls.push(args); return { status: 0 }; },
+  }), 0);
+  assert.deepEqual(calls, [[installer, 'init', '--dir', cwd, '--no-bootstrap']]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(home, '.starci', 'runtime.json'), 'utf8')), { root: runtimeRoot });
+  assert.equal(fs.existsSync(path.join(runtimeRoot, 'packages', 'hfs', 'src')), false);
+  assert.equal(fs.existsSync(path.join(runtimeRoot, 'node_modules', '@starci', 'hfs')), false);
+  assert.equal(fs.existsSync(path.join(cli, '..', 'hfs')), false);
+  assert.equal(fs.lstatSync(hfs).isSymbolicLink(), false);
+  const cliManifest = JSON.parse(fs.readFileSync(path.join(cli, 'package.json'), 'utf8'));
+  const hfsManifest = JSON.parse(fs.readFileSync(path.join(hfs, 'package.json'), 'utf8'));
+  assert.equal(hfsManifest.name, '@starci/hfs');
+  assert.equal(hfsManifest.version, cliManifest.dependencies[hfsManifest.name]);
+  const sourceHfs = createRequire(path.join(root, 'packages', 'hfs', 'package.json'));
+  const privateHfs = createRequire(path.join(hfs, 'package.json'));
+  for (const [name, version] of Object.entries(hfsManifest.dependencies ?? {})) {
+    const manifestFile = (sourceHfs.resolve.paths(name) ?? [])
+      .map((modules) => path.join(modules, ...name.split('/'), 'package.json')).find((file) => fs.existsSync(file));
+    assert.ok(manifestFile, `offline fixture requires an actual installed ${name}@${version}`);
+    const source = fs.realpathSync.native(path.dirname(manifestFile));
+    const dependency = JSON.parse(fs.readFileSync(path.join(source, 'package.json'), 'utf8'));
+    assert.equal(dependency.name, name);
+    assert.equal(dependency.version, version);
+    const destination = path.join(hfs, 'node_modules', ...name.split('/'));
+    fs.cpSync(source, destination, {
+      recursive: true,
+      filter: (file) => !path.relative(source, file).split(path.sep).includes('node_modules'),
+    });
+    assert.equal(fs.lstatSync(destination).isSymbolicLink(), false);
+    const entry = fs.realpathSync.native(privateHfs.resolve(name));
+    const relative = path.relative(fs.realpathSync.native(destination), entry);
+    assert.ok(relative && !relative.startsWith('..') && !path.isAbsolute(relative), `${name} must resolve inside its private physical package`);
+  }
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(?:STARCI_|ORCA_)/i.test(key) && !['NODE_OPTIONS', 'NODE_PATH'].includes(key)));
+  Object.assign(env, { HOME: home, USERPROFILE: home, LOCALAPPDATA: path.join(fixture, 'local'), APPDATA: path.join(fixture, 'roaming') });
+  const shim = path.join(home, '.starci', 'bin', process.platform === 'win32' ? 'starci.cmd' : 'starci');
+  const invoke = (...args) => process.platform === 'win32'
+    ? spawnSync(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', `"${shim}"`, ...args], { cwd, env, encoding: 'utf8', windowsHide: true, windowsVerbatimArguments: true, timeout: 30_000 })
+    : spawnSync(shim, args, { cwd, env, encoding: 'utf8', timeout: 30_000 });
+  const owned = invoke('app', 'explain', 'hfs.json', '--json');
+  assert.equal(owned.status, 0, owned.stderr || String(owned.error ?? ''));
+  const explained = JSON.parse(owned.stdout);
+  assert.deepEqual([explained.path, explained.status, explained.slot], ['hfs.json', 'owned', 'app.declaration']);
+  const unowned = invoke('app', 'explain', 'unowned.fixture', '--json');
+  assert.equal(unowned.status, 1, unowned.stderr || String(unowned.error ?? ''));
+  const refused = JSON.parse(unowned.stdout);
+  assert.deepEqual([refused.path, refused.status, refused.code], ['unowned.fixture', 'no-slot', 'HFS_SLOT_UNDECLARED']);
+  assert.equal(fs.readFileSync(path.join(cwd, 'hfs.json'), 'utf8'), declaration);
+  assert.deepEqual(fs.readdirSync(cwd), ['hfs.json']);
 });
 
 test('the npm entry resolved on this host executes through the current Node binary', (t) => {

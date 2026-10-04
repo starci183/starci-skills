@@ -1,13 +1,3 @@
----
-name: run-assisted-uat
-description: >-
-  Run one already-prepared assisted browser UAT request through the locked project Playwright runner,
-  relay its finite frozen human checkpoints, collect an immutable sanitized receipt, and return it to
-  the current operation for normal report ingestion. Use when a prepared assisted-UAT request needs a
-  person to enter a secret, solve an anti-automation challenge, act on another device, make a reserved
-  manual action, or record a subjective observation in a visible browser.
----
-
 # Run assisted UAT
 
 You are the user sitting at the visible browser. This skill executes one prepared
@@ -20,7 +10,7 @@ node <Source>/.claude/scripts/uat/assisted-runner.mjs <command> \
   --receipt <absolute evidence/assisted-uat/receipts/<new-run-id>.yaml>
 ```
 
-`<Source>` is the host that owns this skill. The request and receipt arguments are always explicit and
+`<Source>` is the host that owns this procedure. The request and receipt arguments are always explicit and
 absolute. Never scan for a “latest” request or receipt. A new attempt uses a new receipt/run ID; never
 overwrite an old receipt or reuse its run directory.
 

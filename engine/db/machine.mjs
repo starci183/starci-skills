@@ -25,7 +25,7 @@
 //   reader   : readOnly, query_only=ON, busy_timeout=15000; observer diagnostics never persist
 //   startup  : sqlite_version, node_version, journal_mode and user_version are recorded in machine_meta; a file that is
 //              not 'starci/machine@1' at user_version MACHINE_VERSION is refused — a fresh machine.sqlite is created by
-//              openMachine on first use from engine/db/migrations/machine/0001-init.sql. The one supported v1-to-v2 additive provider receipt upgrade preserves all host rows; other versions refuse.
+//              openMachine on first use from engine/db/migrations/machine/0001-init.sql. Supported v1/v2 upgrades add provider receipts and core diagnostic scopes while preserving host rows; other versions refuse.
 // Nothing outside engine/ opens machine.sqlite with `new DatabaseSync`: callers use openMachine / openMachineReader / openMachineObserver /
 // withMachine / readMachine and the typed functions on the handle.
 import fs from 'node:fs';
@@ -50,7 +50,7 @@ import { providerReservationMethods } from './provider-reservations.mjs';
 const require = createRequire(import.meta.url);
 const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const MACHINE_SCHEMA = 'starci/machine@1';
-export const MACHINE_VERSION = 2;
+export const MACHINE_VERSION = 3;
 /** Test seam: STARCI_MACHINE_BUSY_TIMEOUT_MS (a positive integer) replaces the writer's busy_timeout; unset in production. */
 const busyTimeoutOf = (env = process.env) => { const n = Number(env?.STARCI_MACHINE_BUSY_TIMEOUT_MS); return Number.isInteger(n) && n > 0 ? n : MACHINE_BUSY_TIMEOUT_MS; };
 export const INIT_SQL_FILE = path.join(ENGINE_DIR, 'migrations', 'machine', '0001-init.sql');
@@ -62,7 +62,7 @@ export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host',
 /**
  * Overrides the per-host state base itself (machine.sqlite, projects/, archive/), the one seam starciLocalRoot and
  * engine/db/ledger.mjs (which re-exports starciLocalRoot for its own projectsRootFor) both read. Debug probes and
- * throwaway repos (skills/debug) point this at a temp directory so they never touch the real
+ * throwaway repos (.starci/host/maintenance.md) point this at a temp directory so they never touch the real
  * %LOCALAPPDATA%/StarCi and leak fake ledgers/workflows into it (2026-09-30 incident: probe-*, dbg-ask-*, dbg-env*
  * repos left six fake-worker ledgers in the live store). STARCI_PROJECTS_ROOT (ledger-db.mjs) and
  * STARCI_TEST_MACHINE_FILE (TEST_REGISTRY_ENV) are narrower overrides that still win over this one when set.
@@ -154,7 +154,7 @@ export function runtimeRev() {
 /** Order of two runtime revs: <0 when a is older than b (time prefix; anything unparsable is oldest). */
 const compareRevs = (a, b) => { const t = (r) => (/^\d{13}:/.test(String(r ?? '')) ? Number(String(r).slice(0, 13)) : -1); return t(a) - t(b); };
 
-const { refuseOld, checkSchema, createSchema, upgradeProviderSchema } = machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_VERSION, initSqlFile: INIT_SQL_FILE, controllers: CONTROLLERS, runtimeRev, pragma });
+const { refuseOld, checkSchema, createSchema, upgradeSchema } = machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_VERSION, initSqlFile: INIT_SQL_FILE, controllers: CONTROLLERS, runtimeRev, pragma });
 
 function openConnection(file, { readOnly = false, env = process.env, now = Date.now, onCorrupt = corruptIncident } = {}) {
   const { DatabaseSync } = require('node:sqlite');
@@ -183,7 +183,7 @@ function openConnection(file, { readOnly = false, env = process.env, now = Date.
         if (hasTables && Number(pragma(db, 'user_version')) === 0) refuseOld(file, 'is an unversioned store');
         createSchema(db, { file, env, now });
       }
-      upgradeProviderSchema(db, { file, now });
+      upgradeSchema(db, { file, now });
       checkSchema(db, file);
       recordFacts(db);
       return db;

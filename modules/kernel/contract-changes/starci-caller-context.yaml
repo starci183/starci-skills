@@ -1,0 +1,28 @@
+id: starci-caller-context
+effectiveAt: '2026-10-04T00:00:00+07:00'
+summary: >-
+  The single public starci entry obtains owner approval for a concrete goal and its workflow/debug
+  startup scope. Native workflow start ensures host readiness before claiming the goal. Config debug
+  is the strict boolean master for automatic native core maintenance; false or absent continues
+  without pairing. coreDebug interval/worktreeLimit remain its sole parameter owner, with authored
+  values only in config.example.yaml. Workflow start and reconciler up accept explicit caller-agent,
+  caller-model and caller-effort route labels separately from Kernel --agent. Labels declare ingress,
+  not desktop model attestation; the native maintenance worker attests its supported launch identity.
+  Unknown desktop metadata is not inferred, and Devin's opaque underlying model remains unproved.
+  The maintenance host slot is separate from the configured Supervisor; existing Supervisor, Kernel
+  and operation pins, common admission, fenced reservations and exact closure remain authoritative.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/starci-caller-context.yaml
+  - engine/config.mjs
+  - config.example.yaml
+  - docs/config-format.md
+  - modules/cli/commands/workflow/start.yaml
+  - modules/cli/commands/reconciler/up.yaml
+  - scripts/kernel/start-workflow.mjs
+  - scripts/kernel/workflow-startup.mjs
+  - scripts/agent/caller-context.mjs
+  - scripts/reconciler/start.mjs
+  - scripts/reconciler/core-debug.mjs
+  - tests/engine/config.spec.mjs
+  - tests/cli/starci-caller-context.spec.mjs

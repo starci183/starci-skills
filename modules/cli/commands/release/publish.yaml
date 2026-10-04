@@ -9,10 +9,13 @@ conventions:
   - plan mode is read-only and reports registry blockers, canon rebind drift and example pin drift
   - publication uses the existing clean proof, registry confirmation and shasum verification
   - scripts/gates/release-plan.mjs publishOrder puts dependencies first and refuses cycles; packages without bundled canon pins win only among ready ties
-  - after publication the flow rebinds code patterns, re-pins and installs examples, syncs them and proves every binding
+  - the package phase rebinds code patterns, re-pins and installs examples, syncs them and proves every binding
+  - runtime-package publishes root package.json after package publication, committed bindings and finished notes; it proves the real archive and private install
+  - runtime-package refuses changed inputs or registry state after its cold proof and never performs rebind or example writes
   - publication never commits, pushes or tags; release cut owns those effects
 flags:
   - {name: publish, type: boolean, summary: perform the plan instead of reading it}
+  - {name: runtime-package, type: boolean, summary: publish the final root runtime after the package phase and committed binding refresh}
   - {name: npm-user, type: string, summary: required logged-in npm account for publication}
   - {name: poll-minutes, type: number, default: 15, summary: registry confirmation deadline per package}
   - {name: pre-land-ref, type: string, summary: require HEAD to equal this pre-land commit}
@@ -27,6 +30,7 @@ json: starci/release-publish-flow@1
 examples:
   - starci release publish
   - starci release publish --publish --npm-user <name> --expect-sha <sha>
+  - starci release publish --runtime-package --publish --npm-user <name> --expect-sha <sha>
 editions: [full]
 since: 1.0.0-alpha.4
 removed:

@@ -1,19 +1,29 @@
 group: workflow
 verb: start
 owner: runtime
-summary: claim the oldest queued goal and boot its one long-lived Kernel agent
+summary: ensure the host and optional core maintenance, then claim an approved goal and boot its Kernel
 impl:
   script: scripts/kernel/start-workflow.mjs
 flags:
   - name: repo
     type: string
-    summary: "repository whose .starciwork ledger holds the queue (default: the working directory)"
+    summary: "repository whose registered project ledger holds the goal queue (default: the working directory)"
   - name: goal
     type: string
     summary: explicit workflow_id to boot instead of the oldest queued
   - name: agent
     type: string
     summary: override the routed kernel agent
+  - name: caller-agent
+    type: enum
+    enum: [codex, claude, devin]
+    summary: declared ingress agent for core maintenance; separate from the Kernel agent override
+  - name: caller-model
+    type: string
+    summary: declared concrete ingress model for core maintenance; the actual worker must attest it
+  - name: caller-effort
+    type: string
+    summary: declared ingress effort for core maintenance; does not override Kernel effort
   - name: launched-by
     type: enum
     enum: [watchdog, supervisor]
@@ -23,8 +33,8 @@ flags:
     type: boolean
     summary: resolve and report the launch without starting anything
 exit:
-  "0": kernel booted or already live
-  "1": refusal or launch failure
+  "0": approved Kernel booted or already live, or a non-actuating plan
+  "1": goal approval, host readiness, maintenance admission or Kernel launch refused
   "2": bad usage
   "3": the previous Kernel dispatch is still alive
   "75": Orca is not answering (host unavailable)
@@ -32,6 +42,7 @@ json: flag
 examples:
   - starci workflow start
   - starci workflow start --repo <path> --goal <workflow_id>
+  - starci workflow start --repo <path> --goal <workflow_id> --caller-agent codex --caller-model gpt-6.1-sol --caller-effort high
 editions:
   - full
 since: 1.0.0-alpha.4

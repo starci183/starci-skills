@@ -3,8 +3,8 @@
 //
 //   create     ensureWorkflowWorktree, before the Kernel launch (scripts/kernel/start-workflow.mjs): Orca creates and owns
 //              the tree - `orca worktree create --repo path:<app repo> --name wf-<workflowId> --base-branch main
-//              --setup run --no-parent` (the repository's setup hook runs a real `npm ci`; there are no node_modules
-//              junctions) - through scripts/machine/worktree-orca.mjs createOrcaWorktree, which takes the per-repo cap slot
+//              --setup run --no-parent` (the existing repository hooks run; start-workflow then installs through
+//              the native npmCi owner before launch, without node_modules links) - through createOrcaWorktree, which takes the per-repo cap slot
 //              first (worktrees.capPerRepo: a full repository refuses worktree-cap and the Kernel launch waits) and
 //              registers the row keyed by Orca's worktree id (kind workflow). Orca names the branch after the worktree
 //              (wf-<id>, its '/' rule): that branch IS the workflow branch, recorded as Orca reported it; every reader
@@ -42,8 +42,6 @@ import { requireWorktreeRecord } from '../lib/worktree-record.mjs';
 const WORKFLOW_WORKTREE_KIND = 'workflow';
 /** The typed dispatch wait of an op whose side is busy in its workflow worktree (modules/kernel/failure-codes.yaml). */
 export const WORKFLOW_SIDE_BUSY = 'workflow-side-busy';
-/** The typed refusal of an op whose workflow has no worktree, never a silent run outside it: {reason: 'workflow-worktree-missing'} (modules/kernel/failure-codes.yaml). */
-export const WORKFLOW_WORKTREE_MISSING = 'workflow-worktree-missing';
 const SIDES = Object.freeze(['be', 'fe']);
 /** The side of an op that writes only the workflow's Work records (app-relative .starciwork/...). */
 const WORK_SIDE = 'work';
@@ -199,7 +197,7 @@ export function workflowWorktreePromptRules(rec) {
     `- Edit and check ONLY in ${wt} (branch ${rec.branch ?? 'the workflow branch'}): the one worktree of this workflow, shared with the ops of the other side. Never edit ${posix(rec.repoRoot)} itself.`,
     `- Run checks and commands from ${wt}, the app root: every owned path is app-relative (be/..., fe/..., .starciwork/...).`,
     '- Write only your owned paths: an op of the other side may be working in this tree at the same time.',
-    "- node_modules here is the worktree's own install (its setup ran npm ci): never run npm/pnpm install, never create a junction or symlink.",
+    "- node_modules here is the worktree's own install (workflow start ran starci npm ci): never run npm/pnpm install, never create a junction or symlink.",
     '- Never commit, merge, push, rebase or reset: leave your changes in the tree. Only the runtime commits - a checkpoint of your green work on the workflow branch - and it lands the branch on main when the workflow finishes.',
   ].join('\n');
 }

@@ -37,6 +37,7 @@ paths:
   - scripts/kernel/workflow-checkpoint-state.mjs
   - scripts/kernel/workflow-rebase.mjs
   - scripts/kernel/workflow-settle.mjs
+  - scripts/lib/locked-operation.mjs
   - scripts/kernel/workflow-worktree.mjs
   - scripts/machine/workflow-tree.mjs
   - tests/kernel/workflow-checkpoint.spec.mjs

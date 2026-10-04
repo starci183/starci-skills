@@ -92,7 +92,7 @@ sections:
         unrelated user Work.
   - title: Mandatory lifecycle gates
     blocks:
-      - "The owner gates are the entry skills' exact `ok` approvals and the settle-time evidence
+      - "The owner gates are the StarCi entry's scope-bound approvals and the settle-time evidence
         verdicts (modules/models/registry.yaml approvalMode: entry-skill-owner-ok); there is no
         separate approvals engine or policy file. Before the first workflow effect the entry skill
         presents one complete brief — goal, scope, repositories, worktree topology, operators,
@@ -403,7 +403,7 @@ sections:
         Edits, retries and polling use relevant partial tests and applicable static/build checks, not a
         full repository run each time. The whole unit suite is never a code-writing op's run (owner 2026-09-29):
         it belongs to unit.verify, dispatched only when the goal or the owner asks for the full unit run, and to the
-        owner's /push-git flow before a main is pushed; e2e runs only on request, and e2e.verify then runs the full e2e suite. Reuse a passing run only with verified unchanged covered inputs, its original
+        owner's /starci release flow before a main is pushed; e2e runs only on request, and e2e.verify then runs the full e2e suite. Reuse a passing run only with verified unchanged covered inputs, its original
         tested revision and explicit limits; check documentation-only deltas separately. Installing the
         same artifact uses relevant installation/build/import smoke checks unless changed inputs or a
         failure justify broader testing. Preserve required CI gates and never claim a partial run is full."
@@ -594,7 +594,7 @@ sections:
         runs ONLY those - the specs of the changed or added source plus the specs that import it - through the op gate
         (scripts/gates/gate.mjs --tests, beside starci app lint --changed, codegen and tsc). It never runs the app's whole unit suite:
         unit.verify runs it (npm test at the app root), dispatched only when the goal or the owner explicitly asks for the full
-        unit run, and the owner's /push-git flow runs it before a main is pushed. e2e runs only when the goal or the
+        unit run, and the owner's /starci release flow runs it before a main is pushed. e2e runs only when the goal or the
         owner asks (config.yaml specs.e2e, default off); e2e.verify then runs the FULL e2e suite. The .claude runtime
         itself follows config.yaml specs.harness (default false = touching-only): changed harness code gets its own
         spec, the land gate runs only the specs touching the landed files (--specs touching) and never the whole suite."

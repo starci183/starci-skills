@@ -173,7 +173,7 @@ const promptWorld = (t) => {
     STARCI_FAKE_ORCA_LOG: path.join(root, 'orca-calls.jsonl'), STARCI_FAKE_ORCA_STATE: stateFile, STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'),
     LOCALAPPDATA: path.join(root, 'localappdata'), STARCI_OWNER_ROOT: ownerRoot };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_GUARD_FILE']) delete env[key];
-  const run = (script, ...args) => spawnSync(process.execPath, [script, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env });
+  const run = (script, ...args) => spawnSync(process.execPath, ['--loader', new URL('../helpers/workflow-startup-loader.mjs', import.meta.url).href, script, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env });
   const state = () => JSON.parse(fs.readFileSync(stateFile, 'utf8'));
   return { root, repo, env, run, state };
 };

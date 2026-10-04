@@ -1,19 +1,8 @@
----
-name: define-goal
-description: >-
-  Turn an owner prompt into a durable workflow goal — cold-scans the project repos, drafts an
-  enriched goal, shows a plan table with the derived op chain, and only on explicit owner approval
-  persists the workflow row, goal revision and inbox queue entry in the project's runtime ledger
-  (%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite). Contract:
-  .claude/modules/goal/define-goal.yaml. Use when the owner asks to define/queue a new goal or
-  start planning a piece of work.
----
+# Define a workflow goal
 
-# define-goal
-
-You are the owner's chat. This skill is how you turn the owner's prompt into a
-durable goal in the ledger, and the owner's exact `ok` is the only thing that
-lets you persist it.
+This internal procedure is selected by an explicit `/starci` request, explicit native selection of the
+StarCi entry, or an already-authorized native StarCi job contract. An ordinary chat request does not
+select it. Selection grants no approval to write a goal or launch a workflow.
 
 Contract: `.claude/modules/goal/define-goal.yaml`
 Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
@@ -22,7 +11,15 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 
 ## Approval gate — mandatory
 
-**Never write a goal silently.** The flow is always assess → plan → owner confirms → persist:
+**Never write a goal silently.** Resolve project, goal, scope and expected outcome first. When these
+are unclear, assess read-only and ask for the missing context. Do not invent a goal or treat silence
+or a generic instruction to handle matters as approval. The flow is assess → plan → owner confirms
+the exact goal and intended actions → persist.
+
+Approval binds the goal identity, content, derived plan and authority. Record its source in the native
+`--reason` provenance; this is conversation evidence, not authenticated identity. Reuse an unchanged
+accepted approval, including an explicitly approved start in the same plan. A material goal or plan
+change needs a new approval. Revisions retain their native content-bound token and exact-`ok` gate.
 
 1. Resolve `<Source>` — the repository containing `.claude/CONTEXT.md` — and the
    project binding (routing: `.workspaces/projects/<project>/work.json`). Get the
@@ -109,14 +106,15 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    (`.claude/scripts/route/route-plan.mjs` +
    `.claude/modules/models/selection.yaml`). An underivable chain prints as
    `underivable (kernel will derive at boot)` — never fill it in by hand.
-6. **Wait for the owner to reply exactly `ok`, `OK`, or `oK`.**
-   Anything else — a question, silence, an edit request — means do NOT persist;
-   clarify or adjust the prompt/title and re-plan.
-7. On `ok`, persist — pass the step-2 extraction through so it lands as
+6. **Ask for the owner's OK for this exact draft and operation plan before queue or start effects.**
+   Show whether the intended actions include persistence only or persistence followed by workflow
+   startup. A question, silence or edit request does not approve it. Re-plan any material edit.
+   Reuse recorded approval only when identity, content, plan, scope and authority still match.
+7. After that approval, persist — pass the step-2 extraction through so it lands as
    `routing_bias` in the goal payload:
 
    ```
-   starci workflow define --project <name> --text "<owner prompt>" --title "<slug>" --display-name "<Product> · <what>" --routing-bias '<json from step 2>' --json
+   starci workflow define --project <name> --text "<owner prompt>" --title "<slug>" --display-name "<Product> · <what>" --routing-bias '<json from step 2>' --reason "<exact owner approval reference>" --json
    ```
 
 8. Report the printed `workflowId` (the goal ID), `goalIdentity`, `opChain`, `queued`.
@@ -130,7 +128,8 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
   mutation surface). Never open or edit the sqlite file by hand.
 - The op chain is derived by `route-plan.mjs` — underivable chains are shown as such,
   never guessed.
-- Do NOT start the workflow here. Starting is the `start-kernel` skill, which
+- Persistence does not itself start the workflow. If the accepted plan includes startup, continue through
+  `start-workflow.md` under that same unchanged approval; otherwise obtain startup approval first. It
   starts ONE long-lived `[Kernel]` worker; each op it runs is one ephemeral
   `[Op]` worker (`orchestration worker-start`, in the workflow's one worktree
   that Orca created at Kernel start) that `starci kernel dispatch` starts and `api

@@ -54,6 +54,8 @@ import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, KERNEL_REV_ACKED_EVENT, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
+import { ensureWorkflowHost, installWorkflowTree, workflowStartAuthority } from './workflow-startup.mjs';
+import { workflowCaller } from '../agent/caller-context.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal, guardReceiptErrors } from '../guards/hook-install.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
@@ -507,6 +509,23 @@ try {
 
   if (!target) { console.log(asJson ? '{"ok":true,"reason":"queue-empty"}' : 'queue empty — no pending or claimed goal'); process.exit(0); }
 
+  const startInput = () => ({ workflow: ledger.db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(target),
+    goal: ledger.db.prepare('SELECT revision,goal_identity,markdown,json,approved_by FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(target) });
+  const { workflow: startWorkflow, goal: startGoal } = startInput();
+  const startAuthority = workflowStartAuthority({ workflow: startWorkflow, goal: startGoal });
+  if (!startAuthority.ok) refuse(startAuthority.reason, { workflowId: target, authority: startAuthority });
+  const hostStartup = await ensureWorkflowHost({ workflow: startWorkflow, goal: startGoal, caller: workflowCaller(process.argv.slice(2)), env: process.env });
+  if (hostStartup.ok !== true || hostStartup.ready !== true)
+    refuse(hostStartup.reason ?? 'workflow-host-not-ready', { workflowId: target, startup: hostStartup },
+      hostStartup.host?.items?.some((item) => item.id === 'orca' && item.status === 'red') ? EXIT_HOST_UNAVAILABLE : 1);
+  const currentStartAuthority = () => {
+    const authority = workflowStartAuthority(startInput());
+    return authority.ok && (authority.goalRevision !== startAuthority.goalRevision || authority.goalIdentity !== startAuthority.goalIdentity)
+      ? { ok: false, reason: 'workflow-goal-unverified', detail: 'the accepted goal changed during startup' } : authority;
+  };
+  const afterHostAuthority = currentStartAuthority();
+  if (!afterHostAuthority.ok) refuse(afterHostAuthority.reason, { workflowId: target, authority: afterHostAuthority, startup: hostStartup });
+
   // A signal is only live when its Orca terminal is connected and writable. A
   // NULL expiry is not immortality: terminal identity is the health proof.
   const priorSignal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(target);
@@ -514,6 +533,7 @@ try {
   if (priorSignal && priorHealth.live) {
     const out = { ok: true, workflowId: target, kernel: priorSignal.token, terminal: priorHealth.value?.terminal ?? null,
       ...(priorHealth.value?.dispatch ? { dispatch: priorHealth.value.dispatch } : {}), replaced: false, note: priorHealth.reason };
+    out.startup = hostStartup;
     console.log(asJson ? JSON.stringify(out) : `kernel already live for ${target} (${priorSignal.token})`);
     process.exit(0);
   }
@@ -535,6 +555,8 @@ try {
           error: `kernel job Dispatch ${managed.dispatchId} is alive (worker ${shown.state ?? 'ready'}); stop it with orca orchestration worker-stop before launching a second kernel` }, EXIT_KERNEL_ALIVE);
     }
   }
+  const beforeSeatAuthority = currentStartAuthority();
+  if (!beforeSeatAuthority.ok) refuse(beforeSeatAuthority.reason, { workflowId: target, authority: beforeSeatAuthority, startup: hostStartup });
   let staleKernel = null;
   if (priorSignal) {
     staleKernel = { token: priorSignal.token, terminal: priorHealth.value?.terminal ?? null,
@@ -569,12 +591,16 @@ try {
 
   // 1. Claim the goal atomically — the named one, or the oldest pending.
   let claim = null;
+  let claimAuthority = null;
   ledger.transaction(() => {
+    claimAuthority = currentStartAuthority();
+    if (!claimAuthority.ok) return;
     const row = ledger.db.prepare("SELECT inbox_id,workflow_id,payload_json,status FROM inbox WHERE kind='goal' AND status='pending' AND workflow_id=? LIMIT 1").get(target);
     if (!row) return;
     setInboxStatus(ledger.db, { inboxId: row.inbox_id, status: 'claimed' });
     claim = row;
   });
+  if (!claimAuthority.ok) refuse(claimAuthority.reason, { workflowId: target, authority: claimAuthority, startup: hostStartup });
   if (!claim) {
     // Nothing pending — re-bind the same durable claimed goal. Agent churn
     // increments the kernel attempt, not the workflow generation.
@@ -592,13 +618,17 @@ try {
   const token = `kernel-${crypto.randomBytes(6).toString('hex')}`;
   const reservationAt = Date.now();
   const reservationExpires = reservationAt + 120000;
+  let reservationAuthority;
   const reserved = ledger.transaction(() => {
+    reservationAuthority = currentStartAuthority();
+    if (!reservationAuthority.ok) return false;
     const occupied = ledger.db.prepare("SELECT token FROM signals WHERE scope='kernel' AND key=? AND (expires_at IS NULL OR expires_at>?)").get(workflowId, reservationAt);
     if (occupied) return false;
     setSignal(ledger.db, { scope: 'kernel', key: workflowId, workflowId, holderPid: process.pid, token, value: { state: 'starting' }, at: reservationAt, expiresAt: reservationExpires });
     return true;
   });
   if (!reserved) {
+    if (!reservationAuthority.ok) refuse(reservationAuthority.reason, { workflowId, authority: reservationAuthority, startup: hostStartup });
     const occupied = ledger.db.prepare("SELECT token FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
     const out = { ok: true, workflowId, kernel: occupied?.token ?? null, replaced: false, note: 'kernel startup already reserved' };
     console.log(asJson ? JSON.stringify(out) : `kernel startup already reserved for ${workflowId}`);
@@ -648,6 +678,9 @@ try {
   for (const warning of route.warnings ?? []) console.error(`start-workflow: warning: ${warning}`);
   if (route.error)
     failStart(route.errorStep ?? 'kernel-route', route.error, null, { agent: route.agent ?? null, requestedModel: route.model ?? null });
+  const beforeTreeAuthority = currentStartAuthority();
+  if (!beforeTreeAuthority.ok) failStart(beforeTreeAuthority.reason, 'the accepted goal changed during route preparation', null,
+    { reason: beforeTreeAuthority.reason, authority: beforeTreeAuthority, startup: hostStartup });
   // modules/kernel/start-workflow.yaml spawn.fallThrough: a group member whose start left no effect (worker-start
   // refused before a Dispatch existed, or its Dispatch was proven gone and released) hands the same boot and
   // reservation to the next member. Anything else ends the boot.
@@ -659,6 +692,7 @@ try {
   // workflow-worktree-missing.
   const appRepo = workflowAppRepo(repo);
   let workflowWorktree = null;
+  let workflowInstall = null;
   if (appRepo) {
     const ensured = ensureWorkflowWorktree({ env: process.env }, { workflowId, appRepo, ledgerId: ledger.ledgerId ?? null });
     if (!ensured.ok) failStart(ensured.reason === 'worktree-cap' ? 'worktree-cap' : 'workflow-worktree', ensured.detail ?? ensured.reason, null,
@@ -669,6 +703,12 @@ try {
       ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, generation: wf?.generation ?? 0, kind: 'workflow-worktree-created',
         payload: { orcaWorktreeId: workflowWorktree.orcaWorktreeId, path: workflowWorktree.path, branch: workflowWorktree.branch, appRepo } }));
     }
+    workflowInstall = await installWorkflowTree({ record: workflowWorktree, env: process.env });
+    if (!workflowInstall.ok) failStart('workflow-worktree-install', workflowInstall.error ?? workflowInstall.reason, null,
+      { reason: workflowInstall.reason, workflowWorktree, install: workflowInstall });
+    const wf = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
+    ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, generation: wf?.generation ?? 0,
+      kind: 'workflow-worktree-installed', payload: { orcaWorktreeId: workflowWorktree.orcaWorktreeId, ...workflowInstall } }));
   }
   const kernelWorktree = workflowWorktree?.path ?? repo;
   // The Kernel's guard (contract change kernel-guard-file): the same job guard an op gets (scripts/guards/hook-install.mjs
@@ -696,6 +736,9 @@ try {
   const priorManaged = parseJsonOr(priorKernelJob?.payload_json)?.managed ?? null;
   const entry = readEnv('ORCA_TERMINAL_HANDLE') || null;
   const specFile = path.join(path.dirname(ledgerFileFor(repo)), 'kernel', `${workflowId}.a${kernelAttemptOf(priorKernelJob) + 1}.prompt.md`);
+  const beforeLaunchAuthority = currentStartAuthority();
+  if (!beforeLaunchAuthority.ok) failStart(beforeLaunchAuthority.reason, 'the accepted goal changed before Kernel launch', null,
+    { reason: beforeLaunchAuthority.reason, authority: beforeLaunchAuthority, startup: hostStartup, workflowWorktree, install: workflowInstall });
   const kernelLaunch = launchKernelGroup({ ledger, workflowId, token, route, members, reservationMs: KERNEL_START_RESERVATION_MS,
     hostUnavailableExit: EXIT_HOST_UNAVAILABLE, memberLabel, failStart, launch: { worktree: kernelWorktree, title, prompt, specFile,
       role: 'kernel', scopeId: `${ledger.ledgerId ?? ledger.path}:${workflowId}:kernel-attempt:${kernelAttemptOf(priorKernelJob) + 1}`,
@@ -781,6 +824,7 @@ try {
       payload: { terminal: handle, host: 'orca', agent: route.agent, routedBy: route.routedBy,
         model: kernelModel, effort: kernelEffort, launch: routeInfo.launch, modelAttested: true,
         inboxId: claim.inbox_id, attempt, launchedBy,
+        startup: hostStartup, ...(workflowInstall ? { install: workflowInstall } : {}),
         nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}`,
         sourceHost: sourceRoot, projectBinding: context?.file ?? null, ...(staleKernel ? { replacedKernel: staleKernel } : {}),
         ...(restartAuthority ? { restartAuthority } : {}),
@@ -797,6 +841,7 @@ try {
 
 
   const out = { ok: true, workflowId, kernel: token, terminal: handle, host: 'orca', executionHost: 'orca',
+    startup: hostStartup, ...(workflowInstall ? { install: workflowInstall } : {}),
     agent: route.agent, routedBy: route.routedBy, launch: routeInfo.launch, modelAttested: true,
     ...(kernelModel ? { model: kernelModel } : {}), ...(kernelEffort ? { effort: kernelEffort } : {}),
     ...(route.route?.profile ? { profile: route.route.profile } : {}),

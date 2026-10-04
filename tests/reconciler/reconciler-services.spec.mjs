@@ -209,3 +209,27 @@ test('one probe pass retries a slow first request: the harness 5 s idle wake-up 
   assert.equal(S.services['harness-ui'].probePath, '/healthz');
   assert.ok(OUTAGE_STATES.has('failed') && !OUTAGE_STATES.has('degraded'), 'one bad pass is not an outage');
 });
+
+test('harness readiness requires actual 200 JSON health while connector liveness retains HTTP semantics', async () => {
+  const healthy = { data: { ok: true, rev: 'fixture-current', dbs: { machine: true, ledgers: { shop: true } } } };
+  const reply = (status, body = healthy, type = 'application/json') => ({ status, headers: new Headers({ 'content-type': type }), json: async () => body });
+  const probe = (response) => httpUp('https://harness.example.org/healthz', { timeoutMs: 1000, health: true, fetchImpl: async () => response });
+  for (const status of [302, 401, 403, 404, 500, 503]) assert.equal((await probe(reply(status))).ok, false, `${status}`);
+  for (const body of [{}, { data: { ok: true } }, { data: { ...healthy.data, ok: false } },
+    { data: { ...healthy.data, dbs: { machine: false, ledgers: {} } } },
+    { data: { ...healthy.data, dbs: { machine: true, ledgers: { shop: false } } } }]) assert.equal((await probe(reply(200, body))).ok, false);
+  assert.equal((await probe(reply(200, healthy, 'text/html'))).ok, false);
+  assert.equal((await probe({ status: 200, headers: new Headers({ 'content-type': 'application/json' }), json: async () => { throw Error('invalid JSON'); } })).ok, false);
+  assert.equal((await probe(reply(200))).ok, true);
+  assert.equal((await httpUp('http://gateway.example.org/', { timeoutMs: 1000, fetchImpl: async () => reply(404) })).ok, true);
+});
+
+test('both harness registry probes request strict health semantics at their configured URLs', async () => {
+  const calls = [];
+  const registry = serviceRegistry({ settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }),
+    http: async (url, options) => { calls.push({ url, options }); return { ok: true, status: 200 }; } });
+  await registry.find((entry) => entry.name === 'harness-ui').probe();
+  await registry.find((entry) => entry.name === 'harness-tunnel').probe();
+  assert.deepEqual(calls.map((call) => call.url), ['http://127.0.0.1:4547/healthz', 'https://harness.example.org/healthz']);
+  assert.ok(calls.every((call) => call.options.health === true));
+});

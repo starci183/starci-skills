@@ -22,7 +22,8 @@ const fixture = (t, version = MACHINE_VERSION) => {
   writer = openMachine(options);
   writer.db.prepare('INSERT INTO machine_meta(key,value) VALUES(?,?)').run('observer-sentinel', 'preserved');
   writer.registerLedger({ ledgerId: 'observer-fixture', name: 'observer-fixture', repoRoot: directory, file: path.join(directory, 'runtime.sqlite') });
-  if (version === 1) writer.db.exec('DROP TABLE provider_reservation_events; DROP TABLE provider_reservations; DELETE FROM schema_migrations WHERE version=2; PRAGMA user_version=1;');
+  if (version === 1) writer.db.exec('DROP TABLE provider_reservation_events; DROP TABLE provider_reservations; DELETE FROM schema_migrations WHERE version>=2; PRAGMA user_version=1;');
+  if (version === 2) writer.db.exec('DELETE FROM schema_migrations WHERE version=3; PRAGMA user_version=2;');
   return { directory, file, options, writer };
 };
 
@@ -86,7 +87,7 @@ test('an absent observer store remains absent without creating directories', (t)
   assert.deepEqual(fs.readdirSync(directory), []);
 });
 
-for (const version of [1, MACHINE_VERSION]) {
+for (const version of [1, 2, MACHINE_VERSION]) {
   test(`observer validates machine v${version}, reads registry and exposes no mutation API`, (t) => {
     const current = fixture(t, version), before = snapshot(current), observer = openMachineObserver(current.options);
     try {

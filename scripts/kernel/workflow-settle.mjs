@@ -13,6 +13,7 @@ import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { TERMINAL_JOB_STATUSES, worktreeSettings } from '../machine/worktree-registry.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { rebaseMilestone } from '../lib/rebase-milestone.mjs';
+import { lockOperation } from '../lib/locked-operation.mjs';
 import { commitShaOf } from './commit-sha.mjs';
 import { createOwnership } from './work-ownership.mjs';
 import { CHECKPOINT_EVENTS, PRESERVED_WORKFLOW_PREFIX, checkpointOp, leasesOf, preserveAndReset, rebaseWorkflow, recoverWorkflowRebase, recordOf, splitChanges, withWorkflowLock } from './workflow-checkpoint.mjs';
@@ -54,9 +55,7 @@ function escalateRebaseConflict(ctx, { workflowId, onto, head, files, preservedR
  * is never tried twice) and opens one rebase-conflict Decision Item. Never throws: the op is green either way, and the
  * finish's rebase stays the hard stop. {due, why, rebased?, onto?, head?, conflict?, error?}
  */
-export function milestoneRebase(ctx, { workflowId, opId }) {
-  return withWorkflowLock(ctx, { workflowId }, (locked) => milestoneOwned(locked, { workflowId, opId }));
-}
+export const milestoneRebase = lockOperation(withWorkflowLock, milestoneOwned);
 function milestoneOwned(ctx, { workflowId, opId }) {
   try {
     const rec = recordOf(ctx, workflowId);
@@ -104,9 +103,7 @@ export function requireWorkOwner(ctx, { workflowId, opId }) {
  * What starci kernel settle does in a workflow worktree, as the ledger event it records: a green op is a checkpoint followed by the
  * milestone rebase; a failed or blocked op is preserved and reset. Throws the typed refusal of checkpointOp/preserveAndReset.
  */
-export function settleCheckpoint(ctx, { workflowId, opId, pass }) {
-  return withWorkflowLock(ctx, { workflowId }, (locked) => settleOwned(locked, { workflowId, opId, pass }));
-}
+export const settleCheckpoint = lockOperation(withWorkflowLock, settleOwned);
 function settleOwned(ctx, { workflowId, opId, pass }) {
   const recovered = recoverWorkflowRebase(ctx, { workflowId, opId });
   if (!pass) return { kind: CHECKPOINT_EVENTS.preserved, ...preserveAndReset(ctx, { workflowId, opId }) };

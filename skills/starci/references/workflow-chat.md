@@ -1,13 +1,3 @@
----
-name: workflow-chat
-description: >-
-  Monitor exactly one workflow's long-lived [Kernel] agent from a plain chat: the goal lands through
-  the define-goal skill, the kernel boots through the start-kernel skill onto an Orca terminal, and
-  this chat relays the kernel's questions and open incidents to the owner verbatim and the owner's
-  words back into the kernel terminal — never deciding, approving or mutating itself. Use when a chat
-  is asked to run, drive, watch or resume a workflow, or when the user says "$workflow-chat".
----
-
 # Workflow chat
 
 You are the owner's chat, monitoring one workflow. You relay; the kernel
@@ -20,11 +10,11 @@ kernel and never an operation.
 
 The current Codex, Claude or Devin chat is the **launcher** and monitor only.
 **Host** means Orca; `agent`, `model`, `profile` and `runtimePool` keep the
-meanings `start-kernel` gives them — never collapse them into “provider”.
+meanings `start-workflow.md` gives them — never collapse them into “provider”.
 
 ## Resolve once
 
-- `<skill root>` is the Source host's `.claude` directory that holds the
+- `<runtime root>` is the Source host's `.claude` directory that holds the
   `CONTEXT.md` you were sent to. `<repo>` is separately the project repository
   that owns the workflow's runtime ledger (`define-goal` printed
   the ledger path on its `ledger:` line). `--repo` always names that ledger owner,
@@ -32,11 +22,11 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 - Every runtime call goes through the runtime's own scripts, run from anywhere:
 
   ```
-  node <skill root>/scripts/kernel/cli.mjs <command> --repo <repo> ...
-  node <skill root>/scripts/api/orca/terminal-read.mjs --terminal <handle> [--screen]
-  node <skill root>/scripts/api/orca/terminal-send.mjs --terminal <handle> --text "..." --enter
-  node <skill root>/scripts/api/orca/terminal-show.mjs --terminal <handle>
-  node <skill root>/scripts/api/orca/terminal-list.mjs [--worktree <sel>]
+  node <runtime root>/scripts/kernel/cli.mjs <command> --repo <repo> ...
+  node <runtime root>/scripts/api/orca/terminal-read.mjs --terminal <handle> [--screen]
+  node <runtime root>/scripts/api/orca/terminal-send.mjs --terminal <handle> --text "..." --enter
+  node <runtime root>/scripts/api/orca/terminal-show.mjs --terminal <handle>
+  node <runtime root>/scripts/api/orca/terminal-list.mjs [--worktree <sel>]
   ```
 
   The scripts call the host CLI themselves; you run them straight from the tree and never
@@ -50,16 +40,15 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
   `terminal-send.mjs`; liveness/output always use `terminal-show.mjs` /
   `terminal-read.mjs`.
 
-## 1. The owner's prompt becomes the goal — through the entry skill
+## 1. The owner's prompt becomes the goal — through the StarCi entry
 
-- Follow the `define-goal` skill verbatim, including its exact-`ok` approval gate, and keep the
+- Follow the goal-definition procedure in `define-goal.md` verbatim, including its scope-bound owner approval gate, and keep the
   printed `workflowId`. Never reword or shrink the owner's prompt.
 
-## 2. Boot the kernel — through the entry skill
+## 2. Boot the kernel — through the StarCi entry
 
-- Follow the `start-kernel` skill verbatim: `--plan` preview (goal revision,
-  inbox status, `host=orca`, Kernel agent/concrete model and `launch=worker`,
-  or "already live"), the owner's exact `ok`, then boot. Keep the attested
+- Follow `start-workflow.md` under the accepted goal and start scope. Reuse unchanged approval
+  already covering startup; otherwise obtain the owner's OK before effects. Keep the attested
   `[Kernel]` terminal handle and Dispatch the result prints — the terminal is
   your relay channel for the rest of the workflow's life.
 - Kernel boot is worker-start: the boot creates the Kernel's entry Run from this
@@ -103,7 +92,7 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 ## 5. Kernel health and finish
 
 - `terminal-show --terminal <kernel handle>` is the liveness check: `connected` + `writable`. A dead
-  or exited kernel terminal means re-run `start-kernel` on the same goal; the durable
+  or exited kernel terminal means re-run the native workflow start on the same goal; the durable
   plan/jobs/events survive agent churn.
 - Connected+writable is only terminal availability. A provider input prompt
   with no current Working/Thinking marker is `turn-idle`; phase=running means
@@ -124,8 +113,8 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 - Write the runtime ledger (`runtime.sqlite`), or keep workflow state in a file of your own — the kernel
   mutates the ledger only through `scripts/kernel/cli.mjs` and the chat mutates nothing at all. A
   live kernel is driven through its `inbox` rows and its terminal.
-- Never approve — the exact-`ok` gate in `define-goal`/`start-kernel` fires only on the owner's
-  literal word; a relayed "looks fine to me" is not approval unless the owner typed it.
+- Never approve on the owner's behalf. Goal and startup acceptance must come from the owner and
+  bind the exact scope. A monitor's judgement and silence never supply that acceptance.
 - Spawn a second kernel or a second workflow in this chat. A second goal is a second workflow: open
   a new chat for it.
 - Run an operation's work inline, edit product code to "help", or answer an op's question by writing

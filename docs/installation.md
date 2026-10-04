@@ -35,20 +35,19 @@ The installer copies the payload declared by `package.json` `files[]` into
    CLAUDE.md, DEVIN.md) receives the same entry between the
    `starci:prompt-entry` markers. Locally written instructions outside the
    markers are preserved.
-2. Copies the two lifecycle entry skills — `define-goal` and `start-kernel` —
-   into each host skills directory that already exists (`.devin/skills/`,
-   `.agents/skills/`), so the host's agent surfaces them. The whole `skills/`
-   tree also lands under `.claude/skills/` as payload; this tree is its
-   canonical source.
+2. Copies the one public `starci` entry into `.agents/skills/starci/`, creating that shared
+   discovery root when absent, and into an existing `.devin/skills/` root. The canonical payload
+   remains `.claude/skills/starci/`; copies carry the same prompt and provider policy bytes.
+   References beneath that entry and `.claude/.starci/host/` are internal instructions, not skills.
 3. Seeds an **untracked** `config.yaml` from `config.example.yaml` — the
    per-project owner config: kernel model, effort, budgets. `route-model` and
    `start-workflow` read it: owner config overrides the route-model default,
    and an explicit `--agent` flag overrides both. The installed
    `.claude/.gitignore` carries `/config.yaml`; the file is never shipped or
    committed.
-4. Verifies the installed source tree (doctor contract checks), and only then
-   records the install manifest `.starci-skills.json` with the version and
-   file hashes. A failed copy or verify records nothing.
+4. Records `.starci-skills.json` with the runtime version, payload file hashes and host entry-copy
+   custody. `starci runtime doctor` is a separate explicit validation action; installation does not
+   claim test or workflow acceptance from a successful file copy.
 
 `starci runtime install` refuses an unmanaged `.claude` by default. `--no-bootstrap` leaves host
 entry files untouched (you then owe the agent the runtime path yourself).
@@ -64,6 +63,21 @@ exits 3 and prints:
 ```text
 starci: the runtime group "<g>" needs the StarCi runtime, which is not installed (run: starci runtime install)
 ```
+
+## Explicit discovery and update custody
+
+Codex reads `agents/openai.yaml` with `policy.allow_implicit_invocation: false`. The same canonical
+`SKILL.md` uses Claude's `disable-model-invocation: true` and Devin CLI's `triggers: [user]`. A human
+selects `/starci` (or the provider's native explicit selection). A plain workflow request does not
+enroll into StarCi. These policies target the documented CLI discovery surfaces; do not claim a
+Devin Desktop automatic-discovery policy that its native contract does not provide.
+
+Update retires an old copied StarCi entry only when its entire regular-file inventory matches the
+previous runtime manifest's LF-normalized digests. Cleanup binds the inspected actual bytes before
+removal. New copies are recorded under `hostSkills` with `hashMode: sha256-bytes`; modified or unowned files
+and symlink/junction roots are preserved and reported. This installer does not traverse global
+user directories or remove unrelated system/plugin skills. A pre-existing unknown bootstrap block
+is refused; only the exact prior installed entry may be refreshed, preserving custom instructions.
 
 ## Git hygiene in bound repositories
 

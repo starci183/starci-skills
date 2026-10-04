@@ -2,11 +2,14 @@
 // ui build staleness, preflight rows). Every host effect is a seam; nothing here starts or stops a process.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
 import { crashLoopPlan, crashLoopRecord, ensure, isPlannedStart, SPAWNED_KIND } from '../../scripts/reconciler/boot.mjs';
 import { PROFILES, REQUIRED_ACTIVE, configuredMode, reconcilerConfig } from '../../scripts/reconciler/state.mjs';
-import { applyProfileText, cmpVersion, engineItems, isTempLedger, ledgerFindings, ledgerIntegrity, pinProblems, profileItems, sqliteItem, summarize, uiBuildState } from '../../scripts/reconciler/start.mjs';
+import { applyHost, buildUi, ensureHostRuntime, applyProfileText, cmpVersion, engineItems, isTempLedger, ledgerFindings, ledgerIntegrity, pinProblems, profileItems, sqliteItem, summarize, uiBuildState } from '../../scripts/reconciler/start.mjs';
 import { tempState } from '../../scripts/reconciler/testing.mjs';
 
 const NOW = 10_000_000;
@@ -80,11 +83,15 @@ test('applyProfileText rewrites the reconciler block, keeps explicit gc/workers/
 });
 
 test('ui/dist is stale when a ui source is newer than the newest built file, or missing', () => {
-  const tree = (files) => {
+  const tree = (files, { entryAsset = true } = {}) => {
+    if (entryAsset && Object.hasOwn(files, '/x/ui/dist/index.html')) files = { ...files, '/x/ui/dist/assets/main.js': files['/x/ui/dist/index.html'] };
+    const canonical = (file) => path.resolve(file).replace(/\\/g, '/');
+    files = Object.fromEntries(Object.entries(files).map(([file, at]) => [canonical(file), at]));
     const fsImpl = {
-      readdirSync: (dir) => Object.keys(files).filter((f) => path.dirname(f) === dir.replace(/\\/g, '/')).map((f) => ({ name: path.basename(f), isDirectory: () => false }))
-        .concat([...new Set(Object.keys(files).map((f) => path.dirname(f)).filter((d) => path.dirname(d) === dir.replace(/\\/g, '/')))].map((d) => ({ name: path.basename(d), isDirectory: () => true }))),
-      statSync: (f) => { const k = f.replace(/\\/g, '/'); if (!(k in files)) throw Error('ENOENT'); return { mtimeMs: files[k] }; },
+      readdirSync: (dir) => Object.keys(files).filter((f) => canonical(path.dirname(f)) === canonical(dir)).map((f) => ({ name: path.basename(f), isDirectory: () => false }))
+        .concat([...new Set(Object.keys(files).map((f) => canonical(path.dirname(f))).filter((d) => canonical(path.dirname(d)) === canonical(dir)))].map((d) => ({ name: path.basename(d), isDirectory: () => true }))),
+      statSync: (f) => { const k = canonical(f); if (!(k in files)) throw Error('ENOENT'); return { mtimeMs: files[k], isFile: () => true }; },
+      readFileSync: () => '<script type="module" src="/assets/main.js"></script>',
     };
     return fsImpl;
   };
@@ -93,6 +100,200 @@ test('ui/dist is stale when a ui source is newer than the newest built file, or 
   assert.equal(uiBuildState({ uiDir: ui, fsImpl: tree({ '/x/ui/src/a.tsx': 300, '/x/ui/dist/index.html': 200 }) }).stale, true);
   assert.equal(uiBuildState({ uiDir: ui, fsImpl: tree({ '/x/ui/package.json': 300, '/x/ui/dist/index.html': 200 }) }).stale, true);
   assert.equal(uiBuildState({ uiDir: ui, fsImpl: tree({ '/x/ui/src/a.tsx': 1 }) }).stale, true);
+  assert.equal(uiBuildState({ uiDir: path.resolve(ui), fsImpl: tree({ '/x/ui/src/a.tsx': 100, '/x/ui/dist/index.html': 200 }, { entryAsset: false }) }).stale, true,
+    'a newer index without its served module entry remains unavailable');
+});
+
+function uiFixture(t) {
+  const prefix = path.join(os.tmpdir(), 'starci-ui-bootstrap-');
+  const root = fs.mkdtempSync(prefix), ui = path.join(root, 'ui');
+  fs.mkdirSync(ui);
+  fs.writeFileSync(path.join(ui, 'package.json'), '{"private":true}\n');
+  fs.writeFileSync(path.join(ui, 'package-lock.json'), '{"lockfileVersion":3}\n');
+  t.after(() => {
+    assert.ok(path.resolve(root).startsWith(path.resolve(prefix)));
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+  const tools = () => {
+    for (const entry of ['vite/bin/vite.js', 'typescript/bin/tsc', 'eslint/bin/eslint.js']) {
+      const file = path.join(ui, 'node_modules', entry);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, '// local build tool\n');
+    }
+  };
+  return { root, ui, tools };
+}
+
+test('a cold non-Git UI installs through the native npm API with its private env before building under one lock', async (t) => {
+  const fixture = uiFixture(t), calls = [], env = { ...process.env, STARCI_UI_BOOTSTRAP_PROBE: 'private-fixture' };
+  assert.equal(fs.existsSync(path.join(fixture.root, '.git')), false);
+  const manifests = ['package.json', 'package-lock.json'].map((name) => fs.readFileSync(path.join(fixture.ui, name)));
+  t.mock.method(childProcess, 'spawnSync', (binary, args, options) => {
+    calls.push('ci');
+    assert.ok(args.includes('ci'), 'the actual ci call file reaches the npm runner');
+    assert.ok(args.includes('--prefer-offline') && args.includes('--no-audit') && args.includes('--no-fund'));
+    assert.equal(options.cwd, fixture.ui);
+    assert.equal(options.env, env, 'the owning API forwards the host private environment to npmSpawn');
+    fixture.tools();
+    return { status: 0, stdout: '', stderr: '' };
+  });
+  syncBuiltinESMExports();
+  t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+  const result = await buildUi({ uiDir: fixture.ui, env }, {
+    underHostLock: async (options, run) => {
+      assert.deepEqual(options, { role: 'coordinator', purpose: 'harness-ui-build', env });
+      calls.push('lock');
+      const value = await run();
+      calls.push('unlock');
+      return { ok: true, value };
+    },
+    npm: (args, options) => {
+      calls.push('build');
+      assert.deepEqual(args, ['run', 'build']);
+      assert.equal(options.cwd, fixture.ui);
+      assert.equal(options.env, env);
+      return { status: 0, stdout: 'built', stderr: '' };
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.install.ok, true);
+  assert.deepEqual(calls, ['lock', 'ci', 'build', 'unlock']);
+  for (const [index, name] of ['package.json', 'package-lock.json'].entries())
+    assert.deepEqual(fs.readFileSync(path.join(fixture.ui, name)), manifests[index]);
+});
+
+test('a warm real local UI toolchain skips installation, while an incomplete node_modules requires it', async (t) => {
+  for (const warm of [true, false]) {
+    const fixture = uiFixture(t), calls = [];
+    if (warm) fixture.tools();
+    else fs.mkdirSync(path.join(fixture.ui, 'node_modules'));
+    const result = await buildUi({ uiDir: fixture.ui }, {
+      underHostLock: async (options, run) => ({ ok: true, value: await run() }),
+      ci: async () => { calls.push('ci'); fixture.tools(); return { ok: true, status: 0 }; },
+      npm: () => { calls.push('build'); return { status: 0 }; },
+    });
+    assert.equal(result.ok, true);
+    assert.deepEqual(calls, warm ? ['build'] : ['ci', 'build']);
+  }
+});
+
+test('failed, unknown or incomplete UI installation cannot reach build or report ready', async (t) => {
+  for (const outcome of [{ ok: false, status: 1, stderr: 'fixture install refusal' }, undefined, { ok: true, status: 0 }, new Error('fixture install failed')]) {
+    const fixture = uiFixture(t);
+    let builds = 0;
+    const result = await buildUi({ uiDir: fixture.ui }, {
+      underHostLock: async (options, run) => ({ ok: true, value: await run() }),
+      ci: async () => { if (outcome instanceof Error) throw outcome; return outcome; },
+      npm: () => { builds++; return { status: 0 }; },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(builds, 0);
+    assert.ok(fs.existsSync(path.join(fixture.ui, 'package-lock.json')), 'a refused runtime bootstrap retains its package tree');
+  }
+});
+
+test('UI installation that changes a manifest is red even with a zero npm receipt', async (t) => {
+  const fixture = uiFixture(t);
+  let builds = 0;
+  const result = await buildUi({ uiDir: fixture.ui }, {
+    underHostLock: async (options, run) => ({ ok: true, value: await run() }),
+    ci: async () => { fixture.tools(); fs.appendFileSync(path.join(fixture.ui, 'package-lock.json'), 'changed'); return { ok: true, status: 0 }; },
+    npm: () => { builds++; return { status: 0 }; },
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.output, /changed a manifest or lockfile/);
+  assert.equal(builds, 0);
+});
+
+test('linked UI ancestors, node_modules and tool directories cannot borrow a toolchain or trigger install/build', async (t) => {
+  for (const kind of ['ancestor', 'node_modules', 'tool']) {
+    const fixture = uiFixture(t), borrowed = path.join(fixture.root, 'borrowed');
+    fs.mkdirSync(borrowed);
+    let uiDir = fixture.ui;
+    if (kind === 'ancestor') {
+      const alias = path.join(fixture.root, 'alias');
+      fs.symlinkSync(fixture.root, alias, process.platform === 'win32' ? 'junction' : 'dir');
+      uiDir = path.join(alias, 'ui');
+    } else if (kind === 'node_modules') {
+      fs.symlinkSync(borrowed, path.join(fixture.ui, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
+    } else {
+      fs.mkdirSync(path.join(fixture.ui, 'node_modules'));
+      fs.symlinkSync(borrowed, path.join(fixture.ui, 'node_modules', 'vite'), process.platform === 'win32' ? 'junction' : 'dir');
+    }
+    const calls = [];
+    const result = await buildUi({ uiDir }, {
+      underHostLock: async (options, run) => ({ ok: true, value: await run() }),
+      ci: () => { calls.push('ci'); return { ok: true, status: 0 }; },
+      npm: () => { calls.push('build'); return { status: 0 }; },
+    });
+    assert.equal(result.ok, false);
+    assert.deepEqual(calls, [], 'no install may traverse an existing linked tool directory');
+  }
+});
+
+test('a held host lock refuses UI work and a failed awaited build blocks subsequent host activation', async () => {
+  const calls = [], env = { STARCI_UI_BOOTSTRAP_PROBE: 'private-fixture' };
+  const held = await buildUi({ env }, {
+    underHostLock: async () => ({ ok: false, reason: 'held' }),
+    ci: () => { calls.push('ci'); }, npm: () => { calls.push('build'); },
+  });
+  assert.equal(held.ok, false);
+  assert.match(held.output, /host lock refused.*held/);
+  const applied = await applyHost({ env, waitMs: 0, workflowSeats: false }, {
+    uiBuildState: () => ({ stale: true, reason: 'cold fixture' }),
+    buildUi: async (options) => { assert.equal(options.env, env); await Promise.resolve(); calls.push('build-failed'); return { ok: false, output: 'fixture ci red' }; },
+    leaderState: () => { calls.push('engine'); }, probeServices: () => { calls.push('services'); },
+    probeOrcaAsync: () => { calls.push('seats'); },
+  });
+  assert.deepEqual(calls, ['build-failed']);
+  assert.deepEqual(applied, ['ui build FAILED: fixture ci red']);
+});
+
+test('host apply keeps Supervisor but excludes Kernel watchdogs during workflow ingress', async () => {
+  const calls = [];
+  const deps = { leaderState: () => ({ fresh: true }), reconcilerNumbers: () => NUMBERS, crashLoopRecord: () => ({ starts: [] }),
+    status: () => ({ modes: {} }), probeServices: async () => [], probeOrcaAsync: async () => ({ ok: true }),
+    loadConfig: () => ({}), supervisorMode: () => 'kernel', json: async () => { calls.push('supervisor'); return { ok: true, action: 'already-live' }; },
+    kernelSeatItems: async () => { calls.push('kernel'); return []; } };
+  await applyHost({ noBuild: true, waitMs: 0, workflowSeats: false }, deps);
+  assert.deepEqual(calls, ['supervisor']);
+  calls.length = 0;
+  await applyHost({ noBuild: true, waitMs: 0, workflowSeats: true }, deps);
+  assert.deepEqual(calls, ['supervisor', 'kernel']);
+});
+
+test('host readiness blocks preflight before effects and applies a down host without Kernel recursion', async () => {
+  let effects = 0;
+  const red = { group: 'preflight', id: 'machine-db', required: true, status: 'red' };
+  const failed = await ensureHostRuntime({ waitMs: 0 }, { gather: async () => [red], applyHost: async () => { effects++; } });
+  assert.equal(failed.ok, false);
+  assert.equal(effects, 0);
+  const seen = [];
+  let applied = false;
+  const result = await ensureHostRuntime({ waitMs: 0 }, { gather: async (options) => { seen.push(options); return [{ group: 'engine', required: true, status: applied ? 'green' : 'red' }]; },
+    applyHost: async (options) => { assert.equal(options.workflowSeats, false); effects++; applied = true; return ['engine started']; } });
+  assert.equal(result.ok, true);
+  assert.equal(effects, 1);
+  assert.ok(seen.every((options) => options.workflowSeats === false && options.coreDebug === false));
+});
+
+test('explicit profile repair and stale-ledger retirement retain their effects on an otherwise healthy host', async () => {
+  for (const option of [{ setProfile: 'operational' }, { retire: true }]) {
+    let effects = 0;
+    const result = await ensureHostRuntime({ waitMs: 0, ...option }, { gather: async () => [],
+      applyHost: async (input) => { assert.equal(input.setProfile ?? input.retire, option.setProfile ?? option.retire); effects++; return ['explicit update']; } });
+    assert.equal(result.ok, true);
+    assert.equal(effects, 1);
+  }
+  let effects = 0;
+  const profile = { group: 'config', id: 'profile', required: true, status: 'red' };
+  const deps = { gather: async () => effects ? [] : [profile], applyHost: async () => { effects++; return ['profile repaired']; } };
+  assert.equal((await ensureHostRuntime({ waitMs: 0, setProfile: 'operational' }, deps)).ok, true);
+  assert.equal(effects, 1);
+  effects = 0;
+  deps.gather = async () => [profile, { group: 'preflight', id: 'machine-db', required: true, status: 'red' }];
+  assert.equal((await ensureHostRuntime({ waitMs: 0, setProfile: 'operational' }, deps)).ok, false);
+  assert.equal(effects, 0, 'explicit profile repair cannot bypass another prerequisite');
 });
 
 test('preflight: SQLite version, temp and missing ledgers, a model pin the launch cannot honour', () => {

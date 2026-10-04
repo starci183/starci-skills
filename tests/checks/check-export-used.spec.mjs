@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { exportUsedFindings, exportedNames, publicEntries } from '../../scripts/checks/check-export-used.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { exportUsedFindings, exportedNames, publicEntries, checkExportUsed } from '../../scripts/checks/check-export-used.mjs';
+import { runGit } from '../../scripts/api/git/lib.mjs';
+import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 // RT_EXPORT_UNUSED: an export that no other tracked text file mentions is dead surface.
 const names = (files) => exportUsedFindings(files).map((f) => [f.code, f.path, f.name]);
@@ -50,4 +54,44 @@ test('the one call function an api call file exports (named after the file) is i
     { rel: 'scripts/api/process/hide-child-windows.mjs', text: 'export function hideChildWindows() {}\nexport const extra = 1;\n' },
     { rel: 'scripts/api/process/lib.mjs', text: 'export const spare = 1;\n' },
   ]), [['RT_EXPORT_UNUSED', 'scripts/api/process/hide-child-windows.mjs', 'extra'], ['RT_EXPORT_UNUSED', 'scripts/api/process/lib.mjs', 'spare']]);
+});
+
+test('the real working-tree export check admits a new reader, excludes an ignored reader, and retains unused exports', t => {
+  const root = mkdtemp(t, 'starci-export-current-');
+  const git = args => {
+    const result = runGit(args, {cwd: root});
+    assert.equal(result.status, 0, String(result.stderr ?? result.error));
+  };
+  git(['init', '--quiet']);
+  fs.mkdirSync(path.join(root, 'scripts'));
+  fs.mkdirSync(path.join(root, 'tests'));
+  const source = path.join(root, 'scripts/source.mjs');
+  fs.writeFileSync(source, 'export const used = 1;\nexport const ignoredOnly = 2;\nexport const orphan = 3;\n');
+  fs.writeFileSync(path.join(root, 'scripts/gone.mjs'), 'export const removed = 1;\n');
+  fs.writeFileSync(path.join(root, '.gitignore'), '/tests/ignored-reader.spec.mjs\n');
+  git(['add', '--', '.gitignore', 'scripts']);
+  fs.unlinkSync(path.join(root, 'scripts/gone.mjs'));
+  const reader = path.join(root, 'tests/new-reader.spec.mjs');
+  fs.writeFileSync(reader, "import {used} from '../scripts/source.mjs';\nused;\n");
+  fs.writeFileSync(path.join(root, 'tests/ignored-reader.spec.mjs'), "import {ignoredOnly} from '../scripts/source.mjs';\nignoredOnly;\n");
+  assert.deepEqual(checkExportUsed(root).map(f => [f.code, f.path, f.name]), [
+    ['RT_EXPORT_UNUSED', 'scripts/source.mjs', 'ignoredOnly'],
+    ['RT_EXPORT_UNUSED', 'scripts/source.mjs', 'orphan'],
+  ]);
+
+  const stat = fs.statSync;
+  const denied = Object.assign(new Error('fixture export stat denied'), {code: 'EACCES'});
+  const statMock = t.mock.method(fs, 'statSync', (file, ...args) => {
+    if (path.resolve(file) === source) throw denied;
+    return stat(file, ...args);
+  });
+  assert.throws(() => checkExportUsed(root), error => error === denied);
+  statMock.mock.restore();
+  const read = fs.readFileSync;
+  const ioFailure = Object.assign(new Error('fixture reader I/O failure'), {code: 'EIO'});
+  t.mock.method(fs, 'readFileSync', (file, ...args) => {
+    if (path.resolve(file) === reader) throw ioFailure;
+    return read(file, ...args);
+  });
+  assert.throws(() => checkExportUsed(root), error => error === ioFailure);
 });

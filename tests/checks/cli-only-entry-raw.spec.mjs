@@ -36,6 +36,17 @@ test('read-only commands in explicit guidance spans pass', () => {
   assert.deepEqual(report.rawUseCounts, {});
 });
 
+test('internalized host prompts and procedure references retain native CLI-only enforcement', () => {
+  const report = scan({
+    '.starci/host/maintenance.md': 'Commit with `git commit -m repair`.\n',
+    'skills/starci/references/release.md': 'Verify with `npm test`.\n',
+  });
+  assert.deepEqual(report.findings.map(({file, program, sub}) => [file, program, sub]), [
+    ['.starci/host/maintenance.md', 'git', 'commit'],
+    ['skills/starci/references/release.md', 'npm', 'test'],
+  ]);
+});
+
 test('inline, fenced, shell-prompt, and PowerShell-prompt commands produce exact policy findings', () => {
   const report = scan({
     'docs/actions.md': [

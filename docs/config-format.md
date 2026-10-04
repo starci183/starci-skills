@@ -47,15 +47,26 @@ Optional keys:
 - `allocation.grants` — `['<pool>=<slots>@<role>+<role>']`, the default grant every workflow gets; once
   declared it is the whole set, so a `capacityAuthority: explicit-workflow-quota` pool (Devin) routes only
   for the granted roles and up to the granted running slots
-- `debug` — boolean
+- `debug` — boolean; `true` pairs an owner-approved workflow start with the native core-maintenance
+  seat. `false` or absent continues workflow startup without automatic maintenance. It changes no
+  Supervisor, Kernel or operation pin and does not bypass admission or owner approval.
+- `coreDebug` — `{interval, worktreeLimit}`: the maintenance cadence (`<n>s`, `<n>m` or `<n>h`, positive)
+  and the positive integer worktree alert threshold. Both are required when the block is present;
+  automatic maintenance requires this block. The shipped values live only in `config.example.yaml`,
+  read through `engine/config.mjs` `coreDebugSettings`; there is no code default or provider-specific key.
 - `specs` — `{harness?, unit?, e2e?}` booleans or null (owner, 2026-09-28 and 2026-09-29; `engine/config.mjs`
   `specsSettings`, defaults in `SPEC_DEFAULTS`); a config without the key gets the defaults, so the shipped example
   carries no block. `harness` (default **false**, touching-only): `.claude` work writes and runs the specs of new or changed
   code, the land gate runs only the specs touching the landed files (`land.mjs --specs touching`, its default) and refuses
   `--specs all` unless `harness: true`; `--specs none` needs `--reason`. The full `.claude` suite runs in exactly one place,
-  the `/push-git` flow (`scripts/supervisor/push-git.mjs`), which needs no key. `unit` (default **true**): a code-writing
+  `/starci release` selects the [release procedure](../skills/starci/references/release.md), after the owner sees
+  the concrete release context and approves it with `OK`; this needs no specs key. That procedure invokes
+  `starci release cut` through `scripts/supervisor/release-cut-cli.mjs` and `scripts/supervisor/release-cut.mjs`.
+  The native owner runs L4 once, including Linux parity, checks that frozen main stayed unchanged, and
+  gates the annotated tag and atomic main-plus-tag push ([release governance](git-governance.md)).
+  `unit` (default **true**): a code-writing
   op writes or updates the unit specs of the source it changes and runs only those; the whole unit suite is `unit.verify`'s
-  (only when the goal asks) or `/push-git`'s. `e2e` (default **false**): e2e runs only when the goal or the owner asks,
+  (only when the goal asks) or that approved release. `e2e` (default **false**): e2e runs only when the goal or the owner asks,
   then `e2e.verify` runs the full e2e suite (see "Product test switches")
 - `connectors` — the public owner-ask channel `{secretsFile?, repos?, gateway?, cloudflare?, telegram?}`,
   all off by default; secrets are named by env var, never stored (docs/connectors.md)
@@ -65,7 +76,10 @@ Optional keys:
   defaults `scripts/machine/home.mjs` `DEFAULTS`)
 - `reconciler` — `{enabled?, profile?, controllers?}`: `profile` `operational` (job, host, workflow, resource active; gc, workers,
   learning shadow) or `observe` (all shadow) sets every controller's default mode; `controllers.<name>.mode`
-  (`off|shadow|active`) overrides one. The `start` skill applies and checks `operational` (docs/architecture.md "The reconciler")
+  (`off|shadow|active`) overrides one. Approved workflow startup automatically ensures the host is ready;
+  `/starci start` is also an explicit inspection or recovery action and checks `operational`. No separate
+  manual startup skill is required. Only an explicit profile update writes that block
+  (docs/architecture.md "The reconciler")
 - `delegation` — `{asks, until, excludes?, note?}` or null: a named delegate answers owner asks until `until`;
   the excluded classes stay owner-only
 - `asks` — `{autoAcceptRecommended?, excludes?}` or null: answer an ask that carries a recommended option with
@@ -74,6 +88,32 @@ Optional keys:
   the owner did not ask to review is accepted without the owner)
 - `uat` — `{maxConcurrent?}` or null: the machine-wide ceiling of concurrent UAT runs (`scripts/uat/uat-slots.mjs`;
   default `engine/config.mjs` `UAT_DEFAULTS`)
+
+## Caller and automatic maintenance
+
+The single public `/starci` entry resolves the Source host and project binding, presents the concrete
+goal and startup scope, and waits for the owner's `OK` before workflow or paired maintenance startup.
+An unclear request or a new goal needs its own approval. The native `starci workflow start` owner
+ensures the host is ready before claiming that goal; `--plan` starts neither services nor workers.
+
+`starci workflow start` and `starci reconciler up` take `--caller-agent`, `--caller-model` and
+`--caller-effort`. These are declared ingress route labels passed to the maintenance owner, not proof
+of a desktop session's active model. Supply a known current concrete route explicitly. An unknown
+desktop session supplies no guessed agent/model metadata. A model omitted from an otherwise declared
+agent can only resolve through that agent's existing catalog/card default, labelled as that default;
+it does not attest the caller's model. The actual native worker must attest the requested supported
+agent/model before pairing is ready. Devin's opaque account-selected model is never inferred or
+reported as concrete model attestation.
+
+Kernel `--agent`, `kernel` pins/groups, the configured Supervisor and operation routes retain their
+own authority. Caller fields do not override them. The native maintenance seat has a distinct host
+slot under the existing Supervisor lifecycle owner, kept alive by the reconciler after the chat
+closes. Matching repeated requests reuse it; a conflicting live or unknown identity refuses a second
+launch. Fresh quota, role floors, reservations and exact closure proof still apply.
+
+`debug: false` removes automatic pairing from workflow startup; it does not stop the engine, a Kernel
+or the owner's configured Supervisor. Public startup readiness belongs to the existing host owner:
+`/starci start` succeeds only after the required checklist, including the public harness, is green.
 
 ## Kernel group
 

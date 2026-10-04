@@ -170,7 +170,7 @@ const SPEC_KEYWORDS = Object.freeze(['touching', 'direct', 'all', 'none']);
 export function specPlan({ fullAllowed = false, fullByPushGit = false, asked = [], named = [], reason = null } = {}) {
   const words = asked.filter((s) => SPEC_KEYWORDS.includes(s));
   const files = [...new Set([...asked.filter((s) => !SPEC_KEYWORDS.includes(s)), ...named])];
-  if (words.includes('all') && !(fullAllowed || fullByPushGit)) return { mode: 'touching', named: files, refused: 'specs-all-refused', detail: 'a land never runs the whole suite: config.yaml specs.harness is not true (touching-only); use --specs touching, or /push-git for the full run' };
+  if (words.includes('all') && !(fullAllowed || fullByPushGit)) return { mode: 'touching', named: files, refused: 'specs-all-refused', detail: 'a land never runs the whole suite: config.yaml specs.harness is not true (touching-only); use --specs touching, or /starci release for the full run' };
   if (words.includes('all')) return { mode: 'all', named: files };
   if (words.includes('direct')) return { mode: 'direct', named: files };
   if (words.includes('none')) {

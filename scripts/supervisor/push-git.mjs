@@ -19,8 +19,8 @@
 //                         every npm run build:<side> the app declares (build:be, build:fe), canon-scan
 //                         (scripts/gates/canon-scan.mjs --root <repo>); a managed script the app lacks is `absent`.
 //   3. red: a failure list grouped by spec file (or by file for typecheck/lint/canon), exit 1, and the flow STOPS -
-//      no push, no later repository. The skill (skills/push-git/SKILL.md) spawns one fixer per failing group, lands
-//      the fixes (land.mjs --specs touching / ff-main.mjs) and runs /push-git again. main must not move between
+//      no push, no later repository. The internal release procedure (skills/starci/references/release.md) spawns one fixer per failing group, lands
+//      the fixes (land.mjs --specs touching / ff-main.mjs) and runs the authorized native release flow again. main must not move between
 //      the suite and the push: if it did, the run is red (main-moved) and starts over.
 //   4. green: push-mains.mjs pushMains for that repository - a dry run (secret scan), the pre-push hooks alone
 //      (--hooks-only), then the push - and the pushed count. The push is recorded in machine.sqlite `pushes` by
@@ -212,9 +212,9 @@ export function pushGitRepo(repo, { check = false, explicit = false, deps = {} }
   }
   if (out.steps.some((s) => s.status === 'red')) return { ...out, verdict: 'red', why: `${out.steps.filter((s) => s.status === 'red').map((s) => s.name).join(', ')} red` };
   const after = mainState(repo, { run: gitRun });
-  if (after.head !== state.head || after.dirty.length) return { ...out, verdict: 'main-moved', why: after.head !== state.head ? `main moved during the run (${String(state.head).slice(0, 9)} -> ${String(after.head).slice(0, 9)}); run /push-git again` : 'the checkout became dirty during the run', dirty: after.dirty.slice(0, 40) };
+  if (after.head !== state.head || after.dirty.length) return { ...out, verdict: 'main-moved', why: after.head !== state.head ? `main moved during the run (${String(state.head).slice(0, 9)} -> ${String(after.head).slice(0, 9)}); run /starci release again` : 'the checkout became dirty during the run', dirty: after.dirty.slice(0, 40) };
   if (!state.ahead) return { ...out, verdict: 'green', pushed: 0, why: 'green; nothing ahead of origin/main to push' };
-  // The push, in the order the skill promises: dry run (secret scan), hooks alone, then the push.
+  // The push, in the order the native push contract promises: dry run (secret scan), hooks alone, then the push.
   const dry = pushRun({ repos: [repo], dryRun: true, record: false })[0];
   out.dryRun = { wouldPush: Boolean(dry?.wouldPush), refused: dry?.refused ?? null, error: dry?.error ?? null };
   if (dry?.refused || dry?.error) return { ...out, verdict: 'push-refused', why: dry.refused ?? dry.error, hint: dry.hint ?? null, scan: dry.scan ?? null };

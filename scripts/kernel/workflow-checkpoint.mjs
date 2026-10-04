@@ -58,6 +58,7 @@ import { splitList } from '../lib/list.mjs';
 import { underAny } from '../lib/path-key.mjs';
 import { commitShaOf } from './commit-sha.mjs';
 import { requireWorktreeRecord } from '../lib/worktree-record.mjs';
+import { lockOperation } from '../lib/locked-operation.mjs';
 import { acceptedDecision, completedRebaseOf, literalPaths, pendingRebaseOf, phaseOf, publicReceipt, receiptState, requireCompletedEffects, requireReceiptBytes, saveReceipt, snapshotTree, withLock, withWorkflowLock } from './workflow-checkpoint-state.mjs';
 import { applyWorkflowRebase } from './workflow-rebase.mjs';
 export { withWorkflowLock } from './workflow-checkpoint-state.mjs';
@@ -189,9 +190,7 @@ function requireReceiptScope(ctx, rec, receipt) {
  * Commit a green op's changes on the workflow branch as the new checkpoint, then setCheckpoint. Nothing changed in its scope: the
  * checkpoint is the current head. {sha, committed, scope}
  */
-export function checkpointOp(ctx, { workflowId, opId }) {
-  return withWorkflowLock(ctx, { workflowId }, (locked) => checkpointOwned(locked, { workflowId, opId }));
-}
+export const checkpointOp = lockOperation(withWorkflowLock, checkpointOwned);
 function checkpointOwned(ctx, { workflowId, opId }) {
   requireCompletedEffects(ctx, { workflowId, opId });
   const rec = recordOf(ctx, workflowId);
@@ -240,9 +239,7 @@ function checkpointOwned(ctx, { workflowId, opId }) {
  * from it or removed; ignored files and node_modules untouched; other live ops' files untouched).
  * {preservedRef|null, resetTo, sha|null}
  */
-export function preserveAndReset(ctx, { workflowId, opId }) {
-  return withWorkflowLock(ctx, { workflowId }, (locked) => preserveOwned(locked, { workflowId, opId }));
-}
+export const preserveAndReset = lockOperation(withWorkflowLock, preserveOwned);
 function preserveOwned(ctx, { workflowId, opId }) {
   requireCompletedEffects(ctx, { workflowId, opId });
   const rec = recordOf(ctx, workflowId);
@@ -358,9 +355,7 @@ function fastForwardMain(ctx, { repoRoot, from, head }) {
  * the guard, review.verify and the rebase; a rebase that moved the branch re-runs the gate on what lands. Idempotent: a
  * finish refused at push or later runs again from the top with nothing new to land.
  */
-export function finishWorkflow(ctx, { workflowId }) {
-  return withWorkflowLock(ctx, { workflowId }, (locked) => finishOwned(locked, { workflowId }));
-}
+export const finishWorkflow = lockOperation(withWorkflowLock, finishOwned);
 function finishOwned(ctx, { workflowId }) {
   const steps = [];
   const main = mainOf(ctx);

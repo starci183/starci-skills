@@ -52,6 +52,7 @@ import { allocationSettings } from '../../../engine/config.mjs';
 import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
 import { pathKey } from '../../lib/path-key.mjs';
 import os from 'node:os';
+import { coreDebugProfile } from '../core-debug.mjs';
 
 /**
  * MB-01: the host's boot identity - the machine's boot minute. The boot order runs once per host boot (and when Orca
@@ -59,9 +60,10 @@ import os from 'node:os';
  */
 const hostBootId = ({ now = Date.now(), uptimeS = os.uptime() } = {}) => `boot-${Math.round((now - uptimeS * 1000) / 60_000)}`;
 const BOOT_EVERY_MS = 365 * 86_400_000;
-export const CONCERNS = Object.freeze(['host.kernel-seat', 'host.supervisor-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
+export const CONCERNS = Object.freeze(['host.kernel-seat', 'host.supervisor-seat', 'host.core-debug-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
 const KERNEL_WATCHDOG = 'scripts/kernel/kernel-watchdog.mjs';
 const SUPERVISOR_WATCHDOG = 'scripts/supervisor/supervisor-watchdog.mjs';
+const CORE_DEBUG_WATCHDOG = 'scripts/reconciler/core-debug.mjs';
 const FOOTPRINT_SCAN = 'scripts/guards/footprint-scan.mjs';
 const LEDGER_HEALTH = 'scripts/reconciler/ledger-health.mjs';
 
@@ -491,6 +493,13 @@ export function createHostController(deps = {}) {
     return { ok: true, action, seat, ...(turn ? { turn } : {}) };
   }
 
+  async function reconcileCoreDebugSeat(ctx) {
+    const r = await ctx.run('node', [CORE_DEBUG_WATCHDOG, '--once', '--json'], { timeoutMs: settings().seats.supervisor.timeoutMs });
+    const result = outputOf(r);
+    return { ok: r?.shadow === true || (r?.ok !== false && result?.ok === true),
+      action: r?.shadow ? 'shadow' : result?.action ?? 'unknown', result };
+  }
+
   /* -------------------------------------------------------- boot (DESIGN 7.7) */
 
   /**
@@ -530,6 +539,7 @@ export function createHostController(deps = {}) {
     finishDuty(ctx, { controller: 'host', duty: 'boot', result: ctx.mode === 'active' ? 'done' : 'skipped', digest: bootIdOf(), now: ctx.now() });
     for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) steps.push({ step: 'seat', ledgerId: l.ledgerId, workflowId: wf, ...(await reconcileKernelSeat(l.ledgerId, wf, ctx)) });
     steps.push({ step: 'seat:supervisor', ...(await reconcileSupervisorSeat(ctx)) });
+    steps.push({ step: `seat:${coreDebugProfile().seatId}`, ...(await reconcileCoreDebugSeat(ctx)) });
     await ctx.log('reconciler.host.boot', `boot order done (${ctx.mode})`, { steps: steps.map((x) => ({ step: x.step, ok: x.ok, to: x.to, action: x.action })) });
     return { ok: true, steps };
   }
@@ -701,6 +711,7 @@ export function createHostController(deps = {}) {
       for (const k of openCorrupt) if (!keys.includes(k)) keys.push(k);
       for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) keys.push(`seat:kernel:${l.ledgerId}:${wf}`);
       keys.push('seat:supervisor');
+      keys.push(`seat:${coreDebugProfile().seatId}`);
       return keys;
     },
     async reconcile(key, ctx) {
@@ -712,6 +723,7 @@ export function createHostController(deps = {}) {
       if (key.startsWith('seat:')) {
         if (bootPending(ctx)) return { ok: true, deferred: 'boot' };
         if (key === 'seat:supervisor') return reconcileSupervisorSeat(ctx);
+        if (key === `seat:${coreDebugProfile().seatId}`) return reconcileCoreDebugSeat(ctx);
         const rest = key.slice('seat:kernel:'.length), cut = rest.lastIndexOf(':');
         return reconcileKernelSeat(rest.slice(0, cut), rest.slice(cut + 1), ctx);
       }

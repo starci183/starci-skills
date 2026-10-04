@@ -1,8 +1,8 @@
 schema: starci/claude-provider@1
 provider: claude
 purpose: >-
-  What a Claude Code chat is to StarCi. A chat submits a goal through the entry skills and then
-  monitors the workflow it spawned (skills/workflow-chat/); it relays the kernel's questions
+  What a Claude Code chat is to StarCi. A chat explicitly selects the StarCi entry and submits an owner-approved goal through its native contract and then
+  monitors the workflow it spawned (skills/starci/references/workflow-chat.md); it relays the kernel's questions
   verbatim and answers for the owner only on the owner's word. It is not an execution host: it
   creates no operation agent and holds no control plane above the kernel.
 agentCard: ../../models/agents/claude.yaml

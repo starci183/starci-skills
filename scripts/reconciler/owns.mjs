@@ -6,7 +6,7 @@
 /** concern -> owning controller. The CONCERNS of the reconciler contract (LANES shared contract). */
 export const CONCERN_OWNER = Object.freeze({
   'job.settle': 'job', 'job.worker': 'job', 'job.dispatch': 'job', 'job.consume-check': 'job', 'job.close-verify': 'job',
-  'host.kernel-seat': 'host', 'host.supervisor-seat': 'host', 'host.services': 'host', 'host.orca': 'host', 'host.processes': 'host', 'host.ledger-health': 'host',
+  'host.kernel-seat': 'host', 'host.supervisor-seat': 'host', 'host.core-debug-seat': 'host', 'host.services': 'host', 'host.orca': 'host', 'host.processes': 'host', 'host.ledger-health': 'host',
   'resource.throttle': 'resource', 'resource.quota': 'resource',
   'gc.sweep': 'gc', 'gc.housekeeping': 'gc',
   'workflow.stall-wake': 'workflow', 'workflow.progress': 'workflow', 'workflow.ask-repark': 'workflow',

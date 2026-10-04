@@ -149,7 +149,7 @@ export const lastJson = (text) => {
 const node = (script, args = []) => [process.execPath, [path.join(SKILL_ROOT, script), ...args]];
 
 /** GET url: ok while it answers below 500 (Cloudflare answers 502/530 when the origin or the tunnel is gone). */
-export async function httpUp(url, { timeoutMs, tries = 1, fetchImpl = fetch } = {}) {
+export async function httpUp(url, { timeoutMs, tries = 1, health = false, fetchImpl = fetch } = {}) {
   let last = null;
   const failures = [];
   for (let i = 1; i <= Math.max(1, tries); i += 1) {
@@ -157,6 +157,16 @@ export async function httpUp(url, { timeoutMs, tries = 1, fetchImpl = fetch } = 
     try {
       const res = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
       last = { ok: res.status < 500, status: res.status, tries: i, ms: Date.now() - started };
+      if (health) {
+        const json = /^application\/json(?:\s*;|$)/i.test(res.headers?.get('content-type') ?? '');
+        let data = null;
+        if (res.status === 200 && json) { try { data = (await res.json())?.data; } catch { data = null; } }
+        const ledgers = data?.dbs?.ledgers;
+        last.ok = res.status === 200 && json && data?.ok === true && data?.dbs?.machine === true
+          && typeof data?.rev === 'string' && data.rev.length > 0 && ledgers != null
+          && typeof ledgers === 'object' && !Array.isArray(ledgers) && Object.values(ledgers).every((value) => value === true);
+        if (!last.ok) last.error = 'harness health contract unavailable';
+      }
     } catch (error) { last = { ok: false, error: String(error?.cause?.code ?? error?.name ?? error?.message ?? error).slice(0, 200), tries: i, ms: Date.now() - started }; }
     if (last.ok) return failures.length ? { ...last, failures } : last;
     failures.push(`${last.status ?? last.error} ${last.ms}ms`);
@@ -217,16 +227,16 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
     // `answers`: asked once more, with aliveTimeoutMs, before any restart; a service that still answers HTTP is never restarted.
     entry('harness-ui', { ownerPath: true, probe: async () => {
       if (!ports.harnessUrl) return { ok: false, error: 'no harness port' };
-      return http(`${ports.harnessUrl}${s['harness-ui'].probePath ?? '/healthz'}`, { timeoutMs: s['harness-ui'].probeTimeoutMs, tries: s['harness-ui'].probeTries ?? 1 });
+      return http(`${ports.harnessUrl}${s['harness-ui'].probePath ?? '/healthz'}`, { timeoutMs: s['harness-ui'].probeTimeoutMs, tries: s['harness-ui'].probeTries ?? 1, health: true });
     }, answers: async () => (ports.harnessUrl ? (await http(`${ports.harnessUrl}${s['harness-ui'].probePath ?? '/healthz'}`, { timeoutMs: s['harness-ui'].aliveTimeoutMs ?? 30_000 })).status != null : false) }),
     entry('harness-tunnel', { ownerPath: true, probe: async () => {
       const drift = portProblem();
       if (drift) return { ok: false, error: drift };
       if (!ports.harnessPublicUrl) return { ok: false, error: 'no public hostname' };
-      return http(`${ports.harnessPublicUrl}${s['harness-tunnel'].probePath ?? '/healthz'}`, { timeoutMs: s['harness-tunnel'].probeTimeoutMs, tries: s['harness-tunnel'].probeTries ?? 1 });
+      return http(`${ports.harnessPublicUrl}${s['harness-tunnel'].probePath ?? '/healthz'}`, { timeoutMs: s['harness-tunnel'].probeTimeoutMs, tries: s['harness-tunnel'].probeTries ?? 1, health: true });
     }, answers: async () => {
       if (!ports.harnessPublicUrl || portProblem()) return false;
-      return (await http(`${ports.harnessPublicUrl}${s['harness-tunnel'].probePath ?? '/healthz'}`, { timeoutMs: s['harness-tunnel'].aliveTimeoutMs ?? 45_000 })).ok === true;
+      return (await http(`${ports.harnessPublicUrl}${s['harness-tunnel'].probePath ?? '/healthz'}`, { timeoutMs: s['harness-tunnel'].aliveTimeoutMs ?? 45_000, health: true })).ok === true;
     } }),
     entry('ask-gateway', { ownerPath: true, probe: () => connectorUp('ask-gateway.mjs', { timeoutMs: s['ask-gateway'].probeTimeoutMs, tries: s['ask-gateway'].probeTries ?? 1, run,
       judge: (v) => v.running === true && (ports.gatewayPort == null || v.port == null || Number(v.port) === ports.gatewayPort) }),

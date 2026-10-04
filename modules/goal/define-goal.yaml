@@ -3,7 +3,7 @@ id: goal.define
 
 # ============================================================================
 # DEFINE-GOAL — the intake ritual. One owner prompt becomes ONE durable goal row
-# in .starciwork/runtime.sqlite PLUS the derived ideal op chain, and ONE pending
+# in the external project runtime ledger PLUS the derived ideal op chain, and ONE pending
 # inbox entry (the queue). Chat is ephemeral; the ledger is the only thing that
 # survives restarts, worktree deletion and agent death. Nothing downstream may
 # read the goal from chat history — only from the ledger.
@@ -11,20 +11,22 @@ id: goal.define
 
 about:
   en: >-
-    Entry skill of every project lifecycle. The owner says what they want in any
-    chat; define-goal derives the goal AND the ideal op chain (via
+    Native goal intake selected by the explicit StarCi entry or an authorized native job contract.
+    Ordinary chat requests do not enroll a workflow. After read-only context assessment, an exact
+    goal draft and derived operation plan need owner acceptance before persistence.
+    Define-goal derives the goal AND the ideal op chain (via
     scripts/route/route-plan.mjs backward-chaining through
     modules/goal/legality.yaml), freezes both into the ledger and queues the
     workflow. A [Kernel] claims queued goals from the inbox — never from a
     prompt string held in a terminal.
 
-actor: any chat / agent surface holding an owner prompt
+actor: explicitly selected owner StarCi entry or an authorized native job holding its bound authority
 executable: scripts/goal/define-goal.mjs
 
 input:
   prompt: the raw owner text, verbatim — recorded for provenance
   repo: >-
-    single-repo mode: the repository root that owns .starciwork/runtime.sqlite
+    single-repo mode: the repository root identifying the project's external runtime ledger
     (defaults to cwd). Mutually exclusive with project.
   project: >-
     project mode: a name resolved through
@@ -33,8 +35,8 @@ input:
     this .claude, or STARCI_SOURCE_ROOT when set. repository.pathFromSource resolves to one app
     repository; its sides.be and sides.fe folders are cold-scanned by --plan.
     The app owns the project ledger: the goal persists to
-    <app-repo>/.starciwork/runtime.sqlite, never to the host repo that holds
-    .claude/.workspaces. Mutually exclusive with repo.
+    the external runtime ledger resolved for the app repository, never a copied worktree database
+    or the host repo's ledger. Mutually exclusive with repo.
   title: optional short name; derived from the prompt when absent
   routing_bias: >-
     Normalized owner intent: legacy prefer/avoid pool strings or concrete selectors,
@@ -53,8 +55,9 @@ input:
     is cold'; `underivable (kernel will derive at boot)` with route-plan's
     reason when it forms no chain; an `assumed:` line per variable the owner
     repository's Work root settles out of band — route-plan --work, per
-    legality.yaml settledOutOfBand), WILL-WRITE list and the resolved ledger path. The skill shows
-    the table to the owner; only an explicit ok re-runs without --plan, which
+    legality.yaml settledOutOfBand), WILL-WRITE list and the resolved ledger path. The explicitly selected entry shows
+    the exact draft, plan and intended persistence/start actions to the owner; accepted approval
+    binds identity, content, plan and scope. Only that accepted re-run without --plan
     is the run that persists.
   revise: >-
     Optional existing workflow_id. Revision mode never creates another
@@ -107,7 +110,10 @@ rules:
   - 'one prompt → one workflow; amendments → goals.revision+1 via goal.revise'
   - 'when the workflow finishes, the goal is finished (workflows.phase=finished, inbox consumed) — a completed goal leaves the queue forever'
   - '--project and --repo are mutually exclusive; --project binds the ledger to the app repository, not the host'
-  - 'the flow is plan → owner ok → persist: --plan exits 0 having written nothing; only the ok re-run without --plan opens the ledger transaction'
+  - 'the flow is context → read-only plan → owner acceptance → persist: --plan writes nothing; selection, silence and generic instructions never accept an unclear goal'
+  - 'approval binds goal identity, content, derived plan and authority; unchanged accepted scope proceeds without another gate, while material scope changes require new acceptance'
+  - 'an intended startup must be included in the accepted plan or approved separately; native workflow ingress validates persisted acceptance before host effects'
+  - 'revision approval retains its native content-bound token and exact owner ok gate'
   - 'revision preserves workflow_id and goal_identity, increments revision by exactly one, records explicit lineage, and never duplicates the workflow or kind=goal inbox row'
   - 'finished/archived workflows and revisions with open operation jobs are refused; checkpoint or settle the operations first'
   - 'same project ledger is not a conflict predicate; only explicit owned-path/effect overlap or live custody constraints may block execution'

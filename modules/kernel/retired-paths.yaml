@@ -5,7 +5,8 @@
 # reconciler controller that owns the duty (modules/reconciler/reconciler.yaml), `removedIn` the lane.
 #
 # moved[]: a file that moved, one entry per move ({from, to, movedIn: the chunk, quiesced: true only for a pinned path moved
-# with the fleet stopped}); written by the move codemod of the runtime HFS migration. History may cite `from`, live prose
+# with the fleet stopped}); recorded by its actual move owner. Existing HFS migration rows were written by its codemod;
+# starci-explicit-entry records its bounded prompt relocation, without claiming that codemod ran. History may cite `from`, live prose
 # cites `to`; RT_RETIRED_PRESENT refuses a `from` that is tracked again.
 # retiredSymbols[]: a name replaced by an Orca built-in or another mechanism ({symbol, replacedBy}); RT_RETIRED_PRESENT
 # refuses a declaration of it in runtime production code (scripts/hfs/runtime-rules/retired.mjs).
@@ -225,6 +226,17 @@ retired:
   - {path: docs/application-runtime-config-and-health.md, retiredAt: 2026-10-02, removedIn: dv-c2-smells, replacedBy: 'docs/application-stacks.md'}
   - {path: docs/runtime-distribution.md, retiredAt: 2026-10-02, removedIn: dv-c2-smells, replacedBy: 'docs/releasing.md'}
 moved:
+  - {from: skills/claude-debug/SKILL.md, to: skills/debug/SKILL.md, movedIn: debug-caller-native-scheduler, quiesced: false}
+  - {from: skills/define-goal/SKILL.md, to: skills/starci/references/define-goal.md, movedIn: starci-explicit-entry, quiesced: false}
+  - {from: skills/start-kernel/SKILL.md, to: skills/starci/references/start-workflow.md, movedIn: starci-explicit-entry, quiesced: false}
+  - {from: skills/workflow-chat/SKILL.md, to: skills/starci/references/workflow-chat.md, movedIn: starci-explicit-entry, quiesced: false}
+  - {from: skills/run-assisted-uat/SKILL.md, to: skills/starci/references/assisted-uat.md, movedIn: starci-explicit-entry, quiesced: false}
+  - {from: skills/push-git/SKILL.md, to: skills/starci/references/release.md, movedIn: starci-explicit-entry, quiesced: false}
+  - {from: skills/computer-use/SKILL.md, to: skills/starci/references/computer-use.md, movedIn: starci-explicit-entry, quiesced: false}
+  - {from: skills/orca-cli/SKILL.md, to: skills/starci/references/orca-cli.md, movedIn: starci-explicit-entry, quiesced: false}
+  - {from: skills/orchestration/SKILL.md, to: skills/starci/references/orchestration.md, movedIn: starci-explicit-entry, quiesced: false}
+  - {from: skills/start/SKILL.md, to: .starci/host/startup.md, movedIn: starci-explicit-entry, quiesced: false}
+  - {from: skills/debug/SKILL.md, to: .starci/host/maintenance.md, movedIn: starci-explicit-entry, quiesced: false}
   - {from: docs/opensource-goal.md, to: docs/goal.md, movedIn: c0-relops, quiesced: false}
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
   - {from: .experiments/OPENSOURCE-GOAL.md, to: docs/goal.md, movedIn: C0, quiesced: false}

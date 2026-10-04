@@ -12,7 +12,7 @@ const wrapperText = ({ program, platform, node, cli }) => platform === 'win32'
   : `#!/bin/sh\nexec "${node}" "${cli}" guard raw ${program} -- "$@"\n`;
 
 /** Write the per-user runtime record, StarCi launcher and guarded PATH tool wrappers for that runtime. */
-export function writeRuntimeShim({ root, home = os.homedir() } = {}, deps = {}) {
+export function writeRuntimeShim({ root, home = os.homedir(), cli: launcher = null } = {}, deps = {}) {
   const mkdir = deps.mkdir ?? ((directory) => mkdirSync(directory, { recursive: true }));
   const write = deps.write ?? writeFileSync;
   const chmod = deps.chmod ?? chmodSync;
@@ -22,7 +22,7 @@ export function writeRuntimeShim({ root, home = os.homedir() } = {}, deps = {}) 
   const starciHome = path.join(home, '.starci');
   const shimDir = path.join(starciHome, 'bin');
   const runtimeJson = path.join(starciHome, 'runtime.json');
-  const cli = path.join(runtimeRoot, 'packages', 'cli', 'bin', 'starci.mjs');
+  const cli = launcher == null ? path.join(runtimeRoot, 'packages', 'cli', 'bin', 'starci.mjs') : path.resolve(launcher);
 
   mkdir(shimDir);
   write(runtimeJson, `${JSON.stringify({ root: runtimeRoot }, null, 2)}\n`);

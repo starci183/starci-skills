@@ -13,7 +13,8 @@ import { tapSummary } from '../../scripts/lib/tap-summary.mjs';
 import { classifyContent } from '../../scripts/gates/release-registry.mjs';
 import { buildPlan, publishOrder, readRows } from '../../scripts/gates/release-plan.mjs';
 import { FINAL_PROOFS, PROOFS, parseArgs, runProofs, verdictOf } from '../../scripts/gates/release-check.mjs';
-import { EXIT, releasePublish } from '../../scripts/gates/release-publish.mjs';
+import { EXIT, releasePublish, parseArgs as publishArgs } from '../../scripts/gates/release-publish.mjs';
+import { releasePublishFlow } from '../../scripts/supervisor/release-publish-flow.mjs';
 import { tgz } from '../helpers/npm-tarball.mjs';
 
 const PIN = (name, dir, version) => `  '${name}':\n    version: ${version}\n    group: starci\n    install: registry\n    source: ${dir}/package.json\n`;
@@ -40,17 +41,19 @@ function tree(t, { versions = {} } = {}) {
 }
 
 /** A fake registry: `published` maps name -> shasum; the local pack of every folder is `local`. */
-function fakeRegistry({ published = {}, local = 'sha-local', unreachable = [], content = 'same', whoami = 'releaser', log = [] } = {}) {
+const runtimeShasum = '1'.repeat(40);
+const publicationSha = 'a'.repeat(40);
+function fakeRegistry({ published = {}, local = 'sha-local', runtimeLocal = runtimeShasum, unreachable = [], content = 'same', whoami = 'releaser', log = [] } = {}) {
   return {
     log,
     state: (name) => (unreachable.includes(name) ? { state: 'unreachable', detail: 'offline' } : name in published ? { state: 'present', shasum: published[name] } : { state: 'absent', latest: '-' }),
-    localShasum: () => local,
+    localShasum: (dir) => dir === '.' ? runtimeLocal : local,
     contentClass: (name) => (typeof content === 'function' ? content(name) : content),
     whoami: () => whoami,
-    publish: (dir) => { log.push(`publish ${dir}`); published[`@starci/${path.basename(dir)}`] = local; return { ok: true, status: 0, stderr: '' }; },
+    publish: (dir) => { log.push(`publish ${dir}`); published[dir === '.' ? 'starci' : `@starci/${path.basename(dir)}`] = dir === '.' ? runtimeLocal : local; return { ok: true, status: 0, stderr: '' }; },
   };
 }
-const allPublished = (extra = {}) => fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local' }, ...extra });
+const allPublished = (extra = {}) => fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local', starci: runtimeShasum }, ...extra });
 
 test('tarFiles reads the regular files of an npm tarball and refuses a truncated one', () => {
   const files = tarFiles(tgz({ 'package/package.json': '{"name":"x"}', 'package/dist/a.js': 'a'.repeat(700) }));
@@ -81,7 +84,9 @@ test('the plan reads the publish set from canon-pins, orders leaves by dependenc
   assert.deepEqual(rows.filter((r) => r.kind === 'private').map((r) => r.name), ['internal-tool'], 'a private package is never in the set');
   assert.deepEqual(publishOrder(rows).map((r) => r.name), ['@starci/leaf-a', '@starci/leaf-b', '@starci/canon']);
   const plan = buildPlan({ root, registry: fakeRegistry() });
-  assert.equal(plan.toPublish.length, 3);
+  assert.equal(plan.toPublish.length, 4);
+  assert.equal(plan.rows.at(-1).name, 'starci');
+  assert.equal(plan.rows.at(-1).pin, '-', 'the root version has no second canon pin');
   assert.deepEqual(plan.blockers, []);
 });
 
@@ -162,7 +167,7 @@ test('release-check goes RED on a skipped app install, a failing spec, a pending
   assert.equal(verdict({ node: fakeNode({ fail: ['specs'] }) })[0], 'RED');
   assert.equal(verdict({ node: fakeNode({ fail: ['package-clean'] }) })[0], 'RED');
   assert.equal(verdict({ node: fakeNode({ fail: ['canon-pins'] }) })[0], 'RED');
-  const [pending, pendingRows] = verdict({ registry: fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local' } }) });
+  const [pending, pendingRows] = verdict({ registry: fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', starci: runtimeShasum } }) });
   assert.equal(pending, 'RED');
   assert.match(pendingRows.find((r) => r.id === 'publish-plan').detail, /1 package\(s\) still to publish: @starci\/canon@2\.0\.0/);
   assert.equal(verdict({ git: { status: () => ({ ok: true, stdout: ' M a.mjs', stderr: '' }) } })[0], 'RED');
@@ -219,4 +224,78 @@ test('release-publish stops at a blocker, a red clean proof and an unbound canon
   assert.deepEqual(cleanRed.registry.log, [], 'a red clean proof publishes nothing');
   const unbound = { ...deps, registry: fakeRegistry(), node: fakeNode({ fail: ['canon-pins'] }) };
   assert.equal(releasePublish({ root: ok, publish: true, npmUser: 'releaser', deps: unbound }), EXIT.unbound);
+});
+
+test('final publish-plan includes root availability and refuses inconclusive or normalized runtime bytes', (t) => {
+  const root = tree(t);
+  const absent = allPublished({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local' } });
+  const plan = buildPlan({ root, registry: absent });
+  assert.deepEqual(plan.toPublish.map((row) => row.name), ['starci']);
+  assert.equal(runProofs({ root, ids: ['publish-plan'], deps: { registry: absent } })[0].status, 'red');
+  for (const content of ['crlf', 'dist 1', 'unknown no archive']) {
+    const changed = buildPlan({ root, registry: allPublished({ runtimeLocal: '2'.repeat(40), content }) });
+    assert.match(changed.blockers.join('\n'), /runtime bytes differ or cannot be proved/);
+  }
+  assert.match(buildPlan({ root, registry: allPublished({ runtimeLocal: null }) }).blockers.join('\n'), /runtime pack could not be listed/);
+  const noShasum = allPublished({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local', starci: null } });
+  assert.match(buildPlan({ root, registry: noShasum }).blockers.join('\n'), /no immutable runtime shasum/);
+});
+
+test('runtime phase waits for package publication and publishes only the root after its own cold proof', (t) => {
+  const root = tree(t), calls = [], lines = [];
+  const git = { dirty: () => ({ ok: true, stdout: '' }), branch: () => ({ stdout: 'main' }), head: () => ({ ok: true, stdout: publicationSha }) };
+  const registry = fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local' }, log: calls });
+  const deps = { registry, git, out: line => lines.push(line), node: fakeNode({ log: calls }),
+    runtimeProof: options => { assert.equal(options.root, root); assert.equal(options.sourceSha, publicationSha); assert.equal(options.expectedShasum, runtimeShasum); calls.push('root cold proof'); return { status: 'green', attempt: 'private-proof' }; } };
+  assert.equal(releasePublish({ root, runtimePackage: true, deps: { ...deps, registry: fakeRegistry() } }), EXIT.blocked);
+  assert.deepEqual(calls, [], 'upstream blockers cause no proof or publication');
+  assert.equal(releasePublish({ root, runtimePackage: true, publish: true, npmUser: 'releaser', deps }), EXIT.done, lines.join('\n'));
+  assert.deepEqual(calls, ['check-canon-pins.mjs', 'root cold proof', 'publish .']);
+  assert.equal(buildPlan({ root, registry }).toPublish.length, 0);
+  assert.equal(publishArgs(['--runtime-package']).runtimePackage, true);
+});
+
+test('runtime publication refuses unfinished notes, failed binding and red cold proof before effects', (t) => {
+  const root = tree(t), calls = [];
+  const registry = fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local' }, log: calls });
+  const git = { dirty: () => ({ ok: true, stdout: '' }), branch: () => ({ stdout: 'main' }), head: () => ({ stdout: publicationSha }) };
+  const options = { root, runtimePackage: true, publish: true, npmUser: 'releaser' };
+  const deps = { registry, git, out: () => {}, node: fakeNode(), runtimeProof: () => ({ status: 'red' }) };
+  fs.writeFileSync(path.join(root, 'CHANGELOG.md'), '## [1.0.0-alpha.9] - in preparation\nTODO: finalize\n');
+  assert.equal(releasePublish({ ...options, deps }), EXIT.failed);
+  fs.writeFileSync(path.join(root, 'CHANGELOG.md'), '## [1.0.0-alpha.9] - 2026-10-04\nFinished.\n');
+  assert.equal(releasePublish({ ...options, deps: { ...deps, node: fakeNode({ fail: ['canon-pins'] }) } }), EXIT.failed);
+  assert.equal(releasePublish({ ...options, deps }), EXIT.failed);
+  assert.deepEqual(calls, []);
+});
+
+test('runtime publication rechecks HEAD, archive and registry after the cold proof', (t) => {
+  const root = tree(t);
+  for (const drift of ['head', 'dirty', 'archive', 'registry']) {
+    let after = false;
+    const calls = [], published = { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local' };
+    const registry = fakeRegistry({ published, log: calls });
+    const originalLocal = registry.localShasum;
+    registry.localShasum = dir => after && drift === 'archive' && dir === '.' ? '2'.repeat(40) : originalLocal(dir);
+    const git = { dirty: () => ({ ok: true, stdout: after && drift === 'dirty' ? ' M skills/starci/SKILL.md' : '' }),
+      branch: () => ({ stdout: 'main' }), head: () => ({ stdout: after && drift === 'head' ? 'other' : publicationSha }) };
+    const code = releasePublish({ root, runtimePackage: true, publish: true, npmUser: 'releaser', deps: { registry, git, out: () => {}, node: fakeNode(),
+      runtimeProof: () => { after = true; if (drift === 'registry') published.starci = runtimeShasum; return { status: 'green' }; } } });
+    assert.equal(code, EXIT.failed, drift);
+    assert.deepEqual(calls, [], `${drift} refuses an immutable publication`);
+  }
+});
+
+test('root flow is locked and does not invoke package rebind or example installation', async (t) => {
+  const root = tree(t), calls = [];
+  const ctx = { cwd: root, args: { 'runtime-package': true, publish: true, 'expect-sha': 'abc' }, env: {}, role: 'release' };
+  const deps = { status: () => ({ ok: true, stdout: '' }), revParse: args => ({ status: 0, stdout: args[0] === 'HEAD' ? 'abc' : 'main' }),
+    underHostLock: async (options, operation) => { calls.push(options.role); return { ok: true, value: await operation() }; },
+    releasePublish: options => { assert.equal(options.runtimePackage, true); options.deps.out('root publication'); return EXIT.done; },
+    runNpm: () => { assert.fail('runtime phase must not install examples'); }, loadPins: () => { assert.fail('runtime phase must not rebind'); } };
+  const result = await releasePublishFlow(ctx, deps);
+  assert.equal(result.code, 0); assert.equal(result.data.phase, 'runtime');
+  assert.equal(result.data.rebind, null); assert.deepEqual(result.data.examples, []); assert.deepEqual(calls, ['release']);
+  assert.equal((await releasePublishFlow({ ...ctx, args: { 'runtime-package': true, publish: true } }, deps)).code, 2);
+  assert.equal((await releasePublishFlow({ ...ctx, args: { ...ctx.args, examples: ['any'] } }, deps)).code, 2);
 });

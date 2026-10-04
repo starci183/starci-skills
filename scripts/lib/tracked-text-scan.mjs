@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { gitOutputOf } from './git.mjs';
 
@@ -41,16 +42,30 @@ export const sentenceRanges = (text, sentences) => {
 export const sentenceTextAt = (ranges, at, text) => ranges.find((range) => at >= range.start && at < range.end)?.text
   ?? lineTextAt(text, at);
 
-/** Repo-relative tracked paths, normalised to forward slashes. */
-export const readTrackedTextFiles = (root, { listFiles, onGitError = null } = {}) => {
+/** Indexed paths; workingTree also admits nonignored new paths and excludes only genuinely missing entries. */
+export const readTrackedTextFiles = (root, { listFiles, onGitError = null, workingTree = false } = {}) => {
+  let files;
   try {
-    return gitOutputOf(listFiles(['-z'], { cwd: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z')
+    const args = workingTree ? ['--cached', '--others', '--exclude-standard', '-z'] : ['-z'];
+    files = gitOutputOf(listFiles(args, { cwd: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z')
       .split('\0').filter(Boolean).map((file) => String(file).replace(/\\/g, '/'));
   } catch (error) {
     if (onGitError) return onGitError(error);
     throw error;
   }
+  if (!workingTree) return files;
+  // Filesystem failures are outside the Git fallback: an unreadable path must never look like an empty tree.
+  return [...new Set(files)].filter(relative => {
+    try { fs.lstatSync(path.join(root, relative)); return true; }
+    catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+  });
 };
+
+/** One current-tree inventory and strict source reader for findings checks sharing the {tracked, read} interface. */
+export const workingTreeFiles = (root, listFiles) => ({
+  tracked: readTrackedTextFiles(root, {listFiles, workingTree: true}),
+  read: relative => fs.readFileSync(path.join(root, relative), 'utf8'),
+});
 
 /** Shared --root/--json envelope for tracked-text checks. */
 export function runTrackedTextCheckCli(argv, io, options) {

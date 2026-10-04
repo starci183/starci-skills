@@ -13,6 +13,8 @@ import {pathToFileURL} from 'node:url';
 import {fakeAdmission} from '../helpers/fake-admission.mjs';
 import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import { DatabaseSync } from 'node:sqlite';
+import { MACHINE_VERSION } from '../../engine/db/machine.mjs';
+import { restoreMachineV1Fixture } from '../helpers/machine-v1-fixture.mjs';
 
 // Every agent launch goes through orchestration worker-start (modules/kernel/contract-changes/
 // launch-through-worker-start.yaml): the Kernel, the [Supervisor], every [Worker] and every [Op]. This spec fails when
@@ -232,7 +234,7 @@ const fixture=t=>{
   process.env.STARCI_TEST_MACHINE_FILE = env.STARCI_TEST_MACHINE_FILE;
   t.after(() => { if (savedMachine === undefined) delete process.env.STARCI_TEST_MACHINE_FILE; else process.env.STARCI_TEST_MACHINE_FILE = savedMachine; });
   fs.mkdirSync(path.join(root,'home'),{recursive:true});
-  const run=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
+  const run=(script,...args)=>spawnSync(process.execPath,['--loader',new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href,script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const callArgv=()=>fs.existsSync(env.STARCI_FAKE_ORCA_LOG)
     ?fs.readFileSync(env.STARCI_FAKE_ORCA_LOG,'utf8').trim().split('\n').filter(Boolean).map(l=>JSON.parse(l).argv):[];
   const calls=()=>callArgv().map(argv=>argv.slice(0,2).join(' '));
@@ -254,9 +256,7 @@ const seedOp=(fx,{jobId,model})=>{
 
 const makeUnprepared = (file, legacy) => {
   if (!legacy) { fs.rmSync(file); return; }
-  const raw = new DatabaseSync(file);
-  raw.exec('DROP TABLE provider_reservation_events; DROP TABLE provider_reservations; DELETE FROM schema_migrations WHERE version=2; PRAGMA user_version=1;');
-  raw.close();
+  restoreMachineV1Fixture(file);
 };
 
 test('authorized Op routing prepares missing and compatible v1 capacity before its actual pool decision', t => {
@@ -269,9 +269,10 @@ test('authorized Op routing prepares missing and compatible v1 capacity before i
     assert.equal(json(routed.stdout).decision.admission.ok, true);
     assert.equal(fx.calls().includes('orchestration worker-start'), false, 'routing alone starts no agent');
     const raw = new DatabaseSync(fx.env.STARCI_TEST_MACHINE_FILE, { readOnly: true });
-    assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 2);
-    assert.equal(raw.prepare('SELECT COUNT(*) n FROM provider_reservations').get().n, 0);
-    raw.close();
+    try {
+      assert.equal(raw.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION);
+      assert.equal(raw.prepare('SELECT COUNT(*) n FROM provider_reservations').get().n, 0);
+    } finally { raw.close(); }
   }
 });
 
@@ -286,16 +287,18 @@ test('actual unpinned Kernel boot prepares missing and compatible v1 stores afte
     fx.run(START_WORKFLOW, '--repo', fx.repo, '--goal', workflowId, '--plan', '--json');
     if (legacy) {
       const raw = new DatabaseSync(fx.env.STARCI_TEST_MACHINE_FILE, { readOnly: true });
-      assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 1); raw.close();
+      try { assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 1); }
+      finally { raw.close(); }
     } else assert.equal(fs.existsSync(fx.env.STARCI_TEST_MACHINE_FILE), false);
     const boot = fx.run(START_WORKFLOW, '--repo', fx.repo, '--goal', workflowId, '--json');
     assert.equal(boot.status, 0, boot.stderr || boot.stdout);
     assert.equal(json(boot.stdout).routedBy, 'route-model');
     assert.ok(['gpt-6.1-sol', 'claude-opus-5-5'].includes(json(boot.stdout).model), boot.stdout);
     const raw = new DatabaseSync(fx.env.STARCI_TEST_MACHINE_FILE, { readOnly: true });
-    assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 2);
-    assert.equal(raw.prepare("SELECT COUNT(*) n FROM provider_reservations WHERE state='live'").get().n, 1);
-    raw.close();
+    try {
+      assert.equal(raw.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION);
+      assert.equal(raw.prepare("SELECT COUNT(*) n FROM provider_reservations WHERE state='live'").get().n, 1);
+    } finally { raw.close(); }
   }
 });
 

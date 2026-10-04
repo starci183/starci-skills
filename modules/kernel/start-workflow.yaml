@@ -50,6 +50,23 @@ actor: >-
 host: orca
 executable: scripts/kernel/start-workflow.mjs
 
+hostStartup:
+  executable: scripts/kernel/workflow-startup.mjs
+  rule: >-
+    A current persisted owner-approved goal in queued or running phase precedes host or maintenance effects.
+    The shared reconciler startup checks the configured public harness and required host services without
+    Kernel watchdog recursion. A cold harness UI installs its real local toolchain through the native npm ci
+    call owner under the shared host lock before build; this runtime-owned bootstrap supports non-Git
+    installed runtimes without changing product npmCi custody. debug true ensures the native maintenance seat on its declared caller route,
+    independent of the Kernel agent override. A refusal or unknown effect prevents the inbox claim.
+    Each new Kernel launch installs its exact owned workflow tree through the native npmCi owner before
+    worker creation, then rereads the current accepted goal immediately before launch. A changed identity,
+    revision, approval or phase refuses that launch and releases its unused reservation while retaining the
+    installation receipt and tree. Installation failure retains the tree. An already-live Kernel is neither reinstalled nor duplicated.
+  receipt: >-
+    Boot and already-live results retain startup authority, host and maintenance receipts; a new launch
+    retains its actual workflow installation receipt. Running proves launch, not product completion.
+
 usage: start-workflow.mjs --repo <path> --goal <workflow_id> [--agent <name>] [--launched-by watchdog|supervisor]
 # --repo is the project repository that owns .starciwork/runtime.sqlite, not Source
 # without --goal: claims the oldest pending inbox goal

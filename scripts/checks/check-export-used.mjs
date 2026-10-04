@@ -3,9 +3,9 @@
 //   starci runtime check --only export-used [--json]
 //
 // RT_EXPORT_UNUSED: a name that a runtime source file (`.mjs` under scripts/, engine/, modules/, bin/, ext/, ui/ and the
-// packages without the generated runtime copies) exports, and that no OTHER tracked text file mentions, is dead surface:
+// packages without the generated runtime copies) exports, and that no OTHER current nonignored text file mentions, is dead surface:
 // strip the `export` (the name is used only here) or delete the declaration (it is used nowhere). A mention is the name as
-// a whole word in any other tracked text file (source, spec, yaml, json, markdown, shell), so a handler a manifest names
+// a whole word in any other indexed or new nonignored text file (source, spec, yaml, json, markdown, shell), so a handler a manifest names
 // and a symbol a spec imports both count. The one structural exemption is a package's public entry: the files its
 // package.json names under `main`, `exports`, `bin` and `types` are API for consumers outside the repository, and the one call
 // function a scripts/api/<system>/<call>.mjs file exports (named after the file, RT_API_SHAPE: the call's own contract). There
@@ -18,6 +18,7 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { callFunctionName } from '../hfs/runtime-rules/api-shape.mjs';
 import { boundNames } from '../lib/ast-names.mjs';
+import { readTrackedTextFiles } from '../lib/tracked-text-scan.mjs';
 
 const EXPORT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext', 'ui', 'packages']);
 const TEXT = /\.(mjs|cjs|js|ts|tsx|json|ya?ml|md|sh|ps1|sql|txt|css|html|hbs|ejs|tpl)$/;
@@ -89,9 +90,9 @@ export function exportUsedFindings(files) {
   return findings;
 }
 
-/** Every tracked text file of the runtime at `root` (generated copies and vendored trees excluded). */
+/** Current indexed and new nonignored text files (generated copies and vendored trees excluded). */
 function readTracked(root = skillRoot) {
-  const tracked = lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
+  const tracked = readTrackedTextFiles(root, {listFiles: lsFiles, workingTree: true});
   const files = [];
   for (const rel of tracked) {
     if (!TEXT.test(rel) || GENERATED.test(rel) || VENDORED.test(rel) || rel.startsWith('packages/grammar/')) continue;
@@ -99,13 +100,16 @@ function readTracked(root = skillRoot) {
     try {
       if (fs.statSync(file).size > MAX_TEXT_BYTES) continue;
       files.push({ rel, text: fs.readFileSync(file, 'utf8') });
-    } catch { /* a tracked file deleted in the worktree is not judged */ }
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
   return files;
 }
 
+/** Run export reachability against the actual current working tree. */
+export const checkExportUsed = (root = skillRoot) => exportUsedFindings(readTracked(root));
+
 if (isMain(import.meta.url)) {
-  const findings = exportUsedFindings(readTracked());
+  const findings = checkExportUsed();
   if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
   else {
     for (const f of findings) console.error(`${f.code} ${f.path}:${f.line} ${f.message}`);

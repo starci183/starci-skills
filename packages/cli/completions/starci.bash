@@ -89,10 +89,7 @@ _starci() {
         connect:telegram-media:--verdict) COMPREPLY=( $(compgen -W "pass fail blocked" -- "$cur") ); return 0;;
         connect:telegram-media:--dispatch) return 0;;
         connect:tunnel:--port) return 0;;
-        debug:pass:--loop-id) return 0;;
-        debug:pass:--scheduler) COMPREPLY=( $(compgen -W "codex-heartbeat claude-loop" -- "$cur") ); return 0;;
-        debug:pass:--scheduler-id) return 0;;
-        debug:pass:--confirmation) COMPREPLY=( $(compgen -W "cancelled ended not-created" -- "$cur") ); return 0;;
+        debug:pass:--dispatch) return 0;;
         debug:pass:--snapshot) return 0;;
         debug:pass:--child-timeout) return 0;;
         debug:pass:--token-window) return 0;;
@@ -548,6 +545,9 @@ _starci() {
         reconciler:once:--key) return 0;;
         reconciler:up:--wait) return 0;;
         reconciler:up:--set-profile) COMPREPLY=( $(compgen -W "operational observe" -- "$cur") ); return 0;;
+        reconciler:up:--caller-agent) COMPREPLY=( $(compgen -W "codex claude devin" -- "$cur") ); return 0;;
+        reconciler:up:--caller-model) return 0;;
+        reconciler:up:--caller-effort) return 0;;
         release:check:--only) return 0;;
         release:clean-test:--changed) return 0;;
         release:clean-test:--base) return 0;;
@@ -898,6 +898,9 @@ _starci() {
         workflow:start:--repo) return 0;;
         workflow:start:--goal) return 0;;
         workflow:start:--agent) return 0;;
+        workflow:start:--caller-agent) COMPREPLY=( $(compgen -W "codex claude devin" -- "$cur") ); return 0;;
+        workflow:start:--caller-model) return 0;;
+        workflow:start:--caller-effort) return 0;;
         workflow:start:--launched-by) COMPREPLY=( $(compgen -W "watchdog supervisor" -- "$cur") ); return 0;;
         workflow:status:--repo) return 0;;
         workflow:status:--workflow) return 0;;
@@ -924,7 +927,7 @@ _starci() {
         connect:telegram) COMPREPLY=( $(compgen -W "--discover-chat --ledger --repo --workflow --dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
         connect:telegram-media) COMPREPLY=( $(compgen -W "--ledger --repo --workflow --job --attempt --op --verdict --dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
         connect:tunnel) COMPREPLY=( $(compgen -W "--port --fast --json --cwd --quiet --help --edition" -- "$cur") );;
-        debug:pass) COMPREPLY=( $(compgen -W "--loop-id --scheduler --scheduler-id --confirmation --confirmed --snapshot --child-timeout --token-window --token-spike --key --lane --reason --json --cwd --quiet --help --edition" -- "$cur") );;
+        debug:pass) COMPREPLY=( $(compgen -W "--dispatch --snapshot --child-timeout --token-window --token-spike --key --lane --reason --json --cwd --quiet --help --edition" -- "$cur") );;
         debug:run) COMPREPLY=( $(compgen -W "--repo --since-hours --child-timeout --token-window --token-spike --json --cwd --quiet --help --edition" -- "$cur") );;
         docker:build) COMPREPLY=( $(compgen -W "--tag --no-cache --json --cwd --quiet --help --edition" -- "$cur") );;
         docker:down) COMPREPLY=( $(compgen -W "--env --volumes --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1027,7 +1030,7 @@ _starci() {
         reconciler:start) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:status) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:stop) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
-        reconciler:up) COMPREPLY=( $(compgen -W "--check --wait --no-build --retire-stale-ledgers --set-profile --json --cwd --quiet --help --edition" -- "$cur") );;
+        reconciler:up) COMPREPLY=( $(compgen -W "--check --wait --no-build --retire-stale-ledgers --set-profile --caller-agent --caller-model --caller-effort --json --cwd --quiet --help --edition" -- "$cur") );;
         release:app-installs) COMPREPLY=( $(compgen -W "--keep --json --cwd --quiet --help --edition" -- "$cur") );;
         release:check) COMPREPLY=( $(compgen -W "--final --only --json --cwd --quiet --help --edition" -- "$cur") );;
         release:clean-test) COMPREPLY=( $(compgen -W "--changed --base --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1035,7 +1038,7 @@ _starci() {
         release:images) COMPREPLY=( $(compgen -W "--app --sides --only --wait-seconds --remove-images --json --cwd --quiet --help --edition" -- "$cur") );;
         release:launch-smoke) COMPREPLY=( $(compgen -W "--app-repo --entry --timeout-ms --out --as --json --cwd --quiet --help --edition" -- "$cur") );;
         release:proof) COMPREPLY=( $(compgen -W "--repo --base --main --out --json --cwd --quiet --help --edition" -- "$cur") );;
-        release:publish) COMPREPLY=( $(compgen -W "--publish --npm-user --poll-minutes --pre-land-ref --expect-sha --examples --json --cwd --quiet --help --edition" -- "$cur") );;
+        release:publish) COMPREPLY=( $(compgen -W "--publish --runtime-package --npm-user --poll-minutes --pre-land-ref --expect-sha --examples --json --cwd --quiet --help --edition" -- "$cur") );;
         release:sync-runtime) COMPREPLY=( $(compgen -W "--check --prepare-grammar --json --cwd --quiet --help --edition" -- "$cur") );;
         route:op) COMPREPLY=( $(compgen -W "--kind --node-kind --phase --intent --ops-dir --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:architecture) COMPREPLY=( $(compgen -W "--base --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1132,7 +1135,7 @@ _starci() {
         workflow:assess) COMPREPLY=( $(compgen -W "--repo --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:bias) COMPREPLY=( $(compgen -W "--normalize --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:define) COMPREPLY=( $(compgen -W "--repo --project --text --title --display-name --params --plan --revise --reason --approve-revision --defined-by --approved-by --bridge-id --routing-bias --json --cwd --quiet --help --edition" -- "$cur") );;
-        workflow:start) COMPREPLY=( $(compgen -W "--repo --goal --agent --launched-by --plan --json --cwd --quiet --help --edition" -- "$cur") );;
+        workflow:start) COMPREPLY=( $(compgen -W "--repo --goal --agent --caller-agent --caller-model --caller-effort --launched-by --plan --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:status) COMPREPLY=( $(compgen -W "--repo --workflow --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:stop) COMPREPLY=( $(compgen -W "--repo --workflow --reason --by --json --cwd --quiet --help --edition" -- "$cur") );;
         *) COMPREPLY=();;

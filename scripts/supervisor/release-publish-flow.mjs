@@ -1,4 +1,4 @@
-// release-publish-flow.mjs - extend package publication with final canon rebind, example re-pin/install/sync, and checks.
+// The package phase owns canon/example refresh; the final runtime phase publishes committed payload under the same host lock.
 import fs from 'node:fs';
 import path from 'node:path';
 import { porcelainStatus } from '../api/git/porcelain-status.mjs';
@@ -56,9 +56,12 @@ export async function releasePublishFlow(ctx, deps = {}) {
   const message = (result) => resultDetail(result, { limit: null, lastLine: true });
   if ((ctx.positionals ?? []).length) return { code: 2, stderr: 'starci release publish: no positional arguments are accepted' };
   const root = path.resolve(ctx.cwd ?? process.cwd());
-  const examples = exampleNames(ctx.args?.examples, root);
+  const runtimePackage = ctx.args?.['runtime-package'] === true;
+  if (runtimePackage && ctx.args?.publish === true && !ctx.args?.['expect-sha']) return { code: 2, stderr: 'starci release publish: --runtime-package --publish requires --expect-sha' };
+  if (runtimePackage && ctx.args?.examples !== undefined) return { code: 2, stderr: 'starci release publish: --runtime-package cannot re-pin examples' };
+  const examples = runtimePackage ? [] : exampleNames(ctx.args?.examples, root);
   const lines = [];
-  const data = { schema: 'starci/release-publish-flow@1', published: ctx.args?.publish === true, rebind: null, examples: [] };
+  const data = { schema: 'starci/release-publish-flow@1', published: ctx.args?.publish === true, phase: runtimePackage ? 'runtime' : 'packages', rebind: null, examples: [] };
   const node = deps.runNode ?? runNode, npm = deps.runNpm ?? runNpm;
   const operation = async () => {
     const tracked = await (deps.status ?? porcelainStatus)(root, { untracked: 'no' });
@@ -75,13 +78,14 @@ export async function releasePublishFlow(ctx, deps = {}) {
     let publishCode;
     try {
       publishCode = await (deps.releasePublish ?? releasePublish)({
-        root, publish: ctx.args?.publish === true, npmUser: ctx.args?.['npm-user'] ?? null,
+        root, publish: ctx.args?.publish === true, runtimePackage, env: ctx.env, npmUser: ctx.args?.['npm-user'] ?? null,
         pollMinutes: Number(ctx.args?.['poll-minutes'] ?? 15), preLandRef: ctx.args?.['pre-land-ref'] ?? null,
         deps: { ...(deps.releaseDeps ?? {}), out: (line) => lines.push(line) },
       });
     } catch (error) { return { code: 1, stderr: `starci release publish: plan failed (${error.message})` }; }
     if (publishCode === 2) return { code: 2, stderr: lines.at(-1) ?? 'starci release publish: bad usage' };
     if (![0, 3].includes(publishCode)) return { code: 1, stderr: lines.at(-1) ?? 'starci release publish: publication plan is blocked' };
+    if (runtimePackage) return publishCode === 0 ? { code: 0 } : { code: 1, stderr: 'starci release publish: runtime phase must finish without an unbound canon' };
     if (!lines.some((line) => /@starci\/cli@/.test(line)) || !lines.some((line) => /@starci\/hfs@/.test(line))) {
       return { code: 1, stderr: 'starci release publish: publish set must contain @starci/cli and @starci/hfs' };
     }

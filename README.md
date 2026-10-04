@@ -10,9 +10,10 @@ byte of agent output in a content-addressed blob store — evidence before compl
 
 StarCi provides:
 
-- **A durable goal and plan:** `define-goal` assesses the request, writes the goal and enqueues the
+- **A durable goal and plan:** the explicitly selected `/starci` entry assesses and previews the request;
+  after the owner accepts the exact goal and plan, native goal definition writes and enqueues the
   op chain in the ledger — the plan survives sessions, restarts and context loss.
-- **A kernel agent per workflow:** `start-kernel` claims a queued goal and boots one long-lived
+- **A kernel agent per workflow:** native workflow startup claims an accepted queued goal and boots one long-lived
   `[Kernel]` agent. It never writes sqlite directly and never touches the host — every mutation goes
   through one `starci kernel <verb>` call. `modules/kernel/api.yaml` and
   `modules/cli/commands/kernel/` hold the verb contracts; [docs/cli.md](docs/cli.md) is the human list.
@@ -84,8 +85,8 @@ The installer:
    source is the runtime and `node` reads it directly.
 2. Writes the `AGENTS.md` bootstrap pointing agents at `.claude/CONTEXT.md` (other host bootstrap
    names are opt-in).
-3. Installs the two entry skills — `define-goal` and `start-kernel` — into the host's skills
-   directories (`.devin/skills/`, `.agents/skills/`, best-effort).
+3. Installs the one public `starci` entry in `.agents/skills/starci/` and in an existing
+   `.devin/skills/` discovery root, recording exact file custody. Internal references are not skills.
 4. Seeds an untracked `config.yaml` from `config.example.yaml` and records an install manifest.
 5. Prints the consumer `.gitignore` lines — `.starciwork/` (runtime state) and `config.yaml`
    (local config) must never be committed by the host project.
@@ -98,9 +99,10 @@ group used before installation exits 3 and prints
 ## How it runs
 
 ```text
-owner prompt
-  └─ define-goal        → goal + op chain queued in the project ledger (runtime.sqlite)
-       └─ start-kernel  → claims the goal, boots the long-lived [Kernel] agent
+explicit /starci request
+  └─ read-only goal assessment + derived plan → owner accepts exact goal and intended actions
+       └─ native goal definition → queue in the project ledger (runtime.sqlite)
+            └─ native workflow start → host readiness + optional maintenance + attested [Kernel]
             └─ starci kernel survey → plan → enqueue → dispatch → settle → finish
                  └─ dispatch spawns one ephemeral [Op] agent per job
                       (adapter card injects the provider CLI flags)
@@ -122,7 +124,7 @@ model, effort and budgets. Resolution order: explicit `--agent` flag > owner `co
 ## Detailed layout
 
 ```text
-CONTEXT.md            the one skill every agent loads first
+CONTEXT.md          canonical runtime entry and instruction load order
 modules/            contracts as data — goal, kernel, ops, models, host, supervisor,
                     reconciler, schemas
 engine/             mechanism — ledger-db, schema.sql, yaml (vendored), config, constants
@@ -131,8 +133,8 @@ scripts/            executables — kernel/cli.mjs, kernel/start-workflow.mjs, g
                     uat/, checks/, context/, lib/, reconcile/, example/, install/
 packages/cli/       @starci/cli, the thin dispatcher and the only starci bin
 modules/host/       per-host contracts — orca call surface (data only)
-skills/             user-facing skills — define-goal, start-kernel, workflow-chat,
-                    start (restart is an alias), run-assisted-uat, orca-cli, orchestration, computer-use
+skills/starci/      one explicit public entry, provider policy and conditional internal references
+.starci/host/       internal startup and maintenance prompts; not host skill discovery
 init/               AGENTS.md bootstrap template
 knowledge/          authored YAML doctrine the checks and skills cite
 benchmark/          model-pool evidence: expectations.yaml, append-only snapshots/, findings/

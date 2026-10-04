@@ -1,6 +1,5 @@
-// fresh-schema.spec.mjs — machine.sqlite and runtime.sqlite are created from ONE schema file each (0001-init.sql) and carry
-// no migration chain: a fresh file already has every table, column and view the runtime reads, its only schema_migrations
-// row is 0001-init, and a file at any other user_version is refused instead of being migrated.
+// Fresh stores carry the executed schema steps. Supported host upgrades preserve existing state;
+// unsupported versions are refused instead of being discarded or downgraded.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -28,15 +27,15 @@ const common = (db, version, journal = [[1, '0001-init']]) => {
   for (const view of views(db)) assert.doesNotThrow(() => db.prepare(`SELECT * FROM ${view} LIMIT 1`).all(), `${view} answers`);
 };
 
-test('runtime keeps its init schema; machine carries the additive provider receipt upgrade', () => {
+test('runtime keeps its init schema; machine carries provider receipts and core maintenance signals', () => {
   assert.deepEqual(fs.readdirSync(path.join(MIGRATIONS, 'runtime')), ['0001-init.sql']);
-  assert.deepEqual(fs.readdirSync(path.join(MIGRATIONS, 'machine')).sort(), ['0001-init.sql', '0002-provider-reservations.sql']);
+  assert.deepEqual(fs.readdirSync(path.join(MIGRATIONS, 'machine')).sort(), ['0001-init.sql', '0002-provider-reservations.sql', '0003-core-debug-signals.sql']);
 });
 
 test('a fresh machine.sqlite has the columns, kinds and views the runtime queries need', (t) => {
   const m = openMachine({ file: path.join(tmp(t), 'machine.sqlite') });
   try {
-    common(m.db, MACHINE_VERSION, [[1, '0001-init'], [2, '0002-provider-reservations']]);
+    common(m.db, MACHINE_VERSION, [[1, '0001-init'], [2, '0002-provider-reservations'], [3, '0003-core-debug-signals']]);
     assert.deepEqual(columns(m.db, 'terminals'), ['handle', 'title', 'role', 'opened_at', 'closed_at', 'close_verified_at', 'closed_by']);
     const worktrees = columns(m.db, 'worktrees');
     for (const column of ['path', 'kind', 'orca_id', 'checkpoint_sha', 'release_pending_at', 'removed_at']) assert.ok(worktrees.includes(column), `worktrees.${column}`);

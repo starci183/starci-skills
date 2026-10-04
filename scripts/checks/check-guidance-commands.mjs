@@ -42,7 +42,8 @@ const HISTORY_DIR = 'modules/kernel/contract-changes/';
 /** The guidance files of a tree: repository-relative POSIX paths. */
 export const isGuidanceFile = (rel) => (rel.startsWith('modules/') && (rel.endsWith('.yaml') || rel.endsWith('.md'))
   && rel !== CATALOG_FILE && !rel.startsWith(HISTORY_DIR))
-  || /^skills\/[^/]+\/SKILL\.md$/.test(rel);
+  || /^skills\/[^/]+\/(?:SKILL\.md|references\/.+\.md)$/.test(rel)
+  || /^\.starci\/host\/.+\.md$/.test(rel);
 
 /* ------------------------------------------------------------ sentences */
 

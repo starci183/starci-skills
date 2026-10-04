@@ -75,13 +75,13 @@ test('a wrapper importing its own runner is the sanctioned path',t=>{
 
 test('raw orca is red, starci orca and prose about orca are clean',t=>{
   const root=fixture(t,{
-    'skills/workflow-chat/SKILL.md':'Read the terminal with `orca terminal send --terminal <h> --text "go" --enter --json`.\n',
+    'skills/starci/references/workflow-chat.md':'Read the terminal with `orca terminal send --terminal <h> --text "go" --enter --json`.\n',
     'modules/kernel/api.yaml':'read: `starci orca terminal-send --terminal <h> --text go`\n',
     'modules/ops/ops/interface.draw.yaml':"action: 'the kernel never runs the orca call itself — scripts/agent/lib.mjs does'\n",
   });
   const r=run(root);
   assert.equal(r.status,1);
-  assert.deepEqual(rules(r.report),['skills/workflow-chat/SKILL.md:1 orca-command'],
+  assert.deepEqual(rules(r.report),['skills/starci/references/workflow-chat.md:1 orca-command'],
     'an English sentence naming orca is not a command line');
 });
 
@@ -102,14 +102,24 @@ test('telling an agent to load the host contract is red',t=>{
   assert.deepEqual(rules(r.report),['CONTEXT.md:1 reads-host-contract']);
 });
 
-test('the host contract and the owner-chat skills may quote orca commands',t=>{
+test('the host contract and the owner-tool references may quote orca commands',t=>{
   const root=fixture(t,{
     'modules/host/orca/index.yaml':"cli: 'orca terminal send --terminal <h> --text \"x\" --enter --json'\n",
-    'skills/orca-cli/SKILL.md':'Run `orca worktree create --repo <r> --name <n>`.\n',
-    'skills/orchestration/SKILL.md':'Run `orca orchestration worker-start --task <t>`.\n',
-    'skills/computer-use/SKILL.md':'Run `orca computer list-windows`.\n',
+    'skills/starci/references/orca-cli.md':'Run `orca worktree create --repo <r> --name <n>`.\n',
+    'skills/starci/references/orchestration.md':'Run `orca orchestration worker-start --task <t>`.\n',
+    'skills/starci/references/computer-use.md':'Run `orca computer list-windows`.\n',
   });
-  assert.equal(run(root).status,0,'the contract is data and those three skills are the owner\'s own tools');
+  assert.equal(run(root).status,0,'the contract is data and those references are the owner\'s own tools');
+});
+
+test('public entry, lifecycle references and internal host prompts retain the host boundary',t=>{
+  const files = ['skills/starci/SKILL.md', 'skills/starci/references/start-workflow.md',
+    'skills/starci/references/assisted-uat.md', 'skills/starci/references/release.md',
+    '.starci/host/startup.md', '.starci/host/maintenance.md'];
+  const root = fixture(t,Object.fromEntries(files.map(file => [file, `Run \`${O} status --json\`.\n`])));
+  const report = run(root);
+  assert.equal(report.status,1);
+  assert.deepEqual(rules(report.report),files.map(file=>`${file}:1 orca-command`).sort());
 });
 
 test('there is no exemption list: a host-contract read is red until it is rewritten',t=>{

@@ -436,9 +436,9 @@ export function inspectOwnerConfig(root=configRoot){
  *   harness - .claude's own specs. Default false = touching-only: harness work writes and runs the specs of new or changed code
  *             and the land gate runs only the specs touching the landed files (`land.mjs --specs touching`, its default);
  *             the whole suite never runs in a land - `--specs all` is refused unless this is true. The full suite runs in
- *             the /push-git flow (scripts/supervisor/push-git.mjs), which needs no key. true = `--specs all` may run;
+ *             the owner-approved /starci release flow (scripts/supervisor/release-cut.mjs), which needs no key. true = `--specs all` may run;
  *   unit    - product unit specs in workflows. Default on: a code-writing op writes/updates the unit specs of the source it
- *             adds or changes and runs only those; the full unit suite is unit.verify's or /push-git's. false = the ops'
+ *             adds or changes and runs only those; the full unit suite is unit.verify's or the approved /starci release flow's. false = the ops'
  *             policy.specsToggle deferral path (scripts/route/spec-deferral.mjs);
  *   e2e     - product e2e in workflows. Default OFF: e2e runs only when the goal or the owner explicitly asks (set true,
  *             or `starci kernel run-deferred-tests`); e2e.verify then runs the FULL e2e suite.
@@ -450,8 +450,8 @@ export function specsSettings(config){const specs=plain(config?.specs)?config.sp
 /** specs.harness of the owner file under `root` (tolerant read: inspectOwnerConfig): true only when the owner opted in to `--specs all`. */
 export function harnessSpecsEnabled(root=configRoot){return specsSettings(inspectOwnerConfig(root).config).harness;}
 /**
- * config.yaml `coreDebug` (skills/debug, scripts/reconciler/debug-pass.mjs): {interval, worktreeLimit}.
- *   interval       <n>s | <n>m | <n>h — the cadence of the invoking chat's verified native scheduler.
+ * config.yaml `coreDebug` (skills/starci, scripts/reconciler/core-debug.mjs): {interval, worktreeLimit}.
+ *   interval       <n>s | <n>m | <n>h — the reconciler's cadence for the native core-maintenance seat.
  *   worktreeLimit  integer >= 1 — more registered worktrees than this in one repository is a core-watch alert.
  * Both keys are required when the block is present; code carries no default (config.example.yaml does).
  */
@@ -468,7 +468,7 @@ function validateCoreDebug(block){
 /** The owner's coreDebug block: {interval, intervalMs, worktreeLimit}. Refuses when config.yaml has none. */
 export function coreDebugSettings(config=loadConfig()){
   const block=config?.coreDebug;
-  if(block===undefined||block===null)throw Error('Invalid config.yaml: coreDebug is missing; copy the coreDebug block from config.example.yaml (e.g. coreDebug: {interval: 10m, worktreeLimit: 40}).');
+  if(block===undefined||block===null)throw Error('Invalid config.yaml: coreDebug is missing; copy the coreDebug block from config.example.yaml.');
   validateCoreDebug(block);
   return {interval:block.interval,intervalMs:durationMs(block.interval),worktreeLimit:block.worktreeLimit};
 }

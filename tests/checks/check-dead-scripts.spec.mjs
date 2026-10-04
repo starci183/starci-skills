@@ -4,6 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DYNAMIC_ROOTS, deadScriptFindings, checkDeadScripts } from '../../scripts/checks/check-dead-scripts.mjs';
 import { ALLOWLIST_FILE } from '../../scripts/lib/allowlist.mjs';
+import { runGit } from '../../scripts/api/git/lib.mjs';
+import { lsFiles } from '../../scripts/api/git/ls-files.mjs';
+import { readTrackedTextFiles } from '../../scripts/lib/tracked-text-scan.mjs';
+import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 /** An allowlist fixture document carrying only a dead-script-entries section of {path, reason} pairs. */
 const allowlistWith = (entries) => `schema: starci/allowlist@1\ndead-script-entries:\n${entries.map(([path, reason]) => `  - {path: ${path}, reason: "${reason}"}`).join('\n')}\n`;
@@ -24,6 +28,15 @@ test('a script imported, spawned or run by a package script, a skill or a YAML e
     'package.json': '{"scripts":{"check":"node scripts/checks/uses.mjs && node scripts/kernel/spawned.mjs"}}',
     'skills/x/SKILL.md': 'Run `node scripts/gates/skill-run.mjs --all`.\n',
     'modules/ops/ops/a.yaml': 'check: scripts/gates/yaml-run.mjs\nsteps:\n  - run: node scripts/gates/yaml-cmd.mjs\n',
+  }), []);
+});
+
+test('internal skill references and host prompts retain executable-reader custody', () => {
+  assert.deepEqual(run({
+    'scripts/gates/reference-reader.mjs': '',
+    'scripts/reconciler/host-reader.mjs': '',
+    'skills/starci/references/release.md': 'Run `node scripts/gates/reference-reader.mjs --json`.\n',
+    '.starci/host/startup.md': 'Run `node scripts/reconciler/host-reader.mjs --check`.\n',
   }), []);
 });
 
@@ -109,4 +122,47 @@ test('each dynamic root names a loader that still lists it, and this runtime has
     assert.ok(fs.existsSync(path.join(root, dir)), `${dir} exists`);
   }
   assert.deepEqual(checkDeadScripts(root), []);
+});
+
+test('the real working-tree check excludes indexed deletions, reads new consumers, and retains actual orphans', t => {
+  const root = mkdtemp(t, 'starci-dead-current-');
+  const git = args => {
+    const result = runGit(args, {cwd: root});
+    assert.equal(result.status, 0, String(result.stderr ?? result.error));
+  };
+  git(['init', '--quiet']);
+  fs.mkdirSync(path.join(root, 'scripts'));
+  for (const name of ['gone', 'used', 'ignored-only', 'orphan']) {
+    fs.writeFileSync(path.join(root, 'scripts', `${name}.mjs`), 'export const value = 1;\n');
+  }
+  fs.writeFileSync(path.join(root, '.gitignore'), '/ignored-reader.mjs\n');
+  git(['add', '--', '.gitignore', 'scripts']);
+  fs.unlinkSync(path.join(root, 'scripts/gone.mjs'));
+  fs.writeFileSync(path.join(root, 'reader.mjs'), "import './scripts/used.mjs';\n");
+  fs.writeFileSync(path.join(root, 'ignored-reader.mjs'), "import './scripts/ignored-only.mjs';\n");
+  assert.deepEqual(codes(checkDeadScripts(root)).sort(), [
+    ['RT_DEAD_SCRIPT', 'scripts/ignored-only.mjs'], ['RT_DEAD_SCRIPT', 'scripts/orphan.mjs'],
+  ]);
+  // Other consumers keep the original index-only behavior unless they explicitly opt in.
+  const indexed = readTrackedTextFiles(root, {listFiles: lsFiles});
+  assert.ok(indexed.includes('scripts/gone.mjs'));
+  assert.equal(indexed.includes('reader.mjs'), false);
+
+  const orphan = path.join(root, 'scripts/orphan.mjs');
+  const read = fs.readFileSync;
+  const denied = Object.assign(new Error('fixture read denied'), {code: 'EACCES'});
+  t.mock.method(fs, 'readFileSync', (file, ...args) => {
+    if (path.resolve(file) === orphan) throw denied;
+    return read(file, ...args);
+  });
+  assert.throws(() => checkDeadScripts(root), error => error === denied);
+  const stat = fs.lstatSync;
+  const ioFailure = Object.assign(new Error('fixture inventory I/O failure'), {code: 'EIO'});
+  t.mock.method(fs, 'lstatSync', (file, ...args) => {
+    if (path.resolve(file) === orphan) throw ioFailure;
+    return stat(file, ...args);
+  });
+  assert.throws(() => readTrackedTextFiles(root, {
+    listFiles: lsFiles, workingTree: true, onGitError: () => [],
+  }), error => error === ioFailure, 'a Git fallback must not hide a filesystem failure');
 });

@@ -37,6 +37,8 @@ export const SUPERVISOR_ID = 'main';
 export const SEAT_ID = 'supervisor';
 const ENABLED_SCOPE = 'supervisor-enabled';
 export const SUPERVISOR_TITLE = `[Supervisor] ${SUPERVISOR_ID}`;
+export const SUPERVISOR_SEAT = Object.freeze({ id: SUPERVISOR_ID, seatId: SEAT_ID, enabledScope: ENABLED_SCOPE,
+  eventPrefix: 'supervisor', title: SUPERVISOR_TITLE });
 export const WORKER_TITLE_PREFIX = '[Worker]';
 export const FIX_KIND = 'runtime.fix';
 export const STARTUP_RESERVATION_MS = 180_000;
@@ -88,8 +90,8 @@ export const supervisorRead = (read, fresh) => ({ env = process.env } = {}) => r
  * The seat: {token, value, at, expiresAt, pid, expired, starting} or null (no seat, or an empty one). `value` is what
  * the launcher wrote ({terminal, agent, model, ...} or {state:'starting', attempt}).
  */
-export function seatOf(m, now = Date.now()) {
-  const row = m.seatOf(SEAT_ID);
+export function seatOf(m, now = Date.now(), profile = SUPERVISOR_SEAT) {
+  const row = m.seatOf(profile.seatId);
   if (!row || row.state === 'empty') return null;
   const detail = row.detail ?? {};
   const expiresAt = detail.expiresAt ?? null;
@@ -98,30 +100,36 @@ export function seatOf(m, now = Date.now()) {
   return { token: detail.token ?? null, value, at: row.booted_at ?? row.last_seen_at ?? null, expiresAt, pid: row.pid ?? null, expired, starting: value.state === 'starting' && !expired, state: row.state };
 }
 /** Write the seat (replacing it): a {state:'starting'} value is the startup reservation (state booting, with expiry). */
-export function writeSeat(m, { token, value, expiresAt = null, now = Date.now() }) {
+export function writeSeat(m, { token, value, expiresAt = null, now = Date.now(), profile = SUPERVISOR_SEAT }) {
   const starting = value?.state === 'starting';
-  return m.upsertSeat({ seatId: SEAT_ID, role: 'supervisor', state: starting ? 'booting' : 'live', parkedReason: null,
+  return m.upsertSeat({ seatId: profile.seatId, role: 'supervisor', state: starting ? 'booting' : 'live', parkedReason: null,
     terminalHandle: value?.terminal ?? null, agent: value?.agent ?? null, model: value?.model ?? null, pid: process.pid,
     bootedAt: now, lastSeenAt: now, detailJson: { token, value, expiresAt } });
 }
 /** Empty the seat (only the holder of `token` when given). True when it was cleared. */
-export function clearSeat(m, { token = null } = {}) {
-  const cur = seatOf(m);
+export function clearSeat(m, { token = null, profile = SUPERVISOR_SEAT } = {}) {
+  const cur = seatOf(m, Date.now(), profile);
   if (!cur || (token && cur.token !== token)) return false;
-  m.upsertSeat({ seatId: SEAT_ID, role: 'supervisor', state: 'empty', terminalHandle: null, pid: null, detailJson: null });
+  m.upsertSeat({ seatId: profile.seatId, role: 'supervisor', state: 'empty', terminalHandle: null, pid: null, detailJson: null });
   return true;
 }
 
 /** Whether the owner enabled the seat: true / false, or null when never set. */
-export function enabledOf(m) {
-  const row = m.supSignal(ENABLED_SCOPE, SUPERVISOR_ID);
+export function enabledOf(m, profile = SUPERVISOR_SEAT) {
+  const row = m.supSignal(profile.enabledScope, profile.id);
   return row ? row.value?.enabled === true : null;
 }
-export function setEnabled(m, enabled, { by = 'cli', now = Date.now() } = {}) {
+export function setEnabled(m, enabled, { by = 'cli', now = Date.now(), profile = SUPERVISOR_SEAT, route = null } = {}) {
   m.transaction(() => {
-    m.setSupSignal({ scope: ENABLED_SCOPE, key: SUPERVISOR_ID, value: { enabled, by, at: new Date(now).toISOString() } });
-    supervisorEvent(m, { kind: enabled ? 'supervisor-enabled' : 'supervisor-disabled', payload: { by }, now });
+    m.setSupSignal({ scope: profile.enabledScope, key: profile.id, value: { enabled, by, at: new Date(now).toISOString(), ...(route ? { route } : {}) } });
+    supervisorEvent(m, { entityId: profile.id, kind: `${profile.eventPrefix}-${enabled ? 'enabled' : 'disabled'}`, payload: { by }, now });
   });
+}
+
+/** Native supervised seats retain their terminals until their owning launcher proves closure. */
+export function supervisedSeatHandles(m) {
+  return new Set(m.seats().filter(row => row.role === 'supervisor' && row.state !== 'empty')
+    .map(row => row.terminal_handle ?? row.detail?.value?.terminal).filter(Boolean));
 }
 
 /** Append one audit event (sup_events). */

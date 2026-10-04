@@ -4,7 +4,7 @@
 import { npmSpawn } from './lib.mjs';
 
 /** {ok, status, stderr} of the install in `cwd` (a directory holding package.json and package-lock.json); `workspaces` limits it to those workspaces. */
-export const ci = (cwd, { timeout = 900_000, workspaces = [] } = {}) => {
-  const r = npmSpawn(['ci', '--prefer-offline', '--no-audit', '--no-fund', ...workspaces.flatMap((name) => ['--workspace', name])], { cwd, timeout });
+export const ci = (cwd, { timeout = 900_000, workspaces = [], env = process.env } = {}) => {
+  const r = npmSpawn(['ci', '--prefer-offline', '--no-audit', '--no-fund', ...workspaces.flatMap((name) => ['--workspace', name])], { cwd, timeout, env });
   return { ok: !r.error && r.status === 0, status: r.status ?? null, stderr: String(r.stderr ?? r.error?.message ?? '').trim() };
 };

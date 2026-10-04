@@ -8,7 +8,8 @@ summary: >-
   scripts/api/git/{worktree-list,worktree-add,worktree-remove,rev-parse,merge-base,branch-delete,branch-description,
   snapshot-commit,preserve-work}.mjs; the Orca lifecycle is scripts/api/orca/{worktree-client,worktree-provision,
   worktree-remove}.mjs; scripts/lib/worktrees.mjs keeps the GC, the counts and its CLI (node scripts/lib/worktrees.mjs
-  gc|counts|resume is unchanged). The link-safe rmdir primitive is scripts/api/fs/rmdir-link.mjs. check-worktree-add
+  gc|counts|resume is unchanged). Link-safe removal uses scripts/api/fs/lib.mjs unlinkOnly through
+  scripts/api/fs/safe-remove.mjs; no separate command process is needed. check-worktree-add
   names scripts/api/git/worktree-add.mjs createScratchWorktree as the one `git worktree add`. check-helper-once no longer
   emits RT_RAW_GIT_SPAWN (its catalog entry is removed); where an external tool may be spawned is the layer check's job.
   The check: scripts/checks/check-layers.mjs (npm run check) reads the rule set modules/kernel/runtime-layers.yaml and
@@ -37,7 +38,7 @@ paths:
   - scripts/api/orca/worktree-provision.mjs
   - scripts/api/orca/worktree-remove.mjs
   - scripts/api/orca/worktree-client.mjs
-  - scripts/api/fs/rmdir-link.mjs
+  - scripts/api/fs/lib.mjs
   - scripts/lib/git.mjs
   - scripts/lib/worktrees.mjs
   - scripts/lib/worktree-registry.mjs

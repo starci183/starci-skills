@@ -20,7 +20,7 @@ const SHA = /^[0-9a-f]{40,64}$/;
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 export const literalPaths = (files) => files.map((file) => `:(literal)${file}`);
 
-export function receiptPayload(row) {
+function receiptPayload(row) {
   return row?.payload_sha ? JSON.parse(getBlob(row.payload_sha).toString('utf8')) : parseJson(row?.payload_json) ?? null;
 }
 export function appendEffectEvent(ctx, args) {

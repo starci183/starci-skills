@@ -1,0 +1,28 @@
+id: starci-explicit-entry
+effectiveAt: '2026-10-03T21:11:05Z'
+summary: >-
+  StarCi exposes one explicitly selected public entry. Lifecycle, assisted UAT, owner tools and
+  release procedures become internal references; host startup and maintenance prompts live inside
+  the canonical runtime at .starci/host. Plain chat keywords do not enroll goals. Invocation is
+  instruction selection, not approval: context assessment and an exact owner-accepted goal/plan
+  precede queue and startup effects. Unchanged accepted scope reuses approval. Provider discovery
+  copies are byte-identical and installer cleanup is bounded by recorded regular-file custody.
+  Native contracts, historical contract ids and protected release/verification owners remain.
+reach: new-legs
+paths:
+  - CONTEXT.md
+  - init/AGENTS.md
+  - skills/starci/SKILL.md
+  - skills/starci/agents/openai.yaml
+  - skills/starci/references/define-goal.md
+  - skills/starci/references/start-workflow.md
+  - skills/starci/references/workflow-chat.md
+  - skills/starci/references/assisted-uat.md
+  - skills/starci/references/release.md
+  - .starci/host/startup.md
+  - .starci/host/maintenance.md
+  - scripts/install/install.mjs
+  - scripts/install/entry-skills.mjs
+  - modules/goal/define-goal.yaml
+  - knowledge/hfs/runtime-slots.yaml
+  - modules/kernel/contract-changes/starci-explicit-entry.yaml

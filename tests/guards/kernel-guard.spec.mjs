@@ -125,7 +125,7 @@ test('start-workflow binds the Kernel guard to the terminal worker-start names a
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([fake]), STARCI_FAKE_ORCA_STATE: state,
     STARCI_FAKE_ORCA_LOG: path.join(root, 'calls.jsonl'), STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1', STARCI_OWNER_ROOT: ownerRoot,
     STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), ORCA_TERMINAL_HANDLE: '' };
-  const run = (script, ...args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', ...script), ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
+  const run = (script, ...args) => spawnSync(process.execPath, ['--loader', new URL('../helpers/workflow-startup-loader.mjs', import.meta.url).href, path.join(ROOT, 'scripts', ...script), ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
   const defined = run(['goal', 'define-goal.mjs'], '--repo', repo, '--text', 'guard the kernel', '--json');
   assert.equal(defined.status, 0, defined.stderr);
   const workflowId = JSON.parse(defined.stdout).workflowId;

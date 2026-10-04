@@ -117,7 +117,7 @@ ruleParams:
     pinned:
       - {path: packages/cli/bin/starci.mjs, why: the @starci/cli npm bin}
       - {path: scripts/kernel/cli.mjs, why: every Kernel and op prompt runs it}
-      - {path: scripts/kernel/start-workflow.mjs, why: the start-kernel skill and the bin}
+      - {path: scripts/kernel/start-workflow.mjs, why: the native workflow launcher}
       - {path: scripts/supervisor/start-supervisor.mjs, why: the supervisor seat launch}
       - {path: "scripts/api/orca/<call>.mjs", why: the only Orca form agent prose may cite (scripts/checks/check-host-boundary.mjs)}
     # The retained runtime self-checks `starci runtime check` runs after the runtime check, in this order.
@@ -564,14 +564,22 @@ slots:
     rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING, RT_DOC_NO_OWNER]
   - id: runtime.skill
     profiles: [runtime]
-    path: "skills/<skill>/"
+    path: "skills/starci/"
     presence: required
     tracked: tracked
     tier: none
     tests: none
     requires: [SKILL.md]
-    allows: [SKILL.md, "references/**"]
+    allows: [SKILL.md, "references/**", agents/openai.yaml]
     rules: [RT_CITED_PATH_MISSING, RT_GUIDANCE_REFUSED_COMMAND]
+  - id: runtime.host-prompts
+    profiles: [runtime]
+    path: ".starci/host/{startup.md,maintenance.md}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING, RT_GUIDANCE_REFUSED_COMMAND]
   - id: runtime.init
     profiles: [runtime]
     path: init/AGENTS.md

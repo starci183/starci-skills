@@ -4,7 +4,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {orcaTreeFindings,readTerminals,FINDING_CODES} from '../../scripts/supervisor/orca-tree.mjs';
+import {orcaTreeFindings,readTerminals,FINDING_CODES,supervisorWorkerHandles} from '../../scripts/supervisor/orca-tree.mjs';
+import os from 'node:os';
+import { openMachine } from '../../engine/db/machine.mjs';
+import { writeSeat } from '../../scripts/machine/home.mjs';
+import { coreDebugProfile } from '../../scripts/reconciler/core-debug.mjs';
+
+test('the Orca tree accounts for a registered maintenance seat with unknown native custody', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'core-tree-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const env = { STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') };
+  const m = openMachine({ env });
+  try { writeSeat(m, { token: 'unknown', profile: coreDebugProfile(), value: { state: 'launch-unknown', terminal: 'held-core-worker', dispatch: 'uncertain-dispatch' } }); }
+  finally { m.close(); }
+  assert.equal(supervisorWorkerHandles({ env }).has('held-core-worker'), true);
+});
 
 // scripts/checks/check-orca-tree.mjs is the only thing that reads the ledger
 // and Orca's terminal listing at once. modules/kernel/start-workflow.yaml

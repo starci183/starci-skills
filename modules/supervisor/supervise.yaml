@@ -211,7 +211,7 @@ lanes:
       restarts kernels to reload context, pushes main, surfaces owner gates to the owner verbatim
     never: dispatches ops, writes a product ledger, answers owner asks on the owner's behalf, edits
       product code, finishes/retries an op itself, or touches the source host repository; define-goal and
-      a kernel start (skills/define-goal, skills/start-kernel) run only in the owner's chat on the owner's
+      a kernel start (skills/starci/references/define-goal.md, skills/starci/references/start-workflow.md) run only in the owner's chat on the owner's
       own words - never from a [Worker], a lane, the [Supervisor] kernel or a relayed message
   worker:
     does: one [Worker] fix agent per root-cause cluster (workers) - fixes it in an ephemeral staging
@@ -227,7 +227,7 @@ chatSeat:
   role: |
     The default (config.yaml supervisor.mode chat): the owner's desktop Claude chat session is the Supervisor.
     It persists with the owner's chat, not with an Orca terminal, and no [Supervisor] kernel runs beside it:
-    the skill /start and the Host controller start none (start-supervisor.mjs answers action chat-mode;
+    native host readiness and the Host controller start none (start-supervisor.mjs answers action chat-mode;
     a supervisor-watchdog.mjs --once pass does nothing).
   does:
     - "registers channel 'main' from the chat (channel.mjs register --id main --label <text>; no Orca terminal - the chat's CLAUDE_CODE_SESSION_ID is recorded) and is the only reader that drains it (channel.mjs inbox --id main); every other reader uses --peek"
@@ -343,7 +343,7 @@ landGate:
        `touching` by default - the named specs plus every spec naming a changed file, red refuses; a land never
        runs the whole suite: `--specs all` is refused unless specs.harness is true or the push-git flow passes
        --full-by-push-git; `--specs none` needs an explicit `--reason` and records it (specReason). The full suite
-       runs only in /push-git (scripts/supervisor/push-git.mjs) before a main is pushed.
+       runs only in /starci release (scripts/supervisor/starci release.mjs) before a main is pushed.
     3. land.mjs fast-forwards live main by compare-and-swap (git update-ref main <new> <base>) and updates the working
        tree and index of exactly the changed paths, which must be clean; main moved -> the gate reruns on the new
        main (3 times at most); a failed tree update rolls the ref and the paths back.
@@ -430,7 +430,7 @@ loop:
       ask's "Generate URL" button or asks with /asks; never re-serve it.
       After a reboot the task StarCi-Reconciler (scripts/reconciler/boot.mjs --install-task) starts the engine
       at logon, so a reboot resumes with no chat at all; starci reconciler restart is the
-      manual lever (the skill /start runs it with the rest of the host).
+      manual lever (native host readiness runs it with the rest of the host).
   perCycle:
     - step: observe
       do: read the printed digest — new op reports, open asks with their liveness tag + serving

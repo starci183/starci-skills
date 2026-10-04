@@ -63,6 +63,21 @@ test('a missing file, a missing symbol and a bare filename are each a dead cite'
   }
 });
 
+test('canonical host prompts are verifiable while local project runtime state remains exempt', () => {
+  const root = fixtureTree({
+    '.starci/host/startup.md': '# Native host startup\n',
+    'modules/kernel/fixture.yaml': 'source: .starci/host/startup.md\nmissing:\n  source: .starci/host/maintenance.md\nstate:\n  source: .starciwork/runtime.sqlite\n',
+  });
+  try {
+    assert.equal(isUnverifiable('.starci/host/startup.md'), false);
+    assert.equal(isUnverifiable('.starciwork/runtime.sqlite'), true);
+    const report = checkContractCites(root);
+    assert.equal(report.ok, false);
+    assert.deepEqual(report.dead.map(({target}) => target), ['.starci/host/maintenance.md']);
+    assert.equal(report.citesChecked, 2);
+  } finally { fs.rmSync(root, {recursive: true, force: true}); }
+});
+
 test('globs, placeholders and runtime state are skipped rather than reported dead', () => {
   const root = fixtureTree({
     'modules/kernel/fixture.yaml': [

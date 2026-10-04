@@ -15,16 +15,15 @@
 // that is how a one-off script (why-backfill, migrate-ui-shapes, repair-rejected-attempts) survived its own removal.
 // A script only tests read is dead code with a test attached: both go (RT_DEAD_SCRIPT). An entry whose script is gone, or
 // that code now reads, is stale and goes too (RT_DEAD_ENTRY): the list only shrinks.
-// Untracked scratch files are the working copy's business (git status), not this check's: it reads tracked files only.
+// The current tree includes indexed and new nonignored files; an indexed path removed from the worktree is absent.
 // The owner ruling behind it: a superseded or unused mechanism is deleted with every reference (owner-rulings.yaml).
-import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { printFindings } from '../lib/check-scan.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
-import { gitOutputOf } from '../lib/git.mjs';
+import { workingTreeFiles } from '../lib/tracked-text-scan.mjs';
 import { ALLOWLIST_FILE, allowlistSection } from '../lib/allowlist.mjs';
 
 export const SCRIPT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext']);
@@ -53,7 +52,7 @@ function executableText(rel, text) {
   if (CODE.test(rel) || HOOK.test(rel) || path.posix.basename(rel) === 'package.json' || rel === '.claude/settings.json') {
     return CODE.test(rel) || HOOK.test(rel) ? text.split('\n').filter((line) => !COMMENT_LINE.test(line)).join('\n') : text;
   }
-  const skill = /^skills\/.*SKILL\.md$/.test(rel);
+  const skill = /^skills\/[^/]+\/(?:SKILL\.md|references\/.+\.md)$/.test(rel) || /^\.starci\/host\/.+\.md$/.test(rel);
   if (/\.ya?ml$/.test(rel) || skill) {
     return text.split('\n').filter((line) => !/^\s*#/.test(line) && (
       EXEC_KEY.test(line) || NODE_COMMAND.test(line) || (runtimeCheckNames(line).size && (skill || EXEC_POSITION.test(line)))
@@ -111,9 +110,6 @@ export function deadScriptFindings({ tracked, read }) {
 }
 
 /** Run the check on the runtime at `root`. */
-export function checkDeadScripts(root = skillRoot) {
-  const tracked = gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter(Boolean);
-  return deadScriptFindings({ tracked, read: (rel) => { try { return fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return ''; } } });
-}
+export const checkDeadScripts = (root = skillRoot) => deadScriptFindings(workingTreeFiles(root, lsFiles));
 
 if (isMain(import.meta.url)) process.exit(printFindings(checkDeadScripts(), "OK: every runtime script has an executable reader or a declared entry."));

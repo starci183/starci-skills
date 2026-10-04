@@ -19,6 +19,9 @@ import process from 'node:process';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../lib/is-main.mjs';
+import {globExpression} from '../lib/glob.mjs';
+import {entrySkillsPlan, applyEntrySkillsPlan} from './entry-skills.mjs';
+export {entrySkillsPlan, applyEntrySkillsPlan};
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
@@ -44,13 +47,10 @@ const rootGlob = (entry) => {
   if (!m) throw new Error(`unsupported files glob in package.json: ${entry}`);
   return readdirSync(packageRoot, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith(`.${m[1]}`)).map((e) => e.name);
 };
-const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-// The `!a/**/b/` negation shape is the only one the files list uses: `a` is a fixed root, `b` the
-// pruned leaf at any depth (`packages/**/node_modules` covers `packages/node_modules` too).
-const PAYLOAD_NEGATIONS = pkg.files.filter((f) => f.startsWith('!')).map((f) => {
-  const parts = f.slice(1).replace(/\/+$/, '').split('/**/');
-  if (parts.length !== 2 || parts.some((p) => p.includes('*'))) throw new Error(`unsupported files negation in package.json: ${f}`);
-  return new RegExp(`^${escapeRe(parts[0])}/(?:.+/)?${escapeRe(parts[1])}(?:/|$)`);
+// One shared glob matcher interprets the manifest's directory and capture-file exclusions.
+const PAYLOAD_NEGATIONS = pkg.files.filter((f) => f.startsWith('!')).flatMap((f) => {
+  const pattern = f.slice(1).replace(/\/+$/, '');
+  return [globExpression(pattern), ...(f.endsWith('/') ? [globExpression(`${pattern}/**`)] : [])];
 });
 const isNegated = (relative) => PAYLOAD_NEGATIONS.some((rx) => rx.test(relative));
 export const PAYLOAD = [...new Set(['package.json', ...pkg.files.filter((f) => !f.startsWith('!')).flatMap((f) => f.includes('*') ? rootGlob(f) : [f.replace(/\/$/, '')])])];
@@ -159,8 +159,9 @@ function readManifest(target) {
   const file = path.join(target, MANIFEST);
   return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
 }
-function writeManifest(target, kept = [], profile = 'full', bootstrapProfile = null) {
+function writeManifest(target, kept = [], profile = 'full', bootstrapProfile = null, hostSkills = null) {
   const manifest = { name: pkg.name, version: pkg.version, installProtocol: installProtocol(), profile, bootstrapProfile, installedAt: new Date().toISOString(), files: hashTree(target) };
+  if (hostSkills) manifest.hostSkills = hostSkills;
   if (kept.length) manifest.keptLocal = kept;
   writeFileSync(path.join(target, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
@@ -192,7 +193,7 @@ function safePayloadTarget(target) {
 
 // Plan host changes before any payload mutation. Only exact installer-owned text is replaced.
 // AGENTS.md is always planned; CLAUDE.md/DEVIN.md enter the plan only when the host opted in.
-function bootstrapPlan(repo, opts) {
+export function bootstrapPlan(repo, opts, manifest = null) {
   for (const name of [...HOST_BOOTSTRAP_NAMES, '.gitignore']) {
     const stat = lstatSync(path.join(repo, name), { throwIfNoEntry: false });
     if (stat && (!stat.isFile() || stat.isSymbolicLink())) throw new Error(name + ': bootstrap target must be a regular owned file, not a symlink/junction');
@@ -200,6 +201,9 @@ function bootstrapPlan(repo, opts) {
   const names = ['AGENTS.md', ...(opts.hosts ?? []).map((h) => HOST_BOOTSTRAP_FILES[h]).filter((n) => n && n !== 'AGENTS.md')];
   const entry = PROMPT_ENTRY;
   const bootstrap = BOOTSTRAP;
+  const priorTemplate = path.join(repo, '.claude', 'init', 'AGENTS.md');
+  const priorEntry = manifest?.files?.['init/AGENTS.md'] && existsSync(priorTemplate)
+    && sha(priorTemplate) === manifest.files['init/AGENTS.md'] ? entryOf(readFileSync(priorTemplate, 'utf8').replace(/\r\n/g, '\n')) : null;
   return names.map(name => {
     const file = path.join(repo, name);
     if (!existsSync(file)) return { name, file, text: bootstrap, action: 'wrote' };
@@ -209,6 +213,9 @@ function bootstrapPlan(repo, opts) {
     // resolves by hand - the installer never rewrites an entry it did not author.
     if (current.replace(/\r\n/g, '\n').includes(entry)) {
       return { name, file, text: current, action: 'unchanged' };
+    }
+    if (priorEntry && current.replace(/\r\n/g, '\n').includes(priorEntry)) {
+      return {name, file, text: current.replace(/\r\n/g, '\n').replace(priorEntry, entry), action: 'updated'};
     }
     if (current.includes(ENTRY_MARKER)) {
       throw new Error(name + ': carries a StarCi entry this installer did not write; reconcile it by hand or pass --no-bootstrap');
@@ -321,26 +328,6 @@ function seedConfig(target, log) {
   }
 }
 
-// The lifecycle entry skills are user-facing: a host discovers them in its own skills dirs, not in
-// the installed .claude tree (where they also ship as payload). Copy them into every host skills dir
-// that already exists — `.devin/skills`, `.agents/skills` — best-effort: a host that keeps no such
-// dir gets no extra files, and a package missing the skills fails payload copy before this runs.
-const ENTRY_SKILLS = ['define-goal', 'start-kernel'];
-const HOST_SKILL_DIRS = ['.devin/skills', '.agents/skills'];
-function installEntrySkills(repo, log) {
-  for (const dir of HOST_SKILL_DIRS) {
-    const dest = path.join(repo, dir);
-    const stat = lstatSync(dest, { throwIfNoEntry: false });
-    if (!stat?.isDirectory() || stat.isSymbolicLink()) continue;
-    for (const skill of ENTRY_SKILLS) {
-      const source = path.join(packageRoot, 'skills', skill);
-      if (!existsSync(source)) { log(`entry skill skills/${skill} is not in this package; skipped ${dir}`); continue; }
-      cpSync(source, path.join(dest, skill), { recursive: true });
-      log(`installed entry skill ${dir}/${skill}`);
-    }
-  }
-}
-
 export function init(opts, log = console.log) {
   const repo = path.resolve(opts.dir);
   const target = path.join(repo, '.claude');
@@ -351,16 +338,17 @@ export function init(opts, log = console.log) {
   const profile = selectedProfile(opts);
   const hostPlan = opts.bootstrap ? bootstrapPlan(repo, opts) : null;
   const stale = stalePlan(target, manifest);
+  const entries = entrySkillsPlan(repo, manifest);
   if (existsSync(target) && readdirSync(target).length && !manifest && !opts.force) {
     throw new Error(`${target} exists and was not installed by ${pkg.name}; move it away or pass --force to replace the runtime paths inside it`);
   }
   mkdirSync(target, { recursive: true });
   copyPayload(target);
   seedConfig(target, log);
-  installEntrySkills(repo, log);
+  const hostSkills = applyEntrySkillsPlan(entries, log);
   const cleaned = removeStaleFiles(target, stale);
   ensureInstalledGitignore(target);
-  const written = writeManifest(target, [], profile, hostPlan ? profile : manifest?.bootstrapProfile ?? null);
+  const written = writeManifest(target, [], profile, hostPlan ? profile : manifest?.bootstrapProfile ?? null, hostSkills);
   log(`installed ${pkg.name}@${pkg.version} into ${target} (${Object.keys(written.files).length} files)`);
   if (hostPlan) writeBootstraps(repo, log, hostPlan);
   else log(`host files unchanged; add these to .gitignore yourself: ${HOST_IGNORES.join('  ')}`);
@@ -377,8 +365,9 @@ export function update(opts, log = console.log) {
   if (!manifest) throw new Error(`${target} has no ${MANIFEST}; run starci runtime install first`);
   checkInstalledProtocol(manifest);
   const profile = selectedProfile(opts);
-  const hostPlan = opts.bootstrap !== false ? bootstrapPlan(opts.dir, opts) : null;
+  const hostPlan = opts.bootstrap !== false ? bootstrapPlan(opts.dir, opts, manifest) : null;
   const stale = stalePlan(target, manifest);
+  const entries = entrySkillsPlan(opts.dir, manifest);
   const before = hashTree(target);
   const locallyChanged = Object.entries(before).filter(([rel, h]) => manifest.files[rel] && manifest.files[rel] !== h).map(([rel]) => rel);
   const locallyAdded = Object.keys(before).filter((rel) => !manifest.files[rel]);
@@ -386,7 +375,7 @@ export function update(opts, log = console.log) {
   const saved = Object.fromEntries([...new Set([...locallyChanged, ...locallyAdded, ...stillKept])].map((rel) => [rel, readFileSync(path.join(target, rel))]));
   copyPayload(target);
   seedConfig(target, log);
-  installEntrySkills(path.resolve(opts.dir), log);
+  const hostSkills = applyEntrySkillsPlan(entries, log);
   const currentFiles = new Set(payloadFiles(packageRoot));
   const kept = [];
   for (const [rel, bytes] of Object.entries(saved)) {
@@ -398,7 +387,7 @@ export function update(opts, log = console.log) {
   }
   const cleaned = removeStaleFiles(target, stale);
   ensureInstalledGitignore(target);
-  const written = writeManifest(target, kept, profile, hostPlan ? profile : manifest.bootstrapProfile ?? null);
+  const written = writeManifest(target, kept, profile, hostPlan ? profile : manifest.bootstrapProfile ?? null, hostSkills);
   log(`updated ${manifest.name}@${manifest.version} -> ${pkg.name}@${pkg.version} in ${target}`);
   for (const rel of kept) log(`kept ${rel} (changed locally; pass --force to take the package version)`);
   if (opts.force) log(`replaced ${Object.keys(saved).filter(rel => currentFiles.has(rel)).length} local current-payload file(s); unowned and locally changed files are preserved`);
@@ -455,9 +444,8 @@ const HELP = `${pkg.name} ${pkg.version}
   starci runtime version
 
 install copies the runnable source payload into <repo>/.claude, then records the install manifest.
-        Seeds an untracked .claude/config.yaml from config.example.yaml; installs the entry skills
-        (define-goal, start-kernel) into the host's .devin/skills/ and .agents/skills/ dirs when they
-        exist; writes the managed StarCi entry into AGENTS.md — CLAUDE.md/DEVIN.md copies only when
+        Seeds an untracked .claude/config.yaml from config.example.yaml; installs the one starci
+        entry into .agents/skills/ and an existing .devin/skills/ root with exact file custody; writes the managed StarCi entry into AGENTS.md — CLAUDE.md/DEVIN.md copies only when
         named by --hosts; and adds .starciwork/ + .claude/config.yaml to the host .gitignore while
         preserving custom instructions. Refuses a .claude it did not install unless --force;
         --no-bootstrap keeps host files unchanged (the gitignore lines are printed instead).
@@ -469,8 +457,8 @@ update  replaces current runtime paths; locally changed current files are kept u
         place: remove .claude by hand and run starci runtime install.
 doctor  runs the installed tree's own tests/*.spec.mjs and reports drift against the manifest.
         --quick runs the core kernel/ledger subset when those specs ship.
-entry   one AGENTS.md prompt-entry: define-goal / start-kernel lifecycle skills. A bootstrap carrying
-        a StarCi entry this installer did not write stops the update before writes; reconcile it by
+entry   one explicit StarCi skill plus one AGENTS.md prompt-entry. Only an exact prior installed
+        entry block may be refreshed; an unknown StarCi block stops before writes. Reconcile it by
         hand or pass --no-bootstrap. Existing ledgers are retained.
 `;
 

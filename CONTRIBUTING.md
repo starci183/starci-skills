@@ -159,7 +159,7 @@ unfinished CHANGELOG notes. The model, the refusals and the risks are in [git go
 
 ## Editing contracts and prose
 
-Every canonical file — `CONTEXT.md`, `README.md`, `docs/**`, `modules/**`, `skills/**` — says
+Every canonical file — `CONTEXT.md`, `README.md`, `docs/**`, `modules/**`, `skills/**`, `.starci/host/**` — says
 one thing, once, in the present tense. These six rules are the bar for any edit on the alpha
 line; a review that finds a violation sends the change back.
 

@@ -77,7 +77,7 @@ import { parseJson } from '../lib/json.mjs';
 import { fmtGb } from '../lib/time.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows } from '../machine/terminal-ledger.mjs';
-import { SKILL_ROOT, archiveRoot as archiveRootOf, lanesRoot, landRoot, productRepos, seatOf, readSupervisor, withSupervisor } from '../machine/home.mjs';
+import { SKILL_ROOT, archiveRoot as archiveRootOf, lanesRoot, landRoot, productRepos, seatOf, readSupervisor, withSupervisor, supervisedSeatHandles } from '../machine/home.mjs';
 import { jobsOf } from './workers.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { LANE_IDLE_MS, laneOwnerOf } from '../machine/lane-owner.mjs';
@@ -211,7 +211,8 @@ export function supervisorView({ env = process.env, now = Date.now() } = {}) {
       return { jobId: r.job_id, status: r.status, cluster: p.cluster ?? null, handle: r.worker_id ?? null, self: p.self === true,
         staging: p.staging ?? null, stagingPath: p.staging?.path ?? null, branch: p.staging?.branch ?? null, base: p.staging?.base ?? null, runId: p.runId ?? null, dispatch: p.dispatch ?? null, updatedAt: r.updated_at };
     });
-    return { seat: seat ? { handle: seat.value?.terminal ?? null, live: !seat.expired && !seat.starting } : null, jobs, leases: supLeaseRowsOf(m) };
+    return { seat: seat ? { handle: seat.value?.terminal ?? null, live: !seat.expired && !seat.starting } : null,
+      seatHandles: [...supervisedSeatHandles(m)], jobs, leases: supLeaseRowsOf(m) };
   }, { seat: null, jobs: [], leases: [] }, { env });
 }
 
@@ -367,6 +368,7 @@ export function classifyTerminals({ terminals, titles, sup, ledgers, workers = n
     const role = shellTitled ? 'shell' : null;
     const row = (verdict, klass, reason, extra = {}) => out.push({ handle: h, role, klass, verdict, reason, title: String(title).slice(0, 120), worktree: t.worktreePath ?? null, ...extra });
     if (sup.seat?.handle === h) { row('keep', 'supervisor-seat', 'the live Supervisor seat'); continue; }
+    if (sup.seatHandles?.includes(h)) { row('keep', 'supervisor-seat', 'an owned supervised seat with unresolved native custody'); continue; }
     if (keepTitles.some((re) => re.test(String(title)) || re.test(String(t.title ?? '')))) { row('keep', 'unknown', 'allowlisted (allocation.gc.keepTitles)'); continue; }
     if (t.connected === false) { row('keep', role ?? 'unknown', 'already disconnected'); continue; }
     if (workers.has(h)) { row('keep', 'orca-worker', 'a worker Orca accounts for (worker-list): released by the agents collector once Orca holds it reclaimable'); continue; }

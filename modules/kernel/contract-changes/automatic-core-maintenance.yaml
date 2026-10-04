@@ -1,0 +1,35 @@
+id: automatic-core-maintenance
+effectiveAt: '2026-10-04T03:58:03+07:00'
+summary: >-
+  After accepted workflow goal and start authority, debug:true ensures a distinct native core-maintenance
+  seat through the existing Supervisor-role launcher and admission owner. The invoking agent and registered
+  concrete model form its sole allow-group; an unspecified model uses only an explicitly labelled
+  same-agent catalog route, and opaque logical runtimes never attest an underlying model. The configured
+  main Supervisor, Kernel and Op routes remain unchanged. Held route conflicts retain custody. Missing
+  callers may attach only by a read-only verified-live result; the Host alone repairs affirmative-dead or
+  failed-before-launch workers from the persisted route. Reconciler cadence wakes that immutable Dispatch.
+  Failed worker-show reads and uncertain launch or closure effects cannot prove death or release a seat.
+  Registered nonempty supervised seats remain accounted for and protected from terminal collection.
+  Diagnostic passes and repair custody use the machine DB writer with immutable enabled-Dispatch fences.
+  Supported v1/v2 machine writers atomically preserve and upgrade signal rows to v3; read-only access does
+  not migrate them. Core maintenance takes only a declared invoking effort and never infers its tier.
+  Chat scheduler JSON ownership and setup/bind/block/stop actions are retired without aliases.
+reach: new-legs
+paths:
+  - scripts/machine/home.mjs
+  - scripts/supervisor/start-supervisor.mjs
+  - scripts/supervisor/seat-sessions.mjs
+  - scripts/reconciler/core-debug.mjs
+  - scripts/reconciler/debug-pass.mjs
+  - engine/db/machine.mjs
+  - engine/db/machine-schema.mjs
+  - engine/db/migrations/machine/0003-core-debug-signals.sql
+  - scripts/reconciler/controllers/host.mjs
+  - scripts/reconciler/owns.mjs
+  - scripts/supervisor/orca-tree.mjs
+  - scripts/supervisor/gc.mjs
+  - modules/reconciler/host.yaml
+  - modules/reconciler/reconciler.yaml
+  - modules/cli/commands/debug/pass.yaml
+  - .starci/host/maintenance.md
+  - modules/kernel/contract-changes/automatic-core-maintenance.yaml

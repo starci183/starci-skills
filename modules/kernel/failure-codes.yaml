@@ -3323,7 +3323,7 @@ LEDGER_LEGACY_WORK_SQLITE:
   causes_vi:
     - "Repo được tạo trước quyết định Q1 và chưa dọn tệp ledger cũ"
     - "Một bản sao ledger cũ bị chép nhầm trở lại repo"
-  nextStep_vi: "Không có tương thích ngược: chủ xóa tệp .starciwork/runtime.sqlite (và -wal/-shm) khỏi repo bằng tay sau khi xác nhận sổ ledger sống ở %LOCALAPPDATA%/StarCi; bộ kiểm tra (starci runtime ledger-hygiene, /start --check) chỉ báo cáo, không tự xóa tệp trong repo."
+  nextStep_vi: "Không có tương thích ngược: chủ xóa tệp .starciwork/runtime.sqlite (và -wal/-shm) khỏi repo bằng tay sau khi xác nhận sổ ledger sống ở %LOCALAPPDATA%/StarCi; bộ kiểm tra (starci runtime ledger-hygiene, starci reconciler up --check) chỉ báo cáo, không tự xóa tệp trong repo."
   owner: owner
   kind: check-finding
 
@@ -11391,6 +11391,65 @@ workflow-work-record-not-owner:
   nextStep_vi: "Job vẫn chưa settle; bỏ thay đổi đó (settle fail để runtime giữ lại và đặt lại) rồi nhờ workflow chủ sửa bằng starci kernel notify --kind request."
   owner: op-retry
   kind: settle-reason
+# Proof: scripts/kernel/workflow-startup.mjs and scripts/kernel/start-workflow.mjs accepted-goal startup boundaries.
+workflow-approval-required:
+  title: "Workflow start requires the owner's accepted goal"
+  title_vi: "Khởi động workflow cần mục tiêu đã được chủ chấp thuận"
+  meaning_vi: "Mục tiêu hiện tại chưa có chấp thuận của chủ hoặc còn tạm thời; runtime không khởi động host, debug hay Kernel từ mục tiêu này."
+  causes_vi:
+    - "Ngữ cảnh hoặc kế hoạch chưa được chủ chấp thuận"
+    - "Mục tiêu do Supervisor đề xuất còn tạm thời"
+  nextStep_vi: "Trình mục tiêu và kế hoạch cụ thể qua /starci, nhận chấp thuận của chủ rồi lưu bằng API mục tiêu; không tự tạo bản ghi chấp thuận."
+  owner: owner
+  kind: verb-refusal
+workflow-not-startable:
+  title: "Workflow phase does not permit a Kernel launch"
+  title_vi: "Trạng thái workflow không cho phép khởi động Kernel"
+  meaning_vi: "Workflow hiện tại không ở trạng thái queued hoặc running, hoặc đã lưu trữ; runtime không cấp một Kernel mới."
+  causes_vi:
+    - "Workflow đã dừng, hoàn tất hoặc lưu trữ"
+  nextStep_vi: "Đối chiếu trạng thái workflow qua API; giữ mục tiêu đã đóng nguyên trạng và chỉ định nghĩa mục tiêu mới khi chủ thực sự yêu cầu."
+  owner: owner
+  kind: verb-refusal
+workflow-goal-unverified:
+  title: "Current accepted goal identity or revision is unverified"
+  title_vi: "Chưa xác minh đúng danh tính hoặc phiên bản mục tiêu đã nhận"
+  meaning_vi: "Nội dung, danh tính hoặc phiên bản mục tiêu không hợp lệ, không khớp workflow, hoặc đã thay đổi trong lúc chuẩn bị host và cài đặt. Kernel không được khởi động với bản cũ."
+  causes_vi:
+    - "Mục tiêu thiếu nội dung hoặc không khớp danh tính workflow"
+    - "Chủ sửa mục tiêu trong lúc startup hay npm ci đang chạy"
+  nextStep_vi: "Đọc lại mục tiêu hiện tại qua API và khởi động theo đúng phiên bản được chủ chấp thuận; giữ cây và phiếu cài đặt để đối chiếu, không tự sửa danh tính."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-host-not-ready:
+  title: "Required host startup has no healthy readiness receipt"
+  title_vi: "Host chưa có phiếu sẵn sàng khỏe mạnh"
+  meaning_vi: "Startup chưa chứng minh engine, Supervisor và các dịch vụ bắt buộc khỏe mạnh, gồm hợp đồng health công khai và các tài nguyên giao diện thật được server phục vụ. Chưa claim goal hay tạo Kernel."
+  causes_vi:
+    - "Dịch vụ bắt buộc còn đỏ hoặc không đọc được"
+    - "Public harness trả redirect, trang lỗi, dữ liệu health sai hoặc thiếu tài nguyên giao diện"
+  nextStep_vi: "Xem phiếu startup và starci reconciler up --check, sửa đúng owner của dòng đỏ rồi đối chiếu lại; một timeout không chứng minh rằng dịch vụ chưa được tạo."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-debug-not-ready:
+  title: "Configured native core debug seat is not ready"
+  title_vi: "Seat debug native đã bật chưa sẵn sàng"
+  meaning_vi: "debug true yêu cầu seat bảo trì native sống trên route caller đã khai báo hoặc đã lưu; phiếu chưa xác nhận sẵn sàng nên Kernel không được claim hay tạo."
+  causes_vi:
+    - "Caller route thiếu, không hợp lệ hoặc xung đột"
+    - "Worker đang khởi động hoặc hiệu ứng launch chưa xác minh"
+  nextStep_vi: "Đọc phiếu maintenance, đối chiếu đúng Dispatch và route caller; không suy model từ Kernel --agent và không tạo worker khác khi phiếu cũ chưa được giải quyết."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-worktree-install-failed:
+  title: "Native workflow-tree installation did not succeed"
+  title_vi: "Cài đặt native trong cây workflow chưa thành công"
+  meaning_vi: "npmCi không trả phiếu thành công cho đúng cây của workflow; reservation Kernel chưa dùng được giải phóng, cây đã đăng ký vẫn giữ lại và không tạo worker."
+  causes_vi:
+    - "npm ci lỗi, registry không truy cập được hoặc phiếu kết quả thiếu"
+  nextStep_vi: "Sửa lỗi trong phiếu npmCi rồi khởi động lại cùng mục tiêu và cây đã đăng ký; không dùng node_modules liên kết, hook giả hoặc op setup thay cho cài đặt native."
+  owner: runtime-core
+  kind: verb-refusal
 # Proof: scripts/kernel/workflow-worktree.mjs requireWorkflowPlacement; scripts/kernel/workflow-checkpoint.mjs followCheckpoint; scripts/lib/worktree-record.mjs.
 workflow-worktree-missing:
   title: "The op's workflow has no worktree"

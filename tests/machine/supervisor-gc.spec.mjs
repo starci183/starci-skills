@@ -47,6 +47,14 @@ test('never the live seat, a live job, a live Kernel or a terminal the runtime d
   for (const h of ['term_seat', 'term_b', 'term_k', 'term_op1', 'term_owner']) assert.equal(d[h].verdict, 'keep', h);
 });
 
+test('native supervised custody protects maintenance even when the host worker listing is empty', () => {
+  const decisions = classifyTerminals({ terminals: [term('held-debug', 'Terminal 7')], titles: new Map(),
+    sup: { ...sup, seatHandles: ['held-debug'] }, ledgers: [], workers: new Set(), screenOf: () => PROMPTS,
+    seen: { 'held-debug': 0 }, now: 1_000_000_000, minAgeMs: 1 });
+  assert.equal(decisions[0].verdict, 'keep');
+  assert.equal(decisions[0].klass, 'supervisor-seat');
+});
+
 test('collects the terminals the ledgers bind to a settled op, a finished [Worker] job or an ended workflow', () => {
   const ended = { ...ledger, workflows: [...ledger.workflows, { workflowId: 'wf-done', name: 'Nivo · Done', ended: true, kernelHandle: 'term_oldk' }] };
   const d = decide([term('term_old', '[Worker] a'), term('term_op2', '[Op] b · Nivo · Live', { worktreePath: REPO_PATH }), term('term_oldk', '[Kernel] Nivo · Done', { worktreePath: REPO_PATH })], { ledgers: [ended] });

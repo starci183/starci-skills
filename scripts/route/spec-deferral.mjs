@@ -219,12 +219,12 @@ export function specsBriefLines({ skillRoot, op, settings = null, forced = false
  * The verification-scope policy every op prompt carries (owner 2026-09-29). A code-writing op writes or updates the unit specs of the
  * source it adds or changes and runs ONLY those (the specs of the changed or added source plus the specs that import it) with typecheck,
  * lint, canon-scan and the build scoped as usual; never the repository's whole unit suite (that is unit.verify's, dispatched only when the
- * goal or the owner asks for it, or the owner's /push-git flow) and never e2e unless the goal or the owner asked (e2e.verify then runs the
+ * goal or the owner asks for it, or the owner's /starci release flow) and never e2e unless the goal or the owner asked (e2e.verify then runs the
  * FULL e2e suite). With specs.unit off the `specs:` line already forbids writing unit specs, so only the whole-suite rule is stated.
  */
 export function verificationScopeLines({ settings = null, skillRoot = null } = {}) {
   const unit = (settings ?? specsOf({ skillRoot })).unit !== false;
   return [
-    `verification_scope (owner 2026-09-29): ${unit ? "write or update the unit specs of the source you add or change and run ONLY those (the specs of the changed or added source plus the specs that import it) with typecheck, lint, canon-scan and the build scoped to your change" : 'run typecheck, lint, canon-scan and the build scoped to your change'}; never the repository's whole unit suite (unit.verify runs it, dispatched only when the goal or the owner asks; /push-git runs it before a push) and never e2e unless the goal or the owner asked (e2e.verify then runs the full e2e suite). Work inside the .claude runtime follows the same rule: its specs are the ones touching your change.`,
+    `verification_scope (owner 2026-09-29): ${unit ? "write or update the unit specs of the source you add or change and run ONLY those (the specs of the changed or added source plus the specs that import it) with typecheck, lint, canon-scan and the build scoped to your change" : 'run typecheck, lint, canon-scan and the build scoped to your change'}; never the repository's whole unit suite (unit.verify runs it, dispatched only when the goal or the owner asks; /starci release runs it before a push) and never e2e unless the goal or the owner asked (e2e.verify then runs the full e2e suite). Work inside the .claude runtime follows the same rule: its specs are the ones touching your change.`,
   ];
 }

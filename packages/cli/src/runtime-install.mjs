@@ -2,6 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { writeRuntimeShim } from './shim.mjs';
 
@@ -104,6 +105,6 @@ export function installRuntime({ cwd = process.cwd(), home = os.homedir(), force
   const installStatus = statusOf(installed, 'runtime installer', report);
   if (installStatus !== 0) return installStatus;
 
-  writeRuntimeShim({ root: runtimeRoot, home }, deps);
+  writeRuntimeShim({ root: runtimeRoot, home, cli: fileURLToPath(new URL('../bin/starci.mjs', import.meta.url)) }, deps);
   return 0;
 }

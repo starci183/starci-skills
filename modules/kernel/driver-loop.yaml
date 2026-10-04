@@ -1244,7 +1244,7 @@ assistedUatLoop:
   prepare: >-
     uat.assisted.prepare freezes exact scripts, bindings, redaction and cleanup
     without executing the journey or changing canonical Work. The user-facing
-    skills/run-assisted-uat session may create exactly one append-only receipt.
+    skills/starci/references/assisted-uat.md session may create exactly one append-only receipt.
   verify: >-
     A later uat.assisted.verify selects exact request/session/receipt paths and
     derives pass from current digest equality, complete ordered execution,
@@ -1257,7 +1257,7 @@ assistedUatLoop:
     waiters FIFO. A queued assisted run reads phase queued (waitingForSlot,
     queuePosition); `uat-slots.mjs run -- <command>` gives any other UAT
     browser run a slot.
-  citation: "modules/ops/ops/uat.assisted.{prepare,verify}.yaml; skills/run-assisted-uat/SKILL.md; scripts/uat/uat-slots.mjs"
+  citation: "modules/ops/ops/uat.assisted.{prepare,verify}.yaml; skills/starci/references/assisted-uat.md; scripts/uat/uat-slots.mjs"
 
 # ============================================================================
 # 3 — RE-PLAN TRIGGERS. When the driver stops following the plan and makes a
