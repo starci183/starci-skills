@@ -692,6 +692,9 @@ ops:
       interface.draw receipt and its image, prompt and content hashes, accepted product intent, the
       actual installed "
     params:
+      audit:
+        required: true
+        setBy: kernel
       maxRounds:
         default: 5
         setBy: kernel
@@ -1188,6 +1191,7 @@ ops:
       - target
       - selection
       - profile
+      - comment-contract
       - review-gate
     writes:
       - node

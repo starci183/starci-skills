@@ -8,7 +8,7 @@ positional:
 flags:
   - {name: port, type: number, summary: "gateway port the tunnel forwards to (default: connectors.gateway.port)"}
   - {name: fast, type: boolean, summary: status only - skip the process-table scan for extra tunnel managers}
-exit: {"0": action completed, "1": another tunnel manager owns the tunnel state, "2": bad usage or configuration}
+exit: {"0": action completed, "1": another tunnel manager owns the state or exact manager/child stop custody is unverified, "2": bad usage or configuration}
 json: always
 examples:
   - starci connect tunnel status

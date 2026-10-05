@@ -9,6 +9,11 @@
 import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 
+/**
+ * Reads a Run and its coordinator handle so callers can decide whether Kernel rebinding is needed.
+ * missing means the typed run_not_found refusal; host unavailability or another failed read cannot establish absence.
+ * ok requires a zero exit and a Run id; coordinator can still be null in an otherwise accepted read.
+ */
 export function runShow({ id }) {
   const r = orcaCall('run-show', { id });
   const run = r.result?.run ?? null;

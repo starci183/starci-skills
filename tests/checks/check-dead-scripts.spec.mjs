@@ -13,7 +13,7 @@ import { mkdtemp } from '../helpers/tmpdir.mjs';
 const allowlistWith = (entries) => `schema: starci/allowlist@1\ndead-script-entries:\n${entries.map(([path, reason]) => `  - {path: ${path}, reason: "${reason}"}`).join('\n')}\n`;
 
 // RED18: a runtime script is alive only when something executable names it. A doc, README, YAML prose line, retired-paths
-// entry, contract-change or benchmark finding is not a reader.
+// entry, YAML prose or benchmark finding is not a reader.
 const run = (files) => deadScriptFindings({ tracked: Object.keys(files), read: (rel) => files[rel] ?? '' });
 const codes = (findings) => findings.map((f) => [f.code, f.path]);
 
@@ -58,7 +58,7 @@ test('a runtime check-only command and a catalog impl are executable readers', (
   }), []);
 });
 
-test('a script named only by a doc, a README, YAML prose, retired-paths, a contract-change or a comment is dead', () => {
+test('a script named only by a doc, a README, YAML prose, retired-paths or a comment is dead', () => {
   const findings = run({
     'scripts/supervisor/why-gone.mjs': 'export const x = 1;',
     'scripts/work/gone-ui-shapes.mjs': '',
@@ -72,7 +72,7 @@ test('a script named only by a doc, a README, YAML prose, retired-paths, a contr
     'modules/ops/ops/prose.yaml': 'description: starci runtime check --only prose-only\n',
     '.husky/pre-commit': '# starci runtime check --only commented-hook\n',
     'modules/kernel/retired-paths.yaml': '  - {path: scripts/kernel/commented.mjs}\n',
-    'modules/kernel/contract-changes/x.yaml': 'run: node scripts/kernel/commented.mjs\n',
+    'modules/kernel/contract-changes/x.yaml': 'summary: scripts/kernel/commented.mjs\n',
     'scripts/lib/other.mjs': '// node scripts/kernel/commented.mjs\n/* scripts/kernel/commented.mjs */\n * scripts/kernel/commented.mjs\n',
     'package.json': '{}',
   });
@@ -82,6 +82,13 @@ test('a script named only by a doc, a README, YAML prose, retired-paths, a contr
     ['RT_DEAD_SCRIPT', 'scripts/checks/check-prose-only.mjs'],
     ['RT_DEAD_SCRIPT', 'scripts/checks/check-commented-hook.mjs'],
   ]);
+});
+
+test('an executable YAML command in the former contract directory is a live reader', () => {
+  assert.deepEqual(run({
+    'scripts/kernel/live-reader.mjs': '',
+    'modules/kernel/contract-changes/x.yaml': 'run: node scripts/kernel/live-reader.mjs\n',
+  }), []);
 });
 
 test('a script only a test names, or only itself or a generated copy names, is dead', () => {
@@ -165,4 +172,36 @@ test('the real working-tree check excludes indexed deletions, reads new consumer
   assert.throws(() => readTrackedTextFiles(root, {
     listFiles: lsFiles, workingTree: true, onGitError: () => [],
   }), error => error === ioFailure, 'a Git fallback must not hide a filesystem failure');
+});
+
+test('Git inventory keeps canonical slash paths and native filesystem reads on every platform', t => {
+  const root = mkdtemp(t, 'starci-inventory-slash-');
+  const git = args => {
+    const result = runGit(args, {cwd: root});
+    assert.equal(result.status, 0, String(result.stderr ?? result.error));
+  };
+  git(['init', '--quiet']);
+  fs.mkdirSync(path.join(root, 'docs'));
+  const relative = 'docs/m\u1edbi ordinary.md';
+  fs.writeFileSync(path.join(root, relative), 'fixture\n');
+  git(['add', '--', 'docs']);
+  assert.deepEqual(readTrackedTextFiles(root, {listFiles: lsFiles}), [relative]);
+  assert.deepEqual(readTrackedTextFiles(root, {listFiles: lsFiles, workingTree: true}), [relative]);
+});
+
+test('POSIX Git inventory preserves literal backslashes and embedded whitespace in live names', {skip: process.platform === 'win32' ? 'Windows does not allow a literal backslash in a filename; run this fixture on POSIX' : false}, t => {
+  const root = mkdtemp(t, 'starci-inventory-literal-');
+  const git = args => {
+    const result = runGit(args, {cwd: root});
+    assert.equal(result.status, 0, String(result.stderr ?? result.error));
+  };
+  git(['init', '--quiet']);
+  fs.mkdirSync(path.join(root, 'docs'));
+  const indexed = 'docs/part\\baseline.yaml';
+  const newFile = 'docs/m\u1edbi\tnew\nbaseline.txt';
+  fs.writeFileSync(path.join(root, indexed), 'fixture\n');
+  git(['add', '--', 'docs']);
+  fs.writeFileSync(path.join(root, newFile), 'fixture\n');
+  assert.deepEqual(readTrackedTextFiles(root, {listFiles: lsFiles}), [indexed]);
+  assert.deepEqual(readTrackedTextFiles(root, {listFiles: lsFiles, workingTree: true}).sort(), [indexed, newFile].sort());
 });

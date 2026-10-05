@@ -20,6 +20,14 @@ import { messageText } from '../../lib/transcript-text.mjs';
 
 const SOURCE_CHANGED = 'source_changed';
 
+/**
+ * Read one bounded output page by Dispatch, selecting transcript or labelled terminal fallback.
+ * Follow its cursor only while the source is unchanged; sourceChanged requires a fresh read.
+ * contentComplete/clipping describe omissions. Output remains unredacted and on Orca's retention;
+ * callers redact and persist evidence through the runtime's artifact owner rather than adopting it.
+ * @param {object} input - Required Dispatch and optional source, cursor, and limit.
+ * @returns {object} Typed source/page content, completeness/archive facts, raw result, and refusal details.
+ */
 export function workerRead({ dispatch, source = null, cursor = null, limit = null }) {
   const r = orcaCall('worker-read', { dispatch, source, cursor, limit: limit == null ? undefined : String(limit) });
   const result = r.result;

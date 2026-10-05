@@ -75,6 +75,21 @@ test('a module-local kind nothing stamps is a stale entry', t => {
   assert.ok(result.unused.includes('starci/module-thing@1'), result.errors.join('\n'));
 });
 
+test('duplicate schema identities fail even when one id carries a parenthetical note', t => {
+  const dir = fixture(t, {
+    catalog: `schemas:
+  - id: starci/thing@1
+    file: modules/thing/index.yaml
+  - id: starci/thing@1 (shared identity)
+    file: modules/other/index.yaml
+`,
+    files: { 'modules/thing/index.yaml': 'schema: starci/thing@1\n' },
+  });
+  const result = checkSchemaCatalog({ root: dir });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.errors, ['starci/thing@1 is listed twice under schemas[].id']);
+});
+
 test('one const may not be listed in both lists', t => {
   const dir = fixture(t, {
     catalog: `schemas:

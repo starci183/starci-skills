@@ -145,6 +145,7 @@ export function validateOpReport(value, { ownedPaths = [], identity = {} } = {})
       if (c?.unavailable !== undefined && typeof c.unavailable !== 'boolean') fail(`checks[${i}].unavailable must be a boolean`);
     });
   }
+  if (value.outcome === 'done' && value.open !== undefined && (!Array.isArray(value.open) || value.open.length)) fail("outcome 'done' carries no unfinished open items; report partial instead");
   if (value.outcome === 'partial' && (!Array.isArray(value.open) || !value.open.length || value.open.some((o) => !text(o)))) fail("outcome 'partial' requires a nonempty open[] of unfinished items");
   if (value.outcome === 'ask' && (!value.question || !text(value.question.text))) fail("outcome 'ask' requires question.text");
   // question.recommended: the 0-based index of the option the op recommends, with

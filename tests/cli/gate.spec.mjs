@@ -41,7 +41,7 @@ const specs = {
   'repo-presentation': { script: 'scripts/gates/repo-presentation.mjs', usage: (s) => matching(s, '//   starci gate repo-presentation'), flags: ['root', 'runtime'] },
   run: { script: 'scripts/gates/gate.mjs', usage: (s) => declaration(s), flags: ['base', 'changed', 'main', 'out', 'root', 'scope', 'tests', 'tree'] },
   sonar: { script: 'scripts/gates/sonar-local.mjs', usage: (s) => declaration(s, 'HELP'), flags: ['base', 'blob', 'declaration', 'host', 'isolate', 'keep-slice-project', 'key', 'log', 'name', 'no-ensure', 'out', 'paths', 'project-gate', 'stack', 'timeout', 'token-ref', 'wait', 'wait-timeout', 'with-token'] },
-  starcistacks: { script: 'scripts/gates/starcistacks.mjs', usage: (s) => declaration(s), flags: ['admitted-at', 'new', 'op'] },
+  starcistacks: { script: 'scripts/gates/starcistacks.mjs', usage: (s) => declaration(s), flags: ['new'] },
   'test-world': { script: 'scripts/gates/test-world-run.mjs', usage: (s) => declaration(s), flags: ['out', 'project', 'root', 'tests'] },
   unit: { script: 'scripts/gates/unit-run.mjs', usage: (s) => declaration(s), flags: ['out', 'root'] },
 };

@@ -27,9 +27,10 @@
 //   an exhausted window is hard-ineligible
 //   overage balance is descriptive; it grants no hard-limit bypass
 //   any API or credential failure remains unknown and blocks normal admission
-// Results are cached cacheMs (default 5 min) so a route storm does not hammer
-// the seat API; cacheMs: 0 disables.
+// Raw provider observations are cached for cacheMs, bound to the credential/request bytes.
+// Each caller applies its current account/policy while preserving the original observation time.
 import { runNode } from '../../api/node/run-node.mjs';
+import { sha256 } from '../../../engine/digest.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -82,12 +83,12 @@ const asNumber = (v) => { if (v === null || v === undefined || v === '') return 
 const iso = (unix) => { const n = asNumber(unix); return n == null ? null : new Date(n * 1000).toISOString(); };
 
 /** The probe result for one planStatus body. Pure; exported for the spec. */
-export function planToResult(plan, { policy = allocationSettings()?.admission, now = Date.now(), account = 'default' } = {}) {
+export function planToResult(plan, { policy = allocationSettings()?.admission, now = Date.now(), observedAt = now, account = 'default' } = {}) {
   const daily = asNumber(plan?.dailyQuotaRemainingPercent);
   const weekly = asNumber(plan?.weeklyQuotaRemainingPercent);
   if (daily == null && weekly == null) {
     return normalizeQuotaSnapshot({ provider: 'devin', account, auth: plan && typeof plan === 'object' && !Array.isArray(plan) ? 'ok' : 'unknown',
-      observedAt: now, windows: [], detail: 'GetUserStatus planStatus carried no quota percentages' }, { policy, now });
+      observedAt, windows: [], detail: 'GetUserStatus planStatus carried no quota percentages' }, { policy, now });
   }
   const remaining = Math.min(daily ?? 100, weekly ?? 100);
   const usedPercent = clampPct(Math.round((100 - remaining) * 10) / 10);
@@ -99,9 +100,9 @@ export function planToResult(plan, { policy = allocationSettings()?.admission, n
     plan?.billingStrategy ? `plan ${plan.billingStrategy}` : null,
     overage ? 'overage balance present' : null,
   ].filter(Boolean).join(' — ');
-  return normalizeQuotaSnapshot({ provider: 'devin', account, auth: 'ok', observedAt: now, detail: parts,
-    windows: [daily != null ? { id: 'daily', usedPercent: 100 - daily, resetsAt: iso(plan?.dailyQuotaResetAtUnix), observedAt: now } : null,
-      weekly != null ? { id: 'weekly', usedPercent: 100 - weekly, resetsAt: iso(plan?.weeklyQuotaResetAtUnix), observedAt: now } : null].filter(Boolean) }, { policy, now });
+  return normalizeQuotaSnapshot({ provider: 'devin', account, auth: 'ok', observedAt, detail: parts,
+    windows: [daily != null ? { id: 'daily', usedPercent: 100 - daily, resetsAt: iso(plan?.dailyQuotaResetAtUnix), observedAt } : null,
+      weekly != null ? { id: 'weekly', usedPercent: 100 - weekly, resetsAt: iso(plan?.weeklyQuotaResetAtUnix), observedAt } : null].filter(Boolean) }, { policy, now });
 }
 
 const cache = new Map();
@@ -113,7 +114,7 @@ const cache = new Map();
  *   apiKey          direct key (specs); otherwise read from credentialsFile
  *   metadata        extra/override fields of the Connect-JSON metadata (non-version versions are replaced)
  *   timeoutMs       API timeout (default 15 s); the child is hard-killed 8 s later
- *   cacheMs         result cache TTL (default 5 min; 0 disables)
+ *   cacheMs         raw observation cache TTL (default 5 min; 0 disables; policy/age are rejudged)
  *   env             environment for APPDATA/STARCI_DEVIN_SEAT_ENDPOINT (default process.env)
  */
 export function probe({ endpoint, credentialsFile, apiKey = null, metadata = {}, timeoutMs = DEFAULT_TIMEOUT_MS, cacheMs = DEFAULT_CACHE_MS, env = process.env, policy, now, account } = {}) {
@@ -127,9 +128,6 @@ export function probe({ endpoint, credentialsFile, apiKey = null, metadata = {},
   if (!key) {
     return { state: 'unknown', usedPercent: null, detail: `no windsurf_api_key in ${credFile}` };
   }
-  const cacheKey = `${url}|${credFile}`;
-  const hit = cache.get(cacheKey);
-  if (cacheMs > 0 && hit && Date.now() - hit.at < cacheMs) return hit.result;
   const payload = {
     metadata: {
       ideName: 'devin-cli',
@@ -141,6 +139,12 @@ export function probe({ endpoint, credentialsFile, apiKey = null, metadata = {},
       extensionVersion: version(metadata.extensionVersion),
     },
   };
+  const clock = () => typeof now === 'function' ? now() : now ?? Date.now();
+  // The request fingerprint stays private; changing credentials or metadata cannot reuse another observation.
+  const cacheKey = `${url}|${credFile}|${sha256(JSON.stringify(payload))}`;
+  const hit = cache.get(cacheKey);
+  if (cacheMs > 0 && hit && Date.now() - hit.at < cacheMs)
+    return planToResult(hit.plan, { policy, now: clock(), observedAt: hit.observedAt, account });
   let r;
   try {
     r = runNode([SEAT_QUOTA_FILE], {
@@ -150,28 +154,29 @@ export function probe({ endpoint, credentialsFile, apiKey = null, metadata = {},
   } catch (error) {
     return { state: 'unknown', usedPercent: null, detail: `seat API spawn failed: ${scrub(error?.message ?? error)}` };
   }
-  const finish = (result) => { if (cacheMs > 0) cache.set(cacheKey, { at: Date.now(), result }); return result; };
   if (r.error || r.status !== 0) {
-    return finish({ state: 'unknown', usedPercent: null,
-      detail: `seat API child failed${r.error?.message ? ` (${scrub(r.error.message)})` : ''}${r.stderr ? `: ${scrub(r.stderr).slice(0, 200)}` : ''}` });
+    return { state: 'unknown', usedPercent: null,
+      detail: `seat API child failed${r.error?.message ? ` (${scrub(r.error.message)})` : ''}${r.stderr ? `: ${scrub(r.stderr).slice(0, 200)}` : ''}` };
   }
   let out;
   try { out = JSON.parse(r.stdout); } catch {
-    return finish({ state: 'unknown', usedPercent: null, detail: 'seat API child returned unparsable output' });
+    return { state: 'unknown', usedPercent: null, detail: 'seat API child returned unparsable output' };
   }
   if (!Number.isInteger(out?.status) || out.status === 0) {
-    return finish({ state: 'unknown', usedPercent: null, detail: `seat API unreachable: ${scrub(out?.error ?? 'network error')}` });
+    return { state: 'unknown', usedPercent: null, detail: `seat API unreachable: ${scrub(out?.error ?? 'network error')}` };
   }
   if (out.status < 200 || out.status >= 300) {
-    return finish({ state: 'unknown', usedPercent: null, detail: `seat API answered HTTP ${out.status}` });
+    return { state: 'unknown', usedPercent: null, detail: `seat API answered HTTP ${out.status}` };
   }
   let body;
   try { body = JSON.parse(out.body); } catch {
-    return finish({ state: 'unknown', usedPercent: null, detail: 'seat API returned a non-JSON body' });
+    return { state: 'unknown', usedPercent: null, detail: 'seat API returned a non-JSON body' };
   }
   const plan = body?.userStatus?.planStatus;
   if (!plan || typeof plan !== 'object') {
-    return finish({ state: 'unknown', usedPercent: null, detail: 'GetUserStatus carried no userStatus.planStatus' });
+    return { state: 'unknown', usedPercent: null, detail: 'GetUserStatus carried no userStatus.planStatus' };
   }
-  return finish(planToResult(plan, { policy, now: typeof now === 'function' ? now() : now ?? Date.now(), account }));
+  const observedAt = clock();
+  if (cacheMs > 0) cache.set(cacheKey, { at: Date.now(), observedAt, plan });
+  return planToResult(plan, { policy, now: observedAt, account });
 }

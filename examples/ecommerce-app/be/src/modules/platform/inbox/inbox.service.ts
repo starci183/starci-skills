@@ -14,9 +14,9 @@ export class PostgresInbox implements Inbox {
         @InjectClock() private readonly clock: Clock,
     ) {}
 
-    /** True for the first claim of the event, false for every later one. */
-    async claim(source: string, eventId: string): Promise<boolean> {
-        const [manager] = this.managers
+    /** Claims through the caller transaction when supplied, otherwise through the app's configured manager. */
+    async claim(source: string, eventId: string, tx?: EntityManager): Promise<boolean> {
+        const manager = tx ?? this.managers[0]
         const rows: Array<object> = await manager.query(CLAIM_EVENT, [source, eventId, this.clock.now()])
         return rows.length > 0
     }

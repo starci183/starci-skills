@@ -6,17 +6,24 @@ import path from 'node:path';
 import http from 'node:http';
 import {spawnSync} from 'node:child_process';
 import {allocationMs} from '../../engine/config.mjs';
+import {SECRET_ENV_FILE,secretEnv} from '../../engine/secrets.mjs';
 import {
-  findDeclaration,isolatedKey,isolationDefines,parseDiffNewLines,projectTokenRef,readSonarDeclaration,resolveConfig,
-  resolveScanCwd,scannerCommand,scrub,sliceChanges,sonarLocalMain,sourceHostStackDir,
+  findDeclaration,isolatedKey,isolationDefines,parseDiffNewLines,projectTokenRef,readSonarDeclaration,resolveConfig as resolveRuntimeConfig,
+  resolveScanCwd,scan,scannerCommand,scrub,sliceChanges,sonarLocalMain,sourceHostStackDir,
 } from '../../scripts/gates/sonar-local.mjs';
 import {resolveCustodyFile,runtimeHostRoot} from '../../scripts/gates/runtime-host.mjs';
+import {loadSonarGate,serverConditions} from '../../scripts/gates/sonar-gate.mjs';
+import {resolveSops} from '../../scripts/api/sops/lib.mjs';
+import {launcher,sealExtCustody,readCustody} from '../../scripts/gates/sonar-ext-custody.mjs';
 
 // Fake values only: no real token is ever read by this spec.
 const ADMIN='fake-admin-token-0001';
 const ANALYSIS='fake-analysis-token-0002';
 const MINTED='fake-minted-project-token-0003';
 const REMINTED='fake-reminted-token-0004';
+
+// Direct resolver cases never read the developer's canonical secret.env.
+const resolveConfig=(options={},env={})=>resolveRuntimeConfig({runtimeSecretEnv:value=>value,...options},env);
 
 function temporary(t,label){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),`starci-sonar-${label}-`));
@@ -57,7 +64,7 @@ const knownSources=({lines={'src/app.js':30,'src/new.js':3,'src/legacy.js':5}}={
 async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=knownSources(),tests=[],
   issues=[{path:'src/legacy.js',line:2,severity:'MAJOR',type:'CODE_SMELL'},{path:'src/app.js',line:2,severity:'MINOR',type:'CODE_SMELL'}],
   hotspots=[{path:'src/legacy.js',line:3}],duplications={},coverage={},projectMeasures={}}={}){
-  const state={coverage,projectMeasures,gateConditions:null,gateSelected:new Map(),newCode:new Map(),duplications:{},projects:new Map(),requests:[],tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,mintValues:[],gate,firstAnalysis,sources,issues,hotspots,tests};
+  const state={coverage,projectMeasures,gateConditions:null,gateName:null,gateSelected:new Map(),newCode:new Map(),duplications:{},projects:new Map(),requests:[],rejectedAnalysisPaths:new Set(),tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,mintValues:[],gate,firstAnalysis,sources,issues,hotspots,tests};
   state.duplications=duplications;
   const fileOf=component=>component.split(':').slice(1).join(':');
   const server=http.createServer((req,res)=>{
@@ -75,6 +82,7 @@ async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=knownS
       if(url.pathname==='/api/system/status')return send(200,{status:up?'UP':'STARTING',version:'26.8.0.fake'});
       const role=state.tokens.get(auth);
       if(!role)return send(401,{errors:[{msg:'unauthorized'}]});
+      if(role==='analysis'&&state.rejectedAnalysisPaths.has(url.pathname))return send(403,{errors:[{msg:'analysis access denied'}]});
       switch(url.pathname){
         case '/api/authentication/validate':return send(200,{valid:true});
         case '/api/projects/search':{
@@ -126,13 +134,13 @@ async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=knownS
           return send(200,{sources:lines.filter(l=>l.line>=from&&l.line<=to)});
         }
         case '/api/qualitygates/show':{
-          if(url.searchParams.get('name')!=='starci-quality'||!state.gateConditions)return send(404,{errors:[{msg:'not found'}]});
-          return send(200,{name:'starci-quality',conditions:[...state.gateConditions.values()]});
+          if(url.searchParams.get('name')!==state.gateName||!state.gateConditions)return send(404,{errors:[{msg:'not found'}]});
+          return send(200,{name:state.gateName,conditions:[...state.gateConditions.values()]});
         }
         case '/api/qualitygates/create':{
           if(role!=='admin')return send(403,{});
-          state.gateConditions=new Map();
-          return send(201,{name:new URLSearchParams(body).get('name')});
+          state.gateConditions=new Map();state.gateName=new URLSearchParams(body).get('name');
+          return send(201,{name:state.gateName});
         }
         case '/api/qualitygates/create_condition':case '/api/qualitygates/update_condition':{
           if(role!=='admin')return send(403,{});
@@ -183,17 +191,21 @@ async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=knownS
  * exists only as .enc, decrypted by a fake sops that also checks it was handed the master identity; a
  * fake stack-secret tool stores minted values as .enc members the fake sops can read back.
  */
-function fakeCustody(root){
+function fakeCustody(root,{canary=null,marker=null}={}){
   const stack=path.join(root,'source','.starcistacks','dev');
   write(stack,'runtime/files/sonarqube-admin-token.key',`${ADMIN}\n`);
   write(stack,'runtime/files/sonarqube-analysis-token.txt.enc',`ENC:${ANALYSIS}`);
   const identity=write(root,'master.identity','AGE-SECRET-KEY-FAKE');
   const sops=write(root,'fake-sops.mjs',`import fs from 'node:fs';
 if(process.env.SOPS_AGE_KEY_FILE!==${JSON.stringify(identity)}){process.stderr.write('wrong identity');process.exit(3);}
+${canary===null?'':`if(process.env.FIXTURE_SOPS_CANARY!==${JSON.stringify(canary)}){process.stderr.write('wrong canonical environment');process.exit(6);}`}
+${marker===null?'':`fs.appendFileSync(${JSON.stringify(marker)},process.argv.includes('--encrypt')?'encrypt\\n':'decrypt\\n');`}
 const file=process.argv.at(-1);
 if(process.argv.includes('--encrypt')){if(!process.argv.includes('--age')){process.stderr.write('no recipient');process.exit(5);}process.stdout.write('ENC:'+fs.readFileSync(file,'utf8'));process.exit(0);}
 process.stdout.write(fs.readFileSync(file,'utf8').replace(/^ENC:/,''));`);
   const stackSecret=write(root,'fake-stack-secret.mjs',`import fs from 'node:fs';import path from 'node:path';
+${canary===null?'':`if(process.env.FIXTURE_SOPS_CANARY!==${JSON.stringify(canary)}||process.env.SOPS_AGE_KEY_FILE!==${JSON.stringify(identity)}){process.stderr.write('wrong canonical stack environment');process.exit(6);}`}
+${marker===null?'':`fs.appendFileSync(${JSON.stringify(marker)},'stack-set\\n');`}
 const [cmd,target,flag,from]=process.argv.slice(2);
 if(cmd!=='set'||flag!=='--from-file')process.exit(4);
 const file=path.join(process.cwd(),'.starcistacks',target+'.enc');
@@ -211,13 +223,293 @@ const CHILD_TIMEOUT_MS=allocationMs('landGate.perSpecMs');
 function configFor(host,custody,extra={}){
   // record: a re-mint event of a spec never reaches the supervisor ledger.
   // specs: the owner switches are fixed (unit on), never the developer's config.yaml.
-  return {host,stack:custody.stack,identity:custody.identity,sops:custody.sops,stackSecret:custody.stackSecret,docker:'starci-no-such-docker',pollMs:5,timeoutMs:CHILD_TIMEOUT_MS,record:()=>{},specs:{unit:true,e2e:false},...extra};
+  return {host,stack:custody.stack,identity:custody.identity,sops:custody.sops,stackSecret:custody.stackSecret,docker:'starci-no-such-docker',pollMs:5,timeoutMs:CHILD_TIMEOUT_MS,record:()=>{},specs:{unit:true,e2e:false},runtimeSecretEnv:env=>{const fixture={...env,SONAR_TOKEN:ANALYSIS};delete fixture.SOPS_AGE_KEY;delete fixture.SOPS_AGE_KEY_FILE;return fixture;},...extra};
 }
 
 const assertNoSecret=(value,label)=>{
   const textValue=typeof value==='string'?value:JSON.stringify(value);
   for(const secret of [ADMIN,ANALYSIS,MINTED,REMINTED])assert.ok(!textValue.includes(secret),`${label} must not carry a token value`);
 };
+
+// Only declared in-memory directory entries are visible to these lookup cases; the host's PATH and WinGet are never read.
+test('SOPS lookup preserves native and Sonar discovery contracts and skips non-files', () => {
+  const vectors = [
+    {
+      "id": "native-windows-default",
+      "platform": "win32",
+      "options": {},
+      "env": {
+        "PATH": "C:\\first;C:\\second",
+        "PATHEXT": ".CMD;.EXE"
+      },
+      "files": [
+        "C:\\first\\sops.exe",
+        "C:\\first\\sops.cmd"
+      ],
+      "expected": "C:\\first\\sops.exe"
+    },
+    {
+      "id": "sonar-windows-pathext-order",
+      "platform": "win32",
+      "options": {
+        "pathext": true,
+        "wingetPackageTree": true
+      },
+      "env": {
+        "PATH": "C:\\first;C:\\second",
+        "PATHEXT": ".CMD;.EXE"
+      },
+      "files": [
+        "C:\\first\\sops.CMD",
+        "C:\\first\\sops.EXE"
+      ],
+      "expected": "C:\\first\\sops.CMD"
+    },
+    {
+      "id": "sonar-windows-default-pathext",
+      "platform": "win32",
+      "options": {
+        "pathext": true,
+        "wingetPackageTree": true
+      },
+      "env": {
+        "PATH": "C:\\first"
+      },
+      "files": [
+        "C:\\first\\sops.EXE",
+        "C:\\first\\sops.CMD"
+      ],
+      "expected": "C:\\first\\sops.EXE"
+    },
+    {
+      "id": "native-bare-windows",
+      "platform": "win32",
+      "options": {},
+      "env": {
+        "PATH": "C:\\first"
+      },
+      "files": [
+        "C:\\first\\sops"
+      ],
+      "expected": "C:\\first\\sops"
+    },
+    {
+      "id": "windows-path-directory-precedence",
+      "platform": "win32",
+      "options": {
+        "pathext": true,
+        "wingetPackageTree": true
+      },
+      "env": {
+        "PATH": "C:\\first;C:\\second",
+        "PATHEXT": ".CMD;.EXE",
+        "LOCALAPPDATA": "C:\\local"
+      },
+      "files": [
+        "C:\\first\\sops.EXE",
+        "C:\\second\\sops.CMD",
+        "C:\\local\\Microsoft\\WinGet\\Links\\sops.CMD"
+      ],
+      "expected": "C:\\first\\sops.EXE"
+    },
+    {
+      "id": "winget-links-precedence",
+      "platform": "win32",
+      "options": {
+        "pathext": true,
+        "wingetPackageTree": true
+      },
+      "env": {
+        "PATH": "",
+        "LOCALAPPDATA": "C:\\local"
+      },
+      "files": [
+        "C:\\local\\Microsoft\\WinGet\\Links\\sops.EXE",
+        "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\sops.EXE"
+      ],
+      "packageEntries": [
+        "OtherVendor"
+      ],
+      "expected": "C:\\local\\Microsoft\\WinGet\\Links\\sops.EXE"
+    },
+    {
+      "id": "sonar-all-packages-one-child",
+      "platform": "win32",
+      "options": {
+        "pathext": true,
+        "wingetPackageTree": true
+      },
+      "env": {
+        "PATH": "",
+        "LOCALAPPDATA": "C:\\local"
+      },
+      "files": [
+        "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\bin\\sops.EXE"
+      ],
+      "packageEntries": [
+        "OtherVendor"
+      ],
+      "children": {
+        "OtherVendor": [
+          "bin"
+        ]
+      },
+      "expected": "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\bin\\sops.EXE"
+    },
+    {
+      "id": "native-package-filter-unchanged",
+      "platform": "win32",
+      "options": {},
+      "env": {
+        "PATH": "",
+        "LOCALAPPDATA": "C:\\local"
+      },
+      "files": [
+        "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\sops.exe"
+      ],
+      "packageEntries": [
+        "OtherVendor"
+      ],
+      "expected": null
+    },
+    {
+      "id": "native-package-root",
+      "platform": "win32",
+      "options": {},
+      "env": {
+        "PATH": "",
+        "LOCALAPPDATA": "C:\\local"
+      },
+      "files": [
+        "C:\\local\\Microsoft\\WinGet\\Packages\\Mozilla.Sops\\sops.exe"
+      ],
+      "packageEntries": [
+        "Mozilla.Sops"
+      ],
+      "expected": "C:\\local\\Microsoft\\WinGet\\Packages\\Mozilla.Sops\\sops.exe"
+    },
+    {
+      "id": "package-root-before-child",
+      "platform": "win32",
+      "options": {
+        "pathext": true,
+        "wingetPackageTree": true
+      },
+      "env": {
+        "PATH": "",
+        "LOCALAPPDATA": "C:\\local"
+      },
+      "files": [
+        "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\sops.EXE",
+        "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\bin\\sops.EXE"
+      ],
+      "packageEntries": [
+        "OtherVendor"
+      ],
+      "children": {
+        "OtherVendor": [
+          "bin"
+        ]
+      },
+      "expected": "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\sops.EXE"
+    },
+    {
+      "id": "directory-impostor-refused",
+      "platform": "win32",
+      "options": {
+        "pathext": true,
+        "wingetPackageTree": true
+      },
+      "env": {
+        "PATH": "C:\\first;C:\\second"
+      },
+      "directories": [
+        "C:\\first\\sops.EXE"
+      ],
+      "files": [
+        "C:\\second\\sops.EXE"
+      ],
+      "expected": "C:\\second\\sops.EXE"
+    },
+    {
+      "id": "posix-path-and-directory",
+      "platform": "linux",
+      "options": {
+        "pathext": true,
+        "wingetPackageTree": true
+      },
+      "env": {
+        "PATH": "/first:/second",
+        "PATHEXT": ".EXE",
+        "LOCALAPPDATA": "/local"
+      },
+      "directories": [
+        "/first/sops"
+      ],
+      "files": [
+        "/second/sops",
+        "/first/sops.EXE"
+      ],
+      "expected": "/second/sops"
+    },
+    {
+      "id": "missing-or-unreadable",
+      "platform": "linux",
+      "options": {},
+      "env": {
+        "PATH": "/missing:/unreadable"
+      },
+      "files": [],
+      "unreadable": [
+        "/unreadable"
+      ],
+      "expected": null
+    }
+  ];
+  for (const vector of vectors) {
+    const paths = vector.platform === 'win32' ? path.win32 : path.posix;
+    // Windows filenames are case-insensitive; POSIX fixtures keep their actual spelling.
+    const key = file => vector.platform === 'win32' ? paths.normalize(file).toLowerCase() : paths.normalize(file);
+    const files = new Set((vector.files ?? []).map(key));
+    const directories = new Set((vector.directories ?? []).map(key));
+    const unreadable = (vector.unreadable ?? []).map(key);
+    const entries = new Map();
+    if (vector.packageEntries) {
+      const packages = paths.join(vector.env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Packages');
+      entries.set(key(packages), vector.packageEntries);
+      for (const [name, children] of Object.entries(vector.children ?? {})) entries.set(key(paths.join(packages, name)), children);
+    }
+    const failure = file => Object.assign(new Error('fixture entry unavailable'), {
+      code: unreadable.some(directory => key(file) === directory || key(file).startsWith(directory + paths.sep)) ? 'EACCES' : 'ENOENT',
+    });
+    const filesystem = {
+      statSync(file) {
+        if (unreadable.some(directory => key(file).startsWith(directory + paths.sep))) throw failure(file);
+        if (files.has(key(file))) return {isFile: () => true};
+        if (directories.has(key(file))) return {isFile: () => false};
+        throw failure(file);
+      },
+      readdirSync(directory, options = {}) {
+        const names = entries.get(key(directory));
+        if (!names) throw failure(directory);
+        return options.withFileTypes ? names.map(name => ({name, isDirectory: () => true})) : [...names];
+      },
+    };
+    assert.equal(resolveSops(vector.env, {...vector.options, platform: vector.platform, filesystem}), vector.expected, vector.id);
+  }
+});
+
+test('explicit SOPS configuration and JS launchers remain independent of discovery', () => {
+  const override = '/fixture/fake-SOPS.MJS';
+  assert.equal(resolveConfig({sops: override}, {STARCI_SOPS: '/fixture/other-sops.cjs'}).sops, override);
+  assert.equal(resolveConfig({}, {STARCI_SOPS: override}).sops, override);
+  const args = ['--decrypt', '--input-type', 'binary', '/fixture/member.enc'];
+  for (const extension of ['js', 'cjs', 'mjs', 'JS', 'CJS', 'MJS']) {
+    const file = `/fixture/fake-sops.${extension}`;
+    assert.deepEqual(launcher(file, args), [process.execPath, [file, ...args]], extension);
+  }
+  assert.deepEqual(launcher('/fixture/sops.exe', args), ['/fixture/sops.exe', args], 'a native binary is not wrapped by Node');
+});
 
 test('status reports server, custody and token validity - never a value', async t => {
   const root=temporary(t,'status');
@@ -405,6 +697,88 @@ test('a rejected example token sealed in a runtime extension custody is re-minte
   assert.equal(again.report.tokenCustody.via,'sops','the sealed member is read back, not minted again');
 });
 
+
+test('canonical inline custody is held before SOPS and cannot fall through plaintext or minting',async t=>{
+  const root=temporary(t,'age-inline-held'),main=path.join(root,'runtime-main'),lane=path.join(root,'lane');
+  fs.mkdirSync(lane);const {host,state}=await fakeSonar(t),marker=path.join(root,'sops-called');
+  const custody=fakeCustody(root,{marker}),ref=extCustody(root);
+  fs.rmSync(custody.identity);
+  write(custody.stack,'runtime/files/sonarqube-analysis-token.txt',ANALYSIS);
+  const contents='SOPS_AGE_KEY=AGE-SECRET-KEY-FAKE-CANONICAL\n';
+  const canonical=write(main,SECRET_ENV_FILE,contents),decoy=write(lane,SECRET_ENV_FILE,'SOPS_AGE_KEY=AGE-SECRET-KEY-FAKE-DECOY\n');
+  const runtimeSecretEnv=(env,root)=>{assert.equal(root,lane);return secretEnv(main,env);};
+  const options=configFor(host,custody,{runtimeRoot:lane,runtimeSecretEnv,identity:null});
+  const env={},report=(await sonarLocalMain(['status'],{env,config:options})).report;
+  assert.equal(report.outcome,'blocked');assert.equal(report.custody.analysis.identityRefusal,'inline-context-unqualified');
+  assert.match(report.custody.analysis.reason,/selected-identity isolation capability/);
+  const cfg=resolveConfig(options,env),before=fs.readFileSync(ref+'.enc');
+  const sealed=sealExtCustody(cfg,ref,MINTED,{scrub});
+  assert.equal(sealed.identityRefusal,'inline-context-unqualified');assert.equal(sealed.ok,false);
+  const requested=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{env,config:options});
+  assert.equal(requested.report.tokenCustody.identityRefusal,'inline-context-unqualified');
+  fs.rmSync(ref+'.enc');
+  const absent=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{env,config:options});
+  assert.equal(absent.report.tokenCustody.identityRefusal,'inline-context-unqualified','missing targets cannot bypass the hold by minting');
+  assert.ok(!fs.existsSync(ref+'.enc'),'a held missing target is never published');
+  fs.writeFileSync(ref+'.enc',before);
+  assert.equal(state.requests.filter(row=>row.path.startsWith('/api/user_tokens/')).length,0,'held identity never triggers mint/revoke');
+  assert.ok(!fs.existsSync(marker));assert.deepEqual(fs.readFileSync(ref+'.enc'),before);assert.ok(!fs.existsSync(ref));
+  assert.equal(fs.readFileSync(canonical,'utf8'),contents);assert.match(fs.readFileSync(decoy,'utf8'),/DECOY/);
+  assert.deepEqual(env,{});assertNoSecret([report,requested.report,sealed],'inline-held reports');
+  assert.ok(!JSON.stringify([report,requested.report,sealed,cfg]).includes('AGE-SECRET-KEY-FAKE-CANONICAL'));
+});
+
+test('blank actual age input refuses custody and extension seal despite a usable original FILE',async t=>{
+  const root=temporary(t,'age-disabled'),main=path.join(root,'runtime-main'),{host,state}=await fakeSonar(t);
+  const marker=path.join(root,'sops-called'),custody=fakeCustody(root,{marker}),ref=extCustody(root);
+  const contents='SOPS_AGE_KEY=AGE-SECRET-KEY-FAKE-CANONICAL\nSOPS_AGE_KEY_FILE='+custody.identity+'\n';
+  const canonical=write(main,SECRET_ENV_FILE,contents),before=fs.readFileSync(ref+'.enc');
+  const options=configFor(host,custody,{runtimeSecretEnv:env=>secretEnv(main,env)});
+  for(const value of ['', '   ',null,undefined]){
+    const env={SOPS_AGE_KEY:value},snapshot=structuredClone(env);
+    const report=(await sonarLocalMain(['status'],{env,config:options})).report;
+    assert.equal(report.outcome,'blocked');assert.equal(report.custody.analysis.identityRefusal,'disabled-inline');
+    const sealed=sealExtCustody(resolveConfig(options,env),ref,MINTED,{scrub});
+    assert.equal(sealed.ok,false);assert.equal(sealed.identityRefusal,'disabled-inline');
+    fs.rmSync(ref+'.enc');
+    const absent=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{env,config:options});
+    assert.equal(absent.report.tokenCustody.identityRefusal,'disabled-inline');assert.ok(!fs.existsSync(ref+'.enc'));
+    fs.writeFileSync(ref+'.enc',before);
+    assert.deepEqual(env,snapshot);assert.deepEqual(fs.readFileSync(ref+'.enc'),before);
+    assertNoSecret([report,sealed],'blank-age reports');
+  }
+  assert.ok(!fs.existsSync(marker));assert.equal(fs.readFileSync(canonical,'utf8'),contents);
+  assert.equal(fs.readFileSync(custody.identity,'utf8'),'AGE-SECRET-KEY-FAKE');assert.ok(!fs.existsSync(ref));
+  assert.equal(state.requests.filter(row=>row.path.startsWith('/api/user_tokens/')).length,0);
+});
+
+test('canonical original FILE environment reaches decrypt, seal and readback without a configured file default',async t=>{
+  const root=temporary(t,'age-file-forward'),main=path.join(root,'runtime-main'),lane=path.join(root,'lane');
+  fs.mkdirSync(lane);const {host,state}=await fakeSonar(t),marker=path.join(root,'sops-called');
+  const custody=fakeCustody(root,{canary:'canonical-owner',marker}),ref=extCustody(root);
+  const contents='SOPS_AGE_KEY_FILE='+custody.identity+'\nFIXTURE_SOPS_CANARY=canonical-owner\n';
+  const canonical=write(main,SECRET_ENV_FILE,contents),original=fs.readFileSync(custody.identity);
+  const options=configFor(host,custody,{identity:null,runtimeRoot:lane,runtimeSecretEnv:(env,root)=>{assert.equal(root,lane);return secretEnv(main,env);}});
+  const env={},snapshot=structuredClone(env),first=await sonarLocalMain(['status'],{env,config:options});
+  assert.equal(first.report.outcome,'up');assert.equal(first.report.custody.analysis.via,'sops');
+  state.mintValues.push(REMINTED);
+  const minted=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{env,config:options});
+  assert.equal(minted.exitCode,0,JSON.stringify(minted.report));assert.equal(minted.report.tokenCustody.via,'minted');
+  const again=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{env,config:options});
+  assert.equal(again.report.tokenCustody.via,'sops');
+  const stackRef='runtime/files/canonical-project-token.key';state.mintValues.push(MINTED);
+  const stack=await sonarLocalMain(['ensure-project','--key','stack-example','--with-token','--token-ref',stackRef],{env,config:options});
+  assert.equal(stack.exitCode,0,JSON.stringify(stack.report));assert.equal(stack.report.tokenCustody.via,'minted');
+  const stackFile=path.join(custody.stack,projectTokenRef('stack-example')+'.enc');
+  assert.equal(fs.readFileSync(stackFile,'utf8'),'ENC:'+MINTED);
+  const calls=fs.readFileSync(marker,'utf8').trim().split('\n');
+  assert.equal(calls.filter(call=>call==='stack-set').length,1,'canonical environment reaches the existing stack-secret child');
+  assert.equal(calls.filter(call=>call==='encrypt').length,1);assert.ok(calls.filter(call=>call==='decrypt').length>=3);
+  assert.equal(fs.readFileSync(ref+'.enc','utf8'),'ENC:'+REMINTED);assert.ok(!fs.existsSync(ref));
+  assert.deepEqual(fs.readFileSync(custody.identity),original);assert.equal(fs.readFileSync(canonical,'utf8'),contents);
+  assert.deepEqual(env,snapshot);assert.deepEqual(fs.readdirSync(lane),[]);assertNoSecret([first.report,minted.report,again.report],'original-file reports');
+});
+
 test('a token that cannot be sealed into an extension custody with no recipient is refused with the reason and revoked', async t => {
   const root=temporary(t,'ext-refuse');
   const {host,state}=await fakeSonar(t);
@@ -458,6 +832,7 @@ function fakeRepo(root,{scanner=true,specFile=false,services=false}={}){
   write(repo,'scanner.mjs',scanner?`import fs from 'node:fs';import path from 'node:path';
 const d=Object.fromEntries(process.argv.slice(2).filter(a=>a.startsWith('-D')).map(a=>a.slice(2).split(/=(.*)/s)));
 fs.writeFileSync(path.join(process.cwd(),'..','scanner-defines.json'),JSON.stringify(d));
+fs.writeFileSync(path.join(process.cwd(),'..','scanner-auth.json'),JSON.stringify({analysis:process.env.SONAR_TOKEN===${JSON.stringify(ANALYSIS)},admin:process.env.SONAR_TOKEN===${JSON.stringify(ADMIN)},argvHasToken:process.argv.some(arg=>arg.includes(process.env.SONAR_TOKEN))}));
 console.log('[INFO] token '+process.env.SONAR_TOKEN);
 if(d['sonar.host.url']!==process.env.SONAR_HOST_URL){console.log('[ERROR] host not overridden');process.exit(5);}
 fs.mkdirSync(d['sonar.working.directory'],{recursive:true});
@@ -483,6 +858,132 @@ const lcovRunner=(calls=[],{write=true,exitCode=0}={})=>Object.assign(({jestCwd,
 },{calls});
 const serviceSources=()=>knownSources({lines:{'src/app.js':30,'src/new.js':3,'src/legacy.js':5,...Object.fromEntries(SERVICE_SLICE.map(file=>[file,4]))}});
 
+
+test('two runtime contexts use one canonical local file with actual environment precedence and no copies',async t=>{
+  const root=temporary(t,'shared-file');
+  const main=path.join(root,'runtime-main'),laneA=path.join(root,'lane-a'),laneB=path.join(root,'lane-b');
+  fs.mkdirSync(laneA,{recursive:true});fs.mkdirSync(laneB,{recursive:true});
+  const {host,state}=await fakeSonar(t),custody=fakeCustody(root);
+  const contents='SONAR_HOST_URL='+host+'\nSONAR_TOKEN='+ANALYSIS+'\n';
+  const file=write(main,SECRET_ENV_FILE,contents);
+  state.tokens.set(REMINTED,'analysis');
+  const visited=[];
+  // Native linked-worktree identity is tested by the higher adapter; this fixture supplies its explicit verified-main seam.
+  const runtimeSecretEnv=(env,runtimeRoot)=>{assert.ok([laneA,laneB].includes(runtimeRoot));visited.push(runtimeRoot);return secretEnv(main,env);};
+  const config=runtimeRoot=>configFor(undefined,custody,{runtimeRoot,runtimeSecretEnv});
+  const first=await sonarLocalMain(['token'],{env:{},config:config(laneA)});
+  const second=await sonarLocalMain(['token'],{env:{SONAR_TOKEN:REMINTED},config:config(laneB)});
+  assert.equal(first.exitCode,0);assert.equal(second.exitCode,0);
+  assert.equal(first.report.host,host);assert.equal(second.report.host,host);
+  assert.deepEqual(state.requests.filter(r=>r.path==='/api/authentication/validate').map(r=>r.auth),[ANALYSIS,REMINTED]);
+  const count=state.requests.length;
+  const blank=await sonarLocalMain(['token'],{env:{SONAR_TOKEN:''},config:config(laneB)});
+  assert.equal(blank.exitCode,2);assert.match(blank.report.custody.reason,/SONAR_TOKEN/);
+  assert.equal(state.requests.length,count,'an explicitly blank environment cannot resurrect the file token');
+  assert.deepEqual(visited,[laneA,laneB,laneB]);assert.equal(fs.readFileSync(file,'utf8'),contents);
+  assert.deepEqual(fs.readdirSync(laneA),[]);assert.deepEqual(fs.readdirSync(laneB),[]);
+  assert.ok(!state.requests.some(r=>r.path.startsWith('/api/user_tokens/')));
+  assertNoSecret([first.report,second.report,blank.report],'shared-file reports');
+});
+
+test('missing or placeholder analysis input stops token, scan and dashboard before provider or custody effects',async t=>{
+  const root=temporary(t,'required-inputs');
+  const {host,state}=await fakeSonar(t),custody=fakeCustody(root),repo=fakeRepo(root);
+  const encrypted=fs.readFileSync(path.join(custody.stack,'runtime/files/sonarqube-analysis-token.txt.enc'));
+  const marker=path.join(root,'sops-invoked');
+  fs.writeFileSync(custody.sops,"import fs from 'node:fs';fs.writeFileSync("+JSON.stringify(marker)+",'called');process.exit(5);");
+  for(const token of [undefined,'','CHANGE_ME','<paste-token>'])for(const action of ['token','scan','dashboard']){
+    const env=token===undefined?{}:{SONAR_TOKEN:token};
+    const run=await sonarLocalMain([action,'--cwd',repo],{env,config:configFor(host,custody,{runtimeSecretEnv:value=>value})});
+    assert.equal(run.exitCode,2,action);
+    assert.match(run.report.reason??run.report.custody.reason,/SONAR_TOKEN/);
+    assertNoSecret(run.report,action+' missing report');
+  }
+  assert.equal(state.requests.length,0,'presence refusal precedes the server probe');
+  assert.equal(fs.existsSync(marker),false,'legacy encrypted custody cannot replace missing input');
+  assert.equal(fs.existsSync(path.join(root,'scanner-auth.json')),false);
+  assert.deepEqual(fs.readFileSync(path.join(custody.stack,'runtime/files/sonarqube-analysis-token.txt.enc')),encrypted);
+});
+
+test('analysis requires a selected safe server and never reports credential-bearing URL input',async t=>{
+  const root=temporary(t,'selected-host'),custody=fakeCustody(root);
+  let calls=0;
+  for(const host of [undefined,'http://user:fake-password@127.0.0.1:1','https://example.invalid/?token=private']){
+    const run=await sonarLocalMain(['token'],{env:{SONAR_TOKEN:ANALYSIS},config:configFor(host,custody,{cwd:root,runtimeSecretEnv:value=>value,fetch:async()=>{calls+=1;throw Error('unexpected provider');}})});
+    assert.equal(run.exitCode,2);assert.match(run.report.custody.reason,/SONAR_HOST_URL/);
+    assertNoSecret(run.report,'URL refusal');assert.ok(!JSON.stringify(run.report).includes('fake-password'));
+    assert.ok(!JSON.stringify(run.report).includes('private'));
+  }
+  assert.equal(calls,0);
+});
+
+test('rejected supplied analysis stops isolation before admin reads, minting or scanner effects',async t=>{
+  const root=temporary(t,'rejected-analysis');
+  const {host,state}=await fakeSonar(t),custody=fakeCustody(root),repo=fakeRepo(root);
+  state.tokens.delete(ANALYSIS);
+  const marker=path.join(root,'admin-decrypted');
+  fs.rmSync(path.join(custody.stack,'runtime/files/sonarqube-admin-token.key'));
+  write(custody.stack,'runtime/files/sonarqube-admin-token.key.enc','ENC:'+ADMIN);
+  fs.writeFileSync(custody.sops,"import fs from 'node:fs';fs.writeFileSync("+JSON.stringify(marker)+",'called');process.stdout.write("+JSON.stringify(ADMIN)+");");
+  const run=await sonarLocalMain(['scan','--cwd',repo,'--wait','--isolate'],{env:{SONAR_TOKEN:ANALYSIS},config:configFor(host,custody)});
+  assert.equal(run.exitCode,2);assert.equal(run.report.custody.analysis.rejected,true);
+  assert.match(run.report.reason,/SONAR_TOKEN is rejected/);
+  assert.equal(fs.existsSync(marker),false,'analysis rejection precedes administrative custody');
+  assert.equal(fs.existsSync(path.join(root,'scanner-auth.json')),false);
+  assert.ok(!state.requests.some(r=>r.auth===ADMIN||r.path.startsWith('/api/user_tokens/')||r.path==='/api/projects/create'));
+  assertNoSecret(run.report,'rejected token report');
+});
+
+test('ordinary analysis reads no encrypted admin and a denied evidence read cannot fall back to admin',async t=>{
+  const root=temporary(t,'read-permission');
+  const {host,state}=await fakeSonar(t),custody=fakeCustody(root),repo=fakeRepo(root);
+  const marker=path.join(root,'admin-decrypted');
+  fs.rmSync(path.join(custody.stack,'runtime/files/sonarqube-admin-token.key'));
+  write(custody.stack,'runtime/files/sonarqube-admin-token.key.enc','ENC:'+ADMIN);
+  fs.writeFileSync(custody.sops,"import fs from 'node:fs';fs.writeFileSync("+JSON.stringify(marker)+",'called');process.stdout.write("+JSON.stringify(ADMIN)+");");
+  const ordinary=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
+  assert.equal(ordinary.exitCode,0,JSON.stringify(ordinary.report));assert.equal(fs.existsSync(marker),false);
+  state.rejectedAnalysisPaths.add('/api/ce/task');
+  const isolated=await sonarLocalMain(['scan','--cwd',repo,'--wait','--isolate'],{config:configFor(host,custody)});
+  assert.equal(isolated.exitCode,2);assert.match(isolated.report.reason,/HTTP 403/);
+  assert.equal(fs.existsSync(marker),true,'explicit same-host isolation selects administrative preparation');
+  const reads=state.requests.filter(r=>r.path==='/api/ce/task');
+  assert.ok(reads.some(r=>r.status===403));assert.ok(reads.every(r=>r.auth===ANALYSIS));
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,'scanner-auth.json'),'utf8')),{analysis:true,admin:false,argvHasToken:false});
+  assert.ok(!state.requests.some(r=>r.path.startsWith('/api/user_tokens/')));
+  assertNoSecret(isolated.report,'evidence permission refusal');
+});
+
+test('shared analysis cannot borrow custody configured for another administrative server',async t=>{
+  const root=temporary(t,'foreign-server');
+  const adminServer=await fakeSonar(t),analysisServer=await fakeSonar(t),custody=fakeCustody(root),repo=fakeRepo(root);
+  const marker=path.join(root,'admin-decrypted');
+  fs.rmSync(path.join(custody.stack,'runtime/files/sonarqube-admin-token.key'));
+  write(custody.stack,'runtime/files/sonarqube-admin-token.key.enc','ENC:'+ADMIN);
+  fs.writeFileSync(custody.sops,"import fs from 'node:fs';fs.writeFileSync("+JSON.stringify(marker)+",'called');process.stdout.write("+JSON.stringify(ADMIN)+");");
+  const run=await sonarLocalMain(['scan','--cwd',repo,'--wait','--isolate'],{
+    env:{SONAR_TOKEN:ANALYSIS,SONAR_HOST_URL:analysisServer.host,STARCI_SONAR_HOST_URL:adminServer.host},
+    config:configFor(undefined,custody,{runtimeSecretEnv:value=>value}),
+  });
+  assert.equal(run.exitCode,0,JSON.stringify(run.report));assert.equal(run.report.host,analysisServer.host);
+  assert.match(run.report.isolated.skipped,/separate provisioning/);
+  assert.equal(fs.existsSync(marker),false);assert.equal(adminServer.state.requests.length,0);
+  assert.ok(!analysisServer.state.requests.some(r=>r.auth===ADMIN||r.path==='/api/projects/create'));
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,'scanner-auth.json'),'utf8')),{analysis:true,admin:false,argvHasToken:false});
+  assertNoSecret(run.report,'foreign analysis report');
+});
+
+test('analysis token-ref refuses before resolution and help requires no credentials',async t=>{
+  let resolutions=0;
+  const config={runtimeSecretEnv:()=>{resolutions+=1;throw Error('resolution must not run');}};
+  for(const action of ['token','scan','dashboard']){
+    const run=await sonarLocalMain([action,'--token-ref','runtime/files/legacy.key'],{env:{},config});
+    assert.equal(run.exitCode,2);assert.match(run.text,/administrative provisioning/);assertNoSecret(run,'token-ref refusal');
+  }
+  const help=await sonarLocalMain(['--help'],{env:{},config});
+  assert.equal(help.exitCode,0);assert.equal(resolutions,0);
+});
+
 test('--blob stores both the sanitized scanner log and the Sonar report', async t => {
   const root=temporary(t,'blob-scan');
   const {host}=await fakeSonar(t);
@@ -504,7 +1005,7 @@ test('--blob stores both the sanitized scanner log and the Sonar report', async 
   assertNoSecret(saved,'stored scan outputs');
 });
 
-test('scan runs the repository scanner against the local host, mints the project token and waits for the gate', async t => {
+test('scan retains the supplied analysis token and reads evidence without provisioning or minting', async t => {
   const root=temporary(t,'scan');
   const {host,state}=await fakeSonar(t);
   const custody=fakeCustody(root);
@@ -515,14 +1016,18 @@ test('scan runs the repository scanner against the local host, mints the project
   assert.equal(exitCode,0,JSON.stringify(report));
   assert.equal(report.outcome,'pass');
   assert.equal(report.projectKey,'product-repo');
-  assert.equal(report.project.created,true);
-  assert.equal(report.custody.analysis.via,'minted');
+  assert.equal(report.project.outcome,'skipped');
+  assert.equal(report.custody.analysis.via,'environment');
+  assert.equal(report.custody.admin.present,false);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,'scanner-auth.json'),'utf8')),{analysis:true,admin:false,argvHasToken:false});
+  assert.ok(!state.requests.some(r=>r.auth===ADMIN),'ordinary analysis never authenticates with administrative custody');
+  assert.ok(!state.requests.some(r=>/user_tokens|projects\/(?:create|delete)/.test(r.path)),'ordinary analysis never mints or provisions');
   assert.equal(report.scanner.runner,'npm run sonar:check');
   assert.equal(report.ceTask.status,'SUCCESS');
   assert.equal(report.schema,'starci/sonar-local-scan@3');
   assert.equal(report.gate.name,'starci-quality');
   assert.deepEqual([report.gate.duplicationMaxPercent,report.gate.blockingSeverities,report.gate.coverageMinPercent],[3,['BLOCKER','CRITICAL'],100]);
-  assert.equal(report.qualityGate.outcome,'ok');
+  assert.equal(report.qualityGate.outcome,'skipped');
   assert.equal(report.scope,'slice');
   assert.equal(report.projectGate.status,'OK');
   assert.equal(report.projectGate.scope,'whole-project');
@@ -536,7 +1041,7 @@ test('scan runs the repository scanner against the local host, mints the project
   assert.deepEqual(report.issues.bySeverity,{MAJOR:3,MINOR:1});
   assert.equal(report.hotspots.toReview,1);
   assert.equal(report.measures.duplicated_lines_density,'4.2');
-  assert.ok(state.requests.filter(r=>r.path==='/api/ce/task').every(r=>r.auth===MINTED),'the gate is read with the project token');
+  assert.ok(state.requests.filter(r=>r.path==='/api/ce/task').every(r=>r.auth===ANALYSIS),'the evidence is read with the supplied analysis token');
   const logText=fs.readFileSync(log,'utf8');
   assert.match(logText,/\[INFO\] token \*\*\*/);
   assertNoSecret(logText,'scanner log');
@@ -686,7 +1191,7 @@ test('a scanner the server refuses is blocked and a submission alone is not a pa
   assert.match(submitted.report.reason,/not a pass/);
 });
 
-test('scan takes host, stack, credentials and project from the repository declaration; disabled is not a pass', async t => {
+test('scan takes the declared server and project with a supplied token; disabled is not a pass', async t => {
   const root=temporary(t,'scan-decl');
   const {host,state}=await fakeSonar(t);
   const custody=fakeCustody(root);
@@ -706,15 +1211,16 @@ services:
 `;
   write(repo,'.starcistacks/application-stacks.yaml',declaration);
   const {identity,sops,stackSecret}=custody;
-  const {exitCode,report}=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:{identity,sops,stackSecret,docker:'starci-no-such-docker',pollMs:5}});
+  const {exitCode,report}=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{env:{SONAR_TOKEN:ANALYSIS},config:{identity,sops,stackSecret,docker:'starci-no-such-docker',pollMs:5,runtimeSecretEnv:value=>value}});
   assert.equal(exitCode,0,JSON.stringify(report));
   assert.equal(report.host,host);
   assert.equal(report.projectKey,'declared-key');
-  assert.equal(state.projects.get('declared-key'),'Declared Name');
-  assert.equal(report.custody.admin.via,'materialized');
-  assert.ok(fs.existsSync(path.join(custody.stack,`${projectTokenRef('declared-key')}.enc`)),'the minted token lands in the declared stack custody');
+  assert.equal(state.projects.has('declared-key'),false,'ordinary analysis leaves provisioning to the administrative owner');
+  assert.equal(report.custody.admin.present,false);
+  assert.equal(report.custody.analysis.via,'environment');
+  assert.ok(!fs.existsSync(path.join(custody.stack,`${projectTokenRef('declared-key')}.enc`)),'analysis creates no encrypted member');
   write(repo,'.starcistacks/application-stacks.yaml',declaration.replace('mode: local','mode: disabled\n    reason: prototype only'));
-  const off=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:{identity,sops,stackSecret}});
+  const off=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{env:{},config:{identity,sops,stackSecret,runtimeSecretEnv:value=>value}});
   assert.equal(off.report.outcome,'disabled');
   assert.match(off.report.reason,/prototype only/);
 });
@@ -833,7 +1339,7 @@ test('a re-mint in a spec run without a recorder never writes machine.sqlite', a
 });
 
 // Live defect: a whole analysis spent 17-40 minutes (JS/TS sensor over ~5600 files) to judge a 1-5 file slice.
-test('--isolate analyses only the slice in a throwaway project scanned with the admin token, then deletes it', async t => {
+test('--isolate provisions separately while scanner and evidence retain the supplied analysis token', async t => {
   const root=temporary(t,'isolate');
   const {host,state}=await fakeSonar(t);
   const custody=fakeCustody(root);
@@ -851,7 +1357,11 @@ test('--isolate analyses only the slice in a throwaway project scanned with the 
   assert.equal(defines['sonar.test.inclusions'],'__starci_no_tests__/**','no scope file is a test, so no test is indexed');
   assert.equal('sonar.javascript.lcov.reportPaths' in defines,false,'the lcov path and the coverage scope come from sonar-project.properties, never a define');
   assert.ok(state.requests.some(r=>r.path==='/api/projects/create'&&r.form.project===sliceKey&&r.auth===ADMIN));
-  assert.ok(state.requests.filter(r=>r.path==='/api/ce/task').every(r=>r.auth===ADMIN),'the slice project is read with the admin token');
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,'scanner-auth.json'),'utf8')),{analysis:true,admin:false,argvHasToken:false});
+  assert.ok(state.requests.filter(r=>r.path==='/api/ce/task').every(r=>r.auth===ANALYSIS),'the slice evidence retains the supplied analysis token');
+  const analysisPaths=new Set(['/api/ce/task','/api/qualitygates/project_status','/api/issues/search','/api/hotspots/search','/api/sources/lines','/api/duplications/show','/api/measures/component']);
+  assert.ok(state.requests.filter(r=>analysisPaths.has(r.path)).every(r=>r.auth===ANALYSIS),'all evidence retains the analysis identity');
+  assert.ok(!state.requests.some(r=>r.path.startsWith('/api/user_tokens/')),'isolation does not mint a scanner token');
   assert.ok(state.requests.some(r=>r.path==='/api/projects/delete'&&r.form.project===sliceKey));
   assert.equal(state.projects.has(sliceKey),false);
   assertNoSecret(report,'summary');
@@ -910,7 +1420,7 @@ test('the scan makes the server gate carry knowledge/sonar-gate.yaml, selects it
   const {host,state}=await fakeSonar(t);
   const custody=fakeCustody(root);
   const repo=fakeRepo(root);
-  const first=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
+  const first={report:await scan(resolveConfig(configFor(host,custody),{}),{cwd:repo,wait:true,ensure:true})};
   assert.equal(first.report.qualityGate.outcome,'ok',JSON.stringify(first.report.qualityGate));
   const conditions=Object.fromEntries([...state.gateConditions.values()].map(c=>[c.metric,`${c.op} ${c.error}`]));
   assert.deepEqual(conditions,{new_coverage:'LT 100',new_duplicated_lines_density:'GT 3',new_security_hotspots_reviewed:'LT 100',new_blocker_violations:'GT 0',new_critical_violations:'GT 0',coverage:'LT 100',violations:'GT 0',security_hotspots_reviewed:'LT 100',duplicated_lines_density:'GT 3'});
@@ -922,14 +1432,14 @@ test('the scan makes the server gate carry knowledge/sonar-gate.yaml, selects it
   state.gateConditions.set('new_coverage',{id:'C-11',metric:'new_coverage',op:'LT',error:'80'});
   state.gateConditions.set('new_lines',{id:'C-12',metric:'new_lines',op:'GT',error:'1000'});
   state.gateConditions.set('new_violations',{id:'C-10',metric:'new_violations',op:'GT',error:'0'});
-  const again=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
+  const again={report:await scan(resolveConfig(configFor(host,custody),{}),{cwd:repo,wait:true,ensure:true})};
   assert.equal(again.report.qualityGate.outcome,'ok');
   assert.deepEqual(again.report.qualityGate.changed.sort(),['-new_lines','-new_violations','new_coverage','new_duplicated_lines_density']);
   assert.equal(state.gateConditions.get('new_duplicated_lines_density').error,'3');
   assert.equal(state.gateConditions.get('new_coverage').error,'100','a lowered coverage threshold is put back to 100');
   assert.ok(!state.gateConditions.has('new_lines'),'a condition the gate does not hold is dropped');
   assert.ok(!state.gateConditions.has('new_violations'));
-  const third=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
+  const third={report:await scan(resolveConfig(configFor(host,custody),{}),{cwd:repo,wait:true,ensure:true})};
   assert.deepEqual(third.report.qualityGate.changed,[],'a matching gate is left as it is');
   assert.ok(made>0);
 });
@@ -941,7 +1451,7 @@ test('a server whose project still sits on the former gate name gets the renamed
   const repo=fakeRepo(root);
   const former=['starci','new','code'].join('-');
   state.gateSelected.set('product-repo',former);
-  const run=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
+  const run={report:await scan(resolveConfig(configFor(host,custody),{}),{cwd:repo,wait:true,ensure:true})};
   assert.equal(run.report.qualityGate.outcome,'ok',JSON.stringify(run.report.qualityGate));
   assert.equal(state.gateSelected.get('product-repo'),'starci-quality','the project is selected onto the current gate');
   assert.ok(state.gateConditions.size>0,'the current gate was created with its conditions');
@@ -1040,7 +1550,7 @@ test('the slice holds every service it touched at 100 coverage: one service belo
 
 test('dashboard prints the project numbers and fails unless bugs, smells and vulnerabilities are 0, hotspots reviewed and every service at 100', async t => {
   const custody=fakeCustody(temporary(t,'dash-custody'));
-  const clean={bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:2,security_hotspots_reviewed:100,coverage:100};
+  const clean={bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:2,security_hotspots_reviewed:100,duplicated_lines_density:0,coverage:100};
   const files={'src/orders/order.service.js':100,'src/orders/payment.service.js':100,'src/orders/order.resolver.js':12.5,'src/main.js':0};
   const run=async(label,over)=>{
     const {host}=await fakeSonar(t,over);
@@ -1048,7 +1558,7 @@ test('dashboard prints the project numbers and fails unless bugs, smells and vul
   };
   const pass=await run('dash-pass',{projectMeasures:clean,coverage:files});
   assert.equal(pass.exitCode,0,JSON.stringify(pass.report));
-  assert.deepEqual(pass.report.numbers,{bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:2,security_hotspots_reviewed:100,coverage:100});
+  assert.deepEqual(pass.report.numbers,{bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:2,security_hotspots_reviewed:100,duplicated_lines_density:0,coverage:100});
   assert.deepEqual(pass.report.coverage.files.map(f=>[f.path,f.coverage]),[['src/orders/order.service.js',100],['src/orders/payment.service.js',100]],'the per-file coverage lists the services only');
   assert.deepEqual(pass.report.coverageExclusions,['src/*.js','src/**/*.resolver.js']);
   const red=await run('dash-red',{projectMeasures:{...clean,bugs:1,code_smells:3,security_hotspots_reviewed:50,coverage:96.4},coverage:{...files,'src/orders/payment.service.js':92.9}});
@@ -1062,6 +1572,108 @@ test('dashboard prints the project numbers and fails unless bugs, smells and vul
   assert.equal(unscoped.exitCode,1);
   assert.match(unscoped.report.reason,/declares no sonar\.coverage\.exclusions/);
   assertNoSecret(red.report,'dashboard report');
+});
+
+
+test('lite Sonar selects its canonical conditions and requires an actual processed project gate plus the non-coverage dashboard',async t=>{
+  const root=temporary(t,'lite-policy'),custody=fakeCustody(root),repo=fakeRepo(root);
+  write(repo,'hfs.json',JSON.stringify({hfs:2,kind:'app',edition:'lite'}));
+  const full=loadSonarGate(),lite=loadSonarGate({cwd:repo});
+  assert.equal(lite.gate.name,'starci-quality-lite');
+  assert.equal(lite.newCode.coverage,undefined);assert.equal(lite.overall.coverage,undefined);
+  assert.deepEqual(loadSonarGate(),full,'selecting a lite repository never contaminates the cached full policy');
+  assert.equal(serverConditions(full).filter(row=>/coverage/.test(row.metric)).length,2);
+  const {host,state}=await fakeSonar(t,{projectMeasures:{bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:0,duplicated_lines_density:0}});
+  const cfg=configFor(host,custody,{coverageRunner:()=>{throw Error('a lite app has no test world');}});
+  const report=await scan(resolveConfig(cfg,{}),{cwd:repo,wait:true,projectGate:true,ensure:true});
+  assert.equal(report.outcome,'pass',JSON.stringify(report));
+  assert.deepEqual([report.scanner.exitCode,report.ceTask.status,report.analysisId,report.projectGate.status],[0,'SUCCESS','AN-1','OK']);
+  assert.equal(state.gateSelected.get('product-repo'),'starci-quality-lite');
+  assert.deepEqual([...state.gateConditions.keys()].sort(),['duplicated_lines_density','new_blocker_violations','new_critical_violations','new_duplicated_lines_density','new_security_hotspots_reviewed','security_hotspots_reviewed','violations'].sort());
+  assert.deepEqual(state.gateConditions.get('violations').error,'0');
+  const dash=await sonarLocalMain(['dashboard','--cwd',repo],{config:cfg});
+  assert.equal(dash.exitCode,0,JSON.stringify(dash.report));
+  assert.deepEqual([dash.report.coverage.applied,dash.report.coverage.status,dash.report.coverage.files],[false,'not-required',[]]);
+  assert.equal('coverage' in dash.report.numbers,false,'no synthetic covered percentage');
+  assert.ok(!state.requests.some(row=>row.path==='/api/measures/component_tree'),'lite has no coverage measure to query');
+  assertNoSecret(report,'lite scan');assertNoSecret(dash.report,'lite dashboard');
+});
+
+test('lite slice coverage is not-required by policy and is distinct from an owner disabling unit tests',async t=>{
+  const root=temporary(t,'lite-slice'),custody=fakeCustody(root),repo=fakeRepo(root,{services:true});
+  write(repo,'hfs.json',JSON.stringify({hfs:2,kind:'app',edition:'lite'}));
+  const {host}=await fakeSonar(t,{sources:serviceSources()});
+  const out=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody,{coverageRunner:()=>{throw Error('coverage runner must not run for lite');}})});
+  assert.equal(out.exitCode,0,JSON.stringify(out.report));
+  assert.deepEqual([out.report.coverageRun.judged,out.report.slice.coverage.status,out.report.slice.coverage.files],[false,'not-required',[]]);
+  assert.equal(out.report.ownerMode,undefined,'declared lite policy is not specs.unit=false');
+  assert.equal(fs.existsSync(path.join(repo,'coverage','lcov.info')),false);
+});
+
+test('lite still refuses a red project gate and blocked server; submission alone is never qualification',async t=>{
+  for(const [label,options,wait,outcome,code] of [['red',{gate:'ERROR'},true,'fail',1],['down',{up:false},true,'blocked',2],['submitted',{},false,'submitted',0]]){
+    const root=temporary(t,`lite-${label}`),custody=fakeCustody(root),repo=fakeRepo(root);
+    write(repo,'hfs.json',JSON.stringify({hfs:2,kind:'app',edition:'lite'}));
+    const {host}=await fakeSonar(t,options);
+    const out=await sonarLocalMain(['scan','--cwd',repo,'--project-gate',...(wait?['--wait']:[])],{config:configFor(host,custody)});
+    assert.deepEqual([out.report.outcome,out.exitCode],[outcome,code],JSON.stringify(out));
+    assert.notEqual(out.report.outcome,'pass');
+  }
+});
+
+test('lite dashboard retains issues, reviewed-hotspot and missing-measure refusals without requiring coverage',async t=>{
+  const clean={bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:2,security_hotspots_reviewed:100,duplicated_lines_density:0};
+  for(const [label,measures,why] of [['bugs',{...clean,bugs:1},/bugs 1 > 0/],['hotspots',{...clean,security_hotspots_reviewed:50},/security_hotspots_reviewed 50% < 100%/],['missing',{...clean,code_smells:undefined},/code_smells is not measured/]]){
+    const root=temporary(t,`lite-dashboard-${label}`),custody=fakeCustody(root),repo=fakeRepo(root);
+    write(repo,'hfs.json',JSON.stringify({hfs:2,kind:'app',edition:'lite'}));
+    const {host}=await fakeSonar(t,{projectMeasures:measures});
+    const out=await sonarLocalMain(['dashboard','--cwd',repo],{config:configFor(host,custody)});
+    assert.equal(out.exitCode,1,JSON.stringify(out));assert.match(out.report.reason,why);
+    assert.equal(out.report.coverage.status,'not-required');
+  }
+});
+
+test('malformed, unsupported or non-app lite declarations refuse before any Sonar request',async t=>{
+  for(const [label,declaration] of [['malformed','{'],['unknown',JSON.stringify({kind:'app',edition:'unknown'})],['foreign',JSON.stringify({kind:'runtime',edition:'lite'})]]){
+    const root=temporary(t,`lite-declaration-${label}`),custody=fakeCustody(root),repo=fakeRepo(root);
+    write(repo,'hfs.json',declaration);
+    const {host,state}=await fakeSonar(t);
+    await assert.rejects(()=>sonarLocalMain(['scan','--cwd',repo,'--project-gate','--wait'],{config:configFor(host,custody)}));
+    assert.equal(state.requests.length,0);
+  }
+});
+
+
+test('each full coverage descriptor is required before default or lite policy selection, including empty descriptors', t=>{
+  const root=temporary(t,'coverage-policy-shape'),lite=path.join(root,'lite');
+  write(lite,'hfs.json',JSON.stringify({kind:'app',edition:'lite'}));
+  const canonical=loadSonarGate();
+  assert.ok(loadSonarGate({cwd:lite}).overall.duplication);
+  for(const area of ['newCode','overall'])for(const bad of ['missing','null','empty','blank-metric','bad-threshold']){
+    const document=structuredClone(canonical);
+    if(bad==='missing')delete document[area].coverage;
+    else if(bad==='null')document[area].coverage=null;
+    else if(bad==='empty')document[area].coverage={};
+    else if(bad==='blank-metric')document[area].coverage.metric=' ';
+    else document[area].coverage.minPercent='100';
+    const file=write(root,`${area}-${bad}.json`,JSON.stringify(document));
+    for(const cwd of [null,lite])assert.throws(()=>loadSonarGate({file,cwd}),new RegExp(`${area}\\.coverage`),`${area}/${bad}/${cwd}`);
+  }
+  assert.ok(loadSonarGate().newCode.coverage,'failed private policies never replace the canonical cache');
+});
+
+test('both full and lite dashboards reject excessive or missing duplication and accept the exact declared maximum',async t=>{
+  for(const edition of ['full','lite'])for(const [label,density,code,why] of [['red',4.2,1,/duplicated_lines_density 4\.2% > 3%/],['missing',undefined,1,/duplicated_lines_density is not measured/],['boundary',3,0,null]]){
+    const root=temporary(t,`density-${edition}-${label}`),custody=fakeCustody(root),repo=fakeRepo(root,{services:true});
+    write(repo,'hfs.json',JSON.stringify({kind:'app',edition}));
+    const {host,state}=await fakeSonar(t,{projectMeasures:{bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:0,coverage:100,duplicated_lines_density:density},coverage:{'src/orders/order.service.js':100,'src/orders/payment.service.js':100}});
+    const out=await sonarLocalMain(['dashboard','--cwd',repo],{config:configFor(host,custody)});
+    assert.equal(out.exitCode,code,JSON.stringify(out));
+    assert.ok(state.requests.some(row=>row.path==='/api/measures/component'&&row.query.metricKeys.split(',').includes('duplicated_lines_density')),'the real dashboard requests the mandatory measure');
+    if(why)assert.match(out.report.reason,why);else assert.equal(out.report.numbers.duplicated_lines_density,3);
+    if(edition==='lite')assert.equal(out.report.coverage.status,'not-required');
+    else assert.equal(out.report.coverage.files.length,2,'full per-file coverage remains required');
+  }
 });
 
 test('an example app inside the runtime checkout resolves its host custody inside this runtime tree, worktree or main checkout', t => {
@@ -1112,4 +1724,25 @@ test('a project token is the declared credential that names the project, else th
   assert.equal(two.projects[0].tokenRef,null,'two analysis credentials and none naming the project: no guess');
   const named=readSonarDeclaration(decl([{id:'proj-key',purpose:'ci',file:'p.key'},{id:'b',purpose:'analysis',file:'b.key'}]));
   assert.match(named.projects[0].tokenRef,/p\.key$/,'a credential naming the project wins');
+});
+
+test('extension custody composes real process ports but script-shaped selected tools cannot fall back or publish',t=>{
+  const root=temporary(t,'age-native-script-refusal'),custody=fakeCustody(root),ref=extCustody(root);
+  const tool=path.join(root,process.platform==='win32'?'sops.exe':'sops'),marker=path.join(root,'selected-child-called');
+  fs.writeFileSync(tool,`#!/usr/bin/env node
+require('node:fs').writeFileSync(${JSON.stringify(marker)},'called');
+`,{mode:0o700});
+  const synthetic=['AGE','SECRET','KEY','1'].join('-')+'A'.repeat(58),env={SOPS_AGE_KEY:synthetic,PATH:root},snapshot=structuredClone(env);
+  const cfg=resolveConfig(configFor('http://fixture.invalid',custody,{sops:tool,identity:null,runtimeSecretEnv:value=>value}),env);
+  const analysis=path.join(custody.stack,'runtime/files/sonarqube-analysis-token.txt');
+  fs.writeFileSync(analysis,ANALYSIS);
+  const original=fs.readFileSync(ref+'.enc'),encrypted=fs.readFileSync(analysis+'.enc');
+  const read=readCustody(cfg,'runtime/files/sonarqube-analysis-token.txt',{remember:value=>value});
+  assert.equal(read.present,false);assert.equal(read.identityRefusal,'native-tool-unavailable');
+  assert.equal(read.value,undefined,'native refusal cannot expose the materialized sibling');
+  const sealed=sealExtCustody(cfg,ref,MINTED,{scrub});
+  assert.equal(sealed.ok,false);assert.equal(sealed.identityRefusal,'native-tool-unavailable');
+  assert.deepEqual(fs.readFileSync(ref+'.enc'),original);assert.deepEqual(fs.readFileSync(analysis+'.enc'),encrypted);
+  assert.ok(!fs.existsSync(ref));assert.ok(!fs.existsSync(marker));assert.deepEqual(env,snapshot);
+  assert.ok(!JSON.stringify([read,sealed,cfg]).includes(synthetic));assertNoSecret([read,sealed],'native-script refusal');
 });

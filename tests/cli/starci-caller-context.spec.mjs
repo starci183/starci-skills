@@ -6,6 +6,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { main } from '../../scripts/cli/main.mjs';
 import { workflowCaller } from '../../scripts/agent/caller-context.mjs';
 import { ensureWorkflowHost } from '../../scripts/kernel/workflow-startup.mjs';
+import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const read = relative => parseYaml(fs.readFileSync(path.join(root, relative), 'utf8'));
@@ -20,24 +21,30 @@ const catalog = {
   }])),
 };
 
-const capture = (runScript = () => 0, env = {}) => {
+const privateRuntime = t => {
+  const runtimeRoot = mkdtemp(t, 'starci-caller-credentials-');
+  fs.copyFileSync(path.join(root, 'config.example.yaml'), path.join(runtimeRoot, 'config.example.yaml'));
+  return runtimeRoot;
+};
+
+const capture = (runScript = () => 0, env = {}, runtimeRoot = root) => {
   const output = { stdout: '', stderr: '' };
   return {
-    catalog, runtimeRoot: root, cwd: root, env, runScript, output,
+    catalog, runtimeRoot, cwd: root, env, runScript, output,
     stdout: text => { output.stdout += text; },
     stderr: text => { output.stderr += text; },
   };
 };
 
-test('workflow caller fields reach the native owner separately from the Kernel override', () => {
+test('workflow caller fields reach the native owner separately from the Kernel override', t => {
   let invoked;
-  const io = capture((script, args, options) => { invoked = { script, args, options }; return 0; });
+  const io = capture((script, args, options) => { invoked = { script, args, options }; return 0; }, {}, privateRuntime(t));
   const flags = ['--repo', 'project-owner', '--goal', 'wf-approved', '--agent', 'claude',
     '--caller-agent', 'codex', '--caller-model', 'gpt-6.1-sol', '--caller-effort', 'high'];
   assert.equal(main(['workflow', 'start', ...flags, '--json'], io), 0);
-  assert.equal(invoked.script, path.join(root, 'scripts', 'kernel', 'start-workflow.mjs'));
+  assert.equal(invoked.script, path.join(io.runtimeRoot, 'scripts', 'kernel', 'start-workflow.mjs'));
   assert.deepEqual(invoked.args, [...flags, '--json']);
-  assert.equal(invoked.options.env, io.env);
+  assert.deepEqual(invoked.options.env, io.env);
   assert.equal(invoked.options.cwd, root);
 });
 
@@ -74,10 +81,11 @@ test('caller flag validation refuses malformed ingress before any native owner r
   }
 });
 
-test('caller equals forms survive catalog dispatch and native failures remain failures', () => {
+test('caller equals forms survive catalog dispatch and native failures remain failures', t => {
+  const runtimeRoot = privateRuntime(t);
   for (const code of [1, 75]) {
     let invoked;
-    const io = capture((script, args) => { invoked = { script, args }; return code; });
+    const io = capture((script, args) => { invoked = { script, args }; return code; }, {}, runtimeRoot);
     const flags = ['--caller-agent=codex', '--caller-model=gpt-6.1-sol', '--caller-effort=high'];
     assert.equal(main(['workflow', 'start', ...flags], io), code);
     assert.deepEqual(invoked.args, flags);
@@ -98,7 +106,8 @@ test('shared caller parsing resolves split and equals forms without Kernel or am
   assert.throws(() => workflowCaller(['--caller-agent', '--caller-model', 'gpt-6.1-sol']));
 });
 
-test('catalog dispatch keeps passthrough caller flags outside declared caller context', () => {
+test('catalog dispatch keeps passthrough caller flags outside declared caller context', t => {
+  const runtimeRoot = privateRuntime(t);
   const declared = ['--caller-agent', 'codex', '--caller-model', 'gpt-6.1-sol', '--caller-effort', 'high'];
   for (const suffixAgent of ['claude', 'unknown-agent']) {
     const suffix = ['--caller-agent', suffixAgent, '--caller-model', 'unvalidated-model', '--caller-effort', 'unvalidated-effort'];
@@ -107,7 +116,7 @@ test('catalog dispatch keeps passthrough caller flags outside declared caller co
       const io = capture((script, args) => {
         invoked = { args, caller: workflowCaller(args) };
         return 0;
-      });
+      }, {}, runtimeRoot);
       const flags = [...prefix, '--', ...suffix];
       assert.equal(main(['workflow', 'start', ...flags], io), 0);
       assert.deepEqual(invoked.args, flags);

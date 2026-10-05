@@ -14,6 +14,7 @@ import path from 'node:path';
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from './secret-patterns.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { altOf } from './source-phrases.mjs';
+import { redactResolvedSecrets } from '../../engine/secrets.mjs';
 
 const REDACTION_VERSION = 'v1';
 export const MARK = '[redacted]';
@@ -41,9 +42,8 @@ export const SECRET_KEY = /^(?:password|passwd|pwd|pass|secret|otp|pin|pincode|p
 
 // ------------------------------------------------------------------------------ declared stack secrets
 // A product repo's .starcistacks/<stack>/stack.yaml `secrets:` block names each secret and the runtime file
-// that holds its value. Both are learned once per repo root per process; values never leave this module.
+// that holds its value. Values are refreshed from their declared inputs; values never leave the filter.
 const STACK_DIRS = ['.starcistacks'];
-const learnedRoots = new Set();
 const secretValues = new Set();
 const secretNames = new Set();
 const envName = (name) => String(name).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase();
@@ -60,8 +60,6 @@ function addSecretValue(value) {
 export function learnStackSecrets(repoRoot) {
   if (typeof repoRoot !== 'string' || !repoRoot) return;
   const root = path.resolve(repoRoot);
-  if (learnedRoots.has(root)) return;
-  learnedRoots.add(root);
   for (const stackDir of STACK_DIRS) {
     for (const entry of listSafe(path.join(root, stackDir))) {
       if (!entry.isDirectory()) continue;
@@ -98,7 +96,7 @@ const declaredNameRule = () => {
 export function redactText(text, { repoRoots = [] } = {}) {
   if (typeof text !== 'string' || !text) return text;
   for (const root of repoRoots) learnStackSecrets(root);
-  let out = text.replace(PEM_BLOCK, (m, kind) => `[redacted:pem ${kind}]`);
+  let out = redactResolvedSecrets(text).replace(PEM_BLOCK, (m, kind) => `[redacted:pem ${kind}]`);
   for (const value of secretValues) if (out.includes(value)) out = out.split(value).join('[redacted:stack-secret]');
   for (const rule of PATTERNS) {
     rule.g.lastIndex = 0;
@@ -136,6 +134,20 @@ export function redactData(value, key = null, depth = 0) {
 export const isTextMedia = (mediaType) => /^text\/|[/+](?:json|xml|yaml|x-yaml|javascript|x-ndjson|x-diff|x-patch|csv|sql|x-sh)\b|^application\/(?:json|xml|yaml|javascript|x-ndjson|x-diff|x-patch|sql)$/i
   .test(String(mediaType ?? ''));
 
+/** The supported text encoding selected by a byte-order mark. */
+export function textEncodingOf(bytes) {
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return 'utf-16le';
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) return 'utf-16be';
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return 'utf-8-bom';
+  return 'utf-8';
+}
+
+/** Decode supported text without accepting malformed bytes as sanitized evidence. */
+export function decodeText(bytes) {
+  const encoding = textEncodingOf(bytes);
+  return new TextDecoder(encoding === 'utf-8-bom' ? 'utf-8' : encoding, { fatal: true }).decode(bytes);
+}
+
 /**
  * Bytes ready for a blob put: text bytes redacted ({redaction:'v1'}), anything else untouched
  * ({redaction:'binary'}). The blob sha is then taken over the returned bytes.
@@ -143,7 +155,7 @@ export const isTextMedia = (mediaType) => /^text\/|[/+](?:json|xml|yaml|x-yaml|j
 export function redactBytes(bytes, mediaType, { repoRoots = [] } = {}) {
   const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
   if (!isTextMedia(mediaType)) return { bytes: buf, redaction: 'binary' };
-  const text = buf.toString('utf8');
+  const text = decodeText(buf);
   const clean = redactText(text, { repoRoots });
-  return { bytes: clean === text ? buf : Buffer.from(clean, 'utf8'), redaction: REDACTION_VERSION };
+  return { bytes: Buffer.from(clean, 'utf8'), redaction: REDACTION_VERSION };
 }

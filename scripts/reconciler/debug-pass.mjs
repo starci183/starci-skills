@@ -52,9 +52,14 @@ export function fixOwnerOf(key) {
 
 export function runPass(state, snap, { now, dispatch }) {
   const alerts = new Map((snap?.alerts ?? []).map((a) => [a.key, a.text]));
+  const healthy = new Set((snap?.observations ?? []).filter((row) => row.state === 'healthy').map((row) => row.key));
   const rows = [];
   for (const [key, fix] of Object.entries(state.fixes)) {
     if (alerts.has(key)) continue;
+    if (!healthy.has(key)) {
+      rows.push({ key, text: fix.text, state: fix.state, observation: 'unknown', fixOwner: fixOwnerOf(key), lane: fix.lane ?? null, since: fix.since });
+      continue;
+    }
     rows.push({ key, text: fix.text, state: 'resolved', fixOwner: fixOwnerOf(key), lane: fix.lane ?? null, since: fix.since });
     delete state.fixes[key];
   }

@@ -6,11 +6,15 @@ import { workerShow } from '../../scripts/api/orca/worker-show.mjs';
 export function closeWorker({ dispatch, handle = null, stopFirst = false, retryRelease = false, env = process.env, deps = {} } = {}) {
   const shown = (deps.show ?? workerShow)({ dispatch });
   const terminal = handle ?? shown?.agentTerminalHandle ?? shown?.dispatch?.assigneeHandle ?? shown?.result?.worker?.agentTerminalHandle;
-  let reads = 0;
+  const object = { pid: 991, ppid: 0, name: 'fixture-agent', created: 1000, exe: 'C:\\fixture\\agent.exe' };
+  const identity = { pid: object.pid, birth: '116444736010000000', exe: object.exe };
+  let reads = 0, table = [object];
   return realCloseWorker({ dispatch, handle: terminal, stopFirst, retryRelease, env, deps: {
-    tableOf: () => ++reads === 1 || env.STARCI_FAKE_CLOSURE_UNPROVEN ? [{ pid: 991, ppid: 0, name: 'fixture-agent', created: 'fixture' }] : [],
-    envOf: () => [{ pid: 991, values: { ORCA_TERMINAL_HANDLE: terminal } }],
-    kill: () => ({ ok: false }), sleep: () => {}, verifyMs: 0, stopVerifyMs: 0,
+    tableOf: () => { if (++reads > 1 && !env.STARCI_FAKE_CLOSURE_UNPROVEN) table = []; return table; },
+    // Environment rows describe the same live census; old tags cannot invent an uncaptured process after closure.
+    envOf: () => table.map(row => ({ pid: row.pid, values: { ORCA_TERMINAL_HANDLE: terminal } })),
+    capture: pid => ({ schema: 'starci/owned-process@1', pid, ok: true, outcome: 'captured', proof: 'process-handle-live', identity }),
+    stopProcess: () => ({ ok: false, outcome: 'unknown' }), sleep: () => {}, verifyMs: 0, stopVerifyMs: 0,
     ...deps,
   } });
 }

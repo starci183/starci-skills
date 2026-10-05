@@ -3,22 +3,24 @@
 // 2026-09-29: a colon-space inside a plain scalar was committed to product .starciwork and to .claude knowledge, and
 // literal usernames/passwords sat in product accounts.yaml files with no check to flag them. Three paths now refuse
 // them: the lib (scripts/work/validate/work-hygiene.mjs), the product repo's pre-commit hook (scripts/guards/hook-install.mjs
-// ensureWorkHook) and starci kernel settle (reason work-hygiene-red, contract change work-hygiene-gate). A clean change passes.
+// ensureWorkHook) and starci kernel settle (reason work-hygiene-red, current hygiene contract). A clean change passes.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileReport, inspectLedger, ledgerFileFor, openLedger, recordCheckRun, writeContract } from '../../engine/db/ledger.mjs';
-import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 import { ensureWorkHook, guardReceiptErrors, WORK_HOOK_MARKER } from '../../scripts/guards/hook-install.mjs';
 import {
-  WORK_ACCOUNT_LITERAL, WORK_HYGIENE_CHANGE, WORK_SECRET_FILE, WORK_SECRET_LITERAL, WORK_SECRET_PATTERN, WORK_YAML_UNPARSEABLE,
+  WORK_ACCOUNT_LITERAL, WORK_SECRET_FILE, WORK_SECRET_LITERAL, WORK_SECRET_PATTERN, WORK_YAML_UNPARSEABLE,
   checkWorkFiles, isLiteralCredential, scanSecrets,
 } from '../../scripts/work/validate/work-hygiene.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { settleFixture } from '../helpers/workflow-settle-fixture.mjs';
 import { withoutGitLocalEnv } from '../../scripts/lib/git.mjs';
+import { captureGateBinding } from '../../scripts/kernel/gate-settle.mjs';
+import { sha256File } from '../../engine/digest.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_PREFIX']) delete process.env[key];
 
@@ -162,8 +164,6 @@ test('the hook wraps husky\'s generated pre-commit dispatcher and never overwrit
 });
 
 // ------------------------------------------------------------------------------------------------ starci kernel settle
-const registry = loadContractChanges(ROOT);
-const admittedAfter = () => { const c = registry.changes.find((x) => x.id === WORK_HYGIENE_CHANGE); assert.ok(c, 'work-hygiene-gate is registered'); return c.effectiveAt; };
 
 const checkout = (t) => {
   const repo = repoOf(t);
@@ -173,15 +173,23 @@ const checkout = (t) => {
   fs.appendFileSync(path.join(repo, '.git', 'info', 'exclude'), '.starciwork/\n');
   return repo;
 };
-const seedJob = (repo, { jobId, wf, files, admittedAt }) => {
-  const ledger = openLedger({ file: ledgerFileFor(repo) });
+const seedJob = (repo, { jobId, wf, files, admittedAt, env = process.env }) => {
+  const read = spawnSync(process.execPath, [path.join(ROOT, 'scripts/gates/read-digest.mjs'), '--root', repo, '--knowledge', 'docs/architecture.md'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 30000 });
+  assert.equal(read.status, 0, read.stderr || read.stdout);
+  // Native READ records the physical target root; keep this operational proof outside portable Work records.
+  const evidence = put(repo, 'docs/checks/read-digest.json', JSON.stringify(JSON.parse(read.stdout)));
+  files = [...files, evidence];
+  const owned = ['src/', '.starciwork/', 'docs/checks/'];
+  const placements = owned.map(path => ({ base: repo, path }));
+  const ledgerFile = ledgerFileFor(repo, { env });
+  const ledger = openLedger({ file: ledgerFile });
   try {
     seedWorkflow(ledger, { id: wf, state: { phase: 'running', job: 'scope' },
       jobs: [{ jobId, opId: 'scope.define', dispatchId: `ctx-${jobId}`, terminalHandle: `term-${jobId}`, status: 'running',
-        payload: { opId: 'scope.define', owned_paths: ['src/', '.starciwork/'], orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
+        payload: { opId: 'scope.define', owned_paths: owned, orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
     const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
     ledger.transaction((db) => {
-      writeContract(db, { attemptId, markdown: '# contract', context: { worktree: repo }, createdAt: admittedAt });
+      writeContract(db, { attemptId, markdown: '# contract', context: { worktree: repo, packet: { context: { selected_op: { contract: { id: 'scope.define', reads: [{ id: 'standard', path: 'docs/architecture.md' }] }, checks: { required: [], candidates: [] } }, readRefs: [{ path: 'docs/architecture.md', absolute: path.join(ROOT, 'docs/architecture.md'), rootKind: 'source', root: ROOT, sha256: sha256File(path.join(ROOT, 'docs/architecture.md')) }], owned_paths: placements.map(row => ({ root: row.base, path: row.path })), gate_binding: captureGateBinding(placements, { at: admittedAt }) } } }, createdAt: admittedAt });
       fileReport(db, { attemptId, outcome: 'done', createdAt: Date.now(),
         report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'wrote the sign-in accounts record', files,
           head: gitOk(repo, 'rev-parse', 'HEAD') } });
@@ -190,17 +198,25 @@ const seedJob = (repo, { jobId, wf, files, admittedAt }) => {
       }
     });
   } finally { ledger.close(); }
+  // A linked workflow checkout has a .git file; operational CHECK input stays beside its private ledger.
+  const scratch = fs.mkdtempSync(path.join(path.dirname(ledgerFile), 'native-read-'));
+  try {
+    const checks = path.join(scratch, 'checks.json');
+    fs.writeFileSync(checks, JSON.stringify({ checks: [{ name: 'read-knowledge', exitCode: 0, command: `starci gate read --root "${repo}" --knowledge docs/architecture.md` }] }));
+    const observed = spawnSync(process.execPath, [API, 'record-checks', '--repo', repo, '--job', jobId, '--checks-file', checks, '--json'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 30000 });
+    assert.equal(observed.status, 0, observed.stderr || observed.stdout);
+  } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
   return jobId;
 };
-const settle = (repo, jobId) => {
-  const r = spawnSync(process.execPath, [API, 'settle', '--repo', repo, '--job', jobId, '--verdict', 'pass', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
+const settle = (repo, jobId, env = process.env) => {
+  const r = spawnSync(process.execPath, [API, 'settle', '--repo', repo, '--job', jobId, '--verdict', 'pass', '--json'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 120000 });
   let body = null; try { body = JSON.parse(r.stdout); } catch { /* not json */ }
   return { r, body };
 };
-const statusOf = (repo, jobId) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status; } finally { l.close(); } };
+const statusOf = (repo, jobId, env = process.env) => { const l = inspectLedger({ file: ledgerFileFor(repo, { env }) }); try { return l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status; } finally { l.close(); } };
 
-test('starci kernel settle refuses an unparseable Work YAML and a literal password (work-hygiene-red), a clean change and an older leg pass', (t) => {
-  const at = admittedAfter() + 1000;
+test('starci kernel settle refuses an unparseable Work YAML and a literal password (work-hygiene-red), current hygiene also refuses an early admission and cannot invent other proof', (t) => {
+  const at = Date.now() - 1000;
 
   const brokenRepo = checkout(t);
   const broken = seedJob(brokenRepo, { jobId: 'op-scope-broken', wf: 'wf-broken', files: [put(brokenRepo, `${FLOW}/index.yaml`, BROKEN_YAML)], admittedAt: at });
@@ -221,11 +237,13 @@ test('starci kernel settle refuses an unparseable Work YAML and a literal passwo
   const oldRepo = checkout(t);
   const old = seedJob(oldRepo, { jobId: 'op-scope-old', wf: 'wf-old', files: [put(oldRepo, `${FLOW}/index.yaml`, BROKEN_YAML)], admittedAt: at - 24 * 3600 * 1000 });
   const legacy = settle(oldRepo, old);
-  assert.notEqual(legacy.body?.reason, 'work-hygiene-red', 'a leg admitted before the change settles on its old contract');
+  assert.equal(legacy.r.status,1,legacy.r.stderr || legacy.r.stdout);
+  assert.equal(legacy.body?.reason,'work-hygiene-red','an earlier admission does not waive current hygiene');
 
-  const cleanRepo = checkout(t);
-  const clean = seedJob(cleanRepo, { jobId: 'op-scope-clean', wf: 'wf-clean', files: [put(cleanRepo, `${FLOW}/accounts.yaml`, CLEAN_ACCOUNTS)], admittedAt: at });
-  const passed = settle(cleanRepo, clean);
-  assert.equal(passed.r.status, 0, passed.r.stderr || passed.r.stdout);
-  assert.equal(statusOf(cleanRepo, clean), 'succeeded');
+  // A passing Git op reaches native checkpointing, so use the existing real worktree/registry fixture.
+  const cleanFixture = settleFixture(t), cleanRepo = cleanFixture.tree;
+  const clean = seedJob(cleanRepo, { jobId: 'op-scope-clean', wf: cleanFixture.workflowId, files: [put(cleanRepo, `${FLOW}/accounts.yaml`, CLEAN_ACCOUNTS)], admittedAt: at, env: cleanFixture.env });
+  const passed = settle(cleanRepo, clean, cleanFixture.env);
+  assert.equal(passed.r.status,0,passed.r.stderr || passed.r.stdout);
+  assert.equal(statusOf(cleanRepo, clean, cleanFixture.env), 'succeeded','the clean Work record qualifies through its real independent READ');
 });

@@ -7,6 +7,7 @@ import { Worker } from 'node:worker_threads';
 import { once } from 'node:events';
 import { probe, planToResult, readWindsurfApiKey } from '../../scripts/agent/quota/devin.mjs';
 import { probeQuota } from '../../scripts/agent/quota/index.mjs';
+import {allocationSettings} from '../../engine/config.mjs';
 
 // The devin quota probe reads the Windsurf seat API devin.exe calls
 // (SeatManagementService/GetUserStatus, Connect-JSON). The probe is synchronous
@@ -192,4 +193,21 @@ test('STARCI_DEVIN_SEAT_ENDPOINT only redirects the key to a loopback URL', asyn
   const opt = noKey(probe({ now: FIXED_NOW, endpoint: 'https://evil.example/x', credentialsFile: cred, cacheMs: 0, timeoutMs: 2000 }));
   assert.match(opt.detail, /loopback/, 'the endpoint option obeys the same rule');
   assert.equal((await seat.requests()).length, 1, 'only the loopback override reached a server');
+});
+
+test('cached quota is bound to credentials and reapplies current account, policy and observation age',async t=>{
+  const seat=await fakeSeat(t,{planStatus:{dailyQuotaRemainingPercent:71,weeklyQuotaRemainingPercent:88}});
+  const file=credFile(t),policy=allocationSettings().admission;
+  const options={endpoint:seat.endpoint,credentialsFile:file,cacheMs:60000,policy,now:FIXED_NOW,account:'first'};
+  const first=noKey(probe(options));assert.equal(first.state,'ok');assert.equal(first.account,'first');
+  const stricter={...policy,version:policy.version+1,reservePercent:20};
+  const second=noKey(probe({...options,policy:stricter,now:FIXED_NOW+1,account:'second'}));
+  assert.equal(second.account,'second');assert.equal(second.policyVersion,stricter.version);assert.equal(second.state,'limited');
+  assert.equal(second.observedAt,FIXED_NOW,'cache hits cannot restamp provider observations');
+  const stale=noKey(probe({...options,now:FIXED_NOW+policy.maxAgeMs+1}));assert.equal(stale.state,'unknown');assert.equal(stale.fresh,false);
+  assert.equal((await seat.requests()).length,1,'unchanged credentials reuse only the raw provider observation');
+  const rotated=KEY+'-rotated';fs.writeFileSync(file,'windsurf_api_key = "'+rotated+'"\n');
+  const next=probe({...options,now:FIXED_NOW+2});assert.equal(next.state,'ok');assert.equal(next.observedAt,FIXED_NOW+2);
+  assert.equal(JSON.stringify(next).includes(rotated),false);
+  const requests=await seat.requests();assert.equal(requests.length,2);assert.equal(JSON.parse(requests[1].body).metadata.apiKey,rotated);
 });

@@ -12,8 +12,7 @@ import { fakeCriticOrca, passingVerdict } from '../helpers/fake-critic-orca.mjs'
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 
 // The draw loop's independent critic is an Orca worker started through orchestration worker-start with the provider,
-// model and effort of runtimes.yaml allocation.drawLoop.critic (modules/kernel/contract-changes/
-// draw-critic-worker-start.yaml): it gets a Task spec naming its clean dir, the images and verdict.json, the runtime
+// model and effort of runtimes.yaml allocation.drawLoop.critic (scripts/work/draw-loop/critic.mjs): it gets a Task spec naming its clean dir, the images and verdict.json, the runtime
 // waits for its worker_done through the orchestration commands, reads the verdict, then stops and releases the worker.
 // A timeout, a refusal or a missing verdict is a typed outcome with no verdict - never a pass. Every Orca call here goes
 // to a fake client; nothing reaches a host.

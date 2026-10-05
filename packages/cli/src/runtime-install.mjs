@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { writeRuntimeShim } from './shim.mjs';
 
-export const RUNTIME_VERSION = '1.0.0-alpha.4';
+import { RUNTIME_VERSION } from './runtime-install.generated.mjs';
+export { RUNTIME_VERSION };
 
 const writeTo = (target, text) => {
   if (typeof target === 'function') target(text);
@@ -105,6 +106,7 @@ export function installRuntime({ cwd = process.cwd(), home = os.homedir(), force
   const installStatus = statusOf(installed, 'runtime installer', report);
   if (installStatus !== 0) return installStatus;
 
-  writeRuntimeShim({ root: runtimeRoot, home, cli: fileURLToPath(new URL('../bin/starci.mjs', import.meta.url)) }, deps);
+  // The download cache supplies the installer; runtime commands must read the installed host's config and bindings.
+  writeRuntimeShim({ root: path.resolve(cwd, '.claude'), home, cli: fileURLToPath(new URL('../bin/starci.mjs', import.meta.url)) }, deps);
   return 0;
 }

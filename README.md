@@ -28,11 +28,12 @@ StarCi provides:
 - **Machine checks:** `scripts/checks/` holds the deterministic gates (architecture, brand,
   staleness, proof bundles, example evidence) that ops must pass before a job settles.
 
-**Requirements:** Node.js 22.13+ (unflagged `node:sqlite`) and a coding agent host. Provider access
+**Requirements:** Node.js 22.22.3 or later within the 22 branch, or 24.15.0 or later within the 24 branch,
+with unflagged `node:sqlite`, and a coding agent host (`package.json` `engines.node`). Provider access
 comes from locally configured agent CLIs (Devin, Claude Code, Codex, Orca) — StarCi has no API key
 of its own.
 
-**Status:** `1.0.0-alpha.2` (alpha line; contracts are provisional until `1.0.0`), MIT, not yet published to npm. Use the source or a reviewed archive.
+**Source version:** `1.0.0-alpha.4` (alpha line; contracts are provisional until `1.0.0`), MIT.
 
 [Overview](#overview) · [Stack](#stack) · [Repository layout](#repository-layout) ·
 [Development](#development) · [Install](#install) · [Documentation](#documentation)
@@ -45,7 +46,7 @@ through the kernel and operation agents.
 
 ## Stack
 
-Node.js 22.13+, npm, SQLite (`node:sqlite`), authored YAML contracts, and JavaScript checks.
+Supported Node.js 22/24, npm, SQLite (`node:sqlite`), authored YAML contracts, and JavaScript checks.
 The examples use NestJS backend and Next.js frontend applications.
 
 ## Repository layout
@@ -174,8 +175,9 @@ Agent-facing instructions live in [CONTEXT.md](CONTEXT.md); humans only need thi
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md): `npm ci`, `npm test` (`node --test tests/*.spec.mjs`),
-evidence is re-recorded — never hand-edited.
+See [CONTRIBUTING.md](CONTRIBUTING.md): use `starci npm ci` and
+`starci test run --level L1 --spec <files>` for affected specs under `tests/**/*.spec.mjs`.
+The release cut owns the full suite; evidence is re-recorded — never hand-edited.
 
 ## License
 

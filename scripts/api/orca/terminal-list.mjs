@@ -9,6 +9,13 @@
 import { orcaCall } from './lib.mjs';
 import { arg, flag } from '../../lib/cli-arg.mjs';
 
+/**
+ * Read the host's terminal inventory, optionally scoped to one worktree, without claiming ownership.
+ * includeVisualLayouts preserves tab layout/title details independently of provider pane titles.
+ * Empty fallback arrays on a failed or unavailable-host read do not prove that no terminal exists.
+ * @param {object} [input] - Optional worktree selector and visual-layout inclusion flag.
+ * @returns {object} ok, terminals, visualLayouts, error, and hostUnavailable for caller verification.
+ */
 export function terminalList({ worktree, includeVisualLayouts = false } = {}) {
   const r = orcaCall('terminal-list', { worktree, 'include-visual-layouts': includeVisualLayouts === true });
   return { ok: r.exitCode === 0, terminals: r.result?.terminals ?? [],

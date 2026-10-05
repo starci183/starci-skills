@@ -29,13 +29,14 @@ import type { TestApi, TestCaller, TestHttp } from "./api"
 import { createTestApi } from "./graphql"
 import { createTestHttp } from "./http-client"
 import { cutConnection, databaseOf, restoreConnections } from "./database-outage"
+import { createWriteFault } from "./database-write-fault"
 import { createKeycloakAdmin } from "./keycloak"
 import { pollUntil } from "./poll"
 import { freePorts } from "./ports"
 import { redisSize } from "./redis-probe"
 import { buildWiring, RUN_DIRECTORY } from "./wiring"
 import { WorldLock } from "./world-lock"
-import type { AppHandle, DatabaseOutageHandle, InfraHandle, KeycloakInfraHandle, ModulesWorldSpec, PostgresInfraHandle, ProviderToken, RedisInfraHandle, ServiceHandle, SignedInPerson, WaitForOptions, WorldBucket, WorldInfra, WorldKeycloak, WorldRequestScope, WorldSpec } from "./world-types"
+import type { AppHandle, DatabaseOutageHandle, InfraHandle, KeycloakInfraHandle, ModulesWorldSpec, PostgresInfraHandle, PostgresWriteFault, PostgresWriteOperation, ProviderToken, RedisInfraHandle, ServiceHandle, SignedInPerson, WaitForOptions, WorldBucket, WorldInfra, WorldKeycloak, WorldRequestScope, WorldSpec } from "./world-types"
 
 const DEFAULT_WAIT_MS = 30_000
 const DEFAULT_POLL_MS = 250
@@ -107,6 +108,8 @@ export class World {
     private readonly subscriptions: Array<GraphqlSubscription<unknown>> = []
     /** The connections this world took down (`infra.postgresql.connection(name).cut()`) and has not restored yet. */
     private readonly downConnections = new Set<string>()
+    /** Named faults stay registered through unknown provisioning or cleanup; stop attempts every cleanup independently. */
+    private readonly writeFaults = new Map<string, { connection: string; table: string; fault: PostgresWriteFault }>()
 
     constructor(
         private readonly declaration: AnyTestWorldConfig,
@@ -116,6 +119,7 @@ export class World {
 
     /** Boots the world; called by the `beforeAll` that `useTestWorld` registers. */
     async start(): Promise<void> {
+        if (this.writeFaults.size > 0) throw worldError(TestWorldErrorCode.InfrastructureFailed, "write-fault cleanup custody must be resolved before starting the world")
         const context = readRunContext()
         const lock = this.openLock(context)
         // The boot uses the shared stack: it waits for another world's outage to end, and an outage waits for it.
@@ -186,7 +190,11 @@ export class World {
     async stop(): Promise<void> {
         const runtime = this.runtime
         this.runtime = null
+        const failures: Array<unknown> = []
+        const restored = await Promise.allSettled([...this.writeFaults.values()].map(({ fault }) => fault.restore()))
+        for (const result of restored) if (result.status === "rejected") failures.push(result.reason)
         if (runtime === null) {
+            if (failures.length > 0) throw worldError(TestWorldErrorCode.InfrastructureFailed, "write-fault cleanup failed; operation custody is retained", new AggregateError(failures))
             this.lock?.close()
             this.lock = null
             return
@@ -194,13 +202,16 @@ export class World {
         // Only a world that injected an outage restores the proxies: another world's outage is that world's to end.
         try {
             if (this.lock?.exclusive === true) await this.restoreInfra(runtime.context)
+        } catch (cause) {
+            failures.push(cause)
         } finally {
-            this.outages.clear()
-            this.lock?.close()
-            this.lock = null
+            if (this.writeFaults.size === 0) {
+                this.outages.clear()
+                this.lock?.close()
+                this.lock = null
+            }
         }
         await Promise.all(this.subscriptions.splice(0).map((subscription) => subscription.close().catch(() => undefined)))
-        const failures: Array<unknown> = []
         const contexts = [...(runtime.root === null ? [] : [runtime.root]), ...[...runtime.apps].reverse().map((app) => app.context)]
         for (const context of contexts) {
             try {
@@ -209,9 +220,15 @@ export class World {
                 failures.push(cause)
             }
         }
-        for (const dataSource of runtime.dataSources) if (dataSource.isInitialized) await dataSource.destroy()
+        for (const dataSource of runtime.dataSources) if (dataSource.isInitialized) {
+            try {
+                await dataSource.destroy()
+            } catch (cause) {
+                failures.push(cause)
+            }
+        }
         const [first] = failures
-        if (first !== undefined) throw worldError(TestWorldErrorCode.InfrastructureFailed, "an app context failed to close", first)
+        if (first !== undefined) throw worldError(TestWorldErrorCode.InfrastructureFailed, "world cleanup failed", new AggregateError(failures))
     }
 
     /** The booted apps by name. */
@@ -341,6 +358,33 @@ export class World {
         const redis = infra.redis
         const postgres = infra.postgresql
         const pgConnect = this.dependencies.pgConnect
+        const writeFault = (connection: string, table: string, operation: PostgresWriteOperation): PostgresWriteFault => {
+            const context = this.booted().context
+            const declaration = this.declaredConnections().find((entry) => entry.name === connection)
+            if (declaration === undefined) throw notDeclared(`infra.postgresql.connection(${connection})`)
+            if ([...this.writeFaults.values()].some((entry) => entry.connection === connection && entry.table === table)) throw worldError(TestWorldErrorCode.ConfigInvalid, "restore this table's existing fault before preparing another")
+            const owner = createWriteFault(context, declaration, table, operation, pgConnect)
+            const key = `postgresql:write:${owner.name}`
+            const fault: PostgresWriteFault = {
+                name: owner.name,
+                errorCode: owner.errorCode,
+                count: () => owner.count(),
+                install: async () => {
+                    this.booted()
+                    await this.beginOutage(key)
+                    await owner.install()
+                },
+                restore: async () => {
+                    await this.openLock(context).acquire()
+                    this.outages.add(key)
+                    await owner.restore()
+                    this.writeFaults.delete(key)
+                    this.endOutage(key)
+                },
+            }
+            this.writeFaults.set(key, { connection, table, fault })
+            return fault
+        }
         const databaseOutage = (name: string): DatabaseOutageHandle => {
             if (postgres === undefined) throw notDeclared("infra.postgresql")
             databaseOf(postgres, name)
@@ -356,6 +400,7 @@ export class World {
                 this.endOutage(key)
             }
             return {
+                writeFault: (table, operation) => writeFault(name, table, operation),
                 cut,
                 restore,
                 during: async <T>(during: () => Promise<T>): Promise<T> => {

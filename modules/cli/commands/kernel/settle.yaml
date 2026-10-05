@@ -282,3 +282,17 @@ refuses:
     again. The matcher is the one runtime rule RT_ABSOLUTE_PATH uses.'
 usedBy: "drive.settle - last step of the op lifecycle: consume-report -> check re-runs -> starci kernel record-checks
   -> settle; a refused settle is a routed verdict (usually retry), never silent loss"
+
+mechanismObservation: >-
+  A fresh pass carrying mechanism-proof-observation requires the existing independent check_runs
+  receipt for every mandatory mechanical proof of the filed selected mode. Native observed output
+  is judged by its existing specialized owner; a green attachment never substitutes for execution.
+  Exact attempt, process status, time, cwd, current target/input bytes and indexed output must agree.
+  The workflow lock rechecks the same native rows and input bytes before preparing a checkpoint.
+  A prepared settlement retains its original accepted decision and recovery authority.
+  READ still needs its filed canonical-law and real target hashes before CHECK/REPORT, including
+  no-touch deciding operations. Source drift after admission remains advisory. Manual semantic
+  review remains an attachment obligation and is not promoted to a fabricated executable command.
+  Only security.verify may complete its inspection with the observed lint exit 1 and complete typed
+  security findings; the stored exit remains 1/fail. Unavailable or crashed tools and dropped findings
+  refuse. Independent delivery, other mechanical gates and report outcome requirements are unchanged.

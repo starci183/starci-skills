@@ -66,7 +66,7 @@ function writeGuardFile(dir, name, body) {
  * because the runtime's own git (checkpoints, land scratch trees) runs as children of the Kernel's api calls and
  * inherits its ORCA_TERMINAL_HANDLE (contract change kernel-guard-file).
  */
-export const GUARD_ROLES = Object.freeze(['op', 'kernel']);
+const GUARD_ROLES = Object.freeze(['op', 'kernel']);
 
 /** <guards root>/jobs/<job>.json — who the worker is, its role and which absolute paths it owns. */
 export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned, workflowWorktree = null, role = 'op', op = null }) {

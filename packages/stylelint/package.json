@@ -1,15 +1,16 @@
 {
   "name": "@starci/stylelint-canon",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "description": "The StarCi CSS lint canon (HFS R61): grammar tokens only, raw brand values only in brand.css, no !important, a global sheet that only imports and declares tokens, and no token redefined in a CSS module.",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": false,
   "exports": {
     ".": "./index.mjs"
   },
   "main": "./index.mjs",
   "files": [
+    "LICENSE",
     "*.mjs",
     "lib/*.mjs",
     "!*.spec.mjs",

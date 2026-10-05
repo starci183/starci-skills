@@ -29,7 +29,7 @@ export const PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 const BINDING_KEYS = Object.freeze(['canon', 'provenance', 'identity']);
 
 const EXT = /\.(?:mjs|cjs|js|ts|tsx|yaml|yml|md|json|cmd|ps1|sh|toml)$/;
-const OUT = /node_modules\/|(?:^|\/)package\.json$|(?:^|\/)package-lock\.json$|(?:^|\/)pnpm-lock\.yaml$|(?:^|\/)yarn\.lock$|CHANGELOG|packages\/[^/]+\/runtime\/|^tests\/|\.spec\.|\.starciwork\/|modules\/kernel\/contract-changes\//;
+const OUT = /node_modules\/|(?:^|\/)package\.json$|(?:^|\/)package-lock\.json$|(?:^|\/)pnpm-lock\.yaml$|(?:^|\/)yarn\.lock$|CHANGELOG|packages\/[^/]+\/runtime\/|^tests\/|\.spec\.|\.starciwork\//;
 const inScope = (rel) => EXT.test(rel) && rel !== PINS_FILE && !OUT.test(rel);
 
 const SEMVER = /\d+\.\d+\.\d+/g;

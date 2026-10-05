@@ -13,12 +13,17 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
+import {TEST_REGISTRY_ENV} from '../../engine/db/machine.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
 import {classifyFailure,measurementCheckClass,resolveRootOwner,failureSignature} from '../../scripts/kernel/verify-failure.mjs';
 import {validateOpReport} from '../../scripts/kernel/report-envelope.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {probe} from '../../scripts/api/http/probe.mjs';
 import {checkEnvironments,discoverHealth,envHealthMain,environmentIdsOfPaths,readRegistered} from '../../scripts/uat/env-health.mjs';
 import {recordEnvelopeChecks} from '../../scripts/kernel/verbs/shared/check-evidence.mjs';
+import {admitPacket,captureDispatchInputs,selectDispatchContract} from '../../scripts/kernel/dispatch-admission.mjs';
+import {revParse} from '../../scripts/api/git/rev-parse.mjs';
+import {withoutGitLocalEnv} from '../../scripts/lib/git.mjs';
 
 // These cases exercise the owner-flow routing of verify failures; autopilot (scripts/kernel/autopilot-run.mjs)
 // is on by default and re-routes an owner gate to a supervisor-gate, so this spec runs with it off -
@@ -41,9 +46,43 @@ const UAT_ROOT_CAUSE={node:'impl.login.shop-be.session-custody',self:false,categ
   evidence:['manifest.yaml step-6/step-7 observed no'],counterCheck:'a served revisit lands without a fresh prompt',
   expectedFix:'refreshSession stops re-demanding the factor for a verified session',recheck:'node --test e2e/login-password-sign-in.spec.mjs'};
 
-const world=(t,{legs=['uat.verify'],workspace=true}={})=>{
-  const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-verify-rel-'));
-  t.after(()=>fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+const seedTargetBaseline=repo=>{
+  fs.writeFileSync(path.join(repo,'.gitignore'),'.starciwork/\n');
+  const options={cwd:repo,encoding:'utf8',windowsHide:true,timeout:30000,env:withoutGitLocalEnv(process.env)};
+  for(const args of [
+    ['init','-q','-b','main'],
+    ['add','--','.gitignore'],
+    ['-c','user.name=verify-reliability','-c','user.email=verify-reliability@starci.test','-c','commit.gpgSign=false',
+      '-c',`core.hooksPath=${path.join(repo,'.starciwork','no-hooks')}`,'commit','-q','-m','private target baseline'],
+  ]){
+    const result=spawnSync('git',args,options);
+    assert.equal(result.status,0,result.stderr||result.error?.message);
+    assert.equal(result.signal,null);
+    assert.equal(result.error,undefined);
+  }
+  const head=revParse(repo,'HEAD');
+  assert.match(head,/^[0-9a-f]{40,64}$/);
+  return head;
+};
+
+const world=(t,{legs=['uat.verify'],workspace=true,admitted=false}={})=>{
+  const base=fs.mkdtempSync(path.join(os.tmpdir(),'starci-verify-rel-'));
+  t.after(()=>fs.rmSync(base,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const wf='wf-verify-rel',repo=admitted?path.join(base,'workflow'):base;
+  const env={...process.env,...(admitted?{[TEST_REGISTRY_ENV]:path.join(base,'machine.sqlite')}:{})};
+  let workflowWorktree=null;
+  if(admitted){
+    const main=path.join(base,'main');fs.mkdirSync(main);seedTargetBaseline(main);
+    const branch=`wf-${wf}`;
+    const made=spawnSync('git',['worktree','add','-q','-b',branch,repo,'main'],
+      {cwd:main,encoding:'utf8',windowsHide:true,timeout:30000,env:withoutGitLocalEnv(env)});
+    assert.equal(made.error,undefined,made.stderr||made.stdout);
+    assert.equal(made.signal,null,made.stderr||made.stdout);
+    assert.equal(made.status,0,made.stderr||made.stdout);
+    workflowWorktree=registerWorkflowWorktree({env},{workflowId:wf,orcaWorktreeId:'verify-reliability::workflow',path:repo,branch});
+    assert.equal(workflowWorktree.path,path.resolve(repo));
+    assert.equal(workflowWorktree.branch,branch);
+  }
   if(workspace){
     const work=path.join(repo,'.starciwork');
     fs.mkdirSync(path.join(work,'features','login','impl','shop-be','session-custody'),{recursive:true});
@@ -51,9 +90,8 @@ const world=(t,{legs=['uat.verify'],workspace=true}={})=>{
     fs.writeFileSync(path.join(work,'features','login','impl','shop-be','session-custody','index.yaml'),
       'schema: work/implementation@1\nid: impl.login.shop-be.session-custody\nrepository: shop-be\nowners:\n  - {role: refresh-session, path: be/src/auth/refresh-session}\n  - {role: sign-out, path: be/src/auth/sign-out}\n');
   }
-  const wf='wf-verify-rel';
-  const seed=fn=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
-  const read=fn=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger.db);}finally{ledger.close();}};
+  const seed=fn=>{const ledger=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(ledger);}finally{ledger.close();}};
+  const read=fn=>{const ledger=inspectLedger({file:ledgerFileFor(repo,{env})});try{return fn(ledger.db);}finally{ledger.close();}};
   seed(ledger=>{
     ledger.ensureWorkflow({workflowId:wf,title:'verify reliability'});
     // workflows.phase moves only through workflow_transitions with a lifecycle_changes row (phase guard).
@@ -65,7 +103,7 @@ const world=(t,{legs=['uat.verify'],workspace=true}={})=>{
   // Kernel's own observations - without it a non-runtime caller re-runs runtime-command checks and the
   // measurement legs get rerun exits, not the seeded evidence (scripts/kernel/verbs/record-checks.mjs).
   const api=(args,extraEnv={})=>{
-    const r=spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_ENV_GATE:'off',...extraEnv}});
+    const r=spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,STARCI_ENV_GATE:'off',...extraEnv}});
     let body=null;try{body=JSON.parse(r.stdout);}catch{}
     return {...r,body};
   };
@@ -95,8 +133,23 @@ const world=(t,{legs=['uat.verify'],workspace=true}={})=>{
       attempt=dispatchAttempt(ledger,jobId);
       ledger.write.setJobStatus({jobId,to:'running',reason:'seed'});
     }
-    if(!ledger.db.prepare('SELECT 1 FROM contracts WHERE attempt_id=?').get(attempt.attempt_id))
-      ledger.write.writeContract({attemptId:attempt.attempt_id,markdown:'# contract',context:{}});
+    if(!ledger.db.prepare('SELECT 1 FROM contracts WHERE attempt_id=?').get(attempt.attempt_id)){
+      let context={};
+      if(admitted){
+        const job=ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId),payload=JSON.parse(job.payload_json);
+        const selected=selectDispatchContract(ROOT,job.op_id,payload);
+        const placements=payload.owned_paths.map(owned=>({base:repo,path:owned}));
+        const packet={context:{records:payload.records,owned_paths:placements.map(place=>({root:place.base,path:place.path})),selected_op:selected.selected,workflow_worktree:workflowWorktree}};
+        admitPacket(ROOT,{packet,op:job.op_id,placements,db:ledger.db,workflowId:wf});
+        const {inputs,contextPack}=captureDispatchInputs({skillRoot:ROOT,op:job.op_id,packet,briefDoc:selected.brief,
+          params:selected.params,repo,stateDir:path.join(repo,'.starciwork'),workerCwd:repo});
+        context={worktree:repo,packet,contract:packet.context.contract,inputs,mandatory:contextPack.mandatory};
+        assert.equal(packet.context.selected_op.mode,'lint');
+        assert.ok(packet.context.readRefs.length>0,'current admission captures its real required READ files');
+        assert.equal(packet.context.gate_binding.targets[0].head,revParse(repo,'HEAD'));
+      }
+      ledger.write.writeContract({attemptId:attempt.attempt_id,markdown:'# contract',context});
+    }
     ledger.write.fileReport({attemptId:attempt.attempt_id,outcome,
       report:{schema:'starci/op-report@1',outcome,summary:`${outcome} on purpose`,...extra}});
   });
@@ -205,15 +258,19 @@ test('an environment failure re-runs behind the pre-step; a tool error retries; 
 /* ------------------------------------------------------------------ measurement leg */
 
 test('a lint MEASUREMENT leg with findings settles pass (even filed failed), and a fail settle on findings alone is refused',t=>{
-  const w=world(t,{legs:['review.verify','test.author','code.refactor'],workspace:false});
+  const w=world(t,{legs:['review.verify','test.author','code.refactor'],workspace:false,admitted:true});
   w.job('lint','review.verify',{params:{mode:'lint'},paths:['.starciwork/evidence/wf.lint']});
   w.report('lint','failed',{checks:CANON_CHECKS,rootCause:{node:'code.refactor',self:false,category:'pending-upstream-repair',claim:'canon debt awaits the refactor legs',evidence:['574 findings']}});
   const checked=w.api(['record-checks','--job','lint','--checks',json({checks:CANON_CHECKS})],{STARCI_CALLER:'runtime-settler'});
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
   assert.deepEqual([checked.body.checkEvidence.passed,checked.body.checkEvidence.failed,checked.body.checkEvidence.green],[3,0,true],'the measured findings count as a completed measurement');
   const refused=w.api(['settle','--job','lint','--verdict','fail']);
-  assert.notEqual(refused.status,0);
-  assert.match(refused.stdout+refused.stderr,/measurement-findings-are-the-result/);
+  assert.equal(refused.error,undefined,refused.stderr||refused.stdout);
+  assert.equal(refused.signal,null,refused.stderr||refused.stdout);
+  assert.equal(refused.status,1,refused.stderr||refused.stdout);
+  const refusal=JSON.parse(refused.stderr);
+  assert.equal(refusal.ok,false,refused.stderr);
+  assert.equal(refusal.code,'measurement-findings-are-the-result',refused.stderr);
   const passed=w.api(['settle','--job','lint','--verdict','pass']);
   assert.equal(passed.status,0,passed.stderr||passed.stdout);
   const row=w.row('lint');
@@ -222,19 +279,28 @@ test('a lint MEASUREMENT leg with findings settles pass (even filed failed), and
 });
 
 test('a measurement whose checker did not run fails as a tool error and retries; the gate leg after a build repairs the owner of its findings',t=>{
-  const w=world(t,{legs:['review.verify','code.refactor','review.verify'],workspace:false});
+  const w=world(t,{legs:['review.verify','code.refactor','review.verify'],workspace:false,admitted:true});
   w.job('lint','review.verify',{params:{mode:'lint'},paths:['.starciwork/evidence/wf.lint']});
   const broken=[{...CANON_CHECKS[0],exitCode:3,evidence:'a selected machine could not run'}];
   w.report('lint','failed',{checks:broken});
-  w.api(['record-checks','--job','lint','--checks',json({checks:broken})],{STARCI_CALLER:'runtime-settler'});
-  let next=w.api(['settle','--job','lint','--verdict','fail']).body.nextStep;
+  const checked=w.api(['record-checks','--job','lint','--checks',json({checks:broken})],{STARCI_CALLER:'runtime-settler'});
+  assert.equal(checked.status,0,checked.stderr||checked.stdout);
+  const failed=w.api(['settle','--job','lint','--verdict','fail']);
+  assert.equal(failed.error,undefined,failed.stderr||failed.stdout);
+  assert.equal(failed.signal,null,failed.stderr||failed.stdout);
+  assert.equal(failed.status,0,failed.stderr||failed.stdout);
+  let next=failed.body.nextStep;
   assert.deepEqual([next.kind,next.route,next.class],['retry','failed-tool-error-retries','tool']);
   // The final gate: a code.refactor settled before it, so findings are findings of the build.
   w.job('refactor','code.refactor',{status:'succeeded',paths:['apps/app/src/a']});
   w.seed(l=>l.db.prepare("UPDATE jobs SET updated_at=1 WHERE job_id='refactor'").run());
   w.job('gate','review.verify',{params:{mode:'lint'},paths:['.starciwork/evidence/wf.lint-final']});
   w.report('gate','failed',{checks:[CANON_CHECKS[0]],rootCause:{node:'code.refactor',self:false,category:'canon',claim:'slice a still has 3 findings',evidence:['canon-scan apps/app/src/a'],files:['apps/app/src/a']}});
-  next=w.api(['settle','--job','gate','--verdict','fail']).body.nextStep;
+  const gated=w.api(['settle','--job','gate','--verdict','fail']);
+  assert.equal(gated.error,undefined,gated.stderr||gated.stdout);
+  assert.equal(gated.signal,null,gated.stderr||gated.stdout);
+  assert.equal(gated.status,0,gated.stderr||gated.stdout);
+  next=gated.body.nextStep;
   assert.deepEqual([next.kind,next.route,next.class],['repair','review-findings-repair-the-build','findings']);
   assert.equal(w.row(next.jobs[0]).op_id,'code.refactor');
   // The repair is the next try of the refactor's own unit: a done unit is reopened for it (units.mjs H5),
@@ -338,6 +404,7 @@ test('starci kernel dispatch runs the environment pre-step for a walk: a foreign
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-env-gate-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const baseline=seedTargetBaseline(repo);
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const log=path.join(root,'calls.jsonl');
   // The spawned api resolves machine.sqlite/projects under ITS env's LOCALAPPDATA + the test registry;
@@ -373,6 +440,7 @@ test('starci kernel dispatch runs the environment pre-step for a walk: a foreign
   writeEnv(hungPort);
   const refused=dispatch();
   assert.equal(refused.status,1,refused.stdout+refused.stderr);
+  assert.ok(refused.stdout.trim(),refused.stderr||'dispatch produced no JSON receipt');
   const out=JSON.parse(refused.stdout);
   assert.equal(out.reason,'environment-not-ready');
   assert.equal(out.services[0].state,'port-conflict');
@@ -388,6 +456,9 @@ test('starci kernel dispatch runs the environment pre-step for a walk: a foreign
   const dry=dispatch();
   assert.equal(dry.status,0,dry.stdout+dry.stderr);
   const packet=JSON.parse(dry.stdout).packet;
+  assert.deepEqual(packet.context.gate_binding.targets,[{root:repo,head:baseline,owned:['.starciwork/features/login/uat/password-sign-in']}]);
+  assert.equal(packet.context.selected_op.contract.id,'uat.verify');
+  assert.ok(packet.context.readRefs.length>0,'the ready stack retains the current dispatch READ snapshot');
   assert.equal(packet.context.environment.ready,true);
   assert.deepEqual(packet.context.environment.services.map(s=>[s.env,s.service,s.state]),[['environment.t.login-local','web','ready']]);
 });

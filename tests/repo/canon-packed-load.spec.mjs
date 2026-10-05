@@ -9,6 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { APP, cleanup, gitAdd, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
+import { BUNDLES, CATALOG, importClosure } from '../../scripts/hfs/sync-runtime.mjs';
+import { catalogFiles } from '../../scripts/lib/i18n.mjs';
 
 const RUNTIME = path.resolve(import.meta.dirname, '..', '..');
 const NEEDED = ['eslint', 'typescript', '@typescript-eslint/eslint-plugin', '@typescript-eslint/parser', 'eslint-plugin-react-hooks', 'globals'];
@@ -23,11 +25,31 @@ test.after(() => {
   cleanup(made);
 });
 
-/** Packs `packages/<dir>` and extracts it as `<repo>/node_modules/@starci/<name>`, with its dependencies linked from the runtime's install. */
+/** The canonical generator graph and inputs in a private runtime; its real prepack creates every bundle there. */
+function privateRuntime(out, dir) {
+  const source = path.join(out, 'source');
+  const inputs = new Set(['package.json', 'packages/hfs/prep-runtime.mjs', CATALOG, ...catalogFiles(RUNTIME),
+    ...importClosure(['scripts/hfs/sync-runtime.mjs']), ...Object.values(BUNDLES).flatMap((bundle) => bundle.files)]);
+  for (const file of inputs) {
+    const target = path.join(source, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(RUNTIME, file), target);
+  }
+  const packageRoot = path.join(RUNTIME, 'packages', ...dir.split('/'));
+  fs.cpSync(packageRoot, path.join(source, 'packages', ...dir.split('/')), { recursive: true,
+    filter: (file) => !path.relative(packageRoot, file).split(path.sep).some((part) => part === 'node_modules' || part === 'runtime') });
+  return source;
+}
+
+/** Packs the private `packages/<dir>` with its real lifecycle and extracts it as `<repo>/node_modules/@starci/<name>`. */
 function installPacked(repo, dir, name) {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-canon-pack-'));
   made.push(out);
-  const tgz = execFileSync('npm', ['pack', '--silent', '--pack-destination', out], { cwd: path.join(RUNTIME, 'packages', ...dir.split('/')), encoding: 'utf8', shell: process.platform === 'win32' }).trim().split(/\r?\n/).at(-1);
+  const source = privateRuntime(out, dir);
+  const packageRoot = path.join(source, 'packages', ...dir.split('/'));
+  assert.equal(fs.existsSync(path.join(packageRoot, 'runtime')), false, 'the private package starts without generated copies');
+  const tgz = execFileSync('npm', ['pack', '--silent', '--pack-destination', out], { cwd: packageRoot, encoding: 'utf8', shell: process.platform === 'win32' }).trim().split(/\r?\n/).at(-1);
+  execFileSync(process.execPath, [path.join(source, 'scripts/hfs/sync-runtime.mjs'), '--check'], { cwd: source });
   const target = path.join(repo, 'node_modules', '@starci', name);
   fs.mkdirSync(target, { recursive: true });
   // Windows' own bsdtar reads drive-letter paths; the GNU tar a git shell puts first on PATH takes `C:` for a remote host

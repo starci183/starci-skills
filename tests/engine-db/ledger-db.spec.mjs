@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 import {LEDGER_SCHEMA,LEDGER_VERSION,ensureWorkflow,inspectLedger,ledgerFileFor,ledgerIdOf,openLedger,releaseTwoPhase,reserveTwoPhase} from '../../engine/db/ledger.mjs';
 import {MACHINE_SCHEMA,MACHINE_VERSION,machineFileFor,openMachine} from '../../engine/db/machine.mjs';
-import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {seedWorkflow,withLedger} from '../helpers/ledger-fixture.mjs';
 
 /**
  * The ledger DB contract (docs/ledger-db.md): schema, meta identity, WAL-by-default with a recorded DELETE
@@ -420,3 +420,27 @@ test('markAttemptUsageUnavailable stores usage_source unavailable with its reaso
   assert.deepEqual(ledger.write.markAttemptUsageUnavailable({attemptId,reason:'late'}),{marked:false},'a measured attempt is never marked');
   ledger.close();
 });
+
+test('atomic workflow slots refuse disjoint work without ledger effects, retain fenced custody, and reopen after release',t=>withLedger(t,({ledger,machine})=>{
+  for(const workflowId of ['wf-slot','wf-other'])seedWorkflow(ledger,{id:workflowId,jobs:[
+    {jobId:workflowId+'-a',opId:'op',status:'queued'},
+    {jobId:workflowId+'-b',opId:'op',status:'queued'},
+    {jobId:workflowId+'-kernel',kind:'kernel',status:'running'},
+  ]});
+  const reserve=(workflowId,suffix,opSlots)=>reserveTwoPhase(ledger,machine,{job:{jobId:workflowId+'-'+suffix,workflowId},
+    leases:[{resourceKey:'path:'+workflowId+'/'+suffix,units:1}],opSlots});
+  const first=reserve('wf-slot','a',{maxOps:1,maxParallelOps:5});
+  assert.equal(first.ok,true,'a running Kernel does not spend an operation slot');
+  ledger.write.setJobStatus({jobId:'wf-slot-a',to:'running',reason:'actual worker accepted'});
+  ledger.write.setJobStatus({jobId:'wf-slot-a',to:'effect_unknown',reason:'worker effect unproved'});
+  const snapshot=()=>({jobs:ledger.db.prepare('SELECT job_id,status,lease_token,deadline FROM jobs ORDER BY job_id').all(),
+    leases:ledger.db.prepare('SELECT * FROM leases ORDER BY resource_key').all(),events:ledger.db.prepare('SELECT seq,digest FROM events ORDER BY seq').all()});
+  const before=snapshot(),second=reserve('wf-slot','b',{maxOps:5,maxParallelOps:1});
+  assert.equal(second.ok,false);assert.equal(second.reason,'max-ops');
+  assert.equal(second.slots.running,1);assert.equal(second.slots.ceilingSource,'maxParallelOps');
+  assert.deepEqual(snapshot(),before,'a cap refusal cannot change job status, token, deadline, leases or event chain');
+  assert.equal(reserve('wf-other','a',{maxOps:1,maxParallelOps:5}).ok,true,'the owner ceiling is per workflow');
+  releaseTwoPhase(ledger,machine,{jobId:'wf-slot-a',status:'failed',reason:'effect reconciled; release'});
+  assert.equal(reserve('wf-slot','b',{maxOps:1,maxParallelOps:5}).ok,true);
+  assert.equal(ledger.getJob('wf-slot-b').status,'leased');
+}));

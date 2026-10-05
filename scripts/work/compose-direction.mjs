@@ -80,7 +80,7 @@ export function composeImages({ base, content, rect, fit = 'cover', scrim = null
 }
 
 /** Resolve a composite's recorded image reference: shell/<path> (a layout capture) or <ui-id>:<path> (a ui asset). */
-export function resolveImageRef(workRoot, ref, uiRecords = null) {
+function resolveImageRef(workRoot, ref, uiRecords = null) {
   const m = parseUiRef(ref);
   if (m) {
     const ui = (uiRecords ?? loadUiRecords(workRoot)).get(m.id);

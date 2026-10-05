@@ -28,7 +28,8 @@ import path from 'node:path';
 import { spawnNode } from '../api/node/spawn-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { inspectLedger } from '../../engine/db/ledger.mjs';
-import { configRoot } from '../../engine/config.mjs';
+import { configRoot, connectorsConfig } from '../../engine/config.mjs';
+import { runtimeSecretEnv } from '../gates/runtime-host.mjs';
 import { DEFAULT_API_BASE, botCall, endpoint, telegramSettings, TEXT_MAX } from './telegram.mjs';
 import { botPolite, redact } from './telegram-polite.mjs';
 import { clip, clipLine } from '../lib/clip.mjs';
@@ -540,7 +541,7 @@ export async function sendSettleMedia({ ledgerFile, repo, workflowId, jobId, att
  * media to send and Telegram is on, and return at once. Synchronous and never throws, so the settle
  * is never slowed or failed by Telegram; a launch failure is one stderr line.
  */
-export function queueSettleMedia(job, { env = process.env, config = undefined, spawnImpl = spawnNode, script = SELF } = {}) {
+export function queueSettleMedia(job, { env = process.env, config = undefined, root = configRoot, spawnImpl = spawnNode, script = SELF } = {}) {
   try {
     const kind = mediaKindOf(job?.op);
     if (!kind) return { queued: false, skipped: 'not a media op' };
@@ -549,7 +550,10 @@ export function queueSettleMedia(job, { env = process.env, config = undefined, s
     // A spec run (node --test sets NODE_TEST_CONTEXT, which a spawned cli.mjs inherits) never
     // reaches the real Bot API: only a spec that points STARCI_TELEGRAM_API_BASE at a fake queues.
     if (isSpecRun(env) && !env.STARCI_TELEGRAM_API_BASE) return { queued: false, skipped: 'test context' };
-    const settings = telegramSettings({ config: config === undefined ? ownerConfig() : config, env });
+    const owner = config === undefined ? ownerConfig() : config;
+    if (!owner || connectorsConfig(owner, env, root).telegram.enabled !== true) return { queued: false, skipped: 'telegram off' };
+    env = runtimeSecretEnv(env, root);
+    const settings = telegramSettings({ config: owner, env, root, preparedEnv: env });
     if (!settings.ready) return { queued: false, skipped: 'telegram off' };
     const args = [script, 'settle', '--ledger', job.ledgerFile, '--repo', job.repo, '--workflow', job.workflowId, '--job', job.jobId,
       '--attempt', String(job.attempt), '--op', job.op, '--verdict', job.verdict, ...(job.dispatchId ? ['--dispatch', String(job.dispatchId)] : [])];

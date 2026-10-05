@@ -14,8 +14,6 @@ import { livePartsOf } from './draw/draw-loop-coverage.mjs';
 import { verifyRecordParts } from './draw-loop.mjs';
 import { feedbackFindings } from './draw-feedback.mjs';
 
-/** The contract change that added the draw loop, the DNA gate and the taste metrics (modules/kernel/contract-changes/). */
-export const DRAW_LOOP_CHANGE = 'draw-loop-dna';
 
 /** {findings, records, loops:[{loop, best, outcome}]} for the files a pass binds. `verify` is injectable (tests). */
 export async function settleDrawMetricFindings({ repo, files, verify = verifyRecordParts }) {

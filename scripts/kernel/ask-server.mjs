@@ -9,17 +9,10 @@
 //
 //   node serve-ask.mjs --repo <path> --workflow <id> [--dispatch <id>] [--ttl <ms>] [--on-demand <via>] [--band <first..last>] [--json]
 //
-// Submit flow: custody fields named '*.key|*.txt|*.json' in the question text
-// are written through <repo>/scripts/stack-secret.mjs set --from-file (the
-// canonical encrypted-custody write; values never touch argv or the ledger),
-// and each written file auto-derives its <NAME>_FILE pointer in the canonical
-// encrypted app.env — then dev-env.mjs refreshes the .env.local managed
-// bridge so the pointer reaches the app's env loader. UPPER_SNAKE variables
-// are upserted into BOTH .env.local (the provision-script sink) and app.env
-// (the canonical encrypted env store). A sanitized receipt (names and custody
-// paths only — never values) is a blob + decisions row (ask-receipts.mjs), an `ask-answered`
-// event is appended, and the workflow's Kernel is woken through its Orca
-// terminal so it can re-verify custody presence and settle the ask.
+// Submission authorization and declared choices are checked before credential effects. Product credentials
+// use scripts/hfs/secret.mjs and the app's selected sealed Stack environment. The receipt, decision and
+// ask-answered event commit together; notifications follow the committed disposition.
+// --review serves artifacts without admitting submissions or recording lifecycle events.
 //
 // Ask-report lifecycle in the ledger (modules/kernel/api.yaml askLifecycle):
 // `ask-notified` when parkAsk told the owner (link on demand), `ask-serving`
@@ -48,13 +41,14 @@
 // the owner asked for that drawing (drawOwnerRequestOf, from the ledger).
 
 import '../api/process/hide-child-windows.mjs';
-import { writeAskReceipt } from '../machine/ask-receipts.mjs';
+import { commitAskAnswer } from '../machine/ask-receipts.mjs';
+import { setSecretValues } from '../hfs/secret.mjs';
+import { claimManager } from '../connectors/lib.mjs';
+import { sha256 } from '../../engine/digest.mjs';
 import fs from 'node:fs';
 import { serve } from '../api/http/serve.mjs';
-import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { runNode } from '../api/node/run-node.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
@@ -343,68 +337,30 @@ export const reportImages = (files, repo) => {
   return (outside.length ? outside : sorted).slice(0, 8);
 };
 
-const custodyDirs = (repo) => [path.join(repo, '.starcistacks', 'dev', 'runtime', 'files')]
-  .filter(d => fs.existsSync(path.dirname(d)));
+const custodyDirs = repo => {
+  const root = path.join(repo, '.starcistacks');
+  if (!fs.existsSync(root)) return [];
+  return fs.readdirSync(root, { withFileTypes: true }).filter(entry => entry.isDirectory())
+    .map(entry => path.join(root, entry.name, 'secrets')).filter(fs.existsSync);
+};
+const custodySlug = name => name.toLowerCase().replace(/\.[^.]+$/, '');
 
-export const custodyPresent = (repo, name) => custodyDirs(repo).some(d => fs.existsSync(path.join(d, name)));
+export const custodyPresent = (repo, name) => custodyDirs(repo).some(d => fs.existsSync(path.join(d, `${custodySlug(name)}.enc`)));
 
-// Canonical encrypted-custody write; falls back to the materialized runtime
-// path when the repo carries no stack-secret tool. Value travels only through
-// a temp file — never argv, never the receipt.
+// Credential writes use the canonical sealed-secret owner; sink failures remain visible to the owner.
 const writeCustody = (repo, name, value) => {
-  const tool = path.join(repo, 'scripts', 'stack-secret.mjs');
-  const tmp = path.join(os.tmpdir(), `serve-ask-${crypto.randomBytes(8).toString('hex')}`);
   try {
-    fs.writeFileSync(tmp, value, { mode: 0o600 });
-    if (fs.existsSync(tool)) {
-      const r = runNode([tool, 'set', `dev/runtime/files/${name}`, '--from-file', tmp], { cwd: repo });
-      if (r.status === 0) return { ok: true, via: 'stack-secret' };
-      return { ok: false, error: String(r.stderr || r.stdout || 'stack-secret set failed').slice(0, 300) };
-    }
-    const dir = custodyDirs(repo)[0];
-    if (!dir) return { ok: false, error: 'no custody dir (.starcistacks/dev/runtime/files)' };
-    fs.copyFileSync(tmp, path.join(dir, name));
-    return { ok: true, via: 'materialized-file' };
-  } finally {
-    try { fs.unlinkSync(tmp); } catch { /* best effort */ }
-  }
+    setSecretValues(repo, { slug: custodySlug(name), values: { data: value } });
+    return { ok: true, via: 'sealed-secret' };
+  } catch { return { ok: false, error: 'canonical encrypted custody update failed; verify the declared environment and SOPS availability' }; }
 };
 
-// Env vars go to BOTH real sinks: `.env.local` is the generated bridge the
-// provision scripts read, and `.starcistacks/dev/runtime/env/app.env` is the
-// canonical encrypted store (whole-file set: show → upsert → set back).
-const upsertLines = (content, key, value) => {
-  const re = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=.*$`, 'm');
-  return re.test(content) ? content.replace(re, `${key}=${value}`) : `${content}${content && !content.endsWith('\n') ? '\n' : ''}${key}=${value}\n`;
-};
-
-const APP_ENV_REL = 'dev/runtime/env/app.env';
-
-// Upsert one KEY=VALUE into the canonical encrypted app.env. Never `set` a
-// whole env file we could not read first — an empty base would clobber every
-// other key in the encrypted store.
-const appEnvUpsert = (repo, key, value) => {
-  const tool = path.join(repo, 'scripts', 'stack-secret.mjs');
-  if (!fs.existsSync(tool)) return false;
-  const tmp = path.join(os.tmpdir(), `serve-ask-env-${crypto.randomBytes(8).toString('hex')}`);
-  try {
-    runNode([tool, 'show', APP_ENV_REL], { cwd: repo, stdio: 'ignore' });
-    const cur = [path.join(repo, '.starcistacks', APP_ENV_REL)].find(fs.existsSync);
-    if (!cur) return false;
-    fs.writeFileSync(tmp, upsertLines(fs.readFileSync(cur, 'utf8'), key, value), { mode: 0o600 });
-    return runNode([tool, 'set', APP_ENV_REL, '--from-file', tmp], { cwd: repo }).status === 0;
-  } finally {
-    try { fs.unlinkSync(tmp); } catch { /* best effort */ }
-  }
-};
-
+// Environment values update the selected app-env envelope while preserving its other keys.
 const writeEnv = (repo, key, value) => {
-  const via = [];
-  const local = path.join(repo, '.env.local');
-  fs.writeFileSync(local, upsertLines(fs.existsSync(local) ? fs.readFileSync(local, 'utf8') : '', key, value), { mode: 0o600 });
-  via.push('.env.local');
-  if (appEnvUpsert(repo, key, value)) via.push('app.env');
-  return { ok: true, via: via.join('+') };
+  try {
+    setSecretValues(repo, { slug: 'app-env', values: { [key]: value } });
+    return { ok: true, via: 'sealed-secret' };
+  } catch { return { ok: false, error: 'canonical encrypted environment update failed; verify the declared environment and SOPS availability' }; }
 };
 
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml' };
@@ -502,11 +458,9 @@ export async function answerDrawReviewByReply({ repo, ledgerFile = null, workflo
       ...(d.golden ? { golden: true } : {}),
       review: question.review,
     };
-    const { receiptPath, receiptSha, decisionId } = writeAskReceipt(ledger, { workflowId, dispatchId, receipt, at: now });
-    ledger.transaction(() => ledger.appendEvent({
-      workflowId, entityType: 'report', entityId: dispatchId,
-      kind: 'ask-answered', payload: { dispatchId, receiptPath, receiptSha, decisionId, answeredBy: OWNER, optionIndex: d.optionIndex, via: 'telegram', custodyWritten: [], envWritten: [], pointersWritten: [], errors: [] },
-    }));
+    const committed = commitAskAnswer(ledger, { workflowId, dispatchId, receipt, at: now, payload: { via: 'telegram' } });
+    if (!committed.accepted) return { ok: false, why: committed.why };
+    const { receiptPath } = committed;
     const rulings = recordDrawAnswer(ledger, { workflowId, report, receipt, receiptPath, repo, now });
     const woke = wake(ledger, { workflowId, dispatchId, receiptPath });
     await closeAskMessages(ledger, { ledgerFile: file, workflowId, dispatchIds: [dispatchId], reason: 'answered', by: OWNER, close });
@@ -706,17 +660,12 @@ export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, repo
     note, at: new Date(now).toISOString(),
     ...(question.review ? { review: question.review } : {}),
   };
-  const { receiptPath, receiptSha, decisionId } = writeAskReceipt(ledger, { workflowId, dispatchId: report.dispatch_id, receipt, at: now });
-  ledger.transaction(() => {
-    ledger.appendEvent({
-      workflowId, entityType: 'report', entityId: report.dispatch_id,
-      kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, receiptSha, decisionId, answeredBy: AUTO_ACCEPTED_BY, optionIndex: index, option: label, note, custodyWritten: [], envWritten: [], pointersWritten: [], errors: [] },
-    });
-    ledger.appendEvent({
-      workflowId, entityType: 'report', entityId: report.dispatch_id,
-      kind: 'ask-auto-accepted', payload: { dispatchId: report.dispatch_id, opId: report.op_id ?? null, optionIndex: index, option: label, recommendedReason: reason, receiptPath, rule: decision.rule, config: { autoAcceptRecommended: policy.autoAcceptRecommended, excludes: [...policy.excludes], source: policy.source ?? null } },
-    });
-  });
+  const committed = commitAskAnswer(ledger, { workflowId, dispatchId: report.dispatch_id, receipt, at: now,
+    payload: { option: label, note }, events: [{ kind: 'ask-auto-accepted', payload: { dispatchId: report.dispatch_id,
+      opId: report.op_id ?? null, optionIndex: index, option: label, recommendedReason: reason, rule: decision.rule,
+      config: { autoAcceptRecommended: policy.autoAcceptRecommended, excludes: [...policy.excludes], source: policy.source ?? null } } }] });
+  if (!committed.accepted) return { accepted: false, why: committed.why };
+  const { receiptPath } = committed;
   const woke = wake(ledger, { workflowId, dispatchId: report.dispatch_id, receiptPath, answeredBy: AUTO_ACCEPTED_BY });
   // An ask the owner was already told about (auto-accept turned on later) leaves the chat.
   await closeAskMessages(ledger, { ledgerFile, workflowId, dispatchIds: [report.dispatch_id], reason: 'answered', by: AUTO_ACCEPTED_BY, close });
@@ -854,6 +803,7 @@ const main = async () => {
       return;
     }
     if (req.method === 'POST' && url.pathname === `/${nonce}/answer`) {
+      if (readonly) { res.writeHead(405, { allow: 'GET' }); res.end('review is read-only'); return; }
       let body = '';
       req.on('data', (c) => { body += c; if (body.length > 256 * 1024) req.destroy(); });
       req.on('end', () => {
@@ -867,44 +817,6 @@ const main = async () => {
           return;
         }
         const params = new URLSearchParams(body);
-        const custodyWritten = [], envWritten = [], pointersWritten = [], errors = [];
-        for (const name of fields.files) {
-          const pairedVar = fields.paired[name];
-          const v = params.get(`file:${name}`);
-          if (v == null || v === '') {
-            // Blank keeps existing custody — but a paired env var still needs
-            // its raw value for provision scripts, synced from the file.
-            if (pairedVar && custodyPresent(repo, name)) {
-              const dir = custodyDirs(repo).find((d) => fs.existsSync(path.join(d, name)));
-              const val = dir ? fs.readFileSync(path.join(dir, name), 'utf8').trim() : null;
-              if (val) { writeEnv(repo, pairedVar, val); envWritten.push(`${pairedVar} (from custody)`); }
-            }
-            continue;
-          }
-          const r = writeCustody(repo, name, v);
-          if (!r.ok) { errors.push(`${name}: ${r.error}`); continue; }
-          custodyWritten.push(`${name} (${r.via})`);
-          // The file alone is unreachable — app.env must carry its <NAME>_FILE
-          // pointer for the stack env convention to see it.
-          const ptr = pointerFor(name);
-          if (appEnvUpsert(repo, ptr, `.starcistacks/dev/runtime/files/${name}`)) pointersWritten.push(ptr);
-          // The merged env var is the same value — provision scripts read it raw.
-          if (pairedVar) { writeEnv(repo, pairedVar, v); envWritten.push(pairedVar); }
-        }
-        for (const v of fields.vars) {
-          const val = params.get(`env:${v}`);
-          if (val == null || val === '') continue;
-          const r = writeEnv(repo, v, val);
-          envWritten.push(v);
-        }
-        // Regenerate the .env.local managed block so fresh *_FILE pointers in
-        // app.env reach the app's env loader without a manual dev:env run.
-        let bridge = null;
-        const devEnv = path.join(repo, 'scripts', 'dev-env.mjs');
-        if (pointersWritten.length && fs.existsSync(devEnv)) {
-          const r = runNode([devEnv], { cwd: repo, stdio: 'ignore' });
-          bridge = r.status === 0 ? 'refreshed' : 'refresh-failed';
-        }
         const mirror = mirroredPick(question, pickGroupsOf(question, images));
         const mirroredIdx = mirror ? mirror.choices.findIndex((c) => String(c.id) === params.get(`pick:${mirror.id}`)) : -1;
         const optionIdx = params.get('option') ?? (mirroredIdx >= 0 ? String(mirroredIdx) : null);
@@ -934,6 +846,51 @@ const main = async () => {
           res.end(`answered_by ${answeredBy} cannot accept a drawing; a drawing served to the owner is the owner's to accept (a delegate may ask for a redraw)`);
           return;
         }
+        const groups = pickGroupsOf(question, images);
+        if ((question.options ?? []).length && (optionIdx == null || !/^\d+$/.test(optionIdx) || !(question.options ?? [])[Number(optionIdx)])) {
+          res.writeHead(400); res.end('choose a declared option'); return;
+        }
+        for (const group of groups) if (!group.choices.some(choice => String(choice.id) === params.get(`pick:${group.id}`))) {
+          res.writeHead(400); res.end('choose a declared pick'); return;
+        }
+        for (const key of params.keys()) if ((key.startsWith('file:') && !fields.files.includes(key.slice(5)))
+          || (key.startsWith('env:') && !fields.vars.includes(key.slice(4)))) {
+          res.writeHead(400); res.end('credential field is not declared by this ask'); return;
+        }
+        const absolute = path.resolve(file), identity = process.platform === 'win32' ? absolute.toLowerCase() : absolute;
+        const held = claimManager(`ask-answer-${sha256(`${identity}|${args.workflow}|${report.dispatch_id}`)}`);
+        if (!held.ok) { res.writeHead(409); res.end('another answer is in progress; wait for its committed disposition'); return; }
+        try {
+        const closed = db.prepare(`SELECT kind FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded')
+          AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(args.workflow, report.dispatch_id);
+        if (closed?.kind === 'ask-answered' || closed?.kind === 'ask-superseded') { res.writeHead(409); res.end('ask is already closed'); return; }
+        const custodyWritten = [], envWritten = [], pointersWritten = [], errors = [];
+        for (const name of fields.files) {
+          const pairedVar = fields.paired[name];
+          const v = params.get(`file:${name}`);
+          if (v == null || v === '') {
+            continue;
+          }
+          const r = writeCustody(repo, name, v);
+          if (!r.ok) { errors.push(`${name}: ${r.error}`); continue; }
+          custodyWritten.push(`${name} (${r.via})`);
+          if (pairedVar) {
+            const paired = writeEnv(repo, pairedVar, v);
+            if (paired.ok) envWritten.push(pairedVar); else errors.push(`${pairedVar}: ${paired.error}`);
+          }
+        }
+        for (const v of fields.vars) {
+          const val = params.get(`env:${v}`);
+          if (val == null || val === '') continue;
+          const r = writeEnv(repo, v, val);
+          if (r.ok) envWritten.push(v); else errors.push(`${v}: ${r.error}`);
+        }
+        const bridge = null;
+        if (errors.length) {
+          res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' });
+          res.end(`Credential update failed. Verified writes: ${custodyWritten.concat(envWritten).join(', ') || 'none'}. ${errors.join('; ')}. The ask remains open.`);
+          return;
+        }
         const picks = {};
         for (const p of pickGroupsOf(question, images)) {
           const v = params.get(`pick:${p.id}`);
@@ -954,11 +911,9 @@ const main = async () => {
           // so the answer proves which drawing it accepted (scripts/work/draw-review.mjs apply).
           ...(question.review ? { review: question.review } : {}),
         };
-        const { receiptPath, receiptSha, decisionId } = writeAskReceipt(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receipt });
-        ledger.transaction(() => ledger.appendEvent({
-          workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id,
-          kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, receiptSha, decisionId, answeredBy, optionIndex: receipt.optionIndex, custodyWritten, envWritten, pointersWritten, errors },
-        }));
+        const committed = commitAskAnswer(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receipt });
+        if (!committed.accepted) { res.writeHead(409); res.end('ask is already closed; verify credential custody before retrying'); return; }
+        const { receiptPath } = committed;
         // The runtime, not the Kernel, turns a draw-review answer into owner rulings and an owed redraw (draw-feedback.mjs).
         try { recordDrawAnswer(ledger, { workflowId: args.workflow, report, receipt, receiptPath, repo }); } catch (error) { console.error(`serve-ask: draw feedback not recorded: ${String(error?.message ?? error).slice(0, 300)}`); }
         const wake = wakeAskAnswered(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receiptPath });
@@ -971,13 +926,14 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
         // Answered: the ask's Telegram messages are deleted, then the form stops serving.
         closeAskMessages(ledger, { ledgerFile: file, workflowId: args.workflow, dispatchIds: [report.dispatch_id], reason: 'answered', by: answeredBy })
           .catch(() => {}).finally(() => setTimeout(() => { server.close(); process.exit(0); }, 400).unref());
+        } finally { held.release(); }
         } catch (error) {
           // A failed write must not kill the one-shot server before the owner
           // can retry — the ask stays unanswered and the form stays usable.
           res.writeHead(500, { 'content-type': 'text/html; charset=utf-8' });
           res.end(`<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px">
-<h2>Write failed — nothing was stored</h2><p style="color:#a33">${esc(String(error?.message ?? error))}</p>
-<p>Go back and resubmit — the ask is still open.</p></body>`);
+<h2>Write failed — verify any credential writes before retrying</h2><p style="color:#a33">${esc(String(error?.message ?? error))}</p>
+<p>The committed ask disposition remains authoritative. Reconcile any credential writes before resubmitting.</p></body>`);
         }
       });
       return;
@@ -997,7 +953,7 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
     const bound = server.address().port;
     const url = `http://127.0.0.1:${bound}/${nonce}`;
     const onDemand = typeof args['on-demand'] === 'string' && args['on-demand'] ? args['on-demand'] : null;
-    ledger.appendEvent({
+    if (!readonly) ledger.appendEvent({
       workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id,
       kind: 'ask-serving', payload: { dispatchId: report.dispatch_id, url, pid: process.pid, fields: { files: fields.files, vars: fields.vars }, ttlMs: ttl,
         ...(onDemand ? { onDemand: true, requestedBy: onDemand } : {}) },
@@ -1009,7 +965,7 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
   tryNext();
   setTimeout(() => {
     if (done) return;
-    ledger.appendEvent({ workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id, kind: 'ask-serving-expired', payload: { dispatchId: report.dispatch_id } });
+    if (!readonly) ledger.appendEvent({ workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id, kind: 'ask-serving-expired', payload: { dispatchId: report.dispatch_id } });
     process.exit(0);
   }, ttl).unref();
 };

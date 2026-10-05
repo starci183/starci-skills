@@ -21,7 +21,6 @@ import { OP_REV_DRIFT, kernelRevState, opRevDrift, revRootOf, shortRev } from '.
 import { ownerSpecs, deferredTestsOf, specsOff } from '../../route/spec-deferral.mjs';
 import { HANDOVER_OP, handoverProjection, handoverReason } from '../handover.mjs';
 import { peerDriftSummaryOf, sourceDriftSummaryOf, staleOperationsOf } from '../input-digests.mjs';
-import { frozenChangesFor, loadContractChanges, pendingContractFollowUps } from '../../machine/contract-version.mjs';
 import { dependenciesOf, dependencyGraph, shortWorkflow } from '../dependency-graph.mjs';
 import { jobDisplayNameOf, nameWithId, opLabel, workflowDisplayName } from '../../lib/display-names.mjs';
 import { LOG_TYPED_MISSING, typedLogGaps } from '../typed-logs.mjs';
@@ -103,11 +102,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   const goalJson = goalJsonOf(latestGoal(db, workflowId));
   const legOps = approvedLegOps(goalJson);
   const planAncestors = planAncestorsOf(goalJson ?? {});
-  // A contract change registered reach: follow-up owes each older leg a follow-up leg (never a hold on
-  // the running one): work the Kernel can enqueue now (scripts/machine/contract-version.mjs). The leg it follows up is
-  // rework: its op's leg and the work-graph nodes it covers read red until the follow-up is enqueued.
-  const contractFollowUps = wf.phase === 'finished' ? [] : (() => { try { return pendingContractFollowUps(db, workflowId, loadContractChanges(skillRoot)); } catch { return []; } })();
-  const workGraph = wf.phase === 'finished' ? null : workGraphStatus(db, workflowId, { rework: new Set(contractFollowUps.map((item) => item.jobId)) });
+  const workGraph = wf.phase === 'finished' ? null : workGraphStatus(db, workflowId);
   const slots = opSlotAdmission(db, workflowId);
   const rtDoc = runtimeProfile();
   // Pool load worker-wide - the same count `starci kernel route` reasons with (poolLoadOf), so status and route agree.
@@ -407,7 +402,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
           checklistDue, checklistApprovals: owed.filter((item) => item.deferClass !== 'credential').map((item) => item.dispatchId).filter(Boolean) } };
     } catch (error) { return { view: { on: autopilotOn(db, workflowId, autopilotSettingsNow), error: String(error?.message ?? error).slice(0, 300) }, graph: null }; }
   })();
-  const graph = graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs, credentialWaitOps, approvalWaitOps, workGraph, contractFollowUps, assetSlotsOwed, autopilot: autopilotView.graph });
+  const graph = graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs, credentialWaitOps, approvalWaitOps, workGraph, assetSlotsOwed, autopilot: autopilotView.graph });
   // The runtime rev the Kernel acked against the runtime's HEAD (runtime-rev.mjs): a stale Kernel re-reads the
   // changed kernel files and acks before anything else, and enqueue/dispatch of a leg whose op contract changed
   // is refused kernel-rev-stale until it does. op-rev-drift: settled legs whose op contract moved after dispatch.
@@ -415,7 +410,6 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   if (kernelRev?.stale) graph.nextActions.unshift(rereadActionOf(kernelRev, workflowId));
   const opRevDriftWarnings = (() => { try { return opRevDriftOf(db, workflowId); } catch { return []; } })();
   const runningRevDrift = (() => { try { return runningOpRevDriftOf(db, workflowId); } catch { return []; } })();
-  const frozenContract = (() => { try { return frozenChangesFor(db, loadContractChanges(skillRoot), { workflowId }).map((c) => ({ id: c.id, batch: c.batch, families: c.families, reach: c.reach, effectiveAt: c.effectiveAtText })); } catch { return []; } })();
   // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
   // ledger that names none (a runtime defect, or a workflow with no plan yet).
   // A peer-wait holds only the ops it names (fe-hold-until-landed): an approved leg with no job yet, neither held nor
@@ -427,7 +421,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   if (peerWaitMovable.length) frontierState = 'orphaned-frontier';
   // A peer-wait holds only the ops it names: an unheld next step is still the Kernel's move (fe-hold-until-landed).
   if (['orphaned-frontier', 'supervisor-wait', 'peer-wait'].includes(frontierState) && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind) && !action.heldBy)) frontierState = 'next-ready';
-  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || kernelRev?.stale === true || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0 || peerMessages.length > 0 || deadPeerWaits.length > 0 || contractFollowUps.length > 0;
+  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || kernelRev?.stale === true || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0 || peerMessages.length > 0 || deadPeerWaits.length > 0;
   const frontier = {
     state: frontierState,
     actionable,
@@ -447,7 +441,6 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     credentialAskDispatches: credentialAsks,
     peerMessageKeys: peerMessages.map((message) => message.key),
     peerWaits: peerWaits.map(({ incidentId, peer, peerPhase, holds, detail, untilMessage, refs, since, untilFoundation, untilLanded }) => ({ incidentId, peer, peerPhase, holds, detail, untilMessage, refs, since, ...(untilFoundation ? { untilFoundation } : {}), ...(untilLanded ? { untilLanded } : {}) })),
-    ...(contractFollowUps.length ? { contractFollowUps } : {}),
     ...(sourceDrift ? { sourceDrift } : {}),
     ...(peerDrift ? { peerDrift } : {}),
     ...(staleProofs.length ? { staleProofs } : {}),
@@ -492,10 +485,8 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
           staleFollowUp.length ? `the owner of a record ${staleFollowUp.map(staleLabel).join(', ')} read declared its committed change breaking; enqueue ONE follow-up leg for each (a new attempt of that op and cut ordinal only - never a seam-first cascade, never a redo of other slices or peers) before yielding` : null].filter(Boolean).join('; ')
       : null,
   };
-  // Follow-up legs a contract change owes ride on whatever the frontier says: they are enqueued, never waited for.
-  if (contractFollowUps.length > 0) {
-    frontier.reason = `${frontier.reason ? `${frontier.reason}; also, ` : ''}contract change(s) meant to reach in-flight work owe follow-up legs: ${contractFollowUps.map((item) => `${item.followUpOp} for ${item.jobId} (${item.op} a${item.attempt}, ${item.change})`).join(', ')}; enqueue each with starci kernel enqueue --op <followUpOp> --contract-change <change> --follow-up-of <jobId>${contractFollowUps.some((item) => item.after) ? ' (--after <jobId> while it still runs)' : ''} - never hold the running leg`;
-  }
+  // Owner-declared product follow-up legs ride on the frontier: they are enqueued, never waited for.
+
   // Typed release conditions still pending, what this status released, and the jobs of this workflow
   // other workflows wait on (gate-conditions.mjs, waiter-priority.mjs).
   // Each key is present only when non-empty, so a workflow that uses neither reads exactly as before.
@@ -616,7 +607,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   // The owner's "test later" list: every leg the config.yaml specs switches deferred (starci kernel run-deferred-tests runs them).
   const specs = ownerSpecs(skillRoot);
   const testsDeferred = { off: specsOff(specs), jobs: deferredTestsOf(db, workflowId), planned: graph.legs.filter((leg) => leg.deferred && !leg.jobId).map((leg) => ({ op: leg.op, reason: leg.deferred })) };
-  const out = { ok: true, workflowId, title, slug: wf.title ?? null, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, testsDeferred, autopilot: autopilotView.view, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
+  const out = { ok: true, workflowId, title, slug: wf.title ?? null, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, testsDeferred, autopilot: autopilotView.view, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}) };
   out.opHealth = opHealth;
   out.kernelNotes = kernelNotes;
   out.stuck = stuck;
@@ -628,10 +619,9 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
       `${nameWithId(title, workflowId)} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
       ...(ramThrottle?.line ? [`  ${ramThrottle.line}`] : []),
       ...(kernel ? [`  kernel: attempt ${kernel.attempt} on ${kernel.terminal ?? '-'} (${kernel.launch ?? '-'} by ${kernel.launchedBy ?? '-'}${kernel.launchedAt ? ` at ${kernel.launchedAt}` : ''})${kernel.you ? ' — this is your terminal' : ''}`] : []),
-      ...(kernelRev ? [`  kernel rev: acked ${shortRev(kernelRev.acked) ?? 'none'} current ${shortRev(kernelRev.current) ?? '-'}${kernelRev.stale ? ` STALE (${kernelRev.full ? 're-read kernel-prompt.md and driver-loop.yaml in full' : `${kernelRev.fileCount} file(s)${kernelRev.changes.length ? `, ${kernelRev.changes.length} contract change(s)` : ''}`})` : kernelRev.unacked ? ' (never acked)' : ''}`] : []),
+      ...(kernelRev ? [`  kernel rev: acked ${shortRev(kernelRev.acked) ?? 'none'} current ${shortRev(kernelRev.current) ?? '-'}${kernelRev.stale ? ` STALE (${kernelRev.full ? 're-read kernel-prompt.md and driver-loop.yaml in full' : `${kernelRev.fileCount} file(s)`})` : kernelRev.unacked ? ' (never acked)' : ''}`] : []),
       ...opRevDriftWarnings.map((w) => `  warn ${OP_REV_DRIFT}: ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}`),
-      ...runningRevDrift.map((w) => `  warn ${OP_REV_DRIFT} (running): ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}; it is judged by its admission${w.advisoryChanges.length ? ` (${w.advisoryChanges.join(', ')} advisory for it)` : ''} - starci kernel nudge --job ${w.jobId} carries the notice when its worker is idle`),
-      ...(frozenContract.length ? [`  contract-frozen: ${frozenContract.map((c) => c.id).join(', ')} (batch ${[...new Set(frozenContract.map((c) => c.batch))].join(', ')}) - withheld from new legs here and owing no follow-up until the Supervisor runs starci kernel contract-release --family <op>`] : []),
+      ...runningRevDrift.map((w) => `  warn ${OP_REV_DRIFT} (running): ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}; it is judged by its admission - starci kernel nudge --job ${w.jobId} carries the notice when its worker is idle`),
       ...outageCircuits.map((c) => `  outage-circuit: ${c.provider} (${c.failureKind}) opened from ${c.jobId}'s screen (${c.match}) until ${c.expiresAt ? new Date(c.expiresAt).toISOString() : 'explicit recovery'}`),
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       `  handover: ${handover.state}${handover.ask ? ` ask ${handover.ask.dispatchId} ${handover.ask.state}${handover.ask.decision ? ` ${handover.ask.decision} by ${handover.ask.answeredBy ?? '-'}` : ''}` : ''}${handover.finishAllowed ? ' — finish allowed' : ' — finish refused until the owner approves'}`,
@@ -664,7 +654,6 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
       ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),
       ...queued.map((item) => `  ${item.jobId} (${item.opId ?? '-'}) ${item.queuedBecause}${item.detail ? ` — ${item.detail}` : ''}`),
       ...staleOperations.map((item) => `  ${staleOperationLine(item)}${item.heldBy ? ` (waits on seam ${item.heldBy})` : ''}`),
-      ...contractFollowUps.map((item) => `  contract-follow-up: ${item.change} owes ${item.followUpOp} after ${item.jobId} (${item.op} a${item.attempt} ${item.status})`),
       ...sourceDriftLines(sourceDrift, '  '),
       ...peerDriftLines(peerDrift, '  '),
       ...(foundations && (foundations.owns.length || foundations.needs.length || foundations.detail) ? [`  foundations: owns ${foundations.owns.map((f) => `${f.name}:${f.state}`).join(', ') || '-'}; needs ${foundations.needs.map((f) => `${f.name}:${f.state}${f.owner ? ` (${f.owner})` : ''}`).join(', ') || '-'}${foundations.detail ? ` — ${foundations.detail}` : ''}`] : []),

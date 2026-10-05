@@ -16,16 +16,20 @@
 // CUSTODY. The document is decrypted into this process's memory only (`sops decrypt --output-type json` over a pipe);
 // its top-level scalar keys become the child's environment. Nothing is written to a file, a log or the parent shell, and
 // a value is never printed except by `--get`, which writes exactly that one value to stdout for the calling process.
-// The age identity is SOPS_AGE_KEY_FILE, default ~/.starci/master.identity. The decryption is scripts/api/sops/exec-env.mjs
+// The caller supplies the canonical environment; engine/secrets.mjs owns identity selection. Decryption is scripts/api/sops/exec-env.mjs
 // execEnv, the child process scripts/api/process/run-shell.mjs runShell.
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { execEnv } from '../api/sops/exec-env.mjs';
 import { runShell } from '../api/process/run-shell.mjs';
+import { runProgram } from '../api/process/run-program.mjs';
+import { resolveRealTool } from '../api/process/resolve-real-tool.mjs';
+
+const sopsInvocation = Object.freeze({ runProgram, resolveRealTool });
 
 /** Runs `command` with the custody keys added to its environment; returns the child's exit status. */
 export function execWithCustody(file, command, options = {}) {
-  const values = execEnv(file, options);
+  const values = execEnv(file, { ...options, invocation: sopsInvocation });
   return runShell(command, values);
 }
 
@@ -37,9 +41,9 @@ function main(argv) {
   const keys = has('--keys');
   const [file, ...command] = argv;
   if (!file) throw new Error("usage: starci gate custody-exec <file>.<fmt>.enc ('<command>' | --get NAME | --keys) [--input-type yaml|json|dotenv]");
-  if (keys) { process.stdout.write(`${Object.keys(execEnv(file, { inputType })).join('\n')}\n`); return 0; }
+  if (keys) { process.stdout.write(`${Object.keys(execEnv(file, { inputType, invocation: sopsInvocation })).join('\n')}\n`); return 0; }
   if (get !== undefined) {
-    const values = execEnv(file, { inputType });
+    const values = execEnv(file, { inputType, invocation: sopsInvocation });
     if (!(get in values)) throw new Error(`${file} holds no ${get}`);
     process.stdout.write(values[get]);
     return 0;

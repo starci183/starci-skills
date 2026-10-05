@@ -56,6 +56,7 @@ import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { assetsOf, flag, isFile, list, sha256File, slash, workRootOf } from './work-io.mjs';
 import { readJsonFile } from '../lib/json.mjs';
+import { insidePath } from '../lib/path-key.mjs';
 import { writeJsonFile } from '../api/fs/write-json-file.mjs';
 import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR, DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from './draw/draw-source.mjs';
@@ -531,12 +532,11 @@ const SCRATCH_REF = 'scratch:';
 const TEMP_REF = 'temp:';
 const WIN = process.platform === 'win32';
 const pathKey = (p) => { const r = path.resolve(p); return WIN ? r.toLowerCase() : r; };
-const within = (root, p) => { const rel = path.relative(root, p); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
 const withReal = (d) => { const out = [path.resolve(d)]; try { out.push(fs.realpathSync.native(d)); } catch { /* missing */ } return out; };
 const reEscape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** The scratch roots of a loop (the loop dir, the job scratch, the OS temp dirs), with a mapper of a path under them. */
-export function scratchRewriter({ out, env = process.env, context = opContextOf({ env }), installed = new Map() }) {
+function scratchRewriter({ out, env = process.env, context = opContextOf({ env }), installed = new Map() }) {
   const loopRoots = withReal(out);
   const jobRoots = context?.scratchDir ? withReal(context.scratchDir) : [];
   const roots = [...new Set([...loopRoots, ...jobRoots, ...[os.tmpdir(), env.TEMP, env.TMP].filter(Boolean).flatMap(withReal)])]
@@ -547,7 +547,7 @@ export function scratchRewriter({ out, env = process.env, context = opContextOf(
   const map = (abs) => {
     const hit = installed.get(pathKey(abs));
     if (hit) return hit;
-    const inRoot = (list) => list.find((r) => within(r, abs));
+    const inRoot = (list) => list.find((r) => insidePath(r, abs, { includeSelf: true }));
     const loopRoot = inRoot(loopRoots);
     if (loopRoot) return `${LOOP_REF}${slash(path.relative(loopRoot, abs)) || '.'}`;
     const jobRoot = inRoot(jobRoots);

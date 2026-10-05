@@ -5,12 +5,12 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {connectorsConfig,connectorSecret,readDotenv,validateConfig,CONNECTOR_DEFAULTS} from '../../engine/config.mjs';
+import {connectorsConfig,connectorSecret,validateConfig,CONNECTOR_DEFAULTS} from '../../engine/config.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {servingAsks,askRepos} from '../../scripts/connectors/lib.mjs';
 import {createGateway,ledgerResolver} from '../../scripts/connectors/ask-gateway.mjs';
 import {parseQuickTunnelUrl,parseConnected,cloudflaredPlan,cloudflaredConfigText,superviseTunnel,tunnelState} from '../../scripts/connectors/tunnel.mjs';
-import {notifyAsk,markAskClosed,sendMessage,discoverChats,askKeyOf,recordAskMessage,readSentStore,textFor} from '../../scripts/connectors/telegram.mjs';
+import {notifyAsk,markAskClosed,sendMessage,discoverChats,askKeyOf,recordAskMessage,readSentStore,textFor,telegramSettings} from '../../scripts/connectors/telegram.mjs';
 import {redact} from '../../scripts/connectors/telegram-polite.mjs';
 import {parkAsk} from '../../scripts/kernel/ask-server.mjs';
 import {mkdtemp} from '../helpers/tmpdir.mjs';
@@ -36,7 +36,7 @@ const until=async(fn,ms=8000)=>{const end=Date.now()+ms;for(;;){const v=fn();if(
 
 test('connectors ship off, normalize with defaults, and report secret presence as a boolean only',()=>{
   assert.equal(validateConfig(EXAMPLE),EXAMPLE,'the shipped example validates');
-  const c=connectorsConfig({...EXAMPLE,connectors:{...EXAMPLE.connectors,secretsFile:null}},{});
+  const c=connectorsConfig({...EXAMPLE,connectors:{...EXAMPLE.connectors,}},{});
   assert.equal(c.cloudflare.mode,'off');
   assert.equal(c.telegram.enabled,false);
   assert.equal(c.telegram.configured,false);
@@ -75,21 +75,27 @@ test('connectors validation fails closed on secrets, unknown keys and inconsiste
     assert.doesNotThrow(()=>validateConfig(withConnectors(connectors)),JSON.stringify(connectors));
 });
 
-test('secrets resolve from the env var, its _FILE pointer or connectors.secretsFile, and a real env var wins',t=>{
+test('connector normalization consumes supplied env only and native settings read the one private runtime secret file',t=>{
   const root=tmp(t,'starci-connectors-secrets-');
-  fs.mkdirSync(path.join(root,'.secrets'));
-  fs.writeFileSync(path.join(root,'.secrets','connectors.env'),`# owner secrets\nTELEGRAM_BOT_TOKEN="${TOKEN}"\nexport CLOUDFLARE_TUNNEL_TOKEN=from-file\n`);
-  assert.deepEqual(readDotenv(path.join(root,'.secrets','connectors.env')),{TELEGRAM_BOT_TOKEN:TOKEN,CLOUDFLARE_TUNNEL_TOKEN:'from-file'});
-  const config=withConnectors({secretsFile:'.secrets/connectors.env',telegram:{enabled:true,chatId:'42'}});
-  const c=connectorsConfig(config,{},root);
-  assert.equal(c.telegram.botTokenPresent,true);
-  assert.equal(c.cloudflare.tokenPresent,true);
-  assert.ok(!JSON.stringify(c).includes(TOKEN));
+  fs.writeFileSync(path.join(root,'secret.env'), 'OWNER_BOT_TOKEN='+TOKEN+'\nOWNER_TUNNEL_TOKEN=private-tunnel-token\n');
+  const config=withConnectors({telegram:{enabled:true,chatId:'42',botTokenEnv:'OWNER_BOT_TOKEN'},cloudflare:{mode:'named',hostname:'response.example.org',tokenEnv:'OWNER_TUNNEL_TOKEN'}});
+  const normalized=connectorsConfig(config,{},root);
+  assert.equal(normalized.telegram.botTokenPresent,false,'normalization does not load a file');
+  assert.equal(normalized.cloudflare.tokenPresent,false);
+  const fromFile=telegramSettings({config,env:{},root});
+  assert.equal(fromFile.ready,true);
+  assert.equal(fromFile.token,TOKEN,'the native reader loads the configured key from the explicit private root');
+  const override=telegramSettings({config,env:{OWNER_BOT_TOKEN:'actual-env-token'},root});
+  assert.equal(override.token,'actual-env-token');
+  const blank=telegramSettings({config,env:{OWNER_BOT_TOKEN:''},root});
+  assert.equal(blank.ready,false,'an actual blank suppresses the file value');
+  assert.ok(!JSON.stringify(blank).includes(TOKEN));
   const pointer=path.join(root,'custody.key');fs.writeFileSync(pointer,'custody-value\n');
   assert.equal(connectorSecret('X_TOKEN',{X_TOKEN_FILE:pointer}),'custody-value');
   assert.equal(connectorSecret('X_TOKEN',{X_TOKEN:'direct',X_TOKEN_FILE:pointer}),'direct');
+  assert.equal(connectorSecret('X_TOKEN',{X_TOKEN:'',X_TOKEN_FILE:pointer}),null,'an own blank cannot resurrect a pointer');
   assert.equal(connectorSecret('X_TOKEN',{}),null);
-  assert.equal(connectorsConfig(withConnectors({secretsFile:'.secrets/missing.env'}),{},root).telegram.botTokenPresent,false,'an absent secrets file is no values');
+  assert.throws(()=>validateConfig(withConnectors({secretsFile:'.secrets/connectors.env'})),/unknown key secretsFile/);
 });
 
 /* ------------------------------------------------------------- gateway */
@@ -237,11 +243,15 @@ test('the tunnel manager records the quick URL and restarts a cloudflared that d
   // an rm registered ahead of the stop can still race a live child on Windows.
   const home=mkdtemp(t,'starci-connectors-tunnel-',()=>handle.stop());
   const fake=path.join(home,'fake-cloudflared.mjs');
-  fs.writeFileSync(fake,`const out=${JSON.stringify(QUICK_OUTPUT)};const argv=process.argv.slice(2);
+  // Keep each actual child alive until the manager captured its identity; native capture can outlast an arbitrary short timer.
+  fs.writeFileSync(fake,`import fs from 'node:fs';const out=${JSON.stringify(QUICK_OUTPUT)};const argv=process.argv.slice(2);
 if(!argv.includes('--config'))process.exit(9);
-process.stderr.write(out);const die=process.env.FAKE_DIE==='1';setTimeout(()=>process.exit(die?3:0),die?150:60000);`);
-  const env={...process.env,LOCALAPPDATA:home,STARCI_TEST_MACHINE_FILE:path.join(home,'machine.sqlite'),STARCI_CLOUDFLARED_COMMAND:process.execPath,STARCI_CLOUDFLARED_ARGS:JSON.stringify([fake]),STARCI_TUNNEL_BACKOFF_MS:'50',FAKE_DIE:'1'};
-  const handle=superviseTunnel({mode:'quick'},{port:7070,env});
+process.stderr.write(out);const marker=process.env.FAKE_EXIT_PREFIX+'.'+process.pid;
+const timer=setInterval(()=>{if(fs.existsSync(marker)){clearInterval(timer);process.exit(3);}},25);setTimeout(()=>process.exit(9),30000);`);
+  const env={...process.env,LOCALAPPDATA:home,STARCI_TEST_MACHINE_FILE:path.join(home,'machine.sqlite'),STARCI_CLOUDFLARED_COMMAND:process.execPath,STARCI_CLOUDFLARED_ARGS:JSON.stringify([fake]),STARCI_TUNNEL_BACKOFF_MS:'50',FAKE_EXIT_PREFIX:path.join(home,'exit-child')};
+  const handle=superviseTunnel({mode:'quick'},{port:7070,env,onState:state=>{
+    if(state.childCapture?.ok===true&&state.childIdentity&&state.childPid)fs.writeFileSync(env.FAKE_EXIT_PREFIX+'.'+state.childPid,'');
+  }});
   const state=await until(()=>{const s=tunnelState(env);return s?.restarts>=2&&s.baseUrl?s:null;});
   assert.equal(state.baseUrl,'https://violet-harbor-quiet-lemon.trycloudflare.com');
   assert.equal(state.mode,'quick');
@@ -265,9 +275,12 @@ const fakeBot=({status=200,json={ok:true,result:{message_id:1}},sequence=null}={
   };
   return {calls,fetchImpl,sends:()=>calls.filter(c=>c.method==='sendMessage')};
 };
-const telegramConfig=(extra={})=>withConnectors({secretsFile:null,cloudflare:{mode:'named',hostname:'response.example.org'},telegram:{enabled:true,chatId:'4242',...extra}});
+const telegramConfig=(extra={})=>withConnectors({cloudflare:{mode:'named',hostname:'response.example.org'},telegram:{enabled:true,chatId:'4242',...extra}});
 const DECISION={text:'Ch\u1ed1t gi\u00e1 g\u00f3i Pro?',options:['99.000\u0111/th\u00e1ng','\u0110\u1ec3 sau']};
-const deps=(machineHome,extra={})=>({config:telegramConfig(),env:{LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN},apiBase:'http://bot.invalid',sleepImpl:async()=>{},warn:()=>{},...extra});
+const deps=(machineHome,extra={})=>{
+  fs.mkdirSync(machineHome,{recursive:true});
+  return {root:machineHome,config:telegramConfig(),env:{LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN},apiBase:'http://bot.invalid',sleepImpl:async()=>{},warn:()=>{},...extra};
+};
 
 // Owner, 2026-09-24: the question goes to Telegram with a "Generate URL" button; the form is served
 // only when the owner presses it (telegram-bridge.spec.mjs covers the press).
@@ -340,12 +353,13 @@ test('parkAsk records ask-notified with the ask fields when the owner is told, a
     // Telegram off: nothing is recorded, and the caller (starci kernel serve-ask) serves the form itself.
     seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_off',question:{text:'q',options:[],refs:['decision.off']}});
     const off=await parkAsk({ledger,ledgerFile,repo:repoRoot,workflowId:'wf-park',report:report('ctx_off'),close,
-      notify:a=>notifyAsk(a,deps(machineHome,{fetchImpl:bot.fetchImpl,config:withConnectors({secretsFile:null}),env:{LOCALAPPDATA:machineHome}}))});
+      notify:a=>notifyAsk(a,deps(machineHome,{fetchImpl:bot.fetchImpl,config:withConnectors({}),env:{LOCALAPPDATA:machineHome}}))});
     assert.deepEqual([off.notified,off.telegram.skipped],[false,'telegram off']);
     const failing=fakeBot({status:400,json:{ok:false,description:'Bad Request: chat not found'}});
     seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_fail',question:{text:'q2',options:[],refs:['decision.fail']}});
     const failed=await parkAsk({ledger,ledgerFile,repo:repoRoot,workflowId:'wf-park',report:report('ctx_fail'),close,notify:a=>notifyAsk(a,deps(path.join(machineHome,'f'),{fetchImpl:failing.fetchImpl}))});
     assert.equal(failed.notified,false);
+    assert.equal(failing.calls.length,1,'the fresh private root reaches the injected failing Bot API');
     assert.deepEqual(rows().slice(4).map(([k,p])=>[k,p.dispatchId]),[['ask-notify-failed','ctx_fail']]);
   });
 });
@@ -355,9 +369,9 @@ test('the notifier never throws into its caller: off, incomplete, answered, fail
     seedAsk(ledger,{workflowId:'wf-a',dispatchId:'ctx_a',question:DECISION});
     const bot=fakeBot(),ask={ledgerFile,workflowId:'wf-a',dispatchId:'ctx_a'};
     const warned=[],warn=w=>warned.push(w);
-    const off=await notifyAsk(ask,deps(machineHome,{fetchImpl:bot.fetchImpl,warn,config:withConnectors({secretsFile:null}),env:{LOCALAPPDATA:machineHome}}));
+    const off=await notifyAsk(ask,deps(machineHome,{fetchImpl:bot.fetchImpl,warn,config:withConnectors({}),env:{LOCALAPPDATA:machineHome}}));
     assert.equal(off.skipped,'telegram off');assert.deepEqual(warned,[],'Telegram that is simply off says nothing');
-    const noChat=await notifyAsk(ask,deps(machineHome,{fetchImpl:bot.fetchImpl,warn,config:withConnectors({secretsFile:null})}));
+    const noChat=await notifyAsk(ask,deps(machineHome,{fetchImpl:bot.fetchImpl,warn,config:withConnectors({})}));
     assert.equal(noChat.ok,true);
     assert.equal(warned.length,1,'a token without a chat id is one warning line');
     assert.match(warned[0],/missing connectors\.telegram\.chatId/);

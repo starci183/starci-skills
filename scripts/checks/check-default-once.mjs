@@ -16,7 +16,7 @@
 // This check refuses, in a second file than the owner:
 //   - `<key> ??|(|||=) <literal>` where key is a camelCase leaf the example documents (any literal restates the
 //     absent-or-default meaning: pollIntervalMs, frozenMinutes, windowHours, maxConcurrent, maxWorkerDepth,
-//     worktreeLimit, maxOps, secretsFile, tokenEnv, ...);
+//     worktreeLimit, maxOps, tokenEnv, ...);
 //   - the same fallback where key is a lowercase documented leaf and the literal is a value the example or the
 //     owner declares for it (mode ?? 'off'/'shared'/'chat', effort ?? 'high', interval ?? '10m',
 //     policy ?? 'balanced', profile ?? 'operational', gear ?? 1, port ?? <gateway port>, model/agent picks);

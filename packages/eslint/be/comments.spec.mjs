@@ -206,3 +206,72 @@ test("law 7: a doc block that only re-spells the declared name is COMMENT-3 wear
     ],
   })
 })
+
+test("public documentation requires a final adjacent description, not tags, headers or punctuation", () => {
+  tester.run("require-export-jsdoc", requireExportJsdoc, {
+    valid: [
+      "/** Returns the rows visible to the authenticated caller.\n * @returns Authorized rows.\n */\nexport const readRows = () => []",
+      "/** Contains the authenticated caller's stable identifier. */\nexport type Viewer = { id: string }",
+      "/** Stable learner identity accepted by account operations. */\nexport interface Learner { id: string }",
+      "/** @file Rows module. */\n/** Returns caller-visible rows. */\nexport const readRows = () => []",
+      "const text = '/** Not a source comment. */'\n/** Reads caller-visible rows. */\nexport const readRows = () => text",
+    ],
+    invalid: [
+      ...["/** */", "/**\n *\n */", "/** @returns Authorized rows. */", "/** @param input - Accepted account id. */", "/** ... --- */", "/** @file Rows module. */", "/** @fileoverview Rows module. */", "/** Rows module.\n * @fileoverview Shared file header.\n */", "/* Returns caller-visible rows. */"].map((doc) => ({ code: doc + "\nexport const readRows = () => []", errors: [{ messageId: "jsdoc" }] })),
+      { code: "/** Returns caller-visible rows. */\n// module banner\nexport const readRows = () => []", errors: [{ messageId: "jsdoc" }] },
+      { code: "/** Returns caller-visible rows. */\nconst unrelated = 1\nexport const readRows = () => unrelated", errors: [{ messageId: "jsdoc" }] },
+      { code: "const text = '/** Returns caller-visible rows. */'\nexport const readRows = () => text", errors: [{ messageId: "jsdoc" }] },
+      { code: "const text = \u0060/** Returns caller-visible rows. */\u0060\nexport const readRows = () => text", errors: [{ messageId: "jsdoc" }] },
+      { code: "/** @returns Account identifier. */\nexport interface Learner { id: string }", errors: [{ messageId: "jsdoc" }] },
+    ],
+  })
+})
+
+test("decorated exports and members retain their canonical documentation placement", () => {
+  tester.run("require-export-jsdoc", requireExportJsdoc, {
+    valid: ["declare const Service: (label?: string) => ClassDecorator\n@Service(\"export\")\n/** Resolves learner accounts for an authorized caller. */\nexport class AccountService {}"],
+    invalid: [{ code: "declare const Service: () => ClassDecorator\n@Service()\n/** @file Accounts module. */\nexport class AccountService {}", errors: [{ messageId: "jsdoc" }] }],
+  })
+  tester.run("require-public-member-jsdoc", requirePublicMemberJsdoc, {
+    valid: [
+      "declare const Read: () => MethodDecorator\nexport class Accounts {\n/** Returns the account visible to this caller. */\n@Read()\nread(): void {}\n}",
+      "export class Reader {\n/** Returns the named account or every visible account. */\nread(id: string): string\nread(): string[]\nread(id?: string): string | string[] { return id ?? [] }\n}",
+    ],
+    invalid: [
+      ...["/** */", "/** @returns One account. */", "/** ... */", "/** @file Accounts module. */", "/** Reads caller-visible accounts. */\n// banner"].map((doc) => ({ code: "export class Accounts {\n" + doc + "\nread(): void {}\n}", errors: [{ messageId: "jsdoc" }] })),
+      { code: "export interface Accounts { /** @returns Account id. */ id: string }", errors: [{ messageId: "jsdoc" }] },
+      { code: "export type Accounts = { /** */ id: string }", errors: [{ messageId: "jsdoc" }] },
+      { code: "export class Reader {\n/** @param id - Account id. */\nread(id: string): string\n/** ... */\nread(): string[]\nread(id?: string): string | string[] { return id ?? [] }\n}", errors: [{ messageId: "jsdoc" }] },
+    ],
+  })
+})
+
+test("enum member tags cannot substitute for a consequence description", () => {
+  tester.run("require-enum-member-jsdoc", requireEnumMemberJsdoc, {
+    valid: ["export enum Verdict { /** No grant may be made until settlement. */ Pending }"],
+    invalid: ["/** */", "/** @type {string} */", "/** ... */", "/** @file Values module. */"].map((doc) => ({ code: "export enum Verdict { " + doc + " Pending }", errors: [{ messageId: "jsdoc" }] })),
+  })
+})
+
+test("parameter tags cannot conceal an export description that only restates its name", () => {
+  tester.run("no-restated-name-jsdoc", noRestatedNameJsdoc, {
+    valid: ["/** Reads an authorized learner.\n * @param id - Stable account id.\n */\nexport const readUser = (id: string) => id"],
+    invalid: [{ code: "/** The read user function.\n * @param id - Stable account id.\n */\nexport const readUser = (id: string) => id", errors: [{ messageId: "restated" }] }],
+  })
+})
+
+test("a later exported function declarator cannot hide behind the first data binding", () => {
+  tester.run("require-export-jsdoc", requireExportJsdoc, {
+    valid: [
+      "/** Reads rows visible to the caller; LIMIT is the maximum page size. */\nexport const LIMIT = 10, readRows = () => []",
+      "/** Reads rows visible to the caller; LIMIT is the maximum page size. */\nexport const readRows = () => [], LIMIT = 10",
+      "/** Reads rows visible to the caller; LIMIT is the maximum page size. */\nexport const LIMIT = 10, readRows = function () { return [] }",
+      "export const LIMIT = 10, MAX_ATTEMPTS = 3",
+    ],
+    invalid: [
+      { code: "export const LIMIT = 10, readRows = () => []", errors: [{ messageId: "jsdoc" }] },
+      { code: "/** */\nexport const LIMIT = 10, readRows = () => []", errors: [{ messageId: "jsdoc" }] },
+      { code: "/** @returns Rows. */\nexport const LIMIT = 10, readRows = function () { return [] }", errors: [{ messageId: "jsdoc" }] },
+    ],
+  })
+})

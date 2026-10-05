@@ -63,6 +63,11 @@ export function lastBusinessSettleSeq(db, workflowId) {
     .get(workflowId, HANDOVER_OP)?.seq ?? null;
 }
 
+/** The latest accepted goal revision invalidates an older handover package even without another business settle. */
+function latestGoalRevisionSeq(db, workflowId) {
+  return db.prepare("SELECT MAX(seq) AS seq FROM events WHERE workflow_id=? AND kind='goal-revised'").get(workflowId)?.seq ?? null;
+}
+
 const readReceipt = readJsonFile;
 
 /** Every handover ask of the workflow, oldest first, with its answer. */
@@ -111,7 +116,7 @@ export function handoverAsks(db, workflowId) {
 /**
  * Whether a handover.review attempt may settle pass: the latest handover ask
  * filed before `attempt` was answered approve, by the owner, with a receipt
- * bound to that ask, and no business job settled after the package was filed.
+ * bound to that ask, and neither a business settle nor an accepted goal revision followed the package.
  */
 export function handoverApprovalOf(db, workflowId, { attempt = Number.POSITIVE_INFINITY } = {}) {
   const asks = handoverAsks(db, workflowId).filter((ask) => Number(ask.attempt) < attempt);
@@ -119,6 +124,9 @@ export function handoverApprovalOf(db, workflowId, { attempt = Number.POSITIVE_I
   const lastBusiness = lastBusinessSettleSeq(db, workflowId);
   const refuse = (reason) => ({ approved: false, reason, ask, lastBusinessSettleSeq: lastBusiness });
   if (!ask) return refuse('no handover ask was filed before this attempt; the owner has not been handed anything to approve');
+  const revisionSeq = latestGoalRevisionSeq(db, workflowId);
+  if (revisionSeq != null && (ask.filedSeq == null || ask.filedSeq < revisionSeq))
+    return refuse(`the goal was revised (event ${revisionSeq}) after handover ask ${ask.dispatchId}; hand the current revision over again`);
   if (ask.state !== 'answered') return refuse(`the latest handover ask ${ask.dispatchId} is ${ask.state}, not answered`);
   if (!ask.receiptBound) return refuse(`the answer receipt of handover ask ${ask.dispatchId} is missing or names another ask`);
   if (ask.decision !== 'approve') return refuse(`the owner answered handover ask ${ask.dispatchId} with ${ask.decision ?? 'no recognised option'}, not approve`);
@@ -131,7 +139,7 @@ export function handoverApprovalOf(db, workflowId, { attempt = Number.POSITIVE_I
 
 /**
  * Whether `starci kernel finish` may close the workflow: a handover-approved event newer
- * than the last business settle. A workflow whose record the owner archived
+ * than the last business settle and accepted goal revision. A workflow whose record the owner archived
  * (workflows.archived_at) is the one existing way out and needs no approval.
  */
 export function handoverGateOf(db, workflowId) {
@@ -143,6 +151,9 @@ export function handoverGateOf(db, workflowId) {
     return { ok: false, reason: 'the owner has not approved a handover of this workflow (no handover-approved event)', approvedSeq: null, lastBusinessSettleSeq: lastBusiness };
   }
   const approval = parseJson(approved.payload_json, {}) ?? {};
+  const revisionSeq = latestGoalRevisionSeq(db, workflowId);
+  if (revisionSeq != null && approved.seq < revisionSeq)
+    return { ok: false, reason: `the handover approval predates the accepted goal revision (event ${revisionSeq}); hand the workflow over again`, approvedSeq: approved.seq, approval, lastBusinessSettleSeq: lastBusiness };
   if (lastBusiness != null && approved.seq < lastBusiness) {
     return { ok: false, reason: `the last handover approval (event ${approved.seq}) predates the last business settle (event ${lastBusiness}); hand the workflow over again`, approvedSeq: approved.seq, approval, lastBusinessSettleSeq: lastBusiness };
   }

@@ -31,7 +31,7 @@ test('RT_PROSE_PATH_NO_SLOT: a path no slot owns, a role-named app and a place a
 
 test('RT_PROSE_PATH_NO_SLOT: generated copies and the slot sources are not read; a repo without example apps is not judged', () => {
   const bad = 'See `be/apps/api/src/main.ts`.\n';
-  assert.deepEqual(prosePathFindings(ctxOf({ 'packages/x/runtime/docs/a.md': bad, 'knowledge/hfs/slots.yaml': bad, 'knowledge/code-examples/a.yaml': bad })), []);
+  assert.deepEqual(prosePathFindings(ctxOf({ 'packages/x/runtime/docs/a.md': bad, 'knowledge/hfs/slots.yaml': bad, 'knowledge/grammars/a.yaml': bad })), []);
   assert.deepEqual(prosePathFindings({ root: process.cwd(), files: ['docs/a.md'], params: {}, read: () => bad }), []);
   assert.deepEqual(pathTokens('see be/apps/<app>/{src/main.ts,Dockerfile}.')[0].paths, ['be/apps/identity/src/main.ts', 'be/apps/identity/Dockerfile']);
 });

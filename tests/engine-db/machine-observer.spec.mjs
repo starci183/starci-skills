@@ -22,8 +22,7 @@ const fixture = (t, version = MACHINE_VERSION) => {
   writer = openMachine(options);
   writer.db.prepare('INSERT INTO machine_meta(key,value) VALUES(?,?)').run('observer-sentinel', 'preserved');
   writer.registerLedger({ ledgerId: 'observer-fixture', name: 'observer-fixture', repoRoot: directory, file: path.join(directory, 'runtime.sqlite') });
-  if (version === 1) writer.db.exec('DROP TABLE provider_reservation_events; DROP TABLE provider_reservations; DELETE FROM schema_migrations WHERE version>=2; PRAGMA user_version=1;');
-  if (version === 2) writer.db.exec('DELETE FROM schema_migrations WHERE version=3; PRAGMA user_version=2;');
+  if (version !== MACHINE_VERSION) writer.db.exec('PRAGMA user_version='+version);
   return { directory, file, options, writer };
 };
 
@@ -87,7 +86,7 @@ test('an absent observer store remains absent without creating directories', (t)
   assert.deepEqual(fs.readdirSync(directory), []);
 });
 
-for (const version of [1, 2, MACHINE_VERSION]) {
+for (const version of [MACHINE_VERSION]) {
   test(`observer validates machine v${version}, reads registry and exposes no mutation API`, (t) => {
     const current = fixture(t, version), before = snapshot(current), observer = openMachineObserver(current.options);
     try {
@@ -227,4 +226,13 @@ test('operational reader actual NOTADB opening still defers its persistent incid
   const notice = JSON.parse(fs.readFileSync(outboxOf(file), 'utf8').trim());
   assert.equal(notice.op, 'log');
   assert.equal(notice.args[0][0].kind, 'machine-db.corrupt');
+});
+
+test('observer refuses retired identities without persistent writes or outbox', t => {
+  for (const version of [1, 2]) {
+    const current = fixture(t, version), before = snapshot(current);
+    assert.throws(() => openMachineObserver(current.options), /machine-schema-old/);
+    assert.deepEqual(snapshot(current), before);
+    assert.equal(fs.existsSync(outboxOf(current.file)), false);
+  }
 });

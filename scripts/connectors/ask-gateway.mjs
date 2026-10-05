@@ -23,9 +23,10 @@ import { serve } from '../api/http/serve.mjs';
 import { request } from '../api/http/request.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connectorsConfig } from '../../engine/config.mjs';
-import { argsOf, askRepos, claimManager, connectorState, lockHolder, markStarting, NONCE, notifiedRepos, ownerConfig, recordAlive, servingAsksAcross, spawnDetached, startingHolder, writeConnectorState } from './lib.mjs';
-import { pidAlive } from '../../engine/db/machine.mjs';
+import { configRoot, connectorsConfig } from '../../engine/config.mjs';
+import { runtimeSecretEnv } from '../gates/runtime-host.mjs';
+import { argsOf, askRepos, claimManager, connectorState, lockHolder, markStarting, NONCE, notifiedRepos, ownerConfig, recordAlive, servingAsksAcross, spawnDetached, startingHolder, writeConnectorState, stopConnector } from './lib.mjs';
+import { captureProcessIdentity } from '../api/process/capture-process-identity.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
@@ -108,26 +109,26 @@ export const gatewayState = (env = process.env) => connectorState('gateway', env
 // starter launched one moments ago that has not claimed it yet.
 export const gatewayAlive = (env = process.env) => recordAlive(gatewayState(env)) || Boolean(lockHolder('gateway', env)) || Boolean(startingHolder('gateway', env));
 
-const settings = (args) => {
-  const config = ownerConfig();
+const settings = (args, env = process.env, root = configRoot, config = undefined) => {
+  if (config === undefined) config = ownerConfig();
   let connectors = null;
-  try { connectors = connectorsConfig(config ?? undefined); } catch (error) { console.error(JSON.stringify({ ok: false, error: error.message })); process.exit(2); }
+  try { connectors = connectorsConfig(config ?? undefined, env, root); } catch (error) { console.error(JSON.stringify({ ok: false, error: error.message })); process.exit(2); }
   const extra = [args.repo ?? []].flat().filter((r) => typeof r === 'string');
   const port = Number(args.port ?? connectors.gateway.port);
   return { connectors, config, extra, port };
 };
 
-async function run(args) {
-  const { extra, port } = settings(args);
+async function run(args, { env, root, config }) {
+  const { extra, port } = settings(args, env, root, config);
   // One gateway per host: concurrent `start` calls each launch a `run`; only the one that claims
   // the host lock 'gateway' (and finds no other live gateway in its connectors row) serves.
-  const claim = claimManager('gateway', { current: gatewayState() });
+  const claim = claimManager('gateway', { current: gatewayState(env), env });
   if (!claim.ok) {
     console.log(JSON.stringify({ ok: false, already: true, error: 'another ask gateway owns the gateway state', pid: claim.holder?.pid ?? null }));
     process.exit(1);
   }
-  process.on('exit', () => { try { writeConnectorState('gateway', { state: 'stopped' }); } catch { /* the store is gone */ } claim.release(); });
-  const live = () => { try { return connectorsConfig(ownerConfig() ?? undefined); } catch { return null; } };
+  process.on('exit', () => { try { writeConnectorState('gateway', { state: 'stopped' }, env); } catch { /* the store is gone */ } claim.release(); });
+  const live = () => { try { return connectorsConfig(config === undefined ? ownerConfig() ?? undefined : config, env, root); } catch { return null; } };
   const server = createGateway({
     // The configured repos plus every repo a Telegram ask notice named (a kernel's `starci kernel serve-ask`
     // notifies from its own repo).
@@ -138,31 +139,34 @@ async function run(args) {
   server.on('error', (error) => { console.error(JSON.stringify({ ok: false, error: `gateway cannot listen on 127.0.0.1:${port}: ${error.code ?? error.message}` })); process.exit(1); });
   server.listen(port, '127.0.0.1', () => {
     const startedAt = new Date().toISOString(), bound = server.address()?.port ?? port;
-    writeConnectorState('gateway', { kind: 'ask-gateway', state: 'running', pid: process.pid, port: bound, config: { schema: 'starci/ask-gateway@1', pid: process.pid, port: bound, startedAt } });
+    const captured = captureProcessIdentity(process.pid);
+    writeConnectorState('gateway', { kind: 'ask-gateway', state: 'running', pid: process.pid, port: bound, config: { schema: 'starci/ask-gateway@1', pid: process.pid, port: bound, startedAt, source: GATEWAY_FILE,
+      processIdentity: captured.ok ? captured.identity : null, processCapture: captured } }, env);
     console.log(JSON.stringify({ ok: true, gateway: `http://127.0.0.1:${port}`, pid: process.pid, repos: askRepos(live(), { extra }) }));
   });
   const stop = () => { server.close(); process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
 }
 
-function main() {
-  const args = argsOf(process.argv.slice(2));
+export function main(argv = process.argv.slice(2), { env = process.env, root = configRoot, config = undefined } = {}) {
+  const args = argsOf(argv);
   const verb = args._[0] ?? 'run';
-  const state = gatewayState();
-  if (verb === 'status') { console.log(JSON.stringify({ ok: true, running: gatewayAlive(), ...(state ?? {}) })); return; }
+  const state = gatewayState(env);
+  if (verb === 'status') { console.log(JSON.stringify({ ok: true, running: gatewayAlive(env), ...(state ?? {}) })); return; }
   if (verb === 'stop') {
-    if (state?.pid && pidAlive(state.pid)) { try { process.kill(state.pid); } catch { /* gone */ } }
-    console.log(JSON.stringify({ ok: true, stopped: state?.pid ?? null })); return;
+    const result = stopConnector('gateway', { source: GATEWAY_FILE, env });
+    console.log(JSON.stringify(result)); if (!result.ok) process.exitCode = 1; return result;
   }
   if (verb === 'start') {
-    if (gatewayAlive()) { console.log(JSON.stringify({ ok: true, already: true, ...state })); return; }
-    const { port } = settings(args);
+    if (gatewayAlive(env)) { console.log(JSON.stringify({ ok: true, already: true, ...state })); return; }
+    env = runtimeSecretEnv(env, root);
+    const { port } = settings(args, env, root, config);
     const pass = [].concat(args.repo ?? []).filter((r) => typeof r === 'string').flatMap((r) => ['--repo', r]);
-    const pid = spawnDetached(GATEWAY_FILE, ['run', '--port', String(port), ...pass]);
-    markStarting('gateway', pid);
+    const pid = spawnDetached(GATEWAY_FILE, ['run', '--port', String(port), ...pass], { env });
+    markStarting('gateway', pid, env);
     console.log(JSON.stringify({ ok: true, launched: pid, gateway: `http://127.0.0.1:${port}` })); return;
   }
-  if (verb === 'run') return run(args);
+  if (verb === 'run') return run(args, { env: runtimeSecretEnv(env, root), root, config });
   console.error('usage: starci connect ask-gateway start|run|status|stop [--port <n>] [--repo <path>]...'); process.exit(2);
 }
 

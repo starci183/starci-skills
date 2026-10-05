@@ -3,7 +3,7 @@
 // the last rule with no undeclared gap, and every rule of the catalog is named by at least one `hfsRules:` of a
 // knowledge/patterns topic or carries `scope: runtime`.
 //   RT_RULE_ID_UNKNOWN  an id no rule has. A retired id (the catalog's `retired` list) is a history name: only the history files
-//                       (contract changes and changelogs) may still spell it; live knowledge, docs and code may not.
+//                       (changelogs) may still spell it; live knowledge, docs and code may not.
 //   RT_RULE_ID_GAP      an id between R01 and the last rule that is neither a rule nor listed as retired.
 //   RT_RULE_UNCITED     a rule no pattern topic cites and that is not marked `scope: runtime`: product law exists to be taught.
 // Specs (tests/**) and generated copies are not read: a spec spells made-up ids as fixtures. Pure apart from ctx.read.
@@ -14,7 +14,7 @@ export const GAP = 'RT_RULE_ID_GAP';
 const UNCITED = 'RT_RULE_UNCITED';
 const READ = /\.(?:mjs|cjs|js|ts|tsx|md|ya?ml|json)$/;
 const SKIPPED = /(?:^|\/)(?:package-lock\.json|npm-shrinkwrap\.json)$|^tests\//;
-const HISTORY = /^modules\/kernel\/contract-changes\/|(?:^|\/)CHANGELOG\.md$|^knowledge\/hfs\/rules\.yaml$/;
+const HISTORY = /(?:^|\/)CHANGELOG\.md$|^knowledge\/hfs\/rules\.yaml$/;
 const RULE_ID = /\bR\d{2,3}\b/g;
 const PATTERN_FILE = /^knowledge\/patterns\/.*\.yaml$/;
 const HFS_RULES = /hfsRules:\s*\[([^\]]*)\]/g;

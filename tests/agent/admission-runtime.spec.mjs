@@ -190,3 +190,19 @@ test('unreadable circuit evidence cannot be turned into provider fallback or a s
   assert.equal(providerBudgetUsage('codex', 'default', options).running, 0);
   assert.equal(providerBudgetUsage('claude', 'default', options).running, 0);
 });
+
+test('final admission obeys an AIMD cap lowered after an earlier route observation',t=>{
+  const options=fixture(t),registry=loadModelRegistry(),pool='codex-agent',top=registry.pools[pool].maxParallel;
+  assert.ok(top>1);const allowGroup=[{provider:'codex',model:'gpt-6.1-sol',pool,maxParallel:top}];
+  const first=launch(options,'worker','worker:aimd:1',{allowGroup});assert.equal(first.ok,true,JSON.stringify(first));
+  assert.equal(first.selected.capacity.maxParallel,top);
+  const machine=openMachine({env:options.env});
+  try{machine.setPoolBackoff({pool,untilAt:Date.now()+60000,reason:JSON.stringify({cap:1,max:top})});}finally{machine.close();}
+  const denied=launch(options,'worker','worker:aimd:2',{allowGroup});assert.equal(denied.ok,false,JSON.stringify(denied));
+  assert.equal(denied.effectState,'none');assert.equal(providerBudgetUsage('codex','default',options).running,1);
+  assert.ok(denied.decision.rejected[0].codes.includes('capacity-full'));
+  // The held attempt is a replay of its original slot, not a second allocation above the new cap.
+  assert.equal(launch(options,'worker','worker:aimd:1',{allowGroup}).reused,true);
+  const restored=openMachine({env:options.env});try{restored.clearPoolBackoff(pool);}finally{restored.close();}
+  assert.equal(launch(options,'worker','worker:aimd:2',{allowGroup}).ok,true,'clearing the current cap is visible immediately');
+});

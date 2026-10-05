@@ -92,7 +92,7 @@ test('land: a refused change never reaches the gate; a landed one is an experime
   for (const k of ['supervisor.action', 'decision', 'warning', 'narration']) assert.ok(kinds.includes(k), `machine log has ${k}`);
 });
 
-test('revert --apply: a revert lane off main with a contract-changes entry for reverted contract files, landed through the gate', async (t) => {
+test('revert --apply: a revert lane off main with only the actual reverted current source files, landed through the gate', async (t) => {
   const env = envOf(t);
   const root = tmp(t, 'starci-sup-revert-');
   const lanes = path.join(root, '..', `${path.basename(root)}-lanes`);
@@ -100,8 +100,6 @@ test('revert --apply: a revert lane off main with a contract-changes entry for r
   const git = (...a) => { const r = spawnSync('git', ['-C', root, ...a], { encoding: 'utf8', windowsHide: true }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
   git('init', '-q', '-b', 'main'); git('config', 'user.email', 'l@t'); git('config', 'user.name', 'l'); git('config', 'core.autocrlf', 'false');
   fs.mkdirSync(path.join(root, 'modules/kernel'), { recursive: true }); fs.mkdirSync(path.join(root, 'modules/supervisor'), { recursive: true });
-  fs.mkdirSync(path.join(root, 'modules/kernel/contract-changes'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'modules/kernel/contract-changes/seed.yaml'), 'id: seed\nsummary: seed\n');
   fs.writeFileSync(path.join(root, 'modules/supervisor/supervise.yaml'), 'a: 1\n');
   git('add', '-A'); git('commit', '-qm', 'init');
   fs.writeFileSync(path.join(root, 'modules/supervisor/supervise.yaml'), 'a: 2\n');
@@ -117,9 +115,7 @@ test('revert --apply: a revert lane off main with a contract-changes entry for r
   const show = git('show', '--stat', '--format=%B', r.revertCommit);
   assert.match(show, /revert\(self-learning\): sig-x/);
   assert.match(show, /Co-Authored-By: Claude Opus 5\.5/);
-  const entryFile = git('show', '--name-only', '--format=', r.revertCommit).split(/\r?\n/).find((f) => f.startsWith('modules/kernel/contract-changes/'));
-  assert.match(entryFile, /^modules\/kernel\/contract-changes\/revert-exp-[0-9a-f]+\.yaml$/, 'one entry file per change');
-  assert.match(git('show', `${r.revertCommit}:${entryFile}`), /^id: revert-exp-[0-9a-f]+[\s\S]*- modules\/supervisor\/supervise\.yaml/);
+  assert.deepEqual(git('show', '--name-only', '--format=', r.revertCommit).split(/\r?\n/).filter(Boolean), ['modules/supervisor/supervise.yaml'],'the native revert creates no historical card');
   assert.equal(git('show', `${r.revertCommit}:modules/supervisor/supervise.yaml`), 'a: 1');
   assert.deepEqual(landed.at(-1).commits, [r.revertCommit]);
   assert.equal(readLearning({ env }).experiments[exp.experiment.id].status, 'reverted');

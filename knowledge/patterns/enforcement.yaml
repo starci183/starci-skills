@@ -22,7 +22,7 @@ rules:
     kind: mandatory
     hfsRules: [R01]
     requirement: |
-      Use the BE and FE pattern cases, the repository law in patterns/repo and code-examples. Preserve the same responsibilities,
+      Use the BE and FE pattern cases, the repository law in patterns/repo and the actual source indexed by examples/index.yaml. Preserve the same responsibilities,
       unit layout, dependency directions and public contracts across projects. Business names, database ownership and platform
       constraints vary; consistency means one coding shape, not one application's behavior or connection token.
     rationale: |

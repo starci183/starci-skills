@@ -1,26 +1,17 @@
 #!/usr/bin/env node
 // starci supervisor gate-stability — would a gate change newly fail work the live workflows already accepted?
 //
-// Owner ruling 2026-09-28 ("Freeze the drawing rules"): a gate or checker change of a frozen op family
-// (modules/kernel/contract-freeze.yaml) is released to running workflows only at a release point the Supervisor
-// decides (starci kernel contract-release). To decide it, the land gate (scripts/supervisor/land.mjs) runs this report when a
-// land touches the family's gatePaths or registers a change that adds checks/codes for it: the family's gates, as
-// the BASE tree and as the CANDIDATE tree have them, over the latest accepted leg (newest succeeded)
-// of the family op in every live workflow of every ledger on this host's registry - read-only. A flip is a leg the
-// base gates pass and the candidate gates fail; newFindings are the candidate findings the base did not report.
-//
-//   starci supervisor gate-stability --family <op> --tree <gate tree> [--ledger <runtime.sqlite>]... [--json]
-//     one side: the findings of --tree's gates (default this tree) on the accepted legs
-//   starci supervisor gate-stability --family <op> --base <tree> --head <tree> [--ledger <file>]... [--json]
-//     both sides and the flips (each side runs in its own process, so each tree's modules load their own data)
-// Exit 0 always when it could run (a report, never a refusal), 2 on bad arguments.
+// Read-only comparison of an explicitly selected current gate set against accepted work.
+// Each side runs in its own tree. Missing gates or execution errors are unavailable proof, never a passing comparison.
+//   starci supervisor gate-stability --family <op> --gate <module#export> --tree <dir> [--ledger <file>]... [--json]
+//   starci supervisor gate-stability --family <op> --gate <module#export> --base <dir> --head <dir> [--ledger <file>]... [--json]
+// Exit 0 for a completed report, 2 for invalid input or unavailable execution.
 import fs from 'node:fs';
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
-import { loadContractFreeze } from '../machine/contract-version.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { asList } from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
@@ -56,8 +47,8 @@ function acceptedLegsOf(ledgerFile, family) {
 
 /** One side: the findings of `tree`'s gates on the accepted legs. {tree, family, gates[], legs:[{ledger, repo, workflowId, jobId, attempt, findings[], errors[]}]} */
 export async function gateSide({ tree = SELF_ROOT, family, ledgers = registeredLedgers(), gates = null }) {
-  const freeze = loadContractFreeze(tree, { file: path.join(tree, 'modules', 'kernel', 'contract-freeze.yaml') });
-  const spec = gates ?? freeze.families.find((f) => f.family === family)?.gates ?? [];
+  const spec = gates;
+  if (!Array.isArray(spec) || !spec.length || spec.some((g) => !g?.module || !g?.export)) throw Error('an explicit nonempty current --gate module#export set is required');
   const fns = [];
   for (const gate of spec) {
     const file = path.join(tree, gate.module);
@@ -79,7 +70,7 @@ export async function gateSide({ tree = SELF_ROOT, family, ledgers = registeredL
       legs.push({ ledger, repo, workflowId: leg.workflowId, jobId: leg.jobId, attempt: leg.attempt, findings, errors });
     }
   }
-  return { tree, family, gates: spec, legs };
+  return { tree, family, gates: spec, legs, errors: fns.filter((g) => g.error).map(({ gate, error }) => `${gate.module}#${gate.export}: ${error}`) };
 }
 
 const keyOf = (f) => `${f.code}|${f.path ?? ''}`;
@@ -105,16 +96,16 @@ function runSide({ runner = SELF_ROOT, tree, family, ledgers = null, gates = nul
     ...(gates ?? []).flatMap((g) => ['--gate', `${g.module}#${g.export}`])];
   const r = runNode(args, { cwd: runner, timeout, env, maxBuffer: 64 * 1024 * 1024 });
   if (r.status !== 0) return { error: String(r.stderr || r.error?.message || `exit ${r.status}`).trim().slice(-400) };
-  return parseJson(r.stdout.trim().split(/\r?\n/).pop(), null) ?? { error: 'unparseable side output' };
+  const side = parseJson(r.stdout.trim().split(/\r?\n/).pop(), null);
+  return !side || !Array.isArray(side.legs) ? { error: 'unparseable side output' } : side.errors?.length ? { error: side.errors.join('; ') } : side;
 }
 
 /**
  * Both sides and the comparison; `runner` is the tree whose copy of this script runs both. Both sides run the gates
- * the HEAD tree's contract-freeze.yaml names (a module the base tree lacks reads as an error there, never a flip).
+ * explicitly selected current gates (a module the base tree lacks is unavailable, never a flip).
  */
-export function gateStability({ runner = SELF_ROOT, base, head, family, ledgers = null, env = process.env }) {
-  const gates = loadContractFreeze(head, { file: path.join(head, 'modules', 'kernel', 'contract-freeze.yaml') }).families.find((f) => f.family === family)?.gates ?? [];
-  if (!gates.length) return { family, error: `no gates for ${family} in ${head}/modules/kernel/contract-freeze.yaml` };
+export function gateStability({ runner = SELF_ROOT, base, head, family, ledgers = null, gates = null, env = process.env }) {
+  if (!Array.isArray(gates) || !gates.length || gates.some((g) => !g?.module || !g?.export)) return { family, error: 'an explicit nonempty current --gate module#export set is required' };
   const b = runSide({ runner, tree: base, family, ledgers, gates, env });
   const h = runSide({ runner, tree: head, family, ledgers, gates, env });
   if (b.error || h.error) return { family, error: b.error ? `base: ${b.error}` : `head: ${h.error}` };
@@ -125,18 +116,18 @@ async function main(argv) {
   const values = (name) => argv.flatMap((a, i) => (a === name && i + 1 < argv.length ? [argv[i + 1]] : []));
   const one = (name) => values(name)[0] ?? null;
   const family = one('--family'), json = argv.includes('--json');
-  if (!family) { process.stderr.write('use: starci supervisor gate-stability --family <op> (--tree <dir> | --base <dir> --head <dir>) [--ledger <file>]... [--json]\n'); return 2; }
+  const gates = values('--gate').map((g) => { const [module, fn] = g.split('#'); return { module, export: fn }; });
+  if (!family || !gates.length || gates.some((g) => !g.module || !g.export)) { process.stderr.write('use: starci supervisor gate-stability --family <op> --gate <module#export> (--tree <dir> | --base <dir> --head <dir>) [--ledger <file>]... [--json]\n'); return 2; }
   const ledgers = values('--ledger').length ? values('--ledger').map((l) => path.resolve(l)) : null;
   if (one('--base') || one('--head')) {
     if (!one('--base') || !one('--head')) { process.stderr.write('--base and --head go together\n'); return 2; }
-    const out = gateStability({ base: path.resolve(one('--base')), head: path.resolve(one('--head')), family, ledgers });
+    const out = gateStability({ base: path.resolve(one('--base')), head: path.resolve(one('--head')), family, ledgers, gates });
     process.stdout.write(json ? `${JSON.stringify(out)}\n` : `${out.error ? `gate-stability ${family}: ${out.error}` : `gate-stability ${family}: ${out.flips} of ${out.legs} accepted leg(s) would flip, ${out.newlyFailing} get new findings\n${out.perLeg.map((l) => `  ${l.workflowId} ${l.jobId}: ${l.baseFindings} -> ${l.headFindings}${l.flipped ? ' FLIP' : ''}${l.newFindings.length ? ` new ${[...new Set(l.newFindings.map((f) => f.code))].join(', ')}` : ''}`).join('\n')}`}\n`);
-    return 0;
+    return out.error ? 2 : 0;
   }
-  const gates = values('--gate').map((g) => { const [module, fn] = g.split('#'); return { module, export: fn }; }).filter((g) => g.module && g.export);
-  const side = await gateSide({ tree: path.resolve(one('--tree') ?? SELF_ROOT), family, ...(ledgers ? { ledgers } : {}), ...(gates.length ? { gates } : {}) });
+  const side = await gateSide({ tree: path.resolve(one('--tree') ?? SELF_ROOT), family, ...(ledgers ? { ledgers } : {}), gates });
   process.stdout.write(json ? `${JSON.stringify(side)}\n` : `${side.legs.map((l) => `${l.workflowId} ${l.jobId}: ${l.findings.length} finding(s)${l.errors.length ? ` errors ${l.errors.join('; ')}` : ''}`).join('\n')}\n`);
-  return 0;
+  return side.errors.length || side.legs.some((leg) => leg.errors.length) ? 2 : 0;
 }
 
 if (isMain(import.meta.url)) main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (error) => { process.stderr.write(`${error?.stack ?? error}\n`); process.exitCode = 2; });

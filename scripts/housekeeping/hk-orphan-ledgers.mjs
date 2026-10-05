@@ -1,9 +1,7 @@
 // hk-orphan-ledgers.mjs — the housekeeping area `orphanledgers`: two ledger-hygiene findings the retention sweep
 // (hk-ledger.mjs, which only prunes debug logs and purges long-ended workflows of ledgers ALREADY known good) and
 // the `/start` preflight (scripts/reconciler/start.mjs ledgerFindings, which only catches a ledger FILE under a
-// temp-looking path or missing) do not catch in full (COOK-BRIEF F4 handover, incident 2026-09-30; follow-up fix
-// 2026-09-30: the first cut only walked machine.sqlite `ledgers`, invisible to a ledger directory the registry no
-// longer names at all — the lead found 6 such directories still sitting in the live state root):
+// temp-looking path or missing) do not catch in full (docs/ledger-db.md §1):
 //
 //   orphan ledgers   EVERY directory under <stateRoot>/projects/, not only the registered ones:
 //                      - registered (any state) and its directory is gone: 'registered-dir-missing'.
@@ -11,7 +9,7 @@
 //                        it, falling back to the ledger's own `repo_root`) is under the OS temp dir, gone, or none
 //                        at all: 'source-roots-unreachable' / 'no-source-roots'.
 //                      - NOT registered at all (the machine.sqlite row is gone but the directory is not — exactly
-//                        the incident's six probe ledgers): the same two reasons, but the source roots come from
+//                        unregistered ledger directories): the same two reasons, but the source roots come from
 //                        the orphaned runtime.sqlite's own workflows.source_roots_json (engine/db/ledger.mjs
 //                        inspectLedger, read-only), the only place left to ask once the registry has forgotten it.
 //                    A debug probe or throwaway repo that registered a ledger (or never even got that far) and

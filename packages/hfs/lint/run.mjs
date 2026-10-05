@@ -19,10 +19,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { linterReport, mergeReports, sonarReport, sourceRootsOf } from '../report/sonar.mjs';
 import { SIDES, appRelativeMessages, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { STYLE_GLOB } from '../sync/index.mjs';
+import { braceVariants, globExpression } from '../runtime/scripts/lib/glob.mjs';
 
 export const LINT_SCHEMA = 'starci/lint@1';
 /** The side whose stylesheets stylelint judges. */
@@ -75,12 +76,14 @@ function runLinter({ cwd, pkg, bin, args, bound = null }) {
     return { error: `${pkg} is not installed for ${cwd}` };
   }
   const run = spawnSync(process.execPath, [...(bound ? linterBoundArgs() : []), entry, ...args], { cwd, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, ...(bound ? { env: { ...process.env, [BOUND_ENV]: bound } } : {}) });
-  // The linters exit 1 when they found something; no json at all means they could not run. ESLint prints its report on stdout,
-  // stylelint (16 and later) its formatter output on stderr.
+  // ESLint prints its report on stdout; stylelint uses stderr. JSON does not prove a completed child: only exits 0/1
+  // without a spawn error or signal are measurable, and exit 1 must carry findings.
   let results;
   try { results = JSON.parse(run.stdout.trim() || run.stderr); } catch { return { error: `${pkg} produced no json report in ${path.basename(cwd)}/ (exit ${run.status}): ${String(run.stderr || run.stdout).trim().split('\n')[0]}` }; }
   if (!Array.isArray(results)) return { error: `${pkg} produced a report that is not a result list` };
-  return { results };
+  const completed = !run.error && !run.signal && [0, 1].includes(run.status)
+    && (run.status === 0 || results.some((result) => result?.messages?.length || result?.warnings?.length));
+  return { results, ...(completed ? {} : { error: `${pkg} could not complete in ${path.basename(cwd)}/ (exit ${run.status}, signal ${run.signal ?? 'none'}): ${String(run.error?.message || run.stderr || run.stdout || '').trim().split('\n')[0]}` }) };
 }
 
 const eslintFindings = (results, appRoot) => results.flatMap((result) => (result.messages ?? []).map((message) => ({
@@ -97,6 +100,69 @@ const byLocation = (a, b) => `${a.path ?? ''}:${String(a.line ?? 0).padStart(7, 
 
 /** The files of `changed` (app-relative) below `side`/, relative to the side folder. */
 const onSide = (changed, side) => changed.filter((file) => file.startsWith(`${side}/`)).map((file) => file.slice(side.length + 1));
+
+const fileKey = (file) => process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file);
+const inside = (root, file) => { const rel = path.relative(root, file); return rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel); };
+
+/** Read the installed canon's source selectors, then enumerate that scope; unavailable or unsupported selectors cannot prove coverage. */
+async function sourceFiles({ repoRoot, cwd, side, scope }) {
+  const entry = createRequire(path.join(cwd, 'package.json')).resolve(`@starci/eslint-canon-${side}`);
+  if (!inside(fs.realpathSync(repoRoot), fs.realpathSync(entry))) throw new Error('the installed canon is outside the app root');
+  const canon = await import(pathToFileURL(entry).href);
+  const factory = side === 'be' ? canon.starciBeConfig : canon.starciFeConfig;
+  if (typeof factory !== 'function' || typeof canon.loadHfs !== 'function') throw new Error('the installed canon has no supported config factory');
+  const config = await factory({ hfs: canon.loadHfs(pathToFileURL(path.join(cwd, 'eslint.config.mjs')).href) });
+  if (!Array.isArray(config)) throw new Error('the installed canon did not return a flat config');
+  const selectors = [], ignored = [];
+  for (const block of config) {
+    if (!block || typeof block !== 'object') throw new Error('the installed canon returned an invalid config block');
+    for (const [field, target] of [['files', selectors], ['ignores', ignored]]) {
+      if (block[field] === undefined) continue;
+      if (!Array.isArray(block[field]) || block[field].some((glob) => typeof glob !== 'string' || glob.startsWith('!'))) throw new Error(`unsupported canon ${field} selectors`);
+      if (field === 'ignores' && Object.keys(block).some((key) => !['ignores', 'name'].includes(key))) throw new Error('unsupported non-global canon ignores');
+      target.push(...block[field].flatMap((glob) => braceVariants(glob).map(globExpression)));
+    }
+  }
+  if (!selectors.length) throw new Error('the installed canon has no source selectors');
+  const matches = (patterns, file) => patterns.some((pattern) => pattern.test(file));
+  const files = [];
+  const visit = (folder) => {
+    for (const child of fs.readdirSync(path.join(cwd, folder), { withFileTypes: true })) {
+      const file = posix(path.join(folder, child.name));
+      // Ask the canon's global ignore patterns before entering output or installed-package trees.
+      if (matches(ignored, file) || matches(ignored, `${file}/__starci_scope_probe__`)) continue;
+      if (child.isSymbolicLink()) throw new Error(`cannot enumerate symlink ${file}`);
+      if (child.isDirectory()) visit(file);
+      else if (child.isFile() && matches(selectors, file)) files.push(file);
+    }
+  };
+  visit(scope ?? '');
+  return files.sort();
+}
+
+/** Every requested source needs an explicit, well-formed result; suppressed findings and foreign paths cannot witness a completed lint. */
+function checkedEslintResults({ results, expected, cwd, scope, changed }) {
+  const required = new Set(expected.map((file) => fileKey(path.join(cwd, file))));
+  const seen = new Set(), valid = [], errors = [];
+  for (const result of results) {
+    if (!result || typeof result.filePath !== 'string' || !path.isAbsolute(result.filePath) || !Array.isArray(result.messages)
+      || result.messages.some((message) => !message || typeof message.message !== 'string')
+      || (result.suppressedMessages !== undefined && !Array.isArray(result.suppressedMessages))) {
+      errors.push('eslint produced a malformed file result'); continue;
+    }
+    const key = fileKey(result.filePath);
+    if (!inside(cwd, result.filePath) || (scope && !inside(path.join(cwd, scope), result.filePath)) || (changed && !required.has(key))) {
+      errors.push(`eslint produced a result outside the requested scope: ${result.filePath}`); continue;
+    }
+    if (seen.has(key)) errors.push(`eslint produced duplicate results for ${result.filePath}`);
+    seen.add(key);
+    if (result.suppressedMessages?.length) errors.push(`eslint suppressed findings for ${result.filePath}`);
+    valid.push(result);
+  }
+  const missing = expected.filter((file) => !seen.has(fileKey(path.join(cwd, file))));
+  if (missing.length) errors.push(`eslint produced no result for requested source files: ${missing.join(', ')}`);
+  return { results: valid, errors };
+}
 
 /**
  * Run the whole lint of the app at `repoRoot`. `hfsCheck(repoRoot)` returns the `starci app check` result (`{ findings, tracked }`); the CLI
@@ -130,9 +196,16 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
     if (workspace !== null && side !== STYLE_SIDE) { engines.eslint.sides[side] = { files: 0, skipped: `outside --workspace ${workspace}` }; continue; }
     const sources = onSide(existing, side).filter((file) => /\.(?:[cm]?[jt]sx?)$/.test(file));
     if (changed !== null && !sources.length) { engines.eslint.sides[side] = { files: 0, skipped: 'no changed source file' }; continue; }
-    const linted = runLinter({ cwd: path.join(repoRoot, side), pkg: 'eslint', bin: 'eslint', args: ['--format', 'json', ...(opts.fix ? ['--fix'] : []), ...(changed ? sources : [onFe ?? '.'])], bound: repoRoot });
+    const cwd = path.join(repoRoot, side);
+    let expected;
+    try { expected = changed ? sources : await sourceFiles({ repoRoot, cwd, side, scope: onFe }); }
+    catch (error) { errors.push(`eslint source scope is unavailable in ${side}/: ${String(error?.message ?? error)}`); engines.eslint.sides[side] = { files: 0 }; continue; }
+    const linted = runLinter({ cwd, pkg: 'eslint', bin: 'eslint', args: ['--format', 'json', ...(opts.fix ? ['--fix'] : []), ...(changed ? sources : [onFe ?? '.'])], bound: repoRoot });
     if (linted.error) errors.push(linted.error);
-    else {
+    if (linted.results) {
+      const checked = checkedEslintResults({ results: linted.results, expected, cwd, scope: onFe, changed: changed !== null });
+      errors.push(...checked.errors);
+      linted.results = checked.results;
       // The side canon names side-relative paths in its messages; the report names every path from the app root.
       const appRelative = appRelativeMessages(side, path.join(repoRoot, side));
       for (const result of linted.results) for (const message of result.messages ?? []) message.message = appRelative(message.message);
@@ -148,7 +221,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
     if (changed === null || styles.length) {
       const linted = runLinter({ cwd: path.join(repoRoot, STYLE_SIDE), pkg: 'stylelint', bin: 'stylelint', args: [...(changed ? styles : [onFe ? `${onFe}/src/**/*.css` : STYLE_GLOB]), '--formatter', 'json', ...(opts.fix ? ['--fix'] : [])] });
       if (linted.error) errors.push(linted.error);
-      else {
+      if (linted.results) {
         const appRelative = appRelativeMessages(STYLE_SIDE, path.join(repoRoot, STYLE_SIDE));
         for (const result of linted.results) for (const warning of result.warnings ?? []) warning.text = appRelative(warning.text);
         raw.stylelint = linted.results;

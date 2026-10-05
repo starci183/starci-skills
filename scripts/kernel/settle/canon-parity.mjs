@@ -20,7 +20,7 @@
 // Anything else (no admission base, an uncovered red, an unverifiable claim, any new finding) goes to the Kernel with
 // its reason - the gate is never weaker than before. Seams (specs): canon, lint, tsc, rerun, diffCheck, git.
 import fs from 'node:fs';
-import crypto from 'node:crypto';
+import { sha256 } from '../../../engine/digest.mjs';
 import path from 'node:path';
 import { runNode } from '../../api/node/run-node.mjs';
 import { checkVerdictOf } from './check-verdict.mjs';
@@ -461,17 +461,21 @@ export async function resolveOwnedRoot(item, { repo }) {
 }
 
 /**
- * What a parity verdict depends on that the slice controls: its admission base and its owned files (path, size,
- * mtime). A cached verdict is reused while this holds (the settler passes every minute; a measurement takes minutes).
+ * Bind cached non-green refusals to the admission base and length-framed owned paths/content, normalizing CRLF.
+ * A Latin-1 round trip preserves arbitrary bytes; an unreadable input disables reuse instead of caching a guess.
  */
 export async function parityFingerprint(item, { repo, resolveRoot = resolveOwnedRoot } = {}) {
   const where = await resolveRoot(item, { repo });
   if (!where.ok) return null;
-  const h = crypto.createHash('sha1').update(String(sliceBaseOf(item))).update('\0');
-  for (const rel of ownedFilesOf(where.root, where.ownedRels)) {
-    try { const st = fs.statSync(path.join(where.root, rel)); h.update(`${rel}\0${st.size}\0${Math.round(st.mtimeMs)}\0`); } catch { h.update(`${rel}\0gone\0`); }
-  }
-  return h.digest('hex').slice(0, 16);
+  const frame = (value) => { const bytes = Buffer.isBuffer(value) ? value : Buffer.from(String(value)); return Buffer.concat([Buffer.from(`${bytes.length}:`), bytes]); };
+  const frames = [frame(sliceBaseOf(item))];
+  try {
+    for (const rel of ownedFilesOf(where.root, where.ownedRels)) {
+      const bytes = Buffer.from(fs.readFileSync(path.join(where.root, rel)).toString('latin1').replace(/\r\n/g, '\n'), 'latin1');
+      frames.push(frame(rel), frame(bytes));
+    }
+  } catch { return null; }
+  return sha256(Buffer.concat(frames));
 }
 // The lint child: node canon-parity.mjs --lint-child <job.json> -> one JSON line, runLintGate's result.
 if (isMain(import.meta.url) && process.argv[2] === '--lint-child') {

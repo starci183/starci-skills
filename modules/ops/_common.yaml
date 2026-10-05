@@ -144,6 +144,12 @@ sections:
         proof and reports the result without another formal question. A reserved exit checkpoint,
         changed envelope or undeclared external effect still requires the user. Parent completion
         is derived.
+  - title: Code authoring follows its owning knowledge loop
+    blocks:
+      - "Whenever this op authors code, including tests, executable examples, draw render sources and
+        setup scripts, follow knowledge/op-gate.yaml's code-authoring instructions within its existing
+        write authority and declared owning profile. This includes conditional code outside enforcedOps;
+        stronger drawing, stacks and test proofs remain owed."
   - title: Read the source tree
     blocks:
       - The runtime reads this tree directly. Contracts load from the authored YAML under
@@ -657,9 +663,9 @@ shared:
           availability proof. Capabilities are the intersection of actual tools, selected profile
           policy, op permissions and existing task authority.
     - id: standard
-      path: knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
+      path: docs/architecture.md + docs/code-pattern-enforcement.md + examples/index.yaml + knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
       purpose:
-        en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml
+        en: "The standard this op's decisions and records cite: docs/architecture.md, docs/code-pattern-enforcement.md, examples/index.yaml, knowledge/op-gate.yaml
           (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map
           of every record it writes (starci app explain at the app root). The files are read in place and
           recorded with their sha256 in the READ digest; nothing here is restated into a record."

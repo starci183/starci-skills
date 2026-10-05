@@ -3,7 +3,7 @@
 group: kernel
 verb: kernel-ack-rev
 owner: runtime
-summary: record the runtime rev whose kernel files this Kernel has read
+summary: project or attest the complete current Kernel READ manifest
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -18,32 +18,36 @@ flags:
     summary: workflow id
   - name: rev
     type: string
-    required: true
-    summary: runtime commit (sha or ref) that was read
-  - name: files
+    summary: exact current Git SHA or installed required-byte revision returned by --plan
+  - name: plan
+    type: boolean
+    summary: return the current server-derived required manifest without acknowledgement
+  - name: read-manifest
     type: string
-    summary: comma list of the kernel files read at that rev
+    summary: regular JSON file containing the exact complete manifest read by this Kernel
+  - name: op
+    type: string
+    summary: include this declared upcoming op contract in the required READ set
 exit:
-  "0": acked
-  "1": refused or failed (rev is no commit of the runtime)
+  "0": planned or acknowledged
+  "1": refused or unavailable current identity/READ inputs
   "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
-  - starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev>
+  - starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --plan
+  - starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev> --read-manifest <file>
 editions:
   - full
 since: 1.0.0-alpha.4
 removed:
   - starci api kernel-ack-rev
   - node scripts/kernel/cli.mjs kernel-ack-rev
-reads: the workflows row; the runtime root's git (rev-parse, diff) (scripts/kernel/runtime-rev.mjs)
-writes: "one runtime-rev-acked event {rev (full sha), files, source: ack, attempt}. start-workflow
-  records the boot rev the same way (source boot, files kernel-prompt.md + driver-loop.yaml). The
-  newest one is the Kernel's acked rev: status kernelRev, the wake text and the kernel-rev-stale
-  gate of enqueue/dispatch read it"
-returns: "{ok:true, workflowId, rev, files, attempt, kernelRev}"
+reads: current workflow, job, singleton signal and actual required runtime contract bytes
+writes: one runtime-rev-acked event bound to the exact current incarnation and complete required READ hashes
+returns: '{ok:true, workflowId, readManifest, rev?, attempt?}'
 refuses:
   - workflow-unknown
-  - "kernel-rev-unknown: --rev is not a commit of the runtime root"
-usedBy: the Kernel, after re-reading what a wake naming a newer runtime rev listed (driver-loop.yaml
-  survey.runtimeRev)
+  - kernel-rev-unknown
+  - kernel-caller-stale
+  - kernel-read-unverified
+usedBy: the current Kernel after reading every path returned by --plan

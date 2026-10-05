@@ -8,6 +8,13 @@
 import { workerVerb, runAsCli } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 
+/**
+ * Request stop of one caller-owned Dispatch through the host's lifecycle classification.
+ * ok requires a classifiable state receipt, not merely exit zero. stop_unknown, unverifiable and
+ * outcome_unknown remain unknown; reconciliation and complete release are owned by closeWorker.
+ * @param {object} input - Required Dispatch identity; this call does not establish ownership.
+ * @returns {object} Classified outcome/effectState, Dispatch/state, host result, and error.
+ */
 export function workerStop({ dispatch }) {
   return workerVerb('worker-stop', dispatch);
 }

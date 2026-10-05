@@ -46,12 +46,6 @@ flags:
   - name: foundation
     type: string
     summary: shared foundation this unit builds
-  - name: contract-change
-    type: string
-    summary: registered follow-up change id in contract-changes.yaml
-  - name: follow-up-of
-    type: string
-    summary: job of this workflow the follow-up leg answers
   - name: new-module
     type: string
     summary: comma list of module root dirs the grant creates
@@ -109,17 +103,7 @@ workUnit: "Every op job is a try of exactly one work unit (scripts/kernel/units.
   unit-overlaps-failed-unit (retry that unit instead). --derived-from <jobs> (graph-edit split,
   merge, wire, recut) makes a new unit inherit what is left of those units' budgets. owner_answers,
   prior_attempt_failures and the lineage route adjustments read the unit's own tries only"
-foundations: "--foundation <name> marks a leg that builds a shared foundation this workflow claimed
-  (starci kernel foundation --claim): payload.foundation, and status lists it first in frontier.queued -
-  foundation legs run first. Without it, a workflow with running peers that declared no foundation
-  (owns / needs / none) is refused foundations-undeclared when it was created after the
-  shared-foundation-planning contract change and its ledger plans foundations at all (a foundation
-  or a declaration is recorded); an older workflow, or a ledger that registered none, is only
-  advised (receipt foundationAdvisory, one stderr line) and never held."
-contractFollowUp: "--contract-change <id> --follow-up-of <jobId> records the follow-up leg a `reach:
-  follow-up` contract change owes an older leg (modules/kernel/contract-changes/; starci kernel status
-  frontier.contractFollowUps): payload.contractChange {id, followUpOf}. Pass --after <jobId> while
-  the older leg still runs; it is never held for the change."
+foundations: "--foundation <name> marks a leg building a shared foundation this workflow claimed. Foundation legs run first. A workflow in a ledger with foundation planning and running peers must declare owns/needs/none before non-foundation legs; a ledger with no foundation planning receives advice, not a fabricated declaration."
 reads: workflows.phase; existing jobs for {workflow_id, op_id}; the brief
   modules/ops/ops/<opId>.yaml must exist and supplies the `params` block every override is checked
   against; the latest goals row's opChain leg for this op supplies what the owner set
@@ -183,8 +167,7 @@ refuses:
     record is no canon-scan"
   - unknown-op: no brief at modules/ops/ops/<opId>.yaml
   - "kernel-rev-stale: the Kernel's acked runtime rev is behind and this op's contract (its brief,
-    _common, the verdict contract, the schemas and checks it cites, scripts/kernel/op-prompt.mjs) or
-    a contract change scoped to it changed in between (runtime-rev.mjs opRevStale). Re-read what api
+    _common, the verdict contract, the schemas and checks it cites, scripts/kernel/op-prompt.mjs) changed in between (runtime-rev.mjs opRevStale). Re-read what api
     status kernelRev lists, starci kernel kernel-ack-rev, enqueue again; legs of other ops are unaffected"
   - "grant-parent-missing: an owned path whose directory does not exist in its target repository
     (the path itself for a directory or glob grant, its parent for a file grant - e.g. src/app when
@@ -230,8 +213,6 @@ refuses:
     detail} on stdout and exits 1, no job written - see foundations above"
   - foundation-not-owned: --foundation names a foundation this workflow has not claimed
   - foundation-name-invalid: --foundation is not a lowercase slug
-  - contract-change-unknown: --contract-change names no registered reach follow-up change
-  - follow-up-of-unknown: --follow-up-of names no job of this workflow
 duplicates: "enqueue does not refuse a second live job for the same op: cutExecution
   (driver-loop.yaml) enqueues N disjoint same-op slices at once, each its own attempt. Duplicate
   suppression is the kernel's plan discipline, and the durable fence is dispatch admission — two

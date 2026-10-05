@@ -15,14 +15,16 @@ npm test        # node --test tests/*.spec.mjs
 `npm run check` is the repository wrapper for `starci runtime check`. During a focused
 change, run one check with `starci runtime check --only <name>`.
 
-Node.js 22.13+ is required (`node:sqlite` unflagged). Runtime code has zero npm dependencies —
-it runs on node builtins plus the vendored `engine/yaml.mjs` bundle. `devDependencies` exist only
-for the test suite and tooling:
+The supported Node.js 22/24 branches are declared in `package.json` `engines.node` and summarized in
+[README prerequisites](README.md). Unflagged `node:sqlite` and the runtime capability checks are
+required. Runtime code uses Node builtins, the vendored `engine/yaml.mjs` bundle and the production
+dependencies declared in `package.json`: `libpg-query` parses PostgreSQL/PLpgSQL and `smol-toml`
+parses TOML. `devDependencies` support contributor specs and tooling:
 
 - `ajv` — schema assertions inside specs.
 - `typescript`, `next`, `swr`, `@nestjs/*`, `@jest/globals`, `@types/jest` — fixture-resolution
-  targets: checks resolve a fixture repo's deps, which walk up into this `node_modules`. They are
-  not libraries the runtime imports.
+  targets: compiler and framework checks resolve the actual target's declared dependencies;
+  contributor fixtures may resolve this repository's development install.
 - `yaml`, `esbuild` — only needed to rebuild the vendored `engine/yaml.mjs` bundle; the bundle is
   frozen, so most contributors never touch these.
 
@@ -59,9 +61,9 @@ record and is worse than a red check.
   `starci runtime gen-catalog --write`, and use `starci runtime gen-catalog --check` to confirm
   the generated catalog, reference, and completions agree. Keep the catalog parity and drift
   checks green.
-- **Code style:** plain `.mjs`, node builtins preferred, no comments unless the reason is not
-  visible in the code. Line endings are LF (`.gitattributes` enforces it — the install manifest
-  hashes bytes).
+- **Code style:** plain `.mjs`, node builtins preferred. Follow the comment contract in
+  `docs/code-pattern-enforcement.md` (REF-COMMENT-1). Line endings are LF (`.gitattributes`
+  enforces it — the install manifest hashes bytes).
 - **State:** project and host state use their SQLite writers in `engine/db/ledger.mjs` and
   `engine/db/machine.mjs`; [storage](docs/ledger-db.md) owns their placement and lifecycle.
   Dispatch artifacts use the OS tmpdir or are deleted after delivery.
@@ -139,9 +141,9 @@ Every runtime change meets these rules on top of the commit bar:
    generated images and agent opinion. Never route a question to the owner that one of them answers.
 6. **Fail closed, visibly.** A gate that crashes must not pass. No empty `catch`, no `|| true` on a
    check whose failure matters.
-7. **Safe to hot-load.** Watchdogs and kernels pick up main mid-run. A change keeps running legs on
-   their contract (`modules/kernel/contract-changes/<id>.yaml`, reach `new-legs`) and never
-   closes, restarts or rewrites live terminals, ledgers or product files.
+7. **Safe to hot-load.** Preserve actual admitted scope, caller/incarnation, native effect custody and filed evidence.
+   New admission requires the exact current READ manifest and current safeguards. Unknown custody stays held.
+   A source change never closes, restarts or rewrites live terminals, ledgers or product files.
 
 ## Commit bar
 

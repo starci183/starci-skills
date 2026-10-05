@@ -4,7 +4,7 @@ import path from 'node:path';
 import { transitionWorkflowToRunning, updateJob } from '../../../engine/db/ledger.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { admitOpSlot } from '../../../engine/admission.mjs';
-import { allocationMs, allocationSettings } from '../../../engine/config.mjs';
+import { allocationMs, allocationSettings, inspectOwnerConfig } from '../../../engine/config.mjs';
 import { buildOpPrompt, renderOwnedPath, ensureJobScratch, jobScratchDirOf } from '../op-prompt.mjs';
 import { priorAttemptFailures } from '../prior-failures.mjs';
 import { withLessons } from '../../machine/lessons-file.mjs';
@@ -27,11 +27,8 @@ import { hostThrottle, noteThrottled, releaseThrottled, DISPATCH_THROTTLED } fro
 import { deferredQueueCause } from '../autopilot-run.mjs';
 import { resolveWorkerLaunchModel, missingHostTools, defaultOperationTarget } from '../../agent/models.mjs';
 import { kindOrder, isFanOutSlice } from '../../agent/models.mjs';
-import { resolveOpParams } from '../dispatch-op.mjs';
-import { readOpManifest } from '../../lib/op-shared.mjs';
 import { checkPrerequisites, prerequisiteDetail } from '../prerequisites.mjs';
 import { FOUNDATION_WAIT, gateShellFoundation, shellFoundationNeed } from '../shell-foundation.mjs';
-import { opInputPaths, recordInputs, workInputPaths } from '../input-digests.mjs';
 import { resumeContextOf } from '../resume-context.mjs';
 import { jobDisplayName, jobWhat, workflowNameOf } from '../../lib/display-names.mjs';
 import { productLocaleFor } from '../product-locale.mjs';
@@ -42,6 +39,8 @@ import { packetFileOf } from '../../machine/task-spec.mjs';
 import { ENV_GATED_OPS } from '../verify-failure.mjs';
 import { bindGuardTerminal } from '../../guards/hook-install.mjs';
 import { readEnv } from '../../lib/env.mjs';
+import { admitPacket, selectDispatchContract, captureDispatchInputs } from '../dispatch-admission.mjs';
+import { reserveDispatch } from '../dispatch-reservation.mjs';
 
 export default {
   verb: 'dispatch',
@@ -49,7 +48,7 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   run({ ledger, args, repo, emit, internals }) {
-    const { skillRoot, SETTLED, queuedSeamsOf, refuseStaleKernelRev, latestGraphNodesOf, deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel, buildPacket, bestEffort, rejectDispatch, DISPATCH_LEASE_TTL_MS, opLeaseRequests, livePathLeaseWait, reserveOpLeases, envServicesOf, environmentPreStep, raiseEnvironmentIncident, opGuardLaunch } = internals;
+    const { skillRoot, SETTLED, queuedSeamsOf, refuseStaleKernelRev, latestGraphNodesOf, deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel, buildPacket, bestEffort, rejectDispatch, opLeaseRequests, livePathLeaseWait, envServicesOf, environmentPreStep, raiseEnvironmentIncident, opGuardLaunch } = internals;
 
   const db = ledger.db, jobId = args.job;
   // Dispatch never re-decides the route; a Kernel's --prefer/--avoid is an unknown option here as on starci kernel route.
@@ -64,6 +63,8 @@ export default {
   requirePhase(getWorkflow(db, job.workflow_id), DISPATCHES, 'dispatch');
   // SETTLE-FIRST (driver-loop.yaml progress.settleFirst): no new dispatch while filed reports wait unconsumed.
   const { payload, op } = queuedJobOp(ledger, { job, verb: 'dispatch', liveHint: 'dispatching a duplicate', internals });
+  const selectedDispatch = selectDispatchContract(skillRoot, op, payload, { planning: !args.spawn });
+  const briefDoc = selectedDispatch.brief, dispatchParams = selectedDispatch.params;
   const dispatchTarget = enqueueRepository({ op, repository: payload.repository, ownedPaths: ownedPathsOf(payload), repo });
   if (!dispatchTarget.ok) {
     const out = { ok: false, jobId, op, reason: dispatchTarget.reason, detail: dispatchTarget.detail };
@@ -129,10 +130,8 @@ export default {
   // the op must read that the binding names but the repository lacks, or a
   // bound record whose dependsOn is not done where the op requires done. A
   // dispatch that can only end blocked on them is a wasted launch.
-  const briefForAdmission = (() => {
-    try { return readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`)); } catch { return null; }
-  })();
-  const prerequisites = briefForAdmission ? checkPrerequisites({ brief: briefForAdmission, payload, repo }) : { unmet: [], unknown: [] };
+  const briefForAdmission = briefDoc;
+  const prerequisites = checkPrerequisites({ brief: briefDoc, payload, repo, params: dispatchParams });
   if (prerequisites.unmet.length) {
     const designGate = prerequisites.unmet.find((item) => item.kind === 'design-not-settled');
     const out = { ok: false, jobId, op, reason: 'prerequisite-unmet', ...(designGate ? { code: designGate.code } : {}), unmet: prerequisites.unmet,
@@ -154,27 +153,6 @@ export default {
     }
   }
 
-  // Environment pre-step, before any Orca call: a walk on a served stack (uat.verify, uat.assisted.verify,
-  // e2e.verify) first proves the environment its records reference is up - probes, health-endpoint
-  // discovery, a restart of the servers the runtime knows how to start - so a dead server is an
-  // environment fact on the packet, never a red walk blamed on the product (scripts/uat/env-health.mjs).
-  // A port held by a process that is not this workspace's server is the one state no op can fix: the job
-  // stays queued behind an [environment] incident. `--env-gate off` (or STARCI_ENV_GATE=off) skips it.
-  let environmentHealth = null;
-  if (ENV_GATED_OPS.includes(op) && args['env-gate'] !== 'off' && readEnv('STARCI_ENV_GATE') !== 'off') {
-    environmentHealth = environmentPreStep(repo, payload);
-    if (environmentHealth?.declared) {
-      ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'environment-checked',
-        payload: { op, ready: environmentHealth.ready, hardBlock: environmentHealth.hardBlock, services: envServicesOf(environmentHealth) } }));
-    }
-    if (environmentHealth?.hardBlock) {
-      const incidentId = raiseEnvironmentIncident(ledger, job, environmentHealth);
-      const out = { ok: false, jobId, op, reason: 'environment-not-ready', incident: incidentId, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
-      emit(out, `dispatch REFUSED for ${jobId} (${op}): environment-not-ready — ${environmentHealth.remedies.join(' | ')}; incident ${incidentId}. This is the environment, not the product: the job stays queued and costs no attempt; dispatch again once the port is free (or --env-gate off to walk anyway)`, args.json);
-      process.exit(1);
-    }
-  }
-
   const model = resolveModel(args.model ?? payload.model ?? defaultOperationTarget());
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
   // Dispatch launches only inside the kind's order at its tier, so strategy kinds run on Claude or Codex alone.
@@ -187,11 +165,6 @@ export default {
   const briefExists = fs.existsSync(briefAbs);
   const lackingTools = missingHostTools({ pool: { provider: model.provider }, kind: op });
 
-  // The packet's params are the brief's defaults with the overrides enqueue
-  // already validated on top — dispatch resolves, it never re-decides.
-  const briefDoc = briefForAdmission ?? readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`));
-  const dispatchParams = resolveOpParams(briefDoc, {}).params;
-  for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(briefDoc?.params ?? {}, name)) dispatchParams[name] = value;
   // The workflow worktree (owner decision WFWT, scripts/kernel/workflow-worktree.mjs): Orca created it before the
   // Kernel started, and every op of the workflow launches with `--worktree <it>`; no op gets a tree of its own. Ops on
   // one side (be/ or fe/) run one at a time, across sides together (canDispatchConcurrently): a busy side is the typed
@@ -215,7 +188,8 @@ export default {
   const boundGoal = payload.goal_binding?.revision != null
     ? db.prepare('SELECT * FROM goals WHERE workflow_id=? AND revision=?').get(job.workflow_id, payload.goal_binding.revision) ?? null : null;
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
-  if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
+  admitPacket(skillRoot, { packet, op, placements, db, workflowId: job.workflow_id });
+  packet.context.selected_op = selectedDispatch.selected;
   if (payload.repairFor) packet.context.repair_for = payload.repairFor;
   if (workflowTree) packet.context.workflow_worktree = { repo: workflowTree.repoRoot, path: workflowTree.path, branch: workflowTree.branch, checkpoint: workflowTree.checkpoint ?? null, side: sideOf(payload) };
   // The cut manifest the brief binds before the first edit (cut-seam.mjs cutManifestOf): every ordinal's paths and
@@ -231,17 +205,6 @@ export default {
   const grammarContext = grammarContextRequired(briefDoc) ? resolveGrammarContext({ skillRoot, repo, inputs: grammarInputsOf(briefDoc) }) : null;
   if (grammarContext) packet.context.grammar = { family: grammarContext.family, sources: grammarContext.sources };
   const grammarMissing = grammarContext?.missing.length ? grammarMissingDetail(grammarContext.missing) : null;
-  // The law inputs this attempt binds, digested now so survey/status can say
-  // when one changed under a settled result (scripts/kernel/input-digests.mjs).
-  // A digest failure records nothing rather than refusing the dispatch.
-  // Source paths are judged against this admission; the product Work records the packet binds
-  // (payload.records) are re-baselined when the job settles.
-  const inputs = (() => {
-    try {
-      return recordInputs(skillRoot, opInputPaths(briefDoc, { params: dispatchParams }), undefined,
-        { repo, workPaths: workInputPaths(payload), workDir: workDirOf(repo) });
-    } catch { return null; }
-  })();
   // The red checks of this job's own retry lineage - for a cut ordinal its own
   // ordinal, never a sibling slice (scripts/kernel/prior-failures.mjs).
   // plus the Supervisor's lessons whose signature names one of those checks (scripts/machine/lessons-file.mjs).
@@ -249,7 +212,31 @@ export default {
   // The job scratch (a3-3 evidence contract): the op writes its report and attachments there and starci kernel report reads them
   // only from op_attempts.scratch_dir / STARCI_JOB_SCRATCH. Created fresh right before the launch.
   const scratchDir = repo ? jobScratchDirOf(repo, job.workflow_id, jobId) : null;
-  const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, scratchDir }) + workflowWorktreePromptRules(workflowTree);
+  const { inputs, contextPack } = captureDispatchInputs({ skillRoot, op, packet, briefDoc, params: dispatchParams,
+    repo, stateDir: repo ? path.resolve(repo, workDirOf(repo)) : null, workDir: workDirOf(repo), workerCwd, planning: !args.spawn });
+  // Environment pre-step, before any Orca call: a walk on a served stack (uat.verify, uat.assisted.verify,
+  // e2e.verify) first proves the environment its records reference is up - probes, health-endpoint
+  // discovery, a restart of the servers the runtime knows how to start - so a dead server is an
+  // environment fact on the packet, never a red walk blamed on the product (scripts/uat/env-health.mjs).
+  // A port held by a process that is not this workspace's server is the one state no op can fix: the job
+  // stays queued behind an [environment] incident. `--env-gate off` (or STARCI_ENV_GATE=off) skips it.
+  let environmentHealth = null;
+  if (ENV_GATED_OPS.includes(op) && args['env-gate'] !== 'off' && readEnv('STARCI_ENV_GATE') !== 'off') {
+    environmentHealth = environmentPreStep(repo, payload);
+    if (environmentHealth?.declared) {
+      ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'environment-checked',
+        payload: { op, ready: environmentHealth.ready, hardBlock: environmentHealth.hardBlock, services: envServicesOf(environmentHealth) } }));
+    }
+    if (environmentHealth?.hardBlock) {
+      const incidentId = raiseEnvironmentIncident(ledger, job, environmentHealth);
+      const out = { ok: false, jobId, op, reason: 'environment-not-ready', incident: incidentId, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
+      emit(out, `dispatch REFUSED for ${jobId} (${op}): environment-not-ready — ${environmentHealth.remedies.join(' | ')}; incident ${incidentId}. This is the environment, not the product: the job stays queued and costs no attempt; dispatch again once the port is free (or --env-gate off to walk anyway)`, args.json);
+      process.exit(1);
+    }
+  }
+
+  if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
+  const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, scratchDir, contextPack }) + workflowWorktreePromptRules(workflowTree);
   const packetFile = repo ? packetFileOf(jobDirOf(repo, job.workflow_id, jobId), job.try_no) : null;
   // The names a person reads (owner request 2026-09-27, scripts/lib/display-names.mjs): the Task display
   // name, the managed worker's tab (terminal-rename once its handle is known) and the command terminal's title
@@ -258,7 +245,7 @@ export default {
   const opWhat = jobWhat({ payload, op, nodes: latestGraphNodesOf(db, job.workflow_id), repo });
   const terminalTitle = `[Op] ${jobDisplayName({ op, what: opWhat, workflowName: workflowNameOf(db, job.workflow_id) })}`;
   const title = terminalTitle;
-  // The one launch (contract-changes/launch-through-worker-start.yaml, worker-start-spec.yaml): worker-start --spec
+  // The one launch (modules/kernel/start-workflow.yaml, worker-start-spec.yaml): worker-start --spec
   // --agent on the op's own worktree, which files the Task in the same call. The launch model is the persisted route's, else the pool's
   // pin at the kind's tier, else the registry default (resolveWorkerLaunchModel); a card that takes no model flag (devin) starts on its default.
   const launchModel = resolveWorkerLaunchModel({ target: model.target, payload: { ...payload, difficulty: launchOrder.difficulty ?? payload.difficulty } });
@@ -392,36 +379,7 @@ export default {
   // already owns a path, or the machine arbiter can't open) is a dispatch
   // rejection: the worker must never be what discovers the write set was
   // already taken, and an unfenced dispatch is exactly what this layer kills.
-  const leaseTtlMs = Number(args['lease-ttl'] ?? payload.leaseTtlMs ?? 0) || DISPATCH_LEASE_TTL_MS;
-  let reserve;
-  try {
-    reserve = reserveOpLeases(ledger, job, payload, { ttlMs: leaseTtlMs, repo });
-  } catch (e) {
-    // Identity/status refusal (job already leased/running, or row drift): the
-    // job is left untouched — an operator error, not a dispatch rejection.
-    const error = String(e?.message ?? e);
-    emit({ ok: false, jobId, refused: 'reserve-failed', error }, `dispatch REFUSED for ${jobId}: ${error}`, args.json);
-    process.exit(1);
-  }
-  if (!reserve.ok) {
-    const reason = (reserve.reasons ?? [reserve.reason]).filter(Boolean).join('; ') || 'reservation refused';
-    // A holder that took the lease between the pre-check and reserve is the same wait. Only when every
-    // refusal reason is about a conflicting path (the overlap, or the capacity-1 row it fills) — a
-    // missing capacity or the machine arbiter is still a rejection.
-    const conflictKeys = new Set((reserve.pathConflicts ?? []).flatMap((c) => [c.requested, c.held]));
-    const pathOnly = (reserve.reasons ?? []).length > 0 && reserve.reasons.every((r) => /overlaps durable lease/.test(r)
-      || [...conflictKeys].some((key) => r.startsWith(`resource ${key} capacity `)));
-    const raceWait = pathOnly ? livePathLeaseWait(db, job, payload, { conflicts: reserve.pathConflicts }) : null;
-    if (raceWait) {
-      emit({ ok: false, jobId, op, reason: 'path-lease', waiting: true, ...raceWait },
-        `dispatch WAITING for ${jobId} (${op}): path-lease — ${raceWait.detail}`, args.json);
-      process.exit(1);
-    }
-    const rejection = rejectDispatch(ledger, job, jobId, op, model, { step: 'reserve', error: reason });
-    emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, reserve, rejection },
-      `dispatch REJECTED for ${jobId} (reserve): ${reason} — job status=${rejection.status}`, args.json);
-    process.exit(1);
-  }
+  const reserve = reserveDispatch({ ledger, args, job, jobId, payload, packet, op, model, repo, emit, internals });
   if (scratchDir) ensureJobScratch({ repo, workflowId: job.workflow_id, jobId });
   // worker-start owns the agent's environment, so no shim reaches it; the history hook in its checkouts does, finding
   // the op by its bound Orca terminal (scripts/guards/hook-install.mjs bindGuardTerminal).
@@ -431,7 +389,7 @@ export default {
 };
 
 function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile = null, worktree, checkoutRoot = worktree, title, reserve, inputs = null, guard = null, launchModel, scratchDir = null }, internals, emit) {
-  const { cleanupManagedWorker, rejectDispatch, ensureWorkflowRun, recordLaunchTerminal, skillRoot, AGENT_HIERARCHY_SCHEMA, operationNodeId, kernelNodeId, buildContractMarkdown, fileContract } = internals;
+  const { cleanupManagedWorker, rejectDispatch, ensureWorkflowRun, recordLaunchTerminal, skillRoot, ownerRoot, AGENT_HIERARCHY_SCHEMA, operationNodeId, kernelNodeId, buildContractMarkdown, fileContract } = internals;
   const db = ledger.db;
 
   let trust = null;
@@ -459,12 +417,14 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   const run = ensureWorkflowRun(ledger, { job, jobId, payload });
   if (!run.ok) return reject({ step: 'run-create', error: run.error });
   const { runId, kernelHandle } = run;
-  // 2b. Depth (contract change worker-depth-limit): the op nests under its Kernel's Dispatch; one deeper than
+  // 2b. Depth: the op nests under its Kernel's Dispatch; one deeper than
   // config.yaml orca.maxWorkerDepth is refused worker-depth-exceeded before its Task exists (no try spent).
   const preflight = depthPreflight({ parentDispatch: run.kernelPayload?.managed?.dispatchId ?? null });
   if (preflight.refusal) return reject({ step: 'depth', code: preflight.refusal.code, error: preflight.refusal.error });
 
-  const launched = spawnOperationAgent({ ledger, job, op, model, launchModel, payload, jobId, prompt, packetFile,
+  const owner = inspectOwnerConfig(ownerRoot);
+  const launchConfig = owner.error || owner.invalid ? null : owner.config;
+  const launched = spawnOperationAgent({ ledger, job, op, model, launchModel, payload, jobId, prompt, packetFile, config: launchConfig,
     worktree: checkoutRoot, title, run: runId, from: kernelHandle, preflight, request: { job: jobId, lease: reserve.leaseToken },
     onCreated: (handle, dispatchId) => recordLaunchTerminal(ledger, jobId, handle, dispatchId), io: { cleanup: cleanupManagedWorker } });
   trust = launched.trust ?? null;
@@ -511,7 +471,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     attemptId = fileContract(db, {
       job, op, dispatchId, markdown: contractMarkdown, now,
       attempt: { scratchDir, managed: 1, runId, taskId, terminalHandle: launched.terminal, provider: model.provider, model: modelId, effort, modelProfile: model.target, pool: model.target, worktreePath: worktree, startedAt: now, attestedAt: now },
-      context: { packet, worktree, model: model.target, managed: payload.managed, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs },
+      context: { packet, contract: packet.context.contract, worktree, model: model.target, managed: payload.managed, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs },
     });
     markRunning(db, { job, jobId, reserve, worker: dispatchId, payload, now });
     ledger.appendEvent({

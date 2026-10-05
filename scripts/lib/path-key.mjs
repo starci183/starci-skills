@@ -54,12 +54,12 @@ export const resolvedKey = (p) => foldCase(path.resolve(p));
 /** Whether `a` and `b` resolve to the same path (always case-folded, so differently-cased spellings count). */
 export const sameResolvedPath = (a, b) => pathKey(a, { fold: true }) === pathKey(b, { fold: true });
 /**
- * Whether `file` sits strictly under `root`. `key` normalizes both sides first (e.g. the registry's
- * realpath-folded treeKey) when the callers' spellings need it.
+ * Whether `file` sits under `root`; `includeSelf` also admits the root itself. `key` normalizes
+ * both sides first (e.g. the registry's realpath-folded treeKey) when their spellings need it.
  */
-export const insidePath = (root, file, { key = (p) => p } = {}) => {
+export const insidePath = (root, file, { key = (p) => p, includeSelf = false } = {}) => {
   const rel = path.relative(key(root), key(file));
-  return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel);
+  return (includeSelf || Boolean(rel)) && !rel.startsWith('..') && !path.isAbsolute(rel);
 };
 /**
  * A path-ish value (a string or a {path} entry) in relative compare form: trimmed, forward slashes,

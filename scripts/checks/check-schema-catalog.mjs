@@ -54,6 +54,7 @@ export function checkSchemaCatalog({ root = skillRoot } = {}) {
   const catalogued = new Map();
   for (const entry of catalog?.schemas ?? []) {
     const id = String(entry?.id ?? '').trim().split(/\s+/)[0];
+    if (catalogued.has(id)) errors.push(`${id} is listed twice under schemas[].id`);
     if (id) catalogued.set(id, 'schemas[].id');
   }
   const moduleLocal = new Map();

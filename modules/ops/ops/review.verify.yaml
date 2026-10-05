@@ -49,6 +49,10 @@ reads:
     path: shared
     purpose:
       en: shared
+  - id: comment-contract
+    path: docs/code-pattern-enforcement.md + <app>/<reviewed range>
+    purpose:
+      en: Read the applicable public API and decision-comment contract with the selected source and callers.
   - id: review-gate
     path: knowledge/op-gate.yaml + scripts/gates/gate.mjs + <app>/<reviewed range>
     purpose:
@@ -85,7 +89,7 @@ steps:
     action:
       en: "Resolve the exact named operation and load only its contract. Its reads/writes, effect ceiling
         and completion profile replace this selector envelope, except the mechanism steps and proofs
-        below (the gate over the reviewed range and the defect classes), which every mode they name keeps; the union of modes never grants
+        below (the gate over the reviewed range, code-comment review and defect classes), which every mode they name keeps; the union of modes never grants
         authority. Resolve the execution profile and actual tool availability before selecting
         instruments; this does not switch the model/runtime or spawn workers. For an explicitly new
         target, absence is expected: inspect the nearest existing ancestor/workspace, then create
@@ -99,6 +103,17 @@ steps:
         per-criterion results and real output refs; no other mode, source repair or successor is
         implied. This handoff is conditional and does not change standalone or named frontend
         response contracts.
+  - reads: [comment-contract, target, selection]
+    writes: [evidence]
+    action:
+      en: |
+        In the code modes (delivery, workflow, api, and select when it picks one of them), CHECK
+        the reviewed source against REF-COMMENT-1 in docs/code-pattern-enforcement.md. Compare API
+        JSDoc and important decision comments with actual owning code, callers and relevant tests.
+        A failing or unjudged required criterion prevents a passing review. Record per-criterion
+        results and source/test references in the existing mode evidence; carry defects into the
+        review-defects classification below. REPORT mechanical proof and agent semantic judgment
+        separately. This review changes no source and creates no extra proof schema or checklist.
   - reads: [review-gate, target, selection]
     writes: [gate-proof, evidence]
     action:
@@ -209,18 +224,26 @@ policy:
               refs/dependencies/acceptance require a reported gap or separately selected scope
               update; never add/remove them to obtain pass.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/coverage.json + evidence/result.md
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: Record review findings and references to the actual implementation-produced gate evidence. No
               new runner execution is claimed.
+        - id: evidence-coverage
+          path: evidence/coverage.json
+          content:
+            en: Retain only the selected delivery coverage.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-result
+          path: evidence/result.md
+          content:
+            en: Retain only the selected delivery result.md at this exact destination; its scope and provenance remain those of evidence.
       steps:
         - reads:
             - application-stacks
             - target
             - repo
             - gates
-          writes: [node, evidence]
+          writes: [node, evidence, evidence-coverage, evidence-result]
           action:
             en: Read the exact delivered source/build and producer evidence for lint, typecheck, tests/coverage,
               build and processed Sonar quality gate. Check command identity, real logs, required
@@ -278,13 +301,13 @@ policy:
       graphPolicy:
         mode: read-only
         location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
-        prerequisiteState: todo
+        prerequisiteState: done-or-exact-direct-predecessor-proposal
         dispatch: never
       reads:
         - id: target
           path: N/index.yaml
           purpose:
-            en: This consumer op requires its target node to exist.
+            en: "This consumer requires its selected target to exist. A reviewed SRS/SDS seed may remain todo only when its exact selected proposal and producer evidence are bound by the passed immediate predecessor in this packet's approved goal identity/revision; todo alone does not satisfy a prerequisite. Do not discover another proposal or add unbound intent. Final completion still requires the current full delivery reconciliation."
         - id: business
           path: .starciwork/features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml
           purpose:
@@ -326,7 +349,7 @@ policy:
               applicable and return partial or blocked. Findings, commit mappings and remaining
               cleanup belong to evidence, never rewritten record prose.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/reconciliation.json + evidence/result.md
+          path: evidence/manifest.yaml
           fields:
             - id
             - nodeId
@@ -347,6 +370,14 @@ policy:
               incomplete tree. The manifest's primary nodeId/inputDigest plus bindings[] cover every
               selected leaf, and sourceIdentity binds the exact tested commits/build represented by
               the reconciliation."
+        - id: evidence-reconciliation
+          path: evidence/reconciliation.json
+          content:
+            en: Retain only the selected business reconciliation.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-result
+          path: evidence/result.md
+          content:
+            en: Retain only the selected business result.md at this exact destination; its scope and provenance remain those of evidence.
       steps:
         - reads:
             - target
@@ -363,7 +394,7 @@ policy:
             - architecture
             - repo
             - proofs
-          writes: [evidence]
+          writes: [evidence, evidence-reconciliation, evidence-result]
           action:
             en: Compare each required business dimension and mapped design contract to delivered code and
               independent observations, including denial and persistence where required. Existing
@@ -374,7 +405,7 @@ policy:
             - architecture
             - proofs
             - target
-          writes: [node, evidence]
+          writes: [node, evidence, evidence-reconciliation, evidence-result]
           action:
             en: Record pass, discrepancy, stale and unproven rows plus named owners. Keep each layer's evidence
               distinct while binding the shared reconciliation revision. Never edit expected to
@@ -382,7 +413,7 @@ policy:
         - reads:
             - target
             - proofs
-          writes: [node, evidence]
+          writes: [node, evidence, evidence-reconciliation, evidence-result]
           action:
             en: Validate all refs and the complete SRS-to-UAT evidence chain. Author done only when every
               required selected leaf is current and bound to the same revision; otherwise keep todo
@@ -465,7 +496,7 @@ policy:
           content:
             en: Read the existing selected scope, expected assertions and .starciwork graph unchanged.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/portfolio-review.json + evidence/result.md
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Retain source/evidence identity checks and task-to-piece coverage; no invented delivery receipt
@@ -473,6 +504,14 @@ policy:
               task done-when to selected peer node IDs and actual repository delivery. Record
               missing peer proof, conflicting ownership and integration gaps without modifying their
               states."
+        - id: evidence-portfolio-review
+          path: evidence/portfolio-review.json
+          content:
+            en: Retain only the selected workflow portfolio-review.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-result
+          path: evidence/result.md
+          content:
+            en: Retain only the selected workflow result.md at this exact destination; its scope and provenance remain those of evidence.
       steps:
         - reads:
             - assignments
@@ -487,7 +526,7 @@ policy:
             - deliveryChain
             - repo
             - assignments
-          writes: [evidence]
+          writes: [evidence, evidence-portfolio-review, evidence-result]
           action:
             en: Read each original outcome and actual delivered bytes/commit; compare every assigned goal line
               and required assertion with its proof. Verify integration lineage and current versions
@@ -497,7 +536,7 @@ policy:
             - assignments
             - proofs
             - deliveryChain
-          writes: [node, evidence]
+          writes: [node, evidence, evidence-portfolio-review, evidence-result]
           action:
             en: Report aggregate scope coverage, absent/failed/stale evidence and cross-piece conflicts. A
               product-delivery workflow may pass only when its final reconciliation proves current
@@ -581,8 +620,7 @@ policy:
           content:
             en: Read the existing selected scope, expected assertions and .starciwork graph unchanged.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/<screen>.png + evidence/measurements.json + evidence/runtime.json + evidence/review.md +
-            evidence/result.md
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Capture real image bytes, viewport/theme/route/state and actual DOM/computed measurements.
@@ -591,6 +629,26 @@ policy:
               Operator-specific observed result in evidence/result.md: Bind environment, actor or anonymous
               and all served repositories in refs. Record current findings without restyling source
               or altering acceptance."
+        - id: evidence-screen
+          path: evidence/<screen>.png
+          content:
+            en: Retain only the selected visual <screen>.png at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-measurements
+          path: evidence/measurements.json
+          content:
+            en: Retain only the selected visual measurements.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-runtime
+          path: evidence/runtime.json
+          content:
+            en: Retain only the selected visual runtime.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-review
+          path: evidence/review.md
+          content:
+            en: Retain only the selected visual review.md at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-result
+          path: evidence/result.md
+          content:
+            en: Retain only the selected visual result.md at this exact destination; its scope and provenance remain those of evidence.
       steps:
         - reads:
             - target
@@ -607,7 +665,7 @@ policy:
             - identity
             - repo
             - target
-          writes: [evidence]
+          writes: [evidence, evidence-screen, evidence-measurements, evidence-runtime, evidence-review, evidence-result]
           action:
             en: Apply common browser provenance and isolation protocol. Verify actual rendered product
               login/state and served build, not just URL/HTTP 200. Anonymous paths explicitly omit
@@ -616,7 +674,7 @@ policy:
             - design
             - target
             - environment
-          writes: [evidence]
+          writes: [evidence, evidence-screen, evidence-measurements, evidence-runtime, evidence-review, evidence-result]
           action:
             en: Reach each selected state using observed controls, capture actual viewport/theme and retain
               local hashed images. Inspect the images for hierarchy, density, text/content,
@@ -625,7 +683,7 @@ policy:
             - design
             - target
             - business
-          writes: [evidence]
+          writes: [evidence, evidence-screen, evidence-measurements, evidence-runtime, evidence-review, evidence-result]
           action:
             en: Measure applicable contrast, computed layout, focus/keyboard behavior and motion/reduced-motion
               with actual tool observations. Label subjective design judgement separately from
@@ -637,7 +695,7 @@ policy:
         - reads:
             - target
             - design
-          writes: [node, evidence]
+          writes: [node, evidence, evidence-screen, evidence-measurements, evidence-runtime, evidence-review, evidence-result]
           action:
             en: Write per-assertion pass/fail/not-run/inconclusive and owner-routed defects. Missing
               runtime/capture is a blocker; known visual failure remains fail. Validate and stop
@@ -719,14 +777,29 @@ policy:
           content:
             en: Read the existing selected scope, expected assertions and .starciwork graph unchanged.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/api-result.json + evidence/readback.json + evidence/runtime.json +
-            evidence/result.md
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Store actual suite cases and result output, status/error/schema checks, read-back and lifecycle
               observations, namespace effects and runtime provenance. API proof is not UI proof.
               Operator-specific observed result in evidence/result.md: Bind actor/environment/repositories,
               preserve selected API expectations and name untested or failed cases."
+        - id: evidence-api-result
+          path: evidence/api-result.json
+          content:
+            en: Retain only the selected api api-result.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-readback
+          path: evidence/readback.json
+          content:
+            en: Retain only the selected api readback.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-runtime
+          path: evidence/runtime.json
+          content:
+            en: Retain only the selected api runtime.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-result
+          path: evidence/result.md
+          content:
+            en: Retain only the selected api result.md at this exact destination; its scope and provenance remain those of evidence.
       steps:
         - reads:
             - application-stacks
@@ -742,7 +815,7 @@ policy:
             - identity
             - fixture
             - repo
-          writes: [evidence]
+          writes: [evidence, evidence-api-result, evidence-readback, evidence-runtime, evidence-result]
           action:
             en: Verify target physical/runtime version, authorization and owned fixture preconditions;
               distinguish anonymous cases from authenticated actors. Do not seed tested outcomes.
@@ -750,7 +823,7 @@ policy:
             - suite
             - identity
             - fixture
-          writes: [evidence]
+          writes: [evidence, evidence-api-result, evidence-readback, evidence-runtime, evidence-result]
           action:
             en: Execute the actual declared API client suite with isolated inputs and preserve redacted
               request/result diagnostics. Copy only cases the runner reported; missing output is
@@ -759,7 +832,7 @@ policy:
             - business
             - suite
             - fixture
-          writes: [evidence]
+          writes: [evidence, evidence-api-result, evidence-readback, evidence-runtime, evidence-result]
           action:
             en: Check response contract, persistent read-back and lifecycle/authorization independently,
               including replay/idempotency or denial where promised. Observe owned effects and
@@ -767,7 +840,7 @@ policy:
         - reads:
             - target
             - suite
-          writes: [node, evidence]
+          writes: [node, evidence, evidence-api-result, evidence-readback, evidence-runtime, evidence-result]
           action:
             en: Record per-assertion verdict and actual served-version evidence, validate bindings and finish
               without UI claims or source repair.
@@ -814,7 +887,7 @@ policy:
             en: Identify exact repositories, projects, Work root and optional stack profiles. Select only
               required checks; do not infer deployment or repair authority.
         - id: policy
-          path: knowledge/coding-reference.yaml + docs/code-pattern-enforcement.md +
+          path: docs/code-pattern-enforcement.md +
             modules/models/code-patterns.yaml + docs/architecture.md +
             docs/application-stacks.md + scripts/gates/canon-scan.mjs
           purpose:

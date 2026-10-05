@@ -129,16 +129,7 @@ returns:
     config.yaml specs switches deferred (status succeeded, result verdict deferred, no attempt
     spent) and the plan legs not yet enqueued that will be; starci kernel run-deferred-tests runs them. legs[]
     of a deferred op carry `deferred` too"
-  kernelRev: "{current, acked, ackedAt, ackSource:boot|ack, stale, unacked?, full?, files[],
-    fileCount, changes[{id, summary, ops}]} (scripts/kernel/runtime-rev.mjs) — current is the
-    runtime root's git HEAD; acked the newest runtime-rev-acked event (boot records the boot rev,
-    starci kernel kernel-ack-rev the Kernel's). stale: acked is behind and a file under modules/kernel,
-    modules/ops, knowledge, modules/models or scripts/kernel/op-prompt.mjs changed in between, or a
-    contract-changes entry file was added (files capped at 12; full: more, or a rev git cannot
-    compare - re-read kernel-prompt.md and driver-loop.yaml in full). unacked: a Kernel that never
-    acked (booted before this): its wakes ask for one full re-read and an ack; nothing is gated for
-    it. Every Kernel wake carries the same `Runtime rev <short-sha>` sentence (wake-delivery.mjs
-    withWakeIdentity, before the seat identity)"
+  kernelRev: "{current, acked, ackedAt, ackSource, stale, unacked?, full?, files[], fileCount, revision?, readUnavailable?}: actual Git revision or explicitly installed required-byte revision. The complete required current READ manifest and current Kernel incarnation gate affected enqueue/dispatch. Wakes summarize it; they are never READ acknowledgements."
   autopilot: "{on, source, ruling?, provisional[{dispatchId, opId, jobId, class, record, receiptPath,
     label: 'self-accepted provisionally', at}], deferred[{jobId, opId, reason, incidentId?, since}],
     deferredToHandover[{key, dispatchId?, jobId?, opId, deferClass:
@@ -255,10 +246,7 @@ returns:
     file. Never makes the frontier actionable and never enters `reason`: the Kernel never redoes
     settled work because a peer rewrote a shared record; only the record's owner declaring the
     change breaking owes work (frontier.staleOperations followUp)"
-  frontier.sourceDrift: "present only when non-empty: {advisory:true, jobs, paths:[{path, jobs,
-    changes[], followUp[], unregistered}]} — sourceDrift summarized per edited Source path. Never
-    makes the frontier actionable and never enters `reason`: the Kernel does not redo settled work
-    for it (what a follow-up change owes is frontier.contractFollowUps)"
+  frontier.sourceDrift: "Recorded/current Source-input differences summarized per path. This factual projection preserves old evidence without treating it as current READ/CHECK or creating automatic historical follow-up work."
   frontier.queued: "[{jobId, opId, attempt, queuedBecause, blockedBy, detail, blocking?}] — one row
     per queued job, the jobs other work waits on first (heaviest blocking weight first,
     waiter-priority.mjs; such a row carries blocking {waiters, workflows[], weight, since}), the
@@ -372,15 +360,6 @@ returns:
     seam (recut) - all make the frontier actionable and are listed in frontier.seamDuties [{duty,
     jobId, cutId}]. A queued seam's dispatch action carries seamDuty dispatch-seam and reads
     \"dispatch seam now\""
-  contractFollowUps: "frontier.contractFollowUps [{change, jobId, op, attempt, status, followUpOp,
-    detail, after}] - for each `reach: follow-up` change in modules/kernel/contract-changes/, the
-    newest leg of its followUp.ops (per cut ordinal) that was admitted before the change, runs or
-    succeeded, and has no follow-up recorded yet (the key is present only while one is owed). Each
-    owed leg is rework: its followUpOp leg reads red in `legs`, the work-graph nodes it covers read
-    red, and nextActions carries a dispatch {op: followUpOp, jobId, change, nodes?} naming the
-    enqueue. Any entry makes the frontier actionable: the Kernel enqueues followUpOp with
-    --contract-change <change> --follow-up-of <jobId> (--after <jobId> while it runs) and never
-    holds the running leg (driver-loop.yaml contractRollout)"
   foundations: "{peers[], declared, none, owns:[{name, kind, state, version, owner, ownerRunning}],
     needs:[...], required, advised, detail?} - this workflow's shared-foundation duty (api
     foundations); required means starci kernel enqueue refuses its non-foundation legs until it declares.

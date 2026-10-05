@@ -10,11 +10,13 @@ import {spawnSync} from 'node:child_process';
 import {fileReport,inspectLedger,ledgerFileFor,openLedger,writeContract,recordCheckRun} from '../../engine/db/ledger.mjs';
 import {readProperties} from '../../scripts/lib/properties.mjs';
 import {coverageScopeOf,judgeCoverage,judgeDashboard,judgeSummary,loadSonarGate,serverConditions,thresholdsOf} from '../../scripts/gates/sonar-gate.mjs';
-import {enforcesOp,judgeJob,readSonarSummary,recordSonarJudgment,SONAR_CHECK,SONAR_ENFORCE_CHANGE,SONAR_INCIDENT_TAG} from '../../scripts/kernel/sonar-settle.mjs';
+import {enforcesOp,judgeJob,readSonarSummary,recordSonarJudgment,SONAR_CHECK,SONAR_INCIDENT_TAG} from '../../scripts/kernel/sonar-settle.mjs';
 import {independentChecksOf} from '../../scripts/kernel/verbs/shared/check-evidence.mjs';
-import {loadContractChanges} from '../../scripts/machine/contract-version.mjs';
 import {buildWhy,checkFacts,loadCatalog} from '../../scripts/kernel/why.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
@@ -46,7 +48,6 @@ test('the gate is one file: the thresholds, the enforced ops and the server cond
     assert.match(manifest,/sonar-local\.mjs scan/,`${op} tells its worker to run sonar-local`);
     assert.match(manifest,/sonar-unavailable/,`${op} tells its worker what an unavailable Sonar means`);
   }
-  assert.ok(loadContractChanges(ROOT).changes.some(c=>c.id===SONAR_ENFORCE_CHANGE&&c.ops.includes('code.refactor')));
 });
 
 test('the gate judges coverage per service: one service below 100 fails, a non-service file is not part of the measure', () => {
@@ -69,13 +70,13 @@ test('the gate judges coverage per service: one service below 100 fails, a non-s
   ],'a resolver, a module, a spec and anything under fe/ are not coverage targets');
   assert.deepEqual(red.failures,['coverage of be/src/features/orders/payment.service.ts 99.4% < 100%']);
   // The project average can round to 100 while one service is below: the per-file verdict still fails.
-  const dashboard=judgeDashboard({measures:{bugs:'0',code_smells:'0',vulnerabilities:'0',security_hotspots:'0',coverage:'100.0'},files,scope},gate);
+  const dashboard=judgeDashboard({measures:{bugs:'0',code_smells:'0',vulnerabilities:'0',security_hotspots:'0',duplicated_lines_density:'0',coverage:'100.0'},files,scope},gate);
   assert.equal(dashboard.verdict,'fail');
   assert.deepEqual(dashboard.failures,['coverage of be/src/features/orders/payment.service.ts 99.4% < 100%']);
   // The same project with every service at 100 passes, whatever the resolver, the module and fe/ show.
   const green=files.map(f=>f.path.endsWith('payment.service.ts')?{...f,coverage:'100.0'}:f);
   assert.deepEqual(judgeCoverage(green,{scope,minPercent}).failures,[]);
-  assert.equal(judgeDashboard({measures:{bugs:'0',code_smells:'0',vulnerabilities:'0',security_hotspots:'0',coverage:'100.0'},files:green,scope},gate).verdict,'pass');
+  assert.equal(judgeDashboard({measures:{bugs:'0',code_smells:'0',vulnerabilities:'0',security_hotspots:'0',duplicated_lines_density:'0',coverage:'100.0'},files:green,scope},gate).verdict,'pass');
   // A service the lcov does not name is never a pass.
   assert.deepEqual(judgeCoverage([{path:'be/src/a.service.ts',coverage:null}],{scope,minPercent}).failures,["be/src/a.service.ts has no coverage measure (the be unit run's lcov is not imported or does not name it)"]);
   // A slice whose scan failed on coverage is a red settle like any other failing condition.
@@ -191,18 +192,25 @@ test('an unavailable Sonar records the explicit why, tells the Supervisor once a
 // ---- starci kernel settle, end to end ---------------------------------------------------------------------------------------
 
 const checkout=t=>{
-  const repo=tmp(t);
-  const git=(...args)=>{const r=spawnSync('git',['-C',repo,...args],{encoding:'utf8',windowsHide:true});assert.equal(r.status,0,`git ${args.join(' ')}: ${r.stderr}`);return r.stdout.trim();};
-  git('init','--quiet','-b','main');git('config','user.email','lane@starci.test');git('config','user.name','lane');git('config','core.autocrlf','false');
-  put(repo,'src/a.ts','export const a = 1;\n');
-  git('add','.');git('commit','--quiet','-m','init');
-  return {repo,git};
+  const root=tmp(t),main=path.join(root,'main'),repo=path.join(root,'workflow'),branch='wf-sonar';
+  fs.mkdirSync(main);
+  const mainGit=proofRepo(t,main);
+  put(main,'src/a.ts','export const a = 1;\n');
+  mainGit('add','src/a.ts');mainGit('commit','--quiet','-m','source baseline');
+  mainGit('worktree','add','-q','-b',branch,repo,'main');
+  const git=(...args)=>mainGit('-C',repo,...args);
+  const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
+  const env={...process.env,STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
+    STARCI_PROJECTS_ROOT:path.join(root,'projects'),LOCALAPPDATA:path.join(root,'localappdata'),STARCI_ARTIFACT_ROOT:path.join(root,'artifacts'),
+    STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',
+    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json')};
+  return {repo,git,env,branch};
 };
-const effectiveOf=id=>loadContractChanges(ROOT).changes.find(c=>c.id===id).effectiveAt;
-const seedImplement=(repo,git,{jobId,wf,summary,admittedAt,op='backend.implement'})=>{
+const seedImplement=({repo,git,env,branch},{jobId,wf,summary,admittedAt,op='backend.implement'})=>{
+  registerWorkflowWorktree({env},{workflowId:wf,orcaWorktreeId:`sonar-${wf}::workflow`,path:repo,branch});
   const files=['src/a.ts'];
   if(summary){put(repo,'src/checks/sonar.json',json(summary));files.push('src/checks/sonar.json');git('add','.');git('commit','--quiet','-m','slice');}
-  const ledger=openLedger({file:ledgerFileFor(repo)});
+  const ledger=openLedger({file:ledgerFileFor(repo,{env})});
   try{
     seedWorkflow(ledger,{id:wf,state:{phase:'running',job:'impl'},
       jobs:[{jobId,opId:op,dispatchId:`ctx-${jobId}`,terminalHandle:`term-${jobId}`,status:'running',
@@ -218,52 +226,55 @@ const seedImplement=(repo,git,{jobId,wf,summary,admittedAt,op='backend.implement
   }finally{ledger.close();}
   return jobId;
 };
-const settle=(repo,jobId,verdict='pass')=>{const r=spawnSync(process.execPath,[API,'settle','--repo',repo,'--job',jobId,'--verdict',verdict,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});let body=null;try{body=JSON.parse(r.stdout);}catch{}return {r,body};};
-const read=(repo,fn)=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
+const settle=({repo,env},jobId,verdict='pass')=>{const r=spawnSync(process.execPath,[API,'settle','--repo',repo,'--job',jobId,'--verdict',verdict,'--json','--sync-tail'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});let body=null;try{body=JSON.parse(r.stdout);}catch{}return {r,body};};
+const read=({repo,env},fn)=>{const l=inspectLedger({file:ledgerFileFor(repo,{env})});try{return fn(l.db);}finally{l.close();}};
 
-test('starci kernel settle refuses a code-writing pass whose sonar.json is red, unavailable or absent, and passes a green one', t => {
-  const at=effectiveOf(SONAR_ENFORCE_CHANGE)+1000;
+test('starci kernel settle refuses a code-writing pass whose sonar.json is red, unavailable or absent, and records green Sonar without inventing complete mechanism proof', t => {
+  const at=Date.now() - 1000;
   const cases=[
     ['red',scan({outcome:'fail',slice:{failures:['1 open BLOCKER/CRITICAL issue(s) on changed lines']}}),'sonar-gate-red'],
     ['down',scan({outcome:'blocked',unavailable:true,reason:'SonarQube is not reachable'}),'sonar-unavailable'],
     ['none',null,'sonar-proof-missing'],
   ];
   for(const [label,summary,code] of cases){
-    const {repo,git}=checkout(t);
-    const jobId=seedImplement(repo,git,{jobId:`op-backend.implement-${label}`,wf:`wf-${label}`,summary,admittedAt:at});
-    const refused=settle(repo,jobId);
+    const fx=checkout(t);
+    const jobId=seedImplement(fx,{jobId:`op-backend.implement-${label}`,wf:`wf-${label}`,summary,admittedAt:at});
+    const refused=settle(fx,jobId);
     assert.equal(refused.r.status,1,refused.r.stdout||refused.r.stderr);
     assert.ok(refused.body,`stdout: ${refused.r.stdout}
 stderr: ${refused.r.stderr}`);
     assert.equal(refused.body.reason,code);
-    assert.equal(read(repo,db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status),'running','a refused settle changes no job');
-    const check=read(repo,db=>db.prepare("SELECT status FROM check_runs WHERE name='sonar-gate' ORDER BY check_id DESC").get());
+    assert.equal(read(fx,db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status),'running','a refused settle changes no job');
+    const check=read(fx,db=>db.prepare("SELECT status FROM check_runs WHERE name='sonar-gate' ORDER BY check_id DESC").get());
     assert.equal(check.status,'fail',`${label}: the refusal is on the attempt as a runtime check`);
     if(label==='down'){
       assert.ok(refused.body.incidentId);
-      assert.equal(read(repo,db=>db.prepare("SELECT owner FROM incidents WHERE last_progress LIKE '[runtime-sonar-unavailable]%'").get().owner),'supervisor');
+      assert.equal(read(fx,db=>db.prepare("SELECT owner FROM incidents WHERE last_progress LIKE '[runtime-sonar-unavailable]%'").get().owner),'supervisor');
     }
     // a fail verdict is the kernel's way out: it settles, and the why carries the code
     if(label==='red'){
-      const failed=settle(repo,jobId,'fail');
+      const failed=settle(fx,jobId,'fail');
       assert.equal(failed.r.status,0,failed.r.stderr||failed.r.stdout);
-      const why=read(repo,db=>JSON.parse(db.prepare('SELECT why_json FROM op_attempts WHERE job_id=?').get(jobId).why_json));
+      const why=read(fx,db=>JSON.parse(db.prepare('SELECT why_json FROM op_attempts WHERE job_id=?').get(jobId).why_json));
       assert.ok(why.codes.includes('sonar-gate-red'),JSON.stringify(why));
     }
   }
-  const {repo,git}=checkout(t);
-  const jobId=seedImplement(repo,git,{jobId:'op-backend.implement-green',wf:'wf-green',summary:scan(),admittedAt:at});
-  const ok=settle(repo,jobId);
-  assert.equal(ok.r.status,0,ok.r.stderr||ok.r.stdout);
-  assert.equal(read(repo,db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status),'succeeded');
+  const fx=checkout(t);
+  const jobId=seedImplement(fx,{jobId:'op-backend.implement-green',wf:'wf-green',summary:scan(),admittedAt:at});
+  const ok=settle(fx,jobId);
+  assert.equal(ok.r.status,1,ok.r.stderr||ok.r.stdout);
+  assert.equal(ok.body?.reason,'op-gate-proof-missing','green Sonar alone has no captured gate baseline');
+  assert.equal(read(fx,db=>db.prepare("SELECT status FROM check_runs WHERE name='sonar-gate' ORDER BY check_id DESC").get().status),'pass');
+  assert.equal(read(fx,db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status),'running','other missing current proof retains the attempt');
 });
 
-test('a leg admitted before the change, and an op outside the gate, settle as before', t => {
-  const {repo,git}=checkout(t);
-  const old=seedImplement(repo,git,{jobId:'op-backend.implement-old',wf:'wf-old',summary:null,admittedAt:effectiveOf(SONAR_ENFORCE_CHANGE)-1000});
-  const settled=settle(repo,old);
-  assert.equal(settled.r.status,0,settled.r.stderr||settled.r.stdout);
+test('an early admission still requires Sonar; the actual op scope excludes documentation', t => {
+  const fx=checkout(t);
+  const old=seedImplement(fx,{jobId:'op-backend.implement-old',wf:'wf-old',summary:null,admittedAt:1});
+  const settled=settle(fx,old);
+  assert.equal(settled.r.status,1,settled.r.stderr||settled.r.stdout);
+  assert.equal(settled.body?.reason,'sonar-proof-missing');
   const other=checkout(t);
-  const outside=seedImplement(other.repo,other.git,{jobId:'op-docs.author-1',wf:'wf-docs',summary:null,admittedAt:effectiveOf(SONAR_ENFORCE_CHANGE)+1000,op:'docs.author'});
-  assert.notEqual(settle(other.repo,outside).body?.reason,'sonar-proof-missing');
+  const outside=seedImplement(other,{jobId:'op-docs.author-1',wf:'wf-docs',summary:null,admittedAt:Date.now() - 1000,op:'docs.author'});
+  assert.notEqual(settle(other,outside).body?.reason,'sonar-proof-missing');
 });

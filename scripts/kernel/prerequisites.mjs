@@ -19,6 +19,7 @@ import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { DIRECTION_EXEMPT, archetypeOf, directionReadiness } from '../work/ui-archetype.mjs';
 import { boundRecordPaths, segments } from './bound-records.mjs';
 import { normRel } from '../lib/path-key.mjs';
+import { readParamName } from '../context/read-refs.mjs';
 
 /** The refusal code of the design gate (unmet kind design-not-settled). */
 export const DESIGN_NOT_SETTLED = 'DESIGN_NOT_SETTLED';
@@ -56,13 +57,18 @@ export function resolveReadPath(pattern, bindings) {
  * Evaluate one job's data prerequisites against the target repository.
  * Returns {unmet:[...], unknown:[...]} — an empty `unmet` admits.
  */
-export function checkPrerequisites({ brief, payload, repo }) {
+export function checkPrerequisites({ brief, payload, repo, params = payload?.params ?? {} }) {
   const unmet = [], unknown = [];
   const records = (Array.isArray(payload?.records) ? payload.records : []).map(normRel).filter(Boolean);
   const bindings = [...(Array.isArray(payload?.owned_paths) ? payload.owned_paths : []), ...records];
 
   for (const read of Array.isArray(brief?.reads) ? brief.reads : []) {
     if (read?.mustExist !== true) continue;
+    const param = readParamName(read.path);
+    if (param !== null) {
+      if (!Object.hasOwn(params ?? {}, param) || params?.[param] == null) unmet.push({ kind: 'instance-missing', read: read.id, path: read.path });
+      continue;
+    }
     const resolved = resolveReadPath(read.path, bindings);
     if (!resolved.length) { unknown.push({ kind: 'read-unbound', read: read.id, path: read.path }); continue; }
     for (const rel of resolved) {
@@ -96,6 +102,8 @@ export function checkPrerequisites({ brief, payload, repo }) {
 export function prerequisiteDetail({ op, jobId, unmet }) {
   const lines = unmet.map((item) => (item.kind === 'record-missing'
     ? `${op} reads ${item.path} (reads.${item.read}, mustExist) and it does not exist`
+    : item.kind === 'instance-missing'
+      ? `${op} requires this attempt's ${item.path} (reads.${item.read}, mustExist) and it is absent or null`
     : item.kind === 'design-not-settled'
       ? `${DESIGN_NOT_SETTLED}: implementation record ${item.record} proves ui record ${item.ui}, whose interface.draw has not settled pass - ${item.why} (reads.${item.read}, designDrawn). Code is never built before its design: enqueue interface.draw for ${item.ui} and dispatch this job --after it. ${translator(ownerLanguage())('Vietnamese: the drawing (interface.draw) of {ui} is not settled yet, so code must not be written; dispatch implement only once it is drawn and accepted', { ui: item.ui })}`
       : item.kind === 'direction-unaccepted'

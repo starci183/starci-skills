@@ -178,15 +178,13 @@ export function sumRows(rows) {
 /** Every prompt-side token the model read (fresh + cache read + cache write): op_attempts.tokens_in. */
 export const promptTokens = (r) => Number(r.inputTokens ?? 0) + Number(r.cacheReadTokens ?? 0) + Number(r.cacheWriteTokens ?? 0);
 
-let priceCache = null;
 /**
- * modules/models/registry.yaml, read once per process (`file` overrides for a spec). The returned
+ * modules/models/registry.yaml, read at each call so hot-loaded pricing uses current bytes. The returned
  * table is the shape callers have always read: {asOf, source, models:{<id>: {input, output,
  * cacheRead, cacheWrite, provider, tier, source}}} — each row is the model's `price` entry flattened
  * with its provider/tier.
  */
 export function loadPrices(file = PRICES_FILE) {
-  if (file === PRICES_FILE && priceCache) return priceCache;
   const doc = readYamlFile(file, null) ?? {};
   const models = {};
   for (const [id, m] of Object.entries(doc.models ?? {}))
@@ -195,7 +193,6 @@ export function loadPrices(file = PRICES_FILE) {
       : { input: m?.input ?? null, output: m?.output ?? null, cacheRead: m?.cacheRead ?? null, cacheWrite: m?.cacheWrite ?? null,
           provider: m?.provider ?? null, tier: m?.tier ?? null, ...(m?.source !== undefined ? { source: m.source } : {}) };
   const table = { asOf: doc.pricing?.asOf ?? doc.asOf ?? null, source: doc.pricing?.source ?? doc.source ?? null, models };
-  if (file === PRICES_FILE) priceCache = table;
   return table;
 }
 

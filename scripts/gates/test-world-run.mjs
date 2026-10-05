@@ -92,10 +92,60 @@ export function specsOf(root, project, tests = null) {
     .filter((rel) => rel.endsWith(def.suffix) && (!narrow || narrow.test(rel)));
 }
 
+const RUN_COUNTS = Object.freeze(['total', 'passed', 'failed', 'skipped', 'files', 'failedFiles']);
+const JEST_COUNTS = Object.freeze(['numTotalTests', 'numPassedTests', 'numFailedTests', 'numPendingTests', 'numTodoTests',
+  'numTotalTestSuites', 'numPassedTestSuites', 'numFailedTestSuites', 'numPendingTestSuites', 'numRuntimeErrorTestSuites']);
+
+/** Reject an incomplete or inconsistent required test measurement without coercing reported counters. */
+export function testRunCountsError(run) {
+  if (!run || RUN_COUNTS.some((key) => !Number.isSafeInteger(run[key]) || run[key] < 0)) return 'test counters must be non-negative safe integers';
+  if (run.total !== run.passed + run.failed + run.skipped || run.failedFiles > run.files) return 'test counters do not describe a complete run';
+  return null;
+}
+
+/** Validate the Jest JSON and its real process result before any producer can call the measurement clean. */
+export function jestRunError(report, run) {
+  if (run?.error || run?.signal || !Number.isSafeInteger(run?.status) || run.status < 0)
+    return `jest did not complete: ${run?.error?.message ?? run?.signal ?? `exit ${run?.status ?? 'unknown'}`}`;
+  if (!report || typeof report !== 'object' || Array.isArray(report) || !Array.isArray(report.testResults)) return 'jest wrote no valid --json report';
+  if (JEST_COUNTS.some((key) => !Number.isSafeInteger(report[key]) || report[key] < 0)) return 'jest counters must be non-negative safe integers';
+  if (typeof report.success !== 'boolean' || typeof report.wasInterrupted !== 'boolean') return 'jest result is missing completion flags';
+  if (report.wasInterrupted || report.runExecError) return 'jest reports an interrupted or incomplete run';
+  if (report.numTotalTestSuites !== report.numPassedTestSuites + report.numFailedTestSuites + report.numPendingTestSuites
+    || report.numRuntimeErrorTestSuites > report.numFailedTestSuites || report.testResults.length !== report.numTotalTestSuites)
+    return 'jest suite counters do not describe a complete run';
+  const totals = { passed: 0, failed: 0, skipped: 0 }, suites = { passed: 0, failed: 0, skipped: 0 };
+  for (const suite of report.testResults) {
+    if (!suite || !['passed', 'failed', 'skipped', 'focused'].includes(suite.status) || !Array.isArray(suite.assertionResults))
+      return 'jest wrote an invalid suite result';
+    if (suite.status === 'focused' && (report.numPendingTests === 0 || !suite.assertionResults.some(a => ['pending', 'skipped', 'disabled'].includes(a?.status))))
+      return 'jest focused suite reports no pending assertion';
+    suites[suite.status === 'focused' ? 'passed' : suite.status] += 1;
+    for (const assertion of suite.assertionResults) {
+      if (assertion?.status === 'passed') totals.passed += 1;
+      else if (assertion?.status === 'failed') totals.failed += 1;
+      else if (['pending', 'todo', 'skipped', 'disabled'].includes(assertion?.status)) totals.skipped += 1;
+      else return 'jest wrote an invalid assertion result';
+    }
+  }
+  const countsError = testRunCountsError(reduceJest(report));
+  if (countsError) return countsError;
+  if (suites.passed !== report.numPassedTestSuites || suites.failed !== report.numFailedTestSuites
+    || suites.skipped !== report.numPendingTestSuites) return 'jest suite counters disagree with its results';
+  if (totals.passed !== report.numPassedTests || totals.failed !== report.numFailedTests
+    || totals.skipped !== report.numPendingTests + report.numTodoTests) return 'jest assertion counters disagree with its results';
+  const measuredFailure = report.numFailedTests > 0 || report.numFailedTestSuites > 0;
+  // A normal failed assertion retains its typed finding; a nonzero process with a clean report never passes.
+  if (run.status !== 0 && !measuredFailure) return `jest exited ${run.status} without a reported test failure`;
+  if (!report.success && !measuredFailure) return 'jest reports an unsuccessful run without a reported test failure';
+  if (report.success && measuredFailure) return 'jest success contradicts its failed tests or suites';
+  return null;
+}
+
 /** jest's --json report, reduced: {total, passed, failed, skipped, files, failures[]}. */
 export function reduceJest(report) {
   const failures = [];
-  for (const file of report?.testResults ?? []) for (const a of file.assertionResults ?? []) {
+  for (const file of Array.isArray(report?.testResults) ? report.testResults : []) for (const a of Array.isArray(file?.assertionResults) ? file.assertionResults : []) {
     if (a.status === 'failed') failures.push({ file: posixPath(String(file.name ?? '')), test: a.fullName ?? a.title, message: String(a.failureMessages?.[0] ?? '').split('\n')[0].slice(0, 300) });
   }
   return { total: report?.numTotalTests ?? 0, passed: report?.numPassedTests ?? 0, failed: report?.numFailedTests ?? 0,
@@ -113,7 +163,7 @@ function runWorldProject(root, project, tests = null, { npm = runNpm } = {}) {
   try { fs.rmSync(outFile, { force: true }); fs.rmdirSync(outDir); } catch { /* a temp file of this run */ }
   return { command: `npm ${args.filter((a) => !a.startsWith('--outputFile=')).join(' ')}`, exit: run.status ?? null,
     ...(report ? reduceJest(report) : { total: 0, passed: 0, failed: 0, skipped: 0, files: 0, failedFiles: 0, failures: [] }),
-    error: report ? null : `jest wrote no --json report (exit ${run.status ?? run.error?.message}): ${String(run.stderr || run.stdout || '').trim().split(/\r?\n/).slice(-1)[0] ?? ''}` };
+    error: jestRunError(report, run) };
 }
 
 /** The findings of a summary (harness, specs and run), each {rule, path, message}. */

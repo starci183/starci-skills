@@ -11,6 +11,9 @@ import { RECORDINGS_ROOT_ENV, defaultRecordRoot, recordingsRootOf } from '../../
 import { LOG_TYPED_MISSING, openLogs, rowsOfEvent, prepareLogRow, typedLogGaps, appendLog } from '../../scripts/kernel/typed-logs.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { proofRepo } from '../helpers/sonar-scan.mjs';
+import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
+import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 
 // git's repository-local variables (git rev-parse --local-env-vars) never reach a fixture: a hook or alias run in a linked
 // worktree exports GIT_DIR, and every fixture git then writes THAT repository whatever cwd or -C it names - a temp dir's
@@ -187,6 +190,12 @@ const deliveredPrompt = (state) => {
 
 test('starci kernel dispatch delivers the typed-log block to the operation worker', (t) => {
   const w = promptWorld(t), workflowId = 'wf-typed-prompt', jobId = 'op-code.refactor-typed-prompt';
+  proofRepo(t,w.repo);
+  const made=fakeOrcaWorktrees({root:path.join(w.root,'worktrees')}).create({repo:`path:${w.repo}`,name:`wf-${workflowId}`,baseBranch:'main'});
+  assert.equal(made.ok,true,made.error);
+  w.repo=path.resolve(made.worktree.path);
+  fs.mkdirSync(path.join(w.repo,'docs'),{recursive:true});
+  registerWorkflowWorktree({env:w.env},{workflowId:workflowId,orcaWorktreeId:made.worktree.id,path:w.repo,branch:made.worktree.branch});
   const ledger = openLedger({ file: ledgerFileFor(w.repo, { env: w.env }) });
   try {
     seedWorkflow(ledger, { id: workflowId, goal: { revision: 1, markdown: '# Typed prompt' }, jobs: [

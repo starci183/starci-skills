@@ -46,13 +46,16 @@ import {
   stepService, runChild, lastJson, probeOrcaAsync,
 } from '../services.mjs';
 import { quickCheck, backupDue } from '../ledger-health.mjs';
+import { reconcileTurnBudget, turnCustodyHold } from '../turn-budget.mjs';
+export { turnStep } from '../turn-budget.mjs';
 import { goalTextRefusal } from '../../goal/goal-text.mjs';
 import { clocksOf } from '../sla.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
 import { pathKey } from '../../lib/path-key.mjs';
 import os from 'node:os';
-import { coreDebugProfile } from '../core-debug.mjs';
+import { seatStateOf, coreDebugSeatKey, reconcileCoreDebugSeat } from '../host-seats.mjs';
+export { seatStateOf };
 
 /**
  * MB-01: the host's boot identity - the machine's boot minute. The boot order runs once per host boot (and when Orca
@@ -63,14 +66,13 @@ const BOOT_EVERY_MS = 365 * 86_400_000;
 export const CONCERNS = Object.freeze(['host.kernel-seat', 'host.supervisor-seat', 'host.core-debug-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
 const KERNEL_WATCHDOG = 'scripts/kernel/kernel-watchdog.mjs';
 const SUPERVISOR_WATCHDOG = 'scripts/supervisor/supervisor-watchdog.mjs';
-const CORE_DEBUG_WATCHDOG = 'scripts/reconciler/core-debug.mjs';
 const FOOTPRINT_SCAN = 'scripts/guards/footprint-scan.mjs';
 const LEDGER_HEALTH = 'scripts/reconciler/ledger-health.mjs';
 
 // A read-only probe answer that a --repair pass would act on (scripts/kernel/kernel-watchdog.mjs statusTick/kernelTick).
 export const NEEDS_REPAIR = new Set(['restart-needed', 'wake-needed', 'queued-input', 'staged-input']);
-// A --repair answer that replaced (or tried to replace) the Kernel.
-export const REPLACED = new Set(['restarted', 'restart-failed']);
+// Only a completed replacement counts toward seat quarantine.
+export const REPLACED = new Set(['restarted']);
 const DOWN_BEFORE_BOOT = new Set(['failed', 'backoff', 'starting', 'quarantined']);
 const STALE_TERMINAL_CODE = 'kernel-stale-terminal-unclosed';
 export const STALE_RETRY_MS = 5 * 60_000;
@@ -94,37 +96,6 @@ export function staleTerminalsOf(rows, { liveHandle = null } = {}) {
     out.push({ incidentId: r.incident_id, handle: String(body.handle) });
   }
   return out;
-}
-
-/** The seat state a watchdog action puts the seat in (DESIGN 9.4). Pure. */
-export function seatStateOf(action) {
-  if (['finished', 'archived'].includes(action)) return 'vacant';
-  if (['restart-needed', 'agent-exit-unconfirmed', 'terminal-unverified', 'terminal-unreadable'].includes(action)) return 'suspect';
-  if (action === 'restarted') return 'reserving';
-  if (['restart-failed', 'kernel-terminal-close-failed'].includes(action)) return 'replacing';
-  if (action === 'host-unavailable') return 'hostOutage';
-  if (['queued-input', 'staged-input'].includes(action)) return 'inputPending';
-  if (action === 'interactive-gate') return 'gated';
-  return 'live';
-}
-
-/**
- * One turn-budget step of a seat: {turn, act: 'interrupt'|'replace'|null, overdue, ended}. `prev` is the seat's
- * recorded turn {startedAt, interruptedAt, replacedAt} or null; `obs` {busy, minutes} one reading (minutes: the
- * spinner timer, null when none shows). A reading whose implied start lies within sameTurnSlackMs of the recorded one
- * is the same turn (no timer: the same while it stays busy). Over budgetMs -> interrupt once; still the same turn
- * graceMs after the interrupt -> replace once. Pure.
- */
-export function turnStep(prev, obs, { now, budgetMs, graceMs, sameTurnSlackMs }) {
-  if (!obs?.busy) return { turn: null, act: null, overdue: false, ended: prev != null };
-  const est = Number.isFinite(obs.minutes) ? now - obs.minutes * 60_000 : null;
-  const same = prev != null && (est == null || Math.abs(est - prev.startedAt) <= sameTurnSlackMs);
-  const turn = same ? { ...prev, startedAt: est == null ? prev.startedAt : Math.min(prev.startedAt, est) } : { startedAt: est ?? now, interruptedAt: null, replacedAt: null };
-  const overdue = now - turn.startedAt > budgetMs;
-  let act = null;
-  if (overdue && turn.interruptedAt == null) { act = 'interrupt'; turn.interruptedAt = now; }
-  else if (turn.interruptedAt != null && turn.replacedAt == null && now - turn.interruptedAt >= graceMs) { act = 'replace'; turn.replacedAt = now; }
-  return { turn, act, overdue, ended: prev != null && !same };
 }
 
 /** The goal problem of a workflow's newest goal text, or null (INV-W4; scripts/goal/goal-text.mjs). */
@@ -218,7 +189,7 @@ export function createHostController(deps = {}) {
   const isBackupDue = deps.backupDue ?? backupDue;
 
   const bootIdOf = deps.bootId ?? (() => hostBootId());
-  const state = { bootPending: null, lastProcessesAt: 0, orphanClocks: new Set(), backupDay: new Map(), clocks: new Map(), staleCloses: new Map() };
+  const state = { bootPending: null, lastProcessesAt: 0, orphanClocks: new Set(), clocks: new Map(), staleCloses: new Map() };
   // SLA clocks are sent on an edge only (ctx.clock when a clock starts, ctx.clear when it stops), as the other
   // controllers do; after an engine restart each clock state is sent once more.
   const clock = async (ctx, entity, st, slaMs, meta) => {
@@ -263,41 +234,8 @@ export function createHostController(deps = {}) {
     return { ended: true };
   }
 
-  /**
-   * The seat's turn budget: read its turn (read-only), step it, and on `interrupt` send the interrupt key + doorbell
-   * re-wake (then the seat's own pass, which wakes a turn-idle Kernel on an actionable frontier); on `replace` close
-   * the seat terminal and run the seat's watchdog pass, which proves it gone and replaces it.
-   */
-  async function turnBudget(ctx, { key, rec, terminal, ledgerId = null, workflowId = null, repo = null, supervisor }) {
-    const now = ctx.now(), n = turnNumbers(), tb = settings().turnBudget ?? { sameTurnSlackMs: 180_000 };
-    const budgetMs = supervisor ? n.supervisorBudgetMs : n.kernelBudgetMs;
-    const obs = await probeTurn({ terminal, supervisor });
-    if (!obs?.ok) return null;
-    const step = turnStep(rec.turn ?? null, obs, { now, budgetMs, graceMs: n.graceMs, sameTurnSlackMs: tb.sameTurnSlackMs });
-    rec.turn = step.turn;
-    const meta = { code: 'KERNEL_TURN_OVERDUE', owner: 'host-controller', ledgerId: ledgerId ?? 'supervisor', workflowId: workflowId ?? 'wf-supervisor',
-      terminal: obs.terminal, agent: obs.agent, budgetMs, enteredAt: step.turn?.startedAt };
-    if (step.ended || !step.overdue) await clear(ctx, key, 'KERNEL_TURN_OVERDUE');
-    if (step.overdue) await clock(ctx, key, 'KERNEL_TURN_OVERDUE', budgetMs, meta);
-    const minutes = step.turn ? Math.round((now - step.turn.startedAt) / 60_000) : 0;
-    if (step.act === 'interrupt') {
-      const args = [SERVICES_FILE, '--turn-interrupt', '--terminal', obs.terminal, '--agent', obs.agent, ...(supervisor ? ['--supervisor'] : ['--repo', repo, '--workflow', workflowId]), '--json'];
-      const r = await ctx.run('node', args, { timeoutMs: 120_000 });
-      await ctx.log('reconciler.host.turn-budget', `${key}: one turn ${minutes} min > ${Math.round(budgetMs / 60_000)} min budget; interrupt (${obs.agent}) + doorbell`, { key, act: 'interrupt', minutes, agent: obs.agent, terminal: obs.terminal, result: outputOf(r) });
-      if (ctx.mode === 'active') {
-        // The re-wake: a turn-idle seat on an actionable frontier (or with inbox/tick work) is woken by its own pass.
-        await ctx.run('node', supervisor ? [SUPERVISOR_WATCHDOG, '--once', '--json'] : [KERNEL_WATCHDOG, '--repo', repo, '--workflow', workflowId, '--once', '--repair', '--json'],
-          { timeoutMs: supervisor ? settings().seats.supervisor.timeoutMs : settings().seats.kernel.timeoutMs });
-      }
-    } else if (step.act === 'replace') {
-      const r = await ctx.run('node', [SERVICES_FILE, '--turn-replace', '--terminal', obs.terminal, '--agent', obs.agent, '--json'], { timeoutMs: 180_000 });
-      await ctx.log('reconciler.host.turn-budget', `${key}: still the same turn ${minutes} min after the interrupt; seat replaced`, { key, act: 'replace', minutes, agent: obs.agent, terminal: obs.terminal, result: outputOf(r) });
-      const pass = await ctx.run('node', supervisor ? [SUPERVISOR_WATCHDOG, '--once', '--json'] : [KERNEL_WATCHDOG, '--repo', repo, '--workflow', workflowId, '--once', '--repair', '--json'],
-        { timeoutMs: supervisor ? settings().seats.supervisor.timeoutMs : settings().seats.kernel.timeoutMs });
-      if (!supervisor && REPLACED.has(outputOf(pass)?.action)) rec.restarts = [...(rec.restarts ?? []), now];
-    }
-    return { state: obs.state, minutes, act: step.act, overdue: step.overdue };
-  }
+  const turnBudget = (ctx, input) => reconcileTurnBudget(ctx, { ...input, probeTurn,
+    numbers: turnNumbers(), settings: settings(), save: (record) => store().put(record), clock, clear });
 
   /* -------------------------------------------------------- services */
 
@@ -351,6 +289,8 @@ export function createHostController(deps = {}) {
 
   async function reconcileKernelSeat(ledgerId, workflowId, ctx) {
     const now = ctx.now(), key = `seat:kernel:${ledgerId}:${workflowId}`, s = settings().seats.kernel;
+    const held = await turnCustodyHold(ctx, key, store().get(key), { ledgerId, workflowId });
+    if (held) return held;
     const ledger = (ctx.ledgers ?? []).find((l) => l.ledgerId === ledgerId);
     if (!ledger) return { ok: false, skipped: 'unknown-ledger' };
     const wf = await ctx.read(ledgerId, (db) => {
@@ -407,7 +347,7 @@ export function createHostController(deps = {}) {
     const stale = seat === 'hostOutage' ? null : await staleTerminalStep(ctx, { ledgerId, workflowId, liveHandle: seatOut?.terminal ?? null });
     const turn = seat === 'live' && action !== 'woken' ? await turnBudget(ctx, { key, rec: next, terminal: seatOut?.terminal ?? null, ledgerId, workflowId, repo: ledger.repo, supervisor: false }) : await endTurn(ctx, key, next);
     store().put(next);
-    return { ok: true, action, seat, acted, replaced, ...(turn ? { turn } : {}), ...(stale?.length ? { staleTerminals: stale } : {}) };
+    return { ok: turn?.ok !== false, action, seat, acted, replaced, ...(turn ? { turn } : {}), ...(stale?.length ? { staleTerminals: stale } : {}) };
   }
 
   /**
@@ -474,6 +414,8 @@ export function createHostController(deps = {}) {
 
   async function reconcileSupervisorSeat(ctx) {
     const now = ctx.now(), key = 'seat:supervisor';
+    const held = await turnCustodyHold(ctx, key, store().get(key));
+    if (held) return held;
     if ((await supervisorMode()) === 'chat') { store().remove?.(key); return { ok: true, skipped: 'chat-mode' }; }
     const r = await ctx.run('node', [SUPERVISOR_WATCHDOG, '--once', '--json'], { timeoutMs: settings().seats.supervisor.timeoutMs });
     const action = outputOf(r)?.action ?? (r?.shadow ? 'shadow' : 'unknown');
@@ -490,14 +432,7 @@ export function createHostController(deps = {}) {
     const turn = ['busy', 'shadow', 'idle'].includes(action) || seat === 'live'
       ? await turnBudget(ctx, { key, rec: next, terminal: outputOf(r)?.terminal ?? null, supervisor: true }) : await endTurn(ctx, key, next);
     store().put(next);
-    return { ok: true, action, seat, ...(turn ? { turn } : {}) };
-  }
-
-  async function reconcileCoreDebugSeat(ctx) {
-    const r = await ctx.run('node', [CORE_DEBUG_WATCHDOG, '--once', '--json'], { timeoutMs: settings().seats.supervisor.timeoutMs });
-    const result = outputOf(r);
-    return { ok: r?.shadow === true || (r?.ok !== false && result?.ok === true),
-      action: r?.shadow ? 'shadow' : result?.action ?? 'unknown', result };
+    return { ok: turn?.ok !== false, action, seat, ...(turn ? { turn } : {}) };
   }
 
   /* -------------------------------------------------------- boot (DESIGN 7.7) */
@@ -539,7 +474,7 @@ export function createHostController(deps = {}) {
     finishDuty(ctx, { controller: 'host', duty: 'boot', result: ctx.mode === 'active' ? 'done' : 'skipped', digest: bootIdOf(), now: ctx.now() });
     for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) steps.push({ step: 'seat', ledgerId: l.ledgerId, workflowId: wf, ...(await reconcileKernelSeat(l.ledgerId, wf, ctx)) });
     steps.push({ step: 'seat:supervisor', ...(await reconcileSupervisorSeat(ctx)) });
-    steps.push({ step: `seat:${coreDebugProfile().seatId}`, ...(await reconcileCoreDebugSeat(ctx)) });
+    steps.push({ step: coreDebugSeatKey(), ...(await reconcileCoreDebugSeat(ctx, { timeoutMs: settings().seats.supervisor.timeoutMs, outputOf })) });
     await ctx.log('reconciler.host.boot', `boot order done (${ctx.mode})`, { steps: steps.map((x) => ({ step: x.step, ok: x.ok, to: x.to, action: x.action })) });
     return { ok: true, steps };
   }
@@ -646,7 +581,7 @@ export function createHostController(deps = {}) {
       return { ok: false, skipped: 'unknown-ledger' };
     }
     const rec = rowOf(key, now);
-    const out = { ok: true };
+    const out = { ok: rec.lastCheck?.ok !== false && rec.state !== 'backup-failed' };
     if (!rec.lastCheckAt || now - rec.lastCheckAt >= lh.quickCheckEveryMs) {
       const r = checkLedger(ledger.file);
       rec.lastCheckAt = now; rec.lastCheck = r;
@@ -659,30 +594,55 @@ export function createHostController(deps = {}) {
         return { ok: true, skipped: 'absent', check: r };
       }
       const was = rec.state;
-      const next = !r.ok ? 'corrupt' : 'ok';
+      const reason = r.ok ? null : r.reason ?? 'integrity-failed';
+      const next = r.ok ? 'ok' : reason === 'integrity-failed' ? 'corrupt' : reason;
       if (rec.state !== next) { rec.state = next; rec.since = now; }
-      if (r.ok) {
-        // The store passed quick_check and the verified open: any LEDGER_CORRUPT episode closes.
+      if (next !== 'corrupt') {
         await clear(ctx, key, 'LEDGER_CORRUPT');
       }
-      else {
+      if (next === 'corrupt') {
         await clock(ctx, key, 'LEDGER_CORRUPT', 0, { code: 'LEDGER_CORRUPT', severity: 'critical', owner: 'host-controller', ledgerId, result: r.result.slice(0, 5) });
         if (was !== 'corrupt') {
           await ctx.openDecision(di({
             kind: 'runtime-defect', ledger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-corrupt:${ledgerId}:${now}`, severity: 'critical',
-            summary: `${ledgerId}: PRAGMA quick_check failed; restore from the newest ${lh.backupDir} backup only with the owner's approval`,
+            summary: `${ledgerId}: database integrity failed; preserve the database and WAL, then inspect a verified ${lh.backupDir} snapshot and its loss window with the owner before restoration`,
             evidence: r.result.slice(0, 5).map((x) => ({ ref: `quick_check:${x}` })), escalateTo: 'owner',
           }));
         }
       }
+      else if (!r.ok && was !== next) {
+        const remedy = reason === 'schema-incompatible' || reason === 'sqlite-downgrade'
+          ? 'use a compatible runtime and SQLite version' : reason === 'identity-mismatch'
+            ? 'resolve the registry and database identity with the owner' : 'resolve storage access or locking';
+        await ctx.openDecision(di({
+          kind: 'runtime-defect', ledger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-health:${ledgerId}:${reason}:${now}`, severity: 'high',
+          summary: `${ledgerId}: ${reason}; preserve the database and WAL and ${remedy}`,
+          evidence: r.result.slice(0, 5).map((x) => ({ ref: `ledger_health:${x}` })),
+        }));
+      }
+      out.ok = r.ok;
       out.check = r;
     }
     const today = new Date(now).toDateString();
-    if (rec.state !== 'corrupt' && state.backupDay.get(ledgerId) !== today && isBackupDue({ ledgerId, now, dir: lh.backupDir, backupHour: lh.backupHour })) {
-      state.backupDay.set(ledgerId, today);
-      await ctx.run('node', [LEDGER_HEALTH, '--backup', '--ledger-id', ledgerId, '--file', ledger.file, '--json'], { timeoutMs: lh.backupTimeoutMs });
-      rec.lastBackupAt = now;
-      out.backup = true;
+    const backedUpToday = rec.lastBackup?.verified === true && rec.lastBackup?.ledgerId === ledgerId && new Date(rec.lastBackupAt).toDateString() === today;
+    if (rec.lastCheck?.ok === true && !backedUpToday && now >= (rec.nextBackupAttemptAt ?? 0) && isBackupDue({ ledgerId, now, dir: lh.backupDir, backupHour: lh.backupHour })) {
+      const r = await ctx.run('node', [LEDGER_HEALTH, '--backup', '--ledger-id', ledgerId, '--file', ledger.file, '--json'], { timeoutMs: lh.backupTimeoutMs });
+      if (ctx.mode === 'active' && !r?.shadow) {
+        const snapshot = outputOf(r);
+        rec.lastBackupAttemptAt = now;
+        rec.lastBackupAttempt = { ok: r?.ok === true, timedOut: r?.timedOut === true, result: snapshot };
+        out.backup = r?.ok === true && snapshot?.ok === true && snapshot?.verified === true && snapshot?.ledgerId === ledgerId;
+        if (out.backup) {
+          rec.lastBackupAt = now; rec.lastBackup = snapshot; rec.nextBackupAttemptAt = null; rec.state = 'ok';
+        } else {
+          rec.nextBackupAttemptAt = now + lh.backupRetryMs; rec.state = 'backup-failed'; out.ok = false;
+          await ctx.openDecision(di({
+            kind: 'runtime-defect', ledger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-backup-failed:${ledgerId}`, severity: 'high',
+            summary: `${ledgerId}: no verified snapshot was published; inspect backup storage access, capacity and the recorded child result before the next retry`,
+            evidence: [{ ref: `engine_action:${r?.actionId ?? 'unavailable'}` }],
+          }));
+        }
+      } else { out.backup = false; out.shadow = true; }
     }
     store().put(rec);
     return out;
@@ -711,7 +671,7 @@ export function createHostController(deps = {}) {
       for (const k of openCorrupt) if (!keys.includes(k)) keys.push(k);
       for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) keys.push(`seat:kernel:${l.ledgerId}:${wf}`);
       keys.push('seat:supervisor');
-      keys.push(`seat:${coreDebugProfile().seatId}`);
+      keys.push(coreDebugSeatKey());
       return keys;
     },
     async reconcile(key, ctx) {
@@ -723,7 +683,7 @@ export function createHostController(deps = {}) {
       if (key.startsWith('seat:')) {
         if (bootPending(ctx)) return { ok: true, deferred: 'boot' };
         if (key === 'seat:supervisor') return reconcileSupervisorSeat(ctx);
-        if (key === `seat:${coreDebugProfile().seatId}`) return reconcileCoreDebugSeat(ctx);
+        if (key === coreDebugSeatKey()) return reconcileCoreDebugSeat(ctx, { timeoutMs: settings().seats.supervisor.timeoutMs, outputOf });
         const rest = key.slice('seat:kernel:'.length), cut = rest.lastIndexOf(':');
         return reconcileKernelSeat(rest.slice(0, cut), rest.slice(cut + 1), ctx);
       }

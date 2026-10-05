@@ -35,25 +35,7 @@ const CHROME = [20, 40, 160, 255];
 const MARK = [250, 200, 0, 255];
 const Ajv2020 = (() => { const loaded = createRequire(path.join(ROOT, 'package.json'))('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
 const validateUi = addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false })).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-ui-screen.schema.yaml'), 'utf8')));
-// The draw-review contract entries (interface-draw-owner-review, draw-review-gate-fails-closed,
-// draw-content-owner-gate, owner-draw-feedback-golden) predated the alpha.3 release base and were deleted by
-// the release-line compaction; every api call in this spec runs against the live entries plus those four.
-const CONTRACT_CHANGES_FILE = (() => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-review-registry-'));
-  after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const changesDir = path.join(ROOT, 'modules', 'kernel', 'contract-changes');
-  const changes = fs.readdirSync(changesDir).filter((f) => f.endsWith('.yaml')).map((f) => parseYaml(fs.readFileSync(path.join(changesDir, f), 'utf8')));
-  changes.push(
-    { id: 'interface-draw-owner-review', effectiveAt: '2026-09-25T00:45:00+07:00', ops: ['interface.draw', 'brand.decide'], summary: 'spec fixture for the compacted entry' },
-    { id: 'draw-review-gate-fails-closed', effectiveAt: '2026-09-25T17:10:00+07:00', ops: ['interface.draw', 'brand.decide', 'interface.implement', 'interface.audit'], summary: 'spec fixture for the compacted entry' },
-    { id: 'draw-content-owner-gate', effectiveAt: '2026-09-27T15:50:00+07:00', reach: 'follow-up', ops: ['interface.draw'], followUp: { op: 'interface.draw', ops: ['interface.draw'], detail: 'spec fixture for the compacted entry' }, summary: 'spec fixture for the compacted entry' },
-    { id: 'owner-draw-feedback-golden', effectiveAt: '2026-09-27T19:30:00+07:00', ops: ['interface.draw', 'brand.decide'], summary: 'spec fixture for the compacted entry' },
-  );
-  const file = path.join(dir, 'contract-changes.yaml');
-  fs.writeFileSync(file, stringifyYaml({ schema: 'starci/contract-changes@1', changes }));
-  return file;
-})();
-const env = (() => { const e = { ...process.env, STARCI_CONNECTORS_OFF: '1', STARCI_CONTRACT_CHANGES: CONTRACT_CHANGES_FILE }; for (const k of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete e[k]; return e; })();
+const env = (() => { const e = { ...process.env, STARCI_CONNECTORS_OFF: '1' }; for (const k of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete e[k]; return e; })();
 const readTree = (p) => parseYaml(fs.readFileSync(path.join(p.work, 'shell', 'index.yaml'), 'utf8'));
 const readApp = (p) => treeOf(readTree(p), 'app');
 const writeTree = (p, tree) => fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml(tree));
@@ -236,11 +218,11 @@ function seedDrawJob(p, { wf = 'wf-draw', jobId = 'job-draw-1', attempt = 1, dis
 const runApi = (...args) => spawnSync(process.execPath, [API, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
 const lastErr = (r) => { try { return JSON.parse(String(r.stderr).trim().split('\n').at(-1)); } catch { return null; } };
 
-test('starci kernel report refuses a done interface.draw that leaves a gating drawing unreviewed; an older leg reports as it was admitted', (t) => {
+test('starci kernel report refuses a done interface.draw that leaves a gating drawing unreviewed; an earlier admission also owes the actual owner review', (t) => {
   const p = greenfield(t);
   const { dir } = drawLayout(p);
   const files = ['.starciwork/features/home/ui/app-layout/index.yaml', '.starciwork/features/home/ui/app-layout/assets/directions/default--page--desktop--light.content.png'];
-  assert.deepEqual(drawReviewsOwed(p.repo, files), { owed: [{ id: DESIGN, dir: '.starciwork/features/home/ui/app-layout', why: 'the owner has not reviewed the drawn parts', gates: ['planned-layout'], owedBefore: true }], unjudged: [] });
+  assert.deepEqual(drawReviewsOwed(p.repo, files), { owed: [{ id: DESIGN, dir: '.starciwork/features/home/ui/app-layout', why: 'the owner has not reviewed the drawn parts', gates: ['planned-layout'] }], unjudged: [] });
   assert.deepEqual(drawReviewsOwed(p.repo, ['.starciwork/features/home/ui/**']).owed.map((o) => o.id), [DESIGN], 'a glob reaches the records under it');
   const report = path.join(reportScratchOf(p), 'report.json');
   fs.writeFileSync(report, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the planned layout.', files, checks: [], head: 'abcdef1234567' }));
@@ -260,12 +242,13 @@ test('starci kernel report refuses a done interface.draw that leaves a gating dr
   fs.writeFileSync(report, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the planned layout.', files, checks: [], head: 'abcdef1234567' }));
   const filed = runApi('report', '--repo', p.repo, '--job', 'job-draw-2', '--report', report, '--json');
   assert.equal(filed.status, 0, filed.stderr);
-  // A leg admitted before the change is judged by the contract it was admitted under.
+  // Current owner review remains mandatory at an earlier admission time.
   drawLayout(p, { mark: [0, 250, 0, 255] });
   seedDrawJob(p, { jobId: 'job-draw-3', attempt: 3, dispatchId: 'ctx_draw_3', admittedAt: Date.parse('2020-01-01T00:00:00Z') });
   fs.writeFileSync(report, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the planned layout.', files, checks: [], head: 'abcdef1234567' }));
   const older = runApi('report', '--repo', p.repo, '--job', 'job-draw-3', '--report', report, '--json');
-  assert.equal(older.status, 0, older.stderr);
+  assert.equal(older.status,1,older.stderr);
+  assert.equal(lastErr(older)?.code,'draw-review-owed');
 });
 
 test('serve-ask: the owner accepts in the form, the receipt keeps the review, and apply settles the record from it', async (t) => {
@@ -305,7 +288,7 @@ test('serve-ask: the owner accepts in the form, the receipt keeps the review, an
 
 // Redundancy audit workui f14: the guard failed open - a record it could not read was skipped and a crash filed
 // the done report with owed []. What the guard cannot judge is named, and a new leg's done report is refused.
-test('starci kernel report refuses draw-review-unjudged when the guard cannot read a record the report reaches; an older leg is warned', (t) => {
+test('starci kernel report refuses draw-review-unjudged when the guard cannot read a record the report reaches; an earlier admission also refuses unavailable review', (t) => {
   const p = greenfield(t);
   const { dir } = drawLayout(p);
   // A page nothing else is known to wait on, drawn in this report.
@@ -330,11 +313,11 @@ test('starci kernel report refuses draw-review-unjudged when the guard cannot re
   assert.equal(refused.status, 1, refused.stdout);
   assert.equal(lastErr(refused)?.code, 'draw-review-unjudged', refused.stderr);
   assert.match(lastErr(refused).error, /could not judge \.starciwork\/features\/home\/ui\/dashboard: cannot tell what waits on/);
-  // A leg admitted after interface-draw-owner-review but before draw-review-gate-fails-closed files with a warning.
+  // The guard refuses unavailable evidence even for an earlier admission.
   seedDrawJob(p, { jobId: 'job-draw-2', attempt: 2, dispatchId: 'ctx_draw_2', admittedAt: Date.parse('2026-09-25T12:00:00+07:00') });
   const warned = runApi('report', '--repo', p.repo, '--job', 'job-draw-2', '--report', report, '--json');
-  assert.equal(warned.status, 0, warned.stderr);
-  assert.match(warned.stderr, /starci kernel report WARNING: the draw review guard could not judge/);
+  assert.equal(warned.status,1,warned.stderr);
+  assert.equal(lastErr(warned)?.code,'draw-review-unjudged');
   // An unparseable layout tree, and a report's ui record that does not parse, are unjudged too.
   fs.rmSync(broken);
   const shellFile = path.join(p.work, 'shell', 'index.yaml');
@@ -414,7 +397,7 @@ test('an unrequested drawing is never auto-accepted; only the owner’s accept s
     // An acceptance answered automatically (a receipt from before the ruling) is not the owner's: the drawing still owes review.
     applyDrawReview(dir, receiptFor(p, question, { answeredBy: 'auto-recommended', dispatchId: 'ctx_legacy_auto' }), { write: true });
     const auto = drawReviewStatus(dir);
-    assert.deepEqual([auto.owed, auto.owedBefore], [true, false], auto.why);
+    assert.equal(auto.owed,true,auto.why);
     assert.match(auto.why, /not by the owner/);
     // The owner's accept settles it.
     applyDrawReview(dir, receiptFor(p, question, { dispatchId: 'ctx_owner_accept' }), { write: true });

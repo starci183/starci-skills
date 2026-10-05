@@ -90,10 +90,10 @@ writes:
   revision:
     - table: goals
       row: '{same workflow_id, revision: latest+1, same goal_identity, markdown, json: {derivedFrom, opChain, derivedPlan, routing_bias, revision}, amendment_json: owner approval receipt}'
-      note: Append-only; the prior revision is never edited or relabelled.
+      note: Append-only; scripts/goal/accept-revision.mjs holds scripts/goal/workflow-lock.mjs through acceptance and the ledger transaction; prior revisions retain their original history.
     - table: inbox
       row: '{same workflow_id, kind: goal-revision, key: workflow_id:revision, payload_json: {baseRevision, revision, goalIdentity, approvalToken, opChain}, status: pending}'
-      note: Wakes the existing workflow contract without adding another kind=goal row or another Kernel singleton.
+      note: Wakes the existing workflow contract; only older pending goal-revision notifications are marked superseded with explicit revision lineage; other pending inputs remain unchanged.
     - table: events
       row: '{kind: goal-revised, payload: {previousRevision, revision, goalIdentity, opChainDiff, kernelResume}}'
 

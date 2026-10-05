@@ -1,8 +1,0 @@
-id: hfs-todo-frontend-references
-effectiveAt: '2026-09-29T04:17:00+07:00'
-summary: "Todo frontend example paths follow its HFS apps/web source and e2e harness. The JSON exception inventory and UAT operator example now point to the moved files."
-reach: new-legs
-paths:
-  - modules/schemas/json-exceptions.yaml
-  - modules/ops/ops/uat.verify.yaml
-  - modules/kernel/contract-changes/hfs-todo-frontend-references.yaml

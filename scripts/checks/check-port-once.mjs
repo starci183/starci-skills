@@ -17,8 +17,7 @@
 // grammar offset) is not a port.
 // Scope: tracked sources and docs under scripts/, engine/, ui/ (minus dist), ext/, docs/, knowledge/, modules/,
 // examples/ and packages/ (minus the generated packages/*/runtime and specs). Out of scope by design: specs and
-// tests/ fixtures, node_modules, the append-only contract history (modules/kernel/contract-changes) and
-// changelogs, work records (.starciwork) and product stack declarations (.starcistacks, starcistacks-services) —
+// tests/ fixtures, node_modules, changelogs, work records (.starciwork) and product stack declarations (.starcistacks, starcistacks-services) —
 // a product declares the ports of the services it runs; it is the owner of those declarations.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,7 +41,7 @@ const CODE_EXT = /\.(?:mjs|cjs|js|ts|tsx)$/;
 // packages/** file may still trip the owned tier, but service-side code declaring the vendor-fixed container port of
 // the product it runs is a product declaration, not a runtime port restated.
 const RUNTIME_CODE = /^(?:scripts|engine|ui|ext)\//;
-const OUT = /node_modules\/|\/dist\/|^packages\/[^/]+\/runtime\/|^tests\/|\.spec\.|\.starciwork\/|\.starcistacks\/|starcistacks-services\/|contract-changes\/|CHANGELOG/;
+const OUT = /node_modules\/|\/dist\/|^packages\/[^/]+\/runtime\/|^tests\/|\.spec\.|\.starciwork\/|\.starcistacks\/|starcistacks-services\/|CHANGELOG/;
 const inScope = scopeFilter({ scope: SCOPE, ext: TEXT_EXT, out: OUT, exclude: SELF_FILES });
 
 /** The port-position contexts, each capturing the port literal in group 1. */

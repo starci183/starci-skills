@@ -14,6 +14,13 @@ import { arg } from '../../lib/cli-arg.mjs';
 /** Rows asked per page: above any host's real count, so a page is complete unless Orca says it truncated it. */
 const PS_LIMIT = 10000;
 
+/**
+ * Read cross-host worktree accounting with ownership comments, activity, and host coverage metadata.
+ * GC must check truncated and omittedHostIds before concluding that an unlisted tree is absent;
+ * normalized counts alone establish neither runtime ownership nor safe removal.
+ * @param {object} [input] - Optional inventory limit forwarded to Orca.
+ * @returns {object} ok, normalized rows, truncation/omitted-host facts, error, and hostUnavailable.
+ */
 export function worktreePs({ limit = PS_LIMIT } = {}) {
   const r = orcaCall('worktree-ps', { limit });
   const rows = Array.isArray(r.result?.worktrees) ? r.result.worktrees : [];

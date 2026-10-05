@@ -1,18 +1,16 @@
-// process-env.mjs - the ONE read of other processes' environment variables on the host.
-//
-// A process started inside an Orca terminal inherits ORCA_TERMINAL_HANDLE (and every child of it does), so the handle in a
-// process's environment PROVES which terminal it belongs to, where a process name or a start time only guesses. The terminal
-// worker close (scripts/machine/worker-close.mjs) reads it to find what a closed terminal left behind.
-//
-//   processEnv({names, pids, run, platform, timeoutMs}) -> [{pid, readable, values: {NAME: value|null}}] | null
-//   names  the variable names to read (case-insensitive); pids  the processes to read (null: every process)
-// readable is false for a process that cannot be opened (another user's, elevated, a 32-bit one): its values are null and prove
-// nothing. Windows reads the PEB (processEnvScript); Linux reads /proc/<pid>/environ; elsewhere null (the table could not be read).
-// Never throws.
+// process-env.mjs — the host API for selected process-environment reads.
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { processEnvRowsOfJson, processEnvScript } from './lib.mjs';
 
+/**
+ * Read selected host processes and return only the requested environment values.
+ * `names` is an array matched case-insensitively; null `pids` scans all processes.
+ * Windows reads x64 process memory; Linux reads `procRoot` environment files.
+ * Rows carry `{pid,readable,values}`; null values mean an absent variable or an
+ * unreadable process. `readable:false` provides no process-ownership proof.
+ * Unsupported platforms and census or parsing failures return null, not an empty list.
+ */
 export function processEnv({ names, pids = null, run = spawnSync, platform = process.platform, timeoutMs = 60_000, procRoot = '/proc' } = {}) {
   try {
     if (platform === 'win32') {

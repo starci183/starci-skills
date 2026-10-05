@@ -8,7 +8,7 @@
 # named section of it and only shrinks.
 schema: starci/runtime-slots@1
 kind: runtime
-version: 1.0.0
+version: 1.1.0
 
 versioning:
   patch: wording, why text, examples; no check result can change.
@@ -97,7 +97,7 @@ ruleParams:
         cmd: [api/fs, api/process]
     # RT_BASE_IMPURE: the base tier never writes the filesystem; it reads process.env only in these declared seams.
     baseWriteMembers: [writeFileSync, appendFileSync, rmSync, rmdirSync, renameSync, unlinkSync, mkdirSync, copyFileSync, cpSync, symlinkSync, linkSync, truncateSync, writeFile, appendFile, rm, rmdir, rename, unlink, mkdir, copyFile, cp, symlink, link, truncate, mkdtempSync, mkdtemp, createWriteStream]
-    baseEnvSeams: [scripts/lib/env.mjs, scripts/lib/sleep-sync.mjs, scripts/gates/runtime-host.mjs, engine/config.mjs, engine/runtime-root.mjs]
+    baseEnvSeams: [scripts/lib/env.mjs, scripts/lib/sleep-sync.mjs, scripts/gates/runtime-host.mjs, engine/config.mjs, engine/runtime-root.mjs, engine/secrets.mjs]
     # RT_API_SHAPE: the systems that carry a calls contract; every call file of such a system is a calls id and vice versa.
     apiContracts:
       orca: modules/host/orca/calls.yaml
@@ -128,6 +128,7 @@ ruleParams:
       - {id: cli-parity, run: scripts/checks/check-cli-parity.mjs}
       - {id: retired-cli, run: scripts/checks/check-retired-cli.mjs}
       - {id: cli-only-entry, run: scripts/checks/check-cli-only-entry.mjs}
+      - {id: runtime-public-docs, run: scripts/checks/check-runtime-public-docs.mjs}
       - {id: schema-catalog, run: scripts/checks/check-schema-catalog.mjs}
       - {id: schema-shared, run: scripts/checks/check-schema-shared.mjs}
       - {id: json-exceptions, run: scripts/checks/check-json-exceptions.mjs}
@@ -194,6 +195,13 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+  - id: runtime.secret-example
+    profiles: [runtime]
+    path: secret.env.example
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
   - id: runtime.git-meta
     profiles: [runtime]
     path: "{.gitignore,.gitattributes}"
@@ -225,7 +233,7 @@ slots:
     rules: [RT_PINNED_PATH_MOVED]
   - id: runtime.local-config
     profiles: [runtime]
-    path: "{config.yaml,config.json,settings.local.json,scheduled_tasks.lock}"
+    path: "{config.yaml,config.json,secret.env,settings.local.json,scheduled_tasks.lock}"
     presence: optional
     tracked: ignored
     tier: none
@@ -282,7 +290,7 @@ slots:
   # ----- engine ---------------------------------------------------------------------------------------------
   - id: runtime.foundation
     profiles: [runtime]
-    path: "engine/{runtime-root,config,invalid-config,orca-config,yaml,plain-object,canonical-json,constants,digest,admission,refuse}.mjs"
+    path: "engine/{runtime-root,config,secrets,invalid-config,orca-config,yaml,plain-object,canonical-json,constants,digest,admission,refuse}.mjs"
     presence: required
     tracked: tracked
     tier: base
@@ -514,14 +522,6 @@ slots:
     tier: none
     tests: none
     rules: [RT_CITED_PATH_MISSING]
-  - id: runtime.contract-history
-    profiles: [runtime]
-    # Append-only history; may cite retired and moved paths (modules/kernel/retired-paths.yaml).
-    path: "modules/kernel/contract-changes/<change>.yaml"
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
   - id: runtime.i18n-catalog
     profiles: [runtime]
     # The Vietnamese message catalog of owner-visible runtime text (scripts/lib/i18n.mjs, scripts/checks/check-i18n-catalog.mjs).
@@ -642,6 +642,13 @@ slots:
     tier: none
     tests: none
     allows: [compose.yaml, cloudflared.yaml, README.md, .gitignore, "secrets/*.enc", secrets/KEYS.md]
+  - id: runtime.example-catalog
+    profiles: [runtime]
+    path: examples/index.yaml
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
   - id: runtime.example
     profiles: [runtime]
     # A product example app; its inside is judged by the PRODUCT HFS (hfs.json kind app; check-example-architecture).
@@ -659,6 +666,33 @@ slots:
     tier: none
     tests: none
     why: a .starcistacks services fixture, not an app (no hfs.json)
+  - id: runtime.example-runtime-reserved
+    profiles: [runtime]
+    path: "examples/.runtimes/"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "the curated per-project fixture paths of runtime.example-runtime-fixtures"
+  - id: runtime.example-runtime-fixtures
+    profiles: [runtime]
+    # Curated sample PROJECT snapshots and selected public CAS fixtures; operational storage stays external.
+    # The sample producer must validate project identity, digest/prefix, public payloads and absence of workflow/history rows.
+    path: "examples/.runtimes/<example-project>/"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    requires: [runtime.sqlite]
+    allows: ["artifacts/<sha-prefix>/<sha256>", "artifacts/<sha-prefix>/<sha256>.json"]
+    why: "CAS fixture paths follow engine/db/blob.mjs; path admission does not qualify the payload or grant runtime effects."
+  - id: runtime.example-runtime-transients
+    profiles: [runtime]
+    path: "examples/.runtimes/<example-project>/{runtime.sqlite-wal,runtime.sqlite-shm,runtime.sqlite-journal,artifacts-views/,cache/,views/,captures/,logs/,traces/}"
+    presence: optional
+    tracked: ignored
+    tier: none
+    tests: none
   - id: runtime.benchmark
     profiles: [runtime]
     path: "benchmark/{README.md,expectations.yaml,findings/<finding>.md,snapshots/<snapshot>.json}"

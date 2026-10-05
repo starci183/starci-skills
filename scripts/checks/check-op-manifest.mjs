@@ -19,7 +19,7 @@ import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { mergeOpShared, opSharedOf } from '../lib/op-shared.mjs';
+import { mergeOpShared, opSharedOf, resolveOpContract, paramDefinitionError, paramValueError } from '../lib/op-shared.mjs';
 import { validateAgainstSchema } from '../lib/json-schema.mjs';
 
 const SCHEMA_FILE = 'modules/schemas/op.schema.yaml';
@@ -109,11 +109,51 @@ export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
     try { full = mergeOpShared(doc, opSharedOf(dir)); }
     catch (e) { add(id, 'SCHEMA_INVALID', 'error', `shared fragment: ${e.message}`); continue; }
 
+    const variants = [['envelope', full]];
+    for (const mode of Object.keys(full?.policy?.executionModes ?? {})) {
+      const selected = resolveOpContract(full, { mode });
+      if (!selected.ok) add(id, 'SCHEMA_INVALID', 'error', selected.detail);
+      else variants.push([mode, selected.contract]);
+      if (!full.params?.mode?.enum?.includes(mode)) add(id, 'SCHEMA_INVALID', 'error', `executionModes.${mode} is not declared by params.mode.enum`);
+    }
+    for (const [mode, effective] of variants) {
+      for (const section of ['reads', 'writes', 'proofs', 'blockers']) {
+        const key = section === 'blockers' ? 'code' : 'id', seen = new Set();
+        const entries = mode === 'envelope' ? full[section] : full.policy.executionModes[mode][section];
+        for (const entry of Array.isArray(entries) ? entries : []) {
+          if (seen.has(entry?.[key])) add(id, 'SCHEMA_INVALID', 'error', `${mode}.${section}: duplicate ${key} ${entry?.[key]}`);
+          seen.add(entry?.[key]);
+        }
+      }
+      for (const [i, step] of (Array.isArray(effective?.steps) ? effective.steps : []).entries()) {
+        for (const section of ['reads', 'writes']) {
+          const declared = new Set((effective?.[section] ?? []).map((entry) => entry.id));
+          for (const ref of step?.[section] ?? []) if (!declared.has(ref)) {
+            add(id, 'SCHEMA_INVALID', 'error', `${mode}.steps[${i}].${section}: undeclared ${ref}`);
+          }
+        }
+      }
+      if (mode !== 'envelope') {
+        for (const [i, proof] of (effective?.proofs ?? []).entries()) if (typeof proof.check === 'string' && !fs.existsSync(path.join(root, proof.check))) {
+          add(id, 'CHECK_MISSING', 'error', `${mode}.proofs[${i}] (${proof.id}).check names ${proof.check}, which is not on disk`);
+        }
+        for (const [i, write] of (effective?.writes ?? []).entries()) if (write.path?.includes(' + ')) {
+          add(id, 'PATH_JOINED', 'error', `${mode}.writes[${i}] (${write.id}).path joins several paths with ' + '`);
+        }
+      }
+    }
+
     // PARAM_DEFAULT — a param either has a value that stands when nobody sets it, or is required
     // of its setter at enqueue; a JSON schema walker without oneOf cannot say "exactly one".
     for (const [name, def] of Object.entries(full?.params && typeof full.params === 'object' ? full.params : {})) {
+      const definitionError = paramDefinitionError(name, def);
+      if (definitionError) add(id, 'SCHEMA_INVALID', 'error', `params.${name}: ${definitionError}`);
       const hasDefault = Object.hasOwn(def ?? {}, 'default'), required = def?.required === true;
       if (hasDefault === required) add(id, 'PARAM_DEFAULT', 'error', `params.${name} ${hasDefault ? 'carries both a default and required: true' : 'carries neither a default nor required: true'} — exactly one`);
+      if (hasDefault) {
+        const error = paramValueError(name, def, def.default);
+        if (error) add(id, 'PARAM_DEFAULT', 'error', `params.${name}.default: ${error}`);
+      }
     }
 
     // (a) PARAM_RESTATED — a tunable's value spelled out in prose the agent reads as law.

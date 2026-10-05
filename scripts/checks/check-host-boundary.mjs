@@ -59,8 +59,7 @@ function orcaVerbs(root){
 const COMMAND_POSITION=/(?:^|[`'"($]|\|\||&&|;|\|)\s*orca\s+([a-z][a-z-]*)/;
 const NODE_PATH=/node\s+(\S*orca\S*)/g;
 const LOADS_HOST=/\b(load|loads|loading|read|reads|reading)\b[^.\n]{0,100}modules\/host\/orca/i;
-// (c) agent-launch: every agent launch is orchestration worker-start (modules/kernel/contract-changes/
-// launch-through-worker-start.yaml). A terminal the runtime creates itself is the bypass: the terminalCreate wrapper,
+// (c) agent-launch: every agent launch is orchestration worker-start (modules/kernel/start-workflow.yaml). A terminal the runtime creates itself is the bypass: the terminalCreate wrapper,
 // the calls.yaml `terminal-create` call, a `terminal create` argv or an `orca terminal create` command string. Only
 // code is read, comment lines skipped. There is no exemption list.
 const LAUNCH_ROOTS=['engine','scripts','bin','init','modules','packages'];
@@ -71,7 +70,7 @@ const TERMINAL_LAUNCH=[
   [/['"`][^'"`\n]*\borca(?:\.exe)?\s+terminal\s+create\b/,'an `orca terminal create` command'],
 ];
 // (d) agent-cli-spawn: an agent never runs as a child process of a runtime script - the PreToolUse hook cannot see it
-// and Orca cannot supervise it (modules/kernel/contract-changes/draw-critic-worker-start.yaml). Read structurally with
+// and Orca cannot supervise it (modules/host/orca/calls.yaml). Read structurally with
 // the TypeScript AST: a call whose callee is bound to node:child_process (spawn, spawnSync, exec, execSync, execFile,
 // execFileSync, fork) and whose command - a literal, a const resolving to one, either branch of a conditional, or the
 // first program word of a shell string / a cmd|sh|powershell argv - names an agent CLI (or its .cmd/.exe shim).

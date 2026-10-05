@@ -7,11 +7,12 @@ Humans maintain structured knowledge under `knowledge/**/*.yaml`. Agents and ope
 
 | Layer | Location | Role |
 | --- | --- | --- |
-| Authored source | `knowledge/**/*.yaml` (and multi-file example `.ts`/`.tsx`) | Edit here. Schema `starci/knowledge-source@1` for topics; `starci/code-example@1` for example manifests; catalogs use `starci/code-example-catalog@1`. |
+| Authored knowledge | `knowledge/**/*.yaml` | Edit topics here under `starci/knowledge-source@1`. |
+| Current code references | `examples/index.yaml` and its indexed app sources | The `starci/code-example-catalog@1` metadata points to the actual source, compiler configs and tests; it does not duplicate code. |
 | Calibration data | `knowledge/ui/proof/calibration/calibration.json` | Explicit data exception; all other authored JSON knowledge is rejected. |
 | Runtime | `knowledge/**/*.yaml` | Read directly from source. Public names are the authored files: `index.yaml`, `foo.yaml`. |
 
-Operator `supportingReferences` and `CONTEXT.md` name runtime paths such as `knowledge/coding-reference.yaml` and `knowledge/patterns/*/index.yaml`. Those authored paths are the public contract; consumers read them in place.
+Operator `supportingReferences` and `CONTEXT.md` name the current law in `docs/architecture.md` and `docs/code-pattern-enforcement.md`, pattern topics under `knowledge/patterns/*/index.yaml`, and `examples/index.yaml`. The single catalog reader resolves its indexed app inputs; declared READs retain their actual Source paths and hashes.
 
 ## Add a pattern topic
 
@@ -20,12 +21,18 @@ Operator `supportingReferences` and `CONTEXT.md` name runtime paths such as `kno
 3. Register the topic in the family `index.yaml` `topics` list (`id`, `path`, `title`, `summary`, optional `ruleIds`).
 4. Validate the YAML (see below). Do not invent a parallel JSON copy of the same rules.
 
-## Add a code example
+## Add a code reference
 
-1. Create `knowledge/code-examples/<lane>/<example-id>/` with real `.ts`/`.tsx` files (and specs when they teach verification).
-2. Add `index.yaml` with `schema: starci/code-example@1`: purpose, `relatedRules`, `files[]` roles, `entrypoint`, `adapt`, dependencies, honest `verification` flags, and provenance.
-3. List the example in `knowledge/code-examples/<lane>/index.yaml` and the top-level `knowledge/code-examples/index.yaml` catalog.
-4. Agents read the example files in place; nothing executes example code at read time.
+1. Implement the pattern in an actual HFS app under `examples/`, with its real imports, owning
+   configuration and tests.
+2. Add one stable ID to `examples/index.yaml` under
+   `modules/schemas/code-example-catalog.schema.yaml`, listing the complete app-relative source
+   set, entrypoint, owning tsconfigs and tests.
+3. Cite the ID from applicable pattern topics. The catalog reader rejects duplicate IDs,
+   missing inputs and paths outside that app. Run the current canon and compiler over the
+   listed source, then the applicable owning tests; catalog validity alone proves no conformance.
+4. Regenerate derived Work or example evidence with its existing generator after the source
+   freezes. Preserve deliberately invalid fixtures as negative oracles.
 
 ## Validation
 
@@ -41,7 +48,7 @@ Authored knowledge is validated as YAML by the test suite and readers. Rejected:
 
 - `modules/schemas/knowledge-source.schema.yaml` (authored YAML)
 - `modules/schemas/knowledge-rule.schema.yaml`
-- `modules/schemas/code-example-manifest.schema.yaml`
+- `modules/schemas/code-example-catalog.schema.yaml`
 
 ## English only
 

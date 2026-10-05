@@ -115,12 +115,10 @@ const isRuntimeOwned = (file) => {
 const isFullyExempt = (file) => {
   const rel = posix(file);
   return /(?:^|\/)CHANGELOG[^/]*\.md$/i.test(rel)
-    || rel.startsWith('modules/kernel/contract-changes/')
     || /^packages\/.+\/runtime\//.test(rel)
     || GENERATED_LOCKFILE.test(rel)
     || rel === 'tests/cli/retired-cli.spec.mjs'
-    || rel === 'packages/cli/src/catalog.generated.mjs'
-    || rel === 'packages/cli/src/removed.mjs';
+    || rel === 'packages/cli/src/catalog.generated.mjs';
 };
 
 /** Hide only the catalog's removed field, preserving offsets and other fields. */

@@ -7,6 +7,13 @@
 import { orcaCall, runAsCli } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 
+/**
+ * Read Orca's registered worktrees, optionally scoped to a repository, without adopting their custody.
+ * Branch refs are normalized and main-worktree identity is preserved. An empty fallback list on a
+ * failed or unavailable-host call is not evidence that a previously held tree has disappeared.
+ * @param {object} [input] - Optional repository selector.
+ * @returns {object} ok, normalized worktree rows, error, and hostUnavailable.
+ */
 export function worktreeList({ repo } = {}) {
   const r = orcaCall('worktree-list', { repo });
   const rows = Array.isArray(r.result?.worktrees) ? r.result.worktrees : [];

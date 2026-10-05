@@ -6,6 +6,7 @@ import { importModule } from '../api/node/import-module.mjs';
 import { runScript } from '../api/node/run-script.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { currentRole, requireRole } from './roles.mjs';
+import { credentialPreflight } from './lib/credential-preflight.mjs';
 
 const defaultRuntimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const cliModule = (file) => importModule(pathToFileURL(path.join(defaultRuntimeRoot, 'packages', 'cli', 'src', file)).href);
@@ -91,42 +92,58 @@ export function main(argv = process.argv.slice(2), io = {}) {
     }
   }
 
-  if (command.impl?.module) {
-    const ctxIo = {
-      stdout: (text) => writeTo(stdout, text),
-      stderr: (text) => writeTo(stderr, text),
-    };
-    const ctx = {
-      args: checked.args,
-      positionals: checked.positionals,
-      global: checked.global,
-      env,
-      cwd,
-      io: ctxIo,
-      role,
-      now: typeof io.now === 'function' ? io.now() : (io.now ?? Date.now()),
-    };
-    return runModule({
-      command,
-      ctx,
-      root,
-      importModuleFn: io.importModule ?? importModule,
-      wantsJson: checked.global.json === true || command.json === 'always',
-      stdout,
-      stderr,
-      group: split.group,
-      verb: split.verb,
-    });
-  }
-  if (!command.impl?.script) return refuse(stderr, `${split.group} ${split.verb} has no runtime implementation`, 1);
+  const invoke = preflight => {
+    if (!preflight.ok) {
+      if (checked.global.json === true || command.json === 'always')
+        writeTo(stdout, JSON.stringify(preflight.data, null, 2) + '\n');
+      const names = preflight.data.missing.map(row => row.name).join(', ');
+      writeTo(stderr, 'starci ' + split.group + ' ' + split.verb + ': ' + preflight.data.code + ': '
+        + (names || 'selected credential sources unavailable') + '. Configure credentials locally; never paste values into chat.\n');
+      return 2;
+    }
+    const env = preflight.env;
+    if (command.impl?.module) {
+      const ctxIo = {
+        stdout: (text) => writeTo(stdout, text),
+        stderr: (text) => writeTo(stderr, text),
+      };
+      const ctx = {
+        args: checked.args,
+        positionals: checked.positionals,
+        global: checked.global,
+        env,
+        cwd,
+        io: ctxIo,
+        role,
+        now: typeof io.now === 'function' ? io.now() : (io.now ?? Date.now()),
+      };
+      return runModule({
+        command,
+        ctx,
+        root,
+        importModuleFn: io.importModule ?? importModule,
+        wantsJson: checked.global.json === true || command.json === 'always',
+        stdout,
+        stderr,
+        group: split.group,
+        verb: split.verb,
+      });
+    }
+    if (!command.impl?.script) return refuse(stderr, `${split.group} ${split.verb} has no runtime implementation`, 1);
 
-  // --quiet and --edition are dispatcher concerns. Runtime handlers never see
-  // spellings they do not declare themselves; --cwd is represented by cwd.
-  const jsonFlag = checked.global.json === true && command.json !== 'always' ? ['--json'] : [];
-  const args = [...(command.impl.args ?? []), ...withFlagsBeforeDashes(checked.localArgs, jsonFlag)];
-  const script = path.resolve(root, command.impl.script);
-  const runner = io.runScript ?? runScript;
-  return runner(script, args, { cwd, env });
+    // --quiet and --edition are dispatcher concerns. Runtime handlers never see
+    // spellings they do not declare themselves; --cwd is represented by cwd.
+    const jsonFlag = checked.global.json === true && command.json !== 'always' ? ['--json'] : [];
+    const args = [...(command.impl.args ?? []), ...withFlagsBeforeDashes(checked.localArgs, jsonFlag)];
+    const script = path.resolve(root, command.impl.script);
+    const runner = io.runScript ?? runScript;
+    return runner(script, args, { cwd, env });
+  };
+  const preflight = credentialPreflight({
+    group: split.group, verb: split.verb, command, args: checked.args, positionals: checked.positionals,
+    runtimeRoot: root, cwd, env,
+  }, io.credentialDependencies);
+  return typeof preflight.then === 'function' ? preflight.then(invoke) : invoke(preflight);
 }
 
 if (isMain(import.meta.url)) process.exitCode = await main(process.argv.slice(2));

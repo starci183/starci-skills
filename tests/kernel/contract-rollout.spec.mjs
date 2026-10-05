@@ -6,84 +6,27 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {
-  CONTRACT_VERSION_SCHEMA,advisoryCodesFor,classifyChecks,contractFilesOf,contractVersionOf,laterChangesFor,loadContractChanges,runtimeShaOf,
+  CONTRACT_VERSION_SCHEMA,classifyChecks,contractFilesOf,contractVersionOf,runtimeShaOf,
 } from '../../scripts/machine/contract-version.mjs';
 import {checkShellConformance} from '../../scripts/work/ui/shell-conformance.mjs';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
 
-// Owner, 2026-09-24: most blocks came from contract changes rolled onto running workflows mid-flight
-// (app shell, layout tree, nav, part review in one night; DRAW_MATRIX_INCOMPLETE refused drawings
-// admitted before it existed). A leg is judged against the contract it was ADMITTED under: dispatch
-// records that version, a check or finding code a registered change added after it is an advisory
-// suspect for that leg, and a change meant to reach in-flight work becomes a follow-up leg, never a
-// hold on the running one.
+// Immutable selected inputs are preserved; current guards refuse red checks at every admission time.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const lastLine=text=>json(String(text).trim().split('\n').at(-1));
-const T0=Date.parse('2026-09-24T01:00:00+07:00');           // before every change below
-const T_SHELL=Date.parse('2026-09-24T01:03:37+07:00'), T_TREE=Date.parse('2026-09-24T02:11:02+07:00'), T_PARTS=Date.parse('2026-09-24T05:25:49+07:00');
+const T0=1;
 
-const REGISTRY=['schema: starci/contract-changes@1','changes:',
-  '  - id: app-shell-record',"    effectiveAt: '2026-09-24T01:03:37+07:00'",'    adds:','      checks:','        - shell-conformance','      codes:','        - SHELL_RECORD_MISSING','    reach: new-legs',
-  '  - id: layout-tree',"    effectiveAt: '2026-09-24T02:11:02+07:00'",'    adds:','      codes:','        - LAYOUT_UNSETTLED','    reach: new-legs',
-  '  - id: part-review-matrix',"    effectiveAt: '2026-09-24T05:25:49+07:00'",'    ops:','        - interface.draw','    adds:','      codes:','        - DRAW_MATRIX_INCOMPLETE','    reach: new-legs',
-  '  - id: token-leak-fix',"    effectiveAt: '2026-09-24T06:00:00+07:00'",'    safetyCritical: true','    adds:','      checks:','        - secret-scan','    reach: new-legs',
-  '  - id: nav-follow-up',"    effectiveAt: '2026-09-24T07:00:00+07:00'",'    summary: nav routes land on a page','    reach: follow-up','    followUp:','      op: interface.implement','      ops:','        - interface.draw','      detail: re-derive the nav of drawings admitted before nav routes',''].join('\n');
-
-const registryFile=t=>{
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-contract-changes-'));
-  t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const file=path.join(dir,'contract-changes.yaml');fs.writeFileSync(file,REGISTRY);return file;
-};
-
-test('the registry normalizes changes, refuses malformed ones, and the live registry parses clean',t=>{
-  const registry=loadContractChanges(ROOT,{file:registryFile(t)});
-  assert.deepEqual(registry.problems,[]);
-  assert.deepEqual(registry.changes.map(c=>c.id),['app-shell-record','layout-tree','part-review-matrix','token-leak-fix','nav-follow-up']);
-  assert.deepEqual(registry.changes.at(-1).followUp,{op:'interface.implement',ops:['interface.draw'],detail:'re-derive the nav of drawings admitted before nav routes'});
-  const live=loadContractChanges(ROOT);
-  assert.deepEqual(live.problems,[],'modules/kernel/contract-changes/ is well-formed');
-  assert.ok(live.changes.some(c=>c.id==='evidence-off-starciwork'&&c.adds.codes.includes('STARCIWORK_DRIFT')));
-
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-bad-changes-'));
-  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
-  const bad=path.join(dir,'x.yaml');
-  fs.writeFileSync(bad,['schema: starci/contract-changes@1','changes:','  - id: Bad Id',"    effectiveAt: '2026-01-01T00:00:00Z'",'  - id: no-date','  - id: odd-reach',"    effectiveAt: '2026-01-01T00:00:00Z'",'    reach: sometimes','  - id: bare-follow-up',"    effectiveAt: '2026-01-01T00:00:00Z'",'    reach: follow-up','  - id: ghost-op',"    effectiveAt: '2026-01-01T00:00:00Z'",'    ops: [review.verify, architecture.revise]','  - id: ghost-follow-up',"    effectiveAt: '2026-01-01T00:00:00Z'",'    reach: follow-up','    followUp:','      op: interface.implement','      ops: [interface.draw, no.such.op]',''].join('\n'));
-  const parsed=loadContractChanges(ROOT,{file:bad});
-  assert.deepEqual(parsed.changes,[]);
-  assert.equal(parsed.problems.length,6,parsed.problems.join('\n'));
-  assert.ok(parsed.problems.some((p) => /ghost-op: .*architecture\.revise.*not an op/.test(p)),'an ops name no manifest declares is a problem');
-  assert.ok(parsed.problems.some((p) => /ghost-follow-up: .*no\.such\.op.*not an op/.test(p)),'a followUp op name no manifest declares is a problem');
-  assert.deepEqual(loadContractChanges(ROOT,{file:path.join(dir,'absent.yaml')}),{schema:'starci/contract-changes@1',changes:[],problems:[]});
-});
-
-test('a red check a later change added is advisory for an older leg; safety-critical and partial matches are not',t=>{
-  const registry=loadContractChanges(ROOT,{file:registryFile(t)});
-  const laterFor=(admittedAt,op='interface.draw')=>laterChangesFor(registry,{admittedAt,op}).map(c=>c.id);
-  assert.deepEqual(laterFor(T0),['app-shell-record','layout-tree','part-review-matrix','nav-follow-up'],'the safety-critical change applies to every leg');
-  assert.deepEqual(laterFor(T0,'interface.implement'),['app-shell-record','layout-tree','nav-follow-up'],'a change scoped to ops reaches only those ops');
-  assert.deepEqual(laterFor(T_PARTS),['nav-follow-up']);
-  assert.deepEqual(laterFor(null),[],'a leg never admitted is admitted under the current contract');
-
-  const checks=[
-    {name:'unit',exitCode:0},
-    {name:'shell-conformance',exitCode:1,advisory:{forged:true}},
-    {name:'draw-matrix',exitCode:1,codes:['DRAW_MATRIX_INCOMPLETE']},
-    {name:'mixed',exitCode:1,codes:['DRAW_MATRIX_INCOMPLETE','COMPOSITE_MISSING']},
-    {name:'secret-scan',exitCode:1},
-  ];
-  const between=classifyChecks(checks,laterChangesFor(registry,{admittedAt:T_TREE+1,op:'interface.draw'}));
-  assert.equal(between[0].advisory,undefined);
-  assert.equal(between[1].advisory,undefined,'shell-conformance predates this leg, and a caller-supplied advisory is dropped');
-  assert.deepEqual(between[2].advisory.changes,['part-review-matrix']);
-  assert.equal(between[3].advisory,undefined,'one code the leg was admitted under keeps the check red');
-  assert.equal(between[4].advisory,undefined,'a safety-critical check is never advisory');
-  const older=classifyChecks(checks,laterChangesFor(registry,{admittedAt:T0,op:'interface.draw'}));
-  assert.deepEqual(older[1].advisory.changes,['app-shell-record']);
-  assert.deepEqual(advisoryCodesFor(registry,{admittedAt:T_SHELL,op:'interface.draw'}),{codes:['LAYOUT_UNSETTLED','DRAW_MATRIX_INCOMPLETE'],checks:[],changes:['layout-tree','part-review-matrix','nav-follow-up']});
+test('caller advisory metadata cannot demote any red current check', () => {
+  const checks = [{ name: 'unit', exitCode: 0 }, { name: 'shell-conformance', exitCode: 1, codes: ['SHELL_RECORD_MISSING'], advisory: { forged: true } },
+    { name: 'mixed', exitCode: 1, advisory: { outOfScope: ['invented'] } }];
+  assert.deepEqual(classifyChecks(checks), [{ name: 'unit', exitCode: 0 }, { name: 'shell-conformance', exitCode: 1, codes: ['SHELL_RECORD_MISSING'] }, { name: 'mixed', exitCode: 1 }]);
+  assert.equal(checks[1].advisory.forged, true, 'classification does not mutate filed caller evidence');
 });
 
 test('the contract version digests the brief, the shared documents and what the brief cites, and reads HEAD without git',t=>{
@@ -105,27 +48,15 @@ test('the contract version digests the brief, the shared documents and what the 
   assert.equal(runtimeShaOf(ROOT)?.length,40,'the runtime root itself reads its HEAD');
 });
 
-test('shell-conformance demotes the codes added after a leg\'s admission to suspects',t=>{
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-shell-admitted-'));
-  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
-  fs.mkdirSync(path.join(dir,'.starciwork'),{recursive:true});
-  const work=path.join(dir,'.starciwork');
-  const strict=checkShellConformance(work);
-  assert.equal(strict.ok,false);
-  assert.ok(strict.refused.some(line=>line.includes('SHELL_RECORD_MISSING')));
-  const admitted=checkShellConformance(work,{advisoryCodes:['SHELL_RECORD_MISSING']});
-  assert.equal(admitted.ok,true);
-  assert.ok(admitted.suspect.some(line=>line.includes('SHELL_RECORD_MISSING')&&line.includes('added after this leg was admitted')));
-  // app-shell-record (which registered SHELL_RECORD_MISSING) predates the alpha.3 release base and was
-  // deleted by the release-line compaction; a fixture registry keeps it so --admitted-at demotes as before.
-  const changesDir=path.join(ROOT,'modules','kernel','contract-changes');
-  const changes=fs.readdirSync(changesDir).filter(f=>f.endsWith('.yaml')).map(f=>parseYaml(fs.readFileSync(path.join(changesDir,f),'utf8')));
-  changes.push({id:'app-shell-record',effectiveAt:'2026-09-24T02:11:02+07:00',adds:{checks:['shell-conformance'],codes:['SHELL_RECORD_MISSING']},summary:'spec fixture for the compacted app-shell-record entry'});
-  const changesFile=path.join(dir,'contract-changes.yaml');fs.writeFileSync(changesFile,stringifyYaml({schema:'starci/contract-changes@1',changes}));
-  const env={...process.env,STARCI_CONTRACT_CHANGES:changesFile};
-  const cli=spawnSync(process.execPath,[path.join(ROOT,'scripts','work','ui','shell-conformance.mjs'),work,'--admitted-at','2026-09-24T00:00:00+07:00'],{cwd:ROOT,encoding:'utf8',windowsHide:true,env});
-  assert.equal(cli.status,0,cli.stdout);
-  assert.equal(spawnSync(process.execPath,[path.join(ROOT,'scripts','work','ui','shell-conformance.mjs'),work,'--admitted-at','soon'],{cwd:ROOT,encoding:'utf8',windowsHide:true,env}).status,2);
+test('missing current shell structure refuses even beside caller advisory metadata', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-shell-admitted-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const work = path.join(root, '.starciwork'); fs.mkdirSync(work);
+  const strict = checkShellConformance(work), forged = checkShellConformance(work, { advisoryCodes: ['SHELL_RECORD_MISSING'] });
+  assert.equal(strict.ok, false); assert.equal(forged.ok, false);
+  assert.ok(forged.refused.some((line) => line.includes('SHELL_RECORD_MISSING')));
+  const result = spawnSync(process.execPath, [path.join(ROOT, 'scripts/work/ui/shell-conformance.mjs'), work, '--admitted-at', '1'], { cwd: ROOT, encoding: 'utf8', windowsHide: true });
+  assert.equal(result.status, 2, result.stdout + result.stderr);
 });
 
 const fixture=t=>{
@@ -133,15 +64,25 @@ const fixture=t=>{
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ['docs','src'])fs.mkdirSync(path.join(repo,d),{recursive:true});
+  const main=path.join(root,'main'),repo=path.join(root,'repo');fs.mkdirSync(main);
+  const wf='wf-contract-rollout',branch=`wf-${wf}`,mainGit=proofRepo(t,main);
+  mainGit('worktree','add','-q','-b',branch,repo,'main');
+  const git=(...args)=>mainGit('-C',repo,...args);
+  for(const d of ['docs','src'])fs.mkdirSync(path.join(repo,d),{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
-  const base={...process.env,STARCI_CONTRACT_CHANGES:registryFile(t),STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
+  const ownerRoot=path.join(root,'owner'),trustHome=path.join(root,'trust-home');
+  fs.mkdirSync(ownerRoot);fs.mkdirSync(trustHome);
+  const owner=parseYaml(fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8'));
+  owner.launchTrust={profile:'automatic',approvedBy:'owner',approvalRef:'private contract rollout fixture adoption',roots:[main]};
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),stringifyYaml(owner));
+  const base={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
+    STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome,
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_PROJECTS_ROOT:path.join(root,'projects'),LOCALAPPDATA:path.join(root,'localappdata')};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete base[key];
   const api=args=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:base});
   const ok=args=>{const r=api(args);assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
-  const wf='wf-contract-rollout';
+  registerWorkflowWorktree({env:base},{workflowId:wf,orcaWorktreeId:'contract-rollout::workflow',path:repo,branch});
   const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo,{env:base})});try{return fn(l);}finally{l.close();}};
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo,{env:base})});try{return fn(l.db);}finally{l.close();}};
   seed(l=>{
@@ -156,31 +97,26 @@ const fixture=t=>{
       payload:{opId:op,owned_paths:[`docs/${jobId}`],managed:{dispatchId}}}]});
     const attemptId=l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
     l.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
-      .run(attemptId,wf,jobId,'# contract','{}',admittedAt);
+      .run(attemptId,wf,jobId,'# contract',JSON.stringify({ worktree: repo, packet: { context: { selected_op: { contract: { id: op }, checks: { required: [], candidates: [] } }, readRefs: [], owned_paths: [{ root: repo, path: `docs/${jobId}` }] } } }),admittedAt);
     l.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,'done','{}',?,?)")
       .run(wf,attemptId,dispatchId,jobId,admittedAt,admittedAt);
   });
-  return {repo,wf,api,ok,seed,read,leg};
+  return {repo,wf,git,api,ok,seed,read,leg};
 };
 
-test('starci kernel record-checks records a later-added red check advisory for an older leg and red for a current one; op-contract names the admission',t=>{
+test('native record-checks retains a red declared result for every admission time and op-contract names actual capture', t => {
   const fx=fixture(t);
-  fx.leg('job-old-draw','interface.draw',T_TREE+60_000);
-  fx.leg('job-new-draw','interface.draw',Date.now());
-  const checks=JSON.stringify({checks:[{name:'unit',exitCode:0},{name:'shell-conformance',exitCode:1,codes:['DRAW_MATRIX_INCOMPLETE'],evidence:'desktop only'}]});
-  const old=fx.ok(['record-checks','--job','job-old-draw','--checks',checks]);
-  assert.deepEqual(old.checkEvidence,{observed:2,passed:0,failed:0,green:false,declared:1,advisory:1});
-  assert.deepEqual(old.advisory,[{name:'shell-conformance',changes:['part-review-matrix']}]);
-  const stored=fx.read(db=>JSON.parse(db.prepare("SELECT summary_json FROM check_runs WHERE job_id=? AND name='shell-conformance' ORDER BY check_id DESC LIMIT 1").get('job-old-draw').summary_json).entry);
-  assert.match(stored.advisory.reason,/added by part-review-matrix after this leg was admitted/);
-  const current=fx.ok(['record-checks','--job','job-new-draw','--checks',checks]);
-  assert.deepEqual(current.checkEvidence,{observed:2,passed:0,failed:1,green:false,declared:1},'a leg admitted after the change is held to it');
-  assert.equal(current.advisory,undefined);
-
-  const contract=fx.ok(['op-contract','--job','job-old-draw']);
-  assert.deepEqual([contract.admission.admittedAt,contract.admission.source],[T_TREE+60_000,'contract-row']);
-  assert.deepEqual(contract.admission.laterChanges,['part-review-matrix','nav-follow-up']);
-  assert.deepEqual(contract.admission.advisoryCodes,['DRAW_MATRIX_INCOMPLETE']);
+  for (const [job, admittedAt] of [['job-early', T0], ['job-current', Date.now()]]) {
+    fx.leg(job, 'interface.draw', admittedAt);
+    const checks = JSON.stringify({ checks: [{ name: 'unit', exitCode: 0 }, { name: 'shell-conformance', exitCode: 1, codes: ['DRAW_MATRIX_INCOMPLETE'], advisory: { forged: true }, evidence: 'desktop only' }] });
+    const result = fx.ok(['record-checks', '--job', job, '--checks', checks]);
+    assert.deepEqual(result.checkEvidence, { observed: 2, passed: 0, failed: 1, green: false, declared: 1 });
+    const stored = fx.read((db) => JSON.parse(db.prepare("SELECT summary_json FROM check_runs WHERE job_id=? AND name='shell-conformance' ORDER BY check_id DESC LIMIT 1").get(job).summary_json).entry);
+    assert.equal(stored.advisory, undefined);
+    const admission = fx.ok(['op-contract', '--job', job]).admission;
+    assert.deepEqual([admission.admittedAt, admission.source], [admittedAt, 'contract-row']);
+    assert.deepEqual(Object.keys(admission).sort(), ['admittedAt', 'digest', 'runtimeSha', 'source']);
+  }
 });
 
 test('dispatch records the contract version the leg is admitted under',t=>{
@@ -190,34 +126,11 @@ test('dispatch records the contract version the leg is admitted under',t=>{
   assert.equal(d.status,0,d.stderr||d.stdout);
   const context=fx.read(db=>JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE job_id=?').get(job).context_json));
   assert.equal(context.contract.schema,CONTRACT_VERSION_SCHEMA);
+  assert.deepEqual(context.packet.context.gate_binding.targets,[{root:fx.repo,head:fx.git('rev-parse','HEAD'),owned:['docs']}]);
+  assert.equal(context.packet.context.workflow_worktree.path,fx.repo);
   assert.equal(context.contract.op,'code.refactor');
   assert.match(context.contract.digest,/^[0-9a-f]{64}$/);
   assert.ok(context.contract.files.some(f=>f.path==='modules/ops/ops/code.refactor.yaml'&&/^[0-9a-f]{64}$/.test(f.digest)));
   const admission=fx.ok(['op-contract','--job',job]).admission;
-  assert.deepEqual([admission.source,admission.digest,admission.laterChanges],['recorded',context.contract.digest,[]]);
-});
-
-test('a reach follow-up change owes each older leg a follow-up leg: status names it, actionable, until the Kernel enqueues it',t=>{
-  const fx=fixture(t);
-  fx.leg('job-draw-old','interface.draw',T0,{status:'succeeded'});
-  fx.leg('job-impl-old','interface.implement',T0,{status:'succeeded'});
-  const before=fx.ok(['status','--workflow',fx.wf]).frontier;
-  assert.deepEqual(before.contractFollowUps.map(f=>[f.change,f.jobId,f.followUpOp,f.after]),[['nav-follow-up','job-draw-old','interface.implement',null]]);
-  assert.equal(before.actionable,true);
-  assert.match(before.reason,/--contract-change <change> --follow-up-of <jobId>/);
-  const refuse=(args,code)=>{const r=fx.api(args);assert.equal(r.status,1,r.stdout);assert.equal(lastLine(r.stderr)?.code,code,r.stderr);};
-  refuse(['enqueue','--workflow',fx.wf,'--op','interface.implement','--paths','docs/x','--contract-change','layout-tree','--follow-up-of','job-draw-old'],'contract-change-unknown');
-  refuse(['enqueue','--workflow',fx.wf,'--op','interface.implement','--paths','docs/x','--contract-change','nav-follow-up','--follow-up-of','job-nowhere'],'follow-up-of-unknown');
-  const follow=fx.ok(['enqueue','--workflow',fx.wf,'--op','interface.implement','--paths','docs/nav','--contract-change','nav-follow-up','--follow-up-of','job-draw-old']);
-  assert.deepEqual(follow.contractChange,{id:'nav-follow-up',followUpOf:'job-draw-old'});
-  assert.equal(fx.ok(['status','--workflow',fx.wf]).frontier.contractFollowUps,undefined,'the key is present only while a follow-up is owed');
-});
-
-test('every op a registered contract change names is an op manifest, never a kind', () => {
-  const registry = loadContractChanges(ROOT);
-  assert.deepEqual(registry.problems, []);
-  const manifests = new Set(fs.readdirSync(path.join(ROOT, 'modules', 'ops', 'ops')).filter((f) => f.endsWith('.yaml')).map((f) => f.replace(/\.yaml$/, '')));
-  const unknown = registry.changes.flatMap((change) => [...change.ops, ...(change.followUp ? [change.followUp.op, ...change.followUp.ops] : [])]
-    .filter((op) => !manifests.has(op)).map((op) => `${change.id}: ${op}`));
-  assert.deepEqual(unknown, []);
+  assert.deepEqual([admission.source,admission.digest],['recorded',context.contract.digest]);
 });

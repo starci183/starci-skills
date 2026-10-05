@@ -1,15 +1,16 @@
 {
   "name": "@starci/eslint-canon-be",
-  "version": "3.0.9",
+  "version": "3.0.10",
   "description": "The StarCi back-end lint canon: every rule its laws publish, gathered as one flat-config plugin.",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": false,
   "exports": {
     ".": "./index.mjs"
   },
   "main": "./index.mjs",
   "files": [
+    "LICENSE",
     "*.mjs",
     "lib/*.mjs",
     "runtime/**",

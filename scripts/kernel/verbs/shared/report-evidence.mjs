@@ -8,7 +8,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { stageBlob, putArtifact, linkReportAttachment, recordCheck, roleOf, kindOf } from '../../../machine/evidence-store.mjs';
+import { isDeepStrictEqual } from 'node:util';
+import { paramValueError } from '../../../lib/op-shared.mjs';
+import { stageBlob, putArtifact, linkReportAttachment, recordCheck, roleOf, kindOf, mediaTypeOf } from '../../../machine/evidence-store.mjs';
+import { isTextMedia } from '../../../lib/redact.mjs';
 import { subkindOf } from '../../artifact-subkind.mjs';
 import { safeRemove } from '../../../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../../machine/artifact-hold.mjs';
@@ -63,16 +66,49 @@ export function attachedArgs(argv = process.argv.slice(2)) {
 }
 
 const ATTACH_MAX_FILES = 2000;
+const REPORT_MAX_BYTES = 4 * 1024 * 1024;
+const ATTACH_MAX_BYTES = 512 * 1024 * 1024;
+const ATTACH_FILE_MAX_BYTES = 256 * 1024 * 1024;
+const ATTACH_TEXT_MAX_BYTES = 16 * 1024 * 1024;
+
+/** Read a finite regular-file snapshot and refuse growth while it is being staged. */
+function readEvidenceFile(file, limit, code) {
+  const before = fs.lstatSync(file);
+  if (!before.isFile() || before.isSymbolicLink()) throw refuse('evidence input must be a regular file', code);
+  if (before.size > limit) throw refuse('evidence input exceeds its byte limit; scratch is retained', code);
+  const fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+  try {
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile() || stat.dev !== before.dev || stat.ino !== before.ino || stat.size > limit)
+      throw refuse('evidence input changed or exceeds its byte limit; scratch is retained', code);
+    const bytes = Buffer.alloc(stat.size + 1);
+    let count = 0;
+    while (count < bytes.length) { const n = fs.readSync(fd, bytes, count, bytes.length - count, null); if (!n) break; count += n; }
+    const after = fs.fstatSync(fd);
+    if (count > stat.size || after.size !== stat.size || after.mtimeMs !== stat.mtimeMs)
+      throw refuse('evidence input changed during staging; scratch is retained', code);
+    return bytes.subarray(0, count);
+  } finally { fs.closeSync(fd); }
+}
+
+/** Refuse an oversized report before reading its payload into memory. */
+export function readReportEnvelope(file) {
+  return readEvidenceFile(file, REPORT_MAX_BYTES, 'report-invalid').toString('utf8');
+}
 /** Scratch folders starci kernel report attaches by itself when present. */
 const AUTO_ATTACH = Object.freeze(['draw-loop', 'captures']);
 /** Every file under a directory (bounded), sorted. */
 function filesUnder(dir, out = []) {
-  let entries = [];
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+  catch { throw refuse(`report attachment directory is unreadable: ${slash(dir)}`, 'report-attachment-missing'); }
   for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (out.length >= ATTACH_MAX_FILES) break;
     const full = path.join(dir, e.name);
-    if (e.isDirectory()) filesUnder(full, out); else if (e.isFile()) out.push(full);
+    if (e.isDirectory()) filesUnder(full, out);
+    else if (e.isFile()) {
+      if (out.length >= ATTACH_MAX_FILES) throw refuse('report attachment inventory exceeds its file limit; scratch is retained', 'report-attachment-invalid');
+      out.push(full);
+    } else throw refuse(`report attachment is not a regular file or directory: ${slash(full)}`, 'report-attachment-invalid');
   }
   return out;
 }
@@ -99,13 +135,19 @@ function attachmentFacts(rel) {
  * checks/<i>-<check>/<stream><ext>. Returns [{name, role, kind, subkind, blob, runId, round, checkIndex, stream}].
  */
 export function stageReportEvidence({ report, scratch, attach = [], opId = null, repoRoots = [] }) {
-  const staged = [], names = new Set();
+  const staged = [], names = new Set(), inventory = [];
+  let totalBytes = 0;
   const add = ({ abs, name, role, runId = null, round = null, checkIndex = null, stream = null }) => {
     let logical = slash(name).replace(/^\/+/, '');
     if (names.has(logical)) return;
     names.add(logical);
+    const size = fs.statSync(abs).size;
+    const mediaType = mediaTypeOf(abs), limit = isTextMedia(mediaType) ? ATTACH_TEXT_MAX_BYTES : ATTACH_FILE_MAX_BYTES;
+    totalBytes += size;
+    if (names.size > ATTACH_MAX_FILES || size > limit || totalBytes > ATTACH_MAX_BYTES)
+      throw refuse('report attachments exceed their file or byte limit; scratch is retained', 'report-attachment-invalid');
     const kind = kindOf(abs);
-    staged.push({ name: logical, role, kind, subkind: subkindOf({ kind, path: slash(logical), opId }), blob: stageBlob(abs, { repoRoots }), runId, round, checkIndex, stream });
+    inventory.push({ abs, size, mediaType, limit, name: logical, role, kind, subkind: subkindOf({ kind, path: slash(logical), opId }), runId, round, checkIndex, stream });
   };
   // The runtime's own agent-data folders in the scratch ride along even when the op did not name them: a draw loop's
   // rounds and bundle (draw-loop.mjs) and its captures must be ledger artifacts, or the blob GC could sweep them.
@@ -125,6 +167,13 @@ export function stageReportEvidence({ report, scratch, attach = [], opId = null,
       add({ abs, name: `checks/${index}-${slug}/${stream}${path.extname(abs) || '.txt'}`, role, checkIndex: index, stream });
     }
   });
+  let stagedBytes = 0;
+  for (const { abs, size: _size, mediaType, limit, ...item } of inventory) {
+    const bytes = readEvidenceFile(abs, limit, 'report-attachment-invalid');
+    stagedBytes += bytes.length;
+    if (stagedBytes > ATTACH_MAX_BYTES) throw refuse('report attachments exceed their aggregate byte limit; scratch is retained', 'report-attachment-invalid');
+    staged.push({ ...item, blob: stageBlob(bytes, { mediaType, repoRoots }) });
+  }
   return staged;
 }
 
@@ -160,31 +209,64 @@ export function fileReportEvidence(db, { attempt, reportId, report, staged, now 
       stdout: blobOf('stdout'), stderr: blobOf('stderr'), output: blobOf('output'), summary: Object.keys(summary).length ? summary : null, now });
     return { checkId: r.checkId, name, status: r.status };
   });
-  const audit = interfaceAuditOf(db, { attempt, staged, now });
+  const audit = interfaceAuditOf(db, { attempt, staged, report, now });
   return { artifacts, checks, ...(audit ? { audit } : {}) };
 }
 
 const INTERFACE_AUDIT_FILE = 'interface-audit.json';
 const INTERFACE_AUDIT_SCHEMA = 'starci/interface-audit-operation@1';
+// Keep capture/proof annotations in the report, while comparing every declared
+// scope field using the admitted shape rather than today's Source manifest.
+function auditMatrixScope(value, shape) {
+  if (shape?.type === 'array' && Array.isArray(value)) return value.map((item) => auditMatrixScope(item, shape.items));
+  if (shape?.type === 'object' && value && typeof value === 'object' && !Array.isArray(value))
+    return Object.fromEntries(Object.keys(shape.properties ?? {}).filter((key) => Object.hasOwn(value, key))
+      .map((key) => [key, auditMatrixScope(value[key], shape.properties[key])]));
+  return value;
+}
+
 /**
  * interface.audit's verdict (ARCHITECTURE-DB §5.2: features/<f>/operations/** → interface_audits): an attached
  * interface-audit.json {schema starci/interface-audit-operation@1, id operation.<feature>.<name>, feature?, scope |
  * selectedMatrix, verdict?, findings?, routeTo?} becomes the interface_audits row of that audit, bound to this attempt.
  */
-function interfaceAuditOf(db, { attempt, staged, now }) {
-  const item = staged.find((s) => s.name.split('/').pop() === INTERFACE_AUDIT_FILE);
+function interfaceAuditOf(db, { attempt, staged, report, now }) {
+  let packet = null;
+  try { packet = JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE attempt_id=?').get(attempt.attempt_id)?.context_json ?? 'null')?.packet; }
+  catch { packet = null; }
+  const definition = packet?.context?.selected_op?.contract?.params?.audit;
+  const typed = definition?.type === 'object' && definition.required === true;
+  const items = staged.filter((s) => s.name.split('/').pop() === INTERFACE_AUDIT_FILE);
+  if (items.length > 1 || (typed && report.outcome === 'done' && items.length !== 1))
+    throw refuse('a completed typed audit needs exactly one interface-audit.json verdict', 'report-attachment-invalid');
+  const item = items[0];
   if (!item) return null;
   let doc = null;
   try { doc = JSON.parse(fs.readFileSync(item.blob.fileUri, 'utf8')); } catch { doc = null; }
-  if (doc?.schema !== INTERFACE_AUDIT_SCHEMA || !/^operation\.[a-z0-9-]+\.[a-z0-9-]+/.test(String(doc.id ?? '')))
+  if (doc?.schema !== INTERFACE_AUDIT_SCHEMA || !/^operation\.[a-z0-9-]+\.[a-z0-9-]+$/.test(String(doc.id ?? '')))
     throw refuse(`${item.name} is not a ${INTERFACE_AUDIT_SCHEMA} verdict with id operation.<feature>.<name>`, 'report-attachment-invalid');
   const feature = doc.feature ?? String(doc.id).split('.')[1];
+  let scope = doc.scope ?? doc.selectedMatrix ?? {};
+  if (typed) {
+    const admitted = packet.params?.audit, error = paramValueError('audit', definition, admitted);
+    const matrixShape = definition.valueSchema?.properties?.selectedMatrix;
+    const measured = auditMatrixScope(doc.selectedMatrix, matrixShape);
+    if (error || attempt.op_id !== 'interface.audit' || packet.context.selected_op.contract.id !== attempt.op_id
+      || admitted.id !== doc.id || admitted.feature !== feature || feature !== String(doc.id).split('.')[1]
+      || !isDeepStrictEqual(measured, admitted.selectedMatrix)
+      || (Object.hasOwn(doc, 'scope') && !isDeepStrictEqual(doc.scope, admitted.selectedMatrix)))
+      throw refuse('the audit verdict does not match its admitted params.audit scope', 'report-attachment-invalid');
+    scope = admitted.selectedMatrix;
+  }
+  const prior = db.prepare('SELECT workflow_id,feature FROM interface_audits WHERE audit_id=?').get(doc.id);
+  if (prior && (prior.workflow_id !== attempt.workflow_id || prior.feature !== feature))
+    throw refuse('the audit identity is already owned by another workflow or feature', 'report-attachment-invalid');
   const verdict = ['pass', 'fail', 'partial'].includes(doc.verdict) ? doc.verdict : null;
   const routeTo = ['interface.implement', 'interface.draw'].includes(doc.routeTo) ? doc.routeTo : null;
   db.prepare(`INSERT INTO interface_audits(audit_id,workflow_id,attempt_id,feature,scope_json,verdict,findings_json,route_to,created_at,updated_at)
       VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(audit_id) DO UPDATE SET workflow_id=excluded.workflow_id,attempt_id=excluded.attempt_id,feature=excluded.feature,
       scope_json=excluded.scope_json,verdict=excluded.verdict,findings_json=excluded.findings_json,route_to=excluded.route_to,updated_at=excluded.updated_at`)
-    .run(doc.id, attempt.workflow_id, attempt.attempt_id, feature, JSON.stringify(doc.scope ?? doc.selectedMatrix ?? {}), verdict,
+    .run(doc.id, attempt.workflow_id, attempt.attempt_id, feature, JSON.stringify(scope), verdict,
       doc.findings == null ? null : JSON.stringify(doc.findings), routeTo, now, now);
   return { auditId: doc.id, verdict };
 }

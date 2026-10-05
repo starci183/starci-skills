@@ -8,11 +8,12 @@
 //   - the pattern files (knowledge/patterns/...) of each file kind: the family's `always` files (op-gate.yaml `kinds`) plus
 //     the topics of the longest dotted slot prefix the derived slot->topic map knows (slotTopicMap, from each topic's own
 //     `slots` field in index.yaml reading order);
-//   - the example files of the same slots in the example app (op-gate.yaml `examples`), matched by the slot's explain pattern.
-// `--read` adds any other file the slice read (app-relative); `--knowledge` adds runtime knowledge files (knowledge/..., a
-// deciding or authoring op's READ: the patterns, catalogs and rules its decision cites), role `knowledge`. A deciding op that
+//   - every source of the stable example IDs cited by those topics, resolved through the actual app catalog.
+// `--read` adds any other file the slice read (app-relative); `--knowledge` adds contained knowledge files or declared common law (a
+// deciding or authoring op's READ: the patterns, catalogs and declared common law its decision cites), role `knowledge`. A deciding op that
 // writes no file yet may give --knowledge alone. The op attaches the digest to its report; `starci kernel settle` re-reads it
-// (scripts/kernel/gate-settle.mjs) and refuses a done whose digest is missing or names no pattern file for a touched kind.
+// (scripts/kernel/gate-settle.mjs). Every applicable pattern/common input and matching example must carry its current hash.
+// A digest records supplied inputs, not comprehension.
 // Exit 0 recorded, 2 the digest could not be built (a touched path hfs cannot explain is recorded with slot null, not an error).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,8 +21,9 @@ import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256File } from '../../engine/digest.mjs';
-import { posixPath } from '../lib/path-key.mjs';
-import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
+import { posixPath, sameResolvedPath, samePath, insidePath } from '../lib/path-key.mjs';
+import { isMain } from '../lib/is-main.mjs';
+import { exampleSourcePaths } from '../lib/example-refs.mjs';
 import { hfsEntry } from '../lib/package-at.mjs';
 
 export const DIGEST_SCHEMA = 'starci/read-digest@1';
@@ -29,7 +31,6 @@ const OP_GATE_SCHEMA = 'starci/op-gate@1';
 const OP_GATE_FILE = 'knowledge/op-gate.yaml';
 const PATTERN_ROOT = 'knowledge/patterns';
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const EXAMPLES_PER_SLOT = 2;
 const firstLine = (text) => String(text ?? '').trim().split(/\r?\n/)[0];
 const USAGE = 'usage: read-digest.mjs --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]';
 const KNOWLEDGE_ROOT = 'knowledge';
@@ -101,24 +102,54 @@ export function patternsForSlot(slot, doc = loadOpGate(), map = slotTopicMap()) 
 }
 
 /**
- * Whether a digest covers the touched kinds: {status: 'pass'|'missing'|'no-pattern', detail, uncovered[]}. `kinds` is
- * [{path, slot}] as the runtime resolved them itself; each kind needs at least one of its pattern files in the digest (a kind
- * with no known slot needs any pattern file).
+ * Whether READ covers the current slice and canonical inputs. `kinds` comes from the target's slot owner, not the digest.
+ * Every applicable pattern and the common files declared by op-gate are required; `expected` also binds matching examples selected by the
+ * READ producer. Extra reads remain allowed, but every recorded input must still exist with its recorded hash.
  */
-export function judgeReadDigest(digest, kinds, doc = loadOpGate()) {
+export function judgeReadDigest(digest, kinds, doc = loadOpGate(), { root = null, base = runtimeRoot, expected = null } = {}) {
   if (!digest || digest.schema !== DIGEST_SCHEMA || !Array.isArray(digest.files))
     return { status: 'missing', detail: `no READ digest (schema ${DIGEST_SCHEMA}) is attached to the report`, uncovered: [] };
-  const named = new Set(digest.files.filter((f) => typeof f?.sha256 === 'string' && /^[0-9a-f]{64}$/.test(f.sha256)).map((f) => posixPath(f.path)));
-  const anyPattern = [...named].some((p) => p.startsWith(`${PATTERN_ROOT}/`));
+  const invalid = (detail, uncovered = []) => ({ status: 'no-pattern', detail, uncovered });
+  if (root && (typeof digest.root !== 'string' || !sameResolvedPath(digest.root, root)))
+    return invalid('the READ digest belongs to another target root');
+  const named = new Map();
+  const canonical = new Set();
+  for (const file of digest.files) {
+    if (typeof file?.path !== 'string' || !/^[0-9a-f]{64}$/.test(String(file.sha256 ?? ''))) {
+      return invalid('the READ digest contains an input without a path and exact sha256');
+    }
+    const rel = posixPath(file.path), from = file.role === 'read' ? root ?? digest.root : base;
+    if (!from || !['read', 'pattern', 'example', 'knowledge'].includes(file.role))
+      return invalid(`the READ input ${rel} has no supported root or role`);
+    const absolute = path.resolve(from, file.path);
+    const within = path.relative(path.resolve(from), absolute);
+    if (file.role !== 'read' && (within === '..' || within.startsWith(`..${path.sep}`) || path.isAbsolute(within)))
+      return invalid(`the canonical READ input ${rel} is outside the runtime`);
+    try {
+      if (!fs.statSync(absolute).isFile() || sha256File(absolute) !== file.sha256)
+        return invalid(`the READ input ${rel} changed since it was recorded`);
+    } catch { return invalid(`the READ input ${rel} is no longer readable`); }
+    if (named.has(rel)) return invalid(`the READ input ${rel} is recorded more than once`);
+    named.set(rel, file.sha256);
+    if (file.role !== 'read') canonical.add(rel);
+  }
+  if (!Array.isArray(doc.digest.required) || !doc.digest.required.length)
+    return invalid('knowledge/op-gate.yaml declares no required common READ inputs');
+  const required = new Map([
+    ...doc.digest.required.map((rel) => [rel, sha256File(path.join(base, rel))]),
+    ...(expected?.files ?? []).map((file) => [file.path, file.sha256]),
+  ]);
+  const touched = new Set((digest.touched ?? []).map(posixPath));
   const uncovered = [];
   for (const kind of kinds) {
-    const owed = patternsForSlot(kind.slot, doc);
-    const covered = owed.length ? owed.some((p) => named.has(p)) : anyPattern;
-    if (!covered) uncovered.push({ path: kind.path, slot: kind.slot ?? null, owed });
+    const owed = patternsForSlot(kind.slot ?? 'app', doc, slotTopicMap({ base }));
+    for (const rel of owed) required.set(rel, sha256File(path.join(base, rel)));
+    const covered = owed.every((rel) => named.has(rel));
+    if (!touched.has(kind.path) || !covered) uncovered.push({ path: kind.path, slot: kind.slot ?? null, owed });
   }
-  if (!kinds.length && !anyPattern && digest.touched?.length) uncovered.push({ path: null, slot: null, owed: [] });
-  return uncovered.length
-    ? { status: 'no-pattern', detail: `the READ digest names no pattern file for ${uncovered.map((u) => `${u.path ?? 'the slice'} (${u.slot ?? 'unknown kind'})`).join(', ')}`, uncovered }
+  const missing = [...required].filter(([rel, hash]) => named.get(rel) !== hash || !canonical.has(rel)).map(([rel]) => rel);
+  if (missing.length) uncovered.push({ path: null, slot: null, owed: missing });
+  return uncovered.length ? invalid(`the READ digest does not cover the current slice and all required inputs: ${missing.join(', ') || uncovered.map((u) => u.path).join(', ')}`, uncovered)
     : { status: 'pass', detail: null, uncovered: [] };
 }
 
@@ -127,11 +158,11 @@ export function judgeReadDigest(digest, kinds, doc = loadOpGate()) {
  * 'no-knowledge', detail}. It needs at least one knowledge file (a pattern or a --knowledge file) with a well-formed sha256, and
  * every file it touched carries an entry of the slot map (the hfs slot of each written record).
  */
-export function judgeKnowledgeDigest(digest) {
+export function judgeKnowledgeDigest(digest, doc = loadOpGate()) {
   if (!digest || digest.schema !== DIGEST_SCHEMA || !Array.isArray(digest.files))
     return { status: 'missing', detail: `no READ digest (schema ${DIGEST_SCHEMA}) is attached to the report` };
-  const read = digest.files.filter((f) => typeof f?.sha256 === 'string' && /^[0-9a-f]{64}$/.test(f.sha256) && posixPath(String(f.path ?? '')).startsWith(`${KNOWLEDGE_ROOT}/`));
-  if (!read.length) return { status: 'no-knowledge', detail: 'the READ digest names no knowledge file (knowledge/patterns/** or a --knowledge file) with its sha256: the decision cites no standard' };
+  const read = digest.files.filter((f) => typeof f?.sha256 === 'string' && /^[0-9a-f]{64}$/.test(f.sha256) && (posixPath(String(f.path ?? '')).startsWith(`${KNOWLEDGE_ROOT}/`) || (doc.digest.required ?? []).includes(posixPath(String(f.path ?? '')))));
+  if (!read.length) return { status: 'no-knowledge', detail: 'the READ digest names no declared canonical knowledge with its sha256: the decision cites no standard' };
   const mapped = new Set((Array.isArray(digest.slotMap) ? digest.slotMap : []).map((m) => posixPath(String(m?.path ?? ''))));
   const unmapped = (Array.isArray(digest.touched) ? digest.touched : []).map((t) => posixPath(String(t))).filter((t) => !mapped.has(t));
   if (unmapped.length) return { status: 'no-knowledge', detail: `the READ digest has no hfs slot entry for ${unmapped.slice(0, 5).join(', ')}` };
@@ -160,21 +191,20 @@ export async function kindsOf(root, files, hfs = hfsEntry(root)) {
   return files.map((file, i) => ({ path: file, slot: explained[i]?.slot ?? null }));
 }
 
-/** The example files of a slot: files of the example side its explain pattern matches (`<name>` spans one segment). */
+/** All actual source files indexed by the selected topics' stable example IDs. */
 function examplesForSlot(explained, doc = loadOpGate(), base = runtimeRoot) {
-  const family = String(explained?.slot ?? '').split('.')[0];
-  const side = doc.examples?.[family];
-  if (!side || !explained?.pattern) return [];
-  const sideRoot = path.join(base, side);
-  if (!fs.existsSync(sideRoot)) return [];
-  const pattern = posixPath(explained.pattern);
-  const expression = new RegExp(`^${pattern.split('/').map((seg) => seg.replace(/<[^>]+>/g, '\u0000').replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\u0000/g, '[^/]+')).join('/')}${pattern.endsWith('/') ? '' : '$'}`);
-  return walkFiles(sideRoot, { sorted: true, exclude: (name, full, entry) => entry.isDirectory() && ['node_modules', '.git', 'dist'].includes(name) })
-    .map((file) => posixPath(path.relative(sideRoot, file)))
-    // An app's explain pattern may carry the side folder (be/src/...) or not (src/...): both spell the same slot.
-    .filter((rel) => expression.test(rel) || expression.test(`${path.posix.basename(posixPath(side))}/${rel}`))
-    .slice(0, EXAMPLES_PER_SLOT)
-    .map((rel) => `${side}/${rel}`);
+  const ids = new Set(), direct = new Set();
+  const collect = (value) => {
+    if (!value || typeof value !== 'object') return;
+    if (Array.isArray(value.relatedExamples)) for (const ref of value.relatedExamples) {
+      if (typeof ref !== 'string') throw new Error('a topic example reference must be a stable ID or concrete Source path');
+      (ref.includes('/') ? direct : ids).add(ref);
+    }
+    for (const child of Object.values(value)) if (child && typeof child === 'object') collect(child);
+  };
+  for (const topic of patternsForSlot(explained?.slot ?? 'app', doc, slotTopicMap({ base })))
+    collect(parseYaml(fs.readFileSync(path.join(base, topic), 'utf8')));
+  return [...(ids.size ? exampleSourcePaths(base, ids, { file: doc.examples.catalog }) : []), ...direct];
 }
 
 /** The digest of a slice: what it must read, each file with its sha256. */
@@ -186,15 +216,36 @@ export async function buildReadDigest({ root, touch, read = [], knowledge = [], 
     return { path: file, slot: e.slot ?? null, status: e.status, pattern: e.pattern ?? null, tier: e.tier ?? null, allowedImports: e.allowedImports ?? null, rules: e.rules ?? [] };
   });
   const files = new Map();
-  const add = (rel, role, from) => { if (!files.has(rel) && fs.existsSync(path.join(from, rel))) files.set(rel, { path: rel, role, sha256: sha256File(path.join(from, rel)) }); };
+  const add = (rel, role, from) => {
+    if (files.has(rel)) return;
+    const file = path.resolve(from, rel);
+    if (!fs.lstatSync(file).isFile() || (role !== 'read' && (path.isAbsolute(rel) || rel.includes(':')
+      || rel.split('/').some((part) => !part || part === '.' || part === '..') || !insidePath(from, file)
+      || !samePath(fs.realpathSync.native(file), file) || !insidePath(fs.realpathSync.native(from), fs.realpathSync.native(file)))))
+      throw new Error(`READ input ${rel} is not a contained regular file`);
+    if (role !== 'read') {
+      let at = path.parse(file).root;
+      for (const segment of file.slice(at.length).split(path.sep).filter(Boolean)) {
+        at = path.join(at, segment);
+        if (fs.lstatSync(at).isSymbolicLink() || !samePath(fs.realpathSync.native(at), at)) throw new Error(`linked READ input: ${rel}`);
+      }
+    }
+    files.set(rel, { path: rel, role, sha256: sha256File(file) });
+  };
+  for (const rel of doc.digest.required ?? []) add(rel, 'knowledge', base);
+  add(doc.examples.catalog, 'example', base);
+  // A deciding READ with no coded slice owes the explicitly declared catalog,
+  // including its compiler and test inputs; a coded slice selects its topics below.
+  if (!touched.length) for (const example of exampleSourcePaths(base, null, { file: doc.examples.catalog })) add(example, 'example', base);
   for (const kind of slotMap) {
-    for (const pattern of patternsForSlot(kind.slot, doc)) add(pattern, 'pattern', base);
+    for (const pattern of patternsForSlot(kind.slot ?? 'app', doc, slotTopicMap({ base }))) add(pattern, 'pattern', base);
     for (const example of examplesForSlot(kind, doc, base)) add(example, 'example', base);
   }
   for (const extra of read) add(posixPath(extra), 'read', path.isAbsolute(extra) ? '' : root);
   for (const rel of knowledge) {
     const clean = posixPath(path.isAbsolute(rel) ? path.relative(base, rel) : rel);
-    if (!clean.startsWith(`${KNOWLEDGE_ROOT}/`) || !fs.existsSync(path.join(base, clean))) throw new Error(`--knowledge ${rel} is not a file under the runtime's ${KNOWLEDGE_ROOT}/`);
+    if ((!clean.startsWith(`${KNOWLEDGE_ROOT}/`) && !(doc.digest.required ?? []).includes(clean))
+      || clean.split('/').some((part) => !part || part === '.' || part === '..') || !insidePath(base, path.resolve(base, clean))) throw new Error(`--knowledge ${rel} is not declared canonical knowledge`);
     add(clean, clean.startsWith(`${PATTERN_ROOT}/`) ? 'pattern' : 'knowledge', base);
   }
   return { schema: DIGEST_SCHEMA, at: new Date().toISOString(), root: posixPath(path.resolve(root)), touched, slotMap, files: [...files.values()] };

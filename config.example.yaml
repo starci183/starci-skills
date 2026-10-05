@@ -6,6 +6,12 @@
 language: vi
 model: null
 effort: medium
+# Explicit current owner adoption is required; shipped defaults grant no trust or purge authority.
+# launchTrust: {profile: automatic, approvedBy: owner, approvalRef: '<current approval>', roots: ['<exact absolute repository root>']}
+# profile: declined preserves an explicit decision; provider-side declines also remain authoritative.
+launchTrust: null
+# retention: {workflowPurge: {approvedBy: owner, approvalRef: '<current approval>', repos: ['<exact absolute ledger-owner repo>']}}
+retention: null
 # debug — automatically pair an approved workflow start with the native core-maintenance seat.
 # false (or absent) starts the workflow without that pairing. The caller route is supplied by the
 # single public /starci entry; it never changes the Supervisor, Kernel or operation model pins.
@@ -111,8 +117,8 @@ models:
 # question, its options and the public link. Telegram carries owner asks only.
 # SECRETS NEVER GO IN THIS FILE: tokenEnv/botTokenEnv NAME an environment variable holding the token
 # (or <NAME>_FILE pointing at a custody file); a value that is not an UPPER_SNAKE env var name is refused.
-#   secretsFile: a gitignored dotenv file (relative to this skill root) whose KEY=VALUE lines count as
-#     environment for the *Env keys; a real environment variable wins. Absent file = no values.
+#   Host credentials use the canonical runtime root secret.env; docs/host-secrets.md owns setup.
+#     Supplied environment values win, including blank values. Missing local file adds no values.
 #   repos: ledger-owner repository roots whose asks go public, relative to the source root (the
 #     directory holding this skill) or absolute. [] = the source root plus every .workspaces project owner.
 #   gateway.port: the one fixed local port the tunnel points at (outside the 6969..7069 form band).
@@ -131,7 +137,6 @@ models:
 #   telegram.exposeCredentialAsks: false keeps a credential/secret ask off the public link — the message
 #     says to answer it on this machine and carries only the localhost link, and the gateway refuses it.
 connectors:
-  secretsFile: .secrets/connectors.env
   repos: []
   gateway: {port: 7070}
   cloudflare: {mode: off, tunnel: null, credentialsFile: null, tokenEnv: CLOUDFLARE_TUNNEL_TOKEN, hostname: null, access: false}

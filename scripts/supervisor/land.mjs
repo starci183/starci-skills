@@ -33,14 +33,7 @@
 //        job - `--specs all` is refused unless `specs.harness: true` or the push-git flow passes `--full-by-push-git`
 //        (engine/config.mjs harnessSpecsEnabled); `--specs none` needs an explicit `--reason` (recorded as specReason on the
 //        land run); `--specs <csv>` adds named specs;
-//      contract-changes: every changed contract/schema/knowledge/op file (CONTRACT_PREFIXES) is covered by
-//        `paths` of an entry the change itself adds or edits - an entry file modules/kernel/contract-changes/<id>.yaml
-//        (contract-changes-store.mjs);
-//      gate-stability (a REPORT, never a refusal): a land touching a frozen family's gatePaths, or adding/editing
-//        a contract change that adds checks or codes for it (modules/kernel/contract-freeze.yaml), runs the family's
-//        gates as main and as the candidate have them over the latest accepted leg of every live workflow
-//        (scripts/supervisor/gate-stability.mjs, read-only) and reports how many would flip - so the Supervisor
-//        decides when to starci kernel contract-release it.
+//      current module contracts and citations are checked on the candidate; native gate and package proofs refuse red or unavailable evidence.
 // 3b. git health: a repo whose shared config says core.bare=true fails every work-tree operation ("this operation must be run
 //    in a work tree"); that is refused as `git-unusable` (before the queue and before each scratch), and a cherry-pick that fails
 //    without unmerged files is `git-failed`, never `conflict`. Each attempt owns one scratch-<pid>-<token> worktree it alone removes.
@@ -76,8 +69,6 @@ import { withSwcCache } from '../gates/build-env.mjs';
 import { hostThrottle } from '../machine/ram-throttle.mjs';
 import { buildGrammar } from '../gates/grammar-build.mjs';
 import { specsDependingOn } from '../lib/spec-deps.mjs';
-import { readContractChangesDocAt } from '../machine/contract-changes-store.mjs';
-import { CONTRACT_CHANGES_DIR, isContractChangesPath } from '../lib/contract-changes-path.mjs';
 import { SKILL_ROOT, lanesRoot, landRoot, supervisorSettings } from '../machine/home.mjs';
 import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
 import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
@@ -85,7 +76,6 @@ import { fullCheckStep } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { tailLines } from '../lib/clip.mjs'; import { landUnderHostLock } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, selfUpgradeNote, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs';
-const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
 export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-worktree-add.mjs']);
 const MAX_MAIN_RETRIES = 3;
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
@@ -111,27 +101,6 @@ export function specRunGate({ concurrency = specConcurrency(), waitMs = LAND_WAI
 }
 
 /* ------------------------------------------------------------ pure pieces */
-
-/** The changed files a contract-changes entry must cover. */
-export const governedPaths = (changed) => changed.map(normPath)
-  .filter((f) => !isContractChangesPath(f) && CONTRACT_PREFIXES.some((p) => (p.endsWith('/') ? f.startsWith(p) : f === p)));
-
-const entryKey = (e) => JSON.stringify(e);
-/**
- * Contract-change enforcement: the entries of `after` that are new or edited against `before` must cover, by
- * their `paths` (a directory covers what is inside it), every governed changed file. Returns {ok, governed,
- * uncovered, entries}.
- */
-export function contractCoverage({ changed, before, after }) {
-  const governed = governedPaths(changed);
-  if (!governed.length) return { ok: true, governed, uncovered: [], entries: [] };
-  const old = new Map((before?.changes ?? []).map((e) => [e?.id, entryKey(e)]));
-  const touched = (after?.changes ?? []).filter((e) => e?.id && old.get(e.id) !== entryKey(e));
-  const paths = touched.flatMap((e) => (Array.isArray(e.paths) ? e.paths : [])).map((p) => normPath(p));
-  const covers = (file) => paths.some((p) => file === p || file.startsWith(`${p}/`));
-  const uncovered = governed.filter((f) => !covers(f));
-  return { ok: uncovered.length === 0, governed, uncovered, entries: touched.map((e) => e.id) };
-}
 
 /**
  * The roots a tree-wide invariant spec scans, as it declares them ONCE: `export const INVARIANT_ROOTS = ['scripts', ...]`
@@ -481,27 +450,8 @@ const readSpecs = (dir) => {
   return names.map((n) => ({ file: `tests/${n}`, text: (() => { try { return fs.readFileSync(path.join(tests, n), 'utf8'); } catch { return ''; } })() }));
 };
 
-/** Every check of step 3 over the scratch `dir` at candidate `head` against `base`. Returns {ok, checks:[...]}. */
-/**
- * The frozen families a land touches: a changed file under one of a family's gatePaths, or an added/edited contract
- * change that governs the family and adds checks or codes. [{family, why[]}]
- */
-export function gateFamiliesTouched({ changed, freeze = [], before = null, after = null }) {
-  const old = new Map((before?.changes ?? []).map((e) => [e?.id, entryKey(e)]));
-  const touched = (after?.changes ?? []).filter((e) => e?.id && old.get(e.id) !== entryKey(e));
-  const out = [];
-  for (const f of freeze) {
-    const files = changed.map(normPath).filter((file) => f.gatePaths.some((p) => file.startsWith(p)));
-    const entries = touched.filter((e) => {
-      const names = [...(Array.isArray(e.ops) ? e.ops : []), e.followUp?.op, ...(Array.isArray(e.followUp?.ops) ? e.followUp.ops : [])];
-      return names.includes(f.family) && ((e.adds?.checks ?? []).length || (e.adds?.codes ?? []).length);
-    }).map((e) => e.id);
-    if (files.length || entries.length) out.push({ family: f.family, why: [...files, ...entries.map((id) => `contract change ${id}`)] });
-  }
-  return out;
-}
-
-export function runChecks({ dir, base, head, specs = [], specMode = 'touching', baseline = null, runSpecs = true, baseTree = null, gateStability = null, ramGate = specRunGate, env = process.env, specBaseRun = specBaseRunAt }) {
+/** Every required check over the candidate scratch; red or unavailable proof refuses. */
+export function runChecks({ dir, base, head, specs = [], specMode = 'touching', baseline = null, runSpecs = true, baseTree = null, ramGate = specRunGate, env = process.env, specBaseRun = specBaseRunAt }) {
   const checks = [];
   const changedOut = git(['diff', '--name-status', `${base}..${head}`], { cwd: dir });
   const rows = changedOut.stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
@@ -523,28 +473,6 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
     checks.push({ name: path.basename(script), ok, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings }) }) });
   }
   for (const step of [mirrorDriftCheck({ dir, changed, baseline }), packageProofCheck({ dir, base }), fullCheckStep(dir)]) if (step) checks.push(step);
-  let coverage;
-  try {
-    const show = (rev) => readContractChangesDocAt(dir, rev)?.doc ?? null;
-    coverage = contractCoverage({ changed, before: show(base), after: show(head) });
-  } catch (e) { coverage = { ok: false, governed: [], uncovered: [], error: String(e?.message ?? e) }; }
-  checks.push({ name: 'contract-changes paths', ok: coverage.ok, governed: coverage.governed, ...(coverage.ok ? { entries: coverage.entries } : { uncovered: coverage.uncovered, output: coverage.error ?? `no added/edited contract change (${CONTRACT_CHANGES_DIR}/<id>.yaml) names ${coverage.uncovered.join(', ')} in its paths` }) });
-  // Gate stability: a report for the Supervisor's release decision, ok whatever it finds.
-  try {
-    const freezeFile = path.join(dir, 'modules', 'kernel', 'contract-freeze.yaml');
-    const freeze = fs.existsSync(freezeFile) ? (parseYaml(fs.readFileSync(freezeFile, 'utf8'))?.families ?? []).map((f) => ({ family: f.family, gatePaths: (f.gatePaths ?? []).map(normPath) })) : [];
-    const show = (rev) => readContractChangesDocAt(dir, rev)?.doc ?? null;
-    const families = gateFamiliesTouched({ changed, freeze, before: show(base), after: show(head) });
-    const runner = path.join(dir, 'scripts', 'supervisor', 'gate-stability.mjs');
-    const baseHead = baseTree ? git(['rev-parse', 'HEAD'], { cwd: baseTree }).stdout : null;
-    for (const { family, why } of families) {
-      if (!baseTree || baseHead !== base || !fs.existsSync(runner)) { checks.push({ name: `gate-stability ${family}`, ok: true, advisory: true, why, skipped: !baseTree ? 'no base tree' : baseHead !== base ? `base tree is at ${baseHead}, not ${base}` : 'no gate-stability.mjs in the candidate' }); continue; }
-      const report = (gateStability ?? ((opts) => spawnGateStability(opts)))({ runner, base: baseTree, head: dir, family });
-      checks.push({ name: `gate-stability ${family}`, ok: true, advisory: true, why, ...(report.error ? { error: report.error } : { legs: report.legs, flips: report.flips, newlyFailing: report.newlyFailing,
-        output: `${report.flips} of ${report.legs} accepted ${family} leg(s) of live workflows would newly fail; ${report.newlyFailing} get new findings - the Supervisor decides the release (starci kernel contract-release --family ${family})`,
-        perLeg: report.perLeg.filter((l) => l.flipped || l.newFindings.length).map(({ repo, workflowId, jobId, flipped, newFindings }) => ({ repo, workflowId, jobId, flipped, codes: [...new Set(newFindings.map((f) => f.code))] })) }) });
-    }
-  } catch (e) { checks.push({ name: 'gate-stability', ok: true, advisory: true, error: String(e?.message ?? e).slice(0, 300) }); }
   const pool = ['touching', 'direct', 'all'].includes(specMode) ? readSpecs(dir) : [];
   let narrowed = [];
   const symbolsOf = (file) => {
@@ -585,13 +513,6 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   }
   if (narrowed.length) checks.push({ name: 'specs direct: hub files', ok: true, advisory: true, narrowed, output: narrowed.map((n) => `${n.file}: ${n.importers} importing specs, kept ${n.kept}${n.symbols ? ` (exports reached: ${n.symbols.join(', ') || 'none'})` : ` (${n.why}: every importer kept)`}`).join('; ') });
   return { ok: checks.every((c) => c.ok), checks, changed, rows, specs: allSpecs };
-}
-
-/** The gate-stability report run from the candidate's own script (scripts/supervisor/gate-stability.mjs --base --head). */
-function spawnGateStability({ runner, base, head, family }) {
-  const r = node([runner, '--family', family, '--base', base, '--head', head, '--json'], { cwd: head, timeout: 600_000 });
-  if (!r.ok) return { error: tailLines(r.stderr || r.stdout, 6) };
-  try { return JSON.parse(r.stdout.trim().split(/\r?\n/).pop()); } catch { return { error: 'unparseable gate-stability output' }; }
 }
 
 /* ------------------------------------------------------------ the gate */

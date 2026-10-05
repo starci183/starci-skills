@@ -8,6 +8,11 @@
 import { orcaCall, orcaAppExe } from './lib.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
+/**
+ * Reads host reachability and the local desktop-app executable location for lifecycle decisions.
+ * timeout is passed to the host call; ok and reachable are distinct, and state can be null.
+ * The appExe disk lookup remains available during an outage; spawnError marks a failed call without a JSON receipt.
+ */
 export function status({ timeout } = {}) {
   const r = orcaCall('status', {}, { timeout });
   const runtime = r.result?.runtime ?? null;

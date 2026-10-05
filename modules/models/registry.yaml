@@ -154,9 +154,6 @@ targets:
   # difficulty and whose `defaultModel` covers an unpinned difficulty. A pool target names no model itself.
   codex-agent:
     runtime: codex
-    profiles:
-      working: gpt-6-luna
-      reasoning: gpt-6.1-sol
     orcaLaunch: {agent: codex}   # orca orchestration worker-start --agent codex
   # Launch-only targets: an explicit `--model gpt-6.1-sol` or `--model gpt-6-luna` request reaches that one model
   # on the Codex provider window. They are off every automatic chain; allocation routes the codex-agent pool.
@@ -164,16 +161,10 @@ targets:
   gpt-6.1-sol:
     runtime: codex
     defaultModel: gpt-6.1-sol
-    profiles:
-      working: gpt-6.1-sol
-      reasoning: gpt-6.1-sol
     orcaLaunch: {agent: codex}   # orca orchestration worker-start --agent codex
   gpt-6-luna:
     runtime: codex
     defaultModel: gpt-6-luna
-    profiles:
-      working: gpt-6-luna
-      reasoning: gpt-6-luna
     orcaLaunch: {agent: codex}   # orca orchestration worker-start --agent codex
   # Cursor: Orca agent id `cursor` (binary cursor-agent). A launch-only target like gpt-6.1-sol: off every automatic chain,
   # reached by an explicit `--model auto` (the CLI's default) or any id of the account's `cursor-agent --list-models`.
@@ -183,43 +174,14 @@ targets:
   cursor-agent:
     runtime: cursor
     defaultModel: auto
-    profiles:
-      working: auto
-      reasoning: auto
     orcaLaunch: {agent: cursor}   # orca orchestration worker-start --agent cursor
   claude-agent:
     runtime: claude
-    profiles:
-      working: opus
-      reasoning: opus-reviewer
     orcaLaunch: {agent: claude}   # orca orchestration worker-start --agent claude
   devin-agent:
     runtime: devin
     executionHosts: [orca]
-    profiles:
-      working: devin-worker
-      reasoning: devin-reviewer
     orcaLaunch: {agent: devin}   # orca orchestration worker-start --agent devin
-targetAliases:
-  codex-gpt-6.1-sol: codex-agent
-  codex-gpt-6-luna: codex-agent
-  devin-devin-worker: devin-agent
-  devin-devin-reviewer: devin-agent
-  # Bare model ids that are not targets resolve to the provider-window pool that carries them, so workflow
-  # quota entries land on the right window. gpt-6.1-sol and gpt-6-luna are targets; their `runtime: codex`
-  # names the window.
-  claude-opus: claude-agent
-  claude-opus-5-5: claude-agent
-skills:
-  starci:
-    chains:
-      working:
-        - devin-agent
-        - codex-agent
-        - claude-agent
-      reasoning:
-        - claude-agent
-        - codex-agent
 # An operator whose kind runtimes.yaml roleOfKind marks think work with no declared order carries the
 # think order of runtimes.yaml allocation.preference.think (Opus, then Sol) and nothing else;
 # scripts/route/route-model.mjs refuses any other pool for it. A kind's declared order wins: owner routing
@@ -524,7 +486,7 @@ selection: |-
   operator chain from top to bottom, choosing the first ready runtime/profile. Fall through only
   after an allowed failure with verified no-effect state. This policy never installs an agent,
   authenticates a provider, grants tools or expands the workflow authority. Every pool launches the one
-  way (modules/kernel/contract-changes/launch-through-worker-start.yaml): `orca orchestration worker-start --agent
+  way (modules/kernel/start-workflow.yaml): `orca orchestration worker-start --agent
   <runtime> [--model <id> --effort <level>] --spec <prompt>` (Orca files the Task), the unattended flags from Orca's per-agent
   default args; the launcher takes the agent terminal from the start receipt (else worker-show) and attests the effective agent and model
   (worker-show). Devin takes no model flag (Orca: --model is for Claude, Codex and Cursor) and starts on its CLI default.

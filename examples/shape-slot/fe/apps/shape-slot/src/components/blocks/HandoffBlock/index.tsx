@@ -11,6 +11,12 @@ import { HandoffBlockBase, handoffBlockDefaultState } from "./component"
 /** Input of HandoffBlock: the handoff id, an atom. */
 type HandoffBlockProps = { readonly handoffId: string }
 
+type HandoffSendSession = {
+    readonly handoffId: string
+    readonly input: SendInput
+    readonly shape: "form" | "confirm"
+}
+
 /**
  * Connected half: HandoffBlockBase plus logic. Owns two independent apis, the send overlay's open
  * state and shape, picks the shape from data, resolves labels and formats the amount — every word
@@ -23,17 +29,23 @@ export const HandoffBlock = (props: HandoffBlockProps) => {
     const format = useFormatter()
     const order = useQueryOrderSwr({ handoffId: props.handoffId })
     const handoff = useQueryHandoffSwr({ handoffId: props.handoffId })
-    const [sendInput, setSendInput] = useState<SendInput>()
-    const [sendShape, setSendShape] = useState<"form" | "confirm">("form")
+    const [sendSession, setSendSession] = useState<HandoffSendSession>()
+    const activeSend = sendSession?.handoffId === props.handoffId ? sendSession : undefined
     const closeSend = () => {
-        setSendShape("form")
-        setSendInput(undefined)
+        setSendSession((current) => (current?.input === activeSend?.input ? undefined : current))
+    }
+    const changeSendShape = (shape: HandoffSendSession["shape"]) => {
+        setSendSession((current) =>
+            current !== undefined && current.input === activeSend?.input ? { ...current, shape } : current,
+        )
     }
     const form = useSendHandoffForm({
         handoffId: props.handoffId,
-        input: sendInput,
-        onReviewed: () => setSendShape("confirm"),
+        input: activeSend?.input,
+        onReviewed: () => changeSendShape("confirm"),
         onSent: closeSend,
+        onClosed: closeSend,
+        onBack: () => changeSendShape("form"),
     })
     const state: HandoffStatus = handoff.data?.status ?? handoffBlockDefaultState
     const orderSlot: Slot<OrderView> = {
@@ -56,8 +68,8 @@ export const HandoffBlock = (props: HandoffBlockProps) => {
                 order: orderSlot,
                 handoff: toSlot(handoff),
                 send: {
-                    isOpen: sendInput !== undefined,
-                    shape: sendShape,
+                    isOpen: activeSend !== undefined,
+                    shape: activeSend?.shape ?? "form",
                     ...form.props,
                     labels: {
                         title: tSend("title"),
@@ -90,8 +102,7 @@ export const HandoffBlock = (props: HandoffBlockProps) => {
             }}
             on={{
                 requestSend: (input) => {
-                    setSendShape("form")
-                    setSendInput(input)
+                    setSendSession({ handoffId: props.handoffId, input, shape: "form" })
                 },
                 retryOrder: () => {
                     void order.mutate()
@@ -99,10 +110,10 @@ export const HandoffBlock = (props: HandoffBlockProps) => {
                 retryHandoff: () => {
                     void handoff.mutate()
                 },
-                sendClose: closeSend,
+                sendClose: form.on.close,
                 sendChange: form.on.change,
                 sendReview: form.on.review,
-                sendBack: () => setSendShape("form"),
+                sendBack: form.on.back,
                 sendConfirm: form.on.confirm,
             }}
         />

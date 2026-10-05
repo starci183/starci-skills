@@ -4922,6 +4922,28 @@ RT_SOURCE_NAME:
   owner: supervisor
   kind: check-finding
 
+RT_PUBLIC_DOCS_INPUT:
+  title: "Runtime public-docs input unavailable"
+  title_vi: "Không kiểm tra được đầu vào JSDoc của API runtime"
+  meaning_vi: "Bộ kiểm tra không đọc hoặc phân tích được source, tooling hay binding API được khai báo, nên không thể xác nhận tài liệu."
+  causes_vi:
+    - "Tooling TypeScript của các bộ kiểm tra chưa có hoặc không chạy được"
+    - "Binding CLI hoặc API không có định nghĩa source rõ ràng và đọc được"
+  nextStep_vi: "Khôi phục tooling và sửa binding hoặc source bị lỗi; chạy lại runtime-public-docs trước khi chấp nhận."
+  owner: runtime-core
+  kind: input-invalid
+
+RT_PUBLIC_JSDOC:
+  title: "Runtime public callable lacks a JSDoc description"
+  title_vi: "API công khai của runtime thiếu mô tả JSDoc"
+  meaning_vi: "Định nghĩa callable được contract native hoặc catalog CLI chọn không có JSDoc mô tả sát trước định nghĩa."
+  causes_vi:
+    - "Thiếu JSDoc hoặc phần mô tả chỉ có khoảng trắng, dấu câu hay type tags"
+    - "Comment thuộc header, định nghĩa khác hoặc một chuỗi ký tự"
+  nextStep_vi: "Viết mô tả chính xác cho contract của callable tại định nghĩa owning; review ý nghĩa riêng rồi chạy lại runtime-public-docs."
+  owner: runtime-core
+  kind: check-finding
+
 RT_RETIRED_PRESENT:
   title: "Retired path or symbol is back"
   title_vi: "Đường dẫn hoặc ký hiệu đã loại bỏ xuất hiện lại"
@@ -4969,7 +4991,7 @@ RT_CITED_PATH_MISSING:
 RT_RETIRED_NAME_LIVE:
   title: "A retired name appears in a live file"
   title_vi: "Một tên đã loại bỏ xuất hiện trong tệp đang dùng"
-  meaning_vi: "Một tệp đang sống được git theo dõi nhắc tới một tên mà registry tuyên bố đã chết: một đường dẫn trong retired[] hoặc moved[].from của modules/kernel/retired-paths.yaml, hoặc một tên gọi không phải đường dẫn trong retiredNames[] (một app đã xóa, một kiểu đặt tên tầng, một tiền tố verb). Lịch sử (contract-changes, CHANGELOG, benchmark, các bản ghi .starciwork) và chính registry được giữ tên đó; văn bản đang sống thì không."
+  meaning_vi: "Một tệp đang sống được git theo dõi nhắc tới một tên mà registry tuyên bố đã chết: một đường dẫn trong retired[] hoặc moved[].from của modules/kernel/retired-paths.yaml, hoặc một tên gọi không phải đường dẫn trong retiredNames[] (một app đã xóa, một kiểu đặt tên tầng, một tiền tố verb). Lịch sử (CHANGELOG, benchmark, các bản ghi .starciwork) và chính registry được giữ tên đó; văn bản đang sống thì không."
   causes_vi:
     - "Di chuyển hay đổi tên một cơ chế mà văn bản, comment hay fixture kiểm thử vẫn nhắc tên cũ"
     - "Sao chép một ví dụ hay mẫu kiểm thử cũ vào một tệp mới"
@@ -7385,25 +7407,6 @@ continue-no-preserved-work:
   causes_vi:
     - "Việc hỏng trước khi viết tệp nào trong các đường dẫn nó sở hữu"
   nextStep_vi: "Lệnh bị từ chối; với việc hỏng, thử lại với hình dạng việc khác thay vì tiếp nối."
-  owner: supervisor
-  kind: verb-refusal
-contract-change-unknown:
-  title: "Contract change not registered"
-  title_vi: "Thay đổi hợp đồng chưa được đăng ký"
-  meaning_vi: "--contract-change không trỏ tới thay đổi có phạm vi follow-up đã đăng ký."
-  causes_vi:
-    - "Gõ sai mã thay đổi"
-    - "Thay đổi chưa được thêm vào sổ đăng ký"
-  nextStep_vi: "Enqueue bị từ chối; đăng ký thay đổi trong modules/kernel/contract-changes/<id>.yaml hoặc dùng đúng mã."
-  owner: supervisor
-  kind: verb-refusal
-contract-family-unknown:
-  title: "Contract family not governed"
-  title_vi: "Họ hợp đồng chưa có thay đổi nào quản"
-  meaning_vi: "Họ hợp đồng được nêu không có thay đổi hoặc lệnh đóng băng nào đăng ký."
-  causes_vi:
-    - "Gõ sai tên họ hợp đồng"
-  nextStep_vi: "Lệnh phát hành bị từ chối; dùng đúng tên họ hợp đồng có đăng ký."
   owner: supervisor
   kind: verb-refusal
 contract-missing:
@@ -10542,15 +10545,6 @@ submission-not-consumed:
   nextStep_vi: "Lỗi được coi là tạm thời; hệ thống gửi lại hoặc thử lại lượt khởi động."
   owner: runtime-core
   kind: runtime-fault
-superseded-by-contract-release:
-  title: "Superseded by newer contract release"
-  title_vi: "Bị thay bởi bản hợp đồng mới"
-  meaning_vi: "Job đang chờ bị huỷ vì đã có job mới hơn cho cùng hợp đồng."
-  causes_vi:
-    - "Hợp đồng được phát hành lại khi job cũ chưa chạy"
-  nextStep_vi: "Job cũ được đánh dấu bỏ (dropped); job mới nhất tiếp tục thay thế."
-  owner: op-retry
-  kind: settle-reason
 supervisor-di-overdue:
   title: "Supervisor decision overdue"
   title_vi: "Quyết định của Supervisor quá hạn"
@@ -14561,7 +14555,7 @@ RT_FACT_FALSE:
 RT_RULE_ID_UNKNOWN:
   title: "A rule id that is not in the catalog"
   title_vi: "Mã luật không có trong danh mục"
-  meaning_vi: "Một tệp được git theo dõi (tri thức, tài liệu, mã hoặc dữ liệu) nêu một mã luật R<số> mà knowledge/hfs/rules.yaml không có, hoặc một mã luật đã nghỉ hưu mà chỉ tệp lịch sử (contract-changes, CHANGELOG) mới được nêu. Mã luật ma làm người đọc và máy trỏ tới một luật không tồn tại."
+  meaning_vi: "Một tệp được git theo dõi (tri thức, tài liệu, mã hoặc dữ liệu) nêu một mã luật R<số> mà knowledge/hfs/rules.yaml không có, hoặc một mã luật đã nghỉ hưu mà chỉ tệp lịch sử (CHANGELOG) mới được nêu. Mã luật ma làm người đọc và máy trỏ tới một luật không tồn tại."
   causes_vi:
     - "Một luật bị xóa hoặc đánh số lại mà các chỗ trích dẫn không được sửa theo"
     - "Gõ nhầm mã luật"
@@ -14749,7 +14743,7 @@ EXAMPLES_CI_APP_QUALITY_DRIFT:
 RT_EXAMPLE_COUPLING:
   title: "Runtime source names a concrete example tree"
   title_vi: "Mã nguồn runtime gọi tên một cây examples/ cụ thể"
-  meaning_vi: "Một tệp nguồn runtime được theo dõi (scripts/, engine/, packages/ trừ bản sao runtime đã sinh, ui/src, ui/api, hay một template quản lý dưới packages/hfs/templates/) viết literal examples/<name> — trỏ tới một thư mục ví dụ cụ thể thay vì một khai báo chung. Canon của runtime ship vào mọi sản phẩm, nên một đường dẫn ví dụ cứng chỉ đúng trên một checkout. Spec, test, lịch sử contract-change, CHANGELOG và các bản ghi .starciwork nằm ngoài phạm vi; một lượt đọc runtime thật sự cần được khai báo một lần trong scripts/lib/example-refs.mjs và mọi nơi dùng gọi tên hằng đó."
+  meaning_vi: "Một tệp nguồn runtime được theo dõi (scripts/, engine/, packages/ trừ bản sao runtime đã sinh, ui/src, ui/api, hay một template quản lý dưới packages/hfs/templates/) viết literal examples/<name> — trỏ tới một thư mục ví dụ cụ thể thay vì một khai báo chung. Canon của runtime ship vào mọi sản phẩm, nên một đường dẫn ví dụ cứng chỉ đúng trên một checkout. Spec, test, lịch sử CHANGELOG và các bản ghi .starciwork nằm ngoài phạm vi; một lượt đọc runtime thật sự cần được khai báo một lần trong scripts/lib/example-refs.mjs và mọi nơi dùng gọi tên hằng đó."
   causes_vi:
     - "Một script hay gate đọc ví dụ của riêng một sản phẩm (ví dụ một tệp declaration đặt theo tên repo) lúc chạy, thay vì một mẫu chung hay tệp của repo đang được kiểm"
     - "Comment, tài liệu hay chuỗi trong nguồn trích dẫn đường dẫn examples/<name> cụ thể thay vì nói examples/<app>"
@@ -15638,3 +15632,43 @@ HFS_LITE_SECRET_CUSTODY:
   nextStep_vi: "Không đọc hay in giá trị. Gỡ secret khỏi cây, xoay secret nếu đã lộ, rồi niêm phong bằng sops tại `.starcistacks/<env>/secrets/<slug>.enc`."
   owner: owner
   kind: check-finding
+
+kernel-caller-stale:
+  title: "Kernel incarnation does not own this mutation"
+  title_vi: "Phiên Kernel không còn sở hữu thao tác"
+  meaning_vi: "Quyền hiện tại đã đổi trước khi ghi dữ liệu hoặc thực hiện tác động."
+  causes_vi:
+    - "Terminal, Dispatch, thế hệ, lượt khởi động hoặc singleton token đã bị thay thế."
+  nextStep_vi: "Giữ nguyên quyền đang tranh chấp; Supervisor kiểm tra phiên hiện tại trước khi thử lại."
+  owner: supervisor
+  kind: verb-refusal
+
+kernel-caller-unknown:
+  title: "Managed caller custody is unavailable"
+  title_vi: "Không xác minh được quyền của caller"
+  meaning_vi: "Lịch sử hoặc binding của caller không đọc được hoặc mâu thuẫn; không suy ra quyền owner."
+  causes_vi:
+    - "Kho ledger hoặc machine không đọc được; binding sai, cũ hoặc thuộc workflow khác."
+  nextStep_vi: "Khôi phục khả năng đọc và xác minh caller thực tế; không dùng biến môi trường để giả quyền."
+  owner: supervisor
+  kind: verb-refusal
+
+kernel-caller-actor:
+  title: "Actor claim contradicts native caller"
+  title_vi: "Actor khai báo mâu thuẫn với caller"
+  meaning_vi: "Giá trị --by không khớp với quyền caller mà owner hiện có xác minh."
+  causes_vi:
+    - "Caller dùng tên Kernel, Op hoặc Supervisor khác với phiên thực tế."
+  nextStep_vi: "Bỏ khai báo giả và dùng đúng caller; chuỗi actor không cấp quyền."
+  owner: supervisor
+  kind: verb-refusal
+
+kernel-read-unverified:
+  title: "Current Kernel READ attestation is incomplete"
+  title_vi: "READ của Kernel hiện tại chưa đầy đủ"
+  meaning_vi: "Manifest READ không chứng minh toàn bộ bytes cần đọc cho phiên Kernel hiện tại."
+  causes_vi:
+    - "File thiếu, hash sai, bytes dirty, descriptor sai hoặc lượt Kernel đã thay đổi."
+  nextStep_vi: "Lấy --plan, đọc đủ từng file và gửi manifest nguyên vẹn với --read-manifest từ Kernel hiện tại."
+  owner: supervisor
+  kind: verb-refusal

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { testSecret } from '../../scripts/uat/test-secret.mjs';
-import { testSecretPaths, isSopsEnvelope, setCommand, sopsFormatFor } from '../../scripts/lib/sops-envelope.mjs';
+import { testSecretPaths, isSopsEnvelope, selectedAgeEnvelope, setCommand, sopsFormatFor } from '../../scripts/lib/sops-envelope.mjs';
 import { scanDiff, diffScanner, scanHint, TEST_SECRET_HINT } from '../../scripts/supervisor/push-mains.mjs';
 
 const sandbox = (t) => {
@@ -42,7 +42,8 @@ test('the reader prefers the local git-ignored plaintext and names the store com
   assert.equal(testSecret('uat-password', { repo }), plain());
   fs.rmSync(file);
   fs.writeFileSync(`${file}.enc`, binaryEnc());
-  assert.throws(() => testSecret('uat-password', { repo, sops: path.join(repo, 'no-such-sops') }), /sops could not decrypt/);
+  const identity = path.join(repo, 'original.identity');fs.writeFileSync(identity, 'FAKE-ORIGINAL-IDENTITY');
+  assert.throws(() => testSecret('uat-password', { repo, env: { SOPS_AGE_KEY_FILE: identity }, sops: path.join(repo, 'no-such-sops') }), /sops could not decrypt/);
 });
 
 test('isSopsEnvelope accepts sops binary, yaml and dotenv files and nothing with a plaintext value', () => {
@@ -105,3 +106,41 @@ test('a .enc passes only as a sops envelope, judged on the whole file when the s
 });
 
 const scanDiffWith = (diff, encText) => { const s = diffScanner([], { encText }); for (const l of diff.split('\n')) s.line(l); return s.findings; };
+
+test('encrypted test-secret readers preserve typed inline and blank refusal without replacing custody',t=>{
+  const repo=sandbox(t),{enc:file}=testSecretPaths('uat-password',{repo});
+  fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,binaryEnc());
+  const before=fs.readFileSync(file),identity=path.join(repo,'original.identity');fs.writeFileSync(identity,'FAKE-ORIGINAL-IDENTITY');
+  for(const [value,reason] of [['AGE-SECRET-KEY-FAKE','inline-context-unqualified'],['','disabled-inline'],[null,'disabled-inline'],[undefined,'disabled-inline']]){
+    const env={SOPS_AGE_KEY:value,SOPS_AGE_KEY_FILE:identity},snapshot=structuredClone(env);
+    assert.throws(()=>testSecret('uat-password',{repo,env,sops:path.join(repo,'no-native-tool')}),error=>error.identityRefusal===reason);
+    assert.deepEqual(env,snapshot);assert.deepEqual(fs.readFileSync(file),before);
+  }
+  assert.equal(fs.readFileSync(identity,'utf8'),'FAKE-ORIGINAL-IDENTITY');
+});
+
+test('selected age admission preserves full encrypted payload and refuses alternate providers, groups, recipients and partial MAC',()=>{
+  const text=binaryEnc(),snapshot=text,recipient=sopsMeta.age[0].recipient;
+  assert.deepEqual(selectedAgeEnvelope(text,'binary',recipient),{ok:true});assert.equal(text,snapshot);
+  assert.deepEqual(selectedAgeEnvelope(text,'json',recipient),{ok:true});
+  const yaml=[`data: ${enc()}`,'sops:', '  age:',`    - recipient: ${recipient}`,'      enc: |',...sopsMeta.age[0].enc.trimEnd().split('\n').map(line=>`        ${line}`),`  mac: ${sopsMeta.mac}`,`  lastmodified: ${sopsMeta.lastmodified}`,`  version: ${sopsMeta.version}`].join('\n');
+  assert.deepEqual(selectedAgeEnvelope(yaml,'yaml',recipient),{ok:true});
+  const inspect=meta=>selectedAgeEnvelope(JSON.stringify({data:enc(),sops:{...sopsMeta,...meta}}),'json',recipient);
+  for(const name of ['kms','gcp_kms','hckms','azure_kv','hc_vault','pgp']){
+    assert.equal(inspect({[name]:[{}]}).reason,'non-age-provider');
+    assert.deepEqual(inspect({[name]:[]}),{ok:true});
+  }
+  assert.equal(inspect({key_groups:[]}).reason,'unsupported-key-group');
+  assert.equal(inspect({shamir_threshold:0}).reason,'unsupported-key-group');
+  assert.equal(inspect({mac_only_encrypted:true}).reason,'partial-mac');
+  assert.equal(inspect({age:[...sopsMeta.age,...sopsMeta.age]}).reason,'unsupported-age-set');
+  assert.equal(inspect({age:[{...sopsMeta.age[0],recipient:'age1other'}]}).reason,'recipient-mismatch');
+  assert.equal(inspect({future_provider:[]}).reason,'unknown-metadata');
+  assert.equal(selectedAgeEnvelope(text,'ini',recipient).reason,'unsupported-format');
+  assert.equal(selectedAgeEnvelope(JSON.stringify({data:enc(),extra:enc(),sops:sopsMeta}),'binary',recipient).reason,'unsupported-binary-shape');
+  assert.equal(selectedAgeEnvelope(text.replace('"sops": {','"sops": {"age":[], '),'json',recipient).reason,'invalid-envelope','duplicate metadata never follows JSON last-key wins');
+  const dot=[`DATA=${enc()}`,`sops_age__list_0__map_recipient=${recipient}`,`sops_age__list_0__map_enc=${sopsMeta.age[0].enc.replaceAll('\n','\\n')}`,`sops_mac=${sopsMeta.mac}`,`sops_lastmodified=${sopsMeta.lastmodified}`,`sops_version=${sopsMeta.version}`].join('\n');
+  assert.deepEqual(selectedAgeEnvelope(dot,'dotenv',recipient),{ok:true});
+  assert.equal(selectedAgeEnvelope(dot+'\nsops_age__list_1__map_recipient=other','dotenv',recipient).reason,'unsupported-key-group');
+  assert.equal(selectedAgeEnvelope(dot+`\nsops_mac=${sopsMeta.mac}`,'dotenv',recipient).reason,'duplicate-key');
+});

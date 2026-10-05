@@ -1,35 +1,17 @@
-// sonar-ext-custody.mjs — custody plumbing of sonar-local.mjs: finding the sops binary, launching a .mjs fake under node,
+// sonar-ext-custody.mjs — custody plumbing of sonar-local.mjs: launching a .mjs fake under node,
 // and sealing a minted analysis token into a runtime extension's ext/<service>/secrets directory (the example apps' tokens).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {encrypt} from '../api/sops/encrypt.mjs';
+import {decrypt} from '../api/sops/decrypt.mjs';
+import {sonarAnalysisEnvironment} from './sonar-credentials.mjs';
+import {resolveSops} from '../api/sops/lib.mjs';
+import {runProgram} from '../api/process/run-program.mjs';
+import {resolveRealTool} from '../api/process/resolve-real-tool.mjs';
 
-const IS_WINDOWS=process.platform==='win32';
-
-/** PATH lookup with PATHEXT and the winget package tree, the way scripts/api/sops/lib.mjs resolveSops finds sops. */
-export function resolveCommand(command,env=process.env){
-  const dirs=(env.PATH||'').split(IS_WINDOWS?';':':').filter(Boolean);
-  if(IS_WINDOWS&&env.LOCALAPPDATA){
-    const winget=path.join(env.LOCALAPPDATA,'Microsoft','WinGet');
-    dirs.push(path.join(winget,'Links'));
-    const packages=path.join(winget,'Packages');
-    try{
-      for(const entry of fs.readdirSync(packages)){
-        const dir=path.join(packages,entry);
-        dirs.push(dir);
-        try{for(const nested of fs.readdirSync(dir,{withFileTypes:true}))if(nested.isDirectory())dirs.push(path.join(dir,nested.name));}catch{/* unreadable */}
-      }
-    }catch{/* no winget packages */}
-  }
-  const exts=IS_WINDOWS?(env.PATHEXT||'.EXE;.CMD;.BAT').split(';').filter(Boolean):[''];
-  for(const dir of dirs)for(const ext of exts){
-    const candidate=path.join(dir,`${command}${ext}`);
-    if(fs.existsSync(candidate))return candidate;
-  }
-  return null;
-}
+const sopsInvocation=Object.freeze({runProgram,resolveRealTool});
 
 /** A .mjs/.js "binary" (the specs' fake sops) runs under this node; anything else runs directly. */
 export const launcher=(bin,args)=>/\.(?:c|m)?js$/i.test(bin)?[process.execPath,[bin,...args]]:[bin,args];
@@ -61,17 +43,56 @@ export function sealExtCustody(cfg,file,value,{scrub}){
   const dir=extSecretsDir(file);
   const recipient=extRecipient(dir);
   if(!recipient)return {ok:false,reason:`${path.basename(dir)} holds no sealed member with exactly one age recipient to seal to`};
-  const sops=cfg.sops??resolveCommand('sops');
-  if(!sops)return {ok:false,reason:'sops is not installed'};
+  const env=sonarAnalysisEnvironment(cfg);
+  const sops=cfg.sops??resolveSops(env,{pathext:true,wingetPackageTree:true});
   const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
   try{
     fs.writeFileSync(tmp,value,{mode:0o600});
-    const [bin,args]=launcher(sops,['--encrypt','--age',recipient,'--input-type','binary','--output-type','json',tmp]);
-    const result=encrypt(bin,args,{identity:cfg.identity,timeout:cfg.timeoutMs});
+    const command=['--encrypt','--age',recipient,'--input-type','binary','--output-type','json',tmp];
+    const [bin,args]=sops?launcher(sops,command):[null,command];
+    const result=encrypt(bin,args,{identity:cfg.identity,env,invocation:sopsInvocation,timeout:cfg.timeoutMs});
+    if(result.error?.identityRefusal)return {ok:false,identityRefusal:result.error.identityRefusal,reason:result.error.message};
     if(result.status!==0||!String(result.stdout??'').trim())return {ok:false,reason:scrub(`sops --encrypt of ${path.basename(file)} exited ${result.status}: ${String(result.stderr).trim().split(/\r?\n/).slice(-2).join(' ')}`)};
     fs.writeFileSync(`${file}.enc`,result.stdout);
     return {ok:true};
   }finally{
     try{fs.rmSync(tmp,{force:true});}catch{/* best effort */}
   }
+}
+
+/**
+ * Read one custody member into memory. Returns {present, value?, via?, reason?}; `value` is for a child
+ * env or a header only. The .enc member decrypted by sops wins; the materialized sibling is the fallback.
+ */
+export function readCustody(cfg,ref,{remember}){
+  // A relative reference is a member of the configured stack; an absolute one (a declaration credential,
+  // resolved from its repository root) must still sit inside a custody tree - a repository's
+  // .starcistacks or a runtime's extension tree (.claude/ext/<service>, or this runtime's own ext/ when it is a
+  // lane worktree, where a host custody path resolves - scripts/gates/runtime-host.mjs resolveCustodyFile).
+  const plainFile=path.resolve(cfg.stackDir,ref);
+  const name=String(ref).replace(/\\/g,'/');
+  const inside=path.isAbsolute(String(ref))
+    ?/[\\/]\.starcistacks[\\/]/.test(plainFile)||/[\\/]\.claude[\\/]ext[\\/]/.test(plainFile)||plainFile.startsWith(path.join(skillRoot,'ext')+path.sep)
+    :plainFile.startsWith(cfg.stackDir+path.sep);
+  if(!inside)return {present:false,name,reason:`custody reference ${name} is outside a stack custody tree`};
+  const enc=`${plainFile}.enc`;
+  const reasons=[];
+  if(fs.existsSync(enc)){
+    const env=sonarAnalysisEnvironment(cfg);
+    const sops=cfg.sops??resolveSops(env,{pathext:true,wingetPackageTree:true});
+    const command=['--decrypt','--input-type','binary','--output-type','binary',enc];
+    const [bin,args]=sops?launcher(sops,command):[null,command];
+    const result=decrypt(bin,args,{env,identity:cfg.identity,invocation:sopsInvocation,maxBuffer:1024*1024,timeout:cfg.timeoutMs});
+    if(result.error?.identityRefusal)return {present:false,name,identityRefusal:result.error.identityRefusal,reason:result.error.message};
+    const value=result.status===0?String(result.stdout??'').trim():'';
+    if(value)return {present:true,value:remember(value),via:'sops',name};
+    reasons.push(result.error?.code==='SOPS_MISSING'?'sops is not installed':result.error?.code==='ETIMEDOUT'?`sops did not decrypt ${name}.enc within ${cfg.timeoutMs}ms`:result.error?`sops failed to start: ${result.error.code??result.error.message}`:`sops could not decrypt ${name}.enc (exit ${result.status})`);
+  }
+  if(fs.existsSync(plainFile)){
+    const value=fs.readFileSync(plainFile,'utf8').trim();
+    if(value)return {present:true,value:remember(value),via:'materialized',name};
+    reasons.push(`${name} is empty`);
+  }
+  if(!fs.existsSync(enc)&&!fs.existsSync(plainFile))reasons.push(`${name}(.enc) is not in custody ${cfg.stackDir}`);
+  return {present:false,name,reason:reasons.join('; ')};
 }

@@ -4,6 +4,7 @@ import {parseYaml} from '../../../engine/yaml.mjs';
 import {canonicalJSON} from '../../../engine/canonical-json.mjs';import {sha256} from '../../../engine/digest.mjs';
 import {slash} from '../../lib/path-key.mjs';
 import {list} from '../../lib/list.mjs';
+import {isDir,isFile} from '../../lib/fs-kind.mjs';
 
 /**
  * The change record: the part of the Work model that decides how far an edit travels.
@@ -63,9 +64,6 @@ const stems=value=>new Set(String(value??'').toLowerCase().match(/[a-z]{4,}/g)?.
 const namesRevision=value=>/\brev(?:ision)?\s*\.?\s*\d+/i.test(String(value??''));
 const moment=value=>{const at=Date.parse(String(value??''));return Number.isFinite(at)?at:null;};
 
-function regular(file){try{const stat=fs.lstatSync(file);return stat.isFile()&&!stat.isSymbolicLink()&&stat.size<=MAX_INPUT_BYTES;}catch{return false;}}
-function directory(file){try{const stat=fs.lstatSync(file);return stat.isDirectory()&&!stat.isSymbolicLink();}catch{return false;}}
-
 /** The normative projection: the record with every prose and lifecycle key removed, at every depth. */
 export function normative(value){
   if(Array.isArray(value))return value.map(normative);
@@ -116,14 +114,14 @@ export function classifyChange(previous,current){
  */
 export function readWorkTree(root){
   const resolved=path.resolve(root);
-  if(!directory(resolved))throw new WorkChangeInputError(`Not a readable Work root: ${slash(root)}`);
+  if(!isDir(resolved,{followLinks:false}))throw new WorkChangeInputError(`Not a readable Work root: ${slash(root)}`);
   const records=new Map(),unreadable=[];
   const walk=dir=>{
     for(const entry of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){
       const target=path.join(dir,entry.name);
-      if(entry.isDirectory()){if(!SKIP_DIRECTORY.test(entry.name)&&directory(target))walk(target);continue;}
+      if(entry.isDirectory()){if(!SKIP_DIRECTORY.test(entry.name)&&isDir(target,{followLinks:false}))walk(target);continue;}
       if(entry.name!=='index.yaml')continue;
-      if(!regular(target)){unreadable.push(slash(path.relative(resolved,target)));continue;}
+      if(!isFile(target,{followLinks:false,maxBytes:MAX_INPUT_BYTES})){unreadable.push(slash(path.relative(resolved,target)));continue;}
       let meta=null;
       try{meta=parseYaml(fs.readFileSync(target,'utf8'));}catch{unreadable.push(slash(path.relative(resolved,target)));continue;}
       if(!object(meta))continue;

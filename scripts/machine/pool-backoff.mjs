@@ -12,15 +12,14 @@
 //
 // Readers: route (scripts/agent/models.mjs selectPool, a live route with a capacity map) rejects a pool whose running
 // count reached its backed-off cap, so the next eligible pool of the order takes the job (and a job with no other
-// eligible pool stays queued); `starci kernel dispatch-ready` routes every job before dispatching, so dispatch respects it.
+// eligible pool stays queued); final agent admission reads the current cap before reserving its provider slot.
 // A row past its until_at is ignored (a dead engine never pins a pool at its floor).
 //
-// Pure over its inputs except poolCapsNow (one machine.sqlite read, cached CACHE_MS).
+// Pure over its inputs except poolCapsNow (one current machine.sqlite read).
 import { readMachine } from '../../engine/db/machine.mjs';
 import { positiveNumber } from '../lib/number.mjs';
 
 export const DEFAULTS = Object.freeze({ floor: 2, decreaseCooldownMs: 120_000, increaseAfterMs: 900_000, increaseStepMs: 300_000, staleMs: 600_000 });
-const CACHE_MS = 5000;
 
 const int = (v, d) => positiveNumber(v, d, { int: true });
 
@@ -81,7 +80,6 @@ export const entriesOfRows = (rows) => Object.fromEntries((rows ?? []).map((r) =
 
 /* ------------------------------------------------------------ the reader */
 
-const cache = new Map();
 
 /** The live backed-off caps of pool_backoff rows: {<pool target>: cap}, rows past until_at skipped. Pure. */
 export function capsOf(rows, { now = Date.now() } = {}) {
@@ -98,11 +96,7 @@ export function capsOf(rows, { now = Date.now() } = {}) {
 /** The backed-off caps published now ({} on any error, with no store, or when stale). */
 export function poolCapsNow({ env = process.env, now = Date.now() } = {}) {
   try {
-    const key = env?.STARCI_TEST_MACHINE_FILE ?? '';
-    const hit = cache.get(key);
-    if (hit && now - hit.at < CACHE_MS && now >= hit.at) return capsOf(hit.rows, { now });
     const rows = readMachine((m) => m.poolBackoff(), [], { env });
-    cache.set(key, { at: now, rows });
     return capsOf(rows, { now });
   } catch { return {}; }
 }

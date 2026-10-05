@@ -194,6 +194,11 @@ test('only a completed matching host replay that proves no effect releases an un
 
 test('a circuit opened after planning refuses consumption using the strict canonical machine observation', t => {
   const { root, env } = isolatedMachine(t), fake = fakeAdmission();
+  const owner = parseYaml(fs.readFileSync(new URL('../../config.example.yaml', import.meta.url), 'utf8'));
+  owner.launchTrust = { profile: 'automatic', approvedBy: 'owner', approvalRef: 'private circuit fixture adoption', roots: [root] };
+  fs.writeFileSync(path.join(root, 'config.yaml'), stringifyYaml(owner));
+  env.STARCI_AGENT_TRUST_HOME = path.join(root, 'trust-home');
+  fs.mkdirSync(env.STARCI_AGENT_TRUST_HOME);
   const request = { role: 'worker', scopeId: 'circuit:attempt:1', allowGroup: [{ provider: 'codex', model: 'gpt-6.1-sol' }] };
   const options = { env, io: { quota: fake.quota } };
   const admission = admitAgent(request, options);
@@ -203,7 +208,7 @@ test('a circuit opened after planning refuses consumption using the strict canon
   machine.close();
   let starts = 0;
   const refused = spawnAgent({ provider: 'codex', model: 'gpt-6.1-sol', role: 'worker', admission, env,
-    worktree: 'fixture', run: 'circuit-run', request: { attempt: 1 }, spec: 'fixture', io: {
+    worktree: root, config: inspectOwnerConfig(root).config, run: 'circuit-run', request: { attempt: 1 }, spec: 'fixture', io: {
       admission: options.io, hostAgent: () => ({ ok: true }), start: () => { starts += 1; return {}; },
     } });
   assert.equal(refused.error, 'provider-circuit-open');

@@ -78,11 +78,17 @@ const createFixture=()=>{
   const repo=path.join(root,'repo');fs.mkdirSync(repo);
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json'),log=path.join(root,'calls.jsonl');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: en\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
+  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);
+  // This private fixture owner adopts only its exact launch root; the real trust writer stays enabled.
+  const ownerConfig=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
+    .replace(/^language:.*$/m,'language: en').replace(/^effort:.*$/m,'effort: medium')
+    .replace(/^kernel:.*$/m,'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}')
+    .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private Orca outage fixture adoption',roots:[repo]})}`);
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),ownerConfig);
   fs.writeFileSync(state,JSON.stringify({sends:0,counter:0,terminals:{},commands:[]}));
   fs.writeFileSync(fake,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
-    STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,
+    STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome,
     STARCI_HOST_WAIT_MS:'0',STARCI_KERNEL_DEATH_SETTLE_MS:'0',LOCALAPPDATA:path.join(root,'localappdata'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_PROJECTS_ROOT:path.join(root,'projects')};
   // Both external boundaries belong to every descendant, including watchdog -> start-workflow.
@@ -104,7 +110,7 @@ const createFixture=()=>{
   // all test-observed mutable state, including the workflow ledger, before the next
   // case so no test observes another test's terminal, job, event, or call log.
   const baseline=path.join(root,'baseline');fs.mkdirSync(baseline);
-  for(const name of ['repo','owner'])fs.cpSync(path.join(root,name),path.join(baseline,name),{recursive:true});
+  for(const name of ['repo','owner','trust-home'])fs.cpSync(path.join(root,name),path.join(baseline,name),{recursive:true});
   fs.copyFileSync(state,path.join(baseline,'orca-state.json'));
   if(fs.existsSync(log))fs.copyFileSync(log,path.join(baseline,'calls.jsonl'));
   const ledgerFile=ledgerFileFor(repo,{env});
@@ -112,7 +118,7 @@ const createFixture=()=>{
   for(const suffix of ['','-wal','-shm'])if(fs.existsSync(`${env.STARCI_TEST_MACHINE_FILE}${suffix}`))
     fs.copyFileSync(`${env.STARCI_TEST_MACHINE_FILE}${suffix}`,path.join(baseline,`machine.sqlite${suffix}`));
   const reset=()=>{
-    for(const name of ['repo','owner']){
+    for(const name of ['repo','owner','trust-home']){
       fs.rmSync(path.join(root,name),{recursive:true,force:true,maxRetries:20,retryDelay:25});
       fs.cpSync(path.join(baseline,name),path.join(root,name),{recursive:true});
     }
@@ -272,7 +278,14 @@ test('watchdog: an unproven process tree retains the disconnected Kernel singlet
   assert.equal(result.action,'restart-failed');
   assert.equal(result.detail?.step,'kernel-stale-terminal-unclosed');
   assert.equal(result.detail?.effectState,'unknown');
-  assert.equal(result.detail?.closure?.processes?.verdict,'survived',JSON.stringify(result));
+  const processes=result.detail?.closure?.processes;
+  assert.equal(processes?.verdict,'unverifiable',JSON.stringify(result));
+  assert.equal(processes?.reason,'an exact native process stop was refused or unverified');
+  assert.deepEqual(processes?.stopReceipts,[{ok:false,outcome:'unknown'}]);
+  assert.deepEqual(processes?.stopped,[],'an unknown stop is never a successful process closure');
+  assert.deepEqual(processes?.members?.map(row=>row.pid),[991],'the process object was captured before closure');
+  assert.deepEqual(processes?.census?.map(row=>row.pid),[991],'the terminal census still contains the measured process');
+  assert.deepEqual(processes?.survivors?.map(row=>row.pid),[991]);
   assert.equal(f.ledgerRows().signal.terminal,f.kernel);
   assert.equal(f.calls().filter(c=>c==='orchestration worker-start').length,starts,'no worker beside an unproven process tree');
 });

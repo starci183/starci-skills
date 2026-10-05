@@ -7,6 +7,11 @@
 import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 
+/**
+ * Registers the Git repository at path and exposes its host repository id for worktree creation.
+ * ok requires an accepted outcome and a returned id; callers retain typed refusal and host-outage detail.
+ * Same-path registration is idempotent, but this adapter does not automatically reissue a lost receipt.
+ */
 export function repoAdd({ path }) {
   const r = orcaCall('repo-add', { path });
   return { ok: r.outcome === 'ok' && Boolean(r.result?.repo?.id), repoId: r.result?.repo?.id ?? null, errorCode: r.receipt?.error?.code ?? null, error: r.error,

@@ -68,7 +68,7 @@ test('Orca host index fixes hierarchy names and exact native API calls',()=>{
 
 test('agent cards carry the spawn contract the host drives',()=>{
   // Every agent is a native-managed agent: the host starts a supervised worker with orchestration worker-start and
-  // composes its command itself; no card carries a terminal fallback (contract-changes/launch-through-worker-start.yaml).
+  // composes its command itself; no card carries a terminal fallback.
   for(const name of ['codex','claude','devin','cursor']){
     const card=agentCard(name);
     assert.equal(card.schema,'starci/agent-card@1',`${name} schema`);

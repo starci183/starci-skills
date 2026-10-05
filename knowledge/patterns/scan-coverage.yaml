@@ -24,7 +24,7 @@ guidance:
       checker behavior, including gaps; it is not a product quality gate.
   - id: collocation
     requirement: |
-      Concrete examples and proposed enforcement upgrades are collocated under code-examples and patterns/enforcement.yaml.
+      Concrete source references are indexed by examples/index.yaml; enforcement obligations live in patterns/enforcement.yaml.
 observations:
   - id: repo-tree-law
     lane: cross-cutting

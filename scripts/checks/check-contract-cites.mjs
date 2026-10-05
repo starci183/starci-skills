@@ -12,15 +12,11 @@
 // A `{a,b}` group expands; a `*` glob, an `<angle>` placeholder or a
 // .starciwork/ runtime path is unverifiable and is skipped by name.
 //
-// History may name what was deleted or moved on purpose: a path listed in
-// modules/kernel/retired-paths.yaml (retired[].path, moved[].from) is a valid cite from a contract-change entry
-// (modules/kernel/contract-changes/**) or the registry itself, and a
-// dead cite everywhere else — modules/kernel/owner-rulings.yaml included (live contract text must name what runs now;
-// a moved path names its moved[].to).
+// Live prose and source comments name current owners. The retired-path declaration alone names its dead paths.
 //
 // RT_CITED_PATH_MISSING (rule R122, gate runtime): citedPathFindings() runs the same reading over every tracked
 // .md/.yaml/.yml file and the comments of every tracked source file outside history (runtimeCiteScan; history is
-// modules/kernel/contract-changes/, the registry itself, CHANGELOG*.md and benchmark/, and generated copy roots are
+// the retired-path registry, CHANGELOG*.md and benchmark/, and generated copy roots are
 // never read) and returns each dead cite as a finding; `starci runtime check` judges it
 // with the runtime check. A token whose top-level segment is not in this tree is skipped, so product-repository
 // paths (src/..., apps/...) in knowledge text name no cite of this tree.
@@ -53,7 +49,7 @@ const SYMBOL_IN_FILE = new RegExp('`([A-Za-z0-9_.$]+)\\(\\)`\\s+in\\s+([A-Za-z0-
 
 class CiteInputError extends Error {}
 
-const HISTORY = (rel) => rel.startsWith('modules/kernel/contract-changes/') || rel === RETIRED_PATHS_FILE;
+const HISTORY = (rel) => rel === RETIRED_PATHS_FILE;
 /** A file the cite scan reads whole (prose) vs one whose comments alone are read (a string literal is data). */
 const PROSE_EXT = /\.(?:ya?ml|md)$/;
 const SOURCE_EXT = /\.(?:mjs|cjs|js|mts|cts|ts|tsx|jsx)$/;

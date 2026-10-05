@@ -11,7 +11,12 @@ import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { workflowWorktreeOf } from '../../scripts/machine/workflow-tree.mjs';
 import { seedWorkflow } from './ledger-fixture.mjs';
-import { writeGreenProofs } from './sonar-scan.mjs';
+import { admitPacket, captureDispatchInputs, selectDispatchContract } from '../../scripts/kernel/dispatch-admission.mjs';
+import { observationContextOf, observeCheck, stageObservation } from '../../scripts/kernel/mechanism-observation.mjs';
+import { classifyCheck, rerunCheck } from '../../scripts/kernel/settle/job-settle.mjs';
+import { recordCheck } from '../../scripts/machine/evidence-store.mjs';
+import { proofEntriesOf } from '../../scripts/kernel/mechanism-proofs.mjs';
+import { gateInputSnapshot } from '../../scripts/gates/gate.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const git = (cwd, ...args) => {
@@ -55,7 +60,15 @@ export function settleFixture(t, { baseText = 'base\n' } = {}) {
       const exists = ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId) != null;
       seedWorkflow(ledger, { id: workflowId, ...(exists ? {} : { goal: { revision: 1, markdown: '# Settle caller' } }), jobs: [job], leases: [{ resourceKey: `spec:${job.jobId}`, jobId: job.jobId, units: 1 }] });
       const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(job.jobId).attempt_id;
-      ledger.write.writeContract({ attemptId, markdown: '# contract', context: { worktree: tree } });
+      const opId = job.opId, payload = job.payload ?? {}, selection = selectDispatchContract(ROOT, opId, payload);
+      const owned = payload.owned_paths ?? [], packet = { context: { records: payload.records ?? [],
+        owned_paths: owned.map((file) => ({ root: tree, path: file })), selected_op: selection.selected,
+        workflow_worktree: workflowWorktreeOf({ env }, workflowId) } };
+      admitPacket(ROOT, { packet, op: opId, placements: owned.map((file) => ({ base: tree, path: file })), db: ledger.db, workflowId });
+      const { inputs, contextPack } = captureDispatchInputs({ skillRoot: ROOT, op: opId, packet, briefDoc: selection.brief,
+        params: selection.params, repo, stateDir: path.join(repo, '.starciwork'), workerCwd: tree });
+      ledger.write.writeContract({ attemptId, markdown: fs.readFileSync(path.join(ROOT, 'modules/ops/ops', `${opId}.yaml`), 'utf8'),
+        context: { worktree: tree, packet, contract: packet.context.contract, inputs, mandatory: contextPack.mandatory } });
       return { ledger, attemptId };
     } catch (error) { ledger.close(); throw error; }
   };
@@ -73,18 +86,66 @@ export function settleFixture(t, { baseText = 'base\n' } = {}) {
     leases: read((db) => db.prepare('SELECT * FROM leases WHERE job_id=? ORDER BY resource_key').all(jobId)),
     outbox: fs.existsSync(`${env[TEST_REGISTRY_ENV]}.outbox.jsonl`) ? fs.readFileSync(`${env[TEST_REGISTRY_ENV]}.outbox.jsonl`, 'utf8') : null,
   });
-  const prepare = ({ jobId, opId = 'docs.author', outcome = 'done', checkExit = 0, report = true, ownedRoot = 'docs', payload = {} }) => {
+  // CHECK outputs and staged blobs stay outside the checkout whose bytes they measure.
+  const proofs = (prepared, jobId) => {
+    const db = prepared.ledger.db, job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+    const owed = proofEntriesOf(job.op_id).map((row) => row.proof);
+    if (!owed.length) return [];
+    assert.ok(owed.every((proof) => ['read-knowledge', 'doc-gate'].includes(proof)), 'fixture only owns native documentation proofs');
+    const context = observationContextOf(db, job, { repo, skillRoot: ROOT });
+    assert.ok(context, 'current fixture admission must require native mechanism observations');
+    const filed = JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE attempt_id=?').get(prepared.attemptId).context_json);
+    const target = filed.packet.context.gate_binding.targets.find((row) => path.resolve(row.root) === tree);
+    const changed = gateInputSnapshot(tree, target.head, [], target.owned).inputs.map((row) => row.path);
+    const knowledge = context.readRefs.filter((row) => row.rootKind === 'source' && row.path.startsWith('knowledge/')).map((row) => row.path);
+    const commands = [
+      ['read-knowledge', ['node', path.join(ROOT, 'scripts/gates/read-digest.mjs'), '--root', tree, ...(changed.length ? ['--touch', ...changed] : []), '--knowledge', ...knowledge]],
+      ['doc-gate', ['node', path.join(ROOT, 'scripts/gates/gate.mjs'), '--root', tree, '--scope', 'docs', '--tree', path.join(tree, 'docs')]],
+    ];
+    const files = [], scratch = path.join(base, 'proofs', jobId);
+    fs.mkdirSync(scratch, { recursive: true });
+    for (const [name, args] of commands.filter(([name]) => owed.includes(name))) {
+      const command = args.map((arg) => JSON.stringify(String(arg).replaceAll('\\', '/'))).join(' ');
+      const check = classifyCheck({ command }, { skillRoot: ROOT, mechanical: true });
+      assert.equal(check.mechanical, true, command);
+      const run = observeCheck(check, context, (cwd) => rerunCheck(check, { repo: cwd, env, timeoutMs: 180000 }));
+      assert.deepEqual([run.processStatus, run.processError, run.processSignal, run.native?.stable], [0, null, null, true], `${command}\n${run.stderr}\n${run.stdout}`);
+      assert.equal(run.output?.schema, check.schema, 'retain the actual native JSON, never a green checker double');
+      const file = path.join(scratch, `${name}.json`);
+      fs.writeFileSync(file, `${JSON.stringify(run.output, null, 2)}\n`);
+      const previous = process.env.STARCI_ARTIFACT_ROOT;
+      try {
+        process.env.STARCI_ARTIFACT_ROOT = env.STARCI_ARTIFACT_ROOT;
+        const { native, ...staged } = stageObservation(run, [tree]);
+        prepared.ledger.transaction(() => recordCheck(db, { attemptId: prepared.attemptId, name: `native-${name}`, phase: 'verify', runner: 'kernel',
+          command, ...staged, summary: { native } }));
+      } finally { if (previous === undefined) delete process.env.STARCI_ARTIFACT_ROOT; else process.env.STARCI_ARTIFACT_ROOT = previous; }
+      files.push(file);
+    }
+    return files;
+  };
+  const pending = new Map();
+  const prepare = ({ jobId, opId = 'docs.author', outcome = 'done', checkExit = 0, report = true, ownedRoot = 'docs', payload = {}, arrange = () => {}, deferProofs = false }) => {
     const prepared = seed({ jobId, opId, status: 'running', dispatchId: `ctx-${jobId}`, payload: { opId, owned_paths: [`${ownedRoot}/`], ...payload } });
+    const finish = (current) => {
+      const files = report && outcome === 'done' && checkExit === 0 ? proofs(current, jobId) : [];
+      if (report) current.ledger.write.fileReport({ attemptId: current.attemptId, outcome, report: { schema: 'starci/op-report@1', outcome, summary: 'checkpoint fixture', files: [`${ownedRoot}/change.md`, ...files], head: git(tree, 'rev-parse', 'HEAD'),
+        ...(outcome === 'blocked' ? { blocker: { kind: 'environment', detail: 'private fixture unavailable' } } : {}) } });
+      if (checkExit !== null) current.ledger.write.recordCheckRun({ attemptId: current.attemptId, name: 'unit', phase: 'verify', runner: 'kernel', status: checkExit === 0 ? 'pass' : 'fail', exitCode: checkExit });
+    };
     try {
       write(tree, `${ownedRoot}/change.md`, `owned change of ${jobId}\n`);
-      const files = writeGreenProofs(path.join(tree, ownedRoot, 'proofs')).map((file) => path.relative(tree, file).replace(/\\/g, '/'));
-      if (report) prepared.ledger.write.fileReport({ attemptId: prepared.attemptId, outcome, report: { schema: 'starci/op-report@1', outcome, summary: 'checkpoint fixture', files: [`${ownedRoot}/change.md`, ...files], head: git(tree, 'rev-parse', 'HEAD'),
-        ...(outcome === 'blocked' ? { blocker: { kind: 'environment', detail: 'private fixture unavailable' } } : {}) } });
-      if (checkExit !== null) prepared.ledger.write.recordCheckRun({ attemptId: prepared.attemptId, name: 'unit', phase: 'verify', runner: 'kernel', status: checkExit === 0 ? 'pass' : 'fail', exitCode: checkExit });
+      arrange();
+      if (deferProofs) pending.set(jobId, () => {
+        const ledger = openLedger({ file: ledgerFileFor(repo, { env }) });
+        try { finish({ ledger, attemptId: prepared.attemptId }); } finally { ledger.close(); }
+      });
+      else finish(prepared);
     } finally { prepared.ledger.close(); }
     return prepared.attemptId;
   };
-  return { base, repo, tree, env, workflowId, runApi, runConcurrentApi, seed, read, capture, prepare };
+  const complete = (jobId) => { assert.ok(pending.has(jobId), 'deferred private CHECK/REPORT exists'); pending.get(jobId)(); pending.delete(jobId); };
+  return { base, repo, tree, env, workflowId, runApi, runConcurrentApi, seed, read, capture, prepare, proofs, complete };
 }
 
 export function apiResult(result) {

@@ -1,8 +1,0 @@
-id: planner-extend
-effectiveAt: '2026-09-29T21:00:00+07:00'
-summary: "owner ruling 2026-09-29 (planner-extend): a workflow on existing code does only the delta, with impact analysis first. define-goal now passes the Work root to route-plan as the survey (--state); an EXTEND goal (text names a surveyed feature) plans backend.implement whenever the feature holds backend records or code, stays behind interface.draw, never lets a done record of another lane or a family-level wildcard settle a goal variable, and prints an IMPACT block. archetypes.yaml verify-only no longer swallows extend/update/modify prompts."
-ops: [backend.implement, interface.draw]
-paths:
-  - modules/goal/archetypes.yaml
-  - modules/goal/existing.yaml
-reach: new-legs

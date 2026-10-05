@@ -2,6 +2,7 @@
 // Goal definition and revision follow modules/goal/define-goal.yaml.
 // The persisted inbox is the Kernel's claim boundary; docs/ledger-db.md owns storage placement.
 import fs from 'node:fs';
+import { acceptGoalRevision } from './accept-revision.mjs';
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
@@ -10,7 +11,7 @@ import { parseJson } from '../lib/json.mjs';
 import { normalizeOwnerRoutingBias } from '../lib/owner-routing-bias.mjs';
 import { currentRole } from '../cli/roles.mjs';
 import { goalTextRefusal } from './goal-text.mjs';
-import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES, createWorkflow, insertGoal, postInbox, recordJobResult, setJobStatus, updateWorkflow } from '../../engine/db/ledger.mjs';
+import { SETTLED_JOB_STATUSES, inspectLedger, openLedger, ledgerFileFor,  createWorkflow, insertGoal, postInbox,   updateWorkflow } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { deriveWorkflowDisplayName, normalizeDisplayName } from '../lib/display-names.mjs';
 import { readEnv } from '../lib/env.mjs';
@@ -64,8 +65,8 @@ if (approvedBy != null && approvedBy !== 'supervisor') { console.error(`--approv
 if ((definedBy || approvedBy) && !bridgeId) { console.error('--defined-by/--approved-by supervisor name the bridging record: --bridge-id <id>'); process.exit(2); }
 if (approvedBy && !approveRevision) { console.error('--approved-by supervisor goes with --approve-revision <preview-token>'); process.exit(2); }
 if (definedBy && argvValue(process.argv, 'revise')) { console.error('--defined-by supervisor defines a new workflow; a revision takes --approved-by supervisor'); process.exit(2); }
-if(routingBias?.reserveOverride && (definedBy || approvedBy || currentRole({root:skillRoot})!=='owner')){
-  console.error('--routing-bias reserveOverride requires the owner context; a delegated or provisional workflow cannot grant it');process.exit(2);
+if ((routingBias?.reserveOverride && (definedBy || approvedBy)) || ((routingBias?.reserveOverride || (!planOnly && !definedBy && !approvedBy)) && currentRole({root:skillRoot}) !== 'owner')) {
+  console.error(routingBias?.reserveOverride ? '--routing-bias reserveOverride requires the owner context; a delegated or provisional workflow cannot grant it' : 'Goal persistence requires the owner context; use --plan for read-only preparation or an explicit Supervisor provisional bridge');process.exit(2);
 }
 const supervisorProvenance = bridgeId ? { by: 'supervisor', provisional: true, bridgeId, reason: argvValue(process.argv, 'reason', null) } : null;
 // A fresh owner-defined goal with --reason records the owner's approval and its chat reference on the goal
@@ -462,124 +463,9 @@ if (revisionBase) {
   }
 
   const ledger = openLedger({ file: revisionBase.file });
-  let alreadyApplied = false;
-  let supersededJobs = [];
   try {
-    ledger.transaction(() => {
-      const current = ledger.db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(reviseWorkflowId);
-      let currentJson = {};
-      try { currentJson = JSON.parse(current?.json || '{}'); } catch { /* handled by revision check */ }
-      if (current?.revision === preview.nextRevision && currentJson?.revision?.approvalToken === approveRevision) {
-        alreadyApplied = true;
-        return;
-      }
-      if (!current || current.revision !== preview.baseRevision || current.goal_identity !== preview.goalIdentity) {
-        throw new Error(`stale revision preview for ${reviseWorkflowId}: expected rev ${preview.baseRevision} and identity ${preview.goalIdentity}`);
-      }
-      const workflow = ledger.db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(reviseWorkflowId);
-      if (!workflow || workflow.phase === 'finished' || workflow.archived_at !== null) throw new Error(`workflow ${reviseWorkflowId} is no longer revisable`);
-      if (workflow.goal_identity && workflow.goal_identity !== preview.goalIdentity) throw new Error(`workflow ${reviseWorkflowId} identity changed after preview`);
-      const settledMarks = SETTLED_JOB_STATUSES.map(() => '?').join(',');
-      const openNow = ledger.db.prepare(`SELECT job_id,op_id,status FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN (${settledMarks}) ORDER BY job_id`)
-        .all(reviseWorkflowId, ...SETTLED_JOB_STATUSES);
-      const unsafeNow = openNow.filter(job => job.status !== 'queued');
-      if (unsafeNow.length) {
-        throw new Error(`cannot checkpoint revision ${preview.nextRevision}: operation effects are still possible (${unsafeNow.map(job => `${job.job_id}:${job.status}`).join(', ')})`);
-      }
-      const leasedQueued = ledger.db.prepare(`SELECT l.job_id,l.resource_key FROM leases l JOIN jobs j ON j.job_id=l.job_id WHERE j.workflow_id=? AND j.kind<>'kernel' AND j.status='queued' ORDER BY l.job_id,l.resource_key`).all(reviseWorkflowId);
-      if (leasedQueued.length) {
-        throw new Error(`cannot checkpoint revision ${preview.nextRevision}: queued job lease drift (${leasedQueued.map(row => `${row.job_id}:${row.resource_key}`).join(', ')})`);
-      }
-      const amendment = approvedBy ? {
-        schema: 'starci/goal-revision-approval@1',
-        source: 'supervisor-autopilot',
-        baseRevision: preview.baseRevision,
-        nextRevision: preview.nextRevision,
-        baseGoalIdentity: preview.goalIdentity,
-        approvalToken: approveRevision,
-        reason: revisionReason,
-        changed: preview.opChainDiff,
-        // Not the owner's: the Supervisor revised the legs under autopilot; the owner may revert it.
-        ownerApproval: null,
-        supervisorApproval: supervisorProvenance,
-        provisional: true,
-        approvedAt: now,
-      } : {
-        schema: 'starci/goal-revision-approval@1',
-        source: 'owner-approved-goal-entry',
-        baseRevision: preview.baseRevision,
-        nextRevision: preview.nextRevision,
-        baseGoalIdentity: preview.goalIdentity,
-        approvalToken: approveRevision,
-        reason: revisionReason,
-        changed: preview.opChainDiff,
-        ownerApproval: {
-          quote: 'ok',
-          threadId: null,
-          messageId: null,
-          messageIdAvailability: 'unavailable-to-cli',
-          assurance: 'conversation-context-not-authenticated',
-        },
-        approvedAt: now,
-      };
-      const nextJson = {
-        ...revisionBase.json,
-        derivedFrom: approvedBy ? 'supervisor-provisional-revision' : 'owner-approved-revision',
-        opChain: chain,
-        derivedPlan: derivedPlanOf(chain),
-        routing_bias: routingBias ?? revisionBase.json?.routing_bias ?? null,
-        revision: amendment,
-      };
-      supersededJobs = openNow.map(job => job.job_id);
-      for (const job of openNow) {
-        const result = {
-          reason: 'goal-revision-superseded', effectState: 'none',
-          baseRevision: preview.baseRevision, nextRevision: preview.nextRevision,
-          approvalToken: approveRevision, at: now,
-        };
-        if (ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job.job_id)?.status === 'queued') {
-          setJobStatus(ledger.db, { jobId: job.job_id, to: 'cancelled', reason: 'goal-revision-superseded', at: now });
-          recordJobResult(ledger.db, { jobId: job.job_id, result, at: now });
-        }
-        ledger.appendEvent({
-          workflowId: reviseWorkflowId, entityType: 'job', entityId: job.job_id,
-          generation: workflow.generation ?? 0, kind: 'job-superseded-by-goal-revision',
-          payload: { opId: job.op_id, ...result }, createdAt: now,
-        });
-      }
-      insertGoal(ledger.db, { workflowId: reviseWorkflowId, revision: preview.nextRevision, goalIdentity: preview.goalIdentity, markdown: text, goal: nextJson,
-        amendment, approvedBy: approvedBy ? 'supervisor' : 'owner', approvalRef: approveRevision ?? null, createdAt: now });
-      if (!workflow.goal_identity) updateWorkflow(ledger.db, { workflowId: reviseWorkflowId, goalIdentity: preview.goalIdentity, at: now });
-      postInbox(ledger.db, { workflowId: reviseWorkflowId, kind: 'goal-revision', key: `${reviseWorkflowId}:${preview.nextRevision}`, fromRef: approvedBy ? 'supervisor' : 'owner', createdAt: now, payload: {
-          revision: preview.nextRevision,
-          baseRevision: preview.baseRevision,
-          goalIdentity: preview.goalIdentity,
-          approvalToken: approveRevision,
-          reason: revisionReason,
-          opChain: preview.opChainDiff.after,
-          supersededJobs,
-          ...(approvedBy ? { approvedBy: 'supervisor', provisional: true, bridgeId } : {}),
-          at: now,
-        } });
-      ledger.appendEvent({
-        workflowId: reviseWorkflowId,
-        entityType: 'goal',
-        entityId: reviseWorkflowId,
-        generation: workflow.generation ?? 0,
-        kind: 'goal-revised',
-        payload: {
-          revision: preview.nextRevision,
-          previousRevision: preview.baseRevision,
-          goalIdentity: preview.goalIdentity,
-          approvalToken: approveRevision,
-          opChainDiff: preview.opChainDiff,
-          supersededJobs,
-          ...(approvedBy ? { approvedBy: 'supervisor', provisional: true, bridgeId } : {}),
-          kernelResume: 'resurvey-pending-revision-inbox',
-        },
-        createdAt: now,
-      });
-    });
+    const { alreadyApplied, supersededJobs } = acceptGoalRevision({ ledger, workflowId: reviseWorkflowId, preview, approveRevision,
+      revisionBase, text, chain, derivedPlan: derivedPlanOf(chain), routingBias, revisionReason, approvedBy, supervisorProvenance, bridgeId, now });
     const out = {
       workflowId: reviseWorkflowId,
       goalRevision: preview.nextRevision,

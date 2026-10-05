@@ -98,3 +98,23 @@ test("there is no copy-module exemption: a resources folder is authoring, and th
   assert.equal(content("apps/web/src/components/leaves/Text/fixtures/copy.ts"), false)
   assert.equal(rules["no-second-language-in-source"], undefined)
 })
+
+test("public documentation requires a final adjacent description, not tags, headers or punctuation", () => {
+  tester.run("require-export-jsdoc", requireExportJsdoc, {
+    valid: [
+      "/** Returns the rows visible to the authenticated caller.\n * @returns Authorized rows.\n */\nexport const readRows = () => []",
+      "/** Contains the authenticated caller's stable identifier. */\nexport type Viewer = { id: string }",
+      "/** Stable learner identity accepted by account operations. */\nexport interface Learner { id: string }",
+      "/** @file Rows module. */\n/** Returns caller-visible rows. */\nexport const readRows = () => []",
+      "const text = '/** Not a source comment. */'\n/** Reads caller-visible rows. */\nexport const readRows = () => text",
+    ],
+    invalid: [
+      ...["/** */", "/**\n *\n */", "/** @returns Authorized rows. */", "/** @param input - Accepted account id. */", "/** ... --- */", "/** @file Rows module. */", "/** @fileoverview Rows module. */", "/** Rows module.\n * @fileoverview Shared file header.\n */", "/* Returns caller-visible rows. */"].map((doc) => ({ code: doc + "\nexport const readRows = () => []", errors: [{ messageId: "jsdoc" }] })),
+      { code: "/** Returns caller-visible rows. */\n// module banner\nexport const readRows = () => []", errors: [{ messageId: "jsdoc" }] },
+      { code: "/** Returns caller-visible rows. */\nconst unrelated = 1\nexport const readRows = () => unrelated", errors: [{ messageId: "jsdoc" }] },
+      { code: "const text = '/** Returns caller-visible rows. */'\nexport const readRows = () => text", errors: [{ messageId: "jsdoc" }] },
+      { code: "const text = \u0060/** Returns caller-visible rows. */\u0060\nexport const readRows = () => text", errors: [{ messageId: "jsdoc" }] },
+      { code: "/** @returns Account identifier. */\nexport interface Learner { id: string }", errors: [{ messageId: "jsdoc" }] },
+    ],
+  })
+})

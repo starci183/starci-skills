@@ -13,6 +13,13 @@
 import { orcaCall, runAsCli, terminalOf } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 
+/**
+ * Read an exact terminal's health and typed refusal without deciding worker liveness or ownership.
+ * hostUnavailable proves nothing about the terminal. When ok is false, normalized connected and
+ * writable defaults must not be treated as death or permission to send, close, or replace a seat.
+ * @param {object} input - Required terminal handle.
+ * @returns {object} ok, terminal, connected/writable/exitCause, typed error, and hostUnavailable.
+ */
 export function terminalShow({ terminal }) {
   const r = orcaCall('terminal-show', { terminal });
   const t = terminalOf(r);

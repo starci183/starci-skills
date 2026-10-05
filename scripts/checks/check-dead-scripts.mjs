@@ -11,7 +11,7 @@
 //   - a directory the runtime loads by listing it (DYNAMIC_ROOTS: verbs, status views, reconciler controllers);
 //   - an entry of the dead-script-entries section of modules/kernel/allowlist.yaml: a CLI nothing imports (owner or agent
 //     tool), declared once with the reason it has no code reader.
-// A mention in a doc, a README, retired-paths.yaml, a contract-change, a benchmark finding or YAML prose is NOT a reader:
+// A mention in a doc, a README, retired-paths.yaml, a benchmark finding or YAML prose is NOT a reader:
 // that is how a one-off script (why-backfill, migrate-ui-shapes, repair-rejected-attempts) survived its own removal.
 // A script only tests read is dead code with a test attached: both go (RT_DEAD_SCRIPT). An entry whose script is gone, or
 // that code now reads, is stale and goes too (RT_DEAD_ENTRY): the list only shrinks.
@@ -40,7 +40,7 @@ const CODE = /\.(mjs|cjs|js|ts|tsx|ps1|sh|cmd)$/;
 const HOOK = /(^|\/)(?:\.husky|hooks\/husky)\/[^/]+$/;
 const GENERATED = /^packages\/[^/]+\/runtime\/|^packages\/eslint\/[^/]+\/runtime\//;
 const isTest = (rel) => rel.startsWith('tests/') || /\.(test|spec)\.mjs$/.test(rel);
-const HISTORY = /^modules\/kernel\/(contract-changes\/|retired-paths\.yaml|owner-rulings\.yaml)/;
+const HISTORY = /^modules\/kernel\/(retired-paths\.yaml|owner-rulings\.yaml)/;
 const COMMENT_LINE = /^\s*(\/\/|\/\*|\*|#)/;
 const EXEC_POSITION = /\b(run|check|script|executable|entry|command|exec|cmd|handler)\s*:/;
 const EXEC_KEY = /\b(run|check|script|executable|entry|command|exec|cmd|handler)\s*:\s*['"]?(node\s+|npm run\s+)?[\w./-]+\.mjs/;

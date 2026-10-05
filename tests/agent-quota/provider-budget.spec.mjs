@@ -12,7 +12,6 @@ import { closeWorker } from '../../scripts/machine/worker-close.mjs';
 import { planAgentAdmission } from '../../scripts/agent/admission.mjs';
 import { spawnAgent } from '../../scripts/agent/lib.mjs';
 import { fakeAdmission } from '../helpers/fake-admission.mjs';
-import { restoreMachineV1Fixture } from '../helpers/machine-v1-fixture.mjs';
 
 const now = Date.parse('2026-10-03T08:00:00Z'), policy = allocationSettings().admission;
 const root = path.resolve(import.meta.dirname, '../..');
@@ -43,11 +42,11 @@ const firstLaunch = (options) => {
       } }),
   };
 };
-const legacyStore = (options) => {
+const currentStore = (options) => {
   const machine = openMachine(options);
-  try { machine.setService({ name: 'preserved-service', kind: 'http', state: 'healthy', port: 41001 }); }
+  try { machine.setService({ name: 'preserved-service', kind: 'http', state: 'healthy', port: 41001 });
+    machine.db.prepare("INSERT INTO machine_meta VALUES('test-preserved','host-data')").run(); }
   finally { machine.close(); }
-  restoreMachineV1Fixture(options.file, { meta: { 'test-preserved': 'host-data' } });
 };
 
 test('the first actual worker launch prepares an absent store while its plan remains read-only', (t) => {
@@ -65,19 +64,18 @@ test('the first actual worker launch prepares an absent store while its plan rem
   assert.equal(usage.reservations[0].handle, 'fixture-terminal');
 });
 
-test('the first actual worker launch upgrades a compatible v1 store and preserves host rows', (t) => {
+test('the first actual worker launch reuses a current store and preserves host rows', (t) => {
   const options = fixture(t);
-  legacyStore(options);
+  currentStore(options);
   const before = new DatabaseSync(options.file, { readOnly: true });
   let service, events;
   try { service = before.prepare('SELECT * FROM services').all(); events = before.prepare('SELECT * FROM service_events').all(); }
   finally { before.close(); }
   const worker = firstLaunch(options), plan = worker.plan();
-  assert.equal(plan.ok, false);
-  assert.ok(plan.rejected[0].codes.includes('capacity-unknown'));
-  assert.equal(providerBudgetUsage('codex', 'a', options).observed, false, 'a v1 reader cannot invent zero usage');
+  assert.equal(plan.ok, true);
+  assert.equal(providerBudgetUsage('codex', 'a', options).observed, true);
   const unchanged = new DatabaseSync(options.file, { readOnly: true });
-  try { assert.equal(unchanged.prepare('PRAGMA user_version').get().user_version, 1, 'planning does not upgrade'); }
+  try { assert.equal(unchanged.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION, 'planning preserves current identity'); }
   finally { unchanged.close(); }
   const launched = worker.launch();
   assert.equal(launched.ok, true, JSON.stringify(launched));
@@ -85,7 +83,7 @@ test('the first actual worker launch upgrades a compatible v1 store and preserve
   const after = new DatabaseSync(options.file, { readOnly: true });
   try {
     assert.equal(after.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION);
-    assert.equal(after.prepare('SELECT count(*) n FROM schema_migrations WHERE version=2').get().n, 1);
+    assert.equal(after.prepare("SELECT count(*) n FROM schema_migrations WHERE version=? AND name='0001-init'").get(MACHINE_VERSION).n, 1);
     assert.equal(after.prepare("SELECT value FROM machine_meta WHERE key='test-preserved'").get().value, 'host-data');
     assert.deepEqual(after.prepare('SELECT * FROM services').all(), service);
     assert.deepEqual(after.prepare('SELECT * FROM service_events').all(), events);
@@ -95,13 +93,13 @@ test('the first actual worker launch upgrades a compatible v1 store and preserve
 });
 
 test('actual launch preparation refuses foreign and future stores without discarding host data', (t) => {
-  for (const incompatible of ['foreign', 'future']) {
+  for (const incompatible of ['foreign', 'future', 1, 2]) {
     const options = fixture(t);
-    legacyStore(options);
+    currentStore(options);
     const raw = new DatabaseSync(options.file);
     try {
       if (incompatible === 'foreign') raw.prepare("UPDATE machine_meta SET value=? WHERE key='schema'").run('foreign/schema@1');
-      else raw.exec('PRAGMA user_version=77');
+      else raw.exec('PRAGMA user_version='+(incompatible === 'future' ? 77 : incompatible));
     } finally { raw.close(); }
     const worker = firstLaunch(options), launched = worker.launch();
     assert.equal(launched.ok, false);
@@ -111,12 +109,12 @@ test('actual launch preparation refuses foreign and future stores without discar
     assert.equal(worker.calls.start, 0, 'schema refusal cannot call the host launcher');
     const check = new DatabaseSync(options.file, { readOnly: true });
     try {
-      assert.equal(check.prepare('PRAGMA user_version').get().user_version, incompatible === 'future' ? 77 : 1);
+      assert.equal(check.prepare('PRAGMA user_version').get().user_version, incompatible === 'future' ? 77 : incompatible === 'foreign' ? MACHINE_VERSION : incompatible);
       assert.equal(check.prepare("SELECT value FROM machine_meta WHERE key='schema'").get().value,
         incompatible === 'foreign' ? 'foreign/schema@1' : 'starci/machine@1');
       assert.equal(check.prepare("SELECT value FROM machine_meta WHERE key='test-preserved'").get().value, 'host-data');
       assert.equal(check.prepare('SELECT count(*) n FROM services').get().n, 1);
-      assert.equal(check.prepare("SELECT count(*) n FROM sqlite_master WHERE name='provider_reservations'").get().n, 0);
+      assert.equal(check.prepare("SELECT count(*) n FROM sqlite_master WHERE name='provider_reservations'").get().n, 1);
     } finally { check.close(); }
   }
 });
@@ -246,20 +244,39 @@ test('a store failure never produces a fallback admission or optimistic capacity
 test('generic closure releases capacity only after both terminal and process-tree exit are proved', (t) => {
   for (const verifiable of [true, false]) {
     const options = fixture(t), receipt = reserveProviderBudget(input(), options).reservation;
-    markProviderBudget(receipt, { state: 'live', handle: 'terminal-a', pid: 1234 }, options);
-    let closed = false;
+    const object = { pid: 1234, ppid: 1, created: 10, exe: 'C:\\fixture\\agent.exe' };
+    const identity = { pid: object.pid, birth: (116444736000000000n + BigInt(object.created) * 10000n).toString(), exe: object.exe };
+    markProviderBudget(receipt, { state: 'live', handle: 'terminal-a', pid: object.pid }, options);
+    let closed = false, captures = 0;
     const out = closeWorker({ dispatch: 'dispatch-a', env: options.env, deps: {
       show: () => ({ ok: true, result: { worker: { agentTerminalHandle: 'terminal-a' } } }),
       release: () => ({ ok: true, state: 'released' }),
-      close: () => { closed = true; return { ok: true, proof: 'gone' }; },
-      tableOf: () => verifiable ? closed ? [] : [{ pid: 1234, ppid: 1, created: 10 }] : null,
-      envOf: () => [{ pid: 1234, values: { ORCA_TERMINAL_HANDLE: 'terminal-a' } }],
+      close: (handle) => { assert.equal(handle, 'terminal-a'); closed = true; return { handle, ok: true, proof: 'gone' }; },
+      tableOf: () => verifiable ? closed ? [] : [object] : null,
+      envOf: () => verifiable ? closed ? [] : [{ pid: object.pid, values: { ORCA_TERMINAL_HANDLE: 'terminal-a' } }] : null,
+      capture: (pid, { ownership }) => {
+        assert.equal(closed, false, 'identity must be captured while the terminal process is live');
+        assert.equal(pid, object.pid);
+        assert.deepEqual(ownership, { key: 'ORCA_TERMINAL_HANDLE', value: 'terminal-a' });
+        captures++;
+        return { schema: 'starci/owned-process@1', pid, ok: true, outcome: 'captured', proof: 'process-handle-live', identity };
+      },
+      stopProcess: () => assert.fail('an exited object or unreadable census authorizes no process stop'),
       verifyMs: 0, pollMs: 1, stopVerifyMs: 0, sleep: () => {},
     } });
     assert.equal(out.ok, true, 'worker outcome alone does not imply its provider slot is released');
     assert.equal(providerBudgetUsage('codex', 'a', options).running, verifiable ? 0 : 1);
-    if (verifiable) assert.equal(out.providerBudget.released, 1);
-    else assert.equal(out.processes.verdict, 'unverifiable');
+    assert.equal(captures, verifiable ? 1 : 0);
+    if (verifiable) {
+      assert.equal(out.providerBudget.released, 1);
+      assert.equal(out.processes.verdict, 'none');
+      assert.deepEqual(out.processes.members[0].identity, identity);
+      assert.deepEqual(out.processes.census, [], 'later terminal census is measured empty');
+    } else {
+      assert.equal(out.processes.verdict, 'unverifiable');
+      assert.equal(out.providerBudget, undefined, 'unknown exit cannot publish a capacity release receipt');
+      assert.equal(providerBudgetUsage('codex', 'a', options).reservations[0].state, 'live');
+    }
   }
 });
 

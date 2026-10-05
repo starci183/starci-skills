@@ -25,7 +25,9 @@
 //       --processes                the process table (host-health listProcesses) as JSON
 //       --turn (--terminal <h> | --supervisor) [--json]   a seat's turn (read-only)
 //       --turn-interrupt --terminal <h> --agent <a> (--repo <r> --workflow <wf> | --supervisor)
-//       --turn-replace --terminal <h> --agent <a>   quit + close the overdue seat terminal.
+//       --turn-replace --terminal <h> --agent <a>   verified exact worker closure before replacement.
+import { replaceOverdueWorker as turnReplace } from './turn-replace.mjs';
+import { classifyAgentScreen, terminalIdentityOf } from '../lib/terminal-liveness.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -35,12 +37,22 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { openMachine } from '../../engine/db/machine.mjs'; import { runNode } from '../api/node/run-node.mjs';
 import { allocationSettings, loadConfig } from '../../engine/config.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
+import { httpUp } from '../api/http/http-up.mjs';
+export { httpUp };
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
 const HOST_YAML = path.join(SKILL_ROOT, 'modules', 'reconciler', 'host.yaml');
 const HARNESS_TUNNEL_YML = path.join(os.homedir(), '.cloudflared', 'harness.yml');
 const RECONCILER_TASK = 'StarCi-Reconciler';
 const starciLauncher = () => path.join(os.homedir(), '.starci', 'bin', process.platform === 'win32' ? 'starci.cmd' : 'starci');
+
+/** Return the platform refusal for a Windows service actuator, or null when none applies. */
+export function servicePlatformProblem(name, platform = process.platform) {
+  if (platform === 'win32') return null;
+  if (name === 'orca') return `Windows desktop restart is unsupported on ${platform}`;
+  if (['harness-ui', 'harness-tunnel', `sched-task:${RECONCILER_TASK}`].includes(name)) return `Windows Task Scheduler is unsupported on ${platform}`;
+  return null;
+}
 
 /* ------------------------------------------------------------ settings */
 
@@ -84,7 +96,7 @@ export function hostSettings(raw = parseYaml(fs.readFileSync(HOST_YAML, 'utf8'))
       interruptKeys: Object.fromEntries(Object.entries(h?.turnBudget?.interruptKeys ?? {}).map(([agent, keys]) => [agent, (Array.isArray(keys) ? keys : [keys]).map(String)])),
     },
     ledgerHealth: {
-      ...section('ledgerHealth', ['quickCheckEveryMs', 'keep', 'backupTimeoutMs']),
+      ...section('ledgerHealth', ['quickCheckEveryMs', 'keep', 'backupTimeoutMs', 'backupRetryMs']),
       backupHour: Number(h?.ledgerHealth?.backupHour ?? 3),
       backupDir: String(h?.ledgerHealth?.backupDir ?? path.join(archiveRootOf(), 'ledger-backups')),
     },
@@ -148,32 +160,6 @@ export const lastJson = (text) => {
 
 const node = (script, args = []) => [process.execPath, [path.join(SKILL_ROOT, script), ...args]];
 
-/** GET url: ok while it answers below 500 (Cloudflare answers 502/530 when the origin or the tunnel is gone). */
-export async function httpUp(url, { timeoutMs, tries = 1, health = false, fetchImpl = fetch } = {}) {
-  let last = null;
-  const failures = [];
-  for (let i = 1; i <= Math.max(1, tries); i += 1) {
-    const started = Date.now();
-    try {
-      const res = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
-      last = { ok: res.status < 500, status: res.status, tries: i, ms: Date.now() - started };
-      if (health) {
-        const json = /^application\/json(?:\s*;|$)/i.test(res.headers?.get('content-type') ?? '');
-        let data = null;
-        if (res.status === 200 && json) { try { data = (await res.json())?.data; } catch { data = null; } }
-        const ledgers = data?.dbs?.ledgers;
-        last.ok = res.status === 200 && json && data?.ok === true && data?.dbs?.machine === true
-          && typeof data?.rev === 'string' && data.rev.length > 0 && ledgers != null
-          && typeof ledgers === 'object' && !Array.isArray(ledgers) && Object.values(ledgers).every((value) => value === true);
-        if (!last.ok) last.error = 'harness health contract unavailable';
-      }
-    } catch (error) { last = { ok: false, error: String(error?.cause?.code ?? error?.name ?? error?.message ?? error).slice(0, 200), tries: i, ms: Date.now() - started }; }
-    if (last.ok) return failures.length ? { ...last, failures } : last;
-    failures.push(`${last.status ?? last.error} ${last.ms}ms`);
-  }
-  return { ...last, failures };
-}
-
 /** Orca answers a terminal listing: {ok, verdict: ok|timeout|unavailable|error, terminals}. */
 export async function probeOrcaAsync({ timeoutMs, run = runChild } = {}) {
   const [cmd, args] = node('scripts/api/orca/terminal-list.mjs');
@@ -199,7 +185,8 @@ async function connectorUp(script, { timeoutMs, tries = 1, run = runChild, extra
 
 /** schtasks /query of one task: {ok, exists, status} (status Ready|Running|Disabled|...). */
 async function taskState(name, { timeoutMs = 30_000, run = runChild, platform = process.platform } = {}) {
-  if (platform !== 'win32') return { ok: false, exists: false, error: 'not windows' };
+  const error = servicePlatformProblem(`sched-task:${name}`, platform);
+  if (error) return { ok: false, exists: false, unsupported: true, unmanaged: true, error };
   const r = await run('schtasks.exe', ['/Query', '/TN', name, '/FO', 'CSV', '/NH'], { timeoutMs });
   if (r.status !== 0) return { ok: false, exists: false };
   const cols = String(r.stdout).trim().split(/\r?\n/)[0]?.split('","').map((c) => c.replace(/^"|"$/g, '')) ?? [];
@@ -215,10 +202,13 @@ async function taskState(name, { timeoutMs = 30_000, run = runChild, platform = 
  * host.yaml allowTaskRepair is false). `ownerPath`: the owner reaches the runtime through it, so a quarantine is
  * urgent for the owner too (DESIGN 9.7). Every seam is injectable for the specs.
  */
-export function serviceRegistry({ settings = hostSettings(), ports = servicePorts(), run = runChild, http = httpUp } = {}) {
+export function serviceRegistry({ settings = hostSettings(), ports = servicePorts(), run = runChild, http = httpUp, platform = process.platform } = {}) {
   const s = settings.services;
   const startCli = (name) => ({ cmd: 'node', args: [SERVICES_FILE, '--start', name, '--json'] });
-  const entry = (name, fields) => ({ name, kind: 'service', restart: true, ownerPath: false, ...s[name], ...fields, start: fields.start ?? (() => startCli(name)) });
+  const entry = (name, fields) => {
+    const error = servicePlatformProblem(name, platform);
+    return { name, kind: 'service', restart: true, ownerPath: false, ...s[name], ...fields, start: fields.start ?? (() => startCli(name)), ...(error ? { restart: false, probe: async () => ({ ok: false, unsupported: true, unmanaged: true, error }), start: () => null } : {}) };
+  };
   const portProblem = () => ports.problems.find((p) => p.startsWith('port-drift')) ?? null;
   const out = [
     // A restart of Orca kills every agent: one that still answers a listing within aliveTimeoutMs is only slow.
@@ -249,7 +239,7 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
     entry('telegram-bridge', { ownerPath: true, probe: () => connectorUp('telegram-bridge.mjs', { timeoutMs: s['telegram-bridge'].probeTimeoutMs, tries: s['telegram-bridge'].probeTries ?? 1, run }) }),
     entry(`sched-task:${RECONCILER_TASK}`, { restart: settings.allowTaskRepair,
       probe: async () => {
-        const t = await taskState(RECONCILER_TASK, { timeoutMs: s[`sched-task:${RECONCILER_TASK}`].probeTimeoutMs, run });
+        const t = await taskState(RECONCILER_TASK, { timeoutMs: s[`sched-task:${RECONCILER_TASK}`].probeTimeoutMs, run, platform });
         return t.exists || settings.allowTaskRepair ? t : { ...t, unmanaged: true };
       },
       start: () => ({ cmd: starciLauncher(), args: ['task', 'register', 'reconciler', '--apply', '--json'] }) }),
@@ -443,7 +433,9 @@ const connectorStart = (script, env) => {
 };
 
 /** Start one service now. Only ever reached through ctx.run in active mode (or by hand). Seams: powershell, tasks. */
-export async function startService(name, { settings = hostSettings(), ports = servicePorts(), env = process.env, powershell = runPowershell, tasks = schtasks } = {}) {
+export async function startService(name, { settings = hostSettings(), ports = servicePorts(), env = process.env, powershell = runPowershell, tasks = schtasks, platform = process.platform } = {}) {
+  const error = servicePlatformProblem(name, platform);
+  if (error) return { ok: false, unsupported: true, error };
   const clean = await cleanEnv(env);
   const s = settings.services[name] ?? {};
   switch (name) {
@@ -497,20 +489,18 @@ const KEY_BYTES = Object.freeze({ esc: '\u001b', 'ctrl+c': '\u0003' });
 
 const SEAT_AGENTS = ['claude', 'codex', 'devin'];
 /**
- * The agent a seat terminal runs, from a terminal-list entry {agentIdentity, title} and its frame: Orca's
- * agentIdentity first, then the title ("⠼ Devin", "✳ Claude Code"), then the frame's own interrupt hint (Devin asks
- * "esc twice"), else quit-agent's heuristic. The interrupt key depends on it: one Esc does not stop Devin. Pure.
+ * Select the seat classifier's provider from the shared terminal identity facts.
+ * Supported metadata/title/frame evidence wins, else the injected or legacy Claude fallback.
+ * This probe reads the terminal; current turn-budget can reuse its agent for an interrupt.
+ * The identity proof describes provider evidence, not effect authority or cryptographic attestation.
  */
-export function seatAgentOf(entry, screen = '', fallback = null) {
-  const named = String(entry?.agentIdentity ?? entry?.agent ?? '').toLowerCase();
-  if (SEAT_AGENTS.includes(named)) return named;
-  const title = String(entry?.title ?? entry?.tabTitle ?? '');
-  for (const a of ['devin', 'codex', 'claude']) if (new RegExp(`\\b${a}\\b`, 'i').test(title)) return a;
-  if (/esc\s+twice\s+to\s+interrupt|Ask Devin\b/i.test(String(screen ?? ''))) return 'devin';
-  return fallback ? fallback(entry, 'claude') : 'claude';
+export function seatAgentOf(entry, screen = '', fallback = null, identity = terminalIdentityOf(entry, { screen })) {
+  if (SEAT_AGENTS.includes(identity.provider)) return identity.provider;
+  // Keep the current probe policy; downstream interrupt eligibility belongs to turn-budget.
+  return (fallback ? fallback(entry, 'claude') : null) ?? 'claude';
 }
 
-/** The seat's terminal, agent and turn: {ok, terminal, agent, state, busy, minutes}. Read-only. */
+/** Read the seat's {ok, terminal, agent, identity, state, busy, minutes}; agent also feeds current turn-budget. */
 async function turnProbe({ terminal = null, supervisor = false } = {}) {
   let handle = terminal;
   if (!handle && supervisor) {
@@ -518,17 +508,18 @@ async function turnProbe({ terminal = null, supervisor = false } = {}) {
     handle = home.readSupervisor((m) => home.seatOf(m, Date.now())?.value?.terminal ?? null, null);
   }
   if (!handle) return { ok: false, error: 'no seat terminal' };
-  const [{ terminalRead }, { terminalList }, { agentOfTerminal }, { classifyAgentScreen }] = await Promise.all([
-    import('../api/orca/terminal-read.mjs'), import('../api/orca/terminal-list.mjs'), import('../kernel/quit-agent.mjs'), import('../lib/terminal-liveness.mjs')]);
+  const [{ terminalRead }, { terminalList }] = await Promise.all([
+    import('../api/orca/terminal-read.mjs'), import('../api/orca/terminal-list.mjs')]);
   const listed = terminalList();
   const entry = (listed.terminals ?? []).find((t) => t.handle === handle) ?? null;
   if (!listed.ok || !entry) return { ok: false, terminal: handle, error: listed.ok ? 'terminal not listed' : 'orca unavailable' };
   const read = terminalRead({ terminal: handle, screen: true });
   if (!read?.ok) return { ok: false, terminal: handle, error: 'terminal unreadable' };
-  const agent = seatAgentOf(entry, read.screen, agentOfTerminal);
+  const identity = terminalIdentityOf(entry, { screen: read.screen });
+  const agent = seatAgentOf(entry, read.screen, null, identity);
   const state = classifyAgentScreen(String(read.screen ?? ''), { provider: agent }).state;
   const busy = state === 'active' || state === 'wedged';
-  return { ok: true, terminal: handle, agent, state, busy, minutes: busy ? turnMinutesOf(read.screen) : null };
+  return { ok: true, terminal: handle, agent, identity, state, busy, minutes: busy ? turnMinutesOf(read.screen) : null };
 }
 
 /**
@@ -555,17 +546,8 @@ async function turnInterrupt({ terminal, agent, repo = null, workflowId = null, 
   const [d, { wakeKernel }] = await Promise.all([import('../machine/decisions.mjs'), import('../kernel/wake-delivery.mjs')]);
   let ring;
   try { ring = supervisor ? await d.ringSupervisor({ wake: wakeKernel, minGapMs: 0 }) : await d.ringDoorbell({ repo, workflowId, wake: wakeKernel, minGapMs: 0 }); } catch (error) { ring = { action: 'ring-failed', error: String(error?.message ?? error) }; }
-  return { ok: sent.every((x) => x.ok), terminal, agent, sent, stateAfter: after?.state ?? null, ring: { action: ring?.action ?? null, delivered: ring?.delivered === true, open: ring?.open ?? null } };
-}
-
-/** Close an overdue seat's terminal (the agent's quit first) so the seat watchdog proves it gone and replaces it. */
-async function turnReplace({ terminal, agent }) {
-  const [{ quitAgent }, { terminalClose }] = await Promise.all([import('../kernel/quit-agent.mjs'), import('../api/orca/terminal-close.mjs')]);
-  let quit = null;
-  try { quit = quitAgent({ handle: terminal, agent }); } catch (error) { quit = { error: String(error?.message ?? error) }; }
-  let closed;
-  try { closed = terminalClose({ terminal }); } catch (error) { closed = { ok: false, error: String(error?.message ?? error) }; }
-  return { ok: closed?.ok === true || quit?.exited === true, terminal, agent, quit, closed: { ok: closed?.ok === true, error: closed?.error ?? null } };
+  const ok = sent.every((x) => x.ok);
+  return { schema: 'starci/turn-interrupt@1', ok, effectState: ok ? 'requested' : 'unknown', terminal, agent, sent, stateAfter: after?.state ?? null, ring: { action: ring?.action ?? null, delivered: ring?.delivered === true, open: ring?.open ?? null } };
 }
 
 /* ------------------------------------------------------------ CLI */

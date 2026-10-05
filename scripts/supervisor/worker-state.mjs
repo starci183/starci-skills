@@ -1,5 +1,7 @@
 // A Worker's actual selected identity and uncertain launch stay on its original attempt and leases.
 import { supervisorEvent } from '../machine/home.mjs';
+import { closeSelfSafe } from '../machine/close-verify.mjs';
+import { releaseSelfSafe, workerClosureProven } from '../machine/worker-close.mjs';
 const ATTEMPT_AGENTS = new Set(['devin', 'codex', 'claude']);
 export const workerAttemptAgent = (provider) => ATTEMPT_AGENTS.has(provider) ? provider : null;
 
@@ -30,4 +32,47 @@ export function recordWorkerLaunch({ m, job, route, spawned, staging, attemptId,
     });
   }
   return { payload, heldUnknown };
+}
+
+// Physical custody is qualified separately from logical release or job completion.
+export const workerTerminalClosed = (job) => job.payload.dispatch
+  ? job.payload.terminalClosed?.dispatch === job.payload.dispatch && job.payload.terminalClosed?.attemptId === job.attempt_id
+    && workerClosureProven(job.payload.terminalClosed, job.worker_id)
+  : job.payload.terminalClosed?.attemptId === job.attempt_id && job.payload.terminalClosed?.handle === job.worker_id && job.payload.terminalClosed?.ok === true
+    && ['gone', 'disconnected'].includes(job.payload.terminalClosed?.proof);
+
+// Existing Supervisor consumer; its public entry and job projection stay in workers.mjs.
+export function closeWorkerTerminalState(m, { jobId, env = process.env, now = Date.now(), close = closeSelfSafe, release = releaseSelfSafe } = {}, jobOf) {
+  const job = jobOf(m, jobId);
+  const handle = job?.worker_id;
+  if (!handle || handle === 'supervisor' || job.payload.self) return null;
+  if (workerTerminalClosed(job)) return null;
+  // A worker-start worker is fenced and released by its Dispatch (release archives its output); a job
+  // recorded without a Dispatch has only its terminal to close.
+  const dispatch = job.payload.dispatch ?? null;
+  let r;
+  try { r = dispatch ? release(dispatch, handle, { owner: `supervisor:${jobId}`, env }) : close(handle, { owner: `supervisor:${jobId}`, env }); }
+  catch (error) { r = { handle, ok: false, error: String(error?.message ?? error) }; }
+  const physical = dispatch ? r?.dispatch === dispatch && workerClosureProven(r, handle)
+    : r?.handle === handle && r?.ok === true && ['gone', 'disconnected'].includes(r?.proof);
+  const record = { handle, attemptId: job.attempt_id ?? null, ...(dispatch ? { dispatch, released: r?.ok === true,
+    closed: r?.closed ?? null, processes: r?.processes ?? null } : {}), ok: physical, proof: (dispatch ? r?.closed?.proof : r?.proof) ?? null,
+    ...(r?.detached ? { detached: true } : {}), ...(r?.pending ? { pending: true } : {}),
+    ...(r?.reason ? { reason: r.reason } : !physical ? { reason: 'worker-closure-unproven' } : {}),
+    ...(r?.error ? { error: String(r.error).slice(0, 200) } : {}), at: new Date(now).toISOString() };
+  try {
+    m.transaction(() => {
+      const fresh = jobOf(m, jobId);
+      if (!fresh || fresh.worker_id !== handle || fresh.attempt_id !== job.attempt_id || (fresh.payload.dispatch ?? null) !== dispatch) {
+        record.ok = false;
+        record.reason = 'worker-owner-changed';
+      }
+      if (record.ok) {
+        setJob(m, jobId, { payload: { ...fresh.payload, terminalClosed: record } });
+        if (fresh.attempt_id != null) m.updateSupAttempt(fresh.attempt_id, { closedAt: now });
+      }
+      supervisorEvent(m, { entityType: 'job', entityId: jobId, kind: record.ok ? 'worker-terminal-closed' : 'worker-terminal-unclosed', payload: record, now });
+    });
+  } catch { /* the close stands; the tick GC re-reads Orca */ }
+  return record;
 }

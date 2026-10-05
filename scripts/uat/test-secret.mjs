@@ -6,7 +6,7 @@
 // committed. It is written with the repository's existing command (`node <repo>/scripts/stack-secret.mjs set
 // <stack>/secrets/test/<name>`, npm run secret:set), which encrypts against the recipients `.sops.yaml` names and
 // removes the plaintext; this module only READS: the local plaintext when present, else the `.enc` decrypted by sops
-// with the shared age identity (SOPS_AGE_KEY_FILE, default ~/.starci/master.identity) into memory.
+// with the shared identity selection engine/secrets.mjs owns; the caller supplies its canonical environment.
 // A credential that need not be stable across runs (a disposable account registered per run) is generated per run
 // and stored nowhere. A value is never logged.
 //
@@ -18,6 +18,9 @@
 // The push secret scan (scripts/supervisor/push-mains.mjs) passes a `.enc` only when isSopsEnvelope holds (scripts/lib/sops-envelope.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
+import { runProgram } from '../api/process/run-program.mjs';
+import { resolveRealTool } from '../api/process/resolve-real-tool.mjs';
+const sopsInvocation = Object.freeze({runProgram,resolveRealTool});
 import { decrypt } from '../api/sops/decrypt.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { setCommand, sopsFormatFor, testSecretPaths } from '../lib/sops-envelope.mjs';
@@ -28,8 +31,8 @@ export function testSecret(name, { repo, stack = 'dev', env = process.env, sops 
   if (fs.existsSync(plain)) return fs.readFileSync(plain, 'utf8').replace(/\r?\n$/, '');
   if (!fs.existsSync(enc)) throw new Error(`test secret ${name} is not in .starcistacks/${rel}.enc; store it with \`${setCommand(name, stack)}\` in ${repo}`);
   const format = sopsFormatFor(plain);
-  const r = decrypt(sops, ['--decrypt', '--input-type', format, '--output-type', format, enc], { cwd: path.resolve(String(repo)), env, maxBuffer: 1024 * 1024 });
-  if (r.error?.code === 'SOPS_MISSING') throw r.error;
+  const r = decrypt(sops, ['--decrypt', '--input-type', format, '--output-type', format, enc], { cwd: path.resolve(String(repo)), env, invocation: sopsInvocation, maxBuffer: 1024 * 1024 });
+  if (r.error?.identityRefusal || r.error?.code === 'SOPS_MISSING') throw r.error;
   if (r.status !== 0) throw new Error(`test secret ${name}: sops could not decrypt .starcistacks/${rel}.enc (${String(r.stderr ?? r.error?.message ?? '').trim().split(/\r?\n/).pop()})`);
   return String(r.stdout).replace(/\r?\n$/, '');
 }

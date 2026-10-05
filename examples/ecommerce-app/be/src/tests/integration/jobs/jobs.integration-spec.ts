@@ -1,6 +1,9 @@
-import { fakeIds } from "@starci/jest-preset"
+import { fakeIds, mock } from "@starci/jest-preset"
 import assert from "node:assert"
+import type { ReceiptService } from "@modules/domain/order"
 import type { ClaimedJob } from "@modules/platform/jobs"
+import { StoreReceiptStep } from "../../../features/jobs/send-receipt/steps/store-receipt.step"
+import { SendReceiptProcessor } from "../../../features/jobs/send-receipt/transport/queue/send-receipt.processor"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
 import { JOB_OF_KEY } from "../../fixtures/queues/probe.sql"
 import { ProbeJobBehavior } from "../../world/probe-job.module"
@@ -64,6 +67,11 @@ describe("fenced jobs (integration)", () => {
         await leaseExpires()
         const owner = await claim(key)
         assert(zombie !== null && owner !== null)
+
+        const receipts = mock<ReceiptService>()
+        const processor = new SendReceiptProcessor(new StoreReceiptStep(receipts, claims()))
+        await expectFencedOut(() => processor.process(zombie))
+        expect(receipts.archiveReceipt).not.toHaveBeenCalled()
 
         await expectFencedOut(() =>
             claims().advance({ jobId: zombie.jobId, expectedFencingToken: zombie.fencingToken, step: "charge" }),

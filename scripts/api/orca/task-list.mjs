@@ -6,6 +6,11 @@
 import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 
+/**
+ * Reads Tasks for the named Run rather than relying on an inferred sender terminal.
+ * ok requires an actual tasks array, including a valid empty array.
+ * A failed or malformed response falls back to an empty array without proving that the Run has no Tasks; callers retain error and outage detail.
+ */
 export function taskList({ run }) {
   const r = orcaCall('task-list', { run });
   const tasks = Array.isArray(r.result?.tasks) ? r.result.tasks : null;

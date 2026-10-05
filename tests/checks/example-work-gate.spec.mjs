@@ -7,6 +7,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { checkWorkTree, checkFamiliesDrift, checkStarciworkBoundary, FAMILIES } from '../../scripts/work/validate/check-example-work.mjs';
 import { validateWork } from '../../scripts/work/validate/work-validate.mjs';
+import { exampleWorkRoots, exampleArtifactReadOptions } from '../../scripts/lib/example-refs.mjs';
+import { capturesOf } from '../../scripts/work/impl-captures.mjs';
+import { renderProofProblems } from '../../scripts/work/render-proof.mjs';
+import { encodePng, screen } from '../helpers/png.mjs';
 
 /**
  * One fixture tree per new-concept rule in scripts/work/validate/check-example-work.mjs, proving each rule refuses the
@@ -906,4 +910,142 @@ test('a UAT flow that selects a role its identity does not present is refused as
   assert.ok(bad.some(p => p.includes('role admin') && p.includes('[HFS_IDENTITY_CUSTODY]')), bad.join('\n'));
   const good = refusalsFor({ ...identityFor('.starcistacks/dev/secrets/identity-demo.enc'), ...flowFor('person') });
   assert.deepEqual(good.filter(p => p.includes('HFS_IDENTITY_CUSTODY')), []);
+});
+
+// The command and this fixture use the same actual HFS-app discovery owner, never a recursive dependency scan.
+test('example Work roots exclude installed dependency templates and catalog metadata', () => {
+  const runtime = freshDir(), app = path.join(runtime, 'examples', 'current-app');
+  write(app, 'hfs.json', '{"kind":"app"}\n');
+  write(app, '.starciwork/index.yaml', 'schema: work/catalog@1\nid: current-app\nfeatures: []\n');
+  write(app, '.starciwork/features/f/br/rule/index.yaml', 'schema: work/business-rule@1\nid: br.f.rule\nstate: todo\n');
+  write(runtime, 'examples/index.yaml', 'schema: starci/code-example-catalog@1\nexamples: []\n');
+  write(app, 'node_modules/installed/hfs.json', '{"kind":"app"}\n');
+  write(app, 'node_modules/installed/templates/app/skeleton/.starciwork/index.yaml', 'schema: work/catalog@1\nid: {{project}}\n');
+  const roots = exampleWorkRoots(runtime);
+  assert.deepEqual(roots, [path.join(app, '.starciwork')]);
+  const problems = [];
+  for (const root of roots) checkWorkTree(root, problems);
+  assert.deepEqual(problems, []);
+});
+
+test('an absent own Work directory is optional but an existing empty or child-only Work root needs its own index', () => {
+  const runtime = freshDir(), app = path.join(runtime, 'examples', 'current-app');
+  write(app, 'hfs.json', '{"kind":"app"}\n');
+  assert.deepEqual(exampleWorkRoots(runtime), [], 'a truly absent own Work directory supplies no Work tree');
+  fs.mkdirSync(path.join(app, '.starciwork'));
+  assert.throws(() => exampleWorkRoots(runtime), /index\.yaml|reference|ENOENT/, 'an existing empty root cannot silently disappear from validation');
+  write(app, '.starciwork/features/f/index.yaml', 'schema: work/feature@1\nid: f\n');
+  assert.throws(() => exampleWorkRoots(runtime), /index\.yaml|reference|ENOENT/, 'child Work records do not replace the required own root index');
+});
+
+test('non-string Work record IDs are typed refusals rather than a crashed criterion walk', () => {
+  for (const id of [17, true, false, null, ['br.f.rule'], { value: 'br.f.rule' }]) {
+    const root = tree({
+      'features/f/br/rule/index.yaml': `schema: work/business-rule@1\nid: ${JSON.stringify(id)}\nstate: todo\nacceptance: [{id: ac.f.rule.accepted, name: accepted}]\n`,
+      'features/f/br/valid/index.yaml': 'schema: work/business-rule@1\nid: br.f.valid\nstate: todo\n',
+    });
+    const problems = [];
+    let counts;
+    assert.doesNotThrow(() => { counts = checkWorkTree(root, problems); });
+    assert.equal(problems.filter(problem => problem.includes('[ID_TYPE]')).length, 1, problems.join('\n'));
+    assert.equal(counts.records, 2, 'catalog and the valid sibling remain in the real record walk');
+  }
+});
+
+test('artifact context uses actual HFS apps including an app absent from the pattern catalog', () => {
+  const runtime = freshDir(), work = path.join(runtime, 'examples', 'lite-app', '.starciwork');
+  write(runtime, 'examples/lite-app/hfs.json', '{"kind":"app"}\n');
+  write(work, 'index.yaml', 'schema: work/catalog@1\nid: lite-app\nfeatures: []\n');
+  write(runtime, 'examples/index.yaml', 'schema: starci/code-example-catalog@1\nexamples: []\n');
+  const options = exampleArtifactReadOptions(runtime, work);
+  assert.ok(Object.isFrozen(options));
+  assert.deepEqual(options, {root: path.join(runtime, 'examples', '.runtimes', 'lite-app', 'artifacts')});
+  assert.deepEqual(exampleArtifactReadOptions(runtime, path.join(freshDir(), '.starciwork')), {});
+  assert.throws(() => exampleArtifactReadOptions(runtime, path.join(runtime, 'examples', 'LITE-APP', '.starciwork')), /context/);
+  assert.throws(() => exampleArtifactReadOptions(runtime, path.join(runtime, 'examples', '.runtimes', 'lite-app')), /context/);
+  assert.throws(() => exampleArtifactReadOptions(runtime, path.join(runtime, 'examples', 'unknown-app', '.starciwork')), /context/);
+  const problems = [];
+  checkWorkTree(work, problems, [], [], work, {runtimeRoot: runtime});
+  assert.deepEqual(problems, [], 'a basic example with no citations needs no CAS directory');
+});
+
+test('selected UAT results require the cited verified bytes even when the authored outcome says pass', () => {
+  const runtime = freshDir(), app = path.join(runtime, 'examples', 'scope-app'), work = path.join(app, '.starciwork');
+  write(app, 'hfs.json', '{"kind":"app"}\n');
+  write(work, 'index.yaml', 'schema: work/catalog@1\nid: scope-app\nfeatures: []\n');
+  const bytes = Buffer.from('outcome: pass\n'), sha = crypto.createHash('sha256').update(bytes).digest('hex');
+  write(work, 'features/f/uat/one/index.yaml', 'schema: work/uat-flow@1\nid: uat.f.one\nstate: done\n');
+  write(work, 'features/f/uat/one/evidence.yaml', JSON.stringify({schema: 'work/evidence@1', record: 'uat.f.one', outcome: 'pass',
+    run: {id: 'one', outcome: 'pass', screens: [{name: 'screen.png', sha256: sha}], videos: [{name: 'video.webm', sha256: sha}], result: {name: 'result.md', sha256: sha}}}));
+  const invoke = () => { const p = []; checkWorkTree(work, p, [], [], work, {runtimeRoot: runtime}); return p; };
+  assert.ok(invoke().some(p => p.includes('[UAT_RESULT_INVALID]')), 'missing result cannot use either authored pass');
+  const cas = path.join(runtime, 'examples', '.runtimes', 'scope-app', 'artifacts');
+  write(cas, `${sha.slice(0, 2)}/${sha}`, bytes);
+  write(cas, `${sha.slice(0, 2)}/${sha}.json`, JSON.stringify({size: bytes.length, mediaType: 'text/markdown', createdAt: '2026-01-01T00:00:00Z'}));
+  assert.deepEqual(invoke().filter(p => p.includes('result does not record') || p.includes('[UAT_RESULT_INVALID]')), []);
+  write(cas, `${sha.slice(0, 2)}/${sha}`, Buffer.from('outcome: fail\n'));
+  assert.ok(invoke().some(p => p.includes('[UAT_RESULT_INVALID]')), 'changed bytes cannot claim the old passing digest');
+});
+
+test('selected render capture context reaches actual PNG and markup checks without default-store fallback', () => {
+  const runtime = freshDir(), app = path.join(runtime, 'examples', 'scope-app'), work = path.join(app, '.starciwork');
+  write(app, 'hfs.json', '{"kind":"app"}\n');
+  write(work, 'index.yaml', 'schema: work/catalog@1\nid: scope-app\nfeatures: []\n');
+  write(work, 'brand/index.yaml', JSON.stringify({brand: {identity: {family: 'starci'}, color: {tokens: [
+    {token: '--demo-accent', value: '#7547ff', role: 'primary'}, {token: '--demo-surface', value: '#ffffff', role: 'surface'}]}}}));
+  const uiDir = path.join(work, 'features/f/ui/one'), implDir = path.join(work, 'features/f/impl/one');
+  write(uiDir, 'index.yaml', JSON.stringify({schema: 'work/ui-screen@1', id: 'ui.f.one', ui: {surfaces: []}}));
+  fs.mkdirSync(implDir, {recursive: true});
+  const options = exampleArtifactReadOptions(runtime, work), beforeEnv = process.env.STARCI_ARTIFACT_ROOT;
+  const png = encodePng({...screen({width: 24, height: 24, bands: [{hex: '#7547ff', rows: 8}]}), filter: 0});
+  const markup = Buffer.from('<main><section><h2>Examples</h2><ul><li>one</li><li>two</li><li>three</li></ul></section></main>');
+  const assets = [];
+  for (const [name, bytes, mediaType] of [['screen.png', png, 'image/png'], ['screen.html', markup, 'text/html']]) {
+    const sha = crypto.createHash('sha256').update(bytes).digest('hex');
+    write(options.root, `${sha.slice(0, 2)}/${sha}`, bytes);
+    write(options.root, `${sha.slice(0, 2)}/${sha}.json`, JSON.stringify({size: bytes.length, mediaType, createdAt: '2026-01-01T00:00:00Z'}));
+    assets.push({name, sha256: sha});
+  }
+  const rec = {schema: 'work/implementation@1', dir: implDir, data: {assets, proves: ['ui.f.one']}};
+  const records = new Map([['ui.f.one', {schema: 'work/ui-screen@1', dir: uiDir}]]);
+  const candidates = capturesOf(implDir, rec.data, options);
+  assert.deepEqual(fs.readFileSync(candidates[0].png), png);
+  assert.deepEqual(fs.readFileSync(candidates[0].markup), markup);
+  assert.deepEqual(renderProofProblems({rec, records, workRoot: work, workspaceDoc: null, blobOptions: options}), []);
+
+  // Mixed citations reach both existing render consumers without invoking the separate byte validator.
+  const secondPng = encodePng({...screen({width: 24, height: 24, bands: [{hex: '#7547ff', rows: 12}]}), filter: 0});
+  const secondSha = crypto.createHash('sha256').update(secondPng).digest('hex');
+  assert.notEqual(secondSha, assets[0].sha256, 'the absent PNG cannot accidentally share the present CAS digest');
+  assets.push({name: 'missing.png', sha256: secondSha}, {name: 'missing.html', sha256: assets[1].sha256});
+  const direct = () => renderProofProblems({rec, records, workRoot: work, workspaceDoc: null, blobOptions: options});
+  const mixedDirect = direct();
+  assert.equal(mixedDirect.filter(p => p.includes('[RENDER_CAPTURE_MISSING]') && p.includes('missing.png')).length, 1,
+    'the readable first PNG must not hide a declared absent PNG: ' + mixedDirect.join('\n'));
+  const brandRecord = JSON.parse(fs.readFileSync(path.join(work, 'brand/index.yaml'), 'utf8'));
+  write(work, 'brand/index.yaml', JSON.stringify({...brandRecord, schema: 'work/brand@1', id: 'brand', state: 'todo'}));
+  write(implDir, 'index.yaml', JSON.stringify({schema: 'work/implementation@1', id: 'impl.f.one', state: 'done', ...rec.data}));
+  const treeRender = () => {
+    const problems = [], warnings = [];
+    checkWorkTree(work, problems, warnings, [], work, {runtimeRoot: runtime});
+    return {problems, warnings};
+  };
+  const mixedTree = treeRender();
+  assert.ok(mixedTree.problems.some(p => p.includes('[RENDER_CAPTURE_MISSING]') && p.includes('missing.png')),
+    'the actual done frontend render leg must refuse mixed missing citations: ' + mixedTree.problems.join('\n'));
+  assert.equal(mixedTree.warnings.filter(p => p.includes('[RENDER_CAPTURE_MISSING]')).length, 0, 'selected absence is not a warning');
+  write(options.root, `${secondSha.slice(0, 2)}/${secondSha}`, secondPng);
+  write(options.root, `${secondSha.slice(0, 2)}/${secondSha}.json`,
+    JSON.stringify({size: secondPng.length, mediaType: 'image/png', createdAt: '2026-01-01T00:00:00Z'}));
+  assert.deepEqual(direct(), [], 'both actual PNGs and matching markup now pass the existing render owner');
+  const restoredTree = treeRender();
+  assert.equal(restoredTree.problems.filter(p => p.includes('[RENDER_CAPTURE_MISSING]')).length, 0,
+    'restoring the selected bytes removes that exact refusal; other structural obligations remain independent');
+  assert.equal(restoredTree.warnings.filter(p => p.includes('[RENDER_CAPTURE_MISSING]')).length, 0);
+  const another = path.join(runtime, 'examples', '.runtimes', 'another-app', 'artifacts');
+  assert.equal(capturesOf(implDir, rec.data, {root: another})[0].png, null);
+  const pngSha = assets[0].sha256;
+  fs.writeFileSync(path.join(options.root, pngSha.slice(0, 2), pngSha), Buffer.alloc(png.length));
+  assert.ok(renderProofProblems({rec, records, workRoot: work, workspaceDoc: null, blobOptions: options}).some(p => p.includes('[RENDER_CAPTURE_INVALID]')));
+  assert.equal(process.env.STARCI_ARTIFACT_ROOT, beforeEnv);
 });

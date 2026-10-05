@@ -2,7 +2,6 @@
 import { getWorkflow } from './shared/rows.mjs';
 import { openPeerWaits } from './shared/peer-waits.mjs';
 import { readFoundations } from '../foundation-registry.mjs';
-import { loadContractChanges } from '../../machine/contract-version.mjs';
 
 export default {
   verb: 'foundations',
@@ -11,7 +10,7 @@ export default {
   run({ ledger, args, repo, emit, internals }) {
     const db = ledger.db;
     if (args.workflow && !getWorkflow(db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
-    const foundations = readFoundations(db), registry = loadContractChanges(internals.skillRoot);
+    const foundations = readFoundations(db);
     const running = db.prepare("SELECT * FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY created_at,workflow_id").all();
     const phaseOf = (id) => { const wf = getWorkflow(db, id); return wf ? (wf.archived_at != null ? 'archived' : wf.phase ?? null) : 'unknown'; };
     const waits = running.flatMap((wf) => openPeerWaits(db, wf.workflow_id).filter((wait) => wait.untilFoundation)
@@ -25,7 +24,7 @@ export default {
       waits: waits.filter((wait) => wait.foundation === f.name).map(({ workflowId, incidentId, holds }) => ({ workflowId, incidentId, holds })),
     }));
     const workflows = running.filter((wf) => !args.workflow || wf.workflow_id === args.workflow).map((wf) => {
-      const duty = internals.foundationDutyOf(db, wf, { foundations, registry });
+      const duty = internals.foundationDutyOf(db, wf, { foundations });
       return { workflowId: wf.workflow_id, title: wf.title ?? null, peers: duty.peers.length, declared: duty.declared, none: duty.none,
         owns: duty.owns.map((f) => f.name), needs: duty.needs.map((f) => f.name), required: duty.required, advised: duty.advised };
     });

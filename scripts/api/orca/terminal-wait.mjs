@@ -10,6 +10,13 @@
 import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 
+/**
+ * Ask Orca to observe exit or tui-idle for the exact terminal within timeoutMs.
+ * A host timeout is a completed read with timedOut true, not a failed call or proof of exit.
+ * Closure callers require satisfied and an available host before releasing terminal custody.
+ * @param {object} input - Required terminal; optional declared condition and wait duration.
+ * @returns {object} Read status, satisfaction/timeout, observed state/exit cause, and host failure details.
+ */
 export function terminalWait({ terminal, for: condition = 'exit', timeoutMs = 10_000 }) {
   const r = orcaCall('terminal-wait', { terminal, for: condition, 'timeout-ms': String(timeoutMs) }, { timeout: timeoutMs + 15_000 });
   const wait = r.result?.wait ?? null;

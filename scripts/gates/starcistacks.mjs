@@ -10,12 +10,10 @@
 // before it asks for any credential, and never asks the owner for what it declares `ownerAction: none`
 // with custody present.
 //
-//   starci gate starcistacks <repo-root> [--new] [--admitted-at <ISO|ms> [--op <op>]] [--json]
+//   starci gate starcistacks <repo-root> [--new] [--json]
 //
 //   --new          the repository is being created by this leg (interface.scaffold, backend.scaffold,
 //                  package.scaffold): a missing declaration or services block is refused, not a suspect
-//   --admitted-at  the leg's admission (starci kernel op-contract --json admission.admittedAt): finding codes a
-//                  contract change added after it are suspects for that leg (modules/kernel/contract-changes/)
 //
 // Refusals: an unknown or ambiguous service declaration, custody that is missing where it is declared,
 // an owner action declared for something custody already holds, CI calling a service the declaration
@@ -47,7 +45,6 @@ export { DECLARATION, STACK_ROOT, findStackDeclaration };
 
 const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 const DECLARATION_SCHEMA = 'starci/application-stacks@1';
-const CONTRACT_CHANGE = 'starcistacks-services';
 const FOLLOW_UP = { op: 'workspace.manage', params: { mode: 'stacks' },
   detail: `author the services block of the repository stack declaration (sonar and every other delivery/quality service) from ${STACK_DECLARATION_TEMPLATE}` };
 
@@ -61,7 +58,7 @@ const SERVICE_CATALOG = {
   'error-tracking': { providers: ['sentry', 'glitchtip'], words: ['sentry', 'glitchtip'], ci: [/getsentry\/action-release/i, /\bSENTRY_AUTH_TOKEN\b/] },
 };
 
-/** Every finding code this check can emit (registered by contract change starcistacks-services). */
+/** Every finding code this check can emit. */
 export const CODES = [
   'STACKS_DECLARATION_MISSING', 'STACKS_DECLARATION_INVALID', 'STACKS_SERVICES_MISSING',
   'STACKS_SCHEMA_INVALID', 'STACKS_SERVICE_UNKNOWN', 'STACKS_PROVIDER_UNKNOWN',
@@ -71,9 +68,6 @@ export const CODES = [
   'STACKS_PLAINTEXT_TRACKED', 'STACKS_ENC_TWIN_MISSING', 'STACKS_GITIGNORE_OPEN', 'STACKS_DECLARATION_IGNORED',
   'STACKS_GITIGNORE_VALUE_OPEN', 'STACKS_RUNBOOK_IGNORED', 'STACKS_QUALITY_GATE_DRIFT',
 ];
-/** Codes an older leg's admission never demotes: a tracked plaintext secret is a leak already, and
- *  ignore rules that let the next one be tracked are the same leak one `git add` away. */
-const SAFETY_CODES = new Set(['STACKS_PLAINTEXT_TRACKED', 'STACKS_GITIGNORE_VALUE_OPEN']);
 /** A plaintext value file inside infra/** (compose, terraform): env files, keys, certificates, tfvars. */
 const INFRA_VALUE_FILE = /^(\.env(\..+)?|.+\.(env|key|pem|tfvars)(\..+)?)$/;
 /** Paths (under <root>/<environment>/) the ignore rules must deny; they need not exist. */
@@ -238,10 +232,9 @@ function git(call, repo, args) {
 
 /**
  * The whole check for one repository. `newRepo`: the leg creates this repository, so what it lacks is
- * refused. `advisoryCodes`: codes a contract change added after the checked leg was admitted - suspects
- * for it (safety codes excepted).
+ * refused under the current declaration and custody rules.
  */
-export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [] } = {}) {
+export function checkStarciStacks(repoRoot, { newRepo = false } = {}) {
   const repo = path.resolve(String(repoRoot ?? ''));
   const name = repositoryName(repo);
   const findings = [];
@@ -422,10 +415,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
       add('suspect', 'STACKS_DECLARATION_IGNORED', shown(own.file), `the ignore rules hide the declaration; re-include it (!${slash(path.relative(repo, own.file))}) so every machine reads the same services`);
   }
 
-  const advisory = new Set(advisoryCodes);
-  for (const finding of findings)
-    if (finding.level === 'refuse' && advisory.has(finding.code) && !SAFETY_CODES.has(finding.code)) Object.assign(finding, { level: 'suspect', advisory: true });
-  const pick = (level) => findings.filter((finding) => finding.level === level).map((finding) => `${finding.file}: ${finding.message} [${finding.code}]${finding.advisory ? ' (added after this leg was admitted)' : ''}`);
+  const pick = (level) => findings.filter((finding) => finding.level === level).map((finding) => `${finding.file}: ${finding.message} [${finding.code}]`);
   const refused = pick('refuse');
   const needsFollowUp = findings.some((finding) => ['STACKS_DECLARATION_MISSING', 'STACKS_SERVICES_MISSING', 'STACKS_SERVICE_UNDECLARED'].includes(finding.code) && finding.level !== 'refuse');
   return {
@@ -434,7 +424,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
     governedBy: governing ? slash(governing.repo) : null,
     services: Object.fromEntries(Object.entries(normalized).map(([id, service]) => [id, summary(service)])),
     refused, suspect: pick('suspect'), findings,
-    ...(needsFollowUp ? { followUp: { change: CONTRACT_CHANGE, ...FOLLOW_UP, ...(isFile(path.join(skillRoot, STACK_DECLARATION_TEMPLATE)) ? { fixture: STACK_DECLARATION_TEMPLATE } : {}) } } : {}),
+    ...(needsFollowUp ? { followUp: { ...FOLLOW_UP, ...(isFile(path.join(skillRoot, STACK_DECLARATION_TEMPLATE)) ? { fixture: STACK_DECLARATION_TEMPLATE } : {}) } } : {}),
   };
 }
 
@@ -478,32 +468,18 @@ export function ownerAskConflict({ repo, question } = {}) {
 
 // ---- CLI ------------------------------------------------------------------------------------------------
 
-async function admittedCodes(argv) {
-  const at = argv.indexOf('--admitted-at');
-  if (at < 0) return { ok: true, codes: [], drop: [] };
-  const raw = argv[at + 1];
-  const admittedAt = /^\d+$/.test(String(raw)) ? Number(raw) : Date.parse(String(raw));
-  if (!Number.isFinite(admittedAt)) return { ok: false };
-  const opAt = argv.indexOf('--op');
-  const { advisoryCodesFor, loadContractChanges } = await import('../machine/contract-version.mjs');
-  const { codes } = advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt, op: opAt >= 0 ? argv[opAt + 1] : null });
-  return { ok: true, codes, drop: [at, at + 1, ...(opAt >= 0 ? [opAt, opAt + 1] : [])] };
-}
-
-const USAGE = 'Usage: starci gate starcistacks <repo-root> [--new] [--admitted-at <ISO|epoch-ms> [--op <op>]] [--json]\n\nHolds a repository\'s stack declaration services block (sonar, container-registry, analytics, error-tracking) and its custody layout to modules/schemas/application-stacks.schema.yaml and stacks-layout.yaml. Exit 0 clean (suspects allowed), 1 refused, 2 usage.\n';
+const USAGE = 'Usage: starci gate starcistacks <repo-root> [--new] [--json]\n\nHolds a repository\'s stack declaration services block (sonar, container-registry, analytics, error-tracking) and its custody layout to modules/schemas/application-stacks.schema.yaml and stacks-layout.yaml. Exit 0 clean (suspects allowed), 1 refused, 2 usage.\n';
 
 export async function checkStarciStacksMain(argv = []) {
-  const admitted = await admittedCodes(argv);
-  if (!admitted.ok) return { exitCode: 2, text: '--admitted-at takes an ISO date-time or epoch milliseconds (starci kernel op-contract --json admission.admittedAt)\n' };
-  const rest = argv.filter((_, index) => !admitted.drop.includes(index));
+  const rest = argv;
   const args = rest.filter((arg) => !['--json', '--new'].includes(arg));
   if (args.includes('--help') || args.includes('-h')) return { exitCode: 0, text: USAGE };
   if (args.length !== 1) return { exitCode: 2, text: USAGE };
   if (!isDir(args[0])) return { exitCode: 2, text: `${args[0]}: not a directory\n` };
-  const result = checkStarciStacks(args[0], { newRepo: rest.includes('--new'), advisoryCodes: admitted.codes });
+  const result = checkStarciStacks(args[0], { newRepo: rest.includes('--new') });
   if (rest.includes('--json')) return { exitCode: result.ok ? 0 : 1, text: `${JSON.stringify(result, null, 2)}\n` };
   const lines = [...result.refused.map((line) => `  REFUSED ${line}`), ...result.suspect.map((line) => `  SUSPECT ${line}`)];
-  if (result.followUp) lines.push(`  follow-up: ${result.followUp.op} mode ${result.followUp.params.mode} (${result.followUp.change})${result.followUp.fixture ? ` from ${result.followUp.fixture}` : ''}`);
+  if (result.followUp) lines.push(`  follow-up: ${result.followUp.op} mode ${result.followUp.params.mode}${result.followUp.fixture ? ` from ${result.followUp.fixture}` : ''}`);
   return { exitCode: result.ok ? 0 : 1, text: `${lines.join('\n')}${lines.length ? '\n' : ''}${result.ok ? 'OK' : 'FAIL'}: starcistacks ${result.repository} - ${result.refused.length} refused, ${result.suspect.length} suspect, services: ${Object.keys(result.services).join(', ') || 'none declared'}.\n` };
 }
 

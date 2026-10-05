@@ -6,6 +6,7 @@ import {walk} from '../work/validate/check-example-work.mjs';
 import {runDerive} from '../example/example-derive.mjs';
 import {runCritique} from '../example/example-critique.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
+import { exampleWorkRoots } from '../lib/example-refs.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 /**
@@ -14,7 +15,7 @@ import { isMain } from '../lib/is-main.mjs';
  * field shaped like a derived one" rule) do not need anything check-example-work.mjs's `checkWorkTree`
  * already computes. Keeping this in its own file keeps both diffs small and independent to merge.
  *
- * Three checks, per `.starciwork` tree found under examples/:
+ * Three checks, per declared example app's own `.starciwork` tree:
  *  1. `_derived/index.yaml` exists and matches what scripts/example/example-derive.mjs computes right now (a stale
  *     or missing derived index is refused - it would be exactly the "authored by hand, drifts silently"
  *     failure mode the derivation exists to prevent).
@@ -53,11 +54,17 @@ export function checkExampleDerived(workRoot, problems) {
   return {checked: true};
 }
 
+/** Check every declared example app's own Work tree; malformed own roots refuse. */
+export function checkExampleDerivedTrees(root, problems) {
+  const roots = exampleWorkRoots(root);
+  for (const workRoot of roots) checkExampleDerived(workRoot, problems);
+  return roots;
+}
+
 if (isMain(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const problems = [];
-  const roots = walk(path.join(root, 'examples')).filter(file => file.endsWith(`.starciwork${path.sep}index.yaml`)).map(path.dirname);
-  for (const workRoot of roots) checkExampleDerived(workRoot, problems);
+  const roots = checkExampleDerivedTrees(root, problems);
   for (const problem of problems) console.log(`REFUSED ${problem}`);
   console.log(`${roots.length} work tree(s) checked: ${problems.length ? `${problems.length} refused` : 'every derived index is fresh and no record authors derived vocabulary'}`);
   process.exitCode = problems.length ? 1 : 0;

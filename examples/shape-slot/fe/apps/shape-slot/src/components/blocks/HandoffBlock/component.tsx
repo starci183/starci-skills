@@ -98,9 +98,10 @@ export const HandoffBlockBase = (props: HandoffBlockBaseProps) => {
             )}
         </SlotView>
     )
-    const send = (value: Handoff, label: string) => (
+    const send = (value: Handoff, label: string, isSkeleton: boolean) => (
         <Button
             variant="primary"
+            isSkeleton={isSkeleton}
             onPress={() => props.on.requestSend({ fingerprint: value.fingerprint, revision: value.revision })}
         >
             {label}
@@ -129,7 +130,7 @@ export const HandoffBlockBase = (props: HandoffBlockBaseProps) => {
                                             {labels.fingerprint} {value.fingerprint} · {labels.revision}{" "}
                                             {value.revision}
                                         </Text>
-                                        {send(value, labels.send)}
+                                        {send(value, labels.send, isSkeleton)}
                                     </div>
                                 )}
                             </SlotView>
@@ -173,7 +174,7 @@ export const HandoffBlockBase = (props: HandoffBlockBaseProps) => {
                                         <Text isSkeleton={isSkeleton}>
                                             {labels.reason}: {value.reason}
                                         </Text>
-                                        {send(value, labels.resend)}
+                                        {send(value, labels.resend, isSkeleton)}
                                     </div>
                                 )}
                             </SlotView>

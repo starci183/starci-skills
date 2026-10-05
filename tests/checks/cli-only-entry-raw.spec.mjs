@@ -86,11 +86,11 @@ test('environment assignments, cd prefixes, and command separators are classifie
   ]);
 });
 
-test('prohibitions, history, tests, generated runtime copies, policy data, and catalog prose are exempt', () => {
+test('former contract entries remain live while prohibitions, real history, tests, generated copies and policy data stay exempt', () => {
   const report = scan({
     'docs/safety.md': 'The raw command `git commit -m x` is denied. Never run `npm test`.',
     'CHANGELOG-next.md': '`git commit -m x`',
-    'modules/kernel/contract-changes/old.yaml': 'summary: "`npm test` was retired"',
+    'modules/kernel/contract-changes/old.yaml': 'summary: "`npm test` was retired"\nrun: "`npm test`"',
     'modules/kernel/command-policy.yaml': 'use: `docker compose up`',
     'tests/fixture.spec.mjs': 'const text = `supabase start`;',
     'packages/hfs/runtime/docs/readme.md': '`git commit -m x`',
@@ -104,6 +104,7 @@ test('prohibitions, history, tests, generated runtime copies, policy data, and c
   });
   assert.deepEqual(report.findings.map(({ file, line, program, sub }) => ({ file, line, program, sub })), [
     { file: 'modules/cli/commands/example/run.yaml', line: 5, program: 'docker', sub: 'compose' },
+    { file: 'modules/kernel/contract-changes/old.yaml', line: 2, program: 'npm', sub: 'test' },
   ]);
 });
 

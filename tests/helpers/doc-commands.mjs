@@ -9,7 +9,7 @@ import { validateArgs } from '../../packages/cli/src/validate-args.mjs';
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'coverage']);
 const TEXT_EXT = ['.md', '.yaml', '.yml', '.json', '.txt', '.mjs', '.ts', '.tsx'];
-const OUTSIDE = [/^modules\/cli\/commands\//, /^modules\/kernel\/contract-changes\//];
+const OUTSIDE = [/^modules\/cli\/commands\//];
 
 export const walk = (dir, ext) => {
   if (!fs.existsSync(dir)) return [];

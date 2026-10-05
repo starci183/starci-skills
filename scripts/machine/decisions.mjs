@@ -19,6 +19,7 @@
 //
 //   starci machine decisions ring|escalate-due|supervisor ... (the catalog defines the public arguments).
 import crypto from 'node:crypto';
+import { mutationAuthority } from '../lib/mutation-fence.mjs';
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
 import { execNode } from '../api/node/exec-node.mjs';
@@ -72,18 +73,20 @@ const SUBJECT_TYPES = new Set(['job', 'unit', 'attempt', 'graph', 'workflow']);
 /** DI fields that live in columns; everything else is the payload. */
 const COLUMN_FIELDS = new Set(['schema', 'id', 'idempotencyKey', 'key', 'keyParts', 'kind', 'decider', 'workflowId', 'summary', 'evidence', 'options', 'allowedVerbs',
   'openedBy', 'openedAt', 'dueAt', 'escalateTo', 'escalations', 'claim', 'status', 'supersededBy', 'claimExpired']);
-const payloadOf = (di) => Object.fromEntries(Object.entries(di).filter(([k, v]) => !COLUMN_FIELDS.has(k) && v !== undefined));
+const payloadOf = (di) => ({ ...Object.fromEntries(Object.entries(di).filter(([k, v]) => !COLUMN_FIELDS.has(k) && k !== 'claimAuthority' && v !== undefined)),
+  ...(di.claim?.authority ? { claimAuthority: di.claim.authority } : {}) });
 const listOf = (text) => { const v = parseJsonOr(text, []); return Array.isArray(v) ? v : []; };
 
 const rowToDi = (r) => {
   const p = parseJsonOr(r.payload_json, {}) ?? {};
+  const { claimAuthority, ...visible } = p;
   return {
-    ...p, schema: DI_SCHEMA, id: r.di_id, idempotencyKey: r.idempotency_key, key: r.idempotency_key, keyParts: parseJsonOr(r.key_parts_json, {}) ?? {},
+    ...visible, schema: DI_SCHEMA, id: r.di_id, idempotencyKey: r.idempotency_key, key: r.idempotency_key, keyParts: parseJsonOr(r.key_parts_json, {}) ?? {},
     kind: r.kind, decider: r.decider, workflowId: r.workflow_id,
     entity: p.entity ?? { type: r.entity_type ?? 'workflow', id: r.entity_id ?? r.workflow_id }, summary: r.summary,
     evidence: listOf(r.evidence_json), options: listOf(r.options_json), allowedVerbs: listOf(r.allowed_verbs_json),
     openedBy: r.opened_by, openedAt: r.opened_at, dueAt: r.due_at ?? null, escalateTo: r.escalate_to ?? null, escalations: Number(r.escalations) || 0,
-    claim: r.claim_by ? { by: r.claim_by, at: r.claim_at, ttlMs: r.claim_ttl_ms ?? CLAIM_TTL_MS } : null, status: r.status,
+    claim: r.claim_by ? { by: r.claim_by, at: r.claim_at, ttlMs: r.claim_ttl_ms ?? CLAIM_TTL_MS, ...(claimAuthority ? { authority: claimAuthority } : {}) } : null, status: r.status,
     resolution: r.resolved_by ? { ...(p.resolution ?? {}), by: r.resolved_by, verb: r.resolution_verb, decisionId: r.decision_id ?? null, at: r.resolved_at } : p.resolution ?? null,
     supersededBy: r.superseded_by ?? null,
   };
@@ -233,7 +236,8 @@ const liveOrRefuse = (db, id, now) => {
   if (!LIVE.includes(di.status)) throw refuse(`decision ${id} is ${di.status}`, 'decision-closed', { status: di.status });
   return di;
 };
-const heldByOther = (di, by, now) => di.status === 'claimed' && di.claim && di.claim.by !== by && di.claim.at + (di.claim.ttlMs ?? CLAIM_TTL_MS) > now;
+const heldByOther = (di, by, now) => di.status === 'claimed' && di.claim && di.claim.at + (di.claim.ttlMs ?? CLAIM_TTL_MS) > now
+  && (di.claim.by !== by || (mutationAuthority() != null && JSON.stringify(di.claim.authority ?? null) !== JSON.stringify(mutationAuthority())));
 
 /** Claim a DI for CLAIM_TTL_MS. Another live claimer is refused decision-held-by-other; the Supervisor claims a Kernel DI only escalated or cross-workflow. */
 export function claimDecision(ledger, id, { by, now = Date.now(), prefix = 'decision' } = {}) {
@@ -246,7 +250,7 @@ export function claimDecision(ledger, id, { by, now = Date.now(), prefix = 'deci
       throw refuse(`decision ${id} is the Kernel's (${di.kind}, not escalated): the Supervisor claims a Kernel DI only when it is escalated or cross-workflow; rule it with a supervisor-ruling DI instead`, 'decision-not-escalated');
     }
     if (di.claimExpired) event(ledger, prefix, di, 'expired', { claim: di.claim }, now);
-    const next = { ...di, status: 'claimed', claim: { by: String(by), at: now, ttlMs: CLAIM_TTL_MS }, ...(di.status === 'escalated' ? { claimedEscalated: true } : {}) };
+    const next = { ...di, status: 'claimed', claim: { by: String(by), at: now, ttlMs: CLAIM_TTL_MS, ...(mutationAuthority() ? { authority: mutationAuthority() } : {}) }, ...(di.status === 'escalated' ? { claimedEscalated: true } : {}) };
     write(ledger, next, now);
     event(ledger, prefix, next, 'claimed', { by: String(by), ttlMs: CLAIM_TTL_MS }, now);
     out = next;
@@ -272,7 +276,7 @@ export function resolveDecision(ledger, id, { by, verb, decisionId = null, note 
     const di = liveOrRefuse(ledger.db, id, now);
     if (heldByOther(di, by, now)) throw refuse(`decision ${id} is claimed by ${di.claim.by}`, 'decision-held-by-other', { holder: di.claim.by });
     if (!verbAllowed(di, verb)) throw refuse(`decision ${id} (${di.kind}) is resolved by one of: ${di.allowedVerbs.join(', ')}`, 'decision-verb-not-allowed', { allowedVerbs: di.allowedVerbs });
-    const next = { ...di, status: 'resolved', resolution: { by: String(by), verb: one(verb, 400), decisionId: decisionId ?? null, at: now, ...(note ? { note: one(note, 600) } : {}) } };
+    const next = { ...di, status: 'resolved', resolution: { by: String(by), ...(mutationAuthority() ? { authority: mutationAuthority() } : {}), verb: one(verb, 400), decisionId: decisionId ?? null, at: now, ...(note ? { note: one(note, 600) } : {}) } };
     write(ledger, next, now);
     event(ledger, prefix, next, 'resolved', next.resolution, now);
     out = next;

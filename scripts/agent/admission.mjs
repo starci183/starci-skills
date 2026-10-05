@@ -7,6 +7,7 @@ import { probeQuota } from './quota/index.mjs';
 import { prepareProviderBudget, reserveProviderBudget, markProviderBudget, releaseProviderBudget, providerBudgetUsage } from './provider-budget.mjs';
 import { biasForRole } from '../lib/owner-routing-bias.mjs';
 import { inspectProviderCircuit } from '../machine/provider-circuit.mjs';
+import { poolCapsNow } from '../machine/pool-backoff.mjs';
 import { providerCircuitOf, kindOrder } from './models.mjs';
 import { inspectOwnerConfig, configuredAllocationPolicy, validateConfig } from '../../engine/config.mjs';
 import { normalizeQuotaSnapshot } from './quota/snapshot.mjs';
@@ -72,6 +73,7 @@ export function planAgentAdmission({ role, scopeId, attemptId = null, kind = nul
   const observations = new Map();
   const circuits = new Map();
   const heldAttempts = new Map();
+  const backoff = poolCapsNow({ env, now: clock() });
   const candidates = (Array.isArray(allowGroup) ? allowGroup : []).map((member, index) => {
     const provider = member.provider ?? member.agent, model = member.model;
     const poolEntries = Object.entries(catalog?.pools ?? {}).filter(([id, pool]) => pool.provider === provider
@@ -90,7 +92,8 @@ export function planAgentAdmission({ role, scopeId, attemptId = null, kind = nul
       && receipt.scope?.scopeId === scopeId && ['runId', 'jobId', 'seat'].every((key) => (receipt.scope?.[key] ?? null) === (scope?.[key] ?? null)));
     if (held) heldAttempts.set(candidateAttemptId, { provider, account, model, receipt: held });
     const maxParallel = poolEntries.length === 0 ? 0
-      : Math.min(member.maxParallel ?? Infinity, ...poolEntries.map(([, row]) => row.maxParallel).filter(Number.isInteger));
+      : Math.min(member.maxParallel ?? Infinity, ...poolEntries.map(([, row]) => row.maxParallel).filter(Number.isInteger),
+        ...poolEntries.flatMap(([id, row]) => [backoff[id], backoff[row.target]]).filter(Number.isInteger));
     const registered = catalog?.models?.[model]?.provider === provider && poolEntries.length > 0;
     const quota = quotaForAdmission({ quota: observations.get(identity), provider, pool, role, kind,
       difficulty: difficulty ?? 'medium', scopeId, registry: catalog, runtimes: rt, policy, now: clock(), io });

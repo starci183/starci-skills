@@ -7,6 +7,13 @@
 import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 
+/**
+ * Set the title of an exact authorized terminal after launch; a title is not launch attestation.
+ * ok requires a successful receipt with a result. A refusal or missing result leaves the rename
+ * unconfirmed, and this wrapper does not retry a lost title-write receipt.
+ * @param {object} input - Required terminal handle and replacement title.
+ * @returns {object} Receipt status, requested terminal/title, result, and error.
+ */
 export function terminalRename({ terminal, title }) {
   const r = orcaCall('terminal-rename', { terminal, title });
   return { ok: r.exitCode === 0 && Boolean(r.result), terminal, title, result: r.result, error: r.error };

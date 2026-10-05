@@ -7,6 +7,7 @@
 //   declaredNames(source)         the names the file declares at any depth as a function, class or variable (RT_RETIRED_PRESENT)
 //   exportedNames(source)         the names the module exports (export function/const/class, export {a as b}, default)
 import { createRequire } from 'node:module';
+import path from 'node:path';
 
 let typescript = null;
 /** The TypeScript compiler, loaded once from the runtime's own dependencies. */
@@ -93,7 +94,20 @@ export function moduleRefs(source) {
 }
 
 /** The relative module references (`./x.mjs`, `../y.mjs`) of a parsed file. */
-export const relativeImports = (source) => moduleRefs(source).filter((ref) => ref.module.startsWith('.')).map((ref) => ({ specifier: ref.module, line: ref.line, column: ref.column }));
+const relativeImports = (source) => moduleRefs(source).filter((ref) => ref.module.startsWith('.')).map((ref) => ({ specifier: ref.module, line: ref.line, column: ref.column }));
+
+/**
+ * Exact relative runtime module targets from the shared AST. Tracked targets participate in the owner graph;
+ * an existing ignored generated target remains outside it. An absent target cannot silently remove an edge.
+ */
+export function relativeImportTargets(ctx, file) {
+  return relativeImports(ctx.parsed(file)).map((ref) => {
+    const to = path.posix.normalize(path.posix.join(path.posix.dirname(file), ref.specifier));
+    const tracked = ctx.fileSet.has(to);
+    const missing = ctx.read(to) == null;
+    return { ...ref, to, tracked, missing };
+  });
+}
 
 /** Every local name a parsed file binds: variable and parameter names (destructuring included), functions, classes, imports. */
 export function localBindings(source) {

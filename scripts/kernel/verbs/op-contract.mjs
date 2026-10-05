@@ -1,7 +1,7 @@
 // starci kernel op-contract: split from cli.mjs.
 import { parseJson } from '../../lib/json.mjs';
 import { jobOpOf } from './shared/rows.mjs';
-import { admittedContractOf, advisoryCodesFor, loadContractChanges } from '../../machine/contract-version.mjs';
+import { admittedContractOf } from '../../machine/contract-version.mjs';
 import { sleepSync } from '../../lib/sleep-sync.mjs';
 const OP_CONTRACT_WAIT_MS = 120_000;
 
@@ -47,13 +47,10 @@ export default {
     }
     if (!row) throw Object.assign(new Error(`no contract row for ${workflowId}/${op} attempt ${attempt ?? '(none filed)'}`), { code: 'contract-missing' });
     if (args.json) {
-      // The admission this attempt is judged by, and what landed after it: the checks and finding codes
-      // those changes added are suspects for this leg (a check script takes --admitted-at <admittedAt>).
+      // The exact filed admission and its captured input identity; current checks are never demoted by its age.
       const admission = admittedContractOf(db, { attempt_id: row.attempt_id });
-      const registry = loadContractChanges(internals.skillRoot);
-      const advisory = Number.isFinite(admission.at) ? advisoryCodesFor(registry, { admittedAt: admission.at, op, withheld: admission.withheld }) : { codes: [], checks: [], changes: [] };
       emit({ ok: true, workflowId, op, attempt: row.attempt, dispatchId: row.dispatch_id, markdown: row.markdown, context: parseJson(row.context_json), createdAt: row.created_at,
-        admission: { admittedAt: admission.at, source: admission.source, withheld: admission.withheld ?? [], runtimeSha: admission.version?.runtimeSha ?? null, digest: admission.version?.digest ?? null, laterChanges: advisory.changes, advisoryChecks: advisory.checks, advisoryCodes: advisory.codes } }, '', true);
+        admission: { admittedAt: admission.at, source: admission.source, runtimeSha: admission.version?.runtimeSha ?? null, digest: admission.version?.digest ?? null } }, '', true);
     } else {
       process.stdout.write(row.markdown.endsWith('\n') ? row.markdown : `${row.markdown}\n`);
     }

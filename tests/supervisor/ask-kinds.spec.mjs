@@ -60,7 +60,7 @@ const fakeBot = () => {
   };
   return { calls, fetchImpl, sends: () => calls.filter((c) => c.method === 'sendMessage') };
 };
-const telegramConfig = () => ({ ...structuredClone(EXAMPLE), language: 'vi', connectors: { secretsFile: null, cloudflare: { mode: 'named', hostname: 'response.example.org' }, telegram: { enabled: true, chatId: String(OWNER) } } });
+const telegramConfig = () => ({ ...structuredClone(EXAMPLE), language: 'vi', connectors: { cloudflare: { mode: 'named', hostname: 'response.example.org' }, telegram: { enabled: true, chatId: String(OWNER) } } });
 const seedAsk = (ledger, { workflowId, dispatchId, opId = 'provision.ask', question }) => {
   if (!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId)) seedWorkflow(ledger, { id: workflowId, state: { phase: 'running' } });
   const jobId=`ask-${dispatchId}`;
@@ -181,7 +181,7 @@ test('/asks lists approval asks only, including one from a supervisor.repos repo
     const otherLedger = openLedger({ file: ledgerFileFor(other) });
     try { seedAsk(otherLedger, { workflowId: 'wf-shop-work-and-stacks', dispatchId: 'ctx_handover', opId: 'handover.review', question: HANDOVER }); } finally { otherLedger.close(); }
     const env = { LOCALAPPDATA: machineHome };
-    const config = { ...structuredClone(EXAMPLE), connectors: { ...EXAMPLE.connectors, secretsFile: null, repos: [repoRoot] }, supervisor: { ...(EXAMPLE.supervisor ?? {}), repos: [other] } };
+    const config = { ...structuredClone(EXAMPLE), connectors: { ...EXAMPLE.connectors, repos: [repoRoot] }, supervisor: { ...(EXAMPLE.supervisor ?? {}), repos: [other] } };
     const repos = bridgeAskRepos({ env, config });
     assert.ok(repos.includes(repoRoot) && repos.includes(other), `the ask repos cover the connector repos and supervisor.repos: ${repos.join(', ')}`);
     const bridge = bridgeFor(t, bot, env, { repos: () => bridgeAskRepos({ env, config }) });

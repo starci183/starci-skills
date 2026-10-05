@@ -12,7 +12,7 @@
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { exitedAgentPromptRow, clipDraft } from '../lib/terminal-liveness.mjs';
+import { exitedAgentPromptRow, clipDraft, terminalIdentityOf } from '../lib/terminal-liveness.mjs';
 import { clearDraft } from './clear-draft.mjs';
 import { draftText } from '../lib/orca-terminal.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
@@ -36,16 +36,14 @@ export const QUIT_WAIT_MS = allocationMs('quitAgent.waitMs');
 export const KNOWN_TERMINAL_AGENTS = Object.freeze(['claude', 'codex', 'devin']);
 
 /**
- * The agent a terminal entry runs: Orca's agentIdentity when it names a known provider, else a
- * title heuristic (tab title first, then pane title), else
- * the caller's fallback ('claude' when none is given: restored old tabs were mostly Claude).
- * `entry`: {agent?, tabTitle?, paneTitle?} - the shape terminal-dedupe and start-supervisor build.
+ * A terminal's explicit known provider for provider-specific quit input.
+ * Read-only title/frame heuristics do not authorize a quit; unresolved,
+ * conflicting and unsupported identities return null. The caller may close
+ * through its existing verified closure owner without typing a guessed quit.
  */
-export function agentOfTerminal(entry, fallback = 'claude') {
-  const named = String(entry?.agent ?? '').toLowerCase();
-  if (KNOWN_TERMINAL_AGENTS.includes(named)) return named;
-  const text = `${entry?.tabTitle ?? ''} ${entry?.paneTitle ?? ''}`;
-  return /codex/i.test(text) ? 'codex' : fallback;
+export function agentOfTerminal(entry) {
+  const identity = terminalIdentityOf(entry);
+  return identity.proof === 'attested' && KNOWN_TERMINAL_AGENTS.includes(identity.provider) ? identity.provider : null;
 }
 
 /**

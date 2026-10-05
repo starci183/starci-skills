@@ -15,12 +15,14 @@ const INDEPENDENT_RUNNERS = Object.freeze(['kernel', 'settler', 'parity', 'integ
 export const latestAttemptIdOf = (db, jobId) => db.prepare('SELECT max(attempt_id) id FROM op_attempts WHERE job_id=?').get(jobId)?.id ?? null;
 
 /** Record one envelope's checks for `attemptId` (inside the caller's transaction). */
-export function recordEnvelopeChecks(db, { attemptId, checks, runner, now = Date.now() }) {
+export function recordEnvelopeChecks(db, { attemptId, checks, runner, observations = new Map(), now = Date.now() }) {
   return checks.map((entry) => {
-    const declared = entry.authority === 'declared';
+    const declared = entry.authority === 'declared', observed = observations.get(String(entry.name));
     return recordCheck(db, { attemptId, name: String(entry.name), phase: 'verify', runner, authority: declared ? 'declared' : 'runtime',
       command: entry.command ?? null, exitCode: declared ? null : entry.exitCode, declaredExitCode: declared ? entry.exitCode : (entry.declaredExitCode ?? null),
-      unavailable: entry.unavailable === true, attribution: entry.attribution ?? null, summary: { entry }, now });
+      ...(observed ? { cwd: observed.cwd, inputDigest: observed.inputDigest, exitCode: observed.exitCode, status: observed.status,
+        startedAt: observed.startedAt, finishedAt: observed.finishedAt, wallMs: observed.wallMs, stdout: observed.stdout, stderr: observed.stderr, output: observed.output } : {}),
+      unavailable: entry.unavailable === true, attribution: entry.attribution ?? null, summary: { entry, ...(observed?.native ? { native: observed.native } : {}) }, now });
   });
 }
 
@@ -35,7 +37,7 @@ export function independentChecksOf(db, { jobId = null, attemptId = null } = {})
   if (!rows.length) return null;
   return { checks: rows.map((r) => {
     const entry = parseJson(r.summary_json ?? '', {})?.entry ?? {};
-    return { ...entry, name: r.name, command: r.command ?? entry.command ?? null, runner: r.runner, authority: r.authority, status: r.status,
+    return { ...entry, checkId: r.check_id, name: r.name, command: r.command ?? entry.command ?? null, runner: r.runner, authority: r.authority, status: r.status,
       exitCode: Number.isInteger(r.exit_code) ? r.exit_code : (r.declared_exit_code ?? 1),
       ...(r.status === 'unavailable' ? { unavailable: true } : {}) };
   }) };

@@ -9,8 +9,8 @@
  *   - `inbox-dedupe-required` judges every DELIVERY method of a service. Doors (consumers, `SignedWebhook` controllers) are
  *     thin (R88): they map the delivery and dispatch one message, so the claim lives in the `*.service.ts` the handler calls,
  *     inside its transaction. A delivery method is a public method of a `<name>.service.ts` whose FIRST parameter has an
- *     `eventId` property, read by the parameter's TYPE. The FIRST awaited expression of such a method must be
- *     `claim(source, eventId)` on a receiver whose type is the `Inbox` port of `platform/inbox`, and the method must return
+ *     `eventId` property, read by the parameter's TYPE. Its first awaited work is the Inbox claim, directly or inside
+ *     the callback of its own EntityManager transaction, with that callback's manager, and the method must return
  *     early when the claim answers `false`. A lookalike `Inbox` declared by another owner, a renamed receiver and a
  *     property injection are all judged by the receiver's type, so only the real port satisfies the rule; a keyword or a
  *     class name never does.
@@ -20,12 +20,15 @@
  *   if ((await this.inbox.claim(source, id)) === false) { return }
  *   const fresh = await this.inbox.claim(source, id)
  *   if (!fresh) return
- * Whether the handler has side effects BEFORE its first await stays a review question (the call graph is not read).
+ * A transaction delivery returns or awaits one transaction as its sole statement. The actual selected inline callback
+ * claims with its own manager in its first statement, then returns on false; no outer work runs after a duplicate.
+ * Direct-claim synchronous effects, getters and called helpers stay review questions (the call graph is not read).
  */
 import { hfsOf } from "./lib/hfs.mjs"
 import { walk } from "./lib/ast.mjs"
 import { baseName, isOwnedType, ownerNameOf } from "./lib/ports.mjs"
-import { typed } from "./lib/types.mjs"
+import { resolveVariable } from "./lib/transactions.mjs"
+import { isPackageType, typed } from "./lib/types.mjs"
 
 /** The `Inbox` port of `platform/inbox`. */
 const isInboxType = (context, node) => isOwnedType(context, node, { name: "Inbox", capability: "inbox", tier: "platform" })
@@ -73,6 +76,52 @@ const firstAwait = (body) => {
     return first
 }
 
+/** True when an expression evaluates a call, construction or write before the designated call completes. */
+const hasPriorEffect = (expression, call) => {
+    let found = false
+    walk(expression, (node) => {
+        if (["CallExpression", "NewExpression", "AssignmentExpression", "UpdateExpression"].includes(node.type)
+            && node !== call && node.range[1] < call.range[1]) found = true
+    }, { intoFunctions: false })
+    return found
+}
+
+/** The first awaited claim in the actual callback of a sole, returned or awaited EntityManager transaction. */
+const transactionClaim = (context, body) => {
+    if (body.body.length !== 1) return null
+    const outer = body.body[0]
+    const expression = outer.type === "ReturnStatement" ? outer.argument
+        : outer.type === "ExpressionStatement" && outer.expression.type === "AwaitExpression" ? outer.expression : null
+    const call = expression?.type === "AwaitExpression" ? expression.argument : expression
+    const callee = call?.callee
+    if (call?.type !== "CallExpression" || callee.type !== "MemberExpression" || callee.computed
+        || callee.property.type !== "Identifier" || callee.property.name !== "transaction"
+        || !isPackageType(context, callee.object, "EntityManager", "typeorm") || hasPriorEffect(call, call)) return null
+    // TypeORM runs arg0 when it is a function, otherwise arg1. Never accept a later, ignored callback.
+    const isolation = call.arguments[0]
+    const callback = call.arguments.length === 1 ? isolation
+        : call.arguments.length === 2 && isolation.type === "Literal"
+            && ["READ UNCOMMITTED", "READ COMMITTED", "REPEATABLE READ", "SERIALIZABLE"].includes(isolation.value)
+            ? call.arguments[1] : null
+    if (!callback || !["ArrowFunctionExpression", "FunctionExpression"].includes(callback.type)
+        || !callback.async || callback.body.type !== "BlockStatement" || callback.params.length !== 1) return null
+    const manager = callback.params[0]
+    if (manager.type !== "Identifier" || !isPackageType(context, manager, "EntityManager", "typeorm")) return null
+    const awaited = firstAwait(callback.body)
+    const parent = awaited?.parent
+    const statement = parent?.type === "VariableDeclarator" && parent.init === awaited
+        && parent.parent.declarations.length === 1 ? parent.parent
+        : ["UnaryExpression", "BinaryExpression"].includes(parent?.type) ? parent.parent
+            : parent?.type === "ExpressionStatement" ? parent : null
+    if (statement !== callback.body.body[0] || statement?.parent !== callback.body) return null
+    const claim = awaited.argument
+    const argument = claim?.type === "CallExpression" ? claim.arguments[2] : null
+    const managerBinding = resolveVariable(context.sourceCode, manager)
+    const argumentBinding = argument?.type === "Identifier" ? resolveVariable(context.sourceCode, argument) : null
+    if (!managerBinding || managerBinding.defs[0]?.name !== manager || !argumentBinding
+        || argumentBinding !== managerBinding || hasPriorEffect(statement, claim)) return null
+    return awaited
+}
 /** Whether a parameter's type has an `eventId` property: the shape of a delivery. */
 const isDeliveryParam = (context, param) => {
     const target = param.type === "TSParameterProperty" ? param.parameter : param.type === "AssignmentPattern" ? param.left : param
@@ -107,7 +156,7 @@ export const inboxDedupeRequired = {
                 if (node.accessibility === "private" || node.accessibility === "protected") return
                 const first = node.value.params[0]
                 if (!first || !isDeliveryParam(context, first)) return
-                const awaited = firstAwait(node.value.body)
+                const awaited = transactionClaim(context, node.value.body) ?? firstAwait(node.value.body)
                 const call = awaited?.argument
                 const claims = call?.type === "CallExpression"
                     && call.callee.type === "MemberExpression"

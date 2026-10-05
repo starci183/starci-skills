@@ -48,7 +48,7 @@ export const readTrackedTextFiles = (root, { listFiles, onGitError = null, worki
   try {
     const args = workingTree ? ['--cached', '--others', '--exclude-standard', '-z'] : ['-z'];
     files = gitOutputOf(listFiles(args, { cwd: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z')
-      .split('\0').filter(Boolean).map((file) => String(file).replace(/\\/g, '/'));
+      .split('\0').filter(Boolean);
   } catch (error) {
     if (onGitError) return onGitError(error);
     throw error;

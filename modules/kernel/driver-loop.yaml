@@ -227,8 +227,7 @@ progress:
 
 decisions:
   rule: >-
-    DECISIONS FIRST, every wake (reconciler DESIGN §10, contract change
-    decision-items): `starci kernel decisions --workflow <wf>` lists the live Decision
+    DECISIONS FIRST, every wake (reconciler DESIGN §10): `starci kernel decisions --workflow <wf>` lists the live Decision
     Items (DI, starci/decision-item@1) that wait on this Kernel - opened by the
     runtime's controllers (a non-green report, a worker question, a stall, a
     stale gate or wait, an unread peer, a rev to ack) or by the Supervisor as a
@@ -310,20 +309,14 @@ tick:
       handoffs and replies there, and what they say can change your plan.
       Act on each and ack it (§ peers below).
     runtimeRev: >-
-      You read kernel-prompt.md and this file ONCE at boot, so a runtime change
-      after it reaches you only through a wake. Every runtime wake carries
-      `Runtime rev <short-sha>` (the .claude HEAD; scripts/kernel/runtime-rev.mjs).
-      On a wake that names a runtime rev newer than the one you acked, BEFORE
-      anything else: re-read exactly the files it lists (the changed
-      modules/kernel, modules/ops, knowledge, modules/models files and the op
-      prompt builder, plus the new contract-changes/<id>.yaml entries it names) - or
-      kernel-prompt.md and driver-loop.yaml in full when it says so - then run
-      `starci kernel kernel-ack-rev --workflow <id> --rev <that rev> --files <what you
-      re-read>`. Until you ack, `starci kernel enqueue` and `starci kernel dispatch` of a leg whose
-      op contract changed in between are refused kernel-rev-stale (other legs
-      run); `starci kernel status` shows kernelRev {acked, current, stale, files} and puts
-      the re-read first in nextActions (kind reread). Boot records the rev you
-      booted on. Never restart yourself to pick up a change.
+      Every wake names the actual runtime revision. Before affected new-leg admission, run
+      `starci kernel kernel-ack-rev --workflow <id> --plan` with --op for the upcoming operation,
+      read every server-derived required path and attest the exact returned manifest with
+      --rev and --read-manifest. The current Kernel incarnation alone acknowledges READ.
+      Boot delivery is provenance, not acknowledgement. Git keeps its actual SHA; installed
+      trees use explicitly installed current required-byte identity. Unknown, missing,
+      changed relevant bytes or incomplete acknowledgements refuse affected enqueue/dispatch.
+      Preserve already admitted attempt custody and evidence; never restart yourself to reread.
     stallWake: >-
       A `[stall]` wake came from the retired headless stall check; its findings
       now reach you as Decision Items the Workflow controller opens
@@ -455,7 +448,7 @@ tick:
       stale job never counts toward its leg until its redo passes. A
       `followUp` row owes ONE follow-up leg, never a seam-first cascade;
       `peerDrift` and `sourceDrift` are advisory and never redone
-      (sharedWorkRecords, contractRollout).
+      (sharedWorkRecords, currentContracts).
       An op `ask` or `blocked` that names another slice's owned paths (files
       it may not write) is resolved by re-dispatching the owning slice as a new
       attempt of that op and cut ordinal, never by leaving the asker waiting.
@@ -1156,9 +1149,10 @@ autopilot:
     the final review; a gate older than supervisorGateTimeoutMs defers what it holds; neither blocks independent work.
     Never route a retry cap or a runtime defect to the owner.
   budgets: >-
-    allocation.autopilot.budgets caps one workflow (attempts, tokens, wall time). Past one, a supervisor-gate holding
-    every queued job opens; the Supervisor reviews, extends (starci kernel autopilot --extend-budget) and resolves it. No loop
-    runs unbounded: redraws, retries and supervisor gates each have their own cap.
+    allocation.autopilot.budgets caps one workflow (real dispatch attempts, recorded attempt and Kernel tokens, wall time).
+    A measured cap overrun or completed attempts with unmeasured usage under an active token cap opens a supervisor-gate
+    holding every queued job. Unknown usage is never zero; the Supervisor records missing usage or reviews an extension
+    (starci kernel autopilot --extend-budget), then resolves the gate. Redraws, retries and supervisor gates retain their caps.
   handover: >-
     handover.review stays the ONE owner gate. Its ask carries question.autopilot - the "backlog awaiting the owner's review" bundle
     from `starci kernel survey --deliveries` .autopilot (every provisional acceptance with its images in question.assets, every
@@ -1442,38 +1436,27 @@ foundations:
     A new version of a landed foundation (a grammar bump, a new shell rev) is a
     re-claim by its owner with --version: dependents keep the landed version until
     the new one lands, and running legs of other workflows are never held for it
-    (contractRollout below).
+    (currentContracts below).
 
 # ============================================================================
-# CONTRACT ROLLOUT — a contract change never lands on running work
-#    (modules/kernel/contract-changes/<id>.yaml; scripts/machine/contract-version.mjs).
+# CURRENT CONTRACT — actual captured inputs and one present source law.
 # ============================================================================
-contractRollout:
+currentContracts:
   admitted: >-
-    `starci kernel dispatch` records the contract version it admits a leg under
-    (contracts.context_json.contract: runtime HEAD, a digest over the op brief,
-    _common, the verdict contract and every schema/check the brief cites, the
-    admission time). A running or settled leg is judged against THAT contract for
-    life; new legs, retries included, use the current one. `starci kernel op-contract --json`
-    admission names the version and the changes that landed after it.
-  advisory: >-
-    A check or finding code a registered change ADDED after a leg was admitted is
-    an advisory suspect for that leg, never a refusal: run the check script with the
-    admission (shell-conformance --admitted-at <admission.admittedAt> --op <op>)
-    and file each red check's finding `codes` with `starci kernel record-checks`; the api marks a
-    later-added red check advisory and `starci kernel settle` does not count it. Report the
-    suspects in the settle notes; the next leg of that record meets them for real.
-    Only a `safetyCritical` change applies to older legs.
-  followUp: >-
-    A change registered `reach: follow-up` is meant to reach in-flight work: `api
-    status` frontier.contractFollowUps lists every older leg it covers (actionable)
-    and you enqueue its follow-up leg - `starci kernel enqueue --op <followUpOp>
-    --contract-change <change> --follow-up-of <jobId>`, with `--after <jobId>` while
-    that leg still runs. Never hold, cancel or re-dispatch the running leg for a
-    contract change, and never wait on the supervisor for one.
+    Dispatch captures the actual selected op contract, source bytes, target/ownership baseline,
+    READ references, identity and admission time in the existing attempt. Preserve that frozen
+    scope and its evidence. A capture is not permission to waive a current safeguard.
+  checks: >-
+    Current caller, required READ, target binding, native proof, drawing, Sonar, hygiene and
+    integrity checks are mandatory when their actual selected scope applies. Unknown or red
+    evidence refuses visibly. Never demote a refusal using a card date, a withheld list or
+    caller-supplied advisory metadata. Record actual checks through the existing native owner.
+  changes: >-
+    Current source revision admission requires an exact server-derived READ manifest.
+    Diagnose concrete Source-input differences without rewriting old evidence or automatically
+    creating historical follow-up jobs. Product Work changes retain their existing owner law.
 
-# Shared product Work records across the workflows of one ledger: the versioned rollout of
-# contractRollout, applied to Work records.
+# Shared product Work records keep their actual ownership and revision duties.
 sharedWorkRecords:
   owner: >-
     Every shared Work record has ONE owner workflow (scripts/kernel/work-ownership.mjs

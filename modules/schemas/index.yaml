@@ -432,7 +432,7 @@ schemas:
     usedBy: [scripts/checks/check-contract-cites.mjs, scripts/checks/check-retired-names.mjs, scripts/hfs/runtime-rules/retired.mjs, scripts/hfs/runtime-rules/size.mjs, scripts/hfs/runtime-check.mjs]
     business:
       question: "Is a cited deleted or moved path an intentional retirement rather than a broken live contract cite, and does a retired path, name or symbol stay gone?"
-      whenNeeded: Checking historical contract-change and owner-ruling citations to removed or moved files; every runtime check (RT_RETIRED_PRESENT, RT_RETIRED_NAME_LIVE, RT_PINNED_PATH_MOVED).
+      whenNeeded: Checking current owner-ruling citations to removed or moved files; every runtime check (RT_RETIRED_PRESENT, RT_RETIRED_NAME_LIVE, RT_PINNED_PATH_MOVED).
       whenNot: Never authorizes a live runtime reference to a deleted or moved file or name.
       selectedBy: The retired-path citation exception in check-contract-cites.mjs and the runtime rules that read it.
 
@@ -620,30 +620,17 @@ schemas:
       whenNot: additionalProperties:true — it is deliberately permissive; do not treat as a strict contract.
       selectedBy: Knowledge authoring review.
 
-  - id: starci/code-example@1
-    file: modules/schemas/code-example-manifest.schema.yaml
-    dialect: json-schema
-    subsystem: knowledge
-    governs: "A code example manifest — id, title, purpose, appliesTo, relatedRules, files, entrypoint, adapt, dependencies, verification, provenance."
-    binds: code-example manifests inside the authored knowledge tree
-    usedBy: [agents and skills, reading knowledge/**/*.yaml]
-    business:
-      question: "Is this example reusable — does it say what it adapts, needs and how to verify?"
-      whenNeeded: Curating example code into the knowledge library.
-      whenNot: Not example CODE itself — the manifest describing it.
-      selectedBy: Knowledge authoring review.
-
   - id: starci/code-example-catalog@1
     file: modules/schemas/code-example-catalog.schema.yaml
     dialect: json-schema
-    subsystem: knowledge
-    governs: "The catalog listing code examples — schema/title/purpose/examples[]."
-    binds: the example catalog document
-    usedBy: [agents and skills, reading knowledge/**/*.yaml]
+    subsystem: examples
+    governs: "Stable pattern IDs bound to complete current source sets, owning tsconfigs and tests in actual HFS apps."
+    binds: examples/index.yaml
+    usedBy: [scripts/lib/example-refs.mjs, scripts/gates/read-digest.mjs]
     business:
       question: "Which examples exist and what is each for?"
       whenNeeded: Browsing/picking an example before adapting it.
-      whenNot: Catalog, not manifest — per-example detail lives in code-example@1 manifests.
+      whenNot: Source membership is not executed lint, typecheck or behavior evidence.
       selectedBy: Agents browsing examples.
 
   # --------------------------------------------------------------------------
@@ -887,12 +874,6 @@ moduleLocalDocumentKinds:
   - id: starci/spec-durations@1
     governs: "The measured seconds of each slow spec file and the per-file land budget scripts/checks/check-spec-budget.mjs judges."
     files: [modules/kernel/spec-durations.yaml]
-  - id: starci/contract-changes@1
-    governs: "The registry of contract changes (one entry file per change under modules/kernel/contract-changes/, fields in contract-changes-format.yaml): what each added (checks, finding codes), when, and whether it reaches in-flight work (scripts/machine/contract-version.mjs)."
-    files: [modules/kernel/contract-changes-format.yaml]
-  - id: starci/contract-freeze@1
-    governs: "The frozen op families and gate paths used to batch contract changes for running workflows."
-    files: [modules/kernel/contract-freeze.yaml]
   - id: starci/owner-rulings@1
     governs: "The owner's standing rulings by stable id, cited as owner:<id> by a drawing's rationale (scripts/work/draw/draw-rationale.mjs)."
     files: [modules/kernel/owner-rulings.yaml]

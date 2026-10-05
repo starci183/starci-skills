@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // dispatch-op.mjs — build and preview the dispatch packet for one op. It launches nothing: every operation starts
 // through `starci kernel dispatch --spawn` (scripts/kernel/verbs/dispatch.mjs), the one agent launch
-// (orca orchestration worker-start, modules/kernel/contract-changes/launch-through-worker-start.yaml).
+// (orca orchestration worker-start, modules/kernel/start-workflow.yaml).
 //
 // Packet contract per modules/kernel/dispatch.yaml +
 // modules/kernel/verdict-contract.yaml (presence checked at runtime):
@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { readOpManifest } from '../lib/op-shared.mjs';
+import { readOpManifest, paramValueError, resolveOpContract, opCheckRequirements } from '../lib/op-shared.mjs';
 import { ownedRecordPaths } from '../work/record-ownership.mjs';
 import { resolveWorkerLaunchModel, defaultOperationTarget } from '../agent/models.mjs';
 import { buildContext } from '../context/pack.mjs';
@@ -46,24 +46,6 @@ const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 // holds the type, the default and who may set it, and the packet carries the
 // resolved value. Prose never restates a number, so nothing has to be inferred
 // from the goal text at run time.
-
-/** One value against one declared param. Returns null when it holds. */
-function paramValueError(name, def, value) {
-  const type = def?.type;
-  if (type === 'enum') {
-    const allowed = Array.isArray(def.enum) ? def.enum : [];
-    return allowed.includes(value) ? null : `${name} must be one of ${allowed.join(', ')} (got ${JSON.stringify(value)})`;
-  }
-  if (type === 'integer' && !Number.isInteger(value)) return `${name} must be an integer (got ${JSON.stringify(value)})`;
-  if (type === 'number' && !(typeof value === 'number' && Number.isFinite(value))) return `${name} must be a number (got ${JSON.stringify(value)})`;
-  if (type === 'string' && typeof value !== 'string') return `${name} must be a string (got ${JSON.stringify(value)})`;
-  if (type === 'boolean' && typeof value !== 'boolean') return `${name} must be true or false (got ${JSON.stringify(value)})`;
-  if (typeof value === 'number') {
-    if (def.min !== undefined && value < def.min) return `${name} is ${value}, below its minimum ${def.min}`;
-    if (def.max !== undefined && value > def.max) return `${name} is ${value}, above its maximum ${def.max}`;
-  }
-  return null;
-}
 
 /** The op's declared defaults with validated overrides on top.
  *  `leg` is what the approved goal leg carries — the only source for a param
@@ -106,7 +88,11 @@ export function resolveOpParams(opDoc, { leg = null, flag = null, enforceRequire
   const params = {};
   for (const [name, def] of Object.entries(declared)) {
     if (Object.hasOwn(overrides, name)) params[name] = overrides[name];
-    else if (Object.hasOwn(def ?? {}, 'default')) params[name] = def.default;
+    else if (Object.hasOwn(def ?? {}, 'default')) {
+      const error = paramValueError(name, def, def.default);
+      if (error) return { ok: false, reason: 'params-invalid', detail: `default ${error}` };
+      params[name] = def.default;
+    }
   }
   return { ok: true, params, overrides };
 }
@@ -182,13 +168,6 @@ function main() {
 
   const owned = resolveOwnedPaths(args.records, args.state);
   const contractPresent = fs.existsSync(path.join(skillRoot, VERDICT_CONTRACT));
-  // Context cutting is a function (scripts/context/pack.mjs): the mandatory
-  // read set is resolved, not asserted — the prompt below enumerates the real
-  // file list, and the packet carries it for the receipt.
-  const ctx = buildContext({
-    op: args.op, records: args.records, stateDir: args.state,
-    skillRoot, briefDoc: opDoc, ownedPaths: owned.ownedPaths,
-  });
 
   let flagParams = null;
   if (args.params !== undefined) {
@@ -197,6 +176,17 @@ function main() {
   }
   const resolved = resolveOpParams(opDoc, { flag: flagParams });
   if (!resolved.ok) { console.error(`${resolved.reason}: ${resolved.detail}`); process.exit(1); }
+  const selected = resolveOpContract(opDoc, { params: resolved.params, allowSelect: true });
+  if (!selected.ok) { console.error(selected.detail); process.exit(1); }
+  // Context cutting is a function (scripts/context/pack.mjs): the mandatory
+  // read set is resolved, not asserted — the prompt below enumerates the real
+  // file list, and the packet carries it for the receipt.
+  const ctx = buildContext({
+    op: args.op, records: args.records, stateDir: args.state,
+    skillRoot, briefDoc: selected.contract, params: resolved.params, ownedPaths: owned.ownedPaths,
+  });
+
+
 
   const packet = {
     op: args.op,
@@ -206,6 +196,8 @@ function main() {
       records: args.records,
       owned_paths: owned.ownedPaths,
       mandatoryReads: ctx.mandatory?.map(m => m.path) ?? [],
+      readRefs: ctx.mandatory ?? [], selected_op: { mode: selected.mode, contract: selected.contract,
+        checks: opCheckRequirements(selected.contract, parseYaml(fs.readFileSync(path.join(modelsDir, 'kinds.yaml'), 'utf8'))?.kinds?.[args.op]) },
       ...(owned.missing ? { recordsNotFound: owned.missing } : {}),
       ...(owned.note ? { note: owned.note } : {}),
       ...(owned.error ? { error: owned.error } : {}),

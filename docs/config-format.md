@@ -9,6 +9,8 @@ StarCi keeps **local runtime preferences** in ignored `config.yaml` at the skill
 | --- | --- |
 | `config.example.yaml` | The authored example and the shipped defaults (`language: vi`, `model: null`, `effort: medium`). |
 | `config.yaml` | User-local runtime config. Seeded verbatim — comments included — from `config.example.yaml`, only when missing. |
+| `secret.env.example` | Tracked credential placeholders; [Host credentials](host-secrets.md) owns local setup. |
+| `secret.env` | Owner-created local plaintext credentials; excluded from Git, package payload and installer custody. |
 
 ## Init copy policy
 
@@ -29,6 +31,9 @@ Required keys:
 - `models.nonOperation` — the closed mapping from the three non-operation roles to one declared pool
 
 Optional keys:
+
+- `launchTrust` — null by default, or `{profile: automatic | declined, approvedBy: owner, approvalRef, roots}`. The current owner records adoption and exact absolute repository roots; this declaration authorizes the managed launch trust/settings/guard preparation for those roots. Existing Git worktrees are checked against their exact main repository root. A directory prefix, unrelated checkout, missing profile or provider-side decline grants no consent. The runtime never copies a historical owner's approval into a new installation. Native provider account authentication remains separate.
+- `retention.workflowPurge` — null by default, or `{approvedBy: owner, approvalRef, repos}` with exact absolute ledger-owner repository roots. Adoption permits automatic verified archive-and-purge of settled, uncited workflows after the declared retention window. Without adoption the sweep reports and keeps those candidates. This profile does not authorize deleting an unidentified database or changing live jobs.
 
 - `kernel` — the `[Kernel]` seat: a single pin `{agent?, model?, effort?}` or a group
   `{group: [{agent, model?}, ...], effort?}` (below); absent or all-null means routing decides
@@ -68,8 +73,9 @@ Optional keys:
   op writes or updates the unit specs of the source it changes and runs only those; the whole unit suite is `unit.verify`'s
   (only when the goal asks) or that approved release. `e2e` (default **false**): e2e runs only when the goal or the owner asks,
   then `e2e.verify` runs the full e2e suite (see "Product test switches")
-- `connectors` — the public owner-ask channel `{secretsFile?, repos?, gateway?, cloudflare?, telegram?}`,
-  all off by default; secrets are named by env var, never stored (docs/connectors.md)
+- `connectors` — the public owner-ask channel `{repos?, gateway?, cloudflare?, telegram?}`,
+  all off by default; credential fields name environment variables ([connectors](connectors.md)).
+  [Host credentials](host-secrets.md) owns their local storage and selected-action preflight.
 - `supervisor` — `{mode?, kernel?, pollIntervalMs?, repos?, stallMinutes?, frozenMinutes?, workers?, landGate?}`:
   the Supervisor seat, optional chat digest cadence and managed product repositories; the reconciler
   Host and Workflow controllers own seat recovery and stall detection ([supervisor](supervisor.md);

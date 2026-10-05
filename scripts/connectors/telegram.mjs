@@ -38,15 +38,16 @@
 // key). Writers take the host lock 'telegram-sent' (lib.mjs withHostMutex) so two
 // asks parked at once never both send. A missing token or chatId is a no-op with one
 // stderr line; nothing here ever throws into its caller. Ledgers are read
-// read-only. The bot token comes from the env var botTokenEnv names (or
-// connectors.secretsFile), is never printed, and is scrubbed from every error.
+// read-only. The bot token comes from the named environment variable or the shared
+// runtime secret.env, is never printed, and is scrubbed from every error.
 // STARCI_TELEGRAM_API_BASE replaces https://api.telegram.org for tests.
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
-import { configRoot, connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
+import { configRoot, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
+import { runtimeSecretEnv } from '../gates/runtime-host.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { argsOf, askRepos, askState, ownerConfig, withHostMutex, withLedgerRead } from './lib.mjs';
 import { publicBase } from './tunnel.mjs';
@@ -199,12 +200,19 @@ export async function removeAskMessage({ token, chatId, messageId, fallbackText,
  * base, warning}. `ready` is false with a one-line `warning` when Telegram is wanted (enabled, or a
  * token is present) but the token or chatId is missing; false with no warning when it is simply off.
  */
-export function telegramSettings({ config = ownerConfig(), env = process.env, root = configRoot } = {}) {
+export function telegramSettings({ config = ownerConfig(), env = process.env, root = configRoot, preparedEnv = null } = {}) {
   if (!config) return { ready: false, warning: 'telegram: config.yaml cannot be read; not notifying' };
   let connectors;
-  try { connectors = connectorsConfig(config, env, root); } catch (error) { return { ready: false, warning: `telegram: ${error.message}` }; }
+  try {
+    env = preparedEnv ?? env;
+    connectors = connectorsConfig(config, env, root);
+    if (connectors.telegram.enabled && preparedEnv === null) {
+      env = runtimeSecretEnv(env, root);
+      connectors = connectorsConfig(config, env, root);
+    }
+  } catch (error) { return { ready: false, warning: `telegram: ${error.message}` }; }
   const telegram = connectors.telegram;
-  const token = connectorSecret(telegram.botTokenEnv, connectorEnv(config, env, root));
+  const token = connectorSecret(telegram.botTokenEnv, env);
   const base = connectors.cloudflare.mode === 'named' ? connectors.cloudflare.publicBase
     : connectors.cloudflare.mode === 'quick' ? publicBase(env) : null;
   const common = { telegram, language: config.language, base, chatId: telegram.chatId };
@@ -579,11 +587,17 @@ async function main() {
   if (!config) { out({ ok: false, error: 'config.yaml cannot be read' }); process.exit(2); }
   let connectors;
   try { connectors = connectorsConfig(config); } catch (error) { out({ ok: false, error: error.message }); process.exit(2); }
-  if (verb === 'sweep') { out(await sweepAskMessages({ repos: () => askRepos(connectors) })); return; }
+  if (verb === 'sweep') { out(await sweepAskMessages({ repos: () => askRepos(connectors) }, { config })); return; }
+  if (!['discover-chat', 'test'].includes(verb)) {
+    console.error('usage: starci connect telegram notify --ledger <file> --workflow <id> --dispatch <id> [--repo <path>] | sweep | discover-chat | test');
+    process.exit(2);
+  }
+  let env;
+  try { env = runtimeSecretEnv(); connectors = connectorsConfig(config, env); } catch (error) { out({ ok: false, error: error.message }); process.exit(2); }
   const telegram = connectors.telegram;
-  const token = connectorSecret(telegram.botTokenEnv, connectorEnv(config));
+  const token = connectorSecret(telegram.botTokenEnv, env);
   if (verb === 'discover-chat') {
-    if (!token) { out({ ok: false, error: `no bot token: set ${telegram.botTokenEnv} (env or connectors.secretsFile)` }); process.exit(2); }
+    if (!token) { out({ ok: false, error: `no bot token: set ${telegram.botTokenEnv} in local secret.env or the actual environment` }); process.exit(2); }
     out(await discoverChats({ token, apiBase })); return;
   }
   if (verb === 'test') {
@@ -591,8 +605,6 @@ async function main() {
     const result = await sendMessage({ token, chatId: telegram.chatId, text: textFor(config.language).test, apiBase });
     out(result); if (!result.ok) process.exitCode = 1; return;
   }
-  console.error('usage: starci connect telegram notify --ledger <file> --workflow <id> --dispatch <id> [--repo <path>] | sweep | discover-chat | test');
-  process.exit(2);
 }
 
 if (isMain(import.meta.url)) main();

@@ -22,68 +22,68 @@ pins:
     source: packages/heroicons/package.json
     why: 'StarCi custom Heroicons-compatible cuts; eslint-canon-fe (icon.mjs) admits @starci/heroicons/24/outline and /16/solid as icon sources, so an app that uses them gets this exact version.'
   '@starci/grammar':
-    version: 0.8.2
+    version: 0.8.3
     group: starci
     install: registry
     side: fe
     source: packages/grammar/package.json
     why: the product front ends pinned older versions (0.4.11, 0.5.0, 0.5.1); the runtime source is 0.8.0 and wins for a @starci package (the brand layer sets `--font-sans` and `--font-mono`; the grammar reads them; 0.7.2 added the Input tel kind and IconButton disclosure props).
   '@starci/eslint-canon-be':
-    version: 3.0.9
+    version: 3.0.10
     group: starci
     install: registry
     side: be
     source: packages/eslint/be/package.json
     why: '3.0.3: its bundled canon-pins copy pins stylelint-canon 2.0.2 and hfs 4.0.3; no rule changed. 3.0.2: its bundled runtime copies (slots, canon-pins, failure codes, the architecture machine) put .starcistacks and .sops.yaml at the app root (app.starcistacks, app.sops) and pin hfs 4.0.2. 3.0.1: its bundled canon-pins copy pins hfs 4.0.1. 3.0.0: `loadHfs(import.meta.url)` of be/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the be side; the project graph is built per side. 2.0.0 (C0 release): starciBeConfig({ hfs: loadHfs(import.meta.url) }) typed factory and the BE-CONVENTION laws.'
   '@starci/eslint-canon-fe':
-    version: 8.0.9
+    version: 8.0.10
     group: starci
     install: registry
     side: fe
     source: packages/eslint/fe/package.json
     why: '8.0.3: its bundled canon-pins copy pins stylelint-canon 2.0.2 and hfs 4.0.3; no rule changed. 8.0.2: its bundled runtime copies (slots, canon-pins, failure codes, the architecture machine) put .starcistacks and .sops.yaml at the app root (app.starcistacks, app.sops) and pin hfs 4.0.2. 8.0.1: its bundled canon-pins copy pins hfs 4.0.1. 8.0.0: `loadHfs(import.meta.url)` of fe/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the fe side; the project graph is built per side. 7.0.0: the front end has no tests (FE_NO_TESTS R97 in hfs); no-vietnamese-in-source (R91).'
   '@starci/stylelint-canon':
-    version: 2.0.4
+    version: 2.0.5
     group: starci
     install: registry
     side: fe
     source: packages/stylelint/package.json
     why: '2.0.2: no-class-selector refuses a compound class selector (`div.card`), which the 2.0.1 pattern let through. 2.0.1 accepts `--font-sans` and `--font-mono` in the brand layer (the vocabulary follows the grammar 0.8.0). 2.0.0 adds status-contrast (HeroUI soft pairs measured per theme), fixes brand-layer-shape on the shared :root,.light,.dark block and the info soft pair, and derives appTokens with loadAppTokens(import.meta.url) for the managed one-line stylelint.config.mjs.'
   '@starci/tsconfig':
-    version: 2.0.2
+    version: 2.0.3
     group: starci
     install: registry
     side: both
     source: packages/tsconfig/package.json
   '@starci/prettier-config':
-    version: 1.0.2
+    version: 1.0.3
     group: starci
     install: registry
     side: both
     source: packages/prettier-config/package.json
   '@starci/jest-preset':
-    version: 2.2.4
+    version: 2.2.5
     group: starci
     install: registry
     side: be
     source: packages/jest-preset/package.json
     why: '2.2.4: the world runner runs up to min(--maxWorkers, slots) world files at once, each in its own process bound to one data slot of the test world (STARCI_TEST_WORLD_SLOT), and reads test-world state protocol 2 only: pinned together with @starci/test-world 1.1.0, any other state file is JEST_PRESET_WORLD_PAIR_MISMATCH. 2.2.3: republished after the move (no preset change). 2.2.2: the unit run writes the lcov Sonar and Codecov import (services only); 2.2.0: the integration, e2e and contract projects run every spec file in a worker process of its own (world-runner.cjs), so a process-global framework registry (@nestjs/graphql type metadata) never leaks between e2e files; 2.1.0: four projects on the test world, the unit kit (mockEntityManager, fakeTransaction, fakeIds, FakeClock, Outcome matchers) and the recordingOutbox claim side.'
   '@starci/test-world':
-    version: 1.2.0
+    version: 1.2.1
     group: starci
     install: registry
     side: be
     source: packages/test-world/package.json
     why: '1.2.0: Kafka as real own infra (the one digest-pinned apache/kafka KRaft image, a broker listener and proxy per slot, slot-prefixed topics, consumer groups and client ids) and schema-per-context Postgres (a schema and a login role per context in a shared database); its CLI main is exported at ./cli for starci app stack, and the former starci app stack bin is removed. 1.1.0: per-worker data slots: a run provisions min(jest workers, workers cap, default 2) slots, each its own namespace (<ns>_w<k>) with its own databases, Keycloak realm, leased Redis DB, bucket/collection/topic prefixes, fakes host, toxiproxy proxies and outage lock, so world files run in parallel; state file protocol 2, paired exactly with @starci/jest-preset 2.2.4 (TEST_WORLD_PAIR_MISMATCH otherwise). 1.0.6: republished after the move (no library change). 1.0.5: a modules world boots real peer apps beside its modules, world.apps.<name>.during(fn) is the outage of a peer app, and w.keycloak.clientSecret(client) answers the run-generated secret of a confidential realm client. 1.0.4: world.resolve and scope.resolve take any Nest token (class, string or symbol). 1.0.3: the globalSetup registers the path aliases as TypeScript resolves them (the extends chain, paths from the config that declares them, the effective baseUrl), so a tests tsconfig that only extends the side config loads the declaration. 1.0.2: every path a declaration names (`stack`, seeds, the realm, Dockerfiles) resolves from the app root (the directory of hfs.json), where .starcistacks lives, never from the be side. The shared e2e library of every back end (R47, R48): the warm stack behind toxiproxy, the network-edge fakes, the Nest boot, the typed useTestWorld handle, useSandbox for contract specs and the outage lock; a devDependency of every back end. 1.0.1: world.keycloak.events/sessions (the user events of the realm and live sessions through the admin API) and world.infra.postgresql.connection(name) (the database of one connection down while the others serve, under the outage lock).'
   '@starci/cli':
-    version: 1.0.0
+    version: 1.0.1
     group: starci
     install: registry
     side: both
     source: packages/cli/package.json
     why: '1.0.0: the only StarCi command package; product repositories install it for starci app, while @starci/hfs remains its pinned transitive implementation.'
   '@starci/hfs':
-    version: 4.0.9
+    version: 4.0.10
     group: starci
     install: registry
     side: both

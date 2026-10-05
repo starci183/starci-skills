@@ -9,6 +9,12 @@
 import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 
+/**
+ * Binds a Run to the named coordinator terminal with request identity derived from the Run and terminal pair.
+ * Callers issue it after a read establishes a different coordinator; a fresh repeated rebind can fence live Dispatches.
+ * Returns a nullable Run, error fields and request metadata; ok follows exit and outcome without requiring a Run receipt.
+ * Reconcile a lost receipt under the same identity rather than issuing another coordinator bind.
+ */
 export function runUse({ id, from }) {
   const r = orcaCall('run-use', { id, from }, { request: { run: id, from } });
   const run = r.result?.run ?? null;

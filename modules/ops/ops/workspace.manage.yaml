@@ -225,9 +225,7 @@ policy:
               evidence/repository-observation.yaml. Never invent repository/environment resources merely
               to satisfy setup."
         - id: node
-          path: .starciwork/index.yaml (catalog + extensions.work3.setup.<workflow>.prepare) +
-            .starciwork/features/<feature>/index.yaml +
-            .starciwork/features/<feature>/<family>/<name>/index.yaml
+          path: .starciwork/index.yaml
           fields:
             - schema
             - id
@@ -266,18 +264,34 @@ policy:
               write scope: correct only selected incomplete semantics and set confirmed records todo
               without implementation completion. Do not introduce preparation for already-ready
               scope or require product-wide scaffolding."
+        - id: node-feature
+          path: .starciwork/features/<feature>/index.yaml
+          content:
+            en: Author only the selected feature overview; it has no completion state.
+        - id: node-records
+          path: .starciwork/features/<feature>/<family>/<name>/index.yaml
+          content:
+            en: Author only the selected flat family records described by node; preserve their declared schema and incomplete state until their owning completion proof.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/scope-review.md + evidence/repository-observation.yaml
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: Retain source-intent citations and actual scope/coverage review in the setup entry's own
               bundle evidence/ only. The entry's review reaches pass only after real review evidence and
               validation; initial scaffolding has no review. No code/UAT pass.
+        - id: evidence-scope-review
+          path: evidence/scope-review.md
+          content:
+            en: Retain only the selected prepare scope-review.md at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-repository-observation
+          path: evidence/repository-observation.yaml
+          content:
+            en: Retain only the selected prepare repository-observation.yaml at this exact destination; its scope and provenance remain those of evidence.
       steps:
         - reads:
             - intent
             - target
-          writes: [workspace, node]
+          writes: [workspace, node, node-feature, node-records]
           action:
             en: Resolve the existing canonical workspace, or initialize only the explicitly new workspace
               identity; establish one purpose, actors/outcomes stated so far, inclusions and
@@ -285,7 +299,7 @@ policy:
         - reads:
             - target
             - declaration
-          writes: [workspace, evidence]
+          writes: [workspace, evidence, evidence-scope-review, evidence-repository-observation]
           action:
             en: Inspect exact Git root/common-dir, remote identity, full HEAD, worktree registration, links and
               dirty paths with read-only commands, and verify each actual remote against the project
@@ -297,7 +311,7 @@ policy:
         - reads:
             - intent
             - target
-          writes: [node]
+          writes: [node, node-feature, node-records]
           action:
             en: Map the purpose into the smallest useful completion tree. A task may cover three UAT flows, but
               each flow has separate UI and UX assertion leaves; do not pre-expand irrelevant
@@ -305,7 +319,7 @@ policy:
         - reads:
             - intent
             - target
-          writes: [node]
+          writes: [node, node-feature, node-records]
           action:
             en: Record applicability and dependencies by stable IDs. A defer decision needs
               rationale/owner/revisit trigger and stays visible; it is not done or na. Reuse
@@ -313,7 +327,7 @@ policy:
         - reads:
             - intent
             - target
-          writes: [node]
+          writes: [node, node-feature, node-records]
           action:
             en: When the user explicitly requests a native goal for this current chat/task and an actual
               supported goal tool exists, inspect/create/reuse that goal according to the tool
@@ -322,7 +336,7 @@ policy:
               create a separate task/agent goal automatically.
         - reads:
             - target
-          writes: [evidence]
+          writes: [evidence, evidence-scope-review, evidence-repository-observation]
           action:
             en: Review tree coverage against the original purpose, validate references and report selected
               eligible ops as suggestions only. Stop without dispatch or cooking child pieces. This
@@ -440,9 +454,7 @@ policy:
               describes; no _resources repository record). Never put the canonical root inside the
               selected disposable target.
         - id: node
-          path: .starciwork/index.yaml (catalog + extensions.work3.setup.<workflow>.import) +
-            .starciwork/features/<feature>/index.yaml + selected imported
-            features/<feature>/<family>/<name>/index.yaml records
+          path: .starciwork/index.yaml
           fields:
             - schema
             - id
@@ -471,9 +483,16 @@ policy:
               never product completion. If optional cleanup is in scope, the entry's migration names
               cleanupTarget and the exact cleanupAssertions, and migration.cleanup stays blocked
               until they pass; no separate cleanup record is authored.
+        - id: node-feature
+          path: .starciwork/features/<feature>/index.yaml
+          content:
+            en: Author only the selected feature overview; it has no completion state.
+        - id: node-records
+          path: .starciwork/features/<feature>/<family>/<name>/index.yaml
+          content:
+            en: Retain only the selected imported records named by node, including their observed source mapping and uninvestigate state.
         - id: resources
-          path: .starciwork/_resources/imports/<resource>/resource.yaml +
-            .starciwork/_resources/imports/<resource>/assets/<asset>
+          path: .starciwork/_resources/imports/<resource>/resource.yaml
           fields:
             - schema
             - id
@@ -493,9 +512,12 @@ policy:
               retrievable existing account custody refs without secrets. Bind stable resource IDs in
               selected imported node refs before computing review digest. Do not copy whole source
               repositories or credentials into .starciwork.
+        - id: resources-asset
+          path: .starciwork/_resources/imports/<resource>/assets/<asset>
+          content:
+            en: Preserve only the selected nonsecret import asset named by resources.files, retaining its original bytes, identity and verified hash.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/inventory.yaml + evidence/source-map.md + evidence/preservation.yaml +
-            evidence/import-review.md + evidence/cleanup.yaml
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Inventory each selected path: origin repository/commit, tracked/dirty/untracked/ignored status,
@@ -507,6 +529,26 @@ policy:
               .starciwork validation output, cleanup target/authority/worker checks and actual
               action or blocked/not-requested. Imported child product assertions must have no
               fabricated evidence."
+        - id: evidence-inventory
+          path: evidence/inventory.yaml
+          content:
+            en: Retain only the selected import inventory.yaml at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-source-map
+          path: evidence/source-map.md
+          content:
+            en: Retain only the selected import source-map.md at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-preservation
+          path: evidence/preservation.yaml
+          content:
+            en: Retain only the selected import preservation.yaml at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-import-review
+          path: evidence/import-review.md
+          content:
+            en: Retain only the selected import import-review.md at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-cleanup
+          path: evidence/cleanup.yaml
+          content:
+            en: Retain only the selected import cleanup.yaml at this exact destination; its scope and provenance remain those of evidence.
         - id: source
           path: <app>/<removal-target>
           fields:
@@ -530,7 +572,7 @@ policy:
             - repo
             - inventory
             - custody
-          writes: [workspace, evidence]
+          writes: [workspace, evidence, evidence-inventory, evidence-source-map, evidence-preservation, evidence-import-review, evidence-cleanup]
           action:
             en: Confirm one pilot and exact canonical destination. Inspect existing target and ancestors;
               absence is expected only for selected new scope. Inventory actual Git
@@ -541,7 +583,7 @@ policy:
             - inventory
             - intent
             - application-stacks
-          writes: [evidence]
+          writes: [evidence, evidence-inventory, evidence-source-map, evidence-preservation, evidence-import-review, evidence-cleanup]
           action:
             en: Read the bounded source and tests; map routes/actions/data/rules to source facts at actual
               commits, and map .starcistacks compose/bootstrap material against the declared stack
@@ -552,7 +594,7 @@ policy:
             - inventory
             - custody
             - repo
-          writes: [resources, evidence]
+          writes: [resources, resources-asset, evidence, evidence-inventory, evidence-source-map, evidence-preservation, evidence-import-review, evidence-cleanup]
           action:
             en: Classify and preserve only selected durable nonsecret artifacts; hash original bytes and
               retrieve/re-hash destination bytes outside the cleanup target. Verify committed
@@ -565,7 +607,7 @@ policy:
             - inventory
             - repo
             - custody
-          writes: [node, resources]
+          writes: [node, node-feature, node-records, resources, resources-asset]
           action:
             en: Author the selected candidate tree and canonical source resources. Imported leaves remain
               uninvestigate with activity:idle and no completion; import itself never confirms their
@@ -582,7 +624,7 @@ policy:
             - inventory
             - custody
             - repo
-          writes: [source, evidence]
+          writes: [source, evidence, evidence-inventory, evidence-source-map, evidence-preservation, evidence-import-review, evidence-cleanup]
           action:
             en: If and only if exact cleanup is selected, re-inspect worktree registration, source/dirty
               inventory and active-worker ownership immediately before removal. Require explicit
@@ -597,7 +639,7 @@ policy:
             - inventory
             - repo
             - custody
-          writes: [node, evidence]
+          writes: [node, node-feature, node-records, evidence, evidence-inventory, evidence-source-map, evidence-preservation, evidence-import-review, evidence-cleanup]
           action:
             en: Finalize semantic scope/resources first, obtain the real inputDigest, then verify imported
               IDs/refs/assertions, preservation hashes and all uninvestigate states. Write only

@@ -287,7 +287,7 @@ starciOrchestrationAllowlist:
     - orchestration ask
     - orchestration check
 forbiddenForStarciOrchestration:
-  # Every agent launch is orchestration worker-start (contract-changes/launch-through-worker-start.yaml): the runtime
+  # Every agent launch is orchestration worker-start (modules/kernel/start-workflow.yaml): the runtime
   # never creates a terminal and never dispatches a Task into a terminal it made.
   - terminal create
   - orchestration dispatch

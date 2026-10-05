@@ -15,6 +15,7 @@ export const safeNextPath = (candidate: string | null, origin: string): string =
     }
     if (
         destination.origin !== origin ||
+        !isSingleSlashPath(destination.pathname) ||
         !isSingleSlashPath(candidate) ||
         !isSingleSlashPath(decoded) ||
         INVALID_PATH_CHARACTER.test(candidate) ||

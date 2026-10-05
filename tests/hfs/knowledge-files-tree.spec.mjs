@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
+import { loadExampleCatalog } from '../../scripts/lib/example-refs.mjs';
 import { loadRuleCatalog, loadSlotManifest, ruleParams } from '../../scripts/hfs/slots.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -39,7 +40,7 @@ for (const { name, doc } of topics) {
   });
 
   test(`${name}: every rule of the topic cites an example that exists (its automated codes are derived from its hfsRules)`, () => {
-    const examples = new Set(fs.readdirSync(path.join(ROOT, 'knowledge', 'code-examples', 'backend')));
+    const examples = new Set(loadExampleCatalog(ROOT).examples.map((example) => example.id));
     for (const rule of doc.rules) {
       for (const id of rule.relatedExamples ?? []) assert.ok(examples.has(id), `${rule.id}: example ${id} does not exist`);
     }

@@ -59,7 +59,28 @@ its lock every 30 s (`STARCI_TUNNEL_OWNER_CHECK_MS`): when another live process 
 cloudflared and exits; when the lock was released, it takes it back. A starter (`start`,
 `ensureAskConnectors`, or the reconciler Host controller) never launches while a manager is alive, and
 records the lock in state `starting` so a launch that has not claimed it yet counts as alive for 30 s.
-A lock whose holder process is gone, or started before the current boot, never blocks a fresh start.
+A stale lock can be replaced when its holder is gone or from an earlier boot. An unresolved tunnel
+child remains held in its original connector row even after the manager dies: `start`, automatic ensure
+and manager claims refuse replacement until that original child has exact closure evidence.
+
+Connector stop requests use the process birth and executable captured by the launching owner. On Windows,
+one verified process handle binds identity, termination and completed exit; the tunnel child also carries a
+fresh launch nonce verified on that handle. The exact manager is closed before its latest owned child is read.
+Missing legacy custody, an unsupported platform, identity conflict or an incomplete call refuses stop and
+retains the recorded custody. A concurrent new owner is never overwritten. These receipts prove the named
+processes only, not descendants. Native calls are owned by `scripts/api/process/owned-process.mjs`.
+Verified manager closure is retained in the same connector row before child closure is attempted. A retry
+uses that receipt rather than stopping a recycled manager PID. Exact child closure is retained before the
+final stopped-state write, so a refused publication can be retried without another process stop. Whole-row
+custody comparisons prevent a concurrent owner from being overwritten; ordinary config writes cannot
+discard an unresolved child identity, launch nonce, capture or retained manager receipt.
+
+The existing `scripts/machine/worker-close.mjs` owner also uses this native API. It captures each measured
+worker process's birth, executable and terminal handle environment before release, stops surviving objects
+individually through their original native identities, and repeats the process/environment census. Missing
+creation or executable evidence, foreign identity, incomplete native receipts, an unreadable census or a
+new uncaptured terminal process leaves closure unverified. These measurements cover captured objects and
+the later visible terminal census; they do not prove universal descendant closure.
 
 ## Owner asks on demand
 
@@ -201,9 +222,9 @@ command the supervisors, within that same scope.
 
 - Never in `config.yaml`. `tokenEnv` / `botTokenEnv` must be an UPPER_SNAKE env var **name**; a pasted
   token, or a `token`/`botToken`/`secret` key, is refused by validation.
-- The value comes from the process environment, or `<NAME>_FILE` pointing at a custody file, or the
-  gitignored dotenv file `connectors.secretsFile` (default `.secrets/connectors.env`, relative to the
-  skill root; `/.secrets/` is in `.gitignore`). A real env var wins over the file.
+- [Host credentials](host-secrets.md) owns the canonical runtime root `secret.env` and environment
+  precedence. Connector fields name the required variable; its `<NAME>_FILE` environment value
+  may point at a custody file. The configuration carries no alternate secrets-file field.
 - A named tunnel with `tunnel` + `credentialsFile` uses the credentials JSON `cloudflared tunnel create`
   wrote (`~/.cloudflared/<uuid>.json`); a remotely managed tunnel token is handed to cloudflared as
   `TUNNEL_TOKEN` in the child environment, never on argv.

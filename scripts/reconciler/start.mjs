@@ -1,35 +1,10 @@
 #!/usr/bin/env node
 // scripts/reconciler/start.mjs — the shared host startup and actual readiness owner.
 // .starci/host/startup.md describes its lifecycle; workflow ingress excludes Kernel watchdogs.
-//
-//   starci reconciler up [--check] [--json] [--wait <sec>] [--no-build] [--retire-stale-ledgers]
-//                                     [--set-profile <operational|observe>]
-//
-// Order of an apply run:
-//   1. preflight (read-only): bundled SQLite >= 3.51.3, machine.sqlite and every registered ledger quick_check, registered
-//      ledgers that are temp/test paths, whose repo_root is gone, or whose file is missing, legacy in-repo .starciwork/runtime.sqlite stores, kernel/supervisor pins whose
-//      agent takes no --model on worker-start (agent card start.modelArgument false), Orca reachable;
-//   2. config: config.yaml is NEVER rewritten by a plain run; a profile that is not operational is a red row with the one
-//      command that fixes it. `--set-profile operational|observe` writes that one `reconciler` block (backup first) and
-//      then runs as usual (operational: job/host/workflow/resource active; gc/workers/learning shadow unless configured);
-//   3. a missing local UI toolchain installed through native npm ci, then ui/dist rebuilt when stale, before services;
-//   4. the reconciler engine: started when down, restarted (planned, never a crash) when it runs --safe without a real
-//      crash loop behind it;
-//   5. every host service that is down, started through services.mjs startService (Orca is never launched: the owner does);
-//   6. the Supervisor seat (start-supervisor.mjs, only when supervisor.mode is kernel) and every running workflow's
-//      Kernel seat (scripts/kernel/kernel-watchdog.mjs --once --repair, the Host controller's own call);
-//   7. the checklist, re-read until green or --wait seconds (default 120) pass.
-// --check runs only the read-only checklist (steps 1 and 7, one pass). Exit 0 only when every REQUIRED item is green.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runNpm } from '../api/npm/run-npm.mjs';
-import { ci } from '../api/npm/ci.mjs';
-import { isLinkLike } from '../api/fs/is-link-like.mjs';
-import { linkedNodeModules, lockedValue } from '../machine/npm-ci.mjs';
-import { underHostLock } from '../machine/verb-lock.mjs';
-import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { legacyWorkSqliteFindings, workspaceBoundRepoRoots } from '../housekeeping/hk-orphan-ledgers.mjs';
@@ -39,9 +14,10 @@ import { green, red, warn } from './checklist-items.mjs';
 import { depthItems } from './depth-items.mjs';
 import { ensure, crashLoopPlan, crashLoopRecord, leaderState, restartEngine, status } from './boot.mjs';
 import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs'; import { DEFAULT_SUPERVISOR_MODE, supervisorMode } from '../machine/home.mjs';
-import { probeOrcaAsync, serviceRegistry, servicePorts, startService } from './services.mjs'; import { execNode } from '../api/node/exec-node.mjs';
+import { probeOrcaAsync, serviceRegistry, servicePorts, servicePlatformProblem, startService } from './services.mjs'; import { execNode } from '../api/node/exec-node.mjs';
 import { sleep } from '../lib/sleep.mjs'; import { isMain } from '../lib/is-main.mjs';
-import { uiDeliveryReadiness } from '../../ui/server.mjs';
+import { buildUi, uiBuildState } from './ui-build.mjs';
+export { buildUi, uiBuildState };
 import { workflowCaller } from '../agent/caller-context.mjs';
 
 const MIN_SQLITE = '3.51.3';
@@ -63,6 +39,13 @@ export function cmpVersion(a, b) {
 export const sqliteItem = (version = process.versions.sqlite, node = process.version) => (cmpVersion(version, MIN_SQLITE) >= 0
   ? green('preflight', 'node-sqlite', 'Node bundled SQLite', `${version} (node ${node})`)
   : red('preflight', 'node-sqlite', 'Node bundled SQLite', `${version} is older than ${MIN_SQLITE} (WAL-reset bug; node ${node})`, `upgrade Node to a release that bundles SQLite >= ${MIN_SQLITE}`));
+
+/** Required managed-service capability; a read-only OS row prevents startup from reaching unsupported actuators. */
+export function hostPlatformItem(platform = process.platform) {
+  const problem = servicePlatformProblem('harness-ui', platform);
+  return problem ? red('preflight', 'host-platform', 'Managed host platform', problem, 'use a host with the declared service lifecycle implementation')
+    : green('preflight', 'host-platform', 'Managed host platform', 'managed service actuators available');
+}
 
 /** A registered ledger that no product should live in: a temp or test path. Pure. */
 export function isTempLedger(file, { tmp = os.tmpdir() } = {}) {
@@ -94,7 +77,7 @@ export function ledgerIntegrity(ledgers, { check = (f) => quickCheck(f), exists 
     if (l.state === 'retired' || !l.file || !exists(l.file)) continue;
     const r = check(l.file);
     out.checked += 1;
-    if (!r.ok) out.bad.push({ name: l.name ?? l.ledgerId, result: r.result?.[0] ?? 'failed' });
+    if (!r.ok) out.bad.push({ name: l.name ?? l.ledgerId, reason: r.reason ?? 'integrity-failed', result: r.result?.[0] ?? 'failed' });
   }
   return out;
 }
@@ -125,96 +108,6 @@ export function pinProblems(pins, { card = (agent) => { try { return parseYaml(f
       out.push({ ...pin, problem: `${pin.agent} takes no --model on worker-start (modules/models/agents/${pin.agent}.yaml start.modelArgument false); drop the model pin` });
   }
   return out;
-}
-
-/** The newest mtime under `root` (files only, node_modules and dist skipped), or 0. Seam: fs. */
-function newestMtime(root, { fsImpl = fs } = {}) {
-  let newest = 0;
-  const walk = (dir) => {
-    let entries = [];
-    try { entries = fsImpl.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      if (e.name === 'node_modules' || e.name === 'dist') continue;
-      const full = path.join(dir, e.name);
-      if (e.isDirectory()) walk(full);
-      else { try { newest = Math.max(newest, fsImpl.statSync(full).mtimeMs); } catch { /* gone */ } }
-    }
-  };
-  walk(root);
-  return newest;
-}
-
-/**
- * Whether ui/dist is older than its sources: any file under ui/src, or ui/package.json, ui/vite.config.*, ui/index.html,
- * ui/tsconfig.json newer than the newest dist file (or dist missing). {stale, reason, srcMs, distMs}. Seam: fs.
- */
-export function uiBuildState({ uiDir = path.join(SKILL_ROOT, 'ui'), fsImpl = fs } = {}) {
-  const distMs = newestMtime(path.join(uiDir, 'dist'), { fsImpl });
-  const stat = (f) => { try { return fsImpl.statSync(path.join(uiDir, f)).mtimeMs; } catch { return 0; } };
-  const loose = ['package.json', 'index.html', 'tsconfig.json', 'vite.config.ts', 'vite.config.mjs', 'vite.config.js'].map(stat);
-  const srcMs = Math.max(newestMtime(path.join(uiDir, 'src'), { fsImpl }), ...loose);
-  const delivery = uiDeliveryReadiness({ distDir: path.join(uiDir, 'dist'), fsImpl });
-  if (!delivery.ok) return { stale: true, reason: `ui/dist delivery is unavailable (${delivery.reason ?? delivery.missing.join(', ')})`, srcMs, distMs };
-  if (!distMs) return { stale: true, reason: 'ui/dist is missing', srcMs, distMs };
-  if (srcMs > distMs) return { stale: true, reason: `a ui source is ${Math.round((srcMs - distMs) / 1000)}s newer than ui/dist`, srcMs, distMs };
-  return { stale: false, reason: 'ui/dist is newer than every ui source', srcMs, distMs };
-}
-
-/** The harness owns its local toolchain install and build, including an installed non-Git runtime. */
-export async function buildUi({ uiDir = path.join(SKILL_ROOT, 'ui'), env = process.env } = {}, deps = {}) {
-  const api = { fs, ci, npm: runNpm, isLinkLike, underHostLock, ...deps };
-  const root = path.resolve(uiDir), modules = path.join(root, 'node_modules');
-  const toolEntries = ['vite/bin/vite.js', 'typescript/bin/tsc', 'eslint/bin/eslint.js'];
-  const noLinks = (dir) => {
-    const ancestors = [];
-    for (let cursor = dir; ; cursor = path.dirname(cursor)) {
-      ancestors.unshift(cursor);
-      if (path.dirname(cursor) === cursor) break;
-    }
-    for (const cursor of ancestors) if (api.isLinkLike(cursor)) throw Error('harness UI path crosses a link');
-  };
-  const guard = () => {
-    noLinks(root);
-    if (!api.fs.lstatSync(root).isDirectory()) throw Error('harness UI directory is unavailable');
-    const local = linkedNodeModules(root, api.fs.lstatSync.bind(api.fs));
-    if (!local.ok || local.linked || api.isLinkLike(modules)) throw Error('harness UI node_modules must be a real local directory');
-    try { if (!api.fs.lstatSync(modules).isDirectory()) throw Error('harness UI node_modules is not a directory'); }
-    catch (error) { if (error?.code !== 'ENOENT') throw error; }
-    for (const entry of toolEntries) {
-      const file = path.join(modules, entry);
-      noLinks(path.dirname(file));
-      if (api.isLinkLike(file)) throw Error('harness UI build tool is linked');
-    }
-    return ['package.json', 'package-lock.json'].map((name) => {
-      const file = path.join(root, name);
-      if (api.isLinkLike(file) || !api.fs.lstatSync(file).isFile()) throw Error('harness UI manifest or lockfile is unavailable');
-      return api.fs.readFileSync(file);
-    });
-  };
-  const toolsReady = () => toolEntries.every((entry) => {
-    const file = path.join(modules, entry);
-    try { noLinks(path.dirname(file)); return !api.isLinkLike(file) && api.fs.lstatSync(file).isFile(); }
-    catch { return false; }
-  });
-  try {
-    const result = await api.underHostLock({ role: 'coordinator', purpose: 'harness-ui-build', env }, async () => {
-      const manifests = guard();
-      let install = null;
-      if (!toolsReady()) {
-        install = await api.ci(root, { env });
-        if (install?.ok !== true || install?.status !== 0)
-          return { ok: false, install, output: `UI dependency install failed: ${String(install?.stderr ?? 'no successful receipt').slice(0, 300)}` };
-      }
-      const current = guard();
-      if (manifests.some((bytes, index) => !bytes.equals(current[index])))
-        return { ok: false, install, output: 'UI dependency installation changed a manifest or lockfile' };
-      if (!toolsReady()) return { ok: false, install, output: 'UI dependency installation left the local build toolchain incomplete' };
-      const r = await api.npm(['run', 'build'], { cwd: root, env, timeout: 900_000 });
-      return { ok: !r.error && r.status === 0, install,
-        output: String(r.stdout ?? '').concat(String(r.stderr ?? '')).trim().split(/\r?\n/).slice(-6).join(' | ').slice(0, 500) };
-    });
-    return lockedValue(result);
-  } catch (error) { return { ok: false, output: String(error?.message ?? error).slice(0, 500) }; }
 }
 
 /* ------------------------------------------------------------ the operational profile */
@@ -359,19 +252,19 @@ async function json(args, { timeoutMs = 120_000 } = {}) {
  * Every checklist row, read-only: preflight, config, engine, controllers, services, seats, sla, ui build. Never throws
  * (a failing section is one red row). Seams (specs): env, config, machine reads, probes.
  */
-export async function gather({ env = process.env, config = safeRun(() => loadConfig(), null), orca = true, seats = true, workflowSeats = true, coreDebug = true, depthProbe = null } = {}) {
+export async function gather({ env = process.env, config = safeRun(() => loadConfig(), null), orca = true, seats = true, workflowSeats = true, coreDebug = true, depthProbe = null, platform = process.platform } = {}) {
   const items = [];
   const push = (...rows) => items.push(...rows.flat());
   // preflight
-  push(sqliteItem());
+  push(sqliteItem(), hostPlatformItem(platform));
   let ledgers = [];
   try {
     const q = readMachine((m) => ({ check: m.db.prepare('PRAGMA quick_check').get()?.quick_check, ledgers: m.listLedgers() }), null, { env });
-    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'starci runtime machine-db (initialises it) or restore from <archive root>/ledger-backups'));
+    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'preserve existing machine.sqlite and WAL; resolve storage access and runtime compatibility; initialise only when absence is confirmed; project snapshots do not contain machine.sqlite'));
     else { ledgers = q.ledgers; push(q.check === 'ok' ? green('preflight', 'machine-db', 'machine.sqlite quick_check', `ok, ${ledgers.length} ledger(s) registered`) : red('preflight', 'machine-db', 'machine.sqlite quick_check', String(q.check), 'restore machine.sqlite (owner-approved)')); }
-  } catch (error) { push(red('preflight', 'machine-db', 'machine.sqlite quick_check', String(error?.message ?? error).slice(0, 200), 'restore machine.sqlite (owner-approved)')); }
+  } catch (error) { push(red('preflight', 'machine-db', 'machine.sqlite health', String(error?.message ?? error).slice(0, 200), 'preserve machine.sqlite and WAL; diagnose access, compatibility and integrity before selecting an owner-approved recovery point')); }
   const integrity = ledgerIntegrity(ledgers);
-  push(integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledgers quick_check', integrity.bad.map((b) => `${b.name}: ${b.result}`).join('; ').slice(0, 400), 'restore the ledger from <archive root>/ledger-backups with every writer stopped (owner-approved)')
+  push(integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledger health', integrity.bad.map((b) => `${b.name} (${b.reason}): ${b.result}`).join('; ').slice(0, 400), 'preserve original database and WAL; resolve schema/SQLite compatibility, identity or access; restore only confirmed integrity failures from an inspected snapshot with every writer stopped and owner approval of its loss window')
     : green('preflight', 'ledger-integrity', 'registered ledgers quick_check', `${integrity.checked} ledger file(s) ok`, { required: false }));
   const found = ledgerFindings(ledgers);
   push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${(f.problem === 'missing-repo' ? f.repoRoot : f.file) ?? '-'})`).join('; ').slice(0, 400), 'starci reconciler up --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')
@@ -496,7 +389,9 @@ function applyProfileFile({ file = path.join(SKILL_ROOT, 'config.yaml'), now = D
 
 export async function applyHost(opts, deps = {}) {
   const applied = [];
-  const { env = process.env, waitMs, setProfile, noBuild, retire, workflowSeats = true } = opts;
+  const { env = process.env, waitMs, setProfile, noBuild, retire, workflowSeats = true, platform = process.platform } = opts;
+  const unsupported = servicePlatformProblem('harness-ui', platform);
+  if (unsupported) return [`host startup refused: ${unsupported}`];
   const api = { uiBuildState, buildUi, leaderState, reconcilerNumbers, crashLoopRecord, status, restartEngine, ensure,
     sleep, probeServices, startService, loadConfig, probeOrcaAsync, supervisorMode, json, kernelSeatItems, ...deps };
   if (retire) {
@@ -554,15 +449,15 @@ export async function applyHost(opts, deps = {}) {
   return applied;
 }
 
-export async function ensureHostRuntime({ env = process.env, waitMs = START_WAIT_MS, workflowSeats = false, check = false, ...opts } = {}, deps = {}) {
+export async function ensureHostRuntime({ env = process.env, waitMs = START_WAIT_MS, workflowSeats = false, check = false, platform = process.platform, ...opts } = {}, deps = {}) {
   const read = deps.gather ?? gather, apply = deps.applyHost ?? applyHost, wait = deps.sleep ?? sleep, now = deps.now ?? Date.now;
-  const readOptions = { env, workflowSeats, coreDebug: check };
+  const readOptions = { env, workflowSeats, coreDebug: check, platform };
   let items = await read(readOptions);
   const blockers = items.filter((item) => item.required && item.status === 'red' && ['preflight', 'config'].includes(item.group)
     && !(opts.setProfile && item.group === 'config' && item.id === 'profile'));
   let applied = [];
   if (!check && blockers.length === 0 && (!summarize(items).ok || opts.setProfile || opts.retire)) {
-    try { applied = await apply({ env, waitMs, workflowSeats, ...opts }); }
+    try { applied = await apply({ env, waitMs, workflowSeats, platform, ...opts }); }
     catch (error) { return { ok: false, summary: summarize(items), applied, items, error: String(error?.message ?? error) }; }
     items = await read(readOptions);
     const until = now() + waitMs;
@@ -572,8 +467,9 @@ export async function ensureHostRuntime({ env = process.env, waitMs = START_WAIT
   return { ok: summary.ok, summary, applied, items };
 }
 
-export async function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2), deps = {}) {
   const has = (f) => argv.includes(f);
+  const workflowEntry = deps.workflowEntry === true;
   const wait = argv.indexOf('--wait');
   const waitMs = Math.max(0, (Number(wait >= 0 ? argv[wait + 1] : START_WAIT_MS / 1000) || START_WAIT_MS / 1000) * 1000);
   const sp = argv.indexOf('--set-profile');
@@ -584,18 +480,21 @@ export async function main(argv = process.argv.slice(2)) {
     return;
   }
   const opts = { waitMs, setProfile, noBuild: has('--no-build'), retire: has('--retire-stale-ledgers') };
-  const result = await ensureHostRuntime({ ...opts, workflowSeats: true, check: has('--check') });
-  if (result.ok && !has('--check') && safeRun(() => loadConfig(), null)?.debug === true) {
-    const { ensureCoreDebug } = await import('./core-debug.mjs');
-    result.maintenance = await ensureCoreDebug({ caller: workflowCaller(argv), env: process.env, plan: false });
+  const env = deps.env ?? process.env;
+  const result = await (deps.ensureHostRuntime ?? ensureHostRuntime)({ ...opts, env, workflowSeats: !workflowEntry, check: has('--check') });
+  if (workflowEntry) result.hostOk = result.ok;
+  if (result.ok && !has('--check') && safeRun(() => (deps.loadConfig ?? loadConfig)(), null)?.debug === true) {
+    const ensureCoreDebug = deps.ensureDebug ?? (await import('./core-debug.mjs')).ensureCoreDebug;
+    result.maintenance = await ensureCoreDebug({ caller: workflowCaller(argv), env, plan: false });
     const ready = result.maintenance?.ok === true && result.maintenance?.ready === true;
     result.items.push(ready ? green('seats', 'core-debug', 'Core debug seat', result.maintenance.action ?? 'ready')
       : red('seats', 'core-debug', 'Core debug seat', result.maintenance.reason ?? result.maintenance.action ?? 'not ready', 'supply the declared caller route and reconcile its native seat'));
     result.summary = summarize(result.items);
     result.ok = result.summary.ok;
   }
-  console.log(has('--json') ? JSON.stringify(result) : renderText(result.items, { applied: result.applied }));
+  (deps.print ?? console.log)(has('--json') ? JSON.stringify(result) : renderText(result.items, { applied: result.applied }));
   process.exitCode = result.ok ? 0 : 1;
+  return result;
 }
 
 if (isMain(import.meta.url)) await main();

@@ -42,7 +42,6 @@ function isRawGuidanceExempt(file) {
   const base = rel.slice(rel.lastIndexOf('/') + 1);
   return rel.startsWith('tests/')
     || HISTORY.test(base)
-    || rel.startsWith('modules/kernel/contract-changes/')
     || rel === 'modules/kernel/command-policy.yaml'
     || /^packages\/[^/]+\/runtime\//.test(rel);
 }

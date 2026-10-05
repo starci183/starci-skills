@@ -9,6 +9,13 @@ import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
+/**
+ * Read a Dispatch's worker state and effective launch from typed host receipt fields.
+ * Malformed start-options JSON does not become attestation; titles and terminal text are never
+ * substituted. A failed or hostUnavailable read proves no worker exit and grants no replacement.
+ * @param {object} input - Required Dispatch identity.
+ * @returns {object} ok, state, Dispatch, effective launch, raw result, error, and hostUnavailable.
+ */
 export function workerShow({ dispatch }) {
   const r = orcaCall('worker-show', { dispatch });
   const result = r.result;

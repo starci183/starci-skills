@@ -77,7 +77,8 @@ const selfFile = fileURLToPath(import.meta.url);
 export async function discoverControllers(dir = CONTROLLERS_DIR) {
   const controllers = [], errors = [];
   let files = [];
-  try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.mjs')).sort(); } catch { return { controllers, errors }; }
+  try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.mjs')).sort(); }
+  catch (error) { return { controllers, errors: [{ file: dir, name: null, error: `controller inventory unreadable: ${String(error?.message ?? error).slice(0, 300)}` }] }; }
   for (const f of files) {
     const file = path.join(dir, f);
     const name = f.replace(/\.mjs$/, '');
@@ -367,6 +368,10 @@ export class Engine {
     budget.unref?.();
     try {
       const result = await work;
+      if (result?.ok === false) {
+        throw Object.assign(Error(result.error ?? result.reason ?? `controller returned ${result.action ?? 'ok:false'}`),
+          { result, ...(Number.isFinite(Number(result.retryAfterMs)) ? { retryAfterMs: Number(result.retryAfterMs) } : {}) });
+      }
       this.queue.done(c.name, item.key);
       // A known wait (a grace window, a busy owner step) is not a failure: the key comes back at that time, no error row.
       const wait = Number(result?.requeueAfterMs);
@@ -379,7 +384,7 @@ export class Engine {
         this.log('reconciler.error', `${c.name} ${item.key} failed (attempt ${attempts}, retry in ${delay}ms): ${String(error?.message ?? error).slice(0, 300)}`,
           { kind: 'reconciler.reconcile-failed', name: c.name, key: item.key, attempts, detail: String(error?.stack ?? error).slice(0, 800) });
       }
-      return { ok: false, key: item.key, error: String(error?.message ?? error), retryMs: delay };
+      return { ok: false, key: item.key, error: String(error?.message ?? error), retryMs: delay, ...(error?.result ? { result: error.result } : {}) };
     } finally { clearTimeout(budget); this.runningLabels.delete(label); this.hb?.running(this.runningLabels); }
   }
 
@@ -520,7 +525,13 @@ export class Engine {
    * Shadow unless the engine was built with apply and took the lead. Returns {ok, controllers: [...], loadErrors}.
    */
   async once({ controller = null, key = null } = {}) {
-    const out = { ok: true, epoch: this.epoch, leader: this.leader, controllers: [], loadErrors: this.loadErrors.map((e) => ({ name: e.name, error: e.error })) };
+    const expected = controller ? [controller] : CONTROLLER_NAMES.filter((name) => this.modes[name] !== 'off');
+    const loaded = new Set(this.controllers.map((c) => c.name));
+    const missing = expected.filter((name) => !loaded.has(name));
+    const incomplete = this.loadErrors.some((e) => e.name == null || expected.includes(e.name));
+    const out = { ok: !incomplete && missing.length === 0, epoch: this.epoch, leader: this.leader, controllers: [],
+      coverage: { expected: expected.length, loaded: expected.length - missing.length, missing },
+      loadErrors: this.loadErrors.map((e) => ({ name: e.name, error: e.error })) };
     const picked = this.controllers.filter((c) => (controller ? c.name === controller : c.mode !== 'off'));
     if (controller && !picked.length) return { ...out, ok: false, error: `no controller '${controller}' (known: ${this.controllers.map((c) => c.name).join(', ') || 'none'})` };
     for (const c of picked) {

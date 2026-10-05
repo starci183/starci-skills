@@ -247,4 +247,4 @@ $defs:
       name: {type: string, pattern: '^[a-z][a-z0-9.-]*$'}
       where: {type: string, minLength: 1}
       recipientPolicy: {type: string, minLength: 1, description: "Which age recipient the envelope is encrypted to: the one shared master recipient every project uses."}
-      keyCustody: {type: string, minLength: 1, description: "Where the decrypting identity lives: the shared master identity (~/.starci/master.identity) decrypts every project's custody, stays outside Git and is backed up by the owner machine."}
+      keyCustody: {type: string, minLength: 1, description: "Where the shared decrypting identity is held; docs/host-secrets.md owns host custody and its execution prerequisites."}

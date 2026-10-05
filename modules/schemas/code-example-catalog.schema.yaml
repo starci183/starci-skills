@@ -1,47 +1,48 @@
 $schema: https://json-schema.org/draft/2020-12/schema
 $id: starci/code-example-catalog@1
-title: StarCi code example catalog
+title: StarCi current app source reference catalog
 type: object
 additionalProperties: false
-required:
-  - schema
-  - title
-  - purpose
-  - examples
+required: [schema, title, purpose, examples]
 properties:
-  schema:
-    type: string
-    const: starci/code-example-catalog@1
-  title:
-    type: string
-    minLength: 1
-  purpose:
-    type: string
-    minLength: 1
+  schema: {type: string, const: starci/code-example-catalog@1}
+  title: {type: string, minLength: 1, pattern: \S}
+  purpose: {type: string, minLength: 1, pattern: \S}
   examples:
     type: array
     minItems: 1
     items:
       type: object
-      additionalProperties: true
-      required:
-        - id
-        - path
+      additionalProperties: false
+      required: [id, path, lane, title, summary, relatedRules, files, entrypoint, projects, tests]
       properties:
-        id:
-          type: string
-          minLength: 1
-        path:
-          type: string
-          minLength: 1
-        title:
-          type: string
-        lane:
-          type: string
-        summary:
-          type: string
+        id: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+        path: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+        lane: {type: string, enum: [backend, frontend]}
+        title: {type: string, minLength: 1, pattern: \S}
+        summary: {type: string, minLength: 1, pattern: \S}
         relatedRules:
           type: array
-          items:
-            type: string
-            minLength: 1
+          minItems: 1
+          uniqueItems: true
+          items: {type: string, minLength: 1, pattern: \S}
+        files:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: {$ref: '#/$defs/relativePath'}
+        entrypoint: {$ref: '#/$defs/relativePath'}
+        projects:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: {$ref: '#/$defs/relativePath'}
+        tests:
+          type: array
+          uniqueItems: true
+          items: {$ref: '#/$defs/relativePath'}
+$defs:
+  relativePath:
+    type: string
+    minLength: 1
+    pattern: '^(?!/)(?![A-Za-z]:)(?!.*\\)(?!.*(?:^|/)\.{1,2}(?:/|$))\S+$'

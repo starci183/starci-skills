@@ -35,16 +35,18 @@ reads: the workflow's scope - its latest work graph's FRs and XBase#state shapes
   (scripts/work/ui/ui-proof-brief.mjs buildBrief) - and every job_artifacts row with its
   artifact_proofs claims and dependency digests
 writes: nothing — pure projection
+policy: the unique active handover job, else the current approved handover job, selects its admitted proof contract including withheld changes; missing or ambiguous admission refuses visibly
 returns:
   schema: starci/proof-coverage@1
   summary: "{proven, stale, missing, total, mustOwed}"
   mustOwed: "[{kind, id, status}] — must-haves not proven: an FR whose requiresProof has a required kind"
   items: "[{kind: fr|shape|case, id, must, requires?[], record?, status: proven|stale|missing,
     evidence:[{jobId, op, attempt, path, kind, sha256, codeSha, state: fresh|stale|unbaselined,
-    changed?[]}]}] — proven: fresh (or unbaselined) evidence exists; stale: every piece of evidence
-    depends on a path whose digest moved; missing: none"
+    changed?[]}]}] — qualified proof requires independently observed exact-command green evidence
+    for every non-waived kind on a settled, baselined attempt; older admitted contracts retain their projection"
   errors: "[{record, error}] — a ui record whose proof cases could not be listed"
 refusals:
   workflow-unknown: no workflows row for --workflow
+  handover-proof-unjudged: no unique active or current approved handover job with an admitted coverage contract
 usedBy: handover.review (its package lists what is not proven) and starci kernel report, which refuses a
   handover ask while a must-have is missing or stale; the ui reads it

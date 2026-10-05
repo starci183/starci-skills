@@ -6,6 +6,9 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
+import { proofRepo } from '../helpers/sonar-scan.mjs';
+import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
+import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 
 // A terminal-send to a Claude Kernel answered agent_prompt_stalled while the wake text sat on its
 // screen. `starci kernel nudge` already proves delivery from the screen (tests/kernel/nudge-delivery-proof.spec.mjs);
@@ -25,10 +28,16 @@ const world=(t,prefix)=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),prefix));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
+  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);
+  // reportWorld registers a real worktree of this repo; its exact Git main root remains the adopted root.
+  const ownerConfig=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
+    .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private wake-delivery fixture adoption',roots:[repo]})}`);
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),ownerConfig);
   const stubFile=path.join(root,'fake-orca.mjs');fs.writeFileSync(stubFile,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stubFile]),
-    STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome,LOCALAPPDATA:path.join(root,'localappdata'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_SLEEP_SCALE:'0'};  // every fixture registers a repo named 'repo' — a private registry per world
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   // The runtime.sqlite every spawned child resolves (projectsRootFor(env)/<ledgerId>/runtime.sqlite);
@@ -43,7 +52,7 @@ const world=(t,prefix)=>{
   const kernelWakes=()=>(fs.existsSync(logFile)?fs.readFileSync(logFile,'utf8').trim().split('\n').filter(Boolean).map(json):[])
     .map(e=>e.argv).filter(a=>a[0]==='terminal'&&a[1]==='send'&&a[a.indexOf('--terminal')+1]===KERNEL)
     .map(a=>({text:a.includes('--text')?a[a.indexOf('--text')+1]:'',enter:a.includes('--enter')}));
-  return {root,repo,env,ledgerFile,orcaState,writeState,seedKernelTerminal,kernelWakes};
+  return {root,repo,ownerRoot,env,ledgerFile,orcaState,writeState,seedKernelTerminal,kernelWakes};
 };
 
 const signalKernel=(ledger,workflowId)=>ledger.db.prepare("INSERT OR REPLACE INTO signals(scope,key,workflow_id,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,?,NULL,?,?,?,NULL)")
@@ -78,6 +87,13 @@ const reportWorld=t=>{
   const w=world(t,'starci-transition-wake-');
   const run=(args,more={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...w.env,...more}});
   const workflowId='wf-transition-wake',jobId='job-transition-wake';
+  proofRepo(t,w.repo);
+  const made=fakeOrcaWorktrees({root:path.join(w.root,'worktrees')}).create({repo:`path:${w.repo}`,name:`wf-${workflowId}`,baseBranch:'main'});
+  assert.equal(made.ok,true,made.error);
+  w.repo=path.resolve(made.worktree.path);
+  fs.mkdirSync(path.join(w.repo,'docs'),{recursive:true});
+  registerWorkflowWorktree({env:w.env},{workflowId:workflowId,orcaWorktreeId:made.worktree.id,path:w.repo,branch:made.worktree.branch});
+  w.ledgerFile=()=>ledgerFileFor(w.repo,{env:w.env});
   const ledger=openLedger({file:w.ledgerFile()});
   try{
     // jobs_enqueue_guard (migrations/runtime/0001-init.sql:278): an op job needs a workflow that accepts
@@ -318,10 +334,11 @@ const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
 
 const unwritableWorld=t=>{
   const w=world(t,'starci-unwritable-repair-');
-  const ownerRoot=path.join(w.root,'owner');fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
+  const ownerFile=path.join(w.ownerRoot,'config.yaml');
+  fs.writeFileSync(ownerFile,fs.readFileSync(ownerFile,'utf8')
+    .replace(/^language:.*$/m,'language: vi').replace(/^effort:.*$/m,'effort: medium')
+    .replace(/^kernel:.*$/m,'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}'));
   w.env.STARCI_FAKE_ORCA_UNIQUE_TERMINALS='1';
-  w.env.STARCI_OWNER_ROOT=ownerRoot;
   // The repair invokes start-workflow in a grandchild; carry only the private external boundaries to it.
   const closureImport=`data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});register(${JSON.stringify(new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href)});`)}`;
   w.env.NODE_OPTIONS=[w.env.NODE_OPTIONS,`--import=${closureImport}`].filter(Boolean).join(' ');

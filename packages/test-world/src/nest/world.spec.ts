@@ -15,6 +15,9 @@ import { SLOT_ENV, STATE_FILE_ENV, writeRunState, removeRunState } from "../jest
 import type { RunContext } from "../jest/context"
 import { World } from "./world"
 import type { WorldSpec } from "./world-types"
+import { DataSource } from "typeorm"
+import { namespaceOf } from "../stack/namespace"
+import { databaseName } from "../stack/services/postgresql"
 
 interface ApiOptions {
     readonly greeting: string
@@ -617,5 +620,109 @@ test("a payment fake declared with webhookApp delivers to that app, not to the f
         assert.deepEqual(webhookHits, ["billing", "identity"])
     } finally {
         await world.stop()
+    }
+})
+
+
+test("write faults own the outage lock, stop attempts every cleanup, and unknown cleanup retains custody until a verified retry", async (t) => {
+    // Only the library DB initialization boundary is stubbed: lock, world handles and teardown run for real private fixtures.
+    t.mock.method(DataSource.prototype, "initialize", async function (this: DataSource): Promise<DataSource> { return this })
+    const context = await publish()
+    const toxiproxy = await fakeToxiproxy()
+    const namespace = namespaceOf(context.root, context.slot)
+    const database = databaseName(namespace.snake, "billing")
+    const privateContext: RunContext = {
+        ...context,
+        namespace,
+        infra: { toxiproxyApi: toxiproxy.url, postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "synthetic", databases: { billing: database }, schemas: {} } },
+    }
+    removeRunState()
+    publishSlot(privateContext)
+    const functions = new Map<string, Record<string, unknown>>()
+    const triggers = new Map<string, Record<string, unknown>>()
+    const queried: Array<string> = []
+    let refused = ""
+    const pgConnect = () => {
+        let checkpoint: { functions: typeof functions; triggers: typeof triggers } | null = null
+        return {
+            connect: async () => undefined,
+            on: () => undefined,
+            end: async () => undefined,
+            query: async (sql: string) => {
+                queried.push(sql)
+                if (sql === "BEGIN") checkpoint = structuredClone({ functions, triggers })
+                if (sql === "ROLLBACK" && checkpoint !== null) {
+                    functions.clear(); triggers.clear()
+                    for (const [name, row] of checkpoint.functions) functions.set(name, row)
+                    for (const [name, row] of checkpoint.triggers) triggers.set(name, row)
+                }
+                if (sql === "COMMIT") checkpoint = null
+                if (sql.startsWith("SELECT current_database()")) return { rows: [{ database, oid: sql.includes("c.relname = 'inbox_claims'") ? "18" : "17", relkind: "r", relispartition: false, inherited: false, constraints: [], triggers: [] }] }
+                if (sql.startsWith("SELECT\n            COALESCE")) {
+                    const name = sql.match(/p\.proname = '([^']+)'/)?.[1] ?? ""
+                    return { rows: [{ functions: functions.has(name) ? [functions.get(name)!] : [], triggers: triggers.has(name) ? [triggers.get(name)!] : [] }] }
+                }
+                const name = sql.match(/"(starci_fault_[a-f0-9]+)"/)?.[1] ?? ""
+                if (sql.startsWith("CREATE FUNCTION")) functions.set(name, { oid: "42", source: sql.split("$fault$")[1], returns: "trigger", arguments: 0, security: false, language: "plpgsql" })
+                if (sql.startsWith("CREATE TRIGGER")) triggers.set(name, { oid: "43", relation: sql.includes('"inbox_claims"') ? "18" : "17", function: "42", type: sql.includes("BEFORE INSERT") ? 7 : 11, enabled: "O", internal: false, constraint: "0" })
+                if (sql.startsWith("DROP TRIGGER")) triggers.delete(name)
+                if (sql.startsWith("DROP FUNCTION")) {
+                    if (name === refused) throw new Error("cleanup reply unavailable")
+                    functions.delete(name)
+                }
+                return { rows: [] }
+            },
+        }
+    }
+    const declared = { ...declaration([]), stacks: { postgresql: { connections: [{ name: "billing" }] } } } as AnyTestWorldConfig
+    const resets: Array<string> = []
+    const options = { resetRun: async (run: RunContext) => { resets.push(run.runId) }, lockIntervalMs: 5, pgConnect }
+    const world = new World(declared, { apps: ["worker"] } as WorldSpec, options)
+    const other = new World(declared, { apps: ["worker"] } as WorldSpec, options)
+    await world.start()
+    await other.start()
+    try {
+        const first = world.infra.postgresql.connection("billing").writeFault("event_outbox", "insert")
+        const second = world.infra.postgresql.connection("billing").writeFault("inbox_claims", "delete")
+        assert.notEqual(first.name, second.name)
+        assert.throws(() => world.infra.postgresql.connection("billing").writeFault("event_outbox", "delete"), /restore this table/)
+        await other.enterTest()
+        let installed = false
+        const installing = first.install().then(() => { installed = true })
+        await settle()
+        assert.equal(installed, false)
+        assert.equal(queried.length, 0, "no catalog or object effect precedes the operation lock")
+        other.leaveTest()
+        await installing
+        assert.equal(await first.count(), 2)
+        let entered = false
+        const entering = other.enterTest().then(() => { entered = true })
+        await settle()
+        assert.equal(entered, false)
+        refused = first.name
+        await assert.rejects(world.stop(), /world cleanup failed/)
+        assert.equal(queried.some((sql) => sql.includes(`p.proname = '${second.name}'`)), true, "the second registered handle was independently checked despite the first cleanup failure")
+        await settle()
+        assert.equal(entered, false, "unknown cleanup retains the operation lock")
+        const resetCount = resets.length
+        const queryCount = queried.length
+        removeRunState()
+        try {
+            await assert.rejects(world.start(), /write-fault cleanup custody must be resolved/)
+            assert.equal(resets.length, resetCount, "pending cleanup refuses reset before reading a new run context")
+            assert.equal(queried.length, queryCount, "restart makes no catalog or database call while custody is unresolved")
+        } finally {
+            publishSlot(privateContext)
+        }
+        refused = ""
+        await world.stop()
+        await entering
+        other.leaveTest()
+        assert.equal(functions.size, 0)
+        assert.equal(triggers.size, 0)
+    } finally {
+        refused = ""
+        await world.stop()
+        await other.stop()
     }
 })

@@ -3,8 +3,12 @@ Task: install, update or bind a runtime host
 
 ## Requirements and trust
 
-Node.js 22.13+ (`package.json` `engines`; `node:sqlite` is unflagged there) and
-npm. The runtime ships sources only — it bundles its own YAML parser
+The local storage profile supports local disks on one host. SQLite WAL files must stay with their database on the same host; SMB/NFS shares, synchronized folders and cross-host concurrent access are unsupported. A project-ledger snapshot is not a whole-system restore point: machine authority, blob bytes, repository Git state and native accounts require separate owner-managed custody. See [ledger recovery limits](ledger-db.md#recovery-scope). No measured RPO or RTO is promised.
+
+Before unattended agent launches, the current owner must adopt `launchTrust` for exact repository roots in the local config; the shipped profile is null. Existing owner-approved roots can keep automatic operation without repeated prompts. Explicit provider declines are preserved. Symbolic `new-child`/`new-top-level` launches are refused until their checkout can be resolved before trust preparation; resolve/create the checkout through its existing worktree owner first. A terminal consent screen alone does not prove root scope. Provider account login and bypass defaults remain native host prerequisites. Automatic workflow purge separately requires `retention.workflowPurge` adoption. See [local config](config-format.md).
+
+Node.js must satisfy `package.json` `engines.node`; unflagged `node:sqlite` and
+npm are required. The runtime ships sources only — it bundles its own YAML parser
 (`engine/yaml.mjs`) and runs with no dependency install. Review the
 downloaded archive before executing it; `npx` executes package code. Pin a
 reviewed version instead of assuming `latest` is safe.

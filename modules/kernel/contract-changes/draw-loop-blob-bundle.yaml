@@ -1,6 +1,0 @@
-id: draw-loop-blob-bundle
-effectiveAt: '2026-09-29T03:00:00+07:00'
-summary: "alpha.3 (ARCHITECTURE-DB §5.1): a draw loop's rounds are agent data. draw-loop.mjs keeps the loop in STARCI_JOB_SCRATCH/draw-loop/<XBase>--<state> (else an OS-temp folder keyed by the ui record), never under ui/<screen>/assets/directions/draw-loop; finish puts the whole loop in the blob store as one starci/blob-bundle@1 (scripts/lib/blob-lookup.mjs putBundle) and every installed part's generation.loop cites it {sha256, round}; api report attaches the scratch draw-loop folder by itself. draw-loop-coverage, draw-gates, draw-loop-settle, draw-quality, draw-feedback and autopilot read the loop through blob-lookup.mjs bundleDir. The finished parts (the direction the owner accepts) stay under ui/<screen>/assets (Q2). check-example-work refuses a draw-loop folder in a tree like any other agent data. Adds no check or finding code"
-reach: new-legs
-paths:
-  - modules/ops/ops/interface.draw.yaml

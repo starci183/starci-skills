@@ -27,7 +27,7 @@
 // DRAW_TOO_MANY_BADGES; DRAW_LOOP_MISSING). starci kernel settle then re-renders and re-measures every live part itself
 // (scripts/work/draw-loop-settle.mjs, draw-metrics-failed).
 //
-// Scope (contract change draw-acceptance-scope-artwork-palette): a file belongs to the ui record whose directory is
+// Scope: a file belongs to the ui record whose directory is
 // its longest path-segment prefix (a nested child record owns its own files). An evidence document the pass names
 // itself is always judged; an evidence document or image reached only by walking an owned directory is judged when
 // the live owning record binds its path - kept historical image-gen evidence (earlier rounds, baselines, redlines)
@@ -50,8 +50,6 @@ export const DRAW_ASSET_NOT_TOKEN_RENDERED = 'DRAW_ASSET_NOT_TOKEN_RENDERED';
 export const DRAW_NOT_SHAPES = 'DRAW_NOT_SHAPES';
 export const DRAW_NOT_REDRAWN = 'DRAW_NOT_REDRAWN';
 export { DATA_STATUS_DRAWN };
-/** The contract change that made the draw acceptance judge every bound asset (modules/kernel/contract-changes/). */
-export const DRAW_ACCEPTANCE_CHANGE = 'draw-adopt-gate';
 export const RENDER_RECORD_SCHEMA = 'starci/draw-render@1';
 const IMAGEGEN_ASSERTION = 'imagegen-provenance';
 /** The `retired` reason of a drawing image_gen.imagegen painted before token rendering (work-ui-screen.schema.yaml). */

@@ -15,8 +15,8 @@ export const lineOf = (text, offset) => {
   return line;
 };
 
-/** Never scanned: contract history, a benchmark finding, a changelog, a .starciwork record and the retired registry. */
-export const isHistoryPath = (rel) => rel.startsWith('modules/kernel/contract-changes/') || rel.startsWith('benchmark/')
+/** Never scanned: a benchmark finding, a changelog, a .starciwork record and the retired registry. */
+export const isHistoryPath = (rel) => rel.startsWith('benchmark/')
   || /(^|\/)CHANGELOG[^/]*\.md$/i.test(rel) || /(^|\/)\.starciwork\//.test(rel) || rel === RETIRED_PATHS_FILE;
 
 /** The generated copy roots of the runtime (ruleParams.runtime.generated), each with a trailing slash. */

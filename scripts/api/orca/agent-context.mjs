@@ -10,6 +10,11 @@
 import { orcaCall } from './lib.mjs';
 import { listingOf } from '../../lib/orca-listing.mjs';
 
+/**
+ * Reads the installed host's command and flag surface for compatibility checks.
+ * ok requires a zero exit and a usable listing; raw commands, count, schema version and failure detail remain available.
+ * listing is a command-to-flag-set map, or null when the response cannot establish that surface.
+ */
 export function agentContext() {
   const r = orcaCall('agent-context');
   const receipt = r.receipt ?? {};

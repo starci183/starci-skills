@@ -14,6 +14,15 @@ import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
+/**
+ * Start a supervised worker and its Task from spec in the selected worktree and existing Run.
+ * The caller supplies its launch request identity and coordinator from handle; orcaCall derives
+ * the replay key. Agent/model admission and ledger reservations remain the caller's responsibility.
+ * A failed receipt may retain partial or unknown effects, so callers reconcile its state/resources
+ * rather than blindly starting another worker or treating a terminal title as effective launch.
+ * @param {object} input - Required spec/worktree/agent/run/request, with declared launch options.
+ * @returns {object} Classified outcome/custody, created identities, effective launch, request, and errors.
+ */
 export function workerStart({ spec, taskTitle, worktree, agent, model, effort, name, repo, baseBranch, displayName, setup, timeoutMs, run, from, request }) {
   const r = orcaCall('worker-start', {
     spec, 'task-title': taskTitle, worktree, agent, model, effort, name, repo,

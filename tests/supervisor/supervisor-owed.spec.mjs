@@ -206,7 +206,7 @@ test('patterns with no incident: 3+ failures in a row since the last success, th
   assert.ok(found.every(f=>f.class===CLASSES.supervisor));
   assert.deepEqual(found.find(f=>f.pattern==='stale-input').labels,['knowledge-churn']);
   const {owed}=owedFindings(ledger.db,{repo:repoRoot,now:NOW,commitsOf:()=>[],staleOf});
-  assert.ok(owed.find(o=>o.pattern==='stale-input').action.includes('contract-changes/'));
+  assert.ok(owed.find(o=>o.pattern==='stale-input').action.includes('current Source obligations'));
   assert.match(owed.find(o=>o.pattern==='retry-loop').line,/^OWED wf-nivo-app-auth-mudqjob3 pattern:retry-loop:op-backend.implement-0000000002 \[pattern:retry-loop\] age=250m open: /);
 }));
 

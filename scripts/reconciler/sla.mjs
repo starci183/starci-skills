@@ -423,17 +423,31 @@ export async function slaPass(ctx, { catalog = null, env = ctx?.env ?? process.e
       m.db.prepare('UPDATE invariant_violations SET cleared_at=? WHERE entity=? AND code=? AND cleared_at IS NULL').run(now, row.entity, ev.code);
     }
     m.log([...toViolate.map(({ ev }) => typedRow(ev, { now })), ...toClear.map(({ ev }) => typedRow(ev, { now, cleared: true }))].map((r) => ({ actor: 'reconciler', ...r })));
-    // Every due episode is violated (an already-reported one included: its event exists) and reported, once.
-    for (const { row } of events) { m.markSlaViolated(Number(row.episode_id)); m.markSlaReported(Number(row.episode_id)); }
+    // Critical delivery stays pending until an actual DI acknowledgement; invariant history remains deduped.
+    for (const { row, ev } of events) { m.markSlaViolated(Number(row.episode_id)); if (ev.severity !== 'critical') m.markSlaReported(Number(row.episode_id)); }
     return { toViolate, toClear };
   }), null, { write: true });
   if (!written) return { ...out, ok: false, error: 'sla pass: machine.sqlite write failed' };
   const { toViolate, toClear } = written;
   out.violated = toViolate.map((x) => x.ev);
   out.cleared = toClear.map((x) => x.ev);
-  for (const ev of out.violated.filter((e) => e.severity === 'critical')) {
-    if (typeof ctx?.openDecision !== 'function') { out.skipped.push(`decision:${ev.dedupeKey}`); continue; }
-    try { await ctx.openDecision(runtimeDefectDecision(ev, { now })); out.decisions += 1; } catch (error) { out.skipped.push(`decision:${ev.dedupeKey}: ${String(error?.message ?? error).slice(0, 120)}`); }
+  const pending = withStateDb(ctx, (m) => m.db.prepare('SELECT * FROM sla_episodes WHERE violated_at IS NOT NULL AND reported_at IS NULL AND cleared_at IS NULL ORDER BY episode_id').all(), null);
+  if (pending == null) return { ...out, ok: false, error: 'sla pass: pending decision read failed' };
+  for (const row of pending) {
+    const ev = violationEvent(row, { catalog: cat, now });
+    if (ev.severity !== 'critical') continue;
+    try {
+      if (typeof ctx?.openDecision !== 'function') throw Error('decision owner unavailable');
+      const acknowledged = await ctx.openDecision(runtimeDefectDecision(ev, { now }));
+      if (ctx.mode === 'shadow') { out.wouldDecisions = (out.wouldDecisions ?? 0) + 1; continue; }
+      if (acknowledged?.ok !== true || acknowledged.shadow || acknowledged.recordedOnly) throw Error('decision delivery was not acknowledged');
+      const marked = withStateDb(ctx, (m) => m.transaction(() => {
+        m.markSlaReported(Number(row.episode_id));
+        return m.db.prepare('SELECT reported_at FROM sla_episodes WHERE episode_id=?').get(row.episode_id)?.reported_at != null;
+      }), false, { write: true });
+      if (!marked) throw Error('decision acknowledgement write failed');
+      out.decisions += 1;
+    } catch (error) { out.ok = false; out.skipped.push(`decision:${ev.dedupeKey}: ${String(error?.message ?? error).slice(0, 120)}`); }
   }
   if (typeof ctx?.log === 'function' && (out.violated.length || out.cleared.length)) {
     try { await ctx.log('reconciler.sla', `sla pass: ${out.violated.length} violated, ${out.cleared.length} cleared`, { violated: out.violated.map((e) => e.dedupeKey), cleared: out.cleared.map((e) => e.dedupeKey) }); } catch { /* best effort */ }

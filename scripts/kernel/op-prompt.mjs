@@ -155,6 +155,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `source_runtime: ${skillRoot}`,
   `target_repository: ${repoLabel}`,
   `brief: ${brief}  (your contract — never renegotiate it)`,
+  ...(packet.context.selected_op ? [`selected_op: mode=${packet.context.selected_op.mode ?? '(single contract)'} — the immutable effective contract is packet context.selected_op.contract. Read it with starci kernel op-contract --json before acting; completionProfile, steps, reads, writes and proofs come only from it. Sibling execution modes grant no authority.`] : []),
   ...specsLines,
   ...verificationScopeLines({ settings: specs }),
   ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')} — the resolved tunables for this dispatch; use these values, never a number you read in prose`] : []),

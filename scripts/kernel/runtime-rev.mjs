@@ -1,44 +1,10 @@
-// runtime-rev.mjs — which runtime revision a long-lived Kernel has read, and what changed since.
-//
-// Owner, 2026-09-27: a Kernel reads modules/kernel/kernel-prompt.md and driver-loop.yaml ONCE at boot,
-// so a later runtime change (grammar, knowledge, prompts, op manifests) never reached a running Kernel
-// without a restart (nine Kernels were restarted that day). Instead the runtime tells it what to re-read:
-//   - the runtime revision is the runtime root's git HEAD (contract-version.mjs runtimeShaOf);
-//   - the Kernel records the revision it has read with `starci kernel kernel-ack-rev` (event runtime-rev-acked);
-//     start-workflow records the boot revision the same way (source boot);
-//   - every Kernel wake carries `Runtime rev <short-sha>` (revWakeLine) and, when the acked revision is
-//     behind, the kernel-relevant files that changed in between (KERNEL_REV_PATHS) plus the
-//     contract-change entry files added in between, one line each - or, past REV_DIFF_MAX_FILES or
-//     for a revision git no longer knows, "re-read kernel-prompt.md and driver-loop.yaml in full";
-//   - until the Kernel acks the current revision, starci kernel enqueue / dispatch of a leg whose op contract
-//     (contractFilesOf: its brief, _common, the verdict contract, the schemas and checks it cites, the
-//     op prompt builder) or a contract change scoped to that op changed in between is refused
-//     kernel-rev-stale (opRevStale); every other leg is unaffected;
-//   - starci kernel settle compares the revision a leg was dispatched under (contracts.context_json.contract
-//     runtimeSha) with the current one and WARNs op-rev-drift when that op's contract files changed
-//     in between (opRevDrift) - never a refusal.
-// A workflow with no runtime-rev-acked event yet (a Kernel booted before this module) is `unacked`: its
-// wake asks for one full re-read and an ack, and nothing is gated until it has acked once.
-//
-// Runtime churn (2026-09-28: ~12 .claude lands in 90 min each made the fe-canon Kernel re-read and ack): a new
-// runtime rev asks the Kernel to re-read (kernelRev.stale, the wake line, the reread next action) ONLY when the land
-// touched the Kernel's own contract - KERNEL_CONTRACT_FILES (kernel-prompt.md, driver-loop.yaml, api.yaml,
-// cli/commands/kernel/, owner-rulings.yaml), the op contract files of an op this workflow has dispatched (opRevFiles), or a
-// contract change with reach new-legs|follow-up that applies to it (its ops, an every-op change, or its paths in
-// that set). Every other land (reconciler, ui, gc, specs, docs, knowledge, runtimes.yaml numbers) updates the code
-// silently. Coalescing: a re-read that touches no KERNEL_CONTRACT_FILES waits until REV_ACK_COALESCE_MS after the
-// last ack (kernelRev.deferred), so a Kernel is asked at most once per 30 min unless its contract file changed.
-// The kernel-rev-stale gate (opRevStale) is unchanged: it still reads every op contract change since the ack
-// (the non-enumerable kernelRev.gate), so a leg is never built from a contract its Kernel has not read.
+// runtime-rev.mjs — scoped revision wakes and already-admitted Op drift; required-read.mjs owns current READ bytes.
 import path from 'node:path';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { diff as gitDiff } from '../api/git/diff.mjs';
 import { fileURLToPath } from 'node:url';
 import { contractFilesOf, runtimeShaOf } from '../machine/contract-version.mjs';
-import { readContractChangesDocAt } from '../machine/contract-changes-store.mjs';
-import { isContractChangesPath } from '../lib/contract-changes-path.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { clipLine } from '../lib/clip.mjs';
 import { underAny } from '../lib/path-key.mjs';
 
 export const KERNEL_REV_ACKED_EVENT = 'runtime-rev-acked';
@@ -47,18 +13,16 @@ export const KERNEL_REV_UNKNOWN = 'kernel-rev-unknown';
 export const OP_REV_DRIFT = 'op-rev-drift';
 /** The runtime paths a Kernel's contract is read from (a directory covers what is inside it). */
 const KERNEL_REV_PATHS = Object.freeze(['modules/kernel', 'modules/cli/commands/kernel', 'modules/ops', 'knowledge', 'modules/models', 'scripts/kernel/op-prompt.mjs']);
-export const KERNEL_BOOT_FILES = Object.freeze(['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml']);
+export { KERNEL_BOOT_FILES } from './required-read.mjs';
 /** The Kernel's own contract: a change to one of these always asks for a re-read (a directory covers what is inside it). */
-const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/cli/commands/kernel', 'modules/kernel/owner-rulings.yaml']);
-/** A re-read of op contracts / contract changes alone is asked at most once per this window after the last ack. */
+import { KERNEL_BOOT_FILES, KERNEL_CONTRACT_FILES, kernelReadManifest } from './required-read.mjs';
+import { kernelAuthorityOf, kernelCustodyOf } from './verbs/shared/kernel-seat.mjs';
+import fs from 'node:fs';
+/** A re-read of op contracts alone is asked at most once per this window after the last ack. */
 const REV_ACK_COALESCE_MS = 30 * 60_000;
-/** Contract changes with these reaches can require a Kernel re-read. */
-const REV_REACHES = Object.freeze(['new-legs', 'follow-up']);
 const OP_PROMPT_FILE = 'scripts/kernel/op-prompt.mjs';
 /** Past this many changed files the wake asks for the full re-read instead of a list. */
 export const REV_DIFF_MAX_FILES = 12;
-const WAKE_CHANGES_MAX = 5;
-const SUMMARY_MAX = 90;
 const SHORT = 12;
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -86,45 +50,19 @@ export function resolveRev(root, rev) {
 }
 
 const underRevPaths = (file) => KERNEL_REV_PATHS.some((p) => file === p || file.startsWith(`${p}/`));
-// The registry at a revision: the entry files (contract-changes-store.mjs).
-const registryAt = (root, rev) => { try { return readContractChangesDocAt(root, rev)?.doc?.changes ?? []; } catch { return []; } };
-const changeIdsAt = (root, rev) => registryAt(root, rev).map((c) => c?.id).filter((id) => typeof id === 'string');
-const changesAt = (root, rev) => {
-  try {
-    return registryAt(root, rev).filter((c) => typeof c?.id === 'string')
-      .map((c) => {
-        const ops = Array.isArray(c.ops) ? c.ops.filter((op) => typeof op === 'string') : [];
-        // An unscoped change reaches every op's contract only when it adds a check or code or is safety-critical.
-        const everyOp = !ops.length && (Boolean(c.adds?.checks?.length || c.adds?.codes?.length) || c.safetyCritical === true);
-        const paths = Array.isArray(c.paths) ? c.paths.filter((p) => typeof p === 'string') : [];
-        const out = { id: c.id, summary: clipLine(c.summary, SUMMARY_MAX), ops, ...(everyOp ? { everyOp: true } : {}) };
-        // reach and paths ride non-enumerable: the wake and starci kernel status keep their shape.
-        Object.defineProperty(out, 'reach', { value: typeof c.reach === 'string' ? c.reach : null, enumerable: false });
-        Object.defineProperty(out, 'paths', { value: paths, enumerable: false });
-        return out;
-      });
-  } catch { return []; }
-};
-
 const diffMemo = new Map();
-/**
- * What changed for a Kernel between `from` and `to`: {known, files[] (kernel-relevant, every one),
- * changes[] ({id, summary, ops} of contract-change entry files present at `to` and absent at `from`)}.
- * known:false when git cannot compare the two (a revision it no longer has).
- */
+/** Actual Kernel-relevant changed paths; unknown revisions remain unavailable. */
 function revDiff(root, from, to) {
   const key = `${root}\0${from}\0${to}`;
   if (diffMemo.has(key)) return diffMemo.get(key);
   let result;
-  if (!resolveRev(root, from) || !resolveRev(root, to)) result = { known: false, files: [], changes: [] };
+  if (!resolveRev(root, from) || !resolveRev(root, to)) result = { known: false, files: [] };
   else {
     const out = git(gitDiff, root, ['--name-only', from, to, '--', ...KERNEL_REV_PATHS]);
-    if (out == null) result = { known: false, files: [], changes: [] };
+    if (out == null) result = { known: false, files: [] };
     else {
       const files = out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).filter(underRevPaths);
-      const before = new Set(changeIdsAt(root, from));
-      const changes = files.some(isContractChangesPath) ? changesAt(root, to).filter((c) => !before.has(c.id)) : [];
-      result = { known: true, files, changes };
+      result = { known: true, files };
     }
   }
   diffMemo.set(key, result);
@@ -136,55 +74,55 @@ function latestRevAck(db, workflowId) {
   const row = db.prepare('SELECT payload_json,created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(workflowId, KERNEL_REV_ACKED_EVENT);
   const payload = parseJson(row?.payload_json);
   if (!payload?.rev) return null;
-  return { rev: payload.rev, at: row.created_at, source: payload.source ?? 'ack', files: Array.isArray(payload.files) ? payload.files : [], attempt: payload.attempt ?? null };
+  return { rev: payload.rev, at: row.created_at, source: payload.source ?? 'ack', files: Array.isArray(payload.files) ? payload.files : [], attempt: payload.attempt ?? null, readManifest: payload.readManifest ?? null };
 }
 
-/**
- * starci kernel status kernelRev: {current, acked, ackedAt, ackSource, stale, unacked?, full?, files[], fileCount,
- * changes[]}. stale: the acked revision is behind and a kernel-relevant file or a contract change moved
- * in between (a revision git cannot compare is stale and full). `files` is capped at REV_DIFF_MAX_FILES;
- * the whole list rides as the non-enumerable `allFiles` for the gate.
- */
+/** Current revision and scoped READ drift; complete paths are retained for admission. */
 /** The ops this workflow has enqueued or dispatched (jobs.op_id); [] when unreadable. */
 function workflowOpsOf(db, workflowId) {
   try { return db.prepare('SELECT DISTINCT op_id FROM jobs WHERE workflow_id=? AND op_id IS NOT NULL').all(workflowId).map((r) => r.op_id).filter(Boolean); } catch { return []; }
 }
 
-/**
- * The part of a rev diff that asks THIS Kernel to re-read: {files, changes, contract} - files in KERNEL_CONTRACT_FILES
- * or in the op contract files of `ops`, the contract changes (reach new-legs|follow-up) scoped to `ops`, every-op, or
- * whose paths touch that set (their registry file then counts too); contract: a KERNEL_CONTRACT_FILES file moved. Pure
- * but for opRevFiles.
- */
+/** The required Kernel and selected operation paths affected by a revision. */
 function kernelRelevantOf(diff, ops, { root = revRootOf() } = {}) {
   const opFiles = new Set(ops.flatMap((op) => { try { return opRevFiles(root, op); } catch { return []; } }));
   const mine = (file) => underAny(file, KERNEL_CONTRACT_FILES) || opFiles.has(file);
-  const changes = (diff.changes ?? []).filter((c) => REV_REACHES.includes(c.reach)
-    && ((c.ops?.length ? c.ops.some((op) => ops.includes(op)) : c.everyOp === true) || (c.paths ?? []).some((p) => mine(p) && !isContractChangesPath(p))));
-  const files = (diff.files ?? []).filter((file) => (isContractChangesPath(file) ? changes.length > 0 : mine(file)));
-  return { files, changes, contract: files.some((file) => underAny(file, KERNEL_CONTRACT_FILES)) };
+  const files = (diff.files ?? []).filter(mine);
+  return { files, contract: files.some((file) => underAny(file, KERNEL_CONTRACT_FILES)) };
 }
 
 export function kernelRevState(db, workflowId, { root = revRootOf(), current = currentRuntimeRev(root), now = Date.now(), ops = null } = {}) {
   const ack = latestRevAck(db, workflowId);
+  let installedRead = null, readUnavailable = null;
+  if (!current && !fs.existsSync(path.join(root,'.git'))) {
+    try {
+      const authority = kernelAuthorityOf(db,workflowId,kernelCustodyOf(db,workflowId).terminal);
+      // An acknowledged upcoming op is still required before its first persisted job exists.
+      const readOps = [...new Set([...(Array.isArray(ack?.readManifest?.ops) ? ack.readManifest.ops : []), ...(ops ?? [])])];
+      installedRead = kernelReadManifest(db,workflowId,{ root,authority,ops: readOps });
+      current = installedRead.rev;
+    } catch (error) { readUnavailable = String(error?.message ?? error); }
+  }
   const state = { current: current ?? null, acked: ack?.rev ?? null, ackedAt: ack?.at ?? null, ackSource: ack?.source ?? null,
-    stale: false, files: [], fileCount: 0, changes: [] };
-  // The gate (opRevStale) reads every kernel-path file and contract change since the ack, whatever the wake asks.
-  let gate = { stale: false, unknownDiff: false, allFiles: [], changes: [] };
+    stale: false, files: [], fileCount: 0 };
+  if (installedRead) state.revision = installedRead.revision;
+  if (readUnavailable) state.readUnavailable = readUnavailable;
+  // The gate (opRevStale) reads every kernel-path file since the ack, whatever the wake asks.
+  let gate = { stale: false, unknownDiff: false, allFiles: [] };
   if (!current) state.unknownCurrent = true;
   else if (!ack) state.unacked = true;
   else if (ack.rev !== current) {
     const diff = revDiff(root, ack.rev, current);
     if (!diff.known) {
       Object.assign(state, { stale: true, full: true, unknownDiff: true });
-      gate = { stale: true, unknownDiff: true, allFiles: [], changes: [] };
+      gate = { stale: true, unknownDiff: true, allFiles: [] };
     } else {
-      gate = { stale: diff.files.length > 0 || diff.changes.length > 0, unknownDiff: false, allFiles: diff.files, changes: diff.changes };
+      gate = { stale: diff.files.length > 0, unknownDiff: false, allFiles: diff.files };
       const rel = kernelRelevantOf(diff, ops ?? workflowOpsOf(db, workflowId), { root });
-      const wants = rel.files.length > 0 || rel.changes.length > 0;
+      const wants = rel.files.length > 0;
       const coalesced = wants && !rel.contract && Number.isFinite(ack.at) && now - ack.at < REV_ACK_COALESCE_MS;
-      if (coalesced) state.deferred = { files: rel.files.slice(0, REV_DIFF_MAX_FILES), changes: rel.changes.map((c) => c.id), until: ack.at + REV_ACK_COALESCE_MS };
-      else if (wants) Object.assign(state, { stale: true, files: rel.files.slice(0, REV_DIFF_MAX_FILES), fileCount: rel.files.length, changes: rel.changes,
+      if (coalesced) state.deferred = { files: rel.files.slice(0, REV_DIFF_MAX_FILES), until: ack.at + REV_ACK_COALESCE_MS };
+      else if (wants) Object.assign(state, { stale: true, files: rel.files.slice(0, REV_DIFF_MAX_FILES), fileCount: rel.files.length,
         ...(rel.files.length > REV_DIFF_MAX_FILES ? { full: true } : {}) });
       if (!wants && diff.files.length) state.silent = diff.files.length; // kernel-path files moved that are not this Kernel's contract
     }
@@ -197,37 +135,26 @@ export function kernelRevState(db, workflowId, { root = revRootOf(), current = c
 /** The contract files one op's leg is built from: contractFilesOf plus the op prompt builder. */
 const opRevFiles = (root, op) => [...new Set([...contractFilesOf(root, op), OP_PROMPT_FILE])];
 
-/**
- * Whether a stale Kernel may not enqueue or dispatch `op`: null when it may, else {files, changes}
- * - the op's contract files and the contract changes scoped to it (or unscoped ones that add a check or
- * code, or are safety-critical) that moved since
- * the acked revision. A revision git cannot compare holds every leg.
- */
+/** Refuse an affected operation until its actual current contract files are read. */
 export function opRevStale(state, op, { root = revRootOf() } = {}) {
   const gate = state?.gate ?? state;
   if (!gate?.stale) return null;
-  if (gate.unknownDiff) return { files: ['(the acked revision is unknown to git)'], changes: [] };
+  if (gate.unknownDiff) return { files: ['(the acked revision is unknown to git)'] };
   const mine = new Set(opRevFiles(root, op));
   const files = (gate.allFiles ?? state.allFiles ?? state.files ?? []).filter((file) => mine.has(file));
-  const changes = (gate.changes ?? []).filter((c) => (c.ops?.length ? c.ops.includes(op) : c.everyOp === true)).map((c) => c.id);
-  return files.length || changes.length ? { files, changes } : null;
+  return files.length ? { files } : null;
 }
 
-const ackCommand = (workflowId, rev) => `starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(rev)}`;
+const ackCommand = (workflowId, rev) => `starci kernel kernel-ack-rev --workflow ${workflowId} --plan; read every returned path, then attest with --rev ${rev} --read-manifest <file>`;
 
 /** The one sentence a Kernel wake carries about the runtime revision (no newline); null without a revision. */
 export function revWakeLine(state, workflowId) {
   if (!state?.current) return null;
   const rev = shortRev(state.current);
-  const full = `re-read ${KERNEL_BOOT_FILES.join(' and ')} in full`;
-  if (state.unacked) return `Runtime rev ${rev}: no runtime rev acked yet - ${full}, then ${ackCommand(workflowId, state.current)} --files kernel-prompt.md,driver-loop.yaml.`;
-  if (!state.stale) return `Runtime rev ${rev}.`;
-  const since = `Runtime rev ${rev} is newer than your acked rev ${shortRev(state.acked)}`;
-  const ids = state.changes.length ? ` (new contract changes: ${state.changes.slice(0, WAKE_CHANGES_MAX * 2).map((c) => c.id).join(', ')})` : '';
-  if (state.full) return `${since}${ids}: ${full}, then ${ackCommand(workflowId, state.current)}; enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE} until then.`;
-  const changes = state.changes.slice(0, WAKE_CHANGES_MAX).map((c) => `${c.id} (${c.summary})`);
-  const more = state.changes.length > WAKE_CHANGES_MAX ? ` (+${state.changes.length - WAKE_CHANGES_MAX})` : '';
-  return `${since}: re-read ${state.files.join(', ')}${changes.length ? `; new contract changes: ${changes.join('; ')}${more}` : ''}; then ${ackCommand(workflowId, state.current)} --files <what you re-read>. Until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}.`;
+  if (!state.stale && !state.unacked) return `Runtime rev ${rev}.`;
+  const reason = state.unacked ? 'no complete runtime READ is acknowledged' : `your acknowledged rev is ${shortRev(state.acked)}`;
+  const files = state.full || state.unacked ? KERNEL_BOOT_FILES : state.files;
+  return `Runtime rev ${rev}: ${reason}; re-read ${files.join(' and ')}, then ${ackCommand(workflowId, state.current)}. Enqueue/dispatch of an affected op is refused ${KERNEL_REV_STALE} until its complete required READ is acknowledged.`;
 }
 
 /** revWakeLine read from the ledger; null when it cannot be read (a db with no events table, no git). */

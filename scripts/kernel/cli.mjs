@@ -39,14 +39,14 @@
 //    [--until-message <peer>[:kind]] [--until-commit <repo>:<ref-or-path>] [--until-incident <id>[:resolved]], each repeatable,
 //    or --attach <incidentId> with them to type an open incident; scripts/kernel/gate-conditions.mjs)
 //   finish   --repo <path> --workflow <id>
-//   kernel-ack-rev --repo <path> --workflow <id> --rev <sha> [--files <csv>]
-//   contract-release --repo <path> --family <op> [--workflow <id>] [--batch <name>] [--reason <text>] [--dry-run]
+//   kernel-ack-rev --repo <path> --workflow <id> --plan | --rev <revision> --read-manifest <file>
 //   run-deferred-tests --repo <path> --workflow <id> [--kind unit|e2e|integration] [--dry-run]
 //
 // Every read prints a JSON-safe result; every write runs inside one
 // ledger.transaction. --json gives the machine form; without it each command
 // prints a compact human line. Bad arguments exit 2 with usage.
 
+import { mechanismGates } from './settle/mechanism-gates.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -56,7 +56,7 @@ import { spawnSyncOverride } from '../api/process/spawn-sync-override.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { execAsSpawnSync } from '../api/process/exec-as-spawn-sync.mjs';
 import {
-  openLedger, ledgerFileFor, newToken, JOB_STATUSES, reserveTwoPhase,
+  openLedger, ledgerFileFor, newToken, JOB_STATUSES, OP_SLOT_HOLDING_STATUSES as SLOT_HOLDING_STATUSES, reserveTwoPhase,
   startAttempt, writeContract, updateContractContext, updateAttempt, endRejectedAttempt, setJobStatus, recordJobResult, releaseLeases, openIncident,
   updateJob, updateIncident, resolveIncident, renewLeases, setSignal, clearSignal, setInboxStatus, jobResult, setUnitState, getUnit,
 } from '../../engine/db/ledger.mjs';
@@ -65,7 +65,7 @@ import { recordWhy } from './why-record.mjs';
 import { opGateBasesOf } from './workflow-checkpoint.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
-  AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, admitOpSlot,
+  AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, workflowOpSlots,
   findOwnedPathLeaseConflicts, ownedPathLeaseRequests, retiredBeforeDispatch, ownedPathsIntersect,
 } from '../../engine/admission.mjs';
 import { admitUnit, spentTriesOf, unitStateOf, writeUnitTry } from './units.mjs';
@@ -100,6 +100,7 @@ import { AGENT_HIERARCHY_SCHEMA, workflowNodeId, kernelNodeId, operationNodeId, 
 import { WORKER_QUESTION } from './verbs/shared/worker-messages.mjs';
 import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './verbs/shared/peer-waits.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from '../guards/op-caller.mjs';
+import { callerAdmission, requireAdmittedKernelRead } from './caller-admission.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { releaseSettledSession } from './op-session.mjs';
 import { recordSettledAttemptUsage } from './usage-record.mjs';
@@ -117,7 +118,7 @@ import { squash } from '../lib/clip.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
 import { FOUNDATION_WAIT, SHELL_FOUNDATION, shellFoundationWaitOf } from './shell-foundation.mjs';
 import {
-  KERNEL_REV_STALE, OP_REV_DRIFT, currentRuntimeRev, kernelRevState, opRevDrift, opRevStale, revRootOf,
+  KERNEL_REV_STALE, KERNEL_REV_UNKNOWN, OP_REV_DRIFT, currentRuntimeRev, kernelRevState, opRevDrift, opRevStale, revRootOf,
   shortRev,
 } from './runtime-rev.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
@@ -133,11 +134,9 @@ import { recentDispatchCounts, auditAuthorOf } from '../agent/balance.mjs';
 import { configuredAllocationPolicy } from '../../engine/config.mjs';
 import { deferJob, deferralOf as testDeferralOf, ownerSpecs, deferredTestsOf, planLegDeferral, specsOff } from '../route/spec-deferral.mjs';
 import { HANDOVER_OP } from './handover.mjs';
+import { admittedVersionOf } from './dispatch-admission.mjs';
 import { baselineWorkInputs, inputDrift } from './input-digests.mjs';
-import {
-  admittedContractOf, admittedBeforeChange, advisoryCodesFor, changeById, withheldChangesFor, classifyChecks,
-  contractVersionOf, laterChangesFor, latestContractOf, loadContractChanges,
-} from '../machine/contract-version.mjs';
+import { admittedContractOf, latestContractOf } from '../machine/contract-version.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { guardLaunch } from '../guards/hook-install.mjs';
 
@@ -167,16 +166,15 @@ import { UNTIL_FLAGS, lineageHeadById } from './gate-conditions.mjs';
 import { extensionUsage, loadApiExtensions, requiredOf, statusExtras } from './api-extensions.mjs';
 import { refuseSettleBacklog } from './kernel-authority.mjs';
 import { refuseDecisionsFirst } from '../machine/decisions.mjs';
-import { DRAW_ACCEPTANCE_CHANGE, drawAcceptanceFindings, jobBoundFiles } from '../work/draw/draw-acceptance.mjs';
-import { DRAW_LOOP_CHANGE, settleDrawMetricFindings } from '../work/draw-loop-settle.mjs';
+import { drawAcceptanceFindings, jobBoundFiles } from '../work/draw/draw-acceptance.mjs';
+import { settleDrawMetricFindings } from '../work/draw-loop-settle.mjs';
 import { recordGrammarProposals } from '../work/grammar-proposal.mjs';
 import { ASSET_OP, recordAssetSlots } from '../work/asset-slot.mjs';
-import { judgeJob, SONAR_ENFORCE_CHANGE } from './sonar-settle.mjs';
-import { judgeJobLoop, judgeJobProofs, OP_GATE_CHANGE, OP_PROOF_CHANGE } from './gate-settle.mjs';
-import { EVIDENCE_HOST_PATH_CHANGE, PROOF_MEDIA_CHANGE, collectJobFiles, evidenceHostPathGate, filedReportOf, indexJobArtifacts, jobShasOf, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
-import { WORK_HYGIENE_CHANGE, checkWorkFilesAbs, inSecretScope, rangeFiles } from '../work/validate/work-hygiene.mjs';
+import { judgeJob } from './sonar-settle.mjs';
+import { collectJobFiles, evidenceHostPathGate, filedReportOf, indexJobArtifacts, jobShasOf, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
+import { checkWorkFilesAbs, inSecretScope, rangeFiles } from '../work/validate/work-hygiene.mjs';
 import { legOrderExemption } from './leg-order.mjs';
-import { PROOF_INTEGRITY_CHANGE, coverageOf } from './proof-integrity.mjs';
+import { proofAcceptanceOf, coverageOf, verifyProofs } from './proof-integrity.mjs';
 import { classifyFailure, isMeasurementLeg, measurementCheckClass, resolveRootOwner } from './verify-failure.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { bestEffortCall, bestEffortCallAsync } from '../agent/best-effort-call.mjs';
@@ -221,11 +219,11 @@ const isCheckResultEnvelope = (value) => {
     return true;
   });
 };
-// A red check starci kernel record-checks marked `advisory` (a check or finding code a contract change added after
-// the leg was admitted) is a suspect, and one it marked `peerBlocked` (its failing files are a
+// A red check recorded as `advisory` because its unchanged Work inputs are outside the owned
+// scope is a suspect, and one marked `peerBlocked` (its failing files are a
 // peer's change, scripts/kernel/gate-attribution.mjs) is the peer's: neither counts passed or
 // failed, and a pass still needs at least one green check.
-const isAdvisoryCheck = (check) => check.exitCode !== 0 && Boolean(check.advisory && typeof check.advisory === 'object');
+const isAdvisoryCheck = (check) => check.exitCode !== 0 && Array.isArray(check.advisory?.outOfScope) && check.advisory.outOfScope.length > 0;
 const isPeerBlockedCheck = (check) => check.exitCode !== 0 && !isAdvisoryCheck(check) && Boolean(check.peerBlocked && typeof check.peerBlocked === 'object');
 /** A measurement leg's red check that ran and measured findings, marked so it counts as a completed measurement. */
 const markMeasured = (check) => (check && typeof check === 'object' && measurementCheckClass(check) === 'findings' && !check.peerBlocked && !check.advisory
@@ -337,11 +335,9 @@ const usage = (code) => {
   cut-seam --publish-interface --job <seam job> --files <csv> [--summary <s>]   the seam publishes its interface: siblings start on it
   cut-seam --release --workflow <id> --op <op> --cut-id <id> --reason <text>     the Kernel releases a cut's siblings to run on a stub now
   cut-seam --reconcile --job <sibling job> --exit-code <n> [--command <c>] [--evidence <path>]   cut-seam-reconcile of a stub sibling against the landed seam
-  kernel-ack-rev --workflow <id> --rev <sha> [--files <csv>]
+  kernel-ack-rev --workflow <id> --plan | --rev <revision> --read-manifest <file>
   autopilot --workflow <id> [--sweep|--bundle|--checklist [--lang vi|en]|--set on|off --reason <s>|--defer-to-handover --op <opId> --class credential|real-money|shared-system|owner-decision --detail <s> [--fields <csv>] [--stub <s>] [--job <id>]|--release <dispatchId|key> --reason <s>|--defer-leg <jobId> --reason <s>|--reopen <dispatchId> --handover-answer <dispatchId> [--note <s>]|--extend-budget attempts=<n>,tokens=<n>,wallMs=<n> --reason <s>]
-           record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (runtime-rev.mjs)
-  contract-release --family <op> [--workflow <id>] [--batch <name>] [--reason <text>] [--dry-run]
-           the Supervisor's release point of a frozen op family (modules/kernel/contract-freeze.yaml)
+           attest the complete server-derived current-incarnation READ manifest (required-read.mjs)
   archive  --workflow <id> --reason <text> [--by owner|supervisor]
            stop a workflow that will not finish: archived_at set, open jobs dropped, asks retired, Kernel and Tasks closed
   rename   --workflow <id> --title "<name>" [--by owner|supervisor] [--no-terminals] [--dry-run]
@@ -455,7 +451,6 @@ const launchGraceOf = (db, job, { now }) => {
 // Operation statuses that hold one of the workflow's concurrent slots. A queued
 // job has not been dispatched and holds nothing; everything from the lease
 // forward does, including a fenced launch whose effect may exist.
-const SLOT_HOLDING_STATUSES = [...JOB_STATUSES.dispatchable.filter((status) => status !== 'queued'), ...JOB_STATUSES.fenced];
 // modules/models/runtimes.yaml — the pool cards and the worker ceiling. Every
 // concurrency number this gate reasons with comes from here, through the one
 // cached loader (engine/config.mjs runtimeProfile): a missing or unparsable
@@ -483,11 +478,7 @@ const ownerMaxOps = () => {
  * (engine/admission.mjs admitOpSlot). The refusal string is `max-ops`.
  */
 const opSlotAdmission = (db, workflowId, { excludeJobId = null } = {}) => {
-  const running = db.prepare(
-    `SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND job_id<>?
-       AND status IN (${SLOT_HOLDING_STATUSES.map(() => '?').join(',')})`
-  ).get(workflowId, excludeJobId ?? '', ...SLOT_HOLDING_STATUSES).n;
-  return admitOpSlot({ running, maxOps: ownerMaxOps(), maxParallelOps: workersMaxParallelOps() });
+  return workflowOpSlots(db, workflowId, { excludeJobId, holdingStatuses: SLOT_HOLDING_STATUSES, maxOps: ownerMaxOps(), maxParallelOps: workersMaxParallelOps() });
 };
 
 /**
@@ -781,13 +772,13 @@ const agentHierarchyOf = (db, workflowId) => agentHierarchyFor(db, workflowId, s
 const staleInputProjection = (db, wf, repo = null) => {
   if (wf.phase === 'finished') return { staleInput: [], sourceDrift: [], peerDrift: [] };
   try {
-    const drift = inputDrift(db, wf.workflow_id, { root: skillRoot, repo, workDir: repo ? workDirOf(repo) : '.starciwork', registry: loadContractChanges(skillRoot) });
+    const drift = inputDrift(db, wf.workflow_id, { root: skillRoot, repo, workDir: repo ? workDirOf(repo) : '.starciwork' });
     return { staleInput: drift.stale, sourceDrift: drift.sourceDrift, peerDrift: drift.peerDrift };
   } catch (e) { return { staleInput: [], sourceDrift: [], peerDrift: [], staleInputError: String(e?.message ?? e) }; }
 };
 const peerDriftLines = (summary, indent = '') => (summary ? summary.records.map((entry) => `${indent}peer-drift (advisory, not stale): ${entry.file} (owner ${entry.owner ?? '-'} by ${entry.ownerBy}) changed after ${entry.jobs} settled job(s) read it${entry.writers.length ? ` — written by ${entry.writers.join(', ')}` : ''}${entry.foreignWrite ? ' (a peer wrote a record this workflow owns: review it, redo nothing)' : ''}${entry.breakingIgnored === 'written-by-non-owner' ? ' — its breaking change note was written by a non-owner and binds nothing' : ''}; nothing to redo unless its owner declares the change breaking`) : []);
 const staleOperationLine = (item) => `${item.followUp ? 'breaking-follow-up' : 'stale-input'}: ${staleLabel(item)} — ${item.paths.join(', ')}${item.breakingBy ? ` (breaking change declared by owner ${item.breakingBy.join(', ')}${item.followUp ? '; ONE follow-up leg' : ''})` : ''}`;
-const sourceDriftLines = (summary, indent = '') => (summary ? summary.paths.map((entry) => `${indent}source-drift (advisory, not stale): ${entry.path} edited after ${entry.jobs} settled job(s) were admitted${entry.changes.length ? ` — registered ${entry.changes.join(', ')}` : ' — UNREGISTERED in modules/kernel/contract-changes/'}${entry.followUp.length ? `; follow-up via contractFollowUps (${entry.followUp.join(', ')})` : '; nothing to redo'}`) : []);
+const sourceDriftLines = (summary, indent = '') => (summary ? summary.paths.map((entry) => `${indent}source-drift (advisory, not stale): ${entry.path} edited after ${entry.jobs} settled job(s) were admitted; current READ and native CHECK remain required`) : []);
 const staleLabel = (item) => `${item.jobId} (${item.op} a${item.attempt}${item.cut ? ` cut ${item.cut.id} ${item.cut.ordinal}/${item.cut.total}` : ''})`;
 /* ---------------------------------------------------------------- status */
 /**
@@ -1149,23 +1140,22 @@ function recordOpRevDrift(ledger, job) {
 
 /** The nextActions step a stale Kernel runs first: re-read what changed, then ack the current rev. */
 const rereadActionOf = (rev, workflowId) => ({ kind: 'reread', rev: rev.current, acked: rev.acked, files: rev.full ? ['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml'] : rev.files,
-  ...(rev.changes.length ? { changes: rev.changes.map((c) => c.id) } : {}),
-  reason: `the runtime moved from the rev you acked (${shortRev(rev.acked)}) to ${shortRev(rev.current)}: re-read ${rev.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : rev.files.join(', ')}${rev.changes.length ? ` and the contract changes ${rev.changes.map((c) => c.id).join(', ')}` : ''}, then starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(rev.current)}; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
+  reason: `the runtime moved from the rev you acked (${shortRev(rev.acked)}) to ${shortRev(rev.current)}: re-read ${rev.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : rev.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and submit the complete READ manifest with --rev ${rev.current} --read-manifest <file>; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
 /**
  * The RUNNING legs whose op contract moved on the runtime since their dispatch (op-rev-drift before settle): the
  * worker still runs its brief, is judged by its admission, and hears it on its next nudge. [{jobId, op, attempt, from,
- * to, files, advisoryChanges}]
+ * to, files}]
  */
 function runningOpRevDriftOf(db, workflowId, { root = revRootOf() } = {}) {
   const rows = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind='op' AND status IN ('running','answering')`).all(workflowId);
   if (!rows.length) return [];
-  const current = currentRuntimeRev(root), registry = loadContractChanges(skillRoot), out = [];
+  const current = currentRuntimeRev(root), out = [];
   for (const job of rows) {
     const op = jobOpOf(job);
     const admission = admittedContractOf(db, job);
     const drift = opRevDrift(root, op, admission.version?.runtimeSha ?? null, current);
     if (!drift) continue;
-    out.push({ jobId: job.job_id, op, attempt: tryOf(job), ...drift, advisoryChanges: laterChangesFor(registry, { admittedAt: admission.at, op, withheld: admission.withheld }).map((c) => c.id) });
+    out.push({ jobId: job.job_id, op, attempt: tryOf(job), ...drift });
   }
   return out;
 }
@@ -1174,19 +1164,20 @@ const opRevDriftOf = (db, workflowId, limit = 5) => db.prepare('SELECT entity_id
   .all(workflowId, OP_REV_DRIFT, limit).map((row) => ({ jobId: row.entity_id, ...(parseJson(row.payload_json) ?? {}), at: row.created_at }));
 
 /**
- * enqueue/dispatch refuse kernel-rev-stale for a leg whose op contract (or a contract change scoped to its op)
+ * enqueue/dispatch refuse kernel-rev-stale for a leg whose current op contract
  * changed between the runtime rev the Kernel acked and the current one (runtime-rev.mjs opRevStale). Other
  * legs, a Kernel that never acked (booted before this gate) and an unreadable rev pass.
  */
 function refuseStaleKernelRev(db, workflowId, op, verb) {
+  requireAdmittedKernelRead(db, workflowId, op);
   const root = revRootOf();
   let state = null;
-  try { state = kernelRevState(db, workflowId, { root }); } catch { return; }
+  try { state = kernelRevState(db, workflowId, { root, ops: [op] }); } catch (error) { throw Object.assign(new Error(`runtime READ comparison unavailable: ${error.message}`), { code: KERNEL_REV_UNKNOWN }); }
   const hit = opRevStale(state, op, { root });
   if (!hit) return;
-  const what = [...hit.files, ...hit.changes.map((id) => `contract change ${id}`)].join(', ');
-  throw Object.assign(new Error(`${KERNEL_REV_STALE}: ${verb} of ${op} refused - its op contract changed between the runtime rev you acked (${shortRev(state.acked)}) and the current one (${shortRev(state.current)}): ${what}. Re-read ${state.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : state.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(state.current)} and ${verb} again (starci kernel status kernelRev)`),
-    { code: KERNEL_REV_STALE, op, acked: state.acked, current: state.current, files: hit.files, changes: hit.changes });
+  const what = hit.files.join(', ');
+  throw Object.assign(new Error(`${KERNEL_REV_STALE}: ${verb} of ${op} refused - its op contract changed between the runtime rev you acked (${shortRev(state.acked)}) and the current one (${shortRev(state.current)}): ${what}. Re-read ${state.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : state.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and attest its complete manifest with --rev ${state.current} --read-manifest <file>, then ${verb} again (starci kernel status kernelRev)`),
+    { code: KERNEL_REV_STALE, op, acked: state.acked, current: state.current, files: hit.files });
 }
 
 const NEXT_ACTION_KINDS = ['retry', 'root-verify', 'dispatch', 'impact-check', 'supervisor-gate', 'owner-gate', 'wait'];
@@ -1201,7 +1192,7 @@ const LEG_IN_FLIGHT = ['leased', 'running', 'answering', 'effect_unknown'];
 /** The newest work-graph nodes of a workflow (display names read what a job covers); null without one. */
 const latestGraphNodesOf = (db, workflowId) => { try { return latestGraphVersion(db, workflowId)?.graph?.nodes ?? null; } catch { return null; } };
 const nextActionLabel = (action) => `${action.kind} ${action.op ?? '-'}${action.jobId ? ` ${action.jobId}` : ''}${action.displayName ?? action.label ? ` «${action.displayName ?? action.label}»` : ''}`;
-function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs = [], credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null, contractFollowUps = [], assetSlotsOwed = [], autopilot = null }) {
+function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs = [], credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null, assetSlotsOwed = [], autopilot = null }) {
   if (wf.phase === 'finished') return { nextActions: [], legs: [] };
   const unresolved = unresolvedFailures(db, failedRows, workflowJobs);
   const rowOf = new Map(workflowJobs.map((row) => [row.job_id, row]));
@@ -1269,22 +1260,13 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
     }
   }
   // A red node of the work graph owes rework: the op that last wrote it runs again on its owned paths.
-  const followedUp = new Set(contractFollowUps.map((item) => item.jobId));
   for (const node of workGraph?.frontier ?? []) {
-    if (node.color !== 'red' || !node.lastOp || followedUp.has(node.lastJob)) continue;
+    if (node.color !== 'red' || !node.lastOp) continue;
     actions.push({ kind: 'dispatch', op: node.lastOp, nodes: [node.id], reason: `work-graph v${workGraph.version} turned ${node.id} red: starci kernel enqueue --op ${node.lastOp} --paths ${node.ownedPaths.join(',')}, then route and dispatch it` });
   }
   // A proof whose every piece of evidence is stale re-runs only the check that made it (proof-integrity.mjs).
   for (const item of staleProofs.filter((proof) => !staleReady.some((stale) => stale.jobId === proof.jobId))) {
     actions.push({ kind: 'impact-check', op: item.op, jobId: item.jobId, reason: `its proof of ${item.items.slice(0, 5).join(', ')}${item.items.length > 5 ? ` (+${item.items.length - 5})` : ''} is stale: ${item.changed.slice(0, 5).join(', ')} changed since it was indexed; re-dispatch ${item.op} as a new attempt --retry-of ${item.jobId} (only that check)` });
-  }
-  // A leg a reach: follow-up contract change owes a follow-up is rework: enqueue the follow-up leg.
-  // Its work-graph nodes read red through the same follow-up, so they ride on this action instead of their own.
-  for (const item of contractFollowUps) {
-    const nodes = (workGraph?.frontier ?? []).filter((node) => node.color === 'red' && node.lastJob === item.jobId);
-    const paths = [...new Set(nodes.flatMap((node) => node.ownedPaths ?? []))];
-    actions.push({ kind: 'dispatch', op: item.followUpOp, jobId: item.jobId, change: item.change, ...(nodes.length ? { nodes: nodes.map((node) => node.id) } : {}),
-      reason: `contract change ${item.change} owes ${item.followUpOp} a follow-up of ${item.jobId} (${item.op} a${item.attempt} ${item.status}): starci kernel enqueue --op ${item.followUpOp} --contract-change ${item.change} --follow-up-of ${item.jobId}${item.after ? ` --after ${item.after}` : ''} ${paths.length ? `--paths ${paths.join(',')}` : 'with its paths'}, then route and dispatch it` });
   }
   // Artwork slots a drawing declared and interface.asset has not filled (scripts/work/asset-slot.mjs): propose the
   // interface.asset leg that owes them, unless one is already queued or in flight.
@@ -1339,7 +1321,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
 
   const unresolvedIds = new Set(unresolved.map((row) => row.job_id));
   const ownerWaitOps = new Set(awaitingOwner.map((item) => item.opId));
-  const reworkOps = new Set(contractFollowUps.map((item) => item.followUpOp));
+  const reworkOps = new Set((workGraph?.frontier ?? []).filter((node) => node.color === 'red').map((node) => node.lastOp).filter(Boolean));
   const ops = [...legOps, ...[...jobsByOp.keys()].filter((op) => !legOps.includes(op))];
   const provisional = autopilot?.provisionalOps ?? new Set();
   const tr = translator(ownerLanguage());
@@ -2185,7 +2167,7 @@ const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS, 
         jobId: job.job_id, workflowId: job.workflow_id, opId: job.op_id,
         attempt: tryOf(job), generation: job.generation, kind: job.kind, role: job.role ?? null,
       },
-      leases, ttlMs, canonicalOf: canon?.canonicalOf ?? null,
+      leases, ttlMs, canonicalOf: canon?.canonicalOf ?? null, opSlots: { maxOps: ownerMaxOps(), maxParallelOps: workersMaxParallelOps() },
     });
   } finally { machine.close(); }
 };
@@ -2197,17 +2179,6 @@ const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS, 
 // command-terminal launches, Dispatch id for managed ones).
 const buildContractMarkdown = ({ op, jobId, prompt, packet }) =>
   `# dispatch contract — [Op] ${op} (job ${jobId})\n\n${prompt}\n\n## packet\n\n\`\`\`json\n${JSON.stringify(packet, null, 2)}\n\`\`\`\n`;
-// context.contract is the contract version the leg is admitted under (scripts/machine/contract-version.mjs):
-// the leg is judged against it for life, whatever lands on main after (modules/kernel/contract-changes/).
-// A frozen family's batched changes not yet released for this workflow are WITHHELD from the leg (contract.withheld,
-// modules/kernel/contract-freeze.yaml): it is judged as if admitted before them, for life.
-const admittedVersionOf = (op, now, { db = null, workflowId = null } = {}) => {
-  let version = null;
-  try { version = contractVersionOf(skillRoot, op, { now }); } catch { return null; }
-  let withheld = [];
-  try { if (db && workflowId) withheld = withheldChangesFor(db, loadContractChanges(skillRoot), { workflowId, op, now }); } catch { withheld = []; }
-  return withheld.length ? { ...version, withheld } : version;
-};
 /**
  * The dispatch's attempt and its contract (DBTREE op_attempts + contracts): one op_attempts row per dispatch - the
  * dispatch guard admits it only for a leased job of a running workflow - carrying the job scratch the op reports from
@@ -2217,7 +2188,7 @@ const admittedVersionOf = (op, now, { db = null, workflowId = null } = {}) => {
 const fileContract = (db, { job, op, dispatchId, markdown, context, now, attempt = {} }) => {
   const row = startAttempt(db, { workflowId: job.workflow_id, jobId: job.job_id, dispatchId, at: now, dispatchedAt: now, ...attempt });
   writeContract(db, { attemptId: row.attempt_id, markdown, createdAt: now,
-    context: context ? { ...context, contract: context.contract ?? admittedVersionOf(op, now, { db, workflowId: job.workflow_id }) } : null });
+    context: context ? { ...context, contract: context.contract ?? admittedVersionOf(skillRoot, op, now, { db, workflowId: job.workflow_id }) } : null });
   return row.attempt_id;
 };
 
@@ -2762,7 +2733,6 @@ const enqueueFollowOn = (ledger, template, { op = jobOpOf(template), retryOf = n
     ...(cut ? { cut } : {}),
     ...(after?.length || priorAfter.length ? { after: [...new Set([...priorAfter, ...(after ?? [])])] } : {}),
     ...(!fresh && payload.foundation ? { foundation: payload.foundation } : {}),
-    ...(!fresh && payload.contractChange ? { contractChange: payload.contractChange } : {}),
     retryReason: { reason, of, liveness, auto: true },
     ...(routed ? { routed } : {}),
     ...(rootVerify ? { rootVerify } : {}),
@@ -3486,12 +3456,10 @@ function reportOwnedPaths(db, job, repo) {
  * admitted before that change on its old contract (null); `requireChange` also refuses when the change is unknown.
  * `requiresReport` returns null when nothing is filed - pass-report-missing owns that refusal.
  */
-function settleJobContext(db, jobId, { changeId = null, opOnly = null, requiresReport = false, requireChange = false } = {}) {
+function settleJobContext(db, jobId, { opOnly = null, requiresReport = false } = {}) {
   const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status) || (opOnly !== null && jobOpOf(job) !== opOnly)) return null;
   const admitted = admittedContractOf(db, job);
-  const change = changeId === null ? null : changeById(loadContractChanges(skillRoot), changeId);
-  if (changeId !== null && ((requireChange && !change) || admittedBeforeChange(admitted, change))) return null;
   const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
   if (requiresReport && (filed.attemptId == null || filed.reportId == null)) return null; // no filed report: pass-report-missing owns the refusal
   return { job, op: jobOpOf(job), admitted, filed };
@@ -3512,64 +3480,34 @@ function settleJobFiles(db, job, repo, filed, { reportText = null, jobId = null 
 function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
   const s = settleJobContext(db, jobId);
   if (!s) return null;
-  const policy = proofMediaPolicyOf(skillRoot, s.op), changes = loadContractChanges(skillRoot);
-  const mediaOwed = Boolean(policy) && !admittedBeforeChange(s.admitted, changeById(changes, PROOF_MEDIA_CHANGE));
-  const hostOwed = !admittedBeforeChange(s.admitted, changeById(changes, EVIDENCE_HOST_PATH_CHANGE));
-  if (!mediaOwed && !hostOwed) return null;
+  const policy = proofMediaPolicyOf(skillRoot, s.op);
   const { envelope, files } = settleJobFiles(db, s.job, repo, s.filed, { reportText, jobId: s.job.job_id });
   const recorded = independentChecksOf(db, { jobId: s.job.job_id })?.checks;
-  const gate = (hostOwed ? evidenceHostPathGate({ files }) : null) ?? (mediaOwed ? proofMediaGate({ policy, files, checks: [...(Array.isArray(recorded) ? recorded : []), ...(Array.isArray(envelope?.checks) ? envelope.checks : [])] }) : null);
+  const gate = evidenceHostPathGate({ files }) ?? (policy ? proofMediaGate({ policy, files, checks: [...(Array.isArray(recorded) ? recorded : []), ...(Array.isArray(envelope?.checks) ? envelope.checks : [])] }) : null);
   return gate ? { ...gate, op: s.op, status: s.job.status } : null;
 }
 // The Sonar gate a code-writing op's settle owes (scripts/kernel/sonar-settle.mjs over knowledge/sonar-gate.yaml): the
 // runtime reads the op's attached sonar.json itself. Read-only here - starci kernel settle records the judgment. A leg admitted before
 // the sonar-enforce change settles on its old contract. Null when the op is not held to the gate.
 function settleSonarGate(db, jobId, repo) {
-  const s = settleJobContext(db, jobId, { changeId: SONAR_ENFORCE_CHANGE, requiresReport: true });
+  const s = settleJobContext(db, jobId, { requiresReport: true });
   if (!s) return null;
   const { files } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
   const judgment = judgeJob({ op: s.op, files });
   return judgment ? { ...judgment, workflowId: s.job.workflow_id, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
-// The op loop a code-writing op's settle owes (scripts/kernel/gate-settle.mjs over knowledge/op-gate.yaml): the runtime re-reads
-// the op's attached gate JSON and READ digest itself and resolves the touched kinds with the app's own starci app explain. Read-only
-// here - starci kernel settle records the judgment. A leg admitted before the op-gate-loop change settles on its old contract. Null when
-// the op is not held to the loop.
-async function settleOpGate(db, jobId, repo) {
-  const s = settleJobContext(db, jobId, { changeId: OP_GATE_CHANGE, requiresReport: true });
-  if (!s) return null;
-  const { roots, files } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
-  // A workflow-worktree op is gated against a checkpoint its side has not moved since (op-gate-base-mismatch otherwise).
-  const gateBases = opGateBasesOf({ db, env: process.env }, { workflowId: s.job.workflow_id, opId: s.job.job_id });
-  const judgment = await judgeJobLoop({ op: s.op, files, roots: roots.length ? roots : [repo], gateBases });
-  return judgment ? { ...judgment, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
-}
-// The mechanism proofs an op owes at settle (scripts/kernel/gate-settle.mjs judgeJobProofs over knowledge/op-gate.yaml opProofs):
-// the test world, the unit kit, the document gate, the READ of a deciding op, the lint of a security or interface op, the review
-// gate and defect classes, the release proof. The runtime re-reads each attached document itself. Read-only here - starci kernel settle
-// records the judgment. A leg admitted before the op-mechanism-proofs change settles on its old contract. Null when the op owes
-// no proof for its mode.
-async function settleOpProofs(db, jobId, repo) {
-  const s = settleJobContext(db, jobId, { changeId: OP_PROOF_CHANGE, requiresReport: true });
-  if (!s) return null;
-  const { files } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
-  const mode = typeof jobPayloadOf(s.job).params?.mode === 'string' ? jobPayloadOf(s.job).params.mode : null;
-  const judgment = judgeJobProofs({ op: s.op, files, mode });
-  return judgment ? { ...judgment, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
-}
+const { settleOpGate, settleOpProofs } = mechanismGates({ skillRoot, settleJobContext, settleJobFiles, jobPlacements, opGateBasesOf });
 // The draw acceptance an interface.draw pass owes (scripts/work/draw/draw-acceptance.mjs): every asset the pass binds -
 // written, adopted, inherited or already there - is a token-rendered shape, no drawing names a data status, and the pass
 // drew something under the current contract (a product's op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
 // Read-only, before anything is written. A leg admitted before the draw-adopt-gate change settles on its old contract.
 function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
-  const s = settleJobContext(db, jobId, { changeId: DRAW_ACCEPTANCE_CHANGE, opOnly: 'interface.draw' });
+  const s = settleJobContext(db, jobId, { opOnly: 'interface.draw' });
   if (!s) return null;
   const { files } = settleJobFiles(db, s.job, repo, s.filed, { reportText });
   const owned = (jobPayloadOf(s.job).owned_paths ?? []).filter((p) => typeof p === 'string' && !p.includes(':'));
   const verdict = drawAcceptanceFindings({ repo, files: [...files.map((f) => f.abs), ...owned] });
-  // A code a contract change added after this leg was admitted is a suspect for it, never a refusal.
-  const advisory = Number.isFinite(s.admitted.at) ? new Set(advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt: s.admitted.at, op: 'interface.draw', withheld: s.admitted.withheld }).codes) : new Set();
-  const findings = verdict.findings.filter((f) => !advisory.has(f.code));
+  const findings = verdict.findings;
   return findings.length ? { op: s.op, status: s.job.status, findings, records: verdict.records } : null;
 }
 // The draw loop's machine metrics, RE-RUN by the runtime (scripts/work/draw-loop-settle.mjs): every live part of every
@@ -3577,13 +3515,12 @@ function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
 // taste metrics, the palette, the Grammar geometry and the ui-proof score - never the loop's self-reported numbers.
 // A leg admitted before the draw-loop-dna change settles on its old contract; a code it added is advisory for it.
 async function settleDrawMetrics(db, jobId, repo, reportAbs, reportText) {
-  const s = settleJobContext(db, jobId, { changeId: DRAW_LOOP_CHANGE, opOnly: 'interface.draw' });
+  const s = settleJobContext(db, jobId, { opOnly: 'interface.draw' });
   if (!s) return null;
   const { files } = settleJobFiles(db, s.job, repo, s.filed, { reportText });
   const owned = (jobPayloadOf(s.job).owned_paths ?? []).filter((p) => typeof p === 'string' && !p.includes(':'));
   const verdict = await settleDrawMetricFindings({ repo, files: [...files.map((f) => f.abs), ...owned] });
-  const advisory = Number.isFinite(s.admitted.at) ? new Set(advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt: s.admitted.at, op: 'interface.draw', withheld: s.admitted.withheld }).codes) : new Set();
-  const findings = verdict.findings.filter((f) => !advisory.has(f.code));
+  const findings = verdict.findings;
   return findings.length ? { op: s.op, status: s.job.status, findings, records: verdict.records, loops: verdict.loops } : null;
 }
 // The Work hygiene a pass owes when it changed files under .starciwork/ or .starcistacks/ (scripts/work/validate/work-hygiene.mjs,
@@ -3591,7 +3528,7 @@ async function settleDrawMetrics(db, jobId, repo, reportAbs, reportText) {
 // names plus every file its commits changed since the base it was admitted on. Read-only, before anything is written.
 // A leg admitted before the work-hygiene-gate change settles on its old contract.
 function settleWorkHygiene(db, jobId, repo, reportAbs, reportText) {
-  const s = settleJobContext(db, jobId, { changeId: WORK_HYGIENE_CHANGE, requireChange: true });
+  const s = settleJobContext(db, jobId, {});
   if (!s) return null;
   const { envelope, roots, files } = settleJobFiles(db, s.job, repo, s.filed, { reportText });
   const changed = files.map((f) => f.abs);
@@ -3726,11 +3663,13 @@ async function runSettleTail(ledger, job, repo, { verdict = null } = {}) {
 // unproven item is flagged on stderr and belongs in the package's "not proven" section. A coverage that cannot be
 // computed refuses too (fail closed). A leg admitted before the proof-integrity change hands over as admitted.
 function handoverProofGate(db, job, repo) {
-  const admitted = admittedContractOf(db, job);
-  const change = changeById(loadContractChanges(skillRoot), PROOF_INTEGRITY_CHANGE);
-  if (admittedBeforeChange(admitted, change)) return;
   let cov;
-  try { cov = coverageOf(db, job.workflow_id, { repo, notCounted: specsOff(ownerSpecs(skillRoot)) }); }
+  try {
+    const { integrity, qualified } = proofAcceptanceOf(db, job, skillRoot);
+    if (!integrity) return;
+    if (qualified) { const verified = verifyProofs(db, job.workflow_id); if (!verified.ok || verified.files.unchained) throw new Error('the workflow proof blobs or event chain are missing, modified or unchained'); }
+    cov = coverageOf(db, job.workflow_id, { repo, notCounted: specsOff(ownerSpecs(skillRoot)), qualified });
+  }
   catch (error) { throw Object.assign(new Error(`handover-proof-unjudged: starci kernel coverage could not be computed (${String(error?.message ?? error).slice(0, 300)}); a handover cannot claim proof it cannot read`), { code: 'handover-proof-unjudged' }); }
   if (cov.mustOwed.length) {
     throw Object.assign(new Error(`handover-proof-owed: ${cov.mustOwed.map((i) => `${i.kind} ${i.id} is ${i.status}`).join('; ')}. A must-have is never handed over unproven: file outcome blocked, blocker kind test-gap, naming each; the Kernel re-runs the check that proves it (starci kernel coverage --workflow ${job.workflow_id}, starci kernel status nextActions)`), { code: 'handover-proof-owed', owed: cov.mustOwed });
@@ -3857,7 +3796,7 @@ const API_INTERNALS = Object.freeze({
   skillRoot, SETTLED, opSlotAdmission, queuedSeamsOf, observeOperationWorker, AGENT_HIERARCHY_SCHEMA,
   kernelNodeId, operationNodeId, openOwnerGates, ownerGateOf, refuseStaleKernelRev, latestGraphNodesOf,
   deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel,
-  buildPacket, bestEffort, rejectDispatch, DISPATCH_LEASE_TTL_MS, opLeaseRequests,
+   buildPacket, bestEffort, rejectDispatch, DISPATCH_LEASE_TTL_MS, opLeaseRequests,
   livePathLeaseWait, reserveOpLeases, buildContractMarkdown, fileContract, envServicesOf,
   environmentPreStep, raiseEnvironmentIncident, recordLaunchTerminal, ensureWorkflowRun,
   opGuardLaunch,
@@ -3906,7 +3845,7 @@ const runExtensionVerb = async (spec, args, repo) => {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) }));
     process.exit(1);
   }
-  const caller = callerOf(ledger.db);
+  const caller = callerOf(ledger.db, process.env, { file: ledger.path });
   if (caller.role === OP_ROLE && spec.kernelOnly) {
     refuseOpCaller(ledger, { cmd: spec.verb, caller, code: 'op-context-refused',
       detail: `'${spec.verb}' is a kernel verb and this caller is operation ${caller.jobId ?? '(unbound)'} (${caller.via}); an op files its own starci kernel report and nothing else` });
@@ -3915,7 +3854,10 @@ const runExtensionVerb = async (spec, args, repo) => {
     refuseOpCaller(ledger, { cmd: spec.verb, caller, code: 'report-identity-mismatch',
       detail: `operation ${caller.jobId ?? '(unbound)'} (${caller.via}) may file a report only for its own job, not ${args.job}` });
   }
-  try { return await spec.run({ ledger, args, repo, emit, need, caller, ext: API_EXT, internals: API_INTERNALS }); } catch (error) {
+  try {
+    const admitted = callerAdmission(ledger, args, { caller });
+    return await admitted.run(() => spec.run({ ledger, args, repo, emit, need, caller: admitted.caller, ext: API_EXT, internals: API_INTERNALS }));
+  } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));
     process.exit(1);
   } finally { ledger.close(); }

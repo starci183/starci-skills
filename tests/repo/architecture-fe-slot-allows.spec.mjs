@@ -44,7 +44,7 @@ test('a hook file directly in hooks/ and a stray file beside a component are FE_
   assert.deepEqual(paths, ['apps/web/src/components/leaves/Chip/helpers.ts', 'apps/web/src/hooks/useLoose.ts']);
 });
 
-// R97 FE_NO_TESTS (contract-change fe-no-tests): a test path of a front end has exactly one finding, FE_NO_TESTS
+// R97 FE_NO_TESTS: a test path of a front end has exactly one finding, FE_NO_TESTS
 // (tests/hfs/hfs-fe-no-tests.spec.mjs); the slot check leaves it alone, so a spec or test file is never FE_SLOT_FILE_ROLE too.
 test('a .spec.tsx or .test.tsx beside a component and a spec in a hooks domain are never FE_SLOT_FILE_ROLE (they are FE_NO_TESTS findings)', t => {
   const report = run(t, {

@@ -34,7 +34,7 @@ removed:
 reads: workflows row; latest goals row (revision, goal_identity, json.opChain — the approved shape
   plan diffs against); all jobs; inbox rows; live signals; the tail of events; open incidents; the
   contracts rows of settled jobs and the current bytes of the inputs they recorded (staleInput and
-  sourceDrift below); modules/kernel/contract-changes/; with --deliveries, every settled job's filed
+  sourceDrift below); with --deliveries, every settled job's filed
   report and every handover ask with its answer receipt
 writes: nothing — pure projection
 returns:
@@ -81,13 +81,7 @@ returns:
     that named it), `writers` the other workflows whose jobs wrote it since, `foreignWrite` a peer
     rewrote a record this workflow owns (review it; redo nothing), `breakingIgnored` a breaking
     change note that binds nothing (a non-owner wrote it, or its owner declared it advisory)"
-  sourceDrift: "[{jobId, op, attempt, cut?, path, kind:source, recorded, current, admittedAt,
-    changes[], followUp[], unregistered}] — ADVISORY only: a Source-law input the settled job was
-    admitted under (recorded at dispatch) has been edited since. The job is judged by what it was
-    admitted under, so this is never owed work: `changes` are the registered contract changes after
-    its admission whose `paths` cover the edit, `followUp` those registered `reach: follow-up` for
-    this op (their owed legs are frontier.contractFollowUps), `unregistered` true when no change
-    names the edit (a supervisor finding: register it)"
+  sourceDrift: "[{jobId, op, attempt, cut?, path, kind:source, recorded, current, admittedAt}]: actual current Source bytes differ from the filed attempt. This is a factual projection, not new proof or automatic follow-up; current READ/CHECK gates remain mandatory."
   staleInputError: present only when the projection itself failed; staleInput and sourceDrift are then []
   deliveries: "--deliveries only: [{jobId, op, attempt, status, verdict, repository, ownedPaths,
     reportFile, outcome, summary, files, head, branch, credentialPending, open, blocker,

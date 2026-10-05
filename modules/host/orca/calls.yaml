@@ -132,9 +132,9 @@ calls:
     timeoutMs: 150000
     replay: request
     flags: [spec, task-title, worktree, agent, model, effort, name, repo, base-branch, display-name, setup, timeout-ms, run, from, retry-request]
-    # The one agent launch (contract-changes/launch-through-worker-start.yaml): Orca launches the agent itself; the
+    # The one agent launch (modules/kernel/start-workflow.yaml): Orca launches the agent itself; the
     # runtime never adopts a terminal (--terminal is not a declared flag, so orcaCall refuses it). --spec creates the
-    # worker's Task in the same call (contract-changes/worker-start-spec.yaml): there is no task-create, so a start
+    # worker's Task in the same call (modules/host/orca/calls.yaml): there is no task-create, so a start
     # that fails leaves no orphan Task. --task and --retry-of are not declared (--retry-of needs --task).
     required: [spec, worktree, agent, run]
     forbidden: [on]

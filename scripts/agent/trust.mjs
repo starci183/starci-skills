@@ -1,9 +1,9 @@
 // scripts/agent/trust.mjs — pre-trust the directory a Claude/Codex agent is
 // launched in, so the runtime (never the owner) answers the launch prompts.
 //
-// Owner instruction, 2026-09-23: the owner is never the one approving launch
-// prompts; the runtime approves them. The owner authorised automatic trust for
-// every directory the runtime launches Claude/Codex agents in.
+// Automatic launch trust requires this installation's explicit launchTrust owner
+// profile and an exact approved repository root. Missing or declined adoption
+// refuses the launch. Existing provider declines are preserved.
 //
 //   ensureLaunchTrust({ agent, cwd })
 //   SCOPE (lead ruling 2026-10-01): the command guard hook and every launch setting are written to the launch
@@ -17,8 +17,8 @@
 //              (set only when missing), each agents/claude.yaml launchEnv key under
 //              env (DISABLE_AUTOUPDATER: Orca composes a worker's command, so its
 //              launch env cannot carry it) and the guard hook.
-//     codex  → [projects."<path>"] trust_level = "trusted" in every Codex home
-//              (CODEX_HOME, ~/.codex, Orca's codex-runtime-home) for the launch
+//     codex  → [projects."<path>"] trust_level = "trusted" in the active managed Codex home
+//              (CODEX_HOME or Orca's codex-runtime-home) for the launch
 //              cwd and the git root Codex keys trust by, in the key forms Codex
 //              writes (win32: a '<drive>:\lower\case' literal and a "<DRIVE>:\\exact" basic), plus the
 //              update-check and model-nudge notices; the guard hook in the project
@@ -48,6 +48,8 @@ import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 import { orcaUserData } from './host-agents.mjs';
+import { codexTrustPaths, launchTrustVerdict } from './launch-trust-policy.mjs';
+export { codexTrustPaths, launchTrustVerdict } from './launch-trust-policy.mjs';
 
 const CLAUDE_CARD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'agents', 'claude.yaml');
 
@@ -79,11 +81,8 @@ export function trustTargets({ env = process.env, platform = process.platform } 
     const key = path.resolve(dir).toLowerCase();
     if (!codexHomes.some((h) => path.resolve(h.dir).toLowerCase() === key)) codexHomes.push({ kind, dir: path.resolve(dir) });
   };
-  if (!root) addHome('CODEX_HOME', env.CODEX_HOME);
-  addHome('codex-home', path.join(home, '.codex'));
-  addHome('orca-codex-home', root
-    ? orcaCodexHome({ env: { APPDATA: path.join(root, 'AppData', 'Roaming'), XDG_CONFIG_HOME: path.join(root, '.config') }, platform, home: root })
-    : orcaCodexHome({ env, platform, home }));
+  // One managed worker home. Do not rewrite unrelated personal Codex homes.
+  addHome('active-codex-home', root ? path.join(root,'.codex') : (env.CODEX_HOME || orcaCodexHome({ env, platform, home })));
   return {
     claudeJson: claudeDir ? path.join(claudeDir, '.claude.json') : path.join(home, '.claude.json'),
     codexHomes,
@@ -140,23 +139,6 @@ export function codexKeyForms(dir, platform = process.platform) {
   if (platform !== 'win32') return [path.posix.resolve(String(dir))];
   const abs = upperDrive(path.win32.resolve(String(dir))).replaceAll('/', '\\');
   return [...new Set([abs.toLowerCase(), abs])];
-}
-
-/** Paths Codex keys trust by: the cwd, its git toplevel and the main worktree root. */
-function codexTrustPaths(cwd) {
-  const out = [path.resolve(cwd)];
-  const git = (...args) => {
-    try {
-      const r = revParseQuery(args, { dir: cwd, timeout: 10000 });
-      return r.status === 0 ? r.stdout.trim() : null;
-    } catch { return null; }
-  };
-  const top = git('--show-toplevel');
-  if (top) out.push(path.resolve(top));
-  const common = git('--path-format=absolute', '--git-common-dir');
-  if (common && path.basename(common) === '.git') out.push(path.resolve(path.dirname(common)));
-  const seen = new Set();
-  return out.filter((p) => { const k = p.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
 }
 
 /* ------------------------------------------------------ atomic rewriting */
@@ -228,6 +210,7 @@ export function writeClaudeTrust({ file, keys, hooks }) {
     for (const key of keys) {
       const existing = doc.projects[key];
       if (existing?.hasTrustDialogAccepted === true) { already.push(key); continue; }
+      if (existing?.hasTrustDialogAccepted === false) throw Error(`${file}: owner declined trust for ${key}`);
       doc.projects[key] = existing && typeof existing === 'object' ? { ...existing, hasTrustDialogAccepted: true } : CLAUDE_PROJECT_DEFAULT();
       written.push(key);
     }
@@ -248,14 +231,14 @@ export function assertClaudeBypassConsent({ file, hooks }) {
   const doc = current == null ? {} : jsonOf(current);
   if (doc === undefined || !doc || typeof doc !== 'object') return { file, ok: false, state: 'unreadable' };
   if (doc.skipDangerousModePermissionPrompt === true) return { file, ok: true, state: 'already' };
-  if ('skipDangerousModePermissionPrompt' in doc) return { file, ok: true, state: 'owner-set-false' };
+  if ('skipDangerousModePermissionPrompt' in doc) return { file, ok: false, state: 'owner-set-false' };
   const updated = atomicUpdate(file, (text) => {
     const d = text == null ? {} : jsonOf(text);
     if (d === undefined || !d || typeof d !== 'object') throw new Error(`${file} is not a JSON object`);
     if ('skipDangerousModePermissionPrompt' in d) return { text: null, result: null };
     d.skipDangerousModePermissionPrompt = true;
     return { text: JSON.stringify(d, null, 2) + (text?.endsWith('\n') ? '\n' : ''), result: null };
-  }, (text) => jsonOf(text ?? '')?.skipDangerousModePermissionPrompt !== undefined, { hooks });
+  }, (text) => jsonOf(text ?? '')?.skipDangerousModePermissionPrompt === true, { hooks });
   return updated.ok ? { file, ok: true, state: updated.changed ? 'written' : 'already' } : { file, ok: false, state: 'failed', error: updated.error };
 }
 
@@ -354,6 +337,7 @@ export function writeCodexTrust({ file, keys, hooks }) {
     for (const key of keys) {
       const table = tables.get(key);
       if (table?.trust === 'trusted') { already.push(key); continue; }
+      if (table?.trust!==null && table?.trust!==undefined) throw Error(`${file}: owner set ${key} trust_level=${table.trust}; refusing to override`);
       written.push(key);
       if (!table) { append.push(key); continue; }
       if (table.trustLine !== null) {
@@ -551,26 +535,35 @@ export function trustCodexToolGuard({ home, cwd, command, appServer = codexAppSe
 
 /* ------------------------------------------------------------------ launch */
 
-/** The launch cwd as a directory, or null for an Orca selector ('active', 'id:…'). */
-function launchDirectory(worktree) {
-  if (typeof worktree !== 'string' || !worktree.trim()) return null;
-  const p = worktree.startsWith('path:') ? worktree.slice(5) : worktree;
-  try { return fs.statSync(p).isDirectory() ? path.resolve(p) : null; } catch { return null; }
-}
-
 /**
  * Pre-trust `cwd` for `agent` before launch. Never throws; a failure is
- * recorded (the gate auto-answer in lib.mjs is the fallback). Returns null for
+ * recorded without a screen-only consent fallback. Returns null for
  * an agent with no trust prompt.
  */
-export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = process.platform, hooks, codexAppServer: appServer = null } = {}) {
+export function ensureLaunchTrust({ agent, cwd, config, env = process.env, platform = process.platform, hooks, codexAppServer: appServer = null } = {}) {
   if (!TRUST_AGENTS.has(agent)) return null;
-  const dir = launchDirectory(cwd);
-  if (!dir) return { agent, paths: [], status: 'skipped', reason: `launch cwd is not a directory: ${cwd ?? 'none'}` };
+  const authorization=launchTrustVerdict({cwd,config,platform});
+  if(!authorization.ok)return {agent,paths:[],status:'declined',reason:authorization.reason};
+  const {dir}=authorization;
   const targets = trustTargets({ env, platform });
   if (targets.skipped) return { agent, paths: [dir], status: 'skipped', reason: targets.skipped };
   const project = projectTargets(dir);
-  const receipt = { agent, paths: [dir], written: [], already: [], errors: [] };
+  const receipt = { agent, paths: [dir], approval:authorization.approval, written: [], already: [], errors: [] };
+  // Check explicit provider declines before writing any trust/settings/hook file.
+  try{
+    if(agent==='claude'){
+      const user=readText(targets.claudeJson),doc=user===null?{}:jsonOf(user);
+      const local=readText(project.claudeSettings),settings=local===null?{}:jsonOf(local);
+      if(!doc||!settings)throw Error('Claude trust/settings file is unreadable');
+      if(claudeKeyForms(dir,platform).some(key=>doc.projects?.[key]?.hasTrustDialogAccepted===false)||settings.skipDangerousModePermissionPrompt===false)
+        return {...receipt,status:'declined',reason:'owner declined Claude project trust or bypass consent'};
+    }
+    if(agent==='codex'){
+      const keys=authorization.paths.flatMap(p=>codexKeyForms(p,platform));
+      for(const home of targets.codexHomes){const tables=codexProjectTables(readText(path.join(home.dir,'config.toml'))??'');
+        if(keys.some(key=>tables.get(key)?.trust!=null&&tables.get(key).trust!=='trusted'))return {...receipt,status:'declined',reason:'owner declined Codex project trust'};}
+    }
+  }catch(error){return {...receipt,status:'failed',errors:[{error:String(error.message)}]};}
   const collect = (r) => {
     for (const key of r.written ?? []) receipt.written.push({ file: r.file, key });
     for (const key of r.already ?? []) receipt.already.push({ file: r.file, key });
@@ -593,10 +586,12 @@ export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = pr
     // The directory trust record is Claude's own per-user state (~/.claude.json); everything else is the worktree's
     // local project settings (<dir>/.claude/settings.local.json), which Claude reads for the bypass consent, env and hooks.
     collect(guard(targets.claudeJson, () => writeClaudeTrust({ file: targets.claudeJson, keys: claudeKeyForms(dir, platform), hooks })));
+    if(receipt.errors.length)return {...receipt,status:'failed'};
     const file = project.claudeSettings;
     const consent = guard(file, () => assertClaudeBypassConsent({ file, hooks }));
     receipt.bypassConsent = consent.state ?? 'failed';
     if (!consent.ok) receipt.errors.push({ file, error: consent.error ?? consent.state });
+    if(receipt.errors.length)return {...receipt,status:'failed'};
     const launchEnv = guard(file, () => assertClaudeSettingsEnv({ file, vars: claudeLaunchEnv(), hooks }));
     receipt.launchEnv = launchEnv.state ?? 'failed';
     if (!launchEnv.ok) receipt.errors.push({ file, error: launchEnv.error ?? launchEnv.state });
@@ -610,10 +605,11 @@ export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = pr
     // records only Codex's hash that trusts it (hooks.state, keyed by that project file).
     receipt.paths = codexTrustPaths(dir);
     const keys = [...new Set(receipt.paths.flatMap((p) => codexKeyForms(p, platform)))];
-    const homes = targets.codexHomes.filter((home) => fs.existsSync(home.dir));
+    const homes = targets.codexHomes;
     for (const home of homes) {
       const file = path.join(home.dir, 'config.toml');
       collect(guard(file, () => writeCodexTrust({ file, keys, hooks })));
+      if(receipt.errors.length)return {...receipt,status:'failed'};
       const noUpdate = guard(file, () => writeCodexNoUpdateCheck({ file, hooks }));
       (receipt.updateCheck ??= []).push({ file, off: noUpdate.ok === true, ...(noUpdate.written ? { written: true } : {}), ...(noUpdate.ok ? {} : { error: noUpdate.error }) });
       if (!noUpdate.ok) receipt.errors.push({ file, error: noUpdate.error });

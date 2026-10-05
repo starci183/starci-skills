@@ -21,8 +21,8 @@
 //     a StarCi marker: a [Kernel]/[Op] tab or pane title, "kernel" in its
 //     title, an op-<kind>-<hex> job id.
 // An agent session with no StarCi marker is the owner's own and is never
-// touched; an unreadable frame is left alone. An agent session gets its CLI's
-// own quit first (quit-agent.mjs: Claude a double Ctrl+C), then the tab close.
+// touched; an unreadable frame is left alone. Explicit supported provider metadata
+// permits its CLI's quit input; the existing tab-close owner still decides closure.
 import fs from 'node:fs';
 import path from 'node:path';
 import { terminalList } from '../api/orca/terminal-list.mjs';
@@ -123,7 +123,7 @@ function planTerminalDedupe({ terminals = [], tabTitles = new Map(), scopes = []
 
 /**
  * List Orca's terminals, plan, and (unless dryRun) close every stray: an agent
- * session gets its quit input first, then the tab close. Never throws.
+ * session gets quit input only for explicit supported metadata, then the existing tab close. Never throws.
  * Returns {ok, dryRun, listed, closed:[...], kept:[...], deferred:[...], skipped?, error?}.
  */
 export function dedupeTerminals({ repos = [], dryRun = false, env = process.env, deps = {} } = {}) {
@@ -147,7 +147,7 @@ export function dedupeTerminals({ repos = [], dryRun = false, env = process.env,
     for (const entry of plan.close) {
       if (dryRun) { result.closed.push({ ...entry, wouldClose: true }); continue; }
       let quitResult = null;
-      if (entry.kind === 'agent') { try { quitResult = quit({ handle: entry.handle, agent: agentOfTerminal(entry) }); } catch (error) { quitResult = { error: String(error?.message ?? error) }; } }
+      if (entry.kind === 'agent') { try { quitResult = quit({ handle: entry.handle, agent: agentOfTerminal(terminals.find((terminal) => terminal?.handle === entry.handle) ?? entry) }); } catch (error) { quitResult = { error: String(error?.message ?? error) }; } }
       let closed;
       try { closed = close(entry.handle); } catch (error) { closed = { ok: false, error: String(error?.message ?? error) }; }
       // An agent that quit on its own may have taken its terminal with it: a refused close of a gone terminal is still closed.

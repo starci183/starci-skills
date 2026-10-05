@@ -316,7 +316,7 @@ steps:
         shell.layouts; the layouts this op settled count. The chrome, navigation,
         UI language and demo personas come from the tree and nowhere else. Freeze complete coverage before drawing.
         Draw only shapes: the record's `ui.shapes`, one per `XBase#state` at the viewports it names
-        (`examples/shape-slot/README.md`, knowledge/code-examples/frontend/connected-block); a record
+        (`examples/shape-slot/README.md`, examples/index.yaml#connected-block); a record
         without `ui.shapes` draws the states of its ui.flow less every data status. A data status -
         loading, empty, error, forbidden, skeleton, 401/403/404, a slot retrying, pending, uncertain,
         stale or last-known, unverified or limited, a no-<thing> state, and a loading, error or not-found

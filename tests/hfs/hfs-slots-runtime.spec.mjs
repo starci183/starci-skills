@@ -9,6 +9,8 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { HFS_MANIFEST_FILE, HfsSlotsError, RUNTIME_MANIFEST_FILE, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration, ruleParams } from '../../scripts/hfs/slots.mjs';
+import { checkRepo } from '../../scripts/hfs/check.mjs';
+import { slotAllowsFindings } from '../../scripts/hfs/runtime-rules/slot-allows.mjs';
 /** An old (moved or retired) runtime path, spelled in segments so the move codemod never rewrites a fixture. */
 const old = (...segments) => segments.join('/');
 
@@ -84,4 +86,68 @@ test('state directories and local junk named in the review log are forbidden in 
     assert.equal(r.classifyPath(forbidden).status, 'forbidden', `${forbidden} must be forbidden`);
   }
   assert.notEqual(r.classifyPath('docs/goal.md').status, 'forbidden');
+});
+
+const SAMPLE_RUNTIME = 'examples/.runtimes/sample-project';
+const SAMPLE_SHA = 'ab'.repeat(32);
+const SAMPLE_CAS = `${SAMPLE_RUNTIME}/artifacts/${SAMPLE_SHA.slice(0, 2)}/${SAMPLE_SHA}`;
+const SAMPLE_FILES = [`${SAMPLE_RUNTIME}/runtime.sqlite`, SAMPLE_CAS, `${SAMPLE_CAS}.json`];
+
+test('curated sample runtimes have their own fixture boundary and require a project DB, without an app declaration', () => {
+  const m = runtimeManifest();
+  const declaration = { hfs: 1, kind: 'runtime', project: 'starci' };
+  const r = createSlotResolver(m, resolveRepoDeclaration(m, declaration));
+  for (const file of SAMPLE_FILES) {
+    const classified = r.classifyPath(file);
+    assert.deepEqual([classified.status, classified.slot, classified.tracking], ['owned', 'runtime.example-runtime-fixtures', 'tracked']);
+    assert.equal(classified.bindings['example-project'], 'sample-project');
+    assert.deepEqual(r.requiredFiles(file), [`${SAMPLE_RUNTIME}/runtime.sqlite`]);
+  }
+  assert.deepEqual(slotAllowsFindings({ resolver: r, files: SAMPLE_FILES }), []);
+  const complete = checkRepo({ repoRoot: ROOT, root: ROOT, manifest: m, declaration, files: SAMPLE_FILES, tree: false });
+  assert.equal(complete.findings.some((f) => f.code === 'HFS_SLOT_REQUIRED_MISSING' && f.path.startsWith('examples/.runtimes/')), false);
+  const missing = checkRepo({ repoRoot: ROOT, root: ROOT, manifest: m, declaration, files: SAMPLE_FILES.slice(1), tree: false });
+  const owed = missing.findings.filter((f) => f.code === 'HFS_SLOT_REQUIRED_MISSING' && f.path.startsWith('examples/.runtimes/'));
+  assert.deepEqual(owed.map(({ slot, path: file, via }) => ({ slot, path: file, via })), [
+    { slot: 'runtime.example-runtime-fixtures', path: `${SAMPLE_RUNTIME}/runtime.sqlite`, via: 'requires' },
+  ]);
+  const ordinary = checkRepo({ repoRoot: ROOT, root: ROOT, manifest: m, declaration, files: ['examples/sample-app/be/src/main.ts'], tree: false });
+  assert.equal(ordinary.findings.some((f) => f.code === 'HFS_SLOT_REQUIRED_MISSING' && f.slot === 'runtime.example' && f.path === 'examples/sample-app/hfs.json'), true);
+});
+
+test('sample fixture ownership closes the reserved tree to unselected files and does not extend outside its prefix', () => {
+  const m = runtimeManifest();
+  const r = createSlotResolver(m, resolveRepoDeclaration(m, { hfs: 1, kind: 'runtime', project: 'starci' }));
+  const stray = [
+    'examples/.runtimes/index.yaml',
+    `${SAMPLE_RUNTIME}/hfs.json`,
+    `${SAMPLE_RUNTIME}/machine.sqlite`,
+    `${SAMPLE_RUNTIME}/report.json`,
+    `${SAMPLE_RUNTIME}/workflows/history.json`,
+    `${SAMPLE_RUNTIME}/artifacts/transcript.json`,
+    `${SAMPLE_RUNTIME}/artifacts/ab/extra/${SAMPLE_SHA}`,
+  ];
+  for (const file of stray) assert.notEqual(r.classifyPath(file).slot, 'runtime.example', `${file} is not an app example`);
+  const findings = slotAllowsFindings({ resolver: r, files: stray });
+  assert.deepEqual(findings.map(({ code, path: file }) => ({ code, path: file })), stray.map((file) => ({ code: 'HFS_FORBIDDEN_PRESENT', path: file })));
+  assert.equal(r.classifyPath('examples/.runtimes').status, 'forbidden');
+  for (const file of ['../examples/.runtimes/sample-project/runtime.sqlite', 'examples/.runtimes-other/sample-project/runtime.sqlite']) {
+    assert.notEqual(r.classifyPath(file).slot, 'runtime.example-runtime-fixtures', `${file} gets no sample runtime fixture allowance`);
+  }
+});
+
+test('sample runtime sidecars and materialized transients are ignored and fail when forced into the tracked tree', () => {
+  const m = runtimeManifest();
+  const declaration = { hfs: 1, kind: 'runtime', project: 'starci' };
+  const r = createSlotResolver(m, resolveRepoDeclaration(m, declaration));
+  const transient = [
+    ...['wal', 'shm', 'journal'].map((suffix) => `${SAMPLE_RUNTIME}/runtime.sqlite-${suffix}`),
+    ...['artifacts-views', 'cache', 'views', 'captures', 'logs', 'traces'].map((dir) => `${SAMPLE_RUNTIME}/${dir}/temporary.bin`),
+  ];
+  for (const file of transient) {
+    const c = r.classifyPath(file);
+    assert.deepEqual([c.slot, c.tracking], ['runtime.example-runtime-transients', 'ignored']);
+  }
+  const report = checkRepo({ repoRoot: ROOT, root: ROOT, manifest: m, declaration, files: transient, tree: false });
+  assert.deepEqual(report.findings.filter((f) => f.code === 'HFS_TRACKED_MUST_BE_IGNORED').map((f) => f.path), transient);
 });

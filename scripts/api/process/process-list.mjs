@@ -1,22 +1,15 @@
-// process-list.mjs — the ONE read of the host's process table (Windows: Get-CimInstance Win32_Process; elsewhere `ps`).
-//
-// Every runtime census reads it: close-verify processTable, host-health listProcesses (with per-process CPU),
-// git-index-lock listGitProcesses, resume-all listWatchdogs,
-// and connectors/tunnel tunnelProcesses. Each keeps its own filter and row shape;
-// the query and the row parsing live in lib.mjs (processListScript, processRowsOfJson, processRowsOfPs), the failure
-// rule (null = the table could not be read) here. Its sibling kill-tree.mjs is the one forced stop.
-//
-//   processList({where, match, cmdMax, cpu, run, platform, timeoutMs})
-//     -> [{pid, ppid, name, exe, cmd, created, ws, cpu?}] | null
-//   where    a WQL filter for Win32_Process (e.g. "Name='node.exe'"); narrows the CIM read itself
-//   match    a RegExp applied to the command line after the read (both platforms)
-//   cmdMax   command-line characters kept per row (default 4000)
-//   cpu      also read Win32_PerfFormattedData_PerfProc_Process: cpu = % of one core
-// The same read WITHOUT blocking the calling thread is process-list-async.mjs processListAsync.
-// Never throws. Off Windows the rows come from `ps -eo pid=,ppid=,comm=,args=` (exe/created/ws are null there).
+// process-list.mjs — the synchronous host process-table read.
 import { spawnSync } from 'node:child_process';
 import { processListScript, processRowsOfJson, processRowsOfPs } from './lib.mjs';
 
+/**
+ * Synchronously read the host process table for caller-owned filtering.
+ * `where` is a Windows WQL filter; `cpu` requests Windows per-core CPU values.
+ * Other platforms use ps, with `exe`, `created` and `ws` left null. `cmdMax`
+ * truncates command lines before the optional `match` RegExp filters rows.
+ * Returns process rows, including an empty list, or null on query or parsing
+ * failure. A caller must treat null as an unreadable table rather than no processes.
+ */
 export function processList({ where = null, match = null, cmdMax = 4000, cpu = false, run = spawnSync, platform = process.platform, timeoutMs = 120_000 } = {}) {
   try {
     let rows;

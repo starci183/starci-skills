@@ -11,6 +11,11 @@ import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
+/**
+ * Answers the named worker question through the calling Kernel terminal, optionally within the supplied Run.
+ * The caller owns the pending question and ledger disposition; this adapter returns the host outcome and result.
+ * A lost receipt is not automatically reissued because another reply is another message.
+ */
 export function reply({ id, body, run = null }) {
   const r = orcaCall('reply', { id, body, run });
   return { ok: r.exitCode === 0 && r.outcome === 'ok', outcome: r.outcome, result: r.result, error: r.exitCode === 0 ? null : r.error };

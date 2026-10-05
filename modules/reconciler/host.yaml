@@ -61,7 +61,9 @@ seats:
 # supervisorTurnBudgetMs, turnInterruptGraceMs): a seat busy in one turn past its budget gets its agent's own interrupt
 # key (interruptKeys: one entry per key press, `esc` = Escape; Devin asks for Esc twice), then the doorbell re-wake;
 # idleWaitMs bounds the wait for the turn to end before the ring. sameTurnSlackMs: two readings of the spinner timer
-# whose implied turn starts differ by less than this are the same turn.
+# whose implied turn starts differ by less than this are the same turn. Intent never confirms a timestamp.
+# An unresolved actuator retains its exact terminal in the existing seat record and holds later watchdog effects.
+# Replacement requires a fresh Dispatch-to-terminal read and the worker owner's terminal/process closure proof.
 turnBudget:
   interruptKeys: {claude: [esc], codex: [esc], devin: [esc, esc]}
   idleWaitMs: 20000
@@ -77,4 +79,4 @@ processes: {everyMs: 60000, orphanMinAgeMs: 1800000, orphanSlaMs: 60000, footpri
 # Ledger health (DESIGN 13): PRAGMA quick_check (read-only) every quickCheckEveryMs; nightly (from backupHour local
 # time) VACUUM INTO <backupDir>/<ledgerId>-<yyyymmdd>.sqlite, the newest keep kept; backupDir defaults to
 # <archive root>/ledger-backups (services.mjs). Restore is manual and owner-approved; nothing here restores.
-ledgerHealth: {quickCheckEveryMs: 3600000, backupHour: 3, keep: 7, backupTimeoutMs: 1800000}
+ledgerHealth: {quickCheckEveryMs: 3600000, backupHour: 3, keep: 7, backupTimeoutMs: 1800000, backupRetryMs: 900000}

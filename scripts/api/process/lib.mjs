@@ -48,7 +48,7 @@ export const processRowsOfPs = (text, cmdMax = 4000) => String(text ?? '').split
 
 // Windows keeps a process's environment block in its PEB: PEB.ProcessParameters (+0x20) -> Environment (+0x80) and
 // EnvironmentSize (+0x3F0), x64 only. A same-user process opens with PROCESS_QUERY_INFORMATION | PROCESS_VM_READ (0x0410).
-const ENV_READER_CSHARP = `
+export const PROCESS_ENV_NATIVE = `
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -68,7 +68,9 @@ public static class StarciProcessEnv {
   public static Dictionary<string, string> Env(int pid) {
     var h = OpenProcess(0x0410, false, pid);
     if (h == IntPtr.Zero) return null;
-    try {
+    try { return EnvHandle(h); } finally { CloseHandle(h); }
+  }
+  public static Dictionary<string, string> EnvHandle(IntPtr h) {
       bool wow; if (IsWow64Process(h, out wow) && wow) return null;
       var pbi = new PBI(); int ret;
       if (NtQueryInformationProcess(h, 0, ref pbi, Marshal.SizeOf(pbi), out ret) != 0) return null;
@@ -86,7 +88,6 @@ public static class StarciProcessEnv {
         d[entry.Substring(0, i)] = entry.Substring(i + 1);
       }
       return d;
-    } finally { CloseHandle(h); }
   }
 }`;
 
@@ -95,7 +96,7 @@ export function processEnvScript({ names, pids = null }) {
   const wanted = JSON.stringify([...names].map(String));
   const ids = pids ? `@(${[...pids].map((p) => Number(p)).filter(Number.isInteger).join(',')})` : '(Get-Process).Id';
   return [
-    `Add-Type -TypeDefinition @'${ENV_READER_CSHARP}\n'@ -Language CSharp`,
+    `Add-Type -TypeDefinition @'${PROCESS_ENV_NATIVE}\n'@ -Language CSharp`,
     `$names = '${psQuote(wanted)}' | ConvertFrom-Json`,
     `$rows = foreach ($id in ${ids}) { $e = [StarciProcessEnv]::Env([int]$id); $v = [ordered]@{}; foreach ($n in $names) { $v[$n] = if ($null -ne $e -and $e.ContainsKey($n)) { $e[$n] } else { $null } }; [pscustomobject]@{ pid = [int]$id; readable = ($null -ne $e); values = $v } }`,
     '@($rows) | ConvertTo-Json -Compress -Depth 4',

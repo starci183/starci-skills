@@ -63,6 +63,7 @@ export class WorldLock {
     private readonly pause: (ms: number) => Promise<void>
     private sharing = false
     private writing = false
+    private acquiring: Promise<void> | null = null
     private closed = false
 
     constructor(
@@ -113,7 +114,18 @@ export class WorldLock {
      */
     async acquire(): Promise<void> {
         this.ensureOpen()
+        if (this.acquiring !== null) return this.acquiring
         if (this.writing) return
+        const acquiring = this.acquireExclusive()
+        this.acquiring = acquiring
+        try {
+            await acquiring
+        } finally {
+            this.acquiring = null
+        }
+    }
+
+    private async acquireExclusive(): Promise<void> {
         const wasSharing = this.sharing
         if (wasSharing) this.removeShared()
         try {

@@ -18,6 +18,12 @@ import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
+/**
+ * Reads a Run coordinator's unacknowledged delivery, optionally acknowledging the supplied delivery first.
+ * Callers name the Run and coordinator terminal and persist every message before passing ack; unacknowledged batches replay.
+ * A failed or malformed read returns ok false with a fallback messages array, which cannot prove an empty inbox.
+ * Consumer fencing and host unavailability remain distinct from a successful empty delivery.
+ */
 export function check({ run, terminal, ack = null }) {
   const r = orcaCall('check', { run, terminal, ack });
   const messages = Array.isArray(r.result?.messages) ? r.result.messages : null;

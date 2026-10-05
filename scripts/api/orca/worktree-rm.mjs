@@ -8,6 +8,14 @@
 import { orcaCall } from './lib.mjs';
 import { arg, flag } from '../../lib/cli-arg.mjs';
 
+/**
+ * Ask Orca to remove the exact caller-admitted worktree and its Git registration.
+ * removeOrcaWorktree owns preservation, link removal, main-checkout protection, and readback; this
+ * wrapper does not establish those preconditions. force forwards a host option, not new authority.
+ * ok requires both a classified successful outcome and removed true; an unknown receipt keeps custody.
+ * @param {object} input - Required worktree selector and optional force.
+ * @returns {object} Outcome, confirmed removal, typed error, and hostUnavailable.
+ */
 export function worktreeRm({ worktree, force = false }) {
   const r = orcaCall('worktree-rm', { worktree, force });
   return {

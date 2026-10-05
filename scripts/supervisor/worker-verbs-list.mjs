@@ -1,6 +1,7 @@
 // worker-verbs-list.mjs - project Orca worker accounting for the lead-facing worker list.
 import path from 'node:path';
 import { terminalList } from '../api/orca/terminal-list.mjs';
+import { terminalIdentityOf } from '../lib/terminal-liveness.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
 import { worktreePathOf } from '../lib/worker-accounting.mjs';
 import { workerListAll } from '../machine/worker-list-all.mjs';
@@ -45,9 +46,9 @@ export function workingByLane(worktrees = [], { worktree = null } = {}) {
 }
 
 const terminalAgent = (terminal) => {
-  const identity = terminal?.agentIdentity;
-  const raw = text(typeof identity === 'string' ? identity : identity?.agent ?? identity?.id ?? terminal?.agent ?? terminal?.provider).toLowerCase();
-  return ['codex', 'claude', 'devin', 'cursor'].find((agent) => raw === agent || raw.includes(agent)) ?? raw;
+  const identity = terminalIdentityOf(terminal);
+  // A title/frame alone does not turn a connected manual pane into a worker.
+  return identity.source === 'title' || identity.source === 'screen' ? identity.raw : identity.provider ?? identity.raw;
 };
 
 /** Fill the normalized worktree-ps rows from terminal-list when Orca omits their legacy agents array. */
@@ -57,8 +58,11 @@ export async function worktreesWithWorkingAgents(worktrees = [], list = terminal
     if (Array.isArray(row?.agents)) { rows.push(row); continue; }
     const terminals = await list({ worktree: `path:${row.path}` });
     if (!terminals?.ok) return { ok: false, worktrees: rows, error: terminals?.error ?? `terminal listing failed for ${row.path}` };
-    const agents = (terminals.terminals ?? []).filter((terminal) => terminal?.connected !== false && terminalAgent(terminal))
-      .map((terminal) => ({ state: 'working', agentType: terminalAgent(terminal) }));
+    const agents = (terminals.terminals ?? []).flatMap((terminal) => {
+      if (terminal?.connected === false) return [];
+      const agentType = terminalAgent(terminal);
+      return agentType ? [{ state: 'working', agentType }] : [];
+    });
     rows.push({ ...row, agents });
   }
   return { ok: true, worktrees: rows };

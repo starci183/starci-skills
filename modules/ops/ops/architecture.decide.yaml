@@ -243,7 +243,7 @@ steps:
         this bounded design job completed, but record state done is reserved for final
         reconciliation of current requirements, design, code, test/E2E and UAT evidence at one
         revision.
-  - reads: [target, repo]
+  - reads: [target, feasibility]
     writes: [work-graph]
     action:
       en: When the workflow has a work graph, revise it to the decided design - domain boundaries, a

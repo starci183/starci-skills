@@ -39,7 +39,7 @@ const ctxOf = (sources, extra = {}) => {
   const list = Object.entries(sources).map(([p, text]) => ({ path: p, text }));
   const parsed = new Map(list.map((s) => [s.path, parseSource(s.text, s.path)]));
   const files = [...list.map((s) => s.path), ...(extra.files ?? [])];
-  return { resolver: RESOLVER, params: PARAMS, sources: list, parsed: (p) => parsed.get(p), files, fileSet: new Set(files), sourceSet: new Set(list.map((s) => s.path)), retiredPaths: {}, base: null, read: () => null, ...extra };
+  return { resolver: RESOLVER, params: PARAMS, sources: list, parsed: (p) => parsed.get(p), files, fileSet: new Set(files), sourceSet: new Set(list.map((s) => s.path)), retiredPaths: {}, base: null, read: (p) => sources[p] ?? null, ...extra };
 };
 
 // ------------------------------------------------------------------------------------------- RT_EXTERNAL_OWNER
@@ -100,6 +100,17 @@ test('RT_BASE_IMPURE: a base helper writing a file or reading process.env outsid
 test('RT_BASE_IMPURE: reads, a local write-named function and an env read in a declared seam are clean', () => {
   assert.deepEqual(base('scripts/lib/r.mjs', "import fs from 'node:fs';\nexport const r = (p) => fs.readFileSync(p, 'utf8');\nconst writeFileSync = (x) => x;\nwriteFileSync(1);\n"), []);
   assert.deepEqual(base('scripts/lib/sleep-sync.mjs', 'export const scale = () => Number(process.env.STARCI_SLEEP_SCALE ?? 1);\n', true), []);
+});
+
+test('the secrets foundation owns its declared read-only environment seam', () => {
+  const file = 'engine/secrets.mjs';
+  assert.equal(RESOLVER.classifyPath(file).slot, 'runtime.foundation');
+  assert.equal(RESOLVER.tierOf(file), 'base');
+  assert.ok(PARAMS.baseEnvSeams.includes(file));
+  const text = fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.deepEqual(base(file, text, PARAMS.baseEnvSeams.includes(file)), []);
+  const write = base(file, "import fs from 'node:fs'; fs.writeFileSync('x', 'x');", true);
+  assert.deepEqual(codesOf(write), ['RT_BASE_IMPURE'], 'the environment seam never permits filesystem writes');
 });
 
 // ------------------------------------------------------------------------------------------- RT_API_SHAPE

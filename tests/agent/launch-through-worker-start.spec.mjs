@@ -14,10 +14,11 @@ import {fakeAdmission} from '../helpers/fake-admission.mjs';
 import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { MACHINE_VERSION } from '../../engine/db/machine.mjs';
-import { restoreMachineV1Fixture } from '../helpers/machine-v1-fixture.mjs';
+import { proofRepo } from '../helpers/sonar-scan.mjs';
+import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
+import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 
-// Every agent launch goes through orchestration worker-start (modules/kernel/contract-changes/
-// launch-through-worker-start.yaml): the Kernel, the [Supervisor], every [Worker] and every [Op]. This spec fails when
+// Every agent launch goes through orchestration worker-start (scripts/agent/admission-launch.mjs): the Kernel, the [Supervisor], every [Worker] and every [Op]. This spec fails when
 // any launch bypasses it - statically (runtime code that creates a terminal, a contract call that could) and on the
 // wire (a dispatch or a Kernel boot whose Orca call log holds a terminal create or an orchestration dispatch).
 
@@ -224,12 +225,13 @@ const fixture=t=>{
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot,{recursive:true});
   fs.writeFileSync(path.join(ownerRoot,'config.yaml'),fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
-    .replace(/^kernel:.*$/m,'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}'));
+    .replace(/^kernel:.*$/m,'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}')
+    .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private worker-start fixture adoption',roots:[repo]})}`));
   const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     STARCI_OWNER_ROOT:ownerRoot,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_PROJECTS_ROOT:path.join(root,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),USERPROFILE:path.join(root,'home'),HOME:path.join(root,'home'),
-    CODEX_HOME:path.join(root,'home','.codex'),ORCA_TERMINAL_HANDLE:''};
+    CODEX_HOME:path.join(root,'home','.codex'),STARCI_AGENT_TRUST_HOME:path.join(root,'home'),ORCA_TERMINAL_HANDLE:''};
   const savedMachine = process.env.STARCI_TEST_MACHINE_FILE;
   process.env.STARCI_TEST_MACHINE_FILE = env.STARCI_TEST_MACHINE_FILE;
   t.after(() => { if (savedMachine === undefined) delete process.env.STARCI_TEST_MACHINE_FILE; else process.env.STARCI_TEST_MACHINE_FILE = savedMachine; });
@@ -254,16 +256,13 @@ const seedOp=(fx,{jobId,model})=>{
   }finally{ledger.close();}
 };
 
-const makeUnprepared = (file, legacy) => {
-  if (!legacy) { fs.rmSync(file); return; }
-  restoreMachineV1Fixture(file);
-};
+const prepareFixtureStore = (file, existing) => { if (!existing) fs.rmSync(file); };
 
-test('authorized Op routing prepares missing and compatible v1 capacity before its actual pool decision', t => {
-  for (const legacy of [false, true]) {
-    const fx = fixture(t), jobId = `route-startup-${legacy}`;
+test('authorized Op routing prepares missing and current capacity before its actual pool decision', t => {
+  for (const existing of [false, true]) {
+    const fx = fixture(t), jobId = `route-startup-${existing}`;
     seedOp(fx, { jobId, model: 'codex-agent' });
-    makeUnprepared(fx.env.STARCI_TEST_MACHINE_FILE, legacy);
+    prepareFixtureStore(fx.env.STARCI_TEST_MACHINE_FILE, existing);
     const routed = fx.run(API, 'route', '--repo', fx.repo, '--job', jobId, '--json');
     assert.equal(routed.status, 0, routed.stderr || routed.stdout);
     assert.equal(json(routed.stdout).decision.admission.ok, true);
@@ -276,18 +275,18 @@ test('authorized Op routing prepares missing and compatible v1 capacity before i
   }
 });
 
-test('actual unpinned Kernel boot prepares missing and compatible v1 stores after its read-only plan', t => {
-  for (const legacy of [false, true]) {
+test('actual unpinned Kernel boot prepares missing and current stores after its read-only plan', t => {
+  for (const existing of [false, true]) {
     const fx = fixture(t), config = path.join(fx.env.STARCI_OWNER_ROOT, 'config.yaml');
     fs.writeFileSync(config, fs.readFileSync(config, 'utf8').replace(/^kernel:.*\r?\n/m, ''));
     const goal = fx.run(DEFINE_GOAL, '--repo', fx.repo, '--text', 'first unpinned kernel startup', '--json');
     assert.equal(goal.status, 0, goal.stderr);
-    makeUnprepared(fx.env.STARCI_TEST_MACHINE_FILE, legacy);
+    prepareFixtureStore(fx.env.STARCI_TEST_MACHINE_FILE, existing);
     const workflowId = json(goal.stdout).workflowId;
     fx.run(START_WORKFLOW, '--repo', fx.repo, '--goal', workflowId, '--plan', '--json');
-    if (legacy) {
+    if (existing) {
       const raw = new DatabaseSync(fx.env.STARCI_TEST_MACHINE_FILE, { readOnly: true });
-      try { assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 1); }
+      try { assert.equal(raw.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION); }
       finally { raw.close(); }
     } else assert.equal(fs.existsSync(fx.env.STARCI_TEST_MACHINE_FILE), false);
     const boot = fx.run(START_WORKFLOW, '--repo', fx.repo, '--goal', workflowId, '--json');
@@ -305,6 +304,12 @@ test('actual unpinned Kernel boot prepares missing and compatible v1 stores afte
 for(const [model,agent,takesModel] of [['claude-agent','claude',true],['codex-agent','codex',true],['devin-agent','devin',false]]){
   test(`starci kernel dispatch --spawn launches a ${model} op through worker-start --agent ${agent}, never a terminal create`,t=>{
     const fx=fixture(t);
+    proofRepo(t,fx.repo);
+    const made=fakeOrcaWorktrees({root:path.join(path.dirname(fx.repo),'worktrees')}).create({repo:`path:${fx.repo}`,name:`wf-${'wf-launch'}`,baseBranch:'main'});
+    assert.equal(made.ok,true,made.error);
+    fx.repo=path.resolve(made.worktree.path);
+    fs.mkdirSync(path.join(fx.repo,'docs'),{recursive:true});
+    registerWorkflowWorktree({env:fx.env},{workflowId:'wf-launch',orcaWorktreeId:made.worktree.id,path:fx.repo,branch:made.worktree.branch});
     const jobId=`job-${agent}`;
     seedOp(fx,{jobId,model});
     const r=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model',model,'--spawn','--json');

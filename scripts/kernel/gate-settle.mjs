@@ -10,8 +10,8 @@
 //   op-gate-new-findings      the gate reports findings the base does not have (lint, tsc, failing specs)
 //   op-read-digest-missing    no READ digest (schema starci/read-digest@1) is attached: the op skipped READ
 //   op-read-digest-no-pattern the digest names no pattern file for a touched file kind
-// Beside the loop, the ops of op-gate.yaml `opProofs` owe their mechanism proofs (contract change op-mechanism-proofs), judged
-// by judgeProofs from the documents the op attached and recorded as the runtime check `op-proof`:
+// Beside the loop, the ops of op-gate.yaml `opProofs` owe their mechanism proofs, judged
+// by the existing specialized judges, reexported here from mechanism-proofs.mjs. Current admitted legs need bound native check_runs, with attachments retained for READ/manual obligations, recorded as `op-proof`:
 //   read-knowledge  op-read-digest-missing, op-read-digest-no-knowledge (no knowledge file, or a written record with no slot)
 //   doc-gate        op-doc-gate-missing, op-doc-gate-tool-failed, op-doc-gate-red (starci gate run --scope docs)
 //   test-world      op-test-world-proof-missing, op-test-world-hand-rolled, op-test-world-run-red (test-world-run.mjs)
@@ -30,48 +30,53 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { recordCheck } from '../machine/evidence-store.mjs';
-import { DOC_PROFILE, GATE_EXIT, GATE_SCHEMA, LINT_SCHEMA } from '../gates/gate.mjs';
-import { DIGEST_SCHEMA, judgeKnowledgeDigest, judgeReadDigest, kindsOf, loadOpGate, loopOps } from '../gates/read-digest.mjs';
-import { TEST_WORLD_RUN_SCHEMA, testWorldFindings } from '../gates/test-world-run.mjs';
-import { UNIT_RUN_SCHEMA, unitFindings } from '../gates/unit-run.mjs';
-import { RELEASE_PROOF_SCHEMA, RELEASE_STEPS, STEP_STATUS } from '../gates/release-proof.mjs';
-import { attachedNameOf } from '../lib/display-names.mjs';
+import { GATE_EXIT, GATE_SCHEMA, LINT_SCHEMA, gateInputSnapshot } from '../gates/gate.mjs';
+import { DIGEST_SCHEMA, buildReadDigest, judgeReadDigest, kindsOf, loadOpGate, loopOps } from '../gates/read-digest.mjs';
+import { TEST_WORLD_RUN_SCHEMA } from '../gates/test-world-run.mjs';
+import { UNIT_RUN_SCHEMA } from '../gates/unit-run.mjs';
+import { RELEASE_PROOF_SCHEMA } from '../gates/release-proof.mjs';
+import { readAttached } from './attached-proof.mjs';
+import { proofEntriesOf, isDocGate } from './mechanism-proofs.mjs';
+export { REVIEW_DEFECTS_SCHEMA, SECURITY_FINDINGS_SCHEMA, proofsOf, judgeTestWorlds, judgeKnowledgeRead, judgeDocGate,
+  judgeTestWorld, judgeUnitRun, judgeLint, securityRelevant, feRelevant, judgeSecurityLint, judgeReviewGate, judgeReviewDefects,
+  judgeRelease, judgeJobProofs, recordProofJudgment, proofRefusalText } from './mechanism-proofs.mjs';
 import { oneLine } from '../lib/clip.mjs';
+import { normRel, sameResolvedPath } from '../lib/path-key.mjs';
+import { isAncestor } from '../api/git/is-ancestor.mjs';
+import { revParse } from '../api/git/rev-parse.mjs';
+import { APP_SCOPE, SIDES, locateDeclaration } from '../hfs/slots.mjs';
 
-export const OP_GATE_CHANGE = 'op-gate-loop';
 const OP_GATE_CHECK = 'op-gate';
-export const OP_PROOF_CHANGE = 'op-mechanism-proofs';
-const OP_PROOF_CHECK = 'op-proof';
-export const REVIEW_DEFECTS_SCHEMA = 'starci/review-defects@1';
-export const SECURITY_FINDINGS_SCHEMA = 'starci/security-findings@1';
-const DEFECT_CLASS_VALUES = Object.freeze(['business', 'non-business']);
-const DOC_MAX_BYTES = 16 * 1024 * 1024;
 const FINDINGS_LISTED = 40;
 
 /**
- * The newest JSON document of `schema` among a job's files ([{abs, name?}] from collectJobFiles), or null. A file counts only
- * when it parses as JSON carrying that schema, whatever it is called.
+ * Capture each resolved placement's HEAD and exact owned scope before a provider can edit it. Unknown placement or Git
+ * identity refuses admission; the existing packet/contract carries these inputs through the attempt without a new store.
  */
-function readAttached(files, schema, accept = () => true) {
-  let best = null;
-  for (const file of files ?? []) {
-    if (!file?.abs || !/\.json$/i.test(file.abs)) continue;
-    let doc = null;
-    try {
-      if (fs.statSync(file.abs).size > DOC_MAX_BYTES) continue;
-      doc = JSON.parse(fs.readFileSync(file.abs, 'utf8'));
-    } catch { continue; }
-    if (doc?.schema !== schema || !accept(doc)) continue;
-    if (!best || String(doc.at ?? '') >= String(best.doc.at ?? '')) best = { doc, file: attachedNameOf(file) };
+export function captureGateBinding(placements, { at, revision = (root) => revParse(root, 'HEAD') } = {}) {
+  if (!Array.isArray(placements) || !placements.length) throw new Error('the admitted job has no resolved target placement');
+  const targets = [];
+  for (const place of placements) {
+    if (place.unresolved || !place.base || !place.path) throw new Error('the job has an unresolved target placement');
+    const root = path.resolve(place.base), owned = normRel(place.path);
+    if (!owned || path.isAbsolute(owned) || owned === '..' || owned.startsWith('../')) throw new Error('the job has an invalid owned path');
+    let target = targets.find((row) => sameResolvedPath(row.root, root));
+    if (!target) {
+      const head = revision(root);
+      if (!/^[0-9a-f]{40,64}$/.test(String(head ?? ''))) throw new Error(`the target Git baseline is unavailable: ${root}`);
+      target = { root, head, owned: [] }; targets.push(target);
+    }
+    if (!target.owned.includes(owned)) target.owned.push(owned);
   }
-  return best;
+  for (const target of targets) target.owned.sort();
+  return { at, targets };
 }
 
 /**
  * What the attached gate JSON and READ digest say, as a settle judgment {status, code, detail, findings[]}. `kinds` is
  * [{path, slot}] of the gate's changed files as the runtime resolved them.
  */
-export function judgeLoop({ gate, digest, kinds, doc = loadOpGate(), gateBases = [] }) {
+export function judgeLoop({ gate, digest, kinds, doc = loadOpGate(), gateBases = [], current = false, snapshot = null, expectedRead = null }) {
   if (!gate || gate.schema !== GATE_SCHEMA)
     return { status: 'missing', code: 'op-gate-proof-missing', detail: `no gate JSON (schema ${GATE_SCHEMA}) is attached to the report: run starci gate run --changed ... --out gate.json and attach it`, findings: [] };
   // In a workflow worktree the gate must measure against a checkpoint the op's side has not moved since
@@ -85,9 +90,32 @@ export function judgeLoop({ gate, digest, kinds, doc = loadOpGate(), gateBases =
     const listed = fresh.slice(0, FINDINGS_LISTED).map((f) => `${f.path ?? '-'}${f.line ? `:${f.line}` : ''} ${f.engine}/${f.rule} ${oneLine(f.message, 160)}`);
     return { status: 'red', code: 'op-gate-new-findings', detail: `${gate.counts?.new ?? fresh.length} new finding(s) over base ${String(gate.base ?? '').slice(0, 12)}; first: ${listed[0] ?? `exit ${gate.exit}`}`, findings: listed };
   }
-  const read = judgeReadDigest(digest, kinds, doc);
+  if (current) {
+    const unavailable = (detail) => ({ status: 'unavailable', code: 'op-gate-tool-failed', detail, findings: [] });
+    if (!snapshot || !Array.isArray(gate.inputs) || !Array.isArray(gate.changed))
+      return unavailable('the gate has no independently bound current input snapshot');
+    if (typeof gate.root !== 'string' || !/^[0-9a-f]{40,64}$/.test(String(gate.head ?? '')) || !sameResolvedPath(gate.root, snapshot.root)
+      || gate.base !== snapshot.base || !isAncestor(snapshot.root, gate.head, snapshot.head))
+      return unavailable('the gate belongs to another target, base or unrelated HEAD; rerun CHECK');
+    const inputs = new Map();
+    for (const file of gate.inputs) {
+      if (typeof file?.path !== 'string' || (file.sha256 !== null && !/^[0-9a-f]{64}$/.test(String(file.sha256 ?? ''))) || inputs.has(file.path))
+        return unavailable('the gate input list contains a missing, malformed or repeated entry');
+      inputs.set(file.path, file.sha256);
+    }
+    const changed = new Set(gate.changed);
+    for (const file of snapshot.inputs) {
+      if (!inputs.has(file.path) || inputs.get(file.path) !== file.sha256 || (file.sha256 !== null && !changed.has(file.path)))
+        return unavailable(`the gate omitted or no longer matches owned input ${file.path}; rerun CHECK`);
+    }
+    if (digest && (!Number.isFinite(Date.parse(gate.at)) || !Number.isFinite(Date.parse(digest.at)) || Date.parse(digest.at) > Date.parse(gate.at)))
+      return unavailable('READ and CHECK do not have an ordered recorded attempt');
+  }
+  let read;
+  try { read = judgeReadDigest(digest, kinds, doc, { root: snapshot?.root, expected: expectedRead }); }
+  catch (error) { read = { status: 'no-pattern', detail: `required READ input could not be verified: ${String(error?.message ?? error)}`, uncovered: [] }; }
   if (read.status === 'missing') return { status: 'missing', code: 'op-read-digest-missing', detail: `${read.detail}: the op skipped READ (starci gate read --touch ... --out read-digest.json)`, findings: [] };
-  if (read.status === 'no-pattern') return { status: 'red', code: 'op-read-digest-no-pattern', detail: read.detail, findings: read.uncovered.map((u) => `${u.path ?? '-'} ${u.slot ?? 'unknown kind'} owes one of ${u.owed.join(', ') || 'knowledge/patterns/**'}`) };
+  if (read.status === 'no-pattern') return { status: 'red', code: 'op-read-digest-no-pattern', detail: read.detail, findings: read.uncovered.map((u) => `${u.path ?? '-'} ${u.slot ?? 'unknown kind'} owes ${u.owed.join(', ') || 'knowledge/patterns/**'}`) };
   return { status: 'pass', code: null, detail: null, findings: [] };
 }
 
@@ -96,19 +124,71 @@ const enforcesLoop = (op, doc = loadOpGate()) => loopOps(doc).has(op);
 
 /**
  * The judgment of a job's files: {op, judged, gateFile, digestFile} - null when the op is not held to the loop. `roots` are the
- * job's placement roots: the kinds are resolved in the gate's root when it is one of them (else the first root).
+ * job's placement roots. A current binding independently resolves every admitted owned delta, including files absent
+ * from the submitted list. Missing target/ownership custody refuses. Non-app code keeps its declared checkers.
  */
-export async function judgeJobLoop({ op, files, roots = [], doc = loadOpGate(), gateBases = [] }) {
-  if (!enforcesLoop(op, doc)) return null;
-  const gate = readAttached(files, GATE_SCHEMA, (g) => !isDocGate(g));
-  const digest = readAttached(files, DIGEST_SCHEMA);
-  let kinds = [];
-  if (gate?.doc?.changed?.length) {
-    const known = roots.map((r) => path.resolve(r));
-    const gateRoot = gate.doc.root && known.some((r) => r.toLowerCase() === path.resolve(gate.doc.root).toLowerCase()) ? path.resolve(gate.doc.root) : known[0] ?? (gate.doc.root ? path.resolve(gate.doc.root) : null);
-    kinds = gateRoot && fs.existsSync(gateRoot) ? await kindsOf(gateRoot, gate.doc.changed) : gate.doc.changed.map((p) => ({ path: p, slot: null }));
+export async function judgeJobLoop({ op, files, roots = [], doc = loadOpGate(), gateBases = [], binding = null, mode = null,
+  readDigest = buildReadDigest, kindResolver = kindsOf }) {
+  if (!binding || (!Object.hasOwn(binding, 'at') && !Object.hasOwn(binding, 'targets')))
+    return { op, judged: { status: 'missing', code: 'op-gate-proof-missing', detail: 'the admission has no recorded target/ownership baseline', findings: [] }, gateFile: null, digestFile: null };
+  {
+    const unavailable = (detail) => ({ op, judged: { status: 'unavailable', code: 'op-gate-tool-failed', detail, findings: [] }, gateFile: null, digestFile: null });
+    const placements = binding.placements ?? [], targets = binding.targets;
+    if (!Number.isFinite(binding.at) || !Array.isArray(targets) || !targets.length || !placements.length || placements.some((p) => p.unresolved || !p.base))
+      return unavailable('the admitted job has no complete target/ownership baseline');
+    const known = [...new Set(placements.map((p) => path.resolve(p.base)))];
+    if (targets.length !== known.length || targets.some((row, i) => targets.slice(0, i).some((prior) => sameResolvedPath(prior.root, row.root))))
+      return unavailable('the admitted target list does not match the persisted placements');
+    const judgments = [];
+    for (const root of known) {
+      try {
+        const target = targets.find((row) => sameResolvedPath(row.root, root));
+        const owned = [...new Set(placements.filter((p) => sameResolvedPath(p.base, root)).map((p) => normRel(p.path)))].sort();
+        if (!target?.head || JSON.stringify(target.owned) !== JSON.stringify(owned))
+          throw new Error('the admitted baseline or owned paths differ from the job placement');
+        const gate = readAttached(files, GATE_SCHEMA, (g) => !isDocGate(g) && typeof g.root === 'string' && sameResolvedPath(g.root, root));
+        const digest = readAttached(files, DIGEST_SCHEMA, (d) => typeof d.root === 'string' && sameResolvedPath(d.root, root));
+        if (gate && (!Number.isFinite(Date.parse(gate.doc.at)) || Date.parse(gate.doc.at) < binding.at || Date.parse(gate.doc.at) > Date.now()))
+          throw new Error('CHECK is not from the current admitted attempt');
+        if (digest && (!Number.isFinite(Date.parse(digest.doc.at)) || Date.parse(digest.doc.at) < binding.at))
+          throw new Error('READ is not from the current admitted attempt');
+        const base = gateBases.includes(gate?.doc.base) ? gate.doc.base : target.head;
+        const snapshot = gateInputSnapshot(root, base, gate?.doc.changed ?? [], owned);
+        const source = snapshot.inputs.filter((file) => /\.(?:[cm]?[jt]sx?)$/i.test(file.path));
+        // Conditional writers inherit the app loop only for executable files the app's slot owner maps to its profiles.
+        // Drawings, runtime/infra scripts and Markdown code fences keep their declared mechanism/checker profiles.
+        const sourceKinds = source.length ? await kindResolver(root, source.map((file) => file.path)) : [];
+        let declaredApp = false;
+        try { declaredApp = JSON.parse(fs.readFileSync(locateDeclaration(root).file, 'utf8')).kind === APP_SCOPE; } catch { /* no app declaration: use the declared non-app profile */ }
+        const producedProfile = proofEntriesOf(op, { mode, doc }).some(({ proof }) => proof === 'produced-lint');
+        const appCode = sourceKinds.some((kind) => SIDES.includes(String(kind.slot ?? '').split('.')[0])
+          || String(kind.slot ?? '').startsWith('app.') || (declaredApp && !kind.slot && !producedProfile));
+        if (source.length && !appCode) {
+          // Document and code gates share a schema; the declared docs profile cannot measure a new executable source file.
+          // The selected op-proof judge still owns its verdict; profile selection grants no fresh-input claim.
+          const executable = new Set([LINT_SCHEMA, GATE_SCHEMA, TEST_WORLD_RUN_SCHEMA, UNIT_RUN_SCHEMA, RELEASE_PROOF_SCHEMA]);
+          const selected = proofEntriesOf(op, { mode, doc }).filter(({ proof }) => executable.has(doc.proofs?.[proof]?.schema) && !isDocGate(doc.proofs?.[proof]));
+          if (!selected.length) return { op, judged: { status: 'missing', code: 'op-gate-proof-missing',
+            detail: `REF-VERIFY-1: no applicable executable checker proof is declared for ${source.map((file) => file.path).join(', ')}; document checks or a Markdown code fence do not measure these files`, findings: [] }, gateFile: null, digestFile: null };
+          const expectedRead = await readDigest({ root, touch: snapshot.inputs.map((file) => file.path), doc });
+          const read = judgeReadDigest(digest?.doc, expectedRead.slotMap, doc, { current: true, root, expected: expectedRead });
+          if (read.status !== 'pass') return { op, judged: { status: read.status === 'missing' ? 'missing' : 'red',
+            code: read.status === 'missing' ? 'op-read-digest-missing' : 'op-read-digest-no-pattern', detail: read.detail, findings: [] }, gateFile: null, digestFile: digest?.file ?? null };
+          continue;
+        }
+        if (!enforcesLoop(op, doc) && !appCode) continue;
+        const expectedRead = await readDigest({ root, touch: snapshot.inputs.map((file) => file.path), doc });
+        const kinds = expectedRead.slotMap.map(({ path: file, slot }) => ({ path: file, slot }));
+        const judged = judgeLoop({ gate: gate?.doc ?? null, digest: digest?.doc ?? null, kinds, doc,
+          gateBases, current: true, snapshot, expectedRead });
+        const judgment = { op, judged, gateFile: gate?.file ?? null, digestFile: digest?.file ?? null };
+        if (judged.status !== 'pass') return judgment;
+        judgments.push(judgment);
+      } catch (error) { return unavailable(`the current owned slice could not be bound: ${String(error?.message ?? error)}`); }
+    }
+    return judgments.length ? { op, judged: judgments[0].judged,
+      gateFile: judgments.map((j) => j.gateFile).join(' + '), digestFile: judgments.map((j) => j.digestFile).join(' + ') } : null;
   }
-  return { op, judged: judgeLoop({ gate: gate?.doc ?? null, digest: digest?.doc ?? null, kinds, doc, gateBases }), gateFile: gate?.file ?? null, digestFile: digest?.file ?? null };
 }
 
 /** Record the judgment on the attempt as the runtime check op-gate. Each call adds one check run; the latest decides. */
@@ -130,208 +210,4 @@ export function loopRefusalText(op, judged, jobId) {
     : judged.code?.startsWith('op-read-digest') ? 'READ before coding: run starci gate read over the touched files, read what it lists and attach read-digest.json.'
     : 'Run starci gate run over the change and attach its gate.json.';
   return `settle REFUSED for ${jobId} (${op}): ${judged.code} - ${judged.detail}; the job stays reported. ${next}`;
-}
-
-// ---- mechanism proofs (op-gate.yaml proofs/opProofs, contract change op-mechanism-proofs) ----
-
-const pass = () => ({ status: 'pass', code: null, detail: null, findings: [] });
-const refused = ({ status, code }, detail, findings = []) => ({ status, code, detail, findings: findings.slice(0, FINDINGS_LISTED) });
-const listed = (rows) => rows.map((f) => `${f.path ?? '-'}${f.line ? `:${f.line}` : ''} ${f.rule ?? f.engine ?? ''} ${oneLine(f.message, 200)}`.trim());
-const isDocGate = (doc) => doc?.profile === DOC_PROFILE;
-const nameOfDefect = (d) => oneLine(d?.id ?? d?.title ?? JSON.stringify(d), 160);
-
-/** The proof entries an op owes for this dispatch ([{proof, projects}]): op-gate.yaml opProofs, a `modes` entry kept only for its modes. */
-function proofEntriesOf(op, { mode = null, doc = loadOpGate() } = {}) {
-  const entries = doc.opProofs?.[op] ?? [];
-  return entries.map((e) => (typeof e === 'string' ? { proof: e, modes: null, projects: [] } : { proof: String(e.proof), modes: e.modes ?? null, projects: e.projects ?? [] }))
-    .filter((e) => !e.modes || !mode || e.modes.includes(mode)).map(({ proof, projects }) => ({ proof, projects }));
-}
-/** The proof ids an op owes for this dispatch. */
-export const proofsOf = (op, opts = {}) => proofEntriesOf(op, opts).map((e) => e.proof);
-
-/** Every JSON document of `schema` among a job's files, newest first ([{doc, file}]). */
-function readAllAttached(files, schema) {
-  const out = [];
-  for (const file of files ?? []) {
-    const one = readAttached([file], schema);
-    if (one) out.push(one);
-  }
-  return out.sort((a, b) => String(b.doc.at ?? '').localeCompare(String(a.doc.at ?? '')));
-}
-
-/**
- * The test-world judgment over every attached summary: each required project has a summary (the newest of that project is
- * judged), and every other attached summary is judged too, so a red contract run beside a green integration run still refuses.
- */
-export function judgeTestWorlds(summaries, projects = []) {
-  const newest = new Map();
-  for (const s of summaries) if (s?.schema === TEST_WORLD_RUN_SCHEMA && !newest.has(s.project)) newest.set(s.project, s);
-  const missing = projects.filter((p) => !newest.has(p));
-  if (!newest.size || missing.length) return refused({ status: 'missing', code: 'op-test-world-proof-missing' }, `no test-world run summary (schema ${TEST_WORLD_RUN_SCHEMA}) of project ${(missing.length ? missing : projects).join(', ') || 'any'} is attached: run starci gate test-world --root <app> --project ${(missing[0] ?? projects[0] ?? 'e2e')} --out test-world-run.json`);
-  for (const project of [...projects, ...[...newest.keys()].filter((p) => !projects.includes(p))]) {
-    const judged = judgeTestWorld(newest.get(project));
-    if (judged.status !== 'pass') return judged;
-  }
-  return pass();
-}
-
-export function judgeKnowledgeRead(digest) {
-  const read = judgeKnowledgeDigest(digest);
-  if (read.status === 'missing') return refused({ status: 'missing', code: 'op-read-digest-missing' }, `${read.detail}: the op decided or authored without READ (starci gate read --root <app> [--touch <records>] --knowledge <knowledge files> --out read-digest.json)`);
-  if (read.status !== 'pass') return refused({ status: 'red', code: 'op-read-digest-no-knowledge' }, read.detail);
-  return pass();
-}
-
-export function judgeDocGate(gate) {
-  if (!gate || gate.schema !== GATE_SCHEMA || !isDocGate(gate)) return refused({ status: 'missing', code: 'op-doc-gate-missing' }, `no document gate (schema ${GATE_SCHEMA}, profile ${DOC_PROFILE}) is attached: run starci gate run --scope docs [--tree <app>/.starciwork] --out doc-gate.json`);
-  if (gate.exit === GATE_EXIT.toolFailed || (gate.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-doc-gate-tool-failed' }, `a document check could not run: ${oneLine((gate.errors ?? []).join('; ') || `exit ${gate.exit}`)}`, (gate.errors ?? []).map(String));
-  const findings = Array.isArray(gate.findings) ? gate.findings : [];
-  if (gate.exit !== GATE_EXIT.clean || findings.length) return refused({ status: 'red', code: 'op-doc-gate-red' }, `${findings.length} document finding(s); first: ${listed(findings)[0] ?? `exit ${gate.exit}`}`, listed(findings));
-  return pass();
-}
-
-export function judgeTestWorld(summary) {
-  if (!summary || summary.schema !== TEST_WORLD_RUN_SCHEMA) return refused({ status: 'missing', code: 'op-test-world-proof-missing' }, `no test-world run summary (schema ${TEST_WORLD_RUN_SCHEMA}) is attached: run starci gate test-world --root <app> --project e2e|integration --out test-world-run.json`);
-  // The runtime re-derives the findings from the recorded harness and specs: a summary with its findings list emptied still fails.
-  const findings = testWorldFindings(summary);
-  if (findings.length) return refused({ status: 'red', code: 'op-test-world-hand-rolled' }, `${findings.length} test-world finding(s); first: ${listed(findings)[0]}`, listed(findings));
-  const run = summary.run;
-  if (!run || run.error || run.exit !== 0 || !(run.total > 0) || run.failed > 0 || run.skipped > 0)
-    return refused({ status: 'red', code: 'op-test-world-run-red' }, run ? `the ${summary.project} run is not green: exit ${run.exit}, ${run.total} test(s), ${run.failed} failed, ${run.skipped} skipped${run.error ? ` (${oneLine(run.error, 200)})` : ''}` : 'the summary records no run',
-      (run?.failures ?? []).map((f) => `${f.file} ${f.test}: ${oneLine(f.message, 160)}`));
-  return pass();
-}
-
-export function judgeUnitRun(summary) {
-  if (!summary || summary.schema !== UNIT_RUN_SCHEMA) return refused({ status: 'missing', code: 'op-unit-proof-missing' }, `no unit run summary (schema ${UNIT_RUN_SCHEMA}) is attached: run starci gate unit --root <app> --out unit-run.json`);
-  const run = summary.run;
-  if (!run || run.error || run.failed > 0 || !(run.total > 0))
-    return refused({ status: 'red', code: 'op-unit-run-red' }, run ? `the unit run is not green: exit ${run.exit}, ${run.total} test(s), ${run.failed} failed${run.error ? ` (${oneLine(run.error, 200)})` : ''}` : 'the summary records no run',
-      (run?.failures ?? []).map((f) => `${f.file} ${f.test}: ${oneLine(f.message, 160)}`));
-  const findings = unitFindings(summary);
-  const coverage = findings.filter((f) => f.rule === 'coverage-below' || f.rule === 'spec-missing');
-  if (coverage.length) return refused({ status: 'red', code: 'op-unit-coverage-below' }, `${coverage.length} service(s) below 100 or without a spec; first: ${listed(coverage)[0]}`, listed(coverage));
-  const kit = findings.filter((f) => f.rule === 'kit');
-  if (kit.length) return refused({ status: 'red', code: 'op-unit-kit-violation' }, `${kit.length} service spec finding(s) off the kit; first: ${listed(kit)[0]}`, listed(kit));
-  if (run.exit !== 0) return refused({ status: 'red', code: 'op-unit-run-red' }, `the unit run exited ${run.exit}`);
-  return pass();
-}
-
-/** A lint judgment over the findings `relevant` keeps (the security codes, or the fe/ side). */
-export function judgeLint(report, relevant, what) {
-  if (!report || report.schema !== LINT_SCHEMA) return refused({ status: 'missing', code: 'op-lint-proof-missing' }, `no starci app lint report (schema ${LINT_SCHEMA}) is attached: run starci app lint --format json at the app root and attach lint.json`);
-  if ((report.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-lint-tool-failed' }, `starci app lint could not run: ${oneLine(report.errors.join('; '))}`, report.errors.map(String));
-  const findings = (report.findings ?? []).filter(relevant);
-  if (findings.length) return refused({ status: 'red', code: 'op-lint-findings' }, `${findings.length} ${what} finding(s); first: ${listed(findings)[0]}`, listed(findings));
-  return pass();
-}
-
-const ruleName = (rule) => String(rule ?? '').split('/').pop();
-/** Whether a lint finding is one of the security canon: its code in securityCodes or its rule in securityRules. */
-export const securityRelevant = (doc = loadOpGate()) => {
-  const codes = new Set(doc.securityCodes ?? []);
-  const rules = new Set(doc.securityRules ?? []);
-  return (f) => codes.has(f.code) || rules.has(ruleName(f.rule));
-};
-export const feRelevant = (f) => String(f.path ?? '').replace(/\\/g, '/').startsWith('fe/');
-
-const posixOf = (p) => String(p ?? '').replace(/\\/g, '/');
-/**
- * The security verdict: the lint ran, and every security canon finding it reports is carried in the op's own findings
- * (starci/security-findings@1 {findings: [{rule, code, path, line, severity, reachability}]}) by path and by code or rule. A
- * security verdict may carry findings - they go to a separate repair - but it may never drop one the canon reported.
- */
-export function judgeSecurityLint(report, findingsDoc, relevant) {
-  const ran = judgeLint(report, () => false, 'security');
-  if (ran.status !== 'pass') return ran;
-  if (!findingsDoc || findingsDoc.schema !== SECURITY_FINDINGS_SCHEMA || !Array.isArray(findingsDoc.findings))
-    return refused({ status: 'missing', code: 'op-security-findings-missing' }, `no typed security findings (schema ${SECURITY_FINDINGS_SCHEMA}, findings[] by rule, empty when there are none) are attached beside lint.json`);
-  const carried = findingsDoc.findings.map((f) => ({ path: posixOf(f?.path), code: f?.code ?? null, rule: ruleName(f?.rule) }));
-  const dropped = (report.findings ?? []).filter(relevant).filter((f) => {
-    const p = posixOf(f.path);
-    return !carried.some((c) => c.path === p && ((f.code && c.code === f.code) || (c.rule && c.rule === ruleName(f.rule))));
-  });
-  if (dropped.length) return refused({ status: 'red', code: 'op-security-finding-unreported' }, `${dropped.length} security canon finding(s) of the lint are missing from the report's findings; first: ${listed(dropped)[0]}`, listed(dropped));
-  return pass();
-}
-
-export function judgeReviewGate(gate) {
-  if (!gate || gate.schema !== GATE_SCHEMA || isDocGate(gate)) return refused({ status: 'missing', code: 'op-gate-proof-missing' }, `no gate JSON (schema ${GATE_SCHEMA}) over the reviewed range is attached: run starci gate run --root <app> --base <first reviewed commit>^ --out gate.json`);
-  if (gate.exit === GATE_EXIT.toolFailed || (gate.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-gate-tool-failed' }, `the gate could not run a tool: ${oneLine((gate.errors ?? []).join('; ') || `exit ${gate.exit}`)}`, (gate.errors ?? []).map(String));
-  const fresh = Array.isArray(gate.findings) ? gate.findings : [];
-  if (gate.exit !== GATE_EXIT.clean || Number(gate.counts?.new ?? fresh.length) > 0)
-    return refused({ status: 'red', code: 'op-gate-new-findings' }, `the reviewed range has ${gate.counts?.new ?? fresh.length} new finding(s) over ${String(gate.base ?? '').slice(0, 12)}: a review cannot pass it`, listed(fresh));
-  return pass();
-}
-
-export function judgeReviewDefects(doc) {
-  if (!doc || doc.schema !== REVIEW_DEFECTS_SCHEMA || !Array.isArray(doc.defects)) return refused({ status: 'missing', code: 'op-review-defects-missing' }, `no defect classification (schema ${REVIEW_DEFECTS_SCHEMA}, defects[], empty when the review found none) is attached`);
-  const unclassified = doc.defects.filter((d) => !DEFECT_CLASS_VALUES.includes(d?.class));
-  if (unclassified.length) return refused({ status: 'red', code: 'op-review-defect-unclassified' }, `${unclassified.length} defect(s) not classified business or non-business; first: ${nameOfDefect(unclassified[0])}`, unclassified.map(nameOfDefect));
-  const filled = (v) => typeof v === 'string' && v.trim().length > 0;
-  const uncaught = doc.defects.filter((d) => d.class === 'non-business' && !filled(d.caughtBy) && !filled(d.missingCheck?.check));
-  if (uncaught.length) return refused({ status: 'red', code: 'op-review-missing-check-unrecorded' }, `${uncaught.length} non-business defect(s) that no check caught carry no missingCheck for .claude; first: ${nameOfDefect(uncaught[0])}`, uncaught.map(nameOfDefect));
-  return pass();
-}
-
-export function judgeRelease(proof) {
-  if (!proof || proof.schema !== RELEASE_PROOF_SCHEMA || !Array.isArray(proof.steps)) return refused({ status: 'missing', code: 'op-release-proof-missing' }, `no release proof (schema ${RELEASE_PROOF_SCHEMA}) is attached: run starci release proof --repo <repo> --base <range start>^ --out release-proof.json`);
-  const byId = new Map(proof.steps.map((s) => [s?.id, s]));
-  const skipped = RELEASE_STEPS.filter((id) => !byId.has(id) || byId.get(id)?.status === STEP_STATUS.skipped);
-  if (skipped.length) return refused({ status: 'red', code: 'op-release-step-skipped' }, `release step(s) missing or skipped: ${skipped.join(', ')}`, skipped.map((id) => `${id} ${oneLine(byId.get(id)?.detail ?? 'not run', 200)}`));
-  const red = RELEASE_STEPS.filter((id) => byId.get(id)?.status !== STEP_STATUS.pass);
-  if (red.length) return refused({ status: 'red', code: 'op-release-step-red' }, `release step(s) not green: ${red.map((id) => `${id} (${byId.get(id)?.status})`).join(', ')}`, red.map((id) => `${id} ${oneLine(byId.get(id)?.detail, 200)}`));
-  return pass();
-}
-
-/** The judgment of one proof over a job's files. */
-function judgeProof(proof, files, doc = loadOpGate(), { projects = [] } = {}) {
-  const read = (schema, accept) => readAttached(files, schema, accept)?.doc ?? null;
-  switch (proof) {
-    case 'read-knowledge': return judgeKnowledgeRead(read(DIGEST_SCHEMA));
-    case 'doc-gate': return judgeDocGate(read(GATE_SCHEMA, isDocGate));
-    case 'test-world': return judgeTestWorlds(readAllAttached(files, TEST_WORLD_RUN_SCHEMA).map((a) => a.doc), projects);
-    case 'unit-kit': return judgeUnitRun(read(UNIT_RUN_SCHEMA));
-    case 'security-lint': return judgeSecurityLint(read(LINT_SCHEMA), read(SECURITY_FINDINGS_SCHEMA), securityRelevant(doc));
-    case 'fe-lint': return judgeLint(read(LINT_SCHEMA), feRelevant, 'fe/');
-    case 'produced-lint': return judgeLint(read(LINT_SCHEMA), () => true, 'produced-file');
-    case 'review-gate': return judgeReviewGate(read(GATE_SCHEMA, (g) => !isDocGate(g)));
-    case 'review-defects': return judgeReviewDefects(read(REVIEW_DEFECTS_SCHEMA));
-    case 'release': return judgeRelease(read(RELEASE_PROOF_SCHEMA));
-    default: throw new Error(`knowledge/op-gate.yaml opProofs names an unknown proof ${proof}`);
-  }
-}
-
-/**
- * The proof judgment of a job: {op, proofs[], proof, judged} - judged is the first refusal in proof order, else a pass; null when
- * the op owes no proof for this mode.
- */
-export function judgeJobProofs({ op, files, mode = null, doc = loadOpGate() }) {
-  const entries = proofEntriesOf(op, { mode, doc });
-  if (!entries.length) return null;
-  const owed = entries.map((e) => e.proof);
-  for (const { proof, projects } of entries) {
-    const judged = judgeProof(proof, files, doc, { projects });
-    if (judged.status !== 'pass') return { op, proofs: owed, proof, judged };
-  }
-  return { op, proofs: owed, proof: null, judged: pass() };
-}
-
-/** Record the proof judgment on the attempt as the runtime check op-proof. Each call adds one check run; the latest decides. */
-export function recordProofJudgment(ledger, { attemptId, judgment, now = Date.now() }) {
-  const { judged } = judgment;
-  const green = judged.status === 'pass';
-  const evidence = green ? `the mechanism proofs hold: ${judgment.proofs.join(', ')}` : oneLine(`${judgment.proof}: ${judged.code}: ${judged.detail}`);
-  ledger.transaction(() => recordCheck(ledger.db, { attemptId, name: OP_PROOF_CHECK, phase: 'verify', runner: 'settler', authority: 'runtime',
-    command: `op-proof settle over ${judgment.proofs.join(', ')} (knowledge/op-gate.yaml opProofs)`, exitCode: green ? 0 : 1,
-    summary: { codes: judged.code ? [judged.code] : [], evidence, failing: judged.findings, status: judged.status,
-      entry: { name: OP_PROOF_CHECK, exitCode: green ? 0 : 1, codes: judged.code ? [judged.code] : [], evidence } }, now }));
-  return { checkName: OP_PROOF_CHECK, green, status: judged.status, code: judged.code, evidence };
-}
-
-/** What `starci kernel settle` prints when it refuses a done a mechanism proof does not allow. */
-export function proofRefusalText(op, judgment, jobId, doc = loadOpGate()) {
-  const { judged, proof } = judgment;
-  const script = doc.proofs?.[proof]?.script;
-  return `settle REFUSED for ${jobId} (${op}): ${judged.code} - ${judged.detail}; the job stays reported. The ${proof} proof is mandatory for ${op} (knowledge/op-gate.yaml opProofs): ${script ? `run ${script}, ` : ''}fix what it reports and attach its document, or settle blocked or failed with these findings; never done.`;
 }

@@ -8,13 +8,15 @@ import { handoverGateOf } from '../handover.mjs';
 import { closeWorkflowDecisions } from '../../machine/decisions.mjs';
 import { CHECKPOINT_EVENTS, finishWorkflow } from '../workflow-checkpoint.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
+import { withWorkflowLock } from '../../goal/workflow-lock.mjs';
 
 export default {
   verb: 'finish',
   required: ['workflow'],
   kernelOnly: true,
   usageInCore: true,
-  run({ ledger, args, emit, internals }) {
+  run({ ledger, args, repo, emit, internals }) {
+    return withWorkflowLock({ db: ledger.db, ledger, env: process.env }, { workflowId: args.workflow }, (locked) => {
     const { FINAL_SETTLED } = internals;
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
@@ -34,11 +36,21 @@ export default {
   // A workflow is done when the owner approved its handover: a handover-approved
   // event newer than the last business settle (scripts/kernel/handover.mjs
   // handoverGateOf). An archived workflow is the one existing way out.
+  // An accepted revision must be planned, never silently disposed by finish.
+  const pendingRevisions = db.prepare("SELECT inbox_id,payload_json FROM inbox WHERE workflow_id=? AND kind='goal-revision' AND status='pending' ORDER BY inbox_id").all(workflowId);
+  if (!already && wf.archived_at == null && pendingRevisions.length) throw Object.assign(new Error(`workflow ${workflowId} still has an unapplied goal revision`), {
+    code: 'handover-not-approved', pendingRevisions: pendingRevisions.map(row => row.inbox_id),
+  });
   const handoverGate = already ? null : handoverGateOf(db, workflowId);
   if (handoverGate && !handoverGate.ok) {
     throw Object.assign(new Error(`workflow ${workflowId} cannot finish: ${handoverGate.reason}; run handover.review as the final leg and let the owner approve it (starci kernel status handover)`), {
       code: 'handover-not-approved', approvedSeq: handoverGate.approvedSeq ?? null, lastBusinessSettleSeq: handoverGate.lastBusinessSettleSeq ?? null,
     });
+  }
+  if (handoverGate?.via === 'handover-approved') {
+    const approvedJob = db.prepare('SELECT * FROM jobs WHERE job_id=? AND workflow_id=?').get(handoverGate.approval.jobId, workflowId);
+    if (!approvedJob) throw Object.assign(new Error('the handover approval has no bound job'), { code: 'handover-not-approved' });
+    internals.handoverProofGate(db, approvedJob, repo);
   }
   const handoverFinish = handoverGate ? { via: handoverGate.via, approvedSeq: handoverGate.approvedSeq ?? null, answeredBy: handoverGate.approval?.answeredBy ?? null } : null;
 
@@ -46,7 +58,7 @@ export default {
   // the merge guard, review.verify of the exact head, the rebase, main fast-forwarded and pushed, the worktree marked
   // release-pending (part A's GC removes it and the workflow branch; the finish runs inside it and never removes it). A refusal keeps
   // the workflow running; the finish runs again once its cause is fixed.
-  const wfCtx = { db, ledger, env: process.env };
+  const wfCtx = locked;
   const land = !already && workflowWorktreeOf(wfCtx, workflowId) ? finishWorkflow(wfCtx, { workflowId }) : null;
   if (land && !land.ok) {
     throw Object.assign(new Error(`workflow ${workflowId} cannot finish: ${land.refusal.code} at ${land.refusal.step} - ${land.refusal.detail}`), {
@@ -91,5 +103,6 @@ export default {
   emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; decisions closed: ${decisionsClosed.length}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
   closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:finish` });
 
+    });
   },
 };

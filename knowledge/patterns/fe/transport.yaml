@@ -71,7 +71,7 @@ rules:
         write: 'if (response.status === 401 || response.status === 403) return { kind: "refused", status: response.status, code }'
       - id: case-3
         when: A block consumes it
-        write: '`toSlot(outcome)` maps ok to data, refused to isForbidden and the rest to isError, and SlotView renders it.'
+        write: '`toSlot(outcome)` maps ok to data, a refused 401 to unauthorized, a refused 403 to forbidden and the rest to isError; `SlotView` follows the family state-recipes. The required data-layer session check still navigates a session refusal to sign-in.'
     verification:
       automated:
         - FE_HTTP_STATUS_COLLAPSE

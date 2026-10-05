@@ -12,6 +12,12 @@ import path from 'node:path';
 import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 
+/**
+ * Publishes an operation's worker_done for its own Task and Dispatch after the caller commits its report.
+ * from and dispatchCapability belong to the dispatched pane; Orca addresses the Dispatch's Run mailbox.
+ * The request identity uses dispatchId and worker_done so a lost receipt is reconciled under the same identity.
+ * Rejects an unsupported outcome by throwing. Host receipts expose outcome, request and refusal detail; ok requires an accepted zero-exit result.
+ */
 export function send({ taskId, dispatchId, from, outcome, reportPath = null, subject = null, dispatchCapability = null }) {
   if (!['succeeded', 'failed'].includes(outcome)) throw new Error(`worker_done --outcome must be succeeded|failed, got '${outcome}'`);
   const r = orcaCall('send', {

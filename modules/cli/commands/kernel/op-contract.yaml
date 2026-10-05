@@ -40,8 +40,7 @@ reads: the contracts row for the job's {workflow_id,op_id,attempt} — the rende
   dispatch wrote
 writes: nothing — pure read of the worker's dispatch authority
 returns: "the stored markdown on stdout; with --json: {ok:true, workflowId, op, attempt, dispatchId,
-  markdown, context, createdAt, admission:{admittedAt, source, withheld, runtimeSha, digest,
-  laterChanges, advisoryChecks, advisoryCodes}}"
+  markdown, context, createdAt, admission:{admittedAt, source, runtimeSha, digest}}"
 dispatchInFlight: dispatch used to commit the contract row only with status running, after the
   preamble was sent and the model attested; a worker whose first action is op-contract landed in
   that window and read contract-missing for a row the Kernel read seconds later (a product Modules
@@ -50,13 +49,7 @@ dispatchInFlight: dispatch used to commit the contract row only with status runn
   job goes running; removed again when the launch is refused after that point). As belt-and-braces,
   with --job, while the job is still leased and its row is absent (a managed worker-start launch),
   op-contract re-reads once a second for up to 120 s before refusing contract-missing
-admission: "--json also returns admission {admittedAt, source:recorded|contract-row, runtimeSha,
-  digest, laterChanges[], advisoryChecks[], advisoryCodes[]}: the contract version dispatch admitted
-  this attempt under (context.contract, scripts/machine/contract-version.mjs; a leg dispatched
-  before versions were recorded is admitted at its row's created_at) and what contract changes
-  landed after it (modules/kernel/contract-changes/). The leg is judged against its admitted
-  contract: those checks and codes are suspects for it, never refusals, and a check script takes the
-  admission (shell-conformance --admitted-at <admittedAt> --op <op>)"
+admission: "--json returns the actual filed admission {admittedAt, source:recorded|contract-row, runtimeSha, digest}. It preserves the dispatched attempt's immutable selected inputs and proof context. Current source checks are mandatory; the capture never authorizes a dated waiver or fabricates new proof."
 refuses:
   - contract-missing: no contracts row for the job's attempt — the job was never dispatched
   - bad-attempt: --attempt is not a positive integer

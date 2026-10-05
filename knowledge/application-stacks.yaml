@@ -63,8 +63,9 @@ guidance:
   - id: STACK-SECRETS
     requirement: |
       Keep encrypted artifacts and public recipient metadata versioned. Every project's envelopes are
-      encrypted to the one shared master age recipient; the shared master identity
-      (~/.starci/master.identity) decrypts every project's custody. Store that identity outside Git/images/ciphertext bundle; specify owner, secure import, backup,
+      encrypted to the one shared master age recipient; shared host identity custody follows
+      docs/host-secrets.md. Store that identity outside Git/images/ciphertext bundle; specify
+      owner, secure import, backup,
       recovery and rotation. Existing ciphertext with a missing key must fail, never trigger
       replacement generation. Use reviewed SOPS/age or a declared custody adapter. Generate
       locally owned secrets with a cryptographic RNG and the consumer's format; separate dev

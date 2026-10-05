@@ -25,17 +25,18 @@
 // Blobs are archived but never deleted here: the blob GC (mark and sweep over every ledger) owns their lifetime.
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
+import {sha256,sha256File} from '../../engine/digest.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { JOB_STATUSES, deleteWorkflowRows, eventsHead, ledgerFileFor, openLedger, recordPurge } from '../../engine/db/ledger.mjs';
 import { zipWrite } from '../api/fs/zip-write.mjs';
-import { zipRead } from '../api/fs/zip-read.mjs';
+import { zipVisit } from '../api/fs/zip-visit.mjs';
+import { zipLimits } from '../api/fs/zip-limits.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
 const USAGE = 'Internal entry: spawned by scripts/housekeeping/hk-ledger.mjs; not invoked directly.\nargs: --repo <repo> --workflow <id> [--archive-root <dir>] [--apply --approved-by <who> --approval-ref <ref>] [--json]';
 const PURGE_MANIFEST_SCHEMA = 'starci/workflow-archive@1';
+const ZIP_RESOURCE_LIMITS = Object.freeze(zipLimits());
 const LIVE = new Set([...JOB_STATUSES.dispatchable, ...JOB_STATUSES.fenced]);
-const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, '');
 const refuse = (code, message) => Object.assign(new Error(message), { code });
 
@@ -63,6 +64,42 @@ function evidenceFiles(db, repo, workflowId) {
 
 function purgeRow(db, workflowId) { return db.prepare('SELECT * FROM workflow_purges WHERE workflow_id=?').get(workflowId) ?? null; }
 
+/** Exact row bytes used for both publication and the final writer-locked comparison. */
+function workflowEntries(db, workflowId) {
+  const entries=[];let total=0;
+  for(const table of ['workflows',...workflowTables(db).filter(t=>t!=='workflows')]){
+    const lines=[];let bytes=0;
+    for(const row of db.prepare(`SELECT * FROM ${table} WHERE workflow_id=? ORDER BY rowid`).iterate(workflowId)){
+      const line=JSON.stringify(row,(key,value)=>value instanceof Uint8Array?{base64:Buffer.from(value).toString('base64')}:value)+'\n';bytes+=Buffer.byteLength(line);
+      if(bytes>ZIP_RESOURCE_LIMITS.maxEntryBytes)throw refuse('zip-limit',`ledger/${table}.ndjson exceeds the supported archive entry budget; workflow rows remain`);
+      lines.push(line);
+    }
+    if((total+=bytes)>ZIP_RESOURCE_LIMITS.maxTotalBytes)throw refuse('zip-limit','workflow row archive exceeds supported total byte budget; rows remain');
+    entries.push({name:`ledger/${table}.ndjson`,data:lines.join('')});
+  }
+  return entries;
+}
+
+/** A verified archive is reusable only while its entire workflow projection is still current. */
+function assertCurrentArchive(db, root, workflowId) {
+  const wf=db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
+  const live=db.prepare('SELECT status FROM jobs WHERE workflow_id=?').all(workflowId).filter(job=>LIVE.has(job.status));
+  if(!wf||(wf.phase!=='finished'&&wf.archived_at==null)||live.length)throw refuse('purge-refused',`${workflowId} is no longer ended and quiescent; workflow rows remain`);
+  const row=purgeRow(db,workflowId);let manifest=null;
+  const checked=zipVisit(row.archive_path,entry=>{if(entry.name==='manifest.json')manifest=JSON.parse(entry.data.toString('utf8'));});
+  const manifestEntry=checked.entries.find(entry=>entry.name==='manifest.json');
+  if(!row.verified_at||checked.sha256!==row.archive_sha256||checked.bytes!==row.archive_bytes||!checked.entries.every(entry=>entry.crcOk)||manifestEntry?.sha256!==row.manifest_sha256||manifest?.schema!==PURGE_MANIFEST_SCHEMA||manifest.workflowId!==workflowId||manifest.repo!==root||!Array.isArray(manifest.entries))
+    throw refuse('archive-verify-failed',`${row.archive_path}: verified archive identity does not read back; workflow rows remain`);
+  const archived=new Map(manifest.entries.map(entry=>[entry.name,entry]));
+  const current=workflowEntries(db,workflowId).map(entry=>({name:entry.name,sha256:sha256(entry.data),bytes:Buffer.byteLength(entry.data)}));
+  const evidence=evidenceFiles(db,root,workflowId);
+  for(const file of evidence.files)current.push({name:`files/${file.rel}`,sha256:sha256File(file.abs),bytes:file.bytes});
+  const counts=rowCounts(db,workflowId),head=eventsHead(db,workflowId);
+  if(manifest.eventsHead!==head||manifest.eventsHead!==row.events_head||JSON.stringify(manifest.counts)!==JSON.stringify(counts)||JSON.stringify(manifest.counts)!==row.counts_json||JSON.stringify(manifest.missingFiles)!==JSON.stringify(evidence.missing)||archived.size!==manifest.entries.length||current.length!==archived.size||current.some(entry=>{const saved=archived.get(entry.name),actual=checked.entries.find(item=>item.name===entry.name);return !saved||!actual||saved.sha256!==actual.sha256||saved.bytes!==actual.bytes||entry.sha256!==saved.sha256||entry.bytes!==saved.bytes;})||checked.entries.length!==archived.size+1)
+    throw refuse('archive-verify-failed',`${workflowId}: workflow changed after archive verification; current rows and archive are retained`);
+}
+
+
 /** Plan (and with `apply`, run) the purge of one finished workflow. */
 export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = null, approvalRef = null, archiveRoot = archiveRootOf(), date = today(), now = Date.now }) {
   const root = path.resolve(repo);
@@ -88,19 +125,17 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
 
     // 2-3. Archive and verify (skipped only when an earlier run already verified this archive and it still matches).
     let row = purgeRow(db, workflowId);
-    const stillGood = row.verified_at && fs.existsSync(row.archive_path) && sha256(fs.readFileSync(row.archive_path)) === row.archive_sha256;
+    let stillGood=false;
+    if(row.verified_at&&fs.existsSync(row.archive_path))try{const checked=zipVisit(row.archive_path,()=>{});stillGood=checked.sha256===row.archive_sha256&&checked.entries.every(e=>e.crcOk)&&checked.entries.find(e=>e.name==='manifest.json')?.sha256===row.manifest_sha256;}catch{/* retain rows; rebuild through the normal verified path */}
     if (!stillGood) {
       const head = eventsHead(db, workflowId);
-      const entries = [{ name: 'ledger/workflows.ndjson', data: `${JSON.stringify(wf)}\n` }];
-      for (const t of workflowTables(db).filter((t) => t !== 'workflows')) {
-        const rows = db.prepare(`SELECT * FROM ${t} WHERE workflow_id=?`).all(workflowId);
-        entries.push({ name: `ledger/${t}.ndjson`, data: rows.map((r) => JSON.stringify(r, (k, v) => (v instanceof Uint8Array ? { base64: Buffer.from(v).toString('base64') } : v))).join('\n') + (rows.length ? '\n' : '') });
-      }
+      const entries = workflowEntries(db,workflowId);
       for (const f of files) entries.push({ name: `files/${f.rel}`, file: f.abs });
       fs.mkdirSync(path.dirname(archive), { recursive: true });
       const tmp = `${archive}.partial-${process.pid}`;
       // The manifest needs every entry's sha256 first: hash, then write the ZIP with the manifest as its last entry.
-      const described = entries.map((e) => { const data = e.data != null ? Buffer.from(e.data) : fs.readFileSync(e.file); return { name: e.name, sha256: sha256(data), bytes: data.length }; });
+      let total=0;if(entries.length+1>ZIP_RESOURCE_LIMITS.maxEntries)throw refuse('zip-limit','workflow archive has too many entries; workflow rows remain');
+      const described = entries.map(e=>{const bytes=e.data!=null?Buffer.byteLength(e.data):fs.statSync(e.file).size;if(bytes>ZIP_RESOURCE_LIMITS.maxEntryBytes||(total+=bytes)>ZIP_RESOURCE_LIMITS.maxTotalBytes)throw refuse('zip-limit','workflow archive exceeds the supported byte budget; workflow rows remain');return {name:e.name,sha256:e.data!=null?sha256(e.data):sha256File(e.file),bytes};});
       const manifest = { schema: PURGE_MANIFEST_SCHEMA, workflowId, repo: root, product: path.basename(root), createdAt: new Date(now()).toISOString(),
         approvedBy, approvalRef, eventsHead: head, counts, entries: described, missingFiles: missing };
       const manifestBuf = Buffer.from(JSON.stringify(manifest, null, 2));
@@ -108,20 +143,19 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
       zipWrite(tmp, [...entries, { name: 'manifest.json', data: manifestBuf }]);
       fs.renameSync(tmp, archive);
       // Verify from disk: every entry inflates, its CRC holds and its sha256 is the manifest's.
-      const read = zipRead(archive);
-      const byName = new Map(read.map((e) => [e.name, e]));
+      const checked = zipVisit(archive,()=>{});
+      const byName = new Map(checked.entries.map((e) => [e.name, e]));
       const onDisk = byName.get('manifest.json');
-      if (!onDisk || sha256(onDisk.data) !== sha256(manifestBuf)) throw refuse('archive-verify-failed', `${archive}: manifest.json does not read back`);
-      const bad = described.filter((d) => { const e = byName.get(d.name); return !e || !e.crcOk || sha256(e.data) !== d.sha256 || e.data.length !== d.bytes; });
-      if (bad.length || read.length !== described.length + 1) throw refuse('archive-verify-failed', `${archive}: ${bad.length} entr(ies) do not match the manifest (${bad.slice(0, 5).map((b) => b.name).join(', ')})`);
-      const archiveBuf = fs.readFileSync(archive);
-      ledger.transaction(() => recordPurge(db, { workflowId, state: 'archived', archivePath: archive, archiveSha256: sha256(archiveBuf), archiveBytes: archiveBuf.length,
+      if (!onDisk || !onDisk.crcOk || onDisk.sha256 !== sha256(manifestBuf)) throw refuse('archive-verify-failed', `${archive}: manifest.json does not read back`);
+      const bad = described.filter((d) => { const e = byName.get(d.name); return !e || !e.crcOk || e.sha256 !== d.sha256 || e.bytes !== d.bytes; });
+      if (bad.length || checked.entries.length !== described.length + 1) throw refuse('archive-verify-failed', `${archive}: ${bad.length} entr(ies) do not match the manifest (${bad.slice(0, 5).map((b) => b.name).join(', ')})`);
+      ledger.transaction(() => recordPurge(db, { workflowId, state: 'archived', archivePath: archive, archiveSha256: checked.sha256, archiveBytes: checked.bytes,
         manifestSha256: sha256(manifestBuf), eventsHead: head, countsJson: JSON.stringify(counts), archivedAt: now(), verifiedAt: now() }));
       row = purgeRow(db, workflowId);
     }
 
     // 4. Delete: the guard opens for this workflow only while its row says 'deleting'.
-    const deleted = ledger.transaction(() => { recordPurge(db, { workflowId, state: 'deleting' }); return deleteWorkflowRows(db, { workflowId }); });
+    const deleted = ledger.transaction(() => { assertCurrentArchive(db,root,workflowId); recordPurge(db, { workflowId, state: 'deleting' }); return deleteWorkflowRows(db, { workflowId }); });
     ledger.transaction(() => recordPurge(db, { workflowId, state: 'purged', purgedAt: now(), countsJson: JSON.stringify({ archived: counts, deleted }) }));
     return { ...plan, ok: true, dryRun: false, deleted, purge: purgeRow(db, workflowId) };
   } finally { ledger.close(); }

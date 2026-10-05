@@ -90,7 +90,7 @@ function milestoneOwned(ctx, { workflowId, opId }) {
  * rule but the repo-owner fallback) is refused workflow-work-record-not-owner: the owner changes it, peers see it when
  * the owner lands. ctx.ownerOf replaces the ledger's ownership in a spec.
  */
-export function requireWorkOwner(ctx, { workflowId, opId }) {
+function requireWorkOwner(ctx, { workflowId, opId }) {
   const rec = recordOf(ctx, workflowId);
   const records = splitChanges(rec.path, leasesOf(ctx, { workflowId, opId })).mine.filter((f) => f.startsWith('.starciwork/'));
   if (!records.length) return;

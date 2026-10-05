@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
+import { declarationEdition } from '../hfs/edition-slots.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GATE_FILE = 'knowledge/sonar-gate.yaml';
@@ -19,15 +20,31 @@ export const GATE_SCHEMA = 'starci/sonar-gate@1';
 export const SCAN_SCHEMA_PREFIX = 'starci/sonar-local-scan@';
 
 let cache = null;
-/** The gate document. Read once per process; `file` bypasses the cache (a spec's own gate). */
-export function loadSonarGate({ base = root, file = null } = {}) {
-  if (!file && cache && cache.base === base) return cache.gate;
-  const gate = parseYaml(fs.readFileSync(file ?? path.join(base, GATE_FILE), 'utf8'));
+/** Read the canonical gate for the repository's declared edition; cache the document, never a selected app view. */
+export function loadSonarGate({ base = root, file = null, cwd = null } = {}) {
+  const gate = !file && cache?.base === base ? cache.gate : parseYaml(fs.readFileSync(file ?? path.join(base, GATE_FILE), 'utf8'));
   if (gate?.schema !== GATE_SCHEMA) throw new Error(`${file ?? GATE_FILE}: schema must be ${GATE_SCHEMA}`);
   for (const key of ['gate', 'newCode', 'overall', 'enforcedOps'])
     if (gate[key] == null) throw new Error(`${file ?? GATE_FILE}: ${key} is required`);
+  // Full coverage is a required policy descriptor; only the selected canonical lite block may omit it.
+  for (const area of ['newCode', 'overall']) {
+    const coverage = gate[area].coverage;
+    if (!coverage || typeof coverage.metric !== 'string' || !coverage.metric.trim() || !Number.isFinite(coverage.minPercent) || coverage.minPercent < 0 || coverage.minPercent > 100)
+      throw new Error(`${file ?? GATE_FILE}: ${area}.coverage requires a metric and minPercent from 0 to 100`);
+  }
   if (!file) cache = { base, gate };
-  return gate;
+  if (!cwd) return gate;
+  let declaration;
+  try { declaration = JSON.parse(fs.readFileSync(path.join(cwd, 'hfs.json'), 'utf8')); }
+  catch (error) { if (error?.code === 'ENOENT') return gate; throw error; }
+  const { edition, valid } = declarationEdition({}, declaration);
+  if (!valid) throw new Error('hfs.json declares an unsupported Sonar edition');
+  if (edition === 'full') return gate;
+  if (declaration.kind !== 'app') throw new Error('hfs.json lite Sonar policy requires an app declaration');
+  const selected = gate[edition];
+  for (const key of ['gate', 'newCode', 'overall'])
+    if (selected?.[key] == null) throw new Error(`${file ?? GATE_FILE}: ${edition}.${key} is required`);
+  return { ...gate, ...selected };
 }
 
 /**
@@ -40,13 +57,13 @@ export function serverConditions(gate) {
   const n = gate.newCode;
   const o = gate.overall;
   const out = [
-    { metric: n.coverage.metric, op: 'LT', error: String(n.coverage.minPercent) },
+    ...(n.coverage ? [{ metric: n.coverage.metric, op: 'LT', error: String(n.coverage.minPercent) }] : []),
     { metric: n.duplication.metric, op: 'GT', error: String(n.duplication.maxPercent) },
     { metric: n.hotspots.metric, op: 'LT', error: String(n.hotspots.minReviewedPercent) },
   ];
   for (const severity of n.issues.blockingSeverities) out.push({ metric: n.issues.metrics[severity], op: 'GT', error: String(n.issues.max) });
   out.push(
-    { metric: o.coverage.metric, op: 'LT', error: String(o.coverage.minPercent) },
+    ...(o.coverage ? [{ metric: o.coverage.metric, op: 'LT', error: String(o.coverage.minPercent) }] : []),
     { metric: o.issues.metric, op: 'GT', error: String(o.issues.max) },
     { metric: o.hotspots.metric, op: 'LT', error: String(o.hotspots.minReviewedPercent) },
     { metric: o.duplication.metric, op: 'GT', error: String(o.duplication.maxPercent) },
@@ -67,7 +84,7 @@ export function thresholdsOf(gate) {
     blockingSeverities: [...n.issues.blockingSeverities],
     blockingIssuesMax: n.issues.max,
     unreviewedHotspotsMax: n.hotspots.unreviewedMax,
-    coverageMinPercent: gate.overall.coverage.minPercent,
+    coverageMinPercent: gate.overall.coverage?.minPercent ?? null,
   };
 }
 
@@ -129,10 +146,10 @@ export function judgeCoverage(files, { scope = coverageScopeOf(), minPercent }) 
 
 /**
  * The dashboard verdict of a whole project (`sonar-local dashboard`): `measures` the project's measures by metric key
- * (bugs, code_smells, vulnerabilities, security_hotspots, security_hotspots_reviewed, coverage), `files` the per-file
+ * (bugs, code_smells, vulnerabilities, security_hotspots, security_hotspots_reviewed, duplicated_lines_density, coverage), `files` the per-file
  * coverage of the project (as judgeCoverage takes it), `scope` its coverage scope (coverageScopeOf). It fails unless every
  * issue type of `overall.issues.types` is at `overall.issues.max`, every hotspot is reviewed (a project with no hotspot has
- * none to review), and every service is at the coverage threshold. Returns {verdict, numbers, coverage, failures}.
+ * none to review), duplication meets its declared maximum, and required coverage meets its per-file threshold. Returns {verdict, numbers, coverage, failures}.
  */
 export function judgeDashboard({ measures = {}, files = [], scope = coverageScopeOf() }, gate) {
   const o = gate.overall;
@@ -148,13 +165,19 @@ export function judgeDashboard({ measures = {}, files = [], scope = coverageScop
   numbers[o.hotspots.metric] = reviewed === null && numbers.security_hotspots === 0 ? 100 : reviewed;
   if (numbers[o.hotspots.metric] === null) failures.push(`${o.hotspots.metric} is not measured`);
   else if (numbers[o.hotspots.metric] < o.hotspots.minReviewedPercent) failures.push(`${o.hotspots.metric} ${numbers[o.hotspots.metric]}% < ${o.hotspots.minReviewedPercent}%`);
-  numbers[o.coverage.metric] = asNumber(measures[o.coverage.metric]);
-  const coverage = judgeCoverage(files, { scope, minPercent: o.coverage.minPercent });
-  if (!coverage.applied) failures.push("the repository declares no sonar.coverage.exclusions: the services' coverage cannot be judged");
-  else if (!coverage.files.length) failures.push('no file of the coverage scope is measured: the scope is empty or the lcov report was not imported');
-  failures.push(...coverage.failures);
-  if (numbers[o.coverage.metric] === null) failures.push(`${o.coverage.metric} is not measured`);
-  else if (numbers[o.coverage.metric] < o.coverage.minPercent) failures.push(`${o.coverage.metric} ${numbers[o.coverage.metric]}% < ${o.coverage.minPercent}%`);
+  numbers[o.duplication.metric] = asNumber(measures[o.duplication.metric]);
+  if (numbers[o.duplication.metric] === null) failures.push(`${o.duplication.metric} is not measured`);
+  else if (numbers[o.duplication.metric] > o.duplication.maxPercent) failures.push(`${o.duplication.metric} ${numbers[o.duplication.metric]}% > ${o.duplication.maxPercent}%`);
+  const coverage = o.coverage ? judgeCoverage(files, { scope, minPercent: o.coverage.minPercent })
+    : { applied: false, status: 'not-required', files: [], failures: [], note: 'the declared Sonar policy has no coverage condition' };
+  if (o.coverage) {
+    numbers[o.coverage.metric] = asNumber(measures[o.coverage.metric]);
+    if (!coverage.applied) failures.push("the repository declares no sonar.coverage.exclusions: the services' coverage cannot be judged");
+    else if (!coverage.files.length) failures.push('no file of the coverage scope is measured: the scope is empty or the lcov report was not imported');
+    failures.push(...coverage.failures);
+    if (numbers[o.coverage.metric] === null) failures.push(`${o.coverage.metric} is not measured`);
+    else if (numbers[o.coverage.metric] < o.coverage.minPercent) failures.push(`${o.coverage.metric} ${numbers[o.coverage.metric]}% < ${o.coverage.minPercent}%`);
+  }
   return { verdict: failures.length ? 'fail' : 'pass', numbers, coverage, failures };
 }
 

@@ -20,6 +20,9 @@ import { loadConfig } from '../../engine/config.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { jobDisplayNameOf, workflowNameOf } from '../lib/display-names.mjs';
 import { sleep } from '../lib/sleep.mjs';
+import { OWNED_PROCESS_SCHEMA } from '../lib/process-identity.mjs';
+import { stopOwnedProcess } from '../api/process/stop-owned-process.mjs';
+import { canonicalJSON } from '../../engine/canonical-json.mjs';
 
 
 /** When this host last booted (ms). */
@@ -80,6 +83,8 @@ function heldBy(name, env, extra = {}) {
  */
 function takeLock(m, name) {
   return m.transaction(() => {
+    const custody = recordOf(m.connectorOf(name));
+    if (connectorManagerBlocked(custody)) return { ok: false, holder: custody, reason: 'connector-child-custody-unreconciled' };
     const cur = m.hostLock(name);
     if (cur && cur.state === 'held' && cur.holder_pid !== process.pid && liveRow(cur)) return { ok: false, holder: lockRecord(cur) };
     if (cur && cur.state !== 'released' && cur.holder_pid !== process.pid) m.releaseHostLock({ name, force: true });
@@ -94,9 +99,10 @@ function takeLock(m, name) {
  * holder is dead or from an earlier boot is stale and taken over. Returns {ok:true, release} or {ok:false, holder}.
  */
 export function claimManager(name, { current = null, env = process.env } = {}) {
+  if (connectorManagerBlocked(current)) return { ok: false, holder: current, reason: 'connector-child-custody-unreconciled' };
   if (current && current.pid !== process.pid && recordAlive(current)) return { ok: false, holder: current };
   const got = withMachine((m) => takeLock(m, name), { env });
-  return got.ok ? heldBy(name, env) : { ok: false, holder: got.holder ?? null };
+  return got.ok ? heldBy(name, env) : { ok: false, holder: got.holder ?? null, ...(got.reason ? { reason: got.reason } : {}) };
 }
 
 /**
@@ -110,6 +116,7 @@ export function claimOrTakeOver(name, { from = null, env = process.env } = {}) {
   const fromPid = Number(from);
   if (Number.isInteger(fromPid) && fromPid > 0) {
     const took = withMachine((m) => m.transaction(() => {
+      if (connectorManagerBlocked(recordOf(m.connectorOf(name)))) return false;
       const cur = m.hostLock(name);
       if (!cur || cur.state === 'released' || cur.holder_pid !== fromPid) return false;
       const at = m.now();
@@ -185,6 +192,8 @@ export function withHostMutex(name, fn, { env = process.env, waitMs = 10_000, st
   return run;
 }
 
+export const CONNECTOR_LAUNCH_ENV = 'STARCI_CONNECTOR_LAUNCH';
+
 /* ------------------------------------------------------------ connectors rows (machine.sqlite connectors) */
 
 const recordOf = (row) => (row ? { ...(row.config ?? {}), pid: row.pid ?? row.config?.pid ?? null, port: row.port ?? row.config?.port ?? null,
@@ -201,11 +210,105 @@ export const connectorStates = (prefix, env = process.env) => readMachine((m) =>
  * Write one connector row: only the fields given change (`config` and `cursor` replace their column whole). Returns
  * true. No secret ever goes here (the token lives in .starcistacks / the secrets file).
  */
-export const writeConnectorState = (name, { kind, state, pid, port, publicUrl, config, cursor } = {}, env = process.env) => withMachine((m) => {
+export const writeConnectorState = (name, { kind, state, pid, port, publicUrl, config, cursor } = {}, env = process.env) => withMachine((m) => m.transaction(() => {
+  const current = recordOf(m.connectorOf(name));
+  if (connectorChildUnresolved(current) && config !== undefined
+      && (config.childLaunchNonce !== current.childLaunchNonce || canonicalJSON(config.childIdentity ?? null) !== canonicalJSON(current.childIdentity ?? null)
+        || canonicalJSON(config.childCapture ?? null) !== canonicalJSON(current.childCapture ?? null)
+        || closedProcess(current.stopReceipt?.manager, current.processIdentity)
+          && canonicalJSON(config.stopReceipt?.manager ?? null) !== canonicalJSON(current.stopReceipt.manager)))
+    throw Error('connector-child-custody-unreconciled');
   const row = { name, updated_at: m.now(), kind, state, pid, port, public_url: publicUrl, config_json: config, cursor_json: cursor };
   m.upsert('connectors', Object.fromEntries(Object.entries(row).filter(([, v]) => v !== undefined)), ['name']);
   return true;
-}, { env });
+}), { env });
+
+
+const sameIdentity = (a, b) => Boolean(a && b) && canonicalJSON(a) === canonicalJSON(b);
+const sameConnectorOwner = (a, b) => Boolean(a && b) && a.pid === b.pid && a.source === b.source && sameIdentity(a.processIdentity, b.processIdentity);
+const closedProcess = (receipt, identity) => receipt?.schema === OWNED_PROCESS_SCHEMA && receipt.ok === true
+  && ['gone', 'stopped'].includes(receipt.outcome) && receipt.proof === 'process-handle-signaled'
+  && receipt.pid === identity?.pid && sameIdentity(receipt.identity, identity);
+const closedChild = (receipt, record) => Boolean(receipt && record.childLaunchNonce && receipt.launchNonce === record.childLaunchNonce)
+  && (closedProcess(receipt, record.childIdentity) || receipt.ok === true && receipt.proof === 'owned-child-process-exit'
+    && receipt.pid === record.childIdentity?.pid || receipt.ok === true && receipt.proof === 'owned-child-spawn-failed' && receipt.pid == null);
+
+/** Original child custody remains owed even when its manager or lock no longer lives. */
+export const connectorChildUnresolved = (record) => Boolean(record && (record.childLaunchNonce || record.childPid || record.childIdentity))
+  && !closedChild(record.childClosure, record) && !closedChild(record.stopReceipt?.child, record);
+export const connectorManagerBlocked = (record) => connectorChildUnresolved(record)
+  && (closedProcess(record.stopReceipt?.manager, record.processIdentity) || !recordAlive(record));
+
+const retainConnectorClosure = (name, expected, receipt, env) => withMachine((m) => m.transaction(() => {
+  const row = m.connectorOf(name), current = recordOf(row);
+  if (!sameConnectorOwner(current, expected) || canonicalJSON(current) !== canonicalJSON(expected)) return false;
+  m.upsert('connectors', { name, updated_at: m.now(), config_json: { ...(row.config ?? {}), stopReceipt: receipt } }, ['name']);
+  return true;
+}), { env });
+
+/** Close only recorded process objects; unknown effects retain the original row and a concurrent new owner is never overwritten. */
+export function stopConnector(name, { source, child = false, env = process.env, read = connectorState, stop = stopOwnedProcess,
+  retain = (expected, receipt) => retainConnectorClosure(name, expected, receipt, env),
+  commit = (expected, receipt) => withMachine((m) => m.transaction(() => {
+    const row = m.connectorOf(name), current = recordOf(row);
+    if (!sameConnectorOwner(current, expected) || canonicalJSON(current) !== canonicalJSON(expected)) return false;
+    const stoppedAt = new Date(m.now()).toISOString();
+    m.upsert('connectors', { name, state: 'stopped', pid: null, public_url: null, updated_at: m.now(),
+      config_json: { ...(row.config ?? {}), pid: null, childPid: null, connected: false, stoppedAt, stopReceipt: receipt } }, ['name']);
+    return true;
+  }), { env }) } = {}) {
+  let original;
+  try { original = read(name, env); } catch (error) { return { ok: false, effectState: 'unknown', reason: 'connector-state-unreadable', error: String(error?.message ?? error) }; }
+  if (!original) return { ok: false, effectState: 'unknown', reason: 'connector-custody-missing' };
+  if (original.source !== source) return { ok: false, effectState: 'none', reason: 'connector-source-conflict', custody: original };
+  const prior = original.stopReceipt;
+  if (original.state === 'stopped' && closedProcess(prior?.manager, original.processIdentity)
+      && (!child || closedChild(prior?.child, original)))
+    return { ok: true, already: true, effectState: 'completed', stopped: original.processIdentity.pid, receipt: prior };
+  const identity = original.processIdentity;
+  if (!identity || identity.pid !== original.pid) return { ok: false, effectState: 'none', reason: 'connector-process-custody-required', custody: original };
+  let manager;
+  if (closedProcess(prior?.manager, identity)) manager = prior.manager;
+  else { try { manager = stop(identity); } catch (error) { manager = { ok: false, error: String(error?.message ?? error) }; } }
+  if (!closedProcess(manager, identity)) return { ok: false, effectState: manager?.outcome === 'refused' ? 'none' : 'unknown',
+    reason: 'connector-manager-closure-unverified', custody: original, receipt: { manager } };
+  let current;
+  try { current = read(name, env); } catch (error) { return { ok: false, effectState: 'unknown', reason: 'connector-state-unreadable', custody: original, receipt: { manager }, error: String(error?.message ?? error) }; }
+  if (!sameConnectorOwner(current, original)) return { ok: false, effectState: 'unknown', reason: 'connector-owner-changed', custody: original, receipt: { manager } };
+  if (child) {
+    try {
+      if (retain(current, { manager, child: current.stopReceipt?.child ?? null }) !== true)
+        return { ok: false, effectState: 'unknown', reason: 'connector-stop-record-refused', custody: current, receipt: { manager } };
+      current = read(name, env);
+      if (!sameConnectorOwner(current, original)) return { ok: false, effectState: 'unknown', reason: 'connector-owner-changed', custody: original, receipt: { manager } };
+    } catch (error) { return { ok: false, effectState: 'unknown', reason: 'connector-stop-record-refused', custody: current, receipt: { manager }, error: String(error?.message ?? error) }; }
+  }
+  let childReceipt = null;
+  if (child) {
+    if (closedChild(current.stopReceipt?.child, current)) childReceipt = current.stopReceipt.child;
+    else if (!current.childPid) {
+      if (!closedChild(current.childClosure, current)) return { ok: false, effectState: 'unknown', reason: 'connector-child-custody-unverified', custody: current, receipt: { manager } };
+      childReceipt = current.childClosure;
+    } else {
+      if (!current.childIdentity || current.childIdentity.pid !== current.childPid)
+        return { ok: false, effectState: 'unknown', reason: 'connector-child-custody-unverified', custody: current, receipt: { manager } };
+      try { childReceipt = { ...stop(current.childIdentity), launchNonce: current.childLaunchNonce }; } catch (error) { childReceipt = { ok: false, error: String(error?.message ?? error) }; }
+      if (!closedProcess(childReceipt, current.childIdentity)) return { ok: false, effectState: 'unknown',
+        reason: 'connector-child-closure-unverified', custody: current, receipt: { manager, child: childReceipt } };
+    }
+  }
+  const receipt = { manager, child: childReceipt };
+  try {
+    if (child) {
+      if (retain(current, receipt) !== true) return { ok: false, effectState: 'unknown', reason: 'connector-stop-record-refused', custody: current, receipt };
+      current = read(name, env);
+      if (!sameConnectorOwner(current, original) || !closedChild(current?.stopReceipt?.child, current))
+        return { ok: false, effectState: 'unknown', reason: 'connector-owner-changed', custody: original, receipt };
+    }
+    if (commit(current, receipt) !== true) return { ok: false, effectState: 'unknown', reason: 'connector-stop-record-refused', custody: current, receipt };
+  } catch (error) { return { ok: false, effectState: 'unknown', reason: 'connector-stop-record-refused', custody: current, receipt, error: String(error?.message ?? error) }; }
+  return { ok: true, effectState: 'completed', stopped: original.pid, receipt };
+}
 
 /** One connector log line in machine_logs (actor connector, kind `<source>.<kind>`). Never throws. */
 export const connectorLog = (source, msg, { env = process.env, level = 'info', kind = 'log', data = null } = {}) =>

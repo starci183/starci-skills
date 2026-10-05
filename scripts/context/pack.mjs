@@ -29,13 +29,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { mergeOpShared, opSharedOf } from '../lib/op-shared.mjs';
+import { mergeOpShared, opSharedOf, resolveOpContract } from '../lib/op-shared.mjs';
 import { ownedRecordPaths } from '../work/record-ownership.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 import { opCli } from '../lib/cli-arg.mjs';
+import { declaredReadTokens, resolveReadReference } from './read-refs.mjs';
+import { EXAMPLE_CATALOG_FILE, exampleSourcePaths } from '../lib/example-refs.mjs';
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -70,63 +72,6 @@ const briefRelOf = op => `modules/ops/ops/${op}.yaml`;
 /** First sentence-ish of a folded yaml purpose string — the packet stays short. */
 function summarize(text, max = 160) { return clipLine(text, max); }
 
-/** A declared read path may carry several refs: `a.mjs + b/*.mjs +\n c.json`. */
-function readTokens(rawPath) {
-  return String(rawPath ?? '').split(/[+\n]/).map(s => s.trim()).filter(Boolean);
-}
-
-/**
- * Classify one declared-read token and, when it names concrete files under the
- * runtime root (or the state dir), resolve it. Returns
- *   {token, kind, resolved:[relPaths], missing:[relPaths]}
- * kinds: file | glob | state | template | prose | instance
- *   file     concrete relative path — existence checked under root
- *   glob     concrete prefix + '*' — expanded under root (bounded)
- *   state    .starciwork-relative — resolved under --state when given
- *   template carries a `<placeholder>` — resolved by the agent against the
- *            bound records (declared only)
- *   prose    free-text fragment inside a declared path (declared only)
- *   instance `N/...`, `evidence/...` — per-op-instance node/evidence paths (declared)
- */
-function resolveReadToken(token, { root, stateDir }) {
-  const rel = token.replaceAll('\\', '/');
-  if (/</.test(rel)) return { token, kind: 'template', resolved: [], missing: [] };
-  // Prose fragments ride inside declared paths ("the slice's existing
-  // regression suite and its real runner") — declared, never a missing path.
-  if (/\s/.test(rel)) return { token, kind: 'prose', resolved: [], missing: [] };
-  if (/^(N|evidence)\//.test(rel)) return { token, kind: 'instance', resolved: [], missing: [] };
-  if (rel === '.starciwork' || rel.startsWith('.starciwork/')) {
-    if (!stateDir) return { token, kind: 'state', resolved: [], missing: [] };
-    const abs = path.join(path.resolve(stateDir), rel.replace(/^\.starciwork\/?/, ''));
-    return fs.existsSync(abs)
-      ? { token, kind: 'state', resolved: [rel], missing: [] }
-      : { token, kind: 'state', resolved: [], missing: [rel] };
-  }
-  if (rel.includes('*')) {
-    // Expand a simple glob under root: walk the concrete prefix dir (skipping
-    // node_modules/dist/.next), keep matches, bound at 50.
-    const prefix = rel.split('*')[0].replace(/\/[^/]*$/, '').replace(/\/$/, '');
-    const base = prefix ? path.join(root, prefix) : root;
-    const hits = listFiles(base, 500)
-      .map(f => path.relative(root, f).replaceAll('\\', '/'))
-      .filter(f => globMatch(rel, f))
-      .slice(0, 50);
-    return hits.length
-      ? { token, kind: 'glob', resolved: hits, missing: [] }
-      : { token, kind: 'glob', resolved: [], missing: [rel] };
-  }
-  return fs.existsSync(path.join(root, rel))
-    ? { token, kind: 'file', resolved: [rel], missing: [] }
-    : { token, kind: 'file', resolved: [], missing: [rel] };
-}
-
-/** Minimal glob match: `*` matches any run of non-`/`-or-`/` chars. */
-function globMatch(pattern, rel) {
-  const rx = new RegExp(`^${pattern.split('*').map(escapeRx).join('[^]*')}$`);
-  return rx.test(rel);
-}
-const escapeRx = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 /**
  * Resolve a record list to owned paths — same ownership resolution
  * dispatch-op.mjs uses (example-ownership helpers over the .starciwork tree).
@@ -153,7 +98,7 @@ function resolveOwnedPaths(records, stateDir, preResolved) {
  */
 export function buildContext({
   op, records = [], stateDir = null, root = DEFAULT_ROOT, skillRoot = null,
-  briefDoc = null, ownedPaths = null, fileCap = FILE_CAP,
+  briefDoc = null, ownedPaths = null, fileCap = FILE_CAP, params = {}, mode, appRoot = null, allowSelect = true,
 } = {}) {
   const rt = path.resolve(skillRoot ?? root ?? DEFAULT_ROOT);
   const briefRel = briefRelOf(op);
@@ -165,20 +110,46 @@ export function buildContext({
   // `shared:` markers in the brief expand to the modules/ops/_common.yaml fragments
   // (scripts/lib/op-shared.mjs); callers that already merged see an idempotent no-op.
   briefDoc = mergeOpShared(briefDoc, opSharedOf(briefAbs));
+  const selected = resolveOpContract(briefDoc, { params, ...(mode === undefined ? {} : { mode }), allowSelect });
+  if (!selected.ok) return { op, error: selected.detail, reason: selected.reason };
+  briefDoc = selected.contract;
 
-  const missing = [];
-  const notes = [];
-  const mandatory = [];
-  const addMandatory = (rel, why) => {
-    const abs = path.join(rt, rel);
-    if (fs.existsSync(abs)) mandatory.push({ path: rel, why });
-    else missing.push(rel);
+  const missing = [], requiredMissing = [], notes = [], mandatory = [];
+  let readsTruncated = false;
+  const roots = { sourceRoot: rt, stateDir, appRoot: appRoot ?? (stateDir ? path.dirname(path.resolve(stateDir)) : null), params };
+  const addReference = (token, why, mustExist = false) => {
+    let result = resolveReadReference(token, roots);
+    // Only an explicitly declared catalog READ expands the contained current
+    // source/compiler/test union. Keep the original READ identity on every hash.
+    if (token === EXAMPLE_CATALOG_FILE && result.resolved.length === 1 && !result.missing.length) {
+      try {
+        const expanded = exampleSourcePaths(rt).map((relative) => resolveReadReference(relative, roots));
+        result = { ...result, resolved: [...result.resolved, ...expanded.flatMap((row) => row.resolved)],
+          missing: expanded.flatMap((row) => row.missing), truncated: expanded.some((row) => row.truncated) };
+      } catch (error) {
+        result = { ...result, kind: 'invalid', resolved: [], missing: [token], error: 'read-failed' };
+        notes.push(`declared catalog READ refused: ${error.message}`);
+      }
+    }
+    missing.push(...result.missing);
+    if (result.rootKind === 'source' || mustExist || result.kind === 'invalid') requiredMissing.push(...result.missing);
+    if (result.truncated) { readsTruncated = true; requiredMissing.push(`truncated:${token}`); }
+    for (const row of result.resolved) {
+      const filed = mandatory.find((entry) => entry.absolute === row.absolute);
+      if (!filed) mandatory.push({ ...row, why });
+      // One file/hash can satisfy several declarations. Retain each original
+      // READ provenance so an earlier explicit source cannot erase catalog duty.
+      else if (!filed.why.split('\n').includes(why)) filed.why += `\n${why}`;
+    }
+    return result;
   };
+  const addMandatory = (rel, why) => addReference(rel, why, true);
 
   // 1-3: the fixed spine every op reads first, in load order.
   addMandatory('CONTEXT.md', "the runtime's load order");
   addMandatory(briefRel, 'your contract — it declares your reads, writes, steps, proofs and blockers');
   addMandatory(VERDICT_CONTRACT, 'what your return must look like');
+  addMandatory('modules/ops/_common.yaml', 'the shared evidence and path contract');
 
   // 4: the brief's own reads/context declarations — concrete files join the
   // mandatory list in declared order; template/repo/instance tokens stay as
@@ -190,14 +161,10 @@ export function buildContext({
     const why = summarize(entry?.purpose?.en ?? entry?.purpose ?? '');
     const resolved = [];
     const placeholders = [];
-    for (const token of readTokens(entry?.path)) {
-      const r = resolveReadToken(token, { root: rt, stateDir });
-      if (r.resolved.length) resolved.push(...r.resolved);
-      else if (r.missing.length) missing.push(...r.missing);
-      else placeholders.push(token);
-    }
-    for (const rel of resolved) {
-      if (!mandatory.some(m => m.path === rel)) mandatory.push({ path: rel, why: `brief read [${entry.id ?? '?'}] — ${why}` });
+    for (const token of declaredReadTokens(entry?.path)) {
+      const result = addReference(token, `brief read [${entry.id ?? '?'}] — ${why}`, entry?.mustExist === true);
+      resolved.push(...result.resolved.map((row) => row.path));
+      if (!result.resolved.length && !result.missing.length) placeholders.push(token);
     }
     declaredReads.push({ id: entry?.id ?? null, path: summarize(entry?.path, 200), why, resolved, placeholders });
   }
@@ -211,9 +178,7 @@ export function buildContext({
     const list = Array.isArray(refs) ? refs : typeof refs === 'string' ? [refs] : [];
     for (const ref of list) {
       const rel = String(ref?.path ?? ref).replaceAll('\\', '/');
-      if (rel && fs.existsSync(path.join(rt, rel)) && !mandatory.some(m => m.path === rel)) {
-        mandatory.push({ path: rel, why: `brief-declared ${field} ref` });
-      }
+      if (rel) for (const token of declaredReadTokens(rel)) addReference(token, `brief-declared ${field} ref`, true);
     }
   }
 
@@ -239,8 +204,8 @@ export function buildContext({
   }
 
   return {
-    op, root: rt,
-    mandatory, declaredReads,
+    op, root: rt, mode: selected.mode,
+    mandatory, declaredReads, requiredMissing: [...new Set(requiredMissing)], readsTruncated,
     ownedPaths: owned.ownedPaths.map(({ abs, ...rest }) => rest),
     ownedFiles, truncated, missing, notes,
   };
@@ -252,7 +217,7 @@ function renderPacket(context) {
   if (context.error) return `CONTEXT PACKET — op ${context.op}\nERROR: ${context.error}`;
   const lines = [`CONTEXT PACKET — op ${context.op}`, ''];
   lines.push('MANDATORY READS — read in this order before any action:');
-  context.mandatory.forEach((m, i) => lines.push(`  ${i + 1}. ${m.path} — ${m.why}`));
+  context.mandatory.forEach((m, i) => lines.push(`  ${i + 1}. ${m.absolute ?? m.path} — ${m.why}`));
   const withPlaceholders = context.declaredReads.filter(d => d.placeholders.length);
   if (withPlaceholders.length) {
     lines.push('', 'DECLARED READS — resolve <placeholders> against your bound records/state before reading:');
@@ -280,7 +245,7 @@ function renderPacket(context) {
 export function renderPromptReads(context) {
   if (context.error) return [`MANDATORY READS: unresolved — ${context.error}`];
   const lines = ['MANDATORY READS — read in this order before any action:'];
-  context.mandatory.forEach((m, i) => lines.push(`  ${i + 1}. ${m.path} — ${m.why}`));
+  context.mandatory.forEach((m, i) => lines.push(`  ${i + 1}. ${m.absolute ?? m.path} — ${m.why}`));
   const ph = context.declaredReads.filter(d => d.placeholders.length);
   if (ph.length) {
     lines.push('  declared reads (resolve <placeholders> against bound records/state):');
@@ -289,6 +254,11 @@ export function renderPromptReads(context) {
   if (context.ownedFiles.length) {
     lines.push(`  owned files on disk: ${context.ownedFiles.length}${context.truncated ? ` (truncated at ${FILE_CAP})` : ''} — full list in the packet`);
   }
+  if (context.missing.length) {
+    lines.push('  MISSING / UNRESOLVED inputs — resolve or report before action:');
+    for (const missing of context.missing) lines.push(`    - ${missing}`);
+  }
+  if (context.readsTruncated) lines.push('  READ expansion is incomplete; execution must not proceed.');
   return lines;
 }
 

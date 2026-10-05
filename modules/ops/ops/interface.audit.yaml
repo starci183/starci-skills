@@ -7,6 +7,87 @@ goal:
     hard-check findings, a calibrated bounded visual rubric and an actionable repair route until the
     selected matrix has no actionable drift.
 params:
+  audit:
+    type: object
+    required: true
+    setBy: kernel
+    valueSchema:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - feature
+      - selectedMatrix
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: ^operation\.[a-z0-9-]+\.[a-z0-9-]+$
+        feature:
+          type: string
+          minLength: 1
+          pattern: ^[a-z0-9-]+$
+        selectedMatrix:
+          type: object
+          additionalProperties: false
+          required:
+          - cells
+          properties:
+            cells:
+              type: array
+              minItems: 1
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                - id
+                - surface
+                - route
+                - state
+                - viewport
+                - theme
+                - assertionIds
+                properties:
+                  id:
+                    type: string
+                    minLength: 1
+                    pattern: ^[a-z0-9][a-z0-9.-]*$
+                  surface:
+                    type: string
+                    minLength: 1
+                    pattern: \S
+                  route:
+                    type: string
+                    minLength: 1
+                    pattern: \S
+                  state:
+                    type: string
+                    minLength: 1
+                    pattern: \S
+                  viewport:
+                    type: string
+                    minLength: 1
+                    pattern: \S
+                  theme:
+                    type: string
+                    minLength: 1
+                    pattern: \S
+                  assertionIds:
+                    type: array
+                    minItems: 1
+                    items:
+                      type: string
+                      minLength: 1
+                      pattern: \S
+        dependencies:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            pattern: \S
+    doc:
+      en: The selected audit identity and nonempty route/state/viewport/theme cells with assertion IDs, frozen
+        in this attempt before launch; previous ledger results are optional history.
   maxRounds:
     type: integer
     default: 5
@@ -28,11 +109,12 @@ graphPolicy:
   dispatch: never
 reads:
   - id: target
-    path: packet params.audit (id operation.<feature>.<audit>, selectedMatrix) + the audit's interface_audits row (starci kernel op-contract)
+    path: params.audit
     mustExist: true
     purpose:
-      en: Read the selected audit scope - exact route/state/viewport/theme matrix, assertion IDs, dependencies -
-        from the packet, and the audit's earlier verdict and findings from its interface_audits ledger row.
+      en: Read the typed audit identity, exact matrix cells, assertion IDs and dependencies from this
+        attempt's filed params.audit. No prior interface_audits row is needed for the first audit;
+        if one exists, retain its earlier verdict and findings as history without redefining this scope.
   - id: intent
     path: .starciwork/features/<feature>/{br,fr,nfr,data,journey,decision,sds,ui}/**/index.yaml + accepted direction
       assets

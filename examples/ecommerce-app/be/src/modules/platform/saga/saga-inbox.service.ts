@@ -14,9 +14,9 @@ export class SagaInbox implements Inbox {
         @InjectClock() private readonly clock: Clock,
     ) {}
 
-    /** True for the first claim of the event, false for every later one. */
-    async claim(source: string, eventId: string): Promise<boolean> {
-        const rows: Array<object> = await this.entityManager.query(CLAIM_SAGA_EVENT, [
+    /** Claims through the caller's order transaction when supplied, otherwise through the configured order manager. */
+    async claim(source: string, eventId: string, manager?: EntityManager): Promise<boolean> {
+        const rows: Array<object> = await (manager ?? this.entityManager).query(CLAIM_SAGA_EVENT, [
             source,
             eventId,
             this.clock.now(),

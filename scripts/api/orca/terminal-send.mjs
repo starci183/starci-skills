@@ -48,6 +48,15 @@ function promptSend({ terminal, body, waitSubmit }) {
     ...(retried ? { retryRequest: retried } : {}), ...(staleIncarnation(terminal, errorCode) ? { staleIncarnation: true } : {}) };
 }
 
+/**
+ * Deliver text from textFile (UTF-8, when supplied) or text to an authorized terminal, optionally
+ * with Enter. With waitSubmit, nonempty text and Enter use the durable prompt path: submitted is
+ * true only for a recorded turn_started stage. Ordinary ok alone does not prove a turn began.
+ * Ambiguous prompt retries retain Orca's request identity; blocked Enter gets one Enter-only retry.
+ * @param {object} input - Required terminal plus text/textFile, enter, and optional waitSubmit.
+ * @returns {object} Receipt status and delivery/refusal details, including available prompt/retry facts.
+ * @throws {Error} When the text file cannot be read or the declared call inputs are invalid.
+ */
 export function terminalSend({ terminal, text, textFile, enter = true, waitSubmit = null }) {
   const body = textFile ? fs.readFileSync(textFile, 'utf8') : (text ?? '');
   if (waitSubmit && enter && body) {

@@ -272,21 +272,21 @@ test('run hands the bridge to a replacement between rounds when the runtime chan
 test('ensureTelegramBridge leaves a live bridge alone, skips when off or unregistered, and launches otherwise', (t) => {
   const home = tmp(t, 'starci-tg-ensure-');
   const env = { LOCALAPPDATA: home, STARCI_TELEGRAM_API_BASE: 'http://127.0.0.1:1' };
-  const config = withConnectors({ secretsFile: null, telegram: { enabled: true, chatId: String(OWNER) }, cloudflare: { mode: 'off' } });
+  const config = withConnectors({ telegram: { enabled: true, chatId: String(OWNER) }, cloudflare: { mode: 'off' } });
   const spawned = [];
   const spawn = (script, args) => { spawned.push([path.basename(script), ...args]); return 4321; };
-  assert.equal(ensureTelegramBridge({ env: { ...env, STARCI_CONNECTORS_OFF: '1' }, config, spawn }).skipped, 'STARCI_CONNECTORS_OFF');
-  assert.equal(ensureTelegramBridge({ env: { LOCALAPPDATA: home, NODE_TEST_CONTEXT: 'child' }, config, spawn }).skipped, 'test context', 'a spec never reaches the real Bot API');
-  assert.match(ensureTelegramBridge({ env, config, spawn }).skipped, /bot token/, 'no token: telegram is not ready');
+  assert.equal(ensureTelegramBridge({ env: { ...env, STARCI_CONNECTORS_OFF: '1' }, config, root: home, spawn }).skipped, 'STARCI_CONNECTORS_OFF');
+  assert.equal(ensureTelegramBridge({ env: { LOCALAPPDATA: home, NODE_TEST_CONTEXT: 'child' }, config, root: home, spawn }).skipped, 'test context', 'a spec never reaches the real Bot API');
+  assert.match(ensureTelegramBridge({ env, config, root: home, spawn }).skipped, /bot token/, 'no token: telegram is not ready');
   const ready = { ...env, TELEGRAM_BOT_TOKEN: TOKEN };
-  assert.equal(ensureTelegramBridge({ env: ready, config, spawn, requireRegistered: true }).skipped, 'no supervisor registered');
-  assert.deepEqual(ensureTelegramBridge({ env: ready, config, spawn, dryRun: true }), { ok: true, wouldStart: true });
-  assert.deepEqual(ensureTelegramBridge({ env: ready, config, spawn }), { ok: true, launched: 4321 });
+  assert.equal(ensureTelegramBridge({ env: ready, config, root: home, spawn, requireRegistered: true }).skipped, 'no supervisor registered');
+  assert.deepEqual(ensureTelegramBridge({ env: ready, config, root: home, spawn, dryRun: true }), { ok: true, wouldStart: true });
+  assert.deepEqual(ensureTelegramBridge({ env: ready, config, root: home, spawn }), { ok: true, launched: 4321 });
   assert.deepEqual(spawned, [['telegram-bridge.mjs', 'run']]);
   const claim = claimManager(BRIDGE_NAME, { env: ready });
-  assert.deepEqual(ensureTelegramBridge({ env: ready, config, spawn }), { ok: true, already: true, pid: process.pid });
+  assert.deepEqual(ensureTelegramBridge({ env: ready, config, root: home, spawn }), { ok: true, already: true, pid: process.pid });
   assert.equal(spawned.length, 1);
-  assert.ok(!JSON.stringify(ensureTelegramBridge({ env: ready, config: withConnectors({ secretsFile: null, telegram: { token: TOKEN } }), spawn })).includes(TOKEN));
+  assert.ok(!JSON.stringify(ensureTelegramBridge({ env: ready, config: withConnectors({ telegram: { token: TOKEN } }), root: home, spawn })).includes(TOKEN));
   claim.release();
 });
 

@@ -94,3 +94,62 @@ test("a service method that takes a delivery claims the event on the Inbox port 
         ],
     })
 })
+
+const transactionService = (body, { asynchronous = false, managerType = "EntityManager", inboxType = "Inbox", declarations = "" } = {}) =>
+    PRELUDE + '\nimport type { EntityManager } from "typeorm"\n' + declarations
+    + "\nclass C {\n    constructor(private readonly em: " + managerType + ", private readonly other: EntityManager, private readonly inbox: " + inboxType + ") {}"
+    + "\n    " + (asynchronous ? "async " : "") + "handle(m: Delivery) { " + body + " }\n    private async work(): Promise<void> {}\n}"
+
+test("delivery claims first with the actual EntityManager callback and cannot escape its duplicate refusal", () => {
+    tester.run("inbox-dedupe-required/transaction", inboxDedupeRequired, {
+        valid: [
+            {
+                name: "returned invoice transaction reads a duplicate and writes only after the bound claim", filename: SERVICE,
+                code: transactionService("return this.em.transaction(async (tx) => { if (!(await this.inbox.claim('billing', m.eventId, tx))) return await tx.query('read duplicate'); return await tx.save({ amount: m.amount }) })"),
+            },
+            {
+                name: "sole awaited payment transaction returns before work on a duplicate", filename: SERVICE,
+                code: transactionService("await this.em.transaction(async (tx) => { if (!(await this.inbox.claim('billing', m.eventId, tx))) return; await tx.save({ amount: m.amount }) })", { asynchronous: true }),
+            },
+            {
+                name: "returned awaited transaction stores its claim and immediately refuses false", filename: SERVICE,
+                code: transactionService("return await this.em.transaction(async (tx) => { const fresh = await this.inbox.claim('billing', m.eventId, tx); if (!fresh) return; await tx.save({ amount: m.amount }) })", { asynchronous: true }),
+            },
+            {
+                name: "actual isolation overload uses the second callback", filename: SERVICE,
+                code: transactionService("return this.em.transaction('SERIALIZABLE', async (tx) => { if ((await this.inbox.claim('billing', m.eventId, tx)) === false) return; await tx.save({ amount: m.amount }) })"),
+            },
+            {
+                name: "renamed typed ports and manager parameter preserve their origin and binding", filename: SERVICE,
+                code: withPrelude('import type { EntityManager as BillingManager } from "typeorm"\nclass C { constructor(private readonly database: BillingManager, private readonly seen: Inbox) {} handle(m: Delivery) { return this.database.transaction(async (unit) => { if (!(await this.seen.claim("billing", m.eventId, unit))) return; await unit.save({ amount: m.amount }) }) } }'),
+            },
+            {
+                name: "function callback selected by TypeORM uses its own parameter and a captured port", filename: SERVICE,
+                code: transactionService("return this.em.transaction(async function (tx) { if (!(await mailbox.claim('billing', m.eventId, tx))) return; await tx.save({ amount: m.amount }) })", { declarations: "declare const mailbox: Inbox" }),
+            },
+        ],
+        invalid: [
+            { name: "claim missing from selected callback", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { await tx.save({ amount: m.amount }) })"), errors: [{ messageId: "noClaim" }] },
+            { name: "claim after the first callback await", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { await tx.save({ amount: m.amount }); if (!(await this.inbox.claim('billing', m.eventId, tx))) return })"), errors: [{ messageId: "noClaim" }] },
+            { name: "synchronous callback work before claim", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { this.work(); if (!(await this.inbox.claim('billing', m.eventId, tx))) return })"), errors: [{ messageId: "noClaim" }] },
+            { name: "argument effect before the claim call", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { if (!(await this.inbox.claim(String(this.work()), m.eventId, tx))) return })"), errors: [{ messageId: "noClaim" }] },
+            { name: "same parameter reassigned while evaluating claim arguments", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { if (!(await this.inbox.claim((tx = this.other, 'billing'), m.eventId, tx))) return })"), errors: [{ messageId: "noClaim" }] },
+            { name: "claim hidden under a conditional path", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { if (m.amount > 0) { if (!(await this.inbox.claim('billing', m.eventId, tx))) return } await tx.save({ amount: m.amount }) })"), errors: [{ messageId: "noClaim" }] },
+            { name: "claim hidden in another callback", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { const later = async () => { if (!(await this.inbox.claim('billing', m.eventId, tx))) return }; await tx.save({ amount: m.amount }); await later() })"), errors: [{ messageId: "noClaim" }] },
+            { name: "TypeORM runs the first callback and ignores the convincing second one", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { await tx.save({ amount: m.amount }) }, async (tx) => { if (!(await this.inbox.claim('billing', m.eventId, tx))) return })"), errors: [{ messageId: "noClaim" }] },
+            { name: "non-inline callback is not inspected", filename: SERVICE, code: transactionService("return this.em.transaction(handler)", { declarations: "declare const handler: (tx: EntityManager) => Promise<void>" }), errors: [{ messageId: "noClaim" }] },
+            { name: "unknown isolation argument cannot choose a proof callback", filename: SERVICE, code: transactionService("return this.em.transaction('NOT-AN-ISOLATION', async (tx) => { if (!(await this.inbox.claim('billing', m.eventId, tx))) return })"), errors: [{ messageId: "noClaim" }] },
+            { name: "claim omits transaction manager", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { if (!(await this.inbox.claim('billing', m.eventId))) return; await tx.save({ amount: m.amount }) })"), errors: [{ messageId: "noClaim" }] },
+            { name: "claim uses outer shared manager", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { if (!(await this.inbox.claim('billing', m.eventId, this.em))) return; await tx.save({ amount: m.amount }) })"), errors: [{ messageId: "noClaim" }] },
+            { name: "same typed manager from another binding is not the transaction parameter", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { if (!(await this.inbox.claim('billing', m.eventId, other))) return; await tx.save({ amount: m.amount }) })", { declarations: "declare const other: EntityManager" }), errors: [{ messageId: "noClaim" }] },
+            { name: "same spelling in a nested shadow is not the selected parameter", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { { const tx = this.other; if (!(await this.inbox.claim('billing', m.eventId, tx))) return }; await tx.save({ amount: m.amount }) })"), errors: [{ messageId: "noClaim" }] },
+            { name: "lookalike Inbox cannot claim for the platform owner", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { if (!(await this.inbox.claim('billing', m.eventId, tx))) return })", { inboxType: "Lookalike" }), errors: [{ messageId: "noClaim" }] },
+            { name: "lookalike transaction receiver cannot grant a transaction", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { if (!(await this.inbox.claim('billing', m.eventId, tx))) return })", { managerType: "PretendManager", declarations: "declare class PretendManager { transaction<T>(work: (tx: EntityManager) => Promise<T>): Promise<T> }" }), errors: [{ messageId: "noClaim" }] },
+            { name: "outer awaited work before returned transaction", filename: SERVICE, code: transactionService("await this.work(); return this.em.transaction(async (tx) => { if (!(await this.inbox.claim('billing', m.eventId, tx))) return })", { asynchronous: true }), errors: [{ messageId: "noClaim" }] },
+            { name: "duplicate callback refusal cannot fall through to outer work", filename: SERVICE, code: transactionService("await this.em.transaction(async (tx) => { if (!(await this.inbox.claim('billing', m.eventId, tx))) return }); await this.work()", { asynchronous: true }), errors: [{ messageId: "noClaim" }] },
+            { name: "unawaited transaction cannot detach delivery completion", filename: SERVICE, code: transactionService("this.em.transaction(async (tx) => { if (!(await this.inbox.claim('billing', m.eventId, tx))) return })"), errors: [{ messageId: "noClaim" }] },
+            { name: "claim answer ignored in the correct transaction", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { await this.inbox.claim('billing', m.eventId, tx); await tx.save({ amount: m.amount }) })"), errors: [{ messageId: "noEarlyReturn" }] },
+            { name: "stored claim cannot run work before testing false", filename: SERVICE, code: transactionService("return this.em.transaction(async (tx) => { const fresh = await this.inbox.claim('billing', m.eventId, tx); await tx.save({ amount: m.amount }); if (!fresh) return })"), errors: [{ messageId: "noEarlyReturn" }] },
+        ],
+    })
+})

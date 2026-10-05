@@ -1,5 +1,4 @@
 // Provider receipt SQL participates in the machine writer's existing fenced transactions.
-import { hasTable } from '../../scripts/lib/sqlite.mjs';
 
 export function providerReservationMethods({ need, parse, toJson, hex }) {
   // Provider/account slots are shared by all five agent roles. A clock timeout is not exit evidence.
@@ -10,7 +9,6 @@ export function providerReservationMethods({ need, parse, toJson, hex }) {
     scope: parse(row.scope_json), estimate: parse(row.estimate_json), quota: parse(row.quota_json),
     override: parse(row.override_json), releasedAt: row.released_at, proof: parse(row.proof_json) } : null;
   function providerReservations(m, { provider = null, account = null, activeOnly = false } = {}) {
-    if (!hasTable(m.db, 'provider_reservations')) return []; // A compatible v1 reader has never held these v2 receipts.
     const where = [], args = [];
     if (provider !== null) { where.push('provider=?'); args.push(provider); }
     if (account !== null) { where.push('account=?'); args.push(account); }
@@ -18,7 +16,6 @@ export function providerReservationMethods({ need, parse, toJson, hex }) {
     return m.db.prepare(`SELECT * FROM provider_reservations${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY fence`).all(...args).map(providerReservationRow);
   }
   function providerReservationUsage(m, { provider, account = 'default' } = {}) {
-    if (!hasTable(m.db, 'provider_reservations')) return { running: null, reservations: [], observed: false };
     const reservations = providerReservations(m, { provider, account, activeOnly: true });
     return { running: reservations.length, reservations, observed: true };
   }

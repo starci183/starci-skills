@@ -3,19 +3,19 @@
 // knowledge/hfs/runtime-slots.yaml), and the owner graph has no cycle. The judge is the product one,
 // scripts/hfs/architecture/tiers.mjs checkTiers, fed the runtime's import graph: the relative specifiers of every
 // production source (read with the TypeScript AST), resolved to tracked files. Pure.
-import path from 'node:path';
 import { checkTiers } from '../architecture/tiers.mjs';
-import { relativeImports } from './source-ast.mjs';
+import { relativeImportTargets } from './source-ast.mjs';
 
 export const CODES = Object.freeze({ direction: 'RT_TIER_DIRECTION', cycle: 'ARCH_OWNER_CYCLE' });
 
 /** The import graph of the runtime sources: {resolver, profile, edges, unit} in the shape checkTiers reads. */
 function runtimeImportGraph(ctx) {
-  const edges = [];
+  const edges = [], missing = [];
   for (const { path: from } of ctx.sources) {
-    for (const ref of relativeImports(ctx.parsed(from))) {
-      const to = path.posix.normalize(path.posix.join(path.posix.dirname(from), ref.specifier));
-      if (!ctx.fileSet.has(to)) continue;
+    for (const ref of relativeImportTargets(ctx, from)) {
+      const { to } = ref;
+      if (ref.missing) missing.push({ code: CODES.direction, level: 'error', path: from, line: ref.line, column: ref.column, message: `${from}:${ref.line} imports missing internal target ${to} (${ref.specifier}): its runtime owner direction cannot be judged` });
+      if (!ref.tracked) continue;
       edges.push({ from, to, line: ref.line, column: ref.column, specifier: ref.specifier, runtime: true });
     }
   }
@@ -25,14 +25,15 @@ function runtimeImportGraph(ctx) {
     const c = ctx.resolver.classifyPath(file);
     return c.slot ? `${c.slot}:${c.root}` : null;
   };
-  return { resolver: ctx.resolver, profile: 'runtime', edges, unit };
+  return { resolver: ctx.resolver, profile: 'runtime', edges, unit, missing };
 }
 
 /** RT_TIER_DIRECTION and ARCH_OWNER_CYCLE findings of the runtime import graph. */
 export function tierFindings(ctx) {
-  const { violations } = checkTiers(runtimeImportGraph(ctx));
-  return violations.map((v) => {
+  const graph = runtimeImportGraph(ctx);
+  const { violations } = checkTiers(graph);
+  return [...graph.missing, ...violations.map((v) => {
     const code = v.ruleId === 'ARCH_OWNER_CYCLE' ? CODES.cycle : CODES.direction;
     return { code, level: 'error', path: v.path, line: v.line, message: code === CODES.direction ? `${v.path}:${v.line} ${v.message}` : `${v.path}:${v.line} ${v.message}`, ...(v.cycle ? { cycle: v.cycle } : {}) };
-  });
+  })];
 }

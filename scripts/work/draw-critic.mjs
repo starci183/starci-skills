@@ -1,7 +1,7 @@
 // draw-critic.mjs — the independent critic of a draw-loop round (owner ruling 2026-09-27: draw -> shoot -> evaluate ->
 // fix; the beauty and hierarchy judgement comes from a critic that did NOT draw it). The critic is a fresh Orca worker
 // with no drawing context, launched like every other agent through orchestration worker-start
-// (scripts/agent/lib.mjs startAgent; modules/kernel/contract-changes/draw-critic-worker-start.yaml) with the provider,
+// (scripts/agent/lib.mjs startAgent; modules/host/orca/calls.yaml) with the provider,
 // model and effort of modules/models/runtimes.yaml allocation.drawLoop.critic. Its placement (criticWorkspace) is a
 // worktree Orca creates at a commit of the empty tree, so it holds only the round's PNGs, its HTML and the rubric; its Task spec names that directory, the images
 // and the one file it may write, verdict.json (starci/draw-critique@1: every rubric check pass/fail with evidence and
@@ -301,7 +301,7 @@ async function awaitCritic({ client, runId, entry, dispatchId, terminal, taskId,
  * fake of the wrappers - runCreate, trust, workerStart, terminalRename, workerShow,
  * workerStop, workerRelease, inbox, taskUpdate, and criticWorkspace/removeCriticWorkspace for the placement); `entry` is the
  * coordinator terminal (the op's ORCA_TERMINAL_HANDLE); `placement` the criticWorkspace options (repoRoot, context);
- * `parentDispatch` the op's Dispatch the critic nests under (the depth preflight, contract change worker-depth-limit).
+ * `parentDispatch` the op's Dispatch the critic nests under (the depth preflight).
  * Returns the critique.json body (never throws): {schema, outcome, critic, rubric, verdict|null, error|null}.
  */
 export async function runCritic({ images, html, rubric, critic, orca = null, entry = readEnv('ORCA_TERMINAL_HANDLE') || null, placement = {},

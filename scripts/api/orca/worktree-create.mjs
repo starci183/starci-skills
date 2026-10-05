@@ -10,6 +10,14 @@ import { arg } from '../../lib/cli-arg.mjs';
 
 const branchOf = (ref) => (ref ? String(ref).replace(/^refs\/heads\//, '') : null);
 
+/**
+ * Create a top-level Orca worktree for a registered repository, forwarding the requested base and setup.
+ * Use the returned id/path/branch; the wrapper never guesses them or binds a runtime ownership row.
+ * createOrcaWorktree owns cap reservation and the ownership comment. A lost receipt is not blindly
+ * replayed, and a receipt without an id and path cannot establish a created tree.
+ * @param {object} input - Required repo/name and optional baseBranch, setup, and ownership comment.
+ * @returns {object} Outcome, normalized worktree identity, typed error, and host availability.
+ */
 export function worktreeCreate({ repo, name, baseBranch, setup = 'skip', comment }) {
   const r = orcaCall('worktree-create', { repo, name, 'base-branch': baseBranch, setup, 'no-parent': true, comment });
   const w = r.result?.worktree ?? null;

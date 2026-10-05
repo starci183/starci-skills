@@ -15,6 +15,13 @@ import { arg } from '../../lib/cli-arg.mjs';
 
 const PAGE_LIMIT = 100;
 
+/**
+ * Read one page of Orca worker accounting with its actual Run scope and pagination metadata.
+ * Without run, the host may scope the page to the caller's bound Run; a global consumer must verify
+ * scope.source and follow page.nextCursor unchanged. A failed page cannot establish worker absence.
+ * @param {object} [input] - Optional Run, terminal-state filter, cursor, and page limit.
+ * @returns {object} ok, worker rows, counts, scope, page, error, and hostUnavailable.
+ */
 export function workerList({ run, terminalState, cursor, limit = PAGE_LIMIT } = {}) {
   const r = orcaCall('worker-list', { run, 'terminal-state': terminalState, cursor, limit: limit == null ? undefined : String(limit) });
   const result = r.result;

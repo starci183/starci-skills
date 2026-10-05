@@ -187,3 +187,22 @@ test('every declared placeholder names a <token> its manifest uses', async () =>
   }
   assert.deepEqual([...new Set(dead)], []);
 });
+
+test('every concrete execution mode is schema-checked and checks/defaults are real', () => {
+  const op = validOp();
+  const { schema, route, ...mode } = validOp();
+  op.params = { mode: { type: 'enum', enum: ['select', 'run'], default: 'select', setBy: 'kernel', doc: { en: 'Selected mode.' } } };
+  op.policy = { executionModes: { run: mode } };
+  assert.deepEqual(checkFixture(op).findings, []);
+  for (const mutate of [
+    (value) => { value.policy.executionModes.run.steps = []; },
+    (value) => { value.policy.executionModes.run.reads.push({ ...value.policy.executionModes.run.reads[0] }); },
+    (value) => { value.policy.executionModes.run.steps[0].reads = ['undeclared']; },
+    (value) => { value.policy.executionModes.run.proofs[0].check = 'scripts/checks/no-real-check.mjs'; },
+    (value) => { value.params.count = { type: 'integer', default: 9, min: 1, max: 3, setBy: 'kernel', doc: { en: 'Bounded value.' } }; },
+    (value) => { value.policy.executionModes.run.typoPolicy = {}; },
+  ]) {
+    const invalid = structuredClone(op); mutate(invalid);
+    assert.equal(checkFixture(invalid).ok, false, 'a broken nested contract/default must refuse');
+  }
+});

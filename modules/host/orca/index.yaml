@@ -46,7 +46,7 @@ launchTrust: "The runtime, never the owner, approves Claude/Codex launch prompts
 workflowKernel:
   role: one-worker-per-workflow
   note: |-
-    The Kernel is an Orca worker (modules/kernel/contract-changes/launch-through-worker-start.yaml). start-workflow,
+    The Kernel is an Orca worker (modules/kernel/start-workflow.yaml). start-workflow,
     run from the launching terminal, creates the Kernel's entry Run (that terminal coordinates it), files the Kernel
     Task and starts it with worker-start. The Kernel's first operation creates the workflow Run from the Kernel's own
     terminal - Orca takes Run-scoped calls only from a Run's coordinator - and every operation Task/Dispatch of that

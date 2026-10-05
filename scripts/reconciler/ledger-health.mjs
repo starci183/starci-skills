@@ -1,14 +1,5 @@
 #!/usr/bin/env node
-// ledger-health.mjs — the Host controller's ledger checks (DESIGN 12.2 "ledger corrupt", 13; LANES.md Lane D item 6).
-//
-//   quickCheck(file)        PRAGMA quick_check on a read-only handle: {ok, result: ['ok'] | [problems...]}; an absent
-//                           file is {ok: false, absent: true} (not created yet: not corrupt, and never created here)
-//   backupFileOf(...)       <backupDir>/<ledgerId>-<yyyymmdd>.sqlite (local date)
-//   backupDue(...)          the nightly backup of one ledger is due: past backupHour today and no file for today
-//   backupLedger(...)       VACUUM INTO that file from a read-only handle, then keep the newest `keep` of that ledger
-//
-// A failed quick_check is the LEDGER_CORRUPT clock plus a DI for the Supervisor (controllers/host.mjs). Restore is
-// manual and owner-approved (copy a backup over the ledger with every writer stopped); nothing here restores.
+// The Host controller's read-only health probe and verified project-ledger snapshots.
 //
 // Internal entry: spawned by scripts/reconciler/controllers/host.mjs; not invoked directly.
 // Args: --check --file <ledger> [--json]
@@ -16,31 +7,39 @@
 // --backup writes a file, so the Host controller reaches it only through ctx.run (recorded, not run, in shadow).
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { isMain } from '../lib/is-main.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
+import { isCorruptError } from '../../engine/db/machine-connection.mjs';
+import { sha256File } from '../../engine/digest.mjs';
 
-// A read-only handle through the ledger module (check-db-openers); unverified so a damaged file still gets its
-// quick_check, and not query_only so VACUUM INTO can write the backup file.
-const openReadOnly = (file) => openLedgerReader(file, { verify: false, queryOnly: false });
+const openReadOnly = (file) => openLedgerReader(file, { verify: false });
+const openBackupSource = (file) => openLedgerReader(file, { queryOnly: false });
 
 /**
- * PRAGMA quick_check on a read-only handle, then a verified open: {ok, result}. An unopenable file is not ok, and a
- * file whose pages are intact but that this runtime refuses (STARCI_LEDGER_SCHEMA_REFUSED) is not ok either: the Host
- * controller reports both as LEDGER_CORRUPT. An absent file is {ok: false, absent: true}: a ledger not created yet,
- * which the Host controller does not report (nothing to restore).
+ * Check pages, runtime compatibility and an optional registry identity without creating a missing file.
  */
-export function quickCheck(file, { open = openReadOnly, verifiedOpen = (f) => openLedgerReader(f), exists = fs.existsSync } = {}) {
-  if (!exists(file)) return { ok: false, absent: true, result: ['absent'] };
+export function quickCheck(file, { open = openReadOnly, verifiedOpen = (f) => openLedgerReader(f), exists = fs.existsSync, expectedLedgerId = null } = {}) {
+  if (!exists(file)) return { ok: false, absent: true, reason: 'absent', result: ['absent'] };
   let db = null;
   try {
     db = open(file);
     const rows = db.prepare('PRAGMA quick_check').all().map((r) => String(Object.values(r)[0]));
-    if (!(rows.length === 1 && rows[0] === 'ok')) return { ok: false, result: rows.slice(0, 20) };
+    if (!(rows.length === 1 && rows[0] === 'ok')) return { ok: false, reason: 'integrity-failed', result: rows.slice(0, 20) };
     let verified = null;
-    try { verified = verifiedOpen(file); } finally { try { verified?.close(); } catch { /* closed */ } }
+    try {
+      verified = verifiedOpen(file);
+      if (expectedLedgerId !== null) {
+        const actual = verified.prepare("SELECT value FROM meta WHERE key='ledger_id'").get()?.value ?? null;
+        if (actual !== expectedLedgerId) return { ok: false, reason: 'identity-mismatch', result: [`ledger identity ${actual ?? 'missing'} differs from ${expectedLedgerId}`] };
+      }
+    } finally { try { verified?.close(); } catch { /* closed */ } }
     return { ok: true, result: rows.slice(0, 20) };
   } catch (error) {
-    return { ok: false, result: [String(error?.message ?? error).slice(0, 300)], error: true };
+    const reason = error?.code === 'STARCI_LEDGER_SCHEMA_REFUSED' ? 'schema-incompatible'
+      : error?.code === 'STARCI_LEDGER_SQLITE_DOWNGRADE' ? 'sqlite-downgrade'
+        : isCorruptError(error) ? 'integrity-failed' : 'inaccessible';
+    return { ok: false, reason, code: error?.code ?? null, result: [String(error?.message ?? error).slice(0, 300)], error: true };
   } finally { try { db?.close(); } catch { /* closed */ } }
 }
 
@@ -51,9 +50,10 @@ const backupFileOf = ({ dir, ledgerId, at }) => path.join(dir, `${ledgerId}-${da
 const safeId = (id) => String(id).replace(/[^\w.-]+/g, '_');
 
 /** The nightly backup is due: local hour >= backupHour and today's file is absent. */
-export function backupDue({ ledgerId, now, dir, backupHour, exists = fs.existsSync }) {
+export function backupDue({ ledgerId, now, dir, backupHour, exists = fs.existsSync, check = quickCheck }) {
   if (new Date(now).getHours() < backupHour) return false;
-  return !exists(backupFileOf({ dir, ledgerId: safeId(ledgerId), at: now }));
+  const file = backupFileOf({ dir, ledgerId: safeId(ledgerId), at: now });
+  return !exists(file) || !check(file, { expectedLedgerId: ledgerId }).ok;
 }
 
 /** The backups of one ledger beyond the newest `keep`, oldest first to delete. Pure over a file list. */
@@ -63,24 +63,44 @@ function prunePlan(files, { ledgerId, keep }) {
   return mine.slice(0, Math.max(0, mine.length - keep));
 }
 
-/** VACUUM INTO today's file (a temp name renamed into place), then prune to `keep`. {ok, file, bytes, pruned}. */
-function backupLedger({ ledgerId, file, dir, keep, now = Date.now(), open = openReadOnly }) {
-  fs.mkdirSync(dir, { recursive: true });
+/** Publish an integrity-, schema- and identity-checked snapshot before retention removes an older snapshot. */
+export function backupLedger({ ledgerId, file, dir, keep, now = Date.now(), open = openBackupSource, check = quickCheck, publish = fs.renameSync, remove = fs.rmSync }) {
   const target = backupFileOf({ dir, ledgerId: safeId(ledgerId), at: now });
-  const temp = `${target}.partial`;
-  try { fs.rmSync(temp, { force: true }); } catch { /* none */ }
+  const temp = `${target}.${randomUUID()}.partial`;
   let db = null;
+  let stage = 'prepare', published = false;
   try {
+    if (!Number.isInteger(keep) || keep < 1) throw Error('backup keep must be a positive integer');
+    fs.mkdirSync(dir, { recursive: true });
+    stage = 'source';
     db = open(file);
+    const actual = db.prepare("SELECT value FROM meta WHERE key='ledger_id'").get()?.value ?? null;
+    if (actual !== ledgerId) throw Error(`ledger identity ${actual ?? 'missing'} differs from ${ledgerId}`);
+    stage = 'snapshot';
     db.prepare('VACUUM INTO ?').run(temp);
+    db.close(); db = null;
+    stage = 'verify';
+    const verification = check(temp, { expectedLedgerId: ledgerId });
+    if (!verification.ok) throw Error(`snapshot ${verification.reason ?? 'verification-failed'}: ${verification.result?.join('; ') ?? 'failed'}`);
+    const digest = sha256File(temp), bytes = fs.statSync(temp).size;
+    const descriptor = fs.openSync(temp, 'r+');
+    try { fs.fsyncSync(descriptor); } finally { fs.closeSync(descriptor); }
+    stage = 'publish';
+    publish(temp, target); published = true;
+    if (sha256File(target) !== digest) throw Error('published snapshot digest differs from the verified bytes');
+    const pruned = [], retentionErrors = [];
+    let expired = [];
+    try { expired = prunePlan(fs.readdirSync(dir), { ledgerId, keep }); }
+    catch (error) { retentionErrors.push({ file: dir, error: String(error?.message ?? error).slice(0, 300) }); }
+    for (const name of expired) {
+      try { remove(path.join(dir, name), { force: true }); pruned.push(name); }
+      catch (error) { retentionErrors.push({ file: name, error: String(error?.message ?? error).slice(0, 300) }); }
+    }
+    return { ok: true, verified: true, file: target, ledgerId, sha256: digest, bytes, pruned, ...(retentionErrors.length ? { retentionErrors } : {}) };
   } catch (error) {
-    try { fs.rmSync(temp, { force: true }); } catch { /* none */ }
-    return { ok: false, file: target, error: String(error?.message ?? error).slice(0, 300) };
+    try { fs.rmSync(temp, { force: true }); } catch { /* owned partial remains for inspection */ }
+    return { ok: false, verified: false, file: target, stage, published, pruned: [], error: String(error?.message ?? error).slice(0, 300) };
   } finally { try { db?.close(); } catch { /* closed */ } }
-  fs.renameSync(temp, target);
-  const pruned = prunePlan(fs.readdirSync(dir), { ledgerId, keep });
-  for (const f of pruned) fs.rmSync(path.join(dir, f), { force: true });
-  return { ok: true, file: target, bytes: fs.statSync(target).size, pruned };
 }
 
 const argsOf = (argv) => {

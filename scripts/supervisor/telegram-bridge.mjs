@@ -65,6 +65,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configRoot, connectorsConfig } from '../../engine/config.mjs';
+import { runtimeSecretEnv } from '../gates/runtime-host.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { pidAlive, readMachine } from '../../engine/db/machine.mjs';
 import { appendInbox, needSupervisorId, validSupervisorId } from '../machine/sup-messages.mjs';
@@ -664,7 +665,10 @@ export function ensureTelegramBridge({ env = process.env, config = undefined, ro
     const live = bridgeAlive(env);
     if (live) return { ok: true, already: true, pid: live.pid };
     if (requireRegistered && !listSupervisors({ env }).length) return { ok: true, skipped: 'no supervisor registered' };
-    const settings = telegramSettings({ config: config === undefined ? ownerConfig() : config, env, root });
+    const owner = config === undefined ? ownerConfig() : config;
+    if (connectorsConfig(owner, env, root).telegram.enabled !== true) return { ok: true, skipped: 'telegram off' };
+    env = runtimeSecretEnv(env, root);
+    const settings = telegramSettings({ config: owner, env, root, preparedEnv: env });
     if (!settings.ready) return { ok: true, skipped: settings.warning ?? 'telegram off' };
     if (dryRun) return { ok: true, wouldStart: true };
     return { ok: true, launched: spawn(BRIDGE_FILE, ['run'], { env }) };
@@ -694,11 +698,14 @@ const bridgeLog = (env, echo) => (line) => {
 };
 
 async function runMain() {
-  const env = process.env;
-  const log = bridgeLog(env, process.stderr.isTTY === true);
+  let env = process.env;
   // A spec run (node --test sets NODE_TEST_CONTEXT, which spawned children inherit) never polls the real bot.
   if (isSpecRun(env) && !env.STARCI_TELEGRAM_API_BASE) { console.log(JSON.stringify({ ok: true, skipped: 'test context' })); return; }
-  const first = telegramSettings({ env });
+  const config = ownerConfig();
+  if (config && connectorsConfig(config, env).telegram.enabled !== true) { console.log(JSON.stringify({ ok: true, skipped: 'telegram off' })); return; }
+  env = runtimeSecretEnv(env);
+  const log = bridgeLog(env, process.stderr.isTTY === true);
+  const first = telegramSettings({ config, env, preparedEnv: env });
   if (!first.ready) { console.log(JSON.stringify({ ok: true, skipped: first.warning ?? 'telegram off' })); return; }
   // A replacement the running bridge spawned (self-reload) takes its lock over; nothing else may.
   const handoverFrom = env[RELOAD_ENV.handoverFrom] ?? null;
@@ -715,7 +722,7 @@ async function runMain() {
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
   console.log(JSON.stringify({ ok: true, pid: process.pid, log: 'machine_logs actor connector kind telegram-bridge.log' }));
   log(`bridge ${process.pid} started${claim.takenOver ? ` (took over from ${handoverFrom})` : ''}`);
-  const bridge = createBridge({ env, log, settings: () => telegramSettings({ env }) });
+  const bridge = createBridge({ env, log, settings: () => telegramSettings({ env, preparedEnv: env }) });
   const watch = createReloadWatch({ root: configRoot, files: bridgeReloadFiles(), lastReloadAt: reloadedAt, headPaths: BRIDGE_HEAD_PATHS });
   const reload = async () => {
     const check = watch.check();

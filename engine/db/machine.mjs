@@ -25,9 +25,10 @@
 //   reader   : readOnly, query_only=ON, busy_timeout=15000; observer diagnostics never persist
 //   startup  : sqlite_version, node_version, journal_mode and user_version are recorded in machine_meta; a file that is
 //              not 'starci/machine@1' at user_version MACHINE_VERSION is refused — a fresh machine.sqlite is created by
-//              openMachine on first use from engine/db/migrations/machine/0001-init.sql. Supported v1/v2 upgrades add provider receipts and core diagnostic scopes while preserving host rows; other versions refuse.
+//              openMachine on first use from engine/db/migrations/machine/0001-init.sql. Current physical objects are validated; existing journals remain historical evidence. Unsupported versions refuse without upgrade.
 // Nothing outside engine/ opens machine.sqlite with `new DatabaseSync`: callers use openMachine / openMachineReader / openMachineObserver /
 // withMachine / readMachine and the typed functions on the handle.
+import { assertMutationFence } from '../../scripts/lib/mutation-fence.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -154,7 +155,7 @@ export function runtimeRev() {
 /** Order of two runtime revs: <0 when a is older than b (time prefix; anything unparsable is oldest). */
 const compareRevs = (a, b) => { const t = (r) => (/^\d{13}:/.test(String(r ?? '')) ? Number(String(r).slice(0, 13)) : -1); return t(a) - t(b); };
 
-const { refuseOld, checkSchema, createSchema, upgradeSchema } = machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_VERSION, initSqlFile: INIT_SQL_FILE, controllers: CONTROLLERS, runtimeRev, pragma });
+const { checkSchema, createSchema } = machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_VERSION, initSqlFile: INIT_SQL_FILE, controllers: CONTROLLERS, runtimeRev, pragma });
 
 function openConnection(file, { readOnly = false, env = process.env, now = Date.now, onCorrupt = corruptIncident } = {}) {
   const { DatabaseSync } = require('node:sqlite');
@@ -166,24 +167,20 @@ function openConnection(file, { readOnly = false, env = process.env, now = Date.
       if (readOnly) {
         db = new DatabaseSync(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS });
         db.exec('PRAGMA query_only=ON; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-16000;');
-        checkSchema(db, file, { readOnly: true });
+        checkSchema(db, file);
         return db;
       }
       db = new DatabaseSync(file, { timeout: busyTimeoutOf(env) });
-      const fresh = Number(pragma(db, 'page_count')) === 0;
-      if (fresh) db.exec('PRAGMA page_size=4096; PRAGMA auto_vacuum=INCREMENTAL;');
+      const empty = Number(pragma(db, 'user_version')) === 0 && !db.prepare("SELECT 1 FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' LIMIT 1").get();
+      if (!empty) checkSchema(db, file); // Refuse existing stores before persistent WAL/facts changes.
+      if (empty) db.exec('PRAGMA page_size=4096; PRAGMA auto_vacuum=INCREMENTAL;');
       const mode = String(pragma(db, 'journal_mode=WAL')).toLowerCase();
       need(mode === 'wal', `machine.sqlite journal_mode is '${mode}', not wal (${file})`, 'STARCI_MACHINE_NOT_WAL');
       db.exec('PRAGMA foreign_keys=ON;');
       for (const [k, v] of Object.entries(writerPragmas(env))) db.exec(`PRAGMA ${k}=${v};`);
       // Never an automatic checkpoint: the engine leader's fenced checkpoint() is the only one (header, G17).
       db.exec('PRAGMA wal_autocheckpoint=0;');
-      if (fresh || Number(pragma(db, 'user_version')) === 0) {
-        const hasTables = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' LIMIT 1").get();
-        if (hasTables && Number(pragma(db, 'user_version')) === 0) refuseOld(file, 'is an unversioned store');
-        createSchema(db, { file, env, now });
-      }
-      upgradeSchema(db, { file, now });
+      if (empty) createSchema(db, { file, env, now });
       checkSchema(db, file);
       recordFacts(db);
       return db;
@@ -304,7 +301,7 @@ function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tem
         db.exec('BEGIN IMMEDIATE');   // a refused BEGIN changed nothing: db.exec backs off (BUSY_RETRY_DELAYS_MS), then throws STARCI_MACHINE_BUSY
         depth += 1;
         let out;
-        try { out = fn(db); db.exec('COMMIT'); } catch (error) { try { if (db.isTransaction) db.raw.exec('ROLLBACK'); } catch { /* none */ } throw error; } finally { depth -= 1; }
+        try { assertMutationFence({ kind: 'machine-write', db }); out = fn(db); db.exec('COMMIT'); } catch (error) { try { if (db.isTransaction) db.raw.exec('ROLLBACK'); } catch { /* none */ } throw error; } finally { depth -= 1; }
         if (retries) noteRecovered({ where: 'transaction', retries });
         return out;
       } catch (error) {
@@ -328,7 +325,10 @@ function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tem
       }
       close();
     } };
-  for (const [name, fn] of Object.entries(API)) m[name] = (...args) => fn(m, ...args);
+  for (const [name, fn] of Object.entries(API)) m[name] = (...args) => {
+    if (!readOnly) assertMutationFence({ kind: 'machine-access', name });
+    return fn(m, ...args);
+  };
   m.tempDirs = tempDirs;
   return m;
 }
@@ -1334,9 +1334,7 @@ const API = {
 };
 
 /** Every typed function at module level too: fn(handle, ...args) — blob-gc and callers holding a handle. */
-export { putMachineBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, setLedgerState, upsertRepository, forEachLedger, attachLedgers, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, ackOwed, upsertLearning, recordSupMessage, supMessages, setSupSignal, supSignal, recordMachineLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, actionOf, actions, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, seatTranscriptSnapshot, upsertTerminal, closeTerminal, acquireHostLock, renewHostLock, releaseHostLock, hostLock, claimResource, releaseClaim, throttleState, setThrottle, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, setBudget, budgets, startGcRun, finishGcRun, recordGcItem, gcRuns, markMachineBlobArchived, pruneSeatSnapshots, upsertLane, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, removedWorktree, reserveWorktree, liveWorktrees, worktreeRow, worktreeRepos, dropWorktree, worktreeGcStop, setWorktreeGcStop, gcCursor, setGcCursor, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, connectorOf, upsertAsk, log, logs, recordMetrics, recordArchive };
-export const addGcItem = recordGcItem;
-export const addGcMarks = gcMark;
+export { putMachineBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, setLedgerState, upsertRepository, forEachLedger, attachLedgers, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, ackOwed, upsertLearning, recordSupMessage, supMessages, setSupSignal, supSignal, recordMachineLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, actionOf, actions, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, seatTranscriptSnapshot, upsertTerminal, closeTerminal, acquireHostLock, renewHostLock, releaseHostLock, hostLock, claimResource, releaseClaim, throttleState, setThrottle, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, setBudget, budgets, startGcRun, finishGcRun, recordGcItem, gcRuns, upsertLane, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, removedWorktree, reserveWorktree, liveWorktrees, worktreeRow, worktreeRepos, dropWorktree, worktreeGcStop, setWorktreeGcStop, gcCursor, setGcCursor, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, connectorOf, upsertAsk, log, logs, recordMetrics };
 export { reserveProvider, providerReservations, providerReservationUsage, markProviderReservation, releaseProviderReservation };
 
 /** Best-effort machine log line from anywhere (never throws): opens, appends, closes. */

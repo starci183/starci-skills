@@ -19,7 +19,7 @@
 // its pick and fallback chain to agents via modules/models/registry.yaml pools/targets.
 // Router refusal or exhaustion is a typed failure, never an implicit Devin kernel.
 //
-// Every Kernel is an Orca worker (modules/kernel/contract-changes/launch-through-worker-start.yaml): the launching
+// Every Kernel is an Orca worker (modules/kernel/start-workflow.yaml): the launching
 // terminal (the owner's chat, the Supervisor, the watchdog's run; ORCA_TERMINAL_HANDLE) creates the Kernel's entry Run
 // and coordinates it, the Kernel's Task carries its prompt, and `orca orchestration worker-start --agent <agent>
 // [--model <id> --effort <level>]` starts it (scripts/agent/lib.mjs startAgent). worker-show attests the effective
@@ -35,26 +35,25 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { runNode } from '../api/node/run-node.mjs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { createKernelRoute } from './kernel-route.mjs';
 import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, releaseKernelJob, recordJobResult, setSignal, clearSignal, updateSignal, openIncident, setInboxStatus } from '../../engine/db/ledger.mjs';
 // The kernel seat's boot count lives in its payload (hierarchy.attempt); jobs.try_no is the op-try ordinal only.
 const kernelAttemptOf = (row) => parseJsonOr(row?.payload_json)?.hierarchy?.attempt ?? 0;
 import { inspectOwnerConfig, loadConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { loadAdapter } from '../agent/lib.mjs';
 import { launchKernelGroup } from './launch-kernel-group.mjs';
 import { expiredKernelStartupHealth } from './kernel-startup-capacity.mjs';
 import { ownerReserveGrant, planAgentAdmission } from '../agent/admission.mjs';
 import { prepareProviderBudget } from '../agent/provider-budget.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
-import { stopAndRelease, workerClosureProven } from '../machine/worker-close.mjs';
-import { DEFAULT_OWNER_LANGUAGE } from '../machine/home.mjs'; import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability, loadModelRegistry } from '../agent/models.mjs';
+import { releaseWorkflowWorker as releaseManagedWorker, recoverWorkflowLaunch } from './workflow-launch-custody.mjs';
+import { DEFAULT_OWNER_LANGUAGE } from '../machine/home.mjs';
 import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
-import { KERNEL_BOOT_FILES, KERNEL_REV_ACKED_EVENT, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
+import { KERNEL_BOOT_FILES, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
-import { ensureWorkflowHost, installWorkflowTree, workflowStartAuthority } from './workflow-startup.mjs';
+import { ensureWorkflowHost, installWorkflowTree, workflowStartAuthority, commitWorkflowStart, recordWorkflowStartFailure } from './workflow-startup.mjs';
 import { workflowCaller } from '../agent/caller-context.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal, guardReceiptErrors } from '../guards/hook-install.mjs';
 import { readEnv } from '../lib/env.mjs';
@@ -78,10 +77,6 @@ if (!Object.hasOwn(LAUNCHERS, launchedBy)) {
   process.exit(2);
 }
 
-const ROUTE_MODEL = path.join(skillRoot, 'scripts', 'route', 'route-model.mjs');
-const KERNEL_ROUTE = { kind: 'model.manageWorkflow', risk: 'high' }; // selection.yaml kernelFunctionKinds
-// The pool difficulty a Kernel seat launches at: kernel functions are think work at the hard floor (runtimes.yaml roleOfKind note); runtimes.yaml pools are keyed by difficulty, not by risk.
-const KERNEL_DIFFICULTY = 'hard';
 // How long a Kernel launch holds its startup reservation: worker-start blocks until the agent is ready (calls.yaml
 // worker-start timeoutMs 150000), plus the Run and Task calls around it.
 const KERNEL_START_RESERVATION_MS = 240000;
@@ -93,215 +88,8 @@ const KERNEL_START_RESERVATION_MS = 240000;
 // STARCI_OWNER_ROOT points the reader at a different directory holding a
 // config.yaml (test and tooling seam).
 const ownerRoot = readEnv('STARCI_OWNER_ROOT') ? path.resolve(readEnv('STARCI_OWNER_ROOT')) : skillRoot;
-const ownerFileLabel = (file) => ownerRoot === skillRoot ? path.relative(skillRoot, file) : file;
-
-// Provider liveness probe: scripts/agent/quota/index.mjs exports
-// probeQuota(provider) → {state, usedPercent, detail}; 'dead' means the
-// provider is not authenticated. It is imported lazily and every failure
-// degrades to 'unknown' — a probe is evidence, never a verdict, and a kernel
-// must still boot when the provider CLI cannot answer. Probes are memoized
-// per process — one account-list read serves every candidate.
-const probeCache = new Map();
-async function probeAgent(agent) {
-  if (probeCache.has(agent)) return probeCache.get(agent);
-  const file = path.join(skillRoot, 'scripts', 'agent', 'quota', 'index.mjs');
-  let probe = { state: 'unknown', detail: 'quota probe not installed' };
-  if (fs.existsSync(file)) {
-    try {
-      const mod = await import(pathToFileURL(file).href);
-      probe = typeof mod.probeQuota === 'function'
-        ? (await mod.probeQuota(agent) ?? { state: 'unknown' })
-        : { state: 'unknown', detail: 'quota module exports no probeQuota' };
-    } catch (e) { probe = { state: 'unknown', detail: `quota probe threw: ${e.message}` }; }
-  }
-  probeCache.set(agent, probe && typeof probe === 'object' ? probe : { state: 'unknown' });
-  return probeCache.get(agent);
-}
-
-// The pool target a provider pin launches on: the registry.yaml pool owned by
-// that provider that carries the kernel-manager role (decide) first, else the
-// provider's first pool.
-function poolTargetForAgent(agent) {
-  const doc = loadModelRegistry();
-  const owned = Object.entries(doc?.pools ?? {}).filter(([, rt]) => rt?.provider === agent);
-  return owned.find(([, rt]) => Array.isArray(rt?.roles) && rt.roles.includes('decide'))?.[0]
-    ?? owned[0]?.[0] ?? null;
-}
-
-// kernel.model resolves its provider through the model catalog: the model id's
-// declared provider (models.<id>.provider), a pool id/target, a pool's
-// per-difficulty pin or defaultModel, or a launch target's runtime.
-// registry.yaml is the single capacity/model-pin authority.
-function agentForModel(model) {
-  const doc = loadModelRegistry();
-  if (!doc) return null;
-  const direct = doc?.models?.[model]?.provider;
-  if (direct) return direct;
-  for (const [id, rt] of Object.entries(doc.pools ?? {})) {
-    if (id === model || rt?.target === model) return rt?.provider ?? null;
-    if (rt?.defaultModel === model || Object.values(rt?.models ?? {}).includes(model)) return rt?.provider ?? null;
-  }
-  return doc?.targets?.[model]?.runtime ?? null;
-}
-
-// A launch target's provider is declared by the registry: the pool's provider,
-// else the target's runtime adapter id (modules/models/registry.yaml).
-function agentForTarget(target) {
-  const doc = loadModelRegistry();
-  return doc?.pools?.[target]?.provider ?? doc?.targets?.[target]?.runtime ?? null;
-}
-
-// One provider's availability for a kernel group member: the quota probe plus
-// this ledger's provider-health circuit (scripts/agent/models.mjs).
-async function memberAvailability(agent, db) {
-  const probe = await probeAgent(agent);
-  let circuit = null;
-  try { circuit = db ? providerCircuitOf(db, agent) : null; } catch { circuit = null; }
-  return providerAvailability({ probe, circuit });
-}
-
-async function completeKernelRoute(route) {
-  if (route.error || !route.agent) return route;
-  let model = route.model ?? route.route?.model ?? null;
-  let effort = route.effort ?? route.route?.effort ?? null;
-  const runtimePool = route.route?.target ?? poolTargetForAgent(route.agent);
-  if ((!model || !effort) && runtimePool) {
-    try {
-      const resolved = resolveLaunchModel(runtimePool, KERNEL_DIFFICULTY);
-      model = model ?? resolved?.modelId ?? null;
-      effort = effort ?? resolved?.effort ?? null;
-    } catch { /* converted to a typed route error below */ }
-  }
-  if (!model)
-    return { ...route, runtimePool, error: `kernel agent '${route.agent}' has no resolvable model for ${KERNEL_ROUTE.kind}/${KERNEL_ROUTE.risk}` };
-  return { ...route, model, effort, runtimePool };
-}
-
-// Resolve the dedicated Kernel terminal's agent/model. Config pins and CLI
-// overrides are authority, not preferences: a dead agent, unknown bare model
-// or agent/model mismatch fails closed instead of choosing a substitute.
-// A config.yaml kernel group and the unpinned think-group route are ordered
-// member lists instead: `members` is the launch order after availability
-// (unavailable skipped, limited last) and `fallThrough` lets the boot move to
-// the next member on a no-effect launch refusal (modules/kernel/start-workflow.yaml
-// spawn.fallThrough). The route's top-level agent/model are members[0].
-const single = (route) => (route.error ? route : { ...route, members: [route], fallThrough: false });
-const groupRoute = (members, extra) => ({ ...members[0], members, fallThrough: true, ...extra });
-const memberLabel = (m) => `${m.agent}/${m.model ?? '(pool model)'}`;
-const memberSummary = (m) => ({ agent: m.agent, model: m.model ?? null, effort: m.effort ?? null,
-  runtimePool: m.runtimePool ?? null, ...(m.availability ? { availability: m.availability.state } : {}) });
-
-async function resolveKernelRoute(db) {
-  if (agentOverride) {
-    const probe = await probeAgent(agentOverride);
-    if (probe?.state === 'dead')
-      return { agent: agentOverride, routedBy: 'override', warnings: [],
-        errorStep: 'kernel-pin-unavailable',
-        error: `explicit kernel agent '${agentOverride}' probe is dead (${probe.detail ?? 'not authenticated'})` };
-    return single(await completeKernelRoute({ agent: agentOverride, routedBy: 'override', warnings: [] }));
-  }
-  const owner = inspectOwnerConfig(ownerRoot);
-  const kc = owner.config?.kernel;
-  const cfgGroup = Array.isArray(kc?.group) ? kc.group.filter(m => typeof m?.agent === 'string' && m.agent.trim())
-    .map(m => ({ agent: m.agent.trim(), model: typeof m.model === 'string' && m.model.trim() ? m.model.trim() : null })) : null;
-  const cfgAgent = !cfgGroup && typeof kc?.agent === 'string' && kc.agent.trim() ? kc.agent.trim() : null;
-  const cfgModel = !cfgGroup && typeof kc?.model === 'string' && kc.model.trim() ? kc.model.trim() : null;
-  // The kernel's own effort pins; the global config effort is inherited only by a kernel agent whose card can pin one
-  // (start.modelArgument: worker-start takes --effort only with --model) - Devin takes neither, so an inherited effort
-  // must not refuse its launch.
-  const pinsEffort = (agent) => { try { return loadAdapter(agent)?.card?.start?.modelArgument !== false; } catch { return true; } };
-  const kernelEffort = typeof kc?.effort === 'string' && kc.effort.trim() ? kc.effort.trim() : null;
-  const globalEffort = typeof owner.config?.effort === 'string' && owner.config.effort.trim() ? owner.config.effort.trim() : null;
-  const cfgEffort = kernelEffort ?? (typeof kc?.agent === 'string' && kc.agent.trim() && !pinsEffort(kc.agent.trim()) ? null : globalEffort);
-  const config = owner.config || owner.error ? {
-    file: owner.config ? ownerFileLabel(owner.file) : null,
-    agent: cfgAgent, model: cfgModel, effort: cfgEffort,
-    ...(cfgGroup ? { group: cfgGroup } : {}),
-    budgets: owner.config?.budgets ?? null,
-    ...(owner.error ? { error: owner.error } : {}),
-    ...(owner.invalid ? { configInvalid: owner.invalid } : {}),
-  } : null;
-  const warnings = [];
-  const warn = (warning) => { warnings.push(warning); console.error(`start-workflow: warning: ${warning}`); };
-  if (cfgGroup?.length) {
-    const availability = new Map();
-    for (const m of cfgGroup) if (!availability.has(m.agent)) availability.set(m.agent, await memberAvailability(m.agent, db));
-    const { ordered, unavailable } = orderByAvailability(cfgGroup, m => availability.get(m.agent));
-    for (const u of unavailable) warn(`kernel group member ${memberLabel(u)} skipped — ${u.availability.reason}`);
-    const members = [];
-    for (const m of ordered) {
-      const modelAgent = m.model ? agentForModel(m.model) : null;
-      if (modelAgent && modelAgent !== m.agent) { warn(`kernel group member ${memberLabel(m)} skipped — model is owned by agent '${modelAgent}'`); continue; }
-      const completed = await completeKernelRoute({ agent: m.agent, routedBy: 'config', model: m.model, effort: cfgEffort, config, warnings, availability: m.availability });
-      if (completed.error) { warn(`kernel group member ${memberLabel(m)} skipped — ${completed.error}`); continue; }
-      members.push(completed);
-    }
-    if (!members.length)
-      return { agent: cfgGroup[0].agent, routedBy: 'config', model: cfgGroup[0].model, effort: cfgEffort, config, warnings,
-        members: [], fallThrough: true, errorStep: 'kernel-group-unavailable',
-        error: `kernel group has no available member: ${warnings.join('; ')}` };
-    return groupRoute(members);
-  }
-  if (cfgAgent) {
-    const modelAgent = cfgModel ? agentForModel(cfgModel) : null;
-    if (modelAgent && modelAgent !== cfgAgent)
-      return { agent: cfgAgent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings,
-        error: `kernel pin mismatch: agent '${cfgAgent}' cannot launch model '${cfgModel}' owned by agent '${modelAgent}'` };
-    const probe = await probeAgent(cfgAgent);
-    if (probe?.state === 'dead')
-      return { agent: cfgAgent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings,
-        errorStep: 'kernel-pin-unavailable',
-        error: `kernel pin failed closed: agent '${cfgAgent}' probe is dead (${probe.detail ?? 'not authenticated'})` };
-    return single(await completeKernelRoute({ agent: cfgAgent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings }));
-  } else if (cfgModel) {
-    const agent = agentForModel(cfgModel);
-    if (!agent)
-      return { agent: null, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings,
-        error: `kernel model pin '${cfgModel}' is not declared by any runtimePool` };
-    const probe = await probeAgent(agent);
-    if (probe?.state === 'dead')
-      return { agent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings,
-        errorStep: 'kernel-pin-unavailable',
-        error: `kernel model pin '${cfgModel}' failed closed: agent '${agent}' probe is dead (${probe.detail ?? 'not authenticated'})` };
-    return single(await completeKernelRoute({ agent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings }));
-  }
-  // Unpinned: route-model resolves the think group quota-aware (selection.yaml
-  // decisionFlow kernel-function + kernel-availability) and reads this repo's
-  // provider-health circuit; its pick and fallbackChain are the members.
-  const r = runNode(
-    [ROUTE_MODEL, '--kind', KERNEL_ROUTE.kind, '--risk', KERNEL_ROUTE.risk, '--repo', repo, '--json'],
-    { timeout: 60000, cwd: skillRoot });
-  const result = parseJson(r.stdout);
-  const pick = result?.pick ?? null;
-  if (r.error || r.status !== 0 || !pick?.target) {
-    return {
-      agent: null, routedBy: 'route-model', effort: cfgEffort, config, warnings,
-      error: r.error?.message ?? (r.status === 0 ? 'route-model returned no pick' : result?.rule ?? `route-model exited ${r.status}`)
-        + ((result?.rejected ?? []).length ? ` — ${result.rejected.map(x => `${x.target}: ${(x.reasons ?? [])[0] ?? 'rejected'}`).join('; ')}` : ''),
-    };
-  }
-  const members = [];
-  for (const [i, c] of [pick, ...(result.fallbackChain ?? [])].entries()) {
-    const agent = agentForTarget(c.target);
-    if (!agent) { warn(`profile for runtimePool '${c.target}' declares no execution agent`); continue; }
-    // Unpinned routing never invents a hard-coded Devin fallback: only
-    // route-model's own members, re-probed so a dead agent is never launched.
-    const probe = await probeAgent(agent);
-    if (probe?.state === 'dead') { warn(`routed agent '${agent}' (${c.target}) probe is dead (${probe.detail ?? 'not authenticated'}) — taking the next member`); continue; }
-    const completed = await completeKernelRoute({
-      agent, routedBy: 'route-model', effort: cfgEffort, config, warnings,
-      ...(result.availability?.[c.target] ? { availability: result.availability[c.target] } : {}),
-      route: { kind: KERNEL_ROUTE.kind, risk: KERNEL_ROUTE.risk, target: c.target, model: c.model ?? null,
-        profile: 'modules/models/registry.yaml', mode: c.mode ?? null, rule: result.rule ?? null },
-    });
-    if (completed.error) { warn(completed.error); continue; }
-    members.push(completed);
-  }
-  if (!members.length)
-    return { agent: null, routedBy: 'route-model', effort: cfgEffort, config, warnings,
-      error: `no routed kernel member is launchable (${warnings.join('; ')})` };
-  return groupRoute(members);
-}
+// One routing scope per launcher; all config, probes and route calls stay deferred.
+const { resolveKernelRoute, memberLabel, memberSummary } = createKernelRoute({ skillRoot, repo, agentOverride, ownerRoot });
 
 // The launch lives in scripts/agent/lib.mjs startAgent: the Kernel is an orca orchestration worker-start worker of
 // its own entry Run (the launching terminal coordinates it), attested from worker-show. No caller assembles a provider
@@ -330,7 +118,7 @@ const context = projectContext();
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
 const promptTemplate = fs.readFileSync(path.join(skillRoot, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
 // The runtime rev this boot reads its kernel files at (runtime-rev.mjs): named in the prompt and recorded as
-// the Kernel's first runtime-rev-acked (source boot), so a later wake names only what changed since.
+// boot delivery provenance; only a current Kernel's explicit READ attestation acknowledges it.
 const bootRuntimeRev = currentRuntimeRev(revRootOf());
 // Who authorized this launch, said first. A first boot runs because the owner approved the
 // start-kernel plan. A replacement resumes an approved workflow: the runtime types its prompt as
@@ -425,12 +213,6 @@ const EXIT_KERNEL_ALIVE = 3;
 // Settlement of a stale Kernel's Dispatch: worker-stop then worker-release (calls.yaml settle-dispatch), recorded as
 // the seat's terminalClosed receipt, including verified terminal and process-tree exit. A refused release is the
 // kernel-stale-terminal-unclosed residue, never silence. Never throws.
-function releaseManagedWorker(dispatchId, handle = null) {
-  const released = stopAndRelease(dispatchId, { handle });
-  const proven = workerClosureProven(released, handle);
-  return { ...released, handle, dispatch: dispatchId, ok: proven,
-    ...(proven ? {} : { error: released.release?.error ?? released.stop?.error ?? 'worker terminal or process exit is unproven' }) };
-}
 
 const ledger = openLedger({ file: ledgerFileFor(repo) });
 try {
@@ -493,7 +275,7 @@ try {
       + (route.error ? ` — ${route.error}` : '') + ')';
     const budgets = route.config?.budgets;
     const budgetLine = budgets && Object.values(budgets).some(v => v != null)
-      ? `\n  budgets (config.yaml): ${['maxOps', 'perOpMs', 'dailyTokens'].map(k => `${k}=${budgets[k] ?? 'unbounded'}`).join('  ')}`
+      ? `\n  budgets (config.yaml): ${['maxOps'].map(k => `${k}=${budgets[k] ?? 'unbounded'}`).join('  ')}`
       : '';
     const warningLine = (route.warnings ?? []).map((w) => `\n  warning: ${w}`).join('');
     const groupLine = route.members?.length > 1
@@ -520,7 +302,8 @@ try {
       hostStartup.host?.items?.some((item) => item.id === 'orca' && item.status === 'red') ? EXIT_HOST_UNAVAILABLE : 1);
   const currentStartAuthority = () => {
     const authority = workflowStartAuthority(startInput());
-    return authority.ok && (authority.goalRevision !== startAuthority.goalRevision || authority.goalIdentity !== startAuthority.goalIdentity)
+    return authority.ok && (authority.goalRevision !== startAuthority.goalRevision || authority.goalIdentity !== startAuthority.goalIdentity
+      || authority.generation !== startAuthority.generation)
       ? { ok: false, reason: 'workflow-goal-unverified', detail: 'the accepted goal changed during startup' } : authority;
   };
   const afterHostAuthority = currentStartAuthority();
@@ -528,7 +311,12 @@ try {
 
   // A signal is only live when its Orca terminal is connected and writable. A
   // NULL expiry is not immortality: terminal identity is the health proof.
-  const priorSignal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(target);
+  let priorSignal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(target);
+  if (parseJsonOr(priorSignal?.value_json)?.state === 'launch-unknown') {
+    const recovery = recoverWorkflowLaunch(ledger, { workflowId: target, signal: priorSignal, env: process.env });
+    if (!recovery.ok) refuse('kernel-launch-unreconciled', { workflowId: target, recovery }, EXIT_HOST_UNAVAILABLE);
+    priorSignal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(target);
+  }
   const priorHealth = await signalHealth(priorSignal);
   if (priorSignal && priorHealth.live) {
     const out = { ok: true, workflowId: target, kernel: priorSignal.token, terminal: priorHealth.value?.terminal ?? null,
@@ -656,17 +444,8 @@ try {
     restart: restartAuthority && { ...restartAuthority, attempt: kernelAttemptOf(priorKernelJob) + 1, launcher: LAUNCHERS[launchedBy] } });
   const prompt = renderKernelPrompt({ workflowId, inboxId: claim.inbox_id, goalRevision: goal?.revision ?? 0, launchAuthority });
   const failStart = (step, error, handle = null, extra = {}, exitCode = 1) => {
-    const at = Date.now();
-    const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
-    ledger.transaction(() => {
-      if (['partial', 'unknown'].includes(extra.effectState)) setSignal(ledger.db, { scope: 'kernel', key: workflowId, workflowId,
-        holderPid: process.pid, token, value: { state: 'launch-unknown', terminal: handle, dispatch: extra.dispatch ?? null,
-          admission: extra.admission ?? null, effectState: extra.effectState }, at, expiresAt: null });
-      else clearSignal(ledger.db, { scope: 'kernel', key: workflowId, token });
-      ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId,
-        generation: workflow?.generation ?? 0, kind: 'kernel-start-failed', payload: { step, error, terminal: handle, ...extra }, createdAt: at });
-    });
-    console.error(JSON.stringify({ ok: false, workflowId, step, error, terminal: handle, ...extra }));
+    const failure = recordWorkflowStartFailure(ledger, { workflowId, token, holderPid: process.pid, step, error, handle, extra });
+    console.error(JSON.stringify({ ok: false, workflowId, ...failure }));
     process.exit(exitCode);
   };
   try {
@@ -711,7 +490,7 @@ try {
       kind: 'workflow-worktree-installed', payload: { orcaWorktreeId: workflowWorktree.orcaWorktreeId, ...workflowInstall } }));
   }
   const kernelWorktree = workflowWorktree?.path ?? repo;
-  // The Kernel's guard (contract change kernel-guard-file): the same job guard an op gets (scripts/guards/hook-install.mjs
+  // The Kernel's guard: the same job guard an op gets (scripts/guards/hook-install.mjs
   // guardLaunch), role 'kernel', naming the workflow worktree and owning no path. It is bound to the Kernel's Orca
   // terminal the moment worker-start names it, so the PreToolUse command guard refuses the Kernel's raw git history
   // changes, worktree adds, recursive deletes, kills by name and raw agent launches; its `node cli.mjs <verb>` calls
@@ -739,8 +518,8 @@ try {
   const beforeLaunchAuthority = currentStartAuthority();
   if (!beforeLaunchAuthority.ok) failStart(beforeLaunchAuthority.reason, 'the accepted goal changed before Kernel launch', null,
     { reason: beforeLaunchAuthority.reason, authority: beforeLaunchAuthority, startup: hostStartup, workflowWorktree, install: workflowInstall });
-  const kernelLaunch = launchKernelGroup({ ledger, workflowId, token, route, members, reservationMs: KERNEL_START_RESERVATION_MS,
-    hostUnavailableExit: EXIT_HOST_UNAVAILABLE, memberLabel, failStart, launch: { worktree: kernelWorktree, title, prompt, specFile,
+  const kernelLaunch = launchKernelGroup({ ledger, workflowId, token, expected: startAuthority, route, members, reservationMs: KERNEL_START_RESERVATION_MS,
+    hostUnavailableExit: EXIT_HOST_UNAVAILABLE, memberLabel, failStart, launch: { worktree: kernelWorktree, title, prompt, specFile, config: route.ownerConfig,
       role: 'kernel', scopeId: `${ledger.ledgerId ?? ledger.path}:${workflowId}:kernel-attempt:${kernelAttemptOf(priorKernelJob) + 1}`,
       bias: parseJsonOr(goal?.json)?.routing_bias, ownerGrant: ownerReserveGrant(goal),
       objective: `[Kernel] ${kernelName} — ${workflowId}`, entry, priorRunId: priorManaged?.runId ?? null, onCreated: bindKernelGuard,
@@ -752,12 +531,13 @@ try {
   // The replaced Kernel's terminal no longer carries this workflow's guard.
   if (!kernelGuard.terminal) bindKernelGuard(handle);
   const priorHandle = priorManaged?.agentTerminalHandle ?? null;
-  if (priorHandle && priorHandle !== handle) { try { unbindGuardTerminal({ skillRoot, handle: priorHandle }); } catch { /* pruned by age later */ } }
   const guardErrors = guardReceiptErrors(kernelGuard);
   if (guardErrors.length) console.error(`start-workflow: warning: kernel-guard-unbound: ${guardErrors.join('; ')}`);
   const guardReceipt = { ...kernelGuard, ...(guardErrors.length ? { code: 'kernel-guard-unbound', errors: guardErrors } : {}) };
   const kernelModel = route.model;
   const kernelEffort = route.effort ?? null;
+  const modelAuthority = spawned.modelAuthority ?? null, effectiveModel = spawned.effective?.model ?? null;
+  const modelAttested = Boolean(kernelModel && spawned.model === kernelModel && effectiveModel === kernelModel);
 
   const now = Date.now();
   const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
@@ -766,15 +546,19 @@ try {
   const previousPayload = parseJsonOr(previousJob?.payload_json);
   const attempt = kernelAttemptOf(previousJob) + 1;
   const routeInfo = { host: 'orca', agent: route.agent, routedBy: route.routedBy, model: kernelModel,
-    effort: kernelEffort, profile: route.route?.profile ?? null, runtimePool: route.runtimePool ?? null, launch: 'worker' };
+    effort: kernelEffort, profile: route.route?.profile ?? null, runtimePool: route.runtimePool ?? null, launch: 'worker',
+    modelAuthority, effectiveModel, modelAttested };
   const managed = { runId: spawned.runId, taskId: spawned.taskId, dispatchId: spawned.dispatchId, agentTerminalHandle: handle,
     admission: spawned.admission ?? null,
     terminalTitle: title, terminalTitleApplied: spawned.titleApplied === true };
 
-  ledger.transaction(() => {
-    updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, holderPid: process.pid, at: now, expiresAt: null,
+  let publication;
+  try {
+    publication = commitWorkflowStart(ledger, { workflowId, expected: startAuthority, token, holderPid: process.pid, at: now }, () => {
+    if (!updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, holderPid: process.pid, at: now, expiresAt: null,
       value: { terminal: handle, dispatch: spawned.dispatchId, runId: spawned.runId, host: 'orca', agent: route.agent, routedBy: route.routedBy,
-        model: kernelModel, effort: kernelEffort, launch: routeInfo.launch, modelAttested: true } });
+        model: kernelModel, effort: kernelEffort, launch: routeInfo.launch, modelAuthority, effectiveModel, modelAttested } }))
+      throw Error('kernel-start-reservation-lost');
     // A restart replaces the SEAT, not the workflow's Orca identity. Writing a
     // fresh object over payload_json dropped orca.runId, so the next dispatch's
     // ensureWorkflowRun saw no Run and created a second one — the two-tree
@@ -800,6 +584,7 @@ try {
           agent: route.agent,
           provider: route.agent,
           model: kernelModel,
+          modelAuthority, effectiveModel, modelAttested,
           profile: route.route?.profile ?? null,
           runtimePool: route.runtimePool ?? null,
           terminalHandle: handle,
@@ -822,7 +607,7 @@ try {
     ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation,
       kind: replaced ? 'kernel-restarted' : 'kernel-booted',
       payload: { terminal: handle, host: 'orca', agent: route.agent, routedBy: route.routedBy,
-        model: kernelModel, effort: kernelEffort, launch: routeInfo.launch, modelAttested: true,
+        model: kernelModel, effort: kernelEffort, launch: routeInfo.launch, modelAuthority, effectiveModel, modelAttested,
         inboxId: claim.inbox_id, attempt, launchedBy,
         startup: hostStartup, ...(workflowInstall ? { install: workflowInstall } : {}),
         nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}`,
@@ -835,14 +620,25 @@ try {
         ...(fellThrough.length ? { fellThrough } : {}),
       },
       createdAt: now });
-    if (bootRuntimeRev) ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation, kind: KERNEL_REV_ACKED_EVENT,
+    ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation, kind: 'runtime-read-delivered',
       payload: { rev: bootRuntimeRev, files: [...KERNEL_BOOT_FILES], source: 'boot', attempt }, createdAt: now });
-  });
-
+    });
+  } catch (error) {
+    publication = { ok: false, reason: 'kernel-seat-publication-failed', error: String(error?.message ?? error) };
+  }
+  if (!publication.ok) {
+    // The attested launch is still ours even when approval or the singleton changed while Orca was awaited.
+    const cleanup = releaseManagedWorker(spawned.dispatchId, handle);
+    if (cleanup.ok) { try { unbindGuardTerminal({ skillRoot, handle }); } catch { /* pruned by age later */ } }
+    failStart(publication.reason, publication.error ?? 'Kernel launch lost its final publication authority', handle,
+      { authority: publication.authority ?? null, dispatch: spawned.dispatchId, admission: spawned.admission ?? null,
+        effectState: cleanup.ok ? 'none' : 'unknown', cleanup });
+  }
+  if (priorHandle && priorHandle !== handle) { try { unbindGuardTerminal({ skillRoot, handle: priorHandle }); } catch { /* pruned by age later */ } }
 
   const out = { ok: true, workflowId, kernel: token, terminal: handle, host: 'orca', executionHost: 'orca',
     startup: hostStartup, ...(workflowInstall ? { install: workflowInstall } : {}),
-    agent: route.agent, routedBy: route.routedBy, launch: routeInfo.launch, modelAttested: true,
+    agent: route.agent, routedBy: route.routedBy, launch: routeInfo.launch, modelAuthority, effectiveModel, modelAttested,
     ...(kernelModel ? { model: kernelModel } : {}), ...(kernelEffort ? { effort: kernelEffort } : {}),
     ...(route.route?.profile ? { profile: route.route.profile } : {}),
     ...(route.runtimePool ? { runtimePool: route.runtimePool } : {}),

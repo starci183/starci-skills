@@ -12,11 +12,19 @@
 // Exit 0 done, 2 a refusal or bad usage (a secret value is never part of a message).
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { runProgram } from '../api/process/run-program.mjs';
+import { resolveRealTool } from '../api/process/resolve-real-tool.mjs';
+const sopsInvocation = Object.freeze({runProgram,resolveRealTool});
+import { randomBytes, randomUUID } from 'node:crypto';
+import { claimManager } from '../connectors/lib.mjs';
+import { sha256 } from '../../engine/digest.mjs';
+import { isSopsEnvelope } from '../lib/sops-envelope.mjs';
 import { decrypt as sopsDecrypt } from '../api/sops/decrypt.mjs';
 import { seal as sopsSeal } from '../api/sops/seal.mjs';
 
 class SecretError extends Error {}
+// claimManager is process-owned; refuse a recursive same-process write as well.
+const writingSecrets = new Set();
 
 const SLUG = /^[a-z0-9][a-z0-9-]*$/u;
 const KEY = /^[A-Za-z_][A-Za-z0-9_]*$/u;
@@ -75,18 +83,19 @@ const fileOf = (directory, slug) => {
 /** The default sops seam: the runtime's sops api, which finds the binary on this machine. */
 function defaultSops(env = process.env) {
   const refuse = (what, result) => {
+    if (result.error?.identityRefusal) return Object.assign(new SecretError(result.error.message), { identityRefusal: result.error.identityRefusal });
     if (result.error?.code === 'SOPS_MISSING') return new SecretError(result.error.message);
     return new SecretError(`sops could not ${what} (exit ${String(result.status)})`);
   };
   return {
     decrypt(file, format) {
-      const result = sopsDecrypt(null, ['decrypt', '--input-type', format, '--output-type', 'json', file], { env });
+      const result = sopsDecrypt(null, ['decrypt', '--input-type', format, '--output-type', 'json', file], { env, invocation: sopsInvocation });
       if (result.status !== 0) throw refuse(`decrypt ${path.basename(file)}; is the age identity installed?`, result);
-      return JSON.parse(result.stdout);
+      try { return JSON.parse(result.stdout); } catch { throw new SecretError('sops returned an invalid plaintext document'); }
     },
     seal(request) {
-      const result = sopsSeal(null, request, { env });
-      if (result.status !== 0) throw refuse(`seal the secret: ${String(result.stderr).trim().split(String.fromCharCode(10)).at(-1)}`, result);
+      const result = sopsSeal(null, request, { env, invocation: sopsInvocation });
+      if (result.status !== 0) throw refuse('seal the secret', result);
       return result.stdout;
     },
   };
@@ -109,8 +118,15 @@ function parse(argv) {
 const readStdin = () => fs.readFileSync(0, 'utf8');
 
 /** Seal `key = value` into the secret `slug`: an existing document keeps its other keys and its recipients. */
-function writeSecret({ file, key, value, age, sops }) {
-  if (!KEY.test(key)) throw new SecretError(`${key} is not a key name`);
+function writeSecret({ file, values, age, sops, processEnv = process.env }) {
+  for (const key of Object.keys(values)) if (!KEY.test(key)) throw new SecretError(`${key} is not a key name`);
+  const absolute = path.resolve(file), target = process.platform === 'win32' ? absolute.toLowerCase() : absolute;
+  const name = `sealed-secret-${sha256(target)}`;
+  if (writingSecrets.has(name)) throw new SecretError('the sealed secret is being updated; retry after that write settles');
+  const held = claimManager(name, { env: processEnv });
+  if (!held.ok) throw new SecretError('the sealed secret is being updated; retry after that write settles');
+  writingSecrets.add(name);
+  try {
   let format = 'json';
   let map = {};
   let recipients = age;
@@ -121,10 +137,28 @@ function writeSecret({ file, key, value, age, sops }) {
     map = sops.decrypt(file, format);
     if (!age.length) recipients = envelope.recipients;
   }
-  map[key] = value;
+  Object.assign(map, values);
   const sealed = sops.seal({ inputType: format, plaintext: plaintextOf(format, map), recipients, filenameOverride: file });
+  let parsed;
+  try { parsed = envelopeOf(sealed); } catch { throw new SecretError('sops returned an invalid sealed document'); }
+  if (!isSopsEnvelope(sealed) || parsed.keys.length !== Object.keys(map).length || !parsed.keys.every(key => Object.hasOwn(map, key))) throw new SecretError('sops returned an invalid sealed document');
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, sealed);
+  const temporary = path.join(path.dirname(file), `.${path.basename(file)}-${randomUUID()}.tmp`);
+  try {
+    fs.writeFileSync(temporary, sealed, { flag: 'wx', mode: 0o600, flush: true });
+    fs.renameSync(temporary, file);
+  } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
+  } finally { writingSecrets.delete(name); held.release(); }
+}
+
+/** Update named keys through the same canonical sealed-secret owner used by the CLI. */
+export function setSecretValues(repoRoot, { slug, values, env = null }, { sops = null, age = [], processEnv = process.env } = {}) {
+  const directory = secretsDirectory(repoRoot, env);
+  const file = fileOf(directory, slug);
+  if (!values || typeof values !== 'object' || Array.isArray(values) || !Object.keys(values).length) throw new SecretError('secret update requires named values');
+  for (const value of Object.values(values)) if (typeof value !== 'string' || value === '') throw new SecretError('secret values must be nonempty strings');
+  writeSecret({ file, values, age, sops: sops ?? defaultSops(processEnv), processEnv });
+  return { file, via: 'sealed-secret' };
 }
 
 /** `starci app secret <verb> ...`; `stdin` returns the value `set` seals, `sops` and `random` are test seams. */
@@ -159,13 +193,13 @@ export function secretMain(argv, { stdout = (s) => process.stdout.write(s), stde
     if (verb === 'set') {
       const value = String(stdin()).replace(/\r?\n$/u, '');
       if (value === '') throw new SecretError('the value on stdin is empty');
-      writeSecret({ file, key, value, age: opts.age, sops: seam });
+      writeSecret({ file, values: { [key]: value }, age: opts.age, sops: seam, processEnv: env });
       stdout(`sealed ${opts.positional[0]} (${key})\n`);
       return 0;
     }
     const bytes = opts.bytes === undefined ? 32 : Number(opts.bytes);
     if (!Number.isInteger(bytes) || bytes < 16 || bytes > 1024) throw new SecretError('--bytes is a whole number from 16 to 1024');
-    writeSecret({ file, key, value: random(bytes).toString('base64url'), age: opts.age, sops: seam });
+    writeSecret({ file, values: { [key]: random(bytes).toString('base64url') }, age: opts.age, sops: seam, processEnv: env });
     stdout(`generated and sealed ${opts.positional[0]} (${key}, ${bytes} bytes); read it with starci app secret show\n`);
     return 0;
   } catch (error) {

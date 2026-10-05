@@ -32,7 +32,7 @@ const publicVerbs = {
   'grammar-geometry': ['check', 'family', 'prompt', 'repo', 'viewport'],
   'grammar-knowledge': ['write'],
   'grammar-registry-pin': ['repo'],
-  'shell-conformance': ['admitted-at', 'op'],
+  'shell-conformance': [],
   'ui-proof-brief': ['elements', 'family', 'repo', 'score', 'surface', 'viewport'],
   'example-critique': ['work', 'write'],
   'example-derive': ['work', 'write'],

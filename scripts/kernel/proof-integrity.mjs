@@ -13,6 +13,7 @@
 //   coverage   every FR, shape and applicable proof case of the workflow's scope with its evidence and status
 //              proven | stale | missing (starci kernel coverage); an FR whose requiresProof has a required kind is a
 //              must-have, and handover.review may not ask the owner while one is missing or stale (starci kernel report).
+//              Qualified coverage requires every demanded kind to have exact-command green independent evidence on its settled attempt.
 //   tamper     the report-filed and artifacts-indexed events carry every artifact {id, name, sha256}, so the events
 //              digest chain covers them; verifyProofs re-reads each blob (the store re-hashes it) and walks the chain
 //              (starci kernel verify-proofs). A Work record cites an artifact by id + sha256, never by a path (ARCHITECTURE-DB §5.3).
@@ -28,6 +29,11 @@ import { list } from '../lib/list.mjs';
 import { createDigester, createWorkDigester, isWorkInput, WORK_PREFIX } from './input-digests.mjs';
 import { latestVersion } from '../work/work-graph-store.mjs';
 import { ARTIFACTS_INDEXED } from './job-artifacts.mjs';
+import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
+import { argvOf } from './settle/check-command.mjs';
+import { workCommonDef } from '../lib/work-schemas.mjs';
+import { validateAgainstSchema } from '../lib/json-schema.mjs';
+import { admittedContractOf } from '../machine/contract-version.mjs';
 // The events whose payload chains artifact {id, sha256} (read lazily: job-artifacts.mjs imports this module).
 const chainedArtifactEvents = () => [ARTIFACTS_INDEXED, 'report-filed'];
 
@@ -46,8 +52,12 @@ function wholeEventPayload(row) {
 }
 
 const PROOF_COVERAGE_SCHEMA = 'starci/proof-coverage@1';
-/** The contract change that made a handover ask owe its must-have proof (modules/kernel/contract-changes/, reach new-legs). */
-export const PROOF_INTEGRITY_CHANGE = 'proof-integrity';
+/** Require the admitted handover's current kind-complete independent proof coverage. */
+export function proofAcceptanceOf(db, job) {
+  const admission = admittedContractOf(db, job);
+  if (!Number.isFinite(admission.at)) throw new Error('the handover job has no admitted contract');
+  return { jobId: job.job_id, integrity: true, qualified: true };
+}
 const PROOF_VERIFY_SCHEMA = 'starci/proof-verify@1';
 const CLAIM_KINDS = ['frs', 'cases', 'shapes', 'specs'];
 const COVERAGE_STATUSES = ['proven', 'stale', 'missing'];
@@ -56,7 +66,7 @@ const SHAPE_ID = /^[A-Z][A-Za-z0-9]*Base#[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CASE_ID = /^[A-Z][A-Z0-9]*-\d+ case-\d+$/;
 const CASE_IN_TEXT = /\b[A-Z][A-Z0-9]*-\d+ case-\d+\b/g;
 const FR_IN_TEXT = /\bfr\.[a-z0-9-]+(?:\.[a-z0-9-]+)+\b/g;
-const SPEC_IN_TEXT = /[\w@./-]+\.(?:e2e-spec|spec|test|e2e)\.[cm]?[jt]sx?\b/g;
+const SPEC_ARGUMENT = /\.(?:e2e-spec|spec|test|e2e)\.[cm]?[jt]sx?$/;
 // Build output and tooling state never count as the code a proof depends on.
 const CODE_SKIP_DIRS = new Set(['node_modules', '.git', '.starciwork', 'dist', 'build', 'out', '.next', '.turbo', 'coverage', 'storybook-static']);
 const UI_DIR = /^(\.starciwork\/features\/[^/]+\/ui\/[^/]+)\//;
@@ -104,7 +114,7 @@ function frRecordsOf(repo) {
       if (typeof doc?.id === 'string' && FR_ID.test(doc.id)) {
         const demands = Object.entries(doc.requiresProof && typeof doc.requiresProof === 'object' ? doc.requiresProof : {});
         out.push({ id: doc.id, dir: slashed(path.relative(repo, dir)), required: demands.filter(([, d]) => d?.required === true).map(([k]) => k).sort(),
-          commands: demands.map(([, d]) => d?.command).filter((c) => typeof c === 'string') });
+          demands: Object.fromEntries(demands), commands: demands.map(([, d]) => d?.command).filter((c) => typeof c === 'string') });
       }
     }
     for (const e of entries) if (e.isDirectory() && !['evidence', 'assets'].includes(e.name)) visit(path.join(dir, e.name));
@@ -113,7 +123,26 @@ function frRecordsOf(repo) {
   return out;
 }
 
-const specsIn = (text) => [...String(text ?? '').matchAll(SPEC_IN_TEXT)].map((m) => slashed(m[0]));
+/** Resolve a scoped FR at its canonical path; an unreadable obligation never becomes an optional warning. */
+function requiredFrOf(repo, id) {
+  const [, feature, ...parts] = id.split('.'), dir = `.starciwork/features/${feature}/fr/${parts.join('/')}`;
+  const doc = parseYaml(fs.readFileSync(path.join(repo, dir, 'index.yaml'), 'utf8'));
+  if (doc?.id !== id || !doc.requiresProof || typeof doc.requiresProof !== 'object' || Array.isArray(doc.requiresProof))
+    throw new Error(`scoped FR ${id} has no readable requiresProof declaration at ${dir}/index.yaml`);
+  const proofShape = workCommonDef('requiresProof'), demandShape = workCommonDef('proofDemand'), proseShape = workCommonDef('prose');
+  if (!proofShape || !demandShape?.not || !proseShape) throw new Error('the canonical proof-demand schema is unreadable');
+  const demands = Object.entries(doc.requiresProof);
+  const problems = validateAgainstSchema(doc.requiresProof, { ...proofShape, $defs: { proofDemand: demandShape, prose: proseShape } });
+  // The shared demand's forbidden conjunction stays schema-owned; this small walker does not interpret generic not.
+  if (demands.some(([, demand]) => validateAgainstSchema(demand, demandShape.not).length === 0)) problems.push('a proof demand carries incompatible flags');
+  if (problems.length) throw new Error(`scoped FR ${id} has malformed proof demands at ${dir}/index.yaml: ${problems.join('; ')}`);
+  return { id, dir, demands: Object.fromEntries(demands), required: demands.filter(([, d]) => d.required === true).map(([kind]) => kind).sort(),
+    commands: demands.map(([, d]) => d.command).filter(command => typeof command === 'string') };
+}
+
+// Reuse the runner's argv owner so quoted path bytes remain one dependency identity.
+const specsIn = (text) => (argvOf(text) ?? []).map((arg) => arg.startsWith('--') && arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : arg)
+  .filter((arg) => !arg.startsWith('-') && SPEC_ARGUMENT.test(arg)).map(slashed);
 const specMatches = (command, spec) => specsIn(command).some((s) => s === spec || s.endsWith(`/${spec}`) || spec.endsWith(`/${s}`));
 
 /**
@@ -210,8 +239,9 @@ export function recordArtifactProofs(db, { repo, job, payload = {}, envelope = n
  */
 function proofArtifactsOf(db, workflowId, { repo }) {
   const rows = db.prepare(`SELECT a.artifact_id,a.job_id,a.op_id,a.attempt_id,a.name,a.kind,a.sha256,a.label,j.try_no,j.status AS job_status,j.updated_at AS job_at,
-      p.claims_json,p.code_sha,p.deps_json
+      p.claims_json,p.code_sha,p.deps_json,t.verdict AS attempt_verdict,t.settled_at,r.outcome AS report_outcome
     FROM job_artifacts a LEFT JOIN jobs j ON j.job_id=a.job_id LEFT JOIN artifact_proofs p ON p.artifact_id=a.artifact_id
+      LEFT JOIN op_attempts t ON t.attempt_id=a.attempt_id LEFT JOIN reports r ON r.attempt_id=a.attempt_id
     WHERE a.workflow_id=? ORDER BY a.artifact_id`).all(workflowId);
   const cd = codeDigester(repo), wd = createWorkDigester(repo);
   const now = new Map();
@@ -221,17 +251,22 @@ function proofArtifactsOf(db, workflowId, { repo }) {
     const deps = r.deps_json ? list(parseJson(r.deps_json, [])) : null;
     const changed = deps ? deps.filter((d) => typeof d?.path === 'string' && digestOf(d) !== d.digest).map((d) => d.path) : [];
     return { artifactId: r.artifact_id, jobId: r.job_id, op: r.op_id, attempt: r.try_no ?? null, attemptId: r.attempt_id, jobStatus: r.job_status ?? null, jobAt: r.job_at ?? null,
-      name: r.name, kind: r.kind, sha256: r.sha256, codeSha: r.code_sha ?? null, claims, state: !deps ? 'unbaselined' : changed.length ? 'stale' : 'fresh', changed };
+      name: r.name, kind: r.kind, sha256: r.sha256, codeSha: r.code_sha ?? null, claims, state: !deps ? 'unbaselined' : changed.length ? 'stale' : 'fresh', changed,
+      baseline: Boolean(deps?.length) && deps.every(d => typeof d?.path === 'string' && /^[0-9a-f]{64}$/.test(String(d.digest ?? ''))),
+      accepted: r.settled_at != null && ((r.job_status === 'succeeded' && r.attempt_verdict === 'pass' && r.report_outcome === 'done')
+        || (r.job_status === 'failed' && r.attempt_verdict === 'fail' && r.report_outcome === 'partial')),
+      checks: independentChecksOf(db, { attemptId: r.attempt_id })?.checks ?? [] };
   });
 }
 
 const itemKey = (kind, id) => `${kind}\0${id}`;
 const CLAIM_OF_ITEM = { fr: 'frs', case: 'cases', shape: 'shapes' };
 /** Evidence per claimed item: Map(kind\0id -> [artifact]); only a settled-succeeded or partial job's artifacts count. */
-const evidenceIndex = (artifacts) => {
+const evidenceIndex = (artifacts, { qualified = false } = {}) => {
   const index = new Map();
   for (const a of artifacts) {
     if (a.jobStatus && !['succeeded', 'failed'].includes(a.jobStatus)) continue;
+    if (qualified && (!a.accepted || !a.baseline)) continue;
     for (const [item, claim] of Object.entries(CLAIM_OF_ITEM)) for (const id of a.claims[claim]) {
       const key = itemKey(item, id);
       if (!index.has(key)) index.set(key, []);
@@ -278,6 +313,16 @@ function scopeOf(db, workflowId) {
   return { graphVersion: graph ? latestVersion(db, workflowId).version : null, frs, shapes: uniq(list(graph?.nodes).flatMap((n) => list(n.shapes)).filter((s) => SHAPE_ID.test(s))), uiDirs };
 }
 
+// A caller's claim names an item; only a green independent run of that item's declared command proves a kind.
+function provesDemand(artifact, demand, kind) {
+  const expected = typeof demand?.command === 'string' ? demand.command.trim() : null;
+  if (!expected) return false;
+  const checks = artifact.checks.filter(check => check.authority === 'runtime'
+    && String(check.command ?? '').trim() === expected);
+  return checks.length > 0 && checks.every(check => check.exitCode === 0 && check.status === 'pass'
+    && !check.unavailable && !check.advisory && !check.peerBlocked && (!check.measured || kind === 'measurement'));
+}
+
 /**
  * starci kernel coverage: every FR, shape and applicable proof case of the workflow's scope with its evidence and status.
  * `briefCases(record)` returns the applicable "RULE-N case-N" ids of one ui record (scripts/work/ui/ui-proof-brief.mjs
@@ -285,10 +330,10 @@ function scopeOf(db, workflowId) {
  */
 // notCounted: the proof kinds the owner switched off (config.yaml specs.unit/e2e false, scripts/route/spec-deferral.mjs):
 // an FR's requiresProof demand of that kind is not counted, so it makes no must-have on its own (listed as `notCounted`).
-export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts = proofArtifactsOf(db, workflowId, { repo }), notCounted = [] } = {}) {
+export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts = proofArtifactsOf(db, workflowId, { repo }), notCounted = [], qualified = false } = {}) {
   const scope = scopeOf(db, workflowId);
-  const index = evidenceIndex(artifacts);
-  const frRecords = new Map(frRecordsOf(repo).map((fr) => [fr.id, fr]));
+  const index = evidenceIndex(artifacts, { qualified });
+  const frRecords = new Map(qualified ? scope.frs.map(id => [id, requiredFrOf(repo, id)]) : frRecordsOf(repo).map(fr => [fr.id, fr]));
   const items = [];
   const shapes = new Set(scope.shapes);
   const cases = new Map();
@@ -305,7 +350,17 @@ export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts 
   const push = (kind, id, extra) => { const evidence = index.get(itemKey(kind, id)) ?? []; items.push({ kind, id, ...extra, status: statusOf(evidence), evidence: evidence.map(evidenceView) }); };
   for (const id of scope.frs) {
     const fr = frRecords.get(id), waived = (fr?.required ?? []).filter((kind) => notCounted.includes(kind)), counted = (fr?.required ?? []).filter((kind) => !notCounted.includes(kind));
-    push('fr', id, { must: Boolean(counted.length), ...(fr ? { requires: counted, record: fr.dir } : { record: null }), ...(waived.length ? { notCounted: waived } : {}) });
+    if (qualified && !fr) throw new Error(`scoped FR ${id} has no readable canonical record`);
+    if (!qualified) { push('fr', id, { must: Boolean(counted.length), ...(fr ? { requires: counted, record: fr.dir } : { record: null }), ...(waived.length ? { notCounted: waived } : {}) }); continue; }
+    const evidence = index.get(itemKey('fr', id)) ?? [];
+    const obligations = counted.map(kind => {
+      const backed = evidence.filter(a => provesDemand(a, fr.demands[kind], kind));
+      return { kind, status: !backed.length ? 'missing' : backed.some(a => a.state === 'fresh') ? 'proven' : 'stale', evidence: backed.map(evidenceView) };
+    });
+    const status = obligations.some(o => o.status === 'missing') ? 'missing' : obligations.some(o => o.status === 'stale') ? 'stale'
+      : obligations.length ? 'proven' : evidence.some(a => a.state === 'fresh') ? 'proven' : evidence.length ? 'stale' : 'missing';
+    items.push({ kind: 'fr', id, must: Boolean(counted.length), requires: counted, record: fr.dir, status, obligations,
+      evidence: evidence.map(evidenceView), ...(waived.length ? { notCounted: waived } : {}) });
   }
   for (const id of [...shapes].sort()) push('shape', id, { must: false });
   for (const [id, records] of [...cases].sort(([a], [b]) => (a < b ? -1 : 1))) push('case', id, { must: false, records: uniq(records) });

@@ -53,6 +53,8 @@ packet:
     owner_delegation: '{asks, until, excludes} | null'  # config.yaml delegation while active
     product_locale: '{locale, source} | null'  # layout tree productLocale.default, else brand voice default; UI copy language
     records: [...]                      # .starciwork records it touches (the read set)
+    selected_op: '{mode, contract, checks:{required,candidates}} | absent'  # immutable selected contract; absent on older attempts
+    readRefs: '[{path,absolute,rootKind,root,sha256,why}] | absent'  # resolved READ snapshot; no current-Source reconstruction
     owned_paths: [...]                  # what it may modify — boundary enforcement
     owner_answers: '[{dispatchId, jobId, attempt, question, options[], chosen:{index,label}|null, picks?, note?, answeredBy, answeredAt, receipt}]'  # present when the retry lineage holds answered asks
     specs_forced: '{at, by, kind} | absent'  # a test leg the config.yaml specs switches deferred, re-queued by starci kernel run-deferred-tests: it runs its whole brief
@@ -113,6 +115,29 @@ fields:
       brief declares become the packet's context. A brief that cannot produce
       every criterion assigned returns blocked with the exact gap
       (modules/ops/ops/task.execute.yaml outcome requirement).
+
+  context.selected_op:
+    meaning: >-
+      The effective shared-expanded contract for exactly one concrete execution mode, with common
+      obligations retained by ID and sibling permissions excluded. Required named layout checks and mechanical proof owners
+      remain distinct from broad kind route candidates and semantic completion/proof obligations.
+      A planning preview may retain mode select; a launched attempt cannot. Older filed attempts without
+      this snapshot retain their admission and are never rebuilt from a current manifest or params.
+    enforcedBy: >-
+      scripts/lib/op-shared.mjs resolveOpContract is the single selector. scripts/kernel/dispatch-admission.mjs
+      selectDispatchContract validates the authored shape/defaults before effects and files selected_op
+      in the existing packet carried by contracts.context_json. The worker reads that filed contract.
+
+  context.readRefs:
+    meaning: >-
+      Canonical runtime Source, product Work and bound app files are identified separately by relative
+      path, absolute path, explicit root and sha256. These are the bytes the selected context actually
+      measured at admission. Instance/prose/new-record templates stay declared; concrete required
+      Source files and bounded expansions cannot disappear silently.
+    enforcedBy: >-
+      scripts/context/pack.mjs buildContext uses scripts/context/read-refs.mjs to resolve each selected
+      reference. scripts/kernel/dispatch-admission.mjs captureDispatchInputs refuses missing or
+      truncated required reads and failed input measurement before environment/provider effects.
 
   context.records:
     meaning: >-
@@ -240,8 +265,9 @@ fields:
       The resource reservation the dispatch holds: the path:* write fences
       (one capacity-1 lease per owned_path, the api's reserveOpLeases) —
       assembled by the api's reserve. The workflow's concurrent-operation
-      ceiling is a separate admission, never a lease row
-      (engine/admission.mjs admitOpSlot; api.yaml route.maxOps).
+      ceiling is checked at preflight and again inside the same ledger transaction that leases the job, never a lease row
+      (engine/admission.mjs workflowOpSlots/admitOpSlot; engine/db/ledger.mjs reserveTwoPhase; api.yaml route.maxOps).
+      A concurrent max-ops refusal leaves the job queued with no lease, token or event write.
     enforcedBy: >-
       The api's admission takes the leases atomically with a TTL
       (DISPATCH_LEASE_TTL_MS=30min default, --lease-ttl overrides;
@@ -361,7 +387,7 @@ spawnMechanics:
     Inside the api call: reserve (durable lease, intent-v1) -> create or reuse
     the workflow Orca Run whose coordinator is the Kernel's own terminal
     -> launch exactly one agent with its operation Task, the one way
-    (contract-changes/launch-through-worker-start.yaml; scripts/agent/lib.mjs
+    (modules/kernel/start-workflow.yaml; scripts/agent/lib.mjs
     spawnAgent): worker-start --spec <packet> --agent <provider> [--model --effort]
     on the op's worktree, which creates the Task and owns its injection; the api
     reads the start receipt and worker-show for terminal/model attestation and never dispatches the Task a

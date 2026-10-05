@@ -7,6 +7,7 @@ import process from 'node:process';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { installRuntime, resolveNpmEntry, RUNTIME_VERSION } from '../../packages/cli/src/runtime-install.mjs';
+import {init, update} from '../../scripts/install/install.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 const fakeInstall = ({ cwd = path.resolve('fake-repo'), home = path.resolve('fake-home'), ...deps } = {}) => {
@@ -109,7 +110,7 @@ test('npm and runtime installer spawn errors and signals are printed', async (t)
   }
 });
 
-test('offline runtime installation binds the real shim to the installed CLI and its physical HFS dependency', { timeout: 60_000 }, async (t) => {
+test('offline runtime installation binds the real shim to the installed host and physical CLI/HFS dependency', { timeout: 60_000 }, async (t) => {
   const fixture = mkdtemp(t, 'starci-shim-home-');
   const home = path.join(fixture, 'home');
   const cwd = path.join(fixture, 'app');
@@ -133,14 +134,27 @@ test('offline runtime installation binds the real shim to the installed CLI and 
   const installer = path.join(runtimeRoot, 'scripts', 'install', 'install.mjs');
   fs.mkdirSync(path.dirname(installer), { recursive: true });
   fs.writeFileSync(installer, 'export {};\n');
+  const standaloneManifest = JSON.parse(fs.readFileSync(path.join(cli, 'package.json'), 'utf8'));
+  standaloneManifest.version = '99.0.0-fixture';
+  fs.writeFileSync(path.join(cli, 'package.json'), JSON.stringify(standaloneManifest));
   const installedCli = await import(pathToFileURL(path.join(cli, 'src', 'runtime-install.mjs')).href);
+  const fetched = [];
   const calls = [];
+  const runInstaller = args => {
+    calls.push(args);
+    (args[1] === 'init' ? init : update)({dir: cwd, bootstrap: false, hosts: []}, () => {});
+    return {status: 0};
+  };
   assert.equal(installedCli.installRuntime({ cwd, home, noBootstrap: true }, {
-    fetchRuntime: () => ({ status: 0 }),
-    runNode: (args) => { calls.push(args); return { status: 0 }; },
+    fetchRuntime: ({packageSpec}) => { fetched.push(packageSpec); return {status: 0}; }, runNode: runInstaller,
   }), 0);
   assert.deepEqual(calls, [[installer, 'init', '--dir', cwd, '--no-bootstrap']]);
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(home, '.starci', 'runtime.json'), 'utf8')), { root: runtimeRoot });
+  assert.deepEqual(fetched, [`starci@${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}`]);
+  const hostRuntime = path.join(cwd, '.claude');
+  const record = path.join(home, '.starci', 'runtime.json');
+  assert.deepEqual(JSON.parse(fs.readFileSync(record, 'utf8')), {root: hostRuntime});
+  fs.mkdirSync(path.join(runtimeRoot, 'scripts', 'cli'), {recursive: true});
+  fs.writeFileSync(path.join(runtimeRoot, 'scripts', 'cli', 'main.mjs'), 'throw new Error("download cache must not own host commands");\n');
   assert.equal(fs.existsSync(path.join(runtimeRoot, 'packages', 'hfs', 'src')), false);
   assert.equal(fs.existsSync(path.join(runtimeRoot, 'node_modules', '@starci', 'hfs')), false);
   assert.equal(fs.existsSync(path.join(cli, '..', 'hfs')), false);
@@ -179,12 +193,52 @@ test('offline runtime installation binds the real shim to the installed CLI and 
   assert.equal(owned.status, 0, owned.stderr || String(owned.error ?? ''));
   const explained = JSON.parse(owned.stdout);
   assert.deepEqual([explained.path, explained.status, explained.slot], ['hfs.json', 'owned', 'app.declaration']);
+  const hostManifest = JSON.parse(fs.readFileSync(path.join(hostRuntime, 'package.json')));
+  for (const [name, version] of Object.entries(hostManifest.dependencies ?? {})) {
+    const source = path.join(hfs, 'node_modules', ...name.split('/'));
+    const identity = JSON.parse(fs.readFileSync(path.join(source, 'package.json')));
+    assert.deepEqual([identity.name, identity.version], [name, version]);
+    const destination = path.join(hostRuntime, 'node_modules', ...name.split('/'));
+    fs.cpSync(source, destination, {recursive: true});
+    assert.equal(fs.lstatSync(destination).isSymbolicLink(), false);
+  }
+  const runtimeVersion = hostManifest.version;
+  const version = invoke('runtime', 'version');
+  assert.equal(version.status, 0, version.stderr || String(version.error ?? ''));
+  assert.equal(version.stdout.trim(), runtimeVersion);
+  const locator = await import(pathToFileURL(path.join(cli, 'src', 'runtime-locate.mjs')).href);
+  const binding = locator.locateRuntime({cwd, home, env, embeddedRoot: path.join(fixture, 'absent')});
+  assert.deepEqual(binding, {root: hostRuntime, source: record});
+  const rootOwner = await import(pathToFileURL(path.join(binding.root, 'engine', 'runtime-root.mjs')).href);
+  const configOwner = await import(pathToFileURL(path.join(binding.root, 'engine', 'config.mjs')).href);
+  assert.equal(rootOwner.skillRoot, hostRuntime);
+  assert.equal(rootOwner.starciSourceRoot(env), cwd);
+  assert.equal(configOwner.configRoot, hostRuntime);
+  const configFile = path.join(hostRuntime, 'config.yaml');
+  const originalConfig = fs.readFileSync(configFile, 'utf8');
+  fs.writeFileSync(configFile, originalConfig + '\nspecs: {harness: true, unit: false, e2e: true}\n');
+  assert.deepEqual(configOwner.specsSettings(configOwner.loadConfig()), {harness: true, unit: false, e2e: true});
+  fs.writeFileSync(configFile, originalConfig);
+  fs.rmSync(runtimeRoot, {recursive: true});
+  const withoutCache = invoke('runtime', 'version');
+  assert.equal(withoutCache.status, 0, withoutCache.stderr || String(withoutCache.error ?? ''));
+  assert.equal(withoutCache.stdout.trim(), runtimeVersion);
+  fs.mkdirSync(path.dirname(installer), {recursive: true});
+  fs.writeFileSync(installer, 'export {};\n');
+  assert.equal(installedCli.installRuntime({cwd, home, noBootstrap: true}, {
+    fetchRuntime: () => ({status: 0}), runNode: runInstaller,
+  }), 0);
+  assert.deepEqual(calls[1], [installer, 'update', '--dir', cwd, '--no-bootstrap']);
+  assert.deepEqual(JSON.parse(fs.readFileSync(record, 'utf8')), {root: hostRuntime});
+  const afterUpdate = invoke('runtime', 'version');
+  assert.equal(afterUpdate.status, 0, afterUpdate.stderr || String(afterUpdate.error ?? ''));
+  assert.equal(afterUpdate.stdout.trim(), runtimeVersion);
   const unowned = invoke('app', 'explain', 'unowned.fixture', '--json');
   assert.equal(unowned.status, 1, unowned.stderr || String(unowned.error ?? ''));
   const refused = JSON.parse(unowned.stdout);
   assert.deepEqual([refused.path, refused.status, refused.code], ['unowned.fixture', 'no-slot', 'HFS_SLOT_UNDECLARED']);
   assert.equal(fs.readFileSync(path.join(cwd, 'hfs.json'), 'utf8'), declaration);
-  assert.deepEqual(fs.readdirSync(cwd), ['hfs.json']);
+  assert.deepEqual(fs.readdirSync(cwd).sort(), ['.agents', '.claude', 'hfs.json']);
 });
 
 test('the npm entry resolved on this host executes through the current Node binary', (t) => {

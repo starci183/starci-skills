@@ -78,7 +78,10 @@ setInterval(()=>{},1000);`);
 test('two ask gateways started at once leave exactly one serving',async t=>{
   const home=mkdtemp(t,'starci-gateway-single-',()=>{for(const r of runs)kill(r.child.pid);});
   const env={...process.env,LOCALAPPDATA:home,...storeOf(home)};
-  const runs=await Promise.all([firstLine([GATEWAY,'run','--port','0'],env),firstLine([GATEWAY,'run','--port','0'],env)]);
+  const config=parseYaml(fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8'));
+  const entry="import {main} from "+JSON.stringify(pathToFileURL(GATEWAY).href)+"; await main(['run','--port','0'],{env:process.env,root:"+JSON.stringify(home)+",config:"+JSON.stringify(config)+"});";
+  const argv=['--input-type=module','-e',entry];
+  const runs=await Promise.all([firstLine(argv,env),firstLine(argv,env)]);
   const serving=runs.filter(r=>r.answer?.ok===true);
   assert.equal(serving.length,1,JSON.stringify(runs.map(r=>r.answer)));
   assert.equal(runs.find(r=>r!==serving[0]).answer?.already,true);
@@ -123,22 +126,43 @@ setInterval(()=>{},1000);`);
 test('ensureAskConnectors starts the gateway and one manager, never a second while one is alive or still starting',t=>{
   const home=tmp(t,'starci-ensure-');
   const env={LOCALAPPDATA:home,STARCI_CLOUDFLARED_COMMAND:process.execPath};
-  const config={...parseYaml(fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')),connectors:{secretsFile:null,cloudflare:{mode:'quick'}}};
+  const config={...parseYaml(fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')),connectors:{cloudflare:{mode:'quick'}}};
   const spawned=[];
   // The launched processes are stood in for by this live process, still starting (no lock yet).
   const spawn=(script,args)=>{spawned.push([path.basename(script),...args]);return process.pid;};
-  assert.equal(ensureAskConnectors({env:{...env,STARCI_CONNECTORS_OFF:'1'},config,spawn}).skipped,'STARCI_CONNECTORS_OFF');
-  assert.equal(ensureAskConnectors({env:{LOCALAPPDATA:home,NODE_TEST_CONTEXT:'child'},config,spawn}).skipped,'test context','a spec never starts the real cloudflared');
-  const first=ensureAskConnectors({env,config,spawn});
+  assert.equal(ensureAskConnectors({env:{...env,STARCI_CONNECTORS_OFF:'1'},config,root:home,spawn}).skipped,'STARCI_CONNECTORS_OFF');
+  assert.equal(ensureAskConnectors({env:{LOCALAPPDATA:home,NODE_TEST_CONTEXT:'child'},config,root:home,spawn}).skipped,'test context','a spec never starts the real cloudflared');
+  const first=ensureAskConnectors({env,config,root:home,spawn});
   assert.deepEqual([first.ok,first.gateway,first.tunnel],[true,{launched:process.pid},{launched:process.pid}]);
   assert.deepEqual(spawned,[['ask-gateway.mjs','run','--port','7070'],['tunnel.mjs','run','--port','7070']]);
-  const second=ensureAskConnectors({env,config,spawn});
+  const second=ensureAskConnectors({env,config,root:home,spawn});
   assert.deepEqual([second.gateway,second.tunnel],[{already:true},{already:process.pid}],'a manager still starting counts as alive');
   assert.equal(spawned.length,2,'no second manager');
   // Past the starting window with no lock and a dead pid, a manager is launched again.
   markStarting('tunnel',deadPid(),env);
-  assert.deepEqual(ensureAskConnectors({env,config,spawn}).tunnel,{launched:process.pid});
+  assert.deepEqual(ensureAskConnectors({env,config,root:home,spawn}).tunnel,{launched:process.pid});
   assert.equal(managerAlive(env)?.pid,process.pid);
+});
+
+test('named ask connector refusal happens before gateway launch and private shared env reaches both children',t=>{
+  const home=tmp(t,'starci-connector-shared-env-');
+  const env={LOCALAPPDATA:home,...storeOf(home),STARCI_CLOUDFLARED_COMMAND:process.execPath};
+  const config={...parseYaml(fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')),connectors:{cloudflare:{mode:'named',hostname:'ask.example.org',tokenEnv:'PRIVATE_TUNNEL_TOKEN'}}};
+  const spawned=[];
+  const spawn=(script,args,options)=>{spawned.push({script:path.basename(script),args,env:options.env});return process.pid;};
+  const missing=ensureAskConnectors({env,config,root:home,spawn});
+  assert.equal(missing.ok,false);
+  assert.match(missing.error,/PRIVATE_TUNNEL_TOKEN/);
+  assert.deepEqual(spawned,[],'missing selected token creates no gateway or manager');
+  fs.writeFileSync(path.join(home,'secret.env'),'PRIVATE_TUNNEL_TOKEN=private-fixture-token\n');
+  const blank=ensureAskConnectors({env:{...env,PRIVATE_TUNNEL_TOKEN:''},config,root:home,spawn});
+  assert.equal(blank.ok,false);
+  assert.deepEqual(spawned,[],'blank actual env prevents file token resurrection');
+  const made=ensureAskConnectors({env,config,root:home,spawn});
+  assert.equal(made.ok,true,JSON.stringify(made));
+  assert.deepEqual(spawned.map(({script})=>script),['ask-gateway.mjs','tunnel.mjs']);
+  assert.ok(spawned.every(({env})=>env.PRIVATE_TUNNEL_TOKEN==='private-fixture-token'));
+  assert.ok(!JSON.stringify(made).includes('private-fixture-token'));
 });
 
 test('tunnel status reports health: manager, cloudflared, gateway reachability, and every extra manager',async t=>{

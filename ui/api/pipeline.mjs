@@ -16,7 +16,7 @@ export const attemptOpen = (row) => row.dispatched_at != null && row.settled_at 
 /** How an ended attempt without a verdict reads: a requeued launch is not a try (rejected), an unknown effect waits on reconcile. */
 const END_STATE_STATUS = { requeued: 'rejected', 'worker-dead': 'failed', 'effect-unknown': 'blocked', cancelled: 'dropped' };
 
-export function attemptStatus(row) {
+function attemptStatus(row) {
   // v_op_history.ui (docs/why.md): an op that ended with an ask waits on the owner; a launch refused at submission is not a try.
   if (row.ui === 'awaiting-owner') return 'awaiting-owner';
   if (row.ui === 'rejected') return 'rejected';

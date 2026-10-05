@@ -3,7 +3,7 @@ name: starci
 description: >-
   Interact with StarCi only through an explicit /starci request or explicit native skill selection.
   Resolve its host and project context, inspect or draft workflow goals, manage approved workflows,
-  diagnose host readiness, run assisted UAT, and complete authorized runtime releases.
+  diagnose host readiness and action credentials, run assisted UAT, and complete authorized runtime releases.
 disable-model-invocation: true
 triggers: [user]
 ---
@@ -31,6 +31,7 @@ Load only the reference needed for the requested action:
 | Owner chat host operations | `references/orca-cli.md` |
 | Owner chat worker coordination | `references/orchestration.md` |
 | Owner chat visible computer inspection | `references/computer-use.md` |
+| Inspect a selected action's credential requirements | `<Source>/.claude/docs/host-secrets.md` |
 | Inspect or recover host readiness | `<Source>/.claude/.starci/host/startup.md` |
 | Inspect runtime maintenance | `<Source>/.claude/.starci/host/maintenance.md` |
 

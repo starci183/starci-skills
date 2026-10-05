@@ -16,7 +16,7 @@ provenance:
 guidance:
   - id: load-order
     requirement: Read hfs/README.md (HFS, the one source and storage standard), hfs/rules.yaml (the one rule
-      catalog), architecture-rules.yaml, coding-reference.yaml and the smallest applicable English Nest/Next topic.
+      catalog), architecture-rules.yaml, ../docs/architecture.md, ../docs/code-pattern-enforcement.md and the smallest applicable English Nest/Next topic.
       All projects use Next.js/NestJS under HFS. Code patterns are checked by
       executable scripts; design patterns and edge cases are reviewed by agents using Markdown guidance.
       Knowledge has no translated mirrors and grants no execution authority. Product requirements, design,
@@ -42,10 +42,6 @@ branches:
     use: The one place the Sonar thresholds live (new code - coverage 100 on the logic of be/src/modules, duplication, blocker/critical issues,
       unreviewed hotspots - and the overall part - coverage 100 per service, no open issue, every hotspot reviewed), the ops that must pass them and the why codes; an app only names the gate
       in the app root's .starcistacks.
-  - id: code-examples
-    title: Code examples
-    path: code-examples/index.yaml
-    use: Focused extracted examples for applying the rules directly.
   - id: hfs-slots
     title: HFS slot manifest
     path: hfs/slots.yaml
@@ -97,5 +93,7 @@ branches:
     path: grammars/index.yaml
     use: Family-specific package observations, not a guarantee of current exports.
 related:
-  - coding-reference.yaml
+  - ../docs/architecture.md
+  - ../docs/code-pattern-enforcement.md
+  - ../examples/index.yaml
   - patterns/scan-coverage.yaml

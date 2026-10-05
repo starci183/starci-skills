@@ -620,7 +620,7 @@ describe('starci app scaffold: the first tree', () => {
     const manifest = JSON.parse(read(root, 'package.json'));
     assert.equal(manifest.scripts['test:stack'], 'starci app stack');
     assert.equal(manifest.devDependencies['@starci/test-world'], parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins['@starci/test-world'].version);
-    assert.equal(manifest.devDependencies['@starci/cli'], '1.0.0', 'the public CLI is an exact app devDependency');
+    assert.equal(manifest.devDependencies['@starci/cli'], parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins['@starci/cli'].version, 'the public CLI is an exact app devDependency');
     assert.equal(manifest.devDependencies['@starci/hfs'], undefined, 'the HFS implementation remains transitive through @starci/cli');
     // The Work tree names the two sides of the app as its repositories, the form of the examples and the work-layout contract.
     const workspace = parseYaml(read(root, '.starciwork/workspace.yaml'));

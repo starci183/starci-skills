@@ -69,3 +69,6 @@ next-env.d.ts
 
 # Keep the cited evidence runs already tracked; ignore fresh replay output.
 /.starciwork/features/**/uat/**/runs/
+
+# Public package policy is tracked with the example source.
+!.starcistacks/.npmignore

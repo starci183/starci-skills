@@ -115,7 +115,7 @@ test('every cite under modules/goal and modules/ops resolves in the real tree', 
   assert.ok(report.citesChecked > 100, `expected a real scan, checked ${report.citesChecked}`);
 });
 
-test('a retired path is valid history in a contract-change entry, and dead in live text — owner-rulings.yaml included', () => {
+test('a retired path is valid only in its registry and dead in former contract entries and live owner text', () => {
   const root = fixtureTree({
     'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@1\nretired:\n  - {path: scripts/old/loop.mjs, retiredAt: 2026-09-28}\n',
     'modules/kernel/contract-changes/old.yaml': 'id: old\nsummary: "`scripts/old/loop.mjs` did it once"\n',
@@ -125,14 +125,14 @@ test('a retired path is valid history in a contract-change entry, and dead in li
   });
   try {
     const report = checkContractCites(root);
-    assert.deepEqual(report.dead.map((d) => d.file), ['modules/kernel/live.yaml', 'modules/kernel/owner-rulings.yaml'], JSON.stringify(report.dead));
-    assert.equal(report.retiredCites, 2, 'the contract-change entry and the registry itself keep the cite as history');
+    assert.deepEqual(report.dead.map((d) => d.file), ['modules/kernel/contract-changes/old.yaml', 'modules/kernel/live.yaml', 'modules/kernel/owner-rulings.yaml'], JSON.stringify(report.dead));
+    assert.equal(report.retiredCites, 1, 'only the retired-path declaration keeps the missing cite as history');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('a moved path is valid history and dead in live text, named with where it went (moved[])', () => {
+test('moved paths in former contract entries and live text are dead; only their registry keeps history', () => {
   const root = fixtureTree({
     'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@2\nretired: []\nmoved:\n  - {from: scripts/old/gate.mjs, to: scripts/gates/gate.mjs, movedIn: C4, quiesced: false}\n  - {from: scripts/kernel/gone-verbs/, to: scripts/kernel/verbs/, movedIn: C6, quiesced: false}\n',
     'modules/kernel/contract-changes/old.yaml': 'id: old\nsummary: "`scripts/old/gate.mjs` ran the gate"\n',
@@ -145,8 +145,13 @@ test('a moved path is valid history and dead in live text, named with where it w
   });
   try {
     const report = checkContractCites(root);
-    assert.deepEqual(report.dead.map((d) => [d.file, d.why]), [['modules/kernel/live.yaml', 'moved to scripts/gates/gate.mjs']]);
-    assert.equal(report.retiredCites, 4, 'the contract changes and the registry itself cite old paths as history, a file below a moved directory and a generated copy of a moved file included');
+    assert.deepEqual(report.dead.map((d) => [d.file, d.why]), [
+      ['modules/kernel/contract-changes/copy.yaml', 'no such file'],
+      ['modules/kernel/contract-changes/old.yaml', 'moved to scripts/gates/gate.mjs'],
+      ['modules/kernel/contract-changes/verb.yaml', 'moved to scripts/kernel/verbs/settle.mjs'],
+      ['modules/kernel/live.yaml', 'moved to scripts/gates/gate.mjs'],
+    ]);
+    assert.equal(report.retiredCites, 1, 'only the registry keeps the old file cite; a live citation of a generated copy is still checked');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -167,8 +172,8 @@ test('RT_CITED_PATH_MISSING: the widened scan reads every tracked doc, yaml and 
     const findings = citedPathFindings(root);
     assert.deepEqual(
       findings.map((f) => f.path).sort(),
-      ['docs/guide.md', 'knowledge/patterns/fe/x.yaml', 'scripts/run.mjs'],
-      'a doc, a knowledge yaml and a source comment are scanned; a string literal, contract history, a changelog and a benchmark are not',
+      ['docs/guide.md', 'knowledge/patterns/fe/x.yaml', 'modules/kernel/contract-changes/old.yaml', 'scripts/run.mjs'],
+      'docs, knowledge, source comments and former contract entries are scanned; string literals, changelogs and benchmarks are not',
     );
     assert.ok(findings.every((f) => f.code === CITED_PATH_MISSING && f.message.includes('scripts/missing/tool.mjs')));
   } finally {

@@ -1,7 +1,7 @@
 # owner-rulings.yaml — the owner's standing rulings, by stable id, so evidence can cite them.
 #
 # A drawing's rationale.json (scripts/work/draw/draw-rationale.mjs) cites an owner ruling as `owner:<id>`; the id must
-# resolve here, to a contract change id (modules/kernel/contract-changes/<id>.yaml), to a note of the ui record's
+# resolve here, to a note of the ui record's
 # ui.review.feedback, to a brand.direction.learned id, or to an answer receipt. An entry is what the owner ruled, in
 # one sentence, with the date and where it is enforced; it is never a runtime opinion. Add an entry in the commit that
 # lands the ruling.
@@ -100,7 +100,7 @@ rulings:
   - id: autopilot-run-to-finish
     date: '2026-09-28'
     ruling: "Run to the finish in one go; don't stop to ask the owner - not even UX/UI review. Machine-gated drawings and directions are accepted provisionally (by autopilot, never golden), runtime/process gates and retry caps go to the Supervisor, credentials/real money/shared external systems are deferred to handover on sandbox/stub paths with ONE end-of-flow credential checklist (\"limit provision asks\"), and the owner reviews everything once at handover; ugly UX/UI is re-run in one batch."
-    enforcedBy: [scripts/kernel/autopilot-run.mjs, modules/models/runtimes.yaml, scripts/kernel/cli.mjs, scripts/work/draw-review.mjs, scripts/work/brand-direction.mjs, scripts/work/brand/brand.mjs]
+    enforcedBy: [scripts/kernel/autopilot-run.mjs, scripts/kernel/autopilot-budget.mjs, modules/models/runtimes.yaml, scripts/kernel/cli.mjs, scripts/work/draw-review.mjs, scripts/work/brand-direction.mjs, scripts/work/brand/brand.mjs]
   - id: grammar-publish-auto-approve
     date: '2026-09-28'
     ruling: "Publishing @starci/grammar to npm needs no owner approval (\"next time do not ask for approval any more ... auto approve\"): after a grammar change lands, bump the semver (additive → minor, fix → patch), date the CHANGELOG entry, land, build and publish, then tell the owner in the digest. Credentials stay the owner's: publishing uses the npm login the owner already holds; never create, enter or rotate a token."
@@ -121,9 +121,9 @@ rulings:
   - id: provider-qwen-removed
     date: '2026-09-29'
     ruling: "The Qwen provider is removed from the runtime with no backward compatibility (\"remove qwen, it is far too lame!! not buying it any more, devin codex claude are enough\"): only claude, codex and devin remain, and a config.yaml that still names qwen is refused with \"Qwen has been removed; use claude, codex or devin\"."
-    enforcedBy: [modules/models/runtimes.yaml, modules/models/registry.yaml, engine/config.mjs, modules/kernel/contract-changes/provider-qwen-removed.yaml]
+    enforcedBy: [modules/models/runtimes.yaml, modules/models/registry.yaml, engine/config.mjs]
   - id: one-pattern-no-legacy
     date: '2026-09-30'
     ruling: "One pattern, no exceptions, no legacy, no backward compatibility: a mechanism that is superseded or unusable is deleted with all its references, never kept as an alias, fallback or second path."
     confirmed: '2026-09-30 owner decision on the starci link removal, task pub1'
-    enforcedBy: [modules/kernel/contract-changes/starci-link-removed.yaml]
+    enforcedBy: [scripts/checks/check-retired-cli.mjs]

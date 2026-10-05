@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict'; import path from 'node:path';
 import {
   hostSettings, servicePorts, serviceRegistry, harnessIngress, stepService, newRecord, backoffDelay, memoryStore, machineStore,
-  orcaRestartScript, cleanEnv, DOWN_STATES, seatAgentOf, httpUp, OUTAGE_STATES,
+  orcaRestartScript, cleanEnv, DOWN_STATES, seatAgentOf, httpUp, OUTAGE_STATES, startService, servicePlatformProblem,
 } from '../../scripts/reconciler/services.mjs';
 import { tempState } from '../../scripts/reconciler/testing.mjs';
 
@@ -41,14 +41,14 @@ test('one port source: the harness port, the tunnel ingress and the gateway port
 test('the probes read the one port source; a drifted tunnel ingress fails the tunnel probe', async () => {
   const seen = [];
   const http = async (url) => { seen.push(url); return { ok: true, status: 200 }; };
-  const reg = serviceRegistry({ settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }), http, run: async () => ({ status: 0, stdout: '{"running":true,"port":7070}' }) });
+  const reg = serviceRegistry({ platform: 'win32', settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }), http, run: async () => ({ status: 0, stdout: '{"running":true,"port":7070}' }) });
   assert.equal((await reg.find((e) => e.name === 'harness-ui').probe()).ok, true);
   assert.equal((await reg.find((e) => e.name === 'harness-tunnel').probe()).ok, true);
   assert.deepEqual(seen, ['http://127.0.0.1:4547/healthz', 'https://harness.example.org/healthz'], 'the lightweight /healthz, not the snapshot page');
   assert.equal((await reg.find((e) => e.name === 'ask-gateway').probe()).ok, true);
-  const wrongPort = serviceRegistry({ settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }), http, run: async () => ({ status: 0, stdout: '{"running":true,"port":7071}' }) });
+  const wrongPort = serviceRegistry({ platform: 'win32', settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }), http, run: async () => ({ status: 0, stdout: '{"running":true,"port":7071}' }) });
   assert.equal((await wrongPort.find((e) => e.name === 'ask-gateway').probe()).ok, false, 'a gateway on another port than config.yaml says is down');
-  const drifted = serviceRegistry({ settings: S, ports: servicePorts({ allocation: { supervisorTick: { statusApp: { port: 4548 } } }, config: CONFIG, harnessYml: HARNESS_YML }), http });
+  const drifted = serviceRegistry({ platform: 'win32', settings: S, ports: servicePorts({ allocation: { supervisorTick: { statusApp: { port: 4548 } } }, config: CONFIG, harnessYml: HARNESS_YML }), http });
   const t = await drifted.find((e) => e.name === 'harness-tunnel').probe();
   assert.equal(t.ok, false);
   assert.match(t.error, /port-drift/);
@@ -145,11 +145,11 @@ test('restart:false (checkers, the task while allowTaskRepair is false) never st
 });
 
 test('the registry marks the scheduled task unmanaged when it is absent and repair is not allowed', async () => {
-  const reg = serviceRegistry({ settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }), run: async () => ({ status: 1, stdout: '' }) });
+  const reg = serviceRegistry({ platform: 'win32', settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }), run: async () => ({ status: 1, stdout: '' }) });
   const task = reg.find((e) => e.name === 'sched-task:StarCi-Reconciler');
   assert.equal(task.restart, false);
   const p = await task.probe();
-  if (process.platform === 'win32') assert.equal(p.unmanaged, true);
+  assert.equal(p.unmanaged, true);
 });
 
 test('Orca restarts through explorer.exe with no agent session variables', async () => {
@@ -226,10 +226,122 @@ test('harness readiness requires actual 200 JSON health while connector liveness
 
 test('both harness registry probes request strict health semantics at their configured URLs', async () => {
   const calls = [];
-  const registry = serviceRegistry({ settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }),
+  const registry = serviceRegistry({ platform: 'win32', settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }),
     http: async (url, options) => { calls.push({ url, options }); return { ok: true, status: 200 }; } });
   await registry.find((entry) => entry.name === 'harness-ui').probe();
   await registry.find((entry) => entry.name === 'harness-tunnel').probe();
   assert.deepEqual(calls.map((call) => call.url), ['http://127.0.0.1:4547/healthz', 'https://harness.example.org/healthz']);
   assert.ok(calls.every((call) => call.options.health === true));
+});
+
+test('service capability classifications limit Windows refusals to their actual actuators', () => {
+  const windows = ['orca', 'harness-ui', 'harness-tunnel', 'sched-task:StarCi-Reconciler'];
+  const portable = ['ask-gateway', 'ask-tunnel', 'telegram-bridge'];
+  for (const name of [...windows, ...portable]) assert.equal(servicePlatformProblem(name, 'win32'), null, name);
+  for (const platform of ['darwin', 'linux']) {
+    assert.equal(servicePlatformProblem('orca', platform), `Windows desktop restart is unsupported on ${platform}`);
+    for (const name of windows.slice(1)) assert.equal(servicePlatformProblem(name, platform), `Windows Task Scheduler is unsupported on ${platform}`, name);
+    for (const name of portable) assert.equal(servicePlatformProblem(name, platform), null, name);
+  }
+});
+
+test('unsupported direct starts refuse before launch environment, actuator settings or Windows APIs', async () => {
+  const ports = servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML });
+  for (const platform of ['darwin', 'linux']) {
+    for (const name of ['orca', 'harness-ui', 'harness-tunnel']) {
+      const calls = [];
+      const settings = { ...S, services: new Proxy(S.services, { get: () => assert.fail('unsupported starts must refuse before actuator settings') }) };
+      const env = new Proxy({}, { ownKeys: () => assert.fail('unsupported starts must refuse before launch environment') });
+      const result = await startService(name, {
+        platform, settings, ports, env,
+        tasks: (...args) => { calls.push(['tasks', ...args]); return { status: 0 }; },
+        powershell: (...args) => { calls.push(['powershell', ...args]); return { status: 0 }; },
+      });
+      assert.deepEqual(result, { ok: false, unsupported: true, error: servicePlatformProblem(name, platform) }, `${platform}:${name}`);
+      assert.deepEqual(calls, [], `${platform}:${name}`);
+    }
+  }
+});
+
+test('unsupported registry entries remain unmanaged even when task repair is allowed', async () => {
+  const ports = servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML });
+  for (const platform of ['darwin', 'linux']) {
+    const calls = [];
+    const registry = serviceRegistry({
+      platform, settings: { ...S, allowTaskRepair: true }, ports,
+      run: async (...args) => { calls.push(['run', ...args]); return { status: 0, stdout: '' }; },
+      http: async (...args) => { calls.push(['http', ...args]); return { ok: true, status: 200 }; },
+    });
+    for (const name of ['orca', 'harness-ui', 'harness-tunnel', 'sched-task:StarCi-Reconciler']) {
+      const entry = registry.find((candidate) => candidate.name === name);
+      assert.equal(entry.restart, false, `${platform}:${name}`);
+      assert.equal(entry.start(), null, `${platform}:${name}`);
+      const probe = await entry.probe();
+      assert.deepEqual(probe, { ok: false, unsupported: true, unmanaged: true, error: servicePlatformProblem(name, platform) }, `${platform}:${name}`);
+      const step = stepService(newRecord(name, 0), probe, opts(entry, 1));
+      assert.equal(step.to, 'unmanaged', `${platform}:${name}`);
+      assert.equal(step.act, null, `${platform}:${name}`);
+    }
+    assert.deepEqual(calls, [], platform);
+  }
+});
+
+test('portable connector registry probes and start commands remain available off Windows', async () => {
+  const ports = servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML });
+  for (const platform of ['darwin', 'linux']) {
+    const calls = [];
+    const registry = serviceRegistry({
+      platform, settings: S, ports,
+      run: async (_cmd, args) => {
+        calls.push([path.basename(args[0]), ...args.slice(1)]);
+        return { status: 0, stdout: JSON.stringify({ running: true, port: ports.gatewayPort, health: { problems: [] } }) };
+      },
+      http: async () => assert.fail('connector status probes must use their injected child runner'),
+    });
+    for (const name of ['ask-gateway', 'ask-tunnel', 'telegram-bridge']) {
+      const entry = registry.find((candidate) => candidate.name === name);
+      assert.equal(entry.restart, true, `${platform}:${name}`);
+      const result = await entry.probe();
+      assert.equal(result.ok, true, `${platform}:${name}`);
+      assert.notEqual(result.unsupported, true, `${platform}:${name}`);
+      assert.deepEqual(entry.start(), { cmd: 'node', args: ['scripts/reconciler/services.mjs', '--start', name, '--json'] });
+    }
+    assert.deepEqual(calls, [['ask-gateway.mjs', 'status'], ['tunnel.mjs', 'status', '--fast'], ['telegram-bridge.mjs', 'status']], platform);
+  }
+});
+
+test('Windows harness starts preserve End, listener stop, then Run ordering', async () => {
+  const ports = servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML });
+  for (const name of ['harness-ui', 'harness-tunnel']) {
+    const task = S.services[name].task;
+    const calls = [];
+    const result = await startService(name, {
+      platform: 'win32', settings: S, ports, env: {},
+      tasks: (args) => {
+        calls.push(['tasks', ...args]);
+        return args[0] === '/End' ? { status: 1, stdout: '', stderr: 'already stopped' } : { status: 0, stdout: ' started \n', stderr: '' };
+      },
+      powershell: () => { calls.push(['powershell']); return { status: 0 }; },
+    });
+    assert.deepEqual(result, { ok: true, task, output: 'started' }, name);
+    assert.deepEqual(calls, [['tasks', '/End', '/TN', task], ...(name === 'harness-ui' ? [['powershell']] : []), ['tasks', '/Run', '/TN', task]], name);
+  }
+});
+
+test('Windows harness starts retain the raw Run failure instead of reporting success', async () => {
+  const ports = servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML });
+  for (const name of ['harness-ui', 'harness-tunnel']) {
+    const task = S.services[name].task;
+    const calls = [];
+    const result = await startService(name, {
+      platform: 'win32', settings: S, ports, env: {},
+      tasks: (args) => {
+        calls.push(['tasks', ...args]);
+        return args[0] === '/Run' ? { status: 5, stdout: '', stderr: ' access denied \n' } : { status: 0, stdout: '', stderr: '' };
+      },
+      powershell: () => { calls.push(['powershell']); return { status: 0 }; },
+    });
+    assert.deepEqual(result, { ok: false, task, output: 'access denied' }, name);
+    assert.deepEqual(calls, [['tasks', '/End', '/TN', task], ...(name === 'harness-ui' ? [['powershell']] : []), ['tasks', '/Run', '/TN', task]], name);
+  }
 });

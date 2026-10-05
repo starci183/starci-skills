@@ -24,14 +24,15 @@ release:
   closeTerminal: true
   verify: terminal-process-tree
 launchTrust: >-
-  Owner instruction 2026-09-23: the runtime, never the owner, approves launch prompts. Before every launch
+  Requires the current installation's explicit launchTrust automatic profile and an exact approved repository root. Before an authorized launch
   scripts/agent/trust.mjs appends [projects."<path>"] trust_level = "trusted" for the cwd and its git root to
-  ~/.codex/config.toml and Orca's CODEX_HOME config.toml; a trust prompt that still appears is answered once, else refused.
+  the active managed CODEX_HOME config.toml; explicit provider declines and unresolved launch directories are refused. A consent screen alone cannot prove scope.
 gateAutoAnswer:
   delayMs: 500
   settleMs: 6000
   gates:
     codex-directory-trust:
+      requiresLaunchTrust: true
       select: 'Yes, continue'
     codex-update-prompt:
       select: 'Skip until next version'

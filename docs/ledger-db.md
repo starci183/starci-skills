@@ -3,11 +3,11 @@ Task: read the runtime's storage
 
 The executed schemas live under `engine/db/migrations/runtime/` and `engine/db/migrations/machine/`.
 `engine/db/ledger.mjs` owns project schema validation; `engine/db/machine.mjs` owns host schema validation
-and the supported provider-reservation and core-maintenance signal upgrades. The host upgrade preserves
-existing rows and records each DDL digest in `schema_migrations` in the same transaction as its version
-change. Machine writers upgrade v1/v2 stores to v3; readers validate v1, v2 or v3 without upgrading them.
-The signal upgrade admits the distinct core-debug enabled and diagnostic scopes while preserving existing
-Supervisor signal keys, tokens, values and expiries. These writers and their SQL files own the storage rules.
+and required physical objects. Current v3 stores preserve their host rows and historical `schema_migrations`
+journal; readers never write it. Fresh machine stores execute one folded `0001-init.sql` and atomically
+record version 3. Other identities refuse without upgrade or reset. The current signal domains keep
+Supervisor keys, tokens, values and expiries separate from core-debug enabled/diagnostic scopes.
+These writers and their SQL files own the storage rules.
 
 ## 1. The layout
 
@@ -23,7 +23,15 @@ Supervisor signal keys, tokens, values and expiries. These writers and their SQL
 - There is no other store. No JSON state file, no JSONL inbox, no text log, no second SQLite file.
 - The writers refuse unsupported schema identities or versions. `openLedger` creates a fresh project
   store at `ledgerFileFor(<repo root>)`; `openMachine` creates a fresh host store at `machineFileFor`
-  or applies its supported additive upgrade to an existing host store.
+  and validates an existing current host store without rewriting its journal.
+- `openLedger({fixture:{ledgerId,createdAt,blobRoot},file,checkpointer:true})` initializes a fresh
+  sample through the same canonical schema and seeds. Its identity is in the reserved synthetic namespace
+  validated by `engine/db/ledger-paths.mjs`; its clock is frozen and `blobRoot` is a portable relative path.
+  A sample accepts no repository, product, machine or cached project binding. Typed mutations and later
+  writable opens refuse it before writer setup; read-only inspection remains available. A real project
+  initializes its own store through its normal lifecycle instead of copying or registering sample bytes.
+  The fixture descriptor and selected artifact roots are explicit producer inputs; metadata alone does not
+  redirect blob readers. Selected reads use the existing per-call blob-root contract.
 - `STARCI_LOCAL_ROOT` overrides the per-host state base (`%LOCALAPPDATA%/StarCi` itself, one shared helper:
   `engine/db/machine.mjs` `starciLocalRoot`/`LOCAL_ROOT_ENV`, re-exported and honored by `engine/db/ledger.mjs`
   `projectsRootFor`) — both `projects/` and `machine.sqlite` move under it. Narrower seams still win when set:
@@ -66,7 +74,12 @@ at their consuming boundary.
 
 The single checkpointing connection is the guard against the WAL-reset defect of SQLite 3.50.4
 until the bundled SQLite is 3.51.3 or newer; the open records `sqlite_version` in the meta table.
-Databases live on local disks only.
+Databases live on a local disk whose filesystem implements SQLite locking and sync correctly. Network shares,
+NAS mounts and cloud-synchronized database directories are outside the supported placement. Root overrides do
+not validate a filesystem's failure behavior. With WAL and `synchronous=NORMAL`, a process crash preserves
+committed transactions, while power loss or a hard reset can roll acknowledged commits back. The runtime does
+not promise zero data loss under those failures. See [SQLite WAL](https://www.sqlite.org/wal.html), reviewed
+2026-10-04; physical power-loss behavior has no measured recovery bound in the runtime's private specs.
 
 ### Transactions
 
@@ -166,18 +179,11 @@ each ledger read-only (`forEachLedger`) and merge in JavaScript. Attaching a bat
   harness serves `GET/HEAD /api/blob/<sha>` with the stored media type, `ETag = sha`, immutable
   caching and `Range`; `text=head|tail&lines=` for logs; `410` with the archive reference after a
   blob was archived and swept.
-- **GC.** Mark and sweep per ledger, never through an attached union: open a `gc_runs` row; for each
-  registered ledger, read-only, select every column listed in its `blob_ref_columns` into
-  `gc_marks`; do the same for machine; sweep a file only when it is unmarked in this run, unpinned in
-  every database, archived, and older than 24 h (the grace against put-before-insert). Every item
-  is a `gc_items` row with its outcome. `scripts/housekeeping/blob-gc.mjs` runs it (dry by default);
-  an unmarked blob past the grace is first zipped to `<archive root>/blob-retention-<date>/`,
-  re-read and re-hashed, recorded in `archives` and marked `archived_at` in every DB that holds it.
-  An old-schema or unreadable source sweeps nothing (fail closed).
+- **GC capability.** `scripts/housekeeping/blob-gc.mjs` plans retention read-only across each registered ledger and machine reference catalog. Missing applicable tables/columns, an unreadable source or an archive whose recorded identity/exact blob-entry digest fails verification blocks the plan. Destructive `--apply` is unsupported and returns nonzero without opening writers, archiving, pruning rows or deleting bytes: the existing GC lock serializes GC processes but ordinary cross-store reference writers do not consume a deletion fence, so an old sha can be reused after marking. A rescan does not prove that race safe. Originals remain; blob disk usage has no enforced upper bound. Worktree and job cleanup are separate owners and remain available.
 - **Blob retention (Q4).** Retention drops a reference from the mark set, never a row by itself:
   attempt prompt, transcript and session blobs (`op_attempts`, `sup_attempts`) stay while the
   workflow or Supervisor job lives, then 30 days for a `pass` verdict and 90 days otherwise;
-  `attempt_transcript_snapshots` and `seat_transcript_snapshots` are pruned once the final
+  `attempt_transcript_snapshots` and `seat_transcript_snapshots` stop marking once the final
   transcript exists (`op_attempts.transcript_sha`, the seat's `agent_sessions.transcript_sha`),
   otherwise they follow the same windows (a seat has no verdict: 90 days); an `agent_sessions`
   transcript keeps 90 days after the session ends. A blob a Work record cites (`pinned = 1`) is kept
@@ -195,8 +201,46 @@ Rows stay while a workflow lives. A finished workflow is purged only as a unit, 
 approval, by `scripts/work/purge-workflow.mjs`: the workflow's rows and referenced blobs are zipped to
 `<archive root>`, the archive is re-read and verified entry by entry, `workflow_purges` records
 the archive, and only then does `DELETE FROM workflows` cascade through every table of that
-workflow. Blob files leave only through the GC sweep above. Machine sample tables keep 14–30 days,
+workflow. Automatic workflow purge requires current explicit `retention.workflowPurge` adoption for its exact repository; the shipped default grants none. The approved workflow ZIP purge remains available within the supported archive envelope; blob files are retained while destructive blob GC is unsupported. Machine sample tables keep 14–30 days,
 `machine_logs` 14 days for debug and 90 days otherwise.
+
+ZIP I/O supports at most 4096 entries, 64 MiB compressed/uncompressed per entry, 256 MiB compressed archive/total uncompressed payload and 1024-byte names. Options can reduce these caps. Verification reads positional records and inflates one entry at a time through `zipVisit`; workflow purge verification retains only entry metadata/digests, and archive hashing streams through the existing digest owner. Invalid bounds, duplicates, encryption/data descriptors, ZIP64, excessive output and truncation refuse before workflow deletion. Compression is synchronous; these byte caps do not establish a hard CPU deadline or an end-to-end RTO.
+
+The output cap and positional I/O APIs are documented by [Node.js zlib](https://nodejs.org/download/release/v22.15.1/docs/api/zlib.html) and [Node.js File system](https://nodejs.org/docs/latest-v24.x/api/fs.html), reviewed 2026-10-04.
+
+Blob publication flushes temporary bytes/metadata before linking and hashes reused bytes before returning. A corrupt same-size destination or invalid sidecar refuses acknowledgement. Publication directory/link persistence and SQLite NORMAL remain dependent on the local filesystem, operating system and hardware; no power-loss guarantee for an acknowledged blob/DB reference is established.
+
+Repository identity preserves case on POSIX and uses the existing Windows case-insensitive policy. An existing pre-fix folded POSIX store is reused only when its own `meta.repo_root` proves the exact requested root. A mismatch refuses and preserves the database for owner migration; no automatic rename or row merge occurs. Case-sensitive Windows directories and synchronized/network storage are outside this profile.
+
+### Recovery scope
+
+The Host controller snapshots individual project ledgers through `scripts/reconciler/ledger-health.mjs`.
+It uses SQLite `VACUUM INTO`, checks the output's pages, supported schema and ledger identity, hashes and
+syncs the snapshot bytes, publishes the file, then applies that ledger's snapshot retention. The active child
+receipt records the file, digest and identity. A failed or shadow action does not advance backup success.
+An output-verification or publication failure preserves older snapshots. Filesystem sync and rename still
+depend on the operating system and storage hardware; these checks establish a usable snapshot under the
+observed conditions, not a physical power-loss guarantee. [SQLite VACUUM](https://www.sqlite.org/lang_vacuum.html)
+defines the snapshot semantics; reviewed 2026-10-04.
+
+These snapshots exclude `machine.sqlite`, blob bytes, Git refs and repository files, owner configuration,
+secrets, provider sessions and external effects. The default backup directory shares the local state root's
+failure domain. Full host/disk-loss recovery, a consistent multi-store export/import and an off-host backup
+service are unsupported capabilities. No recovery-point or recovery-time bound has been measured for them;
+the nightly schedule alone supplies neither an RPO nor an RTO guarantee.
+
+Recovery is manual. Preserve the original database and WAL, resolve compatibility or access failures first,
+and stop every writer before restoring an owner-selected verified snapshot. Inspect its identity, schema,
+digest and creation time against the retained receipt and accept the explicit loss window. Before resuming,
+reconcile the restored project state with the current machine registry, Git checkpoints, evidence bytes and
+provider/external effects; a lost acknowledgement can leave an effect that the restored ledger does not show.
+An unidentified database is retained for diagnosis rather than replaced by an empty store.
+
+A repository clone carries Work records and citations. Host-local ledger rows and blob bytes must be made
+available separately or their verification must be rerun. A citation whose backing bytes are unavailable is
+missing proof; a Git revision alone cannot make that evidence portable. Machine action, probe and metrics
+histories also have no general archive/retention budget; the machine log retention helper does not establish
+a bound for those other tables.
 
 ## 8. Refusal discipline
 

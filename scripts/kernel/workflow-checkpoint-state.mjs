@@ -3,8 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { claimManager } from '../connectors/lib.mjs';
-import { sleepSync } from '../lib/sleep-sync.mjs';
+export { withLock, withWorkflowLock } from '../goal/workflow-lock.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { add as gitAdd } from '../api/git/add.mjs';
@@ -12,10 +11,9 @@ import { readTree } from '../api/git/read-tree.mjs';
 import { writeTree } from '../api/git/write-tree.mjs';
 import { lsTree } from '../api/git/ls-tree.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
-import { getBlob, putBlob } from '../../engine/db/blob.mjs';
+import { getBlob } from '../../engine/db/blob.mjs';
 import { redactData } from '../lib/redact.mjs';
 
-const WORKFLOW_LOCK = Symbol('workflow-checkpoint-lock');
 const SHA = /^[0-9a-f]{40,64}$/;
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 export const literalPaths = (files) => files.map((file) => `:(literal)${file}`);
@@ -27,32 +25,15 @@ export function appendEffectEvent(ctx, args) {
   try { return ctx.ledger.appendEvent(args); }
   catch (error) {
     if (error.code !== 'STARCI_EVENT_PAYLOAD_TOO_LARGE') throw error;
-    const blob = putBlob(Buffer.from(JSON.stringify(redactData(args.payload))), { mediaType: 'application/json' });
-    const { sha, before, committed, opId, attemptId, dispatchId, resetTo } = args.payload;
-    return ctx.ledger.appendEvent({ ...args, payload: { spilled: true, sha256: blob.sha, sha, before, committed, opId, attemptId, dispatchId, resetTo }, payloadSha: blob.sha });
+    // The event's blob foreign key needs the index row in the same ledger before its durable receipt.
+    return ctx.ledger.transaction(() => {
+      const blob = ctx.ledger.write.storeBlob({ content: Buffer.from(JSON.stringify(redactData(args.payload))), mediaType: 'application/json', redaction: 'v1' });
+      const { sha, before, committed, opId, attemptId, dispatchId, resetTo } = args.payload;
+      return ctx.ledger.appendEvent({ ...args, payload: { spilled: true, sha256: blob.sha256, sha, before, committed, opId, attemptId, dispatchId, resetTo }, payloadSha: blob.sha256 });
+    });
   }
 }
 export const preparedSettlementOf = (ctx, { workflowId, opId, attemptId }) => receiptPayload(ctx.db.prepare("SELECT payload_json,payload_sha FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND attempt_id IS ? AND kind IN ('workflow-checkpoint-prepared','workflow-op-preserved-prepared') ORDER BY seq DESC LIMIT 1").get(workflowId, opId, attemptId))?.settlement ?? null;
-
-/** Hold the existing host lock through one synchronous operation. */
-export function withLock(name, fn, { waitMs = 600_000, pollMs = 1000, env = process.env } = {}) {
-  const end = Date.now() + waitMs;
-  for (;;) {
-    const held = claimManager(name, { env });
-    if (held.ok) { try { return fn(); } finally { held.release(); } }
-    if (Date.now() >= end) return { ok: false, reason: 'lock-busy', lock: name, holder: held.holder ?? null };
-    sleepSync(pollMs);
-  }
-}
-/** Native acceptance and direct primitives share the authoritative ledger/workflow lock. */
-export function withWorkflowLock(ctx, { workflowId }, fn) {
-  const identity = ctx?.ledger?.ledgerId ?? ctx?.ledger?.path ?? ctx?.repo ?? '';
-  const name = `workflow-checkpoint-${crypto.createHash('sha1').update(`${identity}:${workflowId}`).digest('hex').slice(0, 16)}`;
-  if (ctx?.[WORKFLOW_LOCK] === name) return fn(ctx);
-  const out = withLock(name, () => fn({ ...ctx, [WORKFLOW_LOCK]: name }), { waitMs: ctx?.lockWaitMs, env: ctx?.env ?? process.env });
-  if (out?.reason === 'lock-busy') throw fail({ code: 'workflow-checkpoint-lock-busy' }, `another checkpoint holds ${name}`);
-  return out;
-}
 
 /** Read the prepared/applied receipt for the same job dispatch attempt. */
 export function receiptState(ctx, { workflowId, opId }, kind) {

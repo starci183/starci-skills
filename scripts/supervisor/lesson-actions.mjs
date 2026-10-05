@@ -6,26 +6,19 @@
 //        [--wrongly-blocked <tests/<name>.spec.mjs>] [--reason <t>] [--wait-ms <ms>] [--json]
 //   starci supervisor lesson-actions revert --experiment <id> [--apply] [--json]
 //   starci supervisor lesson-actions propose --title <t> --evidence <t> --options <t> --recommendation <t> [--send] [--json]
-import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { isMain } from '../lib/is-main.mjs';
 import { verbCli } from '../lib/cli-arg.mjs';
 import { createScratchWorktree, removeScratchWorktree } from '../machine/worktree-git.mjs';
-import { posixPath } from '../lib/path-key.mjs';
-import { entryFileOf } from '../lib/contract-changes-path.mjs';
 import { SKILL_ROOT, lanesRoot } from '../machine/home.mjs';
-import { add as gitAdd } from '../api/git/add.mjs';
 import { commit as gitCommit } from '../api/git/commit.mjs';
-import { diff as gitDiff } from '../api/git/diff.mjs';
 import { revert as gitRevert } from '../api/git/revert.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { show as gitShow } from '../api/git/show.mjs';
 import { KINDS, commitFiles, guardLand, landedWithin, learningSettings, one, readLearning, write } from '../machine/lessons.mjs';
-import { land, governedPaths } from './land.mjs';
+import { land } from './land.mjs';
 import { ownerPush } from '../connectors/telegram.mjs';
-
-const norm = posixPath;
 
 /**
  * Guard, land through the gate, record the experiment. `landFn` is land.mjs land (a spec stubs it). Returns
@@ -54,7 +47,7 @@ export async function landExperiment({ signature, commits, lane, specs = [], wro
 
 /**
  * The revert lane of an experiment: a worktree on lane/revert-<id> off main, `git revert --no-commit` of its commits
- * newest first, a contract-changes entry covering reverted contract files, one commit, the land gate, the result.
+ * newest first, one normal commit, the current land gate and the measured result.
  * `apply` false only plans. Seams: landFn, lanes.
  */
 export async function revertExperiment({ id, apply = false, env = process.env, now = Date.now, landFn = null, root = SKILL_ROOT, lanes = null }) {
@@ -77,18 +70,6 @@ export async function revertExperiment({ id, apply = false, env = process.env, n
   if (!made.ok) throw Object.assign(new Error(`worktree ${dir}: ${made.detail ?? made.reason}`), { code: 'revert-git' });
   try {
     for (const sha of [...e.commits].reverse()) step(gitRevert, 'revert', ['--no-commit', sha]);
-    const changed = step(gitDiff, 'diff', ['--cached', '--name-only']).split(/\r?\n/).filter(Boolean).map(norm);
-    const governed = governedPaths(changed);
-    if (governed.length) {
-      // One file per contract change (scripts/lib/contract-changes-path.mjs).
-      const rel = entryFileOf(name);
-      const entry = [`id: ${name}`, `effectiveAt: '${new Date(now()).toISOString()}'`,
-        `summary: "Supervisor self-learning revert of experiment ${id} (${e.signature}): ${one(state.experiments[id].result?.reason ?? 'measured no improvement', 300).replace(/"/g, "'")}. Adds no check or finding code"`,
-        'reach: new-legs', 'paths:', ...governed.map((p) => `  - ${p}`), ''].join('\n');
-      fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
-      fs.writeFileSync(path.join(dir, rel), entry);
-      step(gitAdd, 'add', [rel]);
-    }
     step(gitCommit, 'commit', ['-q', '-m', `revert(self-learning): ${e.signature} - experiment ${id} did not work\n\nReverts ${e.commits.join(', ')}: ${one(state.experiments[id].result?.reason ?? '', 400)}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`]);
     const sha = step(revParseQuery, 'rev-parse', ['HEAD']);
     const doLand = landFn ?? land;

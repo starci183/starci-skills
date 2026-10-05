@@ -38,6 +38,21 @@ export function boundGuard(handle, { root, env = process.env } = {}) {
   catch { return null; }
 }
 
+/** Actual terminal/seat binding: missing is absent; unreadable, linked or contradictory is unknown. */
+export function boundIdentityOf(handle, { root, env = process.env } = {}) {
+  const read = (family) => {
+    const file = path.join(guardsRoot(root, env), family, `${safeName(handle)}.json`);
+    let stat;
+    try { stat = fs.lstatSync(file); } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+    if (!stat.isFile() || stat.isSymbolicLink()) throw Error('non-regular caller binding');
+    const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!value || typeof value !== 'object' || Array.isArray(value) || value.terminal !== handle) throw Error('contradictory caller binding');
+    return value;
+  };
+  if (!handle) return { guard: null, seat: null };
+  return { guard: read('terminals'), seat: read('seats') };
+}
+
 /**
  * The caller's rights role, or null (the owner's own session). `lockOwner` is the host lock's owner object (or null): the
  * release role needs it, so a session cannot claim release by an environment variable alone.

@@ -200,17 +200,26 @@ const state = stateFile && fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync
 const save = () => { if (stateFile) fs.writeFileSync(stateFile, JSON.stringify(state)); };
 const arg = n => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : null; };
 // A replay-request mutation's receipt is recorded under its --retry-request id before it is printed.
+// Test-only wire loss after a committed/recorded fake effect; never invokes a real host.
+const loseReceipt = () => {
+  const lose = process.env.STARCI_FAKE_ORCA_LOSE_RECEIPT || '';
+  const command = argv.slice(0, 2).join(' ');
+  if (lose === command && (process.env.STARCI_FAKE_ORCA_LOSE_RECEIPT_ALWAYS === '1' || !(state.lostReceipts || []).includes(command))) {
+    state.lostReceipts = [...(state.lostReceipts || []), command]; save();
+    const shape = process.env.STARCI_FAKE_ORCA_LOST_RECEIPT_KIND;
+    if (shape === 'overflow') { fs.writeSync(1, Buffer.alloc(2 * 1024 * 1024, 120)); process.exit(1); }
+    if (shape === 'signal') { process.kill(process.pid, 'SIGTERM'); process.exit(1); }
+    if (shape === 'empty') { console.log('{}'); process.exit(0); }
+    if (shape === 'primitive') { console.log('true'); process.exit(0); }
+    console.log('transport closed before the receipt was written');
+    process.exit(1);
+  }
+};
 const remember = (o, code) => {
   const id = argv.includes('--retry-request') && argv.slice(0, 2).join(' ') !== 'terminal send' ? arg('retry-request') : null;
   // Only a recorded request writes the state: a read never rewrites it (a spec edits it between runs).
   if (id) { state.requests = { ...(state.requests || {}), [id]: { receipt: o, code } }; save(); }
-  const lose = process.env.STARCI_FAKE_ORCA_LOSE_RECEIPT || '';
-  const command = argv.slice(0, 2).join(' ');
-  if (lose === command && !(state.lostReceipts || []).includes(command)) {
-    state.lostReceipts = [...(state.lostReceipts || []), command]; save();
-    console.log('transport closed before the receipt was written');
-    process.exit(1);
-  }
+  loseReceipt();
 };
 const out = o => { remember(o, 0); console.log(JSON.stringify(o)); };
 // STARCI_FAKE_ORCA_STDERR: a harmless line on stderr, like the crashpad registration line the real orca CLI prints in PowerShell.
@@ -302,7 +311,16 @@ if (argv[0] === 'agent-context') {
     if (!flags.includes('json')) flags.push('json');
     commands.push({ command: call.command, flags: flags.map(f => '--' + f) });
   }
-  out({ ok: true, schemaVersion: 1, commandCount: commands.length, commands });
+  // Private transport regression: complete commands alone must not authorize a mutation after failed refresh.
+  const failure = process.env.STARCI_FAKE_ORCA_LISTING_FAILURE || '';
+  const listing = { ok: failure !== 'explicit-refusal', schemaVersion: 1, commandCount: commands.length, commands };
+  if (failure) {
+    fs.writeSync(1, JSON.stringify(listing) + '\n');
+    if (failure === 'overflow') fs.writeSync(1, Buffer.alloc(2 * 1024 * 1024, 32));
+    if (failure === 'signal') process.kill(process.pid, 'SIGTERM');
+    process.exit(failure === 'explicit-refusal' ? 0 : 1);
+  }
+  out(listing);
   process.exit(0);
 }
 if (verb === 'orchestration request-show') {
@@ -314,6 +332,11 @@ if (verb !== 'terminal send' && arg('retry-request') && state.requests?.[arg('re
   const id = arg('retry-request');
   const recorded = state.requests[id];
   state.replays = [...(state.replays || []), { verb, id }]; save();
+  if (process.env.STARCI_FAKE_ORCA_REPLAY_REFUSAL === '1') {
+    console.log(JSON.stringify({ ok: false, error: { code: 'runtime_unavailable', message: 'private replay refusal' } }));
+    process.exit(1);
+  }
+  loseReceipt();
   console.log(JSON.stringify({ ...recorded.receipt, result: { ...(recorded.receipt.result || {}), mutation: { requestId: id, replayed: true } } }));
   process.exit(recorded.code);
 }

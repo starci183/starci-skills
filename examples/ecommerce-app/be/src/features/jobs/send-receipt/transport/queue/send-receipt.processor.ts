@@ -5,7 +5,7 @@ import { RECEIPT_QUEUE } from "@modules/queues/receipt"
 import { StoreReceiptStep } from "../../steps/store-receipt.step"
 
 @Injectable()
-/** The processor of the send-receipt job: the base class claims the job with its fencing token and settles it, `process` runs the one step. */
+/** The processor of the send-receipt job: the runner claims and settles it; `process` delegates the fenced claim to the one step. */
 export class SendReceiptProcessor extends FencedProcessor {
     readonly queue = RECEIPT_QUEUE
 

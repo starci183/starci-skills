@@ -325,3 +325,23 @@ test('a report without a baseline says which findings it could not evaluate',()=
     'a clean report over one tree must say what it did not look at, or it reads as a clean report over the transition');
   assert.equal(report.coverage.compared,0,'nothing was compared, because there was nothing to compare against');
 });
+
+test('Work readers refuse linked roots and report oversized records without reading their body', t => {
+  const root = world(t), oversized = path.join(root, 'features/oversized/index.yaml');
+  write(oversized, 'schema: work/business-rule@1\nid: br.oversized\npadding: ' + 'x'.repeat(5 * 1024 * 1024) + '\n');
+  const read = fs.readFileSync;
+  let bodyReads = 0;
+  fs.readFileSync = (file, ...options) => {
+    if (path.resolve(file) === oversized) bodyReads += 1;
+    return read(file, ...options);
+  };
+  try {
+    const tree = readWorkTree(root);
+    assert.deepEqual(tree.unreadable, ['features/oversized/index.yaml']);
+    assert.equal(tree.records.size, 0);
+    assert.equal(bodyReads, 0, 'a rejected size bound must not read or parse the oversized body');
+  } finally { fs.readFileSync = read; }
+  const link = path.join(root, 'linked-root');
+  fs.symlinkSync(root, link, process.platform === 'win32' ? 'junction' : 'dir');
+  assert.throws(() => readWorkTree(link), WorkChangeInputError);
+});

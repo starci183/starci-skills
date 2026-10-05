@@ -5,7 +5,9 @@
 //
 //   coverage --workflow <id>
 import { ownerSpecs, specsOff } from '../../route/spec-deferral.mjs';
-import { coverageLines, coverageOf } from '../proof-integrity.mjs';
+import { coverageLines, coverageOf, proofAcceptanceOf } from '../proof-integrity.mjs';
+import { JOB_STATUSES } from '../../../engine/db/ledger.mjs';
+import { HANDOVER_OP, handoverApprovalOf, handoverGateOf } from '../handover.mjs';
 
 export default {
   verb: 'coverage',
@@ -18,7 +20,18 @@ export default {
     let knowledge = null;
     const briefCases = (record) => buildBrief({ record, knowledge: (knowledge ??= loadKnowledge()) }).topics.flatMap((t) => t.cases.map((c) => `${c.rule} ${c.case}`));
     const notCounted = specsOff(ownerSpecs(internals.skillRoot));
-    const out = { ok: true, ...coverageOf(ledger.db, args.workflow, { repo, briefCases, notCounted }), ...(notCounted.length ? { notCounted: notCounted.map((kind) => `specs.${kind}=false`) } : {}) };
+    let policy;
+    try {
+      const jobs = ledger.db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND kind<>'kernel'").all(args.workflow, HANDOVER_OP);
+      const active = jobs.filter(job => !JOB_STATUSES.settled.includes(job.status));
+      if (active.length > 1) throw new Error('more than one active handover job has a coverage policy');
+      const gate = handoverGateOf(ledger.db, args.workflow), approval = handoverApprovalOf(ledger.db, args.workflow);
+      const approvedId = gate.ok && gate.via === 'handover-approved' ? gate.approval?.jobId : approval.approved ? approval.ask?.jobId : null;
+      const job = active[0] ?? jobs.find(row => row.job_id === approvedId);
+      if (!job) throw new Error('no active or approved handover job determines coverage policy');
+      policy = proofAcceptanceOf(ledger.db, job, internals.skillRoot);
+    } catch (error) { throw Object.assign(new Error(`handover-proof-unjudged: ${error.message}`), { code: 'handover-proof-unjudged' }); }
+    const out = { ok: true, policy, ...coverageOf(ledger.db, args.workflow, { repo, briefCases, notCounted, qualified: policy.qualified }), ...(notCounted.length ? { notCounted: notCounted.map((kind) => `specs.${kind}=false`) } : {}) };
     emit(out, coverageLines(out).join('\n'), args.json);
   },
 };

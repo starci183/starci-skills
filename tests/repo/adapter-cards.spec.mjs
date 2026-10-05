@@ -19,7 +19,7 @@ for(const file of cards){
     assert.ok(card&&typeof card==='object',`${file} did not parse to an object`);
     assert.equal(card.schema,'starci/agent-card@1',`${file} schema`);
     assert.equal(card.agent,path.basename(file,'.yaml'),`${file} agent name must equal the filename`);
-    // Every agent is the one kind: Orca starts and supervises it (contract-changes/launch-through-worker-start.yaml).
+    // Every agent is the one kind: Orca starts and supervises it.
     assert.equal(card.kind,'native-managed-agent',`${file} kind`);
     assert.equal(card.start?.api,'orchestration.worker-start',`${file}: every agent starts via orchestration.worker-start`);
     assert.equal(card.start?.agentArgument,card.agent,`${file}: worker-start --agent names the card's agent`);

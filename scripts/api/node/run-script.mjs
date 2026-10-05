@@ -2,8 +2,8 @@
 // inherited), the way `starci runtime check` runs each retained self-check. Returns its exit status (1 when it could not start).
 import { nodeSpawn } from './lib.mjs';
 
-/** Runs `script` with `args` in `cwd`, output going to this process's terminal; the exit status, 1 when it did not start. */
-export const runScript = (script, args = [], { cwd } = {}) => {
-  const r = nodeSpawn([script, ...args], { cwd, stdio: 'inherit' });
+/** Runs a runtime script with the supplied cwd and env; inherited stdio, child status or 1 if it cannot start. */
+export const runScript = (script, args = [], { cwd, env } = {}) => {
+  const r = nodeSpawn([script, ...args], { cwd, env, stdio: 'inherit' });
   return r.error ? 1 : (r.status ?? 1);
 };

@@ -54,7 +54,6 @@ import {
 } from '../layout-tree.mjs';
 import { decodePng } from '../png.mjs';
 import { pixelSha256, recompose, resolveHost } from '../compose-direction.mjs';
-import { advisoryCodesFor, loadContractChanges } from '../../machine/contract-version.mjs';
 import { brandOf, brandPalette, paletteFindings } from '../brand/brand-palette.mjs';
 import { isPartName } from '../direction-part.mjs';
 import { generatedDrawingsOf } from './ui-shapes.mjs';
@@ -579,12 +578,8 @@ export function shellBindingFindings(root, workRoot = workRootOf(root)) {
   return out;
 }
 
-/**
- * The whole check for one target: a work tree, the shell dir, a ui record dir or an implementation record dir.
- * `advisoryCodes`: finding codes a contract change added after the checked leg was admitted
- * (--admitted-at, modules/kernel/contract-changes/) - suspects for that leg, never refusals.
- */
-export function checkShellConformance(target, { advisoryCodes = [] } = {}) {
+/** Check the actual tree, shell, UI or implementation record under current structural rules. */
+export function checkShellConformance(target) {
   const resolved = path.resolve(target);
   const dir = fs.existsSync(resolved) && fs.statSync(resolved).isFile() ? path.dirname(resolved) : resolved;
   const workRoot = workRootOf(dir);
@@ -617,38 +612,18 @@ export function checkShellConformance(target, { advisoryCodes = [] } = {}) {
     if (shell) findings.push(...shellPaletteFindings(workRoot, shell, palette));
     for (const { file, record } of uiRecordsUnder(dir)) findings.push(...checkUiRecord(workRoot, file, record, shell, { mode: 'op', uiRecords }), ...uiPaletteFindings(workRoot, file, record, palette));
   }
-  const advisory = new Set(advisoryCodes);
-  for (const f of findings) if (f.level === 'refuse' && advisory.has(f.code)) Object.assign(f, { level: 'suspect', advisory: true });
-  const pick = (level) => findings.filter((f) => f.level === level).map((f) => `${f.file}: ${f.message} [${f.code}]${f.advisory ? ' (added after this leg was admitted)' : ''}`);
+  const pick = (level) => findings.filter((f) => f.level === level).map((f) => `${f.file}: ${f.message} [${f.code}]`);
   const refused = pick('refuse');
   return { schema: 'starci/shell-conformance@2', ok: refused.length === 0, mode, target: slash(dir), workRoot: slash(workRoot), refused, suspect: pick('suspect'), info: pick('info'), findings };
 }
 
-/** --admitted-at <ISO | epoch ms> [--op <op>]: the finding codes contract changes added after that admission. */
-function admittedAdvisory(argv) {
-  const at = argv.indexOf('--admitted-at');
-  if (at < 0) return { ok: true, codes: [], rest: argv };
-  const raw = argv[at + 1];
-  const admittedAt = /^\d+$/.test(String(raw)) ? Number(raw) : Date.parse(String(raw));
-  if (!Number.isFinite(admittedAt)) return { ok: false };
-  const opAt = argv.indexOf('--op');
-  const op = opAt >= 0 ? argv[opAt + 1] : null;
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-  const { codes } = advisoryCodesFor(loadContractChanges(root), { admittedAt, op });
-  const drop = new Set([at, at + 1, ...(opAt >= 0 ? [opAt, opAt + 1] : [])]);
-  return { ok: true, codes, rest: argv.filter((_, index) => !drop.has(index)) };
-}
-
 export function shellConformanceMain(argv = []) {
-  const admitted = admittedAdvisory(argv);
-  if (!admitted.ok) return { exitCode: 2, text: '--admitted-at takes an ISO date-time or epoch milliseconds (starci kernel op-contract --json admission.admittedAt)\n' };
-  argv = admitted.rest;
   const args = argv.filter((a) => a !== '--json');
   if (args.includes('--help') || args.includes('-h') || args.length !== 1) {
     return { exitCode: args.length === 1 ? 0 : 2, text: 'Usage: starci work shell-conformance <work-root | shell-dir | ui-record-dir | impl-record-dir> [--json]\n\nHolds the layout tree (.starciwork/shell/index.yaml, work/layout-tree@1), every ui record\'s route, surface, ancestors and composites, and an implementation\'s app/ files to the real frontend. Exit 0 is clean, 1 lists refusals, 2 is a bad argument.\n' };
   }
   if (!fs.existsSync(args[0])) return { exitCode: 2, text: `${args[0]}: target does not exist\n` };
-  const result = checkShellConformance(args[0], { advisoryCodes: admitted.codes });
+  const result = checkShellConformance(args[0]);
   if (argv.includes('--json')) return { exitCode: result.ok ? 0 : 1, text: `${JSON.stringify(result, null, 2)}\n` };
   const lines = [...result.refused.map((l) => `  REFUSED ${l}`), ...result.suspect.map((l) => `  SUSPECT ${l}`), ...result.info.map((l) => `  info    ${l}`)];
   return { exitCode: result.ok ? 0 : 1, text: `${lines.join('\n')}${lines.length ? '\n' : ''}${result.ok ? 'OK' : 'FAIL'}: shell conformance (${result.mode}) - ${result.refused.length} refused, ${result.suspect.length} suspect.\n` };

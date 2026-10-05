@@ -58,12 +58,31 @@ test('a cleared alert closes its fix; an unclaimed reservation past the TTL is d
   assert.throws(() => settleFix(state, 'service:nope', { now: T0, lane: 'x' }), /no open alert/);
   const later = T0 + CLAIM_TTL_MS + 1;
   const calls = [];
-  const { rows } = runPass(state, { alerts: SNAP.alerts.slice(1) }, { now: later, dispatch: (a) => { calls.push(a.key); return null; } });
+  const { rows } = runPass(state, { alerts: SNAP.alerts.slice(1), observations: [{ key: 'engine', state: 'healthy' }] }, { now: later, dispatch: (a) => { calls.push(a.key); return null; } });
   assert.deepEqual(calls, ['service:harness-tunnel'], 'only the unclaimed reservation is dispatched again');
   assert.equal(rows.find((r) => r.key === 'engine').state, 'resolved');
   assert.equal(state.fixes.engine, undefined);
   assert.equal(state.fixes['wf:nivo:auth-login:leg:impl.login:job-7'].state, 'noted');
   assert.deepEqual(settleFix(state, 'service:harness-tunnel', { now: later, release: true }), { key: 'service:harness-tunnel', released: true });
+});
+
+test('an unreadable collector retains fixing custody until the same key is affirmatively healthy', () => {
+  const state = empty();
+  runPass(state, { alerts: [{ key: 'service:ask-gateway', text: 'down' }] }, { now: T0, dispatch: () => ({ lane: 'repair-a' }) });
+  const calls = [];
+  const unknown = runPass(state, { alerts: [{ key: 'service:list', text: 'inventory unreadable' }],
+    observations: [{ key: 'service:list', state: 'unhealthy' }] }, { now: T0 + 1, dispatch: alert => { calls.push(alert.key); return null; } });
+  assert.equal(state.fixes['service:ask-gateway'].lane, 'repair-a');
+  assert.equal(unknown.rows.find(row => row.key === 'service:ask-gateway').observation, 'unknown');
+  const returned = runPass(state, { alerts: [{ key: 'service:ask-gateway', text: 'still down' }] },
+    { now: T0 + 2, dispatch: alert => { calls.push(alert.key); return null; } });
+  assert.deepEqual(returned.dispatched, []);
+  assert.deepEqual(calls, ['service:list']);
+  const healthy = runPass(state, { alerts: [], observations: [{ key: 'service:ask-gateway', state: 'healthy' }] },
+    { now: T0 + 3, dispatch: () => assert.fail('healthy observations do not dispatch') });
+  assert.equal(healthy.rows.find(row => row.key === 'service:ask-gateway').state, 'resolved');
+  assert.equal(state.fixes['service:ask-gateway'], undefined);
+  assert.ok(state.fixes['service:list'], 'an omitted collector alert also keeps its custody');
 });
 
 test('main-checkout integrity: a deleted tracked file and an empty node_modules are diagnosed and dispatched once to a core lane', () => {

@@ -1,8 +1,0 @@
-id: f4-s08-schema-drift
-effectiveAt: '2026-09-29T12:00:00+07:00'
-summary: "Schema text and shape drift closed for lane F4: the 17 work family schemas now carry the one integration-credential custody description work.schema.yaml already had (identity alias resolved from the backend Stack declaration, encrypted custody under .starcistacks/<env>/secrets/<slug>/, outside the Work tree) so work-credential-shape holds again; work-evidence assets[] oneOf branches declare the path/name property they require (ajv strictRequired); work-critique records[] accepts the shell and brand singleton ids the generator already emits. Adds no check or finding code"
-paths:
-  - modules/schemas
-  - tests/work-credential-shape.spec.mjs
-  - tests/work-record-schemas.spec.mjs
-reach: new-legs

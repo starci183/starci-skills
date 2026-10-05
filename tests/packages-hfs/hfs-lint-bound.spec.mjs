@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { lintRepository, parseLintArgs, linterBoundArgs, BOUND_ENV } from '../../packages/hfs/lint/run.mjs';
 import { appDeclarationText, DEFAULT_APPS } from '../helpers/hfs-arch-fixture.mjs';
+import { fakeLintCanon } from '../helpers/lint-canon-fixture.mjs';
 
 const PACKAGES = path.resolve(import.meta.dirname, '..', '..', 'packages');
 const require = createRequire(path.join(PACKAGES, 'package.json'));
@@ -79,16 +80,18 @@ test('starci app lint starts ESLint with the bound preload and the app root, and
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', private: true }));
   fs.mkdirSync(path.join(dir, 'be', 'src'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'be', 'src', 'a.ts'), 'export {};\n');
-  fs.mkdirSync(path.join(dir, 'fe'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'fe', 'apps', 'app', 'src'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'fe', 'apps', 'app', 'src', 'a.ts'), 'export {};\n');
+  for (const side of ['be', 'fe']) fakeLintCanon(path.join(dir, side));
   const fake = (side, name, body, stream = 'stdout') => {
     const pkg = path.join(dir, side, 'node_modules', name);
     fs.mkdirSync(pkg, { recursive: true });
     fs.writeFileSync(path.join(pkg, 'package.json'), JSON.stringify({ name, version: '9.0.0', bin: { [name]: 'bin.js' } }));
     fs.writeFileSync(path.join(pkg, 'bin.js'), `process.${stream}.write(JSON.stringify(${body}));\n`);
   };
-  const seen = (name) => `[{ filePath: ${JSON.stringify(path.join(dir, 'be', 'src', 'a.ts'))}, messages: [{ ruleId: 'x', line: 1, column: 1, message: [${name}, process.env.${BOUND_ENV} ?? 'unset', process.execArgv.join(' ')].join('|') }] }]`;
-  fake('be', 'eslint', seen("'be'"));
-  fake('fe', 'eslint', seen("'fe'"));
+  const seen = (side, file) => `[{ filePath: ${JSON.stringify(path.join(dir, side, file))}, messages: [{ ruleId: 'x', line: 1, column: 1, message: [${JSON.stringify(side)}, process.env.${BOUND_ENV} ?? 'unset', process.execArgv.join(' ')].join('|') }] }]`;
+  fake('be', 'eslint', seen('be', 'src/a.ts'));
+  fake('fe', 'eslint', seen('fe', 'apps/app/src/a.ts'));
   fake('fe', 'stylelint', '[]', 'stderr');
   const { report } = await lintRepository({ repoRoot: dir, opts: parseLintArgs([]), hfsCheck: async () => ({ findings: [], tracked: [] }), trackedFiles: () => [] });
   const eslint = report.findings.filter((f) => f.engine === 'eslint');

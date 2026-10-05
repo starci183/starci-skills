@@ -12,3 +12,9 @@ export function unlinkOnly(p) {
   try { fs.unlinkSync(p); } catch { try { fs.rmdirSync(p); } catch { /* verified below */ } }
   try { fs.lstatSync(p); return false; } catch (error) { return error?.code === 'ENOENT'; }
 }
+
+/** Construct an archive-reader refusal with its existing error code. */
+export const zipRefuse = (message, code = 'zip-corrupt') => Object.assign(new Error(message), { code });
+
+/** Relative ZIP entry names exclude traversal, drive roots and control characters. */
+export const validZipName=name=>Boolean(name)&&!name.startsWith('/')&&!/^[A-Za-z]:/.test(name)&&!/[\0\r\n\\]/.test(name)&&!name.split('/').includes('..');

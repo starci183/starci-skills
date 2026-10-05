@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
+import {pathToFileURL} from 'node:url';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
+import {writeGreenProofs,proofRepo} from '../helpers/sonar-scan.mjs';
+import {fakeOrcaWorktrees} from '../helpers/fake-orca-worktrees.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
 import {openMachine,TEST_REGISTRY_ENV} from '../../engine/db/machine.mjs';
 import {startKernelApiCli} from '../helpers/engine-db-kernel-api-fixture.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
@@ -60,7 +63,15 @@ const fixture=t=>{
     if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;
     fs.rmSync(machineRoot,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
   t.after(()=>{for(const dir of dirs)fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
-  return {repo(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-'));dirs.push(dir);fs.mkdirSync(path.join(dir,'docs'),{recursive:true});return dir;}};
+  return {repo(workflowId=null){
+    const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-'));dirs.push(dir);
+    if(!workflowId){fs.mkdirSync(path.join(dir,'docs'),{recursive:true});return dir;}
+    const main=path.join(dir,'main');fs.mkdirSync(main);proofRepo(t,main);
+    const made=fakeOrcaWorktrees({root:path.join(dir,'worktrees')}).create({repo:`path:${main}`,name:workflowId,baseBranch:'main'});
+    assert.equal(made.ok,true,made.error);const repo=made.worktree.path;fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+    registerWorkflowWorktree({env:process.env},{workflowId,orcaWorktreeId:made.worktree.id,path:repo,branch:made.worktree.branch});
+    return repo;
+  }};
 };
 /** Seed rows through the ledger API, then close so the spawned CLI never shares the handle. */
 const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{fn(ledger);}finally{ledger.close();}};
@@ -752,7 +763,7 @@ test('status distinguishes a turn-idle Op and nudge wakes the exact worker witho
 });
 
 test('dispatch --job without --spawn prints the packet and leaves the job unclaimed',t=>{
-  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-dispatch';
+  const fx=fixture(t),wf='wf-k7-dispatch',repo=fx.repo(wf);
   seedGoal(repo,wf);
   const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/',
     '--records','scope.workspace-canonicalization','--json');
@@ -761,7 +772,7 @@ test('dispatch --job without --spawn prints the packet and leaves the job unclai
   assert.ok(jobId,'could not resolve the enqueued job id');
   seed(repo,ledger=>ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
     .run(wf,1,'k7goal','# later approved revision',json({derivedFrom:'later-test-revision'}),Date.now()));
-  const r=runApi('dispatch','--repo',repo,'--workflow',wf,'--job',jobId,'--json');
+  const r=runApiFresh('dispatch','--repo',repo,'--workflow',wf,'--job',jobId,'--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   assert.ok(r.stdout.trim().length>0,'dispatch without --spawn should print the packet');
   const preview=out(r);
@@ -770,8 +781,13 @@ test('dispatch --job without --spawn prints the packet and leaves the job unclai
     'dispatch must keep the enqueue-time approved revision rather than silently adopting a later one');
   assert.match(preview?.prompt??'',/records: scope\.workspace-canonicalization/);
   assert.match(preview?.prompt??'',new RegExp(`workflow: ${wf} goal_revision=0 goal_identity=k7goal`));
-  assert.match(preview?.prompt??'',new RegExp(path.join(ROOT,'CONTEXT.md').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),
-    'an Op launched in a routed repo must receive the absolute canonical Source skill path');
+  assert.ok((preview?.prompt??'').split(/\r?\n/).includes('source_runtime: '+ROOT),
+    'relative mandatory reads must be bound to the absolute runtime Source, never the routed product checkout');
+  assert.equal(preview?.packet?.context?.mandatoryReads?.[0],'CONTEXT.md');
+  const readLines=(preview?.prompt??'').split(/\r?\n/),readHeader=readLines.findIndex(line=>line.startsWith('MANDATORY READS'));
+  assert.ok(readHeader>=0,'the prompt keeps the ordered mandatory READ section');
+  assert.ok(readLines[readHeader+1]?.startsWith('  1. '+path.join(ROOT,'CONTEXT.md')+' — '),
+    'the first displayed READ is canonical absolute Source CONTEXT, while packet paths remain relative');
   assert.match(preview?.prompt??'',new RegExp(path.join(ROOT,'modules','ops','ops','docs.author.yaml').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),
     'an Op must receive the absolute operation-contract path, not a cwd-relative modules path');
   assert.doesNotMatch(preview?.prompt??'',/CONTEXT\.md \(repo root\)/);
@@ -779,11 +795,91 @@ test('dispatch --job without --spawn prints the packet and leaves the job unclai
   assert.notEqual(job?.status,'running','a packet print must not mark the job running — nothing was spawned');
 });
 
+
+// Observe real CLI admission/reservation. The loader only synchronizes the calls
+// and exits after the real reservation, before any worker launch; it changes no verdict.
+test('two dispatch processes competing for one workflow slot reserve at most one disjoint job',async t=>{
+  const fx=fixture(t),wf='wf-k7-last-slot-race',repo=fx.repo(wf);
+  const owner=ownerConfig(t,{budgets:{maxOps:1}});seedGoal(repo,wf);
+  const jobs=['docs/a','docs/b'].map(owned=>{
+    const made=runApiAsOwnerFresh(owner,'enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths',owned,'--json');
+    assert.equal(made.status,0,made.stderr);return out(made).job_id;
+  });
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-barrier-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const release=path.join(root,'release'),loader=path.join(root,'reservation-loader.mjs');
+  const ledgerUrl=pathToFileURL(path.join(ROOT,'engine','db','ledger.mjs')).href;
+  const realUrl=ledgerUrl+'?lastSlotActualOwner=1';
+  const wrapper=[
+    'import fs from "node:fs";import path from "node:path";',
+    'import {reserveTwoPhase as actualReserve} from '+JSON.stringify(realUrl)+';',
+    'export * from '+JSON.stringify(realUrl)+';',
+    'export function reserveTwoPhase(ledger,machine,options){',
+    ' const root=process.env.STARCI_PRIVATE_CAP_BARRIER;const id=options.job.jobId;',
+    ' const entered={jobId:id,workflowId:options.job.workflowId,pid:process.pid,',
+    '  jobs:ledger.db.prepare("SELECT job_id,status FROM jobs WHERE workflow_id=? ORDER BY job_id").all(options.job.workflowId)};',
+    ' fs.writeFileSync(path.join(root,id+".entered.json"),JSON.stringify(entered));',
+    ' const pause=new Int32Array(new SharedArrayBuffer(4)),until=Date.now()+45000;',
+    ' while(!fs.existsSync(path.join(root,"release"))){if(Date.now()>until)throw Error("private reservation barrier timeout");Atomics.wait(pause,0,0,5);}',
+    ' const result=actualReserve(ledger,machine,options);',
+    ' process.stdout.write(JSON.stringify({jobId:id,reservation:result})+"\\n");',
+    ' process.exit(0);',
+    '}'
+  ].join('\n');
+  fs.writeFileSync(loader,'const owner='+JSON.stringify(ledgerUrl)+';const source='+JSON.stringify(wrapper)+';\n'+
+    'export async function load(url,context,nextLoad){if(url===owner)return {format:"module",source,shortCircuit:true};return nextLoad(url,context);}\n');
+  const preload='data:text/javascript,'+encodeURIComponent('import {register} from "node:module";register('+JSON.stringify(pathToFileURL(loader).href)+');');
+  const host=path.join(root,'fake-orca.mjs');fs.writeFileSync(host,FAKE_ORCA);
+  const calls=path.join(root,'orca-calls.jsonl');
+  const env={...process.env,STARCI_OWNER_ROOT:owner,STARCI_PRIVATE_CAP_BARRIER:root,
+    ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:'',APPDATA:path.join(root,'appdata'),LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([host]),STARCI_FAKE_ORCA_LOG:calls,
+    STARCI_FAKE_ORCA_STATE:path.join(root,'orca-state.json')};
+  const children=jobs.map(jobId=>{
+    const child=spawn(process.execPath,['--import',preload,API,'dispatch','--repo',repo,'--job',jobId,'--spawn','--json'],
+      {cwd:ROOT,env,windowsHide:true,stdio:['ignore','pipe','pipe']});
+    const record={child,jobId,stdout:'',stderr:'',done:false};
+    child.stdout.on('data',chunk=>{record.stdout+=chunk;});child.stderr.on('data',chunk=>{record.stderr+=chunk;});
+    record.result=new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',(status,signal)=>{
+      record.done=true;resolve({jobId,status,signal,stdout:record.stdout,stderr:record.stderr});});});
+    return record;
+  });
+  t.after(async()=>{for(const record of children)if(!record.done)record.child.kill();await Promise.allSettled(children.map(record=>record.result));});
+  try{
+  const until=Date.now()+45000;
+  while(!jobs.every(jobId=>fs.existsSync(path.join(root,jobId+'.entered.json')))){
+    const failed=children.find(record=>record.done);
+    if(failed)assert.fail('dispatch exited before the real reservation barrier: '+JSON.stringify(await failed.result));
+    assert.ok(Date.now()<until,'both real dispatch calls must reach the reservation barrier');
+    await new Promise(resolve=>setTimeout(resolve,5));
+  }
+  const entered=jobs.map(jobId=>JSON.parse(fs.readFileSync(path.join(root,jobId+'.entered.json'),'utf8')));
+  assert.equal(new Set(entered.map(row=>row.pid)).size,2,'the calls run in independent OS processes');
+  for(const row of entered)assert.deepEqual(row.jobs.map(job=>job.status),['queued','queued'],'both calls pass admission before either reserves');
+  fs.writeFileSync(release,'release both real reservations');
+  const results=await Promise.all(children.map(record=>record.result));
+  for(const result of results)assert.equal(result.status,0,result.stderr||result.stdout);
+  const reservations=results.map(result=>({...result,...out(result)}));
+  const durable=read(repo,l=>({
+    jobs:l.db.prepare('SELECT job_id,status FROM jobs WHERE workflow_id=? ORDER BY job_id').all(wf),
+    leases:l.db.prepare('SELECT job_id,resource_key FROM leases ORDER BY job_id,resource_key').all(),
+    attempts:l.db.prepare('SELECT count(*) n FROM op_attempts WHERE workflow_id=?').get(wf).n,
+  }));
+  t.diagnostic(JSON.stringify({entered,reservations,durable}));
+  assert.equal(fs.existsSync(calls)?fs.readFileSync(calls,'utf8').trim():'','','no Orca call is needed to reproduce lease admission');
+  assert.equal(durable.attempts,0,'the observation stops before any operation worker launch');
+  assert.equal(reservations.filter(row=>row.reservation?.ok).length,1,'maxOps:1 must admit exactly one atomic reservation');
+  assert.equal(reservations.filter(row=>row.reservation?.reason==='max-ops').length,1);
+  assert.deepEqual(durable.jobs.map(job=>job.status).sort(),['leased','queued']);
+  assert.equal(new Set(durable.leases.map(lease=>lease.job_id)).size,1,'only the admitted job owns durable path leases');
+  }finally{for(const record of children)if(!record.done)record.child.kill();await Promise.allSettled(children.map(record=>record.result));}
+});
+
 // budgets.maxOps is the owner's per-workflow concurrency ceiling and it is
 // ENFORCED: min(budgets.maxOps, runtimes.yaml maxParallelOps) is the line, and a
 // job that meets it stays queued instead of launching.
 test('budgets.maxOps refuses the second concurrent operation with max-ops and leaves it queued',t=>{
-  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-max-ops';
+  const fx=fixture(t),wf='wf-k7-max-ops',repo=fx.repo(wf);
   const owner=ownerConfig(t,{budgets:{maxOps:1}});
   seedGoal(repo,wf);
   const first=runApiAsOwner(owner,'enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/a','--json');

@@ -16,7 +16,6 @@ import { DI_KINDS } from '../../scripts/machine/decisions.mjs';
 import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { openMachine, TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { workflowWorktreeOf } from '../../scripts/machine/workflow-tree.mjs';
-import { writeGreenProofs } from '../helpers/sonar-scan.mjs';
 import { acceptedEventFault, apiResult, awaitFile, emptyReceiptBarrier, milestoneRegistryFault, settleFixture } from '../helpers/workflow-settle-fixture.mjs';
 import { milestoneFixture as fixture, MILESTONE_ID as WF, MILESTONE_TEXT as A } from '../helpers/workflow-settle-fixture.mjs';
 
@@ -119,13 +118,13 @@ test('settleCheckpoint rebases only after a green checkpoint; rebase-conflict is
 });
 
 test('starci kernel settle records a workflow checkpoint only for a green op', (t) => {
-  const { tree, env, workflowId, runApi, seed, read, capture } = settleFixture(t);
+  const { tree, env, workflowId, runApi, seed, read, capture, proofs } = settleFixture(t);
 
   const passJob = 'op-docs.author-checkpoint';
   const pass = seed({ jobId: passJob, opId: 'docs.author', status: 'running', dispatchId: 'ctx-pass', payload: { opId: 'docs.author', owned_paths: ['docs/'] } });
   try {
     write(tree, 'docs/pass.md', 'settled green\n');
-    const proofFiles = writeGreenProofs(path.join(tree, 'docs', 'proofs')).map((file) => path.relative(tree, file).replace(/\\/g, '/'));
+    const proofFiles = proofs(pass, passJob);
     pass.ledger.write.fileReport({ attemptId: pass.attemptId, outcome: 'done', report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'green', files: ['docs/pass.md', ...proofFiles], checks: [{ name: 'unit', command: 'true', exitCode: 0 }] } });
   } finally { pass.ledger.close(); }
   const checked = runApi(['record-checks', '--job', passJob, '--checks', JSON.stringify({ checks: [{ name: 'unit', command: 'true', exitCode: 0, evidence: 'green' }] })], { STARCI_CALLER: 'runtime-settler' });
@@ -187,7 +186,7 @@ test('an unchanged accepted dispatch explicitly reuses its checkpoint without an
   assert.equal(firstCheckpoint.committed, true);
   const next = fx.seed({ jobId: second, opId: 'docs.author', status: 'running', dispatchId: 'ctx-unchanged', payload: { opId: 'docs.author', owned_paths: ['docs/'] } });
   try {
-    const files = fs.readdirSync(path.join(fx.tree, 'docs', 'proofs')).map((file) => `docs/proofs/${file}`);
+    const files = fx.proofs(next, second);
     next.ledger.write.fileReport({ attemptId: next.attemptId, outcome: 'done', report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'verified existing bytes', files, head: firstCheckpoint.sha } });
     next.ledger.write.recordCheckRun({ attemptId: next.attemptId, name: 'unit', phase: 'verify', runner: 'kernel', status: 'pass', exitCode: 0 });
   } finally { next.ledger.close(); }
@@ -339,8 +338,7 @@ for (const [verdict, outcome, kind] of [['pass', 'done', 'workflow-checkpoint'],
 
 test('an accepted native checkpoint permits its own due milestone before its final event', (t) => {
   const fx = settleFixture(t, { baseText: A }), jobId = 'op-own-milestone';
-  fx.prepare({ jobId });
-  write(fx.tree, 'docs/base.md', A.replace('l1', 'workflow1'));
+  fx.prepare({ jobId, arrange: () => write(fx.tree, 'docs/base.md', A.replace('l1', 'workflow1')) });
   const onto = commit(fx.repo, 'docs/base.md', A.replace('l9', 'main9'));
   const settled = fx.runApi(['settle', '--job', jobId, '--verdict', 'pass']);
   assert.equal(settled.status, 0, settled.stderr || settled.stdout);
@@ -356,8 +354,7 @@ test('an accepted native checkpoint permits its own due milestone before its fin
 
 test('a due milestone registry failure and final-event failure recover the original dispatch without another rebase', (t) => {
   const fx = settleFixture(t, { baseText: A }), jobId = 'op-milestone-registry-recovery';
-  const attemptId = fx.prepare({ jobId });
-  write(fx.tree, 'docs/base.md', A.replace('l1', 'workflow1'));
+  const attemptId = fx.prepare({ jobId, arrange: () => write(fx.tree, 'docs/base.md', A.replace('l1', 'workflow1')) });
   const onto = commit(fx.repo, 'docs/base.md', A.replace('l9', 'main9'));
   const { preload, writes } = milestoneRegistryFault(fx);
   const interrupted = fx.runApi(['settle', '--job', jobId, '--verdict', 'pass'], {}, preload);
@@ -399,8 +396,7 @@ test('a due milestone registry failure and final-event failure recover the origi
 
 test('a native accepted dispatch interrupted after the milestone branch CAS recovers its saved rebase proposal', (t) => {
   const fx = settleFixture(t, { baseText: A }), jobId = 'op-milestone-cas-interruption';
-  const attemptId = fx.prepare({ jobId });
-  write(fx.tree, 'docs/base.md', A.replace('l1', 'workflow1'));
+  const attemptId = fx.prepare({ jobId, arrange: () => write(fx.tree, 'docs/base.md', A.replace('l1', 'workflow1')) });
   const interrupted = fx.runApi(['settle', '--job', jobId, '--verdict', 'pass'], {}, acceptedEventFault(fx));
   assert.equal(apiResult(interrupted).code, 'injected-accepted-event-failure');
   const checkpoint = fx.read((db) => JSON.parse(db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='workflow-checkpoint-prepared'").get(jobId).payload_json));
@@ -470,7 +466,8 @@ for (const phase of ['before', 'rebase-prepared', 'rebase-branch-applied', 'reba
 
 test('concurrent direct settle calls each attach one scoped checkpoint on the workflow chain', async (t) => {
   const fx = settleFixture(t), jobs = ['op-sibling-a', 'op-sibling-b'];
-  const attempts = jobs.map((jobId, index) => fx.prepare({ jobId, ownedRoot: `docs/${index === 0 ? 'a' : 'b'}` }));
+  const attempts = jobs.map((jobId, index) => fx.prepare({ jobId, ownedRoot: `docs/${index === 0 ? 'a' : 'b'}`, deferProofs: true }));
+  for (const jobId of jobs) fx.complete(jobId);
   const base = git(fx.tree, 'rev-parse', 'HEAD');
   const results = await Promise.all(jobs.map((jobId) => fx.runConcurrentApi(['settle', '--job', jobId, '--verdict', 'pass'])));
   const checkpoints = results.map((result, index) => {

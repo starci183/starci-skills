@@ -46,3 +46,6 @@ export const pathUnder = (child, root) => {
   const a = normPath(child), b = normPath(root);
   return Boolean(a && b) && (a === b || a.startsWith(`${b}/`));
 };
+
+/** Durable Kernel launch history also identifies retired terminals after a guard is pruned. */
+export const KERNEL_LAUNCH_EVENTS = Object.freeze(['kernel-booted', 'kernel-restarted', 'kernel-adopted']);

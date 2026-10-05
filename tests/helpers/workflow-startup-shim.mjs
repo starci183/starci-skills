@@ -1,10 +1,12 @@
-export * from '../../scripts/reconciler/start.mjs';
+export * from '../../scripts/api/node/exec-node.mjs';
 export * from '../../scripts/machine/npm-ci.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-export async function ensureHostRuntime() {
-  return { ok: true, fixture: true, summary: { ok: true }, applied: [], items: [] };
+export async function execNode() {
+  const data = { ok: true, hostOk: true, fixture: true, summary: { ok: true }, applied: [], items: [],
+    maintenance: { ok: true, ready: true, action: 'fixture', fixture: true } };
+  return { error: null, stdout: JSON.stringify(data), stderr: '' };
 }
 
 export async function npmCi(ctx) {

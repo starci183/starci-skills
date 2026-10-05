@@ -56,3 +56,57 @@ export function isSopsEnvelope(text) {
   }
   try { return sopsTree(parseYaml(src)); } catch { return false; }
 }
+
+/** Admit one flat age envelope for the native selected-identity invocation; this is shape admission, never cryptographic proof. */
+export function selectedAgeEnvelope(text, format, recipient) {
+  const refuse = reason => ({ ok: false, reason });
+  if (!['binary', 'json', 'yaml', 'dotenv'].includes(format)) return refuse('unsupported-format');
+  let meta;
+  try {
+    if (format === 'dotenv') {
+      const pairs = new Map();
+      for (const line of String(text).split('\n')) {
+        if (!line || line.startsWith('#')) continue;
+        if (line.includes('\r')) return refuse('unsupported-dotenv');
+        const at = line.indexOf('=');
+        if (at < 1) return refuse('unsupported-dotenv');
+        const name = line.slice(0, at);
+        if (pairs.has(name)) return refuse('duplicate-key');
+        pairs.set(name, line.slice(at + 1).replaceAll('\\n', '\n'));
+      }
+      meta = {};
+      const age = {};
+      for (const [name, value] of pairs) {
+        if (!name.startsWith('sops_')) continue;
+        const key = name.slice('sops_'.length);
+        if (key === 'age__list_0__map_recipient') age.recipient = value;
+        else if (key === 'age__list_0__map_enc') age.enc = value;
+        else if (key === 'mac_only_encrypted') {
+          if (value !== 'false') return refuse('partial-mac');
+          meta[key] = false;
+        } else if (key.includes('__')) return refuse('unsupported-key-group');
+        else meta[key] = value;
+      }
+      meta.age = [age];
+    } else {
+      const doc = parseYaml(String(text));
+      if (format !== 'yaml') JSON.parse(String(text));
+      if (format === 'binary' && (!doc || Object.keys(doc).length !== 2 || !Object.hasOwn(doc, 'data') || !Object.hasOwn(doc, 'sops') || typeof doc.data !== 'string')) return refuse('unsupported-binary-shape');
+      meta = doc?.sops;
+    }
+  } catch { return refuse('invalid-envelope'); }
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta) || !isSopsEnvelope(text)) return refuse('invalid-envelope');
+  if (Object.hasOwn(meta, 'key_groups') || Object.hasOwn(meta, 'shamir_threshold')) return refuse('unsupported-key-group');
+  const providers = ['kms', 'gcp_kms', 'hckms', 'azure_kv', 'hc_vault', 'pgp'];
+  for (const name of providers) if (Object.hasOwn(meta, name) && (!Array.isArray(meta[name]) || meta[name].length)) return refuse('non-age-provider');
+  const fields = new Set([...providers, 'age', 'lastmodified', 'mac', 'version', 'unencrypted_suffix', 'encrypted_suffix', 'unencrypted_regex', 'encrypted_regex', 'unencrypted_comment_regex', 'encrypted_comment_regex', 'mac_only_encrypted']);
+  if (Object.keys(meta).some(name => !fields.has(name))) return refuse('unknown-metadata');
+  if (Object.hasOwn(meta, 'mac_only_encrypted') && meta.mac_only_encrypted !== false) return refuse('partial-mac');
+  if (!Array.isArray(meta.age) || meta.age.length !== 1) return refuse('unsupported-age-set');
+  const entry = meta.age[0];
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry) || Object.keys(entry).some(name => !['recipient', 'enc'].includes(name))) return refuse('invalid-age-entry');
+  if (typeof entry.recipient !== 'string' || entry.recipient !== recipient) return refuse('recipient-mismatch');
+  if (typeof entry.enc !== 'string' || !entry.enc.startsWith('-----BEGIN AGE ENCRYPTED FILE-----\n') || !entry.enc.includes('\n-----END AGE ENCRYPTED FILE-----')) return refuse('invalid-age-entry');
+  if (typeof meta.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(meta.version) || typeof meta.lastmodified !== 'string' || !Number.isFinite(Date.parse(meta.lastmodified))) return refuse('invalid-envelope');
+  return { ok: true };
+}

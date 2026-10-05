@@ -21,6 +21,7 @@ function fixture(t, options = {}) {
     'ui/api/index.mjs': 'export const api = true;\n', 'ui/package.json': '{}\n', 'ui/package-lock.json': '{}\n',
     'ui/src/main.tsx': 'export default null;\n', 'scripts/cli/main.mjs': 'dispatcher\n',
   };
+  if (options.privatePath) source[options.privatePath] = 'PRIVATE_CONFIG_FIXTURE=do-not-package\n';
   const write = (file, bytes) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, bytes); };
   for (const [file, bytes] of Object.entries(source)) write(path.join(root, file), bytes);
   const packed = Object.fromEntries(Object.entries(source).filter(([file]) => file !== options.omit).map(([file, bytes]) => [`package/${file}`, bytes]));
@@ -62,6 +63,17 @@ function fixture(t, options = {}) {
         return options.graphRed ? { status: 1, stderr: 'ERR_MODULE_NOT_FOUND missing UI', stdout: '' }
           : { status: 0, stdout: JSON.stringify({ ...manifest, payload: Object.keys(source), entries }), stderr: '' };
       }
+      if (args[2] === 'doctor') {
+        calls.push('doctor');
+        assert.deepEqual(args, [path.join(opts.cwd, '.claude', 'scripts', 'cli', 'main.mjs'), 'runtime', 'doctor', '--cwd', opts.cwd]);
+        assert.equal(args.includes('--quick'), false);
+        if (options.doctorRed) return {status: 1, stdout: 'FAIL installed dependencies: fixture dependency missing', stderr: ''};
+        if (options.doctorIncomplete) return {status: null, stdout: '', stderr: ''};
+        if (options.doctorSignal) return {status: null, signal: 'SIGTERM', stdout: '', stderr: ''};
+        if (options.doctorError) return {error: {code: 'ENOENT', message: 'fixture doctor runner missing'}, stdout: '', stderr: ''};
+        if (options.doctorTamper) write(path.join(opts.cwd, '.claude/.starci/host/maintenance.md'), 'changed during diagnosis');
+        return {status: 0, stdout: 'doctor: installed source and local runtime capabilities passed', stderr: ''};
+      }
       assert.deepEqual(args.slice(1), ['runtime', args[2], '--cwd', opts.cwd, '--no-bootstrap']);
       assert.ok(args[0].endsWith(path.join('node_modules', 'starci', 'scripts', 'cli', 'main.mjs')));
       if (args[2] === 'update') {
@@ -97,7 +109,7 @@ function fixture(t, options = {}) {
 test('root archive proof uses real packed bytes and isolated owning dispatch, with immutable raw stage receipts', t => {
   const f = fixture(t), result = f.run();
   assert.equal(result.status, 'green', result.detail);
-  assert.deepEqual(f.calls, ['pack', 'install', 'graph', 'dispatch', 'update']);
+  assert.deepEqual(f.calls, ['pack', 'install', 'graph', 'dispatch', 'update', 'doctor']);
   assert.equal(result.archive.shasum, f.expectedShasum);
   assert.ok(result.projectedFiles.includes('.starci/host/startup.md')); assert.equal(result.discoveryFiles.length, 2);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(result.attempt, 'result.json'))), result);
@@ -120,6 +132,21 @@ test('root proof refuses omitted host prompts or UI inputs and unavailable track
     const f = fixture(t, { omit }); assert.equal(f.run().status, 'red', omit); assert.deepEqual(f.calls, ['pack']);
   }
   const f = fixture(t, { noInventory: true }); assert.equal(f.run().status, 'unrun'); assert.deepEqual(f.calls, ['pack']);
+});
+
+test('root proof rejects private configuration and encrypted host custody before installation', t => {
+  for (const privatePath of ['secret.env', 'config/secret.env', 'examples/app/secret.env', 'SECRET.ENV',
+    'ext/sonar/secrets/fixture.key.enc', 'ext/sonar/secrets/fixture.txt', 'EXT/SONAR/SECRETS/fixture.key.enc']) {
+    const f = fixture(t, { privatePath }), result = f.run();
+    assert.equal(result.status, 'red', privatePath);
+    assert.match(result.detail, /private host configuration or custody/);
+    assert.ok(result.archive.packedFiles.includes(`package/${privatePath}`));
+    assert.deepEqual(f.calls, ['pack']);
+    assert.equal(result.detail.includes('PRIVATE_CONFIG_FIXTURE'), false);
+  }
+  const template = fixture(t, { privatePath: 'secret.env.example' });
+  assert.equal(template.run().status, 'green');
+  assert.deepEqual(template.calls, ['pack', 'install', 'graph', 'dispatch', 'update', 'doctor']);
 });
 
 test('root proof retains failed install and graph outcomes and never advances to dispatch', t => {
@@ -146,6 +173,20 @@ test('incomplete archives and process responses never qualify or advance to a la
   for (const option of ['graphIncomplete', 'graphMalformed', 'graphNoProjection']) {
     const f = fixture(t, { [option]: true }); assert.notEqual(f.run().status, 'green', option); assert.deepEqual(f.calls, ['pack', 'install', 'graph']);
   }
+});
+
+test('full installed doctor is mandatory and failures retain raw diagnostics without qualifying the root archive', t => {
+  const red = fixture(t, {doctorRed: true}), result = red.run();
+  assert.equal(result.status, 'red');
+  assert.deepEqual(red.calls, ['pack', 'install', 'graph', 'dispatch', 'update', 'doctor']);
+  assert.match(fs.readFileSync(path.join(result.attempt, 'runtime-doctor.stdout.txt'), 'utf8'), /dependency missing/);
+  for (const option of ['doctorIncomplete', 'doctorSignal', 'doctorError']) {
+    const f = fixture(t, {[option]: true}), incomplete = f.run();
+    assert.equal(incomplete.status, 'unrun', option);
+    assert.deepEqual(f.calls, ['pack', 'install', 'graph', 'dispatch', 'update', 'doctor']);
+  }
+  const changed = fixture(t, {doctorTamper: true});
+  assert.equal(changed.run().status, 'red', 'diagnosis cannot mutate the verified payload and leave the proof green');
 });
 
 test('shared installed-byte verifier rejects traversal and a linked projection root', t => {

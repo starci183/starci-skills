@@ -26,6 +26,7 @@ type SendHandoffFormField = {
 export type SendHandoffFormData = {
     readonly isOpen: boolean
     readonly isSending: boolean
+    readonly error?: string
     readonly fingerprint: SendHandoffFormField
     readonly revision: SendHandoffFormField
     readonly note: SendHandoffFormField
@@ -53,6 +54,11 @@ export const SendHandoffForm = (props: SendHandoffFormProps) => {
     const { labels, fingerprint, revision, note } = props.props
     return (
         <DrawerBranch isOpen={props.props.isOpen} title={labels.title} onDismiss={props.on.close}>
+            {props.props.error === undefined ? null : (
+                <div role="alert">
+                    <Text>{props.props.error}</Text>
+                </div>
+            )}
             {props.state === "form" ? (
                 <>
                     <Input
@@ -60,6 +66,7 @@ export const SendHandoffForm = (props: SendHandoffFormProps) => {
                         name="fingerprint"
                         label={labels.fingerprint}
                         value={fingerprint.value}
+                        isDisabled={props.props.isSending}
                         isError={fingerprint.error !== undefined}
                         errorMessage={fingerprint.error}
                         isRequired
@@ -70,6 +77,7 @@ export const SendHandoffForm = (props: SendHandoffFormProps) => {
                         name="revision"
                         label={labels.revision}
                         value={revision.value}
+                        isDisabled={props.props.isSending}
                         isError={revision.error !== undefined}
                         errorMessage={revision.error}
                         isRequired
@@ -80,11 +88,12 @@ export const SendHandoffForm = (props: SendHandoffFormProps) => {
                         name="note"
                         label={labels.note}
                         value={note.value}
+                        isDisabled={props.props.isSending}
                         isError={note.error !== undefined}
                         errorMessage={note.error}
                         onValueChange={(value) => props.on.change("note", value)}
                     />
-                    <Button variant="primary" width="fill" onPress={props.on.review}>
+                    <Button variant="primary" width="fill" isPending={props.props.isSending} onPress={props.on.review}>
                         {labels.review}
                     </Button>
                 </>
@@ -92,7 +101,7 @@ export const SendHandoffForm = (props: SendHandoffFormProps) => {
             {props.state === "confirm" ? (
                 <>
                     <Text>{labels.confirmQuestion}</Text>
-                    <Button variant="secondary" width="fill" onPress={props.on.back}>
+                    <Button variant="secondary" width="fill" isDisabled={props.props.isSending} onPress={props.on.back}>
                         {labels.back}
                     </Button>
                     <Button variant="primary" width="fill" isPending={props.props.isSending} onPress={props.on.confirm}>

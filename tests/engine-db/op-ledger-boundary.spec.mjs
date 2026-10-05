@@ -7,6 +7,9 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {fakeOrcaWorktrees} from '../helpers/fake-orca-worktrees.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
 
 // Live incident (a base-repos backend.scaffold seam attempt): an op worker ran
 // node:sqlite against .starciwork/runtime.sqlite to inspect jobs. The contract forbade it; the owner wants
@@ -23,35 +26,47 @@ const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-op-boundary-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ["docs"])fs.mkdirSync(path.join(repo,d),{recursive:true});
+  const mainRepo=path.join(root,'main');fs.mkdirSync(mainRepo,{recursive:true});proofRepo(t,mainRepo);
+  const made=fakeOrcaWorktrees({root:path.join(root,'worktrees')}).create({repo:`path:${mainRepo}`,name:'wf-op-boundary',baseBranch:'main'});
+  assert.equal(made.ok,true,JSON.stringify(made));
+  const repo=path.resolve(made.worktree.path);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  const ownerRoot=path.join(root,'owner'),trustHome=path.join(root,'trust-home');fs.mkdirSync(ownerRoot);fs.mkdirSync(trustHome);
+  const example=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8');
+  assert.match(example,/^launchTrust:/m,'fixture uses the actual complete owner config');
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),example.replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private op boundary fixture adoption',roots:[mainRepo]})}`));
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json');
   const base={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:stateFile,
     // machineFileFor honours STARCI_TEST_MACHINE_FILE first; without it the spawned api lands on the
     // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
-    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_PROJECTS_ROOT:path.join(root,'projects'),
+    STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome};
   // The suite may itself run inside an Orca or op terminal: start from a caller with no identity.
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete base[key];
   const api=(args,env={})=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...base,...env}});
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
-  const wf='wf-op-boundary',jobId='job-op-boundary',otherJob='job-op-sibling',managedJob='job-op-managed';
-  const ledger=openLedger({file:ledgerFileFor(repo)});
+  const wf='wf-op-boundary',managedWorkflow='wf-managed-boundary',jobId='job-op-boundary',otherJob='job-op-sibling',managedJob='job-op-managed';
+  const record=registerWorkflowWorktree({env:base},{workflowId:wf,orcaWorktreeId:made.worktree.id,path:repo,branch:made.worktree.branch});
+  assert.equal(path.resolve(record.path),repo);assert.equal(record.branch,made.worktree.branch);
+  const file=ledgerFileFor(repo,{env:base}),ledger=openLedger({file});
   try{
     seedWorkflow(ledger,{id:wf,state:{phase:'running',job:wf},
       jobs:[
         {jobId:`kernel-${wf}`,kind:'kernel',status:'running',workerId:'fake-kernel-terminal',
-          payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,role:'kernel'}}},
+          payload:{managed:{agentTerminalHandle:'fake-kernel-terminal',dispatchId:'kernel-dispatch'},hierarchy:{role:'kernel',workflowId:wf,generation:1,attempt:1,runtime:{terminalHandle:'fake-kernel-terminal'}}}},
         {jobId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}},
         {jobId:otherJob,opId:'docs.author',kind:'op',payload:{opId:'docs.author',owned_paths:['notes/']}},
-        // A managed (worker-start) op: its agent terminal handle is on the payload, its env is Orca's.
-        {jobId:managedJob,opId:'docs.author',kind:'op',status:'running',workerId:'ctx_managed_1',
-          payload:{opId:'docs.author',owned_paths:['guides/'],
-            managed:{dispatchId:'ctx_managed_1',agentTerminalHandle:'term_managed_1',runId:'run-fake-1'}}},
-      ]});
+      ],signals:[{key:wf,token:'kernel-token',value:{terminal:'fake-kernel-terminal',dispatch:'kernel-dispatch'}}]});
+    // The caller-bound managed op belongs to its own workflow; it must not occupy the positive launch's app side.
+    seedWorkflow(ledger,{id:managedWorkflow,state:{phase:'running',job:managedWorkflow},jobs:[
+      {jobId:managedJob,opId:'docs.author',kind:'op',status:'running',workerId:'ctx_managed_1',
+        payload:{opId:'docs.author',owned_paths:['guides/'],
+          managed:{dispatchId:'ctx_managed_1',agentTerminalHandle:'term_managed_1',runId:'run-fake-1'}}},
+    ]});
   }finally{ledger.close();}
-  const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
-  return {root,repo,wf,jobId,otherJob,managedJob,api,orcaState,read};
+  const read=fn=>{const l=inspectLedger({file});try{return fn(l.db);}finally{l.close();}};
+  return {root,repo,wf,managedWorkflow,jobId,otherJob,managedJob,api,orcaState,read};
 };
 
 test('the op launch is a worker-start worker bound to its terminal, and the op packet names no ledger file',t=>{
@@ -132,6 +147,7 @@ test('an op caller is refused every kernel verb; reads and its own report pass t
 
 test('Orca\'s terminal handle identifies an op whose env StarCi could not set (managed worker-start)',t=>{
   const fx=fixture(t);
+  assert.equal(fx.read(db=>db.prepare('SELECT workflow_id FROM jobs WHERE job_id=?').get(fx.managedJob).workflow_id),fx.managedWorkflow,'the live managed identity is a real independent workflow job');
   const asManaged={ORCA_TERMINAL_HANDLE:'term_managed_1'};
   const refused=fx.api(['settle','--job',fx.managedJob,'--verdict','fail'],asManaged);
   assert.equal(refused.status,1);

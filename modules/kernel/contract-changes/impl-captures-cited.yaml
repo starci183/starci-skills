@@ -1,7 +1,0 @@
-id: impl-captures-cited
-effectiveAt: '2026-09-29T04:00:00+07:00'
-summary: "alpha.3 (ARCHITECTURE-DB §5.1): an implementation's running-page captures are agent data. interface.implement keeps each capture and its markup in STARCI_JOB_SCRATCH/captures (api report attaches the folder by itself) and the work/implementation@1 record's assets[] cites them {artifact?, name, role, sha256} - no path, never a file under the impl node's assets/. scripts/work/impl-captures.mjs capturesOf pairs a cited PNG with the markup cited under its stem through scripts/lib/blob-lookup.mjs assetFileOf; render.mjs, shell-conformance, brand-palette and the example render proof read captures only through it. Adds no check or finding code"
-reach: new-legs
-paths:
-  - modules/ops/ops/interface.implement.yaml
-  - modules/schemas/work-implementation.schema.yaml

@@ -6,6 +6,8 @@ import {parseYaml} from './yaml.mjs';
 import {isPlainObject as plain} from './plain-object.mjs';
 import {invalid,validateRoots} from './invalid-config.mjs';
 import {validateOrca} from './orca-config.mjs';
+import {ENV_NAME,secretEnv,connectorSecret} from './secrets.mjs';
+export {readDotenv,connectorSecret} from './secrets.mjs';
 
 export const configRoot=skillRoot;
 export const NON_OPERATION_ROLES={planner:'plan',kernelManager:'decide',validator:'verify'};
@@ -40,6 +42,29 @@ export function runtimeProfile(){
  * here; a literal copy of any of them in a source file would be a second authority.
  */
 export function allocationSettings(){return runtimeProfile()?.allocation??{};}
+// These are current owner declarations, never a historical runtime owner's consent.
+function validateOwnerProfile(value,name,pathsKey){
+  if(value===null)return;
+  const bad=invalid(name);
+  if(!plain(value))bad(' must be an owner approval mapping or null.');
+  const keys=['approvedBy','approvalRef',pathsKey,...(name==='launchTrust'?['profile']:[])];
+  for(const key of Object.keys(value))if(!keys.includes(key))bad(` has unknown key ${key}.`);
+  if(value.approvedBy!=='owner')bad('.approvedBy must be owner; adoption must come from the current owner.');
+  if(typeof value.approvalRef!=='string'||!value.approvalRef.trim())bad('.approvalRef must identify the current owner approval.');
+  if(name==='launchTrust'&&!['automatic','declined'].includes(value.profile))bad('.profile must be automatic or declined.');
+  const paths=value[pathsKey];
+  if(!Array.isArray(paths)||!paths.length||paths.some(p=>typeof p!=='string'||!(path.isAbsolute(p)||path.win32.isAbsolute(p))||/[\r\n\0]/.test(p)))bad(`.${pathsKey} must list exact absolute repository roots.`);
+}
+export function launchTrustSettings(config=loadConfig()){
+  const value=config?.launchTrust??null;validateOwnerProfile(value,'launchTrust','roots');return value;
+}
+export function workflowPurgeSettings(config=loadConfig()){
+  const retention=config?.retention??null;
+  if(retention===null)return null;
+  const bad=invalid('retention');
+  if(!plain(retention)||Object.keys(retention).some(k=>k!=='workflowPurge'))bad(' must be {workflowPurge?} or null.');
+  const value=retention.workflowPurge??null;validateOwnerProfile(value,'retention.workflowPurge','repos');return value;
+}
 /** One positive millisecond value out of `allocation`, by dotted key. Refuses when the contract omits it. */
 export function allocationMs(dotted){
   const raw=dotted.split('.').reduce((node,key)=>(node==null?node:node[key]),allocationSettings());
@@ -75,13 +100,11 @@ const CLOUDFLARE_MODES=['off','quick','named'];
 /** The serve-ask port band, both ends included (scripts/kernel/ask-server.mjs scans [first..last]); the gateway stays outside it. */
 export const ASK_PORT_BAND=[6969,7069];
 export const CONNECTOR_DEFAULTS=Object.freeze({
-  secretsFile:null,
   repos:[],
   gateway:{port:7070},
   cloudflare:{mode:'off',tunnel:null,credentialsFile:null,tokenEnv:'CLOUDFLARE_TUNNEL_TOKEN',hostname:null,access:false},
   telegram:{enabled:false,botTokenEnv:'TELEGRAM_BOT_TOKEN',chatId:null,exposeCredentialAsks:false},
 });
-const ENV_NAME=/^[A-Z_][A-Z0-9_]{0,63}$/;
 const HOSTNAME=/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
 const TUNNEL_REF=/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
 const CHAT_ID=/^(?:-?\d{1,20}|@[A-Za-z][A-Za-z0-9_]{4,31})$/;
@@ -89,7 +112,7 @@ const SECRET_KEYS=['token','tunnelToken','botToken','secret','apiToken','passwor
 function validateConnectors(connectors){
   if(connectors===null)return;
   const bad=invalid('connectors');
-  if(!plain(connectors))bad(' must be {secretsFile?, repos?, gateway?, cloudflare?, telegram?} or null.');
+  if(!plain(connectors))bad(' must be {repos?, gateway?, cloudflare?, telegram?} or null.');
   const closed=(node,where,keys)=>{
     if(!plain(node))bad(`.${where} must be a mapping.`);
     for(const key of Object.keys(node)){
@@ -97,8 +120,7 @@ function validateConnectors(connectors){
       if(!keys.includes(key))bad(`.${where} has unknown key ${key} (allowed: ${keys.join(', ')}).`);
     }
   };
-  closed(connectors,'',['secretsFile','repos','gateway','cloudflare','telegram']);
-  if(connectors.secretsFile!==undefined&&connectors.secretsFile!==null&&(typeof connectors.secretsFile!=='string'||!connectors.secretsFile.trim()))bad('.secretsFile must be a dotenv file path (relative to the skill root) or null.');
+  closed(connectors,'',['repos','gateway','cloudflare','telegram']);
   if(connectors.repos!==undefined&&(!Array.isArray(connectors.repos)||connectors.repos.some(repo=>typeof repo!=='string'||!repo.trim())))bad('.repos must be a list of repository paths.');
   if(connectors.gateway!==undefined){
     closed(connectors.gateway,'gateway',['port']);
@@ -132,46 +154,14 @@ function validateConnectors(connectors){
     if(tg.enabled===true&&(tg.chatId===undefined||tg.chatId===null))bad('.telegram.enabled needs telegram.chatId.');
   }
 }
-/**
- * The secret an env var NAME resolves to: `env[name]`, else the contents of the file `env[name + '_FILE']`
- * points at (the custody pointer convention). Returns null when neither is set. Callers pass the value to
- * the one API that needs it and never print it.
- */
-/** Parse a dotenv file (KEY=VALUE lines, # comments, optional export/quotes). An absent file is {}. */
-export function readDotenv(file){
-  let text='';try{text=fs.readFileSync(file,'utf8');}catch(error){if(error?.code==='ENOENT')return {};throw error;}
-  const out={};
-  for(const line of text.split(/\r?\n/)){
-    const m=line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
-    if(!m)continue;
-    let value=m[2];
-    if(value.length>=2&&(value[0]==='"'||value[0]==="'")&&value.at(-1)===value[0])value=value.slice(1,-1);
-    out[m[1]]=value;
-  }
-  return out;
-}
-/** The dotenv file connectors.secretsFile names, resolved against the skill root; null when unset. */
-const connectorSecretsFile=(config,root=configRoot)=>{const file=config?.connectors?.secretsFile;return typeof file==='string'&&file.trim()?path.resolve(root,file):null;};
-/**
- * The environment the connectors resolve secrets from: connectors.secretsFile's values under the process
- * environment (a real env var wins). It holds secrets — hand it to connectorSecret, never print it.
- */
-export function connectorEnv(config,env=process.env,root=configRoot){const file=connectorSecretsFile(config,root);return file?{...readDotenv(file),...env}:env;}
-export function connectorSecret(name,env=process.env){
-  if(typeof name!=='string'||!ENV_NAME.test(name))return null;
-  const direct=typeof env[name]==='string'?env[name].trim():'';
-  if(direct)return direct;
-  const pointer=typeof env[`${name}_FILE`]==='string'?env[`${name}_FILE`].trim():'';
-  if(!pointer)return null;
-  try{const value=fs.readFileSync(pointer,'utf8').trim();return value||null;}catch{return null;}
-}
+/** Load connector credentials from the explicitly verified runtime main; never print the returned environment. */
+export function connectorEnv(config,env=process.env,verifiedRuntimeRoot){return secretEnv(verifiedRuntimeRoot,env);}
 /**
  * The normalized `connectors` block: defaults filled in, the secrets' PRESENCE (booleans, never values),
  * whether each connector is ready to run, and the owner-facing warnings the security posture earns.
  */
 export function connectorsConfig(config=loadConfig(),env=process.env,root=configRoot){
   validateConfig(config);
-  env=connectorEnv(config,env,root);
   const raw=plain(config?.connectors)?config.connectors:{},d=CONNECTOR_DEFAULTS;
   const cloudflare={...d.cloudflare,...(raw.cloudflare??{})},telegram={...d.telegram,...(raw.telegram??{})};
   if(cloudflare.credentialsFile)cloudflare.credentialsFile=path.resolve(root,cloudflare.credentialsFile.replace(/^~(?=[\\/])/,env.USERPROFILE??env.HOME??'~'));
@@ -189,7 +179,7 @@ export function connectorsConfig(config=loadConfig(),env=process.env,root=config
   if(cloudflare.auth==='token'&&!cloudflare.tokenPresent)warnings.push(`cloudflare.mode named: the tunnel token is not set — export ${cloudflare.tokenEnv} (or ${cloudflare.tokenEnv}_FILE).`);
   if(telegram.enabled&&!telegram.botTokenPresent)warnings.push(`telegram.enabled: the bot token is not set — export ${telegram.botTokenEnv} (or ${telegram.botTokenEnv}_FILE).`);
   if(telegram.exposeCredentialAsks)warnings.push('telegram.exposeCredentialAsks is true: credential asks are posted as public links; Telegram cloud chats are not end-to-end encrypted.');
-  return {secretsFile:connectorSecretsFile(config,root),repos:[...(raw.repos??d.repos)],gateway:{...d.gateway,...(raw.gateway??{})},cloudflare,telegram,warnings};
+  return {repos:[...(raw.repos??d.repos)],gateway:{...d.gateway,...(raw.gateway??{})},cloudflare,telegram,warnings};
 }
 /**
  * config.yaml `asks` — whether an owner ask that carries a recommended option is answered with it
@@ -305,7 +295,9 @@ function validateAgentSeat(seat,name,profile){
   if(seat.effort!==undefined&&seat.effort!==null&&!EFFORT_LEVELS.includes(seat.effort))throw Error(`Invalid config.yaml: ${name}.effort must use the effort vocabulary.`);
 }
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','coreDebug','orca','roots'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','coreDebug','orca','roots','launchTrust','retention'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  if(config?.launchTrust!==undefined)launchTrustSettings(config);
+  if(config?.retention!==undefined)workflowPurgeSettings(config);
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
   if(config?.asks!==undefined)validateAsks(config.asks);
   if(config?.uat!==undefined)validateUat(config.uat);
@@ -372,8 +364,8 @@ export function validateConfig(config){
   }
   if(config?.budgets!==undefined){
     const budgets=config.budgets;
-    if(!plain(budgets)||Object.keys(budgets).some(key=>!['maxOps','perOpMs','dailyTokens'].includes(key))||Object.values(budgets).some(value=>value!==null&&!(Number.isInteger(value)&&value>0)))
-      throw Error('Invalid config.yaml: budgets must be {maxOps?, perOpMs?, dailyTokens?} with positive-integer-or-null values.');
+    if(!plain(budgets)||Object.keys(budgets).some(key=>!['maxOps'].includes(key))||Object.values(budgets).some(value=>value!==null&&!(Number.isInteger(value)&&value>0)))
+      throw Error('Invalid config.yaml: budgets must be {maxOps?} with positive-integer-or-null values.');
   }
   if(!plain(config)||Object.keys(config).some(key=>!allowed.includes(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.includes(config.effort)||!plain(models)||Object.keys(models).some(key=>!['pools','nonOperation','selection'].includes(key))||models.selection!=='quota-aware'||!plain(models.pools)||!plain(models.nonOperation)||Object.keys(models.pools).length!==Object.keys(DEFAULT_MODEL_POOLS).length||Object.keys(models.pools).some(key=>!Object.hasOwn(DEFAULT_MODEL_POOLS,key))||Object.keys(models.nonOperation).length!==Object.keys(NON_OPERATION_ROLES).length||Object.keys(models.nonOperation).some(key=>!Object.hasOwn(NON_OPERATION_ROLES,key)))throw Error('Invalid config.yaml: expected language, model, effort and the closed quota-aware model pools/non-operation role map.');
   for(const [pool,members] of Object.entries(models.pools))if(!Array.isArray(members)||members.length!==2||new Set(members).size!==2||members.some(id=>typeof id!=='string'||!plain(runtimes[id]))||!(members.length===DEFAULT_MODEL_POOLS[pool].length&&members.every(id=>DEFAULT_MODEL_POOLS[pool].includes(id))))throw Error(`Invalid config.yaml: models.pools.${pool} must contain its canonical pair of two unique known runtime ids.`);
@@ -444,7 +436,7 @@ export function inspectOwnerConfig(root=configRoot){
  *             or `starci kernel run-deferred-tests`); e2e.verify then runs the FULL e2e suite.
  * An absent, null or unreadable owner file reads as the defaults: harness off, unit on, e2e off.
  */
-export const SPEC_FAMILIES=Object.freeze(['harness','unit','e2e']);
+const SPEC_FAMILIES=Object.freeze(['harness','unit','e2e']);
 export const SPEC_DEFAULTS=Object.freeze({harness:false,unit:true,e2e:false});
 export function specsSettings(config){const specs=plain(config?.specs)?config.specs:{};return Object.fromEntries(SPEC_FAMILIES.map(key=>[key,typeof specs[key]==='boolean'?specs[key]:SPEC_DEFAULTS[key]]));}
 /** specs.harness of the owner file under `root` (tolerant read: inspectOwnerConfig): true only when the owner opted in to `--specs all`. */

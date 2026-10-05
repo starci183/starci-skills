@@ -63,6 +63,15 @@ hostStartup:
     worker creation, then rereads the current accepted goal immediately before launch. A changed identity,
     revision, approval or phase refuses that launch and releases its unused reservation while retaining the
     installation receipt and tree. Installation failure retains the tree. An already-live Kernel is neither reinstalled nor duplicated.
+    Final seat publication rechecks the original accepted identity, goal revision, workflow generation and
+    startable phase together with the exact unexpired starting token and launcher holder under the ledger
+    write transaction. A changed authority publishes no running job or boot/revision acknowledgement.
+    The newly spawned exact worker is closed through the existing verified worker-closure owner. Unknown
+    cleanup retains original dispatch and admission custody; it never overwrites a newer singleton and
+    instead records the unresolved custody as a failure and open runtime incident. After workflow retirement,
+    the machine records the exact dispatch, admission and cleanup evidence in a Supervisor event and unresolved
+    custody Decision Item without writing the archived product. A refused machine write remains visible and
+    never releases provider capacity or proves worker closure.
   receipt: >-
     Boot and already-live results retain startup authority, host and maintenance receipts; a new launch
     retains its actual workflow installation receipt. Running proves launch, not product completion.
@@ -95,10 +104,11 @@ claim:
     kernel-terminal-unverified until the exact worker identity and definitive
     closure are reconciled; that seat's missing Dispatch alone never authorizes replacement.
   onUnsettledLaunch: >-
-    A partial or unknown launch effect keeps an identity-bound launch-unknown
-    signal and provider reservation. A later boot refuses before replacement,
-    including when no Dispatch was returned. Elapsed time is not worker-exit
-    proof; the prior effect must be definitively reconciled before clearing it.
+    A partial or unknown launch effect keeps an identity-bound launch-unknown signal and provider reservation.
+    A later boot closes the exact recorded Dispatch and terminal through scripts/machine/worker-close.mjs,
+    releases the original provider fence, then clears only its unchanged signal and accepted-goal transaction.
+    Missing identity, incomplete closure or release, changed authority and retired workflows retain custody.
+    A request-only unknown launch remains held; elapsed time never proves no effect.
   onHostOutage: >-
     Orca not answering - runtime_unavailable, orca.exe ENOENT while an update
     replaces it, a timed-out call - says nothing about any terminal. It is
@@ -140,7 +150,7 @@ spawn:
       Success records kernel-booted/kernel-restarted with fellThrough and the
       attested provider reservation receipt. Existing live workers keep their admission.
   launch: >-
-    Every Kernel is an Orca worker (contract-changes/launch-through-worker-start.yaml;
+    Every Kernel is an Orca worker (modules/kernel/start-workflow.yaml;
     scripts/agent/lib.mjs startAgent). The launching terminal (ORCA_TERMINAL_HANDLE:
     the owner's chat, the Supervisor, the watchdog run) creates the Kernel's entry
     Run ("[Kernel] <Workflow> — <workflow_id>", that terminal its coordinator) and

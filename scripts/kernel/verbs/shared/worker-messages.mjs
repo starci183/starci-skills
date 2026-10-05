@@ -18,6 +18,8 @@
 // The ledger rows are what survives Orca's inbox and what the Kernel reads through api (status, questions, messages).
 import { JOB_STATUSES, postInbox, setInboxStatusByKey } from '../../../../engine/db/ledger.mjs';
 import { parseJson } from '../../../lib/json.mjs';
+import { canonicalJSON } from '../../../../engine/canonical-json.mjs';
+import { shortHash } from '../../../lib/hash.mjs';
 import { check as orcaCheck } from '../../../api/orca/check.mjs';
 import { JOB_ROW, latestKernelJobOf } from '../../../machine/job-row.mjs';
 import { contractDispatchIdOf, jobPayloadOf, operationTerminalHandleOf, verbWorkflow } from './rows.mjs';
@@ -84,7 +86,36 @@ const questionPayloadOf = (r) => ({ messageId: r.messageId, type: r.type, runId:
  */
 function bridgeDelivery(ledger, { workflowId, runId, deliveryId, messages }) {
   const db = ledger.db, jobs = operationJobsOf(db, workflowId), now = Date.now();
-  const counts = { questions: 0, messages: 0, heartbeats: 0, types: {} };
+  const payloadDigest = shortHash(canonicalJSON(messages), { n: 64 });
+  const known = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.runId')=? AND json_extract(payload_json,'$.deliveryId')=? LIMIT 1")
+    .get(workflowId, ORCHESTRATION_DELIVERY, runId, deliveryId);
+  if (known) {
+    const prior = parseJson(known.payload_json, {}) ?? {};
+    let legacy = false;
+    if (Object.hasOwn(prior, 'payloadDigest')) {
+      if (prior.payloadDigest !== payloadDigest) throw new Error(`Delivery ${runId}/${deliveryId} lacks a matching immutable payload receipt`);
+    } else {
+      // A committed pre-digest receipt retains its original message-id replay contract, not a manufactured historical digest.
+      const types = {};
+      for (const message of messages) { const type = String(message?.type ?? 'message'); types[type] = (types[type] ?? 0) + 1; }
+      if (prior.count !== messages.length || prior.heartbeats !== (types.heartbeat ?? 0) || canonicalJSON(prior.types) !== canonicalJSON(types))
+        throw new Error(`Delivery ${runId}/${deliveryId} conflicts with its committed legacy summary`);
+      const question = db.prepare("SELECT 1 FROM events e JOIN inbox i ON i.workflow_id=e.workflow_id AND i.kind=? AND i.key=json_extract(e.payload_json,'$.messageId') WHERE e.workflow_id=? AND e.kind='worker-question-bridged' AND json_extract(e.payload_json,'$.runId')=? AND json_extract(e.payload_json,'$.deliveryId')=? AND json_extract(e.payload_json,'$.messageId')=? AND json_extract(i.payload_json,'$.type')=?");
+      const recorded = db.prepare("SELECT 1 FROM events WHERE workflow_id=? AND kind=? AND entity_id=? AND json_extract(payload_json,'$.runId')=? AND json_extract(payload_json,'$.deliveryId')=? AND json_extract(payload_json,'$.type')=?");
+      for (const message of messages) {
+        const type = String(message?.type ?? 'message');
+        if (COUNTED_ONLY_TYPES.has(type)) continue;
+        const id = String(message.id);
+        const committed = ANSWERABLE_MESSAGE_TYPES.has(type)
+          ? question.get(WORKER_QUESTION, workflowId, runId, deliveryId, id, type)
+          : recorded.get(workflowId, ORCHESTRATION_MESSAGE, id, runId, deliveryId, type);
+        if (!committed) throw new Error(`Delivery ${runId}/${deliveryId} has no committed legacy message ${id}`);
+      }
+      legacy = true;
+    }
+    return { questions: 0, messages: 0, heartbeats: 0, types: {}, replayed: true, legacy };
+  }
+  const counts = { questions: 0, messages: 0, heartbeats: 0, types: {}, replayed: false };
   const questionKnown = db.prepare('SELECT 1 FROM inbox WHERE workflow_id=? AND kind=? AND key=?');
   const messageKnown = db.prepare('SELECT 1 FROM events WHERE workflow_id=? AND kind=? AND entity_id=?');
   for (const message of messages) {
@@ -105,7 +136,7 @@ function bridgeDelivery(ledger, { workflowId, runId, deliveryId, messages }) {
     counts.messages += 1;
   }
   ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: ORCHESTRATION_DELIVERY,
-    payload: { runId, deliveryId, count: messages.length, types: counts.types, heartbeats: counts.heartbeats } });
+    payload: { runId, deliveryId, payloadDigest, count: messages.length, types: counts.types, heartbeats: counts.heartbeats } });
   return counts;
 }
 
@@ -156,12 +187,12 @@ const closeStaleQuestions = (db, workflowId, at = Date.now()) => {
  * Drain every Run of the workflow into the ledger (see the header). `rebind(runId)` re-binds the Kernel's own Run to
  * the current Kernel terminal after a consumer_fenced answer (cli.mjs bindRunToKernel); a Run that is not the Kernel's
  * is never re-bound. `check` replaces the Orca wrapper (specs).
- * {ok, runs, deliveries, questions, messages, heartbeats, closed, errors[{runId, code, error}], error}.
+ * {ok, runs, deliveries, questions, messages, heartbeats, legacyReplays, closed, errors[{runId, code, error}], error}.
  */
 export function drainWorkflowMessages(ledger, workflowId, { check = orcaCheck, rebind = null, maxDeliveries = MAX_DELIVERIES_PER_DRAIN } = {}) {
   const db = ledger.db;
   const runIds = [...workflowRunIdsOf(db, workflowId)];
-  const out = { ok: true, runs: runIds, deliveries: 0, questions: 0, messages: 0, heartbeats: 0, closed: 0, errors: [], error: null };
+  const out = { ok: true, runs: runIds, deliveries: 0, questions: 0, messages: 0, heartbeats: 0, legacyReplays: 0, closed: 0, errors: [], error: null };
   const kernelJob = latestKernelJobOf(db, workflowId);
   const terminal = kernelJob?.worker_id ?? null;
   const kernelRunId = jobPayloadOf(kernelJob)?.orca?.runId ?? null;
@@ -181,8 +212,11 @@ export function drainWorkflowMessages(ledger, workflowId, { check = orcaCheck, r
       }
       if (!r.deliveryId || !r.messages.length || n >= maxDeliveries) break;
       const { deliveryId, messages } = r;
-      const counts = ledger.transaction(() => bridgeDelivery(ledger, { workflowId, runId, deliveryId, messages }));
-      out.deliveries += 1; out.questions += counts.questions; out.messages += counts.messages; out.heartbeats += counts.heartbeats;
+      let counts;
+      try { counts = ledger.transaction(() => bridgeDelivery(ledger, { workflowId, runId, deliveryId, messages })); }
+      catch (error) { fail({ runId, code: 'orchestration-check-failed', error: String(error?.message ?? error) }); break; }
+      out.legacyReplays += counts.legacy ? 1 : 0;
+      out.deliveries += counts.replayed ? 0 : 1; out.questions += counts.questions; out.messages += counts.messages; out.heartbeats += counts.heartbeats;
       r = call(deliveryId);
     }
   }

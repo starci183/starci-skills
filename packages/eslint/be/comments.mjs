@@ -10,7 +10,7 @@
  *     constructor and an index signature are not surface, overload signatures of one name share one doc, and a property
  *     set to a literal or a named constant is a data constant (COMMENT-1's reason). Product source only: the test tiers
  *     (`e2e`, `fixtures` of the slot manifest) document their spec-read shapes at the type.
- *   - `require-enum-member-jsdoc` can check that a doc EXISTS and never that it states a
+ *   - `require-enum-member-jsdoc` checks an adjacent non-empty description, never whether it states a
  *     consequence. That half is read by a person, and the rule says so rather than pretending.
  *   - `no-non-ascii-source` takes no exemption marker: HFS removed `vn-ok`, so text a program depends on
  *     lives in a message catalog (slot be.domain.messages, of any module tier, or be.feature.messages), the only place Vietnamese may appear. Specs
@@ -26,6 +26,7 @@
 import { hfsOf } from "./lib/hfs.mjs"
 import { normalizePath } from "./lib/path.mjs"
 import { hasSecondLanguage } from "./runtime/scripts/lib/language.mjs"
+import { jsdocBefore, jsdocDescription } from "./runtime/scripts/lib/jsdoc.mjs"
 
 /** The slots of the per-owner message catalogs: the only source files that may hold Vietnamese. */
 const CATALOG_SLOTS = new Set(["be.domain.messages", "be.feature.messages"])
@@ -91,20 +92,15 @@ const offenceIn = (line) => {
  */
 const hasDocumentedSurface = (declaration) => {
   if (declaration.type === "VariableDeclaration") {
-    // only a const bound to a function has a surface; a data constant is already described
-    const first = declaration.declarations[0]
-    const init = first && first.init
-    return Boolean(init)
-      && (init.type === "ArrowFunctionExpression" || init.type === "FunctionExpression")
+    // a later declarator can expose a function even when the first binding is plain data
+    return declaration.declarations.some(({ init }) => Boolean(init)
+      && (init.type === "ArrowFunctionExpression" || init.type === "FunctionExpression"))
   }
   return DOCUMENTED_KINDS.has(declaration.type)
 }
 
-/** Whether a JSDoc block sits immediately before a node. */
-const hasJsdocBefore = (sourceCode, node) =>
-  sourceCode
-    .getCommentsBefore(node)
-    .some((comment) => comment.type === "Block" && comment.value.startsWith("*"))
+/** Whether the adjacent JSDoc has a declaration description rather than only tags or a file header. */
+const hasJsdocBefore = (sourceCode, node) => jsdocBefore(sourceCode, node) !== null
 
 /** The declared name, for the message. */
 const nameOf = (declaration) => {
@@ -123,7 +119,7 @@ export const requireExportJsdoc = {
     schema: [],
     messages: {
       jsdoc:
-        "`{{name}}` is exported with no doc block. This is surface other files depend on, and a name plus a signature says what it TAKES - never what it is for, or when to reach for it rather than the thing beside it.",
+        "`{{name}}` is exported without an adjacent JSDoc description. This is surface other files depend on, and a name plus a signature says what it TAKES - never what it is for, or when to reach for it rather than the thing beside it.",
     },
   },
   create(context) {
@@ -214,7 +210,7 @@ export const requirePublicMemberJsdoc = {
     schema: [],
     messages: {
       jsdoc:
-        "`{{owner}}.{{name}}` is public surface with no doc block. A caller reaches the member, not the type's doc: say what it is for, what calling or reading it causes, or what it holds.",
+        "`{{owner}}.{{name}}` is public surface without an adjacent JSDoc description. A caller reaches the member, not the type's doc: say what it is for, what calling or reading it causes, or what it holds.",
     },
   },
   create(context) {
@@ -253,7 +249,7 @@ export const requireEnumMemberJsdoc = {
     schema: [],
     messages: {
       jsdoc:
-        "Enum member `{{name}}` has no doc. State what CHOOSING it causes, not what it is called - a member is picked at a call site far from the switch that gives it meaning. (A rule can only see that a doc exists; whether it states a consequence is read by a person.)",
+        "Enum member `{{name}}` has no adjacent JSDoc description. State what CHOOSING it causes, not what it is called - a member is picked at a call site far from the switch that gives it meaning. (A rule can only see that a doc exists; whether it states a consequence is read by a person.)",
     },
   },
   create(context) {
@@ -334,7 +330,7 @@ const RESTATEMENT_FILLER = new Set(["a", "an", "the", "is", "of", "for", "to", "
 
 /** The content words a doc comment contributes once filler is stripped out. */
 const docContentWords = (comment) =>
-  (comment.value.match(/[A-Za-z]+/g) || [])
+  (jsdocDescription(comment).match(/[A-Za-z]+/g) || [])
     .map((word) => word.toLowerCase())
     .filter((word) => !RESTATEMENT_FILLER.has(word))
 
@@ -349,11 +345,6 @@ const isPureRestatement = (comment, declaredName) => {
   for (const word of contentSet) if (!identifierSet.has(word)) return false
   return true
 }
-
-/** The doc block immediately before a node, or null. */
-const jsdocBefore = (sourceCode, node) =>
-  sourceCode.getCommentsBefore(node).find((comment) => comment.type === "Block" && comment.value.startsWith("*"))
-    || null
 
 /** A doc block that only re-spells the declared name is COMMENT-3's violation wearing COMMENT-1's shape. */
 export const noRestatedNameJsdoc = {

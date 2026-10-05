@@ -13,7 +13,7 @@ import {claimFoundation,declareDependent,landFoundation,normalizeFoundationName}
 // really a peer dependency; another's brand.decide waited on base-repos' Grammar and
 // FE app/ for a day). The ledger now keeps a registry of shared foundations - one OWNER workflow, a
 // state, its dependents; a dependent waits with a typed peer-wait --until-foundation, and the owner's
-// landing notifies every dependent and releases those waits. A workflow created after the change
+// landing notifies every dependent and releases those waits. Every workflow
 // declares its foundations before its first leg once the ledger plans foundations at all.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
@@ -25,11 +25,7 @@ const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-foundations-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ["docs"])fs.mkdirSync(path.join(repo,d),{recursive:true});
-  // The spec registry: foundation planning took effect on 2026-01-01, so the workflows created here
-  // are "new" and OLD (created 2025) predates it.
-  const registry=path.join(root,'contract-changes.yaml');
-  fs.writeFileSync(registry,["schema: starci/contract-changes@1",'changes:','  - id: shared-foundation-planning',"    effectiveAt: '2026-01-01T00:00:00Z'",'    summary: spec','    reach: new-legs',''].join('\n'));
-  const base={...process.env,STARCI_CONTRACT_CHANGES:registry};
+  const base={...process.env};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete base[key];
   const api=(args,env={})=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...base,...env}});
   const ledger=openLedger({file:ledgerFileFor(repo)});
@@ -143,7 +139,7 @@ test('foundation writes are Kernel verbs; an op caller may read the registry onl
   assert.equal(fx.api(['foundations'],asOp).status,0);
 });
 
-test('a new workflow with running peers declares its foundations before its first leg once the ledger plans them; an old one is only advised',t=>{
+test('every workflow with running peers declares its foundations before its first leg once the ledger plans them',t=>{
   const fx=fixture(t);
   // Nothing registered in this ledger yet: every workflow is advised, none is held.
   const first=fx.ok(['enqueue','--workflow',MOD,'--op','docs.author','--paths','docs/a']);
@@ -157,9 +153,8 @@ test('a new workflow with running peers declares its foundations before its firs
   const refusal=fx.refused(['enqueue','--workflow',MOD,'--op','docs.author','--paths','docs/b'],'foundations-undeclared');
   assert.match(refusal.detail,/starci kernel foundation --claim/);
   assert.equal(fx.ok(['status','--workflow',MOD]).foundations.required,true);
-  // A workflow created before foundation planning is advised, never held (the versioned-contract rule).
-  const old=fx.ok(['enqueue','--workflow',OLD,'--op','docs.author','--paths','docs/old']);
-  assert.match(old.foundationAdvisory,/advised: it started before foundation planning/);
+  // Creation time cannot waive a current shared-foundation duty.
+  fx.refused(['enqueue','--workflow',OLD,'--op','docs.author','--paths','docs/old'],'foundations-undeclared');
   // A declared workflow enqueues; --foundation marks its foundation legs, which lead the queue.
   assert.equal(fx.ok(['enqueue','--workflow',AUTH,'--op','docs.author','--paths','docs/auth']).foundationAdvisory,undefined);
   fx.refused(['enqueue','--workflow',MOD,'--op','docs.author','--paths','docs/c','--foundation','brand'],'foundation-not-owned');

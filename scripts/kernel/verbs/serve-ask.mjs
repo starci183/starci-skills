@@ -14,28 +14,24 @@
 //
 //   serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>] [--now]
 import path from 'node:path';
-import { runNode } from '../../api/node/run-node.mjs';
 import { spawnNode } from '../../api/node/spawn-node.mjs';
 import { skillRoot } from '../../../engine/runtime-root.mjs';
 import { ledgerFileFor } from '../../../engine/db/ledger.mjs';
-import { connectorsConfig } from '../../../engine/config.mjs';
+import { ensureAskConnectors as ensureConnectors, publicBase } from '../../connectors/tunnel.mjs';
 import { getWorkflow } from './shared/rows.mjs';
 import { AUTOPILOT_BY, PROVISIONAL_LABEL, autopilotAnswerAsk } from '../autopilot-run.mjs';
 import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from '../ask-server.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
-import { readEnv } from '../../lib/env.mjs';
 
 function ensureAskConnectors() {
-  if (readEnv('STARCI_CONNECTORS_OFF') === '1') return null;
-  let cf = null;
-  try { cf = connectorsConfig()?.cloudflare ?? null; } catch { return null; }
-  if (!cf || cf.mode === 'off') return null;
-  const start = (name) => {
-    const r = runNode([path.join(skillRoot, 'scripts', 'connectors', name), 'start'], { cwd: skillRoot, timeout: 60000 });
-    try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return { ok: false, status: r.status }; }
+  const result = ensureConnectors();
+  if (result.skipped) return null;
+  return {
+    gateway: result.ok === true && Boolean(result.gateway),
+    tunnel: result.ok === true && Boolean(result.tunnel),
+    publicBase: result.ok === true ? publicBase() : null,
+    ...(result.ok === false ? { error: result.error } : {}),
   };
-  const gateway = start('ask-gateway.mjs'), tunnel = start('tunnel.mjs');
-  return { gateway: gateway?.ok === true, tunnel: tunnel?.ok === true, publicBase: tunnel?.publicBase ?? null };
 }
 
 export default {

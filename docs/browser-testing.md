@@ -29,3 +29,39 @@ Project screenshots, videos and useful test results belong under the owning
 browser profiles remain local. Never store cookies, tokens or secrets in shared media.
 Browser setup is required for browser verification, not for Business/Architecture or
 backend-only work. See https://playwright.dev/docs/browsers for platform prerequisites.
+
+## Harness scenarios
+
+The runtime harness browser scenarios are owned by `tests/helpers/harness-browser-uat.mjs`;
+its `captureContract` and `assertHarnessCapture` own completeness and unique, nonempty raw media declarations. Native request, injected-fault
+and lifecycle evidence is owned by `tests/helpers/browser-telemetry.mjs`. The scenario modules
+use the portable raw-file recorder in `tests/helpers/browser-proof-artifacts.mjs`; none depends
+on a host scratch path. `ui/fixtures/seed.mjs` and `ui/fixtures/media/` own the private scenario
+inputs. Commit these sources and public assets; keep produced captures and receipts in a fresh
+external run directory.
+
+A caller imports the scenario owners from its selected clean Source checkout and supplies its
+full revision, an explicit external run directory and the actual browser/server inputs:
+
+```js
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const scenario = await import(pathToFileURL(path.join(source, 'tests/helpers/harness-browser-uat.mjs')));
+const telemetry = await import(pathToFileURL(path.join(source, 'tests/helpers/browser-telemetry.mjs')));
+await scenario.capturePhase({ source, sourceSha, dir, browser, origin, privateData,
+  report, fixture, products, t, guard });
+```
+
+Call `capturePhase` for the read-only host and the fresh private fixture, then
+`scenario.assertHarnessCapture(report)` before publishing success. The caller supplies `report.source`
+and `report.sourceSha`, the real same-revision guard, the actual finalized fixture/products manifests,
+and the selected Source dictionary `t`. It owns cold dependencies, the actual UI build and served
+asset checks, exact Source revision checks, private typed seed creation, native UAT slot custody,
+server/browser closure and environment restoration. These preparation and custody wrappers may live
+outside Source; the scenario modules and their required inputs remain in the checkout.
+
+The focused owner is `tests/ui/harness-browser-uat.spec.mjs`. Its private raw-file/count/path/recorder cases
+qualify the module boundary; actual browser qualification separately executes the canonical scenarios
+against the built harness, retains native recordings, checks unexpected failures after telemetry
+closure and verifies capture bytes. An import, count fixture or syntax check does not establish UAT.

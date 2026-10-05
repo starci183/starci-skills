@@ -191,7 +191,7 @@ function resolveCodeDigestPath(rel, dirs, appRoot) {
       return {abs: inside ? path.join(dir.abs, inside) : dir.abs, repoRoot: repoRootBehind(dir)};
     }
   }
-  return {abs: path.join(fallbackRoot, rel), repoRoot: fallbackRoot};
+  return {abs: path.join(appRoot, rel), repoRoot: appRoot};
 }
 
 // ---------- the four bindings ----------

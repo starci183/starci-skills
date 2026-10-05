@@ -84,12 +84,31 @@ export interface InfraHandle extends ProxyToxics {
     during<T>(during: () => Promise<T>): Promise<T>
 }
 
+/** The only row-write operations the infrastructure fault owner may reject. */
+export type PostgresWriteOperation = "insert" | "delete"
+
+/** A generated ordinary trigger and function owned by this private world, with explicit provisioning and cleanup. */
+export interface PostgresWriteFault {
+    /** The generated identity included in the actual PostgreSQL error DETAIL. */
+    readonly name: string
+    /** The real PostgreSQL raise_exception SQLSTATE. */
+    readonly errorCode: string
+    /** Provisions the fault under the world's operation lock; a failed install still needs restore or world stop. */
+    install(): Promise<void>
+    /** Removes only this handle's verified objects; any unknown cleanup refuses success and retains the operation lock. */
+    restore(): Promise<void>
+    /** Reads the physical catalog: two objects when installed and zero after confirmed cleanup. */
+    count(): Promise<number>
+}
+
 /**
  * The outage of ONE database connection of the shared Postgres: the database stops accepting connections and every session
  * on it is terminated, while the other connections' databases keep serving. It takes and keeps the run's outage lock like
  * every other outage.
  */
 export interface DatabaseOutageHandle {
+    /** Prepares a named fault on one regular table in this connection's private schema; no SQL or schema override is accepted. */
+    writeFault(table: string, operation: PostgresWriteOperation): PostgresWriteFault
     /** Refuses every new connection to the database and terminates the live ones. */
     cut(): Promise<void>
     /** Lets the database accept connections again. */

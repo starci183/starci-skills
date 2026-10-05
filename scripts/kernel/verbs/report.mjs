@@ -15,16 +15,15 @@ import { validateOpReport } from '../report-envelope.mjs';
 import { jobPayloadOf, jobOpOf, operationDispatchOf } from './shared/rows.mjs';
 import { HANDOVER_OP, handoverAskProblem } from '../handover.mjs';
 import { autopilotOn, autopilotBundle } from '../autopilot-run.mjs';
-import { DRAW_REVIEW_OP, DRAW_REVIEW_CHANGE, DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../../work/draw-review.mjs';
-import { DRAW_FEEDBACK_CHANGE, reportFeedbackFindings } from '../../work/draw-feedback.mjs';
-import { admittedContractOf, loadContractChanges, changeById, admittedBeforeChange } from '../../machine/contract-version.mjs';
+import { DRAW_REVIEW_OP, drawReviewsOwed } from '../../work/draw-review.mjs';
+import { reportFeedbackFindings } from '../../work/draw-feedback.mjs';
 import { ownerAskConflict } from '../../gates/starcistacks.mjs';
 import { repeatedAnswerOf, ownerAnswersOf } from '../../machine/owner-answers.mjs';
 import { renderReportBlock } from '../report-render.mjs';
 import { startSettlerFor } from '../settle/job-settle.mjs';
 import { appendEvent, fileReport, idempotent, setJobStatus, setUnitState, getUnit, updateJob } from '../../../engine/db/ledger.mjs';
 import { requireReportAttempt } from './shared/report-binding.mjs';
-import { attachedArgs, scratchOf, scratchFile, stageReportEvidence, storedReportOf, fileReportEvidence, removeScratch } from './shared/report-evidence.mjs';
+import { attachedArgs, scratchOf, scratchFile, stageReportEvidence, storedReportOf, fileReportEvidence, removeScratch, readReportEnvelope } from './shared/report-evidence.mjs';
 import { finalizeAttemptTranscript } from '../transcripts.mjs';
 import { send } from '../../api/orca/send.mjs';
 import { isSpecRun } from '../../lib/env.mjs';
@@ -89,8 +88,8 @@ export default {
   // One guarded read: the file that resolved but vanished before the read is a typed refusal,
   // not a raw throw mid-command (G26); everything below parses this same text.
   let reportRaw;
-  try { reportRaw = fs.readFileSync(reportAbs, 'utf8'); }
-  catch { throw Object.assign(new Error(`report file unreadable: ${reportAbs}`), { code: 'report-unreadable' }); }
+  try { reportRaw = readReportEnvelope(reportAbs); }
+  catch (error) { if (error.code === 'report-invalid') throw error; throw Object.assign(new Error(`report file unreadable: ${reportAbs}`), { code: 'report-unreadable' }); }
   const parsed = parseJson(reportRaw);
   const valid = validateOpReport(parsed, { ownedPaths: reportOwnedPaths(db, job, repo), identity: reportIdentityOf(db, job) });
   if (!valid.ok) throw Object.assign(new Error(`report fails starci/op-report@1: ${valid.reasons.join('; ')}`), { code: 'report-invalid' });
@@ -117,22 +116,15 @@ export default {
   // unreviewed is refused draw-review-owed, and the attempt files the draw-review ask instead
   // (scripts/work/draw-review.mjs). A ui record the guard cannot judge - one that does not parse, a layout tree or a
   // dependent record that does not, a guard that crashes - may owe the review, so the report is refused
-  // draw-review-unjudged. A leg admitted before either change reports as it was admitted.
+  // draw-review-unjudged.
   if (jobOpOf(job) === DRAW_REVIEW_OP && report.outcome === 'done') {
-    const admitted = admittedContractOf(db, job);
-    const registry = loadContractChanges(skillRoot);
-    const admittedBefore = (id) => { const change = changeById(registry, id); return Boolean(admittedBeforeChange(admitted, change)); };
-    let owed = [];
-    if (!admittedBefore(DRAW_REVIEW_CHANGE)) {
-      let judged;
-      try { judged = drawReviewsOwed(repo, report.files); } catch (error) { judged = { owed: [], unjudged: [{ path: 'draw-review.mjs drawReviewsOwed', error: String(error?.message ?? error) }] }; }
-      // A leg admitted before draw-content-owner-gate owes the review only for a drawing another leg waits on.
-      owed = admittedBefore(DRAW_OWNER_EVERY_CHANGE) ? judged.owed.filter((o) => o.owedBefore) : judged.owed;
-      if (judged.unjudged.length) {
-        const what = judged.unjudged.map((u) => `${u.path}: ${u.error}`).join('; ').slice(0, 800);
-        if (admittedBefore(DRAW_REVIEW_UNJUDGED_CHANGE)) console.error(`starci kernel report WARNING: the draw review guard could not judge ${what}`);
-        else throw Object.assign(new Error(`draw-review-unjudged: the owner-review guard could not judge ${what}. A record it cannot read may owe the owner review, so the done report is not filed: repair the record (starci runtime validate names what is wrong) and file the report again`), { code: 'draw-review-unjudged', unjudged: judged.unjudged });
-      }
+    let judged;
+    try { judged = drawReviewsOwed(repo, report.files); }
+    catch (error) { judged = { owed: [], unjudged: [{ path: 'draw-review.mjs drawReviewsOwed', error: String(error?.message ?? error) }] }; }
+    const owed = judged.owed;
+    if (judged.unjudged.length) {
+      const what = judged.unjudged.map((u) => `${u.path}: ${u.error}`).join('; ').slice(0, 800);
+      throw Object.assign(new Error(`draw-review-unjudged: the owner-review guard could not judge ${what}. Repair the record and file the report again`), { code: 'draw-review-unjudged', unjudged: judged.unjudged });
     }
     if (owed.length) {
       throw Object.assign(new Error(`draw-review-owed: ${owed.map((o) => `${o.id} (${o.dir}) ${o.gates.length ? `gates another leg (${o.gates.join(', ')})` : 'is a drawing, and every drawing goes to the owner to accept'} and ${o.why}`).join('; ')}. File outcome ask with the question \`node ${path.join(skillRoot, 'scripts', 'work', 'draw-review.mjs')} question --ui <ui-record-dir>\` prints, verbatim (one ask, even with candidatesPerScreen 1); the owner's accept answer is applied by draw-review.mjs apply --receipt <receipt> --write on the re-enqueued attempt`), { code: 'draw-review-owed', owed });
@@ -140,19 +132,14 @@ export default {
   }
   // The owner's feedback loop (scripts/work/draw-feedback.mjs): an interface.draw ask or done report whose ui record
   // carries an owner redraw answer not yet applied, or an owner note the redraw does not address (the rejected bytes,
-  // a brief without the note id, a critic that does not pass it), is refused draw-feedback-unaddressed. A leg admitted
-  // before contract change owner-draw-feedback-golden reports as it was admitted.
+  // a brief without the note id, a critic that does not pass it), is refused draw-feedback-unaddressed.
   if (jobOpOf(job) === DRAW_REVIEW_OP && ['ask', 'done'].includes(report.outcome)) {
-    const change = changeById(loadContractChanges(skillRoot), DRAW_FEEDBACK_CHANGE);
-    const admitted = admittedContractOf(db, job);
-    const before = Boolean(admittedBeforeChange(admitted, change));
-    if (!before) {
-      let verdict;
-      try { verdict = reportFeedbackFindings(db, { repo, report }); } catch (error) { verdict = { findings: [], error: String(error?.message ?? error) }; }
-      if (verdict.error) console.error(`starci kernel report WARNING: the owner-feedback guard could not run: ${verdict.error.slice(0, 300)}`);
-      if (verdict.findings.length) {
-        throw Object.assign(new Error(`draw-feedback-unaddressed: ${verdict.findings.map((f) => f.detail).join(' | ').slice(0, 1600)}. The owner's notes ride in the redraw's brief (node ${path.join(skillRoot, 'scripts', 'work', 'draw-feedback.mjs')} brief --ui <dir>) and the critic gates each; redraw through draw-loop.mjs and check with draw-feedback.mjs check --ui <dir> before reporting`), { code: 'draw-feedback-unaddressed', findings: verdict.findings.slice(0, 50) });
-      }
+    let verdict;
+    try { verdict = reportFeedbackFindings(db, { repo, report }); }
+    catch (error) { verdict = { findings: [], error: String(error?.message ?? error) }; }
+    if (verdict.error) console.error(`starci kernel report WARNING: the owner-feedback guard could not run: ${verdict.error.slice(0, 300)}`);
+    if (verdict.findings.length) {
+      throw Object.assign(new Error(`draw-feedback-unaddressed: ${verdict.findings.map((f) => f.detail).join(' | ').slice(0, 1600)}. Address the owner's notes through the current drawing feedback loop before reporting`), { code: 'draw-feedback-unaddressed', findings: verdict.findings.slice(0, 50) });
     }
   }
   // An ask for what the repository's stack declaration says the runtime already holds (a service declared

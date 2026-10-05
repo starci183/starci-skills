@@ -7,26 +7,18 @@ import {sha256File} from '../../../engine/digest.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
 import {appRootOf, loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
 import {slash} from '../../lib/path-key.mjs';
-import {resolveBlob} from '../../../engine/db/blob.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import {resolveBlob, getBlob} from '../../../engine/db/blob.mjs';
+import {exampleArtifactReadOptions, exampleWorkRoots} from '../../lib/example-refs.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 /**
- * The gate verifies declarations, not bytes. check-example-work.mjs asks whether a done uat-flow has a
- * `runs/<id>/videos/` that is not empty, and whether a ui record names a generation tool - and a 0-byte
- * file renamed `.webm` answers both yes, because `readdirSync().length > 0` counts names. A
- * `ui.assets[].path` line is never opened at all, so the PNG it names may simply not be there.
- * `accounts.yaml` is read `if existsSync` (concept 13's last branch), which makes the file's absence a
- * silent pass rather than a finding. Those are three ways to record a proof that has no bytes behind it.
+ * Byte verification for Work declarations: file existence, size, media signatures
+ * and stamped digests complement the structural checks of check-example-work.
+ * Citations use the existing blob reader. An owned example selects its own
+ * curated fixture CAS; missing bytes, invalid sidecars and incomplete bundles
+ * refuse. Real projects retain their external-store read contract.
  *
- * This script is the byte layer: every artifact a record, an evidence file, a generation receipt or a run
- * manifest declares must exist, must be non-empty, must carry the magic bytes its extension claims, and -
- * where the declaration also stamps a sha256 - must still be the exact bytes that were hashed. A renamed
- * fake (an empty file called `.webm`) and a re-captured artifact whose record was never re-stamped are the
- * two shapes that read as proven and are not.
- *
- * Severity follows check-work-deep's discipline, because a check that cries wolf gets ignored:
- *   REFUSE  - deterministically wrong about the bytes that are on disk right now
- *   SUSPECT - a heuristic over prose (a path quoted inside a prompt text may be named, not supplied)
- *   INFO    - what a rule did not get to look at on this tree, so a clean run stays explainable
+ * REFUSE means deterministically wrong bytes; SUSPECT remains a prose heuristic;
+ * INFO describes the checked coverage. A declared file is never proof by name.
  */
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -252,28 +244,30 @@ function verifyCitation(found, docFile, ctx, sink, seen) {
   const {text, entry} = found;
   const named = `blob citation ${text}`;
   const stamped = typeof entry.sha256 === 'string' ? entry.sha256.trim().toLowerCase() : '';
-  if (!/^[0-9a-f]{64}$/.test(stamped)) {
+  if (!/^[0-9a-f]{64}$/.test(stamped) || (ctx.blobOptions?.root != null && entry.sha256 !== stamped)) {
     sink.refuse(docFile, 'ASSET_STAMP', `${found.trail} cites ${named} with sha256 ${JSON.stringify(entry.sha256)}, which is not a sha256 - the citation resolves nothing`);
     return;
   }
-  const hit = resolveBlob({sha256: stamped});
+  const blobOptions = ctx.blobOptions ?? {};
+  let hit, selectedBytes = null;
+  try {
+    hit = resolveBlob({sha256: stamped}, blobOptions);
+    if (hit && blobOptions.root != null) selectedBytes = getBlob(stamped, {...blobOptions, verifyBundle: true});
+  } catch (error) {
+    sink.refuse(docFile, error.code === 'EINVALBUNDLE' ? 'ASSET_BUNDLE' : 'ASSET_STORE', `${found.trail} cites ${named}, whose selected bytes cannot be verified: ${error.message}`);
+    return;
+  }
   if (!hit || !fs.existsSync(hit.file)) {
-    const message = `${found.trail} cites ${named} (${stamped.slice(0, 12)}), which is not in the blob store`;
-    // A tree shipped under the runtime's examples/ cites blobs its authoring machine filed; the blob store is
-    // machine-local and never distributed with the repository, so there the absence is only a suspect. Every
-    // other tree (a product's own .starciwork) is refused: its citations must resolve in its own store.
-    const shipped = ctx?.workRoot && path.resolve(ctx.workRoot).toLowerCase().startsWith(path.join(root, 'examples').toLowerCase() + path.sep);
-    if (shipped) sink.suspect(docFile, 'ASSET_MISSING', `${message} - a shipped example's blobs are not distributed with it`);
-    else sink.refuse(docFile, 'ASSET_MISSING', `${message} - declared bytes are not there`);
+    sink.refuse(docFile, 'ASSET_MISSING', `${found.trail} cites ${named} (${stamped.slice(0, 12)}), which is not in its selected blob store - declared bytes are not there`);
     return;
   }
   if (seen) { seen.filesOpened += 1; seen.digestsCompared += 1; }
-  const size = fs.statSync(hit.file).size;
+  const size = selectedBytes === null ? fs.statSync(hit.file).size : selectedBytes.length;
   if (size === 0) {
     sink.refuse(docFile, 'ASSET_EMPTY', `${found.trail} cites ${named}, which is a 0-byte blob`);
     return;
   }
-  const actual = sha256File(hit.file);
+  const actual = selectedBytes === null ? sha256File(hit.file) : stamped; // getBlob verified these exact selected bytes
   if (actual !== stamped) sink.refuse(docFile, 'ASSET_DIGEST', `${found.trail} cites ${named} as ${stamped}, but the stored blob hashes to ${actual}`);
 }
 
@@ -415,7 +409,7 @@ function checkReceipt(receiptFile, ctx, sink, seen) {
  * `{refuse, suspect, info}` arrays of `file: message [CODE]`, the shape check-work-deep prints and the
  * CLI reads. Exported so the fixture test can point it at a throwaway tree instead of the real trees.
  */
-export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], info: []}) {
+export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], info: []}, { runtimeRoot = root } = {}) {
   const emit = {
     refuse: (file, code, msg) => out.refuse.push(`${relativeToRoot(file)}: ${msg} [${code}]`),
     suspect: (file, code, msg) => out.suspect.push(`${relativeToRoot(file)}: ${msg} [${code}]`),
@@ -452,7 +446,13 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
     info: (file, code, msg) => emit.info(file, code, msg),
   };
   const inline = indexInlineCriteria(records);
-  const ctxFor = recordDir => ({workRoot, records, inline, recordDir, repoRoot: appRoot, ownerDirOf});
+  let blobOptions;
+  try { blobOptions = exampleArtifactReadOptions(runtimeRoot, workRoot); }
+  catch (error) {
+    emit.refuse(path.join(workRoot, 'index.yaml'), 'ASSET_ROOT', `artifact read context cannot be established: ${error.message}`);
+    return {...counts, records: records.size, evidence: 0};
+  }
+  const ctxFor = recordDir => ({workRoot, records, inline, recordDir, repoRoot: appRoot, ownerDirOf, blobOptions});
 
   // evidence docs by the record directory beside them; the run each one settles on is a claim in bytes
   const evidenceByDir = new Map();
@@ -622,7 +622,7 @@ if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   const treeArg = args.includes('--tree') ? args[args.indexOf('--tree') + 1] : null;
   const trees = treeArg ? [path.resolve(treeArg)]
-    : walk(path.join(root, 'examples')).filter(f => f.endsWith(`.starciwork${path.sep}index.yaml`)).map(path.dirname);
+    : exampleWorkRoots(root);
   const out = {refuse: [], suspect: [], info: []};
   const totals = {declarations: 0, digests: 0, digestsCompared: 0, filesOpened: 0, generatedAssets: 0,
     prompts: 0, runs: 0, receipts: 0, mediaFiles: 0, receiptCalls: 0, accountsFiles: 0, records: 0, evidence: 0};

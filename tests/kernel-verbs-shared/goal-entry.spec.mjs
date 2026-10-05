@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
+import {inspectLedger,ledgerFileFor,openLedger,postInbox} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {JOB_ROW} from '../../scripts/machine/job-row.mjs';
 import {openMachine} from '../../engine/db/machine.mjs';
@@ -50,6 +50,79 @@ test('define-goal --plan writes nothing to sqlite',t=>{
   if(!fs.existsSync(file))return; // the cleanest proof: --plan never even opened the ledger
   const inboxAfter=read(repo,l=>l.db.prepare('SELECT count(*) n FROM inbox').get().n);
   assert.equal(inboxAfter,inboxBefore,'--plan must not write inbox rows');
+});
+
+
+// Exercise the native writer with the same terminal/seat bindings currentRole resolves.
+// These are private fixture handles; no Orca terminal or host seat is created.
+const boundGoalCaller=(t,{role,seat=false})=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-goal-role-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const handle='private-goal-'+role,guards=path.join(root,'guards');
+  const dir=path.join(guards,seat?'seats':'terminals');fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,handle+'.json'),JSON.stringify(seat
+    ?{schema:'starci/seat-guard@1',role,terminal:handle}
+    :{schema:'starci/op-guard@1',role,jobId:'private-'+role,workflowId:'private-goal',owned:[]}));
+  return (...args)=>spawnSync(process.execPath,[DEFINE_GOAL,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,
+    env:{...process.env,STARCI_GUARDS_ROOT:guards,ORCA_TERMINAL_HANDLE:handle,STARCI_ROLE:'owner'}});
+};
+const goalRows=repo=>read(repo,l=>Object.fromEntries(['workflows','goals','inbox','events'].map(table=>
+  [table,l.db.prepare('SELECT * FROM '+table).all().map(row=>JSON.stringify(row)).sort()])));
+const ownerGoalCall=(...args)=>spawnSync(process.execPath,[DEFINE_GOAL,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,
+  env:{...process.env,ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:''}});
+
+test('bound non-owner callers cannot persist fresh owner-labelled goals and leave no ledger',t=>{
+  for(const binding of [{role:'op'},{role:'kernel'},{role:'supervisor',seat:true}]){
+    const repo=fixture(t).repo(),file=ledgerFileFor(repo),call=boundGoalCaller(t,binding);
+    assert.equal(fs.existsSync(file),false);
+    const preview=call('--repo',repo,'--text','build the enrolment api endpoint','--plan','--json');
+    assert.equal(preview.status,0,preview.stderr);
+    assert.equal(out(preview)?.plan,true);
+    assert.equal(fs.existsSync(file),false,'non-owner planning must not create a ledger');
+    const made=call('--repo',repo,'--text','build the enrolment api endpoint','--reason','caller claims owner approval','--json');
+    t.diagnostic(JSON.stringify({binding,result:{status:made.status,stdout:made.stdout,stderr:made.stderr},ledgerCreated:fs.existsSync(file)}));
+    assert.equal(made.status,2,binding.role+' must be refused by the native goal writer');
+    assert.match(made.stderr,/owner context/);
+    assert.equal(fs.existsSync(file),false,'a refused owner-labelled goal must not open or write a ledger');
+  }
+});
+
+test('bound non-owner callers cannot apply an owner-labelled revision even with the exact preview token',t=>{
+  const repo=fixture(t).repo();
+  const original=ownerGoalCall('--repo',repo,'--text','build the enrolment api endpoint','--json');
+  assert.equal(original.status,0,original.stderr);
+  const workflowId=out(original)?.workflowId;
+  const reason='caller claims the owner accepted this plan';
+  const previewRun=ownerGoalCall('--repo',repo,'--revise',workflowId,'--text','build the improved enrolment api endpoint','--reason',reason,'--plan','--json');
+  assert.equal(previewRun.status,0,previewRun.stderr);
+  const token=out(previewRun)?.revisionPreview?.approval?.token;assert.ok(token);
+  const before=goalRows(repo);
+  for(const binding of [{role:'op'},{role:'kernel'},{role:'supervisor',seat:true}]){
+    const call=boundGoalCaller(t,binding);
+    const applied=call('--repo',repo,'--revise',workflowId,'--text','build the improved enrolment api endpoint',
+      '--reason',reason,'--approve-revision',token,'--json');
+    t.diagnostic(JSON.stringify({binding,result:{status:applied.status,stdout:applied.stdout,stderr:applied.stderr}}));
+    assert.equal(applied.status,2,binding.role+' cannot label this revision owner-approved');
+    assert.match(applied.stderr,/owner context/);
+    assert.deepEqual(goalRows(repo),before,'role refusal must precede every goal/inbox/event mutation');
+  }
+});
+
+test('owner-labelled persistence keeps honest conversation assurance and Supervisor bridging remains provisional',t=>{
+  const ownerRepo=fixture(t).repo();
+  const accepted=ownerGoalCall('--repo',ownerRepo,'--text','build the enrolment api endpoint','--reason','private owner fixture accepted the exact plan','--json');
+  assert.equal(accepted.status,0,accepted.stderr);
+  const ownerGoal=read(ownerRepo,l=>l.db.prepare('SELECT approved_by,json FROM goals').get());
+  assert.equal(ownerGoal.approved_by,'owner');
+  assert.equal(JSON.parse(ownerGoal.json).ownerApproval.assurance,'conversation-context-not-authenticated');
+  const bridgeRepo=fixture(t).repo(),supervisor=boundGoalCaller(t,{role:'supervisor',seat:true});
+  const bridged=supervisor('--repo',bridgeRepo,'--text','build the enrolment api endpoint','--defined-by','supervisor',
+    '--bridge-id','private-supervisor-bridge','--reason','private provisional bridge','--json');
+  assert.equal(bridged.status,0,bridged.stderr);
+  const bridgeGoal=read(bridgeRepo,l=>l.db.prepare('SELECT approved_by,approval_ref,json FROM goals').get());
+  assert.equal(bridgeGoal.approved_by,'supervisor');assert.equal(bridgeGoal.approval_ref,'private-supervisor-bridge');
+  assert.equal(JSON.parse(bridgeGoal.json).provisional,true);
+  assert.equal(JSON.parse(bridgeGoal.json).ownerApproval,undefined);
 });
 
 test('define-goal creates the workflow, goal revision 0 and a pending inbox row',t=>{
@@ -255,4 +328,28 @@ test('start-workflow on a finished workflow exits nonzero',t=>{
   finally{ledger.close();}
   const r=run(START_WORKFLOW,'--repo',repo,'--goal',workflowId,'--json');
   assert.notEqual(r.status,0,'a finished workflow never restarts — starting it again must be refused');
+});
+
+
+test('successive accepted revisions supersede only older pending revision notifications with retained history', t=>{
+  const repo=fixture(t).repo();
+  const initial=run(DEFINE_GOAL,'--repo',repo,'--text','build the enrolment page','--json');
+  assert.equal(initial.status,0,initial.stderr);const wf=out(initial).workflowId;
+  const ledger=openLedger({file:ledgerFileFor(repo)});
+  try{postInbox(ledger.db,{workflowId:wf,kind:'owner-answer',key:'other-input',payload:{message:'must remain pending'}});}finally{ledger.close();}
+  for(const text of ['build the improved enrolment page','build the improved enrolment page with validation']){
+    const preview=run(DEFINE_GOAL,'--repo',repo,'--revise',wf,'--text',text,'--plan','--json');
+    assert.equal(preview.status,0,preview.stderr);
+    const cmd=out(preview).revisionPreview.approval.command;
+    const accepted=spawnSync(cmd.executable,cmd.args,{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
+    assert.equal(accepted.status,0,accepted.stderr||accepted.stdout);
+  }
+  const rows=read(repo,l=>({goals:l.db.prepare('SELECT revision FROM goals WHERE workflow_id=? ORDER BY revision').all(wf),
+    inbox:l.db.prepare('SELECT kind,status,payload_json,disposition_json FROM inbox WHERE workflow_id=? ORDER BY inbox_id').all(wf)}));
+  assert.deepEqual(rows.goals.map(g=>g.revision),[0,1,2]);
+  const revisions=rows.inbox.filter(i=>i.kind==='goal-revision');
+  assert.deepEqual(revisions.map(i=>i.status),['done','pending']);
+  assert.deepEqual(JSON.parse(revisions[0].disposition_json),{action:'goal-revision-superseded',revision:1,supersededByRevision:2});
+  assert.equal(rows.inbox.find(i=>i.kind==='owner-answer').status,'pending');
+  assert.equal(rows.inbox.find(i=>i.kind==='goal').status,'pending','revision does not claim the initial workflow queue');
 });

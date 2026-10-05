@@ -94,9 +94,6 @@ schemaToSchema:
      source: "modules/ops/ops/uat.assisted.verify.yaml"}
 
   # --- knowledge --------------------------------------------------------------
-  - {from: code-example-catalog, to: code-example-manifest, type: delegates,
-     note: "catalog lists examples; each example's detail is a code-example@1 manifest",
-     source: "schema titles/required fields"}
   - {from: knowledge-source, to: knowledge-rule, type: delegates,
      note: "topics contain rule entries — contracts of the shipped knowledge/ tree",
      source: "modules/schemas/knowledge-source.schema.yaml; modules/schemas/knowledge-rule.schema.yaml"}
@@ -144,9 +141,13 @@ schemaToSubsystem:
     schemas: [profile-registry]
     note: "governs modules/models/registry.yaml; the model-side detail lives in modules/models/."
 
-  knowledge:        # authored guidance + examples
-    schemas: [knowledge-source, knowledge-rule, code-example-manifest, code-example-catalog]
+  knowledge:        # authored guidance
+    schemas: [knowledge-source, knowledge-rule]
     note: "read directly as authored sources — contracts of the shipped knowledge/ tree."
+
+  examples:         # actual executable app references
+    schemas: [code-example-catalog]
+    note: "indexes app-owned source, compiler configuration and tests; no copied code payload."
 
   build:            # build helpers
     schemas: [allowlist]

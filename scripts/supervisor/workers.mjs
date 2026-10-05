@@ -52,16 +52,14 @@ import {
 import { openMachine, starciLocalRoot } from '../../engine/db/machine.mjs';
 import { createOrcaWorktree, removeOrcaWorktree, orcaWorktreeClient } from '../machine/worktree-orca.mjs';
 import { ci } from '../api/npm/ci.mjs';
-import { closeSelfSafe } from '../machine/close-verify.mjs'; import { releaseSelfSafe } from '../machine/worker-close.mjs';
 import { machineLoad } from '../machine/host-resources.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { catFile } from '../api/git/cat-file.mjs'; import { cherry as gitCherry } from '../api/git/cherry.mjs'; import { cherryPick } from '../api/git/cherry-pick.mjs'; import { commitTree } from '../api/git/commit-tree.mjs'; import { config as gitConfig } from '../api/git/config.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { hook as gitHook } from '../api/git/hook.mjs'; import { log as gitLog } from '../api/git/log.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { mergeBaseQuery } from '../api/git/merge-base-query.mjs'; import { mergeTree } from '../api/git/merge-tree.mjs'; import { push as gitPush } from '../api/git/push.mjs'; import { remote as gitRemote } from '../api/git/remote.mjs'; import { revList } from '../api/git/rev-list.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { show as gitShow } from '../api/git/show.mjs'; import { statusQuery } from '../api/git/status-query.mjs'; import { symbolicRefQuery } from '../api/git/symbolic-ref-query.mjs'; const SUPERVISOR_GIT = { 'cat-file': catFile, cherry: gitCherry, 'cherry-pick': cherryPick, 'commit-tree': commitTree, config: gitConfig, diff: gitDiff, hook: gitHook, log: gitLog, 'ls-files': lsFiles, 'merge-base': mergeBaseQuery, 'merge-tree': mergeTree, push: gitPush, remote: gitRemote, 'rev-list': revList, 'rev-parse': revParseQuery, show: gitShow, status: statusQuery, 'symbolic-ref': symbolicRefQuery };
-import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
-import { CONTRACT_CHANGES_DIR } from '../lib/contract-changes-path.mjs';
+import { posixPath } from '../lib/path-key.mjs';
 import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
 import { loadRuntimes } from '../agent/models.mjs';
-import { recordWorkerLaunch, workerAttemptAgent, setJob } from './worker-state.mjs';
+import { recordWorkerLaunch, workerAttemptAgent, setJob, workerTerminalClosed, closeWorkerTerminalState } from './worker-state.mjs';
 import { startWorkerAgent } from '../agent/start-worker.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { slugify } from '../lib/slug.mjs';
@@ -88,7 +86,6 @@ export function workerGuard(jobId, { root = SKILL_ROOT, staging = null, files = 
 }
 
 export const OPEN_STATUSES = Object.freeze(['queued', 'spawning', 'running', 'reported']);
-const LIVE_STATUSES = Object.freeze(['spawning', 'running', 'reported']);
 const ACTIVE_STATUSES = Object.freeze(['spawning', 'running']);
 const FINAL_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
 /** sup_attempts.agent is one of these (0001-init CHECK); any other provider is recorded as null. */
@@ -136,12 +133,12 @@ export const jobsOf = (m, statuses = null) => m.db.prepare(`${JOB_SELECT} WHERE 
   .all(FIX_KIND, ...(statuses ?? [])).map(rowJob);
 export const jobOf = (m, jobId) => rowJob(m.db.prepare(`${JOB_SELECT} WHERE j.job_id=?`).get(jobId));
 /**
- * The terminals the open [Worker] jobs own: every live-status job's worker_id whose terminal is not closed yet.
+ * The worker terminals still physically held, including logically finished jobs without qualified closure.
  * Orca lists them under the runtime project next to the [Supervisor]; the seat dedupe and the Orca-tree check
  * treat them as owned, never as duplicates, strays or orphans.
  */
-export const openWorkerHandles = (m) => new Set(jobsOf(m, LIVE_STATUSES)
-  .filter((j) => !j.payload.self && j.worker_id && j.attempt_closed_at == null && !j.payload.terminalClosed).map((j) => j.worker_id));
+export const openWorkerHandles = (m) => new Set(jobsOf(m)
+  .filter((j) => !j.payload.self && j.worker_id && !workerTerminalClosed(j)).map((j) => j.worker_id));
 /** The job's newest report: the sup_reports row with `report` parsed, or null. */
 export const reportOf = (m, jobId) => { const r = m.db.prepare('SELECT * FROM sup_reports WHERE job_id=? ORDER BY report_id DESC LIMIT 1').get(jobId); return r ? { ...r, report: parse(r.report_json) } : null; };
 
@@ -150,16 +147,9 @@ function attemptIdOf(m, jobId) {
   return m.latestSupAttempt(jobId)?.attempt_id ?? m.startSupAttempt({ jobId }).attemptId;
 }
 
-// Append-only registries every contract job adds an entry to (supervise.yaml landGate step 2). Leasing one
-// serialized every contract job behind whichever held it (2026-09-24: three jobs queued 70 min on
-// the grammar CHANGELOG). They are never leased: .gitattributes merges them `union` at the gate's
-// cherry-pick, and the gate still parses the result.
-// Entry files under modules/kernel/contract-changes/ are one per change and never shared, so never leased either.
-// Neither is the directory itself: every brief names the bare path, and a lease on it serialized every contract
-// job behind its holder (worker-lease-contract-changes-dir, 2026-09-30). A row a finished job left there no
-// longer matches leaseConflicts either, since the asking job's files are filtered the same way.
+// The grammar npm CHANGELOG uses the declared union merge. Every other owned path participates in leases.
 const SHARED_APPEND_FILES = new Set(['packages/grammar/CHANGELOG.md']);
-const leasable = (files) => files.map(normPath).filter((f) => !SHARED_APPEND_FILES.has(f) && !sameOrUnder(f, CONTRACT_CHANGES_DIR));
+const leasable = (files) => files.map(normPath).filter((f) => !SHARED_APPEND_FILES.has(f));
 
 /** Leases other open jobs hold on any of `files`: [{file, jobId}]. */
 export function leaseConflicts(m, files, jobId = null) {
@@ -454,36 +444,16 @@ export function stageSelf(m, { name, files, root = SKILL_ROOT, env = process.env
 
 /**
  * The Supervisor releases its own [Worker] (owner, 2026-09-28: the Supervisor owns its workers' lifecycle): worker-stop + worker-release on its Dispatch, and
- * records the verified result on the job (payload.terminalClosed, the attempt's closed_at) and as a
+ * records verified physical closure on the job (payload.terminalClosed, the attempt's closed_at) and as a
  * worker-terminal-closed event. Nothing to do for a self job (worker_id 'supervisor'), a job that never got a
  * terminal, or one already closed with proof. A close that is not proven stays unrecorded on the payload so
  * openWorkerHandles still counts the terminal and the tick GC (gc.mjs) retries it as a leftover. `close` is
- * closeSelfSafe (seam). Returns the close result or null.
+ * closeSelfSafe (seam). Managed release bookkeeping is retained separately in the event receipt;
+ * only workerClosureProven qualifies managed physical closure. Detached verifier acceptance is pending.
+ * Returns the close result or null.
  */
-export function closeWorkerTerminal(m, { jobId, env = process.env, now = Date.now(), close = closeSelfSafe, release = releaseSelfSafe } = {}) {
-  const job = jobOf(m, jobId);
-  const handle = job?.worker_id;
-  if (!handle || handle === 'supervisor' || job.payload.self) return null;
-  if (job.payload.terminalClosed?.ok === true) return null;
-  // A worker-start worker is fenced and released by its Dispatch (release archives its output); a job
-  // recorded without a Dispatch has only its terminal to close.
-  const dispatch = job.payload.dispatch ?? null;
-  let r;
-  try { r = dispatch ? release(dispatch, handle, { owner: `supervisor:${jobId}`, env }) : close(handle, { owner: `supervisor:${jobId}`, env }); }
-  catch (error) { r = { handle, ok: false, error: String(error?.message ?? error) }; }
-  const record = { handle, ...(dispatch ? { dispatch } : {}), ok: r?.ok === true, proof: r?.proof ?? null, ...(r?.detached ? { detached: true } : {}), ...(r?.pending ? { pending: true } : {}), ...(r?.reason ? { reason: r.reason } : {}),
-    ...(r?.error ? { error: String(r.error).slice(0, 200) } : {}), at: new Date(now).toISOString() };
-  try {
-    m.transaction(() => {
-      const fresh = jobOf(m, jobId);
-      if (record.ok) {
-        setJob(m, jobId, { payload: { ...fresh.payload, terminalClosed: record } });
-        if (fresh.attempt_id != null) m.updateSupAttempt(fresh.attempt_id, { closedAt: now });
-      }
-      supervisorEvent(m, { entityType: 'job', entityId: jobId, kind: record.ok ? 'worker-terminal-closed' : 'worker-terminal-unclosed', payload: record, now });
-    });
-  } catch { /* the close stands; the tick GC re-reads Orca */ }
-  return record;
+export function closeWorkerTerminal(m, options = {}) {
+  return closeWorkerTerminalState(m, options, jobOf);
 }
 
 /** The worker files its report: the commit on its temp branch, the incidents it fixes, the specs that prove it. */

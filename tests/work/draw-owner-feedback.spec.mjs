@@ -352,7 +352,7 @@ test('the draw-review notice reaches the verified Telegram chat as an album; a r
     return { ok: true, status: 200, json: async () => ({ ok: true, result }) };
   };
   const EX = parseYaml(fs.readFileSync(path.join(ROOT, 'config.example.yaml'), 'utf8'));
-  const config = { ...EX, language: 'vi', connectors: { secretsFile: null, cloudflare: { mode: 'named', hostname: 'response.example.org' }, telegram: { enabled: true, chatId: '4242' } } };
+  const config = { ...EX, language: 'vi', connectors: { cloudflare: { mode: 'named', hostname: 'response.example.org' }, telegram: { enabled: true, chatId: '4242' } } };
   const env = { LOCALAPPDATA: home, TELEGRAM_BOT_TOKEN: '123456789:AAFakeTokenForSpecsOnly_abcdefghijklmnop' };
   const sent = await notifyAsk({ ledgerFile: ledgerFileFor(p.repo), repo: p.repo, workflowId: WF, dispatchId: 'ctx_tg_album' }, { config, env, apiBase: 'http://bot.invalid', fetchImpl, sleepImpl: async () => {}, warn: () => {} });
   assert.equal(sent.ok, true, JSON.stringify(sent));

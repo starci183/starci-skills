@@ -34,11 +34,11 @@
 // Every runtime decision is an `autopilot-*` event `by: autopilot`; nothing here ever writes answeredBy owner.
 import fs from 'node:fs';
 import { loopFileOfRef, loopLabelOf } from '../work/draw/draw-loop-coverage.mjs';
-import { fileAskReceipt, stageReceipt } from '../machine/ask-receipts.mjs';
+import { commitAskAnswer, stageReceipt } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
-import { openIncident, updateIncident } from '../../engine/db/ledger.mjs';
+import { updateIncident } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
@@ -54,9 +54,8 @@ import { DIRECTION_REVIEW_SCHEMA, checkDirection, defaultGrammarRoot, readBrandR
 import { sha256File } from '../work/work-io.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { positiveNumber } from '../lib/number.mjs';
-export const AUTOPILOT_BY = 'autopilot';
-export const AUTOPILOT_RULING = 'autopilot-run-to-finish';
-export const SUPERVISOR_GATE = 'supervisor-gate';
+import { workflowBudget, openIncidents, kindOf, supervisorGatesOf, openSupervisorGate, AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE } from './autopilot-budget.mjs';
+export { openSupervisorGate, AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE } from './autopilot-budget.mjs';
 export const HANDOVER_CREDENTIALS_SUBJECT = 'handover-credentials';
 export const PROVISIONAL_LABEL = 'self-accepted provisional';
 export const AUTOPILOT_EVENTS = Object.freeze({
@@ -280,8 +279,7 @@ const redrawsOf = (db, workflowId, record) => db.prepare(`SELECT count(*) n FROM
 
 /**
  * Write one autopilot answer receipt (blob + decisions row, ask-receipts.mjs) and its ask-answered event; returns the receipt file. Never answeredBy owner.
- * Runs INSIDE the caller's ledger transaction (autopilotAnswerAsk), so it indexes the receipt with fileAskReceipt on that
- * transaction's db - writeAskReceipt opens a transaction of its own and threw ledger-nested-transaction here.
+ * Prepare the receipt blob before the acceptance transaction; its bytes are never written inside BEGIN IMMEDIATE.
  */
 function writeAnswer(ledger, { workflowId, report, question, optionIndex, note, extra = {}, now = Date.now() }) {
   const at = now;
@@ -292,10 +290,9 @@ function writeAnswer(ledger, { workflowId, report, question, optionIndex, note, 
     custodyWritten: [], envWritten: [], pointersWritten: [], bridge: null, errors: [], note, at: new Date(at).toISOString(),
     ...extra, ...(question?.review ? { review: question.review } : {}),
   };
-  const { receiptPath, receiptSha, decisionId } = fileAskReceipt(ledger.db, { workflowId, dispatchId: report.dispatch_id, receipt, blob: stageReceipt(receipt), at });
-  ledger.appendEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: 'ask-answered',
-    payload: { dispatchId: report.dispatch_id, receiptPath, receiptSha, decisionId, answeredBy: AUTOPILOT_BY, optionIndex: optionIndex ?? null, option, note, custodyWritten: [], envWritten: [], pointersWritten: [], errors: [], ...(extra.provisional ? { provisional: true } : {}) } });
-  return receiptPath;
+  const blob = stageReceipt(receipt);
+  return { receipt, blob, at, receiptPath: blob.fileUri };
+
 }
 
 /**
@@ -315,8 +312,11 @@ export function autopilotAnswerAsk({ ledger, repo, workflowId, report, settings 
   const cls = autopilotAskClass({ opId, question, subject: subjectOf(job) });
   const base = { dispatchId: report.dispatch_id, opId, jobId: job?.job_id ?? null, class: cls.class };
   if (cls.class === 'owner-handover') return { handled: false, why: 'owner-handover', ...base };
-  let out;
-  ledger.transaction(() => {
+  let out, prepared = null;
+  const plannedEvents = [];
+  const planAnswer = params => { prepared = writeAnswer(ledger, params); return prepared.receiptPath; };
+  const planEvent = event => plannedEvents.push(event);
+  (() => {
     if (cls.class === 'draw-review' || cls.class === 'direction-review') {
       const review = question.review ?? {};
       const gates = cls.class === 'draw-review'
@@ -326,8 +326,8 @@ export function autopilotAnswerAsk({ ledger, repo, workflowId, report, settings 
       if (gates.ok) {
         const note = `autopilot provisional acceptance (owner ruling ${AUTOPILOT_RULING}): every machine gate passed; the owner reviews it once at handover. Never golden.`;
         const acceptance = { provisional: true, by: AUTOPILOT_BY, receipt: gates };
-        const receiptPath = writeAnswer(ledger, { repo, workflowId, report, question, optionIndex: 0, note, extra: { provisional: true, acceptance }, now });
-        ledger.appendEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: AUTOPILOT_EVENTS.provisional,
+        const receiptPath = planAnswer({ repo, workflowId, report, question, optionIndex: 0, note, extra: { provisional: true, acceptance }, now });
+        planEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: AUTOPILOT_EVENTS.provisional,
           payload: { ...base, by: AUTOPILOT_BY, record, receiptPath, gates: { ok: true, parts: gates.parts ?? gates.golden, beautyMin: gates.beautyMin ?? null, rev: gates.rev ?? null } } });
         out = { handled: true, action: 'provisional', ...base, record, receiptPath, gates };
         return;
@@ -335,7 +335,7 @@ export function autopilotAnswerAsk({ ledger, repo, workflowId, report, settings 
       const done = redrawsOf(db, workflowId, record);
       const stale = gates.findings.length > 0 && gates.findings.every((f) => STALE_CODES.has(f.code));
       if (!stale && done >= settings.redrawBudget) {
-        ledger.appendEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: AUTOPILOT_EVENTS.deferredToHandover,
+        planEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: AUTOPILOT_EVENTS.deferredToHandover,
           payload: { ...base, by: AUTOPILOT_BY, record, deferClass: 'review', classes: ['review'], reason: `the machine gates still fail after ${done} autopilot redraw(s) (redrawBudget ${settings.redrawBudget}); the owner sees it in the final review`, findings: gates.findings.slice(0, 20), stubPath: 'the drawing waits for the final review; independent legs proceed', owed: 'the owner review of this drawing' } });
         out = { handled: true, action: 'deferred-to-handover', ...base, record, findings: gates.findings };
         return;
@@ -345,8 +345,8 @@ export function autopilotAnswerAsk({ ledger, repo, workflowId, report, settings 
       const note = stale
         ? `autopilot ${what} (owner ruling ${AUTOPILOT_RULING}): this ask went stale - the record moved on after it was filed. File the review of the CURRENT ${cls.class === 'draw-review' ? 'parts' : 'direction rev'} again; autopilot judges it then:\n${brief}`
         : `autopilot ${what} (owner ruling ${AUTOPILOT_RULING}): the machine gates fail, fix every finding through the draw loop (draw-loop.mjs round/finish: metrics with the DNA gate, the independent critic's beauty, rationale.json) before asking again:\n${brief}`;
-      const receiptPath = writeAnswer(ledger, { repo, workflowId, report, question, optionIndex: 1, note, extra: { gateFindings: gates.findings.slice(0, 50) }, now });
-      ledger.appendEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: AUTOPILOT_EVENTS.redraw,
+      const receiptPath = planAnswer({ repo, workflowId, report, question, optionIndex: 1, note, extra: { gateFindings: gates.findings.slice(0, 50) }, now });
+      planEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: AUTOPILOT_EVENTS.redraw,
         payload: { ...base, by: AUTOPILOT_BY, record, receiptPath, round: stale ? done : done + 1, budget: settings.redrawBudget, ...(stale ? { stale: true } : {}), findings: gates.findings.slice(0, 20) } });
       out = { handled: true, action: 'redraw', ...base, record, receiptPath, findings: gates.findings };
       return;
@@ -354,8 +354,8 @@ export function autopilotAnswerAsk({ ledger, repo, workflowId, report, settings 
     if (cls.class === 'recommended') {
       const rec = recommendationOf(question);
       const note = `autopilot took the recommended option ${rec.index + 1} provisionally (owner ruling ${AUTOPILOT_RULING})${rec.reason ? ` because ${rec.reason}` : ''}; the owner reviews it at handover`;
-      const receiptPath = writeAnswer(ledger, { repo, workflowId, report, question, optionIndex: rec.index, note, extra: { provisional: true, acceptance: { provisional: true, by: AUTOPILOT_BY, receipt: { recommendation: rec } } }, now });
-      ledger.appendEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: AUTOPILOT_EVENTS.recommended,
+      const receiptPath = planAnswer({ repo, workflowId, report, question, optionIndex: rec.index, note, extra: { provisional: true, acceptance: { provisional: true, by: AUTOPILOT_BY, receipt: { recommendation: rec } } }, now });
+      planEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: AUTOPILOT_EVENTS.recommended,
         payload: { ...base, by: AUTOPILOT_BY, optionIndex: rec.index, option: rec.label, reason: rec.reason, receiptPath } });
       out = { handled: true, action: 'recommended', ...base, receiptPath };
       return;
@@ -364,9 +364,24 @@ export function autopilotAnswerAsk({ ledger, repo, workflowId, report, settings 
     const payload = { ...base, by: AUTOPILOT_BY, deferClass: cls.class, classes: cls.classes, subject: subjectOf(job),
       fields: { files: fields.files, vars: fields.vars }, stubPath: STUB_PATHS[cls.class], owed: OWED_PROOFS[cls.class],
       question: String(question.text ?? '').slice(0, 600) };
-    ledger.appendEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: AUTOPILOT_EVENTS.deferredToHandover, payload });
+    planEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: AUTOPILOT_EVENTS.deferredToHandover, payload });
     out = { handled: true, action: 'deferred-to-handover', ...payload };
-  });
+  })();
+  if (prepared) {
+    const committed = commitAskAnswer(ledger, { workflowId, dispatchId: report.dispatch_id, receipt: prepared.receipt,
+      blob: prepared.blob, at: now, events: plannedEvents,
+      payload: { option: prepared.receipt.option, note: prepared.receipt.note, ...(prepared.receipt.provisional ? { provisional: true } : {}) } });
+    if (!committed.accepted) return { handled: false, why: committed.why, ...base };
+    out.receiptPath = committed.receiptPath;
+  } else {
+    ledger.transaction(() => {
+      if (askClosed(db, workflowId, report.dispatch_id) || deferralOf(db, workflowId, report.dispatch_id)) {
+        out = { handled: false, why: 'already-closed', ...base }; return;
+      }
+      for (const event of plannedEvents) ledger.appendEvent(event);
+    });
+  }
+
   if (out?.receiptPath && typeof wake === 'function') {
     try { out.wake = wake(ledger, { workflowId, dispatchId: report.dispatch_id, receiptPath: out.receiptPath, answeredBy: AUTOPILOT_BY })?.action ?? null; } catch { out.wake = null; }
   }
@@ -454,46 +469,14 @@ export function routeCapUnderAutopilot(db, job, { lineage, routeId, settings = a
   return gates >= settings.supervisorExtraBudget ? { kind: 'deferred', gates, budget: settings.supervisorExtraBudget } : { kind: SUPERVISOR_GATE, gates, budget: settings.supervisorExtraBudget };
 }
 
-const openIncidents = (db, workflowId) => db.prepare("SELECT incident_id,op_id,last_progress,updated_at FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId);
-const kindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(String(lastProgress ?? ''))?.[1] ?? null;
 const raisedOf = (db, workflowId, incidentId) => {
   const row = db.prepare("SELECT created_at,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind IN ('incident-raised',?) ORDER BY seq DESC LIMIT 1").get(workflowId, incidentId, AUTOPILOT_EVENTS.rerouted);
   return row ? { at: row.created_at, ...(parseJson(row.payload_json, {}) ?? {}) } : null;
 };
 
-/** Open supervisor-gate incidents: [{incidentId, opId, holds[], detail, since}]. */
-function supervisorGatesOf(db, workflowId) {
-  return openIncidents(db, workflowId).filter((row) => kindOf(row.last_progress) === SUPERVISOR_GATE).map((row) => {
-    const raised = db.prepare("SELECT created_at,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, row.incident_id);
-    const payload = parseJson(raised?.payload_json, {}) ?? {};
-    return { incidentId: row.incident_id, opId: row.op_id ?? null, holds: list(payload.holds).length ? payload.holds : [row.op_id].filter(Boolean),
-      detail: String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, ''), since: raised?.created_at ?? row.updated_at };
-  });
-}
-
 /** Budget use of one workflow against allocation.autopilot.budgets: {used, caps, exceeded[]}. */
-export function budgetOf(db, workflowId, settings = autopilotSettings()) {
-  const extended = eventsOf(db, workflowId, AUTOPILOT_EVENTS.budgetExtended).reduce((acc, e) => {
-    for (const k of ['attempts', 'tokens', 'wallMs']) acc[k] += num(e[k], 0);
-    return acc;
-  }, { attempts: 0, tokens: 0, wallMs: 0 });
-  const caps = { attempts: settings.budgets.attempts + extended.attempts, tokens: settings.budgets.tokens + extended.tokens, wallMs: settings.budgets.wallMs + extended.wallMs };
-  const attempts = db.prepare("SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel'").get(workflowId)?.n ?? 0;
-  const tokens = db.prepare("SELECT COALESCE(SUM(CAST(json_extract(payload_json,'$.usage.totalTokens') AS INTEGER)),0) t FROM jobs WHERE workflow_id=?").get(workflowId)?.t ?? 0;
-  const started = db.prepare('SELECT MIN(created_at) at FROM events WHERE workflow_id=?').get(workflowId)?.at ?? Date.now();
-  const used = { attempts, tokens: Number(tokens) || 0, wallMs: Date.now() - Number(started) };
-  const exceeded = Object.keys(caps).filter((k) => caps[k] > 0 && used[k] > caps[k]);
-  return { used, caps, exceeded };
-}
-
-const newIncidentId = () => `inc-${Math.random().toString(16).slice(2, 8)}${Date.now().toString(16).slice(-6)}`;
-/** Open one supervisor-gate incident (inside the caller's transaction). */
-export function openSupervisorGate(ledger, { workflowId, opId = null, holds = [], detail, evidence = null, route = null, auto = true }) {
-  const incidentId = newIncidentId();
-  openIncident(ledger.db, { incidentId, workflowId, kind: SUPERVISOR_GATE, opId, lastProgress: `[${SUPERVISOR_GATE}] ${detail}`, detail });
-  ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId, kind: 'incident-raised',
-    payload: { kind: SUPERVISOR_GATE, detail, opId, holds, auto, by: AUTOPILOT_BY, ruling: AUTOPILOT_RULING, ...(route ? { route } : {}), ...(evidence ? { evidence } : {}) } });
-  return incidentId;
+export function budgetOf(db, workflowId, settings = autopilotSettings(), { now = Date.now() } = {}) {
+  return workflowBudget(db, workflowId, { settings, extensionKind: AUTOPILOT_EVENTS.budgetExtended, now });
 }
 
 /**
@@ -543,10 +526,10 @@ export function autopilotSweep({ ledger, repo, workflowId, settings = autopilotS
         payload: { jobIds, opId: gate.opId, incidentId: gate.incidentId, by: AUTOPILOT_BY, reason: `supervisor-gate ${gate.incidentId} unresolved past ${Math.round(settings.supervisorGateTimeoutMs / 60000)} min` } });
       out.timedOut.push({ incidentId: gate.incidentId, jobIds });
     }
-    const budget = budgetOf(db, workflowId, settings);
+    const budget = budgetOf(db, workflowId, settings, { now });
     out.budget = budget;
-    if (budget.exceeded.length && !supervisorGatesOf(db, workflowId).some((g) => g.holds.includes('*'))) {
-      const detail = `autopilot budget spent (${budget.exceeded.map((k) => `${k} ${budget.used[k]} > ${budget.caps[k]}`).join(', ')}): Supervisor review - extend with starci kernel autopilot --extend-budget, then resolve --by supervisor`;
+    if ((budget.exceeded.length || budget.unverified.length) && !supervisorGatesOf(db, workflowId).some((g) => g.holds.includes('*'))) {
+      const detail = `autopilot budget requires review (${[...budget.exceeded.map((k) => `${k} ${k === 'tokens' ? budget.measured.tokens : budget.used[k]} > ${budget.caps[k]}`), ...budget.unverified.map((k) => `${k} unknown: ${budget.coverage.unknown} completed attempts lack usage`)].join(', ')}): Supervisor review - record missing usage or extend with starci kernel autopilot --extend-budget, then resolve --by supervisor`;
       const incidentId = openSupervisorGate(ledger, { workflowId, holds: ['*'], detail, evidence: budget });
       ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId, kind: AUTOPILOT_EVENTS.budget, payload: { ...budget, incidentId, by: AUTOPILOT_BY } });
     }

@@ -9,9 +9,13 @@ import {createRequire} from 'node:module';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
-import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
+import {writeGreenProofs, proofRepo} from '../helpers/sonar-scan.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
 import {INPUT_DIGEST_SCHEMA,baselineWorkInputs,createDigester,inputKindOf,lawTokens,opInputPaths,recordInputs,workInputPaths} from '../../scripts/kernel/input-digests.mjs';
+import {resolveOpContract} from '../../scripts/lib/op-shared.mjs';
+import {usageOfWorkflow} from '../../scripts/kernel/usage-report.mjs';
+import {EXAMPLE_CATALOG_FILE,EXAMPLES_ROOT,exampleSourcePaths,loadExampleCatalog} from '../../scripts/lib/example-refs.mjs';
 
 // Stale input: `starci kernel dispatch` records the digests of the inputs an op reads
 // (contracts.context_json.inputs) by kind. A Source-law input (knowledge/**,
@@ -25,7 +29,7 @@ import {INPUT_DIGEST_SCHEMA,baselineWorkInputs,createDigester,inputKindOf,lawTok
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const OP='code.refactor';
 const WORKFLOW='wf-stale-input';
-const RULES='knowledge/coding-reference.yaml';
+const RULES='knowledge/patterns/fe/index.yaml';
 const FR_DIR='.starciwork/features/task/fr/list';
 const require=createRequire(import.meta.url);
 const sha=text=>crypto.createHash('sha256').update(text).digest('hex');
@@ -60,24 +64,42 @@ const scenario=(title,fn)=>{
   test(title,async()=>{const result=await execution;if(result.error)throw result.error;});
 };
 
-const fixture=(t,{registry=null}={})=>{
+const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stale-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const skill=path.join(root,'skill'),repo=path.join(root,'repo');
+  const skill=path.join(root,'skill'),main=path.join(root,'main'),repo=path.join(root,'repo');
   for(const dir of ['scripts','engine','modules',path.join('packages','cli')])fs.cpSync(path.join(ROOT,dir),path.join(skill,dir),{recursive:true});
   fs.cpSync(path.join(ROOT,'packages','grammar','scripts'),path.join(skill,'packages','grammar','scripts'),{recursive:true});
   for(const file of ['CONTEXT.md','package.json'])fs.copyFileSync(path.join(ROOT,file),path.join(skill,file));
+  // Strict selected READs use the current architecture and pinned lint documentation.
+  for(const rel of ['docs/architecture.md','docs/code-pattern-enforcement.md','packages/eslint/fe/README.md','packages/eslint/be/README.md']){
+    const target=path.join(skill,rel);fs.mkdirSync(path.dirname(target),{recursive:true});
+    fs.copyFileSync(path.join(ROOT,rel),target);
+  }
+  // The real READ producer validates the whole catalog and its public source/compiler/test pointers.
+  const catalog=loadExampleCatalog(ROOT);
+  const exampleReads=[EXAMPLE_CATALOG_FILE,...new Set(catalog.examples.map(row=>`${EXAMPLES_ROOT}/${row.path}/hfs.json`)),...exampleSourcePaths(ROOT)];
+  for(const rel of exampleReads){
+    const target=path.join(skill,rel);fs.mkdirSync(path.dirname(target),{recursive:true});
+    fs.copyFileSync(path.join(ROOT,rel),target);
+  }
   fs.mkdirSync(path.join(skill,'knowledge'),{recursive:true});
   fs.copyFileSync(path.join(ROOT,'knowledge','sonar-gate.yaml'),path.join(skill,'knowledge','sonar-gate.yaml')); // the Sonar gate a code-writing settle reads
-  fs.copyFileSync(path.join(ROOT,'knowledge','op-gate.yaml'),path.join(skill,'knowledge','op-gate.yaml')); // the op loop a code-writing settle reads
-  fs.mkdirSync(repo,{recursive:true});
+  fs.cpSync(path.join(ROOT,'knowledge'),path.join(skill,'knowledge'),{recursive:true}); // current canonical READ inputs, owned by this private runtime
+  fs.mkdirSync(main,{recursive:true});
+  const mainGit=proofRepo(t,main),branch=`wf-${WORKFLOW}`;
+  mainGit('worktree','add','-q','-b',branch,repo,'main');
+  const git=(...args)=>mainGit('-C',repo,...args);
+  fs.writeFileSync(path.join(skill,'config.yaml'),fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
+    .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private stale-input fixture adoption',roots:[main]})}`));
+  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
-    STARCI_OWNER_ROOT:ROOT,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
-    STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_TEST_TEMP_DIR:path.join(root,'tmp'),...(registry?{STARCI_CONTRACT_CHANGES:registry}:{})};
-  if(!registry)delete env.STARCI_CONTRACT_CHANGES;
+    STARCI_OWNER_ROOT:skill,STARCI_AGENT_TRUST_HOME:trustHome,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
+    STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_TEST_TEMP_DIR:path.join(root,'tmp'),STARCI_GIT_MEMO_DIR:path.join(root,'git-memo')};
+  registerWorkflowWorktree({env},{workflowId:WORKFLOW,orcaWorktreeId:'stale-input::workflow',path:repo,branch});
   const api=path.join(skill,'scripts','kernel','cli.mjs');
   const run=(...args)=>new Promise(resolve=>{
     const child=spawn(process.execPath,[api,...args,'--repo',repo,'--json'],{cwd:skill,windowsHide:true,env});
@@ -90,7 +112,7 @@ const fixture=(t,{registry=null}={})=>{
   });
   const write=(rel,text)=>{const file=path.join(skill,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
   const work=(rel,text)=>{const file=path.join(repo,'.starciwork',rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
-  return {root,skill,repo,env,api,run,write,work};
+  return {root,skill,repo,git,env,api,run,write,work};
 };
 const json=r=>{try{return JSON.parse(r.stdout);}catch{const at=r.stdout.indexOf('{'),end=r.stdout.indexOf('\n}');return at<0||end<0?null:JSON.parse(r.stdout.slice(at,end+2));}};
 // A write grant names a directory that must exist in the target repository (grant-parent-missing): seeding a job under
@@ -136,9 +158,12 @@ test('law tokens: knowledge, schema paths and the named data-owned files, never 
   assert.deepEqual(lawTokens('CONTEXT.md (fixed stack) + knowledge/churn-baseline.yaml (shapes common and nest)'),['knowledge/churn-baseline.yaml']);
   assert.deepEqual(lawTokens('scripts/hfs/architecture/*.mjs + modules/models/code-patterns.yaml + docs/architecture.md'),['modules/models/code-patterns.yaml']);
   assert.deepEqual(lawTokens('knowledge/patterns/be/* + knowledge/../CONTEXT.md'),['knowledge/patterns/be/*']);
-  const brief={reads:[{path:'knowledge/grammars/<family>/DNA.yaml'}],policy:{executionModes:{lint:{reads:[{path:'knowledge/coding-reference.yaml'}]}}}};
+  const brief={reads:[{id:'grammar',path:'knowledge/grammars/<family>/DNA.yaml'}]};
   assert.deepEqual(opInputPaths(brief,{params:{family:'carbon'}}),['knowledge/grammars/carbon/DNA.yaml']);
-  assert.deepEqual(opInputPaths(brief,{params:{mode:'lint'}}),['knowledge/grammars/<family>/DNA.yaml','knowledge/coding-reference.yaml']);
+  const selected={...brief,params:{mode:{type:'enum',enum:['select','lint'],default:'select',setBy:'kernel'}},policy:{executionModes:{lint:{reads:[{id:'reference',path:'knowledge/architecture-rules.yaml'}]}}}};
+  assert.deepEqual(opInputPaths(selected,{params:{family:'carbon'}}),['knowledge/grammars/carbon/DNA.yaml'],'planning keeps common reads without a selected mode');
+  assert.equal(resolveOpContract(selected,{params:{family:'carbon'}}).ok,false,'execution still requires one concrete declared mode');
+  assert.deepEqual(opInputPaths(selected,{params:{mode:'lint',family:'carbon'}}),['knowledge/grammars/carbon/DNA.yaml','knowledge/architecture-rules.yaml'],'selected Source-law reads retain distinct common IDs and bind concrete params');
 });
 
 test('digests: a file is sha256 of its bytes, a directory or glob the digest of its sorted file digests, a missing path absent',t=>{
@@ -168,11 +193,18 @@ scenario('dispatch records Source and Work digests by kind; settle re-baselines 
   });
   const dispatched=await fx.run('dispatch','--job','job-refactor','--model','devin-agent','--spawn');
   assert.equal(dispatched.status,0,dispatched.stderr||dispatched.stdout);
+  const readContext=inspect(fx,db=>JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE job_id=?').get('job-refactor').context_json).packet.context);
+  for(const rel of ['docs/architecture.md','docs/code-pattern-enforcement.md']){
+    const absolute=path.resolve(fx.skill,rel);
+    assert.deepEqual(readContext.mandatoryReads.filter(read=>read===rel),[rel],`${rel} is mandatory exactly once`);
+    assert.deepEqual(readContext.readRefs.filter(read=>read.path===rel).map(({rootKind,root,absolute,sha256})=>({rootKind,root,absolute,sha256})),
+      [{rootKind:'source',root:fx.skill,absolute,sha256:sha(fs.readFileSync(absolute))}],`${rel} binds the actual private Source bytes exactly once`);
+  }
   const inputsOf=()=>inspect(fx,db=>JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE workflow_id=?').get(WORKFLOW).context_json).inputs);
   const inputs=inputsOf();
   assert.equal(inputs.schema,INPUT_DIGEST_SCHEMA);
   const recorded=Object.fromEntries(inputs.digests.map(d=>[d.path,d]));
-  assert.deepEqual(Object.keys(recorded).sort(),[FR_DIR,RULES,'knowledge/op-gate.yaml','knowledge/patterns/be/index.yaml','knowledge/patterns/fe/index.yaml','modules/models/code-patterns.yaml'].sort(),
+  assert.deepEqual(Object.keys(recorded).sort(),[FR_DIR,RULES,'knowledge/op-gate.yaml','knowledge/patterns/be/index.yaml','modules/models/code-patterns.yaml'].sort(),
     'a record outside .starciwork (the job\'s own source) is not a Work input');
   assert.deepEqual(Object.values(recorded).filter(d=>d.kind==='work').map(d=>d.path),[FR_DIR]);
   assert.equal(recorded[RULES].kind,'source');
@@ -180,8 +212,11 @@ scenario('dispatch records Source and Work digests by kind; settle re-baselines 
   assert.equal(recorded[FR_DIR].digest,sha(`${FR_DIR}/index.yaml\0${sha('fr: v1\n')}\n`),'a record directory counts its record files, never evidence/');
 
   const report=inspect(fx,db=>path.join(db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=?').get('job-refactor').scratch_dir,'report.json'));
-  fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'refactor done',head:'abc1234def',files:['src/refactor/a.ts',...(writeGreenProofs(path.join(fx.repo,'src','refactor')),['src/refactor/sonar.json','src/refactor/gate.json','src/refactor/read-digest.json'])],checks:[{name:'self',command:'true',exitCode:0}]}));
-  const reported=await fx.run('report','--job','job-refactor','--report',report);
+  const binding=inspect(fx,db=>JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE workflow_id=?').get(WORKFLOW).context_json).packet.context.gate_binding);
+  const proofs=path.join(path.dirname(report),'proofs');
+  writeGreenProofs(proofs,{root:fx.repo,binding,baseRoot:fx.skill});
+  fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'refactor done',head:fx.git('rev-parse','HEAD'),files:[],checks:[{name:'self',command:'true',exitCode:0}]}));
+  const reported=await fx.run('report','--job','job-refactor','--report',report,'--attach',proofs);
   assert.equal(reported.status,0,reported.stderr||reported.stdout);
   const checked=await fx.run('record-checks','--job','job-refactor','--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}));
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
@@ -210,8 +245,8 @@ scenario('dispatch records Source and Work digests by kind; settle re-baselines 
   assert.deepEqual(edited.frontier.staleOperations,[]);
   assert.equal(edited.frontier.actionable,false,'nor actionable');
   assert.equal(edited.frontier.reason,quiet.frontier.reason);
-  assert.deepEqual(edited.sourceDrift.map(s=>[s.jobId,s.path,s.kind,s.recorded,s.current,s.unregistered]),[['job-refactor',RULES,'source',sha('rules: v1\n'),sha('rules: v2\n'),true]]);
-  assert.deepEqual(edited.frontier.sourceDrift,{advisory:true,jobs:1,paths:[{path:RULES,jobs:1,changes:[],followUp:[],unregistered:true}]});
+  assert.deepEqual(edited.sourceDrift.map(s=>[s.jobId,s.path,s.kind,s.recorded,s.current]),[['job-refactor',RULES,'source',sha('rules: v1\n'),sha('rules: v2\n')]]);
+  assert.deepEqual(edited.frontier.sourceDrift,{advisory:true,jobs:1,paths:[{path:RULES,jobs:1}]});
   assert.deepEqual((await survey(fx)).sourceDrift,edited.sourceDrift);
   assert.deepEqual((await survey(fx)).staleInput,[]);
 
@@ -299,20 +334,8 @@ scenario('a finished workflow reports no stale input',async t=>{
 // (8 slices, seam first). The fix: Source edits are judged against admission.
 const STACKS='knowledge/application-stacks.yaml',BASELINE='knowledge/churn-baseline.yaml';
 const T_ADMIT=Date.parse('2026-09-24T16:00:00+07:00');
-const churnRegistry=(t,{followUp=false}={})=>{
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-churn-registry-'));
-  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
-  const file=path.join(dir,'contract-changes.yaml');
-  fs.writeFileSync(file,['schema: starci/contract-changes@1','changes:',
-    '  - id: starcistacks-services',"    effectiveAt: '2026-09-24T17:00:00+07:00'",'    paths:',`      - ${STACKS}`,'      - modules/schemas/stacks-layout.yaml','    reach: new-legs',
-    '  - id: baseline-stack-services-repository',"    effectiveAt: '2026-09-24T17:09:15+07:00'",'    paths:',`      - ${BASELINE}`,
-    ...(followUp?['    reach: follow-up','    followUp:','      op: backend.scaffold','      ops:','        - backend.scaffold','      detail: re-apply the baseline stack services block']:['    reach: new-legs']),
-    ''].join('\n'));
-  return file;
-};
-
-scenario('churn: repeated knowledge edits under many settled legs stale none of them; each is advisory drift naming its registered change',async t=>{
-  const fx=fixture(t,{registry:churnRegistry(t)});
+scenario('churn: repeated knowledge edits under many settled legs stale none of them; each retains factual admitted and current Source bytes',async t=>{
+  const fx=fixture(t);
   fx.write(STACKS,'stacks: v1\n');fx.write(BASELINE,'baseline: v1\n');fx.write('knowledge/unrelated.yaml','x: 1\n');
   const legs=[['interface.draw',8],['backend.implement',5]];
   withLedger(fx,ledger=>{
@@ -334,19 +357,19 @@ scenario('churn: repeated knowledge edits under many settled legs stale none of 
     assert.equal(now.frontier.reason,quiet.frontier.reason);
   }
   const final=await status(fx);
-  assert.deepEqual(final.frontier.sourceDrift,{advisory:true,jobs:13,paths:[{path:STACKS,jobs:13,changes:['starcistacks-services'],followUp:[],unregistered:false}]},
-    'only what the legs read drifts, and the change that registered it is named');
+  assert.deepEqual(final.frontier.sourceDrift,{advisory:true,jobs:13,paths:[{path:STACKS,jobs:13}]},
+    'only the inputs the settled legs actually read contribute to Source drift');
   assert.equal(final.sourceDrift.length,13);
   assert.ok(final.sourceDrift.every(s=>s.admittedAt>=T_ADMIT&&s.recorded===sha('stacks: v1\n')&&s.current===sha('stacks: v4 (18:37)\n')),'judged against the bytes it was admitted under');
 
   fx.write('knowledge/unrelated.yaml','x: 2\n');
   const unregistered=(await status(fx)).frontier.sourceDrift.paths.find(p=>p.path==='knowledge/unrelated.yaml');
-  assert.deepEqual(unregistered,{path:'knowledge/unrelated.yaml',jobs:13,changes:[],followUp:[],unregistered:true},'an edit nobody registered is flagged for the supervisor, still not stale');
+  assert.deepEqual(unregistered,{path:'knowledge/unrelated.yaml',jobs:13},'a changed captured Source input is measured without a historical registry');
   assert.deepEqual((await status(fx)).staleInput,[]);
 });
 
-scenario('mia churn: a cut set admitted before a registered reach follow-up baseline change owes follow-up legs, never a seam-first redo',async t=>{
-  const fx=fixture(t,{registry:churnRegistry(t,{followUp:true})});
+scenario('Source baseline edits preserve settled cuts and never invent follow-up work',async t=>{
+  const fx=fixture(t);
   fx.write(BASELINE,'baseline: v1\n');
   withLedger(fx,ledger=>{
     const inputs=recordInputs(fx.skill,[BASELINE]);
@@ -357,10 +380,9 @@ scenario('mia churn: a cut set admitted before a registered reach follow-up base
   const now=await status(fx);
   assert.deepEqual(now.staleInput,[],'the redo is a follow-up leg, not a stale seam');
   assert.deepEqual(now.frontier.staleOperations,[]);
-  assert.deepEqual(now.frontier.contractFollowUps.map(f=>[f.change,f.jobId,f.followUpOp]),
-    Array.from({length:8},(_,i)=>['baseline-stack-services-repository',`job-base-${i+1}`,'backend.scaffold']),'status lists the owed follow-up legs as for any follow-up change');
-  assert.deepEqual(now.frontier.sourceDrift.paths,[{path:BASELINE,jobs:8,changes:['baseline-stack-services-repository'],followUp:['baseline-stack-services-repository'],unregistered:false}]);
-  assert.equal(now.frontier.actionable,true,'owed follow-ups are actionable, as before');
+  assert.equal(now.frontier.contractFollowUps,undefined,'no retired registry owns current work');
+  assert.deepEqual(now.frontier.sourceDrift.paths,[{path:BASELINE,jobs:8}]);
+  assert.equal(now.frontier.actionable,false,'Source drift cannot invent a new work obligation');
 });
 
 scenario('cut: Work-stale slices list their ordinals; while the seam redo is open the other slices wait on it',async t=>{
@@ -413,9 +435,19 @@ const legacyLedger=file=>{
       {jobId:'job-old-1',opId:OP,status:'succeeded',dispatchId:'job-old-1',payload:{opId:OP,owned_paths:['src/job-old-1/']}},
       {jobId:'job-old-2',opId:'docs.author',status:'succeeded',dispatchId:'job-old-2',payload:{opId:'docs.author',owned_paths:['src/job-old-2/']}},
     ]});
-    for(const row of ledger.db.prepare('SELECT attempt_id,job_id,op_id FROM op_attempts WHERE workflow_id=?').all(WORKFLOW))
+    const pending=usageOfWorkflow(ledger.db,WORKFLOW);
+    assert.deepEqual([pending.coverage.attempts,pending.coverage.measured,pending.coverage.pending,pending.coverage.unavailable,pending.coverage.open],[2,0,2,0,0],'completed legacy fixture attempts start with genuinely unknown usage');
+    for(const row of ledger.db.prepare('SELECT attempt_id,job_id,op_id FROM op_attempts WHERE workflow_id=?').all(WORKFLOW)){
       ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
         .run(row.attempt_id,WORKFLOW,row.job_id,'# contract',JSON.stringify({packet:{op:row.op_id},worktree:'.',model:'devin-agent'}),at);
+      // Nonzero private usage reports satisfy the real meter without changing the old digest-free contracts.
+      assert.deepEqual(ledger.write.recordAttemptUsage({attemptId:row.attempt_id,provider:'codex',source:'provider-report',
+        rows:[{model:'fixture-model',inputTokens:11,outputTokens:3,cacheReadTokens:2,cacheWriteTokens:1,turns:1}]}),{recorded:true,rows:1});
+    }
+    const measured=usageOfWorkflow(ledger.db,WORKFLOW);
+    assert.deepEqual([measured.coverage.attempts,measured.coverage.measured,measured.coverage.pending,measured.coverage.unavailable,measured.coverage.open],[2,2,0,0,0]);
+    assert.equal(measured.total.tokens,34,'the real reader folds both nonzero reports before status can check the token cap');
+    assert.equal(measured.total.costUsd,null,'unpriced fixture usage keeps its cost unknown');
   }finally{ledger.close();}
 };
 const schemaOf=file=>{
@@ -453,6 +485,9 @@ scenario('an existing ledger: no schema change, legacy rows never stale, new dis
   assert.equal(after.frontier.actionable,false);
 
   withLedger(fx,ledger=>{
+    // The synthetic running row has served the legacy frontier assertions; release its side before new admission.
+    ledger.write.setJobStatus({jobId:'job-engaged',to:'cancelled',reason:'legacy-fixture-complete'});
+    assert.equal(ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get('job-engaged').status,'cancelled');
     ledger.write.createUnit({workflowId:WORKFLOW,unitId:'job-new',opId:OP,subjectKey:'job-new',goalRevision:1});
     enqueueSeed(ledger,{jobId:'job-new',workflowId:WORKFLOW,unitId:'job-new',opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/new/'],model:'devin-agent'}});
   });

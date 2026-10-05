@@ -9,6 +9,13 @@ import { orcaCall, terminalOf } from './lib.mjs';
 import { frameText, draftText } from '../../lib/orca-terminal.mjs';
 import { arg, flag } from '../../lib/cli-arg.mjs';
 
+/**
+ * Read one terminal's rendered frame or tail together with its unsubmitted draft for observation.
+ * A frame is not a worker transcript or filed evidence; managed output is read by Dispatch through
+ * workerRead. Callers must check ok before interpreting normalized screen or draft values.
+ * @param {object} input - Required terminal handle, screen selector, and optional output limit.
+ * @returns {object} Read status, terminal detail, extracted screen and draft, and the host error.
+ */
 export function terminalRead({ terminal, screen = true, limit }) {
   const r = orcaCall('terminal-read', { terminal, screen: Boolean(screen), limit });
   const t = terminalOf(r);

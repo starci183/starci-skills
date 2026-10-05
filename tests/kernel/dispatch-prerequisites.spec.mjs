@@ -7,6 +7,8 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
+import {selectDispatchContract} from '../../scripts/kernel/dispatch-admission.mjs';
+import {resolveReadReference} from '../../scripts/context/read-refs.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {checkPrerequisites,prerequisiteDetail,resolveReadPath} from '../../scripts/kernel/prerequisites.mjs';
 
@@ -17,8 +19,8 @@ import {checkPrerequisites,prerequisiteDetail,resolveReadPath} from '../../scrip
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const AUDIT=parseYaml(fs.readFileSync(path.join(ROOT,'modules','ops','ops','interface.audit.yaml'),'utf8'));
-// interface.audit's `target` read is now a packet/ledger reference (params.audit + the
-// interface_audits row), not a repository file; the file-path form below is the shape
+// interface.audit's target is its required typed packet param. A previous ledger
+// row is optional history, not a first-audit prerequisite; the file-path form below is the shape
 // mustExist still resolves, exercised through a synthetic read.
 const TARGET='.starciwork/features/<feature>/operations/<audit>/index.yaml';
 const FILE_READ={id:'target',path:TARGET,mustExist:true};
@@ -32,8 +34,36 @@ const write=(repo,rel,text)=>{fs.mkdirSync(path.dirname(path.join(repo,rel)),{re
 
 test('interface.audit declares its target operation record mustExist',()=>{
   const target=AUDIT.reads.find(r=>r.id==='target');
-  assert.equal(target.path,"packet params.audit (id operation.<feature>.<audit>, selectedMatrix) + the audit's interface_audits row (starci kernel op-contract)");
+  assert.equal(target.path, 'params.audit');
+  assert.equal(AUDIT.params.audit.required, true);
+  assert.equal(AUDIT.params.audit.type, 'object');
   assert.equal(target.mustExist,true);
+});
+
+test('a required typed audit READ uses the attempt value and cannot be satisfied by a filename',t=>{
+  const repo=tmpRepo(t),audit={id:'operation.checkout.purchase',feature:'checkout',selectedMatrix:{cells:[
+    {id:'checkout-ready',surface:'checkout',route:'/checkout',state:'ready',viewport:'desktop',theme:'light',assertionIds:['ui.checkout.total']},
+  ]}};
+  const selected=selectDispatchContract(ROOT,'interface.audit',{params:{audit}});
+  const evaluate=payload=>checkPrerequisites({brief:selected.brief,payload,repo});
+  const missing=[{kind:'instance-missing',read:'target',path:'params.audit'}];
+  assert.deepEqual(evaluate({params:selected.params}).unmet,[],'the complete real selected contract accepts its admitted typed audit');
+  assert.equal(resolveReadReference('params.audit',{sourceRoot:ROOT}).kind,'instance','READ and prerequisite owners agree that the value is not a file');
+  for(const payload of [{},{params:{}},{params:{audit:null}},{params:{audit:undefined}},{params:Object.create({audit})}])
+    assert.deepEqual(evaluate(payload).unmet,missing,'absent, null, undefined or inherited values are not this attempt input');
+  write(repo,'params.audit','this file cannot supply a typed audit');
+  assert.deepEqual(evaluate({}).unmet,missing,'a same-named file cannot impersonate the required attempt value');
+  assert.deepEqual(evaluate({params:{audit:null}}).unmet,missing,'a same-named file cannot turn null into a value');
+  assert.match(prerequisiteDetail({op:'interface.audit',jobId:'job-audit',unmet:missing}),/params\.audit.*absent or null.*stays queued/);
+  const ordinary={reads:[...selected.brief.reads,{id:'private-file',path:'required.yaml',mustExist:true}]};
+  assert.deepEqual(checkPrerequisites({brief:ordinary,payload:{params:selected.params},repo}).unmet,
+    [{kind:'record-missing',read:'private-file',path:'required.yaml'}],'a valid instance does not waive an ordinary required file');
+  write(repo,'required.yaml','schema: private/fixture@1\n');
+  assert.deepEqual(checkPrerequisites({brief:ordinary,payload:{params:selected.params},repo}).unmet,[]);
+  assert.deepEqual(checkPrerequisites({brief:{reads:[{id:'rounds',path:'params.maxRounds',mustExist:true}]},
+    payload:{},params:selected.params,repo}).unmet,[],'selected admission defaults remain actual instance inputs');
+  assert.throws(()=>selectDispatchContract(ROOT,'interface.audit',{}),error=>error.code==='params-invalid','strict admission still owns required shape validation');
+  assert.throws(()=>selectDispatchContract(ROOT,'interface.audit',{params:{audit:null}}),error=>error.code==='params-invalid');
 });
 
 test('a read path resolves only when one binding spells out every placeholder',()=>{

@@ -33,7 +33,6 @@ export const WORK_SECRET_FILE = 'WORK_SECRET_FILE';
 export const WORK_SECRET_PATTERN = 'WORK_SECRET_PATTERN';
 export const WORK_SECRET_LITERAL = 'WORK_SECRET_LITERAL';
 export const WORK_ACCOUNT_LITERAL = 'WORK_ACCOUNT_LITERAL';
-export const WORK_HYGIENE_CHANGE = 'work-hygiene-gate';
 
 const slashed = (p) => String(p).replace(/\\/g, '/');
 const WORK_PATH = /(^|\/)\.starciwork\//;

@@ -4,15 +4,25 @@ dist/
 # Local tools and scratch are not distributable skill sources.
 /.venv/
 
-# Runtime state: the installed product writes .starciwork/runtime.sqlite and
-# ledger artifacts into the CONSUMER repo — consumers must ignore .starciwork/
-# (the installer prints these lines). This repo ignores its own scratch too.
+# Operational state and disposable runtime specs stay untracked.
 /.starciwork/
 /.starci-wk-spec-*/
 
-# Per-project config is seeded from config.example.yaml and stays untracked.
+# Curated sample snapshots exclude process-local sidecars and materialized output.
+/examples/.runtimes/*/runtime.sqlite-wal
+/examples/.runtimes/*/runtime.sqlite-shm
+/examples/.runtimes/*/runtime.sqlite-journal
+/examples/.runtimes/*/artifacts-views/
+/examples/.runtimes/*/cache/
+/examples/.runtimes/*/views/
+/examples/.runtimes/*/captures/
+/examples/.runtimes/*/logs/
+/examples/.runtimes/*/traces/
+
+# Host-local preferences and credentials stay untracked.
 /config.yaml
 /config.json
+/secret.env
 
 # Never accidentally track personal settings.
 resources/settings.json

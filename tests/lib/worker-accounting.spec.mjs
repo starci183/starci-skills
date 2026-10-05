@@ -1,6 +1,6 @@
 // worker-accounting.spec.mjs — worker accounting through Orca's orchestration worker-list (lane WLIST): the
 // scripts/machine/worker-list-all.mjs pager over the scripts/api/orca/worker-list.mjs call (driven through the shared fake Orca, never the live host), the pure reads of
-// scripts/lib/worker-accounting.mjs, the lane-owner rule, and machine.sqlite 0004 (terminals keeps shell sightings only).
+// scripts/lib/worker-accounting.mjs, the lane-owner rule, and the current machine.sqlite schema (terminals keeps shell sightings only).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -100,7 +100,7 @@ test('machine.sqlite: terminals keeps only shell/other sightings; worker columns
   const m = openMachine({ file: path.join(dir, 'machine.sqlite') });
   try {
     assert.equal(m.db.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION);
-    assert.equal(m.db.prepare("SELECT count(*) n FROM schema_migrations WHERE name='0002-provider-reservations' AND status='done'").get().n, 1);
+    assert.equal(m.db.prepare("SELECT count(*) n FROM schema_migrations WHERE version=? AND name='0001-init' AND status='done'").get(MACHINE_VERSION).n, 1);
     assert.deepEqual(m.providerReservations(), []);
     const cols = m.db.prepare("SELECT name FROM pragma_table_info('terminals')").all().map((r) => r.name);
     assert.deepEqual(cols, ['handle', 'title', 'role', 'opened_at', 'closed_at', 'close_verified_at', 'closed_by']);

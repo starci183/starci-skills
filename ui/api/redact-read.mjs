@@ -1,6 +1,6 @@
 import { Transform } from 'node:stream';
-import { StringDecoder } from 'node:string_decoder';
-import { learnStackSecrets, redactData, redactText } from '../../scripts/lib/redact.mjs';
+import { learnStackSecrets, redactData, redactText, textEncodingOf, decodeText } from '../../scripts/lib/redact.mjs';
+export { textEncodingOf, decodeText } from '../../scripts/lib/redact.mjs';
 
 // Owner ruling 2026-09-29 (option a): the public harness shows host paths, command lines,
 // cwd, pids and file locations so every run is traceable to its place on the host.
@@ -13,28 +13,7 @@ export function initializeReadRedaction(projects) {
   for (const row of projects) if (row.repoRoot) learnStackSecrets(row.repoRoot);
 }
 
-/** Text encoding of stored bytes from their byte-order mark; op evidence captured by
- *  PowerShell redirection is often UTF-16 LE with a BOM. */
-export function textEncodingOf(bytes) {
-  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return 'utf-16le';
-  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) return 'utf-16be';
-  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return 'utf-8-bom';
-  return 'utf-8';
-}
-
-/** Decodes stored text bytes to a string, removing any BOM. */
-export function decodeText(bytes) {
-  const encoding = textEncodingOf(bytes);
-  if (encoding === 'utf-16le') return bytes.subarray(2).toString('utf16le');
-  if (encoding === 'utf-16be') {
-    const body = Buffer.from(bytes.subarray(2));
-    body.swap16();
-    return body.toString('utf16le');
-  }
-  if (encoding === 'utf-8-bom') return bytes.subarray(3).toString('utf8');
-  return bytes.toString('utf8');
-}
-
+/** Public text uses the same credential filter as evidence ingestion. */
 export function publicText(value) {
   return redactText(value);
 }
@@ -61,6 +40,18 @@ export function redactTextStream() {
   let held = '';
   let pem = false;
   let discarded = false;
+  let prefix = Buffer.alloc(0);
+  const decode = (chunk, final = false) => {
+    if (!decoder) {
+      prefix = Buffer.concat([prefix, chunk]);
+      if (!final && prefix.length < 3) return '';
+      const encoding = textEncodingOf(prefix);
+      decoder = new TextDecoder(encoding === 'utf-8-bom' ? 'utf-8' : encoding, { fatal: true });
+      chunk = prefix;
+      prefix = Buffer.alloc(0);
+    }
+    return decoder.decode(chunk, { stream: !final });
+  };
   const failClosed = stream => {
     pending = '';
     held = '';
@@ -70,13 +61,7 @@ export function redactTextStream() {
   return new Transform({
     transform(chunk, _encoding, callback) {
       if (discarded) { callback(); return; }
-      if (!decoder) {
-        const encoding = textEncodingOf(chunk);
-        decoder = new StringDecoder(encoding.startsWith('utf-16') ? 'utf16le' : 'utf8');
-        if (encoding === 'utf-16be') { chunk = Buffer.from(chunk); chunk.subarray(0, chunk.length - (chunk.length % 2)).swap16(); }
-        chunk = chunk.subarray(encoding === 'utf-8-bom' ? 3 : encoding === 'utf-8' ? 0 : 2);
-      }
-      pending += decoder.write(chunk);
+      try { pending += decode(chunk); } catch (error) { callback(error); return; }
       if (pending.length + held.length > MAX_BUFFERED_TEXT) { failClosed(this); callback(); return; }
       let end;
       while ((end = pending.indexOf('\n')) >= 0) {
@@ -97,7 +82,8 @@ export function redactTextStream() {
     },
     flush(callback) {
       if (!discarded) {
-        const tail = pending + (decoder ? decoder.end() : '');
+        let tail;
+        try { tail = pending + decode(Buffer.alloc(0), true); } catch (error) { callback(error); return; }
         if (held.length + tail.length > MAX_BUFFERED_TEXT) failClosed(this);
         else if (held || tail) this.push(publicText(held + tail));
       }

@@ -11,20 +11,22 @@ const MUTATE_SEND_HANDOFF_SWR_KEY = "MUTATE_SEND_HANDOFF_SWR"
 type MutateSendHandoffSwrArg = SendInput
 
 /**
- * Sends a handoff to accounting. On success it revalidates the two reads it made stale,
- * by key prefix, so every block showing them refreshes and none keeps the old answer.
+ * Sends a handoff to accounting. Its authoritative read revalidates before completion;
+ * the attempt-history read revalidates independently under the same resource identity.
  */
 export const useMutateSendHandoffSwr = (handoffId?: string) => {
     const { mutate } = useSWRConfig()
     return useSWRMutation<Handoff, Error, readonly [string, string] | null, MutateSendHandoffSwrArg>(
         handoffId === undefined ? null : [MUTATE_SEND_HANDOFF_SWR_KEY, handoffId],
-        async (key, { arg }) => sendHandoff(key[1], arg),
+        async (key, { arg }) => {
+            const handoff = await sendHandoff(key[1], arg)
+            await mutate([QUERY_HANDOFF_SWR_KEY, key[1]])
+            return handoff
+        },
         {
             onSuccess: () => {
                 const stale = (key: unknown) =>
-                    Array.isArray(key) &&
-                    key[1] === handoffId &&
-                    (key[0] === QUERY_HANDOFF_SWR_KEY || key[0] === QUERY_SEND_ATTEMPTS_SWR_KEY)
+                    Array.isArray(key) && key[1] === handoffId && key[0] === QUERY_SEND_ATTEMPTS_SWR_KEY
                 void mutate(stale)
             },
         },

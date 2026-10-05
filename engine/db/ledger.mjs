@@ -1,32 +1,28 @@
+import { assertMutationFence } from '../../scripts/lib/mutation-fence.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
-import {findOwnedPathLeaseConflicts} from '../admission.mjs';
+import {resourceAdmission,workflowOpSlots} from '../admission.mjs';
 import {sha256} from '../digest.mjs';
 import {SETTLED_JOB_LIST} from '../admission.mjs';
 import {putBlob,blobPath} from './blob.mjs';
 import {redactData,redactText} from '../../scripts/lib/redact.mjs';
-import {isBusyError,isUnderTempDir,localProjectsRoot,machineFileFor,newSpanId,newTraceId,readMachine,starciLocalRoot,TEST_REGISTRY_ENV,withMachine} from './machine.mjs';
-import { isSpecRun, readEnv } from '../../scripts/lib/env.mjs';
-import { pathKey } from '../../scripts/lib/path-key.mjs';
+import {isBusyError,isUnderTempDir,machineFileFor,newSpanId,newTraceId,starciLocalRoot,TEST_REGISTRY_ENV,withMachine} from './machine.mjs';
+import { readEnv } from '../../scripts/lib/env.mjs';
+import {PROJECTS_ROOT_ENV,projectsRootFor,ledgerIdForRepo,repoRootKey,resolveLedgerFile,ledgerFixtureInit,assertOperationalLedger} from './ledger-paths.mjs';
 import { hasTable, insertPairs, insertRowWith } from '../../scripts/lib/sqlite.mjs';
 // The machine-side path helpers have one definition (engine/db/machine.mjs); re-exported for the ledger's callers.
 export {isUnderTempDir,machineFileFor,starciLocalRoot,TEST_REGISTRY_ENV};
 const require=createRequire(import.meta.url);
 
 /*
- * runtime.sqlite — the ONE writer (and the reader opener) of a project's runtime ledger (DBTREE.sql PART A,
- * ARCHITECTURE-DB §4, RESEARCH-STORAGE §3). The DDL is engine/db/migrations/runtime/0001-init.sql, executed as is:
- * STRICT tables, state machines, append-only guards and views live IN the database, so an invalid write is refused
- * at the write whatever code issued it. Clean slate (alpha.3): a file that is not 'starci/runtime@1' is refused;
- * there is no migrator, no backfill and no legacy table. A fresh ledger is created by openLedger on first use at
- * the file ledgerFileFor(<repo root>) resolves.
- *
- * Every write to runtime.sqlite goes through the typed functions below (`write.*` on the handle, or the exported
- * functions taking a db inside a transaction). Each state change appends exactly one events row in the same
- * transaction; the events hash chain (digest) is computed here, in JS.
+ * runtime.sqlite — the one project ledger writer and reader opener. Its canonical DDL is executed as is:
+ * STRICT tables, state machines and append-only guards refuse invalid SQL writes at the database boundary.
+ * Unsupported schemas are preserved and refused; openLedger initializes a fresh store through ledgerFileFor.
+ * Typed writes own state changes and their events hash chain in one transaction. Initialization-only samples
+ * use the same DDL and journal, carry synthetic identity/portable metadata and never enroll a live project.
  */
 
 // ---------------------------------------------------------------------------------------------------------
@@ -45,6 +41,8 @@ export const JOB_STATUSES=Object.freeze({
   settled:SETTLED_JOB_LIST,
 });
 export const SETTLED_JOB_STATUSES=JOB_STATUSES.settled;
+// Queued operations and Kernel seats hold no operation slot; an unproved fenced launch still does.
+export const OP_SLOT_HOLDING_STATUSES=Object.freeze([...JOB_STATUSES.dispatchable.filter(status=>status!=='queued'),...JOB_STATUSES.fenced]);
 export const UNIT_STATES=Object.freeze(['planned','queued','running','reported','deciding','done','failed','dropped']);
 const DEFAULT_TRY_BUDGET=5;
 export const JOB_ARTIFACT_KINDS=Object.freeze(['diff','patch','image','video','report','log','trace','file']);
@@ -72,37 +70,11 @@ const RUNTIME_MARKER=root=>fs.existsSync(path.join(root,'packages','cli','bin','
 export const isRuntimeRoot=root=>RUNTIME_MARKER(path.resolve(root));
 /** True when `root` is a repository with a ledger on this host (the runtime checkout itself never is one). */
 export const hasLedger=(root)=>{try{return !isRuntimeRoot(root)&&fs.existsSync(ledgerFileFor(root));}catch{return false;}};
-/** Overrides the projects root (the directory holding <ledger_id>/runtime.sqlite) for this process tree; narrower than machine-db.mjs LOCAL_ROOT_ENV, which this still honors through starciLocalRoot when unset. */
-export const PROJECTS_ROOT_ENV='STARCI_PROJECTS_ROOT';
-const normDir=file=>pathKey(file,{fold:true});
-/** %LOCALAPPDATA%/StarCi/projects (starciLocalRoot, itself overridable by STARCI_LOCAL_ROOT; a node --test process tree gets one under the OS temp directory). */
-export const projectsRootFor=(env=process.env)=>{
-  if(env[PROJECTS_ROOT_ENV])return path.resolve(env[PROJECTS_ROOT_ENV]);
-  const root=localProjectsRoot(env);
-  if(isSpecRun(env)&&!isUnderTempDir(root,{env}))return path.join(os.tmpdir(),'starci-test-projects');
-  return root;
-};
-/** The normalized identity of a repository root: resolved, realpath when it exists, forward slashes, lower case. */
-const repoRootKey=repoRoot=>{let root=path.resolve(repoRoot);try{root=fs.realpathSync.native(root);}catch{}return normDir(root);};
+export {PROJECTS_ROOT_ENV,projectsRootFor,ledgerIdForRepo};
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-/**
- * The ledger id of a repository root until the machine registry (a3-2 machine.ledgers) resolves it: a name-based
- * UUID of the normalized root, so the same root always names the same ledger and no side registry is needed.
- */
-export const ledgerIdForRepo=repoRoot=>{
-  const h=sha256(`starci-ledger:${repoRootKey(repoRoot)}`);
-  return `${h.slice(0,8)}-${h.slice(8,12)}-5${h.slice(13,16)}-${(8|(parseInt(h[16],16)&3)).toString(16)}${h.slice(17,20)}-${h.slice(20,32)}`;
-};
 // file → repo root, for the meta seed (and registration) of a ledger created through ledgerFileFor.
 const repoRootOfFile=new Map();
 const resolvedFiles=new Map();
-/** The registered runtime.sqlite of `repoRoot` in machine.ledgers (a3-2 resolveLedger), or null. */
-function registeredLedgerFile(root,env){
-  try{
-    const row=readMachine(m=>m.resolveLedger({repoRoot:root}),null,{env});
-    return row&&row.state!=='retired'&&row.file?path.resolve(row.file):null;
-  }catch{return null;}
-}
 /**
  * The runtime.sqlite of a project, by its Work-root repository (decision Q1): the file machine.ledgers registers for
  * that root; an unregistered root gets <projects root>/<ledgerIdForRepo(root)>/runtime.sqlite, which openLedger creates
@@ -115,7 +87,7 @@ export const ledgerFileFor=(repoRoot,{env=process.env}={})=>{
   const key=`${repoRootKey(root)}\n${projectsRootFor(env)}`;
   let file=resolvedFiles.get(key);
   if(!file){
-    file=registeredLedgerFile(root,env)??path.join(projectsRootFor(env),ledgerIdForRepo(root),'runtime.sqlite');
+    file=resolveLedgerFile(root,{env,openReader:openLedgerReader});
     if(fs.existsSync(file))resolvedFiles.set(key,file);
   }
   repoRootOfFile.set(path.resolve(file),root);
@@ -189,9 +161,10 @@ function openDb({file,busyTimeoutMs,journalMode='WAL',autoVacuum=false,label,pra
 }
 // handle.transaction(fn): BEGIN IMMEDIATE … COMMIT; a nested call throws. transaction.active() tells whether one is open,
 // so the handle's one-call writes (write.*, ensureWorkflow, appendEvent, enqueueJob) join an open transaction instead.
-const makeTransaction=(db,label)=>{let inside=false;const tx=fn=>{if(inside)throw Error(`${label}-nested-transaction`);inside=true;try{beginImmediate(db);}catch(error){inside=false;throw error;}openLedgerTransactions++;try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}finally{inside=false;openLedgerTransactions--;}};tx.active=()=>inside;return tx;};
+const makeTransaction=(db,label,fixture=null)=>{let inside=false;const tx=fn=>{if(fixture)assertOperationalLedger(metaOf(db));if(inside)throw Error(`${label}-nested-transaction`);inside=true;try{beginImmediate(db);}catch(error){inside=false;throw error;}openLedgerTransactions++;try{assertMutationFence({kind:'ledger-write',db});const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}finally{inside=false;openLedgerTransactions--;}};tx.active=()=>inside;return tx;};
 const userVersion=db=>Number(db.prepare('PRAGMA user_version').get().user_version);
 const metaOf=db=>Object.fromEntries(db.prepare('SELECT key,value FROM meta').all().map(row=>[row.key,row.value]));
+const assertWritableFile=(file,busyTimeoutMs)=>{if(fs.statSync(file).size===0)return;const reader=openLedgerReader(file,{verify:false,busyTimeoutMs});try{if(hasTable(reader,'meta'))assertOperationalLedger(metaOf(reader));}finally{reader.close();}};
 /** True when the ledger `db` holds `table`. */
 export const hasLedgerTable=hasTable;
 /** True when `table` of the ledger `db` has `column`. */
@@ -207,13 +180,13 @@ function verifyLedger(db,{file,sqliteVersion}){
   const version=userVersion(db);
   const legacy=hasTable(db,'meta')?metaOf(db).schema:(hasTable(db,'jobs')||hasTable(db,'events')?'pre-meta':null);
   need(version===LEDGER_VERSION&&legacy===LEDGER_SCHEMA,
-    `ledger-schema-refused: ${file} is ${legacy??'not a StarCi ledger'} at user_version ${version}, this runtime opens only ${LEDGER_SCHEMA} at user_version ${LEDGER_VERSION}; a fresh runtime.sqlite is created by openLedger on first use at the file ledgerFileFor(<repo root>) resolves — move the refused file aside to let one be created`,'STARCI_LEDGER_SCHEMA_REFUSED');
+    `ledger-schema-refused: ${file} is ${legacy??'not a StarCi ledger'} at user_version ${version}, this runtime opens only ${LEDGER_SCHEMA} at user_version ${LEDGER_VERSION}; preserve the database and its WAL, use a compatible runtime, or resolve its identity with the owner`,'STARCI_LEDGER_SCHEMA_REFUSED');
   const recorded=metaOf(db).sqlite_version;
   need(!recorded||!olderThan(sqliteVersion,recorded),`ledger-sqlite-downgrade: ${file} was last opened by SQLite ${recorded}, this process runs ${sqliteVersion}`,'STARCI_LEDGER_SQLITE_DOWNGRADE');
 }
 
 /** Create the ledger on an empty file: 0001-init.sql, user_version=LEDGER_VERSION, meta, schema_migrations — one transaction. */
-function initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot=null,product=null,ledgerId=null}){
+function initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot=null,product=null,ledgerId=null,blobRoot=null,fixtureMarker=null}){
   const empty=()=>userVersion(db)===0&&!db.prepare("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' LIMIT 1").get();
   if(!empty())return false;
   beginImmediate(db);
@@ -226,7 +199,8 @@ function initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot=null,product
     const id=ledgerId??(UUID.test(dirId)?dirId:crypto.randomUUID());
     const seed=db.prepare('INSERT INTO meta(key,value) VALUES(?,?)');
     const meta={ledger_id:id,schema:LEDGER_SCHEMA,created_at:String(at),journal_mode:journalMode.toLowerCase(),sqlite_version:sqliteVersion,
-      blob_root:path.resolve(readEnv('STARCI_ARTIFACT_ROOT')||path.join(os.homedir(),'.starci','artifacts')),runtime_rev:runtimeRev()};
+      blob_root:blobRoot??path.resolve(readEnv('STARCI_ARTIFACT_ROOT')||path.join(os.homedir(),'.starci','artifacts')),runtime_rev:runtimeRev()};
+    if(fixtureMarker)meta.fixture=fixtureMarker;
     if(repoRoot)meta.repo_root=path.resolve(repoRoot);
     if(product)meta.product=product;
     for(const [k,v] of Object.entries(meta))if(v!=null)seed.run(k,String(v));
@@ -780,7 +754,7 @@ export function setAttemptTranscript(db,{attemptId,transcriptSha=undefined,sessi
   return updateAttempt(db,{attemptId,transcriptSha,sessionSha,promptSha,at});
 }
 /** Q11: token counts only; cost_usd stays NULL unless a provider reported it. */
-export function recordLlmUsage(db,{workflowId,subjectType,attemptId=null,turnRef=null,provider,source,at=nowMs(),...fields}){
+function recordLlmUsage(db,{workflowId,subjectType,attemptId=null,turnRef=null,provider,source,at=nowMs(),...fields}){
   insertRow(db,'llm_usage',{workflowId,subjectType,attemptId,turnRef,provider,source,at,...fields});
 }
 
@@ -1018,7 +992,7 @@ export function markBlobArchived(dbOrLedger,{sha256:sha,archivedAt=nowMs(),archi
  * stored (op_attempts.transcript_sha), and any snapshot older than the retention of its attempt's verdict (pass: passMs,
  * anything else: failMs). Returns the number of rows deleted.
  */
-export function pruneAttemptSnapshots(dbOrLedger,{now=nowMs(),passMs,failMs}){
+function pruneAttemptSnapshots(dbOrLedger,{now=nowMs(),passMs,failMs}){
   const db=dbOrLedger.db??dbOrLedger;
   need(Number.isFinite(passMs)&&Number.isFinite(failMs),'pruneAttemptSnapshots needs passMs and failMs');
   const run=d=>d.prepare(`DELETE FROM attempt_transcript_snapshots WHERE snapshot_id IN (
@@ -1060,19 +1034,22 @@ const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkfl
  * `checkpointer:true` is the one connection that checkpoints (the reconciler engine): wal_autocheckpoint=8000 and
  * handle.checkpoint() for the periodic PASSIVE checkpoint; every other connection runs wal_autocheckpoint=0.
  * `write.<fn>(args)` runs one typed write in its own transaction; inside handle.transaction(db=>…) call the exported
- * functions with that db.
+ * functions with that db. `fixture:{ledgerId,createdAt,blobRoot}` creates only a fresh sample; its typed
+ * mutations and later writable opens refuse. The clock is frozen and no registry binding is accepted.
  */
-export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,repoRoot=null,product=null,checkpointer=false,machine=null}={}){
+export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,repoRoot=null,product=null,checkpointer=false,machine=null,fixture=null}={}){
+  fixture=ledgerFixtureInit(fixture,{file,repoRoot,product,machine,mapped:typeof file==='string'&&repoRootOfFile.has(path.resolve(file)),checkpointer,now});
+  if(fixture){fs.closeSync(fs.openSync(file,'wx'));now=()=>fixture.createdAt;}else if(typeof file==='string'&&fs.existsSync(file))assertWritableFile(file,busyTimeoutMs);
   const pragmas=checkpointer?{...LEDGER_PRAGMAS,wal_autocheckpoint:CHECKPOINTER_AUTOCHECKPOINT}:LEDGER_PRAGMAS;
   const {db,sqliteVersion,journalMode}=openDb({file,busyTimeoutMs,journalMode:'WAL',autoVacuum:true,label:'openLedger',pragmas});
   let created=false;
   try{
-    created=initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot:repoRoot??repoRootOfFile.get(path.resolve(file))??null,product});
+    created=initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot:repoRoot??repoRootOfFile.get(path.resolve(file))??null,product,...(fixture?{ledgerId:fixture.ledgerId,blobRoot:fixture.blobRoot,fixtureMarker:fixture.marker}:{})});
     verifyLedger(db,{file,sqliteVersion});
-    const meta=metaOf(db);
+    const meta=metaOf(db);if(!fixture)assertOperationalLedger(meta);
     if(meta.sqlite_version!==sqliteVersion)db.prepare("UPDATE meta SET value=? WHERE key='sqlite_version'").run(sqliteVersion);
   }catch(error){try{db.close();}catch{}throw error;}
-  const transaction=makeTransaction(db,'ledger');
+  const transaction=makeTransaction(db,'ledger',fixture);
   const resolved=path.resolve(file),ledgerId=ledgerIdOf({db});
   // A new ledger enrols itself in machine.ledgers (repo_root from its meta); a refusal (temp file on the live registry) is fine.
   if(created){const own=metaOf(db);if(own.repo_root)try{withMachine(m=>m.registerLedger({ledgerId,file:resolved,repoRoot:own.repo_root,product:own.product??null,schemaVersion:LEDGER_VERSION}));}catch{/* registry unavailable: resolved by name until it is */}}
@@ -1093,7 +1070,7 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_
 }
 /** A read-write connection to an EXISTING ledger (the typed-log writer's own connection), verified, never initialised. */
 export function openLedgerConnection(file,{busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS}={}){
-  need(fs.existsSync(file),`openLedgerConnection needs an existing ledger: ${file}`);
+  need(fs.existsSync(file),`openLedgerConnection needs an existing ledger: ${file}`);assertWritableFile(file,busyTimeoutMs);
   const {db,sqliteVersion}=openDb({file,busyTimeoutMs,journalMode:'WAL',label:'openLedgerConnection'});
   try{verifyLedger(db,{file,sqliteVersion});}catch(error){try{db.close();}catch{}throw error;}
   return db;
@@ -1103,7 +1080,7 @@ export function openLedgerConnection(file,{busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS}
  * Admission: in one ledger transaction, refuse on a durable path-lease overlap or a full repo resource, else move the job
  * ready → leased with its fencing token and write its leases. The ledger is registered on the machine registry first.
  */
-export function reserveTwoPhase(ledger,machine,{job,leases=[],ttlMs=60000,canonicalOf=null}={}){
+export function reserveTwoPhase(ledger,machine,{job,leases=[],ttlMs=60000,canonicalOf=null,opSlots=null}={}){
   need(ledger?.transaction&&ledger?.db,'reserveTwoPhase needs a ledger handle');
   need(machine?.registerLedger,'reserveTwoPhase needs a machine handle');
   need(job?.jobId&&job?.workflowId,'Job identity is required');
@@ -1112,19 +1089,15 @@ export function reserveTwoPhase(ledger,machine,{job,leases=[],ttlMs=60000,canoni
   machine.registerLedger({file:ledger.path,ledgerId:ledger.ledgerId??ledgerIdOf(ledger)});
   return ledger.transaction(db=>{
     const at=ledger.now(),token=newToken();
-    const reasons=[];
-    const pathConflicts=findOwnedPathLeaseConflicts(db,repoNeeds,{canonicalOf});
-    for(const conflict of pathConflicts)reasons.push(`resource ${conflict.requested} overlaps durable lease ${conflict.held} held by ${conflict.job_id}`);
-    for(const item of repoNeeds){
-      const row=db.prepare('SELECT capacity FROM resources WHERE resource_key=?').get(item.resourceKey);
-      const capacity=row?.capacity??1;
-      const used=db.prepare('SELECT COALESCE(SUM(units),0) u FROM leases WHERE resource_key=? AND expires_at>?').get(item.resourceKey,at).u;
-      if(used+item.units>capacity)reasons.push(`resource ${item.resourceKey} capacity ${capacity} has ${used} used and needs ${item.units}`);
-    }
-    if(reasons.length)return {ok:false,reason:reasons.join('; '),reasons,pathConflicts:pathConflicts.map(({requested,held,job_id,workflow_id,op_id,expires_at})=>({requested,held,jobId:job_id,workflowId:workflow_id,opId:op_id,expiresAt:expires_at}))};
     const existing=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(job.jobId);
     need(existing,`job ${job.jobId} is not enqueued`,'STARCI_JOB_NOT_FOUND');
     need(existing.workflow_id===job.workflowId,'Reservation identity does not match the durable job');
+    if(existing.kind!=='kernel'&&opSlots){
+      const slots=workflowOpSlots(db,job.workflowId,{...opSlots,excludeJobId:job.jobId,holdingStatuses:OP_SLOT_HOLDING_STATUSES});
+      if(!slots.ok)return {ok:false,reason:slots.reason,slots};
+    }
+    const resources=resourceAdmission(db,repoNeeds,{at,canonicalOf});
+    if(!resources.ok)return resources;
     if(existing.status==='queued')setJobStatus(db,{jobId:job.jobId,to:'ready',reason:'admission',at});
     setJobStatus(db,{jobId:job.jobId,to:'leased',reason:'admission',leaseToken:token,deadline:at+ttlMs,at,expect:['ready','queued']});
     for(const item of repoNeeds)acquireLease(db,{resourceKey:item.resourceKey,jobId:job.jobId,units:item.units,expiresAt:at+(item.ttlMs??ttlMs),at});

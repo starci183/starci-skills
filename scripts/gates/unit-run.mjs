@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
-import { reduceJest } from './test-world-run.mjs';
+import { jestRunError, reduceJest } from './test-world-run.mjs';
 import { loadSlotManifest } from '../hfs/slots.mjs';
 import { unitRolesOf } from '../hfs/manifest-shape.mjs';
 import { globExpression, braceVariants } from '../lib/glob.mjs';
@@ -130,15 +130,16 @@ function runUnit(root, { npm = runNpm } = {}) {
   for (const dir of [covDir, outDir]) { try { fs.rmdirSync(dir); } catch { /* temp; a reporter may leave more */ } }
   return { command: `npm ${args.filter((a) => !/^--(outputFile|coverageDirectory)=/.test(a)).join(' ')}`, exit: run.status ?? null,
     ...(report ? reduceJest(report) : { total: 0, passed: 0, failed: 0, skipped: 0, files: 0, failedFiles: 0, failures: [] }), coverage,
-    error: report ? null : `jest wrote no --json report (exit ${run.status ?? run.error?.message}): ${String(run.stderr || run.stdout || '').trim().split(/\r?\n/).slice(-1)[0] ?? ''}` };
+    error: jestRunError(report, run) };
 }
 
-function buildUnitRun({ root, rules = unitKitRules(), npm = runNpm }) {
+/** Measure the required unit project and its subject coverage; missing or incomplete runs remain non-green. */
+export function buildUnitRun({ root, rules = unitKitRules(), npm = runNpm }) {
   const abs = path.resolve(root);
   const { coverage, ...run } = runUnit(abs, { npm });
   const summary = { schema: UNIT_RUN_SCHEMA, at: new Date().toISOString(), root: posixPath(abs), run, services: judgeServices(abs, coverage, rules), findings: [], exit: 2 };
   summary.findings = unitFindings(summary);
-  const red = run.error || run.exit !== 0 || run.failed > 0 || run.total === 0;
+  const red = run.error || run.exit !== 0 || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0 || run.total === 0;
   summary.exit = run.error ? 2 : summary.findings.length || red ? 1 : 0;
   return summary;
 }

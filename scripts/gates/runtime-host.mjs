@@ -5,15 +5,46 @@
 // The runtime host is the repository whose checkout holds the runtime's MAIN checkout (`<host>/.claude`), found from git
 // identity, never from the folder this runtime tree happens to sit in: a lane worktree of the runtime
 // (<lanes root>/<lane>/<name>) resolves to the same host as the main checkout. STARCI_SOURCE_ROOT overrides it.
+import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
 import { repositoryHome, repositoryName } from '../hfs/repo-identity.mjs';
+import { secretEnv } from '../../engine/secrets.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { gitOutputOf } from '../lib/git.mjs';
 
 /** The repository hosting this runtime: STARCI_SOURCE_ROOT, else the folder holding the runtime's main checkout. */
 export function runtimeHostRoot(env = process.env) {
   if (env.STARCI_SOURCE_ROOT) return starciSourceRoot(env);
   return path.dirname(repositoryHome(skillRoot));
+}
+
+function verifiedRuntimeMain(runtimeRoot, env) {
+  if (typeof runtimeRoot !== 'string' || !path.isAbsolute(runtimeRoot))
+    throw new TypeError('runtimeSecretEnv requires an absolute runtime root');
+  const stat = fs.lstatSync(runtimeRoot);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('runtime root must be a regular directory');
+  const root = fs.realpathSync.native(runtimeRoot), marker = path.join(root, '.git');
+  let gitMarker;
+  try { gitMarker = fs.lstatSync(marker); } catch (error) { if (error?.code === 'ENOENT') return root; throw error; }
+  if (gitMarker.isSymbolicLink() || (!gitMarker.isFile() && !gitMarker.isDirectory()))
+    throw new Error('runtime Git identity is unavailable');
+  const topLevel = cwd => fs.realpathSync.native(path.resolve(cwd,
+    gitOutputOf(revParseQuery(['--show-toplevel'], { cwd, env })).trim()));
+  if (!same(topLevel(root), root)) throw new Error('runtime must be its Git top level');
+  const main = fs.realpathSync.native(repositoryHome(root)), mainMarker = fs.lstatSync(path.join(main, '.git'));
+  if (!mainMarker.isDirectory() || mainMarker.isSymbolicLink() || !same(topLevel(main), main))
+    throw new Error('runtime main Git identity is unavailable');
+  return main;
+}
+
+/**
+ * Load host-local credentials from this runtime's verified main tree, or its installed physical tree.
+ * A lane never reads its own alternate file. The actual environment wins; no process state is mutated.
+ */
+export function runtimeSecretEnv(env = process.env, runtimeRoot = skillRoot) {
+  return secretEnv(verifiedRuntimeMain(runtimeRoot, env), env);
 }
 
 const same = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);

@@ -7,6 +7,29 @@ host contract and `modules/models/agents/` holds the per-agent cards. The
 mechanism that reads them (`scripts/agent/lib.mjs`, `scripts/api/orca/`) is
 agent-blind.
 
+## Host platform boundaries
+
+The executable resolver is `scripts/api/orca/lib.mjs#resolveOrcaCommand`. It keeps the explicit
+StarCi override, then Orca's managed-session executable hint, before selecting the OS command.
+Linux uses the IDE CLI name because the bare name belongs to the GNOME screen reader; macOS uses
+the registered Orca CLI, and Windows retains its executable-only lookup. A selected executable's
+failure is reported by the existing host-unavailable receipt; the runtime does not retry another build.
+Orca development sessions may select their exact executable through the explicit override.
+
+Managed host startup requires the service actuator capability declared by
+`scripts/reconciler/services.mjs#servicePlatformProblem`. The current harness and scheduled-task
+lifecycle uses Windows Task Scheduler; `scripts/reconciler/start.mjs#hostPlatformItem` makes an
+unsupported managed profile a required preflight refusal before startup effects. Read-only checks
+still report the actual capability. OS-specific process-table reads retain their existing receipt
+and unknown-ownership boundaries; command selection alone proves no managed macOS/Linux startup,
+restart, recovery or process-cleanup conformance. Those require actual disposable-host evidence.
+
+Primary references read on 2026-10-04: [Orca CLI reference](https://www.onorca.dev/docs/cli/reference),
+[Orca install platform notes](https://www.onorca.dev/docs/install), with version-matched CLI discovery owned by
+[Orca CLI guide](../skills/starci/references/orca-cli.md).
+These document executable selection and managed WSL hints; StarCi's service lifecycle and
+its actual qualification remain owned by the runtime paths above.
+
 ## `modules/host/orca/` — the typed host contract
 
 `modules/host/orca/` is the typed contract behind every
@@ -40,7 +63,7 @@ Orca adapter-card fields at top level plus an optional `capabilities:`
 key for agent-specific facts. Shipped cards: `devin`, `claude`, `codex`.
 
 The invariant: **every agent launch is `orchestration worker-start`**
-(`modules/kernel/contract-changes/launch-through-worker-start.yaml`) and **no
+(`modules/kernel/start-workflow.yaml`) and **no
 caller assembles an agent command**. Orca composes it with the owner's per-agent
 default args (Orca settings `agentDefaultArgs`: claude
 `--dangerously-skip-permissions`, codex `--dangerously-bypass-approvals-and-sandbox`,
@@ -174,7 +197,7 @@ that, a worker-start from a worker is refused `nested_worker_depth_exceeded`.
 
 ## Pre-workflow launch smoke
 
-`scripts/kernel/launch-smoke.mjs` (`starci/launch-smoke@2`, contract changes `launch-smoke` and `workflow-worktree`) is the live proof of
+`scripts/kernel/launch-smoke.mjs` (`starci/launch-smoke@2`) is the live proof of
 every nesting path and of the workflow worktree, run by hand from a plain Orca shell before a workflow run (docs/releasing.md "Pre-workflow
 readiness"). It starts no-op agents through the runtime's own launchers and checks the depth and creator Dispatch
 `worker-show` reports:

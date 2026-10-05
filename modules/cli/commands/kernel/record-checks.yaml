@@ -98,3 +98,13 @@ refuses:
   - "report-job-not-active / report-dispatch-unbound / report-contract-unbound: the report binding
     refusals, resolved exactly as `report` binding declares"
 usedBy: drive.settle — after consume-report and before settle; the re-run record a `pass` verdict stands on
+
+nativeMechanismProofs: >-
+  A leg carrying mechanism-proof-observation records canonical mechanical commands through the same
+  independent runner. The runtime derives a declared producer from knowledge/op-gate.yaml and the CLI
+  catalog, binds its exact admitted attempt and filed target, and retains actual process status,
+  cwd, argv, tool bytes, current input bytes, start/end time and indexed redacted stdout/stderr/output
+  in check_runs. Missing status, signal, spawn error, tool exit 2 or changing inputs are unavailable.
+  Caller-supplied native-shaped fields remain claims and cannot supply this runtime receipt.
+  New qualified settlement consumes this row plus the existing attachment/manual obligations; a green
+  attachment alone is insufficient. Recorded Source changes remain admission-scoped advisory.

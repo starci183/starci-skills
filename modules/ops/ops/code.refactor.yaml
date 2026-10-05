@@ -87,7 +87,7 @@ reads:
       en: Establish before any edit which declared check actually exercises the slice's observable
         behavior and that it can run in this environment.
   - id: conventions
-    path: knowledge/coding-reference.yaml + knowledge/patterns/fe/index.yaml +
+    path: docs/architecture.md + docs/code-pattern-enforcement.md + knowledge/patterns/fe/index.yaml +
       knowledge/patterns/be/index.yaml
     purpose:
       en: The adopted naming, error-identity, structure and typing conventions, and the FE or BE pattern

@@ -27,13 +27,14 @@ import {
 } from '../../scripts/work/draw-loop.mjs';
 import { DEFAULT_RUBRIC, normaliseVerdict, parseVerdict, rubricFor, runCritic } from '../../scripts/work/draw-critic.mjs';
 import { fakeCriticOrca, passingVerdict } from '../helpers/fake-critic-orca.mjs';
-import { settleDrawMetricFindings, DRAW_LOOP_CHANGE } from '../../scripts/work/draw-loop-settle.mjs';
+import { settleDrawMetricFindings } from '../../scripts/work/draw-loop-settle.mjs';
 import { ARCHETYPES, archetypeOf, directionReadiness } from '../../scripts/work/ui-archetype.mjs';
 import { DIRECTION_ARCHETYPES } from '../../scripts/work/brand/brand.mjs';
 import { checkPrerequisites, directionPrerequisiteOn, directionVerdicts } from '../../scripts/kernel/prerequisites.mjs';
 import { drawQualityFindings } from '../../scripts/work/draw/draw-quality.mjs';
 import { withRationale, writeRationale } from '../helpers/draw-rationale-fixture.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { captureGateBinding } from '../../scripts/kernel/gate-settle.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-loop-')); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return d; };
@@ -360,7 +361,7 @@ test('ui.archetype: explicit wins, else derived; the direction prerequisite read
   assert.deepEqual(pre.unmet.map((u) => [u.kind, u.record, u.archetype]), [['direction-unaccepted', list, 'list']]);
 });
 
-test('starci kernel settle re-measures the drawn parts itself: a loop-passed draw the runtime cannot verify is refused draw-metrics-failed; an older leg settles as admitted', async (t) => {
+test('native settlement requires produced-lint evidence before accepting a loop-passed drawing at either admission time', async (t) => {
   const { spawnSync } = await import('node:child_process');
   const { openLedger, ledgerFileFor, fileReport, recordCheckRun, writeContract } = await import('../../engine/db/ledger.mjs');
   const p = product(t);
@@ -379,27 +380,16 @@ test('starci kernel settle re-measures the drawn parts itself: a loop-passed dra
   const files = ['.starciwork/features/modules/ui/ledger/index.yaml', ...done.installed.map((i) => `.starciwork/features/modules/ui/ledger/${i.path}`), path.relative(p.repo, path.join(r.out, 'loop.json')).split(path.sep).join('/')];
   fs.writeFileSync(path.join(p.ui, 'grammar-proposal.yaml'), stringifyYaml({ schema: 'starci/grammar-proposal@1', proposals: [
     { name: 'Meter.segments', gap: 'DNA Meter has no segmented variant', anatomy: ['root', 'segments'], tokens: ['--accent'], claims: ['A11Y-3'], render: 'meter.html' }] }));
-  // draw-loop-dna predates the alpha.3 release base, so the release-line compaction deleted it; this spec
-  // keeps a fixture registry (the live entries plus that one change) to exercise the admitted-before boundary.
-  const at = Date.parse('2026-09-27T18:20:00+07:00');
-  const changesDir = path.join(ROOT, 'modules', 'kernel', 'contract-changes');
-  const changes = fs.readdirSync(changesDir).filter((f) => f.endsWith('.yaml')).map((f) => parseYaml(fs.readFileSync(path.join(changesDir, f), 'utf8')));
-  changes.push({ id: DRAW_LOOP_CHANGE, effectiveAt: '2026-09-27T18:20:00+07:00', reach: 'follow-up', ops: ['interface.draw'],
-    followUp: { op: 'interface.draw', ops: ['interface.draw'] },
-    adds: { codes: [DRAW_OFF_GRAMMAR_COMPONENT, DRAW_NOTICE_NOT_ALERT, DRAW_RATIO_NOT_METER, DRAW_ACCENT_BUDGET, DRAW_TOO_MANY_BANDS, DRAW_TOO_MANY_BADGES, DRAW_LOOP_MISSING, DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED] },
-    summary: 'spec fixture for the compacted draw-loop-dna entry' });
-  const changesFile = path.join(tmp(t), 'contract-changes.yaml');
-  fs.writeFileSync(changesFile, stringifyYaml({ schema: 'starci/contract-changes@1', changes }));
-  const env = { ...process.env, STARCI_CONTRACT_CHANGES: changesFile };
+  const at=Date.now() - 1000, env={...process.env};
   const seed = (jobId, wf, admittedAt) => {
     const ledger = openLedger({ file: ledgerFileFor(p.repo) });
     try {
       seedWorkflow(ledger, { id: wf, state: { phase: 'running', job: 'draw' },
         jobs: [{ jobId, opId: 'interface.draw', dispatchId: `ctx-${jobId}`, terminalHandle: `term-${jobId}`, status: 'running',
-          payload: { opId: 'interface.draw', owned_paths: ['src/'], orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
+          payload: { opId: 'interface.draw', owned_paths: ['.starciwork/'], orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
       const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
       ledger.transaction((db) => {
-        writeContract(db, { attemptId, markdown: '# contract', context: { worktree: p.repo }, createdAt: admittedAt });
+        writeContract(db, { attemptId, markdown: '# contract', context: { worktree: p.repo, packet: { context: { selected_op: { contract: { id: 'interface.draw' }, checks: { required: [], candidates: [] } }, readRefs: [], owned_paths: [{ root: p.repo, path: '.starciwork/' }], gate_binding: captureGateBinding([{ base: p.repo, path: '.starciwork/' }], { at: admittedAt }) } } }, createdAt: admittedAt });
         fileReport(db, { attemptId, outcome: 'done', createdAt: Date.now(),
           report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'drawn through the loop', files, head: git('rev-parse', 'HEAD') } });
         for (const check of [{ name: 'owned-paths-committed', command: 'git show' }, { name: 'owned-paths-clean', command: 'git status' }, { name: 'head-ancestor', command: 'git merge-base' }])
@@ -411,16 +401,11 @@ test('starci kernel settle re-measures the drawn parts itself: a loop-passed dra
   const settle = (jobId) => { const s = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'kernel', 'cli.mjs'), 'settle', '--repo', p.repo, '--job', jobId, '--verdict', 'pass', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 300000, env }); let body = null; try { body = JSON.parse(s.stdout); } catch { body = null; } return { s, body }; };
   const fresh = settle(seed('op-interface.draw-loop', 'wf-draw', at + 1000));
   assert.equal(fresh.s.status, 1, fresh.s.stdout || fresh.s.stderr);
-  assert.equal(fresh.body.reason, 'draw-metrics-failed', 'the stubbed loop said pass; the runtime re-ran the metrics itself and could not verify them on this host');
-  assert.ok(fresh.body.codes.some((c) => [DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED].includes(c)));
-  assert.deepEqual(fresh.body.loops, [{ loop: `blob:${done.bundle.slice(0, 12)}`, best: 1, outcome: 'passed' }]);
+  assert.equal(fresh.body.reason, 'op-lint-proof-missing', 'a passing loop attachment does not invent the required native produced-lint check');
   const old = settle(seed('op-interface.draw-old', 'wf-draw-old', at - 1000));
-  assert.equal(old.s.status, 0, old.s.stderr || old.s.stdout);
-  // The settle files the drawing's grammar proposal for the owner - proposed, never accepted - and status lists it.
-  assert.deepEqual(old.body.grammarProposals.map((g) => g.name), ['Meter.segments']);
-  const st = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'kernel', 'cli.mjs'), 'status', '--repo', p.repo, '--workflow', 'wf-draw-old', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
-  assert.equal(st.status, 0, st.stderr);
-  assert.deepEqual(JSON.parse(st.stdout).grammarProposals.map((g) => [g.name, g.status, g.jobId]), [['Meter.segments', 'proposed', 'op-interface.draw-old']]);
+  assert.equal(old.s.status,1,old.s.stderr || old.s.stdout);
+  assert.equal(old.body?.reason,'op-lint-proof-missing');
+  assert.equal(old.body?.grammarProposals,undefined,'an unqualified native settlement cannot claim a settled proposal');
 });
 
 // Autopilot (owner ruling 2026-09-28): a direction archetype brand.decide proposed and every machine check passes is

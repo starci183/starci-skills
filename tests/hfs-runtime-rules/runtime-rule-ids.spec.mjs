@@ -27,7 +27,8 @@ test('RT_RULE_ID_UNKNOWN: a retired id is refused in live files and allowed in t
   const retired = catalog.retired[0].id;
   const text = `Retired: ${retired}\n`;
   assert.deepEqual(live(ruleIdFindings(ctxOf({ 'knowledge/patterns/x.yaml': text }))), [['knowledge/patterns/x.yaml', 1]]);
-  assert.deepEqual(live(ruleIdFindings(ctxOf({ 'modules/kernel/contract-changes/c.yaml': text, 'packages/hfs/CHANGELOG.md': text }))), []);
+  assert.deepEqual(live(ruleIdFindings(ctxOf({ 'packages/hfs/CHANGELOG.md': text }))), []);
+  assert.deepEqual(live(ruleIdFindings(ctxOf({ 'modules/kernel/current.yaml': text }))), [['modules/kernel/current.yaml',1]]);
 });
 
 test('RT_RULE_ID_UNKNOWN: specs, generated copies, lock files and other extensions are not read', () => {

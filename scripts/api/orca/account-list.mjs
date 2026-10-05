@@ -7,6 +7,10 @@
 import { orcaCall } from './lib.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
+/**
+ * Reads Orca's account payload, separating nullable quota windows from the remaining account data.
+ * ok reflects the call exit status; admission callers still judge missing or unavailable provider windows.
+ */
 export function accountList() {
   const r = orcaCall('account-list');
   const { rateLimits = null, ...accounts } = r.result ?? {};

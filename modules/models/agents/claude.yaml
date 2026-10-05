@@ -29,9 +29,9 @@ launchEnvReason: >-
   env in the launch worktree's .claude/settings.local.json (project scope, never a user-global settings file) before every Claude launch - only when the key is missing, an owner-set value is kept. Updates are applied deliberately while no seat runs (docs/supervisor.md "Claude Code
   updates"): stop the seats, have the owner update the global Claude Code package, then /start.
 launchTrust: >-
-  Owner instruction 2026-09-23: the runtime, never the owner, approves launch prompts. Before every launch
+  Requires the current installation's explicit launchTrust automatic profile and an exact approved repository root. Before an authorized launch
   scripts/agent/trust.mjs sets ~/.claude.json projects[<cwd>].hasTrustDialogAccepted (keys <cwd> in its forward- and backslash forms) and
-  asserts settings.json skipDangerousModePermissionPrompt; a gate below that still appears is answered once, else refused.
+  asserts settings.json skipDangerousModePermissionPrompt; explicit provider declines and unresolved launch directories are refused. A consent screen alone cannot prove scope.
 gateAutoAnswer:
   # Claude refuses keys for a moment after a dialog opens; the answer waits delayMs, then walks the cursor to
   # `select` (arrow keys) and presses Enter. A gate still on screen settleMs later is refused.
@@ -39,8 +39,10 @@ gateAutoAnswer:
   settleMs: 6000
   gates:
     claude-workspace-trust:
+      requiresLaunchTrust: true
       select: 'Yes, I trust this folder'
     claude-bypass-permissions-consent:
+      requiresLaunchTrust: true
       select: 'Yes, I accept'
 liveness:
   busyPatterns:

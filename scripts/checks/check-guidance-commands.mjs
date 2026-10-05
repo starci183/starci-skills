@@ -7,7 +7,7 @@
 //   starci runtime check --only guidance-commands -- [--root <tree>] [--json]
 //
 // Read: every tracked string field of modules/**/*.yaml (the failure-code catalog, which is the refusal-message catalog
-// itself, and the modules/kernel/contract-changes/ history excepted), the agent prompts modules/**/*.md, and
+// itself excepted), the agent prompts modules/**/*.md, and
 // skills/**/SKILL.md. A command is a backticked span, a double-quoted span (Markdown prose), a parenthesised span, a
 // fenced code line, or the text after an imperative "run". Each is evaluated by commandVerdict with static deps: no git,
 // no lock recovery, a cwd outside every repository, so only the command text decides.
@@ -37,11 +37,10 @@ import { isMain } from '../lib/is-main.mjs';
 import { altOf } from '../lib/source-phrases.mjs';
 
 export const GUIDANCE_CODE = 'RT_GUIDANCE_REFUSED_COMMAND';
-const HISTORY_DIR = 'modules/kernel/contract-changes/';
 
 /** The guidance files of a tree: repository-relative POSIX paths. */
 export const isGuidanceFile = (rel) => (rel.startsWith('modules/') && (rel.endsWith('.yaml') || rel.endsWith('.md'))
-  && rel !== CATALOG_FILE && !rel.startsWith(HISTORY_DIR))
+  && rel !== CATALOG_FILE)
   || /^skills\/[^/]+\/(?:SKILL\.md|references\/.+\.md)$/.test(rel)
   || /^\.starci\/host\/.+\.md$/.test(rel);
 

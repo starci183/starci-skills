@@ -1,6 +1,6 @@
 // machine.sqlite worktree kinds: one Orca-owned worktree per Kernel workflow is the unit (owner decision WFWT). The per-op kind
 // 'op' does not exist; 'workflow' (the Kernel's tree) and 'critic' (the draw critic's placement) do, and a row carries Orca's
-// worktree id (orca_id, unique) and the workflow's last checkpoint (checkpoint_sha). The host upgrades preserve these rows.
+// worktree id (orca_id, unique) and the workflow's last checkpoint (checkpoint_sha). Current host opens preserve these rows.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,7 +21,7 @@ test('a fresh machine.sqlite: the CHECK refuses the per-op kind, takes workflow 
   const m = openMachine({ file: tmpFile(t) });
   try {
     assert.equal(Number(m.db.prepare('PRAGMA user_version').get().user_version), MACHINE_VERSION);
-    assert.deepEqual(m.db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map((r) => [r.version, r.name]), [[1, '0001-init'], [2, '0002-provider-reservations'], [3, '0003-core-debug-signals']]);
+    assert.deepEqual(m.db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map((r) => [r.version, r.name]), [[MACHINE_VERSION, '0001-init']]);
     assert.throws(() => insert(m.db, row('op', path.resolve('/r/op'))), /CHECK constraint failed/);
     for (const kind of KINDS) insert(m.db, row(kind, path.resolve(`/r/${kind}`)));
     const set = m.db.prepare('UPDATE worktrees SET orca_id=? WHERE path=?');

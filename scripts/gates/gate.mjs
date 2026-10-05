@@ -45,8 +45,9 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { show as gitShow } from '../api/git/show.mjs'; import { mergeTree } from '../api/git/merge-tree.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { lsTree } from '../api/git/ls-tree.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { revList } from '../api/git/rev-list.mjs'; import { mergeBase as mergeBaseOf } from '../api/git/merge-base.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs';
-import { pathKey, posixPath } from '../lib/path-key.mjs';
+import { show as gitShow } from '../api/git/show.mjs'; import { mergeTree } from '../api/git/merge-tree.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { lsTree } from '../api/git/ls-tree.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { revList } from '../api/git/rev-list.mjs'; import { mergeBase as mergeBaseOf } from '../api/git/merge-base.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs';
+import { pathKey, posixPath, sameResolvedPath } from '../lib/path-key.mjs';
+import { opContextOf } from '../guards/op-context.mjs';
 import { hfsEntry } from '../lib/package-at.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, locateDeclaration } from '../hfs/slots.mjs';
@@ -56,12 +57,14 @@ import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/w
 import { parseYaml } from '../../engine/yaml.mjs';
 import { canonContentDigest, installedFiles } from './canon-digest.mjs';
 import { PROFILES_FILE, loadPins } from './canon-pins.mjs';
-import { gateBaseAt } from '../machine/workflow-tree.mjs';
+import { gateGit as git, gateGitText as gitText, resolveGateBase, gateDelta, gateInputSnapshot } from './gate-input.mjs';
+export { resolveGateBase, gateInputSnapshot } from './gate-input.mjs';
+import { jestRunError, reduceJest } from './test-world-run.mjs';
+import { TS_SOURCE, exposesDist, inputStamp, requireTypeCoverage, typeImpact, workspaceDirs } from './type-impact.mjs';
 export const GATE_SCHEMA = 'starci/gate@1';
 export const LINT_SCHEMA = 'starci/lint@1';
 export const GATE_EXIT = Object.freeze({ clean: 0, findings: 1, toolFailed: 2 });
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const TS_SOURCE = /\.(?:[cm]?tsx?)$/;
 const ESLINT_CONFIGS = ['eslint.config.mjs', 'eslint.config.js', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts'];
 const JEST_CONFIGS = ['jest.config.js', 'jest.config.ts', 'jest.config.mjs', 'jest.config.cjs', 'jest.config.json'];
 const LINT_CHUNK = 150;
@@ -75,7 +78,7 @@ const USAGE = 'usage: starci gate run --root <app> [--base <commit>] [--main <re
 export const DOC_PROFILE = 'docs';
 const GATE_PROFILES = Object.freeze(['code', DOC_PROFILE]);
 
-/** The flags; `--changed` takes every argument up to the next flag (an empty list is an empty slice). */
+/** The flags; `--changed` adds named files to the actual base-to-working-tree delta and never narrows it. */
 export function parseGateArgs(argv) {
   const opts = { root: null, base: null, main: null, changed: null, tests: null, out: null, profile: 'code', tree: null };
   for (let i = 0; i < argv.length; i += 1) {
@@ -93,48 +96,8 @@ export function parseGateArgs(argv) {
   return opts;
 }
 
-const git = (call, root, args, options = {}) => call(args, { cwd: root, config: { 'core.quotepath': 'off' }, maxBuffer: 256 * 1024 * 1024, ...options });
-const gitText = (call, root, args) => { const r = git(call, root, args); return !r.error && r.status === 0 ? r.stdout : null; };
 const lines = (text) => String(text ?? '').split(/\r?\n/).filter(Boolean);
 
-/**
- * The base commit: --base verified as a commit; else, when --root is a workflow worktree (the registry knows it, never a
- * branch-name guess), the workflow's previous checkpoint (workflow-checkpoint.mjs gateBaseAt), so only the op's own new
- * findings block; else the merge-base of HEAD with its upstream, main or master.
- */
-export function resolveGateBase(root, base = null, { workflowBase = (dir) => gateBaseAt({ env: process.env }, dir) } = {}) {
-  if (base) {
-    const sha = gitText(revParseQuery, root, ['--verify', '--quiet', `${base}^{commit}`])?.trim();
-    if (!sha) throw Object.assign(new Error(`--base ${base} is not a commit of ${root}`), { code: 'GATE_BASE_UNKNOWN' });
-    return sha;
-  }
-  const checkpoint = workflowBase(root);
-  if (checkpoint) return checkpoint;
-  for (const ref of ['@{upstream}', 'main', 'master', 'origin/HEAD']) {
-    const sha = mergeBaseOf(root, 'HEAD', ref);
-    if (sha) return sha;
-  }
-  throw Object.assign(new Error(`no base: ${root} has no upstream, main or master to measure against; pass --base`), { code: 'GATE_BASE_UNKNOWN' });
-}
-
-/**
- * The delta between the base and the working tree, relative to --root: {changed[] (existing files), added Set, deleted Set,
- * renamed Map(new -> old)}. A rename's old path counts as deleted and its new path is measured against the old path's base
- * blob, so the findings a move carries stay preexisting; untracked files are additions.
- */
-function gateDelta(root, base) {
-  const status = lines(gitText(gitDiff, root, ['--name-status', '--find-renames', '--relative', base]));
-  const added = new Set(), deleted = new Set(), changed = new Set(), renamed = new Map();
-  for (const row of status) {
-    const [kind, file, to] = row.split('\t');
-    const rel = posixPath(file);
-    if (kind.startsWith('R')) { deleted.add(rel); changed.add(posixPath(to)); renamed.set(posixPath(to), rel); }
-    else if (kind === 'D') deleted.add(rel);
-    else { changed.add(rel); if (kind === 'A') added.add(rel); }
-  }
-  for (const file of lines(gitText(lsFiles, root, ['--others', '--exclude-standard']))) { const rel = posixPath(file); changed.add(rel); added.add(rel); }
-  return { changed: [...changed].filter((file) => fs.existsSync(path.join(root, file))).sort(), added, deleted, renamed };
-}
 /** The base path a head path is measured against: its rename source, itself, or null when the base has no such file. */
 const basePathOf = (delta, rel) => (delta.added.has(rel) ? null : delta.renamed.get(rel) ?? rel);
 
@@ -176,6 +139,10 @@ function runAppLint(root, files, hfs) {
     let report = null;
     try { report = JSON.parse(run.stdout); } catch { /* judged below */ }
     if (report?.schema !== LINT_SCHEMA) { errors.push(`starci app lint produced no ${LINT_SCHEMA} report (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n')[0]}`); continue; }
+    // A JSON report cannot override the child outcome. Exit 1 measures findings; any interrupted, unknown or other exit
+    // is a tool failure even when stdout claims a clean report. Keep its findings for diagnosis and the existing base policy.
+    if (run.error || run.signal || ![0, 1].includes(run.status) || (run.status === 1 && !(report.findings ?? []).length))
+      errors.push(`starci app lint did not complete (exit ${run.status}, signal ${run.signal ?? 'none'}): ${String(run.error?.message || run.stderr || run.stdout || '').trim().split('\n')[0]}`);
     // An app implementation that keeps only the last --changed did not lint the rest: that is never a clean lint.
     const judged = new Set((Array.isArray(report.changed) ? report.changed : chunk).map(posixPath)), missed = chunk.filter((file) => !judged.has(posixPath(file)));
     if (missed.length) errors.push(`starci app lint judged ${chunk.length - missed.length} of ${chunk.length} changed files (not ${missed.slice(0, 3).join(', ')}${missed.length > 3 ? ', ...' : ''}): the @starci/hfs behind ${posixPath(hfs.bin)} keeps only the last --changed; install a current @starci/cli`);
@@ -281,22 +248,6 @@ async function lintBaseCounts({ root, base, head, delta, hfs, readBase, cache })
 
 const npm = (cwd, script) => runNpm(['run', script], { cwd, maxBuffer: 256 * 1024 * 1024 });
 const readManifest = (dir) => readJsonFile(path.join(dir, 'package.json'));
-/** A stamp of what `paths` hold in this worktree: their index entries plus their uncommitted state. */
-const inputStamp = (root, paths) => sha256(`${gitText(lsFiles, root, ['-s', '--', ...paths]) ?? ''}\0${gitText(gitStatus, root, ['--porcelain', '--', ...paths]) ?? ''}`);
-const exposesDist = (manifest) => /(^|\/)dist\//.test(JSON.stringify([manifest?.exports ?? null, manifest?.main ?? null, manifest?.types ?? null, manifest?.module ?? null]));
-
-/** The workspace package directories of the root manifest (`dir/*` globs and plain paths). */
-function workspaceDirs(root, manifest) {
-  const globs = Array.isArray(manifest?.workspaces) ? manifest.workspaces : manifest?.workspaces?.packages ?? [];
-  return globs.flatMap((glob) => {
-    const clean = posixPath(glob).replace(/\/$/, '');
-    if (!clean.endsWith('/*')) return fs.existsSync(path.join(root, clean, 'package.json')) ? [clean] : [];
-    const parent = clean.slice(0, -2);
-    let entries = [];
-    try { entries = fs.readdirSync(path.join(root, parent), { withFileTypes: true }); } catch { return []; }
-    return entries.filter((e) => e.isDirectory() && fs.existsSync(path.join(root, parent, e.name, 'package.json'))).map((e) => `${parent}/${e.name}`);
-  });
-}
 
 /** Root codegen, then every dist-exposing workspace package's build; each skipped while its inputs keep their stamp. */
 function prepareTypes(root, cache) {
@@ -304,24 +255,24 @@ function prepareTypes(root, cache) {
   const stamps = readCache(path.join(cache.worktree, 'stamps.json')) ?? {};
   const manifest = readManifest(root);
   if (manifest?.scripts?.codegen) {
-    const inputs = fs.existsSync(path.join(root, 'be', 'contracts')) ? ['be/contracts'] : ['.'];
+    const inputs = ['.'];
     const stamp = inputStamp(root, inputs);
     if (stamps.codegen === stamp) steps.codegen = { ran: false, reason: 'inputs unchanged' };
     else {
       const started = Date.now(), run = npm(root, 'codegen');
       steps.codegen = { ran: true, exit: run.status, ms: Date.now() - started };
-      if (run.status === 0) stamps.codegen = stamp;
+      if (run.status === 0) stamps.codegen = inputStamp(root, inputs);
       else errors.push(`codegen could not run (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n').slice(-1)[0]}`);
     }
   }
   for (const dir of workspaceDirs(root, manifest)) {
     const pkg = readManifest(path.join(root, dir));
     if (!exposesDist(pkg) || !pkg?.scripts?.build) continue;
-    const stamp = inputStamp(root, [dir]), key = `build:${dir}`;
+    const inputs = ['.', `${dir}/dist`], stamp = inputStamp(root, inputs), key = `build:${dir}`;
     if (stamps[key] === stamp && fs.existsSync(path.join(root, dir, 'dist'))) { steps.build.push({ package: pkg.name ?? dir, ran: false }); continue; }
     const started = Date.now(), run = npm(path.join(root, dir), 'build');
     steps.build.push({ package: pkg.name ?? dir, ran: true, exit: run.status, ms: Date.now() - started });
-    if (run.status === 0) stamps[key] = stamp;
+    if (run.status === 0) stamps[key] = inputStamp(root, inputs);
     else errors.push(`build of ${pkg.name ?? dir} could not run (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n').slice(-1)[0]}`);
   }
   writeCache(path.join(cache.worktree, 'stamps.json'), stamps);
@@ -330,11 +281,6 @@ function prepareTypes(root, cache) {
 
 /* ------------------------------------------------------------------------------------------------ tsc */
 
-/** The tsconfig.json nearest above each changed TypeScript file, root-relative. */
-function tsProjectsOf(root, files) {
-  return [...new Set(files.filter((f) => TS_SOURCE.test(f)).map((f) => nearestWith(root, f, ['tsconfig.json'])).filter(Boolean)
-    .map((dir) => posixPath(path.relative(root, path.join(dir, 'tsconfig.json')))))].sort();
-}
 
 /** The worktree's own *.tsbuildinfo files (outside node_modules and .git): stale ones report phantom errors. */
 function removeStaleBuildInfo(root) {
@@ -426,7 +372,7 @@ function loadTypeScript(bound, root, project) {
  * outside the bound it may read). The incremental host is built over the bounded sys, so its own versioned getSourceFile
  * reads through it.
  */
-function headTsc(ts, root, project, { bound, cache }) {
+function headTsc(ts, root, project, { bound, cache, required = [] }) {
   const configPath = path.join(root, project);
   const buildInfo = path.join(cache.worktree, 'tsbuildinfo', `${sha256(`${TSC_BOUND}\0${project}\0${ts.version}\0${fs.readFileSync(configPath, 'utf8')}`).slice(0, 24)}.tsbuildinfo`);
   fs.mkdirSync(path.dirname(buildInfo), { recursive: true });
@@ -435,6 +381,7 @@ function headTsc(ts, root, project, { bound, cache }) {
   if (!parsed) throw new Error(`${project} could not be read`);
   const options = { ...parsed.options, ...NO_OUTPUT, incremental: true, tsBuildInfoFile: buildInfo, preserveSymlinks: true };
   const program = ts.createIncrementalProgram({ rootNames: parsed.fileNames, options, projectReferences: parsed.projectReferences, configFileParsingDiagnostics: ts.getConfigFileParsingDiagnostics(parsed), host: ts.createIncrementalCompilerHost(options, sys) });
+  requireTypeCoverage(root, project, required, program.getProgram().getSourceFiles());
   const findings = errorsOf(ts, programDiagnostics(program), root);
   program.emit();
   return findings;
@@ -443,12 +390,10 @@ function headTsc(ts, root, project, { bound, cache }) {
 /**
  * The base program of one project, read-only: a host whose files are the working tree's except every path the delta changed,
  * which reads its base blob (an added or renamed-to file does not exist, a deleted or renamed-from one comes back). A base
- * finding on a rename source is keyed at its new path. Bounded to `bound` like the head. Cached per (base, project, bound, renames).
+ * finding on a rename source is keyed at its new path. Bounded to `bound` like the head. Recomputed only when head has errors;
+ * the working install and generated inputs are not proved by a shared (base, project) diagnostic cache.
  */
-function baseTsc(ts, root, project, { bound, base, delta, readBase, cache }) {
-  const cacheFile = path.join(cache.shared, 'tsc', `${sha256(`${TSC_BOUND}\0${base}\0${project}\0${posixPath(path.relative(root, bound))}\0${ts.version}\0${JSON.stringify([...delta.renamed])}`)}.json`);
-  const cached = readCache(cacheFile);
-  if (cached) return cached;
+function baseTsc(ts, root, project, { bound, delta, readBase }) {
   const abs = (rel) => posixPath(path.resolve(root, rel));
   const overlay = new Map([...delta.changed, ...delta.deleted].map((rel) => [abs(rel), rel]));
   for (const rel of delta.added) overlay.set(abs(rel), rel);
@@ -464,16 +409,15 @@ function baseTsc(ts, root, project, { bound, base, delta, readBase, cache }) {
     readDirectory: (dir, ext, exclude, include, depth) => [...ts.sys.readDirectory(dir, ext, exclude, include, depth).filter((f) => exists(f)),
       ...deletedSources.filter((f) => posixPath(f).startsWith(`${posixPath(path.resolve(dir))}/`))] });
   const parsed = ts.getParsedCommandLineOfConfigFile(path.join(root, project), {}, sys);
-  if (!parsed) return writeBack(cacheFile, []);
+  if (!parsed) return [];
   const options = { ...parsed.options, ...NO_OUTPUT, incremental: false, preserveSymlinks: true };
   const host = boundHost(ts, ts.createCompilerHost(options), sys);
   const program = ts.createProgram({ rootNames: [...new Set(parsed.fileNames)], options, projectReferences: parsed.projectReferences, host });
   const movedTo = new Map([...delta.renamed].map(([to, from]) => [from, to]));
   const moved = (finding) => (finding.path && movedTo.has(finding.path)
     ? { ...finding, path: movedTo.get(finding.path), key: `${movedTo.get(finding.path)}${finding.key.slice(finding.path.length)}` } : finding);
-  return writeBack(cacheFile, errorsOf(ts, programDiagnostics(program), root).map(moved));
+  return errorsOf(ts, programDiagnostics(program), root).map(moved);
 }
-const writeBack = (file, value) => { writeCache(file, value); return value; };
 
 /** Head tsc findings minus the base's, a multiset over normalised keys: {fresh[], preexisting}. */
 export function newTscFindings(head, baseFindings) {
@@ -495,16 +439,20 @@ function runTests(root, pattern, cache) {
   const run = runNode([bin, '--maxWorkers=2', '--ci', '--json', `--outputFile=${outputFile}`, pattern], { cwd, maxBuffer: 256 * 1024 * 1024 });
   const result = readCache(outputFile);
   if (!result) return { step: { pattern, exit: run.status }, findings: [], error: `jest produced no json result (exit ${run.status}): ${String(run.stderr || run.error?.message || '').trim().split('\n').slice(-1)[0]}` };
+  const error = jestRunError(result, run);
+  const totals = reduceJest(result);
+  if (error) return { step: { pattern, exit: run.status, ...totals }, findings: [], error };
   const findings = [];
-  for (const suite of result.testResults ?? []) {
+  for (const suite of result.testResults) {
     const file = posixPath(path.relative(root, suite.name ?? suite.testFilePath ?? ''));
     if (suite.testExecError || (suite.status === 'failed' && !(suite.assertionResults ?? []).some((a) => a.status === 'failed')))
       findings.push({ engine: 'test', rule: 'suite-failed', path: file, line: null, message: String(suite.testExecError?.message ?? suite.message ?? 'the suite failed to run').split('\n')[0] });
     for (const assertion of (suite.assertionResults ?? []).filter((a) => a.status === 'failed'))
       findings.push({ engine: 'test', rule: 'test-failed', path: file, line: assertion.location?.line ?? null, message: assertion.fullName ?? assertion.title });
   }
+  if (totals.skipped > 0) findings.push({ engine: 'test', rule: 'test-skipped', path: null, line: null, message: `${totals.skipped} required test(s) were pending or todo` });
   if (!result.numTotalTests && !findings.length) findings.push({ engine: 'test', rule: 'no-test-matched', path: null, line: null, message: `no spec matched --tests ${pattern}` });
-  return { step: { pattern, cwd: posixPath(path.relative(root, cwd)) || '.', exit: run.status, total: result.numTotalTests ?? 0, failed: result.numFailedTests ?? 0, ms: Date.now() - started }, findings, error: null };
+  return { step: { pattern, cwd: posixPath(path.relative(root, cwd)) || '.', exit: run.status, ...totals, ms: Date.now() - started }, findings, error: null };
 }
 
 /** The lint half: `starci app lint --changed` over the files, judged against the base. {step, fresh[], preexisting, errors[]} */
@@ -659,22 +607,36 @@ export function installedCanonFindings(root, { runtime = runtimeRoot } = {}) {
  * Spec seams: `hfs` ({dir, bin}) the starci CLI to lint with and its @starci/hfs, default hfsEntry(root); `ts` the TypeScript module, default
  * the app's own install per project.
  */
-export async function runGate({ root, base = null, changed = null, tests = null, main = null, hfs = null, ts: typescript = null }) {
+export async function runGate({ root, base = null, changed = null, tests = null, main = null, hfs = null, ts: typescript = null,
+  context = opContextOf({ contract: true }) }) {
   const at = new Date().toISOString();
   const report = { schema: GATE_SCHEMA, at, root: posixPath(path.resolve(root)), base: null, head: null, dirty: null, changed: [], exit: GATE_EXIT.toolFailed, ok: false,
-    steps: { canon: null, merges: null, lint: null, codegen: null, build: [], tsc: [], tests: null, staleBuildInfo: [] }, counts: { new: 0, preexisting: 0 }, findings: [], errors: [] };
+    steps: { canon: null, merges: null, lint: null, codegen: null, build: [], tsc: [], tests: null, staleBuildInfo: [] }, inputs: [], counts: { new: 0, preexisting: 0 }, findings: [], errors: [] };
   const fail = (error) => { report.errors.push(String(error?.message ?? error)); return finish(report); };
-  let cache, delta;
+  let cache, delta, owned = null;
   try {
     root = path.resolve(root);
+    const binding = context?.gateBinding;
+    if (binding) {
+      const target = binding.targets?.find((row) => sameResolvedPath(row.root, root));
+      if (!target?.head || !target.owned?.length) throw new Error('the gate target is not in the admitted job scope');
+      owned = target.owned;
+      base ??= target.head;
+    }
     report.base = resolveGateBase(root, base);
     report.head = gitText(revParseQuery, root, ['HEAD'])?.trim() ?? null;
-    report.dirty = Boolean((gitText(gitStatus, root, ['--porcelain']) ?? '').trim());
+    const status = gitText(gitStatus, root, ['--porcelain']);
+    if (status === null) throw new Error('the gate working-tree status could not be read');
+    report.dirty = Boolean(status.trim());
     cache = cacheDirs(root);
     delta = gateDelta(root, report.base);
   } catch (error) { return fail(error); }
-  const asked = changed === null ? delta.changed : changed.map((file) => posixPath(path.isAbsolute(file) ? path.relative(root, file) : file));
-  report.changed = [...new Set(asked)].filter((file) => fs.existsSync(path.join(root, file))).sort();
+  try {
+    const snapshot = gateInputSnapshot(root, report.base, changed ?? [], owned);
+    report.head = snapshot.head;
+    report.changed = snapshot.changed;
+    report.inputs = snapshot.inputs;
+  } catch (error) { return fail(error); }
   const readBase = baseBlobReader(root, report.base);
   const fresh = [];
   let preexisting = 0;
@@ -699,14 +661,19 @@ export async function runGate({ root, base = null, changed = null, tests = null,
     preexisting += lint.preexisting;
   }
 
-  const projects = tsProjectsOf(root, report.changed);
-  if (projects.length) {
+  let impact;
+  try { impact = typeImpact(root, report.inputs.map((file) => file.path), { deleted: report.inputs.filter((file) => file.sha256 === null).map((file) => file.path) }); }
+  catch (error) { impact = { projects: [], required: new Map(), errors: [`tsc impact could not be measured: ${error.message}`] }; }
+  report.errors.push(...impact.errors);
+  if (impact.projects.length && !impact.errors.length) {
     report.steps.staleBuildInfo = removeStaleBuildInfo(root);
-    const prepared = prepareTypes(root, cache);
+    let prepared;
+    try { prepared = prepareTypes(root, cache); }
+    catch (error) { prepared = { steps: { codegen: null, build: [] }, errors: [`type prerequisites could not be measured: ${error.message}`] }; }
     report.steps.codegen = prepared.steps.codegen;
     report.steps.build = prepared.steps.build;
     report.errors.push(...prepared.errors);
-    if (!prepared.errors.length) for (const project of projects) {
+    if (!prepared.errors.length) for (const project of impact.projects) {
       const started = Date.now();
       // No install, no measurement: a program over an app with no node_modules would only count its missing imports.
       const bound = appRootOf(root, project);
@@ -716,8 +683,8 @@ export async function runGate({ root, base = null, changed = null, tests = null,
       }
       try {
         const ts = typescript ?? loadTypeScript(bound, root, project);
-        const head = headTsc(ts, root, project, { bound, cache });
-        const baseFindings = head.length ? baseTsc(ts, root, project, { bound, base: report.base, delta, readBase, cache }) : [];
+        const head = headTsc(ts, root, project, { bound, cache, required: impact.required.get(project) });
+        const baseFindings = head.length ? baseTsc(ts, root, project, { bound, delta, readBase }) : [];
         const judged = newTscFindings(head, baseFindings);
         report.steps.tsc.push({ project, errors: head.length, new: judged.fresh.length, preexisting: judged.preexisting, ms: Date.now() - started });
         fresh.push(...judged.fresh.map(({ key, ...finding }) => finding));
@@ -735,6 +702,11 @@ export async function runGate({ root, base = null, changed = null, tests = null,
 
   report.counts = { new: fresh.length, preexisting };
   report.findings = fresh.slice(0, LISTED_MAX);
+  try {
+    const after = gateInputSnapshot(root, report.base, changed ?? [], owned);
+    if (JSON.stringify(after.inputs) !== JSON.stringify(report.inputs) || !isAncestor(root, report.head, after.head))
+      report.errors.push('the gate inputs changed during CHECK; rerun over the current slice');
+  } catch (error) { report.errors.push(String(error?.message ?? error)); }
   return finish(report);
 }
 

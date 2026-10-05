@@ -37,8 +37,6 @@ json: none
 starci app add api checkout --service CheckoutService=@modules/domain/order
 ```
 
-Replaces: `hfs add`, `npx hfs add`
-
 ### starci app check
 
 judge the app tree, managed output, contracts, formatting and architecture
@@ -58,8 +56,6 @@ starci app check --fast
 starci app check --json
 ```
 
-Replaces: `hfs check`, `npx hfs check`
-
 ### starci app emit
 
 emit backend GraphQL, operation and event contract snapshots
@@ -71,8 +67,6 @@ json: none
 ```sh
 starci app emit
 ```
-
-Replaces: `hfs emit-contracts`, `npx hfs emit-contracts`
 
 ### starci app explain
 
@@ -88,8 +82,6 @@ json: flag
 starci app explain be/src/modules/domain/order/index.ts
 ```
 
-Replaces: `hfs explain`, `npx hfs explain`
-
 ### starci app hygiene
 
 judge staged worktree metadata, stack files and plaintext secrets
@@ -101,8 +93,6 @@ json: none
 ```sh
 starci app hygiene
 ```
-
-Replaces: `hfs work-hygiene`, `npx hfs work-hygiene`
 
 ### starci app lint
 
@@ -126,8 +116,6 @@ starci app lint --workspace .
 starci app lint --json
 ```
 
-Replaces: `hfs lint`, `npx hfs lint`
-
 ### starci app new
 
 create a canonical service, unit spec or app image definition
@@ -146,8 +134,6 @@ json: none
 starci app new service be/src/modules/domain/order order
 starci app new image
 ```
-
-Replaces: `hfs new`, `npx hfs new`
 
 ### starci app scaffold
 
@@ -173,8 +159,6 @@ starci app scaffold demo
 starci app scaffold demo --into projects
 ```
 
-Replaces: `hfs scaffold app`, `npx hfs scaffold app`
-
 ### starci app secret
 
 list, read, seal or generate an encrypted app secret
@@ -196,8 +180,6 @@ json: none
 starci app secret list
 starci app secret gen database --key PASSWORD
 ```
-
-Replaces: `hfs secret`, `npx hfs secret`
 
 ### starci app stack
 
@@ -222,8 +204,6 @@ starci app stack status --json
 starci app stack down --force
 ```
 
-Replaces: `starci-test-stack`, `npx starci-test-stack`
-
 ### starci app sync
 
 compare or write every managed app file from its canonical template
@@ -241,8 +221,6 @@ json: none
 starci app sync --check
 starci app sync --write
 ```
-
-Replaces: `hfs sync`, `npx hfs sync`
 
 ### starci app upgrade
 
@@ -308,7 +286,7 @@ operate the local owner-ask HTTP gateway
 
 Positionals: action?
 
-exit: 0 action completed; 1 another gateway owns the state or the port cannot be bound; 2 bad usage or configuration
+exit: 0 action completed; 1 another gateway owns the state, the port cannot be bound, or stop custody is unverified; 2 bad usage or configuration
 
 json: always
 
@@ -316,8 +294,6 @@ json: always
 starci connect ask-gateway status
 starci connect ask-gateway start --repo <path>
 ```
-
-Replaces: `node scripts/connectors/ask-gateway.mjs`, `node .claude/scripts/connectors/ask-gateway.mjs`
 
 ### starci connect telegram
 
@@ -341,8 +317,6 @@ json: always
 starci connect telegram discover-chat
 starci connect telegram notify --ledger <file> --workflow <id> --dispatch <id>
 ```
-
-Replaces: `node scripts/connectors/telegram.mjs`, `node .claude/scripts/connectors/telegram.mjs`
 
 ### starci connect telegram-media
 
@@ -369,8 +343,6 @@ json: always
 starci connect telegram-media settle --ledger <file> --workflow <id> --job <id> --op <op> --verdict pass
 ```
 
-Replaces: `node scripts/connectors/telegram-media.mjs`, `node .claude/scripts/connectors/telegram-media.mjs`
-
 ### starci connect tunnel
 
 operate the Cloudflare owner-ask tunnel
@@ -382,7 +354,7 @@ operate the Cloudflare owner-ask tunnel
 
 Positionals: action?
 
-exit: 0 action completed; 1 another tunnel manager owns the tunnel state; 2 bad usage or configuration
+exit: 0 action completed; 1 another tunnel manager owns the state or exact manager/child stop custody is unverified; 2 bad usage or configuration
 
 json: always
 
@@ -390,8 +362,6 @@ json: always
 starci connect tunnel status
 starci connect tunnel dry-run
 ```
-
-Replaces: `node scripts/connectors/tunnel.mjs`, `node .claude/scripts/connectors/tunnel.mjs`
 
 ## starci debug
 
@@ -424,8 +394,6 @@ starci debug pass claim --key <alert> --lane <lane>
 starci debug pass status
 ```
 
-Replaces: `node scripts/reconciler/debug-pass.mjs`
-
 ### starci debug run
 
 run one allowlisted read-only runtime inspector
@@ -451,8 +419,6 @@ starci debug run supervisor-status
 starci debug run model-scorecard --repo <path>
 starci debug run core-watch
 ```
-
-Replaces: `node scripts/agent/model-scorecard.mjs`, `node scripts/reconciler/core-watch.mjs`
 
 ## starci docker
 
@@ -612,8 +578,6 @@ starci gate canon-scan --root <repo> --stack-kind next --json
 starci gate canon-scan --root <repo> --paths apps/web/src --fix
 ```
 
-Replaces: `node scripts/gates/canon-scan.mjs`, `node .claude/scripts/gates/canon-scan.mjs`
-
 ### starci gate custody-exec
 
 decrypt one custody document for a command or a bounded read
@@ -634,8 +598,6 @@ json: none
 starci gate custody-exec .starcistacks/dev/secrets/app.yaml.enc --keys
 starci gate custody-exec .starcistacks/dev/secrets/app.yaml.enc --get TOKEN
 ```
-
-Replaces: `node scripts/gates/custody-exec.mjs`, `node .claude/scripts/gates/custody-exec.mjs`
 
 ### starci gate env-health
 
@@ -664,8 +626,6 @@ starci gate env-health check --repo <repo> --env local --restart
 starci gate env-health serve --env local --service api --cwd <checkout> -- npm start
 ```
 
-Replaces: `node scripts/uat/env-health.mjs`, `node .claude/scripts/uat/env-health.mjs`
-
 ### starci gate hfs-sync
 
 check an app's generated files and custody trees for drift
@@ -682,8 +642,6 @@ json: flag
 starci gate hfs-sync --repo <product-repo>
 starci gate hfs-sync --repo <product-repo> --json
 ```
-
-Replaces: `node scripts/gates/hfs-sync.mjs`, `node .claude/scripts/gates/hfs-sync.mjs`
 
 ### starci gate read
 
@@ -706,8 +664,6 @@ starci gate read --root <app> --touch be/src/app.service.ts --out read-digest.js
 starci gate read --knowledge knowledge/op-gate.yaml
 ```
 
-Replaces: `node scripts/gates/read-digest.mjs`, `node .claude/scripts/gates/read-digest.mjs`
-
 ### starci gate reference-conventions
 
 probe the installed backend reference rules of a reference root
@@ -721,8 +677,6 @@ json: none
 ```sh
 starci gate reference-conventions <backend-reference-root>
 ```
-
-Replaces: `node scripts/gates/probe-reference-conventions.mjs`
 
 ### starci gate repo-presentation
 
@@ -741,8 +695,6 @@ json: flag
 starci gate repo-presentation --root <repo>
 starci gate repo-presentation --root <repo> --runtime --json
 ```
-
-Replaces: `node scripts/gates/repo-presentation.mjs`, `node .claude/scripts/gates/repo-presentation.mjs`
 
 ### starci gate run
 
@@ -767,8 +719,6 @@ json: always
 starci gate run --root <app> --changed be/src/app.service.ts --out gate.json
 starci gate run --scope docs --tree <app>/.starciwork --out doc-gate.json
 ```
-
-Replaces: `node scripts/gates/gate.mjs`, `node .claude/scripts/gates/gate.mjs`
 
 ### starci gate sonar
 
@@ -808,8 +758,6 @@ starci gate sonar scan --cwd <repo> --base <rev> --paths src --wait
 starci gate sonar dashboard --cwd <repo>
 ```
 
-Replaces: `node scripts/gates/sonar-local.mjs`, `node .claude/scripts/gates/sonar-local.mjs`
-
 ### starci gate starcistacks
 
 check a repository's stack declaration and custody layout
@@ -817,8 +765,6 @@ check a repository's stack declaration and custody layout
 | flag | type | |
 | --- | --- | --- |
 | `--new` | boolean |  |
-| `--admitted-at` | string |  |
-| `--op` | string |  |
 
 Positionals: repo-root
 
@@ -830,8 +776,6 @@ json: flag
 starci gate starcistacks <repo-root>
 starci gate starcistacks <repo-root> --new --json
 ```
-
-Replaces: `node scripts/gates/starcistacks.mjs`, `node .claude/scripts/gates/starcistacks.mjs`
 
 ### starci gate test-world
 
@@ -852,8 +796,6 @@ json: always
 starci gate test-world --root <app> --project e2e --out test-world-run.json
 ```
 
-Replaces: `node scripts/gates/test-world-run.mjs`, `node .claude/scripts/gates/test-world-run.mjs`
-
 ### starci gate unit
 
 run unit tests and judge per-subject coverage and test-kit use
@@ -870,8 +812,6 @@ json: always
 ```sh
 starci gate unit --root <app> --out unit-run.json
 ```
-
-Replaces: `node scripts/gates/unit-run.mjs`, `node .claude/scripts/gates/unit-run.mjs`
 
 ## starci git
 
@@ -975,8 +915,6 @@ starci git land <worktree> <ref> --verified <sha> --verified-log <file> --concur
 starci git land <worktree> <ref> --dry-run --json
 ```
 
-Replaces: `bash land-to-main.sh`
-
 ### starci git sync
 
 merge local main into a clean lane with rerere enabled
@@ -1023,8 +961,6 @@ json: none
 starci guard command
 ```
 
-Replaces: `node scripts/guards/command-guard.mjs`
-
 ### starci guard footprint-scan
 
 scan for fresh cross-repository links and linked worktrees
@@ -1041,8 +977,6 @@ json: flag
 ```sh
 starci guard footprint-scan --json
 ```
-
-Replaces: `node scripts/guards/footprint-scan.mjs`
 
 ### starci guard raw
 
@@ -1079,8 +1013,6 @@ json: none
 ```sh
 starci guard seat-tools
 ```
-
-Replaces: `node scripts/guards/seat-tools.mjs`
 
 ### starci guard verify-commit
 
@@ -1120,8 +1052,6 @@ json: none
 starci harness open
 ```
 
-Replaces: `node ui/harness-verbs.mjs open`
-
 ### starci harness start
 
 start the harness API and UI or its named tunnel
@@ -1149,8 +1079,6 @@ starci harness start
 starci harness start --tunnel
 ```
 
-Replaces: `node ui/harness-verbs.mjs`, `node ui/harness-verbs.mjs --tunnel`
-
 ### starci harness status
 
 report whether the harness health endpoint is up
@@ -1171,8 +1099,6 @@ json: flag
 starci harness status
 starci harness status --json
 ```
-
-Replaces: `node ui/harness-verbs.mjs status`
 
 ### starci harness stop
 
@@ -1195,8 +1121,6 @@ json: flag
 starci harness stop
 starci harness stop --json
 ```
-
-Replaces: `node ui/harness-verbs.mjs stop`
 
 ## starci kernel
 
@@ -1222,8 +1146,6 @@ starci kernel archive --repo <path> --workflow <workflow> --reason <reason>
 starci kernel archive --repo <path> --workflow <workflow> --reason <reason> --by supervisor
 ```
 
-Replaces: `starci api archive`, `node scripts/kernel/cli.mjs archive`
-
 ### starci kernel artifacts
 
 list the indexed proof files of the workflow's jobs, per job (read-only)
@@ -1244,8 +1166,6 @@ json: flag
 starci kernel artifacts --repo <path> --workflow <workflow>
 starci kernel artifacts --repo <path> --workflow <workflow> --job <job> --kind video
 ```
-
-Replaces: `starci api artifacts`, `node scripts/kernel/cli.mjs artifacts`
 
 ### starci kernel autopilot
 
@@ -1287,8 +1207,6 @@ starci kernel autopilot --repo <path> --workflow <workflow> --sweep
 starci kernel autopilot --repo <path> --workflow <workflow> --defer-to-handover --op <op> --class credential --detail <detail>
 ```
 
-Replaces: `starci api autopilot`, `node scripts/kernel/cli.mjs autopilot`
-
 ### starci kernel consume-report
 
 integrate the report a job filed; the Kernel must consume it before settle
@@ -1306,33 +1224,6 @@ json: flag
 starci kernel consume-report --repo <path> --job <job>
 ```
 
-Replaces: `starci api consume-report`, `node scripts/kernel/cli.mjs consume-report`
-
-### starci kernel contract-release
-
-release a frozen op family at the Supervisor release point (contract-freeze.yaml)
-
-| flag | type | |
-| --- | --- | --- |
-| `--repo` | string |  |
-| `--family` | string | required |
-| `--workflow` | string |  |
-| `--batch` | string |  |
-| `--reason` | string |  |
-| `--by` | enum supervisor|owner |  |
-| `--dry-run` | boolean |  |
-
-exit: 0 released, or the dry-run plan shown; 1 refused or failed; 2 bad usage: a required flag is missing or a flag has no value
-
-json: flag
-
-```sh
-starci kernel contract-release --repo <path> --family <family>
-starci kernel contract-release --repo <path> --family <family> --workflow <workflow> --batch <batch> --reason <reason> --dry-run
-```
-
-Replaces: `starci api contract-release`, `node scripts/kernel/cli.mjs contract-release`
-
 ### starci kernel coverage
 
 show every FR, shape and proof case of the workflow's scope as proven, stale or missing
@@ -1349,8 +1240,6 @@ json: flag
 ```sh
 starci kernel coverage --repo <path> --workflow <workflow>
 ```
-
-Replaces: `starci api coverage`, `node scripts/kernel/cli.mjs coverage`
 
 ### starci kernel cut-seam
 
@@ -1383,8 +1272,6 @@ starci kernel cut-seam --repo <path> --release --workflow <workflow> --op <op> -
 starci kernel cut-seam --repo <path> --reconcile --job <job> --exit-code 0
 ```
 
-Replaces: `starci api cut-seam`, `node scripts/kernel/cli.mjs cut-seam`
-
 ### starci kernel decide
 
 open, list or close an entry of the Kernel decision log (hypothesis, action, metric)
@@ -1411,8 +1298,6 @@ starci kernel decide --repo <path> --workflow <workflow> --list
 starci kernel decide --repo <path> --workflow <workflow> --hypothesis <hypothesis> --action-key <key> --metric <metric>
 starci kernel decide --repo <path> --workflow <workflow> --close <decision> --result keep --observed <observed>
 ```
-
-Replaces: `starci api decide`, `node scripts/kernel/cli.mjs decide`
 
 ### starci kernel decisions
 
@@ -1460,8 +1345,6 @@ starci kernel decisions --repo <path> --workflow <workflow> --next
 starci kernel decisions --repo <path> --resolve <decision> --by <actor> --verb <command>
 ```
 
-Replaces: `starci api decisions`, `node scripts/kernel/cli.mjs decisions`
-
 ### starci kernel dispatch
 
 admit a routed job and launch its worker with --spawn; without it print the launch plan
@@ -1485,8 +1368,6 @@ starci kernel dispatch --repo <path> --job <job>
 starci kernel dispatch --repo <path> --job <job> --spawn --model <target>
 ```
 
-Replaces: `starci api dispatch`, `node scripts/kernel/cli.mjs dispatch`
-
 ### starci kernel dispatch-ready
 
 route and dispatch queued-ready jobs up to the workflow allowed parallelism
@@ -1508,8 +1389,6 @@ starci kernel dispatch-ready --repo <path> --workflow <workflow>
 starci kernel dispatch-ready --repo <path> --workflow <workflow> --max 2 --dry-run
 ```
 
-Replaces: `starci api dispatch-ready`, `node scripts/kernel/cli.mjs dispatch-ready`
-
 ### starci kernel enqueue
 
 enqueue a work-unit job with its op, owned paths, records and retry lineage
@@ -1528,8 +1407,6 @@ enqueue a work-unit job with its op, owned paths, records and retry lineage
 | `--cut-total` | number |  |
 | `--after` | string |  |
 | `--foundation` | string |  |
-| `--contract-change` | string |  |
-| `--follow-up-of` | string |  |
 | `--new-module` | string |  |
 | `--retry-of` | string |  |
 | `--reopen` | string |  |
@@ -1549,8 +1426,6 @@ starci kernel enqueue --repo <path> --workflow <workflow> --op <op> --paths <pat
 starci kernel enqueue --repo <path> --workflow <workflow> --op <op> --paths <paths> --retry-of <job>
 starci kernel enqueue --repo <path> --workflow <workflow> --op <op> --paths <paths> --cut-id <cut> --cut-ordinal 1 --cut-total 3
 ```
-
-Replaces: `starci api enqueue`, `node scripts/kernel/cli.mjs enqueue`
 
 ### starci kernel estimate
 
@@ -1575,8 +1450,6 @@ starci kernel estimate --repo <path> --files 12
 starci kernel estimate --repo <path> --files 40 --assertions 120 --gear 2
 ```
 
-Replaces: `starci api estimate`, `node scripts/kernel/cli.mjs estimate`
-
 ### starci kernel extensions
 
 list the file-based kernel extensions: verbs, status fields, boolean flags, load problems
@@ -1592,8 +1465,6 @@ json: flag
 ```sh
 starci kernel extensions --repo <path>
 ```
-
-Replaces: `starci api extensions`, `node scripts/kernel/cli.mjs extensions`
 
 ### starci kernel finish
 
@@ -1611,8 +1482,6 @@ json: flag
 ```sh
 starci kernel finish --repo <path> --workflow <workflow>
 ```
-
-Replaces: `starci api finish`, `node scripts/kernel/cli.mjs finish`
 
 ### starci kernel foundation
 
@@ -1643,8 +1512,6 @@ starci kernel foundation --repo <path> --workflow <workflow> --land <name> --pro
 starci kernel foundation --repo <path> --workflow <workflow> --declare-none
 ```
 
-Replaces: `starci api foundation`, `node scripts/kernel/cli.mjs foundation`
-
 ### starci kernel foundations
 
 list the ledger's shared foundations: owner, state, dependents, waits
@@ -1662,8 +1529,6 @@ json: flag
 starci kernel foundations --repo <path>
 starci kernel foundations --repo <path> --workflow <workflow>
 ```
-
-Replaces: `starci api foundations`, `node scripts/kernel/cli.mjs foundations`
 
 ### starci kernel graph-edit
 
@@ -1701,8 +1566,6 @@ starci kernel graph-edit --repo <path> --workflow <workflow> --edit reorder --de
 starci kernel graph-edit --repo <path> --workflow <workflow> --edit undo --undo <edit>
 ```
 
-Replaces: `starci api graph-edit`, `node scripts/kernel/cli.mjs graph-edit`
-
 ### starci kernel hierarchy
 
 project the agent hierarchy (starci/agent-hierarchy@1) of a workflow
@@ -1719,8 +1582,6 @@ json: flag
 ```sh
 starci kernel hierarchy --repo <path> --workflow <workflow>
 ```
-
-Replaces: `starci api hierarchy`, `node scripts/kernel/cli.mjs hierarchy`
 
 ### starci kernel inbox
 
@@ -1741,8 +1602,6 @@ json: flag
 starci kernel inbox --repo <path> --workflow <workflow>
 starci kernel inbox --repo <path> --workflow <workflow> --ack <key> --disposition <text>
 ```
-
-Replaces: `starci api inbox`, `node scripts/kernel/cli.mjs inbox`
 
 ### starci kernel incident
 
@@ -1783,28 +1642,27 @@ starci kernel incident --repo <path> --workflow <workflow> --resolve <incident> 
 starci kernel incident --repo <path> --workflow <workflow> --attach <incident> --until-job <job>
 ```
 
-Replaces: `starci api incident`, `node scripts/kernel/cli.mjs incident`
-
 ### starci kernel kernel-ack-rev
 
-record the runtime rev whose kernel files this Kernel has read
+project or attest the complete current Kernel READ manifest
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--workflow` | string | required |
-| `--rev` | string | required |
-| `--files` | string |  |
+| `--rev` | string |  |
+| `--plan` | boolean |  |
+| `--read-manifest` | string |  |
+| `--op` | string |  |
 
-exit: 0 acked; 1 refused or failed (rev is no commit of the runtime); 2 bad usage: a required flag is missing or a flag has no value
+exit: 0 planned or acknowledged; 1 refused or unavailable current identity/READ inputs; 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
-starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev>
+starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --plan
+starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev> --read-manifest <file>
 ```
-
-Replaces: `starci api kernel-ack-rev`, `node scripts/kernel/cli.mjs kernel-ack-rev`
 
 ### starci kernel kernel-proposal
 
@@ -1830,8 +1688,6 @@ starci kernel kernel-proposal --repo <path> --workflow <workflow> --list
 starci kernel kernel-proposal --repo <path> --workflow <workflow> --title <title> --evidence <evidence>
 ```
 
-Replaces: `starci api kernel-proposal`, `node scripts/kernel/cli.mjs kernel-proposal`
-
 ### starci kernel lifecycle
 
 pause, stop or resume a workflow; only the owner or supervisor resumes or stops
@@ -1854,8 +1710,6 @@ json: flag
 starci kernel lifecycle --repo <path> --workflow <workflow> --pause --by owner --reason <reason>
 starci kernel lifecycle --repo <path> --workflow <workflow> --resume --by owner --reason <reason>
 ```
-
-Replaces: `starci api lifecycle`, `node scripts/kernel/cli.mjs lifecycle`
 
 ### starci kernel log
 
@@ -1883,8 +1737,6 @@ starci kernel log --repo <path> --workflow <workflow> --kind narration --msg <me
 starci kernel log --repo <path> --workflow <workflow> --job <job> --kind cmd.run --msg <message> --data <json>
 ```
 
-Replaces: `starci api log`, `node scripts/kernel/cli.mjs log`
-
 ### starci kernel logs
 
 list the workflow's typed log rows, oldest first
@@ -1907,8 +1759,6 @@ starci kernel logs --repo <path> --workflow <workflow>
 starci kernel logs --repo <path> --workflow <workflow> --kinds cmd.run,error --after 100 --limit 50
 ```
 
-Replaces: `starci api logs`, `node scripts/kernel/cli.mjs logs`
-
 ### starci kernel messages
 
 drain the workflow Runs into the ledger and list every orchestration message
@@ -1925,8 +1775,6 @@ json: flag
 ```sh
 starci kernel messages --repo <path> --workflow <workflow>
 ```
-
-Replaces: `starci api messages`, `node scripts/kernel/cli.mjs messages`
 
 ### starci kernel notify
 
@@ -1951,8 +1799,6 @@ json: flag
 starci kernel notify --repo <path> --workflow <workflow> --to <to> --kind request --subject <subject> --body <body>
 ```
 
-Replaces: `starci api notify`, `node scripts/kernel/cli.mjs notify`
-
 ### starci kernel nudge
 
 wake a running job's worker at its exact terminal so it files its report
@@ -1969,8 +1815,6 @@ json: flag
 ```sh
 starci kernel nudge --repo <path> --job <job>
 ```
-
-Replaces: `starci api nudge`, `node scripts/kernel/cli.mjs nudge`
 
 ### starci kernel observe
 
@@ -1990,8 +1834,6 @@ json: flag
 starci kernel observe --repo <path> --job <job>
 starci kernel observe --repo <path> --job <job> --lines 60
 ```
-
-Replaces: `starci api observe`, `node scripts/kernel/cli.mjs observe`
 
 ### starci kernel op-contract
 
@@ -2013,8 +1855,6 @@ json: flag
 starci kernel op-contract --repo <path> --job <job>
 starci kernel op-contract --repo <path> --workflow <workflow> --op <op> --attempt 2 --json
 ```
-
-Replaces: `starci api op-contract`, `node scripts/kernel/cli.mjs op-contract`
 
 ### starci kernel op-override
 
@@ -2039,8 +1879,6 @@ starci kernel op-override --repo <path> --workflow <workflow> --op <op> --set '{
 starci kernel op-override --repo <path> --workflow <workflow> --op <op> --clear --decision <decision>
 ```
 
-Replaces: `starci api op-override`, `node scripts/kernel/cli.mjs op-override`
-
 ### starci kernel peers
 
 the workflow's peer workflows of the same ledger
@@ -2057,8 +1895,6 @@ json: flag
 ```sh
 starci kernel peers --repo <path> --workflow <workflow>
 ```
-
-Replaces: `starci api peers`, `node scripts/kernel/cli.mjs peers`
 
 ### starci kernel plan
 
@@ -2083,8 +1919,6 @@ starci kernel plan --repo <path> --workflow <workflow> --file <file>
 starci kernel plan --repo <path> --workflow <workflow> --file <file> --replanned-from <plan> --blocker <blocker> --json
 ```
 
-Replaces: `starci api plan`, `node scripts/kernel/cli.mjs plan`
-
 ### starci kernel provider-backoff
 
 open the provider circuit a persisting rate limit calls for (idempotent)
@@ -2105,8 +1939,6 @@ json: flag
 ```sh
 starci kernel provider-backoff --repo <path> --provider <provider> --open-circuit --reason <reason> --by <by>
 ```
-
-Replaces: `starci api provider-backoff`, `node scripts/kernel/cli.mjs provider-backoff`
 
 ### starci kernel provider-health
 
@@ -2133,8 +1965,6 @@ starci kernel provider-health --repo <path> --provider <provider> --recover --re
 starci kernel provider-health --repo <path> --quota-probe --force --json
 ```
 
-Replaces: `starci api provider-health`, `node scripts/kernel/cli.mjs provider-health`
-
 ### starci kernel questions
 
 list the pending worker questions of a workflow, draining its Runs into the ledger first
@@ -2151,8 +1981,6 @@ json: flag
 ```sh
 starci kernel questions --repo <path> --workflow <workflow>
 ```
-
-Replaces: `starci api questions`, `node scripts/kernel/cli.mjs questions`
 
 ### starci kernel reconcile
 
@@ -2183,8 +2011,6 @@ starci kernel reconcile --repo <path> --job <job> --dead-worker --settle-failed
 starci kernel reconcile --repo <path> --orphan-kernel-jobs --dry-run --json
 ```
 
-Replaces: `starci api reconcile`, `node scripts/kernel/cli.mjs reconcile`
-
 ### starci kernel record-change
 
 the record's OWNER declares its committed change breaking (peers owe ONE follow-up leg) or advisory
@@ -2206,8 +2032,6 @@ starci kernel record-change --repo <path> --workflow <workflow> --record <record
 starci kernel record-change --repo <path> --workflow <workflow> --record <record> --reach advisory --reason <reason> --json
 ```
 
-Replaces: `starci api record-change`, `node scripts/kernel/cli.mjs record-change`
-
 ### starci kernel record-checks
 
 record independent checks against a filed worker report
@@ -2227,8 +2051,6 @@ json: flag
 starci kernel record-checks --repo <path> --job <job> --checks '{"checks":[{"name":"build","exitCode":0}]}'
 starci kernel record-checks --repo <path> --job <job> --checks-file <file> --json
 ```
-
-Replaces: `starci api record-checks`, `node scripts/kernel/cli.mjs record-checks`, `starci api check`, `node scripts/kernel/cli.mjs check`
 
 ### starci kernel redesign
 
@@ -2250,8 +2072,6 @@ json: flag
 ```sh
 starci kernel redesign --repo <path> --workflow <workflow> --op <op> --paths <paths> --decision <decision>
 ```
-
-Replaces: `starci api redesign`, `node scripts/kernel/cli.mjs redesign`
 
 ### starci kernel rename
 
@@ -2276,8 +2096,6 @@ starci kernel rename --repo <path> --workflow <workflow> --title <title> --by su
 starci kernel rename --repo <path> --workflow <workflow> --title <title> --dry-run
 ```
 
-Replaces: `starci api rename`, `node scripts/kernel/cli.mjs rename`
-
 ### starci kernel reply
 
 answer a pending worker question, or route it to the owner with --to-owner
@@ -2298,8 +2116,6 @@ json: flag
 starci kernel reply --repo <path> --workflow <workflow> --message <message> --body <answer>
 starci kernel reply --repo <path> --workflow <workflow> --message <message> --to-owner --json
 ```
-
-Replaces: `starci api reply`, `node scripts/kernel/cli.mjs reply`
 
 ### starci kernel report
 
@@ -2323,8 +2139,6 @@ starci kernel report --repo <path> --job <job> --report <report>
 starci kernel report --repo <path> --job <job> --report <report> --attach <file> --outcome done --dispatch-capability <capability> --json
 ```
 
-Replaces: `starci api report`, `node scripts/kernel/cli.mjs report`
-
 ### starci kernel retire-ask
 
 close an ask the owner should no longer answer (ask-superseded)
@@ -2344,8 +2158,6 @@ json: flag
 starci kernel retire-ask --repo <path> --workflow <workflow> --dispatch <dispatch> --reason <reason>
 ```
 
-Replaces: `starci api retire-ask`, `node scripts/kernel/cli.mjs retire-ask`
-
 ### starci kernel route
 
 resolve and persist the model decision of a job
@@ -2364,8 +2176,6 @@ json: flag
 starci kernel route --repo <path> --job <job>
 starci kernel route --repo <path> --job <job> --difficulty hard --json
 ```
-
-Replaces: `starci api route`, `node scripts/kernel/cli.mjs route`
 
 ### starci kernel run-deferred-tests
 
@@ -2388,8 +2198,6 @@ starci kernel run-deferred-tests --repo <path> --workflow <workflow>
 starci kernel run-deferred-tests --repo <path> --workflow <workflow> --kind unit --dry-run --json
 ```
 
-Replaces: `starci api run-deferred-tests`, `node scripts/kernel/cli.mjs run-deferred-tests`
-
 ### starci kernel serve-ask
 
 park an owner ask: Telegram notice first, the answer form served on demand
@@ -2410,8 +2218,6 @@ json: flag
 starci kernel serve-ask --repo <path> --workflow <workflow>
 starci kernel serve-ask --repo <path> --workflow <workflow> --dispatch <dispatch> --now --ttl 600000 --json
 ```
-
-Replaces: `starci api serve-ask`, `node scripts/kernel/cli.mjs serve-ask`
 
 ### starci kernel settle
 
@@ -2435,8 +2241,6 @@ starci kernel settle --repo <path> --job <job> --verdict pass
 starci kernel settle --repo <path> --job <job> --verdict fail --tool-error checker-did-not-run --sync-tail --json
 ```
 
-Replaces: `starci api settle`, `node scripts/kernel/cli.mjs settle`
-
 ### starci kernel settle-tail
 
 run the async tail of a settled job (artifact index, evidence, retention)
@@ -2455,8 +2259,6 @@ starci kernel settle-tail --repo <path> --job <job>
 starci kernel settle-tail --repo <path> --job <job> --json
 ```
 
-Replaces: `starci api settle-tail`, `node scripts/kernel/cli.mjs settle-tail`
-
 ### starci kernel status
 
 the live status projection of a workflow (frontier, progress, waits)
@@ -2473,8 +2275,6 @@ json: flag
 ```sh
 starci kernel status --repo <path> --workflow <workflow>
 ```
-
-Replaces: `starci api status`, `node scripts/kernel/cli.mjs status`
 
 ### starci kernel survey
 
@@ -2494,8 +2294,6 @@ json: flag
 starci kernel survey --repo <path> --workflow <workflow>
 starci kernel survey --repo <path> --workflow <workflow> --deliveries --json
 ```
-
-Replaces: `starci api survey`, `node scripts/kernel/cli.mjs survey`
 
 ### starci kernel unit
 
@@ -2519,8 +2317,6 @@ starci kernel unit --repo <path> --workflow <workflow>
 starci kernel unit --repo <path> --workflow <workflow> --unit <unit> --raise-budget 4 --by owner --ref <ref>
 ```
 
-Replaces: `starci api unit`, `node scripts/kernel/cli.mjs unit`
-
 ### starci kernel usage
 
 measured tokens by op, model and Kernel of one workflow, or per workflow
@@ -2540,8 +2336,6 @@ starci kernel usage --repo <path>
 starci kernel usage --repo <path> --workflow <workflow> --legs --json
 ```
 
-Replaces: `starci api usage`, `node scripts/kernel/cli.mjs usage`
-
 ### starci kernel verify-proofs
 
 re-hash every indexed proof file and walk the events digest chain; exit 1 on tampering
@@ -2558,8 +2352,6 @@ json: flag
 ```sh
 starci kernel verify-proofs --repo <path> --workflow <workflow>
 ```
-
-Replaces: `starci api verify-proofs`, `node scripts/kernel/cli.mjs verify-proofs`
 
 ## starci lint
 
@@ -2629,8 +2421,6 @@ starci machine decisions supervisor --list
 starci machine decisions ring --repo <path> --workflow <id>
 ```
 
-Replaces: `node scripts/machine/decisions.mjs`, `node .claude/scripts/machine/decisions.mjs`
-
 ### starci machine kernel-watchdog
 
 inspect or repair one running workflow Kernel seat
@@ -2652,8 +2442,6 @@ json: flag
 starci machine kernel-watchdog --repo <path> --workflow <id> --once
 starci machine kernel-watchdog --repo <path> --workflow <id> --once --repair
 ```
-
-Replaces: `node scripts/kernel/kernel-watchdog.mjs`, `node .claude/scripts/kernel/kernel-watchdog.mjs`
 
 ### starci machine lessons
 
@@ -2683,8 +2471,6 @@ starci machine lessons list --json
 starci machine lessons feedback --text <text> --via chat
 ```
 
-Replaces: `node scripts/machine/lessons.mjs`, `node .claude/scripts/machine/lessons.mjs`
-
 ### starci machine op-metrics
 
 report operation health metrics across managed ledgers
@@ -2704,8 +2490,6 @@ json: flag
 starci machine op-metrics --by workflow
 starci machine op-metrics --trend --json
 ```
-
-Replaces: `node scripts/machine/op-metrics.mjs`, `node .claude/scripts/machine/op-metrics.mjs`
 
 ### starci machine seam-policy
 
@@ -2731,8 +2515,6 @@ starci machine seam-policy canon-plan --scan <file> --cut-id <id>
 starci machine seam-policy canon-redispatch --repo <path> --job <id>
 ```
 
-Replaces: `node scripts/kernel/seam-policy.mjs`, `node .claude/scripts/kernel/seam-policy.mjs`
-
 ### starci machine worktrees
 
 inspect, collect or resume runtime worktrees
@@ -2751,8 +2533,6 @@ json: flag
 starci machine worktrees counts --json
 starci machine worktrees gc --plan
 ```
-
-Replaces: `node scripts/machine/worktrees.mjs`, `node .claude/scripts/machine/worktrees.mjs`
 
 ### starci machine worktrees-clean
 
@@ -2783,8 +2563,6 @@ json: starci/worktrees-clean@1
 starci machine worktrees-clean --dry-run
 starci machine worktrees-clean --only 'lane/dv-*' --json
 ```
-
-Replaces: `bash cleanup-worktrees.sh`
 
 ## starci npm
 
@@ -2869,8 +2647,6 @@ starci orca terminal-read --terminal <handle>
 starci orca terminal-read --terminal <handle> --tail --limit 100
 ```
 
-Replaces: `node scripts/api/orca/terminal-read.mjs`, `node .claude/scripts/api/orca/terminal-read.mjs`
-
 ### starci orca terminal-send
 
 send text or Enter to an Orca terminal
@@ -2891,8 +2667,6 @@ json: always
 starci orca terminal-send --terminal <handle> --text <text>
 starci orca terminal-send --terminal <handle> --text-file <file> --no-enter
 ```
-
-Replaces: `node scripts/api/orca/terminal-send.mjs`, `node .claude/scripts/api/orca/terminal-send.mjs`
 
 ## starci reconciler
 
@@ -2916,8 +2690,6 @@ json: flag
 starci reconciler once --controller job --json
 ```
 
-Replaces: `node scripts/reconciler/engine.mjs --once`
-
 ### starci reconciler restart
 
 stop the reconciler engine and ensure a new leader
@@ -2929,8 +2701,6 @@ json: flag
 ```sh
 starci reconciler restart
 ```
-
-Replaces: `node scripts/reconciler/boot.mjs --restart`
 
 ### starci reconciler start
 
@@ -2945,8 +2715,6 @@ starci reconciler start
 starci reconciler start --json
 ```
 
-Replaces: `node scripts/reconciler/boot.mjs`, `node scripts/reconciler/boot.mjs ensure`
-
 ### starci reconciler status
 
 print reconciler leader, queue, mode and violation status
@@ -2960,8 +2728,6 @@ starci reconciler status
 starci reconciler status --json
 ```
 
-Replaces: `node scripts/reconciler/boot.mjs --status`
-
 ### starci reconciler stop
 
 stop the current reconciler engine leader
@@ -2973,8 +2739,6 @@ json: flag
 ```sh
 starci reconciler stop
 ```
-
-Replaces: `node scripts/reconciler/boot.mjs --stop`
 
 ### starci reconciler up
 
@@ -3001,8 +2765,6 @@ starci reconciler up --check --json
 starci reconciler up --caller-agent codex --caller-model gpt-6.1-sol --caller-effort high --json
 ```
 
-Replaces: `node scripts/reconciler/start.mjs`
-
 ## starci release
 
 prove, inspect and perform runtime release operations
@@ -3024,8 +2786,6 @@ starci release app-installs
 starci release app-installs --keep
 ```
 
-Replaces: `node scripts/gates/release-app-installs.mjs`, `node .claude/scripts/gates/release-app-installs.mjs`
-
 ### starci release check
 
 run the one read-only release readiness gate
@@ -3045,8 +2805,6 @@ starci release check --final --json
 starci release check --only publish-plan,canon-pins
 ```
 
-Replaces: `node scripts/gates/release-check.mjs`, `node .claude/scripts/gates/release-check.mjs`, `npm run release:check`
-
 ### starci release clean-test
 
 test published packages from fresh isolated installs
@@ -3065,8 +2823,6 @@ starci release clean-test
 starci release clean-test --changed packages/cli/package.json
 starci release clean-test --base origin/main
 ```
-
-Replaces: `node scripts/gates/package-clean-test.mjs`, `node .claude/scripts/gates/package-clean-test.mjs`
 
 ### starci release cut
 
@@ -3120,8 +2876,6 @@ starci release images --app <app-root>
 starci release images --app <app-root> --sides be --remove-images --json
 ```
 
-Replaces: `bash docker-proof.sh`
-
 ### starci release launch-smoke
 
 prove live nested-agent launch paths on an Orca host
@@ -3146,8 +2900,6 @@ starci release launch-smoke stage --as kernel
 starci release launch-smoke mark --as op
 ```
 
-Replaces: `node scripts/kernel/launch-smoke.mjs`, `node .claude/scripts/kernel/launch-smoke.mjs`
-
 ### starci release proof
 
 build the release proof attached before publish or deploy effects
@@ -3166,8 +2918,6 @@ json: always
 ```sh
 starci release proof --repo <repo> --base <range-start>^ --out release-proof.json
 ```
-
-Replaces: `node scripts/gates/release-proof.mjs`, `node .claude/scripts/gates/release-proof.mjs`
 
 ### starci release publish
 
@@ -3207,8 +2957,6 @@ starci release publish --publish --npm-user <name> --expect-sha <sha>
 starci release publish --runtime-package --publish --npm-user <name> --expect-sha <sha>
 ```
 
-Replaces: `node scripts/gates/release-publish.mjs`, `node .claude/scripts/gates/release-publish.mjs`, `npm run release:publish`, `bash publish-final.sh`
-
 ### starci release sync-runtime
 
 refresh or check package runtime copies and optionally prepare grammar
@@ -3238,8 +2986,6 @@ starci release sync-runtime --check
 starci release sync-runtime --prepare-grammar
 ```
 
-Replaces: `node scripts/hfs/sync-runtime.mjs`, `node .claude/scripts/hfs/sync-runtime.mjs`
-
 ## starci route
 
 resolve runtime operations from structured routing inputs
@@ -3265,8 +3011,6 @@ starci route op --kind backend.implement --json
 starci route op --node-kind ui --intent implement
 ```
 
-Replaces: `node scripts/route/route-op.mjs`, `node .claude/scripts/route/route-op.mjs`
-
 ## starci runtime
 
 install, update and check the StarCi runtime tree
@@ -3290,8 +3034,6 @@ starci runtime architecture <repo-root>
 starci runtime architecture <repo-root> --base <commit>
 ```
 
-Replaces: `node scripts/hfs/architecture.mjs`, `node .claude/scripts/hfs/architecture.mjs`
-
 ### starci runtime benchmark-snapshot
 
 append one model-pool snapshot file under benchmark/snapshots
@@ -3311,8 +3053,6 @@ json: flag
 starci runtime benchmark-snapshot --since-hours 24
 starci runtime benchmark-snapshot --since-hours 24 --repo <path> --json
 ```
-
-Replaces: `node scripts/agent/benchmark-snapshot.mjs`
 
 ### starci runtime check
 
@@ -3351,25 +3091,21 @@ starci runtime derived-fields --check
 starci runtime derived-fields --write
 ```
 
-Replaces: `node scripts/hfs/derived-fields.mjs`, `node .claude/scripts/hfs/derived-fields.mjs`
-
 ### starci runtime doctor
 
-run the installed tree's own specs and report drift against the install manifest
+verify installed payload, public entry custody and local runtime capabilities
 
 | flag | type | |
 | --- | --- | --- |
 | `--quick` | boolean |  |
 
-exit: 0 every spec passed; 1 a spec failed or the tree drifted; 2 bad usage
+exit: 0 the selected local diagnostic checks passed; 1 installed integrity or a selected runtime capability failed; 2 bad usage
 
 json: none
 
 ```sh
 starci runtime doctor --cwd <repo> --quick
 ```
-
-Replaces: `starci doctor`, `npx starci doctor`
 
 ### starci runtime gen-catalog
 
@@ -3389,8 +3125,6 @@ json: none
 starci runtime gen-catalog --check
 starci runtime gen-catalog --write
 ```
-
-Replaces: `node scripts/cli/gen-catalog.mjs`, `node .claude/scripts/cli/gen-catalog.mjs`
 
 ### starci runtime gen-ops
 
@@ -3412,8 +3146,6 @@ starci runtime gen-ops --check
 starci runtime gen-ops --ops-dir <dir> --out <file>
 ```
 
-Replaces: `node scripts/route/build-ops-registry.mjs`
-
 ### starci runtime housekeeping
 
 inspect or apply the host housekeeping sweeps
@@ -3432,8 +3164,6 @@ json: always
 starci runtime housekeeping --dry-run
 starci runtime housekeeping --apply --only tmp,logs
 ```
-
-Replaces: `node scripts/housekeeping/housekeeping.mjs`
 
 ### starci runtime install
 
@@ -3454,8 +3184,6 @@ starci runtime install
 starci runtime install --cwd <repo> --hosts claude,devin
 ```
 
-Replaces: `starci init`, `npx starci init`
-
 ### starci runtime ledger-hygiene
 
 report orphan ledgers and legacy repository-local ledger stores
@@ -3472,8 +3200,6 @@ json: flag
 starci runtime ledger-hygiene
 starci runtime ledger-hygiene --apply --json
 ```
-
-Replaces: `node scripts/housekeeping/ledger-hygiene.mjs`
 
 ### starci runtime link
 
@@ -3518,8 +3244,6 @@ starci runtime machine-db status
 starci runtime machine-db ledgers --all
 ```
 
-Replaces: `node engine/db/machine.mjs`, `node .claude/engine/db/machine.mjs`
-
 ### starci runtime owner-claims-audit
 
 audit owner-decision claims and owner-gates in runtime ledgers
@@ -3538,8 +3262,6 @@ starci runtime owner-claims-audit --repo <repo>
 starci runtime owner-claims-audit --repo <repo>[,<repo>...] --workflow <id> --json
 ```
 
-Replaces: `node scripts/housekeeping/owner-claims-audit.mjs`
-
 ### starci runtime readme-blocks
 
 regenerate or check the generated blocks of knowledge/hfs/README.md
@@ -3557,8 +3279,6 @@ json: none
 starci runtime readme-blocks --check
 starci runtime readme-blocks --write
 ```
-
-Replaces: `node scripts/hfs/readme-blocks.mjs`, `node .claude/scripts/hfs/readme-blocks.mjs`
 
 ### starci runtime status
 
@@ -3590,8 +3310,6 @@ json: none
 starci runtime update --cwd <repo>
 ```
 
-Replaces: `starci update`, `npx starci update`
-
 ### starci runtime validate
 
 read-only Work record/tree validation — structure, consistency, artifacts, schemas
@@ -3612,8 +3330,6 @@ starci runtime validate .starciwork
 starci runtime validate <work-root> --strict --owned <path>
 ```
 
-Replaces: `starci validate`
-
 ### starci runtime version
 
 print the runtime package version
@@ -3625,8 +3341,6 @@ json: none
 ```sh
 starci runtime version
 ```
-
-Replaces: `starci version`, `npx starci version`
 
 ## starci smoke
 
@@ -3660,8 +3374,6 @@ json: starci/smoke-scaffold@1
 starci smoke scaffold --edition full
 starci smoke scaffold --edition lite --into <dir> --keep --json
 ```
-
-Replaces: `bash smoke-scaffold.sh`
 
 ## starci supabase
 
@@ -3771,8 +3483,6 @@ starci supervisor actions record --item <key> --action <verb> --reason <text>
 starci supervisor actions digest --json
 ```
 
-Replaces: `node scripts/supervisor/actions.mjs`
-
 ### starci supervisor bridge
 
 inspect and govern cross-workflow dependencies and shared ownership
@@ -3817,8 +3527,6 @@ starci supervisor bridge list --repo <path> --json
 starci supervisor bridge rewire --repo <path> --bridge <id>
 ```
 
-Replaces: `node scripts/supervisor/bridge.mjs`
-
 ### starci supervisor channel
 
 register, inspect, and answer the Supervisor owner-message channel
@@ -3847,8 +3555,6 @@ starci supervisor channel inbox --id main --peek
 starci supervisor channel reply --id main --text <text> --to <message-id>
 ```
 
-Replaces: `node scripts/supervisor/channel.mjs`, `node .claude/scripts/supervisor/channel.mjs`
-
 ### starci supervisor direct-commits
 
 find runtime main commits that bypassed the exclusive land gate
@@ -3866,11 +3572,9 @@ starci supervisor direct-commits
 starci supervisor direct-commits --repo <path> --json
 ```
 
-Replaces: `node scripts/supervisor/direct-commits.mjs`, `node .claude/scripts/supervisor/direct-commits.mjs`
-
 ### starci supervisor gate-stability
 
-compare frozen gate behavior against accepted work in live workflows
+compare explicitly selected current gates against accepted work in live workflows
 
 | flag | type | |
 | --- | --- | --- |
@@ -3879,18 +3583,16 @@ compare frozen gate behavior against accepted work in live workflows
 | `--base` | string |  |
 | `--head` | string |  |
 | `--ledger` | list |  |
-| `--gate` | list |  |
+| `--gate` | list | required |
 
 exit: 0 stability report completed; 2 bad usage or report execution failed
 
 json: flag
 
 ```sh
-starci supervisor gate-stability --family <op> --tree <dir>
-starci supervisor gate-stability --family <op> --base <dir> --head <dir> --json
+starci supervisor gate-stability --family <op> --gate <module#export> --tree <dir>
+starci supervisor gate-stability --family <op> --gate <module#export> --base <dir> --head <dir> --json
 ```
-
-Replaces: `node scripts/supervisor/gate-stability.mjs`, `node .claude/scripts/supervisor/gate-stability.mjs`
 
 ### starci supervisor gc
 
@@ -3914,8 +3616,6 @@ starci supervisor gc --dry-run
 starci supervisor gc --apply --only agents,shells
 starci supervisor gc --plan --json
 ```
-
-Replaces: `node scripts/supervisor/gc.mjs`
 
 ### starci supervisor land
 
@@ -3943,8 +3643,6 @@ starci supervisor land --status
 starci supervisor land --job <job-id>
 starci supervisor land --commit <sha> --specs touching --lane <name>
 ```
-
-Replaces: `node scripts/supervisor/land.mjs`
 
 ### starci supervisor lesson-actions
 
@@ -3979,8 +3677,6 @@ starci supervisor lesson-actions revert --experiment <id> --apply
 starci supervisor lesson-actions propose --title <text> --evidence <text> --options <text> --recommendation <text>
 ```
 
-Replaces: `node scripts/supervisor/lesson-actions.mjs`, `node .claude/scripts/supervisor/lesson-actions.mjs`
-
 ### starci supervisor notify
 
 deliver a durable Supervisor ruling to one workflow Kernel
@@ -4002,8 +3698,6 @@ json: flag
 starci supervisor notify --repo <path> --workflow <id> --text <text>
 starci supervisor notify --repo <path> --workflow <id> --text-file <file> --json
 ```
-
-Replaces: `node scripts/supervisor/notify.mjs`
 
 ### starci supervisor owed
 
@@ -4031,8 +3725,6 @@ starci supervisor owed ack --item <key> --commits <sha> --reason <text>
 starci supervisor owed acks --json
 ```
 
-Replaces: `node scripts/supervisor/owed.mjs`
-
 ### starci supervisor poll
 
 stream or print a read-only Supervisor digest of workflow progress and blockers
@@ -4054,8 +3746,6 @@ starci supervisor poll --repo <path> --once
 starci supervisor poll --repo <path> --workflow <id> --json
 ```
 
-Replaces: `node scripts/supervisor/poll.mjs`
-
 ### starci supervisor push
 
 run full repository suites and push clean main branches
@@ -4074,8 +3764,6 @@ starci supervisor push
 starci supervisor push --repo <path> --check
 starci supervisor push --json
 ```
-
-Replaces: `node scripts/supervisor/push-git.mjs`
 
 ### starci supervisor push-mains
 
@@ -4096,8 +3784,6 @@ starci supervisor push-mains
 starci supervisor push-mains --repo <path> --dry-run
 starci supervisor push-mains --hooks-only --json
 ```
-
-Replaces: `node scripts/supervisor/push-mains.mjs`, `node .claude/scripts/supervisor/push-mains.mjs`
 
 ### starci supervisor ram-cap
 
@@ -4122,8 +3808,6 @@ starci supervisor ram-cap prioritize --workflow <id> --weight 2 --reserve 1
 starci supervisor ram-cap unprioritize --workflow <id>
 ```
 
-Replaces: `node scripts/supervisor/ram-cap.mjs`
-
 ### starci supervisor report
 
 render or send the owner's detailed workflow progress report
@@ -4143,8 +3827,6 @@ starci supervisor report --repo <path> --send
 starci supervisor report --json
 ```
 
-Replaces: `node scripts/supervisor/progress-report.mjs`
-
 ### starci supervisor start
 
 enable and start the one long-lived Supervisor seat
@@ -4162,8 +3844,6 @@ json: flag
 starci supervisor start
 starci supervisor start --plan
 ```
-
-Replaces: `node scripts/supervisor/start-supervisor.mjs`
 
 ### starci supervisor status
 
@@ -4205,8 +3885,6 @@ starci supervisor telegram-bridge start
 starci supervisor telegram-bridge run
 ```
 
-Replaces: `node scripts/supervisor/telegram-bridge.mjs`, `node .claude/scripts/supervisor/telegram-bridge.mjs`
-
 ### starci supervisor tell
 
 send a desktop message to the Supervisor or read its recent replies
@@ -4231,8 +3909,6 @@ starci supervisor tell <text> --wait
 starci supervisor tell --read --since 30m --json
 ```
 
-Replaces: `node scripts/supervisor/tell.mjs`
-
 ### starci supervisor watchdog
 
 run one reconciler-owned Supervisor seat liveness pass
@@ -4249,8 +3925,6 @@ json: flag
 starci supervisor watchdog --once
 starci supervisor watchdog --once --json
 ```
-
-Replaces: `node scripts/supervisor/supervisor-watchdog.mjs`, `node .claude/scripts/supervisor/supervisor-watchdog.mjs`
 
 ### starci supervisor workers
 
@@ -4288,8 +3962,6 @@ starci supervisor workers list
 starci supervisor workers create --cluster <id> --title <text> --files <csv>
 starci supervisor workers report --job <id> --outcome done --commit <sha>
 ```
-
-Replaces: `node scripts/supervisor/workers.mjs`, `node .claude/scripts/supervisor/workers.mjs`
 
 ## starci task
 
@@ -4344,8 +4016,6 @@ json: starci/task-register@1
 starci task register reconciler
 starci task register harness-tunnel --apply --json
 ```
-
-Replaces: `starci harness install-task`, `starci reconciler install-task`, `node scripts/reconciler/tunnel-task.mjs --install-task`, `node scripts/reconciler/boot.mjs --install-task`
 
 ### starci task show
 
@@ -4471,8 +4141,6 @@ starci uat assisted-runner inspect --request <request.yaml> --receipt <receipt.y
 starci uat assisted-runner signal --request <request.yaml> --receipt <receipt.yaml> --value ok
 ```
 
-Replaces: `node scripts/uat/assisted-runner.mjs`, `node .claude/scripts/uat/assisted-runner.mjs`
-
 ### starci uat slots
 
 inspect UAT slots or run a command while holding one
@@ -4491,8 +4159,6 @@ json: none
 starci uat slots status
 starci uat slots run --record-dir <dir> -- npm test
 ```
-
-Replaces: `node scripts/uat/uat-slots.mjs`, `node .claude/scripts/uat/uat-slots.mjs`
 
 ## starci work
 
@@ -4513,8 +4179,6 @@ starci work asset-slot check .starciwork
 starci work asset-slot list .starciwork --json
 ```
 
-Replaces: `node scripts/work/asset-slot.mjs`
-
 ### starci work brand
 
 derive or verify the canonical brand Work record
@@ -4534,8 +4198,6 @@ json: flag
 ```sh
 starci work brand .starciwork --stage verify --json
 ```
-
-Replaces: `node scripts/work/brand/brand.mjs`
 
 ### starci work brand-direction
 
@@ -4559,8 +4221,6 @@ json: flag
 starci work brand-direction status --work .starciwork
 ```
 
-Replaces: `node scripts/work/brand-direction.mjs`
-
 ### starci work brand-palette
 
 emit a brand palette prompt or check rendered images against it
@@ -4580,8 +4240,6 @@ json: flag
 starci work brand-palette --scan .starciwork --json
 ```
 
-Replaces: `node scripts/work/brand/brand-palette.mjs`
-
 ### starci work check-example-work
 
 check the layout, ids, refs and evidence of every example Work tree
@@ -4593,8 +4251,6 @@ json: none
 ```sh
 starci work check-example-work
 ```
-
-Replaces: `node scripts/work/validate/check-example-work.mjs`
 
 ### starci work compose-direction
 
@@ -4623,8 +4279,6 @@ json: flag
 starci work compose-direction --ui <record> --content <png> --breakpoint mobile --theme light
 ```
 
-Replaces: `node scripts/work/compose-direction.mjs`
-
 ### starci work draw-acceptance
 
 verify that drawn assets are accepted render shapes
@@ -4642,8 +4296,6 @@ json: flag
 ```sh
 starci work draw-acceptance --repo <repo> --job <job> --json
 ```
-
-Replaces: `node scripts/work/draw/draw-acceptance.mjs`
 
 ### starci work draw-dna
 
@@ -4663,8 +4315,6 @@ json: flag
 ```sh
 starci work draw-dna <render.html> --family starci --json
 ```
-
-Replaces: `node scripts/work/draw/draw-dna.mjs`
 
 ### starci work draw-feedback
 
@@ -4691,8 +4341,6 @@ json: flag
 starci work draw-feedback status --ui <record> --json
 ```
 
-Replaces: `node scripts/work/draw-feedback.mjs`
-
 ### starci work draw-gates
 
 run machine and owner gates for a drawn UI record
@@ -4713,8 +4361,6 @@ json: flag
 starci work draw-gates --ui <record> --repo <repo> --json
 ```
 
-Replaces: `node scripts/work/draw-gates.mjs`
-
 ### starci work draw-grammar
 
 resolve the grammar package used by a drawing
@@ -4734,8 +4380,6 @@ json: flag
 starci work draw-grammar --product <app> --json
 ```
 
-Replaces: `node scripts/work/draw-grammar.mjs`
-
 ### starci work draw-layer
 
 verify that drawings are isolated content layers
@@ -4753,8 +4397,6 @@ json: flag
 ```sh
 starci work draw-layer <render-dir> --json
 ```
-
-Replaces: `node scripts/work/draw/draw-layer.mjs`
 
 ### starci work draw-loop
 
@@ -4793,8 +4435,6 @@ json: flag
 starci work draw-loop status --out <loop-dir> --json
 ```
 
-Replaces: `node scripts/work/draw-loop.mjs`
-
 ### starci work draw-rationale
 
 verify the rationale bound to a rendered drawing
@@ -4814,8 +4454,6 @@ json: flag
 ```sh
 starci work draw-rationale <render.html> --json
 ```
-
-Replaces: `node scripts/work/draw/draw-rationale.mjs`
 
 ### starci work draw-render
 
@@ -4850,8 +4488,6 @@ json: flag
 starci work draw-render --html <file> --out <dir> --viewports 390x844 --json
 ```
 
-Replaces: `node scripts/work/draw-render.mjs`
-
 ### starci work draw-review
 
 inspect, ask for, or apply owner review of a drawing
@@ -4875,8 +4511,6 @@ json: flag
 starci work draw-review status --ui <record> --json
 ```
 
-Replaces: `node scripts/work/draw-review.mjs`
-
 ### starci work draw-source
 
 validate a drawing source and its fixture bindings
@@ -4899,8 +4533,6 @@ json: flag
 starci work draw-source <X.draw.tsx> --product <app> --json
 ```
 
-Replaces: `node scripts/work/draw/draw-source.mjs`
-
 ### starci work draw-taste
 
 check a rendered drawing against visual taste rules
@@ -4918,8 +4550,6 @@ json: flag
 starci work draw-taste --html <render.html> --json
 ```
 
-Replaces: `node scripts/work/draw/draw-taste.mjs`
-
 ### starci work evidence-binding
 
 prove that every done leaf's evidence still binds to the source it claims
@@ -4935,8 +4565,6 @@ json: flag
 ```sh
 starci work evidence-binding --work "<.starciwork root>"
 ```
-
-Replaces: `node scripts/work/validate/check-evidence-binding.mjs`
 
 ### starci work example-critique
 
@@ -4955,8 +4583,6 @@ json: none
 starci work example-critique --work .starciwork --write
 ```
 
-Replaces: `node scripts/example/example-critique.mjs`
-
 ### starci work example-derive
 
 derive example catalog artifacts from a Work tree
@@ -4973,8 +4599,6 @@ json: none
 ```sh
 starci work example-derive --work .starciwork --write
 ```
-
-Replaces: `node scripts/example/example-derive.mjs`
 
 ### starci work example-evidence
 
@@ -4995,8 +4619,6 @@ json: none
 starci work example-evidence --work .starciwork --record <id> --cwd <repo> --assert AC-1="npm test"
 ```
 
-Replaces: `node scripts/example/example-evidence.mjs`
-
 ### starci work example-verify
 
 replay and verify evidence for one example Work record
@@ -5014,8 +4636,6 @@ json: none
 ```sh
 starci work example-verify --work .starciwork --record <id> --cwd <repo>
 ```
-
-Replaces: `node scripts/example/example-verify.mjs`
 
 ### starci work grammar-geometry
 
@@ -5037,8 +4657,6 @@ json: flag
 starci work grammar-geometry --prompt --repo <repo> --json
 ```
 
-Replaces: `node scripts/work/ui/grammar-geometry.mjs`
-
 ### starci work grammar-knowledge
 
 compare or refresh measured grammar knowledge
@@ -5055,8 +4673,6 @@ json: flag
 starci work grammar-knowledge --write
 ```
 
-Replaces: `node scripts/work/ui/grammar-knowledge.mjs`
-
 ### starci work grammar-proposal
 
 list or check grammar proposals in Work records
@@ -5071,8 +4687,6 @@ json: flag
 starci work grammar-proposal check .starciwork
 starci work grammar-proposal list .starciwork --json
 ```
-
-Replaces: `node scripts/work/grammar-proposal.mjs`
 
 ### starci work grammar-registry-pin
 
@@ -5089,8 +4703,6 @@ json: flag
 ```sh
 starci work grammar-registry-pin --repo <repo> --json
 ```
-
-Replaces: `node scripts/work/ui/grammar-registry-pin.mjs`
 
 ### starci work graph
 
@@ -5119,8 +4731,6 @@ starci work graph show --repo <path> --workflow <id>
 starci work graph propose --repo <path> --job <id> --file <candidate> --reason <text>
 ```
 
-Replaces: `node scripts/work/work-graph.mjs`, `node .claude/scripts/work/work-graph.mjs`
-
 ### starci work hygiene
 
 parse, scope-validate and secret-check Work and stack files before they are committed
@@ -5139,8 +4749,6 @@ json: flag
 starci work hygiene staged --repo <repo>
 starci work hygiene files --repo <repo> <file>
 ```
-
-Replaces: `node scripts/work/validate/work-hygiene.mjs`, `node .claude/scripts/work/validate/work-hygiene.mjs`
 
 ### starci work layout-tree
 
@@ -5180,8 +4788,6 @@ json: flag
 starci work layout-tree scan --work .starciwork --json
 ```
 
-Replaces: `node scripts/work/layout-tree.mjs`
-
 ### starci work render-proof
 
 render a proof document for one Work record
@@ -5199,16 +4805,9 @@ json: none
 starci work render-proof --work .starciwork --record <id>
 ```
 
-Replaces: `node scripts/work/render-proof.mjs`
-
 ### starci work shell-conformance
 
 check Work and implementation records against the measured frontend shell
-
-| flag | type | |
-| --- | --- | --- |
-| `--admitted-at` | string |  |
-| `--op` | string |  |
 
 Positionals: target
 
@@ -5219,8 +4818,6 @@ json: flag
 ```sh
 starci work shell-conformance .starciwork --json
 ```
-
-Replaces: `node scripts/work/ui/shell-conformance.mjs`
 
 ### starci work ui-proof-brief
 
@@ -5242,8 +4839,6 @@ json: flag
 ```sh
 starci work ui-proof-brief --surface <record> --repo <repo> --json
 ```
-
-Replaces: `node scripts/work/ui/ui-proof-brief.mjs`
 
 ## starci worker
 
@@ -5460,8 +5055,6 @@ json: flag
 starci workflow assess --repo <path> --json
 ```
 
-Replaces: `node scripts/goal/assess.mjs`, `node .claude/scripts/goal/assess.mjs`
-
 ### starci workflow bias
 
 normalize a routing bias or extract one from the owner's text
@@ -5480,8 +5073,6 @@ json: always
 starci workflow bias --normalize '{"prefer":["codex"],"avoid":["devin"]}'
 starci workflow bias "don't use codex"
 ```
-
-Replaces: `node scripts/agent/bias.mjs`, `node .claude/scripts/agent/bias.mjs`
 
 ### starci workflow define
 
@@ -5513,8 +5104,6 @@ starci workflow define --text "Add password reset"
 starci workflow define --plan --text "Add password reset"
 ```
 
-Replaces: `starci goal`, `node scripts/goal/define-goal.mjs`
-
 ### starci workflow start
 
 ensure the host and optional core maintenance, then claim an approved goal and boot its Kernel
@@ -5539,8 +5128,6 @@ starci workflow start
 starci workflow start --repo <path> --goal <workflow_id>
 starci workflow start --repo <path> --goal <workflow_id> --caller-agent codex --caller-model gpt-6.1-sol --caller-effort high
 ```
-
-Replaces: `starci start`, `node scripts/kernel/start-workflow.mjs`
 
 ### starci workflow status
 

@@ -8,7 +8,7 @@
 //   2. Q6: a workflow that ended (phase finished, or archived) more than 30 days ago is archived to a verified zip and
 //      then purged as a unit through scripts/work/purge-workflow.mjs (workflow_purges: planned -> archived ->
 //      deleting -> purged; engine/db/ledger.mjs deleteWorkflowRows cascades the rows). The approval is the owner's Q6
-//      decision (alpha.3 COMMON.md adopts §7 as recommended). A workflow is kept, and reported, while any job of it is
+//      current installation's retention.workflowPurge profile, never a historical owner's Q6 decision. A workflow is kept, and reported, while any job of it is
 //      live or while a Work record cites one of its artifacts (work_citations pins its evidence; a purge would orphan it).
 //      Only the sweep purges, and only with --apply; `starci kernel finish` never purges (the workflow just ended).
 //   3. PRAGMA incremental_vacuum hands freelist pages back. No WAL checkpoint here: the reconciler engine's connection
@@ -16,16 +16,21 @@
 // Blobs are not touched: the blob GC (scripts/housekeeping/blob-gc.mjs) owns their lifetime.
 import fs from 'node:fs';
 import path from 'node:path';
-import { openLedger, JOB_STATUSES } from '../../engine/db/ledger.mjs';
+import { openLedger, openLedgerReader, JOB_STATUSES } from '../../engine/db/ledger.mjs';
 import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
-import { allocationSettings } from '../../engine/config.mjs';
+import { allocationSettings, workflowPurgeSettings } from '../../engine/config.mjs';
 import { hasTable } from '../lib/sqlite.mjs';
 import { positiveNumber } from '../lib/number.mjs';
 
 const DEBUG_LOG_RETENTION_MS = 14 * 86_400_000; // Q5
 const WORKFLOW_RETENTION_MS = 30 * 86_400_000; // Q6
-const Q6_APPROVAL = Object.freeze({ by: 'owner',
-  ref: 'owner decision Q6 (ARCHITECTURE-DB §7, adopted in alpha.3 COMMON.md): a workflow ended more than 30 days ago is zipped, verified and purged' });
+export function workflowPurgeApproval(repo,config){
+  const profile=config===undefined?workflowPurgeSettings():workflowPurgeSettings(config);
+  if(!profile)return null;
+  const key=p=>{const real=fs.realpathSync(p);return process.platform==='win32'?real.toLowerCase():real;};
+  const actual=key(repo);
+  return profile.repos.some(p=>key(p)===actual)?{by:profile.approvedBy,ref:profile.approvalRef}:null;
+}
 
 const SETTLED = new Set(JOB_STATUSES.settled);
 const statSize = (file) => { try { return fs.statSync(file).size; } catch { return 0; } };
@@ -78,7 +83,7 @@ function expiredWorkflows(db, { now = Date.now(), retentionMs = WORKFLOW_RETENTI
  * default: reports what it would delete and purge. `allocation.housekeeping.workflowRetentionMs` overrides 30 days.
  */
 export async function sweepLedgers({ apply = false, now = Date.now(), env = process.env, allocation = allocationSettings(), files = null, machineFile = null,
-  archiveRoot = null, purge = null } = {}) {
+  archiveRoot = null, purge = null, config } = {}) {
   const out = { ok: true, apply: Boolean(apply), freedBytes: 0, deleted: 0, retained: [], skipped: [], purged: [], errors: [] };
   const retentionMs = positiveNumber(allocation?.housekeeping?.workflowRetentionMs, WORKFLOW_RETENTION_MS);
   let list = files ? files.map((file) => ({ file, repoRoot: null })) : null;
@@ -94,7 +99,8 @@ export async function sweepLedgers({ apply = false, now = Date.now(), env = proc
     let expired = [];
     try {
       const before = familySize(file);
-      ledger = openLedger({ file });
+      if(apply)ledger = openLedger({ file });
+      else {const db=openLedgerReader(file);ledger={db,close:()=>db.close()};}
       const repo = repoRoot ?? ledger.db.prepare("SELECT value FROM meta WHERE key='repo_root'").get()?.value ?? null;
       if (apply) {
         const r = retainLedgerDb(ledger.db, { now });
@@ -112,7 +118,9 @@ export async function sweepLedgers({ apply = false, now = Date.now(), env = proc
       if (!w.ok) { out.skipped.push({ path: file, workflowId: w.workflowId, reason: 'kept', detail: w.why }); continue; }
       if (!w.repo) { out.errors.push({ path: file, workflowId: w.workflowId, error: 'the ledger names no repo_root: purge-workflow cannot resolve it' }); continue; }
       try {
-        const r = purgeFn({ repo: w.repo, workflowId: w.workflowId, apply, approvedBy: Q6_APPROVAL.by, approvalRef: Q6_APPROVAL.ref,
+        const approval=workflowPurgeApproval(w.repo,config);
+        if(!approval){out.skipped.push({path:file,workflowId:w.workflowId,reason:'workflow-purge-policy-not-adopted'});continue;}
+        const r = purgeFn({ repo: w.repo, workflowId: w.workflowId, apply, approvedBy: approval.by, approvalRef: approval.ref,
           ...(archiveRoot ? { archiveRoot } : {}), now: () => now });
         out.purged.push({ path: file, workflowId: w.workflowId, endedAt: w.endedAt, dryRun: !apply, archive: r.archive ?? r.purge?.archive_path ?? null, counts: r.counts ?? null, state: r.purge?.state ?? null });
       } catch (error) { out.errors.push({ path: file, workflowId: w.workflowId, error: String(error?.message ?? error) }); }

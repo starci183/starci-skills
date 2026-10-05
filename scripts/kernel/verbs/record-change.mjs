@@ -6,7 +6,6 @@ import { createWorkDigester, inputDrift, isWorkInput } from '../input-digests.mj
 import { RECORD_CHANGE_REACHES, changeNoteOf, committedMatches, committedReader, createOwnership, readRecordChange, writeRecordChange } from '../work-ownership.mjs';
 import { normWork } from '../../lib/path-key.mjs';
 import { RECORD_CHANGE_REFUSED } from '../dependency-graph.mjs';
-import { loadContractChanges } from '../../machine/contract-version.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 
 export default {
@@ -56,10 +55,9 @@ export default {
     // Who now owes a follow-up: the settled jobs of every other live workflow that read an older revision.
     const owes = [];
     if (reach === 'follow-up') {
-      const registry = loadContractChanges(internals.skillRoot);
       for (const peer of db.prepare('SELECT * FROM workflows ORDER BY created_at').all().filter((row) => row.workflow_id !== workflowId && workflowRunning(row))) {
         try {
-          for (const item of inputDrift(db, peer.workflow_id, { root: internals.skillRoot, repo, workDir, registry, ownership: ownerOf }).stale) {
+          for (const item of inputDrift(db, peer.workflow_id, { root: internals.skillRoot, repo, workDir, ownership: ownerOf }).stale) {
             if ((item.breaking ?? []).some((b) => b.via === 'declaration' && keys.includes(b.file))) owes.push({ workflowId: peer.workflow_id, jobId: item.jobId, op: item.op, attempt: item.attempt, ...(item.cut ? { cut: item.cut } : {}) });
           }
         } catch { /* a peer's projection failure never refuses the declaration */ }

@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
+import {fakeOrcaWorktrees} from '../helpers/fake-orca-worktrees.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
 import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import {inspectLedger,ledgerFileFor,openLedger,releaseTwoPhase,reserveTwoPhase} from '../../engine/db/ledger.mjs';
 import {isLeaseOverlapRefusal,patternFindings} from '../../scripts/supervisor/owed.mjs';
@@ -36,7 +38,7 @@ const fixture=t=>{
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');
+  let repo=path.join(root,'repo');
   fs.mkdirSync(repo,{recursive:true});
   git(repo,'init','--quiet');
   git(repo,'config','user.email','lane@starci.test');
@@ -61,6 +63,11 @@ const fixture=t=>{
     STARCI_PROJECTS_ROOT:path.join(root,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
   };
+  // Every dispatch uses the real private workflow worktree and its native registry binding.
+  const made=fakeOrcaWorktrees({root:path.join(root,'worktrees')}).create({repo:`path:${repo}`,name:WORKFLOW,baseBranch:'main'});
+  assert.equal(made.ok,true,made.error);
+  repo=made.worktree.path;
+  registerWorkflowWorktree({env},{workflowId:WORKFLOW,orcaWorktreeId:made.worktree.id,path:repo,branch:made.worktree.branch});
   const run=(...args)=>spawnSync(process.execPath,[API,...placeOnRepo(args,repo),'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
   const withWrite=fn=>{const l=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(l);}finally{l.close();}};
   withWrite(l=>{
@@ -149,7 +156,11 @@ test('an expired lease row is no wait: reserve still refuses it as a recovery si
     assert.equal(r.status,0,r.stderr||r.stdout);return leading(r.stdout).job_id;};
   const holder=enqueue([EN]);
   assert.equal(fx.run('dispatch','--job',holder,'--model','devin-agent','--spawn').status,0);
-  fx.withWrite(l=>l.db.prepare('UPDATE leases SET acquired_at=0,expires_at=1 WHERE job_id=?').run(holder));
+  fx.withWrite(l=>{
+    // A worker requeue leaves this expired row for recovery; no active side hides reserve's refusal.
+    l.write.setJobStatus({jobId:holder,to:'ready',reason:'test-fixture: worker requeued with expired lease awaiting recovery'});
+    l.db.prepare('UPDATE leases SET acquired_at=0,expires_at=1 WHERE job_id=?').run(holder);
+  });
   const waiter=enqueue([EN,'apps/app/src/other']);
   const d=fx.run('dispatch','--job',waiter,'--model','devin-agent','--spawn');
   assert.notEqual(d.status,0);

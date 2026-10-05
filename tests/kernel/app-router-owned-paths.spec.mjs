@@ -13,12 +13,13 @@ import {resolveReadPath} from '../../scripts/kernel/prerequisites.mjs';
 import {validateOpReport} from '../../scripts/kernel/report-envelope.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
-import {placeOnRepo} from '../helpers/op-placement.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
+import {fakeOrcaWorktrees} from '../helpers/fake-orca-worktrees.mjs';
 
 // Next.js App Router route segments are literal directory names that look like globs
 // (inc-ed9f28ec0561 nivo Modules, inc-e3e7d183c3d5 mia base-repos: interface.scaffold/implement
 // could never own src/app/[lang]/…). Each form is carried end to end: admission -> enqueue ->
-// dispatch path leases and their overlap -> report files -> the settle landed-check, whose git
+// dispatch path leases and their overlap -> report files -> the runtime checkpoint, whose git
 // pathspecs must read the name literally (`[id]` as a glob also matches a sibling `i`).
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
@@ -60,6 +61,7 @@ const routeCheckout=(repo)=>{
   git(repo,'config','core.autocrlf','false');
   git(repo,'checkout','--quiet','-b','main');
   write(repo,'.gitignore','.starciwork/\n');
+  write(repo,'hfs.json',JSON.stringify({hfs:2,kind:'app',project:'router-fixture',sides:{be:{apps:[{name:'api',kind:'api'}]},fe:{apps:[{name:'web',kind:'next'}],reads:['be/contracts/']}}}));
   for(const {dir,twin} of FORMS){
     write(repo,pageOf(dir),'export default function Page() { return null; }\n');
     if(twin)write(repo,twin,'twin\n');
@@ -161,10 +163,16 @@ test('prerequisites bind a placeholder to an App Router owned path; report files
 
 /* ------------------------------------------------ api end to end: enqueue -> dispatch -> settle */
 
-const apiFixture=t=>withLedger(t,({root,repoRoot:repo,ledger,ledgerFile})=>{
+const apiFixture=t=>withLedger(t,({root,repoRoot:mainRepo,ledger,ledgerFile})=>{
   // The spawned api mints the attempt scratch under STARCI_TEST_TEMP_DIR (inherited env); this fixture owns its removal.
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  routeCheckout(repo);
+  routeCheckout(mainRepo);
+  const orca=fakeOrcaWorktrees({root:path.join(root,'worktrees')});
+  const placements=new Map([WORKFLOW,WORKFLOW+'-children',WORKFLOW+'-twins'].map(workflowId=>{
+    const made=orca.create({repo:`path:${mainRepo}`,name:`wf-${workflowId}`,baseBranch:'main'});
+    assert.equal(made.ok,true,JSON.stringify(made));return [workflowId,made.worktree];
+  }));
+  const repo=path.resolve(placements.get(WORKFLOW).path);
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
     STARCI_ORCA_COMMAND:process.execPath,
@@ -172,16 +180,19 @@ const apiFixture=t=>withLedger(t,({root,repoRoot:repo,ledger,ledgerFile})=>{
     STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
-    // Two dispatches in one workflow need distinct handles: op_attempts keys (workflow_id,dispatch_id).
+    // Accepted dispatches retain distinct terminal and attempt identities in the shared project ledger.
     STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',
   };
-  const run=(...args)=>spawnSync(process.execPath,[API,...placeOnRepo(args,repo),'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
-  assert.equal(ledgerFileFor(repo,{env}),ledgerFile,'the child API resolves the fixture-owned project ledger');
-  // A unit belongs to an approved goal revision; the goal's opChain carries the leg's granted paths.
-  seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'queued',job:'app router routes'},
-    goal:{revision:1,markdown:'# goal',json:{opChain:{legs:[{op:OP,paths:['src/']}]}}}});
+  // The side scheduler stays active: separate workflows exercise the shared project's path-lease fence.
+  const run=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',mainRepo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
+  assert.equal(ledgerFileFor(mainRepo,{env}),ledgerFile,'the child API resolves the fixture-owned project ledger');
+  for(const [workflowId,tree] of placements){
+    registerWorkflowWorktree({env},{workflowId,orcaWorktreeId:tree.id,path:tree.path,branch:tree.branch});
+    seedWorkflow(ledger,{id:workflowId,state:{phase:'queued',job:'app router routes'},
+      goal:{revision:1,markdown:'# goal',json:{opChain:{legs:[{op:OP,paths:['src/']}]}}}});
+  }
   const inspect=fn=>{const l=inspectLedger({file:ledgerFile});try{return fn(l.db);}finally{l.close();}};
-  return {root,repo,env,run,inspect};
+  return {root,repo,mainRepo,env,run,inspect};
 });
 const leading=stdout=>{
   const open=stdout.indexOf('{'),close=stdout.indexOf('\n}');
@@ -190,8 +201,8 @@ const leading=stdout=>{
 
 test('api: enqueue -> dispatch leases -> overlap refusal -> report -> settle, every App Router form',t=>{
   const fx=apiFixture(t);
-  const enqueue=paths=>{
-    const r=fx.run('enqueue','--workflow',WORKFLOW,'--op',OP,'--paths',paths.join(','));
+  const enqueue=(paths,workflowId=WORKFLOW)=>{
+    const r=fx.run('enqueue','--workflow',workflowId,'--op',OP,'--paths',paths.join(','));
     assert.equal(r.status,0,r.stderr||r.stdout);
     return leading(r.stdout).job_id;
   };
@@ -205,7 +216,7 @@ test('api: enqueue -> dispatch leases -> overlap refusal -> report -> settle, ev
   assert.equal(d1.status,0,`dispatch of the route owner must pass admission: ${d1.stderr||d1.stdout}`);
   assert.deepEqual(leases(routes),ALL_DIRS.map(d=>`path:${d}`).sort(),'one literal path lease per route');
 
-  const children=enqueue(ALL_DIRS.map(d=>`${d}/loading.tsx`));
+  const children=enqueue(ALL_DIRS.map(d=>`${d}/loading.tsx`),WORKFLOW+'-children');
   const d2=dispatch(children);
   assert.notEqual(d2.status,0,'a child of every held route is fenced');
   const refusal=`${d2.stdout}${d2.stderr}`;
@@ -213,29 +224,40 @@ test('api: enqueue -> dispatch leases -> overlap refusal -> report -> settle, ev
   assert.deepEqual(leases(children),[],'a refused dispatch holds nothing');
 
   const twins=FORMS.map(f=>f.twin).filter(tw=>tw&&!isGlobSegment(tw.split('/').at(-1)));
-  const siblings=enqueue(twins);
+  const siblings=enqueue(twins,WORKFLOW+'-twins');
   const d3=dispatch(siblings);
   assert.equal(d3.status,0,`glob twins are disjoint from the literal routes: ${d3.stderr||d3.stdout}`);
 
   for(const dir of ALL_DIRS)write(fx.repo,pageOf(dir),`export default function Page() { return ${JSON.stringify(dir)}; }\n`);
-  writeGreenProofs(path.join(fx.repo,ALL_DIRS[0])); // the Sonar gate and the op loop read the proofs the op commits with its routes
-  git(fx.repo,'add','-A','--',...ALL_DIRS.map(ownedPathspec));
-  git(fx.repo,'commit','--quiet','-m','implement routes');
+  // The op leaves its owned changes dirty; only an accepted runtime settlement commits them.
   const head=git(fx.repo,'rev-parse','HEAD');
   // starci kernel report accepts the file only from inside the attempt's scratch dir (op_attempts.scratch_dir).
   const scratch=fx.inspect(db=>db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=?').get(routes).scratch_dir);
   const reportFile=path.join(scratch,'report.json');
+  const binding=fx.inspect(db=>JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE attempt_id=(SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1)').get(routes).context_json).packet.context.gate_binding);
+  const proofs=path.join(scratch,'proofs');
+  writeGreenProofs(proofs,{root:fx.repo,binding});
   fs.writeFileSync(reportFile,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'implemented every route form',
-    files:[...ALL_DIRS.map(pageOf),`${ALL_DIRS[0]}/sonar.json`,`${ALL_DIRS[0]}/gate.json`,`${ALL_DIRS[0]}/read-digest.json`],checks:[{name:'self-check',command:'true',exitCode:0}],head}));
-  const filed=fx.run('report','--job',routes,'--report',reportFile);
+    files:ALL_DIRS.map(pageOf),checks:[{name:'self-check',command:'true',exitCode:0}],head}));
+  const filed=fx.run('report','--job',routes,'--report',reportFile,'--attach',proofs);
   assert.equal(filed.status,0,`report files under App Router owned paths: ${filed.stderr||filed.stdout}`);
+  assert.deepEqual((leading(filed.stdout).artifacts??[]).map(row=>row.name).filter(name=>['attachments/proofs/gate.json','attachments/proofs/read-digest.json'].includes(name)).sort(),
+    ['attachments/proofs/gate.json','attachments/proofs/read-digest.json'],'route settlement reads the real attached gate and READ blobs');
   // The settler's own re-run evidence is runtime authority (H8); any other caller's green is declared and never counts.
-  const checked=spawnSync(process.execPath,[API,'record-checks','--repo',fx.repo,'--job',routes,'--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}),'--json'],
+  const checked=spawnSync(process.execPath,[API,'record-checks','--repo',fx.mainRepo,'--job',routes,'--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}),'--json'],
     {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...fx.env,STARCI_CALLER:'runtime-settler'}});
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
 
   const settled=fx.run('settle','--job',routes,'--verdict','pass');
   assert.equal(settled.status,0,`settle passes: ${settled.stderr||settled.stdout}`);
   assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(routes).status),'succeeded');
+  const spilled=fx.inspect(db=>db.prepare("SELECT e.payload_sha,b.sha256,b.file_uri FROM events e JOIN blobs b ON b.sha256=e.payload_sha WHERE e.entity_id=? AND e.kind='workflow-checkpoint-prepared' ORDER BY e.seq DESC LIMIT 1").get(routes));
+  assert.ok(spilled?.payload_sha,'the large route acceptance spills its durable prepared decision into an indexed ledger blob');
+  assert.equal(spilled.payload_sha,spilled.sha256);
+  const prepared=JSON.parse(fs.readFileSync(spilled.file_uri,'utf8'));
+  assert.equal(prepared.opId,routes,'the stored payload retains the exact operation attribution');
+  assert.equal(prepared.settlement.verdict,'pass','recovery reads the original accepted verdict from the indexed payload');
   assert.deepEqual(leases(routes),[],'settle releases every route lease');
+  assert.notEqual(git(fx.repo,'rev-parse','HEAD'),head,'accepted route changes produce a runtime checkpoint');
+  assert.deepEqual(git(fx.repo,'diff','--name-only',head,'HEAD').split(/\r?\n/).sort(),ALL_DIRS.map(pageOf).sort(),'the runtime checkpoint owns exactly the literal route files');
 });

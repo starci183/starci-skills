@@ -1,20 +1,10 @@
 # retired-paths.yaml — files deleted on purpose (owner ruling 2026-09-28 "delete on any error": the reconciler is the only
-# loop; rollback is git revert, not a dormant fallback). History may still name them: a contract-change entry
-# (modules/kernel/contract-changes/**) or modules/kernel/owner-rulings.yaml citing one of these paths is valid
-# (scripts/checks/check-contract-cites.mjs); live contract text must name what runs now. `replacedBy` names the
-# reconciler controller that owns the duty (modules/reconciler/reconciler.yaml), `removedIn` the lane.
-#
-# moved[]: a file that moved, one entry per move ({from, to, movedIn: the chunk, quiesced: true only for a pinned path moved
-# with the fleet stopped}); recorded by its actual move owner. Existing HFS migration rows were written by its codemod;
-# starci-explicit-entry records its bounded prompt relocation, without claiming that codemod ran. History may cite `from`, live prose
-# cites `to`; RT_RETIRED_PRESENT refuses a `from` that is tracked again.
-# retiredSymbols[]: a name replaced by an Orca built-in or another mechanism ({symbol, replacedBy}); RT_RETIRED_PRESENT
-# refuses a declaration of it in runtime production code (scripts/hfs/runtime-rules/retired.mjs).
-# retiredNames[]: a dead naming that is not a path ({name, note}) — a deleted app, a layer naming, a verb prefix;
-# RT_RETIRED_NAME_LIVE refuses it in any live tracked file (scripts/checks/check-retired-names.mjs, which also derives the
-# name of every deleted dir/path of this file).
+# loop; rollback is git revert, not a dormant fallback). Live prose names current owners.
+# This declaration lists forbidden paths, moved destinations and dead symbols for the current checks; it does not select another runtime law.
+# replacedBy identifies the current owner; moved[].to identifies the legal destination. Existing data is not rewritten by this source fold.
 schema: starci/retired-paths@2
 retired:
+  - {path: scripts/kernel/contract-changes-store.mjs, removedIn: C3, replacedBy: 'The dated rollout registry is removed; scripts/machine/contract-version.mjs owns captured current admission inputs'}
   - {path: scripts/supervisor/stall-alert.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'workflow controller (stall DIs, escalation), fleet Notifier (owner digest, host-resource push), gc controller (housekeeping status); ownerPush moved to scripts/connectors/telegram.mjs'}
   - {path: scripts/supervisor/tick.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'host (host, orca, statusApp), fleet (digest push, owed, land, alerts), workflow (workflows, progress), resource (sample, census, throttle), gc (gc) controllers; digest reads: poll.mjs --once'}
   - {path: scripts/supervisor/tick-duties.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'the same controllers as tick.mjs'}
@@ -51,7 +41,7 @@ retired:
   - {path: tests/harness-contract.spec.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'owner override: manual UI and API verification; no test files'}
   - {path: ui/op-proofs.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'ui/api/routes/attempt.mjs and the attempt evidence view'}
   - {path: ui/agent-monitor.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'ui/src/pages/work/workflow.tsx and ui/src/pages/attempt/attempt.tsx'}
-  - {path: modules/kernel/contract-changes.yaml, retiredAt: 2026-09-29, removedIn: legacy-wp2, replacedBy: 'one entry file per change under modules/kernel/contract-changes/<id>.yaml (fields: modules/kernel/contract-changes-format.yaml)'}
+  - {path: modules/kernel/contract-changes.yaml, retiredAt: 2026-09-29, removedIn: legacy-wp2, replacedBy: 'scripts/machine/contract-version.mjs captures inputs; current owners enforce current law'}
   - {path: ui/agent-changes.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'ui/api/routes/attempt.mjs diff endpoint'}
   - {path: modules/schemas/work-app-shell.schema.yaml, retiredAt: 2026-09-29, removedIn: layout-tree-no-legacy, replacedBy: 'modules/schemas/work-layout-tree.schema.yaml (work/layout-tree@1)'}
   - {path: engine/index.mjs, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'engine/digest.mjs (sha256, sha256File), engine/plain-object.mjs (isPlainObject), engine/canonical-json.mjs (canonicalJSON); the recursive work/node validator has no replacement - a work/node@N record is refused (HFS_WORK_NODE_RETIRED) by scripts/checks/check-example-work.mjs'}
@@ -471,7 +461,7 @@ moved:
   - {from: tests/connectors-single-instance.spec.mjs, to: tests/connectors/connectors-single-instance.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/connectors.spec.mjs, to: tests/connectors/connectors.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/context-pack.spec.mjs, to: tests/repo/context-pack.spec.mjs, movedIn: C7, quiesced: false}
-  - {from: tests/contract-freeze.spec.mjs, to: tests/supervisor/contract-freeze.spec.mjs, movedIn: C7, quiesced: false}
+  - {from: tests/contract-freeze.spec.mjs, to: tests/supervisor/land-baseline.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/contract-rollout.spec.mjs, to: tests/kernel/contract-rollout.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/credential-pending-rule.spec.mjs, to: tests/repo/credential-pending-rule.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/cut-seam-stub.spec.mjs, to: tests/kernel/cut-seam-stub.spec.mjs, movedIn: C7, quiesced: false}
@@ -960,7 +950,6 @@ moved:
   - {from: scripts/kernel/ask-receipts.mjs, to: scripts/machine/ask-receipts.mjs, movedIn: C3, quiesced: false}
   - {from: scripts/kernel/evidence-store.mjs, to: scripts/machine/evidence-store.mjs, movedIn: C3, quiesced: false}
   - {from: scripts/kernel/contract-version.mjs, to: scripts/machine/contract-version.mjs, movedIn: C3, quiesced: false}
-  - {from: scripts/kernel/contract-changes-store.mjs, to: scripts/machine/contract-changes-store.mjs, movedIn: C3, quiesced: false}
   - {from: engine/db/blob-lookup.mjs, to: engine/db/blob.mjs, movedIn: C3, quiesced: false}
   - {from: scripts/api/git/worktree-list.mjs, to: scripts/api/git/worktree-list-porcelain.mjs, movedIn: C5, quiesced: false}
   - {from: scripts/api/git/preserve-work.mjs, to: scripts/machine/worktree-git.mjs, movedIn: C5, quiesced: false}

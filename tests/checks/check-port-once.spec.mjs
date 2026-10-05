@@ -57,7 +57,6 @@ test('spec files, tests, generated runtime and product stacks are outside the la
     'scripts/x.spec.mjs': `'http://localhost:9010'`,
     'packages/p/runtime/copy.mjs': `'http://localhost:9010'`,
     'examples/starcistacks-services/s.yaml': 'port: 9010\n',
-    'modules/kernel/contract-changes/old.yaml': 'port: 9010',
   }), []);
 });
 

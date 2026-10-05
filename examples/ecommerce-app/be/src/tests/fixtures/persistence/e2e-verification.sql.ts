@@ -132,3 +132,25 @@ export const OUTBOX_OF_EVENT: RowQuery<OutboxStateRow> = {
 /** Writes the outbox row of an event id a second time, as a relay that crashed after sending would ($1 event id). */
 export const DUPLICATE_OUTBOX_ROW = sql`INSERT INTO event_outbox (event_id, event_name, topic, message_key, envelope, created_at)
     SELECT event_id, event_name, topic, message_key, envelope, created_at FROM event_outbox WHERE event_id = $1 ORDER BY id LIMIT 1`
+
+/** Counts the two generated TestWorld trigger/function identities ($1 outbox fault, $2 claim DELETE fault). */
+export const BILLING_FAULT_OBJECT_COUNT: RowQuery<CountRow> = {
+    text: sql`SELECT (
+        (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public' AND p.proname IN ($1, $2))
+        + (SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relname IN ('event_outbox', 'inbox_claims')
+                AND t.tgname IN ($1, $2))
+    )::int AS count`,
+}
+
+/** Counts the exact transfer claim ($1 source, $2 captured JSON body); other fixture claims never enter this count. */
+export const TRANSFER_CLAIM_COUNT: RowQuery<CountRow> = {
+    text: sql`SELECT count(*)::int AS count FROM public.inbox_claims
+    WHERE source = $1 AND event_id = ($2::jsonb ->> 'id')`,
+}
+
+/** Probes the DELETE fault or cleans its control claim ($1 source, $2 exact captured JSON body). */
+export const DELETE_TRANSFER_CLAIM = sql`DELETE FROM public.inbox_claims
+    WHERE source = $1 AND event_id = ($2::jsonb ->> 'id')`

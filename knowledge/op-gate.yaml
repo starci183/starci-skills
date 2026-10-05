@@ -17,6 +17,14 @@ purpose: >-
   checkpoint, so only the op's own new findings block. A green settle commits the op's checkpoint on wf-<workflowId>; a
   failed or blocked op is preserved to preserved/<workflowId>/<op> and the worktree reset to the last checkpoint. Main is
   touched only at the workflow's finish.
+  Before CODE, READ docs/architecture.md and docs/code-pattern-enforcement.md (REF-COMMENT-1) and applicable comment topics,
+  recording them in the operation's existing READ proof. Within each existing round, CHECK comment
+  meaning against source, callers and relevant tests alongside actual owning lint, typecheck and tests.
+  App source uses its existing gate and ESLint profile; non-app code uses its declared supported owning
+  checks, never an app-gate fallback. Missing applicable checkers or tooling block conformance under
+  REF-VERIFY-1. REPORT mechanical proof and required semantic criterion judgments separately in existing
+  evidence; failed or unjudged required criteria prevent done. This instruction creates no new write
+  authority or checker profile.
 enforcedOps:
   - backend.scaffold
   - backend.implement
@@ -38,11 +46,10 @@ digest:
   script: scripts/gates/read-digest.mjs
   schema: starci/read-digest@1
   attach: read-digest.json
-# The example app whose files show each slot done right, per side. A slot's example files are the files of the example side
-# that its `starci app explain` pattern matches.
+  required: [docs/architecture.md, docs/code-pattern-enforcement.md]
+# Topics select stable reference IDs; the catalog binds their complete actual app source sets.
 examples:
-  be: examples/ecommerce-app/be
-  fe: examples/ecommerce-app/fe
+  catalog: examples/index.yaml
 # File kind -> pattern files. A touched file's kind is the slot `starci app explain` names; its family is the slot id's first
 # segment. It owes the family's `always` files plus the topics of the longest dotted slot prefix the derived map knows:
 # each pattern topic declares the slots it teaches in its own `slots` field (knowledge/patterns/<family>/<topic>.yaml),
@@ -57,7 +64,7 @@ kinds:
     always: [repo/index.yaml, repo/folder.yaml]
   app:
     always: [repo/index.yaml, repo/folder.yaml]
-# The mechanism proofs of the ops beyond the code loop (contract change op-mechanism-proofs, owner 2026-10-01). Every op named
+# Native mechanism proofs of the ops beyond the code loop. Every op named
 # under opProofs runs the mechanism its job touches and attaches the document it prints; `starci kernel settle` re-reads each document
 # itself (scripts/kernel/gate-settle.mjs judgeProofs) and records the runtime check op-proof. An op under both enforcedOps and
 # opProofs owes the code loop AND its proofs. A proof listed with `modes` is owed only by a dispatch whose params.mode is one of

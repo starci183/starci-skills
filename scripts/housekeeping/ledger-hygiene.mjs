@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// starci runtime ledger-hygiene — the standalone report of scripts/housekeeping/hk-orphan-ledgers.mjs's two findings (COOK-BRIEF F4
-// handover, incident 2026-09-30): orphan ledgers in the state root, and legacy .starciwork/runtime.sqlite stores in
+// starci runtime ledger-hygiene — the standalone report of scripts/housekeeping/hk-orphan-ledgers.mjs's two findings
+// (docs/ledger-db.md §1): orphan ledgers in the state root, and legacy .starciwork/runtime.sqlite stores in
 // a bound repository. Both are report-only by default; `--apply` archives the orphan ledgers found (never deletes)
 // and never touches a file inside a repository — the legacy-store finding stays report-only always, so the owner
 // removes those files by hand (owner ruling: no legacy).

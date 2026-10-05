@@ -1,19 +1,16 @@
-// kill-tree.mjs — the ONE forced stop of a process tree on the host (taskkill /F /T /PID <pid>).
-//
-// Every runtime path that stops a tree it owns calls this: the GC sweep (scripts/supervisor/gc.mjs), the
-// runaway-shim stop (scripts/supervisor/host-health.mjs
-// stopTree) and the UAT listener restart
-// (scripts/uat/env-health.mjs). Reconciler controllers do not import it: they go through ctx.run so shadow mode
-// can record the stop instead of doing it.
-//
-//   killTree(pid, {timeoutMs, run, platform}) -> {ok, status, output}
-//
-// Never throws. Off Windows it stops nothing and says so (`ok: false`); a caller with a POSIX path keeps its own.
+// kill-tree.mjs — the host API for a forced Windows process-tree stop.
 import { spawnSync } from 'node:child_process';
 
 const KILL_TREE_COMMAND = 'taskkill.exe';
 const killTreeArgs = (pid) => ['/F', '/T', '/PID', String(pid)];
 
+/**
+ * Force-stop a caller-owned PID and its descendants with Windows taskkill.
+ * The caller proves ownership and validates the PID; this API checks neither.
+ * Non-Windows calls stop nothing and return `{ok:false,status:null,output}`.
+ * Returns `{ok,status,output}` with bounded diagnostic text; spawn failures become
+ * failure results. `ok` reflects taskkill's exit status without rechecking liveness.
+ */
 export function killTree(pid, { timeoutMs = 60_000, run = spawnSync, platform = process.platform } = {}) {
   if (platform !== 'win32') return { ok: false, status: null, output: 'not windows' };
   try {

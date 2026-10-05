@@ -100,26 +100,25 @@ conventions:
     contradict the job's bound {run, task, dispatch, from} fails
     starci/op-report@1 at filing (report-invalid)
   callerBoundary: >-
-    The ledger is the Kernel's through these verbs; an op reaches it only through its own `report`
-    and the read projections (status, survey, hierarchy, estimate, op-contract). An op worker ran
-    node:sqlite against .starciwork/runtime.sqlite (inc-360891316369), so this is enforced, not only
-    instructed. ENFORCED: (1) the op packet and prompt name no ledger file - only the api verbs;
-    (2) Orca exports ORCA_TERMINAL_HANDLE into every terminal it owns, so a caller whose handle is the
-    bound terminal of an op job (worker_id, payload managed/orca agentTerminalHandle, hierarchy runtime
-    terminalHandle) is that op - every op is a worker-start agent whose env StarCi cannot set, so that
-    binding is the op's one identity (scripts/guards/op-context.mjs resolves its job, scratch and provider
-    from it for the scripts an op runs); (3) from an op caller every kernel verb
-    (plan, enqueue, route, dispatch, reconcile, nudge, observe, questions, messages, reply, peers, notify, inbox,
-    settle, record-checks, consume-report, serve-ask, retire-ask, incident, provider-health, finish, archive) refuses `op-context-refused` before it runs, and `report`
-    refuses `report-identity-mismatch` for any job but the caller's own (whose dispatch/contract
-    binding the report binding then proves); each refusal appends 'op-caller-refused' on the op's
-    job. RESIDUAL, owner-visible: the api cannot stop a raw file read - a worker with unattended
-    shell permissions can still open the ledger file or unset the marker and call from a terminal
-    Orca does not attribute to it. Nothing it reads that way is authority: only a filed report plus
-    the Kernel's own `starci kernel record-checks` settles, and a ledger claim quoted from a screen is never evidence.
-    Nothing an op needs is only in the ledger: the packet carries the owner's goal statement
-    (context.goal {revision, statement, amendment?} of the revision the job is bound to), so `starci kernel op-contract --json` answers what
-    workers opened the file for (nivo auth inc-26b260e101e4). `messages` is a kernel verb too.
+    scripts/guards/op-caller.mjs resolves actual terminal bindings and managed history, distinguishing
+    Ops, current Kernels, actual Supervisor seats/Workers, known retired/foreign callers, unknown reads
+    and the existing unbound owner session. --by and role environment claims grant no API identity.
+    Ops retain their own report and declared projections; kernelOnly excludes Ops and does not redefine
+    owner/Supervisor maintenance verbs. A Kernel mutation binds workflow generation, attempt, terminal,
+    immutable Dispatch and singleton token through kernel-seat.mjs. caller-admission.mjs rechecks that
+    identity after BEGIN IMMEDIATE and before native Node/Git/Orca effects through the existing owners.
+    Claims and resolutions carry its server-derived incarnation identity. Unknown custody and conflicting
+    actor claims refuse. Unbound owner shell access remains a trusted administrative boundary; this API
+    fence cannot prevent raw SQLite access or prove a missing native handle was never managed.
+  requiredRead: >-
+    scripts/kernel/required-read.mjs derives the complete current Kernel and workflow/op contract paths
+    and byte hashes. kernel-ack-rev --plan projects them; only the current Kernel attests the exact manifest
+    with --read-manifest. Boot records runtime-read-delivered provenance without acknowledgement. Relevant
+    dirty, unknown, incomplete or changed bytes and a replaced incarnation refuse affected new-leg admission.
+    Git trees retain their actual SHA identity. Installed trees validate the existing install descriptor/package
+    protocol and every required custody hash, deriving an explicit installed revision from current required bytes.
+    Neither package version nor a descriptor alone proves READ. Already admitted Ops retain their frozen
+    contract/proof scope; current safeguards apply and changed relevant bytes require actual READ/CHECK.
   sharedCheckout: >-
     Each Git workflow uses its registered workflow checkout and branch; its sibling ops share
     that tree and a worker touches only its owned paths. Ops never stage or commit. ENFORCED at every op dispatch
@@ -141,7 +140,7 @@ conventions:
     GIT_CONFIG_* (HOOKS_BYPASS), and an App Router pathspec git would read as a glob (APP_ROUTER_GLOB);
     deps-guard.mjs refuses an install-family npm, pnpm or yarn command whose package root (cwd, --prefix,
     -C/--dir, --cwd) has a linked node_modules - its own, one it sits inside, or its workspace root's -
-    (DEPS_THROUGH_LINK; this one rule holds with no guard file too, contract change install-through-link),
+    (DEPS_THROUGH_LINK; this rule also holds without a guard file),
     a raw orca orchestration check from the Kernel (KERNEL_ORCA_CHECK), and npm ci while a job of ANOTHER workflow of the ledger is leased; `ln`,
     `mklink`, New-Item -ItemType Junction|SymbolicLink|HardLink and Create*Link are refused (LINK_CREATE)
     - the hook blocks the command (exit 2) with a typed code and the remedy; (2)
@@ -157,7 +156,7 @@ conventions:
     guards.workHook false switch a hook layer off. Settle backs it: only the runtime commits on a workflow
     branch (workflow-checkpoint.mjs checkpointOp), and a commit or change outside an op's leases refuses
     its pass (workflow-foreign-commit, workflow-foreign-change). The Kernel is guarded too
-    (contract change kernel-guard-file): start-workflow.mjs writes it a job guard of role kernel
+    through scripts/guards/hook-install.mjs: start-workflow.mjs writes it a job guard of role kernel
     (kernel-<workflow>, no owned path, its workflowWorktree) and binds it to the Kernel's terminal, so
     layer (1) refuses its raw git history changes, worktree adds, recursive deletes, kills by name and
     raw agent launches while its `node cli.mjs <verb>` calls pass; layer (3) skips a kernel guard, since

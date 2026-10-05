@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { writeContract } from '../../engine/db/ledger.mjs';
 import { writeJobGuard, bindGuardTerminal } from '../../scripts/guards/hook-install.mjs';
 import { opContextOf } from '../../scripts/guards/op-context.mjs';
 
@@ -25,6 +26,12 @@ test('the op context is the job the ledger binds to the caller\'s Orca terminal,
   const env = (extra) => ({ ...process.env, ...extra });
   assert.deepEqual(opContextOf({ env: env({ ORCA_TERMINAL_HANDLE: 'term_draw' }), root: skillRoot }),
     { jobId: 'op-draw-1', workflowId: WF, scratchDir: scratch, provider: 'devin', dispatchId: 'seed:op-draw-1', handle: 'term_draw', ledgerRepo: path.resolve(repoRoot) });
+  const attempt = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get('op-draw-1');
+  const gateBinding = { change: 'op-gate-input-binding', at: Date.now(), targets: [{ root: repoRoot, head: 'a'.repeat(40), owned: ['src'] }] };
+  writeContract(ledger.db, { attemptId: attempt.attempt_id, markdown: '# admitted contract', createdAt: Date.now(),
+    context: { packet: { context: { gate_binding: gateBinding } } } });
+  assert.deepEqual(opContextOf({ env: env({ ORCA_TERMINAL_HANDLE: 'term_draw', STARCI_OP_JOB: 'different-job' }), root: skillRoot, contract: true }).gateBinding,
+    gateBinding, 'the terminal-bound attempt supplies the baseline, never an environment job marker');
   // No terminal, a terminal with no guard (the Kernel's, the owner's), or a guard the ledger does not bind to that
   // terminal: no op. An env marker never names one.
   assert.equal(opContextOf({ env: env({ ORCA_TERMINAL_HANDLE: '', STARCI_OP_JOB: 'op-draw-1', STARCI_JOB_SCRATCH: scratch, STARCI_OP_PROVIDER: 'devin' }), root: skillRoot }), null);

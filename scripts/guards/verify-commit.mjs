@@ -27,7 +27,7 @@ function gitTop(git, cwd) {
 // paths. A merge counts with the files it differs from every parent in, and each commit it brings from its other side
 // is a commit of its own; a pull or fast-forward of published history brings none. (diff-tree of a merge without -c
 // lists nothing, so a merged foreign branch landed unseen.)
-export function foreignPathsOf({ git = 'git', cwd, oldSha, newSha, owned }) {
+function foreignPathsOf({ git = 'git', cwd, oldSha, newSha, owned }) {
   const run = (call, args) => call(args, { cwd, git });
   const top = gitTop(git, cwd);
   const brought = run(revList, [newSha, '--not', oldSha, '--remotes']);

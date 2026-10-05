@@ -27,9 +27,10 @@ rules:
     kind: mandatory
     hfsRules: [R51, R53, R92]
     requirement: |
-      A read failure is a slot status, never a shape: the connected half folds each Outcome with `toSlot` (a refused
-      outcome becomes isForbidden, any other failure isError), and the pure half renders it through `SlotView` with a
-      retry that re-runs that read (knowledge/grammars/starci/playbook.yaml guidance state-recipes). A command failure is
+      A read failure is a slot status, never a shape: the connected half folds each Outcome with `toSlot`, retaining a
+      refused read's status as unauthorized for 401 and forbidden for 403; any other failure becomes isError. The pure
+      half renders `SlotView` by the family state-recipes (knowledge/grammars/starci/playbook.yaml); retry re-runs that
+      read. A command failure is
       resolved by the connected half into field errors (zod message keys resolved by next-intl) or a toast. XState never
       holds failed, error or forbidden.
     rationale: |
@@ -44,8 +45,11 @@ rules:
       - id: case-2
         when: "A read is refused (401 or 403)"
         write: >
-          toSlot gives { isForbidden: true, isError: false }; a primary slot shows the forbidden notice, a secondary slot
-          unmounts, and a session refusal navigates to sign-in from the data layer
+          toSlot preserves 401 as unauthorized and 403 as forbidden, neither as error. Per the family state-recipes,
+          a primary 401 slot shows one sign-in prompt whose action opens the product's real sign-in route and returns
+          to this address; a primary 403 slot shows the forbidden notice, and secondary slots unmount for either status.
+          A session refusal still navigates to sign-in from the required data-layer session check; the slot prompt does
+          not replace that guard
       - id: case-3
         when: "Failure copy"
         write: >

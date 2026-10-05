@@ -224,10 +224,10 @@ file leases, visible in /status and landed through the gate.
   `starci supervisor lesson-actions land --signature <s> --commit <sha> --lane <name> ...` (it calls `land.mjs` and
   records the experiment), or a worker job via `starci supervisor land --job <id>`. The gate cherry-picks onto current main in a
   scratch worktree, runs node --check, YAML/JSON parse, check-module-yaml, check-contract-cites, check-cli-parity,
-  the named specs and the specs touching the changed files, requires a contract-changes entry with `paths` for any
-  contract/schema/knowledge/op file, then fast-forwards live main and pushes. A red gate lands nothing.
+  the named specs and specs touching the changed files, then fast-forwards live main and pushes. Current
+  contracts and native package/proof checks refuse red or unavailable evidence. A red gate lands nothing.
 - Workers do the same in their own staging checkouts and finish with `workers.mjs report`; you land their commits.
-- A contract change reaches new legs only (guardrail contract-rollout): never tell a Kernel to redo settled work.
+- Preserve admitted attempt custody and evidence. Require current READ and safeguards for new admission; diagnose concrete drift without inventing historical follow-up work.
 
 ## Never
 

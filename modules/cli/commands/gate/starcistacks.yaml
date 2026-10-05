@@ -7,8 +7,6 @@ positional:
   - {name: repo-root, required: true, variadic: false}
 flags:
   - {name: new, type: boolean, summary: check a repository being created by this leg}
-  - {name: admitted-at, type: string, summary: admission time for contract-change advice}
-  - {name: op, type: string, summary: admitted operation for contract-change advice}
 exit:
   "0": declaration and custody layout are clean
   "1": repository is refused

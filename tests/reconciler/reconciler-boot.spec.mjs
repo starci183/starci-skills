@@ -9,8 +9,9 @@ import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import { crashLoopPlan, crashLoopRecord, ensure, isPlannedStart, SPAWNED_KIND } from '../../scripts/reconciler/boot.mjs';
 import { PROFILES, REQUIRED_ACTIVE, configuredMode, reconcilerConfig } from '../../scripts/reconciler/state.mjs';
-import { applyHost, buildUi, ensureHostRuntime, applyProfileText, cmpVersion, engineItems, isTempLedger, ledgerFindings, ledgerIntegrity, pinProblems, profileItems, sqliteItem, summarize, uiBuildState } from '../../scripts/reconciler/start.mjs';
+import { applyHost, buildUi, ensureHostRuntime, applyProfileText, cmpVersion, engineItems, hostPlatformItem, isTempLedger, ledgerFindings, ledgerIntegrity, main, pinProblems, profileItems, sqliteItem, summarize, uiBuildState } from '../../scripts/reconciler/start.mjs';
 import { tempState } from '../../scripts/reconciler/testing.mjs';
+import { main as workflowUp } from '../../scripts/reconciler/workflow-up.mjs';
 
 const NOW = 10_000_000;
 const NUMBERS = { pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, backoff: { minMs: 1000, maxMs: 300000 }, crashLoop: { max: 3, windowMs: 1800000 } };
@@ -239,7 +240,7 @@ test('a held host lock refuses UI work and a failed awaited build blocks subsequ
   });
   assert.equal(held.ok, false);
   assert.match(held.output, /host lock refused.*held/);
-  const applied = await applyHost({ env, waitMs: 0, workflowSeats: false }, {
+  const applied = await applyHost({ env, waitMs: 0, workflowSeats: false, platform: 'win32' }, {
     uiBuildState: () => ({ stale: true, reason: 'cold fixture' }),
     buildUi: async (options) => { assert.equal(options.env, env); await Promise.resolve(); calls.push('build-failed'); return { ok: false, output: 'fixture ci red' }; },
     leaderState: () => { calls.push('engine'); }, probeServices: () => { calls.push('services'); },
@@ -255,10 +256,10 @@ test('host apply keeps Supervisor but excludes Kernel watchdogs during workflow 
     status: () => ({ modes: {} }), probeServices: async () => [], probeOrcaAsync: async () => ({ ok: true }),
     loadConfig: () => ({}), supervisorMode: () => 'kernel', json: async () => { calls.push('supervisor'); return { ok: true, action: 'already-live' }; },
     kernelSeatItems: async () => { calls.push('kernel'); return []; } };
-  await applyHost({ noBuild: true, waitMs: 0, workflowSeats: false }, deps);
+  await applyHost({ noBuild: true, waitMs: 0, workflowSeats: false, platform: 'win32' }, deps);
   assert.deepEqual(calls, ['supervisor']);
   calls.length = 0;
-  await applyHost({ noBuild: true, waitMs: 0, workflowSeats: true }, deps);
+  await applyHost({ noBuild: true, waitMs: 0, workflowSeats: true, platform: 'win32' }, deps);
   assert.deepEqual(calls, ['supervisor', 'kernel']);
 });
 
@@ -296,6 +297,30 @@ test('explicit profile repair and stale-ledger retirement retain their effects o
   assert.equal(effects, 0, 'explicit profile repair cannot bypass another prerequisite');
 });
 
+test('unsupported managed-service OS refuses before any host mutation, including explicit profile and retirement requests', async () => {
+  for (const platform of ['linux', 'darwin']) {
+    const item = hostPlatformItem(platform);
+    assert.equal(item.group, 'preflight');
+    assert.equal(item.required, true);
+    assert.equal(item.status, 'red');
+    assert.match(item.detail, /Windows Task Scheduler/);
+    let effects = 0;
+    const result = await ensureHostRuntime({ platform, waitMs: 0, setProfile: 'operational', retire: true }, {
+      gather: async options => { assert.equal(options.platform, platform); return [hostPlatformItem(options.platform)]; },
+      applyHost: async () => { effects++; return ['unexpected effect']; },
+    });
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.applied, []);
+    assert.equal(effects, 0);
+    assert.deepEqual(await applyHost({ platform, waitMs: 0, setProfile: 'operational', retire: true }, {
+      uiBuildState: () => { effects++; throw new Error('unexpected build probe'); },
+      leaderState: () => { effects++; throw new Error('unexpected engine probe'); },
+    }), [`host startup refused: ${item.detail}`]);
+    assert.equal(effects, 0);
+  }
+  assert.equal(hostPlatformItem('win32').status, 'green');
+});
+
 test('preflight: SQLite version, temp and missing ledgers, a model pin the launch cannot honour', () => {
   assert.ok(cmpVersion('3.51.3', '3.51.3') === 0 && cmpVersion('3.50.9', '3.51.3') < 0 && cmpVersion('3.53.4', '3.51.3') > 0);
   assert.equal(sqliteItem('3.51.2').status, 'red');
@@ -313,7 +338,7 @@ test('preflight: SQLite version, temp and missing ledgers, a model pin the launc
   assert.deepEqual(repos.map((f) => `${f.ledgerId}:${f.problem}`), ['e:missing-repo']);
   const integrity = ledgerIntegrity([{ name: 'c', file: ok }, { name: 'x', file: gone }, { name: 'r', file: ok, state: 'retired' }, { name: 'bad', file: 'bad.sqlite' }],
     { exists: (f) => f !== gone, check: (f) => (f === 'bad.sqlite' ? { ok: false, result: ['page 3 corrupt'] } : { ok: true, result: ['ok'] }) });
-  assert.deepEqual(integrity, { bad: [{ name: 'bad', result: 'page 3 corrupt' }], checked: 2 });
+  assert.deepEqual(integrity, { bad: [{ name: 'bad', reason: 'integrity-failed', result: 'page 3 corrupt' }], checked: 2 });
   // A pinned model is launched with worker-start --model and attested from worker-show: only an agent that takes no
   // --model (devin: start.modelArgument false) or has no card cannot honour a pin.
   const card = (agent) => ({ claude: { start: { api: 'orchestration.worker-start' } }, devin: { start: { api: 'orchestration.worker-start', modelArgument: false } } }[agent] ?? null);
@@ -328,4 +353,44 @@ test('the checklist is red when a needed controller is shadow or the engine is s
   assert.equal(summarize(engineItems(status(all('shadow')))).ok, false);
   assert.equal(summarize(engineItems(status({ ...all('active'), gc: { configured: 'shadow', effective: 'shadow' }, workers: { configured: 'shadow', effective: 'shadow' }, learning: { configured: 'shadow', effective: 'shadow' } }))).ok, true);
   assert.equal(summarize(engineItems(status(all('active'), { safe: true }))).ok, false);
+});
+
+test('private workflow startup excludes Kernel recursion and preserves declared caller and partial maintenance outcome', async () => {
+  const previousExit = process.exitCode, env = { fixture: 'actual-caller' }, calls = [], printed = [];
+  try {
+    const result = await workflowUp(['--caller-agent=codex', '--caller-model=gpt-6.1-sol', '--json'], {
+      env, loadConfig: () => ({ debug: true }), print: text => printed.push(JSON.parse(text)),
+      ensureHostRuntime: async input => { calls.push(['host', input]); return { ok: true, items: [], applied: [], summary: { ok: true } }; },
+      ensureDebug: async input => { calls.push(['debug', input]); return { ok: false, ready: false, action: 'launch-unknown', dispatch: 'retained-debug' }; }
+    });
+    assert.equal(calls[0][1].workflowSeats, false);
+    assert.equal(calls[0][1].env, env);
+    assert.deepEqual(calls[1][1], { caller: { agent: 'codex', model: 'gpt-6.1-sol', effort: null }, env, plan: false });
+    assert.equal(result.hostOk, true);
+    assert.equal(result.ok, false);
+    assert.equal(result.maintenance.dispatch, 'retained-debug');
+    assert.equal(printed[0].hostOk, true);
+    assert.equal(process.exitCode, 1);
+  } finally { process.exitCode = previousExit; }
+});
+
+test('ordinary up keeps workflow seats while the private read-only child never launches maintenance', async () => {
+  const previousExit = process.exitCode, requests = [];
+  try {
+    const deps = { loadConfig: () => ({ debug: true }), print: () => {},
+      ensureHostRuntime: async input => { requests.push(input); return { ok: true, items: [], applied: [], summary: { ok: true } }; },
+      ensureDebug: async () => { throw Error('read-only up launched maintenance'); } };
+    const ordinary = await main(['--check', '--json'], deps);
+    const privateResult = await workflowUp(['--check', '--json'], { ...deps, workflowEntry: false });
+    for (const argv of [['--workflow-entry', '--check', '--json'], ['--check', '--json', '--', '--workflow-entry'],
+      ['--workflow-entry=true', '--check', '--json'], ['--workflow-entry=false', '--check', '--json']])
+      await main(argv, deps);
+    assert.equal(requests[0].workflowSeats, true);
+    assert.equal(Object.hasOwn(ordinary, 'hostOk'), false);
+    assert.equal(requests[1].workflowSeats, false);
+    assert.equal(requests[1].check, true);
+    assert.equal(privateResult.hostOk, true);
+    assert.ok(requests.slice(2).every(input => input.workflowSeats === true), 'argv cannot select the private workflow mode');
+    assert.equal(process.exitCode, 0);
+  } finally { process.exitCode = previousExit; }
 });

@@ -40,10 +40,10 @@ reads:
     purpose:
       en: shared
   - id: standard
-    path: knowledge/op-gate.yaml + knowledge/patterns/** + knowledge/code-examples/**
+    path: knowledge/op-gate.yaml + knowledge/patterns/** + examples/index.yaml
     purpose:
-      en: "The standard a content unit's code or product copy follows: the knowledge/patterns files of the code kinds a code sample or snippet shows, knowledge/code-examples, and knowledge/patterns/fe/i18n.yaml for copy that lands in a catalog."
-      vi: "Chuẩn mà mã hoặc nội dung sản phẩm của một đơn vị nội dung theo: các tệp knowledge/patterns của loại mã mà ví dụ hay đoạn mã thể hiện, knowledge/code-examples, và knowledge/patterns/fe/i18n.yaml cho nội dung đưa vào catalog."
+      en: "The standard a content unit's code or product copy follows: the knowledge/patterns files of the code kinds a code sample or snippet shows, the actual source indexed by examples/index.yaml, and knowledge/patterns/fe/i18n.yaml for copy that lands in a catalog."
+      vi: "Chuẩn mà mã hoặc nội dung sản phẩm của một đơn vị nội dung theo: các tệp knowledge/patterns của loại mã mà ví dụ hay đoạn mã thể hiện, the actual source indexed by examples/index.yaml, và knowledge/patterns/fe/i18n.yaml cho nội dung đưa vào catalog."
 writes:
   - id: node
     path: N/index.yaml

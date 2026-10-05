@@ -83,6 +83,13 @@ const booted = (c) => { c._state.bootPending = false; return c; };
 const SEAT = 'seat:kernel:shop-be:wf-shop-fe-canon';
 const repairRuns = (ctx) => ctx.calls.run.filter((r) => r.args[0] === 'scripts/kernel/kernel-watchdog.mjs');
 
+test('ledger backup retry uses the declared positive cooldown and refuses invalid settings',()=>{
+  const raw=parseYaml(fs.readFileSync(new URL('../../modules/reconciler/host.yaml',import.meta.url),'utf8'));
+  assert.equal(S.ledgerHealth.backupRetryMs,raw.ledgerHealth.backupRetryMs);
+  assert.ok(Number.isFinite(S.ledgerHealth.backupRetryMs)&&S.ledgerHealth.backupRetryMs>0);
+  for(const backupRetryMs of [undefined,0,-1,NaN])assert.throws(()=>hostSettings({...raw,ledgerHealth:{...raw.ledgerHealth,backupRetryMs}}),/ledgerHealth.backupRetryMs must be a positive number/);
+});
+
 test('Host controller maintains the distinct core seat through one nonrecursive native watchdog call', async () => {
   const c = booted(controller()), key = `seat:${coreDebugProfile().seatId}`;
   const ctx = hostCtx({ mode: 'active', dbs: {}, runAnswer: () => ({ ok: false, stdout: JSON.stringify({ ok: false, action: 'host-unavailable' }) }) });
@@ -286,7 +293,7 @@ test('ledger health: a failed quick_check is LEDGER_CORRUPT + one DI; the nightl
   const ledgers = [{ ledgerId: 'shop-be', repo: fixtureRepo('r'), file: fixtureLedger('r') }];
   let ok = false;
   const c = controller({ quickCheck: () => (ok ? { ok: true, result: ['ok'] } : { ok: false, result: ['*** in database main ***', 'page 7: btree'] }), backupDue: () => true });
-  const ctx = hostCtx({ ledgers, dbs: { 'shop-be': ledgerDb() } });
+  const ctx = hostCtx({ mode: 'active', ledgers, dbs: { 'shop-be': ledgerDb() }, runAnswer: () => ({ ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: 'shop-be' }) }) });
   await c.reconcile('ledger:shop-be', ctx);
   assert.ok(ctx.calls.clock.some((x) => x.code === 'LEDGER_CORRUPT' && x.severity === 'critical'));
   assert.equal(ctx.calls.decisions.length, 1);
@@ -326,6 +333,9 @@ test('the module export matches the shared contract', async () => {
 /* ------------------------------------------------------------ turn budget (KERNEL_TURN_OVERDUE) */
 
 const TB = { budgetMs: 20 * 60_000, graceMs: 5 * 60_000, sameTurnSlackMs: 180_000 };
+const turnClosed = terminal => ({ schema: 'starci/turn-replace@1', ok: true, effectState: 'closed', terminal,
+  dispatch: 'dispatch-owned', closure: { ok: true, dispatch: 'dispatch-owned', handle: terminal,
+    closed: { ok: true, proof: 'gone' }, processes: { verdict: 'none' } } });
 
 test('turnMinutesOf reads the spinner timer of Claude, Codex and Devin', () => {
   assert.equal(turnMinutesOf('● Read file\n✻ Cogitating… (12m 30s · ↓ 3.2k tokens · esc to interrupt)\n❯ '), 12);
@@ -342,10 +352,14 @@ test('turnStep: over budget -> interrupt once; the same turn grace later -> repl
   r = turnStep(r.turn, { busy: true, minutes: 21 }, { now: t += 11 * 60_000, ...TB });
   assert.equal(r.act, 'interrupt');
   assert.equal(r.overdue, true);
+  assert.equal(r.turn.interruptedAt, null, 'intent alone does not confirm an interrupt');
+  r.turn.interruptedAt = t; // the actuator's confirmed receipt would publish this timestamp
   r = turnStep(r.turn, { busy: true, minutes: 23 }, { now: t += 2 * 60_000, ...TB });
   assert.equal(r.act, null, 'within the grace nothing more');
   const replace = turnStep(r.turn, { busy: true, minutes: 26 }, { now: t + 3 * 60_000, ...TB });
   assert.equal(replace.act, 'replace');
+  assert.equal(replace.turn.replacedAt, null, 'intent alone does not confirm replacement');
+  replace.turn.replacedAt = t + 3 * 60_000;
   assert.equal(turnStep(replace.turn, { busy: true, minutes: 27 }, { now: t + 4 * 60_000, ...TB }).act, null, 'replace once');
   const fresh = turnStep(r.turn, { busy: true, minutes: 1 }, { now: t + 3 * 60_000, ...TB });
   assert.equal(fresh.act, null, 'the interrupt worked: a new turn');
@@ -364,9 +378,10 @@ test('active Kernel seat: a 25-minute turn -> interrupt key + doorbell + re-wake
   let minutes = 25, replaced = false;
   const c = booted(controller({ store: () => store, probeTurn: async () => ({ ok: true, busy: true, state: 'active', minutes, terminal: 'term_k', agent: 'devin' }) }));
   const ctx = hostCtx({ dbs, mode: 'active', runAnswer: (cmd, args) => {
-    if (args.includes('--turn-replace')) { replaced = true; return { ok: true, stdout: '{"ok":true}' }; }
+    if (args.includes('--turn-interrupt')) return { ok: true, code: 0, stdout: JSON.stringify({ schema: 'starci/turn-interrupt@1', ok: true, effectState: 'requested', terminal: 'term_k' }) };
+    if (args.includes('--turn-replace')) { replaced = true; return { ok: true, code: 0, stdout: JSON.stringify(turnClosed('term_k')) }; }
     const action = replaced ? 'restarted' : 'active';
-    return { ok: true, stdout: JSON.stringify(args[0] === 'scripts/kernel/kernel-watchdog.mjs' ? { ok: true, action, terminal: 'term_k' } : { ok: true }) };
+    return { ok: true, code: 0, stdout: JSON.stringify(args[0] === 'scripts/kernel/kernel-watchdog.mjs' ? { ok: true, action, terminal: 'term_k' } : { ok: true }) };
   } });
   const r1 = await c.reconcile(SEAT, ctx);
   assert.equal(r1.turn.act, 'interrupt');
@@ -391,7 +406,10 @@ test('an interrupt that ends the turn clears KERNEL_TURN_OVERDUE and replaces no
   const dbs = { 'shop-be': ledgerDb({ workflows: [{ id: 'wf-shop-fe-canon', goal: GOAL }] }) };
   let obs = { ok: true, busy: true, state: 'active', minutes: 21, terminal: 'term_k', agent: 'claude' };
   const c = booted(controller({ probeTurn: async () => obs }));
-  const ctx = hostCtx({ dbs, mode: 'active' });
+  const ctx = hostCtx({ dbs, mode: 'active', runAnswer: (_cmd, args) => ({ ok: true, code: 0,
+    stdout: JSON.stringify(args.includes('--turn-interrupt')
+      ? { schema: 'starci/turn-interrupt@1', ok: true, effectState: 'requested', terminal: 'term_k' }
+      : { ok: true, action: 'active', terminal: 'term_k' }) }) });
   await c.reconcile(SEAT, ctx);
   ctx.advance(6 * 60_000); obs = { ok: true, busy: false, state: 'turn-idle', minutes: null, terminal: 'term_k', agent: 'claude' };
   await c.reconcile(SEAT, ctx);
@@ -414,7 +432,10 @@ test('shadow: an overdue turn records the interrupt, runs nothing, and a 19-minu
 test('the Supervisor seat has its own 30-minute budget and interrupts with --supervisor', async () => {
   let minutes = 25;
   const c = booted(controller({ probeTurn: async () => ({ ok: true, busy: true, state: 'active', minutes, terminal: 'term_s', agent: 'claude' }) }));
-  const ctx = hostCtx({ dbs: { 'shop-be': ledgerDb() }, mode: 'active', runAnswer: () => ({ ok: true, stdout: '{"ok":true,"action":"busy","terminal":"term_s"}' }) });
+  const ctx = hostCtx({ dbs: { 'shop-be': ledgerDb() }, mode: 'active', runAnswer: (cmd, args) => ({ ok: true, code: 0,
+    stdout: JSON.stringify(args.includes('--turn-interrupt')
+      ? { schema: 'starci/turn-interrupt@1', ok: true, effectState: 'requested', terminal: 'term_s' }
+      : { ok: true, action: 'busy', terminal: 'term_s' }) }) });
   assert.equal((await c.reconcile('seat:supervisor', ctx)).turn.act, null);
   ctx.advance(6 * 60_000); minutes = 31;
   assert.equal((await c.reconcile('seat:supervisor', ctx)).turn.act, 'interrupt');
@@ -461,7 +482,7 @@ test('a service whose port still answers is never restarted, and a degraded pass
   assert.ok(ctx.calls.run.some((r) => r.args.join(' ') === 'scripts/reconciler/services.mjs --start harness-ui --json'), 'silent on its port: restarted');
 });
 
-test('quickCheck: a store the runtime refuses for its schema is not ok (a corrupt-class finding), never a legacy store', () => {
+test('quickCheck: an intact store refused for its schema is incompatible, rather than corrupt', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hk-qc-'));
   try {
     const file = path.join(dir, 'runtime.sqlite');
@@ -470,8 +491,127 @@ test('quickCheck: a store the runtime refuses for its schema is not ok (a corrup
     const refuse = () => { throw Object.assign(new Error('schema refused'), { code: 'STARCI_LEDGER_SCHEMA_REFUSED' }); };
     const r = quickCheck(file, { verifiedOpen: refuse });
     assert.equal(r.ok, false);
+    assert.equal(r.reason, 'schema-incompatible');
     assert.equal(r.legacy, undefined);
     assert.match(r.result[0], /schema refused/);
     assert.equal(quickCheck(path.join(dir, 'absent.sqlite')).ok, false);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('ledger health reports compatibility and access failures without a corruption clock or restoration remedy', async () => {
+  for (const reason of ['schema-incompatible', 'sqlite-downgrade', 'inaccessible', 'identity-mismatch']) {
+    const c = controller({ quickCheck: () => ({ ok: false, reason, result: ['refused without page damage'] }), backupDue: () => true });
+    const ctx = hostCtx({ mode: 'active', dbs: { 'shop-be': ledgerDb() } });
+    const r = await c.reconcile('ledger:shop-be', ctx);
+    assert.equal(r.ok, false, reason); assert.equal(ctx.calls.run.length, 0, reason);
+    assert.equal(ctx.calls.clock.some((row) => row.state === 'LEDGER_CORRUPT'), false, reason);
+    assert.equal(ctx.calls.decisions.length, 1, reason);
+    assert.ok(ctx.calls.decisions[0].summary.includes(reason));
+    assert.equal(ctx.calls.decisions[0].summary.includes('restore'), false, reason);
+  }
+});
+
+test('failed, timed-out, unverified and shadow backups never advance successful backup state', async () => {
+  const failed = [
+    { mode: 'active', answer: { ok: false, stdout: '{"ok":false}' } },
+    { mode: 'active', answer: { ok: false, timedOut: true } },
+    { mode: 'active', answer: { ok: true, stdout: '{"ok":true,"verified":false}' } },
+    { mode: 'shadow', answer: { ok: true, shadow: true } },
+  ];
+  for (const { mode, answer } of failed) {
+    const store = memoryStore(), c = controller({ store: () => store, backupDue: () => true });
+    const ctx = hostCtx({ mode, dbs: { 'shop-be': ledgerDb() }, runAnswer: () => answer });
+    const r = await c.reconcile('ledger:shop-be', ctx);
+    assert.equal(r.backup, false); assert.equal(store.get('ledger:shop-be').lastBackupAt, undefined);
+    ctx.advance(S.ledgerHealth.backupRetryMs);
+    await c.reconcile('ledger:shop-be', ctx);
+    assert.equal(ctx.calls.run.length, 2, 'a failed or shadow action does not suppress the day');
+  }
+});
+
+test('an active verified backup is retried after failure cooldown and suppresses the day only after success', async () => {
+  const store = memoryStore(), c = controller({ store: () => store, backupDue: () => true });
+  let success = false;
+  const ctx = hostCtx({ mode: 'active', dbs: { 'shop-be': ledgerDb() }, runAnswer: () => success
+    ? { ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: 'shop-be' }) } : { ok: false } });
+  await c.reconcile('ledger:shop-be', ctx); ctx.advance(1);
+  await c.reconcile('ledger:shop-be', ctx); assert.equal(ctx.calls.run.length, 1, 'failure observes retry cooldown');
+  success = true; ctx.advance(S.ledgerHealth.backupRetryMs);
+  assert.equal((await c.reconcile('ledger:shop-be', ctx)).backup, true);
+  assert.equal(store.get('ledger:shop-be').lastBackupAt, ctx.now());
+  ctx.advance(60_000); await c.reconcile('ledger:shop-be', ctx);
+  assert.equal(ctx.calls.run.length, 2, 'verified success suppresses the rest of the day');
+});
+
+test('unknown turn closure retains its original seat across ticks and retirement without another watchdog', async () => {
+  for (const native of [
+    { ok: true, code: null, stdout: JSON.stringify(turnClosed('term_k')) },
+    { ok: true, code: 0, signal: 'SIGTERM', stdout: JSON.stringify(turnClosed('term_k')) },
+    { ok: false, code: 1, stdout: JSON.stringify({ ok: false, effectState: 'unknown', terminal: 'term_k' }) },
+    { ok: true, code: 0, stdout: JSON.stringify({ ok: true, terminal: 'term_k' }) }
+  ]) {
+    const db = ledgerDb({ workflows: [{ id: 'wf-shop-fe-canon', goal: GOAL }] });
+    const store = memoryStore();
+    store.put({ name: SEAT, state: 'live', restarts: [], turn: { startedAt: T0 - 30 * 60_000,
+      interruptedAt: T0 - 6 * 60_000, replacedAt: null, terminal: 'term_k' } });
+    const c = booted(controller({ store: () => store, probeTurn: async () => ({ ok: true, busy: true,
+      state: 'active', minutes: 30, terminal: 'term_k', agent: 'codex' }) }));
+    const ctx = hostCtx({ dbs: { 'shop-be': db }, mode: 'active', runAnswer: (cmd, args) =>
+      args.includes('--turn-replace') ? native : { ok: true, code: 0, stdout: '{"ok":true,"action":"active","terminal":"term_k"}' } });
+    const first = await c.reconcile(SEAT, ctx);
+    assert.equal(first.ok, false);
+    assert.equal(first.turn.held, 'turn-custody-unknown');
+    assert.equal(store.get(SEAT).turn.effect.state, 'unknown');
+    assert.equal(store.get(SEAT).turn.replacedAt, null);
+    assert.equal(store.get(SEAT).turn.closedAt, undefined);
+    assert.equal(store.get(SEAT).restarts.length, 0);
+    assert.equal(ctx.calls.run.length, 2, 'only the initial seat read/repair and exact close attempt; no following watchdog');
+    db.prepare("UPDATE workflows SET phase='archived',archived_at=?").run(T0);
+    ctx.calls.run.length = 0;
+    const held = await c.reconcile(SEAT, ctx);
+    assert.equal(held.ok, false);
+    assert.equal(held.held, 'turn-custody-unknown');
+    assert.equal(ctx.calls.run.length, 0);
+    assert.equal(store.get(SEAT).turn.effect.terminal, 'term_k', 'retirement does not discard unresolved machine custody');
+    assert.ok(ctx.calls.decisions.some(d => d.kind === 'runtime-defect'));
+    db.close();
+  }
+});
+
+test('a shadow interrupt does not commit an effect timestamp or escalate into replacement', async () => {
+  const db = ledgerDb({ workflows: [{ id: 'wf-shop-fe-canon', goal: GOAL }] });
+  const store = memoryStore();
+  let minutes = 21;
+  const c = booted(controller({ store: () => store, probeTurn: async () => ({ ok: true, busy: true,
+    state: 'active', minutes, terminal: 'term_k', agent: 'codex' }) }));
+  const ctx = hostCtx({ dbs: { 'shop-be': db } });
+  await c.reconcile(SEAT, ctx);
+  assert.equal(store.get(SEAT).turn.interruptedAt, null);
+  assert.equal(store.get(SEAT).turn.effect, undefined);
+  ctx.advance(6 * 60_000); minutes += 6;
+  await c.reconcile(SEAT, ctx);
+  assert.equal(store.get(SEAT).turn.interruptedAt, null);
+  assert.ok(ctx.calls.run.every(c => !c.args.includes('--turn-replace')));
+  db.close();
+});
+
+test('confirmed closure with failed watchdog does not claim a replacement or count toward quarantine', async () => {
+  const db = ledgerDb({ workflows: [{ id: 'wf-shop-fe-canon', goal: GOAL }] });
+  const store = memoryStore();
+  store.put({ name: SEAT, state: 'live', restarts: [], turn: { startedAt: T0 - 30 * 60_000,
+    interruptedAt: T0 - 6 * 60_000, replacedAt: null, terminal: 'term_k' } });
+  let closed = false;
+  const c = booted(controller({ store: () => store, probeTurn: async () => ({ ok: true, busy: true,
+    state: 'active', minutes: 30, terminal: 'term_k', agent: 'codex' }) }));
+  const ctx = hostCtx({ dbs: { 'shop-be': db }, mode: 'active', runAnswer: (cmd, args) => {
+    if (args.includes('--turn-replace')) { closed = true; return { ok: true, code: 0, stdout: JSON.stringify(turnClosed('term_k')) }; }
+    return closed ? { ok: false, code: 1, stdout: '{"ok":false,"action":"restart-failed"}' }
+      : { ok: true, code: 0, stdout: '{"ok":true,"action":"active","terminal":"term_k"}' };
+  } });
+  const result = await c.reconcile(SEAT, ctx);
+  assert.equal(result.turn.replaced, false);
+  assert.equal(store.get(SEAT).turn.closedAt, T0);
+  assert.equal(store.get(SEAT).turn.replacedAt, null);
+  assert.equal(store.get(SEAT).restarts.length, 0);
+  db.close();
 });

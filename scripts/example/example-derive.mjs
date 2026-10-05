@@ -350,9 +350,9 @@ const DERIVED_FRONTIER_REL = `${DERIVED_DIR_NAME}/frontier.md`;
 /**
  * The one call a caller (this file's CLI, or scripts/checks/check-example-derived.mjs) needs: compute the tree,
  * and either write it (returns {wrote:true}) or compare it against what is on disk (returns {ok, diff}).
- * Comparison is structural (canonicalJSON of the parsed YAML, not the file's bytes), so it is not fooled by
- * whitespace the YAML library might legitimately choose differently across versions - it is fooled by
- * nothing else, because computeDerived is a pure function of the tree.
+ * Index comparison is structural (canonicalJSON of the parsed YAML, not the file's bytes), so YAML
+ * whitespace does not affect freshness. Frontier Markdown must match the rendered UTF-8 bytes exactly;
+ * computeDerived is a pure function of the tree.
  */
 export function runDerive(workRoot, {write} = {}) {
   if (write && [DERIVED_INDEX_REL, DERIVED_FRONTIER_REL].some(rel => !isProductPath(rel))) {
@@ -360,18 +360,22 @@ export function runDerive(workRoot, {write} = {}) {
   }
   const derived = computeDerived(workRoot);
   const doc = buildYamlDocument(derived);
+  const frontier = buildFrontierMarkdown(derived);
   const derivedDir = path.join(workRoot, DERIVED_DIR_NAME);
   const indexPath = path.join(workRoot, DERIVED_INDEX_REL);
   const frontierPath = path.join(workRoot, DERIVED_FRONTIER_REL);
   if (write) {
     fs.mkdirSync(derivedDir, {recursive: true});
     fs.writeFileSync(indexPath, HEADER + stringifyYaml(doc), 'utf8');
-    fs.writeFileSync(frontierPath, buildFrontierMarkdown(derived), 'utf8');
+    fs.writeFileSync(frontierPath, frontier, 'utf8');
     return {wrote: true, derived, doc};
   }
   let onDisk = null;
   try { onDisk = parseYaml(fs.readFileSync(indexPath, 'utf8')); } catch { onDisk = null; }
-  const ok = onDisk !== null && canonicalJSON(onDisk) === canonicalJSON(doc);
+  let onDiskFrontier = null;
+  try { onDiskFrontier = fs.readFileSync(frontierPath); } catch { onDiskFrontier = null; }
+  const ok = onDisk !== null && canonicalJSON(onDisk) === canonicalJSON(doc)
+    && onDiskFrontier !== null && onDiskFrontier.equals(Buffer.from(frontier, 'utf8'));
   return {ok, derived, doc, onDisk};
 }
 
@@ -384,6 +388,6 @@ if (isMain(import.meta.url)) {
       console.log(`${t.total} record(s) with a lifecycle state: ${t.done} done, ${t.todo} todo, ${t.stale} stale, ${t.blocked} blocked; ${result.derived.tally.gaps.length} gap(s) (${result.derived.tally.unbuiltModuleGaps} open unbuilt-module); ${result.derived.frontier.length} in the frontier.`);
     },
     wrote: (workRoot) => `wrote ${path.relative(workRoot, path.join(workRoot, DERIVED_INDEX_REL))} and ${path.relative(workRoot, path.join(workRoot, DERIVED_FRONTIER_REL))}`,
-    stale: `REFUSED: ${DERIVED_INDEX_REL} is missing or stale; run with --write to refresh it.`,
+    stale: `REFUSED: ${DERIVED_INDEX_REL} or ${DERIVED_FRONTIER_REL} is missing or stale; run with --write to refresh them.`,
   });
 }

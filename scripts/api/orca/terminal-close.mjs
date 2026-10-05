@@ -21,6 +21,14 @@ const receiptMessage = (receipt) => {
   return typeof e === 'string' ? e : (e?.message ?? null);
 };
 
+/**
+ * Request closure of the caller-owned terminal or its tab; this call does not establish ownership.
+ * A successful close receipt is accepted. A tab_not_found refusal is accepted only after bounded
+ * terminal-show reads prove the same handle disconnected. Complete managed-worker teardown belongs
+ * to scripts/machine/worker-close.mjs, which also verifies the worker's process tree.
+ * @param {object} input - Required terminal handle and optional tab closure selector.
+ * @returns {object} Closure acceptance, error, and any terminal-show verification and exit cause.
+ */
 export function terminalClose({ terminal, tab = false }) {
   const r = orcaCall('terminal-close', { terminal, tab });
   if (r.exitCode === 0) return { ok: true, error: r.error };

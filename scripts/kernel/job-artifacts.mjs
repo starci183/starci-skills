@@ -41,11 +41,7 @@ const gitResult = (call, args, options) => gitResultOf(call(args, options));
 export { kindOf };
 export const ARTIFACTS_INDEXED = 'artifacts-indexed';
 export const PROOF_MEDIA_MISSING = 'PROOF_MEDIA_MISSING';
-/** The contract change that made visual proof mandatory (modules/kernel/contract-changes/, reach new-legs). */
-export const PROOF_MEDIA_CHANGE = 'job-proof-media';
 export const EVIDENCE_HOST_PATH = 'EVIDENCE_HOST_PATH';
-/** The contract change that made a host path in Work evidence a settle refusal (reach new-legs). */
-export const EVIDENCE_HOST_PATH_CHANGE = 'evidence-host-path';
 
 const SHA = /^[0-9a-f]{7,40}$/i;
 // The runtime's own checkout: a Supervisor job lands its commits there (scripts/supervisor/land.mjs).

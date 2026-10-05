@@ -1,7 +1,0 @@
-id: hfs-fixtures-schema-catalog
-effectiveAt: '2026-09-29T04:47:24+07:00'
-summary: "Register the existing retired-paths and push-scan-allow stamped runtime documents in the schema catalog while HFS architecture fixtures and repository-baseline assertions adopt the mandatory apps/<app> tree."
-reach: new-legs
-paths:
-  - modules/schemas/index.yaml
-  - modules/kernel/contract-changes/hfs-fixtures-schema-catalog.yaml

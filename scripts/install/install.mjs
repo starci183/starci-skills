@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // The installer for StarCi. The runtime is a tree of files under <repo>/.claude plus one managed
 // bootstrap file at the repo root (AGENTS.md by default; CLAUDE.md/DEVIN.md only when the host opts
-// in via --hosts). Nothing here is a framework the tree depends on at run time. The CLI has no
-// dependencies and needs Node 22.13+.
+// in via --hosts). Nothing here is a framework the tree depends on at run time. Runtime
+// dependencies and supported Node branches are declared in package.json.
 //
 //   starci runtime install     install the tree into ./.claude and write the bootstrap
 //   starci runtime update      bring an installed tree to this package's version
@@ -12,15 +12,21 @@
 // Every command takes --dir <repo> (default: the current directory). init refuses a non-empty
 // .claude it did not install unless --force; update keeps a file a person changed locally unless
 // --force; neither ever runs a git command.
-import {sha256} from '../../engine/digest.mjs';
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, rmdirSync, statSync, lstatSync, writeFileSync, appendFileSync } from 'node:fs';
+import {SECRET_ENV_FILE} from '../../engine/secrets.mjs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, rmdirSync, statSync, lstatSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { runNode } from '../api/node/run-node.mjs';
+import {runNpm} from '../api/npm/run-npm.mjs';
+import {isLinkLike} from '../api/fs/is-link-like.mjs';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../lib/is-main.mjs';
-import {globExpression} from '../lib/glob.mjs';
+import {EXAMPLE_CATALOG_FILE} from '../lib/example-refs.mjs';
+import {PAYLOAD, isNegated, payloadFiles, hashTree, payloadHash as sha, copyPayload} from './payload.mjs';
+export {PAYLOAD, payloadFiles};
 import {entrySkillsPlan, applyEntrySkillsPlan} from './entry-skills.mjs';
+import {doctorInstallation} from './doctor.mjs';
+import {runInitialAgeInstall} from './initial-age.mjs';
 export {entrySkillsPlan, applyEntrySkillsPlan};
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -38,35 +44,15 @@ const requireEngineSchema = () => {
   return engineConstants.ENGINE_SCHEMA;
 };
 
-// What an installed tree is made of. Only these paths are copied, hashed and updated; anything else
-// a person adds beside them (other tests, notes) is theirs and is never touched. The payload equals
-// the npm `files` allowlist — the installed tree must be byte-identical to the published tarball —
-// so `!` negations are compiled into the walker and root globs like `*.md` expand to real files.
-const rootGlob = (entry) => {
-  const m = /^\*\.([A-Za-z0-9]+)$/.exec(entry);
-  if (!m) throw new Error(`unsupported files glob in package.json: ${entry}`);
-  return readdirSync(packageRoot, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith(`.${m[1]}`)).map((e) => e.name);
-};
-// One shared glob matcher interprets the manifest's directory and capture-file exclusions.
-const PAYLOAD_NEGATIONS = pkg.files.filter((f) => f.startsWith('!')).flatMap((f) => {
-  const pattern = f.slice(1).replace(/\/+$/, '');
-  return [globExpression(pattern), ...(f.endsWith('/') ? [globExpression(`${pattern}/**`)] : [])];
-});
-const isNegated = (relative) => PAYLOAD_NEGATIONS.some((rx) => rx.test(relative));
-export const PAYLOAD = [...new Set(['package.json', ...pkg.files.filter((f) => !f.startsWith('!')).flatMap((f) => f.includes('*') ? rootGlob(f) : [f.replace(/\/$/, '')])])];
-const MANIFEST = '.starci-skills.json';
+import { INSTALL_MANIFEST_FILE as MANIFEST, INSTALL_PROTOCOL_SCHEMA } from '../lib/install-custody.mjs';
 // The durable workflow protocol an installed tree speaks, independent of public semver: named by the
 // engine schema it enrolls workflows into, ranked by that schema's number. The installer accepts only
 // the marker it writes itself - anything older is cleaned by hand, never upgraded by code.
-const INSTALL_PROTOCOL_SCHEMA = 'starci/install-protocol@1';
 const installProtocol = () => Object.freeze({ schema: INSTALL_PROTOCOL_SCHEMA, engine: requireEngineSchema() });
 const engineRank = (engine) => { const m = /^starci\/engine@(\d+)$/.exec(String(engine ?? '')); return m ? Number(m[1]) : null; };
-// Host-level ignores written into the host repo's own .gitignore: the ledger/runtime state is local
-// to the checkout and the seeded owner config is untracked by contract.
-const HOST_IGNORES = ['.starciwork/', '.claude/config.yaml'];
-// Ignores inside the installed tree itself (its .claude/.gitignore): the seeded owner config is
-// untracked by contract.
-const INSTALLED_IGNORES = ['/config.yaml'];
+// Local owner files stay outside installer custody and Git even under a forced update.
+const INSTALLED_IGNORES = ['/config.yaml', `/${SECRET_ENV_FILE}`];
+const HOST_IGNORES = ['.starciwork/', ...INSTALLED_IGNORES.map(entry => '.claude' + entry)];
 const ENTRY_MARKER = '<!-- starci:prompt-entry -->';
 const entryOf = text => text.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
 
@@ -115,45 +101,6 @@ function parseArgs(argv) {
   return out;
 }
 
-// `docs/` and `examples/` ship only authored reference files. An `examples/<app>/` stack kit (the app root's
-// `.starcistacks/` tree plus the app's `scripts/`, `gateway/`
-// and `.gitignore` support files) additionally ships shell/config/Dockerfile inputs — but never
-// materialized runtime or generated output, never a plaintext secret beside its sealed `.enc`
-// counterpart, and never a `.mjs` automation source.
-const stackKitPath = (relative) => /^examples\/[^/]+\/(\.starcistacks(\/|$)|scripts\/|gateway\/|\.gitignore$)/.test(relative);
-const payloadDocAllowed = (root, relative) => {
-  if (stackKitPath(relative)) {
-    if (/\/(runtime|generated|\.runtime|node_modules|\.scannerwork)(\/|$)/.test(relative)) return false;
-    const absolute = path.join(root, relative);
-    if (!relative.endsWith('.enc') && existsSync(absolute + '.enc')) return false;
-    if (/\.mjs$/.test(relative)) return false;
-    return /\.(md|ya?ml|tsx?|png|svg|sh|ps1|conf)$/.test(relative)
-      || ['Dockerfile', '.gitignore', '.dockerignore'].includes(path.basename(relative));
-  }
-  if (/^examples\/[^/]+\.ya?ml$/.test(relative)) return false;
-  return /\.(md|ya?ml|tsx?|png|svg)$/.test(relative);
-};
-const PAYLOAD_DOC_ROOT = /^(examples|docs)\//;
-const payloadFileAllowed = (root, relative) => !PAYLOAD_DOC_ROOT.test(relative) || payloadDocAllowed(root, relative);
-
-function walk(root, rel = '') {
-  const abs = path.join(root, rel);
-  if (!existsSync(abs)) return [];
-  if (statSync(abs).isFile()) return payloadFileAllowed(root, rel) ? [rel] : [];
-  const out = [];
-  for (const e of readdirSync(abs, { withFileTypes: true })) {
-    const next = rel ? `${rel}/${e.name}` : e.name;
-    // Match npm payload semantics: dependency trees, VCS internals and `files` negations never ship,
-    // and a junction/symlink entry is not ours to copy (a fixture may carry one inside node_modules).
-    if (e.isSymbolicLink() || e.name === 'node_modules' || e.name === '.git' || isNegated(next)) continue;
-    if (e.isDirectory()) out.push(...walk(root, next));
-    else if (payloadFileAllowed(root, next)) out.push(next);
-  }
-  return out;
-}
-const sha = (file) => sha256(readFileSync(file).toString('utf8').replace(/\r\n/g, '\n'));
-export const payloadFiles = (root) => PAYLOAD.flatMap((p) => walk(root, p)).sort();
-const hashTree = (root) => Object.fromEntries(payloadFiles(root).map((rel) => [rel, sha(path.join(root, rel))]));
 
 function readManifest(target) {
   const file = path.join(target, MANIFEST);
@@ -161,34 +108,25 @@ function readManifest(target) {
 }
 function writeManifest(target, kept = [], profile = 'full', bootstrapProfile = null, hostSkills = null) {
   const manifest = { name: pkg.name, version: pkg.version, installProtocol: installProtocol(), profile, bootstrapProfile, installedAt: new Date().toISOString(), files: hashTree(target) };
+  const initialAgeSetup = readManifest(target)?.initialAgeSetup;
+  if (initialAgeSetup !== undefined) manifest.initialAgeSetup = initialAgeSetup;
   if (hostSkills) manifest.hostSkills = hostSkills;
   if (kept.length) manifest.keptLocal = kept;
   writeFileSync(path.join(target, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
 }
 
-function copyPayload(target) {
-  for (const relative of PAYLOAD) {
-    if (!existsSync(path.join(packageRoot, relative))) throw new Error(`package is incomplete: ${relative} is missing`);
-  }
-  // Copy declared files, never recursively replace user-populated directories.
-  // Files the payload no longer ships are handled only by the ownership-checked stale-file plan.
-  for (const relative of payloadFiles(packageRoot)) {
-    const to = path.join(target, relative);
-    mkdirSync(path.dirname(to), { recursive: true });
-    cpSync(path.join(packageRoot, relative), to);
-  }
-}
 
 function safePayloadTarget(target) {
-  const inspect = file => {
+  const inspect = (file, relative) => {
+    if (isNegated(relative)) return;
     const stat = lstatSync(file, { throwIfNoEntry: false });
     if (!stat) return;
     if (stat.isSymbolicLink()) throw new Error('installer payload target contains a symlink/junction; resolve ownership before updating');
-    if (stat.isDirectory()) for (const name of readdirSync(file)) inspect(path.join(file, name));
+    if (stat.isDirectory()) for (const name of readdirSync(file)) inspect(path.join(file, name), `${relative}/${name}`);
   };
   if (lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error('installer .claude target must not be a symlink/junction');
-  for (const relative of [...PAYLOAD, MANIFEST]) inspect(path.join(target, relative));
+  for (const relative of [...PAYLOAD, MANIFEST]) inspect(path.join(target, relative), relative);
 }
 
 // Plan host changes before any payload mutation. Only exact installer-owned text is replaced.
@@ -232,7 +170,7 @@ function writeBootstraps(repo, log, plan) {
   const lines = existsSync(ignore) ? readFileSync(ignore, 'utf8').split(/\r?\n/) : [];
   const missing = HOST_IGNORES.filter((entry) => !lines.some((l) => l.trim() === entry || l.trim() === '/' + entry));
   if (missing.length) {
-    appendFileSync(ignore, `${lines.length && lines.at(-1) !== '' ? '\n' : ''}# StarCi: ledger/runtime state and the seeded owner config are local to this checkout\n${missing.join('\n')}\n`);
+    appendFileSync(ignore, `${lines.length && lines.at(-1) !== '' ? '\n' : ''}# StarCi: runtime state, owner config and credentials are local to this checkout\n${missing.join('\n')}\n`);
     for (const entry of missing) log(`added ${entry} to .gitignore`);
   }
 }
@@ -264,7 +202,8 @@ function stalePlan(target, manifest) {
   const remove = [], preserved = [];
   for (const [relative, originalHash] of Object.entries(manifest?.files ?? {})) {
     if (typeof relative !== 'string' || relative.includes('\\') || relative.includes(':') || path.isAbsolute(relative) || relative.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('invalid installed manifest path; refusing cleanup before writes');
-    if (PRESERVED_ROOTS.has(relative.split('/')[0])) { preserved.push(relative); continue; }
+    // A prior payload claim cannot authorize reading or deleting currently excluded local custody.
+    if (PRESERVED_ROOTS.has(relative.split('/')[0]) || INSTALLED_IGNORES.includes('/' + relative) || isNegated(relative)) { preserved.push(relative); continue; }
     if (current.has(relative)) continue;
     if (relative.split('/').includes('.git')) { preserved.push(relative); continue; }
     let cursor = target, missing = false;
@@ -276,7 +215,7 @@ function stalePlan(target, manifest) {
     }
     if (missing) continue;
     if (!statSync(cursor).isFile()) throw new Error('stale manifest entry must name an owned file, not a directory');
-    if (manifest?.keptLocal?.includes(relative) || sha(cursor) !== originalHash) preserved.push(relative);
+    if (manifest?.keptLocal?.includes(relative) || sha(cursor, relative) !== originalHash) preserved.push(relative);
     else remove.push({ relative, file: cursor, hash: originalHash });
   }
   return { remove, preserved: [...new Set(preserved)] };
@@ -292,7 +231,7 @@ function removeStaleFiles(target, plan) {
     const stat = lstatSync(item.file, { throwIfNoEntry: false });
     // Payload copy may already have replaced an unshipped nested file.
     if (stat) {
-      if (stat.isSymbolicLink() || !stat.isFile() || sha(item.file) !== item.hash) { preserved.push(item.relative); continue; }
+      if (stat.isSymbolicLink() || !stat.isFile() || sha(item.file, item.relative) !== item.hash) { preserved.push(item.relative); continue; }
       rmSync(item.file);
     }
     removed.push(item.relative);
@@ -368,7 +307,9 @@ export function update(opts, log = console.log) {
   const hostPlan = opts.bootstrap !== false ? bootstrapPlan(opts.dir, opts, manifest) : null;
   const stale = stalePlan(target, manifest);
   const entries = entrySkillsPlan(opts.dir, manifest);
-  const before = hashTree(target);
+  if (!opts.force && (Object.hasOwn(manifest.files ?? {}, EXAMPLE_CATALOG_FILE)
+    || existsSync(path.join(target, EXAMPLE_CATALOG_FILE)))) payloadFiles(target);
+  const before = hashTree(target, manifest, opts.force);
   const locallyChanged = Object.entries(before).filter(([rel, h]) => manifest.files[rel] && manifest.files[rel] !== h).map(([rel]) => rel);
   const locallyAdded = Object.keys(before).filter((rel) => !manifest.files[rel]);
   const stillKept = (manifest.keptLocal ?? []).filter(rel => Object.hasOwn(before, rel));
@@ -398,42 +339,14 @@ export function update(opts, log = console.log) {
   return { ...written, ...cleaned };
 }
 
-// The installed tree validates itself: every spec the payload ships is a contract the install can
-// check. `--quick` prefers the core kernel/ledger subset when those specs are present.
-const QUICK_SPECS = ['engine-db/kernel-api.spec.mjs', 'kernel-verbs-shared/goal-entry.spec.mjs', 'engine-db/ledger-schema-parity.spec.mjs', 'kernel/route-model.spec.mjs', 'repo/verdict-contract.spec.mjs'];
+/** Diagnose only installer-owned source, discovery custody and local runtime capabilities. */
 export function doctor(opts, log = console.log) {
-  const target = path.join(opts.dir, '.claude');
-  const manifest = readManifest(target);
-  // The kernel api gate is the modernity marker of the current layout: a tree without it is not an
-  // installed StarCi runtime, no matter what else is present.
-  if (!existsSync(path.join(target, 'scripts', 'kernel', 'cli.mjs'))) {
-    throw new Error(`${target} is not an installed StarCi runtime: missing scripts/kernel/cli.mjs; run starci runtime install first`);
-  }
-  const testsDir = path.join(target, 'tests');
-  const specs = existsSync(testsDir) ? readdirSync(testsDir, { recursive: true }).map((name) => String(name).split(path.sep).join('/')).filter((name) => name.endsWith('.spec.mjs')).sort() : [];
-  if (!specs.length) throw new Error('installed tree has no tests/**/*.spec.mjs to validate against');
-  let tests = opts.quick ? specs.filter((name) => QUICK_SPECS.includes(name)) : specs;
-  if (!tests.length) tests = specs;
-  if (manifest) {
-    const drift = Object.entries(manifest.files).filter(([rel, hash]) => !existsSync(path.join(target, rel)) || sha(path.join(target, rel)) !== hash);
-    log(`${manifest.name}@${manifest.version}; ${drift.length} file(s) changed or missing since install`);
-  }
-  let failed = 0;
-  for (const testFile of tests) {
-    const environment = { ...process.env };
-    // Doctor starts independent test runners even when invoked by an installer test.
-    delete environment.NODE_TEST_CONTEXT;
-    const result = runNode(['--test', '--test-reporter=tap', path.join(testsDir, testFile)], { cwd: target, env: environment });
-    const output = (result.stdout ?? '') + (result.stderr ?? '');
-    const count = Number(output.match(/^# tests (\d+)$/m)?.[1] ?? 0);
-    const passed = Number(output.match(/^# pass (\d+)$/m)?.[1] ?? 0);
-    const failures = Number(output.match(/^# fail (\d+)$/m)?.[1] ?? -1);
-    const success = result.status === 0 && count > 0 && passed === count && failures === 0;
-    if (!success) failed++;
-    log(`${success ? 'ok  ' : 'FAIL'} tests/${testFile}: ${passed}/${count} tests passed${success ? '' : '\n' + output.trim().split('\n').slice(-25).join('\n')}`);
-  }
-  log(failed ? `doctor: ${failed} check(s) failed` : 'doctor: local contracts/tests passed; no product or deployment acceptance implied');
-  return failed;
+  const target = path.resolve(opts.dir, '.claude');
+  return doctorInstallation({
+    target, repo: path.resolve(opts.dir), manifest: readManifest(target), packageManifest: pkg,
+    expectedFiles: hashTree(packageRoot), checkProtocol: checkInstalledProtocol,
+    planEntries: entrySkillsPlan, excluded: isNegated, quick: opts.quick,
+  }, log);
 }
 
 const HELP = `${pkg.name} ${pkg.version}
@@ -443,35 +356,90 @@ const HELP = `${pkg.name} ${pkg.version}
   starci runtime doctor  [--cwd <repo>] [--quick]
   starci runtime version
 
-install copies the runnable source payload into <repo>/.claude, then records the install manifest.
+install copies source into <repo>/.claude, records its custody and installs declared runtime dependencies.
         Seeds an untracked .claude/config.yaml from config.example.yaml; installs the one starci
         entry into .agents/skills/ and an existing .devin/skills/ root with exact file custody; writes the managed StarCi entry into AGENTS.md — CLAUDE.md/DEVIN.md copies only when
-        named by --hosts; and adds .starciwork/ + .claude/config.yaml to the host .gitignore while
+        named by --hosts; and adds runtime state, owner config and secret.env to the host .gitignore while
         preserving custom instructions. Refuses a .claude it did not install unless --force;
         --no-bootstrap keeps host files unchanged (the gitignore lines are printed instead).
+        An eligible original init reserves its initial AGE setup before native generation; an
+        existing explicit identity is reused, and ambiguous or prior unknown custody is held.
 update  replaces current runtime paths; locally changed current files are kept unless --force.
         The runtime reads the installed source directly; no build step runs before recording the
         new version. Manifest-owned files the payload no longer ships are removed when unchanged;
-        changed or unowned files are preserved. Product .starciwork ledgers and owner config are
+        changed or unowned files are preserved. Local config, credentials and excluded custody are
         never cleanup targets. An install recorded under any other protocol is not upgraded in
         place: remove .claude by hand and run starci runtime install.
-doctor  runs the installed tree's own tests/*.spec.mjs and reports drift against the manifest.
-        --quick runs the core kernel/ledger subset when those specs ship.
+doctor  verifies installed payload and public-entry custody, parses shipped YAML contracts,
+        and checks physical runtime dependencies, the dispatcher and Node's SQLite capability.
+        --quick checks install integrity only; host, provider and product readiness use their owning checks.
 entry   one explicit StarCi skill plus one AGENTS.md prompt-entry. Only an exact prior installed
         entry block may be refreshed; an unknown StarCi block stops before writes. Reconcile it by
         hand or pass --no-bootstrap. Existing ledgers are retained.
 `;
 
-if (isMain(import.meta.url)) {
-  try {
-    const opts = parseArgs(process.argv.slice(2));
-    if (opts.command === 'init') init(opts);
-    else if (opts.command === 'update') update(opts);
-    else if (opts.command === 'doctor') process.exitCode = doctor(opts) ? 1 : 0;
-    else if (opts.command === 'version') console.log(pkg.version);
-    else console.log(HELP);
-  } catch (err) {
-    console.error(`${pkg.name}: ${err.message}`);
-    process.exitCode = 1;
+function safeDependencyTarget(target) {
+  for (const name of ['', ...Object.keys(pkg.dependencies ?? {})]) {
+    let cursor = target;
+    for (const part of ['node_modules', ...name.split('/').filter(Boolean)]) {
+      cursor = path.join(cursor, part);
+      const stat = lstatSync(cursor, {throwIfNoEntry: false});
+      if (stat && (isLinkLike(cursor, {stat}) || !stat.isDirectory())) throw new Error('runtime dependency target is redirected or not a directory');
+    }
   }
 }
+
+/**
+ * Run the installed-package lifecycle; exported init/update remain filesystem projection helpers.
+ * Dependency installation runs only after a successful projection, in its own physical target.
+ * @param {string[]} argv Installer command and supported arguments.
+ * @param {object} deps Owned npm/initial-AGE ports, environment and diagnostic sinks for focused fixtures.
+ * @returns {number} Zero only when the selected lifecycle or diagnostic completes successfully.
+ */
+export function main(argv = process.argv.slice(2), deps = {}) {
+  const log = deps.log ?? console.log;
+  const error = deps.error ?? console.error;
+  try {
+    const opts = parseArgs(argv);
+    if (opts.command === 'init' || opts.command === 'update') {
+      const project = () => {
+        const target = path.resolve(opts.dir, '.claude');
+        safeDependencyTarget(target);
+        if (opts.command === 'init') init(opts, log);
+        else update(opts, log);
+        const projectedNode = lstatSync(target);
+        const installed = JSON.parse(readFileSync(path.join(target, 'package.json'), 'utf8'));
+        const entries = value => Object.entries(value ?? {}).sort(([a], [b]) => a.localeCompare(b));
+        if (installed.name !== pkg.name || installed.version !== pkg.version
+          || JSON.stringify(entries(installed.dependencies)) !== JSON.stringify(entries(pkg.dependencies))) {
+          throw new Error('installed package identity or runtime dependencies differ from this installer; reconcile local edits before installing dependencies');
+        }
+        if (Object.keys(installed.dependencies ?? {}).length) {
+          safeDependencyTarget(target);
+          const result = (deps.runNpm ?? runNpm)(['install', '--prefix', target, '--omit=dev', '--no-save', '--package-lock=false', '--no-audit', '--no-fund'],
+            {cwd: target, env: deps.env ?? process.env, timeout: 900_000});
+          if (result.stdout?.trim()) log(result.stdout.trim());
+          if (result.stderr?.trim()) error(result.stderr.trim());
+          if (result.error || result.signal || result.status !== 0) {
+            throw new Error('runtime dependency installation failed (' + (result.status ?? result.signal ?? result.error?.code ?? 'incomplete') + '): ' + (result.error?.message ?? 'see npm diagnostics'));
+          }
+          log('runtime dependency install completed in ' + target);
+        }
+        return {status: 0, targetNode: projectedNode};
+      };
+      if (opts.command === 'update') return project().status;
+      const setup = runInitialAgeInstall({repo: path.resolve(opts.dir), force: opts.force, project},
+        {...(deps.initialAge ?? {}), env: deps.env ?? process.env});
+      log('initial age setup: ' + JSON.stringify(setup));
+      return setup.ok ? 0 : 1;
+    }
+    if (opts.command === 'doctor') return doctor(opts, log) ? 1 : 0;
+    log(opts.command === 'version' ? pkg.version : HELP);
+    return 0;
+  } catch (err) {
+    error(pkg.name + ': ' + err.message);
+    return 1;
+  }
+}
+
+if (isMain(import.meta.url)) process.exitCode = main();

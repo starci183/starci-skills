@@ -177,10 +177,11 @@ export function planSupervisorDedupe({ marked, seatTerminal = null, screenOf, ex
   return plan;
 }
 
-function closeDuplicates(entries, deps, fallbackAgent) {
+// The existing recorded-session plan owns closure; provider facts come from this exact listed handle.
+function closeDuplicates(entries, deps, listing) {
   return entries.map((entry) => {
     let quit = null;
-    if (entry.kind === 'agent') { try { quit = deps.quit(entry.handle, agentOfTerminal(entry, fallbackAgent)); } catch (e) { quit = { error: String(e?.message ?? e) }; } }
+    if (entry.kind === 'agent') { try { quit = deps.quit(entry.handle, agentOfTerminal((listing?.terminals ?? []).find((terminal) => terminal?.handle === entry.handle) ?? entry)); } catch (e) { quit = { error: String(e?.message ?? e) }; } }
     let closed;
     try { closed = deps.close(entry.handle); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
     return { handle: entry.handle, kind: entry.kind, reason: entry.reason, ok: closed?.ok === true || quit?.exited === true, ...(closed?.ok ? {} : { error: String(closed?.error ?? 'close refused') }) };
@@ -259,7 +260,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     }
 
     if (health.live) {
-      const closed = closeDuplicates(dedupe.close, d, settings.agent);
+      const closed = closeDuplicates(dedupe.close, d, listing);
       return { ok: true, exit: 0, action: health.starting ? 'starting' : 'already-live', terminal: health.terminal, reason: health.reason, ...(closed.length ? { closedDuplicates: closed } : {}) };
     }
 
@@ -292,7 +293,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     if (!reserved) return { ok: true, exit: 0, action: 'starting', reason: 'another launcher holds the startup reservation' };
 
     // Only an affirmatively closed predecessor permits this replacement reservation.
-    const closedDuplicates = closeDuplicates(dedupe.close, d, settings.agent);
+    const closedDuplicates = closeDuplicates(dedupe.close, d, listing);
 
     const prompt = renderSupervisorPrompt({
       template: template ?? fs.readFileSync(PROMPT_FILE, 'utf8'),

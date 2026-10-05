@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
-import { starciLocalRoot } from '../../engine/db/machine.mjs';
+import { starciLocalRoot, machineFileFor, openMachine } from '../../engine/db/machine.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { artifactHoldOf } from '../machine/artifact-hold.mjs';
 import { realpathOr } from '../lib/fs-kind.mjs';
@@ -64,7 +64,7 @@ const sizeOf = (p) => { try { return fs.statSync(p).size; } catch { return null;
  * changes and deleted/truncated are the plan (each entry marked dry:true).
  * Returns { ok, apply, freedBytes, deleted, truncated, skipped, errors, report }.
  */
-export async function sweepStarciLogs({ apply = false, now = Date.now(), env = process.env, allocation } = {}) {
+export async function sweepStarciLogs({ apply = false, now = Date.now(), env = process.env, allocation, machineFile = null, machineOpen = openMachine } = {}) {
   const hk = (allocation ?? allocationSettings())?.housekeeping ?? {};
   const maxAgeMs = Number(hk.logMaxAgeMs) > 0 ? Number(hk.logMaxAgeMs) : DEFAULT_LOG_MAX_AGE_MS;
   const capBytes = Number(hk.logCapBytes) > 0 ? Number(hk.logCapBytes) : DEFAULT_LOG_CAP_BYTES;
@@ -83,6 +83,15 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
 
   const skip = (p, reason) => push('skipped', { path: p, reason });
   const fail = (p, error) => { out.ok = false; push('errors', { path: p, code: error?.code ?? 'ERROR', message: String(error?.message ?? error) }); };
+  // Use the existing machine log retention owner; never create a missing DB to prune it.
+  const dbFile=machineFile??machineFileFor(env);
+  out.report.machineLogs={file:dbFile,state:fs.existsSync(dbFile)?(apply?'pending':'dry-run'):'absent',deleted:0};
+  if(apply&&fs.existsSync(dbFile)){
+    let machine;
+    try{machine=machineOpen({file:dbFile,env,now:()=>now});out.report.machineLogs.deleted=Number(machine.pruneLogs());out.report.machineLogs.state='pruned';}
+    catch(error){out.report.machineLogs.state='failed';fail(dbFile,error);}
+    finally{try{machine?.close();}catch{/* closed */}}
+  }
   const unlink = (p, st) => {
     if (artifactHoldOf(p, { env })) { skip(p, 'indexed-job-artifact'); return; }
     const entry = { path: p, bytes: st.size, ...(apply ? {} : { dry: true }) };
@@ -160,7 +169,8 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
   out.report.notes = [
     'orchestration.db is Orca-owned: size reported only, never opened/edited/vacuumed; orca CLI 1.4.209 has no retention or prune command (`orchestration reset` wipes state — not used).',
     'cap mechanism: rename to <file>.1 through rotateLog (the codebase\'s one cap convention); keep-tail truncation exists nowhere here; the .1 sibling is age-deleted on a later sweep.',
-    'gap: append-only guard jsonl under <starciLocalRoot>/guards/ (refusals.jsonl, footprint.jsonl) lies outside these roots — uncapped by this sweep.',
+    'machine_logs uses the existing machine.pruneLogs policy during apply (debug 14 days, other logs 90 days). Dry runs leave the machine database unopened.',
+    'action, call, probe, metric, notification and event histories have no general retention budget here; this sweep does not delete semantic history or unidentified databases.',
   ];
   if (Object.values(overflow).some((n) => n)) out.report.overflow = overflow;
   return out;

@@ -7,7 +7,7 @@
 // path (a directory row covers what is below it), and retiredNames[] declares the dead namings that are not paths (a
 // deleted app, a layer naming, a verb prefix).
 //
-// Never scanned: history (modules/kernel/contract-changes/, CHANGELOG*.md, benchmark/, .starciwork/ records), the
+// Never scanned: history (CHANGELOG*.md, benchmark/, .starciwork/ records), the
 // registry itself (it must name what it declares dead), the generated copy roots, and the two files of this check —
 // like the one allowlist's own files, they carry the tokens they enforce. In the slot manifests a `forbids:` value and
 // the `path:` of a `presence: forbidden` tombstone slot declare a refusal, not a use; those lines are not read.
@@ -21,6 +21,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { parseJson } from '../lib/json.mjs';
+import { readParsedFile } from '../lib/read-text.mjs';
 import { RETIRED_PATHS_FILE, generatedRootsOf, isHistoryPath, lineOf, runReportMain } from '../lib/check-scan.mjs';
 
 const HELP = `Usage: check-retired-names [--root <tree>] [--json]
@@ -76,6 +78,92 @@ export function retiredNameScan(root = DEFAULT_ROOT) {
   }
 }
 
+const packageRelative = (value) => {
+  if (typeof value !== 'string' || /[\\\x00-\x1f\x7f]/.test(value)) return null;
+  const relative = value.startsWith('./') ? value.slice(2) : value;
+  return relative && !/^[A-Za-z]:/.test(relative) && relative.split('/').every((part) => part && part !== '.' && part !== '..') ? relative : null;
+};
+
+const movedBinOwner = (root, token) => {
+  if (token.kind !== 'moved path' || packageRelative(token.to) !== token.to || packageRelative(token.token) !== token.token) return null;
+  for (let directory = path.posix.dirname(token.to); directory !== '.'; directory = path.posix.dirname(directory)) {
+    const file = path.join(root, directory, 'package.json');
+    if (!fs.existsSync(file)) continue;
+    const manifest = readParsedFile(file, (text) => {
+      const parsed = JSON.parse(text);
+      jsonStringSpans(text);
+      return parsed;
+    });
+    if (typeof manifest?.name !== 'string') return null;
+    const relative = token.to.slice(directory.length + 1);
+    if (relative !== token.token) return null;
+    const bins = typeof manifest.bin === 'string' ? { [manifest.name.split('/').at(-1)]: manifest.bin } : manifest.bin;
+    if (!bins || typeof bins !== 'object' || Array.isArray(bins)) return null;
+    const commands = Object.entries(bins).filter(([, value]) => packageRelative(value) === relative).map(([name]) => name);
+    return commands.length ? { name: manifest.name, relative, commands } : null;
+  }
+  return null;
+};
+
+// String spans retain the original file:line and distinguish metadata values from identical prose or keys.
+const jsonStringSpans = (text) => {
+  const lexemes = [...text.matchAll(/"(?:\\.|[^"\\])*"|[{}:,]|\[|\]|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null/g)];
+  const strings = [];
+  let cursor = 0;
+  const value = (keys) => {
+    const item = lexemes[cursor++];
+    if (item[0] === '{') {
+      const seen = new Set();
+      while (lexemes[cursor][0] !== '}') {
+        const key = parseJson(lexemes[cursor++][0]);
+        if (seen.has(key)) throw new Error('Duplicate JSON key');
+        seen.add(key);
+        cursor += 1;
+        value([...keys, key]);
+        if (lexemes[cursor][0] !== ',') break;
+        cursor += 1;
+      }
+      cursor += 1;
+    } else if (item[0] === '[') {
+      let index = 0;
+      while (lexemes[cursor][0] !== ']') {
+        value([...keys, index++]);
+        if (lexemes[cursor][0] !== ',') break;
+        cursor += 1;
+      }
+      cursor += 1;
+    } else if (item[0].startsWith('"')) {
+      strings.push({ keys, value: parseJson(item[0]), start: item.index + 1, end: item.index + item[0].length - 1 });
+    }
+  };
+  value([]);
+  return strings;
+};
+
+const dependencyBinSpans = (root, rel, text, tokens) => {
+  if (path.posix.basename(rel) !== 'package-lock.json') return [];
+  const lock = parseJson(text);
+  if (![2, 3].includes(lock?.lockfileVersion) || !lock.packages || typeof lock.packages !== 'object' || Array.isArray(lock.packages)) return [];
+  let strings;
+  try { strings = jsonStringSpans(text); } catch { return []; } // Ambiguous metadata keeps the raw scan.
+  const spans = [];
+  const owners = new Map();
+  for (const span of strings) {
+    if (span.keys.length !== 4 || span.keys[0] !== 'packages' || span.keys[2] !== 'bin') continue;
+    const [, packageKey, , command] = span.keys;
+    const dependency = packageKey.match(/^(?:node_modules\/(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+\/)*node_modules\/((?:@[a-z0-9._-]+\/)?[a-z0-9._-]+)$/)?.[1];
+    const entry = lock.packages[packageKey];
+    if (!dependency || entry?.link === true || typeof entry?.version !== 'string' || !entry.version.trim() || (entry.name !== undefined && entry.name !== dependency)) continue;
+    for (const token of tokens) {
+      if (token.kind !== 'moved path' || !span.value.includes(token.token)) continue;
+      if (!owners.has(token)) owners.set(token, movedBinOwner(root, token));
+      const owner = owners.get(token);
+      if (owner?.name === dependency && owner.commands.includes(command) && packageRelative(span.value) === owner.relative) spans.push({ ...span, token, owner });
+    }
+  }
+  return spans;
+};
+
 /** The live occurrences of `tokens` under `root`: [{file, line, token, kind, why}]. */
 export function checkRetiredNames(root = DEFAULT_ROOT, tokens = retiredNameTokens(root)) {
   const dead = [];
@@ -87,6 +175,7 @@ export function checkRetiredNames(root = DEFAULT_ROOT, tokens = retiredNameToken
     const buffer = fs.readFileSync(path.join(root, rel));
     if (buffer.includes(0)) continue;
     const text = MANIFESTS.has(rel) ? blankRefusals(buffer.toString('utf8')) : buffer.toString('utf8');
+    const dependencyBins = dependencyBinSpans(root, rel, text, tokens);
     for (const t of tokens) {
       // A moved path that is the tail of its own destination (bin/starci.mjs -> packages/cli/bin/starci.mjs) is not a use of the old path.
       const prefix = t.to && t.to.endsWith(t.token) ? t.to.slice(0, t.to.length - t.token.length) : '';
@@ -94,6 +183,7 @@ export function checkRetiredNames(root = DEFAULT_ROOT, tokens = retiredNameToken
       while (at !== -1) {
         // ...nor is a file inside the destination directory naming it relative to itself (packages/cli/package.json: ./bin/starci.mjs).
         if (prefix && (rel.startsWith(prefix) || text.slice(Math.max(0, at - prefix.length), at) === prefix)) { at = text.indexOf(t.token, at + t.token.length); continue; }
+        if (t.kind === 'moved path' && dependencyBins.some((span) => span.token === t && at >= span.start && at + t.token.length <= span.end)) { at = text.indexOf(t.token, at + t.token.length); continue; }
         dead.push({ file: rel, line: lineOf(text, at), token: t.token, kind: t.kind, why: t.why });
         at = text.indexOf(t.token, at + t.token.length);
       }

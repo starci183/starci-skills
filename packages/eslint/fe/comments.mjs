@@ -16,6 +16,7 @@
  */
 
 import { hasSecondLanguage } from "./runtime/scripts/lib/language.mjs"
+import { jsdocBefore } from "./runtime/scripts/lib/jsdoc.mjs"
 import { fileOf, inSlot } from "./lib/scope.mjs"
 
 /**
@@ -82,13 +83,12 @@ export const requireExportJsdoc = {
     schema: [],
     messages: {
       jsdoc:
-        "`{{name}}` is exported with no documentation block. An export is read far more often than it is written, and by people who never open the body - name the ROLE it plays, not the signature, which the signature already states.",
+        "`{{name}}` is exported without an adjacent JSDoc description. An export is read far more often than it is written, and by people who never open the body - name the ROLE it plays, not the signature, which the signature already states.",
     },
   },
   create(context) {
     const source = context.sourceCode || context.getSourceCode()
-    const hasBlock = (node) =>
-      source.getCommentsBefore(node).some((comment) => comment.type === "Block" && comment.value.startsWith("*"))
+    const hasBlock = (node) => jsdocBefore(source, node) !== null
     const check = (node) => {
       const declaration = node.declaration
       if (!declaration) return

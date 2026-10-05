@@ -1,5 +1,5 @@
 // release-registry.mjs - the npm edge of the release gate: the one object release-plan.mjs and release-publish.mjs talk to.
-// {state(name, version), localShasum(dir), contentClass(name, version, dir), whoami(), publish(dir)}. Specs pass a fake with the
+// {state(name, version), localShasum(dir), contentClass(name, version, dir), whoami(), publish(dir, options)}. Specs pass a fake with the
 // same five functions, so the gate is judged without a network. Reads never write; `publish` is called only by
 // release-publish.mjs when --publish was given.
 import fs from 'node:fs';
@@ -40,7 +40,7 @@ export function classifyContent(registryFiles, localFiles) {
 }
 
 /** The default registry seam over `npm` for the packages under `root`. */
-export function npmRegistry({ root }) {
+export function npmRegistry({ root, pack: packArchive = pack }) {
   const abs = (dir) => path.resolve(root, dir);
   return {
     state: (name, version) => view(name, version),
@@ -53,11 +53,13 @@ export function npmRegistry({ root }) {
     contentClass(name, version, dir) {
       const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'release-pack-'));
       try {
-        const reg = pack(`${name}@${version}`, tmp, { cwd: root });
+        const reg = packArchive(`${name}@${version}`, tmp, { cwd: root });
         if (!reg.ok) return `unknown registry pack failed: ${reg.detail}`;
-        const loc = pack(abs(dir), tmp, { cwd: root });
+        // Registry and local packs share the deterministic filename; retain the published bytes before the local write.
+        const registryFiles = tarFiles(fs.readFileSync(path.join(tmp, reg.file)));
+        const loc = packArchive(abs(dir), tmp, { cwd: root });
         if (!loc.ok) return `unknown local pack failed: ${loc.detail}`;
-        return classifyContent(tarFiles(fs.readFileSync(path.join(tmp, reg.file))), tarFiles(fs.readFileSync(path.join(tmp, loc.file))));
+        return classifyContent(registryFiles, tarFiles(fs.readFileSync(path.join(tmp, loc.file))));
       } catch (error) {
         return `unknown compare failed: ${String(error?.message ?? error).slice(0, 120)}`;
       } finally {
@@ -65,6 +67,6 @@ export function npmRegistry({ root }) {
       }
     },
     whoami: () => whoami(),
-    publish: (dir) => publish(abs(dir)),
+    publish: (dir, options) => publish(abs(dir), options),
   };
 }

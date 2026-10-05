@@ -7,8 +7,8 @@ import {readWorkspace, resolveOwnedDirs, ownerPathProblems, appRootOf, missingOw
 import {renderProofProblems} from '../render-proof.mjs';
 import {DRAW_TOOL, RASTER_TOOL, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings} from '../ui/ui-shapes.mjs';
 import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../asset-slot.mjs';
-import { walkFiles } from '../../lib/walk.mjs';
-import {blobPath} from '../../../engine/db/blob.mjs';
+import { walkFiles } from '../../lib/walk.mjs'; import { exampleWorkRoots, exampleArtifactReadOptions } from '../../lib/example-refs.mjs';
+import {blobPath, getBlob} from '../../../engine/db/blob.mjs';
 import {isProductPath, agentDataCategory} from '../../lib/starciwork-boundary.mjs';
 import { lsFiles } from '../../api/git/ls-files.mjs';
 import {sealedLocationProblem} from './check-work-artifacts.mjs'; import { isMain } from '../../lib/is-main.mjs';
@@ -123,7 +123,7 @@ const collectRecordMap = (scopeRoot) => {
       || (path.basename(rel) === 'manifest.yaml' && segments.includes('evidence'))) continue;
     if (rel.endsWith('/evidence.yaml')) continue;
     if (isRetiredNodeSchema(record.schema)) continue;
-    if (record.id) map.set(record.id, {
+    if (typeof record.id === 'string' && record.id) map.set(record.id, {
       schema: record.schema, state: record.state, change: record.change, file,
       shown: path.relative(root, file).replaceAll('\\', '/'), dir: path.dirname(file),
       data: record,
@@ -179,7 +179,14 @@ export function checkStarciworkBoundary(workRoot, problems, warnings = [], resol
  * the real example tree. `resolveRoot` optionally widens ref resolution to an ancestor tree while record
  * rules still apply only to `workRoot` — the scoped-validate case above.
  */
-export function checkWorkTree(workRoot, problems, warnings = [], infos = [], resolveRoot = workRoot) {
+export function checkWorkTree(workRoot, problems, warnings = [], infos = [], resolveRoot = workRoot, { runtimeRoot = root } = {}) {
+  let blobOptions;
+  try {
+    blobOptions = exampleArtifactReadOptions(runtimeRoot, workRoot, { resolveRoot });
+  } catch (error) {
+    problems.push(`artifact read context cannot be established: ${error.message} [ASSET_ROOT]`);
+    return { records: 0, refs: 0, payloads: 0 };
+  }
   const records = new Map(); // id -> {schema, state, change, file, shown, dir, data}
   const refs = [];
   // Planned design pointers of the layout tree (see plannedDesignPointers): `${file}|${id}` keys.
@@ -260,7 +267,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       problems.push(`${shown}: schema ${record.schema} is the retired recursive work/node envelope; restate it as flat family records (${[...FAMILIES].join(', ')}) [HFS_WORK_NODE_RETIRED]`);
       continue;
     }
-    if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record});
+    if (Object.hasOwn(record, 'id') && typeof record.id !== 'string') problems.push(`${shown}: id must be a string, not ${record.id === null ? 'null' : Array.isArray(record.id) ? 'array' : typeof record.id} [ID_TYPE]`); else if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record});
     if (segments[0] === 'features' && segments.length > 2 && !EXEMPT.has(record.schema)) {
       const want = expectedId(segments);
       if (want && record.id !== want) problems.push(`${shown}: id is ${record.id}, but its place says ${want}`);
@@ -675,9 +682,15 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
           if (!cited(run.videos).length) problems.push(`${rec.shown}: run ${run.id ?? '?'} cites no playable recording (run.videos[] {artifact?, sha256})`);
           if (!cited(run.result).length) problems.push(`${rec.shown}: run ${run.id ?? '?'} cites no result (run.result {artifact?, sha256})`);
           else {
-            const file = blobPath(cited(run.result)[0].sha256);
-            const outcome = file ? (/outcome:\s*pass/i.test(fs.readFileSync(file, 'utf8')) ? 'pass' : 'not-pass') : (run.outcome ?? ev.outcome ?? null);
-            if (outcome !== 'pass') problems.push(`${rec.shown}: run ${run.id ?? '?'}'s result does not record outcome: pass`);
+            try {
+              const file = blobOptions.root == null ? blobPath(cited(run.result)[0].sha256) : null;
+              const bytes = blobOptions.root == null ? (file ? fs.readFileSync(file) : null) : getBlob(cited(run.result)[0].sha256, blobOptions);
+              const outcome = bytes ? (/outcome:\s*pass/i.test(bytes.toString('utf8')) ? 'pass' : 'not-pass') : (run.outcome ?? ev.outcome ?? null);
+              if (outcome !== 'pass') problems.push(`${rec.shown}: run ${run.id ?? '?'}'s result does not record outcome: pass`);
+            } catch (error) {
+              if (blobOptions.root == null) throw error;
+              problems.push(`${rec.shown}: run ${run.id ?? '?'}'s selected result bytes cannot be verified: ${error.message} [UAT_RESULT_INVALID]`);
+            }
           }
         } else if (!ev?.run) {
           problems.push(`${rec.shown}: evidence.yaml has no run - a done uat-flow must cite the exact run it settled on (run {id, result, screens[], videos[]} by sha256)`);
@@ -706,27 +719,14 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     }
   }
 
-  // ---- trust concept 9: a done frontend implementation needs render/brand proof ----
-  // scripts/work/ui/render.mjs + scripts/work/brand/brand.mjs are the canon for "the running page looks like the brand and the
-  // grammar" - palette from the captured PNG's own bytes, card anatomy from the markup kept beside it,
-  // mascot slots from the ui record's surfaces. Until now nothing ran them against this tree, so a
-  // frontend work/implementation@1 could reach `done` with no capture at all (grit item 55). The rule:
-  // a done implementation that is frontend (same predicate as IMPL_BEFORE_DIRECTION - proves a
-  // work/ui-screen@1, or its repository resolves to a `role: fe` workspace entry) must keep real capture
-  // artifacts in the shape render.mjs reads (PNG + sibling .html under its assets/) and pass the checks.
-  // A `skip` on a core check is refused as RENDER_PROOF_INCOMPLETE - an uncheckable claim is not a pass.
+  // A done frontend implementation proves its running page through the existing
+  // render/brand owner: capture PNG, markup, palette, anatomy and mascot rules.
+  // It uses the same frontend predicate as IMPL_BEFORE_DIRECTION. Missing or
+  // uncheckable selected capture bytes refuse; a core-check skip is not a pass.
   for (const [id, rec] of records) {
     if (rec.schema !== 'work/implementation@1' || rec.data?.state !== 'done') continue;
-    for (const problem of renderProofProblems({rec, records, workspaceDoc, workRoot})) {
-      // A tree shipped under the runtime's examples/ cites capture blobs its authoring machine filed; the blob store is
-      // machine-local and never distributed with the repository, so a cited-but-absent capture is only a suspect there
-      // (the same rule check-work-artifacts applies to blob citations). Every other tree is refused.
-      const shipped = path.resolve(workRoot).toLowerCase().startsWith(path.join(root, 'examples').toLowerCase() + path.sep);
-      const citesCaptures = (rec.data?.assets ?? []).some(asset => /\.png$/i.test(String(asset?.name ?? '')) && /^[0-9a-f]{64}$/i.test(String(asset?.sha256 ?? '')));
-      const absent = problem.includes('[RENDER_CAPTURE_MISSING]') && shipped && citesCaptures;
-      if (absent) warnings.push(`${rec.shown}: state is done and its assets[] cite running-page capture blobs, none of which is in the local blob store - a shipped example's blobs are not distributed with it, so the render proof cannot run here [RENDER_CAPTURE_MISSING]`);
-      else problems.push(`${rec.shown}: ${problem}`);
-    }
+    for (const problem of renderProofProblems({rec, records, workspaceDoc, workRoot, blobOptions}))
+      problems.push(`${rec.shown}: ${problem}`);
   }
 
   // ---- concept 13 (continued): uat-flow environment/fixtures/accounts refs resolve to a real _resources entry ----
@@ -895,7 +895,7 @@ if (isMain(import.meta.url)) {
   const infos = [];
   checkFamiliesDrift(problems);
   let records = 0, refs = 0, evidence = 0, payloads = 0;
-  for (const workRoot of walk(path.join(root, 'examples')).filter(file => file.endsWith(`.starciwork${path.sep}index.yaml`)).map(path.dirname)) {
+  for (const workRoot of exampleWorkRoots(root)) {
     checkStarciworkBoundary(workRoot, problems, warnings);
     const counts = checkWorkTree(workRoot, problems, warnings, infos);
     records += counts.records; refs += counts.refs; evidence += counts.evidence; payloads += counts.payloads;

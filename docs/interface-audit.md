@@ -8,6 +8,21 @@ reports `no-actionable-drift` or returns repair-ready findings. It does not edit
 source, generate or retouch replacement renders, dispatch the repair, prove a UAT business journey, or replace
 `review.verify`.
 
+## Typed scope at admission
+
+The Kernel supplies `params.audit` through the existing `starci kernel enqueue --params` input.
+It names one `operation.<feature>.<audit>` identity, its feature, a nonempty `selectedMatrix.cells`
+array, and optional declared dependency IDs. Each cell has a stable `id`, `surface`, `route`,
+`state`, `viewport`, `theme`, and nonempty `assertionIds`. These are scope identifiers; their type
+does not prove that a route is served, a capture is fresh, or an assertion passed.
+
+Enqueue validates this required Kernel-owned object, and native dispatch refuses a missing or
+malformed scope before launch. The selected value and shape are filed in the attempt contract.
+The first audit does not require an `interface_audits` row to exist. Report ingestion compares
+every declared scope field against that filed contract, preserves separate capture annotations,
+and cannot replace another workflow's audit identity. Attempts admitted without this typed
+definition retain their existing contract; they are not reconstructed from current Source.
+
 ## Accepted draw lineage is the baseline
 
 Before looking at the implementation, the audit enumerates every applicable `interface.draw` receipt and its

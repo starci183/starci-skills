@@ -90,6 +90,9 @@ export function gateAutoAnswerRule(adapter, gate) {
   const spec = adapter?.gateAutoAnswer;
   const rule = spec?.gates?.[gate];
   if (!rule || typeof rule.select !== 'string' || !rule.select.trim()) return null;
+  // A terminal frame alone cannot prove its repository or owner approval.
+  // Consent gates must be resolved by the verified prelaunch trust path.
+  if(rule.requiresLaunchTrust===true)return null;
   return { select: rule.select, delayMs: Math.max(0, Number(rule.delayMs ?? spec.delayMs) || 0),
     settleMs: Math.max(1000, Number(rule.settleMs ?? spec.settleMs) || 6000) };
 }

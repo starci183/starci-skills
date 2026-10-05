@@ -311,10 +311,11 @@ export function watchOptions(argv = []) {
 }
 
 /** One read-only snapshot: {at, ok, alerts: [{key, text}], facts: <count>}. */
-export async function snapshot(o = watchOptions()) {
-  const facts = await collect(o);
+export async function snapshot(o = watchOptions(), { collectFacts = collect } = {}) {
+  const facts = await collectFacts(o);
   const alerts = [...facts].filter(([, t]) => t).map(([key, text]) => ({ key, text }));
-  return { at: new Date().toISOString(), ok: alerts.length === 0, alerts, facts: facts.size };
+  return { at: new Date().toISOString(), ok: alerts.length === 0, alerts, facts: facts.size,
+    observations: [...facts].map(([key, text]) => ({ key, state: text ? 'unhealthy' : 'healthy' })) };
 }
 
 async function main(argv = process.argv.slice(2)) {

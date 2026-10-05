@@ -30,11 +30,7 @@ Specs that must pass (done criteria): {specs}
 - Reproduce the defect first with a spec under `tests/` (a new or extended `*.spec.mjs`) that fails before your fix
   and passes after it. Run specs with `starci test run --level L1 --spec <files>`.
 - Keep every file loadable: `node --check` on each changed .mjs, a YAML/JSON parse of each changed module file.
-- A change to a contract, schema, knowledge or op file (modules/kernel, modules/schemas, modules/ops, knowledge,
-  modules/supervisor, modules/models/code-patterns.yaml) registers an entry in the SAME commit as its own file
-  modules/kernel/contract-changes/<id>.yaml (one map: id, effectiveAt, summary, reach, paths; fields in
-  modules/kernel/contract-changes-format.yaml), with `paths` naming every such file and `reach: new-legs` unless the brief says
-  otherwise.
+- Change the existing canonical owner and its directly owning whole specs; current contracts and native checks apply without dated waiver files.
 - Grow the kernel api by files, not by editing its shared lines (scripts/kernel/api-extensions.mjs): a new verb is
   scripts/kernel/verbs/<verb>.mjs plus modules/cli/commands/kernel/<verb>.yaml, a new status field is
   scripts/kernel/status/<key>.mjs, a new boolean flag is a line in scripts/kernel/api-boolean-flags.txt.

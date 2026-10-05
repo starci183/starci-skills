@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
+import {inspectLedger,ledgerFileFor,openLedger,setInboxStatus} from '../../engine/db/ledger.mjs';
+import inboxVerb from '../../scripts/kernel/verbs/inbox.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 
 // Cross-workflow peer messages (modules/kernel/api.yaml peers/notify/inbox, driver-loop.yaml peers).
@@ -126,6 +127,9 @@ test('notify, inbox and ack round trip: a request, a reply, and each disposition
   const replyKey=reply.sent[0].key;
   const acked=fx.ok(['inbox','--workflow',LOGIN,'--ack',key,'--disposition','queued as job-login-phone, replied '+replyKey]);
   assert.deepEqual([acked.acked.key,acked.acked.from,acked.pending],[key,COLLAB,0]);
+  const replay=fx.ok(['inbox','--workflow',LOGIN,'--ack',key,'--disposition','queued as job-login-phone, replied '+replyKey]);
+  assert.equal(replay.replayed,true);
+  assert.deepEqual(replay.acked,acked.acked);
   fx.refused(['inbox','--workflow',LOGIN,'--ack',key,'--disposition','again'],'peer-message-not-pending');
   fx.refused(['inbox','--workflow',LOGIN,'--ack','pm-000000000000','--disposition','x'],'peer-message-unknown');
 
@@ -145,6 +149,27 @@ test('notify, inbox and ack round trip: a request, a reply, and each disposition
   // --to peers reaches every running peer.
   const broadcast=fx.ok(['notify','--workflow',COLLAB,'--to','peers','--kind','heads-up','--subject','chat contract v2','--body','The chat DTO gains a phone field.']);
   assert.deepEqual(broadcast.sent.map(m=>m.to).sort(),[LOGIN,ROOTLESS]);
+});
+
+test('a competing acknowledgement is reloaded in the write transaction and only its winning disposition is reported',t=>{
+  const fx=fixture(t);
+  const key=fx.ok(['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','request','--subject','concurrent','--body','one message']).sent[0].key;
+  const winner=openLedger({file:ledgerFileFor(fx.repo)}),loser=openLedger({file:ledgerFileFor(fx.repo)});
+  t.after(()=>winner.close());t.after(()=>loser.close());
+  let inserted=false;
+  const wrapped=Object.assign(Object.create(loser),{transaction:fn=>{
+    if(!inserted){inserted=true;winner.transaction(db=>{
+      const row=db.prepare("SELECT inbox_id FROM inbox WHERE workflow_id=? AND kind='peer-message' AND key=?").get(LOGIN,key);
+      setInboxStatus(db,{inboxId:row.inbox_id,status:'applied',disposition:{disposition:'winner',by:LOGIN,at:Date.now()}});
+      winner.appendEvent({workflowId:LOGIN,entityType:'workflow',entityId:LOGIN,kind:'peer-message-acked',payload:{key,disposition:'winner'}});
+    });}
+    return loser.transaction(fn);
+  }});
+  const call=(disposition,emit)=>inboxVerb.run({ledger:wrapped,args:{workflow:LOGIN,ack:key,disposition,json:true},repo:fx.repo,emit});
+  assert.throws(()=>call('loser',()=>assert.fail('conflict cannot emit success')),error=>error.code==='peer-message-not-pending');
+  let result;call('winner',out=>{result=out;});
+  assert.equal(result.replayed,true);assert.equal(result.acked.disposition,'winner');
+  assert.equal(fx.read(db=>db.prepare("SELECT count(*) n FROM events WHERE kind='peer-message-acked'").get().n),1);
 });
 
 test('notify refuses a finished, foreign, unknown or self target and malformed messages, writing nothing',t=>{

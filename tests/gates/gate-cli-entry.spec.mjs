@@ -11,6 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { GATE_EXIT, runLintGate } from '../../scripts/gates/gate.mjs';
 import { kindsOf } from '../../scripts/gates/read-digest.mjs';
 import { hfsEntry, starciBin } from '../../scripts/lib/package-at.mjs';
+import { withSpawnResult } from '../helpers/lint-child-outcome.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const RUNTIME_STARCI_BIN = path.join(ROOT, 'packages', 'cli', 'bin', 'starci.mjs');
@@ -104,4 +105,44 @@ test('read-digest explains a path through `starci app explain --json` when the @
   const [spawned] = await kindsOf(root, [file], { dir: tmp(t, 'starci-no-hfs-'), bin: RUNTIME_STARCI_BIN });
   assert.ok(spawned.slot, `no slot through the CLI for ${file}`);
   assert.deepEqual(spawned, inProcess);
+});
+
+test('valid clean app lint JSON never masks a failed or unknown child', async (t) => {
+  const { root, base } = laneApp(t), dir = tmp(t, 'starci-gate-outcome-'), bin = put(dir, 'starci.mjs', '');
+  const finding = { engine: 'hfs', rule: 'fixture-rule', path: 'be/src/a.ts', line: 1, column: 2, message: 'retained finding' };
+  for (const sample of [
+    { status: 1 }, { status: 2 }, { status: 9 }, { status: null }, { status: undefined }, { status: '0' },
+    { status: 0, error: new Error('child spawn failed') }, { status: 0, signal: 'SIGTERM' },
+    { status: 2, findings: true }, { status: 1, error: new Error('child spawn failed'), findings: true },
+  ]) {
+    const child = { status: sample.status, error: sample.error, signal: sample.signal ?? null, stderr: '',
+      stdout: JSON.stringify({ schema: 'starci/lint@1', ok: !sample.findings, changed: ['be/src/a.ts'], errors: [], findings: sample.findings ? [finding] : [] }) };
+    let calls = 0;
+    const measured = await withSpawnResult(t, (command, args) => {
+      const matched = command === process.execPath && args[0] === bin; if (matched) calls += 1; return matched;
+    }, child, () => runLintGate({ root, base, files: ['be/src/a.ts'], hfs: { dir, bin } }));
+    assert.equal(calls, 1, 'the actual lint gate must reach the selected child');
+    assert.equal(measured.exit, GATE_EXIT.toolFailed, String(sample.status));
+    assert.match(measured.errors.join('\n'), /starci app lint did not complete/);
+    if (sample.error) assert.match(measured.errors.join('\n'), /child spawn failed/);
+    if (sample.signal) assert.match(measured.errors.join('\n'), /SIGTERM/);
+    assert.equal(measured.step.findings, sample.findings ? 1 : 0);
+    assert.equal(measured.findings.length, sample.findings ? 1 : 0, 'failed child findings remain visible');
+  }
+});
+
+test('real app lint exit 1 retains findings and the existing read-only baseline policy', async (t) => {
+  const { root, base } = laneApp(t);
+  const finding = { engine: 'hfs', rule: 'fixture-rule', code: 'fixture-rule', path: 'be/src/a.ts', line: 1, message: 'measured finding' };
+  for (const preexisting of [false, true]) {
+    const dir = tmp(t, 'starci-gate-measured-');
+    const bin = put(dir, 'starci.mjs', `process.stdout.write(${JSON.stringify(JSON.stringify({ schema: 'starci/lint@1', ok: false, changed: ['be/src/a.ts'], findings: [finding], errors: [] }))}); process.exitCode = 1;\n`);
+    put(dir, 'runtime/scripts/hfs/check.mjs', `export const checkRepo = () => ({ findings: ${JSON.stringify(preexisting ? [{ level: 'error', code: finding.rule, path: finding.path }] : [])} });\n`);
+    const measured = await runLintGate({ root, base, files: ['be/src/a.ts'], hfs: { dir, bin } });
+    assert.deepEqual(measured.errors, []);
+    assert.equal(measured.exit, preexisting ? GATE_EXIT.clean : GATE_EXIT.findings);
+    assert.equal(measured.preexisting, preexisting ? 1 : 0);
+    assert.equal(measured.step.findings, 1);
+    assert.equal(measured.findings.length, preexisting ? 0 : 1);
+  }
 });

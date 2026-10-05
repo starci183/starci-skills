@@ -8,10 +8,11 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import {
-  canonParityVerdict, checkFamilyOf, sliceBaseOf, parityEligible, tscParity, baseBlobsOf, declaredProjectsOf, lintParity,
+  canonParityVerdict, checkFamilyOf, sliceBaseOf, parityEligible, tscParity, baseBlobsOf, declaredProjectsOf, lintParity, parityFingerprint,
 } from '../../scripts/kernel/settle/canon-parity.mjs';
 import { verifyReported, classifyCheck, isBaselineCheck, settlerSettings, parityCacheFile, EVENTS } from '../../scripts/kernel/settle/job-settle.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
+import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const tmpDirs = [], DRIVE = path.parse(os.tmpdir()).root.replace(/\\/g, '/');
@@ -21,8 +22,7 @@ const git = (cwd, ...args) => { const r = spawnSync('git', ['-C', cwd, ...args],
 const write = (root, rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
 
 /** A git checkout with an owned folder `src/slice` committed at `base`. */
-function checkout(files) {
-  const root = tmp('parity-repo-');
+function checkout(files, { root = tmp('parity-repo-') } = {}) {
   git(root, 'init', '-q'); git(root, 'config', 'user.email', 't@t'); git(root, 'config', 'user.name', 't'); git(root, 'config', 'core.autocrlf', 'false');
   for (const [rel, text] of Object.entries(files)) write(root, rel, text);
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'base');
@@ -158,13 +158,21 @@ test('typecheck parity: a slice-caused error in an importer is new, a foreign er
   assert.deepEqual(own.newErrors.map((e) => [e.file, e.owned]), [['src/slice/a.ts', true]]);
 });
 
-test('verifyReported runs parity only for a canon cut slice the declared checks cannot carry, and caches a refusal', async () => {
-  const { root, base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n' });
-  const db = { prepare: () => ({ get: () => undefined }) };
+test('verifyReported runs parity only for a canon cut slice the declared checks cannot carry, and caches a refusal', async (t) => withLedger(t, async ({ repoRoot: root, ledger }) => {
+  const { base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n' }, { root });
+  const item = sliceItem(base, RED);
+  // The real jobs row gives observationContextOf its declared op identity.
+  // No native result or required READ obligation is manufactured by this fixture.
+  seedWorkflow(ledger, { id: item.workflowId, state: { phase: 'running' }, jobs: [{ jobId: item.jobId, opId: item.op, status: 'running', dispatchId: item.dispatchId, payload: item.payload }] });
+  const db = ledger.db;
   let calls = 0;
   const parity = async () => { calls += 1; return { green: false, reason: 'parity-lint-new', detail: ['x'] }; };
   const parityDeps = { resolveRoot: async () => ({ ok: true, root, ownedRels: ['src/slice'] }) };
-  const item = sliceItem(base, RED);
+  const missingItem = { ...item, jobId: 'private-missing-job', dispatchId: 'private-missing-dispatch' };
+  const missing = await verifyReported(db, missingItem, { repo: root, parity, parityDeps });
+  assert.equal(missing.reason, 'checker-unavailable'); assert.equal(missing.unavailable, true);
+  assert.equal(calls, 0, 'an absent job identity cannot reach parity');
+  assert.equal(fs.existsSync(parityCacheFile(root, missingItem.jobId)), false, 'an unavailable identity creates no parity refusal cache');
   const first = await verifyReported(db, item, { repo: root, parity, parityDeps });
   assert.equal(first.reason, 'parity-lint-new'); assert.equal(calls, 1);
   assert.match(first.detail[0], /^declared: declared-check-red/);
@@ -179,6 +187,47 @@ test('verifyReported runs parity only for a canon cut slice the declared checks 
   assert.equal(plain.reason, 'declared-check-red'); assert.equal(calls, 2, 'a leg with no cut keeps the declared verdict');
   const off = await verifyReported(db, item, { repo: root, parity: null });
   assert.equal(off.reason, 'declared-check-red');
+}));
+
+test('same-size content edits retaining exact mtime invalidate only cached non-green refusals', async (t) => withLedger(t, async ({ repoRoot: root, ledger }) => {
+  const { base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n' }, { root });
+  const file = path.join(root, 'src/slice/a.ts');
+  const stamp = new Date('2020-01-01T00:00:00Z');
+  fs.utimesSync(file, stamp, stamp);
+  const before = fs.statSync(file);
+  const item = sliceItem(base, RED);
+  seedWorkflow(ledger, { id: item.workflowId, state: { phase: 'running' }, jobs: [{ jobId: item.jobId, opId: item.op, status: 'running', dispatchId: item.dispatchId, payload: item.payload }] });
+  const db = ledger.db;
+  const parityDeps = { resolveRoot: async () => ({ ok: true, root, ownedRels: ['src/slice'] }) };
+  let calls = 0;
+  const parity = async () => { calls += 1; return { green: false, reason: 'parity-lint-new', detail: ['x'] }; };
+  const first = await verifyReported(db, item, { repo: root, parity, parityDeps });
+  assert.equal(first.reason, 'parity-lint-new', 'the declared identity reaches its parity refusal before cache assertions');
+  const cache = JSON.parse(fs.readFileSync(parityCacheFile(root, item.jobId), 'utf8'));
+  assert.equal(cache.verdict.green, false);
+  assert.equal((await verifyReported(db, item, { repo: root, parity, parityDeps })).cached, true);
+  assert.equal(calls, 1);
+  write(root, 'src/slice/a.ts', 'export const a = 2;\n');
+  fs.utimesSync(file, before.atime, before.mtime);
+  assert.equal(fs.statSync(file).size, before.size);
+  assert.equal(fs.statSync(file).mtimeMs, before.mtimeMs);
+  const changed = await verifyReported(db, item, { repo: root, parity, parityDeps });
+  assert.notEqual(changed.cached, true);
+  assert.equal(changed.green, false);
+  assert.equal(calls, 2, 'a real content edit cannot reuse the earlier refusal');
+}));
+test('the fingerprint normalizes CRLF and preserves distinct non-UTF8 file bytes', async () => {
+  const { root, base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n' });
+  const item = sliceItem(base, RED);
+  const opts = { repo: root, resolveRoot: async () => ({ ok: true, root, ownedRels: ['src/slice'] }) };
+  const first = await parityFingerprint(item, opts);
+  write(root, 'src/slice/a.ts', 'export const a = 1;\r\n');
+  assert.equal(await parityFingerprint(item, opts), first);
+  const file = path.join(root, 'src/slice/raw.dat');
+  fs.writeFileSync(file, Buffer.from([0xff]));
+  const raw = await parityFingerprint(item, opts);
+  fs.writeFileSync(file, Buffer.from([0xfe]));
+  assert.notEqual(await parityFingerprint(item, opts), raw);
 });
 
 function ledgerWithReport(root, { filedAgoMs }) {

@@ -127,7 +127,7 @@ export function actionOf(item) {
   if (item.pattern) {
     switch (item.pattern) {
       case 'stale-input': return l.has('knowledge-churn')
-        ? 'Source knowledge/schema churn re-staled settled work: register the edit as modules/kernel/contract-changes/<id>.yaml (reach new-legs; follow-up only when in-flight work must catch up) or revert it; settled legs keep the law they were admitted under (guardrail source-knowledge-edits)'
+        ? 'Source knowledge/schema bytes differ from the filed inputs: read the actual current Source obligations, diagnose the concrete mismatch and file new native checks before settling; preserve the captured attempt and its evidence'
         : 'settled work owes a redo or follow-up for a changed product record (a breaking change its owner declared, or an unattributed edit of a record its own workflow owns; peer rewrites are advisory peerDrift and never land here): confirm the follow-up is real and tell the Kernel, or settle the churn at its source';
       case 'worker-died': return 'provider/launcher defect: fix the launch or liveness path in .claude, or route that provider off the op, then tell the Kernel how to retry';
       case 'repeat-reject': return 'the same dispatch step keeps refusing: fix the launcher/host step in .claude, then tell the Kernel to re-dispatch';
@@ -138,7 +138,7 @@ export function actionOf(item) {
   }
   if (id && item.class === CLASSES.supervisor && (item.kind === 'owner-gate' || item.kind === 'owner-gate-pending')) return `an owner gate with no owner ask: decide it under the owner's delegated authority (or have ${wf}'s Kernel park a real owner ask when it is a product decision the owner kept), then tell the Kernel to resolve ${id}`;
   if (l.has('cross-workflow')) return `resolve the cross-workflow effect (custody, history, shared env) between the workflows involved, notify both Kernels, then have ${wf}'s Kernel resolve ${id}`;
-  if (l.has('knowledge-churn')) return `settle the knowledge/contract change (a contract-changes entry file with its reach, or revert) so settled work is not re-staled, then tell ${wf}'s Kernel to resolve ${id}`;
+  if (l.has('knowledge-churn')) return `resolve the concrete current knowledge/contract mismatch and file the required READ/CHECK evidence, then tell ${wf}'s Kernel to resolve ${id}`;
   if (l.has('contract-conflict')) return `make the conflicting contracts/schemas agree in .claude, commit, then tell ${wf}'s Kernel to resolve ${id}`;
   if (l.has('decision')) return `take the delegated decision (owner's grant), record it, and tell ${wf}'s Kernel to resolve ${id} with the ruling`;
   if (l.has('checker') || l.has('grammar')) return `fix the shared checker/tooling/grammar in .claude, commit, then tell ${wf}'s Kernel to resolve ${id}`;

@@ -139,9 +139,7 @@ report fails its job; a reported worker is quit and closed. The Supervisor's own
 `scripts/supervisor/land.mjs`, serialized by a lock that waiters take in request order: cherry-pick onto current main in
 a scratch worktree (a pick with no diff is already landed and moves nothing); then
 `node --check`, YAML/JSON parse, `check-module-yaml`, `check-contract-cites`, `check-cli-parity`, the named specs
-plus every spec naming a changed file (`--specs touching`, the default; a land never runs the whole suite - `--specs all` needs `specs.harness: true`, `--specs none` needs `--reason`; the full suite is /starci release's), and a contract
-change entry (`modules/kernel/contract-changes/<id>.yaml`, one file per entry) whose `paths` cover every changed
-contract/schema/knowledge/op file. Only when all pass does it move live main by compare-and-swap, update exactly
+plus every spec naming a changed file (`--specs touching`, the default; a land never runs the whole suite - `--specs all` needs `specs.harness: true`, `--specs none` needs `--reason`; the full suite is /starci release's). Current contract and native package/proof checks refuse red or unavailable evidence. Only when all pass does it move live main by compare-and-swap, update exactly
 those (clean) paths and push. Red lands nothing. Lanes already committing directly keep doing so until they finish
 (`landGate.mode: shared`); `land.mjs --commit <sha> --lane <name>` moves a lane to the gate, and the owner sets
 `exclusive` when all have.
@@ -157,7 +155,7 @@ pin registry semver, never a `file:` link.
 2. Build (`npm ci` then `npm run build` in `packages/grammar`, a real directory, never a `node_modules` junction)
    and verify the stamp: `starci runtime check --only grammar-dist` is fresh.
 3. Move the CHANGELOG entry under the version with its date; `starci work grammar-knowledge --write`
-   and register the knowledge edit in `modules/kernel/contract-changes/<id>.yaml`.
+   and qualify the actual current knowledge edit through its owning checks.
 4. Land through the gate; `dist/` is untracked, so rebuild `packages/grammar/dist` on live main afterwards.
 5. `npm pack --dry-run` from live `packages/grammar`: the file list is dist, README.md, LICENSE, package.json; and
    `starci release clean-test` is green for every package of the publish set.

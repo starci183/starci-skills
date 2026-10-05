@@ -31,6 +31,8 @@ const openInvoice = { invoiceId: "inv-1", orderId: "o-1", personId: "p-1", total
 const build = async (entityManager: MockEntityManager, claimed = true) => {
     const inbox = fakeInbox()
     if (!claimed) inbox.seen("sepay", "92704")
+    const claim = jest.spyOn(inbox, "claim")
+    const release = jest.spyOn(inbox, "release")
     const bus = recordingEventBus()
     const logger = mock<Logger>()
     const invoices = mock<InvoiceService>()
@@ -45,22 +47,28 @@ const build = async (entityManager: MockEntityManager, claimed = true) => {
             { provide: INVOICE_SERVICE, useValue: invoices },
         ],
     }).compile()
-    return { service: moduleRef.get(PaymentService), inbox, bus, logger, invoices }
+    return { service: moduleRef.get(PaymentService), inbox, claim, release, bus, logger, invoices }
 }
 
 describe("PaymentService", () => {
     describe("acceptBankTransfer", () => {
-        it("claims the transfer first, then marks the invoice paid, records the payment and publishes the confirmation in one committed transaction", async () => {
+        it("claims the transfer, pays the invoice, records the payment and announces it with the same transaction manager", async () => {
             const tx = fakeTransaction(mockEntityManager({ save: [PaymentEntity, paymentRow()] }))
-            const { service, inbox, bus, invoices } = await build(tx.em)
+            const { service, inbox, claim, release, bus, invoices } = await build(tx.em)
             invoices.findOpen.mockResolvedValue(openInvoice)
 
             await service.acceptBankTransfer(notice)
 
             expect(inbox.claims).toEqual([{ source: "sepay", eventId: "92704" }])
-            expect(invoices.findOpen).toHaveBeenCalledWith({ manager: expect.anything(), orderId: "o-1" })
+            const manager = invoices.findOpen.mock.calls[0]?.[0]?.manager
+            expect(manager).toBeDefined()
+            expect(manager).not.toBe(tx.em)
+            expect(claim).toHaveBeenCalledTimes(1)
+            expect(claim).toHaveBeenCalledWith("sepay", "92704", manager)
+            expect(release).not.toHaveBeenCalled()
+            expect(invoices.findOpen).toHaveBeenCalledWith({ manager, orderId: "o-1" })
             expect(invoices.markPaid).toHaveBeenCalledWith({
-                manager: expect.anything(),
+                manager,
                 orderId: "o-1",
                 paidAt: new Date(AT),
             })
@@ -76,6 +84,7 @@ describe("PaymentService", () => {
                 PaymentConfirmedEvent.create({ orderId: "o-1", personId: "p-1", totalMinorUnits: 1500 }),
             ])
             expect(bus.allInTransaction).toBe(true)
+            expect(bus.entries[0]?.tx).toBe(manager)
             expect(tx.commits).toBe(1)
         })
 
@@ -99,13 +108,17 @@ describe("PaymentService", () => {
             expect(tx.em.save).not.toHaveBeenCalled()
         })
 
-        it("does nothing for a delivery whose transfer was already claimed", async () => {
+        it("commits a no-op transaction for an already claimed transfer without repeating its effect", async () => {
             const tx = fakeTransaction(mockEntityManager())
-            const { service, bus, invoices } = await build(tx.em, false)
+            const { service, inbox, release, bus, invoices } = await build(tx.em, false)
 
             await service.acceptBankTransfer(notice)
 
-            expect(tx.em.transaction).not.toHaveBeenCalled()
+            expect(tx.em.transaction).toHaveBeenCalledTimes(1)
+            expect(tx.commits).toBe(1)
+            expect(tx.committedWrites).toEqual([])
+            expect(inbox.claims).toEqual([{ source: "sepay", eventId: "92704" }])
+            expect(release).not.toHaveBeenCalled()
             expect(invoices.findOpen).not.toHaveBeenCalled()
             expect(bus.writes).toEqual([])
         })
@@ -135,16 +148,55 @@ describe("PaymentService", () => {
             expect(bus.writes).toEqual([])
         })
 
-        it("gives the claim back and rethrows when the transaction fails, so the redelivery is processed again", async () => {
+        it("rolls back a failed announcement and propagates its error without compensating claim deletion", async () => {
+            const failure = new Error("billing outbox down")
+            const tx = fakeTransaction(mockEntityManager({ save: [PaymentEntity, paymentRow()] }))
+            const { service, claim, release, bus, invoices } = await build(tx.em)
+            invoices.findOpen.mockResolvedValue(openInvoice)
+            bus.failNext("publish", failure)
+
+            await expect(service.acceptBankTransfer(notice)).rejects.toBe(failure)
+
+            const manager = invoices.findOpen.mock.calls[0]?.[0]?.manager
+            expect(manager).toBeDefined()
+            expect(manager).not.toBe(tx.em)
+            expect(claim).toHaveBeenCalledWith("sepay", "92704", manager)
+            expect(tx.rollbacks).toBe(1)
+            expect(tx.commits).toBe(0)
+            expect(tx.committedWrites).toEqual([])
+            expect(tx.rolledBackWrites).toHaveLength(1)
+            expect(release).not.toHaveBeenCalled()
+            expect(bus.writes).toEqual([])
+        })
+
+        it("rolls back a claim error before invoice work and propagates it without compensating deletion", async () => {
+            const failure = new Error("billing claim unavailable")
+            const tx = fakeTransaction(mockEntityManager())
+            const { service, inbox, release, bus, invoices } = await build(tx.em)
+            inbox.failNext("claim", failure)
+
+            await expect(service.acceptBankTransfer(notice)).rejects.toBe(failure)
+
+            expect(tx.rollbacks).toBe(1)
+            expect(tx.commits).toBe(0)
+            expect(tx.committedWrites).toEqual([])
+            expect(invoices.findOpen).not.toHaveBeenCalled()
+            expect(release).not.toHaveBeenCalled()
+            expect(bus.writes).toEqual([])
+        })
+
+        it("rolls back and propagates a database failure without compensating claim deletion", async () => {
             const failure = new Error("billing database down")
             const tx = fakeTransaction(mockEntityManager())
-            const { service, inbox, invoices } = await build(tx.em)
+            const { service, release, invoices } = await build(tx.em)
             invoices.findOpen.mockRejectedValue(failure)
 
             await expect(service.acceptBankTransfer(notice)).rejects.toBe(failure)
 
-            expect(inbox.released).toEqual([{ source: "sepay", eventId: "92704" }])
+            expect(release).not.toHaveBeenCalled()
             expect(tx.rollbacks).toBe(1)
+            expect(tx.commits).toBe(0)
+            expect(tx.committedWrites).toEqual([])
         })
     })
 })

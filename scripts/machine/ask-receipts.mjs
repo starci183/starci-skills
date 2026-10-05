@@ -1,5 +1,5 @@
-// ask-receipts.mjs — where the answer to an ask is kept (alpha.3, ARCHITECTURE-DB §5.2: serve-ask answers →
-// decisions + blobs; never a file under .starciwork/kernel-evidence).
+// ask-receipts.mjs — where the answer to an ask is kept (docs/ledger-db.md §§5–6): serve-ask answers →
+// decisions + blobs; never a file under .starciwork/kernel-evidence.
 //
 // An answer (owner form, Telegram reply, config auto-accept, autopilot) is one starci/ask-answer@1 receipt. It is put
 // in the blob store (redacted), indexed as a kernel artifact of the attempt that asked - job_artifacts name
@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { recordDecision } from '../../engine/db/ledger.mjs';
+import { sha256 } from '../../engine/digest.mjs';
 import { artifactRoot, blobPath } from '../../engine/db/blob.mjs';
 import { stageBlob, putArtifact } from './evidence-store.mjs';
 import { slash } from '../lib/path-key.mjs';
@@ -25,7 +26,7 @@ export const stageReceipt = (receipt) => stageBlob(Buffer.from(JSON.stringify(re
  * Inside the caller's transaction: index a staged receipt as the asking attempt's kernel artifact and record the
  * answer as a decisions row. Returns {receiptPath, receiptSha, receiptRef, artifactId, decisionId}.
  */
-export function fileAskReceipt(db, { workflowId, dispatchId, receipt, blob, at = Date.now() }) {
+function fileAskReceipt(db, { workflowId, dispatchId, receipt, blob, at = Date.now() }) {
   const report = db.prepare('SELECT attempt_id,job_id FROM reports WHERE workflow_id=? AND dispatch_id=?').get(workflowId, dispatchId) ?? null;
   const attempt = report ? db.prepare('SELECT attempt_id,job_id,op_id FROM op_attempts WHERE attempt_id=?').get(report.attempt_id) : null;
   let name = receiptNameOf(dispatchId, at);
@@ -45,6 +46,32 @@ export function writeAskReceipt(ledger, { workflowId, dispatchId, receipt, at = 
   const blob = stageReceipt(receipt);
   const file = (db) => fileAskReceipt(db, { workflowId, dispatchId, receipt, blob, at });
   return ledger.transaction.active() ? file(ledger.db) : ledger.transaction(file);
+}
+
+/** Atomically accept one answer with its receipt, decision and terminal lifecycle event. */
+export function commitAskAnswer(ledger, { workflowId, dispatchId, receipt, at = Date.now(), payload = {}, events = [], blob: staged = null }) {
+  const blob = staged ?? stageReceipt(receipt);
+  const answerDigest = sha256(JSON.stringify({ ...receipt, at: null }));
+  return ledger.transaction(db => {
+    const latest = db.prepare(`SELECT kind,payload_json FROM events WHERE workflow_id=?
+      AND kind IN ('ask-answered','ask-superseded')
+      AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(workflowId, dispatchId);
+    if (latest?.kind === 'ask-answered' || latest?.kind === 'ask-superseded') {
+      const prior = JSON.parse(latest.payload_json);
+      return prior.answerDigest === answerDigest
+        ? { accepted: true, replayed: true, ...prior }
+        : { accepted: false, why: latest.kind === 'ask-answered' ? 'already-answered' : 'retired' };
+    }
+    const filed = fileAskReceipt(db, { workflowId, dispatchId, receipt, blob, at });
+    const answer = { dispatchId, receiptPath: filed.receiptPath, receiptSha: filed.receiptSha, decisionId: filed.decisionId,
+      answeredBy: receipt.answeredBy, optionIndex: receipt.optionIndex ?? null,
+      custodyWritten: receipt.custodyWritten ?? [], envWritten: receipt.envWritten ?? [], pointersWritten: receipt.pointersWritten ?? [], errors: receipt.errors ?? [],
+      ...payload, answerDigest };
+    ledger.appendEvent({ workflowId, entityType: 'report', entityId: dispatchId, kind: 'ask-answered', payload: answer });
+    for (const event of events) ledger.appendEvent({ workflowId, entityType: 'report', entityId: dispatchId, ...event,
+      payload: { ...event.payload, receiptPath: filed.receiptPath } });
+    return { accepted: true, replayed: false, ...filed };
+  });
 }
 
 /** True when `file` is a blob in the store (a receipt's file lives there). */

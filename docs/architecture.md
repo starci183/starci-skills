@@ -281,8 +281,8 @@ shapes are the `be.*`/`fe.*` slots of `knowledge/hfs/slots.yaml`.
 agent — ownership, composition, dependency direction, public API, abstraction, data boundary,
 state, identity, configuration, authority, effect, concurrency, operability, evidence, work and
 deployment. Every obligation a machine can decide is an `R`-rule of `knowledge/hfs/rules.yaml`,
-stated only there. Load order for an op: the `ARCH-*` catalog, `knowledge/coding-reference.yaml`
-for the concrete Nest/Next profile, then the applicable `knowledge/patterns/**` topics. The
+stated only there. Load order for an op: the `ARCH-*` catalog, the REF obligations below and
+[code-pattern enforcement](code-pattern-enforcement.md), then the applicable `knowledge/patterns/**` topics. The
 executable inventory is `modules/models/code-patterns.yaml` ([code-pattern enforcement](code-pattern-enforcement.md));
 a missing or unavailable checker is a coverage failure an agent can never waive, and the
 [design catalog](design-pattern-catalog.md) supplies the conditional semantic decisions
@@ -303,6 +303,54 @@ consistency; behavioral runs prove the exercised invariant under recorded condit
 review covers responsibility and uncovered obligations. No channel substitutes for another, and no
 ignore, suppression, relaxed threshold or stale hash manufactures a pass. Unsupported syntax and
 unavailable tools block coverage; they are never relabeled as design.
+
+### Coding responsibility and reference obligations
+
+**REF-SCOPE-1 — Specification and reference evidence.** Current accepted Business/SRS and
+Architecture/SDS define product behavior and target boundaries. Adopted portable patterns
+define responsibility and dependency constraints; framework topics define concrete code forms.
+Reference observations and primary framework documentation inform decisions without overriding
+those contracts or inventing product requirements.
+
+**REF-SCOPE-2 — Smallest applicable pattern.** Select the actual framework profile and verified
+installed APIs, map roots and owners, then apply relevant rules. A mechanism needs a real
+boundary or invariant and its verification obligation; appearing in an example is insufficient.
+
+**REF-SCOPE-3 — Boundary review.** Before the first production unit identify its owner, public
+contract, dependencies, data and transaction identity, and applicable code form in the existing
+brief or result. Recheck after refactoring. A renamed facade or empty wrapper does not establish
+a useful boundary; this review needs no additional Plan or checklist.
+
+**REF-SCOPE-4 — Applicable rules.** Adopted rules hold before acceptance. Existing source and
+passing tests do not waive them, and examples cannot override revised law or require obsolete
+boilerplate. A real incompatibility needs a scoped design or tool correction under current
+authority, without silent suppression or unrelated product redesign.
+
+**REF-BE-1 — Persistence identity.** In the TypeORM profile, database-owning code uses the
+correct named EntityManager decorator and every transactional operation uses its
+transaction-scoped manager. Other selected persistence profiles preserve connection, tenant and
+atomicity semantics. A persistence port may isolate a real boundary; a public Store.manager
+escape hatch may not. Change a named-manager lint obligation coherently before changing its
+source pattern, and verify the provider token, transaction callback and installed lint.
+
+**REF-BE-2 — One use case behind protocols.** Transport owns protocol DTOs, controllers and
+resolvers; application owns plain contracts and use cases; modules own reusable capabilities.
+Direct use cases are the default, and bus handlers require actual dispatch semantics. Preserve
+existing typed public APIs through an authorized transition, review the boundaries and boot
+actual DI or bus registration when selected.
+
+**REF-FE-1 — Visual and data ownership.** Follow the adopted Next.js responsibility graph and
+composition patterns using verified installed Grammar exports. The referenced public entry is
+`@starci/grammar/common`. Verify exports before selecting component names or props; invented
+APIs or a replacement design-system pattern cannot bypass a code rule. Mechanical obligations
+need scripts; design and edge cases need separate review.
+
+**REF-LANG-1 — Language and evidence.** Maintain knowledge in English. User-facing communication
+may use the configured language. Verify behavior and coding-reference conformance separately.
+
+`examples/index.yaml` indexes complete current source sets in actual HFS apps. Read every source
+listed for the selected pattern with its owning configuration and tests. The reference is those
+files, not a copied excerpt, and its catalog membership is not a conformance claim.
 
 ## The sds family: source-independent design
 

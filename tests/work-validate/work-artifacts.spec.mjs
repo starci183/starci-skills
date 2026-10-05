@@ -227,3 +227,41 @@ test('a superseded direction is checked for its path only - its digest describes
   assert.ok(found.refuse.some(line => line.includes('[ASSET_MISSING]') && line.includes('supersededDirection')), found.refuse.join('\n'));
   assert.equal(found.refuse.filter(line => line.includes('[ASSET_DIGEST]')).join('\n'), '');
 });
+
+test('selected HFS example citations resolve in their own fixture and refuse absence instead of SUSPECT', () => {
+  const runtime = freshDir(), app = path.join(runtime, 'examples', 'lite-app'), work = path.join(app, '.starciwork');
+  write(app, 'hfs.json', '{"kind":"app"}\n');
+  write(work, 'index.yaml', 'schema: work/catalog@1\nid: lite-app\nfeatures: []\n');
+  const bytes = Buffer.from('selected public evidence'), sha = sha256(bytes);
+  write(work, 'features/f/impl/one/index.yaml', `schema: work/implementation@1\nid: impl.f.one\nstate: todo\nassets: [{name: proof.txt, sha256: ${sha}}]\n`);
+  const invoke = () => { const out = {refuse: [], suspect: [], info: []}; checkWorkArtifacts(work, out, {runtimeRoot: runtime}); return out; };
+  const missing = invoke();
+  assert.ok(missing.refuse.some(line => line.includes('[ASSET_MISSING]')), missing.refuse.join('\n'));
+  assert.equal(missing.suspect.filter(line => line.includes('ASSET_MISSING')).length, 0);
+  const cas = path.join(runtime, 'examples', '.runtimes', 'lite-app', 'artifacts');
+  write(cas, `${sha.slice(0, 2)}/${sha}`, bytes);
+  write(cas, `${sha.slice(0, 2)}/${sha}.json`, JSON.stringify({size: bytes.length, mediaType: 'text/plain', createdAt: '2026-01-01T00:00:00Z'}));
+  assert.deepEqual(invoke().refuse, [], 'the actual selected bytes and sidecar are accepted without any catalog row');
+  write(cas, `${sha.slice(0, 2)}/${sha}`, Buffer.from('tampered public evidence'));
+  assert.ok(invoke().refuse.some(line => line.includes('[ASSET_STORE]')), 'digest corruption is a typed refusal');
+});
+
+test('a selected bundle citation cannot pass with an absent member or malformed owner context', () => {
+  const runtime = freshDir(), app = path.join(runtime, 'examples', 'scope-app'), work = path.join(app, '.starciwork');
+  write(app, 'hfs.json', '{"kind":"app"}\n');
+  write(work, 'index.yaml', 'schema: work/catalog@1\nid: scope-app\nfeatures: []\n');
+  const member = sha256(Buffer.from('member'));
+  const bytes = Buffer.from(JSON.stringify({schema: 'starci/blob-bundle@1', files: {'member.txt': member}})), sha = sha256(bytes);
+  write(work, 'features/f/impl/one/index.yaml', `schema: work/implementation@1\nid: impl.f.one\nstate: todo\nassets: [{name: bundle.json, sha256: ${sha}}]\n`);
+  const cas = path.join(runtime, 'examples', '.runtimes', 'scope-app', 'artifacts');
+  write(cas, `${sha.slice(0, 2)}/${sha}`, bytes);
+  write(cas, `${sha.slice(0, 2)}/${sha}.json`, JSON.stringify({size: bytes.length, mediaType: 'application/json', createdAt: '2026-01-01T00:00:00Z'}));
+  const out = {refuse: [], suspect: [], info: []};
+  checkWorkArtifacts(work, out, {runtimeRoot: runtime});
+  assert.ok(out.refuse.some(line => line.includes('[ASSET_BUNDLE]')), out.refuse.join('\n'));
+  assert.equal(fs.existsSync(cas + '-views'), false);
+  fs.unlinkSync(path.join(app, 'hfs.json'));
+  const invalid = {refuse: [], suspect: [], info: []};
+  checkWorkArtifacts(work, invalid, {runtimeRoot: runtime});
+  assert.ok(invalid.refuse.some(line => line.includes('[ASSET_ROOT]')), invalid.refuse.join('\n'));
+});

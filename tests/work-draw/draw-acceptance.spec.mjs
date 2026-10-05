@@ -11,9 +11,10 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileReport,inspectLedger,ledgerFileFor,openLedger,recordCheckRun,writeContract} from '../../engine/db/ledger.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
+import {captureGateBinding} from '../../scripts/kernel/gate-settle.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import {
-  DATA_STATUS_DRAWN,DRAW_ACCEPTANCE_CHANGE,DRAW_ASSET_NOT_TOKEN_RENDERED,DRAW_NOT_REDRAWN,DRAW_NOT_SHAPES,RENDER_RECORD_SCHEMA,drawAcceptanceFindings,
+  DATA_STATUS_DRAWN,DRAW_ASSET_NOT_TOKEN_RENDERED,DRAW_NOT_REDRAWN,DRAW_NOT_SHAPES,RENDER_RECORD_SCHEMA,drawAcceptanceFindings,
 } from '../../scripts/work/draw/draw-acceptance.mjs';
 import {colorsFromJobs} from '../../scripts/work/work-graph-store.mjs';
 import { withRationale } from '../helpers/draw-rationale-fixture.mjs';
@@ -128,10 +129,10 @@ const seedDraw=(repo,{jobId,wf='wf-draw',files,admittedAt,payload={}})=>{
   try{
     seedWorkflow(ledger,{id:wf,state:{phase:'running',job:'draw'},
       jobs:[{jobId,opId:'interface.draw',dispatchId:`ctx-${jobId}`,terminalHandle:`term-${jobId}`,status:'running',
-        payload:{opId:'interface.draw',owned_paths:['src/'],orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},...payload}}]});
+        payload:{opId:'interface.draw',owned_paths:['.starciwork/'],orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},...payload}}]});
     const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
     ledger.transaction(db=>{
-      writeContract(db,{attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
+      writeContract(db,{attemptId,markdown:'# contract',context:{worktree:repo,packet:{context:{selected_op:{contract:{id:'interface.draw'},checks:{required:[],candidates:[]}},readRefs:[],owned_paths:[{root:repo,path:'.starciwork/'}],gate_binding:captureGateBinding([{base:repo,path:'.starciwork/'}],{at:admittedAt})}}},createdAt:admittedAt});
       fileReport(db,{attemptId,outcome:'done',createdAt:Date.now(),
         report:{schema:'starci/op-report@1',outcome:'done',summary:'adopted 40 inherited interface.draw evidence files unchanged',files,head:spawnSync('git',['-C',repo,'rev-parse','HEAD'],{encoding:'utf8',windowsHide:true}).stdout.trim()}});
       for(const check of [{name:'owned-paths-committed',command:'git show'},{name:'owned-paths-clean',command:'git status'},{name:'head-ancestor',command:'git merge-base'}])
@@ -143,33 +144,23 @@ const seedDraw=(repo,{jobId,wf='wf-draw',files,admittedAt,payload={}})=>{
 const settle=(repo,jobId,env)=>{const r=spawnSync(process.execPath,[API,'settle','--repo',repo,'--job',jobId,'--verdict','pass','--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});let body=null;try{body=JSON.parse(r.stdout);}catch{}return {r,body};};
 const statusOf=(repo,jobId)=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status;}finally{l.close();}};
 
-test('starci kernel settle refuses an adopting interface.draw pass draw-not-accepted; a leg admitted before the change settles as admitted',t=>{
+test('native interface.draw settlement requires produced-lint evidence at both current and earlier admission times',t=>{
   const repo=checkout(t);
   const files=adoptedFixture(repo);
-  // draw-adopt-gate (and draw-loop-dna, whose settle gate the same legs cross) predate the alpha.3 release
-  // base and were deleted by the release-line compaction; a fixture registry keeps them for this boundary.
-  const at=Date.parse('2026-09-27T15:20:00+07:00');
-  const changesDir=path.join(ROOT,'modules','kernel','contract-changes');
-  const changes=fs.readdirSync(changesDir).filter(f=>f.endsWith('.yaml')).map(f=>parseYaml(fs.readFileSync(path.join(changesDir,f),'utf8')));
-  changes.push({id:DRAW_ACCEPTANCE_CHANGE,effectiveAt:'2026-09-27T15:20:00+07:00',reach:'new-legs',ops:['interface.draw'],
-    adds:{codes:[DRAW_ASSET_NOT_TOKEN_RENDERED,DRAW_NOT_SHAPES,DRAW_NOT_REDRAWN]},summary:'spec fixture for the compacted draw-adopt-gate entry'},
-    {id:'draw-loop-dna',effectiveAt:'2026-09-27T18:20:00+07:00',reach:'follow-up',ops:['interface.draw'],followUp:{op:'interface.draw',ops:['interface.draw']},summary:'spec fixture for the compacted draw-loop-dna entry'});
-  const changesFile=path.join(tmp(t),'contract-changes.yaml');
-  fs.writeFileSync(changesFile,yaml({schema:'starci/contract-changes@1',changes}));
-  const env={...process.env,STARCI_CONTRACT_CHANGES:changesFile};
+  const at=Date.now() - 1000, env={...process.env};
   const jobId=seedDraw(repo,{jobId:'op-interface.draw-adopt',files,admittedAt:at+1000});
   const refused=settle(repo,jobId,env);
   assert.equal(refused.r.status,1,refused.r.stdout||refused.r.stderr);
-  assert.equal(refused.body.reason,'draw-not-accepted');
-  assert.ok(refused.body.codes.includes(DRAW_ASSET_NOT_TOKEN_RENDERED));
-  assert.ok(refused.body.codes.includes(DRAW_NOT_REDRAWN));
+  assert.equal(refused.body.reason,'op-lint-proof-missing','a specialized draw attachment cannot replace its native produced-lint prerequisite');
   assert.equal(statusOf(repo,jobId),'running','a refused settle writes nothing');
   const legacy=seedDraw(repo,{jobId:'op-interface.draw-old',wf:'wf-draw-old',files,admittedAt:at-1000});
   const old=settle(repo,legacy,env);
-  assert.equal(old.r.status,0,old.r.stderr||old.r.stdout);
+  assert.equal(old.r.status,1,old.r.stderr||old.r.stdout);
+  assert.equal(old.body?.reason,'op-lint-proof-missing');
+  assert.equal(statusOf(repo,legacy),'running');
 });
 
-test('a succeeded leg owed a follow-up colours its work-graph nodes as rework',()=>{
+test('actual failed work colours its graph nodes as rework',()=>{
   const graph={nodes:[{id:'login.foundation',domain:'login',slice:'login.foundation',kind:'foundation',ownedPaths:[`${UI}/assets`]}]};
   const jobs=[{jobId:'op-draw-adopt',op:'interface.draw',status:'succeeded',at:1,paths:[`${UI}/assets`.toLowerCase()]}];
   assert.equal(colorsFromJobs(graph,jobs)['login.foundation'],'green');

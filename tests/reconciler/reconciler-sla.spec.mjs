@@ -72,6 +72,8 @@ test('a clock past its SLA is exactly one violation event (deduped across passes
 
 test('a critical code opens exactly one runtime-defect DI for the Supervisor', async (t) => {
   const w = world(t);
+  w.ctx.mode = 'active';
+  w.ctx.openDecision = async di => { w.decisions.push(di); return { ok: true }; };
   await setClock(w.ctx, { entity: 'workflow:shop-be:wf-shop-x', state: 'GOAL_TEXT_MISSING', slaMs: 0, ledgerId: 'shop-be', enteredAt: w.at() - 1000 });
   await setClock(w.ctx, { entity: 'stuck:shop-be:wf-shop-x:peer-wait:inc-1', state: 'PEER_WAIT_OVERDUE/critical', slaMs: 4 * 60 * MIN, ledgerId: 'shop-be', enteredAt: w.at() - 5 * 60 * MIN });
   const r = await slaPass(w.ctx);
@@ -163,4 +165,50 @@ test('truth: a violated clock whose condition is gone is cleared by the pass its
     assert.equal(r.violated.length, 0);
     assert.equal(w.events(VIOLATED_KIND).length, 3, 'no new violation');
   });
+});
+
+test('critical DI refusal, missing acknowledgement and lost reply retry without duplicate invariant history', async (t) => {
+  for (const failure of [() => ({ ok: false }), () => undefined, () => ({ ok: true, recordedOnly: true }),
+    () => { throw Error('lost DI reply'); }]) await t.test('a failed delivery remains pending', async (sub) => {
+    const w = world(sub);
+    w.ctx.mode = 'active';
+    let calls = 0;
+    w.ctx.openDecision = async () => { calls += 1; return failure(); };
+    await setClock(w.ctx, { entity: 'workflow:shop-be:wf-di-retry', state: 'GOAL_TEXT_MISSING',
+      slaMs: 0, ledgerId: 'shop-be', enteredAt: w.at() - 1000 });
+    const first = await slaPass(w.ctx);
+    assert.equal(first.ok, false);
+    assert.equal(first.decisions, 0);
+    assert.equal(calls, 1);
+    assert.equal(w.m.db.prepare('SELECT reported_at FROM sla_episodes').get().reported_at, null);
+    assert.equal(w.events(VIOLATED_KIND).length, 1);
+    assert.equal(w.m.db.prepare('SELECT count(*) AS n FROM invariant_violations').get().n, 1);
+    w.ctx.openDecision = async di => { calls += 1; w.decisions.push(di); return { ok: true }; };
+    const next = await slaPass(w.ctx);
+    assert.equal(next.ok, true);
+    assert.equal(next.violated.length, 0, 'retry delivers the already-recorded violation');
+    assert.equal(next.decisions, 1);
+    assert.equal(calls, 2);
+    assert.equal(w.events(VIOLATED_KIND).length, 1);
+    assert.notEqual(w.m.db.prepare('SELECT reported_at FROM sla_episodes').get().reported_at, null);
+    await slaPass(w.ctx);
+    assert.equal(calls, 2, 'successful acknowledgement is delivered once');
+  });
+});
+
+test('shadow would-delivery does not consume the later active critical decision', async (t) => {
+  const w = world(t);
+  await setClock(w.ctx, { entity: 'workflow:shop-be:wf-di-shadow', state: 'GOAL_TEXT_MISSING',
+    slaMs: 0, ledgerId: 'shop-be', enteredAt: w.at() - 1000 });
+  const shadow = await slaPass(w.ctx);
+  assert.equal(shadow.ok, true);
+  assert.equal(shadow.decisions, 0);
+  assert.equal(shadow.wouldDecisions, 1);
+  assert.equal(w.m.db.prepare('SELECT reported_at FROM sla_episodes').get().reported_at, null);
+  w.ctx.mode = 'active';
+  w.ctx.openDecision = async di => { w.decisions.push(di); return { ok: true }; };
+  const active = await slaPass(w.ctx);
+  assert.equal(active.decisions, 1);
+  assert.equal(active.violated.length, 0);
+  assert.equal(w.events(VIOLATED_KIND).length, 1);
 });

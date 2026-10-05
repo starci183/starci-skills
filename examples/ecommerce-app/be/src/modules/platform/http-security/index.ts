@@ -1,4 +1,4 @@
-export { HTTP_SECURITY_ERROR_KINDS, HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
+export { HTTP_SECURITY_ERROR_KINDS, HttpSecurityErrorCode } from "./errors/http-security.error"
 export { requestOf } from "./execution-request.mapper"
 export type { OperationRequest } from "./http-security.contracts"
 export { parseHttpSecurityConfig, parseWebhookProviderConfig } from "./http-security.config"

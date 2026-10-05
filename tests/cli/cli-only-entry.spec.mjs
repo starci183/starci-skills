@@ -129,7 +129,7 @@ test('every declared exemption has a pass fixture and nearby non-exempt text sti
     ['removed catalog field', { 'modules/cli/commands/runtime/public.yaml': "removed: ['node scripts/tools/public.mjs']\n" }, true],
     ['catalog example is not exempt', { 'modules/cli/commands/runtime/public.yaml': "removed: []\nexamples: ['node scripts/tools/public.mjs']\n" }, false],
     ['changelog', { 'CHANGELOG-next.md': direct }, true],
-    ['contract history', { 'modules/kernel/contract-changes/old.yaml': direct }, true],
+    ['current kernel declaration', { 'modules/kernel/current.yaml': direct }, false],
     ['generated runtime copy', { 'packages/hfs/runtime/scripts/call.mjs': direct }, true],
     ['generated lockfile', { 'packages/example/package-lock.json': direct }, true],
     ['variable script path', { 'scripts/caller.mjs': "spawn('node', [scriptPath]);\n" }, true],

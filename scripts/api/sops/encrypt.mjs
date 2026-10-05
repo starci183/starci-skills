@@ -1,14 +1,13 @@
-// encrypt.mjs — one `sops --encrypt` of a plaintext file: the extension custody seal (scripts/gates/sonar-ext-custody.mjs
-// sealExtCustody). The plaintext path is the caller's 0600 temp file; the ciphertext comes back on stdout over a pipe.
-import { spawnSync } from 'node:child_process';
+// encrypt.mjs — the public SOPS file-encrypt call.
+import { runSopsFile } from './lib.mjs';
 
 /**
- * Run `<bin> <args>` with SOPS_AGE_KEY_FILE set to `identity` when given. {status, stdout, stderr, error}.
+ * Encrypt one file from caller-supplied SOPS arguments; the shared file owner preserves recipient-only and original-identity admission.
+ * @param {string|null} bin Explicit SOPS executable, or null to use the selected environment's resolver.
+ * @param {string[]} args SOPS arguments forwarded unchanged to the file operation.
+ * @param {object} options Identity, invocation, environment and capture options owned by runSopsFile.
+ * @returns {{status: number|null, stdout: string|null, stderr: string|null, error: Error|null}} The observed child result or typed identity refusal.
  */
-export function encrypt(bin, args, { identity = null, env = process.env, timeout = undefined, maxBuffer = 1024 * 1024 } = {}) {
-  const r = spawnSync(bin, args, {
-    encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer, timeout,
-    env: identity ? { ...env, SOPS_AGE_KEY_FILE: identity } : env,
-  });
-  return { status: r.status, stdout: r.stdout, stderr: r.stderr, error: r.error ?? null };
+export function encrypt(bin, args, options = {}) {
+  return runSopsFile(bin, args, 'encrypt', options);
 }

@@ -76,6 +76,8 @@ export type {
     ModuleFactory,
     ModulesWorldSpec,
     PostgresInfraHandle,
+    PostgresWriteFault,
+    PostgresWriteOperation,
     ProviderToken,
     RedisInfraHandle,
     ServiceHandle,

@@ -8,11 +8,14 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {
   claudeKeyForms,codexKeyForms,codexHeader,codexProjectTables,writeClaudeTrust,writeCodexTrust,writeCodexNoUpdateCheck,writeCodexNoModelNudge,
-  assertClaudeBypassConsent,ensureLaunchTrust,trustTargets,orcaCodexHome,assertClaudeSettingsEnv,claudeLaunchEnv,
+  assertClaudeBypassConsent,ensureLaunchTrust as ensureAdoptedLaunchTrust,trustTargets,orcaCodexHome,assertClaudeSettingsEnv,claudeLaunchEnv,
   toolGuardCommand,TOOL_GUARD_MATCHER,assertJsonToolGuard,writeDevinProfile,codexGuardBlock,writeCodexToolGuard,trustCodexToolGuard,projectTargets,excludeFromGit,
 } from '../../scripts/agent/trust.mjs';
 import {gateMenuPosition} from '../../scripts/agent/lib.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import { proofRepo } from '../helpers/sonar-scan.mjs';
+import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
+import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 
 // Owner instruction 2026-09-23: the owner never approves a launch prompt; the runtime does. Layer 1 pre-trusts
 // the launch directory in ~/.claude.json and every Codex config.toml; layer 2 answers an allowlisted launch gate
@@ -28,6 +31,7 @@ const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
 const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const tmp=(t,prefix)=>{const d=fs.mkdtempSync(path.join(os.tmpdir(),prefix));t.after(()=>fs.rmSync(d,{recursive:true,force:true,maxRetries:20,retryDelay:25}));return d;};
+const ensureLaunchTrust=options=>ensureAdoptedLaunchTrust({...options,config:{launchTrust:{profile:'automatic',approvedBy:'owner',approvalRef:'private fixture owner adoption',roots:[path.resolve(options.cwd)]}}});
 
 /* ------------------------------------------------------------ key forms */
 
@@ -58,7 +62,7 @@ test('Orca CODEX_HOME resolves from the platform userData dir, and a test proces
 
 const CLAUDE_FIXTURE={numStartups:5,installMethod:'global',tipsHistory:{x:3},hasCompletedOnboarding:true,
   projects:{[F(UP,'Repositories/shop-be')]:{allowedTools:[],hasTrustDialogAccepted:true,lastCost:32.96738740000001},
-    [W(UP,EA)]:{allowedTools:['Bash'],hasTrustDialogAccepted:false,lastSessionId:'abc'}},
+    [W(UP,EA)]:{allowedTools:['Bash'],lastSessionId:'abc'}},
   userID:'9007199254740993123'};
 
 test('Claude trust sets hasTrustDialogAccepted in both key forms, keeps every other field, and is idempotent',t=>{
@@ -67,13 +71,13 @@ test('Claude trust sets hasTrustDialogAccepted in both key forms, keeps every ot
   const keys=claudeKeyForms(W(UP,EA),'win32');
   const first=writeClaudeTrust({file,keys});
   assert.equal(first.ok,true,first.error);
-  assert.deepEqual(first.written,keys,'the untrusted backslash key is upgraded, the forward-slash key is added');
+  assert.deepEqual(first.written,keys,'missing trust fields are adopted in both key forms');
   const doc=JSON.parse(fs.readFileSync(file,'utf8'));
   assert.equal(doc.projects[W(UP,EA)].hasTrustDialogAccepted,true);
   assert.equal(doc.projects[F(UP,EAF)].hasTrustDialogAccepted,true);
   assert.deepEqual(doc.projects[W(UP,EA)],{...CLAUDE_FIXTURE.projects[W(UP,EA)],hasTrustDialogAccepted:true},
     'an existing project keeps its fields and key order');
-  const rest=structuredClone(doc);delete rest.projects[F(UP,EAF)];rest.projects[W(UP,EA)].hasTrustDialogAccepted=false;
+  const rest=structuredClone(doc);delete rest.projects[F(UP,EAF)];delete rest.projects[W(UP,EA)].hasTrustDialogAccepted;
   assert.equal(JSON.stringify(rest,null,2),original,'nothing else changed, byte for byte');
   const bytes=fs.readFileSync(file,'utf8');
   const again=writeClaudeTrust({file,keys});
@@ -112,6 +116,7 @@ test('the bypass-permissions consent is asserted and set only when missing',t=>{
   assert.equal(assertClaudeBypassConsent({file}).state,'already');
   fs.writeFileSync(file,JSON.stringify({skipDangerousModePermissionPrompt:false}));
   assert.equal(assertClaudeBypassConsent({file}).state,'owner-set-false');
+  assert.equal(assertClaudeBypassConsent({file}).ok,false);
   assert.equal(JSON.parse(fs.readFileSync(file,'utf8')).skipDangerousModePermissionPrompt,false,'an explicit owner value is never overwritten');
 });
 
@@ -171,16 +176,18 @@ const TOML_FIXTURE=[
   '',
 ].join('\r\n');
 
-test('Codex trust appends [projects] tables, upgrades an untrusted one in place, and keeps every other table and comment',t=>{
+test('Codex trust preserves an explicit decline and appends only approved missing records',t=>{
   const dir=tmp(t,'starci-trust-codex-');const file=path.join(dir,'config.toml');
   fs.writeFileSync(file,TOML_FIXTURE);
-  const keys=[W(LO,'repositories\\kept'),W(UP,'Repositories\\Upgrade'),W(LO,'repositories\\new'),W(UP,'Repositories\\New')];
+  assert.throws(()=>writeCodexTrust({file,keys:[W(UP,'Repositories\\Upgrade')]}),/refusing to override/);
+  assert.equal(fs.readFileSync(file,'utf8'),TOML_FIXTURE);
+  const keys=[W(LO,'repositories\\kept'),W(LO,'repositories\\new'),W(UP,'Repositories\\New')];
   const r=writeCodexTrust({file,keys});
   assert.equal(r.ok,true,r.error);
   assert.deepEqual(r.already,[W(LO,'repositories\\kept')]);
-  assert.deepEqual(r.written,[W(UP,'Repositories\\Upgrade'),W(LO,'repositories\\new'),W(UP,'Repositories\\New')]);
+  assert.deepEqual(r.written,[W(LO,'repositories\\new'),W(UP,'Repositories\\New')]);
   const text=fs.readFileSync(file,'utf8');
-  assert.ok(text.startsWith(TOML_FIXTURE.replace('trust_level = "untrusted"','trust_level = "trusted"')),'the original text is a prefix: append only, one line edited');
+  assert.ok(text.startsWith(TOML_FIXTURE),'the declined record and original comments stay byte-exact');
   assert.ok(text.includes(`[projects.'${W(LO,'repositories\\new')}']\r\ntrust_level = "trusted"\r\n`));
   assert.ok(text.includes(`[projects."${T(UP,'Repositories\\New')}"]\r\ntrust_level = "trusted"\r\n`));
   for(const line of ['# owner config — keep me','approval_policy = "never"','sandbox_mode = "danger-full-access"','web_search = true # inline comment','[mcp_servers.node_repl]'])
@@ -203,7 +210,7 @@ test('a Codex config rewritten mid-update is retried and the other writer\'s tab
   assert.deepEqual([tables.get('/other')?.trust,tables.get('/repo/x')?.trust],['trusted','trusted']);
 });
 
-test('ensureLaunchTrust writes Claude and every Codex home under the trust home, then reports already',t=>{
+test('ensureLaunchTrust writes Claude and the active managed Codex home, then reports already',t=>{
   const home=tmp(t,'starci-trust-home-');const cwd=tmp(t,'starci-trust-cwd-');
   const env={NODE_TEST_CONTEXT:'child-v8',STARCI_AGENT_TRUST_HOME:home};
   const orcaHome=orcaCodexHome({env:{APPDATA:path.join(home,'AppData','Roaming'),XDG_CONFIG_HOME:path.join(home,'.config')},home});
@@ -217,12 +224,12 @@ test('ensureLaunchTrust writes Claude and every Codex home under the trust home,
   for(const k of claudeKeyForms(cwd))assert.equal(doc.projects[k].hasTrustDialogAccepted,true);
   const codex=ensureLaunchTrust({agent:'codex',cwd,env});
   assert.equal(codex.status,'written');
-  assert.deepEqual([...new Set(codex.written.map(w=>w.file))].sort(),[path.join(home,'.codex','config.toml'),path.join(orcaHome,'config.toml'),path.join(cwd,'.codex','config.toml')].sort());
+  assert.deepEqual([...new Set(codex.written.map(w=>w.file))].sort(),[path.join(home,'.codex','config.toml'),path.join(cwd,'.codex','config.toml')].sort());
   assert.match(fs.readFileSync(path.join(orcaHome,'config.toml'),'utf8'),/^approval_policy = "never"\n/,'the owner\'s approval policy is untouched');
   assert.equal(ensureLaunchTrust({agent:'codex',cwd,env}).status,'already');
   assert.equal(ensureLaunchTrust({agent:'claude',cwd,env}).status,'already');
   assert.equal(ensureLaunchTrust({agent:'gemini',cwd,env}),null,'an agent the runtime launches no worker for is not touched');
-  assert.equal(ensureLaunchTrust({agent:'claude',cwd:'active',env}).status,'skipped','an Orca selector is not a directory');
+  assert.equal(ensureLaunchTrust({agent:'claude',cwd:'active',env}).status,'declined','an Orca selector is not a resolved directory');
 });
 
 /* ---------------------------------------- the command guard, every host */
@@ -289,7 +296,7 @@ test('launch trust writes only under the op worktree and never touches a user-gl
   // notices - never a hook or a launch setting, and never ~/.claude/settings.json or Devin's user config.
   const homeAfter=snapshot(home);
   const changed=[...homeAfter].filter(([f,text])=>homeBefore.get(f)!==text).map(([f])=>f).sort();
-  assert.deepEqual(changed,[path.join(home,'.claude.json'),...codexUsers].sort());
+  assert.deepEqual(changed,[path.join(home,'.claude.json'),codexUsers[0]].sort());
   assert.equal(homeAfter.get(userSettings),homeBefore.get(userSettings),'~/.claude/settings.json is untouched');
   assert.equal(homeAfter.get(devinUser),homeBefore.get(devinUser),'Devin\'s user config is untouched');
   for(const f of codexUsers)assert.doesNotMatch(homeAfter.get(f),/command-guard|hooks\.PreToolUse/,`${f} carries no guard hook`);
@@ -367,15 +374,25 @@ const opFixture=(t,extra={})=>{
   process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
   t.after(()=>{if(savedMachine===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=savedMachine;
     if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;});
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  const mainRepo=path.join(root,'repo');fs.mkdirSync(mainRepo,{recursive:true});
+  proofRepo(t,mainRepo);
   const trustHome=path.join(root,'trust-home');fs.mkdirSync(path.join(trustHome,'.codex'),{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     STARCI_AGENT_TRUST_HOME:trustHome,...extra};
+  const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
+    .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private op fixture adoption',roots:[mainRepo]})}`));
+  env.STARCI_OWNER_ROOT=ownerRoot;
   const run=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const orcaState=()=>json(fs.readFileSync(path.join(root,'state.json'),'utf8'))??{};
   const workflowId='wf-gate',jobId='job-gate';
+  const made=fakeOrcaWorktrees({root:path.join(root,'worktrees')}).create({repo:`path:${mainRepo}`,name:`wf-${workflowId}`,baseBranch:'main'});
+  assert.equal(made.ok,true,made.error);
+  const repo=path.resolve(made.worktree.path);
+  fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  registerWorkflowWorktree({env:env},{workflowId:workflowId,orcaWorktreeId:made.worktree.id,path:repo,branch:made.worktree.branch});
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     seedWorkflow(ledger,{id:workflowId,goal:{revision:1,markdown:'Trust gate fixture',json:{}},jobs:[
@@ -391,7 +408,7 @@ const opFixture=(t,extra={})=>{
     finally{l.close();}
   };
   const job=()=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);}finally{l.close();}};
-  return {repo,trustHome,dispatch,events,job,orcaState};
+  return {repo,mainRepo,ownerRoot,trustHome,callsFile:env.STARCI_FAKE_ORCA_LOG,dispatch,events,job,orcaState};
 };
 
 // Every launch is orchestration worker-start: Orca answers nothing on the owner's behalf and the runtime types
@@ -404,10 +421,24 @@ test('a Codex op dispatch pre-trusts its worktree and the trust receipt rides op
   const [dispatched]=fx.events('op-dispatched');
   assert.equal(dispatched?.trust?.agent,'codex');
   assert.equal(dispatched.trust.status,'written');
-  assert.deepEqual(dispatched.trust.paths,[path.resolve(fx.repo)]);
+  assert.deepEqual(dispatched.trust.paths,[path.resolve(fx.repo),path.resolve(fx.mainRepo)]);
   const toml=fs.readFileSync(path.join(fx.trustHome,'.codex','config.toml'),'utf8');
-  for(const k of codexKeyForms(fx.repo))assert.equal(codexProjectTables(toml).get(k)?.trust,'trusted');
+  for(const dir of [fx.repo,fx.mainRepo])for(const k of codexKeyForms(dir))assert.equal(codexProjectTables(toml).get(k)?.trust,'trusted');
   assert.equal(fx.events('gate-auto-approved').length,0,'nothing is typed into a starting worker');
+});
+
+test('a dispatch consumes the current private owner decline and writes no provider trust or worker-start',t=>{
+  const fx=opFixture(t);
+  fs.writeFileSync(path.join(fx.ownerRoot,'config.yaml'),fs.readFileSync(path.join(fx.ownerRoot,'config.yaml'),'utf8')
+    .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'declined',approvedBy:'owner',approvalRef:'private op fixture current decline',roots:[fx.mainRepo]})}`));
+  const refused=fx.dispatch();
+  assert.equal(refused.status,1,refused.stderr||refused.stdout);
+  assert.equal(json(refused.stdout)?.managed?.step,'launch-trust');
+  assert.equal(fx.job()?.status,'ready');
+  assert.equal(fs.existsSync(path.join(fx.trustHome,'.codex','config.toml')),false);
+  assert.equal(fs.existsSync(projectTargets(fx.repo).codexConfig),false);
+  const calls=fs.readFileSync(fx.callsFile,'utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line).argv);
+  assert.equal(calls.some(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start'),false);
 });
 
 /* ----------------------------------------------- launch trust: kernel */
@@ -418,7 +449,9 @@ const kernelFixture=(t,kernelLine,extra={})=>{
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
   const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);
-  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),`language: vi\neffort: medium\n${kernelLine}\n`);
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
+    .replace(/^kernel:.*$/m,kernelLine)
+    .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private kernel fixture adoption',roots:[repo]})}`));
   fs.writeFileSync(state,JSON.stringify({sends:0,counter:0,terminals:{},commands:[]}));
   fs.writeFileSync(fake,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
@@ -428,7 +461,7 @@ const kernelFixture=(t,kernelLine,extra={})=>{
   const defined=run(DEFINE_GOAL,['--repo',repo,'--text','boot the kernel','--json']);
   assert.equal(defined.status,0,defined.stderr);
   const workflowId=json(defined.stdout)?.workflowId;
-  const boot=()=>run(START_WORKFLOW,['--repo',repo,'--goal',workflowId,'--json']);
+  const boot=(...args)=>run(START_WORKFLOW,['--repo',repo,'--goal',workflowId,...args,'--json']);
   const events=()=>{
     const l=inspectLedger({file:ledgerFileFor(repo)});
     try{return l.db.prepare("SELECT kind,payload_json FROM events WHERE workflow_id=? AND (kind LIKE 'kernel-%' OR kind='gate-auto-approved') ORDER BY seq").all(workflowId)
@@ -439,6 +472,15 @@ const kernelFixture=(t,kernelLine,extra={})=>{
 };
 
 const CLAUDE_KERNEL='kernel: {agent: claude, model: claude-opus-5-5, effort: high}';
+
+test('an explicit Kernel agent override still consumes the current private owner trust profile',t=>{
+  const f=kernelFixture(t,CLAUDE_KERNEL);
+  const r=f.boot('--agent','claude');
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const trust=f.events().find(e=>e.kind==='kernel-booted')?.payload.trust;
+  assert.equal(trust?.approval?.approvalRef,'private kernel fixture adoption');
+  assert.equal(trust?.approval?.root,f.repo);
+});
 
 test('a Claude kernel boot pre-trusts the repository and asserts the bypass consent before worker-start',t=>{
   const f=kernelFixture(t,CLAUDE_KERNEL);

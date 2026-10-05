@@ -13,9 +13,15 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,reopenUnit,raiseTryBudget,recordJobResult,updateAttempt,markReportConsumed} from '../../engine/db/ledger.mjs';
+import { recordArtifactProofs } from '../../scripts/kernel/proof-integrity.mjs';
+import { stageBlob, putArtifact, recordCheck } from '../../scripts/machine/evidence-store.mjs';
+import { fileReport } from '../../engine/db/ledger.mjs';
+import { setSignal, postInbox } from '../../engine/db/ledger.mjs';
+import { handoverApprovalOf, handoverGateOf } from '../../scripts/kernel/handover.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {checkOpManifest} from '../../scripts/checks/check-op-manifest.mjs';
 import {HANDOVER_DECISIONS,HANDOVER_OP,decisionOf,handoverAskProblem} from '../../scripts/kernel/handover.mjs';
+import { AUTOPILOT_EVENTS } from '../../scripts/kernel/autopilot-run.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
@@ -56,6 +62,8 @@ const seedWorkflow=(repo,wf)=>seed(repo,ledger=>ledger.transaction(db=>{
   insertGoal(db,{workflowId:wf,revision:0,goalIdentity:'hgoal',markdown:'# goal',
     goal:{opChain:{legs:[{op:'docs.author'},{op:HANDOVER_OP}]},derivedPlan:{legs:[{op:'docs.author'},{op:HANDOVER_OP}],edges:[['docs.author',HANDOVER_OP]]}},createdAt:at});
   changeWorkflowPhase(db,{workflowId:wf,to:'running',by:'test-fixture',reason:'seed',at});
+  // This manual owner-handover fixture does not run an autopilot provider or claim measured token usage.
+  ledger.appendEvent({workflowId:wf,entityType:'workflow',entityId:wf,kind:AUTOPILOT_EVENTS.configured,payload:{on:false,by:'supervisor',reason:'manual owner-handover fixture'}});
   seedJob(db,{wf,jobId:'job-docs',op:'docs.author',status:'succeeded',result:{verdict:'pass'}});
   ledger.appendEvent({workflowId:wf,entityType:'job',entityId:'job-docs',kind:'op-settled',payload:{verdict:'pass',status:'succeeded'}});
 }));
@@ -329,4 +337,103 @@ test('starci kernel plan does not count a trailing handover.review appended to a
   const middle=await run('plan','--repo',repo,'--workflow',wf,'--file',planFile('b.json',['docs.author',HANDOVER_OP,'review.verify']),'--json');
   assert.equal(json(middle).divergence.diverged,true,'anywhere but last it is a structural change');
 });
+});
+
+
+test('an accepted goal revision invalidates both handover approval routes and finish preserves pending input and kernel custody', async t => {
+  const repo=fixture(t),wf='wf-handover-revised';
+  seedWorkflow(repo,wf);
+  await handOver(repo,wf,{attempt:1,dispatchId:'revision-ho-1'});
+  answer(repo,wf,{dispatchId:'revision-ho-1',optionIndex:0});
+  const approved=await settleApproval(repo,wf,{attempt:2,dispatchId:'revision-ho-2'});
+  assert.equal(approved.status,0,approved.stderr||approved.stdout);
+  const prompt='refactor and canonicalize .starciwork and .starcistacks against the current contracts';
+  const define=path.join(ROOT,'scripts','goal','define-goal.mjs');
+  const preview=await execute(process.execPath,[define,'--repo',repo,'--revise',wf,'--text',prompt,'--plan','--json'],
+    {cwd:ROOT,windowsHide:true,timeout:120000,env:{...process.env,ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:''}});
+  assert.equal(preview.status,0,preview.stderr||preview.stdout);
+  const command=json(preview).revisionPreview.approval.command;
+  const applied=await execute(command.executable,command.args,{cwd:ROOT,windowsHide:true,timeout:120000,
+    env:{...process.env,ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:''}});
+  assert.equal(applied.status,0,applied.stderr||applied.stdout);
+  seed(repo,ledger=>ledger.transaction(db=>{
+    setSignal(db,{scope:'kernel',key:wf,workflowId:wf,token:'revision-seat',value:{workflowId:wf,terminal:null},expiresAt:null});
+    postInbox(db,{workflowId:wf,kind:'owner-answer',key:'preserve-note',payload:{note:'independent consequential input'}});
+  }));
+  assert.equal(read(repo,db=>handoverGateOf(db,wf).ok),false);
+  assert.equal(read(repo,db=>handoverApprovalOf(db,wf,{attempt:3}).approved),false);
+  const capture=()=>read(repo,db=>({workflow:db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(wf),
+    inbox:db.prepare('SELECT * FROM inbox WHERE workflow_id=? ORDER BY inbox_id').all(wf),
+    signals:db.prepare('SELECT * FROM signals WHERE workflow_id=?').all(wf),
+    events:db.prepare('SELECT * FROM events WHERE workflow_id=? ORDER BY seq').all(wf)}));
+  const before=capture();
+  const refused=await run('finish','--repo',repo,'--workflow',wf,'--json');
+  assert.notEqual(refused.status,0);
+  assert.match(refused.stderr,/handover-not-approved/);
+  assert.deepEqual(capture(),before,'refusal neither finishes nor consumes the pending revision/note, releases custody or records a finish');
+  const goal=read(repo,db=>JSON.parse(db.prepare('SELECT json FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(wf).json));
+  const plan=path.join(repo,'revised-plan.json');fs.writeFileSync(plan,JSON.stringify(goal.derivedPlan));
+  const planned=await run('plan','--repo',repo,'--workflow',wf,'--file',plan,'--json');
+  assert.equal(planned.status,0,planned.stderr||planned.stdout);
+  assert.equal(read(repo,db=>handoverGateOf(db,wf).ok),false,'planning the revision does not revive the old approval');
+  await handOver(repo,wf,{attempt:3,dispatchId:'revision-ho-3'});
+  answer(repo,wf,{dispatchId:'revision-ho-3',optionIndex:0});
+  const fresh=await settleApproval(repo,wf,{attempt:4,dispatchId:'revision-ho-4'});
+  assert.equal(fresh.status,0,fresh.stderr||fresh.stdout);
+  const done=await run('finish','--repo',repo,'--workflow',wf,'--json');
+  assert.equal(done.status,0,done.stderr||done.stdout);
+});
+
+
+test('native handover and finish revalidate the actual required proof bytes and canonical obligations',async t=>{
+  const repo=fixture(t),wf='wf-handover-integrity';seedWorkflow(repo,wf);
+  const old=process.env.STARCI_ARTIFACT_ROOT;process.env.STARCI_ARTIFACT_ROOT=path.join(repo,'private-artifacts');
+  t.after(()=>{if(old===undefined)delete process.env.STARCI_ARTIFACT_ROOT;else process.env.STARCI_ARTIFACT_ROOT=old;});
+  const rel='.starciwork/features/acceptance/fr/delivery',id='fr.acceptance.delivery',command='node --test tests/delivery.spec.mjs',e2eCommand='node --test tests/e2e.spec.mjs';
+  fs.mkdirSync(path.join(repo,rel),{recursive:true});fs.mkdirSync(path.join(repo,'tests'));
+  fs.writeFileSync(path.join(repo,'tests/delivery.spec.mjs'),"import test from 'node:test';test('private delivery boundary',()=>{});\n");
+  fs.writeFileSync(path.join(repo,'tests/e2e.spec.mjs'),"import test from 'node:test';test('private e2e boundary',()=>{});\n");
+  seed(repo,l=>l.db.prepare("UPDATE jobs SET payload_json=? WHERE job_id='job-docs'").run(JSON.stringify({opId:'docs.author',records:[rel],owned_paths:['tests/']})));
+  const jobId='job-ho-proof';const {scratch}=seed(repo,l=>seedJob(l,{wf,jobId,op:HANDOVER_OP,unitKey:'ho',dispatchId:'proof-ho-1'}));
+  const ask=writeReport(scratch,'missing-canonical.json',{outcome:'ask',question:{text:'delivery',options:OPTIONS}});
+  const absent=await run('report','--repo',repo,'--job',jobId,'--report',ask,'--json');assert.notEqual(absent.status,0);assert.match(absent.stderr,/handover-proof-unjudged/);
+  assert.equal(read(repo,db=>db.prepare('SELECT count(*) n FROM reports WHERE job_id=?').get(jobId).n),0);assert.equal(fs.existsSync(ask),true);
+  fs.writeFileSync(path.join(repo,rel,'index.yaml'),`id: ${id}\nrequiresProof:\n  unit: { required: true, command: '${command}' }\n  requirements: { required: true, command: '${e2eCommand}' }\n`);
+  const missing=await run('report','--repo',repo,'--job',jobId,'--report',ask,'--json');assert.notEqual(missing.status,0);assert.match(missing.stderr,/handover-proof-owed/);
+  const child=spawnSync(process.execPath,['--test','tests/delivery.spec.mjs'],{cwd:repo,encoding:'utf8',windowsHide:true,timeout:30000});assert.equal(child.status,0,child.stderr||child.stdout);
+  const blob=stageBlob(child.stdout,{file:false});
+  seed(repo,l=>l.transaction(db=>{
+    const job=db.prepare("SELECT * FROM jobs WHERE job_id='job-docs'").get(),attemptId=db.prepare("SELECT attempt_id FROM op_attempts WHERE job_id='job-docs'").get().attempt_id;
+    const envelope={outcome:'done',summary:'actual private run',claims:[{frs:[id]}],checks:[{name:'delivery',command,exitCode:child.status}]};
+    fileReport(db,{attemptId,outcome:'done',report:envelope});recordCheck(db,{attemptId,name:'delivery',phase:'verify',runner:'kernel',command,cwd:repo,exitCode:child.status,stdout:blob});
+    const {artifactId}=putArtifact(db,{workflowId:wf,attemptId,role:'check-stdout',name:'delivery-output.txt',blob,origin:'op'});
+    recordArtifactProofs(db,{repo,job,payload:JSON.parse(job.payload_json),envelope,artifacts:[{artifactId,name:'delivery-output.txt',kind:'text',abs:blob.fileUri}]});
+    l.appendEvent({workflowId:wf,entityType:'job',entityId:job.job_id,kind:'artifacts-indexed',payload:{artifacts:[{id:artifactId,name:'delivery-output.txt',sha256:blob.sha}]}});
+  }));
+  const diagnostic=await run('coverage','--repo',repo,'--workflow',wf,'--json');assert.equal(diagnostic.status,0,diagnostic.stderr||diagnostic.stdout);
+  assert.deepEqual(json(diagnostic).items.find(item=>item.id===id).obligations.map(row=>[row.kind,row.status]),[['requirements','missing'],['unit','proven']]);
+  const stillOwed=await run('report','--repo',repo,'--job',jobId,'--report',ask,'--json');assert.notEqual(stillOwed.status,0);assert.match(stillOwed.stderr,/handover-proof-owed/);
+  const e2e=spawnSync(process.execPath,['--test','tests/e2e.spec.mjs'],{cwd:repo,encoding:'utf8',windowsHide:true,timeout:30000});assert.equal(e2e.status,0,e2e.stderr||e2e.stdout);
+  seed(repo,l=>{const attemptId=l.db.prepare("SELECT attempt_id FROM op_attempts WHERE job_id='job-docs'").get().attempt_id;
+    recordCheck(l.db,{attemptId,name:'e2e',phase:'verify',runner:'kernel',command:e2eCommand,cwd:repo,exitCode:e2e.status,stdout:stageBlob(e2e.stdout,{file:false})});});
+  assert.equal(json(await run('coverage','--repo',repo,'--workflow',wf,'--json')).mustOwed.length,0);
+  assert.equal((await run('report','--repo',repo,'--job',jobId,'--report',ask,'--json')).status,0);
+  assert.equal((await run('settle','--repo',repo,'--job',jobId,'--verdict','blocked','--json')).status,0);
+  seed(repo,l=>l.appendEvent({workflowId:wf,entityType:'report',entityId:'proof-ho-1',kind:'ask-serving',payload:{dispatchId:'proof-ho-1',url:'http://127.0.0.1:6971/a-x',pid:process.pid}}));
+  answer(repo,wf,{dispatchId:'proof-ho-1',optionIndex:0});
+  const approved=await settleApproval(repo,wf,{attempt:2,dispatchId:'proof-ho-2'});assert.equal(approved.status,0,approved.stderr||approved.stdout);
+  fs.writeFileSync(blob.fileUri,'tampered after approval');
+  const before=read(repo,db=>({workflow:db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(wf),events:db.prepare('SELECT * FROM events WHERE workflow_id=? ORDER BY seq').all(wf)}));
+  const refused=await run('finish','--repo',repo,'--workflow',wf,'--json');assert.notEqual(refused.status,0);assert.match(refused.stderr,/handover-proof-unjudged/);
+  assert.deepEqual(read(repo,db=>({workflow:db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(wf),events:db.prepare('SELECT * FROM events WHERE workflow_id=? ORDER BY seq').all(wf)})),before);
+});
+
+test('native coverage refuses absent or ambiguous admitted handover selection',async t=>{
+  const repo=fixture(t),wf='wf-coverage-policy';seedWorkflow(repo,wf);
+  let out=await run('coverage','--repo',repo,'--workflow',wf,'--json');
+  assert.notEqual(out.status,0);assert.match(out.stderr,/handover-proof-unjudged/);
+  seed(repo,l=>{seedJob(l,{wf,jobId:'job-ho-policy-a',op:HANDOVER_OP});
+    seedJob(l,{wf,jobId:'job-ho-policy-b',op:HANDOVER_OP});});
+  out=await run('coverage','--repo',repo,'--workflow',wf,'--json');
+  assert.notEqual(out.status,0);assert.match(out.stderr,/more than one active handover/);
 });

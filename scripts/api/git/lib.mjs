@@ -6,6 +6,7 @@
 // caller's runner into {ok, stdout, stderr}. Only the call files beside this one import it: each names one git verb
 // (diff.mjs, ls-files.mjs, worktree-*.mjs, ...), and a caller folds the spawn result it gets back with the pure
 // helpers of scripts/lib/git.mjs (gitResultOf, gitOutputOf).
+import { assertMutationFence } from '../../lib/mutation-fence.mjs';
 import { spawnSync } from 'node:child_process';
 import { withoutGitLocalEnv } from '../../lib/git.mjs';
 
@@ -16,6 +17,7 @@ import { withoutGitLocalEnv } from '../../lib/git.mjs';
  * ERR_UNKNOWN_ENCODING, so it reaches spawnSync as encoding:null (Buffer output either way).
  */
 export const gitSpawn = (file, args, options = {}) => {
+  assertMutationFence({ kind: 'git-effect', args });
   const spawn = { encoding: 'utf8', windowsHide: true, ...options };
   if (spawn.encoding === 'buffer') spawn.encoding = null;
   return spawnSync(file, args, spawn);

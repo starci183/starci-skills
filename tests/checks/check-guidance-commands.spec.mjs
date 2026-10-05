@@ -100,14 +100,14 @@ test('markdown: fenced lines stand under their lead-in sentence, table cells are
   assert.deepEqual(found, ['rm -rf dist', 'rm -rf out']);
 });
 
-test('scope: module yaml and prompts and skill files; never the refusal catalog or contract-change history', () => {
+test('scope: module yaml and prompts and skill files; never the refusal catalog; current modules are checked', () => {
   assert.ok(isGuidanceFile('modules/supervisor/supervise.yaml'));
   assert.ok(isGuidanceFile('modules/kernel/kernel-prompt.md'));
   assert.ok(isGuidanceFile('skills/starci/SKILL.md'));
   assert.ok(isGuidanceFile('skills/starci/references/release.md'));
   assert.ok(isGuidanceFile('.starci/host/maintenance.md'));
   assert.ok(!isGuidanceFile('modules/kernel/failure-codes.yaml'));
-  assert.ok(!isGuidanceFile('modules/kernel/contract-changes/x.yaml'));
+  assert.ok(isGuidanceFile('modules/kernel/current.yaml'));
   assert.ok(!isGuidanceFile('docs/verify-proof.md'));
 });
 

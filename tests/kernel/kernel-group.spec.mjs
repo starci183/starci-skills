@@ -4,10 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {pathToFileURL} from 'node:url';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {openMachine} from '../../engine/db/machine.mjs';
 import {writeProviderCircuit} from '../../scripts/machine/provider-circuit.mjs';
+import {inspectOwnerConfig} from '../../engine/config.mjs';
 
 // The kernel is a model GROUP: config.yaml `kernel: {group: [...]}` (the shipped default) or the unpinned
 // think-group route. Members are tried in order with the provider availability signals; a single pin keeps
@@ -23,19 +25,29 @@ const fixture=(t,kernelLine)=>{
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo);
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json'),log=path.join(root,'calls.jsonl');
-  const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),`language: vi\neffort: medium\n${kernelLine?`${kernelLine}\n`:''}`);
+  const ownerRoot=path.join(root,'owner'),trustHome=path.join(root,'trust-home');
+  fs.mkdirSync(ownerRoot);fs.mkdirSync(trustHome);
+  // Adoption and provider trust files belong only to this private fixture's exact repository root.
+  const launchTrust={profile:'automatic',approvedBy:'owner',approvalRef:'private kernel-group fixture adoption',roots:[repo]};
+  const config=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
+    .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify(launchTrust)}`)
+    .replace(/^kernel:.*$/m,kernelLine??'');
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),config);
+  const owner=inspectOwnerConfig(ownerRoot);
+  assert.equal(owner.error,null,'the private owner configuration must parse');
+  assert.equal(owner.invalid,null,'launch must consume the complete validated owner configuration');
+  assert.deepEqual(owner.config.launchTrust,launchTrust,'only this private repository has fixture trust adoption');
   fs.writeFileSync(state,JSON.stringify({sends:0,counter:0,terminals:{},commands:[]}));
   fs.writeFileSync(fake,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,
-    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
-  const run=(script,args,extra={})=>spawnSync(process.execPath,['--loader',new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href,script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...extra}});
+    STARCI_AGENT_TRUST_HOME:trustHome,STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
+  const run=(script,args,extra={},loaders=[])=>spawnSync(process.execPath,['--loader',new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href,...loaders.flatMap(file=>['--loader',pathToFileURL(file).href]),script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...extra}});
   const defined=run(DEFINE_GOAL,['--repo',repo,'--text','boot the kernel group','--json']);
   assert.equal(defined.status,0,defined.stderr);
   const workflowId=json(defined.stdout)?.workflowId;assert.ok(workflowId);
   const plan=(extra={})=>{const r=run(START_WORKFLOW,['--repo',repo,'--goal',workflowId,'--plan','--json'],extra);return {r,body:json(r.stdout)};};
-  return {root,repo,state,workflowId,run,plan,machineFile:env.STARCI_TEST_MACHINE_FILE};
+  return {root,repo,state,workflowId,run,plan,launchTrust,machineFile:env.STARCI_TEST_MACHINE_FILE};
 };
 
 test('the group form plans Claude Opus 5.5 first with GPT-6.1 Sol behind it',t=>{
@@ -52,7 +64,8 @@ test('the owner Sonnet group is valid and prefers GPT-6.1 Sol when Claude weekly
   const f=fixture(t,kernelLine);
   // Exercise the complete owner configuration validator as well as the launch plan, rather than the
   // fixture's permissive minimal configuration path. Sonnet is a declared model, not an Opus pool pin.
-  const config=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8').replace(/^kernel:.*$/m,kernelLine);
+  const config=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8').replace(/^kernel:.*$/m,kernelLine)
+    .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify(f.launchTrust)}`);
   fs.writeFileSync(path.join(f.root,'owner','config.yaml'),config);
   const normal=f.plan();
   assert.equal(normal.r.status,0,normal.r.stderr||normal.r.stdout);
@@ -124,6 +137,7 @@ test('a Claude worker that never reaches readiness falls through to GPT-6.1 Sol 
   assert.deepEqual([failed.payload.step,failed.payload.effectState],['worker-start','none']);
   assert.deepEqual(failed.payload.fellThroughTo,{agent:'codex',model:'gpt-6.1-sol'});
   assert.deepEqual([booted.payload.agent,booted.payload.model,booted.payload.launch],['codex','gpt-6.1-sol','worker']);
+  assert.equal(body.modelAttested,true);assert.equal(body.effectiveModel,'gpt-6.1-sol');assert.equal(booted.payload.modelAttested,true);
   assert.equal(booted.payload.fellThrough.length,1);
   const state=readState(f);
   assert.deepEqual(state.refusedStarts,['claude']);
@@ -161,14 +175,37 @@ test('fall-through never happens for a single pin, a start with effect, or the l
   finally{ledger.close();}
 });
 
-test('with no kernel key the unpinned route is the sol-think group',t=>{
-  // Owner routing 2026-09-26: the kernel's own calls walk sol-think - Sol first, Opus as overflow.
-  const f=fixture(t,null);
-  const {r,body}=f.plan();
+test('with no owner configuration the unpinned route is the sol-think group',t=>{
+  // This plan-only probe uses an absent private owner root, without a configured non-operation pool.
+  const f=fixture(t,null),noOwner={STARCI_OWNER_ROOT:path.join(f.root,'absent-owner')};
+  assert.equal(fs.existsSync(noOwner.STARCI_OWNER_ROOT),false,'the default route needs an actually absent owner configuration');
+  const {r,body}=f.plan(noOwner);
   assert.equal(r.status,0,r.stderr||r.stdout);
+  assert.deepEqual(body.config,{file:null},'the plan must observe absence rather than a configured owner pool');
   assert.deepEqual([body.agent,body.model,body.routedBy],['codex','gpt-6.1-sol','route-model']);
   assert.deepEqual(body.group.map(m=>[m.agent,m.model]),[['codex','gpt-6.1-sol'],['claude','claude-opus-5-5']]);
-  const dead=f.plan({STARCI_FAKE_ORCA_DEAD:'codex'});
+  const dead=f.plan({...noOwner,STARCI_FAKE_ORCA_DEAD:'codex'});
   assert.equal(dead.r.status,0,dead.r.stderr);
   assert.deepEqual([dead.body.agent,dead.body.model],['claude','claude-opus-5-5']);
+});
+
+test('a logical runtime Kernel retains its requested route without claiming a concrete model attestation',t=>{
+  const f=fixture(t,'kernel: {agent: devin, model: swe-2-max}');
+  const loader=path.join(f.root,'private-quota-loader.mjs'),owner=new URL('../../scripts/agent/quota/devin.mjs',import.meta.url).href;
+  // Only provider quota is recorded here; the real admission/store, worker lifecycle and Kernel writer still execute.
+  const source='export function probe({account="default",now=Date.now()}={}){const at=typeof now==="function"?now():now;return {provider:"devin",account,auth:"ok",observedAt:at,windows:[{id:"private-weekly",usedPercent:12,observedAt:at,resetsAt:at+3600000}]};}';
+  fs.writeFileSync(loader,'const owner='+JSON.stringify(owner)+';const source='+JSON.stringify(source)+';export async function load(url,context,nextLoad){return url===owner?{format:"module",source,shortCircuit:true}:nextLoad(url,context);}');
+  const r=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json'],{},[loader]);
+  assert.equal(r.status,0,r.stderr||r.stdout);const body=json(r.stdout),event=kernelEvents(f.repo,f.workflowId).find(e=>e.kind==='kernel-booted');
+  assert.equal(body.agent,'devin');assert.equal(body.model,'swe-2-max');assert.equal(body.modelAuthority,'configured-logical-runtime');
+  assert.equal(body.effectiveModel,null);assert.equal(body.modelAttested,false);
+  assert.equal(event.payload.modelAuthority,body.modelAuthority);assert.equal(event.payload.effectiveModel,null);assert.equal(event.payload.modelAttested,false);
+  const ledger=inspectLedger({file:ledgerFileFor(f.repo)});
+  try{
+    const signal=json(ledger.db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(f.workflowId).value_json);
+    const payload=json(ledger.db.prepare("SELECT payload_json FROM jobs WHERE job_id=?").get('kernel-'+f.workflowId).payload_json);
+    assert.equal(signal.modelAttested,false);assert.equal(signal.effectiveModel,null);
+    assert.equal(payload.route.modelAttested,false);assert.equal(payload.hierarchy.runtime.modelAttested,false);
+  }finally{ledger.close();}
+  assert.equal(readState(f).workerStarts.length,1);
 });

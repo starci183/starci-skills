@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { loadCatalog, CATALOG_DIR } from '../../scripts/cli/catalog.mjs';
 import { generateAll } from '../../scripts/cli/gen-catalog.mjs';
+import { retiredCallsInText, retiredMatchers } from '../../scripts/checks/check-retired-cli.mjs';
+import { checkCliParity } from '../../scripts/checks/check-cli-parity.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GEN = path.join(repoRoot, 'scripts', 'cli', 'gen-catalog.mjs');
@@ -45,6 +47,7 @@ conventions: [run only one settlement at a time]`);
 const fixture = (edit) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-catalog-'));
   const put = (rel, text) => { const f = path.join(root, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
+  put('package.json', JSON.stringify({ name: 'starci', version: '0.0.0-fixture' }));
   put(`${CATALOG_DIR}/_global.yaml`, GLOBAL_YAML);
   put(`${CATALOG_DIR}/kernel/_group.yaml`, GROUP_YAML);
   put(`${CATALOG_DIR}/kernel/settle.yaml`, VERB);
@@ -57,14 +60,16 @@ const catalogErrors = (root) => {
   catch (e) { assert.equal(e.code, 'catalog-invalid'); return e.errors; }
 };
 
-test('the real catalog loads: six groups planned or present, kernel verbs sorted', () => {
+test('the real catalog loads every live kernel verb in sorted order', () => {
   const cat = loadCatalog(repoRoot);
   assert.equal(cat.schema, 'starci/cli-catalog@1');
   assert.deepEqual(cat.global.flags.map((f) => f.name), ['json', 'cwd', 'quiet', 'help', 'edition']);
   assert.deepEqual(cat.global.commands, ['explain']);
   const kernel = cat.groups.find((g) => g.group === 'kernel');
   assert.ok(kernel, 'kernel group');
-  assert.ok(kernel.verbs.length >= 55, 'every kernel verb catalogued');
+  const parity = checkCliParity(repoRoot, { files: [] });
+  assert.deepEqual(parity.findings.filter(({ what }) => what === 'catalog:kernel' || what.startsWith('handler:kernel/')), [],
+    'every live kernel implementation and catalog verb agree');
   assert.deepEqual(kernel.verbs.map((v) => v.verb), [...kernel.verbs.map((v) => v.verb)].sort((a, b) => a.localeCompare(b)));
   assert.ok(kernel.verbs.every((v) => v.impl?.script === 'scripts/kernel/cli.mjs'), 'kernel impls go through cli.mjs');
 });
@@ -172,8 +177,26 @@ test('generated catalog and docs carry function-verb policy metadata', async () 
     assert.match(outputs['packages/cli/src/catalog.generated.mjs'], /"effect": "host"/);
     assert.match(outputs['docs/cli.md'], /Effect: host/);
     assert.match(outputs['docs/cli.md'], /Conventions:\n\n- run only one settlement at a time/);
-    assert.match(outputs['docs/cli.md'], /Replaces: `starci api settle`/);
+    assert.match(outputs['docs/cli.md'], /starci kernel settle --repo <p> --job <id>/);
+    assert.match(outputs['packages/cli/src/catalog.generated.mjs'], /"spelling": "starci api settle"/);
     assert.match(outputs['packages/cli/completions/starci.bash'], /\bexplain\b/);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('generated current reference preserves retired metadata and rejects a live retired example', async () => {
+  const root = fixture();
+  try {
+    const catalog = loadCatalog(root), matchers = retiredMatchers(catalog);
+    const outputs = await generateAll(root);
+    assert.deepEqual(retiredCallsInText(outputs['docs/cli.md'], 'docs/cli.md', matchers), []);
+    assert.match(outputs['packages/cli/src/catalog.generated.mjs'], /"spelling": "starci api settle"/);
+    fs.writeFileSync(path.join(root, CATALOG_DIR, 'kernel/settle.yaml'),
+      VERB.replace("examples: ['starci kernel settle --repo <p> --job <id>']", "examples: ['starci api settle --repo <p> --job <id>']"));
+    const bad = await generateAll(root);
+    const findings = retiredCallsInText(bad['docs/cli.md'], 'docs/cli.md', matchers);
+    assert.equal(findings.length, 1, JSON.stringify(findings));
+    assert.equal(findings[0].spelling, 'starci api settle');
+    assert.equal(findings[0].use, 'starci kernel settle');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -205,5 +228,26 @@ test('--check on a temp copy flags a drifted output and passes a synced one', ()
     assert.equal(drift.status, 1);
     assert.ok(drift.stderr.includes(DRIFT), 'a drifted output names the code');
     assert.match(drift.stderr, /docs\/cli\.md/);
+    fs.writeFileSync(doc, fs.readFileSync(doc, 'utf8').replace('\nhand edit\n', ''));
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'starci', version: '0.0.1-fixture' }));
+    const pinDrift = run('--check');
+    assert.equal(pinDrift.status, 1, 'changing the owner version invalidates the delivered pin');
+    assert.match(pinDrift.stderr, /runtime-install\.generated\.mjs/);
+    assert.equal(run('--write').status, 0);
+    assert.equal(run('--check').status, 0);
+    fs.rmSync(path.join(root, 'packages/cli/src/runtime-install.generated.mjs'));
+    assert.equal(run('--check').status, 1, 'a missing pin cannot be in sync');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('runtime install generation refuses a foreign root or non-exact version', async () => {
+  const root = fixture();
+  try {
+    for (const manifest of [{ name: 'foreign', version: '0.0.0-fixture' }, { name: 'starci', version: 'latest' }]) {
+      fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest));
+      await assert.rejects(generateAll(root), /runtime install pin requires/);
+    }
+    fs.rmSync(path.join(root, 'package.json'));
+    await assert.rejects(generateAll(root), /ENOENT/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

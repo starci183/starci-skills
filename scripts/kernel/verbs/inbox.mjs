@@ -16,21 +16,24 @@ export default {
       const key = String(args.ack).trim();
       const disposition = typeof args.disposition === 'string' ? args.disposition.trim() : '';
       if (!disposition) throw Object.assign(new Error('an ack says what was done: --disposition <text>'), { code: 'disposition-missing' });
-      const row = db.prepare("SELECT * FROM inbox WHERE workflow_id=? AND kind=? AND key=? ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, inbox_id DESC LIMIT 1")
-        .get(workflowId, PEER_MESSAGE, key);
-      if (!row) throw Object.assign(new Error(`no peer message ${key} in ${workflowId}'s inbox`), { code: 'peer-message-unknown' });
-      const message = peerMessageOf(row);
-      if (row.status !== 'pending') {
-        throw Object.assign(new Error(`peer message ${key} is already ${row.status}${message.disposition?.disposition ? `: ${message.disposition.disposition}` : ''}`), { code: 'peer-message-not-pending' });
-      }
-      ledger.transaction(() => {
+      const acknowledged = ledger.transaction(() => {
+        const row = db.prepare("SELECT * FROM inbox WHERE workflow_id=? AND kind=? AND key=? ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, inbox_id DESC LIMIT 1")
+          .get(workflowId, PEER_MESSAGE, key);
+        if (!row) throw Object.assign(new Error(`no peer message ${key} in ${workflowId}'s inbox`), { code: 'peer-message-unknown' });
+        const message = peerMessageOf(row);
+        if (row.status !== 'pending') {
+          if (row.status === 'applied' && message.disposition?.disposition === disposition)
+            return { message, disposition: message.disposition.disposition, replayed: true };
+          throw Object.assign(new Error(`peer message ${key} is already ${row.status}${message.disposition?.disposition ? `: ${message.disposition.disposition}` : ''}`), { code: 'peer-message-not-pending' });
+        }
         const now = Date.now();
-        if (db.prepare('SELECT status FROM inbox WHERE inbox_id=?').get(row.inbox_id)?.status === 'pending')
-          setInboxStatus(db, { inboxId: row.inbox_id, status: 'applied', disposition: { disposition, by: workflowId, at: now }, at: now });
+        setInboxStatus(db, { inboxId: row.inbox_id, status: 'applied', disposition: { disposition, by: workflowId, at: now }, at: now });
         ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'peer-message-acked',
           payload: { key, from: message.from, kind: message.kind, disposition } });
+        return { message, disposition, replayed: false };
       });
-      const out = { ok: true, workflowId, acked: { key, from: message.from, kind: message.kind, subject: message.subject, disposition },
+      const { message, replayed } = acknowledged;
+      const out = { ok: true, workflowId, replayed, acked: { key, from: message.from, kind: message.kind, subject: message.subject, disposition: acknowledged.disposition },
         pending: pendingPeerMessagesOf(db, workflowId).length };
       emit(out, `acked ${key} from ${message.from} [${message.kind}] ${message.subject}: ${disposition} (${out.pending} still pending)`, args.json);
       return;

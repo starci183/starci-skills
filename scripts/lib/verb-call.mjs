@@ -25,8 +25,9 @@ export const refusal = (prefix, text, code = 2, data = {}) => ({
   data,
 });
 
-/** Trimmed non-empty lines of text. */
-export const lines = (text) => String(text ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+/** Trimmed non-empty text parts; the default separator is a newline, including CRLF. */
+export const lines = (text, { separator = /\r?\n/ } = {}) =>
+  String(text ?? '').split(separator).map((line) => line.trim()).filter(Boolean);
 
 /** A failed command result represented as a ladder finding. */
 export const failedRunFinding = (kind, subject, run, { limit = 2000 } = {}) => ({

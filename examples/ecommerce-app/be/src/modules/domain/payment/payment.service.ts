@@ -25,7 +25,7 @@ const AMOUNT_MISMATCH = "amount-mismatch"
 @Injectable()
 /**
  * The intake of the bank transfer notifier. `acceptBankTransfer` takes a verified delivery: it claims the transfer in the
- * inbox first, so a redelivery does nothing, then in ONE transaction matches the transfer to the open invoice of the order
+ * inbox inside the transaction that matches the transfer to the open invoice of the order
  * its payment code names and publishes the outcome: `billing.payment-confirmed` when the amount equals the invoice total
  * (the invoice is marked paid and a payment record is written), `billing.payment-failed` when it differs (nothing else
  * changes, the invoice stays open for a correct transfer). A transfer that is not money received, or names no open
@@ -41,15 +41,12 @@ export class PaymentService {
         @InjectInvoiceService() private readonly invoices: InvoiceService,
     ) {}
 
-    /** Records the effect of one verified bank transfer notice exactly once. */
+    /** Commits the claim, payment and outcome of one verified transfer in the same transaction. */
     async acceptBankTransfer(notice: BankTransferNotice): Promise<void> {
-        if (!(await this.inbox.claim(NOTIFIER_SOURCE, notice.eventId))) return
-        try {
-            await this.entityManager.transaction((manager) => this.settle(manager, notice))
-        } catch (error) {
-            await this.inbox.release(NOTIFIER_SOURCE, notice.eventId)
-            throw error
-        }
+        await this.entityManager.transaction(async (manager) => {
+            if (!(await this.inbox.claim(NOTIFIER_SOURCE, notice.eventId, manager))) return
+            await this.settle(manager, notice)
+        })
     }
 
     /** The decision of one claimed notice, inside the transaction that records and publishes its outcome. */

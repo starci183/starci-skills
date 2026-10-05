@@ -187,11 +187,11 @@ export function createCtx({
 
   const would = (verb, argv, extra = {}) => {
     const digest = digestOf([controller, verb, argv]);
+    for (const [k, at] of shared.wouldSeen) if (now() - at >= WOULD_DEDUPE_MS) shared.wouldSeen.delete(k);
     const seen = shared.wouldSeen.get(digest);
     const at = now();
     if (!(seen != null && at - seen < WOULD_DEDUPE_MS)) {
       shared.wouldSeen.set(digest, at);
-      if (shared.wouldSeen.size > 5000) for (const [k, v] of shared.wouldSeen) if (at - v >= WOULD_DEDUPE_MS) shared.wouldSeen.delete(k);
       log('reconciler.would', `${controller} would ${verb} ${clip(argv.join(' '), 200)}`, { verb, argv: clip(argv.join(' '), 1000), mode, digest, ...extra });
     }
     return { ok: true, shadow: true };
@@ -202,20 +202,33 @@ export function createCtx({
     const id = `act-${crypto.randomBytes(8).toString('hex')}`;
     const digest = digestOf([verb, argv]);
     const k = keyNow(), ep = epochNow();
-    const journal = (fn) => { try { if (state) fn(state); } catch { /* the journal is best effort */ } };
-    journal((m) => m.actionIntent({ id, controller, key: k, verb, argvDigest: digest, epoch: ep, mode: 'active', ledgerId }));
+    const journal = (fn) => {
+      if (!state) throw Error('action journal is unavailable');
+      const recorded = fn(state);
+      if (!recorded) throw Error('action journal did not acknowledge the write');
+      return recorded;
+    };
+    const journalFailure = (stage, error, effectState = 'none') => ({ ok: false, actionId: id, journalStage: stage, effectState,
+      ...(effectState === 'unknown' ? { recoveryRequired: true } : {}), error: `action ${stage} journal failed: ${String(error?.message ?? error)}` });
+    try { journal((m) => m.actionIntent({ id, controller, key: k, verb, argvDigest: digest, epoch: ep, mode: 'active', ledgerId })); }
+    catch (error) { return journalFailure('intent', error); }
     let current = false;
     try { current = isCurrentEpoch() === true; } catch { current = false; }
     if (!current) {
       const fenced = { ok: false, fenced: true, error: 'epoch-fenced: this engine is no longer the leader' };
-      journal((m) => m.actionFinish(id, { state: 'fenced', result: fenced, summary: actionSummary(fenced), errorSignature: 'epoch-fenced' }));
-      return fenced;
+      try { journal((m) => m.actionFinish(id, { state: 'fenced', result: fenced, summary: actionSummary(fenced), errorSignature: 'epoch-fenced' })); }
+      catch (error) { return { ...journalFailure('fenced', error), fenced: true }; }
+      return { ...fenced, actionId: id };
     }
-    journal((m) => m.actionRunning(id));
+    try { journal((m) => m.actionRunning(id)); }
+    catch (error) { return journalFailure('running', error); }
     let r;
     try { r = await exec(); } catch (error) { r = { ok: false, error: String(error?.message ?? error) }; }
-    journal((m) => m.actionFinish(id, { state: r?.ok === true ? 'done' : 'failed', exitCode: Number.isInteger(r?.code) ? r.code : null, result: actionResultOf(r),
-      summary: actionSummary(r), stdout: r?.stdout ?? null, stderr: r?.stderr ?? null, errorSignature: r?.ok === true ? null : errorLineOf(r) }));
+    try {
+      journal((m) => m.actionFinish(id, { state: r?.effectState === 'unknown' || r?.recoveryRequired ? 'unknown' : r?.ok === true ? 'done' : 'failed',
+        exitCode: Number.isInteger(r?.code) ? r.code : null, result: actionResultOf(r), summary: actionSummary(r),
+        stdout: r?.stdout ?? null, stderr: r?.stderr ?? null, errorSignature: r?.ok === true ? null : errorLineOf(r) }));
+    } catch (error) { return { ...journalFailure('finish', error, 'unknown'), result: actionResultOf(r) }; }
     log('reconciler.act', `${controller} ${r?.ok === true ? 'ran' : 'FAILED'} ${verb} ${clip(argv.join(' '), 200)}`, { verb, ok: r?.ok === true, ...(r?.ok === true ? {} : { detail: errorLineOf(r) }), actionId: id, argv: clip(argv.join(' '), 1000), epoch: ep, ...(ledgerId ? { ledgerId } : {}) });
     return { ...r, actionId: id };
   };
@@ -246,8 +259,11 @@ export function createCtx({
       const l = ledgerOf(ledgerId);
       if (!l || !workflowId) return { value: null, failure: { cause: 'out-of-view', error: `ledger ${ledgerId} not in view or no workflow` } };
       const id = `${ledgerId}\u0000${workflowId}`;
-      const hit = shared.statusCache.get(id);
       const ttl = Number(numbers?.statusCacheMs) || 20_000;
+      const visible = new Set(ledgersNow().map(item => item.ledgerId));
+      for (const [key, cached] of shared.statusCache)
+        if (now() - cached.at >= ttl || !visible.has(key.split('\u0000')[0])) shared.statusCache.delete(key);
+      const hit = shared.statusCache.get(id);
       if (hit && now() - hit.at < ttl) return hit.promise;
       const promise = Promise.resolve(spawnChild(process.execPath, [API_FILE, 'status', '--repo', l.repo, '--workflow', workflowId, '--json'], { env: childEnv(), timeoutMs: DEFAULT_TIMEOUT_MS }))
         .then((r) => ({ value: r?.value && typeof r.value === 'object' ? r.value : null, failure: statusFailureOf(r, { timeoutMs: DEFAULT_TIMEOUT_MS }) }),

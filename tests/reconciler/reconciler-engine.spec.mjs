@@ -345,3 +345,90 @@ test('a failed action is classified by exit and JSON ok, never by stderr; result
   assert.ok(rows.every((r) => r.result_sha), 'the full result is a blob (MB-03)');
   assert.ok(rows[1].stderr_sha, 'the full stderr is a blob');
 });
+
+test('returned controller failures remain red and retain their queue backoff', async t => {
+  const st = tempState();
+  t.after(() => st.close());
+  const ctl = { name: 'job', list: async () => ['job:failed'], reconcile: async () => ({ ok: false, error: 'provider offline', retryAfterMs: 7000 }) };
+  const e = new Engine({ env: st.env, now: () => 1000, numbers: NUMBERS, controllers: [ctl], state: st.m,
+    config: { enabled: true, controllers: { job: { mode: 'shadow' } } }, ledgers: [], memoryQueue: true, writeLog: () => {}, print: () => {} });
+  st.own(e);
+  await e.load();
+  e.queue.add('job', 'job:failed');
+  const [item] = e.queue.take('job', 1);
+  const result = await e.reconcileOne(e.controllers[0], item);
+  assert.equal(result.ok, false);
+  assert.equal(result.result.error, 'provider offline');
+  assert.equal(result.retryMs, 7000);
+  assert.equal(e.queue.rows.get('job', item.key).due_at, 8000);
+  const once = await e.once({ key: 'job:other' });
+  assert.equal(once.ok, false);
+  assert.equal(once.controllers[0].failed.length, 1);
+});
+
+test('missing inventory and required controller load failure make one-pass coverage incomplete', async t => {
+  const st = tempState();
+  t.after(() => st.close());
+  const absent = await discoverControllers(path.join(st.dir, 'absent'));
+  assert.equal(absent.errors.length, 1);
+  assert.match(absent.errors[0].error, /inventory unreadable/);
+  const dir = path.join(st.dir, 'incomplete-controllers');
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir, 'job.mjs'), "export default { name: 'job', list: async () => [], reconcile: async () => ({ok:true}) };\n");
+  fs.writeFileSync(path.join(dir, 'host.mjs'), "export default { name: 'host', ;\n");
+  const e = new Engine({ env: st.env, numbers: NUMBERS, controllersDir: dir, state: st.m, config: allShadow,
+    ledgers: [], memoryQueue: true, writeLog: () => {}, print: () => {} });
+  st.own(e);
+  await e.load();
+  const incomplete = await e.once();
+  assert.equal(incomplete.ok, false);
+  assert.deepEqual(incomplete.coverage, { expected: 2, loaded: 1, missing: ['host'] });
+  assert.equal(incomplete.loadErrors[0].name, 'host');
+  const onlyJob = await e.once({ controller: 'job' });
+  assert.equal(onlyJob.ok, true, 'a failed disabled controller does not invalidate the requested independent controller');
+});
+
+test('ctx evicts expired status and shadow-call cache rows while retaining fresh dedupe', async () => {
+  let time=1000,calls=0;
+  const shared={statusCache:new Map(),wouldSeen:new Map()};
+  const ledgers=[{ledgerId:'a',repo:'a'},{ledgerId:'b',repo:'b'}];
+  const ctx=createCtx({controller:'job',shared,ledgers,now:()=>time,numbers:{statusCacheMs:100},writeLog:()=>{},
+    spawnChild:async()=>{calls++;return {ok:true,code:0,value:{ok:true}};}});
+  await ctx.statusRead('a','one');await ctx.statusRead('a','one');
+  assert.equal(calls,1,'fresh status stays cached');
+  await ctx.statusRead('b','two');assert.equal(shared.statusCache.size,2);
+  time+=101;await ctx.statusRead('b','two');
+  assert.equal(shared.statusCache.size,1,'expired workflow rows leave the shared map');
+  ledgers.pop();await ctx.statusRead('a','three');
+  assert.equal(shared.statusCache.size,1,'out-of-view ledger rows leave the shared map');
+  for(let i=0;i<20;i++)await ctx.run('node',[`private-${i}.mjs`]);
+  assert.equal(shared.wouldSeen.size,20);
+  await ctx.run('node',['private-0.mjs']);assert.equal(shared.wouldSeen.size,20);
+  time+=10*60_000;await ctx.run('node',['next.mjs']);
+  assert.equal(shared.wouldSeen.size,1,'expiry is reclaimed even below the old size threshold');
+});
+
+test('action journal failures gate effects and retain an unknown finish with its original identity', async t => {
+  const st = tempState();
+  t.after(() => st.close());
+  for (const stage of ['actionIntent', 'actionRunning', 'actionFinish']) {
+    for (const refused of [false, true]) {
+      let spawned = 0;
+      const state = new Proxy(st.m, { get(target, property) {
+        if (property === stage) return () => { if (refused) return false; throw Error('disk full'); };
+        return target[property];
+      } });
+      const ctx = createCtx({ controller: 'host', mode: 'active', state, writeLog: () => {},
+        spawnChild: async () => { spawned += 1; return { ok: true, code: 0, value: { ok: true } }; } });
+      const result = await ctx.run('node', ['fake-actuator.mjs']);
+      assert.equal(result.ok, false, stage);
+      assert.ok(result.actionId);
+      assert.equal(spawned, stage === 'actionFinish' ? 1 : 0, stage);
+      assert.equal(result.effectState, stage === 'actionFinish' ? 'unknown' : 'none', stage);
+      if (stage === 'actionFinish') {
+        assert.equal(result.recoveryRequired, true);
+        assert.equal(st.m.actionOf(result.actionId).state, 'running', 'failed finish leaves durable original custody');
+      }
+    }
+  }
+});

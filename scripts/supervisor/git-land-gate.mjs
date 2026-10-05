@@ -12,7 +12,7 @@ import { compareTypeErrors, projectOf } from './git-land-gate-tsc.mjs';
 
 const CODE = /\.(ts|tsx|mts|mjs|js)$/;
 const BUILTINS = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)]);
-const TEMPLATE = (file) => file.startsWith('packages/hfs/templates/') || file.startsWith('knowledge/code-examples/');
+const TEMPLATE = (file) => file.startsWith('packages/hfs/templates/');
 const slash = (p) => p.replaceAll(String.fromCharCode(92), '/');
 
 const stripJsonc = (text) => {

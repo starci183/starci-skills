@@ -26,7 +26,7 @@ const launchModelOf = (provider, model, card) => model ?? (card?.start?.defaultM
 
 // ---- the one agent launch --------------------------------------------------
 // Every agent - Kernel, [Supervisor], [Worker], [Op] - starts through `orca orchestration worker-start --agent
-// <provider> [--model <id> --effort <level>]` (modules/kernel/contract-changes/launch-through-worker-start.yaml).
+// <provider> [--model <id> --effort <level>]` (modules/kernel/start-workflow.yaml).
 // Orca composes the launch (placement, the owner's per-agent default args, readiness, the Task from --spec) and owns
 // the worker's lifecycle; the runtime pre-trusts the directory, starts the worker with its spec (no task-create: a
 // failed start leaves no orphan Task), takes the agent terminal from worker-show (result.dispatch.assigneeHandle; live Orca 1.4.209
@@ -40,14 +40,14 @@ const launchModelOf = (provider, model, card) => model ?? (card?.start?.defaultM
 // left an effect is reconciled before the failure returns, so no caller ever owns a half launch.
 // `onCreated(handle, dispatchId)` runs the moment the agent terminal is known (before attestation when the start
 // receipt names it): the caller records it durably (inc-e523617a3c31).
-// Depth preflight (contract change worker-depth-limit): `parentDispatch` is the Dispatch of the runtime-launched worker
+// Depth preflight: `parentDispatch` is the Dispatch of the runtime-launched worker
 // this one nests under (an op under its Kernel, the critic under its op), none under the owner's chat. Its depth
 // (worker-show) + 1 deeper than config.yaml orca.maxWorkerDepth (`maxDepth` overrides it) is refused at step 'depth'
 // with worker-depth-exceeded before anything is trusted or started (effectState none). An unreadable parent depth
 // proves nothing: the launch goes on and Orca stays the authority. The receipt carries the attested `depth`.
 export function spawnAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, spec, taskTitle = null,
   run, from = null, request, onCreated = null, parentDispatch = null, maxDepth = null, preflight = null, io = null,
-  role = 'worker', scopeId = null, allowGroup = null, admission = null, bias = null, ownerGrant = null, author = null, qualityFloor = null, kind = null, difficulty = null, env = process.env } = {}) {
+  role = 'worker', scopeId = null, allowGroup = null, admission = null, bias = null, ownerGrant = null, author = null, qualityFloor = null, kind = null, difficulty = null, config = undefined, env = process.env } = {}) {
   addStarciShimToPath();
   const orca = { start: io?.start ?? workerStart, show: io?.show ?? workerShow,
     rename: io?.rename ?? terminalRename, stop: io?.stop ?? workerStop, release: io?.release ?? closeWorker,
@@ -81,6 +81,12 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
   if (!hostRequest) return noEffect('admission', 'the launch requires its immutable host request');
   const hostRequestId = orcaRequestIdOf('worker-start', hostRequest);
   const launchIdentity = launchScopeId('host-launch', { run, request, spec, worktree, repo, baseBranch, name, setup, provider, model: budgetModel });
+  // Invalid model, eligibility or request cannot authorize provider trust writes.
+  let trust = null;
+  try { trust = orca.trust({ agent: provider, cwd: worktree, config, env }); }
+  catch (e) { trust = {agent:provider,status:'failed',errors:[{error:String(e?.message??e)}]}; }
+  if(trust && !['written','already','ok'].includes(trust.status) && trust.ok!==true)
+    return noEffect('launch-trust',trust.reason??trust.errors?.[0]?.error??'launch trust was not verified',{trust});
   const consumed = consumeAgentAdmission(admission, { provider, model: budgetModel, role, launchIdentity, hostRequestId, io: io?.admission, env });
   if (!consumed.ok) {
     const receipt = consumed.reservation ?? admission.receipt;
@@ -101,10 +107,6 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
         || ['state-regression', 'launch-identity-conflict', 'host-request-conflict'].includes(consumed.reason) ? 'unknown' : 'none'), admission };
   }
   if (effort === 'none') effort = null;
-  let trust = null;
-  // A card that takes no model flag (Devin) has no per-worker model: Orca refuses a launch-time model for it and Devin ignores a project config pin (live E7).
-  try { trust = orca.trust({ agent: provider, cwd: worktree }); }
-  catch (e) { trust = { agent: provider, paths: [], status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
   // A new worktree (`worktree: 'new-child' | 'new-top-level'`) carries Orca's creation flags (--repo, --base-branch,
   // --name, --setup); an existing worktree takes none (Orca refuses them there).
   const creates = worktree === 'new-child' || worktree === 'new-top-level';
@@ -231,7 +233,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
 // Returns spawnAgent's receipt (runId/taskId on it), or {ok:false, step:'run-create', effectState:'none'}.
 export function startAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, prompt, specFile = null,
   heading = null, objective, entry = null, priorRunId = null, request, onCreated = null, parentDispatch = null, maxDepth = null, io = null,
-  role = 'worker', scopeId = null, allowGroup = null, admission = null, bias = null, ownerGrant = null, author = null, qualityFloor = null, kind = null, difficulty = null, env = process.env } = {}) {
+  role = 'worker', scopeId = null, allowGroup = null, admission = null, bias = null, ownerGrant = null, author = null, qualityFloor = null, kind = null, difficulty = null, config = undefined, env = process.env } = {}) {
   if (!request || typeof request !== 'object') throw new Error('startAgent needs request: the ledger identity of this launch (calls.yaml replay: request)');
   const orca = { runShow: io?.runShow ?? runShow, runCreate: io?.runCreate ?? runCreate };
   // The depth preflight runs before the Run exists, so a refused launch leaves nothing behind in Orca. With no parent named,
@@ -249,7 +251,7 @@ export function startAgent({ provider, model = null, effort = null, worktree, re
   const spec = taskSpecOf({ prompt, file: specFile, heading: heading ?? title }).spec;
   const launch = (runId) => spawnAgent({ provider, model, effort, worktree, repo, baseBranch, name, setup, title, spec, taskTitle: title, run: runId, from: entry,
     request, onCreated, parentDispatch, maxDepth, preflight, io: { ...io?.spawn, admission: io?.admission ?? io?.spawn?.admission },
-    role, scopeId, allowGroup, admission, bias, ownerGrant, author, qualityFloor, kind, difficulty, env });
+    role, scopeId, allowGroup, admission, bias, ownerGrant, author, qualityFloor, kind, difficulty, config, env });
   if (priorRunId && orca.runShow({ id: priorRunId })?.ok) {
     const reused = launch(priorRunId);
     if (reused.ok || reused.step !== 'worker-start' || reused.effectState !== 'none' || reused.hostUnavailable) return reused;

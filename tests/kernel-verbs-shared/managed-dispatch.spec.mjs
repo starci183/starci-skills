@@ -4,12 +4,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {execFile} from 'node:child_process';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
+import {fakeOrcaWorktrees} from '../helpers/fake-orca-worktrees.mjs';
+import {placeOnRepo} from '../helpers/op-placement.mjs';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
-import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
+import {openLedger,inspectLedger,ledgerFileFor,startAttempt,writeContract,setJobStatus,updateAttempt,recordJobResult,fileReport} from '../../engine/db/ledger.mjs';
+import { admitPacket, captureDispatchInputs, selectDispatchContract } from '../../scripts/kernel/dispatch-admission.mjs';
 import {openMachine,openMachineReader} from '../../engine/db/machine.mjs';
 process.env.STARCI_SLEEP_SCALE??='0.02';
 import {jobRowOf} from '../../scripts/kernel/verbs/shared/rows.mjs';
-import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
+import {writeGreenProofs,proofRepo} from '../helpers/sonar-scan.mjs';
+import {buildContext} from '../../scripts/context/pack.mjs';
 
 // Build the workflow and logical unit required by the current ledger before
 // exercising dispatch. Each fixture op job represents a distinct unit.
@@ -35,10 +40,15 @@ const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 // use those orchestration wrappers: every Kernel is a dedicated Orca
 // terminal, while operation agents retain their routed managed lifecycle.
 
-const fixture=(t,{dead=[],stale=[]}={})=>{
+const fixture=(t,{dead=[],stale=[],allocationPolicy=null}={})=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-managed-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  const mainRepo=path.join(root,'main');fs.mkdirSync(mainRepo,{recursive:true});
+  const mainGit=proofRepo(t,mainRepo);
+  const made=fakeOrcaWorktrees({root:path.join(root,'worktrees')}).create({repo:`path:${mainRepo}`,name:'wf-managed-fixture',baseBranch:'main'});
+  assert.equal(made.ok,true,JSON.stringify(made));
+  const repo=path.resolve(made.worktree.path);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  const git=(...args)=>mainGit('-C',repo,...args);
   // These refused starts leave the exact residual terminal that closure must prove away.
   const startBranch="else if (verb === 'orchestration worker-start') {";
   const stalledDispatch="last_failure: 'agent_prompt_stalled' }";
@@ -51,6 +61,7 @@ const fixture=(t,{dead=[],stale=[]}={})=>{
   }`).replace(stalledDispatch,"last_failure: 'agent_prompt_stalled', assigneeHandle: state.assignees?.[arg('dispatch')] ?? null }");
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,managedFake);
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot,{recursive:true});
+  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);
   const env={...process.env,
     STARCI_ORCA_COMMAND:process.execPath,
     STARCI_ORCA_ARGS:JSON.stringify([stub]),
@@ -59,7 +70,7 @@ const fixture=(t,{dead=[],stale=[]}={})=>{
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     STARCI_FAKE_ORCA_DEAD:dead.join(','),
     STARCI_FAKE_ORCA_STALE:stale.join(','),
-    STARCI_OWNER_ROOT:ownerRoot,
+    STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome,
     APPDATA:path.join(root,'appdata'),
     LOCALAPPDATA:path.join(root,'localappdata'),
     STARCI_PROJECTS_ROOT:path.join(root,'projects'),
@@ -72,19 +83,40 @@ const fixture=(t,{dead=[],stale=[]}={})=>{
   const example=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8');
   const writeConfig=(kernelLine)=>{
     const canonical=kernelLine??'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}';
-    const body=example.replace(/^kernel:.*$/m,canonical);
+    let body=example.replace(/^kernel:.*$/m,canonical)
+      .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private managed dispatch fixture adoption',roots:[mainRepo]})}`);
+    if(allocationPolicy){
+      // Provider circuit scenarios keep order while testing repeated launches; the common example stays balanced.
+      assert.ok(body.includes('\n  policy: balanced\n'),'fixture allocation policy anchor must exist');
+      body=body.replace('\n  policy: balanced\n',`\n  policy: ${allocationPolicy}\n`);
+    }
     assert.match(body,/^kernel:/m,'fixture config keeps the kernel: line');
     fs.writeFileSync(path.join(ownerRoot,'config.yaml'),body);
   };
-  const run=(script,...args)=>new Promise(resolve=>execFile(process.execPath,
-    ['--import',`data:text/javascript,import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});`,script,...args],
-    {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env},
-    (error,stdout,stderr)=>resolve({status:error?.code??0,signal:error?.signal??null,error,stdout,stderr})));
+  writeConfig();
+  const registered=new Set();
+  const bindWorkflow=workflowId=>{
+    if(registered.has(workflowId))return;
+    const record=registerWorkflowWorktree({env},{workflowId,orcaWorktreeId:made.worktree.id,path:repo,branch:made.worktree.branch});
+    assert.equal(path.resolve(record.path),repo);assert.equal(record.branch,git('branch','--show-current'));
+    registered.add(workflowId);
+  };
+  const run=(script,...args)=>{
+    if(script===API&&args[0]==='dispatch'&&args.includes('--spawn')){
+      const ledger=inspectLedger({file:ledgerFileFor(repo,{env})});
+      try{const job=jobRowOf(ledger.db,args[args.indexOf('--job')+1]);assert.ok(job,'fixture dispatch names a real job');bindWorkflow(job.workflow_id);}
+      finally{ledger.close();}
+    }else if(script===START_WORKFLOW&&!args.includes('--plan'))bindWorkflow(args[args.indexOf('--goal')+1]);
+    return new Promise(resolve=>execFile(process.execPath,
+      ['--import',`data:text/javascript,import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});register(${JSON.stringify(new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href)});`,script,...placeOnRepo(args,repo)],
+      {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env},
+      (error,stdout,stderr)=>resolve({status:error?.code??0,signal:error?.signal??null,error,stdout,stderr})));
+  };
   const callArgv=()=>fs.existsSync(path.join(root,'calls.jsonl'))
     ?fs.readFileSync(path.join(root,'calls.jsonl'),'utf8').trim().split('\n').filter(Boolean).map(l=>JSON.parse(l).argv)
     :[];
   const calls=()=>callArgv().map(argv=>argv.slice(0,2).join(' '));
-  return {root,repo,env,ledgerFile:ledgerFileFor(repo,{env}),run,calls,callArgv,writeConfig};
+  return {root,repo,git,env,ledgerFile:ledgerFileFor(repo,{env}),run,calls,callArgv,writeConfig};
 };
 
 const defineGoal=async(fx,text='managed dispatch smoke goal')=>{
@@ -125,6 +157,13 @@ const reportFile=(fx,jobId)=>{
   assert.ok(scratch,`dispatched job ${jobId} has no scratch directory`);
   fs.mkdirSync(scratch,{recursive:true});
   return path.join(scratch,'report.json');
+};
+
+const attachProofs=(fx,jobId,report)=>{
+  const binding=ledgerRead(fx,db=>JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE attempt_id=(SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1)').get(jobId).context_json).packet.context.gate_binding);
+  const dir=path.join(path.dirname(report),'proofs');
+  writeGreenProofs(dir,{root:fx.repo,binding});
+  return dir;
 };
 
 /* ------------------------------------------------ kernel pin precedence */
@@ -221,6 +260,30 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   assert.equal(workerStartCall?.[workerStartCall.indexOf('--task-title')+1],'code.refactor #1');
   assert.equal(workerStartCall?.[workerStartCall.indexOf('--display-name')+1],'[Op] Ch\u1ec9nh s\u1eeda m\u00e3 ngu\u1ed3n · docs · wf-managed');
   assert.ok(workerStartCall?.includes('--spec'),'the rendered packet rides on --spec');
+  // Inspect the real launch transport, including a spilled packet; preview-only wiring cannot satisfy this regression.
+  const taskSpec=workerStartCall[workerStartCall.indexOf('--spec')+1];
+  const packetPath=taskSpec.match(/^ {2}(.+packet\.a\d+\.md)$/m)?.[1];
+  if(packetPath){
+    const rel=path.relative(fx.root,path.resolve(packetPath));
+    assert.ok(rel!=='..'&&!rel.startsWith(`..${path.sep}`)&&!path.isAbsolute(rel),'packet spill remains in this private fixture');
+  }
+  const delivered=packetPath?fs.readFileSync(packetPath,'utf8'):taskSpec;
+  const context=ledgerRead(fx,db=>json(db.prepare('SELECT context_json FROM contracts WHERE attempt_id=(SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1)').get(jobId)?.context_json));
+  const canonical=buildContext({op:'code.refactor',skillRoot:ROOT,records:[],ownedPaths:[]});
+  const expected=canonical.mandatory.map(entry=>entry.path);
+  assert.deepEqual(context?.packet?.context?.mandatoryReads,expected,'the saved actual attempt carries the canonical resolved read list');
+  for(const required of ['docs/architecture.md','docs/code-pattern-enforcement.md','scripts/gates/gate.mjs','modules/kernel/dispatch.yaml'])
+    assert.ok(expected.includes(required),`the actual context must carry ${required}`);
+  const block=delivered.split('MANDATORY READS — read in this order before any action:')[1]?.split('  shared evidence and path policy:')[0];
+  assert.equal(typeof block,'string','worker-start receives the materialized context block');
+  assert.deepEqual(context?.packet?.context?.readRefs?.map(({path:file,absolute,rootKind,root,sha256})=>({path:file,absolute,rootKind,root,sha256})),
+    canonical.mandatory.map(({path:file,sha256})=>({path:file,absolute:path.resolve(ROOT,file),rootKind:'source',root:ROOT,sha256})),
+    'the saved actual READ snapshot binds ordered canonical Source paths, roots and hashes');
+  let cursor=-1;
+  for(const [index,file]of expected.entries()){
+    const at=block.indexOf(`${index+1}. ${path.resolve(ROOT,file)} —`);
+    assert.ok(at>cursor,`actual worker prompt omits or reorders mandatory read ${file}`);cursor=at;
+  }
   const renameCall=calls.find(argv=>argv.slice(0,2).join(' ')==='terminal rename');
   assert.equal(renameCall?.[renameCall.indexOf('--terminal')+1],'fake-terminal-1');
   assert.equal(renameCall?.[renameCall.indexOf('--title')+1],'[Op] Ch\u1ec9nh s\u1eeda m\u00e3 ngu\u1ed3n · docs · wf-managed',
@@ -244,11 +307,13 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   // green Kernel check. starci kernel report sends the op's one worker_done (orca-deep-map
   // REPLACE #9), so Orca settles the Task and Dispatch and settle only releases.
   const report=reportFile(fx,jobId);fs.writeFileSync(report,JSON.stringify({
-    schema:'starci/op-report@1',outcome:'done',summary:'managed dispatch completed',head:'abc1234def',
-    files:['docs/managed-result.md',...(writeGreenProofs(path.join(fx.repo,'docs')),['docs/sonar.json','docs/gate.json','docs/read-digest.json'])],checks:[{name:'self-check',command:'true',exitCode:0}],
+    schema:'starci/op-report@1',outcome:'done',summary:'managed dispatch completed',head:fx.git('rev-parse','HEAD'),
+    files:[],checks:[{name:'self-check',command:'true',exitCode:0}],
   }));
-  const filed=await fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--dispatch-capability','dcap_fake','--json');
+  const filed=await fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--attach',attachProofs(fx,jobId,report),'--dispatch-capability','dcap_fake','--json');
   assert.equal(filed.status,0,`report failed: ${filed.stderr||filed.stdout}`);
+  assert.deepEqual(ledgerRead(fx,db=>db.prepare("SELECT name FROM job_artifacts WHERE job_id=? AND name IN ('attachments/proofs/gate.json','attachments/proofs/read-digest.json') ORDER BY name").all(jobId)).map(row=>row.name),
+    ['attachments/proofs/gate.json','attachments/proofs/read-digest.json'],'the filed attempt carries the actual attached gate and READ blobs');
   const sends=fx.callArgv().filter(argv=>argv.slice(0,2).join(' ')==='orchestration send');
   assert.equal(sends.length,1,'exactly one worker_done');
   const flagOf=(argv,name)=>argv[argv.indexOf(`--${name}`)+1];
@@ -288,10 +353,10 @@ test('starci kernel report without the op\'s Dispatch capability sends no worker
   const d=await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
   assert.equal(d.status,0,d.stderr||d.stdout);
   const report=reportFile(fx,jobId);fs.writeFileSync(report,JSON.stringify({
-    schema:'starci/op-report@1',outcome:'done',summary:'no capability',head:'abc1234def',
-    files:['docs/managed-result.md',...(writeGreenProofs(path.join(fx.repo,'docs')),['docs/sonar.json','docs/gate.json','docs/read-digest.json'])],checks:[{name:'self-check',command:'true',exitCode:0}],
+    schema:'starci/op-report@1',outcome:'done',summary:'no capability',head:fx.git('rev-parse','HEAD'),
+    files:[],checks:[{name:'self-check',command:'true',exitCode:0}],
   }));
-  const filed=await fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
+  const filed=await fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--attach',attachProofs(fx,jobId,report),'--json');
   assert.equal(filed.status,0,filed.stderr||filed.stdout);
   assert.equal(fx.calls().includes('orchestration send'),false,'no capability, no worker_done attempt');
   const done=json(jobRow(fx,jobId)?.payload_json)?.workerDone;
@@ -336,8 +401,11 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
   assert.equal(d.status,0,d.stderr||d.stdout);
   assert.equal(json(jobRow(fx,jobId)?.payload_json)?.managed?.agentTerminalHandle,'fake-terminal-1');
   const report=reportFile(fx,jobId);fs.writeFileSync(report,JSON.stringify({
-    schema:'starci/op-report@1',outcome:'done',summary:'done',head:'abc1234def',files:['docs/r.md',...(writeGreenProofs(path.join(fx.repo,'docs')),['docs/sonar.json','docs/gate.json','docs/read-digest.json'])],checks:[{name:'self',command:'true',exitCode:0}]}));
-  assert.equal((await fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--dispatch-capability','dcap_fake','--json')).status,0);
+    schema:'starci/op-report@1',outcome:'done',summary:'done',head:fx.git('rev-parse','HEAD'),files:[],checks:[{name:'self',command:'true',exitCode:0}]}));
+  const releaseFiled=await fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--attach',attachProofs(fx,jobId,report),'--dispatch-capability','dcap_fake','--json');
+  assert.equal(releaseFiled.status,0,`report failed: ${releaseFiled.stderr||releaseFiled.stdout}`);
+  assert.deepEqual(ledgerRead(fx,db=>db.prepare("SELECT name FROM job_artifacts WHERE job_id=? AND name IN ('attachments/proofs/gate.json','attachments/proofs/read-digest.json') ORDER BY name").all(jobId)).map(row=>row.name),
+    ['attachments/proofs/gate.json','attachments/proofs/read-digest.json'],'the filed attempt carries the actual attached gate and READ blobs');
   fx.env.STARCI_CALLER='runtime-settler';
   assert.equal((await fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'v',command:'v',exitCode:0,evidence:'green'}]}),'--json')).status,0);
   delete fx.env.STARCI_CALLER;
@@ -376,8 +444,24 @@ test('finish closes the kernel terminal and never issues task-update (the Task o
     ledger.db.prepare("UPDATE jobs SET status='cancelled' WHERE job_id=?").run(jobId);
     // Only a running workflow finishes (api-lib/lifecycle.mjs: running -> finished).
     ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'test-fixture',reason:'finish precondition'});
-    // Finish needs the owner's handover approval (tests/kernel/handover.spec.mjs owns that gate).
-    ledger.appendEvent({workflowId,entityType:'job',entityId:'job-finish-handover',kind:'handover-approved',payload:{jobId:'job-finish-handover',dispatchId:'ask-finish',answeredBy:'owner'}});
+    // The terminal-closure fixture includes the real admitted handover job that owns this approval.
+    const handoverJob='job-finish-handover',opId='handover.review',at=Date.now();
+    const payload={opId,owned_paths:['docs/']};
+    enqueueFixtureJob(ledger,{jobId:handoverJob,workflowId,opId,kind:'op',payload});
+    for(const to of ['ready','leased'])setJobStatus(ledger.db,{jobId:handoverJob,to,reason:'fixture handover',at});
+    const attempt=startAttempt(ledger.db,{workflowId,jobId:handoverJob,dispatchId:'handover-finish-review',dispatchedAt:at,startedAt:at,at});
+    const selection=selectDispatchContract(ROOT,opId,payload),packet={context:{records:[],owned_paths:[{root:fx.repo,path:'docs/'}],selected_op:selection.selected}};
+    admitPacket(ROOT,{packet,op:opId,placements:[{base:fx.repo,path:'docs/'}],db:ledger.db,workflowId,now:at});
+    const {inputs}=captureDispatchInputs({skillRoot:ROOT,op:opId,packet,briefDoc:selection.brief,params:selection.params,
+      repo:fx.repo,stateDir:path.join(fx.repo,'.starciwork'),workerCwd:fx.repo});
+    writeContract(ledger.db,{attemptId:attempt.attempt_id,markdown:fs.readFileSync(path.join(ROOT,'modules/ops/ops/handover.review.yaml'),'utf8'),
+      context:{worktree:fx.repo,packet,contract:packet.context.contract,inputs},createdAt:at});
+    setJobStatus(ledger.db,{jobId:handoverJob,to:'running',reason:'fixture handover',attemptId:attempt.attempt_id,at});
+    fileReport(ledger.db,{attemptId:attempt.attempt_id,outcome:'done',report:{schema:'starci/op-report@1',outcome:'done',summary:'owner-handover precondition of terminal closure'},createdAt:at});
+    for(const to of ['reported','succeeded'])setJobStatus(ledger.db,{jobId:handoverJob,to,reason:'fixture handover',attemptId:attempt.attempt_id,at});
+    updateAttempt(ledger.db,{attemptId:attempt.attempt_id,settledAt:at,verdict:'pass',endState:'settled',at});
+    recordJobResult(ledger.db,{jobId:handoverJob,result:{verdict:'pass'},at});
+    ledger.appendEvent({workflowId,entityType:'job',entityId:handoverJob,kind:'handover-approved',payload:{jobId:handoverJob,dispatchId:'ask-finish',answeredBy:'owner'}});
   }finally{ledger.close();}
 
   const finished=await fx.run(API,'finish','--repo',fx.repo,'--workflow',workflowId,'--json');
@@ -395,7 +479,7 @@ test('finish closes the kernel terminal and never issues task-update (the Task o
 });
 
 test('Claude auth rejection circuits the shared-auth provider for every job and reuses the logical operation attempt',async t=>{
-  const fx=fixture(t);
+  const fx=fixture(t,{allocationPolicy:'prefer-then-overflow'});
   fx.env.STARCI_FAKE_ORCA_MODE='auth';
   const jobId='job-claude-auth-circuit';
   const siblingJobId='job-claude-prerouted-sibling';
@@ -415,6 +499,7 @@ test('Claude auth rejection circuits the shared-auth provider for every job and 
   const firstRoute=await fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard',
     '--json');
   assert.equal(firstRoute.status,0,firstRoute.stderr||firstRoute.stdout);
+  assert.equal(json(firstRoute.stdout)?.decision?.routePolicy,'prefer-then-overflow','private owner fixture declares ordered routing');
   assert.equal(json(firstRoute.stdout)?.decision?.model,'claude-agent',
     'fresh authenticated quota permits the owner-preferred provider to reach launch attestation');
   const siblingRoute=await fx.run(API,'route','--repo',fx.repo,'--job',siblingJobId,'--difficulty','hard',
@@ -502,7 +587,7 @@ test('Claude auth fallback advances only after partial effects reconcile and nev
     assert.equal(routed.status,0,routed.stderr||routed.stdout);
     const rejected=await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json');
     assert.notEqual(rejected.status,0);
-    return {fx,jobId,result:ledgerRead(fx,db=>({
+    return {fx,jobId,rejected:json(rejected.stdout),result:ledgerRead(fx,db=>({
       job:jobRowOf(db,jobId),
       leases:db.prepare('SELECT COUNT(*) n FROM leases WHERE job_id=?').get(jobId).n,
     }))};
@@ -510,6 +595,10 @@ test('Claude auth fallback advances only after partial effects reconcile and nev
 
   const partial=await exercise('auth-partial','partial');
   assert.equal(partial.result.job.status,'ready','settled residual resources reduce partial to proven no-effect');
+  const partialClosure=partial.rejected?.managed?.cleanup?.release;
+  assert.equal(partialClosure?.handle,'fake-terminal-1');
+  assert.equal(partialClosure?.processes?.verdict,'none');
+  assert.deepEqual(partialClosure?.processes?.census,[],'partial launch fallback requires the measured terminal census to be empty');
   assert.equal(json(partial.result.job.result_json)?.effectState,'none');
   assert.equal(partial.result.leases,0);
   assert.ok(partial.fx.calls().includes('orchestration worker-stop'));
@@ -520,6 +609,7 @@ test('Claude auth fallback advances only after partial effects reconcile and nev
 
   const unverified=await exercise('auth-partial','unverified-process',true);
   assert.equal(unverified.result.job.status,'effect_unknown','terminal closure alone cannot release an unproven process tree');
+  assert.equal(unverified.rejected?.managed?.cleanup?.release?.processes?.verdict,'unverifiable');
   assert.equal(json(unverified.result.job.result_json)?.effectState,'unknown');
   assert.equal(unverified.result.leases,1,'unproven process exit retains the operation fence');
 
@@ -595,6 +685,10 @@ test('managed prompt stall with exact exited worker is retried as the same logic
   assert.equal(routed.status,0,routed.stderr||routed.stdout);
   const rejected=await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json');
   assert.notEqual(rejected.status,0,'the launch still reports a rejected dispatch to the Kernel');
+  const stalledClosure=json(rejected.stdout)?.managed?.cleanup?.release;
+  assert.equal(stalledClosure?.handle,'fake-terminal-1');
+  assert.equal(stalledClosure?.processes?.verdict,'none');
+  assert.deepEqual(stalledClosure?.processes?.census,[],'exact exited prompt-stall still requires measured process closure');
   const state=ledgerRead(fx,db=>({
     job:jobRowOf(db,jobId),
     leases:db.prepare('SELECT COUNT(*) n FROM leases WHERE job_id=?').get(jobId).n,
@@ -663,7 +757,7 @@ test('kernel launch: Codex boots as a worker of its own entry Run through worker
   assert.equal(json(job?.payload_json)?.managed?.dispatchId,'dispatch-fake-1');
   assert.deepEqual(kernelSignal(fx,workflowId),{
     terminal:'fake-terminal-1',dispatch:'dispatch-fake-1',runId:'run-fake-1',host:'orca',agent:'codex',routedBy:'config',
-    model:'gpt-6.1-sol',effort:'high',launch:'worker',modelAttested:true,
+    model:'gpt-6.1-sol',effort:'high',launch:'worker',modelAuthority:'supported-model-argument',effectiveModel:'gpt-6.1-sol',modelAttested:true,
   });
   const seen=fx.calls();
   for(const step of ['orchestration run-create','orchestration worker-start','terminal rename','orchestration worker-show'])
@@ -710,7 +804,7 @@ test('kernel launch fails closed when the worker does not attest the requested m
 /* ------------------------------------------ worker-start feeds provider health */
 
 test('an unclassified worker-start refusal is a strike; the second one opens the provider circuit',async t=>{
-  const fx=fixture(t);
+  const fx=fixture(t,{allocationPolicy:'prefer-then-overflow'});
   fx.env.STARCI_FAKE_ORCA_MODE='worker-start-refused';
   const workflowId='wf-worker-start-strikes';
   const ledger=openLedger({file:fx.ledgerFile});
@@ -728,6 +822,7 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
   const dispatchClaude=async jobId=>{
     const routed=await fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json');
     assert.equal(routed.status,0,routed.stderr||routed.stdout);
+    assert.equal(json(routed.stdout)?.decision?.routePolicy,'prefer-then-overflow','the private circuit fixture preserves route order');
     return {routed:json(routed.stdout)?.decision?.model,
       dispatched:await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json')};
   };
@@ -772,7 +867,7 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
 });
 
 test('a circuit that reopens for the same failure waits longer each time (circuitBackoff)',async t=>{
-  const fx=fixture(t);
+  const fx=fixture(t,{allocationPolicy:'prefer-then-overflow'});
   fx.env.STARCI_FAKE_ORCA_MODE='worker-start-refused';
   const workflowId='wf-worker-start-backoff';
   const ledger=openLedger({file:fx.ledgerFile});
@@ -789,7 +884,10 @@ test('a circuit that reopens for the same failure waits longer each time (circui
   const refuse=async jobId=>{
     const routed=await fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json');
     assert.equal(routed.status,0,routed.stderr||routed.stdout);
-    await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json');
+    assert.equal(json(routed.stdout)?.decision?.routePolicy,'prefer-then-overflow','the owner-selected fixture policy is retained across cooldowns');
+    assert.equal(json(routed.stdout)?.decision?.model,'claude-agent','each refused launch exercises the same provider before a circuit opens');
+    const refused=await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json');
+    assert.notEqual(refused.status,0,'the fixture must reach the refused worker start');
   };
   const health=()=>{
     const row=providerHealthRow(fx,'claude');
@@ -901,10 +999,16 @@ test('route admits only agents that carry the op host tool; with every carrier e
 test('dispatch --spawn refuses before any Orca call when the routed agent is outside the op order (claude-agent carries no browser-dom)',async t=>{
   const fx=fixture(t);
   fx.writeConfig();
-  seedOp(fx,'wf-host-tools-dispatch','job-audit-codex','interface.audit',{model:'claude-agent'});
+  // Reach the route-order gate with the typed audit input this operation requires.
+  seedOp(fx,'wf-host-tools-dispatch','job-audit-codex','interface.audit',{model:'claude-agent',params:{audit:{
+    id:'operation.x.host-tools',feature:'x',selectedMatrix:{cells:[
+      {id:'host-tools-ready',surface:'host-tools',route:'/',state:'ready',viewport:'desktop',theme:'light',assertionIds:['ui.x.host-tools']},
+    ]},
+  }}});
   const r=await fx.run(API,'dispatch','--repo',fx.repo,'--job','job-audit-codex','--spawn','--json');
-  assert.equal(r.status,1);
+  assert.equal(r.status,1,r.stderr||r.stdout);
   const out=json(r.stdout);
+  assert.ok(out,r.stderr||r.stdout||'dispatch returned no JSON');
   assert.equal(out.reason,'model-outside-order');
   assert.deepEqual(fx.calls(),[],'nothing reached the host');
   assert.equal(jobRow(fx,'job-audit-codex').status,'queued');

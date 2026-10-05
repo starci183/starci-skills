@@ -7,7 +7,10 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {startOpIpcCli} from '../helpers/kernel-verbs-shared-op-ipc-fixture.mjs';
 import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
+import {stageReportEvidence} from '../../scripts/kernel/verbs/shared/report-evidence.mjs';
 import {jobRowOf} from '../../scripts/kernel/verbs/shared/rows.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
+import {fakeOrcaWorktrees} from '../helpers/fake-orca-worktrees.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
@@ -35,7 +38,7 @@ const OP='code.refactor';
 const OWNED=['docs/','src/op-ipc.txt'];
 const checkEnvelope=(...checks)=>({checks});
 import {normalizeOwnedPath} from '../../engine/admission.mjs';
-import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
+import {writeGreenProofs, proofRepo} from '../helpers/sonar-scan.mjs';
 // The ask here exercises the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is on
 // by default, so this spec runs with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -52,10 +55,16 @@ const fixture=(t,{mode='healthy'}={})=>{
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   // The resident entry keeps environment-derived roots. Reset their persisted
   // rows between cases, while each case gets independent fake-Orca log/state.
-  for(const dir of [CLI.projectsRoot,CLI.localAppData,path.join(CLI.workspaceRoot,'repo')])
+  for(const dir of [CLI.projectsRoot,CLI.localAppData,path.join(CLI.workspaceRoot,'main-repo'),path.join(CLI.workspaceRoot,'worktrees')])
     fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});
   for(const file of [CLI.machineFile,`${CLI.machineFile}-shm`,`${CLI.machineFile}-wal`])fs.rmSync(file,{force:true});
-  const repo=path.join(CLI.workspaceRoot,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ['docs','src'])fs.mkdirSync(path.join(repo,d),{recursive:true});
+  const mainRepo=path.join(CLI.workspaceRoot,'main-repo');fs.mkdirSync(path.join(mainRepo,'src'),{recursive:true});
+  fs.writeFileSync(path.join(mainRepo,'src/op-ipc.txt'),'private op IPC fixture\n');
+  const mainGit=proofRepo(t,mainRepo);
+  const made=fakeOrcaWorktrees({root:path.join(CLI.workspaceRoot,'worktrees')}).create({repo:`path:${mainRepo}`,name:`wf-${WORKFLOW}`,baseBranch:'main'});
+  assert.equal(made.ok,true,JSON.stringify(made));
+  const repo=path.resolve(made.worktree.path);for(const d of ['docs','src'])fs.mkdirSync(path.join(repo,d),{recursive:true});
+  const git=(...args)=>mainGit('-C',repo,...args);
   const env={...process.env,
     ...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
     STARCI_ORCA_COMMAND:process.execPath,
@@ -69,6 +78,8 @@ const fixture=(t,{mode='healthy'}={})=>{
     STARCI_PROJECTS_ROOT:CLI.projectsRoot,
     STARCI_TEST_MACHINE_FILE:CLI.machineFile,
   };
+  const placement=registerWorkflowWorktree({env},{workflowId:WORKFLOW,orcaWorktreeId:made.worktree.id,path:repo,branch:made.worktree.branch});
+  assert.equal(path.resolve(placement.path),repo);assert.equal(placement.branch,git('branch','--show-current'));
   const runFresh=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
   const cliEnv=()=>({
     STARCI_ORCA_COMMAND:env.STARCI_ORCA_COMMAND,
@@ -84,8 +95,10 @@ const fixture=(t,{mode='healthy'}={})=>{
     STARCI_AUTOPILOT:env.STARCI_AUTOPILOT,
     STARCI_CALLER:env.STARCI_CALLER??null,
   });
-  const run=(script,...args)=>CLI.run(args,cliEnv());
-  return {root,repo,env,mode,run,runFresh};
+  // Settle may call process.exit on a real refusal. A fresh child preserves that numeric exit
+  // and its JSON reason without killing the resident CLI used by subsequent cases.
+  const run=(script,...args)=>args[0]==='settle'?runFresh(script,...args):CLI.run(args,cliEnv());
+  return {root,repo,git,env,mode,run,runFresh};
 };
 
 // Every handle is opened and closed inside the helper — a leaked sqlite handle
@@ -142,7 +155,7 @@ const writeEnvelope=(fx,{outcome='done',sentinel='SENTINEL-ALPHA',name='report-1
   fs.mkdirSync(path.dirname(file),{recursive:true});
   fs.writeFileSync(file,JSON.stringify({
     schema:'starci/op-report@1',outcome,summary:`op ${outcome} — ${sentinel}`,
-    files:[...files,...(outcome==='done'?(writeGreenProofs(path.join(fx.repo,'docs')),['docs/sonar.json','docs/gate.json','docs/read-digest.json']):[])],checks:[{name:'self-check',command:'true',exitCode:0}],
+    files,head:fx.git('rev-parse','HEAD'),checks:[{name:'self-check',command:'true',exitCode:0}],
     ...(outcome==='partial'?{open:['one unfinished item']}:{}),
     ...(outcome==='ask'?{question:{text:'which way?',options:['a','b']}}:{}),
     ...(outcome==='blocked'?{blocker:{kind:'environment',detail:'dep missing'}}:{}),
@@ -159,8 +172,17 @@ const emitted=stdout=>{
 };
 const fileReport=(fx,jobId,opts={})=>{
   const file=writeEnvelope(fx,opts);
-  const r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',file,'--json');
+  const attach=[];
+  if((opts.outcome??'done')==='done'){
+    const contract=contractRows(fx).find(row=>row.dispatch_id===jobRow(fx,jobId)?.worker_id);
+    const binding=JSON.parse(contract.context_json).packet.context.gate_binding;
+    const proofs=path.join(path.dirname(file),'proofs');
+    writeGreenProofs(proofs,{root:fx.repo,binding});attach.push('--attach',proofs);
+  }
+  const r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',file,...attach,'--json');
   assert.equal(r.status,0,`starci kernel report (${opts.outcome??'done'}) failed: ${r.stderr||r.stdout}`);
+  if((opts.outcome??'done')==='done')assert.deepEqual((emitted(r.stdout)?.artifacts??[]).map(row=>row.name).filter(name=>['attachments/proofs/gate.json','attachments/proofs/read-digest.json'].includes(name)).sort(),
+    ['attachments/proofs/gate.json','attachments/proofs/read-digest.json'],'the real report files the gate and READ artifacts before settlement');
   return r;
 };
 
@@ -353,7 +375,7 @@ test('settle consumes the dispatch report and releases every owned-path lease',t
   fileReport(fx,jobId);
   assert.equal(reportRows(fx)[0].consumed_at,null,'precondition: the report is unconsumed before settle');
 
-  const verdictReport=path.join(fx.repo,'verdict-report.md');
+  const verdictReport=path.join(fx.root,'verdict-report.md');
   fs.writeFileSync(verdictReport,'# verdict\npass\n');
   const checked=independentCheck(fx,jobId,checkEnvelope({name:'validator',exitCode:0}));
   assert.equal(checked.status,0,`starci kernel record-checks failed: ${checked.stderr||checked.stdout}`);
@@ -511,7 +533,7 @@ test('A7: a report binds to the contracts row, never to a dispatch that was reje
   assert.equal(reportRows(fx)[0].dispatch_id,live);
 
   // A report that claims the rejected dispatch is refused under its own name.
-  const forged=path.join(fx.repo,'a7-forged.json');
+  const forged=path.join(fx.root,'a7-forged.json');
   fs.writeFileSync(forged,JSON.stringify({schema:'starci/op-report@1',outcome:'done',
     summary:'claiming the dead dispatch',files:['src/op-ipc.txt'],
     checks:[{name:'self-check',command:'true',exitCode:0}],dispatch:'ctx_rejected_A'}));
@@ -598,4 +620,36 @@ test('an ask settles awaiting-owner: no business attempt spent, projected apart 
   assert.equal(next.retry_of,jobId);
   assert.equal(next.retry_class,'follow-up','owner answers use the durable follow-up try class');
   assert.deepEqual(status().awaitingOwner,[],'a re-enqueued op no longer waits');
+});
+
+
+test('native report refuses an overflowing attachment directory before filing or deleting any scratch bytes',t=>{
+  const fx=fixture(t),job=enqueue(fx,'job-many-attachments');
+  const launched=dispatch(fx,job);assert.equal(launched.status,0,launched.stderr||launched.stdout);
+  const scratch=path.dirname(scratchPath(fx,'report.json')),dir=path.join(scratch,'many');fs.mkdirSync(dir);
+  for(let i=0;i<2001;i++)fs.writeFileSync(path.join(dir,`${String(i).padStart(4,'0')}.txt`),`retained ${i}`);
+  const report=path.join(scratch,'report.json');fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'all attachments',checks:[]}));
+  const before=inspect(fx,db=>({reports:db.prepare('SELECT * FROM reports WHERE job_id=?').all(job),
+    artifacts:db.prepare('SELECT * FROM job_artifacts WHERE job_id=?').all(job),
+    events:db.prepare('SELECT * FROM events WHERE entity_id=? ORDER BY seq').all(job)}));
+  const refused=fx.runFresh(API,'report','--repo',fx.repo,'--job',job,'--report',report,'--attach',dir,'--json');
+  assert.notEqual(refused.status,0);assert.match(refused.stderr,/report-attachment-invalid.*file limit|file limit.*report-attachment-invalid/s);
+  assert.deepEqual(inspect(fx,db=>({reports:db.prepare('SELECT * FROM reports WHERE job_id=?').all(job),
+    artifacts:db.prepare('SELECT * FROM job_artifacts WHERE job_id=?').all(job),
+    events:db.prepare('SELECT * FROM events WHERE entity_id=? ORDER BY seq').all(job)})),before);
+  assert.equal(fs.readdirSync(dir).length,2001);assert.equal(fs.readFileSync(path.join(dir,'2000.txt'),'utf8'),'retained 2000');
+  assert.equal(fs.existsSync(report),true,'the only report copy survives refusal');
+});
+
+test('an unreadable attachment subtree refuses the whole enumeration before publishing earlier readable bytes',t=>{
+  const fx=fixture(t),scratch=path.join(fx.root,'private-scratch');fs.mkdirSync(scratch);
+  const dir=path.join(scratch,'tree'),blocked=path.join(dir,'z-blocked');fs.mkdirSync(blocked,{recursive:true});
+  fs.writeFileSync(path.join(dir,'a-readable.txt'),'keep this');fs.writeFileSync(path.join(blocked,'last.txt'),'also keep');
+  const oldRead=fs.readdirSync,oldStore=process.env.STARCI_ARTIFACT_ROOT;
+  const store=path.join(fx.root,'never-published');process.env.STARCI_ARTIFACT_ROOT=store;
+  fs.readdirSync=function(file,...args){if(path.resolve(String(file))===blocked)throw Object.assign(new Error('private injected IO refusal'),{code:'EACCES'});return oldRead.call(this,file,...args);};
+  try{assert.throws(()=>stageReportEvidence({report:{checks:[]},scratch,attach:[dir]}),error=>error.code==='report-attachment-missing');}
+  finally{fs.readdirSync=oldRead;if(oldStore===undefined)delete process.env.STARCI_ARTIFACT_ROOT;else process.env.STARCI_ARTIFACT_ROOT=oldStore;}
+  assert.equal(fs.existsSync(store),false);assert.equal(fs.readFileSync(path.join(dir,'a-readable.txt'),'utf8'),'keep this');
+  assert.equal(fs.readFileSync(path.join(blocked,'last.txt'),'utf8'),'also keep');
 });

@@ -173,7 +173,7 @@ policy:
               refs/dependencies/acceptance require a reported gap or separately selected scope
               update; never add/remove them to obtain pass.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/readiness.json + evidence/result.md
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Collect all safely inspectable checks, with observed timestamp and source/config/environment
@@ -181,6 +181,14 @@ policy:
               Operator-specific observed result in evidence/result.md: One row per scoped prerequisite:
               needed capability, declaration, actual observation, ready/blocked/not-needed, owner
               and exact remedy. Readiness is time-bound evidence, not lasting global green."
+        - id: evidence-readiness
+          path: evidence/readiness.json
+          content:
+            en: Retain only the selected inspect readiness.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-result
+          path: evidence/result.md
+          content:
+            en: Retain only the selected inspect result.md at this exact destination; its scope and provenance remain those of evidence.
       steps:
         - reads:
             - application-stacks
@@ -195,14 +203,14 @@ policy:
         - reads:
             - repo
             - capabilities
-          writes: [evidence]
+          writes: [evidence, evidence-readiness, evidence-result]
           action:
             en: Inspect actual checkout, dependencies and command/browser capability without installing or
               repairing. Report unrelated dirt without deleting it.
         - reads:
             - environment
             - capabilities
-          writes: [evidence]
+          writes: [evidence, evidence-readiness, evidence-result]
           action:
             en: Probe declared endpoints/build identity, credential custody availability by name, fixture
               ownership and permitted effect scope. Sign-in mutation is not assumed if task only
@@ -212,7 +220,7 @@ policy:
             - repo
             - environment
             - capabilities
-          writes: [node, evidence]
+          writes: [node, evidence, evidence-readiness, evidence-result]
           action:
             en: Record the complete blocker set and skipped dependent checks without stopping at the first
               issue. Validate and finish read-only; no automatic runtime/account/fixture op.
@@ -300,20 +308,36 @@ policy:
               record. Record local PID/session handles in ignored local state or bounded evidence,
               not durable identity.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/runtime.json + evidence/probes.json + evidence/effects.json + evidence/result.md
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Record before/after generation, target/process ownership, actual build command and summary; attach raw build output from STARCI_JOB_SCRATCH at starci kernel report. Record full
               source refs, immutable served artifact, endpoint probes and effect status.
               Operator-specific observed result in evidence/result.md: Keep code/build/served identity
               distinct and no UAT/release readiness claim from a healthy process."
+        - id: evidence-runtime
+          path: evidence/runtime.json
+          content:
+            en: Retain only the selected serve runtime.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-probes
+          path: evidence/probes.json
+          content:
+            en: Retain only the selected serve probes.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-effects
+          path: evidence/effects.json
+          content:
+            en: Retain only the selected serve effects.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-result
+          path: evidence/result.md
+          content:
+            en: Retain only the selected serve result.md at this exact destination; its scope and provenance remain those of evidence.
       steps:
         - reads:
             - application-stacks
             - target
             - runtime
             - repo
-          writes: [evidence]
+          writes: [evidence, evidence-runtime, evidence-probes, evidence-effects, evidence-result]
           action:
             en: Inspect current process/container holder, source/build revision, ports and health. Reuse an
               already matching healthy runtime without restart. Preflight the exact selected target,
@@ -331,7 +355,7 @@ policy:
         - reads:
             - runtime
             - repo
-          writes: [resource, evidence]
+          writes: [resource, evidence, evidence-runtime, evidence-probes, evidence-effects, evidence-result]
           action:
             en: Perform only the exact authorized runtime change and bounded recovery. If integration is
               explicitly included, inspect ownership and conflict scope, preserve actual resulting
@@ -339,7 +363,7 @@ policy:
         - reads:
             - runtime
             - repo
-          writes: [evidence]
+          writes: [evidence, evidence-runtime, evidence-probes, evidence-effects, evidence-result]
           action:
             en: Probe actual served source/build identity, endpoints and stability using declared checks. A
               started PID or build success alone does not prove the target is serving the selected
@@ -347,7 +371,7 @@ policy:
         - reads:
             - target
             - runtime
-          writes: [node, resource, evidence]
+          writes: [node, resource, evidence, evidence-runtime, evidence-probes, evidence-effects, evidence-result]
           action:
             en: Record actual state, partial effects and source-versus-served mapping, then stop. No
               account/fixture/deploy action is automatically performed.
@@ -418,18 +442,30 @@ policy:
             en: Update only service-owned observation/declaration fields on the work/resource@1 record included
               in scope; do not grant new authority by editing allowed effects.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/service-probes.json + evidence/effects.json + evidence/result.md
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Retain actual holder and before/after health/stop evidence with selected command outcome and
               bounded recovery. Operator-specific observed result in evidence/result.md: Record one service
               outcome and partial effects; no product runtime or quality acceptance inferred."
+        - id: evidence-service-probes
+          path: evidence/service-probes.json
+          content:
+            en: Retain only the selected service service-probes.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-effects
+          path: evidence/effects.json
+          content:
+            en: Retain only the selected service effects.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-result
+          path: evidence/result.md
+          content:
+            en: Retain only the selected service result.md at this exact destination; its scope and provenance remain those of evidence.
       steps:
         - reads:
             - application-stacks
             - service
             - target
-          writes: [evidence]
+          writes: [evidence, evidence-service-probes, evidence-effects, evidence-result]
           action:
             en: Inspect target ownership, process/container identity and probe before action; reuse already
               matching state without restart. Do not modify product source or run implementation
@@ -442,14 +478,14 @@ policy:
               servers, foreign holders or unlisted dependencies.
         - reads:
             - service
-          writes: [resource, evidence]
+          writes: [resource, evidence, evidence-service-probes, evidence-effects, evidence-result]
           action:
             en: Run only the declared authorized command if needed, preserve uncertain effects and avoid blind
               retries; no port stealing or undeclared install.
         - reads:
             - service
             - target
-          writes: [node, resource, evidence]
+          writes: [node, resource, evidence, evidence-service-probes, evidence-effects, evidence-result]
           action:
             en: Verify requested state using actual service probe and holder identity, report limits and stop
               without gates or product operations.

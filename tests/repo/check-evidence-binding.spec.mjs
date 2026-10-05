@@ -237,3 +237,13 @@ test('EVIDENCE_OLDER_THAN_SOURCE reads the commit clock against the record\'s ow
   assert.deepEqual(codes(result.stdout), ['EVIDENCE_OLDER_THAN_SOURCE']);
   assert.match(result.stdout, new RegExp(`git commit time, after the record's own revision ${revision.slice(0, 12)}`));
 });
+
+
+test('an unowned digest path resolves at the app root and returns a typed missing finding instead of crashing',t=>{
+  const tree=buildTree(t,t=>t.evidence.codeDigest.files.push({path:'shared/missing.ts',sha256:sha256('missing')}));
+  const r=run('--work',tree.workRoot,'--json');
+  assert.equal(r.status,1,r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout).findings.map(f=>f.code),['EVIDENCE_PATH_MISSING']);
+  assert.match(r.stdout,/shared\/missing\.ts/);
+  assert.doesNotMatch(r.stderr,/ReferenceError/);
+});

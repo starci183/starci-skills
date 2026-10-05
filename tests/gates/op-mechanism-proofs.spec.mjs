@@ -1,4 +1,4 @@
-// The mechanism proofs (knowledge/op-gate.yaml proofs/opProofs, contract change op-mechanism-proofs): every op whose job touches a
+// The mechanism proofs (knowledge/op-gate.yaml proofs/opProofs): every op whose job touches a
 // runtime mechanism attaches the document that mechanism prints, and `starci kernel settle` re-reads it (scripts/kernel/gate-settle.mjs
 // judgeJobProofs, runtime check op-proof) and refuses a done that lacks it, is red or could not run. One spec per refusal code,
 // the producers' own judgments (test-world-run.mjs, unit-run.mjs, release-proof.mjs, starci gate run --scope docs, read-digest.mjs
@@ -16,12 +16,15 @@ import { TEST_WORLD_RUN_SCHEMA, buildTestWorldRun, judgeSpec, testWorldRules } f
 import { UNIT_RUN_SCHEMA, judgeServices, unitFindings, unitKitRules } from '../../scripts/gates/unit-run.mjs';
 import { RELEASE_PROOF_SCHEMA, RELEASE_STEPS, appInstallsStep, buildReleaseProof, scaffoldInvocation } from '../../scripts/gates/release-proof.mjs';
 import {
-  OP_PROOF_CHANGE, REVIEW_DEFECTS_SCHEMA, SECURITY_FINDINGS_SCHEMA, judgeDocGate, judgeJobProofs, judgeKnowledgeRead, judgeLint, judgeRelease, judgeReviewDefects,
+  REVIEW_DEFECTS_SCHEMA, SECURITY_FINDINGS_SCHEMA, captureGateBinding, judgeDocGate, judgeJobLoop, judgeJobProofs, judgeKnowledgeRead, judgeLint, judgeRelease, judgeReviewDefects,
   judgeReviewGate, judgeSecurityLint, judgeTestWorld, judgeTestWorlds, judgeUnitRun, feRelevant, proofsOf, securityRelevant,
 } from '../../scripts/kernel/gate-settle.mjs';
-import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
+import { sha256File } from '../../engine/digest.mjs';
+import { exampleSourcePaths } from '../../scripts/lib/example-refs.mjs';
 import { readCatalog } from '../../scripts/checks/check-failure-codes.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
+import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { greenDocGate, greenGate, greenLint, greenReadDigest, greenReleaseProof, greenReviewDefects, greenTestWorldRun, greenUnitRun } from '../helpers/sonar-scan.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -42,11 +45,9 @@ test('op-gate.yaml: every op named in opProofs exists, every proof is defined, a
     for (const e of entries) assert.ok(doc.proofs[typeof e === 'string' ? e : e.proof], `${op}: proof ${JSON.stringify(e)} is defined`);
   }
   for (const [id, proof] of Object.entries(doc.proofs)) if (proof.script) assert.ok(fs.existsSync(path.join(ROOT, proof.script)), `${id}: ${proof.script} exists`);
-  const change = loadContractChanges(ROOT).changes.find((c) => c.id === OP_PROOF_CHANGE);
-  assert.ok(change, 'the contract change is registered');
   const catalog = readCatalog(ROOT);
-  for (const code of change.adds.codes) assert.ok(catalog[code], `${code} has a failure-codes entry`);
-  assert.deepEqual([...change.families].sort(), Object.keys(doc.opProofs).sort(), 'the change names exactly the ops opProofs holds');
+  for (const code of ['op-read-digest-missing', 'op-doc-gate-missing', 'op-test-world-hand-rolled', 'op-unit-proof-missing', 'op-lint-proof-missing', 'op-review-defects-missing', 'op-release-proof-missing'])
+    assert.ok(catalog[code], `${code} has a current failure-codes entry`);
 });
 
 test('proofsOf: a moded proof is owed only by its modes; select and an unknown mode owe every proof', () => {
@@ -73,14 +74,27 @@ test('read-knowledge: no digest is op-read-digest-missing; no knowledge file or 
   assert.equal(judgeKnowledgeRead(greenReadDigest()).status, 'pass');
 });
 
-test('read-digest --knowledge records runtime knowledge files with their sha256 and refuses a path outside knowledge/', async (t) => {
+test('read-digest records declared law and knowledge hashes but refuses undeclared or escaping canonical reads', async (t) => {
   const app = tmp(t);
   const hfs = { dir: app, bin: path.join(app, 'none.mjs') };
   const digest = await buildReadDigest({ root: app, touch: [], knowledge: ['knowledge/hfs/rules.yaml', 'knowledge/patterns/be/test.yaml'], hfs });
-  assert.deepEqual(digest.files.map((f) => [f.path, f.role]), [['knowledge/hfs/rules.yaml', 'knowledge'], ['knowledge/patterns/be/test.yaml', 'pattern']]);
-  assert.ok(digest.files.every((f) => /^[0-9a-f]{64}$/.test(f.sha256)));
+  const required = loadOpGate().digest.required;
+  assert.ok(required.includes('docs/architecture.md') && required.includes('docs/code-pattern-enforcement.md'), 'both current law owners are required');
+  const expected = new Map(required.map((rel) => [rel, [rel, 'knowledge']]));
+  expected.set(loadOpGate().examples.catalog, [loadOpGate().examples.catalog, 'example']);
+  for (const rel of exampleSourcePaths(ROOT)) expected.set(rel, [rel, 'example']);
+  for (const [rel, role] of [['knowledge/hfs/rules.yaml', 'knowledge'], ['knowledge/patterns/be/test.yaml', 'pattern']])
+    if (!expected.has(rel)) expected.set(rel, [rel, role]);
+  assert.deepEqual(digest.files.map((f) => [f.path, f.role]), [...expected.values()]);
+  for (const file of digest.files) assert.equal(file.sha256, sha256File(path.join(ROOT, file.path)), `${file.path}: exact current canonical bytes`);
   assert.equal(judgeKnowledgeDigest(digest).status, 'pass');
-  await assert.rejects(buildReadDigest({ root: app, touch: [], knowledge: ['scripts/kernel/cli.mjs'], hfs }), /not a file under the runtime's knowledge/);
+  await assert.rejects(buildReadDigest({ root: app, touch: [], knowledge: ['scripts/kernel/cli.mjs'], hfs }), /not declared canonical knowledge/);
+  const declared = await buildReadDigest({ root: app, touch: [], knowledge: ['docs/architecture.md', 'docs/code-pattern-enforcement.md'], hfs });
+  assert.equal(judgeKnowledgeDigest(declared).status, 'pass');
+  for (const rel of ['docs/debugging.md', 'knowledge/../docs/debugging.md', '../CONTEXT.md'])
+    await assert.rejects(buildReadDigest({ root: app, touch: [], knowledge: [rel], hfs }), /not declared canonical knowledge/, rel);
+  const missingLaw = structuredClone(loadOpGate()); missingLaw.digest.required.push('knowledge/private-fixture-missing-common-law.yaml');
+  await assert.rejects(buildReadDigest({ root: app, touch: [], knowledge: ['knowledge/hfs/rules.yaml'], hfs, doc: missingLaw }), /ENOENT/, 'a missing required common law cannot be silently omitted');
 });
 
 // ---- doc-gate ----
@@ -91,6 +105,27 @@ test('doc-gate: missing (or a code gate) is op-doc-gate-missing, a check that ca
   assert.equal(codeOf(judgeDocGate({ ...greenDocGate(), exit: 2, errors: ['check-work-deep could not run (exit 3)'] })), 'op-doc-gate-tool-failed');
   assert.equal(codeOf(judgeDocGate({ ...greenDocGate(), exit: 1, counts: { new: 1 }, findings: [{ engine: 'doc', rule: 'doc-language', path: 'docs/a.md', line: 3, message: 'docs/a.md:3 not English' }] })), 'op-doc-gate-red');
   assert.equal(judgeDocGate(greenDocGate()).status, 'pass');
+});
+
+test('a declared document gate cannot supply an executable checker for newly changed non-app source', async (t) => {
+  const repo = tmp(t, 'starci-op-proof-profile-'), git = gitIn(repo);
+  git('init', '-q', '--template=', '-b', 'main');
+  for (const [key, value] of [['user.name', 'fixture'], ['user.email', 'fixture@starci.test'],
+    ['commit.gpgsign', 'false'], ['core.hooksPath', path.join(repo, 'no-hooks')]]) git('config', key, value);
+  put(repo, 'README.md', '# private runtime fixture\n');
+  git('add', '-A'); git('commit', '-q', '-m', 'private baseline');
+  const placements = [{ base: repo, path: 'scripts' }];
+  const binding = { ...captureGateBinding(placements, { at: Date.now() }), placements };
+  put(repo, 'scripts/repair.mjs', 'export const repair = () => true;\n');
+  // The actual kind/READ owners run; no gate or READ stub can supply the missing executable profile.
+  for (const op of ['docs.author', 'knowledge.repair', 'work.author']) {
+    const result = await judgeJobLoop({ op, files: [], binding });
+    assert.equal(result.judged.code, 'op-gate-proof-missing', op);
+    assert.match(result.judged.detail, /REF-VERIFY-1.*scripts\/repair\.mjs/, op);
+    assert.match(result.judged.detail, /no applicable executable checker/, op);
+  }
+  const review = await judgeJobLoop({ op: 'review.verify', mode: 'delivery', files: [], binding });
+  assert.equal(review.judged.code, 'op-read-digest-missing', 'the declared code review profile remains executable and still requires READ');
 });
 
 test('gate run --scope docs runs every docChecks script: exit 1 is a finding, a crash or another exit is a tool failure', () => {
@@ -138,7 +173,12 @@ function worldApp(t, specs, { preset = true, declaration = true } = {}) {
 }
 const jestRun = (over = {}) => (args) => {
   const out = args.find((a) => a.startsWith('--outputFile=')).slice('--outputFile='.length);
-  fs.writeFileSync(out, JSON.stringify({ numTotalTests: 2, numPassedTests: 2, numFailedTests: 0, numPendingTests: 0, numTodoTests: 0, numTotalTestSuites: 1, numFailedTestSuites: 0, testResults: [], ...over }));
+  const counts = { numTotalTests: 2, numPassedTests: 2, numFailedTests: 0, numPendingTests: 0, numTodoTests: 0, ...over };
+  const statuses = ['passed', 'failed', 'pending', 'todo'].flatMap((status, i) => Array.from({ length: counts[['numPassedTests', 'numFailedTests', 'numPendingTests', 'numTodoTests'][i]] }, () => ({ status })));
+  fs.writeFileSync(out, JSON.stringify({ ...counts, numTotalTestSuites: 1, numPassedTestSuites: counts.numFailedTests ? 0 : 1,
+    numFailedTestSuites: counts.numFailedTests ? 1 : 0, numPendingTestSuites: 0, numRuntimeErrorTestSuites: 0,
+    success: !counts.numFailedTests, wasInterrupted: false,
+    testResults: [{ name: 'fixture.spec.ts', status: counts.numFailedTests ? 'failed' : counts.numPendingTests ? 'focused' : 'passed', assertionResults: statuses }] }));
   return { status: over.numFailedTests ? 1 : 0, stdout: '', stderr: '' };
 };
 
@@ -206,6 +246,8 @@ test('unit-kit: missing, red run, coverage below 100, spec missing and an off-ki
   assert.equal(judgeUnitRun(green).status, 'pass');
   assert.equal(codeOf(judgeUnitRun(unitSummary(app, fullCoverage(app), { ...greenUnitRun().run, failed: 1, exit: 1 }))), 'op-unit-run-red');
   assert.equal(codeOf(judgeUnitRun(unitSummary(app, fullCoverage(app), { ...greenUnitRun().run, total: 0 }))), 'op-unit-run-red');
+  assert.equal(codeOf(judgeUnitRun(unitSummary(app, fullCoverage(app), { ...greenUnitRun().run, passed: 0, skipped: 1 }))), 'op-unit-run-red', 'a unit scenario that never executed cannot pass settle');
+  assert.equal(codeOf(judgeUnitRun(unitSummary(app, fullCoverage(app), { ...greenUnitRun().run, total: '1' }))), 'op-unit-run-red', 'unit counters are not coerced');
   const partial = fullCoverage(app);
   partial[path.join(app, 'be/src/modules/domain/order/order.service.ts')].branches.pct = 87.5;
   assert.equal(codeOf(judgeUnitRun(unitSummary(app, partial))), 'op-unit-coverage-below');
@@ -250,8 +292,8 @@ test('fe-lint: missing, a lint that could not run, and an fe/ finding refuse; a 
     const record = { engine: 'hfs', rule: 'WORK_YAML_UNPARSEABLE', code: 'WORK_YAML_UNPARSEABLE', path: '.starciwork/features/a/ui/b/index.yaml', line: 3, message: 'unparseable' };
     const abs = path.join(dir, 'lint.json');
     fs.writeFileSync(abs, JSON.stringify({ schema: LINT_SCHEMA, findings: [record], errors: [] }));
-    assert.equal(judgeJobProofs({ op: 'interface.draw', files: [{ abs, name: 'lint.json' }] }).judged.code, 'op-lint-findings', 'a drawing is judged on every file it produced, .starciwork included');
-    assert.equal(judgeJobProofs({ op: 'interface.audit', files: [{ abs, name: 'lint.json' }] }).judged.status, 'pass', 'an audit is judged on the fe/ side only');
+    assert.equal(judgeLint(JSON.parse(fs.readFileSync(abs, 'utf8')), () => true, 'produced-file').code, 'op-lint-findings', 'a drawing is judged on every file it produced, .starciwork included');
+    assert.equal(judgeLint(JSON.parse(fs.readFileSync(abs, 'utf8')), feRelevant, 'fe/').status, 'pass', 'an audit is judged on the fe/ side only');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -321,85 +363,130 @@ test('release: missing, a missing or skipped step and a red step refuse; release
 
 // ---- judgeJobProofs over attached files ----
 
-test('judgeJobProofs reads each proof from the attached files by schema and stops at the first refusal', (t) => {
+test('judgeJobProofs refuses paper-only attachments even when every required schema is green', (t) => {
   const dir = tmp(t);
   const file = (name, doc) => { const abs = path.join(dir, name); fs.writeFileSync(abs, JSON.stringify(doc)); return { abs, name }; };
   const files = [file('read-digest.json', greenReadDigest()), file('gate.json', greenGate())];
   const refused = judgeJobProofs({ op: 'docs.author', files });
-  assert.equal(refused.proof, 'doc-gate');
-  assert.equal(refused.judged.code, 'op-doc-gate-missing', 'a code gate never stands in for the document gate');
+  assert.equal(refused.proof, 'read-knowledge');
+  assert.equal(refused.judged.code, 'op-read-digest-missing', 'a filed green digest never stands in for its admitted native READ');
   const done = judgeJobProofs({ op: 'docs.author', files: [...files, file('doc-gate.json', greenDocGate())] });
-  assert.equal(done.judged.status, 'pass');
+  assert.equal(done.judged.status, 'missing', 'green paper documents cannot replace admitted native observations');
   assert.equal(judgeJobProofs({ op: 'goal.revise', files }), null, 'an op with no proof is not judged');
 });
 
 // ---- starci kernel settle end to end ----
 
-const effectiveOf = (id) => loadContractChanges(ROOT).changes.find((c) => c.id === id).effectiveAt;
-function seedOp(t, { label, op, docs, admittedAt = null }) {
-  const repo = tmp(t, 'starci-op-proof-settle-');
+function seedOp(t, { label, op, docs, admittedAt = null, current = false }) {
+  const base = tmp(t, 'starci-op-proof-settle-'), repo = path.join(base, 'main'), tree = path.join(base, 'workflow');
+  fs.mkdirSync(repo);
+  const env = { ...process.env, [TEST_REGISTRY_ENV]: path.join(base, 'machine.sqlite'), LOCALAPPDATA: path.join(base, 'localappdata'),
+    STARCI_PROJECTS_ROOT: path.join(base, 'projects'), STARCI_ARTIFACT_ROOT: path.join(base, 'artifacts'),
+    STARCI_LOCAL_ROOT: path.join(base, 'local'), STARCI_OWNER_ROOT: path.join(base, 'owner'), STARCI_LANES_ROOT: path.join(base, 'lanes') };
+  delete env.STARCI_CALLER;
   const git = gitIn(repo);
   git('init', '--quiet', '-b', 'main');
   for (const [k, v] of [['user.email', 'lane@starci.test'], ['user.name', 'lane'], ['core.autocrlf', 'false'], ['commit.gpgsign', 'false']]) git('config', k, v);
   put(repo, 'docs/a.md', '# a\n');
   git('add', '.'); git('commit', '--quiet', '-m', 'init');
+  const branch = 'branch-' + label;
+  git('worktree', 'add', '-q', '-b', branch, tree, 'main');
+  const treeGit = gitIn(tree);
+  registerWorkflowWorktree({ env }, { workflowId: `wf-${label}`, orcaWorktreeId: 'fixture::' + label, path: tree, branch });
   const files = ['docs/a.md'];
-  for (const [name, doc] of Object.entries(docs)) files.push(put(repo, `docs/checks/${name}`, Buffer.isBuffer(doc) ? doc : JSON.stringify(doc)));
-  git('add', '.'); git('commit', '--quiet', '--allow-empty', '-m', 'slice');
+  // Accepted proof bytes remain owned changes until the real runtime checkpoint commits them.
+  const head = treeGit('rev-parse', 'HEAD');
+  // Capture admission before producing attachments; native observations are still independently required.
+  const admissionAt = admittedAt ?? Date.now() - 1000;
+  const proofDocs = typeof docs === 'function' ? docs({ repo, tree, base, env }) : docs;
+  for (const [name, doc] of Object.entries(proofDocs)) {
+    const proof = doc?.schema === GATE_SCHEMA ? { ...doc, root: tree, base: head, head } : doc;
+    files.push(put(tree, `docs/checks/${name}`, Buffer.isBuffer(proof) ? proof : JSON.stringify(proof)));
+  }
   const jobId = `op-${op}-${label}`;
-  const ledger = openLedger({ file: ledgerFileFor(repo) });
+  const ledger = openLedger({ file: ledgerFileFor(repo, { env }) });
   try {
     seedWorkflow(ledger, { id: `wf-${label}`, state: { phase: 'running', job: 'impl' },
       jobs: [{ jobId, opId: op, dispatchId: `ctx-${jobId}`, terminalHandle: `term-${jobId}`, status: 'running',
         payload: { opId: op, owned_paths: ['docs/'], orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
     const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
     ledger.transaction((db) => {
-      writeContract(db, { attemptId, markdown: '# contract', context: { worktree: repo }, createdAt: admittedAt ?? effectiveOf(OP_PROOF_CHANGE) + 1000 });
+      writeContract(db, { attemptId, markdown: '# contract', context: { worktree: tree, packet: { context: {
+        selected_op: { mode: null, contract: { id: op, reads: [{ id: 'standard', path: 'docs/architecture.md' }] }, checks: { required: [], candidates: [] } },
+        readRefs: [{ path: 'docs/architecture.md', absolute: path.join(ROOT, 'docs/architecture.md'), rootKind: 'source', root: ROOT, sha256: sha256File(path.join(ROOT, 'docs/architecture.md')) }],
+        owned_paths: [{ root: tree, path: 'docs/' }],
+      gate_binding: captureGateBinding([{ base: tree, path: 'docs/' }], { at: admissionAt }) } } }, createdAt: admissionAt });
       fileReport(db, { attemptId, outcome: 'done', createdAt: Date.now(),
-        report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'slice', files, head: git('rev-parse', 'HEAD') } });
+        report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'slice', files, head: treeGit('rev-parse', 'HEAD') } });
       for (const check of [{ name: 'owned-paths-committed', command: 'git show' }, { name: 'owned-paths-clean', command: 'git status' }, { name: 'head-ancestor', command: 'git merge-base' }])
         recordCheckRun(db, { attemptId, name: check.name, phase: 'verify', runner: 'kernel', authority: 'runtime', status: 'pass', exitCode: 0, command: check.command });
     });
   } finally { ledger.close(); }
-  return { repo, jobId };
+  return { repo, tree, env, jobId, base };
 }
-const settle = (repo, jobId) => { const r = spawnSync(process.execPath, [API, 'settle', '--repo', repo, '--job', jobId, '--verdict', 'pass', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 }); let body = null; try { body = JSON.parse(r.stdout); } catch { /* judged below */ } return { r, body }; };
-const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
+const settle = ({ repo, env }, jobId) => { const r = spawnSync(process.execPath, [API, 'settle', '--repo', repo, '--job', jobId, '--verdict', 'pass', '--json'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 120000 }); let body = null; try { body = JSON.parse(r.stdout); } catch { /* judged below */ } return { r, body }; };
+const read = ({ repo, env }, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo, { env }) }); try { return fn(l.db); } finally { l.close(); } };
 // A 1x1 PNG: e2e.verify owes an image of its run (proof-media) before its mechanism proofs are judged.
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-const lastProofCheck = (repo) => read(repo, (db) => db.prepare("SELECT status FROM check_runs WHERE name='op-proof' ORDER BY check_id DESC").get()?.status ?? null);
+const lastProofCheck = (seeded) => read(seeded, (db) => db.prepare("SELECT status FROM check_runs WHERE name='op-proof' ORDER BY check_id DESC").get()?.status ?? null);
 
-test('starci kernel settle refuses a documenting op without its document gate and a reviewing op with an unrecorded missing check; a leg admitted earlier settles on its old contract', (t) => {
+test('starci kernel settle refuses a documenting op without its document gate and a reviewing op with an unrecorded missing check; an earlier admission also needs native evidence', (t) => {
   const cases = [
-    ['docs-nogate', 'docs.author', { 'read-digest.json': greenReadDigest() }, 'op-doc-gate-missing'],
+    ['docs-nogate', 'docs.author', { 'read-digest.json': greenReadDigest() }, 'op-read-digest-missing'],
     ['docs-noread', 'docs.author', { 'doc-gate.json': greenDocGate() }, 'op-read-digest-missing'],
-    ['review-uncaught', 'review.verify', { 'gate.json': greenGate(), 'review-defects.json': { schema: REVIEW_DEFECTS_SCHEMA, defects: [{ id: 'd1', class: 'non-business', caughtBy: null }] } }, 'op-review-missing-check-unrecorded'],
+    ['review-unobserved', 'review.verify', () => ({ 'gate.json': greenGate(), 'review-defects.json': { schema: REVIEW_DEFECTS_SCHEMA, defects: [{ id: 'd1', class: 'non-business', caughtBy: null }] } }), 'op-gate-proof-missing'],
     ['decide-noread', 'architecture.decide', {}, 'op-read-digest-missing'],
   ];
   for (const [label, op, docs, code] of cases) {
-    const { repo, jobId } = seedOp(t, { label, op, docs });
-    const refused = settle(repo, jobId);
+    const seeded = seedOp(t, { label, op, docs }), { jobId } = seeded;
+    const refused = settle(seeded, jobId);
     assert.equal(refused.r.status, 1, `${label}: ${refused.r.stdout || refused.r.stderr}`);
     assert.equal(refused.body?.reason, code, `${label}: ${refused.r.stdout}`);
-    assert.equal(read(repo, (db) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status), 'running', `${label}: a refused settle changes no job`);
-    assert.equal(lastProofCheck(repo), 'fail', `${label}: the refusal is the runtime check op-proof`);
+    assert.equal(read(seeded, (db) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status), 'running', `${label}: a refused settle changes no job`);
+    assert.equal(lastProofCheck(seeded), 'fail', `${label}: the refusal is the runtime check op-proof`);
   }
-  const { repo, jobId } = seedOp(t, { label: 'docs-green', op: 'docs.author', docs: { 'read-digest.json': greenReadDigest(), 'doc-gate.json': greenDocGate() } });
-  const ok = settle(repo, jobId);
-  assert.equal(ok.r.status, 0, ok.r.stderr || ok.r.stdout);
-  assert.equal(read(repo, (db) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status), 'succeeded');
-  assert.equal(lastProofCheck(repo), 'pass');
-  const old = seedOp(t, { label: 'docs-old', op: 'docs.author', docs: {}, admittedAt: effectiveOf(OP_PROOF_CHANGE) - 60000 });
-  const before = settle(old.repo, old.jobId);
-  assert.equal(before.r.status, 0, `a leg admitted before the change settles without the proofs: ${before.r.stdout || before.r.stderr}`);
-  assert.equal(lastProofCheck(old.repo), null);
+  const seeded = seedOp(t, { label: 'docs-claimed', op: 'docs.author', docs: { 'read-digest.json': greenReadDigest(), 'doc-gate.json': greenDocGate() } });
+  const claimed = settle(seeded, seeded.jobId);
+  assert.equal(claimed.r.status,1,claimed.r.stderr || claimed.r.stdout);
+  assert.equal(claimed.body?.reason,'op-read-digest-missing','green attachments do not invent independently observed READ');
+  assert.equal(read(seeded,(db)=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(seeded.jobId).status),'running');
+  const old = seedOp(t, { label: 'docs-early', op: 'docs.author', docs: {}, admittedAt: 1 });
+  const before = settle(old, old.jobId);
+  assert.equal(before.r.status,1,before.r.stdout || before.r.stderr);
+  assert.equal(before.body?.reason,'op-read-digest-missing');
+  assert.equal(lastProofCheck(old),'fail');
 });
 
-test('starci kernel settle refuses an e2e.verify done whose test-world summary shows a hand-rolled world, after its code loop is green', (t) => {
+test('native settlement refuses an unbound e2e loop before attachments can claim a test-world success', (t) => {
   const handRolled = { ...greenTestWorldRun(), specs: [{ path: 'be/src/tests/e2e/a.e2e-spec.ts', useTestWorld: true, modes: ['apps'], outage: 0, forbidden: ['testcontainers'] }] };
-  const { repo, jobId } = seedOp(t, { label: 'e2e-rolled', op: 'e2e.verify', docs: { 'gate.json': { ...greenGate(), changed: [] }, 'read-digest.json': greenReadDigest(), 'test-world-run.json': handRolled, 'run.png': PNG } });
-  const refused = settle(repo, jobId);
+  const seeded = seedOp(t, { label: 'e2e-rolled', op: 'e2e.verify', docs: { 'gate.json': { ...greenGate(), changed: [] }, 'read-digest.json': greenReadDigest(), 'test-world-run.json': handRolled, 'run.png': PNG } }), { jobId } = seeded;
+  const refused = settle(seeded, jobId);
   assert.equal(refused.r.status, 1, refused.r.stdout || refused.r.stderr);
-  assert.equal(refused.body?.reason, 'op-test-world-hand-rolled', refused.r.stdout);
-  assert.equal(refused.body?.proof, 'test-world');
+  assert.equal(read(seeded, (db) => db.prepare("SELECT status FROM check_runs WHERE name='op-gate' ORDER BY check_id DESC LIMIT 1").get()?.status), 'fail');
+  assert.equal(refused.body?.reason,'op-gate-tool-failed',refused.r.stdout);
+  assert.equal(read(seeded,(db)=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status),'running');
+});
+
+
+test('current deciding-op route needs a real record-checks READ before native settle; a green attachment alone refuses', (t) => {
+  const create = (label) => seedOp(t, { label, op: 'architecture.decide', current: true, admittedAt: Date.now() - 1000,
+    docs: ({ tree, env }) => {
+      const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts/gates/read-digest.mjs'), '--root', tree, '--knowledge', 'docs/architecture.md'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 30000 });
+      assert.equal(r.status, 0, r.stderr || r.stdout);
+      return { 'read-digest.json': JSON.parse(r.stdout) };
+    } });
+  const missing = create('current-claimed-only'), refused = settle(missing, missing.jobId);
+  assert.equal(refused.r.status, 1, refused.r.stderr || refused.r.stdout);
+  assert.equal(refused.body?.reason, 'op-read-digest-missing');
+  assert.equal(read(missing, (db) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(missing.jobId).status), 'running');
+  const seeded = create('current-native-read'), checks = path.join(seeded.base, 'independent-checks.json');
+  fs.writeFileSync(checks, JSON.stringify({ checks: [{ name: 'read-knowledge', exitCode: 0, command: `starci gate read --root "${seeded.tree}" --knowledge docs/architecture.md` }] }));
+  const r = spawnSync(process.execPath, [API, 'record-checks', '--repo', seeded.repo, '--job', seeded.jobId, '--checks-file', checks, '--json'], { cwd: ROOT, env: seeded.env, encoding: 'utf8', windowsHide: true, timeout: 30000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  const raw = read(seeded, (db) => db.prepare("SELECT exit_code,authority,output_sha,cwd,summary_json FROM check_runs WHERE name='read-knowledge' ORDER BY check_id DESC").get());
+  assert.equal(raw.exit_code, 0); assert.equal(raw.authority, 'runtime'); assert.equal(raw.cwd, seeded.tree); assert.ok(raw.output_sha);
+  assert.equal(JSON.parse(raw.summary_json).native.schema, DIGEST_SCHEMA);
+  const accepted = settle(seeded, seeded.jobId);
+  assert.equal(accepted.r.status, 0, accepted.r.stderr || accepted.r.stdout);
+  assert.equal(read(seeded, (db) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(seeded.jobId).status), 'succeeded');
 });

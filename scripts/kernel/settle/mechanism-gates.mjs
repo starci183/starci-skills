@@ -1,0 +1,43 @@
+// The existing CLI gate consumers share its private placement/evidence owners.
+import { judgeJobLoop, judgeJobProofs } from '../gate-settle.mjs';
+import { observationContextOf, mechanismObservations } from '../mechanism-observation.mjs';
+import { latestContractOf } from '../../machine/contract-version.mjs';
+import { parseJson } from '../../lib/json.mjs';
+import { jobPayloadOf } from '../verbs/shared/rows.mjs';
+
+/** Bind the native consumers to the CLI's existing private context and placement
+ * functions. The proof consumer stays synchronous for the workflow-lock recheck. */
+export function mechanismGates({ skillRoot, settleJobContext, settleJobFiles, jobPlacements, opGateBasesOf }) {
+// The op loop a code-writing op's settle owes (scripts/kernel/gate-settle.mjs over knowledge/op-gate.yaml): the runtime re-reads
+// the op's attached gate JSON and READ digest itself and resolves the touched kinds with the app's own starci app explain. Read-only
+// here - starci kernel settle records the judgment. Applicable operations require their recorded target baseline and complete current READ.
+async function settleOpGate(db, jobId, repo) {
+  const s = settleJobContext(db, jobId, { requiresReport: true });
+  if (!s) return null;
+  const { roots, files } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
+  // A workflow-worktree op is gated against a checkpoint its side has not moved since (op-gate-base-mismatch otherwise).
+  const gateBases = opGateBasesOf({ db, env: process.env }, { workflowId: s.job.workflow_id, opId: s.job.job_id });
+  const context = parseJson(latestContractOf(db, s.job.job_id)?.context_json);
+  const recorded = context?.packet?.context?.gate_binding;
+  const binding = { ...recorded, placements: jobPlacements(db, s.job, repo) };
+  const judgment = await judgeJobLoop({ op: s.op, files, roots: roots.length ? roots : [repo], gateBases, binding,
+    mode: context?.packet?.context?.selected_op?.mode ?? (typeof jobPayloadOf(s.job).params?.mode === 'string' ? jobPayloadOf(s.job).params.mode : null) });
+  return judgment ? { ...judgment, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
+}
+// The mechanism proofs an op owes at settle (scripts/kernel/gate-settle.mjs judgeJobProofs over knowledge/op-gate.yaml opProofs):
+// the test world, the unit kit, the document gate, the READ of a deciding op, the lint of a security or interface op, the review
+// gate and defect classes, the release proof. Current admitted legs require their native check_runs output; attachments retain the manual review and READ identity obligations. Read-only here - starci kernel settle
+// records the judgment. Null when the selected op mode owes no mechanism proof.
+function settleOpProofs(db, jobId, repo) {
+  const s = settleJobContext(db, jobId, { requiresReport: true });
+  if (!s) return null;
+  const { files } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
+  let context;
+  try { context = observationContextOf(db, s.job, { repo, skillRoot }); }
+  catch (error) { return { op: s.op, attemptId: s.filed.attemptId, proof: null, proofs: [], judged: { status: 'unavailable', code: 'op-gate-tool-failed', detail: error.message, findings: [] } }; }
+  const mode = context?.selected?.mode ?? (typeof jobPayloadOf(s.job).params?.mode === 'string' ? jobPayloadOf(s.job).params.mode : null);
+  const judgment = judgeJobProofs({ op: s.op, files, mode, context, observations: context ? mechanismObservations(db, context) : null });
+  return judgment ? { ...judgment, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
+}
+  return { settleOpGate, settleOpProofs };
+}

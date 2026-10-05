@@ -8,7 +8,7 @@ positional:
 flags:
   - {name: port, type: number, summary: "local port to listen on (default: connectors.gateway.port)"}
   - {name: repo, type: list, summary: "extra repository whose ledger asks the gateway serves; repeatable"}
-exit: {"0": action completed, "1": another gateway owns the state or the port cannot be bound, "2": bad usage or configuration}
+exit: {"0": action completed, "1": "another gateway owns the state, the port cannot be bound, or stop custody is unverified", "2": bad usage or configuration}
 json: always
 examples:
   - starci connect ask-gateway status

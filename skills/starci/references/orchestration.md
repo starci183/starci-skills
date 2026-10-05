@@ -4,7 +4,7 @@ For the owner's chat only. The `[Kernel]` and `[Op]` agents never run these comm
 
 Every agent is started with `orchestration worker-start --agent <provider> [--model <id> --effort <level>]` - the
 StarCi Kernel, Supervisor, [Worker]s and [Op]s included (runtime contract
-`.claude/modules/kernel/contract-changes/launch-through-worker-start.yaml`). Never launch an agent with
+`.claude/modules/kernel/start-workflow.yaml`). Never launch an agent with
 `terminal create`, never hand a pre-made terminal to `worker-start --terminal`, and never `dispatch --inject` a Task
 into a terminal you made. Supervise with `worker-show`, `worker-read`, `worker-stop` and `worker-release`.
 

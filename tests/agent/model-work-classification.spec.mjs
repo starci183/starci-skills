@@ -2,8 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import {pathToFileURL} from 'node:url';
+import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {hostToolsRequired,kindRoute,raiseToFloor,loadRuntimes} from '../../scripts/agent/models.mjs';
+import {hostToolsRequired,hostToolsOf,kindRoute,raiseToFloor,loadRuntimes,resolveWorkerLaunchModel} from '../../scripts/agent/models.mjs';
 import {fakePoolSelection as selectPool} from '../helpers/fake-admission.mjs';
 import {loadPrices,priceOf,costOfRow} from '../../scripts/lib/llm-usage.mjs';
 
@@ -205,4 +208,65 @@ test('a prefer bias cannot hoist a pool outside the think order into strategy wo
   const review=selectPool({kind:'review.verify',difficulty:'medium',runtimes,bias:{prefer:['claude-agent']}});
   assert.deepEqual([review.order,review.target],['review','devin-agent']);
   assert.deepEqual(runtimes.runtimes['devin-agent'].roles,['implement','verify','write'],'Devin carries no decide or plan role (registry.yaml pools)');
+});
+
+test('host tool declarations follow overwrite, deletion and recreation at the same canonical path',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'model-hotload-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const opsDir=path.join(root,'ops'),modelsDir=path.join(root,'models');fs.mkdirSync(opsDir);fs.mkdirSync(path.join(modelsDir,'agents'),{recursive:true});
+  const op=path.join(opsDir,'docs.author.yaml'),agent=path.join(modelsDir,'agents','codex.yaml');
+  const write=tool=>{fs.writeFileSync(op,'route: {riskHints: [host-tool-required:'+tool+']}\n');fs.writeFileSync(agent,'capabilities: {hostTools: ['+tool+']}\n');};
+  write('first');assert.deepEqual(hostToolsRequired('docs.author',{opsDir}),['first']);assert.deepEqual(hostToolsOf('codex',{modelsDir}),['first']);
+  write('second');assert.deepEqual(hostToolsRequired('docs.author',{opsDir}),['second']);assert.deepEqual(hostToolsOf('codex',{modelsDir}),['second']);
+  fs.unlinkSync(op);fs.unlinkSync(agent);assert.deepEqual(hostToolsRequired('docs.author',{opsDir}),[]);assert.deepEqual(hostToolsOf('codex',{modelsDir}),[]);
+  write('third');assert.deepEqual(hostToolsRequired('docs.author',{opsDir}),['third']);assert.deepEqual(hostToolsOf('codex',{modelsDir}),['third']);
+});
+
+test('default pricing rereads the current registry in the same process',async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'price-hotload-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  for(const relative of ['scripts/lib/llm-usage.mjs','scripts/lib/read-yaml.mjs','scripts/lib/read-text.mjs','scripts/lib/number.mjs','engine/yaml.mjs']){
+    const destination=path.join(root,relative);fs.mkdirSync(path.dirname(destination),{recursive:true});fs.copyFileSync(path.join(ROOT,relative),destination);
+  }
+  const file=path.join(root,'modules/models/registry.yaml');fs.mkdirSync(path.dirname(file),{recursive:true});
+  const write=rate=>fs.writeFileSync(file,'models: {fixture: {price: {input: '+rate+', output: 2}}}\n');
+  write(1);const owner=await import(pathToFileURL(path.join(root,'scripts/lib/llm-usage.mjs')).href);
+  assert.equal(owner.loadPrices().models.fixture.input,1);
+  write(3);assert.equal(owner.loadPrices().models.fixture.input,3);
+  fs.unlinkSync(file);assert.deepEqual(owner.loadPrices().models,{});
+  write(4);assert.equal(owner.loadPrices().models.fixture.input,4);
+});
+
+
+test('the current registry schema accepts native targets and rejects undeclared launch fields',()=>{
+  const registry=read('modules/models/registry.yaml');
+  const validate=new Ajv2020({strict:true,allErrors:true}).compile(read('modules/schemas/profile-registry.schema.yaml'));
+  assert.equal(validate(registry),true,JSON.stringify(validate.errors));
+  const unknown=structuredClone(registry);
+  unknown.targets['gpt-6.1-sol'].profiles={working:'gpt-6.1-sol'};
+  assert.equal(validate(unknown),false,'a launch target has no alternate profile-to-model routing contract');
+  assert.ok(validate.errors.some(error=>error.keyword==='additionalProperties'&&error.params.additionalProperty==='profiles'));
+  const invalid=structuredClone(registry);
+  invalid.targets['gpt-6.1-sol'].defaultModel=null;
+  assert.equal(validate(invalid),false,'a declared launch-only model must remain a nonempty string');
+});
+
+test('native worker model resolution uses difficulty pins or an explicit target and refuses unknown targets',()=>{
+  const modelsDir=path.join(ROOT,'modules','models');
+  const resolve=(target,difficulty)=>resolveWorkerLaunchModel({target,payload:{difficulty},runtimes,modelsDir});
+  for(const [target,model] of [['gpt-6.1-sol','gpt-6.1-sol'],['gpt-6-luna','gpt-6-luna'],['cursor-agent','auto']]){
+    assert.deepEqual(resolve(target,'hard'),{modelId:model,effort:null,source:'registry'},target);
+  }
+  for(const [difficulty,model] of [['easy','gpt-6-luna'],['hard','gpt-6.1-sol']]){
+    const result=resolve('codex-agent',difficulty);
+    assert.equal(result.modelId,model);assert.equal(result.source,'runtimes');
+    assert.equal(result.effort,runtimes.runtimes['codex-agent'].effort[difficulty]);
+  }
+  for(const target of ['claude-agent','devin-agent']){
+    const result=resolve(target,'hard');
+    assert.equal(result.modelId,runtimes.runtimes[target].models.hard);assert.equal(result.source,'runtimes');
+  }
+  for(const target of ['codex-gpt-6.1-sol','devin-devin-worker','unknown-target']){
+    const result=resolve(target,'hard');
+    assert.ok(result.error,`${target} must refuse instead of changing its identity`);
+    assert.equal(result.modelId,undefined);
+  }
 });

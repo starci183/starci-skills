@@ -8,6 +8,49 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { INPUT_GLYPH, INPUT_GLYPH_CLASS, AGENT_GLYPH_CLASS } from './input-glyph.mjs';
 import { squash } from './clip.mjs';
 
+const TERMINAL_PROVIDERS = Object.freeze(['claude', 'codex', 'devin', 'cursor']);
+const identityText = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
+const namedProviders = (text) => TERMINAL_PROVIDERS.filter((provider) => new RegExp(`\\b${provider}\\b`, 'i').test(text));
+
+/**
+ * Pure terminal provider facts from explicit metadata, then title/frame cues.
+ * attested means a recognized explicit metadata field, not cryptographic or
+ * authorization proof; consumers separately decide which evidence may act.
+ */
+export function terminalIdentityOf(entry, { screen = '' } = {}) {
+  const fields = [];
+  for (const key of ['agentIdentity', 'agent', 'provider', 'agentType']) {
+    const value = entry?.[key];
+    if (value && typeof value === 'object') {
+      for (const field of ['agent', 'provider', 'agentType', 'type', 'id']) {
+        const text = identityText(value[field]);
+        if (text) fields.push({ source: `${key}.${field}`, text });
+      }
+    } else {
+      const text = identityText(value);
+      if (text) fields.push({ source: key, text });
+    }
+  }
+  const raw = fields[0]?.text ?? '';
+  const explicit = fields.filter(({ text }) => TERMINAL_PROVIDERS.includes(text));
+  const providers = [...new Set(explicit.map(({ text }) => text))];
+  if (providers.length > 1) return { provider: null, proof: 'unknown', source: 'metadata', raw, reason: 'identity-conflict' };
+  if (providers.length === 1) return { provider: providers[0], proof: 'attested', source: explicit[0].source, raw, reason: null };
+  for (const field of fields) {
+    const hinted = namedProviders(field.text);
+    if (hinted.length > 1) return { provider: null, proof: 'unknown', source: field.source, raw, reason: 'identity-ambiguous' };
+    if (hinted.length === 1) return { provider: hinted[0], proof: 'heuristic', source: field.source, raw, reason: 'metadata-label' };
+  }
+  const title = [entry?.title, entry?.tabTitle, entry?.paneTitle].map(identityText).filter(Boolean).join(' ');
+  const hinted = namedProviders(title);
+  if (hinted.length > 1) return { provider: null, proof: 'unknown', source: 'title', raw, reason: 'title-ambiguous' };
+  if (hinted.length === 1) return { provider: hinted[0], proof: 'heuristic', source: 'title', raw, reason: 'title-label' };
+  if (/esc\s+twice\s+to\s+interrupt|Ask Devin\b/i.test(String(screen ?? ''))) {
+    return { provider: 'devin', proof: 'heuristic', source: 'screen', raw, reason: 'frame-cue' };
+  }
+  return { provider: null, proof: 'unknown', source: null, raw, reason: 'provider-unresolved' };
+}
+
 // What a provider's frame looks like is declared on its card (modules/models/agents/<agent>.yaml
 // `liveness`), not guessed here:
 //   busyPatterns    rows that prove a running turn: a spinner, its elapsed timer, its interrupt hint.

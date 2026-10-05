@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {computeDerived, buildYamlDocument, runDerive} from '../../scripts/example/example-derive.mjs';
-import {checkExampleDerived} from '../../scripts/checks/check-example-derived.mjs';
+import {checkExampleDerived, checkExampleDerivedTrees} from '../../scripts/checks/check-example-derived.mjs';
+import {runCritique} from '../../scripts/example/example-critique.mjs';
 import {resolveOwnedDirs, hashOwnedDirs} from '../../scripts/work/record-ownership.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 
@@ -238,6 +239,64 @@ test('gate: a stale (or missing) _derived/index.yaml is refused', () => {
   assert.ok(problemsStale.some(p => p.includes('_derived/index.yaml')), problemsStale.join('\n'));
 });
 
+test('runDerive: write then check accepts both artifacts and keeps structural YAML comparison', () => {
+  const workRoot = tree({
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\n',
+  });
+  runDerive(workRoot, {write: true});
+  const indexPath = path.join(workRoot, '_derived/index.yaml');
+  const frontierPath = path.join(workRoot, '_derived/frontier.md');
+  fs.appendFileSync(indexPath, '# A comment does not change the YAML document.\n');
+  const index = fs.readFileSync(indexPath);
+  const frontier = fs.readFileSync(frontierPath);
+
+  assert.equal(runDerive(workRoot, {write: false}).ok, true);
+  assert.deepEqual(fs.readFileSync(indexPath), index, 'check mode does not rewrite equivalent YAML');
+  assert.deepEqual(fs.readFileSync(frontierPath), frontier, 'check mode does not rewrite fresh Markdown');
+});
+
+test('runDerive: missing frontier Markdown is refused without recreating it', () => {
+  const workRoot = tree({
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\n',
+  });
+  runDerive(workRoot, {write: true});
+  const indexPath = path.join(workRoot, '_derived/index.yaml');
+  const frontierPath = path.join(workRoot, '_derived/frontier.md');
+  const index = fs.readFileSync(indexPath);
+  fs.unlinkSync(frontierPath);
+
+  assert.equal(runDerive(workRoot, {write: false}).ok, false);
+  const problems = [];
+  checkExampleDerived(workRoot, problems);
+  assert.ok(problems.some(problem => problem.includes('example-derive')), problems.join('\n'));
+  assert.equal(fs.existsSync(frontierPath), false, 'checking never repairs a missing generated artifact');
+  assert.deepEqual(fs.readFileSync(indexPath), index, 'the current index remains untouched');
+});
+
+test('runDerive: forged frontier content or changed line endings are refused without rewriting them', () => {
+  const workRoot = tree({
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\n',
+  });
+  runDerive(workRoot, {write: true});
+  const indexPath = path.join(workRoot, '_derived/index.yaml');
+  const frontierPath = path.join(workRoot, '_derived/frontier.md');
+  const index = fs.readFileSync(indexPath);
+  const frontier = fs.readFileSync(frontierPath);
+  const altered = [
+    Buffer.concat([frontier, Buffer.from('- br.f.forged — Fabricated todo\n', 'utf8')]),
+    Buffer.from(frontier.toString('utf8').replaceAll('\n', '\r\n'), 'utf8'),
+  ];
+  for (const bytes of altered) {
+    fs.writeFileSync(frontierPath, bytes);
+    assert.equal(runDerive(workRoot, {write: false}).ok, false);
+    const problems = [];
+    checkExampleDerived(workRoot, problems);
+    assert.ok(problems.some(problem => problem.includes('example-derive')), problems.join('\n'));
+    assert.deepEqual(fs.readFileSync(frontierPath), bytes, 'check mode does not repair altered Markdown');
+    assert.deepEqual(fs.readFileSync(indexPath), index, 'the current index remains untouched');
+  }
+});
+
 test('gate: an authored usedBy/effectiveState/frontier field on a real record is refused', () => {
   const workRoot = tree({
     'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\nusedBy: {refs: [br.f.ghost]}\n',
@@ -255,4 +314,46 @@ test('buildYamlDocument round-trips through stringifyYaml/parseYaml with no auth
   assert.equal(typeof doc.records['br.f.a'].effectiveState, 'string');
   const {ok: okAfter} = runDerive(workRoot, {write: false});
   assert.equal(okAfter, true, 'a freshly written derived index must read back as fresh');
+});
+
+test('runtime derived gate ignores installed template Work and still refuses owned missing or stale output', () => {
+  const runtime = fs.realpathSync(freshDir()), app = path.join(runtime, 'examples', 'current-app');
+  const workRoot = path.join(app, '.starciwork');
+  write(app, 'hfs.json', '{"kind":"app"}\n');
+  write(workRoot, 'index.yaml', 'schema: work/catalog@1\nid: current-app\nfeatures: []\n');
+  write(workRoot, 'features/f/br/rule/index.yaml', 'schema: work/business-rule@1\nid: br.f.rule\ntitle: Rule\nstate: todo\n');
+  write(runtime, 'examples/index.yaml', 'schema: starci/code-example-catalog@1\nexamples: []\n');
+  write(runtime, 'examples/unstarted-app/hfs.json', '{"kind":"app"}\n');
+  const templateRoot = path.join(app, 'node_modules', 'installed', 'templates', 'app', 'skeleton', '.starciwork');
+  const templateIndex = write(templateRoot, 'index.yaml', 'schema: work/catalog@1\nid: {{project}}\nusedBy: forged\n');
+  write(path.dirname(templateRoot), 'hfs.json', '{"kind":"app"}\n');
+  const templateBytes = fs.readFileSync(templateIndex);
+
+  const missing = [];
+  assert.deepEqual(checkExampleDerivedTrees(runtime, missing), [workRoot]);
+  assert.equal(missing.length, 2, missing.join('\n'));
+  assert.ok(missing.every(problem => problem.startsWith(workRoot)), missing.join('\n'));
+  assert.equal(fs.existsSync(path.join(workRoot, '_derived')), false, 'check mode never generates missing output');
+  assert.equal(runDerive(workRoot, {write: true}).wrote, true);
+  assert.equal(runCritique(workRoot, {write: true}).wrote, true);
+  const outputs = ['index.yaml', 'frontier.md', 'critique.yaml', 'critique.md'].map(name => path.join(workRoot, '_derived', name));
+  const outputBytes = outputs.map(file => fs.readFileSync(file));
+  const fresh = [];
+  assert.deepEqual(checkExampleDerivedTrees(runtime, fresh), [workRoot]);
+  assert.deepEqual(fresh, []);
+
+  write(workRoot, 'features/f/br/new/index.yaml', 'schema: work/business-rule@1\nid: br.f.new\ntitle: New\nstate: todo\n');
+  const stale = [];
+  assert.deepEqual(checkExampleDerivedTrees(runtime, stale), [workRoot]);
+  assert.ok(stale.some(problem => problem.includes('/_derived/index.yaml')), stale.join('\n'));
+  for (let i = 0; i < outputs.length; i++) assert.deepEqual(fs.readFileSync(outputs[i]), outputBytes[i], 'checking retains stale output bytes');
+  assert.deepEqual(fs.readFileSync(templateIndex), templateBytes);
+  assert.equal(fs.existsSync(path.join(templateRoot, '_derived')), false, 'installed templates receive no generated output');
+});
+
+test('runtime derived gate refuses an existing child-only own Work tree', () => {
+  const runtime = fs.realpathSync(freshDir()), app = path.join(runtime, 'examples', 'current-app');
+  write(app, 'hfs.json', '{"kind":"app"}\n');
+  write(app, '.starciwork/features/f/index.yaml', 'schema: work/feature@1\nid: f\n');
+  assert.throws(() => checkExampleDerivedTrees(runtime, []), /index\.yaml|reference|ENOENT/);
 });

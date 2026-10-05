@@ -152,13 +152,25 @@ policy:
               refs/dependencies/acceptance require a reported gap or separately selected scope
               update; never add/remove them to obtain pass.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/git-publication.json + evidence/lineage.json + evidence/result.md
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Record observed local/remote refs before/after, exact command/exit, verified diff/ancestry and
               checks at the actual integrated head. Operator-specific observed result in
               evidence/result.md: Record original, integrated and published full SHAs separately, target
               ref and actual publication result; no worktree cleanup implied."
+        - id: evidence-git-publication
+          path: evidence/git-publication.json
+          content:
+            en: Retain only the selected publish git-publication.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-lineage
+          path: evidence/lineage.json
+          content:
+            en: Retain only the selected publish lineage.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-result
+          path: evidence/result.md
+          content:
+            en: Retain only the selected publish result.md at this exact destination; its scope and provenance remain those of evidence.
       steps:
         - reads:
             - repo
@@ -175,7 +187,7 @@ policy:
         - reads:
             - repo
             - publication
-          writes: [evidence]
+          writes: [evidence, evidence-git-publication, evidence-lineage, evidence-result]
           action:
             en: Inspect current remote and local refs, branch policy and required checks/hooks. If integration
               is included, review exact diff/conflicts and retest the actual result; no
@@ -183,7 +195,7 @@ policy:
         - reads:
             - publication
             - repo
-          writes: [evidence]
+          writes: [evidence, evidence-git-publication, evidence-lineage, evidence-result]
           action:
             en: Perform only explicitly requested integration/publication action, non-force and with hooks
               preserved. Tag/PR actions occur only when named; rejected or uncertain effects require
@@ -192,7 +204,7 @@ policy:
             - publication
             - repo
             - target
-          writes: [node, evidence]
+          writes: [node, evidence, evidence-git-publication, evidence-lineage, evidence-result]
           action:
             en: Read target ref back and compare exact expected SHA, record true lineage and limits, then stop
               without deleting branch/worktree/evidence or stopping runtime.
@@ -287,7 +299,7 @@ policy:
             en: Keep immutable artifact identity and actual deployment evidence on the work/resource@1 record;
               do not retag/rebuild and call it the same release.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/deployment.json + evidence/probes.json + evidence/recovery.json + evidence/result.md
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Retain actual target generation/digest before/after, requested command/tool outcome, probe
@@ -295,6 +307,22 @@ policy:
               Operator-specific observed result in evidence/result.md: Name actual deployed/restored
               identity and unresolved acceptance; rollback success is not delivery of the rejected
               release."
+        - id: evidence-deployment
+          path: evidence/deployment.json
+          content:
+            en: Retain only the selected deploy deployment.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-probes
+          path: evidence/probes.json
+          content:
+            en: Retain only the selected deploy probes.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-recovery
+          path: evidence/recovery.json
+          content:
+            en: Retain only the selected deploy recovery.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-result
+          path: evidence/result.md
+          content:
+            en: Retain only the selected deploy result.md at this exact destination; its scope and provenance remain those of evidence.
       steps:
         - reads:
             - application-stacks
@@ -310,21 +338,21 @@ policy:
         - reads:
             - release
             - environment
-          writes: [evidence]
+          writes: [evidence, evidence-deployment, evidence-probes, evidence-recovery, evidence-result]
           action:
             en: Inspect actual active release/target/config revisions, artifact availability and rollback
               viability; compare again immediately before mutation.
         - reads:
             - release
             - environment
-          writes: [resource, evidence]
+          writes: [resource, evidence, evidence-deployment, evidence-probes, evidence-recovery, evidence-result]
           action:
             en: Deploy exact artifact through available authorized provider mechanism. Do not modify
               DNS/host/credentials/schema unless those exact effects are included.
         - reads:
             - release
             - environment
-          writes: [evidence]
+          writes: [evidence, evidence-deployment, evidence-probes, evidence-recovery, evidence-result]
           action:
             en: Observe declared useful health/readiness probes and active digest through a bounded stability
               interval. Detect concurrent target changes before any recovery; only authorized
@@ -332,7 +360,7 @@ policy:
         - reads:
             - release
             - target
-          writes: [node, resource, evidence]
+          writes: [node, resource, evidence, evidence-deployment, evidence-probes, evidence-recovery, evidence-result]
           action:
             en: Report deployed, failed, uncertain or restored identity accurately, keep partial effects and
               unmet probes, validate and stop. No source fixes, wider provisioning or release chain.
@@ -406,8 +434,7 @@ policy:
           content:
             en: Read the existing selected scope, expected assertions and .starciwork graph unchanged.
         - id: evidence
-          path: evidence/manifest.yaml + evidence/migrations-before.json + evidence/migrations-after.json
-            + evidence/replay.json + evidence/result.md
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Keep migration checksums, actual runner/command, redacted output, before/after
@@ -415,6 +442,22 @@ policy:
               logs. Operator-specific observed result in evidence/result.md: Pin exact target/schema/source
               migration identity and expected postconditions. Production mutation is allowed only by
               explicit scoped authority, never by completion of code tests."
+        - id: evidence-migrations-before
+          path: evidence/migrations-before.json
+          content:
+            en: Retain only the selected migrate migrations-before.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-migrations-after
+          path: evidence/migrations-after.json
+          content:
+            en: Retain only the selected migrate migrations-after.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-replay
+          path: evidence/replay.json
+          content:
+            en: Retain only the selected migrate replay.json at this exact destination; its scope and provenance remain those of evidence.
+        - id: evidence-result
+          path: evidence/result.md
+          content:
+            en: Retain only the selected migrate result.md at this exact destination; its scope and provenance remain those of evidence.
       steps:
         - reads:
             - application-stacks
@@ -428,7 +471,7 @@ policy:
               behavior and recovery constraints before any database effect.
         - reads:
             - migration
-          writes: [evidence]
+          writes: [evidence, evidence-migrations-before, evidence-migrations-after, evidence-replay, evidence-result]
           action:
             en: Inspect current migration history/schema and backup/precondition evidence. Classify applied,
               safely pending, conflicting or partial/uncertain; never rerun a partial unknown effect
@@ -436,7 +479,7 @@ policy:
         - reads:
             - migration
             - repo
-          writes: [evidence]
+          writes: [evidence, evidence-migrations-before, evidence-migrations-after, evidence-replay, evidence-result]
           action:
             en: Run only approved pending set through the actual reviewed source runner, or record inspected
               no-op. Preserve original migration-history rows and actual error output; no ad hoc SQL
@@ -444,7 +487,7 @@ policy:
         - reads:
             - migration
             - target
-          writes: [node, evidence]
+          writes: [node, evidence, evidence-migrations-before, evidence-migrations-after, evidence-replay, evidence-result]
           action:
             en: Verify declared schema/data invariants and migration history after execution; perform safe
               supported no-op replay or inspect to prove no pending changes. Report

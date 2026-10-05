@@ -14,7 +14,7 @@ const mediaRows=machineHome=>readMachine(m=>m.db.prepare("SELECT * FROM notifica
 
 const EXAMPLE=parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8'));
 const TOKEN='123456789:AAFakeTokenForSpecsOnly_abcdefghijklmnop';
-const configWith=(telegram)=>({...structuredClone(EXAMPLE),language:'vi',connectors:{secretsFile:null,telegram}});
+const configWith=(telegram)=>({...structuredClone(EXAMPLE),language:'vi',connectors:{telegram}});
 const ON=configWith({enabled:true,chatId:'4242'});
 const OFF=configWith({enabled:false});
 
@@ -31,7 +31,10 @@ const fakeBot=({fail=null}={})=>{
   };
   return {calls,fetchImpl,of:m=>calls.filter(c=>c.method===m)};
 };
-const deps=(machineHome,extra={})=>({config:ON,env:{LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN},apiBase:'http://bot.invalid',sleepImpl:async()=>{},warn:()=>{},...extra});
+const deps=(machineHome,extra={})=>{
+  fs.mkdirSync(machineHome,{recursive:true});
+  return {root:machineHome,config:ON,env:{LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN},apiBase:'http://bot.invalid',sleepImpl:async()=>{},warn:()=>{},...extra};
+};
 
 const put=(root,rel,content='x')=>{const file=path.join(root,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,content);return file;};
 const sized=(root,rel,bytes)=>{const file=put(root,rel,'');fs.truncateSync(file,bytes);return file;};
@@ -177,6 +180,7 @@ test('one send per job attempt: a repeat is skipped, a new attempt sends, and a 
     const down=fakeBot({fail:()=>({status:500,description:'Internal'})});
     const lost=await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW},deps(home,{fetchImpl:down.fetchImpl}));
     assert.deepEqual([lost.ok,lost.sent],[false,0]);
+    assert.equal(lost.failed,1,'the fresh private root reaches the injected failing Bot API');
     const retried=await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW},deps(home,{fetchImpl:bot.fetchImpl}));
     assert.equal(retried.sent,1,'nothing was delivered, so the claim was released');
   });
@@ -246,13 +250,13 @@ test('off: Telegram disabled, connectors off, a spec run, a non-media op or a dr
     const spawned=[];const spawnImpl=(...a)=>{spawned.push(a);return {pid:4242,on(){},unref(){}};};
     const job={ledgerFile,repo:repoRoot,...DRAW};
     const env={LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN,STARCI_TELEGRAM_API_BASE:'http://bot.invalid'};
-    assert.equal(queueSettleMedia(job,{env,config:OFF,spawnImpl}).skipped,'telegram off');
-    assert.equal(queueSettleMedia({...job,verdict:'fail'},{env,config:ON,spawnImpl}).skipped,'a draw is sent when it settles pass');
-    assert.equal(queueSettleMedia({...job,op:'scope.define'},{env,config:ON,spawnImpl}).skipped,'not a media op');
-    assert.equal(queueSettleMedia(job,{env:{...env,STARCI_TELEGRAM_API_BASE:undefined,NODE_TEST_CONTEXT:'child-v8'},config:ON,spawnImpl}).skipped,'test context');
-    assert.equal(queueSettleMedia(job,{env:{...env,STARCI_CONNECTORS_OFF:'1'},config:ON,spawnImpl}).skipped,'STARCI_CONNECTORS_OFF');
+    assert.equal(queueSettleMedia(job,{env,config:OFF,root:machineHome,spawnImpl}).skipped,'telegram off');
+    assert.equal(queueSettleMedia({...job,verdict:'fail'},{env,config:ON,root:machineHome,spawnImpl}).skipped,'a draw is sent when it settles pass');
+    assert.equal(queueSettleMedia({...job,op:'scope.define'},{env,config:ON,root:machineHome,spawnImpl}).skipped,'not a media op');
+    assert.equal(queueSettleMedia(job,{env:{...env,STARCI_TELEGRAM_API_BASE:undefined,NODE_TEST_CONTEXT:'child-v8'},config:ON,root:machineHome,spawnImpl}).skipped,'test context');
+    assert.equal(queueSettleMedia(job,{env:{...env,STARCI_CONNECTORS_OFF:'1'},config:ON,root:machineHome,spawnImpl}).skipped,'STARCI_CONNECTORS_OFF');
     assert.equal(spawned.length,0);
-    const queued=queueSettleMedia({...UAT,ledgerFile,repo:repoRoot},{env,config:ON,spawnImpl});
+    const queued=queueSettleMedia({...UAT,ledgerFile,repo:repoRoot},{env,config:ON,root:machineHome,spawnImpl});
     assert.deepEqual([queued.queued,queued.pid],[true,4242],'a UAT settle queues whatever the verdict');
     const [args,options]=spawned[0];
     assert.match(args[0],/telegram-media\.mjs$/);
@@ -270,7 +274,7 @@ test('settle never fails because Telegram failed: the hook is synchronous, never
     const saved=process.stderr.write;const errs=[];process.stderr.write=(s)=>{errs.push(String(s));return true;};
     let thrown,broken;
     try{
-      thrown=queueSettleMedia({ledgerFile,repo:repoRoot,...DRAW},{env,config:ON,spawnImpl:()=>{throw Error(`spawn EPERM bot${TOKEN}`);}});
+      thrown=queueSettleMedia({ledgerFile,repo:repoRoot,...DRAW},{env,config:ON,root:machineHome,spawnImpl:()=>{throw Error(`spawn EPERM bot${TOKEN}`);}});
       broken=queueSettleMedia(null,{env,config:ON});
     }finally{process.stderr.write=saved;}
     assert.equal(thrown instanceof Promise,false,'the settle never waits on Telegram');
@@ -283,6 +287,7 @@ test('settle never fails because Telegram failed: the hook is synchronous, never
     assert.match(warned.join('\n'),/album not sent: network down/);
     const unauthorized=await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW},deps(path.join(machineHome,'b'),{warn:w=>warned.push(w),fetchImpl:fakeBot({fail:()=>({status:401,description:`Unauthorized bot${TOKEN}`})}).fetchImpl}));
     assert.equal(unauthorized.ok,false);
+    assert.equal(unauthorized.failed,1,'the negative receipt comes from the injected unauthorized upload');
     assert.ok(!warned.join('\n').includes(TOKEN));
     const noLedger=await sendSettleMedia({ledgerFile:path.join(machineHome,'missing.sqlite'),repo:repoRoot,...DRAW},deps(machineHome,{warn:w=>warned.push(w)}));
     assert.deepEqual([noLedger.ok,noLedger.error],[false,'ledger unreadable']);

@@ -7,6 +7,7 @@
 import { JOB_STATUSES, clearSignal, recordJobResult, releaseLeases, setJobStatus } from '../../../../engine/db/ledger.mjs';
 import { retainLedgerDb } from '../../../housekeeping/hk-ledger.mjs';
 import { closeSelfSafe } from '../../../machine/close-verify.mjs';
+import { assertMutationFence } from '../../../lib/mutation-fence.mjs';
 
 /**
  * Move a job to `to` along the shortest job_transitions path from its current status (inside the caller's
@@ -62,6 +63,7 @@ export const retainAfterEnd = (db, now) => {
 // Kernel terminal still open after that is a leftover the Supervisor's tick GC closes and records as a lesson.
 export const closeKernelTerminal = (kernelTerminal, { owner = 'kernel' } = {}) => {
   if (!kernelTerminal) return null;
+  assertMutationFence({ kind: 'kernel-terminal-close', terminal: kernelTerminal });
   try { return closeSelfSafe(kernelTerminal, { owner }); } catch { return null; /* the ledger state stands; the tick GC reconciles host cleanup */ }
 };
 // The worker of a dropped operation: a managed Dispatch is stopped (when it did not settle itself) and released.

@@ -253,7 +253,7 @@ CREATE TABLE IF NOT EXISTS sup_messages(
 CREATE INDEX IF NOT EXISTS ix_sup_messages_unread ON sup_messages(direction,read_at,at);
 
 CREATE TABLE IF NOT EXISTS sup_signals(
-  scope TEXT NOT NULL CHECK(scope IN ('supervisor-enabled','supervisor-busy')), key TEXT NOT NULL,
+  scope TEXT NOT NULL CHECK(scope IN ('supervisor-enabled','supervisor-busy','core-debug-enabled','core-debug-diagnostics')), key TEXT NOT NULL,
   holder_pid INTEGER, token TEXT, value_json TEXT CHECK(value_json IS NULL OR json_valid(value_json)),
   at INTEGER NOT NULL, expires_at INTEGER, PRIMARY KEY(scope,key)) STRICT;
 
@@ -885,3 +885,40 @@ UNION ALL SELECT 'sup_decisions', COALESCE(max(max(opened_at), max(COALESCE(reso
 --     attachLedgers(batch <= 9) is for ad-hoc queries only.
 --   * Blob GC: mark PER ledger into gc_marks (per each DB's blob_ref_columns) then sweep - no ATTACH-UNION.
 -- ---------------------------------------------------------------------------------------------------------
+
+-- Provider/account capacity and durable launch/release evidence share this current host schema.
+-- Additive host provider/account admission receipts. Slot units are concurrent launches,
+-- never provider tokens, credits or measured spend. Released receipts retain attempt identity.
+CREATE TABLE provider_reservations(
+  fence INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT NOT NULL UNIQUE,
+  attempt_id TEXT NOT NULL UNIQUE,
+  provider TEXT NOT NULL,
+  account TEXT NOT NULL,
+  model TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('kernel','op','supervisor','worker','critic')),
+  scope_json TEXT,
+  state TEXT NOT NULL CHECK(state IN ('reserved','launching','live','unknown','released')),
+  slots INTEGER NOT NULL DEFAULT 1 CHECK(slots=1),
+  max_parallel INTEGER NOT NULL CHECK(max_parallel>=0),
+  quota_json TEXT,
+  estimate_json TEXT,
+  override_json TEXT,
+  launch_identity TEXT,
+  host_request_id TEXT,
+  handle TEXT,
+  pid INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  released_at INTEGER,
+  proof_json TEXT
+) STRICT;
+CREATE INDEX provider_reservations_active ON provider_reservations(provider,account,state);
+CREATE TABLE provider_reservation_events(
+  id INTEGER PRIMARY KEY,
+  reservation_id TEXT NOT NULL REFERENCES provider_reservations(id),
+  at INTEGER NOT NULL,
+  from_state TEXT,
+  to_state TEXT NOT NULL,
+  proof_json TEXT
+) STRICT;

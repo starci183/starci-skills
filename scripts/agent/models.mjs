@@ -21,6 +21,7 @@
 // spelling is unknown and refused where a difficulty enters.
 
 import fs from 'node:fs';
+import { readYamlFile } from '../lib/read-yaml.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -184,20 +185,12 @@ function applyBias(chain, bias) {
 // required tool is ineligible — tier order and prefer-bias never hoist it.
 const HOST_TOOL_HINT = 'host-tool-required:';
 const DEFAULT_OPS_DIR = path.join(skillRoot, 'modules', 'ops', 'ops');
-const yamlCache = new Map();
-const readYamlCached = (file) => {
-  if (!yamlCache.has(file)) {
-    let doc = null;
-    try { doc = fs.existsSync(file) ? parseYaml(fs.readFileSync(file, 'utf8')) : null; } catch { doc = null; }
-    yamlCache.set(file, doc);
-  }
-  return yamlCache.get(file);
-};
+
 
 /** The host tools op `kind` declares it cannot run without, from its manifest's route.riskHints. */
 export function hostToolsRequired(kind, { opsDir = DEFAULT_OPS_DIR } = {}) {
   if (!kind || /[\\/]|\.\./.test(String(kind))) return [];
-  const hints = readYamlCached(path.join(opsDir, `${kind}.yaml`))?.route?.riskHints;
+  const hints = readYamlFile(path.join(opsDir, `${kind}.yaml`))?.route?.riskHints;
   return (Array.isArray(hints) ? hints : [])
     .filter((hint) => typeof hint === 'string' && hint.startsWith(HOST_TOOL_HINT))
     .map((hint) => hint.slice(HOST_TOOL_HINT.length).trim()).filter(Boolean);
@@ -206,7 +199,7 @@ export function hostToolsRequired(kind, { opsDir = DEFAULT_OPS_DIR } = {}) {
 /** The host tools the agent behind `provider` has, from its card's capabilities.hostTools. */
 export function hostToolsOf(provider, { modelsDir = DEFAULT_MODELS_DIR } = {}) {
   if (!provider || /[\\/]|\.\./.test(String(provider))) return [];
-  const tools = readYamlCached(path.join(modelsDir, 'agents', `${provider}.yaml`))?.capabilities?.hostTools;
+  const tools = readYamlFile(path.join(modelsDir, 'agents', `${provider}.yaml`))?.capabilities?.hostTools;
   return Array.isArray(tools) ? tools.map(String) : [];
 }
 

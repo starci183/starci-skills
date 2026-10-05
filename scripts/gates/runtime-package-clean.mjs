@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { sha256 } from '../../engine/digest.mjs';
+import { SECRET_ENV_FILE } from '../../engine/secrets.mjs';
 import { LOCAL_ROOT_ENV, TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { PROJECTS_ROOT_ENV } from '../../engine/db/ledger.mjs';
 import { ARTIFACT_ROOT_ENV } from '../../engine/db/blob.mjs';
@@ -82,6 +83,9 @@ export function proveRuntimePackage({ root, sourceSha, expectedShasum, env = pro
     if (shasum !== expectedShasum) return finish('red', PROOF_CODES.install, 'actual archive differs from the frozen publish pack');
     const identity = JSON.parse(files.get('package/package.json')?.toString() ?? '{}');
     if (identity.name !== manifest.name || identity.version !== manifest.version) return finish('red', PROOF_CODES.install, 'packed root package identity differs');
+    // Consumer archives never carry local credentials or the releasing host's encrypted Sonar custody.
+    const privateFile = [...files.keys()].find((file) => file.replaceAll('\\', '/').split('/').at(-1).toLowerCase() === SECRET_ENV_FILE.toLowerCase() || /^package[\\/]ext[\\/]sonar[\\/]secrets(?:[\\/]|$)/i.test(file));
+    if (privateFile) return finish('red', PROOF_CODES.install, `root archive contains private host configuration or custody: ${privateFile}`);
     const required = ['skills/starci/SKILL.md', 'skills/starci/agents/openai.yaml', '.starci/host/startup.md', '.starci/host/maintenance.md',
       'ui/server.mjs', 'ui/api/index.mjs', 'ui/package.json', 'ui/package-lock.json'];
     const uiFiles = (deps.trackedUnder ?? gitTrackedUnder)(path.join(root, 'ui'));
@@ -132,8 +136,14 @@ export function proveRuntimePackage({ root, sourceSha, expectedShasum, env = pro
     if (refreshedCustody.keptLocal?.length || refreshedCustody.preservedStale?.length) return finish('red', PROOF_CODES.test, 'native installer detects changed or unowned payload custody on the fresh host');
     const refreshedFailure = verifyPackedDependencies([{ ...payload, files: projected }], host, { packageRoots: new Map([[manifest.name, target]]) });
     if (refreshedFailure) return finish('red', PROOF_CODES.test, refreshedFailure);
+    const diagnosed = stage('runtime-doctor', () => node([path.join(target, 'scripts', 'cli', 'main.mjs'), 'runtime', 'doctor', '--cwd', host],
+      { cwd: host, env: childEnv, timeout: 300_000, maxBuffer: 64 * 1024 * 1024 }));
+    if (diagnosed.error || diagnosed.signal || !Number.isInteger(diagnosed.status)) return finish('unrun', PROOF_CODES.unrun, 'full installed runtime doctor did not complete');
+    if (diagnosed.status !== 0) return finish('red', PROOF_CODES.test, 'full installed runtime doctor failed; see immutable diagnostics');
+    const diagnosedFailure = verifyPackedDependencies([{ ...payload, files: projected }], host, { packageRoots: new Map([[manifest.name, target]]) });
+    if (diagnosedFailure) return finish('red', PROOF_CODES.test, diagnosedFailure);
     result.projectedFiles = probe.payload; result.discoveryFiles = probe.entries.map((entry) => entry.relative);
-    return finish('green', null, 'actual root archive, installed startup graph and private native installer projection match');
+    return finish('green', null, 'actual root archive, private native projection and full installed runtime doctor match');
   } catch (error) {
     return finish('unrun', PROOF_CODES.unrun, String(error?.stack ?? error));
   }

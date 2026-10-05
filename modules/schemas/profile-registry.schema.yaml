@@ -2,7 +2,7 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: starci://schemas/profile-registry.schema.json
 title: StarCi profile registry
 type: object
-required: [schema, runtimes, aliases, executionModel, targets, skills, operators, fallback]
+required: [schema, runtimes, aliases, executionModel, targets, operators, fallback]
 properties:
   schema: {const: starci/profile-registry@1}
   purpose: {type: string}
@@ -61,10 +61,6 @@ properties:
     type: object
     minProperties: 1
     additionalProperties: {$ref: "#/$defs/target"}
-  skills: {type: object}
-  targetAliases:
-    type: object
-    additionalProperties: {type: string, minLength: 1}
   operators:
     type: object
     additionalProperties:
@@ -152,17 +148,10 @@ $defs:
   target:
     type: object
     additionalProperties: false
-    required: [runtime, profiles, orcaLaunch]
+    required: [runtime, orcaLaunch]
     properties:
       runtime: {type: string, minLength: 1}
       defaultModel: {type: string, minLength: 1}
-      profiles:
-        type: object
-        additionalProperties: false
-        minProperties: 1
-        properties:
-          working: {type: string, minLength: 1}
-          reasoning: {type: string, minLength: 1}
       executionHosts:
         type: array
         minItems: 1
@@ -170,7 +159,7 @@ $defs:
         items:
           enum: [orca]
       orcaLaunch:
-        # The one launch (modules/kernel/contract-changes/launch-through-worker-start.yaml):
+        # The one launch (modules/kernel/start-workflow.yaml):
         # orca orchestration worker-start --agent <agent>.
         type: object
         additionalProperties: false

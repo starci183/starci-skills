@@ -100,7 +100,7 @@ refuses:
       replayed instead)
   - report-missing: report file missing or unreadable
   - report-outside-scratch: the report file is not under the attempt's STARCI_JOB_SCRATCH (a Work path is never a report)
-  - "report-attachment-missing / report-attachment-outside-scratch / report-attachment-invalid: an
+  - "report-attachment-missing / report-attachment-outside-scratch / report-attachment-invalid: unreadable traversal or more than 2000 unique evidence files refuses the whole intake before blob staging; the scratch remains intact; an
     --attach file or a check stdoutPath/stderrPath/outputPath that is missing, outside the scratch,
     or an --attach without a path"
   - "STARCI_REPORT_ALREADY_FILED: the attempt already filed a different report (reports are

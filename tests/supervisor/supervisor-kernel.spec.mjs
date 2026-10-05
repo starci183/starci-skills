@@ -12,7 +12,6 @@ import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { fakeAdmission } from '../helpers/fake-admission.mjs';
-import { restoreMachineV1Fixture } from '../helpers/machine-v1-fixture.mjs';
 
 import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, SEAT_DENIED_TOOLS, seatHealth } from '../../scripts/supervisor/start-supervisor.mjs';
 import { seatToolDecision } from '../../scripts/guards/seat-tools.mjs';
@@ -21,7 +20,7 @@ import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, leaseConflicts, pickWorkerPool, cancelJob, ackReport,
   stageSelf, workerGuard, READINESS_FAILS_PER_HOUR, openWorkerHandles,
 } from '../../scripts/supervisor/workers.mjs';
-import { landCommits, land, contractCoverage, governedPaths, specsTouching, specPlan, runChecks, describe, acquireLand, landQueue, specTimeoutMs, LAND_WAIT_MS } from '../../scripts/supervisor/land.mjs';
+import { landCommits, land, specsTouching, specPlan, runChecks, describe, acquireLand, landQueue, specTimeoutMs, LAND_WAIT_MS } from '../../scripts/supervisor/land.mjs';
 import { scanDiff, defaultPushRepos, boundRepos } from '../../scripts/supervisor/push-mains.mjs';
 import { directCommits, gateLandedShas } from '../../scripts/supervisor/direct-commits.mjs';
 import { tell, replies, sinceMs } from '../../scripts/supervisor/tell.mjs';
@@ -102,24 +101,28 @@ test('a refused worker observation is unverified rather than affirmative death',
   assert.equal(seatHealth(seat, { show: () => ({ ok: true, state: 'released' }) }).dead, true);
 });
 
-test('Supervisor plans neither create an absent machine store nor upgrade a compatible v1 store', async t => {
+test('Supervisor plans neither create an absent machine store nor rewrite a retired store', async t => {
   for (const legacy of [false, true]) {
     const env = envOf(t), file = env.STARCI_TEST_MACHINE_FILE;
     if (legacy) {
       const machine = openMachine({ env });
       machine.meta(); machine.close();
-      restoreMachineV1Fixture(file);
+      const raw = new DatabaseSync(file);
+      try { raw.exec('PRAGMA user_version=1'); } finally { raw.close(); }
     }
     const before = legacy ? crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
     const host = fakeHost(), observations = fakeAdmission();
     host.admission = { quota: observations.quota, circuit: () => null };
-    const result = await launch(env, host, { plan: true });
-    assert.equal(result.action, 'plan');
-    assert.equal(result.admission.ok, false, 'read-only plans refuse unobserved capacity');
-    assert.equal(result.wouldLaunch, false);
+    if (legacy) await assert.rejects(() => launch(env, host, { plan: true }), { code: 'STARCI_MACHINE_SCHEMA_OLD' });
+    else {
+      const result = await launch(env, host, { plan: true });
+      assert.equal(result.action, 'plan');
+      assert.equal(result.admission.ok, false, 'read-only plans refuse unobserved capacity');
+      assert.equal(result.wouldLaunch, false);
+    }
     assert.equal(host.calls.start.length, 0);
     if (legacy) {
-      assert.equal(crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'), before, 'planning preserves all v1 bytes');
+      assert.equal(crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'), before, 'planning preserves all refused-store bytes');
       const raw = new DatabaseSync(file, { readOnly: true });
       try { assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 1); }
       finally { raw.close(); }
@@ -473,9 +476,7 @@ function repoBaseline() {
   fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
   fs.mkdirSync(path.join(root, 'modules', 'kernel'), { recursive: true });
   fs.writeFileSync(path.join(root, 'scripts', 'a.mjs'), 'export const a = 1;\n');
-  fs.mkdirSync(path.join(root, 'modules', 'kernel', 'contract-changes'), { recursive: true });
   fs.mkdirSync(path.join(root, 'packages', 'grammar'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'modules', 'kernel', 'contract-changes', 'old.yaml'), 'id: old\nsummary: x\n');
   fs.writeFileSync(path.join(root, 'packages', 'grammar', 'CHANGELOG.md'), '# Changelog\n\n');
   fs.writeFileSync(path.join(root, 'modules', 'kernel', 'rules.yaml'), 'rule: one\n');
   git(root, 'add', '-A');
@@ -633,25 +634,17 @@ test('land gate: main moving under the checks reruns the gate on the new main', 
   assert.equal(git(root, 'rev-parse', 'main~1'), git(root, 'rev-parse', lane), 'the land sits on top of the lane commit');
 });
 
-test('contract-change enforcement: a contract file change needs an added or edited entry whose paths cover it', (t) => {
-  assert.deepEqual(governedPaths(['knowledge/a.yaml', 'scripts/x.mjs', 'modules/kernel/contract-changes/x.yaml', 'modules/ops/o.yaml']), ['knowledge/a.yaml', 'modules/ops/o.yaml']);
-  const before = { changes: [{ id: 'old', paths: ['knowledge/'] }] };
-  assert.equal(contractCoverage({ changed: ['knowledge/a.yaml'], before, after: before }).ok, false, 'an old entry does not cover a new edit');
-  assert.equal(contractCoverage({ changed: ['knowledge/a.yaml'], before, after: { changes: [...before.changes, { id: 'new', paths: ['knowledge'] }] } }).ok, true, 'a directory covers what is inside it');
-  assert.equal(contractCoverage({ changed: ['scripts/x.mjs'], before, after: before }).ok, true);
-  const env = envOf(t);
-  const root = repoFixture(t);
-  const bare = sideCommit(root, 'c1', { 'modules/kernel/rules.yaml': 'rule: two\n' });
-  const red = landCommits({ commits: [bare], root, env, push: false, deps: { runChecks: lightChecks } });
-  assert.equal(red.reason, 'checks-red');
-  assert.ok(red.checks.some((c) => c.name === 'contract-changes paths' && !c.ok && c.uncovered.includes('modules/kernel/rules.yaml')));
-  const registered = sideCommit(root, 'c2', { 'modules/kernel/rules.yaml': 'rule: two\n',
-    'modules/kernel/contract-changes/rules-two.yaml': 'id: rules-two\nsummary: y\npaths: [modules/kernel/rules.yaml]\nreach: new-legs\n' });
-  const ok = landCommits({ commits: [registered], root, env, push: false, deps: { runChecks: lightChecks } });
-  assert.ok(ok.ok, JSON.stringify(ok.checks));
-  const broken = sideCommit(root, 'c3', { 'modules/kernel/x.yaml': 'a: [unclosed\n', 'modules/kernel/contract-changes/x.yaml': 'id: x\npaths: [modules/kernel/x.yaml]\n' });
-  const unparsable = landCommits({ commits: [broken], root, env, push: false, deps: { runChecks: lightChecks } });
-  assert.ok(unparsable.checks.some((c) => c.name === 'parse modules/kernel/x.yaml' && !c.ok));
+test('current module edits require actual parse checks and preserve main when those checks refuse', (t) => {
+  const env = envOf(t), root = repoFixture(t);
+  const changed = sideCommit(root, 'c1', { 'modules/kernel/rules.yaml': 'rule: two\n' });
+  const accepted = landCommits({ commits: [changed], root, env, push: false, deps: { runChecks: lightChecks } });
+  assert.ok(accepted.ok, JSON.stringify(accepted.checks));
+  const main = git(root, 'rev-parse', 'main');
+  const broken = sideCommit(root, 'c2', { 'modules/kernel/x.yaml': 'a: [unclosed\n' });
+  const refused = landCommits({ commits: [broken], root, env, push: false, deps: { runChecks: lightChecks } });
+  assert.equal(refused.ok, false);
+  assert.ok(refused.checks.some((c) => c.name === 'parse modules/kernel/x.yaml' && !c.ok));
+  assert.equal(git(root, 'rev-parse', 'main'), main);
   assert.deepEqual(specsTouching(['scripts/supervisor/land.mjs', 'tests/x.spec.mjs'], { specs: [{ file: 'tests/a.spec.mjs', text: "import '../scripts/supervisor/land.mjs'" }, { file: 'tests/b.spec.mjs', text: 'nothing' }] }), ['tests/x.spec.mjs', 'tests/a.spec.mjs']);
 });
 
@@ -716,7 +709,7 @@ test('a worker job lands end to end: report -> gate -> succeeded, leases release
   assert.equal(cancelJob(after, { jobId: other.job.job_id, root, env, orca }).ok, true);
 });
 
-test('the grammar changelog and contract-change entry files are never leased; two appends to the changelog both land through the gate (merge=union)', async (t) => {
+test('the grammar changelog is never leased; two appends to the changelog both land through the gate (merge=union)', async (t) => {
   const env = envOf(t);
   const root = repoFixture(t);
   fs.writeFileSync(path.join(root, '.gitattributes'), 'packages/grammar/CHANGELOG.md merge=union\n');
@@ -724,10 +717,10 @@ test('the grammar changelog and contract-change entry files are never leased; tw
   git(root, 'commit', '-q', '-m', 'union changelog');
   const orca = orcaOf(t);
   const m = openMachine({ env });
-  const one = stageSelf(m, { name: 'reg-a', files: ['packages/grammar/CHANGELOG.md', 'modules/kernel/contract-changes/reg-a.yaml', 'scripts/a.mjs'], root, env, orca });
-  const two = stageSelf(m, { name: 'reg-b', files: ['packages/grammar/CHANGELOG.md', 'modules/kernel/contract-changes/reg-a.yaml', 'scripts/b.mjs'], root, env, orca });
+  const one = stageSelf(m, { name: 'reg-a', files: ['packages/grammar/CHANGELOG.md', 'scripts/a.mjs'], root, env, orca });
+  const two = stageSelf(m, { name: 'reg-b', files: ['packages/grammar/CHANGELOG.md', 'scripts/b.mjs'], root, env, orca });
   assert.ok(one.ok && two.ok, JSON.stringify({ one, two }));
-  assert.deepEqual(leaseConflicts(m, ['packages/grammar/CHANGELOG.md', 'modules/kernel/contract-changes/reg-a.yaml']), []);
+  assert.deepEqual(leaseConflicts(m, ['packages/grammar/CHANGELOG.md']), []);
   m.close();
   const log = fs.readFileSync(path.join(root, 'packages', 'grammar', 'CHANGELOG.md'), 'utf8');
   const a = sideCommit(root, 'append-a', { 'packages/grammar/CHANGELOG.md': `${log}## a\n` });
@@ -1039,7 +1032,7 @@ test('a live [Worker] of an open job is owned: never a stray, orphan or [Supervi
     stop: () => assert.fail('never stopped'), release: () => assert.fail('never released') };
   assert.deepEqual(sweepWorkers(sup, d), { deaths: [], closed: [] });
   sup.close();
-  assert.deepEqual([...supervisorWorkerHandles({ env })], ['term_wk']);
+  assert.deepEqual([...supervisorWorkerHandles({ env })].sort(), ['term_wk', 'term_old'].sort(), 'logical success retains a terminal whose physical closure remains unknown');
   // The Orca-tree check: the worker sits in the runtime project's worktree, its job in machine.sqlite sup_jobs.
   const repo = path.join(os.tmpdir(), 'starci-academy-backend', '.claude').replace(/\\/g, '/');
   withLedger(t, ({ ledger }) => {
@@ -1049,7 +1042,7 @@ test('a live [Worker] of an open job is owned: never a stray, orphan or [Supervi
     ]);
     const findings = orcaTreeFindings(ledger.db, rows, { repo, owned: supervisorWorkerHandles({ env }) });
     assert.equal(findings.some((f) => f.terminal === 'term_wk'), false, JSON.stringify(findings));
-    assert.equal(findings.find((f) => f.terminal === 'term_old')?.code, 'STRAY_TERMINAL', 'a settled worker still is stray');
+    assert.equal(findings.some((f) => f.terminal === 'term_old'), false, 'a logically settled worker without closure proof remains owned, never stray');
   });
   // The seat dedupe keys on the seat record: a worker (whatever its titles say) is no seat session, so never a duplicate.
   const terminals = [

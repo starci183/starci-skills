@@ -105,15 +105,24 @@ test('history, changelogs, generated files, the dispatcher table, and this spec 
     'CHANGELOG.md',
     'CHANGELOG-next.md',
     'packages/cli/CHANGELOG.md',
-    'modules/kernel/contract-changes/old.yaml',
     'packages/hfs/runtime/scripts/old.mjs',
     'packages/eslint/fe/runtime/scripts/old.mjs',
     'package-lock.json',
     'packages/example/package-lock.json',
     'packages/cli/src/catalog.generated.mjs',
-    'packages/cli/src/removed.mjs',
     'tests/cli/retired-cli.spec.mjs',
   ]) assert.deepEqual(calls(text, file), [], file);
+  assert.equal(calls(text, 'modules/kernel/current.yaml').length,1,'current source gets no historical directory waiver');
+});
+
+test('a retired module filename grants no blanket exemption', () => {
+  const file = 'packages/cli/src/removed.mjs';
+  const findings = calls('Run `starci api survey`.', file);
+  assert.equal(findings.length, 1, JSON.stringify(findings));
+  assert.equal(findings[0].file, file);
+  assert.equal(findings[0].code, CODE);
+  assert.equal(findings[0].use, 'starci kernel survey');
+  assert.deepEqual(calls('Run `starci kernel survey`.', file), []);
 });
 
 test('only the dispatcher removed-name table is masked in its generator', () => {

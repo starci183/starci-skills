@@ -31,3 +31,11 @@ test('a report may name the credentials it built on placeholders for', async () 
   assert.equal(validateOpReport({ ...base, credentialPending: 'VNPAY_TMN_CODE' }).ok, false);
   assert.equal(validateOpReport({ ...base, credentialPending: ['has space'] }).ok, false);
 });
+
+
+test('done cannot retain unfinished open items while partial retains its explicit unfinished list',()=>{
+  const report={schema:'starci/op-report@1',summary:'one item remains',open:['missing behavior']};
+  assert.equal(validateOpReport({...report,outcome:'done'}).ok,false);
+  assert.equal(validateOpReport({...report,outcome:'partial'}).ok,true);
+  assert.equal(validateOpReport({...report,outcome:'done',open:[]}).ok,true);
+});

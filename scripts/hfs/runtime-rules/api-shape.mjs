@@ -8,7 +8,7 @@
 // Which files are api files, and of which system, comes from the slot (tier api, the <system> its slot binds). Pure.
 import path from 'node:path';
 import { parseYaml } from '../../../engine/yaml.mjs';
-import { exportedNames, relativeImports } from './source-ast.mjs';
+import { exportedNames, relativeImportTargets } from './source-ast.mjs';
 import { ownerIdOf } from './external-owner.mjs';
 
 export const CODE = 'RT_API_SHAPE';
@@ -50,9 +50,10 @@ export function apiShapeFindings(ctx) {
       if (contract?.ids === null) found.push({ code: CODE, level: 'error', path: contract.file, line: 1, message: `${contract.file}, the calls contract of ${owner}, cannot be read` });
       else if (contract && !contract.ids.has(stem)) found.push({ code: CODE, level: 'error', path: file, line: 1, message: `${file} is not a call of ${contract.file}: a call file of ${owner} is named after the call id it wraps (${stem} is no id under calls:)` });
     }
-    for (const ref of relativeImports(ctx.parsed(file))) {
-      const to = path.posix.normalize(path.posix.join(path.posix.dirname(file), ref.specifier));
-      if (!ctx.fileSet.has(to)) continue;
+    for (const ref of relativeImportTargets(ctx, file)) {
+      const { to } = ref;
+      if (ref.missing) found.push({ code: CODE, level: 'error', path: file, line: ref.line, column: ref.column, message: `${file}:${ref.line} imports missing internal target ${to} (${ref.specifier}): its API custody cannot be judged` });
+      if (!ref.tracked) continue;
       const target = ownerIdOf(ctx.resolver, to);
       if (!target || ctx.resolver.tierOf(to) !== 'api' || target === owner) continue;
       if (owner && ctx.resolver.tierOf(file) === 'api') {

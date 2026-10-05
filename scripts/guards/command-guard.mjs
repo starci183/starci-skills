@@ -152,7 +152,7 @@ export function workflowHistoryChange(sub, rest) {
 }
 
 /** The WORKFLOW_HISTORY_CHANGE refusal for one git call inside the guard's workflow worktree, or null. */
-export function workflowHistoryVerdict({ args, cwd, guard, parseGitArgv }) {
+function workflowHistoryVerdict({ args, cwd, guard, parseGitArgv }) {
   if (!guard?.workflowWorktree) return null;
   const parsed = parseGitArgv(args, cwd);
   if (!parsed.sub || !insideDir(parsed.cwd, guard.workflowWorktree)) return null;
@@ -329,7 +329,7 @@ export async function commandVerdict({ command, cwd, guard, env = process.env, d
  * The rules that hold with no guard file (a terminal no launch bound, a lane, the owner's own session): an install
  * through a linked node_modules only. Loads nothing but deps-guard.mjs.
  */
-export async function unguardedVerdict({ command, cwd, env = process.env, dialect = 'bash', npm = null }) {
+async function unguardedVerdict({ command, cwd, env = process.env, dialect = 'bash', npm = null }) {
   const deps = npm ?? await import('./deps-guard.mjs');
   for (const c of commandsOf(command, { cwd, env, dialect })) {
     if (!deps.PACKAGE_MANAGERS.includes(c.program)) continue;

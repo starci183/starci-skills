@@ -8,9 +8,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import {createHash} from 'node:crypto';
+import {publish as publishNpm} from '../../scripts/api/npm/publish.mjs';
 import { tarFiles } from '../../scripts/lib/tar-files.mjs';
 import { tapSummary } from '../../scripts/lib/tap-summary.mjs';
-import { classifyContent } from '../../scripts/gates/release-registry.mjs';
+import { classifyContent, npmRegistry } from '../../scripts/gates/release-registry.mjs';
 import { buildPlan, publishOrder, readRows } from '../../scripts/gates/release-plan.mjs';
 import { FINAL_PROOFS, PROOFS, parseArgs, runProofs, verdictOf } from '../../scripts/gates/release-check.mjs';
 import { EXIT, releasePublish, parseArgs as publishArgs } from '../../scripts/gates/release-publish.mjs';
@@ -35,13 +37,14 @@ function tree(t, { versions = {} } = {}) {
   fs.writeFileSync(path.join(root, 'knowledge/hfs/canon-pins.yaml'),
     `schema: starci/canon-pins@1\npins:\n${PIN('@starci/leaf-a', 'packages/leaf-a', '1.0.0')}${PIN('@starci/leaf-b', 'packages/leaf-b', versions.bPin ?? '1.0.0')}${PIN('@starci/canon', 'packages/canon', '2.0.0')}`);
   for (const dir of ['node_modules', 'packages/node_modules']) { fs.mkdirSync(path.join(root, dir, 'x'), { recursive: true }); }
-  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'starci', version: '1.0.0-alpha.9' }));
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'starci', version: '1.0.0-alpha.9', publishConfig: {tag: 'alpha'} }));
   fs.writeFileSync(path.join(root, 'CHANGELOG.md'), '# Changelog\n\n## [1.0.0-alpha.9] - 2026-10-02\n\n- done\n');
   return root;
 }
 
 /** A fake registry: `published` maps name -> shasum; the local pack of every folder is `local`. */
-const runtimeShasum = '1'.repeat(40);
+const runtimeBytes = tgz({'package/package.json': JSON.stringify({name: 'starci', version: '1.0.0-alpha.9'})});
+const runtimeShasum = createHash('sha1').update(runtimeBytes).digest('hex');
 const publicationSha = 'a'.repeat(40);
 function fakeRegistry({ published = {}, local = 'sha-local', runtimeLocal = runtimeShasum, unreachable = [], content = 'same', whoami = 'releaser', log = [] } = {}) {
   return {
@@ -54,6 +57,12 @@ function fakeRegistry({ published = {}, local = 'sha-local', runtimeLocal = runt
   };
 }
 const allPublished = (extra = {}) => fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local', starci: runtimeShasum }, ...extra });
+
+function rootColdProof(root) {
+  const file = path.join(root, 'proved-runtime.tgz'); fs.writeFileSync(file, runtimeBytes);
+  return {status: 'green', name: 'starci', version: '1.0.0-alpha.9', inputRoot: root, inputSha: publicationSha,
+    archive: {file, bytes: runtimeBytes.length, shasum: runtimeShasum, sha256: createHash('sha256').update(runtimeBytes).digest('hex')}};
+}
 
 test('tarFiles reads the regular files of an npm tarball and refuses a truncated one', () => {
   const files = tarFiles(tgz({ 'package/package.json': '{"name":"x"}', 'package/dist/a.js': 'a'.repeat(700) }));
@@ -68,6 +77,22 @@ test('classifyContent: line endings, stale dist and real drift are told apart', 
   assert.equal(classifyContent(f({ 'package/a.js': 'x\n' }), f({ 'package/a.js': 'x\r\n' })), 'crlf');
   assert.equal(classifyContent(f({ 'package/dist/a.js': '1' }), f({ 'package/dist/a.js': '2' })), 'dist 1');
   assert.match(classifyContent(f({ 'package/a.js': '1' }), f({ 'package/a.js': '2', 'package/b.js': '3' })), /^drift 2: differs a\.js; only-local b\.js$/);
+});
+
+test('registry comparison preserves the published bytes when the local pack overwrites the same name and version', (t) => {
+  const root = tree(t), calls = [], filename = 'starci-leaf-a-1.0.0.tgz';
+  const manifest = fs.readFileSync(path.join(root, 'packages/leaf-a/package.json'));
+  const registry = npmRegistry({ root, pack: (spec, destination, options) => {
+    calls.push({ spec, destination, options });
+    fs.writeFileSync(path.join(destination, filename), tgz({ 'package/package.json': manifest,
+      'package/src/main.mjs': calls.length === 1 ? 'export const payload = "registry";\n' : 'export const payload = "local";\n' }));
+    return { ok: true, file: filename, detail: '' };
+  } });
+  assert.equal(registry.contentClass('@starci/leaf-a', '1.0.0', 'packages/leaf-a'), 'drift 1: differs src/main.mjs');
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls.map(call => call.spec), ['@starci/leaf-a@1.0.0', path.join(root, 'packages/leaf-a')]);
+  assert.equal(calls[0].destination, calls[1].destination, 'both actual archive writes deliberately use the deterministic filename');
+  assert.ok(calls.every(call => call.options.cwd === root));
 });
 
 test('tapSummary reads the counts and the deepest failing names', () => {
@@ -246,7 +271,7 @@ test('runtime phase waits for package publication and publishes only the root af
   const git = { dirty: () => ({ ok: true, stdout: '' }), branch: () => ({ stdout: 'main' }), head: () => ({ ok: true, stdout: publicationSha }) };
   const registry = fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local' }, log: calls });
   const deps = { registry, git, out: line => lines.push(line), node: fakeNode({ log: calls }),
-    runtimeProof: options => { assert.equal(options.root, root); assert.equal(options.sourceSha, publicationSha); assert.equal(options.expectedShasum, runtimeShasum); calls.push('root cold proof'); return { status: 'green', attempt: 'private-proof' }; } };
+    runtimeProof: options => { assert.equal(options.root, root); assert.equal(options.sourceSha, publicationSha); assert.equal(options.expectedShasum, runtimeShasum); calls.push('root cold proof'); return rootColdProof(root); } };
   assert.equal(releasePublish({ root, runtimePackage: true, deps: { ...deps, registry: fakeRegistry() } }), EXIT.blocked);
   assert.deepEqual(calls, [], 'upstream blockers cause no proof or publication');
   assert.equal(releasePublish({ root, runtimePackage: true, publish: true, npmUser: 'releaser', deps }), EXIT.done, lines.join('\n'));
@@ -280,10 +305,76 @@ test('runtime publication rechecks HEAD, archive and registry after the cold pro
     const git = { dirty: () => ({ ok: true, stdout: after && drift === 'dirty' ? ' M skills/starci/SKILL.md' : '' }),
       branch: () => ({ stdout: 'main' }), head: () => ({ stdout: after && drift === 'head' ? 'other' : publicationSha }) };
     const code = releasePublish({ root, runtimePackage: true, publish: true, npmUser: 'releaser', deps: { registry, git, out: () => {}, node: fakeNode(),
-      runtimeProof: () => { after = true; if (drift === 'registry') published.starci = runtimeShasum; return { status: 'green' }; } } });
+      runtimeProof: () => { after = true; if (drift === 'registry') published.starci = runtimeShasum; return rootColdProof(root); } } });
     assert.equal(code, EXIT.failed, drift);
     assert.deepEqual(calls, [], `${drift} refuses an immutable publication`);
   }
+});
+
+test('npm publication uploads the admitted archive with scripts disabled and an explicit channel', () => {
+  const calls = [], dir = path.resolve('release-owner'), archive = path.resolve('proved-runtime.tgz');
+  const run = (args, options) => { calls.push({args, options}); return {status: 0, stderr: ''}; };
+  assert.equal(publishNpm(dir, {archive, tag: 'alpha', run}).ok, true);
+  assert.deepEqual(calls[0].args, ['publish', archive, '--ignore-scripts', '--access', 'public', '--tag', 'alpha']);
+  assert.equal(calls[0].options.cwd, dir);
+  assert.equal(publishNpm(dir, {run}).ok, true);
+  assert.deepEqual(calls[1].args, ['publish', '--access', 'public', '--tag', 'latest']);
+  for (const result of [{status: 1}, {status: null, signal: 'SIGTERM'}, {status: 0, signal: 'SIGTERM'}, {error: new Error('missing npm')}])
+    assert.equal(publishNpm(dir, {archive, tag: 'alpha', run: () => result}).ok, false);
+});
+
+test('root publication sends exact proved bytes and refuses incomplete, tampered or foreign archive custody', t => {
+  for (const defect of ['none', 'missing', 'identity', 'bytes', 'input', 'linked']) {
+    const root = tree(t), calls = [], lines = [];
+    const registry = fakeRegistry({published: {'@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local'}});
+    const originalPublish = registry.publish;
+    registry.publish = (dir, options) => {
+      calls.push({dir, options});
+      assert.equal(dir, '.'); assert.equal(options.tag, 'alpha');
+      assert.deepEqual(fs.readFileSync(options.archive), runtimeBytes);
+      return originalPublish(dir);
+    };
+    const git = {dirty: () => ({ok: true, stdout: ''}), branch: () => ({stdout: 'main'}), head: () => ({stdout: publicationSha})};
+    const code = releasePublish({root, runtimePackage: true, publish: true, npmUser: 'releaser', deps: {
+      registry, git, node: fakeNode(), out: text => lines.push(text), runtimeProof: () => {
+        const proof = rootColdProof(root);
+        if (defect === 'missing') delete proof.archive;
+        if (defect === 'identity') proof.name = 'different-runtime';
+        if (defect === 'input') proof.inputSha = 'b'.repeat(40);
+        if (defect === 'bytes') fs.appendFileSync(proof.archive.file, 'unqualified bytes');
+        if (defect === 'linked') {
+          const target = path.join(root, 'target.tgz');
+          if (process.platform === 'win32') {
+            fs.mkdirSync(target);
+            fs.renameSync(proof.archive.file, path.join(target, 'archive.tgz'));
+            fs.symlinkSync(target, proof.archive.file, 'junction');
+          } else {
+            fs.renameSync(proof.archive.file, target);
+            fs.symlinkSync(target, proof.archive.file, 'file');
+          }
+          assert.equal(fs.lstatSync(proof.archive.file).isSymbolicLink(), true);
+        }
+        return proof;
+      },
+    }});
+    assert.equal(code, defect === 'none' ? EXIT.done : EXIT.failed, lines.join('\n'));
+    assert.equal(calls.length, defect === 'none' ? 1 : 0, defect);
+  }
+});
+
+test('root prerelease channel and untracked payload refusal happen before cold proof or publish', t => {
+  const root = tree(t), calls = [], lines = [];
+  const registry = fakeRegistry({published: {'@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local'}, log: calls});
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json')));
+  delete manifest.publishConfig; fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest));
+  const deps = {registry, out: text => lines.push(text), node: () => assert.fail('channel refusal must precede effects'),
+    git: {dirty: () => ({ok: true, stdout: ''}), branch: () => ({stdout: 'main'}), head: () => ({stdout: publicationSha})}};
+  assert.equal(releasePublish({root, runtimePackage: true, publish: true, npmUser: 'releaser', deps}), EXIT.failed);
+  assert.match(lines.join('\n'), /explicit non-latest/);
+  manifest.publishConfig = {tag: 'alpha'}; fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest));
+  assert.equal(releasePublish({root, runtimePackage: true, publish: true, npmUser: 'releaser', deps: {...deps,
+    git: {...deps.git, dirty: () => ({ok: true, stdout: '?? scripts/unqualified.mjs'})}}}), EXIT.usage);
+  assert.deepEqual(calls, []);
 });
 
 test('root flow is locked and does not invoke package rebind or example installation', async (t) => {

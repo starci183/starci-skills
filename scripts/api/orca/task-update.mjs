@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 // task-update.mjs — the calls.yaml `task-update` call as a callable function.
-// Internal entry: spawned by scripts/kernel/launch-smoke.mjs; not invoked directly.
+// Called by the launch smoke and draw critic for their own Tasks.
 // Args: --id <task_id> --status <status> [--result <json>] [--run <run_id>] [--from <handle>]
-// Returns {ok, taskId, status} — taskId is result.task.id. --result is JSON;
-// objects are serialized by orcaCall. Settle and finish use it to close the
-// operation Task they opened, so a job that ends leaves no open Task in the
-// workflow Run.
 import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 
+/**
+ * Updates an explicitly owned smoke or critic Task; operation Tasks settle through their own worker_done.
+ * id and status are required; pass serialized JSON text for result when it is provided.
+ * Returns the nullable Task and id, error detail and the requested status echoed back; ok requires a zero exit and Task id.
+ * The shared runner may reissue this naturally idempotent state write after a lost receipt.
+ */
 export function taskUpdate({ id, status, result, run, from }) {
   const r = orcaCall('task-update', { id, status, result, run, from });
   const task = r.result?.task ?? null;

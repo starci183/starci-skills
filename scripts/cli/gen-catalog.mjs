@@ -2,6 +2,7 @@
 // Modes: --write writes; --check reports RT_CLI_CATALOG_DRIFT when generated output differs.
 // Outputs: packages/cli/src/catalog.generated.mjs, docs/cli.md, and
 // packages/cli/completions/{starci.bash,_starci,starci.fish,starci.ps1}.
+// The runtime install pin module is derived from the root package identity.
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -66,7 +67,6 @@ const renderDocs = (cat) => {
       out.push(`exit: ${Object.entries(v.exit ?? {}).map(([c, t]) => `${c} ${t}`).join('; ')}`, '',
         `json: ${v.json}`, '');
       if (v.examples?.length) out.push('```sh', ...v.examples, '```', '');
-      if (v.removed?.length) out.push(`Replaces: ${v.removed.map((r) => `\`${r}\``).join(', ')}`, '');
     }
   }
   return out.join('\n');
@@ -257,11 +257,19 @@ ${psLocalValues}
 `;
   return { 'starci.bash': bash, '_starci': zsh, 'starci.fish': fish, 'starci.ps1': ps };
 };
+const renderRuntimeInstallModule = (root) => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  if (manifest.name !== 'starci' || typeof manifest.version !== 'string'
+    || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(manifest.version))
+    throw new Error('runtime install pin requires the starci root package and an exact version');
+  return `// ${GENERATED}\nexport const RUNTIME_VERSION = ${JSON.stringify(manifest.version)};\n`;
+};
 /** Every output the generator owns: {relpath: text}. */
 export const generateAll = async (root = skillRoot) => {
   const cat = loadCatalog(root);
   return {
     'packages/cli/src/catalog.generated.mjs': await renderCatalogModule(cat),
+    'packages/cli/src/runtime-install.generated.mjs': renderRuntimeInstallModule(root),
     'docs/cli.md': renderDocs(cat),
     ...Object.fromEntries(Object.entries(renderCompletions(cat)).map(([k, v]) => [`packages/cli/completions/${k}`, v])),
   };

@@ -86,8 +86,8 @@ test('fake rule id: a rules[] entry that resolves to no knowledge id, DNA name, 
   assert.deepEqual(kinds(f), ['unresolvable rule id']);
   assert.equal(f[0].count, 4);
   const resolve = ruleResolver({});
-  for (const ok of ['GAP-4', 'GAP-4 case-2', 'ui.presentation.gap', 'dna:Button', 'Button.variant=secondary', 'owner:draw-devin-brand-claude', 'owner:work-hygiene-gate']) assert.ok(resolve(ok).ok, ok);
-  for (const bad of ['padding.yaml page-inset', '07-DIRECTION §3.2', 'direction:P2', 'rubric:H3']) assert.equal(resolve(bad).ok, false, bad);
+  for (const ok of ['GAP-4', 'GAP-4 case-2', 'ui.presentation.gap', 'dna:Button', 'Button.variant=secondary', 'owner:draw-devin-brand-claude', 'owner:draw-content-region-only']) assert.ok(resolve(ok).ok, ok);
+  for (const bad of ['padding.yaml page-inset', '07-DIRECTION §3.2', 'direction:P2', 'rubric:H3', 'owner:work-hygiene-gate']) assert.equal(resolve(bad).ok, false, bad);
 });
 
 test('brand.direction ids resolve from the product brand record; an empty because and an uncited one are refused', (t) => {

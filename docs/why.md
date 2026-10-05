@@ -74,11 +74,11 @@ goes to the `not-codes` section of `modules/kernel/allowlist.yaml` with the reas
 
 ## Answers for the UI session
 
-1. **Persisted and importable.** `op_attempts.why_json` holds the why (migration 0004 on the writer's first
-   open of an older ledger; a fresh ledger runs it after 0001). `scripts/kernel/why.mjs` exports the pure read-only
-   `whyOf(ledgerDbOrHandle, attemptRowOrId)`: the stored value, else computed now (so an attempt settled before why existed,
-   or a ledger the writer has not reopened yet, still answers; a reader opened before the column exists just gets the computed
-   value). Also `whyOfOp(db, workflowId, opId)`, `whysOfWorkflow(db, workflowId)`, `computeWhy`, `explainCode(code)`,
+1. **Persisted and importable.** `op_attempts.why_json` holds the why in the current runtime schema,
+   `engine/db/migrations/runtime/0001-init.sql`. `scripts/kernel/why.mjs` exports the pure read-only
+   `whyOf(ledgerDbOrHandle, attemptRowOrId)`: the stored value, else computed now when the attempt has no stored why.
+   The reader does not write the ledger. Also `whyOfOp(db, workflowId, opId)`, `whysOfWorkflow(db, workflowId)`,
+   `computeWhy`, `explainCode(code)`,
    `loadCatalog()`. `v_op_history` carries `why_json` (the UI's `/api/attempts` rows).
 2. **Catalog path and shape.** `modules/kernel/failure-codes.yaml`, flat map `code -> {title, title_vi, meaning_vi, causes_vi[],
    nextStep_vi, owner, kind}`, parsed with `engine/yaml.mjs` (`loadCatalog()` in scripts/kernel/why.mjs does exactly that).

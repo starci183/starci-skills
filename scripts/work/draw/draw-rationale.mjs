@@ -24,7 +24,7 @@
 //   - a rules[] entry that resolves to nothing: its first token must be a knowledge id (knowledge/**: GAP-5,
 //     PADDING-9 case-1, ui.presentation.gap), a DNA component or closed value (dna:Button.variant=secondary), a
 //     brand.direction principle/rubric id (direction:P2, rubric:H3), or an owner ruling (owner:<id> of
-//     modules/kernel/owner-rulings.yaml, a contract change id, a ui.review.feedback note id, an answer receipt);
+//     modules/kernel/owner-rulings.yaml, a ui.review.feedback note id, an answer receipt);
 //   - an empty `because`, or one that cites no FR, content or user job;
 //   - a part with no measured render (re-render it with draw-render) or no redline render beside it.
 //
@@ -35,7 +35,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { COMPONENT_ATTR, PART_ATTR, componentRootOf, loadDna, parseHtml, visibleElement, walkElements, classesOf } from './draw-dna.mjs';
-import { readContractChangesDoc } from '../../machine/contract-changes-store.mjs';
 import { list } from '../../lib/list.mjs';
 import { ancestorsOf } from '../../lib/dom-tree.mjs';
 import { isFile } from '../../lib/fs-kind.mjs'; import { isMain } from '../../lib/is-main.mjs';
@@ -55,8 +54,6 @@ export const REDLINE_LEAF_COMPONENTS = Object.freeze(['Text', 'Heading', 'Icon',
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const KNOWLEDGE = path.join(ROOT, 'knowledge');
 const OWNER_RULINGS = path.join(ROOT, 'modules', 'kernel', 'owner-rulings.yaml');
-// null: the runtime registry (the entry files, scripts/machine/contract-changes-store.mjs).
-const CONTRACT_CHANGES = null;
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return undefined; } };
 const readYamlOr = (f) => { try { return parseYaml(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 const str = (v) => (v == null ? '' : typeof v === 'string' ? v : typeof v === 'number' ? String(v) : JSON.stringify(v));
@@ -172,12 +169,10 @@ function directionIds(workRoot) {
   return { all: idsUnder(direction), rubric: new Set(list(direction?.rubric?.checks).map((c) => str(c?.id).trim()).filter(Boolean)) };
 }
 
-/** Owner ruling ids: modules/kernel/owner-rulings.yaml, contract change ids, the record's feedback notes and receipts. */
-export function ownerIds({ record = null, workRoot = null, rulingsFile = OWNER_RULINGS, changesFile = CONTRACT_CHANGES } = {}) {
+/** Current owner rulings, product feedback notes and actual receipts. */
+export function ownerIds({ record = null, workRoot = null, rulingsFile = OWNER_RULINGS } = {}) {
   const ids = new Set();
   for (const r of list(readYamlOr(rulingsFile)?.rulings)) if (r?.id) ids.add(str(r.id).trim());
-  const changes = changesFile ? readYamlOr(changesFile)?.changes : readContractChangesDoc(ROOT).doc.changes;
-  for (const c of list(changes)) if (c?.id) ids.add(str(c.id).trim());
   const review = record?.ui?.review ?? {};
   for (const n of idsUnder(review.feedback)) ids.add(n);
   for (const r of list(review.feedback?.rounds)) if (r?.receipt) ids.add(str(r.receipt));
@@ -207,11 +202,11 @@ function dnaResolves(dna, token) {
 
 /**
  * A resolver of rules[] entries: (ref) -> {ok, via, id, why?}. Context: {workRoot, record, dna, knowledge,
- * rulingsFile, changesFile, repoRoot}.
+ * rulingsFile, repoRoot}.
  */
-export function ruleResolver({ workRoot = null, record = null, dna = loadDna(), knowledge = knowledgeIndex(), rulingsFile = OWNER_RULINGS, changesFile = CONTRACT_CHANGES, repoRoot = null } = {}) {
+export function ruleResolver({ workRoot = null, record = null, dna = loadDna(), knowledge = knowledgeIndex(), rulingsFile = OWNER_RULINGS, repoRoot = null } = {}) {
   const direction = directionIds(workRoot);
-  const owner = ownerIds({ record, workRoot, rulingsFile, changesFile });
+  const owner = ownerIds({ record, workRoot, rulingsFile });
   const receiptOk = (token) => {
     for (const base of [repoRoot, workRoot ? path.dirname(workRoot) : null, workRoot].filter(Boolean)) {
       const f = path.resolve(base, token);

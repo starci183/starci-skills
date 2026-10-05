@@ -230,6 +230,11 @@ properties:
   policy:
     type: object
     minProperties: 1
+    properties:
+      executionModes:
+        type: object
+        minProperties: 1
+        additionalProperties: {$ref: "#/$defs/executionMode"}
     description: "The one map for op-specific policy. Anything an op used to declare as its own
       top-level `*Policy`, `*Authority`, `executionModes`, `findingSchema` or `modes` key lives here."
   route:
@@ -244,6 +249,28 @@ properties:
       prerequisites: {$ref: "#/$defs/stringList"}
       riskHints: {$ref: "#/$defs/stringList"}
 $defs:
+  executionMode:
+    type: object
+    additionalProperties: false
+    required: [id, goal, nodeKinds, completionProfile, sideEffects, graphPolicy, reads, writes, steps, proofs, blockers]
+    properties:
+      id: {$ref: "#/properties/id"}
+      goal: {$ref: "#/properties/goal"}
+      nodeKinds: {$ref: "#/properties/nodeKinds"}
+      completionProfile: {$ref: "#/properties/completionProfile"}
+      sideEffects: {$ref: "#/properties/sideEffects"}
+      graphPolicy: {$ref: "#/properties/graphPolicy"}
+      reads: {$ref: "#/properties/reads"}
+      writes: {$ref: "#/properties/writes"}
+      steps: {$ref: "#/properties/steps"}
+      proofs: {$ref: "#/properties/proofs"}
+      blockers: {$ref: "#/properties/blockers"}
+      placeholders: {$ref: "#/properties/placeholders"}
+      layoutPolicy: {$ref: "#/properties/layoutPolicy"}
+      grammarContext: {$ref: "#/properties/grammarContext"}
+      grammarInputs: {$ref: "#/properties/grammarInputs"}
+      migrationPolicy: {type: object, minProperties: 1}
+      dataCorrectionPolicy: {type: object, minProperties: 1}
   prose:
     type: object
     additionalProperties: false
@@ -263,6 +290,33 @@ $defs:
     type: array
     minItems: 1
     items: {type: string, minLength: 1}
+  paramValueSchema:
+    type: object
+    additionalProperties: false
+    required: [type]
+    description: "The inline object-param shape uses only the existing zero-dependency schema walker's keywords; external refs and alternative-schema dialects are not supported."
+    properties:
+      type: {enum: [object, array, string, number, integer, boolean]}
+      properties:
+        type: object
+        minProperties: 1
+        additionalProperties: {$ref: "#/$defs/paramValueSchema"}
+      required:
+        type: array
+        minItems: 1
+        items: {type: string, minLength: 1}
+      additionalProperties: {type: boolean}
+      items: {$ref: "#/$defs/paramValueSchema"}
+      enum:
+        type: array
+        minItems: 1
+        items: {type: [string, number, boolean]}
+      minLength: {type: integer, minimum: 1}
+      pattern: {type: string, minLength: 1}
+      minimum: {type: number}
+      maximum: {type: number}
+      minItems: {type: integer, minimum: 1}
+      minProperties: {type: integer, minimum: 1}
   param:
     type: object
     additionalProperties: false
@@ -272,8 +326,9 @@ $defs:
       scripts/checks/check-op-manifest.mjs refuses a param with both or neither."
     properties:
       type:
-        enum: [integer, number, string, boolean, enum]
+        enum: [integer, number, string, boolean, enum, object]
       default: {}
+      valueSchema: {$ref: "#/$defs/paramValueSchema"}
       required:
         const: true
         description: "No default applies: `starci kernel enqueue` refuses params-invalid until the setter

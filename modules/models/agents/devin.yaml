@@ -4,7 +4,7 @@ kind: native-managed-agent
 model: devin-agent
 modelAuthority: configured-logical-runtime
 why: |-
-  Every agent launches the one way (modules/kernel/contract-changes/launch-through-worker-start.yaml): Orca's
+  Every agent launches the one way (modules/kernel/start-workflow.yaml): Orca's
   orchestration worker-start --agent devin places the worker, launches the Devin CLI with the owner's per-agent default
   args (Orca settings agentDefaultArgs.devin: --permission-mode bypass --respect-workspace-trust false), injects the Task
   and owns its lifecycle. worker-start takes --model only for Claude, Codex and Cursor, so a Devin worker starts on its

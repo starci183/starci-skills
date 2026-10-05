@@ -12,16 +12,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { validateAgainstSchema } from './json-schema.mjs';
 
-const cache = new Map();
 const isObj = (v) => v != null && typeof v === 'object' && !Array.isArray(v);
 
 /** The `shared:` fragment table of modules/ops/_common.yaml. `opsDir` may be the ops root
  *  (modules/ops), the per-op directory (modules/ops/ops) or any path inside them; the nearest
- *  `_common.yaml` at or above it wins. Missing file -> empty table. Result cached by directory. */
+ *  `_common.yaml` at or above it wins. Missing file -> empty table. Read fresh for each admission/context snapshot. */
 export function opSharedOf(dir) {
   const key = path.resolve(dir);
-  if (cache.has(key)) return cache.get(key);
   let found = null;
   let d = /\.(yaml|yml)$/i.test(key) ? path.dirname(key) : key;
   for (let i = 0; i < 3 && !found; i += 1) {
@@ -34,7 +33,6 @@ export function opSharedOf(dir) {
     const doc = parseYaml(fs.readFileSync(found, 'utf8'));
     if (isObj(doc?.shared)) shared = doc.shared;
   }
-  cache.set(key, shared);
   return shared;
 }
 
@@ -56,7 +54,10 @@ function mergeEntry(entry, def, where) {
 
 const byId = (list) => {
   const map = new Map();
-  for (const e of Array.isArray(list) ? list : []) if (isObj(e) && e.id != null) map.set(String(e.id), e);
+  for (const entry of Array.isArray(list) ? list : []) if (isObj(entry) && entry.id != null) {
+    if (map.has(String(entry.id))) throw new Error(`duplicate shared fragment id ${entry.id}`);
+    map.set(String(entry.id), entry);
+  }
   return map;
 };
 
@@ -67,11 +68,11 @@ export function mergeOpShared(doc, shared = {}) {
   if (!isObj(doc)) return doc;
   const where = doc.id ?? '?';
   const out = { ...doc };
-  if (isObj(doc.placeholders) && isObj(shared.placeholders)) {
+  if (isObj(doc.placeholders)) {
     const ph = { ...doc.placeholders };
     for (const [k, v] of Object.entries(ph)) {
       if (v === 'shared') {
-        if (!(k in shared.placeholders)) throw new Error(`op manifest ${where}: placeholders.${k} marks shared but _common.yaml shared.placeholders has no ${k}`);
+        if (!isObj(shared.placeholders) || !Object.hasOwn(shared.placeholders, k)) throw new Error(`op manifest ${where}: placeholders.${k} marks shared but _common.yaml shared.placeholders has no ${k}`);
         ph[k] = shared.placeholders[k];
       }
     }
@@ -92,7 +93,117 @@ export function mergeOpShared(doc, shared = {}) {
       ? mergeEntry(e, table.get(e.id), `${where}.${section}`)
       : e));
   }
+  if (isObj(doc.policy?.executionModes)) {
+    out.policy = { ...doc.policy, executionModes: Object.fromEntries(Object.entries(doc.policy.executionModes)
+      .map(([mode, entry]) => [mode, mergeOpShared(entry, shared)])) };
+  }
   return out;
+}
+
+/** Refuse an object param without a closed, explicitly typed property boundary.
+ * The canonical op schema owns the supported nested valueSchema vocabulary. */
+export function paramDefinitionError(name, def) {
+  if (def?.type !== 'object') return null;
+  const shape = def.valueSchema;
+  return isObj(shape) && shape.type === 'object' && isObj(shape.properties)
+    && Object.keys(shape.properties).length > 0 && shape.additionalProperties === false
+    ? null : `${name} requires an object valueSchema with declared properties and additionalProperties: false`;
+}
+
+/** Validate one declared param value, including the defaults used at admission. */
+export function paramValueError(name, def, value) {
+  const type = def?.type, definitionError = paramDefinitionError(name, def);
+  if (definitionError) return definitionError;
+  if (type === 'object') {
+    if (!isObj(value)) return `${name} must be an object`;
+    try {
+      const errors = validateAgainstSchema(value, def.valueSchema);
+      return errors.length ? `${name}: ${errors.join('; ')}` : null;
+    } catch { return `${name} has an invalid valueSchema`; }
+  }
+  if (type === 'enum') {
+    const allowed = Array.isArray(def.enum) ? def.enum : [];
+    return allowed.includes(value) ? null : `${name} must be one of ${allowed.join(', ')} (got ${JSON.stringify(value)})`;
+  }
+  if (type === 'integer' && !Number.isInteger(value)) return `${name} must be an integer (got ${JSON.stringify(value)})`;
+  if (type === 'number' && !(typeof value === 'number' && Number.isFinite(value))) return `${name} must be a number (got ${JSON.stringify(value)})`;
+  if (type === 'string' && typeof value !== 'string') return `${name} must be a string (got ${JSON.stringify(value)})`;
+  if (type === 'boolean' && typeof value !== 'boolean') return `${name} must be true or false (got ${JSON.stringify(value)})`;
+  if (typeof value === 'number') {
+    if (def.min !== undefined && value < def.min) return `${name} is ${value}, below its minimum ${def.min}`;
+    if (def.max !== undefined && value > def.max) return `${name} is ${value}, above its maximum ${def.max}`;
+  }
+  return null;
+}
+
+const mergeByKey = (common, selected, key) => {
+  const result = [...(Array.isArray(common) ? common : [])];
+  for (const entry of Array.isArray(selected) ? selected : []) {
+    const at = result.findIndex((row) => row?.[key] === entry?.[key]);
+    if (at < 0) result.push(entry); else result[at] = entry;
+  }
+  return result;
+};
+
+/** Select one executable mode without inheriting sibling permissions. Planning may
+ * retain the selector envelope; execution requires a concrete declared mode. Common
+ * reads, writes and proof/blocker obligations remain, with selected IDs taking precedence. */
+export function resolveOpContract(brief, { params = {}, mode = params.mode ?? brief?.params?.mode?.default, allowSelect = false } = {}) {
+  const modes = brief?.policy?.executionModes;
+  if (!isObj(modes)) return { ok: true, mode: mode ?? null, contract: brief };
+  if (mode === 'select' && allowSelect) return { ok: true, mode, contract: brief, planning: true };
+  if (typeof mode !== 'string' || !Object.hasOwn(modes, mode) || !isObj(modes[mode])) {
+    return { ok: false, reason: 'params-invalid', detail: `${brief?.id ?? 'op'} requires one concrete params.mode from [${Object.keys(modes).join(', ')}]; select is planning only` };
+  }
+  const selected = modes[mode];
+  if (brief.id !== undefined && selected.id !== undefined && selected.id !== brief.id) return { ok: false, reason: 'params-invalid', detail: `mode ${mode} declares foreign op ${selected.id}` };
+  const contract = { ...brief, ...selected };
+  contract.policy = { ...(brief.policy ?? {}), ...(selected.policy ?? {}) };
+  delete contract.policy.executionModes;
+  // Historical modes kept their specific policy at the mode root. The effective
+  // manifest carries those policies in the same policy map as every other op.
+  for (const key of Object.keys(selected).filter((key) => /(?:Policy|Authority)$/.test(key) && key !== 'graphPolicy' && key !== 'layoutPolicy')) {
+    contract.policy[key] = selected[key]; delete contract[key];
+  }
+  for (const section of ['reads', 'writes', 'proofs']) contract[section] = mergeByKey(brief[section], selected[section], 'id');
+  contract.blockers = mergeByKey(brief.blockers, selected.blockers, 'code');
+  contract.placeholders = { ...(brief.placeholders ?? {}), ...(selected.placeholders ?? {}) };
+  for (const section of ['context', 'knowledge', 'docs']) {
+    if (brief[section] !== undefined || selected[section] !== undefined) {
+      const list = (value) => value == null ? [] : Array.isArray(value) ? value : [value];
+      contract[section] = [...list(brief[section]), ...list(selected[section])];
+    }
+  }
+  return { ok: true, mode, contract };
+}
+
+/** Bind a declared path placeholder only from a concrete single-segment param. */
+export function bindOpPath(pattern, params = {}) {
+  return pattern.replace(/<([A-Za-z0-9_-]+)>/g, (whole, name) => {
+    const value = params[name];
+    return typeof value === 'string' && /^[A-Za-z0-9_.-]+$/.test(value) ? value : whole;
+  });
+}
+
+/** Selected declared READ text and explicit param references, before the input
+ * owner classifies Source-law paths. Selection has one implementation. */
+export function opReadTexts(brief, { params = {}, mode } = {}) {
+  const selected = resolveOpContract(brief, { params, ...(mode == null ? {} : { mode }), allowSelect: true });
+  if (!selected.ok) throw new Error(selected.detail);
+  const reads = (entries) => (Array.isArray(entries) ? entries : typeof entries === 'string' ? [entries] : []).map((entry) => entry?.path ?? entry);
+  const strings = (value) => typeof value === 'string' ? [value] : Array.isArray(value) ? value.flatMap(strings)
+    : isObj(value) ? Object.values(value).flatMap(strings) : [];
+  return [...reads(selected.contract?.reads), ...reads(selected.contract?.context), ...reads(selected.contract?.knowledge), ...strings(params)];
+}
+
+/** Snapshot named checks and mechanical proof owners separately from route
+ * candidates. A proof owner is not automatically an independently runnable CLI. */
+export function opCheckRequirements(contract, kind = {}) {
+  const required = [
+    ...(contract?.layoutPolicy?.checks ?? []).map((value) => ({ path: value, source: 'layoutPolicy', obligation: /[\\/]/.test(value) ? 'check-owner' : 'check-id' })),
+    ...(contract?.proofs ?? []).filter((proof) => typeof proof.check === 'string').map((proof) => ({ path: proof.check, source: 'proof', proof: proof.id, obligation: 'proof-owner' })),
+  ];
+  return { required, candidates: (kind.checks ?? []).map((value) => ({ path: value, source: 'kind' })) };
 }
 
 /** Parse an op manifest file and return the effective (shared-merged) document. */

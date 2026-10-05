@@ -9,6 +9,12 @@ import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
+/**
+ * Creates an Orca Run for objective using the caller's durable request identity.
+ * The caller decides whether creation is needed and names the coordinator through from when provided.
+ * ok requires a zero exit and a Run id; the result also preserves outcome, error and request-replay metadata.
+ * Keep the same request identity while reconciling an unsettled call instead of creating a replacement Run.
+ */
 export function runCreate({ objective, from, request }) {
   const r = orcaCall('run-create', { objective, from }, { request });
   const result = r.result;

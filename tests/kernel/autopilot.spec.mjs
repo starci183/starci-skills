@@ -13,8 +13,8 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { stringifyYaml, parseYaml } from '../../engine/yaml.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
-import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot } from '../../scripts/kernel/autopilot-run.mjs';
+import {seedWorkflow, withLedger} from '../helpers/ledger-fixture.mjs';
+import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot, budgetOf, autopilotSweep } from '../../scripts/kernel/autopilot-run.mjs';
 import { ownerAnswerProof } from '../../scripts/machine/owner-claim.mjs';
 import { applyDrawReview, drawReviewQuestion, drawReviewStatus } from '../../scripts/work/draw-review.mjs';
 import { repeatedAnswerOf } from '../../scripts/machine/owner-answers.mjs';
@@ -89,6 +89,15 @@ test('settings: on by default for every workflow; STARCI_AUTOPILOT and a per-wor
 test('a credential ask is deferred to handover: nothing waits on the owner, the live proof waits for the checklist, the rest proceeds', (t) => {
   const repo = world(t);
   seedAsk(repo, { jobId: 'job-prov', op: 'provision.ask', dispatchId: 'ctx_cred0001', question: CREDENTIAL });
+  // This settled private ask has explicit fixture usage; missing usage is tested separately below.
+  seed(repo, l => {
+    const attemptId=l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get('job-prov').attempt_id;
+    assert.equal(l.write.recordAttemptUsage({attemptId,source:'provider-report',
+      rows:[{model:'private-test-model',inputTokens:17,outputTokens:5,cacheReadTokens:0,cacheWriteTokens:0}]}).recorded,true);
+    const measured=budgetOf(l.db,WF,autopilotSettings({autopilot:{budgets:{tokens:1000}}}));
+    assert.equal(measured.used.tokens,22);assert.equal(measured.coverage.complete,true);
+    assert.deepEqual(measured.unverified,[]);assert.deepEqual(measured.exceeded,[]);
+  });
   seed(repo, (l) => seedJob(l, { jobId: 'job-e2e', op: 'e2e.verify', status: 'queued' }));
   const s = status(repo);
   assert.equal(s.autopilot.on, true);
@@ -298,3 +307,89 @@ test('a brand-direction review repeats only by its text: a revised rev is a new 
   assert.equal(repeatedAnswerOf({ kind: 'brand-direction-review', text: 'Duy\u1ec7t h\u01b0\u1edbng rev 2 [desktop bbbb]', options: ['Ch\u1ea5p nh\u1eadn', 'S\u1eeda l\u1ea1i'] }, answers, { op: 'brand.decide' }), null);
   assert.ok(repeatedAnswerOf({ kind: 'brand-direction-review', text: 'Duy\u1ec7t h\u01b0\u1edbng rev 1 [desktop aaaa]', options: ['Ch\u1ea5p nh\u1eadn', 'S\u1eeda l\u1ea1i'] }, answers, { op: 'brand.decide' }));
 });
+
+// Real attempt/usage writers prove the meter follows dispatch history, not queued job declarations.
+const withUsageBudget = (t, fn) => withLedger(t, ({ ledger, repoRoot }) => {
+  ledger.ensureWorkflow({ workflowId: WF });
+  ledger.write.changeWorkflowPhase({ workflowId: WF, to: 'running', by: 'test', reason: 'usage budget fixture' });
+  const queue = (jobId) => {
+    ledger.write.createUnit({ workflowId: WF, unitId: jobId, opId: 'test.op', subjectKey: jobId, goalRevision: 1 });
+    ledger.enqueueJob({ workflowId: WF, jobId, unitId: jobId, opId: 'test.op', kind: 'op', payload: { usage: { totalTokens: 999999 } } });
+  };
+  const dispatch = (jobId, dispatchId) => {
+    if (ledger.getJob(jobId).status === 'queued') ledger.write.setJobStatus({ jobId, to: 'ready', reason: 'test dispatch' });
+    ledger.write.setJobStatus({ jobId, to: 'leased', reason: 'test dispatch' });
+    const attempt = ledger.write.startAttempt({ workflowId: WF, jobId, dispatchId, provider: 'codex', dispatchedAt: Date.now() });
+    ledger.write.setJobStatus({ jobId, to: 'running', reason: 'test worker accepted' });
+    return attempt.attempt_id;
+  };
+  const end = (jobId, attemptId) => {
+    ledger.write.updateAttempt({ attemptId, settledAt: Date.now(), endState: 'worker-dead' });
+    ledger.write.setJobStatus({ jobId, to: 'ready', reason: 'test worker died; retry same job' });
+  };
+  return fn({ ledger, repoRoot, queue, dispatch, end, settings: autopilotSettings({ autopilot: { budgets: { attempts: 10, tokens: 1000, wallMs: 100000 } } }) });
+});
+
+test('autopilot budgets count each real dispatch and measured attempt/Kernel tokens once, ignoring queued jobs and payload claims', t => withUsageBudget(t, ({ ledger, queue, dispatch, end, settings }) => {
+  queue('meter-queued-a'); queue('meter-queued-b'); queue('meter-work');
+  assert.equal(budgetOf(ledger.db, WF, settings).used.attempts, 0);
+  const first = dispatch('meter-work', 'ctx_meter_first');
+  const rows = [{ model: 'm', inputTokens: 100, outputTokens: 10, cacheReadTokens: 20, cacheWriteTokens: 30, reasoningTokens: 99 }];
+  assert.equal(ledger.write.recordAttemptUsage({ attemptId: first, rows }).recorded, true);
+  assert.equal(ledger.write.recordAttemptUsage({ attemptId: first, rows }).recorded, false);
+  end('meter-work', first);
+  const second = dispatch('meter-work', 'ctx_meter_retry');
+  ledger.write.recordAttemptUsage({ attemptId: second, rows: [{ model: 'm', inputTokens: 5, outputTokens: 7, cacheReadTokens: 0, cacheWriteTokens: 0 }] });
+  end('meter-work', second);
+  const kernel = { workflowId: WF, turnRef: 'kernel:meter:s1@1', provider: 'codex', rows: [{ model: 'm', inputTokens: 2, outputTokens: 3, cacheReadTokens: 4, cacheWriteTokens: 5 }] };
+  assert.equal(ledger.write.recordKernelUsage(kernel).recorded, true);
+  assert.equal(ledger.write.recordKernelUsage(kernel).recorded, false);
+  const result = budgetOf(ledger.db, WF, settings);
+  assert.equal(result.used.attempts, 2, 'two dispatches of one job spend two attempts; queued work spends none');
+  assert.equal(result.used.tokens, 186, 'detail rows include Kernel usage; summaries, reasoning and job payloads are not added again');
+  assert.equal(result.coverage.complete, true);
+  assert.deepEqual(result.exceeded, []);
+  const capped = budgetOf(ledger.db, WF, { ...settings, budgets: { ...settings.budgets, attempts: 1, tokens: 185 } });
+  assert.deepEqual(capped.exceeded, ['attempts', 'tokens']);
+}));
+
+test('completed missing usage is unknown and holds dispatch through the existing Supervisor gate; later measurement replaces unknown', t => withUsageBudget(t, ({ ledger, repoRoot, queue, dispatch, end, settings }) => {
+  queue('meter-unavailable'); queue('meter-pending');
+  const unavailable = dispatch('meter-unavailable', 'ctx_meter_unavailable');
+  end('meter-unavailable', unavailable);
+  ledger.write.markAttemptUsageUnavailable({ attemptId: unavailable, reason: 'private fixture has no adapter result' });
+  const pending = dispatch('meter-pending', 'ctx_meter_pending');
+  end('meter-pending', pending);
+  const before = budgetOf(ledger.db, WF, settings);
+  assert.equal(before.used.tokens, null, 'completed unmeasured attempts cannot claim verified zero');
+  assert.equal(before.measured.tokens, 0);
+  assert.deepEqual(before.unverified, ['tokens']);
+  assert.equal(before.coverage.unknown, 2);
+  assert.equal(before.coverage.complete, false);
+  const sweep = autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings });
+  assert.deepEqual(sweep.budget.unverified, ['tokens']);
+  const gates = ledger.db.prepare("SELECT payload_json FROM events WHERE kind='incident-raised'").all().map(row => JSON.parse(row.payload_json)).filter(row => row.kind === SUPERVISOR_GATE);
+  assert.equal(gates.length, 1); assert.deepEqual(gates[0].holds, ['*']);
+  assert.match(gates[0].detail, /tokens unknown/);
+  autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings });
+  assert.equal(ledger.db.prepare("SELECT count(*) n FROM events WHERE kind='autopilot-budget-exceeded'").get().n, 1);
+  for (const attemptId of [unavailable, pending]) ledger.write.recordAttemptUsage({ attemptId, rows: [{ model: 'm', inputTokens: 4, outputTokens: 2, cacheReadTokens: 0, cacheWriteTokens: 0 }] });
+  const after = budgetOf(ledger.db, WF, settings);
+  assert.equal(after.used.tokens, 12); assert.deepEqual(after.unverified, []); assert.equal(after.coverage.complete, true);
+  assert.equal(ledger.db.prepare("SELECT count(*) n FROM incidents WHERE status='open'").get().n, 1, 'measurement does not silently resolve the Supervisor decision');
+}));
+
+test('an open attempt remains pending, extensions retain existing cap semantics, and a zero token cap does not require a usage hold', t => withUsageBudget(t, ({ ledger, queue, dispatch, end, settings }) => {
+  queue('meter-open'); const attempt = dispatch('meter-open', 'ctx_meter_open');
+  const open = budgetOf(ledger.db, WF, settings);
+  assert.equal(open.used.attempts, 1); assert.equal(open.coverage.open, 1); assert.equal(open.coverage.complete, false); assert.deepEqual(open.unverified, []);
+  end('meter-open', attempt);
+  const zero = budgetOf(ledger.db, WF, { ...settings, budgets: { ...settings.budgets, tokens: 0 } });
+  assert.deepEqual(zero.unverified, []); assert.equal(zero.used.tokens, null, 'completed unavailable totals stay unknown even with no active token cap');
+  ledger.appendEvent({ workflowId: WF, entityType: 'workflow', entityId: WF, kind: 'autopilot-budget-extended', payload: { attempts: 2, tokens: 3, wallMs: 4 } });
+  const started = ledger.db.prepare('SELECT MIN(created_at) at FROM events WHERE workflow_id=?').get(WF).at;
+  const extended = budgetOf(ledger.db, WF, settings, { now: started + 500 });
+  assert.deepEqual(extended.caps, { attempts: 12, tokens: 1003, wallMs: 100004 }); assert.equal(extended.used.wallMs, 500);
+  const uncapped = budgetOf(ledger.db, WF, { ...settings, budgets: { ...settings.budgets, tokens: 0 } });
+  assert.deepEqual(uncapped.unverified, ['tokens'], 'an extension makes the declared zero token cap active');
+}));

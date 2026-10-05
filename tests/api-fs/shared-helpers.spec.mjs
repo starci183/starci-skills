@@ -7,10 +7,13 @@ import path from 'node:path';
 import {clip, clipLine} from '../../scripts/lib/clip.mjs';
 import {braceVariants, globExpression} from '../../scripts/lib/glob.mjs';
 import {parseJson} from '../../scripts/lib/json.mjs';
-import {foldCase, pathKey, posixPath, samePath, slash} from '../../scripts/lib/path-key.mjs';
+import {foldCase, insidePath, pathKey, posixPath, samePath, slash} from '../../scripts/lib/path-key.mjs';
 import {renameOver} from '../../scripts/api/fs/rename-over.mjs';
+import {publishSecret} from '../../scripts/api/fs/publish-secret.mjs';
 import {mkdtemp} from '../helpers/tmpdir.mjs';
 import {TEXT_MAX} from '../../scripts/connectors/telegram.mjs';
+import {isDir,isFile} from '../../scripts/lib/fs-kind.mjs';
+import {lines} from '../../scripts/lib/verb-call.mjs';
 
 test('clip cuts to n characters with an ellipsis; clipLine also folds whitespace onto one line', () => {
   assert.equal(clip('abcdef', 4), 'abc…');
@@ -92,4 +95,172 @@ test('path spellings fold the way this host\'s filesystem does', (t) => {
   assert.equal(pathKey(path.join(dir, 'sub', '..')), pathKey(dir), 'a key is resolved, slashed and folded');
   assert.equal(pathKey(dir).endsWith('/'), false);
   assert.equal(pathKey(dir.toUpperCase()) === pathKey(dir), process.platform === 'win32');
+});
+
+test('filesystem kind probes preserve following defaults and enforce caller-selected entry and size bounds', t => {
+  const root = mkdtemp(t, 'fs-kind-contract-'), file = path.join(root, 'record.yaml');
+  fs.writeFileSync(file, 'abc');
+  assert.equal(isFile(file), true);
+  assert.equal(isFile(file, { followLinks: false, maxBytes: 3 }), true, 'the exact byte bound is admitted');
+  assert.equal(isFile(file, { followLinks: false, maxBytes: 2 }), false);
+  assert.equal(isFile(root, { followLinks: false }), false);
+  assert.equal(isDir(root, { followLinks: false }), true);
+  assert.equal(isDir(file, { followLinks: false }), false);
+  for (const probe of [isFile, isDir]) {
+    assert.equal(probe(path.join(root, 'missing')), false);
+    assert.equal(probe(path.join(root, 'missing'), { followLinks: false }), false);
+  }
+  const target = path.join(root, 'target'), link = path.join(root, 'link');
+  fs.mkdirSync(target);
+  fs.symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir');
+  assert.equal(isDir(link), true, 'existing callers keep following directory links');
+  assert.equal(isDir(link, { followLinks: false }), false, 'bounded callers refuse the linked entry');
+});
+
+test('containment keeps strict defaults and an explicit self-inclusive policy without prefix escapes', () => {
+  const root = path.resolve('root');
+  assert.equal(insidePath(root, root), false);
+  assert.equal(insidePath(root, root, { includeSelf: true }), true);
+  assert.equal(insidePath(root, path.join(root, 'child')), true);
+  for (const file of [path.dirname(root), path.resolve('root-sibling'), path.join(root, '..prefix')]) {
+    assert.equal(insidePath(root, file), false);
+    assert.equal(insidePath(root, file, { includeSelf: true }), false);
+  }
+  assert.equal(insidePath('ROOT', 'root/child', { key: p => path.resolve(p.toLowerCase()) }), true);
+});
+
+test('line normalization keeps CRLF and plus text by default and honors only the selected separator', () => {
+  assert.deepEqual(lines(null), []);
+  assert.deepEqual(lines('  a+b \r\n \n c \n'), ['a+b', 'c']);
+  assert.deepEqual(lines('a+b\rc'), ['a+b\rc'], 'a lone CR remains part of a default line');
+  assert.deepEqual(lines(' a + b\n c ', { separator: /[+\n]/ }), ['a', 'b', 'c']);
+});
+
+test('private publication preserves the exact original credentials and refuses a stale preimage', t => {
+  const root = fs.realpathSync(mkdtemp(t, 'private-publication-'));
+  const file = path.join(root, 'credentials.env');
+  const before = Buffer.from('OTHER_TOKEN=fixture-only\r\n');
+  const addition = Buffer.from('SELECTED_KEY=non-secret-fixture\n');
+  fs.writeFileSync(file, before);
+  const request = { root, name: path.basename(file), before, addition, maxBytes: before.length + addition.length, assertLease: () => true };
+  assert.deepEqual(publishSecret(request), { ok: true, effectState: 'complete', created: false, durability: 'file-fsync' });
+  const expected = Buffer.concat([before, addition]);
+  assert.deepEqual(fs.readFileSync(file), expected);
+  assert.deepEqual(publishSecret(request), { ok: false, effectState: 'none', reason: 'preimage-changed' });
+  assert.deepEqual(fs.readFileSync(file), expected, 'the stale request does not append a duplicate');
+  assert.deepEqual(before, Buffer.from('OTHER_TOKEN=fixture-only\r\n'), 'the caller preimage is not wiped');
+  assert.deepEqual(addition, Buffer.from('SELECTED_KEY=non-secret-fixture\n'), 'the caller payload is not wiped');
+});
+
+test('private publication creates exclusively and never replaces an externally supplied file', t => {
+  const root = fs.realpathSync(mkdtemp(t, 'private-create-'));
+  const file = path.join(root, 'credentials.env');
+  const addition = Buffer.from('SELECTED_KEY=non-secret-fixture\n');
+  const request = { root, name: path.basename(file), before: null, addition, maxBytes: addition.length, assertLease: () => true };
+  const made = publishSecret(request);
+  assert.equal(made.ok, true);
+  assert.equal(made.created, true);
+  assert.equal(made.durability, process.platform === 'win32' ? 'file-fsync-namespace-unqualified' : 'file-and-parent-fsync');
+  assert.deepEqual(fs.readFileSync(file), addition);
+  assert.deepEqual(publishSecret(request), { ok: false, effectState: 'none', reason: 'file-custody' });
+  assert.deepEqual(fs.readFileSync(file), addition);
+});
+
+test('private publication refuses lease loss and an unrelated edit before its write', t => {
+  const root = fs.realpathSync(mkdtemp(t, 'private-lease-'));
+  const file = path.join(root, 'credentials.env');
+  const before = Buffer.from('OTHER_TOKEN=fixture-only\n'), addition = Buffer.from('SELECTED_KEY=fixture-only\n');
+  fs.writeFileSync(file, before);
+  const request = { root, name: path.basename(file), before, addition, maxBytes: before.length + addition.length, assertLease: () => false };
+  assert.deepEqual(publishSecret(request), { ok: false, effectState: 'none', reason: 'lease-lost' });
+  assert.deepEqual(fs.readFileSync(file), before);
+  let checks = 0;
+  const edit = Buffer.from('UNRELATED=kept\n');
+  const changed = publishSecret({ ...request, assertLease: () => {
+    if (++checks === 2) fs.appendFileSync(file, edit);
+    return true;
+  } });
+  assert.deepEqual(changed, { ok: false, effectState: 'none', reason: 'preimage-changed' });
+  assert.deepEqual(fs.readFileSync(file), Buffer.concat([before, edit]));
+});
+
+test('private publication holds a partial append and never deletes or retries its remaining private bytes', t => {
+  const root = fs.realpathSync(mkdtemp(t, 'private-partial-'));
+  const file = path.join(root, 'credentials.env');
+  const before = Buffer.from('OTHER_TOKEN=fixture-only\n'), addition = Buffer.from('SELECTED_KEY=fixture-only\n');
+  fs.writeFileSync(file, before);
+  let calls = 0;
+  const io = { ...fs, writeSync: (fd, bytes, offset, length, position) => {
+    if (++calls === 1) return fs.writeSync(fd, bytes, offset, 3, position);
+    throw new Error('private diagnostic fixture must never be returned');
+  } };
+  const request = { root, name: path.basename(file), before, addition, maxBytes: before.length + addition.length, assertLease: () => true };
+  const result = publishSecret(request, { fs: io });
+  assert.deepEqual(result, { ok: false, effectState: 'unknown', reason: 'io-failed' });
+  const partial = Buffer.concat([before, addition.subarray(0, 3)]);
+  assert.deepEqual(fs.readFileSync(file), partial);
+  assert.deepEqual(publishSecret(request), { ok: false, effectState: 'none', reason: 'preimage-changed' });
+  assert.deepEqual(fs.readFileSync(file), partial);
+  assert.equal(JSON.stringify(result).includes('private diagnostic fixture'), false);
+});
+
+test('private publication holds sync, postwrite lease and descriptor-close failures without rolling back credentials', t => {
+  const root = fs.realpathSync(mkdtemp(t, 'private-unknown-'));
+  const before = Buffer.from('OTHER_TOKEN=fixture-only\n'), addition = Buffer.from('SELECTED_KEY=fixture-only\n');
+  const expected = Buffer.concat([before, addition]);
+  for (const fault of ['sync', 'lease', 'close']) {
+    const file = path.join(root, `${fault}.env`);
+    fs.writeFileSync(file, before);
+    let checks = 0;
+    const io = { ...fs,
+      fsyncSync: fd => { if (fault === 'sync') throw new Error('private sync diagnostic'); return fs.fsyncSync(fd); },
+      closeSync: fd => { fs.closeSync(fd); if (fault === 'close') throw new Error('private close diagnostic'); },
+    };
+    const result = publishSecret({ root, name: path.basename(file), before, addition, maxBytes: expected.length,
+      assertLease: () => ++checks !== 3 || fault !== 'lease' }, { fs: io });
+    assert.deepEqual(result, { ok: false, effectState: 'unknown', reason: fault === 'close' ? 'close-failed' : fault === 'lease' ? 'lease-lost' : 'io-failed' });
+    assert.deepEqual(fs.readFileSync(file), expected, 'unknown never truncates the original or selected bytes');
+  }
+});
+
+test('private publication refuses a replaced inode while retaining its original descriptor', {
+  skip: process.platform === 'win32' ? 'Windows retained-handle rename behavior needs its separate native custody oracle.' : false,
+}, t => {
+  const root = fs.realpathSync(mkdtemp(t, 'private-inode-'));
+  const file = path.join(root, 'credentials.env'), aside = path.join(root, 'retained.env');
+  const before = Buffer.from('OTHER_TOKEN=fixture-only\n'), addition = Buffer.from('SELECTED_KEY=fixture-only\n');
+  fs.writeFileSync(file, before);
+  let checks = 0;
+  const result = publishSecret({ root, name: path.basename(file), before, addition, maxBytes: before.length + addition.length,
+    assertLease: () => {
+      if (++checks === 2) { fs.renameSync(file, aside); fs.writeFileSync(file, before); }
+      return true;
+    } });
+  assert.deepEqual(result, { ok: false, effectState: 'none', reason: 'file-custody' });
+  assert.deepEqual(fs.readFileSync(file), before);
+  assert.deepEqual(fs.readFileSync(aside), before);
+});
+
+test('private publication refuses invalid bounds and unsupported platforms before opening a credential entry', t => {
+  const root = fs.realpathSync(mkdtemp(t, 'private-bound-'));
+  const file = path.join(root, 'credentials.env');
+  const before = Buffer.from('OTHER_TOKEN=fixture-only\n'), addition = Buffer.from('SELECTED_KEY=fixture-only\n');
+  const request = { root, name: path.basename(file), before, addition, maxBytes: before.length + addition.length, assertLease: () => true };
+  assert.deepEqual(publishSecret({ ...request, maxBytes: 1 }), { ok: false, effectState: 'none', reason: 'invalid-request' });
+  assert.deepEqual(publishSecret(request, { platform: 'unsupported' }), { ok: false, effectState: 'none', reason: 'invalid-request' });
+  assert.deepEqual(publishSecret({ ...request, name: '../escape.env' }), { ok: false, effectState: 'none', reason: 'invalid-request' });
+  assert.equal(fs.existsSync(file), false);
+});
+
+test('private publication refuses a symbolic credential entry', {
+  skip: process.platform === 'win32' ? 'Windows file symlink creation requires an explicitly qualified native permissions profile.' : false,
+}, t => {
+  const root = fs.realpathSync(mkdtemp(t, 'private-link-'));
+  const file = path.join(root, 'credentials.env'), target = path.join(root, 'target.env');
+  const before = Buffer.from('OTHER_TOKEN=fixture-only\n'), addition = Buffer.from('SELECTED_KEY=fixture-only\n');
+  const request = { root, name: path.basename(file), before, addition, maxBytes: before.length + addition.length, assertLease: () => true };
+  fs.writeFileSync(target, before);
+  fs.symlinkSync(target, file, 'file');
+  assert.deepEqual(publishSecret(request), { ok: false, effectState: 'none', reason: 'file-custody' });
+  assert.deepEqual(fs.readFileSync(target), before);
 });

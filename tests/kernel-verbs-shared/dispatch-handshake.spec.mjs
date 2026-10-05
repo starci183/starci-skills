@@ -8,6 +8,9 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {jobResultSql} from '../../scripts/machine/job-row.mjs';
 import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
+import { proofRepo } from '../helpers/sonar-scan.mjs';
+import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
+import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
@@ -32,7 +35,8 @@ const fixture=t=>{
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const make=mode=>{
     const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-handshake-'));dirs.push(root);
-    const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+    const mainRepo=path.join(root,'repo');fs.mkdirSync(mainRepo,{recursive:true});
+    proofRepo(t,mainRepo);
     const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
     const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
       STARCI_ORCA_COMMAND:process.execPath,          // the stub runs as `node fake-orca.mjs ...`
@@ -43,9 +47,15 @@ const fixture=t=>{
       // machineFileFor honours STARCI_TEST_MACHINE_FILE first; without it the spawned api lands on the
       // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
       STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
+      STARCI_PROJECTS_ROOT:path.join(root,'projects'),LOCALAPPDATA:path.join(root,'localappdata'),
     };
-    const jobId=`job-${mode}`;
-    const ledger=openLedger({file:ledgerFileFor(repo)});
+    const workflowId='wf-dispatch',jobId=`job-${mode}`;
+    const made=fakeOrcaWorktrees({root:path.join(root,'worktrees')}).create({repo:`path:${mainRepo}`,name:`wf-${workflowId}`,baseBranch:'main'});
+    assert.equal(made.ok,true,made.error);
+    const repo=path.resolve(made.worktree.path);
+    fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+    registerWorkflowWorktree({env:env},{workflowId:workflowId,orcaWorktreeId:made.worktree.id,path:repo,branch:made.worktree.branch});
+    const ledger=openLedger({file:ledgerFileFor(repo,{env})});
     try{
       seedWorkflow(ledger,{id:'wf-dispatch',state:{phase:'running',job:'wf-dispatch'},
         jobs:[{jobId,opId:'code.refactor',kind:'op',
@@ -69,7 +79,7 @@ const orcaState=fx=>JSON.parse(fs.readFileSync(path.join(fx.root,'state.json'),'
 const liveTerminals=fx=>Object.values(orcaState(fx).terminals??{}).filter(term=>!term.closed).map(term=>term.handle);
 
 const jobRow=(fx,jobId)=>{
-  const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
+  const ledger=inspectLedger({file:ledgerFileFor(fx.repo,{env:fx.env})});
   try{return ledger.db.prepare(`SELECT status,worker_id,${jobResultSql('jobs')} AS result_json FROM jobs WHERE job_id=?`).get(jobId);}
   finally{ledger.close();}
 };
@@ -117,7 +127,7 @@ test('auth-dead stub: dispatch never leaves the job running and leaks no worker'
   assert.deepEqual(liveTerminals(fx),[],'a rejected dispatch leaves no live terminal behind');
   const rejection=JSON.parse(r.stdout||'{}')?.rejection;
   assert.equal(rejection?.effectState,'none','a start refused before any Dispatch existed has no effect');
-  const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
+  const ledger=inspectLedger({file:ledgerFileFor(fx.repo,{env:fx.env})});
   try{
     const event=ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id='wf-dispatch' AND kind='dispatch-rejected'").get();
     assert.equal(JSON.parse(event?.payload_json??'{}')?.step,'worker-start','the rejection names the launch step');
@@ -133,7 +143,7 @@ test('auth-dead stub: the rejection is typed dispatch-rejected',t=>{
   const r=runDispatch(fx);
   assert.notEqual(r.status,0);
   const job=jobRow(fx,fx.jobId);
-  const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
+  const ledger=inspectLedger({file:ledgerFileFor(fx.repo,{env:fx.env})});
   let eventKinds=[];
   try{eventKinds=ledger.db.prepare('SELECT kind FROM events WHERE workflow_id=?').all('wf-dispatch').map(e=>e.kind);}
   finally{ledger.close();}

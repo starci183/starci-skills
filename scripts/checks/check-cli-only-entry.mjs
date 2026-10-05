@@ -25,7 +25,7 @@ export const EXEMPTIONS = Object.freeze({
   dispatcher: Object.freeze(['packages/cli/src/**', 'scripts/cli/main.mjs']),
   testSpawnHelpers: Object.freeze(['tests/**/*.spec.mjs', 'tests/helpers/**']),
   catalogDeclarations: Object.freeze(['modules/cli/commands/_internal.yaml', 'modules/cli/commands/** removed fields']),
-  history: Object.freeze(['CHANGELOG*.md', 'modules/kernel/contract-changes/**']),
+  history: Object.freeze(['CHANGELOG*.md']),
   generatedRuntimeCopies: 'packages/*/runtime/**',
   generatedLockfiles: '**/package-lock.json',
   variableScriptPaths: 'node spawns whose script path is held only in a variable',
@@ -50,7 +50,6 @@ const fullyExempt = (file) => file.startsWith('packages/cli/src/')
   || file === 'scripts/cli/main.mjs'
   || file === 'modules/cli/commands/_internal.yaml'
   || /(?:^|\/)CHANGELOG[^/]*\.md$/i.test(file)
-  || file.startsWith('modules/kernel/contract-changes/')
   || /^packages\/.+\/runtime\//.test(file)
   || GENERATED_LOCKFILE.test(file);
 

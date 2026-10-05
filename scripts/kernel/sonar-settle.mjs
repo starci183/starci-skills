@@ -19,7 +19,6 @@ import { inspectOwnerConfig, specsSettings } from '../../engine/config.mjs';
 import { attachedNameOf } from '../lib/display-names.mjs';
 import { oneLine } from '../lib/clip.mjs';
 
-export const SONAR_ENFORCE_CHANGE = 'sonar-enforce';
 export const SONAR_CHECK = 'sonar-gate';
 export const SONAR_INCIDENT_TAG = '[runtime-sonar-unavailable]';
 const SUMMARY_MAX_BYTES = 8 * 1024 * 1024;

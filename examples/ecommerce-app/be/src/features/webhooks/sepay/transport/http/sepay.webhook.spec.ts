@@ -1,10 +1,11 @@
-import { mock } from "@starci/jest-preset"
+import { FakeClock, mock } from "@starci/jest-preset"
 import type { RawBodyRequest } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import type { Request } from "express"
 import { PaymentService } from "@modules/domain/payment"
-import { HttpSecurityError, HttpSecurityErrorCode, WEBHOOK_SIGNATURE } from "@modules/platform/http-security"
-import type { WebhookSignatureService } from "@modules/platform/http-security"
+import { Secret } from "@modules/platform/config"
+import { HttpSecurityErrorCode, WEBHOOK_SIGNATURE, WebhookSignatureService } from "@modules/platform/http-security"
+import type { HttpSecurityOptions } from "@modules/platform/http-security"
 import { SepayTransferRequest } from "./dto/sepay-transfer.request"
 import { SepayWebhook } from "./sepay.webhook"
 
@@ -29,50 +30,85 @@ const noticeOf = (): SepayTransferRequest => {
 const NOTICE = noticeOf()
 const RAW_BODY = Buffer.from(JSON.stringify(NOTICE))
 const REQUEST = mock<RawBodyRequest<Request>>({ rawBody: RAW_BODY })
+const NOW = "2026-10-02T03:00:00.000Z"
+const REPLAY_WINDOW_MS = 300_000
+const TIMESTAMP = String(Date.parse(NOW))
+const STALE_TIMESTAMP = String(Date.parse(NOW) - REPLAY_WINDOW_MS - 1)
 
-const build = async (signature: WebhookSignatureService, payments: PaymentService) => {
+/** Fixed HMAC vectors bind these timestamps to the compact NOTICE bytes and the fixture secret. */
+const SIGNATURE = "sha256=0bf8aa0b90c161316f51b90d0a79b04edace56ebb3a3664b015139f59b85a5fe"
+const STALE_SIGNATURE = "sha256=49740cf400df7a317a63f0cf6afe83a1ee5e0376b9731b70b995bf4d5c0b1315"
+
+const OPTIONS: HttpSecurityOptions = {
+    allowedOrigins: [],
+    rateLimit: { windowMs: 60_000, defaultLimit: 600, strictLimit: 30 },
+    webhooks: { sepay: { secret: new Secret("sepay-unit-fixture-secret"), toleranceMs: REPLAY_WINDOW_MS } },
+}
+
+/** Resolves the real configured verifier through the door token; only the downstream intake is doubled. */
+const build = async () => {
+    const payments = mock<PaymentService>()
+    const verifier = new WebhookSignatureService(OPTIONS, new FakeClock(NOW))
     const moduleRef = await Test.createTestingModule({
         controllers: [SepayWebhook],
         providers: [
-            { provide: WEBHOOK_SIGNATURE, useValue: signature },
+            { provide: WEBHOOK_SIGNATURE, useValue: verifier },
             { provide: PaymentService, useValue: payments },
         ],
     }).compile()
-    return moduleRef.get(SepayWebhook)
+    return { door: moduleRef.get(SepayWebhook), payments }
 }
 
 describe("SepayWebhook", () => {
     describe("receive", () => {
-        it("proves the delivery on its raw body and headers, then hands the notice to the payment intake once", async () => {
-            const signature = mock<WebhookSignatureService>()
-            const payments = mock<PaymentService>()
-            const door = await build(signature, payments)
+        it("accepts the signed exact body and hands the validated notice to the intake once", async () => {
+            const { door, payments } = await build()
 
-            await door.receive(REQUEST, "sha256=abc", "1790899200000", NOTICE)
+            await door.receive(REQUEST, SIGNATURE, TIMESTAMP, NOTICE)
 
-            expect(signature.verify).toHaveBeenCalledWith({
-                provider: "sepay",
-                rawBody: RAW_BODY,
-                signature: "sha256=abc",
-                timestamp: "1790899200000",
-            })
             expect(payments.acceptBankTransfer).toHaveBeenCalledTimes(1)
             expect(payments.acceptBankTransfer).toHaveBeenCalledWith(NOTICE)
         })
 
-        it("never reaches the intake when the proof throws", async () => {
-            const refusal = new HttpSecurityError({ code: HttpSecurityErrorCode.WebhookSignatureInvalid })
-            const signature = mock<WebhookSignatureService>({
-                verify: jest.fn(() => {
-                    throw refusal
-                }),
-            })
-            const payments = mock<PaymentService>()
-            const door = await build(signature, payments)
+        it("refuses altered raw bytes before the intake, even when the parsed notice is unchanged", async () => {
+            const { door, payments } = await build()
+            const changed = mock<RawBodyRequest<Request>>({ rawBody: Buffer.from(JSON.stringify(NOTICE, null, 2)) })
 
-            await expect(door.receive(REQUEST, undefined, undefined, NOTICE)).rejects.toBe(refusal)
+            await expect(door.receive(changed, SIGNATURE, TIMESTAMP, NOTICE)).rejects.toMatchObject({
+                code: HttpSecurityErrorCode.WebhookSignatureInvalid,
+            })
 
             expect(payments.acceptBankTransfer).not.toHaveBeenCalled()
+        })
+
+        it("refuses absent proof headers before the intake", async () => {
+            const { door, payments } = await build()
+
+            await expect(door.receive(REQUEST, undefined, undefined, NOTICE)).rejects.toMatchObject({
+                code: HttpSecurityErrorCode.WebhookSignatureInvalid,
+            })
+
+            expect(payments.acceptBankTransfer).not.toHaveBeenCalled()
+        })
+
+        it("refuses a correctly signed delivery outside the replay window before the intake", async () => {
+            const { door, payments } = await build()
+
+            await expect(door.receive(REQUEST, STALE_SIGNATURE, STALE_TIMESTAMP, NOTICE)).rejects.toMatchObject({
+                code: HttpSecurityErrorCode.WebhookReplayed,
+            })
+
+            expect(payments.acceptBankTransfer).not.toHaveBeenCalled()
+        })
+
+        it("propagates an intake failure instead of acknowledging the signed delivery", async () => {
+            const { door, payments } = await build()
+            const failure = new Error("billing transaction failed")
+            payments.acceptBankTransfer.mockRejectedValue(failure)
+
+            await expect(door.receive(REQUEST, SIGNATURE, TIMESTAMP, NOTICE)).rejects.toBe(failure)
+
+            expect(payments.acceptBankTransfer).toHaveBeenCalledTimes(1)
         })
     })
 })

@@ -73,7 +73,6 @@ import { parseWorktreeList, laneActivity, treeBytes, laneGit } from '../housekee
 import { safeRemoveWorktree } from '../machine/worktree-git.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import { pathKey } from '../lib/path-key.mjs';
-import { parseJson } from '../lib/json.mjs';
 import { fmtGb } from '../lib/time.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows } from '../machine/terminal-ledger.mjs';
@@ -82,6 +81,7 @@ import { jobsOf } from './workers.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { LANE_IDLE_MS, laneOwnerOf } from '../machine/lane-owner.mjs';
 import { evictOverCap, spareInfo } from './lane-cap.mjs';
+import { landedCommitsForLane, laneContentLanded } from './lane-landed.mjs';
 import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs'; import { isMain } from '../lib/is-main.mjs';
@@ -458,40 +458,6 @@ export function orphanProcesses({ table, now = Date.now(), minAgeMs = DEFAULTS.g
 }
 
 /* ------------------------------------------------------------ lanes */
-
-/** The commits the land gate landed for `branch`: every commit of its passed land_runs (commit_sha and commits_json). */
-function landedCommitsForLane(branch, env) {
-  return readSupervisor((m) => {
-    const landed = new Set();
-    for (const r of m.db.prepare("SELECT commit_sha, commits_json FROM land_runs WHERE lane=? AND result='passed'").all(branch)) {
-      landed.add(r.commit_sha);
-      const commits = parseJson(r.commits_json);
-      if (Array.isArray(commits)) for (const sha of commits) if (typeof sha === 'string') landed.add(sha);
-    }
-    return landed;
-  }, new Set(), { env });
-}
-
-/** Conservative file proof for a lane whose land changed patch IDs (conflict resolution or contract entry). */
-function laneContentLanded(commits, branch, root, run) {
-  const touched = new Set();
-  for (const sha of commits) {
-    const paths = run(['diff-tree', '--root', '-r', '--no-commit-id', '--name-only', '-z', sha], { cwd: root });
-    if (!paths.ok) return false;
-    for (const file of paths.stdout.split('\0').filter(Boolean)) touched.add(file);
-  }
-  if (!touched.size) return false;
-  for (const file of touched) {
-    const diff = run(['diff', '--name-only', '-z', 'main', branch, '--', file], { cwd: root });
-    if (!diff.ok) return false;
-    if (!diff.stdout) continue;
-    const mainTime = run(['log', '-1', '--format=%ct', 'main', '--', file], { cwd: root });
-    const laneTime = run(['log', '-1', '--format=%ct', branch, '--', file], { cwd: root });
-    if (!mainTime.ok || !laneTime.ok || !mainTime.stdout.trim() || !laneTime.stdout.trim() ||
-        Number(mainTime.stdout.trim()) <= Number(laneTime.stdout.trim())) return false;
-  }
-  return true;
-}
 
 /** The lanes collector's resume point: the path key the last bounded pass stopped before (machine.sqlite machine_meta). */
 const LANE_CURSOR = 'lanes';

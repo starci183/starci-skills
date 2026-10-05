@@ -13,7 +13,6 @@ import { familyGuardOf, familyViolations, familyOwners } from '../write-families
 import { ownedPathPlacements, enqueueRepository } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
 import { lineageHeadById } from '../gate-conditions.mjs';
-import { loadContractChanges, changeById } from '../../machine/contract-version.mjs';
 import { normalizeFoundationName, readFoundation } from '../foundation-registry.mjs';
 import { admitUnit, writeUnitTry } from '../units.mjs';
 import { isCanonSlice, requirePlannedCanonSlice } from '../canon-plan-gate.mjs';
@@ -155,9 +154,7 @@ export default {
   }
   // Shared foundations (driver-loop.yaml foundations): --foundation <name> marks a leg that builds a
   // foundation this workflow owns, and such legs run first. A workflow with running peers declares
-  // its foundations before its first leg - required of one created after the shared-foundation-planning
-  // change, advised (the receipt says so, nothing is held) for an older one.
-  const registry = loadContractChanges(skillRoot);
+  // its foundations before its first leg when this ledger plans shared foundations.
   let foundationLeg = null, foundationAdvisory = null;
   if (args.foundation != null) {
     const name = normalizeFoundationName(args.foundation);
@@ -167,23 +164,13 @@ export default {
     }
     foundationLeg = name;
   } else {
-    const duty = foundationDutyOf(db, wf, { registry });
+    const duty = foundationDutyOf(db, wf);
     if (duty.required) {
       const out = { ok: false, workflowId, op: args.op, reason: 'foundations-undeclared', peers: duty.peers, detail: duty.detail };
       emit(out, `enqueue REFUSED for ${args.op}: foundations-undeclared — ${duty.detail}`, args.json);
       process.exit(1);
     }
     if (duty.advised) foundationAdvisory = duty.detail;
-  }
-  // --contract-change <id> --follow-up-of <job>: the follow-up leg a `reach: follow-up` contract change
-  // owes an older leg (starci kernel status contractFollowUps); the older leg is never held for it.
-  let contractChange = null;
-  if (args['contract-change'] != null || args['follow-up-of'] != null) {
-    const change = changeById(registry, String(args['contract-change'] ?? '').trim());
-    if (!change || change.reach !== 'follow-up') throw Object.assign(new Error(`--contract-change ${args['contract-change'] ?? '(missing)'} names no registered reach: follow-up change in modules/kernel/contract-changes/`), { code: 'contract-change-unknown' });
-    const source = db.prepare('SELECT job_id FROM jobs WHERE job_id=? AND workflow_id=?').get(String(args['follow-up-of'] ?? ''), workflowId);
-    if (!source) throw Object.assign(new Error(`--follow-up-of ${args['follow-up-of'] ?? '(missing)'} is not a job of ${workflowId}`), { code: 'follow-up-of-unknown' });
-    contractChange = { id: change.id, followUpOf: source.job_id };
   }
   const jobId = `op-${args.op}-${newToken().slice(0, 10)}`;
   let payload;
@@ -209,7 +196,6 @@ export default {
       ...(cut ? { cut } : {}),
       ...(after.length ? { after } : {}),
       ...(foundationLeg ? { foundation: foundationLeg } : {}),
-      ...(contractChange ? { contractChange } : {}),
       ...(canonPlan ? { canonPlan } : {}),
       // The manual-only proofs this goal explicitly asks for (spec-deferral.mjs): an explicit-ask-only leg without the stamp is deferred.
       ...(explicitAsksOf({ skillRoot, text: goal?.markdown }).length ? { explicitAsk: explicitAsksOf({ skillRoot, text: goal?.markdown }) } : {}),
@@ -245,7 +231,7 @@ export default {
 
   const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, unit, cut, params: payload.params ?? null, repository: payload.repository ?? null,
     peerOverlap: peers.overlap, peerHeadsUp: peers.messages, ...(testsDeferred ? { deferred: testsDeferred } : {}),
-    ...(foundationLeg ? { foundation: foundationLeg } : {}), ...(contractChange ? { contractChange } : {}), ...(foundationAdvisory ? { foundationAdvisory } : {}) };
+    ...(foundationLeg ? { foundation: foundationLeg } : {}), ...(foundationAdvisory ? { foundationAdvisory } : {}) };
   if (foundationAdvisory) process.stderr.write(`api: advisory: ${foundationAdvisory}\n`);
   emit(out, `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${unit.retryOf ? ` retry of ${unit.retryOf}` : ''}${unit.reopen ? ` REOPENED: ${unit.reopen.reason}` : ''}, status ${job.status}${testsDeferred ? `, DEFERRED (${testsDeferred.reason}): not dispatched, no attempt spent; starci kernel run-deferred-tests --workflow ${workflowId} runs it later` : ''}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})${peers.overlap.length ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}` : ''}`, args.json);
 

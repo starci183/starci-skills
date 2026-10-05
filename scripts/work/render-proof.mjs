@@ -9,6 +9,7 @@ import {slash} from '../lib/path-key.mjs';
 import {objectList} from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { walkFiles } from '../lib/walk.mjs';
+import { exampleArtifactReadOptions } from '../lib/example-refs.mjs';
 
 /**
  * Grit item 55: scripts/work/ui/render.mjs and scripts/work/brand/brand.mjs are real - a
@@ -101,10 +102,10 @@ function readExampleBrand(workRoot) {
  * its basename. A candidate with no sibling .html is still a candidate - the markup check then reports
  * its own skip, which is a refusal here rather than a pass.
  */
-function captureCandidates(implDir, record) {
+function captureCandidates(implDir, record, blobOptions) {
   // alpha.3: the captures are the blobs the record's assets[] cites (scripts/work/impl-captures.mjs), never files
   // kept under its assets/.
-  return capturesOf(implDir, record).filter(c => c.png).map(c => ({png: c.png, markup: c.markup, name: c.name}));
+  return capturesOf(implDir, record, blobOptions).map(c => ({png: c.png, markup: c.markup, name: c.name}));
 }
 
 /**
@@ -114,7 +115,7 @@ function captureCandidates(implDir, record) {
  * the caller decides which states the proof is required for (the gate requires it for `done`; the CLI runs
  * it for a named record so evidence can bind the actual outcome).
  */
-export function renderProofProblems({rec, records, workspaceDoc, workRoot}) {
+export function renderProofProblems({rec, records, workspaceDoc, workRoot, blobOptions = {}}) {
   const problems = [];
   if (rec?.schema !== 'work/implementation@1') return problems;
   if (!isFrontendImpl(rec, records, workspaceDoc)) return problems;
@@ -132,7 +133,13 @@ export function renderProofProblems({rec, records, workspaceDoc, workRoot}) {
     return problems;
   }
 
-  const candidates = captureCandidates(rec.dir, rec.data);
+  let candidates;
+  try { candidates = captureCandidates(rec.dir, rec.data, blobOptions); }
+  catch (error) {
+    if (blobOptions.root == null) throw error;
+    problems.push(`state is done but its capture bytes cannot be verified: ${error.message} [RENDER_CAPTURE_INVALID]`);
+    return problems;
+  }
   if (!candidates.length) {
     problems.push('state is done but cites no running-page capture in its assets[] - a frontend implementation is proven by a browser PNG plus the markup it rendered, the shape scripts/work/ui/render.mjs reads, and a design/direction image is not an implementation capture [RENDER_CAPTURE_MISSING]');
     return problems;
@@ -140,6 +147,10 @@ export function renderProofProblems({rec, records, workspaceDoc, workRoot}) {
 
   for (const candidate of candidates) {
     const rel = candidate.name;
+    if (!candidate.png) {
+      problems.push(`cited capture ${rel} is missing from its selected blob store - every declared PNG must be readable [RENDER_CAPTURE_MISSING]`);
+      continue;
+    }
     let png = null, failure = null;
     try { png = decodePng(fs.readFileSync(candidate.png)); }
     catch (error) { failure = String(error.message ?? error); }
@@ -190,7 +201,7 @@ if (isMain(import.meta.url)) {
   const workspaceDoc = readWorkspace(workRoot);
   const rec = records.get(args.record);
   if (!rec) { console.error(`REFUSED no record with id ${args.record} was found under ${workRoot}`); process.exit(1); }
-  const problems = renderProofProblems({rec, records, workspaceDoc, workRoot});
+  const problems = renderProofProblems({rec, records, workspaceDoc, workRoot, blobOptions: exampleArtifactReadOptions(root, workRoot)});
   for (const problem of problems) console.log(`REFUSED ${slash(path.relative(workRoot, rec.dir))}: ${problem}`);
   console.log(`${args.record}: ${problems.length ? `${problems.length} refused` : 'render/brand proof holds for every capture'}`);
   process.exitCode = problems.length ? 1 : 0;

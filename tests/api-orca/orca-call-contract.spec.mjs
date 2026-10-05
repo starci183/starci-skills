@@ -9,7 +9,7 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {uuidv5,orcaRequestIdOf,requestStateFrom} from '../../scripts/api/orca/lib.mjs';
 
 // scripts/api/orca/lib.mjs is the whole host boundary: argv comes from
-// modules/host/orca/calls.yaml and, before the first mutation, the verb about
+// modules/host/orca/calls.yaml and, before each new mutation, the verb about
 // to run is compared against the live `orca agent-context --json` listing.
 // Every case here drives that runner through the shared fake Orca, which
 // answers agent-context from calls.yaml itself.
@@ -29,15 +29,24 @@ const stubEnv=(t,extra={})=>{
   }};
 };
 
-// One child node process per case: the agent-context listing is cached for the
-// life of a process, so a fresh process is the only honest way to vary it.
+// One child node process per case keeps binary overrides and private fake state isolated.
+// This outer case captures the inner envelope, including the fake overflow's retained stdout.
+const CASE_MAX_BUFFER=4*1024*1024;
+const caseDiagnostic=r=>`case process failed: ${JSON.stringify({
+  status:r.status,signal:r.signal,error:r.error?{code:r.error.code??null,message:r.error.message}:null,
+  stdoutBytes:Buffer.byteLength(r.stdout??''),stderrBytes:Buffer.byteLength(r.stderr??''),
+  stderrTail:String(r.stderr??'').slice(-4096),maxBuffer:CASE_MAX_BUFFER,
+})}`;
 const call=(fx,body)=>{
   const script=path.join(fx.root,`case-${Math.random().toString(36).slice(2)}.mjs`);
   fs.writeFileSync(script,`import {orcaCall} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','lib.mjs')).href)};\n`+
     `import {requestShow} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','request-show.mjs')).href)};\n`+
     `console.log(JSON.stringify((${body})(orcaCall,requestShow)));\n`);
-  const r=spawnSync(process.execPath,[script],{encoding:'utf8',env:fx.env,timeout:60000,windowsHide:true});
-  assert.equal(r.status,0,`case process failed: ${r.stderr}`);
+  const r=spawnSync(process.execPath,[script],{encoding:'utf8',env:fx.env,timeout:60000,maxBuffer:CASE_MAX_BUFFER,windowsHide:true});
+  const diagnostic=caseDiagnostic(r);
+  assert.equal(r.error,undefined,diagnostic);
+  assert.equal(r.signal,null,diagnostic);
+  assert.equal(r.status,0,diagnostic);
   return JSON.parse(r.stdout.trim().split(/\r?\n/).at(-1));
 };
 const logged=fx=>fs.existsSync(fx.log)
@@ -83,13 +92,13 @@ test('the receipt is classified by the calls.yaml classify block',t=>{
   assert.equal(release.effectState,'partial','state retained is a live residual resource');
 });
 
-test('the live agent-context listing is read once per process, before the first mutation only',t=>{
+test('the live agent-context listing is refreshed before each new mutation, while reads remain untouched',t=>{
   const fx=stubEnv(t);
   const out=call(fx,`c=>[c('terminal-show',{terminal:'t1'}).outcome,c('terminal-read',{terminal:'t1'}).outcome,`+
     `c('terminal-rename',{terminal:'t1',title:'[Op] x'}).outcome,c('terminal-close',{terminal:'t1'}).outcome]`);
   assert.deepEqual(out,['ok','ok','ok','ok']);
   const verbs=logged(fx).map(argv=>argv[0]);
-  assert.equal(verbs.filter(v=>v==='agent-context').length,1,'the listing is cached for the process');
+  assert.equal(verbs.filter(v=>v==='agent-context').length,2,'each new mutation refreshes the current host listing');
   assert.equal(verbs.indexOf('agent-context'),2,'reads run untouched; the listing is fetched at the first mutation');
 });
 
@@ -97,6 +106,40 @@ test('a read-only process never spends a call on agent-context',t=>{
   const fx=stubEnv(t);
   call(fx,`c=>c('terminal-show',{terminal:'t1'}).outcome`);
   assert.equal(logged(fx).some(argv=>argv[0]==='agent-context'),false);
+});
+
+test('a host contract change during one caller process refuses the next mutation before issue',t=>{
+  const fx=stubEnv(t);
+  const out=call(fx,`c=>{const first=c('terminal-rename',{terminal:'t1',title:'first'});
+    process.env.STARCI_FAKE_ORCA_OMIT_COMMAND='terminal rename';
+    const second=c('terminal-rename',{terminal:'t1',title:'second'});return{first,second}}`);
+  assert.equal(out.first.outcome,'ok');
+  assert.deepEqual([out.second.outcome,out.second.effectState,out.second.reason],['failed','none','host-contract-drift']);
+  assert.equal(logged(fx).filter(argv=>argv[0]==='agent-context').length,2);
+  assert.equal(logged(fx).filter(argv=>argv.slice(0,2).join(' ')==='terminal rename').length,1);
+});
+
+test('a failed live refresh cannot reuse an earlier successful listing, and a later refresh may recover',t=>{
+  const fx=stubEnv(t);
+  const out=call(fx,`c=>{const first=c('terminal-rename',{terminal:'t1',title:'first'});
+    process.env.STARCI_FAKE_ORCA_HOST='runtime_unavailable';
+    const second=c('terminal-rename',{terminal:'t1',title:'second'});
+    delete process.env.STARCI_FAKE_ORCA_HOST;
+    const third=c('terminal-rename',{terminal:'t1',title:'third'});return{first,second,third}}`);
+  assert.equal(out.first.outcome,'ok');assert.equal(out.third.outcome,'ok');
+  assert.deepEqual([out.second.outcome,out.second.effectState,out.second.reason,out.second.hostUnavailable],
+    ['failed','none','host-contract-drift',true]);
+  assert.equal(logged(fx).filter(argv=>argv[0]==='agent-context').length,3);
+  assert.equal(logged(fx).filter(argv=>argv.slice(0,2).join(' ')==='terminal rename').length,2);
+});
+
+for(const failure of ['nonzero','signal','overflow','explicit-refusal'])test(`complete commands from a ${failure} fresh listing cannot authorize a new mutation`,t=>{
+  const fx=stubEnv(t,{STARCI_FAKE_ORCA_LISTING_FAILURE:failure});
+  const out=call(fx,`c=>c('terminal-rename',{terminal:'t1',title:'must remain unissued'})`);
+  assert.deepEqual([out.outcome,out.effectState,out.reason],['failed','none','host-contract-drift']);
+  assert.equal(out.missing.listing,'unreadable');
+  assert.equal(logged(fx).filter(argv=>argv[0]==='agent-context').length,1);
+  assert.equal(logged(fx).some(argv=>argv.slice(0,2).join(' ')==='terminal rename'),false);
 });
 
 test('request-show wrapper issues one declared read and rejects unreadable states',t=>{
@@ -197,6 +240,36 @@ test('an absent request after a lost receipt is outcome unknown, never a blind s
   assert.deepEqual([u.outcome,u.reason],['unknown','request-show-unreadable']);
 });
 
+for(const shape of ['overflow','signal','empty','primitive'])test(`a ${shape} receipt loss reconciles the original request exactly once`,t=>{
+  const fx=stubEnv(t,{STARCI_FAKE_ORCA_LOSE_RECEIPT:'orchestration run-create',STARCI_FAKE_ORCA_LOST_RECEIPT_KIND:shape});
+  const out=call(fx,`c=>c('run-create',{objective:'private fixture'},{request:{workflow:'lost-${shape}'}})`);
+  assert.deepEqual([out.outcome,out.effectState,out.request.state],['ok','committed','completed']);
+  const issued=argvOf(fx,'orchestration run-create');assert.equal(issued.length,2);
+  assert.equal(flagOf(issued[0],'--retry-request'),flagOf(issued[1],'--retry-request'));
+  assert.equal(argvOf(fx,'orchestration request-show').length,1);
+  assert.equal(Object.keys(stateOf(fx).runs).length,1);
+});
+
+test('clipped or signal receipts on a non-replay mutation remain unknown and are never issued twice',t=>{
+  for(const shape of ['overflow','signal','empty']) {
+    const fx=stubEnv(t,{STARCI_FAKE_ORCA_LOSE_RECEIPT:'orchestration reply',STARCI_FAKE_ORCA_LOST_RECEIPT_KIND:shape});
+    const out=call(fx,`c=>c('reply',{id:'private-message',body:'private fixture'})`);
+    assert.deepEqual([out.outcome,out.effectState,out.reason],['unknown','unknown','receipt-lost']);
+    assert.equal(argvOf(fx,'orchestration reply').length,1);
+  }
+});
+
+test('a second lost replay receipt or a retry refusal cannot downgrade the original unknown effect to none',t=>{
+  const twice=stubEnv(t,{STARCI_FAKE_ORCA_LOSE_RECEIPT:'orchestration run-create',STARCI_FAKE_ORCA_LOSE_RECEIPT_ALWAYS:'1',STARCI_FAKE_ORCA_LOST_RECEIPT_KIND:'overflow'});
+  const unknown=call(twice,`c=>c('run-create',{objective:'private fixture'},{request:{workflow:'twice-lost'}})`);
+  assert.deepEqual([unknown.outcome,unknown.effectState,unknown.reason],['unknown','unknown','retry-receipt-lost']);
+  assert.equal(argvOf(twice,'orchestration run-create').length,2);assert.equal(Object.keys(stateOf(twice).runs).length,1);
+  const refused=stubEnv(t,{STARCI_FAKE_ORCA_LOSE_RECEIPT:'orchestration run-create',STARCI_FAKE_ORCA_REPLAY_REFUSAL:'1'});
+  const retry=call(refused,`c=>c('run-create',{objective:'private fixture'},{request:{workflow:'refused-replay'}})`);
+  assert.deepEqual([retry.outcome,retry.effectState,retry.reason],['unknown','unknown','retry-unsettled']);
+  assert.equal(Object.keys(stateOf(refused).runs).length,1);
+});
+
 test('a lost receipt of a replay: reissue mutation is re-issued once with no request id; replay: none is never re-issued',t=>{
   const fx=stubEnv(t,{STARCI_FAKE_ORCA_LOSE_RECEIPT:'orchestration worker-stop'});
   const out=call(fx,`c=>c('worker-stop',{dispatch:'d1'})`);
@@ -206,7 +279,7 @@ test('a lost receipt of a replay: reissue mutation is re-issued once with no req
   assert.equal(stops.some(argv=>argv.includes('--retry-request')),false,'a deliberate later stop stays a fresh effect, never a recorded replay');
   const none=stubEnv(t,{STARCI_FAKE_ORCA_LOSE_RECEIPT:'orchestration reply'});
   const r=call(none,`c=>c('reply',{id:'m1',body:'yes'})`);
-  assert.equal(r.outcome,'failed');
+  assert.deepEqual([r.outcome,r.effectState,r.reason],['unknown','unknown','receipt-lost']);
   assert.equal(argvOf(none,'orchestration reply').length,1,'a duplicate reply is a second message: replay none');
 });
 

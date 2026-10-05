@@ -9,7 +9,7 @@ import { braceVariants } from '../../lib/glob.mjs';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../slots.mjs';
 
 export const CODE = 'RT_PROSE_PATH_NO_SLOT';
-const PROSE = /^(?:knowledge\/(?!code-examples\/|grammars\/|hfs\/slots\.yaml$|hfs\/runtime-slots\.yaml$|hfs\/canon-pins\.yaml$).+\.(?:ya?ml|md)|docs\/.+\.md|(?:.+\/)?README\.md)$/;
+const PROSE = /^(?:knowledge\/(?!grammars\/|hfs\/slots\.yaml$|hfs\/runtime-slots\.yaml$|hfs\/canon-pins\.yaml$).+\.(?:ya?ml|md)|docs\/.+\.md|(?:.+\/)?README\.md)$/;
 const TOKEN = /(?<![\w/.<>-])((?:be|fe)\/[\w<>{}.,*@-]+(?:\/[\w<>{}.,*@-]*)*)/g;
 const TOPIC_FILE = /\.(?:ya?ml|md)$/;
 const FOLDERS_BELOW = ['x.ts', 'index.ts', 'main.ts', 'x/index.ts', 'x/x.ts', 'x/x/x.ts', 'x/src/main.ts', 'package.json'];

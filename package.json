@@ -5,11 +5,13 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22.13.0"
+    "node": "^22.22.3 || ^24.15.0"
   },
   "files": [
     "init/",
-    "ext/",
+    "ext/sonar/cloudflared.yaml",
+    "ext/sonar/compose.yaml",
+    "ext/sonar/README.md",
     "skills/",
     ".starci/",
     "ui/",
@@ -18,14 +20,36 @@
     "knowledge/",
     "docs/",
     "examples/",
+    "examples/ecommerce-app/.starciwork/index.yaml",
+    "examples/.runtimes/ecommerce-app/runtime.sqlite",
+    "examples/.runtimes/ecommerce-app/artifacts/6f/6f189e3ab2f477bf71df0a0769b840e655351183f612568f535ea59cf53a60cb",
+    "examples/.runtimes/ecommerce-app/artifacts/6f/6f189e3ab2f477bf71df0a0769b840e655351183f612568f535ea59cf53a60cb.json",
+    "examples/.runtimes/ecommerce-app/artifacts/86/863f4acb57ac72c1ba9f922626135e2e446276fdd5221d0625fbd345167c7329",
+    "examples/.runtimes/ecommerce-app/artifacts/86/863f4acb57ac72c1ba9f922626135e2e446276fdd5221d0625fbd345167c7329.json",
+    "examples/.runtimes/ecommerce-app/artifacts/3f/3fb9b09d5ef7f69c28a5dba22a3fa69e3809751a40f110cc6331523dc1e8a7f8",
+    "examples/.runtimes/ecommerce-app/artifacts/3f/3fb9b09d5ef7f69c28a5dba22a3fa69e3809751a40f110cc6331523dc1e8a7f8.json",
+    "examples/.runtimes/ecommerce-app/artifacts/fe/fe00b0470e01cbb71f81e6e8ae7b9ec8b91cb5cea4926062185e2eb02c2a3374",
+    "examples/.runtimes/ecommerce-app/artifacts/fe/fe00b0470e01cbb71f81e6e8ae7b9ec8b91cb5cea4926062185e2eb02c2a3374.json",
+    "examples/.runtimes/ecommerce-app/artifacts/ad/adfc13b7efcb48bd97e27f449db8fdefe115b213cfb66d2e50c2f299d5b2c3a4",
+    "examples/.runtimes/ecommerce-app/artifacts/ad/adfc13b7efcb48bd97e27f449db8fdefe115b213cfb66d2e50c2f299d5b2c3a4.json",
+    "examples/lite-app/.starciwork/index.yaml",
+    "examples/.runtimes/lite-app/runtime.sqlite",
+    "examples/shape-slot/.starciwork/index.yaml",
+    "examples/.runtimes/shape-slot/runtime.sqlite",
     "scripts/",
     "packages/cli/",
     "packages/hfs/runtime/",
     "packages/hfs/templates/app/package-scripts/package.json",
     "packages/eslint/be/runtime/",
     "packages/eslint/fe/runtime/",
+    "!packages/cli/**/*.spec.mjs",
+    "!packages/cli/**/node_modules/**",
+    "!**/secret.env",
+    "!ext/sonar/secrets/**",
     "!examples/**/node_modules/",
-    "!examples/**/.starciwork/",
+    "!examples/**/.starcistacks/**/secrets/**",
+    "!examples/**/.starciwork/**",
+    "!examples/.runtimes/",
     "!examples/**/dist/",
     "!examples/**/coverage/",
     "!ui/**/node_modules/",
@@ -37,6 +61,7 @@
     "!ui/**/*.log",
     "*.md",
     "config.example.yaml",
+    "secret.env.example",
     "LICENSE"
   ],
   "repository": {
@@ -53,7 +78,8 @@
     "starci"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "tag": "alpha"
   },
   "dependencies": {
     "libpg-query": "18.1.5",

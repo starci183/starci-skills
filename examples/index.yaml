@@ -1,0 +1,333 @@
+schema: starci/code-example-catalog@1
+title: Current app source references
+purpose: |
+  These entries point to authored files in real HFS example apps. Read every listed source and its
+  actual module context; the owning tsconfigs and test paths declare how that source is checked.
+  Metadata is not a compiler result, test result, architecture approval or browser verification.
+  A missing behavioral test remains a coverage gap, never an inferred pass.
+examples:
+  - id: named-exception
+    path: ecommerce-app
+    lane: backend
+    title: "AbstractException declaration shape"
+    summary: "Domain error declarations and their platform mapping keep named business failures separate from transport responses."
+    relatedRules:
+      - BE-ERROR-1
+      - BE-ERROR-2
+      - BE-ERROR-3
+      - BE-FOLDER-5
+    files:
+      - be/src/modules/platform/errors/domain.error.ts
+      - be/src/modules/domain/order/errors/order.error.ts
+      - be/src/modules/platform/errors/errors.contracts.ts
+      - be/src/modules/platform/errors/index.ts
+      - be/src/modules/domain/order/messages/order.messages.ts
+      - be/src/modules/platform/errors/errors.service.spec.ts
+      - be/src/modules/platform/errors/errors.filter.spec.ts
+    entrypoint: be/src/modules/platform/errors/domain.error.ts
+    projects:
+      - be/tsconfig.json
+    tests:
+      - be/src/modules/platform/errors/errors.service.spec.ts
+      - be/src/modules/platform/errors/errors.filter.spec.ts
+  - id: fenced-job
+    path: ecommerce-app
+    lane: backend
+    title: "A fenced background job - claim, guarded writes and a run key"
+    summary: "The registered queue processor, job claim and write steps carry a durable run fence through their actual module wiring."
+    relatedRules:
+      - BE-JOBS-1
+      - BE-JOBS-2
+      - BE-JOBS-3
+      - BE-JOBS-4
+      - BE-JOBS-5
+    files:
+      - be/src/modules/platform/jobs/jobs.contracts.ts
+      - be/src/modules/platform/jobs/jobs.port.ts
+      - be/src/modules/platform/jobs/persistence/jobs.sql.ts
+      - be/src/modules/platform/jobs/job-claim.service.ts
+      - be/src/features/jobs/send-receipt/transport/queue/send-receipt.processor.ts
+      - be/src/features/jobs/send-receipt/steps/store-receipt.step.ts
+      - be/src/features/jobs/send-receipt/send-receipt.module.ts
+      - be/src/features/jobs/send-receipt/transport/queue/send-receipt-queue.module.ts
+      - be/src/modules/platform/jobs/fenced.processor.ts
+      - be/src/modules/platform/jobs/job-runner.service.ts
+      - be/src/modules/queues/receipt/receipt.queue.ts
+      - be/src/modules/domain/order/receipt.service.ts
+      - be/apps/order/src/app.module.ts
+      - be/src/modules/platform/jobs/job-claim.service.spec.ts
+      - be/src/modules/platform/jobs/job-runner.service.spec.ts
+      - be/src/modules/platform/jobs/fenced.processor.spec.ts
+      - be/src/tests/integration/jobs/jobs.integration-spec.ts
+      - be/src/tests/e2e/order/order-paid-archives-receipt.e2e-spec.ts
+    entrypoint: be/src/modules/platform/jobs/jobs.contracts.ts
+    projects:
+      - be/tsconfig.json
+      - be/src/tests/tsconfig.json
+    tests:
+      - be/src/modules/platform/jobs/job-claim.service.spec.ts
+      - be/src/modules/platform/jobs/job-runner.service.spec.ts
+      - be/src/modules/platform/jobs/fenced.processor.spec.ts
+      - be/src/tests/integration/jobs/jobs.integration-spec.ts
+      - be/src/tests/e2e/order/order-paid-archives-receipt.e2e-spec.ts
+  - id: api
+    path: ecommerce-app
+    lane: backend
+    title: "An api feature - a resolver, its command and handler, and the e2e flow"
+    summary: "The GraphQL door maps input to a command; its handler calls the domain capability, with checkout refusal and journey owners."
+    relatedRules:
+      - BE-API-1
+      - BE-API-2
+    files:
+      - be/src/features/api/checkout/application/place-order.handler.ts
+      - be/src/features/api/checkout/transport/graphql/place-order.resolver.ts
+      - be/src/tests/e2e/checkout/checkout-journey.e2e-spec.ts
+      - be/src/features/api/checkout/application/place-order.command.ts
+      - be/src/features/api/checkout/application/place-order.contracts.ts
+      - be/src/features/api/checkout/transport/graphql/place-order.mapper.ts
+      - be/src/features/api/checkout/transport/graphql/dto/place-order.input.ts
+      - be/src/features/api/checkout/transport/graphql/dto/place-order.type.ts
+      - be/src/modules/domain/order/checkout.service.spec.ts
+      - be/src/tests/e2e/checkout/checkout-refusal.e2e-spec.ts
+    entrypoint: be/src/features/api/checkout/application/place-order.handler.ts
+    projects:
+      - be/tsconfig.json
+      - be/src/tests/tsconfig.json
+    tests:
+      - be/src/modules/domain/order/checkout.service.spec.ts
+      - be/src/tests/e2e/checkout/checkout-journey.e2e-spec.ts
+      - be/src/tests/e2e/checkout/checkout-refusal.e2e-spec.ts
+  - id: domain
+    path: ecommerce-app
+    lane: backend
+    title: "A domain capability - a service that owns its rules and publishes inside its transaction"
+    summary: "Payment capability owns its state transition and published events; callers do not substitute transport or persistence policy."
+    relatedRules:
+      - BE-DOMAIN-1
+      - BE-DOMAIN-2
+    files:
+      - be/src/modules/domain/payment/payment.service.ts
+      - be/src/modules/domain/payment/payment.service.spec.ts
+      - be/src/modules/domain/payment/persistence/entities/payment.entity.ts
+      - be/src/modules/events/billing/billing-payment-confirmed.event.ts
+      - be/src/modules/events/billing/billing-payment-failed.event.ts
+      - be/src/tests/e2e/billing/sepay-transfer-pays-invoice.e2e-spec.ts
+    entrypoint: be/src/modules/domain/payment/payment.service.ts
+    projects:
+      - be/tsconfig.json
+      - be/src/tests/tsconfig.json
+    tests:
+      - be/src/modules/domain/payment/payment.service.spec.ts
+      - be/src/tests/e2e/billing/sepay-transfer-pays-invoice.e2e-spec.ts
+  - id: queue
+    path: ecommerce-app
+    lane: backend
+    title: "A typed queue producer called inside the domain transaction"
+    summary: "The domain producer declares the typed receipt job and uses the queue owner within its transactional flow."
+    relatedRules:
+      - BE-QUEUES-1
+      - BE-QUEUES-2
+      - BE-QUEUES-3
+    files:
+      - be/src/modules/queues/receipt/receipt.queue.ts
+      - be/src/modules/domain/order/order-payment.service.ts
+      - be/src/modules/queues/receipt/receipt.module.ts
+      - be/src/modules/platform/queue/index.ts
+      - be/src/modules/domain/order/order-payment.service.spec.ts
+      - be/src/tests/integration/queue/queue.integration-spec.ts
+      - be/src/tests/e2e/order/order-paid-archives-receipt.e2e-spec.ts
+    entrypoint: be/src/modules/queues/receipt/receipt.queue.ts
+    projects:
+      - be/tsconfig.json
+      - be/src/tests/tsconfig.json
+    tests:
+      - be/src/modules/domain/order/order-payment.service.spec.ts
+      - be/src/tests/integration/queue/queue.integration-spec.ts
+      - be/src/tests/e2e/order/order-paid-archives-receipt.e2e-spec.ts
+  - id: projection
+    path: ecommerce-app
+    lane: backend
+    title: "A projection kept current by a reactor"
+    summary: "An event consumer schedules the projection capability; persistence and recompute ownership remain in their actual modules."
+    relatedRules:
+      - BE-PROJECTIONS-1
+      - BE-PROJECTIONS-2
+      - BE-PROJECTIONS-3
+      - BE-PROJECTIONS-4
+      - BE-REACTORS-1
+    files:
+      - be/src/modules/projections/order-summary/order-summary.projection.ts
+      - be/src/modules/projections/order-summary/order-summary.projection-entity.ts
+      - be/src/features/reactors/order-summary-projection/transport/message/order-paid.consumer.ts
+      - be/src/modules/projections/order-summary/persistence/order-summary.sql.ts
+      - be/src/features/reactors/order-summary-projection/application/recompute-order-summary.handler.ts
+      - be/src/features/reactors/order-summary-projection/transport/message/order-summary-projection-message.module.ts
+      - be/src/modules/projections/order-summary/order-summary.projection.spec.ts
+      - be/src/tests/integration/order-summary/order-summary-projection.integration-spec.ts
+    entrypoint: be/src/modules/projections/order-summary/order-summary.projection.ts
+    projects:
+      - be/tsconfig.json
+      - be/src/tests/tsconfig.json
+    tests:
+      - be/src/modules/projections/order-summary/order-summary.projection.spec.ts
+      - be/src/tests/integration/order-summary/order-summary-projection.integration-spec.ts
+  - id: event-bus
+    path: ecommerce-app
+    lane: backend
+    title: "Publish an event in the domain transaction and consume it"
+    summary: "The order capability publishes a typed event and the invoicing consumer maps that event to its application command."
+    relatedRules:
+      - BE-EVENT-BUS-1
+      - BE-EVENT-BUS-2
+      - BE-EVENT-BUS-3
+      - BE-EVENT-BUS-4
+    files:
+      - be/src/modules/events/order/order-placed.event.ts
+      - be/src/modules/domain/order/order.service.ts
+      - be/src/features/api/invoicing/transport/message/order-placed.consumer.ts
+      - be/src/modules/platform/event-bus/event-bus.contracts.ts
+      - be/src/features/api/invoicing/application/issue-invoice.command.ts
+      - be/contracts/order/events.json
+      - be/src/modules/domain/order/order.service.spec.ts
+      - be/src/tests/integration/event-bus/event-bus.integration-spec.ts
+      - be/src/tests/e2e/billing/order-placed.e2e-spec.ts
+    entrypoint: be/src/modules/events/order/order-placed.event.ts
+    projects:
+      - be/tsconfig.json
+      - be/src/tests/tsconfig.json
+    tests:
+      - be/src/modules/domain/order/order.service.spec.ts
+      - be/src/tests/integration/event-bus/event-bus.integration-spec.ts
+      - be/src/tests/e2e/billing/order-placed.e2e-spec.ts
+  - id: saga
+    path: ecommerce-app
+    lane: backend
+    title: "A saga with steps, compensations and a fenced state"
+    summary: "The registered saga coordinates persisted steps, compensations and message outcomes with the platform saga owner."
+    relatedRules:
+      - BE-SERVICES-3
+      - BE-SERVICES-4
+      - BE-SAGA-1
+      - BE-SAGA-2
+      - BE-SAGA-3
+    files:
+      - be/src/modules/platform/saga/saga.service.ts
+      - be/src/features/saga/place-order/place-order.saga.service.ts
+      - be/src/features/saga/place-order/place-order.saga-state.ts
+      - be/src/features/saga/place-order/steps/reserve-order.saga-step.ts
+      - be/src/features/saga/place-order/compensations/reserve-order.compensation.ts
+      - be/src/features/saga/place-order/transport/message/billing-invoice-rejected.consumer.ts
+      - be/src/features/saga/place-order/transport/message/place-order-message.module.ts
+      - be/src/modules/events/billing/billing-invoice-issued.event.ts
+      - be/src/modules/events/billing/billing-invoice-rejected.event.ts
+      - be/contracts/order/events.json
+      - be/contracts/billing/events.json
+      - be/src/features/saga/place-order/application/compensate-place-order.command.ts
+      - be/src/modules/platform/saga/saga.service.spec.ts
+      - be/src/modules/platform/saga/saga-inbox.service.spec.ts
+      - be/src/features/saga/place-order/place-order.saga.service.spec.ts
+      - be/src/tests/e2e/checkout/place-order-saga.e2e-spec.ts
+      - be/src/tests/e2e/order/billing-invoice-rejected.e2e-spec.ts
+    entrypoint: be/src/modules/platform/saga/saga.service.ts
+    projects:
+      - be/tsconfig.json
+      - be/src/tests/tsconfig.json
+    tests:
+      - be/src/modules/platform/saga/saga.service.spec.ts
+      - be/src/modules/platform/saga/saga-inbox.service.spec.ts
+      - be/src/features/saga/place-order/place-order.saga.service.spec.ts
+      - be/src/tests/e2e/checkout/place-order-saga.e2e-spec.ts
+      - be/src/tests/e2e/order/billing-invoice-rejected.e2e-spec.ts
+  - id: realtime
+    path: ecommerce-app
+    lane: backend
+    title: "Read-and-push realtime door"
+    summary: "The GraphQL subscription reads a principal-scoped topic while the event reactor drives the status push capability."
+    relatedRules:
+      - BE-REALTIME-1
+      - BE-REALTIME-2
+      - BE-REALTIME-3
+      - BE-REALTIME-4
+    files:
+      - be/src/features/realtime/order-status/transport/graphql/order-status.subscription.ts
+      - be/src/features/realtime/order-status/transport/graphql/order-status.subscription.spec.ts
+      - be/src/features/realtime/order-status/transport/graphql/dto/order-status-changed.type.ts
+      - be/src/features/reactors/order-status-push/transport/message/order-paid.consumer.ts
+      - be/src/features/realtime/order-status/transport/graphql/dto/order-status.input.ts
+      - be/src/modules/domain/order/order-status.policy.ts
+      - be/src/modules/domain/order/order-status.service.ts
+      - be/src/features/reactors/order-status-push/application/push-order-status.handler.ts
+      - be/src/modules/domain/order/order-status.policy.spec.ts
+      - be/src/modules/domain/order/order-status.service.spec.ts
+      - be/src/tests/integration/realtime/realtime-hub.integration-spec.ts
+      - be/src/tests/e2e/order/order-paid-pushes-status.e2e-spec.ts
+    entrypoint: be/src/features/realtime/order-status/transport/graphql/order-status.subscription.ts
+    projects:
+      - be/tsconfig.json
+      - be/src/tests/tsconfig.json
+    tests:
+      - be/src/features/realtime/order-status/transport/graphql/order-status.subscription.spec.ts
+      - be/src/modules/domain/order/order-status.policy.spec.ts
+      - be/src/modules/domain/order/order-status.service.spec.ts
+      - be/src/tests/integration/realtime/realtime-hub.integration-spec.ts
+      - be/src/tests/e2e/order/order-paid-pushes-status.e2e-spec.ts
+  - id: webhooks
+    path: ecommerce-app
+    lane: backend
+    title: "Signed provider webhook door"
+    summary: "The HTTP webhook checks the provider boundary before the domain payment call; signature and refusal tests own that evidence."
+    relatedRules:
+      - BE-WEBHOOK-1
+      - BE-WEBHOOK-2
+      - BE-WEBHOOK-3
+      - BE-WEBHOOK-4
+      - BE-AUTH-3
+    files:
+      - be/src/features/webhooks/sepay/transport/http/sepay.webhook.ts
+      - be/src/features/webhooks/sepay/transport/http/sepay.webhook.spec.ts
+      - be/src/features/webhooks/sepay/transport/http/dto/sepay-transfer.request.ts
+      - be/src/modules/domain/payment/payment.service.ts
+      - be/src/features/webhooks/sepay/transport/http/sepay-http.module.ts
+      - be/src/modules/platform/http-security/webhook-signature.service.ts
+      - be/src/modules/domain/payment/payment.service.spec.ts
+      - be/src/tests/e2e/billing/sepay-transfer-pays-invoice.e2e-spec.ts
+    entrypoint: be/src/features/webhooks/sepay/transport/http/sepay.webhook.ts
+    projects:
+      - be/tsconfig.json
+      - be/src/tests/tsconfig.json
+    tests:
+      - be/src/features/webhooks/sepay/transport/http/sepay.webhook.spec.ts
+      - be/src/modules/domain/payment/payment.service.spec.ts
+      - be/src/tests/e2e/billing/sepay-transfer-pays-invoice.e2e-spec.ts
+  - id: connected-block
+    path: shape-slot
+    lane: frontend
+    title: "Connected block and pure renderer pair"
+    summary: "The connected owner maps real query/form hooks to a pure Grammar renderer and slot presentation. Its catalog declares no behavioral or browser test because this app currently has none."
+    relatedRules:
+      - FE-FUNCTION-1
+      - FE-FUNCTION-2
+      - FE-FUNCTION-3
+      - FE-FUNCTION-4
+      - FE-FUNCTION-5
+      - FE-FOLDER-1
+      - FE-FOLDER-2
+      - FE-FOLDER-6
+    files:
+      - fe/tsconfig.json
+      - fe/apps/shape-slot/src/components/blocks/HandoffBlock/index.tsx
+      - fe/apps/shape-slot/src/components/blocks/HandoffBlock/component.tsx
+      - fe/apps/shape-slot/src/components/blocks/HandoffBlock/classNames.ts
+      - fe/apps/shape-slot/src/hooks/sales/index.ts
+      - fe/apps/shape-slot/src/hooks/sales/useQueryHandoffSwr.ts
+      - fe/apps/shape-slot/src/hooks/sales/useQueryOrderSwr.ts
+      - fe/apps/shape-slot/src/hooks/sales/useSendHandoffForm.ts
+      - fe/apps/shape-slot/src/hooks/slot/index.ts
+      - fe/apps/shape-slot/src/hooks/slot/slot.shared.ts
+      - fe/apps/shape-slot/src/hooks/slot/useSlotLabels.ts
+      - fe/apps/shape-slot/src/modules/types/index.ts
+      - fe/apps/shape-slot/src/components/composites/SlotView/index.tsx
+    entrypoint: fe/apps/shape-slot/src/components/blocks/HandoffBlock/index.tsx
+    projects:
+      - fe/apps/shape-slot/tsconfig.json
+    tests: []

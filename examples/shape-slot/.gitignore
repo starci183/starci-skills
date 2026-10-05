@@ -63,3 +63,6 @@ next-env.d.ts
 .starcistacks/*/infra/terraform/*.tar.gz
 !.starcistacks/**/*.enc
 # <<< starci app sync <<<
+
+# Public package policy is tracked with the example source.
+!.starcistacks/.npmignore

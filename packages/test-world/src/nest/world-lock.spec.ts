@@ -43,6 +43,65 @@ describe("world outage lock", () => {
         other.close()
     })
 
+    test("concurrent acquisitions of one world both wait for a foreign shared holder before either effect", async () => {
+        const dir = lockDir()
+        const pauses: Array<() => void> = []
+        const outage = new WorldLock(dir, "outage", { ...FAST, pause: () => new Promise<void>((resolve) => pauses.push(resolve)) })
+        const foreign = new WorldLock(dir, "foreign", FAST)
+        await outage.share()
+        await foreign.share()
+        const effects: Array<string> = []
+        const first = outage.acquire().then(() => { effects.push("first") })
+        const second = outage.acquire().then(() => { effects.push("second") })
+        try {
+            await Promise.resolve()
+            await Promise.resolve()
+            assert.deepEqual(effects, [], "neither caller may touch the stack before the foreign reader drains")
+            assert.equal(pauses.length, 1, "both callers wait on the same unfinished acquisition")
+            assert.equal(readdirSync(join(dir, "shared")).includes("foreign"), true)
+            foreign.unshare()
+            pauses.shift()?.()
+            await Promise.all([first, second])
+            assert.deepEqual([...effects].sort(), ["first", "second"])
+            assert.equal(outage.exclusive, true)
+            await outage.acquire()
+            assert.equal(pauses.length, 0, "a completed exclusive hold remains re-entrant")
+        } finally {
+            foreign.unshare()
+            pauses.shift()?.()
+            await Promise.allSettled([first, second])
+            outage.close()
+            foreign.close()
+        }
+    })
+
+    test("closing a shared pending acquisition rejects both callers and releases its writer slot", async () => {
+        const dir = lockDir()
+        const pauses: Array<() => void> = []
+        const outage = new WorldLock(dir, "outage", { ...FAST, pause: () => new Promise<void>((resolve) => pauses.push(resolve)) })
+        const foreign = new WorldLock(dir, "foreign", FAST)
+        await foreign.share()
+        const effects: Array<string> = []
+        const results = Promise.allSettled([
+            outage.acquire().then(() => { effects.push("first") }),
+            outage.acquire().then(() => { effects.push("second") }),
+        ])
+        outage.close()
+        pauses.shift()?.()
+        const settled = await results
+        assert.deepEqual(effects, [])
+        assert.equal(settled.length, 2)
+        for (const result of settled) {
+            assert.equal(result.status, "rejected")
+            if (result.status === "rejected") assert.match(String(result.reason), /outage lock is closed/)
+        }
+        assert.equal(readdirSync(dir).includes("exclusive.lock"), false)
+        foreign.close()
+        const fresh = new WorldLock(dir, "fresh", FAST)
+        await fresh.acquire()
+        fresh.close()
+    })
+
     test("a waiting writer keeps new shared holders out, so an outage is never starved", async () => {
         const dir = lockDir()
         const outage = new WorldLock(dir, "outage", FAST)

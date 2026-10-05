@@ -46,7 +46,7 @@ for (const fn of ['spawnSync', 'execFile']) {
 syncBuiltinESMExports();
 `;
 
-// A runtime root with revisions A and B (the draw brief and the contract registry moved), checked out at B; a
+// A runtime root with revisions A and B (the actual draw brief moved), checked out at B; a
 // product repo whose ledger holds a running workflow acked at A with two running draw legs admitted under A, each
 // on its own worker terminal; and two owner gates waiting on the same uncommitted path of another repo.
 const fixture = (t) => {
@@ -55,13 +55,11 @@ const fixture = (t) => {
   const rt = path.join(dir, 'runtime'); fs.mkdirSync(rt); gitInit(rt);
   write(rt, 'modules/kernel/kernel-prompt.md', 'prompt\n');
   write(rt, 'modules/kernel/driver-loop.yaml', 'loop: 1\n');
-  write(rt, 'modules/kernel/contract-changes/seed.yaml', "id: seed\neffectiveAt: '2026-01-01T00:00:00Z'\nsummary: seed\n");
   write(rt, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\n');
   write(rt, 'scripts/kernel/op-prompt.mjs', 'export {};\n');
   git(rt, 'add', '-A'); git(rt, 'commit', '-qm', 'A');
   const A = git(rt, 'rev-parse', 'HEAD');
   write(rt, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\nnew: rule\n');
-  write(rt, 'modules/kernel/contract-changes/draw-new-rule.yaml', "id: draw-new-rule\neffectiveAt: '2026-09-27T20:00:00+07:00'\nsummary: \"The draw brief gained a rule\"\nreach: new-legs\nops: [interface.draw]\n");
   git(rt, 'add', '-A'); git(rt, 'commit', '-qm', 'B');
   const B = git(rt, 'rev-parse', 'HEAD');
 
@@ -164,7 +162,7 @@ test('starci kernel status output is identical with the memo off, cold and warm'
   assert.ok(cold.git.length > warm.git.length, `and across calls (${cold.git.length} -> ${warm.git.length})`);
   assert.deepEqual(stable(cold.out), stable(off.out));
   assert.deepEqual(stable(warm.out), stable(off.out));
-  assert.deepEqual([off.out.kernelRev.acked, off.out.kernelRev.current, off.out.kernelRev.files], [fx.A, fx.B, ['modules/kernel/contract-changes/draw-new-rule.yaml', 'modules/ops/ops/interface.draw.yaml']]);
+  assert.deepEqual([off.out.kernelRev.acked, off.out.kernelRev.current, off.out.kernelRev.files], [fx.A, fx.B, ['modules/ops/ops/interface.draw.yaml']]);
   assert.equal(off.out.nextActions[0].kind, 'reread');
 });
 

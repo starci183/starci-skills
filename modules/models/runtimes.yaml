@@ -275,9 +275,6 @@ allocation:
   # start waits for an Orca that does not answer, and how long after a responding Orca calls a kernel dead
   # it is asked again.
   hostOutage: {waitMs: 90000, deathSettleMs: 10000}
-  # resume: unused since resume-all.mjs was retired (2026-09-28); the logon run waited orcaWaitMs for Orca; the scheduled task
-  # re-runs resume every everyMs (whole minutes: schtasks /MO).
-  resume: {orcaWaitMs: 600000, everyMs: 600000}
   # supervisorTick: the numbers of the retired supervisor tick (2026-09-28) that the reconciler controllers still read
   # (host thresholds, orca probes, statusApp port, owner digest cadence); everyMs is unused. The tick ran every
   # everyMs (whole minutes: schtasks repetition). host: above maxNode node.exe or maxGit git.exe processes the host
@@ -354,9 +351,6 @@ allocation:
     routeAs: implementation.plan
     minDifficulty: hard
     effort: high
-  # restart: unused since restart-all.mjs was retired (2026-09-28); it waited waitMs for every running workflow to show one live
-  # Kernel, polling every pollMs.
-  restart: {waitMs: 480000, pollMs: 20000}
   # selfReload (scripts/machine/self-reload.mjs): a watchdog loop re-execs at most once per minIntervalMs; its
   # replacement takes over the loop's lock within handoverMs or is stopped.
   selfReload: {minIntervalMs: 300000, handoverMs: 30000}

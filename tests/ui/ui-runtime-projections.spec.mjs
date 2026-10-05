@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { openLedgerReader, recordCheckRun } from '../../engine/db/ledger.mjs';
-import { openMachineObserver, providerReservations, providerReservationUsage } from '../../engine/db/machine.mjs';
+import { openMachineObserver, providerReservations, providerReservationUsage, MACHINE_VERSION } from '../../engine/db/machine.mjs';
 import { admissionReservation, admissionView, attemptAdmission } from '../../ui/api/admission-read.mjs';
 import { workflowCheckpoint, workflowLand } from '../../ui/api/land-read.mjs';
 import { pipelineOf } from '../../ui/api/pipeline.mjs';
@@ -28,11 +28,6 @@ const receipt = (fields = {}) => ({ id: 'receipt-1', fence: 1, attemptId: 'op:sc
   quota: { authority: 'cli', auth: 'authenticated', state: 'available', fresh: true, observedAt: stamp - 10,
     expiresAt: stamp + 100, windows: [{ id: 'weekly', usedPercent: null, resetsAt: null, observedAt: stamp - 10, windowMinutes: 10080 }] }, ...fields });
 
-function makeV1Machine(machine) {
-  // Genuine compatible v1 fixture, following the core provider-schema spec. Only this private writer is changed.
-  assert.equal(machine.db.prepare('PRAGMA user_version').get().user_version, 2);
-  machine.db.exec('DROP TABLE provider_reservation_events; DROP TABLE provider_reservations; DELETE FROM schema_migrations WHERE version=2; PRAGMA user_version=1;');
-}
 function saveReceipt(machine, value) {
   machine.db.prepare(`INSERT INTO provider_reservations(fence,id,attempt_id,provider,account,model,role,scope_json,state,slots,max_parallel,quota_json,created_at,updated_at,released_at)
     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(value.fence, value.id, value.attemptId, value.provider, value.account, value.model, value.role,
@@ -96,8 +91,8 @@ function registryCorruption(t, { stage = 'all', failures = Infinity } = {}) {
 
 const observedHealth = (req, res, store) => { bindProvenance(req, store); healthz(req, res, store); };
 
-test('native v2 captured evidence is historical and unknown retains capacity for all five roles', t => withLedger(t, fixture => {
-  assert.equal(fixture.machine.db.prepare('PRAGMA user_version').get().user_version, 2);
+test('current captured evidence is historical and unknown retains capacity for all five roles', t => withLedger(t, fixture => {
+  assert.equal(fixture.machine.db.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION);
   assert.deepEqual(admissionView(fixture.machine.db), { observed: true, running: 0, unknown: 0, reservations: [] });
   ['kernel', 'op', 'supervisor', 'worker', 'critic'].forEach((role, i) => saveReceipt(fixture.machine,
     receipt({ role, id: `receipt-${i}`, fence: i + 1, attemptId: `launch-${i}`, state: i === 3 ? 'unknown' : i === 4 ? 'released' : 'live' })));
@@ -212,7 +207,6 @@ test('repository identity matches recorded casing and follows native platform ca
 }));
 
 test('read routes project observed/requested models, actual numeric retry IDs, runtime checks and unknown resource/health states', t => withLedger(t, async fixture => {
-  makeV1Machine(fixture.machine);
   seedWorkflow(fixture.ledger, { id: 'wf', jobs: [
     { jobId: 'first-job', unitId: 'unit', opId: 'backend.implement', status: 'failed', result: { verdict: 'fail' }, dispatchedAt: stamp, updatedAt: stamp + 100 },
     { jobId: 'retry-job', unitId: 'unit', opId: 'backend.implement', tryNo: 2, status: 'running', retryOf: 'first-job', dispatchedAt: stamp + 200 },
@@ -236,7 +230,7 @@ test('read routes project observed/requested models, actual numeric retry IDs, r
   const resource = (await request(handleSystem, store, '/api/resources')).json.data;
   assert.equal(resource.quotas[0].ui, 'unknown');
   assert.equal(resource.throttle.ui, 'unknown');
-  assert.equal(resource.admission.observed, false);
+  assert.deepEqual(resource.admission, { observed: true, running: 0, unknown: 0, reservations: [] });
   assert.equal((await request(handleWork, store, '/api/workers')).json.data.health.ui, 'unknown');
   assert.equal((await request(handleSystem, store, '/api/health')).json.data.ui, 'unknown');
   const headResponse = await request(handleSystem, store, '/api/resources', { method: 'HEAD' });
@@ -292,23 +286,15 @@ function registerFixture(fixture) {
   return ledgerId;
 }
 
-test('genuine v1 read routes preserve absent admission as unavailable without upgrading the private machine', t => withLedger(t, async fixture => {
-  makeV1Machine(fixture.machine);
-  const store = readStore(fixture);
-  assert.equal(store.machine.db.prepare('PRAGMA user_version').get().user_version, 1);
-  assert.deepEqual(providerReservationUsage(store.machine, { provider: 'codex', account: 'primary' }), { running: null, reservations: [], observed: false });
-  assert.deepEqual(admissionView(store.machine.db), { observed: false, running: null, unknown: null, reservations: [] });
-  const response = await request(handleSystem, store, '/api/resources');
-  assert.deepEqual(response.json.data.admission, { observed: false, running: null, unknown: null, reservations: [] });
-  assert.equal(store.machine.db.prepare('PRAGMA query_only').get().query_only, 1);
-  assert.equal(store.machine.db.prepare('SELECT total_changes() AS n').get().n, 0);
-  store.machine.close();
-  assert.equal(fixture.machine.db.prepare('PRAGMA user_version').get().user_version, 1);
-  assert.equal(fixture.machine.db.prepare('SELECT count(*) AS n FROM schema_migrations WHERE version=2').get().n, 0);
-  assert.equal(fs.existsSync(`${fixture.machineFile}.outbox.jsonl`), false);
+test('retired machine identity cannot become an authoritative UI read store', t => withLedger(t, fixture => {
+  fixture.machine.db.exec('PRAGMA user_version=1;');
+  const before = observerEvidence(fixture);
+  assert.throws(() => readStore(fixture), /machine-schema-old/);
+  assert.deepEqual(observerEvidence(fixture), before);
+  assert.equal(fs.existsSync(fixture.machineFile+'.outbox.jsonl'), false);
 }));
 
-test('native v2 reservation readers and UI GET/HEAD map recorded holds with no normal-read writes', t => withLedger(t, async fixture => {
+test('current reservation readers and UI GET/HEAD map recorded holds with no normal-read writes', t => withLedger(t, async fixture => {
   const reserved = fixture.machine.reserveProvider({ provider: 'codex', account: 'primary', attemptId: 'native-observed-launch',
     role: 'worker', model: 'model-a', maxParallel: 2, scope: { scopeId: 'native-scope' }, quota: receipt().quota });
   assert.equal(reserved.ok, true);
@@ -339,7 +325,7 @@ test('native v2 reservation readers and UI GET/HEAD map recorded holds with no n
   assert.equal(store.machine.db.prepare('SELECT total_changes() AS n').get().n, 0);
   store.machine.close();
   assert.deepEqual(counts(), before);
-  assert.equal(fixture.machine.db.prepare('PRAGMA user_version').get().user_version, 2);
+  assert.equal(fixture.machine.db.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION);
   assert.equal(fs.existsSync(`${fixture.machineFile}.outbox.jsonl`), false);
 }));
 

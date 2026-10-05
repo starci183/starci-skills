@@ -346,7 +346,7 @@ rules:
       - {kind: eslint-be, id: entrypoint-only-in-apps}
   - id: R34
     code: "BE_SCHEMA_AUTHORITY"
-    law: "Migrations are the only schema authority, run only by the cli migrate command and the test world; `synchronize` is `false`."
+    law: "Migrations own the application schema and run only through cli migrate or TestWorld; `synchronize` is `false`. TestWorld infrastructure may provision generated write-fault triggers and functions only in its verified private connection, preserving production constraints and existing triggers, holding its operation lock through catalog-confirmed cleanup."
     kinds: [lint, codemod, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_SCHEMA_AUTHORITY"]
@@ -1253,7 +1253,7 @@ rules:
       - {kind: runtime, id: generated-untracked, at: scripts/hfs/runtime-rules/generated-untracked.mjs}
   - id: R122
     code: "RT_CITED_PATH_MISSING"
-    law: "A runtime path cited by live prose or contracts (modules outside the contract history, docs, skills, knowledge, CONTEXT.md, README.md, CONTRIBUTING.md, init, the ui docs) exists; a retired or moved path is cited only by history."
+    law: "A runtime path cited by live prose or contracts (modules, docs, skills, knowledge, CONTEXT.md, README.md, CONTRIBUTING.md, init, the ui docs) exists; a retired or moved path is cited only by history."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
@@ -1736,7 +1736,7 @@ rules:
       - {kind: runtime, id: facts, at: scripts/hfs/runtime-rules/facts.mjs}
   - id: R193
     code: "RT_RULE_ID_UNKNOWN"
-    law: "Every rule id (R<digits>) that tracked knowledge, docs, code or data names is a rule of this catalog, and the ids run from R01 to the last rule with no undeclared gap: an id with no rule is listed under `retired` with its reason (RT_RULE_ID_GAP), and every rule of the catalog is named by the `hfsRules:` of at least one knowledge/patterns topic or carries `scope: runtime` (RT_RULE_UNCITED). A retired id is a history name that only the contract changes and the changelogs may still spell; specs and generated copies are not read."
+    law: "Every rule id (R<digits>) that tracked knowledge, docs, code or data names is a rule of this catalog, and the ids run from R01 to the last rule with no undeclared gap: an id with no rule is listed under `retired` with its reason (RT_RULE_ID_GAP), and every rule of the catalog is named by the `hfsRules:` of at least one knowledge/patterns topic or carries `scope: runtime` (RT_RULE_UNCITED). A retired id is a history name that only changelogs may still spell; specs and generated copies are not read."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
@@ -1772,7 +1772,7 @@ rules:
       - {kind: runtime, id: prose-restates, at: scripts/hfs/runtime-rules/prose-restates.mjs}
   - id: R197
     code: "RT_RETIRED_CLI_CALL"
-    law: "No tracked file invokes a command the unified CLI removed: the retired kernel, hfs, test-stack and top-level runtime spellings listed in the `removed` fields of the catalog and in the dispatcher table; those fields, changelogs and contract-change history are exempt."
+    law: "No tracked file invokes a command the unified CLI removed: the retired kernel, hfs, test-stack and top-level runtime spellings listed in the `removed` fields of the catalog and in the dispatcher table; those fields and changelogs are exempt."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
@@ -1851,7 +1851,7 @@ rules:
       - {kind: runtime, id: doc-owner, at: scripts/checks/check-doc-owner.mjs}
   - id: R206
     code: "RT_EXAMPLE_COUPLING"
-    law: "Runtime source never couples to a product or its example: no tracked file under scripts/, engine/, packages/, ui/src or ui/api - and no managed template under packages/hfs/templates/ - spells a literal examples/<name>, one of the product names this runtime shipped against (the closed PRODUCT_NAMES list of scripts/lib/example-refs.mjs), an inc-<hash> a product name prefixes, or a host drive path. Specs, tests, the generated runtime copies, contract-change history, changelogs and .starciwork records are out of scope; a read the runtime genuinely makes at run time is declared once in scripts/lib/example-refs.mjs and every consumer names that constant."
+    law: "Runtime source never couples to a product or its example: no tracked file under scripts/, engine/, packages/, ui/src or ui/api - and no managed template under packages/hfs/templates/ - spells a literal examples/<name>, one of the product names this runtime shipped against (the closed PRODUCT_NAMES list of scripts/lib/example-refs.mjs), an inc-<hash> a product name prefixes, or a host drive path. Specs, tests, the generated runtime copies, changelogs and .starciwork records are out of scope; a read the runtime genuinely makes at run time is declared once in scripts/lib/example-refs.mjs and every consumer names that constant."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
@@ -1860,7 +1860,7 @@ rules:
       - {kind: runtime, id: example-coupling, at: scripts/checks/check-example-coupling.mjs}
   - id: R207
     code: "RT_RETIRED_NAME_LIVE"
-    law: "A name the retired registry declares dead never appears in a live tracked file — not in prose, a comment, a string literal or a path: every retired[].path and moved[].from of modules/kernel/retired-paths.yaml, and every retiredNames[] naming that is not a path (a deleted app, a layer naming, a verb prefix). History (the contract changes, a changelog, a benchmark finding, a .starciwork record), the registry itself and the files of the check may name what was deleted; a slot manifest's forbids value or forbidden-presence tombstone declares a refusal, not a use."
+    law: "A name the retired registry declares dead never appears in a live tracked file — not in prose, a comment, a string literal or a path: every retired[].path and moved[].from of modules/kernel/retired-paths.yaml, and every retiredNames[] naming that is not a path (a deleted app, a layer naming, a verb prefix). History (a changelog, a benchmark finding, a .starciwork record), the registry itself and the files of the check may name what was deleted; a slot manifest's forbids value or forbidden-presence tombstone declares a refusal, not a use."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
@@ -1869,7 +1869,7 @@ rules:
       - {kind: runtime, id: retired-names, at: scripts/checks/check-retired-names.mjs}
   - id: R208
     code: "RT_PORT_RESTATED"
-    law: "Every port literal of the runtime is spelled once, by its owner, and every other file references the owner: the harness UI ports live in modules/models/runtimes.yaml statusApp.port/devPort read through ui/ports.mjs, the local SonarQube host in scripts/gates/sonar-local.mjs DEFAULT_HOST. No in-scope file that is not the owner spells an owned literal in a port position (a scheme://host:NNNN or host:NNNN authority, a *port*/PORT assignment, a listen(NNNN) call), and an unowned literal in a port position of two or more runtime source files gets one owning exported constant the rest reference. Specs, tests, node_modules, the generated runtime copies, contract-change history, changelogs, .starciwork and the product stack declarations (.starcistacks, starcistacks-services - a product owns the ports of the services it runs) are out of scope."
+    law: "Every port literal of the runtime is spelled once, by its owner, and every other file references the owner: the harness UI ports live in modules/models/runtimes.yaml statusApp.port/devPort read through ui/ports.mjs, the local SonarQube host in scripts/gates/sonar-local.mjs DEFAULT_HOST. No in-scope file that is not the owner spells an owned literal in a port position (a scheme://host:NNNN or host:NNNN authority, a *port*/PORT assignment, a listen(NNNN) call), and an unowned literal in a port position of two or more runtime source files gets one owning exported constant the rest reference. Specs, tests, node_modules, the generated runtime copies, changelogs, .starciwork and the product stack declarations (.starcistacks, starcistacks-services - a product owns the ports of the services it runs) are out of scope."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
@@ -1887,7 +1887,7 @@ rules:
       - {kind: runtime, id: default-once, at: scripts/checks/check-default-once.mjs}
   - id: R210
     code: "RT_VERSION_RESTATED"
-    law: "knowledge/hfs/canon-pins.yaml spells the version of every @starci package and every canon-pinned dependency once; a package.json is the declared install site and a lockfile its resolution. Anywhere else a semver literal equal to a pin - or a name@x.y.z specifier naming one - restates it, except on the declared binding keys a refresher owns and rewrites in place (canon.version of the code-pattern bindings held by check-canon-pins.mjs, provenance.version and identity.version of the grammar snapshots rewritten by scripts/work/ui/grammar-knowledge.mjs). Package manifests, lockfiles, changelogs, contract-change history, specs, tests, the generated runtime copies and .starciwork are out of scope; a restatement is fixed by naming the pin, never the literal."
+    law: "knowledge/hfs/canon-pins.yaml spells the version of every @starci package and every canon-pinned dependency once; a package.json is the declared install site and a lockfile its resolution. Anywhere else a semver literal equal to a pin - or a name@x.y.z specifier naming one - restates it, except on the declared binding keys a refresher owns and rewrites in place (canon.version of the code-pattern bindings held by check-canon-pins.mjs, provenance.version and identity.version of the grammar snapshots rewritten by scripts/work/ui/grammar-knowledge.mjs). Package manifests, lockfiles, changelogs, specs, tests, the generated runtime copies and .starciwork are out of scope; a restatement is fixed by naming the pin, never the literal."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]

@@ -17,7 +17,7 @@
 // or not: consume is part of settle, so consumed-but-unsettled is due like filed. The settle itself is the SAME code
 // path as `starci kernel record-checks` then `starci kernel settle`; every refusal still holds, and hands the
 // job to the Kernel with its code. The settler settles what the evidence decides without judgment (H1): a failed or
-// partial report fails, blocked/ask settles blocked, and a done report whose RAW re-run is red fails. It never passes on a worker-declared exit code (H8): every verdict is the
+// partial report fails, blocked/ask settles blocked, and a done report whose RAW re-run is red fails. Only security.verify can carry an observed lint exit 1 as complete typed findings; it stays raw 1. It never passes on a worker-declared exit code (H8): every verdict is the
 // raw exit the runtime observed. It never settles an op whose pass is an owner act, nor a done report nothing re-verifies.
 //
 // Idempotent: a settled job is not due; a needs-kernel handover is recorded once per dispatch and reason; a release is
@@ -29,7 +29,7 @@
 //     verdict, and is skipped), and every one that is a check (not a git/read action)
 //     must be a runtime check the settler can re-run without a shell: starci runtime validate ..., the package CLI,
 //     scripts/checks/<x>.mjs (never --fix/--write/--apply), or starci work graph validate|show|diff; each re-run
-//     (argv, no shell, cwd = the ledger repo) must exit 0;
+//     (argv, no shell) must exit 0; current mechanical proofs run in their filed target, with complete native output. The security.verify lint exception above still requires its typed carriage judge;
 //   - a cut slice (payload.cut) records the two cut checks settle demands: a canon slice (params.canonFamilies) re-runs
 //     canon-scan in-process over its owned paths (cut-slice-postcondition, paths never on a command line) and the
 //     declared re-runs are its cut-regression-inventory; any other cut, and the set-closing pass (full-regression-final),
@@ -44,6 +44,13 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { runNode } from '../../api/node/run-node.mjs';
+import { classifyCheck, argvOf } from './check-command.mjs';
+import { slash as norm } from '../../lib/path-key.mjs';
+import { observationContextOf, observeCheck } from '../mechanism-observation.mjs';
+import { judgeInspectionRun } from '../mechanism-proofs.mjs';
+import { filedReportOf, collectJobFiles } from '../job-artifacts.mjs';
+import { withWorkflowLock } from '../workflow-checkpoint.mjs';
+export { classifyCheck, argvOf };
 import { spawnNode } from '../../api/node/spawn-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor, updateAttempt, releaseLeases, setCondition } from '../../../engine/db/ledger.mjs';
@@ -55,7 +62,7 @@ import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 import { NEEDS_KERNEL_EVENT, KERNEL_ONLY_OPS, reportedJobs, kernelHandoverOf } from '../../machine/reported-jobs.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
-export const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
+export const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 
 export const EVENTS = Object.freeze({
@@ -150,67 +157,18 @@ function unsettledViolations(db, { now = Date.now(), maxAgeMs = settlerSettings(
 
 /* ------------------------------------------------------------ verification */
 
-/** Split a command line into argv, quotes honoured; null when it holds a shell operator or a <placeholder>. */
-export function argvOf(command) {
-  const s = String(command ?? '').trim();
-  if (!s) return null;
-  const out = []; let cur = ''; let q = null; let any = false;
-  for (let i = 0; i < s.length; i += 1) {
-    const c = s[i];
-    if (q) { if (c === q) q = null; else cur += c; continue; }
-    if (c === '"' || c === "'") { q = c; any = true; continue; }
-    if (/\s/.test(c)) { if (cur || any) out.push(cur); cur = ''; any = false; continue; }
-    if ('&|;<>`'.includes(c) || (c === '$' && s[i + 1] === '(')) return null;
-    cur += c;
-  }
-  if (q) return null;
-  if (cur || any) out.push(cur);
-  return out;
-}
-
-const norm = (p) => String(p).replace(/\\/g, '/');
-const ACTION = /^(?:git\s+(?:add|commit|status|rev-parse|log|diff|show|push|fetch|cat-file|merge-base|ls-files|branch|stash)\b|n\/a\b|read\b|cat\b|type\b|ls\b|dir\b)/i;
 const BASELINE_NAME = /(?:^|[-_.\s])(?:before|baseline)(?:$|[-_.\s])/i;
-const MUTATING_FLAG = /^--(?:fix|write|apply|in-place)(?:=|$)/;
-
-/**
- * One declared check, classified: {kind: 'action'} (evidence of an action, not a check), {kind: 'runtime', argv, script}
- * (re-runnable), or {kind: 'foreign', why}.
- */
-export function classifyCheck(check, { skillRoot = SKILL_ROOT } = {}) {
-  const command = String(check?.command ?? '').trim();
-  if (!command || ACTION.test(command)) return { kind: 'action' };
-  const argv = argvOf(command);
-  if (!argv) return { kind: 'foreign', why: 'shell-or-placeholder' };
-  const cliRel = 'packages/cli/bin/starci.mjs';
-  if (/^starci(?:\.cmd|\.exe)?$/i.test(path.basename(argv[0]))) {
-    const rest = argv.slice(1);
-    if (rest.some((a) => MUTATING_FLAG.test(a))) return { kind: 'foreign', why: 'mutating-flag' };
-    if (rest[0] !== 'runtime' || rest[1] !== 'validate') return { kind: 'foreign', why: 'not-a-runtime-check' };
-    return { kind: 'runtime', script: path.join(skillRoot, ...cliRel.split('/')), argv: rest, rel: cliRel };
-  }
-  if (!/^node(?:\.exe)?$/i.test(path.basename(argv[0])) || !argv[1]) return { kind: 'foreign', why: 'not-a-runtime-check' };
-  const rel = /(?:^|\/)\.claude\/((?:packages\/cli\/bin|scripts)\/.+\.mjs)$/i.exec(norm(argv[1]))?.[1]
-    ?? (norm(path.resolve(argv[1])).toLowerCase().startsWith(`${norm(skillRoot).toLowerCase()}/`) ? norm(path.relative(skillRoot, path.resolve(argv[1]))) : null);
-  if (!rel) return { kind: 'foreign', why: 'outside-runtime' };
-  const rest = argv.slice(2);
-  if (rest.some((a) => MUTATING_FLAG.test(a))) return { kind: 'foreign', why: 'mutating-flag' };
-  const ok = (rel === cliRel && rest[0] === 'runtime' && rest[1] === 'validate')
-    || (/^scripts\/checks\/[\w.-]+\.mjs$/.test(rel))
-    || (rel === 'scripts/work/work-graph.mjs' && ['validate', 'show', 'diff'].includes(rest[0]));
-  if (!ok) return { kind: 'foreign', why: `not-a-check-script:${rel}` };
-  return { kind: 'runtime', script: path.join(skillRoot, ...rel.split('/')), argv: rest, rel };
-}
 
 /** Re-run one runtime check: argv, no shell, cwd = the ledger repo. {exitCode, ms, tail} */
 export function rerunCheck(c, { repo, timeoutMs, env = process.env, run = runNode }) {
   const t0 = Date.now();
-  const r = run([c.script, ...c.argv], { cwd: repo, timeout: timeoutMs, env: runtimeEnv(env), maxBuffer: 64 * 1024 * 1024 });
-  const exitCode = r.error ? (r.error.code === 'ETIMEDOUT' ? 124 : 127) : (r.status ?? 1);
+  const r = run([c.script, ...c.argv], { cwd: repo, timeout: timeoutMs, env: { ...runtimeEnv(env), ...(c.mechanical ? { STARCI_RUNTIME: c.runtimeRoot } : {}) }, maxBuffer: 64 * 1024 * 1024 });
+  const exitCode = r.error ? (r.error.code === 'ETIMEDOUT' ? 124 : 127) : r.signal ? null : (Number.isInteger(r.status) ? r.status : null);
   const stdout = Buffer.isBuffer(r.stdout) ? r.stdout : Buffer.from(String(r.stdout ?? ''));
   const stderr = Buffer.isBuffer(r.stderr) ? r.stderr : Buffer.from(String(r.stderr ?? r.error?.message ?? ''));
   return { exitCode, ms: Date.now() - t0, startedAt: t0, finishedAt: Date.now(), cwd: repo,
     stdout, stderr, output: jsonOf(stdout.toString('utf8')),
+    processStatus: Number.isInteger(r.status) ? r.status : null, processSignal: r.signal ?? null, processError: r.error ? String(r.error.code ?? r.error.message) : null,
     tail: String(r.stderr || r.stdout || r.error?.message || '').trim().split(/\r?\n/).slice(-2).join(' ').slice(0, 300) };
 }
 
@@ -248,15 +206,16 @@ export async function recordSettlerCheck(ledger, item, run, { now = Date.now } =
   const stdout = blob(run.stdout, 'text/plain'), stderr = blob(run.stderr, 'text/plain'), output = blob(run.output, 'application/json');
   const at = now();
   const status = CHECK_STATUSES.includes(run.status) ? run.status : checkRunStatusOf(run);
-  return ledger.transaction((db) => {
+  const store = () => ledger.transaction((db) => {
     const attemptId = attemptIdOf(db, item);
     if (attemptId == null) throw Object.assign(new Error(`no attempt for job ${item.jobId}`), { code: 'check-attempt-missing' });
     return recordCheck(db, { attemptId, name: String(run.name), phase: run.phase ?? 'verify', runner: run.runner ?? 'settler', command: run.command ?? null,
       cwd: run.cwd ?? null, inputDigest: run.inputDigest ?? null, exitCode: Number.isInteger(run.exitCode) ? run.exitCode : null,
       declaredExitCode: Number.isInteger(run.declaredExitCode) ? run.declaredExitCode : null, attribution: run.attribution ?? null, status,
       unavailable: status === 'unavailable' || run.exitCode === 124 || run.exitCode === 127, startedAt: run.startedAt ?? at, finishedAt: run.finishedAt ?? at,
-      stdout, stderr, output, summary: run.summary ?? null, note: run.note ?? null, now: at }).checkId;
+      stdout, stderr, output, summary: { ...(run.summary ?? {}), ...(run.native ? { native: run.native } : {}) }, note: run.note ?? null, now: at }).checkId;
   });
+  return run.native ? withWorkflowLock({ db: ledger.db, ledger, repo: item.repo, env: process.env }, { workflowId: item.workflowId }, store) : store();
 }
 
 /**
@@ -322,7 +281,10 @@ async function verifyDeclared(db, item, { repo, settings, rerun, canon, env, rec
   if (!declared.length) return { green: false, reason: 'no-declared-checks' };
   // A baseline measured BEFORE the change (canon-scan-before, gate-before ...) is the refactor's starting point,
   // not its verdict: its exit code is evidence, never a red, and it is not re-run (the tree has moved on).
-  const classed = declared.filter((c) => !isBaselineCheck(c)).map((c) => ({ check: c, ...classifyCheck(c) }));
+  let observation;
+  try { observation = observationContextOf(db, db.prepare('SELECT * FROM jobs WHERE job_id=?').get(item.jobId), { repo, skillRoot: SKILL_ROOT }); }
+  catch (error) { return { green: false, unavailable: true, reason: 'checker-unavailable', detail: [error.message] }; }
+  const classed = declared.filter((c) => !isBaselineCheck(c)).map((c) => ({ check: c, ...classifyCheck(c, { mechanical: Boolean(observation) }) }));
   const foreign = classed.filter((c) => c.kind === 'foreign');
   const foreignRed = foreign.filter((c) => c.check?.exitCode !== 0);
   if (foreignRed.length) {
@@ -337,14 +299,17 @@ async function verifyDeclared(db, item, { repo, settings, rerun, canon, env, rec
   const checks = [];
   for (const c of runtime) {
     if (Date.now() - started > settings.itemBudgetMs) return { green: false, reason: 'verify-budget-exceeded', unavailable: true };
-    const r = rerun(c, { repo, timeoutMs: settings.rerunTimeoutMs, env });
+    const invoke = (target) => rerun(c, { repo: target, timeoutMs: settings.rerunTimeoutMs, env });
+    const r = c.mechanical && observation ? observeCheck(c, observation, invoke) : invoke(repo);
     await record({ name: String(c.check.name ?? c.rel), command: String(c.check.command), phase: 'verify', runner: 'settler',
       declaredExitCode: Number.isInteger(c.check.exitCode) ? c.check.exitCode : null, ...r });
     const v = checkVerdictOf(r);
     if (v.verdict === 'unavailable') return { green: false, unavailable: true, reason: 'checker-unavailable', detail: [`${c.check.name}:${r.exitCode}${v.word ? ` ${v.word}` : ''} ${r.tail ?? ''}`.slice(0, 300)] };
     const entry = { name: String(c.check.name ?? c.rel), exitCode: r.exitCode, command: String(c.check.command).slice(0, 2000),
       evidence: `runtime settler re-run: raw exit ${r.exitCode} in ${Math.round(r.ms / 100) / 10}s (worker declared exit ${c.check.exitCode})` };
-    if (v.verdict === 'red') return { green: false, reason: 'rerun-red', detail: [`${c.check.name}:${r.exitCode} ${r.tail}`.slice(0, 300)], checks: { checks: [...checks, entry] } };
+    const filed = observation && item.op === 'security.verify' ? filedReportOf(db, { job_id: item.jobId, workflow_id: item.workflowId }, { dispatchId: item.dispatchId }) : null;
+    const inspected = filed && judgeInspectionRun(r, collectJobFiles({ repo, envelope: filed.envelope, roots: observation.roots, artifacts: filed.artifacts }).files).status === 'pass';
+    if (v.verdict === 'red' && !inspected) return { green: false, reason: 'rerun-red', detail: [`${c.check.name}:${r.exitCode} ${r.tail}`.slice(0, 300)], checks: { checks: [...checks, entry] } };
     checks.push(entry);
   }
   if (item.payload.cut) {

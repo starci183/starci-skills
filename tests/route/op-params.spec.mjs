@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { resolveOpParams } from '../../scripts/kernel/dispatch-op.mjs';
+import { proofRepo } from '../helpers/sonar-scan.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -25,7 +26,12 @@ const json = (v) => JSON.stringify(v ?? null);
 const fixture = (t) => {
   const dirs = [];
   t.after(() => { for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); });
-  return { repo() { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-params-')); dirs.push(dir); fs.mkdirSync(path.join(dir, 'src')); return dir; } };
+  return { repo() {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-params-')); dirs.push(dir);
+    fs.mkdirSync(path.join(dir, 'src'));
+    proofRepo(t, dir);
+    return dir;
+  } };
 };
 const seed = (repo, fn) => { const ledger = openLedger({ file: ledgerFileFor(repo) }); try { fn(ledger); } finally { ledger.close(); } };
 const read = (repo, fn) => { const ledger = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(ledger); } finally { ledger.close(); } };
@@ -214,7 +220,9 @@ test('enqueue refuses provision.ask without params.subject and says how to re-en
   const ok = out(runApi('enqueue', '--repo', repo, '--workflow', wf, '--op', 'provision.ask', '--paths', '.starciwork/features/x/decision',
     '--params', JSON.stringify({ subject }), '--json'));
   assert.equal(ok?.params?.subject, subject);
-  const body = out(runApi('dispatch', '--repo', repo, '--job', ok.job_id, '--json'));
+  const preview = runApi('dispatch', '--repo', repo, '--job', ok.job_id, '--json');
+  assert.equal(preview.status, 0, preview.stderr || preview.stdout || preview.error?.message);
+  const body = out(preview);
   assert.equal(body?.packet?.params?.subject, subject, 'the packet carries the question');
   assert.match(body.prompt, /params: .*subject="Which payment provider/, 'the op prompt shows what it asks');
 });
@@ -251,4 +259,11 @@ test('a kernel param a planner leg names is the kernel default, split off the ow
     assert.equal(resolved.ok, true, resolved.detail);
     assert.equal(resolved.params[kernelSet.name], value);
   }
+});
+
+test('bad declared defaults refuse instead of entering a preview or dispatch packet', () => {
+  const doc = { id: 'sample.op', params: { count: { type: 'integer', min: 1, max: 2, default: 3, setBy: 'kernel' } } };
+  const refused = resolveOpParams(doc);
+  assert.equal(refused.ok, false); assert.equal(refused.reason, 'params-invalid');
+  assert.match(refused.detail, /default.*above its maximum/);
 });

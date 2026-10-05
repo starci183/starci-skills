@@ -28,13 +28,19 @@ const fixture=t=>{
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json');
   const log=path.join(root,'calls.jsonl');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
+  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);
+  // The same exact repo is the Git main root when prepareWorkflowTree creates a registered workflow tree.
+  const ownerConfig=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
+    .replace(/^language:.*$/m,'language: vi').replace(/^effort:.*$/m,'effort: medium')
+    .replace(/^kernel:.*$/m,'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}')
+    .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private restart fixture adoption',roots:[repo]})}`);
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),ownerConfig);
   fs.writeFileSync(state,JSON.stringify({sends:0,counter:0,terminals:{},commands:[]}));
   // Real Orca mints a distinct Dispatch id per worker-start; the canned 'dispatch-fake-1' would collide on
   // op_attempts.UNIQUE(workflow_id,dispatch_id) when a workflow's second managed op dispatches.
   fs.writeFileSync(fake,FAKE_ORCA.replaceAll("'dispatch-fake-1'","(state.dispatchSeq=(state.dispatchSeq??0)+1,'dispatch-fake-'+state.dispatchSeq)"));
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
-    STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,
+    STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome,
     // The machine registry is worker-wide: fixture repos all basename to 'repo' and collide on ledgers.name.
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
   const run=(script,...args)=>spawnSync(process.execPath,['--loader',new URL('../helpers/worker-close-loader.mjs',import.meta.url).href,'--loader',new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href,script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...(f.closeFails?{STARCI_FAKE_ORCA_CLOSE_FAILS:f.closeFails}:{}),...(f.releaseFails?{STARCI_FAKE_ORCA_RELEASE_FAILS:'1'}:{}),...(f.unverifiedClosure?{STARCI_FAKE_CLOSURE_UNPROVEN:'1'}:{})}});
@@ -209,12 +215,24 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
     assert.ok(kinds.includes('phase-transition'),'the kernel claim must durably record queued->running');
   }finally{ledger.close();}
   // The seat the prompt names is what starci kernel status shows; kernel.you proves the caller's own terminal.
-  const statusAs=handle=>json(spawnSync(process.execPath,[API,'status','--repo',f.repo,'--workflow',workflowId,'--json'],
-    {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...f.env,ORCA_TERMINAL_HANDLE:handle}}).stdout)?.kernel;
-  const seat=statusAs(restartOut.terminal);
+  const statusAs=handle=>{
+    const r=spawnSync(process.execPath,[API,'status','--repo',f.repo,'--workflow',workflowId,'--json'],
+      {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...f.env,ORCA_TERMINAL_HANDLE:handle}});
+    return {status:r.status,error:r.error?.message??null,signal:r.signal,stdout:r.stdout,stderr:r.stderr,
+      kernel:json(r.stdout)?.kernel,refusal:json(String(r.stderr??'').trim().split(/\r?\n/).at(-1))};
+  };
+  const current=statusAs(restartOut.terminal);
+  assert.equal(current.status,0,JSON.stringify(current));assert.equal(current.error,null);assert.equal(current.signal,null);
+  const seat=current.kernel;
   assert.equal(seat?.attempt,2);assert.equal(seat?.terminal,restartOut.terminal);
   assert.equal(seat?.launch,'kernel-restarted');assert.equal(seat?.launchedBy,'watchdog');assert.equal(seat?.you,true);
-  assert.equal(statusAs(firstOut.terminal)?.you,false,'the replaced terminal is not the seat');
+  // Launch history identifies the old Kernel; the current incarnation owner refuses that exact stale caller.
+  const stale=statusAs(firstOut.terminal);
+  assert.equal(stale.status,1,JSON.stringify(stale));assert.equal(stale.error,null);assert.equal(stale.signal,null);
+  assert.equal(stale.stdout.trim(),'','a stale Kernel receives no current seat projection');
+  assert.equal(stale.refusal?.ok,false,JSON.stringify(stale));
+  assert.equal(stale.refusal?.code,'kernel-caller-stale',JSON.stringify(stale));
+  assert.equal(stale.refusal?.error,`current Kernel incarnation unavailable for ${workflowId}`,JSON.stringify(stale));
 });
 
 test('a replacement launch proceeds on its recorded authority alone — no confirmation step anywhere',t=>{
@@ -276,15 +294,17 @@ test('the workflow Orca Run survives a kernel restart — one workflow Run, one 
   const defined=f.run(DEFINE_GOAL,'--repo',f.repo,'--text','keep one run across kernel churn','--json');
   assert.equal(defined.status,0,defined.stderr);
   const workflowId=json(defined.stdout)?.workflowId;assert.ok(workflowId);
+  const tree=prepareWorkflowTree(f,workflowId);
+  for(const ownedPath of ['be/a/','fe/b/'])fs.mkdirSync(path.join(tree.path,ownedPath),{recursive:true});
 
   const first=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
   assert.equal(first.status,0,first.stderr);
   const firstKernel=json(first.stdout)?.terminal;assert.ok(firstKernel);
   assert.equal(json(first.stdout)?.runId,'run-fake-1','the Kernel\'s entry Run');
 
-  enqueueOp(f,workflowId,'job-run-survives-1','docs/a/');
+  enqueueOp(f,workflowId,'job-run-survives-1','be/a/');
   const d1=f.run(API,'dispatch','--repo',f.repo,'--job','job-run-survives-1','--model','claude-agent','--spawn','--json');
-  assert.equal(d1.status,0,d1.stderr||d1.stdout);
+  assert.equal(d1.status,0,`${d1.stderr}\n${d1.stdout}`);
   assert.equal(json(d1.stdout)?.managed?.runId,'run-fake-2');
   assert.equal(payloadOf(f.repo,`kernel-${workflowId}`)?.orca?.runId,'run-fake-2',
     'the workflow Run is recorded on the kernel job, which is what survives an op');
@@ -301,10 +321,14 @@ test('the workflow Orca Run survives a kernel restart — one workflow Run, one 
   assert.equal(afterRestart?.hierarchy?.runtime?.terminalHandle,secondKernel,'the seat facts are still replaced');
   assert.equal(afterRestart?.hierarchy?.attempt,2);
 
-  enqueueOp(f,workflowId,'job-run-survives-2','docs/b/');
+  enqueueOp(f,workflowId,'job-run-survives-2','fe/b/');
   const d2=f.run(API,'dispatch','--repo',f.repo,'--job','job-run-survives-2','--model','claude-agent','--spawn','--json');
-  assert.equal(d2.status,0,d2.stderr||d2.stdout);
+  assert.equal(d2.status,0,`${d2.stderr}\n${d2.stdout}`);
   assert.equal(json(d2.stdout)?.managed?.runId,'run-fake-2','the op after the restart joins the SAME workflow Run');
+  const finalState=readState(f);
+  assert.equal(finalState.runs?.['run-fake-2']?.coordinator,secondKernel,'the workflow Run belongs to the current Kernel');
+  assert.deepEqual((finalState.runUses??[]).filter(r=>r.id==='run-fake-2').map(r=>r.from),[secondKernel],
+    'the workflow Run is rebound exactly once to the replacement Kernel');
 
   const runCreates=f.calls().filter(c=>c==='orchestration run-create');
   assert.equal(runCreates.length,2,`one entry Run and one workflow Run, never one per kernel: ${f.calls().join(', ')}`);

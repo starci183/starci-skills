@@ -1,16 +1,26 @@
 // Kernel group launch: one admitted attempt, no-effect-only fallback and its ledger receipt.
 import { startAgent } from '../agent/lib.mjs';
 import { updateSignal } from '../../engine/db/ledger.mjs';
+import { commitWorkflowStart } from './workflow-startup.mjs';
 
-export function launchKernelGroup({ ledger, workflowId, token, route, members, launch, reservationMs,
-  hostUnavailableExit, memberLabel, failStart }) {
+export function launchKernelGroup({ ledger, workflowId, token, expected, route, members, launch, reservationMs,
+  hostUnavailableExit, memberLabel, failStart }, { start = startAgent, now = Date.now } = {}) {
   const fellThrough = [];
   let spawned = null;
   const remaining = [...members];
   for (let index = 0; remaining.length; index += 1) {
     const member = remaining[0];
-    updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, expiresAt: Date.now() + reservationMs });
-    spawned = startAgent({ ...launch, provider: member.agent, model: member.model, effort: member.effort,
+    const renewed = commitWorkflowStart(ledger, { workflowId, expected, token, holderPid: process.pid, now }, () => {
+      const at = now();
+      if (!updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, expiresAt: at + reservationMs }))
+        throw Error('kernel-start-reservation-lost');
+    });
+    if (!renewed.ok) {
+      failStart(renewed.reason, 'Kernel group lost its accepted goal or starting reservation before launch', null,
+        { effectState: 'none', authority: renewed.authority ?? null });
+      throw Error(renewed.reason);
+    }
+    spawned = start({ ...launch, provider: member.agent, model: member.model, effort: member.effort,
       allowGroup: remaining.map((m) => ({ provider: m.agent, model: m.model, effort: m.effort })) });
     if (spawned.ok) {
       route = { ...member, agent: spawned.provider, model: spawned.admission?.selected?.model ?? spawned.model,
@@ -31,11 +41,11 @@ export function launchKernelGroup({ ledger, workflowId, token, route, members, l
       failStart(spawned.step, spawned.error, spawned.terminal ?? null,
         { ...failure, ...(fellThrough.length ? { fellThrough } : {}),
           ...(route.fallThrough && next ? { fallThroughRefused: `the start left effect '${spawned.effectState ?? 'unknown'}'` } : {}) });
-    const at = Date.now();
+    const failedAt = now();
     const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
     ledger.transaction(() => {
       ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: workflow?.generation ?? 0,
-        kind: 'kernel-start-failed', createdAt: at,
+        kind: 'kernel-start-failed', createdAt: failedAt,
         payload: { step: spawned.step, error: spawned.error, ...failure, fellThroughTo: { agent: next.agent, model: next.model ?? null } } });
     });
     fellThrough.push({ agent: selected.provider, model: selected.model ?? null, step: spawned.step, error: spawned.error });

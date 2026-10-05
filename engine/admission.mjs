@@ -111,6 +111,21 @@ export function findOwnedPathLeaseConflicts(db,requests,{excludeJobId=null,canon
   return conflicts;
 }
 
+/** Existing durable path and resource checks, read inside the caller's reservation transaction. */
+export function resourceAdmission(db,repoNeeds,{at,canonicalOf=null}={}){
+  const reasons=[];
+  const pathConflicts=findOwnedPathLeaseConflicts(db,repoNeeds,{canonicalOf});
+  for(const conflict of pathConflicts)reasons.push(`resource ${conflict.requested} overlaps durable lease ${conflict.held} held by ${conflict.job_id}`);
+  for(const item of repoNeeds){
+    const row=db.prepare('SELECT capacity FROM resources WHERE resource_key=?').get(item.resourceKey);
+    const capacity=row?.capacity??1;
+    const used=db.prepare('SELECT COALESCE(SUM(units),0) u FROM leases WHERE resource_key=? AND expires_at>?').get(item.resourceKey,at).u;
+    if(used+item.units>capacity)reasons.push(`resource ${item.resourceKey} capacity ${capacity} has ${used} used and needs ${item.units}`);
+  }
+  if(reasons.length)return {ok:false,reason:reasons.join('; '),reasons,pathConflicts:pathConflicts.map(({requested,held,job_id,workflow_id,op_id,expires_at})=>({requested,held,jobId:job_id,workflowId:workflow_id,opId:op_id,expiresAt:expires_at}))};
+  return {ok:true};
+}
+
 /**
  * The concurrent-operation ceiling one workflow is admitted at. Two declared numbers meet here and
  * the LOWER of them admits: the owner's `budgets.maxOps` (per workflow) and `maxParallelOps` from
@@ -139,6 +154,14 @@ export function admitOpSlot({running=0,maxOps=null,maxParallelOps=null}={}){
   return held<ceiling
     ?{ok:true,running:held,ceiling,ceilingSource:source,reason:null}
     :{ok:false,running:held,ceiling,ceilingSource:source,reason:'max-ops'};
+}
+
+/** Count this workflow's durable held slots and judge the same declared ceiling at preflight and reservation. */
+export function workflowOpSlots(db,workflowId,{excludeJobId=null,holdingStatuses,maxOps=null,maxParallelOps=null}={}){
+  if(!Array.isArray(holdingStatuses)||!holdingStatuses.length)throw Error('workflowOpSlots requires canonical held statuses');
+  const running=db.prepare(`SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND job_id<>?
+    AND status IN (${holdingStatuses.map(()=>'?').join(',')})`).get(workflowId,excludeJobId??'',...holdingStatuses).n;
+  return admitOpSlot({running,maxOps,maxParallelOps});
 }
 
 const rowObject=value=>{
