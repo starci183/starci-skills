@@ -182,7 +182,7 @@ export default {
     // The work unit this job is a try of (scripts/kernel/units.mjs, H3/H4/H5): its budget, its lineage (--retry-of may
     // name only the unit's latest failed try) and the reopen a passed unit needs. A refusal is typed and nothing is written.
     const admitted = admitUnit(db, { workflowId, op: args.op, goalRevision: goal?.revision ?? null,
-      payload: { cut, records, owned_paths: ownedPaths, ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}) },
+      payload: { cut, records, owned_paths: ownedPaths, ...(Object.keys(resolvedParams.params).length && { params: resolvedParams.params }) },
       retryOf: typeof args['retry-of'] === 'string' && args['retry-of'].trim() ? args['retry-of'].trim() : null,
       reopen: typeof args.reopen === 'string' && args.reopen.trim() ? { reason: args.reopen.trim(), by: 'kernel' } : null,
       derivedFrom: String(args['derived-from'] ?? '').split(',').map((id) => id.trim()).filter(Boolean) });
@@ -190,17 +190,17 @@ export default {
     const self = admitted.unitId ? after.filter((prior) => db.prepare('SELECT unit_id FROM jobs WHERE job_id=?').get(prior)?.unit_id === admitted.unitId) : [];
     if (self.length) throw Object.assign(new Error(`--after names ${self.join(', ')}, a try of this job's own unit ${admitted.unitId}: it would wait on itself; enqueue without that --after - a retry chains through its unit`), { code: 'after-self-lineage' });
     payload = {
-      opId: args.op, records, owned_paths: ownedPaths, ...(newModules.length ? { new_modules: newModules } : {}), title: args.title ?? args.op, risk: args.risk ?? null,
+      opId: args.op, records, owned_paths: ownedPaths, ...(newModules.length && { new_modules: newModules }), title: args.title ?? args.op, risk: args.risk ?? null,
       // --what: the short human name of the target (Vietnamese, ≤40 chars) the op-job display name shows.
-      ...(typeof args.what === 'string' && args.what.trim() ? { displayWhat: args.what.replace(/\s+/g, ' ').trim().slice(0, 60) } : {}),
-      ...(target.repository ? { repository: target.repository } : {}),
-      ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}),
-      ...(cut ? { cut } : {}),
-      ...(after.length ? { after } : {}),
-      ...(foundationLeg ? { foundation: foundationLeg } : {}),
-      ...(canonPlan ? { canonPlan } : {}),
+      ...(typeof args.what === 'string' && args.what.trim() && { displayWhat: args.what.replace(/\s+/g, ' ').trim().slice(0, 60) }),
+      ...(target.repository && { repository: target.repository }),
+      ...(Object.keys(resolvedParams.params).length && { params: resolvedParams.params }),
+      ...(cut && { cut }),
+      ...(after.length && { after }),
+      ...(foundationLeg && { foundation: foundationLeg }),
+      ...(canonPlan && { canonPlan }),
       // The manual-only proofs this goal explicitly asks for (spec-deferral.mjs): an explicit-ask-only leg without the stamp is deferred.
-      ...(explicitAsksOf({ skillRoot, text: goal?.markdown }).length ? { explicitAsk: explicitAsksOf({ skillRoot, text: goal?.markdown }) } : {}),
+      ...(explicitAsksOf({ skillRoot, text: goal?.markdown }).length && { explicitAsk: explicitAsksOf({ skillRoot, text: goal?.markdown }) }),
       goal_binding: { revision: goal?.revision ?? null, identity: goal?.goal_identity ?? null },
       hierarchy: {
         schema: AGENT_HIERARCHY_SCHEMA,
@@ -217,7 +217,7 @@ export default {
     };
     const unitTry = writeUnitTry(db, admitted, { workflowId, jobId, op: args.op, title: payload.title, cut, repository: payload.repository ?? null, at: now });
     job = ledger.enqueueJob({ jobId, workflowId, opId: args.op, ...unitTry, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload, priority: seamPriorityOf(cut), createdAt: now });
-    unit = { unitId: unitTry.unitId, tryNo: unitTry.tryNo, tryBudget: admitted.tryBudget, retryOf: unitTry.retryOf, resumeOf: unitTry.resumeOf, ...(admitted.reopen ? { reopen: admitted.reopen } : {}) };
+    unit = { unitId: unitTry.unitId, tryNo: unitTry.tryNo, tryBudget: admitted.tryBudget, retryOf: unitTry.retryOf, resumeOf: unitTry.resumeOf, ...(admitted.reopen && { reopen: admitted.reopen }) };
     // The owner's config.yaml specs switch off this test class: the leg settles deferred at once, no attempt
     // spent, and the legs behind it proceed (scripts/route/spec-deferral.mjs; starci kernel run-deferred-tests runs it later).
     // An explicit-ask-only leg (integration.verify) the goal did not ask for is deferred the same way.
@@ -232,8 +232,8 @@ export default {
   });
 
   const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, unit, cut, params: payload.params ?? null, repository: payload.repository ?? null,
-    peerOverlap: peers.overlap, peerHeadsUp: peers.messages, ...(testsDeferred ? { deferred: testsDeferred } : {}),
-    ...(foundationLeg ? { foundation: foundationLeg } : {}), ...(foundationAdvisory ? { foundationAdvisory } : {}) };
+    peerOverlap: peers.overlap, peerHeadsUp: peers.messages, ...(testsDeferred && { deferred: testsDeferred }),
+    ...(foundationLeg && { foundation: foundationLeg }), ...(foundationAdvisory && { foundationAdvisory }) };
   if (foundationAdvisory) process.stderr.write(`api: advisory: ${foundationAdvisory}\n`);
   const retryNote = unit.retryOf ? ` retry of ${unit.retryOf}` : '';
   const reopenNote = unit.reopen ? ` REOPENED: ${unit.reopen.reason}` : '';
