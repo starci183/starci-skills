@@ -55,7 +55,7 @@ export function saveReceipt(ctx, kind, phase, receipt) {
 }
 export const phaseOf = (ctx, phase, receipt) => ctx?.checkpointPhase?.(phase, receipt);
 export const publicReceipt = ({ settlement: _settlement, ...receipt }) => receipt;
-export const acceptedDecision = (ctx) => ctx?.settlement ? { settlement: JSON.parse(JSON.stringify(ctx.settlement)) } : {};
+export const acceptedDecision = (ctx) => ctx?.settlement ? { settlement: structuredClone(ctx.settlement) } : {};
 
 /** A private index observes exact worktree bytes without changing the real index or creating another commit. */
 export function snapshotTree(dir, parent, files, git) {

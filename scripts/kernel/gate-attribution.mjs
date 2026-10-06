@@ -68,7 +68,7 @@ export function failingPath(value, repo) {
 }
 
 // A source path the way a gate prints it (tsc `file(12,5)`, jest/eslint `file:12:5`, a bare path).
-const SOURCE_PATH = /(?:^|[\s'"`(\[,])((?:[A-Za-z]:)?[\w.@~-]*(?:[\\/][\w.@~[\]()-]+)+\.(?:tsx?|mts|cts|jsx?|mjs|cjs))(?:\((\d+),\d+\)|:(\d+)(?::\d+)?)?/g;
+const SOURCE_PATH = /(?:^|[\s'"`([,])((?:[A-Za-z]:)?[\w.@~-]*(?:[\\/][\w.@~[\]()-]+)+\.(?:tsx?|mts|cts|jsx?|mjs|cjs))(?:\((\d+),\d+\)|:(\d+)(?::\d+)?)?/g;
 const FAILING_CAP = 20;
 /**
  * The failing files a red check's own text names, for a check that carries no `failing` list: a Kernel
