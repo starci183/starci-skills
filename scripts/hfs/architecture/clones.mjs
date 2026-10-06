@@ -54,7 +54,10 @@ export function tokenize(ts, sourceFile) {
     if (kind >= SyntaxKind.FirstJSDocNode && kind <= SyntaxKind.LastJSDocNode) return;
     if (kind === SyntaxKind.JsxText && node.containsOnlyTriviaWhiteSpaces) return;
     const typeScope = inType || kind === SyntaxKind.InterfaceDeclaration || kind === SyntaxKind.TypeAliasDeclaration;
-    kinds.push(kind === SyntaxKind.Identifier || kind === SyntaxKind.PrivateIdentifier ? ID : literalKinds.has(kind) ? LIT : kind);
+    let normalizedKind = kind;
+    if (kind === SyntaxKind.Identifier || kind === SyntaxKind.PrivateIdentifier) normalizedKind = ID;
+    else if (literalKinds.has(kind)) normalizedKind = LIT;
+    kinds.push(normalizedKind);
     lines.push(lineOf(node.getStart(sourceFile)));
     types.push(typeScope ? 1 : 0);
     ts.forEachChild(node, (child) => { visit(child, typeScope); });

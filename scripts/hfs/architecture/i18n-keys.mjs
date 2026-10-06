@@ -74,7 +74,7 @@ export function checkI18nKeys({ config, graph, context }) {
     for (const file of [...own, ...shared]) {
       const visit = node => {
         if (ts.isStringLiteralLike(node)) patterns.push(node.text.split('.'));
-        else if (ts.isTemplateExpression(node)) patterns.push([node.head.text, ...node.templateSpans.map(span => span.literal.text)].join('\u0000').split('\u0000').join('*').split('.'));
+        else if (ts.isTemplateExpression(node)) patterns.push([node.head.text, ...node.templateSpans.map(span => span.literal.text)].join('\u0000').replaceAll('\u0000', '*').split('.'));
         ts.forEachChild(node, visit);
       };
       visit(file.sourceFile);

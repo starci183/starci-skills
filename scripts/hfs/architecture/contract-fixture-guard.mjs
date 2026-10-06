@@ -77,7 +77,7 @@ function readSpec(ts, sourceFile, helper, providers) {
 }
 
 export function checkContractFixtureGuard(input) {
-  const { config, graph, ts, resolver, tree } = checkerScope(input);
+  const { config, ts, resolver, tree } = checkerScope(input);
   const { contractShape } = resolver.ruleParams();
   const violations = [];
   const fixtures = new Map(); // provider -> first payload fixture file

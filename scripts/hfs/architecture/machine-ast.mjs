@@ -167,5 +167,5 @@ export function machineKit({ config, context, graph }) {
     stringValue, walk, decorators, isExported, propertyNameText, propertyOf, valueOfProperty, at, appRoot };
 }
 
-export const upperSnake = name => name.replace(/-/g, '_').toUpperCase();
+export const upperSnake = name => name.replaceAll('-', '_').toUpperCase();
 export const pascal = name => name.split('-').filter(Boolean).map(part => part[0].toUpperCase() + part.slice(1)).join('');

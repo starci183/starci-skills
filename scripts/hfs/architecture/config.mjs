@@ -14,9 +14,12 @@ function canonical(file) {
 }
 
 function exactKeys(value, allowed, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error(`${label} must be an object.`);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object.`);
   const unknown = Object.keys(value).filter(key => !allowed.has(key));
-  if (unknown.length) throw Error(`${label} has unsupported fields: ${unknown.sort(byCodeUnit).join(', ')}.`);
+  if (unknown.length) {
+    unknown.sort(byCodeUnit);
+    throw new Error(`${label} has unsupported fields: ${unknown.join(', ')}.`);
+  }
 }
 
 /**
@@ -62,6 +65,63 @@ function existingRegularFile(root, relative) {
   }
 }
 
+function admitWorkspace(root, directories, queue, candidate, label = 'local package', strict = false) {
+  const absolute = path.resolve(candidate);
+  if (!isInside(root, absolute) || absolute === root || !existingDirectory(root, slash(path.relative(root, absolute)))) {
+    if (strict) throw new Error(`${label} must resolve to a package directory inside the repository.`);
+    return;
+  }
+  const manifest = path.join(absolute, 'package.json');
+  try {
+    if (!fs.lstatSync(manifest).isFile() || fs.lstatSync(manifest).isSymbolicLink()) {
+      if (strict) throw new Error(`${label} must resolve to a regular package.json inside the repository.`);
+      return;
+    }
+  } catch (error) {
+    if (strict) throw new Error(error.message.startsWith(label) ? error.message : `${label} must resolve to a regular package.json inside the repository.`);
+    return;
+  }
+  const relative = slash(path.relative(root, absolute));
+  if (!directories.has(relative)) { directories.add(relative); queue.push(absolute); }
+}
+
+function workspaceCandidates(packageRoot, normalized) {
+  const segments = normalized.split('/');
+  if (path.isAbsolute(normalized) || segments.some(segment => segment === '..' || (segment.includes('*') && segment !== '*'))) {
+    throw new Error(`Unsupported local workspace pattern: ${normalized}.`);
+  }
+  let candidates = [packageRoot];
+  for (const segment of segments) {
+    const next = [];
+    for (const base of candidates) {
+      if (segment === '*') {
+        if (!fs.existsSync(base) || !fs.lstatSync(base).isDirectory()) continue;
+        next.push(...fs.readdirSync(base, { withFileTypes: true })
+          .filter(item => item.isDirectory())
+          .sort((a, b) => byCodeUnit(a.name, b.name))
+          .map(item => path.join(base, item.name)));
+      } else next.push(path.join(base, segment));
+    }
+    candidates = next;
+  }
+  return { candidates, wildcard: segments.includes('*') };
+}
+
+function admitFileDependencies(root, appPackageRoot, packageRoot, sideRoot, repository, pkg, state) {
+  for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+    for (const [name, value] of Object.entries(pkg?.[section] ?? {})) {
+      if (typeof value !== 'string' || !value.startsWith('file:')) continue;
+      const absolute = path.resolve(sideRoot ? appPackageRoot : packageRoot, value.slice('file:'.length));
+      if (sideRoot && !isInside(root, absolute) && isInside(appPackageRoot, absolute)) continue;
+      const label = `${section}.${name} file dependency`;
+      if (isInside(root, absolute)) { admitWorkspace(root, state.directories, state.queue, absolute, label, true); continue; }
+      if (!repository || !isInside(repository, absolute) || !existingPackageDirectory(absolute)) {
+        throw new Error(`${label} must resolve to a package directory inside the repository.`);
+      }
+    }
+  }
+}
+
 /**
  * The npm workspaces below `root`. The one package.json of an app is at `packageRoot` (the app root; `root` is its side folder):
  * its workspace patterns under `<side>/` are this side's, read relative to the side folder, and every other pattern is the other
@@ -72,25 +132,6 @@ function workspaceDirectories(root, { packageRoot: appPackageRoot = root, side =
   const queue = [root];
   const visited = new Set();
   const repository = enclosingRepository(root);
-  const admit = (candidate, label = 'local package', strict = false) => {
-    const absolute = path.resolve(candidate);
-    if (!isInside(root, absolute) || absolute === root || !existingDirectory(root, slash(path.relative(root, absolute)))) {
-      if (strict) throw Error(`${label} must resolve to a package directory inside the repository.`);
-      return;
-    }
-    const manifest = path.join(absolute, 'package.json');
-    try {
-      if (!fs.lstatSync(manifest).isFile() || fs.lstatSync(manifest).isSymbolicLink()) {
-        if (strict) throw Error(`${label} must resolve to a regular package.json inside the repository.`);
-        return;
-      }
-    } catch (error) {
-      if (strict) throw Error(error.message.startsWith(label) ? error.message : `${label} must resolve to a regular package.json inside the repository.`);
-      return;
-    }
-    const relative = slash(path.relative(root, absolute));
-    if (!directories.has(relative)) { directories.add(relative); queue.push(absolute); }
-  };
   while (queue.length) {
     const packageRoot = queue.shift();
     if (visited.has(packageRoot)) continue;
@@ -99,53 +140,18 @@ function workspaceDirectories(root, { packageRoot: appPackageRoot = root, side =
     const pkg = readJson(path.join(sideRoot ? appPackageRoot : packageRoot, 'package.json'));
     const patterns = Array.isArray(pkg?.workspaces) ? pkg.workspaces : pkg?.workspaces?.packages;
     for (const pattern of Array.isArray(patterns) ? patterns : []) {
-      if (typeof pattern !== 'string' || !pattern.trim()) throw Error('package.json workspace entries must be non-empty paths.');
+      if (typeof pattern !== 'string' || !pattern.trim()) throw new Error('package.json workspace entries must be non-empty paths.');
       const written = slash(pattern.trim()).replace(/^\.\//, '');
       if (sideRoot && !written.startsWith(`${side}/`)) continue;
       const normalized = sideRoot ? written.slice(side.length + 1) : written;
-      const segments = normalized.split('/');
-      if (path.isAbsolute(normalized) || segments.some(segment => segment === '..' || (segment.includes('*') && segment !== '*'))) {
-        throw Error(`Unsupported local workspace pattern: ${normalized}.`);
-      }
-      let candidates = [packageRoot];
-      for (const segment of segments) {
-        const next = [];
-        for (const base of candidates) {
-          if (segment === '*') {
-            if (!fs.existsSync(base) || !fs.lstatSync(base).isDirectory()) continue;
-            next.push(...fs.readdirSync(base, { withFileTypes: true })
-              .filter(item => item.isDirectory())
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .map(item => path.join(base, item.name)));
-          } else next.push(path.join(base, segment));
-        }
-        candidates = next;
-      }
+      const { candidates, wildcard } = workspaceCandidates(packageRoot, normalized);
       // npm expands a `*` segment to the directories that hold a package.json and skips the rest (an empty or untracked folder is
       // HFS_EMPTY_DIR / HFS_SLOT_UNDECLARED, never a reason to analyse nothing); a literal workspace path must resolve. A `*`
       // pattern may match nothing: every app declares the same workspaces (fe/apps/*, fe/packages/*, HFS_MONO_WORKSPACES) whether
       // or not it has a package yet, and the root patterns are held to that fixed list by the rule, not here.
-      const wildcard = segments.includes('*');
-      for (const candidate of candidates) admit(candidate, `workspace ${normalized}`, !wildcard);
+      for (const candidate of candidates) admitWorkspace(root, directories, queue, candidate, `workspace ${normalized}`, !wildcard);
     }
-    for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
-      for (const [name, value] of Object.entries(pkg?.[section] ?? {})) {
-        if (typeof value !== 'string' || !value.startsWith('file:')) continue;
-        const absolute = path.resolve(sideRoot ? appPackageRoot : packageRoot, value.slice('file:'.length));
-        // The app's one package.json also lists the other side's file dependencies (inside the app, outside this side): not this
-        // side's. A path that leaves the app is judged like any other: a package of the same repository, or refused.
-        if (sideRoot && !isInside(root, absolute) && isInside(appPackageRoot, absolute)) continue;
-        const label = `${section}.${name} file dependency`;
-        if (isInside(root, absolute)) { admit(absolute, label, true); continue; }
-        // A sibling package of the same repository: this project consumes it, so the path is real and
-        // resolvable, but it is not part of this project's own source layout and must not become one of
-        // its workspaces - collecting it would pull another package's src into these roots. Refusing it
-        // instead would fail the whole check closed over an ordinary monorepo shape.
-        if (!repository || !isInside(repository, absolute) || !existingPackageDirectory(absolute)) {
-          throw Error(`${label} must resolve to a package directory inside the repository.`);
-        }
-      }
-    }
+    admitFileDependencies(root, appPackageRoot, packageRoot, sideRoot, repository, pkg, { directories, queue });
   }
   return [...directories].sort(byCodeUnit);
 }
@@ -202,7 +208,7 @@ function assertFrontendRolesDisjoint(root, frontend) {
     const left = entries[index];
     const right = entries[other];
     if (isInside(left.absolute, right.absolute) || isInside(right.absolute, left.absolute)) {
-      throw Error(`Architecture frontend role roots must be disjoint; ${left.role} ${left.relative} overlaps ${right.role} ${right.relative}.`);
+      throw new Error(`Architecture frontend role roots must be disjoint; ${left.role} ${left.relative} overlaps ${right.role} ${right.relative}.`);
     }
   }
 }
@@ -227,8 +233,10 @@ function directoriesUnder(root, relative, depth) {
 
 /** The owner entry a slot instance exposes: index.ts/index.tsx, a package's src/index.ts, an app's app.module.ts. */
 function ownerEntry(root, ownerRoot, tier) {
-  const candidates = tier === 'package' ? ['src/index.ts', 'src/index.tsx', 'index.ts', 'index.tsx']
-    : tier === 'app' ? ['app.module.ts'] : ['index.ts', 'index.tsx'];
+  let candidates;
+  if (tier === 'package') candidates = ['src/index.ts', 'src/index.tsx', 'index.ts', 'index.tsx'];
+  else if (tier === 'app') candidates = ['app.module.ts'];
+  else candidates = ['index.ts', 'index.tsx'];
   for (const candidate of candidates) {
     const relative = `${ownerRoot}/${candidate}`;
     if (existingRegularFile(root, relative)) return relative;
@@ -286,7 +294,7 @@ function derivedGrammar(root, packageRoot, workspaces, apps = []) {
  */
 export function loadArchitectureConfig(repositoryRoot, { hfs } = {}) {
   const root = fs.realpathSync(path.resolve(repositoryRoot));
-  if (!fs.lstatSync(root).isDirectory()) throw Error('Repository root must be a directory.');
+  if (!fs.lstatSync(root).isDirectory()) throw new Error('Repository root must be a directory.');
   const opened = hfs ?? openHfs({ repoRoot: root });
   const { profile, apps } = opened.repo;
   // A side of an app (the side folder is the root the machine judges) keeps its dependencies in the app root's one package.json.
@@ -297,7 +305,7 @@ export function loadArchitectureConfig(repositoryRoot, { hfs } = {}) {
   const inferred = inferredLayout(root, [...new Set([...workspaces, ...appDirs])].sort(byCodeUnit));
   const kinds = [profile === 'be' ? 'backend' : 'frontend'];
   const projects = discoveredProjects(root, [...new Set([...workspaces, ...appDirs])].sort(byCodeUnit));
-  if (!projects.length) throw Error('The repository has no tsconfig.json to derive a TypeScript project from.');
+  if (!projects.length) throw new Error('The repository has no tsconfig.json to derive a TypeScript project from.');
   const backend = {
     modules: ['src/modules'],
     // The layered feature root is the api kind (src/features/api/<feature>/: application/ and transport/<protocol>/); the cli

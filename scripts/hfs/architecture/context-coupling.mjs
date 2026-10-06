@@ -19,12 +19,12 @@ const RULE = 'BE_CONTEXT_COUPLING';
 const TYPEORM = 'typeorm';
 const RELATIONS = new Set(['OneToOne', 'OneToMany', 'ManyToOne', 'ManyToMany']);
 // The table identifier after the SQL keyword REFERENCES, optionally schema-qualified and quoted.
-const REFERENCES = /\bREFERENCES\s+(?:"?[A-Za-z0-9_]+"?\s*\.\s*)?"?([A-Za-z0-9_]+)"?/giu;
+const REFERENCES = /\bREFERENCES\s+(?:"?\w+"?\s*\.\s*)?"?(\w+)"?/giu;
 
 export function checkContextCoupling(input) {
   const { graph } = input;
   const kit = machineKit(input);
-  const { ts, resolver } = kit;
+  const { ts } = kit;
   const model = contextModelOf(kit, graph);
   const { tables } = entitiesOf(kit, graph);
   const violations = [];
@@ -83,6 +83,5 @@ export function checkContextCoupling(input) {
     if (covered.has(`${edge.from}|${to.owner.root}`)) continue;
     once(`${edge.from}|${edge.to}|${edge.line}`, { path: edge.from, line: edge.line, column: edge.column, message: `${from.owner.root} (context ${fromContext}) imports ${to.owner.root} (context ${toContext}); a context never imports another context's entities, services or SQL. Keep a local copy fed by its events, or read a projection.`, context: fromContext, targetContext: toContext });
   }
-  void resolver;
   return { violations, coverage: { status: 'checked', ...counts } };
 }

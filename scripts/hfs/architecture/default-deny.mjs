@@ -66,8 +66,10 @@ export function checkDefaultDeny(input) {
   const readsOrigin = declaration => {
     let found = false;
     kit.walk(declaration, node => {
-      if (ts.isPropertyAccessExpression(node) && ORIGIN_HEADERS.has(node.name.text.toLowerCase())) found = true;
-      else if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression) && ORIGIN_HEADERS.has(node.argumentExpression.text.toLowerCase())) found = true;
+      let name = null;
+      if (ts.isPropertyAccessExpression(node)) name = node.name.text;
+      else if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) name = node.argumentExpression.text;
+      if (name && ORIGIN_HEADERS.has(name.toLowerCase())) found = true;
       return !found;
     });
     return found;

@@ -201,8 +201,8 @@ function privateHost(hostname) {
 const DEVELOPMENT_SCRIPTS = ['typecheck', 'lint', 'build', 'test'];
 /** The README command that runs a managed script: `npm test` for test, `npm run <name>` for the others (never a longer script name that starts with it). */
 function scriptCommand(name) {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-  return new RegExp(name === 'test' ? 'npm (?:run test|test)(?![\\w:-])' : `npm run ${escaped}(?![\\w:-])`, 'u');
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+  return new RegExp(name === 'test' ? String.raw`npm (?:run test|test)(?![\w:-])` : String.raw`npm run ${escaped}(?![\w:-])`, 'u');
 }
 
 /** Presentation checks shared by the product HFS gate and this runtime's own standalone gate. */

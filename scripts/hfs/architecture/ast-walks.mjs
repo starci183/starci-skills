@@ -5,8 +5,9 @@ import { UNPROVEN_FRAMEWORK, isUnshadowedCommonJsRequire, relativePath, unwrapEx
 
 /** `expression` unwrapped by the caller's own predicate set (a predicate absent on an older ts reads as never). */
 export function unwrapEach(ts, expression, predicates) {
-  while (expression && predicates.some((predicate) => predicate?.(expression))) expression = expression.expression;
-  return expression;
+  let current = expression;
+  while (current && predicates.some((predicate) => predicate?.(current))) current = current.expression;
+  return current;
 }
 
 /** `value` with every TS alias hop resolved (a re-exported import reads as its target symbol). */
@@ -153,7 +154,8 @@ export function constructedDecoratorKind(ts, checker, decorator, targets, traceO
   const callee = ts.isCallExpression(decorator.expression) ? decorator.expression.expression : decorator.expression;
   const kinds = tracedFrameworkKinds(ts, checker, callee, targets, traceOpts);
   if (kinds.has(UNPROVEN_FRAMEWORK)) return 'unproven framework';
-  return kinds.size === 1 ? [...kinds][0] : kinds.size ? 'multiple framework' : null;
+  if (kinds.size === 1) return [...kinds][0];
+  return kinds.size ? 'multiple framework' : null;
 }
 
 /** The target a decorator resolves to through a `let`/`var` alias's single initializer, or null. */
@@ -178,11 +180,12 @@ export function decoratorCallee(ts, decorator) {
  * not resolve. Null when the statement names no static specifier.
  */
 export function moduleExportsOf(ts, checker, statement) {
-  const moduleSpecifier = (ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement))
-    && statement.moduleSpecifier && ts.isStringLiteralLike(statement.moduleSpecifier) ? statement.moduleSpecifier : null;
-  const importEquals = ts.isImportEqualsDeclaration(statement) && ts.isExternalModuleReference(statement.moduleReference)
-    && statement.moduleReference.expression && ts.isStringLiteralLike(statement.moduleReference.expression)
-    ? statement.moduleReference.expression : null;
+  let moduleSpecifier = null;
+  if ((ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement))
+    && statement.moduleSpecifier && ts.isStringLiteralLike(statement.moduleSpecifier)) moduleSpecifier = statement.moduleSpecifier;
+  let importEquals = null;
+  if (ts.isImportEqualsDeclaration(statement) && ts.isExternalModuleReference(statement.moduleReference)
+    && statement.moduleReference.expression && ts.isStringLiteralLike(statement.moduleReference.expression)) importEquals = statement.moduleReference.expression;
   const specifierNode = moduleSpecifier ?? importEquals;
   const specifier = specifierNode?.text;
   if (specifier == null) return null;
@@ -208,7 +211,8 @@ export function programSourcesOf(context, checker, localFiles, { root = null } =
  * The CommonJS require() caveat every framework scan reports: each `require('<specifier>')` `accepted` pushes
  * `${filePath} uses a CommonJS <label ?? specifier> <detail>` (the import-shape reasoning cannot prove that binding).
  */
-export function commonJsRequireReasons(ts, checker, sourceFile, accepted, reasons, filePath, detail, label = null) {
+export function commonJsRequireReasons(ts, checker, sourceFile, accepted, reasons, filePath, detail) {
+  const label = arguments[7] ?? null;
   const visit = node => {
     if (ts.isCallExpression(node) && isUnshadowedCommonJsRequire(ts, checker, node.expression)
       && node.arguments.length === 1 && ts.isStringLiteralLike(node.arguments[0]) && accepted(node.arguments[0].text)) {
