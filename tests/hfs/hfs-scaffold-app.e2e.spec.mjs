@@ -51,7 +51,9 @@ function testWorldRequire() {
 
 /** The Postgres image the canon stack pins (the example app's stack declaration: what a world attaches to). */
 const POSTGRES_IMAGE = parseYaml(fs.readFileSync(path.join(RUNTIME, 'examples', 'ecommerce-app', '.starcistacks', 'application-stacks.yaml'), 'utf8')).components?.postgres?.image;
-assert.ok(typeof POSTGRES_IMAGE === 'string' && POSTGRES_IMAGE.length > 0, 'the example app stack declaration pins a postgres image');
+test('the example app stack declaration pins a postgres image', () => {
+  assert.ok(typeof POSTGRES_IMAGE === 'string' && POSTGRES_IMAGE.length > 0, 'the example app stack declaration pins a postgres image');
+});
 
 /** The last lines of a run's output, for failure messages. */
 const tail = (run, lines = 30) => `${run.stdout ?? ''}\n${run.stderr ?? ''}`.trim().split(/\r?\n/).slice(-lines).join('\n');
