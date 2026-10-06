@@ -49,9 +49,18 @@ function grantParentViolations({ placements, newModules = [], workDir = '.starci
   return out;
 }
 
+const violationDetail = (v) => {
+  const need = v.newModule
+    ? `the new module ${v.newModule} needs its parent directory ${v.dir}, which does not exist`
+    : `directory ${v.dir} does not exist`;
+  const closest = v.closest === '.' ? 'the repository root' : v.closest;
+  const atRoot = v.atRoot ? ' (only the repository root exists on that path)' : '';
+  return `${v.owned}: ${need}; closest existing directory is ${closest}${atRoot}`;
+};
+
 /** One refusal detail naming each missing directory and the closest existing one. */
 function grantParentDetail(violations) {
-  const shown = violations.slice(0, 4).map((v) => `${v.owned}: ${v.newModule ? `the new module ${v.newModule} needs its parent directory ${v.dir}, which does not exist` : `directory ${v.dir} does not exist`}; closest existing directory is ${v.closest === '.' ? 'the repository root' : v.closest}${v.atRoot ? ' (only the repository root exists on that path)' : ''}`);
+  const shown = violations.slice(0, 4).map(violationDetail);
   return `${violations.length} owned path(s) could never be satisfied: ${shown.join('; ')}. Fix the path to the real directory, or declare a new module with --new-module <repository-relative dir>`;
 }
 

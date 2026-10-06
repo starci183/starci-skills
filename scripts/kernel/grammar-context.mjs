@@ -62,31 +62,33 @@ const installedFamilyCss = ({ skillRoot, family, root }) => {
   return typeof target === 'string' ? path.join(pkgDir, target) : null;
 };
 
-// { family, sources: [{role, path, files?}], missing: [{role, path?, detail}] }. Paths are absolute.
-export function resolveGrammarContext({ skillRoot, repo, binding = projectBinding(repo), inputs = 'reference' }) {
-  const sources = [];
-  const missing = [];
-  const roots = [...new Set([repo, ...(binding?.repos ?? []).map((r) => r.root)].map((r) => path.resolve(r)))];
-  const workDir = path.join(repo, binding?.workDir ?? '.starciwork');
-
+// The family CSS of the brand record, pushed into sources/missing: every declared non-reference css
+// found in its repository, plus the installed @starci/grammar family export. Returns the family name.
+const familyCss = ({ skillRoot, repo, binding, roots, workDir, sources, missing }) => {
   let brand = null;
   try { brand = readBrandRecord(workDir); } catch (e) { missing.push({ role: 'family-css', detail: `no brand record to resolve the family CSS from: ${e.message}` }); }
   const family = brand?.family ?? null;
-  if (brand) {
-    const seen = new Set();
-    const add = (file) => { const key = path.resolve(file).toLowerCase(); if (!seen.has(key)) { seen.add(key); sources.push({ role: 'family-css', path: slash(path.resolve(file)) }); } };
-    const declared = (Array.isArray(brand.brand.sources) ? brand.brand.sources : [])
-      .filter((s) => typeof s?.path === 'string' && /\.css$/i.test(s.path) && s.kind !== 'reference');
-    for (const source of declared) {
-      const file = sourceCandidates({ source, repo, binding, roots }).find(isFile);
-      if (file) add(file);
-      else missing.push({ role: 'family-css', path: `${source.repository ? `${source.repository}:` : ''}${source.path}`, detail: `declared in ${slash(brand.file)} brand.sources and not on disk in its repository` });
+  if (!brand) return family;
+  const seen = new Set();
+  const add = (file) => { const key = path.resolve(file).toLowerCase(); if (!seen.has(key)) { seen.add(key); sources.push({ role: 'family-css', path: slash(path.resolve(file)) }); } };
+  const declared = (Array.isArray(brand.brand.sources) ? brand.brand.sources : [])
+    .filter((s) => typeof s?.path === 'string' && /\.css$/i.test(s.path) && s.kind !== 'reference');
+  for (const source of declared) {
+    const file = sourceCandidates({ source, repo, binding, roots }).find(isFile);
+    if (file) add(file);
+    else {
+      const declaredAt = source.repository ? `${source.repository}:` : '';
+      missing.push({ role: 'family-css', path: `${declaredAt}${source.path}`, detail: `declared in ${slash(brand.file)} brand.sources and not on disk in its repository` });
     }
-    if (family) for (const root of roots) { const file = installedFamilyCss({ skillRoot, family, root }); if (file && isFile(file)) add(file); }
-    if (!sources.length && !missing.length)
-      missing.push({ role: 'family-css', detail: `${slash(brand.file)} declares no CSS in brand.sources and no bound repository installs a ${GRAMMAR_PACKAGE} CSS export for family ${family ?? '(none: brand.identity.family unset)'}` });
   }
+  if (family) for (const root of roots) { const file = installedFamilyCss({ skillRoot, family, root }); if (file && isFile(file)) add(file); }
+  if (!sources.length && !missing.length)
+    missing.push({ role: 'family-css', detail: `${slash(brand.file)} declares no CSS in brand.sources and no bound repository installs a ${GRAMMAR_PACKAGE} CSS export for family ${family ?? '(none: brand.identity.family unset)'}` });
+  return family;
+};
 
+// The grammar and UI knowledge files every grammar op reads: each family topic yaml, each UI area's tree.
+const knowledgeInputs = (skillRoot, sources, missing) => {
   for (const topic of GRAMMAR_KNOWLEDGE_TOPICS) {
     const file = path.join(skillRoot, 'knowledge', 'grammars', GRAMMAR_KNOWLEDGE_FAMILY, `${topic}.yaml`);
     if (isFile(file)) sources.push({ role: 'grammar-knowledge', path: slash(file) });
@@ -98,16 +100,32 @@ export function resolveGrammarContext({ skillRoot, repo, binding = projectBindin
     if (files.length) sources.push({ role: 'ui-knowledge', path: slash(dir), files });
     else missing.push({ role: 'ui-knowledge', path: slash(dir), detail: 'no knowledge yaml on disk' });
   }
+};
+
+// The real components a component-source draw compiles against, not their pictures: the installed dist
+// types, the runtime's packages/grammar/src, the HeroUI CSS.
+const componentSources = ({ skillRoot, roots, sources, missing }) => {
+  const installed = roots.map((r) => path.join(r, 'node_modules', ...GRAMMAR_PACKAGE.split('/'), 'dist')).filter(isDir);
+  for (const dir of installed) sources.push({ role: 'grammar-source', path: slash(dir) });
+  const src = path.join(skillRoot, 'packages', 'grammar', 'src');
+  if (isDir(src)) sources.push({ role: 'grammar-source', path: slash(src) });
+  if (!installed.length && !isDir(src)) missing.push({ role: 'grammar-source', detail: `no ${GRAMMAR_PACKAGE} dist in a bound repository and no ${slash(src)}` });
+  const heroui = roots.map((r) => path.join(r, 'node_modules', '@heroui', 'styles')).find(isDir);
+  if (heroui) sources.push({ role: 'heroui-styles', path: slash(heroui) });
+};
+
+// { family, sources: [{role, path, files?}], missing: [{role, path?, detail}] }. Paths are absolute.
+export function resolveGrammarContext({ skillRoot, repo, binding = projectBinding(repo), inputs = 'reference' }) {
+  const sources = [];
+  const missing = [];
+  const roots = [...new Set([repo, ...(binding?.repos ?? []).map((r) => r.root)].map((r) => path.resolve(r)))];
+  const workDir = path.join(repo, binding?.workDir ?? '.starciwork');
+
+  const family = familyCss({ skillRoot, repo, binding, roots, workDir, sources, missing });
+  knowledgeInputs(skillRoot, sources, missing);
 
   if (inputs === 'component-source') {
-    // The real components, not their pictures: the types the draw file compiles against, the source, the HeroUI CSS.
-    const installed = roots.map((r) => path.join(r, 'node_modules', ...GRAMMAR_PACKAGE.split('/'), 'dist')).filter(isDir);
-    for (const dir of installed) sources.push({ role: 'grammar-source', path: slash(dir) });
-    const src = path.join(skillRoot, 'packages', 'grammar', 'src');
-    if (isDir(src)) sources.push({ role: 'grammar-source', path: slash(src) });
-    if (!installed.length && !isDir(src)) missing.push({ role: 'grammar-source', detail: `no ${GRAMMAR_PACKAGE} dist in a bound repository and no ${slash(src)}` });
-    const heroui = roots.map((r) => path.join(r, 'node_modules', '@heroui', 'styles')).find(isDir);
-    if (heroui) sources.push({ role: 'heroui-styles', path: slash(heroui) });
+    componentSources({ skillRoot, roots, sources, missing });
     return { family, sources, missing, inputs };
   }
   const captures = [path.join(workDir, CAPTURES_DIR), ...roots.map((r) => path.join(r, 'node_modules', ...GRAMMAR_PACKAGE.split('/'), 'captures'))].find(isDir);
@@ -117,7 +135,10 @@ export function resolveGrammarContext({ skillRoot, repo, binding = projectBindin
 }
 
 export const grammarMissingDetail = (missing) => missing
-  .map((m) => `${m.role}${m.path ? ` ${m.path}` : ''}: ${m.detail}`).join('; ');
+  .map((m) => {
+    const file = m.path ? ` ${m.path}` : '';
+    return `${m.role}${file}: ${m.detail}`;
+  }).join('; ');
 
 // The prompt block for packet context.grammar.
 export function renderGrammarContext(grammar) {

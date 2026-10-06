@@ -22,8 +22,8 @@ export const SOURCE_EXT = Object.freeze(['.ts', '.tsx', '.mts', '.cts', '.js', '
 const RESOLVE_EXT = [...SOURCE_EXT, '.d.ts', '.json'];
 const posix = (p) => String(p).replaceAll(/\\/g, '/');
 const SPEC_RE = [
-  /\bimport\s+(?:type\s+)?[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/g,
-  /\bexport\s+(?:type\s+)?[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/g,
+  /\bimport\s+(?:type\s+)?(?:(?!\bfrom\s*['"])[^'"`;])*\bfrom\s*['"]([^'"]+)['"]/g,
+  /\bexport\s+(?:type\s+)?(?:(?!\bfrom\s*['"])[^'"`;])*\bfrom\s*['"]([^'"]+)['"]/g,
   /\bimport\s*['"]([^'"]+)['"]/g,
   /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
   /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
@@ -34,12 +34,20 @@ const SPEC_RE = [
 function parseJsonc(text) {
   let out = '', i = 0, inStr = false;
   const s = String(text ?? '');
+  const copyStringChar = () => {
+    out += s[i];
+    if (s[i] === '\\') { out += s[i + 1] ?? ''; i += 2; return; }
+    if (s[i] === '"') inStr = false;
+    i += 1;
+  };
+  const skipLineComment = () => { while (i < s.length && s[i] !== '\n') i += 1; };
+  const skipBlockComment = () => { i += 2; while (i < s.length && !(s[i] === '*' && s[i + 1] === '/')) i += 1; i += 2; };
   while (i < s.length) {
     const c = s[i], n = s[i + 1];
-    if (inStr) { out += c; if (c === '\\') { out += n ?? ''; i += 2; continue; } if (c === '"') inStr = false; i += 1; continue; }
+    if (inStr) { copyStringChar(); continue; }
     if (c === '"') { inStr = true; out += c; i += 1; continue; }
-    if (c === '/' && n === '/') { while (i < s.length && s[i] !== '\n') i += 1; continue; }
-    if (c === '/' && n === '*') { i += 2; while (i < s.length && !(s[i] === '*' && s[i + 1] === '/')) i += 1; i += 2; continue; }
+    if (c === '/' && n === '/') { skipLineComment(); continue; }
+    if (c === '/' && n === '*') { skipBlockComment(); continue; }
     out += c; i += 1;
   }
   return JSON.parse(out.replace(/,(\s*[}\]])/g, '$1'));
@@ -110,7 +118,9 @@ function tsconfigPaths(root, rel, seen) {
     inherited = tsconfigPaths(root, target, seen) ?? inherited;
   }
   const co = doc?.compilerOptions ?? {};
-  const baseUrl = co.baseUrl != null ? posix(path.join(dir, co.baseUrl)) : (co.paths ? posix(dir) : inherited?.baseUrl ?? null);
+  let baseUrl = inherited?.baseUrl ?? null;
+  if (co.baseUrl != null) baseUrl = posix(path.join(dir, co.baseUrl));
+  else if (co.paths) baseUrl = posix(dir);
   const paths = co.paths ?? inherited?.paths ?? null;
   return paths ? { baseUrl: baseUrl === '.' ? '' : baseUrl, paths } : null;
 }
@@ -121,28 +131,40 @@ const within = (file, dir) => !dir || file === dir || file.startsWith(`${dir}/`)
  * Resolve one specifier from `fromFile` (posix, relative to root): {kind: 'external'} | {kind: 'file', file} |
  * {kind: 'broken', candidates}. `exists(rel)` answers whether a repository-relative path is a file (and `isDir`).
  */
-function resolveSpecifier(fromFile, spec, { scopes, exists, isDir }) {
-  const bases = [];
+// The base paths a specifier resolves from: relative against the importing file, else the deepest
+// tsconfig alias scope that matches it; null marks a bare package specifier (external).
+const basesOf = (fromFile, spec, scopes) => {
   if (spec.startsWith('./') || spec.startsWith('../') || spec === '.' || spec === '..') {
-    bases.push(posix(path.posix.normalize(path.posix.join(path.posix.dirname(fromFile), spec))));
-  } else {
-    const scope = scopes.find((s) => within(fromFile, s.dir) && s.paths.some((p) => matchAlias(p.pattern, spec) != null));
-    if (!scope) return { kind: 'external' };
-    const alias = scope.paths.find((p) => matchAlias(p.pattern, spec) != null);
-    const star = matchAlias(alias.pattern, spec);
-    for (const t of alias.targets) bases.push(posix(path.posix.normalize(path.posix.join(scope.baseUrl ?? scope.dir, t.replace('*', star)))));
+    return [posix(path.posix.normalize(path.posix.join(path.posix.dirname(fromFile), spec)))];
   }
+  const scope = scopes.find((s) => within(fromFile, s.dir) && s.paths.some((p) => matchAlias(p.pattern, spec) != null));
+  if (!scope) return null;
+  const alias = scope.paths.find((p) => matchAlias(p.pattern, spec) != null);
+  const star = matchAlias(alias.pattern, spec);
+  return alias.targets.map((t) => posix(path.posix.normalize(path.posix.join(scope.baseUrl ?? scope.dir, t.replace('*', star)))));
+};
+
+// Probe one base path in resolution order (exact, each extension, index files, the .ts sibling a
+// `./foo.js` NodeNext specifier means), collecting tried paths into `candidates`. The resolved file or null.
+const probeBase = (b, { exists, isDir }, candidates) => {
+  for (const c of [b, ...RESOLVE_EXT.map((e) => `${b}${e}`), ...RESOLVE_EXT.map((e) => `${b}/index${e}`)]) {
+    candidates.push(c);
+    if (exists(c)) return c;
+  }
+  const m = /^(.*)\.[mc]?js$/.exec(b);
+  if (m) for (const e of ['.ts', '.tsx', '.mts', '.cts']) if (exists(`${m[1]}${e}`)) return `${m[1]}${e}`;
+  if (isDir(b)) candidates.push(`${b}/`);
+  return null;
+};
+
+function resolveSpecifier(fromFile, spec, { scopes, exists, isDir }) {
+  const bases = basesOf(fromFile, spec, scopes);
+  if (!bases) return { kind: 'external' };
   const candidates = [];
   for (const base of bases) {
     const b = base.replace(/^\.\//, '');
-    for (const c of [b, ...RESOLVE_EXT.map((e) => `${b}${e}`), ...RESOLVE_EXT.map((e) => `${b}/index${e}`)]) {
-      candidates.push(c);
-      if (exists(c)) return { kind: 'file', file: c };
-    }
-    // `./foo.js` written for a TS source (NodeNext style): the .ts sibling.
-    const m = /^(.*)\.[mc]?js$/.exec(b);
-    if (m) for (const e of ['.ts', '.tsx', '.mts', '.cts']) if (exists(`${m[1]}${e}`)) return { kind: 'file', file: `${m[1]}${e}` };
-    if (isDir(b)) candidates.push(`${b}/`);
+    const hit = probeBase(b, { exists, isDir }, candidates);
+    if (hit) return { kind: 'file', file: hit };
   }
   return { kind: 'broken', candidates: candidates.slice(0, 6) };
 }
@@ -159,6 +181,12 @@ export function matchAlias(pattern, spec) {
  * One pass over a repository working tree: {files, edges: [{from, spec, kind, file?}]}. `only` limits the files
  * READ (their imports) to that set; resolution still sees every file on disk. `readFile(rel)` is a seam.
  */
+// The {from, spec, kind, file?} edge one specifier in `from` yields, or null when it is external.
+const specifierEdge = (from, spec, resolution) => {
+  const r = resolveSpecifier(from, spec, resolution);
+  return r.kind === 'external' ? null : { from, spec, kind: r.kind, ...(r.file ? { file: r.file } : {}) };
+};
+
 function scanImports(root, { only = null, list = trackedList, readFile = null } = {}) {
   const files = trackedSources(root, { list });
   const onDisk = (rel) => { try { return fs.statSync(path.join(root, rel)).isFile(); } catch { return false; } };
@@ -173,8 +201,8 @@ function scanImports(root, { only = null, list = trackedList, readFile = null } 
     const text = read(from);
     if (text == null) continue;
     for (const spec of specifiersOf(text)) {
-      const r = resolveSpecifier(from, spec, { scopes, exists: onDisk, isDir });
-      if (r.kind !== 'external') edges.push({ from, spec, kind: r.kind, ...(r.file ? { file: r.file } : {}) });
+      const edge = specifierEdge(from, spec, { scopes, exists: onDisk, isDir });
+      if (edge) edges.push(edge);
     }
   }
   return { files, edges };

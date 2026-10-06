@@ -35,38 +35,20 @@
 // contract without it never reports stale input or drift. An entry recorded before `kind` existed is classified by its path.
 import fs from 'node:fs';
 import path from 'node:path';
-import { JOB_STATUSES } from '../../engine/db/ledger.mjs';
-import {sha256} from '../../engine/digest.mjs';
-import { admittedContractOf } from '../machine/contract-version.mjs';
-import { changeNoteOf, committedMatches, createOwnership, inside, ownedOf, ownerDeclarationFor, readRecordChanges, workflowCommittedReader } from './work-ownership.mjs';
+import { sha256 } from '../../engine/digest.mjs';
+import { INPUT_DIGEST_SCHEMA, WORK_PREFIX, inputDrift as inputDriftOf, inputKindOf, isSourceLaw, isWorkInput, special } from './input-drift.mjs';
+import { changeNoteOf } from './work-ownership.mjs';
+export { INPUT_DIGEST_SCHEMA, WORK_PREFIX, inputKindOf, isWorkInput };
 import { normWork } from '../lib/path-key.mjs';
-import { parseJson } from '../lib/json.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { opReadTexts, bindOpPath } from '../lib/op-shared.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
 
-export const INPUT_DIGEST_SCHEMA = 'starci/input-digests@1';
 export const ABSENT = 'absent';
-const INPUT_KINDS = new Set(['source', 'work']);
-const SOURCE_ROOTS = ['knowledge/', 'modules/schemas/'];
-const SOURCE_FILES = new Set(['modules/models/code-patterns.yaml']);
-export const WORK_PREFIX = '.starciwork/';
-// A leftover pre-migration ledger path is agent data, never a product input.
-const WORK_EXCLUDED = new Set(['.starciwork/runtime.sqlite']);
-const WORK_EXCLUDED_ROOTS = ['.starciwork/kernel-evidence/', '.starciwork/kernel-strays/', '.starciwork/kernel-approvals/'];
 const WORK_RECORD_FILES = new Set(['index.yaml', 'resource.yaml']);
 const WORK_SKIP_DIRS = new Set(['evidence', 'assets']);
 const WORK_FILE_MAP_MAX = 600;
 const SKIP_DIRS = new Set(['node_modules', '.git']);
-
-const special = (segment) => /[*{<]/.test(segment);
-const isSourceLaw = (rel) => typeof rel === 'string' && !rel.includes('..')
-  && (SOURCE_ROOTS.some((root) => rel.startsWith(root)) || SOURCE_FILES.has(rel));
-export const isWorkInput = (rel) => typeof rel === 'string' && rel.startsWith(WORK_PREFIX) && !rel.includes('..')
-  && !rel.split('/').some(special) && !WORK_EXCLUDED.has(rel) && !/^\.starciwork\/logs\.sqlite\.migrated-/.test(rel) && !WORK_EXCLUDED_ROOTS.some((root) => rel.startsWith(root));
-/** The kind of one recorded entry: its own `kind`, else what its path says (entries recorded before kinds). */
-export const inputKindOf = (entry) => (INPUT_KINDS.has(entry?.kind) ? entry.kind
-  : isSourceLaw(entry?.path) ? 'source' : isWorkInput(entry?.path) ? 'work' : null);
 
 /** The Source-law path tokens a free-form manifest `path:` string names, in order. */
 export function lawTokens(text) {
@@ -110,7 +92,7 @@ const listFiles = (abs, skip = SKIP_DIRS, strict = false) => {
   const out = [];
   const visit = (dir) => {
     let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (error) { if (strict) throw error; return; }
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (error) { if (strict) { throw error; } return; }
     for (const entry of entries) {
       const p = path.join(dir, entry.name);
       if (entry.isDirectory()) { if (!skip.has(entry.name) && !underWorktrees(abs, p)) visit(p); }
@@ -122,23 +104,23 @@ const listFiles = (abs, skip = SKIP_DIRS, strict = false) => {
 };
 
 const globRegex = (pattern) => new RegExp(`^${pattern
-  .replace(/[.+?^$()|[\]\\]/g, String.raw`\$&`)
-  .replace(/<[A-Za-z0-9_-]+>/g, '[^/]+')
-  .replace(/\{([^{}]*)\}/g, (whole, body) => `(?:${body.replaceAll(',', '|')})`)
+  .replaceAll(/[.+?^$()|[\]\\]/g, String.raw`\$&`)
+  .replaceAll(/<[A-Za-z0-9_-]+>/g, '[^/]+')
+  .replaceAll(/\{([^{}]*)\}/g, (whole, body) => `(?:${body.replaceAll(',', '|')})`)
   .replaceAll(/\*\*\//g, '\0')
-  .replace(/\*+/g, '.*')
+  .replaceAll(/\*+/g, '.*')
   .replaceAll('\0', '(?:.*/)?')}$`);
 
 const fileSha = (cache, abs, strict = false) => {
   if (!cache.has(abs)) {
     let digest = null;
-    try { digest = sha256(fs.readFileSync(abs)); } catch (error) { if (strict) throw error; digest = null; }
+    try { digest = sha256(fs.readFileSync(abs)); } catch (error) { if (strict) { throw error; } digest = null; }
     cache.set(abs, digest);
   }
   return cache.get(abs);
 };
 const setDigestOf = (lines) => (lines.length ? sha256(lines.map(([rel, digest]) => `${rel}\0${digest}\n`).join('')) : ABSENT);
-const sortLines = (lines) => lines.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+const sortLines = (lines) => lines.toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 
 /**
  * A Source digester bound to one runtime root. Every file is hashed at most
@@ -157,7 +139,7 @@ export function createDigester(root, { skip = SKIP_DIRS, strict = false } = {}) 
     if (first < 0) {
       const abs = path.join(root, rel);
       let stat = null;
-      try { stat = fs.statSync(abs); } catch (error) { if (strict && !['ENOENT', 'ENOTDIR'].includes(error.code)) throw error; return ABSENT; }
+      try { stat = fs.statSync(abs); } catch (error) { if (strict && !['ENOENT', 'ENOTDIR'].includes(error.code)) { throw error; } return ABSENT; }
       if (stat.isFile()) return fileSha(fileCache, abs, strict) ?? ABSENT;
       return stat.isDirectory() ? setDigest(listFiles(abs, skip, strict)) : ABSENT;
     }
@@ -185,7 +167,7 @@ export function createWorkDigester(repo, { workDir = '.starciwork', strict = fal
   const resolve = (rel) => {
     const abs = absOf(rel);
     let stat = null;
-    try { stat = fs.statSync(abs); } catch (error) { if (strict && !['ENOENT', 'ENOTDIR'].includes(error.code)) throw error; return { digest: ABSENT, files: {} }; }
+    try { stat = fs.statSync(abs); } catch (error) { if (strict && !['ENOENT', 'ENOTDIR'].includes(error.code)) { throw error; } return { digest: ABSENT, files: {} }; }
     if (stat.isFile()) {
       const digest = fileSha(fileCache, abs, strict);
       return digest ? { digest, files: { [rel]: digest } } : { digest: ABSENT, files: {} };
@@ -246,176 +228,12 @@ export function baselineWorkInputs(record, repo, { workDir = '.starciwork', now 
   };
 }
 
-const cutOf = (payloadJson) => {
-  try {
-    const cut = JSON.parse(payloadJson ?? 'null')?.cut;
-    return cut?.id != null ? { id: cut.id, ordinal: cut.ordinal, total: cut.total } : null;
-  } catch { return null; }
-};
-/**
- * Settled jobs of one workflow (succeeded, or failed on a partial report),
- * newest attempt of each (op, cut id, cut ordinal) only, compared with their
- * recorded inputs. Returns {stale, sourceDrift, peerDrift}:
- *   stale        Work inputs whose change is owed work: [{jobId, op, attempt, cut?, heldBy?,
- *                path, kind:'work', recorded, current, changed[], breaking?[], followUp?}].
- *                A changed record file counts here only when its COMMITTED revision differs
- *                from the one the job read (an in-flight rewrite never does) and
- *                - its owner (work-ownership.mjs ownerOf) is a peer workflow that marked the
- *                  change breaking - a committed change note `kind: breaking` with a rev above
- *                  the one the job read, written by the owner, or `starci kernel record-change --reach
- *                  follow-up` - listed in `breaking` [{file, owner, via, rev?, reason?}]; an
- *                  entry whose every file is breaking is `followUp: true`: ONE targeted
- *                  follow-up leg, never held seam-first; or
- *                - the job's own workflow owns it and no job of any other workflow wrote it
- *                  (an unattributed edit, as before).
- *   peerDrift    Work inputs a peer changed without owing anything - advisory, never stale:
- *                [{jobId, op, attempt, cut?, path, kind:'work', files:[{file, owner, ownerBy,
- *                writers[], readRev, currentRev, foreignWrite?, breakingIgnored?}]}].
- *   sourceDrift  Actual Source byte changes after a settled job's admitted input snapshot.
- *                These measurements do not waive current READ or CHECK obligations.
- * The job's own workflow's later legs writing what they own is never a change.
- * A contract with no inputs record, or unparsable JSON, contributes nothing.
- * `ownership`, `committed` and `recordChanges` are injectable for specs.
- */
-export function inputDrift(db, workflowId, { root, repo = null, workDir = '.starciwork', digest = createDigester(root), workDigest = repo ? createWorkDigester(repo, { workDir }) : null,
-  ownership = null, committed = undefined, recordChanges = null } = {}) {
-  const jobs = db.prepare("SELECT job_id,op_id,try_no AS attempt,status,payload_json,created_at,updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IS NOT NULL ORDER BY created_at,job_id").all(workflowId);
-  const newest = new Map(), seams = new Map();
-  const groupOf = (row) => { const cut = cutOf(row.payload_json); return `${row.op_id}\0${cut ? `${cut.id}\0${cut.ordinal}` : ''}`; };
-  for (const row of jobs) {
-    // Rows come oldest first (try numbers are per unit now), so the last one seen per group is its newest job.
-    newest.set(groupOf(row), row.job_id);
-    const cut = cutOf(row.payload_json);
-    if (!cut) continue;
-    const key = `${row.op_id}\0${cut.id}`, seam = seams.get(key);
-    if (!seam || cut.ordinal < seam.ordinal) seams.set(key, { ordinal: cut.ordinal, open: null });
-    const current = seams.get(key);
-    if (cut.ordinal === current.ordinal && !JOB_STATUSES.settled.includes(row.status)) current.open = row.job_id;
-  }
-  // A cut is redone seam-first: while its seam ordinal (the lowest) has an
-  // open job, every higher stale slice of that cut waits on it.
-  const heldBy = (op, cut) => {
-    const seam = cut ? seams.get(`${op}\0${cut.id}`) : null;
-    return seam?.open && cut.ordinal > seam.ordinal ? seam.open : null;
-  };
-  const writerOf = (row) => {
-    const payload = parseJson(row.payload_json) ?? {};
-    const settledAt = JOB_STATUSES.settled.includes(row.status) ? (Number.isFinite(payload.settledAt) ? payload.settledAt : row.updated_at) : null;
-    return { jobId: row.job_id, workflowId: row.workflow_id, status: row.status, owned: ownedOf(payload), settledAt };
-  };
-  // Who may write a product record without it being drift for a job settled at `at`: the job itself,
-  // and every other job of this workflow still open or settled after `at` (its own later legs).
-  const writers = jobs.map((row) => writerOf({ ...row, workflow_id: workflowId }));
-  const attributed = (file, jobId, at) => writers.some((writer) => (writer.jobId === jobId || writer.settledAt == null || writer.settledAt > at)
-    && writer.owned.some((owned) => inside(file, owned)));
-  // The jobs of OTHER workflows that may have written a record after `at`: they own a path covering it
-  // and ran (leased, running, answering, fenced) or settled after `at`. A queued job wrote nothing.
-  let peers;
-  const peerWritersOf = (file, at) => {
-    peers ??= db.prepare("SELECT job_id,workflow_id,status,payload_json,updated_at FROM jobs WHERE workflow_id<>? AND kind<>'kernel' AND status<>'queued'").all(workflowId).map(writerOf);
-    return [...new Set(peers.filter((writer) => (writer.settledAt == null || writer.settledAt > at) && writer.owned.some((owned) => inside(file, owned))).map((writer) => writer.workflowId))].sort(byCodeUnit);
-  };
-  // The contract of each job's newest dispatch (contracts are keyed by attempt_id).
-  const candidates = db.prepare(`SELECT j.job_id,j.workflow_id,j.op_id,j.try_no AS attempt,j.payload_json,
-      CASE WHEN json_valid(c.context_json) THEN json_extract(c.context_json,'$.inputs') END AS inputs
-    FROM jobs j JOIN contracts c ON c.attempt_id=(SELECT max(c2.attempt_id) FROM contracts c2 WHERE c2.job_id=j.job_id)
-    WHERE j.workflow_id=? AND j.kind<>'kernel' AND (j.status='succeeded' OR (j.status='failed' AND EXISTS(
-      SELECT 1 FROM reports r WHERE r.job_id=j.job_id AND r.outcome='partial')))
-    ORDER BY j.op_id,j.created_at,j.job_id`).all(workflowId);
-  const stale = [], sourceDrift = [], peerDrift = [], workChanged = [];
-  for (const row of candidates) {
-    if (!row.inputs || newest.get(groupOf(row)) !== row.job_id) continue;
-    const record = parseJson(row.inputs);
-    if (record?.schema !== INPUT_DIGEST_SCHEMA || !Array.isArray(record.digests)) continue;
-    const cut = cutOf(row.payload_json);
-    let admitted;
-    for (const entry of record.digests) {
-      if (typeof entry?.path !== 'string' || typeof entry.digest !== 'string' || entry.path.includes('..')) continue;
-      const kind = inputKindOf(entry);
-      if (kind === 'source' && isSourceLaw(entry.path)) {
-        const current = digest(entry.path);
-        if (current === entry.digest) continue;
-        admitted ??= admittedContractOf(db, row);
-        sourceDrift.push({ jobId: row.job_id, op: row.op_id, attempt: row.attempt, ...(cut ? { cut } : {}), path: entry.path, kind,
-          recorded: entry.digest, current, admittedAt: Number.isFinite(admitted.at) ? admitted.at : null });
-      } else if (kind === 'work' && workDigest && isWorkInput(entry.path)) {
-        // Judged only against the settle baseline: without it the job's own writes are indistinguishable from drift.
-        const base = entry.settled;
-        if (!base || typeof base.digest !== 'string') continue;
-        const current = workDigest(entry.path);
-        if (current === base.digest) continue;
-        const now = workDigest.files(entry.path);
-        const then = base.files && typeof base.files === 'object' ? base.files : null;
-        const changedFiles = then
-          ? [...new Set([...Object.keys(then), ...Object.keys(now)])].filter((file) => (now[file]?.slice(0, 16) ?? null) !== (then[file] ?? null)).sort(byCodeUnit)
-          : [entry.path];
-        const at = Number(base.at) || 0;
-        const unexplained = changedFiles.filter((file) => !attributed(file, row.job_id, at));
-        if (!unexplained.length) continue;
-        workChanged.push({ row, cut, entry, base, thenFiles: then, at, current, unexplained });
-      }
-    }
-  }
-  // Only committed revisions count (its own records at its workflow branch, others at main: workflowCommittedReader). A
-  // file whose committed bytes are still the ones the job read is an in-flight rewrite, never a change.
-  const perFile = workChanged.filter((item) => item.thenFiles);
-  const ownerOf = perFile.length ? (ownership ?? createOwnership(db, { repo, workDir })) : null;
-  const heads = perFile.length && repo ? (committed === undefined ? workflowCommittedReader({ repo, workDir, workflowId, ownerOf }) : committed)?.(perFile.flatMap((item) => item.unexplained)) ?? null : null;
-  let declarations;
-  const textOf = (file) => {
-    if (heads) return heads.get(file)?.toString('utf8') ?? null;
-    try { return fs.readFileSync(path.join(repo, workDir, file.slice(WORK_PREFIX.length)), 'utf8'); } catch { return null; }
-  };
-  for (const { row, cut, entry, base, thenFiles: then, at, current, unexplained } of workChanged) {
-    const item = { jobId: row.job_id, op: row.op_id, attempt: row.attempt, ...(cut ? { cut } : {}), path: entry.path, kind: 'work' };
-    if (!then) {
-      // A record directory too large for a per-file map is judged by its digest, as before.
-      const held = heldBy(row.op_id, cut);
-      stale.push({ ...item, recorded: base.digest, current, changed: unexplained.slice(0, 10), ...(held ? { heldBy: held } : {}) });
-      continue;
-    }
-    const owed = [], breaking = [], drift = [];
-    for (const file of unexplained) {
-      if (heads && committedMatches(heads.get(file) ?? null, then[file] ?? null)) continue;
-      const owner = ownerOf(file);
-      const writersAfter = peerWritersOf(file, at);
-      const note = changeNoteOf(textOf(file));
-      const readRev = base.revs?.[file] ?? null;
-      const view = { file, owner: owner.workflowId, ownerBy: owner.by, writers: writersAfter, readRev, currentRev: note?.rev ?? null };
-      if (owner.workflowId && owner.workflowId !== workflowId) {
-        declarations ??= recordChanges ?? readRecordChanges(db);
-        const declared = ownerDeclarationFor(declarations, file, { owner: owner.workflowId, after: at });
-        const noteBreaking = note?.kind === 'breaking' && (readRev != null ? note.rev != null && note.rev > readRev : Number.isFinite(note.at) && note.at > at);
-        // A change note binds only when the owner wrote it: a non-owner peer rewriting the owner's record cannot declare it breaking.
-        const byNonOwner = writersAfter.length > 0 && !writersAfter.includes(owner.workflowId);
-        // The job already read the revision the owner declared about: nothing more is owed for it.
-        const alreadyRead = declared?.digests?.[file] != null && declared.digests[file] === then[file];
-        // An owner's `--reach advisory` declaration covers the change note of its revision (and older).
-        const noteWaived = declared?.reach === 'advisory' && (declared.rev == null || note?.rev == null || note.rev <= declared.rev);
-        if (declared?.reach === 'follow-up' && !alreadyRead) {
-          breaking.push({ file, owner: owner.workflowId, via: 'declaration', ...(declared.rev != null ? { rev: declared.rev } : {}), reason: declared.reason, at: declared.at });
-        } else if (noteBreaking && !byNonOwner && !noteWaived && !alreadyRead) {
-          breaking.push({ file, owner: owner.workflowId, via: 'change-note', rev: note.rev });
-        } else {
-          const ignored = !noteBreaking || alreadyRead ? null : noteWaived ? 'owner-declared-advisory' : 'written-by-non-owner';
-          drift.push({ ...view, ...(ignored ? { breakingIgnored: ignored } : {}) });
-        }
-      } else if (writersAfter.length) {
-        drift.push({ ...view, foreignWrite: true });
-      } else {
-        owed.push(file);
-      }
-    }
-    if (drift.length) peerDrift.push({ ...item, files: drift });
-    const changed = [...owed, ...breaking.map((b) => b.file)].sort(byCodeUnit);
-    if (!changed.length) continue;
-    const followUp = owed.length === 0;
-    const held = followUp ? null : heldBy(row.op_id, cut);
-    stale.push({ ...item, recorded: base.digest, current, changed: changed.slice(0, 10), ...(breaking.length ? { breaking } : {}), ...(followUp ? { followUp: true } : {}), ...(held ? { heldBy: held } : {}) });
-  }
-  const order = (a, b) => (a.op < b.op ? -1 : a.op > b.op ? 1 : 0)
-    || (a.cut?.ordinal ?? 0) - (b.cut?.ordinal ?? 0) || a.attempt - b.attempt || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
-  return { stale: stale.toSorted(order), sourceDrift: sourceDrift.toSorted(order), peerDrift: peerDrift.toSorted(order) };
+export function inputDrift(db, workflowId, options = {}) {
+  const { root, repo = null, workDir = '.starciwork' } = options;
+  const digest = options.digest === undefined ? createDigester(root) : options.digest;
+  const workDigest = options.workDigest === undefined ? (repo ? createWorkDigester(repo, { workDir }) : null) : options.workDigest;
+  return inputDriftOf(db, workflowId, { root, repo, workDir, digest, workDigest,
+    ownership: options.ownership ?? null, committed: options.committed, recordChanges: options.recordChanges ?? null });
 }
 
 /** The settled jobs whose Work inputs changed (inputDrift().stale); Source edits never make a job stale. */
@@ -437,7 +255,7 @@ export function staleOperationsOf(staleInput) {
     if (!item.followUp) op.followUp = false;
     for (const b of item.breaking ?? []) op.breakingBy.add(b.owner);
   }
-  return [...byJob.values()].map(({ followUp, breakingBy, ...op }) => ({ ...op, ...(followUp ? { followUp: true } : {}), ...(breakingBy.size ? { breakingBy: [...breakingBy].sort(byCodeUnit) } : {}) }));
+  return [...byJob.values()].map(({ followUp, breakingBy, ...op }) => ({ ...op, ...(followUp ? { followUp: true } : {}), ...(breakingBy.size ? { breakingBy: [...breakingBy].toSorted(byCodeUnit) } : {}) }));
 }
 
 /**
@@ -458,7 +276,7 @@ export function peerDriftSummaryOf(peerDrift) {
   return {
     advisory: true,
     jobs: new Set(peerDrift.map((item) => item.jobId)).size,
-    records: [...byFile.values()].sort((a, b) => (a.file < b.file ? -1 : 1)).map((entry) => ({ file: entry.file, owner: entry.owner, ownerBy: entry.ownerBy, writers: [...entry.writers].sort(byCodeUnit), jobs: entry.jobs.size,
+    records: [...byFile.values()].toSorted((a, b) => (a.file < b.file ? -1 : 1)).map((entry) => ({ file: entry.file, owner: entry.owner, ownerBy: entry.ownerBy, writers: [...entry.writers].toSorted(byCodeUnit), jobs: entry.jobs.size,
       foreignWrite: entry.foreignWrite, ...(entry.breakingIgnored ? { breakingIgnored: entry.breakingIgnored } : {}) })),
   };
 }

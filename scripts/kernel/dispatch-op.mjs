@@ -56,24 +56,46 @@ const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
  *  kernel never guesses a tunable it was not given. A `required: true` param
  *  has no default: with `enforceRequired` (enqueue) its absence is refused;
  *  without it (a packet rendered for a job enqueued earlier) it is omitted. */
+// The params-invalid detail one override carries, or null: undeclared names, a setter without
+// authority and a value outside its declaration are all refused the same way.
+const overrideProblem = (opId, declared, legValues, source, name, value) => {
+  const def = declared[name];
+  if (!def) return `${source} sets ${name}, which ${opId} does not declare`;
+  if (def.setBy === 'owner' && source === '--params' && !Object.hasOwn(legValues, name)) {
+    return `${name} is set by the owner; the approved goal leg does not carry it`;
+  }
+  if (def.setBy === 'kernel' && source === 'goal leg') {
+    return `${name} is set by the kernel; a goal leg cannot carry it`;
+  }
+  return paramValueError(name, def, value);
+};
+
+// The declared params the overrides do not set take their declared default, validated like an
+// override. {params} or {error}.
+const defaultedParams = (declared, overrides) => {
+  const params = {};
+  for (const [name, def] of Object.entries(declared)) {
+    if (Object.hasOwn(overrides, name)) params[name] = overrides[name];
+    else if (Object.hasOwn(def ?? {}, 'default')) {
+      const error = paramValueError(name, def, def.default);
+      if (error) return { error };
+      params[name] = def.default;
+    }
+  }
+  return { params };
+};
+
 export function resolveOpParams(opDoc, { leg = null, flag = null, enforceRequired = false } = {}) {
   const declared = opDoc?.params && typeof opDoc.params === 'object' ? opDoc.params : {};
   const legValues = leg && typeof leg === 'object' ? leg : {};
   const flagValues = flag && typeof flag === 'object' ? flag : {};
   const overrides = {};
+  const opId = opDoc?.id ?? 'this op';
 
   for (const [source, values] of [['goal leg', legValues], ['--params', flagValues]]) {
     for (const [name, value] of Object.entries(values)) {
-      const def = declared[name];
-      if (!def) return { ok: false, reason: 'params-invalid', detail: `${source} sets ${name}, which ${opDoc?.id ?? 'this op'} does not declare` };
-      if (def.setBy === 'owner' && source === '--params' && !Object.hasOwn(legValues, name)) {
-        return { ok: false, reason: 'params-invalid', detail: `${name} is set by the owner; the approved goal leg does not carry it` };
-      }
-      if (def.setBy === 'kernel' && source === 'goal leg') {
-        return { ok: false, reason: 'params-invalid', detail: `${name} is set by the kernel; a goal leg cannot carry it` };
-      }
-      const error = paramValueError(name, def, value);
-      if (error) return { ok: false, reason: 'params-invalid', detail: error };
+      const detail = overrideProblem(opId, declared, legValues, source, name, value);
+      if (detail) return { ok: false, reason: 'params-invalid', detail };
       overrides[name] = value;
     }
   }
@@ -83,18 +105,11 @@ export function resolveOpParams(opDoc, { leg = null, flag = null, enforceRequire
     const [name, def] = missing[0];
     const via = def.setBy === 'owner' ? 'the approved goal leg (define-goal --params)' : `--params '{"${name}": <${def.type}>}'`;
     return { ok: false, reason: 'params-invalid', param: name,
-      detail: `${opDoc?.id ?? 'this op'} requires params.${name} (${def.type}, set by ${def.setBy}): ${def.doc?.en ?? ''} — none was given; re-run enqueue with ${via}` };
+      detail: `${opId} requires params.${name} (${def.type}, set by ${def.setBy}): ${def.doc?.en ?? ''} — none was given; re-run enqueue with ${via}` };
   }
-  const params = {};
-  for (const [name, def] of Object.entries(declared)) {
-    if (Object.hasOwn(overrides, name)) params[name] = overrides[name];
-    else if (Object.hasOwn(def ?? {}, 'default')) {
-      const error = paramValueError(name, def, def.default);
-      if (error) return { ok: false, reason: 'params-invalid', detail: `default ${error}` };
-      params[name] = def.default;
-    }
-  }
-  return { ok: true, params, overrides };
+  const defaulted = defaultedParams(declared, overrides);
+  if (defaulted.error) return { ok: false, reason: 'params-invalid', detail: `default ${defaulted.error}` };
+  return { ok: true, params: defaulted.params, overrides };
 }
 
 /** A planner-injected leg may name the kernel-set tunables its instance needs
@@ -152,6 +167,54 @@ function resolveModel(target, modelsDir) {
 // questions included - with <job-id>/<target-repo> placeholders where only a real job binds values,
 // and the context pack's resolved read list as its MANDATORY READS block.
 
+// The packet modules/kernel/dispatch.yaml defines for one op: brief, resolved params, context,
+// constraints and the returns contract, in that order.
+const packetOf = ({ args, briefRel, resolved, ctx, owned, selected, model, modelsDir }) => ({
+  op: args.op,
+  brief: briefRel,
+  ...(Object.keys(resolved.params).length ? { params: resolved.params } : {}),
+  context: {
+    records: args.records,
+    owned_paths: owned.ownedPaths,
+    mandatoryReads: ctx.mandatory?.map(m => m.path) ?? [],
+    readRefs: ctx.mandatory ?? [], selected_op: { mode: selected.mode, contract: selected.contract,
+      checks: opCheckRequirements(selected.contract, parseYaml(fs.readFileSync(path.join(modelsDir, 'kinds.yaml'), 'utf8'))?.kinds?.[args.op]) },
+    ...(owned.missing ? { recordsNotFound: owned.missing } : {}),
+    ...(owned.note ? { note: owned.note } : {}),
+    ...(owned.error ? { error: owned.error } : {}),
+  },
+  constraints: {
+    model: model.target,
+    provider: model.provider,
+    budget: args.budget ?? null,
+    lease: args.lease ?? null,
+  },
+  returns: { verdict: 'pass|fail|blocked', evidence: ['...paths'], suspicion: 'string?' },
+});
+
+// The human-readable preview of a packet and its launch commands (--json prints the result instead).
+const printPreview = ({ packet, model, contractPresent, commands, prompt }) => {
+  console.log(`PACKET op=${packet.op}`);
+  console.log(`  brief: ${packet.brief}`);
+  if (packet.params) {
+    const rendered = Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ');
+    console.log(`  params: ${rendered}`);
+  }
+  console.log(`  records: ${packet.context.records.join(', ') || '(none)'}`);
+  for (const p of packet.context.owned_paths) console.log(`  owned_path: ${p.path}  (record ${p.record}, via ${p.via}${p.exists ? '' : ', MISSING-ON-DISK'})`);
+  if (packet.context.recordsNotFound) console.log(`  records not in tree: ${packet.context.recordsNotFound.join(', ')}`);
+  if (packet.context.note) console.log(`  note: ${packet.context.note}`);
+  console.log(`  constraints: model=${model.target} budget=${packet.constraints.budget ?? '-'} lease=${packet.constraints.lease ?? '-'}`);
+  console.log(`  returns: verdict pass|fail|blocked + evidence[] + suspicion?  (contract ${VERDICT_CONTRACT}${contractPresent ? '' : ' — NOT LANDED, assumed'})`);
+  console.log('orca commands:');
+  for (const c of commands) {
+    console.log(`  $ ${c.cli}`);
+    if (c.note) console.log(`    note: ${c.note}`);
+  }
+  console.log('prompt the agent receives:');
+  for (const line of prompt.split('\n')) console.log(`  | ${line}`);
+};
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.op) usage(2);
@@ -188,28 +251,7 @@ function main() {
 
 
 
-  const packet = {
-    op: args.op,
-    brief: briefRel,
-    ...(Object.keys(resolved.params).length ? { params: resolved.params } : {}),
-    context: {
-      records: args.records,
-      owned_paths: owned.ownedPaths,
-      mandatoryReads: ctx.mandatory?.map(m => m.path) ?? [],
-      readRefs: ctx.mandatory ?? [], selected_op: { mode: selected.mode, contract: selected.contract,
-        checks: opCheckRequirements(selected.contract, parseYaml(fs.readFileSync(path.join(modelsDir, 'kinds.yaml'), 'utf8'))?.kinds?.[args.op]) },
-      ...(owned.missing ? { recordsNotFound: owned.missing } : {}),
-      ...(owned.note ? { note: owned.note } : {}),
-      ...(owned.error ? { error: owned.error } : {}),
-    },
-    constraints: {
-      model: model.target,
-      provider: model.provider,
-      budget: args.budget ?? null,
-      lease: args.lease ?? null,
-    },
-    returns: { verdict: 'pass|fail|blocked', evidence: ['...paths'], suspicion: 'string?' },
-  };
+  const packet = packetOf({ args, briefRel, resolved, ctx, owned, selected, model, modelsDir });
 
   const prompt = buildOpPrompt({ skillRoot, packet, contextPack: ctx });
   const title = `[Op] ${args.op}`;
@@ -243,22 +285,7 @@ function main() {
   };
 
   if (args.json) { console.log(JSON.stringify(result, null, 2)); return; }
-  console.log(`PACKET op=${packet.op}`);
-  console.log(`  brief: ${packet.brief}`);
-  if (packet.params) console.log(`  params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}`);
-  console.log(`  records: ${packet.context.records.join(', ') || '(none)'}`);
-  for (const p of packet.context.owned_paths) console.log(`  owned_path: ${p.path}  (record ${p.record}, via ${p.via}${p.exists ? '' : ', MISSING-ON-DISK'})`);
-  if (packet.context.recordsNotFound) console.log(`  records not in tree: ${packet.context.recordsNotFound.join(', ')}`);
-  if (packet.context.note) console.log(`  note: ${packet.context.note}`);
-  console.log(`  constraints: model=${model.target} budget=${packet.constraints.budget ?? '-'} lease=${packet.constraints.lease ?? '-'}`);
-  console.log(`  returns: verdict pass|fail|blocked + evidence[] + suspicion?  (contract ${VERDICT_CONTRACT}${contractPresent ? '' : ' — NOT LANDED, assumed'})`);
-  console.log('orca commands:');
-  for (const c of result.orca.commands) {
-    console.log(`  $ ${c.cli}`);
-    if (c.note) console.log(`    note: ${c.note}`);
-  }
-  console.log('prompt the agent receives:');
-  for (const line of prompt.split('\n')) console.log(`  | ${line}`);
+  printPreview({ packet, model, contractPresent, commands: result.orca.commands, prompt });
 }
 
 if (isMain(import.meta.url)) main();

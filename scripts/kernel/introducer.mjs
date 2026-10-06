@@ -49,6 +49,37 @@ const successorOf = (workflows, wf) => {
  * resolveIntroducer(db, {commits, roots, explicit}) ->
  *   {workflowId, via, commit, introducedBy, successorOf?} | {unresolved: true, why, commit}
  */
+// The workflow whose newest report filed this commit as its head, if one claims it.
+const reportHeadOwner = (db, sha, byId) => {
+  const reported = db.prepare(`SELECT r.workflow_id, json_extract(r.report_json,'$.head') AS head FROM reports r
+    WHERE json_extract(r.report_json,'$.head') IS NOT NULL ORDER BY r.created_at DESC`).all()
+    .find((row) => { const h = String(row.head).trim().toLowerCase(); return h.length >= 7 && (sha.toLowerCase().startsWith(h) || h.startsWith(sha.toLowerCase())); });
+  return reported && byId.has(reported.workflow_id) ? byId.get(reported.workflow_id) : null;
+};
+
+// The one workflow whose jobs carry the "(cut <id> n/m)" the commit message names, or null.
+const cutOwner = (db, message, byId) => {
+  const cut = /\bcut\s+([a-z0-9._-]+)\s+\d+\s*\/\s*\d+/i.exec(message)?.[1] ?? null;
+  if (!cut) return null;
+  const owners = [...new Set(db.prepare("SELECT workflow_id FROM jobs WHERE json_extract(payload_json,'$.cut.id')=?").all(cut).map((r) => r.workflow_id))];
+  return owners.length === 1 && byId.has(owners[0]) ? byId.get(owners[0]) : null;
+};
+
+// The workflow whose title/id tokens cover the conventional-commit scope, when exactly one title line does.
+const scopeOwner = (workflows, subject) => {
+  const scope = /^[a-z]+\(([^)]+)\)!?:/i.exec(subject)?.[1] ?? null;
+  if (!scope) return null;
+  const want = tokens(scope);
+  const lines = new Map();
+  for (const w of workflows) {
+    const have = new Set([...tokens(w.title), ...tokens(w.workflow_id)]);
+    if (want.length && want.every((t) => have.has(t))) lines.set(w.title ?? w.workflow_id, [...(lines.get(w.title ?? w.workflow_id) ?? []), w]);
+  }
+  if (lines.size !== 1) return null;
+  const [candidates] = [...lines.values()];
+  return candidates.find(LIVE) ?? candidates.at(-1);
+};
+
 export function resolveIntroducer(db, { commits = [], roots = [], explicit = null }) {
   const workflows = db.prepare('SELECT workflow_id,title,phase,archived_at FROM workflows').all();
   const byId = new Map(workflows.map((w) => [w.workflow_id, w]));
@@ -66,32 +97,15 @@ export function resolveIntroducer(db, { commits = [], roots = [], explicit = nul
     const info = commitInfo(roots, ref);
     const sha = info?.sha ?? String(ref);
     const short = sha.slice(0, 7);
-    const reported = db.prepare(`SELECT r.workflow_id, json_extract(r.report_json,'$.head') AS head FROM reports r
-      WHERE json_extract(r.report_json,'$.head') IS NOT NULL ORDER BY r.created_at DESC`).all()
-      .find((row) => { const h = String(row.head).trim().toLowerCase(); return h.length >= 7 && (sha.toLowerCase().startsWith(h) || h.startsWith(sha.toLowerCase())); });
-    if (reported && byId.has(reported.workflow_id)) return answer(byId.get(reported.workflow_id), 'report-head', sha);
+    const reported = reportHeadOwner(db, sha, byId);
+    if (reported) return answer(reported, 'report-head', sha);
     if (!info) continue;
     const named = workflows.filter((w) => info.message.includes(w.workflow_id));
     if (named.length === 1) return answer(named[0], 'commit-message-workflow', sha);
-    const cut = /\bcut\s+([a-z0-9._-]+)\s+\d+\s*\/\s*\d+/i.exec(info.message)?.[1] ?? null;
-    if (cut) {
-      const owners = [...new Set(db.prepare("SELECT workflow_id FROM jobs WHERE json_extract(payload_json,'$.cut.id')=?").all(cut).map((r) => r.workflow_id))];
-      if (owners.length === 1 && byId.has(owners[0])) return answer(byId.get(owners[0]), 'commit-message-cut', sha);
-    }
-    const scope = /^[a-z]+\(([^)]+)\)!?:/i.exec(info.subject)?.[1] ?? null;
-    if (scope) {
-      const want = tokens(scope);
-      const lines = new Map();
-      for (const w of workflows) {
-        const have = new Set([...tokens(w.title), ...tokens(w.workflow_id)]);
-        if (want.length && want.every((t) => have.has(t))) lines.set(w.title ?? w.workflow_id, [...(lines.get(w.title ?? w.workflow_id) ?? []), w]);
-      }
-      if (lines.size === 1) {
-        const [candidates] = [...lines.values()];
-        const wf = candidates.find(LIVE) ?? candidates.at(-1);
-        return answer(wf, 'commit-scope', sha);
-      }
-    }
+    const cut = cutOwner(db, info.message, byId);
+    if (cut) return answer(cut, 'commit-message-cut', sha);
+    const scoped = scopeOwner(workflows, info.subject);
+    if (scoped) return answer(scoped, 'commit-scope', sha);
     return { unresolved: true, why: `no workflow of this ledger is tied to ${short} (no report head, workflow id, cut or unique scope in its message)`, commit: sha };
   }
   return { unresolved: true, why: 'no --introduced-by commit resolves in the workflow source roots', commit: null };
