@@ -105,7 +105,7 @@ export const connectionFileOf = (hfs, file, role) => {
 }
 
 /** The platform capabilities that own a `persistence/` and so may hold an `EntityManager` (a pattern capability is named by its folder). */
-const PERSISTENCE_CAPABILITIES = new Set(["database", "inbox", "event-bus", "queue", "jobs", "saga", "outbox"])
+const PERSISTENCE_CAPABILITIES = ["database", "inbox", "event-bus", "queue", "jobs", "saga", "outbox"]
 
 /**
  * Whether a class in this file may receive an `EntityManager`: an application handler, a domain service, a projection, a typed queue producer (it takes the transaction of its caller), a platform persistence capability.
@@ -121,7 +121,7 @@ export const mayHoldEntityManager = (hfs, file) => {
     if (found.slot === "be.domain") return base.endsWith(".service.ts")
     if (found.slot === "be.projections") return base.endsWith(".projection.ts")
     if (found.slot === "be.queues") return base.endsWith(".queue.ts")
-    return typeof found.slot === "string" && found.slot.startsWith("be.platform") && PERSISTENCE_CAPABILITIES.has(ownerNameOf(hfs, file))
+    return typeof found.slot === "string" && found.slot.startsWith("be.platform") && PERSISTENCE_CAPABILITIES.includes(ownerNameOf(hfs, file))
 }
 
 /**

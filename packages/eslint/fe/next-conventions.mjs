@@ -13,7 +13,7 @@
 
 import { attribute, attributeValue, calleeName, leadingTextOf, stringOf } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
-import { baseName, classOf, fileOf, inSlot, roleOfFile, slotOfFile } from "./lib/scope.mjs"
+import { baseName, classOf, fileOf, inSlot, roleOfFile, slotOfFile, stem } from "./lib/scope.mjs"
 
 /** Another i18n stack: a second place that decides which language a reader sees. */
 const OTHER_I18N = /^(?:react-i18next|i18next|next-i18next|react-intl|next-translate|@lingui\/.+|typesafe-i18n|rosetta)$/
@@ -43,8 +43,8 @@ export const noMiddlewareFile = {
     const check = (node) => {
       const names = []
       const declaration = node.declaration
-      if (declaration?.id) names.push(declaration.id.name)
-      if (declaration?.type === "VariableDeclaration") {
+      if (declaration && declaration.id) names.push(declaration.id.name)
+      if (declaration && declaration.type === "VariableDeclaration") {
         for (const d of declaration.declarations) if (d.id.type === "Identifier") names.push(d.id.name)
       }
       for (const specifier of node.specifiers ?? []) names.push(specifier.exported.name)
@@ -142,8 +142,8 @@ const exportedNames = (program) => {
   for (const statement of program.body) {
     if (statement.type !== "ExportNamedDeclaration") continue
     const declaration = statement.declaration
-    if (declaration?.id) names.add(declaration.id.name)
-    if (declaration?.type === "VariableDeclaration") {
+    if (declaration && declaration.id) names.add(declaration.id.name)
+    if (declaration && declaration.type === "VariableDeclaration") {
       for (const entry of declaration.declarations) if (entry.id.type === "Identifier") names.add(entry.id.name)
     }
     for (const specifier of statement.specifiers ?? []) names.add(specifier.exported.name)

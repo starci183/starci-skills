@@ -17,7 +17,7 @@ import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { isPackageType, typeOrigins, typed } from "./lib/types.mjs"
 
 /** Files this law governs. A flow is a named lane, not every file that happens to touch a database. */
-const isE2eSpec = (filename) => basename(String(filename || "").replaceAll("\\", "/")).endsWith(".e2e-spec.ts")
+const isE2eSpec = (filename) => /\.e2e-spec\.ts$/.test(basename(String(filename || "").replace(/\\/g, "/")))
 
 /** The in-process dispatchers of `@nestjs/cqrs`: a flow enters through transport, not through them. */
 const BUS_TYPES = ["CommandBus", "QueryBus", "EventBus"]
@@ -86,14 +86,14 @@ export const e2eUsesProductionTransport = {
 // -- E2E-3 ----------------------------------------------------------------------------------------
 
 /** The modules whose `setTimeout`/`setInterval` are timers. */
-const TIMER_MODULES = new Set(["timers", "node:timers", "timers/promises", "node:timers/promises"])
+const TIMER_MODULES = ["timers", "node:timers", "timers/promises", "node:timers/promises"]
 
 /** Whether a call awaits a fixed duration: a global or imported timer, or a `Promise<void>` call given one number. */
 const waitsForDuration = (context, node) => {
     const callee = node.callee
     const binding = callee.type === "Identifier" ? bindingOf(context, node, callee.name) : null
     if (binding?.global && (callee.name === "setTimeout" || callee.name === "setInterval")) return true
-    if (binding?.source && TIMER_MODULES.has(binding.source) && (binding.imported === "setTimeout" || binding.imported === "setInterval")) return true
+    if (binding?.source && TIMER_MODULES.includes(binding.source) && (binding.imported === "setTimeout" || binding.imported === "setInterval")) return true
     if (node.arguments.length !== 1 || node.arguments[0].type === "SpreadElement") return false
     const { checker, toTs } = typed(context)
     const argument = checker.getTypeAtLocation(toTs(node.arguments[0]))
@@ -182,7 +182,7 @@ export const noBranchInFlowStep = {
                     const isFunction = child.type === "ArrowFunctionExpression" || child.type === "FunctionExpression"
                     if (isFunction && current.arguments.includes(child) && isWorldPoll(current)) return false
                     const callee = current.callee
-                    const name = callee?.name || callee?.object?.name
+                    const name = callee && (callee.name || (callee.object && callee.object.name))
                     if (name === "it" || name === "test") return true
                 }
                 child = current
@@ -200,7 +200,7 @@ export const noBranchInFlowStep = {
             SwitchStatement: report,
             LogicalExpression(node) {
                 // `a && b` used as a STATEMENT is a hidden if; the same operator inside an assertion is not
-                if (node.parent?.type === "ExpressionStatement") report(node)
+                if (node.parent && node.parent.type === "ExpressionStatement") report(node)
             },
         }
     },

@@ -21,7 +21,7 @@ export const resolveAlias = (context, specifier) => {
         const prefix = pattern.slice(0, -1)
         if (!specifier.startsWith(prefix)) continue
         const rest = specifier.slice(prefix.length)
-        return { target: posix.normalize(`${base.replaceAll("\\", "/")}/${targets[0].replace("*", rest)}`), rest }
+        return { target: posix.normalize(`${base.replace(/\\/g, "/")}/${targets[0].replace("*", rest)}`), rest }
     }
     return null
 }

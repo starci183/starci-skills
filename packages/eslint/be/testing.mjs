@@ -29,13 +29,13 @@ import { isPackageType, typeOrigins } from "./lib/types.mjs"
 import { doorOfSpec, isUnitSpecFile, unitRoleOfSpec, unitRoleOfSubject } from "./lib/unit-spec.mjs"
 
 /** The file name of a linted path, in forward-slash form. */
-const baseOf = (filename) => basename(String(filename || "").replaceAll("\\", "/"))
+const baseOf = (filename) => basename(String(filename || "").replace(/\\/g, "/"))
 
 /** Test kind `spec`: a unit spec, `<name>.service.spec.ts` beside its service. */
-const isUnitSpec = (filename) => baseOf(filename).endsWith(".spec.ts")
+const isUnitSpec = (filename) => /\.spec\.ts$/.test(baseOf(filename))
 
 /** Test kind `e2e-spec`: `*.e2e-spec.ts` under `src/tests/e2e/` (`integration-spec` and `contract-spec` are the other two kinds of the tests slots). */
-const isE2eSpec = (filename) => baseOf(filename).endsWith(".e2e-spec.ts")
+const isE2eSpec = (filename) => /\.e2e-spec\.ts$/.test(baseOf(filename))
 
 /**
  * Matchers that assert a CALL happened rather than what came out of it.
@@ -64,8 +64,8 @@ const CALL_MATCHERS = new Set([
 const matcherOf = (expectCall) => {
   let cursor = expectCall
   let last = null
-  while (cursor.parent?.type === "MemberExpression" && cursor.parent.object === cursor) {
-    last = cursor.parent.property?.name
+  while (cursor.parent && cursor.parent.type === "MemberExpression" && cursor.parent.object === cursor) {
+    last = cursor.parent.property && cursor.parent.property.name
     cursor = cursor.parent
   }
   return last
@@ -92,7 +92,7 @@ export const noCallOnlySpec = {
     const seen = new Set()
     return {
       CallExpression(node) {
-        if (node.callee?.type !== "Identifier" || node.callee.name !== "expect") return
+        if (!node.callee || node.callee.type !== "Identifier" || node.callee.name !== "expect") return
         const matcher = matcherOf(node)
         if (matcher === null) return
         assertions += 1
@@ -247,7 +247,7 @@ export const noModelCallInE2e = {
     if (!isE2eSpec(filename)) return {}
     return {
       ImportDeclaration(node) {
-        const source = node.source?.value
+        const source = node.source && node.source.value
         if (typeof source !== "string" || !PROVIDER_PACKAGES.test(source)) return
         context.report({ node, messageId: "provider", data: { source } })
       },
@@ -312,7 +312,7 @@ const MARKER_STRINGS = new Set(["stubbed", "stub", "ok", "test", "mock", "fake",
 
 /** A string literal that is nothing but a marker - not an object, not a `JSON.stringify(...)` call. */
 const isMarkerLiteral = (node) => Boolean(
-  node?.type === "Literal" && typeof node.value === "string" && MARKER_STRINGS.has(node.value.trim().toLowerCase()),
+  node && node.type === "Literal" && typeof node.value === "string" && MARKER_STRINGS.has(node.value.trim().toLowerCase()),
 )
 
 /** The world's default model stub returns a payload the production parser can actually parse. */
@@ -333,7 +333,7 @@ export const noMarkerModelStub = {
     return {
       CallExpression(node) {
         const callee = node.callee
-        if (callee?.type !== "MemberExpression" || callee.computed) return
+        if (!callee || callee.type !== "MemberExpression" || callee.computed) return
         const method = callee.property.name
         if (method === "mockResolvedValue" || method === "mockReturnValue") {
           const argument = node.arguments[0]

@@ -117,6 +117,7 @@ export const fetchOnlyInApiClient = {
     },
   },
   create(context) {
+    const filename = context.filename || context.getFilename()
     const client = isApiClient(context)
     const library = (node, source) => {
       if (typeof source === "string" && isTransportLibrary(source)) context.report({ node, messageId: "library", data: { name: source } })
@@ -191,7 +192,7 @@ export const clientFetchHasSignal = {
 }
 
 /** The slots that make up the API layer: the app's `modules/api` and the shared api package. */
-const API_LAYER_SLOTS = new Set(["fe.modules.api", "fe.transport.client", "fe.transport.outcome", "fe.package.api", "fe.package.api.client", "fe.package.api.outcome"])
+const API_LAYER_SLOTS = ["fe.modules.api", "fe.transport.client", "fe.transport.outcome", "fe.package.api", "fe.package.api.client", "fe.package.api.outcome"]
 
 /**
  * True for a file of the API layer, except the data folders its slot allows (`__generated__/`: the types generated from the be
@@ -199,7 +200,7 @@ const API_LAYER_SLOTS = new Set(["fe.modules.api", "fe.transport.client", "fe.tr
  */
 const isTransportFile = (context) => {
   const slotId = slotOfFile(context)
-  if (!API_LAYER_SLOTS.has(slotId)) return false
+  if (!API_LAYER_SLOTS.includes(slotId)) return false
   const hfs = hfsOf(context)
   const dataFolders = (hfs.slot(slotId).allows ?? []).filter((entry) => entry.endsWith("/")).map((entry) => entry.slice(0, -1))
   const { root } = hfs.classify(context.filename || context.getFilename())
@@ -221,10 +222,11 @@ export const noSharedTransportState = {
     },
   },
   create(context) {
+    const filename = context.filename || context.getFilename()
     if (!isTransportFile(context)) return {}
     const check = (node) => {
       const declaration = node.type === "VariableDeclaration" ? node : node.declaration
-      if (declaration?.type !== "VariableDeclaration" || declaration.kind === "const") return
+      if (!declaration || declaration.type !== "VariableDeclaration" || declaration.kind === "const") return
       context.report({ node: declaration, messageId: "shared", data: { kind: declaration.kind } })
     }
     return {
@@ -283,7 +285,7 @@ const isStatusParameter = (context, definition, depth) => {
   const index = fn.params?.findIndex((param) => param === definition.name || (param.type === "AssignmentPattern" && param.left === definition.name))
   if (index === undefined || index < 0) return false
   const binding = fn.type === "FunctionDeclaration" ? fn.id : fn.parent?.type === "VariableDeclarator" && fn.parent.init === fn ? fn.parent.id : null
-  if (binding?.type !== "Identifier") return false
+  if (!binding || binding.type !== "Identifier") return false
   const variable = variableOf(context, binding)
   const calls = (variable?.references ?? []).map((reference) => reference.identifier.parent).filter((parent) => parent?.type === "CallExpression" && parent.callee.type === "Identifier" && parent.callee.name === binding.name)
   return calls.length > 0 && calls.every((call) => call.arguments[index] !== undefined && isResponseStatus(context, call.arguments[index], depth + 1))
@@ -296,7 +298,7 @@ const isResponseStatus = (context, node, depth = 0) => {
   if (expression.type !== "Identifier") return false
   const definition = variableOf(context, expression)?.defs[0]
   if (definition?.type === "Parameter") return isStatusParameter(context, definition, depth)
-  if (definition?.type !== "Variable") return false
+  if (!definition || definition.type !== "Variable") return false
   const declarator = definition.node
   if (declarator.id === definition.name) return declarator.init ? isResponseStatus(context, declarator.init, depth + 1) : false
   if (declarator.id.type !== "ObjectPattern" || !declarator.init) return false
@@ -313,7 +315,7 @@ const numbersOf = (context, node, depth = 0) => {
   const expression = unwrap(node)
   if (!expression || depth > 3) return null
   if (expression.type === "ArrayExpression") {
-    const values = expression.elements.map((element) => (element?.type === "Literal" && typeof element.value === "number" ? element.value : null))
+    const values = expression.elements.map((element) => (element && element.type === "Literal" && typeof element.value === "number" ? element.value : null))
     return values.includes(null) ? null : new Set(values)
   }
   if (expression.type === "NewExpression" && expression.callee.type === "Identifier" && expression.callee.name === "Set" && expression.arguments.length === 1) {
@@ -426,7 +428,7 @@ export const clientMapsAuthToRefused = {
 
 /** The object of `x.ok`, else null. */
 const okSubject = (node) => {
-  if (node?.type !== "MemberExpression" || node.computed || node.property.name !== "ok") return null
+  if (!node || node.type !== "MemberExpression" || node.computed || node.property.name !== "ok") return null
   return node.object
 }
 
@@ -472,7 +474,7 @@ const bodyStatements = (node) => (node.type === "BlockStatement" ? node.body : [
 
 /** True when a subtree mentions a status, an Outcome reason or kind, or the tested value itself, so it can tell the failures apart. */
 const inspectsResponse = (text, subjectName) =>
-  /\bstatus\b|\.(?:reason|kind)\b/.test(text) || (subjectName !== null && new RegExp(String.raw`\b${subjectName}\b`).test(text))
+  /\bstatus\b|\.(?:reason|kind)\b/.test(text) || (subjectName !== null && new RegExp(`\\b${subjectName}\\b`).test(text))
 
 /** A failure (a non-ok HTTP response or a failed `Outcome`) is not one branch, and never `null`: its reason survives to the screen. */
 export const noFailureCollapse = {
@@ -534,7 +536,8 @@ const isJsonRead = (node) => {
     current = current.argument || current.expression
   }
   return Boolean(
-    current?.type === "CallExpression" &&
+    current &&
+      current.type === "CallExpression" &&
       current.callee.type === "MemberExpression" &&
       !current.callee.computed &&
       current.callee.property.name === "json",
@@ -572,6 +575,7 @@ export const noHandTypedWire = {
     },
   },
   create(context) {
+    const filename = context.filename || context.getFilename()
     const source = context.sourceCode ?? context.getSourceCode()
     /** Local names of the type imports that resolve into a `__generated__/` directory. */
     const generated = new Set()
@@ -613,8 +617,8 @@ export const noHandTypedWire = {
         }
       },
       TemplateLiteral(node) {
-        if (node.parent?.type === "TaggedTemplateExpression") return
-        const text = node.quasis[0]?.value.cooked
+        if (node.parent && node.parent.type === "TaggedTemplateExpression") return
+        const text = node.quasis[0] && node.quasis[0].value.cooked
         if (typeof text === "string" && GRAPHQL_TEXT.test(text)) context.report({ node, messageId: "document" })
       },
       Literal(node) {
@@ -647,7 +651,7 @@ export const outcomeKindsExhaustive = {
       SwitchStatement(node) {
         const subject = node.discriminant
         if (subject.type !== "MemberExpression" || subject.computed || subject.property.type !== "Identifier" || subject.property.name !== "kind") return
-        const cases = new Set(node.cases.filter((entry) => entry.test?.type === "Literal").map((entry) => entry.test.value))
+        const cases = new Set(node.cases.filter((entry) => entry.test && entry.test.type === "Literal").map((entry) => entry.test.value))
         if (!cases.has("ok")) return
         const missing = OUTCOME_KINDS.filter((kind) => !cases.has(kind))
         if (missing.length > 0) context.report({ node, messageId: "missing", data: { missing: missing.map((kind) => `\`${kind}\``).join(", ") } })
@@ -711,7 +715,7 @@ export const oneOutcomeUnion = {
         if (!type.types.every((member) => (member.flags & (ts.TypeFlags.Object | ts.TypeFlags.Intersection)) !== 0)) return
         for (const discriminant of ["ok", "kind"]) {
           const values = type.types.map((member) => literalsOf(checker, member, discriminant, tsNode))
-          if (values.includes(null)) continue
+          if (values.some((entry) => entry === null)) continue
           const flat = values.flat()
           // `ok` is a discriminant only when each member pins it to one value; `{ ok: boolean }` on every member is a flag, not a tag.
           const isResult =

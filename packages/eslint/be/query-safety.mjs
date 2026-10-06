@@ -129,7 +129,8 @@ export const noInterpolatedSql = {
             CallExpression(node) {
                 if (migration || !isQueryCall(context, node)) return
                 const first = node.arguments[0]
-                if ((first?.type === "TemplateLiteral" && first.expressions.length > 0) || (first?.type === "BinaryExpression" && first.operator === "+")) context.report({ node: first, messageId: "built" })
+                if (first?.type === "TemplateLiteral" && first.expressions.length > 0) context.report({ node: first, messageId: "built" })
+                else if (first?.type === "BinaryExpression" && first.operator === "+") context.report({ node: first, messageId: "built" })
             },
         }
     },

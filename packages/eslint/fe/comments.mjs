@@ -65,7 +65,7 @@ const proseVisitors = (context, report) => {
       if (typeof node.value === "string") report(node, node.value)
     },
     TemplateElement(node) {
-      report(node, node.value?.cooked)
+      report(node, node.value && node.value.cooked)
     },
     JSXText(node) {
       report(node, node.value)
@@ -95,8 +95,8 @@ export const requireExportJsdoc = {
       const kinds = ["VariableDeclaration", "TSInterfaceDeclaration", "FunctionDeclaration", "TSTypeAliasDeclaration"]
       if (!kinds.includes(declaration.type) || hasBlock(node)) return
       const id =
-        declaration.id || declaration.declarations?.[0]?.id
-      context.report({ node: id || declaration, messageId: "jsdoc", data: { name: id?.name || "this export" } })
+        declaration.id || (declaration.declarations && declaration.declarations[0] && declaration.declarations[0].id)
+      context.report({ node: id || declaration, messageId: "jsdoc", data: { name: (id && id.name) || "this export" } })
     }
     return { ExportNamedDeclaration: check, ExportDefaultDeclaration: check }
   },

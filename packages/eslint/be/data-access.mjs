@@ -133,7 +133,7 @@ export const namedEntityManagerOnly = {
             const type = checker.getTypeFromTypeNode(tsNode)
             const symbol = type.getSymbol()
             const declaration = symbol && symbol.flags & ts.SymbolFlags.Class ? symbol.declarations?.[0] : null
-            if (!declaration || declaration.getSourceFile().fileName.replaceAll("\\", "/").includes("/node_modules/")) return null
+            if (!declaration || declaration.getSourceFile().fileName.replace(/\\/g, "/").includes("/node_modules/")) return null
             for (const property of checker.getPropertiesOfType(type)) {
                 if (property.declarations?.some((entry) => ts.getCombinedModifierFlags(entry) & (ts.ModifierFlags.Private | ts.ModifierFlags.Protected))) continue
                 const memberType = checker.getTypeOfSymbolAtLocation(property, tsNode)

@@ -105,8 +105,8 @@ const hasJsdocBefore = (sourceCode, node) => jsdocBefore(sourceCode, node) !== n
 /** The declared name, for the message. */
 const nameOf = (declaration) => {
   if (declaration.id) return declaration.id.name
-  const first = declaration.declarations?.[0]
-  return first?.id?.name || "this export"
+  const first = declaration.declarations && declaration.declarations[0]
+  return (first && first.id && first.id.name) || "this export"
 }
 
 // -- COMMENT-1 -------------------------------------------------------------------------------------
@@ -218,7 +218,7 @@ export const requirePublicMemberJsdoc = {
     if (TEST_TIERS.has(hfsOf(context).tierOf(normalizePath(context.filename)))) return {}
     const check = (node) => {
       const declaration = node.declaration
-      if (!declaration?.id) return
+      if (!declaration || !declaration.id) return
       // overload signatures share one name; a doc on any of them documents the member
       const groups = new Map()
       for (const member of publicMembersOf(declaration)) {
@@ -256,7 +256,7 @@ export const requireEnumMemberJsdoc = {
     const sourceCode = context.sourceCode || context.getSourceCode()
     return {
       TSEnumDeclaration(node) {
-        if (node.parent?.type !== "ExportNamedDeclaration") return
+        if (!node.parent || node.parent.type !== "ExportNamedDeclaration") return
         for (const member of node.members || []) {
           if (hasJsdocBefore(sourceCode, member)) continue
           const name = member.id && (member.id.name || member.id.value)
@@ -377,7 +377,7 @@ export const noRestatedNameJsdoc = {
       ExportNamedDeclaration: checkExport,
       ExportDefaultDeclaration: checkExport,
       TSEnumDeclaration(node) {
-        if (node.parent?.type !== "ExportNamedDeclaration") return
+        if (!node.parent || node.parent.type !== "ExportNamedDeclaration") return
         for (const member of node.members || []) {
           const doc = jsdocBefore(sourceCode, member)
           if (!doc) continue

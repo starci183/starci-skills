@@ -18,11 +18,11 @@ export const reactHookOf = (context, call) => {
   const callee = unwrap(call.callee)
   if (callee.type === "Identifier") {
     const from = importOf(context, callee)
-    return from?.source === "react" && from.imported ? from.imported : null
+    return from && from.source === "react" && from.imported ? from.imported : null
   }
   if (callee.type === "MemberExpression" && !callee.computed && callee.object.type === "Identifier" && callee.property.type === "Identifier") {
     const from = importOf(context, callee.object)
-    return from?.source === "react" && from.imported === null ? callee.property.name : null
+    return from && from.source === "react" && from.imported === null ? callee.property.name : null
   }
   return null
 }

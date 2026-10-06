@@ -7,5 +7,5 @@ export interface WebhookDelivery {
 
 /** Fixture: the signature and replay-window proof of a signed webhook; throws when the delivery is not proven. */
 export class WebhookSignatureService {
-    verify(_delivery: WebhookDelivery): void { /* the fixture needs the shape, not a body */ }
+    verify(_delivery: WebhookDelivery): void {}
 }

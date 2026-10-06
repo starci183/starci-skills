@@ -136,7 +136,7 @@ export const noCrossOwnerModuleImport = {
             let symbol = tsNode ? checker.getSymbolAtLocation(tsNode) : undefined
             if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
             const declaration = symbol?.declarations?.[0]
-            return declaration ? hfs.ownerOf(String(declaration.getSourceFile().fileName).replaceAll("\\", "/")) : null
+            return declaration ? hfs.ownerOf(String(declaration.getSourceFile().fileName).replace(/\\/g, "/")) : null
         }
         return {
             Decorator(node) {
@@ -394,7 +394,7 @@ export const capabilityModuleShape = {
                 }
                 const base = node.superClass
                 const imported = base?.type === "Identifier" ? importedFrom.get(base.name) : null
-                if (imported?.name !== "ConfigurableModuleClass" || imported.source !== `./${where.name}.module-definition`) {
+                if (!imported || imported.name !== "ConfigurableModuleClass" || imported.source !== `./${where.name}.module-definition`) {
                     context.report({ node: node.id ?? node, messageId: "extendsBase", data: { name: where.name } })
                 }
                 for (const member of node.body.body) {

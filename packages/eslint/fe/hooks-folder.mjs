@@ -28,7 +28,7 @@ const SERVER_ONLY = /^(?:server-only|next\/headers)$/
 const exportedNames = (node) => {
   if (node.type === "ExportDefaultDeclaration") {
     const declaration = node.declaration
-    return [declaration?.id ? declaration.id.name : "default"]
+    return [declaration && declaration.id ? declaration.id.name : "default"]
   }
   const declaration = node.declaration
   if (!declaration) return node.specifiers.map((specifier) => specifier.exported.name)
@@ -69,6 +69,7 @@ export const hooksFolderHoldsHooksOnly = {
     const directlyInHooks = hfsOf(context).relative(file) === found.root
     const name = baseName(file)
     const subject = name
+    const domain = found.bindings.domain
     const isHookFile = /^use[A-Z0-9]\w*\.ts$/.test(subject)
     // The slot names the domain's entry (`index.ts`, role `entry`) and its shared helper file (`<domain>.shared.ts`, role `shared`).
     // Both sit directly in the domain folder: a nested `x/index.ts` is a file the slot does not name.

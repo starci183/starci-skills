@@ -21,7 +21,7 @@
 import { functionOf, isFn } from "./lib/bindings.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isPromiseValued } from "./lib/types.mjs"
-import { roleOfFile, slotOfFile } from "./lib/scope.mjs"
+import { fileOf, roleOfFile, slotOfFile } from "./lib/scope.mjs"
 
 /**
  * The budget the slot of the linted file states (`budget` in knowledge/hfs/slots.yaml), or an empty one when no slot owns the file
@@ -64,7 +64,7 @@ const calleeName = (callee) => {
 const functionName = (node) => {
   if (node.id) return node.id.name
   const parent = node.parent
-  if (parent?.type === "VariableDeclarator" && parent.id.type === "Identifier") return parent.id.name
+  if (parent && parent.type === "VariableDeclarator" && parent.id.type === "Identifier") return parent.id.name
   return null
 }
 

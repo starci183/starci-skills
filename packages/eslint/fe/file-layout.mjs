@@ -13,7 +13,7 @@
  */
 
 import { hfsOf } from "./lib/hfs.mjs"
-import { classOf, fileOf, inSlot, isComponentFile, kindOfFile, roleOfFile } from "./lib/scope.mjs"
+import { classOf, fileOf, inSlot, isComponentFile, kindOfFile, roleOfFile, tierOfFile } from "./lib/scope.mjs"
 
 /** The path segments of the linted file below the folder of its owner (the slot's `root`), directories only. */
 const dirsBelowRoot = (context) => {
@@ -134,12 +134,12 @@ export const exportMatchesFolder = {
     return {
       ExportNamedDeclaration(node) {
         const declaration = node.declaration
-        if (declaration?.type === "VariableDeclaration") {
-          declaration.declarations.forEach((one) => one.id?.name && names.add(one.id.name))
+        if (declaration && declaration.type === "VariableDeclaration") {
+          declaration.declarations.forEach((one) => one.id && one.id.name && names.add(one.id.name))
         }
-        if (declaration?.type === "FunctionDeclaration" && declaration.id) names.add(declaration.id.name)
+        if (declaration && declaration.type === "FunctionDeclaration" && declaration.id) names.add(declaration.id.name)
         for (const specifier of node.specifiers || []) {
-          if (specifier.exported?.name) names.add(specifier.exported.name)
+          if (specifier.exported && specifier.exported.name) names.add(specifier.exported.name)
         }
       },
       "Program:exit"(node) {
@@ -170,11 +170,11 @@ export const noRuntimeNamespace = {
     return {
       ExportNamedDeclaration(node) {
         const declaration = node.declaration
-        if (declaration?.type !== "VariableDeclaration") return
+        if (!declaration || declaration.type !== "VariableDeclaration") return
         for (const one of declaration.declarations) {
-          const name = one.id?.name
-          const init = one.init?.type === "TSAsExpression" ? one.init.expression : one.init
-          if (!name || !/^[A-Z]/.test(name) || init?.type !== "ObjectExpression") continue
+          const name = one.id && one.id.name
+          const init = one.init && one.init.type === "TSAsExpression" ? one.init.expression : one.init
+          if (!name || !/^[A-Z]/.test(name) || !init || init.type !== "ObjectExpression") continue
           const members = init.properties
             .filter((property) => property.type === "Property" && !property.computed)
             .map((property) => (property.key.type === "Identifier" ? property.key.name : null))
@@ -328,12 +328,12 @@ export const sourceTierMarkerMatchesFolder = {
     return {
       ExportNamedDeclaration(node) {
         const declaration = node.declaration
-        if (declaration?.type !== "VariableDeclaration") return
+        if (!declaration || declaration.type !== "VariableDeclaration") return
         for (const item of declaration.declarations || []) {
           if (item.id?.type !== "Identifier" || item.id.name !== "meta") continue
           let init = item.init
           while (init && (init.type === "TSAsExpression" || init.type === "TSSatisfiesExpression")) init = init.expression
-          if (init?.type !== "ObjectExpression") continue
+          if (!init || init.type !== "ObjectExpression") continue
           const shapeProperty = init.properties.find((property) =>
             property.type === "Property" && !property.computed && propertyName(property) === "shape")
           const shape = shapeProperty?.value?.type === "Literal" ? shapeProperty.value.value : null

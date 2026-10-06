@@ -321,7 +321,7 @@ export const throwDomainError = {
                 if (hfs.tierOf(filename) !== "domain") return
                 for (const part of parts) {
                     const declarations = part.getSymbol()?.declarations ?? []
-                    const platform = declarations.some((declaration) => hfs.tierOf(String(declaration.getSourceFile().fileName).replaceAll("\\", "/")) === "platform")
+                    const platform = declarations.find((declaration) => hfs.tierOf(String(declaration.getSourceFile().fileName).replace(/\\/g, "/")) === "platform")
                     if (platform) {
                         context.report({ node: thrown, messageId: "platformThrown", data: { name: part.getSymbol().name } })
                         return

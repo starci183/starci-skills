@@ -34,7 +34,7 @@ import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { normalizePath } from "./lib/path.mjs"
 
 /** A schema generation baked into an identifier. */
-const VERSIONED_NAME = /(?:^|[a-z])V\d+(?:$|[A-Z_])|_V\d+/
+const VERSIONED_NAME = /(?:^|[a-z])V[0-9]+(?:$|[A-Z_])|_V[0-9]+/
 
 /** Bare verbs that say nothing about their object. */
 const BARE_VERBS = new Set([
@@ -105,15 +105,15 @@ export const noVendorModuleFactoryName = {
     return {
       MethodDefinition(node) {
         if (!node.static) return
-        if (node.key?.type !== "Identifier") return
+        if (!node.key || node.key.type !== "Identifier") return
         const suggestion = VENDOR_FACTORY_NAMES.get(node.key.name)
         if (!suggestion) return
 
         const classBody = node.parent
-        const classNode = classBody?.parent
+        const classNode = classBody && classBody.parent
         if (!classNode || !decoratorNames(classNode).includes("Module")) return
 
-        const name = classNode.id?.name || "this module"
+        const name = (classNode.id && classNode.id.name) || "this module"
         context.report({
           node: node.key,
           messageId: "vendorShaped",
@@ -156,7 +156,7 @@ export const noVersionInName = {
         if (node.id) report(node.id, node.id.name)
       },
       MethodDefinition(node) {
-        if (node.key?.type === "Identifier") report(node.key, node.key.name)
+        if (node.key && node.key.type === "Identifier") report(node.key, node.key.name)
       },
     }
   },
@@ -193,7 +193,7 @@ export const noBareVerbExport = {
           const init = one.init
           const isFunction = init
             && (init.type === "ArrowFunctionExpression" || init.type === "FunctionExpression")
-          if (isFunction && one.id?.type === "Identifier") check(one.id, one.id.name)
+          if (isFunction && one.id && one.id.type === "Identifier") check(one.id, one.id.name)
         }
       },
     }

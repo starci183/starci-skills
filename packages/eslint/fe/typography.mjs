@@ -26,8 +26,8 @@ const DEEPEST_LEVEL = 4
 
 /** Intrinsic (lowercase) tag name, or null for a component. */
 const tagName = (opening) => {
-  const name = opening?.name
-  if (name?.type !== "JSXIdentifier") return null
+  const name = opening && opening.name
+  if (!name || name.type !== "JSXIdentifier") return null
   return name.name === name.name.toLowerCase() ? name.name : null
 }
 

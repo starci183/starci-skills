@@ -19,7 +19,8 @@ const awaits = (fn) => {
   let found = false
   walk(fn.body, (node) => {
     if (found) return
-    if (node.type === "AwaitExpression" || (node.type === "ForOfStatement" && node.await)) found = true
+    if (node.type === "AwaitExpression") found = true
+    else if (node.type === "ForOfStatement" && node.await) found = true
   }, { intoFunctions: false })
   return found
 }

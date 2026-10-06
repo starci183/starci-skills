@@ -15,7 +15,7 @@ import { basename } from "node:path"
 const OTHER_KIND_SLOTS = new Set(["be.tests.e2e", "be.tests.integration", "be.tests.contract", "be.tests.world", "be.tests.world.kit"])
 
 /** The file name of a linted path. */
-export const baseOf = (filename) => basename(String(filename || "").replaceAll("\\", "/"))
+export const baseOf = (filename) => basename(String(filename || "").replace(/\\/g, "/"))
 
 /**
  * Whether a file is a unit spec.
@@ -31,7 +31,7 @@ export const isUnitSpecFile = (hfs, filename) => {
 }
 
 /** Whether a file is a `<name>.service.spec.ts` unit spec. */
-export const isServiceSpecFile = (hfs, filename) => baseOf(filename).endsWith(".service.spec.ts") && isUnitSpecFile(hfs, filename)
+export const isServiceSpecFile = (hfs, filename) => /\.service\.spec\.ts$/.test(baseOf(filename)) && isUnitSpecFile(hfs, filename)
 
 /**
  * The unit-tested roles of the back end: `ruleParams.be.unitRoles` of the slot manifest, the ONE list (`[{ role, spec, slot? }]`).

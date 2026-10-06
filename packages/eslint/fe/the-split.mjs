@@ -51,7 +51,7 @@ export const presentationalPurity = {
     return {
       CallExpression(node) {
         const callee = node.callee
-        if (callee?.type !== "Identifier") return
+        if (!callee || callee.type !== "Identifier") return
         if (!REACHES_FOR_THE_WORLD.test(callee.name)) return
         context.report({ node, messageId: "reaches", data: { name: callee.name } })
       },

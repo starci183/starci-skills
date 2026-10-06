@@ -16,7 +16,7 @@
  */
 
 import ts from "typescript"
-import { classifyImport, isProductSource, kindOfFile, roleOfFile, slotOfFile, tierOfFile } from "./lib/scope.mjs"
+import { classifyImport, fileOf, isProductSource, kindOfFile, roleOfFile, slotOfFile, tierOfFile } from "./lib/scope.mjs"
 import { typed } from "./lib/types.mjs"
 
 /** The route roles that are client-only by the framework's own rule: `error` and `global-error`. */
@@ -278,7 +278,7 @@ export const noDangerousHtml = {
 
 /** Forward-slash file name of a declaration, and the package a `node_modules/<pkg>/` (or `@scope/<pkg>`) file belongs to. */
 const packageOfDeclaration = (declaration) => {
-  const match = /\/node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(String(declaration.getSourceFile().fileName).replaceAll("\\", "/"))
+  const match = /\/node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(String(declaration.getSourceFile().fileName).split("\\").join("/"))
   return match ? match[1] : null
 }
 
@@ -311,7 +311,7 @@ const missingAttributes = (checker, type, at) => {
   const stated = httpOnly.length > 0 && (httpOnly.every((part) => isBooleanLiteral(part, true)) || httpOnly.every((part) => isBooleanLiteral(part, false)))
   if (!stated) missing.push("`httpOnly` stated as `true` or `false`")
   const secure = presentPropertyParts(checker, type, "secure", at)
-  if (secure.every((part) => isBooleanLiteral(part, false))) missing.push("`secure`")
+  if (secure.length === 0 || secure.every((part) => isBooleanLiteral(part, false))) missing.push("`secure`")
   const sameSite = presentPropertyParts(checker, type, "sameSite", at)
   if (sameSite.length === 0 || !sameSite.every((part) => part.isStringLiteral() && SAME_SITE.has(part.value))) missing.push('`sameSite: "lax"` or `"strict"`')
   return missing

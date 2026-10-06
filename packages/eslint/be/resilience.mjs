@@ -53,7 +53,9 @@ export const httpNeedsTimeout = {
         const { callee } = node
         if (callee.type === "Identifier" && callee.name === "fetch") {
           const init = node.arguments[1]
-          if (!init || (init.type === "ObjectExpression" && !hasSpread(init) && !hasKey(init, ["signal"]))) {
+          if (!init) {
+            context.report({ node, messageId: "fetchNoSignal" })
+          } else if (init.type === "ObjectExpression" && !hasSpread(init) && !hasKey(init, ["signal"])) {
             context.report({ node, messageId: "fetchNoSignal" })
           }
           return
@@ -72,7 +74,9 @@ export const httpNeedsTimeout = {
         if (!HTTP_METHODS.has(method)) return
         const configAt = method === "request" ? 0 : ["post", "put", "patch"].includes(method) ? 2 : 1
         const config = node.arguments[configAt]
-        if (config === undefined || (config.type === "ObjectExpression" && !hasSpread(config) && !hasKey(config, ["timeout", "signal"]))) {
+        if (config === undefined) {
+          context.report({ node, messageId: "clientNoTimeout", data: { call: `${receiver}.${method}` } })
+        } else if (config.type === "ObjectExpression" && !hasSpread(config) && !hasKey(config, ["timeout", "signal"])) {
           context.report({ node, messageId: "clientNoTimeout", data: { call: `${receiver}.${method}` } })
         }
       },
@@ -199,12 +203,8 @@ const waitsIn = (context, checker, root, depth, seen) => {
     if (ts.isCallExpression(node)) {
       let base = node.expression
       while (ts.isPropertyAccessExpression(base)) base = base.expression
-      if (
-        (ts.isIdentifier(base) && ((base.text === "setTimeout" && isGlobalTimerTs(checker, base)) || isTimerImportTs(checker, base))) ||
-        (depth > 0 && waitsThrough(context, checker, node, depth - 1, seen))
-      ) {
-        found = true
-      }
+      if (ts.isIdentifier(base) && ((base.text === "setTimeout" && isGlobalTimerTs(checker, base)) || isTimerImportTs(checker, base))) found = true
+      else if (depth > 0 && waitsThrough(context, checker, node, depth - 1, seen)) found = true
     }
     if (!found) ts.forEachChild(node, visit)
   }

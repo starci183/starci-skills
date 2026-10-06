@@ -188,13 +188,13 @@ export const noErrorWordingAsLogIdentity = {
     const catchStack = []
     return {
       CatchClause(node) {
-        catchStack.push(node.param?.type === "Identifier" ? node.param.name : null)
+        catchStack.push(node.param && node.param.type === "Identifier" ? node.param.name : null)
       },
       "CatchClause:exit"() {
         catchStack.pop()
       },
       CallExpression(node) {
-        const errorName = catchStack.at(-1)
+        const errorName = catchStack[catchStack.length - 1]
         if (!errorName) return
         if (!isLoggerCall(context, node)) return
 

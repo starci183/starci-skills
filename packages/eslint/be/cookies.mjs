@@ -31,7 +31,7 @@ const responseMethodOf = (checker, toTs, call) => {
     const tsCall = toTs(call)
     const declaration = tsCall ? checker.getResolvedSignature(tsCall)?.declaration : undefined
     if (!declaration || !(ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration)) || !declaration.name) return null
-    const file = String(declaration.getSourceFile().fileName).replaceAll("\\", "/")
+    const file = String(declaration.getSourceFile().fileName).split("\\").join("/")
     const pkg = moduleOf(declaration, file)
     return pkg !== null && RESPONSE_PACKAGES.has(pkg) ? declaration.name.getText() : null
 }

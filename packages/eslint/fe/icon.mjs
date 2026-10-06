@@ -94,7 +94,7 @@ export const noVendorIconOutsideIconLeaf = {
     if (!isProductSource(context) || isIconLeafFile(context)) return {}
     return {
       ImportDeclaration(node) {
-        const source = node.source?.value
+        const source = node.source && node.source.value
         if (!isGlyphImport(source)) return
         context.report({ node, messageId: "vendor", data: { source, leaf: `${ICON_LEAF.kind}/${ICON_LEAF.owner}/index.tsx` } })
       },
@@ -119,7 +119,7 @@ export const heroiconsIsTheGlyphVendor = {
     if (!isProductSource(context)) return {}
     return {
       ImportDeclaration(node) {
-        const source = node.source?.value
+        const source = node.source && node.source.value
         if (!isGlyphImport(source) || HEROICON_PACKAGES.has(String(source))) return
         context.report({ node, messageId: "vendor", data: { source } })
       },

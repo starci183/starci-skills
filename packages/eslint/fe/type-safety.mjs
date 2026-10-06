@@ -37,7 +37,7 @@ export const noDoubleCast = {
       TSAsExpression(node) {
         // The outer cast of a `x as unknown as T` pair: its operand is itself a cast to `unknown`.
         const inner = node.expression
-        if (inner?.type !== "TSAsExpression") return
+        if (!inner || inner.type !== "TSAsExpression") return
         if (!isUnknown(inner.typeAnnotation)) return
         context.report({ node, messageId: "double" })
       },
@@ -76,7 +76,7 @@ export const noTypeAssertion = {
       TSAsExpression(node) {
         if (isConstAssertion(node.typeAnnotation) || isUnknown(node.typeAnnotation)) return
         const inner = node.expression
-        if (inner?.type === "TSAsExpression" && isUnknown(inner.typeAnnotation)) return
+        if (inner && inner.type === "TSAsExpression" && isUnknown(inner.typeAnnotation)) return
         report(node)
       },
       TSTypeAssertion(node) {
