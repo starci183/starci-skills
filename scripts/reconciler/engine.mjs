@@ -609,7 +609,7 @@ async function main(argv = process.argv.slice(2)) {
       }
       result = await engine.once({ controller: argValue(argv, '--controller'), key: argValue(argv, '--key') });
     } finally { engine.close({ releaseLead: apply }); }
-    console.log(json ? JSON.stringify(result) : '[reconciler --once] ' + (result.ok ? 'ok' : 'NOT OK') + ' ' + (result.controllers.map((c) => `${c.name}(${c.mode}) keys=${c.keys} ok=${c.ok} failed=${c.failed.length}`).join('; ') || 'no controller on') + (result.error ? ` ${result.error}` : ''));
+    console.log(json ? JSON.stringify(result) : '[reconciler --once] ' + ((result.ok && 'ok') || 'NOT OK') + ' ' + (result.controllers.map((c) => `${c.name}(${c.mode}) keys=${c.keys} ok=${c.ok} failed=${c.failed.length}`).join('; ') || 'no controller on') + ((result.error && ` ${result.error}`) || ''));
     process.exitCode = result.ok ? 0 : 1;
     return;
   }

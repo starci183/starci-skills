@@ -399,7 +399,7 @@ export function createResourceController(overrides = {}) {
       const sig = JSON.stringify(caps);
       if (sig !== memory.poolWould) {
         memory.poolWould = sig;
-        const text = Object.entries(next).map(([k, e]) => `${k} ${e.cap}/${e.max}${e.reason ? ` (${e.reason})` : ''}`).join(', ') || 'every pool at its maxParallel';
+        const text = Object.entries(next).map(([k, e]) => k + ' ' + e.cap + '/' + e.max + (e.reason ? ' (' + e.reason + ')' : '')).join(', ') || 'every pool at its maxParallel';
         ctx.log(WOULD, `pool backoff: ${text}`, { controller: NAME, action: 'setPoolBackoff', patch: { poolBackoff: next }, caps });
       }
     }

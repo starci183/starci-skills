@@ -133,7 +133,7 @@ function workerMain({ file, leaseMs, renewMs, stallMaxMs, t0, sab }, parentPort)
     if (plan.renew) renew();
     if (plan.log) {
       loggedAt = now;
-      write('warn', `engine main thread blocked ${Math.round(stallMs / 1000)}s in ${st.phase ?? 'an unknown phase'}${plan.withheld ? ' (heartbeat withheld: past the stall limit)' : st.leader ? ' (heartbeat carried by the worker)' : ''}`,
+      write('warn', `engine main thread blocked ${Math.round(stallMs / 1000)}s in ${st.phase ?? 'an unknown phase'}${(plan.withheld && ' (heartbeat withheld: past the stall limit)') || (st.leader && ' (heartbeat carried by the worker)') || ''}`,
         { stallMs, phase: st.phase, phaseAgeMs: st.phaseAt ? now - st.phaseAt : null, running: st.running, epoch: st.epoch, withheld: plan.withheld, stallMaxMs, ...sample() });
     }
     if (plan.withheld && !withheldLogged) {

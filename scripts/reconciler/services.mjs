@@ -177,7 +177,7 @@ async function connectorUp(script, { timeoutMs, tries = 1, run = runChild, extra
   for (let i = 1; i <= Math.max(1, tries); i += 1) {
     const r = await run(cmd, args, { timeoutMs });
     const value = lastJson(r.stdout);
-    last = value ? { ok: judge(value) === true, value, tries: i } : { ok: false, error: r.timedOut ? 'timeout' : String(r.stderr || `exit ${r.status}`).slice(0, 200), tries: i };
+    last = value ? { ok: judge(value) === true, value, tries: i } : { ok: false, error: (r.timedOut && 'timeout') || String(r.stderr || `exit ${r.status}`).slice(0, 200), tries: i };
     if (last.ok) return last;
   }
   return last;

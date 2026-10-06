@@ -260,7 +260,7 @@ const describeStatus = (s) => {
   }).join(', ') || 'empty';
   const lines = [`[reconciler] ${state}${l.safe ? ' (safe mode)' : ''}: leader ${l.holder ?? '-'} pid ${l.pid ?? '-'} epoch ${l.epoch ?? '-'} heartbeat ${heartbeat}`,
     `  enabled ${s.enabled}; modes ${modes}`,
-    `  queue ${s.queueDepth} (${queue}); open violations ${s.violations.open}; actions 1h ${Object.entries(s.actions).map(([k, n]) => `${k} ${n}`).join(', ') || 'none'}; engine starts 24h ${s.starts24h}`,
+    `  queue ${s.queueDepth} (${queue}); open violations ${s.violations.open}; actions 1h ${Object.entries(s.actions).map(([k, n]) => k + ' ' + n).join(', ') || 'none'}; engine starts 24h ${s.starts24h}`,
     `  owned concerns: ${Object.entries(s.concerns).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none (every old loop keeps its duties)'}`,
     ...usageLines(s.usage),
     `  state ${s.stateFile}`];

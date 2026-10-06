@@ -420,7 +420,7 @@ async function reconcileHealth(ctx, settings, { list = null } = {}) {
       const payload = parse(j.payload_json) ?? {};
       const who = { jobId: j.job_id, workflowId: j.workflow_id, op: j.op_id, terminal: j.worker_id, provider: term?.agentIdentity ?? payload.provider ?? null, pool: payload.agent ?? payload.provider ?? null, model: payload.model ?? null };
       if (c.state !== mem.state && c.state !== 'working') {
-        ctx.log('reconciler.worker-health', `${j.job_id} ${c.state}${c.resetMs != null ? ` (reset in ${Math.round(c.resetMs / 1000)}s)` : ''}`, { ...who, state: c.state, preview: String(term?.preview ?? '').slice(0, 200) });
+        ctx.log('reconciler.worker-health', j.job_id + ' ' + c.state + (c.resetMs != null ? ' (reset in ' + Math.round(c.resetMs / 1000) + 's)' : ''), { ...who, state: c.state, preview: String(term?.preview ?? '').slice(0, 200) });
         if (c.state === 'rate-limited') ctx.log('reconciler.provider-rate-limited', `provider ${who.provider ?? '?'} rate-limited (${j.job_id})`, { ...who, resetMs: c.resetMs ?? null });
       }
       let next = planned.mem;

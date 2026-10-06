@@ -274,7 +274,7 @@ async function clockTruth(row, code, src, { now = Date.now() } = {}) {
       // Two tries: the first request after idle can miss a short probe timeout while the service is up.
       for (let i = 0; i < 2; i++) {
         const r = await entry.probe();
-        if (r?.ok === true || r?.unmanaged === true) return { holds: false, why: `probe ok${r?.status ? ` (http ${r.status})` : ''}${i ? ' on the second try' : ''}` };
+        if (r?.ok === true || r?.unmanaged === true) return { holds: false, why: 'probe ok' + (r?.status ? ' (http ' + r.status + ')' : '') + (i ? ' on the second try' : '') };
       }
       return { holds: true };
     }
@@ -374,7 +374,7 @@ export async function transcriptPass(ctx, { catalog, now }) {
 }
 
 /** The clear_reason of a truth check's `why`: the entity is gone, its workflow stopped, or the condition resolved. Pure. */
-const clearReasonOf = (why) => (/\bgone$/.test(String(why ?? '')) ? 'entity-gone' : /^workflow (?:archived|stopped|finished|paused|not running)|^workflow \w+$/.test(String(why ?? '')) ? 'workflow-stopped' : 'resolved');
+const clearReasonOf = (why) => (/\bgone$/.test(String(why ?? '')) && 'entity-gone') || (/^workflow (?:archived|stopped|finished|paused|not running)|^workflow \w+$/.test(String(why ?? '')) && 'workflow-stopped') || 'resolved';
 
 /** Clear every open clock whose condition is gone. Returns Map(entity KEY_SEP state -> why). */
 async function truthPass(ctx, { catalog, now }) {
@@ -486,7 +486,7 @@ if (isMain(import.meta.url)) {
     openDecision: async (di) => { console.error(`would open DI ${di.idempotencyKey}`); return { ok: true, shadow: true }; } };
   if (argv.has('--list')) {
     const out = { stateFile: stateFileOf(ctx), clocks: clocksOf(ctx), open: openViolations(), catalog: slaCatalog() };
-    console.log(json ? JSON.stringify(out, null, 2) : [`state ${out.stateFile}`, ...out.clocks.map((c) => `${c.entity} ${c.state} entered ${new Date(c.enteredAt).toISOString()} sla ${c.slaMs}${c.violatedAt ? ' VIOLATED' : ''}`),
+    console.log(json ? JSON.stringify(out, null, 2) : [`state ${out.stateFile}`, ...out.clocks.map((c) => `${c.entity} ${c.state} entered ${new Date(c.enteredAt).toISOString()} sla ${c.slaMs}${(c.violatedAt && ' VIOLATED') || ''}`),
       `${out.open.length} open violation(s)`, ...out.open.map((v) => `  ${v.dedupeKey} ${v.severity}`)].join('\n'));
   } else if (argv.has('--once')) {
     const m = openMachine();

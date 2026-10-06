@@ -394,7 +394,7 @@ export function createGcController(overrides = {}) {
     let dutyResult = 'skipped';
     if (ctx.mode === 'active') dutyResult = r?.ok === true ? 'done' : 'failed';
     finishDuty(ctx, { controller: NAME, duty: 'blob-sweep', result: dutyResult, now: ctx.now() });
-    return ctx.mode === 'active' ? { ran: true, ok: r?.ok ?? null } : { shadow: true, plan: plan?.error ? { error: plan.error } : { marked: plan?.marked ?? null, toArchive: plan?.toArchive?.length ?? 0, toSweep: plan?.toSweep?.length ?? 0 } };
+    return ctx.mode === 'active' ? { ran: true, ok: r?.ok ?? null } : { shadow: true, plan: (plan?.error && { error: plan.error }) || { marked: plan?.marked ?? null, toArchive: plan?.toArchive?.length ?? 0, toSweep: plan?.toSweep?.length ?? 0 } };
   }
 
   /** A removal changed a main checkout: the GC stopped itself; the Supervisor gets one runtime-defect item per stop. */
