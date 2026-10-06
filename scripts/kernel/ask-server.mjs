@@ -54,15 +54,15 @@ import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
 import { loadConfig, activeDelegation, allocationMs, askAutoAcceptPolicy, ASK_PORT_BAND } from '../../engine/config.mjs';
 import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/telegram.mjs';
-import { parseJson } from '../lib/json.mjs'; import { byCodeUnit } from '../lib/list.mjs';
+import { parseJson } from '../lib/json.mjs';
+import { MIME, imagesOf, assetsOf, toOwnerImages, reportImages, pickGroupsOf, reviewPartIndexOf, drawAnswerExtras } from './ask-images.mjs';
+export { toOwnerImages, reportImages, pickGroupsOf } from './ask-images.mjs';
 // notifyAsk is parkAsk's (the kernel api's) send point; this form never sends a message.
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
 import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, CREDENTIAL_ASK_KINDS, askKindOf, autoAcceptDecision } from '../machine/ask-recommendation.mjs';
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, drawOwnerRulingOf } from '../work/draw-review.mjs';
 import { recordDrawAnswer } from '../work/draw-feedback.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs'; import { altOf, phrasesOf } from '../lib/source-phrases.mjs';
-import { drawImageRefs, ownerImages } from '../work/direction-part.mjs';
 
 // The form speaks the owner's language (config.yaml `language`), English when unknown; the op writes the question
 // in the same language (provision.ask, packet owner_language). Strings are English sources (scripts/lib/i18n.mjs).
@@ -129,6 +129,20 @@ const parseArgs = (argv) => {
 // convention app.env already carries (keycloak-admin.json → KEYCLOAK_ADMIN_FILE).
 const pointerFor = (name) => `${name.replace(/\.[^.]+$/, '').toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_FILE`;
 
+// `X+\.ext` tokens without the backtracking regex: the run of token chars before each extension
+// match is the token; a run an earlier match already consumed cannot start another.
+const extTokensOf = (text, extRe, isChar) => {
+  const out = []; let lastEnd = 0;
+  for (const m of text.matchAll(extRe)) {
+    let s = m.index;
+    while (s > 0 && isChar.test(text[s - 1])) s -= 1;
+    if (s === m.index || s < lastEnd) continue;
+    out.push(text.slice(s, m.index + m[0].length));
+    lastEnd = m.index + m[0].length;
+  }
+  return out;
+};
+
 // The ask report names its provisions in free text; the form derives the
 // entry surface from the same tokens the verifier will check: custody file
 // basenames (*.key/*.txt under runtime/files) and UPPER_SNAKE env variables.
@@ -138,7 +152,7 @@ const pointerFor = (name) => `${name.replace(/\.[^.]+$/, '').toUpperCase().repla
 // bare `X_FILE` var is a pointer to be derived, not a value to paste, so it
 // becomes a custody field instead of a text input.
 export const fieldsOf = (text) => {
-  const files = [...new Set([...text.matchAll(/([\w-]+\.(?:key|txt|json))/g)].map(m => m[1]))];
+  const files = [...new Set(extTokensOf(text, /\.(?:key|txt|json)/g, /[\w-]/))];
   let vars = [...new Set([...text.matchAll(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g)].map(m => m[0]))]
     .filter(v => !/^(JSON|HTTP|URL|API|E2E)$/.test(v));
   const paired = {};
@@ -159,6 +173,10 @@ export const fieldsOf = (text) => {
   };
 };
 const optionText = (o) => (typeof o === 'string' ? o : o?.label ?? '');
+const pickLabel = (o) => {
+  if (o == null) return null;
+  return typeof o === 'string' ? o : o.label ?? null;
+};
 /** The credential fields one question asks for: fieldsOf over its text and option labels. */
 export const questionFields = (question) => fieldsOf(`${question?.text ?? ''}\n${(question?.options ?? []).map(optionText).join('\n')}`);
 
@@ -181,161 +199,6 @@ export function askClassOf({ opId = null, question = null } = {}) {
 }
 /** The legs a credential ask holds: the live proof against the real provider (modules/ops/_common.yaml). */
 export const isLiveProofOp = (op) => /^(?:integration\.verify|e2e\.verify|uat\.verify|uat\.assisted\..+)$/.test(String(op ?? ''));
-
-// An approval ask about produced artifacts is meaningless without showing
-// them — extract image paths named in the question and serve them inline.
-// Basenames (auth-sign-in-desktop-direction.png) are located by a bounded
-// walk under .starciwork, the only tree where workflow evidence lives.
-const imagesOf = (text, repo) => {
-  const tokens = [...new Set([...text.matchAll(/[\w./\\-]+\.(?:png|jpe?g|webp|gif|svg)\b/gi)].map((m) => m[0]))];
-  const root = path.join(repo, '.starciwork');
-  const locate = (base) => {
-    // BFS — a named artifact lives a few levels under .starciwork, while a
-    // DFS stack would burn the whole budget inside kernel-strays archives.
-    const queue = [root]; let head = 0, visited = 0;
-    while (head < queue.length && visited++ < 20000) {
-      const dir = queue[head++];
-      let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
-      for (const e of ents) {
-        if (e.name === base) return path.join(dir, e.name);
-        if (e.isDirectory() && !e.name.startsWith('.')) queue.push(path.join(dir, e.name));
-      }
-    }
-    return null;
-  };
-  const found = [];
-  for (const t of tokens) {
-    const rel = t.replaceAll('\\', '/');
-    const abs = path.join(repo, rel);
-    if (rel.includes('/') && fs.existsSync(abs)) { found.push({ label: rel, abs }); continue; }
-    const hit = fs.existsSync(root) ? locate(path.basename(rel)) : null;
-    if (hit) found.push({ label: rel, abs: hit });
-  }
-  return found;
-};
-
-// A candidate-pick ask often names no files in its question — the artifacts
-// live behind the report's `files` globs instead. Expand each glob's static
-// directory prefix and collect the newest images beneath it (bounded, so a
-// stray `**` cannot crawl the whole tree).
-// A selection ask declares its reviewable artifacts explicitly through
-// `question.assets` — repo-relative paths, optionally {path, label} — so the
-// owner judges the artifacts, not a text description of them.
-const assetsOf = (assets, repo) => {
-  const out = [];
-  for (const a of assets ?? []) {
-    const spec = typeof a === 'string' ? a : a?.path;
-    if (!spec) continue;
-    const rel = String(spec).replaceAll('\\', '/');
-    const abs = path.join(repo, rel);
-    if (fs.existsSync(abs) && MIME[path.extname(abs).slice(1).toLowerCase()])
-      out.push({ label: (typeof a === 'object' && a?.label) || rel, abs });
-  }
-  return out;
-};
-
-// Candidate draws are always recorded in a draws.yaml next to their assets —
-// when an ask names no paths at all, render the newest draw set rather than
-// leaving the owner to pick blind.
-// The images a draws.yaml names. Only a draws.yaml the ask's own report lists
-// is read: picking "the newest draws.yaml in the tree" once served another
-// workflow's candidates under an unrelated question.
-// Each draw names its image as a path or {path, sha256}; the owner-facing
-// one is `part`, then `content`, then `image` (drawImageRefs) — the composite
-// an older draws.yaml put in `image` is swapped for its part by ownerImages.
-const drawsImages = (repo, drawsFile) => {
-  const root = path.join(repo, '.starciwork');
-  const newest = drawsFile;
-  if (!newest || !fs.existsSync(newest)) return [];
-  const text = fs.readFileSync(newest, 'utf8');
-  let entries = null;
-  try { const doc = parseYaml(text); if (Array.isArray(doc?.draws)) entries = doc.draws.map((d) => ({ id: d?.id ?? null, refs: drawImageRefs(d) })); } catch { /* line scan below */ }
-  if (!entries) {
-    entries = [];
-    let id = null;
-    for (const line of text.split('\n')) {
-      const idM = line.match(/^\s+-\s+id:\s*(\S+)/) ?? line.match(/^\s+id:\s*(\S+)/);
-      if (idM) { id = idM[1]; continue; }
-      const imgM = line.match(/^\s+image:\s*(\S+)/);
-      if (imgM) entries.push({ id, refs: [imgM[1]] });
-    }
-  }
-  // draw entries resolve image paths against their ui-node dir, not
-  // necessarily the evidence dir holding draws.yaml — walk ancestors up
-  // to .starciwork until the relative path exists.
-  const resolve = (rel) => {
-    for (let up = 0, dir = path.dirname(newest); up < 6 && dir.startsWith(root); up++, dir = path.dirname(dir)) {
-      const cand = path.join(dir, rel);
-      if (fs.existsSync(cand)) return cand;
-    }
-    return null;
-  };
-  const out = [];
-  for (const { id, refs } of entries) {
-    for (const rel of refs) {
-      const abs = resolve(rel);
-      if (abs && MIME[path.extname(abs).slice(1).toLowerCase()]) { out.push({ label: id ?? rel, abs }); break; }
-    }
-  }
-  return out;
-};
-
-// Owner ruling 2026-09-24: the owner reviews the drawn PART (page content,
-// overlay panel, layout drawing), never the composite placed into the layout
-// capture — that stays evidence for interface.implement/audit. Every image an
-// ask serves goes through this: a composite becomes its part (the label
-// follows it, the original path stays an alias a declared pick still
-// matches), and a composite listed beside its own part collapses into one.
-export const toOwnerImages = (images, repo) => {
-  const repoRel = (abs) => path.relative(repo, abs).replaceAll('\\', '/');
-  const labels = new Map((images ?? []).map((img) => [img?.abs, img?.label]));
-  return ownerImages(images).map((img) => {
-    const aliases = [...new Set(img.aliases.flatMap((a) => [labels.get(a), repoRel(a)]).filter(Boolean))];
-    if (!img.composite) return { ...img, aliases };
-    // A label that is the composite's own file name follows the swap; a
-    // draw id or a declared label stays.
-    const named = String(img.label ?? '').replaceAll('\\', '/');
-    const label = !named || named.endsWith(path.basename(img.composite)) ? repoRel(img.abs) : img.label;
-    return { ...img, label, aliases };
-  });
-};
-
-export const reportImages = (files, repo) => {
-  const out = [], seen = new Set();
-  for (const spec of files ?? []) {
-    const rel = String(spec).replaceAll('\\', '/');
-    const abs = path.join(repo, rel);
-    if (/(^|\/)draws\.yaml$/.test(rel)) {
-      for (const img of drawsImages(repo, abs)) if (!seen.has(img.abs)) { seen.add(img.abs); out.push(img); }
-      continue;
-    }
-    if (!/[*{[]/.test(rel)) {
-      if (fs.existsSync(abs) && MIME[path.extname(abs).slice(1).toLowerCase()] && !seen.has(abs)) { seen.add(abs); out.push({ label: rel, abs, mtime: fs.statSync(abs).mtimeMs }); }
-      continue;
-    }
-    const prefix = rel.slice(0, rel.search(/[*{[]/)).replace(/\/[^/]*$/, '');
-    const base = path.join(repo, prefix);
-    if (!fs.existsSync(base)) continue;
-    const queue = [base]; let head = 0, visited = 0;
-    while (head < queue.length && visited++ < 4000 && out.length < 16) {
-      const dir = queue[head++];
-      let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
-      for (const e of ents) {
-        const p = path.join(dir, e.name);
-        if (e.isDirectory()) { if (!e.name.startsWith('.')) queue.push(p); continue; }
-        if (!MIME[path.extname(e.name).slice(1).toLowerCase()] || seen.has(p)) continue;
-        seen.add(p); out.push({ label: path.relative(repo, p).replaceAll('\\', '/'), abs: p, mtime: e.mtimeMs ?? fs.statSync(p).mtimeMs });
-      }
-    }
-  }
-  // An evidence bundle's direction.png is a copy of a record asset (on
-  // records drawn before the part rule, of the composite): when the report
-  // also names images outside evidence/, those are the ones served — the
-  // same rule telegram-media applies.
-  const sorted = out.toSorted((a, b) => b.mtime - a.mtime);
-  const outside = sorted.filter((img) => !/(^|\/)evidence\//.test(path.relative(repo, img.abs).replaceAll('\\', '/')));
-  return (outside.length ? outside : sorted).slice(0, 8);
-};
 
 const custodyDirs = repo => {
   const root = path.join(repo, '.starcistacks');
@@ -361,53 +224,6 @@ const writeEnv = (repo, key, value) => {
     setSecretValues(repo, { slug: 'app-env', values: { [key]: value } });
     return { ok: true, via: 'sealed-secret' };
   } catch { return { ok: false, error: 'canonical encrypted environment update failed; verify the declared environment and SOPS availability' }; }
-};
-
-const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml' };
-
-// Resolve pick groups for the form: declared question.picks wins; otherwise
-// groups are derived from the draw naming convention
-// <screen>-<choice>[-round-N] / -candidate-<choice>. Returns [] when the
-// images do not partition cleanly into >=2-choice groups — the flat artifact
-// list renders instead. Each choice may carry {idx,label} of its image.
-export const pickGroupsOf = (question, images) => {
-  const imgs = images ?? [];
-  // A question that lists its options already has its answer schema; image
-  // names never add required pick groups to it.
-  if (!question?.picks?.length && (question?.options ?? []).length) return [];
-  if (question?.picks?.length) {
-    return question.picks.map((p) => ({
-      id: String(p.id), label: p.label ?? String(p.id),
-      choices: (p.choices ?? []).map((c) => {
-        const obj = typeof c === 'string' ? { id: c, label: c } : { id: c?.id ?? c?.label, label: c?.label ?? c?.id };
-        if (obj.id == null) return null;
-        if (c?.image) {
-          const rel = String(c.image).replaceAll('\\', '/');
-          const idx = imgs.findIndex((img) => img.label === rel || img.abs.replaceAll('\\', '/').endsWith(rel) || (img.aliases ?? []).some((a) => a === rel || String(a).endsWith(`/${rel}`)));
-          if (idx >= 0) obj.image = { idx, label: imgs[idx].label };
-        }
-        return obj;
-      }).filter(Boolean),
-    }));
-  }
-  const groups = new Map();
-  for (const [i, img] of imgs.entries()) {
-    const base = path.basename(img.label ?? '', path.extname(img.label ?? ''));
-    const m = base.match(/^(.+?)-(?:candidate-)?([a-z])(?:-round-\d+)?$/);
-    if (!m) return [];
-    const [, screen, letter] = m;
-    if (!groups.has(screen)) groups.set(screen, new Map());
-    groups.get(screen).set(letter, { idx: i, label: img.label });
-  }
-  const picks = [];
-  for (const [screen, choices] of groups) {
-    if (choices.size < 2) return [];
-    picks.push({
-      id: screen, label: screen,
-      choices: [...choices.keys()].sort(byCodeUnit).map((k) => ({ id: k.toUpperCase(), label: k.toUpperCase(), image: choices.get(k) })),
-    });
-  }
-  return picks;
 };
 
 // The owner reviews a drawing on Telegram (owner ruling 2026-09-27): a reply to the draw-review notice made of
@@ -450,7 +266,7 @@ export async function answerDrawReviewByReply({ repo, ledgerFile = null, workflo
     const option = (question.options ?? [])[d.optionIndex];
     const receipt = {
       schema: 'starci/ask-answer@1', workflowId, dispatchId, opId: report.op_id,
-      option: option == null ? null : (typeof option === 'string' ? option : option.label ?? null), optionIndex: d.optionIndex, picks: null,
+      option: pickLabel(option), optionIndex: d.optionIndex, picks: null,
       answeredBy: OWNER, via: 'telegram', telegram: { chatId: telegram.chatId ?? null, messageId: telegram.messageId ?? null, replyTo: telegram.replyTo ?? null, verified: true },
       custodyWritten: [], envWritten: [], pointersWritten: [], bridge: null, errors: [],
       note: part && d.decision === 'redraw' ? null : d.note, at: new Date(now).toISOString(),
@@ -468,31 +284,41 @@ export async function answerDrawReviewByReply({ repo, ledgerFile = null, workflo
   } finally { ledger.close(); }
 }
 
-/** The index in question.review.parts of the drawn part at `abs`, or -1. */
-const reviewPartIndexOf = (review, abs, repo) => {
-  if (!abs || !review?.recordPath || !Array.isArray(review.parts)) return -1;
-  const dir = path.dirname(path.resolve(repo, review.recordPath));
-  return review.parts.findIndex((p) => p?.path && path.resolve(dir, p.path).toLowerCase() === path.resolve(abs).toLowerCase());
+
+/** One custody-file label+input row. */
+const custodyFileRow = (name, fields, repo, disabled) => {
+  const present = custodyPresent(repo, name);
+  const paired = fields.paired[name] ? ` · also sets <code>${esc(fields.paired[name])}</code>` : '';
+  return `<label>custody file <code>runtime/files/${esc(name)}</code> → <code>${esc(pointerFor(name))}</code>${paired}${present ? ' <b style="color:#0a7">— already in custody (leave blank to keep)</b>' : ''}</label>
+    <input type="password" name="file:${esc(name)}" autocomplete="off" ${disabled}>`;
 };
 
-/** The draw-review receipt extras of a submitted form: partNotes [{path, shape, note}] and golden. */
-const drawAnswerExtras = (review, params) => {
-  const partNotes = (review.parts ?? []).map((p, k) => ({ path: p.path, shape: p.shape ?? null, note: String(params.get(`partnote:${k}`) ?? '').trim() })).filter((p) => p.note);
-  return { ...(partNotes.length ? { partNotes } : {}), ...(params.get('golden') === '1' ? { golden: true } : {}) };
+/** The radio fieldsets of the pick groups. */
+const pickRowsOf = (pickGroups, nonce, disabled) => pickGroups.map((p) => {
+  const cells = p.choices.map((c) => {
+    const imgTag = c.image ? `<img src="/${esc(nonce)}/img/${esc(c.image.idx)}" alt="${esc(c.image.label)}">` : '';
+    return `<label class="cell"><input type="radio" name="pick:${esc(p.id)}" value="${esc(c.id)}" required ${disabled}>
+      ${imgTag}<span class="cell-label">${esc(c.label)}</span></label>`;
+  }).join('\n');
+  return `<fieldset class="pick"><legend>${esc(p.label ?? p.id)}</legend><div class="cells">${cells}</div></fieldset>`;
+}).join('\n');
+
+/** One artifact figure, with its part-note field on a draw-review ask. */
+const imgRowOf = ({ img, i, pickedImages, drawReview, question, drawText, nonce, repo, disabled }) => {
+  if (pickedImages.has(i)) return '';
+  const k = drawReview ? reviewPartIndexOf(question.review, img?.abs, repo) : -1;
+  const noteField = k >= 0 ? `<label style="font-weight:400">${esc(drawText.partNote)}</label><textarea name="partnote:${k}" form="answer-form" rows="2" ${disabled}></textarea>` : '';
+  return `<figure><img src="/${esc(nonce)}/img/${i}" alt="${esc(img.label)}"><figcaption><code>${esc(img.label)}</code></figcaption>${noteField}</figure>`;
 };
 
 const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonly }) => {
-  const fileRows = fields.files.map((name) => {
-    const present = custodyPresent(repo, name);
-    const paired = fields.paired[name] ? ` · also sets <code>${esc(fields.paired[name])}</code>` : '';
-    return `<label>custody file <code>runtime/files/${esc(name)}</code> → <code>${esc(pointerFor(name))}</code>${paired}${present ? ' <b style="color:#0a7">— already in custody (leave blank to keep)</b>' : ''}</label>
-      <input type="password" name="file:${esc(name)}" autocomplete="off" ${readonly ? 'disabled' : ''}>`;
-  }).join('\n');
+  const disabled = readonly ? 'disabled' : '';
+  const fileRows = fields.files.map((name) => custodyFileRow(name, fields, repo, disabled)).join('\n');
   const varRows = fields.vars.map((v) => `<label><code>${esc(v)}</code></label>
-      <input type="${fields.isSecret(v) ? 'password' : 'text'}" name="env:${esc(v)}" autocomplete="off" ${readonly ? 'disabled' : ''}>`).join('\n');
+      <input type="${fields.isSecret(v) ? 'password' : 'text'}" name="env:${esc(v)}" autocomplete="off" ${disabled}>`).join('\n');
   const { lang, t } = uiText();
   const mirror = mirroredPick(question, pickGroupsOf(question, images));
-  const options = mirror ? '' : (question.options ?? []).map((o, i) => `<label class="opt"><input type="radio" name="option" value="${i}" required ${readonly ? 'disabled' : ''}> ${esc(typeof o === 'string' ? o : o?.label ?? '')}</label>`).join('\n');
+  const options = mirror ? '' : (question.options ?? []).map((o, i) => `<label class="opt"><input type="radio" name="option" value="${i}" required ${disabled}> ${esc(typeof o === 'string' ? o : o?.label ?? '')}</label>`).join('\n');
   // A selection ask declares each pick dimension in question.picks — one
   // required radio group per {id, label, choices}, never free-text picks.
   // When picks are not declared, derive groups from the draw naming
@@ -501,24 +327,12 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
   const pickGroups = pickGroupsOf(question, images);
   const pickedImages = new Set();
   for (const p of pickGroups) for (const c of p.choices) if (c.image) pickedImages.add(c.image.idx);
-  const pickRows = pickGroups.map((p) => {
-    const cells = p.choices.map((c) => {
-      const imgTag = c.image ? `<img src="/${esc(nonce)}/img/${esc(c.image.idx)}" alt="${esc(c.image.label)}">` : '';
-      return `<label class="cell"><input type="radio" name="pick:${esc(p.id)}" value="${esc(c.id)}" required ${readonly ? 'disabled' : ''}>
-        ${imgTag}<span class="cell-label">${esc(c.label)}</span></label>`;
-    }).join('\n');
-    return `<fieldset class="pick"><legend>${esc(p.label ?? p.id)}</legend><div class="cells">${cells}</div></fieldset>`;
-  }).join('\n');
+  const pickRows = pickRowsOf(pickGroups, nonce, disabled);
   // A draw-review ask takes a note per image (draw-feedback.mjs: each is an owner ruling bound to that shape) and the
   // owner's golden mark on an accept.
   const drawReview = askKindOf(question) === DRAW_REVIEW_KIND && question.review;
   const drawText = { partNote: t.partNote, golden: t.golden };
-  const imgRows = (images ?? []).map((img, i) => {
-    if (pickedImages.has(i)) return '';
-    const k = drawReview ? reviewPartIndexOf(question.review, img?.abs, repo) : -1;
-    const noteField = k >= 0 ? `<label style="font-weight:400">${esc(drawText.partNote)}</label><textarea name="partnote:${k}" form="answer-form" rows="2" ${readonly ? 'disabled' : ''}></textarea>` : '';
-    return `<figure><img src="/${esc(nonce)}/img/${i}" alt="${esc(img.label)}"><figcaption><code>${esc(img.label)}</code></figcaption>${noteField}</figure>`;
-  }).join('\n');
+  const imgRows = (images ?? []).map((img, i) => imgRowOf({ img, i, pickedImages, drawReview, question, drawText, nonce, repo, disabled })).join('\n');
   const hasCredentials = fields.files.length > 0 || fields.vars.length > 0;
   return `<!doctype html><html lang="${esc(lang)}"><head><meta charset="utf-8"><title>${esc(t.title)} — ${esc(workflowId)}</title>
 <style>
@@ -547,9 +361,9 @@ ${readonly ? `<p><b>${esc(t.answered)}</b></p>` : ''}
 ${options ? `<h3>${esc(t.choose)}</h3>${options}` : ''}
 ${pickRows ? `<h3>${esc(t.picks)}</h3>${pickRows}` : ''}
 ${hasCredentials ? `<h3>${esc(t.credentials)}</h3>\n${fileRows}\n${varRows}` : ''}
-${drawReview ? `<label class="opt"><input type="checkbox" name="golden" value="1" ${readonly ? 'disabled' : ''}> ${esc(drawText.golden)}</label>` : ''}
-<label>${esc(t.note)}</label><textarea name="note" rows="2" ${readonly ? 'disabled' : ''}></textarea>
-<button type="submit" ${readonly ? 'disabled' : ''}>${esc(t.submit)}</button>
+${drawReview ? `<label class="opt"><input type="checkbox" name="golden" value="1" ${disabled}> ${esc(drawText.golden)}</label>` : ''}
+<label>${esc(t.note)}</label><textarea name="note" rows="2" ${disabled}></textarea>
+<button type="submit" ${disabled}>${esc(t.submit)}</button>
 </form>
 <p class="note">${esc(hasCredentials ? t.custody : t.wakes)}</p>
 </body></html>`;
@@ -650,7 +464,8 @@ export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, repo
   const pickChoice = pickGroup ? (pickGroup.choices ?? [])[index] : null;
   const picks = pickChoice == null ? null : { [String(pickGroup.id)]: String(typeof pickChoice === 'string' ? pickChoice : pickChoice.id ?? pickChoice.label) };
   const via = { structured: 'question.recommended', text: 'marked in the option text', 'draw-review': 'the accept option of a draw-review ask' }[source] ?? source;
-  const note = `auto-accepted by config.yaml ${AUTO_ACCEPT_CONFIG_KEY}: recommended option ${index + 1} (${via})${reason ? ` because ${reason}` : ''}`;
+  const because = reason ? ` because ${reason}` : '';
+  const note = `auto-accepted by config.yaml ${AUTO_ACCEPT_CONFIG_KEY}: recommended option ${index + 1} (${via})${because}`;
   const receipt = {
     schema: 'starci/ask-answer@1',
     workflowId, dispatchId: report.dispatch_id, opId: report.op_id,
@@ -727,6 +542,209 @@ export async function parkAsk({ ledger, ledgerFile, repo, workflowId, report, no
   return { notified, askClass, superseded, telegram };
 }
 
+// The submission gates before any credential effect: the chosen option, the answering actor, and the
+// delegate rules (a delegate answers only while config.yaml delegation names it; it never approves a
+// handover or accepts a drawing). {optionIdx, answeredBy, delegation}, or null after a refusal response.
+const submissionGuard = ({ question, report, images }, res, params) => {
+  const refuse = (text) => { res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' }); res.end(text); };
+  const mirror = mirroredPick(question, pickGroupsOf(question, images));
+  const mirroredIdx = mirror ? mirror.choices.findIndex((c) => String(c.id) === params.get(`pick:${mirror.id}`)) : -1;
+  const optionIdx = params.get('option') ?? (mirroredIdx >= 0 ? String(mirroredIdx) : null);
+  // answered_by: absent means the owner. A delegate may answer only while
+  // config.yaml delegation names it and has not expired.
+  const answeredBy = (params.get('answered_by') || 'owner').trim();
+  let delegation = null;
+  if (answeredBy !== 'owner') {
+    try { delegation = activeDelegation(); } catch { delegation = null; }
+    if (delegation?.asks !== answeredBy) {
+      refuse(`answered_by ${answeredBy} is not an active owner delegate (config.yaml delegation)`);
+      return null;
+    }
+  }
+  // A handover is approved by the owner alone (modules/ops/ops/handover.review.yaml);
+  // a delegate may send feedback or a question, never the approval.
+  if (report.op_id === HANDOVER_OP && answeredBy !== OWNER && HANDOVER_DECISIONS[Number(optionIdx)] === 'approve') {
+    refuse(`answered_by ${answeredBy} cannot approve a handover; only the owner approves it (a delegate may send feedback or a question)`);
+    return null;
+  }
+  // A delegate may ask for a redraw, never accept a drawing: a drawing the owner did not ask for is accepted by
+  // autoAcceptAsk before any form is served, so one served here is the owner's (scripts/work/draw-review.mjs).
+  if (askKindOf(question) === DRAW_REVIEW_KIND && answeredBy !== OWNER && DRAW_REVIEW_DECISIONS[Number(optionIdx)] === 'accept') {
+    refuse(`answered_by ${answeredBy} cannot accept a drawing; a drawing served to the owner is the owner's to accept (a delegate may ask for a redraw)`);
+    return null;
+  }
+  return { optionIdx, answeredBy, delegation };
+};
+
+// Declared choices only: a question with options takes a valid one, each pick group one of its
+// choices, and only declared credential fields may be submitted.
+const declaredOnly = ({ question, images, fields }, res, params, optionIdx) => {
+  const groups = pickGroupsOf(question, images);
+  if ((question.options ?? []).length && (optionIdx == null || !/^\d+$/.test(optionIdx) || !(question.options ?? [])[Number(optionIdx)])) {
+    res.writeHead(400); res.end('choose a declared option'); return false;
+  }
+  for (const group of groups) if (!group.choices.some(choice => String(choice.id) === params.get(`pick:${group.id}`))) {
+    res.writeHead(400); res.end('choose a declared pick'); return false;
+  }
+  for (const key of params.keys()) if ((key.startsWith('file:') && !fields.files.includes(key.slice(5)))
+    || (key.startsWith('env:') && !fields.vars.includes(key.slice(4)))) {
+    res.writeHead(400); res.end('credential field is not declared by this ask'); return false;
+  }
+  return true;
+};
+
+// Credential fields into sealed custody/env, verified writes reported back; a failed write ends the
+// submission (502) with what landed so the owner can reconcile — the ask stays open.
+const writeCredentialFields = ({ repo, fields }, res, params) => {
+  const custodyWritten = [], envWritten = [], errors = [];
+  for (const name of fields.files) {
+    const pairedVar = fields.paired[name];
+    const v = params.get(`file:${name}`);
+    if (v == null || v === '') continue;
+    const r = writeCustody(repo, name, v);
+    if (!r.ok) { errors.push(`${name}: ${r.error}`); continue; }
+    custodyWritten.push(`${name} (${r.via})`);
+    if (pairedVar) {
+      const paired = writeEnv(repo, pairedVar, v);
+      if (paired.ok) envWritten.push(pairedVar); else errors.push(`${pairedVar}: ${paired.error}`);
+    }
+  }
+  for (const v of fields.vars) {
+    const val = params.get(`env:${v}`);
+    if (val == null || val === '') continue;
+    const r = writeEnv(repo, v, val);
+    if (r.ok) envWritten.push(v); else errors.push(`${v}: ${r.error}`);
+  }
+  if (errors.length) {
+    res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end(`Credential update failed. Verified writes: ${custodyWritten.concat(envWritten).join(', ') || 'none'}. ${errors.join('; ')}. The ask remains open.`);
+    return null;
+  }
+  return { custodyWritten, envWritten, pointersWritten: [], bridge: null, errors };
+};
+
+/** The starci/ask-answer@1 receipt of one submission (draw-review extras keep per-part notes and golden). */
+const submissionReceipt = ({ question, report, args, images }, params, { optionIdx, answeredBy, delegation, custodyWritten, envWritten, pointersWritten, bridge, errors }) => {
+  const picks = {};
+  for (const p of pickGroupsOf(question, images)) {
+    const v = params.get(`pick:${p.id}`);
+    if (v != null && v !== '') picks[p.id] = v;
+  }
+  return {
+    schema: 'starci/ask-answer@1',
+    workflowId: args.workflow, dispatchId: report.dispatch_id, opId: report.op_id,
+    option: optionIdx != null ? pickLabel((question.options ?? [])[Number(optionIdx)]) : null,
+    optionIndex: optionIdx != null && (question.options ?? [])[Number(optionIdx)] != null ? Number(optionIdx) : null,
+    picks: Object.keys(picks).length ? picks : null,
+    answeredBy, ...(delegation ? { delegation } : {}),
+    custodyWritten, envWritten, pointersWritten, bridge, errors,
+    note: params.get('note') || null, at: new Date().toISOString(),
+    // Per-image notes and the golden mark of a draw-review answer (draw-feedback.mjs notesOfReceipt, goldenMarkOf).
+    ...(askKindOf(question) === DRAW_REVIEW_KIND && question.review ? drawAnswerExtras(question.review, params) : {}),
+    // A draw-review ask names the record and the part digests the owner was shown; the receipt keeps them
+    // so the answer proves which drawing it accepted (scripts/work/draw-review.mjs apply).
+    ...(question.review ? { review: question.review } : {}),
+  };
+};
+
+// The POST /answer submission: authorization and declared choices before credential effects, then the
+// committed disposition, the receipt and the Kernel wake. A failed write must not kill the one-shot
+// server before the owner can retry — the ask stays unanswered and the form stays usable.
+const answerSubmission = (ctx, res, body) => {
+  const { db, args, report, file, ledger, repo, server } = ctx;
+  try {
+    const already = db.prepare(
+      `SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1`,
+    ).get(args.workflow, report.dispatch_id);
+    if (already) {
+      res.writeHead(409, { 'content-type': 'text/html; charset=utf-8' });
+      res.end('<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px"><h2>Already answered</h2><p>This ask was already settled — no second submission is recorded.</p></body>');
+      return;
+    }
+    const params = new URLSearchParams(body);
+    const guard = submissionGuard(ctx, res, params);
+    if (!guard) return;
+    if (!declaredOnly(ctx, res, params, guard.optionIdx)) return;
+    const absolute = path.resolve(file), identity = process.platform === 'win32' ? absolute.toLowerCase() : absolute;
+    const lockKey = sha256(`${identity}|${args.workflow}|${report.dispatch_id}`);
+    const held = claimManager(`ask-answer-${lockKey}`);
+    if (!held.ok) { res.writeHead(409); res.end('another answer is in progress; wait for its committed disposition'); return; }
+    try {
+      const closed = db.prepare(`SELECT kind FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded')
+        AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(args.workflow, report.dispatch_id);
+      if (closed?.kind === 'ask-answered' || closed?.kind === 'ask-superseded') { res.writeHead(409); res.end('ask is already closed'); return; }
+      const written = writeCredentialFields(ctx, res, params);
+      if (!written) return;
+      const receipt = submissionReceipt(ctx, params, { ...guard, ...written });
+      const committed = commitAskAnswer(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receipt });
+      if (!committed.accepted) { res.writeHead(409); res.end('ask is already closed; verify credential custody before retrying'); return; }
+      const { receiptPath } = committed;
+      // The runtime, not the Kernel, turns a draw-review answer into owner rulings and an owed redraw (draw-feedback.mjs).
+      try { recordDrawAnswer(ledger, { workflowId: args.workflow, report, receipt, receiptPath, repo }); } catch (error) { console.error(`serve-ask: draw feedback not recorded: ${String(error?.message ?? error).slice(0, 300)}`); }
+      const wake = wakeAskAnswered(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receiptPath });
+      const { custodyWritten, envWritten, pointersWritten, errors } = written;
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.end(`<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px">
+<h2>${esc(uiText().t.received)}</h2><p>custody: ${esc(custodyWritten.join(', ') || 'none')} · env: ${esc(envWritten.join(', ') || 'none')} · pointers: ${esc(pointersWritten.join(', ') || 'none')} · wake: ${esc(wake.action)}</p>
+${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` : ''}
+<p>You can close this tab — the workflow kernel has been notified.</p></body>`);
+      ctx.done = true;
+      // Answered: the ask's Telegram messages are deleted, then the form stops serving.
+      closeAskMessages(ledger, { ledgerFile: file, workflowId: args.workflow, dispatchIds: [report.dispatch_id], reason: 'answered', by: guard.answeredBy })
+        .catch(() => {}).finally(() => setTimeout(() => { server.close(); process.exit(0); }, 400).unref());
+    } finally { held.release(); }
+  } catch (error) {
+    res.writeHead(500, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(`<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px">
+<h2>Write failed — verify any credential writes before retrying</h2><p style="color:#a33">${esc(String(error?.message ?? error))}</p>
+<p>The committed ask disposition remains authoritative. Reconcile any credential writes before resubmitting.</p></body>`);
+  }
+};
+
+/** The newest pending ask report of the workflow and its answered flag; exits when there is none. */
+const pendingAsk = (db, args) => {
+  const report = db.prepare(
+    `SELECT r.*,a.op_id FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.outcome='ask' ${args.dispatch ? 'AND r.dispatch_id=?' : ''} ORDER BY r.report_id DESC LIMIT 1`,
+  ).get(...(args.dispatch ? [args.workflow, args.dispatch] : [args.workflow]));
+  if (!report) { console.error(JSON.stringify({ ok: false, error: `no pending ask report for ${args.workflow}` })); process.exit(1); }
+  const answered = db.prepare(
+    `SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1`,
+  ).get(args.workflow, report.dispatch_id);
+  return { report, answered };
+};
+
+// Retire superseded asks and let the gates that own an ask answer it before a form exists: autopilot
+// (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) answers provisionally or defers to handover, and
+// config.yaml asks.autoAcceptRecommended records its recommended option. The owner opening a form
+// (--on-demand) is the owner's own act: a drawing they open is one they asked to review, so it is served.
+const preServeGates = async ({ ledger, file, repo, args, report, readonly }) => {
+  if (readonly) return;
+  const superseded = supersedeEarlierAsks(ledger, args.workflow, report);
+  if (superseded.length) await closeAskMessages(ledger, { ledgerFile: file, workflowId: args.workflow, dispatchIds: superseded, reason: 'retired' });
+  if (!args['on-demand']) {
+    const { autopilotAnswerAsk } = await import('./autopilot-run.mjs');
+    const pilot = autopilotAnswerAsk({ ledger, repo, workflowId: args.workflow, report, wake: wakeAskAnswered });
+    if (pilot.handled) {
+      console.log(JSON.stringify({ ok: true, workflowId: args.workflow, dispatchId: report.dispatch_id, autopilot: true, action: pilot.action, class: pilot.class, receiptPath: pilot.receiptPath ?? null }));
+      process.exit(0);
+    }
+  }
+  const auto = await autoAcceptAsk({ ledger, ledgerFile: file, repo, workflowId: args.workflow, report, ownerOpening: Boolean(args['on-demand']) });
+  if (auto.accepted) {
+    console.log(JSON.stringify({ ok: true, workflowId: args.workflow, dispatchId: report.dispatch_id, autoAccepted: true, optionIndex: auto.optionIndex, option: auto.option, answeredBy: auto.answeredBy, receiptPath: auto.receiptPath, wake: auto.wake?.action ?? null }));
+    process.exit(0);
+  }
+};
+
+/** The owner-facing images of one ask: declared assets, text tokens, then report globs — composites swapped for parts. */
+const formImages = (question, rj, repo) => {
+  const qText = `${question.text ?? ''}\n${(question.options ?? []).map(optionText).join('\n')}`;
+  let images = assetsOf(question.assets, repo);
+  if (!images.length) images = imagesOf(qText, repo);
+  if (!images.length) images = reportImages(rj.files, repo);
+  return toOwnerImages(images, repo);
+};
+
 const main = async () => {
   const args = parseArgs(process.argv.slice(2));
   if (!args.repo || !args.workflow) { console.error('serve-ask needs --repo <path> --workflow <id>'); process.exit(2); }
@@ -736,57 +754,23 @@ const main = async () => {
   const ledger = openLedger({ file });
   const db = ledger.db;
 
-  const report = db.prepare(
-    `SELECT r.*,a.op_id FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.outcome='ask' ${args.dispatch ? 'AND r.dispatch_id=?' : ''} ORDER BY r.report_id DESC LIMIT 1`,
-  ).get(...(args.dispatch ? [args.workflow, args.dispatch] : [args.workflow]));
-  if (!report) { console.error(JSON.stringify({ ok: false, error: `no pending ask report for ${args.workflow}` })); process.exit(1); }
-  const answered = db.prepare(
-    `SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1`,
-  ).get(args.workflow, report.dispatch_id);
+  const { report, answered } = pendingAsk(db, args);
   const readonly = Boolean(args.review);
   if (answered && !readonly) { console.error(JSON.stringify({ ok: false, error: `ask ${report.dispatch_id} already answered` })); process.exit(1); }
 
-  // Parking a replacement ask retires the ones it replaces
-  // (supersedeEarlierAsks), and their Telegram messages leave the chat.
-  // --review reads; it never retires anything.
-  if (!readonly) {
-    const superseded = supersedeEarlierAsks(ledger, args.workflow, report);
-    if (superseded.length) await closeAskMessages(ledger, { ledgerFile: file, workflowId: args.workflow, dispatchIds: superseded, reason: 'retired' });
-  }
-
-  // Autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28): an ask that is not the owner's end-of-flow
-  // step is answered provisionally or deferred to handover, never served. The owner opening a form (--on-demand) is
-  // the owner's own act and is served.
-  if (!readonly && !args['on-demand']) {
-    const { autopilotAnswerAsk } = await import('./autopilot-run.mjs');
-    const pilot = autopilotAnswerAsk({ ledger, repo, workflowId: args.workflow, report, wake: wakeAskAnswered });
-    if (pilot.handled) {
-      console.log(JSON.stringify({ ok: true, workflowId: args.workflow, dispatchId: report.dispatch_id, autopilot: true, action: pilot.action, class: pilot.class, receiptPath: pilot.receiptPath ?? null }));
-      process.exit(0);
-    }
-  }
-  // An ask config.yaml asks.autoAcceptRecommended answers is never served.
-  if (!readonly) {
-    // --on-demand is the owner opening the form: a drawing they open is one they asked to review.
-    const auto = await autoAcceptAsk({ ledger, ledgerFile: file, repo, workflowId: args.workflow, report, ownerOpening: Boolean(args['on-demand']) });
-    if (auto.accepted) {
-      console.log(JSON.stringify({ ok: true, workflowId: args.workflow, dispatchId: report.dispatch_id, autoAccepted: true, optionIndex: auto.optionIndex, option: auto.option, answeredBy: auto.answeredBy, receiptPath: auto.receiptPath, wake: auto.wake?.action ?? null }));
-      process.exit(0);
-    }
-  }
+  // Parking a replacement ask retires the ones it replaces (supersedeEarlierAsks), and their Telegram
+  // messages leave the chat. --review reads; it never retires anything. The same gates that decide an
+  // ask before a form is served run here (autopilot, then auto-accept) — each exits when it answered.
+  await preServeGates({ ledger, file, repo, args, report, readonly });
 
   const rj = parseJson(report.report_json, {});
   const question = rj.question ?? { text: rj.summary ?? '', options: [] };
-  const qText = `${question.text ?? ''}\n${(question.options ?? []).map(optionText).join('\n')}`;
   const fields = questionFields(question);
-  let images = assetsOf(question.assets, repo);
-  if (!images.length) images = imagesOf(qText, repo);
-  if (!images.length) images = reportImages(rj.files, repo);
-  images = toOwnerImages(images, repo);
+  const images = formImages(question, rj, repo);
   const nonce = `a-${crypto.randomBytes(9).toString('hex')}`;
   const ttl = Number(args.ttl ?? DEFAULT_TTL_MS);
 
-  let done = false;
+  const ctx = { db, args, report, question, images, fields, repo, file, ledger, nonce, server: null, done: false };
   const server = serve((req, res) => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
     if (req.method === 'GET' && url.pathname === `/${nonce}`) {
@@ -806,140 +790,12 @@ const main = async () => {
       if (readonly) { res.writeHead(405, { allow: 'GET' }); res.end('review is read-only'); return; }
       let body = '';
       req.on('data', (c) => { body += c; if (body.length > 256 * 1024) req.destroy(); });
-      req.on('end', () => {
-        try {
-        const already = db.prepare(
-          `SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1`,
-        ).get(args.workflow, report.dispatch_id);
-        if (already) {
-          res.writeHead(409, { 'content-type': 'text/html; charset=utf-8' });
-          res.end('<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px"><h2>Already answered</h2><p>This ask was already settled — no second submission is recorded.</p></body>');
-          return;
-        }
-        const params = new URLSearchParams(body);
-        const mirror = mirroredPick(question, pickGroupsOf(question, images));
-        const mirroredIdx = mirror ? mirror.choices.findIndex((c) => String(c.id) === params.get(`pick:${mirror.id}`)) : -1;
-        const optionIdx = params.get('option') ?? (mirroredIdx >= 0 ? String(mirroredIdx) : null);
-        // answered_by: absent means the owner. A delegate may answer only while
-        // config.yaml delegation names it and has not expired.
-        const answeredBy = (params.get('answered_by') || 'owner').trim();
-        let delegation = null;
-        if (answeredBy !== 'owner') {
-          try { delegation = activeDelegation(); } catch { delegation = null; }
-          if (delegation?.asks !== answeredBy) {
-            res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
-            res.end(`answered_by ${answeredBy} is not an active owner delegate (config.yaml delegation)`);
-            return;
-          }
-        }
-        // A handover is approved by the owner alone (modules/ops/ops/handover.review.yaml);
-        // a delegate may send feedback or a question, never the approval.
-        if (report.op_id === HANDOVER_OP && answeredBy !== OWNER && HANDOVER_DECISIONS[Number(optionIdx)] === 'approve') {
-          res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
-          res.end(`answered_by ${answeredBy} cannot approve a handover; only the owner approves it (a delegate may send feedback or a question)`);
-          return;
-        }
-        // A delegate may ask for a redraw, never accept a drawing: a drawing the owner did not ask for is accepted by
-        // autoAcceptAsk before any form is served, so one served here is the owner's (scripts/work/draw-review.mjs).
-        if (askKindOf(question) === DRAW_REVIEW_KIND && answeredBy !== OWNER && DRAW_REVIEW_DECISIONS[Number(optionIdx)] === 'accept') {
-          res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
-          res.end(`answered_by ${answeredBy} cannot accept a drawing; a drawing served to the owner is the owner's to accept (a delegate may ask for a redraw)`);
-          return;
-        }
-        const groups = pickGroupsOf(question, images);
-        if ((question.options ?? []).length && (optionIdx == null || !/^\d+$/.test(optionIdx) || !(question.options ?? [])[Number(optionIdx)])) {
-          res.writeHead(400); res.end('choose a declared option'); return;
-        }
-        for (const group of groups) if (!group.choices.some(choice => String(choice.id) === params.get(`pick:${group.id}`))) {
-          res.writeHead(400); res.end('choose a declared pick'); return;
-        }
-        for (const key of params.keys()) if ((key.startsWith('file:') && !fields.files.includes(key.slice(5)))
-          || (key.startsWith('env:') && !fields.vars.includes(key.slice(4)))) {
-          res.writeHead(400); res.end('credential field is not declared by this ask'); return;
-        }
-        const absolute = path.resolve(file), identity = process.platform === 'win32' ? absolute.toLowerCase() : absolute;
-        const held = claimManager(`ask-answer-${sha256(`${identity}|${args.workflow}|${report.dispatch_id}`)}`);
-        if (!held.ok) { res.writeHead(409); res.end('another answer is in progress; wait for its committed disposition'); return; }
-        try {
-        const closed = db.prepare(`SELECT kind FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded')
-          AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(args.workflow, report.dispatch_id);
-        if (closed?.kind === 'ask-answered' || closed?.kind === 'ask-superseded') { res.writeHead(409); res.end('ask is already closed'); return; }
-        const custodyWritten = [], envWritten = [], pointersWritten = [], errors = [];
-        for (const name of fields.files) {
-          const pairedVar = fields.paired[name];
-          const v = params.get(`file:${name}`);
-          if (v == null || v === '') {
-            continue;
-          }
-          const r = writeCustody(repo, name, v);
-          if (!r.ok) { errors.push(`${name}: ${r.error}`); continue; }
-          custodyWritten.push(`${name} (${r.via})`);
-          if (pairedVar) {
-            const paired = writeEnv(repo, pairedVar, v);
-            if (paired.ok) envWritten.push(pairedVar); else errors.push(`${pairedVar}: ${paired.error}`);
-          }
-        }
-        for (const v of fields.vars) {
-          const val = params.get(`env:${v}`);
-          if (val == null || val === '') continue;
-          const r = writeEnv(repo, v, val);
-          if (r.ok) envWritten.push(v); else errors.push(`${v}: ${r.error}`);
-        }
-        const bridge = null;
-        if (errors.length) {
-          res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' });
-          res.end(`Credential update failed. Verified writes: ${custodyWritten.concat(envWritten).join(', ') || 'none'}. ${errors.join('; ')}. The ask remains open.`);
-          return;
-        }
-        const picks = {};
-        for (const p of pickGroupsOf(question, images)) {
-          const v = params.get(`pick:${p.id}`);
-          if (v != null && v !== '') picks[p.id] = v;
-        }
-        const receipt = {
-          schema: 'starci/ask-answer@1',
-          workflowId: args.workflow, dispatchId: report.dispatch_id, opId: report.op_id,
-          option: optionIdx != null ? (() => { const o = (question.options ?? [])[Number(optionIdx)]; return o == null ? null : (typeof o === 'string' ? o : o.label ?? null); })() : null,
-          optionIndex: optionIdx != null && (question.options ?? [])[Number(optionIdx)] != null ? Number(optionIdx) : null,
-          picks: Object.keys(picks).length ? picks : null,
-          answeredBy, ...(delegation ? { delegation } : {}),
-          custodyWritten, envWritten, pointersWritten, bridge, errors,
-          note: params.get('note') || null, at: new Date().toISOString(),
-          // Per-image notes and the golden mark of a draw-review answer (draw-feedback.mjs notesOfReceipt, goldenMarkOf).
-          ...(askKindOf(question) === DRAW_REVIEW_KIND && question.review ? drawAnswerExtras(question.review, params) : {}),
-          // A draw-review ask names the record and the part digests the owner was shown; the receipt keeps them
-          // so the answer proves which drawing it accepted (scripts/work/draw-review.mjs apply).
-          ...(question.review ? { review: question.review } : {}),
-        };
-        const committed = commitAskAnswer(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receipt });
-        if (!committed.accepted) { res.writeHead(409); res.end('ask is already closed; verify credential custody before retrying'); return; }
-        const { receiptPath } = committed;
-        // The runtime, not the Kernel, turns a draw-review answer into owner rulings and an owed redraw (draw-feedback.mjs).
-        try { recordDrawAnswer(ledger, { workflowId: args.workflow, report, receipt, receiptPath, repo }); } catch (error) { console.error(`serve-ask: draw feedback not recorded: ${String(error?.message ?? error).slice(0, 300)}`); }
-        const wake = wakeAskAnswered(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receiptPath });
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-        res.end(`<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px">
-<h2>${esc(uiText().t.received)}</h2><p>custody: ${esc(custodyWritten.join(', ') || 'none')} · env: ${esc(envWritten.join(', ') || 'none')} · pointers: ${esc(pointersWritten.join(', ') || 'none')} · wake: ${esc(wake.action)}</p>
-${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` : ''}
-<p>You can close this tab — the workflow kernel has been notified.</p></body>`);
-        done = true;
-        // Answered: the ask's Telegram messages are deleted, then the form stops serving.
-        closeAskMessages(ledger, { ledgerFile: file, workflowId: args.workflow, dispatchIds: [report.dispatch_id], reason: 'answered', by: answeredBy })
-          .catch(() => {}).finally(() => setTimeout(() => { server.close(); process.exit(0); }, 400).unref());
-        } finally { held.release(); }
-        } catch (error) {
-          // A failed write must not kill the one-shot server before the owner
-          // can retry — the ask stays unanswered and the form stays usable.
-          res.writeHead(500, { 'content-type': 'text/html; charset=utf-8' });
-          res.end(`<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px">
-<h2>Write failed — verify any credential writes before retrying</h2><p style="color:#a33">${esc(String(error?.message ?? error))}</p>
-<p>The committed ask disposition remains authoritative. Reconcile any credential writes before resubmitting.</p></body>`);
-        }
-      });
+      req.on('end', () => answerSubmission(ctx, res, body));
       return;
     }
     res.writeHead(404); res.end('not found');
   });
+  ctx.server = server;
 
   server.on('error', () => tryNext());
   const bandMatch = typeof args.band === 'string' && args.band.match(/^(\d+)\.\.(\d+)$/);
@@ -964,7 +820,7 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
   });
   tryNext();
   setTimeout(() => {
-    if (done) return;
+    if (ctx.done) return;
     if (!readonly) ledger.appendEvent({ workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id, kind: 'ask-serving-expired', payload: { dispatchId: report.dispatch_id } });
     process.exit(0);
   }, ttl).unref();
