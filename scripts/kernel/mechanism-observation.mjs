@@ -94,7 +94,8 @@ export function observeCheck(check, context, run) {
 export function stageObservation(run, roots) {
   const blob = (value, mediaType) => {
     if (value == null || value.length === 0) return null;
-    const bytes = Buffer.isBuffer(value) ? value : Buffer.from(typeof value === 'string' ? value : JSON.stringify(value));
+    const text = typeof value === 'string' ? value : JSON.stringify(value);
+    const bytes = Buffer.isBuffer(value) ? value : Buffer.from(text);
     return stageBlob(bytes, { mediaType, repoRoots: roots });
   };
   return { cwd: run.cwd, inputDigest: run.inputDigest, exitCode: run.exitCode, status: run.status,
@@ -124,6 +125,25 @@ export function requireObservationFresh(bindings) {
   }
 }
 
+/** One retained native check's output and receipt verdict. */
+const observationOf = (db, context, row, native) => {
+  let doc = null;
+  try {
+    const gap = receiptGap(row, native, context);
+    if (gap) throw new Error(gap);
+    // Serialized native receipts add process fields after hashing the original binding.
+    const binding = { ...native }; delete binding.stable; delete binding.process; delete binding.detail;
+    if (row.input_digest !== digestOf(binding)) throw new Error('the native input receipt is not exact');
+    requireObservationFresh([binding]);
+    if (!row.output_sha || !db.prepare('SELECT 1 FROM blobs WHERE sha256=?').get(row.output_sha)) throw new Error('the native output blob is not indexed');
+    doc = JSON.parse(getBlob(row.output_sha).toString('utf8'));
+    if (doc?.schema !== native.schema) throw new Error('the native child did not return its declared proof schema');
+    if (Number.isInteger(doc.exit) && doc.exit !== row.exit_code) throw new Error('the native JSON exit contradicts the observed process exit');
+    if (row.exit_code !== 0 && !(row.exit_code === 1 && Array.isArray(doc.findings))) throw new Error(`native proof child exited ${row.exit_code}`);
+    return { checkId: row.check_id, doc, native: binding, startedAt: row.started_at, finishedAt: row.finished_at, exitCode: row.exit_code };
+  } catch (error) { return { checkId: row.check_id, doc, native, judged: unavailable(error.message) }; }
+};
+
 /** Read the latest native output per schema/profile/project from this exact
  * attempt. Raw process status, indexed blob bytes, time and target must agree. */
 export function mechanismObservations(db, context) {
@@ -132,25 +152,7 @@ export function mechanismObservations(db, context) {
     const native = parseJson(row.summary_json)?.native;
     if (native?.schema) latest.set(JSON.stringify([native.schema, native.profile, native.project, native.subject]), { row, native });
   }
-  const observations = [];
-  for (const { row, native } of latest.values()) {
-    let doc = null, judged = null;
-    try {
-      const gap = receiptGap(row, native, context);
-      if (gap) throw new Error(gap);
-      // Serialized native receipts add process fields after hashing the original binding.
-      const binding = { ...native }; delete binding.stable; delete binding.process; delete binding.detail;
-      if (row.input_digest !== digestOf(binding)) throw new Error('the native input receipt is not exact');
-      requireObservationFresh([binding]);
-      if (!row.output_sha || !db.prepare('SELECT 1 FROM blobs WHERE sha256=?').get(row.output_sha)) throw new Error('the native output blob is not indexed');
-      doc = JSON.parse(getBlob(row.output_sha).toString('utf8'));
-      if (doc?.schema !== native.schema) throw new Error('the native child did not return its declared proof schema');
-      if (Number.isInteger(doc.exit) && doc.exit !== row.exit_code) throw new Error('the native JSON exit contradicts the observed process exit');
-      if (row.exit_code !== 0 && !(row.exit_code === 1 && Array.isArray(doc.findings))) throw new Error(`native proof child exited ${row.exit_code}`);
-      observations.push({ checkId: row.check_id, doc, native: binding, startedAt: row.started_at, finishedAt: row.finished_at, exitCode: row.exit_code });
-    } catch (error) { judged = unavailable(error.message); observations.push({ checkId: row.check_id, doc, native, judged }); }
-  }
-  return observations;
+  return [...latest.values()].map(({ row, native }) => observationOf(db, context, row, native));
 }
 
 /** One READ-file's verdict detail (unusable), or null when the input is exact. */

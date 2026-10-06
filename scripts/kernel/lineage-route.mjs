@@ -75,8 +75,8 @@ const outageDuringOf = (db, row, pool) => {
  * next older lineage row), used for repeat-red-check.
  */
 export function attemptCauseOf(db, row, previous = null) {
-  if (row.status === AWAITING_OWNER_STATUS) return { cause: 'blocked', attributable: false, detail: 'settled awaiting-owner (the owner was asked)' };
-  if (row.status !== 'failed') return { cause: row.status, attributable: false, detail: `settled ${row.status}` };
+  const status = settledCauseOf(row);
+  if (status) return status;
   const result = resultOf(row);
   if (result.verdict === 'blocked') {
     return { cause: 'blocked', attributable: false, detail: `settled ${result.verdict} (owner or environment)` };
@@ -91,6 +91,18 @@ export function attemptCauseOf(db, row, previous = null) {
   if (result.reason === FAILED_NO_REPORT) return noReportCause(db, row, result);
   if (result.reason === 'dispatch-rejected') return dispatchRejectedCause(result);
   if (result.claimOverruled) return { cause: 'report-rejected', attributable: true, detail: 'reported done; the recorded checks were red' };
+  return reportFailureCause(db, row, previous);
+}
+
+/** A settled row that needs no failed-attempt investigation, or null for a failed row. */
+const settledCauseOf = (row) => {
+  if (row.status === AWAITING_OWNER_STATUS) return { cause: 'blocked', attributable: false, detail: 'settled awaiting-owner (the owner was asked)' };
+  if (row.status !== 'failed') return { cause: row.status, attributable: false, detail: `settled ${row.status}` };
+  return null;
+};
+
+/** The work/environment report verdict, including a repeated red check from the prior attempt. */
+const reportFailureCause = (db, row, previous) => {
   const outcome = reportOutcomeOf(db, row);
   if (outcome === 'partial') {
     const prior = new Set(redChecksOf(db, previous));
