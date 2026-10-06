@@ -248,7 +248,7 @@ export function fixtureFindings(fixtures) {
   for (const { file, value } of fixtures) {
     const label = path.basename(file);
     if (!value || typeof value !== 'object' || Array.isArray(value)) { out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} is not a props object` }); continue; }
-    const keys = Object.keys(value).sort(byCodeUnit);
+    const keys = Object.keys(value).toSorted(byCodeUnit);
     if (keys.join(',') !== 'on,props,state') out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} holds {${keys.join(', ')}}: an XBase fixture is exactly {state, props, on} (the drawing law)` });
     else if (typeof value.state !== 'string') out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} state is not a shape name` });
   }

@@ -276,7 +276,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
         .map((d) => d.getBoundingClientRect()).map((r) => ({ x: r.left, width: r.width }));
       const segmented = el.hasAttribute('data-grammar-meter-segments') || el.hasAttribute('data-segments') || segments.length > 1;
       anatomy.meters.push({ desc: tag(el), segmented, track: { width: t.width, height: t.height },
-        band: { width: band.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0') }, segments });
+        band: { width: band.clientWidth - Number.parseFloat(cs.paddingLeft || '0') - Number.parseFloat(cs.paddingRight || '0') }, segments });
     }
   } catch { /* the anatomy is advisory measurement; the static gate still runs */ }
   // A real grammar drawing (fixture mode of a .draw.tsx): who owns every element that PAINTS - the nearest grammar
@@ -292,7 +292,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
       if ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return true;
       if (cs.backgroundColor && !/^(?:transparent|rgba\(0, 0, 0, 0\))$/.test(cs.backgroundColor)) return true;
       if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
-      if (['Top', 'Right', 'Bottom', 'Left'].some((side) => parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(cs[`border${side}Color`]))) return true;
+      if (['Top', 'Right', 'Bottom', 'Left'].some((side) => Number.parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(cs[`border${side}Color`]))) return true;
       return Boolean(cs.boxShadow && cs.boxShadow !== 'none');
     };
     const components = new Set();

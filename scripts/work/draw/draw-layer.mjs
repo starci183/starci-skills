@@ -265,5 +265,5 @@ async function main(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-layer: ${e?.stack ?? e}\n`); process.exitCode = 2; });
+  try { process.exitCode = await main(process.argv.slice(2)); } catch (e) { process.stderr.write(`draw-layer: ${e?.stack ?? e}\n`); process.exitCode = 2; }
 }
