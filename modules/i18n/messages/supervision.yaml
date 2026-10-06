@@ -109,9 +109,6 @@ messages:
   - {en: "Recorded: you accepted the drawing as the golden reference.", vi: "Đã ghi nhận: thầy duyệt hình và đặt làm hình chuẩn."}
   - {en: "Recorded: you accepted the drawing.", vi: "Đã ghi nhận: thầy duyệt hình."}
   - {en: "Recorded your feedback: the drawing will be redrawn to address every note.", vi: "Đã ghi nhận góp ý của thầy: hình sẽ được vẽ lại theo từng ghi chú."}
-  - {en: "AUTH (sign-in)", vi: "AUTH (đăng nhập)"}
-  - {en: "WSPV (buy & provision workspace)", vi: "WSPV (mua & cấp workspace)"}
-  - {en: "Collab (group chat)", vi: "Collab (chat nhóm)"}
   - {en: "<1 minute", vi: "<1 phút"}
   - {en: "{n} minutes", vi: "{n} phút"}
   - {en: "{h} hours", vi: "{h} giờ"}

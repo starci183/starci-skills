@@ -185,6 +185,7 @@ test('E: /status lists each held settle per workflow: done, waiting on <peer wor
     const wf='wf-nivo-app-auth-mudqjob3', peer='wf-nivo-modules-agentos-mudqjov6', job='op-integration.verify-25532858e7';
     seedWorkflow(ledger,{id:wf,state:{phase:'running'},jobs:[{jobId:job,opId:'integration.verify',status:'running',workerId:'term_ddd12bb0',dispatchId:'ctx_47c2cd765a50',createdAt:Date.now()-5*HOUR}]});
     seedWorkflow(ledger,{id:peer,state:{phase:'running'}});
+    ledger.db.prepare("UPDATE workflows SET display_name='Modules (AgentOS)' WHERE workflow_id=?").run(peer);
     const now=Date.now(), start=now-5*HOUR;
     ledger.db.prepare("UPDATE workflows SET phase='running', created_at=? WHERE workflow_id=?").run(start,wf);
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
