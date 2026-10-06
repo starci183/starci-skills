@@ -454,7 +454,7 @@ function hairlines(v, card) {
 function pageInsetOf(v, card, width) {
   const anc = v.ancestors(card);
   const padded = anc.filter((a) => a.style.padding[1] > 0.5 || a.style.padding[3] > 0.5);
-  const page = anc.find((a) => a.comp === 'PageContainer') ?? padded[padded.length - 1] ?? null;
+  const page = anc.find((a) => a.comp === 'PageContainer') ?? padded.at(-1) ?? null;
   const cardRight = card.rect.x + card.rect.w;
   if (!page) return { left: card.rect.x, right: width - cardRight, via: 'viewport' };
   const [, pr, , pl] = page.style.padding;
