@@ -57,6 +57,11 @@ export async function notifyKernel({ repo, workflowId, text, item = null, entity
     result = { action: rang?.action === 'rung' ? 'kernel-woken' : 'queued', delivered: true, decision: decision.id,
       superseded: opened.json.superseded ?? [], existing: opened.json.existing === true, ring: rang?.action ?? null, ...(rang?.wake ? { state: rang.wake } : {}) };
   }
+  recordNotice({ item, result, body, repo, workflowId, env });
+  return { ...result, workflowId, repo };
+}
+
+function recordNotice({ item, result, body, repo, workflowId, env }) {
   try {
     withSupervisor((m) => supervisorEvent(m, { entityType: 'notice', entityId: workflowId, kind: 'supervisor-notice', payload: { repo, workflowId, action: result.action, delivered: result.delivered === true, chars: body.length, decision: result.decision ?? null, ...(item ? { item } : {}) } }), { env });
   } catch { /* the record is best effort */ }
@@ -65,7 +70,6 @@ export async function notifyKernel({ repo, workflowId, text, item = null, entity
   } else {
     supLog(actionRow({ item: item ?? `notice|${workflowId}`, action: 'notify', reason: body, workflowId, repo, delivered: result.delivered === true }), { env });
   }
-  return { ...result, workflowId, repo };
 }
 
 if (isMain(import.meta.url)) {
@@ -79,8 +83,17 @@ if (isMain(import.meta.url)) {
     process.exitCode = 2;
   } else {
     const r = await notifyKernel({ repo: value('repo'), workflowId: value('workflow'), text, item: value('item'), entity });
-    supervisorLog('notice', `${value('workflow')}: ${r.action}${r.decision ? ` ${r.decision}` : ''}`);
-    console.log(argv.includes('--json') ? JSON.stringify(r) : `${r.workflowId}: ${r.action}${r.delivered ? ' (delivered)' : ''}${r.decision ? ` decision ${r.decision}` : ''}${r.ring ? ` doorbell=${r.ring}` : ''}`);
+    const decision = r.decision ? ` ${r.decision}` : '';
+    supervisorLog('notice', `${value('workflow')}: ${r.action}${decision}`);
+    let summary;
+    if (argv.includes('--json')) summary = JSON.stringify(r);
+    else {
+      const delivered = r.delivered ? ' (delivered)' : '';
+      const decisionText = r.decision ? ` decision ${r.decision}` : '';
+      const ring = r.ring ? ` doorbell=${r.ring}` : '';
+      summary = `${r.workflowId}: ${r.action}${delivered}${decisionText}${ring}`;
+    }
+    console.log(summary);
     if (!r.delivered) process.exitCode = 1;
   }
 }

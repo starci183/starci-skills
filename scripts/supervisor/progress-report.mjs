@@ -45,7 +45,12 @@ const displayName = (wf, names = null, tr = (s) => s) => names?.get(wf) ?? tr(AL
 const namedWorkflows = (db) => { try { return new Map(db.prepare('SELECT * FROM workflows').all().filter((w) => w.display_name).map((w) => [w.workflow_id, w.display_name])); } catch { return new Map(); } };
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
-const dur = (ms, tr) => (ms == null ? '?' : ms < 60000 ? tr('<1 minute') : ms < 3600000 ? tr('{n} minutes', { n: Math.round(ms / 60000) }) : tr('{h} hours', { h: (ms / 3600000).toFixed(1) }));
+const dur = (ms, tr) => {
+  if (ms == null) return '?';
+  if (ms < 60000) return tr('<1 minute');
+  if (ms < 3600000) return tr('{n} minutes', { n: Math.round(ms / 60000) });
+  return tr('{h} hours', { h: (ms / 3600000).toFixed(1) });
+};
 const clock = (ms) => new Date(ms).toLocaleString('vi-VN', { timeZone: TZ, hour12: false, hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 
 /** The repos to report on: --repo args, else config.yaml supervisor.repos (productRepos). */
@@ -141,7 +146,9 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
   const ownerGates = incidents.filter((i) => String(i.last_progress ?? '').startsWith('[owner-gate'));
   const last = db.prepare('SELECT a.op_id, r.outcome, r.report_json, r.created_at FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? ORDER BY r.report_id DESC LIMIT 1').get(wf.workflow_id);
   const elapsed = Math.max(0, now - Number(wf.created_at));
-  const etaMs = done > 0 && total > done ? Math.round((elapsed / done) * (total - done)) : (total > 0 && done >= total ? 0 : null);
+  let etaMs = null;
+  if (done > 0 && total > done) etaMs = Math.round((elapsed / done) * (total - done));
+  else if (total > 0 && done >= total) etaMs = 0;
   // Jobs of this workflow other workflows wait on (scripts/kernel/waiter-priority.mjs).
   let blockingOthers = [];
   try { blockingOthers = blockingOthersOf(blocking ?? blockingJobs(db, { now }), wf.workflow_id, { now }); } catch { blockingOthers = []; }
@@ -178,9 +185,12 @@ const outcomeText = (outcome, tr) => tr(OUTCOME[outcome] ?? outcome);
 /** One held settle as a report line: "done, waiting on <peer workflow>/<job>" and how long. */
 function holdLine(h, { now = Date.now(), language = ownerLanguage() } = {}) {
   const tr = translator(language);
-  const on = h.heldBecause === 'peer-wait'
-    ? `${h.peer ? h.peerName ?? displayName(h.peer, null, tr) : tr('another workflow')}${h.peerJob ? `/${h.peerJob}` : ''}`
-    : tr('you');
+  const peerJob = h.peerJob ? `/${h.peerJob}` : '';
+  let on = tr('you');
+  if (h.heldBecause === 'peer-wait') {
+    const peerName = h.peer ? h.peerName ?? displayName(h.peer, null, tr) : tr('another workflow');
+    on = `${peerName}${peerJob}`;
+  }
   return tr('⏸ {op} ({jobId}): {outcome}, waiting on {on} ({incident}) — for {ago}', {
     op: escapeHtml(legLabel(h.op, language)), jobId: escapeHtml(h.jobId), outcome: escapeHtml(outcomeText(h.outcome, tr)), on: escapeHtml(on), incident: escapeHtml(h.incident), ago: escapeHtml(dur(now - h.since, tr)) })
     + (h.workerReleased ? tr(', worker released') : '');
@@ -203,15 +213,20 @@ export function workflowSection(r, { now = Date.now(), language = ownerLanguage(
   if (failed.length) line.push(tr('⚠️ The last run failed; the kernel will retry: {legs}', { legs: escapeHtml(failed.join(', ')) }));
   if (todo.length) line.push(tr('⬜ Remaining: {legs}', { legs: escapeHtml(todo.join(' → ')) }));
   if (r.lastReport) line.push(tr('📝 Latest report ({op}, {outcome}, {at}): {summary}', { op: escapeHtml(legLabel(r.lastReport.op, language)), outcome: escapeHtml(outcomeText(r.lastReport.outcome, tr)), at: escapeHtml(clock(r.lastReport.at)), summary: escapeHtml(r.lastReport.summary) }));
-  for (const a of r.asks.filter((ask) => ask.askClass !== 'credential')) line.push(`${tr('❓ Waiting on your answer ({op}): {text}', { op: escapeHtml(legLabel(a.op, language)), text: escapeHtml(a.text) })}${a.link ? `\n   ${escapeHtml(a.link)}` : `\n   ${tr('(press /asks for an answer link)')}`}`);
+  for (const a of r.asks.filter((ask) => ask.askClass !== 'credential')) {
+    const answer = tr('❓ Waiting on your answer ({op}): {text}', { op: escapeHtml(legLabel(a.op, language)), text: escapeHtml(a.text) });
+    const link = a.link ? `\n   ${escapeHtml(a.link)}` : `\n   ${tr('(press /asks for an answer link)')}`;
+    line.push(`${answer}${link}`);
+  }
   for (const h of r.holds ?? []) line.push(holdLine(h, { now, language }));
   for (const g of r.ownerGates) line.push(tr('🔒 Waiting on you: {gate}', { gate: escapeHtml(g) }));
   for (const b of r.blocking ?? []) line.push(`${tr('⛓ Blocking other workflows: <b>{op}</b> ({jobId}) — {count} workflow(s) waiting ({workflows}), for {ago}', { op: escapeHtml(legLabel(b.op, language)), jobId: escapeHtml(b.jobId), count: b.workflows.length, workflows: escapeHtml(b.workflows.join(', ')), ago: escapeHtml(dur(now - b.since, tr)) })}${b.status === 'queued' ? tr(', not yet dispatched') : ''}`);
   if (r.runtime.length) line.push(tr('🐞 Open runtime defects: {count} (the supervisor is on them)', { count: r.runtime.length }));
-  line.push(r.etaAt == null
-    ? tr('🕒 ETA: cannot estimate yet (no leg done)')
-    : r.etaMs <= 0 ? tr('🕒 All legs done, waiting for handover')
-    : tr('🕒 ETA: ~{dur} more (around {etaAt}), at the pace since it started ({startedAt})', { dur: escapeHtml(dur(r.etaMs, tr)), etaAt: escapeHtml(clock(r.etaAt)), startedAt: escapeHtml(clock(r.startedAt)) }));
+  let eta;
+  if (r.etaAt == null) eta = tr('🕒 ETA: cannot estimate yet (no leg done)');
+  else if (r.etaMs <= 0) eta = tr('🕒 All legs done, waiting for handover');
+  else eta = tr('🕒 ETA: ~{dur} more (around {etaAt}), at the pace since it started ({startedAt})', { dur: escapeHtml(dur(r.etaMs, tr)), etaAt: escapeHtml(clock(r.etaAt)), startedAt: escapeHtml(clock(r.startedAt)) });
+  line.push(eta);
   return line.join('\n');
 }
 

@@ -17,9 +17,11 @@ export const FINDING_CODES = ['DUPLICATE_KERNEL', 'ORPHAN_TERMINAL', 'STRAY_TERM
  * array. A terminal is live unless it says otherwise.
  */
 export function readTerminals(source) {
-  const rows = Array.isArray(source) ? source
-    : Array.isArray(source?.terminals) ? source.terminals
-      : Array.isArray(source?.result?.terminals) ? source.result.terminals : null;
+  let rows;
+  if (Array.isArray(source)) rows = source;
+  else if (Array.isArray(source?.terminals)) rows = source.terminals;
+  else if (Array.isArray(source?.result?.terminals)) rows = source.result.terminals;
+  else rows = null;
   if (!rows) return null;
   return rows.map((t) => ({
     handle: t?.handle ?? t?.id ?? t?.terminal ?? null,
@@ -33,7 +35,11 @@ const runIdOf = (payload) => payload?.orca?.runId ?? payload?.managed?.runId ?? 
 
 /** The rows of a worker-list receipt, whichever envelope it arrives in (the wrapper's, the raw Orca one, a bare array), or null. */
 export function readWorkers(source) {
-  const rows = Array.isArray(source) ? source : Array.isArray(source?.workers) ? source.workers : Array.isArray(source?.result?.workers) ? source.result.workers : null;
+  let rows;
+  if (Array.isArray(source)) rows = source;
+  else if (Array.isArray(source?.workers)) rows = source.workers;
+  else if (Array.isArray(source?.result?.workers)) rows = source.result.workers;
+  else rows = null;
   return rows;
 }
 
@@ -146,11 +152,12 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null, wor
     if (job.kind === 'kernel' || !['running', 'answering'].includes(job.status)) continue;
     const rename = job.payload?.managed?.terminalTitle;
     if (!rename || rename.ok === true) continue;
+    const renameError = rename.error ? ` (${String(rename.error).slice(0, 120)})` : '';
     const handle = job.payload?.managed?.assignee ?? jobTerminalHandles(job, job.payload)[0] ?? null;
     if (handle && !byHandle.get(handle)?.live) continue;
     findings.push({ code: 'TITLE_DRIFT', workflowId: job.workflow_id, terminal: handle, jobId: job.job_id,
       expected: rename.title ?? `[Op] ${job.op_id}`,
-      detail: `op worker ${handle} of ${job.job_id} never got its tab title "${rename.title ?? ''}"${rename.error ? ` (${String(rename.error).slice(0, 120)})` : ''}` });
+      detail: `op worker ${handle} of ${job.job_id} never got its tab title "${rename.title ?? ''}"${renameError}` });
   }
   // Placement: a live terminal in this project's worktree that is neither a
   // live kernel nor a live job's worker is stray (a settled worker, a leftover

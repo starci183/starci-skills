@@ -52,7 +52,9 @@ function renderQuotaLine(quota, { language = ownerLanguage() } = {}) {
   const parts = [];
   for (const [name, q] of Object.entries(quota ?? {})) {
     if (typeof q?.usedPercent !== 'number' || !Number.isFinite(q.usedPercent)) continue;
-    const mark = q.state === 'dead' ? ' ⛔' : q.state === 'limited' ? ' ⚠' : '';
+    let mark = '';
+    if (q.state === 'dead') mark = ' ⛔';
+    else if (q.state === 'limited') mark = ' ⚠';
     const resetAt = Date.parse(q.resetsAt ?? '');
     const reset = Number.isFinite(resetAt) ? ` ↻${shortIso(resetAt)}` : '';
     parts.push(`${escapeHtml(name)} ${Math.round(q.usedPercent)}% ${t.used}${mark}${escapeHtml(reset)}`);
@@ -62,32 +64,80 @@ function renderQuotaLine(quota, { language = ownerLanguage() } = {}) {
 
 
 /** The block as Telegram HTML, or null. `quota` is a probeAll() result map (null/absent hides the line). */
-export function renderSupervisorBlock(snap, { language = ownerLanguage(), land = { busy: false, current: null }, now = Date.now(), quota = null } = {}) {
-  if (!snap) return null;
-  const t = blockTexts(language);
-  const lines = [];
+function renderSeat(snap, t) {
   const seat = snap.seat?.value?.terminal ? `${escapeHtml(snap.seat.value.agent ?? '')} ${escapeHtml(snap.seat.value.terminal.slice(0, 13))}…` : t.none;
-  // chat mode (config.yaml supervisor.mode): the owner's chat is the Supervisor; there is no seat to show.
-  lines.push(`<b>🧭 ${t.head}</b> — ${snap.mode === 'chat' ? t.chat : snap.enabled === false ? t.off : seat}`);
+  let seatText;
+  if (snap.mode === 'chat') seatText = t.chat;
+  else if (snap.enabled === false) seatText = t.off;
+  else seatText = seat;
+  return `<b>🧭 ${t.head}</b> — ${seatText}`;
+}
+
+function renderTick(snap, t, now) {
   const [last, ...older] = snap.ticks;
-  if (last) {
-    const series = [...snap.ticks].reverse().map((x) => x.owed ?? '?').join(' → ');
-    const prev = older[0]?.owed;
-    const arrow = prev == null || last.owed == null ? '' : last.owed > prev ? ' ↑' : last.owed < prev ? ' ↓' : ' =';
-    lines.push(`${t.owed}: <b>${escapeHtml(last.owed ?? '?')}</b>${arrow}${last.clusters != null ? ` (${escapeHtml(last.clusters)} cluster)` : ''} · ${t.trend} ${escapeHtml(series)} · ${t.tick} ${ago(last.at, now)}`);
-  } else lines.push(`${t.owed}: ${t.noTick}`);
-  const quotaLine = renderQuotaLine(quota, { language });
-  if (quotaLine) lines.push(quotaLine);
+  if (!last) return `${t.owed}: ${t.noTick}`;
+  const series = [...snap.ticks].reverse().map((x) => x.owed ?? '?').join(' → ');
+  const prev = older[0]?.owed;
+  let arrow = '';
+  if (prev != null && last.owed != null) {
+    if (last.owed > prev) arrow = ' ↑';
+    else if (last.owed < prev) arrow = ' ↓';
+    else arrow = ' =';
+  }
+  const cluster = last.clusters != null ? ` (${escapeHtml(last.clusters)} cluster)` : '';
+  return `${t.owed}: <b>${escapeHtml(last.owed ?? '?')}</b>${arrow}${cluster} · ${t.trend} ${escapeHtml(series)} · ${t.tick} ${ago(last.at, now)}`;
+}
+
+function renderWorkers(snap, t, lines) {
   const active = snap.board.active;
   lines.push(`${t.workers} (${active.length}): ${active.length ? '' : t.idle}`);
   for (const w of active) lines.push(`  • ${escapeHtml(w.agent ?? '?')} — ${escapeHtml(w.cluster)} — ${escapeHtml(w.ageMin)}m`);
+}
+
+function renderQueue(snap, land, t) {
   const queue = snap.board.reported;
-  lines.push(`${t.queue}: ${land.busy ? `${t.landing} ${escapeHtml(land.current?.jobId ?? (land.current?.commits ?? []).map((c) => String(c).slice(0, 9)).join(','))}; ` : ''}${queue.length ? queue.map((q) => escapeHtml(q.jobId)).join(', ') : (land.busy ? '' : t.empty)}`);
-  if (snap.lands[0]) lines.push(`${t.lastLand}: ${snap.lands[0].kind === 'land-passed' ? '✅' : '❌'} ${escapeHtml(snap.lands[0].entity_id).slice(0, 40)} ${ago(snap.lands[0].created_at, now)}`);
+  let landing = '';
+  if (land.busy) {
+    const current = land.current?.jobId ?? (land.current?.commits ?? []).map((c) => String(c).slice(0, 9)).join(',');
+    landing = `${t.landing} ${escapeHtml(current)}; `;
+  }
+  let queueText;
+  if (queue.length) queueText = queue.map((q) => escapeHtml(q.jobId)).join(', ');
+  else if (land.busy) queueText = '';
+  else queueText = t.empty;
+  return `${t.queue}: ${landing}${queueText}`;
+}
+
+function renderLastLand(snap, t, now) {
+  const last = snap.lands[0];
+  if (!last) return null;
+  const mark = last.kind === 'land-passed' ? '✅' : '❌';
+  return `${t.lastLand}: ${mark} ${escapeHtml(last.entity_id).slice(0, 40)} ${ago(last.created_at, now)}`;
+}
+
+function renderPushes(snap, t, now, lines) {
   if (snap.pushes.length) {
     lines.push(`${t.pushes}:`);
-    for (const p of snap.pushes) lines.push(`  • ${escapeHtml(path.basename(p.entity_id))} ${p.kind === 'push-main' ? `✅ ${escapeHtml(p.payload.head ?? '')}` : `❌ ${escapeHtml(String(p.payload.refused ?? p.payload.error ?? '').slice(0, 80))}`} ${ago(p.created_at, now)}`);
+    for (const p of snap.pushes) {
+      let result;
+      if (p.kind === 'push-main') result = `✅ ${escapeHtml(p.payload.head ?? '')}`;
+      else result = `❌ ${escapeHtml(String(p.payload.refused ?? p.payload.error ?? '').slice(0, 80))}`;
+      lines.push(`  • ${escapeHtml(path.basename(p.entity_id))} ${result} ${ago(p.created_at, now)}`);
+    }
   }
+}
+
+export function renderSupervisorBlock(snap, { language = ownerLanguage(), land = { busy: false, current: null }, now = Date.now(), quota = null } = {}) {
+  if (!snap) return null;
+  const t = blockTexts(language);
+  const lines = [renderSeat(snap, t), renderTick(snap, t, now)];
+  const quotaLine = renderQuotaLine(quota, { language });
+  if (quotaLine) lines.push(quotaLine);
+  renderWorkers(snap, t, lines);
+  lines.push(renderQueue(snap, land, t));
+  const lastLand = renderLastLand(snap, t, now);
+  if (lastLand) lines.push(lastLand);
+  renderPushes(snap, t, now, lines);
   return lines.join('\n');
 }
 
