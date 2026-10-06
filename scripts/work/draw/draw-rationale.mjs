@@ -82,7 +82,7 @@ export function loadRationale(file) {
   const errors = [];
   const seen = new Set();
   entries.forEach((e, i) => {
-    const at = `decision ${e?.id ?? `#${i + 1}`}`;
+    const at = `decision ${e?.id ?? '#' + (i + 1)}`;
     if (!e || typeof e !== 'object' || Array.isArray(e)) { errors.push(`#${i + 1} is not an object`); return; }
     const missing = REQUIRED_FIELDS.filter((k) => e[k] == null || (typeof e[k] === 'string' && !e[k].trim()));
     if (missing.length) errors.push(`${at} lacks ${missing.join(', ')}`);
@@ -117,7 +117,7 @@ const REF_RX = /^\s*(?:([a-z]+):)?\s*([^\s,;()]+)(?:\s+(case-\d+))?/i;
 function ruleTokenOf(ref) {
   const m = REF_RX.exec(str(ref));
   if (!m) return '';
-  return `${m[2]}${m[3] ? ` ${m[3]}` : ''}`;
+  return `${m[2]}${m[3] ? ' ' + m[3] : ''}`;
 }
 
 let knowledgeCache = null;
@@ -286,7 +286,7 @@ const refsOf = (record) => list(record?.refs).map((r) => (typeof r === 'string' 
 const PHRASING = new Set(['strong', 'em', 'b', 'i', 'u', 's', 'small', 'sub', 'sup', 'abbr', 'mark', 'time', 'code', 'bdi', 'bdo', 'q', 'cite', 'dfn', 'var', 'data', 'kbd', 'br', 'wbr', 'span']);
 const describe = (el) => {
   const cls = classesOf(el).slice(0, 2).join('.');
-  return `<${el.tag}${el.attrs.id ? `#${el.attrs.id}` : ''}${cls ? `.${cls}` : ''}>`;
+  return '<' + el.tag + (el.attrs.id ? '#' + el.attrs.id : '') + (cls ? '.' + cls : '') + '>';
 };
 const whysOf = (el) => str(el?.attrs?.[WHY_ATTR]).split(/\s+/).filter(Boolean);
 const inRedline = (el) => [el, ...ancestorsOf(el)].some((a) => a.attrs?.[REDLINE_ATTR] != null || a.attrs?.id === 'redlines');
@@ -421,7 +421,7 @@ export function rationaleFindings({ html, entries = [], errors = [], measures = 
     const kinds = KINDS_OF_CLASS[cls];
     for (const { value, at } of values.values()) {
       if (!entries.some((e) => kinds.includes(e.kind) && statesValue(e, value))) {
-        add(`uncovered ${CLASS_LABEL[cls]} value`, `${typeof value === 'number' ? `${value}${cls === 'fontWeight' ? '' : 'px'}` : value} (${[...at].slice(0, 2).join('; ')}) - no ${kinds.join('/')} decision states it in its value`);
+        add(`uncovered ${CLASS_LABEL[cls]} value`, `${typeof value === 'number' ? String(value) + (cls === 'fontWeight' ? '' : 'px') : value} (${[...at].slice(0, 2).join('; ')}) - no ${kinds.join('/')} decision states it in its value`);
       }
     }
   }
@@ -430,12 +430,12 @@ export function rationaleFindings({ html, entries = [], errors = [], measures = 
   const out = [];
   for (const [kind, items] of groups) {
     out.push({ code: DRAW_RATIONALE_MISSING, kind, count: items.length, examples: items.slice(0, 8),
-      detail: `${label}: ${kind} (${items.length}) - ${items.slice(0, 4).join('; ')}${items.length > 4 ? ` (+${items.length - 4})` : ''}` });
+      detail: `${label}: ${kind} (${items.length}) - ${items.slice(0, 4).join('; ')}${items.length > 4 ? ' (+' + (items.length - 4) + ')' : ''}` });
   }
   return out;
 }
 
-const hexRgb = (hex) => { const h = String(hex).replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
+const hexRgb = (hex) => { const h = String(hex).replace('#', ''); return [0, 2, 4].map((i) => Number.parseInt(h.slice(i, i + 2), 16)); };
 const colourClose = (a, b) => { const x = hexRgb(a), y = hexRgb(b); return x.every((v, i) => Math.abs(v - y[i]) <= 2); };
 
 /** The measures of a render source's parts: the rationale block of each starci/draw-render@1 record given. */
@@ -460,7 +460,7 @@ export function rationaleSummary(file) {
  */
 export function measureRationale(arg) {
   const { tokens = [], whyAttr, redlineAttr, schema } = arg;
-  const px = (s) => { const n = parseFloat(s); return Number.isFinite(n) ? Math.round(n * 100) / 100 : null; };
+  const px = (s) => { const n = Number.parseFloat(s); return Number.isFinite(n) ? Math.round(n * 100) / 100 : null; };
   // Any CSS colour (rgb, oklch, color-mix ...) to sRGB hex through a 1px canvas; transparent is null.
   const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
   const hexCache = new Map();
@@ -498,7 +498,7 @@ export function measureRationale(arg) {
   };
   const sel = (el) => {
     const cls = typeof el.className === 'string' ? el.className.trim().split(/\s+/).filter(Boolean).slice(0, 2).join('.') : '';
-    return `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${cls ? `.${cls}` : ''}`;
+    return el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (cls ? '.' + cls : '');
   };
   const whyOf = (el) => { const w = el.closest(`[${whyAttr}]`); return w ? w.getAttribute(whyAttr).split(/\s+/).filter(Boolean) : []; };
   const excluded = (el) => Boolean(el.closest(`[${redlineAttr}],#redlines`));
@@ -522,7 +522,7 @@ export function measureRationale(arg) {
     for (const corner of ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius']) {
       const raw = String(cs[corner]).split(' ')[0];
       if (!raw || raw === '0px') continue;
-      if (raw.endsWith('%')) put('radius', parseFloat(raw) >= 50 ? 'circle' : raw, el);
+      if (raw.endsWith('%')) put('radius', Number.parseFloat(raw) >= 50 ? 'circle' : raw, el);
       else { const v = px(raw); const r = el.getBoundingClientRect(); put('radius', v != null && (v >= 999 || v >= Math.min(r.width, r.height) / 2 - 0.5) && v > 8 ? 'pill' : v, el); }
     }
     const text = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
@@ -533,7 +533,7 @@ export function measureRationale(arg) {
       colour(hexOf(cs.color), 'text', el);
     }
     colour(hexOf(cs.backgroundColor), 'background', el);
-    for (const side of ['Top', 'Right', 'Bottom', 'Left']) if (parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none') colour(hexOf(cs[`border${side}Color`]), 'border', el);
+    for (const side of ['Top', 'Right', 'Bottom', 'Left']) if (Number.parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none') colour(hexOf(cs[`border${side}Color`]), 'border', el);
     if (cs.display === 'grid') {
       const kids = [...el.children].filter((k) => visible(k) && !excluded(k));
       if (kids.length >= 2) grids.push({ selector: sel(el), why: whyOf(el), columns: cs.gridTemplateColumns.split(/\s+(?![^(]*\))/).filter(Boolean).length });
@@ -609,12 +609,12 @@ export function drawRedlines(arg) {
   for (const n of all) {
     const l = labelOf(n);
     if (!l || !['layout', 'spacing'].includes(l.kind)) continue;
-    const tag = (v) => `${v}${l.rule ? ` · ${l.rule}` : ''}`;
+    const tag = (v) => `${v}${l.rule ? ' · ' + l.rule : ''}`;
     const kids = [...n.children].filter((k) => !(k instanceof SVGElement) && visible(k));
     const shown = new Set();
     // A decided gap is the container's gap (or a small margin); the free space of space-between is no decision.
     const ncs = getComputedStyle(n);
-    const decided = (g) => g <= 48 || [parseFloat(ncs.rowGap), parseFloat(ncs.columnGap)].some((d) => Number.isFinite(d) && Math.abs(d - g) < 1);
+    const decided = (g) => g <= 48 || [Number.parseFloat(ncs.rowGap), Number.parseFloat(ncs.columnGap)].some((d) => Number.isFinite(d) && Math.abs(d - g) < 1);
     for (let i = 0; i < kids.length - 1; i += 1) {
       const a = box(kids[i]), b = box(kids[i + 1]);
       const vgap = round(b.y - (a.y + a.h)), hgap = round(b.x - (a.x + a.w));
@@ -629,13 +629,13 @@ export function drawRedlines(arg) {
       }
     }
     const cs = getComputedStyle(n), b = box(n);
-    const pt = round(parseFloat(cs.paddingTop) || 0), pl = round(parseFloat(cs.paddingLeft) || 0);
+    const pt = round(Number.parseFloat(cs.paddingTop) || 0), pl = round(Number.parseFloat(cs.paddingLeft) || 0);
     if (pl > 0.5 && b.h > 24) htick(b.x, b.x + pl, b.y + Math.min(b.h - 4, 12));
     if (pt > 0.5 && b.w > 24) vtick(b.x + Math.min(b.w - 4, 12), b.y, b.y + pt);
     if (pt > 0.5 || pl > 0.5) label(b.x + pl + 2, b.y + pt + 11, tag(pt === pl || !pt || !pl ? `p ${pt || pl}` : `p ${pt}/${pl}`), RED);
   }
   // DNA labels at component roots, regions outlined.
-  for (const n of [...document.querySelectorAll('[data-grammar-component]')]) {
+  for (const n of document.querySelectorAll('[data-grammar-component]')) {
     if (n.closest(`[${redlineAttr}],#redlines`) || !visible(n)) continue;
     const name = n.getAttribute('data-grammar-component');
     const upName = n.parentElement?.closest('[data-grammar-component]')?.getAttribute('data-grammar-component');
@@ -645,7 +645,7 @@ export function drawRedlines(arg) {
     const l = labelOf(n);
     if (l?.kind === 'layout') el('rect', { x: b.x, y: b.y, width: b.w, height: b.h, fill: 'none', stroke: BLUE, 'stroke-width': 1, 'stroke-dasharray': '3 2' });
     const variant = n.getAttribute('data-variant') ?? n.getAttribute('data-tone');
-    label(b.x + 2, b.y + 12, `${name}${variant ? ` ${variant}` : ''}`, BLUE);
+    label(b.x + 2, b.y + 12, `${name}${variant ? ' ' + variant : ''}`, BLUE);
   }
   return { labels: placed.length };
 }
@@ -668,7 +668,7 @@ async function main(argv) {
   const records = (at('--records') ? at('--records').split(',') : []).map((f) => readJson(path.resolve(f)));
   const findings = rationaleFindings({ html: fs.readFileSync(html, 'utf8'), entries, errors, measures: measuresOf(records), resolve: ruleResolver({ workRoot, record, repoRoot: process.cwd() }), record, label: path.basename(html) });
   if (argv.includes('--json')) process.stdout.write(`${JSON.stringify({ ok: !findings.length, rationale, decisions: entries.length, findings }, null, 2)}\n`);
-  else process.stdout.write(`${findings.length ? 'REFUSED' : 'ok'}: ${entries.length} decision(s), ${findings.length} finding group(s)\n${findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n')}\n`);
+  else process.stdout.write(`${findings.length ? 'REFUSED' : 'ok'}: ${entries.length} decision(s), ${findings.length} finding group(s)\n${findings.map((f) => '  [' + f.code + '] ' + f.detail).join('\n')}\n`);
   return findings.length ? 1 : 0;
 }
 

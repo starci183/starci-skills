@@ -89,7 +89,12 @@ function badgesOfEntity(entity) {
   return n;
 }
 
-const describe = (el) => `<${el.tag}${classesOf(el).length ? `.${classesOf(el).slice(0, 2).join('.')}` : ''}>${nameOf(el) ? ` ${nameOf(el)}` : ''}`;
+const describe = (el) => {
+  const classes = classesOf(el);
+  const className = classes.length ? `.${classes.slice(0, 2).join('.')}` : '';
+  const name = nameOf(el);
+  return `<${el.tag}${className}>${name ? ` ${name}` : ''}`;
+};
 
 /** The html taste findings (bands, badges) of one render source: [{code, detail, count, examples}]. */
 export function htmlTasteFindings(html, { settings = drawLoopSettings(), label = 'the render' } = {}) {
@@ -218,7 +223,14 @@ async function main(argv) {
   const accents = [];
   argv.forEach((a, i) => { if (a === '--png' && argv[i + 1]) { const r = accentBudgetOf(argv[i + 1], { html: text }); accents.push({ png: argv[i + 1], share: r.share, accent: r.accent }); if (r.finding) findings.push(r.finding); } });
   if (argv.includes('--json')) process.stdout.write(`${JSON.stringify({ ok: !findings.length, findings, accents }, null, 2)}\n`);
-  else process.stdout.write(`${findings.length ? 'REFUSED' : 'ok'}: ${findings.length} finding(s)\n${findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n')}\n${accents.map((a) => `  accent ${a.accent ?? '-'} ${a.share == null ? 'unmeasured' : `${(a.share * 100).toFixed(1)}%`} ${a.png}`).join('\n')}\n`);
+  else {
+    const findingText = findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n');
+    const accentText = accents.map((a) => {
+      const share = a.share == null ? 'unmeasured' : `${(a.share * 100).toFixed(1)}%`;
+      return `  accent ${a.accent ?? '-'} ${share} ${a.png}`;
+    }).join('\n');
+    process.stdout.write(`${findings.length ? 'REFUSED' : 'ok'}: ${findings.length} finding(s)\n${findingText}\n${accentText}\n`);
+  }
   return findings.length ? 1 : 0;
 }
 

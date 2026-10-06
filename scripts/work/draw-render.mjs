@@ -215,7 +215,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
   const pageWidth = de.clientWidth;
   const scrollWidth = Math.max(de.scrollWidth, document.body?.scrollWidth ?? 0);
   const overflowing = scrollWidth > pageWidth ? [...document.querySelectorAll('body *')].filter((el) => el.getBoundingClientRect().right > pageWidth + 0.5)
-    .slice(0, 10).map((el) => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${typeof el.className === 'string' && el.className ? `.${el.className.trim().split(/\s+/).slice(0, 3).join('.')}` : ''}`) : [];
+    .slice(0, 10).map((el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '')) : [];
   const root = document.getElementById('root');
   // The brand art band a drawing marks (draw-taste.mjs ACCENT_EXEMPT_SELECTOR): its rects, in document CSS px, are
   // exempt from the accent budget.
@@ -248,7 +248,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
   // and its segments.
   const anatomy = { alerts: [], meters: [] };
   try {
-    const tag = (el) => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}`;
+    const tag = (el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '');
     const probe = document.createElement('div');
     probe.style.cssText = 'position:absolute;visibility:hidden;background-color:var(--surface)';
     document.body.appendChild(probe);
@@ -308,7 +308,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
         if (marked(a)) { owner = 'grammar'; break; }
         if (a.hasAttribute(layoutAttr)) { owner = 'layout'; break; }
       }
-      if (owner !== 'grammar') unowned.push(`${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? `.${el.className.trim().split(/\s+/).slice(0, 3).join('.')}` : ''}${el.textContent.trim() ? ` "${el.textContent.trim().slice(0, 40)}"` : ''} (${owner ?? 'no owner'})`);
+      if (owner !== 'grammar') unowned.push(el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '') + (el.textContent.trim() ? ' "' + el.textContent.trim().slice(0, 40) + '"' : '') + ` (${owner ?? 'no owner'})`);
     }
     ownership = { components: [...components].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)), layoutElements, unownedCount: unowned.length, unowned: unowned.slice(0, 20) };
     const clone = document.documentElement.cloneNode(true);
@@ -603,7 +603,7 @@ export async function buildFixtureHarness({ component, exportName, props, css, t
     'const noop = () => {};',
     `const revive = (v) => v === '__DRAW_NOOP__' ? noop : Array.isArray(v) ? v.map(revive) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, revive(x)])) : v;`,
     `const props = revive(${JSON.stringify(fixtureProps(fixture))});`,
-    `if (typeof Base !== 'function' && !(Base && typeof Base === 'object')) throw new Error(${JSON.stringify(`${exportName} is not a component export`)});`,
+    `if (typeof Base !== 'function' && !(Base && typeof Base === 'object')) throw new Error(${JSON.stringify(String(exportName) + ' is not a component export')});`,
     "const root = createRoot(document.getElementById('root'));",
     'flushSync(() => root.render(React.createElement(Base, props)));',
   ].join('\n');
@@ -616,7 +616,7 @@ export async function buildFixtureHarness({ component, exportName, props, css, t
       ...(productDir || grammarRoot || component.endsWith(DRAW_SOURCE_SUFFIX) ? { plugins: [drawResolvePlugin({ productDir, grammarRoot })] } : {}),
     });
   } catch (e) {
-    throw new UsageError(`esbuild could not bundle ${exportName} from ${component}: ${(e.errors ?? []).slice(0, 5).map((x) => `${x.location?.file ?? ''}:${x.location?.line ?? ''} ${x.text}`).join('; ') || e.message}`);
+    throw new UsageError(`esbuild could not bundle ${exportName} from ${component}: ${(e.errors ?? []).slice(0, 5).map((x) => (x.location?.file ?? '') + ':' + (x.location?.line ?? '') + ' ' + x.text).join('; ') || e.message}`);
   }
   const js = fs.readFileSync(path.join(workDir, 'harness.js'), 'utf8');
   const candidates = classCandidates(js);
@@ -675,12 +675,12 @@ async function main() {
     const records = await run(argv);
     const ok = records.every((r) => r.ok);
     if (json) process.stdout.write(`${JSON.stringify({ ok, records }, null, 2)}\n`);
-    else for (const r of records) process.stdout.write(`${r.ok ? 'ok  ' : 'RED '} ${r.image.path}${r.failures.length ? `  ${r.failures.join(', ')}` : ''}\n`);
+    else for (const r of records) process.stdout.write(`${r.ok ? 'ok  ' : 'RED '} ${r.image.path}${r.failures.length ? '  ' + r.failures.join(', ') : ''}\n`);
     process.exitCode = ok ? EXIT.ok : EXIT.red;
   } catch (e) {
     const usage = e instanceof UsageError;
     if (json) process.stdout.write(`${JSON.stringify({ ok: false, error: e.message, ...(e.code ? { code: e.code } : {}) }, null, 2)}\n`);
-    process.stderr.write(`draw-render: ${usage || e instanceof RedError ? `${e.code ? `[${e.code}] ` : ''}${e.message}` : e.stack}\n`);
+    process.stderr.write(`draw-render: ${usage || e instanceof RedError ? (e.code ? '[' + e.code + '] ' : '') + e.message : e.stack}\n`);
     process.exitCode = usage ? EXIT.usage : EXIT.red;
   }
 }

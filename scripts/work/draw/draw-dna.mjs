@@ -71,7 +71,7 @@ const DOT_CLASS = /(?:^|[-_])(dot|status-dot|dot-indicator)(?:$|[-_])/i;
  * Alert examples: accent Alert -> primary "Refresh", danger Alert -> danger "Retry"; HeroUI has no success or warning
  * Button variant, so every other tone keeps secondary).
  */
-export const alertActionVariantFor = (tone) => (tone === 'informative' ? 'primary' : tone === 'negative' ? 'danger' : 'secondary');
+export const alertActionVariantFor = (tone) => tone === 'informative' && 'primary' || tone === 'negative' && 'danger' || 'secondary';
 export const DRAW_METER_TRACK = 'DRAW_METER_TRACK';
 export const DRAW_ASSET_SLOT_UNDECLARED = 'DRAW_ASSET_SLOT_UNDECLARED';
 export const DRAW_DNA_CODES = Object.freeze([DRAW_OFF_GRAMMAR_COMPONENT, DRAW_NOTICE_NOT_ALERT, DRAW_RATIO_NOT_METER, DRAW_ALERT_ANATOMY, DRAW_METER_TRACK, DRAW_ASSET_SLOT_UNDECLARED]);

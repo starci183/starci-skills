@@ -194,7 +194,7 @@ export function drawReviewStatus(uiDir) {
   if (acceptance?.current && acceptance.answeredBy === OWNER) why = `accepted by ${acceptance.answeredBy} in ask ${acceptance.dispatchId} at ${acceptance.at}`;
   // Autopilot: a current provisional acceptance owes nothing now - the owner reviews it once, at handover.
   else if (acceptance?.current && isProvisionalAcceptance(acceptance)) { provisional = true; why = `provisionally accepted by autopilot in ask ${acceptance.dispatchId} at ${acceptance.at}: every machine gate passed; the owner reviews it at handover`; }
-  else if (!split.shapes.length) why = `no shape is drawn yet${retiredStates(split).length ? ` (retired: ${retiredStates(split).join(', ')})` : ''}: draw the shapes first`;
+  else if (!split.shapes.length) why = 'no shape is drawn yet' + (retiredStates(split).length ? ' (retired: ' + retiredStates(split).join(', ') + ')' : '') + ': draw the shapes first';
   else if (missing.length) why = `the draw is incomplete: no part at ${missing.join(', ')}`;
   else if (parts.some((p) => !p.current)) why = `a part is not on disk or no longer hashes to its record: ${parts.filter((p) => !p.current).map((p) => p.path).join(', ')}`;
   else if (acceptance?.current) { owed = true; why = `accepted by ${acceptance.answeredBy} in ask ${acceptance.dispatchId}, not by the owner: every drawing is the owner's to accept`; }
@@ -240,7 +240,7 @@ export function drawOwnerRulingOf(db, { job = null, record = null, beforeReportI
         if (a.answeredBy !== OWNER) continue;
         const plainAccept = askKindIn(db, row.workflow_id, a.dispatchId) === DRAW_REVIEW_KIND && a.chosen?.index === 0 && !a.note;
         if (plainAccept) return null;
-        return `the owner answered ask ${a.dispatchId} of ${row.job_id}'s lineage (attempt ${a.attempt}${a.chosen ? `, option ${a.chosen.index != null ? a.chosen.index + 1 : a.chosen.label}` : ''}${a.note ? ', with a note' : ''})`;
+        const option = a.chosen ? ', option ' + (() => { if (a.chosen.index != null) return a.chosen.index + 1; return a.chosen.label; })() : ''; return `the owner answered ask ${a.dispatchId} of ${row.job_id}'s lineage (attempt ${a.attempt}${option}${a.note ? ', with a note' : ''})`;
       }
       const successor = chain[i - 1];
       const waited = parseJsonOr(row.result_json).askDispatchId;
@@ -297,7 +297,7 @@ export function drawReviewQuestion(uiDir, { lang = ownerLanguage(), ownerRequest
   const recipe = recipeRenderedOf(record);
   if (recipe) throw new Error(`${record.id} is rendered by recipe (${recipe.recipes.join(', ')}): ${recipe.why}; it has no drawing and no owner review`);
   const split = reviewShapesOf(record);
-  if (!split.parts.length) throw new Error(`${record.id} draws no shape (role direction-content) at desktop or mobile light${retiredStates(split).length ? `; retired images (${retiredStates(split).join(', ')}) are never put to the owner` : ''} - draw the shapes first`);
+  if (!split.parts.length) throw new Error(`${record.id} draws no shape (role direction-content) at desktop or mobile light` + (retiredStates(split).length ? '; retired images (' + retiredStates(split).join(', ') + ') are never put to the owner' : '') + ' - draw the shapes first');
   const missing = missingCells(split);
   if (missing.length) throw new Error(`${record.id} has no drawn part at ${missing.join(', ')}: the owner reviews every shape at desktop and mobile, light`);
   const reviewed = split.parts.map((p) => {
@@ -476,7 +476,7 @@ export function drawReviewMain(argv = []) {
     targetFlag: '--ui', usage, tag: 'draw-review',
     status: (ui) => {
       const s = drawReviewStatus(ui);
-      return { result: s, text: `${s.id} (${s.state}): ${s.owed ? 'OWNER REVIEW OWED' : 'no owner review owed'} - ${s.why}${s.gates.length ? `\n  gates: ${s.gates.map((g) => g.detail).join(' | ')}` : ''}\n` };
+      return { result: s, text: `${s.id} (${s.state}): ${s.owed ? 'OWNER REVIEW OWED' : 'no owner review owed'} - ${s.why}${s.gates.length ? '\n  gates: ' + s.gates.map((g) => g.detail).join(' | ') : ''}\n` };
     },
     question: (ui, args) => ({ result: drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? ownerLanguage(), ownerRequested: args.includes('--owner-requested'), jobId: flag(args, '--job') ?? opContextOf()?.jobId ?? null }) }),
     apply: (ui, receipt, args) => {
