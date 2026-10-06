@@ -49,6 +49,49 @@ const settlePathOf = (status, to, reportFiled) => {
   return via ? [...via, to] : null;
 };
 
+const owedPathOf = (value) => {
+  let normalized = String(value).replaceAll(/\\/g, '/');
+  while (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
+  return normalized;
+};
+
+function settleSummaryOf({ jobId, verdict, awaitingOwner, peerBlocked, status, nextStep, released, reportsConsumed, managedWorker, sessionReleased, cutSet }) {
+  const awaitingNote = awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : '';
+  let peerNote = '';
+  if (peerBlocked) {
+    const attemptNote = verdict === 'pass' ? '' : ': no business attempt spent';
+    peerNote = ` (peer-blocked ${peerBlocked.checks.join(', ')}${attemptNote}; hand it to the peer: ${peerBlocked.routes.join(' ; ')})`;
+  }
+  let nextNote = '';
+  if (nextStep) {
+    const jobsNote = nextStep.jobs?.length ? ` ${nextStep.jobs.join(',')}` : '';
+    const incidentNote = nextStep.incidentId ? ` ${nextStep.incidentId}` : '';
+    nextNote = ` next=${nextStep.kind}${jobsNote}${incidentNote} (${nextStep.reason})`;
+  }
+  const consumedNote = reportsConsumed ? ', report consumed' : '';
+  let workerNote = '';
+  if (managedWorker) {
+    const dispatchState = managedWorker.dispatch?.state ?? '?';
+    const stopped = managedWorker.stop?.ok ?? '-';
+    const releasedState = managedWorker.release?.ok ?? '-';
+    const custodyState = managedWorker.custody?.state ?? 'unknown';
+    const proofNote = managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : '';
+    workerNote = `, worker ${managedWorker.dispatchId} dispatch=${dispatchState} stop=${stopped} release=${releasedState} custody=${custodyState}${proofNote}`;
+  }
+  let sessionNote = '';
+  if (sessionReleased) {
+    let outcome;
+    if (sessionReleased.released) outcome = `archived ${sessionReleased.files?.length ?? 0} file(s)`;
+    else outcome = `release skipped (${sessionReleased.reason})`;
+    sessionNote = `, session ${outcome}`;
+  }
+  let cutNote = '';
+  if (cutSet) {
+    const state = cutSet.closesSet ? 'CLOSED' : `open ${cutSet.open.join(',')}`;
+    cutNote = `, cut ${cutSet.id} ${state}`;
+  }
+  return `settled ${jobId} verdict=${verdict}${awaitingNote}${peerNote} status=${status}${nextNote} (leases released: ${released}${consumedNote}${workerNote}${sessionNote}${cutNote})`;
+}
 
 export default {
   verb: 'settle',
@@ -276,7 +319,10 @@ export default {
     // A unit a later try already took over, or one another try passed, is left as it is.
     const unit = job.unit_id ? getUnit(db, job.workflow_id, job.unit_id) : null;
     if (unit && unit.state !== 'done' && (unit.current_job_id == null || unit.current_job_id === jobId)) {
-      setUnitState(db, { workflowId: job.workflow_id, unitId: job.unit_id, to: verdict === 'pass' ? 'done' : awaitingOwner ? 'deciding' : 'failed', reason: `${jobId} settled ${verdict}`, at });
+      let unitState = 'failed';
+      if (verdict === 'pass') unitState = 'done';
+      else if (awaitingOwner) unitState = 'deciding';
+      setUnitState(db, { workflowId: job.workflow_id, unitId: job.unit_id, to: unitState, reason: `${jobId} settled ${verdict}`, at });
     }
     // A question the settled worker asked through Orca has no one left to answer.
     for (const q of db.prepare(`SELECT inbox_id FROM inbox WHERE workflow_id=? AND kind=? AND status='pending'
@@ -304,7 +350,7 @@ export default {
     if (verdict === 'pass' && payload.cut && String(payload.params?.canonFamilies ?? '').trim() && payload.params?.canonWire !== true && Array.isArray(envelope?.owedToWire) && envelope.owedToWire.length) {
       try {
         const prefix = String((payload.owned_paths ?? []).find((p) => typeof p === 'string' && /^[^/]+\/(?:apps|packages)\//.test(p)) ?? '').replace(/^([^/]+\/).*$/, '$1');
-        const owed = [...new Set(envelope.owedToWire.map((o) => String(o.path).replaceAll(/\\/g, '/').replace(/\/+$/, '')).map((p) => (prefix && !p.startsWith(prefix) ? `${prefix}${p}` : p)))];
+        const owed = [...new Set(envelope.owedToWire.map((o) => owedPathOf(o.path)).map((p) => (prefix && !p.startsWith(prefix) ? `${prefix}${p}` : p)))];
         const wire = widenCanonWire(ledger, { ...job, payload_json: JSON.stringify(payload) }, payload, owed, []);
         if (wire) recordJobResult(db, { jobId, result: { ...(jobResult(db, jobId) ?? result), owedToWire: { paths: owed, wireJob: wire.jobId } }, at: payload.settledAt });
       } catch (error) {
@@ -365,10 +411,13 @@ export default {
   // recorded proof is the release, and nothing is quit, closed or released again.
   const releasedEarlier = releasedWhileHeldOf(settledPayload);
   // Managed settle — calls.yaml settle-dispatch: releaseManagedWorker below.
-  const managedWorker = !managed?.dispatchId ? null
-    : releasedEarlier ? { ...(settledPayload.managedWorker ?? { dispatchId: managed.dispatchId }), releasedWhileHeld: true,
-      custody: { state: 'released', proof: 'released-while-held', at: releasedEarlier.at ?? null } }
-    : releaseManagedWorker(settledPayload);
+  let managedWorker = null;
+  if (managed?.dispatchId) {
+    if (releasedEarlier) {
+      managedWorker = { ...(settledPayload.managedWorker ?? { dispatchId: managed.dispatchId }), releasedWhileHeld: true,
+        custody: { state: 'released', proof: 'released-while-held', at: releasedEarlier.at ?? null } };
+    } else managedWorker = releaseManagedWorker(settledPayload);
+  }
   // A released worker's output stays readable from Orca's archive: the fullest read becomes op_attempts.transcript_sha.
   if (managedWorker && !releasedEarlier && settledAttemptId != null) finalizeAttemptTranscript(ledger, { attemptId: settledAttemptId, dispatch: managed.dispatchId });
   // The worker's terminal guard binding (<guards root>/terminals/<handle>.json) dies with its
@@ -416,14 +465,16 @@ export default {
   const grammarProposals = recordSettledGrammarProposals(ledger, job, repo);
   const assetSlots = recordSettledAssetSlots(ledger, job, repo);
   const revDrift = recordOpRevDrift(ledger, job);
-  const status = verdict === 'pass' ? 'succeeded' : awaitingOwner ? AWAITING_OWNER_STATUS : 'failed';
+  let status = 'failed';
+  if (verdict === 'pass') status = 'succeeded';
+  else if (awaitingOwner) status = AWAITING_OWNER_STATUS;
   const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(shellLanded ? { shellFoundation: shellLanded } : {}), ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: filedReport, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, reportsConsumed, ...(citations ? { citations } : {}), ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(checkpoint ? { checkpoint } : {}), ...(revDrift ? { opRevDrift: revDrift } : {}), tail };
   if (revDrift) console.error(`starci kernel settle WARN ${OP_REV_DRIFT}: ${jobId} (${revDrift.op}) was dispatched under runtime rev ${shortRev(revDrift.from)}; its op contract changed on main by ${shortRev(revDrift.to)}: ${revDrift.files.join(', ')} - judged as admitted, never refused`);
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
   const typedReleased = releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved;
   if (typedReleased.length) out.autoResolved = typedReleased.map(({ incidentId, workflowId: waiter, evidence, wake }) => ({ incidentId, workflowId: waiter, evidence, ...(wake ? { wake } : {}) }));
-  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''}${peerBlocked ? ` (peer-blocked ${peerBlocked.checks.join(', ')}${verdict === 'pass' ? '' : ': no business attempt spent'}; hand it to the peer: ${peerBlocked.routes.join(' ; ')})` : ''} status=${status}${nextStep ? ` next=${nextStep.kind}${nextStep.jobs?.length ? ` ${nextStep.jobs.join(',')}` : ''}${nextStep.incidentId ? ` ${nextStep.incidentId}` : ''} (${nextStep.reason})` : ''} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} dispatch=${managedWorker.dispatch?.state ?? '?'} stop=${managedWorker.stop?.ok ?? '-'} release=${managedWorker.release?.ok ?? '-'} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${sessionReleased ? `, session ${sessionReleased.released ? `archived ${sessionReleased.files?.length ?? 0} file(s)` : `release skipped (${sessionReleased.reason})`}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
+  emit(out, settleSummaryOf({ jobId, verdict, awaitingOwner, peerBlocked, status, nextStep, released, reportsConsumed, managedWorker, sessionReleased, cutSet: out.cutSet }), args.json);
 
   },
 };
