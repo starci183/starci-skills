@@ -9,7 +9,7 @@
 import { redactText } from '../lib/redact.mjs';
 
 const checkToken = (c) =>
-  `${c?.name ?? '?'} ${Number(c?.exitCode) === 0 ? 'ok' : `fail(${c?.exitCode ?? '?'})`}`;
+  `${c?.name ?? '?'} ${Number(c?.exitCode) === 0 ? 'ok' : 'fail(' + (c?.exitCode ?? '?') + ')'}`;
 
 export function renderReportBlock(report = {}) {
   const lines = [

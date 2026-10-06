@@ -70,6 +70,14 @@ export function opJobsOf(db, workflowId) {
     .all(workflowId).map((j) => ({ ...j, payload: parse(j.payload_json), result: parse(j.result_json) }));
 }
 
+/** The state of one unit's job list: done | open | awaiting-owner | dropped | failed. */
+const unitStateOf = (jobs) => {
+  if (jobs.at(-1)?.status === 'succeeded') return 'done';
+  if (jobs.some((j) => OPEN_JOB.includes(j.status))) return 'open';
+  if (jobs.at(-1)?.status === 'awaiting_owner') return 'awaiting-owner';
+  return jobs.every((j) => j.status === 'cancelled') ? 'dropped' : 'failed';
+};
+
 /**
  * One unit per work unit (payload.unit.id, scripts/kernel/units.mjs): every try of one bounded piece of work, a
  * continuation (graph-edit continue --retry-of) included. A unit is `done` only when its latest try
@@ -77,20 +85,14 @@ export function opJobsOf(db, workflowId) {
  * `failed`. Pure over `jobs`.
  */
 export function unitsOf(jobs) {
-  const keyOf = (j) => `${j.op_id}|${j.unit_id ?? j.job_id}`;
-  const units = new Map();
+  const keyOf = (j) => `${j.op_id}|${j.unit_id ?? j.job_id}`, units = new Map();
   for (const j of jobs) {
-    const k = keyOf(j);
-    if (!units.has(k)) units.set(k, { key: k, op: j.op_id, cut: j.payload?.cut ?? null, jobs: [] });
+    const k = keyOf(j); if (!units.has(k)) units.set(k, { key: k, op: j.op_id, cut: j.payload?.cut ?? null, jobs: [] });
     units.get(k).jobs.push(j);
   }
   for (const u of units.values()) {
-    const ok = u.jobs.filter((j) => j.status === 'succeeded');
-    u.doneAt = ok.length ? Math.min(...ok.map((j) => Number(j.updated_at))) : null;
-    u.state = u.jobs.at(-1)?.status === 'succeeded' ? 'done' : u.jobs.some((j) => OPEN_JOB.includes(j.status)) ? 'open'
-      : u.jobs.at(-1)?.status === 'awaiting_owner' ? 'awaiting-owner'
-      : u.jobs.every((j) => j.status === 'cancelled') ? 'dropped' : 'failed';
-    u.last = u.jobs[u.jobs.length - 1];
+    const ok = u.jobs.filter((j) => j.status === 'succeeded'); u.doneAt = ok.length ? Math.min(...ok.map((j) => Number(j.updated_at))) : null;
+    u.state = unitStateOf(u.jobs); u.last = u.jobs[u.jobs.length - 1];
     u.open = u.jobs.filter((j) => OPEN_JOB.includes(j.status));
   }
   return [...units.values()];
@@ -113,20 +115,17 @@ export function priorities() {
  * poolLoad) and the counts. {allowed, why, workersFree, poolFree, cap}.
  */
 function allowedParallelOf({ core = {}, running = 0, queuedReady = 0, workflowId, prio = priorities(), rt = runtimesDoc() }) {
-  const rtCap = Number(rt?.maxParallelOps) || 20;
-  const thr = core.ramThrottle ?? {};
-  const effective = Number(thr.effectiveCap ?? rtCap);
-  const workersRunning = Number(thr.running ?? running);
-  const workersFree = Math.max(0, effective - workersRunning);
-  const pools = rt?.runtimes ?? {};
-  const load = core.poolLoad?.running ?? {};
-  let poolFree = 0;
+  const rtCap = Number(rt?.maxParallelOps) || 20, thr = core.ramThrottle ?? {};
+  const effective = Number(thr.effectiveCap ?? rtCap), workersRunning = Number(thr.running ?? running);
+  const workersFree = Math.max(0, effective - workersRunning), pools = rt?.runtimes ?? {};
+  const load = core.poolLoad?.running ?? {}; let poolFree = 0;
   for (const [id, p] of Object.entries(pools)) poolFree += Math.max(0, (Number(p?.maxParallel) || 0) - (Number(load[p?.target ?? id] ?? load[id]) || 0));
-  const reserve = prio[workflowId]?.reserve || 0;
-  const cap = reserve > 0 ? reserve : rtCap;
-  const add = Math.min(workersFree, poolFree, queuedReady);
-  const allowed = Math.min(cap, running + add);
-  const binds = add === queuedReady ? 'queued-ready' : add === workersFree ? `worker RAM cap ${effective} (${workersRunning} running worker-wide)` : `pool slots (${poolFree} free; routed-but-undispatched jobs hold slots ${core.poolLoad?.routeHoldMs ? `for ${Math.round(core.poolLoad.routeHoldMs / 60_000)}m` : ''})`;
+  const reserve = prio[workflowId]?.reserve || 0, cap = reserve > 0 ? reserve : rtCap;
+  const add = Math.min(workersFree, poolFree, queuedReady), allowed = Math.min(cap, running + add);
+  const holdFor = core.poolLoad?.routeHoldMs ? 'for ' + Math.round(core.poolLoad.routeHoldMs / 60_000) + 'm' : '';
+  let binds = `pool slots (${poolFree} free; routed-but-undispatched jobs hold slots ${holdFor})`;
+  if (add === queuedReady) binds = 'queued-ready';
+  else if (add === workersFree) binds = `worker RAM cap ${effective} (${workersRunning} running worker-wide)`;
   return { allowed, cap, workersFree, poolFree, why: allowed >= cap ? `workflow cap ${cap}` : binds };
 }
 
@@ -139,54 +138,59 @@ function isPriority(workflowId, prio = priorities()) {
   return Object.values(prio).every((p) => (p.weight ?? 1) <= w);
 }
 
+/** The stall reasons of one workflow and the earliest `since` they implicate. */
+const stallOf = ({ core, queuedReady, running, allowed, now, remaining, minRate, unitsPerHour, priority, lastDoneAt, quietSince, graceMs, unsettled, failedUnits, doneCount }) => {
+  const reasons = []; let since = null;
+  const readySince = (core.stuck ?? []).filter((s) => s.kind === 'queued-ready').map((s) => Number(s.since)).filter(Number.isFinite);
+  if (queuedReady > 0 && running < allowed) {
+    reasons.push(`under-dispatched: ${running} running of ${allowed} allowed with ${queuedReady} queued-ready`);
+    since = readySince.length ? Math.min(...readySince) : now;
+  }
+  if (remaining > 0 && minRate > 0 && unitsPerHour < minRate && now - quietSince >= graceMs) {
+    const lastAgo = lastDoneAt ? Math.round((now - lastDoneAt) / 60_000) + 'm ago' : 'never';
+    reasons.push(`slow: ${unitsPerHour} units/h < ${minRate}/h${priority ? ' (priority workflow)' : ''}, last unit ${lastAgo}`);
+    since = since == null ? quietSince : Math.min(since, quietSince);
+  }
+  if (unsettled.length) {
+    reasons.push(`needs-kernel-decision: ${unsettled.length} reported job(s) wait on the Kernel's settle decision (their slots stay held)`);
+    const oldest = Math.min(...unsettled.map((r) => Number(r.created_at))); since = since == null ? oldest : Math.min(since, oldest);
+  }
+  if (failedUnits > 0 && failedUnits >= doneCount && remaining > 0) reasons.push(`failing: ${failedUnits} unit(s) parked failed vs ${doneCount} done`);
+  return { reasons, since };
+};
+
+/** The ETA of the remaining units: {etaHours, eta} (0/now when nothing remains, null when the rate is dead). */
+const etaOf = (remaining, etaRate, now) => {
+  if (remaining === 0) return { etaHours: 0, eta: new Date(now).toISOString() }; if (etaRate <= 0) return { etaHours: null, eta: null };
+  return { etaHours: Math.round(remaining / etaRate * 10) / 10, eta: new Date(now + remaining / etaRate * HOUR).toISOString() };
+};
+
 /**
  * The progress block of `starci kernel status`. Pure over its inputs: `jobs` (opJobsOf), `core` (the starci kernel status out: legs,
  * frontier, ramThrottle, poolLoad, stuck), `createdAt` (the workflow row), `now`, `settings`.
  */
 export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now = Date.now(), settings = progressSettings(), prio = priorities(), kernelItems = null }) {
-  const units = unitsOf(jobs).filter((u) => u.state !== 'dropped');
-  const done = units.filter((u) => u.state === 'done');
-  const total = units.length;
-  const inWin = (ms) => done.filter((u) => u.doneAt >= now - ms).length;
+  const units = unitsOf(jobs).filter((u) => u.state !== 'dropped'), done = units.filter((u) => u.state === 'done');
+  const total = units.length, inWin = (ms) => done.filter((u) => u.doneAt >= now - ms).length;
   const unitsPerHour = Math.round(inWin(settings.windowMs) / (settings.windowMs / HOUR) * 10) / 10;
-  const etaRate = inWin(settings.etaWindowMs) / (settings.etaWindowMs / HOUR);
-  const remaining = total - done.length;
-  const running = jobs.filter((j) => SLOT_STATUSES.includes(j.status)).length;
-  const queued = core.frontier?.queued ?? [];
-  const readyJobs = queued.filter((q) => q.queuedBecause === 'ready').map((q) => q.jobId);
-  const queuedReady = readyJobs.length;
+  const etaRate = inWin(settings.etaWindowMs) / (settings.etaWindowMs / HOUR), remaining = total - done.length;
+  const running = jobs.filter((j) => SLOT_STATUSES.includes(j.status)).length, queued = core.frontier?.queued ?? [];
+  const readyJobs = queued.filter((q) => q.queuedBecause === 'ready').map((q) => q.jobId), queuedReady = readyJobs.length;
   const par = allowedParallelOf({ core, running, queuedReady, workflowId, prio });
-  const legs = Array.isArray(core.legs) ? core.legs : [];
-  const legsDone = legs.filter((l) => l.color === 'green').length;
-  const lastDoneAt = done.length ? Math.max(...done.map((u) => u.doneAt)) : null;
-  const priority = isPriority(workflowId, prio);
+  const legs = Array.isArray(core.legs) ? core.legs : [], legsDone = legs.filter((l) => l.color === 'green').length;
+  const lastDoneAt = done.length ? Math.max(...done.map((u) => u.doneAt)) : null, priority = isPriority(workflowId, prio);
   const minRate = priority ? settings.minUnitsPerHour.priority : settings.minUnitsPerHour.default;
-  const reasons = [];
-  let since = null;
-  const readySince = (core.stuck ?? []).filter((s) => s.kind === 'queued-ready').map((s) => Number(s.since)).filter(Number.isFinite);
-  if (queuedReady > 0 && running < par.allowed) {
-    reasons.push(`under-dispatched: ${running} running of ${par.allowed} allowed with ${queuedReady} queued-ready`);
-    since = readySince.length ? Math.min(...readySince) : now;
-  }
   const quietSince = lastDoneAt ?? (createdAt != null && Number.isFinite(Number(createdAt)) ? Number(createdAt) : now);
-  if (remaining > 0 && minRate > 0 && unitsPerHour < minRate && now - quietSince >= settings.graceMs) {
-    reasons.push(`slow: ${unitsPerHour} units/h < ${minRate}/h${priority ? ' (priority workflow)' : ''}, last unit ${lastDoneAt ? `${Math.round((now - lastDoneAt) / 60_000)}m ago` : 'never'}`);
-    since = since == null ? quietSince : Math.min(since, quietSince);
-  }
   // SETTLE-FIRST, the Kernel's half (owner ruling settle-runtime-service): the runtime settles green reports itself
   // (scripts/kernel/settle/job-settle.mjs); what waits is only what it handed to the Kernel - non-green outcomes and done reports
   // it could not verify (`kernelItems`, oldest first, already aged past settleBacklog.ageMs). Without them the old reading stands: filed reports never consumed.
   const unsettled = kernelItems
     ? kernelItems.map((k) => ({ job_id: k.jobId, created_at: now - k.ageMin * 60_000, reason: k.reason }))
     : (core.reports ?? []).filter((r) => !r.consumed_at && now - Number(r.created_at) >= settings.settleBacklog.ageMs);
-  if (unsettled.length) {
-    reasons.push(`needs-kernel-decision: ${unsettled.length} reported job(s) wait on the Kernel's settle decision (their slots stay held)`);
-    const oldest = Math.min(...unsettled.map((r) => Number(r.created_at)));
-    since = since == null ? oldest : Math.min(since, oldest);
-  }
   const failedUnits = units.filter((u) => u.state === 'failed').length;
-  if (failedUnits > 0 && failedUnits >= done.length && remaining > 0) reasons.push(`failing: ${failedUnits} unit(s) parked failed vs ${done.length} done`);
-  const sinceMs = since == null ? 0 : Math.max(0, now - since);
+  const { reasons, since } = stallOf({ core, queuedReady, running, allowed: par.allowed, now, remaining, minRate, unitsPerHour, priority,
+    lastDoneAt, quietSince, graceMs: settings.graceMs, unsettled, failedUnits, doneCount: done.length });
+  const sinceMs = since == null ? 0 : Math.max(0, now - since), { etaHours, eta } = etaOf(remaining, etaRate, now);
   return {
     schema: 'starci/progress@1', priority, unitsTotal: total, unitsDone: done.length, unitsOpen: units.filter((u) => u.state === 'open').length, unitsFailed: failedUnits,
     unitsPerHour, minUnitsPerHour: minRate, share: total ? Math.round(done.length / total * 1000) / 1000 : null,
@@ -194,15 +198,14 @@ export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now 
     unsettledReports: unsettled.map((r) => r.job_id ?? r.dispatch_id),
     settleDecisions: kernelItems ?? null,
     running, allowedParallel: par.allowed, parallelCap: par.cap, parallelWhy: par.why, queuedReady, readyJobs,
-    etaHours: remaining === 0 ? 0 : etaRate > 0 ? Math.round(remaining / etaRate * 10) / 10 : null,
-    eta: remaining === 0 ? new Date(now).toISOString() : etaRate > 0 ? new Date(now + remaining / etaRate * HOUR).toISOString() : null,
+    etaHours, eta,
     lastUnitAt: lastDoneAt ? new Date(lastDoneAt).toISOString() : null,
     stall: { stalled: reasons.length > 0, reasons, since: since ? new Date(since).toISOString() : null, sinceMin: Math.round(sinceMs / 60_000),
       kernelDue: reasons.length > 0, supervisorDue: reasons.length > 0 && sinceMs >= settings.supervisorGraceMs },
   };
 }
 
-export const progressLine = (p) => `progress ${p.unitsDone}/${p.unitsTotal} units (${p.share == null ? '-' : Math.round(p.share * 100)}%), ${p.unitsPerHour}/h${p.minUnitsPerHour ? ` (min ${p.minUnitsPerHour})` : ''}, legs ${p.legs.done}/${p.legs.total}, running ${p.running}/${p.allowedParallel} allowed (${p.parallelWhy}), queued-ready ${p.queuedReady}, ETA ${p.eta ? p.eta.slice(0, 16).replace('T', ' ') : 'unknown'}${p.stall.stalled ? ` - STALL ${p.stall.sinceMin}m: ${p.stall.reasons.join('; ')}` : ''}`;
+export const progressLine = (p) => `progress ${p.unitsDone}/${p.unitsTotal} units (${p.share == null ? '-' : Math.round(p.share * 100)}%), ${p.unitsPerHour}/h${p.minUnitsPerHour ? ' (min ' + p.minUnitsPerHour + ')' : ''}, legs ${p.legs.done}/${p.legs.total}, running ${p.running}/${p.allowedParallel} allowed (${p.parallelWhy}), queued-ready ${p.queuedReady}, ETA ${p.eta ? p.eta.slice(0, 16).replace('T', ' ') : 'unknown'}${p.stall.stalled ? ' - STALL ' + p.stall.sinceMin + 'm: ' + p.stall.reasons.join('; ') : ''}`;
 
 /* ------------------------------------------------------------ failure causes */
 
@@ -230,14 +233,8 @@ export const isShapeCause = (c) => SHAPE_CAUSES.has(c);
 
 const PATH_RE = /(?:^|[\s`'"(,:])((?:apps|packages|src|libs|e2e)\/[A-Za-z0-9_@.\-[\]()/]+?[A-Za-z0-9_\])])(?=[\s`'",;:)]|$)/g;
 
-/** The causes of one failed/blocked attempt, primary first. Pure. */
-export function causesOf({ status = 'failed', result = {}, report = null }) {
-  const blocker = report?.blocker ?? {};
-  const kind = String(blocker.kind ?? '').toLowerCase();
-  const text = [report?.summary, blocker.detail, report?.rootCause?.claim, JSON.stringify(report?.openItems ?? ''), ...(report?.checks ?? []).map((c) => `${c.name} ${c.evidence ?? ''} exit=${c.exitCode ?? ''}`)].join(' \n ');
-  const causes = [];
-  const add = (c) => { if (!causes.includes(c)) causes.push(c); };
-  if (!report && (result?.worker?.liveness || result?.reportFiled === false)) add('dead-worker');
+/** The text-matched causes of one attempt (blocker kind + report/body text), appended via `add`. */
+const textCauses = ({ text, kind, causes, add }) => {
   if (/guard file|bind(?:s|ing)? owned|role be, repo ledger|wrong repository/i.test(text)) add('binding-defect');
   if (MISSING_PATHS_RE.test(text)) add('missing-paths');
   if (kind === 'shared-change' || GRANT_NARROW_RE.test(text)) add('grant-too-narrow');
@@ -246,7 +243,15 @@ export function causesOf({ status = 'failed', result = {}, report = null }) {
   if (kind === 'grammar-gap' || /MONOREPO_TIER|monorepo-tier|canon rule .* forbids/i.test(text)) add('canon-conflict');
   if (/IMPORTS_BROKEN_AFTER_MOVE|broken-import|Cannot find module ['"]?[@./]|Module not found: (?:Error: )?Can't resolve|TS2307|unresolved import|Failed to resolve import/i.test(text)) add('broken-import');
   if (!causes.includes('broken-import') && CHECKER_UNAVAILABLE_RE.test(text) && kind === 'environment') add('checker-unavailable');
-  if (report?.rootCause?.self === false && String(report.rootCause.node ?? '').startsWith('wf-')) add('upstream');
+};
+
+/** The causes of one failed/blocked attempt, primary first. Pure. */
+export function causesOf({ status = 'failed', result = {}, report = null }) {
+  const blocker = report?.blocker ?? {}, kind = String(blocker.kind ?? '').toLowerCase();
+  const text = [report?.summary, blocker.detail, report?.rootCause?.claim, JSON.stringify(report?.openItems ?? ''), ...(report?.checks ?? []).map((c) => `${c.name} ${c.evidence ?? ''} exit=${c.exitCode ?? ''}`)].join(' \n ');
+  const causes = [], add = (c) => { if (!causes.includes(c)) causes.push(c); };
+  if (!report && (result?.worker?.liveness || result?.reportFiled === false)) add('dead-worker'); textCauses({ text, kind, causes, add });
+  if (report?.rootCause?.self === false && String(report?.rootCause?.node ?? '').startsWith('wf-')) add('upstream');
   if (report && preservedOf(result) && (report.outcome === 'blocked' || status === 'failed')) add('partial-work');
   if (!causes.length && report && (result?.verdict === 'fail' || report.outcome === 'failed')) add('product-defect');
   if (!causes.length) add(kind === 'environment' ? 'checker-unavailable' : 'other');
@@ -260,12 +265,10 @@ export function causesOf({ status = 'failed', result = {}, report = null }) {
 /** The repository paths a report names that its unit does not own (the destinations a move needs). Pure. */
 export function destinationsOf(report, ownedPaths = []) {
   const text = [report?.summary, report?.blocker?.detail, report?.rootCause?.claim].join(' ');
-  const owned = ownedPaths.map((p) => String(p).replaceAll('\\', '/').replace(/^[^/]*\/(?=(?:apps|packages)\/)/, ''));
-  const out = new Set();
+  const owned = ownedPaths.map((p) => String(p).replaceAll('\\', '/').replace(/^[^/]*\/(?=(?:apps|packages)\/)/, '')), out = new Set();
   for (const m of text.matchAll(PATH_RE)) {
     const p = m[1].replace(/[.,)]+$/, '').replace(/\/+$/, '');
-    if (p.includes('<') || p.includes('*')) continue;
-    if (owned.some((o) => p === o || p.startsWith(`${o}/`) || o.startsWith(`${p}/`))) continue;
+    if (p.includes('<') || p.includes('*') || owned.some((o) => p === o || p.startsWith(`${o}/`) || o.startsWith(`${p}/`))) continue;
     out.add(p);
   }
   return [...out].slice(0, 8);
@@ -276,9 +279,8 @@ export function destinationsOf(report, ownedPaths = []) {
 /** Reports keyed by job id for one workflow: each job's newest report (its latest attempt that filed one). */
 export function reportsOf(db, workflowId) {
   const m = new Map();
-  for (const r of db.prepare('SELECT job_id, outcome, report_json, created_at FROM reports WHERE workflow_id=? ORDER BY report_id').all(workflowId)) {
+  for (const r of db.prepare('SELECT job_id, outcome, report_json, created_at FROM reports WHERE workflow_id=? ORDER BY report_id').all(workflowId))
     m.set(r.job_id, { ...parse(r.report_json), outcome: r.outcome, at: Number(r.created_at) });
-  }
   return m;
 }
 
@@ -291,30 +293,24 @@ const preservedOf = (result) => (typeof result?.checkpoint?.preservedRef === 'st
  * examples, preserved, destinations}], trigger}.
  */
 export function rcaOf({ jobs, reports, now = Date.now(), settings = progressSettings(), stalled = false }) {
-  const units = unitsOf(jobs);
-  const unitOf = new Map(units.flatMap((u) => u.jobs.map((j) => [j.job_id, u])));
-  const since = now - settings.rca.windowMs;
-  const rows = [];
+  const units = unitsOf(jobs), unitOf = new Map(units.flatMap((u) => u.jobs.map((j) => [j.job_id, u])));
+  const since = now - settings.rca.windowMs, rows = [];
   for (const j of jobs) {
     if (j.status !== 'failed' || Number(j.updated_at) < since) continue;
     if (['dropped', 'superseded'].includes(j.result?.verdict)) continue;
-    const report = reports.get(j.job_id) ?? null;
-    const u = unitOf.get(j.job_id);
+    const report = reports.get(j.job_id) ?? null, u = unitOf.get(j.job_id);
     const causes = causesOf({ status: j.status, result: j.result, report });
     rows.push({ jobId: j.job_id, op: j.op_id, unit: u?.key ?? null, unitState: u?.state ?? null, causes, at: Number(j.updated_at),
       summary: one(report?.summary ?? report?.blocker?.detail ?? j.result?.environment ?? j.result?.worker?.liveness ?? j.result?.verdict, 200),
       preserved: preservedOf(j.result), destinations: report ? destinationsOf(report, j.payload?.owned_paths ?? []) : [], env: j.result?.environment ?? null,
       liveness: j.result?.worker?.liveness ?? null, paths: j.payload?.owned_paths ?? [] });
   }
-  const byOp = {};
-  for (const r of rows) byOp[r.op] = (byOp[r.op] ?? 0) + 1;
+  const byOp = {}; for (const r of rows) byOp[r.op] = (byOp[r.op] ?? 0) + 1;
   const trigger = stalled ? 'progress-stall' : Object.entries(byOp).filter(([, n]) => n >= settings.rca.minFailures).map(([op, n]) => `${op} x${n}`).join(', ') || null;
   const clusters = new Map();
-  for (const r of rows) {
-    for (const c of r.causes) {
-      if (!clusters.has(c)) clusters.set(c, { cause: c, why: CAUSES[c]?.why ?? c, authority: CAUSES[c]?.authority ?? 'kernel', rows: [] });
-      clusters.get(c).rows.push(r);
-    }
+  for (const r of rows) for (const c of r.causes) {
+    if (!clusters.has(c)) clusters.set(c, { cause: c, why: CAUSES[c]?.why ?? c, authority: CAUSES[c]?.authority ?? 'kernel', rows: [] });
+    clusters.get(c).rows.push(r);
   }
   const out = [...clusters.values()].map((c) => {
     const openRows = c.rows.filter((r) => r.unitState !== 'done');
@@ -333,10 +329,8 @@ export function rcaOf({ jobs, reports, now = Date.now(), settings = progressSett
 
 /** The Kernel's decision log folded: [{id, hypothesis, actionKey, command, status: open|keep|revert, ...}]. */
 export function decisionsOf(db, workflowId) {
-  const out = new Map();
-  for (const e of db.prepare('SELECT kind, entity_id, payload_json, created_at FROM events WHERE workflow_id=? AND kind IN (?,?) ORDER BY seq').all(workflowId, DECISION_KIND, DECISION_RESULT_KIND)) {
-    const p = parse(e.payload_json);
-    if (e.kind === DECISION_KIND) out.set(e.entity_id, { id: e.entity_id, ...p, status: 'open', at: Number(e.created_at) });
+  const out = new Map(); for (const e of db.prepare('SELECT kind, entity_id, payload_json, created_at FROM events WHERE workflow_id=? AND kind IN (?,?) ORDER BY seq').all(workflowId, DECISION_KIND, DECISION_RESULT_KIND)) {
+    const p = parse(e.payload_json); if (e.kind === DECISION_KIND) out.set(e.entity_id, { id: e.entity_id, ...p, status: 'open', at: Number(e.created_at) });
     else if (out.has(e.entity_id)) Object.assign(out.get(e.entity_id), { status: p.result, observed: p.observed ?? null, closedAt: Number(e.created_at), after: p.after ?? null });
   }
   return [...out.values()];
@@ -346,6 +340,143 @@ export function decisionsOf(db, workflowId) {
 
 const q = (s) => (/[\s,;"'[\]()]/.test(String(s)) ? `"${String(s).replaceAll('"', String.raw`\"`)}"` : String(s));
 const actionKey = (...parts) => parts.join(':');
+const act = (key, tier, cause, unblocks, title, command, expected) => ({ key, tier, cause, unblocks, title, command, expected });
+
+/** The settle verdict an unsettled report's outcome maps to for starci kernel settle --verdict. */
+const settleVerdictOf = (it) => {
+  if (it.outcome === 'done') return 'pass'; if (it.outcome === 'blocked' || it.outcome === 'ask') return 'blocked';
+  return it.outcome ? 'fail' : '<pass|fail|blocked from its report>';
+};
+// 0. NEEDS-KERNEL-DECISION first (owner ruling settle-runtime-service): the runtime settled every green report; what is left
+// is a judgment - a blocked/failed/ask/partial outcome, or a done report whose checks the settler could not re-verify. Each keeps its slot and its unit's verdict hostage until the Kernel decides it.
+const settleBacklogAct = (progress, { api, repo }) => {
+  if (!progress?.unsettledReports?.length) return null;
+  const ids = progress.unsettledReports.filter(Boolean); const items = progress.settleDecisions ?? ids.map((id) => ({ jobId: id, outcome: null, reason: null }));
+  return act(actionKey('settle-backlog', ids.length), 'light', 'needs-kernel-decision', 1000 + ids.length,
+    `decide ${ids.length} needs-kernel-decision settle(s) BEFORE any route or dispatch (starci kernel route/dispatch refuse settle-backlog meanwhile): ${items.slice(0, 8).map((it) => it.jobId + (it.reason ? ` [${it.reason}]` : '')).join(', ')}`,
+    items.slice(0, 20).map((it) => (it.outcome === 'done' ? `${api} check --repo ${q(repo)} --job ${it.jobId} --checks-file <your re-run> && ` : '') + `${api} settle --repo ${q(repo)} --job ${it.jobId} --verdict ${settleVerdictOf(it)}`).join(' ; '),
+    'each settle closes its [Op] terminal (verified close), frees its slot and lets the unit count or route its repair');
+};
+// 0b. IMPORTS_BROKEN_AFTER_MOVE (DESIGN §16.7, FMEA #20): moved code left importers on the old path and no repoint unit owns
+// them. ONE wire unit owning every broken importer, before the next queued units - ranked right after the settle backlog: every later unit's checker fails on these imports until it runs.
+const repointAct = ({ importsBroken, brokenCluster, units, queuedOf, N, api, base }) => {
+  if (!((importsBroken?.count && !importsBroken.repointQueued) || (!importsBroken && brokenCluster?.open))) return null;
+  const files = importsBroken?.brokenFiles ?? []; const nextUnits = units.flatMap(queuedOf).slice(0, N - 1).map((j) => j.job_id);
+  return act(actionKey('repoint', ...(files.length ? files.slice(0, 4) : ['rca'])), 'light', 'broken-import', 500 + (importsBroken?.files ?? brokenCluster?.open ?? 1),
+    importsBroken
+      ? `enqueue ONE repoint unit owning the ${importsBroken.files} file(s) whose ${importsBroken.count} import(s) resolve to nothing (IMPORTS_BROKEN_AFTER_MOVE): repoint imports to the new locations; no other change`
+      : `${brokenCluster.open} unit(s) failed on an unresolved import: enqueue ONE repoint unit owning the importers of the moved paths`,
+    files.length
+      ? `${api} graph-edit ${base} --edit wire --op code.refactor --paths ${q(files.slice(0, 60).join(','))}${nextUnits.length ? ' --before ' + nextUnits.join(',') : ''} --decision <id>`
+      : `${api} status ${base} --json   (read importsBroken.brokenFiles, then: ${api} graph-edit ${base} --edit wire --op code.refactor --paths <them> --before <the next queued units> --decision <id>)`,
+    'the importers point at the moved code; importsBroken clears and later checkers stop failing on the old paths');
+};
+// 1. parallelism: the cheapest, most certain win.
+const dispatchReadyAct = (progress, { api, base }) => {
+  if (!(progress && progress.queuedReady > 0 && progress.running < progress.allowedParallel)) return null;
+  const k = progress.allowedParallel - progress.running;
+  return act(actionKey('dispatch-ready'), 'light', 'under-dispatched', k,
+    `dispatch ${k} more queued-ready unit(s) (running ${progress.running} of ${progress.allowedParallel} allowed)`,
+    `${api} dispatch-ready ${base} --max ${k}`, `running ${progress.running} -> ${progress.allowedParallel}; units/h rises within the next wake`);
+};
+/** Drop queued units whose every owned path is absent in the checkout. */
+const dropAct = ({ missingQueued, N, api, base }) => {
+  if (!missingQueued.length) return null;
+  const drop = missingQueued.slice(0, N).map((m) => m.jobId);
+  return act(actionKey('drop', ...drop), 'light', 'missing-paths', drop.length,
+    `drop ${drop.length} queued unit(s) whose every owned path is absent in the checkout (${missingQueued.slice(0, N).map((m) => m.paths[0]).join(', ')})`,
+    `${api} graph-edit ${base} --edit drop --jobs ${drop.join(',')} --reason "every owned path is absent in the checkout" --decision <id>`,
+    'no agent spends an attempt on a unit with nothing to refactor; if the paths were meant as move targets, re-enqueue them with their sources');
+};
+// 2. heavy re-cut when the cut itself is wrong (missing paths + grants too narrow across many units).
+const recutAct = ({ recutOp, cutWrong, cutIsWrong, openCount, settings, api, base }) => {
+  if (!(cutWrong >= settings.recutThreshold && recutOp)) return null;
+  const canon = recutOp.canon;
+  return act(actionKey('recut', recutOp.op, recutOp.cutId), 'heavy', 'missing-paths+grant-too-narrow', cutIsWrong ? Math.max(cutWrong, openCount) : 0.5,
+    canon
+      ? `re-cut the remaining ${recutOp.op} units of cut ${recutOp.cutId} from a FRESH canon-scan (the goal's own cut method): ${cutWrong} unit(s) were cut on absent paths or too-narrow grants`
+      : `dispatch work.author to re-cut the remaining ${recutOp.op} units of cut ${recutOp.cutId} with this RCA as its brief`,
+    canon
+      ? `${api} graph-edit ${base} --edit scan --op ${recutOp.op} --cut-id ${recutOp.cutId} --decision <id>   (then, when it reports done: ${api} graph-edit ${base} --edit recut --op ${recutOp.op} --cut-id ${recutOp.cutId} --from-scan <file it names> --decision <id>)`
+      : `${api} redesign ${base} --op work.author --rca latest --paths <work.author write set> --decision <id>`,
+    'every remaining unit owns paths that exist, grouped so moves and their consumers share a unit; the parked failed units retire');
+};
+/** partial-work: continue the settled units from their preserved work. */
+const partialWorkActs = ({ c, us, lastFailedOf, N, api, base }) => {
+  const targets = us.filter((u) => !u.open.length && lastFailedOf(u)).slice(0, N); if (!targets.length) return [];
+  return [act(actionKey('continue', ...targets.map((u) => u.key)), 'light', c.cause, targets.length,
+    `continue ${targets.length} unit(s) from their preserved work instead of failures (${c.preserved.slice(0, 3).join(', ')})`,
+    targets.map((u) => `${api} graph-edit ${base} --edit continue --job ${lastFailedOf(u).job_id}${c.destinations.length ? ' --add-paths ' + q(c.destinations.slice(0, 4).join(',')) : ''} --decision <id>`).join(' && '),
+    'the preserved in-ceiling work counts toward the unit, the continuation starts from it')];
+};
+/** grant-too-narrow: ONE wire unit for the shared destinations, widen the queued units, retry or continue the failed. */
+const narrowActs = ({ c, us, rows, queuedOf, lastFailedOf, N, api, base }) => {
+  const acts = [];
+  const shared = c.destinations.filter((d) => rows.filter((r) => r.destinations.includes(d)).length >= 2);
+  const befores = us.flatMap(queuedOf).slice(0, N - 1).map((j) => j.job_id);
+  if (shared.length) acts.push(act(actionKey('wire', ...shared.slice(0, 4)), 'light', c.cause, us.length,
+    `add ONE serial wire unit owning the shared destinations ${shared.slice(0, 4).join(', ')} that ${us.length} unit(s) need`,
+    `${api} graph-edit ${base} --edit wire --op ${us[0]?.op ?? 'code.refactor'} --paths ${q(shared.slice(0, 6).join(','))}${befores.length ? ' --before ' + befores.join(',') : ''} --decision <id>`,
+    'the shared files move once, serially; the units that needed them run after it (a failed one: graph-edit retry --after <wire job>)'));
+  const widen = us.filter((u) => queuedOf(u).length).slice(0, N);
+  if (widen.length && c.destinations.length) acts.push(act(actionKey('widen', ...widen.map((u) => u.key)), 'light', c.cause, widen.length,
+    `widen ${widen.length} queued unit(s) to the destinations their reports name`,
+    widen.map((u) => `${api} graph-edit ${base} --edit widen --job ${queuedOf(u)[0].job_id} --add-paths ${q(c.destinations.slice(0, 4).join(','))} --decision <id>`).join(' && '),
+    'the unit may move its files into their canonical home (leases of other workflows are refused by the api)'));
+  for (const u of us.filter((u) => !u.open.length && lastFailedOf(u)).slice(0, N)) {
+    const r = rows.find((x) => x.unit === u.key); const kept = Boolean(r?.preserved);
+    const dest = (r?.destinations ?? []).filter((d) => !shared.includes(d)).slice(0, 4); if (!dest.length && !kept) continue;
+    acts.push(act(actionKey(kept ? 'continue' : 'retry', u.key), 'light', c.cause, 1,
+      `${kept ? 'continue' : 'retry'} ${u.key} with the destinations its report names${dest.length ? ' (' + dest.join(', ') + ')' : ''}`,
+      `${api} graph-edit ${base} --edit ${kept ? 'continue' : 'retry'} --job ${lastFailedOf(u).job_id}${dest.length ? ' --add-paths ' + q(dest.join(',')) : ''} --decision <id>`,
+      'the unit owns what its fix must touch; the api refuses the same failing shape and the paths of other workflows'));
+  }
+  return acts;
+};
+/** tool-timeout, or test-gap while unit specs are deferred: an op-override params edit covers either. */
+const paramsAct = ({ c, us, api, base, settings }) => (c.cause === 'tool-timeout'
+  ? act(actionKey('params', 'commandTimeoutMs'), 'light', c.cause, c.open,
+    'give the op a longer command window and the background-run rule for long validators',
+    `${api} op-override ${base} --op ${us[0]?.op ?? 'code.refactor'} --set '${JSON.stringify({ commandTimeoutMs: settings.commandTimeoutMs, notes: ['Long validators (canon-scan, gate.mjs, starci app lint) may exceed your tool window: start them in the background writing to a file, then poll that file until it is complete; never report blocked on a tool timeout.'] })}' --decision <id>`,
+    'no unit blocks on a 30 s tool window; applies to every later dispatch of the op in this workflow')
+  : act(actionKey('params', 'specs-unit-off'), 'light', c.cause, c.open,
+    'unit tests are deferred by the owner (config.yaml specs.unit=false): tell the op to guard behaviour with typecheck + canon-scan before/after instead of stopping',
+    `${api} op-override ${base} --op ${us[0]?.op ?? 'code.refactor'} --set '${JSON.stringify({ notes: ['The owner deferred unit tests (config.yaml specs.unit=false): a missing regression suite is not a blocker in this workflow. Guard behaviour with typecheck and canon-scan before and after, and list the untested seams in the report.'] })}' --decision <id>`,
+    'no unit stops on a missing regression suite while unit tests are deferred'));
+/** test-gap: a test.author wire unit before each unit that lacks a regression test. */
+const testGapActs = ({ c, us, lastFailedOf, queuedOf, N, api, base }) => {
+  const t = us.slice(0, N); if (!t.length) return [];
+  return [act(actionKey('test', ...t.map((u) => u.key)), 'light', c.cause, t.length,
+    `add a test.author unit before ${t.length} unit(s) that lack a regression test`,
+    t.map((u) => `${api} graph-edit ${base} --edit wire --op test.author --paths ${q((lastFailedOf(u)?.payload?.owned_paths ?? []).slice(0, 3).join(','))} --before ${queuedOf(u)[0]?.job_id ?? '<the unit\'s next job>'} --decision <id>`).join(' && '),
+    'the refactor unit starts with a regression test to hold parity')];
+};
+/** canon-conflict: a tier-2 kernel-proposal. */
+const canonAct = ({ c, api, base }) => [act(actionKey('proposal', 'canon-conflict'), 'proposal', c.cause, c.open,
+  'the cut asks for a location a canon rule forbids: propose the canon/cut fix (tier 2) and widen the unit to the canonical home meanwhile',
+  `${api} kernel-proposal ${base} --title "cut vs canon location conflict" --evidence ${q(c.examples.join(' | ').slice(0, 400))} --decision <id>`,
+  'the Supervisor lands the canon/cut fix or forwards it to the owner; the widened unit keeps moving')];
+/** dead-worker / binding-defect / checker-unavailable: a runtime cause the Kernel files once, then keeps dispatching. */
+const supervisorAct = ({ c, api, base }) => [act(actionKey('proposal', c.cause), 'supervisor', c.cause, c.open,
+  `${c.cause} x${c.count} (${c.envs.join(', ') || 'no env'}): a runtime cause - file it once, then keep dispatching the healthy units`,
+  `${api} kernel-proposal ${base} --title "${c.cause} x${c.count}" --evidence ${q((c.envs.join(',') + ' | ' + c.examples.join(' | ')).slice(0, 400))} --decision <id>`,
+  'the Supervisor fixes the runtime cause; the Kernel does not retry the same shape waiting for it')];
+/** upstream: the root cause lives in another workflow - message the peer. */
+const upstreamAct = ({ c, api, base }) => [act(actionKey('supervisor', 'upstream'), 'supervisor', c.cause, c.open,
+  'the root cause is in another workflow: message the peer and keep other units moving',
+  `${api} notify ${base} --to peers --kind request --subject "root cause in your workflow" --body ${q(c.examples[0] ?? '')}`,
+  'the peer fixes its side; the Supervisor watches the cross-workflow wait')];
+/** The catalogue action(s) of one RCA cluster (dead-worker also fires with zero open). */
+const clusterActs = (c, ctx) => {
+  if (c.cause === 'partial-work') return partialWorkActs({ c, ...ctx });
+  if (c.cause === 'grant-too-narrow') return narrowActs({ c, ...ctx });
+  if (c.cause === 'tool-timeout' || (c.cause === 'test-gap' && unitSpecsOff())) return [paramsAct({ c, ...ctx })];
+  if (c.cause === 'test-gap') return testGapActs({ c, ...ctx });
+  if (c.cause === 'canon-conflict') return canonAct({ c, api: ctx.api, base: ctx.base });
+  if (c.cause === 'dead-worker' || c.cause === 'binding-defect' || c.cause === 'checker-unavailable') return supervisorAct({ c, api: ctx.api, base: ctx.base });
+  if (c.cause === 'upstream') return upstreamAct({ c, api: ctx.api, base: ctx.base });
+  return [];
+};
 
 /**
  * The ranked candidate actions. Pure over what it is given: `progress`, `rca`, `units` (unitsOf), `workflowId`,
@@ -353,148 +484,31 @@ const actionKey = (...parts) => parts.join(':');
  * Each: {rank, key, tier: light|heavy|proposal|supervisor, title, command, expected, unblocks, cause, tried}.
  */
 export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo>', decisions = [], missingQueued = [], settings = progressSettings(), recutOp = null, importsBroken = null }) {
-  const api = `starci kernel`;
-  const base = `--repo ${q(repo)} --workflow ${workflowId}`;
-  const acts = [];
-  const add = (a) => acts.push(a);
-  const N = settings.maxUnitsPerEdit;
+  const api = `starci kernel`, base = `--repo ${q(repo)} --workflow ${workflowId}`, N = settings.maxUnitsPerEdit;
   const openUnits = (keys) => units.filter((u) => keys.includes(u.key));
-  const queuedOf = (u) => u.jobs.filter((j) => j.status === 'queued');
+  const queuedOf = (u) => u.jobs.filter((j) => j.status === 'queued'), cl = new Map((rca?.clusters ?? []).map((c) => [c.cause, c]));
   const lastFailedOf = (u) => [...u.jobs].reverse().find((j) => j.status === 'failed') ?? null;
-  const cl = new Map((rca?.clusters ?? []).map((c) => [c.cause, c]));
-
-  // 0. NEEDS-KERNEL-DECISION first (owner ruling settle-runtime-service): the runtime settled every green report; what is left
-  // is a judgment - a blocked/failed/ask/partial outcome, or a done report whose checks the settler could not re-verify. Each keeps its slot and its unit's verdict hostage until the Kernel decides it.
-  if (progress?.unsettledReports?.length) {
-    const ids = progress.unsettledReports.filter(Boolean);
-    const items = progress.settleDecisions ?? ids.map((id) => ({ jobId: id, outcome: null, reason: null }));
-    const verdictOf = (it) => (it.outcome === 'done' ? 'pass' : it.outcome === 'blocked' || it.outcome === 'ask' ? 'blocked' : it.outcome ? 'fail' : '<pass|fail|blocked from its report>');
-    add({ key: actionKey('settle-backlog', ids.length), tier: 'light', cause: 'needs-kernel-decision', unblocks: 1000 + ids.length,
-      title: `decide ${ids.length} needs-kernel-decision settle(s) BEFORE any route or dispatch (starci kernel route/dispatch refuse settle-backlog meanwhile): ${items.slice(0, 8).map((it) => `${it.jobId}${it.reason ? ` [${it.reason}]` : ''}`).join(', ')}`,
-      command: items.slice(0, 20).map((it) => `${it.outcome === 'done' ? `${api} check --repo ${q(repo)} --job ${it.jobId} --checks-file <your re-run> && ` : ''}${api} settle --repo ${q(repo)} --job ${it.jobId} --verdict ${verdictOf(it)}`).join(' ; '),
-      expected: 'each settle closes its [Op] terminal (verified close), frees its slot and lets the unit count or route its repair' });
-  }
-  // 0b. IMPORTS_BROKEN_AFTER_MOVE (DESIGN §16.7, FMEA #20): moved code left importers on the old path and no repoint unit owns
-  // them. ONE wire unit owning every broken importer, before the next queued units - ranked right after the settle backlog: every later unit's checker fails on these imports until it runs.
-  const brokenCluster = cl.get('broken-import');
-  if ((importsBroken?.count && !importsBroken.repointQueued) || (!importsBroken && brokenCluster?.open)) {
-    const files = importsBroken?.brokenFiles ?? [];
-    const nextUnits = units.flatMap(queuedOf).slice(0, N - 1).map((j) => j.job_id);
-    add({ key: actionKey('repoint', ...(files.length ? files.slice(0, 4) : ['rca'])), tier: 'light', cause: 'broken-import',
-      unblocks: 500 + (importsBroken?.files ?? brokenCluster?.open ?? 1),
-      title: importsBroken
-        ? `enqueue ONE repoint unit owning the ${importsBroken.files} file(s) whose ${importsBroken.count} import(s) resolve to nothing (IMPORTS_BROKEN_AFTER_MOVE): repoint imports to the new locations; no other change`
-        : `${brokenCluster.open} unit(s) failed on an unresolved import: enqueue ONE repoint unit owning the importers of the moved paths`,
-      command: files.length
-        ? `${api} graph-edit ${base} --edit wire --op code.refactor --paths ${q(files.slice(0, 60).join(','))}${nextUnits.length ? ` --before ${nextUnits.join(',')}` : ''} --decision <id>`
-        : `${api} status ${base} --json   (read importsBroken.brokenFiles, then: ${api} graph-edit ${base} --edit wire --op code.refactor --paths <them> --before <the next queued units> --decision <id>)`,
-      expected: 'the importers point at the moved code; importsBroken clears and later checkers stop failing on the old paths' });
-  }
-  // 1. parallelism: the cheapest, most certain win.
-  if (progress && progress.queuedReady > 0 && progress.running < progress.allowedParallel) {
-    const k = progress.allowedParallel - progress.running;
-    add({ key: actionKey('dispatch-ready'), tier: 'light', cause: 'under-dispatched', unblocks: k,
-      title: `dispatch ${k} more queued-ready unit(s) (running ${progress.running} of ${progress.allowedParallel} allowed)`,
-      command: `${api} dispatch-ready ${base} --max ${k}`, expected: `running ${progress.running} -> ${progress.allowedParallel}; units/h rises within the next wake` });
-  }
-  // 2. heavy re-cut when the cut itself is wrong (missing paths + grants too narrow across many units).
-  const cutWrong = (cl.get('missing-paths')?.open ?? 0) + (cl.get('grant-too-narrow')?.open ?? 0) + missingQueued.length;
   // The cut itself is wrong when its wrong-shaped units reach recutThreshold AND a quarter of the open units: below
   // that, the light edits (drop, widen, wire) fix it without disturbing the units that are right.
+  const cutWrong = (cl.get('missing-paths')?.open ?? 0) + (cl.get('grant-too-narrow')?.open ?? 0) + missingQueued.length;
   const openCount = units.filter((u) => u.state === 'open' || u.state === 'failed').length;
   const cutIsWrong = cutWrong >= Math.max(settings.recutThreshold, Math.ceil(openCount / 4));
-  if (missingQueued.length) {
-    const drop = missingQueued.slice(0, N).map((m) => m.jobId);
-    add({ key: actionKey('drop', ...drop), tier: 'light', cause: 'missing-paths', unblocks: drop.length,
-      title: `drop ${drop.length} queued unit(s) whose every owned path is absent in the checkout (${missingQueued.slice(0, N).map((m) => m.paths[0]).join(', ')})`,
-      command: `${api} graph-edit ${base} --edit drop --jobs ${drop.join(',')} --reason "every owned path is absent in the checkout" --decision <id>`,
-      expected: 'no agent spends an attempt on a unit with nothing to refactor; if the paths were meant as move targets, re-enqueue them with their sources' });
-  }
-  if (cutWrong >= settings.recutThreshold && recutOp) {
-    const canon = recutOp.canon;
-    add({ key: actionKey('recut', recutOp.op, recutOp.cutId), tier: 'heavy', cause: 'missing-paths+grant-too-narrow', unblocks: cutIsWrong ? Math.max(cutWrong, openCount) : 0.5,
-      title: canon
-        ? `re-cut the remaining ${recutOp.op} units of cut ${recutOp.cutId} from a FRESH canon-scan (the goal's own cut method): ${cutWrong} unit(s) were cut on absent paths or too-narrow grants`
-        : `dispatch work.author to re-cut the remaining ${recutOp.op} units of cut ${recutOp.cutId} with this RCA as its brief`,
-      command: canon
-        ? `${api} graph-edit ${base} --edit scan --op ${recutOp.op} --cut-id ${recutOp.cutId} --decision <id>   (then, when it reports done: ${api} graph-edit ${base} --edit recut --op ${recutOp.op} --cut-id ${recutOp.cutId} --from-scan <file it names> --decision <id>)`
-        : `${api} redesign ${base} --op work.author --rca latest --paths <work.author write set> --decision <id>`,
-      expected: 'every remaining unit owns paths that exist, grouped so moves and their consumers share a unit; the parked failed units retire' });
-  }
+  const acts = [
+    settleBacklogAct(progress, { api, repo }),
+    repointAct({ importsBroken, brokenCluster: cl.get('broken-import'), units, queuedOf, N, api, base }),
+    dispatchReadyAct(progress, { api, base }),
+    dropAct({ missingQueued, N, api, base }),
+    recutAct({ recutOp, cutWrong, cutIsWrong, openCount, settings, api, base }),
+  ].filter(Boolean);
   // 3. per cluster, the catalogue action.
   for (const c of rca?.clusters ?? []) {
     if (!c.open && c.cause !== 'dead-worker') continue;
-    const us = openUnits(c.units);
-    if (c.cause === 'partial-work') {
-      const targets = us.filter((u) => !u.open.length && lastFailedOf(u)).slice(0, N);
-      if (targets.length) add({ key: actionKey('continue', ...targets.map((u) => u.key)), tier: 'light', cause: c.cause, unblocks: targets.length,
-        title: `continue ${targets.length} unit(s) from their preserved work instead of failures (${c.preserved.slice(0, 3).join(', ')})`,
-        command: targets.map((u) => `${api} graph-edit ${base} --edit continue --job ${lastFailedOf(u).job_id}${c.destinations.length ? ` --add-paths ${q(c.destinations.slice(0, 4).join(','))}` : ''} --decision <id>`).join(' && '),
-        expected: 'the preserved in-ceiling work counts toward the unit, the continuation starts from it' });
-    } else if (c.cause === 'grant-too-narrow') {
-      const rows = (rca.rows ?? []).filter((r) => r.causes.includes('grant-too-narrow') && r.unitState !== 'done');
-      const shared = c.destinations.filter((d) => rows.filter((r) => r.destinations.includes(d)).length >= 2);
-      const befores = us.flatMap(queuedOf).slice(0, N - 1).map((j) => j.job_id);
-      if (shared.length) add({ key: actionKey('wire', ...shared.slice(0, 4)), tier: 'light', cause: c.cause, unblocks: us.length,
-        title: `add ONE serial wire unit owning the shared destinations ${shared.slice(0, 4).join(', ')} that ${us.length} unit(s) need`,
-        command: `${api} graph-edit ${base} --edit wire --op ${us[0]?.op ?? 'code.refactor'} --paths ${q(shared.slice(0, 6).join(','))}${befores.length ? ` --before ${befores.join(',')}` : ''} --decision <id>`,
-        expected: 'the shared files move once, serially; the units that needed them run after it (a failed one: graph-edit retry --after <wire job>)' });
-      const widen = us.filter((u) => queuedOf(u).length).slice(0, N);
-      if (widen.length && c.destinations.length) add({ key: actionKey('widen', ...widen.map((u) => u.key)), tier: 'light', cause: c.cause, unblocks: widen.length,
-        title: `widen ${widen.length} queued unit(s) to the destinations their reports name`,
-        command: widen.map((u) => `${api} graph-edit ${base} --edit widen --job ${queuedOf(u)[0].job_id} --add-paths ${q(c.destinations.slice(0, 4).join(','))} --decision <id>`).join(' && '),
-        expected: 'the unit may move its files into their canonical home (leases of other workflows are refused by the api)' });
-      const retry = us.filter((u) => !u.open.length && lastFailedOf(u)).slice(0, N);
-      for (const u of retry) {
-        const r = rows.find((x) => x.unit === u.key);
-        const dest = (r?.destinations ?? []).filter((d) => !shared.includes(d)).slice(0, 4);
-        const kept = Boolean(r?.preserved);
-        if (!dest.length && !kept) continue;
-        add({ key: actionKey(kept ? 'continue' : 'retry', u.key), tier: 'light', cause: c.cause, unblocks: 1,
-          title: `${kept ? 'continue' : 'retry'} ${u.key} with the destinations its report names${dest.length ? ` (${dest.join(', ')})` : ''}`,
-          command: `${api} graph-edit ${base} --edit ${kept ? 'continue' : 'retry'} --job ${lastFailedOf(u).job_id}${dest.length ? ` --add-paths ${q(dest.join(','))}` : ''} --decision <id>`,
-          expected: 'the unit owns what its fix must touch; the api refuses the same failing shape and the paths of other workflows' });
-      }
-    } else if (c.cause === 'tool-timeout') {
-      add({ key: actionKey('params', 'commandTimeoutMs'), tier: 'light', cause: c.cause, unblocks: c.open,
-        title: 'give the op a longer command window and the background-run rule for long validators',
-        command: `${api} op-override ${base} --op ${us[0]?.op ?? 'code.refactor'} --set '${JSON.stringify({ commandTimeoutMs: settings.commandTimeoutMs, notes: ['Long validators (canon-scan, gate.mjs, starci app lint) may exceed your tool window: start them in the background writing to a file, then poll that file until it is complete; never report blocked on a tool timeout.'] })}' --decision <id>`,
-        expected: 'no unit blocks on a 30 s tool window; applies to every later dispatch of the op in this workflow' });
-    } else if (c.cause === 'test-gap' && unitSpecsOff()) {
-      add({ key: actionKey('params', 'specs-unit-off'), tier: 'light', cause: c.cause, unblocks: c.open,
-        title: 'unit tests are deferred by the owner (config.yaml specs.unit=false): tell the op to guard behaviour with typecheck + canon-scan before/after instead of stopping',
-        command: `${api} op-override ${base} --op ${us[0]?.op ?? 'code.refactor'} --set '${JSON.stringify({ notes: ['The owner deferred unit tests (config.yaml specs.unit=false): a missing regression suite is not a blocker in this workflow. Guard behaviour with typecheck and canon-scan before and after, and list the untested seams in the report.'] })}' --decision <id>`,
-        expected: 'no unit stops on a missing regression suite while unit tests are deferred' });
-    } else if (c.cause === 'test-gap') {
-      const t = us.slice(0, N);
-      if (t.length) add({ key: actionKey('test', ...t.map((u) => u.key)), tier: 'light', cause: c.cause, unblocks: t.length,
-        title: `add a test.author unit before ${t.length} unit(s) that lack a regression test`,
-        command: t.map((u) => `${api} graph-edit ${base} --edit wire --op test.author --paths ${q((lastFailedOf(u)?.payload?.owned_paths ?? []).slice(0, 3).join(','))} --before ${queuedOf(u)[0]?.job_id ?? '<the unit\'s next job>'} --decision <id>`).join(' && '),
-        expected: 'the refactor unit starts with a regression test to hold parity' });
-    } else if (c.cause === 'canon-conflict') {
-      add({ key: actionKey('proposal', 'canon-conflict'), tier: 'proposal', cause: c.cause, unblocks: c.open,
-        title: 'the cut asks for a location a canon rule forbids: propose the canon/cut fix (tier 2) and widen the unit to the canonical home meanwhile',
-        command: `${api} kernel-proposal ${base} --title "cut vs canon location conflict" --evidence ${q(c.examples.join(' | ').slice(0, 400))} --decision <id>`,
-        expected: 'the Supervisor lands the canon/cut fix or forwards it to the owner; the widened unit keeps moving' });
-    } else if (c.cause === 'dead-worker' || c.cause === 'binding-defect' || c.cause === 'checker-unavailable') {
-      add({ key: actionKey('proposal', c.cause), tier: 'supervisor', cause: c.cause, unblocks: c.open,
-        title: `${c.cause} x${c.count} (${c.envs.join(', ') || 'no env'}): a runtime cause - file it once, then keep dispatching the healthy units`,
-        command: `${api} kernel-proposal ${base} --title "${c.cause} x${c.count}" --evidence ${q(`${c.envs.join(',')} | ${c.examples.join(' | ')}`.slice(0, 400))} --decision <id>`,
-        expected: 'the Supervisor fixes the runtime cause; the Kernel does not retry the same shape waiting for it' });
-    } else if (c.cause === 'upstream') {
-      add({ key: actionKey('supervisor', 'upstream'), tier: 'supervisor', cause: c.cause, unblocks: c.open,
-        title: 'the root cause is in another workflow: message the peer and keep other units moving',
-        command: `${api} notify ${base} --to peers --kind request --subject "root cause in your workflow" --body ${q(c.examples[0] ?? '')}`,
-        expected: 'the peer fixes its side; the Supervisor watches the cross-workflow wait' });
-    }
+    const rows = (rca.rows ?? []).filter((r) => r.causes.includes(c.cause) && r.unitState !== 'done');
+    acts.push(...clusterActs(c, { us: openUnits(c.units), rows, queuedOf, lastFailedOf, N, api, base, settings }));
   }
   // Decision-log memory: an action tried and reverted sinks and is marked; an open one is measuring.
-  const byKey = new Map();
-  for (const d of decisions) if (d.actionKey) byKey.set(d.actionKey, d);
-  for (const a of acts) {
-    const d = byKey.get(a.key);
-    a.tried = d ? { decision: d.id, status: d.status } : null;
-  }
+  const byKey = new Map(); for (const d of decisions) if (d.actionKey) byKey.set(d.actionKey, d);
+  for (const a of acts) { const d = byKey.get(a.key); a.tried = d ? { decision: d.id, status: d.status } : null; }
   const tierRank = { light: 0, heavy: 1, proposal: 2, supervisor: 3 };
   acts.sort((a, b) => (a.tried?.status === 'revert') - (b.tried?.status === 'revert') || (a.tried?.status === 'open') - (b.tried?.status === 'open')
     || b.unblocks - a.unblocks || tierRank[a.tier] - tierRank[b.tier]);
@@ -502,13 +516,10 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
   acts.forEach((a, i) => { a.rank = i + 1; });
   return acts;
 }
-
 /** The `why slow` line (Vietnamese owner digest / English lines). */
 export function whyLine(rca, { language = ownerLanguage(), limit = 5 } = {}) {
-  const cls = (rca?.clusters ?? []).filter((c) => c.open || c.cause === 'dead-worker').slice(0, limit);
-  if (!cls.length) return null;
-  const head = translator(language)('Why slow');
-  return `${head}: ${cls.map((c) => `${c.cause} x${c.count}${c.open !== c.count ? ` (${c.open} open)` : ''}`).join(', ')}`;
+  const cls = (rca?.clusters ?? []).filter((c) => c.open || c.cause === 'dead-worker').slice(0, limit); if (!cls.length) return null;
+  return `${translator(language)('Why slow')}: ${cls.map((c) => c.cause + ' x' + c.count + (c.open !== c.count ? ` (${c.open} open)` : '')).join(', ')}`;
 }
 
 /** A stable id for one RCA snapshot (clusters + counts). */
@@ -523,8 +534,7 @@ function recutTargetOf(units) {
   const byCut = new Map();
   for (const u of units) {
     if (!u.cut?.id || u.state === 'done' || u.state === 'dropped') continue;
-    const k = `${u.op}|${u.cut.id}`;
-    if (!byCut.has(k)) byCut.set(k, { op: u.op, cutId: u.cut.id, canon: Boolean(u.last?.payload?.params?.canonFamilies), units: 0 });
+    const k = `${u.op}|${u.cut.id}`; if (!byCut.has(k)) byCut.set(k, { op: u.op, cutId: u.cut.id, canon: Boolean(u.last?.payload?.params?.canonFamilies), units: 0 });
     byCut.get(k).units += 1;
   }
   return [...byCut.values()].sort((a, b) => b.units - a.units)[0] ?? null;
@@ -535,18 +545,14 @@ function recutTargetOf(units) {
  * job to absolute paths (null when it cannot tell - such a unit is never called missing).
  */
 function missingQueuedOf(units, resolve) {
-  const out = [];
   // A path a running unit of this workflow owns (or sits under/over) may be created by it: never called missing.
-  const low = (p) => String(p).replaceAll('\\', '/').toLowerCase();
+  const out = [], low = (p) => String(p).replaceAll('\\', '/').toLowerCase();
   const running = units.flatMap((u) => u.jobs.filter((j) => SLOT_STATUSES.includes(j.status))).flatMap((j) => (j.payload?.owned_paths ?? []).map(low));
   const near = (p) => running.some((r) => r === p || r.startsWith(`${p}/`) || p.startsWith(`${r}/`) || r.split('/').slice(0, -1).join('/') === p.split('/').slice(0, -1).join('/'));
-  for (const u of units) {
-    for (const j of u.jobs.filter((x) => x.status === 'queued' && !(x.payload?.after ?? []).length)) {
+  for (const u of units) for (const j of u.jobs.filter((x) => x.status === 'queued' && !(x.payload?.after ?? []).length)) {
       if ((j.payload?.owned_paths ?? []).some((p) => near(low(p)))) continue;
-      let abs = null;
-      try { abs = resolve(j); } catch { abs = null; }
+      let abs = null; try { abs = resolve(j); } catch { abs = null; }
       if (Array.isArray(abs) && abs.length && abs.every((p) => p && !fs.existsSync(p))) out.push({ jobId: j.job_id, paths: j.payload?.owned_paths ?? [] });
-    }
   }
   return out;
 }
@@ -556,18 +562,13 @@ function missingQueuedOf(units, resolve) {
  * {progress, rca, actions}.
  */
 export function workflowView({ db, workflowId, core = {}, repo, now = Date.now(), settings = progressSettings(), resolve = null }) {
-  const wf = db.prepare('SELECT created_at FROM workflows WHERE workflow_id=?').get(workflowId);
-  const jobs = opJobsOf(db, workflowId);
-  let kernelItems = null;
-  try { kernelItems = kernelDecisionItems(db, workflowId, { now, ageMs: settings.settleBacklog.ageMs }); } catch { kernelItems = null; }
+  const wf = db.prepare('SELECT created_at FROM workflows WHERE workflow_id=?').get(workflowId), jobs = opJobsOf(db, workflowId);
+  let kernelItems = null; try { kernelItems = kernelDecisionItems(db, workflowId, { now, ageMs: settings.settleBacklog.ageMs }); } catch { kernelItems = null; }
   const progress = progressOf({ jobs, core, workflowId, createdAt: wf?.created_at ?? null, now, settings, kernelItems });
   const reports = reportsOf(db, workflowId);
-  const rca = rcaOf({ jobs, reports, now, settings, stalled: progress.stall.stalled });
-  const units = unitsOf(jobs);
-  const missingQueued = resolve ? missingQueuedOf(units, resolve) : [];
-  const decisions = decisionsOf(db, workflowId);
-  let importsBroken = null;
-  try { importsBroken = repo ? importsBrokenOf({ db, workflowId, repo, now }) : null; } catch { importsBroken = null; }
+  const rca = rcaOf({ jobs, reports, now, settings, stalled: progress.stall.stalled }), units = unitsOf(jobs);
+  const missingQueued = resolve ? missingQueuedOf(units, resolve) : [], decisions = decisionsOf(db, workflowId);
+  let importsBroken = null; try { importsBroken = repo ? importsBrokenOf({ db, workflowId, repo, now }) : null; } catch { importsBroken = null; }
   const actions = actionsOf({ progress, rca, units, workflowId, repo, decisions, missingQueued, settings, recutOp: recutTargetOf(units), importsBroken });
   // DECISIONS FIRST: the oldest open Kernel Decision Item is the top action, in copy-paste form (route, dispatch, enqueue
   // and dispatch-ready refuse decisions-first meanwhile; scripts/machine/decisions.mjs).
@@ -589,8 +590,7 @@ export function workflowView({ db, workflowId, core = {}, repo, now = Date.now()
 
 /** The Kernel notice for one stalled workflow (the Workflow controller's progress-stall DI text). Pure. */
 export function stallNotice(w, { lang = ownerLanguage() } = {}) {
-  const p = w.progress, r = w.rca, tr = translator(lang);
-  const top = (r?.actions ?? []).find((a) => !a.tried) ?? null;
+  const p = w.progress, r = w.rca, tr = translator(lang), top = (r?.actions ?? []).find((a) => !a.tried) ?? null;
   return [
     `PROGRESS-STALL ${p.stall.sinceMin}m: ${p.stall.reasons.join('; ')}.`,
     r ? `${whyLine(r, { language: lang }) ?? ''}` : '',

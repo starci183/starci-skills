@@ -58,11 +58,37 @@ export function resolveReadPath(pattern, bindings) {
  * Returns {unmet:[...], unknown:[...]} — an empty `unmet` admits.
  */
 export function checkPrerequisites({ brief, payload, repo, params = payload?.params ?? {} }) {
-  const unmet = [], unknown = [];
   const records = (Array.isArray(payload?.records) ? payload.records : []).map(normRel).filter(Boolean);
   const bindings = [...(Array.isArray(payload?.owned_paths) ? payload.owned_paths : []), ...records];
+  const reads = Array.isArray(brief?.reads) ? brief.reads : [];
+  const { unmet, unknown } = readGaps({ reads, bindings, repo, params });
 
-  for (const read of Array.isArray(brief?.reads) ? brief.reads : []) {
+  // The hard design gate (owner ruling 2026-09-29 "code truoc ve sau la hong"): a frontend implementation is never
+  // dispatched before the interface.draw of the ui record it proves has settled pass.
+  const designRead = reads.find((read) => read?.designDrawn === true);
+  if (designRead) {
+    for (const verdict of designVerdicts(repo, records)) {
+      if (verdict.unsettled) unmet.push({ kind: 'design-not-settled', code: DESIGN_NOT_SETTLED, read: designRead.id, record: verdict.record, ui: verdict.ui, why: verdict.why });
+    }
+  }
+
+  // An accepted brand.direction archetype before a surface is drawn under it (owner ruling 2026-09-27); the switch is
+  // runtimes.yaml allocation.drawLoop.directionPrerequisite.
+  const directionRead = reads.find((read) => read?.directionArchetype === true);
+  if (directionRead && directionPrerequisiteOn()) {
+    for (const verdict of directionVerdicts(repo, bindings, { workflowId: payload?.workflowId ?? payload?.workflow_id ?? null })) {
+      if (verdict.unaccepted) unmet.push({ kind: 'direction-unaccepted', read: directionRead.id, record: verdict.record, archetype: verdict.archetype, derived: verdict.derived, status: verdict.status, why: verdict.why });
+      else if (verdict.unknown) unknown.push({ kind: 'direction-unknown', read: directionRead.id, record: verdict.record, why: verdict.unknown });
+    }
+  }
+
+  return { unmet, unknown };
+}
+
+/** The mustExist read gaps of the brief: {unmet:[...], unknown:[...]}. */
+const readGaps = ({ reads, bindings, repo, params }) => {
+  const unmet = [], unknown = [];
+  for (const read of reads) {
     if (read?.mustExist !== true) continue;
     const param = readParamName(read.path);
     if (param !== null) {
@@ -75,40 +101,20 @@ export function checkPrerequisites({ brief, payload, repo, params = payload?.par
       if (!fs.existsSync(path.join(repo, rel))) unmet.push({ kind: 'record-missing', read: read.id, path: rel });
     }
   }
-
-  // The hard design gate (owner ruling 2026-09-29 "code truoc ve sau la hong"): a frontend implementation is never
-  // dispatched before the interface.draw of the ui record it proves has settled pass.
-  const designRead = (Array.isArray(brief?.reads) ? brief.reads : []).find((read) => read?.designDrawn === true);
-  if (designRead) {
-    for (const verdict of designVerdicts(repo, records)) {
-      if (verdict.unsettled) unmet.push({ kind: 'design-not-settled', code: DESIGN_NOT_SETTLED, read: designRead.id, record: verdict.record, ui: verdict.ui, why: verdict.why });
-    }
-  }
-
-  // An accepted brand.direction archetype before a surface is drawn under it (owner ruling 2026-09-27); the switch is
-  // runtimes.yaml allocation.drawLoop.directionPrerequisite.
-  const directionRead = (Array.isArray(brief?.reads) ? brief.reads : []).find((read) => read?.directionArchetype === true);
-  if (directionRead && directionPrerequisiteOn()) {
-    for (const verdict of directionVerdicts(repo, bindings, { workflowId: payload?.workflowId ?? payload?.workflow_id ?? null })) {
-      if (verdict.unaccepted) unmet.push({ kind: 'direction-unaccepted', read: directionRead.id, record: verdict.record, archetype: verdict.archetype, derived: verdict.derived, status: verdict.status, why: verdict.why });
-      else if (verdict.unknown) unknown.push({ kind: 'direction-unknown', read: directionRead.id, record: verdict.record, why: verdict.unknown });
-    }
-  }
-
   return { unmet, unknown };
-}
+};
 
 /** The one-paragraph instruction a refused Kernel acts on. */
 export function prerequisiteDetail({ op, jobId, unmet }) {
-  const lines = unmet.map((item) => (item.kind === 'record-missing'
-    ? `${op} reads ${item.path} (reads.${item.read}, mustExist) and it does not exist`
-    : item.kind === 'instance-missing'
-      ? `${op} requires this attempt's ${item.path} (reads.${item.read}, mustExist) and it is absent or null`
-    : item.kind === 'design-not-settled'
-      ? `${DESIGN_NOT_SETTLED}: implementation record ${item.record} proves ui record ${item.ui}, whose interface.draw has not settled pass - ${item.why} (reads.${item.read}, designDrawn). Code is never built before its design: enqueue interface.draw for ${item.ui} and dispatch this job --after it. ${translator(ownerLanguage())('Vietnamese: the drawing (interface.draw) of {ui} is not settled yet, so code must not be written; dispatch implement only once it is drawn and accepted', { ui: item.ui })}`
-      : item.kind === 'direction-unaccepted'
-        ? `bound ui record ${item.record} is a ${item.archetype} surface${item.derived ? ' (derived; set ui.archetype to override)' : ''} and its brand.direction archetype is not accepted by the owner - ${item.why ?? `status ${item.status ?? 'absent'}`} (reads.${item.read}, directionArchetype); enqueue brand.decide --param directionArchetype=${item.archetype} (direction mode; it asks the owner, BRAND_DIRECTION_UNACCEPTED until answered) and dispatch this job --after it`
-      : `${op} has an unmet prerequisite (${item.kind})`));
+  const lines = unmet.map((item) => {
+    if (item.kind === 'record-missing') return `${op} reads ${item.path} (reads.${item.read}, mustExist) and it does not exist`;
+    if (item.kind === 'instance-missing') return `${op} requires this attempt's ${item.path} (reads.${item.read}, mustExist) and it is absent or null`;
+    if (item.kind === 'design-not-settled')
+      return `${DESIGN_NOT_SETTLED}: implementation record ${item.record} proves ui record ${item.ui}, whose interface.draw has not settled pass - ${item.why} (reads.${item.read}, designDrawn). Code is never built before its design: enqueue interface.draw for ${item.ui} and dispatch this job --after it. ${translator(ownerLanguage())('Vietnamese: the drawing (interface.draw) of {ui} is not settled yet, so code must not be written; dispatch implement only once it is drawn and accepted', { ui: item.ui })}`;
+    if (item.kind === 'direction-unaccepted')
+      return `bound ui record ${item.record} is a ${item.archetype} surface${item.derived ? ' (derived; set ui.archetype to override)' : ''} and its brand.direction archetype is not accepted by the owner - ${item.why ?? 'status ' + (item.status ?? 'absent')} (reads.${item.read}, directionArchetype); enqueue brand.decide --param directionArchetype=${item.archetype} (direction mode; it asks the owner, BRAND_DIRECTION_UNACCEPTED until answered) and dispatch this job --after it`;
+    return `${op} has an unmet prerequisite (${item.kind})`;
+  });
   return `${lines.join('; ')}. Produce the missing record or finish the dependency through the op that owns it, then run starci kernel dispatch --job ${jobId} again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched.`;
 }
 
@@ -125,19 +131,26 @@ export function designVerdicts(repo, records) {
     if (!fs.existsSync(file)) continue;
     let impl = null;
     try { impl = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
-    const uiIds = [...new Set([...(Array.isArray(impl?.proves) ? impl.proves : []), ...(Array.isArray(impl?.dependsOn) ? impl.dependsOn : [])]
-      .filter((id) => typeof id === 'string' && id.startsWith('ui.')))];
-    if (!uiIds.length) continue;
-    const uiRecords = loadUiRecords(path.join(repo, ...workParts));
-    for (const ui of uiIds) {
-      const entry = uiRecords.get(ui);
-      if (!entry) { verdicts.push({ record: parts.join('/'), ui, unsettled: true, why: 'the ui record does not exist - nothing was drawn' }); continue; }
-      const acceptance = drawingAcceptance(entry.record, path.dirname(entry.file));
-      if (!acceptance.accepted) verdicts.push({ record: parts.join('/'), ui, unsettled: true, why: `its state is ${acceptance.reason}` });
-    }
+    verdicts.push(...implUiVerdicts(repo, workParts, parts, impl));
   }
   return verdicts;
 }
+
+/** The unsettled ui records one parsed impl record proves (empty when it proves none). */
+const implUiVerdicts = (repo, workParts, parts, impl) => {
+  const uiIds = [...new Set([...(Array.isArray(impl?.proves) ? impl.proves : []), ...(Array.isArray(impl?.dependsOn) ? impl.dependsOn : [])]
+    .filter((id) => typeof id === 'string' && id.startsWith('ui.')))];
+  if (!uiIds.length) return [];
+  const uiRecords = loadUiRecords(path.join(repo, ...workParts));
+  const verdicts = [];
+  for (const ui of uiIds) {
+    const entry = uiRecords.get(ui);
+    if (!entry) { verdicts.push({ record: parts.join('/'), ui, unsettled: true, why: 'the ui record does not exist - nothing was drawn' }); continue; }
+    const acceptance = drawingAcceptance(entry.record, path.dirname(entry.file));
+    if (!acceptance.accepted) verdicts.push({ record: parts.join('/'), ui, unsettled: true, why: `its state is ${acceptance.reason}` });
+  }
+  return verdicts;
+};
 
 /** modules/models/runtimes.yaml allocation.drawLoop.directionPrerequisite: the direction gate is on. */
 export function directionPrerequisiteOn() {

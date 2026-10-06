@@ -92,11 +92,30 @@ export function observeCheck(check, context, run) {
 /** Stage only locally observed child bytes, outside the ledger transaction. This
  * value is never accepted from the caller's checks JSON. */
 export function stageObservation(run, roots) {
-  const blob = (value, mediaType) => value == null || value.length === 0 ? null : stageBlob(Buffer.isBuffer(value) ? value : Buffer.from(typeof value === 'string' ? value : JSON.stringify(value)), { mediaType, repoRoots: roots });
+  const blob = (value, mediaType) => {
+   if (value == null || value.length === 0) return null;
+    let bytes = value;
+    if (!Buffer.isBuffer(value)) {
+      const text = typeof value === 'string' ? value : JSON.stringify(value);
+      bytes = Buffer.from(text);
+    }
+    return stageBlob(bytes, { mediaType, repoRoots: roots });
+  };
   return { cwd: run.cwd, inputDigest: run.inputDigest, exitCode: run.exitCode, status: run.status,
     startedAt: run.startedAt, finishedAt: run.finishedAt, wallMs: run.ms,
     stdout: blob(run.stdout, 'text/plain'), stderr: blob(run.stderr, 'text/plain'), output: blob(run.output, 'application/json'), native: run.native ?? null };
 }
+
+/** The process/target/time/input receipt gap of a retained native run, or null. */
+const receiptGap = (row, native, context) => {
+  if (row.authority !== 'runtime' || row.phase !== 'verify' || !['pass', 'fail'].includes(row.status) || !native.stable || native.process?.error || native.process?.signal
+      || !Number.isInteger(row.exit_code) || native.process?.status !== row.exit_code || row.exit_code === 2
+      || !Number.isFinite(row.started_at) || !Number.isFinite(row.finished_at) || row.started_at < context.admittedAt
+      || row.finished_at < row.started_at || row.finished_at > Date.now() || !sameResolvedPath(row.cwd, native.subject)
+      || !context.roots.some((root) => sameResolvedPath(root, native.subject)))
+    return 'the native check has no complete process, target, time or input receipt';
+  return null;
+};
 
 /** The current input identity of a retained native run, checked again under the
  * existing workflow lock before a fresh settlement can prepare any Git effect. */
@@ -109,6 +128,25 @@ export function requireObservationFresh(bindings) {
   }
 }
 
+/** One retained native check's output and receipt verdict. */
+const observationOf = (db, context, row, native) => {
+  let doc = null;
+  try {
+    const gap = receiptGap(row, native, context);
+    if (gap) throw new Error(gap);
+    // Serialized native receipts add process fields after hashing the original binding.
+    const binding = { ...native }; delete binding.stable; delete binding.process; delete binding.detail;
+    if (row.input_digest !== digestOf(binding)) throw new Error('the native input receipt is not exact');
+    requireObservationFresh([binding]);
+    if (!row.output_sha || !db.prepare('SELECT 1 FROM blobs WHERE sha256=?').get(row.output_sha)) throw new Error('the native output blob is not indexed');
+    doc = JSON.parse(getBlob(row.output_sha).toString('utf8'));
+    if (doc?.schema !== native.schema) throw new Error('the native child did not return its declared proof schema');
+    if (Number.isInteger(doc.exit) && doc.exit !== row.exit_code) throw new Error('the native JSON exit contradicts the observed process exit');
+    if (row.exit_code !== 0 && !(row.exit_code === 1 && Array.isArray(doc.findings))) throw new Error(`native proof child exited ${row.exit_code}`);
+    return { checkId: row.check_id, doc, native: binding, startedAt: row.started_at, finishedAt: row.finished_at, exitCode: row.exit_code };
+  } catch (error) { return { checkId: row.check_id, doc, native, judged: unavailable(error.message) }; }
+};
+
 /** Read the latest native output per schema/profile/project from this exact
  * attempt. Raw process status, indexed blob bytes, time and target must agree. */
 export function mechanismObservations(db, context) {
@@ -117,30 +155,31 @@ export function mechanismObservations(db, context) {
     const native = parseJson(row.summary_json)?.native;
     if (native?.schema) latest.set(JSON.stringify([native.schema, native.profile, native.project, native.subject]), { row, native });
   }
-  const observations = [];
-  for (const { row, native } of latest.values()) {
-    let doc = null, judged = null;
-    try {
-      if (row.authority !== 'runtime' || row.phase !== 'verify' || !['pass', 'fail'].includes(row.status) || !native.stable || native.process?.error || native.process?.signal
-          || !Number.isInteger(row.exit_code) || native.process?.status !== row.exit_code || row.exit_code === 2
-          || !Number.isFinite(row.started_at) || !Number.isFinite(row.finished_at) || row.started_at < context.admittedAt
-          || row.finished_at < row.started_at || row.finished_at > Date.now() || !sameResolvedPath(row.cwd, native.subject)
-          || !context.roots.some((root) => sameResolvedPath(root, native.subject)))
-        throw new Error('the native check has no complete process, target, time or input receipt');
-      // Serialized native receipts add process fields after hashing the original binding.
-      const binding = { ...native }; delete binding.stable; delete binding.process; delete binding.detail;
-      if (row.input_digest !== digestOf(binding)) throw new Error('the native input receipt is not exact');
-      requireObservationFresh([binding]);
-      if (!row.output_sha || !db.prepare('SELECT 1 FROM blobs WHERE sha256=?').get(row.output_sha)) throw new Error('the native output blob is not indexed');
-      doc = JSON.parse(getBlob(row.output_sha).toString('utf8'));
-      if (doc?.schema !== native.schema) throw new Error('the native child did not return its declared proof schema');
-      if (Number.isInteger(doc.exit) && doc.exit !== row.exit_code) throw new Error('the native JSON exit contradicts the observed process exit');
-      if (row.exit_code !== 0 && !(row.exit_code === 1 && Array.isArray(doc.findings))) throw new Error(`native proof child exited ${row.exit_code}`);
-      observations.push({ checkId: row.check_id, doc, native: binding, startedAt: row.started_at, finishedAt: row.finished_at, exitCode: row.exit_code });
-    } catch (error) { judged = unavailable(error.message); observations.push({ checkId: row.check_id, doc, native, judged }); }
-  }
-  return observations;
+  return [...latest.values()].map(({ row, native }) => observationOf(db, context, row, native));
 }
+
+/** One READ-file's verdict detail (unusable), or null when the input is exact. */
+const digestFileVerdict = (file, named, context, digest) => {
+  const rel = normRel(file?.path ?? '');
+  if (!rel || path.isAbsolute(rel) || rel === '..' || rel.startsWith('../') || !/^[a-f0-9]{64}$/.test(String(file?.sha256 ?? '')) || named.has(rel)) return 'READ contains a malformed, foreign or duplicate input';
+  const canonical = ['pattern', 'example', 'knowledge'].includes(file.role);
+  if (!canonical && file.role !== 'read') return `READ has an unsupported input role: ${rel}`;
+  const captured = context.readRefs.find((row) => row.path === rel && (canonical ? row.rootKind === 'source' : row.rootKind !== 'source'));
+  try {
+    if (captured) {
+      if (captured.sha256 !== file.sha256) return `READ differs from its filed input: ${rel}`;
+      // An admitted Source law can drift advisably; the target's bytes cannot.
+      if (captured.rootKind !== 'source' && (!fs.lstatSync(plain(captured.absolute)).isFile() || sha256File(captured.absolute) !== file.sha256))
+        return `READ target input changed or is missing: ${rel}`;
+    }
+    else {
+      const root = canonical ? context.skillRoot : digest.root, absolute = plain(path.resolve(root, rel));
+      if (!insidePath(path.resolve(root), absolute, { includeSelf: true }) || !fs.lstatSync(absolute).isFile() || sha256File(absolute) !== file.sha256) return `READ input is foreign, missing or changed: ${rel}`;
+    }
+  } catch { return `READ input is unreadable: ${rel}`; }
+  named.set(rel, file);
+  return null;
+};
 
 /** Bind deciding-op READ claims to the filed canonical law and real target files.
  * Source changes after admission remain advisory; current target inputs do not. */
@@ -152,24 +191,8 @@ export function judgeFiledRead(digest, context, doc, observations) {
   if (!context.roots.some((root) => sameResolvedPath(root, digest.root))) return bad('READ names a foreign target');
   const named = new Map();
   for (const file of digest.files) {
-    const rel = normRel(file?.path ?? '');
-    if (!rel || path.isAbsolute(rel) || rel === '..' || rel.startsWith('../') || !/^[a-f0-9]{64}$/.test(String(file?.sha256 ?? '')) || named.has(rel)) return bad('READ contains a malformed, foreign or duplicate input');
-    const canonical = ['pattern', 'example', 'knowledge'].includes(file.role);
-    if (!canonical && file.role !== 'read') return bad(`READ has an unsupported input role: ${rel}`);
-    const captured = context.readRefs.find((row) => row.path === rel && (canonical ? row.rootKind === 'source' : row.rootKind !== 'source'));
-    try {
-      if (captured) {
-        if (captured.sha256 !== file.sha256) return bad(`READ differs from its filed input: ${rel}`);
-        // An admitted Source law can drift advisably; the target's bytes cannot.
-        if (captured.rootKind !== 'source' && (!fs.lstatSync(plain(captured.absolute)).isFile() || sha256File(captured.absolute) !== file.sha256))
-          return bad(`READ target input changed or is missing: ${rel}`);
-      }
-      else {
-        const root = canonical ? context.skillRoot : digest.root, absolute = plain(path.resolve(root, rel));
-        if (!insidePath(path.resolve(root), absolute, { includeSelf: true }) || !fs.lstatSync(absolute).isFile() || sha256File(absolute) !== file.sha256) return bad(`READ input is foreign, missing or changed: ${rel}`);
-      }
-    } catch { return bad(`READ input is unreadable: ${rel}`); }
-    named.set(rel, file);
+    const verdict = digestFileVerdict(file, named, context, digest);
+    if (verdict) return bad(verdict);
   }
   // Admission's concrete READ expansion owns these law identities. A later
   // Source law addition cannot retroactively enlarge this attempt's duties.

@@ -96,7 +96,7 @@ export function seamStateOf(db, { workflowId, op, cutId, isOwnerWait = () => fal
  */
 export function siblingSeamHold(db, job, { now = Date.now(), settings = null, isOwnerWait = () => false } = {}) {
   const payload = payloadOf(job), cut = payload.cut;
-  if (!cut || cut.id == null || !(Number(cut.ordinal) > 1)) return null;
+  if (cut?.id == null || !(Number(cut.ordinal) > 1)) return null;
   const op = job.op_id ?? payload.opId;
   const workflowId = job.workflow_id ?? payload.hierarchy?.workflowId;
   const seam = seamStateOf(db, { workflowId, op, cutId: cut.id, isOwnerWait });
@@ -105,7 +105,7 @@ export function siblingSeamHold(db, job, { now = Date.now(), settings = null, is
   const since = Number(job.created_at) || now;
   const base = { seamJobId: seam.head.job_id, seamStatus: seam.head.status, cutId: String(cut.id), op };
   const release = (mode, reason) => ({ hold: false, stub: { mode, ...base, since, reason,
-    ...(seam.interface ? { interface: { files: seam.interface.files ?? [], publishedBy: seam.interface.entityId, at: seam.interface.at, summary: seam.interface.summary ?? null } } : {}) } });
+    ...(seam.interface ? { interface: { files: seam.interface.files ?? [], publishedBy: seam.interface.entityId, at: seam.interface.at, summary: seam.interface.summary ?? null } } : undefined) } });
   if (seam.interface) return release('interface', `seam ${seam.interface.entityId} published its interface (${(seam.interface.files ?? []).map((f) => f.path).join(', ')}): build against it now`);
   if (seam.released) return release('released', `the Kernel released cut ${cut.id} to run on a stub: ${seam.released.reason ?? ''}`.trim());
   if (seam.dead) return release('seam-failed', `seam ${seam.head.job_id} settled ${seam.head.status} and will not pass on its own: run on a stub while the seam is retried or re-cut`);
@@ -169,7 +169,7 @@ export function recutPlanOf(db, { workflowId, op, cutId, isOwnerWait = () => fal
     .all(workflowId, op, String(cutId)).map((row) => ownedOf(payloadOf(row)).filter((p) => !p.startsWith('.starciwork/'))).filter((list) => list.length);
   const segs = siblings.flat().map((p) => p.split('/'));
   let common = segs.length ? segs[0].slice(0, -1) : [];
-  for (const parts of segs) { let i = 0; while (i < common.length && i < parts.length - 1 && common[i] === parts[i]) i += 1; common = common.slice(0, i); }
+  for (const parts of segs) { let i = 0; while (i < common.length && i < parts.length - 1 && common[i] === parts[i]) { i += 1; } common = common.slice(0, i); }
   const root = common.join('/');
   const keep = seamPaths.filter((p) => p.startsWith('.starciwork/') || (root && sameOrUnder(p, root)));
   const wire = seamPaths.filter((p) => !keep.includes(p));
@@ -287,80 +287,80 @@ export function relocationOf(finding, relocations) {
  * without a shared-root file.
  */
 export const REPOINT_BRIEF = 'repoint imports to the new locations; no other change';
-export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, importersOf = null, scanFile = null } = {}) {
-  const { relocations, sharedRoots } = policy ?? canonConformancePolicy();
-  const findings = scan?.findings ?? [];
-  const slices = (scan?.slices ?? []).map((slice) => ({ ordinal: Number(slice.ordinal), wave: String(slice.wave), paths: [...slice.paths], grants: [] }));
-  const holderOf = (file) => slices.find((slice) => slice.paths.some((root) => sameOrUnder(file, root))) ?? null;
-  const wireByWave = new Map();
-  const wireOf = (wave) => {
-    if (!wireByWave.has(wave)) wireByWave.set(wave, { paths: new Set(), reasons: [] });
-    return wireByWave.get(wave);
-  };
+/** The findings' relocation grants: a destination no sibling holds is granted, a held one moves to the wave's wire. */
+const grantSlices = ({ slices, findings, relocations, holderOf, wireOf }) => {
   for (const finding of findings) {
-    const move = relocationOf(finding, relocations);
-    const slice = move && (holderOf(move.moving) ?? holderOf(move.file));
-    if (!slice) continue;
+    const move = relocationOf(finding, relocations); const slice = move && (holderOf(move.moving) ?? holderOf(move.file)); if (!slice) continue;
     for (const dest of move.destinations) {
       if (slice.grants.includes(dest)) continue;
       const holder = slices.find((other) => other !== slice && [...other.paths, ...other.grants].some((root) => pathsOverlap(dest, root)));
       if (!holder) { slice.grants.push(dest); continue; }
-      const wire = wireOf(slice.wave);
-      wire.paths.add(dest);
-      wire.paths.add(move.home);
+      const wire = wireOf(slice.wave); wire.paths.add(dest); wire.paths.add(move.home);
       wire.reasons.push(`${move.ruleId} ${move.moving} -> ${dest}: held by ordinal ${holder.ordinal}`);
     }
   }
-  // Shared-root files (policy sharedRoots; empty in HFS, where owners are derived from slots): the wire's, never a slice's.
+};
+/** Shared-root files (policy sharedRoots; empty in HFS, where owners are derived from slots): the wire's, never a slice's. */
+const sharedRootWires = ({ slices, findings, sharedRoots, wireOf }) => {
   for (const slice of slices) {
     const packages = new Set(findings.filter((finding) => slice.paths.some((root) => sameOrUnder(finding.file, root)))
       .map((finding) => srcRootOf(finding.file)).filter(Boolean).map((src) => src.split('/').slice(0, -1).join('/')));
-    for (const pkg of packages) {
-      for (const shared of sharedRoots) {
-        const file = pkg ? `${pkg}/${shared}` : shared;
-        if (!slices.some((other) => other.paths.some((root) => pathsOverlap(file, root)))) wireOf(slice.wave).paths.add(file);
-      }
+    for (const pkg of packages) for (const shared of sharedRoots) {
+      const file = pkg ? `${pkg}/${shared}` : shared;
+      if (!slices.some((other) => other.paths.some((root) => pathsOverlap(file, root)))) wireOf(slice.wave).paths.add(file);
     }
   }
-  // Every importer of what the wave moves: the wave's wire repoints them after its slices land.
-  const repointByWave = new Map();
-  if (typeof importersOf === 'function') {
-    const movedByWave = new Map();
-    for (const finding of findings) {
-      const move = relocationOf(finding, relocations);
-      const slice = move && (holderOf(move.moving) ?? holderOf(move.file));
-      if (!slice) continue;
-      if (!movedByWave.has(slice.wave)) movedByWave.set(slice.wave, new Set());
-      for (const moved of [move.moving, move.home]) movedByWave.get(slice.wave).add(moved);
-    }
-    for (const [wave, movedSet] of movedByWave) {
-      const moved = [...movedSet].sort(byCodeUnit);
-      let importers = [];
-      try { importers = [...new Set(importersOf(moved) ?? [])].sort(byCodeUnit); } catch (error) { importers = []; wireOf(wave).reasons.push(`repoint importers unavailable: ${String(error?.message ?? error).slice(0, 120)}`); }
-      const wire = wireOf(wave);
-      for (const file of importers) wire.paths.add(file);
-      wire.reasons.push(`repoint: ${importers.length} importer(s) of ${moved.length} moved path(s)`);
-      repointByWave.set(wave, { moved, importers });
-    }
+};
+/** Every importer of what the wave moves: the wave's wire repoints them after its slices land. Map(wave -> {moved, importers}). */
+const repointWaves = ({ findings, relocations, holderOf, wireOf, importersOf }) => {
+  const repointByWave = new Map(); if (typeof importersOf !== 'function') return repointByWave;
+  const movedByWave = new Map();
+  for (const finding of findings) {
+    const move = relocationOf(finding, relocations); const slice = move && (holderOf(move.moving) ?? holderOf(move.file)); if (!slice) continue;
+    if (!movedByWave.has(slice.wave)) movedByWave.set(slice.wave, new Set());
+    for (const moved of [move.moving, move.home]) movedByWave.get(slice.wave).add(moved);
   }
-  const total = slices.length;
-  const out = slices.map((slice) => ({ ...slice, owned: [...slice.paths, ...slice.grants] }));
-  const waves = [...new Set(out.map((slice) => slice.wave))];
-  const wires = waves.filter((wave) => wireByWave.get(wave)?.paths.size || repointByWave.has(wave)).map((wave) => ({
-    wave, paths: [...(wireByWave.get(wave)?.paths ?? [])].sort(byCodeUnit), reasons: wireByWave.get(wave)?.reasons ?? [],
-    after: out.filter((slice) => slice.wave === wave).map((slice) => slice.ordinal),
-    ...(repointByWave.has(wave) ? { repoint: repointByWave.get(wave), brief: REPOINT_BRIEF } : {}),
-  })).filter((wire) => wire.paths.length);
+  for (const [wave, movedSet] of movedByWave) {
+    const moved = [...movedSet].sort(byCodeUnit); let importers = [];
+    try { importers = [...new Set(importersOf(moved) ?? [])].sort(byCodeUnit); } catch (error) { importers = []; wireOf(wave).reasons.push(`repoint importers unavailable: ${String(error?.message ?? error).slice(0, 120)}`); }
+    const wire = wireOf(wave); for (const file of importers) wire.paths.add(file);
+    wire.reasons.push(`repoint: ${importers.length} importer(s) of ${moved.length} moved path(s)`);
+    repointByWave.set(wave, { moved, importers });
+  }
+  return repointByWave;
+};
+/** The starci kernel enqueue lines: one per slice in wave order (a later wave waits on the previous), one per wire. */
+const waveCommands = ({ waves, out, wires, op, cutId, total, scanFile }) => {
   const commands = [];
   for (const [index, wave] of waves.entries()) {
     for (const slice of out.filter((item) => item.wave === wave)) {
       commands.push(`starci kernel enqueue --op ${op} --paths ${slice.owned.join(',')} --cut-id ${cutId} --cut-ordinal ${slice.ordinal} --cut-total ${total} --canon-scan ${scanFile ?? '<this scan file>'}`
         + (index ? ` --after <every job of wave ${waves[index - 1]} and its canon-wire leg>` : ''));
     }
-    const wire = wires.find((item) => item.wave === wave);
-    if (wire) commands.push(`starci kernel enqueue --op ${op} --paths ${wire.paths.join(',')} --params '{"canonWire":true}' --after <every job of wave ${wave}: ordinals ${wire.after.join(',')}> (ONE canon-wire leg${wire.repoint ? `; ${REPOINT_BRIEF}` : ''})`);
+    const wire = wires.find((item) => item.wave === wave); if (wire) commands.push(`starci kernel enqueue --op ${op} --paths ${wire.paths.join(',')} --params '{"canonWire":true}' --after <every job of wave ${wave}: ordinals ${wire.after.join(',')}> (ONE canon-wire leg${wire.repoint ? '; ' + REPOINT_BRIEF : ''})`);
   }
-  return { cutId: cutId == null ? null : String(cutId), op, total, slices: out, wires, commands };
+  return commands;
+};
+export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, importersOf = null, scanFile = null } = {}) {
+  const { relocations, sharedRoots } = policy ?? canonConformancePolicy();
+  const findings = scan?.findings ?? [];
+  const slices = (scan?.slices ?? []).map((slice) => ({ ordinal: Number(slice.ordinal), wave: String(slice.wave), paths: [...slice.paths], grants: [] }));
+  const holderOf = (file) => slices.find((slice) => slice.paths.some((root) => sameOrUnder(file, root))) ?? null;
+  const wireByWave = new Map();
+  const wireOf = (wave) => { if (!wireByWave.has(wave)) wireByWave.set(wave, { paths: new Set(), reasons: [] }); return wireByWave.get(wave); };
+  grantSlices({ slices, findings, relocations, holderOf, wireOf });
+  sharedRootWires({ slices, findings, sharedRoots, wireOf });
+  const repointByWave = repointWaves({ findings, relocations, holderOf, wireOf, importersOf });
+  const total = slices.length;
+  const out = slices.map((slice) => ({ ...slice, owned: [...slice.paths, ...slice.grants] }));
+  const waves = [...new Set(out.map((slice) => slice.wave))];
+  const wires = waves.filter((wave) => wireByWave.get(wave)?.paths.size || repointByWave.has(wave)).map((wave) => ({
+    wave, paths: [...(wireByWave.get(wave)?.paths ?? [])].sort(byCodeUnit), reasons: wireByWave.get(wave)?.reasons ?? [],
+    after: out.filter((slice) => slice.wave === wave).map((slice) => slice.ordinal),
+    ...(repointByWave.has(wave) ? { repoint: repointByWave.get(wave), brief: REPOINT_BRIEF } : undefined),
+  })).filter((wire) => wire.paths.length);
+  return { cutId: cutId == null ? null : String(cutId), op, total, slices: out, wires,
+    commands: waveCommands({ waves, out, wires, op, cutId, total, scanFile }) };
 }
 
 /**
@@ -429,8 +429,8 @@ export function cutManifestOf(db, { workflowId, op, cut, ownJobId = null }) {
 export function cutManifestPromptLines(manifest) {
   if (!manifest) return [];
   return [
-    `cut_manifest: bound at dispatch from the ledger (packet context.cut.manifest, starci kernel op-contract --json): ${manifest.total} ordinal(s), path union ${manifest.pathUnion.length} path(s), ${manifest.disjoint ? 'pairwise-disjoint' : `OVERLAPS ${manifest.overlaps.map((o) => `${o.ordinals.join('/')}@${o.path}`).slice(0, 3).join(', ')}`}`,
-    `  passed ordinals: ${manifest.passed.join(',') || '(none)'}; open: ${manifest.open.join(',') || '(none)'}${manifest.absent.length ? `; no job yet: ${manifest.absent.join(',')}` : ''}; canon-wire legs: ${manifest.wires.map((w) => `${w.jobId} ${w.status}`).join(', ') || '(none)'}`,
+    `cut_manifest: bound at dispatch from the ledger (packet context.cut.manifest, starci kernel op-contract --json): ${manifest.total} ordinal(s), path union ${manifest.pathUnion.length} path(s), ${manifest.disjoint ? 'pairwise-disjoint' : 'OVERLAPS ' + manifest.overlaps.map((o) => o.ordinals.join('/') + '@' + o.path).slice(0, 3).join(', ')}`,
+    `  passed ordinals: ${manifest.passed.join(',') || '(none)'}; open: ${manifest.open.join(',') || '(none)'}${manifest.absent.length ? '; no job yet: ' + manifest.absent.join(',') : ''}; canon-wire legs: ${manifest.wires.map((w) => w.jobId + ' ' + w.status).join(', ') || '(none)'}`,
     `  this IS the complete path-union manifest and passed-ordinal state the brief requires: bind it, never block for it; a sibling path is never yours to edit`,
   ];
 }

@@ -80,20 +80,27 @@ const mergeClaims = (...all) => Object.fromEntries(CLAIM_KINDS.map((k) => [k, un
 const hasClaims = (c) => CLAIM_KINDS.some((k) => list(c?.[k]).length);
 const covers = (owned, file) => { const o = slashed(owned).replace(/\/\*\*$/, ''); const f = slashed(file); return f === o || f.startsWith(`${o}/`); };
 
+const CLAIM_IDS = { frs: 'fr.<feature>.<name> ids', cases: '"RULE-N case-N" ids', shapes: 'XBase#state shapes', specs: 'spec paths' };
+
+/** One claims[] element's problems. */
+const claimProblems = (c, i, ids) => {
+  if (!c || typeof c !== 'object' || Array.isArray(c)) return [`claims[${i}] must be an object`];
+  const out = [];
+  for (const k of Object.keys(c)) if (k !== 'paths' && !CLAIM_KINDS.includes(k)) out.push(`claims[${i}] has unknown field '${k}'`);
+  if (!hasClaims(c)) out.push(`claims[${i}] names none of ${CLAIM_KINDS.join(', ')}`);
+  if (c.paths !== undefined && (!Array.isArray(c.paths) || c.paths.some((p) => typeof p !== 'string' || !p.trim()))) out.push(`claims[${i}].paths must be an array of paths`);
+  for (const k of CLAIM_KINDS) {
+    if (c[k] !== undefined && (!Array.isArray(c[k]) || c[k].some((v) => typeof v !== 'string' || !ids[k].test(v)))) out.push(`claims[${i}].${k} must be an array of ${CLAIM_IDS[k]}`);
+  }
+  return out;
+};
+
 /** Why a report's `claims` [{paths?, frs?, cases?, shapes?, specs?}] is malformed: [reason]. */
 export function claimsProblems(claims) {
   if (!Array.isArray(claims) || claims.length > 100) return ['claims must be an array of at most 100 {paths?, frs?, cases?, shapes?, specs?}'];
   const out = [];
   const ids = { frs: FR_ID, cases: CASE_ID, shapes: SHAPE_ID, specs: /\S/ };
-  claims.forEach((c, i) => {
-    if (!c || typeof c !== 'object' || Array.isArray(c)) { out.push(`claims[${i}] must be an object`); return; }
-    for (const k of Object.keys(c)) if (k !== 'paths' && !CLAIM_KINDS.includes(k)) out.push(`claims[${i}] has unknown field '${k}'`);
-    if (!hasClaims(c)) out.push(`claims[${i}] names none of ${CLAIM_KINDS.join(', ')}`);
-    if (c.paths !== undefined && (!Array.isArray(c.paths) || c.paths.some((p) => typeof p !== 'string' || !p.trim()))) out.push(`claims[${i}].paths must be an array of paths`);
-    for (const k of CLAIM_KINDS) if (c[k] !== undefined) {
-      if (!Array.isArray(c[k]) || c[k].some((v) => typeof v !== 'string' || !ids[k].test(v))) out.push(`claims[${i}].${k} must be an array of ${k === 'frs' ? 'fr.<feature>.<name> ids' : k === 'cases' ? '"RULE-N case-N" ids' : k === 'shapes' ? 'XBase#state shapes' : 'spec paths'}`);
-    }
-  });
+  claims.forEach((c, i) => out.push(...claimProblems(c, i, ids)));
   return out;
 }
 
@@ -183,14 +190,20 @@ function claimsOfJob({ repo, job, payload = {}, envelope = null, rows = [], frRe
     const bases = shapesOf.get(dir).filter((s) => s.state === label.split('--')[0]).map((s) => `${s.base}#${s.state}`).filter((id) => SHAPE_ID.test(id));
     return bases.length === 1 ? bases : [];
   };
-  const byArtifact = new Map();
-  for (const row of rows) {
+  /** One artifact's own claims: the label's shape and a ui-proof-score's passing cases. */
+  const artifactOwn = (row) => {
     const label = typeof row.label === 'string' ? row.label.split('@')[0] : null;
-    const own = { shapes: !label ? [] : SHAPE_ID.test(label) ? [label] : uiShape(row, label) };
+    const own = { shapes: [] };
+    if (label) own.shapes = SHAPE_ID.test(label) ? [label] : uiShape(row, label);
     if (/\.json$/i.test(row.name) && row.kind !== 'report') {
       const doc = parseJson((() => { try { return fs.readFileSync(row.abs, 'utf8'); } catch { return 'null'; } })());
       if (doc?.schema === 'starci/ui-proof-score@1') own.cases = list(doc.cases).filter((c) => c?.status === 'pass').map((c) => `${c.rule} ${c.case}`);
     }
+    return own;
+  };
+  const byArtifact = new Map();
+  for (const row of rows) {
+    const own = artifactOwn(row);
     // claims[].paths name the proof files as the op attached them: the artifact name or its file name.
     const scoped = declared.filter((c) => list(c.paths).some((p) => covers(p, row.name) || slashed(p).split('/').pop() === row.name.split('/').pop()));
     byArtifact.set(row.artifactId, withSpecFrs(mergeClaims(job0, own, ...scoped)));
@@ -250,8 +263,11 @@ function proofArtifactsOf(db, workflowId, { repo }) {
     const claims = r.claims_json ? mergeClaims(parseJson(r.claims_json, {})) : emptyClaims();
     const deps = r.deps_json ? list(parseJson(r.deps_json, [])) : null;
     const changed = deps ? deps.filter((d) => typeof d?.path === 'string' && digestOf(d) !== d.digest).map((d) => d.path) : [];
+    let state = 'fresh';
+    if (!deps) state = 'unbaselined';
+    else if (changed.length) state = 'stale';
     return { artifactId: r.artifact_id, jobId: r.job_id, op: r.op_id, attempt: r.try_no ?? null, attemptId: r.attempt_id, jobStatus: r.job_status ?? null, jobAt: r.job_at ?? null,
-      name: r.name, kind: r.kind, sha256: r.sha256, codeSha: r.code_sha ?? null, claims, state: !deps ? 'unbaselined' : changed.length ? 'stale' : 'fresh', changed,
+      name: r.name, kind: r.kind, sha256: r.sha256, codeSha: r.code_sha ?? null, claims, state, changed,
       baseline: Boolean(deps?.length) && deps.every(d => typeof d?.path === 'string' && /^[0-9a-f]{64}$/.test(String(d.digest ?? ''))),
       accepted: r.settled_at != null && ((r.job_status === 'succeeded' && r.attempt_verdict === 'pass' && r.report_outcome === 'done')
         || (r.job_status === 'failed' && r.attempt_verdict === 'fail' && r.report_outcome === 'partial')),
@@ -264,18 +280,26 @@ const CLAIM_OF_ITEM = { fr: 'frs', case: 'cases', shape: 'shapes' };
 /** Evidence per claimed item: Map(kind\0id -> [artifact]); only a settled-succeeded or partial job's artifacts count. */
 const evidenceIndex = (artifacts, { qualified = false } = {}) => {
   const index = new Map();
+  const addClaims = (a) => {
+    for (const [item, claim] of Object.entries(CLAIM_OF_ITEM)) {
+      for (const id of a.claims[claim]) {
+        const key = itemKey(item, id);
+        if (!index.has(key)) index.set(key, []);
+        index.get(key).push(a);
+      }
+    }
+  };
   for (const a of artifacts) {
     if (a.jobStatus && !['succeeded', 'failed'].includes(a.jobStatus)) continue;
     if (qualified && (!a.accepted || !a.baseline)) continue;
-    for (const [item, claim] of Object.entries(CLAIM_OF_ITEM)) for (const id of a.claims[claim]) {
-      const key = itemKey(item, id);
-      if (!index.has(key)) index.set(key, []);
-      index.get(key).push(a);
-    }
+    addClaims(a);
   }
   return index;
 };
-const statusOf = (evidence) => (!evidence.length ? 'missing' : evidence.some((e) => e.state !== 'stale') ? 'proven' : 'stale');
+const statusOf = (evidence) => {
+  if (!evidence.length) return 'missing';
+  return evidence.some((e) => e.state !== 'stale') ? 'proven' : 'stale';
+};
 
 /**
  * The stale proofs starci kernel status acts on: claimed items whose every piece of evidence is stale, grouped by the newest
@@ -340,27 +364,40 @@ export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts 
   const errors = [];
   for (const dir of scope.uiDirs) {
     const doc = recordAt(repo, dir);
-    for (const s of list(doc?.ui?.shapes)) if (s?.base && s?.state && SHAPE_ID.test(`${s.base}#${s.state}`)) shapes.add(`${s.base}#${s.state}`);
+    for (const s of list(doc?.ui?.shapes)) { if (s?.base && s?.state && SHAPE_ID.test(`${s.base}#${s.state}`)) shapes.add(`${s.base}#${s.state}`); }
     if (doc && briefCases) {
       try { for (const id of briefCases(doc, dir)) { if (!cases.has(id)) cases.set(id, []); cases.get(id).push(doc.id ?? dir); } }
       catch (error) { errors.push({ record: dir, error: String(error?.message ?? error).slice(0, 200) }); }
     }
   }
-  const evidenceView = (a) => ({ artifactId: a.artifactId, jobId: a.jobId, op: a.op, attempt: a.attempt, name: a.name, kind: a.kind, sha256: a.sha256, codeSha: a.codeSha, state: a.state, ...(a.changed.length ? { changed: a.changed } : {}) });
+  const evidenceView = (a) => ({ artifactId: a.artifactId, jobId: a.jobId, op: a.op, attempt: a.attempt, name: a.name, kind: a.kind, sha256: a.sha256, codeSha: a.codeSha, state: a.state, ...(a.changed.length ? { changed: a.changed } : undefined) });
   const push = (kind, id, extra) => { const evidence = index.get(itemKey(kind, id)) ?? []; items.push({ kind, id, ...extra, status: statusOf(evidence), evidence: evidence.map(evidenceView) }); };
+  const obligationStatus = (backed) => {
+    if (!backed.length) return 'missing';
+    return backed.some((a) => a.state === 'fresh') ? 'proven' : 'stale';
+  };
+  const frStatus = (obligations, evidence) => {
+    if (obligations.some((o) => o.status === 'missing')) return 'missing';
+    if (obligations.some((o) => o.status === 'stale')) return 'stale';
+    if (obligations.length) return 'proven';
+    if (evidence.some((a) => a.state === 'fresh')) return 'proven';
+    return evidence.length ? 'stale' : 'missing';
+  };
+  const frItem = (id, fr, waived, counted) => {
+    if (qualified && !fr) throw new Error(`scoped FR ${id} has no readable canonical record`);
+    const evidence = index.get(itemKey('fr', id)) ?? [];
+    if (!qualified) return { kind: 'fr', id, must: Boolean(counted.length), ...(fr ? { requires: counted, record: fr.dir } : { record: null }),
+      ...(waived.length ? { notCounted: waived } : {}), status: statusOf(evidence), evidence: evidence.map(evidenceView) };
+    const obligations = counted.map((kind) => {
+      const backed = evidence.filter((a) => provesDemand(a, fr.demands[kind], kind));
+      return { kind, status: obligationStatus(backed), evidence: backed.map(evidenceView) };
+    });
+    return { kind: 'fr', id, must: Boolean(counted.length), requires: counted, record: fr.dir, status: frStatus(obligations, evidence), obligations,
+      evidence: evidence.map(evidenceView), ...(waived.length ? { notCounted: waived } : {}) };
+  };
   for (const id of scope.frs) {
     const fr = frRecords.get(id), waived = (fr?.required ?? []).filter((kind) => notCounted.includes(kind)), counted = (fr?.required ?? []).filter((kind) => !notCounted.includes(kind));
-    if (qualified && !fr) throw new Error(`scoped FR ${id} has no readable canonical record`);
-    if (!qualified) { push('fr', id, { must: Boolean(counted.length), ...(fr ? { requires: counted, record: fr.dir } : { record: null }), ...(waived.length ? { notCounted: waived } : {}) }); continue; }
-    const evidence = index.get(itemKey('fr', id)) ?? [];
-    const obligations = counted.map(kind => {
-      const backed = evidence.filter(a => provesDemand(a, fr.demands[kind], kind));
-      return { kind, status: !backed.length ? 'missing' : backed.some(a => a.state === 'fresh') ? 'proven' : 'stale', evidence: backed.map(evidenceView) };
-    });
-    const status = obligations.some(o => o.status === 'missing') ? 'missing' : obligations.some(o => o.status === 'stale') ? 'stale'
-      : obligations.length ? 'proven' : evidence.some(a => a.state === 'fresh') ? 'proven' : evidence.length ? 'stale' : 'missing';
-    items.push({ kind: 'fr', id, must: Boolean(counted.length), requires: counted, record: fr.dir, status, obligations,
-      evidence: evidence.map(evidenceView), ...(waived.length ? { notCounted: waived } : {}) });
+    items.push(frItem(id, fr, waived, counted));
   }
   for (const id of [...shapes].sort(byCodeUnit)) push('shape', id, { must: false });
   for (const [id, records] of [...cases].sort(([a], [b]) => (a < b ? -1 : 1))) push('case', id, { must: false, records: uniq(records) });
@@ -370,10 +407,19 @@ export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts 
   return { schema: PROOF_COVERAGE_SCHEMA, workflowId, graphVersion: scope.graphVersion, summary: { ...summary, total: items.length, mustOwed: owed.length }, mustOwed: owed, items, ...(errors.length ? { errors } : {}) };
 }
 
+/** One evidence row's stale note, or ''. */
+const staleNote = (e) => (e.state === 'stale' ? ` [stale: ${list(e.changed).slice(0, 3).join(', ')}]` : '');
+/** The " — jobId:name[, +n]" tail of a coverage item line, or ''. */
+const evidenceTail = (evidence) => {
+  const shown = evidence.slice(0, 3).map((e) => `${e.jobId}:${e.name}${staleNote(e)}`).join('; ');
+  const more = evidence.length > 3 ? ` (+${evidence.length - 3})` : '';
+  return ` — ${shown}${more}`;
+};
+
 /** One text line per coverage item, for the human form of starci kernel coverage. */
 export const coverageLines = (cov) => [
-  `coverage ${cov.workflowId}: ${cov.summary.proven} proven, ${cov.summary.stale} stale, ${cov.summary.missing} missing of ${cov.summary.total}${cov.summary.mustOwed ? `; ${cov.summary.mustOwed} must-have owed` : ''}`,
-  ...cov.items.map((i) => `  ${i.status.padEnd(7)} ${i.kind.padEnd(5)} ${i.id}${i.must ? ' (must)' : ''}${i.evidence.length ? ` — ${i.evidence.map((e) => `${e.jobId}:${e.name}${e.state === 'stale' ? ` [stale: ${list(e.changed).slice(0, 3).join(', ')}]` : ''}`).slice(0, 3).join('; ')}${i.evidence.length > 3 ? ` (+${i.evidence.length - 3})` : ''}` : ''}`),
+  `coverage ${cov.workflowId}: ${cov.summary.proven} proven, ${cov.summary.stale} stale, ${cov.summary.missing} missing of ${cov.summary.total}${cov.summary.mustOwed ? '; ' + cov.summary.mustOwed + ' must-have owed' : ''}`,
+  ...cov.items.map((i) => `  ${i.status.padEnd(7)} ${i.kind.padEnd(5)} ${i.id}${i.must ? ' (must)' : ''}${i.evidence.length ? evidenceTail(i.evidence) : ''}`),
 ];
 
 /**
@@ -388,16 +434,21 @@ export function verifyProofs(db, workflowId) {
   for (const e of db.prepare(`SELECT kind,payload_json,payload_sha FROM events WHERE workflow_id=? AND kind IN (${chainedArtifactEvents().map(() => '?').join(',')}) ORDER BY seq`)
     .all(workflowId, ...chainedArtifactEvents())) for (const a of list(wholeEventPayload(e)?.artifacts)) if (a?.id != null && a?.sha256) chained.set(Number(a.id), a.sha256);
   const rows = db.prepare('SELECT artifact_id,job_id,name,sha256 FROM job_artifacts WHERE workflow_id=? ORDER BY artifact_id').all(workflowId);
+  const tamperOf = (r, recorded) => {
+    const base = { artifactId: r.artifact_id, jobId: r.job_id, name: r.name };
+    let problem = null;
+    try { getBlob(r.sha256); } catch (error) { problem = error?.code === 'ENOENT' ? 'missing' : 'modified'; }
+    if (problem) return { ...base, reason: problem, expected: r.sha256 };
+    if (recorded && recorded !== r.sha256) return { ...base, reason: 'ledger-row-differs-from-chain', expected: recorded, actual: r.sha256 };
+    return null;
+  };
   const tampered = [];
   let unchained = 0;
   for (const r of rows) {
     const recorded = chained.get(r.artifact_id) ?? null;
     if (!recorded) unchained += 1;
-    const base = { artifactId: r.artifact_id, jobId: r.job_id, name: r.name };
-    let problem = null;
-    try { getBlob(r.sha256); } catch (error) { problem = error?.code === 'ENOENT' ? 'missing' : 'modified'; }
-    if (problem) tampered.push({ ...base, reason: problem, expected: r.sha256 });
-    else if (recorded && recorded !== r.sha256) tampered.push({ ...base, reason: 'ledger-row-differs-from-chain', expected: recorded, actual: r.sha256 });
+    const t = tamperOf(r, recorded);
+    if (t) tampered.push(t);
   }
   return { schema: PROOF_VERIFY_SCHEMA, workflowId, ok: !tampered.length && chain.ok,
     files: { checked: rows.length, intact: rows.length - tampered.length, tampered, unchained },
