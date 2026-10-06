@@ -38,7 +38,10 @@ export function resetHintMs(text) {
   const m = /(?:reset|resets|try again|retry|available)\s+(?:in|after)\s+(\d+(?:\.\d+)?)\s*(s|sec|secs|seconds?|m|min|mins|minutes?|h|hr|hours?)\b/i.exec(String(text ?? ''));
   if (!m) return null;
   const n = Number(m[1]), u = m[2].toLowerCase();
-  return Math.round(n * (u.startsWith('h') ? 3_600_000 : u.startsWith('m') ? 60_000 : 1000));
+  let multiplier = 1000;
+  if (u.startsWith('h')) multiplier = 3_600_000;
+  else if (u.startsWith('m')) multiplier = 60_000;
+  return Math.round(n * multiplier);
 }
 
 /** Classify one worker. Pure. `mem` is the job's probe memory ({lastOutputAt, ...}); `term` the orca terminal row or null. */
@@ -74,19 +77,30 @@ export function planHealth(c, { mem = {}, now = Date.now(), settings = HEALTH_DE
   }
   if (c.state !== mem.state) { m.since = now; m.nudges = 0; m.lastNudgeAt = null; m.backoffMs = null; m.decided = false; }
   const since = m.since ?? now;
-  if (c.state === 'rate-limited') {
-    if (now - since > settings.rateLimitDecisionMs && !m.decided) return { mem: { ...m, decided: true }, action: { kind: 'decision', why: `rate-limited for ${Math.round((now - since) / 60_000)} min` } };
-    const wait = c.resetMs != null ? c.resetMs
-      : Math.min(settings.backoffMaxMs, (m.backoffMs ?? settings.backoffMinMs / 2) * 2) * (1 + 0.2 * rand());
-    if (m.nextAt == null) return { mem: { ...m, nextAt: now + wait, backoffMs: c.resetMs != null ? m.backoffMs : Math.min(settings.backoffMaxMs, (m.backoffMs ?? settings.backoffMinMs / 2) * 2) }, action: null };
-    if (now < m.nextAt) return { mem: m, action: null };
-    return { mem: { ...m, nextAt: null, nudges: (m.nudges ?? 0) + 1, lastNudgeAt: now }, action: { kind: 'send', text: NUDGE.retry } };
+  if (c.state === 'rate-limited') return planRateLimited(c, m, { now, settings, rand, since });
+  if (c.state === 'done-without-report') return planDoneWithoutReport(m, { now, settings, since });
+  return planIdleAtPrompt(m, { now, settings });
+}
+
+function planRateLimited(c, m, { now, settings, rand, since }) {
+  if (now - since > settings.rateLimitDecisionMs && !m.decided) return { mem: { ...m, decided: true }, action: { kind: 'decision', why: `rate-limited for ${Math.round((now - since) / 60_000)} min` } };
+  const backoffMsOf = () => Math.min(settings.backoffMaxMs, (m.backoffMs ?? settings.backoffMinMs / 2) * 2);
+  const wait = c.resetMs != null ? c.resetMs : backoffMsOf() * (1 + 0.2 * rand());
+  if (m.nextAt == null) {
+    const backoffMs = c.resetMs != null ? m.backoffMs : backoffMsOf();
+    return { mem: { ...m, nextAt: now + wait, backoffMs }, action: null };
   }
-  if (c.state === 'done-without-report') {
-    if (now - since > settings.doneFailAfterMs) return { mem: { ...m, failed: true }, action: m.failed ? null : { kind: 'fail-no-report' } };
-    if (m.lastNudgeAt != null && now - m.lastNudgeAt < settings.doneNudgeEveryMs) return { mem: m, action: null };
-    return { mem: { ...m, nudges: (m.nudges ?? 0) + 1, lastNudgeAt: now }, action: { kind: 'send', text: NUDGE.report } };
-  }
+  if (now < m.nextAt) return { mem: m, action: null };
+  return { mem: { ...m, nextAt: null, nudges: (m.nudges ?? 0) + 1, lastNudgeAt: now }, action: { kind: 'send', text: NUDGE.retry } };
+}
+
+function planDoneWithoutReport(m, { now, settings, since }) {
+  if (now - since > settings.doneFailAfterMs) return { mem: { ...m, failed: true }, action: m.failed ? null : { kind: 'fail-no-report' } };
+  if (m.lastNudgeAt != null && now - m.lastNudgeAt < settings.doneNudgeEveryMs) return { mem: m, action: null };
+  return { mem: { ...m, nudges: (m.nudges ?? 0) + 1, lastNudgeAt: now }, action: { kind: 'send', text: NUDGE.report } };
+}
+
+function planIdleAtPrompt(m, { now, settings }) {
   // idle-at-prompt
   if ((m.nudges ?? 0) >= settings.maxIdleNudges) {
     if (m.lastNudgeAt != null && now - m.lastNudgeAt >= settings.idleNudgeEveryMs && !m.decided) return { mem: { ...m, decided: true }, action: { kind: 'decision', why: `idle at its prompt after ${m.nudges} nudge(s)` } };
