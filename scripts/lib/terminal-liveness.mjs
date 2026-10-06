@@ -461,7 +461,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // Both patterns anchor on (?:^|\n), so each reads one row as well as a frame.
   // The last topRows.length rows of wideRows are topRows (the same filter over a longer tail).
   const wideRows = lines.slice(-WIDE_ROWS).filter(line => !/^\s*[│┃┆┊]/u.test(line));
-  const lastIndex = (test) => { for (let i = wideRows.length - 1; i >= 0; i -= 1) if (test(wideRows, i)) return i; return -1; };
+  const lastIndex = (test) => { for (let i = wideRows.length - 1; i >= 0; i -= 1) { if (test(wideRows, i)) return i; } return -1; };
   const lastActive = lastIndex((rows, i) => active.test(rows[i])), lastPrompt = lastIndex(promptAt);
   const finishedAfterSpinner = lastActive >= 0 && lastPrompt > lastActive
     && wideRows.slice(lastActive + 1, lastPrompt).some((line, i) => !companion(line) && !wrapsFrom(wideRows[lastActive + i], line));

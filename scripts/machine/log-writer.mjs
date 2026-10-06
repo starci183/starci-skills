@@ -151,7 +151,7 @@ function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS }
     }
     return out;
   };
-  const schedule = () => { if (timer || closed) return; timer = setTimeout(() => { timer = null; try { flush(); } catch (error) { process.stderr.write(`log-writer flush failed: ${error?.message ?? error}\n`); } }, flushMs); timer.unref?.(); };
+  const schedule = () => { if (timer || closed) { return; } timer = setTimeout(() => { timer = null; try { flush(); } catch (error) { process.stderr.write(`log-writer flush failed: ${error?.message ?? error}\n`); } }, flushMs); timer.unref?.(); };
 
   const writer = {
     file,

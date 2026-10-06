@@ -113,7 +113,7 @@ const nestedAgentDataCategory = (dirs, name) => {
   if (dirs[0] === 'features' && dirs.includes('impl') && dirs.includes('assets')) return 'capture';
   if (dirs[0] === 'shell' && dirs[1] === 'assets') return 'layout-capture';
   if (name && /^report.*\.json$/.test(name)) return 'stray-report';
-  if (name && /\.tmp\.json$/.test(name)) return 'cache';
+  if (name && name.endsWith('.tmp.json')) return 'cache';
   return null;
 };
 

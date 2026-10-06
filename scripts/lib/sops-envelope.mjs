@@ -27,7 +27,7 @@ export const setCommand = (name = '<name>', stack = 'dev') => `node scripts/stac
 /** sops' format for a plaintext path, as the repository's stack-secret.mjs formatFor decides it. */
 export const sopsFormatFor = (file) => {
   if (file.endsWith('.env')) return 'dotenv';
-  if (/\.json$/.test(file)) return 'json';
+  if (file.endsWith('.json')) return 'json';
   if (/\.(ya?ml|kubeconfig)$/.test(file)) return 'yaml';
   return 'binary';
 };
