@@ -75,9 +75,9 @@ export const expectInFamilyScope = (element: Element | null, family: string | nu
 export const installDomShims = () => {
     if (globalThis.ResizeObserver === undefined) {
         globalThis.ResizeObserver = class ResizeObserver {
-            observe() {}
-            unobserve() {}
-            disconnect() {}
+            observe() { /* the shim only needs the shape, observing does nothing */ }
+            unobserve() { /* the shim only needs the shape, observing does nothing */ }
+            disconnect() { /* the shim only needs the shape, observing does nothing */ }
         } as unknown as typeof ResizeObserver
     }
     if (typeof Element !== "undefined" && !("getAnimations" in Element.prototype)) {

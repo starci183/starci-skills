@@ -154,7 +154,7 @@ export const DataTable = <Row extends DataTableRow>({
                                 isRowHeader={column.id === rowHeaderId}
                                 textValue={column.label}
                             >
-                                {({ sortDirection }: { readonly sortDirection?: "ascending" | "descending" | undefined }) => column.allowsSorting === true
+                                {({ sortDirection }: { readonly sortDirection: "ascending" | "descending" | undefined }) => column.allowsSorting === true
                                     ? <HeroTable.SortableColumnHeader className="starci-core-data-table-sort" {...(sortDirection === undefined ? {} : { sortDirection })}>{column.label}</HeroTable.SortableColumnHeader>
                                     : column.label}
                             </HeroTable.Column>

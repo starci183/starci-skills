@@ -2106,7 +2106,6 @@
     .starci-core-workspace-shell-rail { grid-area: rail; }
 
     .starci-core-workspace-shell-navigation,
-    .starci-core-workspace-shell-primary,
     .starci-core-workspace-shell-rail {
         width: 100%;
         min-width: 0;
@@ -2117,6 +2116,8 @@
         display: flex;
         flex-direction: column;
         gap: var(--grammar-region-gap, 1.5rem);
+        width: 100%;
+        min-width: 0;
         outline: none;
     }
 

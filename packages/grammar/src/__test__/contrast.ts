@@ -26,7 +26,7 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8"
 
 /** Leaf rules with the at-rule preludes that wrap them (`@layer` included). */
 export const cssBlocks = (css: string): ReadonlyArray<Block> => {
-    const source = css.replace(/\/\*[\s\S]*?\*\//g, "")
+    const source = css.replaceAll(/\/\*[\s\S]*?\*\//g, "")
     const blocks: Array<Block> = []
     const stack: Array<{ prelude: string; start: number }> = []
     let cursor = 0
@@ -43,7 +43,7 @@ export const cssBlocks = (css: string): ReadonlyArray<Block> => {
         if (open === undefined) continue
         const body = source.slice(open.start, index)
         if (!body.includes("{") && !open.prelude.startsWith("@")) {
-            blocks.push({ selector: open.prelude.replace(/\s+/g, " "), at: stack.map((entry) => entry.prelude), body })
+            blocks.push({ selector: open.prelude.replaceAll(/\s+/g, " "), at: stack.map((entry) => entry.prelude), body })
         }
         cursor = index + 1
     }
@@ -52,7 +52,7 @@ export const cssBlocks = (css: string): ReadonlyArray<Block> => {
 
 /** Custom-property declarations in source order (a repeated name keeps the later value, as the cascade does). */
 export const customProperties = (body: string): Map<string, string> =>
-    new Map(Array.from(body.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+?)\s*(?:;|$)/g), (m) => [m[1] ?? "", (m[2] ?? "").replace(/\s+/g, " ").trim()]))
+    new Map(Array.from(body.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+?)\s*(?:;|$)/g), (m) => [m[1] ?? "", (m[2] ?? "").replaceAll(/\s+/g, " ").trim()]))
 
 const inMedia = (block: Block) => block.at.some((prelude) => prelude.startsWith("@media"))
 
@@ -375,7 +375,7 @@ export const parseColor = (input: string): Rgba | null => {
             // Channel arithmetic (`calc(l + 0.14)`, `calc(c * 0.25)`, `max(0.8, calc(l + 0.5))`): the channel
             // keywords, numbers, + - * / and min()/max()/clamp() only; anything else is not a colour this helper reads.
             if (/^[lch\d\s.+\-*/(),]*$/.test(token.replaceAll(/calc|min|max|clamp/g, ""))) {
-                const expression = token.replaceAll(/calc\(/g, "(").replaceAll(/clamp\(/g, "K(").replace(/([lch])/g, (_, key: keyof typeof channels) => String(channels[key]))
+                const expression = token.replaceAll(/calc\(/g, "(").replaceAll(/clamp\(/g, "K(").replaceAll(/([lch])/g, (_, key: keyof typeof channels) => String(channels[key]))
                     .replaceAll(/max\(/g, "Math.max(").replaceAll(/min\(/g, "Math.min(")
                 const clamp = (low: number, value: number, high: number) => Math.min(Math.max(value, low), high)
                 return evaluateArithmetic(expression, clamp)
