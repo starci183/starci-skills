@@ -146,21 +146,25 @@ export const toOwnerImages = (images, repo) => {
 };
 
 /** The images under one glob's static directory prefix (bounded BFS), into `out`/`seen`. */
+const appendGlobImages = (repo, dir, entries, queue, out, seen) => {
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      if (!e.name.startsWith('.')) queue.push(p);
+      continue;
+    }
+    if (!MIME[path.extname(e.name).slice(1).toLowerCase()] || seen.has(p)) continue;
+    seen.add(p); out.push({ label: path.relative(repo, p).replaceAll('\\', '/'), abs: p, mtime: e.mtimeMs ?? fs.statSync(p).mtimeMs });
+  }
+};
+
 const globImages = (repo, base, out, seen) => {
   if (!fs.existsSync(base)) return;
   const queue = [base]; let head = 0, visited = 0;
   while (head < queue.length && visited++ < 4000 && out.length < 16) {
     const dir = queue[head++];
     let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
-    for (const e of ents) {
-      const p = path.join(dir, e.name);
-      if (e.isDirectory()) {
-        if (!e.name.startsWith('.')) queue.push(p);
-        continue;
-      }
-      if (!MIME[path.extname(e.name).slice(1).toLowerCase()] || seen.has(p)) continue;
-      seen.add(p); out.push({ label: path.relative(repo, p).replaceAll('\\', '/'), abs: p, mtime: e.mtimeMs ?? fs.statSync(p).mtimeMs });
-    }
+    appendGlobImages(repo, dir, ents, queue, out, seen);
   }
 };
 
