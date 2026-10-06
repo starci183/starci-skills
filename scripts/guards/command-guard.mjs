@@ -128,7 +128,10 @@ const recursiveDeleteVerdict = (program, args, dialect) => {
 // every -C) lies inside it may read, never change history or a ref, and never discard tracked work.
 const WORKFLOW_HISTORY_VERBS = new Set(['commit', 'merge', 'rebase', 'push', 'pull', 'cherry-pick', 'revert', 'am', 'update-ref', 'switch', 'filter-branch', 'replace']);
 const RESET_MODES = new Set(['--hard', '--soft', '--mixed', '--merge', '--keep']);
-const BRANCH_WRITES = /^(?:-[dDmMcCfu]|--delete|--move|--copy|--force|--set-upstream-to(?:=.*)?|--unset-upstream|--edit-description|--track(?:=.*)?|--no-track)$/;
+const BRANCH_WRITE_FLAGS = new Set(['-d', '-D', '-m', '-M', '-c', '-C', '-f', '-u', '--delete', '--move', '--copy', '--force', '--unset-upstream', '--edit-description', '--no-track']);
+const branchWriteValue = (option, name) => option === name || (option.startsWith(`${name}=`)
+  && !['\n', '\r', '\u2028', '\u2029'].some(lineBreak => option.slice(name.length + 1).includes(lineBreak)));
+const isBranchWrite = option => BRANCH_WRITE_FLAGS.has(option) || branchWriteValue(option, '--set-upstream-to') || branchWriteValue(option, '--track');
 const BRANCH_READ_WORDS = new Set(['--list', '--all', '--remotes', '--show-current', '--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--sort', '--format', '--color', '--no-color', '--column', '--no-column', '-vv', '--verbose']);
 const BRANCH_READ_VALUES = /^--(?:sort|format|color|column)=/;
 const branchRead = (o) => BRANCH_READ_WORDS.has(o) || BRANCH_READ_VALUES.test(o) || /^-[avrl]+$/.test(o);
@@ -145,7 +148,7 @@ const SUB_CHANGE = {
     return options.some((o) => o === '-d' || o === '--delete' || o === '-f' || o === '--force') ? 'git tag writes a ref' : null;
   },
   branch: (options, words) => {
-    if (options.some((o) => BRANCH_WRITES.test(o))) return 'git branch writes a ref';
+    if (options.some(isBranchWrite)) return 'git branch writes a ref';
     return words.length && !options.some((o) => branchRead(o)) ? 'git branch creates a ref' : null;
   },
   reflog: (options, words) => (['expire', 'delete'].includes(words[0]) ? `git reflog ${words[0]} rewrites ref history` : null),
