@@ -149,10 +149,14 @@ function resolutionClaimOf(db, resolution) {
   const byOwner = payload.by === OWNER;
   if (!claim && !byOwner) return { unproven: false, claim: null, by: payload.by ?? null, reason: null };
   const { proven, proof, tried } = provenOwnerAnswer(db, { ownerAnswer: payload.ownerAnswer?.dispatchId ?? payload.ownerAnswer ?? [], detail: payload.detail });
+  const unprovenReason = () => {
+    if (tried.length) return tried.map((t) => t.reason).join('; ');
+    return 'no owner answer is recorded or cited';
+  };
   return {
     unproven: !proven, claim: claim ?? '(by owner)', by: payload.by ?? null,
     ...(proof ? { proof: proof.dispatchId } : {}),
-    reason: proven ? null : (tried.length ? tried.map((t) => t.reason).join('; ') : 'no owner answer is recorded or cited'),
+    reason: proven ? null : unprovenReason(),
   };
 }
 
