@@ -26,7 +26,7 @@ const posix = posixPath;
 export function isWorktreesPath(rel, { root = null } = {}) {
   let p = posix(rel);
   if (root && path.isAbsolute(String(rel))) p = posix(path.relative(root, String(rel)));
-  p = p.replace(/\/+$/, '');
+  while (p.endsWith('/')) p = p.slice(0, -1);
   return p === WORKTREES_REL || p.startsWith(`${WORKTREES_REL}/`) || p.includes(`/${WORKTREES_REL}/`) || p.endsWith(`/${WORKTREES_REL}`);
 }
 

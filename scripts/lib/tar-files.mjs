@@ -4,7 +4,11 @@
 import zlib from 'node:zlib';
 
 const BLOCK = 512;
-const text = (buf, from, len) => buf.toString('utf8', from, from + len).replace(/\0[\s\S]*$/, '');
+const text = (buf, from, len) => {
+  const value = buf.toString('utf8', from, from + len);
+  const nul = value.indexOf('\0');
+  return nul < 0 ? value : value.slice(0, nul);
+};
 const octal = (buf, from, len) => Number.parseInt(text(buf, from, len).trim() || '0', 8);
 
 /** Map<string, Buffer> of the regular files in `tgz` (a Buffer). Throws on a truncated or corrupt archive. */

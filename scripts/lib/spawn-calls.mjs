@@ -51,7 +51,7 @@ export function spawnCalls(text, file = 'x.mjs') {
   const out = { imports: [], calls: [] };
   if (!/child_process/.test(text)) return out;
   const t = ts();
-  const source = t.createSourceFile(file, text, t.ScriptTarget.Latest, true, /\.ts$/.test(file) ? t.ScriptKind.TS : t.ScriptKind.JS);
+  const source = t.createSourceFile(file, text, t.ScriptTarget.Latest, true, file.endsWith('.ts') ? t.ScriptKind.TS : t.ScriptKind.JS);
   const lineOf = (node) => source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
   const fnBinding = new Map(); // local name -> child_process function name
   const nsBinding = new Set(); // local names bound to the module itself
@@ -68,7 +68,9 @@ export function spawnCalls(text, file = 'x.mjs') {
   };
   const bindPattern = (pattern) => {
     for (const el of pattern.elements) {
-      const imported = el.propertyName && t.isIdentifier(el.propertyName) ? el.propertyName.text : t.isIdentifier(el.name) ? el.name.text : null;
+      let imported = null;
+      if (el.propertyName && t.isIdentifier(el.propertyName)) imported = el.propertyName.text;
+      else if (t.isIdentifier(el.name)) imported = el.name.text;
       if (imported && SPAWN_SET.has(imported) && t.isIdentifier(el.name)) fnBinding.set(el.name.text, imported);
     }
   };

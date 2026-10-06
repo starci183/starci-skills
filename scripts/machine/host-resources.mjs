@@ -65,7 +65,9 @@ export const resourceThresholds = (settings = null) => {
 /** The drive (or mount root) a path resolves on, spelled 'C:' on Windows, '/' on POSIX. */
 export const driveOf = (p) => {
   const root = path.parse(path.resolve(String(p))).root;
-  return root.replace(/[\\/]+$/, '') || root;
+  let withoutTrailingSeparators = root;
+  while (withoutTrailingSeparators.endsWith('/') || withoutTrailingSeparators.endsWith('\\')) withoutTrailingSeparators = withoutTrailingSeparators.slice(0, -1);
+  return withoutTrailingSeparators || root;
 };
 
 const sameDrive = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();

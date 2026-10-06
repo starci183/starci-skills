@@ -57,7 +57,12 @@ export const readTrackedTextFiles = (root, { listFiles, onGitError = null, worki
   // Filesystem failures are outside the Git fallback: an unreadable path must never look like an empty tree.
   return [...new Set(files)].filter(relative => {
     try { fs.lstatSync(path.join(root, relative)); return true; }
-    catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+    catch (error) {
+      if (error.code === 'ENOENT') {
+        return false;
+      }
+      throw error;
+    }
   });
 };
 

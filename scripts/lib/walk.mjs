@@ -20,7 +20,12 @@ export function walkFiles(dir, {filter = () => true, sorted = false, exclude = (
     if (depth > maxDepth) return;
     let entries;
     try { entries = fs.readdirSync(current, {withFileTypes: true}); }
-    catch (error) { if (ignoreReadErrors) return; throw error; }
+    catch (error) {
+      if (ignoreReadErrors) {
+        return;
+      }
+      throw error;
+    }
     if (sorted) entries = entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
       const full = path.join(current, entry.name);
