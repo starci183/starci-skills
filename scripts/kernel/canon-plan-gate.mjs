@@ -58,7 +58,8 @@ export function requirePlannedCanonSlice({ cut, ownedPaths, scanFile }) {
   if (unfixable) throw Object.assign(new Error(`canon slice ${cut.ordinal} has no fix target: its moves are held elsewhere (${unfixable.moves.slice(0, 3).join('; ')}); cut it again (starci kernel graph-edit --edit scan, then recut)`), { code: 'canon-slice-no-fix-target' });
   const missing = slice.owned.filter((p) => !ownedPaths.some((q) => covers(q, p)));
   if (missing.length) {
-    throw Object.assign(new Error(`canon slice ${cut.ordinal} must own the plan's relocation destinations too (paths + grants): missing ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? ` +${missing.length - 8}` : ''}`), { code: 'canon-slice-missing-grants', missing });
+    const extra = missing.length > 8 ? ` +${missing.length - 8}` : '';
+    throw Object.assign(new Error(`canon slice ${cut.ordinal} must own the plan's relocation destinations too (paths + grants): missing ${missing.slice(0, 8).join(', ')}${extra}`), { code: 'canon-slice-missing-grants', missing });
   }
   return { plan: { scan: String(scanFile), cutId: String(cut.id), ordinal: Number(cut.ordinal), grants: slice.grants } };
 }

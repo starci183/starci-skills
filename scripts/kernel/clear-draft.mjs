@@ -106,10 +106,10 @@ export function probeDraft({ terminal, restore = true, intervalMs = CLEAR_DRAFT_
   const initial = String(first.draft).trim(), after = String(probe.now.draft ?? '').trim();
   // Ctrl+U deleted from the cursor back to the row start: on one row, what is left is the draft's tail;
   // on the last of several rows, its head.
-  const removed = !after ? initial
-    : initial.endsWith(after) ? initial.slice(0, initial.length - after.length)
-    : initial.startsWith(after) ? initial.slice(after.length).replace(/^\n/, '')
-    : null;
+  let removed = null;
+  if (!after) removed = initial;
+  else if (initial.endsWith(after)) removed = initial.slice(0, initial.length - after.length);
+  else if (initial.startsWith(after)) removed = initial.slice(after.length).replace(/^\n/, '');
   const retype = restore && removed && !/\n/.test(initial) && initial.endsWith(after);
   let restored = false, sends = probe.sends;
   if (retype) {
