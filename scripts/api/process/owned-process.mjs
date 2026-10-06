@@ -41,6 +41,25 @@ public static class StarciOwnedProcess {
 }`;
 const quote = (value) => value == null ? '$null' : `'${String(value).replaceAll("'", "''")}'`;
 
+const refusalReason = (pid, identity, ownership, waitMs) => {
+  if (!Number.isInteger(pid) || pid <= 0 || identity && !validIdentity(identity)
+      || ownership && (typeof ownership.key !== 'string' || !ownership.key || typeof ownership.value !== 'string' || !ownership.value))
+    return 'process-custody-required';
+  if (!Number.isInteger(waitMs) || waitMs <= 0 || waitMs > 60000) return 'process-wait-invalid';
+  return null;
+};
+
+const receiptIncomplete = (data, pid, identity, actual) => {
+  if (data?.schema !== OWNED_PROCESS_SCHEMA || data.pid !== pid || typeof data.ok !== 'boolean'
+      || !['unknown', 'refused', 'captured', 'stopped', 'gone'].includes(data.outcome) || typeof data.proof !== 'string')
+    return true;
+  if (!data.ok) return false;
+  if (!validIdentity(actual)) return true;
+  if (identity && (actual.birth !== identity.birth || actual.exe.toLowerCase() !== identity.exe.toLowerCase())) return true;
+  if (data.proof !== (identity ? 'process-handle-signaled' : 'process-handle-live')) return true;
+  return !(identity ? ['gone', 'stopped'] : ['captured']).includes(data.outcome);
+};
+
 /**
  * Capture a live process, or stop the exact captured identity on one verified native handle.
  * Only Windows is qualified; custody, platform, child completion or receipt failures remain refused or unknown.
@@ -49,10 +68,8 @@ const quote = (value) => value == null ? '$null' : `'${String(value).replaceAll(
 export function ownedProcess(pid, { identity = null, ownership = null, waitMs = allocationMs('workerClose.stopVerifyMs'), run = spawnSync, platform = process.platform } = {}) {
   const base = { schema: OWNED_PROCESS_SCHEMA, pid, ok: false, outcome: 'unknown', identity: identity ?? null };
   if (platform !== 'win32') return { ...base, reason: 'process-platform-unverified' };
-  if (!Number.isInteger(pid) || pid <= 0 || identity && !validIdentity(identity)
-      || ownership && (typeof ownership.key !== 'string' || !ownership.key || typeof ownership.value !== 'string' || !ownership.value))
-    return { ...base, outcome: 'refused', reason: 'process-custody-required' };
-  if (!Number.isInteger(waitMs) || waitMs <= 0 || waitMs > 60000) return { ...base, outcome: 'refused', reason: 'process-wait-invalid' };
+  const refused = refusalReason(pid, identity, ownership, waitMs);
+  if (refused) return { ...base, outcome: 'refused', reason: refused };
   const script = [`Add-Type -TypeDefinition @'\n${PROCESS_ENV_NATIVE}\n${NATIVE}\n'@ -Language CSharp`,
     `$r = [StarciOwnedProcess]::Call(${pid}, $${identity ? 'true' : 'false'}, ${quote(identity?.birth)}, ${quote(identity?.exe)}, ${quote(ownership?.key)}, ${quote(ownership?.value)}, ${waitMs})`,
     `@{ schema = '${OWNED_PROCESS_SCHEMA}'; pid = ${pid}; ok = $r[0]; outcome = $r[1]; proof = $r[2]; birth = $r[3]; exe = $r[4]; nativeError = $r[5] } | ConvertTo-Json -Compress`].join('\n');
@@ -65,11 +82,7 @@ export function ownedProcess(pid, { identity = null, ownership = null, waitMs = 
   let data;
   try { data = JSON.parse(String(result.stdout ?? '').trim()); } catch { return { ...base, reason: 'process-receipt-incomplete' }; }
   const actual = { pid, birth: data?.birth, exe: data?.exe };
-  if (data?.schema !== OWNED_PROCESS_SCHEMA || data.pid !== pid || typeof data.ok !== 'boolean'
-      || !['unknown', 'refused', 'captured', 'stopped', 'gone'].includes(data.outcome) || typeof data.proof !== 'string'
-      || data.ok && (!validIdentity(actual) || identity && (actual.birth !== identity.birth || actual.exe.toLowerCase() !== identity.exe.toLowerCase())
-        || data.proof !== (identity ? 'process-handle-signaled' : 'process-handle-live')
-        || !(identity ? ['gone', 'stopped'] : ['captured']).includes(data.outcome)))
+  if (receiptIncomplete(data, pid, identity, actual))
     return { ...base, reason: 'process-receipt-incomplete' };
   return { schema: OWNED_PROCESS_SCHEMA, pid, ok: data.ok, outcome: data.outcome, proof: data.proof,
     identity: identity ?? (validIdentity(actual) ? actual : null), nativeError: data.nativeError ?? null,

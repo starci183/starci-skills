@@ -10,7 +10,9 @@ import { processListScript, processRowsOfJson, processRowsOfPs } from './lib.mjs
 
 const execAsync = (cmd, args, { timeout }) => new Promise((resolve) => {
   execFile(cmd, args, { encoding: 'utf8', windowsHide: true, timeout, maxBuffer: 256 * 1024 * 1024 }, (error, stdout) => {
-    resolve({ status: error ? (typeof error.code === 'number' ? error.code : null) : 0, stdout: String(stdout ?? '') });
+    let status = 0;
+    if (error) status = typeof error.code === 'number' ? error.code : null;
+    resolve({ status, stdout: String(stdout ?? '') });
   });
 });
 
@@ -19,12 +21,12 @@ export async function processListAsync({ where = null, match = null, cmdMax = 40
   try {
     if (platform !== 'win32') {
       const r = await (run ?? execAsync)('ps', ['-eo', 'pid=,ppid=,comm=,args='], { timeout: Math.min(timeoutMs, 30_000) });
-      if (!r || r.status !== 0) return null;
+      if (r?.status !== 0) return null;
       const rows = processRowsOfPs(r.stdout, cmdMax);
       return match ? rows.filter((p) => match.test(p.cmd)) : rows;
     }
     const r = await (run ?? execAsync)('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', processListScript({ where, cmdMax, cpu })], { timeout: timeoutMs });
-    if (!r || r.status !== 0) return null;
+    if (r?.status !== 0) return null;
     const rows = processRowsOfJson(r.stdout);
     return match ? rows.filter((p) => match.test(p.cmd)) : rows;
   } catch { return null; }

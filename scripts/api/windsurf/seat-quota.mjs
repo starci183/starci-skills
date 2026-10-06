@@ -12,7 +12,7 @@ if (isMain(import.meta.url)) {
   let raw = '';
   process.stdin.on('data', (c) => { raw += c; }).on('end', async () => {
     let answer;
-    try { answer = await seatQuota(JSON.parse(raw)); } catch (error) { answer = { status: 0, error: String((error && error.message) || error) }; }
+    try { answer = await seatQuota(JSON.parse(raw)); } catch (error) { answer = { status: 0, error: String(error?.message || error) }; }
     process.stdout.write(JSON.stringify(answer));
   });
 }

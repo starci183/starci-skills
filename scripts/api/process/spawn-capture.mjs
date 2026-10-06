@@ -44,11 +44,17 @@ export const spawnCapture = (cmd, args, { cwd, env = process.env, timeoutMs = 12
     settled = true; clearTimeout(timer);
     const truncated = stdout.truncated || stderr.truncated;
     const uncertain = spawned && (timedOut || truncated || error || !closed || signal);
+    let processState = 'not-started';
+    if (spawned) processState = 'unknown';
+    if (closed) processState = 'closed';
+    let effect = {};
+    if (uncertain) effect = { effectState: 'unknown', recoveryRequired: true };
+    else if (!spawned) effect = { effectState: 'none' };
     child.stdout?.destroy(); child.stderr?.destroy(); child.unref?.();
     resolve({ code, stdout: textOf(stdout), stderr: textOf(stderr), timedOut, pid: child.pid ?? null, signal,
-      processState: closed ? 'closed' : spawned ? 'unknown' : 'not-started', outputComplete: closed && !timedOut && !truncated && !error && !signal,
+      processState, outputComplete: closed && !timedOut && !truncated && !error && !signal,
       capture: { stdout: countsOf(stdout), stderr: countsOf(stderr) },
-      ...(uncertain ? { effectState: 'unknown', recoveryRequired: true } : !spawned ? { effectState: 'none' } : {}),
+      ...effect,
       ...(error || truncated || signal ? { error: error ?? (truncated ? 'capture output exceeded its byte budget' : `child terminated by ${signal}`) } : {}) });
   };
   child.stdout?.on('data', data => { if (!settled) capture(stdout, data); });

@@ -22,6 +22,18 @@ const executableNames = (program, { env, platform }) => {
   return [...new Set(names)];
 };
 
+const firstExecutableHit = (entry, names, stat, realpath) => {
+  for (const executable of names) {
+    const candidate = path.join(entry, executable);
+    try {
+      if (stat(candidate).isFile()) {
+        try { return realpath(candidate); } catch { return path.resolve(candidate); }
+      }
+    } catch { /* try the next executable spelling or PATH entry */ }
+  }
+  return null;
+};
+
 /** Resolve `program` from PATH while excluding <home>/.starci/bin by canonical directory identity. */
 export function resolveRealTool(program, { env = process.env, home = os.homedir(), platform = process.platform,
   stat = fs.statSync, realpath = fs.realpathSync.native } = {}) {
@@ -33,14 +45,8 @@ export function resolveRealTool(program, { env = process.env, home = os.homedir(
   for (const rawEntry of pathValue(env).split(delimiter).filter(Boolean)) {
     const entry = rawEntry.replace(/^"(.*)"$/, '$1');
     if (canonical(entry, { platform, realpath }) === shimKey) continue;
-    for (const executable of names) {
-      const candidate = path.join(entry, executable);
-      try {
-        if (stat(candidate).isFile()) {
-          try { return realpath(candidate); } catch { return path.resolve(candidate); }
-        }
-      } catch { /* try the next executable spelling or PATH entry */ }
-    }
+    const hit = firstExecutableHit(entry, names, stat, realpath);
+    if (hit) return hit;
   }
   return null;
 }
