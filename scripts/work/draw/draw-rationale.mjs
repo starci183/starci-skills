@@ -56,7 +56,7 @@ const KNOWLEDGE = path.join(ROOT, 'knowledge');
 const OWNER_RULINGS = path.join(ROOT, 'modules', 'kernel', 'owner-rulings.yaml');
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return undefined; } };
 const readYamlOr = (f) => { try { return parseYaml(fs.readFileSync(f, 'utf8')); } catch { return null; } };
-const str = (v) => (v == null ? '' : typeof v === 'string' ? v : typeof v === 'number' ? String(v) : JSON.stringify(v));
+const str = (v) => { if (v == null) return ''; if (typeof v === 'string') return v; if (typeof v === 'number') return String(v); return JSON.stringify(v); };
 
 // ---------------------------------------------------------------------------------------------------------
 // The rationale file

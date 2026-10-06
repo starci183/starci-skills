@@ -1165,7 +1165,7 @@ export function addPlanned(record, { node: id, files = [], design = null }) {
     if (!node) {
       const parent = nodeById(record, parentId);
       const name = parts[n - 1], kind = segmentKindOf(name);
-      node = { id: nid, parent: parentId, segment: name, segmentKind: kind, url: kind === 'group' || kind === 'slot' ? parent.url : kind === 'intercept' ? interceptTarget(name, parent.url) : joinUrl(parent.url, name), origin: 'planned' };
+      node = { id: nid, parent: parentId, segment: name, segmentKind: kind, url: (() => { if (kind === 'group' || kind === 'slot') return parent.url; if (kind === 'intercept') return interceptTarget(name, parent.url); return joinUrl(parent.url, name); })(), origin: 'planned' };
       record.nodes.push(node);
     }
     if (n === parts.length) {

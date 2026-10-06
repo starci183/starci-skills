@@ -376,7 +376,7 @@ export function surfaceBackground(value) {
 function declaredPx(el, prop, rules = []) {
   const read = (v) => {
     const m = /^(-?\d+(?:\.\d+)?)(px|rem)$/.exec(String(v ?? '').trim());
-    return m ? Number(m[1]) * (m[2] === 'rem' ? 16 : 1) : null;
+    if (!m) return null; return Number(m[1]) * (m[2] === 'rem' ? 16 : 1);
   };
   const inline = read(declsOf(el.attrs.style)[prop]);
   if (inline != null) return inline;
@@ -473,7 +473,7 @@ export function dnaFindings(html, { dna = loadDna(), proposals = new Set(), labe
       for (const [prop, c] of spec.closed) {
         const raw = el.attrs[`data-${kebab(prop)}`] ?? el.attrs[`data-grammar-${kebab(prop)}`];
         if (raw == null || raw === '') continue;
-        const ok = c.values ? c.values.includes(raw) : c.type === 'PresentationState' ? Boolean(presentationStateOf(raw)) : true;
+        const ok = c.values ? c.values.includes(raw) : (() => { if (c.type === 'PresentationState') return Boolean(presentationStateOf(raw)); return true; })();
         if (!ok) add(DRAW_OFF_GRAMMAR_COMPONENT, 'closed value off DNA', el, `${name} ${prop}="${raw}" is not one of ${c.values ? c.values.join('|') : 'the PresentationState values'}`);
       }
     }

@@ -101,7 +101,7 @@ export function parseArgs(argv) {
   const o = { css: [], fullPage: false, json: false, theme: 'light' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (BOOL_FLAGS.has(a)) { o[a === '--full-page' ? 'fullPage' : a === '--trace' ? 'trace' : 'json'] = true; continue; }
+    if (BOOL_FLAGS.has(a)) { o[(() => { if (a === '--full-page') return 'fullPage'; if (a === '--trace') return 'trace'; return 'json'; })()] = true; continue; }
     if (!VALUE_FLAGS.has(a)) throw new UsageError(`unknown argument ${a}`);
     const v = argv[++i];
     if (v == null || v.startsWith('--')) throw new UsageError(`${a} needs a value`);
@@ -187,9 +187,7 @@ export function judgeCapture(m) {
 }
 
 /** Fixture JSON -> props: every "[Function]" becomes a no-op. */
-export const fixtureProps = (value) => (value === FUNCTION_FIXTURE ? '__DRAW_NOOP__'
-  : Array.isArray(value) ? value.map(fixtureProps)
-    : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fixtureProps(v)])) : value);
+export const fixtureProps = (value) => (() => { if (value === FUNCTION_FIXTURE) return '__DRAW_NOOP__'; if (Array.isArray(value)) return value.map(fixtureProps); if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fixtureProps(v)])); return value; })();
 
 /** Candidate class tokens of a bundle for tailwind's build(): everything between quotes and whitespace. */
 export const classCandidates = (text) => [...new Set(String(text).split(/[\s"'`\\]+/).filter((t) => t.length > 0 && t.length <= 200))];
@@ -447,7 +445,7 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
 export async function captureHtml({ html, out, viewports, theme, fullPage, name, source, playwright, trace = false, rationale = undefined }) {
   fs.mkdirSync(out, { recursive: true });
   // The rationale beside the source (draw-rationale.mjs rationaleFileOf) labels the redline; an explicit one wins.
-  const rationaleFile = rationale === undefined ? rationaleFileOf(html) : (typeof rationale === 'string' ? rationale : rationale?.file ?? null);
+  const rationaleFile = rationale === undefined ? rationaleFileOf(html) : (() => { if (typeof rationale === 'string') return rationale; return rationale?.file ?? null; })();
   const why = rationaleFile ? { file: rationaleFile, entries: loadRationale(rationaleFile).entries } : null;
   const browser = await playwright.chromium.launch().catch((e) => { throw new UsageError(`chromium launch failed (${playwright.name} ${playwright.version}): ${e.message.split('\n')[0]}`); });
   const records = [];
@@ -680,7 +678,7 @@ async function main() {
   } catch (e) {
     const usage = e instanceof UsageError;
     if (json) process.stdout.write(`${JSON.stringify({ ok: false, error: e.message, ...(e.code ? { code: e.code } : {}) }, null, 2)}\n`);
-    process.stderr.write(`draw-render: ${usage || e instanceof RedError ? (e.code ? '[' + e.code + '] ' : '') + e.message : e.stack}\n`);
+    process.stderr.write('draw-render: ' + (() => { if (!(usage || e instanceof RedError)) return e.stack; if (e.code) return '[' + e.code + '] ' + e.message; return e.message; })() + '\n');
     process.exitCode = usage ? EXIT.usage : EXIT.red;
   }
 }
