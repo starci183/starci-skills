@@ -15,7 +15,7 @@ import { artifactHoldOf } from '../../scripts/machine/artifact-hold.mjs';
 import { recordCheck } from '../../scripts/machine/evidence-store.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs'; const R = path.join(os.tmpdir(), 'repo').replace(/\\/g, '/');
 
-// Typed logs (scripts/kernel/typed-logs.mjs): rows in the ledger's logs table (<repo>/.starciwork/runtime.sqlite),
+// Typed logs (scripts/kernel/typed-logs.mjs): rows in the ledger's logs table (the project's runtime.sqlite),
 // validated per kind, redacted at write, capped per job, append-only; sidecar ingest and event derivation
 // are idempotent.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -31,7 +31,7 @@ const repoDir = (t) => {
 };
 const track = (t, handle) => { scopes.get(t).push(() => handle.close()); return handle; };
 const logsOf = (t, repo, workflows = [WF]) => {
-  // A log row references its workflow (engine/db/migrations/runtime/0001-init.sql logs.workflow_id -> workflows): the ledger holds it first.
+  // A log row references its workflow (engine/db/schema/runtime.sql logs.workflow_id -> workflows): the ledger holds it first.
   const ledger = openLedger({ file: ledgerFileFor(repo) });
   try { for (const workflowId of workflows) ledger.ensureWorkflow({ workflowId }); } finally { ledger.close(); }
   return track(t, openLogs(repo));
@@ -196,19 +196,18 @@ test('starci kernel log: a kernel logs a typed row without a ledger write; an op
   after.close();
 });
 
-test('housekeeping never removes the ledger holding the logs, nor the retired logs.sqlite (artifact-hold)', (t) => {
+test('housekeeping never removes the ledger holding the logs (artifact-hold)', (t) => {
   const repo = repoDir(t);
-  const logs = openLogs(repo); logs.close();
-  // Q1: the ledger that now holds the logs lives outside .starciwork (ledgerFileFor -> projects root); what
-  // .starciwork still holds is the retired logs.sqlite and its migrated copies, so those stay held.
-  const ledger = ledgerFileFor(repo);
-  assert.ok(fs.existsSync(ledger), 'openLogs created the project ledger');
-  fs.mkdirSync(path.join(repo, '.starciwork'), { recursive: true });
-  fs.writeFileSync(path.join(repo, '.starciwork', 'logs.sqlite'), '');
-  const hold = artifactHoldOf(path.join(repo, '.starciwork'), { repos: [{ repo, ledger }] });
+  const local = path.join(repo, 'host-state');
+  const ledger = path.join(local, 'projects', 'led-00000001', 'runtime.sqlite');
+  fs.mkdirSync(path.dirname(ledger), { recursive: true });
+  fs.writeFileSync(ledger, '');
+  const hold = artifactHoldOf(path.join(local, 'projects'), { repos: [{ repo, ledger }] });
   assert.ok(hold);
-  assert.deepEqual(hold.paths, ['.starciwork/logs.sqlite']);
-  fs.writeFileSync(path.join(repo, '.starciwork', 'logs.sqlite.migrated-20260927'), '');
-  assert.deepEqual(artifactHoldOf(path.join(repo, '.starciwork'), { repos: [{ repo, ledger }] }).paths, ['.starciwork/logs.sqlite', '.starciwork/logs.sqlite.migrated-20260927']);
+  assert.deepEqual(hold.paths, ['runtime.sqlite']);
+  assert.equal(artifactHoldOf(ledger, { repos: [{ repo, ledger }] })?.ledger, ledger);
   assert.equal(artifactHoldOf(path.join(repo, 'src'), { repos: [{ repo, ledger }] }), null);
+  const env = { ...process.env, STARCI_LOCAL_ROOT: local };
+  assert.match(artifactHoldOf(path.join(local, 'projects'), { repos: null, env })?.error ?? '', /registry cannot be read/, 'an unreadable registry holds the projects root');
+  assert.equal(artifactHoldOf(path.join(repo, 'src'), { repos: null, env }), null);
 });

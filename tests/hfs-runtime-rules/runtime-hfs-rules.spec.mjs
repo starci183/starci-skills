@@ -8,7 +8,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RUNTIME_MANIFEST_FILE, createSlotResolver, loadSlotManifest, resolveRepoDeclaration, ruleParams } from '../../scripts/hfs/slots.mjs';
-import { runtimeCheck } from '../../scripts/hfs/runtime-check.mjs';
+import { baseRevision, runtimeCheck } from '../../scripts/hfs/runtime-check.mjs';
+import { add as gitAdd } from '../../scripts/api/git/add.mjs';
+import { commit as gitCommit } from '../../scripts/api/git/commit.mjs';
+import { init as gitInit } from '../../scripts/api/git/init.mjs';
 import { parseSource } from '../../scripts/hfs/runtime-rules/source-ast.mjs';
 import { fileExternalFindings, ownerIdOf } from '../../scripts/hfs/runtime-rules/external-owner.mjs';
 import { fileBaseFindings } from '../../scripts/hfs/runtime-rules/base-pure.mjs';
@@ -18,7 +21,7 @@ import { changelogSection, releaseNotesFindings, releaseNotesRepoFindings } from
 import { callExportFinding, callFunctionName, contractCallIds } from '../../scripts/hfs/runtime-rules/api-shape.mjs';
 import { packageSlotsOf, specPlacementFinding } from '../../scripts/hfs/runtime-rules/test-layout.mjs';
 import { nameFindings, sourceNameFindings } from '../../scripts/hfs/runtime-rules/source-name.mjs';
-import { pinnedFindings, retiredFindings } from '../../scripts/hfs/runtime-rules/retired.mjs';
+import { pinnedFindings } from '../../scripts/hfs/runtime-rules/pinned.mjs';
 import { sizeFindings } from '../../scripts/hfs/runtime-rules/size.mjs';
 import { tierFindings } from '../../scripts/hfs/runtime-rules/tier-direction.mjs';
 import { fileLinkFindings } from '../../scripts/hfs/runtime-rules/node-modules-link.mjs';
@@ -27,7 +30,7 @@ import { absolutePathFindings, absolutePathRepoFindings } from '../../scripts/hf
 import { generatedUntrackedFindings } from '../../scripts/hfs/runtime-rules/generated-untracked.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-/** An old (moved or retired) runtime path, spelled in segments so the move codemod never rewrites a fixture. */
+/** A runtime path spelled in segments so the move codemod never rewrites a fixture. */
 const old = (...segments) => segments.join('/');
 const MANIFEST = loadSlotManifest({ root: ROOT, file: path.join(ROOT, RUNTIME_MANIFEST_FILE) });
 const RESOLVER = createSlotResolver(MANIFEST, resolveRepoDeclaration(MANIFEST, { hfs: 1, kind: 'runtime', project: 'starci' }));
@@ -39,7 +42,7 @@ const ctxOf = (sources, extra = {}) => {
   const list = Object.entries(sources).map(([p, text]) => ({ path: p, text }));
   const parsed = new Map(list.map((s) => [s.path, parseSource(s.text, s.path)]));
   const files = [...list.map((s) => s.path), ...(extra.files ?? [])];
-  return { resolver: RESOLVER, params: PARAMS, sources: list, parsed: (p) => parsed.get(p), files, fileSet: new Set(files), sourceSet: new Set(list.map((s) => s.path)), retiredPaths: {}, base: null, read: (p) => sources[p] ?? null, ...extra };
+  return { resolver: RESOLVER, params: PARAMS, sources: list, parsed: (p) => parsed.get(p), files, fileSet: new Set(files), sourceSet: new Set(list.map((s) => s.path)), base: null, read: (p) => sources[p] ?? null, ...extra };
 };
 
 // ------------------------------------------------------------------------------------------- RT_EXTERNAL_OWNER
@@ -167,54 +170,23 @@ test('RT_SOURCE_NAME: kebab names, and lib.mjs repeated across api systems, are 
   assert.deepEqual(sourceNameFindings(ctxOf({ 'scripts/api/git/lib.mjs': '', 'scripts/api/orca/lib.mjs': '', 'scripts/agent/send.mjs': '' })), []);
 });
 
-// ------------------------------------------------------------------------------------------- RT_RETIRED_PRESENT / RT_PINNED_PATH_MOVED
-
-test('RT_RETIRED_PRESENT: a retired path, a moved-from path or a retired symbol that comes back is refused', () => {
-  const ctx = ctxOf({ 'scripts/kernel/orca-tasks.mjs': 'export function closeOperationTask() {}\n' }, {
-    files: ['scripts/lib/gone-tree.mjs', old('scripts', 'checks', 'gate.mjs')],
-    retiredPaths: { retired: [{ path: 'scripts/lib/gone-tree.mjs' }], moved: [{ from: old('scripts', 'checks', 'gate.mjs'), to: 'scripts/gates/gate.mjs', movedIn: 'C4' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
-  });
-  assert.deepEqual(codesOf(retiredFindings(ctx)), ['RT_RETIRED_PRESENT', 'RT_RETIRED_PRESENT', 'RT_RETIRED_PRESENT']);
-});
-
-test('RT_RETIRED_PRESENT: retired paths that stay gone and a symbol only called, never declared, are clean', () => {
-  const ctx = ctxOf({ 'scripts/kernel/orca-tasks.mjs': "import { other } from './x.mjs';\nother('closeOperationTask');\n" }, {
-    retiredPaths: { retired: [{ path: 'scripts/lib/gone-tree.mjs' }], moved: [{ from: old('scripts', 'checks', 'gate.mjs'), to: 'scripts/gates/gate.mjs' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
-  });
-  assert.deepEqual(retiredFindings(ctx), []);
-});
-
-test('RT_RETIRED_PRESENT: a migration comment that names a retired symbol is a stale cite; the replacement and SQL code are clean', () => {
-  const sql = {
-    'engine/db/migrations/machine/0001-init.sql': 'CREATE TABLE t(x);\n-- removed by safeRemoveTree, never followed\n',
-    'engine/db/migrations/runtime/0001-init.sql': "-- removed by safeRemove\nCREATE TABLE safeRemoveTree_log(x); INSERT INTO t VALUES('safeRemoveTree');\n",
-  };
-  const ctx = (files) => ctxOf({}, { files: Object.keys(files), read: (p) => files[p] ?? null, retiredPaths: { retiredSymbols: [{ symbol: 'safeRemoveTree', replacedBy: 'safeRemove' }] } });
-  const found = retiredFindings(ctx(sql));
-  assert.deepEqual(found.map((f) => [f.code, f.path, f.line]), [['RT_RETIRED_PRESENT', 'engine/db/migrations/machine/0001-init.sql', 2]]);
-  assert.match(found[0].message, /names safeRemoveTree in a comment/);
-  assert.deepEqual(retiredFindings(ctx({ 'engine/db/migrations/runtime/0001-init.sql': sql['engine/db/migrations/runtime/0001-init.sql'] })), []);
-});
+// ------------------------------------------------------------------------------------------- RT_PINNED_PATH_MOVED
 
 const PINNED_FILES = ['packages/cli/bin/starci.mjs', 'scripts/kernel/cli.mjs', 'scripts/kernel/start-workflow.mjs', 'scripts/supervisor/start-supervisor.mjs', 'scripts/reconciler/boot.mjs', 'scripts/guards/command-guard.mjs', 'scripts/guards/seat-tools.mjs'];
 
-test('RT_PINNED_PATH_MOVED: a pinned path that is gone, or moved without quiesced: true, is refused', () => {
+test('RT_PINNED_PATH_MOVED: a pinned path that is gone is refused', () => {
   const gone = pinnedFindings(ctxOf({}, { files: PINNED_FILES.filter((p) => p !== 'packages/cli/bin/starci.mjs') }));
   assert.deepEqual(codesOf(gone), ['RT_PINNED_PATH_MOVED']);
-  const loose = pinnedFindings(ctxOf({}, { files: [...PINNED_FILES, 'scripts/api/orca/worker-go.mjs'], retiredPaths: { moved: [{ from: 'scripts/api/orca/worker-start.mjs', to: 'scripts/api/orca/worker-go.mjs', quiesced: false }] } }));
-  assert.deepEqual(codesOf(loose), ['RT_PINNED_PATH_MOVED'], 'a pinned pattern (scripts/api/orca/<call>.mjs) moves only quiesced');
 });
 
-test('RT_PINNED_PATH_MOVED: every pinned path present, or one moved with the workers quiesced, is clean', () => {
+test('RT_PINNED_PATH_MOVED: every pinned path present is clean', () => {
   assert.deepEqual(pinnedFindings(ctxOf({}, { files: PINNED_FILES })), []);
-  const moved = pinnedFindings(ctxOf({}, { files: [...PINNED_FILES.filter((p) => p !== 'packages/cli/bin/starci.mjs'), 'packages/cli/bin/starci-next.mjs'], retiredPaths: { moved: [{ from: 'packages/cli/bin/starci.mjs', to: 'packages/cli/bin/starci-next.mjs', quiesced: true }] } }));
-  assert.deepEqual(moved, []);
 });
 
 // ------------------------------------------------------------------------------------------- HFS_SIZE_GROWTH
 
 const lines = (n) => `${Array.from({ length: n }, (_, i) => `export const v${i} = ${i};`).join('\n')}\n`;
-const baseRev = (files) => ({ sha: '0123456789abcdef', show: (p) => files[p] ?? null });
+const baseRev = (files, renames = {}) => ({ sha: '0123456789abcdef', show: (p) => files[p] ?? null, renamedFrom: (p) => renames[p] ?? null });
 
 test('HFS_SIZE_GROWTH: an oversized runtime source that grows, or a new one above soft, is refused', () => {
   const grown = sizeFindings(ctxOf({ 'scripts/kernel/big.mjs': lines(620) }, { base: baseRev({ 'scripts/kernel/big.mjs': lines(600) }) }));
@@ -223,11 +195,38 @@ test('HFS_SIZE_GROWTH: an oversized runtime source that grows, or a new one abov
   assert.deepEqual(codesOf(fresh), ['HFS_SIZE_GROWTH']);
 });
 
-test('HFS_SIZE_GROWTH: an oversized file that shrinks, a moved one that keeps its size, and no base revision are clean', () => {
+test('HFS_SIZE_GROWTH: an oversized file that shrinks, a renamed one that keeps its size, and no base revision are clean', () => {
   assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/big.mjs': lines(590) }, { base: baseRev({ 'scripts/kernel/big.mjs': lines(600) }) })), []);
-  assert.deepEqual(sizeFindings(ctxOf({ 'scripts/machine/decisions.mjs': lines(700) }, { base: baseRev({ [old('scripts', 'reconciler', 'decisions.mjs')]: lines(700) }), retiredPaths: { moved: [{ from: old('scripts', 'reconciler', 'decisions.mjs'), to: 'scripts/machine/decisions.mjs' }] } })), []);
-  assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/verbs/big.mjs': lines(700) }, { base: baseRev({ [old('scripts', 'kernel', 'api-verbs', 'big.mjs')]: lines(700) }), retiredPaths: { moved: [{ from: old('scripts', 'kernel', 'api-verbs', ''), to: 'scripts/kernel/verbs/' }] } })), [], 'a file below a moved directory keeps its size');
+  assert.deepEqual(sizeFindings(ctxOf({ 'scripts/machine/decisions.mjs': lines(700) }, { base: baseRev({ [old('scripts', 'reconciler', 'decisions.mjs')]: lines(700) }, { 'scripts/machine/decisions.mjs': old('scripts', 'reconciler', 'decisions.mjs') }) })), []);
   assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/big.mjs': lines(900) })), []);
+});
+
+test('HFS_SIZE_GROWTH: a renamed oversized file that grows is refused against its old path', () => {
+  const was = old('scripts', 'reconciler', 'decisions.mjs');
+  const grown = sizeFindings(ctxOf({ 'scripts/machine/decisions.mjs': lines(720) }, { base: baseRev({ [was]: lines(700) }, { 'scripts/machine/decisions.mjs': was }) }));
+  assert.deepEqual(codesOf(grown), ['HFS_SIZE_GROWTH']);
+  assert.equal(grown[0].before, 701);
+});
+
+test('baseRevision: git rename detection maps a renamed file to its path at the merge-base with main', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-size-rename-'));
+  try {
+    const identity = { 'user.name': 'spec', 'user.email': 'spec@example.invalid', 'commit.gpgsign': 'false' };
+    assert.equal(gitInit(dir).ok, true);
+    fs.mkdirSync(path.join(dir, 'scripts', 'reconciler'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'scripts', 'reconciler', 'decisions.mjs'), lines(700));
+    assert.equal(gitAdd(['-A'], { cwd: dir }).status, 0);
+    assert.equal(gitCommit(['-m', 'base'], { cwd: dir, config: identity }).status, 0);
+    fs.mkdirSync(path.join(dir, 'scripts', 'machine'), { recursive: true });
+    fs.renameSync(path.join(dir, 'scripts', 'reconciler', 'decisions.mjs'), path.join(dir, 'scripts', 'machine', 'decisions.mjs'));
+    assert.equal(gitAdd(['-A'], { cwd: dir }).status, 0);
+    const base = baseRevision(dir);
+    assert.equal(base.renamedFrom('scripts/machine/decisions.mjs'), 'scripts/reconciler/decisions.mjs');
+    assert.equal(base.renamedFrom('scripts/machine/other.mjs'), null);
+    assert.equal(base.show('scripts/reconciler/decisions.mjs'), lines(700));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // ------------------------------------------------------------------------------------------- RT_NODE_MODULES_LINK
@@ -317,7 +316,7 @@ test('RT_ABSOLUTE_PATH: the repo scan reads tracked files through ctx.read', () 
 const FIXTURE_MANIFEST = `schema: starci/runtime-slots@1
 kind: runtime
 version: 1.0.0
-versioning: {patch: p, minor: m, major: M, retire: r, pins: none}
+versioning: {patch: p, minor: m, major: M, pins: none}
 presenceValues: [required, optional, opt-in, forbidden]
 trackedValues: [tracked, ignored, external, generated]
 testValues: [unit-beside, e2e, none]

@@ -167,7 +167,7 @@ function applicationGraphs(config, context, modules) {
 /** Prove only static exported class-token identity and selected CQRS handler registration. */
 export function checkModuleRegistration(config, context) {
   const selected = config.backend.moduleRegistration;
-  if (!selected) return { violations: [], coverage: { status: 'unavailable', reason: 'architecture.json does not select Nest module-registration identity checks' } };
+  if (!selected) return { violations: [], coverage: { status: 'unavailable', reason: 'hfs.json does not select Nest module-registration identity checks' } };
   const ts = context.ts;
   const localFiles = new Set(context.files.map(file => canonical(file.fileName)));
   const modules = [];

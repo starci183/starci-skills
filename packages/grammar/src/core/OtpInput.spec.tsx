@@ -36,7 +36,7 @@ describe.each(GRAMMAR_ROOT_CASES)("Common OtpInput under $name", ({ Root, family
         expect(input.getAttribute("aria-describedby")).toBe("otp-help")
     })
 
-    it("stays a bare strip without a name source (backwards compatible)", () => {
+    it("stays a bare strip without a name source", () => {
         const { container } = render(<Root><OtpInput id="otp" name="otp" /></Root>)
         expect(container.querySelector("[data-grammar-otp-field]")).toBeNull()
         expect(screen.queryByRole("group")).toBeNull()

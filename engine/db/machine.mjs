@@ -5,7 +5,7 @@
 // services, seats and deliveries, throttle and pool backoff, GC, the land queue, lanes, pushes, machine_logs (+FTS5),
 // metrics and notifications. It replaces reconciler.sqlite, the supervisor ledger, journal.sqlite, the JSON state files
 // (ram-throttle.json, gc-state.json, reconciler-starts.json, the heartbeat, the land queue dirs, connectors/, env-servers/,
-// uat-slots/) and the text logs. The DDL is engine/db/migrations/machine/0001-init.sql (executed as data).
+// uat-slots/) and the text logs. The DDL is engine/db/schema/machine.sql (executed as data).
 //
 // Connection policy (DBTREE header, RESEARCH-STORAGE §3):
 //   new file : page_size=4096, auto_vacuum=INCREMENTAL before the first table, then journal_mode=WAL (anything else refuses)
@@ -25,7 +25,7 @@
 //   reader   : readOnly, query_only=ON, busy_timeout=15000; observer diagnostics never persist
 //   startup  : sqlite_version, node_version, journal_mode and user_version are recorded in machine_meta; a file that is
 //              not 'starci/machine@1' at user_version MACHINE_VERSION is refused — a fresh machine.sqlite is created by
-//              openMachine on first use from engine/db/migrations/machine/0001-init.sql. The store has exactly one schema: an existing file that is not exactly that schema is refused unchanged, for writers and readers alike, and has no upgrade path.
+//              openMachine on first use from engine/db/schema/machine.sql. The store has exactly one schema: an existing file that is not exactly that schema is refused unchanged, for writers and readers alike, and has no upgrade path.
 // Nothing outside engine/ opens machine.sqlite with `new DatabaseSync`: callers use openMachine / openMachineReader / openMachineObserver /
 // withMachine / readMachine and the typed functions on the handle.
 import { assertMutationFence } from '../../scripts/lib/mutation-fence.mjs';
@@ -55,7 +55,7 @@ export const MACHINE_SCHEMA = 'starci/machine@1';
 export const MACHINE_VERSION = 3;
 /** Test seam: STARCI_MACHINE_BUSY_TIMEOUT_MS (a positive integer) replaces the writer's busy_timeout; unset in production. */
 const busyTimeoutOf = (env = process.env) => { const n = Number(env?.STARCI_MACHINE_BUSY_TIMEOUT_MS); return Number.isInteger(n) && n > 0 ? n : MACHINE_BUSY_TIMEOUT_MS; };
-export const INIT_SQL_FILE = path.join(ENGINE_DIR, 'migrations', 'machine', '0001-init.sql');
+export const INIT_SQL_FILE = path.join(ENGINE_DIR, 'schema', 'machine.sql');
 export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'workers', 'learning']);
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -91,8 +91,7 @@ export function isUnderTempDir(file, { env = process.env, tempDirs = tempDirsOf(
   return forms.some((form) => tempDirs.map(normDir).some((dir) => form.startsWith(`${dir}/`)));
 }
 /**
- * machine.sqlite for `env`: TEST_REGISTRY_ENV when set; else <starciLocalRoot>/machine.sqlite (beside projects/,
- * NOT in the old runtime/ directory, so the new store never meets the old file at the same path) — except inside a node --test
+ * machine.sqlite for `env`: TEST_REGISTRY_ENV when set; else <starciLocalRoot>/machine.sqlite (beside projects/) — except inside a node --test
  * process tree whose runtime root is not under the temp directory, which gets a shared temp registry instead.
  */
 export const machineFileFor = (env = process.env) => {
@@ -243,7 +242,7 @@ function updateRow(db, table, set, where) {
 // The handle
 // ---------------------------------------------------------------------------------------------------------------------
 /**
- * Open machine.sqlite read-write (creating it from 0001-init on an empty file). Every connection runs wal_autocheckpoint=0;
+ * Open machine.sqlite read-write (creating it from schema/machine.sql on an empty file). Every connection runs wal_autocheckpoint=0;
  * `checkpointer:true` marks the reconciler engine's connection, the only one allowed to call checkpoint(), and only while
  * the engine_leader row names it (header).
  */

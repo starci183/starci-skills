@@ -44,7 +44,7 @@ function fixture(t) {
   return { machine, ledger, store };
 }
 
-test('native anchor paging survives inserts and rejects changed scope, deleted anchors and legacy cursors', () => {
+test('native anchor paging survives inserts and rejects changed scope, deleted anchors and positional cursors', () => {
   const initial = url('/api/decisions?project=fixture&limit=1');
   const rows = [{ id: 'same', store: 'machine', ledgerId: 'ledger-a' }, { id: 'same', store: 'ledger', ledgerId: 'ledger-a' }, { id: 'last', store: 'ledger', ledgerId: 'ledger-a' }];
   const first = page(rows, initial);
@@ -53,8 +53,8 @@ test('native anchor paging survives inserts and rejects changed scope, deleted a
   const changed = url(next); changed.searchParams.set('project', 'other');
   assert.throws(() => page(rows, changed), ReadCursorError);
   assert.throws(() => page(rows.slice(1), next), ReadCursorError);
-  const legacy = url(initial); legacy.searchParams.set('cursor', '1');
-  assert.throws(() => page(rows, legacy), ReadCursorError);
+  const positional = url(initial); positional.searchParams.set('cursor', '1');
+  assert.throws(() => page(rows, positional), ReadCursorError);
   assert.equal(limitOf(url('/api/logs?limit=1.9')), 1);
   assert.equal(limitOf(url('/api/logs?limit=900')), 200);
 });

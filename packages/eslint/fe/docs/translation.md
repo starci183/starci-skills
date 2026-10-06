@@ -2,7 +2,7 @@
 
 Law module: `translation.mjs`. Catalogue: R58 FE_I18N_LITERAL.
 
-No text a reader can see or hear is written in source, at any tier and in any language: it is read from a `next-intl` catalogue through `t()`. There is no `vn-ok` pragma, no endonym exemption and no `resources/` copy folder; the catalogues (`messages/<locale>.json`), fixtures and specs are the only content paths. The notion of a literal is the same as the repository's i18n catalog check: a word is two or more letters, and the copy attributes are `label`, `title`, `alt`, `placeholder` and the `aria-*` set.
+No text a reader can see or hear is written in source, at any tier and in any language: it is read from a `next-intl` catalogue through `t()`. There is no pragma, no endonym exemption and no `resources/` copy folder; the catalogues (`messages/<locale>.json`), fixtures and specs are the only content paths. The notion of a literal is the same as the repository's i18n catalog check: a word is two or more letters, and the copy attributes are `label`, `title`, `alt`, `placeholder` and the `aria-*` set.
 
 Every rule below is an error in `starciFeConfig`; none can be switched off or suppressed inline.
 
@@ -51,4 +51,4 @@ A template literal with substitutions is copy when its static parts contain a wo
 
 **Why:** The text `"<text>"` at `<file>:<line>` does not go through `t()`.
 
-**Fix:** Move the sentence into `modules/i18n/messages/<locale>.json` and read it with `t("key")`; there is no exception and no `vn-ok`.
+**Fix:** Move the sentence into `modules/i18n/messages/<locale>.json` and read it with `t("key")`; there is no exception.

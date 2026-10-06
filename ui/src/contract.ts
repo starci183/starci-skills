@@ -89,7 +89,7 @@ export type AttemptRow = {
 export type RecordedDecision = { id: string; decider: string; choice: string | null; rationale: string | null; result: unknown; at: number; association: 'attempt' | 'job' };
 export type RuntimeCheckpoint = { sha: string; at: number; committed: boolean | null; scope: string[] | null; files: string[] | null };
 export type WorkflowLand = {
-  scope: 'workflow'; workflow: string; repo: string; branch: string | null; source: 'workflow-landed' | 'product-land';
+  scope: 'workflow'; workflow: string; repo: string; branch: string | null; source: 'workflow-landed';
   result: string; mergedSha: string | null; reason: string | null; output: BlobLink | null; at: number; steps: unknown[];
   pushed: boolean | null; checkpoint: RuntimeCheckpoint | null; attemptAssociation: 'head-match' | 'unproven';
 };
@@ -219,11 +219,6 @@ export type Usage = { recorded: boolean; byModel: { model: string; subject_type:
 export type MetricSnapshotProvenance = { id: number; kind: string; ledgerId: string | null; workflowId: string | null; at: number | null;
   windowMs: number | null; subject: string | null; dataSha: string | null; payloadSource: 'blob' | 'inline'; ageMs: number | null };
 export type MetricRead<T = Record<string, unknown>> = { snapshot: MetricSnapshotProvenance; payload: T };
-export type MetricOpRow = { op: string; agent: string | null; model: string | null; attempts: number; pass: number; fail: number; blocked: number;
-  workerDead: number; settled: number; passRate: number | null; cohort: { since: number; until: number; basis: 'dispatch' };
-  p50CycleMs: number | null; p90QueueMs: number | null; topFailure: { class: string; n: number }[];
-  tokensIn: number | null; tokensOut: number | null; costUsd: number | null;
-  usageCoverage: { rows: number; tokensIn: number; tokensOut: number; costUsd: number; complete: boolean } };
 export type PipelineView = { goalRevision: number | null; chainStatus: string; legs: LegRow[]; edges: { from: string; to: string }[];
   approvedBy: string | null; approvalRef: string | null; approvalState: 'recorded' | 'unproven'; planSource: 'goals.opChain';
   scheduling: { source: string; ops: string[]; edges: { from: string; to: string }[]; readError: string | null };

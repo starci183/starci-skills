@@ -1,6 +1,5 @@
 // Hermetic apps for the HFS architecture machine specs: a temp git repo with the app-root hfs.json, and in one side folder a
-// tsconfig and the files a spec lists, judged by checkArchitecture (the side folder as its root) with the injected TypeScript compiler. No architecture.json exists any
-// more; the declaration is hfs.json (modules/schemas/hfs-repo.schema.yaml), the direction matrix and slots are
+// tsconfig and the files a spec lists, judged by checkArchitecture (the side folder as its root) with the injected TypeScript compiler. The declaration is hfs.json (modules/schemas/hfs-repo.schema.yaml), the direction matrix and slots are
 // knowledge/hfs/slots.yaml.
 import fs from 'node:fs';
 import os from 'node:os';

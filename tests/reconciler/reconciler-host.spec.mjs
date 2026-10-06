@@ -492,7 +492,6 @@ test('quickCheck: an intact store refused for its schema is incompatible, rather
     const r = quickCheck(file, { verifiedOpen: refuse });
     assert.equal(r.ok, false);
     assert.equal(r.reason, 'schema-incompatible');
-    assert.equal(r.legacy, undefined);
     assert.match(r.result[0], /schema refused/);
     assert.equal(quickCheck(path.join(dir, 'absent.sqlite')).ok, false);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }

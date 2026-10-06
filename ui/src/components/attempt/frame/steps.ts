@@ -1,4 +1,4 @@
-import type { AttemptDetailV2, UiState } from '../../../contract';
+import type { AttemptDetailV3, UiState } from '../../../contract';
 import { statusFromOutcome, statusFromVerdict, statusTone, type Tone } from '../../status';
 import type { StepItem } from '../../step-bar';
 import { formatSpan } from './util';
@@ -9,12 +9,12 @@ import { checkpointState } from '../checkpoint';
 
 const stateOf = (tone: Tone): UiState => tone === 'success' ? 'done' : tone === 'failed' ? 'bad' : tone === 'running' ? 'running' : tone === 'warning' ? 'warn' : 'waiting';
 
-export function isOpen(attempt: AttemptDetailV2): boolean {
+export function isOpen(attempt: AttemptDetailV3): boolean {
   return attempt.verdict == null && attempt.endState == null;
 }
 
 /** Recorded milestones; each tone and timestamp comes from its own receipt. */
-export function stepItems(attempt: AttemptDetailV2): StepItem[] {
+export function stepItems(attempt: AttemptDetailV3): StepItem[] {
   const at = (step: string) => attempt.timeline.find(item => item.step === step)?.at ?? null;
   const open = isOpen(attempt);
   const startedAt = at('started');

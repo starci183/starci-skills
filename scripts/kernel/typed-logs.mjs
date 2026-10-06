@@ -1,5 +1,5 @@
 // typed-logs.mjs — logs as typed rows, not scraped terminal text. The `logs` table of the repository's ledger
-// (engine/db/ledger.mjs ledgerFileFor; engine/db/migrations/runtime/0001-init.sql; one RDBMS per project, so a finished
+// (engine/db/ledger.mjs ledgerFileFor; engine/db/schema/runtime.sql; one RDBMS per project, so a finished
 // workflow is archived and deleted as a unit).
 // Every write goes through the process's ONE buffered writer (log-writer.mjs: its own connection, short batched
 // BEGIN IMMEDIATE transactions, never inside a caller's ledger transaction), so twenty ops logging at once never hold the ledger's write lock for more than milliseconds.
@@ -167,7 +167,7 @@ export function prepareLogRow(row, { dataMaxBytes = logSettings().dataMaxBytes, 
 }
 
 // ------------------------------------------------------------------------------------------- storage
-// The `logs` and `log_cursors` tables live in the ledger (created by openLedger from 0001-init.sql). Every
+// The `logs` and `log_cursors` tables live in the ledger (created by openLedger from schema/runtime.sql). Every
 // write goes through the process's ONE buffered writer (log-writer.mjs); reads use the writer's own connection.
 /**
  * The repository's typed logs: {db, file, writer, close()}. `db` reads (the writer's connection to
@@ -258,13 +258,10 @@ export function syncDerivedLogs(logs, ledgerDb, { batch = 1000, maxBatches = 300
   const kinds = DERIVED_EVENT_KINDS.map(() => '?').join(',');
   const eventsAfter = ledgerDb.prepare(`SELECT seq,workflow_id,entity_type,entity_id,attempt_id,kind,payload_json,created_at FROM events WHERE seq>? AND kind IN (${kinds}) ORDER BY seq LIMIT ?`);
   const jobStmt = ledgerDb.prepare(`SELECT op_id,try_no AS attempt,${jobResultSql('jobs')} AS result_json FROM jobs WHERE job_id=?`);
-  let artifactStmt = null;
-  try { artifactStmt = ledgerDb.prepare('SELECT * FROM job_artifacts WHERE job_id=? AND path=?'); } catch { artifactStmt = null; }
   const patchDocs = new Map();
   const ctx = {
     ledgerKey,
     jobOf: (id) => jobStmt.get(id) ?? null,
-    artifactOf: (jobId, p) => { try { return artifactStmt?.get(jobId, p) ?? null; } catch { return null; } },
     // The pre-structured diff (<patch>.json) of a repo-relative patch path; null when absent or unreadable.
     patchJsonOf: (rel) => {
       if (!repo) return null;

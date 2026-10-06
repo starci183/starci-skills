@@ -93,8 +93,8 @@ examples:
 editions:
   - full
 reads: the workflow and job rows (identity only), the caller (an op terminal is bound to its job)
-writes: "one row into the ledger's logs table (<repo>/.starciwork/runtime.sqlite since 2026-09-27;
-  scripts/kernel/ typed-logs.mjs) through the process's buffered log writer
+writes: "one row into the ledger's logs table (the project's runtime.sqlite;
+  scripts/kernel/typed-logs.mjs) through the process's buffered log writer
   (scripts/machine/log-writer.mjs: its own connection, one short transaction, committed before the
   verb returns; no events row, never inside a ledger transaction). The row is validated per kind,
   redacted (the push secret-scan patterns of scripts/lib/secret-patterns.mjs plus OTPs, bearer
@@ -109,8 +109,7 @@ kinds: "step.start {name} | step.end {name, durationMs?, ok?} | cmd.run {cmd, ex
   {markdown} | narration {markdown} | ask {question, options?} | error {code, message, hint?} |
   warning {code, message, missing?}; derived from ledger events (a Kernel may write them): dispatch,
   report, settle, land, incident, job.drop, log.truncated"
-sidecar: "none in any repository (alpha.3): the retired
-  .starciwork/kernel-evidence/<workflow>/jobs/<job>/log.jsonl file is gone. An op logs through this
+sidecar: "none in any repository. An op logs through this
   verb; lines it kept in <STARCI_JOB_SCRATCH>/log.jsonl instead (one JSON object per line, {kind,
   msg, data?, refs?, at?, level?, node?}) are ingested by starci kernel report into the ledger's logs table
   before the scratch is deleted (typed-logs.mjs ingestScratchLog), keyed by line so nothing is

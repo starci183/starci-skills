@@ -87,7 +87,7 @@ const drawEntries = (text) => {
   for (const line of text.split('\n')) {
     const idM = line.match(/^\s+-\s+id:\s*(\S+)/) ?? line.match(/^\s+id:\s*(\S+)/);
     if (idM) { id = idM[1]; continue; }
-    const imgM = line.match(/^\s+image:\s*(\S+)/);
+    const imgM = line.match(/^\s+part:\s*(\S+)/);
     if (imgM) entries.push({ id, refs: [imgM[1]] });
   }
   return entries;
@@ -99,9 +99,7 @@ const drawEntries = (text) => {
 // The images a draws.yaml names. Only a draws.yaml the ask's own report lists
 // is read: picking "the newest draws.yaml in the tree" once served another
 // workflow's candidates under an unrelated question.
-// Each draw names its image as a path or {path, sha256}; the owner-facing
-// one is `part`, then `content`, then `image` (drawImageRefs) — the composite
-// an older draws.yaml put in `image` is swapped for its part by ownerImages.
+// Each draw names its part as a path or {path, sha256} (drawImageRefs).
 const drawsImages = (repo, drawsFile) => {
   const root = path.join(repo, '.starciwork');
   const newest = drawsFile;
@@ -185,8 +183,7 @@ const specImages = (spec, repo, out, seen) => {
 export const reportImages = (files, repo) => {
   const out = [], seen = new Set();
   for (const spec of files ?? []) specImages(spec, repo, out, seen);
-  // An evidence bundle's direction.png is a copy of a record asset (on
-  // records drawn before the part rule, of the composite): when the report
+  // An evidence bundle's direction.png is a copy of a record asset: when the report
   // also names images outside evidence/, those are the ones served — the
   // same rule telegram-media applies.
   const sorted = out.toSorted((a, b) => b.mtime - a.mtime);

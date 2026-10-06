@@ -51,8 +51,8 @@ Rules that hold everywhere:
 - **`.starciwork` holds product content only**: Work records, SRS/SDS, UI specifications and brand.
   Agent output lives in SQL and blobs; a Work record cites it by artifact id and sha256.
 
-The schema itself is data: `engine/db/migrations/runtime/0001-init.sql` and
-`engine/db/migrations/machine/0001-init.sql`. See [storage](ledger-db.md) for the tables and
+The schema itself is data: `engine/db/schema/runtime.sql` and
+`engine/db/schema/machine.sql`. See [storage](ledger-db.md) for the tables and
 [debugging](debugging.md) for the queries that answer "why is this stuck".
 
 ## Roles
@@ -166,8 +166,8 @@ repeatedly is replaced.
 
 `starci reconciler up` (`scripts/reconciler/start.mjs`, with `skills/starci/references/host-startup.md` as its internal
 procedure; `starci reconciler restart` is the restart lever) runs, in order: preflight (Node bundles
-SQLite >= 3.51.3, `machine.sqlite` quick_check, every registered ledger's quick_check, ledgers on temp/test paths or with a missing repo or file, legacy
-in-repo `.starciwork/runtime.sqlite`, kernel/supervisor pins whose agent card cannot attest the model, Orca reachable);
+SQLite >= 3.51.3, `machine.sqlite` quick_check, every registered ledger's quick_check, ledgers on temp/test paths or with a missing repo or file,
+kernel/supervisor pins whose agent card cannot attest the model, Orca reachable);
 reports a `reconciler.profile` other than operational as red (`config.yaml` is never rewritten by a plain run; `--set-profile operational|observe` writes that one block, backup first);
 rebuilds `ui/dist` with `npm run build` in `ui/` when any `ui/src`, `ui/package.json`, `ui/index.html` or vite config is
 newer than the build (a failed build is red); starts the engine, or restarts it out of `--safe` when no real crash loop
@@ -202,7 +202,7 @@ custody, encrypted with sops; they never enter a database or a blob.
 | Host runtime loop | `modules/reconciler/reconciler.yaml`, `scripts/reconciler/engine.mjs` |
 | Operation contracts | `modules/ops/ops/*.yaml` ([ops-source-ownership](ops-source-ownership.md)) |
 | Model routing | `modules/models/selection.yaml`, `scripts/route/route-model.mjs` |
-| Schemas | `engine/db/migrations/runtime/0001-init.sql`, `engine/db/migrations/machine/0001-init.sql` |
+| Schemas | `engine/db/schema/runtime.sql`, `engine/db/schema/machine.sql` |
 | Writers | `engine/db/ledger.mjs`, `engine/db/machine.mjs`, `engine/db/blob.mjs` |
 | Redaction | `scripts/lib/redact.mjs` (applied before every blob put and every log write) |
 | Host contract and agent cards | `modules/host/**`, `modules/models/agents/**` ([host contract](host-contract.md)) |
@@ -421,8 +421,7 @@ and kernel over domain, gates, machine and hfs, down to the api, db and base tie
 `ruleParams.runtime.infraOwners` declares which api system may call which host surface
 (`node:child_process` only in `scripts/api/*`, `node:sqlite` only in `engine/db`, each program word
 only in its own system's folder). A path the target tree moves is a forbidden slot whose `goesTo`
-names its successor; files move with the move codemod, which appends the `moved[]` entries of
-`modules/kernel/retired-paths.yaml`.
+names its successor; files move with the move codemod.
 
 `starci runtime check` dispatches to `scripts/checks/check-runtime.mjs`: `node --check`
 over every `.mjs` of `engine/`, `scripts/`, `modules/` and `bin/`; the runtime HFS check

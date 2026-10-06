@@ -3,7 +3,7 @@
 //
 //   normalizeBias(obj)   — canonicalize a bias object (agent-supplied or
 //                          regex-extracted): aliases → canonical pool ids,
-//                          legacy soft unknowns dropped; hard constraints preserved or refused.
+//                          unknown soft aliases dropped; hard constraints preserved or refused.
 //   extractRoutingBias(text) -> { prefer: [], avoid: [] }
 //                          — regex floor for callers with no agent in the
 //                          loop (automation, programmatic define-goal). An

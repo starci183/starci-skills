@@ -122,10 +122,10 @@ test('the GC reclaims orphans: an ended workflow\'s tree (through Orca), an unre
   const ended = ensureWorkflowWorktree({ env, orca }, { workflowId: 'wf-shop-fe-ended-1a', appRepo: repo }).record;
   write(ended.path, 'src/wip.ts', 'export const wip = 1;\n');
   // 2. a tree under the worktrees root the registry never knew (made before the registry, or by a crashed run).
-  const orphan = path.join(worktreesRootOf(repo), 'legacy', '_wf');
+  const orphan = path.join(worktreesRootOf(repo), 'stray', '_wf');
   fs.mkdirSync(path.dirname(orphan), { recursive: true });
-  git(repo, 'worktree', 'add', '-q', '-b', 'wf/legacy', orphan, 'main');
-  git(repo, 'config', 'branch.wf/legacy.description', 'wf-shop-fe-legacy-9z');
+  git(repo, 'worktree', 'add', '-q', '-b', 'wf/stray', orphan, 'main');
+  git(repo, 'config', 'branch.wf/stray.description', 'wf-shop-fe-stray-9z');
   write(orphan, 'src/unlanded.ts', 'export const u = 1;\n');
   git(orphan, 'add', '-A'); git(orphan, 'commit', '-qm', 'unlanded work');
   // 3. a land scratch whose creating process is gone.
@@ -148,16 +148,16 @@ test('the GC reclaims orphans: an ended workflow\'s tree (through Orca), an unre
   assert.ok(orca.calls.some(([verb, a]) => verb === 'remove' && a.worktree === `id:${ended.orcaWorktreeId}`), 'Orca removed it');
   assert.equal(by(orphan)?.reason, 'orphan');
   assert.equal(by(orphan)?.ok, true);
-  assert.equal(by(orphan)?.preserved, 'refs/heads/preserved/wf-shop-fe-legacy-9z', 'the unlanded commit is preserved');
-  assert.equal(git(repo, 'show', 'preserved/wf-shop-fe-legacy-9z:src/unlanded.ts'), 'export const u = 1;');
+  assert.equal(by(orphan)?.preserved, 'refs/heads/preserved/wf-shop-fe-stray-9z', 'the unlanded commit is preserved');
+  assert.equal(git(repo, 'show', 'preserved/wf-shop-fe-stray-9z:src/unlanded.ts'), 'export const u = 1;');
   assert.equal(by(scratch)?.reason, 'owner-gone');
   assert.equal(by(scratch)?.home, 'git');
   assert.equal(by(slot.pending)?.reason, 'slot-never-bound');
   assert.equal(by(live.path), undefined, 'a running workflow is never collected');
   for (const p of [ended.path, orphan, scratch]) assert.ok(!fs.existsSync(p), `${p} removed`);
-  assert.ok(!fs.existsSync(path.dirname(orphan)), 'the empty legacy <wf> directory goes too');
+  assert.ok(!fs.existsSync(path.dirname(orphan)), 'the empty stray <wf> directory goes too');
   assert.ok(fs.existsSync(live.path));
-  assert.deepEqual(branches(repo, 'wf/legacy'), []);
+  assert.deepEqual(branches(repo, 'wf/stray'), []);
   assert.equal(trees(repo), 2, 'main + the live workflow');
   const counts = worktreeCounts({ env, repos: [repo], now }).find((c) => c.repoRoot === repo);
   assert.deepEqual({ live: counts.live, cap: counts.cap, orphans: counts.orphans.length, over: counts.over }, { live: 1, cap: 10, orphans: 0, over: false });

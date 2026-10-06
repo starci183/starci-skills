@@ -1,15 +1,12 @@
 // Host discovery projection owned by the runtime installer; no effects occur on import.
 // Only exact recorded regular-file custody admits a copy update or retired entry removal.
-import {sha256, sha256File} from '../../engine/digest.mjs';
-import {cpSync, mkdirSync, readdirSync, readFileSync, rmSync, rmdirSync, lstatSync} from 'node:fs';
+import {sha256File} from '../../engine/digest.mjs';
+import {cpSync, mkdirSync, readdirSync, rmSync, rmdirSync, lstatSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {isLinkLike} from '../api/fs/is-link-like.mjs';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-// Prior runtime manifests normalized line endings; new discovery custody binds exact copied bytes.
-const legacySha = file => sha256(readFileSync(file).toString('utf8').replaceAll('\r\n', '\n'));
-
 const ENTRY_SKILL = 'starci';
 const HOST_SKILL_DIRS = ['.devin/skills', '.agents/skills'];
 
@@ -24,12 +21,12 @@ function entryPath(repo, relative) {
   return file;
 }
 
-function entryInventory(directory, relative = '', files = {}, digest = sha256File) {
+function entryInventory(directory, relative = '', files = {}) {
   const stat = lstatSync(directory, {throwIfNoEntry: false});
   if (!stat) return files;
   if (isLinkLike(directory, {stat}) || (!stat.isDirectory() && !stat.isFile())) throw new Error('entry skill contains an unowned link or special file');
-  if (stat.isFile()) { files[relative] = digest(directory); return files; }
-  for (const name of readdirSync(directory).sort()) entryInventory(path.join(directory, name), relative ? `${relative}/${name}` : name, files, digest);
+  if (stat.isFile()) { files[relative] = sha256File(directory); return files; }
+  for (const name of readdirSync(directory).sort()) entryInventory(path.join(directory, name), relative ? `${relative}/${name}` : name, files);
   return files;
 }
 
@@ -61,8 +58,7 @@ export function entrySkillsPlan(repo, manifest = null) {
       }
       const owned = Object.fromEntries(Object.entries(manifest.files).filter(([file]) => file.startsWith(prefix))
         .map(([file, digest]) => [file.slice(prefix.length), digest]));
-      const prior = entryInventory(entryPath(repo, relative), '', {}, legacySha);
-      if (Object.keys(actual).length !== Object.keys(owned).length || Object.entries(prior).some(([file, digest]) => owned[file] !== digest)) {
+      if (Object.keys(actual).length !== Object.keys(owned).length || Object.entries(actual).some(([file, digest]) => owned[file] !== digest)) {
         plan.preserved.push({path: relative, reason: 'entry differs from prior installer custody'});
         continue;
       }
@@ -77,8 +73,7 @@ export function entrySkillsPlan(repo, manifest = null) {
       continue;
     }
     const unowned = Object.entries(actual).some(([file, digest]) => !payload[file]
-      || (digest !== payload[file] && digest !== manifest?.hostSkills?.files?.[`${relative}/${file}`]
-        && legacySha(entryPath(repo, `${relative}/${file}`)) !== manifest?.files?.[`skills/${ENTRY_SKILL}/${file}`]));
+      || (digest !== payload[file] && digest !== manifest?.hostSkills?.files?.[`${relative}/${file}`]));
     if (unowned) { plan.preserved.push({path: relative, reason: 'entry contains locally changed or unowned files'}); continue; }
     for (const [file, digest] of Object.entries(payload)) {
       const target = `${relative}/${file}`;

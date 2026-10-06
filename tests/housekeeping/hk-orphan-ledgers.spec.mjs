@@ -7,14 +7,13 @@ import { fileURLToPath } from 'node:url';
 import { openLedger, projectsRootFor } from '../../engine/db/ledger.mjs';
 import { openMachine, projectLedgerFile, readMachine, repoKeyOf } from '../../engine/db/machine.mjs';
 import {
-  ORPHAN_LEDGER_CODE, LEGACY_WORK_SQLITE_CODE, REGISTERED_DIR_MISSING_REASON, archiveOrphanLedger, boundRepoRoots, dateStamp,
-  legacyWorkSqliteFindings, orphanLedgerFindings, orphanReason, sourceRootsFromLedgerFile, sourceRootsOf,
-  sweepOrphanLedgers, workspaceBoundRepoRoots,
+  ORPHAN_LEDGER_CODE, REGISTERED_DIR_MISSING_REASON, archiveOrphanLedger, dateStamp,
+  orphanLedgerFindings, orphanReason, sourceRootsFromLedgerFile, sourceRootsOf,
+  sweepOrphanLedgers,
 } from '../../scripts/housekeeping/hk-orphan-ledgers.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 
-// The two ledger-hygiene findings of COOK-BRIEF F4 handover (incident 2026-09-30): a registered ledger whose bound
-// repo(s) are gone (orphan) and a bound repo that still has an in-repo .starciwork/runtime.sqlite (legacy).
+// The ledger-hygiene finding: a registered ledger whose bound repo(s) are gone (orphan).
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /** A sandbox whose state root is entirely its own: env.STARCI_LOCAL_ROOT resolves machine.sqlite, projects/ and
@@ -54,15 +53,6 @@ function makeUnregisteredLedger(file, { workflowId = 'wf-orphan-fixture-one', so
   try { ledger.write.createWorkflow({ workflowId, phase: 'awaiting-approval', sourceRoots }); } finally { ledger.close(); }
 }
 
-/** A .workspaces/projects/<name>/work.json under `sourceRoot` (modules/schemas/workspace-routing.yaml bindingShape). */
-function makeWorkspaceBinding(sourceRoot, name, pathFromSource) {
-  const dir = path.join(sourceRoot, '.workspaces', 'projects', name);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'work.json'), JSON.stringify({ schema: 'starci/workspace-binding@2', project: name,
-    repository: pathFromSource === undefined ? undefined : { pathFromSource, gitRepository: `https://example.test/${name}.git` },
-    sides: { be: 'be', fe: 'fe' }, work: { pathFromRepository: '.starciwork' } }));
-}
-
 test('orphanReason: no roots, every root unreachable, and at least one reachable', () => {
   assert.equal(orphanReason([]), 'no-source-roots');
   assert.equal(orphanReason(['/a', '/b'], { unreachable: () => true }), 'source-roots-unreachable');
@@ -71,21 +61,6 @@ test('orphanReason: no roots, every root unreachable, and at least one reachable
 
 test('dateStamp is YYYYMMDD, matching blob-gc.mjs and purge-workflow.mjs', () => {
   assert.equal(dateStamp(Date.UTC(2026, 8, 30, 12, 0, 0)), '20260930');
-});
-
-test('legacyWorkSqliteFindings is pure: it never opens a database, only checks the filesystem', (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-legacy-store-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const clean = path.join(root, 'clean-repo'), legacy = path.join(root, 'legacy-repo'), missing = path.join(root, 'no-such-repo');
-  fs.mkdirSync(path.join(clean, '.starciwork'), { recursive: true });
-  fs.mkdirSync(path.join(legacy, '.starciwork'), { recursive: true });
-  fs.writeFileSync(path.join(legacy, '.starciwork', 'runtime.sqlite'), 'x');
-  fs.writeFileSync(path.join(legacy, '.starciwork', 'runtime.sqlite-wal'), 'x');
-  const found = legacyWorkSqliteFindings([clean, legacy, missing, legacy, repoKeyOf(legacy)]); // a duplicate root is deduped across separator styles
-  assert.equal(found.length, 1);
-  assert.equal(found[0].code, LEGACY_WORK_SQLITE_CODE);
-  assert.equal(found[0].repoRoot, repoKeyOf(legacy)); // the canonical registry form (machine-db.mjs repoKey), not the raw OS path
-  assert.deepEqual(found[0].files.map((f) => path.basename(f)).sort(), ['runtime.sqlite', 'runtime.sqlite-wal']);
 });
 
 test('sourceRootsOf unions machine.sqlite repositories rows with the ledger\'s own repo_root, deduped', (t) => {
@@ -168,48 +143,6 @@ test('orphanLedgerFindings: a registered ledger whose directory is gone entirely
 test('starciSourceRoot: STARCI_SOURCE_ROOT overrides it, else it is the directory holding this runtime checkout', () => {
   assert.equal(starciSourceRoot({}), path.dirname(REPO_ROOT));
   assert.equal(starciSourceRoot({ STARCI_SOURCE_ROOT: path.join(os.tmpdir(), 'somewhere-else') }), path.join(os.tmpdir(), 'somewhere-else'));
-});
-
-test('workspaceBoundRepoRoots resolves one app root per binding, pathFromSource "." included', (t) => {
-  const sourceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-workspace-source-'));
-  t.after(() => fs.rmSync(sourceRoot, { recursive: true, force: true }));
-  makeWorkspaceBinding(sourceRoot, 'starci-academy', '.');
-  makeWorkspaceBinding(sourceRoot, 'broken', undefined); // no `repository` at all: skipped, never a crash
-  fs.mkdirSync(path.join(sourceRoot, '.workspaces', 'projects', 'unreadable'), { recursive: true });
-  fs.writeFileSync(path.join(sourceRoot, '.workspaces', 'projects', 'unreadable', 'work.json'), '{not json');
-
-  const roots = workspaceBoundRepoRoots({ env: { STARCI_SOURCE_ROOT: sourceRoot } });
-  assert.deepEqual(roots, [path.resolve(sourceRoot).replace(/\\/g, '/')]);
-});
-
-test('workspaceBoundRepoRoots: no .workspaces/projects directory yields [] rather than throwing', (t) => {
-  const sourceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-no-workspaces-'));
-  t.after(() => fs.rmSync(sourceRoot, { recursive: true, force: true }));
-  assert.deepEqual(workspaceBoundRepoRoots({ env: { STARCI_SOURCE_ROOT: sourceRoot } }), []);
-});
-
-test('boundRepoRoots merges machine.sqlite repositories with every .workspaces binding, deduped across path-separator styles', (t) => {
-  const { env: machineEnv } = sandbox(t);
-  const sourceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-workspace-source-'));
-  t.after(() => fs.rmSync(sourceRoot, { recursive: true, force: true }));
-  const env = { ...machineEnv, STARCI_SOURCE_ROOT: sourceRoot };
-  // The same repo is bound both ways: registered in machine.sqlite (forward-slash, repoKey-normalized) and in a
-  // workspace binding resolved natively (backslash on Windows) — it must land in the merged list exactly once.
-  makeLedger(env, { ledgerId: 'shared-repo-ledger', repoRoot: REPO_ROOT });
-  makeWorkspaceBinding(sourceRoot, 'shared', REPO_ROOT);
-  makeWorkspaceBinding(sourceRoot, 'workspace-only', '.');
-
-  const roots = boundRepoRoots({ env });
-  const repoRootCount = roots.filter((r) => r.replace(/\\/g, '/').toLowerCase() === REPO_ROOT.replace(/\\/g, '/').toLowerCase()).length;
-  assert.equal(repoRootCount, 1, `the shared repo appears once regardless of separator style: ${JSON.stringify(roots)}`);
-  assert.ok(roots.some((r) => r.replace(/\\/g, '/').toLowerCase() === sourceRoot.replace(/\\/g, '/').toLowerCase()), 'the workspace-only binding (pathFromSource ".") is included too');
-});
-
-test('boundRepoRoots lists every distinct repository root the registry knows', (t) => {
-  const { env } = sandbox(t);
-  makeLedger(env, { ledgerId: 'ledger-a', repoRoot: REPO_ROOT });
-  const roots = boundRepoRoots({ env });
-  assert.ok(roots.includes(repoKeyOf(REPO_ROOT)));
 });
 
 test('sweepOrphanLedgers dry run only reports; --apply moves the ledger directory (never deletes) and retires the row', async (t) => {

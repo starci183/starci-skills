@@ -9,7 +9,7 @@
 @layer starci-grammar-offset-pop {
     /* ---------------------------------------------------------------- tone vocabulary */
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-tone] {
-        --offset-pop-tone-color: var(--offset-pop-surface-muted);
+        --offset-pop-tone-color: var(--offset-pop-surface-secondary);
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-tone="informative"] {

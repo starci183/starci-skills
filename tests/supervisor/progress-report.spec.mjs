@@ -21,7 +21,7 @@ test('the progress report spells out each workflow in Vietnamese with a finish t
     const wf = 'wf-nivo-app-auth-mudqjob3';
     const start = Date.now() - 4 * 3600000;
     seedWorkflow(ledger, { id: wf, state: { phase: 'running' }, now:start });
-    ledger.db.prepare("UPDATE workflows SET created_at=? WHERE workflow_id=?").run(start, wf);
+    ledger.db.prepare("UPDATE workflows SET created_at=?, display_name='AUTH' WHERE workflow_id=?").run(start, wf);
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
       .run(wf, 1, 'g', GOAL, JSON.stringify({ derivedPlan: { legs: ['request.analyze', 'scope.define', 'business.decide', 'architecture.decide', 'work.author'] } }), start);
     seedWorkflow(ledger,{id:wf,now:start,jobs:[
@@ -42,7 +42,7 @@ test('the progress report spells out each workflow in Vietnamese with a finish t
     const text = progressMessages([{ repo: 'r', ...p }]).join('\n');
     // The Vietnamese wording lives in the i18n catalog (modules/i18n/messages): assert the rendered catalog text.
     assert.ok(text.includes(trv('<b>[StarCi] Progress report at {now}</b>', { now: '|' }).split('|')[0]));
-    assert.ok(text.includes(trv('<b>▶ {name}</b> — {done}/{total} legs done', { name: trv('AUTH (sign-in)'), done: 2, total: 4 })));
+    assert.ok(text.includes(trv('<b>▶ {name}</b> — {done}/{total} legs done', { name: 'AUTH', done: 2, total: 4 })));
     assert.ok(text.includes(trv('Goal: {goal}', { goal: GOAL })));
     assert.ok(text.includes(`${trv('🔄 In progress: <b>{op}</b>', { op: LEG_VI['business.decide'] })}${trv(' (rework)')}`));
     assert.ok(text.includes(trv('⏳ Waiting its turn: {legs}', { legs: LEG_VI['architecture.decide'] })));

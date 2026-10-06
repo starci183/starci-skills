@@ -65,7 +65,7 @@ examples:
 editions:
   - full
 purpose: Every indexed proof file of the workflow's jobs (job_artifacts), per job; a pure projection.
-reads: the job_artifacts rows of the workflow (engine/db/migrations/runtime/0001-init.sql), joined
+reads: the job_artifacts rows of the workflow (engine/db/schema/runtime.sql), joined
   to each job's status
 subkinds: "what produced the file (engine/db/ledger.mjs JOB_ARTIFACT_SUBKINDS,
   scripts/kernel/artifact-subkind.mjs): draw-render | asset-gen | app-capture | e2e-capture |

@@ -1,7 +1,7 @@
 // blob.mjs — the content-addressed blob store (operational evidence and agent output) beside the two SQLite stores:
 // putBlob/getBlob/statBlob/putJson write and read it; blob bytes are immutable and never removed here.
 //
-// Reading agent output back out of the blob store (alpha.3, ARCHITECTURE-DB §5.3). A Work record and the
+// Reading agent output back out of the blob store. A Work record and the
 // draw subsystem cite agent output by {artifact?, sha256}; this is the one place that turns such a citation back into
 // bytes, a readable file with an extension, or a directory.
 //   resolveBlob(ref, {db})   ref = {artifact?, sha256?} | 'blob:<sha>' | '<sha>' → {sha256, file} | null (an artifact id

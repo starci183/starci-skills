@@ -53,16 +53,6 @@ AC_NAMING_ASYMMETRY:
   owner: op-retry
   kind: check-finding
 
-AC_UNREMAPPED_REF:
-  title: "Reference uses old criterion id"
-  title_vi: "Tham chiếu còn dùng mã tiêu chí cũ"
-  meaning_vi: "Một nơi vẫn gọi tiêu chí đã gộp bằng mã ac cũ thay vì dạng gọn mới."
-  causes_vi:
-    - "Gộp tiêu chí nhưng chưa cập nhật các chỗ tham chiếu"
-  nextStep_vi: "Đây chỉ là cảnh báo; op sẽ sửa tham chiếu sang dạng cha#mã ở lần chạy sau."
-  owner: op-retry
-  kind: check-finding
-
 AGENT_HEADLESS_LAUNCH:
   title: "Headless agent launch refused"
   title_vi: "Không được tự chạy agent ở chế độ không giao diện"
@@ -2645,12 +2635,11 @@ HFS_FORBIDDEN_PRESENT:
 HFS_INLINE_SUPPRESSION:
   title: "Inline lint or type suppression"
   title_vi: "Chú thích tắt luật tại chỗ"
-  meaning_vi: "Có chú thích tắt luật hoặc miễn trừ trong mã: eslint-disable, eslint-enable, eslint-env, /* global */, stylelint-disable, @ts-ignore, @ts-expect-error, @ts-nocheck (ở bất kỳ vị trí nào trong chú thích), istanbul, c8 hay v8 ignore, NOSONAR, sonar-disable, prettier-ignore hoặc vn-ok. HFS không cho tắt luật, bỏ kiểm tra kiểu, giấu độ phủ hay giấu phát hiện Sonar tại chỗ."
+  meaning_vi: "Có chú thích tắt luật hoặc miễn trừ trong mã: eslint-disable, eslint-enable, eslint-env, /* global */, stylelint-disable, @ts-ignore, @ts-expect-error, @ts-nocheck (ở bất kỳ vị trí nào trong chú thích), istanbul, c8 hay v8 ignore, NOSONAR, sonar-disable hoặc prettier-ignore. HFS không cho tắt luật, bỏ kiểm tra kiểu, giấu độ phủ hay giấu phát hiện Sonar tại chỗ."
   causes_vi:
     - "eslint-disable hoặc stylelint-disable (dòng, dòng kế tiếp hoặc cả tệp) để qua một luật"
     - "@ts-ignore hoặc @ts-expect-error để qua lỗi kiểu"
     - "istanbul, c8 hay v8 ignore để giấu mã khỏi độ phủ; NOSONAR hay sonar-disable để giấu phát hiện; prettier-ignore để bỏ định dạng"
-    - "vn-ok để miễn luật ngôn ngữ"
   nextStep_vi: "Sửa mã cho đúng luật, hoặc đề xuất đổi luật trong canon; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
@@ -3369,17 +3358,6 @@ LEDGER_CORRUPT:
   nextStep_vi: "Bộ điều phối báo khẩn ngay cho chủ; cần khôi phục ledger từ bản sao lưu hằng đêm."
   owner: owner
   kind: runtime-fault
-
-LEDGER_LEGACY_WORK_SQLITE:
-  title: "Legacy in-repo runtime.sqlite"
-  title_vi: "Sổ ledger cũ còn nằm trong repo"
-  meaning_vi: "Một repo đã đăng ký (machine.sqlite repositories) vẫn còn tệp .starciwork/runtime.sqlite (hoặc -wal/-shm) từ trước quyết định Q1, trong khi sổ ledger thật đã chuyển ra <runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite."
-  causes_vi:
-    - "Repo được tạo trước quyết định Q1 và chưa dọn tệp ledger cũ"
-    - "Một bản sao ledger cũ bị chép nhầm trở lại repo"
-  nextStep_vi: "Không có tương thích ngược: chủ xóa tệp .starciwork/runtime.sqlite (và -wal/-shm) khỏi repo bằng tay sau khi xác nhận sổ ledger sống ở <runtime root>/.runtime; bộ kiểm tra (starci runtime ledger-hygiene, starci reconciler up --check) chỉ báo cáo, không tự xóa tệp trong repo."
-  owner: owner
-  kind: check-finding
 
 LEDGER_ORPHAN_STATE_ROOT:
   title: "Orphan ledger in the state root"
@@ -4660,7 +4638,7 @@ RT_DEAD_SCRIPT:
     - "Script chạy một lần (backfill, migrate) được giữ lại sau khi xong việc"
     - "Cơ chế đã bị thay nhưng tệp cũ chưa xóa"
     - "Chỉ còn test gọi tới tệp"
-  nextStep_vi: "Người giám sát xóa script cùng test của nó và ghi vào modules/kernel/retired-paths.yaml, hoặc nối nó vào nơi thật sự dùng, qua một lane đã land."
+  nextStep_vi: "Người giám sát xóa script cùng test của nó, hoặc nối nó vào nơi thật sự dùng, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -5041,17 +5019,6 @@ RT_PUBLIC_JSDOC:
   owner: runtime-core
   kind: check-finding
 
-RT_RETIRED_PRESENT:
-  title: "Retired path or symbol is back"
-  title_vi: "Đường dẫn hoặc ký hiệu đã loại bỏ xuất hiện lại"
-  meaning_vi: "Một đường dẫn trong retired[] hoặc moved[].from của modules/kernel/retired-paths.yaml lại được git theo dõi, hoặc một ký hiệu trong retiredSymbols[] lại được khai báo trong mã runtime. Thứ đã được thay thế (kể cả các chức năng Orca có sẵn) phải giữ nguyên là đã thay thế."
-  causes_vi:
-    - "Khôi phục một tệp cũ thay vì dùng tệp kế nhiệm"
-    - "Viết lại một cơ chế mà Orca đã cung cấp sẵn"
-  nextStep_vi: "Người giám sát xóa tệp hoặc ký hiệu và dùng phần thay thế ghi trong retired-paths.yaml."
-  owner: supervisor
-  kind: check-finding
-
 GENERATED_UNTRACKED:
   title: "Tracked path under a generated root"
   title_vi: "Đường dẫn được git theo dõi dưới một gốc sinh tự động"
@@ -5077,22 +5044,11 @@ RT_GENERATED_DRIFT:
 RT_CITED_PATH_MISSING:
   title: "Cited runtime path does not exist"
   title_vi: "Đường dẫn được trích dẫn không tồn tại"
-  meaning_vi: "Văn bản đang dùng (modules ngoài lịch sử hợp đồng, docs, skills, knowledge, CONTEXT.md, README.md, CONTRIBUTING.md, init, tài liệu ui) trích dẫn một đường dẫn runtime không tồn tại, hoặc trích dẫn một đường dẫn đã loại bỏ hay đã chuyển chỗ mà chỉ lịch sử mới được nhắc."
+  meaning_vi: "Văn bản đang dùng (modules ngoài lịch sử hợp đồng, docs, skills, knowledge, CONTEXT.md, README.md, CONTRIBUTING.md, init, tài liệu ui) trích dẫn một đường dẫn runtime không tồn tại."
   causes_vi:
     - "Di chuyển hay xóa tệp mà không cập nhật tài liệu"
     - "Gõ sai đường dẫn trong tài liệu"
-  nextStep_vi: "Người giám sát sửa trích dẫn thành đường dẫn hiện tại (moved[].to của retired-paths.yaml cho tệp đã chuyển) hoặc xóa câu đó."
-  owner: supervisor
-  kind: check-finding
-
-RT_RETIRED_NAME_LIVE:
-  title: "A retired name appears in a live file"
-  title_vi: "Một tên đã loại bỏ xuất hiện trong tệp đang dùng"
-  meaning_vi: "Một tệp đang sống được git theo dõi nhắc tới một tên mà registry tuyên bố đã chết: một đường dẫn trong retired[] hoặc moved[].from của modules/kernel/retired-paths.yaml, hoặc một tên gọi không phải đường dẫn trong retiredNames[] (một app đã xóa, một kiểu đặt tên tầng, một tiền tố verb). Lịch sử (CHANGELOG, benchmark, các bản ghi .starciwork) và chính registry được giữ tên đó; văn bản đang sống thì không."
-  causes_vi:
-    - "Di chuyển hay đổi tên một cơ chế mà văn bản, comment hay fixture kiểm thử vẫn nhắc tên cũ"
-    - "Sao chép một ví dụ hay mẫu kiểm thử cũ vào một tệp mới"
-  nextStep_vi: "Người giám sát viết lại chỗ đó theo tên hiện tại (moved[].to, hoặc ghi chú của mục retiredNames) hoặc xóa nó; một tên mà một luật phải gọi đích danh được viết từ các phần ghép, không phải literal."
+  nextStep_vi: "Người giám sát sửa trích dẫn thành đường dẫn hiện tại hoặc xóa câu đó."
   owner: supervisor
   kind: check-finding
 
@@ -5140,13 +5096,13 @@ RT_ABSOLUTE_PATH:
   kind: check-finding
 
 RT_PINNED_PATH_MOVED:
-  title: "Pinned path moved"
-  title_vi: "Đường dẫn được ghim bị chuyển chỗ"
-  meaning_vi: "Một đường dẫn được ghim (ruleParams.runtime.pinned: được lưu ngoài git trong hook, settings, tác vụ định kỳ, prompt) không còn tồn tại mà không có mục moved[] trong retired-paths.yaml, hoặc được chuyển bằng một mục moved[] không có quiesced: true."
+  title: "Pinned path missing"
+  title_vi: "Đường dẫn được ghim không còn tồn tại"
+  meaning_vi: "Một đường dẫn được ghim (ruleParams.runtime.pinned: được lưu ngoài git trong hook, settings, tác vụ định kỳ, prompt) không còn tồn tại."
   causes_vi:
     - "Đổi tên một tệp mà hook hay tác vụ định kỳ đang trỏ tới"
     - "Chuyển tệp khi các worker còn đang chạy"
-  nextStep_vi: "Người giám sát khôi phục đường dẫn, hoặc chuyển nó trong một lần land khi các worker đã dừng với mục moved[] có quiesced: true rồi viết lại các bản lưu bên ngoài."
+  nextStep_vi: "Người giám sát khôi phục đường dẫn."
   owner: supervisor
   kind: check-finding
 
@@ -12512,16 +12468,6 @@ HFS_AGENT_DATA_TRACKED:
   owner: op-retry
   kind: check-finding
 
-HFS_WORK_NODE_RETIRED:
-  title: "Only flat family records, never `work/node`"
-  title_vi: "Còn record work/node đã bỏ"
-  meaning_vi: "Record `<id>` vẫn dùng dạng `work/node` đã bỏ. Chuyển sang family phẳng `<family>`."
-  causes_vi:
-    - "Vi phạm luật R08: Không còn record `work/node@*`; mọi record là record phẳng `features/<f>/<family>/<name>/index.yaml`."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
 HFS_IDENTITY_CUSTODY:
   title: "An identity points its secret at `secrets/identity-<slug>.enc`; UAT chooses by role"
   title_vi: "Bí mật của identity sai chỗ"
@@ -12696,7 +12642,7 @@ HFS_CONTRACT_SNAPSHOT_DRIFT:
 HFS_ARCH_CONFIG_UNREAD:
   title: "The machine reads `hfs.json`; zero files analysed is red"
   title_vi: "Máy kiến trúc không đọc được hfs.json"
-  meaning_vi: "Kiểm tra kiến trúc không đọc được `hfs.json` phân tích 0 tệp, hoặc repo còn một tệp cấu hình mà máy không đọc nữa (`architecture.json`) — đây là đỏ, không phải 'chưa có dữ liệu'."
+  meaning_vi: "Kiểm tra kiến trúc không đọc được `hfs.json` phân tích 0 tệp — đây là đỏ, không phải 'chưa có dữ liệu'."
   causes_vi:
     - "Vi phạm luật R24: Máy kiến trúc tự đọc `hfs.json`; phân tích 0 tệp hay `unavailable` cho một profile đã khai = thất bại."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
@@ -12992,7 +12938,7 @@ FE_I18N_LITERAL:
   title_vi: "Chữ hiển thị không đi qua t()"
   meaning_vi: "Chữ `\\\"<text>\\\"` ở `<file>:<line>` không đi qua `t()`."
   causes_vi:
-    - "Vi phạm luật R58: Không chữ hiển thị (JSX text, `aria-label`, `title`, `placeholder`, `alt`, object copy) ở MỌI tầng, mọi ngôn ngữ; không `vn-ok`; `<html lang>` lấy từ `[locale]`."
+    - "Vi phạm luật R58: Không chữ hiển thị (JSX text, `aria-label`, `title`, `placeholder`, `alt`, object copy) ở MỌI tầng, mọi ngôn ngữ; `<html lang>` lấy từ `[locale]`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding

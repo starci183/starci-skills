@@ -112,7 +112,7 @@ function hasEntryGate(source) {
   if (text.startsWith('#!')) return true;
   const code = codeOnly(text);
   if (/\bisMain\s*\(\s*import\.meta\.url\s*\)/.test(code)) return true;
-  // A legacy entry may read argv directly at module scope. Function/default
+  // An entry may read argv directly at module scope. Function/default
   // parameters and arrow helpers merely accepting argv are libraries, not mains.
   let depth = 0;
   for (const line of code.split(/\r?\n/)) {

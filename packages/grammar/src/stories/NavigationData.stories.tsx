@@ -19,7 +19,7 @@ type Story = StoryObj;
 const faq: ReadonlyArray<G.AccordionItem> = [
   { id: 'billing', title: 'How does billing work?', content: 'You are billed monthly for active seats.' },
   { id: 'cancel', title: 'Can I cancel any time?', content: 'Yes. Access continues until the end of the period.' },
-  { id: 'legacy', title: 'Legacy plans', content: 'No longer available.', isDisabled: true },
+  { id: 'archived', title: 'Archived plans', content: 'Not available.', isDisabled: true },
 ];
 
 export const Accordion: Story = {

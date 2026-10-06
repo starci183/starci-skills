@@ -29,7 +29,7 @@ let fixture;
 test.before(()=>{fixture=createKernelDeadWorkerSelfHealFixture({api:API,fakeOrca:FAKE_ORCA,root:ROOT,wf:WF,jobId:JOB,handle:HANDLE,op:OP,hour:HOUR,minute:MIN});});
 test.after(async()=>{await fixture?.close();});
 
-// One reusable world: the migrated ledgers and committed Git baseline are copied back before every
+// One reusable world: the seeded ledgers and committed Git baseline are copied back before every
 // case, then only that case's worker state and timestamps are injected. No test sees prior state.
 const world=async(t,fn,{op=OP,...options}={})=>fn(fixture.reset({...options,operation:op}));
 const status=async run=>{const r=await run('status','--workflow',WF);assert.equal(r.status,0,r.stderr||r.stdout);return out(r);};

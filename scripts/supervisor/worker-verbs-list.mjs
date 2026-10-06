@@ -51,7 +51,7 @@ const terminalAgent = (terminal) => {
   return identity.source === 'title' || identity.source === 'screen' ? identity.raw : identity.provider ?? identity.raw;
 };
 
-/** Fill the normalized worktree-ps rows from terminal-list when Orca omits their legacy agents array. */
+/** Fill the normalized worktree-ps rows from terminal-list when Orca omits their agents array. */
 export async function worktreesWithWorkingAgents(worktrees = [], list = terminalList) {
   const rows = [];
   for (const row of worktrees) {

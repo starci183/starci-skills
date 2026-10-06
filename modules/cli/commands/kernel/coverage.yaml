@@ -39,7 +39,7 @@ returns:
   items: "[{kind: fr|shape|case, id, must, requires?[], record?, status: proven|stale|missing,
     evidence:[{jobId, op, attempt, path, kind, sha256, codeSha, state: fresh|stale|unbaselined,
     changed?[]}]}] — qualified proof requires independently observed exact-command green evidence
-    for every non-waived kind on a settled, baselined attempt; older admitted contracts retain their projection"
+    for every non-waived kind on a settled, baselined attempt"
   errors: "[{record, error}] — a ui record whose proof cases could not be listed"
 refusals:
   workflow-unknown: no workflows row for --workflow

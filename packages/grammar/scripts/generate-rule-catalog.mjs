@@ -1,11 +1,8 @@
 /**
  * Regenerate the Common UI rule catalog from the canonical knowledge tree.
  *
- * WHY THIS EXISTS. `conformance.ts` used to carry a hand-written family table. A hand-written copy
- * of somebody else's catalog is only ever correct on the day it is typed: the tree renamed
- * `accessibility` from `ACCESSIBILITY-n` to `A11Y-n`, retired COLOR, MEDIA, FIELD, ICON, SIZING,
- * INTERACTION and CONTROL-STATE, and added MEASURE, OVERFLOW, TONE and FLOW, while the table went
- * on asserting the 2024 shape and every conformance check went on passing against it.
+ * WHY THIS EXISTS. A hand-written copy of somebody else's catalog is only ever correct on the day
+ * it is typed, and every conformance check goes on passing against it.
  *
  * WHAT A FAMILY IS. One topic file under `ui/composition`, `ui/presentation`, `ui/proof` or
  * `grammars/starci`. Translations (`*.vi.md`), directory indexes (`INDEX.md`) and files still

@@ -339,8 +339,6 @@ const hasTable = (db, name) => sqliteHasTable(db, name, { views: true });
 /** The closed attempts of one ledger that lack a transcript: [{attemptId, workflowId, closedAt}]. Pure over the handle. */
 function attemptsWithoutTranscript(db, { now = Date.now(), windowMs = TRANSCRIPT_WINDOW_MS, limit = TRANSCRIPT_LIMIT } = {}) {
   if (!hasTable(db, 'op_attempts')) return [];
-  const cols = new Set(db.prepare('PRAGMA table_info(op_attempts)').all().map((c) => c.name));
-  if (!cols.has('transcript_sha') || !cols.has('terminal_closed_at')) return [];
   return db.prepare('SELECT attempt_id, workflow_id, terminal_closed_at FROM op_attempts WHERE terminal_closed_at IS NOT NULL AND transcript_sha IS NULL AND terminal_closed_at > ? ORDER BY terminal_closed_at DESC LIMIT ?')
     .all(now - windowMs, limit).map((r) => ({ attemptId: r.attempt_id, workflowId: r.workflow_id ?? null, closedAt: Number(r.terminal_closed_at) }));
 }

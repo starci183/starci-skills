@@ -261,12 +261,13 @@ function interfaceAuditOf(db, { attempt, staged, report, now }) {
     throw refuse('a completed typed audit needs exactly one interface-audit.json verdict', 'report-attachment-invalid');
   const item = items[0];
   if (!item) return null;
+  if (!typed) throw refuse('an interface-audit.json verdict needs the typed params.audit definition of its attempt', 'report-attachment-invalid');
   let doc = null;
   try { doc = JSON.parse(fs.readFileSync(item.blob.fileUri, 'utf8')); } catch { doc = null; }
   if (doc?.schema !== INTERFACE_AUDIT_SCHEMA || !/^operation\.[a-z0-9-]+\.[a-z0-9-]+$/.test(String(doc.id ?? '')))
     throw refuse(`${item.name} is not a ${INTERFACE_AUDIT_SCHEMA} verdict with id operation.<feature>.<name>`, 'report-attachment-invalid');
   const feature = doc.feature ?? String(doc.id).split('.')[1];
-  const scope = typed ? admittedScopeOf({ packet, definition, doc, feature, attempt }) : doc.scope ?? doc.selectedMatrix ?? {};
+  const scope = admittedScopeOf({ packet, definition, doc, feature, attempt });
   const prior = db.prepare('SELECT workflow_id,feature FROM interface_audits WHERE audit_id=?').get(doc.id);
   if (prior && (prior.workflow_id !== attempt.workflow_id || prior.feature !== feature))
     throw refuse('the audit identity is already owned by another workflow or feature', 'report-attachment-invalid');

@@ -53,10 +53,10 @@ const joinAll = sink => [...sink.refuse, ...sink.suspect, ...sink.info].join('\n
 const criterion = (name, rule) => `schema: work/acceptance-criterion@1\nid: ${rule.replace(/^br\./, 'ac.')}.${name}\nrule: ${rule}\ngiven: g\nwhen: w\nthen: [t]\n`;
 const rule = (id, criteria, extra = '') => `schema: work/business-rule@1\nid: ${id}\ntitle: t\nstate: todo\nstatements: [s]\nacceptanceCriteria: [${criteria.join(', ')}]\nmodule: src/f\n${extra}`;
 
-test('a recursive work/node features/index.yaml catalog does not stand in for the root work/catalog record', () => {
+test('a features/index.yaml that is not a work/catalog record does not stand in for the root catalog', () => {
   const workRoot = path.join(freshDir(), '.starciwork');
-  write(workRoot, 'workspace.yaml', 'schema: work/workspace@1\nid: recursive\n');
-  write(workRoot, 'features/index.yaml', 'schema: work/node@2\nid: recursive.features\nkind: business\nrequired: true\ndescription: Recursive feature catalog.\n');
+  write(workRoot, 'workspace.yaml', 'schema: work/workspace@1\nid: other\n');
+  write(workRoot, 'features/index.yaml', 'schema: work/feature@1\nid: other.features\ntitle: Features\n');
   const sink = checkWorkConsistencyTree(workRoot);
   assert.equal(refusedWith(sink, 'CATALOG_DIRTY').length, 1, joinAll(sink));
 });

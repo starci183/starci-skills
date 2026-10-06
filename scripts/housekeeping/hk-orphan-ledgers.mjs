@@ -1,4 +1,4 @@
-// hk-orphan-ledgers.mjs — the housekeeping area `orphanledgers`: two ledger-hygiene findings the retention sweep
+// hk-orphan-ledgers.mjs — the housekeeping area `orphanledgers`: the ledger-hygiene finding the retention sweep
 // (hk-ledger.mjs, which only prunes debug logs and purges long-ended workflows of ledgers ALREADY known good) and
 // the `/start` preflight (scripts/reconciler/start.mjs ledgerFindings, which only catches a ledger FILE under a
 // temp-looking path or missing) do not catch in full (docs/ledger-db.md §1):
@@ -18,65 +18,27 @@
 //                    deletes) to <stateRoot>/archive/orphan-ledgers/<YYYYMMDD>/<ledgerId>/ and retires its row
 //                    through engine/db/machine.mjs setLedgerState when one exists — the one writer; nothing here
 //                    opens machine.sqlite for write itself.
-//   legacy stores    a repository bound either in machine.sqlite `repositories` OR in any
-//                    .workspaces/projects/*/work.json (one app repository; pathFromSource "."
-//                    resolves to the Source host itself, e.g. this runtime's own backend) that still has an
-//                    in-repo .starciwork/runtime.sqlite (+ -wal/-shm), the pre-decision-Q1 location.
-//                    LEDGER_LEGACY_WORK_SQLITE. Report only, here and in `/start --check` (both call
-//                    legacyWorkSqliteFindings so the two never drift): nothing in this codebase deletes a file
-//                    inside a product repository; the owner removes it once the ledger is confirmed to live only
-//                    in <runtime root>/.runtime (owner ruling: no legacy).
 //
 //   starci runtime housekeeping --only orphanledgers [--apply] --json
-//   starci runtime ledger-hygiene [--apply] [--json]                  the standalone report (both findings)
+//   starci runtime ledger-hygiene [--apply] [--json]                  the standalone report
 import fs from 'node:fs';
 import path from 'node:path';
 import { inspectLedger, projectsRootFor } from '../../engine/db/ledger.mjs';
 import { isUnderTempDir, machineFileFor, readMachine, starciLocalRoot, withMachine } from '../../engine/db/machine.mjs';
-import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
 export const ORPHAN_LEDGER_CODE = 'LEDGER_ORPHAN_STATE_ROOT';
-export const LEGACY_WORK_SQLITE_CODE = 'LEDGER_LEGACY_WORK_SQLITE';
 /** A registered (any state) ledger whose directory is gone entirely — registry drift, distinct from an unreachable source root. */
 export const REGISTERED_DIR_MISSING_REASON = 'registered-dir-missing';
 
 const exists = (p) => { try { return fs.existsSync(p); } catch { return false; } };
 /** Case-insensitive, separator-normalized directory identity, for comparing a disk path against a DB-recorded one. */
 const dirKey = (p) => pathKey(p, { fold: true });
-/**
- * A repo root in the forward-slash form machine.sqlite `repositories.repo_root` already stores (engine/db/machine.mjs
- * repoKey), so a root discovered on disk (native, backslash on Windows) and one read back from the registry dedupe
- * as the same string instead of surviving as two `Set` entries that only differ by separator.
- */
-const canonicalRoot = (p) => path.resolve(String(p)).replaceAll('\\', '/');
 /** YYYYMMDD, the same stamp scripts/housekeeping/blob-gc.mjs and scripts/work/purge-workflow.mjs archive folders use. */
 export const dateStamp = (now = Date.now()) => new Date(now).toISOString().slice(0, 10).replaceAll('-', '');
 
-
-/**
- * Every repository root any .workspaces/projects/*\/work.json binds (modules/schemas/workspace-routing.yaml
- * bindingShape), the one app `repository.pathFromSource` resolved against starciSourceRoot — "."
- * resolves to the Source host itself. A missing or unreadable .workspaces/projects, or one malformed work.json, is
- * skipped, never a crash. Deduped, absolute.
- */
-export function workspaceBoundRepoRoots({ env = process.env } = {}) {
-  const sourceRoot = starciSourceRoot(env);
-  const projectsDir = path.join(sourceRoot, '.workspaces', 'projects');
-  let entries = [];
-  try { entries = fs.readdirSync(projectsDir, { withFileTypes: true }); } catch { return []; }
-  const roots = new Set();
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    let doc;
-    try { doc = JSON.parse(fs.readFileSync(path.join(projectsDir, entry.name, 'work.json'), 'utf8')); } catch { continue; }
-    const rel = doc?.schema === 'starci/workspace-binding@2' ? doc?.repository?.pathFromSource : null;
-    if (typeof rel === 'string' && rel.trim()) roots.add(canonicalRoot(path.resolve(sourceRoot, rel)));
-  }
-  return [...roots];
-}
 
 /** The total bytes under `dir` (files only; missing/unreadable entries count as 0). Pure I/O, no seam needed in specs (tmp fixtures). */
 function dirBytes(dir) {
@@ -170,29 +132,6 @@ export function orphanLedgerFindings({ env = process.env, machineFile = null } =
     const roots = sourceRootsFromLedgerFile(ledgerFile);
     const reason = orphanReason(roots, { env });
     if (reason) out.push({ code: ORPHAN_LEDGER_CODE, ledgerId: name, name: null, file: ledgerFile, sourceRoots: roots, reason, registered: false });
-  }
-  return out;
-}
-
-/** Every distinct bound repository root the registry knows (machine.sqlite `repositories`). */
-export function boundRepoRoots({ env = process.env, machineFile = null } = {}) {
-  const registered = readMachine((m) => m.db.prepare('SELECT repo_root FROM repositories').all().map((r) => r.repo_root),
-    [], { file: machineFile ?? machineFileFor(env), env });
-  return [...new Set([...registered, ...workspaceBoundRepoRoots({ env })].filter(Boolean).map(canonicalRoot))];
-}
-
-/**
- * Legacy in-repo store findings, PURE over a plain list of repo roots (no DB access of its own) so `/start --check`
- * (scripts/reconciler/start.mjs, which already has its own ledger list open) and this sweep's own
- * boundRepoRoots()-backed call share exactly one detection: [{code, repoRoot, files}]. `files` lists whichever of
- * runtime.sqlite / -wal / -shm exist; a root that does not exist on this host is silently skipped (fs.existsSync).
- */
-export function legacyWorkSqliteFindings(repoRoots) {
-  const out = [];
-  for (const repoRoot of new Set((repoRoots ?? []).filter(Boolean).map(canonicalRoot))) {
-    const base = path.join(repoRoot, '.starciwork', 'runtime.sqlite');
-    const files = ['', '-wal', '-shm'].map((suffix) => `${base}${suffix}`).filter(exists);
-    if (files.length) out.push({ code: LEGACY_WORK_SQLITE_CODE, repoRoot, files });
   }
   return out;
 }

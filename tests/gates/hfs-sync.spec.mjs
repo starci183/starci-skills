@@ -58,8 +58,6 @@ describe('the template renderer', () => {
     const files = walk(path.join(ROOT, 'packages', 'hfs', 'templates'));
     const read = file => fs.readFileSync(path.join(ROOT, file), 'utf8');
     assert.deepEqual(appCliTemplateFindings({ files, read }), []);
-    const bad = appCliTemplateFindings({ files: ['packages/hfs/templates/app/hook'], read: () => `${['npx', 'hfs', 'work-hygiene'].join(' ')}\n` });
-    assert.deepEqual(bad.map((finding) => [finding.code, finding.line]), [['RT_CLI_APP_ONLY_TEMPLATES', 1]]);
     const wrongGroup = appCliTemplateFindings({ files: ['packages/hfs/templates/app/hook'], read: () => 'starci runtime check\n' });
     assert.deepEqual(wrongGroup.map((finding) => [finding.code, finding.line]), [['RT_CLI_APP_ONLY_TEMPLATES', 1]]);
   });
@@ -485,12 +483,12 @@ describe('the package.json scripts of the app', () => {
   });
   it('are compared as parsed JSON: key order and the rest of package.json are not drift, an extra or changed script is', async t => {
     const dir = repo(t);
-    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', dependencies: { a: '1' }, scripts: { legacy: 'x' } }, null, 4));
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', dependencies: { a: '1' }, scripts: { unmanaged: 'x' } }, null, 4));
     await run(['--write'], dir);
     const pkg = () => JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
     assert.equal(pkg().name, 'demo');
     assert.deepEqual(pkg().dependencies, { a: '1' });
-    assert.equal(pkg().scripts.legacy, undefined, 'a script outside the managed block is dropped by --write');
+    assert.equal(pkg().scripts.unmanaged, undefined, 'a script outside the managed block is dropped by --write');
     assert.equal((await run(['--check'], dir)).code, 0);
     const reordered = { ...pkg(), scripts: Object.fromEntries(Object.entries(pkg().scripts).reverse()) };
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(reordered));
@@ -561,7 +559,7 @@ describe('work-hygiene', () => {
     // This temp repo is no runtime checkout — its root carries no scripts/housekeeping/ledger-hygiene.mjs: the section is silently absent.
     const lines = [];
     assert.equal(await runWorkHygiene({ cwd: dir, out: line => lines.push(line) }), 0);
-    assert.ok(!lines.some(line => /LEDGER_(ORPHAN_STATE_ROOT|LEGACY_WORK_SQLITE)/.test(line)));
+    assert.ok(!lines.some(line => /LEDGER_ORPHAN_STATE_ROOT/.test(line)));
     // Run from the real checkout (this repo IS the runtime): the section runs and never throws, whatever it finds.
     const inRepo = [];
     await runWorkHygiene({ cwd: ROOT, out: line => inRepo.push(line), files: [] });

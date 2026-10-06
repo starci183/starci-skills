@@ -8,8 +8,8 @@ import type { FeKitI18nConfig } from "./config"
  * the thing the reader actually saw. A cookie cannot do any of those, because it is not in the
  * link.
  *
- * THE COOKIE STAYS, in a smaller job. It no longer decides what a URL means - the segment does -
- * but it still remembers which language a returning reader chose, so `/` sends them where they
+ * THE COOKIE has a small job. It does not decide what a URL means - the segment does -
+ * but it remembers which language a returning reader chose, so `/` sends them where they
  * were rather than to the default every time.
  *
  * `createRouting` wraps next-intl's `defineRouting` so the routing object derives entirely from

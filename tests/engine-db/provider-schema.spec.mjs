@@ -59,17 +59,17 @@ test('missing current provider tables/index and removed CHECK refuse before pers
   }
 });
 
-test('a failed fresh init rolls back every table, metadata, journal and version', t => {
+test('a failed fresh init rolls back every table, metadata and version', t => {
   const options = fixture(t), prepare = DatabaseSync.prototype.prepare;
   let ddlApplied = false;
   const mocked = t.mock.method(DatabaseSync.prototype, 'prepare', function (sql, ...args) {
-    if (sql.startsWith('INSERT INTO schema_migrations(')) {
+    if (sql.startsWith('INSERT INTO mode_changes(')) {
       ddlApplied = Boolean(prepare.call(this, "SELECT 1 FROM sqlite_master WHERE name='provider_reservations'").get());
-      throw Error('fixture current-init journal fault');
+      throw Error('fixture current-init fault');
     }
     return prepare.call(this, sql, ...args);
   });
-  try { assert.throws(() => openMachine(options), /fixture current-init journal fault/); }
+  try { assert.throws(() => openMachine(options), /fixture current-init fault/); }
   finally { mocked.mock.restore(); }
   assert.equal(ddlApplied, true, 'failure follows real current DDL');
   const check = new DatabaseSync(options.file, { readOnly: true });
@@ -115,7 +115,7 @@ test('an unversioned populated store whose table resembles SQLite names is not i
   } finally { check.close(); }
 });
 
-test('a first initializer that wins before BEGIN keeps its journal and host rows', t => {
+test('a first initializer that wins before BEGIN keeps its host rows', t => {
   const options = fixture(t), exec = DatabaseSync.prototype.exec;
   let winner = null;
   const mocked = t.mock.method(DatabaseSync.prototype, 'exec', function (sql, ...args) {
@@ -124,7 +124,6 @@ test('a first initializer that wins before BEGIN keeps its journal and host rows
       const other = openMachine(options);
       try {
         other.setService({ name: 'first-initializer', kind: 'http', state: 'healthy', port: 41001 });
-        winner.journal = other.db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
         winner.services = other.db.prepare('SELECT * FROM services').all();
       } finally { other.close(); }
     }
@@ -134,9 +133,7 @@ test('a first initializer that wins before BEGIN keeps its journal and host rows
   try {
     current = openMachine(options);
     assert.equal(current.db.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION);
-    assert.deepEqual(current.db.prepare('SELECT * FROM schema_migrations ORDER BY version').all(), winner.journal);
     assert.deepEqual(current.db.prepare('SELECT * FROM services').all(), winner.services);
-    assert.equal(winner.journal.length, 1, 'one actual init, with no adoption/rewrite by the waiting connection');
     assert.equal(current.db.prepare('PRAGMA auto_vacuum').get().auto_vacuum, 2);
   } finally { current?.close(); mocked.mock.restore(); }
 });

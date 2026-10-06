@@ -45,14 +45,10 @@ export function handoverAskProblem(question) {
 }
 
 /** approve | feedback | question for one answer receipt, else null. The
- *  receipt's optionIndex decides; an older receipt is matched by its label. */
-export function decisionOf(receipt, question) {
+ *  receipt's optionIndex decides. */
+export function decisionOf(receipt) {
   if (!receipt || typeof receipt !== 'object') return null;
-  let index = Number.isInteger(receipt.optionIndex) ? receipt.optionIndex : -1;
-  if (index < 0 && typeof receipt.option === 'string') {
-    index = (Array.isArray(question?.options) ? question.options : []).map(optionLabel).indexOf(receipt.option);
-  }
-  return HANDOVER_DECISIONS[index] ?? null;
+  return HANDOVER_DECISIONS[Number.isInteger(receipt.optionIndex) ? receipt.optionIndex : -1] ?? null;
 }
 
 /** The newest op-settled event of a job that is neither the Kernel nor a
@@ -106,7 +102,7 @@ export function handoverAsks(db, workflowId) {
       answeredBy,
       // Both the receipt and the ledger event must name the owner.
       byOwner: receiptBound && receipt.answeredBy === OWNER && event.answeredBy === OWNER,
-      decision: receiptBound ? decisionOf(receipt, question) : null,
+      decision: receiptBound ? decisionOf(receipt) : null,
       note: receiptBound ? receipt.note ?? null : null,
       answeredAt: receiptBound ? receipt.at ?? null : null,
     };

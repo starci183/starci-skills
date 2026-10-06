@@ -6,7 +6,7 @@ import { checkRepository } from '../../scripts/hfs/check.mjs';
 import { APP, cleanup, gitAdd, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
 
 // Every front-end file is owned by a slot and named by it: a file no slot owns is HFS_SLOT_UNDECLARED (`starci app check`), a file its
-// slot does not name is FE_SLOT_FILE_ROLE (the machine), a retired name is HFS_FORBIDDEN_PRESENT. All are errors. The app is checked
+// slot does not name is FE_SLOT_FILE_ROLE (the machine), a name a slot forbids is HFS_FORBIDDEN_PRESENT. All are errors. The app is checked
 // at its root, so every path is app-relative (fe/...).
 const made = [];
 const repoOf = (mutate) => {
@@ -23,7 +23,7 @@ const put = (dir, relative, text = 'export {};\n') => {
 };
 const errorsOf = (result, code) => result.findings.filter((f) => f.code === code && f.level === 'error').map((f) => f.path);
 
-test('a clean app (its fe side) has no unowned, unnamed or retired file', () => {
+test('a clean app (its fe side) has no unowned, unnamed or forbidden file', () => {
   const result = checkRepository({ repoRoot: repoOf() });
   assert.deepEqual(result.findings, []);
 });

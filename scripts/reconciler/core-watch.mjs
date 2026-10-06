@@ -84,7 +84,7 @@ async function httpProbe(url, timeoutMs) {
 /** The leader row, controller modes and failing queue, read through the machine reader (never boot.mjs --status text). */
 function readEngine() {
   return readMachine((m) => {
-    // One query failing (an older live schema lacks a column a newer reader expects) must not blind the others.
+    // One query failing must not blind the others.
     const q = (sql, args, one, fallback) => { try { const st = m.db.prepare(sql); return one ? st.get(...args) ?? fallback : st.all(...args); } catch { return fallback; } };
     const leader = q('SELECT * FROM engine_leader WHERE name=?', [LEADER_NAME], true, null);
     const run = leader?.process_run_id != null ? q('SELECT start_reason FROM process_runs WHERE run_id=?', [leader.process_run_id], true, null) : null;

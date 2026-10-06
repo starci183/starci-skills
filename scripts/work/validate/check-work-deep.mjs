@@ -60,18 +60,15 @@ const normDigestOf = data => {
 };
 
 /** Every record id this record references, anywhere in its yaml - deps for blast-radius purposes.
- * Compact format: `P#frag` is a dep on P (the parent owns the inlined criterion), and a bare `ac.*` id
- * that survives only as an inline entry is a dep on the parent carrying it - `canon` maps both forms to
- * the record that actually owns the content today, so DEP_STALE follows the dependency through the
- * collapse rather than losing it. */
-function depsOf(data, canon = id => id) {
+ * Compact format: `P#frag` is a dep on P (the parent owns the inlined criterion). */
+function depsOf(data) {
   const deps = new Set();
   const collect = node => {
     if (typeof node === 'string') {
       const s = node.trim();
-      if (ID_RE.test(s)) { deps.add(canon(s)); return; }
+      if (ID_RE.test(s)) { deps.add(s); return; }
       const {id, frag} = splitRef(s);
-      if (frag !== null && frag && ID_RE.test(id)) deps.add(canon(id));
+      if (frag !== null && frag && ID_RE.test(id)) deps.add(id);
       return;
     }
     if (Array.isArray(node)) return node.forEach(collect);
@@ -187,9 +184,8 @@ function checkTree(workRoot, out, baseline) {
 
   const normNow = new Map(); // id -> normDigest
   for (const [id, rec] of records) normNow.set(id, normDigestOf(rec.data));
-  // Compact format: a reference written as `P#frag` or a collapsed bare `ac.*` id still names a real
-  // dependency - the record carrying the criterion. Baseline dep ids from before the collapse resolve
-  // through the same map.
+  // Compact format: a reference written as `P#frag` names a real dependency - the record carrying the
+  // criterion.
   const inline = indexInlineCriteria(records);
   const recOf = ref => {
     const rid = resolveRecordRef(records, ref, inline);
@@ -432,12 +428,10 @@ function checkTree(workRoot, out, baseline) {
 // ---------- baseline ----------
 function writeBaseline(workRoot) {
   const records = loadRecords(workRoot, walk);
-  const inline = indexInlineCriteria(records);
-  const canon = id => records.has(id) ? id : (inline.byAcId.get(id) ?? id);
   const entry = {};
   for (const [id, rec] of records) {
     const deps = {};
-    for (const depId of depsOf(rec.data, canon)) {
+    for (const depId of depsOf(rec.data)) {
       const dep = records.get(depId);
       if (dep) deps[depId] = normDigestOf(dep.data);
     }

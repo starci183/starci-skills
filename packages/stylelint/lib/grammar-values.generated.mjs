@@ -250,7 +250,6 @@ export const GRAMMAR_VALUES = {
       "--offset-pop-success": "#91e4ca",
       "--offset-pop-success-foreground": "#1c1524",
       "--offset-pop-surface": "#fffdf9",
-      "--offset-pop-surface-muted": "var(--offset-pop-surface-secondary)",
       "--offset-pop-surface-radius": "1.5rem",
       "--offset-pop-surface-secondary": "#f8dbe8",
       "--offset-pop-surface-shadow": "var(--offset-pop-shadow-x) var(--offset-pop-shadow-y) 0 var(--offset-pop-shadow-ink)",

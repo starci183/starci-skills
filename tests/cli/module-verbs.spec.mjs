@@ -158,7 +158,7 @@ test('script verbs keep the caller environment when they cross the process seam'
   const catalog = {
     global: [],
     groups: { demo: { owner: 'runtime', verbs: { script: {
-      impl: { script: 'scripts/legacy.mjs' }, flags: [], json: 'flag', roles: ['lead'],
+      impl: { script: 'scripts/other.mjs' }, flags: [], json: 'flag', roles: ['lead'],
     } } } },
   };
   assert.equal(runtimeMain(['demo', 'script'], {

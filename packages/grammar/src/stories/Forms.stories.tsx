@@ -20,7 +20,7 @@ const planOptions: ReadonlyArray<G.ListOption> = [
   { id: 'starter', label: 'Starter', description: 'For one person' },
   { id: 'team', label: 'Team', description: 'Up to ten people' },
   { id: 'org', label: 'Organisation' },
-  { id: 'legacy', label: 'Legacy plan', isDisabled: true },
+  { id: 'archived', label: 'Archived plan', isDisabled: true },
 ];
 
 const choiceOptions: ReadonlyArray<G.ChoiceOption> = [

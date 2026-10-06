@@ -82,7 +82,7 @@ test("COMMENTS-5: no Vietnamese anywhere in source, specs and test titles includ
       // a fixtures folder outside the i18n slot is not exempt
       { filename: at("e2e/fixtures/copy.ts"), code: `export const SAMPLE = "${VI_NFC}"`, errors: [{ messageId: "vietnamese" }] },
       // a pragma excuses nothing
-      { filename: SRC, code: `// vn-ok: server text\nconst s = "${VI_NFC}"`, errors: [{ messageId: "vietnamese" }] },
+      { filename: SRC, code: `// server text\nconst s = "${VI_NFC}"`, errors: [{ messageId: "vietnamese" }] },
     ],
   })
 })

@@ -10,7 +10,7 @@ Files: `compose.yaml` (SonarQube + its Postgres + the one-shot admin-password bo
 `cloudflared.yaml` (the Cloudflare tunnel that publishes it publicly, profile `public`), `secrets/`
 (SOPS `*.enc` custody — ciphertext only, see `secrets/KEYS.md`).
 
-Identity preserved from the legacy `<source>/.stacks` stack, so the already-running container keeps
+Fixed identity, so the running container keeps
 working: Compose project `starci`, containers `starci-sonarqube`, `starci-sonarqube-postgres`,
 `starci-sonarqube-bootstrap`, `starci-cloudflared-sonarqube`, named volumes `starci-sonarqube-*`,
 published port `${STARCI_PORT_SONARQUBE}` → container `9000` (this host's published port is the one

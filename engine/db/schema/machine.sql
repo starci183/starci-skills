@@ -1,6 +1,6 @@
 -- ############################################################################################################
 -- machine.sqlite (one per machine) - this file is the single schema step of the database.
--- Tables: machine_meta/schema_migrations - identity and migration journal; ui_states/ui_state_map - display
+-- Tables: machine_meta - identity; ui_states/ui_state_map - display
 -- vocabulary; blob_ref_columns - blob-referencing columns; ledgers/repositories - registered projects;
 -- agents/models - agent and model catalog; blobs/archives/gc_marks - content store and GC; sup_* - Supervisor;
 -- process_runs/engine_*/schedules/sla_episodes/invariant_violations - reconciler; services/seats/deliveries/
@@ -15,10 +15,6 @@
 -- ---------------------------------------------------------------------------------------------------------
 -- machine_meta: host_id, schema='starci/machine@1', created_at, blob_root, runtime_rev, sqlite_version, node_version.
 CREATE TABLE IF NOT EXISTS machine_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
-CREATE TABLE IF NOT EXISTS schema_migrations(
-  version INTEGER PRIMARY KEY, name TEXT NOT NULL, runtime_rev TEXT, sql_sha256 TEXT NOT NULL,
-  backup_path TEXT, backup_sha256 TEXT, started_at INTEGER NOT NULL, finished_at INTEGER,
-  status TEXT NOT NULL CHECK(status IN ('running','done','failed'))) STRICT;
 
 CREATE TABLE IF NOT EXISTS ui_states(
   ui TEXT PRIMARY KEY CHECK(ui IN ('bad','warn','running','waiting','ok','done','unknown')),
@@ -303,7 +299,7 @@ CREATE TRIGGER IF NOT EXISTS process_runs_no_delete BEFORE DELETE ON process_run
   WHEN OLD.started_at > CAST(unixepoch('subsec')*1000 AS INTEGER) - 7776000000 BEGIN   -- only GC deletes rows older than 90 days
     SELECT RAISE(ABORT,'process_runs are append-only (90-day retention)');
   END;
--- UI-API compatibility (/api/reconciler starts24h): engine starts = view.
+-- /api/reconciler starts24h: engine starts = view.
 CREATE VIEW IF NOT EXISTS v_engine_starts AS
 SELECT run_id, started_at AS at, pid, rev, epoch, start_reason AS reason, ended_at, exit_reason, killed_by
 FROM process_runs WHERE role='engine';
@@ -514,7 +510,7 @@ CREATE TABLE IF NOT EXISTS seat_turns(
   span_id      TEXT) STRICT;
 CREATE INDEX IF NOT EXISTS ix_seat_turns ON seat_turns(seat_id,started_at);
 
--- seat_transcript_snapshots (UI-API sec. 2.10): periodic redacted scrollback snapshots of Kernel/Supervisor seats.
+-- seat_transcript_snapshots: periodic redacted scrollback snapshots of Kernel/Supervisor seats.
 CREATE TABLE IF NOT EXISTS seat_transcript_snapshots(
   snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,
   seat_id     TEXT NOT NULL REFERENCES seats(seat_id),
@@ -801,7 +797,7 @@ CREATE VIEW IF NOT EXISTS v_engine_actions AS
 SELECT a.*, COALESCE(m.ui,'unknown') AS ui FROM engine_actions a
 LEFT JOIN ui_state_map m ON m.entity='engine-action' AND m.native=a.state;
 
--- Open SLA clocks (replaces the old sla_clocks table).
+-- Open SLA clocks.
 CREATE VIEW IF NOT EXISTS v_sla_open AS
 SELECT e.*, e.entered_at + e.sla_ms AS due_at,
        CASE WHEN e.violated_at IS NULL THEN 'waiting' WHEN e.severity='critical' THEN 'bad' ELSE 'warn' END AS ui

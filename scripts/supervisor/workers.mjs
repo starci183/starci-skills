@@ -86,7 +86,7 @@ export function workerGuard(jobId, { root = SKILL_ROOT, staging = null, files = 
 export const OPEN_STATUSES = Object.freeze(['queued', 'spawning', 'running', 'reported']);
 const ACTIVE_STATUSES = Object.freeze(['spawning', 'running']);
 const FINAL_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
-/** sup_attempts.agent is one of these (0001-init CHECK); any other provider is recorded as null. */
+/** sup_attempts.agent is one of these (runtime schema CHECK); any other provider is recorded as null. */
 const MAX_SPAWN_ATTEMPTS = 3;
 export const READINESS_FAILS_PER_HOUR = 2;
 export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin' });

@@ -150,7 +150,7 @@ envelope:
     Identity fields (run, task, dispatch, from) bind the report to the exact
     dispatch; UNIQUE(workflow_id, dispatch_id) on the reports table means one
     dispatch produces exactly one report (engine/db/ledger.mjs /
-    engine/db/migrations/runtime/0001-init.sql reports DDL). Filing is `starci kernel report --job <id>
+    engine/db/schema/runtime.sql reports DDL). Filing is `starci kernel report --job <id>
     --report <file>` — the file is a starci/op-report@1 JSON envelope the api
     validates (identity fields run/task/dispatch/from are stamped from the
     job row, never the worker's claim); an upsert on that key, so a re-filed
@@ -299,7 +299,7 @@ rejects:
       {workflow_id,op_id,attempt,generation,token} must equal its job's);
       a settle against an already-settled job is refused (job-settled).
       An agent cannot graft evidence or a lease onto another job.
-    citation: "engine/db/migrations/runtime/0001-init.sql leases_match_job triggers; scripts/kernel/cli.mjs settle job-settled refusal"
+    citation: "engine/db/schema/runtime.sql leases_match_job triggers; scripts/kernel/cli.mjs settle job-settled refusal"
   - id: unverifiable-evidence
     rule: >-
       Declared bytes missing/empty/wrong-magic/wrong-digest refuse the run

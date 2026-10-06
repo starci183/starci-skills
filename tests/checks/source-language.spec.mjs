@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DECLARED_SOURCE_CATALOGS, sourceLanguageFindings } from '../../scripts/checks/check-doc-language.mjs';
+import { DECLARED_SOURCE_CATALOGS, RUNTIME_DOCUMENT_ROOTS, sourceLanguageFindings } from '../../scripts/checks/check-doc-language.mjs';
 import { declaredVietnameseFieldsOf, documentLanguageHits } from '../../scripts/lib/language.mjs';
 
 // HFS_SOURCE_NOT_ENGLISH: runtime source is English; Vietnamese lives only in a declared catalog. Vietnamese letters in this
@@ -20,7 +20,7 @@ const found = (dir) => sourceLanguageFindings(dir).map((f) => [f.code, f.path]);
 test('English source, comments, SQL comments and loanwords are clean', (t) => {
   assert.deepEqual(found(fixture(t, {
     'scripts/a.mjs': '// An English comment with naive facade Muller loanwords.\nexport const x = "ready";\n',
-    'engine/db/migrations/machine/0001-init.sql': '-- the machine registry\nCREATE TABLE t(a TEXT);\n',
+    'engine/db/schema/machine.sql': '-- the machine registry\nCREATE TABLE t(a TEXT);\n',
     'ui/src/pages/home.tsx': 'export const label = "Overview";\n',
     'tests/a.spec.mjs': "assert.equal(1, 1);\n",
   })), []);
@@ -29,12 +29,12 @@ test('English source, comments, SQL comments and loanwords are clean', (t) => {
 test('a Vietnamese string, comment or SQL comment in source is refused, in every source root', (t) => {
   assert.deepEqual(found(fixture(t, {
     'scripts/kernel/a.mjs': `export const message = '${VI}';\n`,
-    'engine/db/migrations/runtime/0001-init.sql': `-- ${VI}\nCREATE TABLE t(a TEXT);\n`,
+    'engine/db/schema/runtime.sql': `-- ${VI}\nCREATE TABLE t(a TEXT);\n`,
     'ui/src/pages/home.tsx': `// ${VI}\n`,
     'packages/x/index.cjs': `/* ${VI} */\n`,
     'tests/a.spec.mjs': `assert.equal(text, '${VI}');\n`,
   })).sort(), [
-    ['HFS_SOURCE_NOT_ENGLISH', 'engine/db/migrations/runtime/0001-init.sql'], ['HFS_SOURCE_NOT_ENGLISH', 'packages/x/index.cjs'],
+    ['HFS_SOURCE_NOT_ENGLISH', 'engine/db/schema/runtime.sql'], ['HFS_SOURCE_NOT_ENGLISH', 'packages/x/index.cjs'],
     ['HFS_SOURCE_NOT_ENGLISH', 'scripts/kernel/a.mjs'], ['HFS_SOURCE_NOT_ENGLISH', 'tests/a.spec.mjs'], ['HFS_SOURCE_NOT_ENGLISH', 'ui/src/pages/home.tsx'],
   ]);
 });
@@ -57,4 +57,11 @@ test('the i18n catalog files declare their vi field, so a catalog is the one pla
   assert.deepEqual(documentLanguageHits(rel, `messages:\n  - {en: "Open, then close", vi: "M\u1edf, r\u1ed3i \u0111\u00f3ng"}\n`), [], 'a comma inside the quoted vi value stays inside the declared field');
   assert.equal(documentLanguageHits('modules/i18n/other.yaml', `note: ${VI}\n`).length, 1);
   assert.equal(documentLanguageHits(rel, `purpose: ${VI}\n`).length, 1);
+});
+
+test('benchmark/ is evidence, not a document root: the doc-language check does not read it and the package does not ship it', () => {
+  assert.ok(!RUNTIME_DOCUMENT_ROOTS.includes('benchmark'));
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  const files = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).files;
+  assert.ok(!files.some((entry) => entry.startsWith('benchmark')));
 });

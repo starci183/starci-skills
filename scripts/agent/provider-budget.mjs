@@ -20,7 +20,7 @@ const validGrant = (quota, role, scopeId, policy, now) => quota.authority !== 'o
 /** Actual admission prepares the store through its writer; read-only plans never create or upgrade it. */
 export function prepareProviderBudget(options = {}) {
   return withMachine((machine) => {
-    machine.meta(); // Forces the owning connection's schema validation/create/compatible upgrade.
+    machine.meta(); // Forces the owning connection's schema validation/create.
     return { ok: true, file: machine.file };
   }, optionsOf(options));
 }

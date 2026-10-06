@@ -5,7 +5,7 @@ import { statusFromOutcome, statusFromVerdict, type Status } from '../../status'
 import { StatusChip } from '../../status-chip';
 import { Advanced, Grow } from '../../motion';
 import { Card } from '../frame/card';
-import { useManifest } from './manifest';
+import { manifestOf } from './manifest';
 import { settleView } from './settle-text';
 import { WhyBlock } from '../../why/why-block';
 import { t } from '../../../i18n/t';
@@ -73,7 +73,7 @@ function Assertions({ manifest }: Readonly<{ manifest: AttemptManifest }>) {
 
 /** Block 4 "Conclusion": what the op says, the manifest checklist, claims, and the kernel's verdict with the reason. */
 export function ResultCard({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) {
-  const manifest = useManifest(attempt);
+  const manifest = manifestOf(attempt);
   const opStatus = statusFromOutcome(attempt.reportOutcome);
   const verdictStatus = statusFromVerdict(attempt.verdict, attempt.reportedAt != null && attempt.settledAt == null && attempt.endState == null, attempt.ui);
   const settle = settleView(attempt);

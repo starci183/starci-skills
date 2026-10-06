@@ -75,7 +75,7 @@ goes to the `not-codes` section of `modules/kernel/allowlist.yaml` with the reas
 ## Answers for the UI session
 
 1. **Persisted and importable.** `op_attempts.why_json` holds the why in the current runtime schema,
-   `engine/db/migrations/runtime/0001-init.sql`. `scripts/kernel/why.mjs` exports the pure read-only
+   `engine/db/schema/runtime.sql`. `scripts/kernel/why.mjs` exports the pure read-only
    `whyOf(ledgerDbOrHandle, attemptRowOrId)`: the stored value, else computed now when the attempt has no stored why.
    The reader does not write the ledger. Also `whyOfOp(db, workflowId, opId)`, `whysOfWorkflow(db, workflowId)`,
    `computeWhy`, `explainCode(code)`,
@@ -93,7 +93,7 @@ goes to the `not-codes` section of `modules/kernel/allowlist.yaml` with the reas
      stays `requeued`, `effect-unknown` stays as is); `v_op_history.ui = 'rejected'` (neutral, a Vietnamese "rejected on delivery" label). The why `state` is `dispatch-rejected` (`requeued` for an
      unknown effect); `next` says it is not counted.
    The two ui values are computed by the view: `v_op_history.ui` is `awaiting-owner` / `rejected` for those two natives and
-   `ui_state_map` for every other one (`ui_states` is unchanged). `0001-init.sql` carries `op_attempts.why_json` and the
+   `ui_state_map` for every other one (`ui_states` is unchanged). `schema/runtime.sql` carries `op_attempts.why_json` and the
    `v_attempt_state` and `v_op_history` views that compute them.
 4. **Kernel notes.** Source: table `events`, kinds `kernel-decision` (entity_type `decision`, payload `{hypothesis, actionKey,
    metric, command, baseline}`), `kernel-decision-result` (same entity_id, payload `{result: keep|revert, observed}`) and

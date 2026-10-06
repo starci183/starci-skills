@@ -144,7 +144,7 @@ export const themeOf = (value) => { const v = String(value ?? '').toLowerCase();
 
 /**
  * The drawings one draw/asset report produced, in the order they were drawn:
- *  1. the draws[] of every draws.yaml the report names - each draw's `part`, else `content`, else `image`
+ *  1. the draws[] of every draws.yaml the report names - each draw's `part`
  *     (paths resolve against the draws file, then its ui record, then the repo) - the op's own index of
  *     its representative directions;
  * and every pick is the drawn part, never its composite (scripts/work/direction-part.mjs).

@@ -135,7 +135,7 @@ export function seedWorkflow(ledger,{id,state=null,events=[],jobs=[],leases=[],g
     for(const job of jobs){
       const jobId=job.jobId??job.job_id,opId=job.opId??job.op_id??job.payload?.opId??null;
       const kind=job.kind==='kernel'?'kernel':'op',status=job.status??'queued';
-      // Legacy fixture `attempt` named an observation; a new unit always starts at try 1.
+      // A new unit always starts at try 1.
       const tryNo=Math.max(1,job.tryNo??job.try_no??1),unitId=kind==='op'?(job.unitId??job.unit_id??jobId):null;
       const created=job.createdAt??job.created_at??at,updated=job.updatedAt??job.updated_at??created;
       const leaseToken=job.leaseToken??job.lease_token??leases.find(lease=>(lease.jobId??lease.job_id)===jobId)?.token??`seed:${jobId}`;

@@ -11,7 +11,7 @@ afterEach(cleanup)
 const items = [
     { id: "billing", title: "Billing", content: "Monthly" },
     { id: "access", title: "Access", content: "Roles" },
-    { id: "legacy", title: "Legacy", content: "Old", isDisabled: true },
+    { id: "archived", title: "Archived", content: "Closed", isDisabled: true },
 ]
 
 const states = () => [...document.querySelectorAll(".starci-core-generic-accordion-item")].map((node) => node.getAttribute("data-grammar-disclosure-state"))

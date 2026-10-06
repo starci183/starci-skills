@@ -145,8 +145,7 @@ const plainKey = (property) => {
 
 /**
  * The world an integration spec (`{ modules }`, with real peer apps beside them as `apps` when its client calls another app of
- * ours) or an e2e spec (`{ apps }`, never `modules`) asks for; every such spec asks for one; the retired name `useE2eWorld`
- * exists nowhere.
+ * ours) or an e2e spec (`{ apps }`, never `modules`) asks for; every such spec asks for one.
  */
 export const testWorldShape = {
     meta: {
@@ -158,21 +157,14 @@ export const testWorldShape = {
             apps: "An e2e spec boots applications: call `useTestWorld({ apps: {...} })`, not `modules`.",
             literal: "The options of `useTestWorld(...)` must be one object literal with plain keys: a variable, a spread or a computed key hides whether the spec asks for `modules` or `apps`.",
             missing: "This spec never calls `useTestWorld(...)`: integration and e2e specs run inside the one test world.",
-            retired: "`useE2eWorld` is the retired name of `useTestWorld`; there is one name, no alias.",
         },
     },
     create(context) {
         const slot = hfsOf(context).slotOf(context.filename || context.getFilename())
         const wants = slot === "be.tests.integration" ? "modules" : slot === "be.tests.e2e" ? "apps" : null
-        const retired = {
-            Identifier(node) {
-                if (node.name === "useE2eWorld") context.report({ node, messageId: "retired" })
-            },
-        }
-        if (!wants) return retired
+        if (!wants) return {}
         let seen = false
         return {
-            ...retired,
             CallExpression(node) {
                 if (node.callee.type !== "Identifier" || node.callee.name !== "useTestWorld") return
                 seen = true

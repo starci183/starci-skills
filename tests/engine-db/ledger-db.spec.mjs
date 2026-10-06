@@ -20,11 +20,10 @@ const sha256=text=>crypto.createHash('sha256').update(text).digest('hex');
 const chainHolds=rows=>rows.every((row,i)=>(row.prev_digest??null)===(i?rows[i-1].digest:null)&&row.digest===sha256(`${row.prev_digest??''}${row.event_id}${row.kind}${row.payload_json??''}${row.created_at}`));
 const temporary=()=>fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-db-'));
 /**
- * A v1 ledger exactly as it looked before the identity/anchor addendum: every §4 table except `meta`, and
- * `events.digest` with no default and no chain trigger — the shape a ledger built by an earlier agent
- * build (or any file that reached user_version=1 before this module carried `meta`) is stuck in.
+ * A user_version=1 ledger file that is not the current schema: every table except `meta`, and
+ * `events.digest` with no default and no chain trigger.
  */
-function preMetaLedgerFile(){
+function ledgerFileWithoutMeta(){
   const dir=temporary(),file=path.join(dir,'runtime.sqlite');
   const {DatabaseSync}=require('node:sqlite');
   const db=new DatabaseSync(file);
@@ -85,11 +84,11 @@ function preMetaLedgerFile(){
     CREATE TABLE inputs(workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), key TEXT NOT NULL,
       goal_revision INTEGER NOT NULL, sha256 TEXT NOT NULL, size INTEGER NOT NULL, media_type TEXT,
       origin TEXT NOT NULL, bytes BLOB NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(workflow_id,key));
-    CREATE TABLE migrations(source TEXT PRIMARY KEY, kind TEXT NOT NULL, rows_json TEXT NOT NULL, at INTEGER NOT NULL);
+    CREATE TABLE notes(source TEXT PRIMARY KEY, kind TEXT NOT NULL, rows_json TEXT NOT NULL, at INTEGER NOT NULL);
     PRAGMA user_version=1;
   `);
   const digest=text=>crypto.createHash('sha256').update(text).digest('hex');
-  db.prepare('INSERT INTO workflows(workflow_id,title,created_at,updated_at,generation,goal_identity) VALUES(?,?,?,?,?,?)').run('wf','pre-addendum',1000,1000,1,'goal-1');
+  db.prepare('INSERT INTO workflows(workflow_id,title,created_at,updated_at,generation,goal_identity) VALUES(?,?,?,?,?,?)').run('wf','no-meta',1000,1000,1,'goal-1');
   const d1=digest('e1kdone{"x":1}1000');
   db.prepare('INSERT INTO events(event_id,workflow_id,generation,entity_type,entity_id,kind,payload_json,prev_digest,digest,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
     .run('e1','wf',1,'workflow','wf','kdone','{"x":1}',null,d1,1000);
@@ -106,7 +105,7 @@ test('the ledger schema carries every contract table, the meta identity, the dri
   assert.equal(Number(ledger.db.prepare('PRAGMA foreign_keys').get().foreign_keys),1);
   assert.equal(Number(ledger.db.prepare('PRAGMA synchronous').get().synchronous),1,'synchronous=NORMAL (LEDGER_PRAGMAS, owner ruling 2026-09-27: WAL commits without a per-commit fsync)');
   const names=ledger.db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table','trigger','index')").all().map(row=>row.name);
-  for(const table of ['meta','schema_migrations','workflows','lifecycle_changes','goals','work_units','op_attempts','events','jobs','resources','leases','incidents','reports','contracts','check_runs','inbox','signals','goal_inputs'])
+  for(const table of ['meta','workflows','lifecycle_changes','goals','work_units','op_attempts','events','jobs','resources','leases','incidents','reports','contracts','check_runs','inbox','signals','goal_inputs'])
     assert.ok(names.includes(table),`missing table ${table}`);
   assert.ok(names.includes('leases_match_job')&&names.includes('leases_match_job_update'),'the drift trigger covers INSERT and UPDATE');
   for(const index of ['ix_units_state','events_entity','events_kind','jobs_queue','jobs_op','leases_expiry'])assert.ok(names.includes(index),`missing index ${index}`);
@@ -286,14 +285,14 @@ test('inspectLedger refuses a missing file, and reflects the identity and versio
   inspect.close();
 });
 
-test('openLedger refuses a pre-meta schema without changing its rows',t=>{
-  const {dir,file,firstDigest}=preMetaLedgerFile();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+test('openLedger refuses a ledger file without a meta table and leaves its rows unchanged',t=>{
+  const {dir,file,firstDigest}=ledgerFileWithoutMeta();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const {DatabaseSync}=require('node:sqlite'),precheck=new DatabaseSync(file,{readOnly:true});
-  assert.equal(precheck.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get(),undefined,'confirms the fixture predates meta');
+  assert.equal(precheck.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get(),undefined,'confirms the fixture has no meta table');
   precheck.close();
   assert.throws(()=>openLedger({file}),e=>e.code==='STARCI_LEDGER_SCHEMA_REFUSED');
   const after=new DatabaseSync(file,{readOnly:true});
-  assert.deepEqual({...after.prepare('SELECT workflow_id,title FROM workflows').get()},{workflow_id:'wf',title:'pre-addendum'});
+  assert.deepEqual({...after.prepare('SELECT workflow_id,title FROM workflows').get()},{workflow_id:'wf',title:'no-meta'});
   assert.deepEqual({...after.prepare('SELECT event_id,digest FROM events').get()},{event_id:'e1',digest:firstDigest});
   assert.equal(after.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get(),undefined);
   after.close();
@@ -328,14 +327,13 @@ test('inspectLedger exposes the same job and event read surface as openLedger',t
   inspect.close();
 });
 
-/** jobs.status `awaiting_owner`: a try that ended asking the owner settles there (never `failed`); 0001-init.sql carries it. */
+/** jobs.status `awaiting_owner`: a try that ended asking the owner settles there (never `failed`); the runtime schema carries it. */
 test('a fresh ledger carries awaiting_owner: the status, its transitions, its ui state and the job triggers',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
   try{
     const db=ledger.db;
     assert.ok(db.prepare("SELECT sql FROM sqlite_master WHERE name='jobs'").get().sql.includes("'awaiting_owner'"));
-    assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map(r=>[r.version,r.name]),[[1,'0001-init']]);
     assert.equal(db.prepare("SELECT count(*) n FROM job_transitions WHERE to_status='awaiting_owner'").get().n,2);
     assert.equal(db.prepare("SELECT ui FROM ui_state_map WHERE entity='job' AND native='awaiting_owner'").get().ui,'waiting');
     assert.deepEqual(db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'jobs_%' ORDER BY name").all().map(r=>r.name),['jobs_enqueue_guard','jobs_release_leases','jobs_status_guard']);
@@ -394,7 +392,7 @@ test('recordAttemptUsage writes llm_usage rows and the attempt summary once; rec
   ledger.close();
 });
 
-test('a fresh ledger carries the widened usage_source CHECK and usage_reason from 0001-init',t=>{
+test('a fresh ledger carries the widened usage_source CHECK and usage_reason from the schema',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
   try{

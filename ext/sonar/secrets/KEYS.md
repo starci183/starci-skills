@@ -1,7 +1,6 @@
 # ext/sonar custody
 
-SOPS/age ciphertext twins of the host-level SonarQube secrets, moved read-only from the legacy
-`<source>/.stacks/dev/runtime/files/` members. All are encrypted to the source stack's age recipient
+SOPS/age ciphertext twins of the host-level SonarQube secrets. All are encrypted to the source stack's age recipient
 `age1myd77xz5lhsluc4ejzztsck32pfq3vfpzrva8cegzydk2guhxqesgm3z4j`; the decryption identity
 (`~/.starci/master.identity`) stays outside Git and is backed up by the owner machine.
 
@@ -21,6 +20,6 @@ repository and have no stack-secret tool or recipient of their own, so their ana
 
 Decrypt one member: `sops -d secrets/<name>.enc > secrets/<name>` — the plaintext twin is gitignored
 and must never be committed. If a twin listed above is missing, the owner re-mints the secret
-(`scripts/gates/sonar-local.mjs` / the legacy `secret:gen` flow), encrypts it to the same recipient
+(`scripts/gates/sonar-local.mjs`), encrypts it to the same recipient
 (`sops -e --age age1myd77xz5lhsluc4ejzztsck32pfq3vfpzrva8cegzydk2guhxqesgm3z4j`), commits only the
 `.enc`, and applies the new value to the live server where the consumer reads it.

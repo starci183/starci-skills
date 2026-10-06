@@ -395,7 +395,7 @@ test('an unrequested drawing is never auto-accepted; only the owner’s accept s
     assert.deepEqual([r.accepted, r.why], [false, 'owner-only'], JSON.stringify(r));
     assert.deepEqual([eventsOf(l, 'ask-answered'), eventsOf(l, 'ask-auto-accepted'), spy.woken.length], [[], [], 0], 'nothing is answered: the ask is served to the owner');
     // An acceptance answered automatically (a receipt from before the ruling) is not the owner's: the drawing still owes review.
-    applyDrawReview(dir, receiptFor(p, question, { answeredBy: 'auto-recommended', dispatchId: 'ctx_legacy_auto' }), { write: true });
+    applyDrawReview(dir, receiptFor(p, question, { answeredBy: 'auto-recommended', dispatchId: 'ctx_auto_answered' }), { write: true });
     const auto = drawReviewStatus(dir);
     assert.equal(auto.owed,true,auto.why);
     assert.match(auto.why, /not by the owner/);

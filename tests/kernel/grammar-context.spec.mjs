@@ -59,7 +59,7 @@ test('interface.implement and interface.audit declare grammarContext: required',
 test('the family CSS resolves from brand.sources and the installed grammar family export; knowledge and captures ride along',t=>{
   const p=product(t,{family:'starci',captures:true,
     sources:[{repository:'fe',path:'src/family.css',kind:'tokens'},{path:'src/app/globals.css',kind:'css'},
-      {path:path.join(os.tmpdir(),'legacy','globals.css'),kind:'reference'},{repository:'fe',path:'src/Brand.tsx',kind:'component'}],
+      {path:path.join(os.tmpdir(),'reference','globals.css'),kind:'reference'},{repository:'fe',path:'src/Brand.tsx',kind:'component'}],
     grammarExports:{'./core.css':'./dist/core/styles.css','./offset-pop.css':'./dist/offset-pop/styles.css'}});
   write(p.fe,'src/family.css',':root{}');
   write(p.fe,'src/app/globals.css',':root{}');

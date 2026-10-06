@@ -1,6 +1,5 @@
-// Common is the public semantic/props authority. Physical renderer paths remain
-// internal compatibility storage until the package can move them without a
-// breaking source-layout migration.
+// Common is the public semantic/props authority. Physical renderer paths are
+// internal storage, not a public tier.
 export { GrammarRoot, type GrammarRootProps } from "../core/primitive/GrammarRoot/index.js"
 export { PageContainer, type PageContainerProps } from "../core/primitive/PageContainer/index.js"
 export { Badge, type BadgeProps, type BadgeTone } from "../core/primitive/Badge/index.js"

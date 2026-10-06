@@ -94,9 +94,8 @@ export const ledgerFileFor=(repoRoot,{env=process.env}={})=>{
 // ---------------------------------------------------------------------------------------------------------
 // Connection policy (DBTREE header "PRAGMA at open", RESEARCH-STORAGE §3)
 // ---------------------------------------------------------------------------------------------------------
-const INIT_SQL_FILE=new URL('./migrations/runtime/0001-init.sql',import.meta.url);
+const INIT_SQL_FILE=new URL('./schema/runtime.sql',import.meta.url);
 const INIT_SQL=fs.readFileSync(INIT_SQL_FILE,'utf8');
-const INIT_SQL_SHA=sha256(INIT_SQL);
 const LEDGER_BUSY_TIMEOUT_MS=15000;
 /**
  * Writer pragmas. wal_autocheckpoint=0 on EVERY connection except the one checkpointer (openLedger({checkpointer:true}),
@@ -170,19 +169,19 @@ const versionTuple=v=>String(v).split('.').map(Number);
 const olderThan=(a,b)=>{const x=versionTuple(a),y=versionTuple(b);for(let i=0;i<Math.max(x.length,y.length);i++){if((x[i]??0)!==(y[i]??0))return (x[i]??0)<(y[i]??0);}return false;};
 
 /**
- * Refuse any file that is not a starci/runtime@1 ledger at user_version LEDGER_VERSION (no migration chain). Also refuses a
+ * Refuse any file that is not a starci/runtime@1 ledger at user_version LEDGER_VERSION. Also refuses a
  * running SQLite older than the one the ledger recorded.
  */
 function verifyLedger(db,{file,sqliteVersion}){
   const version=userVersion(db);
-  let legacy=null;if(hasTable(db,'meta'))legacy=metaOf(db).schema;else if(hasTable(db,'jobs')||hasTable(db,'events'))legacy='pre-meta';
-  need(version===LEDGER_VERSION&&legacy===LEDGER_SCHEMA,
-    `ledger-schema-refused: ${file} is ${legacy??'not a StarCi ledger'} at user_version ${version}, this runtime opens only ${LEDGER_SCHEMA} at user_version ${LEDGER_VERSION}; preserve the database and its WAL, use a compatible runtime, or resolve its identity with the owner`,'STARCI_LEDGER_SCHEMA_REFUSED');
+  let found=null;if(hasTable(db,'meta'))found=metaOf(db).schema;else if(hasTable(db,'jobs')||hasTable(db,'events'))found='no-meta';
+  need(version===LEDGER_VERSION&&found===LEDGER_SCHEMA,
+    `ledger-schema-refused: ${file} is ${found??'not a StarCi ledger'} at user_version ${version}, this runtime opens only ${LEDGER_SCHEMA} at user_version ${LEDGER_VERSION}; preserve the database and its WAL, use a compatible runtime, or resolve its identity with the owner`,'STARCI_LEDGER_SCHEMA_REFUSED');
   const recorded=metaOf(db).sqlite_version;
   need(!recorded||!olderThan(sqliteVersion,recorded),`ledger-sqlite-downgrade: ${file} was last opened by SQLite ${recorded}, this process runs ${sqliteVersion}`,'STARCI_LEDGER_SQLITE_DOWNGRADE');
 }
 
-/** Create the ledger on an empty file: 0001-init.sql, user_version=LEDGER_VERSION, meta, schema_migrations — one transaction. */
+/** Create the ledger on an empty file: schema/runtime.sql, user_version=LEDGER_VERSION, meta — one transaction. */
 function initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot=null,product=null,ledgerId=null,blobRoot=null,fixtureMarker=null}){
   const empty=()=>userVersion(db)===0&&!db.prepare("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' LIMIT 1").get();
   if(!empty())return false;
@@ -201,8 +200,6 @@ function initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot=null,product
     if(repoRoot)meta.repo_root=path.resolve(repoRoot);
     if(product)meta.product=product;
     for(const [k,v] of Object.entries(meta))if(v!=null)seed.run(k,String(v));
-    db.prepare("INSERT INTO schema_migrations(version,name,runtime_rev,sql_sha256,started_at,finished_at,status) VALUES(1,'0001-init',?,?,?,?,'done')")
-      .run(meta.runtime_rev,INIT_SQL_SHA,at,now());
     db.exec('COMMIT');
     return true;
   }catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}
@@ -283,7 +280,7 @@ export const REDACTED_COLUMNS=Object.freeze({
   logs:['msg','data_json','refs_json'],reports:['report_json'],check_runs:['command','note','summary_json','attribution_json'],
   incidents:['detail','last_progress'],inbox:['payload_json','disposition_json'],decision_items:['summary','payload_json','evidence_json'],
   decisions:['rationale','result_json'],contracts:['markdown','context_json'],api_requests:['result_json'],op_attempts:['settle_json','why_json'],
-  conditions:['message'],goals:['markdown','amendment_json'],settle_tails:['last_error'],product_lands:['reason','checks_json'],
+  conditions:['message'],goals:['markdown','amendment_json'],settle_tails:['last_error'],
   record_changes:['reason'],foundations:['detail'],foundation_declarations:['detail'],interface_audits:['findings_json'],
 });
 const redactValue=(col,val)=>{
@@ -615,15 +612,14 @@ export function updateAttempt(db,{attemptId,at=nowMs(),...fields}){
  * job goes back to ready) or effect-unknown (a worker may have started; reconcile decides). A requeued attempt is also
  * settled by the kernel (settled_at, no verdict: nothing was judged) and released, so every reader that asks "still open?"
  * answers no; task_closed_at is stamped when its Orca Task was closed. A refused launch is never a try of the unit and
- * never a dispatch it spent: work_units.dispatches (the "attempts" the UI counts) gives the slot back. The legacy shape
- * (end_state requeued written by the refusal, settled_at and released_at never stamped) is sealed the same way, once.
+ * never a dispatch it spent: work_units.dispatches (the "attempts" the UI counts) gives the slot back.
  * An attempt that is already sealed or ended otherwise is left alone (returns false).
  */
 export function endRejectedAttempt(db,{attemptId,endState,effectState,releasedAt=null,taskClosedAt=null,at=nowMs()}){
   need(['requeued','effect-unknown'].includes(endState),`a refused launch ends requeued or effect-unknown, not ${endState}`);
   const row=db.prepare('SELECT * FROM op_attempts WHERE attempt_id=?').get(attemptId);
   need(row,`attempt ${attemptId} not found`,'STARCI_ATTEMPT_NOT_FOUND');
-  if(row.settled_at!=null||!(row.end_state==null||row.end_state==='requeued'))return false;
+  if(row.settled_at!=null||row.end_state!=null)return false;
   updateAttempt(db,{attemptId,at,endState,effectState,...(releasedAt!=null?{releasedAt,settledAt:releasedAt,settledBy:'kernel'}:{}),...(taskClosedAt!=null?{taskClosedAt}:{})});
   if(row.unit_id)db.prepare('UPDATE work_units SET dispatches=max(dispatches-1,0),updated_at=? WHERE workflow_id=? AND unit_id=?').run(at,row.workflow_id,row.unit_id);
   return true;
@@ -740,7 +736,7 @@ export function citeBlob(db,{recordId,recordPath,field,sha256:sha,artifactId=nul
     .run(recordId,recordPath,field,artifactId,sha,role,recordRev,createdAt);
   db.prepare('UPDATE blobs SET pinned=1 WHERE sha256=?').run(sha);
 }
-/** A periodic scrollback snapshot (UI-API §2.10); an unchanged scrollback adds nothing. */
+/** A periodic scrollback snapshot; an unchanged scrollback adds nothing. */
 export function recordTranscriptSnapshot(db,{attemptId,sha256:sha,lines,bytes,at=nowMs()}){
   const a=db.prepare('SELECT workflow_id FROM op_attempts WHERE attempt_id=?').get(attemptId);
   need(a,`attempt ${attemptId} not found`,'STARCI_ATTEMPT_NOT_FOUND');
@@ -935,16 +931,6 @@ function updateSettleTail(db,{attemptId,state,lastError=undefined,dueAt=undefine
   if(state==='done')fields.doneAt=at;
   return updateRow(db,'settle_tails',{attemptId},fields).changes>0;
 }
-function recordProductLand(db,{workflowId,repoRoot,wfBranch,result='queued',spanId=newSpanId(),startedAt=nowMs(),...fields}){
-  const {lastInsertRowid}=insertRow(db,'product_lands',{workflowId,spanId,repoRoot,wfBranch,result,startedAt,...fields});
-  appendEvent(db,{workflowId,entityType:'workflow',entityId:workflowId,spanId,kind:'product-land',payload:{landId:Number(lastInsertRowid),result},createdAt:startedAt});
-  return Number(lastInsertRowid);
-}
-function finishProductLand(db,{landId,result,at=nowMs(),...fields}){
-  const row=db.prepare('SELECT * FROM product_lands WHERE land_id=?').get(landId);need(row,`product land ${landId} not found`);
-  updateRow(db,'product_lands',{landId},{result,finishedAt:at,...fields});
-  appendEvent(db,{workflowId:row.workflow_id,entityType:'workflow',entityId:row.workflow_id,spanId:row.span_id,kind:'product-land',payload:{landId,result},createdAt:at});
-}
 
 // --- shared foundations, declarations, path transfers, record changes (A6) ------------------------------------------
 const FOUNDATION_KIND_ENUM=new Set(['brand','grammar','layout-tree','shell','module','contract','other']);
@@ -1000,7 +986,7 @@ function pruneAttemptSnapshots(dbOrLedger,{now=nowMs(),passMs,failMs}){
 }
 
 // --- workflow purge (the one delete path: archive verified first, then one cascading DELETE) --------------------------
-/** Upsert the workflow_purges tombstone; the table CHECK refuses deleting/purged without approval and a verified archive. */
+/** Upsert the workflow_purges record; the table CHECK refuses deleting/purged without approval and a verified archive. */
 export function recordPurge(db,{workflowId,state,at=nowMs(),...fields}){
   const prior=db.prepare('SELECT 1 FROM workflow_purges WHERE workflow_id=?').get(workflowId);
   if(!prior)insertRow(db,'workflow_purges',{workflowId,state,createdAt:at,...fields});
@@ -1025,18 +1011,18 @@ const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkfl
   createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,endRejectedAttempt,writeContract,
   declareResource,acquireLease,renewLeases,releaseLeases,idempotent,recordFailedRequest,fileReport,markReportConsumed,recordCheckRun,recordArtifact,attachToReport,
   recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,recordAttemptUsage,markAttemptUsageUnavailable,recordKernelUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
-  postInbox,setInboxStatus,setInboxStatusByKey,updateGoalJson,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail,recordProductLand,finishProductLand});
+  postInbox,setInboxStatus,setInboxStatusByKey,updateGoalJson,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail});
 
 // initLedger + verifyLedger + the meta touch-ups of a fresh openLedger open; throws leaving the caller to close db.
-const initAndVerifyLedger=(db,{file,now,sqliteVersion,journalMode,repoRoot,product,fixture})=>{const created=initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot,product,...(fixture?{ledgerId:fixture.ledgerId,blobRoot:fixture.blobRoot,fixtureMarker:fixture.marker}:{})});verifyLedger(db,{file,sqliteVersion});const meta=metaOf(db);if(!fixture)assertOperationalLedger(meta);if(meta.sqlite_version!==sqliteVersion)db.prepare("UPDATE meta SET value=? WHERE key='sqlite_version'").run(sqliteVersion);return created;};
+const initAndVerifyLedger=(db,{file,now,sqliteVersion,journalMode,repoRoot,product,fixture})=>{const created=initLedger(db,{file,now,sqliteVersion:fixture?.sqliteVersion??sqliteVersion,journalMode,repoRoot,product,...(fixture?{ledgerId:fixture.ledgerId,blobRoot:fixture.blobRoot,fixtureMarker:fixture.marker}:{})});verifyLedger(db,{file,sqliteVersion});const meta=metaOf(db);if(!fixture)assertOperationalLedger(meta);if(!fixture&&meta.sqlite_version!==sqliteVersion)db.prepare("UPDATE meta SET value=? WHERE key='sqlite_version'").run(sqliteVersion);return created;};
 // A new ledger enrols itself in machine.ledgers (repo_root from its meta); a refusal (temp file on the live registry) is fine.
 const registerNewLedger=(db,created,{file,resolved,ledgerId})=>{if(!created)return;const own=metaOf(db);if(own.repo_root)try{withMachine(m=>m.registerLedger({ledgerId,file:resolved,repoRoot:own.repo_root,product:own.product??null,schemaVersion:LEDGER_VERSION}));}catch{/* registry unavailable: resolved by name until it is */}};
 /**
- * The read-write handle. A new (empty) file is created with 0001-init.sql; any other schema is refused (clean slate).
+ * The read-write handle. A new (empty) file is created from schema/runtime.sql; any other schema is refused (clean slate).
  * `checkpointer:true` is the one connection that checkpoints (the reconciler engine): wal_autocheckpoint=8000 and
  * handle.checkpoint() for the periodic PASSIVE checkpoint; every other connection runs wal_autocheckpoint=0.
  * `write.<fn>(args)` runs one typed write in its own transaction; inside handle.transaction(db=>…) call the exported
- * functions with that db. `fixture:{ledgerId,createdAt,blobRoot}` creates only a fresh sample; its typed
+ * functions with that db. `fixture:{ledgerId,createdAt,blobRoot[,sqliteVersion]}` creates only a fresh sample that records the stated SQLite version (default the running one); its typed
  * mutations and later writable opens refuse. The clock is frozen and no registry binding is accepted.
  */
 export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,repoRoot=null,product=null,checkpointer=false,machine=null,fixture=null}={}){

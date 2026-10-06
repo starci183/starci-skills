@@ -187,7 +187,7 @@ complete -c starci -n '__starci_needs_verb runtime' -a 'gen-catalog' -d 'write o
 complete -c starci -n '__starci_needs_verb runtime' -a 'gen-ops' -d 'regenerate or check the generated operation registry'
 complete -c starci -n '__starci_needs_verb runtime' -a 'housekeeping' -d 'inspect or apply the host housekeeping sweeps'
 complete -c starci -n '__starci_needs_verb runtime' -a 'install' -d 'install the StarCi runtime — fetch the pinned package, then init or update <cwd>/.claude'
-complete -c starci -n '__starci_needs_verb runtime' -a 'ledger-hygiene' -d 'report orphan ledgers and legacy repository-local ledger stores'
+complete -c starci -n '__starci_needs_verb runtime' -a 'ledger-hygiene' -d 'report orphan ledgers'
 complete -c starci -n '__starci_needs_verb runtime' -a 'link' -d 'point the per-user StarCi launcher at a live runtime checkout'
 complete -c starci -n '__starci_needs_verb runtime' -a 'machine-db' -d 'inspect or maintain the host machine database'
 complete -c starci -n '__starci_needs_verb runtime' -a 'owner-claims-audit' -d 'audit owner-decision claims and owner-gates in runtime ledgers'

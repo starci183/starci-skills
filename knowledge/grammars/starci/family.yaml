@@ -92,7 +92,7 @@ dna:
   universalSpacing:
     - COMMON_SPACING_SCALE
     - COMMON_SPACING_TOKENS
-  compatibilityAliases:
+  derivedNames:
     - name: --starci-core-page-inset
       targets: --grammar-page-inset
     - name: --starci-core-region-gap
@@ -103,8 +103,8 @@ dna:
       targets: --grammar-row-gap
     - name: --starci-core-inline-gap
       targets: --grammar-inline-gap
-  aliasNote: |
-    These are compatibility aliases to --grammar-*, not a second scale.
+  derivedNote: |
+    These names carry the matching --grammar-* value under the family namespace, not a second scale.
 themeAndAccessibility:
   supports:
     - light

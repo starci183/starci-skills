@@ -12,19 +12,14 @@ export const WORK_PREFIX = '.starciwork/';
 const INPUT_KINDS = new Set(['source', 'work']);
 const SOURCE_ROOTS = ['knowledge/', 'modules/schemas/'];
 const SOURCE_FILES = new Set(['modules/models/code-patterns.yaml']);
-const WORK_EXCLUDED = new Set(['.starciwork/runtime.sqlite']);
 const WORK_EXCLUDED_ROOTS = ['.starciwork/kernel-evidence/', '.starciwork/kernel-strays/', '.starciwork/kernel-approvals/'];
 export const special = (segment) => /[*{<]/.test(segment);
 export const isSourceLaw = (rel) => typeof rel === 'string' && !rel.includes('..')
   && (SOURCE_ROOTS.some((root) => rel.startsWith(root)) || SOURCE_FILES.has(rel));
 export const isWorkInput = (rel) => typeof rel === 'string' && rel.startsWith(WORK_PREFIX) && !rel.includes('..')
-  && !rel.split('/').some(special) && !WORK_EXCLUDED.has(rel) && !/^\.starciwork\/logs\.sqlite\.migrated-/.test(rel) && !WORK_EXCLUDED_ROOTS.some((root) => rel.startsWith(root));
-export const inputKindOf = (entry) => {
-  if (INPUT_KINDS.has(entry?.kind)) return entry.kind;
-  if (isSourceLaw(entry?.path)) return 'source';
-  if (isWorkInput(entry?.path)) return 'work';
-  return null;
-};
+  && !rel.split('/').some(special) && !WORK_EXCLUDED_ROOTS.some((root) => rel.startsWith(root));
+/** The kind of one recorded entry: its own `kind`, or null. */
+export const inputKindOf = (entry) => (INPUT_KINDS.has(entry?.kind) ? entry.kind : null);
 
 const cutOf = (payloadJson) => {
   try {

@@ -1,4 +1,4 @@
-# StarCi .starciwork: product content only (ARCHITECTURE-DB §5.1, work-layout.yaml shape.productPaths).
+# StarCi .starciwork: product content only (work-layout.yaml shape.productPaths).
 # Agent output (reports, checks, captures, draw rounds, UAT runs, logs, ledgers, worktrees) lives in
 # runtime.sqlite rows and blobs outside the repository.
 /*

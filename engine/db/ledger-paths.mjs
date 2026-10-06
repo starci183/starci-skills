@@ -37,7 +37,7 @@ function registeredLedgerFile(root,env,openReader){
 }
 function assertLedgerRoot(file,root,openReader){
   const db=openReader(file);let own;try{own=db.prepare("SELECT value FROM meta WHERE key='repo_root'").get()?.value;}finally{db.close();}
-  if(!own||repoRootKey(own)!==repoRootKey(root))throw Object.assign(new Error(`ledger-root-mismatch: ${file} belongs to another or unverified repository; preserve the database and resolve the owner binding before migration`),{code:'STARCI_LEDGER_ROOT_MISMATCH'});
+  if(!own||repoRootKey(own)!==repoRootKey(root))throw Object.assign(new Error(`ledger-root-mismatch: ${file} belongs to another or unverified repository; preserve the database and resolve the owner binding with the owner`),{code:'STARCI_LEDGER_ROOT_MISMATCH'});
 }
 function unregisteredLedgerFile(root,env,openReader){
   const base=projectsRootFor(env),current=path.join(base,ledgerIdForRepo(root),'runtime.sqlite');
@@ -60,7 +60,8 @@ export function ledgerFixtureInit(fixture,{file,repoRoot,product,machine,mapped,
   }
   if(!fixture||typeof fixture!=='object'||Array.isArray(fixture)
     ||![Object.prototype,null].includes(Object.getPrototypeOf(fixture))
-    ||Object.keys(fixture).sort(byCodeUnit).join(',')!=='blobRoot,createdAt,ledgerId')fixtureRefused('needs exactly ledgerId, createdAt and blobRoot');
+    ||!['blobRoot,createdAt,ledgerId','blobRoot,createdAt,ledgerId,sqliteVersion'].includes(Object.keys(fixture).sort(byCodeUnit).join(',')))fixtureRefused('needs ledgerId, createdAt and blobRoot, and may state sqliteVersion');
+  if(fixture.sqliteVersion!==undefined&&(typeof fixture.sqliteVersion!=='string'||!/^\d+\.\d+\.\d+(?:\.\d+)?$/.test(fixture.sqliteVersion)))fixtureRefused('sqliteVersion must be a dotted numeric version');
   if(typeof fixture.ledgerId!=='string'||!SYNTHETIC_LEDGER_ID.test(fixture.ledgerId))fixtureRefused('ledgerId must be a synthetic UUID');
   if(!Number.isSafeInteger(fixture.createdAt)||fixture.createdAt<=0||!Number.isFinite(new Date(fixture.createdAt).getTime()))fixtureRefused('createdAt must be a positive safe epoch millisecond');
   const root=fixture.blobRoot;

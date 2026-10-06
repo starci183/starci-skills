@@ -76,7 +76,7 @@ const seedWorkflow=(repo,wf,{worktree=true}={})=>seed(repo,ledger=>ledger.transa
   ledger.appendEvent({workflowId:wf,entityType:'job',entityId:'job-docs',kind:'op-settled',payload:{verdict:'pass',status:'succeeded'}});
 }));
 /**
- * One op job of the migrated schema: unit -> queued -> ready -> leased -> a contract-bound open
+ * One op job of the current schema: unit -> queued -> ready -> leased -> a contract-bound open
  * attempt -> running (the state starci kernel report / check / settle accept), or further to reported ->
  * succeeded with its result on the attempt when `status` says so. Jobs of one `unitKey` are the
  * tries of one unit: a retry chains retry_of to the failed previous try, a try after a passed one
@@ -195,9 +195,9 @@ test('a handover ask carries exactly the three options approve, feedback, questi
   assert.match(handoverAskProblem({text:'x',options:[...OPTIONS,'Kh\u00e1c']}),/exactly 3 options/);
   assert.match(handoverAskProblem({text:'x',options:[OPTIONS[0],OPTIONS[0],OPTIONS[2]]}),/distinct/);
   assert.match(handoverAskProblem({text:'x',options:OPTIONS,picks:[{id:'p',choices:['a','b']}]}),/no picks/);
-  assert.equal(decisionOf({optionIndex:0},{options:OPTIONS}),'approve');
-  assert.equal(decisionOf({option:OPTIONS[1]},{options:OPTIONS}),'feedback','an older receipt is matched by its label');
-  assert.equal(decisionOf({optionIndex:2},{options:OPTIONS}),'question');
+  assert.equal(decisionOf({optionIndex:0}),'approve');
+  assert.equal(decisionOf({option:OPTIONS[1]}),null,'a receipt without optionIndex decides nothing');
+  assert.equal(decisionOf({optionIndex:2}),'question');
 
   const repo=fixture(t),wf='wf-handover-shape';
   seedWorkflow(repo,wf);

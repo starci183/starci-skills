@@ -22,9 +22,9 @@ import { insidePath } from '../lib/path-key.mjs';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SETTINGS_FILE = path.join(SKILL_ROOT, 'modules', 'kernel', 'product-land.yaml');
 export const PRESERVED_PREFIX = 'preserved';
-/** The workflow phases after which its worktree is collectable (runtime 0001-init workflows.phase). */
+/** The workflow phases after which its worktree is collectable (runtime schema workflows.phase). */
 export const ENDED_WORKFLOW_PHASES = Object.freeze(['stopped', 'finished', 'archived']);
-/** Op job statuses whose worker still holds a terminal (runtime 0001-init jobs.status). */
+/** Op job statuses whose worker still holds a terminal (runtime schema jobs.status). */
 export const TERMINAL_JOB_STATUSES = Object.freeze(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
 const ENDED = new Set(ENDED_WORKFLOW_PHASES);
 export const SETTLED_JOBS = new Set(SETTLED_JOB_LIST);

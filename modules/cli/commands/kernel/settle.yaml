@@ -116,7 +116,7 @@ writes: jobs.status -> succeeded|failed|awaiting_owner + result_json {verdict,..
 validates: "The reports ROW is the durable verdict - filed by `starci kernel report`, integrated by `api
   consume-report`; the done-marker/message is only the wake-up and the file is the bound artifact
   (modules/kernel/verdict-contract.yaml envelope). validateOpReport runs starci/op-report@1 at
-  filing (`starci kernel report`; alpha.3: the reports row of the job's attempt is the ONLY report, a --report
+  filing (`starci kernel report`; the reports row of the job's attempt is the ONLY report, a --report
   path is ignored with a warning): outcome's payload present, files inside the job's owned_paths,
   identity bound to the job. `pass` records only after the declared checks re-ran green (`starci kernel record-checks`
   row) - evidence is bytes on disk, never words in a summary (verdict-contract.yaml accepts). A

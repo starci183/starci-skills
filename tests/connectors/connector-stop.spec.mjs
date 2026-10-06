@@ -24,7 +24,7 @@ const assertCustody = (actual, expected) => {
     assert.deepEqual(actual[key], expected[key], `original ${key} is retained`);
 };
 
-test('legacy or conflicting connector custody refuses without any process call or row mutation', (t) => withLedger(t, () => {
+test('connector custody without a process identity, or in conflict with the registered one, refuses without any process call or row mutation', (t) => withLedger(t, () => {
   for (const config of [{ processIdentity: null }, { source: slashPath('D', 'other-runtime', 'tunnel.mjs') }, { processIdentity: { ...manager, pid: 9999 } }]) {
     put('tunnel', config);
     const before = connectorState('tunnel');

@@ -86,11 +86,11 @@ export const MANIFEST_KINDS = [APP_KIND, RUNTIME_KIND];
 export const manifestKind = (m) => (isPlainObject(m) && m.kind !== undefined ? m.kind : APP_KIND);
 const strList = (v) => stringList(v);
 
-const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'liteManagedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'perConnection', 'parent', 'editions', 'litePresence', 'lite', 'provider', 'coverage', 'entries', 'outcomeHome', 'anonymousActions'];
+const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'liteManagedBy', 'rules', 'goesTo', 'why', 'since', 'perConnection', 'parent', 'editions', 'litePresence', 'lite', 'provider', 'coverage', 'entries', 'outcomeHome', 'anonymousActions'];
 /** The fields a slot's `lite` overlay may hold: the same keys it would carry in the slot body, resolved under edition lite. */
 const LITE_OVERLAY_KEYS = ['path', 'requires', 'allows', 'forbids', 'minInstances', 'requiredInstances'];
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */
-const RUNTIME_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'minInstances', 'requires', 'allows', 'forbids', 'budget', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'generatedBy', 'parent', 'coverage'];
+const RUNTIME_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'minInstances', 'requires', 'allows', 'forbids', 'budget', 'rules', 'goesTo', 'why', 'since', 'generatedBy', 'parent', 'coverage'];
 
 /** Shape problems of one slot of a manifest of `kind` (app or runtime). */
 export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] } = {}) {
@@ -162,8 +162,6 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   if (slot.rules !== undefined && !(Array.isArray(slot.rules) && slot.rules.every((r) => /^[A-Z][A-Z0-9_]*\*?$/.test(String(r))) && new Set(slot.rules).size === slot.rules.length)) bad.push(`${at}: rules must be unique rule ids`);
   if (slot.perConnection !== undefined && !(slot.id === 'be.persistence' && strList(slot.perConnection) && slot.perConnection.length && new Set(slot.perConnection).size === slot.perConnection.length && slot.perConnection.every((name) => NAME.test(name)))) bad.push(`${at}: perConnection is a unique list of capability names, only on be.persistence (the platform capabilities whose tables exist on every connection that uses them)`);
   if (slot.since !== undefined && !SEMVER.test(String(slot.since))) bad.push(`${at}: since must be a version`);
-  if (slot.retiredIn !== undefined && !(Number.isInteger(slot.retiredIn) && slot.retiredIn >= 2)) bad.push(`${at}: retiredIn must be a major`);
-  if (slot.retiredIn !== undefined && typeof slot.successor !== 'string') bad.push(`${at}: a retired slot names its successor`);
   if (slot.tracked === 'external' && (typeof slot.goesTo !== 'string' || slot.presence !== 'forbidden')) bad.push(`${at}: an external slot is forbidden and says where it goes (goesTo)`);
   if (slot.presence === 'forbidden' && slot.tracked !== 'external') bad.push(`${at}: a forbidden slot is external`);
   return bad;
@@ -181,7 +179,7 @@ export function runtimeShapeProblems(m) {
   for (const key of Object.keys(m)) if (!allowed.has(key)) bad.push(`unknown top-level key ${key}`);
   if (!/^starci\/runtime-slots@\d+$/.test(String(m.schema))) bad.push('schema must be starci/runtime-slots@<major>');
   if (!SEMVER.test(String(m.version))) bad.push('version must be MAJOR.MINOR.PATCH');
-  if (!isPlainObject(m.versioning) || !['patch', 'minor', 'major', 'retire', 'pins'].every((k) => typeof m.versioning[k] === 'string')) bad.push('versioning needs patch, minor, major, retire and pins text');
+  if (!isPlainObject(m.versioning) || !['patch', 'minor', 'major', 'pins'].every((k) => typeof m.versioning[k] === 'string')) bad.push('versioning needs patch, minor, major and pins text');
   if (JSON.stringify(m.presenceValues) !== JSON.stringify(PRESENCE)) bad.push(`presenceValues must be ${PRESENCE.join(', ')}`);
   if (JSON.stringify(m.trackedValues) !== JSON.stringify(RUNTIME_TRACKED)) bad.push(`trackedValues must be ${RUNTIME_TRACKED.join(', ')}`);
   if (JSON.stringify(m.testValues) !== JSON.stringify(TESTS)) bad.push(`testValues must be ${TESTS.join(', ')}`);

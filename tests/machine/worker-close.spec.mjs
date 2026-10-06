@@ -356,7 +356,7 @@ test('Supervisor records genuine measured managed closure once and then releases
 
 test('historical thin closure flags or timestamps retain managed custody until the existing proof owner qualifies it', async (t) => withLedger(t, async ({ machine: m }) => {
   const { createJob, closeWorkerTerminal, jobOf, openWorkerHandles } = await import('../../scripts/supervisor/workers.mjs');
-  const { job } = createJob(m, { cluster: 'legacy-close-flag', title: 'legacy close flag', files: ['scripts/legacy-close.mjs'] });
+  const { job } = createJob(m, { cluster: 'close-flag', title: 'close flag', files: ['scripts/close-flag.mjs'] });
   m.db.prepare("UPDATE sup_jobs SET status='failed',payload_json=json_set(payload_json,'$.dispatch',?,'$.terminalClosed',json(?)) WHERE job_id=?")
     .run(DISPATCH, JSON.stringify({ handle: HANDLE, dispatch: DISPATCH, ok: true, proof: null }), job.job_id);
   m.startSupAttempt({ jobId: job.job_id });

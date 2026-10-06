@@ -4,7 +4,7 @@
 //     secrets/<slug>.enc, seeds}); a `.enc` outside <env>/secrets/ is never allowed, `runtime/files/`, a root `DESIGN.md`,
 //     `deployment.json` and `k8s/` are not in the list, so they fall out of it;
 //   - the declaration (read by scripts/lib/stack-declaration.mjs, the one reader of it) states a sonar service, a local
-//     Sonar is owned by the host (`stack.owner: host`, root `.claude/ext/sonar`), and no service still points at `.stacks`.
+//     Sonar is owned by the host (`stack.owner: host`, root `.claude/ext/sonar`).
 // The declaration's services contract (custody, CI wiring, project keys) stays check-starcistacks's; this file judges shape only.
 import { braceVariants, globExpression } from '../../lib/glob.mjs';
 import { declaredStack, findStackDeclaration, STACK_ROOT, text } from '../../lib/stack-declaration.mjs';
@@ -15,7 +15,6 @@ const STACKS_SLOT = 'app.starcistacks';
 const HOST_SONAR_ROOT = '.claude/ext/sonar';
 const SEALED = /\.enc$/;
 const INSIDE_SECRETS = /^[^/]+\/secrets\/[^/]+\.enc$/;
-const RETIRED_ROOT = /^\.?stacks(?:\/|$)/;
 
 /** The anchored expressions of a slot's `allows` entries: `<name>` is one path segment, braces alternate. */
 const allowedExpressions = (allows) => allows.flatMap((entry) => braceVariants(entry.replace(/<[a-z][a-z0-9-]*>/g, '*'))).map((variant) => globExpression(variant.endsWith('/') ? `${variant}**` : variant));
@@ -45,7 +44,6 @@ function declarationFindings(repoRoot, files, prefix) {
   }
   for (const [id, entry] of Object.entries(services)) {
     const stack = declaredStack(entry);
-    if (stack?.root && RETIRED_ROOT.test(stack.root)) findings.push(shapeFinding(declared, `${declared} services.${id}.stack.root ${stack.root} still points at the retired .stacks root; the stack root is ${STACK_ROOT}`));
     if (id === 'sonar' && text(entry?.mode) === 'local' && !(stack?.hostOwned && stack.root === HOST_SONAR_ROOT)) {
       findings.push(shapeFinding(declared, `${declared} services.sonar is a local Sonar but is not owned by the host; declare stack.owner host with root ${HOST_SONAR_ROOT}`));
     }

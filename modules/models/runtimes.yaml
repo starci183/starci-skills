@@ -80,7 +80,7 @@ allocation:
   # (review-hands), reviews - the third audit family.
   hands: [devin-agent]
   # Owner decision 2026-09-25 ("ok"): route by the 72h evidence of scripts/agent/model-scorecard.mjs (1389 op jobs over the product ledgers of that window).
-  # Those historical Sol scores describe the pre-migration model; they are not GPT-6.1 Sol qualification evidence.
+  # Those historical Sol scores describe an earlier Sol model; they are not GPT-6.1 Sol qualification evidence.
   # Each kind walks ONE order, named by its roleOfKind `order` (default: `think` for think work, else its role),
   # at its difficulty tier:
   #   implement, write, verify (hands-on implementation: backend.implement, interface.implement, code.refactor,
@@ -107,8 +107,7 @@ allocation:
   #     review.verify, handover.review, security.verify, goal.validate, uat.assisted.verify, interface.audit and
   #     the hands-on e2e/integration/perf/uat verify kinds - and work.author walk the review order: Devin,
   #     then Opus and Sol as overflow only (overflowByOrder.review). The cross-family rule sends a review of
-  #     what Devin implemented to Opus or Sol. An experiment, measured in
-  #     benchmark/findings/2026-09-25-review-hands.md.
+  #     what Devin implemented to Opus or Sol. An experiment.
   # Claude and Codex keep strategy: request.analyze, scope.define, business/architecture/goal decide and
   # revise, decision.prepare and implementation.plan (the cut) stay on think/decide/plan (Opus, Sol); brand.decide
   # walks its own brand order (Opus, then Sol).
@@ -228,8 +227,7 @@ allocation:
     # `l.from.files: 12` is ledger-derived: of 52 settled implement/refactor/author jobs in the
     # measured product ledger, closures at or above 12 authored files ran a median 46 min against 12 min below
     # it, the first cutoff where the majority exceeds one targetMinutes[1] window
-    # (benchmark/findings/2026-09-23-parallel-gear.md). Every other `from` bound is the
-    # benchmark/findings/fable.md sketch value carried as an ASSUMPTION: that ledger holds exactly one job over three
+    #. Every other `from` bound is a sketch value carried as an ASSUMPTION: that ledger holds exactly one job over three
     # windows and no assertion or component measurement at all, so `xl.from` and both `assertions`
     # bounds have no observation behind them and are re-derived when estimate inputs are recorded.
     size:
@@ -275,9 +273,8 @@ allocation:
   # start waits for an Orca that does not answer, and how long after a responding Orca calls a kernel dead
   # it is asked again.
   hostOutage: {waitMs: 90000, deathSettleMs: 10000}
-  # supervisorTick: the numbers of the retired supervisor tick (2026-09-28) that the reconciler controllers still read
-  # (host thresholds, orca probes, statusApp port, owner digest cadence); everyMs is unused. The tick ran every
-  # everyMs (whole minutes: schtasks repetition). host: above maxNode node.exe or maxGit git.exe processes the host
+  # supervisorTick: the numbers the reconciler controllers read
+  # (host thresholds, orca probes, statusApp port, owner digest cadence). host: above maxNode node.exe or maxGit git.exe processes the host
   # controller logs the counts and the parents holding the most. orca: terminal-list is probed up to probes times, probeTimeoutMs each, gapMs apart; when every
   # probe fails the Orca app (never its terminal daemon) gets closeWaitMs to close before it is forced, is launched
   # again, and restart-all runs. deadKernelMs: a watchdog whose trailing ticks read tick-failed or restart-failed
@@ -290,7 +287,6 @@ allocation:
   # actions.mjs) no supervisor action touched this long is an SLA breach, alerted into the Supervisor's inbox.
   # ownerDigestMs: the Owner Notifier's periodic owner digest goes out at most this often.
   supervisorTick:
-    everyMs: 1800000
     host: {maxNode: 300, maxGit: 100}
     orca: {probeTimeoutMs: 30000, probes: 5, gapMs: 30000, closeWaitMs: 20000}
     deadKernelMs: 900000

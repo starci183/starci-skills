@@ -84,9 +84,7 @@ test('HFS_STACKS_SHAPE: runtime/files, a sealed file outside secrets/, DESIGN.md
   assert.match(only(result, 'HFS_STACKS_SHAPE').find((f) => f.path.endsWith('application-stacks.yaml')).message, /not owned by the host/);
 });
 
-test('HFS_STACKS_SHAPE: a service still rooted at .stacks and a declaration with no sonar are refused', () => {
-  const stale = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, '.starcistacks/application-stacks.yaml', `${STACKS_DECLARATION}  error-tracking:\n    provider: sentry\n    mode: local\n    stack:\n      repository: demo\n      root: .stacks\n      environment: dev\n`)) });
-  assert.match(only(stale, 'HFS_STACKS_SHAPE')[0].message, /retired \.stacks root/);
+test('HFS_STACKS_SHAPE: a declaration with no sonar is refused', () => {
   const silent = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, '.starcistacks/application-stacks.yaml', 'schema: starci/application-stacks@1\nservices:\n  error-tracking:\n    provider: sentry\n    mode: disabled\n')) });
   assert.match(only(silent, 'HFS_STACKS_SHAPE')[0].message, /no sonar service/);
 });

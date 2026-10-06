@@ -95,7 +95,7 @@ export { axios }` },
             { filename: DOMAIN, code: `export const load = () => import("axios")`, errors: [{ messageId: "foreign" }] },
             { filename: DOMAIN, code: `const Redis = require("ioredis")\nexport { Redis }`, errors: [{ messageId: "foreign" }] },
             { filename: DOMAIN, code: `export { caching } from "cache-manager"`, errors: [{ messageId: "foreign" }] },
-            // the retired repository rule must-use-cache-service: the raw cache token stays inside the cache capability
+            // the raw cache token stays inside the cache capability
             { filename: FEATURE, code: `import { CACHE_MANAGER } from "@nestjs/cache-manager"\nexport { CACHE_MANAGER }`, errors: [{ messageId: "foreign" }] },
             { filename: INTEGRATION, code: `import dayjs from "dayjs/plugin/utc"\nexport { dayjs }`, errors: [{ messageId: "foreign" }] },
             { filename: DOMAIN, code: `import winston from "winston"\nexport { winston }`, errors: [{ messageId: "foreign" }] },

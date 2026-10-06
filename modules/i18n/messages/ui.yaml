@@ -354,8 +354,6 @@ messages:
     vi: Tệp bằng chứng
   - en: Evidence submitted by the op (`evidence/`)
     vi: Bằng chứng op nộp (`evidence/`)
-  - en: evidence/ is the op evidence folder; older attempts recorded it as E/
-    vi: evidence/ là thư mục bằng chứng của op; lần thử cũ ghi là E/
   - en: Fail
     vi: Hỏng
   - en: failed
@@ -3311,8 +3309,6 @@ messages:
     vi: "Chi phí đã ghi nhận (phần đã biết)"
   - en: "Totals include reported measurements only; missing measurements remain unknown."
     vi: "Tổng chỉ gồm các phép đo đã báo cáo; phép đo thiếu vẫn chưa rõ."
-  - en: "Attempt totals from the dispatch cohort; the grouped usage source is empty or unavailable."
-    vi: "Tổng lần thử trong nhóm điều phối; nguồn usage theo nhóm rỗng hoặc chưa khả dụng."
   - en: "Available sources returned no usage; the full scope is incomplete."
     vi: "Các nguồn khả dụng chưa trả usage; phạm vi đầy đủ còn thiếu dữ liệu."
   - en: "Nothing recorded yet."

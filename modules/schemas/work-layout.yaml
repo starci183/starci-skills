@@ -14,11 +14,8 @@ shape:
     business/, architecture/, business/srs/ or architecture/sds/ segment anywhere.
     scripts/work/validate/check-example-work.mjs reads shape.families from this file at gate time and refuses
     (FAMILIES_DRIFT) the moment its own FAMILIES set and this list disagree, so the two cannot drift apart
-    silently. A work/node@N record (the retired recursive envelope, e.g. under business/{overview,srs} or
-    architecture/{overview,sds}) is refused by the gate (HFS_WORK_NODE_RETIRED): restate it as these flat
-    families. A root-level .starciwork/<name>/index.yaml operations or import record outside features/ is a
-    path outside the product list (drift) and belongs in the catalog's setup entries (shape.setup). Ops
-    never author or edit work/node records."
+    silently. A root-level .starciwork/<name>/index.yaml operations or import record outside features/ is a
+    path outside the product list (drift) and belongs in the catalog's setup entries (shape.setup)."
   br: features/<feature>/br/<name>/index.yaml, schema work/business-rule@1. May carry appliesTo, module
     (a string or list of module-root directory paths - never individual files, see the owners note under
     implementation below) and blockedBy.
@@ -113,12 +110,12 @@ shape:
       and a product record cites it by artifact id + sha256 (docs/ledger-db.md). The categories below
       are scripts/lib/starciwork-boundary.mjs agentDataCategory, which scripts/work/validate/check-example-work.mjs
       refuses in a .starciwork tree [HFS_AGENT_DATA_TRACKED], and shape.starciworkIgnore keeps them out of git."
-    - kernel-evidence/**, kernel-strays/**, kernel-approvals/** (retired custody)
+    - kernel-evidence/**, kernel-strays/**, kernel-approvals/**
     - evidence/<workflow>.<mode>/** and any <node>/evidence/<id>/** bundle
     - any evidence/** capture, impl/<repository>/<name>/assets/** capture, shell/assets/** layout capture
     - uat/<flow>/runs/<runId>/**, ui/<screen>/assets/**/draw-loop/** rounds, features/<feature>/operations/**
     - report*.json copies, *.tmp.json, settle-parity/, settle-tail/, runtime/, canon-seams/
-    - the ledger and log files (runtime.sqlite*, logs.sqlite*) and worktrees/ (a workflow's one worktree is created and owned by Orca outside the app checkout)
+    - the ledger and log files (runtime.sqlite*) and worktrees/ (a workflow's one worktree is created and owned by Orca outside the app checkout)
     - "evidence/** bundles, UAT runs and interface.audit verdicts are filed from STARCI_JOB_SCRATCH with starci kernel report --attach
       (modules/ops/_common.yaml Path and field contract): artifacts of the attempt, the audit an interface_audits row.
       Draw-loop rounds are one blob bundle generation.loop cites {sha256, round}; impl running-page captures are blobs
@@ -147,7 +144,7 @@ shape:
     column) and serves it at /api/blob/<sha256>. A product record cites a blob through work_citations, which pins
     it; scripts/housekeeping/blob-gc.mjs sweeps an unreferenced blob only after the 24 h grace and a verified archive."
   workflowLogs: the typed log rows the kernel, ops and runtime write are the logs table of the project ledger (see
-    workflowRunState). No log file, cursor or retired log database lives in the Work tree.
+    workflowRunState). No log file, cursor or log database lives in the Work tree.
   uiDirectionAsset: "features/<feature>/ui/<screen>/assets/<name>.png with a sibling
     <name>.prompt.txt under the same assets/. interface.draw writes both - the record's ui block
     (intent, surfaces, states, coverage {scale, representativeScreens, map}, accessibility,
@@ -253,8 +250,7 @@ rules:
     features/<feature>/index.yaml (work/feature@1); the specification itself lives in flat family
     records - fr for functional requirements, nfr for qualities, br for rules, data for data
     definitions, journey for customer journeys and decision for open or settled policy questions.
-    Every record is a complete typed document of its own family schema; the retired
-    work/node@1-plus-extensions.work3.srs shape is not authored into this layout."
+    Every record is a complete typed document of its own family schema."
   - Each fr record owns its actors, trigger, main/exception flows, postconditions, composes,
     requiresProof and provenBy in one file. Rule, quality, data, decision and journey records
     remain separate addressable owners and link through stable semantic IDs. Parent indexes
@@ -324,9 +320,9 @@ rules:
     a violation). Central schemas stay in .claude.
   - Repository and environment provenance is written directly in sourceRefs or the owning module
     record. refs and dependsOn remain stable technical node IDs for digest propagation.
-  - "UAT accounts.yaml uses schema work/disposable-accounts@1 (the example tree's own convention; the
-    the retired monolith shape embedded a literal username/password
-    pair per entry, which is refused now that _resources/identities/** exists). Each entry is
+  - "UAT accounts.yaml uses schema work/disposable-accounts@1 (the example tree's own convention;
+    an entry never embeds a literal username/password
+    pair: _resources/identities/** holds identities). Each entry is
     {role, identity: <_resources identity resource id>} - a sealed ref, never a synthetic password
     written into the flow's own tree. Images and video remain original binary assets."
   - "Direction, capture and run are three different outputs and never share a shape. interface.draw's
@@ -349,7 +345,7 @@ rules:
     rather than from a record that carries its own archive."
   - "The Work tree holds product content only: shape.productPaths is the whole list. Agent output
     (shape.agentData) lives in the project ledger and the blob store and is cited, never copied in. A path
-    that is neither is drift: product records in a retired layout (business/, architecture/, deeper nesting),
+    that is neither is drift: product records in a layout other than the family folders (business/, architecture/, deeper nesting),
     which the owner moves and no script deletes."
   - interface.draw writes one or more selected records at ui/<name>/index.yaml, nesting deeper by
     name segment where a screen group needs it. Store all actual drawings, reference images and

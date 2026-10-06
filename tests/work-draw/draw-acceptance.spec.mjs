@@ -153,11 +153,11 @@ test('native interface.draw settlement requires produced-lint evidence at both c
   assert.equal(refused.r.status,1,refused.r.stdout||refused.r.stderr);
   assert.equal(refused.body.reason,'op-lint-proof-missing','a specialized draw attachment cannot replace its native produced-lint prerequisite');
   assert.equal(statusOf(repo,jobId),'running','a refused settle writes nothing');
-  const legacy=seedDraw(repo,{jobId:'op-interface.draw-old',wf:'wf-draw-old',files,admittedAt:at-1000});
-  const old=settle(repo,legacy,env);
+  const earlier=seedDraw(repo,{jobId:'op-interface.draw-old',wf:'wf-draw-old',files,admittedAt:at-1000});
+  const old=settle(repo,earlier,env);
   assert.equal(old.r.status,1,old.r.stderr||old.r.stdout);
   assert.equal(old.body?.reason,'op-lint-proof-missing');
-  assert.equal(statusOf(repo,legacy),'running');
+  assert.equal(statusOf(repo,earlier),'running');
 });
 
 test('actual failed work colours its graph nodes as rework',()=>{

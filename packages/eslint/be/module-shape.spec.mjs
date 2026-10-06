@@ -26,8 +26,10 @@ const tester = typedTester()
 const MODULE = at("src/modules/domain/plan/plan.module.ts")
 const APP = at("apps/api/src/app.module.ts")
 
-test("the retired global allowlist is gone", () => {
-    assert.equal("global-module-allowlist" in rules, false)
+test("every rule this law declares is exported as a rule", () => {
+    for (const [name, rule] of Object.entries(rules)) {
+        if (!rule?.meta || typeof rule.create !== "function") throw new Error(`${name} is not a rule`)
+    }
 })
 
 test("@Global() is refused everywhere, specs included", () => {
@@ -167,7 +169,7 @@ test("no mutable state at module scope", () => {
         invalid: [
             { filename: MODULE, code: "let counter = 0", errors: [{ messageId: "mutable" }] },
             { filename: MODULE, code: "export let cache = new Map()", errors: [{ messageId: "mutable" }] },
-            { filename: MODULE, code: "var legacy = 1", errors: [{ messageId: "mutable" }] },
+            { filename: MODULE, code: "var counter = 1", errors: [{ messageId: "mutable" }] },
             { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: "let shared = 1", errors: [{ messageId: "mutable" }] },
         ],
     })

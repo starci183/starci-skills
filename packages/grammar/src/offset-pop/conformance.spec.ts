@@ -488,7 +488,7 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
         const toneColour = new Map(baseRules.filter((rule) => rule.declarations.some((d) => d.property === "--offset-pop-tone-color"))
             .map((rule) => [rule.selector.match(/\[data-grammar-tone(?:="([a-z]+)")?\]$/)?.[1] ?? "unnamed", rule.declarations.find((d) => d.property === "--offset-pop-tone-color")?.value]))
         expect(Object.fromEntries(toneColour)).toEqual({
-            unnamed: "var(--offset-pop-surface-muted)",
+            unnamed: "var(--offset-pop-surface-secondary)",
             informative: "var(--info)",
             affirmative: "var(--success)",
             cautionary: "var(--warning)",

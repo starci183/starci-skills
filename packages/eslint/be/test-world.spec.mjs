@@ -62,7 +62,7 @@ test("R47: nothing under src/tests overrides a provider", () => {
     })
 })
 
-test("R47: integration asks for { modules } (peer apps may join as apps), e2e for { apps }; useE2eWorld does not exist", () => {
+test("R47: integration asks for { modules } (peer apps may join as apps), e2e for { apps }", () => {
     const world = "declare function useTestWorld(options: object): object\n"
     tester.run("test-world-shape", testWorldShape, {
         valid: [
@@ -90,7 +90,6 @@ export const world = alias({ apps: {} })`, errors: [{ messageId: "missing" }] },
             { filename: INTEGRATION, code: `${world}export const world = useTestWorld({ apps: { order: {} } })`, errors: [{ messageId: "modules" }] },
             { filename: E2E, code: `${world}export const world = useTestWorld({ modules: [] })`, errors: [{ messageId: "apps" }] },
             { filename: E2E, code: "export const nothing = 1", errors: [{ messageId: "missing" }] },
-            { filename: USE_WORLD, code: "export const useE2eWorld = () => 1", errors: [{ messageId: "retired" }] },
         ],
     })
 })

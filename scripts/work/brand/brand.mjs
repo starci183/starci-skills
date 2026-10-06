@@ -321,9 +321,7 @@ export function readBrandRecord(tree){
   if(!file)throw new Error(`No brand record: expected ${candidates.map(candidate=>slash(path.relative(root,candidate))).join(' or ')}.`);
   const source=readText(file);
   const record=parseYaml(source);
-  // work/brand@1 is the one family modules/schemas/work-layout.yaml allows for the brand record; the retired
-  // recursive work/node@N envelope is refused, never read.
-  if(/^work\/node@/.test(record?.schema??''))throw new Error('HFS_WORK_NODE_RETIRED: the brand record is a retired work/node record; restate it as a work/brand@1 record.');
+  // work/brand@1 is the one family modules/schemas/work-layout.yaml allows for the brand record.
   if(record?.schema!=='work/brand@1'||record?.kind!=='brand')throw new Error('A brand record must be a work/brand@1 record of kind brand.');
   if(!record.brand||typeof record.brand!=='object'||Array.isArray(record.brand))throw new Error('The brand record carries no brand specification.');
   const declared=record.rev??record.revision??record.brand.rev;

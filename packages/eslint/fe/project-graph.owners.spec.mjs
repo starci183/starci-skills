@@ -245,7 +245,7 @@ test("FE_SOURCE_LAYOUT_INVALID: a source file sits in a tier folder; the framewo
             // a hook sits below a domain folder, never directly under hooks
             "apps/web/src/hooks/use-thing.ts": "export const useThing = () => 1\n",
             // only blocks, composites, branches and leaves sit in components
-            "apps/web/src/components/pages/Legacy/index.tsx": "export const Legacy = () => <main />\n",
+            "apps/web/src/components/pages/Archive/index.tsx": "export const Archive = () => <main />\n",
             // everything else at the source root is refused
             "apps/web/src/config.ts": "export const config = 1\n",
             "apps/web/src/server.ts": "export const server = () => null\n",
@@ -266,7 +266,7 @@ test("FE_SOURCE_LAYOUT_INVALID: a source file sits in a tier folder; the framewo
         ],
         invalid: [
             s.bad("apps/web/src/hooks/use-thing.ts", 1),
-            s.bad("apps/web/src/components/pages/Legacy/index.tsx", 1),
+            s.bad("apps/web/src/components/pages/Archive/index.tsx", 1),
             s.bad("apps/web/src/config.ts", 1),
             s.bad("apps/web/src/server.ts", 1),
             s.bad("apps/web/src/i18n/request.ts", 1),

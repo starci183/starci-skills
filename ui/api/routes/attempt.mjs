@@ -96,9 +96,9 @@ function whereOf(ledger, raw, job, capture) {
     traceSpan: raw.span_id ?? null, job: raw.job_id ?? null, jobStatus: job?.status ?? null, currentJobStatus: job?.status ?? null };
 }
 // Evidence files grouped by what they are, not by raw prefix. 'evidence' is the op's submitted
-// evidence folder (attachments/evidence/, formerly attachments/E/).
+// evidence folder (attachments/evidence/).
 function groupOf(name, role) {
-  if (/^attachments\/(evidence|E)\//.test(name)) return 'evidence';
+  if (/^attachments\/evidence\//.test(name)) return 'evidence';
   if (/^checks\//.test(name) || role.startsWith('check-')) return 'check';
   if (role === 'patch' || role === 'diff') return 'diff';
   if (['screenshot', 'capture', 'render', 'video', 'uat-run', 'trace', 'dom', 'direction', 'redline'].includes(role)) return 'media';
@@ -143,9 +143,9 @@ function jsonSchemaOf(sha) {
   schemaBySha.set(sha, schema);
   return schema;
 }
-// attachments/(evidence|E)/manifest.yaml -> { outcome, assertions, assets, provenance } (null when absent or unreadable).
+// attachments/evidence/manifest.yaml -> { outcome, assertions, assets, provenance } (null when absent or unreadable).
 function manifestOf(artifactRows) {
-  const item = artifactRows.find(x => /^attachments\/(evidence|E)\/manifest\.ya?ml$/.test(x.name));
+  const item = artifactRows.find(x => /^attachments\/evidence\/manifest\.ya?ml$/.test(x.name));
   if (!item) return null;
   const base = { folder: path.posix.dirname(item.name), manifest: null,
     read: { state: 'unavailable', artifactId: item.artifact_id, sha: item.sha256 } };
@@ -245,7 +245,7 @@ function attemptDetail(store, ledger, db, row) {
     usage: usageDetail(db, { attempt: row.attempt_id }),
     why: whyFor(db, row), usageSource: raw.usage_source ?? null, usageReason: raw.usage_reason == null ? null : publicText(String(raw.usage_reason)),
     tryBudget: row.unit_id ? one(db, 'SELECT try_budget FROM work_units WHERE workflow_id=? AND unit_id=?', row.workflow_id, row.unit_id)?.try_budget ?? null : null,
-    checkpoint: workflowCheckpoint(db, raw), land: workflowLand(db, raw, blobLink),
+    checkpoint: workflowCheckpoint(db, raw), land: workflowLand(db, raw),
     report: report ? { id: report.report_id, outcome: report.outcome, json: parse(report.report_json),
       attachments: many(db, 'SELECT m.* FROM v_media m JOIN report_attachments ra ON ra.artifact_id=m.artifact_id WHERE ra.report_id=?', report.report_id).map(m => mediaItem(m, ledger.name)) } : null,
     checks, artifacts: mediaRows, nonMedia,
@@ -374,7 +374,7 @@ export async function handleAttempt(request, response, store, url) {
   const route = match[3] ?? 'detail';
   if (route === 'detail') {
     sendJson(request, response, attemptDetail(store, ledger, db, row), { sources: [
-      ...source(ledger.name, 'v_op_history', 'op_attempts', 'jobs', 'contracts', 'reports', 'check_runs', 'v_checks', 'v_media', 'job_artifacts', 'blobs', 'report_attachments', 'decisions', 'decision_items', 'work_units', 'attempt_transcript_snapshots', 'product_lands', 'events', 'llm_usage'),
+      ...source(ledger.name, 'v_op_history', 'op_attempts', 'jobs', 'contracts', 'reports', 'check_runs', 'v_checks', 'v_media', 'job_artifacts', 'blobs', 'report_attachments', 'decisions', 'decision_items', 'work_units', 'attempt_transcript_snapshots', 'events', 'llm_usage'),
       ...source('machine', 'v_engine_actions', 'action_steps', 'sup_learning'),
       ...source('runtime', 'modules/reconciler/sla.yaml', 'modules/models/runtimes.yaml', 'modules/kernel/failure-codes.yaml'),
       ...(admissionObserved(store.machine.db) ? source('machine', 'provider_reservations') : [])], stale: staleOf(store) }); return true;

@@ -34,7 +34,7 @@ export const CODE = 'RT_SLOT_ID_SHAPE';
 const APP_MANIFEST = 'knowledge/hfs/slots.yaml';
 const RUNTIME_MANIFEST = 'knowledge/hfs/runtime-slots.yaml';
 /** The manifests a slot id may live in, in scan order. */
-export const MANIFESTS = Object.freeze([APP_MANIFEST, RUNTIME_MANIFEST]);
+const MANIFESTS = Object.freeze([APP_MANIFEST, RUNTIME_MANIFEST]);
 
 const SEGMENT = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const pairsOf = (v) => (Array.isArray(v) ? v.filter((p) => Array.isArray(p) && p.length === 2) : []);

@@ -61,7 +61,7 @@ test('a source change after the build makes the dist stale and names the token d
   assert.ok(cli.text.includes(FIX_LINE));
 });
 
-test('a stale 0.4.x build without a stamp is refused, with the old danger token in evidence',t=>{
+test('a build without a stamp is refused, with the differing danger token in evidence',t=>{
   const g=grammarFixture(t,{stamp:false});
   g.write('dist/core/styles.css',SRC_CSS.replace('oklch(50.13% 0.1783 28.70)',OLD_DANGER));
   const status=grammarDistStatus(g.root);
@@ -109,11 +109,9 @@ test('an unreadable stamp is refused like a missing one',t=>{
   refused(grammarDistStatus(g.root),'unstamped');
 });
 
-test('a registry install carries no source: unverifiable is allowed, but its own stamp still binds',t=>{
-  const legacy=grammarFixture(t,{withSource:false,stamp:false,label:'registry-legacy'});
-  const old=grammarDistStatus(legacy.root);
-  assert.equal(old.state,'unverifiable');
-  assert.equal(old.ok,true);
+test('a registry install carries no source: unverifiable is allowed, but its own stamp must exist and still binds',t=>{
+  const unstamped=grammarFixture(t,{withSource:false,stamp:false,label:'registry-unstamped'});
+  refused(grammarDistStatus(unstamped.root),'unstamped');
   const stamped=grammarFixture(t,{withSource:false,label:'registry-stamped'});
   assert.equal(grammarDistStatus(stamped.root).state,'unverifiable');
   stamped.write('dist/core/styles.css',SRC_CSS.replace('oklch(50.13% 0.1783 28.70)',OLD_DANGER));

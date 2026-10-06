@@ -3421,11 +3421,10 @@ function reportOwnedPaths(db, job, repo) {
 }
 
 // The visual proof a pass owes (proofMediaGate over policy.proofMedia) and the host-path-free evidence it keeps (evidenceHostPathGate): read-only,
-// before anything is written. A leg admitted before the job-proof-media or evidence-host-path change settles on its old contract.
+// before anything is written.
 /**
  * The settle-gate prelude every per-gate settle function shares: the job row (null when the job is gone, its status
- * is not reportable, or `opOnly` names another op), its op and its contract admission. `changeId` settles a leg
- * admitted before that change on its old contract (null); `requireChange` also refuses when the change is unknown.
+ * is not reportable, or `opOnly` names another op), its op and its contract admission.
  * `requiresReport` returns null when nothing is filed - pass-report-missing owns that refusal.
  */
 function settleJobContext(db, jobId, { opOnly = null, requiresReport = false } = {}) {
@@ -3459,8 +3458,7 @@ function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
   return gate ? { ...gate, op: s.op, status: s.job.status } : null;
 }
 // The Sonar gate a code-writing op's settle owes (scripts/kernel/sonar-settle.mjs over knowledge/sonar-gate.yaml): the
-// runtime reads the op's attached sonar.json itself. Read-only here - starci kernel settle records the judgment. A leg admitted before
-// the sonar-enforce change settles on its old contract. Null when the op is not held to the gate.
+// runtime reads the op's attached sonar.json itself. Read-only here - starci kernel settle records the judgment. Null when the op is not held to the gate.
 function settleSonarGate(db, jobId, repo) {
   const s = settleJobContext(db, jobId, { requiresReport: true });
   if (!s) return null;
@@ -3472,7 +3470,7 @@ const { settleOpGate, settleOpProofs } = mechanismGates({ skillRoot, settleJobCo
 // The draw acceptance an interface.draw pass owes (scripts/work/draw/draw-acceptance.mjs): every asset the pass binds -
 // written, adopted, inherited or already there - is a token-rendered shape, no drawing names a data status, and the pass
 // drew something under the current contract (a product's op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
-// Read-only, before anything is written. A leg admitted before the draw-adopt-gate change settles on its old contract.
+// Read-only, before anything is written.
 function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
   const s = settleJobContext(db, jobId, { opOnly: 'interface.draw' });
   if (!s) return null;
@@ -3485,7 +3483,6 @@ function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
 // The draw loop's machine metrics, RE-RUN by the runtime (scripts/work/draw-loop-settle.mjs): every live part of every
 // ui record the pass binds is re-rendered from its render source and re-measured - the capture, the DNA gate, the
 // taste metrics, the palette, the Grammar geometry and the ui-proof score - never the loop's self-reported numbers.
-// A leg admitted before the draw-loop-dna change settles on its old contract; a code it added is advisory for it.
 async function settleDrawMetrics(db, jobId, repo, reportAbs, reportText) {
   const s = settleJobContext(db, jobId, { opOnly: 'interface.draw' });
   if (!s) return null;
@@ -3498,7 +3495,6 @@ async function settleDrawMetrics(db, jobId, repo, reportAbs, reportText) {
 // The Work hygiene a pass owes when it changed files under .starciwork/ or .starcistacks/ (scripts/work/validate/work-hygiene.mjs,
 // the same parse + scoped strict validate + secret scan the product repo's pre-commit hook runs): the files its report
 // names plus every file its commits changed since the base it was admitted on. Read-only, before anything is written.
-// A leg admitted before the work-hygiene-gate change settles on its old contract.
 function settleWorkHygiene(db, jobId, repo, reportAbs, reportText) {
   const s = settleJobContext(db, jobId, {});
   if (!s) return null;
@@ -3633,7 +3629,7 @@ async function runSettleTail(ledger, job, repo, { verdict = null } = {}) {
 // A handover ask reaches the owner only with every must-have proven (proof-integrity.mjs coverageOf): an FR whose
 // requiresProof has a required kind and whose evidence is missing or stale refuses it handover-proof-owed. Any other
 // unproven item is flagged on stderr and belongs in the package's "not proven" section. A coverage that cannot be
-// computed refuses too (fail closed). A leg admitted before the proof-integrity change hands over as admitted.
+// computed refuses too (fail closed).
 function handoverProofGate(db, job, repo) {
   let cov;
   try {

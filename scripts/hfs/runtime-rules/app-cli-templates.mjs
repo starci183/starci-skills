@@ -7,7 +7,6 @@ const ROOTS = [
   'packages/eslint/be/runtime/packages/hfs/templates/',
   'packages/eslint/fe/runtime/packages/hfs/templates/',
 ];
-const RETIRED_APP = /\b(?:npx\s+)?hfs\s+(?:scaffold|add|lint|sync|check|explain|emit-contracts|work-hygiene|new|secret)\b|\bstarci-test-stack\b/;
 const WRONG_STARCI_GROUP = /\b(?:npx\s+)?starci\s+(?!app\b)[a-z][a-z0-9-]*\b/;
 
 /** Findings for managed template source and generated copies that invoke a non-app CLI surface. */
@@ -20,9 +19,7 @@ export function appCliTemplateFindings({ files, read }) {
     const lines = text.split(/\r?\n/u);
     for (let index = 0; index < lines.length; index += 1) {
       const line = lines[index];
-      const retired = RETIRED_APP.exec(line);
-      const wrongGroup = WRONG_STARCI_GROUP.exec(line);
-      const match = retired ?? wrongGroup;
+      const match = WRONG_STARCI_GROUP.exec(line);
       if (!match) continue;
       findings.push({
         code: APP_ONLY_TEMPLATES,

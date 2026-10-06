@@ -153,18 +153,16 @@ function mediaRows({ base, jobId, ctx, payload: p, tr, ak }) {
   for (const artifact of (Array.isArray(p.artifacts) ? p.artifacts : [])) {
     if (media >= DERIVED_ARTIFACT_ROWS_MAX) break;
     if (typeof artifact?.path !== 'string') continue;
-    const record = ctx.artifactOf ? ctx.artifactOf(jobId, artifact.path) : null;
-    const kind = record?.kind ?? strOr(artifact.kind);
+    const kind = strOr(artifact.kind);
     const logKind = artifactLogKind(kind);
     if (!logKind) continue;
     media += 1;
-    const subkind = strOr(record?.subkind) ?? strOr(artifact.subkind);
-    const label = strOr(record?.label);
+    const subkind = strOr(artifact.subkind);
     const noun = artifactNoun(logKind, tr);
     const source = `ev:${ak}:a:${shortHash(jobId + '\n' + artifact.path + '\n' + (artifact.sha256 ?? ''), { n: 24 })}`;
     rows.push({ ...base, jobId, kind: logKind, src: source,
-      msg: `${noun}${subkind ? ' ' + subkind : ''}: ${clipLine(label ?? artifact.path.split('/').pop(), 160)}`, refs: [artifact.path],
-      data: compact({ artifactRef: artifact.path, label, subkind, bytes: intOr(record?.bytes), mime: logKind === 'trace' ? undefined : strOr(record?.mime), sha256: strOr(artifact.sha256) ?? strOr(record?.sha256) }) });
+      msg: `${noun}${subkind ? ' ' + subkind : ''}: ${clipLine(artifact.path.split('/').pop(), 160)}`, refs: [artifact.path],
+      data: compact({ artifactRef: artifact.path, subkind, sha256: strOr(artifact.sha256) }) });
   }
   return rows;
 }

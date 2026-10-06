@@ -1,4 +1,4 @@
-// Fresh stores carry the executed schema steps. Existing current host journals remain historical evidence;
+// Fresh stores carry the executed schema. Existing current host journals remain historical evidence;
 // unsupported versions are refused instead of being discarded or downgraded.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,12 +7,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { LEDGER_VERSION, openLedger, openLedgerReader, openLedgerConnection, ledgerFileFor, PROJECTS_ROOT_ENV, TEST_REGISTRY_ENV } from '../../engine/db/ledger.mjs';
-import { sha256 } from '../../engine/digest.mjs';
 import { slashPath } from '../fixtures/win-path.mjs';
 import { MACHINE_VERSION, openMachine } from '../../engine/db/machine.mjs';
 
 const require = createRequire(import.meta.url);
-const MIGRATIONS = path.resolve(import.meta.dirname, '..', '..', 'engine', 'db', 'migrations');
+const SCHEMA_DIR = path.resolve(import.meta.dirname, '..', '..', 'engine', 'db', 'schema');
 
 const tmp = (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-fresh-schema-'));
@@ -21,23 +20,21 @@ const tmp = (t) => {
 };
 const columns = (db, table) => db.prepare(`SELECT name FROM pragma_table_info('${table}')`).all().map((r) => r.name);
 const views = (db) => db.prepare("SELECT name FROM sqlite_master WHERE type='view' ORDER BY name").all().map((r) => r.name);
-const common = (db, version, journal = [[1, '0001-init']]) => {
+const common = (db, version) => {
   assert.equal(Number(db.prepare('PRAGMA user_version').get().user_version), version);
-  assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map((r) => [r.version, r.name]), journal);
   assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
   assert.equal(db.prepare('PRAGMA foreign_key_check').all().length, 0);
   for (const view of views(db)) assert.doesNotThrow(() => db.prepare(`SELECT * FROM ${view} LIMIT 1`).all(), `${view} answers`);
 };
 
-test('runtime keeps its init schema; machine carries provider receipts and core maintenance signals', () => {
-  assert.deepEqual(fs.readdirSync(path.join(MIGRATIONS, 'runtime')), ['0001-init.sql']);
-  assert.deepEqual(fs.readdirSync(path.join(MIGRATIONS, 'machine')).sort(), ['0001-init.sql']);
+test('each store has exactly one schema file', () => {
+  assert.deepEqual(fs.readdirSync(SCHEMA_DIR).sort(), ['machine.sql', 'runtime.sql']);
 });
 
 test('a fresh machine.sqlite has the columns, kinds and views the runtime queries need', (t) => {
   const m = openMachine({ file: path.join(tmp(t), 'machine.sqlite') });
   try {
-    common(m.db, MACHINE_VERSION, [[MACHINE_VERSION, '0001-init']]);
+    common(m.db, MACHINE_VERSION);
     assert.deepEqual(columns(m.db, 'terminals'), ['handle', 'title', 'role', 'opened_at', 'closed_at', 'close_verified_at', 'closed_by']);
     const worktrees = columns(m.db, 'worktrees');
     for (const column of ['path', 'kind', 'orca_id', 'checkpoint_sha', 'release_pending_at', 'removed_at']) assert.ok(worktrees.includes(column), `worktrees.${column}`);
@@ -77,7 +74,7 @@ test('a file at another user_version is refused, never migrated', (t) => {
 });
 
 const SAMPLE = Object.freeze({ ledgerId: '00000000-0000-4000-8000-000000000001', createdAt: 1767225600000, blobRoot: 'artifacts' });
-const INIT_FILE = path.join(MIGRATIONS, 'runtime', '0001-init.sql');
+const INIT_FILE = path.join(SCHEMA_DIR, 'runtime.sql');
 const initSql = fs.readFileSync(INIT_FILE, 'utf8');
 const logicalTables = (db) => db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all()
   .map((row) => row.name).filter((name) => !name.startsWith('logs_fts_'));
@@ -100,16 +97,9 @@ test('a fresh basic sample keeps canonical schema/catalogs, frozen metadata and 
     assert.equal(meta.repo_root, undefined);
     assert.equal(meta.product, undefined);
     assert.equal(meta.sqlite_version, sample.db.prepare('SELECT sqlite_version() AS version').get().version);
-    const journal = sample.db.prepare('SELECT * FROM schema_migrations').all();
-    assert.equal(journal.length, 1);
-    assert.equal(journal[0].sql_sha256, sha256(fs.readFileSync(INIT_FILE)));
-    assert.equal(journal[0].started_at, SAMPLE.createdAt);
-    assert.equal(journal[0].finished_at, SAMPLE.createdAt);
-    assert.equal(journal[0].status, 'done');
-    assert.equal(journal[0].runtime_rev, meta.runtime_rev ?? null);
     for (const table of logicalTables(sample.db)) {
       if (catalogs.includes(table)) assert.deepEqual(sortedRows(sample.db, table), sortedRows(baseline.db, table), `${table} keeps the canonical seed`);
-      else if (!['meta', 'schema_migrations'].includes(table)) assert.equal(Number(sample.db.prepare(`SELECT count(*) AS n FROM ${table}`).get().n), 0, `${table} has no history`);
+      else if (table !== 'meta') assert.equal(Number(sample.db.prepare(`SELECT count(*) AS n FROM ${table}`).get().n), 0, `${table} has no history`);
     }
     assert.notEqual(baseline.ledgerId, SAMPLE.ledgerId);
     assert.throws(() => sample.transaction(() => assert.fail('sample transaction ran')), /ledger-fixture-read-only/);
@@ -141,6 +131,7 @@ test('fixture input refuses live bindings, real IDs, nonportable metadata and ex
     { fixture: { ...SAMPLE, ledgerId: SAMPLE.ledgerId.toUpperCase().replace('0001', '000A') } },
     { fixture: { ...SAMPLE, createdAt: 0 } }, { fixture: { ...SAMPLE, createdAt: 1.5 } }, { fixture: { ...SAMPLE, createdAt: Number.MAX_SAFE_INTEGER } },
     { fixture: { ...SAMPLE, extra: true } }, { fixture: {} }, { fixture: false },
+    { fixture: { ...SAMPLE, sqliteVersion: 3 } }, { fixture: { ...SAMPLE, sqliteVersion: 'latest' } },
     ...['', '/artifacts', slashPath('C', 'artifacts'), '../artifacts', 'artifacts/..', 'artifacts\\nested', 'artifacts/', ' artifacts', 'artifacts?private', 'a\u0000b', 'a\rb', 'a\nb'].map((blobRoot) => ({ fixture: { ...SAMPLE, blobRoot } })),
     { repoRoot: dir }, { product: 'test-product' }, { machine: { registerLedger() { assert.fail('machine registration reached'); } } },
     { now: () => SAMPLE.createdAt }, { checkpointer: false }, { file: path.join(dir, 'other.sqlite') },
@@ -153,6 +144,16 @@ test('fixture input refuses live bindings, real IDs, nonportable metadata and ex
   assert.throws(() => openLedger(options), /ledger-fixture-refused/);
   assert.equal(fs.statSync(file).size, 0, 'an existing empty file is not adopted');
   assert.deepEqual(fs.readdirSync(dir), ['runtime.sqlite']);
+});
+
+test('a fixture records the SQLite version it states; a version newer than the running SQLite is refused', (t) => {
+  const pinned = path.join(tmp(t), 'runtime.sqlite');
+  const sample = openLedger({ file: pinned, fixture: { ...SAMPLE, sqliteVersion: '3.51.3' }, checkpointer: true });
+  try { assert.equal(sample.meta().sqlite_version, '3.51.3'); } finally { sample.close(); }
+  const reader = openLedgerReader(pinned);
+  try { assert.equal(reader.prepare("SELECT value FROM meta WHERE key='sqlite_version'").get().value, '3.51.3'); } finally { reader.close(); }
+  const newer = path.join(tmp(t), 'runtime.sqlite');
+  assert.throws(() => openLedger({ file: newer, fixture: { ...SAMPLE, sqliteVersion: '99.0.0' }, checkpointer: true }), /ledger-sqlite-downgrade/);
 });
 
 test('ordinary initialization still accepts an empty file and reopens its unchanged project identity', (t) => {

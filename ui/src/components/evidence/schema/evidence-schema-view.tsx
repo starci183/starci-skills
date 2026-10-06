@@ -62,10 +62,6 @@ export function EvidenceSchemaView({ file, authorOp = '' }: Readonly<{ file: Evi
       if (schema.startsWith('starci/work-graph@')) return <WorkGraphSlices graph={workGraphFromFile(data, file, authorOp)} />;
     }
   }
-  // Scope evidence files carry no `schema` key in older attempts; recognise them by shape.
-  if (file.kind === 'json' && !blob.truncated) {
-    try { const data = JSON.parse(blob.text) as unknown; const r = rec(data); if (r && rec(r.scope)?.nodes && r.requestDigest) return <ScopeView data={data} />; } catch { /* plain JSON below */ }
-  }
   return <div className="min-w-0">{note}
     {file.kind === 'markdown' ? <MarkdownView text={blob.text} />
       : file.kind === 'json' ? <JsonView text={blob.text} />

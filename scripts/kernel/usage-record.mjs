@@ -171,7 +171,7 @@ function indexSessions(options = {}) {
 
 /* ------------------------------------------------------------------------------------------------- op attempts */
 
-/** The agent adapter of an attempt row (op_attempts.agent is a legacy column; provider carries the family). */
+/** The agent adapter of an attempt row (op_attempts.agent names the adapter; provider carries the family). */
 export const attemptAgent = (a) => agentOfJob({ agent: a?.agent, provider: a?.provider, model: a?.model });
 
 /**

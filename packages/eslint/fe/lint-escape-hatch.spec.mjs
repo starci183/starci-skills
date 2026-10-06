@@ -51,15 +51,13 @@ test("LINT-ESCAPE-1: product source cannot change its own lint policy", () => {
       },
     ],
     invalid: [
-      // the other spellings of "not here": the compiler's own switches, and the retired second-language pragma
+      // the other spellings of "not here": the compiler's own switches
       { filename: SOURCE, code: "// @ts-ignore\nconst value: number = 'x'", errors: [{ messageId: "typescript" }] },
-      { filename: SOURCE, code: "// @ts-expect-error - legacy\nconst value: number = 'x'", errors: [{ messageId: "typescript" }] },
+      { filename: SOURCE, code: "// @ts-expect-error - reason\nconst value: number = 'x'", errors: [{ messageId: "typescript" }] },
       { filename: SOURCE, code: "// @ts-nocheck\nconst value = 1", errors: [{ messageId: "typescript" }] },
-      { filename: SOURCE, code: "// vn-ok: the server sends this verbatim\nconst value = 1", errors: [{ messageId: "pragma" }] },
-      { filename: SOURCE, code: "const value = 'x' // vn-ok: one academy's own name", errors: [{ messageId: "pragma" }] },
       // the other tools' switches
       { filename: SOURCE, code: "const value = 1 // NOSONAR\n", errors: [{ messageId: "tool" }] },
-      { filename: SOURCE, code: "// NOSONAR: legacy\nconst value = 1", errors: [{ messageId: "tool" }] },
+      { filename: SOURCE, code: "// NOSONAR: reason\nconst value = 1", errors: [{ messageId: "tool" }] },
       { filename: SOURCE, code: "// @sonar-ignore\nconst value = 1", errors: [{ messageId: "tool" }] },
       { filename: SOURCE, code: "/* istanbul ignore next */\nconst value = 1", errors: [{ messageId: "tool" }] },
       { filename: SOURCE, code: "/* istanbul ignore if */\nconst value = 1", errors: [{ messageId: "tool" }] },

@@ -1,10 +1,9 @@
 # The shared local SonarQube - a HOST extension, not part of any product stack.
 #
 # One SonarQube Community Build with a dedicated PostgreSQL database serves every
-# StarCi product (see README.md). This file is the read-only-moved copy of the
-# legacy <source>/.stacks/dev/infra/compose/sonarqube.yaml under the `starci`
+# StarCi product (see README.md). This file runs under the `starci`
 # Compose project. The project name, container names, named volumes and the
-# published port variable are unchanged, so the running starci-sonarqube
+# published port variable are fixed, so the running starci-sonarqube
 # container and its data keep working under this extension.
 #
 # The database password and the published port are NOT stored here: the stack

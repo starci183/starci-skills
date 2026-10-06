@@ -92,7 +92,7 @@
 
     .grammar-common-root[data-grammar-family="offset-pop"] :is([data-component="Select"], [data-component="ComboBox"], [data-component="SearchField"], [data-component="NumberField"], [data-component="DateField"], [data-component="TimeField"], [data-component="DatePicker"], [data-component="DateRangePicker"], [data-component="Textarea"])[data-grammar-readonly="true"] [data-grammar-field-control="true"] {
         border-style: dashed;
-        background: var(--offset-pop-surface-muted);
+        background: var(--offset-pop-surface-secondary);
     }
 
     /* Disabled dimming stays the vendor's (one opacity, never compounded); the family drops its vectors. */

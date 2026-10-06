@@ -79,7 +79,7 @@ test('starci kernel archive resolves every live DI of the workflow (open|claimed
 test('a leftover DI locked open on an already-archived workflow is never listed, escalated, rung or blocking', async (t) => {
   const { repo, ledger, env, api } = repoWithLedger(t, [WF_ARCH]);
   openDi(ledger, WF_ARCH, { idempotencyKey: 'progress-stall:wf:leftover', dueMs: 60_000 });
-  // The pre-fix shape: the phase flips with the DI still open, locked forever (events_refuse_archived).
+  // The phase flips with the DI still open, locked forever (events_refuse_archived).
   toPhase(ledger, WF_ARCH, ['stopped', 'archived']);
   assert.equal(ledger.db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(WF_ARCH).phase, 'archived');
   assert.equal(ledger.db.prepare("SELECT status FROM decision_items WHERE workflow_id=?").get(WF_ARCH).status, 'open', 'the leftover stays open in the row');

@@ -4,8 +4,7 @@
  * Globality is a composition decision, not a property of a module: a capability is registered once per app, in the app's
  * `app.module.ts`, as `X.register({ isGlobal: true, ...options })`, and never listed in another module's `imports`.
  *
- *   - `no-global-decorator` refuses `@Global()` anywhere, specs included. (It replaces `global-module-allowlist`: the
- *     manifest no longer carries a list of modules that may be global.)
+ *   - `no-global-decorator` refuses `@Global()` anywhere, specs included.
  *   - `is-global-only-in-app` refuses `isGlobal: true` (and a dynamic module literal `global: true`) outside
  *     `apps/<app>/src/app.module.ts`.
  *   - `no-cross-owner-module-import` refuses a `@Module({ imports })` entry whose module class is declared by another

@@ -59,8 +59,7 @@
         --offset-pop-motion-duration: 140ms;
         --offset-pop-motion-easing: cubic-bezier(.2, .8, .2, 1);
 
-        /* Compatibility names from before the semantic contract. */
-        --offset-pop-surface-muted: var(--offset-pop-surface-secondary);
+        /* The composite motion value every family transition reads; reduced motion replaces it. */
         --offset-pop-transition: var(--offset-pop-motion-duration) var(--offset-pop-motion-easing);
 
         /* HeroUI and Common anatomy resolve through the same DNA. */

@@ -73,7 +73,7 @@ boundary:
     slice table and model/routing reasoning are persisted into the ledger
     as they form — `starci kernel plan` records the plan digest + structural diff +
     lineage, `starci kernel incident` records a named finding; the ledger's events
-    (engine/db/migrations/runtime/0001-init.sql) are the durable memory. A kernel
+    (engine/db/schema/runtime.sql) are the durable memory. A kernel
     that dies mid-survey must lose nothing — hoarding state in context
     until dispatch is a defect.
   terminalLifecycle: >-
@@ -318,8 +318,7 @@ tick:
       changed relevant bytes or incomplete acknowledgements refuse affected enqueue/dispatch.
       Preserve already admitted attempt custody and evidence; never restart yourself to reread.
     stallWake: >-
-      A `[stall]` wake came from the retired headless stall check; its findings
-      now reach you as Decision Items the Workflow controller opens
+      A `[stall]` finding reaches you as a Decision Item the Workflow controller opens
       (scripts/reconciler/controllers/workflow.mjs: stale-gate, stale-wait,
       stale-peer-wait, unread-peer, orphaned-frontier, progress-stall) through
       `starci kernel decisions`. Such an item names something this workflow
@@ -1623,7 +1622,7 @@ failureHandling:
       closed by handle first (scripts/agent/lib.mjs terminal close).
     singleton: >-
       One kernel per workflow, one supervisor per ledger — kernel-lock and
-      supervisor-lock signal rows are the claims (engine/db/migrations/runtime/0001-init.sql
+      supervisor-lock signal rows are the claims (engine/db/schema/runtime.sql
       signals). Two kernels for one workflow is the corruption this exists
       to prevent.
     note: >-
@@ -1653,7 +1652,7 @@ supervision:
   auditTrail: >-
     Every transition is an event in the ledger (engine/db/ledger.mjs events
     table, hash-chained — the writer's eventDigest computes each link;
-    engine/db/migrations/runtime/0001-init.sql); persist-as-you-
+    engine/db/schema/runtime.sql); persist-as-you-
     think (boundary.persistAsYouThink) is what makes that trail complete —
     findings and plans land in events as they form, so a
     dead kernel leaves a re-readable trail, not a lost context.

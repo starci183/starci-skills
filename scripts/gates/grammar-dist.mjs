@@ -19,7 +19,7 @@ import {DIGEST_ALGORITHM,STAMP_FILE,STAMP_SCHEMA,distDigest,sourceDigest} from '
  * digest algorithm from the current source digest, the built files still hash to the stamp's dist
  * digest, and every `--*` custom property the source CSS declares has the same value in the copied dist
  * CSS. A package that does not carry its source (a registry install) cannot be rebuilt or compared, so
- * it is `unverifiable` and allowed; if it carries a stamp, the version and dist digest still bind.
+ * it is `unverifiable` and allowed once its stamp binds: the version and dist digest must agree.
  */
 
 export const GRAMMAR_PACKAGE='@starci/grammar';
@@ -95,11 +95,9 @@ export function grammarPackageOf(file){
 /** The `; <token summary>` tail of a detail string, empty when no token differs. */
 const tokenTail=tokens=>tokens.differenceCount?'; '+tokenSummary(tokens):'';
 
-/** The result for a dist with no valid stamp: unstamped when source exists, unverifiable when it does not. */
-const unstampedResult=(hasSource,result,tokens,evidence,stampFile)=>
-  hasSource
-    ?result('unstamped',`dist/${STAMP_FILE} is ${fs.existsSync(stampFile)?'not a valid build stamp':'missing'}, so this dist was not produced by the current build script${tokenTail(tokens)}`,evidence)
-    :result('unverifiable','the package carries neither source nor a build stamp (a registry install from before stamps); nothing to compare',evidence);
+/** The result for a dist with no valid stamp. */
+const unstampedResult=(result,tokens,evidence,stampFile)=>
+  result('unstamped',`dist/${STAMP_FILE} is ${fs.existsSync(stampFile)?'not a valid build stamp':'missing'}, so this dist was not produced by the current build script${tokenTail(tokens)}`,evidence);
 
 /** The result when the stamp's algorithm or source digest no longer binds the current source, or null. */
 const sourceStaleness=(root,stamp,tokens,evidence,result)=>{
@@ -136,7 +134,7 @@ export function grammarDistStatus(packageRoot=defaultGrammarPackageRoot()){
   const stamp=readJson(stampFile);
   const tokens=hasSource?compareCssTokens(root):{compared:0,differences:[],differenceCount:0};
   const evidence={stamp,tokens};
-  if(!stamp||stamp.schema!==STAMP_SCHEMA)return unstampedResult(hasSource,result,tokens,evidence,stampFile);
+  if(!stamp||stamp.schema!==STAMP_SCHEMA)return unstampedResult(result,tokens,evidence,stampFile);
   if(hasSource){
     const stale=sourceStaleness(root,stamp,tokens,evidence,result);
     if(stale)return stale;

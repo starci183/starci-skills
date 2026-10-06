@@ -31,7 +31,7 @@ const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{r
 const read=(repo,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
 const seedGoal=(repo,workflowId)=>seed(repo,ledger=>ledger.transaction(db=>{
   ledger.ensureWorkflow({workflowId,title:'prior failures'});
-  // A running workflow: op_attempts may only be created on one (op_attempts_dispatch_guard, 0001-init.sql:376-383).
+  // A running workflow: op_attempts may only be created on one (op_attempts_dispatch_guard, schema/runtime.sql:376-383).
   changeWorkflowPhase(db,{workflowId,to:'running',by:'seed',reason:'fixture'});
   db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
     .run(workflowId,0,'priorgoal','# goal',json({derivedFrom:'prior-failures-test'}),Date.now());
@@ -46,7 +46,7 @@ const jobRow=(repo,jobId)=>read(repo,l=>l.db.prepare('SELECT * FROM jobs WHERE j
 /** Settle a job and record its kernel check_runs on its own dispatch attempt: {name: exitCode}. */
 const finish=(repo,wf,jobId,status,checks)=>seed(repo,l=>l.transaction(db=>{
   const at=Date.now();
-  // The status path a real dispatched job walks (job_transitions, 0001-init.sql:83-92): the attempt row may
+  // The status path a real dispatched job walks (job_transitions, schema/runtime.sql:83-92): the attempt row may
   // only be inserted while the job is leased, and it settles through running→reported→<terminal>.
   for(const to of ['ready','leased'])setJobStatus(db,{jobId,to,reason:'seed-dispatch',at});
   const attempt=startAttempt(db,{workflowId:wf,jobId,dispatchId:`seed-dispatch:${jobId}`,at});
@@ -74,7 +74,7 @@ test('interleaved cut ordinals: each retry sees only its own ordinal\'s red chec
   assert.deepEqual(names(failuresOf(repo,o1a3)),['ord1-slice'],'ordinal 1 sees its own red, not ordinal 2\'s newer red');
   finish(repo,wf,o1a3,'succeeded',{'ord1-slice':0});
   const o2a4=enqueue(repo,wf,cut(2));                 // try 2 of ordinal 2's unit, after a sibling went green
-  assert.equal(jobRow(repo,o2a4).try_no,2,'try_no counts the unit, not the op (jobs.try_no, 0001-init.sql:256)');
+  assert.equal(jobRow(repo,o2a4).try_no,2,'try_no counts the unit, not the op (jobs.try_no, schema/runtime.sql:256)');
   assert.deepEqual(names(failuresOf(repo,o2a4)),['ord2-slice'],
     'a sibling\'s newer GREEN row must not hide this ordinal\'s own red checks');
   const o5a5=enqueue(repo,wf,cut(5));                 // attempt 5: ordinal 5 first execution
@@ -122,7 +122,7 @@ test('jobs.retry_of picks the predecessor within the lineage; the column is the 
   };
   assert.deepEqual(names(withRetryOf(o1a1)),['first-red'],'rows after the named predecessor are not its checks');
   // The reader trusts retry_of literally; a cross-unit value is unwritable in a real ledger
-  // (jobs_enqueue_guard refuses retry_of not of the same unit, 0001-init.sql:292-294), so no
+  // (jobs_enqueue_guard refuses retry_of not of the same unit, schema/runtime.sql:292-294), so no
   // sibling-fallback exists to assert - naming a sibling reads the sibling's checks.
   assert.deepEqual(names(withRetryOf(o2a2)),['sibling-red']);
 });

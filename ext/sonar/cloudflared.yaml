@@ -1,7 +1,5 @@
 # Publishes the local SonarQube as the public host URL every product's GitHub
-# CI scans against (see README.md). Read-only-moved copy of the legacy
-# <source>/.stacks/dev/infra/compose/cloudflared-sonarqube.yaml, under the same
-# `starci` Compose project. The Cloudflare control plane and API credential live
+# CI scans against (see README.md), under the `starci` Compose project. The Cloudflare control plane and API credential live
 # at Source scope; this stack owns only the connector process and its issued run
 # token, mounted read-only from the decrypted
 # `secrets/cloudflare-starci-local-services-tunnel-token.key`.

@@ -88,12 +88,12 @@ rules:
       manual: []
     relatedExamples: []
   - id: REPO-WORK-3
-    title: Flat records, no work/node
+    title: Flat family records
     kind: mandatory
-    hfsRules: [R08, R64]
+    hfsRules: [R64]
     requirement: |
       Every record is a flat family record `features/<feature>/<family>/<name>/index.yaml` of a family in
-      modules/schemas/work-layout.yaml. There is no `work/node` record. A ui-screen record declares `app`, a name from
+      modules/schemas/work-layout.yaml. A ui-screen record declares `app`, a name from
       `hfs.json` `apps`.
     rationale: |
       One record vocabulary lets the validators and every agent read a tree the same way.
@@ -103,7 +103,6 @@ rules:
         write: features/sales/ui/summary/index.yaml with app console.
     verification:
       automated:
-        - HFS_WORK_NODE_RETIRED
         - FE_APP_ISOLATION
       manual: []
     relatedExamples: []

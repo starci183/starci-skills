@@ -139,7 +139,7 @@ test('workflow land prefers the current event, binds workflow/repository and dis
   ] });
   fixture.ledger.transaction(db => db.prepare('UPDATE op_attempts SET repo_root=?,head_sha=? WHERE attempt_id=1').run(fixture.repoRoot, head));
   const raw = fixture.ledger.db.prepare('SELECT * FROM op_attempts WHERE attempt_id=1').get();
-  let land = workflowLand(fixture.ledger.db, raw, () => null);
+  let land = workflowLand(fixture.ledger.db, raw);
   assert.equal(land.scope, 'workflow');
   assert.equal(land.source, 'workflow-landed');
   assert.equal(land.result, 'landed');
@@ -147,22 +147,9 @@ test('workflow land prefers the current event, binds workflow/repository and dis
   assert.equal(land.branch, null);
   assert.equal(land.attemptAssociation, 'head-match');
   assert.equal(land.checkpoint.sha, head);
-  land = workflowLand(fixture.ledger.db, { ...raw, job_id: 'another-job', head_sha: later }, () => null);
+  land = workflowLand(fixture.ledger.db, { ...raw, job_id: 'another-job', head_sha: later });
   assert.equal(land.attemptAssociation, 'unproven');
-  assert.equal(workflowLand(fixture.ledger.db, { ...raw, workflow_id: 'foreign-workflow' }, () => null), null);
-}));
-
-test('legacy product land keeps native outcome and recorded branch only for the exact repository', t => withLedger(t, fixture => {
-  seedWorkflow(fixture.ledger, { id: 'wf' });
-  fixture.ledger.transaction(db => db.prepare('INSERT INTO product_lands(workflow_id,span_id,repo_root,wf_branch,result,merged_sha,pushed,started_at) VALUES(?,?,?,?,?,?,?,?)')
-    .run('wf', '0123456789abcdef', fixture.repoRoot, 'wf/recorded', 'conflict', null, 0, stamp));
-  const raw = { workflow_id: 'wf', repo_root: fixture.repoRoot, branch: 'op/lane', head_sha: head };
-  const land = workflowLand(fixture.ledger.db, raw, () => null);
-  assert.equal(land.source, 'product-land');
-  assert.equal(land.result, 'conflict');
-  assert.equal(land.branch, 'wf/recorded');
-  assert.equal(land.attemptAssociation, 'unproven');
-  assert.equal(workflowLand(fixture.ledger.db, { ...raw, repo_root: `${fixture.repoRoot}-other` }, () => null), null);
+  assert.equal(workflowLand(fixture.ledger.db, { ...raw, workflow_id: 'foreign-workflow' }), null);
 }));
 
 test('successful operation checkpoint remains observable before workflow land and excludes later job dispatch evidence', t => withLedger(t, async fixture => {
@@ -173,7 +160,7 @@ test('successful operation checkpoint remains observable before workflow land an
   fixture.ledger.transaction(db => db.prepare('UPDATE op_attempts SET repo_root=? WHERE attempt_id=1').run(fixture.repoRoot));
   const raw = fixture.ledger.db.prepare('SELECT * FROM op_attempts WHERE attempt_id=1').get();
   assert.deepEqual(workflowCheckpoint(fixture.ledger.db, raw), { sha: head, at: stamp + 50, committed: null, scope: null, files: null });
-  assert.equal(workflowLand(fixture.ledger.db, raw, () => null), null);
+  assert.equal(workflowLand(fixture.ledger.db, raw), null);
   const detail = (await request(handleAttempt, readStore(fixture), '/api/attempts/fixture/1')).json.data;
   assert.deepEqual(detail.checkpoint, { sha: head, at: stamp + 50, committed: null, scope: null, files: null });
   assert.equal(detail.land, null);
@@ -196,10 +183,10 @@ test('repository identity matches recorded casing and follows native platform ca
   seedWorkflow(fixture.ledger, { id: 'wf', events: [{ kind: 'workflow-landed', at: stamp,
     payload: { head, repoRoot: fixture.repoRoot, steps: [] } }] });
   const attempt = { workflow_id: 'wf', repo_root: fixture.repoRoot, head_sha: head };
-  const land = workflowLand(fixture.ledger.db, attempt, () => null);
+  const land = workflowLand(fixture.ledger.db, attempt);
   assert.equal(land?.source, 'workflow-landed');
   assert.equal(land?.attemptAssociation, 'head-match');
-  const differentCase = workflowLand(fixture.ledger.db, { ...attempt, repo_root: fixture.repoRoot.toUpperCase() }, () => null);
+  const differentCase = workflowLand(fixture.ledger.db, { ...attempt, repo_root: fixture.repoRoot.toUpperCase() });
   if (process.platform === 'win32') {
     assert.equal(differentCase?.source, 'workflow-landed');
     assert.equal(differentCase?.attemptAssociation, 'head-match');
@@ -300,7 +287,7 @@ test('current reservation readers and UI GET/HEAD map recorded holds with no nor
   assert.equal(reserved.ok, true);
   fixture.machine.markProviderReservation({ id: reserved.reservation.id, fence: reserved.reservation.fence,
     attemptId: reserved.reservation.attemptId, state: 'unknown', launchIdentity: 'fixture-launch', hostRequestId: 'fixture-request' });
-  const counts = () => ['machine_logs', 'provider_reservations', 'provider_reservation_events', 'schema_migrations']
+  const counts = () => ['machine_logs', 'provider_reservations', 'provider_reservation_events']
     .map(table => fixture.machine.db.prepare(`SELECT count(*) AS n FROM ${table}`).get().n);
   const before = counts(), store = readStore(fixture);
   const native = providerReservations(store.machine, { activeOnly: true });

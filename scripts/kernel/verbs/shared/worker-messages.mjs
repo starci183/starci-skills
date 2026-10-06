@@ -89,7 +89,7 @@ function bridgeDelivery(ledger, { workflowId, runId, deliveryId, messages }) {
   const payloadDigest = shortHash(canonicalJSON(messages), { n: 64 });
   const known = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.runId')=? AND json_extract(payload_json,'$.deliveryId')=? LIMIT 1")
     .get(workflowId, ORCHESTRATION_DELIVERY, runId, deliveryId);
-  if (known) return replayDelivery(db, { workflowId, runId, deliveryId, messages, payloadDigest, known });
+  if (known) return replayDelivery({ runId, deliveryId, payloadDigest, known });
   const counts = { questions: 0, messages: 0, heartbeats: 0, types: {}, replayed: false };
   const questionKnown = db.prepare('SELECT 1 FROM inbox WHERE workflow_id=? AND kind=? AND key=?');
   const messageKnown = db.prepare('SELECT 1 FROM events WHERE workflow_id=? AND kind=? AND entity_id=?');
@@ -116,35 +116,10 @@ function bridgeDelivery(ledger, { workflowId, runId, deliveryId, messages }) {
 }
 
 /** A Delivery already bridged: its receipt re-verified, then the zero-counts replay result. */
-function replayDelivery(db, { workflowId, runId, deliveryId, messages, payloadDigest, known }) {
+function replayDelivery({ runId, deliveryId, payloadDigest, known }) {
   const prior = parseJson(known.payload_json, {}) ?? {};
-  let legacy = false;
-  if (Object.hasOwn(prior, 'payloadDigest')) {
-    if (prior.payloadDigest !== payloadDigest) throw new Error(`Delivery ${runId}/${deliveryId} lacks a matching immutable payload receipt`);
-  } else {
-    requireLegacyReplay(db, { workflowId, runId, deliveryId, messages, prior });
-    legacy = true;
-  }
-  return { questions: 0, messages: 0, heartbeats: 0, types: {}, replayed: true, legacy };
-}
-
-// A committed pre-digest receipt retains its original message-id replay contract, not a manufactured historical digest.
-function requireLegacyReplay(db, { workflowId, runId, deliveryId, messages, prior }) {
-  const types = {};
-  for (const message of messages) { const type = String(message?.type ?? 'message'); types[type] = (types[type] ?? 0) + 1; }
-  if (prior.count !== messages.length || prior.heartbeats !== (types.heartbeat ?? 0) || canonicalJSON(prior.types) !== canonicalJSON(types))
-    throw new Error(`Delivery ${runId}/${deliveryId} conflicts with its committed legacy summary`);
-  const question = db.prepare("SELECT 1 FROM events e JOIN inbox i ON i.workflow_id=e.workflow_id AND i.kind=? AND i.key=json_extract(e.payload_json,'$.messageId') WHERE e.workflow_id=? AND e.kind='worker-question-bridged' AND json_extract(e.payload_json,'$.runId')=? AND json_extract(e.payload_json,'$.deliveryId')=? AND json_extract(e.payload_json,'$.messageId')=? AND json_extract(i.payload_json,'$.type')=?");
-  const recorded = db.prepare("SELECT 1 FROM events WHERE workflow_id=? AND kind=? AND entity_id=? AND json_extract(payload_json,'$.runId')=? AND json_extract(payload_json,'$.deliveryId')=? AND json_extract(payload_json,'$.type')=?");
-  for (const message of messages) {
-    const type = String(message?.type ?? 'message');
-    if (COUNTED_ONLY_TYPES.has(type)) continue;
-    const id = String(message.id);
-    const committed = ANSWERABLE_MESSAGE_TYPES.has(type)
-      ? question.get(WORKER_QUESTION, workflowId, runId, deliveryId, id, type)
-      : recorded.get(workflowId, ORCHESTRATION_MESSAGE, id, runId, deliveryId, type);
-    if (!committed) throw new Error(`Delivery ${runId}/${deliveryId} has no committed legacy message ${id}`);
-  }
+  if (prior.payloadDigest !== payloadDigest) throw new Error(`Delivery ${runId}/${deliveryId} lacks a matching immutable payload receipt`);
+  return { questions: 0, messages: 0, heartbeats: 0, types: {}, replayed: true };
 }
 
 /** Orchestration-message events of the workflow (every bridged type except questions and heartbeats), oldest first. */
@@ -198,12 +173,12 @@ const closeStaleQuestions = (db, workflowId, at = Date.now()) => {
  * Drain every Run of the workflow into the ledger (see the header). `rebind(runId)` re-binds the Kernel's own Run to
  * the current Kernel terminal after a consumer_fenced answer (cli.mjs bindRunToKernel); a Run that is not the Kernel's
  * is never re-bound. `check` replaces the Orca wrapper (specs).
- * {ok, runs, deliveries, questions, messages, heartbeats, legacyReplays, closed, errors[{runId, code, error}], error}.
+ * {ok, runs, deliveries, questions, messages, heartbeats, closed, errors[{runId, code, error}], error}.
  */
 export function drainWorkflowMessages(ledger, workflowId, { check = orcaCheck, rebind = null, maxDeliveries = MAX_DELIVERIES_PER_DRAIN } = {}) {
   const db = ledger.db;
   const runIds = [...workflowRunIdsOf(db, workflowId)];
-  const out = { ok: true, runs: runIds, deliveries: 0, questions: 0, messages: 0, heartbeats: 0, legacyReplays: 0, closed: 0, errors: [], error: null };
+  const out = { ok: true, runs: runIds, deliveries: 0, questions: 0, messages: 0, heartbeats: 0, closed: 0, errors: [], error: null };
   const kernelJob = latestKernelJobOf(db, workflowId);
   const terminal = kernelJob?.worker_id ?? null;
   const kernelRunId = jobPayloadOf(kernelJob)?.orca?.runId ?? null;
@@ -236,7 +211,6 @@ function drainRun(ledger, { workflowId, runId, terminal, kernelRunId, rebind, ch
     let counts;
     try { counts = ledger.transaction(() => bridgeDelivery(ledger, { workflowId, runId, deliveryId, messages })); }
     catch (error) { fail({ runId, code: 'orchestration-check-failed', error: String(error?.message ?? error) }); break; }
-    out.legacyReplays += counts.legacy ? 1 : 0;
     out.deliveries += counts.replayed ? 0 : 1; out.questions += counts.questions; out.messages += counts.messages; out.heartbeats += counts.heartbeats;
     r = call(deliveryId);
   }

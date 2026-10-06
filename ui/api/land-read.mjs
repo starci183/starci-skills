@@ -38,7 +38,7 @@ export function workflowCheckpoint(db, attempt) {
 }
 
 /** A workflow receipt may be shown beside an attempt; association needs recorded head equality. */
-export function workflowLand(db, attempt, blobLink) {
+export function workflowLand(db, attempt) {
   const workflow = attempt.workflow_id, repo = attempt.repo_root;
   if (!repoKey(repo)) return null;
   const checkpoint = workflowCheckpoint(db, attempt);
@@ -54,10 +54,5 @@ export function workflowLand(db, attempt, blobLink) {
       mergedSha: head, reason: null, output: null, at: event.occurred_at, steps,
       pushed: typeof push?.pushed === 'boolean' ? push.pushed : null, checkpoint, attemptAssociation: association(head) };
   }
-  // Historical product lands retain their own repository and native outcome provenance.
-  const legacy = many(db, 'SELECT * FROM product_lands WHERE workflow_id=? ORDER BY land_id DESC', workflow).find(row => sameRepo(row.repo_root, repo));
-  if (!legacy) return null;
-  return { scope: 'workflow', workflow, repo: legacy.repo_root, branch: legacy.wf_branch ?? null, source: 'product-land', result: legacy.result,
-    mergedSha: legacy.merged_sha ?? null, reason: legacy.reason ?? null, output: blobLink(db, legacy.output_sha), at: legacy.finished_at ?? legacy.started_at,
-    steps: [], pushed: legacy.pushed == null ? null : Boolean(legacy.pushed), checkpoint, attemptAssociation: association(sha(legacy.merged_sha)) };
+  return null;
 }

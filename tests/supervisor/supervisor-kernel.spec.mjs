@@ -101,19 +101,19 @@ test('a refused worker observation is unverified rather than affirmative death',
   assert.equal(seatHealth(seat, { show: () => ({ ok: true, state: 'released' }) }).dead, true);
 });
 
-test('Supervisor plans neither create an absent machine store nor rewrite a retired store', async t => {
-  for (const legacy of [false, true]) {
+test('Supervisor plans neither create an absent machine store nor rewrite a store of another schema version', async t => {
+  for (const foreign of [false, true]) {
     const env = envOf(t), file = env.STARCI_TEST_MACHINE_FILE;
-    if (legacy) {
+    if (foreign) {
       const machine = openMachine({ env });
       machine.meta(); machine.close();
       const raw = new DatabaseSync(file);
       try { raw.exec('PRAGMA user_version=1'); } finally { raw.close(); }
     }
-    const before = legacy ? crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
+    const before = foreign ? crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
     const host = fakeHost(), observations = fakeAdmission();
     host.admission = { quota: observations.quota, circuit: () => null };
-    if (legacy) await assert.rejects(() => launch(env, host, { plan: true }), { code: 'STARCI_MACHINE_SCHEMA_OLD' });
+    if (foreign) await assert.rejects(() => launch(env, host, { plan: true }), { code: 'STARCI_MACHINE_SCHEMA_OLD' });
     else {
       const result = await launch(env, host, { plan: true });
       assert.equal(result.action, 'plan');
@@ -121,7 +121,7 @@ test('Supervisor plans neither create an absent machine store nor rewrite a reti
       assert.equal(result.wouldLaunch, false);
     }
     assert.equal(host.calls.start.length, 0);
-    if (legacy) {
+    if (foreign) {
       assert.equal(crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'), before, 'planning preserves all refused-store bytes');
       const raw = new DatabaseSync(file, { readOnly: true });
       try { assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 1); }

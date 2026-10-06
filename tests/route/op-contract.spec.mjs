@@ -89,7 +89,7 @@ test('strict admission measurement distinguishes unreadable bytes from legitimat
   try {
     fs.readFileSync = (target, ...args) => { if (path.resolve(target) === file) throw Object.assign(new Error('fixture-only unreadable bytes'), { code: 'EACCES' }); return read(target, ...args); };
     assert.throws(() => recordInputs(root, ['knowledge/present.yaml'], undefined, { strict: true }), (error) => error.code === 'EACCES');
-    assert.equal(recordInputs(root, ['knowledge/present.yaml']).digests[0].digest, ABSENT, 'legacy advisory readers retain their behavior');
+    assert.equal(recordInputs(root, ['knowledge/present.yaml']).digests[0].digest, ABSENT, 'a non-strict reader reads an unreadable file as absent');
     assert.equal(recordInputs(root, ['knowledge/never-created.yaml'], undefined, { strict: true }).digests[0].digest, ABSENT);
   } finally { fs.readFileSync = read; }
 });

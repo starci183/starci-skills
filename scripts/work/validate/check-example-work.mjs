@@ -29,11 +29,7 @@ import {sealedLocationProblem} from './check-work-artifacts.mjs'; import { isMai
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
-// `work/node@*` is the retired recursive specification envelope from the pre-flat business/srs and
-// architecture/sds layouts. It has no reader: a record carrying it is refused (HFS_WORK_NODE_RETIRED) and
-// must be restated as flat family records.
 const EXEMPT = new Set(['work/catalog@1', 'work/workspace@1', 'work/brand@1', 'work/feature@1', 'work/disposable-accounts@1']);
-const isRetiredNodeSchema = schema => /^work\/node@\d+$/.test(schema ?? '');
 const KERNEL_CUSTODY_ROOTS = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals']);
 /** A reference-shaped id: a record family prefix and at least two dot segments. */
 export const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
@@ -122,7 +118,6 @@ const collectRecordMap = (scopeRoot) => {
     if ((record.schema === 'work/evidence@1' && !rel.endsWith('/evidence.yaml'))
       || (path.basename(rel) === 'manifest.yaml' && segments.includes('evidence'))) continue;
     if (rel.endsWith('/evidence.yaml')) continue;
-    if (isRetiredNodeSchema(record.schema)) continue;
     if (typeof record.id === 'string' && record.id) map.set(record.id, {
       schema: record.schema, state: record.state, change: record.change, file,
       shown: path.relative(root, file).replaceAll('\\', '/'), dir: path.dirname(file),
@@ -139,7 +134,7 @@ const BOUNDARY_TRANSITIONAL = Object.freeze([]);
  * product content (isProductPath) or it is refused. Known agent data - evidence/ and impl captures, uat runs, evidence
  * bundles, operations/ audits, kernel custody, stray report copies, caches, ledgers - is REFUSED
  * [HFS_AGENT_DATA_TRACKED], one line per agent-data directory (draw-loop rounds included: the loop is a blob bundle); its home is the project ledger and the blob store
- * (starci kernel report --attach). A path that is neither (a record in a legacy layout) is WARNED [STARCIWORK_DRIFT].
+ * (starci kernel report --attach). A path that is neither (a record off the product path list) is WARNED [STARCIWORK_DRIFT].
  * Paths are judged relative to the tree root (`resolveRoot`). The gate below runs it over every example tree.
  * Only TRACKED files are judged (`git ls-files`; supervisor decision 2026-09-30): ignored local agent data on disk is the
  * ledger/housekeeping hygiene check's business, never a validation refusal. A tree outside a git work tree has none.
@@ -263,10 +258,6 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       evidenceFiles.push({record, shown, dir: path.dirname(file)});
       continue;
     }
-    if (isRetiredNodeSchema(record.schema)) {
-      problems.push(`${shown}: schema ${record.schema} is the retired recursive work/node envelope; restate it as flat family records (${[...FAMILIES].join(', ')}) [HFS_WORK_NODE_RETIRED]`);
-      continue;
-    }
     if (Object.hasOwn(record, 'id') && typeof record.id !== 'string') problems.push(`${shown}: id must be a string, not ${(record.id === null && 'null') || (Array.isArray(record.id) && 'array') || typeof record.id} [ID_TYPE]`); else if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record});
     if (segments[0] === 'features' && segments.length > 2 && !EXEMPT.has(record.schema)) {
       const want = expectedId(segments);
@@ -367,7 +358,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
   for (const collision of inline.collisions) {
     problems.push(`inline criterion ${collision.id} is declared under both ${collision.parents.join(' and ')} [AC_ID_COLLISION]`);
   }
-  // Structured fields below hold record references too: `P#frag` and collapsed bare `ac.*` ids resolve
+  // Structured fields below hold record references too: `P#frag` resolves
   // to the record that carries the criterion, so a blockedBy on one criterion of a record is a wait on
   // that record, and a dangling fragment surfaces through the same "does not exist / no record owns"
   // refusal a dangling plain id gets.
@@ -379,9 +370,8 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
   // ---- refs resolve (existing structural check, now also covers blockedBy/conflictsWith/appliesTo/subscribes/extends record ids) ----
   // Compact-format resolution: `P#frag` resolves when P is a record and frag names an inline criterion
   // P carries (full id, short name, or last id segment - or a live record id / kept-separate ac id under
-  // P). A bare `ac.*` id that no record owns but some record now carries inline still resolves - it is
-  // not dangling - but warns AC_UNREMAPPED_REF because `parent#ac-id` is the canonical form. The ref's
-  // own declaration trail (acceptance.id / statements.id inside the entry itself) never warns.
+  // P). A bare `ac.*` id that no record owns is dangling: `parent#ac-id` is the form. The ref's
+  // own declaration trail (acceptance.id / statements.id inside the entry itself) is the declaration, not a ref.
   const DECL_TRAIL = /^(?:acceptance|statements)\.(?:.+\.)?id$/;
   for (const ref of refs) {
     if (ref.malformedRef) {
@@ -400,12 +390,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       continue;
     }
     if (resolveMap.has(ref.id)) continue;
-    if (resolveInline.byAcId.has(ref.id)) {
-      if (!DECL_TRAIL.test(ref.trail)) {
-        warnings.push(`${ref.file}: ${ref.trail} references collapsed criterion ${ref.id} by its old ac id - the compact form is ${resolveInline.byAcId.get(ref.id)}#${ref.id} [AC_UNREMAPPED_REF]`);
-      }
-      continue;
-    }
+    if (resolveInline.byAcId.has(ref.id) && DECL_TRAIL.test(ref.trail)) continue;
     if (ref.trail === 'apps.nodes.layout.design' && plannedDesigns.has(`${ref.file}|${ref.id}`)) {
       warnings.push(`${ref.file}: ${ref.trail} names ${ref.id}, the surface-layout ui record interface.draw has not drawn yet - a planned pointer, resolved when interface.draw creates ${placeOfUiId(ref.id)} with surface: layout and route set to the layout node [DESIGN_PLANNED]`);
       continue;

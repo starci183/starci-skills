@@ -14,7 +14,7 @@ const cliEntry = path.join(runtimeRoot, 'packages', 'cli', 'bin', 'starci.mjs');
 
 /** `starci smoke scaffold`: one sequential scaffold/install/lint/typecheck/build/check proof. */
 export async function smokeScaffold(ctx, deps = {}) {
-  const ok = (result) => resultOk(result, { acceptOk: false, codeFallback: true });
+  const ok = (result) => resultOk(result, { acceptOk: false });
   const detail = (result) => resultDetail(result, { limit: null, lastLine: true });
   const edition = String(ctx.global?.edition ?? ctx.args?.edition ?? '');
   if (!['full', 'lite'].includes(edition)) return { code: 2, stderr: 'starci smoke scaffold: --edition must be full or lite' };

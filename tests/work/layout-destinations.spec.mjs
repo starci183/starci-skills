@@ -54,7 +54,7 @@ test('destination captures are recorded per key, with the nav target as the defa
   const photosDesktop = node.layout.destinations[0].captures.find((c) => c.breakpoint === 'desktop');
   assert.equal(photosDesktop.name, 'assets/layouts/app--locale-console--photos--desktop--light.png', 'a capture is a blob citation, never a file under shell/assets');
   assert.deepEqual(photosDesktop.slot, DESKTOP_SLOT, 'the slot is measured from the key colour');
-  assert.ok(fs.existsSync(captureFileOf(p.shellDir, photosDesktop)));
+  assert.ok(fs.existsSync(captureFileOf(photosDesktop)));
   assert.equal(node.layout.rev, 1, 'a first destination capture does not move the layout rev');
   assert.equal(validateTree(p.record), true, JSON.stringify(validateTree.errors));
   addCapture(p.tree, p.shellDir, { node: CONSOLE, destination: 'photos', breakpoint: 'desktop', theme: 'light', file: capturePng(p, 'photos2', 'desktop', [11, 151, 11, 255]) });
@@ -157,14 +157,4 @@ test('shell-conformance holds destinations to the layout: known nodes below it, 
   const result = checkShellConformance(path.join(p.work, 'shell'));
   assert.ok(result.refused.some((l) => /records destination photos twice \[LAYOUT_DESTINATION_INVALID\]/.test(l)));
   assert.ok(result.refused.some((l) => /is active for \/\[locale\]\/\(auth\)\/sign-in, which is not a node at or below the layout/.test(l)));
-});
-
-test('an extensions.destinationCaptures block is refused; destinations live on the layout node only', async (t) => {
-  const p = await settledProduct(t);
-  assert.equal(validateTree(p.record), true, JSON.stringify(validateTree.errors));
-  const legacy = structuredClone(p.record);
-  legacy.extensions = { destinationCaptures: { note: 'one capture per destination', items: [{ key: 'photos', breakpoint: 'desktop', path: 'assets/layouts/photos--desktop--light.png', sha256: 'a'.repeat(64) }] } };
-  assert.equal(validateTree(legacy), false, 'the retired block is not a valid extension');
-  assert.deepEqual(destinationsOf(legacy, nodeById(treeOf(legacy, 'app'), CONSOLE)), [], 'it is never read as destinations');
-  assert.equal('promoteDestinations' in await import('../../scripts/work/layout-tree.mjs'), false, 'there is no promote path');
 });

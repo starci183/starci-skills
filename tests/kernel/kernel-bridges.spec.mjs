@@ -211,25 +211,16 @@ test('a routed shared blocker becomes a typed wait on the introducer\'s owning j
   assert.deepEqual(viaCommit.sharedBlocker.until, [{ type: 'job', jobId: OWNER, want: 'succeeded' }], 'the open job owning a file the commit changed');
   const unnamed = raise('the shared module is broken');
   assert.deepEqual(unnamed.sharedBlocker.until, [{ type: 'message', peer: STUDIO, kind: 'reply' }], 'no owning job: the introducer\'s reply releases it');
-  // A blocker routed before routing typed it reads typed all the same.
-  const legacy = 'inc-000000legacy';
-  w.seed((l) => {
-    const text = `Commit 9caa2d5c (${INTRO} a5) broke the spec; queued sibling ${OWNER} owns the fix`;
-    l.db.prepare("INSERT INTO incidents(incident_id,workflow_id,kind,owner,attempts,model_calls,tokens,elapsed_ms,last_progress,status,created_at,updated_at) VALUES(?,?,'other','kernel',0,0,0,0,?,'open',?,?)")
-      .run(legacy, REPORTER, `[shared-blocker] ${text}`, Date.now(), Date.now());
-    l.appendEvent({ workflowId: REPORTER, entityType: 'incident', entityId: legacy, kind: 'incident-raised', payload: { kind: 'shared-blocker', detail: text, opId: null } });
-    l.appendEvent({ workflowId: REPORTER, entityType: 'incident', entityId: legacy, kind: 'shared-blocker-routed', payload: { routed: true, to: STUDIO, key: 'pm-x', via: 'explicit', commit: null } });
-  });
   const frontier = json(w.api(['status', '--workflow', REPORTER]).stdout).frontier;
   const typed = new Map((frontier.gateConditions ?? []).map((c) => [c.incidentId, c]));
-  for (const id of [named.incidentId, viaCommit.incidentId, legacy]) {
+  for (const id of [named.incidentId, viaCommit.incidentId]) {
     assert.deepEqual(typed.get(id)?.until, [{ type: 'job', jobId: OWNER, want: 'succeeded' }], `${id} waits on ${OWNER}`);
   }
   assert.equal(typed.has(unnamed.incidentId), true);
   w.seed((l) => w.settleTo(l, OWNER, 'succeeded', 'seed owner settled'));
   json(w.api(['status', '--workflow', REPORTER]).stdout);
   const status = (id) => w.read((db) => db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(id).status);
-  assert.deepEqual([named.incidentId, viaCommit.incidentId, legacy, unnamed.incidentId].map(status), ['resolved', 'resolved', 'resolved', 'open']);
+  assert.deepEqual([named.incidentId, viaCommit.incidentId, unnamed.incidentId].map(status), ['resolved', 'resolved', 'open']);
 });
 
 test('op-contract waits for a dispatch still committing its row, and answers missing at once otherwise', async (t) => {

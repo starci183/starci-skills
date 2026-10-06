@@ -196,9 +196,9 @@ test('the product-locale rule is kept: every content prompt states it', async (t
 
 test('starci runtime validate lists records drawn before the layout tree as suspects, and a shell that is not a layout tree as a refusal', async (t) => {
   const p = await settledProduct(t);
-  const legacyUi = path.join(p.work, 'features', 'old', 'ui', 'screen');
-  fs.mkdirSync(legacyUi, { recursive: true });
-  fs.writeFileSync(path.join(legacyUi, 'index.yaml'), stringifyYaml(uiSkeleton('ui.old.screen')));
+  const staleUi = path.join(p.work, 'features', 'old', 'ui', 'screen');
+  fs.mkdirSync(staleUi, { recursive: true });
+  fs.writeFileSync(path.join(staleUi, 'index.yaml'), stringifyYaml(uiSkeleton('ui.old.screen')));
   const findings = shellBindingFindings(p.work);
   assert.deepEqual(findings.map((f) => [f.level, f.code]).sort(), [['suspect', 'SHELL_BINDING_MISSING'], ['suspect', 'UI_ROUTE_MISSING']]);
   fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml({ schema: 'work/other-shell@1', id: 'shell', productLocale: { default: 'vi', fallback: 'vi', locales: ['vi'] } }));
@@ -310,7 +310,7 @@ test('the contracts say it: owner reviews parts, composites are implement/audit 
   assert.ok(draw.proofs.some((p) => p.id === 'owner-sees-parts'));
   assert.match(draw.proofs.find((p) => p.id === 'shell-conformance').requirement.en, /DRAW_MATRIX_INCOMPLETE/);
   const common = readYaml('modules/ops/_common.yaml').sections.find((s) => /productLocale/.test(s.title)).blocks;
-  assert.ok(common.some((b) => /owner reviews shapes only - one per XBase#state of the record's ui\.shapes - as the drawn PART,\s+never the composite/.test(b) && /panel alone/.test(b) && /retired\s+data-status image is never shown/.test(b)));
+  assert.ok(common.some((b) => /owner reviews shapes only - one per XBase#state of the record's ui\.shapes - as the drawn PART,\s+never the composite/.test(b) && /panel alone/.test(b) && /data-status image\s+is never shown/.test(b)));
   assert.ok(common.some((b) => /desktop AND mobile in the light theme/.test(b) && /Dark is optional/.test(b)));
   assert.match(readYaml('modules/ops/ops/interface.implement.yaml').reads.find((r) => r.id === 'draws').purpose.en, /build reference is the composite/);
   assert.match(JSON.stringify(readYaml('modules/ops/ops/interface.audit.yaml').steps), /direction image the owner is shown is the drawn part/);

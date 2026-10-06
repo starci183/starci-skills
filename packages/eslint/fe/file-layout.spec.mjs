@@ -140,7 +140,7 @@ test("FILE-1: the path predicts the name", () => {
       // not a PascalCase component folder
       { filename: at("apps/web/src/hooks/swr/index.ts"), code: "export const useX = () => null" },
       // a PascalCase folder no component slot owns is not a component folder
-      { filename: at("apps/web/src/modules/Legacy/index.tsx"), code: "export const Other = () => null" },
+      { filename: at("apps/web/src/modules/Archive/index.tsx"), code: "export const Other = () => null" },
       // the drawing half is not the entry
       { filename: at(`${R}/leaves/Text/component.tsx`), code: "export const Paragraph = () => null" },
     ],

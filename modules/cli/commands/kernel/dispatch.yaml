@@ -73,7 +73,7 @@ reads: the job row + its workflow — including the PERSISTED `starci kernel rou
   target repository, the records its `mustExist` reads resolve to and the bound records
   (prerequisite-unmet below); the model resolution through route-model
   (modules/models/selection.yaml — eligibility first, budget orders the eligible)
-attempt: "alpha.3: a queued or ready job launches (ready: a launch refused before its op took the
+attempt: "a queued or ready job launches (ready: a launch refused before its op took the
   contract returns the SAME job to ready, H13 - no new try, attemptConsumed false; a launch whose
   effect is unknown fences the job effect_unknown for reconcile). Once Orca returns the dispatch id,
   one op_attempts row (dispatch_seq, scratch_dir = the job scratch, terminal, run, task, pool) and
@@ -276,7 +276,7 @@ refuses:
       reconcile proves no-effect against, kept apart from payload.managed so it can never be read as
       the job's live binding. The prompt is sent observed for the card submission window (calls.yaml
       terminal-send-prompt): a turn_started receipt proves the submit. One not seen submitted (no
-      turn start, or an old host's agent_prompt_stalled) is proven from the frame: lost (the
+      turn start, or agent_prompt_stalled) is proven from the frame: lost (the
       provider idle at an empty input), it is sent once more, and lost again the send is refused
       with signal prompt-delivery-stalled; a terminal whose process incarnation the host refuses is
       terminal-incarnation-stale. That refusal and an unclassified worker-start refusal each record

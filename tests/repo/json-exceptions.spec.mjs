@@ -36,7 +36,7 @@ async function loadChecker() {
 test('authored JSON outside allowlist fails the exceptions checker', async t => {
   const checkJsonExceptions = await loadChecker();
   const dir = disposable(t, 'starci-json-ex-');
-  // Synthesized offender tree (the legacy/builders copy fixture is gone): one allowlisted manifest,
+  // Synthesized offender tree: one allowlisted manifest,
   // one authored JSON the allowlist does not name.
   fs.mkdirSync(path.join(dir, 'modules', 'kernel'), { recursive: true });
   const allowlist = path.join(dir, 'modules', 'kernel', 'allowlist.yaml');

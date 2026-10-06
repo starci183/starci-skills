@@ -1,7 +1,6 @@
-// runtime-mirror-drift (2026-10-01): 6ba66d84a/df2c3c52e changed engine/db/ledger.mjs and added ledger migration 0005
-// through the land gate, which never ran sync-runtime --check, so packages/hfs/runtime went stale on main. The gate now
-// runs `sync-runtime --check` as a tree check whenever the candidate changes a file a runtime bundle mirrors (computed
-// from the candidate's own BUNDLES), with the findings-based red-on-main baseline of the other tree checks.
+// runtime-mirror-drift: the land gate runs `sync-runtime --check` as a tree check whenever the candidate changes a file a
+// runtime bundle mirrors (computed from the candidate's own BUNDLES), with the findings-based red-on-main baseline of the
+// other tree checks, so packages/hfs/runtime never goes stale on main.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -118,7 +117,7 @@ test('the real generator mirrors the published closure only (no ledger writer: t
   assert.ok(bundles.includes('packages/hfs/runtime'));
   assert.ok(files.includes('scripts/hfs/check.mjs'));
   assert.ok(!files.includes('engine/db/ledger.mjs'), 'safe-remove takes its hold from the caller, so no bundle drags the ledger writer in');
-  for (const file of files.filter((f) => f.startsWith('engine/db/migrations/'))) assert.ok(fs.existsSync(path.join(ROOT, file)), file);
+  for (const file of files.filter((f) => f.startsWith('engine/db/schema/'))) assert.ok(fs.existsSync(path.join(ROOT, file)), file);
   const r = mirrorRun(ROOT);
   assert.equal(r.ok, true, r.full);
 });

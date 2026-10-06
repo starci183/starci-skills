@@ -7,7 +7,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
-import { legacyWorkSqliteFindings, workspaceBoundRepoRoots } from '../housekeeping/hk-orphan-ledgers.mjs';
 import { quickCheck } from './ledger-health.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { green, red, warn } from './checklist-items.mjs';
@@ -221,9 +220,6 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   const found = ledgerFindings(ledgers);
   push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${(f.problem === 'missing-repo' ? f.repoRoot : f.file) ?? '-'})`).join('; ').slice(0, 400), 'starci reconciler up --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')
     : green('preflight', 'ledgers', 'registered ledgers', 'no temp/test path and no missing file', { required: false }));
-  const legacy = legacyWorkSqliteFindings([...ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot), ...workspaceBoundRepoRoots({ env })]);
-  push(legacy.length ? warn('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', `${legacy.length} store(s): ${legacy.map((f) => f.repoRoot).join(', ').slice(0, 300)}`, 'the ledger lives in <runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite; archive the in-repo copy (LEDGER_LEGACY_WORK_SQLITE, starci runtime ledger-hygiene)')
-    : green('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', 'none', { required: false }));
   push(await worktreeItems({ env, repos: ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot) }));
   const pinBad = pinProblems(configuredPins(config));
   push(pinBad.length ? red('preflight', 'pins', 'kernel/supervisor model pins', pinBad.map((p) => `${p.where}: ${p.problem}`).join('; ').slice(0, 400), 'drop the model pin of an agent that takes no --model (modules/models/agents/<agent>.yaml start.modelArgument)')

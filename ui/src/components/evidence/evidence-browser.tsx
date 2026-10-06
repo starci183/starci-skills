@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Info, Star } from 'lucide-react';
+import { Star } from 'lucide-react';
 import type { EvidenceFile, EvidenceFileV3, EvidenceGroup } from '../../contract';
 import type { Concept } from '../concept';
 import { FileTypeBadge, StatusChip } from '../status-chip';
@@ -11,8 +11,8 @@ import { t } from '../../i18n/t';
 export { useBlobText } from './use-blob-text';
 export const concept: Concept = 'C8';
 
-const GROUPS: { id: EvidenceGroup; title: string; hint: string; tip?: string }[] = [
-  { id: 'evidence', title: t('Evidence submitted by the op (`evidence/`)'), hint: t('Files the op wrote itself to prove its result.'), tip: t('evidence/ is the op evidence folder; older attempts recorded it as E/') },
+const GROUPS: { id: EvidenceGroup; title: string; hint: string }[] = [
+  { id: 'evidence', title: t('Evidence submitted by the op (`evidence/`)'), hint: t('Files the op wrote itself to prove its result.') },
   { id: 'op-run', title: t('Results of commands the op ran'), hint: t('Output of the commands the op ran while working.') },
   { id: 'check', title: t('Check output'), hint: t('Stdout/stderr of each check, grouped by check name.') },
   { id: 'media', title: t('Images & video'), hint: t('Screenshots and recorded video.') },
@@ -123,7 +123,6 @@ export function EvidenceBrowser({ files, selected, onSelect }: Readonly<{ files:
         return <section key={group.id} aria-label={group.title}>
           <h3 className="flex items-center gap-2 px-1 text-sm font-semibold">
             {group.title}
-            {group.tip ? <span title={group.tip} aria-label={group.tip} className="inline-flex text-muted-foreground"><Info className="size-3.5" aria-hidden="true" /></span> : null}
             <span className="ml-auto text-xs font-normal text-muted-foreground">{inGroup.length}</span>
           </h3>
           <p className="px-1 pb-1 text-xs text-muted-foreground">{group.hint}</p>

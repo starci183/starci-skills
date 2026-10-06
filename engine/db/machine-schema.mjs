@@ -4,7 +4,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { artifactRoot } from './blob.mjs';
-import { sha256 } from '../digest.mjs';
 import { hasTable } from '../../scripts/lib/sqlite.mjs';
 
 const require = createRequire(import.meta.url);
@@ -42,7 +41,7 @@ export function machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_
   }
   /** Refuse any store that is not exactly the current schema, leaving it unchanged; the operator replaces it with a fresh store. */
   function refuseOld(file, why) {
-    throw Object.assign(new Error(`machine-schema-old: ${path.resolve(file)} ${why}; expected '${MACHINE_SCHEMA}' (user_version ${MACHINE_VERSION}) with its current physical schema; the store is not the current schema and has been left unchanged: replace it with a fresh store (no upgrade or migration exists)`),
+    throw Object.assign(new Error(`machine-schema-old: ${path.resolve(file)} ${why}; expected '${MACHINE_SCHEMA}' (user_version ${MACHINE_VERSION}) with its current physical schema; the store is not the current schema and has been left unchanged: replace it with a fresh store`),
       { code: 'STARCI_MACHINE_SCHEMA_OLD' });
   }
   function checkIdentity(db, file) {
@@ -69,7 +68,7 @@ export function machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_
     db.exec('BEGIN IMMEDIATE');
     try {
       if (Number(pragma(db, 'user_version')) !== 0 || db.prepare("SELECT 1 FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' LIMIT 1").get()) {
-        // Another initializer may have committed while this connection waited for BEGIN; keep its current rows/journal.
+        // Another initializer may have committed while this connection waited for BEGIN; keep its current rows.
         checkSchema(db, file); db.exec('COMMIT'); return;
       }
       db.exec(sql);
@@ -77,11 +76,9 @@ export function machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_
       for (const [key, value] of Object.entries({ host_id: os.hostname(), schema: MACHINE_SCHEMA, created_at: String(at), blob_root: artifactRoot(env),
         runtime_rev: runtimeRev(), sqlite_version: db.prepare('select sqlite_version() v').get().v,
         node_version: process.version, journal_mode: 'wal' })) meta.run(key, String(value));
-      db.prepare("INSERT INTO schema_migrations(version,name,runtime_rev,sql_sha256,started_at,finished_at,status) VALUES(?,'0001-init',?,?,?,?,'done')")
-        .run(MACHINE_VERSION, runtimeRev(), sha256(sql), at, now());
       // Every controller starts in shadow until the owner switches it.
       for (const controller of CONTROLLERS) {
-        db.prepare("INSERT INTO mode_changes(controller,from_mode,to_mode,by,reason,at) VALUES(?,NULL,'shadow','machine-db:init','0001-init',?)").run(controller, at);
+        db.prepare("INSERT INTO mode_changes(controller,from_mode,to_mode,by,reason,at) VALUES(?,NULL,'shadow','machine-db:init','init',?)").run(controller, at);
         db.prepare("INSERT INTO controller_modes(controller,mode,set_at,set_by) VALUES(?,'shadow',?,'machine-db:init')").run(controller, at);
       }
       db.exec(`PRAGMA user_version=${MACHINE_VERSION}`);

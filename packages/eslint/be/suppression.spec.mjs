@@ -45,7 +45,6 @@ test("no comment switches a check off at the place it is written", () => {
             { filename: FILE, code: "const a = 1 // NOSONAR", errors: [{ messageId: "sonar" }] },
             { filename: FILE, code: "// sonar-disable-next-line\nconst a = 1", errors: [{ messageId: "sonar" }] },
             { filename: FILE, code: "// prettier-ignore\nconst a   =   1", errors: [{ messageId: "prettier" }] },
-            { filename: FILE, code: "const a = 'x' // vn-ok: keyword the matcher reads", errors: [{ messageId: "vn-ok" }] },
         ],
     })
 })

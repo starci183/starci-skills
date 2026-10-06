@@ -1,5 +1,5 @@
 // docker-policy.mjs - pure Docker ownership policy. No LITE port-block helper exists in packages/hfs in this tree, so the
-// full edition accepts published ports only in the reserved 41000-44999 range and still names the protected legacy blocks.
+// full edition accepts published ports only in the reserved 41000-44999 range and names the protected blocks.
 import { isProtectedContainer, protectedPortLabel } from '../lib/protected-installations.mjs';
 
 export const DOCKER_PORT_POLICY = 'DOCKER_PORT_POLICY';

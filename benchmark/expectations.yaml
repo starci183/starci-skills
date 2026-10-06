@@ -1,8 +1,7 @@
 # benchmark/expectations.yaml — what the runtime EXPECTS of each model pool, as its routing contract assumes it.
 #
 # This is the "expected" half of the benchmark: every claim is derived from the routing contract and cites the
-# file it came from. The "actual" half is benchmark/snapshots/*.json (measured) and benchmark/findings/*.md
-# (the analysis comparing the two). Nothing here is measured, and nothing here is a public benchmark figure
+# file it came from. The "actual" half is benchmark/snapshots/*.json (measured). Nothing here is measured, and nothing here is a public benchmark figure
 # unless `publicBenchmarks` cites it.
 #
 # publicBenchmarks rule: every value is null until a public source is cited for it. A filled value names
@@ -31,7 +30,7 @@ history:
   - id: routing-by-evidence
     date: 2026-09-25
     decidedBy: owner ('ok')
-    evidence: [benchmark/snapshots/2026-09-25-72h.json, benchmark/findings/2026-09-25.md]
+    evidence: [benchmark/snapshots/2026-09-25-72h.json]
     landed: {commit: f17e62112, contractChange: routing-by-evidence}
     shares: {devin-agent: 35, qwen-agent: 35, claude-agent: 20, codex-agent: 10}   # was qwen 40 / claude 20 / codex 20 / devin 20
     routing:
@@ -46,7 +45,6 @@ history:
     decidedBy: owner ("chia bớt cho devin qwen cái này, codex/claude chỉ là quyết định thôi (tức là đưa ra chiến lược), review thì phải cho tay chân làm là ok nhất! cứ thử mảng cho devin/qwen, ghi benchmark sai sửa sau")
     amends: routing-by-evidence
     kind: experiment                              # decided before measuring; re-measured by a 48h snapshot
-    evidence: [benchmark/findings/2026-09-25-review-hands.md]
     landed: {contractChange: routing-review-hands}
     shares: unchanged
     routing:
@@ -82,7 +80,7 @@ pools:
         work only as overflow below insane (allocation.balanced.overflowOnly).
       strengths:
         - strategy kinds: request.analyze, scope.define, business.decide, architecture.decide, brand.decide, decision.prepare, implementation.plan, workspace.manage
-        - business/architecture.decide at 72-73% pass over the 72h snapshot (benchmark/findings/2026-09-25.md)
+        - business/architecture.decide at 72-73% pass over the 72h snapshot
       notExpectedFor:
         - first pick for any review or verify kind, or work.author (review order, overflow only)
         - host-tool routes: interface.draw, interface.asset (image_gen) and interface.audit (browser-dom) — agents/claude.yaml hostTools is empty
@@ -148,7 +146,7 @@ pools:
         since 2026-09-25.
       strengths:
         - backend.implement 70% and interface.implement 68% pass over the 72h snapshot
-        - review (routing-review-hands, unmeasured: benchmark/findings/2026-09-25-review-hands.md)
+        - review (routing-review-hands, unmeasured)
         - browser-dom host tool (interface.audit)
       notExpectedFor:
         - strategy: decide/plan and every think kind outside the review order (roles gate)

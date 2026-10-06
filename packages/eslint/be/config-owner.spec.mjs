@@ -62,7 +62,7 @@ test("the process environment is read only by the file that declares EnvSource i
             { filename: SERVICE, code: "import 'dotenv/config'", errors: [{ messageId: "package" }] },
             { filename: SERVICE, code: `${importLine("default as dotenv", DOTENV)}export const x = dotenv`, errors: [{ messageId: "package" }] },
             { filename: SERVICE, code: `const d = require(${JSON.stringify(DOTENV)})`, errors: [{ messageId: "package" }] },
-            // a config getter is no longer matched by name: `envConfig()` is a plain unresolved call here
+            // a config getter is not matched by name: `envConfig()` is a plain unresolved call here
             { filename: SERVICE, code: "const p = path.join(process.cwd(), 'src', 'x')", errors: [{ messageId: "cwdPath" }] },
             { filename: SERVICE, code: "const p = path.resolve(process.cwd(), '.starcistacks/dev')", errors: [{ messageId: "cwdPath" }] },
         ],

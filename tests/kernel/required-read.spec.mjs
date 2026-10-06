@@ -26,7 +26,7 @@ test('required READ plan is complete and server-derived; exact attestation alone
   assert.throws(() => admitRead(w),{ code: 'kernel-read-unverified' });ack(w,required);admitRead(w);
 }));
 
-test('boot provenance and legacy empty READ do not acknowledge current bytes; replaced incarnation owes its own read', t => withKernelIngress(t,w => {
+test('boot provenance and an empty READ acknowledgement do not acknowledge current bytes; replaced incarnation owes its own read', t => withKernelIngress(t,w => {
   for (const [kind,payload] of [['runtime-read-delivered',{ rev: w.git('rev-parse','HEAD'),files: ['modules/kernel/kernel-prompt.md'],source: 'boot' }],['runtime-rev-acked',{ rev: w.git('rev-parse','HEAD'),files: [],source: 'ack' }]])
     w.ledger.transaction(() => w.ledger.appendEvent({ workflowId: w.workflowId,entityType: 'kernel',entityId: w.workflowId,kind,payload }));
   assert.throws(() => admitRead(w),{ code: 'kernel-read-unverified' });

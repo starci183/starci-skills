@@ -95,7 +95,7 @@ function product(t) {
     return f;
   };
   const ledger = () => openLedger({ file: ledgerFileFor(repo) });
-  // The ask an interface.draw attempt files: on the migrated schema a reports row keys the dispatch's
+  // The ask an interface.draw attempt files: on the current schema a reports row keys the dispatch's
   // op_attempts row, so the whole workflow → unit → job → leased → attempt → reported chain is seeded
   // through the ledger helpers, then the ask itself filed with fileReport.
   const fileAsk = (l, dispatchId, question) => {

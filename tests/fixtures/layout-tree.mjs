@@ -74,7 +74,7 @@ export async function settledProduct(t, { photosVisible = false } = {}) {
   photos.layout.chrome = photosVisible ? 'visible' : 'passthrough';
   photos.layout.state = photosVisible ? 'todo' : 'done';
   fs.mkdirSync(shellDir, { recursive: true });
-  // alpha.3: a lockup is a blob the tree cites {name, sha256, theme}, never a file under shell/assets.
+  // A lockup is a blob the tree cites {name, sha256, theme}, never a file under shell/assets.
   const lockupBytes = encodePng(blankImage(4, 2, [0, 0, 0, 255]));
   const { sha: lockupSha } = putBlob(lockupBytes, { mediaType: 'image/png' });
   tree.brand = { component: 'PhotoBrand', lockups: [{ name: 'assets/lockups/lockup--light.png', sha256: lockupSha, theme: 'light' }] };

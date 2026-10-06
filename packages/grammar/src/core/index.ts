@@ -54,7 +54,7 @@ export const coreRuleConformance = defineGrammarRuleConformance({
     familyEvidence: {},
 })
 
-// Compatibility re-exports; Common is the canonical family-base authority.
+// Re-exports of the family-base API; Common is its authority.
 export { defineGrammarFamily }
 export type {
     GrammarComponentRenderer,

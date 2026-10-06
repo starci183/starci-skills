@@ -130,8 +130,8 @@ export function resolveOwnedDirs(id, record, recordsById, workspaceDoc, workRoot
   };
   add(record.data, 'self');
   if (!declaresOwnPaths(record.data)) {
-    // Compact format: `proves` may name `P#frag` or a collapsed bare `ac.*` id - both resolve to the
-    // record carrying the criterion, so canonicalize each entry before comparing.
+    // Compact format: `proves` may name `P#frag`, which resolves to the record carrying the criterion,
+    // so canonicalize each entry before comparing.
     const inline = indexInlineCriteria(recordsById);
     for (const [otherId, other] of recordsById) {
       if (other.schema !== 'work/implementation@1') continue;
@@ -242,8 +242,7 @@ export function inlineCriteriaOf(data) {
 
 /**
  * Indexes every inline criterion over a records map:
- *   byAcId    - a declared entry id -> the id of the record carrying it (a bare `ac.*` ref resolves
- *               through this when no live record owns it)
+ *   byAcId    - a declared entry id -> the id of the record carrying it (`P#ac-id` resolves through this)
  *   byParent  - parent record id -> Map(fragment -> entry) for `parent#frag` resolution; every entry
  *               registers its full id, its last id segment and its `name`
  *   collisions - a declared entry id claimed under two different parents: [{id, parents}]
@@ -279,8 +278,7 @@ export function splitRef(ref) {
 /**
  * The record id a reference resolves to, or null when nothing owns it. `P` resolves when P is a record;
  * `P#frag` resolves to P when P is a record and frag names an inline criterion P carries (by full id,
- * short name or last segment) or is itself a live record id; a bare `ac.*` id resolves to the parent
- * record that now carries it inline when no live record owns it. `inline` may be passed when the caller
+ * short name or last segment) or is itself a live record id; a bare id that no record owns is unresolved. `inline` may be passed when the caller
  * already built indexInlineCriteria(records).
  */
 export function resolveRecordRef(records, ref, inline = indexInlineCriteria(records)) {
@@ -292,8 +290,7 @@ export function resolveRecordRef(records, ref, inline = indexInlineCriteria(reco
     if (inline.byAcId.get(frag) === id) return id;
     return null;
   }
-  if (records.has(id)) return id;
-  return inline.byAcId.get(id) ?? null;
+  return records.has(id) ? id : null;
 }
 
 /** A minimal records map (id -> {id, schema, data, dir}) for a `.starciwork` tree, built the same way

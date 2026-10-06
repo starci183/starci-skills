@@ -16,7 +16,7 @@ function fixture(t, source) {
   write('modules/kernel/allowlist.yaml', 'schema: starci/allowlist@1\nnot-codes: []\n');
   write('scripts/land.mjs', source);
   write('modules/models/kinds.yaml', 'vocabularies: {}\n');
-  write('engine/db/migrations/runtime/0001-init.sql', '');
+  write('engine/db/schema/runtime.sql', '');
   return base;
 }
 const codes = (t, lines) => emittedCodes(fixture(t, lines.join('\n'))).map((e) => e.code);

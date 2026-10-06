@@ -1,4 +1,4 @@
-# knowledge/hfs/rules.yaml - the machine-readable catalog of the HFS rules (the ids run R01 up; an id with no rule is listed under `retired` with its reason, never reused; count the rules, never type the count).
+# knowledge/hfs/rules.yaml - the machine-readable catalog of the HFS rules (count the rules, never type the count).
 #
 # One entry per rule: its id, its finding code, the law in one line, how a violation is fixed
 # (`kinds`), the gates it runs at, the failure codes it reports, and every enforcer that judges it. The prose of each
@@ -101,14 +101,6 @@ rules:
     failureCodes: ["HFS_AGENT_DATA_TRACKED"]
     enforcers:
       - {kind: work-validate, id: agent-data-tracked, at: scripts/work/validate/check-example-work.mjs}
-  - id: R08
-    code: "HFS_WORK_NODE_RETIRED"
-    law: "Only flat family records, never `work/node`."
-    kinds: [check, codemod]
-    gates: [settle, land, ci]
-    failureCodes: ["HFS_WORK_NODE_RETIRED"]
-    enforcers:
-      - {kind: work-validate, id: work-node-retired, at: scripts/work/validate/check-example-work.mjs}
   - id: R09
     code: "HFS_IDENTITY_CUSTODY"
     law: "An identity points its secret at `secrets/identity-<slug>.enc`; UAT chooses by role."
@@ -483,7 +475,7 @@ rules:
     editions: [full]
     enforcers:
       - {kind: hfs, id: test-topology, at: scripts/hfs/rules/test-topology.mjs}
-      - {kind: machine, id: test-kind-retired, at: scripts/hfs/architecture/hfs.mjs}
+      - {kind: machine, id: test-kind-unsupported, at: scripts/hfs/architecture/hfs.mjs}
       - {kind: eslint-be, id: test-world-files}
       - {kind: machine, id: contract-fixture-guard, at: scripts/hfs/architecture/contract-fixture-guard.mjs}
       - {kind: eslint-be, id: unit-test-colocated}
@@ -1232,15 +1224,6 @@ rules:
     failureCodes: ["RT_SOURCE_NAME"]
     enforcers:
       - {kind: runtime, id: source-name, at: scripts/hfs/runtime-rules/source-name.mjs}
-  - id: R120
-    code: "RT_RETIRED_PRESENT"
-    law: "No path of retired[] and no `from` of moved[] in modules/kernel/retired-paths.yaml is tracked again, and no symbol of its retiredSymbols[] is declared in runtime production code."
-    scope: runtime
-    kinds: [check]
-    gates: [land, runtime]
-    failureCodes: ["RT_RETIRED_PRESENT"]
-    enforcers:
-      - {kind: runtime, id: retired-present, at: scripts/hfs/runtime-rules/retired.mjs}
   - id: R121
     code: "RT_GENERATED_DRIFT"
     law: "A generated root of ruleParams.runtime.generated is git-ignored output of its declared generatedBy: the repo's check regenerates every root, the runtime copies (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) are judged equal to what scripts/hfs/sync-runtime.mjs writes from the single source, and no git-tracked path lies under a generated root."
@@ -1253,7 +1236,7 @@ rules:
       - {kind: runtime, id: generated-untracked, at: scripts/hfs/runtime-rules/generated-untracked.mjs}
   - id: R122
     code: "RT_CITED_PATH_MISSING"
-    law: "A runtime path cited by live prose or contracts (modules, docs, skills, knowledge, CONTEXT.md, README.md, CONTRIBUTING.md, init, the ui docs) exists; a retired or moved path is cited only by history."
+    law: "A runtime path cited by live prose or contracts (modules, docs, skills, knowledge, CONTEXT.md, README.md, CONTRIBUTING.md, init, the ui docs) exists; history (a changelog, a benchmark file) is not read."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
@@ -1262,13 +1245,13 @@ rules:
       - {kind: runtime, id: cited-path, at: scripts/checks/check-contract-cites.mjs}
   - id: R124
     code: "RT_PINNED_PATH_MOVED"
-    law: "A pinned path of ruleParams.runtime.pinned (persisted outside git) exists, or moved through a modules/kernel/retired-paths.yaml moved[] entry marked quiesced: true, landed with the workers stopped."
+    law: "A pinned path of ruleParams.runtime.pinned (persisted outside git) exists."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_PINNED_PATH_MOVED"]
     enforcers:
-      - {kind: runtime, id: pinned-path, at: scripts/hfs/runtime-rules/retired.mjs}
+      - {kind: runtime, id: pinned-path, at: scripts/hfs/runtime-rules/pinned.mjs}
   - id: R125
     code: "RT_NODE_MODULES_LINK"
     law: "No runtime source creates a junction or a symlink for a node_modules folder, through node:fs (symlink, symlinkSync, directly or through a local wrapper) or a spawned link command (mklink /J or /D, New-Item -ItemType Junction or SymbolicLink, ln -s): every checkout installs its own dependencies with a real npm ci from the cache."
@@ -1790,7 +1773,7 @@ rules:
       - {kind: runtime, id: cli-parity, at: scripts/checks/check-cli-parity.mjs}
   - id: R200
     code: "RT_CLI_APP_ONLY_TEMPLATES"
-    law: "Managed app templates and their generated runtime copies invoke product actions only through `starci app <verb>`; retired hfs and test-stack commands, and any other starci group, are forbidden there."
+    law: "Managed app templates and their generated runtime copies invoke product actions only through `starci app <verb>`; any other starci group is forbidden there."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
@@ -1849,15 +1832,6 @@ rules:
     failureCodes: ["RT_EXAMPLE_COUPLING", "RT_PRODUCT_NAME_IN_SOURCE", "RT_HOST_PATH_IN_TEMPLATE"]
     enforcers:
       - {kind: runtime, id: example-coupling, at: scripts/checks/check-example-coupling.mjs}
-  - id: R207
-    code: "RT_RETIRED_NAME_LIVE"
-    law: "A name the retired registry declares dead never appears in a live tracked file — not in prose, a comment, a string literal or a path: every retired[].path and moved[].from of modules/kernel/retired-paths.yaml, and every retiredNames[] naming that is not a path (a deleted app, a layer naming, a verb prefix). History (a changelog, a benchmark finding, a .starciwork record), the registry itself and the files of the check may name what was deleted; a slot manifest's forbids value or forbidden-presence tombstone declares a refusal, not a use."
-    scope: runtime
-    kinds: [check]
-    gates: [land, runtime]
-    failureCodes: ["RT_RETIRED_NAME_LIVE"]
-    enforcers:
-      - {kind: runtime, id: retired-names, at: scripts/checks/check-retired-names.mjs}
   - id: R208
     code: "RT_PORT_RESTATED"
     law: "Every port literal of the runtime is spelled once, by its owner, and every other file references the owner: the harness UI ports live in modules/models/runtimes.yaml statusApp.port/devPort read through ui/ports.mjs, the local SonarQube host in scripts/gates/sonar-local.mjs DEFAULT_HOST. No in-scope file that is not the owner spells an owned literal in a port position (a scheme://host:NNNN or host:NNNN authority, a *port*/PORT assignment, a listen(NNNN) call), and an unowned literal in a port position of two or more runtime source files gets one owning exported constant the rest reference. Specs, tests, node_modules, the generated runtime copies, changelogs, .starciwork and the product stack declarations (.starcistacks, starcistacks-services - a product owns the ports of the services it runs) are out of scope."
@@ -2015,7 +1989,7 @@ rules:
       - {kind: runtime, id: hook-shape, at: scripts/hfs/runtime-rules/hook-shape.mjs}
   - id: R226
     code: "RT_SPEC_OVER_BUDGET"
-    law: "Every recorded spec duration should stay within the shared per-file land budget in modules/kernel/spec-durations.yaml: for alpha.4 an over-budget spec is an advisory info finding ranked by its excess (it does not fail the check stage; the budget turns blocking in alpha.5), and every recorded spec path must still exist. An over-budget spec is repaired without removing tests or assertions: share a per-process fixture, remove per-test install or boot, inject the clock and never lengthen a timeout; stale rows are refreshed from the current land record."
+    law: "Every recorded spec duration should stay within the shared per-file land budget in modules/kernel/spec-durations.yaml: an over-budget spec is an advisory info finding ranked by its excess (it does not fail the check stage), and every recorded spec path must still exist. An over-budget spec is repaired without removing tests or assertions: share a per-process fixture, remove per-test install or boot, inject the clock and never lengthen a timeout; stale rows are refreshed from the current land record."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]

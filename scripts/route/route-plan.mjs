@@ -477,7 +477,7 @@ function surveyS0(stateDir) {
 
 /** Does S0 satisfy var {family,suffix,state}? A NAMED suffix needs a settled record whose id
  *  contains it. An unnamed one (X / '' / absent) is a family-level wildcard: it never settles a GOAL
- *  variable (the goal names no unit, so nothing on disk proves it done - that wildcard used to drop the
+ *  variable (the goal names no unit, so nothing on disk proves it done: settling it would drop the
  *  whole chain, backend.implement included, the moment any impl record was done), and for a prerequisite
  *  it counts only records of the goal's own features when the survey matched some, and never for the families
  *  an EXTEND changes (s0.extendFamilies: impl, ui). An impl variable

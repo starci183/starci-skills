@@ -24,7 +24,6 @@ import { RUNTIME_INCIDENT } from './poll.mjs';
 import { productRepos, supervisorSettings } from '../machine/home.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { opLabel, opLabelMap } from '../lib/display-names.mjs';
-import { WORKFLOW_ALIASES } from '../lib/example-refs.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 
 const TZ = 'Asia/Ho_Chi_Minh';
@@ -34,13 +33,10 @@ const TZ = 'Asia/Ho_Chi_Minh';
 export const LEG_VI = Object.freeze(Object.fromEntries(Object.entries(opLabelMap()).map(([op, label]) => [op, label.vi ?? op])));
 // The label in the report's language (modules/ops/_labels.yaml carries vi and en), the vi one when neither is declared.
 const legLabel = (op, language) => opLabel(op, language);
-// English alias sources; the i18n catalog carries the owner's wording for each. The product-keyed slugs
-// themselves are declared once in scripts/lib/example-refs.mjs (R206).
-const ALIASES = WORKFLOW_ALIASES;
 const baseName = (wf) => wf.replace(/^wf-/, '').replace(/-mu[a-z0-9]{6,}$/, '');
 // The workflow's display name (starci kernel rename / define-goal: workflows.display_name) when the ledger has one,
-// else the older alias, else the goal slug.
-const displayName = (wf, names = null, tr = (s) => s) => names?.get(wf) ?? tr(ALIASES[baseName(wf)] ?? baseName(wf));
+// else the goal slug.
+const displayName = (wf, names = null, tr = (s) => s) => names?.get(wf) ?? tr(baseName(wf));
 /** workflow_id -> display_name for the workflows of `db` that have one. */
 const namedWorkflows = (db) => { try { return new Map(db.prepare('SELECT * FROM workflows').all().filter((w) => w.display_name).map((w) => [w.workflow_id, w.display_name])); } catch { return new Map(); } };
 

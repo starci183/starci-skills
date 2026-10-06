@@ -117,10 +117,10 @@ rulings:
     date: '2026-09-28'
     ruling: "All agent and runtime metadata leaves product git: attempts, models, reports, checks, logs, evidence, captures and renders live in SQL plus the external sha256 blob store, whose rows carry file_uri and /api/blob/<sha256> links. .starciwork retains important product content only: Work records, SRS/SDS, UI specifications and brand. Start the final canonical schema fresh after verified archival of old stores; no legacy data migration or read fallback. The host machine.sqlite owns machine and worker state; no third DB is added."
     confirmed: '2026-09-28 owner chat: "ok do it, 10 agent sol"; owner final storage principle and CLEAN-SLATE ruling in <tmp>/evidence-db'
-    enforcedBy: [modules/schemas/work-layout.yaml, engine/db/migrations/runtime/0001-init.sql, engine/db/ledger.mjs, engine/db/blob.mjs]
-  - id: provider-qwen-removed
+    enforcedBy: [modules/schemas/work-layout.yaml, engine/db/schema/runtime.sql, engine/db/ledger.mjs, engine/db/blob.mjs]
+  - id: providers-claude-codex-devin
     date: '2026-09-29'
-    ruling: "The Qwen provider is removed from the runtime with no backward compatibility (\"remove qwen, it is far too lame!! not buying it any more, devin codex claude are enough\"): only claude, codex and devin remain, and a config.yaml that still names qwen is refused with \"Qwen has been removed; use claude, codex or devin\"."
+    ruling: "The runtime has three providers, claude, codex and devin (owner: \"devin codex claude are enough\"); no other provider is routed to."
     enforcedBy: [modules/models/runtimes.yaml, modules/models/registry.yaml, engine/config.mjs]
   - id: one-pattern-no-legacy
     date: '2026-09-30'

@@ -291,7 +291,7 @@ kernelSeat:
     (start-supervisor --replace), wakes the idle Supervisor with one-line tags ([inbox] [land] [report]
     [worker] [register]; never owner text, never while it is mid-turn or its subagents run, never the same
     text twice), heartbeats channel 'main' while the seat is live and registered from its own terminal, and
-    the Job controller sweeps [Worker] terminals (sweepWorkers). There is no watchdog loop (retired 2026-09-28).
+    the Job controller sweeps [Worker] terminals (sweepWorkers).
     In mode chat, or while the seat is DISABLED or was never started, a pass does nothing.
   state: |
     The Supervisor's durable state is machine.sqlite (engine/db/machine.mjs): the seat row, sup_signals
@@ -398,8 +398,7 @@ chat:
 
 scheduledTick:
   role: |
-    Retired 2026-09-28 (owner ruling "delete on any error": the reconciler is the only loop). There is no supervisor tick
-    and no task StarCi-Supervisor-Every30m; every duty it ran belongs to an active reconciler controller (modules/reconciler/reconciler.yaml; the task StarCi-Reconciler runs the
+    Every supervisor duty belongs to an active reconciler controller (modules/reconciler/reconciler.yaml; the task StarCi-Reconciler runs the
     engine): host, orca and statusApp to the Host controller; the digest's push of main, OWED clusters, the land queue
     and the owner alerts to the Workers controller and its Notifier; workflows, progress and stuck waits to the Workflow
     controller; sample, census and the RAM throttle to the Resource controller; gc to the GC controller. Their

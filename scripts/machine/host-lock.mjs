@@ -1,13 +1,12 @@
 // host-lock.mjs — the ONE host lock of the heavy runtime work (a land's gate run, a release cut): one holder at a time on this host.
 //
-// The primitive is the one the external lock used: the atomic mkdir of a single lock directory. What changed is the owner
-// file, which is JSON (schema starci/host-lock@1) naming who holds it: token, pid, role, purpose, the Orca terminal handle,
-// the host and the start time. That makes three things possible that a plain text file never allowed:
+// The primitive is the atomic mkdir of a single lock directory. Its owner file is JSON (schema starci/host-lock@1) naming
+// who holds it: token, pid, role, purpose, the Orca terminal handle, the host and the start time. That makes three things possible:
 //   - a dead holder is detected (its pid is gone) and the lock is taken over atomically instead of blocking everyone;
 //   - a release is refused for a stranger (the token must match), so one actor never drops another's lock;
 //   - the rights guard (scripts/guards/rights.mjs) reads the owner (hostLockOwner) and decides who may do what meanwhile.
-// A lock whose owner file is ownerless plain text (no pid to test) is held, never stale, until its file is older than
-// legacyStaleMs. The release cut (scripts/supervisor/release-cut.mjs, GOVERNANCE lane) runs under
+// A lock directory without a readable owner file (no pid to test) is held, never stale, until it is older than
+// ownerlessStaleMs. The release cut (scripts/supervisor/release-cut.mjs, GOVERNANCE lane) runs under
 // withHostLock({role: 'release', purpose: 'release-cut'}); the land gate under withHostLock({role: 'coordinator', purpose: 'land'}).
 //
 // Every function is synchronous and pure fs; the seams {fs, now, isAlive, pid, host, env, dir, newToken, remove} are injectable.
@@ -21,9 +20,9 @@ import { safeRemove } from '../api/fs/safe-remove.mjs';
 
 export const HOST_LOCK_SCHEMA = 'starci/host-lock@1';
 export const ROLES = Object.freeze(['release', 'coordinator', 'lead', 'worker']);
-const LEGACY_STALE_MS = 6 * 60 * 60 * 1000;
+const OWNERLESS_STALE_MS = 6 * 60 * 60 * 1000;
 const OWNER_FILE = 'owner';
-const LEGACY_TEXT_CLIP = 500;
+const OWNERLESS_TEXT_CLIP = 500;
 
 /** The lock directory: STARCI_HOST_LOCK_DIR, else <starci local root>/host-lock. */
 export function hostLockDir({ env = process.env } = {}) {
@@ -31,9 +30,9 @@ export function hostLockDir({ env = process.env } = {}) {
   return set ? path.resolve(set) : path.join(starciLocalRoot(env), 'host-lock');
 }
 
-// The lock directory as found on disk: {kind: 'free'} | {kind: 'json', owner} | {kind: 'plain', text, mtimeMs}.
-// A directory without a readable owner file (a holder between its mkdir and its write, or a crash there) is 'plain' with
-// the directory's own age, so it too expires through legacyStaleMs.
+// The lock directory as found on disk: {kind: 'free'} | {kind: 'json', owner} | {kind: 'ownerless', text, mtimeMs}.
+// A directory without a readable owner file (a holder between its mkdir and its write, or a crash there) is 'ownerless' with
+// the directory's own age, so it too expires through ownerlessStaleMs.
 function readRaw(dir, fs) {
   let st;
   try { st = fs.statSync(dir); } catch (error) {
@@ -45,18 +44,18 @@ function readRaw(dir, fs) {
   try {
     const owner = JSON.parse(text);
     if (owner && typeof owner === 'object' && owner.schema === HOST_LOCK_SCHEMA && typeof owner.token === 'string') return { kind: 'json', owner };
-  } catch { /* plain text */ }
-  return { kind: 'plain', text, mtimeMs: st.mtimeMs };
+  } catch { /* not an owner document */ }
+  return { kind: 'ownerless', text, mtimeMs: st.mtimeMs };
 }
 
 // The owner object a raw lock stands for, with `stale` set: a JSON owner is stale when its ttl ran out, or when it is on this
-// host and its pid is gone; a plain-text owner is stale only past legacyStaleMs.
-function viewOf(raw, { now, isAlive, host, legacyStaleMs }) {
+// host and its pid is gone; an ownerless lock is stale only past ownerlessStaleMs.
+function viewOf(raw, { now, isAlive, host, ownerlessStaleMs }) {
   if (raw.kind === 'free') return null;
   const at = now();
-  if (raw.kind === 'plain') {
-    return { schema: 'legacy', legacy: true, text: raw.text.slice(0, LEGACY_TEXT_CLIP), token: null, pid: null, role: null, purpose: null, handle: null, host: null,
-      since: new Date(raw.mtimeMs).toISOString(), ttlMs: null, stale: at - raw.mtimeMs >= legacyStaleMs };
+  if (raw.kind === 'ownerless') {
+    return { schema: 'ownerless', ownerless: true, text: raw.text.slice(0, OWNERLESS_TEXT_CLIP), token: null, pid: null, role: null, purpose: null, handle: null, host: null,
+      since: new Date(raw.mtimeMs).toISOString(), ttlMs: null, stale: at - raw.mtimeMs >= ownerlessStaleMs };
   }
   const owner = raw.owner;
   const since = Date.parse(owner.since);
@@ -65,8 +64,8 @@ function viewOf(raw, { now, isAlive, host, legacyStaleMs }) {
   return { ...owner, stale: expired || dead };
 }
 
-const seamsOf = ({ fs = nodeFs, now = Date.now, isAlive = pidAlive, host = os.hostname(), legacyStaleMs = LEGACY_STALE_MS } = {}) => ({ fs, now, isAlive, host, legacyStaleMs });
-const sameLock = (raw, view) => (raw.kind === 'json' ? view.token === raw.owner.token : raw.kind === 'plain' && view.legacy === true && view.text === raw.text.slice(0, LEGACY_TEXT_CLIP));
+const seamsOf = ({ fs = nodeFs, now = Date.now, isAlive = pidAlive, host = os.hostname(), ownerlessStaleMs = OWNERLESS_STALE_MS } = {}) => ({ fs, now, isAlive, host, ownerlessStaleMs });
+const sameLock = (raw, view) => (raw.kind === 'json' ? view.token === raw.owner.token : raw.kind === 'ownerless' && view.ownerless === true && view.text === raw.text.slice(0, OWNERLESS_TEXT_CLIP));
 const removeTree = (target, remove) => { try { const r = remove(target); return r !== false && r?.ok !== false; } catch { return false; } };
 const defaultRemove = (target) => safeRemove(target, { hold: () => null });
 
@@ -91,7 +90,7 @@ function moveAside(dir, expected, { fs, newToken }) {
 /**
  * The owner of the lock: null when it is free, else {schema, token, pid, role, purpose, handle, host, since, ttlMs, stale}.
  * `stale` is true for a holder whose process is gone (or whose ttl ran out): callers report it, acquireHostLock takes it over.
- * An ownerless plain-text owner reads {legacy: true, text, since: <file time>, stale} with null token/pid/role.
+ * A lock directory without a readable owner reads {ownerless: true, text, since: <file time>, stale} with null token/pid/role.
  */
 export function hostLockOwner({ dir, env = process.env, ...seams } = {}) {
   const s = seamsOf(seams);
@@ -125,7 +124,7 @@ export function acquireHostLock({ role, purpose = null, handle, pid = process.pi
       continue;
     }
     try { s.fs.writeFileSync(path.join(lockDir, OWNER_FILE), `${JSON.stringify(owner, null, 2)}\n`, { flag: 'wx' }); } catch (error) {
-      try { remove(lockDir); } catch { /* a directory without an owner expires through legacyStaleMs */ }
+      try { remove(lockDir); } catch { /* a directory without an owner expires through ownerlessStaleMs */ }
       throw error;
     }
     return { ok: true, token, owner, ...(tookOverFrom ? { tookOverFrom } : {}) };

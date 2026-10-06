@@ -4,8 +4,7 @@
 //   starci debug run model-scorecard --repo <repoRoot> [--repo <another>] [--since-hours N] [--json]
 //
 // Reads each repo's runtime ledger READ-ONLY at the file machine.ledgers names for it (decision Q1,
-// ledgerFileFor(repo): <runtime root>/.runtime/projects/<ledger id>/runtime.sqlite — never the pre-Q1 in-repo
-// .starciwork/runtime.sqlite; never migrates, never writes). One row per
+// ledgerFileFor(repo): <runtime root>/.runtime/projects/<ledger id>/runtime.sqlite; never writes). One row per
 // pool x op kind over `jobs` rows with kind='op':
 //   pool      payload.model (claude-agent | codex-agent | devin-agent | ...); a job that was
 //             never routed (no payload.model: dropped or queued before a route) is reported as

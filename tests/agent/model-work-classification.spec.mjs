@@ -69,7 +69,8 @@ test('a floor raises a measured difficulty and never lowers it',()=>{
   const implement=selectPool({kind:'backend.implement',difficulty:'easy',runtimes});
   assert.deepEqual([implement.measuredDifficulty,implement.difficulty],['easy','medium']);
   assert.equal(selectPool({kind:'backend.implement',difficulty:'insane',runtimes}).difficulty,'insane');
-  assert.equal(kindRoute('legacy.kind',{roleOfKind:{'legacy.kind':'implement'}}).role,'implement','a bare role string still resolves');
+  assert.equal(kindRoute('x.kind',{roleOfKind:{'x.kind':{role:'implement',work:'hands-on',floor:'easy'}}}).role,'implement','a roleOfKind entry resolves its role');
+  assert.equal(kindRoute('x.kind',{roleOfKind:{'x.kind':'implement'}}).role,null,'an entry that is not an object names no role');
 });
 
 // Owner rule: thinking work goes to Claude Opus 5.5, or GPT-6.1 Sol when Claude is unavailable, at every

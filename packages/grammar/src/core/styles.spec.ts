@@ -22,7 +22,7 @@ describe("Core capability styles", () => {
         }
         for (const [tokenName, value] of Object.entries(STARCI_CORE_TOKEN_DEFAULTS)) {
             if (["--starci-core-page-inset", "--starci-core-region-gap", "--starci-core-section-gap", "--starci-core-inline-gap", "--starci-core-row-gap"].includes(tokenName)) {
-                expect(coreCss, `legacy alias missing for ${tokenName}`).toContain(`${tokenName}: var(--grammar-`)
+                expect(coreCss, `family rhythm name missing for ${tokenName}`).toContain(`${tokenName}: var(--grammar-`)
             } else {
                 expect(coreCss, `CSS default drifted from ${tokenName}`).toContain(`${tokenName}: ${value};`)
             }
@@ -104,10 +104,9 @@ describe("Core capability styles", () => {
         /*
          * Scoped to the trigger's OWN rule.
          *
-         * The guard used to be an unbounded `[\s\S]*?` over the whole sheet, so it went red the
-         * first time any later object painted a selected state with `--accent-soft` - which says
-         * nothing about the accordion trigger. What it means is that the trigger's hover rule must
-         * not tint; that is the block it now reads.
+         * The guard reads only that block, not the whole sheet: a later object painting a selected
+         * state with `--accent-soft` says nothing about the accordion trigger. What it means is that
+         * the trigger's hover rule must not tint.
          */
         const accordionHoverRule = css.match(/\.starci-core-accordion-trigger:hover,[^{]*\{[^}]*\}/)?.[0] ?? ""
         expect(accordionHoverRule).not.toBe("")

@@ -27,7 +27,7 @@ export function inspectProviderCircuit(provider, { machine = null, env = process
   finally { if (own) m?.close(); }
 }
 
-/** Legacy tolerant projection; admission uses the typed observation above. */
+/** Tolerant projection (a missing or unreadable store reads as no row); admission uses the typed observation above. */
 export function readProviderCircuit(provider, options = {}) { return inspectProviderCircuit(provider, options).row; }
 
 /** Store the circuit of `provider` (value.status unavailable|recovered|striking|healthy). Returns true when written. */

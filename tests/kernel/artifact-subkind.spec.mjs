@@ -22,7 +22,7 @@ import { adoptLaunchTrust } from '../helpers/launch-trust.mjs';
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_IMPLICIT_WORK_TREE', 'GIT_PREFIX', 'GIT_CONFIG', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_GRAFT_FILE', 'GIT_NO_REPLACE_OBJECTS', 'GIT_REPLACE_REF_BASE', 'GIT_SHALLOW_FILE']) delete process.env[key];
 
 // The harness data contract's runtime half: job_artifacts.subkind (what produced a file) derived from facts only, its
-// additive migration and idempotent backfill, the Playwright recordings a job's uat-slots runs leave, the typed rows the
+// idempotent backfill, the Playwright recordings a job's uat-slots runs leave, the typed rows the
 // runtime derives itself (cmd.run per check, file.edit per patch file, render/video/trace per artifact) and the
 // LOG_TYPED_MISSING warning when an op logged nothing of its own.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -122,7 +122,6 @@ test('runtime-derived rows: a cmd.run per recorded check, a file.edit per patch 
     ledgerKey: 'k',
     jobOf: () => ({ op_id: 'e2e.verify', attempt: 1, result_json: null }),
     checksOf: () => [{ name: 'e2e', command: 'npx playwright test', exitCode: 1, evidence: '.starciwork/evidence/wf-r.e2e/run.log', durationMs: 41200 }, { name: 'lint', exitCode: 0 }],
-    artifactOf: (job, p) => ({ 'a.png': { kind: 'image', subkind: 'e2e-capture', label: 'home@desktop', bytes: 70, mime: 'image/png' }, 'v.webm': { kind: 'video', subkind: 'e2e-video', bytes: 4 }, 't.zip': { kind: 'trace', subkind: 'playwright-trace', bytes: 3 }, 'r.json': { kind: 'report' } })[p.split('/').pop()] ?? null,
     patchJsonOf: () => ({ files: [{ path: 'src/a.ts', status: 'M', added: 3, removed: 1 }, { path: 'src/new.ts', status: 'A', added: 10, removed: 0 }] }),
   };
   const checks = rowsOfEvent(ev(1, 'checks-recorded', { op: 'e2e.verify', attempt: 1 }), ctx);
@@ -131,13 +130,13 @@ test('runtime-derived rows: a cmd.run per recorded check, a file.edit per patch 
   assert.deepEqual([cmds[0].actor, cmds[0].data.cmd, cmds[0].data.exit, cmds[0].data.durationMs, cmds[0].data.evidenceRef, cmds[0].data.checkName], ['check', 'npx playwright test', 1, 41200, '.starciwork/evidence/wf-r.e2e/run.log', 'e2e']);
   assert.deepEqual(cmds[0].refs, ['.starciwork/evidence/wf-r.e2e/run.log']);
   const indexed = rowsOfEvent(ev(2, 'artifacts-indexed', { jobId: 'op-x-1', patch: { path: '.starciwork/kernel-evidence/wf-r/jobs/op-x-1/op-x-1.patch' },
-    artifacts: [{ path: 'e/a.png', sha256: 'a' }, { path: 'e/v.webm', sha256: 'b' }, { path: 'e/t.zip', sha256: 'c' }, { path: 'e/r.json', sha256: 'd' }] }), ctx);
+    artifacts: [{ path: 'e/a.png', sha256: 'a', kind: 'image', subkind: 'e2e-capture' }, { path: 'e/v.webm', sha256: 'b', kind: 'video', subkind: 'e2e-video' }, { path: 'e/t.zip', sha256: 'c', kind: 'trace', subkind: 'playwright-trace' }, { path: 'e/r.json', sha256: 'd', kind: 'report' }] }), ctx);
   assert.deepEqual(indexed.map((r) => r.kind), ['file.edit', 'file.edit', 'render', 'video', 'trace']);
   const edit = indexed[0];
   assert.deepEqual([edit.data.path, edit.data.added, edit.data.removed, edit.data.status, edit.data.diffRef], ['src/a.ts', 3, 1, 'M', '.starciwork/kernel-evidence/wf-r/jobs/op-x-1/op-x-1.patch.json#src/a.ts']);
-  assert.deepEqual([indexed[2].data.subkind, indexed[2].data.label, indexed[2].refs[0]], ['e2e-capture', 'home@desktop', 'e/a.png']);
+  assert.deepEqual([indexed[2].data.subkind, indexed[2].refs[0]], ['e2e-capture', 'e/a.png']);
   for (const row of [...checks, ...indexed]) assert.equal(prepareLogRow(row).error, undefined, `${row.kind} is valid`);
-  const again = rowsOfEvent(ev(7, 'artifacts-indexed', { jobId: 'op-x-1', patch: { path: '.starciwork/kernel-evidence/wf-r/jobs/op-x-1/op-x-1.patch' }, artifacts: [{ path: 'e/a.png', sha256: 'a' }] }), ctx);
+  const again = rowsOfEvent(ev(7, 'artifacts-indexed', { jobId: 'op-x-1', patch: { path: '.starciwork/kernel-evidence/wf-r/jobs/op-x-1/op-x-1.patch' }, artifacts: [{ path: 'e/a.png', sha256: 'a', kind: 'image', subkind: 'e2e-capture' }] }), ctx);
   assert.equal(again.find((r) => r.kind === 'render').src, indexed[2].src, 'a re-announced artifact derives the same src: stored once');
   assert.equal(again[0].src, edit.src);
 });

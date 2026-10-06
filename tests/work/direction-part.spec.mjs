@@ -67,27 +67,27 @@ test('a layout drawing composite resolves to the layout drawing itself', async (
   assert.equal(hit.file, content, 'the layout part the owner reviews, not the layout placed into its parent capture');
 });
 
-test('records drawn before the rule: the .content sibling is found; an image with no part is shown as it is', (t) => {
+test('the .content sibling is found; an image with no part is shown as it is', (t) => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'direction-part-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const put = (rel) => { const f = path.join(base, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, rel); return f; };
   const composite = put('ui/pay/assets/directions/pending--page--desktop--light.png');
   const part = put('ui/pay/assets/directions/pending--page--desktop--light.content.png');
-  const legacy = put('ui/pay/assets/checkout.png');
+  const plain = put('ui/pay/assets/checkout.png');
   assert.deepEqual(partOf(composite), { file: part, composite, kind: 'composite' });
-  assert.deepEqual(partOf(legacy), { file: legacy, composite: null, kind: 'plain' }, 'backward compatible: a legacy direction stays');
+  assert.deepEqual(partOf(plain), { file: plain, composite: null, kind: 'plain' }, 'an image with no part is its own owner image');
   assert.equal(isPartName(part), true);
   assert.equal(partNameOf(composite), part);
   assert.equal(partNameOf(part), null);
-  const shown = ownerImages([composite, part, legacy]);
-  assert.deepEqual(shown.map((s) => s.file), [part, legacy], 'a composite listed beside its own part collapses into the part');
+  const shown = ownerImages([composite, part, plain]);
+  assert.deepEqual(shown.map((s) => s.file), [part, plain], 'a composite listed beside its own part collapses into the part');
   assert.deepEqual(shown[0].aliases, [composite, part]);
   const objects = ownerImages([{ label: 'pending', abs: composite }]);
   assert.deepEqual([objects[0].label, objects[0].abs, objects[0].composite], ['pending', part, composite], 'object entries keep their fields');
 });
 
-test('a draws.yaml entry names its owner image part first, then content, then image; strings or {path}', () => {
-  assert.deepEqual(drawImageRefs({ image: { path: 'c.png', sha256: 'x' }, content: { path: 'c.content.png' }, part: 'p.png' }), ['p.png', 'c.content.png', 'c.png']);
-  assert.deepEqual(drawImageRefs({ image: 'legacy.png' }), ['legacy.png']);
+test('a draws.yaml entry names its owner image by its part; a string or {path}', () => {
+  assert.deepEqual(drawImageRefs({ composite: { path: 'c.png', sha256: 'x' }, part: { path: 'p.png' } }), ['p.png']);
+  assert.deepEqual(drawImageRefs({ part: 'p.png' }), ['p.png']);
   assert.deepEqual(drawImageRefs({}), []);
 });

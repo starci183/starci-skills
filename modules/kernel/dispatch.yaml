@@ -53,7 +53,7 @@ packet:
     owner_delegation: '{asks, until, excludes} | null'  # config.yaml delegation while active
     product_locale: '{locale, source} | null'  # layout tree productLocale.default, else brand voice default; UI copy language
     records: [...]                      # .starciwork records it touches (the read set)
-    selected_op: '{mode, contract, checks:{required,candidates}} | absent'  # immutable selected contract; absent on older attempts
+    selected_op: '{mode, contract, checks:{required,candidates}} | absent'  # immutable selected contract; absent on a planning preview
     readRefs: '[{path,absolute,rootKind,root,sha256,why}] | absent'  # resolved READ snapshot; no current-Source reconstruction
     owned_paths: [...]                  # what it may modify — boundary enforcement
     owner_answers: '[{dispatchId, jobId, attempt, question, options[], chosen:{index,label}|null, picks?, note?, answeredBy, answeredAt, receipt}]'  # present when the retry lineage holds answered asks
@@ -121,8 +121,8 @@ fields:
       The effective shared-expanded contract for exactly one concrete execution mode, with common
       obligations retained by ID and sibling permissions excluded. Required named layout checks and mechanical proof owners
       remain distinct from broad kind route candidates and semantic completion/proof obligations.
-      A planning preview may retain mode select; a launched attempt cannot. Older filed attempts without
-      this snapshot retain their admission and are never rebuilt from a current manifest or params.
+      A planning preview may retain mode select; a launched attempt cannot. A filed attempt keeps the
+      snapshot it was admitted with and is never rebuilt from a current manifest or params.
     enforcedBy: >-
       scripts/lib/op-shared.mjs resolveOpContract is the single selector. scripts/kernel/dispatch-admission.mjs
       selectDispatchContract validates the authored shape/defaults before effects and files selected_op
@@ -281,7 +281,7 @@ fields:
     meaning: >-
       The lease token is the packet's spine. The api's reserveOpLeases seeds
       the path:* resources and reserveTwoPhase takes the lease atomically
-      (intent-v1 exact-binding, engine/db/migrations/runtime/0001-init.sql §6); the token is what
+      (intent-v1 exact-binding, engine/db/schema/runtime.sql §6); the token is what
       every later
       fact must match. The agent's writes, its report and its settlement all
       hang off {jobId, leaseToken} — the op physically cannot record evidence
@@ -291,7 +291,7 @@ fields:
       The leases_match_job BEFORE INSERT/UPDATE triggers RAISE(ABORT,
       'lease-identity-drift') when a lease row does not match its job's
       {workflow_id, op_id, attempt, generation, lease_token}
-      (engine/db/ledger.mjs / engine/db/migrations/runtime/0001-init.sql); the api wraps that as a
+      (engine/db/ledger.mjs / engine/db/schema/runtime.sql); the api wraps that as a
       typed {ok:false, code:'lease-identity-drift'}. A reservation whose
       durable status or resource
       binding no longer matches exactly is status 'effect_unknown' — it stops the

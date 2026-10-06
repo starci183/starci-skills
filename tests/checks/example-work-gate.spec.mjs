@@ -62,22 +62,6 @@ function refusalsFor(extra) {
   return problems;
 }
 
-test('a recursive work/node record is refused as HFS_WORK_NODE_RETIRED, one refusal per record, and never read as a flat family', () => {
-  const problems = refusalsFor({
-    'features/chatbot/business/index.yaml': 'schema: work/node@1\nid: chatbot.business\nkind: business\nrequired: true\n',
-    'features/chatbot/business/overview/index.yaml': 'schema: work/node@1\nid: chatbot.business.overview\nkind: business-overview\nrequired: true\nstate: todo\n',
-    'features/chatbot/business/srs/index.yaml': 'schema: work/node@1\nid: chatbot.business.srs\nkind: business\nrequired: true\nextensions:\n  work3:\n    srs:\n      schema: starci/srs-aggregate@1\n',
-    'features/chatbot/architecture/sds/components/router/index.yaml': 'schema: work/node@2\nid: chatbot.architecture.sds.component.router\nkind: architecture\nrequired: true\nstate: done\n',
-    'features/chatbot/implementation/frontend/shell/evidence/proof/manifest.yaml': 'schema: work/evidence@1\nid: proof.chatbot.shell\nnodeId: chatbot.shell\noutcome: pass\nassets: []\n',
-    'kernel-strays/retired-copy/features/chatbot/fr/broken/index.yaml': 'schema: work/functional-requirement@1\nid: wrong\nstate: done\n',
-  });
-  const retired = problems.filter(problem => problem.includes('[HFS_WORK_NODE_RETIRED]'));
-  for (const rel of ['features/chatbot/business/index.yaml', 'features/chatbot/business/overview/index.yaml', 'features/chatbot/business/srs/index.yaml', 'features/chatbot/architecture/sds/components/router/index.yaml'])
-    assert.ok(retired.some(problem => problem.includes(rel)), `${rel} is refused: ${problems.join(' | ')}`);
-  assert.equal(retired.length, 4, problems.join('\n'));
-  assert.equal(problems.filter(problem => problem.includes('no record family in its path') || problem.includes('but its place says')).length, 0, 'a retired node is refused once, not also judged as a flat record\n' + problems.join('\n'));
-});
-
 test('concept 1: blocker edges - prose blockedBy is refused, dangling target is refused, a stale (done) blocker is refused', () => {
   const proseOnly = refusalsFor({
     'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: todo\nblockedBy:\n  - a plain sentence naming nothing\n',
@@ -658,6 +642,21 @@ test('concept 13: _resources custody is exactly the work/resource@1 schema, and 
   assert.equal(good.length, 0, good.join('\n'));
 });
 
+test('walk scope: kernel custody roots are not read, and an evidence manifest is proof payload that is skipped, not judged as a family record', () => {
+  const problems = [];
+  const infos = [];
+  const workRoot = tree({
+    'features/f/fr/ok/index.yaml': 'schema: work/functional-requirement@1\nid: fr.f.ok\nstate: todo\n',
+    'kernel-strays/copy/features/f/fr/broken/index.yaml': 'schema: work/functional-requirement@1\nid: wrong\nstate: done\n',
+    'kernel-evidence/features/f/fr/broken/index.yaml': 'schema: work/functional-requirement@1\nid: wrong\nstate: done\n',
+    'features/f/impl/shell/evidence/proof/manifest.yaml': 'schema: work/evidence@1\nid: proof.f.shell\nnodeId: impl.f.shell\noutcome: pass\nassets: []\n',
+  });
+  checkWorkTree(workRoot, problems, [], infos);
+  assert.equal(problems.filter(p => p.includes('kernel-strays') || p.includes('kernel-evidence') || p.includes('manifest.yaml')).length, 0, problems.join('\n'));
+  assert.ok(infos.some(i => i.includes('PAYLOAD_SKIPPED') && i.includes('proof/manifest.yaml')), infos.join('\n'));
+  assert.ok(!infos.some(i => i.includes('kernel-strays')), infos.join('\n'));
+});
+
 test('payload rule: a yaml whose schema is not a work/* record schema is an artifact payload - INFO PAYLOAD_SKIPPED, never id-matched to its path, never ref-collected', () => {
   // A tool receipt inside a family path: no id, foreign schema. Before the rule this drew
   // "id is undefined, but its place says ..."; now it is counted as a skipped payload.
@@ -729,7 +728,7 @@ test('v11 compact: `parent#frag` resolves an inlined criterion by short name, la
   assert.ok(malformed.some(p => p.includes('REF_MALFORMED')), malformed.join('\n'));
 });
 
-test('v11 compact: a bare collapsed ac id still resolves through the parent, but warns AC_UNREMAPPED_REF; the entry\'s own declaration never warns', () => {
+test('v11 compact: a bare inline ac id is a dangling ref (parent#ac-id is the form); the entry\'s own declaration is not a ref', () => {
   const workRoot = tree({
     'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.rule.works-when, name: works-when}\n',
     'features/f/br/other/index.yaml': 'schema: work/business-rule@1\nid: br.f.other\ntitle: t\nstate: todo\nrefs: [ac.f.rule.works-when]\n',
@@ -737,11 +736,8 @@ test('v11 compact: a bare collapsed ac id still resolves through the parent, but
   const problems = [];
   const warnings = [];
   checkWorkTree(workRoot, problems, warnings);
-  assert.equal(problems.length, 0, problems.join('\n'));
-  const remapped = warnings.filter(w => w.includes('AC_UNREMAPPED_REF'));
-  assert.equal(remapped.length, 1, warnings.join('\n')); // only br.f.other's ref warns
-  assert.ok(remapped[0].includes('br/other/index.yaml'), remapped[0]);
-  assert.ok(remapped[0].includes('br.f.rule#ac.f.rule.works-when'), remapped[0]);
+  assert.equal(problems.length, 1, problems.join('\n')); // only br.f.other's ref is dangling
+  assert.ok(problems[0].includes('br/other/index.yaml') && problems[0].includes('ac.f.rule.works-when'), problems[0]);
 });
 
 test('v11 compact: an inline criterion id must be the id its place implies, may not collide, and may not carry its own lifecycle', () => {
@@ -772,7 +768,7 @@ test('v11 compact: an inline criterion id must be the id its place implies, may 
   assert.ok(lifecycle.some(p => p.includes('AC_LIFECYCLE_INLINE')), lifecycle.join('\n'));
 });
 
-test('v11 compact: structured ref fields (blockedBy.record, closedBy, appliesTo) resolve `parent#frag` and collapsed ac ids to the carrying record', () => {
+test('v11 compact: structured ref fields (blockedBy.record, closedBy, appliesTo) resolve `parent#frag` to the carrying record', () => {
   // a blockedBy on one criterion of a record is a wait on that record - resolves, no dangling refusal
   const blocked = refusalsFor({
     'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.rule.works-when, name: works-when}\n',
@@ -780,12 +776,12 @@ test('v11 compact: structured ref fields (blockedBy.record, closedBy, appliesTo)
   });
   assert.equal(blocked.filter(p => p.includes('does not exist')).length, 0, blocked.join('\n'));
 
-  // closedBy naming a collapsed criterion's old id still finds the record that owns it
+  // closedBy naming a bare inline criterion id is dangling: the record owns it, the criterion is not a record
   const gapClosed = refusalsFor({
     'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: done\nacceptance:\n  - {id: ac.f.rule.works-when, name: works-when}\nverificationSource: authored-claim\nbecause: c\n',
     'features/f/gap/absence/index.yaml': 'schema: work/gap@1\nid: gap.f.absence\ntitle: t\nstate: done\nstatement: s\nclosedBy: ac.f.rule.works-when\nverificationSource: authored-claim\nbecause: closed\n',
   });
-  assert.equal(gapClosed.filter(p => p.includes('no record owns') || p.includes('closedBy')).length, 0, gapClosed.join('\n'));
+  assert.ok(gapClosed.some(p => p.includes('closedBy') || p.includes('no record owns')), gapClosed.join('\n'));
 });
 
 test('v11 compact: a kept-separate ac record still resolves as itself, and `parent#ac-id` reaches it through the parent', () => {
@@ -798,8 +794,7 @@ test('v11 compact: a kept-separate ac record still resolves as itself, and `pare
   const warnings = [];
   checkWorkTree(workRoot, problems, warnings);
   assert.equal(problems.length, 0, problems.join('\n'));
-  // the kept ac is still a live record, so the bare id is a normal ref - no remap warning
-  assert.equal(warnings.filter(w => w.includes('AC_UNREMAPPED_REF')).length, 0, warnings.join('\n'));
+  // the kept ac is a live record, so the bare id is a normal ref
 });
 
 test('scoped record validation resolves tree-level _resources refs via resolveRoot', () => {
@@ -831,14 +826,6 @@ test('a root import-cv-* folder is drift, not a known agent-data class', () => {
   checkStarciworkBoundary(workRoot, problems, warnings);
   assert.deepEqual(problems, [], 'drift never refuses');
   assert.ok(warnings.some(w => w.includes('import-cv-seam') && w.includes('[STARCIWORK_DRIFT]')), warnings.join('\n'));
-  assert.ok(!warnings.some(w => w.includes('legacy-import')), warnings.join('\n'));
-});
-
-test('work/node@1 and @2 are each refused at the tree walk', () => {
-  for (const schema of ['work/node@1', 'work/node@2']) {
-    const problems = refusalsFor({ 'features/f/index.yaml': `schema: ${schema}\nid: f\nkind: business\nrequired: true\n` });
-    assert.ok(problems.some(p => p.includes('[HFS_WORK_NODE_RETIRED]')), `${schema}: ${problems.join('\n')}`);
-  }
 });
 
 // R07 HFS_AGENT_DATA_TRACKED: `starci runtime validate` on a .starciwork refuses known agent data and admits product records.
@@ -870,14 +857,6 @@ test('work-validate raises no HFS_AGENT_DATA_TRACKED for a .starciwork of produc
     'features/f/uat/x/index.yaml': 'schema: work/uat-flow@1\nid: uat.f.x\ntitle: t\nstate: todo\n',
   });
   assert.deepEqual(validateWork(workRoot).refused.filter(line => line.includes('HFS_AGENT_DATA_TRACKED')), []);
-});
-
-// R08 HFS_WORK_NODE_RETIRED: only flat family records.
-test('a flat family record raises no HFS_WORK_NODE_RETIRED, and a work/node one does', () => {
-  const flat = refusalsFor({ 'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: todo\n' });
-  assert.deepEqual(flat.filter(p => p.includes('HFS_WORK_NODE_RETIRED')), []);
-  const node = refusalsFor({ 'features/f/br/rule/index.yaml': 'schema: work/node@1\nid: br.f.rule\nkind: business\nrequired: true\n' });
-  assert.equal(node.filter(p => p.includes('[HFS_WORK_NODE_RETIRED]')).length, 1, node.join('\n'));
 });
 
 // R09 HFS_IDENTITY_CUSTODY: an identity names its secret identity-<slug>.enc; a flow selects by a role the identity presents.

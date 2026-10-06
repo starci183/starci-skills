@@ -1,10 +1,9 @@
 // verb-call.mjs - shared normalization for external-call results returned to function-backed verbs.
 
-/** Whether a spawn-style result succeeded, with opt-ins for the few legacy result shapes. */
-export const resultOk = (result, { acceptOk = true, codeFallback = false } = {}) => {
+/** Whether a spawn-style result succeeded; `acceptOk: false` ignores an `ok` field and reads the exit status. */
+export const resultOk = (result, { acceptOk = true } = {}) => {
   if (!result) return false;
-  const status = result.status ?? (codeFallback ? result.code : undefined);
-  return Boolean(acceptOk && result.ok !== undefined ? result.ok : !result.error && status === 0);
+  return Boolean(acceptOk && result.ok !== undefined ? result.ok : !result.error && result.status === 0);
 };
 
 /** Trimmed stdout or stderr from either the standard or compact call-result shape. */

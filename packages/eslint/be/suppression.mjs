@@ -9,8 +9,7 @@
  *   - TypeScript: `@ts-ignore`, `@ts-expect-error` and `@ts-nocheck`, wherever they sit in a comment;
  *   - coverage: `istanbul ignore`, `c8 ignore`, `v8 ignore`;
  *   - Sonar: `NOSONAR` and `sonar-disable`;
- *   - Prettier: `prettier-ignore`;
- *   - the `vn-ok` language marker.
+ *   - Prettier: `prettier-ignore`.
  *
  * The factory also sets `noInlineConfig: true`, so ESLint itself ignores such a comment; this rule is what turns the
  * ignored comment into a failure a person reads, instead of a silent no-op that looks like an exemption. There is no
@@ -24,7 +23,6 @@ const TS_DIRECTIVE = /@ts-(?:ignore|expect-error|nocheck)\b/
 const COVERAGE_IGNORE = /(?:^|[\s*/])(?:istanbul|c8|v8)\s+ignore\b/
 const SONAR = /\bNOSONAR\b|\bsonar-(?:disable|enable)\b/i
 const PRETTIER_IGNORE = /(?:^|[\s*/])prettier-ignore\b/
-const LANGUAGE_MARKER = /\bvn-ok\b/
 
 /** The finding a comment is, or null when it is ordinary prose. `/* global x *\/` is a block-comment form only. */
 const kindOf = (comment) => {
@@ -35,7 +33,6 @@ const kindOf = (comment) => {
     if (COVERAGE_IGNORE.test(text)) return "coverage"
     if (SONAR.test(text)) return "sonar"
     if (PRETTIER_IGNORE.test(text)) return "prettier"
-    if (LANGUAGE_MARKER.test(text)) return "vn-ok"
     return null
 }
 
@@ -43,7 +40,7 @@ const kindOf = (comment) => {
 export const noInlineSuppression = {
     meta: {
         type: "problem",
-        docs: { description: "No eslint, TypeScript, coverage, Sonar or Prettier suppression comment, and no vn-ok marker." },
+        docs: { description: "No eslint, TypeScript, coverage, Sonar or Prettier suppression comment." },
         schema: [],
         messages: {
             eslint: "An `eslint-disable`/`eslint-enable`, `eslint-env`, `/* global */` or rule-configuration comment. HFS does not switch a rule off or declare a global in place: fix the code, or propose a change to the rule in the canon.",
@@ -51,7 +48,6 @@ export const noInlineSuppression = {
             coverage: "An `istanbul`/`c8`/`v8 ignore` comment hides code from coverage. Write the test that covers it, or delete the code that nothing reaches.",
             sonar: "A `NOSONAR` or `sonar-disable` comment hides a finding from Sonar. Fix the finding.",
             prettier: "A `prettier-ignore` comment exempts code from the formatter. Let the formatter write it.",
-            "vn-ok": "A `vn-ok` marker exempts a line from the language rule. HFS keeps no exemption marker: write the text in English, or move the data to a locale or data file.",
         },
     },
     create(context) {

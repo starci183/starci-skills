@@ -2,9 +2,8 @@
 // and config files go to ONE canon-wire leg per wave (HFS has no shared registration file: owners are derived
 // from knowledge/hfs/slots.yaml, so policy sharedRoots is empty), and a blocked slice is redone from its commit
 // (scripts/kernel/seam-policy.mjs canonCutPlanOf / canonRedispatchOf; modules/kernel/driver-loop.yaml
-// enqueue.cutExecution). A canon slice (7/34) committed
-// 9 -> 7 findings, then blocked shared-change - the rest needed its product-shells owners MOVED into
-// features/layouts, none of which it owned; 22 of 56 slices failed so.
+// enqueue.cutExecution). A slice whose findings need product-shells owners moved into features/layouts,
+// none of which it owns, is blocked on shared-change, so the move goes to the wire leg.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -45,7 +44,7 @@ test('a relocation finding names the file that moves and the canon homes it may 
   const layout = relocationOf({ ruleId: 'FE_SOURCE_LAYOUT_INVALID', file: `${shells}/Sidebar/component.tsx` }, relocations);
   assert.equal(layout.home, `${shells}/Sidebar`);
   assert.ok(layout.destinations.includes(`${SRC}/features/layouts/Sidebar`));
-  assert.equal(relocationOf({ ruleId: 'FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES', file: route, related: `${shells}/ConsoleLayout/index.tsx` }, relocations), null, 'a retired rule has no relocation entry: a tier violation is not a relocation');
+  assert.equal(relocationOf({ ruleId: 'FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES', file: route, related: `${shells}/ConsoleLayout/index.tsx` }, relocations), null, 'a rule with no relocation entry: a tier violation is not a relocation');
   assert.deepEqual(canonConformancePolicy().sharedRoots, [], 'HFS has no shared registration file: owners are derived from slots');
   assert.equal(relocationOf({ ruleId: 'starci-fe/naming', file: `${SRC}/components/blocks/sales/Handoff/index.tsx` }, relocations), null, 'a finding fixed in place needs no destination');
 });
@@ -74,7 +73,7 @@ test('a destination a sibling already owns is never granted: the move goes to th
   assert.ok(!slice.grants.some((p) => p.startsWith(`${SRC}/features/`)), 'ordinal 1 owns apps/app/src/features, so nothing under it is granted to ordinal 2');
   const wire = plan.wires.find((item) => item.wave === 'shared');
   assert.ok(wire.paths.includes(`${SRC}/features/layouts/Sidebar`) && wire.paths.includes(`${shells}/Sidebar`), 'the wire moves the contested owner once the slices land');
-  assert.ok(!wire.paths.some((p) => p.endsWith('architecture.json')), 'the wire carries the contested move, no retired registration file');
+  assert.ok(!wire.paths.some((p) => p.endsWith('architecture.json')), 'the wire carries the contested move, no registration file');
   assert.deepEqual(wire.after, [2]);
   assert.match(plan.commands.find((command) => command.includes('"canonWire":true')), /^starci kernel enqueue --op code\.refactor --paths .*--params '\{"canonWire":true\}' --after /);
 });

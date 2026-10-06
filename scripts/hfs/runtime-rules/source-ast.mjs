@@ -4,7 +4,6 @@
 //   moduleRefs(source)            every import/export-from/require()/import() of a string specifier: [{module, line}]
 //   relativeImports(source)       the relative specifiers among them: [{specifier, line, column}]
 //   localBindings(source)         every name the file declares (variables, functions, classes, parameters, imports)
-//   declaredNames(source)         the names the file declares at any depth as a function, class or variable (RT_RETIRED_PRESENT)
 //   exportedNames(source)         the names the module exports (export function/const/class, export {a as b}, default)
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -129,19 +128,6 @@ export function localBindings(source) {
   };
   visit(source);
   return names;
-}
-
-/** The names a parsed file declares as a function, a class or a variable, at any depth, with their lines. */
-export function declaredNames(source) {
-  const t = ts();
-  const out = [];
-  const visit = (node) => {
-    if (((t.isFunctionDeclaration(node) || t.isClassDeclaration(node)) && node.name)
-      || (t.isVariableDeclaration(node) && t.isIdentifier(node.name))) out.push({ name: node.name.text, line: lineOf(source, node) });
-    t.forEachChild(node, visit);
-  };
-  visit(source);
-  return out;
 }
 
 /** The names a parsed module exports, each with whether it is a function (declaration or an arrow/function initializer). */
