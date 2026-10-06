@@ -3,9 +3,11 @@ Task: read the runtime's storage
 
 The executed schemas live under `engine/db/migrations/runtime/` and `engine/db/migrations/machine/`.
 `engine/db/ledger.mjs` owns project schema validation; `engine/db/machine.mjs` owns host schema validation
-and required physical objects. Current v3 stores preserve their host rows and historical `schema_migrations`
-journal; readers never write it. Fresh machine stores execute one folded `0001-init.sql` and atomically
-record version 3. Other identities refuse without upgrade or reset. The current signal domains keep
+and required physical objects. A writer atomically migrates a recognized v2 host store to v3 by widening
+only the signal scope CHECK, preserving all signal columns, other host rows and historical `schema_migrations`
+entries. Required v2 objects match the canonical schema with that one scope difference; extra objects refuse.
+Readers require v3 and never migrate. Fresh machine stores execute one folded `0001-init.sql` and atomically
+record version 3. Other identities and shapes refuse without reset. The current signal domains keep
 Supervisor keys, tokens, values and expiries separate from core-debug enabled/diagnostic scopes.
 These writers and their SQL files own the storage rules.
 
@@ -23,7 +25,7 @@ These writers and their SQL files own the storage rules.
 - There is no other store. No JSON state file, no JSONL inbox, no text log, no second SQLite file.
 - The writers refuse unsupported schema identities or versions. `openLedger` creates a fresh project
   store at `ledgerFileFor(<repo root>)`; `openMachine` creates a fresh host store at `machineFileFor`
-  and validates an existing current host store without rewriting its journal.
+  and validates or migrates a recognized existing host store without rewriting its historical journal.
 - `openLedger({fixture:{ledgerId,createdAt,blobRoot},file,checkpointer:true})` initializes a fresh
   sample through the same canonical schema and seeds. Its identity is in the reserved synthetic namespace
   validated by `engine/db/ledger-paths.mjs`; its clock is frozen and `blobRoot` is a portable relative path.
