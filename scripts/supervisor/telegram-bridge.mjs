@@ -412,7 +412,7 @@ export function createBridge({
     if (!state || state.closed) {
       await call('answerCallbackQuery', { callback_query_id: query.id, text: t().askClosed });
       if (messageId) await removeMessage(messageId);
-      say(`ask button ${key}: no open ask${state?.closed ? ` (${state.closed})` : ''}; message removed`);
+      say(`ask button ${key}: no open ask${state?.closed ? ' (' + state.closed + ')' : ''}; message removed`);
       return { closed: state?.closed ?? 'unknown' };
     }
     await call('answerCallbackQuery', { callback_query_id: query.id, text: t().askGenerating });
@@ -505,7 +505,7 @@ export function createBridge({
     const r = await answerDraw({ repo: entry.repo ?? (entry.ledgerFile ? path.dirname(path.dirname(entry.ledgerFile)) : null), ledgerFile: entry.ledgerFile ?? null,
       workflowId: entry.workflowId, dispatchId: entry.dispatchId, text, partPath: entry.partPath,
       telegram: { chatId: current.chatId, messageId: message.message_id ?? null, replyTo } });
-    say(`draw review ${entry.key}: owner reply ${r?.ok ? r.decision : `not recorded (${r?.why ?? 'error'})`}`);
+    say(`draw review ${entry.key}: owner reply ${r?.ok ? r.decision : 'not recorded (' + (r?.why ?? 'error') + ')'}`);
     const tr = translator(current.language);
     const ack = (() => { if (!r?.ok) return tr('Not recorded: {why}.', { why: r?.why ?? tr('error') }); if (r.decision === 'accept') return tr(r.golden ? 'Recorded: you accepted the drawing as the golden reference.' : 'Recorded: you accepted the drawing.'); return tr('Recorded your feedback: the drawing will be redrawn to address every note.'); })();
     await send(ack, { replyTo: message.message_id });
@@ -719,7 +719,7 @@ async function runMain() {
   const stop = () => { controller.abort(); claim.release(); process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
   console.log(JSON.stringify({ ok: true, pid: process.pid, log: 'machine_logs actor connector kind telegram-bridge.log' }));
-  log(`bridge ${process.pid} started${claim.takenOver ? ` (took over from ${handoverFrom})` : ''}`);
+  log(`bridge ${process.pid} started${claim.takenOver ? ' (took over from ' + handoverFrom + ')' : ''}`);
   const bridge = createBridge({ env, log, settings: () => telegramSettings({ env, preparedEnv: env }) });
   const watch = createReloadWatch({ root: configRoot, files: bridgeReloadFiles(), lastReloadAt: reloadedAt, headPaths: BRIDGE_HEAD_PATHS });
   const reload = async () => {
