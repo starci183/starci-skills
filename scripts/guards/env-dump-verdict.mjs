@@ -58,11 +58,15 @@ const pythonDumpHow = (args) => {
 };
 
 /** The ENV_DUMP refusal for one parsed command, or null. */
+const interpreterDumpVerdict = (c) => {
+  if (NODE_PROGRAMS.has(c.program)) { const how = nodeDumpHow(c.args); if (how) return refusal(c, how); }
+  if (PYTHON_PROGRAMS.has(c.program)) { const how = pythonDumpHow(c.args); if (how) return refusal(c, how); }
+  return null;
+};
+
 export function envDumpVerdict(parsed) {
   const c = assignedCommand(parsed);
   const shell = shellDumpVerdict(c);
   if (shell) return shell;
-  if (NODE_PROGRAMS.has(c.program)) { const how = nodeDumpHow(c.args); if (how) return refusal(c, how); }
-  if (PYTHON_PROGRAMS.has(c.program)) { const how = pythonDumpHow(c.args); if (how) return refusal(c, how); }
-  return null;
+  return interpreterDumpVerdict(c);
 }
