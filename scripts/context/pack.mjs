@@ -72,6 +72,79 @@ const briefRelOf = op => `modules/ops/ops/${op}.yaml`;
 /** First sentence-ish of a folded yaml purpose string — the packet stays short. */
 function summarize(text, max = 160) { return clipLine(text, max); }
 
+/** Resolve one declared read token and file its hits/misses on `acc` (the mandatory list dedupes by absolute path). */
+const addReadReference = (token, why, mustExist, acc) => {
+  let result = resolveReadReference(token, acc.roots);
+  // Only an explicitly declared catalog READ expands the contained current
+  // source/compiler/test union. Keep the original READ identity on every hash.
+  if (token === EXAMPLE_CATALOG_FILE && result.resolved.length === 1 && !result.missing.length) {
+    try {
+      const expanded = exampleSourcePaths(acc.rt).map((relative) => resolveReadReference(relative, acc.roots));
+      result = { ...result, resolved: [...result.resolved, ...expanded.flatMap((row) => row.resolved)],
+        missing: expanded.flatMap((row) => row.missing), truncated: expanded.some((row) => row.truncated) };
+    } catch (error) {
+      result = { ...result, kind: 'invalid', resolved: [], missing: [token], error: 'read-failed' };
+      acc.notes.push(`declared catalog READ refused: ${error.message}`);
+    }
+  }
+  acc.missing.push(...result.missing);
+  if (result.rootKind === 'source' || mustExist || result.kind === 'invalid') acc.requiredMissing.push(...result.missing);
+  if (result.truncated) { acc.readsTruncated = true; acc.requiredMissing.push(`truncated:${token}`); }
+  for (const row of result.resolved) {
+    const filed = acc.mandatory.find((entry) => entry.absolute === row.absolute);
+    if (!filed) acc.mandatory.push({ ...row, why });
+    // One file/hash can satisfy several declarations. Retain each original
+    // READ provenance so an earlier explicit source cannot erase catalog duty.
+    else if (!filed.why.split('\n').includes(why)) filed.why += `\n${why}`;
+  }
+  return result;
+};
+
+/** The brief's reads/context declarations as {id, path, why, resolved, placeholders} rows. */
+const declaredReadList = (declared, contextDecl, addReference) => {
+  const declaredReads = [];
+  for (const entry of [...declared, ...contextDecl]) {
+    const why = summarize(entry?.purpose?.en ?? entry?.purpose ?? '');
+    const resolved = [];
+    const placeholders = [];
+    for (const token of declaredReadTokens(entry?.path)) {
+      const result = addReference(token, `brief read [${entry.id ?? '?'}] — ${why}`, entry?.mustExist === true);
+      resolved.push(...result.resolved.map((row) => row.path));
+      if (!result.resolved.length && !result.missing.length) placeholders.push(token);
+    }
+    declaredReads.push({ id: entry?.id ?? null, path: summarize(entry?.path, 200), why, resolved, placeholders });
+  }
+  return declaredReads;
+};
+
+/** brief-declared knowledge:/docs: refs that exist on disk join the mandatory list. */
+const addDeclaredRefs = (briefDoc, addReference) => {
+  for (const field of ['knowledge', 'docs']) {
+    const refs = briefDoc?.[field];
+    const list = Array.isArray(refs) ? refs : [refs].filter((r) => typeof r === 'string');
+    for (const ref of list) {
+      const rel = String(ref?.path ?? ref).replaceAll('\\', '/');
+      if (rel) for (const token of declaredReadTokens(rel)) addReference(token, `brief-declared ${field} ref`, true);
+    }
+  }
+};
+
+/** The files the owned write set currently holds on disk, repo-relative, capped at fileCap. */
+const ownedFileList = (ownedPaths, repoBase, fileCap) => {
+  const ownedFiles = [];
+  let truncated = false;
+  for (const o of ownedPaths) {
+    const abs = o.abs ?? path.join(repoBase, o.path);
+    if (!fs.existsSync(abs)) continue;
+    const files = fs.statSync(abs).isDirectory()
+      ? listFiles(abs, fileCap + 1 - ownedFiles.length)
+      : [abs];
+    for (const f of files) ownedFiles.push(path.relative(repoBase, f).replaceAll('\\', '/'));
+    if (ownedFiles.length > fileCap) { ownedFiles.length = fileCap; truncated = true; break; }
+  }
+  return { ownedFiles, truncated };
+};
+
 /**
  * Resolve a record list to owned paths — same ownership resolution
  * dispatch-op.mjs uses (example-ownership helpers over the .starciwork tree).
@@ -115,34 +188,9 @@ export function buildContext({
   briefDoc = selected.contract;
 
   const missing = [], requiredMissing = [], notes = [], mandatory = [];
-  let readsTruncated = false;
   const roots = { sourceRoot: rt, stateDir, appRoot: appRoot ?? (stateDir ? path.dirname(path.resolve(stateDir)) : null), params };
-  const addReference = (token, why, mustExist = false) => {
-    let result = resolveReadReference(token, roots);
-    // Only an explicitly declared catalog READ expands the contained current
-    // source/compiler/test union. Keep the original READ identity on every hash.
-    if (token === EXAMPLE_CATALOG_FILE && result.resolved.length === 1 && !result.missing.length) {
-      try {
-        const expanded = exampleSourcePaths(rt).map((relative) => resolveReadReference(relative, roots));
-        result = { ...result, resolved: [...result.resolved, ...expanded.flatMap((row) => row.resolved)],
-          missing: expanded.flatMap((row) => row.missing), truncated: expanded.some((row) => row.truncated) };
-      } catch (error) {
-        result = { ...result, kind: 'invalid', resolved: [], missing: [token], error: 'read-failed' };
-        notes.push(`declared catalog READ refused: ${error.message}`);
-      }
-    }
-    missing.push(...result.missing);
-    if (result.rootKind === 'source' || mustExist || result.kind === 'invalid') requiredMissing.push(...result.missing);
-    if (result.truncated) { readsTruncated = true; requiredMissing.push(`truncated:${token}`); }
-    for (const row of result.resolved) {
-      const filed = mandatory.find((entry) => entry.absolute === row.absolute);
-      if (!filed) mandatory.push({ ...row, why });
-      // One file/hash can satisfy several declarations. Retain each original
-      // READ provenance so an earlier explicit source cannot erase catalog duty.
-      else if (!filed.why.split('\n').includes(why)) filed.why += `\n${why}`;
-    }
-    return result;
-  };
+  const acc = { roots, rt, mandatory, missing, requiredMissing, notes, readsTruncated: false };
+  const addReference = (token, why, mustExist = false) => addReadReference(token, why, mustExist, acc);
   const addMandatory = (rel, why) => addReference(rel, why, true);
 
   // 1-3: the fixed spine every op reads first, in load order.
@@ -154,33 +202,15 @@ export function buildContext({
   // 4: the brief's own reads/context declarations — concrete files join the
   // mandatory list in declared order; template/repo/instance tokens stay as
   // declared refs the agent resolves against its bound records.
-  const declaredReads = [];
-  const declared = Array.isArray(briefDoc?.reads) ? briefDoc.reads : [];
-  const contextDecl = Array.isArray(briefDoc?.context) ? briefDoc.context : [];
-  for (const entry of [...declared, ...contextDecl]) {
-    const why = summarize(entry?.purpose?.en ?? entry?.purpose ?? '');
-    const resolved = [];
-    const placeholders = [];
-    for (const token of declaredReadTokens(entry?.path)) {
-      const result = addReference(token, `brief read [${entry.id ?? '?'}] — ${why}`, entry?.mustExist === true);
-      resolved.push(...result.resolved.map((row) => row.path));
-      if (!result.resolved.length && !result.missing.length) placeholders.push(token);
-    }
-    declaredReads.push({ id: entry?.id ?? null, path: summarize(entry?.path, 200), why, resolved, placeholders });
-  }
+  const declaredReads = declaredReadList(
+    Array.isArray(briefDoc?.reads) ? briefDoc.reads : [],
+    Array.isArray(briefDoc?.context) ? briefDoc.context : [], addReference);
 
   // 5: the packet contract (short) — the op should know what a dispatch grants.
   addMandatory(DISPATCH_CONTRACT, 'the packet contract — what this dispatch grants and forbids (read the packet + nonGoals blocks)');
 
   // 6: brief-declared knowledge:/docs: refs that exist on disk.
-  for (const field of ['knowledge', 'docs']) {
-    const refs = briefDoc?.[field];
-    const list = Array.isArray(refs) ? refs : typeof refs === 'string' ? [refs] : [];
-    for (const ref of list) {
-      const rel = String(ref?.path ?? ref).replaceAll('\\', '/');
-      if (rel) for (const token of declaredReadTokens(rel)) addReference(token, `brief-declared ${field} ref`, true);
-    }
-  }
+  addDeclaredRefs(briefDoc, addReference);
 
   // 7: owned write set + the files it currently holds (bounded).
   const owned = resolveOwnedPaths(records, stateDir, ownedPaths);
@@ -191,25 +221,26 @@ export function buildContext({
   // Owned dirs resolve against the repository root that owns the .starciwork
   // (dirname of the state dir); with no state they are runtime-root-relative.
   const repoBase = stateDir ? path.dirname(path.resolve(stateDir)) : rt;
-  const ownedFiles = [];
-  let truncated = false;
-  for (const o of owned.ownedPaths) {
-    const abs = o.abs ?? path.join(repoBase, o.path);
-    if (!fs.existsSync(abs)) continue;
-    const files = fs.statSync(abs).isDirectory()
-      ? listFiles(abs, fileCap + 1 - ownedFiles.length)
-      : [abs];
-    for (const f of files) ownedFiles.push(path.relative(repoBase, f).replaceAll('\\', '/'));
-    if (ownedFiles.length > fileCap) { ownedFiles.length = fileCap; truncated = true; break; }
-  }
+  const { ownedFiles, truncated } = ownedFileList(owned.ownedPaths, repoBase, fileCap);
 
   return {
     op, root: rt, mode: selected.mode,
-    mandatory, declaredReads, requiredMissing: [...new Set(requiredMissing)], readsTruncated,
+    mandatory, declaredReads, requiredMissing: [...new Set(requiredMissing)], readsTruncated: acc.readsTruncated,
     ownedPaths: owned.ownedPaths.map(({ abs, ...rest }) => rest),
     ownedFiles, truncated, missing, notes,
   };
 }
+
+/** The DECLARED READS section lines: one per unresolved placeholder token. */
+const placeholderLines = (context) => {
+  const withPlaceholders = context.declaredReads.filter(d => d.placeholders.length);
+  if (!withPlaceholders.length) return [];
+  const lines = ['', 'DECLARED READS — resolve <placeholders> against your bound records/state before reading:'];
+  for (const d of withPlaceholders) {
+    for (const t of d.placeholders) lines.push(`  - [${d.id ?? '?'}] ${t}${d.why ? ' — ' + d.why : ''}`);
+  }
+  return lines;
+};
 
 /** The rendered packet — the exact text the op must be told to read, in load
  *  order. Written to --out or embedded in the dispatch prompt. */
@@ -218,24 +249,17 @@ function renderPacket(context) {
   const lines = [`CONTEXT PACKET — op ${context.op}`, ''];
   lines.push('MANDATORY READS — read in this order before any action:');
   context.mandatory.forEach((m, i) => lines.push(`  ${i + 1}. ${m.absolute ?? m.path} — ${m.why}`));
-  const withPlaceholders = context.declaredReads.filter(d => d.placeholders.length);
-  if (withPlaceholders.length) {
-    lines.push('', 'DECLARED READS — resolve <placeholders> against your bound records/state before reading:');
-    for (const d of withPlaceholders) {
-      for (const t of d.placeholders) lines.push(`  - [${d.id ?? '?'}] ${t}${d.why ? ` — ${d.why}` : ''}`);
-    }
-  }
+  lines.push(...placeholderLines(context));
   lines.push('', 'OWNED WRITE SET — only these paths may be modified:');
   if (context.ownedPaths.length) {
     for (const o of context.ownedPaths) lines.push(`  - ${o.path}  (record ${o.record}, via ${o.via}${o.exists ? '' : ', MISSING-ON-DISK'})`);
   } else lines.push('  (none bound — writes stay inside the brief write-ceiling)');
   if (context.ownedFiles.length) {
-    lines.push('', `OWNED FILES ON DISK — ${context.ownedFiles.length} shown${context.truncated ? `, truncated at ${FILE_CAP}` : ''}:`);
+    lines.push('', `OWNED FILES ON DISK — ${context.ownedFiles.length} shown${context.truncated ? ', truncated at ' + FILE_CAP : ''}:`);
     for (const f of context.ownedFiles) lines.push(`  - ${f}`);
   }
   if (context.missing.length) {
-    lines.push('', 'MISSING / UNRESOLVED — report as a blocker if the brief needed them:');
-    for (const m of context.missing) lines.push(`  - ${m}`);
+    lines.push('', 'MISSING / UNRESOLVED — report as a blocker if the brief needed them:', ...context.missing.map((m) => `  - ${m}`));
   }
   for (const n of context.notes) lines.push('', `note: ${n}`);
   return lines.join('\n');
@@ -252,7 +276,7 @@ export function renderPromptReads(context) {
     for (const d of ph) for (const t of d.placeholders) lines.push(`    - [${d.id ?? '?'}] ${t}`);
   }
   if (context.ownedFiles.length) {
-    lines.push(`  owned files on disk: ${context.ownedFiles.length}${context.truncated ? ` (truncated at ${FILE_CAP})` : ''} — full list in the packet`);
+    lines.push(`  owned files on disk: ${context.ownedFiles.length}${context.truncated ? ' (truncated at ' + FILE_CAP + ')' : ''} — full list in the packet`);
   }
   if (context.missing.length) {
     lines.push('  MISSING / UNRESOLVED inputs — resolve or report before action:');

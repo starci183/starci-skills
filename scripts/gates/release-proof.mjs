@@ -45,7 +45,10 @@ const defaultNpm = (args, opts) => runNpm(args, { maxBuffer: 512 * 1024 * 1024, 
  * writes the app with @starci/jest-preset beside it. `pins` is the pins map of knowledge/hfs/canon-pins.yaml; a pin that is missing throws.
  */
 export function scaffoldInvocation(pins, into) {
-  const pinned = (name) => { if (!pins?.[name]?.version) throw new Error(`no canon pin for ${name}`); return `${name}@${pins[name].version}`; };
+  const pinned = (name) => {
+    if (!pins?.[name]?.version) throw new Error(`no canon pin for ${name}`);
+    return `${name}@${pins[name].version}`;
+  };
   return ['-y', '-p', pinned('@starci/cli'), '-p', pinned('@starci/jest-preset'), 'starci', 'app', 'scaffold', 'release-app', '--into', into];
 }
 
@@ -53,7 +56,10 @@ export function appInstallsStep({ runtime = runtimeRoot, node = defaultNode } = 
   const run = node([path.join(runtime, 'scripts', 'gates', 'release-app-installs.mjs')], { cwd: runtime });
   const output = `${run.stdout ?? ''}\n${run.stderr ?? ''}`;
   const skipped = output.split(/\r?\n/).filter((l) => /\bSKIPPED:/.test(l));
-  const status = run.error || run.status === null ? STEP_STATUS.toolFailed : skipped.length ? STEP_STATUS.skipped : run.status === 0 ? STEP_STATUS.pass : STEP_STATUS.red;
+  let status;
+  if (run.error || run.status === null) status = STEP_STATUS.toolFailed;
+  else if (skipped.length) status = STEP_STATUS.skipped;
+  else status = run.status === 0 ? STEP_STATUS.pass : STEP_STATUS.red;
   return { id: 'app-installs', command: 'starci release app-installs', exit: run.status ?? null, status,
     detail: skipped.length ? `a proof skipped: ${skipped.slice(0, 3).join(' | ')}` : tail(output) };
 }
@@ -72,18 +78,30 @@ export function canonPinsStep({ repo, runtime = runtimeRoot, node = defaultNode 
   const runtimeResult = results[0];
   // The runtime judgment must have bound at least one code-pattern profile to its published canon by the content digest.
   const unbound = !broken && !(Number(runtimeResult.profiles) > 0);
+  let status = STEP_STATUS.pass;
+  if (broken) status = STEP_STATUS.toolFailed;
+  else if (red.length || unbound) status = STEP_STATUS.red;
+  let detail;
+  if (broken) detail = `check-canon-pins produced no JSON (${broken.label})`;
+  else if (unbound) detail = 'no code-pattern profile is bound to its canon content digest';
+  else detail = red.flatMap((r) => r.errors.map((e) => `${r.label}: ${e}`)).slice(0, 10).join(' | ');
   return { id: 'canon-pins', command: `starci runtime check --only canon-pins -- --json${results.length > 1 ? ' (+ --repo <app>)' : ''}`, exit: Math.max(...results.map((r) => r.exit ?? 2)),
-    status: broken ? STEP_STATUS.toolFailed : red.length || unbound ? STEP_STATUS.red : STEP_STATUS.pass,
+    status,
     profiles: runtimeResult.profiles, pins: runtimeResult.pins,
-    detail: broken ? `check-canon-pins produced no JSON (${broken.label})` : unbound ? 'no code-pattern profile is bound to its canon content digest' : red.flatMap((r) => r.errors.map((e) => `${r.label}: ${e}`)).slice(0, 10).join(' | ') };
+    detail };
 }
 
 function mergeGuardStep({ repo, base, main = null }) {
   try {
     const from = resolveGateBase(repo, base);
     const guard = mergeGuard(repo, { base: from, mainTip: mainTipOf(repo, main) });
-    return { id: 'merge-guard', command: `starci gate run (merge guard ${from.slice(0, 12)}..HEAD)`, exit: guard.errors.length ? 2 : guard.findings.length ? 1 : 0,
-      status: guard.errors.length ? STEP_STATUS.toolFailed : guard.findings.length ? STEP_STATUS.red : STEP_STATUS.pass, checked: guard.checked.length,
+    let exit;
+    let status;
+    if (guard.errors.length) { exit = 2; status = STEP_STATUS.toolFailed; }
+    else if (guard.findings.length) { exit = 1; status = STEP_STATUS.red; }
+    else { exit = 0; status = STEP_STATUS.pass; }
+    return { id: 'merge-guard', command: `starci gate run (merge guard ${from.slice(0, 12)}..HEAD)`, exit,
+      status, checked: guard.checked.length,
       detail: guard.errors.length ? guard.errors.join(' | ') : guard.findings.map((f) => f.message).slice(0, 5).join(' | ') };
   } catch (error) {
     return { id: 'merge-guard', command: 'starci gate run (merge guard)', exit: 2, status: STEP_STATUS.toolFailed, checked: 0, detail: String(error?.message ?? error) };
@@ -92,16 +110,22 @@ function mergeGuardStep({ repo, base, main = null }) {
 
 export function checkStep({ runtime = runtimeRoot, npm = defaultNpm } = {}) {
   const run = npm(['run', 'check'], { cwd: runtime });
+  let status;
+  if (run.error || run.status === null) status = STEP_STATUS.toolFailed;
+  else status = run.status === 0 ? STEP_STATUS.pass : STEP_STATUS.red;
   return { id: 'check', command: 'starci runtime check', exit: run.status ?? null,
-    status: run.error || run.status === null ? STEP_STATUS.toolFailed : run.status === 0 ? STEP_STATUS.pass : STEP_STATUS.red, detail: tail(`${run.stdout ?? ''}\n${run.stderr ?? ''}`) };
+    status, detail: tail(`${run.stdout ?? ''}\n${run.stderr ?? ''}`) };
 }
 
 export function buildReleaseProof({ repo, base, main = null, runtime = runtimeRoot, node = defaultNode, npm = defaultNpm }) {
   const abs = path.resolve(repo);
   const steps = [appInstallsStep({ runtime, node }), canonPinsStep({ repo: abs, runtime, node }), mergeGuardStep({ repo: abs, base, main }), checkStep({ runtime, npm })];
   const ok = steps.every((s) => s.status === STEP_STATUS.pass);
+  let exit;
+  if (ok) exit = 0;
+  else exit = steps.some((s) => s.status === STEP_STATUS.toolFailed) ? 2 : 1;
   return { schema: RELEASE_PROOF_SCHEMA, at: new Date().toISOString(), repo: posixPath(abs), base, runtime: posixPath(runtime), steps, ok,
-    exit: ok ? 0 : steps.some((s) => s.status === STEP_STATUS.toolFailed) ? 2 : 1 };
+    exit };
 }
 
 function parseReleaseArgs(argv) {

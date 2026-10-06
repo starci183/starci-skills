@@ -14,7 +14,7 @@ import {resolveRealTool} from '../api/process/resolve-real-tool.mjs';
 const sopsInvocation=Object.freeze({runProgram,resolveRealTool});
 
 /** A .mjs/.js "binary" (the specs' fake sops) runs under this node; anything else runs directly. */
-export const launcher=(bin,args)=>/\.(?:c|m)?js$/i.test(bin)?[process.execPath,[bin,...args]]:[bin,args];
+export const launcher=(bin,args)=>/\.[cm]?js$/i.test(bin)?[process.execPath,[bin,...args]]:[bin,args];
 
 /** A runtime extension's custody directory: <runtime>/ext/<service>/secrets, a host tree no stack-secret tool manages. */
 export const extSecretsDir=file=>{
@@ -60,6 +60,29 @@ export function sealExtCustody(cfg,file,value,{scrub}){
   }
 }
 
+const custodyInside=(cfg,ref,plainFile)=>path.isAbsolute(String(ref))
+  ?/[\\/]\.starcistacks[\\/]/.test(plainFile)||/[\\/]\.claude[\\/]ext[\\/]/.test(plainFile)||plainFile.startsWith(path.join(skillRoot,'ext')+path.sep)
+  :plainFile.startsWith(cfg.stackDir+path.sep);
+
+/** The .enc member decrypted by sops: a read verdict, or null after recording why it could not serve. */
+const decryptCustody=(cfg,enc,name,reasons,remember)=>{
+  const env=sonarAnalysisEnvironment(cfg);
+  const sops=cfg.sops??resolveSops(env,{pathext:true,wingetPackageTree:true});
+  const command=['--decrypt','--input-type','binary','--output-type','binary',enc];
+  const [bin,args]=sops?launcher(sops,command):[null,command];
+  const result=decrypt(bin,args,{env,identity:cfg.identity,invocation:sopsInvocation,maxBuffer:1024*1024,timeout:cfg.timeoutMs});
+  if(result.error?.identityRefusal)return {present:false,name,identityRefusal:result.error.identityRefusal,reason:result.error.message};
+  const value=result.status===0?String(result.stdout??'').trim():'';
+  if(value)return {present:true,value:remember(value),via:'sops',name};
+  let reason;
+  if(result.error?.code==='SOPS_MISSING')reason='sops is not installed';
+  else if(result.error?.code==='ETIMEDOUT')reason=`sops did not decrypt ${name}.enc within ${cfg.timeoutMs}ms`;
+  else if(result.error)reason=`sops failed to start: ${result.error.code??result.error.message}`;
+  else reason=`sops could not decrypt ${name}.enc (exit ${result.status})`;
+  reasons.push(reason);
+  return null;
+};
+
 /**
  * Read one custody member into memory. Returns {present, value?, via?, reason?}; `value` is for a child
  * env or a header only. The .enc member decrypted by sops wins; the materialized sibling is the fallback.
@@ -70,23 +93,14 @@ export function readCustody(cfg,ref,{remember}){
   // .starcistacks or a runtime's extension tree (.claude/ext/<service>, or this runtime's own ext/ when it is a
   // lane worktree, where a host custody path resolves - scripts/gates/runtime-host.mjs resolveCustodyFile).
   const plainFile=path.resolve(cfg.stackDir,ref);
-  const name=String(ref).replace(/\\/g,'/');
-  const inside=path.isAbsolute(String(ref))
-    ?/[\\/]\.starcistacks[\\/]/.test(plainFile)||/[\\/]\.claude[\\/]ext[\\/]/.test(plainFile)||plainFile.startsWith(path.join(skillRoot,'ext')+path.sep)
-    :plainFile.startsWith(cfg.stackDir+path.sep);
+  const name=String(ref).replaceAll('\\','/');
+  const inside=custodyInside(cfg,ref,plainFile);
   if(!inside)return {present:false,name,reason:`custody reference ${name} is outside a stack custody tree`};
   const enc=`${plainFile}.enc`;
   const reasons=[];
   if(fs.existsSync(enc)){
-    const env=sonarAnalysisEnvironment(cfg);
-    const sops=cfg.sops??resolveSops(env,{pathext:true,wingetPackageTree:true});
-    const command=['--decrypt','--input-type','binary','--output-type','binary',enc];
-    const [bin,args]=sops?launcher(sops,command):[null,command];
-    const result=decrypt(bin,args,{env,identity:cfg.identity,invocation:sopsInvocation,maxBuffer:1024*1024,timeout:cfg.timeoutMs});
-    if(result.error?.identityRefusal)return {present:false,name,identityRefusal:result.error.identityRefusal,reason:result.error.message};
-    const value=result.status===0?String(result.stdout??'').trim():'';
-    if(value)return {present:true,value:remember(value),via:'sops',name};
-    reasons.push(result.error?.code==='SOPS_MISSING'?'sops is not installed':result.error?.code==='ETIMEDOUT'?`sops did not decrypt ${name}.enc within ${cfg.timeoutMs}ms`:result.error?`sops failed to start: ${result.error.code??result.error.message}`:`sops could not decrypt ${name}.enc (exit ${result.status})`);
+    const verdict=decryptCustody(cfg,enc,name,reasons,remember);
+    if(verdict)return verdict;
   }
   if(fs.existsSync(plainFile)){
     const value=fs.readFileSync(plainFile,'utf8').trim();

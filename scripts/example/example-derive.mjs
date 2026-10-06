@@ -60,8 +60,13 @@ function collectIdsByTrail(value, trail, out) {
     if (frag !== null && frag && ID_RE.test(id)) out.push({trail, id});
     return;
   }
-  if (Array.isArray(value)) { for (const item of value) collectIdsByTrail(item, trail, out); return; }
-  if (isPlainObject(value)) for (const [k, v] of Object.entries(value)) collectIdsByTrail(v, trail ? `${trail}.${k}` : k, out);
+  if (Array.isArray(value)) {
+    for (const item of value) { collectIdsByTrail(item, trail, out); }
+    return;
+  }
+  if (isPlainObject(value)) {
+    for (const [k, v] of Object.entries(value)) collectIdsByTrail(v, trail ? `${trail}.${k}` : k, out);
+  }
 }
 
 /** The edge kind one collected `{trail, id}` hit belongs to, or null when the layout's rules do not name
@@ -86,6 +91,26 @@ function classifyEdge(recordSchema, trail) {
 /** The reverse index: id -> edge kind -> sorted, deduplicated list of ids that reference it that way.
  * Self-references (a record's own `id` echoed back by a field the collector also walks) are dropped - a
  * record does not use itself. */
+// Compact format: an inline criterion's own `id:` under acceptance:/statements: is a declaration, not an
+// edge; a reference to a collapsed `ac.*` id is an edge to the parent record that now carries the criterion.
+const DECL_TRAIL = /^(?:acceptance|statements)\.(?:.+\.)?id$/;
+
+/** Files one record's collected `{trail, id}` hits into `usedBy`/`unclassified` (self-references dropped -
+ * a record does not use itself). */
+const indexHits = (record, hits, usedBy, unclassified, canon) => {
+  for (const {trail, id: targetId} of hits) {
+    if (DECL_TRAIL.test(trail)) continue;
+    const canonical = canon(targetId);
+    if (canonical === record.id) continue;
+    const kind = classifyEdge(record.schema, trail);
+    if (!kind) { unclassified.push({from: record.id, field: trail, target: canonical}); continue; }
+    if (!usedBy.has(canonical)) usedBy.set(canonical, new Map());
+    const byKind = usedBy.get(canonical);
+    if (!byKind.has(kind)) byKind.set(kind, new Set());
+    byKind.get(kind).add(record.id);
+  }
+};
+
 function buildUsedBy(records) {
   const usedBy = new Map(); // targetId -> Map(kind -> Set(sourceId))
   const unclassified = []; // {from, field, target}
@@ -93,7 +118,6 @@ function buildUsedBy(records) {
   // an edge (same reason the top-level `id` key is skipped); and a reference to a collapsed `ac.*` id is
   // an edge to the parent record that now carries the criterion.
   const inline = indexInlineCriteria(records);
-  const DECL_TRAIL = /^(?:acceptance|statements)\.(?:.+\.)?id$/;
   const canon = id => records.has(id) ? id : (inline.byAcId.get(id) ?? id);
   for (const record of records.values()) {
     const hits = [];
@@ -101,17 +125,7 @@ function buildUsedBy(records) {
       if (key === 'id') continue;
       collectIdsByTrail(value, key, hits);
     }
-    for (const {trail, id: targetId} of hits) {
-      if (DECL_TRAIL.test(trail)) continue;
-      const canonical = canon(targetId);
-      if (canonical === record.id) continue;
-      const kind = classifyEdge(record.schema, trail);
-      if (!kind) { unclassified.push({from: record.id, field: trail, target: canonical}); continue; }
-      if (!usedBy.has(canonical)) usedBy.set(canonical, new Map());
-      const byKind = usedBy.get(canonical);
-      if (!byKind.has(kind)) byKind.set(kind, new Set());
-      byKind.get(kind).add(record.id);
-    }
+    indexHits(record, hits, usedBy, unclassified, canon);
   }
   unclassified.sort((a, b) => a.from.localeCompare(b.from) || a.field.localeCompare(b.field) || a.target.localeCompare(b.target));
   return {usedBy, unclassified};
@@ -134,13 +148,25 @@ function buildUsedBy(records) {
  *    after this record was last proven. Only checked when evidence exists and both timestamps parse; a
  *    record with no evidence has no proof to invalidate this way.
  */
+/** Whether the evidence's `recordDigest` no longer matches the record's current bytes on disk. */
+const recordDigestMismatch = (record, evidence) =>
+  typeof evidence.data.recordDigest === 'string' && evidence.data.recordDigest !== ''
+  && sha256File(record.file) !== evidence.data.recordDigest;
+
+/** The first `appliesTo` source record whose `change.at` is later than `capturedAt`, or null. */
+const newerAppliesToSource = (record, appliesToSources, records, capturedAt) => {
+  for (const sourceId of appliesToSources.get(record.id) ?? []) {
+    const changeAt = isoTime(records.get(sourceId)?.data?.change?.at);
+    if (Number.isFinite(changeAt) && changeAt > capturedAt) return sourceId;
+  }
+  return null;
+};
+
 function staleness(record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot) {
   const evidence = evidenceByDir.get(record.dir);
   if (!evidence) return null;
   if (evidence.data.stale === true) return {reason: 'evidence-marked-stale'};
-  if (typeof evidence.data.recordDigest === 'string' && evidence.data.recordDigest) {
-    if (sha256File(record.file) !== evidence.data.recordDigest) return {reason: 'digest-mismatch'};
-  }
+  if (recordDigestMismatch(record, evidence)) return {reason: 'digest-mismatch'};
   if (typeof evidence.data.codeDigest?.digest === 'string') {
     const dirs = resolveOwnedDirs(record.id, record, records, workspaceDoc, workRoot);
     const fresh = hashOwnedDirs(dirs);
@@ -148,10 +174,8 @@ function staleness(record, evidenceByDir, appliesToSources, records, workspaceDo
   }
   const capturedAt = isoTime(evidence.data.provenance?.capturedAt);
   if (Number.isFinite(capturedAt)) {
-    for (const sourceId of appliesToSources.get(record.id) ?? []) {
-      const changeAt = isoTime(records.get(sourceId)?.data?.change?.at);
-      if (Number.isFinite(changeAt) && changeAt > capturedAt) return {reason: `appliesTo-newer:${sourceId}`};
-    }
+    const newer = newerAppliesToSource(record, appliesToSources, records, capturedAt);
+    if (newer !== null) return {reason: `appliesTo-newer:${newer}`};
   }
   return null;
 }
@@ -189,9 +213,10 @@ function effectiveStateOf(record, evidenceByDir, appliesToSources, records, work
  */
 function resolveBlockers(record, records, canon = id => id) {
   const roots = new Map(); // id -> {id, rootKind, because, cyclic}
-  const rootKindOf = target => target.schema === 'work/gap@1' ? 'gap'
-    : (target.schema === 'work/policy-decision@1' && target.data.outcome === 'open') ? 'decision'
-    : 'record';
+  const rootKindOf = target => [
+    target.schema === 'work/gap@1' && 'gap',
+    target.schema === 'work/policy-decision@1' && target.data.outcome === 'open' && 'decision',
+  ].find(Boolean) ?? 'record';
 
   function walkEdge(rawId, because, visited) {
     const targetId = canon(rawId);
@@ -247,13 +272,25 @@ export function computeDerived(workRoot) {
     });
   }
 
-  // tally: done/todo/stale/blocked, per feature and overall - only over records the layout gives a
-  // lifecycle state to (effectiveState !== null), scoped to actual features (workspace.yaml/brand/index.yaml
-  // sit outside any feature and are not "work the lead tallies").
+  return {
+    records: derivedRecords,
+    tally: deriveTally(derivedRecords, records),
+    frontier: deriveFrontier(derivedRecords, records, canon),
+    unclassified,
+  };
+}
+
+/** The done/todo/stale/blocked tally, per feature and overall - only over records the layout gives a
+ * lifecycle state to (effectiveState !== null), scoped to actual features (workspace.yaml/brand/index.yaml
+ * sit outside any feature and are not "work the lead tallies"). */
+function deriveTally(derivedRecords, records) {
   const blankCounts = () => ({done: 0, todo: 0, stale: 0, blocked: 0, total: 0});
   const overall = blankCounts();
   const byFeature = new Map();
-  const bucketOf = state => state === 'done' ? 'done' : state === 'suspended' ? 'stale' : state === 'blocked' ? 'blocked' : state === 'todo' ? 'todo' : null;
+  const bucketOf = state => [
+    state === 'done' && 'done', state === 'suspended' && 'stale',
+    state === 'blocked' && 'blocked', state === 'todo' && 'todo',
+  ].find(Boolean) ?? null;
   for (const record of derivedRecords.values()) {
     if (!record.feature || record.effectiveState === null) continue;
     const bucket = bucketOf(record.effectiveState);
@@ -266,27 +303,27 @@ export function computeDerived(workRoot) {
 
   // closedBy is a list of record ids (schemas/work-layout.yaml, concept 7); a bare string is the common
   // one-closer case and is normalised the same way here as scripts/work/validate/check-example-work.mjs's gate treats it.
-  const normalizeClosedBy = v => v == null ? null : Array.isArray(v) ? v : [v];
+  const normalizeClosedBy = v => {
+    if (v == null) return null;
+    return Array.isArray(v) ? v : [v];
+  };
   const gaps = [...records.values()].filter(r => r.schema === 'work/gap@1')
     .map(r => ({id: r.id, feature: r.feature, state: r.state, closedBy: normalizeClosedBy(r.data.closedBy)}))
     .sort((a, b) => a.id.localeCompare(b.id));
   const unbuiltModuleGaps = gaps.filter(g => g.id.endsWith('.unbuilt-module') && g.state === 'todo').length;
+  return {
+    overall,
+    byFeature: new Map([...byFeature.entries()].sort(([a], [b]) => a.localeCompare(b))),
+    gaps, unbuiltModuleGaps,
+  };
+}
 
-  const frontier = [...derivedRecords.values()]
+/** The `todo` records with no unmet blockers, in the deterministic frontier order. */
+function deriveFrontier(derivedRecords, records, canon) {
+  return [...derivedRecords.values()]
     .filter(r => r.state === 'todo' && unmetBlockers(records.get(r.id), records, canon).length === 0)
     .map(r => ({id: r.id, feature: r.feature, title: records.get(r.id).data.title ?? null}))
     .sort((a, b) => (a.feature ?? '').localeCompare(b.feature ?? '') || a.id.localeCompare(b.id));
-
-  return {
-    records: derivedRecords,
-    tally: {
-      overall,
-      byFeature: new Map([...byFeature.entries()].sort(([a], [b]) => a.localeCompare(b))),
-      gaps, unbuiltModuleGaps,
-    },
-    frontier,
-    unclassified,
-  };
 }
 
 /** The plain JS structure written to `_derived/index.yaml` - built from `computeDerived`'s output with every
@@ -339,7 +376,7 @@ function buildFrontierMarkdown(derived) {
     lines.push(`## ${feature}`);
     const items = byFeature.get(feature) ?? [];
     if (!items.length) lines.push('(none)');
-    else for (const item of items) lines.push(`- ${item.id}${item.title ? ` — ${item.title}` : ''}`);
+    else for (const item of items) lines.push(`- ${item.id}${item.title ? ' — ' + item.title : ''}`);
     lines.push('');
   }
   return lines.join('\n');

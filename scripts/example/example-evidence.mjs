@@ -60,7 +60,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 function parseArgs(argv) {
   const args = parseOpts(argv, {
     ...workRecordSpec,
-    '--assert': (o, take) => (o.assert ??= []).push(take()),
+    '--assert': (o, take) => {
+      o.assert ??= [];
+      return o.assert.push(take());
+    },
   }, argThrow);
   needArgs(args, ['work', 'record', 'cwd']);
   if (!args.assert?.length) throw new Error('at least one --assert <ac-id>=<command> is required');

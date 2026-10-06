@@ -76,6 +76,8 @@ const USAGE = 'usage: starci gate run --root <app> [--base <commit>] [--main <re
 export const DOC_PROFILE = 'docs';
 const GATE_PROFILES = Object.freeze(['code', DOC_PROFILE]);
 
+const GATE_VALUE_FLAGS = new Set(['--root', '--base', '--main', '--tests', '--out', '--tree', '--scope']);
+
 /** The flags; `--changed` adds named files to the actual base-to-working-tree delta and never narrows it. */
 export function parseGateArgs(argv) {
   const opts = { root: null, base: null, main: null, changed: null, tests: null, out: null, profile: 'code', tree: null };
@@ -84,16 +86,16 @@ export function parseGateArgs(argv) {
     if (arg === '--changed') {
       opts.changed = [];
       while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts.changed.push(argv[++i]);
-    } else if (['--root', '--base', '--main', '--tests', '--out', '--tree', '--scope'].includes(arg)) {
-      if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
-      opts[arg === '--scope' ? 'profile' : arg.slice(2)] = argv[++i];
-    } else throw new Error(`unknown argument ${arg}; ${USAGE}`);
+      continue;
+    }
+    if (!GATE_VALUE_FLAGS.has(arg)) throw new Error(`unknown argument ${arg}; ${USAGE}`);
+    if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
+    opts[arg === '--scope' ? 'profile' : arg.slice(2)] = argv[++i];
   }
   if (!GATE_PROFILES.includes(opts.profile)) throw new Error(`--scope must be one of ${GATE_PROFILES.join(', ')}; ${USAGE}`);
   if (opts.tree && opts.profile !== DOC_PROFILE) throw new Error(`--tree belongs to --scope ${DOC_PROFILE}; ${USAGE}`);
   return opts;
 }
-
 const lines = (text) => String(text ?? '').split(/\r?\n/).filter(Boolean);
 
 /** The base path a head path is measured against: its rename source, itself, or null when the base has no such file. */
@@ -111,7 +113,6 @@ function baseBlobReader(root, base) {
     return memo.get(rel);
   };
 }
-
 /** The cache directory of this worktree (its git dir, never the checkout) and the shared one of the repository. */
 function cacheDirs(root) {
   const own = gitText(revParseQuery, root, ['--absolute-git-dir'])?.trim();
@@ -127,34 +128,36 @@ const readCache = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf
 const writeCache = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(value)); };
 
 /* ----------------------------------------------------------------------------------------------- lint */
-
+/** The errors and deduplicated findings one lint chunk contributes. */
+const judgeLintChunk = (run, chunk, hfs, seen, findings, errors) => {
+  let report = null;
+  try { report = JSON.parse(run.stdout); } catch { /* judged below */ }
+  if (report?.schema !== LINT_SCHEMA) { errors.push(`starci app lint produced no ${LINT_SCHEMA} report (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n')[0]}`); return; }
+  // A JSON report cannot override the child outcome. Exit 1 measures findings; any interrupted, unknown or other exit
+  // is a tool failure even when stdout claims a clean report. Keep its findings for diagnosis and the existing base policy.
+  if (run.error || run.signal || ![0, 1].includes(run.status) || (run.status === 1 && !(report.findings ?? []).length))
+    errors.push(`starci app lint did not complete (exit ${run.status}, signal ${run.signal ?? 'none'}): ${String(run.error?.message || run.stderr || run.stdout || '').trim().split('\n')[0]}`);
+  // An app implementation that keeps only the last --changed did not lint the rest: that is never a clean lint.
+  const judged = new Set((Array.isArray(report.changed) ? report.changed : chunk).map(posixPath)), missed = chunk.filter((file) => !judged.has(posixPath(file)));
+  if (missed.length) errors.push(`starci app lint judged ${chunk.length - missed.length} of ${chunk.length} changed files (not ${missed.slice(0, 3).join(', ')}${missed.length > 3 ? ', ...' : ''}): the @starci/hfs behind ${posixPath(hfs.bin)} keeps only the last --changed; install a current @starci/cli`);
+  errors.push(...(report.errors ?? []).map((e) => `starci app lint: ${e}`));
+  for (const finding of report.findings ?? []) {
+    const id = JSON.stringify([finding.engine, finding.rule, finding.path, finding.line, finding.column, finding.message]);
+    if (!seen.has(id)) { seen.add(id); findings.push(finding); }
+  }
+};
 /** `starci app lint --changed <file>...` (one file per list flag) at the app root, in chunks (the Windows command line); {findings, errors}. */
 function runAppLint(root, files, hfs) {
   const findings = [], errors = [], seen = new Set();
   for (let i = 0; i < files.length; i += LINT_CHUNK) {
     const chunk = files.slice(i, i + LINT_CHUNK);
     const run = runNode([hfs.bin, 'app', 'lint', ...chunk.flatMap((file) => ['--changed', file]), '--format', 'json'], { cwd: root, maxBuffer: 512 * 1024 * 1024 });
-    let report = null;
-    try { report = JSON.parse(run.stdout); } catch { /* judged below */ }
-    if (report?.schema !== LINT_SCHEMA) { errors.push(`starci app lint produced no ${LINT_SCHEMA} report (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n')[0]}`); continue; }
-    // A JSON report cannot override the child outcome. Exit 1 measures findings; any interrupted, unknown or other exit
-    // is a tool failure even when stdout claims a clean report. Keep its findings for diagnosis and the existing base policy.
-    if (run.error || run.signal || ![0, 1].includes(run.status) || (run.status === 1 && !(report.findings ?? []).length))
-      errors.push(`starci app lint did not complete (exit ${run.status}, signal ${run.signal ?? 'none'}): ${String(run.error?.message || run.stderr || run.stdout || '').trim().split('\n')[0]}`);
-    // An app implementation that keeps only the last --changed did not lint the rest: that is never a clean lint.
-    const judged = new Set((Array.isArray(report.changed) ? report.changed : chunk).map(posixPath)), missed = chunk.filter((file) => !judged.has(posixPath(file)));
-    if (missed.length) errors.push(`starci app lint judged ${chunk.length - missed.length} of ${chunk.length} changed files (not ${missed.slice(0, 3).join(', ')}${missed.length > 3 ? ', ...' : ''}): the @starci/hfs behind ${posixPath(hfs.bin)} keeps only the last --changed; install a current @starci/cli`);
-    errors.push(...(report.errors ?? []).map((e) => `starci app lint: ${e}`));
-    for (const finding of report.findings ?? []) {
-      const id = JSON.stringify([finding.engine, finding.rule, finding.path, finding.line, finding.column, finding.message]);
-      if (!seen.has(id)) { seen.add(id); findings.push(finding); }
-    }
+    judgeLintChunk(run, chunk, hfs, seen, findings, errors);
   }
   return { findings, errors };
 }
-
 const lintKey = (finding) => `${posixPath(finding.path ?? '')}|${finding.engine}/${finding.rule}`;
-const countBy = (items, key) => { const m = new Map(); for (const item of items) m.set(key(item), (m.get(key(item)) ?? 0) + 1); return m; };
+const countBy = (items, key) => { const m = new Map(); for (const item of items) { m.set(key(item), (m.get(key(item)) ?? 0) + 1); } return m; };
 
 /** Head lint findings minus the base's, per (file, engine/rule) count: {fresh[], preexisting}. */
 export function newLintFindings(head, baseCounts) {
@@ -163,7 +166,6 @@ export function newLintFindings(head, baseCounts) {
   const fresh = head.filter((finding) => grown.has(lintKey(finding)));
   return { fresh, preexisting: head.length - fresh.length };
 }
-
 const nearestWith = (root, file, names) => {
   let dir = path.dirname(path.join(root, file));
   for (;;) {
@@ -174,7 +176,6 @@ const nearestWith = (root, file, names) => {
     dir = up;
   }
 };
-
 /**
  * ESLint over base blobs, read-only: (basePath, headPath) -> the rule ids of the base blob of basePath linted as headPath through
  * the app's own install and the nearest flat config (null when the base has no such file). Cached per (base, paths, config).
@@ -201,7 +202,6 @@ function baseEslint({ root, base, readBase, cache }) {
     return messages;
   };
 }
-
 /**
  * The ESLint findings of `files` (root-relative) at `base`, read-only from git objects (no tree, no worktree, no link):
  * [{file, ruleId}] - what scripts/kernel/settle/canon-parity.mjs compares a slice's remaining canon findings with.
@@ -211,10 +211,9 @@ export async function baseEslintFindings({ root, base, files }) {
   const sha = resolveGateBase(root, base);
   const atBase = baseEslint({ root, base: sha, readBase: baseBlobReader(root, sha), cache: cacheDirs(root) });
   const out = [];
-  for (const file of [...new Set(files.map(posixPath))]) for (const ruleId of (await atBase(file, file)) ?? []) out.push({ file, ruleId });
+  for (const file of new Set(files.map(posixPath))) for (const ruleId of (await atBase(file, file)) ?? []) out.push({ file, ruleId });
   return out;
 }
-
 /**
  * The base counts of the lint keys the head reports:ESLint over the base blob of each file (lintText through the app's
  * own install and the nearest flat config), the repository checks over the base listing. Nothing is written to the tree.
@@ -243,7 +242,6 @@ async function lintBaseCounts({ root, base, head, delta, hfs, readBase, cache })
 }
 
 /* ------------------------------------------------------------------------------------ codegen + build */
-
 const npm = (cwd, script) => runNpm(['run', script], { cwd, maxBuffer: 256 * 1024 * 1024 });
 const readManifest = (dir) => readJsonFile(path.join(dir, 'package.json'));
 
@@ -260,33 +258,32 @@ function prepareTypes(root, cache) {
       const started = Date.now(), run = npm(root, 'codegen');
       steps.codegen = { ran: true, exit: run.status, ms: Date.now() - started };
       if (run.status === 0) stamps.codegen = inputStamp(root, inputs);
-      else errors.push(`codegen could not run (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n').slice(-1)[0]}`);
+      else errors.push(`codegen could not run (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n').at(-1)}`);
     }
   }
-  for (const dir of workspaceDirs(root, manifest)) {
-    const pkg = readManifest(path.join(root, dir));
-    if (!exposesDist(pkg) || !pkg?.scripts?.build) continue;
-    const inputs = ['.', `${dir}/dist`], stamp = inputStamp(root, inputs), key = `build:${dir}`;
-    if (stamps[key] === stamp && fs.existsSync(path.join(root, dir, 'dist'))) { steps.build.push({ package: pkg.name ?? dir, ran: false }); continue; }
-    const started = Date.now(), run = npm(path.join(root, dir), 'build');
-    steps.build.push({ package: pkg.name ?? dir, ran: true, exit: run.status, ms: Date.now() - started });
-    if (run.status === 0) stamps[key] = inputStamp(root, inputs);
-    else errors.push(`build of ${pkg.name ?? dir} could not run (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n').slice(-1)[0]}`);
-  }
+  for (const dir of workspaceDirs(root, manifest)) prepareBuild(root, dir, stamps, steps, errors);
   writeCache(path.join(cache.worktree, 'stamps.json'), stamps);
   return { steps, errors };
 }
+/** One dist-exposing workspace package's build, skipped while its inputs keep their stamp. */
+const prepareBuild = (root, dir, stamps, steps, errors) => {
+  const pkg = readManifest(path.join(root, dir));
+  if (!exposesDist(pkg) || !pkg?.scripts?.build) return;
+  const inputs = ['.', `${dir}/dist`], stamp = inputStamp(root, inputs), key = `build:${dir}`;
+  if (stamps[key] === stamp && fs.existsSync(path.join(root, dir, 'dist'))) { steps.build.push({ package: pkg.name ?? dir, ran: false }); return; }
+  const started = Date.now(), run = npm(path.join(root, dir), 'build');
+  steps.build.push({ package: pkg.name ?? dir, ran: true, exit: run.status, ms: Date.now() - started });
+  if (run.status === 0) stamps[key] = inputStamp(root, inputs);
+  else errors.push(`build of ${pkg.name ?? dir} could not run (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n').at(-1)}`);
+};
 
 /* ------------------------------------------------------------------------------------------------ tsc */
-
-
 /** The worktree's own *.tsbuildinfo files (outside node_modules and .git): stale ones report phantom errors. */
 function removeStaleBuildInfo(root) {
   const files = walkFiles(root, { filter: (name) => name.endsWith('.tsbuildinfo'), exclude: (name, full, entry) => entry.isDirectory() && (name === 'node_modules' || name === '.git'), ignoreReadErrors: true });
   for (const file of files) fs.rmSync(file, { force: true });
   return files.map((file) => posixPath(path.relative(root, file)));
 }
-
 /** A diagnostic as {path, line, code, message, key}; the key drops the position and the absolute root. */
 function tscFinding(ts, diagnostic, root) {
   const rootPaths = [path.resolve(root), posixPath(path.resolve(root))];
@@ -296,7 +293,6 @@ function tscFinding(ts, diagnostic, root) {
   const line = diagnostic.file && diagnostic.start !== undefined ? diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start).line + 1 : null;
   return { engine: 'tsc', rule: `TS${diagnostic.code}`, path: file, line, message, key: `${file ?? '-'}|TS${diagnostic.code}|${scrub(message).replace(/\s+/g, ' ').trim()}` };
 }
-
 const errorsOf = (ts, diagnostics, root) => diagnostics.filter((d) => d.category === ts.DiagnosticCategory.Error).map((d) => tscFinding(ts, d, root));
 const programDiagnostics = (program) => [...program.getConfigFileParsingDiagnostics(), ...program.getOptionsDiagnostics(), ...program.getGlobalDiagnostics(), ...program.getSyntacticDiagnostics(), ...program.getSemanticDiagnostics()];
 const NO_OUTPUT = { noEmit: true, composite: false, declaration: false, declarationMap: false, emitDeclarationOnly: false, sourceMap: false };
@@ -320,7 +316,6 @@ export function appRootOf(root, project) {
   if (pathKey(appRoot) !== pathKey(top) && isAppDeclaration(appRoot)) return appRoot;
   return lockRoot ?? top;
 }
-
 /** Whether `project` has an install: a node_modules in its folder or one above it, up to `bound` (the app root or the side). */
 function hasInstall(bound, root, project) {
   for (let dir = path.dirname(path.resolve(root, project)); ; dir = path.dirname(dir)) {
@@ -328,7 +323,6 @@ function hasInstall(bound, root, project) {
     if (pathKey(dir) === pathKey(bound) || path.dirname(dir) === dir) return false;
   }
 }
-
 /**
  * `base` (a ts.sys shape) answering only for paths inside `bound`, TypeScript's lib directory and the `allow`ed files; realpath
  * is the identity. Every program of the gate reads through one, so nothing above the app root satisfies an import.
@@ -346,7 +340,6 @@ export function boundedSys(ts, bound, base = ts.sys, allow = []) {
     realpath: (p) => p,
     onUnRecoverableConfigFileDiagnostic: () => {} };
 }
-
 /** The compiler host of `host` rewired onto a bounded sys: every lookup, and every source file, goes through it. */
 function boundHost(ts, host, sys) {
   return Object.assign(host, {
@@ -354,7 +347,6 @@ function boundHost(ts, host, sys) {
     getSourceFile: (fileName, languageVersion) => { const text = sys.readFile(fileName); return text === undefined ? undefined : ts.createSourceFile(fileName, text, languageVersion); },
   });
 }
-
 /** The app's own TypeScript: the first node_modules/typescript from the project's folder up to `bound`, never above it. */
 function loadTypeScript(bound, root, project) {
   for (let dir = path.dirname(path.resolve(root, project)); ; dir = path.dirname(dir)) {
@@ -364,7 +356,6 @@ function loadTypeScript(bound, root, project) {
   }
   throw new Error(`${INSTALL_MISSING} typescript is not installed under the app root ${posixPath(path.relative(root, bound)) || '.'}`);
 }
-
 /**
  * The head program of one project, bounded to `bound`: incremental, its buildinfo in the worktree's git dir (the one file
  * outside the bound it may read). The incremental host is built over the bounded sys, so its own versioned getSourceFile
@@ -372,7 +363,7 @@ function loadTypeScript(bound, root, project) {
  */
 function headTsc(ts, root, project, { bound, cache, required = [] }) {
   const configPath = path.join(root, project);
-  const buildInfo = path.join(cache.worktree, 'tsbuildinfo', `${sha256(`${TSC_BOUND}\0${project}\0${ts.version}\0${fs.readFileSync(configPath, 'utf8')}`).slice(0, 24)}.tsbuildinfo`);
+  const buildInfo = path.join(cache.worktree, 'tsbuildinfo', `${sha256(TSC_BOUND + '\0' + project + '\0' + ts.version + '\0' + fs.readFileSync(configPath, 'utf8')).slice(0, 24)}.tsbuildinfo`);
   fs.mkdirSync(path.dirname(buildInfo), { recursive: true });
   const sys = boundedSys(ts, bound, ts.sys, [buildInfo]);
   const parsed = ts.getParsedCommandLineOfConfigFile(configPath, {}, sys);
@@ -384,7 +375,6 @@ function headTsc(ts, root, project, { bound, cache, required = [] }) {
   program.emit();
   return findings;
 }
-
 /**
  * The base program of one project, read-only: a host whose files are the working tree's except every path the delta changed,
  * which reads its base blob (an added or renamed-to file does not exist, a deleted or renamed-from one comes back). A base
@@ -416,7 +406,6 @@ function baseTsc(ts, root, project, { bound, delta, readBase }) {
     ? { ...finding, path: movedTo.get(finding.path), key: `${movedTo.get(finding.path)}${finding.key.slice(finding.path.length)}` } : finding);
   return errorsOf(ts, programDiagnostics(program), root).map(moved);
 }
-
 /** Head tsc findings minus the base's, a multiset over normalised keys: {fresh[], preexisting}. */
 export function newTscFindings(head, baseFindings) {
   const remaining = countBy(baseFindings, (f) => f.key);
@@ -425,7 +414,6 @@ export function newTscFindings(head, baseFindings) {
 }
 
 /* ---------------------------------------------------------------------------------------------- tests */
-
 /** The slice's specs through the app's jest (--maxWorkers=2): {step, findings, error}. */
 function runTests(root, pattern, cache) {
   const cwd = [root, path.join(root, 'be')].find((dir) => JEST_CONFIGS.some((name) => fs.existsSync(path.join(dir, name))) || readManifest(dir)?.jest) ?? root;
@@ -436,7 +424,7 @@ function runTests(root, pattern, cache) {
   const started = Date.now();
   const run = runNode([bin, '--maxWorkers=2', '--ci', '--json', `--outputFile=${outputFile}`, pattern], { cwd, maxBuffer: 256 * 1024 * 1024 });
   const result = readCache(outputFile);
-  if (!result) return { step: { pattern, exit: run.status }, findings: [], error: `jest produced no json result (exit ${run.status}): ${String(run.stderr || run.error?.message || '').trim().split('\n').slice(-1)[0]}` };
+  if (!result) return { step: { pattern, exit: run.status }, findings: [], error: `jest produced no json result (exit ${run.status}): ${String(run.stderr || run.error?.message || '').trim().split('\n').at(-1)}` };
   const error = jestRunError(result, run);
   const totals = reduceJest(result);
   if (error) return { step: { pattern, exit: run.status, ...totals }, findings: [], error };
@@ -452,7 +440,6 @@ function runTests(root, pattern, cache) {
   if (!result.numTotalTests && !findings.length) findings.push({ engine: 'test', rule: 'no-test-matched', path: null, line: null, message: `no spec matched --tests ${pattern}` });
   return { step: { pattern, cwd: posixPath(path.relative(root, cwd)) || '.', exit: run.status, ...totals, ms: Date.now() - started }, findings, error: null };
 }
-
 /** The lint half: `starci app lint --changed` over the files, judged against the base. {step, fresh[], preexisting, errors[]} */
 async function lintAgainstBase({ root, base, files, delta, hfs, readBase, cache }) {
   const lint = runAppLint(root, files, hfs);
@@ -466,7 +453,6 @@ async function lintAgainstBase({ root, base, files, delta, hfs, readBase, cache 
   return { step: { files: files.length, findings: lint.findings.length, new: judged.fresh.length, preexisting: judged.preexisting },
     fresh: judged.fresh.map(({ engine, rule, path: file, line, message }) => ({ engine, rule, path: file, line, message })), preexisting: judged.preexisting, errors };
 }
-
 /**
  * The gate's lint half alone, for a caller that measures TypeScript itself (scripts/kernel/settle/canon-parity.mjs):
  * {exit, step, findings[] (new), preexisting, errors[]} over `files` against `base`, with the gate's exit codes.
@@ -476,14 +462,13 @@ export async function runLintGate({ root, base, files, hfs = null }) {
     root = path.resolve(root);
     const sha = resolveGateBase(root, base);
     const lint = await lintAgainstBase({ root, base: sha, files, delta: gateDelta(root, sha), hfs: hfs ?? hfsEntry(root), readBase: baseBlobReader(root, sha), cache: cacheDirs(root) });
-    return { exit: lint.errors.length ? GATE_EXIT.toolFailed : lint.fresh.length ? GATE_EXIT.findings : GATE_EXIT.clean, step: lint.step, findings: lint.fresh, preexisting: lint.preexisting, errors: lint.errors };
+    return { exit: [lint.errors.length && GATE_EXIT.toolFailed, lint.fresh.length && GATE_EXIT.findings].find(Boolean) ?? GATE_EXIT.clean, step: lint.step, findings: lint.fresh, preexisting: lint.preexisting, errors: lint.errors };
   } catch (error) {
     return { exit: GATE_EXIT.toolFailed, step: null, findings: [], preexisting: 0, errors: [String(error?.message ?? error)] };
   }
 }
 
 /* ------------------------------------------------------------------------------------------ merge guard */
-
 const GUARD_CHUNK = 200;
 /** {path -> blob} of `commit` over `paths` (ls-tree -z, chunked; a missing path has no entry). Full-tree, repository-relative. */
 function blobsAt(root, commit, paths) {
@@ -494,7 +479,6 @@ function blobsAt(root, commit, paths) {
   }
   return out;
 }
-
 /**
  * The main-side changes one merge commit dropped (owner 2026-10-01, merge 9958cce38 "merge main into lane/ut-int"): the merge
  * is recomputed with `git merge-tree --write-tree` from its lane parent and its main parent, and every path the main parent
@@ -516,13 +500,11 @@ export function droppedMainChanges(root, { merge, mainParent, laneParent }) {
     .map((file) => ({ path: file, conflicted: conflicts.has(file), main: main.get(file) ?? null, lane: lane.get(file) ?? null }));
   return { merge, lane: laneParent, main: mainParent, mergeBase, conflicted, dropped };
 }
-
 /** The main line a merge is judged against: `main`, else `master`, else null (then no merge has a main side). */
 export function mainTipOf(root, ref = null) {
   for (const name of ref ? [ref] : ['main', 'master']) { const sha = gitText(revParseQuery, root, ['--verify', '--quiet', `${name}^{commit}`])?.trim(); if (sha) return sha; }
   return null;
 }
-
 /**
  * THE merge guard: every merge commit in base..head whose parents split into exactly one main-side parent (an ancestor of the
  * main tip) and a lane parent is recomputed (droppedMainChanges); a merge with dropped main changes is a finding (engine
@@ -549,7 +531,6 @@ export function mergeGuard(root, { base, head = 'HEAD', mainTip = mainTipOf(root
 }
 
 /* ----------------------------------------------------------------------------------------- installed canon */
-
 const INSTALL = Object.freeze({ missing: 'CANON_INSTALL_MISSING', mismatch: 'CANON_INSTALL_MISMATCH', unjudged: 'CANON_INSTALL_UNJUDGED' });
 
 /**
@@ -565,7 +546,6 @@ function installedPackageRoot(directory, name, bound) {
   }
   return null;
 }
-
 /**
  * Every profile's canon as installed under the app at `root`, judged against its binding in `runtime`'s code-patterns.yaml:
  * the package resolved from the pin's side directory must have the bound version and content digest.
@@ -599,7 +579,84 @@ export function installedCanonFindings(root, { runtime = runtimeRoot } = {}) {
 }
 
 /* ----------------------------------------------------------------------------------------------- gate */
-
+/** The op-binding's owned scope for this root (and the default base it implies); throws when out of scope. */
+const gateOwned = (context, root, takeBase) => {
+  const binding = context?.gateBinding;
+  if (!binding) return null;
+  const target = binding.targets?.find((row) => sameResolvedPath(row.root, root));
+  if (!target?.head || !target.owned?.length) throw new Error('the gate target is not in the admitted job scope');
+  takeBase(target.head);
+  return target.owned;
+};
+/** The installed canon and the merge guard: findings that never count as preexisting. */
+const runStaticChecks = (root, report, main, fresh) => {
+  // The installed canon: the lint below means nothing over a canon that is not the bound one.
+  const installed = installedCanonFindings(root);
+  report.steps.canon = installed.checked;
+  report.errors.push(...installed.errors);
+  fresh.push(...installed.findings);
+  // The merge guard first: a merge in base..HEAD that took the lane side over a main-side change is never a clean branch.
+  const guard = mergeGuard(root, { base: report.base, mainTip: mainTipOf(root, main) });
+  report.steps.merges = { checked: guard.checked, dropped: guard.findings.length };
+  report.errors.push(...guard.errors);
+  fresh.push(...guard.findings);
+};
+/** The lint step over the changed files; returns its preexisting count. */
+const runLintStep = async (root, report, { delta, hfs, readBase, cache }, fresh) => {
+  if (!report.changed.length) return 0;
+  const lint = await lintAgainstBase({ root, base: report.base, files: report.changed, delta, hfs: hfs ?? hfsEntry(root), readBase, cache });
+  report.errors.push(...lint.errors);
+  report.steps.lint = lint.step;
+  fresh.push(...lint.fresh);
+  return lint.preexisting;
+};
+/** One project's head tsc against its base; tool errors land in report.errors, never thrown. */
+const tscProject = (root, project, report, { cache, delta, readBase, typescript, required }, fresh) => {
+  const started = Date.now();
+  // No install, no measurement: a program over an app with no node_modules would only count its missing imports.
+  const bound = appRootOf(root, project);
+  if (!hasInstall(bound, root, project)) {
+    report.errors.push(`${INSTALL_MISSING} tsc cannot measure ${project}: its app root ${posixPath(path.relative(root, bound)) || '.'} (or its side) has no install (node_modules); install it and re-run`);
+    return 0;
+  }
+  try {
+    const ts = typescript ?? loadTypeScript(bound, root, project);
+    const head = headTsc(ts, root, project, { bound, cache, required });
+    const baseFindings = head.length ? baseTsc(ts, root, project, { bound, delta, readBase }) : [];
+    const judged = newTscFindings(head, baseFindings);
+    report.steps.tsc.push({ project, errors: head.length, new: judged.fresh.length, preexisting: judged.preexisting, ms: Date.now() - started });
+    fresh.push(...judged.fresh.map(({ key, ...finding }) => finding));
+    return judged.preexisting;
+  } catch (error) { report.errors.push(`tsc could not run on ${project}: ${String(error?.message ?? error).split('\n')[0]}`); return 0; }
+};
+/** The impact-driven tsc steps: stale buildinfo, codegen/build prerequisites, then one bounded program per project. */
+const runTscSteps = (root, report, { cache, delta, readBase, typescript }, fresh) => {
+  let impact;
+  try { impact = typeImpact(root, report.inputs.map((file) => file.path), { deleted: report.inputs.filter((file) => file.sha256 === null).map((file) => file.path) }); }
+  catch (error) { impact = { projects: [], required: new Map(), errors: [`tsc impact could not be measured: ${error.message}`] }; }
+  report.errors.push(...impact.errors);
+  if (!impact.projects.length || impact.errors.length) return 0;
+  report.steps.staleBuildInfo = removeStaleBuildInfo(root);
+  let prepared;
+  try { prepared = prepareTypes(root, cache); }
+  catch (error) { prepared = { steps: { codegen: null, build: [] }, errors: [`type prerequisites could not be measured: ${error.message}`] }; }
+  report.steps.codegen = prepared.steps.codegen;
+  report.steps.build = prepared.steps.build;
+  report.errors.push(...prepared.errors);
+  let preexisting = 0;
+  if (!prepared.errors.length) for (const project of impact.projects) {
+    preexisting += tscProject(root, project, report, { cache, delta, readBase, typescript, required: impact.required.get(project) }, fresh);
+  }
+  return preexisting;
+};
+/** The post-run input check: a slice that moved during CHECK is rerun, never admitted. */
+const verifyGateInputs = (root, report, changed, owned) => {
+  try {
+    const after = gateInputSnapshot(root, report.base, changed ?? [], owned);
+    if (JSON.stringify(after.inputs) !== JSON.stringify(report.inputs) || !isAncestor(root, report.head, after.head))
+      report.errors.push('the gate inputs changed during CHECK; rerun over the current slice');
+  } catch (error) { report.errors.push(String(error?.message ?? error)); }
+};
 /**
  * Run the gate; resolves the starci/gate@1 report. Never throws for a tool failure: it lands in errors[] with exit 2.
  * Spec seams: `hfs` ({dir, bin}) the starci CLI to lint with and its @starci/hfs, default hfsEntry(root); `ts` the TypeScript module, default
@@ -614,13 +671,7 @@ export async function runGate({ root, base = null, changed = null, tests = null,
   let cache, delta, owned = null;
   try {
     root = path.resolve(root);
-    const binding = context?.gateBinding;
-    if (binding) {
-      const target = binding.targets?.find((row) => sameResolvedPath(row.root, root));
-      if (!target?.head || !target.owned?.length) throw new Error('the gate target is not in the admitted job scope');
-      owned = target.owned;
-      base ??= target.head;
-    }
+    owned = gateOwned(context, root, (head) => { base ??= head; });
     report.base = resolveGateBase(root, base);
     report.head = gitText(revParseQuery, root, ['HEAD'])?.trim() ?? null;
     const status = gitText(gitStatus, root, ['--porcelain']);
@@ -638,88 +689,30 @@ export async function runGate({ root, base = null, changed = null, tests = null,
   const readBase = baseBlobReader(root, report.base);
   const fresh = [];
   let preexisting = 0;
-
-  // The installed canon: the lint below means nothing over a canon that is not the bound one.
-  const installed = installedCanonFindings(root);
-  report.steps.canon = installed.checked;
-  report.errors.push(...installed.errors);
-  fresh.push(...installed.findings);
-
-  // The merge guard first: a merge in base..HEAD that took the lane side over a main-side change is never a clean branch.
-  const guard = mergeGuard(root, { base: report.base, mainTip: mainTipOf(root, main) });
-  report.steps.merges = { checked: guard.checked, dropped: guard.findings.length };
-  report.errors.push(...guard.errors);
-  fresh.push(...guard.findings);
-
-  if (report.changed.length) {
-    const lint = await lintAgainstBase({ root, base: report.base, files: report.changed, delta, hfs: hfs ?? hfsEntry(root), readBase, cache });
-    report.errors.push(...lint.errors);
-    report.steps.lint = lint.step;
-    fresh.push(...lint.fresh);
-    preexisting += lint.preexisting;
-  }
-
-  let impact;
-  try { impact = typeImpact(root, report.inputs.map((file) => file.path), { deleted: report.inputs.filter((file) => file.sha256 === null).map((file) => file.path) }); }
-  catch (error) { impact = { projects: [], required: new Map(), errors: [`tsc impact could not be measured: ${error.message}`] }; }
-  report.errors.push(...impact.errors);
-  if (impact.projects.length && !impact.errors.length) {
-    report.steps.staleBuildInfo = removeStaleBuildInfo(root);
-    let prepared;
-    try { prepared = prepareTypes(root, cache); }
-    catch (error) { prepared = { steps: { codegen: null, build: [] }, errors: [`type prerequisites could not be measured: ${error.message}`] }; }
-    report.steps.codegen = prepared.steps.codegen;
-    report.steps.build = prepared.steps.build;
-    report.errors.push(...prepared.errors);
-    if (!prepared.errors.length) for (const project of impact.projects) {
-      const started = Date.now();
-      // No install, no measurement: a program over an app with no node_modules would only count its missing imports.
-      const bound = appRootOf(root, project);
-      if (!hasInstall(bound, root, project)) {
-        report.errors.push(`${INSTALL_MISSING} tsc cannot measure ${project}: its app root ${posixPath(path.relative(root, bound)) || '.'} (or its side) has no install (node_modules); install it and re-run`);
-        continue;
-      }
-      try {
-        const ts = typescript ?? loadTypeScript(bound, root, project);
-        const head = headTsc(ts, root, project, { bound, cache, required: impact.required.get(project) });
-        const baseFindings = head.length ? baseTsc(ts, root, project, { bound, delta, readBase }) : [];
-        const judged = newTscFindings(head, baseFindings);
-        report.steps.tsc.push({ project, errors: head.length, new: judged.fresh.length, preexisting: judged.preexisting, ms: Date.now() - started });
-        fresh.push(...judged.fresh.map(({ key, ...finding }) => finding));
-        preexisting += judged.preexisting;
-      } catch (error) { report.errors.push(`tsc could not run on ${project}: ${String(error?.message ?? error).split('\n')[0]}`); }
-    }
-  }
-
+  runStaticChecks(root, report, main, fresh);
+  preexisting += await runLintStep(root, report, { delta, hfs, readBase, cache }, fresh);
+  preexisting += runTscSteps(root, report, { cache, delta, readBase, typescript }, fresh);
   if (tests) {
     const tested = runTests(root, tests, cache);
     report.steps.tests = tested.step;
     if (tested.error) report.errors.push(tested.error);
     fresh.push(...tested.findings);
   }
-
   report.counts = { new: fresh.length, preexisting };
   report.findings = fresh.slice(0, LISTED_MAX);
-  try {
-    const after = gateInputSnapshot(root, report.base, changed ?? [], owned);
-    if (JSON.stringify(after.inputs) !== JSON.stringify(report.inputs) || !isAncestor(root, report.head, after.head))
-      report.errors.push('the gate inputs changed during CHECK; rerun over the current slice');
-  } catch (error) { report.errors.push(String(error?.message ?? error)); }
+  verifyGateInputs(root, report, changed, owned);
   return finish(report);
 }
-
 function finish(report) {
-  report.exit = report.errors.length ? GATE_EXIT.toolFailed : report.counts.new ? GATE_EXIT.findings : GATE_EXIT.clean;
+  report.exit = [report.errors.length && GATE_EXIT.toolFailed, report.counts.new && GATE_EXIT.findings].find(Boolean) ?? GATE_EXIT.clean;
   report.ok = report.exit === GATE_EXIT.clean;
   return report;
 }
-
 /** The document checks of op-gate.yaml docChecks: [{id, script, tree}]. */
 function docChecksOf(runtime = runtimeRoot) {
   const doc = parseYaml(fs.readFileSync(path.join(runtime, 'knowledge', 'op-gate.yaml'), 'utf8'));
   return (doc?.docChecks ?? []).map((c) => ({ id: String(c.id), script: String(c.script), tree: c.tree === true }));
 }
-
 const DOC_PATH = /^(?:REFUSED?\s+)?([^\s:]+\.(?:md|ya?ml|mjs|json)):(\d+)/;
 /** The lines a document check prints for its refusals: REFUSE/REFUSED or file:line lines when it has them, else its last lines. */
 function refusalLines(output) {
@@ -727,7 +720,26 @@ function refusalLines(output) {
   const refused = all.filter((l) => /^REFUSED?\b/.test(l) || DOC_PATH.test(l));
   return (refused.length ? refused : all.slice(-5)).slice(0, 50);
 }
-
+/** One doc check's run: its step row, its tool errors, its refusal findings. */
+const runDocCheck = (check, { runtime, tree, spawn, report, fresh }) => {
+  const args = [path.join(runtime, check.script), ...(check.tree && tree ? ['--tree', path.resolve(tree)] : [])];
+  const started = Date.now();
+  const run = spawn(args, { cwd: runtime, maxBuffer: 256 * 1024 * 1024 });
+  report.steps.docs.push({ id: check.id, command: `node ${check.script}${check.tree && tree ? ' --tree <tree>' : ''}`, exit: run.status ?? null, ms: Date.now() - started });
+  // An uncaught exception also exits 1: a stack trace on stderr is a check that could not run, never its findings.
+  const crashed = run.status === 1 && String(run.stderr ?? '').split('\n').some((l) => /^\s+at /.test(l) && /[:(]\d+:\d+\)?$/.test(l));
+  if (run.error || crashed || (run.status !== 0 && run.status !== 1)) {
+    const reason = String(run.stderr ?? '').split(/\r?\n/).find((l) => /Error/.test(l))?.trim() ?? '';
+    report.errors.push(`${check.id} could not run (exit ${run.status ?? run.error?.message})${reason ? ': ' + reason : ''}`);
+    return;
+  }
+  if (run.status === 1) {
+    for (const message of refusalLines(`${run.stdout ?? ''}\n${run.stderr ?? ''}`)) {
+      const at = DOC_PATH.exec(message);
+      fresh.push({ engine: 'doc', rule: check.id, path: at?.[1] ?? null, line: at ? Number(at[2]) : null, message });
+    }
+  }
+};
 /**
  * The document profile: each docChecks script run from the runtime root (`tree` ones with --tree when given). Exit 1 of a check
  * is its findings, any other exit (or a spawn error) a tool that could not run. The same starci/gate@1 envelope, profile docs.
@@ -739,25 +751,7 @@ export function runDocGate({ tree = null, runtime = runtimeRoot, checks = docChe
   if (tree && !fs.existsSync(path.resolve(tree))) { report.errors.push(`--tree ${tree} does not exist`); return finish(report); }
   if (!checks.length) { report.errors.push('knowledge/op-gate.yaml names no docChecks'); return finish(report); }
   const fresh = [];
-  for (const check of checks) {
-    const args = [path.join(runtime, check.script), ...(check.tree && tree ? ['--tree', path.resolve(tree)] : [])];
-    const started = Date.now();
-    const run = spawn(args, { cwd: runtime, maxBuffer: 256 * 1024 * 1024 });
-    report.steps.docs.push({ id: check.id, command: `node ${check.script}${check.tree && tree ? ' --tree <tree>' : ''}`, exit: run.status ?? null, ms: Date.now() - started });
-    // An uncaught exception also exits 1: a stack trace on stderr is a check that could not run, never its findings.
-    const crashed = run.status === 1 && /^\s+at .+[:(]\d+:\d+\)?$/m.test(String(run.stderr ?? ''));
-    if (run.error || crashed || (run.status !== 0 && run.status !== 1)) {
-      const reason = String(run.stderr ?? '').split(/\r?\n/).find((l) => /Error/.test(l))?.trim() ?? '';
-      report.errors.push(`${check.id} could not run (exit ${run.status ?? run.error?.message})${reason ? `: ${reason}` : ''}`);
-      continue;
-    }
-    if (run.status === 1) {
-      for (const message of refusalLines(`${run.stdout ?? ''}\n${run.stderr ?? ''}`)) {
-        const at = DOC_PATH.exec(message);
-        fresh.push({ engine: 'doc', rule: check.id, path: at?.[1] ?? null, line: at ? Number(at[2]) : null, message });
-      }
-    }
-  }
+  for (const check of checks) runDocCheck(check, { runtime, tree, spawn, report, fresh });
   report.counts = { new: fresh.length, preexisting: 0 };
   report.findings = fresh.slice(0, LISTED_MAX);
   return finish(report);

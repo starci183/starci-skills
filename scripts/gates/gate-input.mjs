@@ -42,6 +42,13 @@ export function resolveGateBase(root, base = null, { workflowBase = (dir) => gat
  * renamed Map(new -> old)}. A rename's old path counts as deleted and its new path is measured against the old path's base
  * blob, so the findings a move carries stay preexisting; untracked files are additions.
  */
+/** Files one non-rename diff status line into the delta sets. */
+const recordStatus = (kind, rel, { added, deleted, changed }) => {
+  if (kind === 'D') { deleted.add(rel); return; }
+  changed.add(rel);
+  if (kind === 'A') added.add(rel);
+};
+
 function gateDelta(root, base) {
   const diff = gitText(gitDiff, root, ['--name-status', '-z', '--find-renames', '--relative', base]);
   const untracked = gitText(lsFiles, root, ['--others', '--exclude-standard', '-z']);
@@ -57,8 +64,7 @@ function gateDelta(root, base) {
       if (!to) throw new Error('the gate rename has no destination');
       deleted.add(rel); changed.add(posixPath(to)); renamed.set(posixPath(to), rel);
     }
-    else if (kind === 'D') deleted.add(rel);
-    else { changed.add(rel); if (kind === 'A') added.add(rel); }
+    else recordStatus(kind, rel, { added, deleted, changed });
   }
   for (const file of String(untracked).split('\0').filter(Boolean)) { const rel = posixPath(file); changed.add(rel); added.add(rel); }
   return { changed: [...changed].filter((file) => fs.existsSync(path.join(root, file))).sort(byCodeUnit), added, deleted, renamed };

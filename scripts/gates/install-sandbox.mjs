@@ -94,16 +94,16 @@ function exists(file) { return fs.existsSync(file); }
 
 /** The managed gitignore entries `text` lacks, matching a line with or without a leading slash. Pure. */
 export function missingIgnores(text, entries = HOST_IGNORES) {
-  const lines = text.split(/\r?\n/).map((line) => line.trim());
-  return entries.filter((entry) => !lines.includes(entry) && !lines.includes(`/${entry}`));
+  const lines = new Set(text.split(/\r?\n/).map((line) => line.trim()));
+  return entries.filter((entry) => !lines.has(entry) && !lines.has(`/${entry}`));
 }
 
 /** The last `lines` non-blank lines of `text` (CRLF folded): the part of a child's output that names its failure. Pure. */
-export function tailOf(text, lines = TAIL_LINES) { return String(text ?? '').replace(/\r\n/g, '\n').split('\n').filter((line) => line.trim()).slice(-lines).join('\n'); }
+export function tailOf(text, lines = TAIL_LINES) { return String(text ?? '').replaceAll('\r\n', '\n').split('\n').filter((line) => line.trim()).slice(-lines).join('\n'); }
 
 /** The failure detail of a child step: its exit, the installer's JSON result line when it printed one, then the tail of its stdout, stderr and own report. Pure. */
 export function childDetail({ label, status, stdout = '', stderr = '', report = '' }) {
-  const result = String(stdout).replace(/\r\n/g, '\n').split('\n').filter((line) => line.startsWith('initial age setup: ')).at(-1);
+  const result = String(stdout).replaceAll('\r\n', '\n').split('\n').findLast((line) => line.startsWith('initial age setup: '));
   return [`${label} exit ${status}`, ...(result ? [`installer result: ${result}`] : []), `--- output tail (last ${TAIL_LINES} lines of stdout, stderr and report)`, tailOf(`${stdout}\n${stderr}\n${report}`)].join('\n');
 }
 
@@ -133,10 +133,11 @@ export function summaryOf({ results, version, platform, node, sandbox }) {
 
 /** The markdown table of a summary for $GITHUB_STEP_SUMMARY. Pure. */
 export function summaryMarkdown(summary) {
-  const rows = summary.results.map((r) => `| ${r.status} | ${r.name} | ${String(r.detail ?? '').replace(/\|/g, '/').split(/\r?\n/)[0].slice(0, 200)} |`);
+  const rows = summary.results.map((r) => `| ${r.status} | ${r.name} | ${String(r.detail ?? '').replaceAll('|', '/').split(/\r?\n/)[0].slice(0, 200)} |`);
   const fence = '`'.repeat(3);
   const long = summary.results.filter((r) => r.status !== 'pass' && String(r.detail ?? '').includes('\n')).map((r) => `<details open><summary>${r.name}</summary>\n\n${fence}text\n${r.detail.replaceAll(fence, "'''")}\n${fence}\n</details>\n`);
-  return [`## Install sandbox (${summary.platform}, node ${summary.node}, starci ${summary.version})`, '', `passed ${summary.passed}, failed ${summary.failed}, could not run ${summary.errored}${summary.skipped ? `, skipped ${summary.skipped}` : ''}`, '', '| result | assertion | detail |', '| --- | --- | --- |', ...rows, '', ...long].join('\n');
+  const skipped = summary.skipped ? `, skipped ${summary.skipped}` : '';
+  return [`## Install sandbox (${summary.platform}, node ${summary.node}, starci ${summary.version})`, '', `passed ${summary.passed}, failed ${summary.failed}, could not run ${summary.errored}${skipped}`, '', '| result | assertion | detail |', '| --- | --- | --- |', ...rows, '', ...long].join('\n');
 }
 
 /** The `docker run` arguments (after `--rm`) of the Linux sandbox: one named container, the staged directory mounted READ-ONLY at /in, no port, no other mount. Pure. */
@@ -204,7 +205,7 @@ async function removeTree(dir) {
 class CouldNotRun extends Error {}
 
 const read = (file) => fs.readFileSync(file, 'utf8');
-const lf = (text) => text.split('\r\n').join('\n');
+const lf = (text) => text.replaceAll('\r\n', '\n');
 
 /** A finished child as {status, stdout, stderr}; a spawn error (`label` could not start) is CouldNotRun. */
 function finished(label, result) {
@@ -327,14 +328,16 @@ async function runSandbox({ tarball, keep = false }) {
       record('runtime.json names <app>/.claude as the runtime root', record0 !== null && path.resolve(record0.root) === claude, record0 ? record0.root : 'missing');
       record('the starci shim file exists', exists(shim), rel(shim));
       // The shim is the per-user launcher; a .cmd needs the command interpreter, a POSIX shim runs directly.
+      const quoted = (a) => (/[\s&]/.test(a) ? `"${a}"` : a);
       const starci = (args, extra = {}) => platform === 'win32'
-        ? exec(readEnv('ComSpec') ?? 'cmd.exe', ['/d', '/s', '/c', `"${shim}" ${args.map((a) => (/[\s&]/.test(a) ? `"${a}"` : a)).join(' ')}`], { ...opts, windowsVerbatimArguments: true, ...extra })
+        ? exec(readEnv('ComSpec') ?? 'cmd.exe', ['/d', '/s', '/c', `"${shim}" ${args.map(quoted).join(' ')}`], { ...opts, windowsVerbatimArguments: true, ...extra })
         : exec(shim, args, { ...opts, ...extra });
       // `starci --version` prints the version of the CLI package (packages/cli, its own semver); the runtime version is the one `runtime version` prints.
       const cliVersion = starci(['--version']);
       record('starci --version prints a semver', cliVersion.status === 0 && /^\d+\.\d+\.\d+/.test(cliVersion.stdout.trim()), `cli package ${JSON.stringify(cliVersion.stdout.trim().slice(0, 40))}`);
       const v = starci(['runtime', 'version']);
-      record('starci runtime version equals the tarball version', v.status === 0 && v.stdout.trim() === version, `exit ${v.status}, printed ${JSON.stringify(v.stdout.trim().slice(0, 80))}, tarball ${version}${v.stderr.trim() ? `, stderr ${JSON.stringify(v.stderr.trim().slice(0, 200))}` : ''}`);
+      const stderr = v.stderr.trim() ? `, stderr ${JSON.stringify(v.stderr.trim().slice(0, 200))}` : '';
+      record('starci runtime version equals the tarball version', v.status === 0 && v.stdout.trim() === version, `exit ${v.status}, printed ${JSON.stringify(v.stdout.trim().slice(0, 80))}, tarball ${version}${stderr}`);
       const entry = starci(['runtime', 'check', '--only', 'entry', '--', app]);
       record('starci runtime check --only entry <app> passes', entry.status === 0, `exit ${entry.status}, ${(entry.stdout || entry.stderr).trim().slice(0, 400)}`);
       const machine = path.join(store, 'machine.sqlite');
@@ -364,7 +367,10 @@ async function runSandbox({ tarball, keep = false }) {
       fs.mkdirSync(path.join(root, 'app-spelled'));
       const made = gitInit(other, { env });
       const code = made.ok ? await install({ cwd: other, homeDir: homeSpelled, environment: sandboxEnv({ base: env, home: homeSpelled, platform }) }) : null;
-      record(name, code === 0 && exists(path.join(root, 'app-spelled', '.claude', '.starci-skills.json')), code === 0 ? `through ${spelled.path}` : made.ok ? failed('runtime install through the spelled path', code) : made.stderr);
+      let detail = made.stderr;
+      if (code === 0) detail = `through ${spelled.path}`;
+      else if (made.ok) detail = failed('runtime install through the spelled path', code);
+      record(name, code === 0 && exists(path.join(root, 'app-spelled', '.claude', '.starci-skills.json')), detail);
       if (spelled.holder) fs.unlinkSync(spelled.holder);
     });
   } else if (fetched) skipped(['configuration assertions', 'shim and CLI assertions', 'second install'], 'skipped: the runtime install above failed, so there is no installed host to assert');
@@ -418,7 +424,10 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   }
   const text = JSON.stringify(summary, null, 2);
   process.stdout.write(`${text}\n`);
-  for (const r of summary.results) process.stdout.write(`${r.status.toUpperCase().padEnd(5)} ${r.name}${r.status === 'pass' ? '' : `: ${r.detail}`}\n`);
+  for (const r of summary.results) {
+    const detail = r.status === 'pass' ? '' : `: ${r.detail}`;
+    process.stdout.write(`${r.status.toUpperCase().padEnd(5)} ${r.name}${detail}\n`);
+  }
   if (args.out) fs.writeFileSync(args.out, `${text}\n`);
   if (env.GITHUB_STEP_SUMMARY) fs.appendFileSync(env.GITHUB_STEP_SUMMARY, `${summaryMarkdown(summary)}\n`);
   return exitCodeFor(summary.results);

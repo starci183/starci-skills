@@ -19,9 +19,10 @@ import {posixPath} from '../lib/path-key.mjs';
 import { log as gitLog } from '../api/git/log.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { mergeBase as mergeBaseOf } from '../api/git/merge-base.mjs';
 import { unquoteDiffPath } from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
-import {coverageScopeOf,coverageTargetOf,judgeCoverage,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
+import {coverageScopeOf,coverageTargetOf,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
+import { evaluateSlice as evaluateSliceCore } from './sonar-slice.mjs';
 import {text} from '../lib/stack-declaration.mjs';
-import {extSecretsDir,launcher,sealExtCustody,readCustody} from './sonar-ext-custody.mjs';
+import {extSecretsDir,sealExtCustody,readCustody} from './sonar-ext-custody.mjs';
 import {inspectOwnerConfig,specsSettings} from '../../engine/config.mjs';
 import {createRequire} from 'node:module';
 import { isSpecRun } from '../lib/env.mjs';
@@ -91,7 +92,10 @@ const LOG_CAP=4*1024*1024;
 // ---- secrets never leave this module in the clear -------------------------------------------------------
 
 const SECRETS=new Set();
-const remember=value=>{if(typeof value==='string'&&value.length>=4)SECRETS.add(value);return value;};
+const remember=value=>{
+  if(typeof value==='string'&&value.length>=4)SECRETS.add(value);
+  return value;
+};
 /** Replace every secret this process has read with *** (tokens also appear URL- or base64-encoded). */
 export function scrub(text){
   let out=String(text??'');
@@ -136,6 +140,36 @@ export function findDeclaration(cwd){
   return null;
 }
 
+/** The stack block of a Sonar service declaration resolved to {stackDir, composeFile, container}. */
+const declaredStackOf=(sonar,repoDir,repoRoot)=>{
+  let stackDir=null,composeFile=null,container=null;
+  if(plain(sonar.stack)){
+    const stack=sonar.stack;
+    const compose=text(stack.compose);
+    if(text(stack.owner)==='host'){
+      // The host form lives in this runtime tree (.claude/ext/<service>), not in the declaring
+      // repository (check-starcistacks.mjs normalizeService resolves it the same way).
+      const root=text(stack.root)?.replaceAll('\\','/');
+      stackDir=root&&/^\.claude\/ext\/[a-z][a-z0-9-]*$/.test(root)?path.join(skillRoot,root.slice('.claude/'.length)):null;
+      if(compose&&stackDir)composeFile=path.join(stackDir,compose);
+    }else{
+      const dir=repoDir(text(stack.repository));
+      stackDir=path.join(dir,text(stack.root)??'.starcistacks',text(stack.environment)??'dev');
+      if(compose)composeFile=/^\.starcistacks[\\/]/.test(compose)?path.join(dir,compose):path.resolve(stackDir,compose);
+    }
+    container=text(stack.container);
+  }else if(text(sonar.stack)&&sonar.stack!=='source-host')stackDir=path.join(repoRoot,'.starcistacks',sonar.stack);
+  return {stackDir,composeFile,container};
+};
+
+/** The declared projects, both forms (a list of {repository,key,name}, or a map repository -> key|{key,name}). */
+const declaredProjectsOf=sonar=>{
+  let list=[];
+  if(Array.isArray(sonar.projects))list=sonar.projects.filter(plain).map(p=>({repository:text(p.repository),key:text(p.key),name:text(p.name)}));
+  else if(plain(sonar.projects))list=Object.entries(sonar.projects).map(([repository,v])=>({repository,key:text(v)??text(v?.key),name:text(v?.name)}));
+  return list.filter(p=>p.key);
+};
+
 /**
  * The thin resolver between a stack declaration and this helper, so the declaration schema
  * (modules/schemas/application-stacks.schema.yaml `services`) can evolve on its own. It reads
@@ -160,25 +194,8 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
   // A named repository resolves by identity (scripts/gates/runtime-host.mjs): the declaring repository, the runtime host or a
   // sibling checkout; one not checked out here is named where its sibling checkout would be, so its custody reads as missing.
   const repoDir=name=>!name?repoRoot:resolveDeclaredRepository(name,{fromRepo:repoRoot})??path.join(path.dirname(repositoryHome(repoRoot)),name);
-  let stackDir=null,composeFile=null,container=null;
-  if(plain(sonar.stack)){
-    const stack=sonar.stack;
-    const compose=text(stack.compose);
-    if(text(stack.owner)==='host'){
-      // The host form lives in this runtime tree (.claude/ext/<service>), not in the declaring
-      // repository (check-starcistacks.mjs normalizeService resolves it the same way).
-      const root=text(stack.root)?.replace(/\\/g,'/');
-      stackDir=root&&/^\.claude\/ext\/[a-z][a-z0-9-]*$/.test(root)?path.join(skillRoot,root.slice('.claude/'.length)):null;
-      if(compose&&stackDir)composeFile=path.join(stackDir,compose);
-    }else{
-      const dir=repoDir(text(stack.repository));
-      stackDir=path.join(dir,text(stack.root)??'.starcistacks',text(stack.environment)??'dev');
-      if(compose)composeFile=/^\.starcistacks[\\/]/.test(compose)?path.join(dir,compose):path.resolve(stackDir,compose);
-    }
-    container=text(stack.container);
-  }else if(text(sonar.stack)&&sonar.stack!=='source-host')stackDir=path.join(repoRoot,'.starcistacks',sonar.stack);
-  const projects=(Array.isArray(sonar.projects)?sonar.projects.filter(plain).map(p=>({repository:text(p.repository),key:text(p.key),name:text(p.name)}))
-    :plain(sonar.projects)?Object.entries(sonar.projects).map(([repository,v])=>({repository,key:text(v)??text(v?.key),name:text(v?.name)})):[]).filter(p=>p.key);
+  const {stackDir,composeFile,container}=declaredStackOf(sonar,repoDir,repoRoot);
+  const projects=declaredProjectsOf(sonar);
   const credentials=(Array.isArray(sonar.credentials)?sonar.credentials:[]).filter(plain).map(c=>({id:text(c.id)??'',env:text(c.env),purpose:text(c.purpose)??'',
     file:resolveCustodyFile(repoDir(text(c.custody?.repository)),text(c.custody?.path))})).filter(c=>c.file);
   const isAdmin=c=>/admin/i.test(c.id)||/admin/i.test(path.basename(c.file));
@@ -215,12 +232,17 @@ export function resolveConfig(options={},env=process.env){
   let decl=null,declarationError=null;
   if(found){try{decl=readSonarDeclaration(found.file,found.repoRoot);}catch(error){declarationError=`${found.file}: ${error.message}`;}}
   const stackDir=path.resolve(options.stack??decl?.stackDir??env.STARCI_SONAR_STACK??sourceHostStackDir());
-  const declaredHost=decl?(decl.mode==='hosted'?decl.hostPublic:decl.hostLocal):null;
-  const selectedHost=options.host??(Object.hasOwn(env,'SONAR_HOST_URL')?env.SONAR_HOST_URL:declaredHost??env.STARCI_SONAR_HOST_URL);
+  let declaredHost=null;
+  if(decl)declaredHost=decl.mode==='hosted'?decl.hostPublic:decl.hostLocal;
+  const envHost=Object.hasOwn(env,'SONAR_HOST_URL')?env.SONAR_HOST_URL:declaredHost??env.STARCI_SONAR_HOST_URL;
+  const selectedHost=options.host??envHost;
   const host=selectedHost??DEFAULT_HOST;
   const administrativeHost=options.host??declaredHost??env.STARCI_SONAR_HOST_URL??DEFAULT_HOST;
   const repository=options.cwd?repositoryName(path.resolve(options.cwd)):null;
   const project=decl?.projects.find(p=>p.repository===repository)??null;
+  let declaration=null;
+  if(decl)declaration={file:decl.file,provider:decl.provider,mode:decl.mode,projects:decl.projects.map(p=>p.key),ci:decl.ci?.wiring??null,ownerAction:decl.ownerAction};
+  else if(declarationError)declaration={error:declarationError};
   return bindSonarCredentials({
     host:safeSonarHost(host)??'',
     publicHost:String(decl?.hostPublic??PUBLIC_HOST).replace(/\/+$/,''),
@@ -239,7 +261,7 @@ export function resolveConfig(options={},env=process.env){
     declaredName:project?.name??null,
     declaredTokenRef:project?.tokenRef??null,
     disabled:decl?.mode==='disabled'?(decl.reason??'the stack declaration disables Sonar'):null,
-    declaration:decl?{file:decl.file,provider:decl.provider,mode:decl.mode,projects:decl.projects.map(p=>p.key),ci:decl.ci?.wiring??null,ownerAction:decl.ownerAction}:(declarationError?{error:declarationError}:null),
+    declaration,
     // specs: the owner's product-test switches ({unit}); null reads config.yaml `specs` per scan. coverageRunner: the
     // function that writes the slice's lcov (runSliceCoverage); a spec passes its own.
     specs:options.specs??null,
@@ -281,7 +303,7 @@ function writeCustody(cfg,ref,value,{env}){
   if((!managed||path.basename(managed)!=='.starcistacks')&&!cfg.stackSecret)
     return {ok:false,reason:`the custody member ${ref} is neither under a .starcistacks tree a stack-secret tool manages nor in a runtime extension's secrets directory`};
   if(!fs.existsSync(tool))return {ok:false,reason:`no stack-secret tool at ${tool}`};
-  const target=path.relative(stacksRoot,file).replace(/\\/g,'/');
+  const target=path.relative(stacksRoot,file).replaceAll('\\','/');
   const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
   try{
     fs.writeFileSync(tmp,value,{mode:0o600});
@@ -352,7 +374,11 @@ async function firstAccepted(cfg,refs){
   let stale=null;
   for(const ref of refs){
     const entry=readCustody(cfg,ref,{remember});
-    if(!entry.present){misses.push(entry.reason);if(entry.identityRefusal)return {entry:null,misses,stale,identityRefusal:entry.identityRefusal};continue;}
+    if(!entry.present){
+      misses.push(entry.reason);
+      if(entry.identityRefusal)return {entry:null,misses,stale,identityRefusal:entry.identityRefusal};
+      continue;
+    }
     const accepted=await tokenAccepted(cfg,entry.value);
     if(accepted!==false)return {entry:{...entry,accepted},misses,stale};
     stale??=entry;
@@ -381,6 +407,15 @@ async function genericToken(cfg,{admin=null}={}){
   return {present:false,name:cfg.analysisToken,...(stale?{rejected:true}:{}),reason:misses.filter(Boolean).join('; ')};
 }
 
+// Over the member the server rejected when it can be written; else the declaration's own custody
+// reference for the project (a product repository's .starcistacks while the sonar stack is the host
+// extension), else the conventional member of the configured stack.
+const projectMintRef=(cfg,key,stale)=>{
+  if(stale&&inStack(cfg,stale.name))return stale.name;
+  if(inStack(cfg,cfg.declaredTokenRef??''))return cfg.declaredTokenRef;
+  return projectTokenRef(key);
+};
+
 /**
  * The analysis token for one project. Order: an explicit custody reference, the declaration's reference
  * for the project, the minted member projectTokenRef(key) - the first the server accepts. When none is
@@ -395,12 +430,7 @@ async function projectToken(cfg,{key,admin,tokenRef,mint=true}={}){
   if(identityRefusal)return {present:false,name:refs.at(-1)??cfg.analysisToken,identityRefusal,reason:misses.join('; ')};
   if(entry)return entry;
   if(key&&mint&&admin?.present){
-    // Over the member the server rejected when it can be written; else the declaration's own custody
-    // reference for the project (a product repository's .starcistacks while the sonar stack is the host
-    // extension), else the conventional member of the configured stack.
-    const ref=stale&&inStack(cfg,stale.name)?stale.name
-      :inStack(cfg,cfg.declaredTokenRef??'')?cfg.declaredTokenRef
-      :projectTokenRef(key);
+    const ref=projectMintRef(cfg,key,stale);
     const minted=await mintToken(cfg,{admin,ref,type:'PROJECT_ANALYSIS_TOKEN',projectKey:key,label:key});
     if(minted.present){
       if(!stale)return minted;
@@ -451,12 +481,28 @@ export function containerState(cfg){
 
 /** A plain sentence for a server that does not answer, naming what to do next. */
 function downMessage(cfg,server,docker){
-  const where=`SonarQube at ${cfg.host} is not reachable (${server.error??`HTTP ${server.status}`})`;
+  const where=`SonarQube at ${cfg.host} is not reachable (${server.error??'HTTP '+server.status})`;
   if(docker.state==='docker-unavailable')return `${where}; Docker is not available on this machine, so the local server cannot run. Start Docker Desktop, then the source dev stack (${cfg.composeFile}).`;
   if(docker.state==='missing')return `${where}; container ${cfg.container} does not exist. Bring up the source dev stack's SonarQube (${cfg.composeFile}).`;
-  if(docker.state==='running')return `${where}; container ${cfg.container} is running${docker.health?` (${docker.health})`:''} - it may still be starting; retry when /api/system/status reports UP.`;
+  if(docker.state==='running'){
+    const health=docker.health?` (${docker.health})`:'';
+    return `${where}; container ${cfg.container} is running${health} - it may still be starting; retry when /api/system/status reports UP.`;
+  }
   return `${where}; container ${cfg.container} is ${docker.state}. Start it: docker start ${cfg.container}-postgres ${cfg.container}`;
 }
+
+/** The status outcome and its one-line message once custody was read. */
+const statusOutcome=(cfg,server,docker,tokens,up)=>{
+  if(!up){
+    const message=server.reachable&&server.status===200?`SonarQube at ${cfg.host} answers but reports ${server.json?.status??'unknown'}; wait until it is UP.`:downMessage(cfg,server,docker);
+    return {outcome:'down',message};
+  }
+  if(!tokens.analysis.present||tokens.analysis.valid===false){
+    const state=tokens.analysis.present||tokens.analysis.rejected?'rejected by the server':'missing from custody';
+    return {outcome:'blocked',message:`the analysis token is ${state} (${tokens.analysis.name}); repair the source stack custody (secret:gen / stack-secret) - never ask the owner for it.`};
+  }
+  return {outcome:'up'};
+};
 
 export async function status(cfg){
   cfg=sonarAdministrativeConfig(cfg);
@@ -474,10 +520,7 @@ export async function status(cfg){
   const report={schema:SCHEMA,command:'status',host:cfg.host,publicHost:cfg.publicHost,stack:cfg.stackDir,declaration:cfg.declaration,
     server:{reachable:server.reachable,up,...(server.json?.status?{status:server.json.status}:{}),...(server.json?.version?{version:server.json.version}:{}),...(server.error?{error:server.error}:{})},
     docker,custody:tokens};
-  if(!up){report.outcome='down';report.message=server.reachable&&server.status===200?`SonarQube at ${cfg.host} answers but reports ${server.json?.status??'unknown'}; wait until it is UP.`:downMessage(cfg,server,docker);}
-  else if(!tokens.analysis.present||tokens.analysis.valid===false){report.outcome='blocked';report.message=`the analysis token is ${tokens.analysis.present||tokens.analysis.rejected?'rejected by the server':'missing from custody'} (${tokens.analysis.name}); repair the source stack custody (secret:gen / stack-secret) - never ask the owner for it.`;}
-  else report.outcome='up';
-  return report;
+  return Object.assign(report,statusOutcome(cfg,server,docker,tokens,up));
 }
 
 const KEY_PATTERN=/^(?=.*[A-Za-z_.:-])[A-Za-z0-9_.:-]{1,400}$/;
@@ -525,23 +568,9 @@ async function ensureQualityGate(cfg,{key,admin,gate=loadSonarGate()}={}){
   if(shown.status!==200)return failed('show gate',shown);
   const have=new Map((shown.json?.conditions??[]).map(c=>[c.metric,c]));
   const want=serverConditions(gate);
-  const changed=[];
-  for(const condition of want){
-    const current=have.get(condition.metric);
-    if(current&&current.op===condition.op&&String(current.error)===condition.error)continue;
-    const answer=current
-      ?await call(cfg,'POST','/api/qualitygates/update_condition',{token,form:{id:current.id,metric:condition.metric,op:condition.op,error:condition.error}})
-      :await call(cfg,'POST','/api/qualitygates/create_condition',{token,form:{gateName:name,metric:condition.metric,op:condition.op,error:condition.error}});
-    if(answer.status!==200&&answer.status!==201&&answer.status!==204)return failed(`condition ${condition.metric}`,answer);
-    changed.push(condition.metric);
-  }
-  const wanted=new Set(want.map(c=>c.metric));
-  for(const current of have.values()){
-    if(wanted.has(current.metric))continue;
-    const answer=await call(cfg,'POST','/api/qualitygates/delete_condition',{token,form:{id:current.id}});
-    if(answer.status!==200&&answer.status!==204)return failed(`drop condition ${current.metric}`,answer);
-    changed.push(`-${current.metric}`);
-  }
+  const synced=await syncGateConditions(cfg,token,name,have,want,failed);
+  if(synced.failed)return synced.failed;
+  const changed=synced.changed;
   const selected=await call(cfg,'POST','/api/qualitygates/select',{token,form:{gateName:name,projectKey:key}});
   if(selected.status!==200&&selected.status!==204)return failed('select gate',selected);
   const period=gate.gate.newCodePeriod;
@@ -550,7 +579,30 @@ async function ensureQualityGate(cfg,{key,admin,gate=loadSonarGate()}={}){
   return {...base,outcome:'ok',changed};
 }
 
-const quote=arg=>/^[\w@%+=:,./\\-]+$/.test(arg)?arg:`"${String(arg).replace(/"/g,'\\"')}"`;
+/** Create/update the gate's wanted conditions and drop the rest; {changed} or {failed}. */
+const syncGateConditions=async(cfg,token,name,have,want,failed)=>{
+  const changed=[];
+  for(const condition of want){
+    const current=have.get(condition.metric);
+    if(current?.op===condition.op&&String(current.error)===condition.error)continue;
+    const answer=current
+      ?await call(cfg,'POST','/api/qualitygates/update_condition',{token,form:{id:current.id,metric:condition.metric,op:condition.op,error:condition.error}})
+      :await call(cfg,'POST','/api/qualitygates/create_condition',{token,form:{gateName:name,metric:condition.metric,op:condition.op,error:condition.error}});
+    if(answer.status!==200&&answer.status!==201&&answer.status!==204)return {failed:failed(`condition ${condition.metric}`,answer)};
+    changed.push(condition.metric);
+  }
+  const wanted=new Set(want.map(c=>c.metric));
+  for(const current of have.values()){
+    if(wanted.has(current.metric))continue;
+    const answer=await call(cfg,'POST','/api/qualitygates/delete_condition',{token,form:{id:current.id}});
+    if(answer.status!==200&&answer.status!==204)return {failed:failed(`drop condition ${current.metric}`,answer)};
+    changed.push(`-${current.metric}`);
+  }
+  return {changed};
+};
+
+const ESCAPED_QUOTE=String.raw`\"`;
+const quote=arg=>/^[\w@%+=:,./\\-]+$/.test(arg)?arg:`"${String(arg).replaceAll('"',ESCAPED_QUOTE)}"`;
 
 /**
  * The repository's own scanner: its `sonar:check` script when it has one (repositories that declare it), otherwise
@@ -604,17 +656,18 @@ export function parseDiffNewLines(patch){
       if(hunk&&count>0)current.ranges.push([start,start+count-1]);
       continue;
     }
-    if(!header)continue;
-    if(line.startsWith('new file mode'))current.added=true;
-    else if(line==='--- /dev/null')current.added=true;
-    else if(line==='+++ /dev/null')current.deleted=true;
-    else if(line.startsWith('+++ '))current.path=unquote(line.slice(4)).replace(/^b\//,'');
-    else if(line.startsWith('rename to '))current.path??=unquote(line.slice(10));
+    if(header)applyDiffHeader(current,line);
   }
   return files.filter(f=>f.path&&!f.deleted).map(({path:file,added,ranges})=>({path:file,added,ranges}));
 }
 
-const inRanges=(ranges,from,to=from)=>ranges.some(([a,b])=>from<=b&&to>=a);
+/** One header line of a file's diff, read only before its first hunk. */
+const applyDiffHeader=(current,line)=>{
+  if(line.startsWith('new file mode')||line==='--- /dev/null')current.added=true;
+  else if(line==='+++ /dev/null')current.deleted=true;
+  else if(line.startsWith('+++ '))current.path=unquote(line.slice(4)).replace(/^b\//,'');
+  else if(line.startsWith('rename to '))current.path??=unquote(line.slice(10));
+};
 
 const splitList=value=>(Array.isArray(value)?value:[value]).flatMap(v=>String(v??'').split(',')).map(v=>v.trim()).filter(Boolean);
 
@@ -623,6 +676,21 @@ const splitList=value=>(Array.isArray(value)?value:[value]).flatMap(v=>String(v?
  * reads, inside --paths when given, plus untracked files there (every line new). Paths are relative
  * to cwd, the scanner's project base directory.
  */
+/** The diff of one commit plus the untracked files in the pathspec (every untracked line new). */
+const collectSlice=(cwd,commit,pathspec)=>{
+  const diff=git(gitDiff,cwd,['--no-color','--no-ext-diff','--no-textconv','-U0','-M','--relative','--src-prefix=a/','--dst-prefix=b/',commit,...pathspec]);
+  if(diff.status!==0)return {error:String(diff.stderr).trim().split(/\r?\n/)[0]};
+  const files=parseDiffNewLines(diff.stdout);
+  const untracked=git(lsFiles,cwd,['--others','--exclude-standard','-z',...pathspec]);
+  for(const file of String(untracked.stdout??'').split('\0').filter(Boolean)){
+    if(files.some(f=>f.path===file))continue;
+    let lines=0;
+    try{const body=fs.readFileSync(path.join(cwd,file),'utf8');lines=body.split(/\r?\n/).length-(body.endsWith('\n')?1:0);}catch{/* unreadable */}
+    files.push({path:file,added:true,untracked:true,ranges:lines>0?[[1,lines]]:[]});
+  }
+  return {files};
+};
+
 export function sliceChanges(cwd,{base,paths}={}){
   const scope=splitList(paths);
   const baseRef=base||'HEAD';
@@ -630,19 +698,7 @@ export function sliceChanges(cwd,{base,paths}={}){
   if(resolved.error||(resolved.status!==0&&git(revParseQuery,cwd,['--git-dir']).status!==0))return {ok:false,code:'SLICE_NOT_GIT',reason:`${cwd} is not a git checkout, so the slice cannot be read`};
   if(resolved.status!==0)return {ok:false,code:'SLICE_BASE_UNKNOWN',reason:`the slice base ${baseRef} is not a commit in ${cwd}`};
   const pathspec=scope.length?['--',...scope]:[];
-  const collect=commit=>{
-    const diff=git(gitDiff,cwd,['--no-color','--no-ext-diff','--no-textconv','-U0','-M','--relative','--src-prefix=a/','--dst-prefix=b/',commit,...pathspec]);
-    if(diff.status!==0)return {error:String(diff.stderr).trim().split(/\r?\n/)[0]};
-    const files=parseDiffNewLines(diff.stdout);
-    const untracked=git(lsFiles,cwd,['--others','--exclude-standard','-z',...pathspec]);
-    for(const file of String(untracked.stdout??'').split('\0').filter(Boolean)){
-      if(files.some(f=>f.path===file))continue;
-      let lines=0;
-      try{const body=fs.readFileSync(path.join(cwd,file),'utf8');lines=body.split(/\r?\n/).length-(body.endsWith('\n')?1:0);}catch{/* unreadable */}
-      files.push({path:file,added:true,untracked:true,ranges:lines>0?[[1,lines]]:[]});
-    }
-    return {files};
-  };
+  const collect=commit=>collectSlice(cwd,commit,pathspec);
   const baseCommit=resolved.stdout.trim();
   const first=collect(baseCommit);
   if(first.error)return {ok:false,code:'SLICE_NOT_GIT',reason:`git diff against ${baseRef} failed: ${first.error}`};
@@ -663,18 +719,15 @@ export function sliceChanges(cwd,{base,paths}={}){
 
 /** GET with the analysis token, retried with the admin token when the analysis user may not browse. */
 async function read(cfg,tokens,pathname){
-  let last;
-  for(const token of tokens){
-    last=await call(cfg,'GET',pathname,{token});
-    if(last.status!==401&&last.status!==403)return last;
+  for(let i=0;i<tokens.length;i+=1){
+    const got=await call(cfg,'GET',pathname,{token:tokens[i]});
+    if(i===tokens.length-1||got.status!==401&&got.status!==403)return got;
   }
-  return last;
 }
 
 const facet=(json,property)=>Object.fromEntries((json?.facets??[]).find(f=>f.property===property)?.values?.map(v=>[v.val,v.count])??[]);
 
-const PAGE=500,MAX_PAGES=40,ITEM_CAP=50,ISSUE_BATCH=25;
-const tally=(items,field)=>items.reduce((out,item)=>{const k=item[field]??'unknown';out[k]=(out[k]??0)+1;return out;},{});
+const PAGE=500,MAX_PAGES=40;
 
 /** Every page of a paged Web API list, or {error} when a page cannot be read. */
 async function readAll(cfg,tokens,pathname,listKey){
@@ -717,34 +770,6 @@ function fileQualifier(props={},pkg=null){
 }
 
 /**
- * One issues/search over component keys of one qualifier: `components` (componentKeys on servers
- * before 10.2). When a batch still fails the same-qualifier check - the test-path rule disagreed with
- * the scanner's own detection - it is asked one key at a time: a single key can never mix.
- */
-async function sliceIssues(cfg,tokens,keys){
-  const batch=keys.map(encodeURIComponent).join(',');
-  let got=await readAll(cfg,tokens,`/api/issues/search?components=${batch}&resolved=false`,'issues');
-  if(got.error&&got.status===400)got=await readAll(cfg,tokens,`/api/issues/search?componentKeys=${batch}&resolved=false`,'issues');
-  if(got.error&&got.status===400&&keys.length>1&&/same qualifier/i.test(got.error)){
-    const items=[];
-    for(const key of keys){const single=await sliceIssues(cfg,tokens,[key]);if(single.error)return single;items.push(...single.items);}
-    return {items};
-  }
-  return got;
-}
-
-/** The lines of `fileKey` that lie in a duplicated block, from an api/duplications/show answer. */
-function duplicatedLinesOf(doc,fileKey){
-  const refs=Object.entries(doc?.files??{}).filter(([,file])=>file?.key===fileKey).map(([ref])=>String(ref));
-  const lines=new Set();
-  for(const duplication of doc?.duplications??[])for(const block of duplication?.blocks??[]){
-    if(!refs.includes(String(block?._ref)))continue;
-    for(let line=Number(block.from);line<Number(block.from)+Number(block.size);line+=1)lines.add(line);
-  }
-  return lines;
-}
-
-/**
  * The be unit run over the slice's services alone, writing the lcov Sonar imports: jest from the directory two levels above
  * the lcov report (`be/coverage/lcov.info` -> be/, the preset's coverageDirectory under its rootDir), the unit project, the
  * specs related to `files` and coverage collected from `files` only, so the per-file threshold and the report name exactly
@@ -778,7 +803,7 @@ function prepareSliceCoverage(cfg,{cwd,props,slice,gate}){
   const isTarget=coverageTargetOf(scope);
   const targets=slice.files.map(f=>f.path).filter(file=>isTarget(file)&&fs.existsSync(path.join(cwd,file)));
   if(!targets.length)return {judged:true,targets};
-  const lcov=String(props['sonar.javascript.lcov.reportPaths']??'').split(',').map(p=>p.trim()).filter(Boolean)[0];
+  const lcov=String(props['sonar.javascript.lcov.reportPaths']??'').split(',').map(p=>p.trim()).find(Boolean);
   if(!lcov)return {judged:true,targets,error:'sonar-project.properties names no sonar.javascript.lcov.reportPaths: the coverage of the slice\'s services cannot be imported'};
   const jestCwd=path.resolve(cwd,path.dirname(path.dirname(lcov)));
   const lcovFile=path.resolve(cwd,lcov);
@@ -790,14 +815,6 @@ function prepareSliceCoverage(cfg,{cwd,props,slice,gate}){
     ...(ran.error||!written?{error:ran.error??`the unit run (exit ${ran.exitCode}) wrote no ${lcov}`}:{})};
 }
 
-/** The Sonar `coverage` measure of one file, a number or null when Sonar holds none; {error} when the server cannot answer. */
-async function fileCoverage(cfg,tokens,fileKey){
-  const got=await read(cfg,tokens,`/api/measures/component?component=${encodeURIComponent(fileKey)}&metricKeys=coverage`);
-  if(got.status===404)return {coverage:null};
-  if(!got.reachable||got.status!==200)return {error:got.error??`HTTP ${got.status}`};
-  return {coverage:(got.json?.component?.measures??[]).find(m=>m.metric==='coverage')?.value??null};
-}
-
 /**
  * Judge the slice on the processed analysis against `gate` (thresholdsOf(knowledge/sonar-gate.yaml)): open
  * blocker and critical issues and to-review hotspots on its changed lines (a line-less one only on a file
@@ -806,96 +823,7 @@ async function fileCoverage(cfg,tokens,fileKey){
  * A changed file the server does not know (excluded, not source) is listed as not analyzed.
  */
 export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate=thresholdsOf(loadSonarGate()),coverageRun=null}){
-  const qualifierOf=fileQualifier(props,pkg);
-  const files=slice.files.filter(f=>f.ranges.length||f.added);
-  const analyzed=new Map(),notAnalyzed=[];
-  let changedSourceLines=0;
-  for(const file of files){
-    const fileKey=`${key}:${file.path}`;
-    const from=file.ranges.length?Math.min(...file.ranges.map(r=>r[0])):1;
-    const to=file.ranges.length?Math.max(...file.ranges.map(r=>r[1])):1;
-    const lines=await read(cfg,tokens,`/api/sources/lines?key=${encodeURIComponent(fileKey)}&from=${from}&to=${to}`);
-    if(lines.status===404){notAnalyzed.push(file.path);continue;}
-    if(!lines.reachable||lines.status!==200)return {error:`source lines of ${file.path} could not be read: ${lines.error??`HTTP ${lines.status}`}`};
-    analyzed.set(fileKey,file);
-    if(qualifierOf(file.path)==='FIL')changedSourceLines+=file.ranges.reduce((n,[a,b])=>n+(b-a+1),0);
-  }
-  const onSlice=(item,component)=>{
-    const file=analyzed.get(component);
-    if(!file)return false;
-    const from=item.textRange?.startLine??item.line;
-    if(from===undefined||from===null)return file.added;
-    return inRanges(file.ranges,Number(from),Number(item.textRange?.endLine??from));
-  };
-  const keys=[...analyzed.keys()];
-  // issues/search refuses one list mixing qualifiers: spec files (UTS) are asked apart from sources
-  // (FIL), in the same 25-key batches, and the results merge (inc-0fee2b8fb296).
-  const groups=new Map();
-  for(const fileKey of keys){
-    const qualifier=qualifierOf(analyzed.get(fileKey).path);
-    if(!groups.has(qualifier))groups.set(qualifier,[]);
-    groups.get(qualifier).push(fileKey);
-  }
-  const issues=[];
-  for(const group of groups.values()){
-    for(let i=0;i<group.length;i+=ISSUE_BATCH){
-      const got=await sliceIssues(cfg,tokens,group.slice(i,i+ISSUE_BATCH));
-      if(got.error)return {error:`issues of the slice could not be read: ${got.error}`};
-      issues.push(...got.items.filter(issue=>onSlice(issue,issue.component)));
-    }
-  }
-  const hotspotsRead=keys.length?await readAll(cfg,tokens,`/api/hotspots/search?projectKey=${encodeURIComponent(key)}&status=TO_REVIEW`,'hotspots'):{items:[]};
-  if(hotspotsRead.error)return {error:`hotspots of the project could not be read: ${hotspotsRead.error}`};
-  const hotspots=hotspotsRead.items.filter(h=>onSlice(h,h.component));
-  const pathOf=component=>analyzed.get(component)?.path??component;
-  const failures=[];
-  // Duplication: the share of the changed source lines that sit inside a duplicated block (the file's own side).
-  const duplication={changedLines:changedSourceLines,duplicatedLines:0,percent:null,threshold:gate.duplicationMaxPercent,files:[]};
-  for(const fileKey of keys){
-    const file=analyzed.get(fileKey);
-    if(qualifierOf(file.path)!=='FIL'||!file.ranges.length)continue;
-    const shown=await read(cfg,tokens,`/api/duplications/show?key=${encodeURIComponent(fileKey)}`);
-    if(shown.status===404)continue;
-    if(!shown.reachable||shown.status!==200)return {error:`duplications of ${file.path} could not be read: ${shown.error??`HTTP ${shown.status}`}`};
-    const mine=duplicatedLinesOf(shown.json,fileKey);
-    const hit=[...mine].filter(line=>inRanges(file.ranges,line)).sort((a,b)=>a-b);
-    if(hit.length){duplication.duplicatedLines+=hit.length;duplication.files.push({path:file.path,lines:hit.slice(0,ITEM_CAP)});}
-  }
-  duplication.percent=changedSourceLines?Math.round((duplication.duplicatedLines/changedSourceLines)*1000)/10:null;
-  if(!changedSourceLines){duplication.applied=false;duplication.note='the slice changed no source line';}
-  else if(changedSourceLines<gate.ignoreBelowChangedLines){duplication.applied=false;duplication.note=`${changedSourceLines} changed source lines (< ${gate.ignoreBelowChangedLines}): like the server's ignoreSmallChanges, the threshold is not held`;}
-  else{duplication.applied=true;if(duplication.percent>gate.duplicationMaxPercent)failures.push(`duplication on the slice's changed lines ${duplication.percent}% > ${gate.duplicationMaxPercent}%`);}
-  const blocking=issues.filter(i=>gate.blockingSeverities.includes(i.severity));
-  const lesser=issues.filter(i=>!gate.blockingSeverities.includes(i.severity));
-  if(blocking.length>gate.blockingIssuesMax)failures.push(`${blocking.length} open ${gate.blockingSeverities.join('/')} issue(s) on changed lines`);
-  if(hotspots.length>gate.unreviewedHotspotsMax)failures.push(`${hotspots.length} security hotspot(s) to review on changed lines`);
-  // Coverage: each service the slice touched, on its own measure (one service below the threshold fails the slice).
-  const scope=coverageScopeOf(props);
-  const isTarget=coverageTargetOf(scope);
-  const measured=[];
-  for(const fileKey of coverageRun?.judged===false?[]:keys){
-    const file=analyzed.get(fileKey);
-    if(qualifierOf(file.path)!=='FIL'||!isTarget(file.path))continue;
-    const got=await fileCoverage(cfg,tokens,fileKey);
-    if(got.error)return {error:`coverage of ${file.path} could not be read: ${got.error}`};
-    measured.push({path:file.path,coverage:got.coverage});
-  }
-  const coverage=coverageRun?.judged===false
-    ?{applied:false,status:coverageRun.ownerMode?'not-measured':'not-required',ownerMode:coverageRun.ownerMode,exclusions:scope.exclusions,minPercent:gate.coverageMinPercent,files:[],failures:[],note:coverageRun.note}
-    :judgeCoverage(measured,{scope,minPercent:gate.coverageMinPercent});
-  if(coverageRun?.judged!==false&&coverageRun?.error)coverage.failures.unshift(`the slice's services could not be measured: ${coverageRun.error}`);
-  if(!coverage.status)coverage.status=!coverage.applied?'no-scope':coverage.failures.length?'red':coverage.files.length?'green':'no-target';
-  failures.push(...coverage.failures);
-  return {error:null,result:{
-    analyzedFiles:keys.length,notAnalyzed,
-    newIssues:{total:issues.length,blocking:blocking.length,notBlocking:lesser.length,bySeverity:tally(issues,'severity'),byType:tally(issues,'type'),
-      items:[...blocking,...lesser].slice(0,ITEM_CAP).map(i=>({key:i.key,rule:i.rule,severity:i.severity,type:i.type,path:pathOf(i.component),line:i.line??null,message:i.message,blocking:gate.blockingSeverities.includes(i.severity)}))},
-    newHotspots:{total:hotspots.length,items:hotspots.slice(0,ITEM_CAP).map(h=>({key:h.key,rule:h.ruleKey,probability:h.vulnerabilityProbability,path:pathOf(h.component),line:h.line??null,message:h.message}))},
-    duplication,
-    coverage,
-    verdict:failures.length?'fail':'pass',
-    failures,
-  }};
+  return evaluateSliceCore(cfg,tokens,{key,slice,props,pkg,gate,coverageRun},{read,readAll,fileQualifier});
 }
 
 /**
@@ -923,6 +851,22 @@ export function isolatedKey(key,scope){
   return `${key}-slice-${hash}`.slice(0,400);
 }
 
+const testInclusions=(scope,patterns,hasTests,main,isFile)=>{
+  if(!patterns.length)return hasTests?main:[];
+  const matchers=patterns.flatMap(braceVariants).map(globExpression),tests=[];
+  for(const scopePath of scope){
+    if(isFile(scopePath)){
+      if(matchers.some(matcher=>matcher.test(scopePath)))tests.push(scopePath);
+      continue;
+    }
+    for(const pattern of patterns){
+      if(pattern.startsWith('**/'))tests.push(`${scopePath}/${pattern}`);
+      else if(pattern.startsWith(`${scopePath}/`))tests.push(pattern);
+    }
+  }
+  return tests;
+};
+
 /**
  * The scanner defines that index only the slice: sonar.inclusions over each scope path (a file as
  * itself, a directory as <dir>/**), and - when the repository declares sonar.test.inclusions - each of
@@ -934,17 +878,7 @@ export function isolationDefines(cwd,props,scope){
   const isFile=p=>{try{return fs.statSync(path.join(cwd,p)).isFile();}catch{return false;}};
   const main=scope.map(p=>isFile(p)?p:`${p}/**`);
   const patterns=splitList(props['sonar.test.inclusions']);
-  let tests=[];
-  if(patterns.length){
-    const matchers=patterns.flatMap(braceVariants).map(globExpression);
-    for(const p of scope){
-      if(isFile(p)){if(matchers.some(m=>m.test(p)))tests.push(p);continue;}
-      for(const pattern of patterns){
-        if(pattern.startsWith('**/'))tests.push(`${p}/${pattern}`);
-        else if(pattern.startsWith(`${p}/`))tests.push(pattern);
-      }
-    }
-  }else if(props['sonar.tests'])tests=main;
+  const tests=testInclusions(scope,patterns,Boolean(props['sonar.tests']),main,isFile);
   // SonarJS builds one TypeScript program per tsconfig.json it finds anywhere in the tree: one product
   // repository held 31 (stray copies under .starciwork/kernel-strays and .infra), and a 9-file isolated analysis
   // still spent 19.7 minutes in the JS/TS sensor. The repository's own root tsconfig is the one that
@@ -954,45 +888,68 @@ export function isolationDefines(cwd,props,scope){
   return [...tsconfig,`-Dsonar.inclusions=${main.join(',')}`,...(patterns.length||props['sonar.tests']?[`-Dsonar.test.inclusions=${tests.length?[...new Set(tests)].join(','):'__starci_no_tests__/**'}`]:[])];
 }
 
-export async function scan(cfg,options={}){
-  const cwd=path.resolve(options.cwd??process.cwd());
-  const summary={schema:SCAN_SCHEMA,at:new Date().toISOString(),host:cfg.host,publicHost:cfg.publicHost,cwd,stack:cfg.stackDir,declaration:cfg.declaration};
-  const finish=(outcome,reason,extra={})=>Object.assign(summary,extra,{outcome,...(reason?{reason}:{}),...(outcome==='blocked'?{unavailable:true}:{})});
+const prepareScanInputs=(cfg,options,cwd,summary,finish)=>{
   if(!fs.existsSync(path.join(cwd,'package.json'))&&!fs.existsSync(path.join(cwd,'sonar-project.properties')))
-    return finish('blocked',`${cwd} has neither package.json nor sonar-project.properties`);
+    return {result:finish('blocked',`${cwd} has neither package.json nor sonar-project.properties`)};
   const props=readProperties(path.join(cwd,'sonar-project.properties'));
   let pkg=null;
   try{pkg=JSON.parse(fs.readFileSync(path.join(cwd,'package.json'),'utf8'));}catch{/* no manifest */}
-  let key=options.key??cfg.declaredKey??props['sonar.projectKey']??(pkg?.name?String(pkg.name).replace(/^@/,'').replace(/\//g,'_'):null);
+  const key=options.key??cfg.declaredKey??props['sonar.projectKey']??(pkg?.name?String(pkg.name).replace(/^@/,'').replaceAll('/','_'):null);
   summary.projectKey=key;
   summary.revision=gitRevision(cwd);
   const gateDoc=loadSonarGate({cwd});
   summary.gate=thresholdsOf(gateDoc);
   if(cfg.declaredQualityGate&&cfg.declaredQualityGate!==gateDoc.gate.name)summary.gate.declarationDrift=`the declaration names quality gate ${cfg.declaredQualityGate}; the gate is ${gateDoc.gate.name}`;
-  if(cfg.disabled)return finish('disabled',`Sonar is disabled for this repository: ${cfg.disabled}`);
+  if(cfg.disabled)return {result:finish('disabled',`Sonar is disabled for this repository: ${cfg.disabled}`)};
   const missing=sonarCredentialRequirements({action:'scan',config:cfg}).filter(row=>!row.present).map(row=>row.name);
-  if(missing.length)return finish('blocked',`missing credential inputs: ${missing.join(', ')}`,{missing});
-  if(!key)return finish('blocked','no project key: pass --key or set sonar.projectKey');
-
-  // The slice is a local fact: read and refuse it before the scanner runs.
+  if(missing.length)return {result:finish('blocked',`missing credential inputs: ${missing.join(', ')}`,{missing})};
+  if(!key)return {result:finish('blocked','no project key: pass --key or set sonar.projectKey')};
   const projectGateMode=Boolean(options.projectGate);
   summary.scope=projectGateMode?'project':'slice';
   let slice=null;
   if(!projectGateMode){
     slice=sliceChanges(cwd,{base:options.base,paths:options.paths});
-    if(!slice.ok)return finish(slice.code==='SLICE_NOT_GIT'?'blocked':'refused',slice.reason,{code:slice.code});
+    if(!slice.ok)return {result:finish(slice.code==='SLICE_NOT_GIT'?'blocked':'refused',slice.reason,{code:slice.code})};
     summary.slice={base:slice.base,baseCommit:slice.baseCommit,...(slice.baseFallback?{baseFallback:slice.baseFallback}:{}),paths:slice.paths,changedFiles:slice.files.map(f=>f.path)};
-    if(!slice.files.length)return finish('refused',`the slice changes no file against ${slice.base}${slice.paths.length?` inside ${slice.paths.join(', ')}`:''}: pass --base <the commit before this slice's first edit> and --paths <its owned paths>`,{code:'SLICE_EMPTY'});
+    const sliceScope=slice.paths.length?` inside ${slice.paths.join(', ')}`:'';
+    if(!slice.files.length)return {result:finish('refused',`the slice changes no file against ${slice.base}${sliceScope}: pass --base <the commit before this slice's first edit> and --paths <its owned paths>`,{code:'SLICE_EMPTY'})};
   }
+  return {cwd,props,pkg,key,gateDoc,slice,projectGateMode};
+};
+
+const prepareIsolatedProject=async(cfg,options,{cwd,props,key,slice,admin,gateDoc,summary})=>{
+  const state={key,extra:[],isolated:null};
+  if(!(options.isolate&&slice))return state;
+  const scope=slice.paths.length?slice.paths:slice.files.map(f=>f.path);
+  if(!admin.present)summary.isolated={skipped:`the admin token is not in custody (${admin.reason}): the full analysis runs instead`};
+  else{
+    const sliceKey=isolatedKey(key,scope);
+    const ensured=await ensureProject(cfg,{key:sliceKey,name:`${key} slice ${sliceKey.slice(-10)}`});
+    if(ensured.outcome!=='ok')summary.isolated={skipped:`the slice project could not be created (${ensured.message}): the full analysis runs instead`};
+    else{
+      state.isolated={projectKey:sliceKey,parentKey:key,scope};
+      summary.isolated=state.isolated;
+      state.key=sliceKey;
+      summary.projectKey=state.key;
+      if(options.ensure!==false)summary.qualityGate={...summary.qualityGate,isolatedSelect:(await ensureQualityGate(cfg,{key:sliceKey,admin,gate:gateDoc})).outcome};
+      state.extra.push(...isolationDefines(cwd,props,scope));
+    }
+  }
+  return state;
+};
+
+const prepareScanExecution=async(cfg,options,inputs,summary,finish)=>{
+  const {cwd,props,pkg,key,gateDoc,slice}=inputs;
   const server=await call(cfg,'GET','/api/system/status');
   if(!(server.reachable&&server.json?.status==='UP')){
-    const docker=containerState(cfg);
-    return finish('blocked',server.reachable?`SonarQube at ${cfg.host} reports ${server.json?.status??`HTTP ${server.status}`}`:downMessage(cfg,server,docker),{docker});
+    const docker=containerState(cfg),serverStatus=server.json?.status??`HTTP ${server.status}`;
+    const reason=server.reachable?`SonarQube at ${cfg.host} reports ${serverStatus}`:downMessage(cfg,server,docker);
+    return {result:finish('blocked',reason,{docker})};
   }
   summary.serverVersion=server.json.version;
   const token=await suppliedSonarToken(cfg,{validate:value=>tokenAccepted(cfg,value),remember});
   summary.custody={analysis:custodyView(token)};
-  if(!token.present)return finish('blocked',token.reason);
+  if(!token.present)return {result:finish('blocked',token.reason)};
   const admin=(options.isolate||options.ensure===true)&&sonarAdminForAnalysis(cfg)?readCustody(cfg,cfg.adminToken,{remember}):{present:false,name:cfg.adminToken,reason:'the analysis server has separate provisioning'};
   summary.custody.admin=custodyView(admin);
   if(options.ensure!==false){
@@ -1000,108 +957,115 @@ export async function scan(cfg,options={}){
     summary.project={outcome:ensured.outcome,...(ensured.created!==undefined?{created:ensured.created}:{}),...(ensured.message?{message:ensured.message}:{})};
   }
   if(options.ensure!==false)summary.qualityGate=await ensureQualityGate(cfg,{key,admin,gate:gateDoc});
-  // An isolated slice analysis: admin custody provisions the throwaway project; its scanner keeps the
-  // supplied analysis token, judged, then deleted below; it must authorize that isolated project.
-  const extra=[];
-  let isolated=null;
-  if(options.isolate&&slice){
-    const scope=slice.paths.length?slice.paths:slice.files.map(f=>f.path);
-    if(!admin.present)summary.isolated={skipped:`the admin token is not in custody (${admin.reason}): the full analysis runs instead`};
-    else{
-      const sliceKey=isolatedKey(key,scope);
-      const ensured=await ensureProject(cfg,{key:sliceKey,name:`${key} slice ${sliceKey.slice(-10)}`});
-      if(ensured.outcome!=='ok')summary.isolated={skipped:`the slice project could not be created (${ensured.message}): the full analysis runs instead`};
-      else{
-        isolated={projectKey:sliceKey,parentKey:key,scope};
-        summary.isolated=isolated;
-        key=sliceKey;
-        summary.projectKey=key;
-        if(options.ensure!==false)summary.qualityGate={...summary.qualityGate,isolatedSelect:(await ensureQualityGate(cfg,{key:sliceKey,admin,gate:gateDoc})).outcome};
-        extra.push(...isolationDefines(cwd,props,scope));
-      }
-    }
-  }
-  // The slice's services get their own fresh lcov before the scanner reads it (a project-gate scan imports the report the
-  // last `npm test` wrote).
+  const isolation=await prepareIsolatedProject(cfg,options,{cwd,props,key,slice,admin,gateDoc,summary});
   const coverageRun=slice?prepareSliceCoverage(cfg,{cwd,props,slice,gate:gateDoc}):null;
   if(coverageRun)summary.coverageRun=coverageRun;
   if(coverageRun?.ownerMode==='specs.unit=false')summary.ownerMode={specs:{unit:false},coverage:'not-measured',note:coverageRun.note};
   const analysisToken=token.value;
   const childEnv={...sonarAnalysisEnvironment(cfg),SONAR_HOST_URL:cfg.host,SONAR_TOKEN:analysisToken};
-
   const workDir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-sonar-'));
+  return {cwd,props,pkg,gateDoc,slice,projectGateMode:inputs.projectGateMode,key:isolation.key,admin,isolated:isolation.isolated,extra:isolation.extra,
+    coverageRun,analysisToken,tokenName:token.name,childEnv,workDir};
+};
+
+const submitScan=async(cfg,options,setup,summary,finish)=>{
+  const plan=scannerCommand({pkg:setup.pkg,props:setup.props,host:cfg.host,key:setup.key,workDir:setup.workDir,extra:setup.extra});
+  const run=await runScanner(setup.cwd??path.resolve(options.cwd??process.cwd()),plan,setup.childEnv,Number(options.timeoutSec??1800)*1000);
+  summary.scanner={runner:plan.runner,command:scrub(run.display),exitCode:run.exitCode,durationMs:run.durationMs};
+  if(options.log){fs.mkdirSync(path.dirname(path.resolve(options.log)),{recursive:true});fs.writeFileSync(options.log,`$ ${scrub(run.display)}\n${run.log}`);summary.scanner.log=path.resolve(options.log);}
+  if(options.blob){
+    const stored=await emitCheckOutput(`$ ${scrub(run.display)}\n${run.log}`,{blob:true,mediaType:'text/plain',put:options.put,write:()=>{}});
+    summary.scanner.logSha=stored.sha;
+  }
+  const report=readProperties(path.join(setup.workDir,'report-task.txt'));
+  if(!report.ceTaskId){
+    const tail=run.log.trim().split(/\r?\n/).slice(-3).join(' | ');
+    const outcome=/\b401\b|not authori[sz]ed|unauthori[sz]ed/i.test(run.log)?'blocked':'fail';
+    return {result:finish(outcome,`the scanner submitted no analysis (exit ${run.exitCode}) with ${setup.tokenName}: ${tail}`)};
+  }
+  summary.ceTask={id:report.ceTaskId};
+  summary.dashboardUrl=report.dashboardUrl??`${cfg.host}/dashboard?id=${encodeURIComponent(setup.key)}`;
+  summary.publicDashboardUrl=`${cfg.publicHost}/dashboard?id=${encodeURIComponent(setup.key)}`;
+  return {report};
+};
+
+const waitForScan=async(cfg,options,setup,report,summary,finish)=>{
+  const tokens=[setup.analysisToken],deadline=Date.now()+Number(options.waitSec??600)*1000;
+  let task;
+  for(;;){
+    const polled=await read(cfg,tokens,`/api/ce/task?id=${encodeURIComponent(report.ceTaskId)}`);
+    task=polled.json?.task;
+    if(!polled.reachable||polled.status!==200){
+      const detail=polled.error??`HTTP ${polled.status}`;
+      return {result:finish('blocked',`compute-engine task ${report.ceTaskId} could not be read: ${detail}`)};
+    }
+    if(['SUCCESS','FAILED','CANCELED'].includes(task?.status))break;
+    if(Date.now()>deadline)return {result:finish('blocked',`compute-engine task ${report.ceTaskId} still ${task?.status} after the wait`)};
+    await new Promise(r=>setTimeout(r,cfg.pollMs));
+  }
+  summary.ceTask.status=task.status;
+  summary.analysisId=task.analysisId??null;
+  if(task.status!=='SUCCESS'){
+    const detail=task.errorMessage?` - ${scrub(task.errorMessage)}`:'';
+    return {result:finish('fail',`the server did not process the analysis: ${task.status}${detail}`)};
+  }
+  return {task,tokens};
+};
+
+const finishScan=async(cfg,setup,taskState,summary,finish)=>{
+  const {task,tokens}=taskState,key=setup.key;
+  const gate=await read(cfg,tokens,`/api/qualitygates/project_status?analysisId=${encodeURIComponent(task.analysisId)}`);
+  const project=gate.json?.projectStatus;
+  const projectGate={scope:'whole-project',status:project?.status??null,conditions:(project?.conditions??[]).map(c=>({metric:c.metricKey,status:c.status,actual:c.actualValue,comparator:c.comparator,threshold:c.errorThreshold}))};
+  summary.projectGate=projectGate;
+  const component=encodeURIComponent(key);
+  let issues=await read(cfg,tokens,`/api/issues/search?components=${component}&resolved=false&ps=1&facets=severities,types,impactSeverities`);
+  if(issues.status!==200)issues=await read(cfg,tokens,`/api/issues/search?componentKeys=${component}&resolved=false&ps=1&facets=severities,types`);
+  if(issues.status===200)summary.issues={scope:'whole-project',total:issues.json?.paging?.total??issues.json?.total??null,bySeverity:facet(issues.json,'severities'),byType:facet(issues.json,'types'),byImpactSeverity:facet(issues.json,'impactSeverities')};
+  const hotspots=await read(cfg,tokens,`/api/hotspots/search?projectKey=${component}&status=TO_REVIEW&ps=1`);
+  if(hotspots.status===200)summary.hotspots={scope:'whole-project',toReview:hotspots.json?.paging?.total??null};
+  const measures=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=duplicated_lines_density,ncloc,coverage`);
+  if(measures.status===200)summary.measures=Object.fromEntries((measures.json?.component?.measures??[]).map(m=>[m.metric,m.value]));
+  if(projectGate.status==='OK'&&!projectGate.conditions.length)projectGate.note='no condition was evaluated (a first analysis has no new code); read the overall measures';
+  const projectFailures=projectGate.conditions.filter(c=>c.status==='ERROR').map(c=>`${c.metric} ${c.actual} vs ${c.comparator} ${c.threshold}`);
+  if(setup.projectGateMode){
+    if(projectGate.status==='OK')return finish('pass');
+    if(projectGate.status==='ERROR')return finish('fail','the quality gate failed: '+projectFailures.join(', '));
+    const status=projectGate.status??`HTTP ${gate.status}`;
+    return finish('blocked',`no quality-gate result for the analysis (status ${status})`);
+  }
+  const failureNote=projectFailures.length?` (project gate: ${projectFailures.join(', ')})`:'';
+  projectGate.note=[`whole-project debt, reported and not a block: the slice verdict decides${failureNote}`,projectGate.note].filter(Boolean).join('; ');
+  const judged=await evaluateSlice(cfg,tokens,{key,slice:setup.slice,props:setup.props,pkg:setup.pkg,gate:summary.gate,coverageRun:setup.coverageRun});
+  if(judged.error)return finish('blocked',judged.error);
+  Object.assign(summary.slice,judged.result);
+  if(judged.refused)return finish('refused',judged.refused.reason,{code:judged.refused.code});
+  if(judged.result.verdict==='pass')return finish('pass');
+  return finish('fail',`the slice fails on new code: ${judged.result.failures.join('; ')}`);
+};
+
+export async function scan(cfg,options={}){
+  const cwd=path.resolve(options.cwd??process.cwd());
+  const summary={schema:SCAN_SCHEMA,at:new Date().toISOString(),host:cfg.host,publicHost:cfg.publicHost,cwd,stack:cfg.stackDir,declaration:cfg.declaration};
+  const finish=(outcome,reason,extra={})=>Object.assign(summary,extra,{outcome,...(reason?{reason}:{}),...(outcome==='blocked'?{unavailable:true}:{})});
+  const inputs=prepareScanInputs(cfg,options,cwd,summary,finish);
+  if(inputs.result)return inputs.result;
+  const setup=await prepareScanExecution(cfg,options,inputs,summary,finish);
+  if(setup.result)return setup.result;
   try{
-    const plan=scannerCommand({pkg,props,host:cfg.host,key,workDir,extra});
-    const run=await runScanner(cwd,plan,childEnv,Number(options.timeoutSec??1800)*1000);
-    summary.scanner={runner:plan.runner,command:scrub(run.display),exitCode:run.exitCode,durationMs:run.durationMs};
-    if(options.log){fs.mkdirSync(path.dirname(path.resolve(options.log)),{recursive:true});fs.writeFileSync(options.log,`$ ${scrub(run.display)}\n${run.log}`);summary.scanner.log=path.resolve(options.log);}
-    if(options.blob){
-      const stored=await emitCheckOutput(`$ ${scrub(run.display)}\n${run.log}`,{blob:true,mediaType:'text/plain',
-        put:options.put,write:()=>{}});
-      summary.scanner.logSha=stored.sha;
-    }
-    const report=readProperties(path.join(workDir,'report-task.txt'));
-    if(!report.ceTaskId){
-      const tail=run.log.trim().split(/\r?\n/).slice(-3).join(' | ');
-      return finish(/\b401\b|not authori[sz]ed|unauthori[sz]ed/i.test(run.log)?'blocked':'fail',`the scanner submitted no analysis (exit ${run.exitCode}) with ${token.name}: ${tail}`);
-    }
-    summary.ceTask={id:report.ceTaskId};
-    summary.dashboardUrl=report.dashboardUrl??`${cfg.host}/dashboard?id=${encodeURIComponent(key)}`;
-    summary.publicDashboardUrl=`${cfg.publicHost}/dashboard?id=${encodeURIComponent(key)}`;
+    const submitted=await submitScan(cfg,options,setup,summary,finish);
+    if(submitted.result)return submitted.result;
     if(!options.wait)return finish('submitted','scanner submission alone is not a pass; rerun with --wait for the processed quality gate');
-
-    const tokens=[analysisToken];
-    const deadline=Date.now()+Number(options.waitSec??600)*1000;
-    let task;
-    for(;;){
-      const polled=await read(cfg,tokens,`/api/ce/task?id=${encodeURIComponent(report.ceTaskId)}`);
-      task=polled.json?.task;
-      if(!polled.reachable||polled.status!==200)return finish('blocked',`compute-engine task ${report.ceTaskId} could not be read: ${polled.error??`HTTP ${polled.status}`}`);
-      if(['SUCCESS','FAILED','CANCELED'].includes(task?.status))break;
-      if(Date.now()>deadline)return finish('blocked',`compute-engine task ${report.ceTaskId} still ${task?.status} after the wait`);
-      await new Promise(r=>setTimeout(r,cfg.pollMs));
-    }
-    summary.ceTask.status=task.status;
-    summary.analysisId=task.analysisId??null;
-    if(task.status!=='SUCCESS')return finish('fail',`the server did not process the analysis: ${task.status}${task.errorMessage?` - ${scrub(task.errorMessage)}`:''}`);
-
-    const gate=await read(cfg,tokens,`/api/qualitygates/project_status?analysisId=${encodeURIComponent(task.analysisId)}`);
-    const project=gate.json?.projectStatus;
-    const projectGate={scope:'whole-project',status:project?.status??null,conditions:(project?.conditions??[]).map(c=>({metric:c.metricKey,status:c.status,actual:c.actualValue,comparator:c.comparator,threshold:c.errorThreshold}))};
-    summary.projectGate=projectGate;
-    const component=encodeURIComponent(key);
-    let issues=await read(cfg,tokens,`/api/issues/search?components=${component}&resolved=false&ps=1&facets=severities,types,impactSeverities`);
-    if(issues.status!==200)issues=await read(cfg,tokens,`/api/issues/search?componentKeys=${component}&resolved=false&ps=1&facets=severities,types`);
-    if(issues.status===200)summary.issues={scope:'whole-project',total:issues.json?.paging?.total??issues.json?.total??null,bySeverity:facet(issues.json,'severities'),byType:facet(issues.json,'types'),byImpactSeverity:facet(issues.json,'impactSeverities')};
-    const hotspots=await read(cfg,tokens,`/api/hotspots/search?projectKey=${component}&status=TO_REVIEW&ps=1`);
-    if(hotspots.status===200)summary.hotspots={scope:'whole-project',toReview:hotspots.json?.paging?.total??null};
-    const measures=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=duplicated_lines_density,ncloc,coverage`);
-    if(measures.status===200)summary.measures=Object.fromEntries((measures.json?.component?.measures??[]).map(m=>[m.metric,m.value]));
-    // Sonar way judges new code only: a project's first analysis has none, so the gate is OK with no
-    // condition evaluated. That is the server's verdict and stays a pass, but the summary says so.
-    if(projectGate.status==='OK'&&!projectGate.conditions.length)projectGate.note='no condition was evaluated (a first analysis has no new code); read the overall measures';
-    const projectFailures=projectGate.conditions.filter(c=>c.status==='ERROR').map(c=>`${c.metric} ${c.actual} vs ${c.comparator} ${c.threshold}`);
-    if(projectGateMode){
-      if(projectGate.status==='OK')return finish('pass');
-      if(projectGate.status==='ERROR')return finish('fail','the quality gate failed: '+projectFailures.join(', '));
-      return finish('blocked',`no quality-gate result for the analysis (status ${projectGate.status??`HTTP ${gate.status}`})`);
-    }
-    // The project has no new-code baseline, so its gate judges the whole project's debt: a note for the
-    // report, never this slice's verdict.
-    projectGate.note=[`whole-project debt, reported and not a block: the slice verdict decides${projectFailures.length?` (project gate: ${projectFailures.join(', ')})`:''}`,projectGate.note].filter(Boolean).join('; ');
-    const judged=await evaluateSlice(cfg,tokens,{key,slice,props,pkg,gate:summary.gate,coverageRun});
-    if(judged.error)return finish('blocked',judged.error);
-    Object.assign(summary.slice,judged.result);
-    if(judged.refused)return finish('refused',judged.refused.reason,{code:judged.refused.code});
-    if(judged.result.verdict==='pass')return finish('pass');
-    return finish('fail',`the slice fails on new code: ${judged.result.failures.join('; ')}`);
+    const completed=await waitForScan(cfg,options,setup,submitted.report,summary,finish);
+    if(completed.result)return completed.result;
+    return await finishScan(cfg,setup,completed,summary,finish);
   }finally{
-    safeRemove(workDir,{hold:artifactHoldReason});
+    safeRemove(setup.workDir,{hold:artifactHoldReason});
     // The throwaway slice project is judged and gone: the next scan of the same scope re-creates it.
-    if(isolated&&!options.keepSliceProject){
-      const removed=await call(cfg,'POST','/api/projects/delete',{token:admin.value,form:{project:isolated.projectKey}}).catch(error=>({status:0,error:String(error?.message??error)}));
-      isolated.deleted=removed.status===204||removed.status===200;
-      if(!isolated.deleted)isolated.deleteError=`HTTP ${removed.status??0} ${removed.text??removed.error??''}`.trim();
+    if(setup.isolated&&!options.keepSliceProject){
+      const removed=await call(cfg,'POST','/api/projects/delete',{token:setup.admin.value,form:{project:setup.isolated.projectKey}}).catch(error=>({status:0,error:String(error?.message??error)}));
+      setup.isolated.deleted=removed.status===204||removed.status===200;
+      if(!setup.isolated.deleted)setup.isolated.deleteError=`HTTP ${removed.status??0} ${removed.text??removed.error??''}`.trim();
     }
   }
 }
@@ -1171,30 +1135,62 @@ const HELP=`Usage: starci gate sonar <command> [options]
           quality.sonar declaration when it has one, else ${DEFAULT_HOST} and the source host's .starcistacks/dev
 Exit 0 pass/up/ok, 1 failing result or refused scan (empty slice), 2 blocked or usage.`;
 
+const BOOLEAN_FLAGS=new Map([['--wait','wait'],['--no-ensure','ensure'],['--with-token','withToken'],['--project-gate','projectGate'],
+  ['--isolate','isolate'],['--keep-slice-project','keepSliceProject'],['--blob','blob'],['--help','help'],['-h','help']]);
+const parseArgument=(out,argv,index)=>{
+  const arg=argv[index];
+  if(arg==='--'){out.rest=argv.slice(index+1);return argv.length;}
+  const boolean=BOOLEAN_FLAGS.get(arg);
+  if(boolean){out[boolean]=arg==='--no-ensure'?false:true;return index;}
+  if(!arg.startsWith('--')){out._.push(arg);return index;}
+  const [flag,inline]=arg.slice(2).split(/=(.*)/s),name=flag.replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase());
+  const value=inline??argv[index+1];
+  out[name]=name==='paths'&&out.paths?`${out.paths},${value}`:value;
+  return inline===undefined?index+1:index;
+};
 function parseArgs(argv){
   const out={_:[],rest:null};
-  for(let i=0;i<argv.length;i++){
-    const a=argv[i];
-    if(a==='--'){out.rest=argv.slice(i+1);break;}
-    if(a==='--wait')out.wait=true;
-    else if(a==='--no-ensure')out.ensure=false;
-    else if(a==='--with-token')out.withToken=true;
-    else if(a==='--project-gate')out.projectGate=true;
-    else if(a==='--isolate')out.isolate=true;
-    else if(a==='--keep-slice-project')out.keepSliceProject=true;
-    else if(a==='--blob')out.blob=true;
-    else if(a==='--help'||a==='-h')out.help=true;
-    else if(a.startsWith('--')){
-      const [flag,inline]=a.slice(2).split(/=(.*)/s);
-      const name=flag.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());
-      const value=inline??argv[++i];
-      out[name]=name==='paths'&&out.paths?`${out.paths},${value}`:value;
-    }else out._.push(a);
+  for(let index=0;index<argv.length;index+=1){
+    index=parseArgument(out,argv,index);
+    if(out.rest!==null)break;
   }
   return out;
 }
 
 const exitFor=outcome=>({up:0,ok:0,pass:0,present:0,submitted:0,disabled:0,fail:1,refused:1}[outcome]??2);
+
+const ensureProjectReport=async(cfg,args,key)=>{
+  const report=await ensureProject(cfg,{key,name:args.name??cfg.declaredName});
+  if(report.outcome==='ok'&&args.withToken){
+    const token=await projectToken(cfg,{key,admin:readCustody(cfg,cfg.adminToken,{remember}),tokenRef:args.tokenRef});
+    report.tokenCustody=custodyView(token);
+    if(!token.present)Object.assign(report,{outcome:'blocked',message:`no analysis token for ${key}: ${token.reason}`});
+  }
+  return report;
+};
+const tokenCommandResult=async(cfg,args,key,env)=>{
+  const child=await sonarEnv(cfg,{base:env});
+  if(child.ok&&args.rest?.length)return {direct:{exitCode:runShell(args.rest.map(quote).join(' '),child.env)}};
+  return {report:{schema:SCHEMA,command:'token',host:cfg.host,...(key?{projectKey:key}:{}),custody:child.custody,outcome:child.ok?'present':'blocked'}};
+};
+const runSonarCommand=async(args,cfg,key,env,put)=>{
+  const command=args._[0];
+  if(command==='status')return {report:await status(cfg)};
+  if(command==='ensure-project')return {report:await ensureProjectReport(cfg,args,key)};
+  if(command==='token')return tokenCommandResult(cfg,args,key,env);
+  if(command==='scan'){
+    const report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,blob:args.blob,put,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
+      base:args.base,paths:args.paths,projectGate:args.projectGate,isolate:args.isolate,keepSliceProject:args.keepSliceProject});
+    if(args.out)await emitCheckOutput(`${scrub(JSON.stringify(report,null,2))}\n`,{out:args.out});
+    return {report};
+  }
+  if(command==='dashboard'){
+    const report=await dashboard(cfg,{cwd:args.cwd,key:args.key,tokenRef:args.tokenRef});
+    if(args.out)await emitCheckOutput(`${scrub(JSON.stringify(report,null,2))}\n`,{out:args.out});
+    return {report};
+  }
+  return {direct:{exitCode:2,text:`sonar-local: unknown command ${command}\n\n${HELP}`}};
+};
 
 export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={}){
   const args=parseArgs(argv);
@@ -1206,40 +1202,20 @@ export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={
   let cfg=resolveConfig({...config,...(args.host?{host:args.host}:{}),...(args.stack?{stack:args.stack}:{}),...(args.cwd?{cwd:args.cwd}:{}),...(args.declaration?{declaration:args.declaration}:{})},env);
   if(command==='status'||command==='ensure-project')cfg=sonarAdministrativeConfig(cfg);
   const key=args.key??cfg.declaredKey??undefined;
-  let report;
-  if(command==='status')report=await status(cfg);
-  else if(command==='ensure-project'){
-    report=await ensureProject(cfg,{key,name:args.name??cfg.declaredName});
-    if(report.outcome==='ok'&&args.withToken){
-      const token=await projectToken(cfg,{key,admin:readCustody(cfg,cfg.adminToken,{remember}),tokenRef:args.tokenRef});
-      report.tokenCustody=custodyView(token);
-      if(!token.present)Object.assign(report,{outcome:'blocked',message:`no analysis token for ${key}: ${token.reason}`});
-    }
-  }else if(command==='token'){
-    const child=await sonarEnv(cfg,{base:env});
-    if(!child.ok||!args.rest?.length)report={schema:SCHEMA,command:'token',host:cfg.host,...(key?{projectKey:key}:{}),custody:child.custody,outcome:child.ok?'present':'blocked'};
-    else{
-      // A shell resolves npm/npx .cmd shims on Windows; each argument is quoted so paths with spaces survive.
-      return {exitCode:runShell(args.rest.map(quote).join(' '),child.env)};
-    }
-  }else if(command==='scan'){
-    report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,blob:args.blob,put,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
-      base:args.base,paths:args.paths,projectGate:args.projectGate,isolate:args.isolate,keepSliceProject:args.keepSliceProject});
-    if(args.out)await emitCheckOutput(`${scrub(JSON.stringify(report,null,2))}\n`,{out:args.out});
-  }else if(command==='dashboard'){
-    report=await dashboard(cfg,{cwd:args.cwd,key:args.key,tokenRef:args.tokenRef});
-    if(args.out)await emitCheckOutput(`${scrub(JSON.stringify(report,null,2))}\n`,{out:args.out});
-  }else return {exitCode:2,text:`sonar-local: unknown command ${command}\n\n${HELP}`};
+  const result=await runSonarCommand(args,cfg,key,env,put);
+  if(result.direct)return result.direct;
+  const report=result.report;
   const safeReport=JSON.parse(scrub(JSON.stringify(report)));
   const blob=args.blob?await emitCheckOutput(`${JSON.stringify(safeReport,null,2)}\n`,{blob:true,put,write:()=>{}}):null;
   return {exitCode:exitFor(report.outcome),report:safeReport,...(blob?{blob}:{})};
 }
 
 if(isMain(import.meta.url)){
-  sonarLocalMain(process.argv.slice(2)).then(({exitCode,report,text,blob})=>{
+  try{
+    const {exitCode,report,text,blob}=await sonarLocalMain(process.argv.slice(2));
     if(text)process.stdout.write(`${text}\n`);
     if(blob)process.stdout.write(`${JSON.stringify(blob)}\n`);
     else if(report)process.stdout.write(`${JSON.stringify(report,null,2)}\n`);
     process.exitCode=exitCode;
-  },error=>{process.stderr.write(`sonar-local: ${scrub(error?.stack??error)}\n`);process.exitCode=2;});
+  }catch(error){process.stderr.write(`sonar-local: ${scrub(error?.stack??error)}\n`);process.exitCode=2;}
 }

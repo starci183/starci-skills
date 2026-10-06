@@ -8,6 +8,7 @@ import {computeDerived, runGenerated} from './example-derive.mjs';
 import { readWorkTree } from '../lib/work-tree.mjs';
 import {APP_SIDES, appRootOf, indexInlineCriteria, repoRootFor, resolveRecordRef} from '../work/record-ownership.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { computeBlockerCycleFindings } from './example-blocker-cycles.mjs';
 
 /**
  * `.starciwork` can already answer "what is done, what is stale, what is blocked" (example-derive.mjs).
@@ -134,6 +135,18 @@ function blastRadiusOf(ruleId, derivedRecords, provesUsedBy) {
   return visited;
 }
 
+/** The union of module/owner paths over `ids` (raw records only; ids without one contribute nothing). */
+const ownedPathSet = (ids, rawRecords) => {
+  const paths = new Set();
+  for (const id of ids) {
+    const raw = rawRecords.get(id);
+    if (!raw) continue;
+    for (const p of modulePaths(raw)) paths.add(p);
+    for (const p of ownerPaths(raw)) paths.add(p);
+  }
+  return paths;
+};
+
 function computeBlastRadiusFindings(derived, rawRecords, evidenceByDir) {
   const provesUsedBy = buildProvesUsedBy(rawRecords);
   const findings = [];
@@ -141,17 +154,11 @@ function computeBlastRadiusFindings(derived, rawRecords, evidenceByDir) {
   for (const rule of rules) {
     const affected = [...blastRadiusOf(rule.id, derived.records, provesUsedBy)].sort(byCodeUnit);
     const staledEvidence = affected.filter(id => evidenceByDir.has(rawRecords.get(id)?.dir)).length;
-    const paths = new Set();
-    for (const id of [rule.id, ...affected]) {
-      const raw = rawRecords.get(id);
-      if (!raw) continue;
-      for (const p of modulePaths(raw)) paths.add(p);
-      for (const p of ownerPaths(raw)) paths.add(p);
-    }
+    const paths = ownedPathSet([rule.id, ...affected], rawRecords);
     findings.push({
       id: `blast-radius:${rule.id}`,
       kind: 'blast-radius',
-      severity: affected.length >= 10 ? 'critical' : affected.length >= 3 ? 'warn' : 'info',
+      severity: [affected.length >= 10 && 'critical', affected.length >= 3 && 'warn'].find(Boolean) ?? 'info',
       records: [rule.id, ...affected],
       because: `A breaking change to ${rule.id} sends ${affected.length} other record(s) back to todo, would stale ${staledEvidence} evidence file(s), and touches ${paths.size} code path(s) (${[...paths].sort(byCodeUnit).join(', ') || '(none owned yet)'}) - this is the number a reviewer wants before approving the change.`,
       radius: affected.length,
@@ -194,136 +201,35 @@ function computeFanInFindings(derived) {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// Section 3: blocker cycles
+// Section 3: blocker cycles — scripts/example/example-blocker-cycles.mjs
 // ---------------------------------------------------------------------------------------------------------
-
-/** Tarjan's algorithm, iterative in spirit but written recursively (these graphs are small); node and edge
- * order are both sorted first, so two runs over the same tree produce byte-identical SCCs and the same
- * chosen ring. Only edges between two nodes in `candidateIds` are considered - the cycle detector should not
- * wander into the whole tree's blockedBy graph, only the part example-derive.mjs already flagged `cyclic`. */
-function stronglyConnectedComponents(candidateIds, edgesOf) {
-  const ids = [...candidateIds].sort(byCodeUnit);
-  const index = new Map(), lowlink = new Map(), onStack = new Set(), stack = [];
-  const sccs = [];
-  let counter = 0;
-  function strongconnect(v) {
-    index.set(v, counter); lowlink.set(v, counter); counter += 1;
-    stack.push(v); onStack.add(v);
-    for (const w of [...edgesOf(v)].filter(x => candidateIds.has(x)).sort(byCodeUnit)) {
-      if (!index.has(w)) {
-        strongconnect(w);
-        lowlink.set(v, Math.min(lowlink.get(v), lowlink.get(w)));
-      } else if (onStack.has(w)) {
-        lowlink.set(v, Math.min(lowlink.get(v), index.get(w)));
-      }
-    }
-    if (lowlink.get(v) === index.get(v)) {
-      const component = [];
-      let w;
-      do { w = stack.pop(); onStack.delete(w); component.push(w); } while (w !== v);
-      component.sort(byCodeUnit);
-      sccs.push(component);
-    }
-  }
-  for (const v of ids) if (!index.has(v)) strongconnect(v);
-  return sccs;
-}
-
-/** One concrete simple cycle through `scc`, starting at its lexicographically smallest member and
- * preferring the smallest available neighbor at each step (deterministic). Tries a full-coverage
- * (Hamiltonian) cycle first - a ring that visits every member is the more informative report of "what is
- * actually stuck together" than the shortest possible loop through just two of them - and falls back to the
- * shortest cycle it can find if no full-coverage ring exists. `scc` is strongly connected, so at least the
- * fallback is guaranteed to succeed. */
-function findRingIn(scc, edgesOf) {
-  if (scc.length === 1) return [scc[0], scc[0]]; // self-loop
-  const members = new Set(scc);
-  const start = [...scc].sort(byCodeUnit)[0];
-  const neighborsOf = node => [...edgesOf(node)].filter(n => members.has(n)).sort(byCodeUnit);
-
-  function fullCoverageRing() {
-    const path = [start];
-    const visited = new Set([start]);
-    function dfs(node) {
-      if (path.length === scc.length) return neighborsOf(node).includes(start);
-      for (const n of neighborsOf(node)) {
-        if (visited.has(n)) continue;
-        path.push(n); visited.add(n);
-        if (dfs(n)) return true;
-        path.pop(); visited.delete(n);
-      }
-      return false;
-    }
-    return dfs(start) ? [...path, start] : null;
-  }
-
-  function shortestRing() {
-    const path = [start];
-    const onPath = new Set([start]);
-    function dfs(node) {
-      const neighbors = neighborsOf(node);
-      if (neighbors.includes(start) && path.length > 1) return true;
-      for (const n of neighbors) {
-        if (n === start || onPath.has(n)) continue;
-        path.push(n); onPath.add(n);
-        if (dfs(n)) return true;
-        path.pop(); onPath.delete(n);
-      }
-      return false;
-    }
-    dfs(start);
-    return [...path, start];
-  }
-
-  return fullCoverageRing() ?? shortestRing();
-}
-
-function computeBlockerCycleFindings(derived, rawRecords) {
-  const inline = indexInlineCriteria(rawRecords);
-  const canon = ref => resolveRecordRef(rawRecords, ref, inline) ?? ref;
-  const candidateIds = new Set();
-  for (const rec of derived.records.values()) {
-    if (rec.blockers.some(b => b.cyclic)) {
-      candidateIds.add(rec.id);
-      for (const b of rec.blockers) if (b.cyclic) candidateIds.add(b.id);
-    }
-  }
-  const edgesOf = id => {
-    const raw = rawRecords.get(id);
-    const edges = Array.isArray(raw?.data.blockedBy) ? raw.data.blockedBy : [];
-    return edges.filter(e => isPlainObject(e) && typeof e.record === 'string').map(e => canon(e.record));
-  };
-  const sccs = stronglyConnectedComponents(candidateIds, edgesOf).filter(c => c.length > 1);
-  sccs.sort((a, b) => a[0].localeCompare(b[0]));
-  const findings = [];
-  for (const scc of sccs) {
-    const ring = findRingIn(scc, edgesOf);
-    const because = [];
-    for (let i = 0; i < ring.length - 1; i += 1) {
-      const from = ring[i], to = ring[i + 1];
-      const raw = rawRecords.get(from);
-      const edge = (Array.isArray(raw?.data.blockedBy) ? raw.data.blockedBy : []).find(e => isPlainObject(e) && canon(e.record) === to);
-      because.push(`${from} is blockedBy ${to}${edge?.because ? ` ("${edge.because.slice(0, 90)}${edge.because.length > 90 ? '...' : ''}")` : ''}`);
-    }
-    const features = new Set(scc.map(id => derived.records.get(id)?.feature).filter(Boolean));
-    const candidateAnchors = [...rawRecords.values()]
-      .filter(r => features.has(r.feature) && !scc.includes(r.id))
-      .filter(r => r.schema === 'work/gap@1' || (r.schema === 'work/policy-decision@1' && r.data.outcome === 'open'))
-      .map(r => r.id).sort(byCodeUnit);
-    findings.push({
-      id: `blocker-cycle:${scc[0]}`,
-      kind: 'blocker-cycle',
-      severity: 'critical',
-      records: scc,
-      because: `A blockedBy ring never reaches a gap or an open decision: ${ring.join(' → ')}. It never resolves on its own. ${candidateAnchors.length ? `Candidate anchors already in the tree for the same feature(s) that no ring member currently points at: ${candidateAnchors.join(', ')} - one of the ring's records should point outward at one of these instead of at another ring member.` : 'No gap or open decision exists yet for the same feature(s); one needs to be authored so a ring member can point outward instead of at another ring member.'} Edges: ${because.join('; ')}.`,
-    });
-  }
-  return findings;
-}
 
 // ---------------------------------------------------------------------------------------------------------
 // Section 4: done without a code anchor
 // ---------------------------------------------------------------------------------------------------------
+
+/** The anchors of `rec` that resolve to nothing on disk, rendered `${p} (${via})` with the repository note. */
+const missingAnchors = (rec, anchors, repos) => {
+  const missing = [];
+  for (const {p, via} of anchors) {
+    const {exists, note} = resolveAnchor(repos, rec, p);
+    if (!exists) missing.push(note ? `${p} (${via}; ${note})` : `${p} (${via})`);
+  }
+  return missing;
+};
+
+/** The done-proves-not-done finding of one work/implementation record, or null. */
+const notDoneProvesFinding = (rec, rawRecords, inline) => {
+  const notDone = rec.data.proves.filter(t => typeof t === 'string' && rawRecords.get(resolveRecordRef(rawRecords, t, inline) ?? t)?.state !== 'done');
+  if (!notDone.length) return null;
+  return {
+    id: `done-proves-not-done:${rec.id}`,
+    kind: 'done-proves-not-done',
+    severity: 'warn',
+    records: [rec.id, ...notDone],
+    because: `${rec.id} is state: done and proves ${notDone.join(', ')}, but that target is not itself done - an implementation cannot outrun the specification it claims to prove.`,
+  };
+};
 
 function computeDoneAnchorFindings(rawRecords, repos) {
   const findings = [];
@@ -332,11 +238,7 @@ function computeDoneAnchorFindings(rawRecords, repos) {
     if (rec.state !== 'done') continue;
     const anchors = [...ownerPaths(rec).map(p => ({p, via: 'owners'})), ...modulePaths(rec).map(p => ({p, via: 'module'}))];
     if (!anchors.length) continue;
-    const missing = [];
-    for (const {p, via} of anchors) {
-      const {exists, note} = resolveAnchor(repos, rec, p);
-      if (!exists) missing.push(note ? `${p} (${via}; ${note})` : `${p} (${via})`);
-    }
+    const missing = missingAnchors(rec, anchors, repos);
     if (missing.length) {
       findings.push({
         id: `done-without-anchor:${rec.id}`,
@@ -347,16 +249,8 @@ function computeDoneAnchorFindings(rawRecords, repos) {
       });
     }
     if (rec.schema === 'work/implementation@1' && Array.isArray(rec.data.proves)) {
-      const notDone = rec.data.proves.filter(t => typeof t === 'string' && rawRecords.get(resolveRecordRef(rawRecords, t, inline) ?? t)?.state !== 'done');
-      if (notDone.length) {
-        findings.push({
-          id: `done-proves-not-done:${rec.id}`,
-          kind: 'done-proves-not-done',
-          severity: 'warn',
-          records: [rec.id, ...notDone],
-          because: `${rec.id} is state: done and proves ${notDone.join(', ')}, but that target is not itself done - an implementation cannot outrun the specification it claims to prove.`,
-        });
-      }
+      const extra = notDoneProvesFinding(rec, rawRecords, inline);
+      if (extra) findings.push(extra);
     }
   }
   return findings.sort((a, b) => a.id.localeCompare(b.id));
@@ -370,8 +264,7 @@ function computeUnboundSdsFindings(rawRecords, repos) {
   const findings = [];
   for (const rec of rawRecords.values()) {
     if (rec.schema !== 'work/sds-component@1') continue;
-    const owners = Array.isArray(rec.data.owners) ? rec.data.owners : null;
-    if (!owners?.length) {
+    if (!Array.isArray(rec.data.owners) || !rec.data.owners.length) {
       findings.push({
         id: `unbound-sds:${rec.id}`,
         kind: 'unbound-sds',
@@ -381,6 +274,7 @@ function computeUnboundSdsFindings(rawRecords, repos) {
       });
       continue;
     }
+    const owners = rec.data.owners;
     const unresolved = owners.filter(o => {
       if (!isPlainObject(o) || typeof o.path !== 'string' || !o.path) return true;
       const {exists, abs} = resolveAnchor(repos, rec, o.path);
@@ -581,10 +475,7 @@ function buildCritiqueMarkdown(critique) {
     const items = critique.findings.filter(f => section.kind.includes(f.kind));
     lines.push(`## ${section.title}`, '', `${items.length} finding(s).`, '');
     if (!items.length) { lines.push('(none)', ''); continue; }
-    for (const item of items) {
-      lines.push(`- **${item.id}** [${item.severity}] (${item.records.join(', ')})`, `  ${item.because}`);
-    }
-    lines.push('');
+    lines.push(...items.flatMap(item => [`- **${item.id}** [${item.severity}] (${item.records.join(', ')})`, `  ${item.because}`]), '');
   }
   return lines.join('\n');
 }

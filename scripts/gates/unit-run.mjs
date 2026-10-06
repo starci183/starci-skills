@@ -22,7 +22,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 import { jestRunError, reduceJest } from './test-world-run.mjs';
@@ -46,11 +45,25 @@ export function unitKitRules(runtime = runtimeRoot) {
 
 const BE = 'be/';
 
+/** `variant` with each `<placeholder>` replaced by `*` (an empty `<>` is left alone, as <[^>]+> requires a name). */
+const placeholderStars = (variant) => {
+  let out = '', i = 0;
+  for (;;) {
+    const open = variant.indexOf('<', i);
+    if (open < 0) return out + variant.slice(i);
+    const close = variant.indexOf('>', open + 1);
+    if (close < 0) return out + variant.slice(i);
+    if (close === open + 1) { out += variant.slice(i, open + 1); i = open + 1; continue; }
+    out += `${variant.slice(i, open)}*`;
+    i = close + 1;
+  }
+};
+
 /** True when the be-relative `file` lies inside slot `id` (its path with each `<placeholder>` a `*`, a directory owning everything below it). */
 function inSlot(manifest, id, file) {
   const slot = manifest.slots.find((candidate) => candidate.id === id);
   if (!slot) return false;
-  return braceVariants(slot.path).some((variant) => globExpression(`${variant.replace(/<[^>]+>/g, '*')}${variant.endsWith('/') ? '**' : ''}`).test(file));
+  return braceVariants(slot.path).some((variant) => globExpression(`${placeholderStars(variant)}${variant.endsWith('/') ? '**' : ''}`).test(file));
 }
 
 /** The spec-required unit role of an app-relative file, or null: its name ends in .<role>.ts under be/src (outside be/src/tests) and, for a role tied to a slot, inside that slot. */
@@ -68,15 +81,15 @@ export function servicesOf(root, roles = unitRolesOf(loadSlotManifest()), manife
   if (!fs.existsSync(dir)) return [];
   return walkFiles(dir, { sorted: true, exclude: (name, full, entry) => entry.isDirectory() && ['node_modules', 'dist', 'coverage', 'tests'].includes(name) })
     .map((file) => posixPath(path.relative(root, file)))
-    .filter((rel) => !/\.spec\.ts$/.test(rel) && (unitRoleOf(rel, roles, manifest) !== null || isMeasured(manifest, rel.slice(BE.length))));
+    .filter((rel) => !rel.endsWith('.spec.ts') && (unitRoleOf(rel, roles, manifest) !== null || isMeasured(manifest, rel.slice(BE.length))));
 }
 
 /** The kit judgment of one service spec: the forbidden needles it uses, the required ones it lacks, a `new Subject(`. */
 function judgeServiceSpec(text, serviceText, rules) {
-  const code = String(text).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-  const subject = /export\s+class\s+([A-Za-z0-9_]+)/.exec(String(serviceText ?? ''))?.[1] ?? null;
+  const code = String(text).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n\r\u2028\u2029]*/gm, '$1');
+  const subject = /export\s+class\s+(\w+)/.exec(String(serviceText ?? ''))?.[1] ?? null;
   return { missing: rules.required.filter((needle) => !code.includes(needle)), forbidden: rules.forbidden.filter((needle) => code.includes(needle)),
-    constructsSubject: Boolean(subject && new RegExp(`new\\s+${subject}\\s*\\(`).test(code)), subject };
+    constructsSubject: Boolean(subject && new RegExp(String.raw`new\s+${subject}\s*\(`).test(code)), subject };
 }
 
 /** The per-subject records from the coverage summary (keys absolute or app-relative) and the specs beside each subject. */
@@ -94,7 +107,9 @@ export function judgeServices(root, coverage, rules = unitKitRules()) {
     const pct = Object.fromEntries(COVERAGE_METRICS.map((m) => [m, metrics?.[m]?.pct ?? null]));
     const unitRole = unitRoleOf(rel, roles, manifest);
     const roleName = unitRole?.role ?? roleOfName(rel);
-    const specRel = `${rel.slice(0, -`.${roleName}.ts`.length)}.${unitRole?.spec ?? `${roleName}.spec`}.ts`;
+    const suffix = `.${roleName}.ts`;
+    const specName = unitRole?.spec ?? `${roleName}.spec`;
+    const specRel = `${rel.slice(0, -suffix.length)}.${specName}.ts`;
     const spec = fs.existsSync(path.join(root, specRel)) ? specRel : null;
     const kit = spec && unitRole ? judgeServiceSpec(fs.readFileSync(path.join(root, specRel), 'utf8'), fs.readFileSync(path.join(root, rel), 'utf8'), rules) : null;
     return { path: rel, role: roleName, measured: isMeasured(manifest, rel.slice(BE.length)), specRequired: unitRole !== null, coverage: pct, spec, kit };
@@ -106,7 +121,10 @@ export function unitFindings(summary) {
   const out = [];
   for (const s of summary.services ?? []) {
     const below = COVERAGE_METRICS.filter((m) => s.coverage?.[m] !== 100);
-    if (s.measured !== false && below.length) out.push({ rule: 'coverage-below', path: s.path, message: `${below.map((m) => `${m} ${s.coverage?.[m] ?? 'not measured'}`).join(', ')} (every measured file owes 100 on each metric)` });
+    if (s.measured !== false && below.length) {
+      const parts = below.map((m) => `${m} ${s.coverage?.[m] ?? 'not measured'}`).join(', ');
+      out.push({ rule: 'coverage-below', path: s.path, message: `${parts} (every measured file owes 100 on each metric)` });
+    }
     if (s.specRequired === false) continue;
     if (!s.spec) { out.push({ rule: 'spec-missing', path: s.path, message: `no <name>.${s.role ?? 'service'}.spec.ts beside it` }); continue; }
     for (const needle of s.kit?.missing ?? []) out.push({ rule: 'kit', path: s.spec, message: `the spec never uses ${needle}` });
@@ -140,7 +158,8 @@ export function buildUnitRun({ root, rules = unitKitRules(), npm = runNpm }) {
   const summary = { schema: UNIT_RUN_SCHEMA, at: new Date().toISOString(), root: posixPath(abs), run, services: judgeServices(abs, coverage, rules), findings: [], exit: 2 };
   summary.findings = unitFindings(summary);
   const red = run.error || run.exit !== 0 || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0 || run.total === 0;
-  summary.exit = run.error ? 2 : summary.findings.length || red ? 1 : 0;
+  if (run.error) summary.exit = 2;
+  else summary.exit = summary.findings.length || red ? 1 : 0;
   return summary;
 }
 

@@ -84,7 +84,6 @@ const optionLabel = (o) => (typeof o === 'string' ? o : o?.label ?? o?.id ?? '')
 const when = (ms, language) => new Date(ms).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-GB', { hour12: false });
 
 /* ------------------------------------------------------------ ask keys and buttons */
-
 /** The store key of one ask (`<workflow>|<dispatch>`). */
 const askStoreKey = (workflowId, dispatchId) => `${workflowId}|${dispatchId}`;
 /** The short key a "Generate URL" button carries: 16 hex chars of sha256(workflow|dispatch). */
@@ -94,10 +93,9 @@ export const ASK_CALLBACK = /^ask:([0-9a-f]{16})$/;
 export const askButton = (language, key) => ({ inline_keyboard: [[{ text: textFor(language).generate, callback_data: `ask:${key}` }]] });
 
 /* ------------------------------------------------------------ messages */
-
 // The workflow by its display name with the id after it, then the asking op job's name when known
 // (`<op label> · <what> · <workflow name>`, scripts/lib/display-names.mjs).
-const workflowLine = (t, workflow) => [`${t.workflow}: ${workflow.title && workflow.title !== workflow.id ? `${workflow.title} (${workflow.id})` : workflow.id}`,
+const workflowLine = (t, workflow) => [`${t.workflow}: ${workflow.title && workflow.title !== workflow.id ? workflow.title + ' (' + workflow.id + ')' : workflow.id}`,
   ...(workflow.job ? [`${t.job}: ${workflow.job}`] : [])].join('\n');
 
 /** The link the owner gets for one served ask, and why. */
@@ -145,13 +143,11 @@ export function autoAcceptedMessage({ workflow, question, label, language }) {
 function closedMessage({ reason, by = null, title, question, language, now = Date.now() }) {
   const t = textFor(language);
   const stamp = new Date(now).toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
-  const head = `${reason === 'retired' ? t.retired : t.answered} (${t.at} ${stamp}${by ? `, ${by}` : ''})`;
+  const head = `${reason === 'retired' ? t.retired : t.answered} (${t.at} ${stamp}${by ? ', ' + by : ''})`;
   return [head, `${t.workflow}: ${title}`, '', String(question?.text ?? '')].join('\n').slice(0, TEXT_MAX);
 }
 /* ------------------------------------------------------------ Bot API */
-
 export const endpoint = (apiBase, token, method) => `${apiBase.replace(/\/+$/, '')}/bot${token}/${method}`;
-
 /**
  * One Bot API call with polite retries (botPolite): a JSON POST to `method` under the 15 s read timeout.
  */
@@ -194,7 +190,6 @@ export async function removeAskMessage({ token, chatId, messageId, fallbackText,
 }
 
 /* ------------------------------------------------------------ settings */
-
 /**
  * What a notification needs from config + environment: {ready, token, chatId, language, telegram,
  * base, warning}. `ready` is false with a one-line `warning` when Telegram is wanted (enabled, or a
@@ -213,8 +208,9 @@ export function telegramSettings({ config = ownerConfig(), env = process.env, ro
   } catch (error) { return { ready: false, warning: `telegram: ${error.message}` }; }
   const telegram = connectors.telegram;
   const token = connectorSecret(telegram.botTokenEnv, env);
-  const base = connectors.cloudflare.mode === 'named' ? connectors.cloudflare.publicBase
-    : connectors.cloudflare.mode === 'quick' ? publicBase(env) : null;
+  const cloudflare = connectors.cloudflare;
+  const basePick = { named: () => cloudflare.publicBase, quick: () => publicBase(env) }[cloudflare.mode];
+  const base = basePick ? basePick() : null;
   const common = { telegram, language: config.language, base, chatId: telegram.chatId };
   if (telegram.enabled && token && telegram.chatId) return { ready: true, token, ...common };
   if (!telegram.enabled && !token) return { ready: false, ...common };
@@ -223,7 +219,6 @@ export function telegramSettings({ config = ownerConfig(), env = process.env, ro
 }
 
 /* ------------------------------------------------------------ the sent store */
-
 // The store is machine.sqlite `notifications`, read into the in-memory shape the notices work on:
 // {asks: {<workflow>|<dispatch>: entry}, keys: {<button key>: <workflow>|<dispatch>}, events: {<key>: at}}.
 const SENT_LOCK = 'telegram-sent';
@@ -301,7 +296,6 @@ export const recordAskMessage = ({ workflowId, dispatchId, repo = null, ledgerFi
   }, { env });
 
 /* ------------------------------------------------------------ the draw review on Telegram */
-
 const DRAW_REVIEW_ASK = 'draw-review';
 const CAPTION_MAX = 1000;
 /** The line under a draw-review notice: how the owner answers by replying. */
@@ -313,13 +307,13 @@ function drawAlbumCaption(question, language) {
   const review = question.review ?? {};
   const shapes = [...new Set((review.parts ?? []).map((p) => p?.shape).filter(Boolean))];
   const round = Number.isInteger(review.round) ? review.round : 1;
-  const answers = new RegExp(`${translatedPattern('Round {round}', 'round', '\\d+')};[^\\[]*(.*?)(?:\\.\\s|$)`).exec(String(question.text ?? ''))?.[1] ?? '';
+  const answers = new RegExp(String.raw`${translatedPattern('Round {round}', 'round', String.raw`\d+`)};[^\[]*(.*?)(?:\.\s|$)`).exec(String(question.text ?? ''))?.[1] ?? '';
   const head = tr('[StarCi] Please review: {record}', { record: review.record ?? '' });
   const lines = [head, `${tr('Shapes')}: ${shapes.join(', ') || '-'}`, tr('Round {round}', { round })];
   if (round > 1 && answers) lines.push(`${tr('Notes addressed')}: ${answers}`);
   // The evidence (owner ruling 2026-09-27): redline images ride in the album, rationale.json is named here.
   const why = Array.isArray(question.rationale) ? question.rationale : [];
-  if (why.length) lines.push(`${tr('Rationale')}: ${why.map((r) => `${r.file} (${r.decisions} ${tr('decisions')})`).join(', ')}${(review.redlines ?? []).length ? `; ${tr('redline images attached')}` : ''}`);
+  if (why.length) lines.push(`${tr('Rationale')}: ${why.map((r) => r.file + ' (' + r.decisions + ' ' + tr('decisions') + ')').join(', ')}${(review.redlines ?? []).length ? '; ' + tr('redline images attached') : ''}`);
   return clip(lines.join('\n'), CAPTION_MAX);
 }
 
@@ -370,15 +364,14 @@ export const drawReviewEntryByMessage = (messageId, env = process.env) => {
 };
 
 /* ------------------------------------------------------------ the ask from the ledger */
-
 const readAsk = (ledgerFile, workflowId, dispatchId, now) => {
   const handle = inspectLedger({ file: ledgerFile });
   try { return askState(handle.db, workflowId, dispatchId, { now }); } finally { try { handle.close(); } catch { /* closed */ } }
 };
-const guarded = (env, apiBase, fetchImpl) => (env.STARCI_CONNECTORS_OFF === '1' ? 'STARCI_CONNECTORS_OFF'
+const guarded = (env, apiBase, fetchImpl, specReason = 'test context') => [env.STARCI_CONNECTORS_OFF === '1' && 'STARCI_CONNECTORS_OFF',
   // A spec run (node --test sets NODE_TEST_CONTEXT, which spawned children such as a serve-ask under
   // test inherit) never reaches the real Bot API, whatever the owner config says.
-  : isSpecRun(env) && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context' : null);
+  isSpecRun(env) && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch && specReason].find(Boolean) ?? null;
 
 /**
  * The resolved context of one owner-facing send: every option defaulted, Telegram checked (a guarded-off
@@ -474,7 +467,7 @@ export async function markAskClosed({ ledgerFile, workflowId, dispatchId, reason
       const out = { deleted: [], edited: [], failed: [] };
       for (const messageId of ids) {
         const how = await removeAskMessage({ token: settings.token, chatId: settings.chatId, messageId, fallbackText, apiBase, fetchImpl, sleepImpl });
-        out[how === 'edited' ? 'edited' : how === 'failed' ? 'failed' : 'deleted'].push(messageId);
+        out[['edited', 'failed'].includes(how) ? how : 'deleted'].push(messageId);
       }
       if (out.failed.length) warn(`telegram: ${out.failed.length} message(s) of ask ${dispatchId} could not be removed; the bridge sweep retries`);
       store.asks[askKey] = { ...sent, messageIds: out.failed, messageId: undefined, url: null, closed: closedAs, closedAt: now,
@@ -486,6 +479,32 @@ export async function markAskClosed({ ledgerFile, workflowId, dispatchId, reason
     return { ok: false, error: 'close failed' };
   }
 }
+
+/** One stored ask's sweep step: its messages are deleted once the ask closed, unlinked when their served form is gone. */
+const sweepAskEntry = async (askKey, entry, { deps, locate, result }) => {
+  const { env, fetchImpl, apiBase, sleepImpl, now, settings } = deps;
+  const ids = messageIdsOf(entry);
+  if (!ids.length) return;
+  const [workflowId, dispatchId] = entry.workflowId ? [entry.workflowId, entry.dispatchId] : askKey.split('|');
+  const ledgerFile = entry.ledgerFile ?? (entry.repo ? ledgerFileFor(entry.repo) : locate(workflowId));
+  let view = null;
+  try { view = ledgerFile && fs.existsSync(ledgerFile) ? readAsk(ledgerFile, workflowId, dispatchId, now) : null; } catch { view = null; }
+  if (!view) return;
+  if (view.closed || entry.closed) {
+    const r = await markAskClosed({ ledgerFile, workflowId, dispatchId, reason: (view.closed ?? entry.closed) === 'answered' ? 'answered' : 'retired' }, deps);
+    result.closed.push({ workflowId, dispatchId, ...r });
+    return;
+  }
+  if (!entry.key || !entry.url || entry.url === view.serving?.url) return;
+  // The form those messages link to is gone (expired, or its process died): back to the notice.
+  const text = askMessage({ workflow: { id: workflowId, title: view.title, job: view.jobName ?? null }, question: view.question, language: settings.language });
+  for (const messageId of ids) {
+    await botCall({ token: settings.token, apiBase, fetchImpl, sleepImpl, method: 'editMessageText', attempts: 2,
+      payload: { chat_id: settings.chatId, message_id: messageId, text, link_preview_options: { is_disabled: true }, reply_markup: askButton(settings.language, entry.key) } });
+  }
+  await recordAskMessage({ workflowId, dispatchId, url: null }, { env, now });
+  result.unlinked.push({ workflowId, dispatchId, messageIds: ids });
+};
 
 /**
  * The bridge's reconciler (also `telegram.mjs sweep`): every ask message in the store whose ask
@@ -512,28 +531,7 @@ export async function sweepAskMessages({ repos = () => [] } = {}, {
       return repo ? ledgerFileFor(repo) : null;
     };
     for (const [askKey, entry] of Object.entries(readSentStore(env).asks)) {
-      const ids = messageIdsOf(entry);
-      if (!ids.length) continue;
-      const [workflowId, dispatchId] = entry.workflowId ? [entry.workflowId, entry.dispatchId] : askKey.split('|');
-      const ledgerFile = entry.ledgerFile ?? (entry.repo ? ledgerFileFor(entry.repo) : locate(workflowId));
-      let view = null;
-      try { view = ledgerFile && fs.existsSync(ledgerFile) ? readAsk(ledgerFile, workflowId, dispatchId, now) : null; } catch { view = null; }
-      if (!view) continue;
-      if (view.closed || entry.closed) {
-        const r = await markAskClosed({ ledgerFile, workflowId, dispatchId, reason: (view.closed ?? entry.closed) === 'answered' ? 'answered' : 'retired' }, deps);
-        result.closed.push({ workflowId, dispatchId, ...r });
-        continue;
-      }
-      if (entry.key && entry.url && entry.url !== view.serving?.url) {
-        // The form those messages link to is gone (expired, or its process died): back to the notice.
-        const text = askMessage({ workflow: { id: workflowId, title: view.title, job: view.jobName ?? null }, question: view.question, language: settings.language });
-        for (const messageId of ids) {
-          await botCall({ token: settings.token, apiBase, fetchImpl, sleepImpl, method: 'editMessageText', attempts: 2,
-            payload: { chat_id: settings.chatId, message_id: messageId, text, link_preview_options: { is_disabled: true }, reply_markup: askButton(settings.language, entry.key) } });
-        }
-        await recordAskMessage({ workflowId, dispatchId, url: null }, { env, now });
-        result.unlinked.push({ workflowId, dispatchId, messageIds: ids });
-      }
+      await sweepAskEntry(askKey, entry, { deps, locate, result });
     }
   } catch (error) {
     try { warn(`telegram: sweep failed: ${redact(error?.message ?? error)}`); } catch { /* nothing left */ }
@@ -592,20 +590,24 @@ async function main() {
     console.error('usage: starci connect telegram notify --ledger <file> --workflow <id> --dispatch <id> [--repo <path>] | sweep | discover-chat | test');
     process.exit(2);
   }
-  let env;
+  await runReadOnlyVerb(verb, { config, apiBase, out });
+}
+
+/** The read-only verbs (discover-chat, test): resolve the secret env, then run the one requested. */
+const runReadOnlyVerb = async (verb, { config, apiBase, out }) => {
+  let env, connectors;
   try { env = runtimeSecretEnv(); connectors = connectorsConfig(config, env); } catch (error) { out({ ok: false, error: error.message }); process.exit(2); }
   const telegram = connectors.telegram;
   const token = connectorSecret(telegram.botTokenEnv, env);
   if (verb === 'discover-chat') {
     if (!token) { out({ ok: false, error: `no bot token: set ${telegram.botTokenEnv} in local secret.env or the actual environment` }); process.exit(2); }
-    out(await discoverChats({ token, apiBase })); return;
+    out(await discoverChats({ token, apiBase }));
+    return;
   }
-  if (verb === 'test') {
-    if (!token || !telegram.chatId) { out({ ok: false, error: `test needs ${telegram.botTokenEnv} and connectors.telegram.chatId` }); process.exit(2); }
-    const result = await sendMessage({ token, chatId: telegram.chatId, text: textFor(config.language).test, apiBase });
-    out(result); if (!result.ok) process.exitCode = 1; return;
-  }
-}
+  if (!token || !telegram.chatId) { out({ ok: false, error: `test needs ${telegram.botTokenEnv} and connectors.telegram.chatId` }); process.exit(2); }
+  const result = await sendMessage({ token, chatId: telegram.chatId, text: textFor(config.language).test, apiBase });
+  out(result); if (!result.ok) process.exitCode = 1;
+};
 
 if (isMain(import.meta.url)) main().catch((error) => { console.error(error); process.exit(1); });
 
@@ -616,9 +618,7 @@ if (isMain(import.meta.url)) main().catch((error) => { console.error(error); pro
  */
 export async function ownerPush(text, { env = process.env, settings = null, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = undefined } = {}) {
   const s = settings ?? telegramSettings({ env });
-  const skipped = env.STARCI_CONNECTORS_OFF === '1' ? 'STARCI_CONNECTORS_OFF'
-    : isSpecRun(env) && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context: refusing the real Bot API'
-    : !s?.ready ? (s?.warning ?? 'telegram is off (connectors.telegram)') : null;
+  const skipped = guarded(env, apiBase, fetchImpl, 'test context: refusing the real Bot API') ?? (!s?.ready ? (s?.warning ?? 'telegram is off (connectors.telegram)') : null);
   if (skipped) return { ok: true, skipped };
   try {
     const r = await sendMessage({ token: s.token, chatId: s.chatId, text: typeof text === 'function' ? text(s.language) : text, apiBase, fetchImpl, ...(sleepImpl ? { sleepImpl } : {}) });

@@ -18,7 +18,6 @@
 // a value is never printed except by `--get`, which writes exactly that one value to stdout for the calling process.
 // The caller supplies the canonical environment; engine/secrets.mjs owns identity selection. Decryption is scripts/api/sops/exec-env.mjs
 // execEnv, the child process scripts/api/process/run-shell.mjs runShell.
-import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { execEnv } from '../api/sops/exec-env.mjs';
 import { runShell } from '../api/process/run-shell.mjs';
@@ -34,8 +33,17 @@ export function execWithCustody(file, command, options = {}) {
 }
 
 function main(argv) {
-  const flag = (name) => { const at = argv.indexOf(name); if (at < 0) return undefined; return argv.splice(at, 2)[1]; };
-  const has = (name) => { const at = argv.indexOf(name); if (at < 0) return false; argv.splice(at, 1); return true; };
+  const flag = (name) => {
+    const at = argv.indexOf(name);
+    if (at < 0) return undefined;
+    return argv.splice(at, 2)[1];
+  };
+  const has = (name) => {
+    const at = argv.indexOf(name);
+    if (at < 0) return false;
+    argv.splice(at, 1);
+    return true;
+  };
   const inputType = flag('--input-type');
   const get = flag('--get');
   const keys = has('--keys');

@@ -56,7 +56,10 @@ try {
   else {
     // The fresh install is real npm output (links included): removed without ever following a link.
     const removed = safeRemove(into, { hold: artifactHoldReason });
-    if (!removed.ok) console.log(`release-app-installs: could not remove ${into}: ${removed.errors.map((e) => `${e.code} ${e.path}`).join('; ')}`);
+    if (!removed.ok) {
+      const errors = removed.errors.map((e) => `${e.code} ${e.path}`).join('; ');
+      console.log(`release-app-installs: could not remove ${into}: ${errors}`);
+    }
   }
 }
 process.exit(exit);

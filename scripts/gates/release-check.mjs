@@ -155,7 +155,10 @@ if (isMain(import.meta.url)) {
       for (const row of rows) process.stdout.write(`${row.status === STEP_STATUS.pass ? 'ok  ' : 'RED '} ${row.id}: ${row.detail}\n`);
       process.stdout.write(`release-check ${verdict}: ${rows.filter((r) => r.status === STEP_STATUS.pass).length} of ${rows.length} proof(s) hold\n`);
     }
-    process.exitCode = verdict === 'GREEN' || verdict === 'PARTIAL' ? 0 : verdict === 'RED' ? 1 : 2;
+    let exitCode = 2;
+    if (verdict === 'GREEN' || verdict === 'PARTIAL') exitCode = 0;
+    else if (verdict === 'RED') exitCode = 1;
+    process.exitCode = exitCode;
   } catch (error) {
     process.stderr.write(`release-check: ${error.message}\n`);
     process.exitCode = 2;

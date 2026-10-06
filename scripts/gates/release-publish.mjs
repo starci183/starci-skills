@@ -46,98 +46,118 @@ function runtimeArchive(proof, row, root, head, expectedIntegrity) {
 /** The plan as printed lines. */
 function planLines(plan) {
   const lines = ['== publish set, in publish order'];
-  plan.rows.forEach((row, i) => lines.push(`  ${i + 1}. ${row.name}@${row.version} (pin ${row.pin}, ${row.last ? 'last' : 'leaf'}): registry ${row.registry.state}; ${row.action}${row.note ? ` - ${row.note}` : ''}`));
+  plan.rows.forEach((row, i) => {
+    const note = row.note ? ` - ${row.note}` : '';
+    lines.push(`  ${i + 1}. ${row.name}@${row.version} (pin ${row.pin}, ${row.last ? 'last' : 'leaf'}): registry ${row.registry.state}; ${row.action}${note}`);
+  });
   for (const row of plan.others) lines.push(`  skip ${row.name} (${row.dir}): ${row.kind}`);
   if (plan.blockers.length) lines.push('== BLOCKERS', ...plan.blockers.map((b) => `  - ${b}`));
   lines.push(`${plan.toPublish.length} to publish, ${plan.blockers.length} blocker(s)`);
   return lines;
 }
 
-/**
- * Run the plan or publish it. deps (seams of a spec): registry, node (process runner), ci (npm ci), git ({status, branch, head}),
- * sleep, out (a line writer). Returns the exit code; every line goes through `out`.
- */
-export function releasePublish({ root = runtimeRoot, publish = false, runtimePackage = false, npmUser = null, pollMinutes = 15, preLandRef = null, env = process.env, deps = {} } = {}) {
-  const out = deps.out ?? ((line) => process.stdout.write(`${line}\n`));
-  const registry = deps.registry ?? npmRegistry({ root });
-  const node = deps.node ?? ((args, opts) => runNode(args, { stdio: 'inherit', ...opts }));
-  const install = deps.ci ?? ((dir) => ci(path.resolve(root, dir)));
-  const sleep = deps.sleep ?? sleepSync;
-  const git = deps.git ?? {
+/** The injected seams of a spec over their npm/git/process defaults. */
+const publishSeams = (root, runtimePackage, deps) => ({
+  out: deps.out ?? ((line) => process.stdout.write(`${line}\n`)),
+  registry: deps.registry ?? npmRegistry({ root }),
+  node: deps.node ?? ((args, opts) => runNode(args, { stdio: 'inherit', ...opts })),
+  install: deps.ci ?? ((dir) => ci(path.resolve(root, dir))),
+  sleep: deps.sleep ?? sleepSync,
+  git: deps.git ?? {
     dirty: () => porcelainStatus(root, { untracked: runtimePackage ? 'all' : 'no', ...(runtimePackage ? {} : { pathspecs: ['packages', 'knowledge/hfs', 'modules/models'] }) }),
     branch: () => revParseQuery(['--abbrev-ref', 'HEAD'], { cwd: root }),
     head: (ref = 'HEAD') => revParseQuery([ref], { cwd: root }),
-  };
-  if (publish && !npmUser) { out(`release-publish: --publish needs --npm-user <name>; ${USAGE}`); return EXIT.usage; }
-  const plan = buildPlan({ root, registry, scope: runtimePackage ? 'runtime' : 'packages' });
-  const rootManifest = runtimePackage ? JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) : null;
-  const publicationTag = runtimePackage ? (rootManifest.publishConfig?.tag ?? 'latest') : 'latest';
-  if (runtimePackage && (!/^[a-z][a-z0-9-]*$/i.test(publicationTag)
-    || (rootManifest.version.includes('-') && publicationTag === 'latest')))
+  },
+});
+
+/** The root publication tag; adds the tag and release-notes blockers of the runtime phase to the plan. */
+const runtimeTag = (root, plan) => {
+  const rootManifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const tag = rootManifest.publishConfig?.tag ?? 'latest';
+  if (!/^[a-z][a-z0-9-]*$/i.test(tag) || (rootManifest.version.includes('-') && tag === 'latest'))
     plan.blockers.push('root prerelease publication requires an explicit non-latest publishConfig.tag');
-  if (runtimePackage) {
-    const version = plan.rows[0].version;
-    const findings = releaseNotesFindings({ tags: [`v${version}`], changelog: fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8') });
-    plan.blockers.push(...findings.map((finding) => finding.message));
-  }
-  for (const line of planLines(plan)) out(line);
-  if (!publish) return plan.blockers.length ? EXIT.blocked : EXIT.done;
-  if (plan.blockers.length) { out('release-publish: refusing to publish with blockers'); return EXIT.failed; }
+  const version = plan.rows[0].version;
+  const findings = releaseNotesFindings({ tags: [`v${version}`], changelog: fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8') });
+  plan.blockers.push(...findings.map((finding) => finding.message));
+  return tag;
+};
+
+/** npm identity, clean inputs and the pinned HEAD a publish requires: {code: an exit} or {code: null, head}. */
+const publishPreflight = ({ registry, git, npmUser, preLandRef, runtimePackage, out }) => {
   const who = registry.whoami();
-  if (who !== npmUser) { out(`release-publish: the npm user is '${who ?? 'none'}', expected '${npmUser}'`); return EXIT.usage; }
+  if (who !== npmUser) { out(`release-publish: the npm user is '${who ?? 'none'}', expected '${npmUser}'`); return { code: EXIT.usage }; }
   const dirty = git.dirty();
-  if (!dirty.ok || dirty.stdout) { out(`release-publish: tracked changes in the publication inputs; publish only committed work\n${dirty.stdout || dirty.stderr}`); return EXIT.usage; }
+  if (!dirty.ok || dirty.stdout) { out(`release-publish: tracked changes in the publication inputs; publish only committed work\n${dirty.stdout || dirty.stderr}`); return { code: EXIT.usage }; }
   const frozenHead = git.head('HEAD');
-  if (frozenHead.ok === false || (frozenHead.status !== undefined && frozenHead.status !== 0)) { out('release-publish: Git could not read the publication HEAD'); return EXIT.usage; }
+  if (frozenHead.ok === false || (frozenHead.status !== undefined && frozenHead.status !== 0)) { out('release-publish: Git could not read the publication HEAD'); return { code: EXIT.usage }; }
   const head = String(frozenHead.stdout ?? '').trim();
-  if (runtimePackage && !/^[0-9a-f]{40}$/.test(head)) { out('release-publish: root publication needs an exact committed HEAD'); return EXIT.usage; }
+  if (runtimePackage && !/^[0-9a-f]{40}$/.test(head)) { out('release-publish: root publication needs an exact committed HEAD'); return { code: EXIT.usage }; }
   if (preLandRef) {
-    if (String(git.head('HEAD').stdout).trim() !== String(git.head(preLandRef).stdout).trim()) { out(`release-publish: HEAD is not the pre-land ref ${preLandRef}`); return EXIT.usage; }
-  } else if (String(git.branch().stdout).trim() !== 'main') { out('release-publish: the checkout is not on main'); return EXIT.usage; }
+    if (String(git.head('HEAD').stdout).trim() !== String(git.head(preLandRef).stdout).trim()) { out(`release-publish: HEAD is not the pre-land ref ${preLandRef}`); return { code: EXIT.usage }; }
+  } else if (String(git.branch().stdout).trim() !== 'main') { out('release-publish: the checkout is not on main'); return { code: EXIT.usage }; }
+  return { code: null, head };
+};
 
+/** The proof of one row: the runtime cold proof, or the package's own clean-install test. */
+const rowProof = (row, { runtimePackage, deps, root, head, localBefore, env, node }) => runtimePackage
+  ? (deps.runtimeProof ?? proveRuntimePackage)({ root, sourceSha: head, expectedIntegrity: localBefore, env, deps: deps.runtimeProofDeps ?? {} })
+  : node([path.join(root, 'scripts', 'gates', 'package-clean-test.mjs'), '--changed', `${row.dir}/package.json`], { cwd: root, env });
+
+/** The runtime inputs must be exactly as the cold proof left them: an exit code, or null when unchanged. */
+const recheckRuntime = (row, { git, registry, root, head, out }, localBefore) => {
+  const currentHead = git.head('HEAD'), currentDirty = git.dirty();
+  if (currentHead.ok === false || (currentHead.status !== undefined && currentHead.status !== 0) || String(currentHead.stdout ?? '').trim() !== head || !currentDirty.ok || currentDirty.stdout || registry.localIntegrity(row.dir) !== localBefore) { out('release-publish: runtime inputs changed during the cold proof; publication refused'); return EXIT.failed; }
+  const refreshed = buildPlan({ root, registry, scope: 'runtime' });
+  if (refreshed.blockers.length) { out(`release-publish: runtime registry changed during the cold proof: ${refreshed.blockers.join('; ')}`); return EXIT.failed; }
+  if (refreshed.rows[0].action !== 'publish') { out('release-publish: runtime version appeared during the cold proof; review the fresh immutable registry receipt before publication'); return EXIT.failed; }
+  return null;
+};
+
+/** Poll until the version is on the registry, then confirm its integrity against the local pack. */
+const confirmPublished = ({ registry, sleep, pollMinutes, runtimePackage, out }, row, proof) => {
+  const deadline = Date.now() + pollMinutes * 60_000;
+  let seen = registry.state(row.name, row.version);
+  while (seen.state !== 'present') {
+    if (Date.now() >= deadline) { out(`release-publish: ${row.name}@${row.version} is not on the registry after ${pollMinutes} min (last: ${seen.state})`); return EXIT.failed; }
+    sleep(POLL_STEP_MS);
+    seen = registry.state(row.name, row.version);
+  }
+  const local = runtimePackage ? proof.archive.integrity : registry.localIntegrity(row.dir);
+  if (local !== seen.integrity) { out(`release-publish: ${row.name}@${row.version} integrity mismatch: registry ${seen.integrity}, local pack ${local}`); return EXIT.failed; }
+  out(`  published and confirmed (integrity ${local})`);
+  return null;
+};
+
+/** Prove, upload and confirm one row: an exit code, or null when the row published. */
+const publishRow = (row, ctx) => {
+  const { root, runtimePackage, out, registry, install, head } = ctx;
+  out(`== ${row.name}@${row.version}`);
+  const localBefore = runtimePackage ? registry.localIntegrity(row.dir) : null;
+  const proof = rowProof(row, { ...ctx, localBefore });
+  if (runtimePackage) out(`  runtime clean proof ${proof.status}; receipt ${proof.attempt ?? 'unavailable'}: ${proof.detail ?? ''}`);
+  const unproved = runtimePackage ? proof.status !== 'green' : proof.status !== 0;
+  if (unproved) { out(`release-publish: ${row.name}: clean proof not green`); return EXIT.failed; }
+  if (row.prepack && row.lock) {
+    const installed = install(row.dir);
+    if (!installed.ok) { out(`release-publish: ${row.name}: npm ci failed: ${installed.stderr}`); return EXIT.failed; }
+  }
   if (runtimePackage) {
-    const bound = node([path.join(root, 'scripts', 'checks', 'check-canon-pins.mjs')], { cwd: root, env });
-    if (bound.status !== 0) { out('release-publish: finish and commit the package rebind before the runtime package phase'); return EXIT.failed; }
+    const code = recheckRuntime(row, ctx, localBefore);
+    if (code !== null) return code;
   }
+  let archive = null;
+  if (runtimePackage) {
+    try { archive = runtimeArchive(proof, row, root, head, localBefore); }
+    catch (error) { out(`release-publish: ${error.message}; publication refused`); return EXIT.failed; }
+  }
+  // Upload the proved archive, so npm cannot repack mutable source or rerun its lifecycle after qualification.
+  const published = registry.publish(row.dir, { ...(archive ? {archive} : {}), tag: ctx.publicationTag });
+  if (!published.ok) { out(`release-publish: ${row.name}: npm publish failed (exit ${published.status}): ${published.stderr}`); return EXIT.failed; }
+  return confirmPublished(ctx, row, proof);
+};
 
-  for (const row of plan.toPublish) {
-    out(`== ${row.name}@${row.version}`);
-    const localBefore = runtimePackage ? registry.localIntegrity(row.dir) : null;
-    const proof = runtimePackage
-      ? (deps.runtimeProof ?? proveRuntimePackage)({ root, sourceSha: head, expectedIntegrity: localBefore, env, deps: deps.runtimeProofDeps ?? {} })
-      : node([path.join(root, 'scripts', 'gates', 'package-clean-test.mjs'), '--changed', `${row.dir}/package.json`], { cwd: root, env });
-    if (runtimePackage) out(`  runtime clean proof ${proof.status}; receipt ${proof.attempt ?? 'unavailable'}: ${proof.detail ?? ''}`);
-    if (runtimePackage ? proof.status !== 'green' : proof.status !== 0) { out(`release-publish: ${row.name}: clean proof not green`); return EXIT.failed; }
-    if (row.prepack && row.lock) {
-      const installed = install(row.dir);
-      if (!installed.ok) { out(`release-publish: ${row.name}: npm ci failed: ${installed.stderr}`); return EXIT.failed; }
-    }
-    if (runtimePackage) {
-      const currentHead = git.head('HEAD'), currentDirty = git.dirty();
-      if (currentHead.ok === false || (currentHead.status !== undefined && currentHead.status !== 0) || String(currentHead.stdout ?? '').trim() !== head || !currentDirty.ok || currentDirty.stdout || registry.localIntegrity(row.dir) !== localBefore) { out('release-publish: runtime inputs changed during the cold proof; publication refused'); return EXIT.failed; }
-      const refreshed = buildPlan({ root, registry, scope: 'runtime' });
-      if (refreshed.blockers.length) { out(`release-publish: runtime registry changed during the cold proof: ${refreshed.blockers.join('; ')}`); return EXIT.failed; }
-      if (refreshed.rows[0].action !== 'publish') { out('release-publish: runtime version appeared during the cold proof; review the fresh immutable registry receipt before publication'); return EXIT.failed; }
-    }
-    let archive = null;
-    if (runtimePackage) {
-      try { archive = runtimeArchive(proof, row, root, head, localBefore); }
-      catch (error) { out(`release-publish: ${error.message}; publication refused`); return EXIT.failed; }
-    }
-    // Upload the proved archive, so npm cannot repack mutable source or rerun its lifecycle after qualification.
-    const published = registry.publish(row.dir, { ...(archive ? {archive} : {}), tag: publicationTag });
-    if (!published.ok) { out(`release-publish: ${row.name}: npm publish failed (exit ${published.status}): ${published.stderr}`); return EXIT.failed; }
-    const deadline = Date.now() + pollMinutes * 60_000;
-    let seen = registry.state(row.name, row.version);
-    while (seen.state !== 'present') {
-      if (Date.now() >= deadline) { out(`release-publish: ${row.name}@${row.version} is not on the registry after ${pollMinutes} min (last: ${seen.state})`); return EXIT.failed; }
-      sleep(POLL_STEP_MS);
-      seen = registry.state(row.name, row.version);
-    }
-    const local = runtimePackage ? proof.archive.integrity : registry.localIntegrity(row.dir);
-    if (local !== seen.integrity) { out(`release-publish: ${row.name}@${row.version} integrity mismatch: registry ${seen.integrity}, local pack ${local}`); return EXIT.failed; }
-    out(`  published and confirmed (integrity ${local})`);
-  }
+/** The post-loop result: runtime publishes end here; package publishes need a green canon binding. */
+const finishPublish = ({ runtimePackage, node, root, out }, plan) => {
   if (runtimePackage) {
     out(`release-publish: done; ${plan.toPublish.length} runtime package(s) published and confirmed; no binding writes`);
     return EXIT.done;
@@ -149,11 +169,41 @@ export function releasePublish({ root = runtimeRoot, publish = false, runtimePac
   }
   out(`release-publish: done; ${plan.toPublish.length} package(s) published and confirmed; canon binding green`);
   return EXIT.done;
+};
+
+/**
+ * Run the plan or publish it. deps (seams of a spec): registry, node (process runner), ci (npm ci), git ({status, branch, head}),
+ * sleep, out (a line writer). Returns the exit code; every line goes through `out`.
+ */
+export function releasePublish({ root = runtimeRoot, publish = false, runtimePackage = false, npmUser = null, pollMinutes = 15, preLandRef = null, env = process.env, deps = {} } = {}) {
+  const { out, registry, node, install, sleep, git } = publishSeams(root, runtimePackage, deps);
+  if (publish && !npmUser) { out(`release-publish: --publish needs --npm-user <name>; ${USAGE}`); return EXIT.usage; }
+  const plan = buildPlan({ root, registry, scope: runtimePackage ? 'runtime' : 'packages' });
+  const publicationTag = runtimePackage ? runtimeTag(root, plan) : 'latest';
+  for (const line of planLines(plan)) out(line);
+  if (!publish) return plan.blockers.length ? EXIT.blocked : EXIT.done;
+  if (plan.blockers.length) { out('release-publish: refusing to publish with blockers'); return EXIT.failed; }
+  const preflight = publishPreflight({ registry, git, npmUser, preLandRef, runtimePackage, out });
+  if (preflight.code !== null) return preflight.code;
+  const head = preflight.head;
+  if (runtimePackage) {
+    const bound = node([path.join(root, 'scripts', 'checks', 'check-canon-pins.mjs')], { cwd: root, env });
+    if (bound.status !== 0) { out('release-publish: finish and commit the package rebind before the runtime package phase'); return EXIT.failed; }
+  }
+  const ctx = { root, runtimePackage, publicationTag, pollMinutes, env, head, deps, out, registry, node, install, sleep, git };
+  for (const row of plan.toPublish) {
+    const code = publishRow(row, ctx);
+    if (code !== null) return code;
+  }
+  return finishPublish({ runtimePackage, node, root, out }, plan);
 }
 
 export function parseArgs(argv) {
   const opts = { publish: false, runtimePackage: false, npmUser: null, pollMinutes: 15, preLandRef: null };
-  const need = (i, flag) => { if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${flag} needs a value; ${USAGE}`); return argv[i + 1]; };
+  const need = (i, flag) => {
+    if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${flag} needs a value; ${USAGE}`);
+    return argv[i + 1];
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--publish') opts.publish = true;

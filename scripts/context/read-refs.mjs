@@ -23,6 +23,55 @@ export function declaredReadTokens(raw) {
   return lines(raw, { separator: READ_SEPARATOR });
 }
 
+/** Refuse a hit whose path chain crosses a symlink or escapes `root`. */
+const safeReadPath = (root, file) => {
+  let at = root;
+  for (const segment of path.relative(root, file).split(path.sep).filter(Boolean)) {
+    at = path.join(at, segment);
+    if (fs.lstatSync(at).isSymbolicLink()) throw Object.assign(new Error('linked READ path'), { code: 'READ_LINKED' });
+  }
+  if (!insidePath(fs.realpathSync(root), fs.realpathSync(file), { includeSelf: true })) throw Object.assign(new Error('READ root escape'), { code: 'READ_ROOT_ESCAPE' });
+};
+
+const addHit = (state, file) => {
+  safeReadPath(state.root, file);
+  if (!fs.lstatSync(file).isFile()) return;
+  if (state.hits.size >= MATCH_LIMIT && !state.hits.has(file)) { state.truncated = true; return; }
+  state.hits.add(file);
+};
+
+const visitDir = (state, dir, regex) => {
+  if (state.truncated) return;
+  safeReadPath(state.root, dir);
+  const entries = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+  for (const entry of entries) {
+    if (++state.visited > INSPECTION_LIMIT) { state.truncated = true; return; }
+    const file = path.join(dir, entry.name);
+    if (entry.isDirectory() && !SKIP.has(entry.name)) visitDir(state, file, regex);
+    else if (entry.isFile() && regex.test(path.relative(state.root, file).replaceAll('\\', '/'))) addHit(state, file);
+    if (state.truncated) return;
+  }
+};
+
+/** Expand one concrete pattern list under `state.root` into absolute file hits; returns true on an escaping pattern. */
+const expandPatterns = (patterns, state, missing) => {
+  const { root } = state;
+  for (const pattern of patterns) {
+    if (!insidePath(root, path.resolve(root, pattern), { includeSelf: true })) return true;
+    if (/[*?]/.test(pattern)) {
+      const prefix = pattern.slice(0, pattern.search(/[*?]/)).replace(/\/[^/]*$/, '');
+      const base = path.resolve(root, prefix);
+      if (fs.existsSync(base)) visitDir(state, base, globExpression(pattern));
+    } else {
+      const file = path.resolve(root, pattern);
+      if (fs.existsSync(file)) { if (fs.lstatSync(file).isDirectory()) visitDir(state, file, globExpression(`${pattern.replace(/\/$/, '')}/**`)); else addHit(state, file); }
+    }
+    const matches = /[*?]/.test(pattern) ? globExpression(pattern) : globExpression(`${pattern.replace(/\/$/, '')}/**`);
+    if (![...state.hits].some((file) => file === path.resolve(root, pattern) || matches.test(path.relative(root, file).replaceAll('\\', '/')))) missing.push(pattern);
+  }
+  return false;
+};
+
 /** Resolve one READ reference with an explicit Source, Work or app root. Values
  * of params.* are instance inputs, not runtime filenames. New record templates
  * may remain unresolved; they are never reported as missing Source law files. */
@@ -42,54 +91,16 @@ export function resolveReadReference(token, { sourceRoot, stateDir = null, appRo
   if (rel.includes('<') || !root) return { token: original, kind: 'template', rootKind, resolved: [], missing: rootKind === 'source' ? [original] : [], truncated: false };
   root = path.resolve(root);
   if (!insidePath(root, path.resolve(root, rel), { includeSelf: true })) return { token: original, kind: 'invalid', rootKind, resolved: [], missing: [original], truncated: false };
-  const patterns = braceVariants(rel), hits = new Set(), missing = [];
-  let visited = 0, truncated = false;
-  const safePath = (file) => {
-    let at = root;
-    for (const segment of path.relative(root, file).split(path.sep).filter(Boolean)) {
-      at = path.join(at, segment);
-      if (fs.lstatSync(at).isSymbolicLink()) throw Object.assign(new Error('linked READ path'), { code: 'READ_LINKED' });
-    }
-    if (!insidePath(fs.realpathSync(root), fs.realpathSync(file), { includeSelf: true })) throw Object.assign(new Error('READ root escape'), { code: 'READ_ROOT_ESCAPE' });
-  };
-  const add = (file) => {
-    safePath(file);
-    if (!fs.lstatSync(file).isFile()) return;
-    if (hits.size >= MATCH_LIMIT && !hits.has(file)) { truncated = true; return; }
-    hits.add(file);
-  };
-  const visit = (dir, regex) => {
-    if (truncated) return;
-    safePath(dir);
-    const entries = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
-    for (const entry of entries) {
-      if (++visited > INSPECTION_LIMIT) { truncated = true; return; }
-      const file = path.join(dir, entry.name);
-      if (entry.isDirectory() && !SKIP.has(entry.name)) visit(file, regex);
-      else if (entry.isFile() && regex.test(path.relative(root, file).replaceAll('\\', '/'))) add(file);
-      if (truncated) return;
-    }
-  };
+  const patterns = braceVariants(rel), missing = [];
+  const expansion = { root, hits: new Set(), visited: 0, truncated: false };
   try {
-    for (const pattern of patterns) {
-      if (!insidePath(root, path.resolve(root, pattern), { includeSelf: true })) return { token: original, kind: 'invalid', rootKind, resolved: [], missing: [original], truncated: false };
-      if (/[*?]/.test(pattern)) {
-        const prefix = pattern.slice(0, pattern.search(/[*?]/)).replace(/\/[^/]*$/, '');
-        const base = path.resolve(root, prefix);
-        if (fs.existsSync(base)) visit(base, globExpression(pattern));
-      } else {
-        const file = path.resolve(root, pattern);
-        if (fs.existsSync(file)) { if (fs.lstatSync(file).isDirectory()) visit(file, globExpression(`${pattern.replace(/\/$/, '')}/**`)); else add(file); }
-      }
-      const matches = /[*?]/.test(pattern) ? globExpression(pattern) : globExpression(`${pattern.replace(/\/$/, '')}/**`);
-      if (![...hits].some((file) => file === path.resolve(root, pattern) || matches.test(path.relative(root, file).replaceAll('\\', '/')))) missing.push(pattern);
-    }
-    const resolved = [...hits].sort(byCodeUnit).map((absolute) => ({
+    if (expandPatterns(patterns, expansion, missing)) return { token: original, kind: 'invalid', rootKind, resolved: [], missing: [original], truncated: false };
+    const resolved = [...expansion.hits].sort(byCodeUnit).map((absolute) => ({
       path: rootKind === 'work' ? `.starciwork/${path.relative(root, absolute).replaceAll('\\', '/')}` : path.relative(root, absolute).replaceAll('\\', '/'),
       absolute, rootKind, root, sha256: sha256(fs.readFileSync(absolute)),
     }));
-    return { token: original, kind: /[*?{]/.test(rel) ? 'glob' : 'file', rootKind, resolved, missing, truncated };
+    return { token: original, kind: /[*?{]/.test(rel) ? 'glob' : 'file', rootKind, resolved, missing, truncated: expansion.truncated };
   } catch (error) {
-    return { token: original, kind: ['READ_LINKED', 'READ_ROOT_ESCAPE'].includes(error.code) ? 'invalid' : 'unreadable', rootKind, resolved: [], missing: [original], truncated, error: error.code ?? 'read-failed' };
+    return { token: original, kind: ['READ_LINKED', 'READ_ROOT_ESCAPE'].includes(error.code) ? 'invalid' : 'unreadable', rootKind, resolved: [], missing: [original], truncated: expansion.truncated, error: error.code ?? 'read-failed' };
   }
 }

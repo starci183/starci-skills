@@ -24,7 +24,8 @@ export function requiredGatesFor({kind,policy={}}={}){
   return list(configured).map(item=>typeof item==='string'?{id:item,kind:item,required:true}:{required:true,...item});
 }
 
-function validateEvidencePacket(packet,{requireIndependent=false}={}){
+/** The schema/field/independence errors of one packet, in the order validateEvidencePacket reports them. */
+const packetFieldErrors=(packet,requireIndependent)=>{
   const errors=[];
   if(packet?.schema!==EVIDENCE_PACKET)errors.push('invalid evidence schema');
   for(const field of ['gateId','gateKind','candidateDigest','oracleDigest','environmentDigest','owner'])if(!nonempty(packet?.[field]))errors.push(`missing ${field}`);
@@ -33,17 +34,34 @@ function validateEvidencePacket(packet,{requireIndependent=false}={}){
   if(!ACCEPTANCE_VERDICTS.includes(packet?.verdict))errors.push('invalid verdict');
   if(requireIndependent&&packet?.independentFromAttempt!==true)errors.push('gate requires evidence independent from the implementation attempt');
   if(requireIndependent&&(!nonempty(packet?.ownerAttemptId)||packet.ownerAttemptId===packet.opId))errors.push('independent gate requires a distinct owner attempt identity');
+  return errors;
+};
+
+/** The assertion errors of one packet (missing list, malformed entries, a pass with no evidence). */
+const packetAssertionErrors=(packet)=>{
+  const errors=[];
   if(!list(packet?.assertions).length)errors.push('missing assertions');
   for(const assertion of list(packet?.assertions)){
     if(!nonempty(assertion?.id)||!nonempty(assertion?.sourceRef)||!ACCEPTANCE_VERDICTS.includes(assertion?.outcome))errors.push('malformed assertion');
     if(assertion?.outcome==='pass'&&!list(assertion?.evidenceRefs).length)errors.push(`passing assertion ${assertion?.id??'(unknown)'} has no evidence`);
   }
+  return errors;
+};
+
+/** The artifact errors of one packet (malformed entries, evidenceRefs naming no declared artifact id). */
+const packetArtifactErrors=(packet)=>{
+  const errors=[];
   const ids=new Set();
   for(const artifact of list(packet?.artifacts)){
     if(!nonempty(artifact?.id)||!nonempty(artifact?.path)||!/^[a-f0-9]{64}$/.test(artifact?.sha256??''))errors.push('malformed artifact');
     else ids.add(artifact.id);
   }
   for(const assertion of list(packet?.assertions))for(const ref of list(assertion?.evidenceRefs))if(!ids.has(ref))errors.push(`assertion references missing artifact ${ref}`);
+  return errors;
+};
+
+function validateEvidencePacket(packet,{requireIndependent=false}={}){
+  const errors=[...packetFieldErrors(packet,requireIndependent),...packetAssertionErrors(packet),...packetArtifactErrors(packet)];
   return {ok:errors.length===0,errors};
 }
 
@@ -61,26 +79,33 @@ export function resolveEvidencePacket(packet,{evidenceRoot,requireIndependent=fa
   return {ok:errors.length===0,errors,packet:{...packet,resolvedArtifacts:artifacts,evidenceResolved:true}};
 }
 
+/** The blocking entry one required gate contributes, or null when its evidence admits it. */
+const requirementBlocking=(requirement,{evidence,candidate,identity,evidenceRoots})=>{
+  const packet=evidence.find(item=>item?.gateId===requirement.id);
+  if(!packet)return{gateId:requirement.id,verdict:'unavailable',reason:'required gate has no evidence packet'};
+  const root=evidenceRoots[requirement.id];
+  const valid=root?resolveEvidencePacket(packet,{evidenceRoot:root,requireIndependent:Boolean(requirement.independent)})
+    :validateEvidencePacket(packet,{requireIndependent:Boolean(requirement.independent)});
+  if(!valid.ok)return{gateId:requirement.id,verdict:'inconclusive',reason:valid.errors.join('; ')};
+  if(requirement.resolveArtifacts!==false&&!root)return{gateId:requirement.id,verdict:'inconclusive',reason:'required gate evidence was not independently resolved'};
+  if(identity&&!identityMatches(packet,identity))return{gateId:requirement.id,verdict:'inconclusive',reason:'evidence belongs to another attempt/job generation'};
+  if(packet.candidateDigest!==candidate.candidateDigest||packet.oracleDigest!==candidate.oracleDigest||packet.environmentDigest!==candidate.environmentDigest){
+    return{gateId:requirement.id,verdict:'inconclusive',reason:'evidence is stale for the sealed candidate, oracle or environment'};
+  }
+  const assertionFailure=packet.assertions.find(item=>item.outcome!=='pass');
+  if(packet.verdict!=='pass'||assertionFailure)return{gateId:requirement.id,verdict:packet.verdict==='pass'?(assertionFailure?.outcome??'inconclusive'):packet.verdict,
+    reason:assertionFailure?`assertion ${assertionFailure.id} is ${assertionFailure.outcome}`:`gate returned ${packet.verdict}`};
+  return null;
+};
+
 /** Required gates are fail closed: only a fresh, bound `pass` can admit integration. */
 export function evaluateAcceptance({requirements=[],evidence=[],candidate,identity,evidenceRoots={}}={}){
   const blocking=[];
   if(!candidate||!nonempty(candidate.candidateDigest)||!nonempty(candidate.oracleDigest))blocking.push({gateId:'candidate',verdict:'inconclusive',reason:'missing sealed candidate identity'});
   for(const requirement of requirements){
     if(requirement.required===false)continue;
-    const packet=evidence.find(item=>item?.gateId===requirement.id);
-    if(!packet){blocking.push({gateId:requirement.id,verdict:'unavailable',reason:'required gate has no evidence packet'});continue;}
-    const root=evidenceRoots[requirement.id];
-    const valid=root?resolveEvidencePacket(packet,{evidenceRoot:root,requireIndependent:Boolean(requirement.independent)})
-      :validateEvidencePacket(packet,{requireIndependent:Boolean(requirement.independent)});
-    if(!valid.ok){blocking.push({gateId:requirement.id,verdict:'inconclusive',reason:valid.errors.join('; ')});continue;}
-    if(requirement.resolveArtifacts!==false&&!root){blocking.push({gateId:requirement.id,verdict:'inconclusive',reason:'required gate evidence was not independently resolved'});continue;}
-    if(identity&&!identityMatches(packet,identity)){blocking.push({gateId:requirement.id,verdict:'inconclusive',reason:'evidence belongs to another attempt/job generation'});continue;}
-    if(packet.candidateDigest!==candidate.candidateDigest||packet.oracleDigest!==candidate.oracleDigest||packet.environmentDigest!==candidate.environmentDigest){
-      blocking.push({gateId:requirement.id,verdict:'inconclusive',reason:'evidence is stale for the sealed candidate, oracle or environment'});continue;
-    }
-    const assertionFailure=packet.assertions.find(item=>item.outcome!=='pass');
-    if(packet.verdict!=='pass'||assertionFailure)blocking.push({gateId:requirement.id,verdict:packet.verdict==='pass'?(assertionFailure?.outcome??'inconclusive'):packet.verdict,
-      reason:assertionFailure?`assertion ${assertionFailure.id} is ${assertionFailure.outcome}`:`gate returned ${packet.verdict}`});
+    const blocked=requirementBlocking(requirement,{evidence,candidate,identity,evidenceRoots});
+    if(blocked)blocking.push(blocked);
   }
   const precedence=['fail','inconclusive','unavailable'];
   const verdict=blocking.length?(precedence.find(value=>blocking.some(item=>item.verdict===value))??'inconclusive'):'pass';

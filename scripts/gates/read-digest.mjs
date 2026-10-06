@@ -74,7 +74,8 @@ export function slotTopicMap({ base = runtimeRoot } = {}) {
     }
   });
   const map = new Map();
-  for (const d of declared.sort((a, b) => a.familyRank - b.familyRank || a.rank - b.rank || a.rel.localeCompare(b.rel))) {
+  declared.sort((a, b) => a.familyRank - b.familyRank || a.rank - b.rank || a.rel.localeCompare(b.rel));
+  for (const d of declared) {
     if (!map.has(d.slot)) map.set(d.slot, []);
     map.get(d.slot).push(d.rel);
   }
@@ -100,13 +101,46 @@ export function patternsForSlot(slot, doc = loadOpGate(), map = slotTopicMap()) 
   return [...new Set([...(family.always ?? []), ...own])].map((rel) => `${PATTERN_ROOT}/${rel}`);
 }
 
+/** The checks of one digest entry: an invalid detail string, or null when it records fine into named/canonical. */
+const fileVerdict = (file, { root, digest, base, named, canonical }) => {
+  if (typeof file?.path !== 'string' || !/^[0-9a-f]{64}$/.test(String(file.sha256 ?? '')))
+    return 'the READ digest contains an input without a path and exact sha256';
+  const rel = posixPath(file.path), from = file.role === 'read' ? root ?? digest.root : base;
+  if (!from || !['read', 'pattern', 'example', 'knowledge'].includes(file.role))
+    return `the READ input ${rel} has no supported root or role`;
+  const absolute = path.resolve(from, file.path);
+  const within = path.relative(path.resolve(from), absolute);
+  if (file.role !== 'read' && (within === '..' || within.startsWith(`..${path.sep}`) || path.isAbsolute(within)))
+    return `the canonical READ input ${rel} is outside the runtime`;
+  try {
+    if (!fs.statSync(absolute).isFile() || sha256File(absolute) !== file.sha256)
+      return `the READ input ${rel} changed since it was recorded`;
+  } catch { return `the READ input ${rel} is no longer readable`; }
+  if (named.has(rel)) return `the READ input ${rel} is recorded more than once`;
+  named.set(rel, file.sha256);
+  if (file.role !== 'read') canonical.add(rel);
+  return null;
+};
+
+/** The kinds of the slice uncovered by the digest; each owed pattern also becomes required. */
+const sliceUncovered = (kinds, touched, named, required, base, doc) => {
+  const uncovered = [];
+  for (const kind of kinds) {
+    const owed = patternsForSlot(kind.slot ?? 'app', doc, slotTopicMap({ base }));
+    for (const rel of owed) required.set(rel, sha256File(path.join(base, rel)));
+    const covered = owed.every((rel) => named.has(rel));
+    if (!touched.has(kind.path) || !covered) uncovered.push({ path: kind.path, slot: kind.slot ?? null, owed });
+  }
+  return uncovered;
+};
+
 /**
  * Whether READ covers the current slice and canonical inputs. `kinds` comes from the target's slot owner, not the digest.
  * Every applicable pattern and the common files declared by op-gate are required; `expected` also binds matching examples selected by the
  * READ producer. Extra reads remain allowed, but every recorded input must still exist with its recorded hash.
  */
 export function judgeReadDigest(digest, kinds, doc = loadOpGate(), { root = null, base = runtimeRoot, expected = null } = {}) {
-  if (!digest || digest.schema !== DIGEST_SCHEMA || !Array.isArray(digest.files))
+  if (digest?.schema !== DIGEST_SCHEMA || !Array.isArray(digest?.files))
     return { status: 'missing', detail: `no READ digest (schema ${DIGEST_SCHEMA}) is attached to the report`, uncovered: [] };
   const invalid = (detail, uncovered = []) => ({ status: 'no-pattern', detail, uncovered });
   if (root && (typeof digest.root !== 'string' || !sameResolvedPath(digest.root, root)))
@@ -114,23 +148,8 @@ export function judgeReadDigest(digest, kinds, doc = loadOpGate(), { root = null
   const named = new Map();
   const canonical = new Set();
   for (const file of digest.files) {
-    if (typeof file?.path !== 'string' || !/^[0-9a-f]{64}$/.test(String(file.sha256 ?? ''))) {
-      return invalid('the READ digest contains an input without a path and exact sha256');
-    }
-    const rel = posixPath(file.path), from = file.role === 'read' ? root ?? digest.root : base;
-    if (!from || !['read', 'pattern', 'example', 'knowledge'].includes(file.role))
-      return invalid(`the READ input ${rel} has no supported root or role`);
-    const absolute = path.resolve(from, file.path);
-    const within = path.relative(path.resolve(from), absolute);
-    if (file.role !== 'read' && (within === '..' || within.startsWith(`..${path.sep}`) || path.isAbsolute(within)))
-      return invalid(`the canonical READ input ${rel} is outside the runtime`);
-    try {
-      if (!fs.statSync(absolute).isFile() || sha256File(absolute) !== file.sha256)
-        return invalid(`the READ input ${rel} changed since it was recorded`);
-    } catch { return invalid(`the READ input ${rel} is no longer readable`); }
-    if (named.has(rel)) return invalid(`the READ input ${rel} is recorded more than once`);
-    named.set(rel, file.sha256);
-    if (file.role !== 'read') canonical.add(rel);
+    const detail = fileVerdict(file, { root, digest, base, named, canonical });
+    if (detail) return invalid(detail);
   }
   if (!Array.isArray(doc.digest.required) || !doc.digest.required.length)
     return invalid('knowledge/op-gate.yaml declares no required common READ inputs');
@@ -139,13 +158,7 @@ export function judgeReadDigest(digest, kinds, doc = loadOpGate(), { root = null
     ...(expected?.files ?? []).map((file) => [file.path, file.sha256]),
   ]);
   const touched = new Set((digest.touched ?? []).map(posixPath));
-  const uncovered = [];
-  for (const kind of kinds) {
-    const owed = patternsForSlot(kind.slot ?? 'app', doc, slotTopicMap({ base }));
-    for (const rel of owed) required.set(rel, sha256File(path.join(base, rel)));
-    const covered = owed.every((rel) => named.has(rel));
-    if (!touched.has(kind.path) || !covered) uncovered.push({ path: kind.path, slot: kind.slot ?? null, owed });
-  }
+  const uncovered = sliceUncovered(kinds, touched, named, required, base, doc);
   const missing = [...required].filter(([rel, hash]) => named.get(rel) !== hash || !canonical.has(rel)).map(([rel]) => rel);
   if (missing.length) uncovered.push({ path: null, slot: null, owed: missing });
   return uncovered.length ? invalid(`the READ digest does not cover the current slice and all required inputs: ${missing.join(', ') || uncovered.map((u) => u.path).join(', ')}`, uncovered)
@@ -158,7 +171,7 @@ export function judgeReadDigest(digest, kinds, doc = loadOpGate(), { root = null
  * every file it touched carries an entry of the slot map (the hfs slot of each written record).
  */
 export function judgeKnowledgeDigest(digest, doc = loadOpGate()) {
-  if (!digest || digest.schema !== DIGEST_SCHEMA || !Array.isArray(digest.files))
+  if (digest?.schema !== DIGEST_SCHEMA || !Array.isArray(digest?.files))
     return { status: 'missing', detail: `no READ digest (schema ${DIGEST_SCHEMA}) is attached to the report` };
   const read = digest.files.filter((f) => typeof f?.sha256 === 'string' && /^[0-9a-f]{64}$/.test(f.sha256) && (posixPath(String(f.path ?? '')).startsWith(`${KNOWLEDGE_ROOT}/`) || (doc.digest.required ?? []).includes(posixPath(String(f.path ?? '')))));
   if (!read.length) return { status: 'no-knowledge', detail: 'the READ digest names no declared canonical knowledge with its sha256: the decision cites no standard' };
@@ -206,6 +219,39 @@ function examplesForSlot(explained, doc = loadOpGate(), base = runtimeRoot) {
   return [...(ids.size ? exampleSourcePaths(base, ids, { file: doc.examples.catalog }) : []), ...direct];
 }
 
+/** One digest entry: the contained regular file at `rel`, or a throw when it is not. */
+const digestFile = (files, rel, role, from) => {
+  if (files.has(rel)) return;
+  const file = path.resolve(from, rel);
+  if (!fs.lstatSync(file).isFile() || (role !== 'read' && (path.isAbsolute(rel) || rel.includes(':')
+    || rel.split('/').some((part) => !part || part === '.' || part === '..') || !insidePath(from, file)
+    || !samePath(fs.realpathSync.native(file), file) || !insidePath(fs.realpathSync.native(from), fs.realpathSync.native(file)))))
+    throw new Error(`READ input ${rel} is not a contained regular file`);
+  if (role !== 'read') {
+    let at = path.parse(file).root;
+    for (const segment of file.slice(at.length).split(path.sep).filter(Boolean)) {
+      at = path.join(at, segment);
+      if (fs.lstatSync(at).isSymbolicLink() || !samePath(fs.realpathSync.native(at), at)) throw new Error(`linked READ input: ${rel}`);
+    }
+  }
+  files.set(rel, { path: rel, role, sha256: sha256File(file) });
+};
+
+/** The digest role of a filed required ref by its path shape. */
+const filedRole = (rel) => {
+  if (rel.startsWith(`${PATTERN_ROOT}/`)) return 'pattern';
+  if (/^(?:knowledge|docs)\//.test(rel)) return 'knowledge';
+  return 'example';
+};
+
+/** A --knowledge entry: declared canonical knowledge, contained and normal, or a throw. */
+const addKnowledge = (files, rel, doc, base) => {
+  const clean = posixPath(path.isAbsolute(rel) ? path.relative(base, rel) : rel);
+  if ((!clean.startsWith(`${KNOWLEDGE_ROOT}/`) && !(doc.digest.required ?? []).includes(clean))
+    || clean.split('/').some((part) => !part || part === '.' || part === '..') || !insidePath(base, path.resolve(base, clean))) throw new Error(`--knowledge ${rel} is not declared canonical knowledge`);
+  digestFile(files, clean, clean.startsWith(`${PATTERN_ROOT}/`) ? 'pattern' : 'knowledge', base);
+};
+
 /** The digest of a slice: what it must read, each file with its sha256. */
 export async function buildReadDigest({ root, touch, read = [], knowledge = [], filed = null, doc = loadOpGate(), hfs = hfsEntry(root), base = runtimeRoot }) {
   const touched = [...new Set((touch ?? []).map((f) => posixPath(path.isAbsolute(f) ? path.relative(root, f) : f)))].sort(byCodeUnit);
@@ -215,22 +261,7 @@ export async function buildReadDigest({ root, touch, read = [], knowledge = [], 
     return { path: file, slot: e.slot ?? null, status: e.status, pattern: e.pattern ?? null, tier: e.tier ?? null, allowedImports: e.allowedImports ?? null, rules: e.rules ?? [] };
   });
   const files = new Map();
-  const add = (rel, role, from) => {
-    if (files.has(rel)) return;
-    const file = path.resolve(from, rel);
-    if (!fs.lstatSync(file).isFile() || (role !== 'read' && (path.isAbsolute(rel) || rel.includes(':')
-      || rel.split('/').some((part) => !part || part === '.' || part === '..') || !insidePath(from, file)
-      || !samePath(fs.realpathSync.native(file), file) || !insidePath(fs.realpathSync.native(from), fs.realpathSync.native(file)))))
-      throw new Error(`READ input ${rel} is not a contained regular file`);
-    if (role !== 'read') {
-      let at = path.parse(file).root;
-      for (const segment of file.slice(at.length).split(path.sep).filter(Boolean)) {
-        at = path.join(at, segment);
-        if (fs.lstatSync(at).isSymbolicLink() || !samePath(fs.realpathSync.native(at), at)) throw new Error(`linked READ input: ${rel}`);
-      }
-    }
-    files.set(rel, { path: rel, role, sha256: sha256File(file) });
-  };
+  const add = (rel, role, from) => digestFile(files, rel, role, from);
   for (const rel of doc.digest.required ?? []) add(rel, 'knowledge', base);
   add(doc.examples.catalog, 'example', base);
   // A deciding READ with no coded slice owes the explicitly declared catalog,
@@ -242,12 +273,7 @@ export async function buildReadDigest({ root, touch, read = [], knowledge = [], 
   }
   for (const extra of read) add(posixPath(extra), 'read', path.isAbsolute(extra) ? '' : root);
   // The op's filed READ owns its required refs: --touch adds slot files, it never removes one of these.
-  for (const rel of [...filed ?? []].sort(byCodeUnit)) add(rel, rel.startsWith(`${PATTERN_ROOT}/`) ? 'pattern' : /^(?:knowledge|docs)\//.test(rel) ? 'knowledge' : 'example', base);
-  for (const rel of knowledge) {
-    const clean = posixPath(path.isAbsolute(rel) ? path.relative(base, rel) : rel);
-    if ((!clean.startsWith(`${KNOWLEDGE_ROOT}/`) && !(doc.digest.required ?? []).includes(clean))
-      || clean.split('/').some((part) => !part || part === '.' || part === '..') || !insidePath(base, path.resolve(base, clean))) throw new Error(`--knowledge ${rel} is not declared canonical knowledge`);
-    add(clean, clean.startsWith(`${PATTERN_ROOT}/`) ? 'pattern' : 'knowledge', base);
-  }
+  for (const rel of [...filed ?? []].sort(byCodeUnit)) add(rel, filedRole(rel), base);
+  for (const rel of knowledge) addKnowledge(files, rel, doc, base);
   return { schema: DIGEST_SCHEMA, at: new Date().toISOString(), root: posixPath(path.resolve(root)), touched, slotMap, files: [...files.values()] };
 }
