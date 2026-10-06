@@ -238,7 +238,10 @@ test('cloudflared always runs on a generated config; a named token rides the chi
   assert.throws(()=>cloudflaredPlan({mode:'off'},{port:7070,configFile,env:{}}),/no tunnel to run/);
 });
 
-test('the tunnel manager records the quick URL and restarts a cloudflared that dies',async t=>{
+// The supervisor restarts a dead cloudflared only once it has proved the first one gone, and that proof is a captured process identity,
+// which only Windows qualifies (scripts/api/process/owned-process.mjs answers process-platform-unverified elsewhere, and the supervisor then fails closed).
+const OWNED_CHILD_PROOF=process.platform!=='win32'&&'cloudflared child proof is a captured process identity, qualified on Windows only (owned-process.mjs: process-platform-unverified); a POSIX host never restarts an unproven child';
+test('the tunnel manager records the quick URL and restarts a cloudflared that dies',{skip:OWNED_CHILD_PROOF},async t=>{
   // The supervisor's cloudflared is stopped inside the same after-callback, before the dir comes down -
   // an rm registered ahead of the stop can still race a live child on Windows.
   const home=mkdtemp(t,'starci-connectors-tunnel-',()=>handle.stop());
