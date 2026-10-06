@@ -120,7 +120,7 @@ export function failuresOf(name, text, { repo = null } = {}) {
   if (name === 'canon-scan') {
     try {
       const doc = JSON.parse(text);
-      for (const f of doc?.findings ?? []) add(f.file, `${f.family ?? 'canon'}${f.rule ? `:${f.rule}` : ''}${f.line ? ` @${f.line}` : ''}${f.message ? ` ${String(f.message).slice(0, 120)}` : ''}`.trim());
+      for (const f of doc?.findings ?? []) add(f.file, `${f.family ?? 'canon'}${f.rule ? ':' + f.rule : ''}${f.line ? ' @' + f.line : ''}${f.message ? ' ' + String(f.message).slice(0, 120) : ''}`.trim());
       if (groups.size) return finish(groups);
     } catch { /* not JSON: the generic parse below */ }
   }
@@ -268,10 +268,10 @@ export function pushGit({ repos = null, check = false, deps = {} } = {}) {
 export function describeRun(run) {
   const out = [];
   for (const r of run.repos) {
-    out.push(`${r.name}: ${String(r.verdict).toUpperCase()}${r.why ? ` - ${r.why}` : ''}${r.pushed ? ` (pushed ${r.pushed})` : ''}`);
+    out.push(r.name + ': ' + String(r.verdict).toUpperCase() + (r.why ? ' - ' + r.why : '') + (r.pushed ? ' (pushed ' + r.pushed + ')' : ''));
     if (r.dirty?.length) for (const d of r.dirty.slice(0, 15)) out.push(`    dirty ${d}`);
     for (const s of r.steps ?? []) {
-      out.push(`  ${s.status.padEnd(7)} ${s.name}${s.ms != null ? ` (${Math.round(s.ms / 1000)}s)` : ''}${s.note ? ` - ${s.note}` : ''}${s.log && s.status === 'red' ? `  log: ${s.log}` : ''}`);
+      out.push('  ' + s.status.padEnd(7) + ' ' + s.name + (s.ms != null ? ' (' + Math.round(s.ms / 1000) + 's)' : '') + (s.note ? ' - ' + s.note : '') + (s.log && s.status === 'red' ? '  log: ' + s.log : ''));
       for (const g of s.failures ?? []) {
         out.push(`      ${g.file}`);
         for (const item of g.items) out.push(`        - ${item}`);
@@ -280,7 +280,7 @@ export function describeRun(run) {
     }
   }
   if (run.notRun?.length) out.push(`not run (stopped at the first red): ${run.notRun.join(', ')}`);
-  out.push(run.ok ? `PUSH-GIT ${run.check ? 'CHECK ' : ''}GREEN${run.check ? '' : `: ${run.pushed} commit(s) pushed`}` : 'PUSH-GIT RED: fix the failing groups, land the fixes (starci supervisor land --specs touching), then run starci supervisor push again');
+  out.push(run.ok ? 'PUSH-GIT ' + (run.check ? 'CHECK ' : '') + 'GREEN' + (run.check ? '' : ': ' + run.pushed + ' commit(s) pushed') : 'PUSH-GIT RED: fix the failing groups, land the fixes (starci supervisor land --specs touching), then run starci supervisor push again');
   return out.join('\n');
 }
 
@@ -290,7 +290,7 @@ if (isMain(import.meta.url)) {
   if (bad.length) { console.error(`unknown option ${bad.join(' ')}; use: starci supervisor push [--repo <path>]... [--check] [--json]`); process.exit(2); }
   const repos = argv.flatMap((a, i) => (a === '--repo' && argv[i + 1] ? [argv[i + 1]] : []));
   const run = pushGit({ repos: repos.length ? repos : null, check: argv.includes('--check') });
-  try { supervisorLog('push-git', `${run.ok ? 'green' : 'red'} ${run.repos.map((r) => `${r.name}:${r.verdict}`).join(' ')}${run.check ? ' (check)' : ''}`); } catch { /* the printed record is the run */ }
+  try { supervisorLog('push-git', (run.ok ? 'green' : 'red') + ' ' + run.repos.map((r) => r.name + ':' + r.verdict).join(' ') + (run.check ? ' (check)' : '')); } catch { /* the printed record is the run */ }
   console.log(argv.includes('--json') ? JSON.stringify(run) : describeRun(run));
   if (!run.ok) process.exitCode = 1;
 }

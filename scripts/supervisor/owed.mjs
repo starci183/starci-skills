@@ -158,7 +158,7 @@ export function fixTokens(kind, text) {
     out.set(t, Math.max(out.get(t) ?? 0, weight));
   };
   const body = String(text ?? '');
-  for (const m of body.matchAll(/[\w@.[\]-]*(?:\/[\w@.[\]-]+)+\.(?:mjs|js|ts|tsx|yaml|yml|json|md)\b/g)) {
+  for (const m of body.matchAll(/[\w@.[\]-]*\/(?:[\w@.[\]-]+\/)*[\w@.[\]-]+\.(?:mjs|js|ts|tsx|yaml|yml|json|md)\b/g)) {
     const base = m[0].split('/').pop();
     add(base, 2); add(base.replace(/\.[a-z]+$/i, ''), 2);
   }
@@ -320,7 +320,7 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
 const hash = (s) => shortHash(s, { algo: 'sha1', n: 8 });
 const ownedPaths = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : []).map(String);
 const pathsKey = (payload) => JSON.stringify([...ownedPaths(payload)].sort(byCodeUnit));
-const bare = (p) => p.replaceAll(/\\/g, '/').replace(/(\/\*\*?)+$/, '').replace(/\/+$/, '');
+const bare = (p) => p.replaceAll(/\\/g, '/').replace(/(?:\/\*{1,2})+$/, '').replace(/\/+$/, '');
 // Every owned path of `tail` lies under (or is) a path some job in `jobs` owns: a cut set that re-sliced it.
 const pathsCovered = (tail, jobs) => {
   const want = ownedPaths(tail.payload).map(bare);
@@ -382,7 +382,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
   const out = [];
   const put = (workflowId, pattern, id, since, summary, extra = {}) => out.push({
     class: CLASSES.supervisor, reason: 'repeated failure with no incident', workflowId, repo, incidentId: null, pattern, key: `pattern:${pattern}:${id}`,
-    kind: `pattern:${pattern}`, labels: [pattern === 'stale-input' ? 'knowledge-churn' : pattern === 'repeat-check' ? 'checker' : 'runtime'],
+    kind: `pattern:${pattern}`, labels: [(pattern === 'stale-input' && 'knowledge-churn') || (pattern === 'repeat-check' && 'checker') || 'runtime'],
     raisedAt: since, ageMin: minutes(now - since), summary: clipLine(summary, 220), ...extra });
   for (const w of runningWorkflows(db)) {
     const wf = w.workflow_id;
@@ -422,11 +422,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       const loops = new Map(), repeats = new Map();
       const gates = ownerGates(db, wf), askJobs = openAskJobs(db, wf);
       // The newest job of a lineage decides whether it waits on the owner (ownerHoldOf).
-      const waiting = (tails) => {
-        const newest = [...tails].sort((a, b) => b.created_at - a.created_at || String(b.job_id).localeCompare(String(a.job_id)))[0];
-        const hold = ownerHoldOf(db, wf, newest, { byId, gates, askJobs });
-        return hold ? { class: CLASSES.owner, reason: `waiting on the owner: newest job ${hold.jobId} is ${newest.status} behind ${hold.kind === 'owner-gate' ? `owner gate ${hold.incidentId}` : `owner ask ${hold.dispatchId}`}${hold.via !== hold.jobId ? ` (via ${hold.via})` : ''}`, ownerHold: hold } : {};
-      };
+      const waiting = (tails) => { const newest = [...tails].sort((a, b) => b.created_at - a.created_at || String(b.job_id).localeCompare(String(a.job_id)))[0]; const hold = ownerHoldOf(db, wf, newest, { byId, gates, askJobs }); if (!hold) return {}; const ownerItem = hold.kind === 'owner-gate' ? 'owner gate ' + hold.incidentId : 'owner ask ' + hold.dispatchId; const via = hold.via !== hold.jobId ? ' (via ' + hold.via + ')' : ''; return { class: CLASSES.owner, reason: 'waiting on the owner: newest job ' + hold.jobId + ' is ' + newest.status + ' behind ' + ownerItem + via, ownerHold: hold }; };
       for (const tail of jobs.filter((j) => !retried.has(j.job_id))) {
         if (tail.status === 'succeeded' || tail.status === 'cancelled') continue;
         if (!OPEN_JOB.has(tail.status)) {
@@ -462,13 +458,13 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         }
       }
       for (const [id, { streak, tails }] of loops) {
-        put(wf, 'retry-loop', id, streak[0].created_at, `${streak[0].op_id}: ${streak.filter((j) => j.status === 'failed').length} failed attempt(s) in a row since the last success (${streak.map((j) => `a${j.attempt} ${j.status}`).join(', ')}); now ${tails.map((t) => `${t.job_id} ${t.status}`).join(', ')}`,
+        put(wf, 'retry-loop', id, streak[0].created_at, `${streak[0].op_id}: ${streak.filter((j) => j.status === 'failed').length} failed attempt(s) in a row since the last success (${streak.map((j) => 'a' + j.attempt + ' ' + j.status).join(', ')}); now ${tails.map((t) => t.job_id + ' ' + t.status).join(', ')}`,
           { jobs: streak.map((j) => j.job_id), lastFailureAt: lastFailureOf(db, wf, streak), ...waiting(tails) });
       }
       for (const [id, r] of repeats) {
         const list = [...r.jobs.values()].sort((a, b) => a.attempt - b.attempt);
         if (list.length < 2) continue;
-        put(wf, 'repeat-check', id, list[0].updated_at, `check ${r.name} failed on ${list.length} attempts of ${r.op} (${list.map((j) => `a${j.attempt}`).join(', ')}); now ${[...r.tails].join(', ')}`,
+        put(wf, 'repeat-check', id, list[0].updated_at, `check ${r.name} failed on ${list.length} attempts of ${r.op} (${list.map((j) => 'a' + j.attempt).join(', ')}); now ${[...r.tails].join(', ')}`,
           { jobs: list.map((j) => j.job_id), lastFailureAt: lastFailureOf(db, wf, [...r.lineage.values()]), ...waiting(r.tailJobs.values()) });
       }
     } catch { /* a malformed chain is not a finding */ }
@@ -505,7 +501,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       }
       for (const [sig, g] of groups) {
         if (g.jobs.length < 2) continue;
-        put(wf, 'repeat-reject', `${wf}:${hash(sig)}`, g.at, `${g.jobs.length} dispatch rejects at step ${g.step} (${[...g.providers].join(', ')})${g.error ? `: ${g.error}` : ''}`, { jobs: [...new Set(g.jobs)], lastFailureAt: g.last });
+        put(wf, 'repeat-reject', `${wf}:${hash(sig)}`, g.at, `${g.jobs.length} dispatch rejects at step ${g.step} (${[...g.providers].join(', ')})${g.error ? ': ' + g.error : ''}`, { jobs: [...new Set(g.jobs)], lastFailureAt: g.last });
       }
     } catch { /* no events */ }
     // Dispatches whose guard receipt says a layer did not install: the worker ran without it.
@@ -535,7 +531,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         const since = Math.min(...paths.map((p) => { try { return fs.statSync(path.isAbsolute(p) ? p : p.startsWith('.starciwork/') && repo ? path.join(repo, p) : path.join(root, p)).mtimeMs; } catch { return now; } }));
         const source = paths.some((p) => !p.startsWith('.starciwork/'));
         const followUps = ops.filter((o) => o.followUp).length;
-        put(wf, 'stale-input', wf, since, `${ops.length} settled job(s) owe work for changed input(s) ${clipLine(paths.join(', '), 120)}${followUps ? ` (${followUps} owner-declared breaking follow-up(s))` : ''} (e.g. ${ops.slice(0, 3).map((o) => o.jobId).join(', ')})`,
+        put(wf, 'stale-input', wf, since, `${ops.length} settled job(s) owe work for changed input(s) ${clipLine(paths.join(', '), 120)}${followUps ? ' (' + followUps + ' owner-declared breaking follow-up(s))' : ''} (e.g. ${ops.slice(0, 3).map((o) => o.jobId).join(', ')})`,
           { jobs: ops.map((o) => o.jobId), paths, labels: [source ? 'knowledge-churn' : 'cross-workflow'] });
       }
     } catch { /* no contracts */ }
@@ -545,7 +541,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
 
 /* ------------------------------------------------------------ the whole projection */
 
-const owedLine = (i) => `OWED ${i.workflowId} ${i.incidentId ?? i.key} [${i.kind ?? '-'}] age=${i.ageMin}m ${i.fixedBy ? `fixed-by ${i.fixedBy.sha.slice(0, 9)}?` : 'open'}${i.ackReopened ? ` ack-reopened (acked ${new Date(i.ackReopened.at).toISOString()})` : ''}: ${i.summary}`;
+const owedLine = (i) => 'OWED ' + i.workflowId + ' ' + (i.incidentId ?? i.key) + ' [' + (i.kind ?? '-') + '] age=' + i.ageMin + 'm ' + (i.fixedBy ? 'fixed-by ' + i.fixedBy.sha.slice(0, 9) + '?' : 'open') + (i.ackReopened ? ' ack-reopened (acked ' + new Date(i.ackReopened.at).toISOString() + ')' : '') + ': ' + i.summary;
 
 /* ------------------------------------------------------------ the supervisor's disposition: ack */
 
@@ -658,7 +654,7 @@ function resolveCommits(list, { root = SKILL_ROOT, resolve = revParse } = {}) {
 
 function main() {
   const argv = process.argv.slice(2);
-  const values = (name) => { const out = []; for (let i = 0; i < argv.length; i++) if (argv[i] === `--${name}`) out.push(argv[++i]); return out; };
+  const values = (name) => { const out = []; for (let i = 0; i < argv.length; i++) { if (argv[i] === `--${name}`) out.push(argv[++i]); } return out; };
   const value = (name) => values(name)[0] ?? null;
   const has = (name) => argv.includes(`--${name}`);
   const verb = argv[0] && !argv[0].startsWith('--') ? argv[0] : null;
@@ -700,8 +696,8 @@ function main() {
   result.counts.fixedBy = owed.filter((i) => i.status === 'fixed-by').length;
   result.counts.acked = result.items.filter((i) => i.acked).length;
   if (has('json')) { console.log(JSON.stringify(has('all') ? result : { ...result, items: owed })); return; }
-  console.log(`[owed] ${result.repos.length} ledger(s): ${owed.length} owed (${result.counts.fixedBy} likely fixed), ${Object.entries(result.counts).filter(([k]) => k !== CLASSES.supervisor && k !== 'fixedBy').map(([k, n]) => `${k} ${n}`).join(', ')}`);
-  for (const i of owed) console.log(`  ${i.line}${i.fixedBy ? ` <- ${i.fixedBy.how}${i.fixedBy.tokens ? ` (${i.fixedBy.tokens.join(', ')})` : ''} "${i.fixedBy.subject}"` : ''}`);
+  console.log(`[owed] ${result.repos.length} ledger(s): ${owed.length} owed (${result.counts.fixedBy} likely fixed), ${Object.entries(result.counts).filter(([k]) => k !== CLASSES.supervisor && k !== 'fixedBy').map(([k, n]) => k + ' ' + n).join(', ')}`);
+  for (const i of owed) console.log('  ' + i.line + (i.fixedBy ? ' <- ' + i.fixedBy.how + (i.fixedBy.tokens ? ' (' + i.fixedBy.tokens.join(', ') + ')' : '') + ' "' + i.fixedBy.subject + '"' : ''));
   if (has('all')) {
     for (const i of result.items.filter((x) => x.acked)) console.log(`  ACKED ${i.workflowId} ${i.key} at ${new Date(i.acked.at).toISOString()} (${(i.acked.commits ?? []).map((c) => String(c).slice(0, 9)).join(', ')}): ${i.acked.reason}`);
     for (const i of result.items.filter((x) => x.class !== CLASSES.supervisor)) console.log(`  ${i.class.toUpperCase()} ${i.workflowId} ${i.incidentId ?? i.key} [${i.kind ?? '-'}] age=${i.ageMin}m: ${i.reason}`);

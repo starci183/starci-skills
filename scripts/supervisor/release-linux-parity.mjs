@@ -59,47 +59,58 @@ function leaveOut({ step, dir, matrixJob }) {
   return null;
 }
 
+function planStep({ file, id, app, ctx, jobEnv, defaultDir, step, seen, node }) {
+  let nextNode = node;
+  const setup = String(step.uses ?? '').startsWith('actions/setup-node');
+  if (setup && step.with?.['node-version'] !== undefined) {
+    const major = /\d+/.exec(expand(step.with['node-version'], ctx))?.[0];
+    if (major && (nextNode === null || Number(major) > Number(nextNode))) nextNode = major;
+  }
+  if (step.run === undefined) return { node: nextNode };
+  const where = `${file}:${id}`;
+  const dir = path.posix.normalize(expand(step['working-directory'] ?? defaultDir, { ...ctx, env: { ...ctx.env, ...jobEnv } }));
+  const appLabel = app ? `[${app}]` : '';
+  const name = `${where}${appLabel}: ${expand(step.name ?? String(step.run).split('\n')[0], ctx)}`;
+  const run = expand(step.run, { ...ctx, env: { ...ctx.env, ...jobEnv } });
+  const reason = leaveOut({ step: { ...step, run }, dir, matrixJob: app !== null });
+  if (reason) return { node: nextNode, skipped: { name, reason } };
+  // Identical means the same directory, command and the env values the command reads (`starci app lint "$APP_DIR"` differs per app).
+  const read = Object.keys(jobEnv).filter((k) => run.includes(`$${k}`) || run.includes(`\${${k}}`)).map((k) => `${k}=${jobEnv[k]}`);
+  const key = [dir, run.trim(), ...read].join('\u0000');
+  if (seen.has(key)) return { node: nextNode };
+  seen.add(key);
+  return { node: nextNode, entry: { name, dir, run: run.trim(), env: jobEnv } };
+}
+
+function planJob({ file, id, job, apps, base, seen, state, steps, skipped }) {
+  const where = `${file}:${id}`;
+  if (/workflow_dispatch/.test(String(job.if ?? ''))) { skipped.push({ name: where, reason: 'manual job' }); return; }
+  const matrixApps = job.strategy?.matrix?.app !== undefined ? apps : [null];
+  for (const app of matrixApps) {
+    const ctx = { matrix: app ? { app } : {}, env: base.env };
+    const jobEnv = literalEnv({ ...base.env, ...job.env }, ctx);
+    const defaultDir = expand(job.defaults?.run?.['working-directory'] ?? '.', { ...ctx, env: { ...ctx.env, ...jobEnv } });
+    for (const step of job.steps ?? []) {
+      const planned = planStep({ file, id, app, ctx, jobEnv, defaultDir, step, seen, node: state.node });
+      state.node = planned.node;
+      if (planned.skipped) skipped.push(planned.skipped);
+      if (planned.entry) steps.push(planned.entry);
+    }
+  }
+}
+
 /**
  * The parity plan: {image, steps: [{name, dir, run, env}], skipped: [{name, reason}]}. Pure over the parsed workflows and the example app names.
  * A job whose matrix is the derived app list runs once per example app; a job gated on workflow_dispatch is left out whole; a step identical to an earlier one
  * (same directory, command and the env it reads: the repeated root install) runs once.
  */
 export function parityPlan({ workflows, apps }) {
-  const steps = [], skipped = [], seen = new Set();
-  let node = null;
+  const steps = [], skipped = [], seen = new Set(), state = { node: null };
   for (const { file, doc } of workflows) {
     const base = { env: { ...doc.env } };
-    for (const [id, job] of Object.entries(doc.jobs ?? {})) {
-      const where = `${file}:${id}`;
-      if (/workflow_dispatch/.test(String(job.if ?? ''))) { skipped.push({ name: where, reason: 'manual job' }); continue; }
-      const matrixApps = job.strategy?.matrix?.app !== undefined ? apps : [null];
-      for (const app of matrixApps) {
-        const ctx = { matrix: app ? { app } : {}, env: base.env };
-        const jobEnv = literalEnv({ ...base.env, ...job.env }, ctx);
-        const defaultDir = expand(job.defaults?.run?.['working-directory'] ?? '.', { ...ctx, env: { ...ctx.env, ...jobEnv } });
-        for (const step of job.steps ?? []) {
-          const setup = String(step.uses ?? '').startsWith('actions/setup-node');
-          if (setup && step.with?.['node-version'] !== undefined) {
-            const major = /\d+/.exec(expand(step.with['node-version'], ctx))?.[0];
-            if (major && (node === null || Number(major) > Number(node))) node = major;
-          }
-          if (step.run === undefined) continue;
-          const dir = path.posix.normalize(expand(step['working-directory'] ?? defaultDir, { ...ctx, env: { ...ctx.env, ...jobEnv } }));
-          const name = `${where}${app ? `[${app}]` : ''}: ${expand(step.name ?? String(step.run).split('\n')[0], ctx)}`;
-          const run = expand(step.run, { ...ctx, env: { ...ctx.env, ...jobEnv } });
-          const reason = leaveOut({ step: { ...step, run }, dir, matrixJob: app !== null });
-          if (reason) { skipped.push({ name, reason }); continue; }
-          // Identical means the same directory, command and the env values the command reads (`starci app lint "$APP_DIR"` differs per app).
-          const read = Object.keys(jobEnv).filter((k) => run.includes(`$${k}`) || run.includes(`\${${k}}`)).map((k) => `${k}=${jobEnv[k]}`);
-          const key = [dir, run.trim(), ...read].join('\u0000');
-          if (seen.has(key)) continue;
-          seen.add(key);
-          steps.push({ name, dir, run: run.trim(), env: jobEnv });
-        }
-      }
-    }
+    for (const [id, job] of Object.entries(doc.jobs ?? {})) planJob({ file, id, job, apps, base, seen, state, steps, skipped });
   }
-  return { image: `node:${node ?? DEFAULT_NODE}`, steps, skipped };
+  return { image: `node:${state.node ?? DEFAULT_NODE}`, steps, skipped };
 }
 
 const quote = (v) => `'${String(v).replaceAll(/'/g, String.raw`'\''`)}'`;
@@ -120,7 +131,8 @@ export function parityScript(plan) {
   });
   if (plan.specs?.length) {
     // The tests the host run could not execute (a shell it lacks, a link privilege it will not grant): their spec files run here, the shells installed INSIDE the container only.
-    lines.push(`run_step ${quote(`${LINUX_SPECS_LABEL}: ${plan.specs.length} spec file(s) the host run skipped tests of`)} . <<'__STEP_SPECS__'`,
+    const specsName = `${LINUX_SPECS_LABEL}: ${plan.specs.length} spec file(s) the host run skipped tests of`;
+    lines.push(`run_step ${quote(specsName)} . <<'__STEP_SPECS__'`,
       'apt-get update -qq && apt-get install -y -qq zsh fish > /dev/null',
       `node ${SPEC_IMPORTS} --test --test-reporter=spec ${plan.specs.map(quote).join(' ')}`,
       '__STEP_SPECS__');
