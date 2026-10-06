@@ -525,7 +525,7 @@ export async function loadDnaModule(file){
   return Object.fromEntries(Object.entries(exported).filter(([,value])=>value&&typeof value==='object'));
 }
 
-const plain=value=>structuredClone(value);
+const plain=value=>JSON.parse(JSON.stringify(value));
 
 // ---------------------------------------------------------------------------
 // The whole census.

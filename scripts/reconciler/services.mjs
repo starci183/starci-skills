@@ -422,7 +422,7 @@ export function orcaRestartScript({ app, closeWaitMs }) {
     'while ((Get-Date) -lt $deadline -and (& $mine).Count) { Start-Sleep -Milliseconds 500 }',
     '$left = & $mine',
     '$left | Stop-Process -Force -ErrorAction SilentlyContinue',
-    String.raw`Start-Process -FilePath "$env:WINDIR\explorer.exe" -ArgumentList ('"' + $app + '")'`,
+    String.raw`Start-Process -FilePath "$env:WINDIR\explorer.exe" -ArgumentList ('"' + $app + '"')`,
     '@{ closed = $before.Count; forced = $left.Count; via = "explorer.exe" } | ConvertTo-Json -Compress',
   ].join('\n');
 }

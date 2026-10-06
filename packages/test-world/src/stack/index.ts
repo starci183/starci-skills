@@ -250,7 +250,7 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
     /** Records what the run provisioned so far on its lease, so a crash after this point is reclaimed exactly. */
     const recordProvisioned = (namespace: Namespace, runId: string, infra: RunInfra): Promise<void> =>
         registry().update((data) => {
-            data.leases = data.leases.map((lease) => (lease.runId === runId ? { ...lease, identity: namespace, infra: structuredClone(infra) } : lease))
+            data.leases = data.leases.map((lease) => (lease.runId === runId ? { ...lease, identity: namespace, infra: JSON.parse(JSON.stringify(infra)) as RunInfra } : lease))
         })
 
     const registerLease = async (namespace: Namespace, runId: string): Promise<void> => {

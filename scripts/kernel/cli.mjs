@@ -672,7 +672,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
     const { lastOutputAt, outputAgeMs } = outputAgeOf(shown?.terminal?.lastOutputAt, now);
     const connected = shown?.connected === true, shownWritable = shown?.writable === true;
     const refusedAt = shownWritable ? sendRefusedAtOf(db, job, terminalHandle) : null;
-    const refused = refusedAt != null && lastOutputAt < refusedAt;
+    const refused = refusedAt != null && !(lastOutputAt >= refusedAt);
     let screenState = null, shellPrompt = null, providerOutage = null, inputDraft = null, screenGate = null, screen = null;
     if (shown?.ok && connected && shownWritable) {
       try {
@@ -705,7 +705,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
     const heartbeatAt = stale.staleActive || refused ? ageFallbackAt ?? heartbeatAtOf(job) : null;
     const heartbeatAgeMs = heartbeatAt != null ? Math.max(0, now - heartbeatAt) : null;
     const beating = heartbeatAgeMs != null && heartbeatAgeMs <= activeStaleMs;
-    const unwritable = refused && heartbeatAt <= refusedAt;
+    const unwritable = refused && !(heartbeatAt > refusedAt);
     const writable = shownWritable && !unwritable;
     // A host dialog the worker's card allowlists (a loop-detection menu) is the runtime's to
     // answer: starci kernel nudge picks it. Answered maxPerAttempt times on this attempt, it is a loop (gate-loop).
@@ -1087,7 +1087,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
   try { conflict = findOwnedPathLeaseConflicts(db, opLeaseRequests(payload, canon, opId), { excludeJobId: job.job_id, canonicalOf: canon?.canonicalOf })[0] ?? null; }
   catch { conflict = null; }
   if (conflict) {
-    const expired = Number(conflict.expires_at) <= Date.now();
+    const expired = !(Number(conflict.expires_at) > Date.now());
     return {
       queuedBecause: 'path-lease',
       blockedBy: { path: conflict.held, job: conflict.job_id, op: conflict.op_id ?? null, expiresAt: conflict.expires_at ?? null },
@@ -2135,7 +2135,7 @@ const livePathLeaseWait = (db, job, payload, { conflicts = null, now = Date.now(
   for (const row of rows) {
     if (!holderStatus.has(row.jobId)) holderStatus.set(row.jobId, db.prepare('SELECT status FROM jobs WHERE job_id=?').get(row.jobId)?.status ?? null);
     const status = holderStatus.get(row.jobId);
-    if (row.expiresAt <= now || !status || FINAL_SETTLED.includes(status)) return null;
+    if (!(row.expiresAt > now) || !status || FINAL_SETTLED.includes(status)) return null;
   }
   const holders = [...new Map(rows.map((row) => [row.jobId, {
     jobId: row.jobId, opId: row.opId, workflowId: row.workflowId, status: holderStatus.get(row.jobId),

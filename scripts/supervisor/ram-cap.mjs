@@ -26,7 +26,7 @@ function main(argv) {
     const workflowId = opt('workflow');
     if (!workflowId) { console.error(`${verb} needs --workflow <id>`); return 2; }
     const weight = verb === 'prioritize' ? Number(opt('weight')) : null;
-    if (verb === 'prioritize' && (weight <= 0 || Number.isNaN(weight))) { console.error('prioritize needs --weight <positive number>'); return 2; }
+    if (verb === 'prioritize' && !(weight > 0)) { console.error('prioritize needs --weight <positive number>'); return 2; }
     const ok = setPriority({ workflowId, weight, reserve: Number(opt('reserve') ?? 0) });
     const priorities = priorityTable(null, readThrottleState());
     out({ ok, workflowId, priority: priorities[workflowId] ?? { weight: 1, reserve: 0 }, store: 'machine.sqlite throttle_state' },

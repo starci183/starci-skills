@@ -64,7 +64,7 @@ const digest=sha256;
 // Colour mathematics: sRGB <-> linear <-> OKLab <-> oklch, and WCAG contrast.
 // ---------------------------------------------------------------------------
 
-const clamp01=value=>Math.max(0,Math.min(1,value));
+const clamp01=value=>value<0?0:value>1?1:value;
 /** sRGB transfer function and its inverse; the piecewise form, not the 2.2 approximation. */
 const srgbToLinear=channel=>channel<=0.04045?channel/12.92:((channel+0.055)/1.055)**2.4;
 const linearToSrgb=channel=>channel<=0.0031308?channel*12.92:1.055*channel**(1/2.4)-0.055;

@@ -180,7 +180,7 @@ function parseMix(inner) {
   else if (p1 === null) p1 = 100 - p2
   else if (p2 === null) p2 = 100 - p1
   const sum = p1 + p2
-  if (sum <= 0 || p1 < 0 || p2 < 0) return null
+  if (!(sum > 0) || p1 < 0 || p2 < 0) return null
   const [w1, w2] = [p1 / sum, p2 / sum]
   const multiplier = sum < 100 ? sum / 100 : 1
   const [a, b] = [items[0].color, items[1].color]

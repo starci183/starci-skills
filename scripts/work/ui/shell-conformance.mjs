@@ -400,7 +400,7 @@ function checkComposites(workRoot, uiFile, record, shell, { mode, level, records
       if (!overlay) out.push(finding('refuse', 'COMPOSITE_INCONSISTENT', at, `${where}: only a modal or drawer has an overlay presentation`));
       const host = resolveHost(records, record.host);
       const hostRef = parseUiRef(c.host?.asset);
-      const hostAsset = host?.id != null && hostRef?.id === host.id ? assetsOf(host.record).find((x) => x.path === hostRef.path) : null;
+      const hostAsset = host && hostRef?.id === host.id ? assetsOf(host.record).find((x) => x.path === hostRef.path) : null;
       if (!hostAsset) out.push(finding('refuse', 'COMPOSITE_HOST_MISMATCH', at, `${where} is drawn over ${c.host?.asset ?? '(nothing)'}, which is not an asset of host ${record.host}`));
       else {
         if (hostAsset.sha256 !== c.host.sha256) out.push(finding(level.stale, 'COMPOSITE_HOST_MISMATCH', at, `${where}: host ${c.host.asset} changed since this overlay was drawn over it - recompose`));

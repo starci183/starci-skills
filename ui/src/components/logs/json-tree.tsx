@@ -11,7 +11,7 @@ function Scalar({ value }: Readonly<{ value: unknown }>) {
   if (value === null) return <span className="text-muted-foreground">null</span>;
   if (typeof value === 'string') return <span className="break-words whitespace-pre-wrap text-foreground">"{value}"</span>;
   if (typeof value === 'number') return <span className="text-[color:var(--status-running)]">{value}</span>;
-  return <span className="text-[color:var(--status-warning)]">{JSON.stringify(value)}</span>;
+  return <span className="text-[color:var(--status-warning)]">{String(value as boolean)}</span>;
 }
 
 function Node({ name, value, depth }: Readonly<{ name?: string; value: unknown; depth: number }>) {

@@ -29,11 +29,10 @@ export const smtpFake = (): FakeDefinition<SmtpFakeClient> => ({
         const failures = new FailureQueue()
         const server = new SmtpServer({ log, failures })
         const port = await server.listen()
-        const reset = (): Promise<void> => {
+        const reset = async (): Promise<void> => {
             log.clear()
             failures.clear()
             server.clear()
-            return Promise.resolve()
         }
         return {
             url: "",

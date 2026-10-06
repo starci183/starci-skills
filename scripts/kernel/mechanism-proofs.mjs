@@ -70,7 +70,7 @@ export function judgeTestWorld(summary) {
   const findings = testWorldFindings(summary);
   if (findings.length) return refused({ status: 'red', code: 'op-test-world-hand-rolled' }, `${findings.length} test-world finding(s); first: ${listed(findings)[0]}`, listed(findings));
   const run = summary.run;
-  if (!run || run.error || testRunCountsError(run) || run.exit !== 0 || run.total <= 0 || run.files <= 0 || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0)
+  if (!run || run.error || testRunCountsError(run) || run.exit !== 0 || !(run.total > 0) || !(run.files > 0) || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0)
     return refused({ status: 'red', code: 'op-test-world-run-red' }, run ? `the ${summary.project} run is not green: exit ${run.exit}, ${run.total} test(s), ${run.failed} failed, ${run.skipped} skipped${run.error ? ` (${oneLine(run.error, 200)})` : ''}` : 'the summary records no run',
       (run?.failures ?? []).map((f) => `${f.file} ${f.test}: ${oneLine(f.message, 160)}`));
   return pass();
@@ -79,7 +79,7 @@ export function judgeTestWorld(summary) {
 export function judgeUnitRun(summary) {
   if (summary?.schema !== UNIT_RUN_SCHEMA) return refused({ status: 'missing', code: 'op-unit-proof-missing' }, `no unit run summary (schema ${UNIT_RUN_SCHEMA}) is attached: run starci gate unit --root <app> --out unit-run.json`);
   const run = summary.run;
-  if (!run || run.error || testRunCountsError(run) || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0 || run.total <= 0 || run.files <= 0)
+  if (!run || run.error || testRunCountsError(run) || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0 || !(run.total > 0) || !(run.files > 0))
     return refused({ status: 'red', code: 'op-unit-run-red' }, run ? `the unit run is not green: exit ${run.exit}, ${run.total} test(s), ${run.failed} failed, ${run.skipped} skipped${run.error ? ` (${oneLine(run.error, 200)})` : ''}` : 'the summary records no run',
       (run?.failures ?? []).map((f) => `${f.file} ${f.test}: ${oneLine(f.message, 160)}`));
   const findings = unitFindings(summary);

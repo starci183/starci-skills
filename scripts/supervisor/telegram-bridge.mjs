@@ -486,7 +486,7 @@ export function createBridge({
 
   let lastSweep = -Infinity;
   const sweep = async () => {
-    if (sweepEveryMs < 0 || now() - lastSweep < sweepEveryMs) return null;
+    if (!(sweepEveryMs >= 0) || now() - lastSweep < sweepEveryMs) return null;
     lastSweep = now();
     const r = await sweepAskMessages({ repos }, { env, apiBase, fetchImpl, sleepImpl, now: now(), settings: current, warn: say });
     if (r.closed?.length || r.unlinked?.length) say(`sweep: ${r.closed.length} closed ask(s) cleared, ${r.unlinked.length} dead link(s) removed`);
