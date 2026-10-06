@@ -70,7 +70,10 @@ export function parseArgs(argv) {
     if (BOOLEAN_FLAGS.has(key)) { out[key] = true; continue; }
     const value = argv[i + 1];
     if (value == null || value.startsWith('--')) fail(`--${key} needs a value`, 'arg-missing');
-    if (key === 'repo') (out.repos ??= []).push(value);
+    if (key === 'repo') {
+      out.repos ??= [];
+      out.repos.push(value);
+    }
     out[key] = value; i++;
   }
   return out;
@@ -154,7 +157,7 @@ function retypeWait(repo, { workflowId, incidentId, foundation, bridgeId, reason
   if (!raise.ok && !landed) return { workflowId, from: incidentId, error: `${raise.code}: ${raise.error}` };
   const to = raise.ok ? raise.body?.incidentId ?? null : null;
   const resolve = apiCall(repo, ['incident', '--workflow', workflowId, '--resolve', incidentId, '--by', 'supervisor', '--detail',
-    `${TAG} ${bridgeId}: ${to ? `re-typed as ${to}, which waits on foundation ${foundation}` : `foundation ${foundation} already landed`}; ${clip(reason, 240)}`], { env });
+    `${TAG} ${bridgeId}: ` + (to ? 're-typed as ' + to + ', which waits on foundation ' + foundation : 'foundation ' + foundation + ' already landed') + `; ${clip(reason, 240)}`], { env });
   return { workflowId, from: incidentId, to, holds, ...(landed ? { foundationLanded: true } : {}), ...(resolve.ok ? {} : { resolveError: `${resolve.code}: ${resolve.error}` }) };
 }
 
@@ -170,8 +173,8 @@ const q = (s) => `"${String(s).replaceAll(/"/g, '\'')}"`;
 export function commandFor(repo, f) {
   const p = f.proposal ?? {};
   const base = `starci supervisor bridge ${p.action} --repo ${repo}`;
-  if (p.action === 'bridge') return `${base}${p.blocker ? ` --blocker ${p.blocker}` : ''} --dependents ${list(p.dependents).join(',')} --foundation ${p.foundation ?? '<name>'} --goal ${q(p.goalDraft ?? '<goal>')} --reason ${q(f.summary)} --finding ${q(f.key)} --start`;
-  if (p.action === 'transfer') return `${base} --foundation ${p.target?.foundation ?? '<name>'}${p.mergeInto ? ` --merge-into ${p.mergeInto}` : ` --to ${p.to ?? '<wf>'}`} --reason ${q(p.why)} --finding ${q(f.key)}`;
+  if (p.action === 'bridge') return base + (p.blocker ? ` --blocker ${p.blocker}` : '') + ` --dependents ${list(p.dependents).join(',')} --foundation ${p.foundation ?? '<name>'} --goal ${q(p.goalDraft ?? '<goal>')} --reason ${q(f.summary)} --finding ${q(f.key)} --start`;
+  if (p.action === 'transfer') return `${base} --foundation ${p.target?.foundation ?? '<name>'}` + (p.mergeInto ? ` --merge-into ${p.mergeInto}` : ` --to ${p.to ?? '<wf>'}`) + ` --reason ${q(p.why)} --finding ${q(f.key)}`;
   if (p.action === 'designate') return `${base} --lead ${p.owner} --waiter ${p.waiter} --releases ${list(p.releases).join(',')} --reason ${q(p.why)} --finding ${q(f.key)}`;
   if (p.action === 'revise') return `${base} --workflow ${p.workflow} --text <revised goal text parking ${list(p.paths).join(', ')}> --reason ${q(p.why)} --finding ${q(f.key)}`;
   return null;
@@ -276,7 +279,8 @@ async function rewireBridge(repo, bridgeId, { env = process.env, args = {}, quie
   const notices = [];
   if (!quiet || results.length) for (const dep of bridge.dependents) {
     const mine = results.filter((r) => r.workflowId === dep);
-    notices.push(await notify(repo, dep, `${TAG} ${bridgeId}: your wait${mine.length ? ` ${mine.map((r) => `${r.from}${r.to ? ` is now ${r.to}` : ''}`).join(', ')}` : ''} waits on foundation ${bridge.foundation}, owned by bridging workflow ${bridge.workflowId} (${clip(bridge.reason, 200)}). Its landing releases the held work; re-verify in your own preflight before dispatch.`, args));
+    const waitText = mine.length ? ' ' + mine.map((r) => r.from + (r.to ? ' is now ' + r.to : '')).join(', ') : '';
+    notices.push(await notify(repo, dep, `${TAG} ${bridgeId}: your wait${waitText} waits on foundation ${bridge.foundation}, owned by bridging workflow ${bridge.workflowId} (${clip(bridge.reason, 200)}). Its landing releases the held work; re-verify in your own preflight before dispatch.`, args));
   }
   return { ok: results.every((r) => !r.error), rewired: results, record, notices };
 }
@@ -354,7 +358,10 @@ async function cmdTransfer(args, { env = process.env } = {}) {
   if (results.length) updateBridge(repo, bridgeId, (b) => ({ ...b, rewired: results }));
   const notices = [];
   for (const wf of new Set([from, to, ...moved.dependents].filter(Boolean))) {
-    notices.push(await notify(repo, wf, `${TAG} ${bridgeId}: ${mergeInto ? `foundation ${name} is merged into ${mergeInto} (owner ${to ?? '-'}); a need of ${name} is now a need of ${mergeInto}` : `foundation ${name} now belongs to ${to} (was ${from ?? 'unowned'})`} - ${clip(reason, 200)}. Read starci kernel foundations; re-check it in your own preflight.`, args));
+    const ownership = mergeInto
+      ? `foundation ${name} is merged into ${mergeInto} (owner ${to ?? '-'}); a need of ${name} is now a need of ${mergeInto}`
+      : `foundation ${name} now belongs to ${to} (was ${from ?? 'unowned'})`;
+    notices.push(await notify(repo, wf, `${TAG} ${bridgeId}: ${ownership} - ${clip(reason, 200)}. Read starci kernel foundations; re-check it in your own preflight.`, args));
   }
   supervisorAction({ item: args.finding ?? `transfer|foundation:${name}`, action: 'transfer', reason, workflowId: to, refs: [bridgeId, name, mergeInto].filter(Boolean), env });
   return { ok: true, action: 'transfer', bridgeId, foundation: name, ...(mergeInto ? { mergeInto } : {}), from, to, dependents: moved.dependents, rewired: results, ...approval, notices };
@@ -388,9 +395,10 @@ async function cmdRevise(args, { env = process.env } = {}) {
     appendEvents(ledger, [workflowId], 'supervisor-revision-requested', { bridgeId, state: rec.state, reason, ...approval, opChainDiff: preview.opChainDiff });
     return rec;
   });
-  const notice = await notify(repo, workflowId, rec.state === 'applied'
+  const noticeText = rec.state === 'applied'
     ? `${TAG} ${bridgeId}: the Supervisor revised your goal to rev ${preview.nextRevision} (provisional, ${clip(reason, 200)}): run starci kernel survey and resurvey the pending goal-revision inbox; queued legs it removed were superseded.`
-    : `${TAG} ${bridgeId}: the Supervisor requests a goal revision (${clip(reason, 200)}): ${rec.state === 'refused' ? `it could not be applied (${clip(rec.error, 160)}) - settle or reconcile the open legs it names, ` : ''}the owner or autopilot applies it; keep the duplicated legs parked meanwhile.`, args);
+    : `${TAG} ${bridgeId}: the Supervisor requests a goal revision (${clip(reason, 200)}): ` + (rec.state === 'refused' ? `it could not be applied (${clip(rec.error, 160)}) - settle or reconcile the open legs it names, ` : '') + 'the owner or autopilot applies it; keep the duplicated legs parked meanwhile.';
+  const notice = await notify(repo, workflowId, noticeText, args);
   supervisorAction({ item: args.finding ?? `revise|${workflowId}`, action: 'revise', reason, workflowId, refs: [bridgeId], env });
   return { ok: rec.state !== 'refused', action: 'revise', bridgeId, workflowId, state: rec.state, ...approval, preview: rec.preview, ...(applied ? { applied } : {}), notice };
 }
@@ -437,10 +445,10 @@ async function cmdDesignate(args, { env = process.env } = {}) {
 /* -------------------------------------------------------------------- CLI */
 const human = {
   detect: (out) => out.repos.flatMap((r) => [
-    `${r.repo}: ${r.error ? `unreadable (${r.error})` : `${r.nodes.length} live workflow(s), ${r.edges.filter((e) => e.strength === 'hard').length} hard / ${r.edges.filter((e) => e.strength !== 'hard').length} soft edge(s), ${r.findings.length} finding(s), ${r.bridges.length} bridge(s)`}`,
-    ...r.edges.filter((e) => e.strength === 'hard').map((e) => `  WAITS ${shortWorkflow(e.from)} -> ${shortWorkflow(e.to)} via ${e.via} ${e.ref ?? '-'}${e.job ? ` (${e.job})` : ''}`),
+    r.repo + ': ' + (r.error ? 'unreadable (' + r.error + ')' : `${r.nodes.length} live workflow(s), ${r.edges.filter((e) => e.strength === 'hard').length} hard / ${r.edges.filter((e) => e.strength !== 'hard').length} soft edge(s), ${r.findings.length} finding(s), ${r.bridges.length} bridge(s)`),
+    ...r.edges.filter((e) => e.strength === 'hard').map((e) => '  WAITS ' + shortWorkflow(e.from) + ' -> ' + shortWorkflow(e.to) + ' via ' + e.via + ' ' + (e.ref ?? '-') + (e.job ? ' (' + e.job + ')' : '')),
     ...r.findings.flatMap((f) => [`  ${findingLine(f)}`, ...(f.proposal?.clearCut ? [`    run: ${commandFor(r.repo, f)}`] : [])]),
-    ...r.bridges.map((b) => `  BRIDGE ${b.id} ${b.action} ${b.state ?? '-'}${b.provisional ? ' provisional' : ''}${b.workflowId ? ` ${shortWorkflow(b.workflowId)}` : ''}${b.foundation ? ` owns ${b.foundation}` : ''}: ${b.reason}`),
+    ...r.bridges.map((b) => '  BRIDGE ' + b.id + ' ' + b.action + ' ' + (b.state ?? '-') + (b.provisional ? ' provisional' : '') + (b.workflowId ? ' ' + shortWorkflow(b.workflowId) : '') + (b.foundation ? ' owns ' + b.foundation : '') + ': ' + b.reason),
   ]).join('\n'),
   list: (out) => [`${out.repo}: ${out.bridges.length} bridging record(s)`, ...out.bridges.map((b) => `  ${b.id} ${b.action} ${b.state ?? '-'}${b.provisional ? ' provisional' : ''} ${b.workflowId ?? b.to ?? b.owner ?? ''} — ${clip(b.reason, 200)}`)].join('\n'),
 };
