@@ -119,7 +119,10 @@ export function footprintObservations(samples, table, { kernelMb = DEFAULTS.kern
     if (opsMb <= 0) continue;
     const weight = running.reduce((sum, [kind, n]) => sum + num(n) * priorMbOf(kind, table), 0);
     if (weight <= 0) continue;
-    for (const [kind] of running) (obs[kind] ??= []).push(Math.round(opsMb * priorMbOf(kind, table) / weight));
+    for (const [kind] of running) {
+      obs[kind] ??= [];
+      obs[kind].push(Math.round(opsMb * priorMbOf(kind, table) / weight));
+    }
   }
   return obs;
 }
@@ -478,7 +481,7 @@ export function footprintSample({ owners = [], ops = [], kernels = 0, freeRamPct
   const agentRamMb = {};
   for (const g of agents) agentRamMb[g.key] = (agentRamMb[g.key] ?? 0) + Math.round(num(g.ramMb));
   const running = ops.filter((o) => o.status !== 'queued');
-  const runningByPool = running.reduce((acc, o) => { if (o.pool) acc[o.pool] = (acc[o.pool] ?? 0) + 1; return acc; }, {});
+  const runningByPool = running.reduce((acc, o) => { if (o.pool) { acc[o.pool] = (acc[o.pool] ?? 0) + 1; } return acc; }, {});
   return { opAgentRamMb: Object.values(agentRamMb).reduce((a, b) => a + b, 0), agentRamMb, kernels: num(kernels), running: countByKind(running), runningByPool,
     ...(freeRamPct != null ? { freeRamPct } : {}) };
 }

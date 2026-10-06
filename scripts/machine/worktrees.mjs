@@ -65,7 +65,7 @@ export function worktreeCounts({ repos = [], env = process.env, settings = workt
   let rows = [], known = [];
   try { rows = withRegistry((m) => m.liveWorktrees(), env); known = withRegistry((m) => m.worktreeRepos(), env); } catch { rows = []; known = []; }
   const all = new Map();
-  for (const r of [...known, ...repos.filter(Boolean)]) { if (!fs.existsSync(r)) continue; const home = mainRootOf(r, { git }); const k = treeKey(home); if (!all.has(k)) all.set(k, home); }
+  for (const r of [...known, ...repos.filter(Boolean)]) { if (!fs.existsSync(r)) { continue; } const home = mainRootOf(r, { git }); const k = treeKey(home); if (!all.has(k)) all.set(k, home); }
   const out = [];
   for (const repoRoot of all.values()) {
     const mine = rows.filter((r) => sameTree(r.repo_root, repoRoot));
@@ -152,7 +152,7 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
   try { ps = orca.ps(); } catch (error) { ps = { ok: false, error: String(error?.message ?? error) }; }
   const cover = psCoverage(ps);
   const byId = new Map(), byPath = new Map();
-  if (cover.ok) for (const w of ps.worktrees) { if (w.id) byId.set(w.id, w); if (w.path) byPath.set(treeKey(w.path), w); }
+  if (cover.ok) { for (const w of ps.worktrees) { if (w.id) byId.set(w.id, w); if (w.path) byPath.set(treeKey(w.path), w); } }
   const orcaTreeOf = (row) => (cover.ok ? byId.get(row.orca_id) ?? byPath.get(treeKey(row.path)) ?? null : null);
   // A workflow tree's live terminals are Orca's count; a tree a complete page does not list holds none; otherwise unknown
   // (Infinity: kept).
@@ -165,12 +165,12 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
       if (isPendingRow(row)) {
         // A slot whose creator died before Orca answered: the slot goes back. A tree Orca may have made for it carries the
         // runtime's stamp, and the orphan pass below adopts or removes it.
-        if (stalePending(row, now, settings.ownerGoneMs)) { if (apply) releaseOrcaSlot(row.path, { env }); items.push({ path: row.path, repoRoot, reason: 'slot-never-bound', action: 'unregister', ok: true }); }
+        if (stalePending(row, now, settings.ownerGoneMs)) { if (apply) { releaseOrcaSlot(row.path, { env }); } items.push({ path: row.path, repoRoot, reason: 'slot-never-bound', action: 'unregister', ok: true }); }
         continue;
       }
       if (!fs.existsSync(row.path)) {
         const reg = fs.existsSync(repoRoot) ? registeredAt(repoRoot, row.path, { git }) : null;
-        if (!reg) { if (apply) markRemoved(row.path, { env }); items.push({ path: row.path, repoRoot, reason: 'directory-gone', action: 'unregister', ok: true }); continue; }
+        if (!reg) { if (apply) { markRemoved(row.path, { env }); } items.push({ path: row.path, repoRoot, reason: 'directory-gone', action: 'unregister', ok: true }); continue; }
       }
       const tip = row.branch ? revParse(repoRoot, `refs/heads/${row.branch}`) : revParse(row.path, 'HEAD');
       const main = revParse(repoRoot, 'main');

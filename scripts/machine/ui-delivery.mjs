@@ -25,9 +25,9 @@ export function uiDeliveryReadiness({ distDir = path.join(skillRoot, 'ui', 'dist
       const style = kind === 'link' && String(attribute(tag, 'rel')).split(/\s+/).includes('stylesheet');
       if (!module && !style) continue;
       const value = attribute(tag, module ? 'src' : 'href');
-      if (!value) { if (module) missing.push('module-source'); continue; }
+      if (!value) { if (module) { missing.push('module-source'); } continue; }
       const url = new URL(value, 'http://localhost/');
-      if (url.origin !== 'http://localhost') { if (module) missing.push('external-module'); continue; }
+      if (url.origin !== 'http://localhost') { if (module) { missing.push('external-module'); } continue; }
       const relative = decodeURIComponent(url.pathname).replace(/^\//, '');
       assets.push(relative);
       if (module) modules.push(relative);
