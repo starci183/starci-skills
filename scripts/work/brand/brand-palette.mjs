@@ -476,7 +476,7 @@ async function main(argv) {
     if (json) return { exitCode: 0, text: `${JSON.stringify(result, null, 2)}\n` };
     if (!result.brand) return { exitCode: 2, text: `${result.error}\n` };
     const bad = result.results.filter((r) => r.findings.some((f) => f.level === 'refuse'));
-    const lines = bad.map((r) => `${r.record}  ${r.file}  [${r.kind}${r.declared ? '' : ', undeclared'}]\n    ${r.refused.map(describeOffender).join('\n    ')}${r.findings.some((f) => f.code === PALETTE_CODES.primaryAbsent) ? `\n    primary ${r.primary.token} ${r.primary.hex} absent` : ''}`);
+    const lines = bad.map((r) => `${r.record}  ${r.file}  [${r.kind}${r.declared ? '' : ', undeclared'}]\n    ${r.refused.map(describeOffender).join('\n    ')}${r.findings.some((f) => f.code === PALETTE_CODES.primaryAbsent) ? '\n    primary ' + r.primary.token + ' ' + r.primary.hex + ' absent' : ''}`);
     return { exitCode: 0, text: `${lines.join('\n')}${lines.length ? '\n' : ''}${bad.length} of ${result.results.length} images off-brand (brand ${result.brand.file} rev ${result.brand.rev}, primary ${result.brand.primary?.hex ?? 'none'})\n` };
   }
   return { exitCode: 2, text: 'Usage: starci work brand-palette --prompt <work-root> | --check <png> --brand <work-root> [--json] | --scan <work-root> [--json]\n' };
