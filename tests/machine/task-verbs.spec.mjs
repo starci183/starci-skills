@@ -28,7 +28,7 @@ test('task register prints reviewable scripts for both runtime tasks without cha
 test('task register --apply makes exactly one injected registration call', async () => {
   const calls = [];
   const result = await taskRegister(ctx('reconciler', { apply: true }), {
-    registerScheduledTask: (script, options) => { calls.push({ script, options }); return { status: 0, stdout: 'registered StarCi-Reconciler' }; },
+    platform: 'win32', registerScheduledTask: (script, options) => { calls.push({ script, options }); return { status: 0, stdout: 'registered StarCi-Reconciler' }; },
   });
   assert.equal(result.code, 0);
   assert.equal(result.data.applied, true);
