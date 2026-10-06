@@ -310,7 +310,6 @@ allocationFacts:
   workerCeiling: modules/models/runtimes.yaml maxParallelOps
   difficultyVocabulary:               # pool models/effort maps and tier keys
     canonical: [easy, medium, hard, insane]
-    aliases: "S|M|L|XL map to easy|medium|hard|insane; 'high' reads as 'hard'. Resolvers normalize both spellings."
   tiers: modules/models/runtimes.yaml allocation.tiers        # pool order per difficulty, keyed by role, `think` or a kind order
   preference: modules/models/runtimes.yaml allocation.preference  # per-key order; `think` is the frontier order, `sol-think` the kernel functions' Sol-first order
   poolSelection:

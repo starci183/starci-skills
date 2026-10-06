@@ -21,8 +21,7 @@
 //       [--no-checks]           op declares no machine checks
 //       [--difficulty <easy|medium|hard|insane>]   measured difficulty (default
 //                               medium; required with --plan), raised to the
-//                               kind's runtimes.yaml roleOfKind floor; alias
-//                               spellings (s|m|l|xl, 'high') are normalized
+//                               kind's runtimes.yaml roleOfKind floor
 //       [--plan]                what-if view: walk the runtimes.yaml difficulty tier
 //                               (∩ per-role preference) instead of the declared
 //                               operator chain; missing or stale qualification

@@ -342,9 +342,7 @@ const JOB_ID_RE = /\bop-[a-z][a-z0-9.-]*?-[0-9a-f]{10}\b/gi;
  * blocker text names plus `ownerJobs` (routing adds the open jobs of `to` owning a file the introducing
  * commit changed); each is taken at its lineage head, and a head that had already succeeded before the
  * blocker was raised (`since`) is the introducer, not the repair. With no such job the release is the
- * introducer's reply (the follow-up asks it to notify the reporter). One blocker
- * was routed to its peer workflow, named that peer's queued owner job, and still sat
- * untyped on the supervisor as OWED.
+ * introducer's reply (the follow-up asks it to notify the reporter).
  */
 export function sharedBlockerUntil(db, { to, text = '', since = 0, ownerJobs = [] }) {
   if (!to) return [];
@@ -377,16 +375,7 @@ export function typedIncidents(db, { workflowId = null } = {}) {
         AND kind IN ('incident-raised',?,?) ORDER BY seq DESC`).all(row.workflow_id, row.incident_id, CONDITIONS_ATTACHED_EVENT, SHARED_BLOCKER_ROUTED);
     const raised = events.find((event) => event.kind === 'incident-raised');
     const withUntil = events.find((event) => Array.isArray(parseJson(event.payload_json, {})?.until));
-    let until = withUntil ? parseJson(withUntil.payload_json, {}).until : null;
-    // A shared blocker routed before its routing typed the wait: derive the same release now.
-    if (!until && kindOf(row.last_progress) === 'shared-blocker') {
-      const routed = events.find((event) => event.kind === SHARED_BLOCKER_ROUTED && parseJson(event.payload_json, {})?.routed === true);
-      if (routed) {
-        until = sharedBlockerUntil(db, { to: parseJson(routed.payload_json, {}).to, text: String(row.last_progress ?? ''),
-          since: raised?.created_at ?? row.updated_at });
-      }
-    }
-    until = (until ?? []).filter((cond) => cond && UNTIL_TYPES.includes(cond.type));
+    const until = (withUntil ? parseJson(withUntil.payload_json, {}).until ?? [] : []).filter((cond) => cond && UNTIL_TYPES.includes(cond.type));
     if (!until.length) continue;
     const raisedPayload = parseJson(raised?.payload_json, {}) ?? {};
     out.push({

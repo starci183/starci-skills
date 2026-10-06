@@ -368,7 +368,7 @@ export async function handleAttempt(request, response, store, url) {
   const route = match[3] ?? 'detail';
   if (route === 'detail') {
     sendJson(request, response, attemptDetail(store, ledger, db, row), { sources: [
-      ...source(ledger.name, 'v_op_history', 'op_attempts', 'jobs', 'contracts', 'reports', 'check_runs', 'v_checks', 'v_media', 'job_artifacts', 'blobs', 'report_attachments', 'decisions', 'decision_items', 'work_units', 'attempt_transcript_snapshots', 'product_lands', 'events', 'llm_usage'),
+      ...source(ledger.name, 'v_op_history', 'op_attempts', 'jobs', 'contracts', 'reports', 'check_runs', 'v_checks', 'v_media', 'job_artifacts', 'blobs', 'report_attachments', 'decisions', 'decision_items', 'work_units', 'attempt_transcript_snapshots', 'events', 'llm_usage'),
       ...source('machine', 'v_engine_actions', 'action_steps', 'sup_learning'),
       ...source('runtime', 'modules/reconciler/sla.yaml', 'modules/models/runtimes.yaml', 'modules/kernel/failure-codes.yaml'),
       ...(admissionObserved(store.machine.db) ? source('machine', 'provider_reservations') : [])], stale: staleOf(store) }); return true;
