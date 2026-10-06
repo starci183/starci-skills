@@ -37,8 +37,11 @@ export const WORK_HOOK_MARKER = 'starci-work-guard';
 export const RUNTIME_GIT_HOOKS_MARKER = 'starci-git-hooks';
 const WORK_HOOK_VERSION = 1;
 
-const normOwned = (p) => path.resolve(p).replace(/\\/g, '/');
+const normOwned = (p) => path.resolve(p).replaceAll('\\', '/');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
+// A single-quoted shell word: ' wrapped as '\'' (close, escaped quote, reopen).
+const SQUOTE = String.raw`'\''`;
+const shellQuote = (s) => `'${String(s).replaceAll('\\', '/').replaceAll("'", SQUOTE)}'`;
 export const JOB_GUARD_TTL_MS = allocationMs('jobGuard.ttlMs');
 export const terminalsDir = (skillRoot = path.resolve(here, '..', '..')) => path.join(guardsRoot(skillRoot), 'terminals');
 
@@ -115,7 +118,7 @@ const git = (call, cwd, args) => call(args, { dir: cwd, timeout: 20_000 });
 
 export function historyHookBody({ branches = [], root, nodePath = process.execPath, terminals = terminalsDir() }) {
   const protectedList = [...new Set(['main', 'master', ...branches.filter((b) => /^[A-Za-z0-9._/-]+$/.test(b))])].join(' ');
-  const q = (s) => `'${String(s).replace(/\\/g, '/').replace(/'/g, `'\\''`)}'`;
+  const q = shellQuote;
   return `#!/bin/sh
 # ${HOOK_MARKER} v${HOOK_VERSION} — installed by the StarCi runtime (scripts/guards/hook-install.mjs); rewritten on every op dispatch.
 # The shared branch is append-only (modules/ops/_common.yaml "Evidence, completion and commits"):
@@ -168,6 +171,24 @@ exit $status
 `;
 }
 
+// A relative core.hooksPath (husky's .husky/_) resolves per checkout: husky generates that directory, with
+// its own `.gitignore` of `*`, only where `npm install` ran, so a linked worktree has none. A hooks directory
+// that does not exist yet, holds no file and has nothing tracked is given husky's own self-ignoring layout;
+// anything else stays refused. True when the hook file may be written.
+const admitFreshHooksDir = (root, hooksDir, isIgnored) => {
+  const relDir = path.relative(root, hooksDir).replaceAll('\\', '/');
+  const absent = !fs.existsSync(hooksDir);
+  const empty = absent || (fs.statSync(hooksDir).isDirectory() && fs.readdirSync(hooksDir).length === 0);
+  const tracked = git(lsFiles, root, ['--', relDir]);
+  if (!empty || tracked.status !== 0 || tracked.stdout.trim()) return false;
+  fs.mkdirSync(hooksDir, { recursive: true });
+  fs.writeFileSync(path.join(hooksDir, '.gitignore'), '*\n');
+  if (isIgnored()) return true;
+  if (absent) safeRemove(hooksDir, { hold: artifactHoldReason });
+  else fs.rmSync(path.join(hooksDir, '.gitignore'), { force: true });
+  return false;
+};
+
 /**
  * hookTarget(repoRoot, name) -> {root, hooksDir, file} | {installed: false, reason, path?}
  * Resolves where hook `name` goes: into the repository's effective hooks
@@ -188,26 +209,9 @@ function hookTarget(repoRoot, name) {
   const inside = (parent, child) => { const rel = path.relative(parent, child); return !rel.startsWith('..') && !path.isAbsolute(rel); };
   const inWorktree = inside(root, hooksDir) && !inside(path.join(root, '.git'), hooksDir);
   if (inWorktree && !fs.existsSync(file)) {
-    const rel = path.relative(root, file).replace(/\\/g, '/');
+    const rel = path.relative(root, file).replaceAll('\\', '/');
     const isIgnored = () => git(checkIgnore, root, ['-q', '--no-index', '--', rel]).status === 0;
-    if (!isIgnored()) {
-      // A relative core.hooksPath (husky's .husky/_) resolves per checkout: husky generates that directory, with
-      // its own `.gitignore` of `*`, only where `npm install` ran, so a linked worktree has none. A hooks directory
-      // that does not exist yet, holds no file and has nothing tracked
-      // is given husky's own self-ignoring layout; anything else stays refused.
-      const relDir = path.relative(root, hooksDir).replace(/\\/g, '/');
-      const absent = !fs.existsSync(hooksDir);
-      const empty = absent || (fs.statSync(hooksDir).isDirectory() && fs.readdirSync(hooksDir).length === 0);
-      const tracked = git(lsFiles, root, ['--', relDir]);
-      if (!empty || tracked.status !== 0 || tracked.stdout.trim()) return { installed: false, reason: 'hooks-dir-tracked', path: file };
-      fs.mkdirSync(hooksDir, { recursive: true });
-      fs.writeFileSync(path.join(hooksDir, '.gitignore'), '*\n');
-      if (!isIgnored()) {
-        if (absent) safeRemove(hooksDir, { hold: artifactHoldReason });
-        else fs.rmSync(path.join(hooksDir, '.gitignore'), { force: true });
-        return { installed: false, reason: 'hooks-dir-tracked', path: file };
-      }
-    }
+    if (!isIgnored() && !admitFreshHooksDir(root, hooksDir, isIgnored)) return { installed: false, reason: 'hooks-dir-tracked', path: file };
   }
   return { root, hooksDir, file };
 }
@@ -240,7 +244,7 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
 
 /** The work-record check shared by the dispatch hook and the runtime's generated pre-commit hook. */
 export function workHookCheck({ root, nodePath = process.execPath }) {
-  const q = (s) => `'${String(s).replace(/\\/g, '/').replace(/'/g, `'\\''`)}'`;
+  const q = shellQuote;
   return `# ${WORK_HOOK_MARKER} v${WORK_HOOK_VERSION} - installed by the StarCi runtime (scripts/guards/hook-install.mjs); rewritten on every op dispatch.
 # Staged Work and stack files are checked before the commit exists: YAML that parses, records that pass their scoped
 # strict validation, and no secret outside an .enc file (starci work hygiene). e2e never runs here.
@@ -303,19 +307,16 @@ export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId,
   const receipt = { jobFile: null, hooks: [] };
   try { receipt.jobFile = writeJobGuard({ skillRoot, jobId, workflowId, ledgerRepo, owned, workflowWorktree, role, op }); }
   catch (e) { receipt.jobFile = { error: String(e?.message ?? e) }; }
-  if (settings.historyHook) {
-    for (const repo of [...new Set(repos.filter(Boolean).map((r) => path.resolve(r)))]) {
-      try { receipt.hooks.push({ repo, ...ensureHistoryHook(repo, { skillRoot }) }); }
-      catch (e) { receipt.hooks.push({ repo, installed: false, reason: String(e?.message ?? e) }); }
+  const installPerRepo = (repos, install, sink) => {
+    for (const repo of new Set(repos.filter(Boolean).map((r) => path.resolve(r)))) {
+      try { sink.push({ repo, ...install(repo) }); }
+      catch (e) { sink.push({ repo, installed: false, reason: String(e?.message ?? e) }); }
     }
-  } else receipt.hooks = [{ disabled: true }];
-  if (settings.workHook) {
-    receipt.workHooks = [];
-    for (const repo of [...new Set(repos.filter(Boolean).map((r) => path.resolve(r)))]) {
-      try { receipt.workHooks.push({ repo, ...ensureWorkHook(repo, { skillRoot }) }); }
-      catch (e) { receipt.workHooks.push({ repo, installed: false, reason: String(e?.message ?? e) }); }
-    }
-  } else receipt.workHooks = [{ disabled: true }];
+  };
+  if (settings.historyHook) installPerRepo(repos, (repo) => ensureHistoryHook(repo, { skillRoot }), receipt.hooks);
+  else receipt.hooks = [{ disabled: true }];
+  if (settings.workHook) { receipt.workHooks = []; installPerRepo(repos, (repo) => ensureWorkHook(repo, { skillRoot }), receipt.workHooks); }
+  else receipt.workHooks = [{ disabled: true }];
   return { receipt };
 }
 

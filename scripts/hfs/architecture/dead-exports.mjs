@@ -129,7 +129,7 @@ function rootFiles(graph, config) {
     if (!node.owner || node.tier !== 'app') continue;
     const slot = graph.resolver.slot(node.owner.slot);
     const inside = rel.slice(withoutSlash(node.owner.root).length + 1);
-    if ((slot?.requires ?? []).some(name => name === inside)) roots.add(rel);
+    if ((slot?.requires ?? []).includes(inside)) roots.add(rel);
   }
   for (const [key, owner] of graph.ownerRoots) {
     if (owner.tier !== 'package') continue;

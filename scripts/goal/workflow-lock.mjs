@@ -18,7 +18,8 @@ export function withLock(name, fn, { waitMs = 600_000, pollMs = 1000, env = proc
 /** Native acceptance and direct primitives share the authoritative ledger/workflow lock. */
 export function withWorkflowLock(ctx, { workflowId }, fn) {
   const identity = ctx?.ledger?.ledgerId ?? ctx?.ledger?.path ?? ctx?.repo ?? '';
-  const name = `workflow-checkpoint-${crypto.createHash('sha1').update(`${identity}:${workflowId}`).digest('hex').slice(0, 16)}`;
+  const lockKey = `${identity}:${workflowId}`;
+  const name = `workflow-checkpoint-${crypto.createHash('sha1').update(lockKey).digest('hex').slice(0, 16)}`;
   if (ctx?.[WORKFLOW_LOCK] === name) return fn(ctx);
   const out = withLock(name, () => fn({ ...ctx, [WORKFLOW_LOCK]: name }), { waitMs: ctx?.lockWaitMs, env: ctx?.env ?? process.env });
   if (out?.reason === 'lock-busy') throw Object.assign(new Error(`another checkpoint holds ${name}`), { code: 'workflow-checkpoint-lock-busy' });

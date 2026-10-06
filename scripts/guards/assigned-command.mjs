@@ -8,5 +8,5 @@ export function assignedCommand(c) {
   if (at === 0 && !String(w[0]).startsWith('=')) return c;
   const program = String(w[at] ?? '').replace(/^=/, '');
   // Native programs are lowercased by the parser; a [Type]::Method word keeps its case for the matcher.
-  return { ...c, program: /^\[/.test(program) ? program : program.toLowerCase(), args: w.slice(at + 1) };
+  return { ...c, program: program.startsWith('[') ? program : program.toLowerCase(), args: w.slice(at + 1) };
 }

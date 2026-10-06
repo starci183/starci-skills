@@ -78,13 +78,11 @@ function transportFrameworkEvidence(ts, sourceFile, checker) {
   // The destructured binding elements naming a transport export (or a computed binding, which cannot be
   // proved to exclude one): `const { Controller, [x]: y } = ...`. `rest` elements are always opaque.
   const destructuredBindings = (elements, detail) => elements.flatMap(element => {
-    const selected = element.dotDotDotToken
-      ? null
-      : ts.isIdentifier(element.propertyName ?? element.name)
-        ? (element.propertyName ?? element.name).text
-        : ts.isStringLiteralLike(element.propertyName)
-          ? element.propertyName.text
-          : null;
+    let selected = null;
+    if (!element.dotDotDotToken) {
+      const imported = element.propertyName ?? element.name;
+      if (ts.isIdentifier(imported) || ts.isStringLiteralLike(imported)) selected = imported.text;
+    }
     return selected === null || NEST_COMMON_TRANSPORT.has(selected) ? [{ node: element, detail: selected ?? detail }] : [];
   });
   const namespaceUsages = binding => {
@@ -119,9 +117,8 @@ function transportFrameworkEvidence(ts, sourceFile, checker) {
       && ts.isStringLiteralLike(statement.moduleReference.expression)
       ? statement.moduleReference.expression
       : null;
-    const importSpecifier = ts.isImportDeclaration(statement) && ts.isStringLiteralLike(statement.moduleSpecifier)
-      ? statement.moduleSpecifier
-      : importEqualsSpecifier;
+    let importSpecifier = importEqualsSpecifier;
+    if (ts.isImportDeclaration(statement) && ts.isStringLiteralLike(statement.moduleSpecifier)) importSpecifier = statement.moduleSpecifier;
     if (!importSpecifier) continue;
     const specifier = importSpecifier.text;
     if (TRANSPORT_PACKAGES.test(specifier)) {
@@ -153,9 +150,9 @@ function transportFrameworkEvidence(ts, sourceFile, checker) {
       : null;
     if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && ts.isCallExpression(node.expression)) {
       const specifier = requiredSpecifier(node.expression);
-      const selected = ts.isPropertyAccessExpression(node)
-        ? node.name.text
-        : ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
+      let selected = null;
+      if (ts.isPropertyAccessExpression(node)) selected = node.name.text;
+      else if (ts.isStringLiteralLike(node.argumentExpression)) selected = node.argumentExpression.text;
       if (specifier && TRANSPORT_PACKAGES.test(specifier)) {
         found.push({ node: ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression, specifier, detail: `${selected ?? 'computed member'} from ${specifier}` });
       } else if (specifier === '@nestjs/common' && (selected === null || NEST_COMMON_TRANSPORT.has(selected))) {

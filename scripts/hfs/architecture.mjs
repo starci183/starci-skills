@@ -5,7 +5,6 @@
 // Prints one starci/architecture-check@1 record. Exit 0: ok. Exit 1: violations or errors (a check that
 // cannot run is an error, never a pass). Exit 2: bad arguments.
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
 import {checkArchitecture} from './architecture/index.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
@@ -19,11 +18,11 @@ function parseArchitectureArgs(argv) {
     const value = argv[index];
     if (value === '--base') {
       base = argv[++index];
-      if (!base) throw Error(`--base needs a commit; ${USAGE}`);
-    } else if (value.startsWith('-') || root !== null) throw Error(`unexpected argument ${value}; ${USAGE}`);
+      if (!base) throw new Error(`--base needs a commit; ${USAGE}`);
+    } else if (value.startsWith('-') || root !== null) throw new Error(`unexpected argument ${value}; ${USAGE}`);
     else root = value;
   }
-  if (root === null) throw Error(USAGE);
+  if (root === null) throw new Error(USAGE);
   return {root, base};
 }
 

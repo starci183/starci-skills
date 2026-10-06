@@ -15,7 +15,7 @@ import { refusalLines } from './refusals.mjs';
 const policyCache = new Map();
 const compiledCache = new WeakMap();
 const toSet = (value) => new Set(Array.isArray(value) ? value.map(String) : []);
-const slash = (value) => String(value ?? '').replace(/\\/g, '/');
+const slash = (value) => String(value ?? '').replaceAll(/\\/g, '/');
 const programName = (value) => path.basename(slash(value)).toLowerCase().replace(/\.(?:exe|cmd|bat|ps1)$/, '');
 // These utilities have no state-changing form. Keeping this tiny compiled subset beside the evaluator lets the hook avoid
 // filesystem/YAML work for its hottest path; the complete admission table remains command-policy.yaml and is tested through
@@ -130,6 +130,70 @@ const forbiddenOption = (args, options) => args.some((value) => options.some((op
   return arg === flag || (flag.length === 2 && arg.startsWith(flag));
 }));
 
+const gitPolicyVerdict = ({ role, args, p, policy, text }) => {
+  const { sub, rest } = gitSubOf(args);
+  if (!sub || p.gitRead.has(sub)) return null;
+  if (p.gitListForms.has(sub) && gitListFormRead(sub, rest)) return null;
+  if (sub === 'push') {
+    const targets = pushTargets(rest), mayBackup = p.backupRoles.has(role);
+    if (mayBackup && p.backupRef && !targets.broad && targets.refs.length && targets.refs.every((ref) => p.backupRef.test(ref))) return null;
+  }
+  const denied = policy.git?.deny?.[sub];
+  const fallbackUse = useOf(policy.git?.deny?.merge, 'starci git sync');
+  const use = useOf(denied, fallbackUse);
+  const code = codeOf(denied, 'RIGHTS_GIT_SYNC');
+  return refusal(code, text, `the ${role} role does not run git ${sub} directly because git writes and synchronization go through the starci git verbs`, use);
+};
+
+const npmPolicyVerdict = ({ role, args, p, policy, guard, handle, lockOwner, text }) => {
+  const words = packageWords(args), verb = words[0] ?? '';
+  if (args.length === 1 && ['-v', '--version'].includes(args[0])) return null;
+  if (p.npmRead.has(verb) || (verb === 'config' && p.npmRead.has(`config ${words[1] ?? ''}`)) || (verb === 'pack' && args.includes('--dry-run'))) return null;
+  if (publishScript(words)) {
+    const denied = policy.npm?.deny?.publish, use = useOf(denied, 'starci release cut');
+    return refusal(codeOf(denied, 'RIGHTS_NPM_PUBLISH'), text, `the ${role} role does not publish a package because packages are published once per release from the release commit`, use);
+  }
+  if (suiteScript(words) && !afterDashDash(args).length) {
+    if (p.suiteOps.has(String(guard?.op ?? ''))) return null;
+    const use = useOf(policy.npm?.deny?.[verb === 'run' || verb === 'run-script' ? verb : 'test'], 'starci gate unit --root <app>');
+    return refusal('RIGHTS_SUITE_RUN', text, `the ${role} role does not run a whole suite because full suites run only in the release cut or the requested verify ops`, use);
+  }
+  if (cleanInstall(verb)) {
+    if (args.includes('--dry-run')) return null;
+    let owner = null;
+    try { owner = lockOwner(); } catch { /* an unreadable lock proves no ownership */ }
+    if (owner && !owner.stale && (owner.role === 'release' || (handle && owner.handle === handle))) return null;
+    const denied = policy.npm?.deny?.ci, use = useOf(denied, 'the runtime installs dependencies under the host lock');
+    return refusal(codeOf(denied, 'RIGHTS_NPM_CI_UNLOCKED'), text, 'this clean install rewrites node_modules without the caller holding the host lock', use);
+  }
+  if (suiteScript(words) && afterDashDash(args).length) return null;
+  const denied = policy.npm?.deny?.[verb] ?? policy.npm?.deny?.run;
+  const use = useOf(denied, 'starci gate run --root <app>');
+  return refusal(codeOf(denied, 'RIGHTS_RAW_TOOL'), text, `the ${role} role does not run this package-manager action directly because scripts and dependency changes go through a starci verb`, use);
+};
+
+const nodePolicyVerdict = ({ role, args, p, guard, text }) => {
+  if (hasOption(args, '--eval', '-e', '--print', '-p')) return raw(role, text, 'use the starci verb of the action or check a file with node --check', 'inline Node.js program');
+  if (args.length === 1 && ['--version', '-v'].includes(args[0])) return null;
+  if (hasOption(args, '--check', '-c')) return null;
+  if (args.includes('--test')) {
+    if (nodeWholeSuite(args)) {
+      if (p.suiteOps.has(String(guard?.op ?? ''))) return null;
+      return refusal('RIGHTS_SUITE_RUN', text, `the ${role} role does not run a whole suite because full suites run only in the release cut or the requested verify ops`, 'run one explicit spec file or use the matching starci verify verb');
+    }
+    const targets = nodeOperands(args).filter((value) => value !== 'test');
+    if (p.nodeTest.has(role) && targets.length && targets.every((value) => /\.(?:spec|test)\.[cm]?js$/i.test(value))) return null;
+    return raw(role, text, 'starci gate unit --root <app> (the op gate selects the specs of the change)', 'raw test runner');
+  }
+  return raw(role, text, genericUse, 'Node.js script');
+};
+
+const orcaPolicyVerdict = ({ role, args, p, policy, text }) => {
+  const [group, verb] = args;
+  if (p.orcaGroups.has(group) && p.orcaRead.has(verb)) return null;
+  return raw(role, text, useOf(policy.orca, genericUse), 'Orca mutation');
+};
+
 /**
  * Decide one normalized command for a bound role. Returns null to pass or the shared refusal shape.
  * `lockOwner` is a synchronous reader and is called only for a clean install.
@@ -151,69 +215,10 @@ export function policyVerdict({ role, command, guard = null, handle = null, lock
   if (p.runtime.has(program)) return null;
   if (program === 'node' && nodeEntry(args, p.nodeScripts)) return null;
 
-  if (program === 'git') {
-    const { sub, rest } = gitSubOf(args);
-    if (!sub || p.gitRead.has(sub)) return null;
-    if (p.gitListForms.has(sub) && gitListFormRead(sub, rest)) return null;
-    if (sub === 'push') {
-      const targets = pushTargets(rest), mayBackup = p.backupRoles.has(role);
-      if (mayBackup && p.backupRef && !targets.broad && targets.refs.length && targets.refs.every((ref) => p.backupRef.test(ref))) return null;
-    }
-    const denied = policy.git?.deny?.[sub];
-    const fallbackUse = useOf(policy.git?.deny?.merge, 'starci git sync');
-    const use = useOf(denied, fallbackUse);
-    const code = codeOf(denied, 'RIGHTS_GIT_SYNC');
-    return refusal(code, text, `the ${role} role does not run git ${sub} directly because git writes and synchronization go through the starci git verbs`, use);
-  }
-
-  if (p.npmPrograms.has(program)) {
-    const words = packageWords(args), verb = words[0] ?? '';
-    if (args.length === 1 && ['-v', '--version'].includes(args[0])) return null;
-    if (p.npmRead.has(verb) || (verb === 'config' && p.npmRead.has(`config ${words[1] ?? ''}`)) || (verb === 'pack' && args.includes('--dry-run'))) return null;
-    if (publishScript(words)) {
-      const denied = policy.npm?.deny?.publish, use = useOf(denied, 'starci release cut');
-      return refusal(codeOf(denied, 'RIGHTS_NPM_PUBLISH'), text, `the ${role} role does not publish a package because packages are published once per release from the release commit`, use);
-    }
-    if (suiteScript(words) && !afterDashDash(args).length) {
-      if (p.suiteOps.has(String(guard?.op ?? ''))) return null;
-      const use = useOf(policy.npm?.deny?.[verb === 'run' || verb === 'run-script' ? verb : 'test'], 'starci gate unit --root <app>');
-      return refusal('RIGHTS_SUITE_RUN', text, `the ${role} role does not run a whole suite because full suites run only in the release cut or the requested verify ops`, use);
-    }
-    if (cleanInstall(verb)) {
-      if (args.includes('--dry-run')) return null;
-      let owner = null;
-      try { owner = lockOwner(); } catch { /* an unreadable lock proves no ownership */ }
-      if (owner && !owner.stale && (owner.role === 'release' || (handle && owner.handle === handle))) return null;
-      const denied = policy.npm?.deny?.ci, use = useOf(denied, 'the runtime installs dependencies under the host lock');
-      return refusal(codeOf(denied, 'RIGHTS_NPM_CI_UNLOCKED'), text, 'this clean install rewrites node_modules without the caller holding the host lock', use);
-    }
-    if (suiteScript(words) && afterDashDash(args).length) return null;
-    const denied = policy.npm?.deny?.[verb] ?? policy.npm?.deny?.run;
-    const use = useOf(denied, 'starci gate run --root <app>');
-    return refusal(codeOf(denied, 'RIGHTS_RAW_TOOL'), text, `the ${role} role does not run this package-manager action directly because scripts and dependency changes go through a starci verb`, use);
-  }
-
-  if (program === 'node') {
-    if (hasOption(args, '--eval', '-e', '--print', '-p')) return raw(role, text, 'use the starci verb of the action or check a file with node --check', 'inline Node.js program');
-    if (args.length === 1 && ['--version', '-v'].includes(args[0])) return null;
-    if (hasOption(args, '--check', '-c')) return null;
-    if (args.includes('--test')) {
-      if (nodeWholeSuite(args)) {
-        if (p.suiteOps.has(String(guard?.op ?? ''))) return null;
-        return refusal('RIGHTS_SUITE_RUN', text, `the ${role} role does not run a whole suite because full suites run only in the release cut or the requested verify ops`, 'run one explicit spec file or use the matching starci verify verb');
-      }
-      const targets = nodeOperands(args).filter((value) => value !== 'test');
-      if (p.nodeTest.has(role) && targets.length && targets.every((value) => /\.(?:spec|test)\.[cm]?js$/i.test(value))) return null;
-      return raw(role, text, 'starci gate unit --root <app> (the op gate selects the specs of the change)', 'raw test runner');
-    }
-    return raw(role, text, genericUse, 'Node.js script');
-  }
-
-  if (program === 'orca') {
-    const [group, verb] = args;
-    if (p.orcaGroups.has(group) && p.orcaRead.has(verb)) return null;
-    return raw(role, text, useOf(policy.orca, genericUse), 'Orca mutation');
-  }
+  if (program === 'git') return gitPolicyVerdict({ role, args, p, policy, text });
+  if (p.npmPrograms.has(program)) return npmPolicyVerdict({ role, args, p, policy, guard, handle, lockOwner, text });
+  if (program === 'node') return nodePolicyVerdict({ role, args, p, guard, text });
+  if (program === 'orca') return orcaPolicyVerdict({ role, args, p, policy, text });
 
   const rawTool = policy['raw-tools']?.[program];
   if (rawTool) return raw(role, text, useOf(rawTool, genericUse));

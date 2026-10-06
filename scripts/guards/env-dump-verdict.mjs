@@ -24,10 +24,10 @@ const refusal = (c, how) => ({ code: 'ENV_DUMP', command: [c.program, ...c.args]
   remedy: 'read only the one named, non-secret variable you need (echo $NAME, $env:NAME, printenv NAME); never dump the environment' });
 
 const namesNothing = (args) => !args.some((a) => !a.startsWith('-'));
+const scriptAfter = (args, flag) => { const at = args.findIndex((a) => flag.test(a)); return at >= 0 ? args[at + 1] ?? '' : null; };
 
-/** The ENV_DUMP refusal for one parsed command, or null. */
-export function envDumpVerdict(parsed) {
-  const c = assignedCommand(parsed);
+/** The shell-form dumpers (env/printenv/set/export/declare, PowerShell env: listers, GetEnvironmentVariables). */
+const shellDumpVerdict = (c) => {
   const { program, args, dialect } = c;
   // A relative path such as runtime/env is a file of that name, not the env program (an absolute path still is).
   const relative = /[\\/]/.test(String(c.word ?? '')) && !/^(?:[a-z]:)?[\\/]/i.test(String(c.word));
@@ -40,16 +40,29 @@ export function envDumpVerdict(parsed) {
   }
   if (LISTERS.has(program) && args.some((a) => ENV_DRIVE.test(a))) return refusal(c, `${program} env:`);
   if (GET_ENV.test(program)) return refusal(c, '[Environment]::GetEnvironmentVariables()');
-  const script = (flag) => { const at = args.findIndex((a) => flag.test(a)); return at >= 0 ? args[at + 1] ?? '' : null; };
-  if (NODE_PROGRAMS.has(program)) {
-    const print = script(/^(?:-p|--print)$/);
-    const evalOnly = script(/^(?:-e|--eval)$/);
-    const body = print ?? evalOnly;
-    if (body != null && (NODE_WHOLE.test(body) || (print != null && NODE_PRINT_WHOLE.test(body)))) return refusal(c, 'a node script printing process.env');
-  }
-  if (PYTHON_PROGRAMS.has(program)) {
-    const body = script(/^-c$/);
-    if (body != null && PYTHON_WHOLE.test(body) && PYTHON_OUTPUT.test(body)) return refusal(c, 'a python script printing os.environ');
-  }
+  return null;
+};
+
+/** `node -p|-e` whose script body prints or serializes process.env whole. */
+const nodeDumpHow = (args) => {
+  const print = scriptAfter(args, /^(?:-p|--print)$/);
+  const evalOnly = scriptAfter(args, /^(?:-e|--eval)$/);
+  const body = print ?? evalOnly;
+  return body != null && (NODE_WHOLE.test(body) || (print != null && NODE_PRINT_WHOLE.test(body))) ? 'a node script printing process.env' : null;
+};
+
+/** `python -c` whose script body prints os.environ. */
+const pythonDumpHow = (args) => {
+  const body = scriptAfter(args, /^-c$/);
+  return body != null && PYTHON_WHOLE.test(body) && PYTHON_OUTPUT.test(body) ? 'a python script printing os.environ' : null;
+};
+
+/** The ENV_DUMP refusal for one parsed command, or null. */
+export function envDumpVerdict(parsed) {
+  const c = assignedCommand(parsed);
+  const shell = shellDumpVerdict(c);
+  if (shell) return shell;
+  if (NODE_PROGRAMS.has(c.program)) { const how = nodeDumpHow(c.args); if (how) return refusal(c, how); }
+  if (PYTHON_PROGRAMS.has(c.program)) { const how = pythonDumpHow(c.args); if (how) return refusal(c, how); }
   return null;
 }

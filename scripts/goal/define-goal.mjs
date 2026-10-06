@@ -11,7 +11,7 @@ import { parseJson } from '../lib/json.mjs';
 import { normalizeOwnerRoutingBias } from '../lib/owner-routing-bias.mjs';
 import { currentRole } from '../cli/roles.mjs';
 import { goalTextRefusal } from './goal-text.mjs';
-import { SETTLED_JOB_STATUSES, inspectLedger, openLedger, ledgerFileFor,  createWorkflow, insertGoal, postInbox,   updateWorkflow } from '../../engine/db/ledger.mjs';
+import { SETTLED_JOB_STATUSES, inspectLedger, openLedger, ledgerFileFor,  createWorkflow, insertGoal, postInbox } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { deriveWorkflowDisplayName, normalizeDisplayName } from '../lib/display-names.mjs';
 import { readEnv } from '../lib/env.mjs';
@@ -161,7 +161,7 @@ const samePath = (a, b) => {
   return process.platform === 'win32' ? norm(a).toLowerCase() === norm(b).toLowerCase() : norm(a) === norm(b);
 };
 const assessLineFor = (data, repoPath) => {
-  const entries = Array.isArray(data) ? data : data && typeof data === 'object' ? [data] : [];
+  const entries = Array.isArray(data) ? data : [data].filter(d => d && typeof d === 'object');
   const hit = entries.find(e => typeof e?.repo === 'string' && samePath(e.repo, repoPath));
   if (!hit) return 'not assessed';
   if (!hit.exists) return 'missing';
@@ -216,7 +216,7 @@ if (legParams) {
   const ops = new Set((chain?.legs ?? []).map(l => l.op));
   const unknown = Object.keys(legParams).filter(op => !ops.has(op));
   if (unknown.length) {
-    console.error(`--params names op(s) the derived chain does not hold: ${unknown.join(', ')}${ops.size ? ` (chain: ${[...ops].join(', ')})` : ' (chain: underivable)'}`);
+    console.error('--params names op(s) the derived chain does not hold: ' + unknown.join(', ') + (ops.size ? ` (chain: ${[...ops].join(', ')})` : ' (chain: underivable)'));
     process.exit(2);
   }
   for (const leg of chain.legs) if (legParams[leg.op]) leg.params = legParams[leg.op];
@@ -360,7 +360,7 @@ if (planOnly) {
     return { seq: l.seq, op: legLabel(l), tier, estimateMinutes: COLD_MINUTES[tier], ...(l.params ? { params: l.params } : {}) };
   });
   const totalMinutes = legs.length ? legs.reduce((n, l) => n + l.estimateMinutes, 0) : null;
-  const outOfBandAssumed = [...new Set([...(chain?.assumed ?? []), ...(chain?.legs ?? []).flatMap(l => l.assumed ?? [])].filter(a => /satisfied out-of-band, no chain leg$/.test(a)))];
+  const outOfBandAssumed = [...new Set([...(chain?.assumed ?? []), ...(chain?.legs ?? []).flatMap(l => l.assumed ?? [])].filter(a => String(a).endsWith('satisfied out-of-band, no chain leg')))];
   const out = {
     plan: true,
     mode: revisionBase ? 'revise' : 'define',
@@ -385,11 +385,11 @@ if (planOnly) {
     revisionPreview: preview ?? undefined,
   };
   if (asJson) { console.log(JSON.stringify(out, null, 2)); process.exit(0); }
-  const lines = [`PLAN — ${revisionBase ? `revise ${reviseWorkflowId} to rev ${preview.nextRevision}` : `goal "${out.title}"`}`, ...(out.displayName ? [`  name: ${out.displayName}`] : []), `  identity: ${out.goalIdentity}${revisionBase ? ' (preserved)' : ''}`];
+  const planHead = revisionBase ? `revise ${reviseWorkflowId} to rev ${preview.nextRevision}` : `goal "${out.title}"`;
+  const lines = [`PLAN — ${planHead}`, ...(out.displayName ? [`  name: ${out.displayName}`] : []), `  identity: ${out.goalIdentity}${revisionBase ? ' (preserved)' : ''}`];
   lines.push(project
     ? `  scope: project '${project.project}' → ${project.ownerRepo}`
-    : `  scope: repo ${repo}`);
-  lines.push('STATE (cold scan):');
+    : `  scope: repo ${repo}`, 'STATE (cold scan):');
   for (const r of scanRepos) {
     const name = r.role ? `${r.role}  ${r.path}` : `repo  ${r.path}`;
     lines.push(`  ${name}  — ${assess.available ? assessLineFor(assess.data, r.path) : 'assess unavailable'}`);
@@ -397,34 +397,31 @@ if (planOnly) {
   lines.push('GOAL:', `  ${text}`);
   if (out.impact) {
     const im = out.impact;
-    lines.push(`IMPACT (survey of existing Work): ${im.shape}${im.features.length ? ` of ${im.features.join(', ')}` : ''}`);
-    lines.push(`  reused (done, not re-planned): ${im.reusedDone.length}  open: ${im.open.length}  backend records: ${im.backendRecords.length}  frontend records: ${im.frontendRecords.length}  other features settled (out of scope): ${im.settledOutOfScope}`);
+    lines.push(`IMPACT (survey of existing Work): ${im.shape}${im.features.length ? ' of ' + im.features.join(', ') : ''}`,
+      `  reused (done, not re-planned): ${im.reusedDone.length}  open: ${im.open.length}  backend records: ${im.backendRecords.length}  frontend records: ${im.frontendRecords.length}  other features settled (out of scope): ${im.settledOutOfScope}`);
   }
   lines.push(`OP CHAIN (estimate is cold: easy=${COLD_MINUTES.easy}m medium=${COLD_MINUTES.medium}m hard=${COLD_MINUTES.hard}m):`);
+  const legParamPairs = (params) => Object.entries(params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ');
+  const legLine = (l) => `  ${l.seq}. ${l.op}  ~${l.estimateMinutes}m ${l.tier}${l.params ? '  params ' + legParamPairs(l.params) : ''}`;
   if (legs.length) {
-    for (const l of legs) lines.push(`  ${l.seq}. ${l.op}  ~${l.estimateMinutes}m ${l.tier}${l.params ? `  params ${Object.entries(l.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''}`);
+    for (const l of legs) lines.push(legLine(l));
     lines.push(`  total ~${totalMinutes}m — estimate is cold`);
     for (const a of outOfBandAssumed) lines.push(`  assumed: ${a}`);
   } else {
-    lines.push('  underivable (kernel will derive at boot)');
-    lines.push(`  reason: ${underivable.status} — ${underivable.reason}`);
+    lines.push('  underivable (kernel will derive at boot)', `  reason: ${underivable.status} — ${underivable.reason}`);
   }
   const cfg = out.config;
+  const groupRoute = cfg.kernel?.group?.map(m => `${m.agent}/${m.model ?? '(pool model)'}`).join(' → '),
+    kernelText = cfg.kernel?.group ? `kernel group ${groupRoute}` : `kernel pin agent=${cfg.kernel?.agent ?? '(none)'} model=${cfg.kernel?.model ?? '(none)'}`;
   lines.push(cfg.file
-    ? `CONFIG: ${cfg.file} — ${cfg.kernel?.group
-      ? `kernel group ${cfg.kernel.group.map(m => `${m.agent}/${m.model ?? '(pool model)'}`).join(' → ')}`
-      : `kernel pin agent=${cfg.kernel?.agent ?? '(none)'} model=${cfg.kernel?.model ?? '(none)'}`} effort=${cfg.kernel?.effort ?? '(default)'}`
-      + (cfg.budgets && Object.values(cfg.budgets).some(v => v != null) ? ` budgets=${JSON.stringify(cfg.budgets)}` : '')
-      + (cfg.error ? ` (${cfg.error})` : '')
-    : 'CONFIG: no config.yaml — kernel route falls to --agent flag or route-model');
-  lines.push('WILL WRITE:', ...willWrite.map(w => `  - ${w}`));
+    ? `CONFIG: ${cfg.file} — ${kernelText} effort=${cfg.kernel?.effort ?? '(default)'}${cfg.budgets && Object.values(cfg.budgets).some(v => v != null) ? ` budgets=${JSON.stringify(cfg.budgets)}` : ''}${cfg.error ? ` (${cfg.error})` : ''}`
+    : 'CONFIG: no config.yaml — kernel route falls to --agent flag or route-model', 'WILL WRITE:', ...willWrite.map(w => `  - ${w}`));
   if (revisionBase) {
-    lines.push(`REVISION DIFF: remove [${preview.opChainDiff.removed.join(', ') || '-'}] add [${preview.opChainDiff.added.join(', ') || '-'}] reordered=${preview.opChainDiff.reordered}`);
-    lines.push(`APPROVAL REQUIRED: exact owner reply ok; token ${preview.approval.token}`);
-    lines.push(`KERNEL: ${preview.kernel.live ? 'live' : 'not live'}; resume is forbidden until the approved rev ${preview.nextRevision} transaction lands`);
+    lines.push(`REVISION DIFF: remove [${preview.opChainDiff.removed.join(', ') || '-'}] add [${preview.opChainDiff.added.join(', ') || '-'}] reordered=${preview.opChainDiff.reordered}`,
+      `APPROVAL REQUIRED: exact owner reply ok; token ${preview.approval.token}`,
+      `KERNEL: ${preview.kernel.live ? 'live' : 'not live'}; resume is forbidden until the approved rev ${preview.nextRevision} transaction lands`);
   }
-  lines.push(`ledger: ${out.ledger}`, 're-run without --plan to persist');
-  console.log(lines.join('\n'));
+  console.log(lines.concat(`ledger: ${out.ledger}`, 're-run without --plan to persist').join('\n'));
   process.exit(0);
 }
 
@@ -458,7 +455,8 @@ if (revisionBase) {
   }
   const unsafePreviewJobs = revisionBase.openOperationJobs.filter(job => job.status !== 'queued');
   if (unsafePreviewJobs.length) {
-    console.error(`cannot revise ${reviseWorkflowId}: ${unsafePreviewJobs.length} operation job(s) have possible effects (${unsafePreviewJobs.map(job => `${job.job_id}:${job.status}`).join(', ')}); settle or reconcile them before revision checkpoint`);
+    const unsafeList = unsafePreviewJobs.map(job => `${job.job_id}:${job.status}`).join(', ');
+    console.error(`cannot revise ${reviseWorkflowId}: ${unsafePreviewJobs.length} operation job(s) have possible effects (${unsafeList}); settle or reconcile them before revision checkpoint`);
     process.exit(2);
   }
 
@@ -478,7 +476,8 @@ if (revisionBase) {
       kernel: { live: revisionBase.liveKernel, resumeAllowed: true, action: 'resurvey pending goal-revision inbox; do not spawn a second kernel' },
       ledger: revisionBase.file,
     };
-    console.log(asJson ? JSON.stringify(out, null, 2) : `revised ${reviseWorkflowId} to goal rev ${preview.nextRevision}; ${revisionBase.liveKernel ? 'live kernel may now resurvey' : 'revision awaits the existing workflow kernel'}`);
+    const resumeText = revisionBase.liveKernel ? 'live kernel may now resurvey' : 'revision awaits the existing workflow kernel';
+    console.log(asJson ? JSON.stringify(out, null, 2) : `revised ${reviseWorkflowId} to goal rev ${preview.nextRevision}; ${resumeText}`);
   } catch (error) {
     console.error(error.message);
     process.exitCode = 2;
@@ -499,5 +498,6 @@ try {
     ledger.appendEvent({ workflowId, entityType: 'goal', entityId: workflowId, kind: 'goal-defined', payload: { revision: 0, goalIdentity, legs: chain?.legs?.length ?? null, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}) } });
   });
   const out = { workflowId, displayName, goalRevision: 0, goalIdentity, opChain: chain?.legs?.map(l => l.op) ?? null, queued: true, ledger: ledgerFileFor(repo), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}) };
-  console.log(asJson ? JSON.stringify(out, null, 2) : `queued ${workflowId} "${displayName}" (goal rev 0, ${goalIdentity}${chain ? `, ${chain.legs.length} legs` : ', chain: underivable'})`);
+  const chainText = chain ? `, ${chain.legs.length} legs` : ', chain: underivable';
+  console.log(asJson ? JSON.stringify(out, null, 2) : `queued ${workflowId} "${displayName}" (goal rev 0, ${goalIdentity}${chainText})`);
 } finally { ledger.close(); }

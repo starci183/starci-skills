@@ -20,14 +20,7 @@ const HOOKS_SLOT = 'fe.hooks';
 const HOOK_NAME = /^use[A-Z0-9]/u;
 const SHARED = /\.shared\.[cm]?tsx?$/u;
 
-export function checkHooksAreHooks(input) {
-  const { config, graph } = input;
-  const kit = machineKit(input);
-  const { ts, resolver } = kit;
-  const violations = [];
-  const domains = new Set();
-
-  const tree = treeOf(config.root);
+const sharedFilesOf = (tree, resolver, domains) => {
   const shared = new Map(); // domain root -> [file]
   for (const rel of [...tree.files].sort(byCodeUnit)) {
     const classified = resolver.classifyPath(rel);
@@ -38,6 +31,10 @@ export function checkHooksAreHooks(input) {
     if (!shared.has(classified.root)) shared.set(classified.root, []);
     shared.get(classified.root).push({ rel, base });
   }
+  return shared;
+};
+
+const reportSharedFileViolations = (shared, violations) => {
   for (const [root, list] of shared) {
     const domain = path.posix.basename(root);
     const at = (item, message) => violations.push({ ruleId: RULE, path: item.rel, line: 1, column: 1, domain, message });
@@ -50,8 +47,9 @@ export function checkHooksAreHooks(input) {
       at(item, `${item.rel} is a second shared file of hooks domain ${domain}; a domain has exactly one, ${domain}.shared.ts. Merge the helpers into it.`);
     }
   }
+};
 
-  // Helpers declared in more than one file of one domain.
+const declaredHelpersOf = (graph, resolver, ts) => {
   const declared = new Map(); // domain root -> name -> [{file, node}]
   for (const file of graph.files.values()) {
     if (file.slot !== HOOKS_SLOT) continue;
@@ -74,6 +72,10 @@ export function checkHooksAreHooks(input) {
       }
     }
   }
+  return declared;
+};
+
+const reportDuplicateHelpers = (declared, violations, kit) => {
   for (const [root, byName] of declared) {
     const domain = path.posix.basename(root);
     for (const [name, list] of byName) {
@@ -85,5 +87,16 @@ export function checkHooksAreHooks(input) {
       }
     }
   }
+};
+
+export function checkHooksAreHooks(input) {
+  const { config, graph } = input;
+  const kit = machineKit(input);
+  const { ts, resolver } = kit;
+  const violations = [];
+  const domains = new Set();
+  const shared = sharedFilesOf(treeOf(config.root), resolver, domains);
+  reportSharedFileViolations(shared, violations);
+  reportDuplicateHelpers(declaredHelpersOf(graph, resolver, ts), violations, kit);
   return { violations, coverage: { status: 'checked', domains: domains.size } };
 }

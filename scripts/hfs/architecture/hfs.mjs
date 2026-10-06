@@ -201,8 +201,8 @@ function privateHost(hostname) {
 const DEVELOPMENT_SCRIPTS = ['typecheck', 'lint', 'build', 'test'];
 /** The README command that runs a managed script: `npm test` for test, `npm run <name>` for the others (never a longer script name that starts with it). */
 function scriptCommand(name) {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-  return new RegExp(name === 'test' ? 'npm (?:run test|test)(?![\\w:-])' : `npm run ${escaped}(?![\\w:-])`, 'u');
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+  return new RegExp(name === 'test' ? String.raw`npm (?:run test|test)(?![\w:-])` : String.raw`npm run ${escaped}(?![\w:-])`, 'u');
 }
 
 /** Presentation checks shared by the product HFS gate and this runtime's own standalone gate. */
@@ -258,9 +258,7 @@ export function checkRepoPresentation({ root, runtime = false, tree = treeView(r
     const development = sectionBody('Development');
     const scripts = DEVELOPMENT_SCRIPTS.filter(name => managedScriptNames(profile, edition).has(name));
     const commands = [/npm (?:ci|install)/u, ...scripts.map(scriptCommand)];
-    if (commands.some(command => !command.test(development)))
-      finding('HFS_README_DEVELOPMENT_INCOMPLETE', 'README.md',
-        `Development must show npm install and the managed script commands: ${scripts.map(name => (name === 'test' ? 'npm test' : `npm run ${name}`)).join(', ')}.`);
+    if (commands.some(command => !command.test(development))) finding('HFS_README_DEVELOPMENT_INCOMPLETE', 'README.md', 'Development must show npm install and the managed script commands: ' + scripts.map(name => (name === 'test' ? 'npm test' : `npm run ${name}`)).join(', ') + '.');
   }
   if (tree.hasDir('.starciwork') && headings.some(item => item.name === 'Work') &&
       !/\.starciwork\b/u.test(sectionBody('Work')))

@@ -74,7 +74,7 @@ export function checkI18nKeys({ config, graph, context }) {
     for (const file of [...own, ...shared]) {
       const visit = node => {
         if (ts.isStringLiteralLike(node)) patterns.push(node.text.split('.'));
-        else if (ts.isTemplateExpression(node)) patterns.push([node.head.text, ...node.templateSpans.map(span => span.literal.text)].join('\u0000').split('\u0000').join('*').split('.'));
+        else if (ts.isTemplateExpression(node)) patterns.push([node.head.text, ...node.templateSpans.map(span => span.literal.text)].join('\u0000').replaceAll('\u0000', '*').split('.'));
         ts.forEachChild(node, visit);
       };
       visit(file.sourceFile);
@@ -118,7 +118,8 @@ export function checkI18nKeys({ config, graph, context }) {
       const read = node => {
         if (ts.isCallExpression(node)) {
           const callee = node.expression;
-          const owner = ts.isIdentifier(callee) ? callee : (ts.isPropertyAccessExpression(callee) && READERS.has(callee.name.text) && ts.isIdentifier(callee.expression) ? callee.expression : null);
+          let owner = ts.isIdentifier(callee) ? callee : null;
+          if (ts.isPropertyAccessExpression(callee) && READERS.has(callee.name.text) && ts.isIdentifier(callee.expression)) owner = callee.expression;
           const [first] = node.arguments;
           const declaration = owner ? checker.getSymbolAtLocation(owner)?.valueDeclaration : null;
           if (owner && first !== undefined && namespaces.has(declaration)) {

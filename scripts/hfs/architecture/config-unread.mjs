@@ -15,14 +15,14 @@ export const CONFIG_UNREAD_RULE_IDS = ['HFS_ARCH_CONFIG_UNREAD'];
 
 const RULE = 'HFS_ARCH_CONFIG_UNREAD';
 /** Config file names an earlier machine read and this one never does. */
-const RETIRED_CONFIG_NAMES = ['architecture.json'];
+const RETIRED_CONFIG_NAMES = new Set(['architecture.json']);
 
 export function checkConfigUnread({ config, context }) {
   const violations = [];
   const tree = treeOf(config.root);
   let retired = 0;
   for (const file of [...tree.files].sort(byCodeUnit)) {
-    if (!RETIRED_CONFIG_NAMES.includes(path.posix.basename(file))) continue;
+    if (!RETIRED_CONFIG_NAMES.has(path.posix.basename(file))) continue;
     retired += 1;
     violations.push({ ruleId: RULE, path: file, line: 1, column: 1,
       message: `${file} is a config the architecture machine no longer reads. hfs.json declares the repository; owners, roots, tiers and budgets come from the slot manifest. Delete ${file}.` });

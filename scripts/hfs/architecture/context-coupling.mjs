@@ -19,12 +19,26 @@ const RULE = 'BE_CONTEXT_COUPLING';
 const TYPEORM = 'typeorm';
 const RELATIONS = new Set(['OneToOne', 'OneToMany', 'ManyToOne', 'ManyToMany']);
 // The table identifier after the SQL keyword REFERENCES, optionally schema-qualified and quoted.
-const REFERENCES = /\bREFERENCES\s+(?:"?[A-Za-z0-9_]+"?\s*\.\s*)?"?([A-Za-z0-9_]+)"?/giu;
+const REFERENCES = /\bREFERENCES\s+(?:"?\w+"?\s*\.\s*)?"?(\w+)"?/giu;
+
+const checkCrossContextImports = (graph, model, covered, counts, once) => {
+  for (const edge of graph.edges) {
+    const from = graph.files.get(edge.from);
+    const to = graph.files.get(edge.to);
+    if (!from?.owner || !to?.owner || from.owner.root === to.owner.root) continue;
+    const fromContext = model.contextOfFile(edge.from);
+    const toContext = model.contextOfFile(edge.to);
+    if (!fromContext || !toContext || fromContext === toContext) continue;
+    counts.imports += 1;
+    if (covered.has(`${edge.from}|${to.owner.root}`)) continue;
+    once(`${edge.from}|${edge.to}|${edge.line}`, { path: edge.from, line: edge.line, column: edge.column, message: `${from.owner.root} (context ${fromContext}) imports ${to.owner.root} (context ${toContext}); a context never imports another context's entities, services or SQL. Keep a local copy fed by its events, or read a projection.`, context: fromContext, targetContext: toContext });
+  }
+};
 
 export function checkContextCoupling(input) {
   const { graph } = input;
   const kit = machineKit(input);
-  const { ts, resolver } = kit;
+  const { ts } = kit;
   const model = contextModelOf(kit, graph);
   const { tables } = entitiesOf(kit, graph);
   const violations = [];
@@ -41,24 +55,23 @@ export function checkContextCoupling(input) {
     const checker = kit.checkerOf(file.sourceFile);
     if (base.endsWith('.entity.ts')) {
       kit.walk(file.sourceFile, node => {
-        if (!ts.isDecorator(node) || !ts.isCallExpression(node.expression)) return true;
+        if (!ts.isDecorator(node) || !ts.isCallExpression(node.expression)) return;
         const binding = kit.importBinding(checker, node.expression.expression);
-        if (binding?.module !== TYPEORM || !RELATIONS.has(binding.name)) return true;
+        if (binding?.module !== TYPEORM || !RELATIONS.has(binding.name)) return;
         counts.relations += 1;
         const argument = node.expression.arguments[0];
         const target = argument && (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) && !ts.isBlock(argument.body) ? model.unparen(argument.body) : null;
-        if (!target || !(ts.isIdentifier(target) || ts.isPropertyAccessExpression(target))) return true;
+        if (!target || !(ts.isIdentifier(target) || ts.isPropertyAccessExpression(target))) return;
         const home = kit.declarationsOf(checker, ts.isPropertyAccessExpression(target) ? target.name : target).map(kit.ownerOfDeclaration).find(Boolean);
         const targetContext = home ? model.contextOfCapability(home.root) : null;
-        if (!home || !targetContext || targetContext === ownContext) return true;
+        if (!home || !targetContext || targetContext === ownContext) return;
         covered.add(`${file.rel}|${home.root}`);
         once(`${file.rel}|${node.getStart()}`, { ...kit.at(file.rel, file.sourceFile, node), message: `A ${binding.name} relation in ${file.owner.root} (context ${ownContext}) targets an entity of ${home.root} (context ${targetContext}); a relation never crosses a context. Keep the other context's id as a plain column and fill a local copy or a projection from its events.`, context: ownContext, targetContext });
-        return true;
       });
     }
     if (file.rel.slice(file.owner.root.length + 1).startsWith('persistence/migrations/')) {
       kit.walk(file.sourceFile, node => {
-        if (!(ts.isStringLiteralLike(node) || ts.isTemplateExpression(node))) return true;
+        if (!(ts.isStringLiteralLike(node) || ts.isTemplateExpression(node))) return;
         const text = ts.isTemplateExpression(node) ? node.head.text + node.templateSpans.map(span => ` ${span.literal.text}`).join('') : node.text;
         for (const match of text.matchAll(REFERENCES)) {
           counts.foreignKeys += 1;
@@ -67,22 +80,10 @@ export function checkContextCoupling(input) {
           if (!entity || !targetContext || targetContext === ownContext) continue;
           once(`${file.rel}|${node.getStart()}|${match[1]}`, { ...kit.at(file.rel, file.sourceFile, node), message: `A foreign key in ${file.rel} references table ${entity.table} of ${entity.owner} (context ${targetContext}), but this migration belongs to context ${ownContext}; a foreign key never crosses a context. Keep the id as a plain column and validate it through the other context's API or a local copy fed by its events.`, context: ownContext, targetContext, table: entity.table });
         }
-        return true;
       });
     }
   }
 
-  for (const edge of graph.edges) {
-    const from = graph.files.get(edge.from);
-    const to = graph.files.get(edge.to);
-    if (!from?.owner || !to?.owner || from.owner.root === to.owner.root) continue;
-    const fromContext = model.contextOfFile(edge.from);
-    const toContext = model.contextOfFile(edge.to);
-    if (!fromContext || !toContext || fromContext === toContext) continue;
-    counts.imports += 1;
-    if (covered.has(`${edge.from}|${to.owner.root}`)) continue;
-    once(`${edge.from}|${edge.to}|${edge.line}`, { path: edge.from, line: edge.line, column: edge.column, message: `${from.owner.root} (context ${fromContext}) imports ${to.owner.root} (context ${toContext}); a context never imports another context's entities, services or SQL. Keep a local copy fed by its events, or read a projection.`, context: fromContext, targetContext: toContext });
-  }
-  void resolver;
+  checkCrossContextImports(graph, model, covered, counts, once);
   return { violations, coverage: { status: 'checked', ...counts } };
 }

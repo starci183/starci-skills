@@ -15,6 +15,34 @@ export const INJECTION_TOKEN_EXPORTED_RULE_IDS = ['BE_RAW_INJECT'];
 
 const RULE = 'BE_RAW_INJECT';
 
+const exportedVariableHasName = (ts, kit, statement, name) => {
+  if (!ts.isVariableStatement(statement) || !kit.isExported(statement)) return false;
+  return statement.declarationList.declarations.some(declaration =>
+    (ts.isIdentifier(declaration.name) && declaration.name.text === name)
+    || (ts.isObjectBindingPattern(declaration.name) && declaration.name.elements.some(element => ts.isIdentifier(element.name) && element.name.text === name)));
+};
+
+const exportedDeclarationHasName = (ts, statement, name) => ts.isExportDeclaration(statement) && statement.exportClause
+  && ts.isNamedExports(statement.exportClause) && statement.exportClause.elements.some(element => element.name.text === name);
+
+const exportsName = (ts, kit, file, name) => Boolean(file && file.sourceFile.statements.some(statement =>
+  exportedVariableHasName(ts, kit, statement, name) || exportedDeclarationHasName(ts, statement, name)));
+
+const indexOf = (graph, file) => (file?.owner ? graph.files.get(`${file.owner.root}/index.ts`) : null);
+
+const injectionViolationFor = (graph, kit, ts, dependency) => {
+  const decoratorFile = graph.files.get(kit.graphPath(dependency.decoratorDeclaration));
+  if (dependency.kind === 'unresolved') {
+    return decoratorFile ? { ruleId: RULE, path: decoratorFile.rel, ...kit.at(decoratorFile.rel, decoratorFile.sourceFile, dependency.injectorCall), decorator: dependency.decorator,
+      message: `${dependency.decorator}() cannot be followed to its token (${dependency.reason}); name an exported \`unique symbol\` const so a unit spec can provide it.` } : null;
+  }
+  const tokenFile = dependency.declaration ? graph.files.get(kit.graphPath(dependency.declaration)) : null;
+  const homes = [decoratorFile, tokenFile && path.posix.basename(tokenFile.rel).endsWith('.decorators.ts') ? tokenFile : null, indexOf(graph, decoratorFile), indexOf(graph, tokenFile)];
+  if (!decoratorFile || homes.some(home => exportsName(ts, kit, home, dependency.name))) return null;
+  return { ruleId: RULE, path: decoratorFile.rel, ...kit.at(decoratorFile.rel, decoratorFile.sourceFile, dependency.injectorCall), decorator: dependency.decorator, token: dependency.name,
+    message: `${dependency.decorator}() injects ${dependency.name}, which is not exported from ${path.posix.basename(decoratorFile.rel)} nor from the capability index.ts; export the token so a unit spec can provide it (\`{ provide: ${dependency.name}, useValue: double }\`).` };
+};
+
 export function checkInjectionTokenExported(input) {
   const { graph } = input;
   const kit = machineKit(input);
@@ -23,39 +51,13 @@ export function checkInjectionTokenExported(input) {
   const seen = new Set();
   let decorators = 0;
 
-  const exportsName = (file, name) => {
-    if (!file) return false;
-    for (const statement of file.sourceFile.statements) {
-      if (ts.isVariableStatement(statement) && kit.isExported(statement)) {
-        for (const declaration of statement.declarationList.declarations) {
-          if (ts.isIdentifier(declaration.name) && declaration.name.text === name) return true;
-          if (ts.isObjectBindingPattern(declaration.name) && declaration.name.elements.some(element => ts.isIdentifier(element.name) && element.name.text === name)) return true;
-        }
-      }
-      if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)
-        && statement.exportClause.elements.some(element => element.name.text === name)) return true;
-    }
-    return false;
-  };
-  const indexOf = file => (file?.owner ? graph.files.get(`${file.owner.root}/index.ts`) : null);
-
   for (const { file, declaration } of serviceClasses(kit, graph)) {
     for (const dependency of constructorDependencies(kit, file, declaration)) {
       if (dependency.external || !dependency.decoratorDeclaration || !dependency.injectorCall || seen.has(dependency.injectorCall)) continue;
       seen.add(dependency.injectorCall);
       decorators += 1;
-      const decoratorFile = graph.files.get(kit.graphPath(dependency.decoratorDeclaration));
-      if (dependency.kind === 'unresolved') {
-        if (decoratorFile) violations.push({ ruleId: RULE, path: decoratorFile.rel, ...kit.at(decoratorFile.rel, decoratorFile.sourceFile, dependency.injectorCall), decorator: dependency.decorator,
-          message: `${dependency.decorator}() cannot be followed to its token (${dependency.reason}); name an exported \`unique symbol\` const so a unit spec can provide it.` });
-        continue;
-      }
-      const tokenFile = dependency.declaration ? graph.files.get(kit.graphPath(dependency.declaration)) : null;
-      const homes = [decoratorFile, tokenFile && path.posix.basename(tokenFile.rel).endsWith('.decorators.ts') ? tokenFile : null, indexOf(decoratorFile), indexOf(tokenFile)];
-      if (homes.some(home => exportsName(home, dependency.name))) continue;
-      if (!decoratorFile) continue;
-      violations.push({ ruleId: RULE, path: decoratorFile.rel, ...kit.at(decoratorFile.rel, decoratorFile.sourceFile, dependency.injectorCall), decorator: dependency.decorator, token: dependency.name,
-        message: `${dependency.decorator}() injects ${dependency.name}, which is not exported from ${path.posix.basename(decoratorFile.rel)} nor from the capability index.ts; export the token so a unit spec can provide it (\`{ provide: ${dependency.name}, useValue: double }\`).` });
+      const violation = injectionViolationFor(graph, kit, ts, dependency);
+      if (violation) violations.push(violation);
     }
   }
   return { violations, coverage: { status: 'checked', decorators, files: graph.files.size } };

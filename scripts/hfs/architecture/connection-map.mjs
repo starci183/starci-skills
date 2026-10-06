@@ -34,6 +34,12 @@ const SOURCE_CALLS = new Set(['getDataSourceToken', 'InjectDataSource']);
 const ENV_KEY = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/u;
 const INJECTOR_NAME = /^Inject[A-Za-z0-9]*EntityManager$/u;
 
+const exportedInjectorName = (ts, kit, node) => {
+  if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && ts.isVariableStatement(node.parent?.parent) && kit.isExported(node.parent.parent)) return node.name.text;
+  if (ts.isFunctionDeclaration(node) && kit.isExported(node) && node.name) return node.name.text;
+  return null;
+};
+
 function readEnvFiles(target) {
   const merged = new Map();
   const readFile = file => {
@@ -42,7 +48,7 @@ function readEnvFiles(target) {
     for (const raw of text.split(/\r?\n/u)) {
       const line = raw.trim();
       if (!line || line.startsWith('#')) continue;
-      const match = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/u.exec(line);
+      const match = /^(?:export\s+)?([A-Za-z_]\w*)\s*=\s*(.*)$/u.exec(line);
       if (!match) continue;
       let value = match[2].trim();
       if (/^(['"]).*\1$/u.test(value)) value = value.slice(1, -1);
@@ -105,7 +111,7 @@ export function checkConnectionMap(input) {
       if (key === null) return true;
       if (key === `${connection.envPrefix}_SCHEMA`) readsSchema = true;
       const own = key.startsWith(`${connection.envPrefix}_`);
-      const foreign = declared.find(other => other !== connection && key.startsWith(`${other.envPrefix}_`));
+      const foreign = declared.some(other => other !== connection && key.startsWith(`${other.envPrefix}_`));
       if (!own || foreign) {
         report(configRel, `${configRel} reads ${key}; the config of connection ${connection.name} reads only ${connection.envPrefix}_* keys.`, { ...kit.at(configRel, configFile.sourceFile, node), connection: connection.name });
       }
@@ -132,7 +138,8 @@ export function checkConnectionMap(input) {
           const value = kit.stringValue(checker, node.arguments[0]);
           const home = value === null ? null : decoratorsFile(value);
           if (value === null || !byName.has(value)) {
-            report(file.rel, `${binding.name}() names ${value === null ? 'a connection that cannot be resolved to a constant' : `connection ${value}, which hfs.json does not declare`}; only the declared connections have an entity manager token.`, kit.at(file.rel, file.sourceFile, node));
+            const target = value === null ? 'a connection that cannot be resolved to a constant' : `connection ${value}, which hfs.json does not declare`;
+            report(file.rel, `${binding.name}() names ${target}; only the declared connections have an entity manager token.`, kit.at(file.rel, file.sourceFile, node));
           } else if (file.rel !== home) {
             report(file.rel, `${binding.name}(${value}) belongs in ${home} only; inject the shared manager with Inject${pascal(value)}EntityManager() instead of a second path to connection ${value}.`, { ...kit.at(file.rel, file.sourceFile, node), connection: value });
           } else {
@@ -144,8 +151,7 @@ export function checkConnectionMap(input) {
           if (!allowed) report(file.rel, `${binding.name}() reaches the DataSource outside platform/database and the cli; inject the shared EntityManager of the connection instead.`, kit.at(file.rel, file.sourceFile, node));
         }
       }
-      const exportedName = (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && ts.isVariableStatement(node.parent?.parent) && kit.isExported(node.parent.parent)) ? node.name.text
-        : (ts.isFunctionDeclaration(node) && kit.isExported(node) && node.name ? node.name.text : null);
+      const exportedName = exportedInjectorName(ts, kit, node);
       if (exportedName && INJECTOR_NAME.test(exportedName)) {
         const home = [...byName.keys()].find(name => `Inject${pascal(name)}EntityManager` === exportedName);
         if (!home || file.rel !== decoratorsFile(home)) {
@@ -164,9 +170,9 @@ export function checkConnectionMap(input) {
     const checker = kit.checkerOf(root.sourceFile);
     const passed = new Map();
     kit.walk(root.sourceFile, node => {
-      if (!(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register')) return true;
+      if (!(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register')) return;
       const owner = kit.declarationsOf(checker, node.expression.expression).map(kit.ownerOfDeclaration).find(Boolean);
-      if (!owner || owner.tier !== 'platform' || owner.name !== 'database') return true;
+      if (owner?.tier !== 'platform' || owner.name !== 'database') return;
       registrations += 1;
       for (const argument of node.arguments) {
         kit.walk(argument, inner => {
@@ -180,7 +186,6 @@ export function checkConnectionMap(input) {
           return false;
         });
       }
-      return true;
     });
   }
 
@@ -212,7 +217,8 @@ export function checkConnectionMap(input) {
       // Two contexts may share one database only as distinct, named schemas; a context that is its own database shares it with nobody.
       const clash = sharing.find(other => schema === null || other.schema === null || other.schema === schema);
       if (clash) {
-        report(rel, `Connections ${clash.name} and ${connection.name} resolve to the same database (${host}:${port}/${database}${schema !== null && clash.schema === schema ? `, schema ${schema || '(none)'}` : ''}) in stack ${env}; contexts share a database only as distinct schemas (isolation schema, a different ${connection.envPrefix}_SCHEMA), otherwise one physical database is one connection.`, { connection: connection.name, env });
+        const schemaDetail = schema !== null && clash.schema === schema ? `, schema ${schema || '(none)'}` : '';
+        report(rel, `Connections ${clash.name} and ${connection.name} resolve to the same database (${host}:${port}/${database}${schemaDetail}) in stack ${env}; contexts share a database only as distinct schemas (isolation schema, a different ${connection.envPrefix}_SCHEMA), otherwise one physical database is one connection.`, { connection: connection.name, env });
       }
       sharing.push({ name: connection.name, schema });
       seen.set(triple, sharing);

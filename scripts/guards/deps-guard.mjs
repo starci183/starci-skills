@@ -98,6 +98,17 @@ export function linkedNodeModulesOf(program, argv, cwd = process.cwd()) {
   } catch { return null; }
 }
 
+/** The install kind for a package manager's subcommand (npm/pnpm/yarn membership tables). */
+const installKindOf = (program, sub) => {
+  if (program === 'npm') {
+    if (NPM_CLEAN_INSTALL.has(sub)) return 'clean-install';
+    return sub && NPM_INSTALL.has(sub) ? 'install' : 'pass';
+  }
+  if (program === 'pnpm') return sub && PNPM_INSTALL.has(sub) ? 'install' : 'pass';
+  // yarn with no subcommand installs; any other word runs a script.
+  return !sub || YARN_INSTALL.has(sub) ? 'install' : 'pass';
+};
+
 /** classifyInstall(program, argv) -> {kind: 'pass'|'install'|'clean-install', sub}: whether the command rewrites node_modules. */
 export function classifyInstall(program, argv) {
   if (!PACKAGE_MANAGERS.includes(program)) return { kind: 'pass', sub: null };
@@ -114,13 +125,7 @@ export function classifyInstall(program, argv) {
   const global = args.some((a) => a === '-g' || a === '--global' || a === '--location=global') || (program === 'yarn' && sub === 'global');
   const dry = args.some((a) => a === '--dry-run' || a === '--lockfile-only');
   if (global || dry) return { kind: 'pass', sub };
-  if (program === 'npm') {
-    if (NPM_CLEAN_INSTALL.has(sub)) return { kind: 'clean-install', sub };
-    return { kind: sub && NPM_INSTALL.has(sub) ? 'install' : 'pass', sub };
-  }
-  if (program === 'pnpm') return { kind: sub && PNPM_INSTALL.has(sub) ? 'install' : 'pass', sub };
-  // yarn with no subcommand installs; any other word runs a script.
-  return { kind: !sub || YARN_INSTALL.has(sub) ? 'install' : 'pass', sub };
+  return { kind: installKindOf(program, sub), sub };
 }
 
 /** Jobs of OTHER workflows of this ledger that hold a lease right now (read-only). */

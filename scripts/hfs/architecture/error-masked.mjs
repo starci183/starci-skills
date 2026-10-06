@@ -15,7 +15,7 @@ export function checkErrorMasked(input) {
   const kit = machineKit(input);
   const { ts } = kit;
   const violations = [];
-  const inErrors = (checker, node) => kit.declarationsOf(checker, node).map(kit.ownerOfDeclaration).some(owner => owner && owner.tier === 'platform' && owner.name === 'errors');
+  const inErrors = (checker, node) => kit.declarationsOf(checker, node).map(kit.ownerOfDeclaration).some(owner => owner?.tier === 'platform' && owner.name === 'errors');
   let apps = 0;
   for (const app of config.apps.filter(item => item.kind === 'api')) {
     const root = kit.appRoot(app.name);
@@ -39,21 +39,19 @@ export function checkErrorMasked(input) {
     const checker = kit.checkerOf(file.sourceFile);
     kit.walk(file.sourceFile, node => {
       if (!(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && ['forRoot', 'forRootAsync'].includes(node.expression.name.text)
-        && kit.isImportOf(checker, node.expression.expression, 'GraphQLModule', '@nestjs/graphql'))) return true;
+        && kit.isImportOf(checker, node.expression.expression, 'GraphQLModule', '@nestjs/graphql'))) return;
       graphql += 1;
       let masked = false;
       for (const argument of node.arguments) {
         kit.walk(argument, inner => {
           if ((ts.isPropertyAssignment(inner) || ts.isShorthandPropertyAssignment(inner)) && kit.propertyNameText(inner.name) === 'formatError'
             && inErrors(checker, kit.valueOfProperty(inner))) masked = true;
-          return true;
         });
       }
       if (!masked) {
         violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node),
           message: `GraphQLModule.${node.expression.name.text} must pass the \`formatError\` exported by platform/errors; without it a resolver error reaches the client with its internal message.` });
       }
-      return true;
     });
   }
   return { violations, coverage: { status: 'checked', apps, graphqlRegistrations: graphql } };

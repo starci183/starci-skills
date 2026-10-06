@@ -15,7 +15,13 @@ const camel = name => { const text = pascal(name); return text[0].toLowerCase() 
  */
 export function collectRegistrations({ kit, graph, persistenceOf }) {
   const { ts } = kit;
-  const unparen = node => { let current = node; while (current && (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression?.(current) || ts.isNonNullExpression(current))) current = current.expression; return current; };
+  const unparen = node => {
+    let current = node;
+    while (current && (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression?.(current) || ts.isNonNullExpression(current))) {
+      current = current.expression;
+    }
+    return current;
+  };
   const returned = declaration => {
     const fn = ts.isVariableDeclaration(declaration) && declaration.initializer ? unparen(declaration.initializer) : declaration;
     if (!(ts.isArrowFunction(fn) || ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn) || ts.isMethodDeclaration(fn)) || !fn.body) return null;
@@ -81,13 +87,16 @@ export function collectRegistrations({ kit, graph, persistenceOf }) {
   const arraysIn = (checker, expression, out, depth) => {
     const node = unparen(expression);
     if (!node || depth > 6) return;
-    if (ts.isArrayLiteralExpression(node)) { for (const element of node.elements) arraysIn(checker, ts.isSpreadElement(element) ? element.expression : element, out, depth + 1); return; }
+    if (ts.isArrayLiteralExpression(node)) {
+      for (const element of node.elements) { arraysIn(checker, ts.isSpreadElement(element) ? element.expression : element, out, depth + 1); }
+      return;
+    }
     if (!ts.isIdentifier(node) && !ts.isPropertyAccessExpression(node)) return;
     const declaration = kit.declarationsOf(checker, ts.isPropertyAccessExpression(node) ? node.name : node)[0];
     if (!declaration || !ts.isVariableDeclaration(declaration) || !ts.isIdentifier(declaration.name)) return;
     const rel = kit.graphPath(declaration);
     const owner = rel ? persistenceOf(rel) : null;
-    if (owner && owner.below.length === 1 && owner.below[0] === 'connection.ts' && [`${camel(owner.capability)}Entities`, `${camel(owner.capability)}Migrations`].includes(declaration.name.text)) {
+    if (owner?.below.length === 1 && owner.below[0] === 'connection.ts' && [`${camel(owner.capability)}Entities`, `${camel(owner.capability)}Migrations`].includes(declaration.name.text)) {
       out.push({ key: path.posix.dirname(owner.root), name: owner.capability });
     } else if (declaration.initializer) arraysIn(kit.checkerOf(declaration.getSourceFile()), declaration.initializer, out, depth + 1);
   };
@@ -97,23 +106,22 @@ export function collectRegistrations({ kit, graph, persistenceOf }) {
   for (const file of graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
     kit.walk(file.sourceFile, node => {
-      if (!ts.isObjectLiteralExpression(node)) return true;
+      if (!ts.isObjectLiteralExpression(node)) return;
       const arrays = [];
       for (const key of ['entities', 'migrations']) {
         const property = kit.propertyOf(node, key);
         if (property) arraysIn(checker, kit.valueOfProperty(property), arrays, 0);
       }
-      if (!arrays.length) return true;
+      if (!arrays.length) return;
       registrations += 1;
       const connection = nameOfLiteral(checker, node, 0);
       all.push({ file, node, connection });
-      if (connection === null) return true;
+      if (connection === null) return;
       for (const { key, name } of new Map(arrays.map(item => [item.key, item])).values()) {
         if (!registered.has(key)) registered.set(key, { name, connections: new Map() });
         const sites = registered.get(key).connections;
         if (!sites.has(connection)) sites.set(connection, { file, node });
       }
-      return true;
     });
   }
   return { registered, registrations, all };
@@ -167,7 +175,13 @@ export function contextModelOf(kit, graph) {
     if (!file?.owner || !CONTEXT_TIERS.has(file.tier)) return null;
     return contextOfCapability(file.owner.root);
   };
-  const unparen = node => { let current = node; while (current && (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isNonNullExpression(current))) current = current.expression; return current; };
+  const unparen = node => {
+    let current = node;
+    while (current && (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isNonNullExpression(current))) {
+      current = current.expression;
+    }
+    return current;
+  };
   /** The declared connection named by a decorator whose callee is declared in src/modules/platform/database/<conn>.decorators.ts, else null. */
   const connectionOfDecorators = (checker, declaration) => {
     for (const decorator of kit.decorators(declaration)) {
@@ -187,7 +201,9 @@ export function contextModelOf(kit, graph) {
   const connectionOfManager = (checker, expression, depth = 0) => {
     const node = unparen(expression);
     if (!node || depth > 4) return null;
-    const target = ts.isPropertyAccessExpression(node) ? node.name : (ts.isIdentifier(node) ? node : null);
+    let target = null;
+    if (ts.isPropertyAccessExpression(node)) target = node.name;
+    else if (ts.isIdentifier(node)) target = node;
     if (!target) return null;
     const declaration = kit.declarationsOf(checker, target)[0];
     if (!declaration) return null;
@@ -217,13 +233,13 @@ export function connectionsComposedBy(kit, app) {
   const checker = kit.checkerOf(root.sourceFile);
   const items = [];
   kit.walk(root.sourceFile, node => {
-    if (!(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register')) return true;
+    if (!(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register')) return;
     const owner = kit.declarationsOf(checker, node.expression.expression).map(kit.ownerOfDeclaration).find(Boolean);
-    if (!owner || owner.tier !== 'platform' || owner.name !== 'database') return true;
+    if (owner?.tier !== 'platform' || owner.name !== 'database') return;
     for (const argument of node.arguments) {
       kit.walk(argument, inner => {
-        if (ts.isPropertyAssignment(inner.parent ?? {}) && inner.parent.name === inner) return true;
-        if (ts.isPropertyAccessExpression(inner.parent ?? {}) && inner.parent.name === inner) return true;
+        const parent = inner.parent;
+        if (parent?.name === inner && (ts.isPropertyAssignment(parent) || ts.isPropertyAccessExpression(parent))) return true;
         if (!(ts.isIdentifier(inner) || ts.isStringLiteralLike(inner) || ts.isPropertyAccessExpression(inner))) return true;
         const value = kit.stringValue(checker, inner);
         if (value === null || !declared.has(value)) return true;
@@ -231,7 +247,6 @@ export function connectionsComposedBy(kit, app) {
         return false;
       });
     }
-    return true;
   });
   return { root, items };
 }

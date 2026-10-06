@@ -122,7 +122,7 @@ function checkGrammar(config, context) {
   const installs = [...new Map(consumers.map(consumer => [consumer.packageRoot, consumer])).values()];
   const packageRoot = installs[0]?.packageRoot ?? local?.root ?? path.join(installRoot, 'node_modules', ...grammar.package.split('/'));
   const manifestFile = path.join(packageRoot, 'package.json');
-  const manifest = readJson(manifestFile);
+  readJson(manifestFile);
   const ownerOf = (fileName) => consumers.filter(consumer => isInside(consumer.root, fileName))
     .sort((a, b) => b.root.length - a.root.length)[0] ?? null;
   const contractProblems = [];
@@ -265,7 +265,7 @@ function routePageRoots(context, sourceFile, featureRoots) {
 function routingTermination(ts, statement, navigation) {
   if (ts.isThrowStatement(statement)) return true;
   if (ts.isBlock(statement)) return statement.statements.length > 0 && routingTermination(ts, statement.statements.at(-1), navigation);
-  const expression = ts.isExpressionStatement(statement) ? statement.expression : (ts.isReturnStatement(statement) ? statement.expression : null);
+  const expression = ts.isExpressionStatement(statement) ? statement.expression : (ts.isReturnStatement(statement) && statement.expression) || null;
   return Boolean(expression && ts.isCallExpression(expression) && ts.isIdentifier(expression.expression)
     && ['redirect', 'notFound'].includes(navigation.get(expression.expression.text)));
 }
@@ -326,7 +326,7 @@ function checkRoute(config, context, sourceFile, roots) {
 }
 
 function roleEntry(relative) {
-  const parts = String(relative).replace(/\\/g, '/').split('/');
+  const parts = String(relative).replaceAll('\\', '/').split('/');
   return parts.length === 1 && /^index\.[cm]?[jt]sx?$/i.test(parts[0]);
 }
 
@@ -364,11 +364,9 @@ function checkFrontendSourceLayout(config, sourceFile, roots) {
   if (located.role === 'components') valid = COMPONENT_TIERS.has(first) || roleEntry(located.relative);
   if (located.role === 'hooks') valid = located.relative.includes('/') || roleEntry(located.relative);
   return valid ? [] : [{ ruleId: 'FE_SOURCE_LAYOUT_INVALID', path: relativePath(config.root, sourceFile.fileName), line: 1, column: 1,
-    message: located.role === 'features'
-      ? 'Frontend features contain only pages, layouts and overlays plus an optional root public entry.'
-      : located.role === 'components'
-        ? 'Frontend components contain only blocks, composites, branches and leaves plus an optional root public entry.'
-        : 'Every authored custom hook is grouped below a domain folder under hooks; only the root public entry may sit directly under hooks.' }];
+    message: ({ features: 'Frontend features contain only pages, layouts and overlays plus an optional root public entry.',
+      components: 'Frontend components contain only blocks, composites, branches and leaves plus an optional root public entry.',
+      hooks: 'Every authored custom hook is grouped below a domain folder under hooks; only the root public entry may sit directly under hooks.' })[located.role] }];
 }
 
 function declarationName(ts, declaration) {
@@ -638,8 +636,7 @@ function checkWorldRenderBoundaries(config, context, roots) {
     }
     if (ts.isCallExpression(expression)) {
       const selected = unwrapExpression(ts, expression.expression);
-      const name = ts.isIdentifier(selected) ? selected.text
-        : ts.isPropertyAccessExpression(selected) ? selected.name.text : null;
+      const name = (ts.isIdentifier(selected) && selected.text) || (ts.isPropertyAccessExpression(selected) && selected.name.text) || null;
       if (['forwardRef', 'memo'].includes(name) && expression.arguments[0]) return expressionFunctions(expression.arguments[0], checker, seen);
     }
     const symbol = normalizedSymbolValue(ts, checker, selectedSymbol(ts, checker, expression));
@@ -683,8 +680,8 @@ function checkWorldRenderBoundaries(config, context, roots) {
     const expression = unwrapExpression(ts, input);
     if (ts.isIdentifier(expression) && symbolIsWorld(checker.getSymbolAtLocation(expression), sourceFile)) return true;
     if ((ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression))) {
-      const property = ts.isPropertyAccessExpression(expression) ? expression.name.text
-        : ts.isStringLiteralLike(expression.argumentExpression) ? expression.argumentExpression.text : null;
+      let property = ts.isPropertyAccessExpression(expression) ? expression.name.text : null;
+      if (property === null && ts.isStringLiteralLike(expression.argumentExpression)) property = expression.argumentExpression.text;
       const namespace = checker.getSymbolAtLocation(expression.expression);
       if (intrinsicUiHookSymbol(selectedSymbol(ts, checker, expression), checker)) return false;
       if (namespaceIsWorld(namespace, sourceFile, property)) return true;
@@ -732,8 +729,8 @@ function checkWorldRenderBoundaries(config, context, roots) {
     }
     if (ts.isCallExpression(expression) && (ts.isPropertyAccessExpression(expression.expression)
       || ts.isElementAccessExpression(expression.expression))) {
-      const name = ts.isPropertyAccessExpression(expression.expression) ? expression.expression.name.text
-        : ts.isStringLiteralLike(expression.expression.argumentExpression) ? expression.expression.argumentExpression.text : null;
+      let name = ts.isPropertyAccessExpression(expression.expression) ? expression.expression.name.text : null;
+      if (name === null && ts.isStringLiteralLike(expression.expression.argumentExpression)) name = expression.expression.argumentExpression.text;
       if (name === 'map' && expression.arguments[0]) return expressionFunctions(expression.arguments[0], checker)
         .some(fn => functionHasRender(fn, checker, seen));
     }
@@ -848,8 +845,8 @@ function checkWorldRenderBoundaries(config, context, roots) {
         return hasBoundary;
       }
       if ((ts.isPropertyAccessExpression(expression.expression) || ts.isElementAccessExpression(expression.expression))) {
-        const name = ts.isPropertyAccessExpression(expression.expression) ? expression.expression.name.text
-          : ts.isStringLiteralLike(expression.expression.argumentExpression) ? expression.expression.argumentExpression.text : null;
+        let name = ts.isPropertyAccessExpression(expression.expression) ? expression.expression.name.text : null;
+        if (name === null && ts.isStringLiteralLike(expression.expression.argumentExpression)) name = expression.expression.argumentExpression.text;
         if (name === 'map' && expression.arguments[0]) {
           const renderers = expressionFunctions(expression.arguments[0], checker);
           return renderers.length > 0 && renderers.every(fn => !functionUsesWorld(fn, checker)
@@ -861,9 +858,8 @@ function checkWorldRenderBoundaries(config, context, roots) {
     }
     if (ts.isJsxFragment(expression)) {
       const children = expression.children.filter(child => !ts.isJsxText(child) || child.text.trim());
-      return children.length > 0 && children.every(child => ts.isJsxExpression(child)
-        ? renderBoundary(child.expression, checker, seen, false, expectedFile)
-        : ts.isJsxText(child) ? false : renderBoundary(child, checker, seen, false, expectedFile));
+      return children.length > 0 && children.every(child => !ts.isJsxText(child)
+        && renderBoundary(ts.isJsxExpression(child) ? child.expression : child, checker, seen, false, expectedFile));
     }
     if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) {
       const opening = ts.isJsxElement(expression) ? expression.openingElement : expression;
@@ -877,9 +873,8 @@ function checkWorldRenderBoundaries(config, context, roots) {
         // A layout may hand its one opaque router-supplied child to its pure sibling.
         // Extra drawing still has to satisfy the ordinary resolved render boundary.
         const routedChild = pureTarget && children.length === 1 && routedLayoutChild(opening, children[0], checker);
-        if (!routedChild && !children.every(child => ts.isJsxExpression(child)
-          ? renderBoundary(child.expression, checker, seen, false, expectedFile)
-          : ts.isJsxText(child) ? false : renderBoundary(child, checker, seen, false, expectedFile))) return false;
+        if (!routedChild && !children.every(child => !ts.isJsxText(child)
+          && renderBoundary(ts.isJsxExpression(child) ? child.expression : child, checker, seen, false, expectedFile))) return false;
         hasBoundary = true;
       }
       for (const attribute of opening.attributes.properties) {
@@ -962,9 +957,7 @@ export function checkFrontend(config, context) {
     if (insideAny(roots.routes, sourceFile.fileName) && path.basename(sourceFile.fileName).toLowerCase() === 'page.tsx') {
       violations.push(...checkRoute(config, context, sourceFile, roots));
     }
-    violations.push(...checkFrontendSourceLayout(config, sourceFile, roots));
-    violations.push(...checkCustomHookLocations(config, context, sourceFile, roots));
-    violations.push(...checkPureAndData(config, context, sourceFile, roots));
+    violations.push(...checkFrontendSourceLayout(config, sourceFile, roots), ...checkCustomHookLocations(config, context, sourceFile, roots), ...checkPureAndData(config, context, sourceFile, roots));
   }
   violations.push(...checkWorldRenderBoundaries(config, context, roots));
   return violations;

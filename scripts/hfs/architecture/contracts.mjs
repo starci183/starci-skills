@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
-import { referencedExports, relativePath, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
-import { anyDescendant, commonJsRequireReasons, constructedDecoratorKind as sharedConstructedDecoratorKind, decoratorCallee, moduleExportsOf, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, returnedExpressions, selectedNode, valueSymbol, violation } from './ast-walks.mjs';
+import { referencedExports, relativePath, unwrapExpression } from './typescript.mjs';
+import { anyDescendant, commonJsRequireReasons, constructedDecoratorKind as sharedConstructedDecoratorKind, decoratorCallee, moduleExportsOf, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, selectedNode, valueSymbol, violation } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 export const PUBLIC_CONTRACT_RULE_ID = 'BE_PUBLIC_CONTRACT_FORM';
@@ -95,14 +95,14 @@ function sourceRole(sourceFile) {
   const normalized = sourceFile.fileName.replaceAll('\\', '/');
   const base = path.basename(sourceFile.fileName).replace(SOURCE_EXTENSION, '').toLowerCase();
   const segments = base.split('.');
-  const role = segments.length > 1 ? segments.at(-1) : base === 'use-case' || base.endsWith('-use-case') ? 'use-case' : null;
+  const role = segments.length > 1 ? segments.at(-1) : ((base === 'use-case' || base.endsWith('-use-case')) && 'use-case') || null;
   return { base, role, transport: normalized.includes('/transport/') };
 }
 
 function isFrameworkHelper(sourceFile, declaration, framework) {
   const role = sourceRole(sourceFile);
   if (role.transport || NON_API_SOURCE_ROLES.has(role.role) || NON_API_SOURCE_ROLES.has(role.base)) return true;
-  if (declaration && declaration.name && /Module$/.test(declaration.name.text ?? '')) {
+  if (declaration?.name && /Module$/.test(declaration.name.text ?? '')) {
     return nodeDecorators(framework.ts, declaration).some(decorator => decoratorKind(framework.ts, framework.checker, decorator, framework.targets) === 'Module');
   }
   return false;

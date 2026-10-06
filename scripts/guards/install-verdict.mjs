@@ -33,7 +33,7 @@ export async function installVerdict({ program, args, cwd, guard, deps }) {
 // operationAgent), and no ledger record depends on those.
 export function kernelMailboxVerdict(program, args, guard) {
   if (program !== 'orca' || guard?.role !== 'kernel') return null;
-  const words = args.filter((a) => !/^-/.test(a));
+  const words = args.filter((a) => !a.startsWith('-'));
   if (words[0] !== 'orchestration' || words[1] !== 'check') return null;
   return { code: 'KERNEL_ORCA_CHECK', command: ['orca', ...args].join(' ').slice(0, 200),
     reason: 'the Kernel never runs orca orchestration check: its --ack consumes deliveries before the ledger records them',

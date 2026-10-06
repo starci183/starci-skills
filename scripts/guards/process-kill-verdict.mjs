@@ -49,20 +49,25 @@ function targetsOf(args) {
     const a = args[i];
     const inline = /^-(?:id|inputobject):(.*)$/i.exec(a);
     if (inline) out.push(inline[1]);
-    else if (TARGET_OPTION.test(a)) { if (i + 1 < args.length) out.push(args[i + 1]); i += 1; }
+    else if (TARGET_OPTION.test(a)) { if (i + 1 < args.length) { out.push(args[i + 1]); } i += 1; }
     else if (OPTION_VALUE.test(a)) i += 1;
     else if (!a.startsWith('-')) out.push(a);
   }
   return out;
 }
 
+// 'kill' or 'Stop-Process' when its named targets are not all literal PIDs, else null.
+const killTargetHow = (program, targets) => {
+  if (targets.length && targets.every((t) => LITERAL.test(t))) return null;
+  return program === 'kill' ? 'kill' : 'Stop-Process';
+};
+
 // A kill sink whose target is not one literal PID: how it is spelled, or null.
 function sinkOf(c) {
   const { program, args } = c;
   if (POWERSHELL_STOP.has(program) || program === 'kill') {
     if (args.some((a) => /^-l$/.test(a))) return null;
-    const targets = targetsOf(args);
-    return targets.length && targets.every((t) => LITERAL.test(t)) ? null : program === 'kill' ? 'kill' : 'Stop-Process';
+    return killTargetHow(program, targetsOf(args));
   }
   if (program === 'taskkill') {
     const at = args.findIndex((a) => /^(?:\/\/?|-)pid$/i.test(a));
