@@ -85,6 +85,7 @@ import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 import { workerObservation } from './worker-observation.mjs';
 import { queuedDependencyDetail } from './queued-dependency-detail.mjs';
+import { deferredFieldOf, legStatusColorOf } from './leg-status-view.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { headShaOf } from '../lib/git-dir.mjs';
@@ -1315,15 +1316,9 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
       && rows.some((row) => deferredJobs.has(row.job_id)) && !rows.some((row) => row.status === 'succeeded')) {
       return { op, color: 'deferred', label: tr('deferred to the final review'), jobId: latest?.job_id ?? null, status: latest?.status ?? null };
     }
-    const color = !rows.length ? 'gray'
-      : rows.some((row) => LEG_IN_FLIGHT.includes(row.status)) ? 'yellow'
-      : failedRows.some((row) => row.op_id === op && unresolvedIds.has(row.job_id)) ? 'red'
-      : rows.some((row) => row.status === 'queued' && rowOf.get(jobPayloadOf(row).retry?.retryOf)?.status === 'failed') ? 'red'
-      : rows.some((row) => row.status === 'queued') || ownerWaitOps.has(op) ? 'yellow'
-      : rows.some((row) => row.status === 'succeeded') ? (reworkOps.has(op) ? 'red' : 'green')
-      : 'red';
+    const color = legStatusColorOf({ noRows: () => !rows.length, inFlight: () => rows.some((row) => LEG_IN_FLIGHT.includes(row.status)), unresolved: () => failedRows.some((row) => row.op_id === op && unresolvedIds.has(row.job_id)), failedRetry: () => rows.some((row) => row.status === 'queued' && rowOf.get(jobPayloadOf(row).retry?.retryOf)?.status === 'failed'), queued: () => rows.some((row) => row.status === 'queued'), ownerWait: () => ownerWaitOps.has(op), succeeded: () => rows.some((row) => row.status === 'succeeded'), rework: () => reworkOps.has(op) });
     const deferred = latest ? specDeferredJobs.get(latest.job_id) ?? null : null;
-    const deferredField = deferred ? { deferred } : !rows.length && deferredPlanOps.has(op) ? { deferred: deferredPlanOps.get(op).reason } : {};
+    const deferredField = deferredFieldOf(deferred, () => !rows.length && deferredPlanOps.has(op), () => deferredPlanOps.get(op).reason);
     if (color === 'green' && provisional.has(op)) return { op, color: 'green-provisional', label: tr(PROVISIONAL_LABEL), jobId: latest?.job_id ?? null, status: latest?.status ?? null, ...deferredField };
     // A leg whose latest try ended asking the owner is yellow and says so: it is a wait, never a failure.
     const waitsOnOwner = latest?.status === 'awaiting_owner' && ownerWaitOps.has(op) ? { awaitingOwner: true } : {};
