@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { byCodeUnit } from '../lib/list.mjs';
 import { fileURLToPath } from 'node:url';
-import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
+import { stringifyYaml } from '../../engine/yaml.mjs';
 import { readOpManifest } from '../lib/op-shared.mjs';
 import { stringItems, ROUTE_FIELDS } from './route-fields.mjs';
 
