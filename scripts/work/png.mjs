@@ -17,10 +17,7 @@ const paeth = (a, b, c) => {
   return pb <= pc ? b : c;
 };
 
-/** Decode PNG bytes into {width, height, data: Uint8Array RGBA}. Throws `unsupported png: ...`. */
-export function decodePng(bytes) {
-  const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes ?? []);
-  if (buf.length < 8 || !buf.subarray(0, 8).equals(SIGNATURE)) throw new Error('unsupported png: not a PNG signature');
+function pngChunks(buf) {
   let header = null, palette = null, trns = null;
   const idat = [];
   for (let at = 8; at + 8 <= buf.length;) {
@@ -34,6 +31,64 @@ export function decodePng(bytes) {
     else if (type === 'IEND') break;
     at = start + length + 4;
   }
+  return { header, palette, trns, idat };
+}
+
+function sampleAt(line, depth, index) {
+  if (depth === 8) return line[index];
+  if (depth === 16) return line[index * 2];
+  const bit = index * depth, byte = line[bit >> 3], shift = 8 - depth - (bit & 7);
+  return (byte >> shift) & ((1 << depth) - 1);
+}
+
+function unfilterRow(raw, at, line, prior, filter, bpp) {
+  for (let i = 0; i < line.length; i += 1) {
+    const x = raw[at + 1 + i], a = i >= bpp ? line[i - bpp] : 0, b = prior[i], c = i >= bpp ? prior[i - bpp] : 0;
+    let value = x;
+    if (filter === 1) value += a;
+    else if (filter === 2) value += b;
+    else if (filter === 3) value += (a + b) >> 1;
+    else if (filter === 4) value += paeth(a, b, c);
+    line[i] = value & 0xff;
+  }
+}
+
+function writePixel(out, offset, sample, colour, scale, palette, trns) {
+  if (colour === 3) {
+    const index = sample(0);
+    out[offset] = palette[index * 3] ?? 0; out[offset + 1] = palette[index * 3 + 1] ?? 0; out[offset + 2] = palette[index * 3 + 2] ?? 0;
+    out[offset + 3] = trns && index < trns.length ? trns[index] : 255;
+  } else if (colour === 0 || colour === 4) {
+    const g = Math.round(sample(0) * scale);
+    out[offset] = g; out[offset + 1] = g; out[offset + 2] = g; out[offset + 3] = colour === 4 ? sample(1) : 255;
+  } else {
+    out[offset] = sample(0); out[offset + 1] = sample(1); out[offset + 2] = sample(2); out[offset + 3] = colour === 6 ? sample(3) : 255;
+  }
+}
+
+function decodeRows(raw, header, palette, trns, channels, stride, bpp) {
+  const { width, height, depth, colour } = header;
+  if (raw.length < (stride + 1) * height) throw new Error('unsupported png: image data shorter than the header declares');
+  const out = new Uint8Array(width * height * 4);
+  let prior = new Uint8Array(stride);
+  const line = new Uint8Array(stride);
+  const scale = depth < 8 && colour !== 3 ? 255 / ((1 << depth) - 1) : 1;
+  for (let y = 0; y < height; y += 1) {
+    const at = y * (stride + 1), filter = raw[at];
+    if (filter > 4) throw new Error(`unsupported png: filter type ${filter}`);
+    unfilterRow(raw, at, line, prior, filter, bpp);
+    const sample = (index) => sampleAt(line, depth, index);
+    for (let x = 0; x < width; x += 1) writePixel(out, (y * width + x) * 4, (index) => sample(x * channels + index), colour, scale, palette, trns);
+    prior = Uint8Array.from(line);
+  }
+  return out;
+}
+
+/** Decode PNG bytes into {width, height, data: Uint8Array RGBA}. Throws `unsupported png: ...`. */
+export function decodePng(bytes) {
+  const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes ?? []);
+  if (buf.length < 8 || !buf.subarray(0, 8).equals(SIGNATURE)) throw new Error('unsupported png: not a PNG signature');
+  const { header, palette, trns, idat } = pngChunks(buf);
   if (!header?.width || !header?.height) throw new Error('unsupported png: no usable IHDR');
   const { width, height, depth, colour } = header;
   if (!(colour in CHANNELS)) throw new Error(`unsupported png: colour type ${colour}`);
@@ -46,45 +101,7 @@ export function decodePng(bytes) {
   const bitsPerPixel = channels * depth;
   const stride = Math.ceil((width * bitsPerPixel) / 8);
   const bpp = Math.max(1, bitsPerPixel >> 3);
-  if (raw.length < (stride + 1) * height) throw new Error('unsupported png: image data shorter than the header declares');
-  const out = new Uint8Array(width * height * 4);
-  let prior = new Uint8Array(stride);
-  const line = new Uint8Array(stride);
-  for (let y = 0; y < height; y += 1) {
-    const at = y * (stride + 1), filter = raw[at];
-    if (filter > 4) throw new Error(`unsupported png: filter type ${filter}`);
-    for (let i = 0; i < stride; i += 1) {
-      const x = raw[at + 1 + i], a = i >= bpp ? line[i - bpp] : 0, b = prior[i], c = i >= bpp ? prior[i - bpp] : 0;
-      let value = x;
-      if (filter === 1) value += a;
-      else if (filter === 2) value += b;
-      else if (filter === 3) value += (a + b) >> 1;
-      else if (filter === 4) value += paeth(a, b, c);
-      line[i] = value & 0xff;
-    }
-    const sample = (index) => {
-      if (depth === 8) return line[index];
-      if (depth === 16) return line[index * 2];
-      const bit = index * depth, byte = line[bit >> 3], shift = 8 - depth - (bit & 7);
-      return (byte >> shift) & ((1 << depth) - 1);
-    };
-    const scale = depth < 8 && colour !== 3 ? 255 / ((1 << depth) - 1) : 1;
-    for (let x = 0; x < width; x += 1) {
-      const o = (y * width + x) * 4, s = x * channels;
-      if (colour === 3) {
-        const index = sample(s);
-        out[o] = palette[index * 3] ?? 0; out[o + 1] = palette[index * 3 + 1] ?? 0; out[o + 2] = palette[index * 3 + 2] ?? 0;
-        out[o + 3] = trns && index < trns.length ? trns[index] : 255;
-      } else if (colour === 0 || colour === 4) {
-        const g = Math.round(sample(s) * scale);
-        out[o] = g; out[o + 1] = g; out[o + 2] = g; out[o + 3] = colour === 4 ? sample(s + 1) : 255;
-      } else {
-        out[o] = sample(s); out[o + 1] = sample(s + 1); out[o + 2] = sample(s + 2); out[o + 3] = colour === 6 ? sample(s + 3) : 255;
-      }
-    }
-    prior = Uint8Array.from(line);
-  }
-  return { width, height, data: out };
+  return { width, height, data: decodeRows(raw, header, palette, trns, channels, stride, bpp) };
 }
 
 const chunk = (type, body) => {
@@ -128,22 +145,21 @@ export function blankImage(width, height, rgba = [255, 255, 255, 255]) {
  * Resample `image` to width x height. Downscaling by more than half averages the covered source area (a box
  * filter), everything else is bilinear. Pure arithmetic, so the same inputs give the same pixels anywhere.
  */
-export function resizeImage(image, width, height) {
-  if (image.width === width && image.height === height) return { width, height, data: Uint8Array.from(image.data) };
-  const out = new Uint8Array(width * height * 4), sx = image.width / width, sy = image.height / height, src = image.data;
-  if (sx > 2 || sy > 2) {
-    for (let y = 0; y < height; y += 1) {
-      const y0 = Math.floor(y * sy), y1 = Math.max(y0 + 1, Math.floor((y + 1) * sy));
-      for (let x = 0; x < width; x += 1) {
-        const x0 = Math.floor(x * sx), x1 = Math.max(x0 + 1, Math.floor((x + 1) * sx));
-        const sum = [0, 0, 0, 0];
-        for (let yy = y0; yy < y1; yy += 1) for (let xx = x0; xx < x1; xx += 1) { const s = (yy * image.width + xx) * 4; sum[0] += src[s]; sum[1] += src[s + 1]; sum[2] += src[s + 2]; sum[3] += src[s + 3]; }
-        const n = (y1 - y0) * (x1 - x0), d = (y * width + x) * 4;
-        for (let c = 0; c < 4; c += 1) out[d + c] = Math.round(sum[c] / n);
-      }
+function resizeBox(image, width, height, sx, sy, src, out) {
+  for (let y = 0; y < height; y += 1) {
+    const y0 = Math.floor(y * sy), y1 = Math.max(y0 + 1, Math.floor((y + 1) * sy));
+    for (let x = 0; x < width; x += 1) {
+      const x0 = Math.floor(x * sx), x1 = Math.max(x0 + 1, Math.floor((x + 1) * sx));
+      const sum = [0, 0, 0, 0];
+      for (let yy = y0; yy < y1; yy += 1) for (let xx = x0; xx < x1; xx += 1) { const s = (yy * image.width + xx) * 4; sum[0] += src[s]; sum[1] += src[s + 1]; sum[2] += src[s + 2]; sum[3] += src[s + 3]; }
+      const n = (y1 - y0) * (x1 - x0), d = (y * width + x) * 4;
+      for (let c = 0; c < 4; c += 1) out[d + c] = Math.round(sum[c] / n);
     }
-    return { width, height, data: out };
   }
+  return { width, height, data: out };
+}
+
+function resizeBilinear(image, width, height, sx, sy, src, out) {
   for (let y = 0; y < height; y += 1) {
     const fy = Math.min(image.height - 1, Math.max(0, (y + 0.5) * sy - 0.5)), y0 = Math.floor(fy), y1 = Math.min(image.height - 1, y0 + 1), wy = fy - y0;
     for (let x = 0; x < width; x += 1) {
@@ -153,6 +169,13 @@ export function resizeImage(image, width, height) {
     }
   }
   return { width, height, data: out };
+}
+
+export function resizeImage(image, width, height) {
+  if (image.width === width && image.height === height) return { width, height, data: Uint8Array.from(image.data) };
+  const out = new Uint8Array(width * height * 4), sx = image.width / width, sy = image.height / height, src = image.data;
+  if (sx > 2 || sy > 2) return resizeBox(image, width, height, sx, sy, src, out);
+  return resizeBilinear(image, width, height, sx, sy, src, out);
 }
 
 /** Crop a rectangle out of `image`. */
@@ -165,6 +188,14 @@ export function cropImage(image, { x, y, width, height }) {
   return { width, height, data: out };
 }
 
+function compositePixel(base, top, source, target, alphaByte) {
+  if (alphaByte === 255) { base.data[target] = top.data[source]; base.data[target + 1] = top.data[source + 1]; base.data[target + 2] = top.data[source + 2]; base.data[target + 3] = 255; return; }
+  if (alphaByte === 0) return;
+  const alpha = alphaByte / 255, beneath = base.data[target + 3] / 255, outA = alpha + beneath * (1 - alpha);
+  for (let c = 0; c < 3; c += 1) base.data[target + c] = Math.round((top.data[source + c] * alpha + base.data[target + c] * beneath * (1 - alpha)) / (outA || 1));
+  base.data[target + 3] = Math.round(outA * 255);
+}
+
 /** Alpha-composite `top` over `base` (mutated) with its top-left corner at (x, y); pixels outside `base` are dropped. */
 export function drawOver(base, top, x, y) {
   for (let row = 0; row < top.height; row += 1) {
@@ -173,12 +204,8 @@ export function drawOver(base, top, x, y) {
     for (let col = 0; col < top.width; col += 1) {
       const bx = x + col;
       if (bx < 0 || bx >= base.width) continue;
-      const s = (row * top.width + col) * 4, d = (by * base.width + bx) * 4, a = top.data[s + 3];
-      if (a === 255) { base.data[d] = top.data[s]; base.data[d + 1] = top.data[s + 1]; base.data[d + 2] = top.data[s + 2]; base.data[d + 3] = 255; continue; }
-      if (a === 0) continue;
-      const alpha = a / 255, beneath = base.data[d + 3] / 255, outA = alpha + beneath * (1 - alpha);
-      for (let c = 0; c < 3; c += 1) base.data[d + c] = Math.round((top.data[s + c] * alpha + base.data[d + c] * beneath * (1 - alpha)) / (outA || 1));
-      base.data[d + 3] = Math.round(outA * 255);
+      const s = (row * top.width + col) * 4, d = (by * base.width + bx) * 4;
+      compositePixel(base, top, s, d, top.data[s + 3]);
     }
   }
   return base;
@@ -202,10 +229,7 @@ export function keyRect(image, key = [255, 0, 255], tolerance = 8) {
   for (let y = 0; y < image.height; y += 1) for (let x = 0; x < image.width; x += 1) {
     if (!hits((y * image.width + x) * 4)) continue;
     count += 1;
-    if (x < minX) { minX = x; }
-    if (x > maxX) { maxX = x; }
-    if (y < minY) { minY = y; }
-    if (y > maxY) { maxY = y; }
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
   }
   if (!count) return null;
   const rect = { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
