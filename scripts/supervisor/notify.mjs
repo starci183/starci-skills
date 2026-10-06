@@ -14,7 +14,6 @@
 // machine.sqlite sup_events.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { openDecision, ringDoorbellWith } from '../machine/decisions.mjs';
 import { wakeKernel } from '../kernel/wake-delivery.mjs';
@@ -74,7 +73,7 @@ if (isMain(import.meta.url)) {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const text = value('text-file') ? fs.readFileSync(value('text-file'), 'utf8') : value('text');
   const entityArg = value('entity');
-  const entity = entityArg && entityArg.includes(':') ? { type: entityArg.slice(0, entityArg.indexOf(':')), id: entityArg.slice(entityArg.indexOf(':') + 1) } : null;
+  const entity = entityArg?.includes(':') ? { type: entityArg.slice(0, entityArg.indexOf(':')), id: entityArg.slice(entityArg.indexOf(':') + 1) } : null;
   if (!value('repo') || !value('workflow') || !text?.trim()) {
     console.error('use: starci supervisor notify --repo <ledger-owner> --workflow <id> (--text <t> | --text-file <f>) [--item <key>] [--entity <type>:<id>] [--json]');
     process.exitCode = 2;

@@ -11,8 +11,6 @@
 // A desktop message's answer is recorded only (never sent to Telegram); a Telegram message's answer goes to
 // Telegram and is recorded too. Owner approvals for owner-only actions never travel this way: they come from
 // the verified owner Telegram chat or from the Supervisor's own Orca terminal.
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { getSupervisor, supervisorOnline } from './telegram-bridge.mjs';
 import { appendInbox, readInbox, readOutbox } from '../machine/sup-messages.mjs';
 import { SUPERVISOR_ID } from '../machine/home.mjs';
@@ -32,11 +30,11 @@ export function tell(text, { env = process.env, now = new Date() } = {}) {
 
 /** `--since` as epoch ms: an ISO time, or a relative age like 30m / 2h / 1d. */
 export function sinceMs(value, now = Date.now()) {
-  if (!value) return now - 24 * 3600_000;
+  if (!value) return now - 24 * 3_600_000;
   const rel = /^(\d+)\s*([mhd])$/i.exec(String(value).trim());
-  if (rel) return now - Number(rel[1]) * { m: 60_000, h: 3600_000, d: 86_400_000 }[rel[2].toLowerCase()];
+  if (rel) return now - Number(rel[1]) * { m: 60_000, h: 3_600_000, d: 86_400_000 }[rel[2].toLowerCase()];
   const at = Date.parse(value);
-  return Number.isFinite(at) ? at : now - 24 * 3600_000;
+  return Number.isFinite(at) ? at : now - 24 * 3_600_000;
 }
 
 /** The replies since `since` (ms), oldest first, each with the text of the message it answers. */
@@ -84,4 +82,4 @@ async function main() {
   if (!reply) process.exitCode = 124;
 }
 
-if (isMain(import.meta.url)) Promise.resolve().then(main).catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });
+if (isMain(import.meta.url)) await main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });

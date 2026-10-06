@@ -78,7 +78,7 @@ export const OWNER_GATE_KINDS = ['owner-gate', 'owner-gate-pending', 'supervisor
 /** The typed wait on a peer workflow (scripts/kernel/cli.mjs PEER_WAIT, openPeerWaits). */
 const PEER_WAIT_KIND = 'peer-wait';
 /** Worker liveness that is a turn in progress: a workflow with one is working, not stalled. */
-const WORKING_LIVENESS = ['active', 'active-unclassified'];
+const WORKING_LIVENESS = new Set(['active', 'active-unclassified']);
 const SETTLED = SETTLED_JOB_LIST;
 /** The non-Kernel jobs of one workflow the ledger holds running (a worker's op in flight). */
 const runningJobs = (db, wf) => {
@@ -113,7 +113,7 @@ export function lastProgress(db, workflowId) {
     report ? { at: report, kind: 'report' } : null,
     row ? { at: row.created_at, kind: 'workflow-created' } : null,
   ].filter(Boolean);
-  return candidates.sort((a, b) => b.at - a.at)[0] ?? { at: 0, kind: 'none' };
+  return candidates.toSorted((a, b) => b.at - a.at)[0] ?? { at: 0, kind: 'none' };
 }
 
 /** Open owner-gate incidents with the jobs/ops they hold and when they were raised. */
@@ -199,7 +199,7 @@ export const namedWorkflows = (text) => [...new Set(String(text ?? '').match(/\b
 const namedJobs = (text) => [...new Set(String(text ?? '').match(/\bop-[a-z0-9.-]+-[0-9a-f]{10}\b/gi) ?? [])];
 
 /** Record states that mean the thing a gate waited for has landed. */
-const LANDED_STATES = ['done', 'settled', 'decided', 'approved', 'accepted', 'final', 'complete', 'completed', 'passed', 'ready'];
+const LANDED_STATES = new Set(['done', 'settled', 'decided', 'approved', 'accepted', 'final', 'complete', 'completed', 'passed', 'ready']);
 
 /**
  * What a path an incident names looks like now, against the time the gate was raised:
@@ -225,14 +225,14 @@ function pathEvidence(repo, rel, raisedAt) {
   }
   const born = Number.isFinite(st.birthtimeMs) && st.birthtimeMs > 0 ? st.birthtimeMs : st.mtimeMs;
   const at = Math.max(born, st.mtimeMs);
-  const settledState = !state || LANDED_STATES.includes(state.toLowerCase());
+  const settledState = !state || LANDED_STATES.has(state.toLowerCase());
   return { path: rel, exists: true, landed: at > raisedAt && settledState, waiting: !settledState, at, born, written: st.mtimeMs, created: born > raisedAt, state };
 }
 
 /** Peer messages delivered to `workflowId` after `since`, from one of `peers` (ledger inbox rows). */
 const peerDeliveries = (db, workflowId, peers, since) => (peers.length ? db.prepare(
   "SELECT key, payload_json, status, created_at, applied_at FROM inbox WHERE workflow_id=? AND kind='peer-message' AND created_at>? ORDER BY inbox_id").all(workflowId, since)
-  .map((row) => ({ key: row.key, status: row.status, at: row.created_at, appliedAt: row.applied_at, ...(({ from, kind, subject }) => ({ from, kind, subject }))(parse(row.payload_json)) }))
+  .map((row) => ({ key: row.key, status: row.status, at: row.created_at, appliedAt: row.applied_at, ...(({ from, kind, subject }) => { return { from, kind, subject }; })(parse(row.payload_json)) }))
   .filter((m) => peers.includes(m.from)) : []);
 
 /** A gate whose release is a peer's message itself (a heads-up, a reply, a notice), not a record. */
@@ -334,7 +334,7 @@ export function judgePeerWait({ db, workflowId, wait, repo = null, dbOf = () => 
     else if (until.unmeetable.length) reasons.push(`an until condition can no longer hold: ${until.unmeetable.join('; ')}`);
   } else {
     const headOf = (id) => { for (const d of [peerDb, db]) { const head = lineageHeadById(d, id); if (head) return head; } return null; };
-    const jobs = [...new Set([...namedJobs(wait.text), ...wait.refs.filter((ref) => /^op-/.test(ref))])].filter((id) => !wait.holds.includes(id))
+    const jobs = [...new Set([...namedJobs(wait.text), ...wait.refs.filter((ref) => ref.startsWith('op-'))])].filter((id) => !wait.holds.includes(id))
       .map(headOf).filter(Boolean);
     if (jobs.length && jobs.every(({ row }) => SETTLED.includes(row.status) && row.updated_at > wait.raisedAt)) {
       reasons.push(`named job(s) settled after the wait: ${jobs.map(({ row, via }) => `${via.length ? `${via.map((hop) => hop.jobId).join(' -> ')} -> ` : ''}${row.job_id} ${row.status} ${clock(row.updated_at)}`).join(', ')}`);
@@ -417,7 +417,7 @@ export const ledgerLookup = ({ repo = null, db, ledgers = [] }) => (wf) => {
 export function busyWhy(status, kernelTurn = () => null) {
   const working = workingWorkers(status);
   if (working.length) return `worker ${working.map((wk) => wk.jobId).join(', ')} mid-turn`;
-  return WORKING_LIVENESS.includes(kernelTurn()) ? 'its Kernel is mid-turn' : null;
+  return WORKING_LIVENESS.has(kernelTurn()) ? 'its Kernel is mid-turn' : null;
 }
 
 /** The frontier lists naming a worker starci kernel status judged not working (dead, wedged, at its prompt, asking). */
@@ -435,7 +435,7 @@ const activeStaleMsOf = () => { try { return allocationMs('liveness.activeStaleM
 export function workingWorkers(status, activeStaleMs = activeStaleMsOf()) {
   const flagged = new Set(NOT_WORKING_LISTS.flatMap((key) => status?.frontier?.[key] ?? []));
   const fresh = (ms) => ms != null && Number.isFinite(Number(ms)) && Number.isFinite(Number(activeStaleMs)) && Number(activeStaleMs) > 0 && Number(ms) <= Number(activeStaleMs);
-  return (status?.workers ?? []).filter((wk) => WORKING_LIVENESS.includes(wk.liveness)
+  return (status?.workers ?? []).filter((wk) => WORKING_LIVENESS.has(wk.liveness)
     || (!flagged.has(wk.jobId) && (fresh(wk.outputAgeMs) || fresh(wk.heartbeatAgeMs))));
 }
 

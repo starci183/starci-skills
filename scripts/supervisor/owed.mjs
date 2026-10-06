@@ -55,7 +55,6 @@
 //            an open owner ask (on it or on a job its --after chain reaches) is the owner's, not OWED.
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { logSince } from '../api/git/log-since.mjs'; import { revParse } from '../api/git/rev-parse.mjs';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../../engine/config.mjs';
@@ -86,11 +85,11 @@ const LEASE_OVERLAP_REASON = /^resource path:.+? (?:overlaps durable lease path:
 export const isLeaseOverlapRefusal = (payload) => {
   if (payload?.step !== 'reserve') return false;
   const reasons = String(payload.error ?? '').split('; ').map((r) => r.trim()).filter(Boolean);
-  return reasons.length > 0 && reasons.some((r) => /overlaps durable lease/.test(r)) && reasons.every((r) => LEASE_OVERLAP_REASON.test(r));
+  return reasons.some((r) => /overlaps durable lease/.test(r)) && reasons.every((r) => LEASE_OVERLAP_REASON.test(r));
 };
 /** A failed retry chain older than this is history, not a pattern. */
 const CHAIN_WINDOW_MS = 24 * 60 * 60_000;
-const OPEN_JOB = ['queued', 'leased', 'running', 'answering'];
+const OPEN_JOB = new Set(['queued', 'leased', 'running', 'answering']);
 
 const parse = parseJsonOr;
 const kindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(lastProgress ?? '')?.[1] ?? null;
@@ -296,7 +295,7 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
         else if (v.asks.length) put(CLASSES.owner, `owner ask ${v.asks.map((a) => a.dispatchId).join(', ')} open`);
         else if (PEER_DEPENDENCY.test(gate.text)) put(CLASSES.kernel, 'an owner gate its own text calls a peer dependency: its Kernel re-records it as a peer-wait (stall wake)');
         else if (OWNER_ONLY.test(gate.text)) put(CLASSES.owner, 'an owner-only condition (credentials, push/publish, handover, payment/legal)');
-        else if (v.waits.length && v.peers.some((p) => { const d = dbOf(p); const r = d?.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(p); return r && r.phase === 'running' && r.archived_at == null; })) {
+        else if (v.waits.length && v.peers.some((p) => { const d = dbOf(p); const r = d?.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(p); return r?.phase === 'running' && r.archived_at == null; })) {
           put(CLASSES.peer, `waits on a record a running peer owes: ${clipLine(v.waits.join(', '), 140)}`);
         } else put(CLASSES.supervisor, v.waits.length ? `owner gate waits on ${clipLine(v.waits.join(', '), 120)} and no running peer it names owes it` : 'owner gate with no owner ask and no owner-only condition');
         continue;
@@ -321,7 +320,7 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
 const hash = (s) => shortHash(s, { algo: 'sha1', n: 8 });
 const ownedPaths = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : []).map(String);
 const pathsKey = (payload) => JSON.stringify([...ownedPaths(payload)].sort(byCodeUnit));
-const bare = (p) => p.replace(/\\/g, '/').replace(/(\/\*\*?)+$/, '').replace(/\/+$/, '');
+const bare = (p) => p.replaceAll(/\\/g, '/').replace(/(\/\*\*?)+$/, '').replace(/\/+$/, '');
 // Every owned path of `tail` lies under (or is) a path some job in `jobs` owns: a cut set that re-sliced it.
 const pathsCovered = (tail, jobs) => {
   const want = ownedPaths(tail.payload).map(bare);
@@ -430,7 +429,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       };
       for (const tail of jobs.filter((j) => !retried.has(j.job_id))) {
         if (tail.status === 'succeeded' || tail.status === 'cancelled') continue;
-        if (!OPEN_JOB.includes(tail.status)) {
+        if (!OPEN_JOB.has(tail.status)) {
           if (now - tail.updated_at > CHAIN_WINDOW_MS) continue;
           // A later job of the same op over the same paths took the work over: this chain is history.
           const later = jobs.filter((j) => j.op_id === tail.op_id && j.created_at > tail.created_at);

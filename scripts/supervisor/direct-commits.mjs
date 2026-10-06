@@ -10,7 +10,6 @@
 //
 //   starci supervisor direct-commits [--json] [--repo <path>]
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { git } from './workers.mjs';
 import { SKILL_ROOT, readSupervisor } from '../machine/home.mjs';
 import { isMain } from '../lib/is-main.mjs';

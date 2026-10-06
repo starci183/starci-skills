@@ -12,7 +12,6 @@
 // time. Credential asks are one count line pointing at /creds, never listed.
 // Owner asks still reach Telegram only from the kernel (starci kernel serve-ask); this
 // is the supervisor's status digest. Ledgers are read read-only.
-import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { loadConfig } from '../../engine/config.mjs';
@@ -139,7 +138,7 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
   const names = namedWorkflows(db);
   const holds = settleHoldsOf(db, wf.workflow_id, { now }).map((h) => (h.peer ? { ...h, peerName: displayName(h.peer, names, tr) } : h));
   const runtime = incidents.filter((i) => RUNTIME_INCIDENT.test(i.last_progress ?? ''));
-  const ownerGates = incidents.filter((i) => /^\[owner-gate/.test(i.last_progress ?? ''));
+  const ownerGates = incidents.filter((i) => String(i.last_progress ?? '').startsWith('[owner-gate'));
   const last = db.prepare('SELECT a.op_id, r.outcome, r.report_json, r.created_at FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? ORDER BY r.report_id DESC LIMIT 1').get(wf.workflow_id);
   const elapsed = Math.max(0, now - Number(wf.created_at));
   const etaMs = done > 0 && total > done ? Math.round((elapsed / done) * (total - done)) : (total > 0 && done >= total ? 0 : null);
@@ -271,4 +270,4 @@ async function main() {
   }
 }
 
-if (isMain(import.meta.url)) Promise.resolve().then(main).catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });
+if (isMain(import.meta.url)) await main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });

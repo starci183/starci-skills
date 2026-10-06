@@ -5,14 +5,14 @@ import { createRequire } from 'node:module';
 import { runNpm as runNpmCall } from '../api/npm/run-npm.mjs';
 import { runNpx as runNpxCall } from '../api/npm/run-npx.mjs';
 
-const slash = (p) => path.resolve(p).replaceAll(String.fromCharCode(92), '/').toLowerCase();
+const slash = (p) => path.resolve(p).replaceAll(String.fromCodePoint(92), '/').toLowerCase();
 
 /** The nearest tsconfig owning a changed file, relative to root. */
 export function projectOf(root, file) {
   let dir = path.dirname(path.join(root, file));
   while (dir.startsWith(root)) {
     const candidate = path.join(dir, 'tsconfig.json');
-    if (fs.existsSync(candidate)) return path.relative(root, candidate).replaceAll(String.fromCharCode(92), '/');
+    if (fs.existsSync(candidate)) return path.relative(root, candidate).replaceAll(String.fromCodePoint(92), '/');
     if (dir === root) break;
     dir = path.dirname(dir);
   }
@@ -30,7 +30,7 @@ function appRootOf(root, project) {
 const modulesChain = (root, project) => {
   const found = [], bound = path.resolve(appRootOf(root, project));
   for (let dir = path.dirname(path.join(root, project)); ; dir = path.dirname(dir)) {
-    if (fs.existsSync(path.join(dir, 'node_modules'))) found.push(path.relative(root, dir).replaceAll(String.fromCharCode(92), '/') || '.');
+    if (fs.existsSync(path.join(dir, 'node_modules'))) found.push(path.relative(root, dir).replaceAll(String.fromCodePoint(92), '/') || '.');
     if (path.resolve(dir) === bound || path.dirname(dir) === dir) break;
   }
   return found;
@@ -42,7 +42,7 @@ function prepareFrontendProjects(root, projects, deps = {}) {
   const prepared = new Set();
   for (const project of projects) {
     const appRoot = appRootOf(root, project);
-    if (prepared.has(appRoot) || !path.relative(appRoot, path.join(root, project)).replaceAll(String.fromCharCode(92), '/').startsWith('fe/')) continue;
+    if (prepared.has(appRoot) || !path.relative(appRoot, path.join(root, project)).replaceAll(String.fromCodePoint(92), '/').startsWith('fe/')) continue;
     prepared.add(appRoot);
     let pkg = {};
     try { pkg = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8')); } catch { /* tsc reports unreadable projects */ }
@@ -82,7 +82,7 @@ function typeErrors(root, project) {
   const diagnostics = [...program.getConfigFileParsingDiagnostics(), ...program.getOptionsDiagnostics(), ...program.getGlobalDiagnostics(), ...program.getSyntacticDiagnostics(), ...program.getSemanticDiagnostics()];
   const errors = diagnostics.filter((d) => d.category === ts.DiagnosticCategory.Error && d.file).map((d) => {
     const { line, character } = d.file.getLineAndCharacterOfPosition(d.start ?? 0);
-    const file = path.relative(root, d.file.fileName).replaceAll(String.fromCharCode(92), '/');
+    const file = path.relative(root, d.file.fileName).replaceAll(String.fromCodePoint(92), '/');
     return `${file}(${line + 1},${character + 1}): error TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, '\n').split('\n')[0]}`;
   });
   return { ok: true, errors };

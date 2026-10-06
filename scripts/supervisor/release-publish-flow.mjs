@@ -80,7 +80,7 @@ export async function releasePublishFlow(ctx, deps = {}) {
       publishCode = await (deps.releasePublish ?? releasePublish)({
         root, publish: ctx.args?.publish === true, runtimePackage, env: ctx.env, npmUser: ctx.args?.['npm-user'] ?? null,
         pollMinutes: Number(ctx.args?.['poll-minutes'] ?? 15), preLandRef: ctx.args?.['pre-land-ref'] ?? null,
-        deps: { ...(deps.releaseDeps ?? {}), out: (line) => lines.push(line) },
+        deps: { ...deps.releaseDeps, out: (line) => lines.push(line) },
       });
     } catch (error) { return { code: 1, stderr: `starci release publish: plan failed (${error.message})` }; }
     if (publishCode === 2) return { code: 2, stderr: lines.at(-1) ?? 'starci release publish: bad usage' };
