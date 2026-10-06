@@ -34,15 +34,27 @@ const CLIENT_SLOTS = new Set([APP_CLIENT_SLOT, 'fe.package.api.client']);
 const NO_CLIENT = "the repository has no transport client. Create the one client (packages/<family>-api/src/client.ts, or the only app's modules/api/client.ts) and call it.";
 
 /** True when `node` names the global fetch: no import, and no declaration outside a lib declaration file. */
+function isGlobalObjectFetch(ts, node) {
+  return ts.isPropertyAccessExpression(node) && node.name.text === 'fetch' && ts.isIdentifier(node.expression) && GLOBAL_OBJECTS.has(node.expression.text);
+}
+
+function isDeclarationName(ts, parent, node) {
+  return (ts.isPropertyAssignment(parent) || ts.isPropertyDeclaration(parent) || ts.isMethodDeclaration(parent) || ts.isBindingElement(parent) || ts.isParameter(parent) || ts.isVariableDeclaration(parent)) && parent.name === node;
+}
+
+function isTypeOrImportPosition(ts, parent) {
+  return ts.isTypeQueryNode(parent) || ts.isQualifiedName(parent) || ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent) || ts.isPropertySignature(parent);
+}
+
 function isGlobalFetch(ts, kit, checker, node) {
-  if (!ts.isIdentifier(node)) return ts.isPropertyAccessExpression(node) && node.name.text === 'fetch' && ts.isIdentifier(node.expression) && GLOBAL_OBJECTS.has(node.expression.text);
-  if (node.text !== 'fetch' || kit.importBinding(checker, node)) return false;
+  if (!ts.isIdentifier(node)) return isGlobalObjectFetch(ts, node);
+  if (node.text !== 'fetch') return false;
+  if (kit.importBinding(checker, node)) return false;
   const parent = node.parent;
   if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
   // A type position (`typeof fetch`, `typeof globalThis.fetch`) names the type of fetch and sends nothing.
-  if (ts.isTypeQueryNode(parent) || ts.isQualifiedName(parent)) return false;
-  if ((ts.isPropertyAssignment(parent) || ts.isPropertyDeclaration(parent) || ts.isMethodDeclaration(parent) || ts.isBindingElement(parent) || ts.isParameter(parent) || ts.isVariableDeclaration(parent)) && parent.name === node) return false;
-  if (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent) || ts.isPropertySignature(parent)) return false;
+  if (isTypeOrImportPosition(ts, parent)) return false;
+  if (isDeclarationName(ts, parent, node)) return false;
   const declarations = kit.declarationsOf(checker, node);
   return declarations.every(declaration => declaration.getSourceFile().isDeclarationFile);
 }
@@ -57,6 +69,33 @@ function reportMultiplicity(items, noun, nextApps, report, list) {
   }
 }
 
+function globalFetchUse(ts, kit, checker, node) {
+  if (ts.isPropertyAccessExpression(node) && isGlobalFetch(ts, kit, checker, node)) return 'property';
+  if (ts.isIdentifier(node) && isGlobalFetch(ts, kit, checker, node)) return 'identifier';
+  return null;
+}
+
+function moduleSpecifierOf(ts, node) {
+  if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return node.moduleSpecifier;
+  if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require'))) return node.arguments[0];
+  return null;
+}
+
+function inspectTransportNode({ ts, kit, checker, file, node, isClient, clientCalls, clients, owned, report }) {
+  const fetchUse = globalFetchUse(ts, kit, checker, node);
+  if (fetchUse !== null) {
+    if (isClient) clientCalls.value += 1;
+    else if (fetchUse === 'property') report(file, node, `${node.getText(file.sourceFile)} reaches the global fetch outside the transport client; ${owned}`);
+    else report(file, node, `fetch is used outside the transport client (called, aliased or passed as a value); ${owned}`);
+    return false;
+  }
+  const specifier = moduleSpecifierOf(ts, node);
+  if (specifier && ts.isStringLiteralLike(specifier) && HTTP_LIBRARIES.has(specifier.text.split('/')[0])) {
+    report(file, node, `${specifier.text} is a second HTTP transport; the repository's one transport is built on fetch (${clients.length ? clients.map(item => item.rel).join(', ') : 'no client exists yet'}). Use the client.`, { library: specifier.text });
+  }
+  return true;
+}
+
 function inspectTransportFiles({ files, graph, kit, ts, clientRels, clients, owned, report }) {
   const appsWithFiles = new Set();
   let readers = 0;
@@ -65,27 +104,9 @@ function inspectTransportFiles({ files, graph, kit, ts, clientRels, clients, own
     if (bindings?.app) appsWithFiles.add(bindings.app);
     const checker = kit.checkerOf(file.sourceFile);
     const isClient = clientRels.has(file.rel);
-    let clientCalls = 0;
-    kit.walk(file.sourceFile, node => {
-      if (ts.isPropertyAccessExpression(node) && isGlobalFetch(ts, kit, checker, node)) {
-        if (isClient) clientCalls += 1;
-        else report(file, node, `${node.getText(file.sourceFile)} reaches the global fetch outside the transport client; ${owned}`);
-        return false;
-      }
-      if (ts.isIdentifier(node) && isGlobalFetch(ts, kit, checker, node)) {
-        if (isClient) clientCalls += 1;
-        else report(file, node, `fetch is used outside the transport client (called, aliased or passed as a value); ${owned}`);
-        return false;
-      }
-      let specifier = null;
-      if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) specifier = node.moduleSpecifier;
-      else if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require'))) specifier = node.arguments[0];
-      if (specifier && ts.isStringLiteralLike(specifier) && HTTP_LIBRARIES.has(specifier.text.split('/')[0])) {
-        report(file, node, `${specifier.text} is a second HTTP transport; the repository's one transport is built on fetch (${clients.length ? clients.map(item => item.rel).join(', ') : 'no client exists yet'}). Use the client.`, { library: specifier.text });
-      }
-      return true;
-    });
-    if (isClient && clientCalls === 0) report(file, file.sourceFile, `${file.rel} never calls the global fetch; the client is the one module that owns fetch, with its timeout and abort signal.`);
+    const clientCalls = { value: 0 };
+    kit.walk(file.sourceFile, node => inspectTransportNode({ ts, kit, checker, file, node, isClient, clientCalls, clients, owned, report }));
+    if (isClient && clientCalls.value === 0) report(file, file.sourceFile, `${file.rel} never calls the global fetch; the client is the one module that owns fetch, with its timeout and abort signal.`);
     if (file.slot === API_SLOT && bindings?.app && path.posix.basename(file.rel).startsWith('read-')) {
       readers += 1;
       const reachesClient = graph.edges.some(edge => edge.from === file.rel && edge.runtime
