@@ -81,7 +81,7 @@ export function decodeBase85Line(line) {
   const out = [];
   for (let i = 1; i + 5 <= line.length; i += 5) {
     let acc = 0;
-    for (let j = 0; j < 5; j++) { const v = B85_INDEX.get(line[i + j]); if (v == null) throw new Error('bad base85 char'); acc = acc * 85 + v; }
+    for (let j = 0; j < 5; j++) { const v = B85_INDEX.get(line[i + j]); if (v == null) { throw new Error('bad base85 char'); } acc = acc * 85 + v; }
     out.push((acc >>> 24) & 255, (acc >>> 16) & 255, (acc >>> 8) & 255, acc & 255);
   }
   return Buffer.from(out.slice(0, len));
@@ -100,7 +100,7 @@ function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
   let mode = 'mail', subject = null, blobs = null;
   let binary = null; // {side, kind, size, lines:[]}
   const fileFor = (p, oldPath, status) => {
-    if (files.has(p)) { const f = files.get(p); f.touches += 1; if (status === 'D') f.status = f.status === 'A' ? 'A' : 'D'; return f; }
+    if (files.has(p)) { const f = files.get(p); f.touches += 1; if (status === 'D') { f.status = f.status === 'A' ? 'A' : 'D'; } return f; }
     if (files.size >= caps.files) { omitted.add(p); anyTruncated = true; return { path: p, omitted: true, added: 0, removed: 0, hunks: [], touches: 1 }; }
     const f = { path: p, oldPath: oldPath && oldPath !== p ? oldPath : null, status, added: 0, removed: 0, language: languageOf(p), binary: false, image: isImagePath(p), touches: 1, hunks: [], truncated: false, lineCount: 0 };
     files.set(p, f);
@@ -172,9 +172,9 @@ function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
     if (l.startsWith('rename to ')) { pending.b = unquoteGitPath(l.slice(10)); pending.status = 'R'; return true; }
     if (l.startsWith('copy from ')) { pending.a = unquoteGitPath(l.slice(10)); pending.status = 'A'; return true; }
     if (l.startsWith('copy to ')) { pending.b = unquoteGitPath(l.slice(8)); return true; }
-    if (l.startsWith('index ')) { const m = /^index ([0-9a-f]+)\.\.([0-9a-f]+)/.exec(l); if (m) blobs = [m[1], m[2]]; return true; }
-    if (l.startsWith('--- ')) { const a = stripSide(l.slice(4)); if (a) pending.a = a; return true; }
-    if (l.startsWith('+++ ')) { const b = stripSide(l.slice(4)); if (b) pending.b = b; else if (pending.status === 'D') pending.b = null; startFile(); return true; }
+    if (l.startsWith('index ')) { const m = /^index ([0-9a-f]+)\.\.([0-9a-f]+)/.exec(l); if (m) { blobs = [m[1], m[2]]; } return true; }
+    if (l.startsWith('--- ')) { const a = stripSide(l.slice(4)); if (a) { pending.a = a; } return true; }
+    if (l.startsWith('+++ ')) { const b = stripSide(l.slice(4)); if (b) { pending.b = b; } else if (pending.status === 'D') { pending.b = null; } startFile(); return true; }
     if (l.startsWith('GIT binary patch') || (l.startsWith('Binary files ') && l.endsWith(' differ'))) {
       startFile();
       if (!file.omitted) file.binary = true;
