@@ -55,17 +55,22 @@ async function waitReply(id, { timeoutMs = DEFAULT_WAIT_MS, intervalMs = 2000, e
   }
 }
 
-const show = (r) => `[${r.at}] via ${r.via}${r.question ? `\n  > ${String(r.question).replace(/\s+/g, ' ').slice(0, 160)}` : ''}\n${r.text}`;
+const show = (r) => {
+  const question = r.question ? `\n  > ${String(r.question).replace(/\s+/g, ' ').slice(0, 160)}` : '';
+  return `[${r.at}] via ${r.via}${question}\n${r.text}`;
+};
 
 async function main() {
   const argv = process.argv.slice(2);
   const has = (n) => argv.includes(`--${n}`);
-  const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
+  const value = (n) => { const i = argv.indexOf(`--${n}`); if (i < 0) return null; return argv[i + 1] ?? null; };
   const asJson = has('json');
   if (has('help') || !argv.length) { console.log('use: starci supervisor tell "<text>" [--wait] [--timeout-ms <n>] | starci supervisor tell --read [--since <ISO|30m|2h>] [--limit <n>] [--json]'); return; }
   if (has('read')) {
     const list = replies({ since: sinceMs(value('since')), limit: Number(value('limit')) || 20 });
-    console.log(asJson ? JSON.stringify(list) : list.length ? list.map(show).join('\n\n') : 'no replies in that window');
+    let output = list.length ? list.map(show).join('\n\n') : 'no replies in that window';
+    if (asJson) output = JSON.stringify(list);
+    console.log(output);
     return;
   }
   const valued = new Set(['--timeout-ms', '--since', '--limit']);
@@ -78,8 +83,12 @@ async function main() {
   }
   const reply = await waitReply(r.id, { timeoutMs: Number(value('timeout-ms')) || DEFAULT_WAIT_MS });
   if (asJson) console.log(JSON.stringify({ ...r, reply }));
-  else console.log(reply ? show(reply) : `sent ${r.id}; no reply yet (starci supervisor tell --read later)`);
+  else if (reply) console.log(show(reply));
+  else console.log(`sent ${r.id}; no reply yet (starci supervisor tell --read later)`);
   if (!reply) process.exitCode = 124;
 }
 
-if (isMain(import.meta.url)) await main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });
+if (isMain(import.meta.url)) {
+  try { await main(); }
+  catch (error) { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; }
+}

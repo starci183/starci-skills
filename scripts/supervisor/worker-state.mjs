@@ -5,6 +5,13 @@ import { releaseSelfSafe, workerClosureProven } from '../machine/worker-close.mj
 const ATTEMPT_AGENTS = new Set(['devin', 'codex', 'claude']);
 export const workerAttemptAgent = (provider) => ATTEMPT_AGENTS.has(provider) ? provider : null;
 
+function closeWorkerEffect({ dispatch, handle, jobId, env, close, release }) {
+  try {
+    if (dispatch) return release(dispatch, handle, { owner: `supervisor:${jobId}`, env });
+    return close(handle, { owner: `supervisor:${jobId}`, env });
+  } catch (error) { return { handle, ok: false, error: String(error?.message ?? error) }; }
+}
+
 /** Write a job's status and/or payload; the machine owns its status event. */
 export function setJob(m, jobId, { status = null, payload = undefined }) {
   if (status) return m.setSupJobStatus(jobId, status, { payload });
@@ -50,9 +57,7 @@ export function closeWorkerTerminalState(m, { jobId, env = process.env, now = Da
   // A worker-start worker is fenced and released by its Dispatch (release archives its output); a job
   // recorded without a Dispatch has only its terminal to close.
   const dispatch = job.payload.dispatch ?? null;
-  let r;
-  try { r = dispatch ? release(dispatch, handle, { owner: `supervisor:${jobId}`, env }) : close(handle, { owner: `supervisor:${jobId}`, env }); }
-  catch (error) { r = { handle, ok: false, error: String(error?.message ?? error) }; }
+  const r = closeWorkerEffect({ dispatch, handle, jobId, env, close, release });
   const physical = dispatch ? r?.dispatch === dispatch && workerClosureProven(r, handle)
     : r?.handle === handle && r?.ok === true && ['gone', 'disconnected'].includes(r?.proof);
   let reason = r?.reason;

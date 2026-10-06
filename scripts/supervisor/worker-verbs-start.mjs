@@ -28,13 +28,19 @@ function availabilityOf(registry, agent) {
 
 function modelsOf(registry, agent) {
   const models = new Set();
-  for (const [id, row] of Object.entries(registry?.models ?? {})) if (row?.provider === agent) models.add(id);
+  for (const [id, row] of Object.entries(registry?.models ?? {})) {
+    if (row?.provider === agent) models.add(id);
+  }
   for (const pool of Object.values(registry?.pools ?? {})) {
     if (pool?.provider !== agent) continue;
     if (pool.defaultModel) models.add(String(pool.defaultModel));
-    for (const model of Object.values(pool.models ?? {})) if (model) models.add(String(model));
+    for (const model of Object.values(pool.models ?? {})) {
+      if (model) models.add(String(model));
+    }
   }
-  for (const target of Object.values(registry?.targets ?? {})) if (target?.runtime === agent && target.defaultModel) models.add(String(target.defaultModel));
+  for (const target of Object.values(registry?.targets ?? {})) {
+    if (target?.runtime === agent && target.defaultModel) models.add(String(target.defaultModel));
+  }
   return models;
 }
 
@@ -44,8 +50,41 @@ function defaultModelOf(registry, agent) {
   return pool?.defaultModel ?? target?.defaultModel ?? null;
 }
 
+function hasBriefExtension(line, start) {
+  let end = start;
+  while (end < line.length && !/[\s"'<>]/.test(line[end])) end++;
+  return end - start > 1 && /\.(?:md|txt|ya?ml)\b/i.test(line.slice(start + 1, end));
+}
+
 function briefReference(line) {
-  return /(?:^|\s|["'(])[^\s"'<>]+\.(?:md|txt|ya?ml)\b/i.test(line);
+  for (let index = 0; index < line.length; index++) {
+    if (index === 0 && hasBriefExtension(line, index)) return true;
+    if (/\s|["'(]/.test(line[index]) && hasBriefExtension(line, index + 1)) return true;
+  }
+  return false;
+}
+
+function prepareWorkerStart(ctx, deps) {
+  const args = ctx?.args ?? {};
+  const agent = clean(args.agent);
+  const cwd = path.resolve(ctx?.cwd ?? process.cwd());
+  let registry;
+  try { registry = deps.registry ?? loadModelRegistry(); }
+  catch (error) { return refusal(`model registry is unavailable: ${error.message}`); }
+  if (!agentsOf(registry).has(agent)) return refusal(`unknown agent '${agent || '(empty)'}'`);
+  if (args.model && agent === 'devin') return refusal("agent 'devin' does not take --model");
+  if (['cursor', 'claude'].includes(agent) && availabilityOf(registry, agent) === 'unavailable')
+    return refusal(`agent '${agent}' is marked unavailable in the model registry`);
+  const allowedModels = modelsOf(registry, agent);
+  if (args.model && allowedModels.size && !allowedModels.has(String(args.model)))
+    return refusal(`model '${args.model}' is not registered for agent '${agent}'`);
+  const model = args.model ?? (agent === 'devin' ? defaultModelOf(registry, agent) : null);
+  if (!model) return refusal('--model must name a concrete registered model');
+  const title = clean(args['task-title']);
+  if (!title) return refusal('--task-title is required');
+  const spec = resolveWorkerSpec(args.spec, cwd, deps);
+  if (spec.error) return refusal(spec.error);
+  return { args, agent, cwd, model, title, spec };
 }
 
 function resolveWorkerSpec(value, cwd, { readFile = (file) => fs.readFileSync(file, 'utf8'), exists = fs.existsSync } = {}) {
@@ -69,26 +108,9 @@ const consumerFenced = (result) => result?.errorCode === 'consumer_fenced'
 
 /** Start one supervised worker after registry, worktree and spec validation. */
 export async function workerStartVerb(ctx, deps = {}) {
-  const args = ctx?.args ?? {};
-  const agent = clean(args.agent);
-  const cwd = path.resolve(ctx?.cwd ?? process.cwd());
-  let registry;
-  try {
-    registry = deps.registry ?? loadModelRegistry();
-  } catch (error) { return refusal(`model registry is unavailable: ${error.message}`); }
-  if (!agentsOf(registry).has(agent)) return refusal(`unknown agent '${agent || '(empty)'}'`);
-  if (args.model && agent === 'devin') return refusal("agent 'devin' does not take --model");
-  if (['cursor', 'claude'].includes(agent) && availabilityOf(registry, agent) === 'unavailable')
-    return refusal(`agent '${agent}' is marked unavailable in the model registry`);
-  const allowedModels = modelsOf(registry, agent);
-  if (args.model && allowedModels.size && !allowedModels.has(String(args.model)))
-    return refusal(`model '${args.model}' is not registered for agent '${agent}'`);
-  const model = args.model ?? (agent === 'devin' ? defaultModelOf(registry, agent) : null);
-  if (!model) return refusal('--model must name a concrete registered model');
-  const title = clean(args['task-title']);
-  if (!title) return refusal('--task-title is required');
-  const spec = resolveWorkerSpec(args.spec, cwd, deps);
-  if (spec.error) return refusal(spec.error);
+  const prepared = prepareWorkerStart(ctx, deps);
+  if (prepared.code != null) return prepared;
+  const { args, agent, cwd, model, title, spec } = prepared;
 
   const ps = await (deps.worktreePs ?? worktreePs)();
   if (!ps?.ok) return { code: 1, text: `starci worker start: ${ps?.error ?? 'Orca worktree listing failed'}`,
