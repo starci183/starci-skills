@@ -78,7 +78,7 @@ export function captureGateBinding(placements, { at, revision = (root) => revPar
  * [{path, slot}] of the gate's changed files as the runtime resolved them.
  */
 export function judgeLoop({ gate, digest, kinds, doc = loadOpGate(), gateBases = [], current = false, snapshot = null, expectedRead = null }) {
-  if (!gate || gate.schema !== GATE_SCHEMA)
+  if (gate?.schema !== GATE_SCHEMA)
     return { status: 'missing', code: 'op-gate-proof-missing', detail: `no gate JSON (schema ${GATE_SCHEMA}) is attached to the report: run starci gate run --changed ... --out gate.json and attach it`, findings: [] };
   // In a workflow worktree the gate must measure against a checkpoint the op's side has not moved since
   // (scripts/machine/workflow-tree.mjs gateBasesOf, newest first): a gate over another base judges other findings than the op's own.

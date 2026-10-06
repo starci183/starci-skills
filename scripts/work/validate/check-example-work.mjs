@@ -290,7 +290,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     if (entry.schema !== 'work/implementation@1' || entry.data?.state !== 'done') continue;
     for (const ref of Array.isArray(entry.data.proves) ? entry.data.proves : []) {
       const target = typeof ref === 'string' ? splitRef(ref.trim()).id : null;
-      if (!target || !target.startsWith('sds.')) continue;
+      if (!target?.startsWith('sds.')) continue;
       if (!sdsProvers.has(target)) sdsProvers.set(target, []);
       sdsProvers.get(target).push(implId);
     }
@@ -547,7 +547,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       }
       if (data.owners) {
         for (const owner of data.owners) {
-          if (!owner || !owner.role || !owner.path) problems.push(`${rec.shown}: owners entry missing role or path`);
+          if (!owner?.role || !owner?.path) problems.push(`${rec.shown}: owners entry missing role or path`);
         }
       }
     }
@@ -594,7 +594,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     // pending (info), and a todo component an implementation already proved is warned (reconciliation owes
     // it). Named owners are checked for existence by the OWNER_PATH_MISSING rule above.
     if (schema === 'work/sds-component@1') {
-      const hasOwners = Array.isArray(data.owners) && data.owners.some(o => o && o.path);
+      const hasOwners = Array.isArray(data.owners) && data.owners.some(o => o?.path);
       if (!hasOwners) {
         const provers = sdsProvers.get(id) ?? [];
         if (provers.length) {
@@ -712,7 +712,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     }
 
     // ---- concept 13: typed _resources custody uses exactly the work/resource@1 schema ----
-    if (rec.file.replaceAll('\\', '/').includes('/_resources/') && /\/resource\.yaml$/.test(rec.file.replaceAll('\\', '/'))) {
+    if (rec.file.replaceAll('\\', '/').includes('/_resources/') && rec.file.replaceAll('\\', '/').endsWith('/resource.yaml')) {
       if (schema !== 'work/resource@1') {
         problems.push(`${rec.shown}: _resources custody uses schema work/resource@1, not "${schema}"`);
       }
@@ -723,7 +723,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
   // render/brand owner: capture PNG, markup, palette, anatomy and mascot rules.
   // It uses the same frontend predicate as IMPL_BEFORE_DIRECTION. Missing or
   // uncheckable selected capture bytes refuse; a core-check skip is not a pass.
-  for (const [id, rec] of records) {
+  for (const [, rec] of records) {
     if (rec.schema !== 'work/implementation@1' || rec.data?.state !== 'done') continue;
     for (const problem of renderProofProblems({rec, records, workspaceDoc, workRoot, blobOptions}))
       problems.push(`${rec.shown}: ${problem}`);
@@ -731,18 +731,18 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
 
   // ---- concept 13 (continued): uat-flow environment/fixtures/accounts refs resolve to a real _resources entry ----
   const resourceKind = (id) => recOf(id)?.data?.kind;
-  for (const [id, rec] of records) {
+  for (const [, rec] of records) {
     if (rec.schema !== 'work/uat-flow@1') continue;
     const data = rec.data;
     if (data.environment) {
       const target = recOf(data.environment);
-      if (!target || target.schema !== 'work/resource@1') problems.push(`${rec.shown}: environment ${data.environment} does not resolve to a work/resource@1`);
+      if (target?.schema !== 'work/resource@1') problems.push(`${rec.shown}: environment ${data.environment} does not resolve to a work/resource@1`);
       else if (resourceKind(data.environment) !== 'environment') problems.push(`${rec.shown}: environment ${data.environment} resolves to a work/resource@1 of kind "${resourceKind(data.environment)}", not environment`);
     }
     if (Array.isArray(data.fixtures)) {
       for (const fid of data.fixtures) {
         const target = recOf(fid);
-        if (!target || target.schema !== 'work/resource@1') problems.push(`${rec.shown}: fixture ${fid} does not resolve to a work/resource@1`);
+        if (target?.schema !== 'work/resource@1') problems.push(`${rec.shown}: fixture ${fid} does not resolve to a work/resource@1`);
         else if (resourceKind(fid) !== 'fixture') problems.push(`${rec.shown}: fixture ${fid} resolves to a work/resource@1 of kind "${resourceKind(fid)}", not fixture`);
       }
     }
@@ -753,7 +753,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
         for (const account of accountsDoc?.accounts ?? []) {
           if (!account?.identity) continue;
           const target = recOf(account.identity);
-          if (!target || target.schema !== 'work/resource@1') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} does not resolve to a work/resource@1`);
+          if (target?.schema !== 'work/resource@1') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} does not resolve to a work/resource@1`);
           else if (resourceKind(account.identity) !== 'identity') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} resolves to a work/resource@1 of kind "${resourceKind(account.identity)}", not identity`);
           else if (Array.isArray(target.data?.roles) && typeof account.role === 'string' && !target.data.roles.includes(account.role)) problems.push(`${rec.shown}: accounts.yaml selects role ${account.role} of ${account.identity}, which presents only [${target.data.roles.join(', ')}]; a flow chooses an identity by a role it presents [HFS_IDENTITY_CUSTODY]`);
         }

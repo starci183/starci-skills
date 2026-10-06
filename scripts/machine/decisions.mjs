@@ -21,7 +21,6 @@
 import crypto from 'node:crypto';
 import { mutationAuthority } from '../lib/mutation-fence.mjs';
 import path from 'node:path';
-import { runNode } from '../api/node/run-node.mjs';
 import { execNode } from '../api/node/exec-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseJsonOr } from '../lib/json.mjs';
@@ -87,7 +86,7 @@ const rowToDi = (r) => {
     evidence: listOf(r.evidence_json), options: listOf(r.options_json), allowedVerbs: listOf(r.allowed_verbs_json),
     openedBy: r.opened_by, openedAt: r.opened_at, dueAt: r.due_at ?? null, escalateTo: r.escalate_to ?? null, escalations: Number(r.escalations) || 0,
     claim: r.claim_by ? { by: r.claim_by, at: r.claim_at, ttlMs: r.claim_ttl_ms ?? CLAIM_TTL_MS, ...(claimAuthority ? { authority: claimAuthority } : {}) } : null, status: r.status,
-    resolution: r.resolved_by ? { ...(p.resolution ?? {}), by: r.resolved_by, verb: r.resolution_verb, decisionId: r.decision_id ?? null, at: r.resolved_at } : p.resolution ?? null,
+    resolution: r.resolved_by ? { ...p.resolution, by: r.resolved_by, verb: r.resolution_verb, decisionId: r.decision_id ?? null, at: r.resolved_at } : p.resolution ?? null,
     supersededBy: r.superseded_by ?? null,
   };
 };
@@ -309,12 +308,12 @@ export function escalateDecision(ledger, id, { to = 'supervisor', by = 'unknown'
 export const BLOCK_AGE_MS = 2 * 60_000;
 const DECISIONS_FIRST = 'decisions-first';
 /** Kinds whose entity is a reported job: live only while the settler still hands that job to the Kernel. */
-const JOB_KINDS = ['settle-nongreen', 'checks-needed', 'retry-decision'];
+const JOB_KINDS = new Set(['settle-nongreen', 'checks-needed', 'retry-decision']);
 /** The env mark apiRun (kernel-authority.mjs) sets on its children: graph-edit / redesign resolve DIs through them. */
 export const CHILD_ENV = 'STARCI_API_CHILD';
 
 const pendingJobsOf = (db, workflowId, now) => { try { return new Map(kernelDecisionItems(db, workflowId, { now }).map((i) => [i.jobId, i])); } catch { return null; } };
-const liveFor = (d, pending) => !(JOB_KINDS.includes(d.kind) && d.entity?.type === 'job' && pending && !pending.has(d.entity.id));
+const liveFor = (d, pending) => !(JOB_KINDS.has(d.kind) && d.entity?.type === 'job' && pending && !pending.has(d.entity.id));
 const lastAckAt = (db, workflowId) => db.prepare("SELECT max(created_at) t FROM events WHERE workflow_id=? AND kind='runtime-rev-acked'").get(workflowId)?.t ?? null;
 
 /**
@@ -332,15 +331,15 @@ export function blockingDecisions(db, workflowId, { now = Date.now(), minAgeMs =
     .sort((a, b) => (b.severity === 'critical') - (a.severity === 'critical') || (a.openedAt ?? 0) - (b.openedAt ?? 0));
 }
 
-const q = (v) => (/[\s"'|;&<>]/.test(String(v)) ? `'${String(v).replace(/'/g, "'\\''")}'` : String(v));
+const q = (v) => (/[\s"'|;&<>]/.test(String(v)) ? `'${String(v).replaceAll("'", String.raw`'\''`)}'` : String(v));
 const lastRefusalsOf = (db, jobId) => db.prepare("SELECT kind, payload_json FROM events WHERE entity_type='job' AND entity_id=? AND (kind LIKE '%-refused' OR kind LIKE '%needs-kernel') ORDER BY seq DESC LIMIT 6").all(jobId)
-  .map((e) => ({ kind: e.kind, ...(parseJsonOr(e.payload_json, {}) ?? {}) }));
+  .map((e) => ({ kind: e.kind, ...parseJsonOr(e.payload_json, {}) }));
 const reportOf = (db, dispatchId) => {
   if (!dispatchId) return null;
   const r = db.prepare('SELECT outcome, report_json FROM reports WHERE dispatch_id=? ORDER BY rowid DESC LIMIT 1').get(dispatchId);
-  return r ? { outcome: r.outcome, ...(parseJsonOr(r.report_json, {}) ?? {}) } : null;
+  return r ? { outcome: r.outcome, ...parseJsonOr(r.report_json, {}) } : null;
 };
-const appOf = (p) => String(p).replace(/\\/g, '/').match(/(?:^|\/)((?:apps|packages)\/[^/]+)/)?.[1] ?? '.';
+const appOf = (p) => /(?:^|\/)((?:apps|packages)\/[^/]+)/.exec(String(p).replaceAll('\\', '/'))?.[1] ?? '.';
 
 /**
  * One DI in copy-paste form: {id, kind, jobId, code, what, commands: [{key, title, run}], decide, resolve}. For a job DI
@@ -352,7 +351,7 @@ export function resolutionOf(db, di, { repo = '<repo>', now = Date.now() } = {})
   const wf = di.workflowId, api = 'starci kernel', R = `--repo ${q(repo)}`;
   const base = { id: di.id, kind: di.kind, summary: di.summary };
   const resolve = (verb) => `${api} decisions ${R} --resolve ${di.id} --by kernel:${wf} --verb ${q(verb)} --decision <decide id>`;
-  if (!(JOB_KINDS.includes(di.kind) && di.entity?.type === 'job')) {
+  if (!(JOB_KINDS.has(di.kind) && di.entity?.type === 'job')) {
     const opts = (di.options ?? []).slice(0, 3).map((o, i) => ({ key: o.key ?? `option-${i + 1}`, title: o.title ?? o.key ?? '', run: o.verb ?? '' }));
     return { ...base, jobId: null, code: di.kind, what: di.summary, commands: opts, decide: null, resolve: resolve(opts[0]?.run || '<what you ran>') };
   }
@@ -367,13 +366,13 @@ export function resolutionOf(db, di, { repo = '<repo>', now = Date.now() } = {})
   const failures = (refusal?.failures ?? []).map(String);
   const owned = (payload.owned_paths ?? []).map(String);
   // Owned paths may carry the product repo's folder (my-app/apps/...) while a report names repo-relative files.
-  const repoPrefix = owned.map((p) => p.replace(/\\/g, '/').match(/^([^/]+\/)(?:apps|packages|src)\//)?.[1]).find(Boolean) ?? '';
+  const repoPrefix = owned.map((p) => p.replaceAll('\\', '/').match(/^([^/]+\/)(?:apps|packages|src)\//)?.[1]).find(Boolean) ?? '';
   const withPrefix = (p) => (repoPrefix && !String(p).startsWith(repoPrefix) && /^(apps|packages|src)\//.test(String(p)) ? `${repoPrefix}${p}` : String(p));
   const failing = [...new Set([...(refusal?.files ?? []), ...(refusal?.continuation?.files ?? []), ...((report?.owedToWire ?? []).map((o) => o?.path).filter(Boolean))].map(withPrefix))].slice(0, 20);
   const paths = [...new Set([...owned, ...failing])];
   const op = job?.op_id ?? pending?.op ?? '<op>';
   const what = String(payload.displayWhat ?? payload.title ?? jobId);
-  const params = { ...(payload.params ?? {}), ...(refusal?.continuation?.resumeFrom ? { resumeFrom: refusal.continuation.resumeFrom } : {}) };
+  const params = { ...payload.params, ...(refusal?.continuation?.resumeFrom ? { resumeFrom: refusal.continuation.resumeFrom } : {}) };
   const paramsArg = Object.keys(params).length ? ` --params ${q(JSON.stringify(params))}` : '';
   const oneLine = String(report?.summary ?? di.summary).replace(/\s+/g, ' ').slice(0, 160);
   const whatLine = `${op} ${jobId} reported ${outcome ?? '?'}; refused ${code}${failures.length ? ` (${failures[0].replace(/\s+/g, ' ').slice(0, 80)})` : ''}: ${oneLine}`;
@@ -401,7 +400,7 @@ export function decisionsFirstText(verb, workflowId, blocking, top) {
   return [`${DECISIONS_FIRST}: ${blocking.length} Decision Item(s) of ${workflowId} wait on you, open and unclaimed for more than ${Math.round(BLOCK_AGE_MS / 60_000)} min - ${verb} is refused until you decide them (starci kernel decisions --workflow ${workflowId}).`,
     `Oldest: ${top.id} - ${top.what}`,
     top.decide ? `1. log it: ${top.decide}` : null,
-    ...top.commands.map((c, i) => `${step}${String.fromCharCode(97 + i)}. ${c.title}: ${c.run}`),
+    ...top.commands.map((c, i) => `${step}${String.fromCodePoint(97 + i)}. ${c.title}: ${c.run}`),
     `${step + 1}. ${top.resolve}`,
     `(starci kernel decisions --claim ${top.id} --by kernel:${workflowId} holds it 15 min; a command carrying --resolves ${top.id} passes this guard)`].filter(Boolean).join('\n');
 }
@@ -515,7 +514,7 @@ export function openDecision(repo, di, { env = process.env, run = runDecisionsVe
 
 const doorbellText = (n, workflowId, top = null) => [`${RING_TAG} ${n} waiting: starci kernel decisions --workflow ${workflowId}`,
   ...(top ? [`oldest ${top.id}: ${String(top.what).slice(0, 220)}`, top.decide ? `log: ${top.decide}` : null,
-    `pick ONE: ${top.commands.map((c, i) => `(${String.fromCharCode(97 + i)}) ${c.title}: ${c.run}`).join(' || ')}`, `then: ${top.resolve}`] : [])].filter(Boolean).join(' | ');
+    `pick ONE: ${top.commands.map((c, i) => `(${String.fromCodePoint(97 + i)}) ${c.title}: ${c.run}`).join(' || ')}`, `then: ${top.resolve}`] : [])].filter(Boolean).join(' | ');
 const RING_SCOPE = 'decision-doorbell';
 
 /**
@@ -608,7 +607,7 @@ export const supervisorDecisions = (m, { all = false, now = Date.now() } = {}) =
  * the ':'-separated components of its key. At least two parts, none empty.
  */
 function supKeyParts(key, named) {
-  if (named) return Object.fromEntries(Object.entries(checkKeyParts(named)).map(([k, v]) => [k, v.replace(/:/g, '-')]));
+  if (named) return Object.fromEntries(Object.entries(checkKeyParts(named)).map(([k, v]) => [k, v.replaceAll(':', '-')]));
   const parts = key.split(':');
   return parts.length > 1 ? Object.fromEntries(parts.map((v, i) => [i === 0 ? 'kind' : `part${i}`, v])) : { kind: 'key', key };
 }
@@ -733,7 +732,7 @@ export function dueStep(di, now = Date.now()) {
   if (di.decider !== 'kernel' || di.status !== 'open' || di.kind === 'supervisor-ruling' || !Number.isFinite(di.dueAt)) return null;
   const span = Math.max(1, di.dueAt - (di.openedAt ?? di.dueAt));
   if (now >= di.dueAt + span) return { step: 'supervisor' };
-  if (now >= di.dueAt && !(di.escalations > 0)) return { step: 'remind' };
+  if (now >= di.dueAt && di.escalations <= 0) return { step: 'remind' };
   return null;
 }
 
@@ -803,5 +802,6 @@ if (isMain(import.meta.url)) {
     }
     throw refuse('use: starci machine decisions ring | escalate-due [--apply] | supervisor [--list|--claim|--resolve|--ring]', 'usage');
   };
-  main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code ?? null })); process.exitCode = error?.code === 'usage' ? 2 : 1; });
+  try { await main(); }
+  catch (error) { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code ?? null })); process.exitCode = error?.code === 'usage' ? 2 : 1; }
 }

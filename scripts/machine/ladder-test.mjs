@@ -80,7 +80,7 @@ function selectedSpecs({ root, level, args, changed, allSpecs, deps }) {
 function runSummary(run) {
   const text = (run.stdout ?? '') + '\n' + (run.stderr ?? '');
   const count = (name) => {
-    const matches = text.matchAll(new RegExp('^[ \\t]*(?:[ℹ#][ \\t]*)?' + name + '[ \\t]+(\\d+)[ \\t]*\\r?$', 'gim'));
+    const matches = text.matchAll(new RegExp(String.raw`^[ \t]*(?:[ℹ#][ \t]*)?` + name + String.raw`[ \t]+(\d+)[ \t]*\r?$`, 'gim'));
     const match = [...matches].at(-1);
     return match ? Number(match[1]) : null;
   };

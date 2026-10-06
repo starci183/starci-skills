@@ -37,7 +37,7 @@ export function versionOf(db, workflowId, version) {
 
 const hits = (a, b) => a.some((p) => b.some((q) => p === q || p.startsWith(`${q}/`) || q.startsWith(`${p}/`)));
 
-const RUNNING = JOB_STATUSES.dispatchable.filter((s) => s !== 'queued');
+const RUNNING = new Set(JOB_STATUSES.dispatchable.filter((s) => s !== 'queued'));
 const upLinks = (nodes) => {
   const kids = new Map(nodes.map((n) => [n.id, []]));
   const upOf = new Map();
@@ -83,10 +83,10 @@ export function colorsFromJobs(graph, jobs, { recorded = {}, since = 0 } = {}) {
   const own = (n) => {
     const rework = recorded[n.id] === RED;
     const mine = covering.get(n.id).filter((j) => !rework || (j.at ?? 0) > since);
-    if (mine.some((j) => RUNNING.includes(j.status))) return YELLOW;
+    if (mine.some((j) => RUNNING.has(j.status))) return YELLOW;
     // The newest covering try asked the owner: the node waits (yellow), it did not fail.
     if (mine.at(-1)?.status === AWAITING_OWNER_STATUS) return YELLOW;
-    const last = mine.filter((j) => j.status === 'succeeded' || j.status === 'failed').at(-1);
+    const last = mine.findLast((j) => j.status === 'succeeded' || j.status === 'failed');
     if (last) return last.status === 'succeeded' ? GREEN : RED;
     return rework ? RED : GRAY;
   };

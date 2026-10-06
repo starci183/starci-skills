@@ -10,7 +10,7 @@ import { num } from './analytics-data';
 import { t } from '../../i18n/t';
 import { FeedbackState } from '../feedback-state';
 
-function Row({ row }: { row: WorkflowRowV2 }) {
+function Row({ row }: { readonly row: WorkflowRowV2 }) {
   const url = `/api/workflows/${encodeURIComponent(row.project)}/${encodeURIComponent(row.id)}/pipeline`;
   const q = useApiQuery<PipelineView>(url, { topics: [`wf:${row.project}:${row.id}`], intervalMs: 30_000 });
   const pipe = q.data, mini = row.pipeline;
@@ -28,7 +28,7 @@ function Row({ row }: { row: WorkflowRowV2 }) {
   </li>;
 }
 
-export function WorkflowProgress({ workers, project }: { workers: QuerySnapshot<WorkersViewV2>; project: string }) {
+export function WorkflowProgress({ workers, project }: { readonly workers: QuerySnapshot<WorkersViewV2>; readonly project: string }) {
   const rows = (workers.data?.workflows ?? []).filter(w => !project || w.project === project || w.ledgerId === project);
   return <ChartCard title={t('Workflow progress')} hint={t('One row per workflow; each cell is a leg of the chain, x/y is legs passed over total.')}
     legend={[{ tone: 'success', label: t('Passed') }, { tone: 'running', label: t('Running') }, { tone: 'queued', label: t('Waiting / not reached') }, { tone: 'failed', label: t('Failed/blocked') }, { tone: 'warning', label: t('Waiting to retry') }, { tone: 'skipped', label: t('Deferred / external') }]}

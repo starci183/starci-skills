@@ -12,7 +12,7 @@ const parentOf = (value: string) => value.replace(/[\\/][^\\/]*$/, '');
  * A host path the owner can open: the chip opens it in VS Code (vscode://file/…), with Cursor,
  * containing-folder (files) and copy actions. The handlers open on the viewer's own machine.
  */
-export function PathLink({ path, kind = 'dir', label }: { path: string | null | undefined; kind?: 'dir' | 'file'; label?: string }) {
+export function PathLink({ path, kind = 'dir', label }: { readonly path: string | null | undefined; readonly kind?: 'dir' | 'file'; readonly label?: string }) {
   const [copied, setCopied] = useState(false);
   if (!path) return <span className="text-muted-foreground">—</span>;
   const Icon = kind === 'file' ? File : Folder;

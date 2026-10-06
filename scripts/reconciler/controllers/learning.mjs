@@ -9,7 +9,6 @@
 //                  Active, it also runs the recording pass (`lessons.mjs` learnTick through ctx.run) so the hypotheses
 //                  and verdicts land in the learning log; shadow records would-rows only.
 // Pure planner planLearning; numbers: modules/reconciler/learning.yaml and runtimes.yaml allocation.supervisorLearning.
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { yamlNumberSettings } from '../../lib/read-yaml.mjs';

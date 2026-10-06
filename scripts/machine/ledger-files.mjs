@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
 
-const norm = (file) => path.resolve(String(file)).replace(/\\/g, '/').toLowerCase();
+const norm = (file) => path.resolve(String(file)).replaceAll('\\', '/').toLowerCase();
 const tempDirs = (env = process.env) => [...new Set([os.tmpdir(), env.TEMP, env.TMP].filter(Boolean).map(norm))];
 const FIXTURE_SEGMENT = /^fixtures?$/i;
 

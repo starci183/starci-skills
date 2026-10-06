@@ -18,21 +18,21 @@ export const concept: Concept = 'C8';
 const SEARCHABLE = new Set(['text', 'json', 'diff']);
 const btn = 'inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs hover:bg-muted disabled:opacity-50';
 
-function Note({ children, tone }: { children: ReactNode; tone?: 'warning' | 'failed' }) {
+function Note({ children, tone }: { readonly children: ReactNode; readonly tone?: 'warning' | 'failed' }) {
   return <div className="rounded-md border border-border px-3 py-2 text-sm" data-tone={tone}
     style={tone ? { borderColor: 'var(--tone-line)', background: 'var(--tone-bg)' } : undefined}>{children}</div>;
 }
 
-function Body({ file, query, blob }: { file: EvidenceFile; query: string; blob: BlobText }) {
+function Body({ file, query, blob }: { readonly file: EvidenceFile; readonly query: string; readonly blob: BlobText }) {
   if (blob.status === 'error' && blob.httpStatus === 410) return <Note tone="warning">{t('Archived evidence is unavailable.')}</Note>;
   if (file.kind === 'image') return <ImageView file={file} />;
   if (file.kind === 'video') return <VideoView file={file} />;
-  if (file.kind === 'audio') return <audio src={file.href} controls preload="metadata" className="w-full" />;
+  if (file.kind === 'audio') return <audio src={file.href} controls preload="metadata" className="w-full"><track kind="captions" /></audio>;
   if (!TEXT_KINDS.has(file.kind)) {
     return <Note>{file.kind === 'pdf' ? t('PDF file') : t('Binary file')} ({formatBytes(file.bytes)}, {file.mediaType}) {t('cannot be previewed.')} <a className="underline" href={file.href} target="_blank" rel="noreferrer">{t('Open raw ↗')}</a></Note>;
   }
-  if (blob.status === 'loading' || blob.status === 'idle') return <div className="space-y-2" role="status" aria-label={t('Loading')}>
-    {[80, 60, 90, 45, 70].map((w, i) => <div key={i} className="h-3 rounded bg-muted" style={{ width: `${w}%` }} />)}</div>;
+  if (blob.status === 'loading' || blob.status === 'idle') return <output className="block space-y-2" aria-label={t('Loading')}>
+    {[80, 60, 90, 45, 70].map(w => <div key={w} className="h-3 rounded bg-muted" style={{ width: `${w}%` }} />)}</output>;
   if (blob.status === 'error') return <Note tone="failed">{t('Could not load the content ({error}).', { error: blob.error ?? '' })} <a className="underline" href={file.href} target="_blank" rel="noreferrer">{t('Open raw ↗')}</a></Note>;
   if (blob.text.trim() === '') return <Note>{t('Empty file (no content).')}</Note>;
   const { text } = blob;
@@ -51,7 +51,7 @@ function Body({ file, query, blob }: { file: EvidenceFile; query: string; blob: 
 }
 
 /** Right-hand frame: toolbar, meta line and the type-dispatched body of one evidence file. */
-export function EvidenceViewer({ file }: { file: EvidenceFile }) {
+export function EvidenceViewer({ file }: { readonly file: EvidenceFile }) {
   const [query, setQuery] = useState('');
   const blob = useBlobText(file);
   const canSearch = SEARCHABLE.has(file.kind);

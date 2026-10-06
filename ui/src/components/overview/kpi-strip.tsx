@@ -11,7 +11,7 @@ type Kpi = { tone: Tone; value: number | null; label: string; note: string };
 const observed = (value: number | null | undefined) => typeof value === 'number' && Number.isFinite(value) ? value : null;
 
 /** Essentials: four big numbers (ops running, workflows needing attention, passed / failed in 24 h) that count up on first view. */
-export function KpiStrip({ summary, needsAttention, loading = false }: { summary: WorkersSummary | null | undefined; needsAttention: number | null | undefined; loading?: boolean }) {
+export function KpiStrip({ summary, needsAttention, loading = false }: Readonly<{ summary: WorkersSummary | null | undefined; needsAttention: number | null | undefined; loading?: boolean }>) {
   const items: Kpi[] = [
     { tone: 'running', value: observed(summary?.opsRunning), label: t('ops running'), note: t('Dispatched attempts the agent has not reported yet.') },
     { tone: 'failed', value: observed(needsAttention), label: t('workflows needing attention'), note: t('Workflows that are stuck or slow and need a person.') },
@@ -31,7 +31,7 @@ export function KpiStrip({ summary, needsAttention, loading = false }: { summary
 }
 
 /** Secondary numbers (settling ops, queued units, 24 h tokens) shown inside "Advanced". */
-export function KpiExtras({ summary }: { summary: WorkersSummary | undefined }) {
+export function KpiExtras({ summary }: Readonly<{ summary: WorkersSummary | undefined }>) {
   if (!summary) return null;
   const usage = summary.usage24h;
   const tokens = usage.recorded && observed(usage.inputTokens) != null && observed(usage.outputTokens) != null ? usage.inputTokens! + usage.outputTokens! : null;

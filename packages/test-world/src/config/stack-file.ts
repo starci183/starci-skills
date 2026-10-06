@@ -26,7 +26,7 @@ export interface StackDefinition {
 const asRecord = (value: unknown): Readonly<Record<string, unknown>> | undefined =>
     typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
 
-const VARIABLE = /\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}/g
+const VARIABLE = /\$\{([A-Za-z_]\w*)(?::?-([^}]*))?\}/g
 
 /** Resolves `${VAR:-default}` and `${VAR-default}` to the default; answers `undefined` when a variable has no default. */
 export const resolveImageString = (raw: string): string | undefined => {

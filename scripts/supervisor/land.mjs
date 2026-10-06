@@ -53,7 +53,7 @@ import path from 'node:path';
 import { randomBytes, createHash } from 'node:crypto';
 import { setPriority } from '../api/process/set-priority.mjs';
 import { runNode } from '../api/node/run-node.mjs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
 import { git, normPath, finishLanded, selfJobsLandedBy, recordLandFailed } from './workers.mjs';
@@ -80,7 +80,7 @@ export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scrip
 const MAX_MAIN_RETRIES = 3;
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */
-export const specConcurrency = () => { const n = Number(allocationSettings()?.landGate?.specConcurrency); if (!Number.isInteger(n) || n < 1) throw Error('modules/models/runtimes.yaml allocation.landGate.specConcurrency must be a positive integer'); return n; };
+export const specConcurrency = () => { const n = Number(allocationSettings()?.landGate?.specConcurrency); if (!Number.isInteger(n) || n < 1) throw new Error('modules/models/runtimes.yaml allocation.landGate.specConcurrency must be a positive integer'); return n; };
 export const specTimeoutMs = (count) => allocationMs('landGate.specsBaseMs') + count * allocationMs('landGate.perSpecMs');
 
 /**
@@ -137,12 +137,12 @@ const SPEC_KEYWORDS = Object.freeze(['touching', 'direct', 'all', 'none']);
  * Returns {mode: none|touching|all, named, refused?, detail?}.
  */
 export function specPlan({ fullAllowed = false, fullByPushGit = false, asked = [], named = [], reason = null } = {}) {
-  const words = asked.filter((s) => SPEC_KEYWORDS.includes(s));
+  const words = new Set(asked.filter((s) => SPEC_KEYWORDS.includes(s)));
   const files = [...new Set([...asked.filter((s) => !SPEC_KEYWORDS.includes(s)), ...named])];
-  if (words.includes('all') && !(fullAllowed || fullByPushGit)) return { mode: 'touching', named: files, refused: 'specs-all-refused', detail: 'a land never runs the whole suite: config.yaml specs.harness is not true (touching-only); use --specs touching, or /starci release for the full run' };
-  if (words.includes('all')) return { mode: 'all', named: files };
-  if (words.includes('direct')) return { mode: 'direct', named: files };
-  if (words.includes('none')) {
+  if (words.has('all') && !(fullAllowed || fullByPushGit)) return { mode: 'touching', named: files, refused: 'specs-all-refused', detail: 'a land never runs the whole suite: config.yaml specs.harness is not true (touching-only); use --specs touching, or /starci release for the full run' };
+  if (words.has('all')) return { mode: 'all', named: files };
+  if (words.has('direct')) return { mode: 'direct', named: files };
+  if (words.has('none')) {
     if (!String(reason ?? '').trim()) return { mode: 'touching', named: files, refused: 'specs-none-needs-reason', detail: '--specs none needs an explicit --reason "<why no spec touching this change applies>"' };
     return { mode: 'none', named: [] };
   }
@@ -156,14 +156,14 @@ const HUNK_LINES = 40, HUNKS_PER_FILE = 4, CONFLICT_FILES = 20;
 export function conflictHunks(text) {
   const lines = String(text ?? '').split(/\r?\n/);
   const hunks = [];
-  for (let i = 0; i < lines.length && hunks.length < HUNKS_PER_FILE; i += 1) {
-    if (!lines[i].startsWith('<<<<<<< ')) continue;
+  let i = 0;
+  while (i < lines.length && hunks.length < HUNKS_PER_FILE) {
+    if (!lines[i].startsWith('<<<<<<< ')) { i += 1; continue; }
     let end = i + 1;
     while (end < lines.length && !lines[end].startsWith('>>>>>>> ')) end += 1;
-    const from = Math.max(0, i - 2), to = Math.min(lines.length, end + 3);
-    const body = lines.slice(from, to).map((l) => (l.length > 300 ? `${l.slice(0, 300)}...` : l));
+    const body = lines.slice(Math.max(0, i - 2), Math.min(lines.length, end + 3)).map((l) => (l.length > 300 ? `${l.slice(0, 300)}...` : l));
     hunks.push({ line: i + 1, text: (body.length > HUNK_LINES ? [...body.slice(0, HUNK_LINES), `... (${body.length - HUNK_LINES} more lines)`] : body).join('\n') });
-    i = end;
+    i = end + 1;
   }
   return hunks;
 }
@@ -309,7 +309,7 @@ export function baselineVerdict(script, pre, cur) {
  */
 const FAIL_REPORTER = `export default async function* failures(source) {
   const pending = new Map();
-  const line = (file, f) => JSON.stringify({ file, name: f.path.join(' > ') }) + '\\n';
+  const line = (file, f) => JSON.stringify({ file, name: f.path.join(' > ') }) + String.fromCharCode(10);
   for await (const { type, data } of source) {
     if (type !== 'test:pass' && type !== 'test:fail') continue;
     const file = data.file ?? '';
@@ -455,7 +455,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   const checks = [];
   const changedOut = git(['diff', '--name-status', `${base}..${head}`], { cwd: dir });
   const rows = changedOut.stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
-  const changed = rows.map((r) => normPath(r[r.length - 1]));
+  const changed = rows.map((r) => normPath(r.at(-1)));
   const present = changed.filter((f) => fs.existsSync(path.join(dir, f)));
   for (const f of present.filter((x) => x.endsWith('.mjs'))) {
     const r = node(['--check', f], { cwd: dir, timeout: 60_000 });
@@ -476,8 +476,8 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   const pool = ['touching', 'direct', 'all'].includes(specMode) ? readSpecs(dir) : [];
   let narrowed = [];
   const symbolsOf = (file) => {
-    const row = rows.find((r) => normPath(r[r.length - 1]) === file);
-    if (!row || row[0] !== 'M' || !/.mjs$/.test(file)) return { symbols: null, why: row?.[0] !== 'M' ? `status ${row?.[0] ?? '?'}` : 'not a .mjs file' };
+    const row = rows.find((r) => normPath(r.at(-1)) === file);
+    if (row?.[0] !== 'M' || !/.mjs$/.test(file)) return { symbols: null, why: row?.[0] !== 'M' ? `status ${row?.[0] ?? '?'}` : 'not a .mjs file' };
     const diff = git(['diff', '-U0', '--no-color', `${base}..${head}`, '--', file], { cwd: dir });
     const source = git(['show', `${head}:${file}`], { cwd: dir });
     return diff.ok && source.ok ? changedExports({ source: source.stdout, ranges: headRanges(diff.stdout) }) : { symbols: null, why: 'diff unreadable' };
@@ -639,7 +639,7 @@ export function landQueue({ env = process.env } = {}) {
  */
 export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs = 5000, lane = null, commits = [], sleep = sleepSync } = {}) {
   let ticketId;
-  try { ticketId = withMachine((m) => m.enqueueLand({ lane, commitSha: commits[commits.length - 1] ?? 'unknown', commits: commits.length }), { env }); }
+  try { ticketId = withMachine((m) => m.enqueueLand({ lane, commitSha: commits.at(-1) ?? 'unknown', commits: commits.length }), { env }); }
   catch (error) { if (isMachineBusy(error)) return { ok: false, holder: null, ahead: -1, why: 'db-busy', detail: error.message }; throw error; }
   const finish = (state) => { try { withMachine((m) => m.finishLandTicket(ticketId, state), { env }); } catch { /* the reaper cancels it */ } };
   const drop = () => finish('cancelled');
@@ -738,7 +738,7 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
       const staging = job.payload.staging;
       commits = staging ? git(['rev-list', '--reverse', `${staging.base}..${staging.branch}`], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean) : [];
     } else if (!commits) {
-      if (!report || report.outcome !== 'done' || !report.commit) return { ok: false, reason: 'no-done-report', detail: `${jobId} has no done report with a commit` };
+      if (report?.outcome !== 'done' || !report.commit) return { ok: false, reason: 'no-done-report', detail: `${jobId} has no done report with a commit` };
       const list = report.base ? git(['rev-list', '--reverse', `${report.base}..${report.commit}`], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean) : [report.commit];
       commits = list.length ? list : [report.commit];
     }

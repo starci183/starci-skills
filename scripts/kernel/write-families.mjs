@@ -54,7 +54,7 @@ export function familyGuardOf(brief) {
   return featureWrites ? { families, overview } : null;
 }
 
-const slash = (p) => String(p).replace(/\\/g, '/').replace(/^\.\//, '');
+const slash = (p) => String(p).replaceAll('\\', '/').replace(/^\.\//, '');
 
 export function familyViolations(guard, ownedPaths) {
   if (!guard) return [];

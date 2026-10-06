@@ -171,7 +171,7 @@ export function registerSupervisor({ id, label, repos = [], terminal = null, ses
   const at = new Date(now).toISOString();
   const record = {
     schema: 'starci/supervisor-channel@1', id, label: String(label ?? '').trim() || id,
-    repos: [].concat(repos ?? []).map(String).map((r) => r.trim()).filter(Boolean), registeredAt: at, heartbeatAt: at,
+    repos: [repos ?? []].flat().map(String).map((r) => r.trim()).filter(Boolean), registeredAt: at, heartbeatAt: at,
     // The Orca terminal that registered (ORCA_TERMINAL_HANDLE): the [Supervisor] kernel's seat for id 'main'.
     ...(terminal ? { terminal } : {}),
     // The chat session that registered with no terminal (supervisor.mode chat): the one that drains id 'main'.
@@ -338,7 +338,7 @@ export function createBridge({
   const onStatus = async () => {
     let messages;
     try { messages = statusMessages(); } catch (error) { say(`status report failed: ${error?.message ?? error}`); return send(t().statusFailed); }
-    for (const text of [].concat(messages ?? []).filter(Boolean)) {
+    for (const text of [messages ?? []].flat().filter(Boolean)) {
       const sent = await send(text, { html: true });
       if (!sent.ok) return sent;
     }
@@ -486,7 +486,7 @@ export function createBridge({
 
   let lastSweep = -Infinity;
   const sweep = async () => {
-    if (!(sweepEveryMs >= 0) || now() - lastSweep < sweepEveryMs) return null;
+    if (sweepEveryMs < 0 || now() - lastSweep < sweepEveryMs) return null;
     lastSweep = now();
     const r = await sweepAskMessages({ repos }, { env, apiBase, fetchImpl, sleepImpl, now: now(), settings: current, warn: say });
     if (r.closed?.length || r.unlinked?.length) say(`sweep: ${r.closed.length} closed ask(s) cleared, ${r.unlinked.length} dead link(s) removed`);
@@ -516,12 +516,12 @@ export function createBridge({
 
   const onMessage = async (message) => {
     const text = typeof message.text === 'string' ? message.text : typeof message.caption === 'string' ? message.caption : null;
-    if (text == null || !text.trim()) return send(t().textOnly, { replyTo: message.message_id });
+    if (!text?.trim()) return send(t().textOnly, { replyTo: message.message_id });
     if (message.reply_to_message && !text.trim().startsWith('/')) {
       const drawn = await onDrawReply(message, text);
       if (drawn) return drawn;
     }
-    const command = /^\/([A-Za-z_]+)(?:@[A-Za-z0-9_]+)?(?:\s|$)/.exec(text.trim());
+    const command = /^\/([A-Za-z_]+)(?:@\w+)?(?:\s|$)/.exec(text.trim());
     if (!command) return onText(message, text);
     const name = command[1].toLowerCase();
     say(`command /${name}`);

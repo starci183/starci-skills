@@ -44,7 +44,7 @@ export default {
     const sent = [];
     ledger.transaction(() => {
       const now = Date.now();
-      for (const to of [...new Set(targets)]) {
+      for (const to of new Set(targets)) {
         // A Kernel re-sending after a crash sends the same message, not a second one.
         const same = pendingPeerMessagesOf(db, to).find((m) => m.from === workflowId && m.kind === kind && m.subject === subject
           && m.body === body && (m.replyTo ?? null) === replyTo);

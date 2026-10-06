@@ -18,7 +18,7 @@ import { citeBlob } from '../../../engine/db/ledger.mjs';
 export const CITATION_UNRESOLVED = 'CITATION_UNRESOLVED';
 const CITATION_ROLES = Object.freeze(['direction', 'capture', 'uat-screen', 'uat-video', 'uat-result', 'render', 'layout-capture']);
 const SHA = /^[a-f0-9]{64}$/;
-const slash = (p) => String(p).replace(/\\/g, '/');
+const slash = (p) => String(p).replaceAll('\\', '/');
 
 /**
  * Every citation in a parsed Work record: [{field, sha256, artifactId, role}]. A citation is an object with a

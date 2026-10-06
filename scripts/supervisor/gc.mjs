@@ -60,7 +60,6 @@ import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
@@ -697,7 +696,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
 
   if (want.has('lanes')) {
     let landBusy = false;
-    try { landBusy = (deps.landBusy ?? (async () => (await import('./land.mjs')).landStatus({ env }).busy))(); landBusy = await landBusy; } catch { landBusy = true; }
+    try { landBusy = await Promise.resolve((deps.landBusy ?? (async () => (await import('./land.mjs')).landStatus({ env }).busy))()); } catch { landBusy = true; }
     // The live owners of a lane: Orca's active workers over every Run (null when Orca is down or answers for one Run).
     const laneWorkers = (deps.activeWorkers ?? (() => activeWorkersAllRuns()))();
     // A removal that ever changed a main checkout stops every worktree removal until an operator clears it
@@ -705,7 +704,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     const stoppedMark = (deps.gcStop ?? (() => readSupervisor((m) => m.worktreeGcStop(), null, { env })))();
     const cursor = (deps.laneCursor ?? readLaneCursor)(env);
     const l = stoppedMark ? { items: [], freedBytes: 0, errors: [`lanes skipped: the worktree GC is stopped since ${new Date(stoppedMark.at).toISOString()} (${(stoppedMark.damage ?? []).join('; ').slice(0, 200)})`], progress: { total: 0, done: 0, complete: false, next: null, stopped: true } } : collectLanes({ apply, env, now, settings, sup, git: deps.git ?? null, landBusy, workers: laneWorkers, cursor, clock: deps.clock ?? Date.now });
-    report.progress = { ...(report.progress ?? {}), lanes: l.progress };
+    report.progress = { ...report.progress, lanes: l.progress };
     // A partial pass resumes where it stopped; a complete one starts over next time (a dry run never moves the cursor).
     if (apply && !stoppedMark) (deps.writeLaneCursor ?? writeLaneCursor)(l.progress.complete ? null : l.progress.next, env);
     if (stoppedMark) { report.ok = false; report.stopped = { reason: 'main-checkout-damaged', ...stoppedMark, since: stoppedMark.at }; }
@@ -812,8 +811,8 @@ export function describe(report) {
 }
 
 export function parseArgs(argv = []) {
-  const known = ['dry-run', 'apply', 'json', 'only', 'plan', 'holder', 'trigger'];
-  const bad = argv.filter((a) => a.startsWith('--') && !known.includes(a.slice(2)));
+  const known = new Set(['dry-run', 'apply', 'json', 'only', 'plan', 'holder', 'trigger']);
+  const bad = argv.filter((a) => a.startsWith('--') && !known.has(a.slice(2)));
   if (bad.length) return { ok: false, error: `unknown flag(s): ${bad.join(' ')}` };
   const i = argv.indexOf('--only');
   const only = i >= 0 ? String(argv[i + 1] ?? '').split(',').map((s) => s.trim()).filter(Boolean) : null;

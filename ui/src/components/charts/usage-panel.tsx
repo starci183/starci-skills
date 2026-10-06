@@ -16,12 +16,12 @@ type UsageWindow = { window: '24h' | '7d'; recorded: boolean; byModel: Group[]; 
 const tokens = (row: UsageRow) => (row.input ?? 0) + (row.output ?? 0);
 const dayLabel = (key: string) => { const [, m, d] = key.split('-'); return `${d}/${m}`; };
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({ label, value, hint }: Readonly<{ label: string; value: string; hint?: string }>) {
   return <div className="min-w-0 rounded-lg bg-muted/50 p-3"><div className="text-xs text-muted-foreground">{label}</div><div className="mt-1 truncate text-xl font-semibold tabular-nums" title={hint}>{value}</div></div>;
 }
 
 /** Horizontal bars: input (blue) and output (green) per row, sorted by the server. */
-function TokenRows({ title, rows, name }: { title: string; rows: Group[]; name: (k: string) => string }) {
+function TokenRows({ title, rows, name }: Readonly<{ title: string; rows: Group[]; name: (k: string) => string }>) {
   const max = Math.max(1, ...rows.map(tokens));
   return <div className="min-w-0">
     <h4 className="m-0 mb-2 text-xs font-medium text-muted-foreground">{title}</h4>
@@ -38,7 +38,7 @@ function TokenRows({ title, rows, name }: { title: string; rows: Group[]; name: 
 }
 
 /** Cost (or, when no cost was reported, token) per day as columns. */
-function PerDay({ rows }: { rows: Group[] }) {
+function PerDay({ rows }: Readonly<{ rows: Group[] }>) {
   const hasCost = rows.some(r => r.costUsd != null);
   const value = (r: Group) => hasCost ? r.costUsd : r.input == null && r.output == null ? null : tokens(r);
   const max = Math.max(1e-9, ...rows.flatMap(r => value(r) == null ? [] : [value(r)!]));
@@ -54,7 +54,7 @@ function PerDay({ rows }: { rows: Group[] }) {
   </div>;
 }
 
-export function UsagePanel({ metrics, window: win, project, onRetryMetrics }: { metrics: QuerySnapshot<OpsMetric[]>; window: '24h' | '7d'; project: string; onRetryMetrics: () => void }) {
+export function UsagePanel({ metrics, window: win, project, onRetryMetrics }: Readonly<{ metrics: QuerySnapshot<OpsMetric[]>; window: '24h' | '7d'; project: string; onRetryMetrics: () => void }>) {
   const url = `/api/metrics/usage?window=${win}${project ? `&project=${encodeURIComponent(project)}` : ''}`;
   const query = useApiQuery<UsageWindow>(url, { topics: ['workers'], intervalMs: 30_000 });
   const usage = query.data;

@@ -9,36 +9,6 @@ import { loadAdapter } from '../agent/lib.mjs';
 import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability, loadModelRegistry } from '../agent/models.mjs';
 import { parseJson } from '../lib/json.mjs';
 
-export function createKernelRoute({ skillRoot, repo, agentOverride, ownerRoot }) {
-const ROUTE_MODEL = path.join(skillRoot, 'scripts', 'route', 'route-model.mjs');
-const KERNEL_ROUTE = { kind: 'model.manageWorkflow', risk: 'high' }; // selection.yaml kernelFunctionKinds
-// The pool difficulty a Kernel seat launches at: kernel functions are think work at the hard floor (runtimes.yaml roleOfKind note); runtimes.yaml pools are keyed by difficulty, not by risk.
-const KERNEL_DIFFICULTY = 'hard';
-const ownerFileLabel = (file) => ownerRoot === skillRoot ? path.relative(skillRoot, file) : file;
-
-// Provider liveness probe: scripts/agent/quota/index.mjs exports
-// probeQuota(provider) → {state, usedPercent, detail}; 'dead' means the
-// provider is not authenticated. It is imported lazily and every failure
-// degrades to 'unknown' — a probe is evidence, never a verdict, and a kernel
-// must still boot when the provider CLI cannot answer. Probes are memoized
-// per process — one account-list read serves every candidate.
-const probeCache = new Map();
-async function probeAgent(agent) {
-  if (probeCache.has(agent)) return probeCache.get(agent);
-  const file = path.join(skillRoot, 'scripts', 'agent', 'quota', 'index.mjs');
-  let probe = { state: 'unknown', detail: 'quota probe not installed' };
-  if (fs.existsSync(file)) {
-    try {
-      const mod = await import(pathToFileURL(file).href);
-      probe = typeof mod.probeQuota === 'function'
-        ? (await mod.probeQuota(agent) ?? { state: 'unknown' })
-        : { state: 'unknown', detail: 'quota module exports no probeQuota' };
-    } catch (e) { probe = { state: 'unknown', detail: `quota probe threw: ${e.message}` }; }
-  }
-  probeCache.set(agent, probe && typeof probe === 'object' ? probe : { state: 'unknown' });
-  return probeCache.get(agent);
-}
-
 // The pool target a provider pin launches on: the registry.yaml pool owned by
 // that provider that carries the kernel-manager role (decide) first, else the
 // provider's first pool.
@@ -70,6 +40,36 @@ function agentForModel(model) {
 function agentForTarget(target) {
   const doc = loadModelRegistry();
   return doc?.pools?.[target]?.provider ?? doc?.targets?.[target]?.runtime ?? null;
+}
+
+export function createKernelRoute({ skillRoot, repo, agentOverride, ownerRoot }) {
+const ROUTE_MODEL = path.join(skillRoot, 'scripts', 'route', 'route-model.mjs');
+const KERNEL_ROUTE = { kind: 'model.manageWorkflow', risk: 'high' }; // selection.yaml kernelFunctionKinds
+// The pool difficulty a Kernel seat launches at: kernel functions are think work at the hard floor (runtimes.yaml roleOfKind note); runtimes.yaml pools are keyed by difficulty, not by risk.
+const KERNEL_DIFFICULTY = 'hard';
+const ownerFileLabel = (file) => ownerRoot === skillRoot ? path.relative(skillRoot, file) : file;
+
+// Provider liveness probe: scripts/agent/quota/index.mjs exports
+// probeQuota(provider) → {state, usedPercent, detail}; 'dead' means the
+// provider is not authenticated. It is imported lazily and every failure
+// degrades to 'unknown' — a probe is evidence, never a verdict, and a kernel
+// must still boot when the provider CLI cannot answer. Probes are memoized
+// per process — one account-list read serves every candidate.
+const probeCache = new Map();
+async function probeAgent(agent) {
+  if (probeCache.has(agent)) return probeCache.get(agent);
+  const file = path.join(skillRoot, 'scripts', 'agent', 'quota', 'index.mjs');
+  let probe = { state: 'unknown', detail: 'quota probe not installed' };
+  if (fs.existsSync(file)) {
+    try {
+      const mod = await import(pathToFileURL(file).href);
+      probe = typeof mod.probeQuota === 'function'
+        ? (await mod.probeQuota(agent) ?? { state: 'unknown' })
+        : { state: 'unknown', detail: 'quota module exports no probeQuota' };
+    } catch (e) { probe = { state: 'unknown', detail: `quota probe threw: ${e.message}` }; }
+  }
+  probeCache.set(agent, probe && typeof probe === 'object' ? probe : { state: 'unknown' });
+  return probeCache.get(agent);
 }
 
 // One provider's availability for a kernel group member: the quota probe plus
@@ -201,7 +201,7 @@ async function routeKernel(db, owner) {
     };
   }
   const members = [];
-  for (const [i, c] of [pick, ...(result.fallbackChain ?? [])].entries()) {
+  for (const [, c] of [pick, ...(result.fallbackChain ?? [])].entries()) {
     const agent = agentForTarget(c.target);
     if (!agent) { warn(`profile for runtimePool '${c.target}' declares no execution agent`); continue; }
     // Unpinned routing never invents a hard-coded Devin fallback: only

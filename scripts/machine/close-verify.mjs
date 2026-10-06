@@ -30,7 +30,6 @@
 //
 // A WORKER's release goes through scripts/machine/worker-close.mjs (release, this terminal close, and a proof that no process of the terminal's
 // shell tree remains): `worker-release` alone does not end every agent (a released cursor worker kept running). This file proves a terminal's close.
-import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalWait } from '../api/orca/terminal-wait.mjs';

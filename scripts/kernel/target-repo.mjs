@@ -85,7 +85,7 @@ const FRONTEND_OPS = (() => {
 const REPO_PREFIX = /^repository:([^/\\]+)[/\\]?(.*)$/;
 // A path without the trailing glob a directory grant may use.
 const tidy = (p) => String(p).replace(/(^|\/)\*{1,2}$/, '').replace(/\/+$/, '') || '.';
-const slashed = (p) => String(p).replace(/\\/g, '/');
+const slashed = (p) => String(p).replaceAll(/\\/g, '/');
 
 // In a bound app every owned path is app-relative - the ONE form gate.mjs (--root <app> --changed), the knowledge and every
 // finding use: be/<path>, fe/<path>, the Work dir (.starciwork/<path>) or a path of the app root (package.json, hfs.json,

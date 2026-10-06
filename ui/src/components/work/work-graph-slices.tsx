@@ -28,7 +28,7 @@ const colorLabel = (color: string | null) => color === 'gray' ? t('Not started')
 const edgeDash = (kind: string | null) => kind === 'contract' ? '6 3' : kind === 'order' ? '2 3' : undefined;
 
 /** The scope's work graph (slices + data edges) from work_graph_versions, layered left to right by longest path. */
-export function WorkGraphSlices({ graph }: { graph: WorkGraphView | null }) {
+export function WorkGraphSlices({ graph }: Readonly<{ graph: WorkGraphView | null }>) {
   const arrowId = useId();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   if (!graph) return <p className="rounded-lg border p-4 text-sm text-muted-foreground">{t('No slice graph for this scope yet (the work graph has not been written).')}</p>;
@@ -44,8 +44,7 @@ export function WorkGraphSlices({ graph }: { graph: WorkGraphView | null }) {
     outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), edge]);
   }
   const queue = graph.nodes.filter(n => remaining.get(n.id) === 0 && !evidence.unresolved.has(n.id)).map(n => n.id);
-  for (let cursor = 0; cursor < queue.length; cursor++) {
-    const from = queue[cursor];
+  for (const from of queue) {
     for (const edge of outgoing.get(from) ?? []) {
       layer.set(edge.to, Math.max(layer.get(edge.to) ?? 0, (layer.get(from) ?? 0) + 1));
       const count = (remaining.get(edge.to) ?? 0) - 1;
@@ -78,7 +77,7 @@ export function WorkGraphSlices({ graph }: { graph: WorkGraphView | null }) {
     {graph.reason && <p className="text-xs text-muted-foreground">{graph.reason}</p>}
     {anomalySections.some(section => section.rows.length > 0) && <details className="rounded-lg border bg-card p-3 text-xs">
       <summary className="flex cursor-pointer items-center gap-2 font-medium"><AlertTriangle className="size-4 shrink-0" aria-hidden="true" />{t('Recorded dependency anomalies')}</summary>
-      <div className="mt-3 space-y-3 text-muted-foreground">{anomalySections.map(({ label, rows }) => rows.length > 0 && <div key={label}><strong className="text-foreground">{label}</strong><ul className="mt-1 space-y-1">{rows.map((edge, index) => <li key={index} className="break-all font-mono">{edgeLabel(edge)}</li>)}</ul></div>)}<p>{t('Dependency order unresolved')}: <span className="break-all font-mono">{[...unresolved].join(', ') || '—'}</span></p></div>
+      <div className="mt-3 space-y-3 text-muted-foreground">{anomalySections.map(({ label, rows }) => rows.length > 0 && <div key={label}><strong className="text-foreground">{label}</strong><ul className="mt-1 space-y-1">{rows.map((edge, index) => <li key={`${edge.from}-${edge.to}-${edge.kind ?? ''}-${index}`} className="break-all font-mono">{edgeLabel(edge)}</li>)}</ul></div>)}<p>{t('Dependency order unresolved')}: <span className="break-all font-mono">{[...unresolved].join(', ') || '—'}</span></p></div>
     </details>}
     {graph.nodes.length === 0 && <p className="rounded-lg border p-4 text-sm text-muted-foreground">{t('This recorded graph has no nodes.')}</p>}
     <div className="max-w-full overflow-x-auto rounded-lg border bg-card focus-visible:outline-2 focus-visible:outline-ring" tabIndex={0} aria-label={t('Work slice graph')}>
@@ -88,7 +87,7 @@ export function WorkGraphSlices({ graph }: { graph: WorkGraphView | null }) {
         {edges.map((e, i) => {
           const a = pos.get(e.from); const b = pos.get(e.to); if (!a || !b) return null;
           const x1 = a.x + NODE_W; const y1 = a.y + NODE_H / 2; const x2 = b.x; const y2 = b.y + NODE_H / 2; const mx = (x1 + x2) / 2;
-          return <path key={i} d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2 - 2},${y2}`} fill="none" strokeWidth="1.5" strokeDasharray={edgeDash(e.kind)} markerEnd={`url(#${arrowId})`} style={{ stroke: 'var(--muted-foreground)' }}>
+          return <path key={`${e.from}-${e.to}-${e.kind ?? ''}-${i}`} d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2 - 2},${y2}`} fill="none" strokeWidth="1.5" strokeDasharray={edgeDash(e.kind)} markerEnd={`url(#${arrowId})`} style={{ stroke: 'var(--muted-foreground)' }}>
             <title>{edgeLabel(e)}</title>
           </path>;
         })}
@@ -118,7 +117,7 @@ export function WorkGraphSlices({ graph }: { graph: WorkGraphView | null }) {
         {[{ label: t('Reads'), value: selectedNode.reads }, { label: t('Requirements'), value: selectedNode.frs }, { label: t('Shapes'), value: selectedNode.shapes }, { label: t('Inferred fields'), value: selectedNode.inferred }].map(({ label, value }) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="mt-0.5 break-all font-mono">{listLabel(value)}</dd></div>)}
       </dl>
       <div className="mt-3 border-t pt-3"><p className="text-muted-foreground">{t('Owned paths')}</p>{selectedNode.ownedPaths == null ? <p className="mt-1">—</p> : <><ul className="mt-1 space-y-1">{selectedNode.ownedPaths.map(path => <li key={path} className="break-all font-mono">{path}</li>)}</ul>{selectedNode.ownedPaths.length === 0 && <p className="mt-1">{t('None recorded')}</p>}</>}</div>
-      <div className="mt-3 border-t pt-3"><p className="text-muted-foreground">{t('Recorded node edges')}</p><ul className="mt-1 space-y-1">{graph.edges.filter(edge => edge.from === selectedNode.id || edge.to === selectedNode.id).map((edge, index) => <li key={index} className="break-all font-mono">{edgeLabel(edge)}</li>)}</ul>{graph.edges.every(edge => edge.from !== selectedNode.id && edge.to !== selectedNode.id) && <p className="mt-1">{t('None recorded')}</p>}</div>
+      <div className="mt-3 border-t pt-3"><p className="text-muted-foreground">{t('Recorded node edges')}</p><ul className="mt-1 space-y-1">{graph.edges.filter(edge => edge.from === selectedNode.id || edge.to === selectedNode.id).map((edge, index) => <li key={`${edge.from}-${edge.to}-${edge.kind ?? ''}-${index}`} className="break-all font-mono">{edgeLabel(edge)}</li>)}</ul>{graph.edges.every(edge => edge.from !== selectedNode.id && edge.to !== selectedNode.id) && <p className="mt-1">{t('None recorded')}</p>}</div>
       {unresolved.has(selectedNode.id) && <p className="mt-3 text-muted-foreground">{t('Dependency order unresolved')}</p>}
     </div>}
   </div>;

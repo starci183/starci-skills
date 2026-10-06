@@ -37,7 +37,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { safeRemoveWorktree, createScratchWorktree } from '../machine/worktree-git.mjs';
@@ -53,12 +52,12 @@ import { SKILL_ROOT, readSupervisor, withSupervisor, supervisorSettings, product
 
 // The secret scan's patterns live in scripts/lib/secret-patterns.mjs, so the typed-log redaction
 // (scripts/kernel/typed-logs.mjs) imports the very same rules without loading the supervisor.
-import { FORBIDDEN_FILES, SECRET_PATTERNS, secretHits } from '../lib/secret-patterns.mjs';
+import { FORBIDDEN_FILES, secretHits } from '../lib/secret-patterns.mjs';
 import { foldCase, realPath, slash } from '../lib/path-key.mjs';
 import { isSopsEnvelope, setCommand } from '../lib/sops-envelope.mjs';
 import { forEachFileLine } from '../lib/read-text.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs'; import { isMain } from '../lib/is-main.mjs'; import { byCodeUnit } from '../lib/list.mjs';
-export { FORBIDDEN_FILES, SECRET_PATTERNS };
+export { FORBIDDEN_FILES }; export { SECRET_PATTERNS } from '../lib/secret-patterns.mjs';
 
 /**
  * Scan a unified diff (added lines only) and its file list. Returns [{file, line, pattern}] - never the value.

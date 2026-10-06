@@ -21,6 +21,7 @@ import { lineageHeadById, typedIncidents } from './gate-conditions.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
+import { recordPathsOf } from './verbs/shared/rows.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 /** How long a queued job may block another workflow before its own Kernel is told
@@ -28,14 +29,12 @@ import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 export const BLOCKING_HEADS_UP_MS = allocationMs('waiterPriority.blockingHeadsUpMs');
 export const BLOCKING_HEADS_UP_AUTO = 'blocking-waiters';
 const SETTLED = SETTLED_JOB_LIST;
-const GATE_KINDS = ['owner-gate', 'owner-gate-pending', 'peer-wait'];
+const GATE_KINDS = new Set(['owner-gate', 'owner-gate-pending', 'peer-wait']);
 const PEER_MESSAGE = 'peer-message';
 // Job ids are op-<op>-<10 hex> (starci kernel enqueue).
 const JOB_ID = /\bop-[a-z][a-z0-9.-]*?-[0-9a-f]{10}\b/gi;
 
 const norm = (p) => posixPath(p).replace(/\/+$/, '');
-const ownedRecordPaths = (payload) => (payload?.owned_paths ?? [])
-  .map((p) => norm(typeof p === 'string' ? p : p?.path)).filter((p) => p.startsWith('.starciwork/'));
 const round2 = (n) => Math.round(n * 100) / 100;
 
 /**
@@ -73,7 +72,7 @@ export function blockingJobs(db, { now = Date.now() } = {}) {
       if (cond.type === 'record') {
         const want = norm(cond.path);
         for (const job of open) {
-          if (ownedRecordPaths(job.payload).some((owned) => sameOrUnder(want, owned) || sameOrUnder(owned, want))) {
+          if (recordPathsOf(job.payload, norm).some((owned) => sameOrUnder(want, owned) || sameOrUnder(owned, want))) {
             add(job, { workflowId: incident.workflowId, via: 'until-record', ref: incident.incidentId, since: incident.since });
           }
         }
@@ -83,7 +82,7 @@ export function blockingJobs(db, { now = Date.now() } = {}) {
 
   // Free-text gates of another workflow naming the job.
   const gates = db.prepare("SELECT incident_id,workflow_id,last_progress,updated_at FROM incidents WHERE status='open' ORDER BY updated_at").all()
-    .filter((row) => live.has(row.workflow_id) && GATE_KINDS.includes(/^\[([^\]]+)\]/.exec(row.last_progress ?? '')?.[1]));
+    .filter((row) => live.has(row.workflow_id) && GATE_KINDS.has(/^\[([^\]]+)\]/.exec(row.last_progress ?? '')?.[1]));
   for (const gate of gates) {
     const raised = db.prepare("SELECT payload_json,created_at FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1")
       .get(gate.workflow_id, gate.incident_id);
@@ -101,13 +100,13 @@ export function blockingJobs(db, { now = Date.now() } = {}) {
     .filter((row) => row.payload.kind === 'request' && row.payload.from && live.has(row.workflow_id));
   for (const request of requests) {
     const text = [request.payload.subject, request.payload.body, ...(Array.isArray(request.payload.refs) ? request.payload.refs : [])].join(' ');
-    const normText = text.replace(/\\/g, '/');
+    const normText = text.replaceAll('\\', '/');
     const waiter = { workflowId: request.payload.from, via: 'peer-request', ref: request.key, since: request.payload.at ?? request.created_at };
     for (const job of jobsNamed(text)) if (job.workflow_id === request.workflow_id) add(job, waiter);
     for (const job of open.filter((row) => row.workflow_id === request.workflow_id)) {
       const op = job.op_id ?? job.payload.opId;
-      const opNamed = op && new RegExp(`(^|[^A-Za-z0-9.-])${op.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^A-Za-z0-9-]|$)`).test(text);
-      const recordNamed = ownedRecordPaths(job.payload).some((owned) => normText.includes(owned));
+      const opNamed = op && new RegExp(`(^|[^A-Za-z0-9.-])${op.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}([^A-Za-z0-9-]|$)`).test(text);
+      const recordNamed = recordPathsOf(job.payload, norm).some((owned) => normText.includes(owned));
       if (opNamed || recordNamed) add(job, waiter);
     }
   }

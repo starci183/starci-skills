@@ -363,7 +363,7 @@ function checkConsistencyTree(workRoot, records, sink) {
       const featureShown = path.relative(root, featureFile).replaceAll('\\', '/');
       let feature = null;
       try { feature = fs.existsSync(featureFile) ? parseYaml(fs.readFileSync(featureFile, 'utf8')) : null; } catch { feature = null; }
-      if (!feature || feature.schema !== 'work/feature@1') {
+      if (feature?.schema !== 'work/feature@1') {
         refuse(entryShown, 'CATALOG_DIRTY', `entry points at ${featureShown}, which is ${feature ? `a ${feature.schema}` : 'absent'} - every catalog entry needs a work/feature@1 node beside it`);
         continue;
       }

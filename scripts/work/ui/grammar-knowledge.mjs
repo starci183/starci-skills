@@ -31,7 +31,7 @@ export const GRAMMAR_FAMILIES=Object.freeze([
 ]);
 
 const read=file=>fs.readFileSync(file,'utf8');
-const lineAt=(text,offset)=>{let line=1;for(let i=0;i<offset&&i<text.length;i++)if(text.charCodeAt(i)===10)line++;return line;};
+const lineAt=(text,offset)=>{let line=1;for(let i=0;i<offset&&i<text.length;i++)if(text.codePointAt(i)===10)line++;return line;};
 const uniq=values=>[...new Set(values)];
 const byName=(a,b)=>a<b?-1:a>b?1:0;
 
@@ -89,7 +89,7 @@ export function lexSource(source){
     if(c==='{'){braces++;i++;continue;}
     if(c==='}'){
       braces--;
-      if(templateDepth.length&&templateDepth[templateDepth.length-1]===braces){
+      if(templateDepth.length&&templateDepth.at(-1)===braces){
         templateDepth.pop();
         const result=scanTemplate(i+1);
         if(result.open){templateDepth.push(braces);braces++;}
@@ -126,7 +126,7 @@ export function cssDeclarations(css){
     else if(c==='}'||c===';'){
       const text=code.slice(segmentStart,i);
       const match=/^\s*(--[A-Za-z0-9_-]+)\s*:([\s\S]*)$/.exec(text);
-      if(match&&stack.length&&!stack[stack.length-1].startsWith('@')){
+      if(match&&stack.length&&!stack.at(-1).startsWith('@')){
         const offset=segmentStart+text.indexOf(match[1]);
         declarations.push({name:match[1],value:match[2].replace(/\s+/g,' ').trim(),context:[...stack],line:lineAt(code,offset)});
       }
@@ -187,18 +187,18 @@ export function registryNames(packageRoot){
   const commonDir=path.join(packageRoot,'src','common');
   const registry=lexSource(read(path.join(commonDir,'registry.tsx'))).code;
   const body=/COMMON_GRAMMAR_COMPONENTS\s*=\s*Object\.freeze\(\{([\s\S]*?)\}\s*as const\)/.exec(registry);
-  if(!body)throw Error('COMMON_GRAMMAR_COMPONENTS was not found in src/common/registry.tsx');
+  if(!body)throw new Error('COMMON_GRAMMAR_COMPONENTS was not found in src/common/registry.tsx');
   const names=[];
   const groups=[];
   for(const part of body[1].split(',').map(item=>item.trim()).filter(Boolean)){
     const spread=/^\.\.\.([A-Z0-9_]+)$/.exec(part);
     if(!spread){names.push({name:part,group:'base'});continue;}
     const file=fs.readdirSync(commonDir).filter(name=>/^renderers-.+\.ts$/.test(name))
-      .map(name=>path.join(commonDir,name)).find(candidate=>new RegExp(`export const ${spread[1]}\\b`).test(read(candidate)));
-    if(!file)throw Error(`${spread[1]} is spread into COMMON_GRAMMAR_COMPONENTS but no renderers-*.ts defines it`);
+      .map(name=>path.join(commonDir,name)).find(candidate=>new RegExp(String.raw`export const ${spread[1]}\b`).test(read(candidate)));
+    if(!file)throw new Error(`${spread[1]} is spread into COMMON_GRAMMAR_COMPONENTS but no renderers-*.ts defines it`);
     const group=/renderers-(.+)\.ts$/.exec(file)[1];
     groups.push({group,map:spread[1],file:slash(path.relative(packageRoot,file))});
-    const map=new RegExp(`export const ${spread[1]}\\s*=\\s*Object\\.freeze\\(\\{([\\s\\S]*?)\\}\\s*as const\\)`).exec(lexSource(read(file)).code);
+    const map=new RegExp(String.raw`export const ${spread[1]}\s*=\s*Object\.freeze\(\{([\s\S]*?)\}\s*as const\)`).exec(lexSource(read(file)).code);
     for(const name of map[1].split(',').map(item=>item.trim()).filter(Boolean))names.push({name,group});
   }
   return {names,groups};
@@ -213,10 +213,10 @@ function barrelExports(packageRoot){
     const file=path.join(commonDir,name);
     for(const statement of exportStatements(read(file))){
       const moduleFile=resolveModule(file,statement.from);
-      const types=statement.names.filter(part=>part.startsWith('type ')).map(part=>part.slice(5).trim());
+      const types=new Set(statement.names.filter(part=>part.startsWith('type ')).map(part=>part.slice(5).trim()));
       for(const part of statement.names.filter(item=>!item.startsWith('type '))){
         const value=part.split(/\s+as\s+/).pop().trim();
-        exported.set(value,{moduleFile,propsType:types.includes(`${value}Props`)?`${value}Props`:null,barrel:name});
+        exported.set(value,{moduleFile,propsType:types.has(`${value}Props`)?`${value}Props`:null,barrel:name});
       }
     }
   }
@@ -238,7 +238,7 @@ const classesIn=value=>[...value.matchAll(CLASS_LITERAL)].map(m=>m[1]);
 
 /** The text of one top-level exported declaration: from its line to the next top-level `export`. */
 function declarationText(code,name){
-  const start=new RegExp(`^export\\s+(?:const|function|let|class)\\s+${name}\\b`,'m').exec(code);
+  const start=new RegExp(String.raw`^export\s+(?:const|function|let|class)\s+${name}\b`,'m').exec(code);
   if(!start)return null;
   const rest=code.slice(start.index+1);
   const next=/^export\s/m.exec(rest);
@@ -321,7 +321,7 @@ function closedValuesOf(moduleFile,propsType,aliases){
     if(seen.has(prop))continue;
     const cleaned=type.replace(/\s*\|\s*undefined$/,'').trim();
     if(isLiteralUnion(cleaned)){seen.add(prop);closed.push({prop,values:literalValues(cleaned)});continue;}
-    if(!/^[A-Z]\w*$/.test(cleaned)||/Props$/.test(cleaned))continue;
+    if(!/^[A-Z]\w*$/.test(cleaned)||cleaned.endsWith('Props'))continue;
     const alias=aliases.get(cleaned);
     if(alias&&path.dirname(path.resolve(alias.file))===moduleDir){seen.add(prop);closed.push({prop,values:alias.values});continue;}
     if(alias||['IconSource','PresentationState'].includes(cleaned)){seen.add(prop);closed.push({prop,type:cleaned});}
@@ -332,7 +332,7 @@ function closedValuesOf(moduleFile,propsType,aliases){
 /** One renderer's census: kind, source, classes and rule ids, and closed prop values. */
 function censusRenderer({name,group},{packageRoot,exported,catalog,rendererNames,aliases}){
   const entry=exported.get(name);
-  if(!entry||!entry.moduleFile)throw Error(`${name} is registered in COMMON_GRAMMAR_COMPONENTS but no Common barrel re-exports it`);
+  if(!entry?.moduleFile)throw new Error(`${name} is registered in COMMON_GRAMMAR_COMPONENTS but no Common barrel re-exports it`);
   const moduleFile=entry.moduleFile;
   const coreDir=path.join(packageRoot,'src','core');
   const relative=slash(path.relative(coreDir,moduleFile));
@@ -476,7 +476,7 @@ function censusFamilyTokens(packageRoot,family,{commonTokens=[],include=[]}={}){
   const rows=new Map();
   for(const sheet of sheets){
     for(const d of cssDeclarations(read(sheet))){
-      const selectors=d.context[d.context.length-1].split(',').map(s=>s.trim());
+      const selectors=d.context.at(-1).split(',').map(s=>s.trim());
       const atRules=d.context.slice(0,-1).filter(p=>p.startsWith('@media')||p.startsWith('@supports'));
       const onRoot=selectors.every(s=>s.startsWith(scope)&&!/\s/.test(s.slice(scope.length)));
       if(!onRoot)continue;
@@ -515,17 +515,17 @@ function censusFamilyTokens(packageRoot,family,{commonTokens=[],include=[]}={}){
 /** Loads a family's `dna.ts` by stripping its types; every exported frozen object is returned. */
 export async function loadDnaModule(file){
   const source=read(file);
-  if(typeof module.stripTypeScriptTypes!=='function')throw Error('this Node has no module.stripTypeScriptTypes (needs >= 22.13)');
+  if(typeof module.stripTypeScriptTypes!=='function')throw new Error('this Node has no module.stripTypeScriptTypes (needs >= 22.13)');
   const emit=process.emitWarning;
   process.emitWarning=(warning,...rest)=>{if(!String(warning?.message??warning).includes('stripTypeScriptTypes'))emit.call(process,warning,...rest);};
   let js;
   try{js=module.stripTypeScriptTypes(source,{mode:'strip'});}finally{process.emitWarning=emit;}
-  if(/^\s*import\s/m.test(js))throw Error(`${slash(file)} imports another module; the DNA module must stay self-contained`);
+  if(/^\s*import\s/m.test(js))throw new Error(`${slash(file)} imports another module; the DNA module must stay self-contained`);
   const exported=await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
   return Object.fromEntries(Object.entries(exported).filter(([,value])=>value&&typeof value==='object'));
 }
 
-const plain=value=>JSON.parse(JSON.stringify(value));
+const plain=value=>structuredClone(value);
 
 // ---------------------------------------------------------------------------
 // The whole census.
@@ -540,7 +540,7 @@ export async function censusGrammar({packageRoot=defaultPaths().packageRoot}={})
     return fs.existsSync(full)?fs.readdirSync(full).filter(name=>name.endsWith('.css')).map(name=>stripCssComments(read(path.join(full,name)))):[];
   }).join('\n');
   const emitted=uniq(renderers.flatMap(r=>r.classes)).sort(byName);
-  const painted=emitted.filter(cls=>new RegExp(`\\.${cls.replace(/[-]/g,'\\-')}(?![\\w-])`).test(shipped));
+  const painted=emitted.filter(cls=>new RegExp(String.raw`\.${cls.replaceAll('-',String.raw`\-`)}(?![\w-])`).test(shipped));
   const families={};
   for(const family of GRAMMAR_FAMILIES.filter(f=>f.dnaModule)){
     const dna=plain(await loadDnaModule(path.join(packageRoot,family.dnaModule)));
@@ -588,7 +588,7 @@ function censusDigests(packageRoot,files){
 // ---------------------------------------------------------------------------
 
 const q=value=>JSON.stringify(String(value));
-const key=value=>/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)?value:q(value);
+const key=value=>/^[A-Za-z_]\w*$/.test(value)?value:q(value);
 const scalar=value=>typeof value==='number'||typeof value==='boolean'?String(value):value===null?'null':q(value);
 const flow=list=>`[${list.map(q).join(', ')}]`;
 
@@ -603,10 +603,7 @@ function yamlObject(object,indent){
 function yamlRenderers(renderers,{closedValues=false,source=true}={}){
   const lines=['renderers:'];
   for(const r of renderers){
-    lines.push(`  - component: ${q(r.component)}`);
-    lines.push(`    propsType: ${r.propsType?q(r.propsType):'null'}`);
-    lines.push(`    kind: ${q(r.kind)}`);
-    lines.push(`    group: ${q(r.group)}`);
+    lines.push(`  - component: ${q(r.component)}`,`    propsType: ${r.propsType?q(r.propsType):'null'}`,`    kind: ${q(r.kind)}`,`    group: ${q(r.group)}`);
     if(source)lines.push(`    source: ${q(r.source)}`);
     if(closedValues){
       if(!r.closedValues.length)lines.push('    closedValues: []');
@@ -619,8 +616,7 @@ function yamlRenderers(renderers,{closedValues=false,source=true}={}){
         }
       }
     }
-    lines.push(`    claims: ${flow(r.claims)}`);
-    lines.push(`    computedClaims: ${flow(r.computedClaims)}`);
+    lines.push(`    claims: ${flow(r.claims)}`,`    computedClaims: ${flow(r.computedClaims)}`);
     if(!r.classes.length)lines.push('    classes: []');
     else{lines.push('    classes:');for(const c of r.classes)lines.push(`      - ${q(c)}`);}
   }
@@ -664,14 +660,14 @@ export function replaceBlock(text,name,replacement,{parent=null}={}){
   let start=-1,end=lines.length;
   if(parent===null){
     start=lines.findIndex(line=>line.startsWith(`${name}:`));
-    if(start<0)throw Error(`no top-level \`${name}:\` block`);
+    if(start<0)throw new Error(`no top-level \`${name}:\` block`);
     for(let i=start+1;i<lines.length;i++)if(/^[A-Za-z]/.test(lines[i])){end=i;break;}
     while(end>start+1&&lines[end-1].trim()==='')end--;
   }else{
     const top=lines.findIndex(line=>line.startsWith(`${parent}:`));
-    if(top<0)throw Error(`no top-level \`${parent}:\` block`);
+    if(top<0)throw new Error(`no top-level \`${parent}:\` block`);
     start=lines.findIndex((line,i)=>i>top&&line.startsWith(`  ${name}:`));
-    if(start<0)throw Error(`no \`${parent}.${name}\` block`);
+    if(start<0)throw new Error(`no \`${parent}.${name}\` block`);
     for(let i=start+1;i<lines.length;i++)if(!/^(\s{3,}|\s*$)/.test(lines[i])||/^\S/.test(lines[i])){end=i;break;}
     while(end>start+1&&lines[end-1].trim()==='')end--;
   }
@@ -760,8 +756,8 @@ export async function checkGrammarKnowledge({packageRoot=defaultPaths().packageR
     for(const [name,value] of Object.entries(expected))if(counts[name]!==value)findings.push({file,what:`identity.counts.${name}`,detail:`snapshot ${counts[name]} but source ${value}`});
   }
   const catalog=readYaml(path.join(grammarRoot,'index.yaml'));
-  const listed=(catalog.families??[]).map(f=>f.id);
-  for(const family of GRAMMAR_FAMILIES)if(!listed.includes(family.knowledge))findings.push({file:'index.yaml',what:'families',detail:`no \`${family.knowledge}\` family entry`});
+  const listed=new Set((catalog.families??[]).map(f=>f.id));
+  for(const family of GRAMMAR_FAMILIES)if(!listed.has(family.knowledge))findings.push({file:'index.yaml',what:'families',detail:`no \`${family.knowledge}\` family entry`});
   for(const topic of catalog.topics??[]){
     if(!fs.existsSync(path.join(grammarRoot,topic.path)))findings.push({file:'index.yaml',what:`topics.${topic.id}`,detail:`${topic.path} does not exist`});
   }
@@ -811,7 +807,7 @@ export async function writeGrammarKnowledge({packageRoot=defaultPaths().packageR
   const census=await censusGrammar({packageRoot});
   const written=[];
   const commonFile=path.join(grammarRoot,'common','DNA.yaml');
-  let text=withVersion(read(commonFile).replace(/\r\n/g,'\n'),census.version);
+  let text=withVersion(read(commonFile).replaceAll('\r\n','\n'),census.version);
   text=replaceBlock(text,'tokens',yamlCommonTokens(census.commonTokens));
   text=replaceBlock(text,'renderers',yamlRenderers(census.renderers,{closedValues:false}));
   const gaps=(parseYaml(text).gaps??[]).length;
@@ -822,7 +818,7 @@ export async function writeGrammarKnowledge({packageRoot=defaultPaths().packageR
     const file=path.join(grammarRoot,family.knowledge,'DNA.yaml');
     if(!fs.existsSync(file))continue;
     const measured=census.families[family.knowledge];
-    let doc=withVersion(read(file).replace(/\r\n/g,'\n'),census.version);
+    let doc=withVersion(read(file).replaceAll('\r\n','\n'),census.version);
     doc=replaceBlock(doc,'dna',`dna:\n${yamlObject(measured.dna,2)}`);
     doc=replaceBlock(doc,'tokens',yamlFamilyTokens(measured.tokens));
     doc=replaceBlock(doc,'renderers',yamlRenderers(census.renderers,{closedValues:true}));
@@ -833,7 +829,7 @@ export async function writeGrammarKnowledge({packageRoot=defaultPaths().packageR
     fs.writeFileSync(file,doc);written.push(`${family.knowledge}/DNA.yaml`);
     const index=path.join(grammarRoot,family.knowledge,'index.yaml');
     if(fs.existsSync(index)){
-      const before=read(index).replace(/\r\n/g,'\n'),after=withVersion(before,census.version);
+      const before=read(index).replaceAll('\r\n','\n'),after=withVersion(before,census.version);
       if(after!==before){fs.writeFileSync(index,after);written.push(`${family.knowledge}/index.yaml`);}
     }
   }

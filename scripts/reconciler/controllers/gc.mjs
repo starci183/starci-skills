@@ -149,7 +149,7 @@ function sweepItem(i) {
 
 export function createGcController(overrides = {}) {
   const deps = { ...liveDeps, ...overrides };
-  const settings = { ...gcControllerSettings(), ...(overrides.settings ?? {}) };
+  const settings = { ...gcControllerSettings(), ...overrides.settings };
 
   const would = (ctx, action, target, data = {}) => ctx.log(WOULD, `${action} ${target}`, { controller: NAME, action, target, ...data });
   const tries = new Map(); // key -> grace waits so far (per engine process; the final outcome is durable in gc_items)
@@ -384,7 +384,7 @@ export function createGcController(overrides = {}) {
     ctx.log('reconciler.gc.stopped', `GC STOPPED: a worktree removal changed the main checkout (${(stop.damage ?? []).join('; ').slice(0, 300)})`, { controller: NAME, ...stop });
     await ctx.openDecision({
       schema: 'starci/decision-item@1', kind: 'runtime-defect', decider: 'supervisor', ledger: 'supervisor',
-      idempotencyKey: `gc-main-damaged:${String(stop.path ?? 'unknown').replace(/:/g, '_')}`, entity: { type: 'worktree', id: String(stop.path ?? 'unknown') },
+      idempotencyKey: `gc-main-damaged:${String(stop.path ?? 'unknown').replaceAll(':', '_')}`, entity: { type: 'worktree', id: String(stop.path ?? 'unknown') },
       summary: `The GC stopped: removing ${stop.path ?? 'a worktree'} changed the main checkout (${(stop.damage ?? []).join('; ').slice(0, 300)})`,
       evidence: [{ ref: `worktree:${stop.path ?? ''}`, why: (stop.damage ?? []).join('; ').slice(0, 500) }],
       options: [{ key: 'restore-and-resume', verb: 'restore the main checkout (git checkout -- <paths>, npm ci), find the link that was followed, then starci machine worktrees resume', recommended: true }],

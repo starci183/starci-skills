@@ -1,4 +1,4 @@
-import { CANONICAL_RULE_IDS, RULE_FAMILY_COUNTS } from "./rule-catalog.generated.js"
+import { CANONICAL_RULE_IDS } from "./rule-catalog.generated.js"
 
 /**
  * The catalog is GENERATED, not transcribed.
@@ -13,7 +13,7 @@ import { CANONICAL_RULE_IDS, RULE_FAMILY_COUNTS } from "./rule-catalog.generated
  *
  * Regenerate with `node packages/grammar/scripts/generate-rule-catalog.mjs [knowledgeDir]` from the package root.
  */
-export { RULE_FAMILY_COUNTS }
+export { RULE_FAMILY_COUNTS } from "./rule-catalog.generated.js"
 
 /** Every canonical Common UI rule id, exactly as the knowledge tree spells it. */
 export const COMMON_UI_RULE_IDS = CANONICAL_RULE_IDS

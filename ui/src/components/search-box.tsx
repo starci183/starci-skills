@@ -38,7 +38,7 @@ function isHit(value: unknown): value is SearchHit {
     && 'href' in value && (value.href === null || typeof value.href === 'string')
     && 'title' in value && typeof value.title === 'string'
     && (!('project' in value) || value.project === undefined || value.project === null || typeof value.project === 'string')
-    && 'ui' in value && UI_STATES.some(state => state === value.ui)
+    && 'ui' in value && (UI_STATES as readonly unknown[]).includes(value.ui)
     && 'matched' in value && isIdentity(value.matched)
     && 'ref' in value && (value.ref === null || isSearchRef(value.ref));
 }
@@ -56,7 +56,7 @@ function hitKey(hit: SearchHit): string {
 }
 
 function targetOf(hit: SearchHit): 'route' | 'blob' | null {
-  if (!hit.ref || hit.href !== hit.ref.href) return null;
+  if (hit.href !== hit.ref?.href) return null;
   if (/^\/api\/blob\/[a-f0-9]{64}$/.test(hit.ref.href)) return 'blob';
   return hit.ref.href.startsWith('#/') && parseRoute(hit.ref.href).kind !== 'not-found' ? 'route' : null;
 }
@@ -156,11 +156,11 @@ export function SearchBox() {
       <Command className="rounded-none! px-5 pb-5 pt-0" shouldFilter={false} label={t('Search results')}>
         <CommandInput autoFocus value={query} onValueChange={setQuery} placeholder={t('Enter an id or keyword…')} aria-label={t('Search keywords')} />
         <CommandList className="search-results" aria-busy={loading}>
-          {!needle && <p role="status">{t('Enter an id to open its evidence.')}</p>}
-          {partial && !error && <div className="flex items-center gap-2 py-2 text-xs text-[var(--status-warning)]" role="status" title={provenance}>
+          {!needle && <output>{t('Enter an id to open its evidence.')}</output>}
+          {partial && !error && <output className="flex items-center gap-2 py-2 text-xs text-[var(--status-warning)]" title={provenance}>
             <CircleAlert className="size-4 shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1">{t('Some search sources could not be read.')}</span>
             <Button variant="ghost" size="sm" disabled={loading} onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>
-          </div>}
+          </output>}
           {loading && <CommandLoading><span className="flex items-center gap-2 px-3 py-4"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{t('Searching…')}</span></CommandLoading>}
           {error && <div title={provenance}><FeedbackState error onRetry={() => setRetry(value => value + 1)}>{current?.data ? t('Could not refresh the search. Showing the last successful results.') : error}</FeedbackState></div>}
           {!loading && !error && needle && hits.length === 0 && <CommandEmpty>{partial ? t('No matching results from the available sources.') : t('No matching results.')}</CommandEmpty>}
@@ -176,7 +176,7 @@ export function SearchBox() {
               <StateChip state={hit.ui} compact />{target === 'blob' ? <ExternalLink className="size-4" aria-hidden="true" /> : target === 'route' ? <ArrowRight className="size-4" aria-hidden="true" /> : null}
             </CommandItem>;
           })}
-          {current?.data?.truncated && <p role="status" title={provenance}>{t('Showing the first {n} search results.', { n: hits.length })}</p>}
+          {current?.data?.truncated && <output title={provenance}>{t('Showing the first {n} search results.', { n: hits.length })}</output>}
         </CommandList>
       </Command>
     </DialogContent>

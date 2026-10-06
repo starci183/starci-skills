@@ -48,7 +48,7 @@ export default {
     for (const jobId of p.readyJobs ?? []) {
       if (launched >= k) break;
       const job = jobRow(db, jobId);
-      if (!job || job.status !== 'queued') { results.push({ jobId, skipped: `status ${job?.status ?? 'gone'}` }); continue; }
+      if (job?.status !== 'queued') { results.push({ jobId, skipped: `status ${job?.status ?? 'gone'}` }); continue; }
       const failed = failedShapesOf(db, wf, job).get(shapeOf(job.op_id, job.payload));
       if (failed) { results.push({ jobId, skipped: `same-failing-shape as ${failed.jobId} (${failed.causes.join(', ')}): change it with starci kernel graph-edit (widen/params/split) first` }); continue; }
       if (args['dry-run']) { results.push({ jobId, would: job.payload.kernelModel ? `dispatch --model ${job.payload.kernelModel}` : 'route + dispatch --spawn' }); launched += 1; continue; }

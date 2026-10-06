@@ -58,7 +58,7 @@ export function backupDue({ ledgerId, now, dir, backupHour, exists = fs.existsSy
 
 /** The backups of one ledger beyond the newest `keep`, oldest first to delete. Pure over a file list. */
 function prunePlan(files, { ledgerId, keep }) {
-  const re = new RegExp(`^${safeId(ledgerId).replace(/[.]/g, '\\.')}-(\\d{8})\\.sqlite$`);
+  const re = new RegExp(String.raw`^${safeId(ledgerId).replaceAll('.', String.raw`\.`)}-(\d{8})\.sqlite$`);
   const mine = files.filter((f) => re.test(f)).sort();
   return mine.slice(0, Math.max(0, mine.length - keep));
 }
@@ -70,24 +70,24 @@ export function backupLedger({ ledgerId, file, dir, keep, now = Date.now(), open
   let db = null;
   let stage = 'prepare', published = false;
   try {
-    if (!Number.isInteger(keep) || keep < 1) throw Error('backup keep must be a positive integer');
+    if (!Number.isInteger(keep) || keep < 1) throw new Error('backup keep must be a positive integer');
     fs.mkdirSync(dir, { recursive: true });
     stage = 'source';
     db = open(file);
     const actual = db.prepare("SELECT value FROM meta WHERE key='ledger_id'").get()?.value ?? null;
-    if (actual !== ledgerId) throw Error(`ledger identity ${actual ?? 'missing'} differs from ${ledgerId}`);
+    if (actual !== ledgerId) throw new Error(`ledger identity ${actual ?? 'missing'} differs from ${ledgerId}`);
     stage = 'snapshot';
     db.prepare('VACUUM INTO ?').run(temp);
     db.close(); db = null;
     stage = 'verify';
     const verification = check(temp, { expectedLedgerId: ledgerId });
-    if (!verification.ok) throw Error(`snapshot ${verification.reason ?? 'verification-failed'}: ${verification.result?.join('; ') ?? 'failed'}`);
+    if (!verification.ok) throw new Error(`snapshot ${verification.reason ?? 'verification-failed'}: ${verification.result?.join('; ') ?? 'failed'}`);
     const digest = sha256File(temp), bytes = fs.statSync(temp).size;
     const descriptor = fs.openSync(temp, 'r+');
     try { fs.fsyncSync(descriptor); } finally { fs.closeSync(descriptor); }
     stage = 'publish';
     publish(temp, target); published = true;
-    if (sha256File(target) !== digest) throw Error('published snapshot digest differs from the verified bytes');
+    if (sha256File(target) !== digest) throw new Error('published snapshot digest differs from the verified bytes');
     const pruned = [], retentionErrors = [];
     let expired = [];
     try { expired = prunePlan(fs.readdirSync(dir), { ledgerId, keep }); }

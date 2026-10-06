@@ -14,7 +14,7 @@ export const concept: Concept = 'C2';
 const number = (value: number | null | undefined) => value == null || !Number.isFinite(value) ? '—' : new Intl.NumberFormat('vi-VN').format(value);
 
 /** Running ops per model as bars, plus 24 h token usage. */
-export function ModelsPanel({ summary, bare = false, readError, sourcePartial = false, sourceLoaded = false }: { summary: WorkersSummary | null | undefined; bare?: boolean; readError?: string | null; sourcePartial?: boolean; sourceLoaded?: boolean }) {
+export function ModelsPanel({ summary, bare = false, readError, sourcePartial = false, sourceLoaded = false }: Readonly<{ summary: WorkersSummary | null | undefined; bare?: boolean; readError?: string | null; sourcePartial?: boolean; sourceLoaded?: boolean }>) {
   const { running, settling, error, meta, activeObserved } = useAttemptAgents();
   const partial = hasUnavailableSources(meta);
   const families = new Map<string, ReturnType<typeof attemptAgent>[]>();
@@ -26,8 +26,8 @@ export function ModelsPanel({ summary, bare = false, readError, sourcePartial = 
   return <div className={`flex flex-col gap-4 ${bare ? '' : 'p-4 sm:p-6'}`}>
     <div>
       <p className="text-xs font-medium text-muted-foreground">{t('Loaded executing attempts · host scope')}</p>
-      {error && <p className="shell-error mt-2" role="status">{t('The source is failing; showing the last read. {error}', { error })}</p>}
-      {partial ? <p className="shell-error mt-2" role="status">{t('Some sources are unavailable; showing the recorded part.')}</p> : null}
+      {error && <output className="block shell-error mt-2">{t('The source is failing; showing the last read. {error}', { error })}</output>}
+      {partial ? <output className="block shell-error mt-2">{t('Some sources are unavailable; showing the recorded part.')}</output> : null}
       {families.size ? <div className="mt-2 flex flex-col gap-2">{[...families.entries()].map(([family, list]) => <div key={family} className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="w-14 shrink-0 text-xs font-medium">{familyTint[list[0].family].name}</span>
         <span className="flex flex-wrap items-center gap-2">{list.map(agent => <AgentAvatar key={agent.href} agent={agent} size={26} live />)}</span>
@@ -37,8 +37,8 @@ export function ModelsPanel({ summary, bare = false, readError, sourcePartial = 
       {meta?.next ? <p className="mt-2 text-xs text-muted-foreground">{t('More active attempts are available in the attempt list.')}</p> : null}
     </div>
     <div><p className="mb-2 text-xs font-medium text-muted-foreground">{t('Executing operations by recorded model · host scope')}</p>
-    {readError && <p className="shell-error mb-2" role="status">{t('The source is failing; showing the last read. {error}', { error: readError })}</p>}
-    {sourcePartial && <p className="shell-error mb-2" role="status">{t('Some sources are unavailable; showing the recorded part.')}</p>}
+    {readError && <output className="block shell-error mb-2">{t('The source is failing; showing the last read. {error}', { error: readError })}</output>}
+    {sourcePartial && <output className="block shell-error mb-2">{t('Some sources are unavailable; showing the recorded part.')}</output>}
     {models.length ? <ul className="flex flex-col gap-3">
       {models.map((item, index) => <li key={`${item.model ?? item.pool ?? 'unknown'}-${index}`} data-tone={item.running == null ? 'queued' : 'running'}>
         <div className="flex items-baseline justify-between gap-2 text-sm"><span className="flex min-w-0 items-center gap-2"><AgentAvatar agent={agentOf(item)} size={22} /><span className="min-w-0 truncate font-medium">{item.model ?? item.pool ?? t('Unknown model')}</span></span><span className="shrink-0 text-right tabular-nums">{t('{n} executing', { n: number(item.running) })}<span className="block text-xs text-muted-foreground">{t('{n} reported', { n: number(item.settling) })}</span></span></div>

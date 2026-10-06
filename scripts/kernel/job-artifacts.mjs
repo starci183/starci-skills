@@ -47,7 +47,7 @@ const SHA = /^[0-9a-f]{7,40}$/i;
 const RUNTIME_ROOT = path.resolve(import.meta.dirname, '..', '..');
 const WALK_MAX = 2000;
 const WALK_DEPTH = 6;
-const slashed = (p) => String(p).replace(/\\/g, '/');
+const slashed = (p) => String(p).replaceAll(/\\/g, '/');
 
 const statOf = (p) => { try { return fs.statSync(p); } catch { return null; } };
 const inside = (root, p) => isInside(path.resolve(root), path.resolve(p), { includeSelf: false });
@@ -168,7 +168,7 @@ export function writeJobPatch({ repo, job, envelope, result, payload, placements
     // A batch's last commit need not be the oldest across the whole owned set.
     if (commits.size) {
       const history = gitResult(revList, [`--since=${since}`, full], { dir: root, timeout, maxBuffer: 64 * 1024 * 1024 });
-      const oldest = history.ok ? history.stdout.split(/\s+/).filter((sha) => commits.has(sha)).at(-1) : null;
+      const oldest = history.ok ? history.stdout.split(/\s+/).findLast((sha) => commits.has(sha)) : null;
       if (oldest) base = revParse(root, `${oldest}^`, timeout) ?? 'root';
     }
   }
@@ -237,7 +237,7 @@ export function evidenceHostPathGate({ files, read = readText }) {
     for (const hit of found) {
       if (offenders.length >= MAX_OFFENDERS) break;
       const line = text.slice(0, hit.offset).split('\n').length;
-      offenders.push(`${String(file.name ?? abs).replace(/\\/g, '/')}:${line} ${hit.sample}`);
+      offenders.push(`${String(file.name ?? abs).replaceAll(/\\/g, '/')}:${line} ${hit.sample}`);
     }
   }
   if (!offenders.length) return null;
@@ -338,8 +338,8 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
  * harness path of its bytes (/api/blob/<sha256>).
  */
 export function listJobArtifacts(db, { workflowId, jobId = null, kind = null, subkind = null }) {
-  if (kind && !ARTIFACT_KINDS.includes(kind)) throw Object.assign(Error(`artifact kind must be ${ARTIFACT_KINDS.join('|')}, got '${kind}'`), { code: 'artifact-kind-unknown' });
-  if (subkind && !ARTIFACT_SUBKINDS.includes(subkind)) throw Object.assign(Error(`artifact subkind must be ${ARTIFACT_SUBKINDS.join('|')}, got '${subkind}'`), { code: 'artifact-subkind-unknown' });
+  if (kind && !ARTIFACT_KINDS.includes(kind)) throw Object.assign(new Error(`artifact kind must be ${ARTIFACT_KINDS.join('|')}, got '${kind}'`), { code: 'artifact-kind-unknown' });
+  if (subkind && !ARTIFACT_SUBKINDS.includes(subkind)) throw Object.assign(new Error(`artifact subkind must be ${ARTIFACT_SUBKINDS.join('|')}, got '${subkind}'`), { code: 'artifact-subkind-unknown' });
   const where = ['a.workflow_id=?', ...(jobId ? ['a.job_id=?'] : []), ...(kind ? ['a.kind=?'] : []), ...(subkind ? ['a.subkind=?'] : [])];
   const rows = db.prepare(`SELECT a.*, b.http_path, j.status AS job_status, j.try_no FROM job_artifacts a JOIN blobs b ON b.sha256=a.sha256
     LEFT JOIN jobs j ON j.job_id=a.job_id WHERE ${where.join(' AND ')} ORDER BY a.artifact_id`)

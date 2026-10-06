@@ -41,7 +41,6 @@ import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, 
 // The kernel seat's boot count lives in its payload (hierarchy.attempt); jobs.try_no is the op-try ordinal only.
 const kernelAttemptOf = (row) => parseJsonOr(row?.payload_json)?.hierarchy?.attempt ?? 0;
 import { inspectOwnerConfig, loadConfig } from '../../engine/config.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { launchKernelGroup } from './launch-kernel-group.mjs';
 import { expiredKernelStartupHealth } from './kernel-startup-capacity.mjs';
 import { ownerReserveGrant, planAgentAdmission } from '../agent/admission.mjs';
@@ -558,7 +557,7 @@ try {
     if (!updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, holderPid: process.pid, at: now, expiresAt: null,
       value: { terminal: handle, dispatch: spawned.dispatchId, runId: spawned.runId, host: 'orca', agent: route.agent, routedBy: route.routedBy,
         model: kernelModel, effort: kernelEffort, launch: routeInfo.launch, modelAuthority, effectiveModel, modelAttested } }))
-      throw Error('kernel-start-reservation-lost');
+      throw new Error('kernel-start-reservation-lost');
     // A restart replaces the SEAT, not the workflow's Orca identity. Writing a
     // fresh object over payload_json dropped orca.runId, so the next dispatch's
     // ensureWorkflowRun saw no Run and created a second one — the two-tree
@@ -596,9 +595,9 @@ try {
       ...nextPayload,
       ...(previousPayload.orca ? { orca: { ...previousPayload.orca } } : {}),
       hierarchy: {
-        ...(previousPayload.hierarchy ?? {}),
+        ...previousPayload.hierarchy,
         ...nextPayload.hierarchy,
-        runtime: { ...(previousPayload.hierarchy?.runtime ?? {}), ...nextPayload.hierarchy.runtime },
+        runtime: { ...previousPayload.hierarchy?.runtime, ...nextPayload.hierarchy.runtime },
       },
     });
     // The kernel row is born running and bound to its worker; a released seat (ready) is re-bound, a live one adopted.

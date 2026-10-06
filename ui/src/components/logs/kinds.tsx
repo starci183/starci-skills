@@ -29,7 +29,6 @@ export const kindFamilies: { value: string; label: string }[] = [
   { value: 'reconciler.', label: t('reconciler.* — reconciler') }, { value: 'incident', label: t('incident — incident') },
 ];
 
-const [esc, bel] = [String.fromCharCode(27), String.fromCharCode(7)];
-const ansiPattern = new RegExp(String.raw`${esc}(?:\[[0-?]*[ -/]*[@-~]|\][^${bel}${esc}]*(?:${bel}|${esc}\\)|[@-Z\\-_])`, 'g');
+const ansiPattern = /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])/g;
 /** Strip ANSI escape sequences so terminal output reads as plain text. */
 export const stripAnsi = (text: string) => text.replace(ansiPattern, '');

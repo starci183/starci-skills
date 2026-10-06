@@ -70,7 +70,7 @@ function signatureProblem(file, head) {
   const prefix = head.subarray(0, expected.starts.length);
   const tagOk = !expected.tag || head.subarray(expected.tagAt, expected.tagAt + 4).toString('ascii') === expected.tag;
   if (prefix.equals(expected.starts) && tagOk) return null;
-  const asText = slash(head.subarray(0, 24).toString('utf8')).replace(/[^\x20-\x7e./]/g, '.');
+  const asText = slash(head.subarray(0, 24).toString('utf8')).replace(/[^\x20-\x7e]/g, '.');
   return `its first bytes are ${prefix.toString('hex')}${head.length ? ` ("${asText}")` : ' - the file is empty'}, not ${expected.name} (${expected.starts.toString('hex')})`;
 }
 
@@ -409,7 +409,7 @@ function checkReceipt(receiptFile, ctx, sink, seen) {
  * `{refuse, suspect, info}` arrays of `file: message [CODE]`, the shape check-work-deep prints and the
  * CLI reads. Exported so the fixture test can point it at a throwaway tree instead of the real trees.
  */
-export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], info: []}, { runtimeRoot = root } = {}) {
+export function checkWorkArtifacts(workRoot, out, { runtimeRoot = root } = {}) { out ??= {refuse: [], suspect: [], info: []};
   const emit = {
     refuse: (file, code, msg) => out.refuse.push(`${relativeToRoot(file)}: ${msg} [${code}]`),
     suspect: (file, code, msg) => out.suspect.push(`${relativeToRoot(file)}: ${msg} [${code}]`),
@@ -492,7 +492,7 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
   // same reading check-work-deep reports as PAYLOAD_AS_RECORD). Their declarations are verified once, below,
   // with the run dir / record dir they are actually relative to - checking them here would double-report
   // every line and resolve `videos/x.webm` against the wrong directory.
-  for (const [id, rec] of records) {
+  for (const [, rec] of records) {
     const data = rec.data ?? {};
     if (typeof data.schema === 'string' && !data.schema.startsWith('work/')) continue;
     const indexFile = path.join(rec.dir, 'index.yaml');

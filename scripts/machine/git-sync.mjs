@@ -26,8 +26,8 @@ function dirtyPaths(text) {
 function mergeTreeConflicts(text) {
   const found = [];
   for (const line of String(text ?? '').split(/\r?\n/)) {
-    const stage = line.match(/^\d{6} [0-9a-f]+ [123]\t(.+)$/i);
-    const conflict = line.match(/^CONFLICT \([^)]+\): .*? in (.+)$/);
+    const stage = /^\d{6} [0-9a-f]+ [123]\t(.+)$/i.exec(line);
+    const conflict = /^CONFLICT \([^)]+\): .*? in (.+)$/.exec(line);
     if (stage) found.push(stage[1]);
     else if (conflict) found.push(conflict[1]);
   }

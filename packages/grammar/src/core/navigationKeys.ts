@@ -36,7 +36,7 @@ export const moveFocusBetweenPeers = (
     const key = rtl && orientation !== "vertical"
         ? event.key === "ArrowLeft" ? "ArrowRight" : event.key === "ArrowRight" ? "ArrowLeft" : event.key
         : event.key
-    let next = index
+    let next: number
     if (PREVIOUS[orientation].includes(key)) next = index === 0 ? peers.length - 1 : index - 1
     else if (NEXT[orientation].includes(key)) next = index === peers.length - 1 ? 0 : index + 1
     else if (key === "Home") next = 0

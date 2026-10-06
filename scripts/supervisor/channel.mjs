@@ -31,7 +31,6 @@
 //       ("TELEGRAM <inboxId>: <first 200 chars>") and exits 0; exits 124 on timeout.
 //       Run it under a Monitor so the supervisor wakes the moment the owner writes.
 import fs from 'node:fs';
-import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs'; import { logLine } from '../lib/escape.mjs';
 import { argsOf } from '../connectors/lib.mjs';
 import { botCall, DEFAULT_API_BASE, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
@@ -248,7 +247,7 @@ async function main() {
     if (typeof args['text-file'] === 'string') {
       try { text = fs.readFileSync(args['text-file'], 'utf8'); } catch (error) { return fail(`cannot read --text-file: ${error.code ?? error.message}`); }
     }
-    if (!text || !text.trim()) return fail('reply needs --text <t> or --text-file <f>');
+    if (!text?.trim()) return fail('reply needs --text <t> or --text-file <f>');
     const r = await replyToOwner({ id, text, to: typeof args.to === 'string' ? args.to : null });
     out(r); if (!r.ok) process.exitCode = 1; return;
   }
@@ -260,4 +259,4 @@ async function main() {
   }
 }
 
-if (isMain(import.meta.url)) Promise.resolve().then(main).catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });
+if (isMain(import.meta.url)) await main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });

@@ -34,7 +34,7 @@ const style: Record<Kind, string> = {
 };
 
 /** Unified diff: file headers, hunk headers, +/- colouring and old/new line numbers. */
-export function DiffTextView({ text }: { text: string }) {
+export function DiffTextView({ text }: { readonly text: string }) {
   const rows = parseDiff(cleanLines(text));
   const adds = rows.filter(r => r.kind === 'add').length;
   const dels = rows.filter(r => r.kind === 'del').length;

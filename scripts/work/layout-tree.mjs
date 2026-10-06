@@ -160,7 +160,7 @@ function layoutComponentOf(text) {
     for (const name of m[1].replace(/[{}]/g, ',').split(',').map((s) => s.trim().split(/\s+as\s+/).pop()).filter(Boolean)) if (/^[A-Z]/.test(name)) imported.add(name);
   }
   // A JSX tag, not a TypeScript type argument: `Promise<Metadata>` has an identifier right before the `<`.
-  const tags = [...text.matchAll(/(?<![A-Za-z0-9_$\])])<([A-Z][A-Za-z0-9_]*)[\s/>]/g)].map((m) => m[1]).filter((t) => imported.has(t));
+  const tags = [...text.matchAll(/(?<![\w$\])])<([A-Z]\w*)[\s/>]/g)].map((m) => m[1]).filter((t) => imported.has(t));
   const chrome = tags.filter((t) => !/Providers?$/.test(t) && t !== 'Fragment' && t !== 'Suspense');
   return { component: chrome[0] ?? null, passthrough: chrome.length === 0 };
 }
@@ -384,7 +384,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, name = nul
       const text2 = readText(registry.file) ?? '';
       digests.push([rel(registry.file), sha256File(registry.file)]);
       const { ns, prefix } = labelKeyPattern(text2);
-      const componentName = text2.match(/export\s+(?:const|function)\s+([A-Z][A-Za-z0-9_]*)/)?.[1];
+      const componentName = text2.match(/export\s+(?:const|function)\s+([A-Z]\w*)/)?.[1];
       const findings = [];
       const items = registry.items.map((item) => {
         let i18nKey = ns || prefix ? [ns, `${prefix ?? ''}${item.key}`].filter(Boolean).join('.') : null;
@@ -432,7 +432,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, name = nul
 
 /** The app's name when nothing declares one: the last segment of its root (fe/apps/landing -> landing). */
 const appNameOf = (root) => {
-  const last = String(root ?? '').split('/').filter((p) => p && p !== '.').pop();
+  const last = String(root ?? '').split('/').findLast((p) => p && p !== '.');
   return (last ?? 'app').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app';
 };
 
@@ -838,7 +838,7 @@ export function baseLayoutFor(record, route, bp, theme, { shellDir, uiLoader = n
   const chain = layoutChainOf(record, route, { self });
   if (!chain) return { missing: `${route} is not a node of the layout tree` };
   const visible = chain.filter((n) => n.layout?.chrome === 'visible');
-  const node = visible[visible.length - 1];
+  const node = visible.at(-1);
   if (!node) return null;
   const bound = list(ui?.shell?.layouts).find((b) => b?.node === node.id)?.destination ?? null;
   const picked = destinationFor(record, node, { route: ui?.route ?? route, activeNav: ui?.shell?.activeNav ?? null, key: bound });
@@ -1073,7 +1073,7 @@ function addDestinationCapture(record, shellDir, { node: id, destination, routes
   if (!entry) { entry = { key: destination, routes: wanted, captures: [] }; dests.push(entry); } else entry.routes = wanted;
   const prior = list(entry.captures).find((c) => c.breakpoint === breakpoint && c.theme === theme);
   entry.captures = [...list(entry.captures).filter((c) => !(c.breakpoint === breakpoint && c.theme === theme)), capture].sort((a, b) => `${a.breakpoint}/${a.theme}`.localeCompare(`${b.breakpoint}/${b.theme}`));
-  node.layout.destinations = dests.sort((a, b) => a.key.localeCompare(b.key));
+  node.layout.destinations = dests.toSorted((a, b) => a.key.localeCompare(b.key));
   node.layout.chrome = 'visible';
   if (prior && prior.sha256 !== capture.sha256) node.layout.rev = (node.layout.rev ?? 1) + 1;
   return { destination, ...capture };
@@ -1096,21 +1096,21 @@ export function lockupSourceOf(record, workRoot, ref, uiLoader = null) {
   if (ui) {
     const { id, path: rel } = ui;
     const node = allNodesOf(record).find((n) => n.layout?.design === id && n.layout.chrome === 'visible');
-    if (!node || node.origin !== 'planned') return { error: `${id} is not the design record of a planned visible layout of this tree - a lockup is cropped from a real render once the frontend renders it` };
+    if (node?.origin !== 'planned') return { error: `${id} is not the design record of a planned visible layout of this tree - a lockup is cropped from a real render once the frontend renders it` };
     const design = (uiLoader ?? ((x) => loadUiRecords(workRoot).get(x) ?? null))(id);
     if (!design) return { error: `${id} does not exist - interface.draw draws the planned layout first` };
     const acceptance = drawingAcceptance(design.record, path.dirname(design.file));
     if (!acceptance.accepted) return { error: `${id} is ${acceptance.reason} - the layout drawing is accepted before its lockup is taken: ${ACCEPT_PATH}` };
     const asset = assetsOf(design.record).find((a) => a.path === rel);
     const c = asset?.composite;
-    if (!c || c.surface !== 'layout' || c.presentation !== 'page' || !c.childSlot || asset.selected === false) return { error: `${rel} is not an accepted layout composite of ${id} (a selected page composite of the layout with a measured childSlot)` };
+    if (c?.surface !== 'layout' || c?.presentation !== 'page' || !c?.childSlot || asset.selected === false) return { error: `${rel} is not an accepted layout composite of ${id} (a selected page composite of the layout with a measured childSlot)` };
     const file = path.join(path.dirname(design.file), rel);
     if (!fs.existsSync(file)) return { error: `${rel} is not on disk` };
     const sha256 = sha256File(file);
     if (asset.sha256 && asset.sha256 !== sha256) return { error: `${rel} no longer hashes to its recorded sha256` };
     return { file, ref: `${id}:${slash(rel)}`, kind: 'layout-drawing', sha256, node: node.id, theme: c.theme ?? null };
   }
-  const shell = text.match(/^shell\/(.+)$/);
+  const shell = /^shell\/(.+)$/.exec(text);
   if (!shell) return { error: `--from names shell/<capture path> or <ui-id>:<layout composite path>, not ${text || '(nothing)'}` };
   const rel = shell[1];
   for (const node of allNodesOf(record).filter((n) => n.layout)) {
@@ -1147,7 +1147,7 @@ function addLockup(record, workRoot, { from, rect, theme = null, provenance = nu
     provenance: provenance ?? `cropped by ${SCANNER} lockup from ${source.kind === 'render' ? 'the real render' : 'the accepted layout drawing'} ${source.ref}`,
     source: { ref: source.ref, kind: source.kind, sha256: source.sha256, rect: r },
   };
-  record.brand = { ...(record.brand ?? {}), lockups: [...list(record.brand?.lockups).filter((l) => (l.theme ?? 'light') !== th), lockup].sort((a, b) => String(a.theme).localeCompare(String(b.theme))) };
+  record.brand = { ...record.brand, lockups: [...list(record.brand?.lockups).filter((l) => (l.theme ?? 'light') !== th), lockup].sort((a, b) => String(a.theme).localeCompare(String(b.theme))) };
   return lockup;
 }
 
@@ -1169,7 +1169,7 @@ export function addPlanned(record, { node: id, files = [], design = null }) {
       record.nodes.push(node);
     }
     if (n === parts.length) {
-      if (files.length) node.files = { ...(node.files ?? {}), ...Object.fromEntries(files.map((f) => [f, node.files?.[f] ?? { path: `${record.app?.appDir ?? 'app'}${nid === '/' ? '' : nid}/${f}.tsx` }])) };
+      if (files.length) node.files = { ...node.files, ...Object.fromEntries(files.map((f) => [f, node.files?.[f] ?? { path: `${record.app?.appDir ?? 'app'}${nid === '/' ? '' : nid}/${f}.tsx` }])) };
       if (files.includes('layout') && !node.layout) node.layout = { chrome: 'visible', state: 'todo', rev: 1, ...(design ? { design } : {}) };
       else if (design && node.layout) node.layout.design = design;
     }
@@ -1223,7 +1223,7 @@ export function layoutTreeMain(argv = []) {
       const file = args.find((a) => !a.startsWith('--') && a !== flag(args, '--key') && a !== flag(args, '--tolerance'));
       if (!file) return { exitCode: 2, text: 'Usage: starci work layout-tree slot <png> [--key ff00ff] [--tolerance 8]\n' };
       const hex = (flag(args, '--key') ?? 'ff00ff').replace(/^#/, '');
-      const key = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      const key = [0, 2, 4].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
       const found = keyRect(decodePng(fs.readFileSync(file)), key, Number(flag(args, '--tolerance') ?? 8));
       if (!found || found.fill < SLOT_FILL_MIN) return { exitCode: 1, text: `${JSON.stringify({ ok: false, found })}\n` };
       return { exitCode: 0, text: `${JSON.stringify({ ok: true, slot: found.rect, fill: Number(found.fill.toFixed(4)) })}\n` };

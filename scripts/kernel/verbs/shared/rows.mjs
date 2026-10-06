@@ -12,6 +12,10 @@ export const goalJsonOf = (row) => parseJson(row?.json ?? '', {});
 export const jobPayloadOf = (row) => parseJson(row?.payload_json ?? '', {});
 export const jobOpOf = (job) => job.op_id ?? jobPayloadOf(job).opId ?? null;
 export const ownedPathsOf = (payload) => (payload?.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
+/** The .starciwork record directories a job owns: where a read-only verify of its node writes its evidence. */
+export const recordPathsOf = (payload, norm = (p) => p) => (payload?.owned_paths ?? [])
+  .map((p) => norm(typeof p === 'string' ? p : p?.path))
+  .filter((p) => typeof p === 'string' && p.startsWith('.starciwork/'));
 /**
  * The settle result of a job row read through JOB_ROW (machine/job-row.mjs): its result_json column is the ledger's job
  * result, the newest attempt's settle_json, else the newest job-result event (engine/db/ledger.mjs jobResult).
@@ -25,7 +29,7 @@ export const latestReportOf = (db, jobId) => db.prepare('SELECT r.* FROM reports
 export const csvList = (v) => (v == null ? [] : (Array.isArray(v) ? v : String(v).split(','))
   .map((s) => String(s).trim()).filter(Boolean));
 // (starci kernel incident --kind peer-wait --until-foundation <name>), which the landing releases.
-export const workflowRunning = (wf) => Boolean(wf && wf.phase === 'running' && wf.archived_at == null);
+export const workflowRunning = (wf) => Boolean(wf?.phase === 'running' && wf.archived_at == null);
 export const workDirOf = (repo) => { try { return projectBinding(repo)?.workDir ?? '.starciwork'; } catch { return '.starciwork'; } };
 export const ARCHIVED_BY = ['owner', 'supervisor'];
 

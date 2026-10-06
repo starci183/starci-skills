@@ -34,7 +34,7 @@ const optionLabel = (option) => (typeof option === 'string' ? option : option?.l
 export function handoverAskProblem(question) {
   if (!question || typeof question !== 'object') return 'a handover ask needs question {text, options}';
   const options = Array.isArray(question.options) ? question.options : null;
-  if (!options || options.length !== HANDOVER_DECISIONS.length) {
+  if (options?.length !== HANDOVER_DECISIONS.length) {
     return `a handover ask carries exactly ${HANDOVER_DECISIONS.length} options, in the order ${HANDOVER_DECISIONS.join(', ')}; got ${options ? options.length : 'none'}`;
   }
   const labels = options.map((option) => String(optionLabel(option) ?? '').trim());

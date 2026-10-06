@@ -14,8 +14,8 @@ import { independentChecksOf } from './shared/check-evidence.mjs';
 import { WORKER_QUESTION } from './shared/worker-messages.mjs';
 import { releaseTypedWaits } from './shared/peer-waits.mjs';
 import { queueTail as queueSettleTail, startTail as startSettleTail } from '../settle/job-settle.mjs';
-import { OP_REV_DRIFT, opRevDrift, shortRev } from '../runtime-rev.mjs';
-import { HANDOVER_APPROVED, HANDOVER_OP, handoverApprovalOf, handoverGateOf } from '../handover.mjs';
+import { OP_REV_DRIFT, shortRev } from '../runtime-rev.mjs';
+import { HANDOVER_APPROVED, HANDOVER_OP, handoverApprovalOf } from '../handover.mjs';
 import { unbindGuardTerminal } from '../../guards/hook-install.mjs';
 import { SEAM_RECONCILED_EVENT } from '../seam-policy.mjs';
 import { settlePreflight } from './shared/settle-preflight.mjs';
@@ -60,7 +60,7 @@ export default {
       `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
   },
   async run({ ledger, args, repo, emit, internals }) {
-    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, heldDispatchOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
+    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, heldDispatchOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleOpProofs, widenCanonWire } = internals;
 
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
   const initialJob = jobRowOf(db, jobId);
@@ -304,7 +304,7 @@ export default {
     if (verdict === 'pass' && payload.cut && String(payload.params?.canonFamilies ?? '').trim() && payload.params?.canonWire !== true && Array.isArray(envelope?.owedToWire) && envelope.owedToWire.length) {
       try {
         const prefix = String((payload.owned_paths ?? []).find((p) => typeof p === 'string' && /^[^/]+\/(?:apps|packages)\//.test(p)) ?? '').replace(/^([^/]+\/).*$/, '$1');
-        const owed = [...new Set(envelope.owedToWire.map((o) => String(o.path).replace(/\\/g, '/').replace(/\/+$/, '')).map((p) => (prefix && !p.startsWith(prefix) ? `${prefix}${p}` : p)))];
+        const owed = [...new Set(envelope.owedToWire.map((o) => String(o.path).replaceAll(/\\/g, '/').replace(/\/+$/, '')).map((p) => (prefix && !p.startsWith(prefix) ? `${prefix}${p}` : p)))];
         const wire = widenCanonWire(ledger, { ...job, payload_json: JSON.stringify(payload) }, payload, owed, []);
         if (wire) recordJobResult(db, { jobId, result: { ...(jobResult(db, jobId) ?? result), owedToWire: { paths: owed, wireJob: wire.jobId } }, at: payload.settledAt });
       } catch (error) {

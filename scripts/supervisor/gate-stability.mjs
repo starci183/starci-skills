@@ -48,7 +48,7 @@ function acceptedLegsOf(ledgerFile, family) {
 /** One side: the findings of `tree`'s gates on the accepted legs. {tree, family, gates[], legs:[{ledger, repo, workflowId, jobId, attempt, findings[], errors[]}]} */
 export async function gateSide({ tree = SELF_ROOT, family, ledgers = registeredLedgers(), gates = null }) {
   const spec = gates;
-  if (!Array.isArray(spec) || !spec.length || spec.some((g) => !g?.module || !g?.export)) throw Error('an explicit nonempty current --gate module#export set is required');
+  if (!Array.isArray(spec) || !spec.length || spec.some((g) => !g?.module || !g?.export)) throw new Error('an explicit nonempty current --gate module#export set is required');
   const fns = [];
   for (const gate of spec) {
     const file = path.join(tree, gate.module);
@@ -130,4 +130,7 @@ async function main(argv) {
   return side.errors.length || side.legs.some((leg) => leg.errors.length) ? 2 : 0;
 }
 
-if (isMain(import.meta.url)) main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (error) => { process.stderr.write(`${error?.stack ?? error}\n`); process.exitCode = 2; });
+if (isMain(import.meta.url)) {
+  try { process.exitCode = await main(process.argv.slice(2)); }
+  catch (error) { process.stderr.write(`${error?.stack ?? error}\n`); process.exitCode = 2; }
+}

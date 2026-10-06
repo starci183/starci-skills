@@ -15,14 +15,14 @@ import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C4';
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) {
   return <section><h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>{children}</section>;
 }
 const none = <p className="text-xs text-muted-foreground">{t('None')}</p>;
 const oneLine = (text: string, n = 220) => { const s = text.replace(/\s+/g, ' ').trim(); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
 
 /** Side drawer for one leg. Essentials: what it does, why it is (not) moving, the one next step. Everything else sits under "Advanced". */
-export function LegDrawer({ project, wf, leg, pipeline, onClose }: { project: string; wf: string; leg: LegRow | null; pipeline: PipelineView; onClose: () => void }) {
+export function LegDrawer({ project, wf, leg, pipeline, onClose }: Readonly<{ project: string; wf: string; leg: LegRow | null; pipeline: PipelineView; onClose: () => void }>) {
   if (!leg) return null;
   const byOp = new Map(pipeline.legs.map(l => [l.op, l]));
   const upstream = pipeline.edges.filter(e => e.to === leg.op).map(e => e.from);

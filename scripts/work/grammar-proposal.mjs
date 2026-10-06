@@ -43,8 +43,8 @@ const RULE_ID = /\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+\b/;
 // A section marker matches in either language: the Vietnamese alternatives are lexicon data
 // (modules/goal/source-phrases.yaml proposal).
 const MD_FIELDS = {
-  gap: new RegExp(`\\bgap\\b|\\bwhy\\b|does not (have|publish|describe)|no (dna|component|variant)|lacks?\\b|${altOf('proposal.gap')}`, 'i'),
-  anatomy: new RegExp(`\\banatomy\\b|\\bslots?\\b|\\bparts?\\b|${altOf('proposal.anatomy')}`, 'i'),
+  gap: new RegExp(String.raw`\bgap\b|\bwhy\b|does not (have|publish|describe)|no (dna|component|variant)|lacks?\b|${altOf('proposal.gap')}`, 'i'),
+  anatomy: new RegExp(String.raw`\banatomy\b|\bslots?\b|\bparts?\b|${altOf('proposal.anatomy')}`, 'i'),
   tokens: /\btokens?\b|var\(--|--[a-z][\w-]*|\b\d+px\b/i,
   claims: RULE_ID,
   render: /```\s*html|<(div|section|span|article|button|svg)\b|\.(png|html)\b|isolated render/i,
@@ -55,9 +55,9 @@ function headingNames(raw) {
   const names = new Set();
   for (const q of String(raw).matchAll(/data-grammar-proposal=["']([^"']+)["']/g)) names.add(q[1].trim());
   const heading = String(raw).replace(/[`*]/g, '').trim().replace(/^\d+[.)]\s*/, '');
-  const variant = /^([A-Z][\w]*)\s+(?:variant|slot|part)\s+([A-Za-z][\w-]*)/.exec(heading);
+  const variant = /^([A-Z]\w*)\s+(?:variant|slot|part)\s+([A-Za-z][\w-]*)/.exec(heading);
   if (variant) names.add(`${variant[1]}.${variant[2]}`);
-  if (!names.size) for (const q of String(raw).matchAll(/`([A-Z][\w]*(?:\.[\w-]+)?)`/g)) names.add(q[1]);
+  if (!names.size) for (const q of String(raw).matchAll(/`([A-Z]\w*(?:\.[\w-]+)?)`/g)) names.add(q[1]);
   const lead = /^([A-Za-z][\w.-]*)$/.exec(heading.split(/\s+[—–-]\s+|\s*\(|:/)[0].trim());
   if (!names.size && lead && !SECTION_WORDS.has(lead[1].toLowerCase())) names.add(lead[1]);
   return [...names];
@@ -78,7 +78,7 @@ function markdownProposals(text, file) {
     // A heading whose section states none of the fields (a document title over several proposals) is not a proposal.
     if (missing.length === PROPOSAL_FIELDS.length) continue;
     const gap = /(?:^|\n)#{1,4}\s*gap[^\n]*\n+([^\n#]+)/i.exec(body)?.[1] ?? body.split('\n').find((l) => MD_FIELDS.gap.test(l)) ?? '';
-    out.push({ name: names[0], names, file, format: 'md', gap: gap.trim().slice(0, 300), claims: [...new Set(body.match(new RegExp(RULE_ID.source, 'g')) ?? [])],
+    out.push({ name: names[0], names, file, format: 'md', gap: gap.trim().slice(0, 300), claims: [...new Set([...body.matchAll(new RegExp(RULE_ID.source, 'g'))].map((m) => m[0]))],
       render: /```\s*html([\s\S]*?)```/i.exec(body)?.[1]?.trim() ?? (/\(([^)]+\.(?:png|html))\)|`([^`]+\.(?:png|html))`/.exec(body)?.slice(1).find(Boolean) ?? null),
       status: PROPOSED, complete: missing.length === 0, missing });
   }
@@ -90,7 +90,7 @@ function yamlProposals(doc, file) {
   return list.filter((p) => p && typeof p === 'object' && p.name).map((p) => {
     const missing = PROPOSAL_FIELDS.filter((f) => p[f] == null || p[f] === '' || (Array.isArray(p[f]) && !p[f].length && f !== 'tokens'));
     return { name: String(p.name).trim(), names: [String(p.name).trim()], file, format: 'yaml', gap: String(p.gap ?? '').slice(0, 300),
-      claims: Array.isArray(p.claims) ? p.claims.map(String) : String(p.claims ?? '').match(new RegExp(RULE_ID.source, 'g')) ?? [],
+      claims: Array.isArray(p.claims) ? p.claims.map(String) : [...String(p.claims ?? '').matchAll(new RegExp(RULE_ID.source, 'g'))].map((m) => m[0]),
       render: typeof p.render === 'string' ? p.render : p.render?.path ?? null, status: p.status === PROPOSED || p.status == null ? PROPOSED : String(p.status),
       complete: missing.length === 0, missing };
   });
@@ -153,7 +153,7 @@ export function recordGrammarProposals(ledger, { job, repo, files, now = Date.no
   for (const p of found) {
     let sha = null;
     try { sha = sha256File(p.file); } catch { sha = null; }
-    const rel = path.relative(repo, p.file).replace(/\\/g, '/');
+    const rel = path.relative(repo, p.file).replaceAll('\\', '/');
     const seen = db.prepare("SELECT 1 FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.name')=? AND json_extract(payload_json,'$.sha256') IS ? LIMIT 1")
       .get(job.workflow_id, GRAMMAR_PROPOSAL_FILED, p.name, sha);
     if (seen) continue;

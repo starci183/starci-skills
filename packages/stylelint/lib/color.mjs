@@ -79,7 +79,7 @@ function splitArguments(inner) {
   return { parts: main.trim().split(/\s+/).filter(Boolean), alpha: alpha === undefined ? null : alpha.trim(), legacy: false }
 }
 
-const NUMBER = "[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:e[+-]?\\d+)?"
+const NUMBER = String.raw`[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?`
 
 /** A number, or a percentage mapped so 100% is `full`; `none` is 0. Anything else is null. */
 function amount(word, full) {
@@ -116,7 +116,7 @@ export function parseColor(text) {
   const hex = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(value)
   if (hex) {
     const digits = hex[1].length <= 4 ? [...hex[1]].map((digit) => digit + digit).join("") : hex[1]
-    const channel = (index) => parseInt(digits.slice(index * 2, index * 2 + 2), 16) / 255
+    const channel = (index) => Number.parseInt(digits.slice(index * 2, index * 2 + 2), 16) / 255
     return fromSrgb([channel(0), channel(1), channel(2)], digits.length === 8 ? channel(3) : 1)
   }
   const call = /^([a-z-]+)\(([\s\S]*)\)$/.exec(value)
@@ -170,7 +170,7 @@ function parseMix(inner) {
   if (!space || operands.length !== 2) return null
   const [, model, method = "shorter"] = space
   const items = operands.map((operand) => {
-    const percentage = new RegExp(`(?:^|\\s)(${NUMBER})%$`).exec(operand)
+    const percentage = new RegExp(String.raw`(?:^|\s)(${NUMBER})%$`).exec(operand)
     const color = parseColor(percentage ? operand.slice(0, percentage.index).trim() : operand)
     return color === null ? null : { color, percent: percentage ? Number(percentage[1]) : null }
   })
@@ -180,7 +180,7 @@ function parseMix(inner) {
   else if (p1 === null) p1 = 100 - p2
   else if (p2 === null) p2 = 100 - p1
   const sum = p1 + p2
-  if (!(sum > 0) || p1 < 0 || p2 < 0) return null
+  if (sum <= 0 || p1 < 0 || p2 < 0) return null
   const [w1, w2] = [p1 / sum, p2 / sum]
   const multiplier = sum < 100 ? sum / 100 : 1
   const [a, b] = [items[0].color, items[1].color]

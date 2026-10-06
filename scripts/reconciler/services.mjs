@@ -58,7 +58,7 @@ export function servicePlatformProblem(name, platform = process.platform) {
 
 const positive = (value, where) => {
   const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) throw Error(`modules/reconciler/host.yaml ${where} must be a positive number`);
+  if (!Number.isFinite(n) || n <= 0) throw new Error(`modules/reconciler/host.yaml ${where} must be a positive number`);
   return n;
 };
 
@@ -71,7 +71,7 @@ export function hostSettings(raw = parseYaml(fs.readFileSync(HOST_YAML, 'utf8'))
     for (const key of ['everyMs', 'probeTimeoutMs', 'failAfter', 'startTimeoutMs', 'slaMs']) services[name][key] = positive(s?.[key], `services.${name}.${key}`);
   }
   const checkers = (h.checkers ?? []).map((c, i) => {
-    if (!c?.name || !c?.cmd) throw Error(`modules/reconciler/host.yaml checkers[${i}] needs name and cmd`);
+    if (!c?.name || !c?.cmd) throw new Error(`modules/reconciler/host.yaml checkers[${i}] needs name and cmd`);
     return { name: String(c.name), cmd: String(c.cmd), args: (c.args ?? []).map(String), everyMs: positive(c.everyMs ?? 300000, `checkers[${i}].everyMs`),
       probeTimeoutMs: positive(c.probeTimeoutMs ?? 60000, `checkers[${i}].probeTimeoutMs`), slaMs: positive(c.slaMs ?? 600000, `checkers[${i}].slaMs`),
       failAfter: positive(c.failAfter ?? 1, `checkers[${i}].failAfter`), startTimeoutMs: 1 };
@@ -267,7 +267,7 @@ export const newRecord = (name, now) => ({ name, state: 'declared', since: now, 
  * mutated. `entry.restart` false never starts (and never quarantines: nothing restarted it).
  */
 export function stepService(rec, probe, { now, entry, backoff, quarantine }) {
-  const r = { ...rec, restarts: [...(rec.restarts ?? [])], lastProbe: { ok: probe?.ok === true, at: now, ...(probe?.detail ?? {}) } };
+  const r = { ...rec, restarts: [...(rec.restarts ?? [])], lastProbe: { ok: probe?.ok === true, at: now, ...probe?.detail } };
   const from = r.state;
   const to = (state) => { if (r.state !== state) { r.state = state; r.since = now; } };
   let act = null, quarantined = false;
@@ -305,7 +305,7 @@ const serviceKindOf = (name) => {
   const n = String(name ?? '');
   if (n.startsWith('ledger:')) return 'ledger';
   if (n.startsWith('sched-task:')) return 'scheduled-task';
-  if (/-tunnel$/.test(n)) return 'tunnel';
+  if (n.endsWith('-tunnel')) return 'tunnel';
   if (n === 'ask-gateway' || n === 'telegram-bridge') return 'connector';
   if (n.startsWith('checker:') || n === 'harness-ui') return 'http';
   return 'host-app';
@@ -353,7 +353,7 @@ export function machineStore(m) {
     const restarts = (rec.restarts ?? []).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
     const fresh = restarts.filter((t) => !had.includes(t));
     const restartsFrom = restarts.length ? restarts[0] : had.length ? had.at(-1) + 1 : 0;
-    const { name, state, since, restarts: _r, ...fields } = rec;
+    const { name, state, since, ...fields } = rec; delete fields.restarts;
     const fromState = row && !prev.removed ? prev.state ?? row.state : null;
     m.upsert('services', { name, kind: row?.kind ?? serviceKindOf(name), state: serviceStateOf(state), since: since ?? at,
       last_probe_json: { ...fields, state, restartsFrom } }, ['name']);
@@ -397,7 +397,7 @@ export function openServiceStore({ env = process.env } = {}) {
 
 /* ------------------------------------------------------------ actuators (the CLI; active mode only) */
 
-const psQuote = (s) => `'${String(s).replace(/'/g, "''")}'`;
+const psQuote = (s) => `'${String(s).replaceAll("'", "''")}'`;
 
 /** Launch environment for a desktop host: no agent/Claude session variables (scripts/lib/host-launch-env.mjs hostLaunchEnv). */
 export async function cleanEnv(env = process.env) {
@@ -422,7 +422,7 @@ export function orcaRestartScript({ app, closeWaitMs }) {
     'while ((Get-Date) -lt $deadline -and (& $mine).Count) { Start-Sleep -Milliseconds 500 }',
     '$left = & $mine',
     '$left | Stop-Process -Force -ErrorAction SilentlyContinue',
-    'Start-Process -FilePath "$env:WINDIR\\explorer.exe" -ArgumentList (\'"\' + $app + \'"\')',
+    String.raw`Start-Process -FilePath "$env:WINDIR\explorer.exe" -ArgumentList ('"' + $app + '")'`,
     '@{ closed = $before.Count; forced = $left.Count; via = "explorer.exe" } | ConvertTo-Json -Compress',
   ].join('\n');
 }
@@ -444,7 +444,7 @@ export async function startService(name, { settings = hostSettings(), ports = se
       const app = status({ timeout: 5000 }).appExe;
       if (!app) return { ok: false, error: 'no Orca app beside the orca CLI' };
       const r = powershell(orcaRestartScript({ app, closeWaitMs: s.closeWaitMs ?? 30_000 }), { env: clean, timeout: (s.closeWaitMs ?? 30_000) + 120_000 });
-      return { ok: r.status === 0, app, ...(lastJson(r.stdout) ?? {}), ...(r.status ? { error: String(r.stderr ?? '').trim().slice(0, 300) } : {}) };
+      return { ok: r.status === 0, app, ...lastJson(r.stdout), ...(r.status ? { error: String(r.stderr ?? '').trim().slice(0, 300) } : {}) };
     }
     case 'harness-ui': case 'harness-tunnel': {
       const task = s.task; // tunnel-task.mjs registers `starci harness start --tunnel` as the harness-tunnel action
@@ -487,7 +487,7 @@ export function turnMinutesOf(screen) {
 
 const KEY_BYTES = Object.freeze({ esc: '\u001b', 'ctrl+c': '\u0003' });
 
-const SEAT_AGENTS = ['claude', 'codex', 'devin'];
+const SEAT_AGENTS = new Set(['claude', 'codex', 'devin']);
 /**
  * Select the seat classifier's provider from the shared terminal identity facts.
  * Supported metadata/title/frame evidence wins, else the injected or legacy Claude fallback.
@@ -495,7 +495,7 @@ const SEAT_AGENTS = ['claude', 'codex', 'devin'];
  * The identity proof describes provider evidence, not effect authority or cryptographic attestation.
  */
 export function seatAgentOf(entry, screen = '', fallback = null, identity = terminalIdentityOf(entry, { screen })) {
-  if (SEAT_AGENTS.includes(identity.provider)) return identity.provider;
+  if (SEAT_AGENTS.has(identity.provider)) return identity.provider;
   // Keep the current probe policy; downstream interrupt eligibility belongs to turn-budget.
   return (fallback ? fallback(entry, 'claude') : null) ?? 'claude';
 }
@@ -591,7 +591,7 @@ async function main() {
     const r = await turnInterrupt({ terminal: a.terminal, agent: a.agent, repo: a.repo ?? null, workflowId: a.workflow ?? null, supervisor: a.supervisor === true });
     out(r); if (!r.ok) process.exitCode = 1; return;
   }
-  if (a['turn-replace']) { const r = await turnReplace({ terminal: a.terminal, agent: a.agent }); out(r); if (!r.ok) process.exitCode = 1; return; }
+  if (a['turn-replace']) { const r = turnReplace({ terminal: a.terminal, agent: a.agent }); out(r); if (!r.ok) process.exitCode = 1; return; }
   if (a.processes) {
     const { listProcesses } = await import('../supervisor/host-health.mjs');
     const procs = listProcesses();

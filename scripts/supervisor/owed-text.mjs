@@ -12,15 +12,15 @@ export const NOTE_KIND = /^(?:plan|plan-note|replan-note|scope-decision|owner-ru
 /** Text that addresses or waits on the supervisor, the runtime monitor, Source or the file owner. The Vietnamese
  * alternatives a note may carry are lexicon data (modules/goal/source-phrases.yaml owed), never source literals. */
 export const SUPERVISOR_ADDRESSED = new RegExp(
-  `\\b(?:for|to|ask(?:s|ing)?|needs?|awaiting|awaits?|waits? (?:on|for))\\s+(?:the\\s+)?(?:supervisor|runtime monitor|source|file owner)\\b`
-  + `|\\b(?:${altOf('owed.supervisorVerbs')})\\s+supervisor\\b`
-  + `|\\bsupervisor\\s*(?:\\/|${altOf('owed.orWord')}|or)\\s*(?:${altOf('owed.ownerWord')}|owner)`
-  + `|(?:${altOf('owed.ownerWord')}|owner)\\s*(?:${altOf('owed.orWord')}|or|\\/)\\s*supervisor\\b`
-  + `|\\bruntime monitor\\b|\\boutside (?:my |the kernel'?s |kernel |its )?authority\\b|${altOf('owed.beyondAuthority')}`, 'i');
+  String.raw`\b(?:for|to|ask(?:s|ing)?|needs?|awaiting|awaits?|waits? (?:on|for))\s+(?:the\s+)?(?:supervisor|runtime monitor|source|file owner)\b`
+  + String.raw`|\b(?:${altOf('owed.supervisorVerbs')})\s+supervisor\b`
+  + String.raw`|\bsupervisor\s*(?:\/|${altOf('owed.orWord')}|or)\s*(?:${altOf('owed.ownerWord')}|owner)`
+  + String.raw`|(?:${altOf('owed.ownerWord')}|owner)\s*(?:${altOf('owed.orWord')}|or|\/)\s*supervisor\b`
+  + String.raw`|\bruntime monitor\b|\boutside (?:my |the kernel'?s |kernel |its )?authority\b|${altOf('owed.beyondAuthority')}`, 'i');
 /** An owner-gate condition only the owner can meet (owner, 2026-09-24: everything else is the supervisor's). */
-export const OWNER_ONLY = new RegExp(`\\bcredentials?\\b|\\bcreds\\b|\\bsecrets?\\b|\\bpasswords?\\b|\\bapi[- ]?keys?\\b|\\boauth\\b|\\bconsent\\b|\\bpayments?\\b|\\bbilling\\b|\\blegal\\b|\\bpush(?:ing)? to (?:a |the )?remote\\b|\\bpublish(?:ing)?\\b|\\bhandover\\b|${altOf('owed.ownerOnly')}`, 'i');
+export const OWNER_ONLY = new RegExp(String.raw`\bcredentials?\b|\bcreds\b|\bsecrets?\b|\bpasswords?\b|\bapi[- ]?keys?\b|\boauth\b|\bconsent\b|\bpayments?\b|\bbilling\b|\blegal\b|\bpush(?:ing)? to (?:a |the )?remote\b|\bpublish(?:ing)?\b|\bhandover\b|${altOf('owed.ownerOnly')}`, 'i');
 
 // The text rules' Vietnamese alternatives are lexicon data (modules/goal/source-phrases.yaml owed).
 export const WORKER_DIED_TEXT = new RegExp(`without (?:filing )?(?:a |an )?(?:api )?report|bare PowerShell prompt|${altOf('owed.workerDied')}`, 'i');
 export const CONTRACT_CONFLICT_TEXT = new RegExp(`${altOf('owed.contractConflict')}|contradict`, 'i');
-export const DECISION_TEXT = new RegExp(`${altOf('owed.decision')}|\\bdelegat`, 'i');
+export const DECISION_TEXT = new RegExp(String.raw`${altOf('owed.decision')}|\bdelegat`, 'i');

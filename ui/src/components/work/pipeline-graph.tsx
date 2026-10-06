@@ -51,19 +51,19 @@ const activate = (leg: LegRow, onSelect: (leg: LegRow) => void) => (event: Keybo
 };
 
 /** S3: the whole planned op chain as a pipeline (columns = levels, stacked = parallel). */
-export function PipelineGraph({ pipeline, selected, onSelect }: { pipeline: PipelineView; selected: string | null; onSelect: (leg: LegRow) => void }) {
+export function PipelineGraph({ pipeline, selected, onSelect }: { readonly pipeline: PipelineView; readonly selected: string | null; readonly onSelect: (leg: LegRow) => void }) {
   const narrow = useNarrow();
   const planned = { ...pipeline, legs: pipeline.legs.filter(leg => leg.inPlan) };
   const history = pipeline.legs.filter(leg => !leg.inPlan);
   return <div className="space-y-4">
-    {!planned.legs.length ? <p className="text-sm text-muted-foreground">{t('This workflow has no planned op chain yet.')}</p> : pipeline.anomalies.length ? <div className="space-y-2 rounded-md border p-3"><p className="text-sm text-muted-foreground">{t('Recorded graph anomalies; dependency ordering is unavailable.')}</p>{pipeline.anomalies.map((anomaly, index) => <p key={index} className="break-all font-mono text-xs">{anomaly.kind} · {anomaly.from ?? '—'} → {anomaly.to ?? '—'}</p>)}<div className="flex flex-wrap gap-2">{planned.legs.map(leg => <button key={leg.op} type="button" onClick={() => onSelect(leg)} className="rounded-md border px-3 py-2 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">{legName(leg)} · {leg.op}</button>)}</div></div> : narrow ? <PipelineList pipeline={planned} selected={selected} onSelect={onSelect} /> : <PipelineSvg pipeline={planned} selected={selected} onSelect={onSelect} />}
+    {!planned.legs.length ? <p className="text-sm text-muted-foreground">{t('This workflow has no planned op chain yet.')}</p> : pipeline.anomalies.length ? <div className="space-y-2 rounded-md border p-3"><p className="text-sm text-muted-foreground">{t('Recorded graph anomalies; dependency ordering is unavailable.')}</p>{pipeline.anomalies.map(anomaly => <p key={`${anomaly.kind}:${anomaly.from}:${anomaly.to}`} className="break-all font-mono text-xs">{anomaly.kind} · {anomaly.from ?? '—'} → {anomaly.to ?? '—'}</p>)}<div className="flex flex-wrap gap-2">{planned.legs.map(leg => <button key={leg.op} type="button" onClick={() => onSelect(leg)} className="rounded-md border px-3 py-2 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">{legName(leg)} · {leg.op}</button>)}</div></div> : narrow ? <PipelineList pipeline={planned} selected={selected} onSelect={onSelect} /> : <PipelineSvg pipeline={planned} selected={selected} onSelect={onSelect} />}
     {history.length > 0 && <div className="border-t pt-3"><h3 className="text-sm font-semibold">{t('Recorded operation history')}</h3><p className="mt-1 text-xs text-muted-foreground">{t('Operation scope; excluded from plan progress. Instance association is unproven.')}</p><div className="mt-2 flex flex-wrap gap-2">{history.map(leg => <button key={leg.op} type="button" aria-pressed={selected === leg.op} onClick={() => onSelect(leg)} className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"><StatusChip status={leg.status} /><span>{legName(leg)} <span className="font-mono text-xs text-muted-foreground">{leg.op}</span></span><span className="text-xs text-muted-foreground">{t('{n} attempts', { n: leg.attempts.length })}</span></button>)}</div></div>}
   </div>;
 }
 
 const edgeStroke = (tone: 'current' | 'done' | 'plain') => tone === 'current' ? toneVar('running') : tone === 'done' ? toneVar('success', '-line') : 'var(--muted-foreground)';
 
-function PipelineSvg({ pipeline, selected, onSelect }: { pipeline: PipelineView; selected: string | null; onSelect: (leg: LegRow) => void }) {
+function PipelineSvg({ pipeline, selected, onSelect }: { readonly pipeline: PipelineView; readonly selected: string | null; readonly onSelect: (leg: LegRow) => void }) {
   const holder = useRef<HTMLDivElement>(null);
   const [measured, setMeasured] = useState(1050);
   useEffect(() => {
@@ -90,6 +90,7 @@ function PipelineSvg({ pipeline, selected, onSelect }: { pipeline: PipelineView;
       {[...placed.values()].map(({ leg, x, y }) => {
         const tone = statusTone[leg.status], isSel = selected === leg.op;
         const name = legName(leg), goal = legGoal(leg), agents = legAgents(leg);
+        const [nameLine1, nameLine2] = wrap2(name, Math.floor(chars * 0.9));
         return <g key={leg.op} transform={`translate(${x},${y})`} data-tone={tone} data-leg={leg.op} data-status={leg.status} role="button" tabIndex={0} className="group cursor-pointer outline-none"
           aria-label={`${name} (${leg.op}): ${statusLabels[leg.status]}, ${legSummary(leg)}${leg.current ? t(', the current leg') : ''}`} aria-pressed={isSel}
           onClick={() => onSelect(leg)} onKeyDown={activate(leg, onSelect)}>
@@ -99,7 +100,7 @@ ${goal}` : ''}`}</title>
           {leg.current && <rect x={-3} y={-3} width={nodeW + 6} height={NODE_H + 6} rx={8} fill="none" stroke={toneVar('running')} strokeWidth={1.5} />}
           <rect width={nodeW} height={NODE_H} rx={6} fill="var(--card)" stroke={isSel ? 'var(--ring)' : 'var(--border)'} strokeWidth={isSel ? 1.5 : 1} strokeDasharray={dashed(leg.status) ? '5 4' : undefined} />
           <rect x={-3} y={-3} width={nodeW + 6} height={NODE_H + 6} rx={8} fill="none" stroke="var(--ring)" strokeWidth={2} className="opacity-0 group-focus-visible:opacity-100" />
-          <text x={8} y={19} fontSize="13" fontWeight="650" className="fill-foreground">{wrap2(name, Math.floor(chars * 0.9)).map((line, i) => <tspan key={i} x={8} dy={i ? 15 : 0}>{line}</tspan>)}</text>
+          <text x={8} y={19} fontSize="13" fontWeight="650" className="fill-foreground"><tspan x={8} dy={0}>{nameLine1}</tspan>{nameLine2 != null && <tspan x={8} dy={15}>{nameLine2}</tspan>}</text>
           <circle cx={12} cy={55} r={3.5} fill="var(--tone)" />
           <text x={20} y={59} fontSize="11.5" fontWeight="600" fill="var(--tone)">{clip(statusLabels[leg.status], chars - 2)}</text>
           <text x={8} y={79} fontSize="11.5" className="fill-muted-foreground">{clip(legSummary(leg), chars)}</text>
@@ -114,7 +115,7 @@ ${goal}` : ''}`}</title>
   </div>;
 }
 
-function PipelineList({ pipeline, selected, onSelect }: { pipeline: PipelineView; selected: string | null; onSelect: (leg: LegRow) => void }) {
+function PipelineList({ pipeline, selected, onSelect }: { readonly pipeline: PipelineView; readonly selected: string | null; readonly onSelect: (leg: LegRow) => void }) {
   const columns = buildColumns(pipeline.legs);
   return <div data-pipeline-list><Stagger as="ol" className="flex flex-col gap-4">{columns.map(col => <StaggerItem as="li" key={col.level}>
     <p className="mb-2 text-xs font-semibold text-muted-foreground">{col.index + 1}. {col.label}{col.legs.length > 1 && <span className="font-normal normal-case"> · {t('parallel')}</span>}</p>

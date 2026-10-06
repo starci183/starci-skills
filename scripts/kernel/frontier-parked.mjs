@@ -34,7 +34,7 @@ export function parkedBehindWaits(queued = [], heldSettle = []) {
     if (roots.has(jobId)) return roots.get(jobId);
     if (memo.has(jobId)) return memo.get(jobId);
     const item = byId.get(jobId);
-    if (!item || item.queuedBecause !== 'dependency' || !item.blockedBy?.job || seen.has(jobId)) return null;
+    if (item?.queuedBecause !== 'dependency' || !item.blockedBy?.job || seen.has(jobId)) return null;
     seen.add(jobId);
     const root = rootOf(item.blockedBy.job, seen);
     memo.set(jobId, root);
@@ -57,9 +57,9 @@ export function parkedBehindWaits(queued = [], heldSettle = []) {
  */
 // Autopilot (scripts/kernel/autopilot-run.mjs): a job a supervisor-gate holds, or one deferred (to the final review, or
 // to the handover credential checklist), is no open work of the Kernel's either.
-const HELD_ELSEWHERE = ['peer-wait', 'supervisor-gate', 'deferred', 'deferred-to-handover'];
+const HELD_ELSEWHERE = new Set(['peer-wait', 'supervisor-gate', 'deferred', 'deferred-to-handover']);
 export function waitHeldOperations(queued = [], heldSettle = [], parked = new Map()) {
-  const peerHeld = queued.filter((item) => HELD_ELSEWHERE.includes(item.queuedBecause)).length;
-  const behind = [...parked.values()].filter((root) => root.settle || HELD_ELSEWHERE.includes(root.heldBecause)).length;
+  const peerHeld = queued.filter((item) => HELD_ELSEWHERE.has(item.queuedBecause)).length;
+  const behind = [...parked.values()].filter((root) => root.settle || HELD_ELSEWHERE.has(root.heldBecause)).length;
   return peerHeld + heldSettle.length + behind;
 }

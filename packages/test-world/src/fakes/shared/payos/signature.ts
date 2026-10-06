@@ -34,7 +34,7 @@ const stringify = (value: unknown): string => {
     if (typeof value === "string") return value === "null" || value === "undefined" ? "" : value
     if (Array.isArray(value)) return JSON.stringify(value.map(sortedDeep))
     if (typeof value === "object") return JSON.stringify(sortedDeep(value))
-    return String(value)
+    return String(value as number | boolean)
 }
 
 /** HMAC-SHA256 hex of a string. */

@@ -93,7 +93,7 @@ export function createOrcaWorktree({ repoRoot, kind, name, base, setup = 'skip',
   const ask = () => orca.create({ repo: `path:${posixPath(slot.repoRoot)}`, name, baseBranch: base, setup, comment });
   let made = ask();
   // A repository Orca does not know yet is registered once (idempotent), then the creation is asked again.
-  if (!made?.ok && made?.errorCode === 'repo_not_found' && orca.addRepo && orca.addRepo({ path: posixPath(slot.repoRoot) })?.ok) made = ask();
+  if (!made?.ok && made?.errorCode === 'repo_not_found' && orca.addRepo?.({ path: posixPath(slot.repoRoot) })?.ok) made = ask();
   if (!made?.ok || !made.worktree?.id || !made.worktree?.path) {
     releaseOrcaSlot(slot.pending, { env });
     return { ok: false, reason: 'orca-worktree-create-failed', detail: String(made?.error ?? made?.errorCode ?? 'no worktree in the receipt').slice(0, 400) };

@@ -157,7 +157,7 @@ describe("PrimaryRailLayout collapse", () => {
     it("keeps every two-column form inside the widening query, and none in the collapse", () => {
         const wide = rules.filter((rule) => rule.selector.includes(".starci-core-primary-rail-layout")
             && trackCount(declarationOf(rule.body, "grid-template-columns") ?? "") > 1)
-        expect(wide.length).toBe(3)
+        expect(wide).toHaveLength(3)
         for (const rule of wide) {
             expect(rule.conditions).toContain("@container starci-core-primary-rail (min-width: 56.001rem)")
             expect(rule.selector, "a rail track is only owed to a layout that has a rail").toContain("[data-grammar-layout-rail=\"present\"]")
@@ -215,7 +215,7 @@ describe("WorkspaceShell collapse", () => {
     it("owns the side-by-side tiers in two widening queries and the seam with them", () => {
         const side = rules.filter((rule) => rule.selector.includes(".starci-core-workspace-shell-layout")
             && areaColumnCount(declarationOf(rule.body, "grid-template-areas") ?? "") > 1)
-        expect(side.length).toBe(6)
+        expect(side).toHaveLength(6)
         for (const rule of side) {
             expect(rule.conditions.some((condition) => condition === "@container starci-core-workspace-shell (min-width: 56.001rem)"
                 || condition === "@container starci-core-workspace-shell (min-width: 72.001rem)"), `${rule.selector} sits outside a widening tier`).toBe(true)

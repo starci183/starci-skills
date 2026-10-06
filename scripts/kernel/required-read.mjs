@@ -12,7 +12,7 @@ export const KERNEL_BOOT_FILES = Object.freeze(['modules/kernel/kernel-prompt.md
 export const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/cli/commands/kernel', 'modules/kernel/owner-rulings.yaml']);
 const OP_PROMPT_FILE = 'scripts/kernel/op-prompt.mjs';
 const KERNEL_READ_SCHEMA = 'starci/kernel-required-read@1';
-const refuse = detail => Object.assign(Error(detail), { code: 'kernel-read-unverified' });
+const refuse = detail => Object.assign(new Error(detail), { code: 'kernel-read-unverified' });
 const sameRow = (a, b) => a?.path === b?.path && a?.sha256 === b?.sha256 && a?.bytes === b?.bytes;
 
 const expand = (root, relative) => {

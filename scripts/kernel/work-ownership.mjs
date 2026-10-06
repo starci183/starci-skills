@@ -47,7 +47,6 @@ import { byCodeUnit } from '../lib/list.mjs';
 import { recordRecordChange } from '../../engine/db/ledger.mjs';
 import { workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 
-export const TRANSFER_SCOPE = 'ownership-transfer';
 export const TRANSFER_SCHEMA = 'starci/ownership-transfer@1';
 /** Every ownership transfer the Supervisor recorded ({path, to, from, reason, at, by, provisional, bridgeId}): path_transfers rows. */
 export const readTransfers = (db) => db.prepare("SELECT detail_json FROM path_transfers WHERE state='applied' ORDER BY path").all()
@@ -170,7 +169,7 @@ const committedDigestsOf = (buffer) => {
   if (!buffer) return [];
   const raw = sha16(buffer);
   const text = buffer.toString('latin1');
-  const crlf = sha16(Buffer.from(text.replace(/\r?\n/g, '\r\n'), 'latin1'));
+  const crlf = sha16(Buffer.from(text.replaceAll(/\r?\n/g, '\r\n'), 'latin1'));
   const lf = sha16(Buffer.from(text.replace(/\r\n/g, '\n'), 'latin1'));
   return [...new Set([raw, crlf, lf])];
 };

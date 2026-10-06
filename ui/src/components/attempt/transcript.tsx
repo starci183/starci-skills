@@ -17,7 +17,7 @@ export const concept: Concept = 'C7';
 type Snapshot = { id: number; at: number; lines: number; bytes: number };
 const PAGE = 300;
 
-export function TranscriptViewer({ project, attemptId, live }: { project: string; attemptId: string; live: boolean }) {
+export function TranscriptViewer({ project, attemptId, live }: { readonly project: string; readonly attemptId: string; readonly live: boolean }) {
   const base = `/api/attempts/${encodeURIComponent(project)}/${encodeURIComponent(attemptId)}/transcript`;
   const snapshots = useApiQuery<Snapshot[]>(`${base}/snapshots`, { topics: [`attempt:${project}:${attemptId}`], intervalMs: 60_000 });
   const [draft, setDraft] = useState('');

@@ -30,7 +30,8 @@ function fileAskReceipt(db, { workflowId, dispatchId, receipt, blob, at = Date.n
   const report = db.prepare('SELECT attempt_id,job_id FROM reports WHERE workflow_id=? AND dispatch_id=?').get(workflowId, dispatchId) ?? null;
   const attempt = report ? db.prepare('SELECT attempt_id,job_id,op_id FROM op_attempts WHERE attempt_id=?').get(report.attempt_id) : null;
   let name = receiptNameOf(dispatchId, at);
-  for (let n = at + 1; db.prepare('SELECT 1 FROM job_artifacts WHERE workflow_id=? AND name=?').get(workflowId, name); n += 1) name = receiptNameOf(dispatchId, n);
+  let n = at + 1;
+  while (db.prepare('SELECT 1 FROM job_artifacts WHERE workflow_id=? AND name=?').get(workflowId, name)) { name = receiptNameOf(dispatchId, n); n += 1; }
   const { artifactId } = putArtifact(db, { workflowId, attemptId: attempt?.attempt_id ?? null, jobId: attempt?.job_id ?? report?.job_id ?? null, opId: attempt?.op_id ?? null,
     role: 'other', kind: 'report', name, blob, origin: 'kernel', now: at });
   const answeredBy = String(receipt.answeredBy ?? 'unknown');
@@ -90,7 +91,7 @@ export function receiptFileOf(ref, { base = process.cwd() } = {}) {
 }
 
 /** How a Work record cites a receipt file: `blob:<sha256>` for a blob, else the path relative to `repoRoot`. */
-export const receiptRefOf = (file, repoRoot) => (isBlobFile(file) ? `blob:${path.basename(file)}` : path.relative(repoRoot, file).replace(/\\/g, '/'));
+export const receiptRefOf = (file, repoRoot) => (isBlobFile(file) ? `blob:${path.basename(file)}` : path.relative(repoRoot, file).replaceAll('\\', '/'));
 
 /**
  * The prelude of every `apply` that settles from a serve-ask answer (scripts/work/draw-review.mjs,

@@ -24,13 +24,13 @@ export const fileOf = (root) => root.source?.input?.file ?? ""
 // -- the two themes of the brand layer -------------------------------------------------------------------------
 
 const quoted = `["']?`
-const LIGHT = new RegExp(`^(?::root|html|\\.light|\\[data-theme=${quoted}light${quoted}\\]|:root\\[data-theme=${quoted}light${quoted}\\]|:root\\.light)$`)
-const DARK = new RegExp(`^(?:\\.dark|\\[data-theme=${quoted}dark${quoted}\\]|:root\\[data-theme=${quoted}dark${quoted}\\]|:root\\.dark|html\\.dark)$`)
+const LIGHT = new RegExp(String.raw`^(?::root|html|\.light|\[data-theme=${quoted}light${quoted}\]|:root\[data-theme=${quoted}light${quoted}\]|:root\.light)$`)
+const DARK = new RegExp(String.raw`^(?:\.dark|\[data-theme=${quoted}dark${quoted}\]|:root\[data-theme=${quoted}dark${quoted}\]|:root\.dark|html\.dark)$`)
 /** The grammar's family root: the element that re-declares the family tokens on itself. */
-const FAMILY_ROOT = `\\.grammar-common-root\\[data-grammar-family=${quoted}[a-z][a-z0-9-]*${quoted}\\]`
-const theme = (name) => `\\[data-grammar-theme=${quoted}${name}${quoted}\\]`
+const FAMILY_ROOT = String.raw`\.grammar-common-root\[data-grammar-family=${quoted}[a-z][a-z0-9-]*${quoted}\]`
+const theme = (name) => String.raw`\[data-grammar-theme=${quoted}${name}${quoted}\]`
 const FAMILY_LIGHT = new RegExp(`^${FAMILY_ROOT}(?:${theme("light")})?$`)
-const FAMILY_DARK = new RegExp(`^(?:\\.dark\\s+${FAMILY_ROOT}|${FAMILY_ROOT}(?:\\.dark|${theme("dark")}))$`)
+const FAMILY_DARK = new RegExp(String.raw`^(?:\.dark\s+${FAMILY_ROOT}|${FAMILY_ROOT}(?:\.dark|${theme("dark")}))$`)
 const FAMILY_SYSTEM = new RegExp(`^${FAMILY_ROOT}(?:${theme("system")})?$`)
 /** The selectors that match the document root whatever the theme is. */
 const ALWAYS = /^(?::root|html)$/

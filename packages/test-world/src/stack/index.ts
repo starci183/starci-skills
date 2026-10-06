@@ -250,7 +250,7 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
     /** Records what the run provisioned so far on its lease, so a crash after this point is reclaimed exactly. */
     const recordProvisioned = (namespace: Namespace, runId: string, infra: RunInfra): Promise<void> =>
         registry().update((data) => {
-            data.leases = data.leases.map((lease) => (lease.runId === runId ? { ...lease, identity: namespace, infra: JSON.parse(JSON.stringify(infra)) as RunInfra } : lease))
+            data.leases = data.leases.map((lease) => (lease.runId === runId ? { ...lease, identity: namespace, infra: structuredClone(infra) } : lease))
         })
 
     const registerLease = async (namespace: Namespace, runId: string): Promise<void> => {
@@ -303,7 +303,7 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
             for (const key of Object.keys(data.notes)) if (key.includes(`:${namespace.kebab}-`)) delete data.notes[key]
         })
         const first = errors[0]
-        if (first !== undefined) throw first instanceof Error ? first : worldError(TestWorldErrorCode.InfrastructureFailed, String(first))
+        if (first !== undefined) throw first instanceof Error ? first : worldError(TestWorldErrorCode.InfrastructureFailed, String(first as string))
     }
 
     return {
@@ -398,7 +398,7 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
                     partial[item.service] = run
                     await recordProvisioned(namespace, runId, infraOf())
                     const notes = provisioned.notes
-                    if (notes !== undefined) await registry().update((data) => void Object.assign(data.notes, notes))
+                    if (notes !== undefined) await registry().update((data) => { Object.assign(data.notes, notes) })
                 }
                 if (request.k3d !== undefined) {
                     const cluster = await clusterApi()

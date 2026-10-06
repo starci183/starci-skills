@@ -32,7 +32,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { runNode } from '../api/node/run-node.mjs';
-import { fileURLToPath } from 'node:url';
 import { git } from './workers.mjs';
 import { defaultPushRepos, pushMains, describePush } from './push-mains.mjs';
 import { SKILL_ROOT, supervisorLog } from '../machine/home.mjs';
@@ -98,7 +97,7 @@ export function planFor(repo, { runtimeRoot = SKILL_ROOT, pkg = readPackage(repo
 }
 
 const rel = (file, repo) => {
-  const flat = (p) => String(p ?? '').replace(/^file:\/+/, '').replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+  const flat = (p) => String(p ?? '').replace(/^file:\/+/, '').replaceAll(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
   const f = flat(file), base = flat(repo);
   return base && f.toLowerCase().startsWith(`${base.toLowerCase()}/`) ? f.slice(base.length + 1) : f;
 };
@@ -126,8 +125,7 @@ export function failuresOf(name, text, { repo = null } = {}) {
     } catch { /* not JSON: the generic parse below */ }
   }
   let pendingFile = null, pendingTap = null, eslintFile = null, jestFile = null;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  for (const line of lines) {
     let m;
     // node:test spec reporter: "test at <file>:l:c" then "✖ <name> (12ms)"
     if ((m = /^\s*test at (.+?):\d+:\d+\s*$/.exec(line))) { pendingFile = m[1]; continue; }
@@ -141,18 +139,19 @@ export function failuresOf(name, text, { repo = null } = {}) {
     // tsc
     if ((m = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$/.exec(line)) || (m = /^(.+?):(\d+):(\d+)\s+-\s+error\s+(TS\d+):\s+(.*)$/.exec(line))) { add(m[1], `${m[4]} @${m[2]} ${m[5].slice(0, 120)}`); continue; }
     // eslint stylish
-    if ((m = /^(?:[A-Za-z]:)?[\w./\\@()[\]-]+\.[cm]?[jt]sx?$/.exec(line.trim())) && !line.startsWith(' ')) { eslintFile = line.trim(); continue; }
-    if (eslintFile && (m = /^\s+(\d+):(\d+)\s+error\s+(.*?)\s{2,}(\S+)\s*$/.exec(line))) { add(eslintFile, `${m[4]} @${m[1]} ${m[3].slice(0, 100)}`); continue; }
+    if (/^(?:[A-Za-z]:)?[\w./\\@()[\]-]+\.[cm]?[jt]sx?$/.test(line.trim()) && !line.startsWith(' ')) { eslintFile = line.trim(); continue; }
+    if (eslintFile && (m = /^\s+(\d+):(\d+)\s+error\s+(.*?)\s{2,}(\S+)\s*$/.exec(line))) { add(eslintFile, `${m[4]} @${m[1]} ${m[3].slice(0, 100)}`); }
   }
   if (!groups.size) {
     const tail = lines.map((l) => l.trimEnd()).filter(Boolean).slice(-20);
     if (tail.length) for (const t of tail) add('(unparsed)', t);
   }
   return finish(groups);
-  function finish(map) {
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(0, MAX_GROUPS)
-      .map(([file, items]) => ({ file, items: items.slice(0, MAX_ITEMS_PER_GROUP), ...(items.length > MAX_ITEMS_PER_GROUP ? { more: items.length - MAX_ITEMS_PER_GROUP } : {}) }));
-  }
+}
+
+function finish(map) {
+  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(0, MAX_GROUPS)
+    .map(([file, items]) => ({ file, items: items.slice(0, MAX_ITEMS_PER_GROUP), ...(items.length > MAX_ITEMS_PER_GROUP ? { more: items.length - MAX_ITEMS_PER_GROUP } : {}) }));
 }
 
 /* ------------------------------------------------------------ running */
@@ -271,7 +270,7 @@ export function describeRun(run) {
 
 if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
-  const bad = argv.filter((a, i) => a.startsWith('--') && !['--repo', '--check', '--json'].includes(a) && !(argv[i - 1] === '--repo'));
+  const bad = argv.filter((a, i) => a.startsWith('--') && !['--repo', '--check', '--json'].includes(a) && argv[i - 1] !== '--repo');
   if (bad.length) { console.error(`unknown option ${bad.join(' ')}; use: starci supervisor push [--repo <path>]... [--check] [--json]`); process.exit(2); }
   const repos = argv.flatMap((a, i) => (a === '--repo' && argv[i + 1] ? [argv[i + 1]] : []));
   const run = pushGit({ repos: repos.length ? repos : null, check: argv.includes('--check') });

@@ -7,7 +7,7 @@ import { jsonText } from './frame/util';
 
 export const concept: Concept = 'C6';
 
-function ReceiptRows({ receipt, historical }: { receipt: AdmissionReservation | null; historical: boolean }) {
+function ReceiptRows({ receipt, historical }: Readonly<{ receipt: AdmissionReservation | null; historical: boolean }>) {
   if (!receipt) return <p className="m-0 text-sm text-muted-foreground">{historical ? t('No admission receipt was captured for this dispatch.') : t('No current receipt matches the captured binding.')}</p>;
   const quota = receipt.quota;
   return <dl className="m-0">
@@ -21,7 +21,7 @@ function ReceiptRows({ receipt, historical }: { receipt: AdmissionReservation | 
 }
 
 /** Captured admission data and the API's exact fenced match are separate observations. */
-export function AdmissionDetails({ attempt }: { attempt: AttemptDetailV2 }) {
+export function AdmissionDetails({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
   const admission = attempt.admission;
   const captured = admission?.source === 'contract';
   return <section className="mt-3 border-t border-border pt-3">

@@ -84,9 +84,9 @@ export async function discoverControllers(dir = CONTROLLERS_DIR) {
     const name = f.replace(/\.mjs$/, '');
     try {
       const mod = (await import(pathToFileURL(file).href)).default;
-      if (!mod || typeof mod !== 'object') throw Error('no default export');
-      if (mod.name !== name) throw Error(`name '${mod.name}' is not the file name '${name}'`);
-      if (typeof mod.reconcile !== 'function') throw Error('reconcile() missing');
+      if (!mod || typeof mod !== 'object') throw new Error('no default export');
+      if (mod.name !== name) throw new Error(`name '${mod.name}' is not the file name '${name}'`);
+      if (typeof mod.reconcile !== 'function') throw new Error('reconcile() missing');
       controllers.push({ name, file, module: mod });
     } catch (error) { errors.push({ file, name, error: String(error?.message ?? error).slice(0, 400) }); }
   }
@@ -226,7 +226,7 @@ export class Engine {
     // handover; the previous epoch's row is closed as reload | lost); the holder's own row is renewed.
     const out = this.state.transaction(() => {
       const row = this.state.leaderOf(LEADER_NAME);
-      const handover = Boolean(handoverPid && row && row.pid === handoverPid && row.holder !== this.holder);
+      const handover = Boolean(handoverPid && row?.pid === handoverPid && row.holder !== this.holder);
       const r = this.state.acquireLeader({ name: LEADER_NAME, holder: this.holder, pid: process.pid, leaseMs, rev: this.rev ?? undefined, processRunId: this.processRunId, handover });
       if (!r.leader) return { ok: false, standby: `leader ${row?.holder ?? r.holder} epoch ${r.epoch} until ${row ? new Date(row.expires_at).toISOString() : '?'}` };
       return { ok: true, epoch: Number(r.epoch), tookOver: !r.renewed && Boolean(row) };
@@ -369,7 +369,7 @@ export class Engine {
     try {
       const result = await work;
       if (result?.ok === false) {
-        throw Object.assign(Error(result.error ?? result.reason ?? `controller returned ${result.action ?? 'ok:false'}`),
+        throw Object.assign(new Error(result.error ?? result.reason ?? `controller returned ${result.action ?? 'ok:false'}`),
           { result, ...(Number.isFinite(Number(result.retryAfterMs)) ? { retryAfterMs: Number(result.retryAfterMs) } : {}) });
       }
       this.queue.done(c.name, item.key);
@@ -478,7 +478,7 @@ export class Engine {
     this.draining = true;
     this.hb?.notify({ draining: true });
     if (this.leader) this.renew();
-    try { while (this.running.size) await Promise.allSettled([...this.running]); }
+    try { while (this.running.size) await Promise.allSettled(this.running); }
     finally { this.draining = false; this.hb?.notify({ draining: false }); if (this.leader) this.renew(); }
   }
 

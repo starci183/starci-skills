@@ -3,7 +3,7 @@ import path from 'node:path';
 import {capturesOf} from '../impl-captures.mjs';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {decodePng} from '../png.mjs';
-import {TOKEN_TOLERANCE,defaultGrammarRoot,deltaEOk,formatHex,oklabToOklch,parseColor,readBrandRecord,rgbToOklab} from '../brand/brand.mjs';
+import {TOKEN_TOLERANCE,defaultGrammarRoot,deltaEOk,oklabToOklch,parseColor,readBrandRecord,rgbToOklab} from '../brand/brand.mjs';
 import {slash} from '../../lib/path-key.mjs';
 import {objectList, byCodeUnit} from '../../lib/list.mjs';
 import {formatCheckLines} from '../../lib/check-format.mjs';
@@ -226,7 +226,7 @@ export function scanMarkup(html){
     const selfClosing=match[4]==='/';
     const classAttribute=/\bclass\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes);
     const classes=(classAttribute?.[1]??classAttribute?.[2]??classAttribute?.[3]??'').trim().split(/\s+/).filter(Boolean);
-    const parent=stack[stack.length-1];
+    const parent=stack.at(-1);
     const node={tag,classes,children:[],parent,depth:parent.depth+1};
     parent.children.push(node);
     nodes+=1;
@@ -367,7 +367,7 @@ export function checkMascotSlot(first,second){
   const surface=typeof screen==='string'?{name:screen,route:null}:(screen??{});
   const evidence={screen:surface.name??null,route:surface.route??null,mascot:mascot?.name??null,
     allowedIn:Array.isArray(mascot?.allowedIn)?mascot.allowedIn:[]};
-  if(!mascot||!mascot.name)return check(id,'skip','The brand record names no mascot, so no surface can be missing one.',evidence);
+  if(!mascot?.name)return check(id,'skip','The brand record names no mascot, so no surface can be missing one.',evidence);
   if(!evidence.allowedIn.length)return check(id,'skip',`The brand names the mascot \`${mascot.name}\` but allows it on no surface, so none is missing it.`,evidence);
   const allowed=evidence.allowedIn.filter(entry=>names(entry,surface.name)||names(entry,surface.route));
   if(!allowed.length)return check(id,'skip',`The brand does not allow the mascot on \`${surface.name??surface.route??'this surface'}\`, so no slot is expected there.`,evidence);
@@ -389,10 +389,10 @@ export function checkMascotSlot(first,second){
 
 const readNodeRecord=uiDir=>{
   const file=path.join(path.resolve(uiDir),'index.yaml');
-  if(!fs.existsSync(file)||!fs.lstatSync(file).isFile())throw Error(`No design record: expected ${slash(file)}.`);
+  if(!fs.existsSync(file)||!fs.lstatSync(file).isFile())throw new Error(`No design record: expected ${slash(file)}.`);
   const record=parseYaml(fs.readFileSync(file,'utf8'));
-  if(!record||typeof record!=='object'||Array.isArray(record))throw Error('A design record must be a YAML mapping.');
-  if(!record.ui||typeof record.ui!=='object'||Array.isArray(record.ui))throw Error('The node at this path carries no `ui:` design specification.');
+  if(!record||typeof record!=='object'||Array.isArray(record))throw new Error('A design record must be a YAML mapping.');
+  if(!record.ui||typeof record.ui!=='object'||Array.isArray(record.ui))throw new Error('The node at this path carries no `ui:` design specification.');
   return {file,record};
 };
 
@@ -434,8 +434,8 @@ function candidatesOf(uiDir,record,{captureDir=null}={}){
  * The result is `ok` only when no check failed - a skipped check never makes a drawing proven.
  */
 export function runRenderChecks({uiDir,captureDir=null,brandTree,family=null,grammarRoot=defaultGrammarRoot()}={}){
-  if(!uiDir)throw Error('runRenderChecks needs a ui node directory.');
-  if(!brandTree)throw Error('runRenderChecks needs the Work tree that owns the brand record.');
+  if(!uiDir)throw new Error('runRenderChecks needs a ui node directory.');
+  if(!brandTree)throw new Error('runRenderChecks needs the Work tree that owns the brand record.');
   const {file,record}=readNodeRecord(uiDir);
   const identity=readBrandRecord(brandTree);
   const grammarFamily=family??identity.family??null;

@@ -94,7 +94,7 @@ function varReferences(value) {
       if (node.type !== "function") continue
       if (node.value.toLowerCase() === "var") {
         const first = node.nodes.find((child) => child.type === "word")
-        if (first && first.value.startsWith("--")) found.push({ name: first.value, node })
+        if (first?.value.startsWith("--")) found.push({ name: first.value, node })
       }
       walk(node.nodes)
     }

@@ -25,12 +25,11 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { isMain } from '../lib/is-main.mjs';
 import { allocationMs, allocationSettings } from '../../engine/config.mjs';
-import { retiredBeforeDispatch } from '../../engine/admission.mjs';
+import { retiredBeforeDispatch, SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { parseJson } from '../lib/json.mjs'; import { byCodeUnit } from '../lib/list.mjs';
 import { preservedRefOf } from './preserved-ref.mjs';
 import { jobResultSql } from '../machine/job-row.mjs';
-import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { pathsOverlap, sameOrUnder } from '../lib/path-key.mjs';
 
 export const SEAM_INTERFACE_EVENT = 'seam-interface-published';
@@ -43,7 +42,7 @@ const FINAL = SETTLED_JOB_LIST;
 const payloadOf = (row) => parseJson(row?.payload_json ?? '', {}) ?? {};
 const ownedOf = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : [])
   .map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && p.trim())
-  .map((p) => p.replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, ''));
+  .map((p) => p.replaceAll('\\', '/').replace(/\/\*\*$/, '').replace(/\/+$/, ''));
 
 /**
  * modules/models/runtimes.yaml allocation.cutSeam: maxSiblingWaitMs (the longest a sibling ordinal waits on
@@ -53,7 +52,7 @@ const ownedOf = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owne
 export function cutSeamSettings() {
   const maxSiblingWaitMs = allocationMs('cutSeam.maxSiblingWaitMs');
   const raw = Number(allocationSettings()?.cutSeam?.recutAfterFailures);
-  if (!Number.isInteger(raw) || raw < 1) throw Error('modules/models/runtimes.yaml allocation.cutSeam.recutAfterFailures must declare a positive integer');
+  if (!Number.isInteger(raw) || raw < 1) throw new Error('modules/models/runtimes.yaml allocation.cutSeam.recutAfterFailures must declare a positive integer');
   return { maxSiblingWaitMs, recutAfterFailures: raw };
 }
 
@@ -65,7 +64,7 @@ export const isSeamCut = (cut) => Boolean(seamPriorityOf(cut));
 
 const cutEvents = (db, { workflowId, op, cutId, kind }) => db.prepare('SELECT seq,entity_id,payload_json,created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq')
   .all(workflowId, kind)
-  .map((row) => ({ seq: row.seq, entityId: row.entity_id, at: row.created_at, ...(parseJson(row.payload_json, {}) ?? {}) }))
+  .map((row) => ({ seq: row.seq, entityId: row.entity_id, at: row.created_at, ...(parseJson(row.payload_json, {})) }))
   .filter((event) => event.op === op && String(event.cutId) === String(cutId));
 
 /**
@@ -97,7 +96,7 @@ export function seamStateOf(db, { workflowId, op, cutId, isOwnerWait = () => fal
  */
 export function siblingSeamHold(db, job, { now = Date.now(), settings = null, isOwnerWait = () => false } = {}) {
   const payload = payloadOf(job), cut = payload.cut;
-  if (!cut || cut.id == null || !(Number(cut.ordinal) > 1)) return null;
+  if (cut?.id == null || Number(cut.ordinal) <= 1) return null;
   const op = job.op_id ?? payload.opId;
   const workflowId = job.workflow_id ?? payload.hierarchy?.workflowId;
   const seam = seamStateOf(db, { workflowId, op, cutId: cut.id, isOwnerWait });
@@ -193,7 +192,7 @@ export function digestInterfaceFiles({ repo, payload, files }) {
   const owned = ownedOf(payload);
   const out = [];
   for (const raw of files) {
-    const file = String(raw).replace(/\\/g, '/').replace(/^\.\//, '');
+    const file = String(raw).replaceAll('\\', '/').replace(/^\.\//, '');
     if (!file || path.isAbsolute(file) || file.split('/').includes('..')) throw Object.assign(new Error(`seam interface file ${raw} is not a workspace-relative path`), { code: 'seam-interface-path-invalid' });
     if (!owned.some((root) => sameOrUnder(file, root))) throw Object.assign(new Error(`seam interface file ${file} is outside the seam's owned paths (${owned.join(', ')})`), { code: 'seam-interface-outside-seam' });
     const abs = path.resolve(repo, file);
@@ -248,7 +247,7 @@ const srcRootOf = (file) => {
 export function canonConformancePolicy(brief = readModuleJson('modules', 'ops', 'ops', `${CANON_OP}.yaml`)) {
   const policy = brief?.policy?.canonConformance ?? {};
   if (!policy.relocations || typeof policy.relocations !== 'object' || !Array.isArray(policy.sharedRoots)) {
-    throw Error('modules/ops/ops/code.refactor.yaml policy.canonConformance must declare relocations {<ruleId>: {moves, into}} and sharedRoots []');
+    throw new Error('modules/ops/ops/code.refactor.yaml policy.canonConformance must declare relocations {<ruleId>: {moves, into}} and sharedRoots []');
   }
   return { relocations: policy.relocations, sharedRoots: policy.sharedRoots.map(String) };
 }
@@ -392,7 +391,7 @@ export function canonRedispatchOf(db, jobId, { extraPaths = [] } = {}) {
  * the cut's canon-wire legs.
  */
 export function cutManifestOf(db, { workflowId, op, cut, ownJobId = null }) {
-  if (!cut || cut.id == null) return null;
+  if (cut?.id == null) return null;
   const rows = db.prepare(`SELECT job_id,status,try_no AS attempt,worker_id,payload_json,json_extract(payload_json,'$.cut.ordinal') AS ordinal FROM jobs
     WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? ORDER BY created_at,job_id`).all(workflowId, op, String(cut.id))
     .filter((row) => row.job_id === ownJobId || (row.status !== 'cancelled' && !retiredBeforeDispatch(row)));
@@ -455,7 +454,7 @@ export function canonSettleFollowUpOf({ payload, report, manifest = null, destin
   if (!report || !['blocked', 'failed'].includes(String(report.outcome))) return null;
   const owned = ownedOf(payload);
   const prefix = (owned.find((p) => /^[^/]+\/(?:apps|packages)\//.test(p)) ?? '').replace(/^([^/]+\/)(?:apps|packages)\/.*$/, '$1');
-  const norm = (p) => { const clean = String(p).replace(/\\/g, '/').replace(/\/+$/, ''); return prefix && !clean.startsWith(prefix) ? `${prefix}${clean}` : clean; };
+  const norm = (p) => { const clean = String(p).replaceAll('\\', '/').replace(/\/+$/, ''); return prefix && !clean.startsWith(prefix) ? `${prefix}${clean}` : clean; };
   const siblings = (manifest?.ordinals ?? []).filter((o) => o.ordinal !== Number(payload.cut.ordinal) && o.status !== 'succeeded').flatMap((o) => o.paths);
   const grants = [], wire = [];
   const text = [report.summary, report.blocker?.detail, ...(report.checks ?? []).map((c) => c?.evidence)].join(' ');
@@ -510,4 +509,4 @@ async function main(argv) {
   console.error('use: starci machine seam-policy canon-plan --scan <file> --cut-id <id> | canon-redispatch --repo <repo> --job <id> [--paths <csv>]');
   return 2;
 }
-if (isMain(import.meta.url)) main(process.argv.slice(2)).then((code) => { process.exitCode = code; }).catch((error) => { console.error(error); process.exit(1); });
+if (isMain(import.meta.url)) { try { process.exitCode = await main(process.argv.slice(2)); } catch (error) { console.error(error); process.exit(1); } }

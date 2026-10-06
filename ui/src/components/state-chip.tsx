@@ -20,7 +20,7 @@ const icons = {
 /** v_op_history.ui also carries the attempt-only states 'awaiting-owner' and 'rejected' (docs/why.md). */
 export type AnyUiState = UiState | 'awaiting-owner' | 'rejected';
 
-export function StateChip({ state, label, compact = false }: { state: AnyUiState; label?: string; compact?: boolean }) {
+export function StateChip({ state, label, compact = false }: Readonly<{ state: AnyUiState; label?: string; compact?: boolean }>) {
   if (state === 'awaiting-owner' || state === 'rejected') return <StatusChip status={state} label={compact ? <span className="sr-only">{label}</span> : label} />;
   const known: UiState = state in icons ? state : 'unknown';
   const Icon = icons[known];

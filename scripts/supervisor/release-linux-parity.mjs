@@ -67,19 +67,19 @@ export function parityPlan({ workflows, apps }) {
   const steps = [], skipped = [], seen = new Set();
   let node = null;
   for (const { file, doc } of workflows) {
-    const base = { env: { ...(doc.env ?? {}) } };
+    const base = { env: { ...doc.env } };
     for (const [id, job] of Object.entries(doc.jobs ?? {})) {
       const where = `${file}:${id}`;
       if (/workflow_dispatch/.test(String(job.if ?? ''))) { skipped.push({ name: where, reason: 'manual job' }); continue; }
       const matrixApps = job.strategy?.matrix?.app !== undefined ? apps : [null];
       for (const app of matrixApps) {
         const ctx = { matrix: app ? { app } : {}, env: base.env };
-        const jobEnv = literalEnv({ ...base.env, ...(job.env ?? {}) }, ctx);
+        const jobEnv = literalEnv({ ...base.env, ...job.env }, ctx);
         const defaultDir = expand(job.defaults?.run?.['working-directory'] ?? '.', { ...ctx, env: { ...ctx.env, ...jobEnv } });
         for (const step of job.steps ?? []) {
-          const setup = /^actions\/setup-node/.test(String(step.uses ?? ''));
+          const setup = String(step.uses ?? '').startsWith('actions/setup-node');
           if (setup && step.with?.['node-version'] !== undefined) {
-            const major = expand(step.with['node-version'], ctx).match(/\d+/)?.[0];
+            const major = /\d+/.exec(expand(step.with['node-version'], ctx))?.[0];
             if (major && (node === null || Number(major) > Number(node))) node = major;
           }
           if (step.run === undefined) continue;
@@ -101,7 +101,7 @@ export function parityPlan({ workflows, apps }) {
   return { image: `node:${node ?? DEFAULT_NODE}`, steps, skipped };
 }
 
-const quote = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`;
+const quote = (v) => `'${String(v).replaceAll(/'/g, String.raw`'\''`)}'`;
 
 /** The bash script the container runs: extract HEAD, snapshot it as a git repository, then each step in order, `##STEP`/`##FAILED` markers in the log. Pure. */
 export function parityScript(plan) {

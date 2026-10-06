@@ -22,7 +22,7 @@ import { byCodeUnit } from '../../lib/utils';
 
 export const concept: Concept = 'C12';
 
-function PageRead<T>({ query, url }: { query: PagedQuerySnapshot<T>; url: string }) {
+function PageRead<T>({ query, url }: Readonly<{ query: PagedQuerySnapshot<T>; url: string }>) {
   return <><ReadQuality query={query} url={url} onRetry={query.refresh} />
     {query.data !== null ? <p className="text-xs text-muted-foreground">{t('{n} rows loaded', { n: query.data.length })} · {t('Counts describe loaded records, not the full population.')}</p> : null}
     {query.loadMoreError ? <FeedbackState error onRetry={query.loadMoreErrorCode === 'BAD_CURSOR' ? query.refresh : query.loadMore}>{query.loadMoreError}{query.loadMoreErrorCode === 'BAD_CURSOR' ? ` · ${t('Refresh first page')}` : ''}</FeedbackState> : null}
@@ -46,8 +46,8 @@ function href(changes: Record<string, string | null>): string {
   return `#/decisions${params.size ? `?${params}` : ''}`;
 }
 function navigate(changes: Record<string, string | null>): void { window.location.hash = href(changes).slice(1); }
-function SelectFilter({ label, value, options, onChange }: { label: string; value: string;
-  options: { value: string; label: string }[]; onChange: (value: string) => void }) {
+function SelectFilter({ label, value, options, onChange }: Readonly<{ label: string; value: string;
+  options: { value: string; label: string }[]; onChange: (value: string) => void }>) {
   const id = useId();
   return <div className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><label htmlFor={id}>{label}</label>
     <NativeSelect id={id} value={value} onChange={event => onChange(event.target.value)} className="w-full">
@@ -56,7 +56,7 @@ function SelectFilter({ label, value, options, onChange }: { label: string; valu
   </div>;
 }
 
-function DecisionCard({ row }: { row: DecisionRow }) {
+function DecisionCard({ row }: Readonly<{ row: DecisionRow }>) {
   const credential = row.kind === 'credential-missing';
   return <Card size="sm" className="min-w-0 transition-colors hover:bg-muted/20"><CardContent>
     <a href={row.href} className="group flex min-w-0 flex-col gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:gap-4">
@@ -74,7 +74,7 @@ function DecisionCard({ row }: { row: DecisionRow }) {
   </CardContent></Card>;
 }
 
-function AskCard({ row }: { row: AskRow }) {
+function AskCard({ row }: Readonly<{ row: AskRow }>) {
   return <ConceptBlock concept="C12" as="article"><Card size="sm"><CardContent className="flex flex-col gap-3">
     <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><MessageCircleQuestion className="size-4 text-primary" aria-hidden="true" /><strong className="text-sm">{row.credential ? 'credential' : t('Ask the owner')}</strong></div>
       <Badge variant="outline">{statusLabel(row.state)}</Badge></div>
@@ -85,7 +85,7 @@ function AskCard({ row }: { row: AskRow }) {
   </CardContent></Card></ConceptBlock>;
 }
 
-function IncidentCard({ row, selected = false }: { row: IncidentRow; selected?: boolean }) {
+function IncidentCard({ row, selected = false }: Readonly<{ row: IncidentRow; selected?: boolean }>) {
   return <ConceptBlock concept="C12" as="article" className="min-w-0"><Card size="sm" data-selected={selected} className={selected ? 'ring-2 ring-ring' : undefined}><CardContent className="flex flex-col gap-3">
     <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
       <StateChip state={row.ui} compact /><div className="flex min-w-0 flex-1 flex-col gap-1"><div className="flex flex-wrap items-center gap-2"><strong className="break-all text-sm">{row.kind}</strong><span className="text-xs text-muted-foreground">{statusLabel(row.status)}</span></div>

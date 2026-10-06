@@ -550,4 +550,4 @@ async function main() {
   }
 }
 
-if (isMain(import.meta.url)) main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code })); process.exit(1); });
+if (isMain(import.meta.url)) { try { await main(); } catch (error) { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code })); process.exit(1); } }

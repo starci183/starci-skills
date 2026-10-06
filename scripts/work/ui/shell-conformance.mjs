@@ -92,7 +92,7 @@ export function isPlannedLayoutDrawing(tree, record) {
   const resolved = appOfUi(tree, record);
   if (resolved.error) return false;
   const node = nodeById(resolved.tree, record.route);
-  return Boolean(node && node.origin === 'planned' && node.layout?.chrome === 'visible' && node.layout.design === record.id);
+  return Boolean(node?.origin === 'planned' && node.layout?.chrome === 'visible' && node.layout.design === record.id);
 }
 const shown = (workRoot, file) => slash(path.relative(path.dirname(workRoot), file)) || slash(file);
 
@@ -286,7 +286,7 @@ function checkUiRecord(workRoot, uiFile, record, shell, { mode = 'op', uiRecords
     if (typeof record.host !== 'string' || !record.host) out.push(finding('refuse', 'OVERLAY_HOST_MISSING', at, 'an overlay names the host it opens over - a ui record id or a route'));
     else if (!resolveHost(records, record.host) && !(record.host.startsWith('/') && nodeById(tree, record.host))) out.push(finding('refuse', 'OVERLAY_HOST_UNRESOLVED', at, `host ${record.host} is neither a ui record nor a route of the layout tree`));
     if (record.routed === true && !declaredNew) {
-      const intercept = nodesOf(tree).find((n) => n.intercepts === route);
+      const intercept = nodesOf(tree).some((n) => n.intercepts === route);
       if (!intercept) out.push(finding('refuse', 'ROUTED_INTERCEPT_MISSING', at, `${route} is a routed overlay but no intercepting route (@slot/(.)x) in app/ presents it - declare routeParent until interface.implement adds it`));
     }
   } else {
@@ -400,7 +400,7 @@ function checkComposites(workRoot, uiFile, record, shell, { mode, level, records
       if (!overlay) out.push(finding('refuse', 'COMPOSITE_INCONSISTENT', at, `${where}: only a modal or drawer has an overlay presentation`));
       const host = resolveHost(records, record.host);
       const hostRef = parseUiRef(c.host?.asset);
-      const hostAsset = host && hostRef?.id === host.id ? assetsOf(host.record).find((x) => x.path === hostRef.path) : null;
+      const hostAsset = host?.id != null && hostRef?.id === host.id ? assetsOf(host.record).find((x) => x.path === hostRef.path) : null;
       if (!hostAsset) out.push(finding('refuse', 'COMPOSITE_HOST_MISMATCH', at, `${where} is drawn over ${c.host?.asset ?? '(nothing)'}, which is not an asset of host ${record.host}`));
       else {
         if (hostAsset.sha256 !== c.host.sha256) out.push(finding(level.stale, 'COMPOSITE_HOST_MISMATCH', at, `${where}: host ${c.host.asset} changed since this overlay was drawn over it - recompose`));
@@ -456,7 +456,7 @@ function checkPromptLocale(workRoot, uiFile, record, shell) {
     seen.add(promptPath);
     const file = path.join(path.dirname(uiFile), promptPath);
     if (!fs.existsSync(file)) { out.push(finding('refuse', 'SHELL_PROMPT_UNREADABLE', at, `${asset.path}: its prompt ${promptPath} is not on disk`)); continue; }
-    if (!new RegExp(`product[\\s_-]?locale\\s*[:=]\\s*${escapeRegExp(locale)}(?![A-Za-z0-9-])`, 'i').test(fs.readFileSync(file, 'utf8'))) out.push(finding('refuse', 'SHELL_LOCALE_DRIFT', at, `${promptPath} does not state "Product locale: ${locale}" - UI copy follows the layout tree's productLocale, not owner_language`));
+    if (!new RegExp(String.raw`product[\s_-]?locale\s*[:=]\s*${escapeRegExp(locale)}(?![A-Za-z0-9-])`, 'i').test(fs.readFileSync(file, 'utf8'))) out.push(finding('refuse', 'SHELL_LOCALE_DRIFT', at, `${promptPath} does not state "Product locale: ${locale}" - UI copy follows the layout tree's productLocale, not owner_language`));
   }
   return out;
 }
@@ -594,16 +594,13 @@ export function checkShellConformance(target) {
     // A ui record needs the tree whole and its own ancestors settled - not every layout of the product.
     const lockupDeferredFor = shell && !shell.error && isPlannedLayoutDrawing(shell.record, own) ? own.id : null;
     if (shell && own.shell?.chromeless !== true) findings.push(...checkShellRecord(workRoot, shell, { requireAll: false, uiRecords, lockupDeferredFor }).filter((f) => f.code !== 'ROUTE_NOT_IN_NAV'));
-    findings.push(...checkUiRecord(workRoot, indexFile, own, shell, { mode: 'op', uiRecords }));
-    findings.push(...uiPaletteFindings(workRoot, indexFile, own));
+    findings.push(...checkUiRecord(workRoot, indexFile, own, shell, { mode: 'op', uiRecords }), ...uiPaletteFindings(workRoot, indexFile, own));
   } else if (own?.schema === IMPL_SCHEMA) {
     mode = 'implementation';
-    findings.push(...checkImplementationRecord(workRoot, indexFile, own, shell));
-    findings.push(...implementationPaletteFindings(workRoot, indexFile));
+    findings.push(...checkImplementationRecord(workRoot, indexFile, own, shell), ...implementationPaletteFindings(workRoot, indexFile));
   } else if (own?.schema === TREE_SCHEMA) {
     mode = 'shell';
-    findings.push(...checkShellRecord(workRoot, shell, { uiRecords }));
-    findings.push(...shellPaletteFindings(workRoot, shell));
+    findings.push(...checkShellRecord(workRoot, shell, { uiRecords }), ...shellPaletteFindings(workRoot, shell));
   } else {
     mode = 'tree';
     if (shell) findings.push(...checkShellRecord(workRoot, shell, { uiRecords }));

@@ -42,8 +42,6 @@ import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, loadConfig, DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
 import {
   SKILL_ROOT, FIX_KIND, WORKER_TITLE_PREFIX, readSupervisor,
@@ -126,7 +124,7 @@ const JOB_SELECT = `SELECT j.*, a.attempt_id, a.terminal_handle, a.closed_at AS 
 function rowJob(row) {
   if (!row) return null;
   const payload = parse(row.payload_json);
-  const { terminal_handle: handle, payload_json: _p, files_json: _f, ...rest } = row;
+  const { terminal_handle: handle, ...rest } = row; delete rest.payload_json; delete rest.files_json;
   return { ...rest, payload, result: payload.result ?? null, worker_id: payload.self ? (row.attempt_id != null ? 'supervisor' : null) : handle ?? null };
 }
 export const jobsOf = (m, statuses = null) => m.db.prepare(`${JOB_SELECT} WHERE j.kind=? ${statuses ? `AND j.status IN (${statuses.map(() => '?').join(',')})` : ''} ORDER BY j.created_at, j.job_id`)
@@ -161,8 +159,8 @@ export function leaseConflicts(m, files, jobId = null) {
 
 /** Create the job of one cluster; an open job of the same cluster is returned instead (one worker per cluster). */
 export function createJob(m, { cluster, title, files = [], incidents = [], specs = [], brief = '', agent = null, self = false, now = Date.now() }) {
-  if (!cluster) throw Error('a job needs --cluster <id>');
-  if (!files.length) throw Error('a job needs --files <csv>: the explicit file leases');
+  if (!cluster) throw new Error('a job needs --cluster <id>');
+  if (!files.length) throw new Error('a job needs --files <csv>: the explicit file leases');
   const open = jobsOf(m, OPEN_STATUSES).find((j) => j.payload.cluster === cluster);
   if (open) return { created: false, job: open };
   const jobId = `fix-${slugify(cluster, { max: 40, fallback: 'fix' })}-${crypto.randomBytes(3).toString('hex')}`;
@@ -288,7 +286,7 @@ export async function routeWorker({ m, prefer = null, avoid = [], config = undef
     const { recentDispatchCounts } = await import('../agent/balance.mjs');
     Object.assign(recent, recentDispatchCounts({ windowHours, machine: true, env }).counts);
   } catch { /* balance is best effort */ }
-  const since = Date.now() - windowHours * 3600_000;
+  const since = Date.now() - windowHours * 3_600_000;
   for (const j of jobsOf(m).filter((x) => x.created_at >= since && x.payload.pool)) recent[j.payload.pool] = (recent[j.payload.pool] ?? 0) + 1;
   const { providerAvailability, providerCircuitOf } = await import('../agent/models.mjs');
   let probe = null;
@@ -342,7 +340,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
   const cap = adaptiveCap({ base: settings.workers.base, max: settings.workers.max, queued: queuedJobs.length, running, load });
   const result = { cap, launched: [], skipped: [], failed: [] };
   // Providers whose worker terminal failed readiness this pass, or READINESS_FAILS_PER_HOUR times in the hour.
-  const notReady = new Set(readinessFailedProviders(m, { since: now() - 3600_000 }));
+  const notReady = new Set(readinessFailedProviders(m, { since: now() - 3_600_000 }));
   let live = running;
   for (const job of queuedJobs) {
     if (live >= cap.cap) { result.skipped.push({ jobId: job.job_id, reason: `cap ${cap.cap} reached (${cap.reason})` }); continue; }
@@ -645,4 +643,4 @@ async function main() {
   } finally { m.close(); }
 }
 
-if (isMain(import.meta.url)) Promise.resolve().then(main).catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });
+if (isMain(import.meta.url)) await main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });

@@ -19,7 +19,7 @@ export type VnpayParams = Readonly<Record<string, string | number | undefined>>
 const EXCLUDED = new Set(["vnp_SecureHash", "vnp_SecureHashType"])
 
 /** VNPAY url-encoding: `encodeURIComponent` with `+` for spaces, as the reference samples do. */
-export const vnpayEncode = (value: string): string => encodeURIComponent(value).replace(/%20/g, "+")
+export const vnpayEncode = (value: string): string => encodeURIComponent(value).replaceAll("%20", "+")
 
 /** The parameters that take part in the signature: sorted, without empty values and without the hash keys. */
 export const vnpaySortedEntries = (params: VnpayParams): ReadonlyArray<readonly [string, string]> => {
@@ -129,7 +129,7 @@ export const vnpayPipeString = (body: VnpayBody, fields: ReadonlyArray<string>):
     fields
         .map((field) => {
             const value = body[field]
-            return value === undefined || value === null ? "" : String(value)
+            return value === undefined || value === null ? "" : String(value as string | number)
         })
         .join("|")
 

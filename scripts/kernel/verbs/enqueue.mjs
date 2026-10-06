@@ -2,15 +2,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { newToken } from '../../../engine/db/ledger.mjs';
-import { parseYaml } from '../../../engine/yaml.mjs';
-import { getWorkflow, latestGoal, jobPayloadOf, ownedPathsOf } from './shared/rows.mjs';
+import { getWorkflow, latestGoal } from './shared/rows.mjs';
 import { peerOverlapHeadsUp } from './shared/peer-waits.mjs';
 import { splitGoalLegParams, resolveOpParams } from '../dispatch-op.mjs';
 import { readOpManifest } from '../../lib/op-shared.mjs';
 import { AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, provisionAskMidFlow } from '../autopilot-run.mjs';
 import { slash } from '../../lib/path-key.mjs';
 import { familyGuardOf, familyViolations, familyOwners } from '../write-families.mjs';
-import { ownedPathPlacements, enqueueRepository } from '../target-repo.mjs';
+import { enqueueRepository } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
 import { lineageHeadById } from '../gate-conditions.mjs';
 import { normalizeFoundationName, readFoundation } from '../foundation-registry.mjs';
@@ -55,12 +54,12 @@ export default {
     }
   }
   const legSplit = splitGoalLegParams(brief, goalLegOf(goal, args.op));
-  const kernelFlag = Object.keys(legSplit.kernel).length || flagParams ? { ...legSplit.kernel, ...(flagParams ?? {}) } : null;
+  const kernelFlag = Object.keys(legSplit.kernel).length || flagParams ? { ...legSplit.kernel, ...flagParams } : null;
   // Autopilot (owner ruling 2026-09-28 "limit provision asks"): no provision.ask leg opens mid-flow - the code
   // proceeds on sandbox/stub/mocks and every credential or approval need is recorded deferred-to-handover
   // (starci kernel autopilot --defer-to-handover). The one provision.ask is the end-of-flow credential checklist (params.subject
   // handover-credentials); a retry of an ask the owner already answered (--retry-of) still runs.
-  if (args.op === 'provision.ask' && args['retry-of'] == null && provisionAskMidFlow(db, workflowId, { params: { ...(legSplit.owner ?? {}), ...(kernelFlag ?? {}) } })) {
+  if (args.op === 'provision.ask' && args['retry-of'] == null && provisionAskMidFlow(db, workflowId, { params: { ...legSplit.owner, ...kernelFlag } })) {
     const out = { ok: false, workflowId, op: args.op, reason: 'autopilot-provision-deferred',
       detail: `autopilot (${AUTOPILOT_RULING}) opens no provision.ask mid-flow: build on the sandbox/stub path, record the need with starci kernel autopilot --workflow ${workflowId} --defer-to-handover --op <asking op> --class credential|real-money|shared-system|owner-decision --detail "<what is owed>" [--fields <FILE_OR_VAR,...>], and the end-of-flow checklist (--params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}') collects it once` };
     emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);

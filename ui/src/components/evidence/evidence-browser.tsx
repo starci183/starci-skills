@@ -56,7 +56,7 @@ export function organise(files: EvidenceFile[]) {
 }
 const keyFirst = (list: EvidenceFile[]) => [...list.filter(isKey), ...list.filter(f => !isKey(f))];
 
-function Row({ file, active, onPick, also }: { file: EvidenceFile; active: boolean; onPick: () => void; also?: EvidenceFile[] }) {
+function Row({ file, active, onPick, also }: Readonly<{ file: EvidenceFile; active: boolean; onPick: () => void; also?: EvidenceFile[] }>) {
   return <button type="button" role="option" aria-selected={active} onClick={onPick}
     className={`flex w-full min-w-0 flex-col gap-1 rounded-md border px-2 py-2 text-left text-sm ${active ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'}`}>
     <span className="flex min-w-0 items-center gap-2">
@@ -73,7 +73,7 @@ function Row({ file, active, onPick, also }: { file: EvidenceFile; active: boole
   </button>;
 }
 
-function Thumb({ file, active, onPick }: { file: EvidenceFile; active: boolean; onPick: () => void }) {
+function Thumb({ file, active, onPick }: Readonly<{ file: EvidenceFile; active: boolean; onPick: () => void }>) {
   return <button type="button" role="option" aria-selected={active} onClick={onPick} title={file.name}
     className={`flex min-w-0 flex-col gap-1 rounded-md border p-1 text-left ${active ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}>
     <span className="flex aspect-video items-center justify-center overflow-hidden rounded bg-muted">
@@ -86,7 +86,7 @@ function Thumb({ file, active, onPick }: { file: EvidenceFile; active: boolean; 
 }
 
 /** Grouped file tree (left) + type-aware viewer frame (right); stacked on mobile. */
-export function EvidenceBrowser({ files, selected, onSelect }: { files: EvidenceFile[]; selected: number | null; onSelect: (artifactId: number) => void }) {
+export function EvidenceBrowser({ files, selected, onSelect }: Readonly<{ files: EvidenceFile[]; selected: number | null; onSelect: (artifactId: number) => void }>) {
   const current = useMemo(() => files.find(f => f.artifactId === selected) ?? defaultEvidence(files), [files, selected]);
   const listRef = useRef<HTMLDivElement>(null);
   const org = useMemo(() => organise(files), [files]);
@@ -113,8 +113,8 @@ export function EvidenceBrowser({ files, selected, onSelect }: { files: Evidence
 
   if (files.length === 0) return <div className="rounded-lg border p-4 text-sm text-muted-foreground">{t('This attempt has no evidence files yet.')}</div>;
 
-  return <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]" onKeyDown={onKeyDown}>
-    <div ref={listRef} role="listbox" aria-label={t('Evidence files')} tabIndex={0} className="max-h-[70vh] min-w-0 space-y-4 overflow-auto rounded-lg border bg-card p-2">
+  return <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]">
+    <div ref={listRef} role="listbox" aria-label={t('Evidence files')} tabIndex={0} onKeyDown={onKeyDown} className="max-h-[70vh] min-w-0 space-y-4 overflow-auto rounded-lg border bg-card p-2">
       {GROUPS.map(group => {
         const inGroup = keyFirst(org.visible.filter(f => f.group === group.id));
         if (inGroup.length === 0) return null;

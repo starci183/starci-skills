@@ -90,14 +90,14 @@ function useAllAttempts(project: string, win: Window, retryKey: number): { rows:
   return state.key === key ? state : { rows: null, error: null, stale: [], truncated: false };
 }
 
-function Segmented({ value, onChange }: { value: Window; onChange: (value: Window) => void }) {
+function Segmented({ value, onChange }: Readonly<{ value: Window; onChange: (value: Window) => void }>) {
   const options: { value: Window; label: string }[] = [{ value: '24h', label: t('24 hours') }, { value: '7d', label: t('7 days') }];
-  return <div role="group" aria-label={t('Time window')} className="inline-flex gap-1 rounded-lg border bg-muted/40 p-1">
+  return <fieldset aria-label={t('Time window')} className="inline-flex min-w-0 gap-1 rounded-lg border bg-muted/40 p-1">
     {options.map(o => <Button key={o.value} type="button" size="sm" variant={value === o.value ? 'secondary' : 'ghost'} aria-pressed={value === o.value} onClick={() => onChange(o.value)}>{o.label}</Button>)}
-  </div>;
+  </fieldset>;
 }
 
-function Count({ tone, label, n }: { tone: 'success' | 'failed' | 'running'; label: string; n: number }) {
+function Count({ tone, label, n }: Readonly<{ tone: 'success' | 'failed' | 'running'; label: string; n: number }>) {
   return <span data-tone={tone} className="inline-flex items-center gap-1.5"><span className="status-dot" aria-hidden="true" /><strong className="tabular-nums text-foreground"><Ticker value={n} /></strong> {label}</span>;
 }
 
@@ -151,7 +151,7 @@ export default function AnalyticsPage() {
     </div>
 
     {attempts.error ? <FeedbackState error onRetry={() => setRetryKey(value => value + 1)}>{attempts.rows ? t('The source is failing; keeping the last rows read. ') : null}{t('Could not load the attempt list ({error}).', { error: attempts.error })}</FeedbackState> : null}
-    {attempts.stale.length ? <p className="shell-error" role="status">{t('Source out of sync: {list}', { list: attempts.stale.join(', ') })}</p> : null}
+    {attempts.stale.length ? <output className="shell-error block">{t('Source out of sync: {list}', { list: attempts.stale.join(', ') })}</output> : null}
     {attempts.truncated ? <FeedbackState>{t('Analytics reached the 10,000-row cap; charts cover the loaded dispatch cohort only.')}</FeedbackState> : null}
     <p className="text-xs text-muted-foreground">{t('Dispatch cohort: {window}. Counts describe loaded records; settlements are not a separate settlement-window total.', { window: win === '24h' ? t('24 hours') : t('7 days') })}</p>
 

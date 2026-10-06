@@ -308,7 +308,7 @@ export const sepayFake = defineHttpFake<SepayClient, SepayOptions | undefined, S
             ...shared,
             settle: (params) => bridge.call("settle", { ...params, deliverTo: target() }),
             fail: (params) => bridge.call("fail", { ...params, deliverTo: target() }),
-            replayWebhook: (reference, options) => bridge.call("replay-webhook", { reference, ...(options ?? {}), deliverTo: target() }),
+            replayWebhook: (reference, options) => bridge.call("replay-webhook", { reference, ...options, deliverTo: target() }),
         }
     },
 })

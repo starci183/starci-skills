@@ -7,12 +7,10 @@ import { formatDayTime } from './leg/time';
 import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C4';
-export type WorkGraph = { nodes: GraphNode[]; edges: Edge[]; groups: { op: string; total: number; byUi: Record<UiState, number> }[] };
+export type WorkGraph = { nodes: GraphNode[]; edges: GraphEdge[]; groups: { op: string; total: number; byUi: Record<UiState, number> }[] };
 type Predecessor = { unit: string; kind: string };
-export type GraphGroup = { id: string; op: string; nodes: GraphNode[]; incoming: Edge[]; recordedEdges: Edge[]; predecessors: Predecessor[]; ui: UiState; orderUnresolved: boolean };
-type Group = GraphGroup;
-type Edge = GraphEdge;
-type GroupEdge = Edge & { records: Edge[] };
+export type GraphGroup = { id: string; op: string; nodes: GraphNode[]; incoming: GraphEdge[]; recordedEdges: GraphEdge[]; predecessors: Predecessor[]; ui: UiState; orderUnresolved: boolean };
+type GroupEdge = GraphEdge & { records: GraphEdge[] };
 type Dependency = { from: string; to: string };
 const severity: UiState[] = ['bad', 'warn', 'running', 'waiting', 'unknown', 'ok', 'done'];
 const nodeWidth = 208, nodeHeight = 76, colGap = 130, rowGap = 54;
@@ -38,7 +36,7 @@ export function graphEvidenceOf<T extends Dependency>(nodeIds: string[], recorde
     seen.add(root);
     const stack = [{ id: root, cursor: 0 }];
     while (stack.length) {
-      const top = stack[stack.length - 1];
+      const top = stack.at(-1)!;
       const next = outgoing.get(top.id)![top.cursor++];
       if (next != null) {
         if (!seen.has(next)) { seen.add(next); stack.push({ id: next, cursor: 0 }); }
@@ -65,7 +63,7 @@ export function graphEvidenceOf<T extends Dependency>(nodeIds: string[], recorde
   const cyclic = drawable.filter(edge => cycleNodes.has(edge.from) && component.get(edge.from) === component.get(edge.to));
   const unresolved = new Set([...cycleNodes, ...self.filter(edge => ids.has(edge.to)).map(edge => edge.to), ...dangling.filter(edge => ids.has(edge.to)).map(edge => edge.to)]);
   const queue = [...unresolved];
-  for (let cursor = 0; cursor < queue.length; cursor++) for (const next of outgoing.get(queue[cursor]) ?? []) {
+  for (const unit of queue) for (const next of outgoing.get(unit) ?? []) {
     if (!unresolved.has(next)) { unresolved.add(next); queue.push(next); }
   }
   return { drawable, dangling, self, cyclic, unresolved };
@@ -79,7 +77,7 @@ function buildLayout(graph: WorkGraph) {
     incoming.set(JSON.stringify([edge.from, edge.kind]), { unit: edge.from, kind: edge.kind });
     incomingByUnit.set(edge.to, incoming);
   }
-  const grouped = new Map<string, Group>();
+  const grouped = new Map<string, GraphGroup>();
   const unitGroup = new Map<string, string>();
   for (const node of graph.nodes) {
     const predecessors = [...(incomingByUnit.get(node.unit)?.values() ?? [])]
@@ -105,7 +103,7 @@ function buildLayout(graph: WorkGraph) {
     group.recordedEdges = graph.edges.filter(edge => unitGroup.get(edge.to) === group.id);
   }
   const depth = new Map(groups.map(group => [group.id, 0]));
-  const outgoing = new Map<string, Edge[]>();
+  const outgoing = new Map<string, GraphEdge[]>();
   const remaining = new Map(groups.map(group => [group.id, 0]));
   for (const edge of edges) {
     outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), edge]);
@@ -113,8 +111,7 @@ function buildLayout(graph: WorkGraph) {
   }
   const orderUnknown = new Set(groups.filter(group => group.nodes.some(node => evidence.unresolved.has(node.unit))).map(group => group.id));
   const queue = groups.filter(group => remaining.get(group.id) === 0 && !orderUnknown.has(group.id)).map(group => group.id);
-  for (let cursor = 0; cursor < queue.length; cursor++) {
-    const from = queue[cursor];
+  for (const from of queue) {
     for (const edge of outgoing.get(from) ?? []) {
       depth.set(edge.to, Math.max(depth.get(edge.to) ?? 0, (depth.get(from) ?? 0) + 1));
       const count = (remaining.get(edge.to) ?? 0) - 1;
@@ -134,7 +131,7 @@ function buildLayout(graph: WorkGraph) {
   return { groups: layers.flat(), edges, positions, evidence, orderUnknown, unresolvedColumn, width: Math.max(1, layers.length) * (nodeWidth + colGap) - colGap + 48, height: Math.max(1, ...layers.map(layer => layer.length)) * (nodeHeight + rowGap) - rowGap + top + 24 };
 }
 
-export function GraphView({ graph, onUnit, onGroupSelect, selectionInInspector = false }: { graph: WorkGraph; onUnit: (unit: string) => void; onGroupSelect?: (group: GraphGroup | null) => void; selectionInInspector?: boolean }) {
+export function GraphView({ graph, onUnit, onGroupSelect, selectionInInspector = false }: { readonly graph: WorkGraph; readonly onUnit: (unit: string) => void; readonly onGroupSelect?: (group: GraphGroup | null) => void; readonly selectionInInspector?: boolean }) {
   const arrowId = useId();
   const [selected, setSelected] = useState<string | null>(null);
   const layout = useMemo(() => buildLayout(graph), [graph]);
@@ -148,7 +145,7 @@ export function GraphView({ graph, onUnit, onGroupSelect, selectionInInspector =
     const unknown = group.nodes.filter(node => node.ui === 'unknown').length;
     return t('{done}/{total} units done', { done, total: group.nodes.length }) + (unknown ? ` · ${t('{n} unknown', { n: unknown })}` : '');
   };
-  const edgeLabel = (edge: Edge) => `${edge.from} → ${edge.to} (${edge.kind}) · ${t('source: {source}', { source: edge.source ?? '—' })} · ${formatDayTime(edge.createdAt)}`;
+  const edgeLabel = (edge: GraphEdge) => `${edge.from} → ${edge.to} (${edge.kind}) · ${t('source: {source}', { source: edge.source ?? '—' })} · ${formatDayTime(edge.createdAt)}`;
   const anomalySections = [{ label: t('Missing endpoint'), rows: layout.evidence.dangling }, { label: t('Self dependency'), rows: layout.evidence.self }, { label: t('Cycle dependency'), rows: layout.evidence.cyclic }];
   const selectGroup = (group: GraphGroup) => {
     const next = selected === group.id ? null : group;
@@ -160,7 +157,7 @@ export function GraphView({ graph, onUnit, onGroupSelect, selectionInInspector =
     {(layout.evidence.dangling.length > 0 || layout.evidence.self.length > 0 || layout.evidence.cyclic.length > 0) && <details className="rounded-lg border bg-card p-3 text-xs">
       <summary className="flex cursor-pointer items-center gap-2 font-medium"><AlertTriangle className="size-4 shrink-0" aria-hidden="true" />{t('Recorded dependency anomalies')}</summary>
       <div className="mt-3 space-y-3 text-muted-foreground">
-        {anomalySections.map(({ label, rows }) => rows.length > 0 && <div key={label}><strong className="text-foreground">{label}</strong><ul className="mt-1 space-y-1">{rows.map((edge, index) => <li key={index} className="break-all font-mono">{edgeLabel(edge)}</li>)}</ul></div>)}
+        {anomalySections.map(({ label, rows }) => rows.length > 0 && <div key={label}><strong className="text-foreground">{label}</strong><ul className="mt-1 space-y-1">{rows.map(edge => <li key={`${edge.from}:${edge.to}:${edge.kind}:${edge.source}:${edge.createdAt}`} className="break-all font-mono">{edgeLabel(edge)}</li>)}</ul></div>)}
         <p>{t('Dependency order unresolved')}: <span className="break-all font-mono">{[...layout.evidence.unresolved].join(', ') || '—'}</span></p>
       </div>
     </details>}
@@ -180,7 +177,7 @@ export function GraphView({ graph, onUnit, onGroupSelect, selectionInInspector =
       {selectedGroup && <div className={selectionInInspector ? 'rounded-lg border bg-card p-3 lg:hidden' : 'rounded-lg border bg-card p-3'}>
         <div className="mb-2 space-y-1"><strong className="text-sm">{selectedGroup.op} ×{selectedGroup.nodes.length}</strong><p className="break-words text-xs text-muted-foreground">{predecessorsLabel(selectedGroup)}</p><p className="text-xs text-muted-foreground">{countsLabel(selectedGroup)}</p></div>
         <div className="grid gap-1 sm:grid-cols-2">{selectedGroup.nodes.map(node => <button type="button" key={node.unit} onClick={() => onUnit(node.unit)} className="flex min-w-0 items-start gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring"><span className="min-w-0 flex-1"><span className="block truncate font-medium" title={node.title}>{node.title}</span><span className="block break-all font-mono text-xs text-muted-foreground">{node.unit} · {node.state}</span><span className="mt-1 block break-all text-xs text-muted-foreground">{t('Workflow')}: {node.workflowId ?? '—'} · {node.goalRevision == null ? t('Goal revision not recorded') : t('Goal revision {n}', { n: node.goalRevision })}</span><span className="block break-all text-xs text-muted-foreground">{t('Subject key')}: <span className="font-mono">{node.subjectKey ?? '—'}</span></span><span className="block break-all text-xs text-muted-foreground">{t('Current job')}: <span className="font-mono">{node.currentJob ?? '—'}</span></span></span><StateChip state={node.ui} compact /></button>)}</div>
-        {selectedGroup.recordedEdges.length > 0 && <details className="mt-3 border-t pt-3 text-xs"><summary className="cursor-pointer font-medium">{t('Recorded incoming edges')}</summary><ul className="mt-2 space-y-1 text-muted-foreground">{selectedGroup.recordedEdges.map((edge, index) => <li key={index} className="break-all font-mono">{edgeLabel(edge)}</li>)}</ul></details>}
+        {selectedGroup.recordedEdges.length > 0 && <details className="mt-3 border-t pt-3 text-xs"><summary className="cursor-pointer font-medium">{t('Recorded incoming edges')}</summary><ul className="mt-2 space-y-1 text-muted-foreground">{selectedGroup.recordedEdges.map(edge => <li key={`${edge.from}:${edge.to}:${edge.kind}:${edge.source}:${edge.createdAt}`} className="break-all font-mono">{edgeLabel(edge)}</li>)}</ul></details>}
       </div>}
     </>}
   </ConceptBlock>;

@@ -35,7 +35,6 @@
 // define-goal.mjs, start-workflow.mjs and cli.mjs incident; nothing here edits a ledger by hand.
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
-import { fileURLToPath } from 'node:url';
 import { inspectLedger, ledgerFileFor, newToken, openLedger } from '../../engine/db/ledger.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -125,7 +124,7 @@ async function notify(repo, workflowId, text, args) {
 }
 
 const appendEvents = (ledger, workflows, kind, payload) => {
-  for (const workflowId of [...new Set(workflows.filter(Boolean))]) {
+  for (const workflowId of new Set(workflows.filter(Boolean))) {
     if (!workflowOf(ledger.db, workflowId)) continue;
     ledger.appendEvent({ workflowId, entityType: 'bridge', entityId: payload.bridgeId, kind, payload });
   }
@@ -166,7 +165,7 @@ export function detect(repos, { now = Date.now() } = {}) {
     catch (error) { return { repo, ok: false, error: clip(error?.message ?? error, 300), findings: [], edges: [], nodes: [], bridges: [] }; }
   });
 }
-const q = (s) => `"${String(s).replace(/"/g, '\'')}"`;
+const q = (s) => `"${String(s).replaceAll(/"/g, '\'')}"`;
 /** The command line the Supervisor would run for a clear-cut finding. */
 export function commandFor(repo, f) {
   const p = f.proposal ?? {};
@@ -204,7 +203,7 @@ async function cmdBridge(args, { env = process.env } = {}) {
     });
     if (!waits.length && blocker) {
       const graph = dependencyGraph(db, { repo, light: true });
-      waits = [...new Map(graph.edges.filter((e) => dependents.includes(e.from) && e.to === blocker && e.strength === 'hard' && /^inc-/.test(String(e.ref)))
+      waits = [...new Map(graph.edges.filter((e) => dependents.includes(e.from) && e.to === blocker && e.strength === 'hard' && String(e.ref).startsWith('inc-'))
         .map((e) => [e.ref, { workflowId: e.from, incidentId: e.ref }])).values()];
     }
     return { existing, waits };
@@ -354,7 +353,7 @@ async function cmdTransfer(args, { env = process.env } = {}) {
   const results = prior.waits.map((w) => retypeWait(repo, { ...w, foundation: mergeInto ?? name, bridgeId, reason: mergeInto ? `foundation ${name} is ${mergeInto} under another name` : `foundation ${name} moved to ${to}; ${reason}`, env }));
   if (results.length) updateBridge(repo, bridgeId, (b) => ({ ...b, rewired: results }));
   const notices = [];
-  for (const wf of [...new Set([from, to, ...moved.dependents].filter(Boolean))]) {
+  for (const wf of new Set([from, to, ...moved.dependents].filter(Boolean))) {
     notices.push(await notify(repo, wf, `${TAG} ${bridgeId}: ${mergeInto ? `foundation ${name} is merged into ${mergeInto} (owner ${to ?? '-'}); a need of ${name} is now a need of ${mergeInto}` : `foundation ${name} now belongs to ${to} (was ${from ?? 'unowned'})`} - ${clip(reason, 200)}. Read starci kernel foundations; re-check it in your own preflight.`, args));
   }
   supervisorAction({ item: args.finding ?? `transfer|foundation:${name}`, action: 'transfer', reason, workflowId: to, refs: [bridgeId, name, mergeInto].filter(Boolean), env });
@@ -411,7 +410,7 @@ async function cmdDesignate(args, { env = process.env } = {}) {
       return explicit;
     }
     const graph = dependencyGraph(db, { repo, light: true });
-    return [...new Set(graph.edges.filter((e) => e.from === lead && e.to === waiter && e.strength === 'hard' && /^inc-/.test(String(e.ref))).map((e) => e.ref))];
+    return [...new Set(graph.edges.filter((e) => e.from === lead && e.to === waiter && e.strength === 'hard' && String(e.ref).startsWith('inc-')).map((e) => e.ref))];
   });
   if (!releases.length) fail(`${lead} holds no open wait on ${waiter}: there is no cycle to break from its side`, 'nothing-to-release');
   const bridgeId = `br-${newToken().slice(0, 10)}`;
@@ -467,12 +466,12 @@ export async function main(argv = process.argv.slice(2), { env = process.env } =
 
 if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
-  main(argv).then((out) => {
-    const verb = argv[0];
+  try {
+    const out = await main(argv), verb = argv[0];
     console.log(argv.includes('--json') || !human[verb] ? JSON.stringify(out, null, argv.includes('--json') ? 0 : 2) : human[verb](out));
     if (out?.ok === false) process.exitCode = 1;
-  }).catch((error) => {
+  } catch (error) {
     console.log(JSON.stringify({ ok: false, code: error.code ?? 'error', error: error.message }));
     process.exitCode = error.code === 'usage' || error.code === 'arg-missing' ? 2 : 1;
-  });
+  }
 }

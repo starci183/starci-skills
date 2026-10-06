@@ -9,7 +9,7 @@ import { Card, CardContent } from '../ui/card';
 export const concept: Concept = 'C15';
 
 /** S8: where the workflow runs on the host (repos, work tree, ledger, blobs, seat, terminals, worktrees) and its token/cost usage. */
-export function WorkflowInfraCard({ where, usage }: { where: WorkflowWhere; usage: Usage }) {
+export function WorkflowInfraCard({ where, usage }: Readonly<{ where: WorkflowWhere; usage: Usage }>) {
   return <section aria-label={t('Infrastructure and cost')}><Card size="sm"><CardContent>
     <h3 className="m-0 mb-3 text-sm font-semibold">{t('Infrastructure & cost')}</h3>
     <div className="grid gap-x-8 lg:grid-cols-2">

@@ -255,11 +255,11 @@ const webApi = (request: FakeHttpRequest, context: Context): FakeHttpReply => {
     if (fields === null) return { body: vnpayApiError("malformed") }
     if (!vnpayPipeVerify(body, fields, secret)) return { body: vnpayApiError("invalidSignature") }
     if (body["vnp_TmnCode"] !== tmnCodeOf(context)) return { body: vnpayApiError("merchantInvalid") }
-    const txn = context.state.txns.get(String(body["vnp_TxnRef"] ?? ""))
+    const txn = context.state.txns.get(String((body["vnp_TxnRef"] ?? "") as string))
     if (txn === undefined) return { body: vnpayApiError("orderNotFound") }
-    const responseId = String(body["vnp_RequestId"] ?? "")
+    const responseId = String((body["vnp_RequestId"] ?? "") as string)
     if (command === "querydr") return { body: vnpayQuerydrResponse(viewOf(context, txn), responseId, secret) }
-    const amount = String(body["vnp_Amount"] ?? "")
+    const amount = String((body["vnp_Amount"] ?? "") as string)
     if (txn.status !== "paid") return { body: vnpayApiError("orderNotFound") }
     if (txn.refundIds.includes(responseId)) return { body: vnpayApiError("duplicated") }
     if (!/^\d+$/.test(amount) || Number(amount) / 100 + txn.refunded > Number(txn.amountRaw) / 100) return { body: vnpayApiError("invalidAmount") }
@@ -268,7 +268,7 @@ const webApi = (request: FakeHttpRequest, context: Context): FakeHttpReply => {
     return {
         body: vnpayRefundResponse(
             viewOf(context, txn),
-            { vnp_TransactionType: String(body["vnp_TransactionType"] ?? "02"), vnp_Amount: amount },
+            { vnp_TransactionType: String((body["vnp_TransactionType"] ?? "02") as string), vnp_Amount: amount },
             responseId,
             secret,
         ),

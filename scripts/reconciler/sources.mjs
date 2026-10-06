@@ -37,7 +37,7 @@ export function ledgersOf({ env = process.env, repos = null, exists = fs.existsS
     try { file = ledgerFileFor(root); } catch { continue; }
     if (!exists(file)) continue;
     let id = path.basename(root) || 'repo';
-    for (let n = 2; taken.has(id); n += 1) id = `${path.basename(root)}-${n}`;
+    let n = 2; while (taken.has(id)) { id = `${path.basename(root)}-${n}`; n += 1; }
     taken.add(id);
     out.push({ ledgerId: id, repo: root, file });
   }

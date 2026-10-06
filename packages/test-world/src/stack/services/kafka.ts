@@ -36,7 +36,7 @@ export const ownedBy = (listing: string, prefix: string): ReadonlyArray<string> 
 export const partitionsOf = (describe: string): ReadonlyArray<{ readonly topic: string; readonly partition: number }> =>
     linesOf(describe).flatMap((line) => {
         const match = /Topic:\s*(\S+)\s.*Partition:\s*(\d+)/.exec(line)
-        return match === null || match[1] === undefined || match[2] === undefined ? [] : [{ topic: match[1], partition: Number(match[2]) }]
+        return match?.[1] === undefined || match?.[2] === undefined ? [] : [{ topic: match[1], partition: Number(match[2]) }]
     })
 
 /** The `kafka-delete-records` offset file that empties partitions up to their high watermark (offset -1). */

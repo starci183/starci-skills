@@ -168,7 +168,7 @@ export function checkWorkChange({workRoot,baselineRoot=null}={}){
     const declared=change&&text(change.kind)?change.kind.trim():null;
     const rev=change?change.rev:null;
     const digest=normativeDigest(record.meta);
-    const statements=list(record.meta.statements).filter(text).map(item=>item.trim());
+    const statements=new Set(list(record.meta.statements).filter(text).map(item=>item.trim()));
     const withdraws=change?list(change.withdraws).filter(text).map(item=>item.trim()):[];
     const computed=baseline?classifyChange(previous,record):null;
 
@@ -182,7 +182,7 @@ export function checkWorkChange({workRoot,baselineRoot=null}={}){
         add('CHANGE_INVALID',record,'change.withdraws must be a list of non-empty statements');
       if(withdraws.length&&declared!=='breaking')
         add('WITHDRAWS_WITHOUT_BREAKING',record,'withdrawing a statement is a breaking change; a withdrawal that is not declared as one is indistinguishable from a clarification',{observed:declared});
-      for(const clause of withdraws)if(statements.includes(clause))
+      for(const clause of withdraws)if(statements.has(clause))
         add('WITHDRAWS_STILL_PRESENT',record,'a withdrawn statement is still one of the record statements',{observed:clause});
       // A first revision has no predecessor, so its kind is decidable without a baseline.
       if(rev===1&&declared!==null&&CHANGE_KINDS.includes(declared)&&declared!=='initial')
@@ -213,7 +213,7 @@ export function checkWorkChange({workRoot,baselineRoot=null}={}){
     const changeAt=change?moment(change.at):null;
     // A break stales the evidence it expired; the clause words are what the reason must name.
     const clause=new Set([...withdraws.flatMap(item=>[...stems(item)]),
-      ...(baseline&&previous?list(previous.meta.statements).filter(text).filter(item=>!statements.includes(item.trim())).flatMap(item=>[...stems(item)]):[])]);
+      ...(baseline&&previous?list(previous.meta.statements).filter(text).filter(item=>!statements.has(item.trim())).flatMap(item=>[...stems(item)]):[])]);
     const broke=declared==='breaking'||computed==='breaking';
     const stale=proof?.stale===true;
     if(proof){
@@ -253,13 +253,13 @@ export function checkWorkChange({workRoot,baselineRoot=null}={}){
   for(const item of unreadable)
     findings.push({code:'RECORD_UNREADABLE',id:`path:${item.path}`,path:item.path,
       detail:'the record is not readable YAML 1.2, so no change about it was decided',observed:item.tree});
+  findings.sort((a,b)=>a.code.localeCompare(b.code)||a.id.localeCompare(b.id)||String(a.observed??'').localeCompare(String(b.observed??'')));
   return {schema:RESULT,workRoot:slash(current.root),baseline:baseline?slash(baseline.root):null,
     clean:findings.length===0,
     coverage:{records:current.records.size,governed:summaries.filter(item=>item.declaredKind!==null).length,
       proven:summaries.filter(item=>item.evidence).length,stale:summaries.filter(item=>item.evidence?.stale).length,compared:baseline?summaries.filter(item=>item.computedKind!==null).length:0,
       unreadable:unreadable.map(item=>item.path)},
-    records:summaries,
-    findings:findings.sort((a,b)=>a.code.localeCompare(b.code)||a.id.localeCompare(b.id)||String(a.observed??'').localeCompare(String(b.observed??''))),
+    records:summaries,findings,
     limitations:[baseline?'The transition is computed between two given trees; neither is independently authenticated as the revision it claims to be.':'No baseline was given, so no transition was computed: the declared kind was not verified against the edit, withdrawals were not matched to a previous revision, and an undeclared edit cannot be seen. Pass --against a previous Work tree for those.',
       'Prose and lifecycle keys are excluded from the normative digest by name, so a normative obligation written into a description travels nowhere.',
       'Evidence staleness is judged from the evidence block the record carries, its recordDigest and its capture time; no proof was re-run and no assertion was re-observed.',

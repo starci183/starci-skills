@@ -62,7 +62,7 @@ export const peerOpenJobsOf = (db, workflowId) => db.prepare(`SELECT job_id,op_i
 /** A workflow's current leg: its most recently moved in-flight job, else its latest queued one. */
 export const currentLegOf = (jobs) => {
   const inFlight = jobs.filter((job) => job.status !== 'queued').sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
-  const pick = inFlight ?? jobs.filter((job) => job.status === 'queued').at(-1) ?? null;
+  const pick = inFlight ?? jobs.findLast((job) => job.status === 'queued') ?? null;
   return pick ? { jobId: pick.jobId, op: pick.op, status: pick.status, attempt: pick.attempt } : null;
 };
 export const peerMessageOf = (row) => {
@@ -114,7 +114,7 @@ export const openPeerWaits = (db, workflowId) => db.prepare("SELECT incident_id,
       untilLanded: typeof payload.untilLanded === 'string' ? payload.untilLanded : null,
       since: raised?.created_at ?? row.updated_at,
       peerPhase: peerRow ? (peerRow.archived_at != null ? 'archived' : peerRow.phase ?? null) : 'unknown',
-      peerRunning: Boolean(peerRow && peerRow.phase === 'running' && peerRow.archived_at == null),
+      peerRunning: Boolean(peerRow?.phase === 'running' && peerRow?.archived_at == null),
     };
   })
   .filter(Boolean);

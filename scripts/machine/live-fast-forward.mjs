@@ -69,10 +69,10 @@ export function fastForwardLive({ root, base, head, rows }) {
   const written = rows.filter((r) => !r[0].startsWith('D')).map((r) => normPath(r[r.length - 1]));
   const gone = [...deleted, ...renamedFrom];
   try {
-    if (written.length) { const co = inBatches(written, (batch) => checkoutPaths(root, head, batch)); if (!co.ok) throw Error(co.stderr || 'checkout failed'); }
+    if (written.length) { const co = inBatches(written, (batch) => checkoutPaths(root, head, batch)); if (!co.ok) throw new Error(co.stderr || 'checkout failed'); }
     if (gone.length) {
       const rm = inBatches(gone, (batch) => rmCached(root, batch));
-      if (!rm.ok) throw Error(rm.stderr || 'git rm --cached failed');
+      if (!rm.ok) throw new Error(rm.stderr || 'git rm --cached failed');
       for (const f of gone) { try { fs.rmSync(path.join(root, f), { force: true }); } catch { /* already gone */ } }
     }
     return { ok: true, written, removed: gone };

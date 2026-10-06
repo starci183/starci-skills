@@ -45,7 +45,7 @@ export function unfiledReportCandidates({ scratch = null, sinceMs = 0, jobId = n
     else if (REPORT_FILE.test(path.basename(root))) files.push(root);
   }
   const out = [];
-  for (const file of [...new Set(files)]) {
+  for (const file of new Set(files)) {
     let mtimeMs;
     try { mtimeMs = fs.statSync(file).mtimeMs; } catch { continue; }
     if (Number.isFinite(sinceMs) && mtimeMs < sinceMs - SLACK_MS) continue;

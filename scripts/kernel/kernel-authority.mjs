@@ -14,12 +14,10 @@
 //   (d) every mutating verb names an OPEN decision of the Kernel's decision log (hypothesis -> action -> metric ->
 //       keep/revert); a reverted action key is refused as a new decision, a failing unit shape is never re-dispatched
 //   (e) every graph edit is an event with its inverse; `graph-edit --undo <edit>` reverts it
-import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { refuse as refuseError } from '../../engine/refuse.mjs';
@@ -101,7 +99,7 @@ export function dropJob(ledger, job, { reason, editId, now = Date.now() }) {
 export function restoreJob(ledger, jobId, { editId, now = Date.now() }) {
   const db = ledger.db;
   const j = jobRow(db, jobId);
-  if (!j || j.status !== 'cancelled' || j.result?.by !== editId || !j.unit_id) return null;
+  if (j?.status !== 'cancelled' || j.result?.by !== editId || !j.unit_id) return null;
   const unit = db.prepare('SELECT * FROM work_units WHERE workflow_id=? AND unit_id=?').get(j.workflow_id, j.unit_id);
   if (!unit || unit.state === 'done') return null;
   const open = db.prepare(`SELECT 1 FROM jobs WHERE workflow_id=? AND unit_id=? AND status NOT IN (${SETTLED_JOB_STATUSES.map(() => '?').join(',')}) LIMIT 1`)

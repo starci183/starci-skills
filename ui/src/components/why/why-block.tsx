@@ -17,14 +17,14 @@ export function whyOwner(owner: string | null | undefined): { label: string; ton
   return { label: owner, tone: 'queued' };
 }
 
-export function WhyOwnerBadge({ owner }: { owner: string | null | undefined }) {
+export function WhyOwnerBadge({ owner }: Readonly<{ owner: string | null | undefined }>) {
   const o = whyOwner(owner);
   return <span data-tone={o.tone} className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-[var(--tone)]">
     <span className="size-1.5 rounded-full bg-[var(--tone)]" aria-hidden="true" />{o.label}
   </span>;
 }
 
-function CodeChips({ why }: { why: Why }) {
+function CodeChips({ why }: Readonly<{ why: Why }>) {
   const items = why.codeInfo?.length ? why.codeInfo : why.codes.map(code => ({ code, known: false, title: code, meaning: null, next: null }));
   if (!items.length) return null;
   return <div className="flex flex-wrap gap-2">{items.map(item => <span key={item.code} title={[item.title, item.meaning].filter(Boolean).join(' — ')}
@@ -37,7 +37,7 @@ function CodeChips({ why }: { why: Why }) {
  * The owner-facing reason (starci/why@1). `compact`: headline + who acts next (cards, headers, drawers).
  * Full: headline, cause, op-vs-runtime disagreement, what happens next; codes and refs under "Advanced".
  */
-export function WhyBlock({ why, compact = false, className = '' }: { why: Why | null | undefined; compact?: boolean; className?: string }) {
+export function WhyBlock({ why, compact = false, className = '' }: Readonly<{ why: Why | null | undefined; compact?: boolean; className?: string }>) {
   if (!why?.headline) return null;
   if (compact) return <div className={`flex min-w-0 flex-wrap items-start gap-2 ${className}`}>
     <p className="m-0 min-w-0 flex-1 text-sm leading-6">{why.headline}</p><WhyOwnerBadge owner={why.owner} />
@@ -52,7 +52,7 @@ export function WhyBlock({ why, compact = false, className = '' }: { why: Why | 
     {why.codes.length || why.refs?.length ? <Advanced summary={t('{codes} codes · {refs} references', { codes: why.codes.length, refs: why.refs?.length ?? 0 })}>
       <div className="flex flex-col gap-3">
         <CodeChips why={why} />
-        {why.refs?.length ? <ul className="m-0 flex list-none flex-col gap-1 p-0 font-mono text-xs text-muted-foreground">{why.refs.map((ref, i) => <li key={i} className="break-all">
+        {why.refs?.length ? <ul className="m-0 flex list-none flex-col gap-1 p-0 font-mono text-xs text-muted-foreground">{why.refs.map((ref, i) => <li key={`${ref.kind}-${i}`} className="break-all">
           {ref.kind === 'check' ? `check ${ref.name} · ${ref.runner} · ${ref.status}` : ref.kind === 'commit' ? `commit ${String(ref.sha).slice(0, 12)}` : ref.kind === 'report' ? `report #${ref.reportId}` : JSON.stringify(ref)}
         </li>)}</ul> : null}
       </div>

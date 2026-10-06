@@ -23,7 +23,7 @@ const evidenceText = (summary: unknown): string | null => {
   return null;
 };
 
-function CopyButton({ value }: { value: string }) {
+function CopyButton({ value }: Readonly<{ value: string }>) {
   const [copied, setCopied] = useState(false);
   return <button type="button" className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground" title={t('Copy the command')} onClick={() => {
     void navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }, () => undefined);
@@ -59,7 +59,7 @@ function runtimeSide(pair: CheckPair): { verdict: Verdict; exit: number | null }
   return { verdict: observation === 'pass' || observation === 'fail' ? observation : null, exit: row.exitCode };
 }
 
-function Mark({ verdict, exit, extra }: { verdict: Verdict; exit: number | null; extra?: string | null }) {
+function Mark({ verdict, exit, extra }: Readonly<{ verdict: Verdict; exit: number | null; extra?: string | null }>) {
   const tone = verdict === 'pass' ? 'success' : verdict === 'fail' ? 'failed' : 'queued';
   return <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs" data-tone={tone} style={{ color: 'var(--tone)' }}>
     <b className="text-sm">{verdict === 'pass' ? '✓' : verdict === 'fail' ? '✗' : '—'}</b>
@@ -68,14 +68,14 @@ function Mark({ verdict, exit, extra }: { verdict: Verdict; exit: number | null;
   </span>;
 }
 
-function Tails({ check }: { check: CheckRow }) {
+function Tails({ check }: Readonly<{ check: CheckRow }>) {
   const tails = [check.stdout && ['stdout', check.stdout] as const, check.stderr && ['stderr', check.stderr] as const, check.output && ['output', check.output] as const].filter((item): item is NonNullable<typeof item> => Boolean(item));
   if (!tails.length) return null;
   return <details className="mt-2"><summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">{t('Tail {labels}', { labels: tails.map(([label]) => label).join(' / ') })}</summary>
     <div className="mt-2 grid gap-2">{tails.map(([label, blob]) => <div key={label}><p className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">{label} · {blob.bytes.toLocaleString('vi-VN')} B</p><div className="max-h-56 overflow-auto"><BlobText blob={blob} mode="tail" lines={40} /></div></div>)}</div></details>;
 }
 
-function PairRow({ pair, files, onOpenFile }: { pair: CheckPair; files: EvidenceFile[]; onOpenFile: (file: EvidenceFile) => void }) {
+function PairRow({ pair, files, onOpenFile }: Readonly<{ pair: CheckPair; files: EvidenceFile[]; onOpenFile: (file: EvidenceFile) => void }>) {
   const [open, setOpen] = useState(false);
   const op = opSide(pair);
   const rt = runtimeSide(pair);
@@ -113,7 +113,7 @@ function PairRow({ pair, files, onOpenFile }: { pair: CheckPair; files: Evidence
 }
 
 /** One latest run per exact runner/authority/phase/name, selected by the read API. */
-export function CheckList({ attempt, onOpenFile }: { attempt: AttemptDetailV2; onOpenFile: (file: EvidenceFile) => void }) {
+export function CheckList({ attempt, onOpenFile }: Readonly<{ attempt: AttemptDetailV2; onOpenFile: (file: EvidenceFile) => void }>) {
   const summary = verificationSummary(attempt);
   const pairs = summary.pairs;
   const confirmed = summary.passed;

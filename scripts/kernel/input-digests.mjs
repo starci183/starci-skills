@@ -47,12 +47,12 @@ import { underWorktrees } from '../lib/worktree-exclude.mjs';
 
 export const INPUT_DIGEST_SCHEMA = 'starci/input-digests@1';
 export const ABSENT = 'absent';
-const INPUT_KINDS = ['source', 'work'];
+const INPUT_KINDS = new Set(['source', 'work']);
 const SOURCE_ROOTS = ['knowledge/', 'modules/schemas/'];
-const SOURCE_FILES = ['modules/models/code-patterns.yaml'];
+const SOURCE_FILES = new Set(['modules/models/code-patterns.yaml']);
 export const WORK_PREFIX = '.starciwork/';
 // A leftover pre-migration ledger path is agent data, never a product input.
-const WORK_EXCLUDED = ['.starciwork/runtime.sqlite'];
+const WORK_EXCLUDED = new Set(['.starciwork/runtime.sqlite']);
 const WORK_EXCLUDED_ROOTS = ['.starciwork/kernel-evidence/', '.starciwork/kernel-strays/', '.starciwork/kernel-approvals/'];
 const WORK_RECORD_FILES = new Set(['index.yaml', 'resource.yaml']);
 const WORK_SKIP_DIRS = new Set(['evidence', 'assets']);
@@ -61,11 +61,11 @@ const SKIP_DIRS = new Set(['node_modules', '.git']);
 
 const special = (segment) => /[*{<]/.test(segment);
 const isSourceLaw = (rel) => typeof rel === 'string' && !rel.includes('..')
-  && (SOURCE_ROOTS.some((root) => rel.startsWith(root)) || SOURCE_FILES.includes(rel));
+  && (SOURCE_ROOTS.some((root) => rel.startsWith(root)) || SOURCE_FILES.has(rel));
 export const isWorkInput = (rel) => typeof rel === 'string' && rel.startsWith(WORK_PREFIX) && !rel.includes('..')
-  && !rel.split('/').some(special) && !WORK_EXCLUDED.includes(rel) && !/^[.]starciwork[/]logs[.]sqlite[.]migrated-/.test(rel) && !WORK_EXCLUDED_ROOTS.some((root) => rel.startsWith(root));
+  && !rel.split('/').some(special) && !WORK_EXCLUDED.has(rel) && !/^\.starciwork\/logs\.sqlite\.migrated-/.test(rel) && !WORK_EXCLUDED_ROOTS.some((root) => rel.startsWith(root));
 /** The kind of one recorded entry: its own `kind`, else what its path says (entries recorded before kinds). */
-export const inputKindOf = (entry) => (INPUT_KINDS.includes(entry?.kind) ? entry.kind
+export const inputKindOf = (entry) => (INPUT_KINDS.has(entry?.kind) ? entry.kind
   : isSourceLaw(entry?.path) ? 'source' : isWorkInput(entry?.path) ? 'work' : null);
 
 /** The Source-law path tokens a free-form manifest `path:` string names, in order. */
@@ -122,10 +122,10 @@ const listFiles = (abs, skip = SKIP_DIRS, strict = false) => {
 };
 
 const globRegex = (pattern) => new RegExp(`^${pattern
-  .replace(/[.+?^$()|[\]\\]/g, '\\$&')
+  .replace(/[.+?^$()|[\]\\]/g, String.raw`\$&`)
   .replace(/<[A-Za-z0-9_-]+>/g, '[^/]+')
-  .replace(/\{([^{}]*)\}/g, (whole, body) => `(?:${body.split(',').join('|')})`)
-  .replace(/\*\*\//g, '\0')
+  .replace(/\{([^{}]*)\}/g, (whole, body) => `(?:${body.replaceAll(',', '|')})`)
+  .replaceAll(/\*\*\//g, '\0')
   .replace(/\*+/g, '.*')
   .replaceAll('\0', '(?:.*/)?')}$`);
 
@@ -249,7 +249,7 @@ export function baselineWorkInputs(record, repo, { workDir = '.starciwork', now 
 const cutOf = (payloadJson) => {
   try {
     const cut = JSON.parse(payloadJson ?? 'null')?.cut;
-    return cut && cut.id != null ? { id: cut.id, ordinal: cut.ordinal, total: cut.total } : null;
+    return cut?.id != null ? { id: cut.id, ordinal: cut.ordinal, total: cut.total } : null;
   } catch { return null; }
 };
 /**
@@ -415,7 +415,7 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
   }
   const order = (a, b) => (a.op < b.op ? -1 : a.op > b.op ? 1 : 0)
     || (a.cut?.ordinal ?? 0) - (b.cut?.ordinal ?? 0) || a.attempt - b.attempt || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
-  return { stale: stale.sort(order), sourceDrift: sourceDrift.sort(order), peerDrift: peerDrift.sort(order) };
+  return { stale: stale.toSorted(order), sourceDrift: sourceDrift.toSorted(order), peerDrift: peerDrift.toSorted(order) };
 }
 
 /** The settled jobs whose Work inputs changed (inputDrift().stale); Source edits never make a job stale. */

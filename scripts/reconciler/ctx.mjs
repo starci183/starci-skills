@@ -92,7 +92,7 @@ const actionResultOf = (r) => { const { stdout, stderr, ...rest } = r ?? {}; ret
  */
 export function reconcilerLog(m, row, { env = process.env } = {}) {
   const data = row?.data ?? {};
-  const level = row?.level ?? (/\.error$/.test(String(row?.kind ?? '')) ? 'error' : 'info');
+  const level = row?.level ?? (String(row?.kind ?? '').endsWith('.error') ? 'error' : 'info');
   const out = { actor: 'reconciler', controller: typeof data.controller === 'string' ? data.controller : null, kind: String(row?.kind ?? 'reconciler.event'),
     msg: String(row?.msg ?? ''), level, data, refs: row?.refs ?? null, actionId: typeof data.actionId === 'string' ? data.actionId : null,
     workflowId: typeof data.workflowId === 'string' ? data.workflowId : null, ...(row?.at ? { at: row.at } : {}) };
@@ -127,7 +127,7 @@ export function statusFailureOf(r, { timeoutMs = null } = {}) {
   if (r?.ok && value) return null;
   const stderr = String(r?.stderr ?? '');
   const stderrHead = clip(stderr.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !isNodeWarningLine(l)).join(' | '), 300) || null;
-  const refusal = value && value.ok === false ? value : (() => { const j = lastJsonLine(stderr); return j && typeof j === 'object' && j.ok === false ? j : null; })();
+  const refusal = value?.ok === false ? value : (() => { const j = lastJsonLine(stderr); return j && typeof j === 'object' && j.ok === false ? j : null; })();
   const base = { code: Number.isInteger(r?.code) ? r.code : null, timedOut: Boolean(r?.timedOut), stderrHead };
   if (r?.timedOut) return { cause: 'timeout', error: `starci kernel status timed out after ${timeoutMs ?? '?'}ms`, ...base };
   if (r?.error) return { cause: 'spawn', error: clip(`starci kernel status did not spawn: ${r.error}`, 300), ...base };
@@ -146,7 +146,7 @@ const CTX_LOG_KINDS = Object.freeze(['reconciler.would', 'reconciler.act', 'reco
  */
 export function logRowOf(controller, kind, msg, data = {}, { key = null } = {}) {
   const k = String(kind ?? 'reconciler.event');
-  const rowKind = CTX_LOG_KINDS.includes(k) && Object.hasOwn(LOG_KINDS, k) ? k : /\.error$/.test(k) ? 'reconciler.error' : 'reconciler.event';
+  const rowKind = CTX_LOG_KINDS.includes(k) && Object.hasOwn(LOG_KINDS, k) ? k : k.endsWith('.error') ? 'reconciler.error' : 'reconciler.event';
   const who = String(controller ?? 'engine');
   const payload = { ...(data && typeof data === 'object' ? data : {}), controller: who, ...(key && data?.key == null ? { key: String(key) } : {}) };
   if (rowKind !== k) payload.kind = k;
@@ -172,7 +172,7 @@ export function createCtx({
   controller, mode = 'shadow', key = null, state = null, stateFile = state?.file ?? null, epoch = 0, ledgers = [], numbers = { statusCacheMs: 20_000 },
   modes = {}, env = process.env, now = Date.now, shared = { statusCache: new Map(), wouldSeen: new Map() },
   isCurrentEpoch = () => true, spawnChild = spawnJson, writeLog = (row) => reconcilerLog(state, row, { env }), reader = openLedgerReader,
-  loadDecisions = async () => (fs.existsSync(DECISIONS_FILE) ? import(`file://${DECISIONS_FILE.replace(/\\/g, '/')}`) : null),
+  loadDecisions = async () => (fs.existsSync(DECISIONS_FILE) ? import(`file://${DECISIONS_FILE.replaceAll('\\', '/')}`) : null),
 } = {}) {
   const keyNow = () => valueOf(key) ?? null;
   const epochNow = () => Number(valueOf(epoch)) || 0;
@@ -203,9 +203,9 @@ export function createCtx({
     const digest = digestOf([verb, argv]);
     const k = keyNow(), ep = epochNow();
     const journal = (fn) => {
-      if (!state) throw Error('action journal is unavailable');
+      if (!state) throw new Error('action journal is unavailable');
       const recorded = fn(state);
-      if (!recorded) throw Error('action journal did not acknowledge the write');
+      if (!recorded) throw new Error('action journal did not acknowledge the write');
       return recorded;
     };
     const journalFailure = (stage, error, effectState = 'none') => ({ ok: false, actionId: id, journalStage: stage, effectState,
@@ -248,7 +248,7 @@ export function createCtx({
     now: () => now(),
     read(ledgerId, fn) {
       const l = ledgerOf(ledgerId);
-      if (!l || !l.file || !fs.existsSync(l.file)) return null;
+      if (!l?.file || !fs.existsSync(l.file)) return null;
       const db = reader(l.file);
       try { return fn(db); } finally { try { db.close(); } catch { /* closed */ } }
     },

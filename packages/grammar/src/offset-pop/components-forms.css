@@ -146,7 +146,7 @@
         box-shadow: none;
     }
 
-    /* Focus: the family focus ring around the control; press: the shadow collapses into travel. */
+    /* Focus paints the family ring around the control, and press collapses the shadow into travel. */
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-field="true"] [data-grammar-choice-target][data-focus-visible="true"] [data-grammar-choice-control],
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-field="true"] [data-grammar-choice-target]:focus-within:has(:focus-visible) [data-grammar-choice-control] {
         outline: 2px solid var(--focus);

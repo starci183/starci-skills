@@ -29,12 +29,11 @@ import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { openMachine, openMachineReader, pidAlive, starciLocalRoot } from '../../engine/db/machine.mjs';
 import { agentOfTerminal } from '../kernel/quit-agent.mjs';
 import {
-  SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_TITLE, STARTUP_RESERVATION_MS,
+  SKILL_ROOT, SUPERVISOR_ID, STARTUP_RESERVATION_MS,
   readSupervisor, seatOf, writeSeat, clearSeat, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog,
   DEFAULT_OWNER_LANGUAGE, SUPERVISOR_SEAT, supervisedSeatHandles,
 } from '../machine/home.mjs';
@@ -395,4 +394,4 @@ async function main() {
   return out(r);
 }
 
-if (isMain(import.meta.url)) Promise.resolve().then(main).catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });
+if (isMain(import.meta.url)) await main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });

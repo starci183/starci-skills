@@ -12,7 +12,7 @@ import { t } from '../../i18n/t';
 
 const H = 190, TOP = 8, BOTTOM = 26, LEFT = 30;
 
-export function Throughput({ rows, since, now }: { rows: AttemptRow[]; since: number; now: number }) {
+export function Throughput({ rows, since, now }: Readonly<{ rows: AttemptRow[]; since: number; now: number }>) {
   const [ref, width] = useWidth();
   const { step, buckets } = useMemo(() => throughput(rows, since, now), [rows, since, now]);
   const max = Math.max(1, ...buckets.map(b => Math.max(b.dispatched, b.settled))), tick = Math.max(1, niceStep(max, 4)), top = Math.ceil(max / tick) * tick;

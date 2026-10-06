@@ -9,7 +9,6 @@ import { mergeBaseQuery } from '../api/git/merge-base-query.mjs';
 import { revList } from '../api/git/rev-list.mjs';
 import { diff as gitDiff } from '../api/git/diff.mjs';
 import { updateRef } from '../api/git/update-ref.mjs';
-import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { TERMINAL_JOB_STATUSES, worktreeSettings } from '../machine/worktree-registry.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { rebaseMilestone } from '../lib/rebase-milestone.mjs';

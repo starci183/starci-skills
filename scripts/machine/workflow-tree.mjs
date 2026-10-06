@@ -46,7 +46,7 @@ export function workflowWorktreeAt(ctx, dir) {
 }
 
 /** The registry functions a caller may replace (ctx.worktree in a spec, the functions above in the runtime). */
-const registryOf = (ctx) => ({ workflowWorktreeOf, workflowWorktreeAt, ...(ctx?.worktree ?? {}) });
+const registryOf = (ctx) => ({ workflowWorktreeOf, workflowWorktreeAt, ...ctx?.worktree });
 
 /** The registry record of the workflow's worktree, its directory present: {workflowId, orcaWorktreeId, path, branch, checkpoint}. */
 function presentRecordOf(ctx, workflowId) {

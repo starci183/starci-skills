@@ -4,7 +4,6 @@ import { isMain } from '../lib/is-main.mjs';
 import { workCli } from '../lib/work-cli.mjs';
 import {isPlainObject} from '../../engine/plain-object.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {walk} from '../work/validate/check-example-work.mjs';
 import {computeDerived, runGenerated} from './example-derive.mjs';
 import { readWorkTree } from '../lib/work-tree.mjs';
 import {APP_SIDES, appRootOf, indexInlineCriteria, repoRootFor, resolveRecordRef} from '../work/record-ownership.mjs';
@@ -222,7 +221,8 @@ function stronglyConnectedComponents(candidateIds, edgesOf) {
       const component = [];
       let w;
       do { w = stack.pop(); onStack.delete(w); component.push(w); } while (w !== v);
-      sccs.push(component.sort(byCodeUnit));
+      component.sort(byCodeUnit);
+      sccs.push(component);
     }
   }
   for (const v of ids) if (!index.has(v)) strongconnect(v);
@@ -294,8 +294,9 @@ function computeBlockerCycleFindings(derived, rawRecords) {
     return edges.filter(e => isPlainObject(e) && typeof e.record === 'string').map(e => canon(e.record));
   };
   const sccs = stronglyConnectedComponents(candidateIds, edgesOf).filter(c => c.length > 1);
+  sccs.sort((a, b) => a[0].localeCompare(b[0]));
   const findings = [];
-  for (const scc of sccs.sort((a, b) => a[0].localeCompare(b[0]))) {
+  for (const scc of sccs) {
     const ring = findRingIn(scc, edgesOf);
     const because = [];
     for (let i = 0; i < ring.length - 1; i += 1) {
@@ -370,7 +371,7 @@ function computeUnboundSdsFindings(rawRecords, repos) {
   for (const rec of rawRecords.values()) {
     if (rec.schema !== 'work/sds-component@1') continue;
     const owners = Array.isArray(rec.data.owners) ? rec.data.owners : null;
-    if (!owners || !owners.length) {
+    if (!owners?.length) {
       findings.push({
         id: `unbound-sds:${rec.id}`,
         kind: 'unbound-sds',
@@ -581,8 +582,7 @@ function buildCritiqueMarkdown(critique) {
     lines.push(`## ${section.title}`, '', `${items.length} finding(s).`, '');
     if (!items.length) { lines.push('(none)', ''); continue; }
     for (const item of items) {
-      lines.push(`- **${item.id}** [${item.severity}] (${item.records.join(', ')})`);
-      lines.push(`  ${item.because}`);
+      lines.push(`- **${item.id}** [${item.severity}] (${item.records.join(', ')})`, `  ${item.because}`);
     }
     lines.push('');
   }

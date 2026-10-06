@@ -1,5 +1,4 @@
 // starci kernel reconcile: recover a fenced launch or handle one typed recovery mode.
-import path from 'node:path';
 import { recordWhy } from '../why-record.mjs';
 import { recordJobResult, releaseLeases, setJobStatus, updateAttempt } from '../../../engine/db/ledger.mjs';
 import { parseJson } from '../../lib/json.mjs';
@@ -116,8 +115,8 @@ export default {
         entry?.dispatchId === dispatchId ? { ...entry, effectState: 'none', reconciledAt: now } : entry);
     }
     if (nextPayload.hierarchy?.runtime) {
-      const { taskId, dispatchId: ignoredDispatch, terminalHandle, ...runtime } = nextPayload.hierarchy.runtime;
-      nextPayload.hierarchy.runtime = runtime;
+      nextPayload.hierarchy.runtime = Object.fromEntries(Object.entries(nextPayload.hierarchy.runtime)
+        .filter(([key]) => key !== 'taskId' && key !== 'dispatchId' && key !== 'terminalHandle'));
     }
     const result = {
       reason: 'dispatch-reconciled', dispatchId, effectState: 'none',

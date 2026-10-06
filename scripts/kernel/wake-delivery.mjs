@@ -419,7 +419,7 @@ export function wakeKernelForTransition(ledger, { workflowId, transition, ids = 
     }
     return woke;
   }
-  const { action: _action, delivered: _delivered, state, receipt: _receipt, terminal, ...fields } = woke;
+  const { state, terminal, ...fields } = woke; delete fields.action; delete fields.delivered; delete fields.receipt;
   try {
     ledger.transaction(() => ledger.appendEvent({
       workflowId, entityType: 'workflow', entityId: workflowId, kind: 'kernel-transition-woken',

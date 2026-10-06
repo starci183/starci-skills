@@ -98,11 +98,13 @@ const sseEvent = (payload: unknown): string => `data: ${JSON.stringify(payload)}
 /** Deterministic unit vector of `dimensions` floats derived from a sha256 of the input. */
 export const embeddingVector = (input: string, dimensions: number): Array<number> => {
     const values: Array<number> = []
-    for (let block = 0; values.length < dimensions; block += 1) {
+    let block = 0
+    while (values.length < dimensions) {
         const digest = createHash("sha256").update(`${input}#${block}`).digest()
         for (let offset = 0; offset + 4 <= digest.length && values.length < dimensions; offset += 4) {
             values.push(digest.readUInt32BE(offset) / 0xffffffff * 2 - 1)
         }
+        block += 1
     }
     const norm = Math.sqrt(values.reduce((sum, value) => sum + value * value, 0)) || 1
     return values.map((value) => Math.round((value / norm) * 1e8) / 1e8)
@@ -165,7 +167,7 @@ const chat = (request: FakeHttpRequest, state: OpenAiState): FakeHttpReply => {
 const completions = (request: FakeHttpRequest, state: OpenAiState): FakeHttpReply => {
     const body = jsonObject(request)
     if (body === null) return { status: 400, body: errorBody(400, "the request body is not a JSON object") }
-    const prompt = Array.isArray(body["prompt"]) ? body["prompt"].join("") : String(body["prompt"] ?? "")
+    const prompt = Array.isArray(body["prompt"]) ? body["prompt"].join("") : String((body["prompt"] ?? "") as string)
     const scripted = nextReply(state, `Echo: ${prompt}`)
     const model = scripted.model ?? (typeof body["model"] === "string" ? body["model"] : (state.models[0] ?? "fake-chat"))
     const text = scripted.content ?? ""

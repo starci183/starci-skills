@@ -34,7 +34,7 @@ type Score = { op: string; agent: string | null; model: string | null; attempts:
 const tabLabels: Record<SystemTab, string> = { engine: 'Engine', sla: 'SLA', resources: t('Resources'), services: t('Services'), cleanup: t('Cleanup'), land: t('Runtime integration'), supervisor: 'Supervisor', learning: t('Learning') };
 const tabConcepts: Record<SystemTab, Concept> = { engine: 'C13', sla: 'C13', resources: 'C14', services: 'C3', cleanup: 'C15', land: 'C11', supervisor: 'C3', learning: 'C16' };
 const tabItemKeys: Partial<Record<SystemTab, HealthSummary['items'][number]['key'][]>> = { sla: ['sla'], services: ['services', 'seats'], cleanup: ['leaks', 'gc'], land: ['land'] };
-function TabSummary({ items }: { items: HealthSummary['items'] }) {
+function TabSummary({ items }: { readonly items: HealthSummary['items'] }) {
   if (!items.length) return null;
   return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{items.map((item) => <Metric key={item.key} label={item.key === 'land' ? t('Runtime integration') : item.key} value={<StateChip state={item.ui} label={item.value} />} />)}</div>;
 }
@@ -130,7 +130,7 @@ function SlaTab() {
   </ConceptBlock>;
 }
 
-function Sparkline({ values }: { values: (number | null)[] }) {
+function Sparkline({ values }: { readonly values: (number | null)[] }) {
   const observed = values.filter((value): value is number => value != null && Number.isFinite(value));
   if (observed.length < 2) return <span className="text-xs text-muted-foreground">{t('Not enough samples')}</span>;
   const max = Math.max(...observed, 1), min = Math.min(...observed, 0), span = Math.max(1, max - min);
@@ -176,9 +176,9 @@ function ServicesTab() {
     <QueryPanel title={t('Open terminals')} concept="C3" query={terminals} url={'/api/terminals?open=1'} ui={terminals.data ? stateOf(terminals.data) : 'unknown'} summary={terminals.data ? t('{n} terminals', { n: terminals.data.length }) : undefined}>{(rows) => <><p className="mb-3 text-xs text-muted-foreground">{t('Shells recorded by garbage collection; agent seats and attempts account for worker terminals.')}</p><DataTable rows={rows} getKey={(row) => row.handle} columns={[{ key: 'title', header: 'Terminal', render: (row) => row.title }, { key: 'role', header: t('Role'), render: (row) => row.role }, { key: 'seen', header: t('First seen'), render: (row) => at(row.openedAt) }, { key: 'state', header: t('State'), render: (row) => <StateChip state={row.ui} compact /> }, { key: 'open', header: '', render: (row) => <Button variant="ghost" size="sm" onClick={() => select({ kind: 'terminal', row })}>{t('Details')}</Button> }]} /></>}</QueryPanel>
     <Drawer open={drawer.open} onOpenChange={drawer.onOpenChange} title={title} description={t('Recorded runtime source')}>
       <div className="flex flex-col gap-4">{selected ? <ServiceFacts selected={selected} /> : <QueryView query={targetRead} url={drawer.url} empty={t('No matching record in the runtime source.')}>{(found) => found && <ServiceFacts selected={found} />}</QueryView>}
-      {serviceName && <>
+      {serviceName &&
       <QueryView query={probes} url={`/api/services/${encodeURIComponent(serviceName ?? '')}/probes`}>{(data) => <div className="flex flex-col gap-4"><h3 className="font-medium">{t('Recent probes')}</h3><DataTable rows={data.probes} getKey={(row) => row.at} columns={[{ key: 'at', header: t('At'), render: (row) => at(row.at) }, { key: 'result', header: t('Outcome'), render: (row) => row.ok ? t('Passed') : t('Error') }, { key: 'latency', header: t('Latency'), render: (row) => row.latencyMs == null ? '—' : `${number(row.latencyMs)} ms` }]} /><h3 className="font-medium">{t('Events')}</h3><DataTable rows={data.events} getKey={(row) => `${row.at}:${row.to}`} columns={[{ key: 'at', header: t('At'), render: (row) => at(row.at) }, { key: 'transition', header: t('Transition'), render: (row) => `${row.from} → ${row.to}` }, { key: 'action', header: t('Action'), render: (row) => dash(row.action) }]} /></div>}</QueryView>
-      </>}</div>
+      }</div>
     </Drawer>
   </ConceptBlock>;
 }

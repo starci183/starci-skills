@@ -37,13 +37,12 @@
 import { blockingJobs } from './waiter-priority.mjs';
 import { typedIncidents } from './gate-conditions.mjs';
 import { readFoundations } from './foundation-registry.mjs';
-import { TRANSFER_SCHEMA, TRANSFER_SCOPE, createOwnership, ownedOf, readTransfers } from './work-ownership.mjs';
-import { normWork } from '../lib/path-key.mjs';
+import { createOwnership, ownedOf, readTransfers } from './work-ownership.mjs';
+import { normWork, pathsOverlap } from '../lib/path-key.mjs';
 import { latestVersion } from '../work/work-graph-store.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { recordPathTransfer } from '../../engine/db/ledger.mjs';
 import { byCodeUnit, list } from '../lib/list.mjs';
-import { pathsOverlap } from '../lib/path-key.mjs';
 import { clipLine } from '../lib/clip.mjs';
 
 const BRIDGE_SCOPE = 'supervisor-bridge';
@@ -108,7 +107,7 @@ function cyclesOf(nodes, edges) {
       const scc = [];
       let w;
       do { w = stack.pop(); on.delete(w); scc.push(w); } while (w !== v);
-      if (scc.length > 1) sccs.push(scc.sort(byCodeUnit));
+      if (scc.length > 1) sccs.push(scc.toSorted(byCodeUnit));
     }
   };
   for (const n of nodes) if (!idx.has(n)) visit(n);
@@ -220,7 +219,7 @@ export function dependencyGraph(db, { repo = null, now = Date.now(), light = fal
   // Refused record-change declarations: the record is a peer's (cli.mjs record-change-refused).
   for (const ev of db.prepare('SELECT workflow_id,payload_json,created_at FROM events WHERE kind=? AND created_at>=? ORDER BY seq').all(RECORD_CHANGE_REFUSED, now - REFUSAL_WINDOW_MS)) {
     const p = parseJson(ev.payload_json, {}) ?? {};
-    for (const owner of [...new Set(list(p.owners).map((o) => o?.workflowId).filter(Boolean))]) {
+    for (const owner of new Set(list(p.owners).map((o) => o?.workflowId).filter(Boolean))) {
       edge({ from: ev.workflow_id, to: owner, via: 'record-owner', ref: p.record ?? null, strength: SOFT, since: ev.created_at, item: { kind: 'record', path: p.record ?? null } });
     }
   }
@@ -244,14 +243,14 @@ export function dependencyGraph(db, { repo = null, now = Date.now(), light = fal
     // The owner side: the workflow the most live workflows wait on overall, then the oldest.
     const waitedBy = (wf) => new Set(hard.filter((e) => e.to === wf).map((e) => e.from)).size;
     const owner = [...scc].sort((a, b) => waitedBy(b) - waitedBy(a) || (byId.get(a).created_at - byId.get(b).created_at))[0];
-    const waiters = scc.filter((wf) => wf !== owner);
+    const waiter = scc.find((wf) => wf !== owner);
     const release = cycleEdges.filter((e) => e.from === owner);
     findings.push({
       key: `circular-wait|${scc.join('+')}`, kind: 'circular-wait', workflows: scc,
       summary: `circular wait ${scc.map(shortWorkflow).join(' <-> ')}: ${cycleEdges.map((e) => `${shortWorkflow(e.from)} waits on ${shortWorkflow(e.to)} (${e.via} ${e.ref})`).join('; ')}`,
       evidence: cycleEdges,
-      proposal: { action: 'designate', owner, waiter: waiters[0], releases: release.map((e) => e.ref).filter(Boolean),
-        clearCut: scc.length === 2 && release.every((e) => /^inc-/.test(String(e.ref))),
+      proposal: { action: 'designate', owner, waiter, releases: release.map((e) => e.ref).filter(Boolean),
+        clearCut: scc.length === 2 && release.every((e) => String(e.ref).startsWith('inc-')),
         why: `${shortWorkflow(owner)} is waited on by the most workflows${scc.length === 2 ? '' : ' (a cycle of more than two needs judgement)'}; its own waits into the cycle (${release.map((e) => e.ref).join(', ') || '-'}) are released and the others keep waiting on it` },
     });
   }

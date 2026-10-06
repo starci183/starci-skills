@@ -13,7 +13,7 @@ const bytes = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : 
 const isFile = (rel: string) => !/[\\/]$/.test(rel) && /\.[a-z0-9]+$/i.test(rel);
 
 /** S8: "Where it ran & resources" — every host location, id and resource the attempt touched. */
-export function AttemptWhereCard({ attempt }: { attempt: AttemptDetailV2 }) {
+export function AttemptWhereCard({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
   const w = attempt.where;
   const transcript = attempt.terminal?.transcript ?? null;
   const transcriptHref = `#/a/${encodeURIComponent(attempt.project)}/${encodeURIComponent(String(attempt.id))}?step=run`;

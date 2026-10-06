@@ -44,8 +44,8 @@ const transaction = async <T>(client: PgClient, work: () => Promise<T>): Promise
     } catch (cause) {
         try {
             await client.query("ROLLBACK")
-        } catch (rollback) {
-            throw new AggregateError([cause, rollback], "write-fault transaction and rollback failed")
+        } catch (error_) {
+            throw new AggregateError([cause, error_], "write-fault transaction and rollback failed")
         }
         throw cause
     }
@@ -63,7 +63,7 @@ export const createWriteFault = (
     connect: PgConnect = realPgConnect,
 ): PostgresWriteFault => {
     const run = context.infra.postgresql
-    if (run === undefined || run.databases[connection.name] === undefined) throw worldError(TestWorldErrorCode.NotDeclared, `Postgres connection ${connection.name} was not provisioned`)
+    if (run?.databases[connection.name] === undefined) throw worldError(TestWorldErrorCode.NotDeclared, `Postgres connection ${connection.name} was not provisioned`)
     if (operation !== "insert" && operation !== "delete") throw worldError(TestWorldErrorCode.ConfigInvalid, "a write fault operation is insert or delete")
     identifier(table)
     if (!Number.isInteger(context.slot) || context.slot < 1 || normalisedRoot(context.root) !== normalisedRoot(context.namespace.root) || namespaceOf(context.root, context.slot).snake !== context.namespace.snake) throw failure("slot and namespace metadata disagree")
@@ -74,7 +74,7 @@ export const createWriteFault = (
     const schema = identifier(connection.schema ?? "public")
     if (run.host !== "127.0.0.1" || !Number.isInteger(run.directPort) || run.directPort <= 0) throw failure("the private stack endpoint is invalid")
     const config: PgConfig = { host: run.host, port: run.directPort, user: run.user, password: run.password, database }
-    const name = `starci_fault_${randomUUID().replace(/-/g, "")}`
+    const name = `starci_fault_${randomUUID().replaceAll("-", "")}`
     const relation = `${quoteIdent(schema)}.${quoteIdent(table)}`
     const functionName = `${quoteIdent(schema)}.${quoteIdent(name)}`
     const body = `BEGIN RAISE EXCEPTION 'TestWorld write fault' USING ERRCODE = '${SQLSTATE}', DETAIL = '${name}'; END;`

@@ -59,7 +59,7 @@ export interface HttpFakeContext<TState, TOptions> {
     /** A run-stable secret by label. */
     secret(label: string): string
     /** Runs delayed work; cancelled by reset and close. */
-    schedule(delayMs: number, task: () => Promise<unknown> | unknown): void
+    schedule(delayMs: number, task: () => unknown): void
     /** Calls the app with a webhook. */
     deliverWebhook(request: WebhookRequest): Promise<WebhookDelivery>
     /** True when a `badSignature` failure was armed for the next delivery (consumed). */
@@ -84,7 +84,7 @@ export interface HttpFakeRoute<TState, TOptions> {
 export type HttpFakeControlAction<TState, TOptions> = (
     body: unknown,
     context: HttpFakeContext<TState, TOptions>,
-) => unknown | Promise<unknown>
+) => unknown
 
 /** What a fake declares. */
 export interface HttpFakeSpec<TClient extends FakeClient, TOptions, TState> {
@@ -140,7 +140,7 @@ export const matchPath = (pattern: string, pathname: string): Record<string, str
 }
 
 const encodeBody = (reply: FakeHttpReply): { readonly payload: string | Buffer; readonly headers: Record<string, string> } => {
-    const headers: Record<string, string> = { ...(reply.headers ?? {}) }
+    const headers: Record<string, string> = { ...reply.headers }
     const body = reply.body
     if (body === undefined) return { payload: "", headers }
     if (typeof body === "string" || Buffer.isBuffer(body)) return { payload: body, headers }

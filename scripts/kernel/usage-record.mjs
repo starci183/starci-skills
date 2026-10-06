@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
-import { extractUsage, costOfRow, loadPrices, sumRows, promptTokens, deltaRows, USAGE_AGENTS, USAGE_SOURCE, USAGE_UNAVAILABLE } from '../lib/llm-usage.mjs';
+import { extractUsage, costOfRow, loadPrices, deltaRows, USAGE_AGENTS, USAGE_SOURCE, USAGE_UNAVAILABLE } from '../lib/llm-usage.mjs';
 import { sessionHomes } from './op-session.mjs';
 import { agentOfJob } from '../lib/job-agent.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
@@ -385,4 +385,4 @@ if (isMain(import.meta.url)) {
   process.exit(r.ok ? 0 : 1);
 }
 
-export { sumRows, promptTokens };
+export { sumRows, promptTokens } from '../lib/llm-usage.mjs';

@@ -53,7 +53,7 @@ export function usageOfWorkflow(db, workflowId, { legs = false } = {}) {
   const pending = Number(db.prepare(`SELECT count(*) n FROM op_attempts a WHERE a.workflow_id=? AND a.usage_source IS NULL AND (a.settled_at IS NOT NULL OR a.end_state IS NOT NULL)
       AND NOT EXISTS(SELECT 1 FROM llm_usage u WHERE u.subject_type='attempt' AND u.attempt_id=a.attempt_id)`).get(workflowId).n);
   const out = {
-    workflowId, total: finish(total), byOp: byOp.sort((a, b) => b.tokens - a.tokens), byModel: byModel.sort((a, b) => b.tokens - a.tokens),
+    workflowId, total: finish(total), byOp: byOp.toSorted((a, b) => b.tokens - a.tokens), byModel: byModel.toSorted((a, b) => b.tokens - a.tokens),
     kernel: { ...finish(kernelTotal), sessions: new Set(kernelRows.map((r) => r.session)).size,
       models: fold(kernelRows, (r) => `${r.provider}/${r.model}`).map((m) => ({ model: m.key, ...tally(m) })) },
     coverage: { attempts: Number(cov.attempts), measured: Number(cov.measured ?? 0), open: Number(cov.open ?? 0),

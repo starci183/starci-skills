@@ -75,7 +75,7 @@ export const ensureImages = async (deps: ImagesDependencies, request: EnsureImag
         }
         await deps.ledger.update((data) => {
             const entry = data[repository] ?? {}
-            if (entry[tag] === undefined) entry[tag] = deps.now()
+            entry[tag] ??= deps.now()
             data[repository] = entry
         })
         if (!reuse) await collectGarbage(deps, repository, request.registryHost, tag)

@@ -197,7 +197,7 @@ export const Field = ({
     children,
 }: FieldProps) => {
     const generated = useId()
-    const id = idProp ?? `field${generated.replace(/:/g, "")}`
+    const id = idProp ?? `field${generated.replaceAll(":", "")}`
     const invalid = isFieldInvalid({ isInvalid, errorMessage })
     const descriptionId = description == null ? undefined : `${id}-description`
     const errorId = invalid && errorMessage != null ? `${id}-error` : undefined

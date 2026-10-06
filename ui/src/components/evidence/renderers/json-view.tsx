@@ -36,7 +36,7 @@ function leafTone(v: Json): Tone | null {
   return null;
 }
 
-function Leaf({ v }: { v: Json }) {
+function Leaf({ v }: Readonly<{ v: Json }>) {
   const [more, setMore] = useState(false);
   if (v === null) return <span className="italic text-muted-foreground">null</span>;
   const tone = leafTone(v);
@@ -50,12 +50,12 @@ function Leaf({ v }: { v: Json }) {
     );
   }
   if (typeof v === 'boolean') return <span data-tone={tone ?? undefined} className="font-medium text-[var(--tone)]">{String(v)}</span>;
-  return <span data-tone="running" className="text-[var(--tone)]">{String(v)}</span>;
+  return <span data-tone="running" className="text-[var(--tone)]">{JSON.stringify(v)}</span>;
 }
 
 /** Hover-revealed on a mouse; on touch (coarse pointer) an always-visible icon pair at the end of the row, in flow so it never covers text. */
 const touchBtn = `${toolbarBtn} pointer-coarse:size-7 pointer-coarse:justify-center pointer-coarse:px-0`;
-function Actions({ value, path }: { value: Json; path: string }) {
+function Actions({ value, path }: Readonly<{ value: Json; path: string }>) {
   return (
     <span className="absolute right-1 top-0 flex shrink-0 gap-1 rounded-md bg-card opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100 pointer-coarse:static pointer-coarse:ml-auto pointer-coarse:bg-transparent pointer-coarse:opacity-100">
       <CopyButton className={touchBtn} labelClassName="pointer-coarse:sr-only" value={() => typeof value === 'string' ? value : JSON.stringify(value, null, 2)} label={t('Value')} title={t('Copy the value')} />
@@ -64,7 +64,7 @@ function Actions({ value, path }: { value: Json; path: string }) {
   );
 }
 
-function Node({ k, v, path, depth, mode }: { k: string | number | null; v: Json; path: string; depth: number; mode: Mode }) {
+function Node({ k, v, path, depth, mode }: Readonly<{ k: string | number | null; v: Json; path: string; depth: number; mode: Mode }>) {
   const container = isContainer(v);
   const [open, setOpen] = useState(() => mode.m === 'all' || (mode.m === 'default' && depth < 2));
   const [limit, setLimit] = useState(PAGE);
@@ -106,7 +106,7 @@ function Node({ k, v, path, depth, mode }: { k: string | number | null; v: Json;
 }
 
 /** JSON / JSONL as a collapsible coloured tree. Invalid JSON falls back to text with a warning. */
-export function JsonView({ text }: { text: string }) {
+export function JsonView({ text }: Readonly<{ text: string }>) {
   const [mode, setMode] = useState<Mode>({ m: 'default', n: 0 });
   const [raw, setRaw] = useState(false);
   const parsed = parseJson(text);
@@ -133,7 +133,7 @@ export function JsonView({ text }: { text: string }) {
         <div key={mode.n} className="max-h-[70vh] overflow-auto bg-background p-3 font-mono text-xs leading-5">
           {single
             ? <Node k={null} v={parsed.docs[0]} path="$" depth={0} mode={mode} />
-            : parsed.docs.map((d, i) => <Node key={i} k={t('line {n}', { n: i + 1 })} v={d} path={`$[${i}]`} depth={0} mode={mode} />)}
+            : parsed.docs.map((d, i) => <Node key={`${i}-${typeof d}`} k={t('line {n}', { n: i + 1 })} v={d} path={`$[${i}]`} depth={0} mode={mode} />)}
         </div>
       )}
     </Frame>

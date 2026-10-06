@@ -94,7 +94,7 @@ export default {
     }
     // The released and notified Kernels are woken now rather than at the next watchdog tick.
     const wakes = [];
-    for (const target of [...new Set([...released.map((item) => item.workflowId), ...notified.map((item) => item.to)])]) {
+    for (const target of new Set([...released.map((item) => item.workflowId), ...notified.map((item) => item.to)])) {
       const holds = released.filter((item) => item.workflowId === target);
       let wake;
       try {

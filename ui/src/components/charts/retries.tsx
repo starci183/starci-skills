@@ -15,7 +15,7 @@ function failureName(raw: string): string {
 }
 type Bar = { key: string; label: string; n: number; tone: Tone; title: string };
 
-function Bars({ bars, width, aria }: { bars: Bar[]; width: number; aria: string }) {
+function Bars({ bars, width, aria }: Readonly<{ bars: Bar[]; width: number; aria: string }>) {
   const max = Math.max(1, ...bars.map(b => b.n)), labelW = Math.min(150, width * 0.4), valueW = 36, plotW = Math.max(40, width - labelW - valueW - 10);
   const chars = Math.floor(labelW / 6.4);
   return <svg width={width} height={bars.length * ROW} role="img" aria-label={aria} className="block max-w-full">
@@ -27,7 +27,7 @@ function Bars({ bars, width, aria }: { bars: Bar[]; width: number; aria: string 
   </svg>;
 }
 
-export function Retries({ rows }: { rows: AttemptRow[] }) {
+export function Retries({ rows }: Readonly<{ rows: AttemptRow[] }>) {
   const [ref, width] = useWidth();
   const dist = [...triesPerUnit(rows).entries()].sort((a, b) => a[0] - b[0]);
   const tryBars: Bar[] = dist.map(([tries, n]) => ({ key: `t${tries}`, label: t('Highest observed try: {n}', { n: tries }), n, tone: tries === 1 ? 'success' : tries === 2 ? 'warning' : 'failed',

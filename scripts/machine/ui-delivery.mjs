@@ -17,7 +17,7 @@ export function uiDeliveryReadiness({ distDir = path.join(skillRoot, 'ui', 'dist
   try {
     if (!file('index.html')) return { ok: false, reason: 'index unavailable' };
     const html = fsImpl.readFileSync(path.join(root, 'index.html'), 'utf8');
-    const attribute = (tag, name) => new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`, 'i').exec(tag)?.[1] ?? null;
+    const attribute = (tag, name) => new RegExp(String.raw`\b${name}\s*=\s*["']([^"']*)["']`, 'i').exec(tag)?.[1] ?? null;
     const missing = [], assets = [], modules = [];
     for (const match of html.matchAll(/<(script|link)\b[^>]*>/gi)) {
       const tag = match[0], kind = match[1].toLowerCase();

@@ -7,14 +7,14 @@ export const concept: Concept = 'C17';
 
 const isObject = (value: unknown): value is Record<string, unknown> | unknown[] => typeof value === 'object' && value !== null;
 
-function Scalar({ value }: { value: unknown }) {
+function Scalar({ value }: Readonly<{ value: unknown }>) {
   if (value === null) return <span className="text-muted-foreground">null</span>;
   if (typeof value === 'string') return <span className="break-words whitespace-pre-wrap text-foreground">"{value}"</span>;
   if (typeof value === 'number') return <span className="text-[color:var(--status-running)]">{value}</span>;
-  return <span className="text-[color:var(--status-warning)]">{String(value)}</span>;
+  return <span className="text-[color:var(--status-warning)]">{JSON.stringify(value)}</span>;
 }
 
-function Node({ name, value, depth }: { name?: string; value: unknown; depth: number }) {
+function Node({ name, value, depth }: Readonly<{ name?: string; value: unknown; depth: number }>) {
   const [open, setOpen] = useState(depth < 1);
   const label = name != null ? <span className="text-muted-foreground">{name}: </span> : null;
   if (!isObject(value)) return <div className="py-1 pl-4">{label}<Scalar value={value} /></div>;
@@ -31,6 +31,6 @@ function Node({ name, value, depth }: { name?: string; value: unknown; depth: nu
 }
 
 /** Collapsible JSON tree (no HTML injection: every leaf is rendered as text). */
-export function JsonTree({ value }: { value: unknown }) {
+export function JsonTree({ value }: Readonly<{ value: unknown }>) {
   return <div className="max-h-80 overflow-auto rounded-md border bg-muted/30 p-2 font-mono text-[11.5px] leading-5" aria-label={t('JSON data')}><Node value={value} depth={0} /></div>;
 }

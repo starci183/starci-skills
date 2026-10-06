@@ -194,7 +194,7 @@ export class World {
         const restored = await Promise.allSettled([...this.writeFaults.values()].map(({ fault }) => fault.restore()))
         for (const result of restored) if (result.status === "rejected") failures.push(result.reason)
         if (runtime === null) {
-            if (failures.length > 0) throw worldError(TestWorldErrorCode.InfrastructureFailed, "write-fault cleanup failed; operation custody is retained", new AggregateError(failures))
+            if (failures.length > 0) throw worldError(TestWorldErrorCode.InfrastructureFailed, "write-fault cleanup failed; operation custody is retained", new AggregateError(failures, "write-fault cleanup failed"))
             this.lock?.close()
             this.lock = null
             return
@@ -228,7 +228,7 @@ export class World {
             }
         }
         const [first] = failures
-        if (first !== undefined) throw worldError(TestWorldErrorCode.InfrastructureFailed, "world cleanup failed", new AggregateError(failures))
+        if (first !== undefined) throw worldError(TestWorldErrorCode.InfrastructureFailed, "world cleanup failed", new AggregateError(failures, "world cleanup failed"))
     }
 
     /** The booted apps by name. */
@@ -353,7 +353,7 @@ export class World {
                     }
                 },
             }
-            return { ...base, ...(extra?.(base) ?? {}) }
+            return { ...base, ...extra?.(base) }
         }
         const redis = infra.redis
         const postgres = infra.postgresql
@@ -691,7 +691,7 @@ export class World {
             baseUrl,
             operations: decl.operations ?? {},
             graphqlPath: decl.graphqlPath ?? "/graphql",
-            track: (subscription) => void this.subscriptions.push(subscription),
+            track: (subscription) => { this.subscriptions.push(subscription) },
             signIn: async (email, password) => {
                 if (identity === undefined) throw notDeclared("identity")
                 return identity.signIn(this.identityWorld(), { email, password })
@@ -700,7 +700,7 @@ export class World {
         return { name, context: app, api, url: baseUrl }
     }
 
-    private async bootModules(spec: ModulesWorldSpec, wiring: ReturnType<typeof buildWiring>): Promise<INestApplicationContext> {
+    private bootModules(spec: ModulesWorldSpec, wiring: ReturnType<typeof buildWiring>): Promise<INestApplicationContext> {
         const base = this.declaration.modules
         if (base === undefined) throw notDeclared("modules (declare `modules.base` in test-world.config.ts)")
         const logger = [...(this.declaration.logger ?? DEFAULT_LOGGER)]

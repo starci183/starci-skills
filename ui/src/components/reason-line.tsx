@@ -6,7 +6,7 @@ import { t } from '../i18n/t';
 
 export const concept: Concept = 'frame';
 
-export function ReasonLine({ reason, prefix = t('Why'), className = '' }: { reason: Reason | null | undefined; prefix?: string; className?: string }) {
+export function ReasonLine({ reason, prefix = t('Why'), className = '' }: { readonly reason: Reason | null | undefined; readonly prefix?: string; readonly className?: string }) {
   return <div className={`reason-line ${className}`}>
     <Info aria-hidden="true" className="size-3.5 shrink-0" />
     <span><strong>{prefix}:</strong> {formatReason(reason)}</span>

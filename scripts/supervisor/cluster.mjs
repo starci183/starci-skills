@@ -54,7 +54,7 @@ export function clusterOwed(items) {
       patterns: its.filter((x) => x.pattern).map((x) => x.key),
       fixedBy: fixes.length === 1 && its.every((x) => x.fixedBy?.sha === fixes[0]) ? fixes[0] : null,
       oldestMin: Math.max(...its.map((x) => x.ageMin ?? 0)),
-      summary: its.map((x) => x.summary).filter(Boolean)[0] ?? '',
+      summary: its.map((x) => x.summary).find(Boolean) ?? '',
       items: its,
     };
   });

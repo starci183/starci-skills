@@ -232,7 +232,7 @@ export const Tooltip: Story = {
       </State>
     </Matrix>
   ),
-  play: async ({ canvasElement }) => {
+  play: ({ canvasElement }) => {
     const trigger = canvasElement.querySelector<HTMLElement>('[data-grammar-tooltip-trigger] button');
     trigger?.focus();
   },

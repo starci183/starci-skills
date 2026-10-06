@@ -34,9 +34,9 @@ const OWNER_CLAIM_PATTERNS = [
   /(?<!\bno )(?<!\bwithout )(?<!\bawaiting )(?<!\bpending )\bowner(?:'s)?\s+(?:ruling|approval|confirmation|sign-?off|consent|answer|go-ahead)\b(?!\s+(?:is\s+)?(?:pending|required|needed|missing|owed|outstanding))/,
   // Vietnamese (folded, as matched): owner da / chu du an xac nhan / thay duyet / duoc owner duyet / xac nhan cua chu so huu
   /\bowner da\b/,
-  new RegExp(`\\b${SUBJECT_VI}(?:\\/supervisor)?\\s+(?:da\\s+)?(?:xac nhan|duyet|phe duyet|dong y|chap nhan|tra loi|chon|quyet dinh|cho phep|phan quyet)\\b`),
-  new RegExp(`\\bduoc\\s+${SUBJECT_VI}\\s+(?:xac nhan|duyet|phe duyet|dong y|chap nhan|tra loi|cho phep)\\b`),
-  new RegExp(`\\b(?:xac nhan|phe duyet|phan quyet|quyet dinh) cua ${SUBJECT_VI}\\b`),
+  new RegExp(String.raw`\b${SUBJECT_VI}(?:\/supervisor)?\s+(?:da\s+)?(?:xac nhan|duyet|phe duyet|dong y|chap nhan|tra loi|chon|quyet dinh|cho phep|phan quyet)\b`),
+  new RegExp(String.raw`\bduoc\s+${SUBJECT_VI}\s+(?:xac nhan|duyet|phe duyet|dong y|chap nhan|tra loi|cho phep)\b`),
+  new RegExp(String.raw`\b(?:xac nhan|phe duyet|phan quyet|quyet dinh) cua ${SUBJECT_VI}\b`),
 ].map((re) => new RegExp(re.source, 'g'));
 
 // A phrase just after a wait, a condition or a negation is not a claim: "cho chu so huu duyet", "until the
@@ -49,7 +49,7 @@ export function ownerClaimOf(text) {
   for (const re of OWNER_CLAIM_PATTERNS) {
     re.lastIndex = 0;
     for (let m = re.exec(folded); m; m = re.exec(folded)) {
-      const before = folded.slice(Math.max(0, m.index - 24), m.index).replace(/[(\[]/g, ' ');
+      const before = folded.slice(Math.max(0, m.index - 24), m.index).replace(/[[(]/g, ' ');
       if (!NOT_A_CLAIM_BEFORE.test(before)) return m[0].trim();
       if (m[0].length === 0) re.lastIndex += 1;
     }

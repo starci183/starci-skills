@@ -41,7 +41,7 @@ export function explainCode(code, catalog = loadCatalog()) {
 
 const clip = (s, n = 220) => clipLine(s, n);
 /** A Windows or POSIX absolute path shortened to its last three segments (the owner reads names, not temp roots). */
-const shortPaths = (s) => String(s ?? '').replace(/(?:[A-Za-z]:)?[\\/](?:[^\s"'\\/:*?<>|]+[\\/])+([^\s"'\\/:*?<>|]+[\\/][^\s"'\\/:*?<>|]+[\\/][^\s"'\\/:*?<>|]+|[^\s"'\\/:*?<>|]+)/g, '…/$1').replace(/\\/g, '/');
+const shortPaths = (s) => String(s ?? '').replaceAll(/(?:[A-Za-z]:)?[\\/](?:[^\s"'\\/:*?<>|]+[\\/])+([^\s"'\\/:*?<>|]+[\\/][^\s"'\\/:*?<>|]+[\\/][^\s"'\\/:*?<>|]+|[^\s"'\\/:*?<>|]+)/g, '…/$1').replaceAll('\\', '/');
 const BRACKET = /\[([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\]/g;
 const uniq = (list) => [...new Set(list.filter((x) => typeof x === 'string' && x))];
 const many = (db, sql, ...args) => db.prepare(sql).all(...args);
@@ -223,9 +223,9 @@ export function buildWhy(ctx) {
   // Failed: the runtime's verdict is fail.
   if (attempt.verdict === 'fail' || attempt.verdict === 'partial') {
     const runtimeRed = checks.filter((c) => c.authority === 'runtime' && RED.has(c.status));
-    const declaredRed = checks.filter((c) => c.authority === 'declared' && RED.has(c.status));
+    const declaredRed = checks.find((c) => c.authority === 'declared' && RED.has(c.status));
     const claimOverruled = settle.claimOverruled === true || (outcome === 'done' && attempt.verdict === 'fail');
-    const red = runtimeRed[0] ?? declaredRed[0] ?? null;
+    const red = runtimeRed[0] ?? declaredRed ?? null;
     const codes = uniq([...(red?.codes ?? []), ...runtimeRed.slice(1).flatMap((c) => c.codes)]);
     const primary = codes.find((c) => catalog[c]) ?? codes[0] ?? null;
     const next = nextOf({ step, unit, tryNo: attempt.try_no, primary, catalog });

@@ -19,27 +19,28 @@ function uptime(sec: number): string {
   return d ? t('{d} days {h} h', { d, h }) : h ? t('{h} h {m} min', { h, m }) : t('{m} min', { m });
 }
 
-function Bar({ pct, tone, label }: { pct: number | null; tone: Tone; label: string }) {
+function Bar({ pct, tone, label }: Readonly<{ pct: number | null; tone: Tone; label: string }>) {
   const value = pct == null || !Number.isFinite(pct) ? null : Math.max(0, Math.min(100, pct));
-  return <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100}
-    aria-valuenow={value == null ? undefined : Math.round(value)} aria-valuetext={value == null ? t('No reading yet') : undefined}>
+  return <div className="h-2 overflow-hidden rounded-full bg-muted">
+    <progress className="sr-only" aria-label={label} value={value == null ? undefined : Math.round(value)} max={100}
+      aria-valuetext={value == null ? t('No reading yet') : undefined} />
     {value != null && <Grow className="block h-full rounded-full" style={{ width: `${value}%`, background: toneVar(tone) }} />}
   </div>;
 }
 
-function Row({ label, value, pct, tone }: { label: string; value: string; pct: number | null; tone: Tone }) {
+function Row({ label, value, pct, tone }: Readonly<{ label: string; value: string; pct: number | null; tone: Tone }>) {
   return <div className="flex flex-col gap-1">
     <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm"><span className="min-w-0 text-muted-foreground">{label}</span><span className="font-medium tabular-nums">{value}</span></div>
     <Bar pct={pct} tone={tone} label={label} />
   </div>;
 }
 
-function Temp({ value }: { value: number | null }) {
+function Temp({ value }: Readonly<{ value: number | null }>) {
   if (value == null) return <span className="text-muted-foreground">{t('unreadable')}</span>;
   return <span className="font-medium tabular-nums">{nf(value)} °C</span>;
 }
 
-function Spark({ history }: { history: HostView['history'] }) {
+function Spark({ history }: Readonly<{ history: HostView['history'] }>) {
   if (history.length < 2) return <p className="text-sm text-muted-foreground">{t('Not enough samples to draw a trend yet.')}</p>;
   const x = (i: number) => (i * 300 / (history.length - 1)).toFixed(1);
   const line = (pick: (row: HostView['history'][number]) => number | null) => {
@@ -68,7 +69,7 @@ function Spark({ history }: { history: HostView['history'] }) {
 }
 
 /** Host machine card (CPU, RAM, GPU, temperatures, disks, agents' RAM, sparkline) from /api/host. */
-export function HostCard({ compact = false, bare = false }: { compact?: boolean; bare?: boolean }) {
+export function HostCard({ compact = false, bare = false }: Readonly<{ compact?: boolean; bare?: boolean }>) {
   const query = useApiQuery<HostView>('/api/host', { topics: ['system'], intervalMs: 10_000 });
   const host = query.data;
   if (!host) return <section className="rounded-lg border bg-card p-4 sm:p-6" data-concept="C14">
@@ -92,7 +93,7 @@ export function HostCard({ compact = false, bare = false }: { compact?: boolean;
       <QueryReadNotice query={query} url="/api/host" />
       <div>
         <p className="mb-2 truncate text-sm font-medium" title={host.cpu.model}>{host.cpu.model}</p>
-        <Row label={t('CPU · {cores} physical cores / {threads} logical processors', { cores: host.cpu.cores == null ? '—' : host.cpu.cores, threads: host.cpu.threads == null ? '—' : host.cpu.threads })} value={load == null ? t('no reading yet') : `${nf(load)} %`} pct={load} tone={readingTone(load)} />
+        <Row label={t('CPU · {cores} physical cores / {threads} logical processors', { cores: host.cpu.cores ?? '—', threads: host.cpu.threads ?? '—' })} value={load == null ? t('no reading yet') : `${nf(load)} %`} pct={load} tone={readingTone(load)} />
         <p className="mt-1 text-xs">{t('CPU temperature:')} {cpuTemp}</p>
       </div>
       <Row label="RAM" value={`${gb(usedMb)} / ${gb(host.ram.totalMb)} (${nf(host.ram.usedPct)} %)`} pct={host.ram.usedPct} tone={readingTone(host.ram.usedPct)} />

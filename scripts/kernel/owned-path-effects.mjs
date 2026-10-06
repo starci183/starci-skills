@@ -57,8 +57,8 @@ export const specBatches = (specs) => {
   const out = [[]];
   let size = 0;
   for (const spec of specs) {
-    if (size + spec.length > SPEC_BATCH_CHARS && out[out.length - 1].length) { out.push([]); size = 0; }
-    out[out.length - 1].push(spec);
+    if (size + spec.length > SPEC_BATCH_CHARS && out.at(-1).length) { out.push([]); size = 0; }
+    out.at(-1).push(spec);
     size += spec.length + 12;
   }
   return out.filter((batch) => batch.length);
@@ -68,7 +68,7 @@ export const specBatches = (specs) => {
 // (':' is U+F03A), while an owned path records the ASCII name: a job owning '.../-change:' never matched
 // the '.../-change' its own commit deleted, so the file read as foreign (inc-54046f4a4f99). Git reads
 // both spellings of a spec, and names are compared in the ASCII form.
-const winMapped = (p) => String(p).replace(/[\u0001-\u001f"*:<>?|]/g, (c) => String.fromCharCode(0xf000 + c.charCodeAt(0)));
+const winMapped = (p) => String(p).replace(/[\u0001-\u001f"*:<>?|]/g, (c) => String.fromCodePoint(0xf000 + c.codePointAt(0)));
 const bothSpellings = (specs) => [...new Set(specs.flatMap((s) => [s, winMapped(s)]))];
 
 const dirtyOf = (root, specs, timeoutMs, label) => {

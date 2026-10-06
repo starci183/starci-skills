@@ -222,7 +222,7 @@ export function ruleResolver({ workRoot = null, record = null, dna = loadDna(), 
   return (ref) => {
     const text = str(ref);
     const m = REF_RX.exec(text);
-    if (!m || !m[2]) return { ok: false, id: text, why: 'empty rule reference' };
+    if (!m?.[2]) return { ok: false, id: text, why: 'empty rule reference' };
     const ns = m[1] ? m[1].toLowerCase() : null;
     const token = m[2].replace(/[.:]+$/, '');
     const kase = m[3] ?? null;
@@ -274,7 +274,7 @@ export function becauseCites(because, refs = []) {
   const s = str(because);
   if (!s.trim()) return false;
   if (refs.some((r) => r && s.includes(r))) return true;
-  return /\b(?:N?FR|BR|UJ|JTBD|US)[-.]?[A-Za-z0-9]*\d|\bfr\.[a-z0-9][\w.-]*|\b\d{2}-CONTENT\b|\bcontent\b|\buser(?:'s)? job\b|\bjob[- ]to[- ]be[- ]done\b|\bjob:/i.test(s);
+  return /\b(?:N?FR|BR|UJ|JTBD|US)[-.]?[A-Z0-9]*\d|\bfr\.[a-z0-9][\w.-]*|\b\d{2}-CONTENT\b|\bcontent\b|\buser(?:'s)? job\b|\bjob[- ]to[- ]be[- ]done\b|\bjob:/i.test(s);
 }
 
 const refsOf = (record) => list(record?.refs).map((r) => (typeof r === 'string' ? r : r?.id ?? r?.ref ?? null)).filter(Boolean).map(String);
@@ -350,7 +350,7 @@ export function rationaleFindings({ html, entries = [], errors = [], measures = 
   }
 
   // 3. DNA components and closed variants the render uses.
-  const mentions = (needle) => entries.some((e) => new RegExp(`(^|[^A-Za-z0-9])${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^A-Za-z0-9]|$)`).test(`${str(e.decision)} ${str(e.value)} ${list(e.rules).map(str).join(' ')}`));
+  const mentions = (needle) => entries.some((e) => new RegExp(`(^|[^A-Za-z0-9])${needle.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}([^A-Za-z0-9]|$)`).test(`${str(e.decision)} ${str(e.value)} ${list(e.rules).map(str).join(' ')}`));
   const used = new Map();
   for (const el of visible) {
     const name = componentRootOf(el);
@@ -435,7 +435,7 @@ export function rationaleFindings({ html, entries = [], errors = [], measures = 
   return out;
 }
 
-const hexRgb = (hex) => { const h = String(hex).replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
+const hexRgb = (hex) => { const h = String(hex).replace('#', ''); return [0, 2, 4].map((i) => Number.parseInt(h.slice(i, i + 2), 16)); };
 const colourClose = (a, b) => { const x = hexRgb(a), y = hexRgb(b); return x.every((v, i) => Math.abs(v - y[i]) <= 2); };
 
 /** The measures of a render source's parts: the rationale block of each starci/draw-render@1 record given. */
@@ -460,7 +460,7 @@ export function rationaleSummary(file) {
  */
 export function measureRationale(arg) {
   const { tokens = [], whyAttr, redlineAttr, schema } = arg;
-  const px = (s) => { const n = parseFloat(s); return Number.isFinite(n) ? Math.round(n * 100) / 100 : null; };
+  const px = (s) => { const n = Number.parseFloat(s); return Number.isFinite(n) ? Math.round(n * 100) / 100 : null; };
   // Any CSS colour (rgb, oklch, color-mix ...) to sRGB hex through a 1px canvas; transparent is null.
   const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
   const hexCache = new Map();
@@ -522,7 +522,7 @@ export function measureRationale(arg) {
     for (const corner of ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius']) {
       const raw = String(cs[corner]).split(' ')[0];
       if (!raw || raw === '0px') continue;
-      if (raw.endsWith('%')) put('radius', parseFloat(raw) >= 50 ? 'circle' : raw, el);
+      if (raw.endsWith('%')) put('radius', Number.parseFloat(raw) >= 50 ? 'circle' : raw, el);
       else { const v = px(raw); const r = el.getBoundingClientRect(); put('radius', v != null && (v >= 999 || v >= Math.min(r.width, r.height) / 2 - 0.5) && v > 8 ? 'pill' : v, el); }
     }
     const text = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
@@ -533,7 +533,7 @@ export function measureRationale(arg) {
       colour(hexOf(cs.color), 'text', el);
     }
     colour(hexOf(cs.backgroundColor), 'background', el);
-    for (const side of ['Top', 'Right', 'Bottom', 'Left']) if (parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none') colour(hexOf(cs[`border${side}Color`]), 'border', el);
+    for (const side of ['Top', 'Right', 'Bottom', 'Left']) if (Number.parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none') colour(hexOf(cs[`border${side}Color`]), 'border', el);
     if (cs.display === 'grid') {
       const kids = [...el.children].filter((k) => visible(k) && !excluded(k));
       if (kids.length >= 2) grids.push({ selector: sel(el), why: whyOf(el), columns: cs.gridTemplateColumns.split(/\s+(?![^(]*\))/).filter(Boolean).length });
@@ -600,7 +600,7 @@ export function drawRedlines(arg) {
   const box = (n) => { const b = n.getBoundingClientRect(); return { x: b.left + scrollX, y: b.top + scrollY, w: b.width, h: b.height }; };
   const visible = (n) => { const b = n.getBoundingClientRect(); const cs = getComputedStyle(n); return b.width > 1 && b.height > 1 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
   const whys = (n) => (n.getAttribute(whyAttr) ?? '').split(/\s+/).filter(Boolean);
-  const labelOf = (n) => whys(n).map((id) => labels[id]).find((l) => l) ?? null;
+  const labelOf = (n) => whys(n).map((id) => labels[id]).find(Boolean) ?? null;
   const round = (v) => Math.round(v * 10) / 10;
   const vtick = (x, y1, y2) => { line(x, y1, x, y2, RED); line(x - 3, y1, x + 3, y1, RED); line(x - 3, y2, x + 3, y2, RED); };
   const htick = (x1, x2, y) => { line(x1, y, x2, y, RED); line(x1, y - 3, x1, y + 3, RED); line(x2, y - 3, x2, y + 3, RED); };
@@ -614,7 +614,7 @@ export function drawRedlines(arg) {
     const shown = new Set();
     // A decided gap is the container's gap (or a small margin); the free space of space-between is no decision.
     const ncs = getComputedStyle(n);
-    const decided = (g) => g <= 48 || [parseFloat(ncs.rowGap), parseFloat(ncs.columnGap)].some((d) => Number.isFinite(d) && Math.abs(d - g) < 1);
+    const decided = (g) => g <= 48 || [Number.parseFloat(ncs.rowGap), Number.parseFloat(ncs.columnGap)].some((d) => Number.isFinite(d) && Math.abs(d - g) < 1);
     for (let i = 0; i < kids.length - 1; i += 1) {
       const a = box(kids[i]), b = box(kids[i + 1]);
       const vgap = round(b.y - (a.y + a.h)), hgap = round(b.x - (a.x + a.w));
@@ -629,22 +629,22 @@ export function drawRedlines(arg) {
       }
     }
     const cs = getComputedStyle(n), b = box(n);
-    const pt = round(parseFloat(cs.paddingTop) || 0), pl = round(parseFloat(cs.paddingLeft) || 0);
+    const pt = round(Number.parseFloat(cs.paddingTop) || 0), pl = round(Number.parseFloat(cs.paddingLeft) || 0);
     if (pl > 0.5 && b.h > 24) htick(b.x, b.x + pl, b.y + Math.min(b.h - 4, 12));
     if (pt > 0.5 && b.w > 24) vtick(b.x + Math.min(b.w - 4, 12), b.y, b.y + pt);
     if (pt > 0.5 || pl > 0.5) label(b.x + pl + 2, b.y + pt + 11, tag(pt === pl || !pt || !pl ? `p ${pt || pl}` : `p ${pt}/${pl}`), RED);
   }
   // DNA labels at component roots, regions outlined.
-  for (const n of [...document.querySelectorAll('[data-grammar-component]')]) {
+  for (const n of document.querySelectorAll('[data-grammar-component]')) {
     if (n.closest(`[${redlineAttr}],#redlines`) || !visible(n)) continue;
-    const name = n.getAttribute('data-grammar-component');
-    const upName = n.parentElement?.closest('[data-grammar-component]')?.getAttribute('data-grammar-component');
-    if (leaf.includes(name) || (upName === name && n.hasAttribute('data-grammar-part'))) continue;
+    const name = n.dataset.grammarComponent;
+    const upName = n.parentElement?.closest('[data-grammar-component]')?.dataset.grammarComponent;
+    if (leaf.includes(name) || (upName === name && n.dataset.grammarPart !== undefined)) continue;
     const b = box(n);
     if (b.w < 48 || b.h < 24) continue;
     const l = labelOf(n);
     if (l?.kind === 'layout') el('rect', { x: b.x, y: b.y, width: b.w, height: b.h, fill: 'none', stroke: BLUE, 'stroke-width': 1, 'stroke-dasharray': '3 2' });
-    const variant = n.getAttribute('data-variant') ?? n.getAttribute('data-tone');
+    const variant = n.dataset.variant ?? n.dataset.tone;
     label(b.x + 2, b.y + 12, `${name}${variant ? ` ${variant}` : ''}`, BLUE);
   }
   return { labels: placed.length };

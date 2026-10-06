@@ -33,7 +33,7 @@ export function decodePng(bytes) {
     else if (type === 'IEND') break;
     at = start + length + 4;
   }
-  if (!header || !header.width || !header.height) throw new Error('unsupported png: no usable IHDR');
+  if (!header?.width || !header?.height) throw new Error('unsupported png: no usable IHDR');
   const { width, height, depth, colour } = header;
   if (!(colour in CHANNELS)) throw new Error(`unsupported png: colour type ${colour}`);
   if (![1, 2, 4, 8, 16].includes(depth) || ((colour === 2 || colour === 4 || colour === 6) && depth < 8) || (colour === 3 && depth > 8)) throw new Error(`unsupported png: bit depth ${depth} for colour type ${colour}`);

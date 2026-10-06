@@ -50,8 +50,8 @@ export function unquoteGitPath(value) {
     const ch = body[i];
     if (ch !== '\\') { bytes.push(...Buffer.from(ch, 'utf8')); continue; }
     const next = body[i + 1];
-    if (/[0-7]/.test(next)) { bytes.push(parseInt(body.slice(i + 1, i + 4), 8)); i += 3; }
-    else { bytes.push(ESC[next] ?? next.charCodeAt(0)); i += 1; }
+    if (/[0-7]/.test(next)) { bytes.push(Number.parseInt(body.slice(i + 1, i + 4), 8)); i += 3; }
+    else { bytes.push(ESC[next] ?? next.codePointAt(0)); i += 1; }
   }
   return Buffer.from(bytes).toString('utf8');
 }
@@ -75,7 +75,7 @@ const B85_INDEX = new Map([...B85].map((c, i) => [c, i]));
 /** One `GIT binary patch` data line decoded: its first char gives the byte count, the rest is base85. */
 export function decodeBase85Line(line) {
   const c = line[0];
-  const len = c >= 'A' && c <= 'Z' ? c.charCodeAt(0) - 64 : c >= 'a' && c <= 'z' ? c.charCodeAt(0) - 96 + 26 : -1;
+  const len = c >= 'A' && c <= 'Z' ? c.codePointAt(0) - 64 : c >= 'a' && c <= 'z' ? c.codePointAt(0) - 96 + 26 : -1;
   if (len < 0) throw new Error('bad base85 length');
   const out = [];
   for (let i = 1; i + 5 <= line.length; i += 5) {

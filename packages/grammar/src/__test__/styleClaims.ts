@@ -56,7 +56,7 @@ const subjects = (selector: string): ReadonlyArray<string> =>
  * in one particular state, and a state-keyed rule is still that class's own rule.
  */
 export const declarationsFor = (css: string, className: string): ReadonlyArray<Declaration> => {
-    const owns = new RegExp(`\\.${className}(?![\\w-])`)
+    const owns = new RegExp(String.raw`\.${className}(?![\w-])`)
     return cssRules(css)
         .filter((rule) => subjects(rule.selector).some((subject) => owns.test(subject)))
         .flatMap((rule) => rule.body.split(";"))
@@ -136,7 +136,7 @@ export const grammarClassNames = (element: Element): ReadonlyArray<string> =>
 /** Report the paint ids one claimed element emits that the sheet does not keep. */
 export const unbackedClaims = (css: string, element: Element): ReadonlyArray<string> => {
     const declarations = grammarClassNames(element).flatMap((className) => declarationsFor(css, className))
-    return (element.getAttribute("data-contract") ?? "")
+    return ((element as HTMLElement).dataset.contract ?? "")
         .split(" ")
         .filter(Boolean)
         .filter(isPaintClaim)

@@ -128,7 +128,7 @@ export function mechanismObservations(db, context) {
           || !context.roots.some((root) => sameResolvedPath(root, native.subject)))
         throw new Error('the native check has no complete process, target, time or input receipt');
       // Serialized native receipts add process fields after hashing the original binding.
-      const { stable: _s, process: _p, detail: _d, ...binding } = native;
+      const binding = { ...native }; delete binding.stable; delete binding.process; delete binding.detail;
       if (row.input_digest !== digestOf(binding)) throw new Error('the native input receipt is not exact');
       requireObservationFresh([binding]);
       if (!row.output_sha || !db.prepare('SELECT 1 FROM blobs WHERE sha256=?').get(row.output_sha)) throw new Error('the native output blob is not indexed');

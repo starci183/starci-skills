@@ -102,7 +102,7 @@ export class FakeTimers {
     private readonly pending = new Set<NodeJS.Timeout>()
 
     /** Runs `task` after `delayMs`; a failing task is swallowed (there is nobody to tell). */
-    schedule(delayMs: number, task: () => Promise<unknown> | unknown): void {
+    schedule(delayMs: number, task: () => unknown): void {
         const timer = setTimeout(() => {
             this.pending.delete(timer)
             void Promise.resolve()

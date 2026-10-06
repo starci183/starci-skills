@@ -108,7 +108,7 @@ export function satisfiesRange(version, range) {
  * upgradeOwed, attempts:[{source, version, root, ok, errors}], error?}.
  */
 export function resolveDrawGrammar({ file = null, productDir, skillRoot = SKILL_ROOT, grammarDist = null, prefer = 'auto', typecheck = typecheckDraw, claudeRoots = null }) {
-  if (!PREFERENCES.includes(prefer)) throw Error(`--grammar must be one of ${PREFERENCES.join('|')}`);
+  if (!PREFERENCES.includes(prefer)) throw new Error(`--grammar must be one of ${PREFERENCES.join('|')}`);
   const all = grammarCandidates({ productDir, skillRoot, grammarDist, claudeRoots });
   const product = all.find((c) => c.source === 'product') ?? null;
   const productRange = productRangeOf(productDir);
@@ -151,5 +151,5 @@ async function main(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-grammar: ${e?.stack ?? e}\n`); process.exitCode = 2; });
+  try { process.exitCode = await main(process.argv.slice(2)); } catch (e) { process.stderr.write(`draw-grammar: ${e?.stack ?? e}\n`); process.exitCode = 2; }
 }

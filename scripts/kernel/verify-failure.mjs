@@ -19,11 +19,11 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { FAILURE_CLASSES } from './report-envelope.mjs';
 /** The verify ops whose red is, by default, a defect in what they walked or measured - never in the walk. */
-const VERIFY_OPS = ['uat.verify', 'uat.assisted.verify', 'e2e.verify', 'integration.verify', 'interface.audit', 'review.verify', 'security.verify', 'perf.verify', 'unit.verify'];
+const VERIFY_OPS = new Set(['uat.verify', 'uat.assisted.verify', 'e2e.verify', 'integration.verify', 'interface.audit', 'review.verify', 'security.verify', 'perf.verify', 'unit.verify']);
 /** The ops that walk a served stack: `starci kernel dispatch` runs the environment pre-step (scripts/uat/env-health.mjs) for them. */
 export const ENV_GATED_OPS = ['uat.verify', 'uat.assisted.verify', 'e2e.verify'];
 /** review.verify modes whose run is a measurement: scripts execute and write reports only (CONTEXT.md). */
-const MEASUREMENT_MODES = ['lint'];
+const MEASUREMENT_MODES = new Set(['lint']);
 const ENV_HEALTH_CHECK = 'env-health';
 
 // Exit-code semantics of the checkers a measurement runs. `error` codes mean the tool did not measure;
@@ -68,7 +68,7 @@ const opOf = (job) => job?.op_id ?? payloadOf(job).opId ?? null;
 export function isMeasurementLeg(db, job, { buildOps = [] } = {}) {
   if (opOf(job) !== 'review.verify') return false;
   const params = payloadOf(job).params ?? {};
-  if (!MEASUREMENT_MODES.includes(params.mode)) return false;
+  if (!MEASUREMENT_MODES.has(params.mode)) return false;
   if (params.lintRole === 'gate') return false;
   if (params.lintRole === 'measurement') return true;
   if (!db || !buildOps.length) return true;
@@ -114,7 +114,7 @@ export function classifyFailure({ op, report, checks = null, measurement = false
   if (report?.blocker?.kind === 'environment' || envCheckRed(all)) {
     return { class: 'environment', reason: report?.blocker?.kind === 'environment' ? 'blocker environment' : `${ENV_HEALTH_CHECK} check red: the stack under test was not ready`, ...(stated ? { stated } : {}) };
   }
-  const verify = VERIFY_OPS.includes(op);
+  const verify = VERIFY_OPS.has(op);
   if (measurement) {
     const split = measurementSplit(all);
     if (split.errors.length) return { class: 'tool', reason: `checker(s) did not measure: ${[...new Set(split.errors.map((c) => c.name))].join(', ')}` };
@@ -155,7 +155,7 @@ const FAMILY_DIR = { impl: 'impl', ui: 'ui', sds: 'sds', contract: 'contract', f
 const ROLE_BUILD = { be: 'backend.implement', backend: 'backend.implement', fe: 'interface.implement', frontend: 'interface.implement' };
 
 const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
-const posix = (p) => String(p).replace(/\\/g, '/');
+const posix = (p) => String(p).replaceAll('\\', '/');
 
 /** The workspace repositories {name → role} of a ledger repo (.starciwork/workspace.yaml). */
 function workspaceRoles(repo) {
@@ -186,7 +186,7 @@ export function findRecord(repo, id) {
       else if (e.isFile() && e.name === 'index.yaml') {
         seen += 1;
         const file = path.join(dir, e.name);
-        try { if (new RegExp(`^id:\\s*['"]?${want.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]?\\s*$`, 'm').test(fs.readFileSync(file, 'utf8'))) return file; } catch { /* unreadable */ }
+        try { if (new RegExp(String.raw`^id:\s*['"]?${want.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}['"]?\s*$`, 'm').test(fs.readFileSync(file, 'utf8'))) return file; } catch { /* unreadable */ }
       }
     }
   }
@@ -233,7 +233,7 @@ export function resolveRootOwner({ repo, rootCause, kinds, failing = [], reporte
     // No record and no declared files: the reporter's own owned source paths of the owner's side.
     const beSide = /backend|^be$/.test(role ?? '') || kind === 'backend.implement';
     const own = (reporterPayload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean)
-      .filter((p) => !/^\.starciwork\//.test(p))
+      .filter((p) => !p.startsWith('.starciwork/'))
       .filter((p) => (beSide ? p.startsWith('be/') : kind === 'interface.implement' ? p.startsWith('fe/') : true));
     ownedPaths.push(...own, ...failing.filter((f) => /[\\/]/.test(f)));
   }

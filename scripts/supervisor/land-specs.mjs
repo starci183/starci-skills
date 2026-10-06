@@ -40,8 +40,8 @@ function topLevelBlocks(source) {
   return heads.map((h, i) => { const end = i + 1 < heads.length ? heads[i + 1].start - 1 : lines.length; return { ...h, end, text: lines.slice(h.start - 1, end).join('\n') }; });
 }
 
-const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const uses = (text, name) => new RegExp(`(^|[^\\w$.])${escapeRe(name)}(?![\\w$])`).test(text);
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+const uses = (text, name) => new RegExp(String.raw`(^|[^\w$.])${escapeRe(name)}(?![\w$])`).test(text);
 
 /**
  * The exports a change can reach: the declarations holding a changed line of the head file, then every declaration that
@@ -79,7 +79,7 @@ export function changedExports({ source, ranges }) {
  * kept, symbols}]}.
  */
 export function specsDirect(changed, { specs, symbolsOf = () => null, hub = HUB_IMPORTERS }) {
-  const norm = changed.map((f) => String(f).replace(/\\/g, '/'));
+  const norm = changed.map((f) => String(f).replaceAll(/\\/g, '/'));
   const own = norm.filter((f) => /^tests\/[^/]+\.spec\.mjs$/.test(f));
   const source = norm.filter((f) => !f.startsWith('tests/'));
   const code = new Map(specs.map((s) => [s.file, codeOf(s.text)]));

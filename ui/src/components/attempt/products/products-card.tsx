@@ -35,7 +35,7 @@ function keyFiles(attempt: AttemptDetailV3): EvidenceFileV3[] {
   return out;
 }
 
-function KeyEvidence({ file, authorOp, defaultOpen }: { file: EvidenceFileV3; authorOp: string; defaultOpen: boolean }) {
+function KeyEvidence({ file, authorOp, defaultOpen }: Readonly<{ file: EvidenceFileV3; authorOp: string; defaultOpen: boolean }>) {
   const [open, setOpen] = useState(defaultOpen);
   const id = `key-${file.artifactId}`;
   return <li className="min-w-0 py-2 first:pt-0 last:pb-0">
@@ -54,7 +54,7 @@ function KeyEvidence({ file, authorOp, defaultOpen }: { file: EvidenceFileV3; au
 }
 
 /** Recorded commit content and submitted evidence, with the commit's authority explicit. */
-export function ProductsCard({ project, attempt }: { project: string; attempt: AttemptDetailV3 }) {
+export function ProductsCard({ project, attempt }: Readonly<{ project: string; attempt: AttemptDetailV3 }>) {
   const { products, loading, fallback, error, url, read } = useProducts(project, attempt);
   const key = keyFiles(attempt);
   const files = products?.files ?? [];

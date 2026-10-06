@@ -38,10 +38,9 @@ import { ownerRubricChecks } from './draw-feedback.mjs';
 import { startAgent } from '../agent/lib.mjs';
 import { loadAdapter, adapterModelAuthority } from '../agent/model-registry.mjs';
 import { releaseAgentAdmission } from '../agent/admission.mjs';
-import { workerClosureProven } from '../machine/worker-close.mjs';
+import { closeWorker, workerClosureProven } from '../machine/worker-close.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
-import { closeWorker } from '../machine/worker-close.mjs';
 import { check as orcaCheck } from '../api/orca/check.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 import { readEnv } from '../lib/env.mjs';
@@ -308,7 +307,7 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
   parentDispatch = placement?.context?.dispatchId ?? (orca ? null : opContextOf()?.dispatchId ?? null),
   pollMs = DEFAULT_POLL_MS, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now }) {
   const rubricInfo = { source: rubric?.source ?? null, checks: (rubric?.checks ?? []).length };
-  if (!critic || typeof critic !== 'object' || !critic.provider || !critic.model || !(Number(critic.timeoutMs) > 0)) {
+  if (!critic || typeof critic !== 'object' || !critic.provider || !critic.model || (Number(critic.timeoutMs) || 0) <= 0) {
     return { schema: CRITIQUE_SCHEMA, outcome: 'not-configured', critic: { independent: false }, rubric: rubricInfo, verdict: null,
       error: 'no critic is configured (modules/models/runtimes.yaml allocation.drawLoop.critic needs provider, model and timeoutMs)' };
   }

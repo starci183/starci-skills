@@ -10,11 +10,11 @@ export const unitStates = ['planned', 'queued', 'running', 'reported', 'deciding
 export type UnitState = (typeof unitStates)[number];
 
 /** A distribution of units by current state, never a sequential workflow timeline. */
-export function LifecycleBar({ counts, onSelect, selected }: {
+export function LifecycleBar({ counts, onSelect, selected }: Readonly<{
   counts: Partial<Record<UnitState, number>>;
   selected?: UnitState | null;
   onSelect?: (state: UnitState) => void;
-}) {
+}>) {
   const total = unitStates.reduce((sum, state) => sum + Math.max(0, counts[state] ?? 0), 0);
   if (total === 0) return <div className="empty-state">{t('No units in the graph yet.')}</div>;
   return <div className="lifecycle" data-concept="C4">

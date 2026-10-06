@@ -125,7 +125,7 @@ const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input'
 const RAW = new Set(['script', 'style', 'template', 'textarea', 'title', 'noscript', 'xmp']);
 const TAG_RX = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>|<\?[^>]*>|<\/([a-zA-Z][\w:-]*)\s*>|<([a-zA-Z][\w:-]*)((?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*(\/?)>/g;
 const ATTR_RX = /([^\s"'>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
-const decode = (s) => String(s).replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'");
+const decode = (s) => String(s).replaceAll(/&nbsp;/g, ' ').replaceAll(/&amp;/g, '&').replaceAll(/&lt;/g, '<').replaceAll(/&gt;/g, '>').replaceAll(/&quot;/g, '"').replaceAll(/&#39;|&apos;/g, "'");
 
 function parseAttrs(text) {
   const out = {};
@@ -150,7 +150,7 @@ export function parseHtml(html) {
       const tag = m[1].toLowerCase();
       let at = cur;
       while (at && at.tag !== tag) at = at.parent;
-      if (at && at.parent) cur = at.parent;
+      if (at?.parent) cur = at.parent;
       continue;
     }
     if (!m[2]) continue;
@@ -273,7 +273,7 @@ export const componentRootOf = (el) => {
   const up = ancestorsOf(el).find((a) => a.attrs?.[COMPONENT_ATTR]);
   return up && componentNameOf(up) === name && el.attrs[PART_ATTR] ? '' : name;
 };
-const proposalOf = (el) => [el, ...ancestorsOf(el)].map((a) => a.attrs?.[PROPOSAL_ATTR]).find((p) => p && p.trim()) ?? null;
+const proposalOf = (el) => [el, ...ancestorsOf(el)].map((a) => a.attrs?.[PROPOSAL_ATTR]).find((p) => p?.trim()) ?? null;
 const inComponent = (el, names) => [el, ...ancestorsOf(el)].some((a) => names.includes(componentNameOf(a)));
 
 /** The tone an element declares: data-tone / data-grammar-tone / tone / data-state / data-status, else a tone class. */
@@ -334,7 +334,7 @@ function styleRulesOf(tree) {
 
 /** Whether a selector's last compound (no pseudo-class) matches `el` by tag, id, classes and attributes. */
 function selectorMatches(selector, el) {
-  const last = selector.split(/\s*[>+~]\s*|\s+/).filter(Boolean).at(-1) ?? '';
+  const last = selector.split(/\s*[>+~]\s*|\s+/).findLast(Boolean) ?? '';
   if (!last || /:/.test(last.replace(/\[[^\]]*\]/g, ''))) return false;
   const tag = /^[a-zA-Z][\w-]*/.exec(last)?.[0];
   if (tag && tag.toLowerCase() !== el.tag) return false;
@@ -355,7 +355,7 @@ function declaredBackgroundsOf(el, rules = []) {
   const out = [];
   const inline = declsOf(el.attrs.style);
   for (const k of ['background', 'background-color']) if (inline[k]) out.push({ value: inline[k], via: `style ${k}` });
-  for (const c of classesOf(el)) if (/^bg-/.test(c)) out.push({ value: c.slice(3), via: `class ${c}` });
+  for (const c of classesOf(el)) if (c.startsWith('bg-')) out.push({ value: c.slice(3), via: `class ${c}` });
   for (const r of rules) {
     if (!selectorMatches(r.selector, el)) continue;
     for (const k of ['background', 'background-color']) if (r.decls[k]) out.push({ value: r.decls[k], via: `${r.selector} {${k}}` });

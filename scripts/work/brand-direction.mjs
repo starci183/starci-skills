@@ -172,7 +172,7 @@ export function promoteGolden(work, { uiDir, archetype, parts, receiptFile, html
   }
   const receiptRel = slash(path.relative(repoRoot, receiptAbs));
   const accepted = direction.status === 'accepted' && direction.acceptance?.rev === direction.rev;
-  const acceptance = { acceptedBy: receipt.dispatchId, receipt: receiptRel, acceptedAt: typeof receipt.at === 'string' && /Z$/.test(receipt.at) ? receipt.at : new Date().toISOString(), rev: direction.rev };
+  const acceptance = { acceptedBy: receipt.dispatchId, receipt: receiptRel, acceptedAt: typeof receipt.at === 'string' && receipt.at.endsWith('Z') ? receipt.at : new Date().toISOString(), rev: direction.rev };
   const nextDirection = {
     ...direction,
     golden: [...(Array.isArray(direction.golden) ? direction.golden : []).filter((g) => g?.archetype !== archetype), ...golden],
@@ -230,7 +230,7 @@ export function applyDirectionReview(work, receiptFile, { write = false } = {}) 
   const seen = new Map((Array.isArray(review.golden) ? review.golden : []).map((g) => [slash(String(g?.png ?? '')), g?.sha256]));
   const problems = [...current].filter(([png, sha]) => seen.get(png) !== sha).map(([png]) => `${png} changed or was not shown to the owner`);
   if (problems.length) throw new Error(`the owner's acceptance in ask ${receipt.dispatchId ?? '?'} cannot settle ${archetype}: ${problems.join('; ')} - ask again`);
-  const acceptedAt = typeof receipt.at === 'string' && /Z$/.test(receipt.at) ? receipt.at : new Date().toISOString();
+  const acceptedAt = typeof receipt.at === 'string' && receipt.at.endsWith('Z') ? receipt.at : new Date().toISOString();
   const acceptance = { acceptedBy: receipt.dispatchId, receipt: receiptRel, acceptedAt, rev: direction.rev };
   const nextDirection = {
     ...direction,

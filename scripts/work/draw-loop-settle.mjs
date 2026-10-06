@@ -6,11 +6,10 @@
 // failures and its loop's best round. An owner note the redraw does not address is DRAW_FEEDBACK_UNADDRESSED
 // (scripts/work/draw-feedback.mjs): the part not redrawn, the note not in its brief, or the critic not passing it.
 import path from 'node:path';
-import { loopFileOfRef, loopLabelOf } from './draw/draw-loop-coverage.mjs';
+import { livePartsOf, loopFileOfRef, loopLabelOf } from './draw/draw-loop-coverage.mjs';
 import fs from 'node:fs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { drawAcceptanceFindings } from './draw/draw-acceptance.mjs';
-import { livePartsOf } from './draw/draw-loop-coverage.mjs';
 import { verifyRecordParts } from './draw-loop.mjs';
 import { feedbackFindings } from './draw-feedback.mjs';
 

@@ -118,7 +118,7 @@ export function planDeps({ graphs = [], now, settings = DEFAULTS, language = own
       options: [
         { key: 'seam-stub', title: tr('Publish a seam stub so one branch keeps running'), recommended: true },
         { key: 'bridge', verb: 'starci supervisor bridge', title: tr('Supervisor bridge: transfer or assign the owner of the shared need') },
-        { key: `lower-priority:${cycle[cycle.length - 1]}`, title: tr('Lower the priority of branch {branch}', { branch: cycle[cycle.length - 1] }) },
+        { key: `lower-priority:${cycle.at(-1)}`, title: tr('Lower the priority of branch {branch}', { branch: cycle.at(-1) }) },
       ],
     }));
   }
@@ -322,7 +322,7 @@ export async function reconcileWorkers(key, ctx, { settings = workersSettings(),
     for (const w of running) { try { const st = await ctx.status(w.ledgerId, w.workflowId); if (Array.isArray(st?.stuck)) stuck.push(...st.stuck); } catch { /* unreadable */ } }
     const payload = om.snapshotPayload(om.aggregate(records, { now, windowMs }), stuck);
     const record = deps.recordSnapshot ?? (async (p) => {
-      const { withSupervisor, supervisorEvent } = await import('../../machine/home.mjs');
+      const { withSupervisor } = await import('../../machine/home.mjs');
       withSupervisor((m) => om.recordSnapshot(m, p), { env: ctx.env ?? process.env });
     });
     await record(payload);

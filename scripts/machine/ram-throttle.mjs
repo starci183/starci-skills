@@ -174,7 +174,7 @@ export function nextMode(prev, { freeRamPct, cpuBusy = null }, t = throttleThres
 export function priorityTable(settings = null, state = {}) {
   const fromYaml = (settings ?? allocationSettings())?.resources?.ramThrottle?.priorities ?? {};
   const out = {};
-  for (const [wf, v] of Object.entries({ ...fromYaml, ...(state?.priorities ?? {}) })) {
+  for (const [wf, v] of Object.entries({ ...fromYaml, ...state?.priorities })) {
     if (v == null) continue;
     const weight = positiveNumber(typeof v === 'object' ? v.weight : v, 1);
     const reserve = Math.max(0, Math.floor(num(typeof v === 'object' ? v.reserve : 0)));
@@ -321,11 +321,11 @@ export function publishThrottle(m, { mode, cpuHot = false, why = null, effective
 
 /** The Supervisor's host override of one workflow's priority (throttle_state.priorities_json); weight null removes it. */
 export function setPriority({ workflowId, weight = null, reserve = 0, by = 'supervisor', now = Date.now(), env = process.env }) {
-  if (!workflowId) throw Error('setPriority needs a workflow id');
+  if (!workflowId) throw new Error('setPriority needs a workflow id');
   try {
     return withMachine((m) => m.transaction(() => {
       const cur = m.throttleState();
-      const priorities = { ...(cur?.priorities ?? {}) };
+      const priorities = { ...cur?.priorities };
       if (weight == null) priorities[workflowId] = null;
       else priorities[workflowId] = { weight: positiveNumber(weight, 1), reserve: Math.max(0, Math.floor(num(reserve))), by, at: new Date(now).toISOString() };
       if (cur) m.update('throttle_state', { priorities_json: priorities }, { id: 1 });

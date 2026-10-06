@@ -22,7 +22,7 @@ export function argvOf(command) {
   return out;
 }
 
-const norm = (p) => String(p).replace(/\\/g, '/');
+const norm = (p) => String(p).replaceAll('\\', '/');
 const ACTION = /^(?:git\s+(?:add|commit|status|rev-parse|log|diff|show|push|fetch|cat-file|merge-base|ls-files|branch|stash)\b|n\/a\b|read\b|cat\b|type\b|ls\b|dir\b)/i;
 const MUTATING_FLAG = /^--(?:fix|write|apply|in-place)(?:=|$)/;
 

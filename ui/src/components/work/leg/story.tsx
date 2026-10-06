@@ -16,7 +16,7 @@ export const concept: Concept = 'C4';
 const outcomeLabel: Record<string, string> = { done: t('Op reported done'), partial: t('Op reported partial'), failed: t('Op reported failed'), ask: t('Op asked back'), blocked: t('Op reported blocked') };
 const fmt = (n: number) => n.toLocaleString('vi-VN');
 
-function Block({ title, children }: { title: string; children: ReactNode }) {
+function Block({ title, children }: { readonly title: string; readonly children: ReactNode }) {
   return <section className="mt-6 first:mt-0"><h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>{children}</section>;
 }
 const muted = (text: string) => <p className="text-xs text-muted-foreground">{text}</p>;
@@ -32,7 +32,7 @@ export function legTokens(leg: LegRow): { input: number | null; output: number |
 }
 
 /** Essentials: "What it does" — what the op does (Vietnamese first, English original on demand) and its side effects. */
-export function LegAbout({ leg }: { leg: LegRow }) {
+export function LegAbout({ leg }: { readonly leg: LegRow }) {
   const info = legInfo(leg);
   const [en, setEn] = useState(false);
   const goal = info?.goal.vi ?? info?.goal.en ?? null;
@@ -49,7 +49,7 @@ export function LegAbout({ leg }: { leg: LegRow }) {
 }
 
 /** Advanced part of the op story: input, output, tokens. Reads the latest attempt for the real hand-over. */
-export function LegStory({ project, wf, leg, pipeline }: { project: string; wf: string; leg: LegRow; pipeline: PipelineView }) {
+export function LegStory({ project, wf, leg, pipeline }: { readonly project: string; readonly wf: string; readonly leg: LegRow; readonly pipeline: PipelineView }) {
   const info = legInfo(leg);
   const latest = [...leg.attempts].sort((a, b) => b.id - a.id)[0] ?? null;
   const url = latest ? `/api/attempts/${encodeURIComponent(project)}/${latest.id}` : '';
@@ -66,7 +66,7 @@ export function LegStory({ project, wf, leg, pipeline }: { project: string; wf: 
   const reads = info?.reads ?? [];
   return <div>
     {latest && detail.error && <FeedbackState error onRetry={() => refreshQuery(url)}>{detail.meta ? t('The source is failing; showing the last read. {error}', { error: detail.error }) : detail.error}</FeedbackState>}
-    {latest && detail.meta?.stale?.length ? <p className="shell-error text-xs" role="status">{t('Source out of sync: {list}', { list: detail.meta.stale.join(', ') })}</p> : null}
+    {latest && detail.meta?.stale?.length ? <output className="shell-error block text-xs">{t('Source out of sync: {list}', { list: detail.meta.stale.join(', ') })}</output> : null}
     {latest && detail.meta && <p className="mb-3 text-xs text-muted-foreground">{t('Read observed {at}', { at: formatAbsolute(detail.observedAt) })}</p>}
     <Block title={t('Inputs')}>
       {reads.length ? <ul className="space-y-2">{reads.map(r => <li key={r.id} className="text-xs"><span className="font-mono font-semibold">{r.id}</span>{r.purpose ? <span className="block text-muted-foreground">{r.purpose}</span> : null}</li>)}</ul> : muted(info?.declarations?.reads ? t('The op declares no read data.') : t('Input declaration unknown.'))}

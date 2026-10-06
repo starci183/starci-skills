@@ -107,8 +107,8 @@ export function classifyClass(token) {
 
 /** The rationale decision justifying a free spacing class: a spacing|layout decision naming the class, with a rule id. */
 function justifiedBy(cls, rationale) {
-  const escaped = cls.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
-  const rx = new RegExp(`(^|[^\\w-])${escaped}($|[^\\w-])`);
+  const escaped = cls.replace(/[.*+?^${}()|[\]\\/]/g, String.raw`\$&`);
+  const rx = new RegExp(String.raw`(^|[^\w-])${escaped}($|[^\w-])`);
   return list(rationale).find((e) => ['spacing', 'layout'].includes(e?.kind) && list(e.rules).some((r) => String(r).trim())
     && rx.test(`${e.value ?? ''} ${e.decision ?? ''}`)) ?? null;
 }
@@ -261,7 +261,7 @@ export function markLayoutElements(text, { ts = loadTypescript()?.ts, file = 'so
   };
   walk(sf);
   let out = text;
-  for (const pos of at.sort((a, b) => b - a)) out = `${out.slice(0, pos)} ${LAYOUT_ATTR}=""${out.slice(pos)}`;
+  for (const pos of at.toSorted((a, b) => b - a)) out = `${out.slice(0, pos)} ${LAYOUT_ATTR}=""${out.slice(pos)}`;
   return out;
 }
 
@@ -294,7 +294,7 @@ export function typecheckDraw({ file, productDir, grammarRoot, ts: tsIn = null }
     if (!read.error) options = ts.parseJsonConfigFileContent(read.config, ts.sys, productDir, undefined, tsconfig).options;
   }
   const modules = nodeModulesUp(productDir);
-  const paths = { ...(options.paths ?? {}) };
+  const paths = { ...options.paths };
   const base = options.pathsBasePath ?? options.baseUrl ?? productDir;
   for (const [k, v] of Object.entries(paths)) paths[k] = v.map((p) => path.resolve(base, p));
   const gRoot = path.resolve(grammarRoot);
@@ -343,11 +343,11 @@ export async function checkDrawSource({ file, fixtures = [], productDir, skillRo
 
 /* ------------------------------------------------------------------------ CLI */
 
-const VALUE_FLAGS = ['--fixture', '--product', '--grammar', '--grammar-dist', '--rationale'];
+const VALUE_FLAGS = new Set(['--fixture', '--product', '--grammar', '--grammar-dist', '--rationale']);
 
 async function main(argv) {
   const json = argv.includes('--json');
-  const file = argv.find((a, i) => !a.startsWith('--') && !VALUE_FLAGS.includes(argv[i - 1]));
+  const file = argv.find((a, i) => !a.startsWith('--') && !VALUE_FLAGS.has(argv[i - 1]));
   const vals = (k) => argv.flatMap((a, i) => (argv[i - 1] === k ? [a] : []));
   if (!file) { process.stderr.write('use: starci work draw-source <X.draw.tsx> [--fixture <json>]... [--product <app dir>] [--grammar auto|product|claude-dist] [--grammar-dist <package root>] [--rationale <file>] [--json]\n'); return 2; }
   const productDir = path.resolve(vals('--product')[0] ?? path.dirname(file));
@@ -361,5 +361,5 @@ async function main(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-source: ${e?.stack ?? e}\n`); process.exitCode = 2; });
+  try { process.exitCode = await main(process.argv.slice(2)); } catch (e) { process.stderr.write(`draw-source: ${e?.stack ?? e}\n`); process.exitCode = 2; }
 }

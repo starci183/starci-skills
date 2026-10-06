@@ -157,7 +157,7 @@ const liveDeps = {
   host: async () => (await import('../../machine/host-resources.mjs')).hostResourcesFor({}),
   // starci kernel status progress.queuedReady of one workflow (ctx.status, cached and shared); its ledger from the census row's file.
   queuedReady: async (ctx, workflowId, ledgerFile) => {
-    const key = (f) => String(f ?? '').replace(/\\/g, '/').toLowerCase();
+    const key = (f) => String(f ?? '').replaceAll('\\', '/').toLowerCase();
     const l = (ctx.ledgers ?? []).find((x) => x.ledgerId !== 'supervisor' && x.file && key(x.file) === key(ledgerFile));
     const ids = l ? [l.ledgerId] : (ctx.ledgers ?? []).filter((x) => x.ledgerId !== 'supervisor').map((x) => x.ledgerId);
     for (const id of ids) {
@@ -191,7 +191,7 @@ export function createResourceController(overrides = {}) {
   const env = () => deps.env ?? process.env;
   const writeMachine = (fn) => withSupervisor(fn, { env: env() });
   const readMachineOr = (fn, fallback) => readSupervisor(fn, fallback, { env: env() });
-  const settings = { ...resourceControllerSettings(), ...(overrides.config ?? {}) };
+  const settings = { ...resourceControllerSettings(), ...overrides.config };
   // Shadow keeps its own hysteresis (it never writes throttle_state); active reads it back from the row it writes.
   const memory = { shadowPrev: null, lastWould: null, lastFootprintAt: null, starving: {}, clocks: {}, lastProbe: {},
     pools: null, poolCursor: {}, providerSeen: {}, poolWould: null, circuits: {} };
@@ -315,7 +315,7 @@ export function createResourceController(overrides = {}) {
    */
   async function reconcilePools(ctx) {
     const pb = await deps.poolBackoff();
-    const t = await deps.throttle();
+    await deps.throttle();
     const now = ctx.now();
     const pools = await deps.pools(); // [{target, provider, maxParallel}]
     const byTarget = new Map(pools.map((p) => [p.target, p]));

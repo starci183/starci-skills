@@ -6,6 +6,7 @@ import { TEST_WORLD_RUN_SCHEMA, testRunCountsError, testWorldFindings } from '..
 import { UNIT_RUN_SCHEMA, unitFindings } from '../gates/unit-run.mjs';
 import { RELEASE_PROOF_SCHEMA, RELEASE_STEPS, STEP_STATUS } from '../gates/release-proof.mjs';
 import { oneLine } from '../lib/clip.mjs';
+import { slash } from '../lib/path-key.mjs';
 import { readAttached, readAllAttached } from './attached-proof.mjs';
 import { judgeFiledRead } from './mechanism-observation.mjs';
 
@@ -56,7 +57,7 @@ export function judgeKnowledgeRead(digest) {
 }
 
 export function judgeDocGate(gate) {
-  if (!gate || gate.schema !== GATE_SCHEMA || !isDocGate(gate)) return refused({ status: 'missing', code: 'op-doc-gate-missing' }, `no document gate (schema ${GATE_SCHEMA}, profile ${DOC_PROFILE}) is attached: run starci gate run --scope docs [--tree <app>/.starciwork] --out doc-gate.json`);
+  if (gate?.schema !== GATE_SCHEMA || !isDocGate(gate)) return refused({ status: 'missing', code: 'op-doc-gate-missing' }, `no document gate (schema ${GATE_SCHEMA}, profile ${DOC_PROFILE}) is attached: run starci gate run --scope docs [--tree <app>/.starciwork] --out doc-gate.json`);
   if (gate.exit === GATE_EXIT.toolFailed || (gate.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-doc-gate-tool-failed' }, `a document check could not run: ${oneLine((gate.errors ?? []).join('; ') || `exit ${gate.exit}`)}`, (gate.errors ?? []).map(String));
   const findings = Array.isArray(gate.findings) ? gate.findings : [];
   if (gate.exit !== GATE_EXIT.clean || findings.length) return refused({ status: 'red', code: 'op-doc-gate-red' }, `${findings.length} document finding(s); first: ${listed(findings)[0] ?? `exit ${gate.exit}`}`, listed(findings));
@@ -64,21 +65,21 @@ export function judgeDocGate(gate) {
 }
 
 export function judgeTestWorld(summary) {
-  if (!summary || summary.schema !== TEST_WORLD_RUN_SCHEMA) return refused({ status: 'missing', code: 'op-test-world-proof-missing' }, `no test-world run summary (schema ${TEST_WORLD_RUN_SCHEMA}) is attached: run starci gate test-world --root <app> --project e2e|integration --out test-world-run.json`);
+  if (summary?.schema !== TEST_WORLD_RUN_SCHEMA) return refused({ status: 'missing', code: 'op-test-world-proof-missing' }, `no test-world run summary (schema ${TEST_WORLD_RUN_SCHEMA}) is attached: run starci gate test-world --root <app> --project e2e|integration --out test-world-run.json`);
   // The runtime re-derives the findings from the recorded harness and specs: a summary with its findings list emptied still fails.
   const findings = testWorldFindings(summary);
   if (findings.length) return refused({ status: 'red', code: 'op-test-world-hand-rolled' }, `${findings.length} test-world finding(s); first: ${listed(findings)[0]}`, listed(findings));
   const run = summary.run;
-  if (!run || run.error || testRunCountsError(run) || run.exit !== 0 || !(run.total > 0) || !(run.files > 0) || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0)
+  if (!run || run.error || testRunCountsError(run) || run.exit !== 0 || run.total <= 0 || run.files <= 0 || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0)
     return refused({ status: 'red', code: 'op-test-world-run-red' }, run ? `the ${summary.project} run is not green: exit ${run.exit}, ${run.total} test(s), ${run.failed} failed, ${run.skipped} skipped${run.error ? ` (${oneLine(run.error, 200)})` : ''}` : 'the summary records no run',
       (run?.failures ?? []).map((f) => `${f.file} ${f.test}: ${oneLine(f.message, 160)}`));
   return pass();
 }
 
 export function judgeUnitRun(summary) {
-  if (!summary || summary.schema !== UNIT_RUN_SCHEMA) return refused({ status: 'missing', code: 'op-unit-proof-missing' }, `no unit run summary (schema ${UNIT_RUN_SCHEMA}) is attached: run starci gate unit --root <app> --out unit-run.json`);
+  if (summary?.schema !== UNIT_RUN_SCHEMA) return refused({ status: 'missing', code: 'op-unit-proof-missing' }, `no unit run summary (schema ${UNIT_RUN_SCHEMA}) is attached: run starci gate unit --root <app> --out unit-run.json`);
   const run = summary.run;
-  if (!run || run.error || testRunCountsError(run) || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0 || !(run.total > 0) || !(run.files > 0))
+  if (!run || run.error || testRunCountsError(run) || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0 || run.total <= 0 || run.files <= 0)
     return refused({ status: 'red', code: 'op-unit-run-red' }, run ? `the unit run is not green: exit ${run.exit}, ${run.total} test(s), ${run.failed} failed, ${run.skipped} skipped${run.error ? ` (${oneLine(run.error, 200)})` : ''}` : 'the summary records no run',
       (run?.failures ?? []).map((f) => `${f.file} ${f.test}: ${oneLine(f.message, 160)}`));
   const findings = unitFindings(summary);
@@ -92,7 +93,7 @@ export function judgeUnitRun(summary) {
 
 /** A lint judgment over the findings `relevant` keeps (the security codes, or the fe/ side). */
 export function judgeLint(report, relevant, what) {
-  if (!report || report.schema !== LINT_SCHEMA) return refused({ status: 'missing', code: 'op-lint-proof-missing' }, `no starci app lint report (schema ${LINT_SCHEMA}) is attached: run starci app lint --format json at the app root and attach lint.json`);
+  if (report?.schema !== LINT_SCHEMA) return refused({ status: 'missing', code: 'op-lint-proof-missing' }, `no starci app lint report (schema ${LINT_SCHEMA}) is attached: run starci app lint --format json at the app root and attach lint.json`);
   if ((report.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-lint-tool-failed' }, `starci app lint could not run: ${oneLine(report.errors.join('; '))}`, report.errors.map(String));
   const findings = (report.findings ?? []).filter(relevant);
   if (findings.length) return refused({ status: 'red', code: 'op-lint-findings' }, `${findings.length} ${what} finding(s); first: ${listed(findings)[0]}`, listed(findings));
@@ -106,9 +107,8 @@ export const securityRelevant = (doc = loadOpGate()) => {
   const rules = new Set(doc.securityRules ?? []);
   return (f) => codes.has(f.code) || rules.has(ruleName(f.rule));
 };
-export const feRelevant = (f) => String(f.path ?? '').replace(/\\/g, '/').startsWith('fe/');
+export const feRelevant = (f) => String(f.path ?? '').replaceAll('\\', '/').startsWith('fe/');
 
-const posixOf = (p) => String(p ?? '').replace(/\\/g, '/');
 /**
  * The security verdict: the lint ran, and every security canon finding it reports is carried in the op's own findings
  * (starci/security-findings@1 {findings: [{rule, code, path, line, severity, reachability}]}) by path and by code or rule. A
@@ -117,11 +117,11 @@ const posixOf = (p) => String(p ?? '').replace(/\\/g, '/');
 export function judgeSecurityLint(report, findingsDoc, relevant) {
   const ran = judgeLint(report, () => false, 'security');
   if (ran.status !== 'pass') return ran;
-  if (!findingsDoc || findingsDoc.schema !== SECURITY_FINDINGS_SCHEMA || !Array.isArray(findingsDoc.findings))
+  if (findingsDoc?.schema !== SECURITY_FINDINGS_SCHEMA || !Array.isArray(findingsDoc.findings))
     return refused({ status: 'missing', code: 'op-security-findings-missing' }, `no typed security findings (schema ${SECURITY_FINDINGS_SCHEMA}, findings[] by rule, empty when there are none) are attached beside lint.json`);
-  const carried = findingsDoc.findings.map((f) => ({ path: posixOf(f?.path), code: f?.code ?? null, rule: ruleName(f?.rule) }));
+  const carried = findingsDoc.findings.map((f) => ({ path: slash(f?.path), code: f?.code ?? null, rule: ruleName(f?.rule) }));
   const dropped = (report.findings ?? []).filter(relevant).filter((f) => {
-    const p = posixOf(f.path);
+    const p = slash(f.path);
     return !carried.some((c) => c.path === p && ((f.code && c.code === f.code) || (c.rule && c.rule === ruleName(f.rule))));
   });
   if (dropped.length) return refused({ status: 'red', code: 'op-security-finding-unreported' }, `${dropped.length} security canon finding(s) of the lint are missing from the report's findings; first: ${listed(dropped)[0]}`, listed(dropped));
@@ -143,7 +143,7 @@ function judgeInspectionCarriage(report, findingsDoc, relevant) {
   const dropped = (report.findings ?? []).filter(relevant).filter((f) => {
     // Consume each carried location once: one path/rule row cannot cover two
     // reported locations or duplicate observations of the same location.
-    const index = carried.findIndex((c, i) => !used.has(i) && posixOf(c.path) === posixOf(f.path)
+    const index = carried.findIndex((c, i) => !used.has(i) && slash(c.path) === slash(f.path)
       && c.line === f.line && c.code === (f.code ?? null) && ruleName(c.rule) === ruleName(f.rule));
     if (index < 0) return true;
     used.add(index); return false;
@@ -154,7 +154,7 @@ function judgeInspectionCarriage(report, findingsDoc, relevant) {
 }
 
 export function judgeReviewGate(gate) {
-  if (!gate || gate.schema !== GATE_SCHEMA || isDocGate(gate)) return refused({ status: 'missing', code: 'op-gate-proof-missing' }, `no gate JSON (schema ${GATE_SCHEMA}) over the reviewed range is attached: run starci gate run --root <app> --base <first reviewed commit>^ --out gate.json`);
+  if (gate?.schema !== GATE_SCHEMA || isDocGate(gate)) return refused({ status: 'missing', code: 'op-gate-proof-missing' }, `no gate JSON (schema ${GATE_SCHEMA}) over the reviewed range is attached: run starci gate run --root <app> --base <first reviewed commit>^ --out gate.json`);
   if (gate.exit === GATE_EXIT.toolFailed || (gate.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-gate-tool-failed' }, `the gate could not run a tool: ${oneLine((gate.errors ?? []).join('; ') || `exit ${gate.exit}`)}`, (gate.errors ?? []).map(String));
   const fresh = Array.isArray(gate.findings) ? gate.findings : [];
   if (gate.exit !== GATE_EXIT.clean || Number(gate.counts?.new ?? fresh.length) > 0)
@@ -163,7 +163,7 @@ export function judgeReviewGate(gate) {
 }
 
 export function judgeReviewDefects(doc) {
-  if (!doc || doc.schema !== REVIEW_DEFECTS_SCHEMA || !Array.isArray(doc.defects)) return refused({ status: 'missing', code: 'op-review-defects-missing' }, `no defect classification (schema ${REVIEW_DEFECTS_SCHEMA}, defects[], empty when the review found none) is attached`);
+  if (doc?.schema !== REVIEW_DEFECTS_SCHEMA || !Array.isArray(doc.defects)) return refused({ status: 'missing', code: 'op-review-defects-missing' }, `no defect classification (schema ${REVIEW_DEFECTS_SCHEMA}, defects[], empty when the review found none) is attached`);
   const unclassified = doc.defects.filter((d) => !DEFECT_CLASS_VALUES.includes(d?.class));
   if (unclassified.length) return refused({ status: 'red', code: 'op-review-defect-unclassified' }, `${unclassified.length} defect(s) not classified business or non-business; first: ${nameOfDefect(unclassified[0])}`, unclassified.map(nameOfDefect));
   const filled = (v) => typeof v === 'string' && v.trim().length > 0;
@@ -173,7 +173,7 @@ export function judgeReviewDefects(doc) {
 }
 
 export function judgeRelease(proof) {
-  if (!proof || proof.schema !== RELEASE_PROOF_SCHEMA || !Array.isArray(proof.steps)) return refused({ status: 'missing', code: 'op-release-proof-missing' }, `no release proof (schema ${RELEASE_PROOF_SCHEMA}) is attached: run starci release proof --repo <repo> --base <range start>^ --out release-proof.json`);
+  if (proof?.schema !== RELEASE_PROOF_SCHEMA || !Array.isArray(proof.steps)) return refused({ status: 'missing', code: 'op-release-proof-missing' }, `no release proof (schema ${RELEASE_PROOF_SCHEMA}) is attached: run starci release proof --repo <repo> --base <range start>^ --out release-proof.json`);
   const byId = new Map(proof.steps.map((s) => [s?.id, s]));
   const skipped = RELEASE_STEPS.filter((id) => !byId.has(id) || byId.get(id)?.status === STEP_STATUS.skipped);
   if (skipped.length) return refused({ status: 'red', code: 'op-release-step-skipped' }, `release step(s) missing or skipped: ${skipped.join(', ')}`, skipped.map((id) => `${id} ${oneLine(byId.get(id)?.detail ?? 'not run', 200)}`));

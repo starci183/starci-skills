@@ -33,7 +33,6 @@
 // evidence per part (draw-rationale.mjs DRAW_RATIONALE_MISSING: <part>.rationale.json, data-why everywhere, every value
 // its draw-render record measured covered, every rule id resolvable, <part>.redline.png beside it).
 import fs from 'node:fs';
-import { loopFileOfRef } from './draw-loop-coverage.mjs';
 import path from 'node:path';
 import { decodePng } from '../png.mjs';
 import { isFile } from '../../lib/fs-kind.mjs';
@@ -44,7 +43,7 @@ import { DRAW_TOOL, SHAPE_DUPLICATE, assetStateOf, dataStatusOf } from '../ui/ui
 import { DRAW_DNA_CODES, anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw-dna.mjs';
 import { DRAW_TASTE_CODES, accentBudgetOf, drawLoopSettings, htmlTasteFindings } from './draw-taste.mjs';
 import { assetRequestIdsFor } from '../asset-slot.mjs';
-import { DRAW_LOOP_MISSING, loopCoverageFindings } from './draw-loop-coverage.mjs';
+import { DRAW_LOOP_MISSING, loopCoverageFindings, loopFileOfRef } from './draw-loop-coverage.mjs';
 import { DRAW_RATIONALE_MISSING, loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw-rationale.mjs';
 import { altOf } from '../../lib/source-phrases.mjs';
 
@@ -91,14 +90,14 @@ const partStemOf = (src) => String(src).replace(/(?:\.dom)?\.html$/i, '');
 export function visibleTextOf(html) {
   return String(html)
     .replace(/<!--[\s\S]*?-->/g, ' ').replace(/<(script|style|template|svg)\b[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<[^>]+>/g, '\n').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"')
+    .replace(/<[^>]+>/g, '\n').replaceAll('&nbsp;', ' ').replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replace(/&#39;|&apos;/g, "'").replaceAll('&quot;', '"')
     .split('\n').map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
 }
 
 /** Internal-copy patterns: each {id, rx, why}. Owner ruling 2026-09-27 names the `source:` label (and its Vietnamese
  * form, lexicon drawCopy.sourceLabel), installation ids, kebab ids. */
 const INTERNAL_COPY = Object.freeze([
-  { id: 'source-label', rx: new RegExp(`(^|\\s)(${altOf('drawCopy.sourceLabel')}|source)\\s*:`, 'giu'), why: 'a source label is provenance jargon, not product copy' },
+  { id: 'source-label', rx: new RegExp(String.raw`(^|\s)(${altOf('drawCopy.sourceLabel')}|source)\s*:`, 'giu'), why: 'a source label is provenance jargon, not product copy' },
   { id: 'internal-vocabulary', rx: new RegExp(`${altOf('drawCopy.internalVocabulary')}|current source|core system`, 'giu'), why: 'internal system vocabulary' },
   { id: 'record-id', rx: /\b(?:installation|instance|inst|ws|wf|op|job|ctx|req|evt)-[a-z0-9]+(?:-[a-z0-9]+)*\b/gi, why: 'a raw record id' },
   { id: 'kebab-id', rx: /\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/g, why: 'a kebab-case identifier', test: (m) => /\d/.test(m) || m.split('-').length >= 3 },
@@ -124,7 +123,7 @@ const CONTROL_RX = /<(button)\b|<a\b[^>]*\bhref=|<select\b|<input\b[^>]*\btype=[
 export const controlCountOf = (html) => (String(html).match(CONTROL_RX) ?? []).length;
 
 const COMMAND_RX = /\b(activates?|selects?|clicks?|press(?:es)?|opens?|chooses?|submits?|taps?|confirms?|cancels?|retries|installs?|uninstalls?|configures?|toggles?|enters?|types?)\b/i;
-const ACTOR_RX = new RegExp(`^\\s*(the\\s+)?(owner|user|member|admin|administrator|actor|viewer|operator|person|customer|visitor|${altOf('drawCopy.actor')})\\b`, 'i');
+const ACTOR_RX = new RegExp(String.raw`^\s*(the\s+)?(owner|user|member|admin|administrator|actor|viewer|operator|person|customer|visitor|${altOf('drawCopy.actor')})\b`, 'i');
 /** The commands a person leaves `state` by: ui.flow transitions from it whose trigger is an actor's command. */
 export function commandsFrom(record, state) {
   return list(record?.ui?.flow?.transitions).filter((t) => {
@@ -138,8 +137,8 @@ export function commandsFrom(record, state) {
 // TagGroup root and Badge dot) are not badges; a vendor variant class is BEM (`chip--success`, `tag--default`).
 const BADGE_RX = /<([a-z][a-z0-9-]*)\b([^>]*\b(?:class|data-slot|data-component)=["'][^"']*\b(?:badge|chip|status-pill|pill|tag)(?![\w-])[^"']*["'][^>]*)>([\s\S]*?)<\/\1>/gi;
 const TONES = ['success', 'warning', 'danger', 'error', 'info', 'accent', 'primary', 'secondary', 'neutral', 'default', 'muted'];
-const TONE_RX = new RegExp(`\\b(?:data-tone|tone|color|variant)=["'](${TONES.join('|')})["']|\\b(?:text|bg|border|badge|chip|tag|tone)--?(${TONES.join('|')})\\b|var\\(--[\\w-]*(${TONES.join('|')})[\\w-]*\\)`, 'i');
-const SUCCESS_WORDS = new RegExp(`\\b(installed|active|ready|confirmed|enabled|connected|healthy|succeeded|success)\\b|${altOf('drawCopy.success')}`, 'i');
+const TONE_RX = new RegExp(String.raw`\b(?:data-tone|tone|color|variant)=["'](${TONES.join('|')})["']|\b(?:text|bg|border|badge|chip|tag|tone)--?(${TONES.join('|')})\b|var\(--[\w-]*(${TONES.join('|')})[\w-]*\)`, 'i');
+const SUCCESS_WORDS = new RegExp(String.raw`\b(installed|active|ready|confirmed|enabled|connected|healthy|succeeded|success)\b|${altOf('drawCopy.success')}`, 'i');
 /** Badges a render source draws: [{text, tone|null}]. */
 export function badgesOf(html) {
   const out = [];
@@ -295,7 +294,7 @@ export function drawQualityFindings(recordDir, record, repo) {
     let score = null;
     try { score = JSON.parse(fs.readFileSync(scoreFile, 'utf8')); } catch { score = null; }
     const htmlSha = shaOf(src);
-    if (!score || score.schema !== SCORE_SCHEMA) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} has no ui-proof score: ${component ? 'draw it through the draw loop (starci work draw-loop round, then finish installs <part>.score.json)' : `run starci work ui-proof-brief --surface <record> --repo <product> --score ${path.basename(src)} --viewport <WxH> --json > ${path.basename(scoreFile)}`}` });
+    if (score?.schema !== SCORE_SCHEMA) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} has no ui-proof score: ${component ? 'draw it through the draw loop (starci work draw-loop round, then finish installs <part>.score.json)' : `run starci work ui-proof-brief --surface <record> --repo <product> --score ${path.basename(src)} --viewport <WxH> --json > ${path.basename(scoreFile)}`}` });
     // A component part was scored on its bundled harness page, never on the DOM snapshot; its freshness is the settle
     // re-measure from <part>.draw.tsx (draw-loop-settle.mjs), so only the score's verdict binds here.
     else if (!component && score.htmlSha256 !== htmlSha) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${path.basename(scoreFile)} scored another version of ${path.basename(src)} (htmlSha256 ${String(score.htmlSha256 ?? 'absent').slice(0, 12)}, now ${String(htmlSha).slice(0, 12)}): score the current render` });
@@ -317,6 +316,6 @@ export function drawQualityFindings(recordDir, record, repo) {
     else if (by !== OWNER) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `the acceptance was answered by ${by ?? 'nobody named'}, not the owner: a drawing never turns green on checks or an automatic accept` });
   }
   // A drawn data status the vocabulary names is DATA_STATUS_DRAWN (ui-shapes.mjs); nothing to add here.
-  void dataStatusOf;
+  dataStatusOf;
   return out;
 }

@@ -25,7 +25,6 @@ import '../api/process/hide-child-windows.mjs';
 import path from 'node:path';
 import {sha256} from '../../engine/digest.mjs';
 import { runNode } from '../api/node/run-node.mjs';
-import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
@@ -81,7 +80,7 @@ export const busySignature = (screen) => sha256(
 ).slice(0, 24);
 
 /** An input row aimed at a subagent ("❯ Message @general-purpose…"): Escape leaves it before a wake. */
-export const SUBAGENT_INPUT = new RegExp(`^\\s*${INPUT_GLYPH_CLASS}[^\\n]*@[\\w@.-]+`, 'm');
+export const SUBAGENT_INPUT = new RegExp(String.raw`^\s*${INPUT_GLYPH_CLASS}[^\n]*@[\w@.-]+`, 'm');
 
 /** Busy screen states a frozen frame rescues; gates/failed/unreadable stay plain busy. */
 const FROZEN_BUSY = new Set(['active', 'unknown', 'wedged', 'subagents-running']);

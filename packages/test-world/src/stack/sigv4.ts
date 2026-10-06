@@ -25,7 +25,7 @@ export const sha256Hex = (data: string | Buffer): string => createHash("sha256")
 const hmac = (key: string | Buffer, data: string): Buffer => createHmac("sha256", key).update(data).digest()
 
 /** RFC 3986 encoding as SigV4 wants it (everything but `A-Za-z0-9-_.~`). */
-export const uriEncode = (value: string): string => encodeURIComponent(value).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+export const uriEncode = (value: string): string => encodeURIComponent(value).replace(/[!'()*]/g, (char) => `%${char.codePointAt(0)?.toString(16).toUpperCase()}`)
 
 /** The canonical query string: keys sorted, keys and values encoded. */
 export const canonicalQuery = (query: Readonly<Record<string, string>>): string =>

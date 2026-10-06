@@ -2,8 +2,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { transitionWorkflowToRunning, updateJob } from '../../../engine/db/ledger.mjs';
-import { parseYaml } from '../../../engine/yaml.mjs';
-import { admitOpSlot } from '../../../engine/admission.mjs';
 import { allocationMs, allocationSettings, inspectOwnerConfig } from '../../../engine/config.mjs';
 import { buildOpPrompt, renderOwnedPath, ensureJobScratch, jobScratchDirOf } from '../op-prompt.mjs';
 import { priorAttemptFailures } from '../prior-failures.mjs';
@@ -25,8 +23,7 @@ import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from '.
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../../machine/host-resources.mjs';
 import { hostThrottle, noteThrottled, releaseThrottled, DISPATCH_THROTTLED } from '../../machine/ram-throttle.mjs';
 import { deferredQueueCause } from '../autopilot-run.mjs';
-import { resolveWorkerLaunchModel, missingHostTools, defaultOperationTarget } from '../../agent/models.mjs';
-import { kindOrder, isFanOutSlice } from '../../agent/models.mjs';
+import { resolveWorkerLaunchModel, missingHostTools, defaultOperationTarget, kindOrder, isFanOutSlice } from '../../agent/models.mjs';
 import { checkPrerequisites, prerequisiteDetail } from '../prerequisites.mjs';
 import { FOUNDATION_WAIT, gateShellFoundation, shellFoundationNeed } from '../shell-foundation.mjs';
 import { resumeContextOf } from '../resume-context.mjs';
@@ -458,18 +455,17 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     attempt: job.try_no, generation: job.generation,
   };
   payload.hierarchy.runtime = {
-    ...(payload.hierarchy.runtime ?? {}), host: 'orca',
+    ...payload.hierarchy.runtime, host: 'orca',
     agent: model.provider, provider: model.provider, model: modelId,
     profile: model.target, runtimePool: model.target,
     runId, taskId, dispatchId, terminalHandle: launched.terminal,
   };
   const contractMarkdown = buildContractMarkdown({ op, jobId, prompt, packet });
-  let attemptId = null;
   runningOrAbandon(() => ledger.transaction(() => {
     const now = Date.now();
     // The attempt and its contract (the dispatch authority; dispatch_id is the worker's Dispatch id), then running.
     transitionWorkflowToRunning(ledger, { workflowId: job.workflow_id, now, by: 'kernel', reason: `first dispatch ${jobId}` });
-    attemptId = fileContract(db, {
+    fileContract(db, {
       job, op, dispatchId, markdown: contractMarkdown, now,
       attempt: { scratchDir, managed: 1, runId, taskId, terminalHandle: launched.terminal, provider: model.provider, model: modelId, effort, modelProfile: model.target, pool: model.target, worktreePath: worktree, startedAt: now, attestedAt: now },
       context: { packet, contract: packet.context.contract, worktree, model: model.target, managed: payload.managed, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs },

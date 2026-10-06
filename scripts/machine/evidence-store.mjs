@@ -35,7 +35,7 @@ const RED_CHECK_STATUSES = Object.freeze(['fail', 'error']);
 export const TRANSCRIPT_SNAPSHOT_MS = 60_000;
 
 
-const slash = (p) => String(p).replace(/\\/g, '/');
+const slash = (p) => String(p).replaceAll('\\', '/');
 
 const IMAGE = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml' };
 const VIDEO = { '.webm': 'video/webm', '.mp4': 'video/mp4', '.mov': 'video/quicktime' };

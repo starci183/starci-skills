@@ -32,8 +32,7 @@ import { positiveNumber } from '../../lib/number.mjs';
 import { productLedgers } from '../../lib/ledgers.mjs';
 import { stallFindings, peerWaits, ownerGates, namedWorkflows, lastProgress, apiFrontier } from '../../supervisor/stall.mjs';
 import { openAsks } from '../../supervisor/poll.mjs';
-import { progressSettings } from '../../kernel/progress-rca.mjs';
-import { stallNotice } from '../../kernel/progress-rca.mjs';
+import { progressSettings, stallNotice } from '../../kernel/progress-rca.mjs';
 import { telemetrySettings } from '../../machine/op-metrics.mjs';
 import { unresolvedPlaceholders } from '../../goal/goal-text.mjs';
 import { shortRev } from '../../kernel/runtime-rev.mjs';
@@ -149,8 +148,8 @@ export function planWorkflow({ ledgerId, workflowId, status = null, findings = [
   const stalledFinding = findings.find((f) => f.type === 'STALLED' && f.alert) ?? null;
   const orphaned = frontier?.state === 'orphaned-frontier';
   const progressStalled = progress?.stall?.stalled === true;
-  const progressSince = progressStalled && progress.stall.since ? Date.parse(progress.stall.since) : NaN;
-  const episodeStarts = [progressSince, stalledFinding ? Number(stalledFinding.idleSince) : NaN].filter(Number.isFinite);
+  const progressSince = progressStalled && progress.stall.since ? Date.parse(progress.stall.since) : Number.NaN;
+  const episodeStarts = [progressSince, stalledFinding ? Number(stalledFinding.idleSince) : Number.NaN].filter(Number.isFinite);
   const planned = episodeStarts.length ? Math.min(...episodeStarts) : now;
   if (progressStalled || stalledFinding) {
     out.stalled = true;
@@ -378,7 +377,7 @@ export async function reconcileWorkflow(key, ctx, { settings = workflowSettings(
     const own = readers.get(ledgerId);
     if (!own) return { ok: true, key, skipped: 'ledger-out-of-view', cleared: await clearWorkflowClocks(ctx, ledgerId, workflowId) };
     const row = own.db.prepare('SELECT workflow_id, phase, archived_at FROM workflows WHERE workflow_id=?').get(workflowId);
-    if (!row || row.phase !== 'running' || row.archived_at != null) {
+    if (row?.phase !== 'running' || row?.archived_at != null) {
       return { ok: true, key, ended: row?.phase ?? 'unknown', cleared: await clearWorkflowClocks(ctx, ledgerId, workflowId) };
     }
     base = { goal: goalOf(own.db, workflowId), lastProgress: lastProgress(own.db, workflowId) };

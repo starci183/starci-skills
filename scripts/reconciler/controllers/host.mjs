@@ -106,7 +106,7 @@ export function goalProblem(markdown, refusal) {
 
 const normRepo = (p) => pathKey(p, { fold: true });
 const argOf = (cmd, name) => {
-  const m = new RegExp(`(?:^|\\s)--${name}(?:=|\\s+)(?:"([^"]*)"|'([^']*)'|(\\S+))`).exec(String(cmd ?? ''));
+  const m = new RegExp(String.raw`(?:^|\s)--${name}(?:=|\s+)(?:"([^"]*)"|'([^']*)'|(\S+))`).exec(String(cmd ?? ''));
   return m ? (m[1] ?? m[2] ?? m[3]) : null;
 };
 const RUNTIME_LOOP = /(?:[\\/](watchdog|start-workflow|serve-ask)\.mjs["']?(?=\s|$)|(?:^|\s)starci\s+workflow\s+(start)(?=\s|$))/i;
@@ -299,7 +299,7 @@ export function createHostController(deps = {}) {
       return w ? { phase: w.phase, archivedAt: w.archived_at, goal: g?.markdown ?? null } : null;
     });
     const clearAll = async () => { for (const st of ['SEAT_VACANT', 'KERNEL_GATED', 'ORCA_DOWN', 'KERNEL_INPUT_STUCK', 'SEAT_QUARANTINED', 'KERNEL_TURN_OVERDUE']) await clear(ctx, key, st); };
-    if (!wf || wf.phase !== 'running' || wf.archivedAt != null) { await clearAll(); store().remove?.(key); return { ok: true, skipped: 'not-running' }; }
+    if (wf?.phase !== 'running' || wf?.archivedAt != null) { await clearAll(); store().remove?.(key); return { ok: true, skipped: 'not-running' }; }
     const rec = rowOf(key, now);
     const problem = goalProblem(wf.goal, goalRefusal);
     if (problem) {
@@ -473,8 +473,8 @@ export function createHostController(deps = {}) {
     claimDue(ctx, { controller: 'host', duty: 'boot', intervalMs: BOOT_EVERY_MS, now: ctx.now(), force: true });
     finishDuty(ctx, { controller: 'host', duty: 'boot', result: ctx.mode === 'active' ? 'done' : 'skipped', digest: bootIdOf(), now: ctx.now() });
     for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) steps.push({ step: 'seat', ledgerId: l.ledgerId, workflowId: wf, ...(await reconcileKernelSeat(l.ledgerId, wf, ctx)) });
-    steps.push({ step: 'seat:supervisor', ...(await reconcileSupervisorSeat(ctx)) });
-    steps.push({ step: coreDebugSeatKey(), ...(await reconcileCoreDebugSeat(ctx, { timeoutMs: settings().seats.supervisor.timeoutMs, outputOf })) });
+    steps.push({ step: 'seat:supervisor', ...(await reconcileSupervisorSeat(ctx)) },
+      { step: coreDebugSeatKey(), ...(await reconcileCoreDebugSeat(ctx, { timeoutMs: settings().seats.supervisor.timeoutMs, outputOf })) });
     await ctx.log('reconciler.host.boot', `boot order done (${ctx.mode})`, { steps: steps.map((x) => ({ step: x.step, ok: x.ok, to: x.to, action: x.action })) });
     return { ok: true, steps };
   }
@@ -670,8 +670,7 @@ export function createHostController(deps = {}) {
       try { if (ctx.machine) openCorrupt = clocksOf(ctx, { prefixes: ['ledger:'] }).filter((c) => c.state === 'LEDGER_CORRUPT').map((c) => c.entity); } catch { openCorrupt = []; }
       for (const k of openCorrupt) if (!keys.includes(k)) keys.push(k);
       for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) keys.push(`seat:kernel:${l.ledgerId}:${wf}`);
-      keys.push('seat:supervisor');
-      keys.push(coreDebugSeatKey());
+      keys.push('seat:supervisor', coreDebugSeatKey());
       return keys;
     },
     async reconcile(key, ctx) {

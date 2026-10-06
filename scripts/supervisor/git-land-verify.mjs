@@ -9,7 +9,7 @@ import { walkFiles } from '../lib/walk.mjs';
 import { specRunEnv, specTimeoutMs } from './land.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 
-const posix = (p) => p.replaceAll(String.fromCharCode(92), '/');
+const posix = (p) => p.replaceAll(String.fromCodePoint(92), '/');
 const outputOf = (r) => `${String(r?.stdout ?? '')}${String(r?.stderr ?? r?.error?.message ?? '')}`;
 const okOf = (r) => !r?.error && r?.status === 0;
 

@@ -71,7 +71,7 @@ const SPEC_ARGUMENT = /\.(?:e2e-spec|spec|test|e2e)\.[cm]?[jt]sx?$/;
 const CODE_SKIP_DIRS = new Set(['node_modules', '.git', '.starciwork', 'dist', 'build', 'out', '.next', '.turbo', 'coverage', 'storybook-static']);
 const UI_DIR = /^(\.starciwork\/features\/[^/]+\/ui\/[^/]+)\//;
 const CHECK_OP = /\.(?:verify|audit)$/;
-const PROVEN_OUTCOMES = ['done', 'partial'];
+const PROVEN_OUTCOMES = new Set(['done', 'partial']);
 
 const slashed = (p) => String(p).replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/+$/, '');
 const uniq = (values) => [...new Set(values.filter((v) => typeof v === 'string' && v))].sort(byCodeUnit);
@@ -151,7 +151,7 @@ const specMatches = (command, spec) => specsIn(command).some((s) => s === spec |
  * done|partial report and a check with exitCode 0; a label or a score file speaks for itself.
  */
 function claimsOfJob({ repo, job, payload = {}, envelope = null, rows = [], frRecords = null }) {
-  const proven = PROVEN_OUTCOMES.includes(envelope?.outcome);
+  const proven = PROVEN_OUTCOMES.has(envelope?.outcome);
   const passing = proven ? list(envelope?.checks).filter((c) => c?.exitCode === 0) : [];
   const fromChecks = {
     specs: passing.flatMap((c) => specsIn(c.command)),
@@ -308,7 +308,7 @@ function scopeOf(db, workflowId) {
     .filter((r) => typeof r === 'string').map(slashed);
   const frDir = /^\.starciwork\/features\/([^/]+)\/fr\/([^/]+(?:\/[^/]+)*?)(?:\/index\.yaml)?$/;
   const frs = uniq([...list(graph?.nodes).flatMap((n) => list(n.frs)).filter((id) => FR_ID.test(id)),
-    ...records.map((r) => frDir.exec(r)).filter((m) => m && !/\/(evidence|assets)(\/|$)/.test(m[2])).map((m) => `fr.${m[1]}.${m[2].split('/').join('.')}`)]);
+    ...records.map((r) => frDir.exec(r)).filter((m) => m && !/\/(evidence|assets)(\/|$)/.test(m[2])).map((m) => `fr.${m[1]}.${m[2].replaceAll('/', '.')}`)]);
   const uiDirs = uniq(records.map((r) => UI_DIR.exec(`${r}/`)?.[1]));
   return { graphVersion: graph ? latestVersion(db, workflowId).version : null, frs, shapes: uniq(list(graph?.nodes).flatMap((n) => list(n.shapes)).filter((s) => SHAPE_ID.test(s))), uiDirs };
 }

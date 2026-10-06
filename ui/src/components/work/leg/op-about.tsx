@@ -7,12 +7,12 @@ import { t } from '../../../i18n/t';
 
 export const concept: Concept = 'C4';
 
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
+function Block({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) {
   return <section className="mt-6"><h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>{children}</section>;
 }
 
 /** "What this op does" + inputs, outputs, side effects, manifest — from the op's own yaml (read-only). */
-export function OpAbout({ leg }: { leg: LegRow }) {
+export function OpAbout({ leg }: Readonly<{ leg: LegRow }>) {
   const info = legInfo(leg);
   const [more, setMore] = useState(false);
   if (!info) return null;

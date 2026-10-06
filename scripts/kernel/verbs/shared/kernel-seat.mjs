@@ -42,7 +42,7 @@ export function kernelAuthorityOf(db, workflowId, handle, { now = Date.now() } =
     && handle && job.worker_id === handle && hierarchy.runtime?.terminalHandle === handle
     && managed?.agentTerminalHandle === handle && value?.terminal === handle
     && managed.dispatchId && value.dispatch === managed.dispatchId;
-  if (!valid) throw Object.assign(Error(`current Kernel incarnation unavailable for ${workflowId}`), { code: 'kernel-caller-stale' });
+  if (!valid) throw Object.assign(new Error(`current Kernel incarnation unavailable for ${workflowId}`), { code: 'kernel-caller-stale' });
   const identity = { role: 'kernel', workflowId, generation: wf.generation, attempt: hierarchy.attempt,
     terminal: handle, dispatch: managed.dispatchId, token: signal.token };
   return { ...identity, digest: sha256(JSON.stringify(identity)) };

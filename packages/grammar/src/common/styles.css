@@ -5,14 +5,6 @@
 @import "./components-navigation.css";
 
 @layer starci-grammar-common {
-    .grammar-common-root {
-        --grammar-inline-gap: 0.5rem;
-        --grammar-row-gap: 0.75rem;
-        --grammar-section-gap: 1rem;
-        --grammar-region-gap: 1.5rem;
-        --grammar-page-inset: clamp(1rem, 3vw, 2rem);
-        min-width: 0;
-    }
 
     /*
      * THE ROOT OWNS EVERY VENDOR THEME VARIABLE.
@@ -27,6 +19,13 @@
      * it lands on. A family supplies its semantic values; the rest follows.
      */
     .grammar-common-root {
+        --grammar-inline-gap: 0.5rem;
+        --grammar-row-gap: 0.75rem;
+        --grammar-section-gap: 1rem;
+        --grammar-region-gap: 1.5rem;
+        --grammar-page-inset: clamp(1rem, 3vw, 2rem);
+        min-width: 0;
+
         color-scheme: light;
 
         --background: oklch(97.02% 0 0);
@@ -677,6 +676,7 @@
         align-items: baseline;
         justify-content: space-between;
         gap: var(--grammar-inline-gap, 0.5rem);
+        padding: 0 !important;
     }
 
     .starci-core-surface-label > :first-child {
@@ -752,6 +752,7 @@
         border-radius: var(--starci-core-surface-radius, 1rem);
         background: var(--surface, Canvas);
         color: var(--surface-foreground, CanvasText);
+        padding: 0 !important;
     }
 
     @property --starci-core-highlight-angle {
@@ -767,6 +768,8 @@
     }
 
     .starci-core-surface-highlight {
+        position: relative;
+        height: 100%;
         border-radius: var(--starci-core-surface-radius, 1rem);
         overflow: visible;
     }
@@ -2100,20 +2103,21 @@
     .starci-core-workspace-shell-layout[data-grammar-workspace-align="start"] { align-items: start; }
     .starci-core-workspace-shell-layout[data-grammar-workspace-align="stretch"] { align-items: stretch; }
     .starci-core-workspace-shell-navigation { grid-area: navigation; }
-    .starci-core-workspace-shell-primary { grid-area: primary; }
     .starci-core-workspace-shell-rail { grid-area: rail; }
 
     .starci-core-workspace-shell-navigation,
-    .starci-core-workspace-shell-primary,
     .starci-core-workspace-shell-rail {
         width: 100%;
         min-width: 0;
     }
 
     .starci-core-workspace-shell-primary {
+        grid-area: primary;
         display: flex;
         flex-direction: column;
         gap: var(--grammar-region-gap, 1.5rem);
+        width: 100%;
+        min-width: 0;
         outline: none;
     }
 
@@ -2320,21 +2324,6 @@
         justify-content: flex-end;
         padding: 0.5rem 1rem;
         border-bottom: 1px solid var(--separator, var(--starci-core-separator, GrayText));
-    }
-
-    .starci-core-chat-workspace-rail-trigger {
-        display: inline-flex;
-        min-width: 2.75rem;
-        min-height: 2.75rem;
-        align-items: center;
-        justify-content: center;
-        padding-inline: 0.75rem;
-        border: 1px solid var(--separator, var(--starci-core-separator, GrayText));
-        border-radius: var(--starci-core-control-radius, 0.75rem);
-        background: var(--surface, var(--starci-core-surface, Canvas));
-        color: var(--foreground, var(--starci-core-foreground, CanvasText));
-        font-size: 0.875rem;
-        font-weight: 500;
     }
 
     .starci-core-chat-workspace-rail-trigger:focus-visible,
@@ -2570,19 +2559,6 @@
 
     .starci-core-surface-card.starci-core-form-surface--compact {
         width: min(100%, var(--starci-core-form-compact-measure, 28rem)) !important;
-    }
-
-    .starci-core-surface-label {
-        padding: 0 !important;
-    }
-
-    .starci-core-surface {
-        padding: 0 !important;
-    }
-
-    .starci-core-surface-highlight {
-        position: relative;
-        height: 100%;
     }
 
     /* --- Surface list --- */
@@ -2959,7 +2935,6 @@
     /* Authored overflow behaviour: wrap is the resting answer, the other two are opted into. */
     .starci-core-text[data-overflow="wrap"] {
         overflow-wrap: anywhere;
-        word-break: break-word;
     }
 
     .starci-core-text[data-overflow="truncate"] {
@@ -3136,6 +3111,18 @@
 
     /* --- Chat workspace: the compact rail trigger's resting paint. --- */
     .starci-core-chat-workspace-rail-trigger {
+        display: inline-flex;
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+        align-items: center;
+        justify-content: center;
+        padding-inline: 0.75rem;
+        border: 1px solid var(--separator, var(--starci-core-separator, GrayText));
+        border-radius: var(--starci-core-control-radius, 0.75rem);
+        background: var(--surface, var(--starci-core-surface, Canvas));
+        color: var(--foreground, var(--starci-core-foreground, CanvasText));
+        font-size: 0.875rem;
+        font-weight: 500;
         box-shadow: 0 1px 2px 0 color-mix(in srgb, CanvasText 8%, transparent);
         outline: none;
         transition: background-color var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));

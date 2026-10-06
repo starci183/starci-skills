@@ -281,7 +281,7 @@ async function reconcileJob(ctx, ledgerId, jobId, settings) {
   const key = jobKey(ledgerId, jobId);
   if (terminalRuns.get(key) === s.kind) return { ok: true, action: 'terminal', step: s.kind, why: 'workflow-archived' };
   const r = await actJob(ctx, ledgerId, jobId, f, s, settings);
-  if (r && r.ok === false && isArchivedRefusal(r)) {
+  if (r?.ok === false && isArchivedRefusal(r)) {
     terminalRuns.set(key, s.kind);
     ctx.log('reconciler.event', `job ${key} ${s.kind}: workflow-archived refused the write; terminal, not retried`, { kind: 'reconciler.terminal-refusal', key, step: s.kind });
     return { ...r, ok: true, action: s.kind, terminal: 'workflow-archived' };
@@ -449,7 +449,7 @@ async function reconcileHealth(ctx, settings, { list = null } = {}) {
       healthMem.set(j.job_id, next);
     }
   }
-  for (const id of [...healthMem.keys()]) if (!seen.has(id)) healthMem.delete(id); // a job no longer live forgets its probe memory
+  for (const id of healthMem.keys()) if (!seen.has(id)) healthMem.delete(id); // a job no longer live forgets its probe memory
   return out;
 }
 export const _health = { reset: () => { healthMem.clear(); lastSendAt = 0; }, mem: healthMem };

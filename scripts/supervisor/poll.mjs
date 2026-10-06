@@ -188,7 +188,7 @@ const newArtifacts = (repo, sinceMs) => {
       try { const st = fs.statSync(p); if (st.mtimeMs > sinceMs) found.push({ path: p, mtime: st.mtimeMs }); } catch { /* skip */ }
     }
   }
-  return found.sort((a, b) => b.mtime - a.mtime).slice(0, 12);
+  return found.toSorted((a, b) => b.mtime - a.mtime).slice(0, 12);
 };
 
 // --- health the supervisor must raise on its own -------------------------------

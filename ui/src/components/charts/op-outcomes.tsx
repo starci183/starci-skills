@@ -12,7 +12,7 @@ import { t } from '../../i18n/t';
 const ROW = 46;
 const order: AttemptState[] = ['pass', 'bad', 'run', 'settling', 'retry', 'dropped', 'unknown'];
 
-export function OpOutcomes({ rows }: { rows: AttemptRow[] }) {
+export function OpOutcomes({ rows }: { readonly rows: AttemptRow[] }) {
   const [ref, width] = useWidth();
   const groups = [...groupBy(rows, row => row.op).entries()].map(([op, list]) => ({ op, ...counts(list) })).sort((a, b) => b.total - a.total || a.op.localeCompare(b.op));
   const max = Math.max(1, ...groups.map(g => g.total));

@@ -4,9 +4,9 @@ import { isMain } from '../lib/is-main.mjs';
 import { workCli } from '../lib/work-cli.mjs';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {isPlainObject} from '../../engine/plain-object.mjs';import {sha256File} from '../../engine/digest.mjs';
-import {ID_RE, walk as walkAll} from '../work/validate/check-example-work.mjs';
+import {ID_RE} from '../work/validate/check-example-work.mjs';
 import { readWorkTree } from '../lib/work-tree.mjs';
-import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../work/record-ownership.mjs';
+import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, splitRef, resolveRecordRef} from '../work/record-ownership.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
 import { canonicalJSON } from '../../engine/canonical-json.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
@@ -44,7 +44,7 @@ const HEADER = [
 ].join('\n')+'\n';
 
 
-const isoTime = v => typeof v === 'string' && Number.isFinite(Date.parse(v)) ? Date.parse(v) : NaN;
+const isoTime = v => typeof v === 'string' && Number.isFinite(Date.parse(v)) ? Date.parse(v) : Number.NaN;
 
 
 /** Every id-shaped string under `value`, tagged with the dotted key path it was found at (arrays do not add

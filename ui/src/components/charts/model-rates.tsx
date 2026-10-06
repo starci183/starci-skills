@@ -11,13 +11,13 @@ import { t } from '../../i18n/t';
 
 const ROW = 76;
 
-function AgentGlyph({ model, pool, agent: agentId }: { model: string; pool: string | null; agent: string | null }) {
+function AgentGlyph({ model, pool, agent: agentId }: Readonly<{ model: string; pool: string | null; agent: string | null }>) {
   const agent = agentOf({ model, pool, agent: agentId });
   const tint = familyTint[agent.family];
   return <foreignObject x={0} y={-3} width={22} height={22}><span className="grid size-5 place-items-center rounded-full border p-[3px]" style={tintStyle(tint.tone)} title={[tint.name, pool, model].filter(Boolean).join(' · ')}><AgentMark family={agent.family} initial={model[0]?.toUpperCase()} /></span></foreignObject>;
 }
 
-export function ModelRates({ rows }: { rows: AttemptRow[] }) {
+export function ModelRates({ rows }: Readonly<{ rows: AttemptRow[] }>) {
   const [ref, width] = useWidth();
   const models = [...groupBy(rows, row => row.model ?? t('model unknown')).entries()].map(([model, list]) => {
     const first = list.filter(r => r.attempt === 1 && isVerdictSettled(r));
