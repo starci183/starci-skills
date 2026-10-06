@@ -68,7 +68,8 @@ export function backupDue({ ledgerId, now, dir, backupHour, exists = fs.existsSy
 
 /** The backups of one ledger beyond the newest `keep`, oldest first to delete. Pure over a file list. */
 function prunePlan(files, { ledgerId, keep }) {
-  const re = new RegExp(String.raw`^${safeId(ledgerId).replaceAll('.', String.raw`\.`)}-(\d{8})\.sqlite$`);
+  const escapedDot = String.raw`\.`;
+  const re = new RegExp(String.raw`^${safeId(ledgerId).replaceAll('.', escapedDot)}-(\d{8})\.sqlite$`);
   const mine = files.filter((f) => re.test(f)).sort();
   return mine.slice(0, Math.max(0, mine.length - keep));
 }
