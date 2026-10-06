@@ -2645,12 +2645,11 @@ HFS_FORBIDDEN_PRESENT:
 HFS_INLINE_SUPPRESSION:
   title: "Inline lint or type suppression"
   title_vi: "Chú thích tắt luật tại chỗ"
-  meaning_vi: "Có chú thích tắt luật hoặc miễn trừ trong mã: eslint-disable, eslint-enable, eslint-env, /* global */, stylelint-disable, @ts-ignore, @ts-expect-error, @ts-nocheck (ở bất kỳ vị trí nào trong chú thích), istanbul, c8 hay v8 ignore, NOSONAR, sonar-disable, prettier-ignore hoặc vn-ok. HFS không cho tắt luật, bỏ kiểm tra kiểu, giấu độ phủ hay giấu phát hiện Sonar tại chỗ."
+  meaning_vi: "Có chú thích tắt luật hoặc miễn trừ trong mã: eslint-disable, eslint-enable, eslint-env, /* global */, stylelint-disable, @ts-ignore, @ts-expect-error, @ts-nocheck (ở bất kỳ vị trí nào trong chú thích), istanbul, c8 hay v8 ignore, NOSONAR, sonar-disable hoặc prettier-ignore. HFS không cho tắt luật, bỏ kiểm tra kiểu, giấu độ phủ hay giấu phát hiện Sonar tại chỗ."
   causes_vi:
     - "eslint-disable hoặc stylelint-disable (dòng, dòng kế tiếp hoặc cả tệp) để qua một luật"
     - "@ts-ignore hoặc @ts-expect-error để qua lỗi kiểu"
     - "istanbul, c8 hay v8 ignore để giấu mã khỏi độ phủ; NOSONAR hay sonar-disable để giấu phát hiện; prettier-ignore để bỏ định dạng"
-    - "vn-ok để miễn luật ngôn ngữ"
   nextStep_vi: "Sửa mã cho đúng luật, hoặc đề xuất đổi luật trong canon; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
@@ -12949,7 +12948,7 @@ FE_I18N_LITERAL:
   title_vi: "Chữ hiển thị không đi qua t()"
   meaning_vi: "Chữ `\\\"<text>\\\"` ở `<file>:<line>` không đi qua `t()`."
   causes_vi:
-    - "Vi phạm luật R58: Không chữ hiển thị (JSX text, `aria-label`, `title`, `placeholder`, `alt`, object copy) ở MỌI tầng, mọi ngôn ngữ; không `vn-ok`; `<html lang>` lấy từ `[locale]`."
+    - "Vi phạm luật R58: Không chữ hiển thị (JSX text, `aria-label`, `title`, `placeholder`, `alt`, object copy) ở MỌI tầng, mọi ngôn ngữ; `<html lang>` lấy từ `[locale]`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding

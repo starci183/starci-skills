@@ -21,7 +21,7 @@ gatheredPluginSpec({ side: "fe", dir: HERE, plugin, lawOwners, recommended, rule
 
 test("fe: the plugin publishes rules only - no repository audit rides beside it", async () => {
   const module = await import("./index.mjs")
-  assert.equal(module.audits, undefined, "the effective-config audit is superseded by the managed eslint.config.mjs (R17)")
+  assert.equal(module.audits, undefined, "the plugin exports rules only; the managed eslint.config.mjs carries the effective config (R17)")
   assert.equal(module.auditOwners, undefined)
 })
 
@@ -34,8 +34,6 @@ test("fe: the gathered config refuses inline lint directives and reports dead on
   assert.deepEqual(linterOptions, { noInlineConfig: true, reportUnusedDisableDirectives: "error" })
 })
 
-test("fe: the retired second-language rule and the vocabulary-only copy rule no longer exist", () => {
-  assert.equal(rules["no-second-language-in-source"], undefined)
-  assert.equal(rules["no-hardcoded-copy-in-vocabulary"], undefined)
+test("fe: the hardcoded-copy rule is published", () => {
   assert.equal(typeof rules["no-hardcoded-copy"]?.create, "function")
 })

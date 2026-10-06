@@ -15,7 +15,7 @@ import { artifactHoldOf } from '../../scripts/machine/artifact-hold.mjs';
 import { recordCheck } from '../../scripts/machine/evidence-store.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs'; const R = path.join(os.tmpdir(), 'repo').replace(/\\/g, '/');
 
-// Typed logs (scripts/kernel/typed-logs.mjs): rows in the ledger's logs table (<repo>/.starciwork/runtime.sqlite),
+// Typed logs (scripts/kernel/typed-logs.mjs): rows in the ledger's logs table (the project's runtime.sqlite),
 // validated per kind, redacted at write, capped per job, append-only; sidecar ingest and event derivation
 // are idempotent.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -196,11 +196,16 @@ test('starci kernel log: a kernel logs a typed row without a ledger write; an op
 
 test('housekeeping never removes the ledger holding the logs (artifact-hold)', (t) => {
   const repo = repoDir(t);
-  const ledger = path.join(repo, '.starciwork', 'runtime.sqlite');
+  const local = path.join(repo, 'host-state');
+  const ledger = path.join(local, 'projects', 'led-00000001', 'runtime.sqlite');
   fs.mkdirSync(path.dirname(ledger), { recursive: true });
   fs.writeFileSync(ledger, '');
-  const hold = artifactHoldOf(path.join(repo, '.starciwork'), { repos: [{ repo, ledger }] });
+  const hold = artifactHoldOf(path.join(local, 'projects'), { repos: [{ repo, ledger }] });
   assert.ok(hold);
-  assert.deepEqual(hold.paths, ['.starciwork/runtime.sqlite']);
+  assert.deepEqual(hold.paths, ['runtime.sqlite']);
+  assert.equal(artifactHoldOf(ledger, { repos: [{ repo, ledger }] })?.ledger, ledger);
   assert.equal(artifactHoldOf(path.join(repo, 'src'), { repos: [{ repo, ledger }] }), null);
+  const env = { ...process.env, STARCI_LOCAL_ROOT: local };
+  assert.match(artifactHoldOf(path.join(local, 'projects'), { repos: null, env })?.error ?? '', /registry cannot be read/, 'an unreadable registry holds the projects root');
+  assert.equal(artifactHoldOf(path.join(repo, 'src'), { repos: null, env }), null);
 });

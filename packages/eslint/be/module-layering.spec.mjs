@@ -27,12 +27,11 @@ const IN_LOGGING = at("src/modules/platform/logging/json-logger.service.ts")
 const IN_FEATURE = at("src/features/api/checkout/application/place.handler.ts")
 const IN_APP_ROOT = at("apps/api/src/app.module.ts")
 
-test("every rule this law declares is exported under its published name, and the old name is gone", () => {
+test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
     assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
   }
   assert.ok(rules["import-owner-entry"])
-  assert.equal(rules["must-deep-module-import"], undefined)
 })
 
 test("R30: another owner is imported through its public entry, never through a path into it", () => {

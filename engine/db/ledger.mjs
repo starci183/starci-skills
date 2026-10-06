@@ -986,7 +986,7 @@ function pruneAttemptSnapshots(dbOrLedger,{now=nowMs(),passMs,failMs}){
 }
 
 // --- workflow purge (the one delete path: archive verified first, then one cascading DELETE) --------------------------
-/** Upsert the workflow_purges tombstone; the table CHECK refuses deleting/purged without approval and a verified archive. */
+/** Upsert the workflow_purges record; the table CHECK refuses deleting/purged without approval and a verified archive. */
 export function recordPurge(db,{workflowId,state,at=nowMs(),...fields}){
   const prior=db.prepare('SELECT 1 FROM workflow_purges WHERE workflow_id=?').get(workflowId);
   if(!prior)insertRow(db,'workflow_purges',{workflowId,state,createdAt:at,...fields});

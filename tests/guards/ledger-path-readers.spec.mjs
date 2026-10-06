@@ -1,13 +1,11 @@
-// legacy-ledger-path-readers.spec.mjs — repo-keyed ledger readers resolve a repo's runtime.sqlite through the
-// machine registry (decision Q1: engine/db/ledger.mjs ledgerFileFor -> machine.sqlite ledgers.file ->
-// <runtime root>/.runtime/projects/<ledger id>/runtime.sqlite), never the pre-Q1 in-repo .starciwork/runtime.sqlite
-// (cluster legacy-ledger-path-readers). The owner digest and the deps guard's peer-lease read opened the in-repo
-// path only: nivo-backend (no in-repo file) contributed nothing to the digest, and mia-mia-backend / starci-next
-// would have surfaced their stale in-repo stores instead of the live ledger.
+// ledger-path-readers.spec.mjs — repo-keyed ledger readers resolve a repo's runtime.sqlite through the
+// machine registry (engine/db/ledger.mjs ledgerFileFor -> machine.sqlite ledgers.file ->
+// <runtime root>/.runtime/projects/<ledger id>/runtime.sqlite); a file inside the checkout is never a ledger source.
+// The owner digest and the deps guard's peer-lease read both go through that one resolver.
 //   1. A repo whose ledger lives only at the registry path IS read: its owner-wait DI reaches digestInputs'
 //      ownerWaits, and peerLeasedJobs reports its leased jobs ({known:true}).
-//   2. A stale in-repo runtime.sqlite beside a registered ledger is never opened: its phantom owner DI and
-//      phantom leased job stay invisible to both readers.
+//   2. A runtime.sqlite inside the checkout beside a registered ledger is never opened: its owner DI and
+//      leased job stay invisible to both readers.
 //   3. A repo with no resolvable ledger is a quiet skip ({known:false}, no ownerWaits line, no throw), and a repo the
 //      registry never named is NOT read through an in-repo store either: ledgerFileFor is the one resolver.
 import test from 'node:test';
@@ -31,7 +29,7 @@ const leasedOp = (jobId) => ({ jobId, opId: 'backend.implement', status: 'leased
 test('a repo whose ledger lives only at the registry path is read by the digest and the deps guard', async (t) => {
   await withLedger(t, async ({ repoRoot, ledger }) => {
     // withLedger parks the ledger at ledgerFileFor(repoRoot) and registers it in the test machine.sqlite —
-    // exactly the post-Q1 shape: nothing at <repo>/.starciwork/runtime.sqlite.
+    // the one ledger location: nothing at <repo>/.starciwork/runtime.sqlite.
     seedWorkflow(ledger, { id: 'wf-live', jobs: [leasedOp('op-live')] });
     ownerWait(ledger, 'wf-live', 'owner must pick an option for wf-live');
 
@@ -45,24 +43,24 @@ test('a repo whose ledger lives only at the registry path is read by the digest 
   });
 });
 
-test('a stale in-repo runtime.sqlite beside a registered ledger is never read', async (t) => {
+test('a runtime.sqlite inside the checkout beside a registered ledger is never read', async (t) => {
   await withLedger(t, async ({ repoRoot, ledger }) => {
     seedWorkflow(ledger, { id: 'wf-live', jobs: [leasedOp('op-live')] });
     ownerWait(ledger, 'wf-live', 'the live owner wait');
-    // The pre-Q1 leftover inside the checkout: a valid ledger file whose rows are the dead store's (it is never
-    // registered — repoRootOfFile knows only the projects path, so openLedger writes no registry row for it).
-    const stale = openLedger({ file: path.join(repoRoot, '.starciwork', 'runtime.sqlite') });
+    // A ledger-shaped file inside the checkout (it is never registered — repoRootOfFile knows only the projects
+    // path, so openLedger writes no registry row for it).
+    const inCheckout = openLedger({ file: path.join(repoRoot, '.starciwork', 'runtime.sqlite') });
     try {
-      seedWorkflow(stale, { id: 'wf-stale', jobs: [leasedOp('op-ghost')] });
-      ownerWait(stale, 'wf-stale', 'a phantom wait from the stale store');
-    } finally { stale.close(); }
+      seedWorkflow(inCheckout, { id: 'wf-in-checkout', jobs: [leasedOp('op-ghost')] });
+      ownerWait(inCheckout, 'wf-in-checkout', 'a wait from the in-checkout file');
+    } finally { inCheckout.close(); }
 
     const inputs = await digestInputs({ env: process.env, now: 120_000, repos: [repoRoot] });
     assert.deepEqual(inputs.ownerWaits, ['wf-live: the live owner wait'],
-      'the stale store\'s DI stays out of the digest');
+      'the in-checkout file\'s DI stays out of the digest');
 
     const peers = await peerLeasedJobs({ ledgerRepo: repoRoot, workflowId: 'wf-self' });
-    assert.deepEqual(peers.jobs.map((j) => j.jobId), ['op-live'], 'the phantom lease never surfaces');
+    assert.deepEqual(peers.jobs.map((j) => j.jobId), ['op-live'], 'the in-checkout lease never surfaces');
   });
 });
 
@@ -76,16 +74,16 @@ test('a repo with no resolvable ledger is a quiet skip, and an in-repo store of 
     assert.deepEqual(await peerLeasedJobs({ ledgerRepo: bare, workflowId: 'wf-x' }), { known: false, jobs: [] });
 
     // The registry never named this checkout: an in-repo file is not a ledger, so it contributes nothing.
-    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-legacy-only-'));
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-in-checkout-only-'));
     t.after(() => fs.rmSync(repo, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
     fs.mkdirSync(path.join(repo, '.starciwork'));
-    const legacy = openLedger({ file: path.join(repo, '.starciwork', 'runtime.sqlite') });
+    const inCheckoutOnly = openLedger({ file: path.join(repo, '.starciwork', 'runtime.sqlite') });
     try {
-      seedWorkflow(legacy, { id: 'wf-legacy', jobs: [leasedOp('op-old')] });
-      ownerWait(legacy, 'wf-legacy', 'the only store this checkout has');
-    } finally { legacy.close(); }
-    const legacyInputs = await digestInputs({ env: process.env, now: 120_000, repos: [repo] });
-    assert.deepEqual(legacyInputs.ownerWaits, []);
+      seedWorkflow(inCheckoutOnly, { id: 'wf-in-checkout-only', jobs: [leasedOp('op-old')] });
+      ownerWait(inCheckoutOnly, 'wf-in-checkout-only', 'the only store this checkout has');
+    } finally { inCheckoutOnly.close(); }
+    const inCheckoutInputs = await digestInputs({ env: process.env, now: 120_000, repos: [repo] });
+    assert.deepEqual(inCheckoutInputs.ownerWaits, []);
     assert.deepEqual(await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-x' }), { known: false, jobs: [] });
   });
 });

@@ -174,7 +174,7 @@ ruleParams:
       http: [platform/http]
       https: [platform/http]
       cache-manager: [integrations/cache, integrations/redis]
-      "@nestjs/cache-manager": [integrations/cache, integrations/redis]     # the CACHE_MANAGER token: caching goes through the cache capability (retired local rule must-use-cache-service)
+      "@nestjs/cache-manager": [integrations/cache, integrations/redis]     # the CACHE_MANAGER token: caching goes through the cache capability
       redis: [integrations/cache, integrations/redis]
       ioredis: [integrations/cache, integrations/redis]
       bullmq: [platform/queue]               # pattern queue: BullMQ jobs and job schedulers (the relay of the outbox into queues)

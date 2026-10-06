@@ -10,7 +10,7 @@ import { noAuthUseGuards, rules } from "./authorization.mjs"
 const tester = typedTester()
 const CONTROLLER = at("src/features/api/plan/transport/http/create-plan.controller.ts")
 
-test("the law publishes exactly the guard rule and not the retired identity-needs-guard", () => {
+test("the law publishes exactly the guard rule", () => {
     if (Object.keys(rules).join() !== "no-auth-use-guards") throw new Error("authorization law must ship only no-auth-use-guards")
 })
 

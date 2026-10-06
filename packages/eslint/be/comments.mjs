@@ -12,7 +12,7 @@
  *     (`e2e`, `fixtures` of the slot manifest) document their spec-read shapes at the type.
  *   - `require-enum-member-jsdoc` checks an adjacent non-empty description, never whether it states a
  *     consequence. That half is read by a person, and the rule says so rather than pretending.
- *   - `no-non-ascii-source` takes no exemption marker: HFS removed `vn-ok`, so text a program depends on
+ *   - `no-non-ascii-source` takes no exemption marker, so text a program depends on
  *     lives in a message catalog (slot be.domain.messages, of any module tier, or be.feature.messages), the only place Vietnamese may appear. Specs
  *     and fixtures get no exemption.
  *   - `no-restated-name-jsdoc` (law 7) holds the decidable slice of law 3 - a doc block whose only

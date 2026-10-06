@@ -29,9 +29,9 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 const LEDGER_WIDE=['artifact_proofs','blob_ref_columns','blobs','foundations','job_transitions','log_cursors',
   'logs_fts','logs_fts_config','logs_fts_data','logs_fts_docsize','logs_fts_idx','meta','path_transfers',
   'report_attachments','resources','ui_state_map','ui_states','work_citations','workflow_transitions'];
-// workflow_purges carries the workflow_id of a workflow the owner-approved purge DELETED: it is the tombstone naming the
+// workflow_purges carries the workflow_id of a workflow the owner-approved purge DELETED: it is the record naming the
 // verified evidence archive (path, sha256, events head), so it must outlive its workflow - the one deliberate exception.
-const TOMBSTONES=['workflow_purges'];
+const PURGE_RECORDS=['workflow_purges'];
 
 const withLedger=fn=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-shape-'));
@@ -45,7 +45,7 @@ const parentsOf=(ledger,table)=>ledger.db.prepare(`PRAGMA foreign_key_list(${tab
 test('every workflow-owned table reaches workflows, directly or through its job',()=>withLedger(ledger=>{
   const orphans=[];
   for(const table of tablesOf(ledger)){
-    if(table==='workflows'||TOMBSTONES.includes(table)||!columnsOf(ledger,table).includes('workflow_id'))continue;
+    if(table==='workflows'||PURGE_RECORDS.includes(table)||!columnsOf(ledger,table).includes('workflow_id'))continue;
     const parents=parentsOf(ledger,table);
     // unit_edges reaches workflows through work_units; leases reaches it through jobs.
     if(!parents.includes('workflows')&&!(table==='leases'&&parents.includes('jobs'))

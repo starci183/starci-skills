@@ -92,7 +92,7 @@ export const why = {
   "no-hardcoded-copy": {
     code: "FE_I18N_LITERAL",
     en: "The text `\"<text>\"` in `<file>:<line>` does not go through `t()`.",
-    fix: "Move the sentence into `modules/i18n/messages/<locale>.json` and read it with `t(\"key\")`; no exceptions and no `vn-ok`.",
+    fix: "Move the sentence into `modules/i18n/messages/<locale>.json` and read it with `t(\"key\")`; no exceptions.",
   },
   "no-raw-brand-value": {
     code: "FE_STYLE_TOKEN_ONLY",
@@ -127,7 +127,7 @@ export const why = {
   "no-inline-lint-config": {
     code: "HFS_INLINE_SUPPRESSION",
     en: "A comment disabling a rule sits at `<file>:<line>`. HFS does not allow in-place suppression - fix the code, or propose a rule change.",
-    fix: "Remove `eslint-disable`, `@ts-ignore`, `@ts-expect-error` or `vn-ok` and fix the cause.",
+    fix: "Remove `eslint-disable`, `@ts-ignore` or `@ts-expect-error` and fix the cause.",
   },
   "no-double-cast": {
     code: "FE_TYPE_ESCAPE",

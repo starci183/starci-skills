@@ -20,7 +20,7 @@
 //      and the manifest's own sha256 recorded; state 'archived', verified_at set. No delete happens before this;
 //   4. DELETE: state 'deleting' (the table CHECK refuses it without the approval and a verified archive; the events and
 //      logs delete guards open only now), one DELETE of the workflows row that cascades to every workflow table
-//      (engine/db/ledger.mjs deleteWorkflowRows); state 'purged'. The workflow_purges row stays as the tombstone that
+//      (engine/db/ledger.mjs deleteWorkflowRows); state 'purged'. The workflow_purges row stays as the record that
 //      names the archive (path, sha256, bytes, manifest sha256, events head, counts).
 // Blobs are archived but never deleted here: the blob GC (mark and sweep over every ledger) owns their lifetime.
 import fs from 'node:fs';
@@ -40,7 +40,7 @@ const LIVE = new Set([...JOB_STATUSES.dispatchable, ...JOB_STATUSES.fenced]);
 const today = () => new Date().toISOString().slice(0, 10).replaceAll('-', '');
 const refuse = (code, message) => Object.assign(new Error(message), { code });
 
-/** Every table of the ledger with a workflow_id column (never workflow_purges, the tombstone). */
+/** Every table of the ledger with a workflow_id column (never workflow_purges, the purge record). */
 function workflowTables(db) {
   return db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((r) => r.name)
     .filter((t) => t !== 'workflow_purges' && db.prepare(`PRAGMA table_info(${t})`).all().some((c) => c.name === 'workflow_id'));

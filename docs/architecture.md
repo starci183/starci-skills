@@ -166,8 +166,8 @@ repeatedly is replaced.
 
 `starci reconciler up` (`scripts/reconciler/start.mjs`, with `skills/starci/references/host-startup.md` as its internal
 procedure; `starci reconciler restart` is the restart lever) runs, in order: preflight (Node bundles
-SQLite >= 3.51.3, `machine.sqlite` quick_check, every registered ledger's quick_check, ledgers on temp/test paths or with a missing repo or file, legacy
-in-repo `.starciwork/runtime.sqlite`, kernel/supervisor pins whose agent card cannot attest the model, Orca reachable);
+SQLite >= 3.51.3, `machine.sqlite` quick_check, every registered ledger's quick_check, ledgers on temp/test paths or with a missing repo or file,
+kernel/supervisor pins whose agent card cannot attest the model, Orca reachable);
 reports a `reconciler.profile` other than operational as red (`config.yaml` is never rewritten by a plain run; `--set-profile operational|observe` writes that one block, backup first);
 rebuilds `ui/dist` with `npm run build` in `ui/` when any `ui/src`, `ui/package.json`, `ui/index.html` or vite config is
 newer than the build (a failed build is red); starts the engine, or restarts it out of `--safe` when no real crash loop

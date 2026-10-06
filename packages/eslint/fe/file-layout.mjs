@@ -346,7 +346,7 @@ export const sourceTierMarkerMatchesFolder = {
   },
 }
 
-/** `shells/` no longer exists; vendor mechanics are closed named branches. */
+/** `shells/` is not a tier; vendor mechanics are closed named branches. */
 export const noShellTier = {
   meta: {
     type: "problem",

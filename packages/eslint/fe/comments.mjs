@@ -6,8 +6,7 @@
  * chunks and JSX text alike - everywhere prose can hide in a source file.
  *
  * `no-vietnamese-in-source` holds the English-only law: identifiers, string literals, template text, JSX text,
- * comments and test titles carry no Vietnamese letter. The old `vn-ok: <reason>` pragma is gone (it was used 490
- * times in one repository, and one escape is enough to turn a rule into a comment convention). Detection is
+ * comments and test titles carry no Vietnamese letter. There is no exemption marker. Detection is
  * structural on characters (`scripts/lib/language.mjs`, folded to NFC), never a word list.
  *
  * The exceptions that remain are placements, not judgements, and that is on purpose: a locale dictionary

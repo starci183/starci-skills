@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS goal_inputs(
   created_at    INTEGER NOT NULL,
   PRIMARY KEY(workflow_id,key)) STRICT;
 
--- workflow_purges: tombstone of the single delete path (no FK: survives the purge).
+-- workflow_purges: the record of the single delete path (no FK: survives the purge).
 CREATE TABLE IF NOT EXISTS workflow_purges(
   workflow_id     TEXT PRIMARY KEY,
   state           TEXT NOT NULL CHECK(state IN ('planned','archived','deleting','purged')),
