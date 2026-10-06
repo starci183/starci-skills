@@ -221,12 +221,14 @@ export async function runBlobGc({apply=false,env=process.env,now=Date.now(),rete
 
 function describe(r) {
   const L = [`blob GC ${r.apply ? 'APPLY' : 'dry run'} - store ${r.root}: ${r.stored} blob(s)`];
-  for (const s of r.sources) L.push(`  mark ${s.name.padEnd(28)} ${String(s.marks).padStart(7)} sha (${s.pinned} pinned, ${s.rows} blob rows)${s.error ? `  ! ${s.error}` : ''}`);
-  L.push(`  marked ${r.marked}; kept ${r.kept} pinned-only, ${r.young} younger than the 24 h grace`);
-  L.push(`  archive then remove: ${r.toArchive.length} blob(s) ${(r.archiveBytes / 1024 ** 2).toFixed(1)} MB; remove (already archived): ${r.toSweep.length} blob(s) ${(r.sweepBytes / 1024 ** 2).toFixed(1)} MB`);
-  if (r.blocked.length) L.push(`  ! sweeping nothing: ${r.blocked.join('; ')}`);
-  if (r.refused) L.push(`  refused: ${r.refused}`);
-  if (r.apply) L.push(`  effect state ${r.effectState}; freed ${(r.freedBytes / 1024 ** 2).toFixed(1)} MB`);
+  L.push(
+    ...r.sources.map((s) => `  mark ${s.name.padEnd(28)} ${String(s.marks).padStart(7)} sha (${s.pinned} pinned, ${s.rows} blob rows)${s.error ? `  ! ${s.error}` : ''}`),
+    `  marked ${r.marked}; kept ${r.kept} pinned-only, ${r.young} younger than the 24 h grace`,
+    `  archive then remove: ${r.toArchive.length} blob(s) ${(r.archiveBytes / 1024 ** 2).toFixed(1)} MB; remove (already archived): ${r.toSweep.length} blob(s) ${(r.sweepBytes / 1024 ** 2).toFixed(1)} MB`,
+    ...(r.blocked.length ? [`  ! sweeping nothing: ${r.blocked.join('; ')}`] : []),
+    ...(r.refused ? [`  refused: ${r.refused}`] : []),
+    ...(r.apply ? [`  effect state ${r.effectState}; freed ${(r.freedBytes / 1024 ** 2).toFixed(1)} MB`] : []),
+  );
   return L.join('\n');
 }
 
