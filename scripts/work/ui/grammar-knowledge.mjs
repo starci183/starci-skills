@@ -33,7 +33,7 @@ export const GRAMMAR_FAMILIES=Object.freeze([
 const read=file=>fs.readFileSync(file,'utf8');
 const lineAt=(text,offset)=>{let line=1;for(let i=0;i<offset&&i<text.length;i++){if(text.codePointAt(i)===10)line++;}return line;};
 const uniq=values=>[...new Set(values)];
-const byName=(a,b)=>{if(a<b)return -1;if(a>b)return 1;return 0;};
+const byName=(a,b)=>{if(a<b){return -1;}if(a>b){return 1;}return 0;};
 
 function defaultPaths(root=skillRoot){
   return {root,packageRoot:path.join(root,'packages','grammar'),grammarRoot:path.join(root,'knowledge','grammars')};
@@ -148,7 +148,7 @@ export function cssReads(css){
     if(match[2]){
       let depth=1,j=pattern.lastIndex;
       const start=j;
-    while(j<code.length&&depth){if(code[j]==='('){depth++;}else if(code[j]===')'){depth--;}j++;}
+      while(j<code.length&&depth){if(code[j]==='('){depth++;}else if(code[j]===')'){depth--;}j++;}
       fallback=code.slice(start,j-1).replace(/\s+/g,' ').trim();
     }
     reads.push({name:match[1],fallback,line:lineAt(code,match.index)});
@@ -455,7 +455,7 @@ function censusCommonTokens(packageRoot,renderers){
     }
     const first=uses[0];
     const writer=writes.get(name);
-    return {name,assignedBy:(()=>{if(writer)return 'renderer';if(name.startsWith('--starci-core-'))return 'family';return 'host';})(),
+    return {name,assignedBy:(()=>{if(writer){return 'renderer';}if(name.startsWith('--starci-core-')){return 'family';}return 'host';})(),
       ...(writer?{writtenBy:[...writer].sort(byName)}:{}),readBy:'common',
       ...(first.fallback===null?{}:{commonFallback:first.fallback}),uses:uses.length,source:`${rel(packageRoot,first.sheet)}:${first.line}`};
   });
@@ -494,7 +494,7 @@ function censusFamilyTokens(packageRoot,family,{commonTokens=[],include=[]}={}){
     if(rows.has(name))continue;
     const token=common.get(name);
     if(!token)continue;
-    rows.set(name,{name,value:token.value??token.commonFallback??null,valueFrom:(()=>{if(token.value!==undefined)return 'common';if(token.assignedBy==='renderer')return 'renderer';return 'common-fallback';})(),
+    rows.set(name,{name,value:token.value??token.commonFallback??null,valueFrom:(()=>{if(token.value!==undefined){return 'common';}if(token.assignedBy==='renderer'){return 'renderer';}return 'common-fallback';})(),
       source:token.source,overrides:[]});
   }
   return [...rows.values()].map(row=>{
@@ -540,7 +540,7 @@ export async function censusGrammar({packageRoot=defaultPaths().packageRoot}={})
     return fs.existsSync(full)?fs.readdirSync(full).filter(name=>name.endsWith('.css')).map(name=>stripCssComments(read(path.join(full,name)))):[];
   }).join('\n');
   const emitted=uniq(renderers.flatMap(r=>r.classes)).sort(byName);
-  const painted=emitted.filter(cls=>new RegExp(String.raw`\.${cls.replaceAll('-',String.raw`\-`)}(?![\w-])`).test(shipped));
+  const painted=emitted.filter(cls=>new RegExp('\\.'+cls.replaceAll('-','\\-')+'(?![\\w-])').test(shipped));
   const families={};
   for(const family of GRAMMAR_FAMILIES.filter(f=>f.dnaModule)){
     const dna=plain(await loadDnaModule(path.join(packageRoot,family.dnaModule)));
@@ -589,13 +589,13 @@ function censusDigests(packageRoot,files){
 
 const q=value=>JSON.stringify(String(value));
 const key=value=>/^[A-Za-z_]\w*$/.test(value)?value:q(value);
-const scalar=value=>{if(typeof value==='number'||typeof value==='boolean')return String(value);if(value===null)return 'null';return q(value);};
+const scalar=value=>{if(typeof value==='number'||typeof value==='boolean'){return String(value);}if(value===null){return 'null';}return q(value);};
 const flow=list=>`[${list.map(q).join(', ')}]`;
 
 /** A nested plain object as block YAML at `indent`. */
 function yamlObject(object,indent){
   const pad=' '.repeat(indent);
-  return Object.entries(object).map(([name,value])=>{if(value&&typeof value==='object'&&!Array.isArray(value))return `${pad}${key(name)}:\n${yamlObject(value,indent+2)}`;return `${pad}${key(name)}: ${Array.isArray(value)?flow(value):scalar(value)}`;}).join('\n');
+  return Object.entries(object).map(([name,value])=>{if(value&&typeof value==='object'&&!Array.isArray(value)){return `${pad}${key(name)}:\n${yamlObject(value,indent+2)}`;}return `${pad}${key(name)}: ${Array.isArray(value)?flow(value):scalar(value)}`;}).join('\n');
 }
 
 function yamlRenderers(renderers,{closedValues=false,source=true}={}){
