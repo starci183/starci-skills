@@ -264,3 +264,17 @@ test('private publication refuses a symbolic credential entry', {
   assert.deepEqual(publishSecret(request), { ok: false, effectState: 'none', reason: 'file-custody' });
   assert.deepEqual(fs.readFileSync(target), before);
 });
+
+test('private publication accepts a root spelled through a linked prefix and still refuses a linked root or leaf', t => {
+  const base = fs.realpathSync(mkdtemp(t, 'private-prefix-'));
+  const real = path.join(base, 'real'), via = path.join(base, 'via');
+  fs.mkdirSync(path.join(real, 'inner'), { recursive: true });
+  fs.symlinkSync(real, via, 'junction'); // a junction needs no privilege on Windows and is a plain directory link on POSIX
+  const before = Buffer.from('OTHER_TOKEN=fixture-only\n'), addition = Buffer.from('SELECTED_KEY=fixture-only\n');
+  const request = root => ({ root, name: 'credentials.env', before: null, addition, maxBytes: before.length + addition.length, assertLease: () => true });
+  const spelled = path.join(via, 'inner');
+  assert.equal(publishSecret(request(spelled)).ok, true, 'a linked prefix above the trusted root is only a spelling');
+  assert.deepEqual(fs.readFileSync(path.join(real, 'inner', 'credentials.env')), addition);
+  assert.deepEqual(publishSecret(request(via)), { ok: false, effectState: 'none', reason: 'root-custody' }, 'the root itself being a link is refused');
+  assert.equal(fs.existsSync(path.join(real, 'credentials.env')), false);
+});

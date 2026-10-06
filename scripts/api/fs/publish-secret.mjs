@@ -23,7 +23,9 @@ export function publishSecret({ root, name, before, addition, maxBytes, assertLe
   let fd = null, parentFd = null, mutated = false, outcome;
   const lease = () => { if (assertLease() !== true) refuse('lease-lost'); };
   const stat = p => fs.lstatSync(p, { bigint: true });
-  const canonical = p => samePath(path.resolve(fs.realpathSync(p)), path.resolve(p));
+  // The caller's root may be spelled through a symlinked prefix or an 8.3 name: it is canonicalised once; the root and its leaf are judged against that.
+  let realRoot;
+  const canonical = p => samePath(fs.realpathSync(p), p === root ? realRoot : path.join(realRoot, name));
   const plainFile = st => st.isFile() && !st.isSymbolicLink() && st.nlink === 1n;
   const matches = bytes => {
     const st = fs.fstatSync(fd, { bigint: true });
@@ -43,7 +45,8 @@ export function publishSecret({ root, name, before, addition, maxBytes, assertLe
   try {
     lease();
     const rootStat = stat(root);
-    if (!rootStat.isDirectory() || rootStat.isSymbolicLink() || !canonical(root)) refuse('root-custody');
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) refuse('root-custody');
+    realRoot = fs.realpathSync(root);
     if (platform !== 'win32') {
       parentFd = fs.openSync(root, fs.constants.O_RDONLY | (fs.constants.O_DIRECTORY ?? 0) | (fs.constants.O_NOFOLLOW ?? 0));
       if (!sameNode(rootStat, fs.fstatSync(parentFd, { bigint: true }))) refuse('root-custody');

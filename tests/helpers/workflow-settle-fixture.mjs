@@ -16,7 +16,6 @@ import { observationContextOf, observeCheck, stageObservation } from '../../scri
 import { classifyCheck, rerunCheck } from '../../scripts/kernel/settle/job-settle.mjs';
 import { recordCheck } from '../../scripts/machine/evidence-store.mjs';
 import { proofEntriesOf } from '../../scripts/kernel/mechanism-proofs.mjs';
-import { gateInputSnapshot } from '../../scripts/gates/gate.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const git = (cwd, ...args) => {
@@ -94,12 +93,10 @@ export function settleFixture(t, { baseText = 'base\n' } = {}) {
     assert.ok(owed.every((proof) => ['read-knowledge', 'doc-gate'].includes(proof)), 'fixture only owns native documentation proofs');
     const context = observationContextOf(db, job, { repo, skillRoot: ROOT });
     assert.ok(context, 'current fixture admission must require native mechanism observations');
-    const filed = JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE attempt_id=?').get(prepared.attemptId).context_json);
-    const target = filed.packet.context.gate_binding.targets.find((row) => path.resolve(row.root) === tree);
-    const changed = gateInputSnapshot(tree, target.head, [], target.owned).inputs.map((row) => row.path);
+    // The READ is the declared-law form `starci gate read --knowledge <filed knowledge>`: a --touch slice names only its slot's examples, while the filed READ owes the whole declared catalog.
     const knowledge = context.readRefs.filter((row) => row.rootKind === 'source' && row.path.startsWith('knowledge/')).map((row) => row.path);
     const commands = [
-      ['read-knowledge', ['node', path.join(ROOT, 'scripts/gates/read-digest.mjs'), '--root', tree, ...(changed.length ? ['--touch', ...changed] : []), '--knowledge', ...knowledge]],
+      ['read-knowledge', ['node', path.join(ROOT, 'scripts/gates/read-digest.mjs'), '--root', tree, '--knowledge', ...knowledge]],
       ['doc-gate', ['node', path.join(ROOT, 'scripts/cli/gate-run.mjs'), '--root', tree, '--scope', 'docs', '--tree', path.join(tree, 'docs')]],
     ];
     const files = [], scratch = path.join(base, 'proofs', jobId);
@@ -128,7 +125,7 @@ export function settleFixture(t, { baseText = 'base\n' } = {}) {
   const prepare = ({ jobId, opId = 'docs.author', outcome = 'done', checkExit = 0, report = true, ownedRoot = 'docs', payload = {}, arrange = () => {}, deferProofs = false }) => {
     const prepared = seed({ jobId, opId, status: 'running', dispatchId: `ctx-${jobId}`, payload: { opId, owned_paths: [`${ownedRoot}/`], ...payload } });
     const finish = (current) => {
-      const files = report && outcome === 'done' && checkExit === 0 ? proofs(current, jobId) : [];
+      const files = report ? proofs(current, jobId) : [];
       if (report) current.ledger.write.fileReport({ attemptId: current.attemptId, outcome, report: { schema: 'starci/op-report@1', outcome, summary: 'checkpoint fixture', files: [`${ownedRoot}/change.md`, ...files], head: git(tree, 'rev-parse', 'HEAD'),
         ...(outcome === 'blocked' ? { blocker: { kind: 'environment', detail: 'private fixture unavailable' } } : {}) } });
       if (checkExit !== null) current.ledger.write.recordCheckRun({ attemptId: current.attemptId, name: 'unit', phase: 'verify', runner: 'kernel', status: checkExit === 0 ? 'pass' : 'fail', exitCode: checkExit });
