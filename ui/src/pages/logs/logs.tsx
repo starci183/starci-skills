@@ -30,7 +30,7 @@ const asTime = (value: string | null) => {
 const fromTime = (value: string) => value ? String(new Date(value).getTime()) : '';
 const unique = (rows: LogRow[]): LogRow[] => [...new Map(rows.map((row) => [row.key, row])).values()].sort((a, b) => b.at - a.at || a.db.localeCompare(b.db) || b.seq - a.seq);
 
-function FilterFields({ filters, onChange, contract }: { filters: URLSearchParams; onChange: (name: string, value: string) => void; contract: ContractInfo | null }) {
+function FilterFields({ filters, onChange, contract }: Readonly<{ filters: URLSearchParams; onChange: (name: string, value: string) => void; contract: ContractInfo | null }>) {
   const fieldId = useId();
   const level = filters.get('minLevel') === 'warn' ? 'warn+' : filters.get('level') ?? 'all';
   const changeLevel = (value: string) => onChange('levelChoice', value);
@@ -48,13 +48,13 @@ function FilterFields({ filters, onChange, contract }: { filters: URLSearchParam
 const chipClass = 'max-w-full min-w-0 [&>select]:text-xs';
 const ranges = [['900000', 'Last 15 minutes'], ['3600000', 'Last hour'], ['86400000', 'Last 24 hours'], ['604800000', 'Last 7 days']] as const;
 
-function FilterBar({ filters, onChange, contract, onMore, activeCount, workflows }: { filters: URLSearchParams; onChange: (name: string, value: string) => void; contract: ContractInfo | null; workflows: Pick<WorkflowRow, 'id' | 'name' | 'project'>[]; onMore: () => void; activeCount: number }) {
+function FilterBar({ filters, onChange, contract, onMore, activeCount, workflows }: Readonly<{ filters: URLSearchParams; onChange: (name: string, value: string) => void; contract: ContractInfo | null; workflows: Pick<WorkflowRow, 'id' | 'name' | 'project'>[]; onMore: () => void; activeCount: number }>) {
   const level = filters.get('minLevel') === 'warn' ? 'warn+' : filters.get('level') ?? 'all';
   const customRange = filters.has('since') || filters.has('until');
   const chip = (active: boolean) => ({ className: `${chipClass}${active ? ' [&>select]:bg-muted' : ''}`, size: 'sm' as const, 'data-active': active });
   const advancedActive = filters.has('wf') || filters.has('actor') || filters.has('kind') || customRange || filters.has('since') || filters.has('until');
   const workflowValue = filters.has('wf') ? JSON.stringify([filters.get('project') ?? '', filters.get('wf')]) : '';
-  return <div className="flex flex-col gap-3" role="group" aria-label={t('Log filters')}>
+  return <fieldset className="min-w-0 flex flex-col gap-3" aria-label={t('Log filters')}>
     <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[12rem] flex-1 sm:max-w-sm"><Input type="search" className="h-8 text-xs" aria-label={t('Search the logs')} value={filters.get('q') ?? ''} onChange={(event) => onChange('q', event.target.value)} placeholder={t('Search the logs')} /></div>
         <NativeSelect aria-label={t('Minimum level')} {...chip(level !== 'all')} value={level} onChange={(event) => onChange('levelChoice', event.target.value)}><NativeSelectOption value="all">{t('All levels')}</NativeSelectOption><NativeSelectOption value="warn+">{t('Level ≥ warning')}</NativeSelectOption><NativeSelectOption value="error">{t('Errors only')}</NativeSelectOption><NativeSelectOption value="warn">{t('Warnings only')}</NativeSelectOption><NativeSelectOption value="info">{t('Info only')}</NativeSelectOption><NativeSelectOption value="debug">{t('Debug only')}</NativeSelectOption></NativeSelect>
@@ -69,7 +69,7 @@ function FilterBar({ filters, onChange, contract, onMore, activeCount, workflows
     <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={onMore}><SlidersHorizontal size={14} /> {t('More filters')}</Button>
       </div>
     </Advanced>
-  </div>;
+  </fieldset>;
 }
 
 export default function LogsPage() {
@@ -179,7 +179,7 @@ export default function LogsPage() {
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><div className="flex flex-wrap items-center gap-2"><span>{t('{n} rows loaded', { n: observed ? rows.length : '—' })}</span><span>{sources.length ? sources.map((source) => source === 'machine' ? t('machine') : source).join(' · ') : t('Unknown')}</span></div><div className="flex items-center gap-2"><span>{logs.meta ? t('Response read: {at}', { at: formatAbsolute(logs.meta.at) }) : t('No source timestamp yet')}</span><Button variant="ghost" size="icon" aria-label={t('Refresh')} onClick={logs.refresh}><RefreshCw size={15} /></Button></div></div>
       {streamEpoch === filterKey && pending.length > 0 && <div className="pointer-events-none sticky top-16 z-20 flex justify-center"><Button size="sm" className="pointer-events-auto rounded-full shadow-md" onClick={showPending}><ArrowUp size={14} /> {t('{n} new rows', { n: pending.length })}</Button></div>}
       {logs.error && <FeedbackState error onRetry={logs.refresh}>{logs.data ? t('The source is failing; keeping the last rows read. ') : t('Could not read the logs. ')}{logs.error}</FeedbackState>}
-      {partialSources(logs).length ? <p className="shell-error" role="status">{t('Source out of sync: {list}', { list: partialSources(logs).join(', ') })}</p> : null}
+      {partialSources(logs).length ? <output className="block shell-error">{t('Source out of sync: {list}', { list: partialSources(logs).join(', ') })}</output> : null}
       {!observed && !logs.error ? <PageSkeleton label={t('Reading the logs…')} /> : observed && (rows.length > 0 || !logs.error && !partialSources(logs).length) ? <LogView rows={rows} freshKeys={fresh} regionRef={regionRef} onRegionScroll={onRegionScroll} /> : null}
       {logs.loadMoreError && <FeedbackState error onRetry={logs.loadMoreErrorCode === 'BAD_CURSOR' ? logs.refresh : logs.loadMore}>{logs.loadMoreError}{logs.loadMoreErrorCode === 'BAD_CURSOR' ? ` · ${t('Refresh first page')}` : ''}</FeedbackState>}
       {logs.next && <Button variant="outline" className="w-full" disabled={logs.loadingMore} onClick={logs.loadMore}>{logs.loadingMore ? t('Loading…') : t('Load more')}</Button>}

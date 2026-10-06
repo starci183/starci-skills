@@ -18,18 +18,18 @@ export const concept: Concept = 'C6';
 const verdictWords: Record<string, string> = { pass: t('passed'), fail: t('failed'), partial: t('partial'), blocked: t('blocked'), dropped: t('dropped'), cancelled: t('cancelled') };
 const outcomeWords: Record<string, string> = { done: t('done'), partial: t('partial'), failed: t('failed'), ask: t('needs a question'), blocked: t('blocked') };
 
-function Crumb({ href, children }: { href: string; children: React.ReactNode }) {
+function Crumb({ href, children }: Readonly<{ href: string; children: React.ReactNode }>) {
   return <a className="hover:text-foreground hover:underline" href={href}>{children}</a>;
 }
 
-function SiblingLink({ target, label, dir }: { target: Ref; label: string; dir: 'prev' | 'next' }) {
+function SiblingLink({ target, label, dir }: Readonly<{ target: Ref; label: string; dir: 'prev' | 'next' }>) {
   return <a href={target.href} className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs text-muted-foreground hover:border-primary hover:text-foreground">
     {dir === 'prev' ? <ArrowLeft className="size-3.5" aria-hidden="true" /> : null}{label} #{target.id}{dir === 'next' ? <ArrowRight className="size-3.5" aria-hidden="true" /> : null}
   </a>;
 }
 
 /** Job try and dispatch sequence are distinct; the unit's current budget is reference metadata. */
-export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV3; project: string }) {
+export function AttemptHeader({ attempt, project }: Readonly<{ attempt: AttemptDetailV3; project: string }>) {
   const open = isOpen(attempt);
   const outcome = statusFromOutcome(attempt.reportOutcome);
   const verdict = statusFromVerdict(attempt.verdict, open && Boolean(attempt.reportedAt), attempt.ui);

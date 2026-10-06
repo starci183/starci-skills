@@ -33,7 +33,7 @@ function overall(row: WorkflowRowV2): { status: Status; label?: string } {
 }
 
 /** Essentials: name, status, one "why / working on" line, leg dots, x/y and one next action. The rest sits in "Advanced". */
-export function WorkflowCard({ row }: { row: WorkflowRowV2 }) {
+export function WorkflowCard({ row }: Readonly<{ row: WorkflowRowV2 }>) {
   const pipeline = row.pipeline;
   const agents = useAttemptAgents();
   const { running: activeAttempts, settling: reportedAttempts } = agents;
@@ -95,10 +95,10 @@ export function WorkflowCard({ row }: { row: WorkflowRowV2 }) {
       </dl>
       <p className="mt-3 text-xs text-muted-foreground">{t('Try values are recorded ordinals; budgets do not show spent business retries.')}</p>
       {(historyLegs.length > 0 || unboundLegs.length > 0) && <p className="mt-2 text-xs text-muted-foreground">{t('Workflow history does not prove completion of the current goal plan or an unbound planner instance.')}</p>}
-      {row.progressReadError && <p className="shell-error mt-3" role="status">{t('Progress observations are unavailable: {error}', { error: row.progressReadError })}</p>}
+      {row.progressReadError && <output className="shell-error mt-3 block">{t('Progress observations are unavailable: {error}', { error: row.progressReadError })}</output>}
       <p className="mt-2 text-xs text-muted-foreground">{t('Progress snapshot:')} {row.progressSnapshot ? <><TimeAgo at={row.progressSnapshot.at} /> · #{row.progressSnapshot.id}</> : t('Not observed.')}</p>
-      {agents.error && <p className="shell-error mt-3" role="status">{t('The source is failing; showing the last read. {error}', { error: agents.error })}</p>}
-      {hasUnavailableSources(agents.meta) && <p className="shell-error mt-3" role="status">{t('Some sources are unavailable; showing the recorded part.')}</p>}
+      {agents.error && <output className="shell-error mt-3 block">{t('The source is failing; showing the last read. {error}', { error: agents.error })}</output>}
+      {hasUnavailableSources(agents.meta) && <output className="shell-error mt-3 block">{t('Some sources are unavailable; showing the recorded part.')}</output>}
       {agents.meta?.next && <p className="mt-2 text-xs text-muted-foreground">{t('More active attempts are available in the attempt list.')}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-xs text-muted-foreground">
         <span>{t('Last event:')} <TimeAgo at={pipeline?.lastEventAt} /></span>

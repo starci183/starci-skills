@@ -15,12 +15,12 @@ export const concept: Concept = 'C6';
 const pathsOf = (svg: string) => [...svg.matchAll(/\sd="([^"]+)"/g)].map(match => match[1]);
 const marks = { claude: pathsOf(claudeSvg), codex: pathsOf(openaiSvg) } as const;
 
-function PathMark({ paths, fill }: { paths: readonly string[]; fill: string }) {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" className="size-full" style={{ fill }}>{paths.map((d, i) => <path key={i} d={d} />)}</svg>;
+function PathMark({ paths, fill }: { readonly paths: readonly string[]; readonly fill: string }) {
+  return <svg viewBox="0 0 24 24" aria-hidden="true" className="size-full" style={{ fill }}>{paths.map(d => <path key={d} d={d} />)}</svg>;
 }
 
 /** The agent family's official mark (the runtime has exactly Claude, Codex and Devin); unknown falls back to a letter. */
-export function AgentMark({ family, initial = '?' }: { family: AgentFamily; initial?: string }) {
+export function AgentMark({ family, initial = '?' }: { readonly family: AgentFamily; readonly initial?: string }) {
   switch (family) {
     case 'claude': return <PathMark paths={marks.claude} fill="var(--brand-claude)" />;
     case 'codex': return <PathMark paths={marks.codex} fill="var(--foreground)" />;

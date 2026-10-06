@@ -10,7 +10,7 @@ const BareContext = createContext(false);
 export const BareCards = BareContext.Provider;
 
 /** Section card used by every block of the attempt page: title, hint on the right, body. */
-export function Card({ id, title, hint, right, concept: c, children, className = '' }: { id?: string; title: ReactNode; hint?: ReactNode; right?: ReactNode; concept: Concept; children: ReactNode; className?: string }) {
+export function Card({ id, title, hint, right, concept: c, children, className = '' }: { readonly id?: string; readonly title: ReactNode; readonly hint?: ReactNode; readonly right?: ReactNode; readonly concept: Concept; readonly children: ReactNode; readonly className?: string }) {
   const bare = useContext(BareContext);
   if (bare) {
     return <ConceptBlock concept={c} as="section" aria-label={typeof title === 'string' ? title : undefined} className={`flex min-w-0 flex-col gap-4 ${className}`}>
@@ -33,6 +33,6 @@ export function Card({ id, title, hint, right, concept: c, children, className =
   </ConceptBlock>;
 }
 
-export function Empty({ children }: { children: ReactNode }) {
+export function Empty({ children }: { readonly children: ReactNode }) {
   return <FeedbackState>{children}</FeedbackState>;
 }

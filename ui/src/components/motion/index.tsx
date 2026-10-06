@@ -16,28 +16,28 @@ export const concept: Concept = 'frame';
 export const EASE = [0.2, 0.8, 0.2, 1] as const;
 export const DURATION = { fast: 0.15, base: 0.2, enter: 0.24 } as const;
 
-export function MotionProvider({ children }: { children: ReactNode }) {
+export function MotionProvider({ children }: Readonly<{ children: ReactNode }>) {
   return <MotionConfig reducedMotion="user" transition={{ duration: DURATION.base, ease: EASE }}>{children}</MotionConfig>;
 }
 
 /** Section/page enter: fade + 8 px slide up. `delay` in seconds. */
-export function Enter({ children, className, delay = 0, as = 'div' }: { children: ReactNode; className?: string; delay?: number; as?: 'div' | 'section' | 'li' | 'article' | 'main' }) {
+export function Enter({ children, className, delay = 0, as = 'div' }: Readonly<{ children: ReactNode; className?: string; delay?: number; as?: 'div' | 'section' | 'li' | 'article' | 'main' }>) {
   const Tag = motion[as];
   return <Tag className={className} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DURATION.enter, ease: EASE, delay }}>{children}</Tag>;
 }
 
 /** List that staggers its <StaggerItem> children once, on first render (40 ms apart). */
-export function Stagger({ children, className, as = 'div' }: { children: ReactNode; className?: string; as?: 'div' | 'ul' | 'ol' | 'section' }) {
+export function Stagger({ children, className, as = 'div' }: Readonly<{ children: ReactNode; className?: string; as?: 'div' | 'ul' | 'ol' | 'section' }>) {
   const Tag = motion[as];
   return <Tag className={className} initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}>{children}</Tag>;
 }
-export function StaggerItem({ children, className, as = 'div' }: { children: ReactNode; className?: string; as?: 'div' | 'li' | 'article' }) {
+export function StaggerItem({ children, className, as = 'div' }: Readonly<{ children: ReactNode; className?: string; as?: 'div' | 'li' | 'article' }>) {
   const Tag = motion[as];
   return <Tag className={className} variants={{ hidden: { opacity: 0, y: 6 }, show: { opacity: 1, y: 0, transition: { duration: DURATION.base, ease: EASE } } }}>{children}</Tag>;
 }
 
 /** Hover lift + press for clickable cards. */
-export function Lift({ children, className, onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
+export function Lift({ children, className, onClick }: Readonly<{ children: ReactNode; className?: string; onClick?: () => void }>) {
   return <motion.div className={className} onClick={onClick} whileTap={{ scale: 0.995 }} transition={{ duration: DURATION.fast, ease: EASE }}>{children}</motion.div>;
 }
 
@@ -45,9 +45,9 @@ export function Lift({ children, className, onClick }: { children: ReactNode; cl
  * "Advanced": secondary/technical details, collapsed by default. Nothing is removed, only demoted.
  * `summary` is a one-line hint of what is inside; height animates open/closed.
  */
-export function Advanced({ children, summary, title = t('Advanced'), defaultOpen = false, className = '', variant = 'inline' }: {
+export function Advanced({ children, summary, title = t('Advanced'), defaultOpen = false, className = '', variant = 'inline' }: Readonly<{
   children: ReactNode; summary?: ReactNode; title?: ReactNode; defaultOpen?: boolean; className?: string; variant?: 'inline' | 'card';
-}) {
+}>) {
   const [open, setOpen] = useState(defaultOpen);
   const card = variant === 'card';
   return <Collapsible open={open} onOpenChange={setOpen} className={`ui-advanced ${card ? 'rounded-xl border bg-card' : 'border-t pt-3'} min-w-0 ${className}`} data-advanced={open ? 'open' : 'closed'} data-advanced-variant={variant}>
@@ -67,7 +67,7 @@ export function Advanced({ children, summary, title = t('Advanced'), defaultOpen
 }
 
 /** Number that counts up to its value when it first scrolls into view (and on change). */
-export function Ticker({ value, format = (n: number) => new Intl.NumberFormat('vi-VN').format(Math.round(n)), className }: { value: number; format?: (n: number) => string; className?: string }) {
+export function Ticker({ value, format = (n: number) => new Intl.NumberFormat('vi-VN').format(Math.round(n)), className }: Readonly<{ value: number; format?: (n: number) => string; className?: string }>) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true });
   const reduce = useReducedMotion();
@@ -84,12 +84,12 @@ export function Ticker({ value, format = (n: number) => new Intl.NumberFormat('v
 }
 
 /** Bar segment / progress that grows from the left on first render. */
-export function Grow({ className, style, delay = 0, title }: { className?: string; style?: React.CSSProperties; delay?: number; title?: string }) {
+export function Grow({ className, style, delay = 0, title }: Readonly<{ className?: string; style?: React.CSSProperties; delay?: number; title?: string }>) {
   return <motion.span className={className} style={{ transformOrigin: 'left center', ...style }} title={title} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: DURATION.enter, ease: EASE, delay }} />;
 }
 
 /** Status chip / label that cross-fades when its text changes. */
-export function Swap({ children, keyValue, className }: { children: ReactNode; keyValue: string; className?: string }) {
+export function Swap({ children, keyValue, className }: Readonly<{ children: ReactNode; keyValue: string; className?: string }>) {
   return <AnimatePresence mode="wait" initial={false}>
     <motion.span key={keyValue} className={className} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -3 }} transition={{ duration: DURATION.fast, ease: EASE }}>{children}</motion.span>
   </AnimatePresence>;

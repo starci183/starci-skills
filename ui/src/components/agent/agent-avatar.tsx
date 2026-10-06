@@ -44,6 +44,6 @@ export function AgentAvatar({ agent, size = 20, withLabel = false, live = false,
 }
 
 /** Several agents (one per attempt/unit), overlapping, with "+N". */
-export function AgentStack({ agents, max = 4, size = 20 }: { agents: LinkedAgent[]; max?: number; size?: number }) {
-  return <span className="inline-flex items-center"><span className="inline-flex -space-x-2">{agents.slice(0, max).map((a, i) => <span key={i} className="rounded-full ring-2 ring-card"><AgentAvatar agent={a} size={size} /></span>)}</span>{agents.length > max ? <span className="pl-2 text-xs text-muted-foreground">+{agents.length - max}</span> : null}</span>;
+export function AgentStack({ agents, max = 4, size = 20 }: Readonly<{ agents: LinkedAgent[]; max?: number; size?: number }>) {
+  return <span className="inline-flex items-center"><span className="inline-flex -space-x-2">{agents.slice(0, max).map((a, i) => <span key={`${a.family}:${a.label}:${i}`} className="rounded-full ring-2 ring-card"><AgentAvatar agent={a} size={size} /></span>)}</span>{agents.length > max ? <span className="pl-2 text-xs text-muted-foreground">+{agents.length - max}</span> : null}</span>;
 }

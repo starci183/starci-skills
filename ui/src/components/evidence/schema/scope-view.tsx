@@ -11,16 +11,16 @@ const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : typeof v === 'number' ? String(v) : null);
 const strs = (v: unknown): string[] => arr(v).map(x => str(x) ?? '').filter(Boolean);
 
-function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
+function Section({ title, count, children }: Readonly<{ title: string; count?: number; children: ReactNode }>) {
   return <section className="min-w-0">
     <h4 className="mb-2 flex items-baseline gap-2 text-sm font-semibold">{title}{count != null ? <span className="text-xs font-normal text-muted-foreground">{count}</span> : null}</h4>
     {children}
   </section>;
 }
-const Bullets = ({ items }: { items: string[] }) => <ul className="max-w-[72ch] list-disc space-y-1 pl-5 text-sm">{items.map((t, i) => <li key={i} className="break-words">{t}</li>)}</ul>;
+const Bullets = ({ items }: { items: string[] }) => <ul className="max-w-[72ch] list-disc space-y-1 pl-5 text-sm">{items.map(t => <li key={t} className="break-words">{t}</li>)}</ul>;
 
 /** `starci/scope-evidence@1` (scope.json): what the op decided to include, own, defer and how far its effects may reach. */
-export function ScopeView({ data }: { data: unknown }) {
+export function ScopeView({ data }: Readonly<{ data: unknown }>) {
   const root = rec(data) ?? {};
   const scope = rec(root.scope) ?? {};
   const request = rec(scope.request) ?? {};
@@ -38,7 +38,7 @@ export function ScopeView({ data }: { data: unknown }) {
       <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-[10rem_minmax(0,1fr)]">
         {digest ? <><dt className="text-muted-foreground">{t('Brief id (digest)')}</dt><dd className="flex min-w-0 flex-wrap items-center gap-2"><code className="break-all font-mono text-xs">{digest}</code><CopyButton value={digest} /></dd></> : null}
         {str(root.scopeRecord) ? <><dt className="text-muted-foreground">{t('Scope record')}</dt><dd className="min-w-0 break-all font-mono text-xs">{str(root.scopeRecord)}</dd></> : null}
-        {str(request.workflow) ? <><dt className="text-muted-foreground">Workflow</dt><dd className="min-w-0 break-all font-mono text-xs">{str(request.workflow)}{request.goalRevision != null ? ` · goal rev ${String(request.goalRevision)}` : ''}</dd></> : null}
+        {str(request.workflow) ? <><dt className="text-muted-foreground">Workflow</dt><dd className="min-w-0 break-all font-mono text-xs">{str(request.workflow)}{request.goalRevision != null ? ` · goal rev ${str(request.goalRevision) ?? JSON.stringify(request.goalRevision)}` : ''}</dd></> : null}
         <dt className="text-muted-foreground">{t('Previous scope')}</dt><dd className="min-w-0 break-words">{prior ?? str(request.source) ?? t('Not recorded.')}</dd>
         {str(request.outcome) ? <><dt className="text-muted-foreground">{t('Required outcome')}</dt><dd className="min-w-0 max-w-[72ch] break-words">{str(request.outcome)}</dd></> : null}
       </dl>
@@ -61,11 +61,11 @@ export function ScopeView({ data }: { data: unknown }) {
     </Section> : null}
 
     {deps.length ? <Section title={t('Dependencies')} count={deps.length}>
-      <ul className="grid gap-1 text-xs">{deps.map((d, i) => <li key={i} className="min-w-0 break-words"><code className="font-mono">{str(d.from)}</code> <span className="text-muted-foreground">{t('needs')}</span> <code className="font-mono">{str(d.to)}</code>{str(d.reason) ? <span className="text-muted-foreground"> — {str(d.reason)}</span> : null}</li>)}</ul>
+      <ul className="grid gap-1 text-xs">{deps.map(d => <li key={JSON.stringify(d)} className="min-w-0 break-words"><code className="font-mono">{str(d.from)}</code> <span className="text-muted-foreground">{t('needs')}</span> <code className="font-mono">{str(d.to)}</code>{str(d.reason) ? <span className="text-muted-foreground"> — {str(d.reason)}</span> : null}</li>)}</ul>
     </Section> : null}
 
     {exclusions.length ? <Section title={t('Deferred / not done')} count={exclusions.length}>
-      <ul className="grid gap-2">{exclusions.map((e, i) => <li key={i} data-tone="skipped" className="min-w-0 rounded-lg border border-dashed border-[var(--tone-line)] p-2"><strong className="break-words">{str(e.subject)}</strong>{str(e.reason) ? <p className="break-words text-muted-foreground">{str(e.reason)}</p> : null}</li>)}</ul>
+      <ul className="grid gap-2">{exclusions.map(e => <li key={JSON.stringify(e)} data-tone="skipped" className="min-w-0 rounded-lg border border-dashed border-[var(--tone-line)] p-2"><strong className="break-words">{str(e.subject)}</strong>{str(e.reason) ? <p className="break-words text-muted-foreground">{str(e.reason)}</p> : null}</li>)}</ul>
     </Section> : null}
 
     {effects.length ? <Section title={t('Maximum allowed effects')}><Bullets items={effects} /></Section> : null}

@@ -66,7 +66,7 @@ export function throughput(rows: AttemptRow[], since: number, now: number, maxBu
   const times = rows.flatMap(row => [row.dispatchedAt, row.settledAt]).filter((t): t is number => t != null && t >= since);
   const from = times.length ? Math.min(...times) : since;
   const span = Math.max(now - from, 60e3);
-  const step = STEPS_MS.find(s => Math.ceil(span / s) <= maxBuckets) ?? STEPS_MS[STEPS_MS.length - 1];
+  const step = STEPS_MS.find(s => Math.ceil(span / s) <= maxBuckets) ?? STEPS_MS.at(-1)!;
   const zoneShift = 7 * 3600e3;
   const first = Math.floor((from + zoneShift) / step) * step - zoneShift;
   const buckets: Bucket[] = [];

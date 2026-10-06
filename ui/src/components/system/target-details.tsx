@@ -15,11 +15,11 @@ export type Push = { id: number; repo: string; repoRole: string | null; scope: '
 export type Lane = { scope: 'runtime'; name: string; worktree: string | null; branch: string; baseSha: string | null; headSha: string | null; owner: string | null; supJob: Ref | null; supJobId: string | null; state: string; ui: UiState; createdAt: number; landedAt: number | null; removedAt: number | null; report: BlobLink | null };
 export type LandTarget = { kind: 'land-run' | 'commit'; row: LandRun } | { kind: 'land-ticket'; row: LandTicket } | { kind: 'lane'; row: Lane } | { kind: 'push'; row: Push };
 
-function Facts({ rows }: { rows: [string, string][] }) {
+function Facts({ rows }: Readonly<{ rows: [string, string][] }>) {
   return <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">{rows.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="break-words">{value}</dd></div>)}</dl>;
 }
 
-export function ServiceFacts({ selected }: { selected: ServiceTarget }) {
+export function ServiceFacts({ selected }: Readonly<{ selected: ServiceTarget }>) {
   if (selected.kind === 'service') {
     const row = selected.row;
     return <div className="flex flex-col gap-4"><StateChip state={row.ui} label={row.state} /><Facts rows={[
@@ -51,7 +51,7 @@ export function landTargetTitle(selected: LandTarget) {
   return `Land #${selected.row.id}`;
 }
 
-export function LandFacts({ selected }: { selected: LandTarget }) {
+export function LandFacts({ selected }: Readonly<{ selected: LandTarget }>) {
   if (selected.kind === 'land-ticket') {
     const row = selected.row;
     return <div className="flex flex-col gap-4"><StateChip state={row.ui} label={row.state} /><Facts rows={[

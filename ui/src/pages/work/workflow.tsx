@@ -40,22 +40,22 @@ type Verify = { schema: string; ok: boolean; files: { checked: number; intact: n
 type Worktree = { kind: string; branch: string | null; path: string; jobId: string | null; attempt: number | null; ui: 'bad' | 'warn' | 'running' | 'waiting' | 'ok' | 'done' | 'unknown'; createdAt: number; removedAt: number | null };
 type UnitEdge = { id: string; href: string; from: string; to: string; kind: string; source: string; createdAt: number };
 
-function Panel({ title, children, concept }: { title: string; children: React.ReactNode; concept: 'C1' | 'C2' | 'C4' | 'C5' | 'C12' | 'C15' | 'C17' | 'C11' | 'C7' }) {
+function Panel({ title, children, concept }: { readonly title: string; readonly children: React.ReactNode; readonly concept: 'C1' | 'C2' | 'C4' | 'C5' | 'C12' | 'C15' | 'C17' | 'C11' | 'C7' }) {
   return <ConceptBlock concept={concept} as="section" className="min-w-0"><Card size="sm"><CardHeader><CardTitle><h2>{title}</h2></CardTitle></CardHeader><CardContent>{children}</CardContent></Card></ConceptBlock>;
 }
 
-function ReadState({ snapshot, url, label }: { snapshot: QuerySnapshot<unknown>; url: string; label?: string }) {
+function ReadState({ snapshot, url, label }: { readonly snapshot: QuerySnapshot<unknown>; readonly url: string; readonly label?: string }) {
   const prefix = label ? `${label} · ` : '';
   return <div className="space-y-2">
     {snapshot.error && <FeedbackState error onRetry={() => refreshQuery(url)}>{prefix}{snapshot.meta ? t('The source is failing; showing the last read. {error}', { error: snapshot.error }) : snapshot.error}</FeedbackState>}
-    {!snapshot.meta && !snapshot.error && <p className="text-xs text-muted-foreground" role="status">{prefix}{t('Loading…')}</p>}
-    {snapshot.meta?.stale?.length ? <p className="shell-error text-xs" role="status">{prefix}{t('Source out of sync: {list}', { list: snapshot.meta.stale.join(', ') })}</p> : null}
+    {!snapshot.meta && !snapshot.error && <output className="block text-xs text-muted-foreground">{prefix}{t('Loading…')}</output>}
+    {snapshot.meta?.stale?.length ? <output className="shell-error block text-xs">{prefix}{t('Source out of sync: {list}', { list: snapshot.meta.stale.join(', ') })}</output> : null}
     {snapshot.meta && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">{prefix}{t('Read observed {at}', { at: formatAbsolute(snapshot.observedAt) })}</summary><p>{t('Response assembled {at}', { at: formatAbsolute(snapshot.meta.at) })}</p><ul className="mt-1 space-y-1 font-mono">{snapshot.meta.sources.map((source, index) => <li key={`${source.db}:${source.rel}:${index}`} className="break-all">{source.db}:{source.rel}{source.at != null ? ` · ${formatAbsolute(source.at)}` : ''}</li>)}</ul></details>}
     {snapshot.meta?.next && <p className="text-xs text-muted-foreground">{t('More rows are available; this view shows one page.')}</p>}
   </div>;
 }
 
-function MoreRows({ read }: { read: { data: unknown[] | null; next: string | null; loadingMore: boolean; loadMoreError: string | null; loadMore: () => void } }) {
+function MoreRows({ read }: { readonly read: { data: unknown[] | null; next: string | null; loadingMore: boolean; loadMoreError: string | null; loadMore: () => void } }) {
   return <div className="mt-3 space-y-2 text-xs text-muted-foreground">
     {read.data && <p>{t('Loaded {n} rows · page scope; live data may change.', { n: read.data.length })}</p>}
     {read.loadMoreError && <FeedbackState error onRetry={read.loadMore}>{read.loadMoreError}</FeedbackState>}
@@ -63,12 +63,12 @@ function MoreRows({ read }: { read: { data: unknown[] | null; next: string | nul
   </div>;
 }
 
-function SnapshotFacts({ read }: { read: MetricRead<unknown> }) {
+function SnapshotFacts({ read }: { readonly read: MetricRead<unknown> }) {
   const snapshot = read.snapshot;
   return <p className="break-all text-xs text-muted-foreground">{t('Snapshot #{id} · recorded {at}', { id: snapshot.id, at: formatAbsolute(snapshot.at) })} · {snapshot.payloadSource}{snapshot.windowMs != null ? ` · ${t('Window {n} hours', { n: snapshot.windowMs / 3_600_000 })}` : ''}{snapshot.subject ? ` · ${snapshot.subject}` : ''}{snapshot.dataSha ? ` · SHA ${snapshot.dataSha}` : ''}</p>;
 }
 
-function UnitDetail({ project, wf, selected, state, graphMode }: { project: string; wf: string; selected: string | null; state: string | null; graphMode: boolean }) {
+function UnitDetail({ project, wf, selected, state, graphMode }: { readonly project: string; readonly wf: string; readonly selected: string | null; readonly state: string | null; readonly graphMode: boolean }) {
   const url = selected ? `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/units/${encodeURIComponent(selected)}` : '';
   const detail = useApiQuery<{ unit: UnitRow; attempts: AttemptRow[]; edges: { in: UnitEdge[]; out: UnitEdge[] }; decisions: { id: string; choice: string; rationale: string | null; at: number }[]; blockedBy: { reason: { code: string; params: Record<string, string | number> }; ui: UnitRow['ui'] }[] }>(url, { enabled: Boolean(selected), topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 20_000 });
   if (!selected) return <p className="text-sm text-muted-foreground">{t('Pick an Op group or a unit to see details.')}</p>;
@@ -81,7 +81,7 @@ function UnitDetail({ project, wf, selected, state, graphMode }: { project: stri
       <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{detail.data.unit.unit} · {detail.data.unit.op}</p>
       <p className="mt-2 break-all text-xs text-muted-foreground">{t('Goal revision {n}', { n: detail.data.unit.goalRevision })} · {detail.data.unit.subjectKey} · {t('Current job {job}', { job: detail.data.unit.currentJob ?? '—' })}</p>
       <p className="mt-2 text-xs text-muted-foreground">{unitStateLabels[detail.data.unit.state]} · {t('try {tries}/{budget}', { tries: detail.data.unit.tries, budget: detail.data.unit.tryBudget })} · {t('{n} dispatches', { n: detail.data.unit.attempts })}</p>
-      {detail.data.blockedBy.map((blocker, i) => <ReasonLine key={i} reason={blocker.reason} className="mt-2" />)}
+      {detail.data.blockedBy.map(blocker => <ReasonLine key={JSON.stringify(blocker.reason)} reason={blocker.reason} className="mt-2" />)}
       {detail.data.attempts.map(attempt => <a key={attempt.id} href={attempt.href} className="mt-3 flex min-w-0 items-start gap-2 text-sm hover:underline"><StatusDot status={statusFromUi(attempt.ui)} /><span className="min-w-0 flex-1"><span className="block">#{attempt.id} · {t('Business try {n} · dispatch {dispatch}', { n: attempt.attempt, dispatch: attempt.dispatchSeq })}</span><span className="block break-all text-xs text-muted-foreground">{attempt.job} · {attempt.agent ?? t('unknown agent')}</span></span><ArrowRight className="size-3 shrink-0" /></a>)}
       <Advanced className="mt-3" summary={t('Recorded dependencies and decisions')}>
         {(['in', 'out'] as const).map(direction => <div key={direction} className="mt-2"><strong className="text-xs">{direction === 'in' ? t('Predecessors') : t('Dependents')}</strong>{detail.data!.edges[direction].map(edge => <a key={`${edge.from}:${edge.to}:${edge.kind}`} href={edge.href} className="mt-2 block break-all text-xs hover:underline">{edge.from} → {edge.to} · {edge.kind} · {edge.source} · {formatAbsolute(edge.createdAt)}</a>)}</div>)}
@@ -90,7 +90,7 @@ function UnitDetail({ project, wf, selected, state, graphMode }: { project: stri
     </>}</div>;
 }
 
-function UnitsTab({ project, wf, graph, legacyGraph }: { project: string; wf: string; graph: QuerySnapshot<WorkGraph>; legacyGraph: boolean }) {
+function UnitsTab({ project, wf, graph, legacyGraph }: { readonly project: string; readonly wf: string; readonly graph: QuerySnapshot<WorkGraph>; readonly legacyGraph: boolean }) {
   const state = query().get('state');
   const url = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/units?limit=200${state ? `&state=${encodeURIComponent(state)}` : ''}`;
   const units = usePagedApiQuery<UnitRow>(url, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 20_000, getKey: unit => `${unit.workflowId}:${unit.unit}` });
@@ -107,7 +107,7 @@ function UnitsTab({ project, wf, graph, legacyGraph }: { project: string; wf: st
   const counts = graphData ? Object.fromEntries(['planned', 'queued', 'running', 'reported', 'deciding', 'done', 'failed', 'dropped'].map(value => [value, graphData.nodes.filter(node => node.state === value).length])) as Record<UnitState, number> : null;
   const graphUrl = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/graph`;
   return <Panel title={t('Units · {n}', { n: graphMode ? graphData?.nodes.length ?? '—' : units.meta ? rows.length : '—' })} concept="C4">
-    <div className="flex flex-wrap gap-1" role="group" aria-label={t('Units')}><Button size="sm" variant={graphMode ? 'ghost' : 'secondary'} aria-pressed={!graphMode} onClick={() => { window.location.hash = href(selected, state, false); }}>{t('List')}</Button><Button size="sm" variant={graphMode ? 'secondary' : 'ghost'} aria-pressed={graphMode} onClick={() => { window.location.hash = href(selected, null, true); }}>{t('Unit graph')}</Button></div>
+    <fieldset className="m-0 flex min-w-0 flex-wrap gap-1 border-0 p-0" aria-label={t('Units')}><Button size="sm" variant={graphMode ? 'ghost' : 'secondary'} aria-pressed={!graphMode} onClick={() => { window.location.hash = href(selected, state, false); }}>{t('List')}</Button><Button size="sm" variant={graphMode ? 'secondary' : 'ghost'} aria-pressed={graphMode} onClick={() => { window.location.hash = href(selected, null, true); }}>{t('Unit graph')}</Button></fieldset>
     <ReadState snapshot={graph} url={graphUrl} label={t('Unit graph')} />
     {graphMode ? <>{graph.data && <GraphView graph={graph.data} onUnit={unit => { window.location.hash = href(unit, null, true); }} />}</> : <>
     <ReadState snapshot={units} url={url} label={t('List')} />
@@ -123,20 +123,20 @@ function UnitsTab({ project, wf, graph, legacyGraph }: { project: string; wf: st
   </Panel>;
 }
 
-function AttemptsTab({ project, wf }: { project: string; wf: string }) {
+function AttemptsTab({ project, wf }: { readonly project: string; readonly wf: string }) {
   const url = `/api/attempts?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`;
   const attempts = usePagedApiQuery<AttemptRow>(url, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 30_000, getKey: attempt => String(attempt.id) });
   return <Panel title={t('Attempts')} concept="C7"><ReadState snapshot={attempts} url={url} /><div className="divide-y">{attempts.data?.map(item => <a key={item.id} href={item.href} className="flex min-w-0 items-start gap-3 py-3 text-sm hover:text-primary"><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1"><span className="block font-medium">#{item.id} · {item.op}</span><span className="mt-1 block break-all font-mono text-xs text-muted-foreground">{t('Unit {unit} · job {job}', { unit: item.unit ?? '—', job: item.job })}</span><span className="mt-1 block text-xs text-muted-foreground">{t('Business try {n} · dispatch {dispatch}', { n: item.attempt, dispatch: item.dispatchSeq })} · {item.agent ?? '—'} · {formatAbsolute(item.dispatchedAt)}</span></span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{attempts.meta && !attempts.error && !attempts.data?.length && <p className="text-sm text-muted-foreground">{t('No attempts yet.')}</p>}<MoreRows read={attempts} /></Panel>;
 }
 
-function DecisionsTab({ project, wf }: { project: string; wf: string }) {
+function DecisionsTab({ project, wf }: { readonly project: string; readonly wf: string }) {
   const open = usePagedApiQuery<DecisionRow>(`/api/decisions?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`, { topics: ['decisions'], intervalMs: 20_000, getKey: item => item.key });
   const log = usePagedApiQuery<DecisionLog>(`/api/decisions/log?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 60_000, getKey: item => item.key });
   return <div className="flex flex-col gap-4"><Panel title={t('Awaiting decision')} concept="C12"><ReadState snapshot={open} url={`/api/decisions?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`} /><div className="divide-y">{open.data?.map(item => <a key={item.key} href={item.href} className="flex min-w-0 items-center gap-2 py-3 text-sm hover:text-primary"><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 break-words">{item.summary}<span className="block font-mono text-xs text-muted-foreground">{item.id}</span></span><span className="text-xs text-muted-foreground">{item.decider}</span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{open.meta && !open.error && !open.data?.length && <p className="text-sm text-muted-foreground">{t('No pending decisions.')}</p>}<MoreRows read={open} /></Panel>
     <Panel title={t('Decision log')} concept="C5"><ReadState snapshot={log} url={`/api/decisions/log?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`} /><div className="divide-y">{log.data?.map(item => <div key={item.key} className="py-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><strong>{item.choice}</strong><span className="text-xs text-muted-foreground">{item.decider} · {formatAbsolute(item.at)}</span></div>{item.rationale && <p className="mt-1 text-muted-foreground">{item.rationale}</p>}{item.di && <a href={item.di.href} className="text-xs text-primary hover:underline">{t('Open the decision')}</a>}</div>)}</div>{log.meta && !log.error && !log.data?.length && <p className="text-sm text-muted-foreground">{t('No settled decisions yet.')}</p>}<MoreRows read={log} /></Panel></div>;
 }
 
-function WhyTab({ project, wf }: { project: string; wf: string }) {
+function WhyTab({ project, wf }: { readonly project: string; readonly wf: string }) {
   const url = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/rca`;
   const rca = useApiQuery<MetricRead<Rca> | null>(url, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 60_000 });
   const payload = rca.data?.payload;
@@ -148,13 +148,13 @@ function WhyTab({ project, wf }: { project: string; wf: string }) {
   </> : rca.meta && !rca.error ? <p className="text-sm text-muted-foreground">{t('No analysis yet.')}</p> : null}</Panel>;
 }
 
-function TimelineTab({ project, wf }: { project: string; wf: string }) {
+function TimelineTab({ project, wf }: { readonly project: string; readonly wf: string }) {
   const url = `/api/timeline?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`;
   const timeline = usePagedApiQuery<TimelineItem>(url, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 30_000, getKey: item => item.key });
   return <Panel title={t('Timeline')} concept="C17"><ReadState snapshot={timeline} url={url} /><div className="divide-y">{timeline.data?.map(item => <div key={item.key} className="flex min-w-0 items-start gap-3 py-3 text-sm"><StatusDot status={statusFromUi(item.ui)} /><div className="min-w-0 flex-1"><p className="break-words">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.source} · {item.kind} · {formatAbsolute(item.at)}</p>{item.ref && <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{item.ref.kind}:{item.ref.id}</p>}</div>{item.ref && <a href={item.ref.href} aria-label={t('Open details')}><ArrowRight className="size-4" /></a>}</div>)}</div>{timeline.meta && !timeline.error && !timeline.data?.length && <p className="text-sm text-muted-foreground">{t('No timeline yet.')}</p>}<MoreRows read={timeline} /></Panel>;
 }
 
-function EvidenceTab({ project, wf }: { project: string; wf: string }) {
+function EvidenceTab({ project, wf }: { readonly project: string; readonly wf: string }) {
   const base = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}`;
   const mediaUrl = `/api/media?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`;
   const media = usePagedApiQuery<MediaItem>(mediaUrl, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 60_000, getKey: item => String(item.artifactId) });
@@ -171,13 +171,13 @@ function EvidenceTab({ project, wf }: { project: string; wf: string }) {
   </Panel>;
 }
 
-function InfraTab({ project, wf }: { project: string; wf: string }) {
+function InfraTab({ project, wf }: { readonly project: string; readonly wf: string }) {
   const url = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/worktrees`;
   const worktrees = usePagedApiQuery<Worktree>(url, { topics: ['system'], intervalMs: 60_000, getKey: item => item.path });
   return <Panel title={t('Infrastructure · worktrees')} concept="C15"><ReadState snapshot={worktrees} url={url} /><div className="divide-y">{worktrees.data?.map(item => <div key={item.path} className="flex min-w-0 items-start gap-3 py-3 text-sm"><StatusDot status={statusFromUi(item.ui)} /><div className="min-w-0 flex-1"><p className="break-words font-medium">{item.branch ?? item.kind}</p><p className="mt-1 break-all font-mono text-xs text-muted-foreground">{item.path ?? item.kind}</p><p className="mt-1 text-xs text-muted-foreground">{formatAbsolute(item.createdAt)}{item.removedAt != null ? ` · ${t('Removed {at}', { at: formatAbsolute(item.removedAt) })}` : ''}</p></div></div>)}</div>{worktrees.meta && !worktrees.error && !worktrees.data?.length && <p className="text-sm text-muted-foreground">{t('No worktrees recorded.')}</p>}<MoreRows read={worktrees} /></Panel>;
 }
 
-export function WorkflowPage({ project, wf, tab = 'units' }: { project: string; wf: string; tab?: WorkflowTab }) {
+export function WorkflowPage({ project, wf, tab = 'units' }: { readonly project: string; readonly wf: string; readonly tab?: WorkflowTab }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(timer); }, []);
   const base = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}`;
@@ -212,7 +212,7 @@ export function WorkflowPage({ project, wf, tab = 'units' }: { project: string; 
         <div className="flex min-w-0 flex-col gap-6">
           <WorkflowInfraCard where={row.where} usage={row.usage} />
           {pipe && <div className="grid min-w-0 gap-6"><Panel title={t('Attempts per leg')} concept="C7"><AttemptGantt pipeline={pipe} now={now} /></Panel><Panel title={t('Work slice graph')} concept="C4"><WorkGraphSlices graph={pipe.workGraph} /></Panel></div>}
-          {pipe && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">{t('Scheduling graph reference · derivedPlan')}</summary>{pipe.scheduling.readError ? <p className="mt-2 break-words">{pipe.scheduling.readError}</p> : <ul className="mt-2 space-y-1 font-mono">{pipe.scheduling.ops.map(op => <li key={op}>{op}</li>)}{pipe.scheduling.edges.map((edge, index) => <li key={index}>{edge.from} → {edge.to}</li>)}</ul>}</details>}
+          {pipe && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">{t('Scheduling graph reference · derivedPlan')}</summary>{pipe.scheduling.readError ? <p className="mt-2 break-words">{pipe.scheduling.readError}</p> : <ul className="mt-2 space-y-1 font-mono">{pipe.scheduling.ops.map(op => <li key={op}>{op}</li>)}{pipe.scheduling.edges.map(edge => <li key={`${edge.from}>${edge.to}`}>{edge.from} → {edge.to}</li>)}</ul>}</details>}
           <div className="grid min-w-0 gap-6 lg:grid-cols-2">
             <Panel title={t('Awaiting decision · {n}', { n: row.counts.decisionsOpen })} concept="C12"><ReadState snapshot={decisions} url={`/api/decisions?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`} /><div className="divide-y">{decisions.data?.map(item => <a key={item.key} href={item.href} className="flex min-w-0 items-center gap-2 py-3 text-sm hover:text-primary"><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 break-words">{item.summary}</span><span className="text-xs text-muted-foreground">{item.decider}{item.overdue ? t(' · overdue') : ''}</span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{decisions.meta && !decisions.error && !decisions.data?.length && <p className="text-sm text-muted-foreground">{t('No pending decisions.')}</p>}<MoreRows read={decisions} /></Panel>
             <Panel title={t('Blocking · {n}', { n: row.blockedBy.length })} concept="C4"><div className="divide-y">{row.blockedBy.map((item, index) => <a key={`${item.ref.kind}-${item.ref.id}-${index}`} href={item.ref.href} className="flex min-w-0 items-start gap-3 py-3 text-sm hover:text-primary"><span className="text-xs tabular-nums text-muted-foreground">{index + 1}.</span><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 break-words">{formatReason(item.reason)}<span className="block text-xs text-muted-foreground">{t('{who} · since {at}', { who: item.who, at: formatAbsolute(item.since) })}</span></span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{row.blockedBy.length === 0 && <p className="text-sm text-muted-foreground">{t('No blockers recorded.')}</p>}</Panel>

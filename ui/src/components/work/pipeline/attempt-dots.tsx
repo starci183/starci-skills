@@ -5,7 +5,7 @@ import { statusLabels, statusTone } from '../../status';
 import { t } from '../../../i18n/t';
 
 /** One dot per attempt, coloured by the attempt's own status (SVG). */
-export function AttemptDotsSvg({ attempts, x, y, max = 12 }: { attempts: AttemptBrief[]; x: number; y: number; max?: number }) {
+export function AttemptDotsSvg({ attempts, x, y, max = 12 }: Readonly<{ attempts: AttemptBrief[]; x: number; y: number; max?: number }>) {
   const shown = attempts.slice(-max);
   return <g aria-hidden="true">{shown.map((attempt, i) => <circle key={attempt.id} cx={x + i * 12 + 4} cy={y} r={4.5} data-tone={statusTone[attempt.status]} fill="var(--tone)" >
     <title>{`${t('Attempt #{id}', { id: attempt.id })} · ${statusLabels[attempt.status]}`}</title></circle>)}

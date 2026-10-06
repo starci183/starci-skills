@@ -15,7 +15,7 @@ export function checkpointState(checkpoint: RuntimeCheckpoint | null): { status:
   return { status: 'unknown', label: t('Commit action not recorded') };
 }
 
-export function CheckpointReceipt({ attempt }: { attempt: AttemptDetailV2 }) {
+export function CheckpointReceipt({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
   const checkpoint = attempt.checkpoint;
   const state = checkpointState(checkpoint);
   const report = attempt.report?.json;

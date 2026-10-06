@@ -5,9 +5,9 @@ import { t } from '../i18n/t';
 
 export const concept: Concept = 'frame';
 
-export function Drawer({ open, onOpenChange, title, description, children }: {
+export function Drawer({ open, onOpenChange, title, description, children }: Readonly<{
   open: boolean; onOpenChange: (open: boolean) => void; title: ReactNode; description?: ReactNode; children: ReactNode;
-}) {
+}>) {
   const returnFocus = useRef<HTMLElement | SVGElement | null>(null);
   return <Sheet open={open} onOpenChange={onOpenChange}>
     <SheetContent side="right" className="drawer-panel"

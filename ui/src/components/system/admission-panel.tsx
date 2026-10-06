@@ -32,7 +32,7 @@ function capturedAt(value: number | string | null | undefined): string {
   return Number.isFinite(epoch) ? at(epoch) : '—';
 }
 
-function ReceiptFacts({ row }: { row: AdmissionReservation }) {
+function ReceiptFacts({ row }: Readonly<{ row: AdmissionReservation }>) {
   const quota = row.quota;
   return <Advanced title={t('Receipt {id}', { id: row.id })} summary={`${row.role} · ${row.provider} / ${row.account}`}>
     <dl className="grid gap-4 text-sm sm:grid-cols-2">
@@ -80,7 +80,7 @@ function ReceiptFacts({ row }: { row: AdmissionReservation }) {
   </Advanced>;
 }
 
-export function AdmissionPanel({ admission }: { admission: AdmissionView | null | undefined }) {
+export function AdmissionPanel({ admission }: Readonly<{ admission: AdmissionView | null | undefined }>) {
   const observed = admission?.observed === true;
   const rows = admission?.reservations ?? [];
   const ui: UiState = !observed || admission?.unknown == null || admission.unknown > 0

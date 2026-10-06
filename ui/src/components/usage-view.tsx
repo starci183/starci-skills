@@ -33,7 +33,7 @@ export const costVi = (value: number | null | undefined): string => value == nul
 export const sourceLabel = (source: string): string => source === 'cli-transcript' ? t('from the CLI transcript') : source === 'provider-report' ? t('reported by the provider') : source;
 
 /** Stacked bar of input / output / cache tokens with a legend; segments use status tones, not literal colours. */
-export function TokenBar({ input, output, cache, complete: measurementsComplete = true }: { input: number | null; output: number | null; cache: number | null; complete?: boolean }) {
+export function TokenBar({ input, output, cache, complete: measurementsComplete = true }: { readonly input: number | null; readonly output: number | null; readonly cache: number | null; readonly complete?: boolean }) {
   const complete = measurementsComplete && [input, output, cache].every(value => value != null && Number.isFinite(value) && value >= 0);
   const total = complete ? input! + output! + cache! : null;
   const parts: { key: string; label: string; value: number | null; tone: 'running' | 'success' | 'queued' }[] = [
@@ -49,7 +49,7 @@ export function TokenBar({ input, output, cache, complete: measurementsComplete 
   </div>;
 }
 
-function Sources({ sources }: { sources?: string[] }) {
+function Sources({ sources }: { readonly sources?: string[] }) {
   if (!sources?.length) return null;
   return <span className="inline-flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">{t('Data sources:')} {sources.map(s => <InfoChip key={s} tone={s === 'provider-report' ? 'success' : 'running'}>{sourceLabel(s)}</InfoChip>)}</span>;
 }
@@ -59,12 +59,15 @@ const td = 'px-2 py-1 font-mono tabular-nums';
 const tools = (row: UsageRow) => `${compactVi(row.toolCalls)}${row.toolErrors ? t(' / {n} errors', { n: row.toolErrors }) : ''}`;
 const cacheOf = (row: Pick<UsageRow, 'cacheRead' | 'cacheWrite'>) => row.cacheRead == null || row.cacheWrite == null ? null : row.cacheRead + row.cacheWrite;
 
-function UsageTable({ title, first, rows, label }: { title: string; first: string; rows: (UsageRow & { extra?: string })[]; label: (row: never, index: number) => ReactNode }) {
+const byModelLabel = (row: Usage['byModel'][number] & { provider?: string }) => <>{row.model}<span className="ml-1 text-muted-foreground">{row.subject_type === 'kernel-turn' ? t('Kernel turn') : t('attempt')}{row.provider && row.provider !== row.model ? ` · ${row.provider}` : ''}</span></>;
+const byRecordLabel = (row: NonNullable<UsageV3['rows']>[number]) => <><span>{row.provider} · #{row.id}</span><span className="block text-muted-foreground">{t('Requested model')}: {row.requestModel ?? '—'}</span><span className="block text-muted-foreground">{t('Response model')}: {row.responseModel ?? '—'}</span><span className="block text-muted-foreground">{sourceLabel(row.source)}</span></>;
+
+function UsageTable({ title, first, rows, label, getKey }: { readonly title: string; readonly first: string; readonly rows: (UsageRow & { extra?: string })[]; readonly label: (row: never, index: number) => ReactNode; readonly getKey: (row: never) => string }) {
   return <div className="overflow-x-auto">
     <p className="m-0 mb-2 text-[11px] font-medium text-muted-foreground">{title}</p>
     <table className="w-full min-w-[520px] border-collapse text-xs">
       <thead><tr className="text-left text-muted-foreground">{[first, t('In'), t('Out'), t('Cache'), t('Reasoning'), t('Cost'), t('Turns'), t('Tools')].map(h => <th key={h} className={th}>{h}</th>)}</tr></thead>
-      <tbody>{rows.map((row, index) => <tr key={index} className="border-b border-border last:border-b-0">
+      <tbody>{rows.map((row, index) => <tr key={getKey(row as never)} className="border-b border-border last:border-b-0">
         <td className="px-2 py-1 font-mono [overflow-wrap:anywhere]">{label(row as never, index)}</td>
         <td className={td}>{compactVi(row.input)}</td><td className={td}>{compactVi(row.output)}</td><td className={td} title={t('read {read} · write {write}', { read: vi(row.cacheRead, 0), write: vi(row.cacheWrite, 0) })}>{compactVi(cacheOf(row))}</td>
         <td className={td}>{compactVi(row.reasoning)}</td><td className={td} title={row.completeness?.fields.costUsd?.complete === false ? t('Recorded part') : undefined}>{costVi(row.costUsd)}{row.costUsd != null && row.completeness?.fields.costUsd?.complete === false ? ' *' : ''}</td><td className={td}>{compactVi(row.turns)}</td><td className={td}>{tools(row)}</td>
@@ -74,7 +77,7 @@ function UsageTable({ title, first, rows, label }: { title: string; first: strin
 }
 
 /** Token / cost usage block; shows "not recorded" honestly when llm_usage is empty. */
-export function UsageView({ usage: raw, compact = false }: { usage: Usage; compact?: boolean }) {
+export function UsageView({ usage: raw, compact = false }: { readonly usage: Usage; readonly compact?: boolean }) {
   const usage = raw as UsageV3;
   const total = usage.recorded ? usage.total : null;
   if (!usage.recorded || !total) {
@@ -105,11 +108,11 @@ export function UsageView({ usage: raw, compact = false }: { usage: Usage; compa
     </dl>
     <Sources sources={usage.sources} />
     {total.completeness ? <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">{t('Measurement coverage')}</summary><dl className="mt-2 grid grid-cols-2 gap-2">{Object.entries(total.completeness.fields).map(([field, coverage]) => <div key={field}><dt className="font-mono">{field}</dt><dd className="m-0">{coverage.known}/{coverage.total}</dd></div>)}</dl></details> : null}
-    {usage.byModel.length ? <UsageTable title={t('By model')} first="Model" rows={usage.byModel}
-      label={((row: (typeof usage.byModel)[number] & { provider?: string }) => <>{row.model}<span className="ml-1 text-muted-foreground">{row.subject_type === 'kernel-turn' ? t('Kernel turn') : t('attempt')}{row.provider && row.provider !== row.model ? ` · ${row.provider}` : ''}</span></>) as never} /> : null}
-    {byOp.length > 0 && (byOp.length > 1 || byOp[0].op !== 'kernel') ? <UsageTable title={t('By op (leg)')} first="Op" rows={byOp}
+    {usage.byModel.length ? <UsageTable title={t('By model')} first="Model" rows={usage.byModel} getKey={((row: Usage['byModel'][number]) => `${row.subject_type}:${row.model}`) as never}
+      label={byModelLabel as never} /> : null}
+    {byOp.length > 0 && (byOp.length > 1 || byOp[0].op !== 'kernel') ? <UsageTable title={t('By op (leg)')} first="Op" rows={byOp} getKey={((row: UsageRow & { op: string }) => row.op) as never}
       label={((row: (typeof byOp)[number]) => row.op === 'kernel' ? t('Kernel (coordinator turns)') : row.op) as never} /> : null}
-    {rows.length > 0 ? <UsageTable title={t('By record')} first={t('Record')} rows={rows}
-      label={((row: (typeof rows)[number]) => <><span>{row.provider} · #{row.id}</span><span className="block text-muted-foreground">{t('Requested model')}: {row.requestModel ?? '—'}</span><span className="block text-muted-foreground">{t('Response model')}: {row.responseModel ?? '—'}</span><span className="block text-muted-foreground">{sourceLabel(row.source)}</span></>) as never} /> : null}
+    {rows.length > 0 ? <UsageTable title={t('By record')} first={t('Record')} rows={rows} getKey={((row: NonNullable<UsageV3['rows']>[number]) => String(row.id)) as never}
+      label={byRecordLabel as never} /> : null}
   </div>;
 }

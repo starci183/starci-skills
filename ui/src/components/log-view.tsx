@@ -19,14 +19,14 @@ export const concept: Concept = 'C17';
 const timeFormat = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 const shortWf = (wf: string) => wf.replace(/^wf-/, '');
 
-function RefLinks({ refs }: { refs: LogRow['refs'] }) {
+function RefLinks({ refs }: Readonly<{ refs: LogRow['refs'] }>) {
   if (!refs.length) return <span className="text-muted-foreground">{t('No links yet.')}</span>;
   return <div className="flex flex-wrap gap-3">{refs.map((ref) => <a key={`${ref.kind}:${ref.project ?? ''}:${ref.id}`} href={ref.href} className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><Link2 size={12} aria-hidden="true" />{ref.kind} · {ref.id}</a>)}</div>;
 }
 
 const linkClass = 'text-primary hover:underline';
 
-export function LogRowItem({ row, fresh = false }: { row: LogRow; fresh?: boolean }) {
+export function LogRowItem({ row, fresh = false }: Readonly<{ row: LogRow; fresh?: boolean }>) {
   const tone = levelTone[row.level];
   const Icon = kindIcon(row.kind);
   const wfRef = row.refs.find((ref) => ref.kind === 'workflow');
@@ -42,9 +42,9 @@ export function LogRowItem({ row, fresh = false }: { row: LogRow; fresh?: boolea
         {tone && <span className="shrink-0 text-[11px] font-semibold leading-5 text-[color:var(--tone)] md:hidden">{levelLabels[row.level]}</span>}
         <ChevronRight className="mt-1 size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90 md:hidden" aria-hidden="true" />
       </span>
-      <span className="hidden min-w-0 truncate font-mono text-[11px] text-muted-foreground md:block" onClick={(event) => { if ((event.target as HTMLElement).closest('a')) event.stopPropagation(); }} onKeyDown={(event) => { if ((event.target as HTMLElement).closest('a')) event.stopPropagation(); }}>
-        {wfRef ? <a href={wfRef.href} className={linkClass}>{shortWf(wfRef.id)}</a> : row.wf ? shortWf(row.wf) : row.db === 'machine' ? t('machine') : row.db}
-        {attemptRef && <> · <a href={attemptRef.href} className={linkClass}>#{attemptRef.id}</a></>}
+      <span className="hidden min-w-0 truncate font-mono text-[11px] text-muted-foreground md:block">
+        {wfRef ? <a href={wfRef.href} className={linkClass} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{shortWf(wfRef.id)}</a> : row.wf ? shortWf(row.wf) : row.db === 'machine' ? t('machine') : row.db}
+        {attemptRef && <> · <a href={attemptRef.href} className={linkClass} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>#{attemptRef.id}</a></>}
       </span>
     </summary>
     <div className="flex flex-col gap-3 border-t bg-muted/20 px-4 py-3 text-xs md:pl-[6.5rem]">
@@ -74,7 +74,7 @@ export function LogRowItem({ row, fresh = false }: { row: LogRow; fresh?: boolea
   </details>;
 }
 
-export function LogView({ rows, empty = t('No matching log rows.'), freshKeys, regionRef, onRegionScroll }: { rows: LogRow[]; empty?: string; freshKeys?: ReadonlySet<string>; regionRef?: Ref<HTMLDivElement>; onRegionScroll?: (top: number) => void }) {
+export function LogView({ rows, empty = t('No matching log rows.'), freshKeys, regionRef, onRegionScroll }: Readonly<{ rows: LogRow[]; empty?: string; freshKeys?: ReadonlySet<string>; regionRef?: Ref<HTMLDivElement>; onRegionScroll?: (top: number) => void }>) {
   const [staggered] = useState(() => new Set(rows.slice(0, 12).map((row) => row.key)));
   if (!rows.length) return <FeedbackState>{empty}</FeedbackState>;
   return <ConceptBlock concept="C17" aria-label={t('Log rows')}>
@@ -84,7 +84,7 @@ export function LogView({ rows, empty = t('No matching log rows.'), freshKeys, r
   </ConceptBlock>;
 }
 
-export function TimelineView({ rows, empty = t('No matching timeline entries yet.') }: { rows: TimelineItem[]; empty?: string }) {
+export function TimelineView({ rows, empty = t('No matching timeline entries yet.') }: Readonly<{ rows: TimelineItem[]; empty?: string }>) {
   if (!rows.length) return <FeedbackState>{empty}</FeedbackState>;
   return <ConceptBlock concept="C17" className="flex flex-col gap-2" aria-label={t('Timeline')}>
     {rows.map((row, index) => <Card key={`${row.at}:${row.kind}:${index}`} size="sm"><CardContent className="flex items-start gap-3"><StateChip state={row.ui} compact /><div className="min-w-0 flex-1"><div className="text-sm font-medium">{row.title}</div><div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground"><span>{formatAbsolute(row.at)}</span><span>· {row.source}</span><span>· {row.kind}</span></div></div>{row.ref && <a href={row.ref.href} className="shrink-0 text-xs text-primary hover:underline">{row.ref.id}</a>}</CardContent></Card>)}

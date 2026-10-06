@@ -5,7 +5,7 @@ import { t } from '../i18n/t';
 
 export const concept: Concept = 'C17';
 
-export function BlobText({ blob, mode = 'tail', lines = 80 }: { blob: BlobLink | null; mode?: 'head' | 'tail'; lines?: number }) {
+export function BlobText({ blob, mode = 'tail', lines = 80 }: Readonly<{ blob: BlobLink | null; mode?: 'head' | 'tail'; lines?: number }>) {
   const [state, setState] = useState<{ text: string; error: string | null; loading: boolean }>({ text: '', error: null, loading: Boolean(blob) });
   useEffect(() => {
     if (!blob) { setState({ text: '', error: null, loading: false }); return; }
@@ -22,6 +22,6 @@ export function BlobText({ blob, mode = 'tail', lines = 80 }: { blob: BlobLink |
   }, [blob?.href, lines, mode]);
   if (!blob) return <p className="empty-state">{t('No content yet.')}</p>;
   if (state.loading) return <p className="empty-state">{t('Reading the content…')}</p>;
-  if (state.error) return <p className="empty-state" role="status">{state.error}</p>;
+  if (state.error) return <output className="empty-state block">{state.error}</output>;
   return <pre className="blob-text" tabIndex={0}>{state.text}</pre>;
 }

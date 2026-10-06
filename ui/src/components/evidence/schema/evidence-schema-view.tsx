@@ -1,5 +1,4 @@
-import type { WorkGraphView } from '../../../contract';
-import type { EvidenceFile } from '../../../contract';
+import type { EvidenceFile, WorkGraphView } from '../../../contract';
 import type { Concept } from '../../concept';
 import { WorkGraphSlices } from '../../work/work-graph-slices';
 import { JsonView, MarkdownView, TextView, YamlView } from '../renderers';
@@ -49,7 +48,7 @@ export function schemaOf(file: EvidenceFile & { schema?: string | null }, text: 
 }
 
 /** Renders one evidence file by what it is: scope evidence, work graph, markdown, YAML, other JSON, plain text. */
-export function EvidenceSchemaView({ file, authorOp = '' }: { file: EvidenceFile & { schema?: string | null }; authorOp?: string }) {
+export function EvidenceSchemaView({ file, authorOp = '' }: Readonly<{ file: EvidenceFile & { schema?: string | null }; authorOp?: string }>) {
   const blob = useBlobText(file);
   if (blob.status === 'idle' || blob.status === 'loading') return <p className="p-3 text-sm text-muted-foreground">{t('Reading {name}…', { name: file.base })}</p>;
   if (blob.status === 'error') return <p role="alert" className="p-3 text-sm text-[var(--status-failed)]">{t('Could not read {name}: {error}', { name: file.base, error: blob.error ?? '' })}</p>;

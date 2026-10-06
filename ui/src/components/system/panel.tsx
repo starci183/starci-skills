@@ -35,7 +35,7 @@ export function BlobLinkButton({ blob, label }: { blob: BlobLink | null; label: 
     : <span className="text-muted-foreground">{t('No {label} yet', { label: label.toLowerCase() })}</span>;
 }
 
-export function QueryReadNotice<T>({ query, url }: { query: QuerySnapshot<T>; url?: string }) {
+export function QueryReadNotice<T>({ query, url }: { readonly query: QuerySnapshot<T>; readonly url?: string }) {
   const stale = [...new Set([...(query.meta?.stale ?? []), ...(query.errorMeta?.stale ?? [])])];
   const sources = query.errorMeta?.sources ?? query.meta?.sources ?? [];
   if (!query.error && !stale.length) return null;
@@ -50,7 +50,7 @@ export function QueryReadNotice<T>({ query, url }: { query: QuerySnapshot<T>; ur
   </div>;
 }
 
-export function QueryView<T>({ query, url, children, empty = t('No data yet.') }: { query: QuerySnapshot<T>; url?: string; children: (data: T) => ReactNode; empty?: string }) {
+export function QueryView<T>({ query, url, children, empty = t('No data yet.') }: { readonly query: QuerySnapshot<T>; readonly url?: string; readonly children: (data: T) => ReactNode; readonly empty?: string }) {
   if (query.data == null) {
     if (query.error) return <QueryReadNotice query={query} url={url} />;
     return query.loading || query.meta == null ? <PageSkeleton label={t('Reading the data…')} /> : <FeedbackState>{empty}</FeedbackState>;
@@ -61,7 +61,7 @@ export function QueryView<T>({ query, url, children, empty = t('No data yet.') }
   </>;
 }
 
-export function Panel({ title, summary, ui = 'unknown', concept: blockConcept, children }: { title: string; summary?: string; ui?: UiState; concept: Concept; children: ReactNode }) {
+export function Panel({ title, summary, ui = 'unknown', concept: blockConcept, children }: { readonly title: string; readonly summary?: string; readonly ui?: UiState; readonly concept: Concept; readonly children: ReactNode }) {
   return <ConceptBlock concept={blockConcept}>
     <Advanced key={isIssue(ui) ? 'issue' : 'calm'} variant="card" defaultOpen={ui === 'bad'} summary={summary}
       title={<span className="inline-flex items-center gap-3">{title}<StateChip state={ui} compact /></span>}>
@@ -70,7 +70,7 @@ export function Panel({ title, summary, ui = 'unknown', concept: blockConcept, c
   </ConceptBlock>;
 }
 
-export function QueryPanel<T>({ title, summary, ui = 'unknown', concept: blockConcept, query, url, children }: { title: string; summary?: string; ui?: UiState; concept: Concept; query: QuerySnapshot<T>; url: string; children: (data: T) => ReactNode }) {
+export function QueryPanel<T>({ title, summary, ui = 'unknown', concept: blockConcept, query, url, children }: { readonly title: string; readonly summary?: string; readonly ui?: UiState; readonly concept: Concept; readonly query: QuerySnapshot<T>; readonly url: string; readonly children: (data: T) => ReactNode }) {
   if (query.data == null) return <ConceptBlock concept={blockConcept}>
     <Card><CardContent><h2 className="mb-3 text-sm font-medium">{title}</h2><QueryView query={query} url={url}>{children}</QueryView></CardContent></Card>
   </ConceptBlock>;
@@ -78,7 +78,7 @@ export function QueryPanel<T>({ title, summary, ui = 'unknown', concept: blockCo
   return <Panel title={title} summary={summary} ui={observedState} concept={blockConcept}><QueryView query={query} url={url}>{children}</QueryView></Panel>;
 }
 
-export function Metric({ label, value, help }: { label: string; value: ReactNode; help?: string }) {
+export function Metric({ label, value, help }: { readonly label: string; readonly value: ReactNode; readonly help?: string }) {
   return <div className="flex min-w-0 flex-col gap-1 border-t p-4 min-[760px]:p-6">
     <div className="text-xs text-muted-foreground">{label}</div>
     <div className="text-lg font-semibold tabular-nums">{value}</div>

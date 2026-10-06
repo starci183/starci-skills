@@ -17,19 +17,19 @@ export function useOpInfo(attempt: Pick<AttemptDetailV3, 'project' | 'wf' | 'op'
 }
 
 /** Essentials block "What this op does". */
-export function AttemptOpGoal({ attempt, info, loading, reference }: { attempt: AttemptDetailV3; info: OpInfo | null; loading: boolean; reference?: ReturnType<typeof useOpInfo> }) {
+export function AttemptOpGoal({ attempt, info, loading, reference }: Readonly<{ attempt: AttemptDetailV3; info: OpInfo | null; loading: boolean; reference?: ReturnType<typeof useOpInfo> }>) {
   return <div className="grid gap-3">{reference ? <ReadWarning read={reference.read} url={reference.url} retained={Boolean(info)} /> : null}<OpGoalCard attempt={attempt} info={info} loading={loading} /></div>;
 }
 
 /** Advanced block "Inputs & context"; fetches the workflow goal only once it is mounted (i.e. opened). */
-export function AttemptInputContext({ attempt, info }: { attempt: AttemptDetailV3; info: OpInfo | null }) {
+export function AttemptInputContext({ attempt, info }: Readonly<{ attempt: AttemptDetailV3; info: OpInfo | null }>) {
   const enc = encodeURIComponent;
   const workflow = useApiQuery<WorkflowDetailV2>(`/api/workflows/${enc(attempt.project)}/${enc(attempt.wf)}`);
   return <div className="grid gap-3"><ReadWarning read={workflow} url={`/api/workflows/${enc(attempt.project)}/${enc(attempt.wf)}`} retained={Boolean(workflow.data)} /><InputContextCard attempt={attempt} info={info} goal={workflow.data?.goal ?? null} /></div>;
 }
 
 /** Blocks 2 and 3 together (kept for other callers). */
-export function AttemptIO({ attempt }: { attempt: AttemptDetailV3 }) {
+export function AttemptIO({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) {
   const reference = useOpInfo(attempt);
   const { info, loading } = reference;
   return <>

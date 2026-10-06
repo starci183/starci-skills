@@ -16,7 +16,7 @@ const statusView: Record<ProductFile['status'], { status: Status; label: string 
   unchanged: { status: 'queued', label: t('unchanged') }, missing: { status: 'retry', label: t('unreadable') },
 };
 
-function Content({ file }: { file: ProductFile }) {
+function Content({ file }: Readonly<{ file: ProductFile }>) {
   if (file.content == null) {
     return <p className="rounded-lg border p-3 text-sm text-muted-foreground">{file.error ?? (file.status === 'deleted' ? t('The file was deleted in this commit, so it has no content.') : t('The server has not sent this file\'s content. See the "Changes" tab for what the op edited.'))}</p>;
   }
@@ -26,13 +26,13 @@ function Content({ file }: { file: ProductFile }) {
   </div>;
 }
 
-function Diff({ file }: { file: ProductFile }) {
+function Diff({ file }: Readonly<{ file: ProductFile }>) {
   if (!file.diff) return <p className="rounded-lg border p-3 text-sm text-muted-foreground">{file.status === 'unchanged' ? t('This file is unchanged from its parent commit.') : t('No comparison available for this file.')}</p>;
   return <div className="min-w-0">{file.diffTruncated ? <p className="mb-2 text-xs text-muted-foreground">{t('Long diff: only the beginning is shown.')}</p> : null}<DiffTextView text={file.diff} /></div>;
 }
 
 /** One file the op wrote to the repo: status, path, size; opens into content and diff tabs. */
-export function ProductRow({ file, defaultOpen = false, extra }: { file: ProductFile; defaultOpen?: boolean; extra?: ReactNode }) {
+export function ProductRow({ file, defaultOpen = false, extra }: Readonly<{ file: ProductFile; defaultOpen?: boolean; extra?: ReactNode }>) {
   const [open, setOpen] = useState(defaultOpen);
   const [tab, setTab] = useState<'content' | 'diff'>(file.content == null && file.diff ? 'diff' : 'content');
   const view = statusView[file.status];

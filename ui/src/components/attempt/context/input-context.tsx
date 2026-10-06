@@ -17,7 +17,7 @@ const verdictWords: Record<string, string> = { pass: t('passed'), fail: t('faile
 const empty = (value: unknown) => value == null || (Array.isArray(value) && !value.length) || (typeof value === 'object' && !Array.isArray(value) && !Object.keys(value as object).length);
 const h3 = 'm-0 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 
-function GoalExcerpt({ text, revision }: { text: string | null; revision: number | null }) {
+function GoalExcerpt({ text, revision }: Readonly<{ text: string | null; revision: number | null }>) {
   const [open, setOpen] = useState(false);
   if (!text) return <p className="m-0 text-sm text-muted-foreground">{t('Could not read the workflow goal yet.')}</p>;
   const long = text.length > 280 || text.split('\n').length > 3;
@@ -31,13 +31,13 @@ function GoalExcerpt({ text, revision }: { text: string | null; revision: number
 }
 
 /** Block 3 "Inputs & context": workflow goal, what the kernel handed over, what the op must read, and the previous attempt. */
-export function InputContextCard({ attempt, info, goal }: { attempt: AttemptDetailV3; info: OpInfo | null; goal: { text: string; revision: number } | null }) {
+export function InputContextCard({ attempt, info, goal }: Readonly<{ attempt: AttemptDetailV3; info: OpInfo | null; goal: { text: string; revision: number } | null }>) {
   const input = attempt.input;
   const reads = info?.reads ?? [];
   const captured = attempt.dispatchContext;
   const capturedGoal = attempt.capturedGoal;
   const prior = attempt.prior ?? null;
-  const reason = prior && prior.settleReason != null ? (typeof prior.settleReason === 'string' ? prior.settleReason : jsonText(prior.settleReason)) : null;
+  const reason = prior?.settleReason != null ? (typeof prior.settleReason === 'string' ? prior.settleReason : jsonText(prior.settleReason)) : null;
   return <Card id="attempt-input" concept="C8" title={t('Inputs & context')} hint={t('what the kernel hands over, what the op must read')}>
     <div className="grid gap-6">
       <section><h3 className={h3}>{t('Captured workflow goal')}</h3><GoalExcerpt text={capturedGoal?.text ?? null} revision={capturedGoal?.revision ?? null} />

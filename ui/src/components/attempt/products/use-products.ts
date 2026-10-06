@@ -11,7 +11,7 @@ export const kindOfPath = (path: string): EvidenceKind => kindByExt[path.split('
 /** Split a unified diff into per-file patches keyed by the new path. */
 export function splitDiff(text: string): Map<string, string> {
   const out = new Map<string, string>();
-  const parts = text.replace(/\r/g, '').split(/^(?=diff --git )/m);
+  const parts = text.replaceAll('\r', '').split(/^(?=diff --git )/m);
   for (const part of parts) {
     const m = /^diff --git a\/(.+?) b\/(.+)$/m.exec(part);
     if (m) out.set(m[2].trim(), part.trimEnd());

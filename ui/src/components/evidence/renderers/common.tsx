@@ -20,7 +20,7 @@ export async function copyText(value: string): Promise<boolean> {
   } catch { return false; }
 }
 
-export function CopyButton({ value, label = t('Copy text'), title, className = toolbarBtn, icon, labelClassName, disabled }: { value: string | (() => string); label?: string; title?: string; className?: string; icon?: ReactNode; labelClassName?: string; disabled?: boolean }) {
+export function CopyButton({ value, label = t('Copy text'), title, className = toolbarBtn, icon, labelClassName, disabled }: Readonly<{ value: string | (() => string); label?: string; title?: string; className?: string; icon?: ReactNode; labelClassName?: string; disabled?: boolean }>) {
   const [done, setDone] = useState(false);
   return (
     <Button type="button" variant="outline" size="xs" disabled={disabled} className={className} title={title ?? label} aria-label={title ?? label} onClick={async () => {
@@ -32,9 +32,9 @@ export function CopyButton({ value, label = t('Copy text'), title, className = t
   );
 }
 
-const ESC = String.fromCharCode(27);
-const BEL = String.fromCharCode(7);
-const ANSI_RE = new RegExp(`${ESC}\\[[0-9;?]*[ -/]*[@-~]|${ESC}\\][^${BEL}]*(?:${BEL}|${ESC}\\\\)|${ESC}[()][A-Za-z0-9]`, 'g');
+const ESC = String.fromCodePoint(27);
+const BEL = String.fromCodePoint(7);
+const ANSI_RE = new RegExp(String.raw`${ESC}\[[0-9;?]*[ -/]*[@-~]|${ESC}\][^${BEL}]*(?:${BEL}|${ESC}\\)|${ESC}[()][A-Za-z0-9]`, 'g');
 export function stripAnsi(text: string): string { return text.replace(ANSI_RE, ''); }
 
 /** Outcome-like words get a status tone wherever they appear as a value. */
@@ -48,7 +48,7 @@ export function wordTone(word: string): Tone | null {
   }
 }
 
-export function Toolbar({ children, right }: { children?: ReactNode; right?: ReactNode }) {
+export function Toolbar({ children, right }: Readonly<{ children?: ReactNode; right?: ReactNode }>) {
   return (
     <div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-2 py-2">
       {children}
@@ -57,12 +57,12 @@ export function Toolbar({ children, right }: { children?: ReactNode; right?: Rea
   );
 }
 
-export function Frame({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Frame({ children, className = '' }: Readonly<{ children: ReactNode; className?: string }>) {
   return <div className={`overflow-hidden rounded-lg border bg-card text-card-foreground ${className}`}>{children}</div>;
 }
 
 /** One numbered line: gutter + content. */
-export function Line({ n, children, tone, wrap = true }: { n: number | string; children: ReactNode; tone?: Tone; wrap?: boolean }) {
+export function Line({ n, children, tone, wrap = true }: Readonly<{ n: number | string; children: ReactNode; tone?: Tone; wrap?: boolean }>) {
   return (
     <div data-tone={tone} className={`flex min-w-full font-mono text-xs leading-5 ${tone ? 'bg-[var(--tone-bg)]' : ''} ${wrap ? '' : 'w-max'}`}>
       <span className="sticky left-0 w-12 shrink-0 select-none bg-inherit pr-3 text-right tabular-nums text-muted-foreground/70">{n}</span>

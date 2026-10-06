@@ -4,7 +4,7 @@ import type { Concept } from './concept';
 
 export const concept: Concept = 'frame';
 
-export function TimeAgo({ at, className = '' }: { at: number | null | undefined; className?: string }) {
+export function TimeAgo({ at, className = '' }: Readonly<{ at: number | null | undefined; className?: string }>) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => { if (!document.hidden) setNow(Date.now()); }, 60_000);

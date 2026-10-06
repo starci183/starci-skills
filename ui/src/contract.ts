@@ -168,7 +168,6 @@ export type AdmissionQuota = {
   windows: { id: string; usedPercent: number | null; resetsAt: number | null; observedAt: number | null; windowMinutes: number | null }[];
   usedPercent: number | null; detail: string | null;
 };
-export type QuotaSnapshot = AdmissionQuota;
 export type AdmissionReservation = {
   id: string; fence: number; attemptId: string; provider: string; account: string; model: string; role: AdmissionRole; state: AdmissionState;
   slots: number; maxParallel: number; scope: unknown; handle: string | null; pid: number | null; launchIdentity: string | null; hostRequestId: string | null;
@@ -190,7 +189,7 @@ export type LandRun = { id: number; ticket: string | null; lane: string | null; 
   scope: 'runtime';
   specs: unknown; push: Ref | null; stdout: BlobLink | null; stderr: BlobLink | null; startedAt: number; finishedAt: number | null };
 
-export type LogRow = { key: string; db: 'machine'|string; seq: number; at: number; actor: string; controller: string | null; project: string | null; wf: string | null; job: string | null;
+export type LogRow = { key: string; db: string; seq: number; at: number; actor: string; controller: string | null; project: string | null; wf: string | null; job: string | null;
   store: 'machine' | 'ledger'; ledgerId: string | null;
   level: 'debug'|'info'|'warn'|'error'; kind: string; msg: string; data: unknown; refs: Ref[]; traceId: string | null; spanId: string | null };
 export type TimelineItem = { key: string; id: string; ledgerId: string; project: string; at: number; source: 'event'|'log'|'attempt'|'check'|'decision'|'violation'|'action'; kind: string; ui: UiState; title: string; ref: Ref | null; detail: unknown };
@@ -303,7 +302,7 @@ export type AttemptDetailV3 = Omit<AttemptDetailV2, 'files'> & Partial<AttemptWh
   prior: PriorAttempt | null; checkPairs: CheckPair[] };
 
 /* ---- why (docs/why.md, starci/why@1) and the token meter. ---- */
-export type WhyRef = { kind: 'check' | 'report' | 'commit' | string; name?: string; runner?: string; status?: string; reportId?: number; sha?: string };
+export type WhyRef = { kind: string; name?: string; runner?: string; status?: string; reportId?: number; sha?: string };
 export type Why = { headline: string; state: string; cause: string | null; disagreement: string | null; next: string | null;
   provenance?: { source: 'stored' | 'computed'; at: number | null };
   owner: string | null; codes: string[]; refs: WhyRef[]; attemptId?: number; opId?: string; tryNo?: number;

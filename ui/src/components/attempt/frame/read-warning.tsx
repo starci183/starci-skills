@@ -9,7 +9,7 @@ export const concept: Concept = 'C7';
 export type ReadState = Pick<QuerySnapshot<unknown>, 'error' | 'meta' | 'observedAt'>;
 
 /** Request-local read warning. Successful GET/304 time is not a source evidence timestamp. */
-export function ReadWarning({ read, url, retained = false }: { read: ReadState; url: string; retained?: boolean }) {
+export function ReadWarning({ read, url, retained = false }: Readonly<{ read: ReadState; url: string; retained?: boolean }>) {
   const stale = read.meta?.stale ?? [];
   if (!read.error && !stale.length) return null;
   return <FeedbackState error onRetry={() => refreshQuery(url)}>

@@ -56,7 +56,7 @@ function routeTitle(route: Route): string {
   }
 }
 
-function PageSlot({ route }: { route: Route }) {
+function PageSlot({ route }: Readonly<{ route: Route }>) {
   const path = routePage(route);
   if (path == null) return <FeedbackState><strong>{t('Page not found')}</strong> · {t('Check the URL.')} <a href="#/" className="underline">{t('Back to Overview')}</a></FeedbackState>;
   const Page = pages[path];
@@ -138,16 +138,16 @@ export default function App() {
     <div className="shell-content">
       <header className="shell-header">
         <div className="shell-header-left">
-          <span className="shell-live" role="status" data-status={live} title={live === 'live' ? t('SSE connection established') : live === 'hidden' ? t('Tab hidden, updates paused') : t('Polling periodically')}>
+          <output className="shell-live" data-status={live} title={live === 'live' ? t('SSE connection established') : live === 'hidden' ? t('Tab hidden, updates paused') : t('Polling periodically')}>
             <span className="shell-live-dot" aria-hidden="true" />
             <span>{live === 'live' ? t('SSE connected') : live === 'hidden' ? t('Paused') : t('Polling')}</span>
-          </span>
+          </output>
           <span className="shell-header-separator" aria-hidden="true" />
           <span className="shell-last-updated min-w-0 truncate" title={[readTime, age == null ? '' : formatAge(age), provenance].filter(Boolean).join(' · ')}>{readTime}</span>
-          {hasReadIssues && <span className="shell-source-health" data-status={health.errorCount || contract.error ? 'error' : 'stale'} role="status" title={provenance}>
+          {hasReadIssues && <output className="shell-source-health" data-status={health.errorCount || contract.error ? 'error' : 'stale'} title={provenance}>
             <CircleAlert size={14} aria-hidden="true" />
             <span>{health.errorCount ? t('{n} failing queries', { n: health.errorCount }) : contract.error ? t('Could not read the API contract') : t('{n} unavailable sources', { n: health.staleCount })}</span>
-          </span>}
+          </output>}
         </div>
         <div className="shell-header-right">
           <SearchBox />

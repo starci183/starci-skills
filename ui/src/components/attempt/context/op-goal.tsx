@@ -9,7 +9,7 @@ import { FeedbackState } from '../../feedback-state';
 export const concept: Concept = 'C8';
 
 /** Block 2 "What this op does": the Vietnamese goal, what it must produce, its limits. `info` is null while loading or when the op has no yaml. */
-export function OpGoalCard({ attempt, info, loading }: { attempt: AttemptDetailV3; info: OpInfo | null; loading: boolean }) {
+export function OpGoalCard({ attempt, info, loading }: Readonly<{ attempt: AttemptDetailV3; info: OpInfo | null; loading: boolean }>) {
   const goalVi = info?.goal?.vi ?? null;
   const goalEn = info?.goal?.en ?? null;
   const main = goalVi ?? goalEn;

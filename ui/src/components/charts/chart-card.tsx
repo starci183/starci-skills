@@ -4,15 +4,14 @@ import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { DURATION, EASE } from '../motion';
 import { toneVar, type Tone } from '../status';
-import { FeedbackState } from '../feedback-state';
+import { FeedbackState, PageSkeleton } from '../feedback-state';
 import { t } from '../../i18n/t';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { refreshQuery, type QuerySnapshot } from '../../api/query';
-import { PageSkeleton } from '../feedback-state';
 
 export type LegendItem = { tone?: Tone; label: string; hollow?: boolean; neutral?: boolean };
 
-export function Legend({ items }: { items: LegendItem[] }) {
+export function Legend({ items }: Readonly<{ items: LegendItem[] }>) {
   return <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label={t('Legend')}>
     {items.map(item => <li key={item.label} className="inline-flex items-center gap-2">
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
@@ -24,8 +23,8 @@ export function Legend({ items }: { items: LegendItem[] }) {
 }
 
 /** One analytics chart: title, one-line explanation, legend, body or empty state. */
-export function ChartCard({ title, hint, legend, empty, className = '', children }: { title: string; hint: string; legend?: LegendItem[];
-  empty?: string | false; className?: string; children?: ReactNode }) {
+export function ChartCard({ title, hint, legend, empty, className = '', children }: Readonly<{ title: string; hint: string; legend?: LegendItem[];
+  empty?: string | false; className?: string; children?: ReactNode }>) {
   return <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DURATION.enter, ease: EASE }} className={`min-w-0 ${className}`} aria-label={title}>
     <Card className="chart-card min-w-0"><CardHeader>
       <CardTitle><h2>{title}</h2></CardTitle>
@@ -36,11 +35,11 @@ export function ChartCard({ title, hint, legend, empty, className = '', children
 }
 
 /** Availability belongs to the query; an unread source is never an empty chart. */
-export function ReadQuality<T>({ query, url, onRetry }: { query: QuerySnapshot<T>; url?: string; onRetry?: () => void }) {
+export function ReadQuality<T>({ query, url, onRetry }: Readonly<{ query: QuerySnapshot<T>; url?: string; onRetry?: () => void }>) {
   const retry = onRetry ?? (url ? () => refreshQuery(url) : undefined);
   return <>
     {query.error ? <FeedbackState error onRetry={retry}>{query.data !== null ? t('The source is failing; showing the last read. {error}', { error: query.error }) : t('Could not read the source: {error}', { error: query.error })}</FeedbackState> : null}
-    {partialSources(query).length ? <p className="shell-error" role="status">{t('Source out of sync: {list}', { list: partialSources(query).join(', ') })}</p> : null}
+    {partialSources(query).length ? <output className="shell-error block">{t('Source out of sync: {list}', { list: partialSources(query).join(', ') })}</output> : null}
     {query.data === null && !query.error ? query.meta ? <FeedbackState>{t('Unknown')}</FeedbackState> : <PageSkeleton label={t('Reading the data…')} /> : null}
   </>;
 }

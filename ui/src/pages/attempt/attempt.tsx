@@ -45,7 +45,7 @@ function costSummary(a: AttemptDetailV3): string {
 }
 
 /** One "Advanced" card. `nonce` > 0 means a deep link / step click asked for it open; a new nonce remounts it open. */
-function AdvancedSection({ id, title, summary, concept: c, nonce, children }: { id: string; title: string; summary: string; concept: Concept; nonce: number; children: React.ReactNode }) {
+function AdvancedSection({ id, title, summary, concept: c, nonce, children }: Readonly<{ id: string; title: string; summary: string; concept: Concept; nonce: number; children: React.ReactNode }>) {
   return <StaggerItem>
     <ConceptBlock concept={c} as="section" id={id} className="min-w-0 scroll-mt-4">
       <Advanced key={`${id}:${nonce}`} variant="card" title={title} summary={summary} defaultOpen={nonce > 0}>
@@ -61,7 +61,7 @@ function AttemptPage() {
   return <AttemptDetailPage key={`${route.project}/${route.attemptId}`} project={route.project} attemptId={route.attemptId} routeStep={route.step} />;
 }
 
-function AttemptDetailPage({ project, attemptId, routeStep }: { project: string; attemptId: string; routeStep: AttemptStep }) {
+function AttemptDetailPage({ project, attemptId, routeStep }: Readonly<{ project: string; attemptId: string; routeStep: AttemptStep }>) {
   const attempt = useApiQuery<AttemptDetailV3>(baseOf(project, attemptId), { topics: [`attempt:${project}:${attemptId}`], intervalMs: 20_000 });
   const data = attempt.data;
   const [fileId, setFileId] = useState<number | null>(() => { const raw = hashParam('file'); return raw && /^\d+$/.test(raw) ? Number(raw) : null; });

@@ -45,7 +45,7 @@ function renderLine(line: string, hits: Entry[] | undefined, current: number): R
 }
 
 /** Plain text / log / stdout. ANSI stripped, searchable, windowed above 5 000 lines. */
-export function TextView({ text, query, className = '' }: { text: string; query: string; className?: string }) {
+export function TextView({ text, query, className = '' }: Readonly<{ text: string; query: string; className?: string }>) {
   const lines = useMemo(() => cleanLines(text), [text]);
   const windowed = lines.length > WINDOW_AT;
   const [wrap, setWrap] = useState(true);
@@ -103,7 +103,9 @@ export function TextView({ text, query, className = '' }: { text: string; query:
     for (let i = first; i < last; i++) rows.push(<Line key={i} n={i + 1} tone={lineTone(lines[i])} wrap={false}>{renderLine(lines[i], byLine.get(i), current)}</Line>);
     body = <div style={{ height: lines.length * ROW, position: 'relative' }}><div style={{ position: 'absolute', top: first * ROW, left: 0, right: 0 }}>{rows}</div></div>;
   } else {
-    body = lines.map((l, i) => <Line key={i} n={i + 1} tone={lineTone(l)} wrap={effectiveWrap}>{renderLine(l, byLine.get(i), current)}</Line>);
+    const nodes: ReactNode[] = [];
+    for (let i = 0; i < lines.length; i++) nodes.push(<Line key={i} n={i + 1} tone={lineTone(lines[i])} wrap={effectiveWrap}>{renderLine(lines[i], byLine.get(i), current)}</Line>);
+    body = nodes;
   }
 
   return (

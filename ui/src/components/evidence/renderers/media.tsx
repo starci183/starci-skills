@@ -9,7 +9,7 @@ import { t } from '../../../i18n/t';
 import { Button } from '../../ui/button';
 import { FeedbackState } from '../../feedback-state';
 
-export function ImageView({ file }: { file: EvidenceFile }) {
+export function ImageView({ file }: Readonly<{ file: EvidenceFile }>) {
   const [dim, setDim] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [full, setFull] = useState(false);
@@ -44,7 +44,7 @@ export function ImageView({ file }: { file: EvidenceFile }) {
 
 const SPEEDS = [0.5, 1, 1.5, 2];
 
-export function VideoView({ file }: { file: EvidenceFile }) {
+export function VideoView({ file }: Readonly<{ file: EvidenceFile }>) {
   const ref = useRef<HTMLVideoElement>(null);
   const [speed, setSpeed] = useState(1);
   const [info, setInfo] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export function VideoView({ file }: { file: EvidenceFile }) {
       {/* #t=0.1 makes the browser paint the first frame as the poster */}
       <video ref={ref} src={`${file.href}#t=0.1`} controls preload="metadata" playsInline className="max-h-[70vh] w-full bg-muted/40"
         aria-label={file.name} onError={() => setFailed(true)}
-        onLoadedMetadata={e => { const v = e.currentTarget; setFailed(false); setInfo([`${v.videoWidth}×${v.videoHeight}`, Number.isFinite(v.duration) ? t('{n} sec', { n: Math.round(v.duration) }) : null].filter(Boolean).join(' · ')); }} />
+        onLoadedMetadata={e => { const v = e.currentTarget; setFailed(false); setInfo([`${v.videoWidth}×${v.videoHeight}`, Number.isFinite(v.duration) ? t('{n} sec', { n: Math.round(v.duration) }) : null].filter(Boolean).join(' · ')); }}><track kind="captions" /></video>
       <div className="flex flex-wrap items-center gap-2 border-t bg-muted/40 px-2 py-1.5 text-[11px] text-muted-foreground">
         <span>{t('Speed')}</span>
         {SPEEDS.map(r => <Button variant="outline" size="xs" key={r} type="button" className={toolbarBtn} disabled={failed} aria-pressed={speed === r} onClick={() => setRate(r)}>{r}×</Button>)}

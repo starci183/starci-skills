@@ -16,7 +16,7 @@ export function legTry(leg: { tries: number | null; tryBudget?: number | null; u
 }
 
 /** Mini pipeline: one dot per leg in chain order. Current leg is ringed; deferred/external are dashed. */
-export function PipelineDots({ pipeline }: { pipeline: MiniPipeline }) {
+export function PipelineDots({ pipeline }: Readonly<{ pipeline: MiniPipeline }>) {
   const legs = pipeline.legs.filter(leg => leg.inPlan);
   return <ol className="flex flex-wrap items-center gap-2" aria-label={t("The workflow's leg chain")}>
     {legs.map((leg, index) => {

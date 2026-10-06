@@ -10,7 +10,7 @@ const outcomeOf = (value: string): string => (/^(true|pass|passed|ok)$/i.test(va
  * assets as plain paths or `{path, role}`, and folded multi-line `detail`.
  */
 export function parseManifestYaml(text: string): AttemptManifest | null {
-  const lines = text.replace(/\r/g, '').split('\n');
+  const lines = text.replaceAll('\r', '').split('\n');
   const top: Record<string, string[]> = {};
   let key: string | null = null;
   const head: Record<string, string> = {};
@@ -24,8 +24,8 @@ export function parseManifestYaml(text: string): AttemptManifest | null {
     const out: { indent: number; rows: string[] }[] = [];
     for (const row of rows) {
       const dash = /^(\s*)-(?:\s+(.*))?$/.exec(row);
-      if (dash && (!out.length || dash[1].length <= out[out.length - 1].indent - 2)) out.push({ indent: dash[1].length + 2, rows: [dash[2] ?? ''] });
-      else if (out.length) out[out.length - 1].rows.push(row);
+      if (dash && (!out.length || dash[1].length <= out.at(-1)!.indent - 2)) out.push({ indent: dash[1].length + 2, rows: [dash[2] ?? ''] });
+      else if (out.length) out.at(-1)!.rows.push(row);
     }
     return out;
   };

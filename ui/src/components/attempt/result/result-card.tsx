@@ -43,7 +43,7 @@ function assertionStatus(outcome: string): AssertStatus {
 const icons: Partial<Record<Status, typeof CircleCheck>> = { success: CircleCheck, failed: CircleAlert, deferred: CircleMinus };
 const toneOf = (s: Status) => (s === 'success' ? 'success' : s === 'failed' ? 'failed' : 'skipped');
 
-function Assertions({ manifest }: { manifest: AttemptManifest }) {
+function Assertions({ manifest }: Readonly<{ manifest: AttemptManifest }>) {
   const rows = manifest.assertions.map(a => ({ ...a, ...assertionStatus(a.outcome) }));
   const pass = rows.filter(r => r.status === 'success').length;
   const fail = rows.filter(r => r.status === 'failed').length;
@@ -72,7 +72,7 @@ function Assertions({ manifest }: { manifest: AttemptManifest }) {
 }
 
 /** Block 4 "Conclusion": what the op says, the manifest checklist, claims, and the kernel's verdict with the reason. */
-export function ResultCard({ attempt }: { attempt: AttemptDetailV3 }) {
+export function ResultCard({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) {
   const manifest = useManifest(attempt);
   const opStatus = statusFromOutcome(attempt.reportOutcome);
   const verdictStatus = statusFromVerdict(attempt.verdict, attempt.reportedAt != null && attempt.settledAt == null && attempt.endState == null, attempt.ui);
@@ -109,7 +109,7 @@ export function ResultCard({ attempt }: { attempt: AttemptDetailV3 }) {
         </div>
         {attempt.why ? <WhyBlock why={attempt.why} className="mb-4 max-w-[80ch]" /> : null}
         {attempt.why?.provenance?.source === 'computed' ? <p className="text-xs text-muted-foreground">{t('Explanation computed from current reference data; it is not a stored settlement receipt.')}</p> : null}
-        {settle.lines.length ? <ul className="m-0 flex max-w-[72ch] list-disc flex-col gap-1 pl-6 text-sm">{settle.lines.map((line, i) => <li key={i} className="break-words">{line}</li>)}</ul>
+        {settle.lines.length ? <ul className="m-0 flex max-w-[72ch] list-disc flex-col gap-1 pl-6 text-sm">{settle.lines.map((line, i) => <li key={`${i}-${line}`} className="break-words">{line}</li>)}</ul>
           : <p className="m-0 text-sm text-muted-foreground">{attempt.verdict ? t('No additional verdict reason was recorded.') : t('No verdict has been recorded for this attempt yet.')}</p>}
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-4 text-sm">
           <span className="text-muted-foreground">{t('Next step:')}</span>

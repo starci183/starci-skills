@@ -8,7 +8,7 @@ const INLINE_RE = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*|__[^_\n]+__)|(\*[^*\s][^*\n]*\*|
 
 const safeHref = (h: string) => /^https?:\/\//i.test(h) ? h : null;
 
-function Link({ href, children }: { href: string; children: ReactNode }) {
+function Link({ href, children }: Readonly<{ href: string; children: ReactNode }>) {
   const ok = safeHref(href);
   if (!ok) return <>{children}</>;
   return <a href={ok} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2 break-words">{children}</a>;
@@ -37,7 +37,7 @@ const splitRow = (l: string) => l.trim().replace(/^\|/, '').replace(/\|$/, '').s
 const isSep = (l: string) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l) && l.includes('-');
 const LIST_RE = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
 
-function CodeBlock({ code, lang }: { code: string; lang: string }) {
+function CodeBlock({ code, lang }: Readonly<{ code: string; lang: string }>) {
   return (
     <div className="overflow-hidden rounded-lg border bg-muted/40">
       <div className="flex items-center justify-between border-b bg-muted/60 px-2 py-1 text-[11px] text-muted-foreground">
@@ -69,7 +69,8 @@ function blocks(src: string, base: string): ReactNode[] {
     if (h) {
       const lvl = h[1].length;
       const cls = ['text-xl font-semibold', 'text-lg font-semibold border-b pb-1', 'text-base font-semibold', 'text-sm font-semibold', 'text-sm font-medium', 'text-xs font-medium text-muted-foreground'][lvl - 1];
-      out.push(<div key={k} role="heading" aria-level={lvl} className={`${cls} mt-2`}>{inline(h[2], k)}</div>);
+      const Tag = `h${lvl}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+      out.push(<Tag key={k} className={`${cls} mt-2`}>{inline(h[2], k)}</Tag>);
       i++; continue;
     }
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) { out.push(<hr key={k} className="my-2 border-border" />); i++; continue; }
@@ -83,48 +84,54 @@ function blocks(src: string, base: string): ReactNode[] {
       const head = splitRow(l);
       const aligns = splitRow(lines[i + 1]).map(c => c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : 'left');
       i += 2;
-      const rows: string[][] = [];
-      while (i < lines.length && lines[i].trim() && lines[i].includes('|')) rows.push(splitRow(lines[i++]));
+      type Cell = { key: string; text: string; align: 'left' };
+      const cols: Cell[] = head.map((c, j) => ({ key: `${k}h${j}`, text: c, align: aligns[j] as 'left' }));
+      const rows: { key: string; cells: Cell[] }[] = [];
+      while (i < lines.length && lines[i].trim() && lines[i].includes('|')) {
+        const line = i;
+        const texts = splitRow(lines[i++]);
+        rows.push({ key: `${k}r${line}`, cells: head.map((_, j) => ({ key: `${k}r${line}c${j}`, text: texts[j] ?? '', align: aligns[j] as 'left' })) });
+      }
       out.push(
         <div key={k} className="overflow-x-auto rounded-lg border">
           <table className="w-full border-collapse text-xs">
-            <thead className="bg-muted/60"><tr>{head.map((c, j) => <th key={j} style={{ textAlign: aligns[j] as 'left' }} className="border-b px-2 py-2 font-semibold">{inline(c, `${k}h${j}`)}</th>)}</tr></thead>
-            <tbody>{rows.map((r, ri) => <tr key={ri} className="border-b last:border-0">{head.map((_, j) => <td key={j} style={{ textAlign: aligns[j] as 'left' }} className="px-2 py-1 align-top">{inline(r[j] ?? '', `${k}r${ri}c${j}`)}</td>)}</tr>)}</tbody>
+            <thead className="bg-muted/60"><tr>{cols.map(col => <th key={col.key} style={{ textAlign: col.align }} className="border-b px-2 py-2 font-semibold">{inline(col.text, col.key)}</th>)}</tr></thead>
+            <tbody>{rows.map(row => <tr key={row.key} className="border-b last:border-0">{row.cells.map(cell => <td key={cell.key} style={{ textAlign: cell.align }} className="px-2 py-1 align-top">{inline(cell.text, cell.key)}</td>)}</tr>)}</tbody>
           </table>
         </div>,
       );
       continue;
     }
     if (LIST_RE.test(l)) {
-      const items: { depth: number; ordered: boolean; num: string; text: string }[] = [];
+      const items: { key: string; depth: number; ordered: boolean; num: string; text: string }[] = [];
       while (i < lines.length) {
         const m = LIST_RE.exec(lines[i]);
-        if (m) { items.push({ depth: Math.floor(m[1].replace(/\t/g, '  ').length / 2), ordered: /\d/.test(m[2]), num: m[2], text: m[3] }); i++; }
-        else if (lines[i].trim() && /^\s{2,}\S/.test(lines[i]) && items.length) { items[items.length - 1].text += ` ${lines[i].trim()}`; i++; }
+        if (m) { items.push({ key: `${k}l${items.length}`, depth: Math.floor(m[1].replaceAll('\t', '  ').length / 2), ordered: /\d/.test(m[2]), num: m[2], text: m[3] }); i++; }
+        else if (lines[i].trim() && /^\s{2,}\S/.test(lines[i]) && items.length) { items.at(-1)!.text += ` ${lines[i].trim()}`; i++; }
         else break;
       }
       out.push(
         <ul key={k} className="space-y-1">
-          {items.map((it, j) => (
-            <li key={j} style={{ marginLeft: it.depth * 16 }} className="flex gap-2">
+          {items.map(it => (
+            <li key={it.key} style={{ marginLeft: it.depth * 16 }} className="flex gap-2">
               <span className="w-5 shrink-0 text-right text-muted-foreground">{it.ordered ? it.num : '•'}</span>
-              <span className="min-w-0 break-words">{inline(it.text, `${k}l${j}`)}</span>
+              <span className="min-w-0 break-words">{inline(it.text, it.key)}</span>
             </li>
           ))}
         </ul>,
       );
       continue;
     }
-    const buf: string[] = [];
-    while (i < lines.length && lines[i].trim() && !/^\s*(```|~~~|#{1,6}\s|>|([-*_])(\s*\2){2,}\s*$)/.test(lines[i]) && !LIST_RE.test(lines[i]) && !(lines[i].includes('|') && i + 1 < lines.length && isSep(lines[i + 1]))) buf.push(lines[i++]);
-    if (!buf.length) { buf.push(lines[i++]); }
-    out.push(<p key={k} className="break-words leading-6">{buf.map((b, j) => <span key={j}>{j ? <br /> : null}{inline(b.trim(), `${k}p${j}`)}</span>)}</p>);
+    const buf: { key: string; text: string }[] = [];
+    while (i < lines.length && lines[i].trim() && !/^\s*(```|~~~|#{1,6}\s|>|([-*_])(\s*\2){2,}\s*$)/.test(lines[i]) && !LIST_RE.test(lines[i]) && !(lines[i].includes('|') && i + 1 < lines.length && isSep(lines[i + 1]))) { buf.push({ key: `${k}p${i}`, text: lines[i] }); i++; }
+    if (!buf.length) { buf.push({ key: `${k}p${i}`, text: lines[i] }); i++; }
+    out.push(<p key={k} className="break-words leading-6">{buf.map((b, j) => <span key={b.key}>{j ? <br /> : null}{inline(b.text.trim(), b.key)}</span>)}</p>);
   }
   return out;
 }
 
 /** Small safe markdown renderer (React nodes only, http(s) links only). */
-export function MarkdownView({ text }: { text: string }) {
+export function MarkdownView({ text }: Readonly<{ text: string }>) {
   const src = text.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
   return (
     <Frame>

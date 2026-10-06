@@ -11,7 +11,7 @@ import { t } from '../../i18n/t';
 const ROW = 28;
 const cut = (text: string, n: number) => text.length > n ? `${text.slice(0, n - 1)}…` : text;
 
-export function DurationPlot({ rows, now }: { rows: AttemptRow[]; now: number }) {
+export function DurationPlot({ rows, now }: Readonly<{ rows: AttemptRow[]; now: number }>) {
   const [ref, width] = useWidth();
   const dots = useMemo(() => rows.map(row => {
     const state = attemptState(row);

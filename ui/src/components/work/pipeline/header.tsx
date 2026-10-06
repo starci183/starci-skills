@@ -17,7 +17,7 @@ const stuckReasons: Record<string, string> = {
 const fmt = (value: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(value);
 
 /** Overall progress: one segment per leg in chain order, coloured by status, with a counted legend. */
-export function LegProgress({ pipeline, eta, action }: { pipeline: PipelineView; eta?: string; action?: { href: string; label: string } | null }) {
+export function LegProgress({ pipeline, eta, action }: { readonly pipeline: PipelineView; readonly eta?: string; readonly action?: { href: string; label: string } | null }) {
   const { done, total, byStatus } = pipeline.progress;
   const legs = pipeline.legs.filter(leg => leg.inPlan).sort((a, b) => a.seq - b.seq);
   if (!pipeline.progress.available) return <p className="text-sm text-muted-foreground">{t('Plan progress is unavailable.')}</p>;
@@ -33,7 +33,7 @@ export function LegProgress({ pipeline, eta, action }: { pipeline: PipelineView;
   </div>;
 }
 
-export function WorkflowHeader({ row, pipeline }: { row: WorkflowDetailV2; pipeline: PipelineView | null }) {
+export function WorkflowHeader({ row, pipeline }: { readonly row: WorkflowDetailV2; readonly pipeline: PipelineView | null }) {
   const problems = [
     row.blockedBy.length > 0 && { key: 'b', status: 'blocked' as Status, text: t('{n} blocking points', { n: row.blockedBy.length }) },
     (pipeline?.failures ?? 0) > 0 && { key: 'f', status: 'failed' as Status, text: t('{n} failed attempts', { n: pipeline!.failures }) },

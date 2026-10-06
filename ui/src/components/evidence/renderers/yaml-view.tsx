@@ -31,8 +31,8 @@ function scalar(raw: string, k: string): { node: ReactNode; block: boolean } {
     const rest = scalar(meta[3], `${k}r`);
     return { node: <span key={k}><span className="text-[var(--status-warning)]">{meta[1]}</span>{meta[2] ?? ''}{rest.node}</span>, block: rest.block };
   }
-  if (v[0] === '"' || v[0] === "'") return { node: <span key={k} className="text-foreground">{v}</span>, block: false };
-  if (v[0] === '[' || v[0] === '{') return { node: <span key={k} className="text-foreground">{v}</span>, block: false };
+  if (v.startsWith('"') || v.startsWith("'")) return { node: <span key={k} className="text-foreground">{v}</span>, block: false };
+  if (v.startsWith('[') || v.startsWith('{')) return { node: <span key={k} className="text-foreground">{v}</span>, block: false };
   if (NUM_RE.test(v)) return { node: <span key={k} data-tone="running" className="text-[var(--tone)]">{v}</span>, block: false };
   if (/^(true|false|null|~|yes|no)$/i.test(v)) {
     const tone = /^true$/i.test(v) ? 'success' : /^false$/i.test(v) ? 'failed' : null;
@@ -47,7 +47,7 @@ function tokenize(line: string): { nodes: ReactNode[]; block: boolean } {
   const trimmed = line.trim();
   const indent = line.slice(0, line.length - line.trimStart().length);
   if (!trimmed) return { nodes: [' '], block: false };
-  if (trimmed[0] === '#') return { nodes: [indent, <span key="c" className={`italic ${muted}`}>{trimmed}</span>], block: false };
+  if (trimmed.startsWith('#')) return { nodes: [indent, <span key="c" className={`italic ${muted}`}>{trimmed}</span>], block: false };
   if (trimmed === '---' || trimmed === '...') return { nodes: [<span key="d" className={muted}>{line}</span>], block: false };
   const nodes: ReactNode[] = [indent];
   let rest = trimmed;
@@ -83,20 +83,20 @@ function tokenize(line: string): { nodes: ReactNode[]; block: boolean } {
 }
 
 /** YAML with line numbers and light highlighting. Outcome values (pass/fail/blocked/done…) take status tones. */
-export function YamlView({ text }: { text: string }) {
-  const src = text.replace(/^﻿/, '').replace(/\r\n/g, '\n');
+export function YamlView({ text }: Readonly<{ text: string }>) {
+  const src = text.replaceAll(/^﻿/g, '').replace(/\r\n/g, '\n');
   const lines = src.split('\n');
   if (lines.length > 5000) return <TextView text={text} query="" />;
   let block: number | null = null;
   const rows = lines.map((line, i) => {
     const indent = line.length - line.trimStart().length;
     if (block !== null) {
-      if (!line.trim() || indent > block) return <Line key={i} n={i + 1}><span className="text-foreground/90">{line || ' '}</span></Line>;
+      if (!line.trim() || indent > block) return <Line key={`${i + 1}-${line}`} n={i + 1}><span className="text-foreground/90">{line || ' '}</span></Line>;
       block = null;
     }
     const t = tokenize(line);
     if (t.block) block = indent;
-    return <Line key={i} n={i + 1}>{t.nodes}</Line>;
+    return <Line key={`${i + 1}-${line}`} n={i + 1}>{t.nodes}</Line>;
   });
   return (
     <Frame className="evidence-code-frame">

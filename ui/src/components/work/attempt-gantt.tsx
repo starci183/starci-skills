@@ -17,7 +17,7 @@ const wasDispatched = (attempt: AttemptBrief): attempt is DispatchedAttempt => a
 const recordedTime = (at: number | null | undefined) => at != null && Number.isFinite(at) ? at : null;
 
 /** Actual dispatch timeline per leg, independent of the Op and Unit dependency graphs. */
-export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: number }) {
+export function AttemptGantt({ pipeline, now }: { readonly pipeline: PipelineView; readonly now: number }) {
   const hatchId = useId();
   const rows = pipeline.legs.map(leg => ({ leg, atts: leg.attempts.filter(wasDispatched) })).filter(r => r.atts.length);
   if (!rows.length) return <p className="rounded-lg border p-4 text-sm text-muted-foreground">{t('No attempts to draw a timeline for yet.')}</p>;

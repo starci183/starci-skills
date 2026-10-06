@@ -15,9 +15,9 @@ const columnClass = (column: { className?: string; numeric?: boolean }) => [colu
 
 const rowEnter = (index: number) => ({ initial: { opacity: 0, y: 6 }, animate: { opacity: 1, y: 0 }, transition: { duration: DURATION.base, ease: EASE, delay: Math.min(index, 12) * 0.03 } });
 
-export function DataTable<T>({ rows, columns, getKey, empty = t('Nothing recorded yet.'), caption }: {
+export function DataTable<T>({ rows, columns, getKey, empty = t('Nothing recorded yet.'), caption }: Readonly<{
   rows: T[]; columns: DataColumn<T>[]; getKey: (row: T) => string | number; empty?: string; caption?: string;
-}) {
+}>) {
   if (rows.length === 0) return <FeedbackState>{empty}</FeedbackState>;
   return <>
     <div className="data-table-desktop">
@@ -28,10 +28,10 @@ export function DataTable<T>({ rows, columns, getKey, empty = t('Nothing recorde
           : <TableCell key={column.key} className={columnClass(column)}>{column.render(row)}</TableCell>)}</TableRow>)}</TableBody>
       </Table>
     </div>
-    <div className="data-table-mobile" role="list" aria-label={caption}>
-      {rows.map((row, index) => <motion.div key={getKey(row)} role="listitem" {...rowEnter(index)}><Card size="sm"><CardContent><dl className="mobile-row-fields">
+    <ul className="data-table-mobile" aria-label={caption}>
+      {rows.map((row, index) => <motion.li key={getKey(row)} className="min-w-0" {...rowEnter(index)}><Card size="sm"><CardContent><dl className="mobile-row-fields">
         {columns.map((column) => <div key={column.key} className={column.mobileStack ? 'mobile-field-stack' : undefined}><dt>{column.header}</dt><dd>{column.render(row)}</dd></div>)}
-      </dl></CardContent></Card></motion.div>)}
-    </div>
+      </dl></CardContent></Card></motion.li>)}
+    </ul>
   </>;
 }

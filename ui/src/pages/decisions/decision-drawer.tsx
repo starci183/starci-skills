@@ -20,16 +20,16 @@ const actor = (value: string | null | undefined) => value === 'owner' ? t('The o
 const channel = (value: DecisionRow['channel']) => ({ 'kernel-seat': t('Kernel seat'), 'supervisor-seat': t('Supervisor seat'), telegram: 'Telegram', 'serve-ask': t('the ask channel') } as Record<string, string>)[value ?? ''] ?? t('Unknown');
 const isRef = (item: Evidence): item is Ref => 'href' in item;
 
-function EvidenceList({ items, credential }: { items: Evidence[]; credential: boolean }) {
+function EvidenceList({ items, credential }: Readonly<{ items: Evidence[]; credential: boolean }>) {
   if (!items.length) return <p className="text-sm text-muted-foreground">{t('No linked evidence yet.')}</p>;
-  return <ul className="flex flex-col gap-2">{items.map((item, index) => <li key={index}>
+  return <ul className="flex flex-col gap-2">{items.map((item, index) => <li key={`${isRef(item) ? item.href : item.text}-${index}`}>
     {isRef(item) ? <a href={item.href} className="inline-flex max-w-full items-center gap-1 rounded-md text-sm font-medium text-primary underline-offset-4 hover:underline">
       <span className="truncate">{item.kind} · {item.id}</span><ArrowUpRight className="size-3.5 shrink-0" aria-hidden="true" />
     </a> : <span className="text-sm text-muted-foreground">{credential ? t('Credential details are hidden.') : item.text}</span>}
   </li>)}</ul>;
 }
 
-export function DecisionDrawer({ id, store, ledger, onClose }: { id: string | null; store: string | null; ledger: string | null; onClose: () => void }) {
+export function DecisionDrawer({ id, store, ledger, onClose }: Readonly<{ id: string | null; store: string | null; ledger: string | null; onClose: () => void }>) {
   const params = new URLSearchParams();
   if (store) params.set('store', store);
   if (ledger) params.set('ledger', ledger);

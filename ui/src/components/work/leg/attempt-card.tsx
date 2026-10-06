@@ -14,7 +14,7 @@ const verdictLabel: Record<NonNullable<AttemptBrief['verdict']>, string> = { pas
 const fmt = (n: number | null) => n == null ? '–' : n.toLocaleString('vi-VN');
 
 /** One dispatch, its Op report and the independently recorded runtime verdict. */
-export function AttemptCard({ attempt, now }: { attempt: AttemptBrief; now: number }) {
+export function AttemptCard({ attempt, now }: Readonly<{ attempt: AttemptBrief; now: number }>) {
   const executing = attempt.open && attempt.endedAt == null && attempt.reportedAt == null && !attempt.reportOutcome;
   const end = attempt.settledAt ?? attempt.endedAt ?? (executing ? now : null);
   const outcome = statusFromOutcome(attempt.reportOutcome);

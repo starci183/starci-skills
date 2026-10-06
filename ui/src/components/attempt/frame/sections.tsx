@@ -22,7 +22,7 @@ const timelineLabels: Record<string, string> = {
   checked: t('Checked'), settled: t('Settled'), released: t('Slot released'), 'terminal-closed': t('Terminal closed'), 'worktree-removed': t('Worktree removed'),
 };
 
-export function TranscriptSection({ project, attemptId, attempt }: { project: string; attemptId: string; attempt: AttemptDetailV2 }) {
+export function TranscriptSection({ project, attemptId, attempt }: Readonly<{ project: string; attemptId: string; attempt: AttemptDetailV2 }>) {
   const logsUrl = `/api/logs?project=${encodeURIComponent(project)}&job=${encodeURIComponent(attempt.job)}&limit=100`;
   const logs = useApiQuery<LogRow[]>(logsUrl, { topics: [`attempt:${project}:${attemptId}`], intervalMs: 30_000 });
   const terminal = attempt.terminal;
@@ -40,7 +40,7 @@ export function TranscriptSection({ project, attemptId, attempt }: { project: st
   </Card>;
 }
 
-export function DiffSection({ project, attemptId, attempt }: { project: string; attemptId: string; attempt: AttemptDetailV2 }) {
+export function DiffSection({ project, attemptId, attempt }: Readonly<{ project: string; attemptId: string; attempt: AttemptDetailV2 }>) {
   const diffUrl = `/api/attempts/${encodeURIComponent(project)}/${encodeURIComponent(attemptId)}/diff`;
   const diff = useApiQuery<JobDiff | null>(diffUrl, { intervalMs: 60_000 });
   const where = attempt.where;
@@ -55,7 +55,7 @@ export function DiffSection({ project, attemptId, attempt }: { project: string; 
   </Card>;
 }
 
-export function LandSection({ attempt }: { attempt: AttemptDetailV2 }) {
+export function LandSection({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
   const land = attempt.land;
   return <Card id="attempt-step-land" concept="C11" title={t('Workflow integration (Land)')} hint={t('the workflow integration record, separate from this attempt verdict')}
     right={<StatusChip status={workflowLandStatus(land)} label={land?.result ?? t('No workflow land record')} />}>
@@ -75,7 +75,7 @@ export function LandSection({ attempt }: { attempt: AttemptDetailV2 }) {
   </Card>;
 }
 
-export function TimelineCard({ attempt }: { attempt: AttemptDetailV2 }) {
+export function TimelineCard({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
   const first = attempt.timeline.find(item => item.at)?.at ?? null;
   return <Card concept="C7" title={t('Timeline')} hint={t('milestones measured from the ledger, with SLA deadlines')}>
     <ol className="m-0 grid list-none gap-x-6 p-0 sm:grid-cols-2">{attempt.timeline.map(item => <li key={item.step} className="flex items-center gap-2 border-b py-2 text-sm" data-tone={item.late ? 'warning' : item.at ? 'success' : 'queued'}>
@@ -87,11 +87,11 @@ export function TimelineCard({ attempt }: { attempt: AttemptDetailV2 }) {
   </Card>;
 }
 
-function ActionRowView({ action }: { action: ActionRow }) {
+function ActionRowView({ action }: Readonly<{ action: ActionRow }>) {
   return <li className="flex flex-wrap items-center gap-2 py-2 text-sm"><StatusChip status={statusFromUi(action.ui)} label={action.state} /><span>{action.controller} · {action.duty ?? action.verb ?? action.state}</span>{action.exitCode != null ? <span className="text-xs text-muted-foreground">exit {action.exitCode}</span> : null}<span className="ml-auto text-xs text-muted-foreground">{formatAbsolute(action.startedAt)}</span></li>;
 }
 
-function DecisionRowView({ decision }: { decision: RecordedDecision }) {
+function DecisionRowView({ decision }: Readonly<{ decision: RecordedDecision }>) {
   return <li className="min-w-0 py-2 text-sm">
     <div className="flex flex-wrap items-center gap-2"><span className="rounded border px-2 py-1 text-[11px] text-muted-foreground">{decision.decider}</span><span className="min-w-0 flex-1 break-words">{decision.choice ?? t('Choice not recorded')}</span><span className="text-xs text-muted-foreground">{formatAbsolute(decision.at)}</span></div>
     <p className="mb-0 mt-1 text-xs text-muted-foreground">{decision.association === 'attempt' ? t('Exact Attempt association') : t('Job-wide association')}</p>
@@ -101,7 +101,7 @@ function DecisionRowView({ decision }: { decision: RecordedDecision }) {
 }
 
 /** Controller actions, decisions and lessons tied to this attempt (three framed cards). */
-export function AttemptDecisions({ attempt }: { attempt: AttemptDetailV2 }) {
+export function AttemptDecisions({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
   return <BareCards value={false}>
     <div className="grid min-w-0 gap-4 lg:grid-cols-3">
       <Card concept="C13" title={t('Who touched it')} hint={t('Recorded actions for this job; may span dispatches')}>{attempt.actions.length ? <ul className="m-0 list-none divide-y p-0">{attempt.actions.map(action => <ActionRowView key={action.id} action={action} />)}</ul> : <Empty>{t('No controller action recorded yet.')}</Empty>}</Card>
@@ -112,7 +112,7 @@ export function AttemptDecisions({ attempt }: { attempt: AttemptDetailV2 }) {
 }
 
 /** Timeline, controller actions, decisions and lessons tied to this attempt. */
-export function AttemptTrail({ attempt }: { attempt: AttemptDetailV2 }) {
+export function AttemptTrail({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
   return <div className="grid min-w-0 gap-4">
     <TimelineCard attempt={attempt} />
     <AttemptDecisions attempt={attempt} />
