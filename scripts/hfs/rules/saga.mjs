@@ -123,9 +123,9 @@ export function sagaFindings({ repoRoot, files }) {
       const text = readText(repoRoot, orchestrator);
       if (text === null) continue;
       const sourceFile = parse(ts, text);
-      const imported = specifiersOf(ts, sourceFile).map((specifier) => path.posix.normalize(path.posix.join(path.posix.dirname(orchestrator), specifier)));
+      const imported = new Set(specifiersOf(ts, sourceFile).map((specifier) => path.posix.normalize(path.posix.join(path.posix.dirname(orchestrator), specifier))));
       for (const file of [...steps.values(), ...compensations.values()]) {
-        if (!imported.includes(file.replace(/\.ts$/, ''))) findings.push(found(SAGA_STEP_COMPENSATION, orchestrator, `${orchestrator} does not list ${file}: the orchestrator imports every step and every compensation of its saga, so a step nobody runs cannot hide.`, { step: file }));
+        if (!imported.has(file.replace(/\.ts$/, ''))) findings.push(found(SAGA_STEP_COMPENSATION, orchestrator, `${orchestrator} does not list ${file}: the orchestrator imports every step and every compensation of its saga, so a step nobody runs cannot hide.`, { step: file }));
       }
       // R170
       const stem = ORCHESTRATOR.exec(orchestrator)[2];
