@@ -135,7 +135,7 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
       const tmp = `${archive}.partial-${process.pid}`;
       // The manifest needs every entry's sha256 first: hash, then write the ZIP with the manifest as its last entry.
       let total=0;if(entries.length+1>ZIP_RESOURCE_LIMITS.maxEntries)throw refuse('zip-limit','workflow archive has too many entries; workflow rows remain');
-      const described = entries.map(e=>{const bytes=e.data!=null?Buffer.byteLength(e.data):fs.statSync(e.file).size;if(bytes>ZIP_RESOURCE_LIMITS.maxEntryBytes||(total+=bytes)>ZIP_RESOURCE_LIMITS.maxTotalBytes)throw refuse('zip-limit','workflow archive exceeds the supported byte budget; workflow rows remain');return {name:e.name,sha256:e.data!=null?sha256(e.data):sha256File(e.file),bytes};});
+      const described = entries.map(e=>{const bytes=e.data!=null?Buffer.byteLength(e.data):fs.statSync(e.file).size;if(bytes>ZIP_RESOURCE_LIMITS.maxEntryBytes||(total+=bytes)>ZIP_RESOURCE_LIMITS.maxTotalBytes){throw refuse('zip-limit','workflow archive exceeds the supported byte budget; workflow rows remain');}return {name:e.name,sha256:e.data!=null?sha256(e.data):sha256File(e.file),bytes};});
       const manifest = { schema: PURGE_MANIFEST_SCHEMA, workflowId, repo: root, product: path.basename(root), createdAt: new Date(now()).toISOString(),
         approvedBy, approvalRef, eventsHead: head, counts, entries: described, missingFiles: missing };
       const manifestBuf = Buffer.from(JSON.stringify(manifest, null, 2));

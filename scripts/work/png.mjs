@@ -13,7 +13,8 @@ const CHANNELS = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 };
 
 const paeth = (a, b, c) => {
   const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
-  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+  if (pa <= pb && pa <= pc) return a;
+  return pb <= pc ? b : c;
 };
 
 /** Decode PNG bytes into {width, height, data: Uint8Array RGBA}. Throws `unsupported png: ...`. */
@@ -54,7 +55,12 @@ export function decodePng(bytes) {
     if (filter > 4) throw new Error(`unsupported png: filter type ${filter}`);
     for (let i = 0; i < stride; i += 1) {
       const x = raw[at + 1 + i], a = i >= bpp ? line[i - bpp] : 0, b = prior[i], c = i >= bpp ? prior[i - bpp] : 0;
-      line[i] = (filter === 0 ? x : filter === 1 ? x + a : filter === 2 ? x + b : filter === 3 ? x + ((a + b) >> 1) : x + paeth(a, b, c)) & 0xff;
+      let value = x;
+      if (filter === 1) value += a;
+      else if (filter === 2) value += b;
+      else if (filter === 3) value += (a + b) >> 1;
+      else if (filter === 4) value += paeth(a, b, c);
+      line[i] = value & 0xff;
     }
     const sample = (index) => {
       if (depth === 8) return line[index];
@@ -196,7 +202,10 @@ export function keyRect(image, key = [255, 0, 255], tolerance = 8) {
   for (let y = 0; y < image.height; y += 1) for (let x = 0; x < image.width; x += 1) {
     if (!hits((y * image.width + x) * 4)) continue;
     count += 1;
-    if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+    if (x < minX) { minX = x; }
+    if (x > maxX) { maxX = x; }
+    if (y < minY) { minY = y; }
+    if (y > maxY) { maxY = y; }
   }
   if (!count) return null;
   const rect = { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
