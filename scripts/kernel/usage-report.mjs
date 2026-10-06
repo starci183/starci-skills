@@ -19,7 +19,7 @@ const SUMS = `sum(u.input_tokens) AS inputTokens, sum(u.output_tokens) AS output
   sum(CASE WHEN u.cost_usd IS NULL THEN 1 ELSE 0 END) AS unpriced, count(*) AS records`;
 
 const blank = () => ({ ...Object.fromEntries(NUM.map((k) => [k, 0])), costUsd: 0, unpriced: 0, records: 0 });
-const add = (t, r) => { for (const k of NUM) t[k] += Number(r[k] ?? 0); t.costUsd += Number(r.costUsd ?? 0); t.unpriced += Number(r.unpriced ?? 0); t.records += Number(r.records ?? 0); return t; };
+const add = (t, r) => { for (const k of NUM) { t[k] += Number(r[k] ?? 0); } t.costUsd += Number(r.costUsd ?? 0); t.unpriced += Number(r.unpriced ?? 0); t.records += Number(r.records ?? 0); return t; };
 /** The finished shape of a folded total: tokens = every token the models handled; costUsd null unless every record is priced. */
 const finish = (t) => ({
   inputTokens: t.inputTokens, outputTokens: t.outputTokens, cacheReadTokens: t.cacheReadTokens, cacheWriteTokens: t.cacheWriteTokens, reasoningTokens: t.reasoningTokens,
@@ -77,10 +77,24 @@ export function usageOfLedger(db, { sinceMs = null } = {}) {
   const rows = db.prepare(`SELECT u.subject_type AS subjectType, u.provider AS provider, COALESCE(u.response_model,u.request_model,'unknown') AS model, ${SUMS}
     FROM llm_usage u ${where} GROUP BY u.subject_type, u.provider, model`).all(...args).map((r) => ({ ...r }));
   const total = blank(); for (const r of rows) add(total, r);
-  const part = (type) => { const t = blank(); for (const r of rows.filter((x) => x.subjectType === type)) add(t, r); return finish(t); };
+  const part = (type) => { const t = blank(); for (const r of rows.filter((x) => x.subjectType === type)) { add(t, r); } return finish(t); };
   return { total: finish(total), attempts: part('attempt'), kernel: part('kernel-turn'),
     byModel: fold(rows, (r) => `${r.provider}/${r.model}`).map((t) => ({ model: t.key, ...tally(t) })).sort((a, b) => b.tokens - a.tokens) };
 }
+
+const readLedgerUsage = (l, { out, now, windowMs, all, win, models }) => {
+  let db = null;
+  try {
+    db = openLedgerReader(l.file);
+    const life = usageOfLedger(db), recent = usageOfLedger(db, { sinceMs: now - windowMs });
+    const unavailable = db.prepare("SELECT count(*) n FROM op_attempts WHERE usage_source='unavailable'").get().n;
+    const pending = db.prepare("SELECT count(*) n FROM op_attempts WHERE usage_source IS NULL AND (settled_at IS NOT NULL OR end_state IS NOT NULL) AND NOT EXISTS(SELECT 1 FROM llm_usage u WHERE u.subject_type='attempt' AND u.attempt_id=op_attempts.attempt_id)").get().n;
+    out.ledgers.push({ name: l.name, ledgerId: l.ledgerId, total: life.total, window: recent.total, attempts: life.attempts, kernel: life.kernel, unavailableAttempts: Number(unavailable), pendingAttempts: Number(pending), byModel: life.byModel });
+    for (const m of life.byModel) models.push(m);
+    add(all, { ...life.total, costUsd: life.total.costUsd ?? 0, unpriced: life.total.costUsd === null && life.total.tokens ? 1 : 0, records: life.total.tokens ? 1 : 0 });
+    add(win, { ...recent.total, costUsd: recent.total.costUsd ?? 0, unpriced: recent.total.costUsd === null && recent.total.tokens ? 1 : 0, records: recent.total.tokens ? 1 : 0 });
+  } catch (error) { out.ledgers.push({ name: l.name, error: String(error?.message ?? error).slice(0, 160) }); } finally { try { db?.close(); } catch { /* closed */ } }
+};
 
 /**
  * The machine-wide summary `boot.mjs --status` prints: every registered ledger's usage (window and all time, by model) and the
@@ -100,19 +114,7 @@ export function machineUsage({ env = process.env, now = Date.now(), windowMs = 2
     }, null, { env });
   } catch (error) { out.error = String(error?.message ?? error).slice(0, 200); }
   const all = blank(), win = blank(), models = [];
-  for (const l of ledgers) {
-    let db = null;
-    try {
-      db = openLedgerReader(l.file);
-      const life = usageOfLedger(db), recent = usageOfLedger(db, { sinceMs: now - windowMs });
-      const unavailable = db.prepare("SELECT count(*) n FROM op_attempts WHERE usage_source='unavailable'").get().n;
-      const pending = db.prepare("SELECT count(*) n FROM op_attempts WHERE usage_source IS NULL AND (settled_at IS NOT NULL OR end_state IS NOT NULL) AND NOT EXISTS(SELECT 1 FROM llm_usage u WHERE u.subject_type='attempt' AND u.attempt_id=op_attempts.attempt_id)").get().n;
-      out.ledgers.push({ name: l.name, ledgerId: l.ledgerId, total: life.total, window: recent.total, attempts: life.attempts, kernel: life.kernel, unavailableAttempts: Number(unavailable), pendingAttempts: Number(pending), byModel: life.byModel });
-      for (const m of life.byModel) models.push(m);
-      add(all, { ...life.total, costUsd: life.total.costUsd ?? 0, unpriced: life.total.costUsd === null && life.total.tokens ? 1 : 0, records: life.total.tokens ? 1 : 0 });
-      add(win, { ...recent.total, costUsd: recent.total.costUsd ?? 0, unpriced: recent.total.costUsd === null && recent.total.tokens ? 1 : 0, records: recent.total.tokens ? 1 : 0 });
-    } catch (error) { out.ledgers.push({ name: l.name, error: String(error?.message ?? error).slice(0, 160) }); } finally { try { db?.close(); } catch { /* closed */ } }
-  }
+  for (const l of ledgers) readLedgerUsage(l, { out, now, windowMs, all, win, models });
   if (out.supervisor) models.push(...out.supervisor.byModel);
   out.total = finish(all); out.window = finish(win);
   out.byModel = fold(models.map((m) => ({ ...m, unpriced: m.costUsd === null && m.tokens ? 1 : 0, records: m.tokens ? 1 : 0, costUsd: m.costUsd ?? 0 })), (r) => r.model).map((t) => ({ model: t.key, ...tally(t) })).sort((a, b) => b.tokens - a.tokens);
@@ -120,4 +122,7 @@ export function machineUsage({ env = process.env, now = Date.now(), windowMs = 2
 }
 
 /** Compact human lines for a usage total. */
-export const tokenLine = (t) => `${(t.tokens ?? 0).toLocaleString('en-US')} tok (in ${(t.inputTokens ?? 0).toLocaleString('en-US')}, cache-read ${(t.cacheReadTokens ?? 0).toLocaleString('en-US')}, cache-write ${(t.cacheWriteTokens ?? 0).toLocaleString('en-US')}, out ${(t.outputTokens ?? 0).toLocaleString('en-US')})${t.costUsd == null ? '' : ` $${t.costUsd}`}`;
+export const tokenLine = (t) => {
+  const cost = t.costUsd == null ? '' : ` $${t.costUsd}`;
+  return `${(t.tokens ?? 0).toLocaleString('en-US')} tok (in ${(t.inputTokens ?? 0).toLocaleString('en-US')}, cache-read ${(t.cacheReadTokens ?? 0).toLocaleString('en-US')}, cache-write ${(t.cacheWriteTokens ?? 0).toLocaleString('en-US')}, out ${(t.outputTokens ?? 0).toLocaleString('en-US')})${cost}`;
+};

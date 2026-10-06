@@ -11,8 +11,13 @@ export default {
     const v = viewOf(ctx);
     return v.rca.trigger || v.rca.actions.length ? v.rca : null;
   },
-  lines: (r) => [
-    `rca ${r.id} (${r.trigger ?? 'no trigger'}): ${r.clusters.slice(0, 6).map((c) => `${c.cause} x${c.count}${c.open !== c.count ? `/${c.open} open` : ''}`).join(', ') || 'no failures'}`,
-    ...r.actions.slice(0, 5).map((a) => `  action #${a.rank} [${a.tier}]${a.tried ? ` (tried ${a.tried.decision}: ${a.tried.status})` : ''} ${a.title}\n    run: ${a.command}\n    expect: ${a.expected}`),
-  ],
+  lines: (r) => {
+    const clusters = r.clusters.slice(0, 6)
+      .map((c) => `${c.cause} x${c.count}` + (c.open !== c.count ? `/${c.open} open` : ''))
+      .join(', ') || 'no failures';
+    const actions = r.actions.slice(0, 5).map((a) => `  action #${a.rank} [${a.tier}]`
+      + (a.tried ? ` (tried ${a.tried.decision}: ${a.tried.status})` : '')
+      + ` ${a.title}\n    run: ${a.command}\n    expect: ${a.expected}`);
+    return [`rca ${r.id} (${r.trigger ?? 'no trigger'}): ${clusters}`, ...actions];
+  },
 };

@@ -27,8 +27,11 @@ import { operationDispatchOf } from './verbs/shared/rows.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 /** The header line that keeps Orca's completeness verdict with the stored output. */
-export const outputHeader = (out) => `[worker-read dispatch=${out.dispatch} source=${out.source}${out.fallbackReason ? ` fallback=${out.fallbackReason}` : ''}`
-  + ` contentComplete=${out.contentComplete === true}${out.clipping?.length ? ` clipping=${out.clipping.join(',')}` : ''}]`;
+export const outputHeader = (out) => {
+  const fallback = out.fallbackReason ? ` fallback=${out.fallbackReason}` : '';
+  const clipping = out.clipping?.length ? ` clipping=${out.clipping.join(',')}` : '';
+  return `[worker-read dispatch=${out.dispatch} source=${out.source}${fallback} contentComplete=${out.contentComplete === true}${clipping}]`;
+};
 
 /**
  * The whole output of the worker that holds Dispatch `dispatch` (every page), or null when Orca cannot read it.

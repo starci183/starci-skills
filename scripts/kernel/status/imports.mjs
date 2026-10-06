@@ -76,6 +76,10 @@ export default {
     if (ctx.wf?.phase === 'finished' || ctx.wf?.archived_at) return null;
     return importsBrokenOf({ db: ctx.db, workflowId: ctx.workflowId, repo: ctx.repo, now: ctx.now ?? Date.now() });
   },
-  lines: (v) => [`IMPORTS_BROKEN_AFTER_MOVE ${v.count} import(s) in ${v.files} file(s) resolve to nothing (${v.trees.map((t) => `${t.kind} ${t.path}`).join('; ')})`
-    + `${v.repointQueued ? ' - a repoint unit is queued' : ' - NO repoint unit queued: enqueue one wave canon-wire unit owning the importers before the next wave'}; e.g. ${v.sample.slice(0, 3).map((s) => `${s.from} -> ${s.spec}`).join('; ')}`],
+  lines: (v) => {
+    const trees = v.trees.map((t) => `${t.kind} ${t.path}`).join('; ');
+    const repoint = v.repointQueued ? ' - a repoint unit is queued' : ' - NO repoint unit queued: enqueue one wave canon-wire unit owning the importers before the next wave';
+    const sample = v.sample.slice(0, 3).map((s) => `${s.from} -> ${s.spec}`).join('; ');
+    return [`IMPORTS_BROKEN_AFTER_MOVE ${v.count} import(s) in ${v.files} file(s) resolve to nothing (${trees})${repoint}; e.g. ${sample}`];
+  },
 };

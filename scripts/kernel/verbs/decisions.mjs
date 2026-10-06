@@ -30,7 +30,11 @@ const evidenceOf = (args) => {
   }
   return args.evidence ? [{ ref: String(args.evidence).slice(0, 400) }] : [];
 };
-const line = (d) => `${d.id} [${d.status}${d.severity === 'critical' ? ' CRITICAL' : ''}] ${d.kind} ${d.entity?.type}:${d.entity?.id} due ${new Date(d.dueAt).toISOString().slice(0, 16)}Z (${d.decider}): ${d.summary}${d.allowedVerbs?.length ? `\n    resolve with: ${d.allowedVerbs.join(' | ')}` : ''}`;
+const line = (d) => {
+  const severity = d.severity === 'critical' ? ' CRITICAL' : '';
+  const resolve = d.allowedVerbs?.length ? `\n    resolve with: ${d.allowedVerbs.join(' | ')}` : '';
+  return `${d.id} [${d.status}${severity}] ${d.kind} ${d.entity?.type}:${d.entity?.id} due ${new Date(d.dueAt).toISOString().slice(0, 16)}Z (${d.decider}): ${d.summary}${resolve}`;
+};
 
 export default {
   verb: 'decisions',
@@ -48,8 +52,9 @@ export default {
         dueMs: args['due-ms'], idempotencyKey: args.key, evidence: evidenceOf(args), allowedVerbs: csv(args['allowed-verbs']),
         options: args['options-json'] ? parseJsonOr(args['options-json'], []) : [], severity: args.severity, item: args.item, by,
       }, { ledgerName: path.basename(repo) });
+      const supersededText = r.superseded.length ? `\n  supersedes ${r.superseded.join(', ')}` : '';
       emit({ ok: true, created: r.created, existing: r.existing, superseded: r.superseded, decision: r.di },
-        `${r.created ? 'opened' : 'already open'} ${line(r.di)}${r.superseded.length ? `\n  supersedes ${r.superseded.join(', ')}` : ''}`, args.json);
+        `${r.created ? 'opened' : 'already open'} ${line(r.di)}${supersededText}`, args.json);
       return;
     }
     if (args.claim) {

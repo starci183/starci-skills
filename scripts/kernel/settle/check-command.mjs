@@ -4,27 +4,69 @@ import { loadCatalog } from '../../cli/catalog.mjs';
 import { loadOpGate } from '../../gates/read-digest.mjs';
 
 const DEFAULT_ROOT = path.resolve(import.meta.dirname, '../../..');
+const SHELL_OPERATOR = (s, i) => '&|;<>`'.includes(s[i]) || (s[i] === '$' && s[i + 1] === '(');
+
+/** One unquoted character into {out, cur, q, any}; null when it is a shell operator. */
+const unquoted = (st, c, s, i) => {
+  if (c === '"' || c === "'") { st.q = c; st.any = true; return st; }
+  if (/\s/.test(c)) {
+    if (st.cur || st.any) st.out.push(st.cur);
+    st.cur = ''; st.any = false;
+    return st;
+  }
+  if (SHELL_OPERATOR(s, i)) return null;
+  st.cur += c;
+  return st;
+};
+
 /** Split a command line into argv, quotes honoured; null when it holds a shell operator or a <placeholder>. */
 export function argvOf(command) {
   const s = String(command ?? '').trim();
   if (!s) return null;
-  const out = []; let cur = ''; let q = null; let any = false;
+  const st = { out: [], cur: '', q: null, any: false };
   for (let i = 0; i < s.length; i += 1) {
     const c = s[i];
-    if (q) { if (c === q) q = null; else cur += c; continue; }
-    if (c === '"' || c === "'") { q = c; any = true; continue; }
-    if (/\s/.test(c)) { if (cur || any) out.push(cur); cur = ''; any = false; continue; }
-    if ('&|;<>`'.includes(c) || (c === '$' && s[i + 1] === '(')) return null;
-    cur += c;
+    if (st.q) {
+      if (c === st.q) st.q = null;
+      else st.cur += c;
+      continue;
+    }
+    if (!unquoted(st, c, s, i)) return null;
   }
-  if (q) return null;
-  if (cur || any) out.push(cur);
-  return out;
+  if (st.q) return null;
+  if (st.cur || st.any) st.out.push(st.cur);
+  return st.out;
 }
 
 const norm = (p) => String(p).replaceAll('\\', '/');
-const ACTION = /^(?:git\s+(?:add|commit|status|rev-parse|log|diff|show|push|fetch|cat-file|merge-base|ls-files|branch|stash)\b|n\/a\b|read\b|cat\b|type\b|ls\b|dir\b)/i;
+const ACTION = /^(?:git\s+(?:add|commit|status|rev-parse|log|diff|show|push|fetch|cat-file|merge-base|ls-files|branch|stash)|n\/a|read|cat|type|ls|dir)\b/i;
 const MUTATING_FLAG = /^--(?:fix|write|apply|in-place)(?:=|$)/;
+
+const CLI_REL = 'packages/cli/bin/starci.mjs';
+
+/** The `starci ...` argv branch of classifyCheck. */
+const classifyStarciArgv = (rest, skillRoot, mechanical) => {
+  if (rest.some((a) => MUTATING_FLAG.test(a))) return { kind: 'foreign', why: 'mutating-flag' };
+  if (mechanical) { const native = mechanismCommand(rest, skillRoot); if (native) return native; }
+  if (rest[0] !== 'runtime' || rest[1] !== 'validate') return { kind: 'foreign', why: 'not-a-runtime-check' };
+  return { kind: 'runtime', script: path.join(skillRoot, ...CLI_REL.split('/')), argv: rest, rel: CLI_REL };
+};
+
+/** The `node <script> ...` argv branch of classifyCheck. */
+const classifyNodeArgv = (argv, skillRoot, mechanical) => {
+  if (!/^node(?:\.exe)?$/i.test(path.basename(argv[0])) || !argv[1]) return { kind: 'foreign', why: 'not-a-runtime-check' };
+  const rel = /(?:^|\/)\.claude\/((?:packages\/cli\/bin|scripts)\/.+\.mjs)$/i.exec(norm(argv[1]))?.[1]
+    ?? (norm(path.resolve(argv[1])).toLowerCase().startsWith(`${norm(skillRoot).toLowerCase()}/`) ? norm(path.relative(skillRoot, path.resolve(argv[1]))) : null);
+  if (!rel) return { kind: 'foreign', why: 'outside-runtime' };
+  const rest = argv.slice(2);
+  if (rest.some((a) => MUTATING_FLAG.test(a))) return { kind: 'foreign', why: 'mutating-flag' };
+  const ok = (rel === CLI_REL && rest[0] === 'runtime' && rest[1] === 'validate')
+    || (/^scripts\/checks\/[\w.-]+\.mjs$/.test(rel))
+    || (rel === 'scripts/work/work-graph.mjs' && ['validate', 'show', 'diff'].includes(rest[0]));
+  if (mechanical) { const native = rel === CLI_REL ? mechanismCommand(rest, skillRoot) : mechanismScript(rel, rest, skillRoot); if (native) return native; }
+  if (!ok) return { kind: 'foreign', why: `not-a-check-script:${rel}` };
+  return { kind: 'runtime', script: path.join(skillRoot, ...rel.split('/')), argv: rest, rel };
+};
 
 /**
  * One declared check, classified: {kind: 'action'} (evidence of an action, not a check), {kind: 'runtime', argv, script}
@@ -35,26 +77,8 @@ export function classifyCheck(check, { skillRoot = DEFAULT_ROOT, mechanical = fa
   if (!command || ACTION.test(command)) return { kind: 'action' };
   const argv = argvOf(command);
   if (!argv) return { kind: 'foreign', why: 'shell-or-placeholder' };
-  const cliRel = 'packages/cli/bin/starci.mjs';
-  if (/^starci(?:\.cmd|\.exe)?$/i.test(path.basename(argv[0]))) {
-    const rest = argv.slice(1);
-    if (rest.some((a) => MUTATING_FLAG.test(a))) return { kind: 'foreign', why: 'mutating-flag' };
-    if (mechanical) { const native = mechanismCommand(rest, skillRoot); if (native) return native; }
-    if (rest[0] !== 'runtime' || rest[1] !== 'validate') return { kind: 'foreign', why: 'not-a-runtime-check' };
-    return { kind: 'runtime', script: path.join(skillRoot, ...cliRel.split('/')), argv: rest, rel: cliRel };
-  }
-  if (!/^node(?:\.exe)?$/i.test(path.basename(argv[0])) || !argv[1]) return { kind: 'foreign', why: 'not-a-runtime-check' };
-  const rel = /(?:^|\/)\.claude\/((?:packages\/cli\/bin|scripts)\/.+\.mjs)$/i.exec(norm(argv[1]))?.[1]
-    ?? (norm(path.resolve(argv[1])).toLowerCase().startsWith(`${norm(skillRoot).toLowerCase()}/`) ? norm(path.relative(skillRoot, path.resolve(argv[1]))) : null);
-  if (!rel) return { kind: 'foreign', why: 'outside-runtime' };
-  const rest = argv.slice(2);
-  if (rest.some((a) => MUTATING_FLAG.test(a))) return { kind: 'foreign', why: 'mutating-flag' };
-  const ok = (rel === cliRel && rest[0] === 'runtime' && rest[1] === 'validate')
-    || (/^scripts\/checks\/[\w.-]+\.mjs$/.test(rel))
-    || (rel === 'scripts/work/work-graph.mjs' && ['validate', 'show', 'diff'].includes(rest[0]));
-  if (mechanical) { const native = rel === cliRel ? mechanismCommand(rest, skillRoot) : mechanismScript(rel, rest, skillRoot); if (native) return native; }
-  if (!ok) return { kind: 'foreign', why: `not-a-check-script:${rel}` };
-  return { kind: 'runtime', script: path.join(skillRoot, ...rel.split('/')), argv: rest, rel };
+  if (/^starci(?:\.cmd|\.exe)?$/i.test(path.basename(argv[0]))) return classifyStarciArgv(argv.slice(1), skillRoot, mechanical);
+  return classifyNodeArgv(argv, skillRoot, mechanical);
 }
 
 
@@ -63,7 +87,10 @@ export function classifyCheck(check, { skillRoot = DEFAULT_ROOT, mechanical = fa
 const withoutOutput = (args) => {
   const out = [];
   for (let i = 0; i < args.length; i += 1) {
-    if (args[i] === '--out') { if (i + 1 >= args.length) return null; i += 1; }
+    if (args[i] === '--out') {
+      if (i + 1 >= args.length) return null;
+      i += 1;
+    }
     else if (!args[i].startsWith('--out=')) out.push(args[i]);
   }
   return out;

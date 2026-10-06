@@ -10,21 +10,12 @@ import { CHECKPOINT_EVENTS, finishWorkflow } from '../workflow-checkpoint.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { withWorkflowLock } from '../../goal/workflow-lock.mjs';
 
-export default {
-  verb: 'finish',
-  required: ['workflow'],
-  kernelOnly: true,
-  usageInCore: true,
-  run({ ledger, args, repo, emit, internals }) {
-    return withWorkflowLock({ db: ledger.db, ledger, env: process.env }, { workflowId: args.workflow }, (locked) => {
-    const { FINAL_SETTLED } = internals;
-  const db = ledger.db, workflowId = args.workflow, now = Date.now();
+function assertFinishable({ db, workflowId, repo, internals }) {
+  const { FINAL_SETTLED } = internals;
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
   const already = wf.phase === 'finished';
-  // running -> finished only (DBTREE workflow_transitions): a paused or stopped workflow is resumed first.
   requirePhase(wf, ['running', 'finished'], 'finish');
-
   const openOperations = db.prepare(
     `SELECT job_id,status FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`
   ).all(workflowId, ...FINAL_SETTLED);
@@ -33,10 +24,6 @@ export default {
       code: 'workflow-open-jobs', openJobs: openOperations,
     });
   }
-  // A workflow is done when the owner approved its handover: a handover-approved
-  // event newer than the last business settle (scripts/kernel/handover.mjs
-  // handoverGateOf). An archived workflow is the one existing way out.
-  // An accepted revision must be planned, never silently disposed by finish.
   const pendingRevisions = db.prepare("SELECT inbox_id,payload_json FROM inbox WHERE workflow_id=? AND kind='goal-revision' AND status='pending' ORDER BY inbox_id").all(workflowId);
   if (!already && wf.archived_at == null && pendingRevisions.length) throw Object.assign(new Error(`workflow ${workflowId} still has an unapplied goal revision`), {
     code: 'handover-not-approved', pendingRevisions: pendingRevisions.map(row => row.inbox_id),
@@ -53,6 +40,18 @@ export default {
     internals.handoverProofGate(db, approvedJob, repo);
   }
   const handoverFinish = handoverGate ? { via: handoverGate.via, approvedSeq: handoverGate.approvedSeq ?? null, answeredBy: handoverGate.approval?.answeredBy ?? null } : null;
+  return { already, handoverFinish };
+}
+
+export default {
+  verb: 'finish',
+  required: ['workflow'],
+  kernelOnly: true,
+  usageInCore: true,
+  run({ ledger, args, repo, emit, internals }) {
+    return withWorkflowLock({ db: ledger.db, ledger, env: process.env }, { workflowId: args.workflow }, (locked) => {
+      const db = ledger.db, workflowId = args.workflow, now = Date.now();
+      const { already, handoverFinish } = assertFinishable({ db, workflowId, repo, internals });
 
   // The workflow's single land into main (WFWT, scripts/kernel/workflow-checkpoint.mjs finishWorkflow): the full gate,
   // the merge guard, review.verify of the exact head, the rebase, main fast-forwarded and pushed, the worktree marked
@@ -100,7 +99,9 @@ export default {
   const out = { ok: true, workflowId, phase: 'finished', inboxClosed: closed, incidentsClosed, decisionsClosed, alreadyFinished: already,
     kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal),
     retention, ...(handoverFinish ? { handover: handoverFinish } : {}), ...(land ? { landed: { head: land.head, releasePending: land.releasePending, steps: land.steps.map((st) => st.step) } } : {}) };
-  emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; decisions closed: ${decisionsClosed.length}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
+  const alreadyLabel = already ? ' (was already finished)' : '';
+  const terminalLabel = kernelTerminal ? `, terminal ${kernelTerminal} close requested` : '';
+  emit(out, `workflow ${workflowId} finished${alreadyLabel} — inbox rows closed: ${closed}; decisions closed: ${decisionsClosed.length}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${terminalLabel}; history preserved`, args.json);
   closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:finish` });
 
     });

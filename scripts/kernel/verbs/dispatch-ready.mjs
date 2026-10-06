@@ -16,6 +16,45 @@ import { spawnNode } from '../../api/node/spawn-node.mjs';
 import { API_FILE, PUSH_KIND, apiRun, failedShapesOf, jobRow, newId, recordKernel, refuse, shapeOf } from '../kernel-authority.mjs';
 import { refuseDecisionsFirst } from '../../machine/decisions.mjs';
 
+function spawnDetached({ args, emit, repo, wf, pushId, dir, resultFile }) {
+  fs.mkdirSync(dir, { recursive: true });
+  const argv = [API_FILE, 'dispatch-ready', '--repo', repo, '--workflow', wf, '--foreground', '--push-id', pushId, ...(args.max ? ['--max', String(args.max)] : [])];
+  const log = fs.openSync(`${resultFile}.log`, 'a');
+  const child = spawnNode(argv, { detached: true, stdio: ['ignore', log, log], env: process.env });
+  child.unref();
+  emit({ ok: true, workflowId: wf, pushId, detached: true, pid: child.pid, resultFile }, `dispatch-ready ${pushId} running in the background (pid ${child.pid}); result: ${resultFile}; the next starci kernel status shows the running count`, args.json);
+}
+
+function processReadyJob({ db, repo, wf, jobId, dryRun }) {
+  const job = jobRow(db, jobId);
+  if (job?.status !== 'queued') return { result: { jobId, skipped: `status ${job?.status ?? 'gone'}` }, launched: 0, stop: false };
+  const failed = failedShapesOf(db, wf, job).get(shapeOf(job.op_id, job.payload));
+  if (failed) return { result: { jobId, skipped: `same-failing-shape as ${failed.jobId} (${failed.causes.join(', ')}): change it with starci kernel graph-edit (widen/params/split) first` }, launched: 0, stop: false };
+  if (dryRun) return { result: { jobId, would: job.payload.kernelModel ? `dispatch --model ${job.payload.kernelModel}` : 'route + dispatch --spawn' }, launched: 1, stop: false };
+
+  const model = job.payload.kernelModel ?? null;
+  if (!model) {
+    const route = apiRun(['route', '--job', jobId, ...(job.payload.difficulty ? ['--difficulty', job.payload.difficulty] : [])], { repo, timeoutMs: 300_000 });
+    if (!route.ok) return { result: { jobId, route: route.json?.reason ?? route.json?.error ?? `exit ${route.status}` }, launched: 0, stop: false };
+  }
+  const dispatch = apiRun(['dispatch', '--job', jobId, '--spawn', ...(model ? ['--model', model] : [])], { repo, timeoutMs: 15 * 60_000 });
+  const waiting = dispatch.json?.waiting === true;
+  const result = { jobId, dispatched: dispatch.ok && !waiting,
+    waiting: waiting ? (dispatch.json?.reason ?? dispatch.json?.throttle?.reason ?? 'waiting') : null,
+    error: dispatch.ok ? null : (dispatch.json?.reason ?? dispatch.json?.error ?? `exit ${dispatch.status}`) };
+  const stop = waiting && /host-resources|workers-max|heavy-paused|does-not-fit|priority-reserved|worktree-cap/.test(JSON.stringify(dispatch.json ?? {}));
+  return { result, launched: dispatch.ok && !waiting ? 1 : 0, stop };
+}
+
+function resultRows(results, includeWould, prefix) {
+  return results.map((result) => {
+    const status = includeWould
+      ? (result.dispatched ? 'dispatched' : result.would ?? result.skipped ?? result.waiting ?? result.route ?? result.error)
+      : (result.dispatched ? 'dispatched' : result.skipped ?? result.waiting ?? result.route ?? result.error);
+    return `${prefix}${result.jobId}: ${status}`;
+  }).join('\n');
+}
+
 export default {
   verb: 'dispatch-ready',
   required: ['workflow'],
@@ -30,12 +69,7 @@ export default {
     const dir = kernelScratchDirOf(repo, wf, 'dispatch');
     const resultFile = path.join(dir, `${pushId}.json`);
     if (!args.foreground && !args['dry-run']) {
-      fs.mkdirSync(dir, { recursive: true });
-      const argv = [API_FILE, 'dispatch-ready', '--repo', repo, '--workflow', wf, '--foreground', '--push-id', pushId, ...(args.max ? ['--max', String(args.max)] : [])];
-      const log = fs.openSync(`${resultFile}.log`, 'a');
-      const child = spawnNode(argv, { detached: true, stdio: ['ignore', log, log], env: process.env });
-      child.unref();
-      emit({ ok: true, workflowId: wf, pushId, detached: true, pid: child.pid, resultFile }, `dispatch-ready ${pushId} running in the background (pid ${child.pid}); result: ${resultFile}; the next starci kernel status shows the running count`, args.json);
+      spawnDetached({ args, emit, repo, wf, pushId, dir, resultFile });
       return;
     }
     const st = apiRun(['status', '--workflow', wf], { repo, timeoutMs: 300_000 });
@@ -47,30 +81,19 @@ export default {
     let launched = 0;
     for (const jobId of p.readyJobs ?? []) {
       if (launched >= k) break;
-      const job = jobRow(db, jobId);
-      if (job?.status !== 'queued') { results.push({ jobId, skipped: `status ${job?.status ?? 'gone'}` }); continue; }
-      const failed = failedShapesOf(db, wf, job).get(shapeOf(job.op_id, job.payload));
-      if (failed) { results.push({ jobId, skipped: `same-failing-shape as ${failed.jobId} (${failed.causes.join(', ')}): change it with starci kernel graph-edit (widen/params/split) first` }); continue; }
-      if (args['dry-run']) { results.push({ jobId, would: job.payload.kernelModel ? `dispatch --model ${job.payload.kernelModel}` : 'route + dispatch --spawn' }); launched += 1; continue; }
-      let model = job.payload.kernelModel ?? null;
-      if (!model) {
-        const r = apiRun(['route', '--job', jobId, ...(job.payload.difficulty ? ['--difficulty', job.payload.difficulty] : [])], { repo, timeoutMs: 300_000 });
-        if (!r.ok) { results.push({ jobId, route: r.json?.reason ?? r.json?.error ?? `exit ${r.status}` }); continue; }
-      }
-      const d = apiRun(['dispatch', '--job', jobId, '--spawn', ...(model ? ['--model', model] : [])], { repo, timeoutMs: 15 * 60_000 });
-      const waiting = d.json?.waiting === true;
-      results.push({ jobId, dispatched: d.ok && !waiting, waiting: waiting ? (d.json?.reason ?? d.json?.throttle?.reason ?? 'waiting') : null, error: d.ok ? null : (d.json?.reason ?? d.json?.error ?? `exit ${d.status}`) });
-      if (d.ok && !waiting) launched += 1;
+      const processed = processReadyJob({ db, repo, wf, jobId, dryRun: Boolean(args['dry-run']) });
+      results.push(processed.result);
+      launched += processed.launched;
       // A host refusal (RAM, disk, workers cap, a repository at its worktree cap) will refuse the next one too: stop and let the next wake retry.
-      if (waiting && /host-resources|workers-max|heavy-paused|does-not-fit|priority-reserved|worktree-cap/.test(JSON.stringify(d.json ?? {}))) break;
+      if (processed.stop) break;
     }
     const out = { ok: true, workflowId: wf, pushId, before: { running: p.running, allowed: p.allowedParallel, queuedReady: p.queuedReady }, target: k, launched, results, dryRun: Boolean(args['dry-run']) };
     if (!args['dry-run']) {
       recordKernel(ledger, { workflowId: wf, entityType: 'dispatch-push', entityId: pushId, kind: PUSH_KIND, repo, payload: out,
         msg: `dispatch-ready ${pushId}: ${launched}/${k} launched (running ${p.running} of ${p.allowedParallel} allowed)`,
-        markdown: `Parallelism push **${pushId}**: running ${p.running} of ${p.allowedParallel} allowed, ${p.queuedReady} queued-ready. Launched ${launched} of ${k}.\n\n${results.map((r) => `- ${r.jobId}: ${r.dispatched ? 'dispatched' : r.skipped ?? r.waiting ?? r.route ?? r.error}`).join('\n')}` });
+        markdown: `Parallelism push **${pushId}**: running ${p.running} of ${p.allowedParallel} allowed, ${p.queuedReady} queued-ready. Launched ${launched} of ${k}.\n\n${resultRows(results, false, '- ')}` });
       try { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(resultFile, JSON.stringify(out, null, 2)); } catch { /* the event stands */ }
     }
-    emit(out, `dispatch-ready ${pushId}: launched ${launched} of ${k} (running ${p.running} of ${p.allowedParallel} allowed)\n${results.map((r) => `  ${r.jobId}: ${r.dispatched ? 'dispatched' : r.would ?? r.skipped ?? r.waiting ?? r.route ?? r.error}`).join('\n')}`, args.json);
+    emit(out, `dispatch-ready ${pushId}: launched ${launched} of ${k} (running ${p.running} of ${p.allowedParallel} allowed)\n${resultRows(results, true, '  ')}`, args.json);
   },
 };

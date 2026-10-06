@@ -60,8 +60,9 @@ export default {
   // (starci kernel autopilot --defer-to-handover). The one provision.ask is the end-of-flow credential checklist (params.subject
   // handover-credentials); a retry of an ask the owner already answered (--retry-of) still runs.
   if (args.op === 'provision.ask' && args['retry-of'] == null && provisionAskMidFlow(db, workflowId, { params: { ...legSplit.owner, ...kernelFlag } })) {
+    const checklistParams = `{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}`;
     const out = { ok: false, workflowId, op: args.op, reason: 'autopilot-provision-deferred',
-      detail: `autopilot (${AUTOPILOT_RULING}) opens no provision.ask mid-flow: build on the sandbox/stub path, record the need with starci kernel autopilot --workflow ${workflowId} --defer-to-handover --op <asking op> --class credential|real-money|shared-system|owner-decision --detail "<what is owed>" [--fields <FILE_OR_VAR,...>], and the end-of-flow checklist (--params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}') collects it once` };
+      detail: `autopilot (${AUTOPILOT_RULING}) opens no provision.ask mid-flow: build on the sandbox/stub path, record the need with starci kernel autopilot --workflow ${workflowId} --defer-to-handover --op <asking op> --class credential|real-money|shared-system|owner-decision --detail "<what is owed>" [--fields <FILE_OR_VAR,...>], and the end-of-flow checklist (--params '${checklistParams}') collects it once` };
     emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
     throw new VerbExit(1);
   }
@@ -149,7 +150,8 @@ export default {
     // A failed or cancelled job whose retry lineage carries on is waited on through it (lineageHeadOf).
     const head = FINAL_SETTLED.includes(row.status) && row.status !== 'succeeded' ? lineageHeadById(db, prior).row : row;
     if (FINAL_SETTLED.includes(head.status) && head.status !== 'succeeded') {
-      throw Object.assign(new Error(`--after names ${prior}, which already settled ${row.status} and can never succeed; a retry of it chains through its retry lineage (enqueue the same op${hasCut ? ' and cut ordinal' : ''} without --after)`), { code: 'after-settled' });
+      const cutNote = hasCut ? ' and cut ordinal' : '';
+      throw Object.assign(new Error(`--after names ${prior}, which already settled ${row.status} and can never succeed; a retry of it chains through its retry lineage (enqueue the same op${cutNote} without --after)`), { code: 'after-settled' });
     }
   }
   // Shared foundations (driver-loop.yaml foundations): --foundation <name> marks a leg that builds a
@@ -180,7 +182,7 @@ export default {
     // The work unit this job is a try of (scripts/kernel/units.mjs, H3/H4/H5): its budget, its lineage (--retry-of may
     // name only the unit's latest failed try) and the reopen a passed unit needs. A refusal is typed and nothing is written.
     const admitted = admitUnit(db, { workflowId, op: args.op, goalRevision: goal?.revision ?? null,
-      payload: { cut, records, owned_paths: ownedPaths, ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}) },
+      payload: { cut, records, owned_paths: ownedPaths, ...(Object.keys(resolvedParams.params).length && { params: resolvedParams.params }) },
       retryOf: typeof args['retry-of'] === 'string' && args['retry-of'].trim() ? args['retry-of'].trim() : null,
       reopen: typeof args.reopen === 'string' && args.reopen.trim() ? { reason: args.reopen.trim(), by: 'kernel' } : null,
       derivedFrom: String(args['derived-from'] ?? '').split(',').map((id) => id.trim()).filter(Boolean) });
@@ -188,17 +190,17 @@ export default {
     const self = admitted.unitId ? after.filter((prior) => db.prepare('SELECT unit_id FROM jobs WHERE job_id=?').get(prior)?.unit_id === admitted.unitId) : [];
     if (self.length) throw Object.assign(new Error(`--after names ${self.join(', ')}, a try of this job's own unit ${admitted.unitId}: it would wait on itself; enqueue without that --after - a retry chains through its unit`), { code: 'after-self-lineage' });
     payload = {
-      opId: args.op, records, owned_paths: ownedPaths, ...(newModules.length ? { new_modules: newModules } : {}), title: args.title ?? args.op, risk: args.risk ?? null,
+      opId: args.op, records, owned_paths: ownedPaths, ...(newModules.length && { new_modules: newModules }), title: args.title ?? args.op, risk: args.risk ?? null,
       // --what: the short human name of the target (Vietnamese, ≤40 chars) the op-job display name shows.
-      ...(typeof args.what === 'string' && args.what.trim() ? { displayWhat: args.what.replace(/\s+/g, ' ').trim().slice(0, 60) } : {}),
-      ...(target.repository ? { repository: target.repository } : {}),
-      ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}),
-      ...(cut ? { cut } : {}),
-      ...(after.length ? { after } : {}),
-      ...(foundationLeg ? { foundation: foundationLeg } : {}),
-      ...(canonPlan ? { canonPlan } : {}),
+      ...(typeof args.what === 'string' && args.what.trim() && { displayWhat: args.what.replace(/\s+/g, ' ').trim().slice(0, 60) }),
+      ...(target.repository && { repository: target.repository }),
+      ...(Object.keys(resolvedParams.params).length && { params: resolvedParams.params }),
+      ...(cut && { cut }),
+      ...(after.length && { after }),
+      ...(foundationLeg && { foundation: foundationLeg }),
+      ...(canonPlan && { canonPlan }),
       // The manual-only proofs this goal explicitly asks for (spec-deferral.mjs): an explicit-ask-only leg without the stamp is deferred.
-      ...(explicitAsksOf({ skillRoot, text: goal?.markdown }).length ? { explicitAsk: explicitAsksOf({ skillRoot, text: goal?.markdown }) } : {}),
+      ...(explicitAsksOf({ skillRoot, text: goal?.markdown }).length && { explicitAsk: explicitAsksOf({ skillRoot, text: goal?.markdown }) }),
       goal_binding: { revision: goal?.revision ?? null, identity: goal?.goal_identity ?? null },
       hierarchy: {
         schema: AGENT_HIERARCHY_SCHEMA,
@@ -215,7 +217,7 @@ export default {
     };
     const unitTry = writeUnitTry(db, admitted, { workflowId, jobId, op: args.op, title: payload.title, cut, repository: payload.repository ?? null, at: now });
     job = ledger.enqueueJob({ jobId, workflowId, opId: args.op, ...unitTry, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload, priority: seamPriorityOf(cut), createdAt: now });
-    unit = { unitId: unitTry.unitId, tryNo: unitTry.tryNo, tryBudget: admitted.tryBudget, retryOf: unitTry.retryOf, resumeOf: unitTry.resumeOf, ...(admitted.reopen ? { reopen: admitted.reopen } : {}) };
+    unit = { unitId: unitTry.unitId, tryNo: unitTry.tryNo, tryBudget: admitted.tryBudget, retryOf: unitTry.retryOf, resumeOf: unitTry.resumeOf, ...(admitted.reopen && { reopen: admitted.reopen }) };
     // The owner's config.yaml specs switch off this test class: the leg settles deferred at once, no attempt
     // spent, and the legs behind it proceed (scripts/route/spec-deferral.mjs; starci kernel run-deferred-tests runs it later).
     // An explicit-ask-only leg (integration.verify) the goal did not ask for is deferred the same way.
@@ -230,10 +232,19 @@ export default {
   });
 
   const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, unit, cut, params: payload.params ?? null, repository: payload.repository ?? null,
-    peerOverlap: peers.overlap, peerHeadsUp: peers.messages, ...(testsDeferred ? { deferred: testsDeferred } : {}),
-    ...(foundationLeg ? { foundation: foundationLeg } : {}), ...(foundationAdvisory ? { foundationAdvisory } : {}) };
+    peerOverlap: peers.overlap, peerHeadsUp: peers.messages, ...(testsDeferred && { deferred: testsDeferred }),
+    ...(foundationLeg && { foundation: foundationLeg }), ...(foundationAdvisory && { foundationAdvisory }) };
   if (foundationAdvisory) process.stderr.write(`api: advisory: ${foundationAdvisory}\n`);
-  emit(out, `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${unit.retryOf ? ` retry of ${unit.retryOf}` : ''}${unit.reopen ? ` REOPENED: ${unit.reopen.reason}` : ''}, status ${job.status}${testsDeferred ? `, DEFERRED (${testsDeferred.reason}): not dispatched, no attempt spent; starci kernel run-deferred-tests --workflow ${workflowId} runs it later` : ''}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})${peers.overlap.length ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}` : ''}`, args.json);
+  const retryNote = unit.retryOf ? ` retry of ${unit.retryOf}` : '';
+  const reopenNote = unit.reopen ? ` REOPENED: ${unit.reopen.reason}` : '';
+  const deferredNote = testsDeferred ? `, DEFERRED (${testsDeferred.reason}): not dispatched, no attempt spent; starci kernel run-deferred-tests --workflow ${workflowId} runs it later` : '';
+  const repositoryNote = payload.repository ? `, repository ${payload.repository}` : '';
+  const cutNote = cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : '';
+  const paramsNote = payload.params ? `, params ${Object.entries(payload.params).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(' ')}` : '';
+  const overlapNote = peers.overlap.length
+    ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}`
+    : '';
+  emit(out, `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${retryNote}${reopenNote}, status ${job.status}${deferredNote}${repositoryNote}${cutNote}${paramsNote})${overlapNote}`, args.json);
 
   },
 };

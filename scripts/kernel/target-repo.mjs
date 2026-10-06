@@ -51,18 +51,25 @@ export function boundRepoRoots(ledgerRepos) {
   return [...out.values()];
 }
 
-const repoName = (url) => (typeof url === 'string' ? url.replace(/[\\/]+$/, '').split(/[\\/:]/).pop().replace(/\.git$/i, '') : null);
+const trimEndWhile = (value, matches) => {
+  let end = value.length;
+  while (end > 0 && matches(value[end - 1])) end -= 1;
+  return value.slice(0, end);
+};
+const repoName = (url) => (typeof url === 'string' ? trimEndWhile(url, (c) => c === '/' || c === '\\').split(/[\\/:]/).pop().replace(/\.git$/i, '') : null);
 
 // A repo id is a side (be or fe), or the app repository's name or path.
 export function bindingRepo(binding, id) {
   if (!binding || typeof id !== 'string' || !id.trim()) return null;
   const want = id.trim();
-  return binding.repos.find((r) => r.role === want)
-    ?? binding.repos.find((r) => path.basename(r.root) === want)
-    ?? (binding.appRoot && (repoName(binding.repos[0]?.gitRepository) === want || path.basename(binding.appRoot) === want || samePath(binding.appRoot, path.resolve(starciSourceRoot(), want)))
-      ? { role: 'app', root: binding.appRoot, appRoot: binding.appRoot, gitRepository: binding.repos[0]?.gitRepository ?? null } : null)
-    ?? binding.repos.find((r) => samePath(r.root, path.resolve(starciSourceRoot(), want)))
-    ?? null;
+  const roleRepo = binding.repos.find((r) => r.role === want);
+  if (roleRepo) return roleRepo;
+  const namedRepo = binding.repos.find((r) => path.basename(r.root) === want);
+  if (namedRepo) return namedRepo;
+  const appMatches = binding.appRoot && (repoName(binding.repos[0]?.gitRepository) === want
+    || path.basename(binding.appRoot) === want || samePath(binding.appRoot, path.resolve(starciSourceRoot(), want)));
+  if (appMatches) return { role: 'app', root: binding.appRoot, appRoot: binding.appRoot, gitRepository: binding.repos[0]?.gitRepository ?? null };
+  return binding.repos.find((r) => samePath(r.root, path.resolve(starciSourceRoot(), want))) ?? null;
 }
 
 // Ops delivered on the frontend side: every modules/models/kinds.yaml lane
@@ -84,8 +91,14 @@ const FRONTEND_OPS = (() => {
 
 const REPO_PREFIX = /^repository:([^/\\]+)[/\\]?(.*)$/;
 // A path without the trailing glob a directory grant may use.
-const tidy = (p) => String(p).replace(/(^|\/)\*{1,2}$/, '').replace(/\/+$/, '') || '.';
-const slashed = (p) => String(p).replaceAll(/\\/g, '/');
+const tidy = (p) => {
+  let s = String(p);
+  if (s.endsWith('/**')) s = s.slice(0, -3);
+  else if (s.endsWith('/*')) s = s.slice(0, -2);
+  else if (s === '**' || s === '*') s = '';
+  return trimEndWhile(s, (c) => c === '/') || '.';
+};
+const slashed = (p) => String(p).replaceAll('\\', '/');
 
 // In a bound app every owned path is app-relative - the ONE form gate.mjs (--root <app> --changed), the knowledge and every
 // finding use: be/<path>, fe/<path>, the Work dir (.starciwork/<path>) or a path of the app root (package.json, hfs.json,
@@ -139,25 +152,36 @@ function jobTargetRepository({ op, payload, binding }) {
 // path of the app root) is `app`; Work paths alone fall back to an explicit --repository or the op's side. An
 // explicit --repository is resolved through the binding (refused when it cannot be). Unbound, --repository or
 // none (the job targets where dispatch places it).
+function boundOwnedPathRepository(binding, ownedPaths) {
+  for (const owned of ownedPaths) {
+    const problem = appRelativeProblem(binding, owned);
+    if (problem) return { ok: false, reason: 'path-not-app-relative', detail: problem };
+  }
+  const roles = new Set(ownedPaths.map((owned) => sideOfAppPath(binding, owned)).filter(Boolean));
+  if (roles.size > 1) return { ok: true, repository: 'app' };
+  if (roles.size) return { ok: true, repository: [...roles][0] };
+  return null;
+}
+
+function unboundOwnedPathRepository(ownedPaths) {
+  const named = ownedPaths.find((owned) => REPO_PREFIX.test(slashed(owned)));
+  return named ? { ok: false, reason: 'path-repository-unknown', detail: `owned path ${named} names a repository, which no project binding for this repo can resolve` } : null;
+}
+
+function explicitRepository(repository, binding) {
+  const bound = bindingRepo(binding, String(repository));
+  if (bound) return { ok: true, repository: bound.role };
+  if (path.isAbsolute(String(repository)) && isDir(String(repository))) return { ok: true, repository: path.resolve(String(repository)) };
+  const where = binding ? `bound in ${binding.file}` : 'directory (no project binding for this repo)';
+  return { ok: false, reason: 'repository-unknown', detail: `--repository ${repository} names no repository ${where}` };
+}
+
 export function enqueueRepository({ op, repository, ownedPaths, repo }) {
   const binding = projectBinding(repo);
-  if (binding) {
-    for (const owned of ownedPaths) {
-      const problem = appRelativeProblem(binding, owned);
-      if (problem) return { ok: false, reason: 'path-not-app-relative', detail: problem };
-    }
-    const roles = new Set(ownedPaths.map((owned) => sideOfAppPath(binding, owned)).filter(Boolean));
-    if (roles.size > 1) return { ok: true, repository: 'app' };
-    if (roles.size) return { ok: true, repository: [...roles][0] };
-  } else {
-    const named = ownedPaths.find((owned) => REPO_PREFIX.test(slashed(owned)));
-    if (named) return { ok: false, reason: 'path-repository-unknown', detail: `owned path ${named} names a repository, which no project binding for this repo can resolve` };
-  }
+  const ownedPath = binding ? boundOwnedPathRepository(binding, ownedPaths) : unboundOwnedPathRepository(ownedPaths);
+  if (ownedPath) return ownedPath;
   if (repository != null) {
-    const bound = bindingRepo(binding, String(repository));
-    if (bound) return { ok: true, repository: bound.role };
-    if (path.isAbsolute(String(repository)) && isDir(String(repository))) return { ok: true, repository: path.resolve(String(repository)) };
-    return { ok: false, reason: 'repository-unknown', detail: `--repository ${repository} names no repository ${binding ? `bound in ${binding.file}` : 'directory (no project binding for this repo)'}` };
+    return explicitRepository(repository, binding);
   }
   const target = jobTargetRepository({ op, payload: {}, binding });
   return { ok: true, repository: target?.id ?? null };

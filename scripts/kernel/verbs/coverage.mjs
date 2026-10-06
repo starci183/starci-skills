@@ -18,7 +18,11 @@ export default {
     if (!internals.getWorkflow(ledger.db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
     const { buildBrief, loadKnowledge } = await import('../../work/ui/ui-proof-brief.mjs');
     let knowledge = null;
-    const briefCases = (record) => buildBrief({ record, knowledge: (knowledge ??= loadKnowledge()) }).topics.flatMap((t) => t.cases.map((c) => `${c.rule} ${c.case}`));
+    const briefCases = (record) => {
+      const currentKnowledge = knowledge ?? loadKnowledge();
+      knowledge = currentKnowledge;
+      return buildBrief({ record, knowledge: currentKnowledge }).topics.flatMap((t) => t.cases.map((c) => `${c.rule} ${c.case}`));
+    };
     const notCounted = specsOff(ownerSpecs(internals.skillRoot));
     let policy;
     try {
