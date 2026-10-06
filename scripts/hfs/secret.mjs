@@ -25,7 +25,7 @@ import { byCodeUnit } from '../lib/list.mjs';
 class SecretError extends Error {}
 
 const SLUG = /^[a-z0-9][a-z0-9-]*$/u;
-const KEY = /^[A-Za-z_][A-Za-z0-9_]*$/u;
+const KEY = /^[A-Za-z_]\w*$/u;
 const DEFAULT_KEY = 'data';
 const VERBS = new Set(['list', 'show', 'set', 'gen']);
 
@@ -45,19 +45,19 @@ export function envelopeOf(text) {
     return { format, keys: Object.keys(doc).filter((name) => name !== 'sops'), recipients: (doc.sops?.age ?? []).map((entry) => entry.recipient).filter(Boolean) };
   }
   if (format === 'yaml') {
-    const keys = [...text.matchAll(/^([A-Za-z_][A-Za-z0-9_]*):/gmu)].map((match) => match[1]).filter((name) => name !== 'sops');
+    const keys = [...text.matchAll(/^([A-Za-z_]\w*):/gmu)].map((match) => match[1]).filter((name) => name !== 'sops');
     return { format, keys, recipients: [...text.matchAll(/^\s+-?\s*recipient:\s*(\S+)/gmu)].map((match) => match[1]) };
   }
-  const keys = [...text.matchAll(/^([A-Za-z_][A-Za-z0-9_]*)=/gmu)].map((match) => match[1]).filter((name) => !name.startsWith('sops_'));
+  const keys = [...text.matchAll(/^([A-Za-z_]\w*)=/gmu)].map((match) => match[1]).filter((name) => !name.startsWith('sops_'));
   return { format, keys, recipients: [...text.matchAll(/^sops_age__list_\d+__map_recipient=(\S+)/gmu)].map((match) => match[1]) };
 }
 
 /** The plaintext document `map` in the given format. A dotenv value cannot hold a line break. */
 export function plaintextOf(format, map) {
   if (format === 'json') return `${JSON.stringify(map)}\n`;
-  if (format === 'yaml') return `${Object.entries(map).map(([name, value]) => `${name}: ${JSON.stringify(value)}`).join('\n')}\n`;
+  if (format === 'yaml') return Object.entries(map).map(([name, value]) => name + ': ' + JSON.stringify(value)).join('\n') + '\n';
   for (const [name, value] of Object.entries(map)) if (/[\r\n]/u.test(value)) throw new SecretError(`${name} holds a line break; a dotenv secret holds one-line values only`);
-  return `${Object.entries(map).map(([name, value]) => `${name}=${value}`).join('\n')}\n`;
+  return Object.entries(map).map(([name, value]) => name + '=' + value).join('\n') + '\n';
 }
 
 /** The directory of the sealed secrets of the app at `repoRoot` for `env`; the one env that has secrets when none is named. */

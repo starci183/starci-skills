@@ -7,7 +7,7 @@
 //                                             inside roots.worktree|runtime|tmp|home -> <worktree>|<runtime>|<tmp>|<home>; a host
 //                                             executable (a shell) -> its bare command name; any other host path -> <host>/<last segment>
 // `%LOCALAPPDATA%` as an unexpanded name is not a path and is never touched.
-const SEP = '(?:\\\\\\\\|\\\\|/)';
+const SEP = String.raw`(?:\\\\|\\|/)`;
 const DRIVE = /(?<![\p{L}\p{N}_])[A-Za-z]:(?:\\|\/(?!\/))/gu;
 const PROFILE = /(?<![\p{L}\p{N}_.:-])\/(?:Users|home)\/[A-Za-z0-9][A-Za-z0-9_.-]*\//gu;
 const APPDATA = /(?<![\p{L}\p{N}_])AppData[\\/](?:Local|LocalLow|Roaming)(?![\p{L}\p{N}_])/gu;
@@ -17,7 +17,7 @@ const KINDS = [
   { kind: 'AppData path', rx: APPDATA },
 ];
 const TAIL = '[^\\s"\'`)\\]},;<>|]*';
-const BEFORE = '(?<![\\p{L}\\p{N}_])';
+const BEFORE = String.raw`(?<![\p{L}\p{N}_])`;
 
 /** The host-path hits of one text: [{kind, sample, offset}] sorted by offset; a profile or AppData part of a drive path is the drive path's. */
 export function hostPathHits(text) {
@@ -31,7 +31,7 @@ export function hostPathHits(text) {
   return hits.filter((h) => h.kind === 'drive-letter path' || !insideDrivePath(h)).sort((a, b) => a.offset - b.offset);
 }
 
-const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 const rootPattern = (root) => String(root).replace(/[\\/]+$/, '').split(/[\\/]+/).map(escape).join(SEP);
 const portable = (s) => s.replace(/\\{1,2}/g, '/');
 
@@ -39,7 +39,7 @@ const portable = (s) => s.replace(/\\{1,2}/g, '/');
 function replaceRoots(text, roots) {
   let out = text;
   for (const { root, to } of roots) {
-    const rx = new RegExp(`${BEFORE}${rootPattern(root)}(?=${SEP}|[^\\p{L}\\p{N}_.~-]|$)(${SEP}${TAIL})?`, 'giu');
+    const rx = new RegExp(String.raw`${BEFORE}${rootPattern(root)}(?=${SEP}|[^\p{L}\p{N}_.~-]|$)(${SEP}${TAIL})?`, 'giu');
     out = out.replace(rx, (_, tail) => {
       const rest = tail ? portable(tail.replace(new RegExp(`^${SEP}`), '')) : '';
       if (to === '') return rest || '.';
@@ -57,9 +57,9 @@ export function normalizeHostPaths(text, roots = {}) {
     .sort((a, b) => b.root.length - a.root.length);
   let out = replaceRoots(String(text), known);
   // A host executable keeps only its bare command name: a shell path is recorded as `bash -c ...`.
-  out = out.replace(new RegExp(`${BEFORE}[A-Za-z]:(?:${SEP}[^\\s"'\\\\/]+)*${SEP}([^\\s"'\\\\/]+?)\\.exe(?![\\p{L}\\p{N}_.])`, 'giu'), '$1');
+  out = out.replace(new RegExp(String.raw`${BEFORE}[A-Za-z]:(?:${SEP}[^\s"'\\/]+)*${SEP}([^\s"'\\/]+?)\.exe(?![\p{L}\p{N}_.])`, 'giu'), '$1');
   // Any other host path: a placeholder plus its last segment.
-  out = out.replace(new RegExp(`${BEFORE}[A-Za-z]:(?:\\\\{1,2}|/(?!/))${TAIL}`, 'gu'), (path) => `<host>/${path.split(/[\\/]+/).filter(Boolean).pop()}`.replace(/\/[A-Za-z]:$/, ''));
+  out = out.replace(new RegExp(String.raw`${BEFORE}[A-Za-z]:(?:\\{1,2}|/(?!/))${TAIL}`, 'gu'), (path) => `<host>/${path.split(/[\\/]+/).findLast(Boolean)}`.replace(/\/[A-Za-z]:$/, ''));
   out = out.replace(/(?<![\p{L}\p{N}_.:-])\/(?:Users|home)\/[A-Za-z0-9][A-Za-z0-9_.-]*\/[^\s"'`)\]},;<>|]*/gu, (path) => `<home>/${path.split('/').slice(3).join('/')}`.replace(/\/$/, ''));
   return out;
 }
