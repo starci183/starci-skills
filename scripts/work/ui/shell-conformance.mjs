@@ -244,7 +244,7 @@ function checkUiRecord(workRoot, uiFile, record, shell, { mode = 'op', uiRecords
     if (mode === 'op') out.push(...checkPromptLocale(workRoot, uiFile, record, shell));
     return out;
   }
-  if (!raw) { if (record?.shell?.chromeless !== true) out.push(finding('refuse', 'SHELL_RECORD_MISSING', at, 'the Work tree has no layout tree to place this route in')); return out; }
+  if (!raw) { if (record?.shell?.chromeless !== true) { out.push(finding('refuse', 'SHELL_RECORD_MISSING', at, 'the Work tree has no layout tree to place this route in')); } return out; }
   // The app the route is in: `app:` names it; a tree of one app is that app; else the route decides when only one app holds it.
   const resolved = appOfUi(raw, record);
   if (resolved.error) { out.push(finding('refuse', resolved.error.code, at, `${record.id} ${resolved.error.message}`)); return out; }

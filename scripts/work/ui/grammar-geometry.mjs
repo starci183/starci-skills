@@ -187,8 +187,8 @@ export function loadSheet(entries, { resolveBare = () => [], sourceOf = (file, s
       const layer = prefixed(imp.layer ?? imp.parentLayer);
       if (/^\.\.?\//.test(imp.target)) { load(path.resolve(path.dirname(abs), imp.target), source, layer); continue; }
       const bare = resolveBare(imp.target, abs);
-      if (bare && !Array.isArray(bare)) { for (const l of bare.layers ?? []) addLayer(l); continue; }
-      for (const b of bare ?? []) { if (b.layers) { for (const l of b.layers) addLayer(l); continue; } load(b.file, b.source, layer); }
+      if (bare && !Array.isArray(bare)) { for (const l of bare.layers ?? []) { addLayer(l); } continue; }
+      for (const b of bare ?? []) { if (b.layers) { for (const l of b.layers) { addLayer(l); } continue; } load(b.file, b.source, layer); }
     }
     for (const l of parsed.layers) addLayer(prefixed(l));
     for (const r of parsed.rules) { const layer = prefixed(r.layer); addLayer(layer); sheet.rules.push({ ...r, layer, source, order: sheet.rules.length }); }
@@ -241,7 +241,7 @@ function simpleParts(compound) {
     if (m.index !== consumed) return null;
     consumed = m.index + m[0].length;
     const part = m[0];
-    if (part.startsWith(':')) { if (part === ':root' || part === ':host') parts.push(':root'); else return null; continue; }
+    if (part.startsWith(':')) { if (part === ':root' || part === ':host') { parts.push(':root'); } else return null; continue; }
     parts.push(part.startsWith('[') ? `[${part.slice(1, -1).replace(/\s+/g, '')}]` : part);
   }
   return consumed === compound.length ? parts : null;
@@ -274,7 +274,7 @@ export function selectorMatch(selector, chain) {
   for (let c = compounds.length - 2; c >= 0; c--) {
     const via = compounds[c + 1].combinator;
     if (via === '>') { at -= 1; if (at < 0 || !holds(compounds[c].parts, chain[at])) return -1; }
-    else { let j = at - 1; while (j >= 0 && !holds(compounds[c].parts, chain[j])) j -= 1; if (j < 0) return -1; at = j; }
+    else { let j = at - 1; while (j >= 0 && !holds(compounds[c].parts, chain[j])) { j -= 1; } if (j < 0) return -1; at = j; }
   }
   return compounds.reduce((n, c) => n + specificity(c.parts), 0);
 }
@@ -317,7 +317,7 @@ export function evalLength(text, { vw = null, rootPx = ROOT_FONT_PX, unitless = 
   while (re.lastIndex < src.length) {
     const at = re.lastIndex;
     m = re.exec(src);
-    if (m?.index !== at) { if (/^\s*$/.test(src.slice(at))) break; return null; }
+    if (m?.index !== at) { if (/^\s*$/.test(src.slice(at))) { break; } return null; }
     if (m[1] !== undefined) tokens.push({ num: Number(m[1]), unit: m[2].toLowerCase() });
     else if (m[3] !== undefined) tokens.push({ fn: m[3].toLowerCase() });
     else tokens.push({ op: m[4] });
@@ -326,7 +326,7 @@ export function evalLength(text, { vw = null, rootPx = ROOT_FONT_PX, unitless = 
   const toPx = ({ num, unit }) => {
     if (unit === 'px') return { v: num, len: true };
     if (unit === 'rem' || unit === 'em') return { v: num * rootPx, len: true };
-    if (unit === 'vw') { if (vw == null) throw new Error('vw'); return { v: (num * vw) / 100, len: true }; }
+    if (unit === 'vw') { if (vw == null) { throw new Error('vw'); } return { v: (num * vw) / 100, len: true }; }
     if (unit === '') return { v: num, len: false };
     throw new Error(`unit ${unit}`);
   };
@@ -345,7 +345,7 @@ export function evalLength(text, { vw = null, rootPx = ROOT_FONT_PX, unitless = 
     const t = tokens[i++];
     if (!t) throw new Error('end');
     if (t.num !== undefined) return toPx(t);
-    if (t.op === '(') { const v = expr(); if (tokens[i++]?.op !== ')') throw new Error('paren'); return v; }
+    if (t.op === '(') { const v = expr(); if (tokens[i++]?.op !== ')') { throw new Error('paren'); } return v; }
     if (t.op === '-') { const v = factor(); return { v: -v.v, len: v.len }; }
     if (t.fn === 'calc') { const [v] = args(); return v; }
     if (t.fn === 'min' || t.fn === 'max') { const list = args(); return { v: Math[t.fn](...list.map((x) => x.v)), len: list.some((x) => x.len) }; }
