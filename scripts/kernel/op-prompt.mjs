@@ -22,8 +22,9 @@ const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
 // An owned path as the worker reads it: bare when it lives in the worker's
 // checkout, rooted at its own checkout otherwise.
+const withoutTrailingDotSegment = (value) => value.endsWith('/.') ? value.slice(0, -2) : value;
 export const renderOwnedPath = (p, cwd) => (p.root && path.resolve(p.root) !== path.resolve(cwd)
-  ? `${p.root.replaceAll(/\\/g, '/')}/${p.path}`.replace(/\/\.$/, '') : p.path);
+  ? withoutTrailingDotSegment(`${p.root.replaceAll(/\\/g, '/')}/${p.path}`) : p.path);
 
 // Whether the op's brief (its manifest text) names `needle`: a machine line is printed only for the ops
 // whose contract uses it. An unreadable brief names nothing.
