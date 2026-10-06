@@ -8,6 +8,10 @@ import { HANDOVER_OP } from '../handover.mjs';
 import { planGraphOf } from '../../route/plan-edges.mjs';
 import { deferredTestsOf, ownerSpecs, planLegDeferral, specsOff } from '../../route/spec-deferral.mjs';
 
+const planShapeInvalid = (plan) => !plan || !Array.isArray(plan.legs)
+  || plan.legs.some((l) => !l || typeof l.op !== 'string' || !l.op)
+  || (plan.edges !== undefined && (!Array.isArray(plan.edges) || plan.edges.some((e) => !Array.isArray(e) || e.length !== 2 || e.some((label) => typeof label !== 'string' || !label))));
+
 export default {
   verb: 'plan',
   required: ['workflow', 'file'],
@@ -19,8 +23,7 @@ export default {
     const file = path.resolve(args.file);
     if (!fs.existsSync(file)) throw Object.assign(new Error(`plan file missing: ${file}`), { code: 'plan-file-missing' });
     const plan = parseJson(fs.readFileSync(file, 'utf8'));
-    if (!plan || !Array.isArray(plan.legs) || plan.legs.some((l) => !l || typeof l.op !== 'string' || !l.op)
-      || (plan.edges !== undefined && (!Array.isArray(plan.edges) || plan.edges.some((e) => !Array.isArray(e) || e.length !== 2 || e.some((label) => typeof label !== 'string' || !label))))) {
+    if (planShapeInvalid(plan)) {
       throw Object.assign(new Error(`invalid plan file ${file} — expected {legs:[{op,paths?,notes?}], edges:[[fromLeg,toLeg]]}`), { code: 'plan-file-invalid' });
     }
     const legs = plan.legs.map((l) => ({ op: l.op, ...(l.paths ? { paths: l.paths } : {}), ...(l.notes ? { notes: l.notes } : {}) }));
@@ -82,9 +85,10 @@ export default {
       .map((leg) => ({ op: leg.op, reason: leg.deferral.reason }));
     const testsDeferred = { off: specsOff(specs), legs: deferredLegs, jobs: deferredTestsOf(db, workflowId) };
     const out = { ok: true, workflowId, goalRevision: g?.revision ?? null, divergence, lineage, inboxApplied, legs, testsDeferred };
+    const deferredList = deferredLegs.map((leg) => `${leg.op}:${leg.reason}`).join(',');
     emit(out,
       `plan-derived for ${workflowId}: ${legs.length} legs — diverged=${divergence.diverged}` +
-      (deferredLegs.length ? ` tests-deferred=[${deferredLegs.map((leg) => `${leg.op}:${leg.reason}`).join(',')}]` : '') +
+      (deferredLegs.length ? ` tests-deferred=[${deferredList}]` : '') +
       (divergence.missing.length ? ` missing=[${divergence.missing.join(',')}]` : '') +
       (divergence.extra.length ? ` extra=[${divergence.extra.join(',')}]` : '') +
       (divergence.reordered ? ' reordered' : '') +

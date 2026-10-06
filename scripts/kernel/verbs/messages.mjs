@@ -25,8 +25,13 @@ export default workflowVerb('messages', ({ ledger, args, emit, internals }) => {
     const fresh = messages.filter((m) => m.new).map((m) => m.id);
     if (fresh.length) ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'orchestration-messages-read', payload: { ids: fresh } }));
     const out = { ok: drained.ok, workflowId, runs: drained.runs, count: messages.length, new: fresh.length, heartbeats: drained.heartbeats, messages, ...(drained.error ? { error: drained.error } : {}) };
+    const drainError = drained.error ? ` — orchestration check failed: ${drained.error}` : '';
     emit(out, [
-      `messages ${workflowId}: ${messages.length} orchestration message(s) on ${drained.runs.length} Run(s), ${fresh.length} new${drained.error ? ` — orchestration check failed: ${drained.error}` : ''}`,
-      ...messages.slice(-40).map((m) => `  ${m.new ? '*' : ' '} ${m.id} [${m.type}] ${m.jobId ?? m.from ?? '-'}${m.opId ? ` (${m.opId} a${m.attempt})` : ''}: ${m.subject ?? ''} ${m.body ? `— ${m.body.replace(/\s+/g, ' ').slice(0, 160)}` : ''}\n      -> ${m.handle}`),
+      `messages ${workflowId}: ${messages.length} orchestration message(s) on ${drained.runs.length} Run(s), ${fresh.length} new${drainError}`,
+      ...messages.slice(-40).map((m) => {
+        const op = m.opId ? ` (${m.opId} a${m.attempt})` : '';
+        const body = m.body ? `— ${m.body.replace(/\s+/g, ' ').slice(0, 160)}` : '';
+        return `  ${m.new ? '*' : ' '} ${m.id} [${m.type}] ${m.jobId ?? m.from ?? '-'}${op}: ${m.subject ?? ''} ${body}\n      -> ${m.handle}`;
+      }),
     ].join('\n'), args.json);
 });

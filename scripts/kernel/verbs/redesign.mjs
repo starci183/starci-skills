@@ -26,12 +26,13 @@ export default {
     const st = apiRun(['status', '--workflow', wf], { repo, timeoutMs: 300_000 });
     const rca = st.json?.rca ?? null;
     const progress = st.json?.progress ?? null;
+    const artifact = { 'goal.revise': 'leg plan', 'scope.define': 'scope' }[args.op] ?? 'cut';
     const brief = {
       id: rca?.id ?? null,
       why: rca?.why ?? null,
       progress: progress ? { unitsDone: progress.unitsDone, unitsTotal: progress.unitsTotal, unitsPerHour: progress.unitsPerHour, stall: progress.stall?.reasons ?? [] } : null,
       clusters: (rca?.clusters ?? []).slice(0, 8).map((c) => ({ cause: c.cause, count: c.count, open: c.open, why: c.why, examples: c.examples, destinations: c.destinations })),
-      ask: String(args.brief ?? `Redesign so the remaining units can pass: the clusters above are why the current ${args.op === 'goal.revise' ? 'leg plan' : args.op === 'scope.define' ? 'scope' : 'cut'} does not progress.`),
+      ask: String(args.brief ?? `Redesign so the remaining units can pass: the clusters above are why the current ${artifact} does not progress.`),
     };
     const r = apiRun(['enqueue', '--workflow', wf, '--op', args.op, '--paths', String(args.paths), '--what', `redesign ${rca?.id ?? ''}`.trim(), '--title', `${args.op}: redesign from RCA ${rca?.id ?? ''}`.trim()], { repo });
     if (!r.ok || !r.json?.job_id) throw refuse(`enqueue ${args.op} refused: ${r.json?.reason ?? ''} ${r.json?.detail ?? r.json?.error ?? r.err ?? r.out}`.trim(), r.json?.reason ?? 'enqueue-refused');

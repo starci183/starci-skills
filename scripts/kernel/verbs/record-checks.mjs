@@ -71,7 +71,12 @@ export default {
   parsed.checks = attributeChecks(db, { repo, job: { ...job, op_id: op }, checks: classifyChecks(parsed.checks) });
   // Only the api marks a measurement leg's findings as measured (verify-failure.mjs); a caller's mark is dropped.
   const measurementLeg = isMeasurementLeg(db, { ...job, op_id: op }, { buildOps: buildOpsOf() });
-  parsed.checks = parsed.checks.map((check) => { if (!check || typeof check !== 'object') return check; const clean = { ...check }; delete clean.measured; return measurementLeg ? markMeasured(clean) : clean; });
+  parsed.checks = parsed.checks.map((check) => {
+    if (!check || typeof check !== 'object') return check;
+    const clean = { ...check };
+    delete clean.measured;
+    return measurementLeg ? markMeasured(clean) : clean;
+  });
   const peerBlockedChecks = parsed.checks.filter(isPeerBlockedCheck).map((check) => ({ name: check.name, peers: check.peerBlocked.peers }));
   const checkEvidence = summarizeCheckEvidence(parsed);
   withWorkflowLock({ db, ledger, repo, env: process.env }, { workflowId: job.workflow_id }, () => ledger.transaction(() => {
@@ -88,7 +93,9 @@ export default {
   }));
   const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, op, attempt, checks: parsed.checks.length, checkEvidence,
     ...(peerBlockedChecks.length ? { peerBlocked: peerBlockedChecks } : {}) };
-  emit(out, `checks recorded for ${job.job_id} (op ${op}, attempt ${attempt})${peerBlockedChecks.length ? `; peer-blocked (a peer's change, not this op's): ${peerBlockedChecks.map((c) => `${c.name} [${c.peers.map((p) => p.jobId ?? p.commit?.slice(0, 12)).join(',')}]`).join(', ')}` : ''}`, args.json);
+  const peerName = (c) => `${c.name} [${c.peers.map((p) => p.jobId ?? p.commit?.slice(0, 12)).join(',')}]`;
+  const peerBlocked = peerBlockedChecks.length ? `; peer-blocked (a peer's change, not this op's): ${peerBlockedChecks.map(peerName).join(', ')}` : '';
+  emit(out, `checks recorded for ${job.job_id} (op ${op}, attempt ${attempt})${peerBlocked}`, args.json);
 
   },
 };

@@ -24,7 +24,8 @@ export default {
     if (item.state !== 'pending') {
       throw Object.assign(new Error(`worker question ${messageId} is ${item.state}; nothing waits on this reply`), { code: `question-${item.state}` });
     }
-    const body = toOwner ? `${OWNER_ROUTED_REPLY}${args.body ? ` Kernel note: ${args.body}` : ''}` : String(args.body);
+    const kernelNote = args.body ? ` Kernel note: ${args.body}` : '';
+    const body = toOwner ? `${OWNER_ROUTED_REPLY}${kernelNote}` : String(args.body);
     internals.bindRunToKernel({ db, ledger, workflowId, runId: item.runId, by: `reply:${messageId}` });
     const sent = orcaReply({ id: messageId, body, run: item.runId });
     if (!sent.ok) {

@@ -9,6 +9,29 @@ import { byCodeUnit } from '../../lib/list.mjs';
 import { RECORD_CHANGE_REFUSED } from '../dependency-graph.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 
+const recordRevs = (tree, workDir, keys) => keys.map((file) => { try { return changeNoteOf(fs.readFileSync(path.join(tree, workDir, file.slice('.starciwork/'.length)), 'utf8'))?.rev ?? null; } catch { return null; } }).filter((rev) => rev != null);
+
+// The refusal is a cross-workflow dependency the Supervisor reads (dependency-graph.mjs record-owner edges).
+const refuseForeignOwners = (ledger, { workflowId, record, reach, foreign }) => {
+  try { ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: RECORD_CHANGE_REFUSED,
+    payload: { record, reach, owners: foreign.slice(0, 20).map((o) => ({ file: o.file, workflowId: o.workflowId ?? null, by: o.by })) } })); } catch { /* the refusal stands either way */ }
+  const detail = foreign.slice(0, 5).map((o) => `${o.file} is owned by ${o.workflowId ?? '-'} (${o.by}${o.detail ? `: ${o.detail}` : ''})`).join('; ');
+  throw Object.assign(new Error(`${workflowId} does not own ${foreign.length} record file(s) of ${record}: ${detail}; only a record's owner declares its change (tell the owner with starci kernel notify --kind request)`), { code: 'record-change-not-owner', owners: foreign });
+};
+
+// Who now owes a follow-up: the settled jobs of every other live workflow that read an older revision.
+const followUpOwed = (db, { workflowId, skillRoot, repo, workDir, ownerOf, keys }) => {
+  const owes = [];
+  for (const peer of db.prepare('SELECT * FROM workflows ORDER BY created_at').all().filter((row) => row.workflow_id !== workflowId && workflowRunning(row))) {
+    try {
+      for (const item of inputDrift(db, peer.workflow_id, { root: skillRoot, repo, workDir, ownership: ownerOf }).stale) {
+        if ((item.breaking ?? []).some((b) => b.via === 'declaration' && keys.includes(b.file))) owes.push({ workflowId: peer.workflow_id, jobId: item.jobId, op: item.op, attempt: item.attempt, ...(item.cut ? { cut: item.cut } : {}) });
+      }
+    } catch { /* a peer's projection failure never refuses the declaration */ }
+  }
+  return owes;
+};
+
 export default {
   verb: 'record-change',
   required: ['workflow', 'record', 'reach', 'reason'],
@@ -18,7 +41,10 @@ export default {
     const db = ledger.db, workflowId = args.workflow;
     const wf = getWorkflow(db, workflowId);
     if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-    if (!workflowRunning(wf)) throw Object.assign(new Error(`workflow ${workflowId} is ${wf.archived_at != null ? 'archived' : `phase ${wf.phase ?? 'unset'}`}; only a running workflow declares a change to a record it owns`), { code: 'workflow-not-running' });
+    if (!workflowRunning(wf)) {
+      const state = wf.archived_at != null ? 'archived' : `phase ${wf.phase ?? 'unset'}`;
+      throw Object.assign(new Error(`workflow ${workflowId} is ${state}; only a running workflow declares a change to a record it owns`), { code: 'workflow-not-running' });
+    }
     const reach = String(args.reach ?? '').trim();
     if (!RECORD_CHANGE_REACHES.includes(reach)) throw Object.assign(new Error(`--reach must be ${RECORD_CHANGE_REACHES.join('|')}, got '${reach}'`), { code: 'record-change-reach-invalid' });
     const reason = typeof args.reason === 'string' ? args.reason.trim() : '';
@@ -32,18 +58,13 @@ export default {
     if (!keys.length) throw Object.assign(new Error(`${record} holds no record file (index.yaml/resource.yaml) in ${tree}`), { code: 'record-change-record-missing' });
     const ownerOf = createOwnership(db, { repo, workDir });
     const foreign = keys.map((file) => ({ file, ...ownerOf(file) })).filter((o) => o.workflowId !== workflowId);
-    if (foreign.length) {
-      // The refusal is a cross-workflow dependency the Supervisor reads (dependency-graph.mjs record-owner edges).
-      try { ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: RECORD_CHANGE_REFUSED,
-        payload: { record, reach, owners: foreign.slice(0, 20).map((o) => ({ file: o.file, workflowId: o.workflowId ?? null, by: o.by })) } })); } catch { /* the refusal stands either way */ }
-      throw Object.assign(new Error(`${workflowId} does not own ${foreign.length} record file(s) of ${record}: ${foreign.slice(0, 5).map((o) => `${o.file} is owned by ${o.workflowId ?? '-'} (${o.by}${o.detail ? `: ${o.detail}` : ''})`).join('; ')}; only a record's owner declares its change (tell the owner with starci kernel notify --kind request)`), { code: 'record-change-not-owner', owners: foreign });
-    }
+    if (foreign.length) refuseForeignOwners(ledger, { workflowId, record, reach, foreign });
     const heads = committedReader(tree, { workDir })(keys);
     const inFlight = heads ? keys.filter((file) => !committedMatches(heads.get(file) ?? null, files[file].slice(0, 16))) : [];
     if (inFlight.length) {
       throw Object.assign(new Error(`${inFlight.length} record file(s) of ${record} differ from their committed revision (${inFlight.slice(0, 5).join(', ')}): the runtime commits a record when the op that wrote it settles green (its checkpoint); declare after that - only a committed revision is declared`), { code: 'record-change-uncommitted', files: inFlight });
     }
-    const revs = keys.map((file) => { try { return changeNoteOf(fs.readFileSync(path.join(tree, workDir, file.slice('.starciwork/'.length)), 'utf8'))?.rev ?? null; } catch { return null; } }).filter((rev) => rev != null);
+    const revs = recordRevs(tree, workDir, keys);
     const now = Date.now();
     const owner = ownerOf(keys[0]);
     const entry = { reach, reason, at: now, by: workflowId, ownerBy: owner.by, ...(revs.length ? { rev: Math.max(...revs) } : {}),
@@ -53,19 +74,12 @@ export default {
       ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'record-change-declared',
         payload: { record, reach, reason, rev: entry.rev ?? null, files: keys.length } });
     });
-    // Who now owes a follow-up: the settled jobs of every other live workflow that read an older revision.
-    const owes = [];
-    if (reach === 'follow-up') {
-      for (const peer of db.prepare('SELECT * FROM workflows ORDER BY created_at').all().filter((row) => row.workflow_id !== workflowId && workflowRunning(row))) {
-        try {
-          for (const item of inputDrift(db, peer.workflow_id, { root: internals.skillRoot, repo, workDir, ownership: ownerOf }).stale) {
-            if ((item.breaking ?? []).some((b) => b.via === 'declaration' && keys.includes(b.file))) owes.push({ workflowId: peer.workflow_id, jobId: item.jobId, op: item.op, attempt: item.attempt, ...(item.cut ? { cut: item.cut } : {}) });
-          }
-        } catch { /* a peer's projection failure never refuses the declaration */ }
-      }
-    }
+    const owes = reach === 'follow-up' ? followUpOwed(db, { workflowId, skillRoot: internals.skillRoot, repo, workDir, ownerOf, keys }) : [];
     const history = readRecordChange(db, record)?.history ?? [];
     const out = { ok: true, workflowId, record, reach, reason, rev: entry.rev ?? null, files: keys, owner: { workflowId, by: owner.by, detail: owner.detail ?? null }, declarations: history.length, owes };
-    emit(out, `record-change ${record} (${keys.length} file(s)${entry.rev != null ? `, rev ${entry.rev}` : ''}) reach ${reach} by owner ${workflowId} (${owner.by})${reach === 'follow-up' ? `; owes ONE follow-up leg to ${owes.map((o) => `${o.jobId} (${o.workflowId})`).join(', ') || 'no settled peer job'}` : '; peers read it as advisory peerDrift'}`, args.json);
+    const revNote = entry.rev != null ? `, rev ${entry.rev}` : '';
+    const owesList = owes.map((o) => `${o.jobId} (${o.workflowId})`).join(', ') || 'no settled peer job';
+    const owesNote = reach === 'follow-up' ? `; owes ONE follow-up leg to ${owesList}` : '; peers read it as advisory peerDrift';
+    emit(out, `record-change ${record} (${keys.length} file(s)${revNote}) reach ${reach} by owner ${workflowId} (${owner.by})${owesNote}`, args.json);
   },
 };

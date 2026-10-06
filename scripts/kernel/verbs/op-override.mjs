@@ -40,7 +40,8 @@ export default {
       payload: { id, op: args.op, override, cleared: Boolean(args.clear), previous: prev, decision: decision.id },
       msg: `op-override ${args.op} ${args.clear ? 'cleared' : JSON.stringify(override)}`,
       markdown: `Local override of **${args.op}** for this workflow (decision ${decision.id}):\n\n\`${args.clear ? 'cleared' : JSON.stringify(override)}\`\n\nPrevious: \`${JSON.stringify(prev)}\`` });
+    const action = args.clear ? 'cleared' : `set: ${JSON.stringify(override)}`;
     emit({ ok: true, workflowId: wf, op: args.op, override, previous: prev, id },
-      `${args.op} override ${args.clear ? 'cleared' : `set: ${JSON.stringify(override)}`} (applies to every later dispatch of ${args.op} in ${wf}; restore: op-override --set '${JSON.stringify(prev ?? {})}' or --clear)`, args.json);
+      `${args.op} override ${action} (applies to every later dispatch of ${args.op} in ${wf}; restore: op-override --set '${JSON.stringify(prev ?? {})}' or --clear)`, args.json);
   },
 };

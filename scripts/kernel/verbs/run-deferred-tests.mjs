@@ -10,8 +10,10 @@ export default workflowVerb('run-deferred-tests', ({ ledger, args, emit, interna
     const pending = deferredTestsOf(db, workflowId, { kind });
     const requeued = args['dry-run'] ? [] : requeueDeferredTests(ledger, { workflowId, kind, by: args.by ?? 'owner' });
     const out = { ok: true, workflowId, kind, dryRun: Boolean(args['dry-run']), deferred: pending, requeued, specs: ownerSpecs(internals.skillRoot) };
+    const kindArg = kind ? ` --kind ${kind}` : '';
+    const action = args['dry-run'] ? `would re-queue ${pending.length}` : `re-queued ${requeued.length}`;
     emit(out, [
-      `run-deferred-tests ${workflowId}${kind ? ` --kind ${kind}` : ''}: ${args['dry-run'] ? `would re-queue ${pending.length}` : `re-queued ${requeued.length}`} deferred test leg(s)`,
+      `run-deferred-tests ${workflowId}${kindArg}: ${action} deferred test leg(s)`,
       ...(args['dry-run'] ? pending : requeued).map((item) => `  ${item.jobId} ${item.op} a${item.attempt} (${item.reason})`),
       ...(requeued.length ? ['  next: starci kernel status, then route and dispatch each (they run even while the switch is still off)'] : []),
     ].join('\n'), args.json);

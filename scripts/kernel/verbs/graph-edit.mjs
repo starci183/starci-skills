@@ -37,7 +37,6 @@ import { preservedRefOf } from '../preserved-ref.mjs';
 import { readCanonScan, unfixableSlicesOf } from '../canon-plan-gate.mjs';
 import { putArtifact, stageBlob } from '../../machine/evidence-store.mjs';
 
-const EDITS = ['drop', 'widen', 'wire', 'continue', 'retry', 'reorder', 'split', 'merge', 'params', 'scan', 'recut', 'undo'];
 const parseJson = (s, what) => { try { return JSON.parse(s); } catch (e) { throw refuse(`${what} is not JSON: ${e.message}`, 'edit-invalid'); } };
 /** Refuse a continuation/retry of a unit that already passed its gates. */
 const unitDone = (db, wf, job) => {
@@ -69,6 +68,264 @@ function enqueueUnit({ repo, wf, op, paths, what, extra = [], derivedFrom = [] }
   return r.json.job_id;
 }
 
+function editDrop({ db, wf, args, ledger, bound, rec, editId, now }) {
+  const ids = csv(args.jobs ?? args.job);
+  if (!ids.length) throw refuse('drop needs --jobs <csv>', 'edit-invalid');
+  if (!String(args.reason ?? '').trim()) throw refuse('drop needs --reason', 'edit-invalid');
+  bound(ids.length);
+  const jobs = ids.map((id) => editableJob(db, wf, id));
+  ledger.transaction(() => { for (const j of jobs) { dropJob(ledger, j, { reason: `kernel graph-edit: ${args.reason}`, editId, now }); rec.dropped.push(j.job_id); } });
+  return `dropped ${ids.join(', ')}`;
+}
+
+function editWiden({ db, wf, args, repo, ledger, change }) {
+  const job = editableJob(db, wf, args.job);
+  const add = checkPaths(db, { repo, workflowId: wf, op: job.op_id, payload: job.payload, current: job.payload.owned_paths ?? [], add: csv(args['add-paths']) });
+  const paths = [...new Set([...(job.payload.owned_paths ?? []), ...add])];
+  const next = { ...job.payload, owned_paths: paths };
+  const failed = failedShapesOf(db, wf, job).get(shapeOf(job.op_id, next));
+  if (failed) throw refuse(`this shape already failed in ${failed.jobId} (${failed.causes.join(', ')}): change it more`, 'shape-already-failed');
+  ledger.transaction(() => change(job, { owned_paths: paths }));
+  return `widened ${job.job_id} by ${add.join(', ')}`;
+}
+
+function editWire({ db, wf, args, repo, ledger, bound, rec, tag, change }) {
+  const before = csv(args.before).map((id) => editableJob(db, wf, id));
+  bound(1 + before.length);
+  const op = args.op ?? before[0]?.op_id ?? 'code.refactor';
+  const refPaths = before[0]?.payload?.owned_paths ?? [];
+  const paths = checkPaths(db, { repo, workflowId: wf, op, payload: before[0]?.payload ?? {}, current: refPaths, add: csv(args.paths) });
+  const created = enqueueUnit({ repo, wf, op, paths, what: `wire ${paths.slice(0, 2).map((p) => p.split('/').pop()).join(',')}`, derivedFrom: before.map((j) => j.job_id) });
+  rec.created.push(created);
+  tag(created, { wire: true });
+  ledger.transaction(() => { for (const j of before) change(jobRow(db, j.job_id), { after: [...new Set([...(j.payload.after ?? []), created])] }); });
+  const waitNote = before.length ? `; ${before.map((j) => j.job_id).join(', ')} wait on it` : '';
+  return `wire unit ${created} (${op}) owns ${paths.join(', ')}${waitNote}`;
+}
+
+function editContinue({ db, wf, args, repo, ledger, rec, tag, editId, now }) {
+  const job = jobRow(db, args.job);
+  if (!job || job.workflow_id !== wf || job.kind !== 'op') throw refuse(`${args.job} is not an op job of ${wf}`, 'job-foreign');
+  if (job.status !== 'failed') throw refuse(`${job.job_id} is ${job.status}: a continuation follows a failed/blocked attempt`, 'edit-invalid');
+  unitDone(db, wf, job);
+  const preserved = preservedRefOf(db, job.job_id);
+  if (!preserved) throw refuse(`the runtime preserved no work of ${job.job_id}: a continuation continues preserved work (retry a failure with a changed shape instead)`, 'continue-no-preserved-work');
+  const open = db.prepare(`SELECT job_id FROM jobs WHERE workflow_id=? AND op_id=? AND status IN (${OPEN_JOB.map(() => '?').join(',')}) AND json_extract(payload_json,'$.kernelEdit.continuationOf')=?`).get(wf, job.op_id, ...OPEN_JOB, job.job_id);
+  if (open) throw refuse(`${open.job_id} already continues ${job.job_id}`, 'continue-exists');
+  const add = args['add-paths'] ? checkPaths(db, { repo, workflowId: wf, op: job.op_id, payload: job.payload, current: job.payload.owned_paths ?? [], add: csv(args['add-paths']) }) : [];
+  const paths = [...new Set([...(job.payload.owned_paths ?? []), ...add])];
+  const cut = job.payload.cut;
+  const created = enqueueUnit({ repo, wf, op: job.op_id, paths, what: `continue ${job.job_id.slice(-7)}`,
+    extra: ['--retry-of', job.job_id, ...(cut ? ['--cut-id', String(cut.id), '--cut-ordinal', String(cut.ordinal), '--cut-total', String(cut.total)] : [])] });
+  rec.created.push(created);
+  tag(created, { continuationOf: job.job_id, preserved, unitOf: job.job_id });
+  const c = jobRow(db, created);
+  const addedNote = add.length ? ` (you now also own ${add.join(', ')})` : '';
+  if (c) setPayload(ledger, c, { ...c.payload, kernelOverride: { ...c.payload.kernelOverride, notes: [...(c.payload.kernelOverride?.notes ?? []), `Continuation of ${job.job_id}: the runtime preserved its in-ceiling work as ${preserved}. Apply it to your owned paths first (git diff ${preserved}^ ${preserved} -- <owned paths> | git apply); finish what its report left open${addedNote}.`] } }, now);
+  ledger.transaction(() => ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: job.job_id, kind: 'unit-partial-continued', payload: { by: created, preserved, editId } }));
+  return `continuation ${created} of ${job.job_id} from ${preserved}`;
+}
+
+function editRetry({ db, wf, args, repo, ledger, rec, tag, now }) {
+  const job = jobRow(db, args.job);
+  if (!job || job.workflow_id !== wf || job.kind !== 'op') throw refuse(`${args.job} is not an op job of ${wf}`, 'job-foreign');
+  if (!RETRYABLE_JOB_STATUSES.includes(job.status)) throw refuse(`${job.job_id} is ${job.status}: retry follows a failed or awaiting_owner attempt`, 'edit-invalid');
+  unitDone(db, wf, job);
+  const open = db.prepare(`SELECT job_id FROM jobs WHERE workflow_id=? AND status IN (${OPEN_JOB.map(() => '?').join(',')}) AND (json_extract(payload_json,'$.retry.retryOf')=? OR json_extract(payload_json,'$.kernelEdit.unitOf')=?)`).get(wf, ...OPEN_JOB, job.job_id, job.job_id);
+  if (open) throw refuse(`${open.job_id} already retries ${job.job_id}: edit that queued unit (widen/params) instead`, 'retry-exists');
+  const add = args['add-paths'] ? checkPaths(db, { repo, workflowId: wf, op: job.op_id, payload: job.payload, current: job.payload.owned_paths ?? [], add: csv(args['add-paths']) }) : [];
+  const o = args.set ? validateOverride(parseJson(args.set, '--set')) : null;
+  const next = { ...job.payload, owned_paths: [...new Set([...(job.payload.owned_paths ?? []), ...add])], kernelOverride: { ...job.payload.kernelOverride, ...o }, ...(o?.model ? { kernelModel: o.model } : {}) };
+  const failedShapes = failedShapesOf(db, wf, { job_id: '__new__', op_id: job.op_id, payload: next });
+  const same = shapeOf(job.op_id, next) === shapeOf(job.op_id, job.payload) || failedShapes.has(shapeOf(job.op_id, next));
+  if (same) throw refuse(`the retry has the same shape as a failed attempt of this unit: widen its paths (--add-paths) or change its override (--set) - never the same failing shape`, 'shape-already-failed');
+  const cut = job.payload.cut;
+  const after = csv(args.after);
+  const created = enqueueUnit({ repo, wf, op: job.op_id, paths: next.owned_paths, what: `retry ${job.payload.displayWhat ?? ''}`.trim(),
+    extra: ['--retry-of', job.job_id, ...(cut ? ['--cut-id', String(cut.id), '--cut-ordinal', String(cut.ordinal), '--cut-total', String(cut.total)] : []), ...(after.length ? ['--after', after.join(',')] : [])] });
+  rec.created.push(created);
+  tag(created, { retryOf: job.job_id, unitOf: job.job_id, added: add });
+  const c = jobRow(db, created);
+  if (c && (o || next.kernelModel)) setPayload(ledger, c, { ...c.payload, kernelOverride: next.kernelOverride, ...(next.kernelModel ? { kernelModel: next.kernelModel } : {}), ...(o?.difficulty ? { difficulty: o.difficulty } : {}) }, now);
+  const addedNote = add.length ? ` (+${add.join(', ')})` : '';
+  const overrideNote = o ? ` (${Object.keys(o).join(', ')})` : '';
+  return `retry ${created} of ${job.job_id} with a changed shape${addedNote}${overrideNote}`;
+}
+
+function editReorder({ db, wf, args, ledger, change }) {
+  const job = editableJob(db, wf, args.job);
+  const after = csv(args.after);
+  if (!after.length) throw refuse('reorder needs --after <csv>', 'edit-invalid');
+  for (const a of after) {
+    const j = jobRow(db, a);
+    if (!j || j.workflow_id !== wf) throw refuse(`${a} is not a job of ${wf}`, 'job-foreign');
+    if (afterClosure(db, a).has(job.job_id)) throw refuse(`${job.job_id} after ${a} would be a cycle`, 'edit-cycle');
+  }
+  ledger.transaction(() => change(job, { after: [...new Set([...(job.payload.after ?? []), ...after])] }));
+  return `${job.job_id} now waits on ${after.join(', ')}`;
+}
+
+function editSplit({ db, wf, args, repo, ledger, bound, rec, tag, editId, now }) {
+  const job = editableJob(db, wf, args.job);
+  const parts = parseJson(args.parts, '--parts');
+  if (!Array.isArray(parts) || parts.length < 2 || parts.some((p) => !Array.isArray(p) || !p.length)) throw refuse('--parts is 2..N non-empty arrays of paths', 'edit-invalid');
+  bound(1 + parts.length);
+  const own = new Set(job.payload.owned_paths ?? []);
+  const flat = parts.flat();
+  if (flat.some((p) => !own.has(p)) || new Set(flat).size !== flat.length || flat.length !== own.size) throw refuse('the parts must partition the unit\'s owned paths exactly (disjoint, nothing added or lost)', 'edit-invalid');
+  for (const [i, p] of parts.entries()) { const id = enqueueUnit({ repo, wf, op: job.op_id, paths: p, what: `split ${i + 1}/${parts.length} of ${job.payload.displayWhat ?? job.job_id}`, derivedFrom: [job.job_id] }); rec.created.push(id); tag(id, { splitOf: job.job_id }); }
+  ledger.transaction(() => { dropJob(ledger, jobRow(db, job.job_id), { reason: `split into ${rec.created.join(', ')}`, editId, now }); rec.dropped.push(job.job_id); });
+  return `split ${job.job_id} into ${rec.created.join(', ')}`;
+}
+
+function editMerge({ db, wf, args, repo, ledger, bound, rec, tag, editId, now }) {
+  const jobs = csv(args.jobs).map((id) => editableJob(db, wf, id));
+  if (jobs.length < 2) throw refuse('merge needs --jobs with 2..N queued units', 'edit-invalid');
+  bound(jobs.length + 1);
+  if (new Set(jobs.map((j) => j.op_id)).size !== 1) throw refuse('merge joins units of one op', 'edit-invalid');
+  const paths = [...new Set(jobs.flatMap((j) => j.payload.owned_paths ?? []))];
+  const id = enqueueUnit({ repo, wf, op: jobs[0].op_id, paths, what: `merge of ${jobs.length} units`, derivedFrom: jobs.map((j) => j.job_id) });
+  rec.created.push(id); tag(id, { mergeOf: jobs.map((j) => j.job_id) });
+  ledger.transaction(() => { for (const j of jobs) { dropJob(ledger, jobRow(db, j.job_id), { reason: `merged into ${id}`, editId, now }); rec.dropped.push(j.job_id); } });
+  return `merged ${jobs.map((j) => j.job_id).join(', ')} into ${id}`;
+}
+
+function editParams({ db, wf, args, ledger, change }) {
+  const job = editableJob(db, wf, args.job);
+  const o = validateOverride(parseJson(args.set, '--set'));
+  const patch = { kernelOverride: { ...job.payload.kernelOverride, ...o } };
+  if (o.difficulty) patch.difficulty = o.difficulty;
+  if (o.model) patch.kernelModel = o.model;
+  ledger.transaction(() => change(job, patch));
+  return `set ${Object.keys(o).join(', ')} on ${job.job_id}`;
+}
+
+function editScan({ db, wf, args, repo, rec, editId, decision }) {
+  const units = db.prepare("SELECT job_id, op_id, status, payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=?").all(wf, args.op, String(args['cut-id'] ?? ''));
+  if (!units.length) throw refuse(`no ${args.op} unit of cut ${args['cut-id']} in ${wf}`, 'cut-unknown');
+  const sample = units.map((u) => ({ ...u, payload: JSON.parse(u.payload_json) })).find((u) => u.payload.params?.canonFamilies);
+  if (!sample) throw refuse(`cut ${args['cut-id']} is no canon cut (no params.canonFamilies): its re-cut belongs to work.author - starci kernel redesign --op work.author`, 'scan-not-canon');
+  const place = ownedPathPlacements({ op: sample.op_id, payload: sample.payload, ownedPaths: sample.payload.owned_paths.slice(0, 1), repo })[0];
+  if (!place || place.unresolved || !place.role) throw refuse('the cut\'s repository does not resolve (project binding)', 'scan-root-unknown');
+  const root = place.base;
+  // Busy paths (running units of this workflow, other workflows' open units) stay out of the fresh cut.
+  const prefix = `${String(sample.payload.owned_paths[0]).split('/')[0]}/`;
+  const busy = [...new Set(db.prepare(`SELECT payload_json, workflow_id, status FROM jobs WHERE kind='op' AND status IN (${OPEN_JOB.filter((s) => s !== 'queued').map(() => '?').join(',')})`).all(...OPEN_JOB.filter((s) => s !== 'queued'))
+    .flatMap((r) => JSON.parse(r.payload_json).owned_paths ?? []).filter((p) => String(p).startsWith(prefix)).map((p) => String(p).slice(prefix.length)))];
+  const exclude = [...new Set([...csv(args.exclude), 'design-plans', ...busy])];
+  const dir = kernelScratchDirOf(repo, wf, 'scans');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `${editId}.json`);
+  const log = fs.openSync(`${file}.log`, 'a');
+  const out = fs.openSync(file, 'w');
+  const child = spawnNode([path.join(skillRoot, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--families', String(sample.payload.params.canonFamilies || 'all'), '--exclude', exclude.join(','), '--json'],
+    { cwd: skillRoot, detached: true, stdio: ['ignore', out, log] });
+  child.unref();
+  rec.scan = { file, root, exclude: exclude.length, pid: child.pid, prefix };
+  return `canon-scan started in the background (pid ${child.pid}) -> ${file}; next wake: starci kernel graph-edit --workflow ${wf} --edit recut --op ${args.op} --cut-id ${args['cut-id']} --from-scan ${file} --decision ${decision.id}`;
+}
+
+// Enqueue the re-cut's slices wave by wave, then its canon-wire legs; record + tag each into the edit's record.
+function recutEnqueueUnits({ repo, wf, op, newCut, cutPlan, prefixed, derivedFrom, total, cutFile, cutId, scanTag, rec, tag }) {
+  const byWave = new Map();
+  const waves = [...new Set(cutPlan.slices.map((sl) => sl.wave))];
+  for (const sl of cutPlan.slices) {
+    const prior = sl.wave !== waves[0] ? byWave.get(waves[waves.indexOf(sl.wave) - 1]) ?? [] : [];
+    const id = enqueueUnit({ repo, wf, op, paths: prefixed(sl.owned), what: `recut ${sl.ordinal}/${total} ${sl.wave ?? ''}`.trim(), derivedFrom,
+      extra: [...(total >= 2 ? ['--cut-id', newCut, '--cut-ordinal', String(sl.ordinal), '--cut-total', String(total), '--canon-scan', cutFile] : []),
+        ...(prior.length ? ['--after', prior.join(',')] : [])] });
+    rec.created.push(id);
+    tag(id, { recutOf: cutId, scan: scanTag });
+    if (!byWave.has(sl.wave)) byWave.set(sl.wave, []);
+    byWave.get(sl.wave).push(id);
+  }
+  for (const wire of cutPlan.wires) {
+    const id = enqueueUnit({ repo, wf, op, paths: prefixed(wire.paths), what: `canon wire ${wire.wave}`, derivedFrom,
+      extra: ['--params', JSON.stringify({ canonWire: true }), ...((byWave.get(wire.wave) ?? []).length ? ['--after', byWave.get(wire.wave).join(',')] : [])] });
+    rec.created.push(id);
+    tag(id, { recutOf: cutId, wire: true });
+  }
+}
+
+function editRecut({ db, wf, args, repo, ledger, rec, tag, editId, now }) {
+  // H6: a re-cut goes through the canon planner (scripts/kernel/seam-policy.mjs canonCutPlanOf): each slice owns its paths
+  // PLUS the relocation destinations its findings need, contested moves go to one canon-wire leg per wave, and a slice
+  // whose moves another slice holds (no fix target) is refused here and cut again - never enqueued to block.
+  const file = String(args['from-scan'] ?? '');
+  if (!file || !fs.existsSync(file)) throw refuse('recut needs --from-scan <canon-scan json file> (start one with --edit scan)', 'edit-invalid');
+  let scan;
+  try { scan = readCanonScan(file); } catch (error) { throw refuse(`${error.message} (the scan may still run: check ${file}.log)`, error.code === 'canon-scan-invalid' ? 'scan-invalid' : 'scan-incomplete'); }
+  if (scan.status === 'unavailable') throw refuse(`the scan answered unavailable (${(scan.issues ?? []).map((i) => i.code).join(', ')}): fix the checker first (a kernel-proposal), never re-cut on a partial measurement`, 'scan-unavailable');
+  const cutId = String(args['cut-id'] ?? '');
+  const units = db.prepare(`SELECT job_id, op_id, status, payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND (json_extract(payload_json,'$.cut.id')=? OR json_extract(payload_json,'$.kernelEdit.recutOf')=?)`).all(wf, args.op, cutId, cutId)
+    .map((j) => ({ ...j, payload: JSON.parse(j.payload_json) }));
+  if (!units.length) throw refuse(`no ${args.op} unit of cut ${cutId}`, 'cut-unknown');
+  const prefix = args['path-prefix'] ?? `${String(units[0].payload.owned_paths?.[0] ?? '').split('/')[0]}/`;
+  const retire = units.filter((j) => j.status === 'queued' && !dispatchedEver(db, j.job_id));
+  const running = units.filter((j) => OPEN_JOB.includes(j.status) && j.status !== 'queued');
+  const busy = running.flatMap((j) => j.payload.owned_paths ?? []).map((p) => String(p).toLowerCase());
+  const n = 1 + db.prepare("SELECT COUNT(*) n FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.edit')='recut'").get(wf, GRAPH_EDIT_KIND).n;
+  const newCut = `${cutId}-r${n}`;
+  const plan = canonCutPlanOf(scan, { cutId: newCut, op: args.op });
+  const unfixable = unfixableSlicesOf(plan);
+  const noTarget = new Set(unfixable.map((u) => u.ordinal));
+  const prefixed = (list) => list.map((p) => `${prefix}${p}`);
+  const clear = plan.slices.filter((sl) => !noTarget.has(sl.ordinal)).map((sl) => ({ ...sl, owned: prefixed(sl.owned) }))
+    .filter((sl) => !sl.owned.some((p) => busy.some((bz) => p.toLowerCase().startsWith(bz) || bz.startsWith(p.toLowerCase()))))
+    .filter((sl) => !foreignOverlap(db, { repo, workflowId: wf, op: args.op, payload: units[0].payload, paths: sl.owned }).length);
+  const noFix = unfixable.length ? ` (${unfixable.length} slice(s) have no fix target: cut again)` : '';
+  if (!clear.length) throw refuse(`the fresh scan leaves no plannable slice outside running or foreign work${noFix}`, 'recut-empty');
+  // The record the cut comes from is kept as a kernel artifact; the enqueue gate re-plans each slice from it.
+  const scanBlob = stageBlob(fs.readFileSync(file), { mediaType: 'application/json', repoRoots: [repo] });
+  const scanArt = ledger.transaction((tx) => putArtifact(tx, { workflowId: wf, attemptId: null, role: 'scan', kind: 'file', name: `scans/${newCut}.json`, blob: scanBlob, origin: 'kernel' }));
+  // The gate re-plans from a scan whose slices are exactly the kept ones, renumbered 1..total.
+  const kept = new Set(clear.map((sl) => sl.ordinal));
+  const cutScan = { ...scan, slices: scan.slices.filter((sl) => kept.has(Number(sl.ordinal))).map((sl, i) => ({ ...sl, ordinal: i + 1 })) };
+  const cutFile = path.join(kernelScratchDirOf(repo, wf, 'scans'), `${newCut}.plan.json`);
+  fs.mkdirSync(path.dirname(cutFile), { recursive: true });
+  fs.writeFileSync(cutFile, JSON.stringify(cutScan));
+  const cutPlan = canonCutPlanOf(cutScan, { cutId: newCut, op: args.op });
+  const total = cutPlan.slices.length;
+  const derivedFrom = units.map((j) => j.job_id);
+  recutEnqueueUnits({ repo, wf, op: args.op, newCut, cutPlan, prefixed, derivedFrom, total, cutFile, cutId,
+    scanTag: { artifactId: scanArt.artifactId, sha256: scanBlob.sha }, rec, tag });
+  ledger.transaction(() => { for (const j of retire) { dropJob(ledger, jobRow(db, j.job_id), { reason: `re-cut into ${newCut} from a fresh canon-scan`, editId, now }); rec.dropped.push(j.job_id); } });
+  rec.recut = { from: cutId, to: newCut, scan: { artifactId: scanArt.artifactId, sha256: scanBlob.sha }, slices: scan.slices.length, kept: total, wires: cutPlan.wires.length,
+    noFixTarget: unfixable, skipped: plan.slices.length - total - unfixable.length, running: running.map((j) => j.job_id) };
+  const refusedNote = unfixable.length ? `, ${unfixable.length} slice(s) refused (no fix target: cut again)` : '';
+  return `re-cut ${cutId}: ${retire.length} queued unit(s) retired, ${total} planned unit(s) in ${newCut} + ${cutPlan.wires.length} wire leg(s)${refusedNote}`;
+}
+
+function editUndo({ db, wf, args, ledger, rec, editId, now }) {
+  const id = String(args.undo ?? '');
+  const ev = db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? AND entity_id=?').get(wf, GRAPH_EDIT_KIND, id);
+  if (!ev) throw refuse(`edit ${id} is not in ${wf}`, 'edit-unknown');
+  if (db.prepare("SELECT 1 FROM events WHERE workflow_id=? AND kind='kernel-graph-edit-undone' AND entity_id=?").get(wf, id)) throw refuse(`edit ${id} is already undone`, 'edit-undone');
+  const e = JSON.parse(ev.payload_json);
+  const kept = [];
+  ledger.transaction(() => {
+    for (const jobId of e.created ?? []) {
+      const j = jobRow(db, jobId);
+      if (j?.status === 'queued' && !dispatchedEver(db, jobId)) { dropJob(ledger, j, { reason: `undo ${id}`, editId, now }); rec.dropped.push(jobId); }
+      else if (j) kept.push(`${jobId} (${j.status})`);
+    }
+    // A dropped unit comes back as a NEW try of its unit (resume_of the cancelled job): cancelled is terminal.
+    for (const jobId of e.dropped ?? []) { const restored = restoreJob(ledger, jobId, { editId: id, now }); if (restored) rec.created.push(restored); else kept.push(`${jobId} (not restorable)`); }
+    for (const c of e.changed ?? []) {
+      const j = jobRow(db, c.jobId);
+      if (j?.status === 'queued' && !dispatchedEver(db, c.jobId)) { setPayload(ledger, j, { ...j.payload, ...c.before }, now); rec.changed.push({ jobId: c.jobId, restored: Object.keys(c.before) }); }
+      else kept.push(`${c.jobId} (${j?.status ?? 'gone'})`);
+    }
+    ledger.appendEvent({ workflowId: wf, entityType: 'graph-edit', entityId: id, kind: 'kernel-graph-edit-undone', payload: { by: editId, kept } });
+  });
+  rec.undoOf = id;
+  const keptNote = kept.length ? `; already dispatched, left alone: ${kept.join(', ')}` : '';
+  return `undid ${id}${keptNote}`;
+}
+
+const EDIT_RUN = { drop: editDrop, widen: editWiden, wire: editWire, continue: editContinue, retry: editRetry, reorder: editReorder, split: editSplit, merge: editMerge, params: editParams, scan: editScan, recut: editRecut, undo: editUndo };
+const EDITS = Object.keys(EDIT_RUN);
+
 export default {
   verb: 'graph-edit',
   required: ['workflow', 'edit'],
@@ -92,230 +349,11 @@ export default {
       return payload;
     };
     const tag = (jobId, patch) => { const j = jobRow(db, jobId); if (j) setPayload(ledger, j, { ...j.payload, kernelEdit: { ...j.payload.kernelEdit, edit, editId, decision: decision?.id ?? null, ...patch } }, now); };
-    let human = '';
+    const human = EDIT_RUN[edit]({ ledger, db, wf, args, repo, now, decision, editId, rec, bound, change, tag });
 
-    if (edit === 'drop') {
-      const ids = csv(args.jobs ?? args.job);
-      if (!ids.length) throw refuse('drop needs --jobs <csv>', 'edit-invalid');
-      if (!String(args.reason ?? '').trim()) throw refuse('drop needs --reason', 'edit-invalid');
-      bound(ids.length);
-      const jobs = ids.map((id) => editableJob(db, wf, id));
-      ledger.transaction(() => { for (const j of jobs) { dropJob(ledger, j, { reason: `kernel graph-edit: ${args.reason}`, editId, now }); rec.dropped.push(j.job_id); } });
-      human = `dropped ${ids.join(', ')}`;
-    } else if (edit === 'widen') {
-      const job = editableJob(db, wf, args.job);
-      const add = checkPaths(db, { repo, workflowId: wf, op: job.op_id, payload: job.payload, current: job.payload.owned_paths ?? [], add: csv(args['add-paths']) });
-      const paths = [...new Set([...(job.payload.owned_paths ?? []), ...add])];
-      const next = { ...job.payload, owned_paths: paths };
-      const failed = failedShapesOf(db, wf, job).get(shapeOf(job.op_id, next));
-      if (failed) throw refuse(`this shape already failed in ${failed.jobId} (${failed.causes.join(', ')}): change it more`, 'shape-already-failed');
-      ledger.transaction(() => change(job, { owned_paths: paths }));
-      human = `widened ${job.job_id} by ${add.join(', ')}`;
-    } else if (edit === 'reorder') {
-      const job = editableJob(db, wf, args.job);
-      const after = csv(args.after);
-      if (!after.length) throw refuse('reorder needs --after <csv>', 'edit-invalid');
-      for (const a of after) {
-        const j = jobRow(db, a);
-        if (!j || j.workflow_id !== wf) throw refuse(`${a} is not a job of ${wf}`, 'job-foreign');
-        if (afterClosure(db, a).has(job.job_id)) throw refuse(`${job.job_id} after ${a} would be a cycle`, 'edit-cycle');
-      }
-      ledger.transaction(() => change(job, { after: [...new Set([...(job.payload.after ?? []), ...after])] }));
-      human = `${job.job_id} now waits on ${after.join(', ')}`;
-    } else if (edit === 'params') {
-      const job = editableJob(db, wf, args.job);
-      const o = validateOverride(parseJson(args.set, '--set'));
-      const patch = { kernelOverride: { ...job.payload.kernelOverride, ...o } };
-      if (o.difficulty) patch.difficulty = o.difficulty;
-      if (o.model) patch.kernelModel = o.model;
-      ledger.transaction(() => change(job, patch));
-      human = `set ${Object.keys(o).join(', ')} on ${job.job_id}`;
-    } else if (edit === 'wire') {
-      const before = csv(args.before).map((id) => editableJob(db, wf, id));
-      bound(1 + before.length);
-      const op = args.op ?? before[0]?.op_id ?? 'code.refactor';
-      const refPaths = before[0]?.payload?.owned_paths ?? [];
-      const paths = checkPaths(db, { repo, workflowId: wf, op, payload: before[0]?.payload ?? {}, current: refPaths, add: csv(args.paths) });
-      const created = enqueueUnit({ repo, wf, op, paths, what: `wire ${paths.slice(0, 2).map((p) => p.split('/').pop()).join(',')}`, derivedFrom: before.map((j) => j.job_id) });
-      rec.created.push(created);
-      tag(created, { wire: true });
-      ledger.transaction(() => { for (const j of before) change(jobRow(db, j.job_id), { after: [...new Set([...(j.payload.after ?? []), created])] }); });
-      human = `wire unit ${created} (${op}) owns ${paths.join(', ')}${before.length ? `; ${before.map((j) => j.job_id).join(', ')} wait on it` : ''}`;
-    } else if (edit === 'continue') {
-      const job = jobRow(db, args.job);
-      if (!job || job.workflow_id !== wf || job.kind !== 'op') throw refuse(`${args.job} is not an op job of ${wf}`, 'job-foreign');
-      if (job.status !== 'failed') throw refuse(`${job.job_id} is ${job.status}: a continuation follows a failed/blocked attempt`, 'edit-invalid');
-      unitDone(db, wf, job);
-      const preserved = preservedRefOf(db, job.job_id);
-      if (!preserved) throw refuse(`the runtime preserved no work of ${job.job_id}: a continuation continues preserved work (retry a failure with a changed shape instead)`, 'continue-no-preserved-work');
-      const open = db.prepare(`SELECT job_id FROM jobs WHERE workflow_id=? AND op_id=? AND status IN (${OPEN_JOB.map(() => '?').join(',')}) AND json_extract(payload_json,'$.kernelEdit.continuationOf')=?`).get(wf, job.op_id, ...OPEN_JOB, job.job_id);
-      if (open) throw refuse(`${open.job_id} already continues ${job.job_id}`, 'continue-exists');
-      const add = args['add-paths'] ? checkPaths(db, { repo, workflowId: wf, op: job.op_id, payload: job.payload, current: job.payload.owned_paths ?? [], add: csv(args['add-paths']) }) : [];
-      const paths = [...new Set([...(job.payload.owned_paths ?? []), ...add])];
-      const cut = job.payload.cut;
-      const created = enqueueUnit({ repo, wf, op: job.op_id, paths, what: `continue ${job.job_id.slice(-7)}`,
-        extra: ['--retry-of', job.job_id, ...(cut ? ['--cut-id', String(cut.id), '--cut-ordinal', String(cut.ordinal), '--cut-total', String(cut.total)] : [])] });
-      rec.created.push(created);
-      tag(created, { continuationOf: job.job_id, preserved, unitOf: job.job_id });
-      const c = jobRow(db, created);
-      if (c) setPayload(ledger, c, { ...c.payload, kernelOverride: { ...c.payload.kernelOverride, notes: [...(c.payload.kernelOverride?.notes ?? []), `Continuation of ${job.job_id}: the runtime preserved its in-ceiling work as ${preserved}. Apply it to your owned paths first (git diff ${preserved}^ ${preserved} -- <owned paths> | git apply); finish what its report left open${add.length ? ` (you now also own ${add.join(', ')})` : ''}.`] } }, now);
-      ledger.transaction(() => ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: job.job_id, kind: 'unit-partial-continued', payload: { by: created, preserved, editId } }));
-      human = `continuation ${created} of ${job.job_id} from ${preserved}`;
-    } else if (edit === 'retry') {
-      const job = jobRow(db, args.job);
-      if (!job || job.workflow_id !== wf || job.kind !== 'op') throw refuse(`${args.job} is not an op job of ${wf}`, 'job-foreign');
-      if (!RETRYABLE_JOB_STATUSES.includes(job.status)) throw refuse(`${job.job_id} is ${job.status}: retry follows a failed or awaiting_owner attempt`, 'edit-invalid');
-      unitDone(db, wf, job);
-      const open = db.prepare(`SELECT job_id FROM jobs WHERE workflow_id=? AND status IN (${OPEN_JOB.map(() => '?').join(',')}) AND (json_extract(payload_json,'$.retry.retryOf')=? OR json_extract(payload_json,'$.kernelEdit.unitOf')=?)`).get(wf, ...OPEN_JOB, job.job_id, job.job_id);
-      if (open) throw refuse(`${open.job_id} already retries ${job.job_id}: edit that queued unit (widen/params) instead`, 'retry-exists');
-      const add = args['add-paths'] ? checkPaths(db, { repo, workflowId: wf, op: job.op_id, payload: job.payload, current: job.payload.owned_paths ?? [], add: csv(args['add-paths']) }) : [];
-      const o = args.set ? validateOverride(parseJson(args.set, '--set')) : null;
-      const next = { ...job.payload, owned_paths: [...new Set([...(job.payload.owned_paths ?? []), ...add])], kernelOverride: { ...job.payload.kernelOverride, ...o }, ...(o?.model ? { kernelModel: o.model } : {}) };
-      const failedShapes = failedShapesOf(db, wf, { job_id: '__new__', op_id: job.op_id, payload: next });
-      const same = shapeOf(job.op_id, next) === shapeOf(job.op_id, job.payload) || failedShapes.has(shapeOf(job.op_id, next));
-      if (same) throw refuse(`the retry has the same shape as a failed attempt of this unit: widen its paths (--add-paths) or change its override (--set) - never the same failing shape`, 'shape-already-failed');
-      const cut = job.payload.cut;
-      const after = csv(args.after);
-      const created = enqueueUnit({ repo, wf, op: job.op_id, paths: next.owned_paths, what: `retry ${job.payload.displayWhat ?? ''}`.trim(),
-        extra: ['--retry-of', job.job_id, ...(cut ? ['--cut-id', String(cut.id), '--cut-ordinal', String(cut.ordinal), '--cut-total', String(cut.total)] : []), ...(after.length ? ['--after', after.join(',')] : [])] });
-      rec.created.push(created);
-      tag(created, { retryOf: job.job_id, unitOf: job.job_id, added: add });
-      const c = jobRow(db, created);
-      if (c && (o || next.kernelModel)) setPayload(ledger, c, { ...c.payload, kernelOverride: next.kernelOverride, ...(next.kernelModel ? { kernelModel: next.kernelModel } : {}), ...(o?.difficulty ? { difficulty: o.difficulty } : {}) }, now);
-      human = `retry ${created} of ${job.job_id} with a changed shape${add.length ? ` (+${add.join(', ')})` : ''}${o ? ` (${Object.keys(o).join(', ')})` : ''}`;
-    } else if (edit === 'split') {
-      const job = editableJob(db, wf, args.job);
-      const parts = parseJson(args.parts, '--parts');
-      if (!Array.isArray(parts) || parts.length < 2 || parts.some((p) => !Array.isArray(p) || !p.length)) throw refuse('--parts is 2..N non-empty arrays of paths', 'edit-invalid');
-      bound(1 + parts.length);
-      const own = new Set(job.payload.owned_paths ?? []);
-      const flat = parts.flat();
-      if (flat.some((p) => !own.has(p)) || new Set(flat).size !== flat.length || flat.length !== own.size) throw refuse('the parts must partition the unit\'s owned paths exactly (disjoint, nothing added or lost)', 'edit-invalid');
-      for (const [i, p] of parts.entries()) { const id = enqueueUnit({ repo, wf, op: job.op_id, paths: p, what: `split ${i + 1}/${parts.length} of ${job.payload.displayWhat ?? job.job_id}`, derivedFrom: [job.job_id] }); rec.created.push(id); tag(id, { splitOf: job.job_id }); }
-      ledger.transaction(() => { dropJob(ledger, jobRow(db, job.job_id), { reason: `split into ${rec.created.join(', ')}`, editId, now }); rec.dropped.push(job.job_id); });
-      human = `split ${job.job_id} into ${rec.created.join(', ')}`;
-    } else if (edit === 'merge') {
-      const jobs = csv(args.jobs).map((id) => editableJob(db, wf, id));
-      if (jobs.length < 2) throw refuse('merge needs --jobs with 2..N queued units', 'edit-invalid');
-      bound(jobs.length + 1);
-      if (new Set(jobs.map((j) => j.op_id)).size !== 1) throw refuse('merge joins units of one op', 'edit-invalid');
-      const paths = [...new Set(jobs.flatMap((j) => j.payload.owned_paths ?? []))];
-      const id = enqueueUnit({ repo, wf, op: jobs[0].op_id, paths, what: `merge of ${jobs.length} units`, derivedFrom: jobs.map((j) => j.job_id) });
-      rec.created.push(id); tag(id, { mergeOf: jobs.map((j) => j.job_id) });
-      ledger.transaction(() => { for (const j of jobs) { dropJob(ledger, jobRow(db, j.job_id), { reason: `merged into ${id}`, editId, now }); rec.dropped.push(j.job_id); } });
-      human = `merged ${jobs.map((j) => j.job_id).join(', ')} into ${id}`;
-    } else if (edit === 'scan') {
-      const units = db.prepare("SELECT job_id, op_id, status, payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=?").all(wf, args.op, String(args['cut-id'] ?? ''));
-      if (!units.length) throw refuse(`no ${args.op} unit of cut ${args['cut-id']} in ${wf}`, 'cut-unknown');
-      const sample = units.map((u) => ({ ...u, payload: JSON.parse(u.payload_json) })).find((u) => u.payload.params?.canonFamilies);
-      if (!sample) throw refuse(`cut ${args['cut-id']} is no canon cut (no params.canonFamilies): its re-cut belongs to work.author - starci kernel redesign --op work.author`, 'scan-not-canon');
-      const place = ownedPathPlacements({ op: sample.op_id, payload: sample.payload, ownedPaths: sample.payload.owned_paths.slice(0, 1), repo })[0];
-      if (!place || place.unresolved || !place.role) throw refuse('the cut\'s repository does not resolve (project binding)', 'scan-root-unknown');
-      const root = place.base;
-      // Busy paths (running units of this workflow, other workflows' open units) stay out of the fresh cut.
-      const prefix = `${String(sample.payload.owned_paths[0]).split('/')[0]}/`;
-      const busy = [...new Set(db.prepare(`SELECT payload_json, workflow_id, status FROM jobs WHERE kind='op' AND status IN (${OPEN_JOB.filter((s) => s !== 'queued').map(() => '?').join(',')})`).all(...OPEN_JOB.filter((s) => s !== 'queued'))
-        .flatMap((r) => JSON.parse(r.payload_json).owned_paths ?? []).filter((p) => String(p).startsWith(prefix)).map((p) => String(p).slice(prefix.length)))];
-      const exclude = [...new Set([...csv(args.exclude), 'design-plans', ...busy])];
-      const dir = kernelScratchDirOf(repo, wf, 'scans');
-      fs.mkdirSync(dir, { recursive: true });
-      const file = path.join(dir, `${editId}.json`);
-      const log = fs.openSync(`${file}.log`, 'a');
-      const out = fs.openSync(file, 'w');
-      const child = spawnNode([path.join(skillRoot, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--families', String(sample.payload.params.canonFamilies || 'all'), '--exclude', exclude.join(','), '--json'],
-        { cwd: skillRoot, detached: true, stdio: ['ignore', out, log] });
-      child.unref();
-      rec.scan = { file, root, exclude: exclude.length, pid: child.pid, prefix };
-      human = `canon-scan started in the background (pid ${child.pid}) -> ${file}; next wake: starci kernel graph-edit --workflow ${wf} --edit recut --op ${args.op} --cut-id ${args['cut-id']} --from-scan ${file} --decision ${decision.id}`;
-    } else if (edit === 'recut') {
-      // H6: a re-cut goes through the canon planner (scripts/kernel/seam-policy.mjs canonCutPlanOf): each slice owns its paths
-      // PLUS the relocation destinations its findings need, contested moves go to one canon-wire leg per wave, and a slice
-      // whose moves another slice holds (no fix target) is refused here and cut again - never enqueued to block.
-      const file = String(args['from-scan'] ?? '');
-      if (!file || !fs.existsSync(file)) throw refuse('recut needs --from-scan <canon-scan json file> (start one with --edit scan)', 'edit-invalid');
-      let scan;
-      try { scan = readCanonScan(file); } catch (error) { throw refuse(`${error.message} (the scan may still run: check ${file}.log)`, error.code === 'canon-scan-invalid' ? 'scan-invalid' : 'scan-incomplete'); }
-      if (scan.status === 'unavailable') throw refuse(`the scan answered unavailable (${(scan.issues ?? []).map((i) => i.code).join(', ')}): fix the checker first (a kernel-proposal), never re-cut on a partial measurement`, 'scan-unavailable');
-      const cutId = String(args['cut-id'] ?? '');
-      const units = db.prepare(`SELECT job_id, op_id, status, payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND (json_extract(payload_json,'$.cut.id')=? OR json_extract(payload_json,'$.kernelEdit.recutOf')=?)`).all(wf, args.op, cutId, cutId)
-        .map((j) => ({ ...j, payload: JSON.parse(j.payload_json) }));
-      if (!units.length) throw refuse(`no ${args.op} unit of cut ${cutId}`, 'cut-unknown');
-      const prefix = args['path-prefix'] ?? `${String(units[0].payload.owned_paths?.[0] ?? '').split('/')[0]}/`;
-      const retire = units.filter((j) => j.status === 'queued' && !dispatchedEver(db, j.job_id));
-      const running = units.filter((j) => OPEN_JOB.includes(j.status) && j.status !== 'queued');
-      const busy = running.flatMap((j) => j.payload.owned_paths ?? []).map((p) => String(p).toLowerCase());
-      const n = 1 + db.prepare("SELECT COUNT(*) n FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.edit')='recut'").get(wf, GRAPH_EDIT_KIND).n;
-      const newCut = `${cutId}-r${n}`;
-      const plan = canonCutPlanOf(scan, { cutId: newCut, op: args.op });
-      const unfixable = unfixableSlicesOf(plan);
-      const noTarget = new Set(unfixable.map((u) => u.ordinal));
-      const prefixed = (list) => list.map((p) => `${prefix}${p}`);
-      const clear = plan.slices.filter((sl) => !noTarget.has(sl.ordinal)).map((sl) => ({ ...sl, owned: prefixed(sl.owned) }))
-        .filter((sl) => !sl.owned.some((p) => busy.some((bz) => p.toLowerCase().startsWith(bz) || bz.startsWith(p.toLowerCase()))))
-        .filter((sl) => !foreignOverlap(db, { repo, workflowId: wf, op: args.op, payload: units[0].payload, paths: sl.owned }).length);
-      if (!clear.length) throw refuse(`the fresh scan leaves no plannable slice outside running or foreign work${unfixable.length ? ` (${unfixable.length} slice(s) have no fix target: cut again)` : ''}`, 'recut-empty');
-      // The record the cut comes from is kept as a kernel artifact; the enqueue gate re-plans each slice from it.
-      const scanBlob = stageBlob(fs.readFileSync(file), { mediaType: 'application/json', repoRoots: [repo] });
-      const scanArt = ledger.transaction((tx) => putArtifact(tx, { workflowId: wf, attemptId: null, role: 'scan', kind: 'file', name: `scans/${newCut}.json`, blob: scanBlob, origin: 'kernel' }));
-      // The gate re-plans from a scan whose slices are exactly the kept ones, renumbered 1..total.
-      const kept = new Set(clear.map((sl) => sl.ordinal));
-      const cutScan = { ...scan, slices: scan.slices.filter((sl) => kept.has(Number(sl.ordinal))).map((sl, i) => ({ ...sl, ordinal: i + 1 })) };
-      const cutFile = path.join(kernelScratchDirOf(repo, wf, 'scans'), `${newCut}.plan.json`);
-      fs.mkdirSync(path.dirname(cutFile), { recursive: true });
-      fs.writeFileSync(cutFile, JSON.stringify(cutScan));
-      const cutPlan = canonCutPlanOf(cutScan, { cutId: newCut, op: args.op });
-      const total = cutPlan.slices.length;
-      const derivedFrom = units.map((j) => j.job_id);
-      const byWave = new Map();
-      const waves = [...new Set(cutPlan.slices.map((sl) => sl.wave))];
-      for (const sl of cutPlan.slices) {
-        const prior = sl.wave !== waves[0] ? byWave.get(waves[waves.indexOf(sl.wave) - 1]) ?? [] : [];
-        const id = enqueueUnit({ repo, wf, op: args.op, paths: prefixed(sl.owned), what: `recut ${sl.ordinal}/${total} ${sl.wave ?? ''}`.trim(), derivedFrom,
-          extra: [...(total >= 2 ? ['--cut-id', newCut, '--cut-ordinal', String(sl.ordinal), '--cut-total', String(total), '--canon-scan', cutFile] : []),
-            ...(prior.length ? ['--after', prior.join(',')] : [])] });
-        rec.created.push(id);
-        tag(id, { recutOf: cutId, scan: { artifactId: scanArt.artifactId, sha256: scanBlob.sha } });
-        if (!byWave.has(sl.wave)) byWave.set(sl.wave, []);
-        byWave.get(sl.wave).push(id);
-      }
-      for (const wire of cutPlan.wires) {
-        const id = enqueueUnit({ repo, wf, op: args.op, paths: prefixed(wire.paths), what: `canon wire ${wire.wave}`, derivedFrom,
-          extra: ['--params', JSON.stringify({ canonWire: true }), ...((byWave.get(wire.wave) ?? []).length ? ['--after', byWave.get(wire.wave).join(',')] : [])] });
-        rec.created.push(id);
-        tag(id, { recutOf: cutId, wire: true });
-      }
-      ledger.transaction(() => { for (const j of retire) { dropJob(ledger, jobRow(db, j.job_id), { reason: `re-cut into ${newCut} from a fresh canon-scan`, editId, now }); rec.dropped.push(j.job_id); } });
-      rec.recut = { from: cutId, to: newCut, scan: { artifactId: scanArt.artifactId, sha256: scanBlob.sha }, slices: scan.slices.length, kept: total, wires: cutPlan.wires.length,
-        noFixTarget: unfixable, skipped: plan.slices.length - total - unfixable.length, running: running.map((j) => j.job_id) };
-      human = `re-cut ${cutId}: ${retire.length} queued unit(s) retired, ${total} planned unit(s) in ${newCut} + ${cutPlan.wires.length} wire leg(s)${unfixable.length ? `, ${unfixable.length} slice(s) refused (no fix target: cut again)` : ''}`;
-    } else if (edit === 'undo') {
-      const id = String(args.undo ?? '');
-      const ev = db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? AND entity_id=?').get(wf, GRAPH_EDIT_KIND, id);
-      if (!ev) throw refuse(`edit ${id} is not in ${wf}`, 'edit-unknown');
-      if (db.prepare("SELECT 1 FROM events WHERE workflow_id=? AND kind='kernel-graph-edit-undone' AND entity_id=?").get(wf, id)) throw refuse(`edit ${id} is already undone`, 'edit-undone');
-      const e = JSON.parse(ev.payload_json);
-      const kept = [];
-      ledger.transaction(() => {
-        for (const jobId of e.created ?? []) {
-          const j = jobRow(db, jobId);
-          if (j?.status === 'queued' && !dispatchedEver(db, jobId)) { dropJob(ledger, j, { reason: `undo ${id}`, editId, now }); rec.dropped.push(jobId); }
-          else if (j) kept.push(`${jobId} (${j.status})`);
-        }
-        // A dropped unit comes back as a NEW try of its unit (resume_of the cancelled job): cancelled is terminal.
-        for (const jobId of e.dropped ?? []) { const restored = restoreJob(ledger, jobId, { editId: id, now }); if (restored) rec.created.push(restored); else kept.push(`${jobId} (not restorable)`); }
-        for (const c of e.changed ?? []) {
-          const j = jobRow(db, c.jobId);
-          if (j?.status === 'queued' && !dispatchedEver(db, c.jobId)) { setPayload(ledger, j, { ...j.payload, ...c.before }, now); rec.changed.push({ jobId: c.jobId, restored: Object.keys(c.before) }); }
-          else kept.push(`${c.jobId} (${j?.status ?? 'gone'})`);
-        }
-        ledger.appendEvent({ workflowId: wf, entityType: 'graph-edit', entityId: id, kind: 'kernel-graph-edit-undone', payload: { by: editId, kept } });
-      });
-      rec.undoOf = id;
-      human = `undid ${id}${kept.length ? `; already dispatched, left alone: ${kept.join(', ')}` : ''}`;
-    }
-
+    const decisionNote = decision ? ` for decision ${decision.id}` : '';
     recordKernel(ledger, { workflowId: wf, entityType: 'graph-edit', entityId: editId, kind: GRAPH_EDIT_KIND, repo, payload: rec,
-      msg: `graph-edit ${editId} ${edit}: ${human}`, markdown: `Graph edit **${editId}** (${edit})${decision ? ` for decision ${decision.id}` : ''}\n\n${human}\n\nCreated: ${rec.created.join(', ') || '-'}\nDropped: ${rec.dropped.join(', ') || '-'}\nChanged: ${rec.changed.map((c) => c.jobId).join(', ') || '-'}\n\nUndo: starci kernel graph-edit --workflow ${wf} --edit undo --undo ${editId}`,
+      msg: `graph-edit ${editId} ${edit}: ${human}`, markdown: `Graph edit **${editId}** (${edit})${decisionNote}\n\n${human}\n\nCreated: ${rec.created.join(', ') || '-'}\nDropped: ${rec.dropped.join(', ') || '-'}\nChanged: ${rec.changed.map((c) => c.jobId).join(', ') || '-'}\n\nUndo: starci kernel graph-edit --workflow ${wf} --edit undo --undo ${editId}`,
       refs: [...rec.created, ...rec.dropped].map((j) => `job:${j}`) });
     emit({ ok: true, workflowId: wf, editId, ...rec }, `${editId}: ${human}\n  undo: starci kernel graph-edit --workflow ${wf} --edit undo --undo ${editId}`, args.json);
   },

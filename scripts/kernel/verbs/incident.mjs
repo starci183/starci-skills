@@ -23,91 +23,21 @@ export default {
   run({ ledger, args, emit, internals }) {
     const db = ledger.db, workflowId = args.workflow, now = Date.now();
     if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-    if (args.resolve) {
-      const row = db.prepare('SELECT incident_id,status,last_progress FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.resolve, workflowId);
-      if (!row) throw Object.assign(new Error(`incident ${args.resolve} is not on ${workflowId}`), { code: 'incident-unknown' });
-      // Who resolves it, and the owner answer any owner claim rests on (scripts/machine/owner-claim.mjs):
-      // free text saying "Owner confirmed" is no owner answer (inc-2474f6593dfe, inc-f19d118298f1).
-      const by = typeof args.by === 'string' && args.by.trim() ? args.by.trim() : null;
-      if (by && !RESOLVERS.includes(by)) throw Object.assign(new Error(`--by ${by}: a resolution is by ${RESOLVERS.join(', ')}`), { code: 'resolver-invalid' });
-      const ownerCheck = resolutionOwnerCheck(db, { kind: incidentKindOf(row.last_progress), detail: args.detail ?? '', by, ownerAnswer: csvList(args['owner-answer']) });
-      const changed = row.status === 'open';
-      if (changed && ownerCheck.needs && !ownerCheck.proven) {
-        const tried = ownerCheck.tried.map((t) => t.reason).join('; ');
-        throw Object.assign(new Error(`incident ${row.incident_id} not resolved: ${ownerCheck.why}, but no verified owner answer backs it${tried ? ` (${tried})` : ''}. Name the ask the owner answered with --owner-answer <dispatchId> (its ask-answered event and receipt must both say answeredBy owner). No such answer: keep the incident open and raise or keep an owner ask (the owner answers it); resolved by the Kernel or the supervisor without the owner, say --by kernel|supervisor and state what landed, never that the owner decided`), { code: OWNER_CLAIM_UNPROVEN });
-      }
-      if (changed) {
-        ledger.transaction(() => {
-          resolveIncident(db, { incidentId: row.incident_id, reason: 'answered', at: now });
-          ledger.appendEvent({
-            workflowId, entityType: 'incident', entityId: row.incident_id,
-            kind: 'incident-resolved', payload: { detail: args.detail ?? null, by: ownerCheck.by,
-              ...(ownerCheck.proof ? { ownerAnswer: { dispatchId: ownerCheck.proof.dispatchId, workflowId: ownerCheck.proof.workflowId, receiptPath: ownerCheck.proof.receiptPath } } : {}) },
-          });
-        });
-      }
-      const out = { ok: true, incidentId: row.incident_id, workflowId, status: 'resolved', changed, ...(changed ? { by: ownerCheck.by, ...(ownerCheck.proof ? { ownerAnswer: ownerCheck.proof.dispatchId } : {}) } : {}) };
-      emit(out, `incident ${row.incident_id} ${changed ? 'resolved' : 'was already ' + row.status} on ${workflowId}`, args.json);
-      return;
-    }
+    if (args.resolve) { incidentResolveExisting(ledger, db, workflowId, args, now, emit); return; }
     // Typed release conditions (scripts/kernel/gate-conditions.mjs): stored on the incident and checked
     // by the runtime, which resolves it once every one holds. An incident raised without them is
     // resolved only by the Kernel. --attach types an incident that is already open.
     const until = parseConditions(db, args.until, { workflowId });
     const typedRepo = path.resolve(args.repo ?? process.cwd());
-    if (args.attach) {
-      const row = db.prepare('SELECT incident_id,status FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.attach, workflowId);
-      if (!row) throw Object.assign(new Error(`incident ${args.attach} is not on ${workflowId}`), { code: 'incident-unknown' });
-      if (row.status !== 'open') throw Object.assign(new Error(`incident ${args.attach} is ${row.status}; only an open incident takes release conditions`), { code: 'incident-not-open' });
-      if (!until.length) throw Object.assign(new Error('--attach needs at least one --until-<type> condition'), { code: 'until-missing' });
-      ledger.transaction(() => {
-        ledger.appendEvent({ workflowId, entityType: 'incident', entityId: row.incident_id, kind: CONDITIONS_ATTACHED_EVENT,
-          payload: { until, detail: args.detail ?? null } });
-        // A wait typed on a shared foundation makes its workflow a dependent, so the landing notifies it.
-        for (const cond of until.filter((item) => item.type === 'foundation')) {
-          const foundation = readFoundation(db, cond.name);
-          if (!foundation || (foundation.dependents ?? []).some((d) => d.workflowId === workflowId) || foundation.owner?.workflowId === workflowId) continue;
-          writeFoundation(db, declareDependent(foundation, { name: cond.name, workflowId, detail: args.detail ?? null, now }).record, now);
-          ledger.appendEvent({ workflowId, entityType: 'foundation', entityId: cond.name, kind: 'foundation-dependent-declared', payload: { name: cond.name, via: row.incident_id } });
-        }
-      });
-      const released = releaseTypedWaits(ledger, { repo: typedRepo, workflowId }).resolved.find((r) => r.incidentId === row.incident_id) ?? null;
-      const out = { ok: true, incidentId: row.incident_id, workflowId, status: released ? 'resolved' : 'open', until, ...(released ? { autoResolved: released } : {}) };
-      emit(out, `incident ${row.incident_id} on ${workflowId} now releases on ${until.map(conditionLabel).join(' AND ')}${released ? ` — already met, resolved: ${released.evidence.join('; ')}` : ''}`, args.json);
-      return;
-    }
+    if (args.attach) { incidentAttachConditions(ledger, db, workflowId, args, until, typedRepo, now, emit); return; }
     const holds = String(args.holds ?? '').split(',').map((item) => item.trim()).filter(Boolean);
     // A peer-wait names the peer workflow it waits on (openPeerWaits): only a running peer of this
     // workflow can land the thing and send the message that wakes it.
-    let peerWait = null, foundationWait = null;
     const foundationCond = until.find((cond) => cond.type === 'foundation') ?? null;
     const landedCond = until.find((cond) => cond.type === 'landed') ?? null;
+    let peerWait = null, foundationWait = null;
     if (args.kind === PEER_WAIT) {
-      let peer = typeof args.peer === 'string' ? args.peer.trim() : '';
-      // --until-landed <wf>@<repository>: the wait is on that workflow's product land (gate-conditions.mjs); it is the peer.
-      if (landedCond) {
-        if (peer && peer !== landedCond.workflowId) throw Object.assign(new Error(`--until-landed names ${landedCond.workflowId}, not --peer ${peer}`), { code: 'landed-peer-mismatch' });
-        peer = landedCond.workflowId;
-      }
-      // --until-foundation <name>: a typed wait released when that shared foundation lands (a
-      // gate-conditions.mjs condition; starci kernel foundation --land resolves it and wakes this Kernel). Its
-      // peer is the foundation's owner.
-      if (foundationCond) {
-        const name = foundationCond.name;
-        const foundation = readFoundation(db, name);
-        if (!foundation) throw Object.assign(new Error(`no shared foundation ${name} is registered; its owner claims it (starci kernel foundation --claim ${name}) or you declare the need (starci kernel foundation --declare-dependent ${name}) first`), { code: 'foundation-unknown' });
-        if (foundation.state === 'landed') throw Object.assign(new Error(`foundation ${name} already landed (${foundation.version ?? 'no version'}: ${foundation.landed?.proof ?? '-'}); there is nothing to wait for`), { code: 'foundation-landed' });
-        if (!foundation.owner) throw Object.assign(new Error(`foundation ${name} has no owner yet, so nothing would land it; agree its owner with your peers (starci kernel notify) and have it claimed first`), { code: 'foundation-unowned' });
-        if (peer && peer !== foundation.owner.workflowId) throw Object.assign(new Error(`foundation ${name} is owned by ${foundation.owner.workflowId}, not ${peer}`), { code: 'foundation-peer-mismatch' });
-        peer = foundation.owner.workflowId;
-        foundationWait = { name, foundation };
-      }
-      if (!peer) throw Object.assign(new Error('a peer-wait names the workflow it waits on: --peer <workflowId>'), { code: 'peer-wait-peer-missing' });
-      const refusal = peerRefusalOf(db, getWorkflow(db, workflowId), peer);
-      if (refusal) throw Object.assign(new Error(`peer-wait on ${peer} refused: ${refusal.detail}`), { code: refusal.code });
-      peerWait = { peer, untilMessage: args['until-message'] === true, refs: csvList(args.refs),
-        ...(foundationWait ? { untilFoundation: foundationWait.name } : {}),
-        ...(landedCond ? { untilLanded: `${landedCond.workflowId}@${landedCond.repository}` } : {}) };
+      ({ peerWait, foundationWait } = peerWaitSpecOf(db, workflowId, args, { foundationCond, landedCond }));
     } else if (args.peer || args['until-message'] || foundationCond) {
       // A peer's foundation is waited on as a peer-wait, never an owner-gate (driver-loop.yaml foundations.depend).
       throw Object.assign(new Error('--peer, a bare --until-message and --until-foundation go with --kind peer-wait (an open incident is typed with --attach)'), { code: 'peer-wait-kind-mismatch' });
@@ -134,8 +64,8 @@ export default {
     const released = until.length ? releaseTypedWaits(ledger, { repo: typedRepo, workflowId }).resolved.find((r) => r.incidentId === incidentId) ?? null : null;
     const sharedBlocker = args.kind === SHARED_BLOCKER ? routeSharedBlocker(ledger, { workflowId, incidentId, args, repo: typedRepo }) : null;
     const out = { ok: true, incidentId, workflowId, kind: args.kind, status: released ? 'resolved' : 'open', ...(holds.length ? { holds } : {}), ...(peerWait), ...(until.length ? { until } : {}), ...(released ? { autoResolved: released } : {}), ...(sharedBlocker ? { sharedBlocker } : {}) };
-    emit(out, `incident ${incidentId} open on ${workflowId} — ${args.kind}${peerWait ? ` on ${peerWait.peer}${peerWait.untilMessage ? ' (until its next message)' : ''}${peerWait.untilFoundation ? ` (until foundation ${peerWait.untilFoundation} lands)` : ''}` : ''}: ${args.detail}`, args.json);
-    if (until.length && !args.json) console.log(`  typed release: ${until.map(conditionLabel).join(' AND ')}${released ? ` — already met, resolved: ${released.evidence.join('; ')}` : ''}`);
+    emit(out, `incident ${incidentId} open on ${workflowId} — ${args.kind}${peerWaitNote(peerWait)}: ${args.detail}`, args.json);
+    if (until.length && !args.json) console.log(`  typed release: ${until.map(conditionLabel).join(' AND ')}${metNote(released)}`);
     if (sharedBlocker && !args.json) console.log(sharedBlocker.routed
       ? `  shared blocker routed to ${sharedBlocker.to} as follow-up ${sharedBlocker.key} (introduced by ${sharedBlocker.introducedBy ?? sharedBlocker.to}, via ${sharedBlocker.via})`
       : `  shared blocker NOT routed: ${sharedBlocker.why}`);
@@ -143,6 +73,94 @@ export default {
 };
 
 const SHARED_BLOCKER = 'shared-blocker';
+
+const metNote = (released) => released ? ` — already met, resolved: ${released.evidence.join('; ')}` : '';
+const peerWaitNote = (peerWait) => {
+  if (!peerWait) return '';
+  const messageNote = peerWait.untilMessage ? ' (until its next message)' : '';
+  const foundationNote = peerWait.untilFoundation ? ` (until foundation ${peerWait.untilFoundation} lands)` : '';
+  return ` on ${peerWait.peer}${messageNote}${foundationNote}`;
+};
+
+function incidentResolveExisting(ledger, db, workflowId, args, now, emit) {
+  const row = db.prepare('SELECT incident_id,status,last_progress FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.resolve, workflowId);
+  if (!row) throw Object.assign(new Error(`incident ${args.resolve} is not on ${workflowId}`), { code: 'incident-unknown' });
+  // Who resolves it, and the owner answer any owner claim rests on (scripts/machine/owner-claim.mjs):
+  // free text saying "Owner confirmed" is no owner answer (inc-2474f6593dfe, inc-f19d118298f1).
+  const by = typeof args.by === 'string' && args.by.trim() ? args.by.trim() : null;
+  if (by && !RESOLVERS.includes(by)) throw Object.assign(new Error(`--by ${by}: a resolution is by ${RESOLVERS.join(', ')}`), { code: 'resolver-invalid' });
+  const ownerCheck = resolutionOwnerCheck(db, { kind: incidentKindOf(row.last_progress), detail: args.detail ?? '', by, ownerAnswer: csvList(args['owner-answer']) });
+  const changed = row.status === 'open';
+  if (changed && ownerCheck.needs && !ownerCheck.proven) {
+    const tried = ownerCheck.tried.map((t) => t.reason).join('; ');
+    const triedNote = tried ? ` (${tried})` : '';
+    throw Object.assign(new Error(`incident ${row.incident_id} not resolved: ${ownerCheck.why}, but no verified owner answer backs it${triedNote}. Name the ask the owner answered with --owner-answer <dispatchId> (its ask-answered event and receipt must both say answeredBy owner). No such answer: keep the incident open and raise or keep an owner ask (the owner answers it); resolved by the Kernel or the supervisor without the owner, say --by kernel|supervisor and state what landed, never that the owner decided`), { code: OWNER_CLAIM_UNPROVEN });
+  }
+  if (changed) {
+    ledger.transaction(() => {
+      resolveIncident(db, { incidentId: row.incident_id, reason: 'answered', at: now });
+      ledger.appendEvent({
+        workflowId, entityType: 'incident', entityId: row.incident_id,
+        kind: 'incident-resolved', payload: { detail: args.detail ?? null, by: ownerCheck.by,
+          ...(ownerCheck.proof ? { ownerAnswer: { dispatchId: ownerCheck.proof.dispatchId, workflowId: ownerCheck.proof.workflowId, receiptPath: ownerCheck.proof.receiptPath } } : {}) },
+      });
+    });
+  }
+  const out = { ok: true, incidentId: row.incident_id, workflowId, status: 'resolved', changed, ...(changed ? { by: ownerCheck.by, ...(ownerCheck.proof ? { ownerAnswer: ownerCheck.proof.dispatchId } : {}) } : {}) };
+  emit(out, `incident ${row.incident_id} ${changed ? 'resolved' : 'was already ' + row.status} on ${workflowId}`, args.json);
+}
+
+function incidentAttachConditions(ledger, db, workflowId, args, until, typedRepo, now, emit) {
+  const row = db.prepare('SELECT incident_id,status FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.attach, workflowId);
+  if (!row) throw Object.assign(new Error(`incident ${args.attach} is not on ${workflowId}`), { code: 'incident-unknown' });
+  if (row.status !== 'open') throw Object.assign(new Error(`incident ${args.attach} is ${row.status}; only an open incident takes release conditions`), { code: 'incident-not-open' });
+  if (!until.length) throw Object.assign(new Error('--attach needs at least one --until-<type> condition'), { code: 'until-missing' });
+  ledger.transaction(() => {
+    ledger.appendEvent({ workflowId, entityType: 'incident', entityId: row.incident_id, kind: CONDITIONS_ATTACHED_EVENT,
+      payload: { until, detail: args.detail ?? null } });
+    // A wait typed on a shared foundation makes its workflow a dependent, so the landing notifies it.
+    for (const cond of until.filter((item) => item.type === 'foundation')) {
+      const foundation = readFoundation(db, cond.name);
+      if (!foundation || (foundation.dependents ?? []).some((d) => d.workflowId === workflowId) || foundation.owner?.workflowId === workflowId) continue;
+      writeFoundation(db, declareDependent(foundation, { name: cond.name, workflowId, detail: args.detail ?? null, now }).record, now);
+      ledger.appendEvent({ workflowId, entityType: 'foundation', entityId: cond.name, kind: 'foundation-dependent-declared', payload: { name: cond.name, via: row.incident_id } });
+    }
+  });
+  const released = releaseTypedWaits(ledger, { repo: typedRepo, workflowId }).resolved.find((r) => r.incidentId === row.incident_id) ?? null;
+  const out = { ok: true, incidentId: row.incident_id, workflowId, status: released ? 'resolved' : 'open', until, ...(released ? { autoResolved: released } : {}) };
+  emit(out, `incident ${row.incident_id} on ${workflowId} now releases on ${until.map(conditionLabel).join(' AND ')}${metNote(released)}`, args.json);
+}
+
+// The --peer spec of a peer-wait, resolved through --until-landed / --until-foundation; throws the refusal.
+function peerWaitSpecOf(db, workflowId, args, { foundationCond, landedCond }) {
+  let peer = typeof args.peer === 'string' ? args.peer.trim() : '';
+  // --until-landed <wf>@<repository>: the wait is on that workflow's product land (gate-conditions.mjs); it is the peer.
+  if (landedCond) {
+    if (peer && peer !== landedCond.workflowId) throw Object.assign(new Error(`--until-landed names ${landedCond.workflowId}, not --peer ${peer}`), { code: 'landed-peer-mismatch' });
+    peer = landedCond.workflowId;
+  }
+  // --until-foundation <name>: a typed wait released when that shared foundation lands (a
+  // gate-conditions.mjs condition; starci kernel foundation --land resolves it and wakes this Kernel). Its
+  // peer is the foundation's owner.
+  let foundationWait = null;
+  if (foundationCond) {
+    const name = foundationCond.name;
+    const foundation = readFoundation(db, name);
+    if (!foundation) throw Object.assign(new Error(`no shared foundation ${name} is registered; its owner claims it (starci kernel foundation --claim ${name}) or you declare the need (starci kernel foundation --declare-dependent ${name}) first`), { code: 'foundation-unknown' });
+    if (foundation.state === 'landed') throw Object.assign(new Error(`foundation ${name} already landed (${foundation.version ?? 'no version'}: ${foundation.landed?.proof ?? '-'}); there is nothing to wait for`), { code: 'foundation-landed' });
+    if (!foundation.owner) throw Object.assign(new Error(`foundation ${name} has no owner yet, so nothing would land it; agree its owner with your peers (starci kernel notify) and have it claimed first`), { code: 'foundation-unowned' });
+    if (peer && peer !== foundation.owner.workflowId) throw Object.assign(new Error(`foundation ${name} is owned by ${foundation.owner.workflowId}, not ${peer}`), { code: 'foundation-peer-mismatch' });
+    peer = foundation.owner.workflowId;
+    foundationWait = { name, foundation };
+  }
+  if (!peer) throw Object.assign(new Error('a peer-wait names the workflow it waits on: --peer <workflowId>'), { code: 'peer-wait-peer-missing' });
+  const refusal = peerRefusalOf(db, getWorkflow(db, workflowId), peer);
+  if (refusal) throw Object.assign(new Error(`peer-wait on ${peer} refused: ${refusal.detail}`), { code: refusal.code });
+  return { foundationWait, peerWait: { peer, untilMessage: args['until-message'] === true, refs: csvList(args.refs),
+    ...(foundationWait ? { untilFoundation: foundationWait.name } : {}),
+    ...(landedCond ? { untilLanded: `${landedCond.workflowId}@${landedCond.repository}` } : {}) } };
+}
+
 function routeSharedBlocker(ledger, { workflowId, incidentId, args, repo }) {
   const db = ledger.db;
   const self = getWorkflow(db, workflowId);

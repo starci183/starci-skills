@@ -34,6 +34,65 @@ function ensureAskConnectors() {
   };
 }
 
+function answerWithAutopilot({ ledger, repo, workflowId, report, emit, args }) {
+  const pilot = autopilotAnswerAsk({ ledger, repo, workflowId, report,
+    wake: (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
+      `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'Re-read starci kernel status and run nextActions.'] }) });
+  if (!pilot.handled) return false;
+  const out = { ok: true, workflowId, dispatchId: report.dispatch_id, autopilot: true, action: pilot.action, class: pilot.class, ...(pilot.receiptPath ? { receiptPath: pilot.receiptPath } : {}),
+    ...(pilot.stubPath ? { stubPath: pilot.stubPath, owed: pilot.owed } : {}), ...(pilot.findings ? { findings: pilot.findings.slice(0, 20) } : {}) };
+  let message;
+  if (pilot.action === 'deferred-to-handover') {
+    const stubPath = pilot.stubPath ?? 'the stub path';
+    message = `ask ${report.dispatch_id} deferred to handover by autopilot (${pilot.class}): nothing is sent to the owner; proceed on ${stubPath}; owed at handover: ${pilot.owed ?? '-'}`;
+  } else {
+    const provisional = pilot.action === 'provisional' ? `, ${PROVISIONAL_LABEL}` : '';
+    message = `ask ${report.dispatch_id} answered by autopilot (${pilot.action}, answeredBy ${AUTOPILOT_BY}${provisional}): re-enqueue ${report.op_id} --retry-of its job so it applies receipt ${pilot.receiptPath}`;
+  }
+  emit(out, message, args.json);
+  return true;
+}
+
+async function answerWithConfig({ ledger, repo, workflowId, report, emit, args }) {
+  const auto = await autoAcceptAsk({ ledger, ledgerFile: ledgerFileFor(repo), repo, workflowId, report });
+  if (!auto.accepted) return false;
+  const superseded = supersedeEarlierAsks(ledger, workflowId, report);
+  await closeAskMessages(ledger, { ledgerFile: ledgerFileFor(repo), workflowId, dispatchIds: superseded, reason: 'retired' });
+  const telegram = auto.telegram?.sent ? 'sent' : (auto.telegram?.skipped ?? auto.telegram?.error ?? null);
+  const out = { ok: true, workflowId, dispatchId: report.dispatch_id, autoAccepted: true, optionIndex: auto.optionIndex, option: auto.option, answeredBy: auto.answeredBy, receiptPath: auto.receiptPath, wake: auto.wake?.action ?? null, telegram };
+  emit(out, `ask ${report.dispatch_id} auto-accepted by config.yaml asks.autoAcceptRecommended: option ${auto.optionIndex + 1} (${auto.option}), answeredBy ${auto.answeredBy}; no form served. It binds like an owner answer for this business choice: re-enqueue the op with the answer bound (receipt ${auto.receiptPath}); a later owner answer supersedes it`, args.json);
+  return true;
+}
+
+async function serveOwnerAsk({ ledger, args, repo, emit, workflowId, dispatchId, report }) {
+  const parked = report ? await parkAsk({ ledger, ledgerFile: ledgerFileFor(repo), repo, workflowId, report }) : null;
+  const notice = parked?.notified ? { notified: true, messageId: parked.telegram?.messageId ?? null, fresh: Boolean(parked.telegram?.sent) } : null;
+  if (parked?.notified && args.now !== true) {
+    const out = { ok: true, workflowId, dispatchId: report.dispatch_id, onDemand: true, askClass: parked.askClass, telegram: notice, superseded: parked.superseded, pid: null, servedBy: null };
+    let where;
+    if (parked.askClass === 'credential') {
+      where = 'a credential ask: listed in the owner\'s Telegram /creds, never pushed; it holds only the live-proof legs, so keep driving every other approved leg';
+    } else {
+      const delivery = notice.fresh ? 'sent now' : 'already in the chat';
+      where = `the owner has it on Telegram with a Generate URL button (${delivery})`;
+    }
+    emit(out, `ask ${report.dispatch_id} parked: ${where}; no form is served until the owner asks for one. The answer's ask-answered wakes you`, args.json);
+    return;
+  }
+  // Served now: --now (local use), or Telegram is off / unreachable so nothing else could serve it.
+  const connectors = parked?.notified ? null : ensureAskConnectors();
+  const script = path.join(skillRoot, 'scripts', 'kernel', 'ask-server.mjs');
+  const argv = [script, '--repo', repo, '--workflow', workflowId, ...(dispatchId ? ['--dispatch', dispatchId] : []), ...(args.ttl ? ['--ttl', String(args.ttl)] : [])];
+  const child = spawnNode(argv, { detached: true, stdio: 'ignore', cwd: skillRoot });
+  child.unref();
+  let why = null;
+  if (parked) why = parked.notified ? 'now' : `telegram: ${parked.telegram?.skipped ?? parked.telegram?.error ?? 'not sent'}`;
+  const out = { ok: true, workflowId, dispatchId, pid: child.pid ?? null, servedBy: 'scripts/kernel/ask-server.mjs', onDemand: false, ...(notice ? { telegram: notice } : {}), ...(why ? { servedBecause: why } : {}), ...(connectors ? { connectors } : {}) };
+  const dispatchNote = dispatchId ? ` dispatch ${dispatchId}` : '';
+  const whyNote = why ? `, ${why}` : '';
+  emit(out, `serve-ask launched for ${workflowId}${dispatchNote} (pid ${out.pid}${whyNote}); status shows ask-serving once the form binds`, args.json);
+}
+
 export default {
   verb: 'serve-ask',
   required: ['workflow'],
@@ -53,50 +112,13 @@ export default {
     // Autopilot (owner ruling 2026-09-28): the ask is answered provisionally or deferred to handover - never sent to the
     // owner - unless it is the owner's own end-of-flow step (the handover, its credential checklist).
     if (report && !answered) {
-      const pilot = autopilotAnswerAsk({ ledger, repo, workflowId, report,
-        wake: (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
-          `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'Re-read starci kernel status and run nextActions.'] }) });
-      if (pilot.handled) {
-        const out = { ok: true, workflowId, dispatchId: report.dispatch_id, autopilot: true, action: pilot.action, class: pilot.class, ...(pilot.receiptPath ? { receiptPath: pilot.receiptPath } : {}),
-          ...(pilot.stubPath ? { stubPath: pilot.stubPath, owed: pilot.owed } : {}), ...(pilot.findings ? { findings: pilot.findings.slice(0, 20) } : {}) };
-        emit(out, pilot.action === 'deferred-to-handover'
-          ? `ask ${report.dispatch_id} deferred to handover by autopilot (${pilot.class}): nothing is sent to the owner; proceed on ${pilot.stubPath ?? 'the stub path'}; owed at handover: ${pilot.owed ?? '-'}`
-          : `ask ${report.dispatch_id} answered by autopilot (${pilot.action}, answeredBy ${AUTOPILOT_BY}${pilot.action === 'provisional' ? `, ${PROVISIONAL_LABEL}` : ''}): re-enqueue ${report.op_id} --retry-of its job so it applies receipt ${pilot.receiptPath}`, args.json);
-        return;
-      }
+      if (answerWithAutopilot({ ledger, repo, workflowId, report, emit, args })) return;
     }
     if (report && !answered) {
-      const auto = await autoAcceptAsk({ ledger, ledgerFile: ledgerFileFor(repo), repo, workflowId, report });
-      if (auto.accepted) {
-        const superseded = supersedeEarlierAsks(ledger, workflowId, report);
-        await closeAskMessages(ledger, { ledgerFile: ledgerFileFor(repo), workflowId, dispatchIds: superseded, reason: 'retired' });
-        const out = { ok: true, workflowId, dispatchId: report.dispatch_id, autoAccepted: true, optionIndex: auto.optionIndex, option: auto.option, answeredBy: auto.answeredBy, receiptPath: auto.receiptPath, wake: auto.wake?.action ?? null, telegram: auto.telegram?.sent ? 'sent' : (auto.telegram?.skipped ?? auto.telegram?.error ?? null) };
-        emit(out, `ask ${report.dispatch_id} auto-accepted by config.yaml asks.autoAcceptRecommended: option ${auto.optionIndex + 1} (${auto.option}), answeredBy ${auto.answeredBy}; no form served. It binds like an owner answer for this business choice: re-enqueue the op with the answer bound (receipt ${auto.receiptPath}); a later owner answer supersedes it`, args.json);
-        return;
-      }
+      if (await answerWithConfig({ ledger, repo, workflowId, report, emit, args })) return;
     }
     // Tell the owner, serve on demand (parkAsk). An answered ask (or none) goes
     // straight to serve-ask.mjs, which refuses it with its own error.
-    const parked = report && !answered ? await parkAsk({ ledger, ledgerFile: ledgerFileFor(repo), repo, workflowId, report }) : null;
-    const notice = parked?.notified ? { notified: true, messageId: parked.telegram?.messageId ?? null, fresh: Boolean(parked.telegram?.sent) } : null;
-    if (parked?.notified && args.now !== true) {
-      const out = { ok: true, workflowId, dispatchId: report.dispatch_id, onDemand: true, askClass: parked.askClass, telegram: notice, superseded: parked.superseded, pid: null, servedBy: null };
-      const where = parked.askClass === 'credential'
-        ? 'a credential ask: listed in the owner\'s Telegram /creds, never pushed; it holds only the live-proof legs, so keep driving every other approved leg'
-        : `the owner has it on Telegram with a Generate URL button (${notice.fresh ? 'sent now' : 'already in the chat'})`;
-      emit(out, `ask ${report.dispatch_id} parked: ${where}; no form is served until the owner asks for one. The answer's ask-answered wakes you`, args.json);
-      return;
-    }
-    // Served now: --now (local use), or Telegram is off / unreachable so nothing
-    // else could serve it. Without a Telegram notice the gateway and tunnel are
-    // kept up here (both starts are idempotent) so a public link exists.
-    const connectors = parked?.notified ? null : ensureAskConnectors();
-    const script = path.join(skillRoot, 'scripts', 'kernel', 'ask-server.mjs');
-    const argv = [script, '--repo', repo, '--workflow', workflowId, ...(dispatchId ? ['--dispatch', dispatchId] : []), ...(args.ttl ? ['--ttl', String(args.ttl)] : [])];
-    const child = spawnNode(argv, { detached: true, stdio: 'ignore', cwd: skillRoot });
-    child.unref();
-    const why = parked ? (parked.notified ? 'now' : `telegram: ${parked.telegram?.skipped ?? parked.telegram?.error ?? 'not sent'}`) : null;
-    const out = { ok: true, workflowId, dispatchId, pid: child.pid ?? null, servedBy: 'scripts/kernel/ask-server.mjs', onDemand: false, ...(notice ? { telegram: notice } : {}), ...(why ? { servedBecause: why } : {}), ...(connectors ? { connectors } : {}) };
-    emit(out, `serve-ask launched for ${workflowId}${dispatchId ? ` dispatch ${dispatchId}` : ''} (pid ${out.pid}${why ? `, ${why}` : ''}); status shows ask-serving once the form binds`, args.json);
+    await serveOwnerAsk({ ledger, args, repo, emit, workflowId, dispatchId, report: report && !answered ? report : null });
   },
 };

@@ -13,6 +13,27 @@ import { kernelCustodyOf } from './shared/kernel-seat.mjs';
 import { jobDisplayNameOf, normalizeDisplayName } from '../../lib/display-names.mjs';
 import { terminalRename } from '../../api/orca/terminal-rename.mjs';
 
+// Every live tab that shows the name is renamed through the host's terminal-rename call, best effort.
+const renameLiveTabs = (db, { workflowId, name, repo }) => {
+  const terminals = [];
+  const apply = (terminal, title, extra) => {
+    let r;
+    try { r = terminalRename({ terminal, title }); } catch (e) { r = { ok: false, error: String(e?.message ?? e) }; }
+    terminals.push({ terminal, title, ok: r?.ok === true, ...extra, ...(r?.ok ? {} : { error: String(r?.error?.message ?? r?.error ?? 'terminal-rename failed').slice(0, 200) }) });
+  };
+  const kernelTerminal = kernelCustodyOf(db, workflowId).terminal;
+  if (kernelTerminal) apply(kernelTerminal, `[Kernel] ${name}`, { role: 'kernel' });
+  const cache = new Map();
+  const open = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('running','answering') ORDER BY created_at,job_id").all(workflowId);
+  for (const job of open) {
+    const payload = jobPayloadOf(job);
+    const handle = payload.managed?.assignee ?? payload.orca?.agentTerminalHandle ?? payload.managed?.agentTerminalHandle ?? job.worker_id ?? payload.hierarchy?.runtime?.terminalHandle ?? null;
+    if (!handle || handle === kernelTerminal) continue;
+    apply(handle, `[Op] ${jobDisplayNameOf(db, job, { repo, workflowName: name, cache })}`, { role: 'op', jobId: job.job_id });
+  }
+  return terminals;
+};
+
 export default {
   verb: 'rename',
   required: ['workflow', 'title'],
@@ -32,7 +53,8 @@ export default {
     if (args['dry-run']) {
       const kernelTerminal = kernelCustodyOf(db, workflowId).terminal;
       const out = { ok: true, dryRun: true, workflowId, title: name, from, slug: wf.title ?? null, by, changed, kernelTerminal };
-      return emit(out, `dry run: workflow ${workflowId} ${changed ? `would be renamed "${from ?? wf.title ?? workflowId}" -> "${name}"` : `is already named "${name}"`} (by ${by}); kernel tab ${kernelTerminal ?? '-'}; nothing written`, args.json);
+      const what = changed ? `would be renamed "${from ?? wf.title ?? workflowId}" -> "${name}"` : `is already named "${name}"`;
+      return emit(out, `dry run: workflow ${workflowId} ${what} (by ${by}); kernel tab ${kernelTerminal ?? '-'}; nothing written`, args.json);
     }
     if (changed) {
       ledger.transaction(() => {
@@ -41,25 +63,11 @@ export default {
           payload: { from, to: name, slug: wf.title ?? null, by, at: now } });
       });
     }
-    const terminals = [];
-    if (!args['no-terminals'] && wf.phase !== 'finished' && wf.archived_at == null) {
-      const apply = (terminal, title, extra) => {
-        let r;
-        try { r = terminalRename({ terminal, title }); } catch (e) { r = { ok: false, error: String(e?.message ?? e) }; }
-        terminals.push({ terminal, title, ok: r?.ok === true, ...extra, ...(r?.ok ? {} : { error: String(r?.error?.message ?? r?.error ?? 'terminal-rename failed').slice(0, 200) }) });
-      };
-      const kernelTerminal = kernelCustodyOf(db, workflowId).terminal;
-      if (kernelTerminal) apply(kernelTerminal, `[Kernel] ${name}`, { role: 'kernel' });
-      const cache = new Map();
-      const open = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('running','answering') ORDER BY created_at,job_id").all(workflowId);
-      for (const job of open) {
-        const payload = jobPayloadOf(job);
-        const handle = payload.managed?.assignee ?? payload.orca?.agentTerminalHandle ?? payload.managed?.agentTerminalHandle ?? job.worker_id ?? payload.hierarchy?.runtime?.terminalHandle ?? null;
-        if (!handle || handle === kernelTerminal) continue;
-        apply(handle, `[Op] ${jobDisplayNameOf(db, job, { repo, workflowName: name, cache })}`, { role: 'op', jobId: job.job_id });
-      }
-    }
+    const terminals = !args['no-terminals'] && wf.phase !== 'finished' && wf.archived_at == null ? renameLiveTabs(db, { workflowId, name, repo }) : [];
     const out = { ok: true, workflowId, title: name, from, slug: wf.title ?? null, by, changed, terminals };
-    emit(out, `workflow ${workflowId} ${changed ? `renamed "${from ?? wf.title ?? workflowId}" -> "${name}"` : `already named "${name}"`} (by ${by}); tabs renamed ${terminals.filter((t) => t.ok).length}/${terminals.length}${terminals.some((t) => !t.ok) ? ` — failed: ${terminals.filter((t) => !t.ok).map((t) => `${t.terminal} (${t.error})`).join('; ')}` : ''}`, args.json);
+    const what = changed ? `renamed "${from ?? wf.title ?? workflowId}" -> "${name}"` : `already named "${name}"`;
+    const failed = terminals.filter((t) => !t.ok).map((t) => `${t.terminal} (${t.error})`).join('; ');
+    const failedNote = failed ? ` — failed: ${failed}` : '';
+    emit(out, `workflow ${workflowId} ${what} (by ${by}); tabs renamed ${terminals.filter((t) => t.ok).length}/${terminals.length}${failedNote}`, args.json);
   },
 };

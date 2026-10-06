@@ -6,6 +6,144 @@ import { biasForRole } from '../../lib/owner-routing-bias.mjs';
 import { ownerReserveGrant, quotaForAdmission } from '../../agent/admission.mjs';
 import { prepareProviderBudget, providerBudgetUsage } from '../../agent/provider-budget.mjs';
 import { VerbExit } from './shared/verb-exit.mjs';
+
+function routeHumanOf({ jobId, kind, difficulty, decided, lineageAdjust, blockingView }) {
+  const lines = [
+    `route ${jobId} (${kind}, ${difficulty}) → ${decided.model} model=${decided.modelId ?? '-'} effort=${decided.effort ?? '-'}`,
+    `  chain: ${decided.routeChain.join(' → ') || '(none)'}`,
+  ];
+  if (lineageAdjust && (lineageAdjust.demoted.length || lineageAdjust.excluded.length)) {
+    const changedPools = [...lineageAdjust.demoted.map((pool) => `${pool} demoted`), ...lineageAdjust.excluded.map((pool) => `${pool} excluded`)].join(', ');
+    const causes = Object.entries(lineageAdjust.pools).map(([pool, item]) => `${pool}: ${item.causes.join(', ')}`).join('; ');
+    const takenNote = lineageAdjust.demotedTaken ? '; no other pool was eligible' : '';
+    lines.push(`  retry lineage: ${changedPools} (${causes})${takenNote}`);
+  }
+  if (decided.routeBalance) {
+    const deficits = Object.entries(decided.routeBalance.deficits)
+      .map(([pool, item]) => `${pool} ${Math.round(item.actual * 100)}%/${Math.round(item.target * 100)}%`).join(', ');
+    lines.push(`  balanced (last ${decided.routeBalance.windowHours}h, ${decided.routeBalance.recentTotal} jobs): ${deficits}`);
+  }
+  if (decided.routeCrossFamily?.applied) {
+    lines.push(`  cross-family audit: ${decided.routeCrossFamily.authorOp ?? 'author op'} ran on ${decided.routeCrossFamily.author}; the auditor takes the other family`);
+  }
+  if (decided.routeRejected.length) lines.push('  rejected:', ...decided.routeRejected.map((item) => `    ${item.target}: ${item.reason}`));
+  if (blockingView?.waiters) {
+    lines.push(`  blocking: ${blockingView.waiters} waiter(s) (${blockingView.workflows.length} other workflow(s)) wait on ${jobId}, weight ${blockingView.weight}: dispatch it first`);
+  }
+  if (blockingView?.outrankedBy.length) {
+    const preferred = blockingView.outrankedBy.length === 1 ? 'it' : 'them';
+    const jobs = blockingView.outrankedBy.map((item) => `${item.jobId} (${item.opId ?? '-'}, weight ${item.weight}, ${item.workflows.length} workflow(s) wait)`).join(', ');
+    lines.push(`  outranked: ${jobs}; prefer dispatching ${preferred} before ${jobId}`);
+  }
+  return lines.join('\n');
+}
+
+async function capacityForPools({ db, jobId, ledger, pools, rtDoc, rtMerged, regDoc, kind, difficulty, scopeId,
+  poolLoadOf, accountList, normalizeProvider, probeQuotaSafe, providerHealthOf, circuitClearHint }) {
+  const poolLoad = poolLoadOf(db, { excludeJobId: jobId });
+  const runningByModel = poolLoad.byModel;
+  let accounts = null;
+  try { accounts = await accountList() ?? null; } catch { accounts = null; }
+  const quotaByProvider = new Map();
+  const budgetByProvider = new Map();
+  const capacity = {};
+  for (const [poolId, rt] of Object.entries(pools)) {
+    const target = rt?.target ?? poolId;
+    const provider = rt?.provider ?? null;
+    const providerKey = normalizeProvider(provider);
+    if (provider && !quotaByProvider.has(providerKey)) quotaByProvider.set(providerKey, await probeQuotaSafe(provider));
+    const measuredQuota = provider ? quotaByProvider.get(providerKey)
+      : { state: 'unknown', usedPercent: null, detail: 'pool declares no provider' };
+    const quota = quotaForAdmission({ quota: measuredQuota, provider: providerKey, pool: poolId, role: 'op', kind, difficulty,
+      scopeId, registry: regDoc, runtimes: rtMerged, policy: rtDoc?.allocation?.admission });
+    if (provider && !budgetByProvider.has(providerKey)) budgetByProvider.set(providerKey, providerBudgetUsage(providerKey, quota.account));
+    const budget = budgetByProvider.get(providerKey);
+    const reservedJobs = new Set((budget?.reservations ?? []).filter((receipt) => receipt.scope?.scopeId?.startsWith(`${ledger.ledgerId ?? ledger.path}:`))
+      .map((receipt) => receipt.scope?.jobId).filter(Boolean));
+    const unreservedLocal = [...poolLoad.holders].filter((holder) => {
+      if (reservedJobs.has(holder)) return false;
+      const row = db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(holder);
+      let payload;
+      try { payload = JSON.parse(row?.payload_json ?? '{}'); } catch (error) { throw new Error(`routing capacity is unreadable for ${holder}: ${error.message}`); }
+      const ownerPool = pools[payload.model] ?? Object.values(pools).find((pool) => pool.target === payload.model);
+      return ownerPool?.provider === provider;
+    }).length;
+    const providerHealth = provider ? providerHealthOf(db, provider) : null;
+    let authDetail = quota?.detail ?? null;
+    if (providerHealth) {
+      const failure = providerHealth.detail ?? providerHealth.signal ?? providerHealth.failureKind ?? 'circuit open';
+      const expires = providerHealth.expiresAt ? new Date(providerHealth.expiresAt).toISOString() : 'explicit recovery';
+      authDetail = `${failure} (circuit open until ${expires}${circuitClearHint(providerHealth)})`;
+    }
+    capacity[target] = {
+      running: Number.isInteger(budget?.running) ? budget.running + unreservedLocal : null,
+      maxParallel: rt?.maxParallel ?? null,
+      quota,
+      auth: providerHealth || quota?.state === 'dead' ? 'dead' : 'ok',
+      authDetail,
+      providerHealth,
+      openIncident: false,
+    };
+  }
+  return { accounts, poolLoad, runningByModel, capacity };
+}
+
+function planRoute({ db, ledger, job, payload, kind, difficulty, rtDoc, rtMerged, regDoc, ownerRoot,
+  configuredAllocationPolicy, loadConfig, recentDispatchCounts, kindRouteOf, auditAuthorOf, isFanOutSlice, selectPool,
+  lineage, lineageError, scopeId, bias, capacity }) {
+  let allocation = null;
+  try { allocation = configuredAllocationPolicy(loadConfig(ownerRoot)); } catch { allocation = null; }
+  const balancedRoute = (allocation?.policy ?? rtDoc?.allocation?.policy) === 'balanced';
+  const recent = balancedRoute
+    ? recentDispatchCounts({ db, ledgerFile: ledger.path ?? null, windowHours: allocation?.windowHours })
+    : null;
+  const routeKind = kindRouteOf(kind, rtDoc);
+  const author = routeKind.role === 'verify'
+    ? (() => { try { return auditAuthorOf(db, job, { runtimes: rtMerged }); } catch { return null; } })()
+    : null;
+  const fanOut = isFanOutSlice(payload);
+  const redesignAs = typeof payload.redesign?.routeAs === 'string' ? payload.redesign.routeAs : null;
+  const decision = selectPool({ kind: redesignAs ?? kind, difficulty, bias, capacity, runtimes: rtMerged,
+    scopeId, attemptId: scopeId, now: Date.now(), modelRegistry: regDoc,
+    policy: allocation?.policy ?? undefined,
+    shares: allocation?.shares ?? undefined,
+    recent: recent?.counts,
+    grants: allocation?.grants ?? undefined,
+    auditOf: author?.pool ?? undefined,
+    fanOut,
+    lineage: lineage && (lineage.demote.length || lineage.exclude.length) ? lineage : null });
+  let lineageAdjust = null;
+  if (lineage) {
+    lineageAdjust = { demoted: lineage.demote, excluded: lineage.exclude, pools: lineage.pools,
+      attempts: lineage.attempts, demotedTaken: decision?.lineage?.demotedTaken ?? false };
+  } else if (lineageError) lineageAdjust = { demoted: [], excluded: [], error: lineageError };
+  return { recent, redesignAs, decision, lineageAdjust, author };
+}
+
+function refuseRouteDecision({ decision, bias, routeFacts, kind, jobId, difficulty, runningByModel, poolLoad, emit, args }) {
+  if (decision?.toolUnavailable) {
+    const { tools, holders } = decision.toolUnavailable;
+    const serving = holders.filter((h) => h.roles.includes(decision.role) || (decision.order && h.roles.includes(decision.order)));
+    const avoided = bias.avoid.filter((p) => serving.some((h) => h.target === p));
+    let exclusionNote;
+    if (avoided.length) exclusionNote = `; ${avoided.join(', ')} has it and is excluded by the goal's routing_bias avoid (the owner's). Only the owner changes that bias.`;
+    else {
+      const toolOwners = serving.length ? `the agents that have it (${serving.map((h) => h.target).join(', ')}) are outside that order` : 'no agent card lists it under capabilities.hostTools';
+      exclusionNote = `; ${toolOwners}. Raise starci kernel incident --kind tool-unavailable for the owner.`;
+    }
+    const detail = `${kind} needs host tool ${tools.join(', ')} (route.riskHints host-tool-required on modules/ops/ops/${kind}.yaml) and no agent in its ${decision.work ?? decision.role} order at ${decision.difficulty} [${decision.chain.join(', ')}] has it`
+      + exclusionNote + ' The job stays queued; never dispatch it on an agent without the tool.';
+    const out = { ok: false, jobId, kind, difficulty: decision.difficulty, bias, ...routeFacts, reason: 'tool-unavailable', tools, holders: serving, detail };
+    emit(out, `route REFUSED for ${jobId} (${kind}): tool-unavailable — ${detail}`, args.json);
+    throw new VerbExit(1);
+  }
+  if (!decision || decision.error) {
+    const out = { ok: false, jobId, kind, difficulty, bias, ...routeFacts, error: decision?.error ?? 'selectPool returned no decision', poolLoad: { running: runningByModel, routeHoldMs: poolLoad.routeHoldMs } };
+    emit(out, `route REFUSED for ${jobId} (${kind}, ${difficulty}): ${out.error}`, args.json);
+    throw new VerbExit(1);
+  }
+}
+
 export default {
   verb: 'route',
   required: ['job'],
@@ -66,13 +204,7 @@ export default {
   try { lineage = lineageRouteAdjust(db, job); } catch (e) { lineageError = String(e?.message ?? e); }
   const difficulty = args.difficulty ?? payload.difficulty ?? 'medium';
 
-  // Capacity per registry.yaml pool: live running count, declared maxParallel,
-  // the provider quota probe and the typed, expiring provider-health circuit.
-  // Generic workflow incidents are evidence for the Kernel, not provider
-  // health. Their free-form text can mention every fallback provider (for
-  // example while documenting a recovered dispatch failure), so substring
-  // matching them here would permanently poison every pool because incidents
-  // are intentionally append-only until workflow finish.
+  // Capacity per registry.yaml pool includes the live running count, quota and typed provider-health circuit.
   const rtFile = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
   const rtDoc = fs.existsSync(rtFile) ? parseYaml(fs.readFileSync(rtFile, 'utf8')) : null;
   const regFile = path.join(skillRoot, 'modules', 'models', 'registry.yaml');
@@ -80,105 +212,16 @@ export default {
   const pools = regDoc?.pools ?? {};
   // The one merged view selectPool's helpers expect: allocation policy + pools.
   const rtMerged = { ...(rtDoc), runtimes: pools };
-  // Pool load (poolLoadOf, shared with starci kernel status): running, leased and answering jobs hold their pool slot, and a
-  // routed-but-queued one while its route hold lasts, so sequential route calls in one fan-out see the workers filling
-  // instead of piling every slice onto the first preferred pool. The job being routed holds nothing yet.
-  const poolLoad = poolLoadOf(db, { excludeJobId: jobId });
-  const runningByModel = poolLoad.byModel;
-  let accounts = null;
-  try { accounts = await accountList() ?? null; } catch { accounts = null; }
-  const quotaByProvider = new Map();
-  const budgetByProvider = new Map();
-  const capacity = {};
-  for (const [poolId, rt] of Object.entries(pools)) {
-    const target = rt?.target ?? poolId;
-    const provider = rt?.provider ?? null;
-    const providerKey = normalizeProvider(provider);
-    if (provider && !quotaByProvider.has(providerKey)) quotaByProvider.set(providerKey, await probeQuotaSafe(provider));
-    const measuredQuota = provider ? quotaByProvider.get(providerKey)
-      : { state: 'unknown', usedPercent: null, detail: 'pool declares no provider' };
-    const quota = quotaForAdmission({ quota: measuredQuota, provider: providerKey, pool: poolId, role: 'op', kind, difficulty,
-      scopeId, registry: regDoc, runtimes: rtMerged, policy: rtDoc?.allocation?.admission });
-    if (provider && !budgetByProvider.has(providerKey)) budgetByProvider.set(providerKey, providerBudgetUsage(providerKey, quota.account));
-    const budget = budgetByProvider.get(providerKey);
-    const reservedJobs = new Set((budget?.reservations ?? []).filter((receipt) => receipt.scope?.scopeId?.startsWith(`${ledger.ledgerId ?? ledger.path}:`))
-      .map((receipt) => receipt.scope?.jobId).filter(Boolean));
-    const unreservedLocal = [...poolLoad.holders].filter((holder) => {
-      if (reservedJobs.has(holder)) return false;
-      const row = db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(holder);
-      let payload;
-      try { payload = JSON.parse(row?.payload_json ?? '{}'); } catch (error) { throw new Error(`routing capacity is unreadable for ${holder}: ${error.message}`); }
-      const ownerPool = pools[payload.model] ?? Object.values(pools).find((pool) => pool.target === payload.model);
-      return ownerPool?.provider === provider;
-    }).length;
-    const providerHealth = provider ? providerHealthOf(db, provider) : null;
-    capacity[target] = {
-      running: Number.isInteger(budget?.running) ? budget.running + unreservedLocal : null,
-      maxParallel: rt?.maxParallel ?? null,
-      quota,
-      auth: providerHealth || quota?.state === 'dead' ? 'dead' : 'ok',
-      authDetail: providerHealth
-        ? `${providerHealth.detail ?? providerHealth.signal ?? providerHealth.failureKind ?? 'circuit open'} (circuit open until ${providerHealth.expiresAt ? new Date(providerHealth.expiresAt).toISOString() : 'explicit recovery'}${circuitClearHint(providerHealth)})`
-        : quota?.detail ?? null,
-      providerHealth,
-      openIncident: false,
-    };
-  }
+  const capacityResult = await capacityForPools({ db, jobId, ledger, pools, rtDoc, rtMerged, regDoc, kind, difficulty, scopeId,
+    poolLoadOf, accountList, normalizeProvider, probeQuotaSafe, providerHealthOf, circuitClearHint });
+  const { accounts, poolLoad, runningByModel, capacity } = capacityResult;
 
-  // Owner allocation (config.yaml allocation, engine/config.mjs configuredAllocationPolicy): the policy,
-  // target shares and window of the balanced allocator, and the grants that open an
-  // explicit-workflow-quota pool (Devin). A declared grants list is the whole set of grants; with none
-  // declared, or no readable config, routing keeps the runtimes.yaml default policy and ungated pools.
-  let allocation = null;
-  try { allocation = configuredAllocationPolicy(loadConfig(ownerRoot)); } catch { allocation = null; }
-  const balancedRoute = (allocation?.policy ?? rtDoc?.allocation?.policy) === 'balanced';
-  const recent = balancedRoute
-    ? recentDispatchCounts({ db, ledgerFile: ledger.path ?? null, windowHours: allocation?.windowHours })
-    : null;
-  const routeKind = kindRouteOf(kind, rtDoc);
-  // Every verify kind looks up the op whose output it reviews - a think record or, since the owner decision
-  // of 2026-09-25 (review-hands), hands-on implementation - so the reviewer's family differs from the author's.
-  const author = routeKind.role === 'verify'
-    ? (() => { try { return auditAuthorOf(db, job, { runtimes: rtMerged }); } catch { return null; } })()
-    : null;
-  // A cut slice of a fan-out (payload.cut, ordinal of total >= 2) is small bounded work: hands-on slices walk
-  // the fan-out order (runtimes.yaml allocation.preference.scaffold, Devin first; owner decision 2026-09-25).
-  const fanOut = isFanOutSlice(payload);
-  // A redesign leg (starci kernel redesign; runtimes.yaml allocation.redesign) routes as its strong-reasoning alias, so the op
-  // that re-cuts, re-scopes or re-plans from an RCA reasons on the plan/think pools whatever its usual order.
-  const redesignAs = typeof payload.redesign?.routeAs === 'string' ? payload.redesign.routeAs : null;
-  const decision = selectPool({ kind: redesignAs ?? kind, difficulty, bias, capacity, runtimes: rtMerged,
-    scopeId, attemptId: scopeId, now: Date.now(), modelRegistry: regDoc,
-    policy: allocation?.policy ?? undefined,
-    shares: allocation?.shares ?? undefined,
-    recent: recent?.counts,
-    grants: allocation?.grants ?? undefined,
-    auditOf: author?.pool ?? undefined,
-    fanOut,
-    lineage: lineage && (lineage.demote.length || lineage.exclude.length) ? lineage : null });
-  const lineageAdjust = lineage ? {
-    demoted: lineage.demote, excluded: lineage.exclude, pools: lineage.pools,
-    attempts: lineage.attempts, demotedTaken: decision?.lineage?.demotedTaken ?? false,
-  } : lineageError ? { demoted: [], excluded: [], error: lineageError } : null;
+  const plan = planRoute({ db, ledger, job, payload, kind, difficulty, rtDoc, rtMerged, regDoc, ownerRoot,
+    configuredAllocationPolicy, loadConfig, recentDispatchCounts, kindRouteOf, auditAuthorOf, isFanOutSlice, selectPool,
+    lineage, lineageError, scopeId, bias, capacity });
+  const { recent, redesignAs, decision, lineageAdjust, author } = plan;
   const routeFacts = { ...(lineageAdjust ? { lineageAdjust } : {}) };
-  if (decision?.toolUnavailable) {
-    const { tools, holders } = decision.toolUnavailable;
-    const serving = holders.filter((h) => h.roles.includes(decision.role) || (decision.order && h.roles.includes(decision.order)));
-    const avoided = bias.avoid.filter((p) => serving.some((h) => h.target === p));
-    const detail = `${kind} needs host tool ${tools.join(', ')} (route.riskHints host-tool-required on modules/ops/ops/${kind}.yaml) and no agent in its ${decision.work ?? decision.role} order at ${decision.difficulty} [${decision.chain.join(', ')}] has it`
-      + (avoided.length
-        ? `; ${avoided.join(', ')} has it and is excluded by the goal's routing_bias avoid (the owner's). Only the owner changes that bias.`
-        : `; ${serving.length ? `the agents that have it (${serving.map((h) => h.target).join(', ')}) are outside that order` : 'no agent card lists it under capabilities.hostTools'}. Raise starci kernel incident --kind tool-unavailable for the owner.`)
-      + ' The job stays queued; never dispatch it on an agent without the tool.';
-    const out = { ok: false, jobId, kind, difficulty: decision.difficulty, bias, ...routeFacts, reason: 'tool-unavailable', tools, holders: serving, detail };
-    emit(out, `route REFUSED for ${jobId} (${kind}): tool-unavailable — ${detail}`, args.json);
-    throw new VerbExit(1);
-  }
-  if (!decision || decision.error) {
-    const out = { ok: false, jobId, kind, difficulty, bias, ...routeFacts, error: decision?.error ?? 'selectPool returned no decision', poolLoad: { running: runningByModel, routeHoldMs: poolLoad.routeHoldMs } };
-    emit(out, `route REFUSED for ${jobId} (${kind}, ${difficulty}): ${out.error}`, args.json);
-    throw new VerbExit(1);
-  }
+  refuseRouteDecision({ decision, bias, routeFacts, kind, jobId, difficulty, runningByModel, poolLoad, emit, args });
 
   const decided = {
     admission: decision.admission ?? null,
@@ -226,25 +269,7 @@ export default {
   // same workflow other workflows wait on and should be dispatched first.
   const blockingView = blockingViewOf(db, job);
   if (blockingView) out.blocking = blockingView;
-  emit(out, [
-    `route ${jobId} (${kind}, ${difficulty}) → ${decided.model} model=${decided.modelId ?? '-'} effort=${decided.effort ?? '-'}`,
-    `  chain: ${decided.routeChain.join(' → ') || '(none)'}`,
-    ...(lineageAdjust && (lineageAdjust.demoted.length || lineageAdjust.excluded.length)
-      ? [`  retry lineage: ${[...lineageAdjust.demoted.map((p) => `${p} demoted`), ...lineageAdjust.excluded.map((p) => `${p} excluded`)].join(', ')} (${Object.entries(lineageAdjust.pools).map(([p, v]) => `${p}: ${v.causes.join(', ')}`).join('; ')})${lineageAdjust.demotedTaken ? '; no other pool was eligible' : ''}`]
-      : []),
-    ...(decided.routeBalance
-      ? [`  balanced (last ${decided.routeBalance.windowHours}h, ${decided.routeBalance.recentTotal} jobs): ${Object.entries(decided.routeBalance.deficits)
-        .map(([pool, d]) => `${pool} ${Math.round(d.actual * 100)}%/${Math.round(d.target * 100)}%`).join(', ')}`]
-      : []),
-    ...(decided.routeCrossFamily?.applied
-      ? [`  cross-family audit: ${decided.routeCrossFamily.authorOp ?? 'author op'} ran on ${decided.routeCrossFamily.author}; the auditor takes the other family`]
-      : []),
-    ...(decided.routeRejected.length
-      ? ['  rejected:', ...decided.routeRejected.map((r) => `    ${r.target}: ${r.reason}`)]
-      : []),
-    ...(blockingView?.waiters ? [`  blocking: ${blockingView.waiters} waiter(s) (${blockingView.workflows.length} other workflow(s)) wait on ${jobId}, weight ${blockingView.weight}: dispatch it first`] : []),
-    ...(blockingView?.outrankedBy.length ? [`  outranked: ${blockingView.outrankedBy.map((b) => `${b.jobId} (${b.opId ?? '-'}, weight ${b.weight}, ${b.workflows.length} workflow(s) wait)`).join(', ')}; prefer dispatching ${blockingView.outrankedBy.length === 1 ? 'it' : 'them'} before ${jobId}`] : []),
-  ].join('\n'), args.json);
+  emit(out, routeHumanOf({ jobId, kind, difficulty, decided, lineageAdjust, blockingView }), args.json);
 
   },
 };

@@ -4,6 +4,27 @@ import { getWorkflow, csvList } from './shared/rows.mjs';
 import { PEER_MESSAGE, peerMessageOf, peerRefusalOf, peerWaitMessageArrived, peerWorkflowsOf, pendingPeerMessagesOf, releaseTypedWaits, writePeerMessage } from './shared/peer-waits.mjs';
 const PEER_MESSAGE_KINDS = ['request', 'heads-up', 'handoff', 'reply', 'follow-up'];
 
+const refusePeerTargets = (db, self, targets) => {
+  for (const to of new Set(targets)) {
+    const refusal = peerRefusalOf(db, self, to);
+    if (refusal) throw Object.assign(new Error(refusal.detail), { code: refusal.code });
+  }
+};
+
+// A target waiting on this workflow (peer-wait) is woken now, and its --until-message waits resolve. A typed
+// --until-message wait of a target (gate-conditions.mjs) may hold now; its release wakes the target unless the
+// peer-wait wake already did.
+const wakeNotifyTargets = (ledger, { repo, sender, kind, subject, sent }) => {
+  for (const message of sent.filter((m) => !m.deduped)) {
+    const arrived = peerWaitMessageArrived(ledger, { waiter: message.to, peer: sender, key: message.key, kind, subject });
+    if (arrived) message.peerWait = arrived;
+  }
+  for (const message of sent.filter((m) => !m.deduped)) {
+    const released = releaseTypedWaits(ledger, { repo, workflowId: message.to, wake: !message.peerWait, self: sender }).resolved;
+    if (released.length) message.autoResolved = released.map(({ incidentId, evidence, wake }) => ({ incidentId, evidence, ...(wake ? { wake } : {}) }));
+  }
+};
+
 export default {
   verb: 'notify',
   required: ['workflow', 'to', 'kind', 'subject', 'body'],
@@ -33,10 +54,7 @@ export default {
     }
     const wanted = String(args.to).trim();
     const targets = wanted === 'peers' ? peerWorkflowsOf(db, self).map((wf) => wf.workflow_id) : csvList(wanted);
-    for (const to of new Set(targets)) {
-      const refusal = peerRefusalOf(db, self, to);
-      if (refusal) throw Object.assign(new Error(refusal.detail), { code: refusal.code });
-    }
+    refusePeerTargets(db, self, targets);
     if (original && !targets.includes(original.from)) {
       throw Object.assign(new Error(`--reply-to ${replyTo} came from ${original.from}; a reply goes back to its sender`), { code: 'reply-to-mismatch' });
     }
@@ -52,18 +70,9 @@ export default {
         sent.push(writePeerMessage(ledger, { from: self, to, kind, subject, body, replyTo, refs, now }));
       }
     });
-    // A target waiting on this workflow (peer-wait) is woken now, and its --until-message waits resolve.
-    for (const message of sent.filter((m) => !m.deduped)) {
-      const arrived = peerWaitMessageArrived(ledger, { waiter: message.to, peer: workflowId, key: message.key, kind, subject });
-      if (arrived) message.peerWait = arrived;
-    }
-    // A typed --until-message wait of a target (gate-conditions.mjs) may hold now; its release wakes the
-    // target unless the peer-wait wake above already did.
-    for (const message of sent.filter((m) => !m.deduped)) {
-      const released = releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()), workflowId: message.to, wake: !message.peerWait, self: workflowId }).resolved;
-      if (released.length) message.autoResolved = released.map(({ incidentId, evidence, wake }) => ({ incidentId, evidence, ...(wake ? { wake } : {}) }));
-    }
+    wakeNotifyTargets(ledger, { repo: path.resolve(args.repo ?? process.cwd()), sender: workflowId, kind, subject, sent });
     const out = { ok: true, workflowId, kind, subject, replyTo, sent };
-    emit(out, `notify ${workflowId} [${kind}] ${subject} -> ${sent.map((m) => `${m.to} (${m.key}${m.deduped ? ', already pending' : ''})`).join(', ') || 'no running peer'}`, args.json);
+    const sentList = sent.map((m) => `${m.to} (${m.key}${m.deduped ? ', already pending' : ''})`).join(', ') || 'no running peer';
+    emit(out, `notify ${workflowId} [${kind}] ${subject} -> ${sentList}`, args.json);
   },
 };

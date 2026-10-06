@@ -45,14 +45,18 @@ export default {
     let tier = { tier: 'auto', reasons: [] };
     try { tier = (await import('../../machine/lessons.mjs')).tierOf(files.map((p) => ({ path: p, status: 'M' }))); } catch { /* the Supervisor decides */ }
     const payload = { id, title: String(args.title), evidence: String(args.evidence), files, patchFile, tier: tier.tier, tierReasons: tier.reasons, decision: args.decision ?? null, status: 'open' };
+    const patchBlock = patchFile ? `\n\nPatch: ${patchFile}` : '';
+    const patchLine = patchFile ? `\nPatch: ${patchFile}` : '';
+    const filesLine = files.length ? `\nFiles: ${files.join(', ')}` : '';
     recordKernel(ledger, { workflowId: wf, entityType: 'kernel-proposal', entityId: id, kind: PROPOSAL_KIND, repo, payload,
       msg: `kernel-proposal ${id} (${tier.tier}): ${args.title}`,
-      markdown: `Kernel proposal **${id}** (${tier.tier})\n\n${args.title}\n\nEvidence: ${args.evidence}\n\nFiles: ${files.join(', ') || '-'}${patchFile ? `\n\nPatch: ${patchFile}` : ''}` });
+      markdown: `Kernel proposal **${id}** (${tier.tier})\n\n${args.title}\n\nEvidence: ${args.evidence}\n\nFiles: ${files.join(', ') || '-'}${patchBlock}` });
     let inbox = null;
     try {
       inbox = appendInbox('main', { chatId: null, messageId: null, from: `kernel:${wf}`,
-        text: `KERNEL-PROPOSAL ${id} (${tier.tier}) from ${wf}: ${args.title}\nEvidence: ${String(args.evidence).slice(0, 800)}${patchFile ? `\nPatch: ${patchFile}` : ''}${files.length ? `\nFiles: ${files.join(', ')}` : ''}\n(supervise.yaml kernelProposals: land AUTO through a lane, forward IMPORTANT to the owner)` })?.id ?? null;
+        text: `KERNEL-PROPOSAL ${id} (${tier.tier}) from ${wf}: ${args.title}\nEvidence: ${String(args.evidence).slice(0, 800)}${patchLine}${filesLine}\n(supervise.yaml kernelProposals: land AUTO through a lane, forward IMPORTANT to the owner)` })?.id ?? null;
     } catch { inbox = null; }
-    emit({ ok: true, workflowId: wf, ...payload, inbox }, `kernel-proposal ${id} filed (${tier.tier}${tier.reasons.length ? `: ${tier.reasons.join('; ')}` : ''}); the Supervisor owns it now - keep the workflow moving with a local override meanwhile`, args.json);
+    const tierReasons = tier.reasons.length ? `: ${tier.reasons.join('; ')}` : '';
+    emit({ ok: true, workflowId: wf, ...payload, inbox }, `kernel-proposal ${id} filed (${tier.tier}${tierReasons}); the Supervisor owns it now - keep the workflow moving with a local override meanwhile`, args.json);
   },
 };

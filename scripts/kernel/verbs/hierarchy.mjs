@@ -9,7 +9,11 @@ export default {
     const out = { ok: true, ...internals.agentHierarchyOf(ledger.db, args.workflow) };
     emit(out, [
       `${out.workflow.nodeId} (${out.workflow.status ?? '-'})`,
-      ...out.nodes.map((node) => `  ${node.parentNodeId} -> ${node.nodeId} [${node.status}${node.verdict === AWAITING_OWNER ? ` ${AWAITING_OWNER}` : ''}]${node.runtime.model ? ` ${node.runtime.agent ?? '-'} / ${node.runtime.model}` : ''}`),
+      ...out.nodes.map((node) => {
+        const verdict = node.verdict === AWAITING_OWNER ? ` ${AWAITING_OWNER}` : '';
+        const runtime = node.runtime.model ? ` ${node.runtime.agent ?? '-'} / ${node.runtime.model}` : '';
+        return `  ${node.parentNodeId} -> ${node.nodeId} [${node.status}${verdict}]${runtime}`;
+      }),
     ].join('\n'), args.json);
   },
 };
