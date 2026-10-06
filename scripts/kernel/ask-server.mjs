@@ -110,7 +110,7 @@ const sameAskSubject = (a, b) => {
   if (a.refs.length && b.refs.length) return a.refs.some((ref) => b.refs.includes(ref));
   return !(a.subject || b.subject || a.refs.length || b.refs.length);
 };
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const esc = (s) => String(s ?? '').replaceAll(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const parseArgs = (argv) => {
   const a = { _: [] };
@@ -127,7 +127,7 @@ const parseArgs = (argv) => {
 
 // A custody file becomes reachable through a `<NAME>_FILE` pointer — the same
 // convention app.env already carries (keycloak-admin.json → KEYCLOAK_ADMIN_FILE).
-const pointerFor = (name) => `${name.replace(/\.[^.]+$/, '').toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_FILE`;
+const pointerFor = (name) => `${name.replace(/\.[^.]+$/, '').toUpperCase().replaceAll(/[^A-Z0-9]+/g, '_')}_FILE`;
 
 // `X+\.ext` tokens without the backtracking regex: the run of token chars before each extension
 // match is the token; a run an earlier match already consumed cannot start another.
@@ -173,9 +173,10 @@ export const fieldsOf = (text) => {
   };
 };
 const optionText = (o) => (typeof o === 'string' ? o : o?.label ?? '');
-const pickLabel = (o) => {
+const pickLabel = (o, preferId = false) => {
   if (o == null) return null;
-  return typeof o === 'string' ? o : o.label ?? null;
+  if (typeof o === 'string') return o;
+  return preferId ? o.id ?? o.label : o.label ?? null;
 };
 /** The credential fields one question asks for: fieldsOf over its text and option labels. */
 export const questionFields = (question) => fieldsOf(`${question?.text ?? ''}\n${(question?.options ?? []).map(optionText).join('\n')}`);
@@ -237,7 +238,7 @@ export function drawReplyDecision(text) {
   const raw = String(text ?? '').trim();
   const golden = GOLDEN_REPLY.test(raw);
   GOLDEN_REPLY.lastIndex = 0;
-  const words = raw.replace(GOLDEN_REPLY, ' ').toLowerCase().split(/[\s.,!?;:()\-–—]+/u).filter(Boolean);
+  const words = raw.replaceAll(GOLDEN_REPLY, ' ').toLowerCase().split(/[\s.,!?;:()\-–—]+/u).filter(Boolean);
   GOLDEN_REPLY.lastIndex = 0;
   const accept = (words.length > 0 || golden) && words.every((w) => ACCEPT_WORDS.has(w));
   return accept ? { decision: 'accept', optionIndex: 0, golden, note: golden ? 'golden' : null } : { decision: 'redraw', optionIndex: 1, golden: false, note: raw || null };
@@ -283,7 +284,6 @@ export async function answerDrawReviewByReply({ repo, ledgerFile = null, workflo
     return { ok: true, decision: d.decision, golden: d.golden, receiptPath, rulings: rulings.rulings.length, redrawOwed: Boolean(rulings.redrawOwed), wake: woke };
   } finally { ledger.close(); }
 }
-
 
 /** One custody-file label+input row. */
 const custodyFileRow = (name, fields, repo, disabled) => {
@@ -462,7 +462,7 @@ export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, repo
   const { index, label, reason, source } = decision.recommendation;
   const pickGroup = Array.isArray(question.picks) && question.picks.length === 1 ? question.picks[0] : null;
   const pickChoice = pickGroup ? (pickGroup.choices ?? [])[index] : null;
-  const picks = pickChoice == null ? null : { [String(pickGroup.id)]: String(typeof pickChoice === 'string' ? pickChoice : pickChoice.id ?? pickChoice.label) };
+  const picks = pickChoice == null ? null : { [String(pickGroup.id)]: String(pickLabel(pickChoice, true)) };
   const via = { structured: 'question.recommended', text: 'marked in the option text', 'draw-review': 'the accept option of a draw-review ask' }[source] ?? source;
   const because = reason ? ` because ${reason}` : '';
   const note = `auto-accepted by config.yaml ${AUTO_ACCEPT_CONFIG_KEY}: recommended option ${index + 1} (${via})${because}`;
@@ -666,8 +666,8 @@ const answerSubmission = (ctx, res, body) => {
     if (!guard) return;
     if (!declaredOnly(ctx, res, params, guard.optionIdx)) return;
     const absolute = path.resolve(file), identity = process.platform === 'win32' ? absolute.toLowerCase() : absolute;
-    const lockKey = sha256(`${identity}|${args.workflow}|${report.dispatch_id}`);
-    const held = claimManager(`ask-answer-${lockKey}`);
+    const key = `${identity}|${args.workflow}|${report.dispatch_id}`;
+    const held = claimManager(`ask-answer-${sha256(key)}`);
     if (!held.ok) { res.writeHead(409); res.end('another answer is in progress; wait for its committed disposition'); return; }
     try {
       const closed = db.prepare(`SELECT kind FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded')
@@ -798,7 +798,7 @@ const main = async () => {
   ctx.server = server;
 
   server.on('error', () => tryNext());
-  const bandMatch = typeof args.band === 'string' && args.band.match(/^(\d+)\.\.(\d+)$/);
+  const bandMatch = typeof args.band === 'string' ? /^(\d+)\.\.(\d+)$/.exec(args.band) : null;
   const [PORT_FIRST, PORT_LAST] = bandMatch ? [Number(bandMatch[1]), Number(bandMatch[2])] : [ASK_FIRST, ASK_LAST];
   let port = PORT_FIRST;
   const tryNext = () => {

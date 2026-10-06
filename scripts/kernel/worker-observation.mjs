@@ -28,12 +28,14 @@ export const workerObservation = (ctx, { workerGateAnswerOf, terminalGoneCodes, 
   let liveness = seen;
   if (quiet) liveness = 'quiet';
   else if (starting) liveness = 'starting';
+  let staleReason = null;
+  if (stale.staleActive && connected && writable) staleReason = beating ? 'heartbeat' : 'stale-active';
   return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness, connected, writable, ...(quiet ? { quiet } : {}),
     terminalStatus: shown?.terminal?.status ?? null, lastOutputAt,
     outputAgeMs, screenState, ...(shellPrompt ? { shellPrompt } : {}), ...(inputDraft ? { inputDraft: clipDraft(inputDraft) } : {}),
     ...(frame ? { screen, draft: inputDraft } : {}),
     ...(screenGate ? { gate: screenGate } : {}), ...(gateAnswer ? { gateAutoAnswer: gateAnswer } : {}),
-    ...(stale.staleActive && connected && writable ? { livenessReason: beating ? 'heartbeat' : 'stale-active' } : {}),
+    ...(staleReason ? { livenessReason: staleReason } : {}),
     ...(heartbeatAgeMs != null ? { heartbeatAgeMs } : {}),
     ...(starting ? { livenessReason: 'launch-grace', launchGrace: starting } : {}),
     ...(providerOutage ? { providerOutage } : {}),
