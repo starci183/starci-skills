@@ -31,7 +31,7 @@ import { workerContext } from '../api/node/worker-context.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { checkArchitecture } from '../hfs/architecture/index.mjs';
-import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
+import { normPath, posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { WORKTREES_IGNORE_GLOBS } from '../lib/worktree-exclude.mjs';
 import { emitCheckOutput } from './output.mjs';
 import { isMain } from '../lib/is-main.mjs';
@@ -43,11 +43,7 @@ const MACHINES = ['eslint', 'architecture'];
 const USAGE = 'usage: starci gate canon-scan --root <repo> [--stack-kind next|nest] [--families <csv>] [--paths <csv>] [--exclude <csv>] [--machines eslint,architecture] [--fix] [--json] [--out <scratch-file> | --blob]';
 
 const csv = splitList;
-const prefixOf = (value) => {
-  let out = posixPath(value);
-  while (out.endsWith('/')) out = out.slice(0, -1);
-  return out;
-};
+const prefixOf = (value) => normPath(value, { dot: true });
 const under = sameOrUnder;
 const count = (map, key) => { map[key] = (map[key] ?? 0) + 1; };
 

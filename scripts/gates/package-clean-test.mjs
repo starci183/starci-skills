@@ -46,7 +46,7 @@ import { runScript } from '../api/node/run-script.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
-import { posixPath } from '../lib/path-key.mjs';
+import { insidePath, normPath, posixPath } from '../lib/path-key.mjs';
 import { diff } from '../api/git/diff.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { tailLines } from '../lib/clip.mjs';
@@ -72,18 +72,12 @@ export function publishSet(root = runtimeRoot) {
     .map(([name, pin]) => ({ name, dir: posixPath(path.dirname(pin.source)) }));
 }
 
-const stripTrailingSlashes = (value) => {
-  let out = String(value ?? '');
-  while (out.endsWith('/')) out = out.slice(0, -1);
-  return out;
-};
-
 /** The generated roots of the runtime manifest under `root` (ruleParams.runtime.generated), runtime-relative posix; [] when the runtime has no manifest. */
 function generatedRoots(root = runtimeRoot) {
   const file = path.join(root, 'knowledge', 'hfs', 'runtime-slots.yaml');
   if (!fs.existsSync(file)) return [];
   return (parseYaml(fs.readFileSync(file, 'utf8'))?.ruleParams?.runtime?.generated ?? [])
-    .map((g) => stripTrailingSlashes(g.root ?? ''))
+    .map((g) => normPath(g.root ?? ''))
     .filter(Boolean);
 }
 
@@ -286,11 +280,6 @@ export function verifyPackedDependencies(payloads, installRoot, { packageRoots =
   return null;
 }
 
-const inside = (dir, parent) => {
-  const rel = path.relative(parent, dir);
-  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
-};
-
 /** Stage the unit into the temp tree: {at, installRoot, own, copied}. Comments mark the source vs generated copies. */
 const stageUnit = (unit, { root, temp, sources }) => {
   const at = (abs) => path.join(temp, 'r', path.relative(root, abs));
@@ -302,14 +291,14 @@ const stageUnit = (unit, { root, temp, sources }) => {
   }
   for (const dir of own) copyTracked(dir, at(dir));
   // the other published packages' sources, never inside a folder copied above
-  const sourcesCopied = sources.map((d) => path.resolve(root, d)).filter((d) => !own.some((o) => inside(d, o) || inside(o, d)));
+  const sourcesCopied = sources.map((d) => path.resolve(root, d)).filter((d) => !own.some((o) => insidePath(o, d, { includeSelf: true }) || insidePath(d, o, { includeSelf: true })));
   for (const dir of sourcesCopied) copyTracked(dir, at(dir));
   // The generated runtime copies are untracked but shipped content the packages' own tests read; the fresh sync's
   // output is carried like the tracked files (a copied dir's generated root inside it, or a generated root holding it).
   const copied = [...own, ...sourcesCopied];
   for (const g of generatedRoots(root)) {
     const abs = path.resolve(root, g);
-    if (copied.some((d) => inside(abs, d) || inside(d, abs)) && fs.existsSync(abs)) fs.cpSync(abs, at(abs), { recursive: true });
+    if (copied.some((d) => insidePath(d, abs, { includeSelf: true }) || insidePath(abs, d, { includeSelf: true })) && fs.existsSync(abs)) fs.cpSync(abs, at(abs), { recursive: true });
   }
   return { at, installRoot, own, copied };
 };

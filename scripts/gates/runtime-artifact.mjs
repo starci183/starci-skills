@@ -59,8 +59,14 @@ export function explicitWorkPaths(files) {
 
 /** The inventory.txt text: every packed file sorted by path with its byte size, one `<size>\t<path>` line each. */
 export function inventoryText(packedFiles) {
-  const sorted = [...packedFiles].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
-  return `${sorted.map((file) => `${file.size}\t${file.path}`).join('\n')}\n`;
+  const byPath = (a, b) => {
+    if (a.path < b.path) return -1;
+    if (a.path > b.path) return 1;
+    return 0;
+  };
+  const sorted = [...packedFiles].sort(byPath);
+  const lines = sorted.map((file) => `${file.size}\t${file.path}`).join('\n');
+  return `${lines}\n`;
 }
 
 /**

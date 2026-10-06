@@ -27,7 +27,10 @@ function verifiedRuntimeMain(runtimeRoot, env) {
   if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('runtime root must be a regular directory');
   const root = fs.realpathSync.native(runtimeRoot), marker = path.join(root, '.git');
   let gitMarker;
-  try { gitMarker = fs.lstatSync(marker); } catch (error) { if (error?.code === 'ENOENT') return root; throw error; }
+  try { gitMarker = fs.lstatSync(marker); } catch (error) {
+    if (error?.code === 'ENOENT') return root;
+    throw error;
+  }
   if (gitMarker.isSymbolicLink() || (!gitMarker.isFile() && !gitMarker.isDirectory()))
     throw new Error('runtime Git identity is unavailable');
   const topLevel = cwd => fs.realpathSync.native(path.resolve(cwd,
@@ -73,7 +76,7 @@ export function resolveDeclaredRepository(name, { fromRepo } = {}) {
  */
 export function resolveCustodyFile(repo, rel) {
   if (!repo || !rel || String(rel).split(/[\\/]/).includes('..')) return null;
-  const posix = String(rel).replace(/\\/g, '/');
+  const posix = String(rel).replaceAll('\\', '/');
   if (posix.startsWith('.claude/') && same(path.resolve(repo), path.resolve(runtimeHostRoot()))) return path.join(skillRoot, posix.slice('.claude/'.length));
   return path.join(repo, rel);
 }
