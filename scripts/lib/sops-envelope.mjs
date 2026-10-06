@@ -25,7 +25,12 @@ export function testSecretPaths(name, { repo, stack = 'dev' } = {}) {
 export const setCommand = (name = '<name>', stack = 'dev') => `node scripts/stack-secret.mjs set ${stack}/secrets/test/${name}`;
 
 /** sops' format for a plaintext path, as the repository's stack-secret.mjs formatFor decides it. */
-export const sopsFormatFor = (file) => (file.endsWith('.env') ? 'dotenv' : /\.json$/.test(file) ? 'json' : /\.(ya?ml|kubeconfig)$/.test(file) ? 'yaml' : 'binary');
+export const sopsFormatFor = (file) => {
+  if (file.endsWith('.env')) return 'dotenv';
+  if (file.endsWith('.json')) return 'json';
+  if (/\.(ya?ml|kubeconfig)$/.test(file)) return 'yaml';
+  return 'binary';
+};
 
 /** Every leaf outside the `sops` block is an ENC[...] value (or null); the block itself carries a mac. */
 const allEncrypted = (node) => {
@@ -48,7 +53,7 @@ export function isSopsEnvelope(text) {
   if (!src.trim()) return false;
   try { return sopsTree(JSON.parse(src)); } catch { /* not JSON */ }
   const lines = src.split(/\r?\n/).filter((l) => l.trim() && !/^\s*#/.test(l));
-  if (lines.length && lines.every((l) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(l))) {
+  if (lines.length && lines.every((l) => /^[A-Za-z_]\w*=/.test(l))) {
     const pairs = lines.map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]);
     const meta = pairs.filter(([k]) => k.startsWith('sops_'));
     const vals = pairs.filter(([k]) => !k.startsWith('sops_'));

@@ -15,7 +15,11 @@ export function parseLessonsFile(text) {
     const head = /^ {2}- signature: (.*)$/.exec(line);
     if (head) { cur = { signature: JSON.parse(head[1]) }; lessons.push(cur); continue; }
     const field = /^ {4}(source|weight|status|text): (.*)$/.exec(line);
-    if (field && cur) cur[field[1]] = field[1] === 'text' ? JSON.parse(field[2]) : field[1] === 'weight' ? Number(field[2]) : field[2];
+    if (field && cur) {
+      if (field[1] === 'text') cur[field[1]] = JSON.parse(field[2]);
+      else if (field[1] === 'weight') cur[field[1]] = Number(field[2]);
+      else cur[field[1]] = field[2];
+    }
   }
   return lessons;
 }

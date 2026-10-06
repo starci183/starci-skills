@@ -129,7 +129,9 @@ export function learningState(m) {
     } else if (r.kind === 'experiment-result' && experiments[p.id]) {
       experiments[p.id] = { ...experiments[p.id], status: p.outcome, result: p };
       const s = sig(experiments[p.id].signature);
-      s.status = p.outcome === 'kept' ? 'kept' : p.outcome === 'revert-due' ? 'measuring' : 'reverted';
+      if (p.outcome === 'kept') s.status = 'kept';
+      else if (p.outcome === 'revert-due') s.status = 'measuring';
+      else s.status = 'reverted';
       if (p.outcome === 'revert-due') experiments[p.id].status = 'revert-due';
     } else if (LESSON_KINDS.has(r.kind)) lessons.push(p);
     else if (r.kind === 'proposal') proposals[p.id] = p;
@@ -144,7 +146,9 @@ function learningItem(kind, p) {
   if (kind === KINDS.experiment) return { itemId: p.id, kind: 'experiment', title: String(p.signature), state: 'measuring', lane: p.lane ?? null, landedSha: p.head ?? null };
   if (kind === KINDS.result) return { itemId: `${p.id}:result`, kind: 'experiment-result', parentId: p.id, title: String(p.signature), state: p.outcome ?? null };
   if (kind === KINDS.proposal) return { itemId: p.id, kind: 'proposal', title: String(p.title ?? p.id), state: p.status ?? 'open' };
-  const lessonKind = p.status === 'owner-feedback' ? 'owner-feedback' : p.via === 'gc' ? 'leftover' : 'lesson';
+  let lessonKind = 'lesson';
+  if (p.via === 'gc') lessonKind = 'leftover';
+  if (p.status === 'owner-feedback') lessonKind = 'owner-feedback';
   return { itemId: `les-${crypto.randomUUID()}`, kind: lessonKind, title: String(p.signature ?? p.text ?? 'lesson').slice(0, 200), state: p.status ?? null, lane: p.lane ?? null };
 }
 

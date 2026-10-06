@@ -74,7 +74,11 @@ const imagePathOf = image => {
 /** True when the image reference carries a tag or digest (an external image, not a placeholder of the repository's own build). */
 const isTagged = image => image.includes('@') || image.slice(image.lastIndexOf('/') + 1).includes(':');
 
-const asList = value => (Array.isArray(value) ? value : value === undefined || value === null ? [] : [value]);
+const asList = value => {
+  if (Array.isArray(value)) return value;
+  if (value === undefined || value === null) return [];
+  return [value];
+};
 
 /** A compose `environment` (map or `KEY=VALUE` list) as a plain object; a `*_FILE` variable becomes the plain variable with the test value. */
 const environmentOf = value => {

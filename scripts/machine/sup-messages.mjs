@@ -8,14 +8,23 @@ const ID = /^[A-Za-z0-9._-]{1,60}$/;   // 'sup:' + id stays within Telegram call
 /** Whether `id` is a valid supervisor channel id. */
 export const validSupervisorId = (id) => typeof id === 'string' && ID.test(id);
 /** `id` when valid; throws otherwise. */
-export const needSupervisorId = (id) => { if (!validSupervisorId(id)) throw new Error(`supervisor id must match ${ID} (got ${JSON.stringify(String(id ?? ''))})`); return id; };
+export const needSupervisorId = (id) => {
+  if (!validSupervisorId(id)) {
+    throw new Error(`supervisor id must match ${ID} (got ${JSON.stringify(String(id ?? ''))})`);
+  }
+  return id;
+};
 
 // The newest rows a read returns (the history before them stays in the table).
 const READ_LIMIT = 1000;
 const iso = (ms) => (ms == null ? null : new Date(ms).toISOString());
 const msOf = (at) => { const ms = typeof at === 'number' ? at : Date.parse(at ?? ''); return Number.isFinite(ms) ? ms : Date.now(); };
 const idText = (v) => (v == null || v === '' ? null : String(v));
-const idValue = (v) => (v == null ? null : /^-?\d{1,15}$/.test(v) ? Number(v) : v);
+const idValue = (v) => {
+  if (v == null) return null;
+  if (/^-?\d{1,15}$/.test(v)) return Number(v);
+  return v;
+};
 const inboxItem = (row) => ({ id: row.msg_id, at: iso(row.at), chatId: row.chat_id ?? null, messageId: idValue(row.message_id), text: row.text, read: row.read_at != null,
   ...(row.read_at != null ? { readAt: iso(row.read_at) } : {}), ...(row.from_ref ? { from: row.from_ref } : {}) });
 const outboxItem = (row) => ({ id: row.msg_id, at: iso(row.at), to: row.to_ref ?? null, via: row.via ?? null, ok: row.ok !== 0, text: row.text });
@@ -65,4 +74,3 @@ export function takeInbox(id, { env = process.env, peek = false, ids = null, now
     return rows.map(inboxItem);
   }), { env });
 }
-

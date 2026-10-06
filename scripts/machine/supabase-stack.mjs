@@ -41,7 +41,7 @@ function withoutTomlComment(line) {
     const character = line[index];
     if (quote === '"' && escaped) { escaped = false; continue; }
     if (quote === '"' && character === '\\') { escaped = true; continue; }
-    if (quote) { if (character === quote) quote = null; continue; }
+    if (quote) { if (character === quote) { quote = null; } continue; }
     if (character === '"' || character === "'") { quote = character; continue; }
     if (character === '#') return line.slice(0, index);
   }

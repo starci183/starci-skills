@@ -10,7 +10,7 @@ import { squash } from './clip.mjs';
 
 const TERMINAL_PROVIDERS = Object.freeze(['claude', 'codex', 'devin', 'cursor']);
 const identityText = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
-const namedProviders = (text) => TERMINAL_PROVIDERS.filter((provider) => new RegExp(`\\b${provider}\\b`, 'i').test(text));
+const namedProviders = (text) => TERMINAL_PROVIDERS.filter((provider) => new RegExp(String.raw`\b${provider}\b`, 'i').test(text));
 
 /**
  * Pure terminal provider facts from explicit metadata, then title/frame cues.
@@ -203,7 +203,7 @@ export function stagedInputRow(screen, stagedPattern = DEFAULT_STAGED_PATTERN, {
 // input box unseen: the frame read turn-idle with an empty '❯', the next wake was typed onto it, and
 // the texts piled up (a collab Kernel, 2026-09-25). A reader puts the draft back where the agent
 // shows it before any classification.
-const DRAFT_GLYPH_ROW = new RegExp(`^(\\s*(?:[│┃]\\s?)?\\s*${INPUT_GLYPH_CLASS})(?:\\s|$)`, 'u');
+const DRAFT_GLYPH_ROW = new RegExp(String.raw`^(\s*(?:[│┃]\s?)?\s*${INPUT_GLYPH_CLASS})(?:\s|$)`, 'u');
 /**
  * `screen` with `draft` written into its LAST input-glyph row (within the last 14 rows), or appended
  * as a '› <draft>' row when the frame shows none. The draft is collapsed to one row: every classifier
@@ -248,7 +248,7 @@ export function draftOwnership(draft, { texts = [], stagedPattern = DEFAULT_STAG
   for (const text of own) rest = rest.split(text).join('\n');
   const starts = [...rest.matchAll(RUNTIME_WAKE_OPENER)].map((m) => m.index);
   const cuts = [0, ...starts.filter((i) => i > 0), rest.length];
-  const pieces = cuts.slice(0, -1).map((from, i) => rest.slice(from, cuts[i + 1]).split('\n')).flat().map(squash).filter(Boolean);
+  const pieces = cuts.slice(0, -1).flatMap((from, i) => rest.slice(from, cuts[i + 1]).split('\n')).map(squash).filter(Boolean);
   const runtimePiece = (piece) => new RegExp(`^(?:${RUNTIME_WAKE_OPENER.source})`).test(piece)
     || (piece.length >= MIN_ECHO_CHARS && own.some((text) => text.includes(piece)));
   return { kind: pieces.every(runtimePiece) ? 'runtime' : 'foreign', draft: d };
@@ -278,7 +278,7 @@ export function shellPromptPrefix(row) {
   return null;
 }
 // The rows an agent TUI draws at the foot of its frame: its input row (Codex "›", Claude "❯") and footers (Codex "gpt-6.1-sol high · 62% left", Claude "bypass permissions").
-const AGENT_FOOT_ROW = new RegExp(`^\\s*${AGENT_GLYPH_CLASS}(?:\\s|$)|\\bAsk Codex\\b|\\bMessage Devin\\b|bypass permissions|\\d+% (?:context )?left\\b|esc to (?:interrupt|cancel)`, 'iu');
+const AGENT_FOOT_ROW = new RegExp(String.raw`^\s*${AGENT_GLYPH_CLASS}(?:\s|$)|\bAsk Codex\b|\bMessage Devin\b|bypass permissions|\d+% (?:context )?left\b|esc to (?:interrupt|cancel)`, 'iu');
 // An agent command typed after a prompt: a launch still starting, never an exit. The launch line may open
 // with shell statements before the agent (`$env:DISABLE_AUTOUPDATER='1'; & claude ...`, agents/claude.yaml
 // launchEnv): any `;`-separated statement that runs an agent makes it a launch.
@@ -439,7 +439,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // "You have orchestration messages") rather than "Ask ...". Any non-empty
   // prompt row is turn-idle unless a current activity marker above wins. This row set is the
   // provider-agnostic floor (a card's readiness.screenPattern is the launcher's readiness check, scripts/agent/lib.mjs).
-  const readyPrompt = new RegExp(`(?:^|\\n)\\s*${INPUT_GLYPH_CLASS}\\s*(?:\\S|$)|(?:^|\\n)\\s*(?:Ask Codex|Ask Claude|Message Devin|Enter a prompt)\\b`, 'im');
+  const readyPrompt = new RegExp(String.raw`(?:^|\n)\s*${INPUT_GLYPH_CLASS}\s*(?:\S|$)|(?:^|\n)\s*(?:Ask Codex|Ask Claude|Message Devin|Enter a prompt)\b`, 'im');
   const promptAt = (rows, i) => readyPrompt.test(rows[i]);
 
   // A boxed dialog (a `framed` gate) is drawn behind the same rail a quoted child transcript uses, so it is
@@ -461,7 +461,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // Both patterns anchor on (?:^|\n), so each reads one row as well as a frame.
   // The last topRows.length rows of wideRows are topRows (the same filter over a longer tail).
   const wideRows = lines.slice(-WIDE_ROWS).filter(line => !/^\s*[│┃┆┊]/u.test(line));
-  const lastIndex = (test) => { for (let i = wideRows.length - 1; i >= 0; i -= 1) if (test(wideRows, i)) return i; return -1; };
+  const lastIndex = (test) => { for (let i = wideRows.length - 1; i >= 0; i -= 1) { if (test(wideRows, i)) return i; } return -1; };
   const lastActive = lastIndex((rows, i) => active.test(rows[i])), lastPrompt = lastIndex(promptAt);
   const finishedAfterSpinner = lastActive >= 0 && lastPrompt > lastActive
     && wideRows.slice(lastActive + 1, lastPrompt).some((line, i) => !companion(line) && !wrapsFrom(wideRows[lastActive + i], line));
@@ -493,7 +493,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
  * (inc-5e126e55cef4, inc-32adb2f77bf5). An unknown output time is never an age.
  */
 export function outputAgeOf(lastOutputAt, now = Date.now()) {
-  const at = lastOutputAt == null || lastOutputAt === '' ? NaN : Number(lastOutputAt);
+  const at = lastOutputAt == null || lastOutputAt === '' ? Number.NaN : Number(lastOutputAt);
   if (!Number.isFinite(at) || at <= 0) return { lastOutputAt: null, outputAgeMs: null };
   return { lastOutputAt: at, outputAgeMs: Math.max(0, now - at) };
 }

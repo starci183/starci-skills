@@ -50,7 +50,10 @@ export function scopeFor(level) {
 
 /** Normalize one catalog list flag (undefined, a string or repeated values) to unique repository paths. */
 export function pathList(value) {
-  const values = Array.isArray(value) ? value : value == null ? [] : [value];
+  let values;
+  if (Array.isArray(value)) values = value;
+  else if (value == null) values = [];
+  else values = [value];
   return [...new Set(values.flatMap((item) => String(item).split(',')).map((item) => item.trim().replaceAll('\\', '/').replace(/^\.\//, '')).filter(Boolean))];
 }
 

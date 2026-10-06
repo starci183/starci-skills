@@ -119,7 +119,10 @@ export function footprintObservations(samples, table, { kernelMb = DEFAULTS.kern
     if (opsMb <= 0) continue;
     const weight = running.reduce((sum, [kind, n]) => sum + num(n) * priorMbOf(kind, table), 0);
     if (weight <= 0) continue;
-    for (const [kind] of running) (obs[kind] ??= []).push(Math.round(opsMb * priorMbOf(kind, table) / weight));
+    for (const [kind] of running) {
+      obs[kind] ??= [];
+      obs[kind].push(Math.round(opsMb * priorMbOf(kind, table) / weight));
+    }
   }
   return obs;
 }
@@ -161,7 +164,10 @@ export function nextMode(prev, { freeRamPct, cpuBusy = null }, t = throttleThres
   const why = [];
   if (ramMode === 'critical') why.push(pct < t.landSpecPauseBelowPct ? `free RAM ${pct1(pct)} < ${t.landSpecPauseBelowPct}%: heavy ops and land-gate spec runs paused` : `free RAM ${pct1(pct)} not yet above ${t.landSpecResumeAbovePct}% since going critical: heavy ops and land-gate spec runs stay paused`);
   else if (ramMode === 'heavy-paused') why.push(pct < t.heavyStopBelowPct ? `free RAM ${pct1(pct)} < ${t.heavyStopBelowPct}%: no new heavy op below the top priority` : `free RAM ${pct1(pct)} not yet above ${t.heavyResumeAbovePct}% since the heavy pause: no new heavy op below the top priority`);
-  if (cpuHot) why.push(`CPU ${Math.round(num(cpu ?? 1) * 100)}% ${cpu != null && cpu >= t.cpuHeavyStopAbove ? `>= ${Math.round(t.cpuHeavyStopAbove * 100)}%` : `not yet below ${Math.round(t.cpuHeavyResumeBelow * 100)}%`}: no new heavy op below the top priority`);
+  if (cpuHot) {
+    const threshold = cpu != null && cpu >= t.cpuHeavyStopAbove ? `>= ${Math.round(t.cpuHeavyStopAbove * 100)}%` : `not yet below ${Math.round(t.cpuHeavyResumeBelow * 100)}%`;
+    why.push(`CPU ${Math.round(num(cpu ?? 1) * 100)}% ${threshold}: no new heavy op below the top priority`);
+  }
   return { mode, ramMode, cpuHot, why: why.join('; ') || `free RAM ${pct1(pct)}: normal` };
 }
 
@@ -172,7 +178,7 @@ export function nextMode(prev, { freeRamPct, cpuBusy = null }, t = throttleThres
  * overrides on top: {<workflowId>: {weight, reserve}}. A weight <= 0 or missing entry is weight 1, reserve 0.
  */
 export function priorityTable(settings = null, state = {}) {
-  const fromYaml = (settings ?? allocationSettings())?.resources?.ramThrottle?.priorities ?? {};
+  const fromYaml = (settings ?? allocationSettings())?.resources?.ramThrottle?.priorities;
   const out = {};
   for (const [wf, v] of Object.entries({ ...fromYaml, ...state?.priorities })) {
     if (v == null) continue;
@@ -278,8 +284,16 @@ export function admitOp({ op, workflowId = null, ops = [], maxParallelOps = null
 /* ------------------------------------------------------------ IO */
 
 /** The DB mode (throttle_state / throttle_events enum normal|heavy|critical) of a code mode, and back. */
-export const dbMode = (mode) => (mode === 'heavy-paused' ? 'heavy' : MODES.includes(mode) ? mode : 'normal');
-const codeMode = (mode) => (mode === 'heavy' ? 'heavy-paused' : MODES.includes(mode) ? mode : null);
+export const dbMode = (mode) => {
+  if (mode === 'heavy-paused') return 'heavy';
+  if (MODES.includes(mode)) return mode;
+  return 'normal';
+};
+const codeMode = (mode) => {
+  if (mode === 'heavy') return 'heavy-paused';
+  if (MODES.includes(mode)) return mode;
+  return null;
+};
 
 
 /**
@@ -405,14 +419,16 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   const override = overrideOf(env);
   const testContext = Boolean(isSpecRun(env ?? {})) && !override;
   const host = hostResourcesFor({ env, repo, settings: s });
-  const cpuBusy = override ? (override.cpuBusy != null ? num(override.cpuBusy) : null)
-    : testContext && !load ? null
-    : (() => { try { return (load ?? (() => machineLoad({ sampleMs: 200 })))()?.cpuBusy ?? null; } catch { return null; } })();
+  let cpuBusy;
+  if (override) cpuBusy = override.cpuBusy != null ? num(override.cpuBusy) : null;
+  else if (testContext && !load) cpuBusy = null;
+  else { try { cpuBusy = (load ?? (() => machineLoad({ sampleMs: 200 })))()?.cpuBusy ?? null; } catch { cpuBusy = null; } }
   const workers = Array.isArray(override?.ops) ? { ops: override.ops.map((o) => ({ status: 'running', ...o })), kernels: num(override.kernels) }
     : (census ?? (() => workersCensus({ db, ledgerFile, env })))();
   const ops = workers.ops ?? [];
-  const samples = Array.isArray(override?.footprints) ? override.footprints
-    : override ? [] : (() => { try { return (footprints ?? (() => recentFootprints({ limit: thresholds.historySamples, env })))(); } catch { return []; } })();
+  let samples = [];
+  if (Array.isArray(override?.footprints)) samples = override.footprints;
+  else if (!override) { try { samples = (footprints ?? (() => recentFootprints({ limit: thresholds.historySamples, env })))(); } catch { samples = []; } }
   const estimates = opRamEstimates(table, samples, thresholds);
   const prev = state ?? readThrottleState({ env });
   const priorities = priorityTable(s, prev);
@@ -421,9 +437,10 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   // it published (fresh within RECONCILER_MODE_FRESH_MS); a stale or missing publication is computed locally and never
   // written (owner ruling 2026-09-28 "on an error, delete it outright": no dormant fallback writer).
   const published = prev.writer === RECONCILER_WRITER && MODES.includes(prev.mode) && now - Date.parse(prev.at ?? '') < RECONCILER_MODE_FRESH_MS;
-  const m = published ? { mode: prev.mode, ramMode: MODES.includes(prev.ramMode) ? prev.ramMode : prev.mode, cpuHot: Boolean(prev.cpuHot), why: prev.why ?? `${prev.mode} (published by ${RECONCILER_WRITER})` }
-    : ramKnown ? nextMode(prev, { freeRamPct: host.freeRamPct, cpuBusy }, thresholds)
-    : { mode: prev.mode ?? 'normal', ramMode: prev.ramMode ?? 'normal', cpuHot: Boolean(prev.cpuHot), why: 'RAM unmeasured: mode unchanged' };
+  let m;
+  if (published) m = { mode: prev.mode, ramMode: MODES.includes(prev.ramMode) ? prev.ramMode : prev.mode, cpuHot: Boolean(prev.cpuHot), why: prev.why ?? `${prev.mode} (published by ${RECONCILER_WRITER})` };
+  else if (ramKnown) m = nextMode(prev, { freeRamPct: host.freeRamPct, cpuBusy }, thresholds);
+  else m = { mode: prev.mode ?? 'normal', ramMode: prev.ramMode ?? 'normal', cpuHot: Boolean(prev.cpuHot), why: 'RAM unmeasured: mode unchanged' };
   const maxParallelOps = (() => { const n = Number(runtimeProfile()?.maxParallelOps); return Number.isInteger(n) && n > 0 ? n : null; })();
   const running = ops.filter((o) => o.status !== 'queued');
   const cap = effectiveCapOf({ maxParallelOps, running: running.length, host, mode: m.mode, estimates, thresholds });
@@ -466,7 +483,7 @@ export function footprintSample({ owners = [], ops = [], kernels = 0, freeRamPct
   const agentRamMb = {};
   for (const g of agents) agentRamMb[g.key] = (agentRamMb[g.key] ?? 0) + Math.round(num(g.ramMb));
   const running = ops.filter((o) => o.status !== 'queued');
-  const runningByPool = running.reduce((acc, o) => { if (o.pool) acc[o.pool] = (acc[o.pool] ?? 0) + 1; return acc; }, {});
+  const runningByPool = running.reduce((acc, o) => { if (o.pool) { acc[o.pool] = (acc[o.pool] ?? 0) + 1; } return acc; }, {});
   return { opAgentRamMb: Object.values(agentRamMb).reduce((a, b) => a + b, 0), agentRamMb, kernels: num(kernels), running: countByKind(running), runningByPool,
     ...(freeRamPct != null ? { freeRamPct } : {}) };
 }

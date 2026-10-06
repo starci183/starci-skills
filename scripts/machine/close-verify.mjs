@@ -103,7 +103,9 @@ export function closeAndVerify(handle, { show = terminalShow, close = terminalCl
     const viaWait = proven?.ok === true && !proven.hostUnavailable;
     for (let waited = 0; waited <= (viaWait ? 0 : verifyMs); waited += intervalMs) {
       if (waited > 0) sleep(intervalMs);
-      const state = viaWait ? (proven.satisfied ? 'disconnected' : 'connected') : terminalState(handle, { show });
+      let state;
+      if (viaWait) state = proven.satisfied ? 'disconnected' : 'connected';
+      else state = terminalState(handle, { show });
       if (state === 'gone' || state === 'disconnected') {
         delete out.error;
         return { ...out, ok: true, proof: state };
@@ -151,7 +153,8 @@ if (isMain(import.meta.url)) {
   if (argv.includes('--log')) {
     try {
       const { supLog } = await import('./sup-log.mjs');
-      supLog({ kind: 'gc.collect', level: out.ok ? 'info' : 'warn', msg: `${out.owner} closed its own terminal ${handle}: ${out.ok ? out.proof : `NOT closed (${out.reason ?? out.error ?? '?'})`}`,
+      const result = out.ok ? out.proof : `NOT closed (${out.reason ?? out.error ?? '?'})`;
+      supLog({ kind: 'gc.collect', level: out.ok ? 'info' : 'warn', msg: `${out.owner} closed its own terminal ${handle}: ${result}`,
         data: { class: 'self-close', action: 'close-terminal', target: handle, owner: out.owner, ok: out.ok, ...(out.proof ? { proof: out.proof } : {}), ...(out.reason ? { reason: out.reason } : {}) } });
     } catch { /* the log is best effort; the close already happened */ }
   }

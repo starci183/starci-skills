@@ -51,7 +51,7 @@ const PRODUCT_PATTERNS = Object.freeze([
 const DENY_SEGMENT = /^(draw-loop|evidence|runs|kernel-evidence|kernel-strays|kernel-approvals)$/;
 const DENY_FILE = /^(report.*\.json|.*\.tmp\.json)$/;
 
-const segs = (rel) => String(rel ?? '').replace(/\\/g, '/').split('/').filter((s) => s && s !== '.');
+const segs = (rel) => String(rel ?? '').replaceAll('\\', '/').split('/').filter((s) => s && s !== '.');
 const fits = (matcher, seg) => (typeof matcher === 'string' ? matcher === seg : matcher.test(seg));
 
 function denied(parts, { dir = false } = {}) {
@@ -94,19 +94,18 @@ const ROOT_CACHE_FILE = /^(.*\.tmp\.json|tmp-.*\.json|scan-i18n.*\.json|runtime-
  * cache. A path that is neither known agent data nor on the §5.1 list
  * (isProductPath) is drift: product records in a retired layout, kept and reported, never removed by a script.
  */
-export function agentDataCategory(rel, { dir = false } = {}) {
-  const parts = segs(rel);
-  if (!parts.length) return null;
-  const top = parts[0];
-  const dirs = dir ? parts : parts.slice(0, -1);
-  const name = dir ? null : parts.at(-1);
-  if (parts.length === 1 && !dir && /^runtime\.sqlite/.test(top)) return 'ledger';
-  if (parts.length === 1 && !dir && /^logs\.sqlite/.test(top)) return 'logs-db';
+const rootAgentDataCategory = (parts, dir, top) => {
+  if (parts.length === 1 && !dir && top.startsWith('runtime.sqlite')) return 'ledger';
+  if (parts.length === 1 && !dir && top.startsWith('logs.sqlite')) return 'logs-db';
   if (top === 'worktrees') return 'worktrees';
   if (top === 'kernel-evidence') return 'kernel-evidence';
   if (top === 'kernel-strays' || top === 'kernel-approvals') return 'kernel-strays';
   if (ROOT_CACHE_DIRS.has(top) && (dir || parts.length > 1)) return 'cache';
   if (parts.length === 1 && !dir && ROOT_CACHE_FILE.test(top)) return 'cache';
+  return null;
+};
+
+const nestedAgentDataCategory = (dirs, name) => {
   if (dirs.includes('draw-loop')) return 'draw-round';
   if (dirs.includes('runs') && dirs[0] === 'features' && dirs.includes('uat')) return 'uat-run';
   if (dirs.includes('evidence')) return 'evidence-bundle';
@@ -114,8 +113,17 @@ export function agentDataCategory(rel, { dir = false } = {}) {
   if (dirs[0] === 'features' && dirs.includes('impl') && dirs.includes('assets')) return 'capture';
   if (dirs[0] === 'shell' && dirs[1] === 'assets') return 'layout-capture';
   if (name && /^report.*\.json$/.test(name)) return 'stray-report';
-  if (name && /\.tmp\.json$/.test(name)) return 'cache';
+  if (name && name.endsWith('.tmp.json')) return 'cache';
   return null;
+};
+
+export function agentDataCategory(rel, { dir = false } = {}) {
+  const parts = segs(rel);
+  if (!parts.length) return null;
+  const top = parts[0];
+  const dirs = dir ? parts : parts.slice(0, -1);
+  const name = dir ? null : parts.at(-1);
+  return rootAgentDataCategory(parts, dir, top) ?? nestedAgentDataCategory(dirs, name);
 }
 
 /**

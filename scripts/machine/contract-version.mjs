@@ -44,8 +44,9 @@ export const latestContractOf = (db, jobId) => db.prepare('SELECT c.*, a.dispatc
  */
 export function admittedContractOf(db, job) {
   // `job` is a jobs row (its newest attempt's contract), or names one dispatch by attempt_id (contracts are keyed by it).
-  const row = job?.attempt_id != null ? db.prepare('SELECT * FROM contracts WHERE attempt_id=?').get(job.attempt_id) ?? null
-    : job?.job_id ? latestContractOf(db, job.job_id) : null;
+  let row = null;
+  if (job?.attempt_id != null) row = db.prepare('SELECT * FROM contracts WHERE attempt_id=?').get(job.attempt_id) ?? null;
+  else if (job?.job_id) row = latestContractOf(db, job.job_id);
   if (!row) return { at: null, source: 'not-admitted', version: null };
   const version = parseJson(row.context_json ?? '')?.contract;
   const recorded = version?.schema === CONTRACT_VERSION_SCHEMA ? version : null;

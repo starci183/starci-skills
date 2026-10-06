@@ -120,9 +120,12 @@ export function resolutionOwnerCheck(db, { kind = null, detail = '', by = null, 
   const claim = ownerClaimOf(detail);
   const ownerGate = OWNER_GATE_KINDS.includes(kind);
   const resolver = by ?? (ownerGate ? OWNER : 'kernel');
-  const why = claim ? `the resolution text claims an owner decision ("${claim}")`
-    : resolver === OWNER ? (by ? 'it resolves as the owner (--by owner)' : `it resolves an ${kind} (an owner gate resolves as the owner unless --by kernel|supervisor says the owner did not)`)
-    : null;
+  let why = null;
+  if (claim) why = `the resolution text claims an owner decision ("${claim}")`;
+  else if (resolver === OWNER) {
+    if (by) why = 'it resolves as the owner (--by owner)';
+    else why = `it resolves an ${kind} (an owner gate resolves as the owner unless --by kernel|supervisor says the owner did not)`;
+  }
   if (!why) return { needs: false, why: null, claim: null, by: resolver, proven: false, proof: null, tried: [] };
   const { proven, proof, tried } = provenOwnerAnswer(db, { ownerAnswer, detail });
   return { needs: true, why, claim, by: resolver, proven, proof, tried };
@@ -146,10 +149,14 @@ function resolutionClaimOf(db, resolution) {
   const byOwner = payload.by === OWNER;
   if (!claim && !byOwner) return { unproven: false, claim: null, by: payload.by ?? null, reason: null };
   const { proven, proof, tried } = provenOwnerAnswer(db, { ownerAnswer: payload.ownerAnswer?.dispatchId ?? payload.ownerAnswer ?? [], detail: payload.detail });
+  const unprovenReason = () => {
+    if (tried.length) return tried.map((t) => t.reason).join('; ');
+    return 'no owner answer is recorded or cited';
+  };
   return {
     unproven: !proven, claim: claim ?? '(by owner)', by: payload.by ?? null,
     ...(proof ? { proof: proof.dispatchId } : {}),
-    reason: proven ? null : (tried.length ? tried.map((t) => t.reason).join('; ') : 'no owner answer is recorded or cited'),
+    reason: proven ? null : unprovenReason(),
   };
 }
 

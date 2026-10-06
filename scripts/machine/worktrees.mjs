@@ -65,7 +65,7 @@ export function worktreeCounts({ repos = [], env = process.env, settings = workt
   let rows = [], known = [];
   try { rows = withRegistry((m) => m.liveWorktrees(), env); known = withRegistry((m) => m.worktreeRepos(), env); } catch { rows = []; known = []; }
   const all = new Map();
-  for (const r of [...known, ...repos.filter(Boolean)]) { if (!fs.existsSync(r)) continue; const home = mainRootOf(r, { git }); const k = treeKey(home); if (!all.has(k)) all.set(k, home); }
+  for (const r of [...known, ...repos.filter(Boolean)]) { if (!fs.existsSync(r)) { continue; } const home = mainRootOf(r, { git }); const k = treeKey(home); if (!all.has(k)) all.set(k, home); }
   const out = [];
   for (const repoRoot of all.values()) {
     const mine = rows.filter((r) => sameTree(r.repo_root, repoRoot));
@@ -152,7 +152,7 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
   try { ps = orca.ps(); } catch (error) { ps = { ok: false, error: String(error?.message ?? error) }; }
   const cover = psCoverage(ps);
   const byId = new Map(), byPath = new Map();
-  if (cover.ok) for (const w of ps.worktrees) { if (w.id) byId.set(w.id, w); if (w.path) byPath.set(treeKey(w.path), w); }
+  if (cover.ok) { for (const w of ps.worktrees) { if (w.id) byId.set(w.id, w); if (w.path) byPath.set(treeKey(w.path), w); } }
   const orcaTreeOf = (row) => (cover.ok ? byId.get(row.orca_id) ?? byPath.get(treeKey(row.path)) ?? null : null);
   // A workflow tree's live terminals are Orca's count; a tree a complete page does not list holds none; otherwise unknown
   // (Infinity: kept).
@@ -165,12 +165,12 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
       if (isPendingRow(row)) {
         // A slot whose creator died before Orca answered: the slot goes back. A tree Orca may have made for it carries the
         // runtime's stamp, and the orphan pass below adopts or removes it.
-        if (stalePending(row, now, settings.ownerGoneMs)) { if (apply) releaseOrcaSlot(row.path, { env }); items.push({ path: row.path, repoRoot, reason: 'slot-never-bound', action: 'unregister', ok: true }); }
+        if (stalePending(row, now, settings.ownerGoneMs)) { if (apply) { releaseOrcaSlot(row.path, { env }); } items.push({ path: row.path, repoRoot, reason: 'slot-never-bound', action: 'unregister', ok: true }); }
         continue;
       }
       if (!fs.existsSync(row.path)) {
         const reg = fs.existsSync(repoRoot) ? registeredAt(repoRoot, row.path, { git }) : null;
-        if (!reg) { if (apply) markRemoved(row.path, { env }); items.push({ path: row.path, repoRoot, reason: 'directory-gone', action: 'unregister', ok: true }); continue; }
+        if (!reg) { if (apply) { markRemoved(row.path, { env }); } items.push({ path: row.path, repoRoot, reason: 'directory-gone', action: 'unregister', ok: true }); continue; }
       }
       const tip = row.branch ? revParse(repoRoot, `refs/heads/${row.branch}`) : revParse(row.path, 'HEAD');
       const main = revParse(repoRoot, 'main');
@@ -179,8 +179,11 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
       if (row.claim_id != null) { try { pid = withRegistry((m) => m.db.prepare('SELECT owner_pid FROM claims WHERE claim_id=?').get(row.claim_id)?.owner_pid ?? null, env); } catch { pid = null; } }
       const workflowPhase = row.kind === 'workflow' && row.workflow_id ? phaseOf(row.ledger_id, row.workflow_id) : null;
       const terminalsLive = row.kind === 'workflow' ? liveTerminalsOf(row) : 0;
-      const ownerStatus = row.kind === 'workflow' ? null : row.job_id ? lookup(row.ledger_id, row.job_id)
-        : row.kind === 'supervisor-staging' && row.lane ? supOf(row.lane) : null;
+      let ownerStatus = null;
+      if (row.kind !== 'workflow') {
+        if (row.job_id) ownerStatus = lookup(row.ledger_id, row.job_id);
+        else if (row.kind === 'supervisor-staging' && row.lane) ownerStatus = supOf(row.lane);
+      }
       const reason = collectReason({ row, jobStatus: ownerStatus, workflowPhase, terminalsLive, merged, ownerAlive: pid == null ? false : ownerAlive(Number(pid)), now, ownerGoneMs: settings.ownerGoneMs });
       if (!reason) continue;
       if (halt()) return items;
@@ -312,7 +315,8 @@ function collectOrcaOrphans({ ps, items, halt, lookup, phaseOf, supOf, now, appl
     }
     const r = removeOrcaWorktree({ repoRoot, orcaId: w.id, dir, branch: w.branch, deleteBranch: w.branch ? 'force' : null,
       preserve: { name: orphanPreserveName({ slot: stamp.slot, orcaId: w.id, digest: shortHash }) }, env, git, orca });
-    orphanIncident({ level: r.ok ? 'warn' : 'error', msg: `orphaned Orca tree ${w.id} (${w.comment}), owner ${v.owner}: ${r.ok ? 'preserved and removed' : `removal failed: ${r.reason}`}`,
+    const result = r.ok ? 'preserved and removed' : `removal failed: ${r.reason}`;
+    orphanIncident({ level: r.ok ? 'warn' : 'error', msg: `orphaned Orca tree ${w.id} (${w.comment}), owner ${v.owner}: ${result}`,
       owner, data: { orcaId: w.id, path: dir, stamp: w.comment, preserved: r.preserved?.ref ?? null, error: r.ok ? null : r.reason }, env });
     items.push({ ...base, reason: 'orca-orphan', action: 'remove', ok: r.ok, preserved: r.preserved?.ref ?? null, ...(r.ok ? {} : { error: r.reason }), ...(r.fatal ? { fatal: true, damage: r.damage } : {}) });
     if (r.fatal) return halt();
@@ -323,7 +327,8 @@ function collectOrcaOrphans({ ps, items, halt, lookup, phaseOf, supOf, now, appl
 /** Remove one collectable tree through the home that made it: Orca (the row has an orca_id) or git. */
 function collect({ row, repoRoot, dir, branch, name, reason, merged, apply, env, git, orca }) {
   if (!apply) return { path: dir, repoRoot, reason, action: 'would-remove', ok: null, home: row?.orca_id ? 'orca' : 'git' };
-  const deleteBranch = branch ? (merged || row?.release_pending_at != null ? 'merged' : 'force') : null;
+  let deleteBranch = null;
+  if (branch) deleteBranch = merged || row?.release_pending_at != null ? 'merged' : 'force';
   const r = row?.orca_id
     ? removeOrcaWorktree({ repoRoot, orcaId: row.orca_id, dir, branch, deleteBranch, preserve: { name }, env, git, orca })
     : removeScratchWorktree({ repoRoot, dir, branch, deleteBranch, preserve: { name }, env, git });

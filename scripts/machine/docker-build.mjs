@@ -31,7 +31,10 @@ export async function dockerBuild(ctx, deps = {}) {
   try {
     const run = async () => {
       const result = await (deps.dockerBuild ?? realDockerBuild)({ dockerfile, tag, noCache: ctx.args?.['no-cache'] === true }, { cwd });
-      if (!success(result)) return { code: 1, stderr: `starci docker build: ${detail(result) || `docker exited ${result?.status ?? 'without a status'}`}` };
+      if (!success(result)) {
+        const error = detail(result) || `docker exited ${result?.status ?? 'without a status'}`;
+        return { code: 1, stderr: `starci docker build: ${error}` };
+      }
       return { code: 0, text: `starci docker build: built ${tag}`, data: { schema: 'starci/docker-build@1', project, app, tag, dockerfile, context: cwd } };
     };
     const locked = await (deps.underHostLock ?? underHostLock)({ role: ctx.role ?? 'owner', purpose: 'docker-build', env: ctx.env }, run, deps);

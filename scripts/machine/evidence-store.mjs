@@ -77,8 +77,11 @@ export function roleOf(file) {
  * the ledger transaction. Returns {sha, bytes, mediaType, redaction, fileUri} for registerBlob / putArtifact.
  */
 export function stageBlob(source, { mediaType = null, file = null, repoRoots = [] } = {}) {
-  const raw = Buffer.isBuffer(source) ? source : typeof source === 'string' && file === false ? Buffer.from(source, 'utf8')
-    : typeof source === 'string' ? fs.readFileSync(source) : Buffer.from(source);
+  let raw;
+  if (Buffer.isBuffer(source)) raw = source;
+  else if (typeof source === 'string' && file === false) raw = Buffer.from(source, 'utf8');
+  else if (typeof source === 'string') raw = fs.readFileSync(source);
+  else raw = Buffer.from(source);
   const type = mediaType ?? (typeof source === 'string' && file !== false ? mediaTypeOf(source) : 'application/octet-stream');
   const { bytes, redaction } = redactBytes(raw, type, { repoRoots });
   const put = putBlob(bytes, { mediaType: type });
@@ -148,7 +151,9 @@ function checkStatusOf({ exitCode = null, declaredExitCode = null, unavailable =
   if (unavailable || status === 'unavailable') return 'unavailable';
   if (error || status === 'error') return 'error';
   // The raw exit wins over the declared one; an explicit 'fail' (a green exit with red findings) stays fail.
-  const exit = Number.isInteger(exitCode) ? exitCode : Number.isInteger(declaredExitCode) ? declaredExitCode : null;
+  let exit = null;
+  if (Number.isInteger(exitCode)) exit = exitCode;
+  else if (Number.isInteger(declaredExitCode)) exit = declaredExitCode;
   if (exit == null) return status === 'pass' || status === 'fail' ? status : 'error';
   return exit === 0 && status !== 'fail' ? 'pass' : 'fail';
 }
@@ -167,9 +172,13 @@ export function recordCheck(db, { attemptId, name, phase, runner, authority = nu
   if (!CHECK_PHASES.includes(phase)) throw refuse(`check phase must be ${CHECK_PHASES.join('|')}, got '${phase}'`, 'check-phase-unknown');
   if (attemptId == null) throw refuse(`check '${name}' has no attempt`, 'check-attempt-missing');
   const auth = runner === 'op' ? 'declared' : authority ?? 'runtime';
-  const raw = runner === 'op' ? null : (Number.isInteger(exitCode) ? exitCode : null);
-  const declared = runner === 'op' ? (Number.isInteger(exitCode) ? exitCode : Number.isInteger(declaredExitCode) ? declaredExitCode : null)
-    : (Number.isInteger(declaredExitCode) ? declaredExitCode : null);
+  let raw = null;
+  if (runner !== 'op' && Number.isInteger(exitCode)) raw = exitCode;
+  let declared = null;
+  if (runner === 'op') {
+    if (Number.isInteger(exitCode)) declared = exitCode;
+    else if (Number.isInteger(declaredExitCode)) declared = declaredExitCode;
+  } else if (Number.isInteger(declaredExitCode)) declared = declaredExitCode;
   const st = checkStatusOf({ exitCode: raw, declaredExitCode: declared, unavailable, error, skipped, status });
   for (const b of [stdout, stderr, output]) if (b) registerBlob(db, b, { now });
   const wall = wallMs ?? (Number.isFinite(startedAt) && Number.isFinite(finishedAt) ? finishedAt - startedAt : null);

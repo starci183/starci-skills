@@ -13,7 +13,11 @@ export function lintChecksForChanges(changed) {
   const code = files.some((file) => /\.(?:[cm]?js|ts|tsx)$/i.test(file));
   const prose = files.some((file) => /\.(?:md|ya?ml)$/i.test(file));
   const specs = files.some((file) => /(?:^|\/)tests?\/|\.spec\./i.test(file));
-  return RUNTIME_LINT_CHECKS.filter((id) => id === 'doc-language' ? prose : id === 'specs' ? specs : code);
+  return RUNTIME_LINT_CHECKS.filter((id) => {
+    if (id === 'doc-language') return prose;
+    if (id === 'specs') return specs;
+    return code;
+  });
 }
 
 /** `starci lint run`; process execution stays behind the starci CLI and is injectable with deps.runStarci. */

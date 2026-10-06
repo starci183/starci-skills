@@ -80,6 +80,24 @@ export function dataRefsOf(text) {
   return [...out];
 }
 
+const dataRefSelectsChange = (root, reached, wanted, readFile) => {
+  for (const file of reached) {
+    if (!file.startsWith('tests/')) continue;
+    let text;
+    try { text = (readFile ?? ((p) => fs.readFileSync(p, 'utf8')))(path.join(root, file)); } catch { continue; }
+    for (const ref of dataRefsOf(text)) {
+      for (const changedFile of wanted) if (changedFile === ref || changedFile.startsWith(ref + '/')) return true;
+    }
+  }
+  return false;
+};
+
+const specDependsOnChange = (root, spec, wanted, cache, readFile) => {
+  const reached = reachableFrom(root, spec, { cache, readFile });
+  for (const file of reached) if (wanted.has(file)) return true;
+  return dataRefSelectsChange(root, reached, wanted, readFile);
+};
+
 /**
  * The specs (repository-relative paths) whose import graph reaches any changed file. `specs` is the list of spec paths to
  * consider; `changed` the repository-relative changed files. A changed spec selects itself.
@@ -87,18 +105,7 @@ export function dataRefsOf(text) {
 export function specsDependingOn(root, changed, specs, { readFile } = {}) {
   const wanted = new Set(changed.map(posix));
   const cache = new Map();
-  return specs.filter((spec) => {
-    const reached = reachableFrom(root, spec, { cache, readFile });
-    for (const file of reached) if (wanted.has(file)) return true;
-    // data trees named by the spec and by its test helpers (tests/**): every changed file below one of them selects the spec
-    for (const file of reached) {
-      if (!file.startsWith('tests/')) continue;
-      let text;
-      try { text = (readFile ?? ((p) => fs.readFileSync(p, 'utf8')))(path.join(root, file)); } catch { continue; }
-      for (const ref of dataRefsOf(text)) for (const changedFile of wanted) if (changedFile === ref || changedFile.startsWith(ref + '/')) return true;
-    }
-    return false;
-  });
+  return specs.filter((spec) => specDependsOnChange(root, spec, wanted, cache, readFile));
 }
 
 // Internal entry: spawned by scripts/supervisor/land.mjs; not invoked directly.

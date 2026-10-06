@@ -43,7 +43,10 @@ export async function preflightIndexLock({ cwd = process.cwd(), guard = null, en
     const age = `${Math.round((result.ageMs ?? 0) / 60000)} min`;
     if (result.state === 'removed') say(`starci guard: removed a stale ${result.lock} (${age} old, no git process on this repository); recorded as ${LOCK_EVENT}.`);
     else if (result.state === 'held') say(`starci guard: ${result.lock} is ${age} old but a git process may still hold it (${result.holders.map((h) => h.pid).join(', ')}); left in place - retry shortly, never delete it by hand.`);
-    else if (result.state !== 'fresh' && result.state !== 'absent') say(`starci guard: ${result.lock} is ${age} old and was left in place (${result.state}${result.error ? `: ${result.error}` : ''}).`);
+    else if (result.state !== 'fresh' && result.state !== 'absent') {
+      const error = result.error ? `: ${result.error}` : '';
+      say(`starci guard: ${result.lock} is ${age} old and was left in place (${result.state}${error}).`);
+    }
     return result;
   } catch (error) {
     say(`starci guard: index-lock check error (${error?.message ?? error}); running git anyway`);

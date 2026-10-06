@@ -77,10 +77,10 @@ const payloadOf = (di) => ({ ...Object.fromEntries(Object.entries(di).filter(([k
 const listOf = (text) => { const v = parseJsonOr(text, []); return Array.isArray(v) ? v : []; };
 
 const rowToDi = (r) => {
-  const p = parseJsonOr(r.payload_json, {}) ?? {};
+  const p = parseJsonOr(r.payload_json);
   const { claimAuthority, ...visible } = p;
   return {
-    ...visible, schema: DI_SCHEMA, id: r.di_id, idempotencyKey: r.idempotency_key, key: r.idempotency_key, keyParts: parseJsonOr(r.key_parts_json, {}) ?? {},
+    ...visible, schema: DI_SCHEMA, id: r.di_id, idempotencyKey: r.idempotency_key, key: r.idempotency_key, keyParts: parseJsonOr(r.key_parts_json),
     kind: r.kind, decider: r.decider, workflowId: r.workflow_id,
     entity: p.entity ?? { type: r.entity_type ?? 'workflow', id: r.entity_id ?? r.workflow_id }, summary: r.summary,
     evidence: listOf(r.evidence_json), options: listOf(r.options_json), allowedVerbs: listOf(r.allowed_verbs_json),
@@ -333,11 +333,11 @@ export function blockingDecisions(db, workflowId, { now = Date.now(), minAgeMs =
 
 const q = (v) => (/[\s"'|;&<>]/.test(String(v)) ? `'${String(v).replaceAll("'", String.raw`'\''`)}'` : String(v));
 const lastRefusalsOf = (db, jobId) => db.prepare("SELECT kind, payload_json FROM events WHERE entity_type='job' AND entity_id=? AND (kind LIKE '%-refused' OR kind LIKE '%needs-kernel') ORDER BY seq DESC LIMIT 6").all(jobId)
-  .map((e) => ({ kind: e.kind, ...parseJsonOr(e.payload_json, {}) }));
+  .map((e) => ({ kind: e.kind, ...parseJsonOr(e.payload_json) }));
 const reportOf = (db, dispatchId) => {
   if (!dispatchId) return null;
   const r = db.prepare('SELECT outcome, report_json FROM reports WHERE dispatch_id=? ORDER BY rowid DESC LIMIT 1').get(dispatchId);
-  return r ? { outcome: r.outcome, ...parseJsonOr(r.report_json, {}) } : null;
+  return r ? { outcome: r.outcome, ...parseJsonOr(r.report_json) } : null;
 };
 const appOf = (p) => /(?:^|\/)((?:apps|packages)\/[^/]+)/.exec(String(p).replaceAll('\\', '/'))?.[1] ?? '.';
 
@@ -357,7 +357,7 @@ export function resolutionOf(db, di, { repo = '<repo>', now = Date.now() } = {})
   }
   const jobId = di.entity.id;
   const job = db.prepare('SELECT job_id, op_id, status, payload_json FROM jobs WHERE job_id=?').get(jobId);
-  const payload = parseJsonOr(job?.payload_json, {}) ?? {};
+  const payload = parseJsonOr(job?.payload_json);
   const pending = pendingJobsOf(db, wf, now)?.get(jobId) ?? null;
   const refusal = lastRefusalsOf(db, jobId).find((r) => r.kind !== 'job-settle-needs-kernel') ?? null;
   const report = reportOf(db, pending?.dispatchId);
@@ -589,7 +589,7 @@ const withSup = async (fn, { env = process.env, now = Date.now() } = {}) => {
 
 /** A sup_decision_items row as the decision-item@1 object the deciders read (the schema payload + the row's state). */
 const supDiOf = (r) => {
-  const p = parseJsonOr(r.payload_json, {}) ?? {};
+  const p = parseJsonOr(r.payload_json);
   return { ...p, id: r.di_id, idempotencyKey: r.idempotency_key, kind: r.kind, decider: r.decider, summary: r.summary, status: r.status,
     dueAt: r.due_at ?? p.dueAt ?? null, escalations: r.escalations ?? 0, deliveredAt: r.delivered_at ?? null,
     claim: r.claim_by ? { by: r.claim_by, at: r.claim_at, ttlMs: r.claim_ttl_ms ?? CLAIM_TTL_MS } : null,

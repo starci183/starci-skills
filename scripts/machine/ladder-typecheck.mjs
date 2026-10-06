@@ -59,7 +59,11 @@ export async function typecheckRun(ctx, deps = {}) {
     }
   } else {
     const all = typeScriptProjects(root, deps);
-    const projects = explicit.length ? explicit : level === 'L4' ? all : projectsForChanges(all, changed, { affected: level === 'L2' || level === 'L3' });
+    let projects = explicit;
+    if (!projects.length) {
+      if (level === 'L4') projects = all;
+      else projects = projectsForChanges(all, changed, { affected: level === 'L2' || level === 'L3' });
+    }
     for (const project of projects) {
       scope.push(project);
       const run = runProject(root, project, deps);

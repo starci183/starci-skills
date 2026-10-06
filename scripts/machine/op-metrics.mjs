@@ -239,7 +239,7 @@ function healthRow(key, records) {
   for (const list of chains.values()) {
     let last = null;
     for (const r of list) {
-      if (r.outcome !== 'failed') { if (r.outcome === 'succeeded') last = null; continue; }
+      if (r.outcome !== 'failed') { if (r.outcome === 'succeeded') { last = null; } continue; }
       if (last && r.signature === last) repeated++;
       last = r.signature;
     }
@@ -265,7 +265,7 @@ function healthRow(key, records) {
 export function aggregate(records, { now = Date.now(), windowMs } = {}) {
   const group = (by) => {
     const m = new Map();
-    for (const r of records) { const k = r[by]; if (!m.has(k)) m.set(k, []); m.get(k).push(r); }
+    for (const r of records) { const k = r[by]; if (!m.has(k)) { m.set(k, []); } m.get(k).push(r); }
     return [...m].map(([k, list]) => healthRow(k, list)).sort((a, b) => b.jobs - a.jobs || String(a.key).localeCompare(String(b.key)));
   };
   return { schema: 'starci/op-metrics@1', at: now, windowMs, totals: healthRow('all', records), ops: group('op'), workflows: group('workflowId') };

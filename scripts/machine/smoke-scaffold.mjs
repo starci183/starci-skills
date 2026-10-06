@@ -65,9 +65,9 @@ export async function smokeScaffold(ctx, deps = {}) {
       return { code: 0 };
     };
     const locked = await (deps.underHostLock ?? underHostLock)({ role: ctx.role ?? 'owner', purpose: 'smoke-scaffold', env }, operation, deps);
-    response = locked?.ok === true && Object.hasOwn(locked, 'value') ? locked.value
-      : locked?.ok === false && locked?.code === undefined ? { code: 1, stderr: `starci smoke scaffold: host lock refused (${locked.reason ?? 'held'})` }
-        : locked;
+    if (locked?.ok === true && Object.hasOwn(locked, 'value')) response = locked.value;
+    else if (locked?.ok === false && locked?.code === undefined) response = { code: 1, stderr: `starci smoke scaffold: host lock refused (${locked.reason ?? 'held'})` };
+    else response = locked;
   } catch (error) { response = { code: 1, stderr: `starci smoke scaffold: ${error.message}` }; }
 
   if (ctx.args?.keep !== true) {
@@ -75,5 +75,6 @@ export async function smokeScaffold(ctx, deps = {}) {
     if (!removed?.ok) response = { code: 1, stderr: `starci smoke scaffold: scratch cleanup failed (${removed?.errors?.[0]?.message ?? 'unknown error'})` };
   }
   const data = { schema: 'starci/smoke-scaffold@1', edition, steps };
-  return { ...response, text: `starci smoke scaffold: ${steps.filter((step) => step.ok).length}/${steps.length} steps passed${ctx.args?.keep ? `; kept ${root}` : ''}`, data };
+  const retained = ctx.args?.keep ? `; kept ${root}` : '';
+  return { ...response, text: `starci smoke scaffold: ${steps.filter((step) => step.ok).length}/${steps.length} steps passed${retained}`, data };
 }

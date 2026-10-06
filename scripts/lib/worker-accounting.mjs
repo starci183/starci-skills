@@ -69,10 +69,11 @@ export function workerTerminalHandles(rows = []) {
 }
 
 /** The first active worker whose worktree is `lanePath` or inside it, or null. */
-export function activeWorkerOn(rows = [], lanePath) {
+export function activeWorkerOn(rows, lanePath) {
+  const workerRows = rows === undefined ? [] : rows;
   if (!lanePath) return null;
   const lane = pathKey(lanePath);
-  return rows.find((r) => {
+  return workerRows.find((r) => {
     if (r?.terminalState !== 'active') return false;
     const wt = worktreePathOf(r);
     return Boolean(wt) && sameOrUnder(pathKey(wt), lane);

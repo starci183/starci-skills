@@ -31,8 +31,9 @@ const LINEAGE_LIMIT = 64;
  */
 export function lineageJobsOf(db, job) {
   const out = [], seen = new Set([job?.job_id]);
-  const start = job && ('retry_of' in job || 'resume_of' in job) ? job
-    : (job?.job_id ? db.prepare('SELECT retry_of, resume_of FROM jobs WHERE job_id=?').get(job.job_id) : null);
+  let start = null;
+  if (job && ('retry_of' in job || 'resume_of' in job)) start = job;
+  else if (job?.job_id) start = db.prepare('SELECT retry_of, resume_of FROM jobs WHERE job_id=?').get(job.job_id);
   let id = start?.retry_of ?? start?.resume_of ?? null;
   while (id && !seen.has(id) && out.length < LINEAGE_LIMIT) {
     seen.add(id);
@@ -114,7 +115,20 @@ export function repeatedAnswerOf(question, answers, { op = null } = {}) {
 }
 
 /** One prompt line per answer: what was asked, what was chosen, by whom, and where the receipt is. */
-export const ownerAnswerLine = (a) => `  - [${a.dispatchId}, attempt ${a.attempt}] "${a.question.replace(/\s+/g, ' ').slice(0, 300)}"`
-  + ` -> ${a.chosen ? `option ${a.chosen.index != null ? a.chosen.index + 1 : '?'}${a.chosen.label ? ` "${String(a.chosen.label).replace(/\s+/g, ' ').slice(0, 200)}"` : ''}` : 'answered (see receipt)'}`
-  + `${a.picks ? ` picks ${JSON.stringify(a.picks)}` : ''}${a.note ? ` note "${String(a.note).replace(/\s+/g, ' ').slice(0, 200)}"` : ''}`
-  + ` (answeredBy ${a.answeredBy} at ${a.answeredAt}${a.receipt ? `; receipt ${a.receipt}` : ''})`;
+export const ownerAnswerLine = (a) => {
+  const dispatchId = a.dispatchId;
+  const attempt = a.attempt;
+  const question = a.question.replace(/\s+/g, ' ').slice(0, 300);
+  let chosen = 'answered (see receipt)';
+  if (a.chosen) {
+    const option = a.chosen.index != null ? a.chosen.index + 1 : '?';
+    const label = a.chosen.label ? ` "${String(a.chosen.label).replace(/\s+/g, ' ').slice(0, 200)}"` : '';
+    chosen = `option ${option}${label}`;
+  }
+  const picks = a.picks ? ` picks ${JSON.stringify(a.picks)}` : '';
+  const note = a.note ? ` note "${String(a.note).replace(/\s+/g, ' ').slice(0, 200)}"` : '';
+  const answeredBy = a.answeredBy;
+  const answeredAt = a.answeredAt;
+  const receipt = a.receipt ? `; receipt ${a.receipt}` : '';
+  return `  - [${dispatchId}, attempt ${attempt}] "${question}" -> ${chosen}${picks}${note} (answeredBy ${answeredBy} at ${answeredAt}${receipt})`;
+};

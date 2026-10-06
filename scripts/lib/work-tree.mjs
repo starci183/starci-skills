@@ -8,6 +8,12 @@ import { isPlainObject } from '../../engine/plain-object.mjs';
 import { walkFiles } from './walk.mjs';
 
 const DERIVED = '_derived';
+const yamlObjectOf = (file) => {
+  try {
+    const data = parseYaml(fs.readFileSync(file, 'utf8'));
+    return isPlainObject(data) ? data : null;
+  } catch { return null; }
+};
 
 /**
  * Every record and evidence file under `workRoot`:
@@ -21,9 +27,8 @@ export function readWorkTree(workRoot) {
   for (const file of walkFiles(workRoot).filter((f) => f.endsWith('.yaml'))) {
     const relPath = path.relative(workRoot, file).replaceAll('\\', '/');
     if (relPath === DERIVED || relPath.startsWith(`${DERIVED}/`)) continue;
-    let data;
-    try { data = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
-    if (!isPlainObject(data)) continue;
+    const data = yamlObjectOf(file);
+    if (!data) continue;
     const dir = path.dirname(relPath).replaceAll('\\', '/');
     if (relPath.endsWith('/evidence.yaml') || relPath === 'evidence.yaml') {
       evidenceByDir.set(dir, { data, file, dir });

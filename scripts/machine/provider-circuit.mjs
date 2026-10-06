@@ -21,7 +21,7 @@ export function inspectProviderCircuit(provider, { machine = null, env = process
     if (!m) { m = openMachineReader({ env }); own = true; }
     const row = providerHealth(m).find((r) => r.provider === key);
     if (!row) return { observed: true, row: null, error: null };
-    const detail = parseJsonOr(row.detail_json) ?? {};
+    const detail = parseJsonOr(row.detail_json);
     return { observed: true, row: { value: { ...detail, provider: key, status: row.status, failureKind: row.failure_kind ?? detail.failureKind ?? null, strikes: row.strikes }, at: row.updated_at, expiresAt: row.circuit_open_until ?? null }, error: null };
   } catch (error) { return { observed: false, row: null, error: error.message }; }
   finally { if (own) m?.close(); }

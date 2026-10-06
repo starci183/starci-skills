@@ -28,9 +28,13 @@ export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.ur
 let cachedRev = null;
 export function runtimeRevOf() {
   if (cachedRev) return cachedRev;
-  if (readEnv('STARCI_RUNTIME_REV')) return (cachedRev = String(readEnv('STARCI_RUNTIME_REV')));
+  if (readEnv('STARCI_RUNTIME_REV')) {
+    cachedRev = String(readEnv('STARCI_RUNTIME_REV'));
+    return cachedRev;
+  }
   const head = headTime(SKILL_ROOT);
-  return (cachedRev = head ? `${String(head.time * 1000).padStart(13, '0')}:${head.sha}` : 'unknown');
+  cachedRev = head ? `${String(head.time * 1000).padStart(13, '0')}:${head.sha}` : 'unknown';
+  return cachedRev;
 }
 export const SUPERVISOR_ID = 'main';
 /** The seats row of the one Supervisor seat. */
@@ -179,11 +183,14 @@ export function supervisorSettings({ config = undefined } = {}) {
   const kernel = cfg?.kernel ?? {};
   const seat = sup.kernel ?? {};
   const pick = (...values) => values.find((v) => typeof v === 'string' && v.trim())?.trim() ?? null;
+  let group = null;
+  if (Array.isArray(seat.group)) group = seat.group;
+  else if (!seat.agent && !seat.model && Array.isArray(kernel.group)) group = kernel.group;
   return {
     mode: SUPERVISOR_MODES.includes(sup.mode) ? sup.mode : DEFAULT_SUPERVISOR_MODE,
     agent: pick(seat.agent, kernel.agent, DEFAULT_AGENT),
     model: pick(seat.model, seat.agent ? null : kernel.model),
-    group: Array.isArray(seat.group) ? seat.group : !seat.agent && !seat.model && Array.isArray(kernel.group) ? kernel.group : null,
+    group,
     effort: pick(seat.effort, seat.agent ? null : kernel.effort, cfg?.effort),
     repos: Array.isArray(sup.repos) ? sup.repos : [],
     pollIntervalMs: Number.isInteger(sup.pollIntervalMs) ? sup.pollIntervalMs : DEFAULTS.pollIntervalMs,
