@@ -84,6 +84,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 import { workerObservation } from './worker-observation.mjs';
+import { queuedDependencyDetail } from './queued-dependency-detail.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { headShaOf } from '../lib/git-dir.mjs';
@@ -1035,13 +1036,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
       return {
         queuedBecause: dead ? 'dependency-failed' : 'dependency',
         blockedBy: { op: prior.op_id, job: prior.job_id },
-        detail: (priorId === seam
-          ? (seamHold?.hold ? seamHold.detail : `cut ${payload.cut.id} seam ${prior.job_id} is ${prior.status}; the other ordinals wait for it`)
-          : (recordDeps.get(job.job_id) ?? []).includes(priorId)
-            ? `a Work record this job owns dependsOn a record owned by ${prior.job_id}, which is ${prior.status}`
-            : `declared --after job ${prior.job_id} is ${prior.status}`)
-          + (prior.job_id !== priorId ? ` (the retry lineage of ${priorId})` : '')
-          + (dead ? '; it will not succeed on its own, so the Kernel retries it, re-points this job, or drops it' : ''),
+        detail: queuedDependencyDetail({ priorId, prior, seam, seamHold, payload, recordDeps, jobId: job.job_id, dead }),
       };
     }
   }
