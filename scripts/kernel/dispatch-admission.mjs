@@ -25,13 +25,8 @@ export function admitPacket(root, { packet, op, placements, db, workflowId, now 
   packet.context.gate_binding = captureGateBinding(placements, { at: admitted.admittedAt });
 }
 
-/** Resolve persisted params and a single execution contract before any launch
- * effects. The queue already owns setter authority; defaults are still validated. */
-export function selectDispatchContract(root, op, payload, { planning = false } = {}) {
-  const brief = readOpManifest(path.join(root, 'modules', 'ops', 'ops', `${op}.yaml`));
-  const schema = parseYaml(fs.readFileSync(path.join(root, 'modules', 'schemas', 'op.schema.yaml'), 'utf8'));
-  const errors = validateAgainstSchema(brief, schema);
-  if (errors.length) throw Object.assign(new Error(`invalid op contract: ${errors.join('; ')}`), { code: 'op-context-refused' });
+// The declared defaults with the payload's overrides on top, each value checked against its definition.
+const dispatchParamsOf = (brief, payload) => {
   const params = {};
   for (const [name, definition] of Object.entries(brief.params ?? {})) if (Object.hasOwn(definition, 'default')) params[name] = definition.default;
   Object.assign(params, payload.params ?? {});
@@ -39,20 +34,39 @@ export function selectDispatchContract(root, op, payload, { planning = false } =
     const definition = brief.params?.[name], error = definition ? paramValueError(name, definition, value) : `undeclared params.${name}`;
     if (error) throw Object.assign(new Error(error), { code: 'params-invalid' });
   }
-  if (!planning) for (const [name, definition] of Object.entries(brief.params ?? {})) {
+  return params;
+};
+
+const requireDeclaredParams = (brief, params) => {
+  for (const [name, definition] of Object.entries(brief.params ?? {})) {
     if (definition.required === true && !Object.hasOwn(params, name))
       throw Object.assign(new Error(`required params.${name} is absent`), { code: 'params-invalid' });
   }
-  const selected = resolveOpContract(brief, { params, allowSelect: planning });
-  if (!selected.ok) throw Object.assign(new Error(selected.detail), { code: selected.reason });
-  const kinds = parseYaml(fs.readFileSync(path.join(root, 'modules', 'models', 'kinds.yaml'), 'utf8'));
-  const checks = opCheckRequirements(selected.contract, kinds?.kinds?.[op]);
-  if (!planning) for (const check of checks.required.filter((row) => row.obligation !== 'check-id')) {
+};
+
+const requireReadChecks = (root, checks, params) => {
+  for (const check of checks.required.filter((row) => row.obligation !== 'check-id')) {
     const owner = resolveReadReference(check.path, { sourceRoot: root, params });
     if (owner.missing.length || owner.truncated || owner.resolved.length !== 1) {
       throw Object.assign(new Error(`required ${check.obligation} missing or unreadable: ${check.path}`), { code: 'op-context-refused' });
     }
   }
+};
+
+/** Resolve persisted params and a single execution contract before any launch
+ * effects. The queue already owns setter authority; defaults are still validated. */
+export function selectDispatchContract(root, op, payload, { planning = false } = {}) {
+  const brief = readOpManifest(path.join(root, 'modules', 'ops', 'ops', `${op}.yaml`));
+  const schema = parseYaml(fs.readFileSync(path.join(root, 'modules', 'schemas', 'op.schema.yaml'), 'utf8'));
+  const errors = validateAgainstSchema(brief, schema);
+  if (errors.length) throw Object.assign(new Error(`invalid op contract: ${errors.join('; ')}`), { code: 'op-context-refused' });
+  const params = dispatchParamsOf(brief, payload);
+  if (!planning) requireDeclaredParams(brief, params);
+  const selected = resolveOpContract(brief, { params, allowSelect: planning });
+  if (!selected.ok) throw Object.assign(new Error(selected.detail), { code: selected.reason });
+  const kinds = parseYaml(fs.readFileSync(path.join(root, 'modules', 'models', 'kinds.yaml'), 'utf8'));
+  const checks = opCheckRequirements(selected.contract, kinds?.kinds?.[op]);
+  if (!planning) requireReadChecks(root, checks, params);
   return { brief: selected.contract, params, selected: { mode: selected.mode, contract: selected.contract, checks } };
 }
 

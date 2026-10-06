@@ -18,6 +18,18 @@
  * (`via` is the held job the chain ends in; `settle` when that job's settle is what the wait holds). A chain
  * that ends in anything else (a running job, a ready or capacity-queued job, a cycle) parks nothing.
  */
+// The wait root a dependency chain ends in, memoized: null while `jobId` is no parked dependant.
+const rootOf = (roots, memo, byId, jobId, seen) => {
+  if (roots.has(jobId)) return roots.get(jobId);
+  if (memo.has(jobId)) return memo.get(jobId);
+  const item = byId.get(jobId);
+  if (item?.queuedBecause !== 'dependency' || !item.blockedBy?.job || seen.has(jobId)) return null;
+  seen.add(jobId);
+  const root = rootOf(roots, memo, byId, item.blockedBy.job, seen);
+  memo.set(jobId, root);
+  return root;
+};
+
 export function parkedBehindWaits(queued = [], heldSettle = []) {
   const roots = new Map();
   for (const item of queued) {
@@ -30,20 +42,10 @@ export function parkedBehindWaits(queued = [], heldSettle = []) {
   }
   const byId = new Map(queued.map((item) => [item.jobId, item]));
   const memo = new Map();
-  const rootOf = (jobId, seen) => {
-    if (roots.has(jobId)) return roots.get(jobId);
-    if (memo.has(jobId)) return memo.get(jobId);
-    const item = byId.get(jobId);
-    if (item?.queuedBecause !== 'dependency' || !item.blockedBy?.job || seen.has(jobId)) return null;
-    seen.add(jobId);
-    const root = rootOf(item.blockedBy.job, seen);
-    memo.set(jobId, root);
-    return root;
-  };
   const out = new Map();
   for (const item of queued) {
     if (item.queuedBecause !== 'dependency') continue;
-    const root = rootOf(item.jobId, new Set());
+    const root = rootOf(roots, memo, byId, item.jobId, new Set());
     if (root) out.set(item.jobId, root);
   }
   return out;

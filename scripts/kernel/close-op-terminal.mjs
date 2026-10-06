@@ -44,23 +44,33 @@ export const closeOperationTerminal = (handle, { tabOnly = false, list = termina
 // no longer knows is gone: nothing to close. Used for a dead worker's shell
 // (starci kernel reconcile --dead-worker) and an exited kernel's shell (start-workflow).
 // Returns {handle, closed, proof: disconnected|shell-prompt|gone|null, shellPrompt?, tab?, reason?, error?}.
+// The refusal a `terminal show` failure means: gone when Orca no longer knows the handle, else unproven.
+const unprovenClose = (handle, shown) => {
+  if (shown?.ok) return null;
+  if (!shown?.hostUnavailable && TERMINAL_GONE_CODES.has(shown?.errorCode)) return { handle, closed: false, proof: 'gone' };
+  return { handle, closed: false, proof: null, reason: shown?.hostUnavailable ? 'host-unavailable' : 'unverified',
+    ...(shown?.error || shown?.errorCode ? { error: String(shown.error || shown.errorCode) } : {}) };
+};
+
+// The exit proof of a shown terminal: 'disconnected' unless it answers connected+writable, where only
+// a frame ending in a bare shell prompt proves the agent exited. `refusal` when nothing proves it.
+const exitProofOf = (handle, shown, read) => {
+  if (shown.connected !== true || shown.writable !== true) return { proof: 'disconnected', shellPrompt: null };
+  let screen = null;
+  try { const frame = read({ terminal: handle, screen: true }); if (frame?.ok) screen = String(frame.screen ?? ''); } catch { /* unreadable proves nothing */ }
+  const shellPrompt = screen == null ? null : exitedAgentPromptRow(screen);
+  if (!shellPrompt) return { refusal: { handle, closed: false, proof: null, reason: screen == null ? 'unreadable' : 'agent-screen' } };
+  return { proof: 'shell-prompt', shellPrompt };
+};
+
 export const closeExitedTerminal = (handle, { show = terminalShow, read = terminalRead, close = closeOperationTerminal } = {}) => {
   if (!handle) return null;
   let shown;
   try { shown = show({ terminal: handle }); } catch (error) { shown = { ok: false, error: String(error?.message ?? error) }; }
-  if (!shown?.ok) {
-    if (!shown?.hostUnavailable && TERMINAL_GONE_CODES.has(shown?.errorCode)) return { handle, closed: false, proof: 'gone' };
-    return { handle, closed: false, proof: null, reason: shown?.hostUnavailable ? 'host-unavailable' : 'unverified',
-      ...(shown?.error || shown?.errorCode ? { error: String(shown.error || shown.errorCode) } : {}) };
-  }
-  let proof = 'disconnected', shellPrompt = null;
-  if (shown.connected === true && shown.writable === true) {
-    let screen = null;
-    try { const frame = read({ terminal: handle, screen: true }); if (frame?.ok) screen = String(frame.screen ?? ''); } catch { /* unreadable proves nothing */ }
-    shellPrompt = screen == null ? null : exitedAgentPromptRow(screen);
-    if (!shellPrompt) return { handle, closed: false, proof: null, reason: screen == null ? 'unreadable' : 'agent-screen' };
-    proof = 'shell-prompt';
-  }
+  const unproven = unprovenClose(handle, shown);
+  if (unproven) return unproven;
+  const { proof, shellPrompt, refusal } = exitProofOf(handle, shown, read);
+  if (refusal) return refusal;
   let closed;
   try { closed = close(handle); } catch (error) { closed = { ok: false, error: String(error?.message ?? error) }; }
   return { handle, closed: closed?.ok === true, proof, ...(shellPrompt ? { shellPrompt } : {}),

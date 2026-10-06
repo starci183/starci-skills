@@ -94,7 +94,8 @@ export function declareDependent(existing, { name, workflowId, detail = null, no
 export function landFoundation(existing, { name, workflowId, proof, version = null, refs = [], now = Date.now() }) {
   if (!existing) fail(`foundation ${name} is not registered; claim it first (starci kernel foundation --claim ${name})`, 'foundation-unknown');
   if (existing.owner?.workflowId !== workflowId) {
-    fail(`foundation ${name} is ${existing.owner ? `owned by ${existing.owner.workflowId}` : 'unclaimed'}; only its owner lands it (claim it first when its owner stopped running)`, 'foundation-not-owner', { owner: existing.owner?.workflowId ?? null });
+    const held = existing.owner ? `owned by ${existing.owner.workflowId}` : 'unclaimed';
+    fail(`foundation ${name} is ${held}; only its owner lands it (claim it first when its owner stopped running)`, 'foundation-not-owner', { owner: existing.owner?.workflowId ?? null });
   }
   const text = String(proof ?? '').trim();
   if (!text) fail('a landing names its proof: --proof <what landed and how it was checked: a commit, a published version, a record rev>', 'foundation-proof-missing');

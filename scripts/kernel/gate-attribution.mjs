@@ -68,7 +68,7 @@ export function failingPath(value, repo) {
 }
 
 // A source path the way a gate prints it (tsc `file(12,5)`, jest/eslint `file:12:5`, a bare path).
-const SOURCE_PATH = /(?:^|[\s'"`([,])((?:[A-Za-z]:)?[\w.@~-]*(?:[\\/][\w.@~[\]()-]+)+\.(?:tsx?|mts|cts|jsx?|mjs|cjs))(?:\((\d+),\d+\)|:(\d+)(?::\d+)?)?/g;
+const SOURCE_PATH = /(?:^|[\s'`"([,])((?:[A-Za-z]:)?[\w.@~-]*(?:[\\/][\w.@~\[\]()-]+)+\.(?:[mc]?ts|tsx|[mc]?js|jsx))(?:\((\d+),\d+\)|:(\d+)(?::\d+)?)?/g;
 const FAILING_CAP = 20;
 /**
  * The failing files a red check's own text names, for a check that carries no `failing` list: a Kernel
@@ -89,7 +89,7 @@ export function failingFromText(text) {
   return out;
 }
 
-const IMPORT_SPEC = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*|^\s*import\s+)['"]([^'"]+)['"]/gm;
+const IMPORT_SPEC = /(?:\bfrom\s*|\b(?:import|require)\s*\(\s*|^\s*import\s+)['"]([^'"]+)['"]/gm;
 const dropFirst = (value) => value.split('/').slice(1).join('/');
 /**
  * Whether `file` (repo-relative in `root`) imports anything under `owned` (plain repo-relative paths):
@@ -150,6 +150,56 @@ function locateFailing(value, { repo, roots }) {
  * project's other repositories); `git(args, dir)` returns {ok, stdout} (scripts/lib/git.mjs gitResultOf) and defaults to git
  * in `dir` (the repository holding the file).
  */
+// The owner the file's post-lineage commits name: 'own' on this workflow's commit, else 'peer' on the
+// first resolvable commit of another workflow; 'unknown' while every commit is unresolved.
+const committedOwner = (file, commits, root, ctx) => {
+  let entry = { path: file, owner: 'unknown' };
+  for (const sha of commits) {
+    const found = ctx.introducerOf(sha, root);
+    if (found.unresolved) continue;
+    if (ctx.ownWorkflow(found)) return { path: file, owner: 'own', via: 'commit', commit: sha };
+    if (entry.owner === 'unknown') entry = { path: file, owner: 'peer', via: 'commit', workflowId: found.workflowId, commit: sha, introducedBy: found.introducedBy };
+  }
+  return entry;
+};
+
+// Red before this lineage began: nothing touched the file since, the tree holds its last commit's
+// bytes, that commit is another workflow's, and nothing the file imports is this job's to change.
+const preexistingOwner = (file, rel, history, root, ctx) => {
+  const [sha] = history[0];
+  const found = ctx.introducerOf(sha, root);
+  return !found.unresolved && found.workflowId && !ctx.ownWorkflow(found) && !importsOwned(root, rel, ctx.ownedPlain)
+    ? { path: file, owner: 'peer', via: 'preexisting', workflowId: found.workflowId, commit: sha, introducedBy: found.introducedBy }
+    : null;
+};
+
+// One failing file's owner: this job's owned path, a peer lease on the dirty file, the commit history
+// since the lineage began, a preexisting red, or untouched foreign work-record debt.
+const attributeFile = ({ key: file, rel, root }, ctx) => {
+  const key = ctx.canonical(file);
+  if (ctx.own.some((mine) => ownedPathsIntersect(mine, ctx.compare(key)))) return { path: file, owner: 'own', via: 'owned-path' };
+  const at = (args) => ctx.run(args, root);
+  const status = at(['status', '--porcelain', '--', rel]);
+  const dirty = status.ok && status.stdout.trim().length > 0;
+  const held = dirty
+    ? findOwnedPathLeaseConflicts(ctx.db, ownedPathLeaseRequests([key]), { excludeJobId: ctx.job.job_id, canonicalOf: ctx.canon?.canonicalOf ?? null })
+    : [];
+  if (held.length) {
+    return { path: file, owner: 'peer', via: 'lease', workflowId: held[0].workflow_id, jobId: held[0].job_id };
+  }
+  // Committer times are filtered here, not by --since: git stops its walk at the first older commit.
+  const log = Number.isFinite(ctx.since) ? at(['log', `-n${LOG_DEPTH}`, '--format=%H %ct', '--', rel]) : { ok: false };
+  const history = log.ok ? log.stdout.split(/\r?\n/).map((line) => line.trim().split(' ')).filter(([sha]) => sha) : [];
+  const commits = history.filter(([, when]) => Number(when) * 1000 >= ctx.since).map(([sha]) => sha);
+  let entry = committedOwner(file, commits, root, ctx);
+  if (entry.owner === 'unknown' && !isWorkRecord(rel) && !commits.length && status.ok && !dirty && history.length) {
+    entry = preexistingOwner(file, rel, history, root, ctx) ?? entry;
+  }
+  // Untouched since the lineage began (clean and no commit) and a Work record: foreign debt, not this job's.
+  if (entry.owner === 'unknown' && isWorkRecord(rel) && status.ok && !dirty && log.ok && !commits.length) entry = { path: file, owner: 'foreign', via: 'outside-owned-untouched' };
+  return entry;
+};
+
 export function attributeRedGate(db, { repo, job, failing = [], canon = null, git = null }) {
   const run = git ?? (([verb, ...rest], dir = repo) => gitResultOf(ATTRIBUTION_CALLS[verb](rest, { dir, timeout: 20_000 })));
   const payload = payloadOf(job);
@@ -176,47 +226,13 @@ export function attributeRedGate(db, { repo, job, failing = [], canon = null, gi
 
   const located = new Map();
   for (const entry of failing.map((f) => locateFailing(f, { repo, roots })).filter(Boolean)) if (!located.has(entry.key)) located.set(entry.key, entry);
-  const files = [];
-  for (const { root, rel, key: file } of located.values()) {
-    const key = canonical(file);
-    if (own.some((mine) => ownedPathsIntersect(mine, compare(key)))) { files.push({ path: file, owner: 'own', via: 'owned-path' }); continue; }
-    const at = (args) => run(args, root);
-    const status = at(['status', '--porcelain', '--', rel]);
-    const dirty = status.ok && status.stdout.trim().length > 0;
-    const held = dirty
-      ? findOwnedPathLeaseConflicts(db, ownedPathLeaseRequests([key]), { excludeJobId: job.job_id, canonicalOf: canon?.canonicalOf ?? null })
-      : [];
-    if (held.length) {
-      files.push({ path: file, owner: 'peer', via: 'lease', workflowId: held[0].workflow_id, jobId: held[0].job_id });
-      continue;
-    }
-    // Committer times are filtered here, not by --since: git stops its walk at the first older commit.
-    const log = Number.isFinite(since) ? at(['log', `-n${LOG_DEPTH}`, '--format=%H %ct', '--', rel]) : { ok: false };
-    const history = log.ok ? log.stdout.split(/\r?\n/).map((line) => line.trim().split(' ')).filter(([sha]) => sha) : [];
-    const commits = history.filter(([, when]) => Number(when) * 1000 >= since).map(([sha]) => sha);
-    let entry = { path: file, owner: 'unknown' };
-    for (const sha of commits) {
-      const found = introducerOf(sha, root);
-      if (found.unresolved) continue;
-      if (ownWorkflow(found)) { entry = { path: file, owner: 'own', via: 'commit', commit: sha }; break; }
-      if (entry.owner === 'unknown') entry = { path: file, owner: 'peer', via: 'commit', workflowId: found.workflowId, commit: sha, introducedBy: found.introducedBy };
-    }
-    // Red before this lineage began: nothing touched the file since, the tree holds its last commit's
-    // bytes, that commit is another workflow's, and nothing the file imports is this job's to change.
-    if (entry.owner === 'unknown' && !isWorkRecord(rel) && !commits.length && status.ok && !dirty && history.length) {
-      const [sha] = history[0];
-      const found = introducerOf(sha, root);
-      if (!found.unresolved && found.workflowId && !ownWorkflow(found) && !importsOwned(root, rel, ownedPlain)) {
-        entry = { path: file, owner: 'peer', via: 'preexisting', workflowId: found.workflowId, commit: sha, introducedBy: found.introducedBy };
-      }
-    }
-    // Untouched since the lineage began (clean and no commit) and a Work record: foreign debt, not this job's.
-    if (entry.owner === 'unknown' && isWorkRecord(rel) && status.ok && !dirty && log.ok && !commits.length) entry = { path: file, owner: 'foreign', via: 'outside-owned-untouched' };
-    files.push(entry);
-  }
+  const ctx = { canonical, own, compare, run, since, job, db, canon, introducerOf, ownWorkflow, ownedPlain };
+  const files = [...located.values()].map((entry) => attributeFile(entry, ctx));
 
-  const cls = files.some((f) => f.owner === 'own') ? 'own' : files.some((f) => f.owner === 'peer') ? 'peer'
-    : files.length && files.every((f) => f.owner === 'foreign') ? 'foreign' : 'unknown';
+  let cls = 'unknown';
+  if (files.some((f) => f.owner === 'own')) cls = 'own';
+  else if (files.some((f) => f.owner === 'peer')) cls = 'peer';
+  else if (files.length && files.every((f) => f.owner === 'foreign')) cls = 'foreign';
   const peers = new Map();
   for (const f of files.filter((x) => x.owner === 'peer')) {
     const id = `${f.workflowId}\0${f.jobId ?? ''}\0${f.commit ?? ''}`;

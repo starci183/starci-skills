@@ -91,9 +91,9 @@ export function handoverAsks(db, workflowId) {
     const superseded = lifecycle('ask-superseded');
     // Parked again after a supersede - served, or notified for on-demand serving - reopens it.
     const reserved = [lifecycle('ask-serving'), lifecycle('ask-notified')].filter(Boolean).sort((a, b) => b.seq - a.seq)[0] ?? null;
-    const state = answered ? 'answered'
-      : superseded && !(reserved && reserved.seq > superseded.seq) ? 'superseded'
-      : 'pending';
+    let state = 'pending';
+    if (answered) state = 'answered';
+    else if (superseded && !(reserved?.seq > superseded.seq)) state = 'superseded';
     const event = parseJson(answered?.payload_json, {}) ?? {};
     const receipt = answered ? readReceipt(event.receiptPath) : null;
     const receiptBound = Boolean(receipt) && receipt.dispatchId === dispatchId && receipt.workflowId === workflowId;
@@ -173,6 +173,17 @@ export function handoverGateOf(db, workflowId) {
  * `due` (boolean) additionally requires every approved leg other than the
  * handover to hold a succeeded job and no other answered ask left to re-enqueue.
  */
+// The projection's state word for the gate, open jobs and the latest ask.
+const handoverStateOf = ({ gate, open, askIsLatest, latestAsk, latestJob, lastBusinessPass }) => {
+  if (gate.ok && gate.via === HANDOVER_APPROVED) return 'approved';
+  if (open.length) return 'running';
+  if (askIsLatest && latestAsk.state === 'pending') return 'awaiting-owner';
+  if (askIsLatest && latestAsk.state === 'answered') return lastBusinessPass != null && lastBusinessPass > latestAsk.answeredSeq ? 'due' : 'answered';
+  if (askIsLatest && latestAsk.state === 'superseded') return 'retired';
+  if (latestJob) return 'due';
+  return 'not-started';
+};
+
 export function handoverProjection(db, workflowId, { legOps = [], alsoSettled = [] } = {}) {
   const gate = handoverGateOf(db, workflowId);
   const jobs = db.prepare("SELECT job_id,status,try_no AS attempt FROM jobs WHERE workflow_id=? AND op_id=? AND kind<>'kernel' ORDER BY created_at,job_id")
@@ -189,14 +200,7 @@ export function handoverProjection(db, workflowId, { legOps = [], alsoSettled = 
     .get(workflowId, HANDOVER_OP)?.seq ?? null;
   const askIsLatest = Boolean(latestAsk && latestJob && latestAsk.jobId === latestJob.job_id);
 
-  let state;
-  if (gate.ok && gate.via === HANDOVER_APPROVED) state = 'approved';
-  else if (open.length) state = 'running';
-  else if (askIsLatest && latestAsk.state === 'pending') state = 'awaiting-owner';
-  else if (askIsLatest && latestAsk.state === 'answered') state = lastBusinessPass != null && lastBusinessPass > latestAsk.answeredSeq ? 'due' : 'answered';
-  else if (askIsLatest && latestAsk.state === 'superseded') state = 'retired';
-  else if (latestJob) state = 'due';
-  else state = 'not-started';
+  const state = handoverStateOf({ gate, open, askIsLatest, latestAsk, latestJob, lastBusinessPass });
 
   const succeededOps = new Set(db.prepare("SELECT DISTINCT op_id FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='succeeded' AND op_id IS NOT NULL")
     .all(workflowId).map((row) => row.op_id));
