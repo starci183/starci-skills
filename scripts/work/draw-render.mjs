@@ -377,12 +377,10 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
       // components that emitted none (PageContainer, SectionHeader, SurfaceCard, MediaFrame, ...).
       for (const el of document.querySelectorAll('[data-component]')) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', el.getAttribute('data-component'));
       for (const [selector, name] of markers) for (const el of document.querySelectorAll(selector)) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', name);
-      {
-        for (const e of entries) {
-          let els = [];
-          try { els = [...document.querySelectorAll(e.selector)]; } catch { els = []; }
-          for (const el of els) el.setAttribute(whyAttr, [...new Set([...(el.getAttribute(whyAttr) ?? '').split(/\s+/).filter(Boolean), e.id])].join(' '));
-        }
+      for (const e of entries) {
+        let els = [];
+        try { els = [...document.querySelectorAll(e.selector)]; } catch { els = []; }
+        for (const el of els) el.setAttribute(whyAttr, [...new Set([...(el.getAttribute(whyAttr) ?? '').split(/\s+/).filter(Boolean), e.id])].join(' '));
       }
     }, { entries: (rationale?.entries ?? []).filter((e) => typeof e?.selector === 'string' && typeof e?.id === 'string').map((e) => ({ id: e.id, selector: e.selector })), whyAttr: WHY_ATTR, markers: GRAMMAR_ROOT_MARKERS });
     const raw = await page.evaluate(measurePage, { generic: GENERIC_FAMILIES, exemptSelector: ACCENT_EXEMPT_SELECTOR, layoutAttr: LAYOUT_ATTR });
@@ -637,7 +635,7 @@ export async function run(argv, { cwd = process.cwd() } = {}) {
   const anchor = o.html ? path.dirname(o.html) : path.dirname(o.component);
   // The product app of a drawing that lives outside it (a ui record dir, a temp dir): --product, else the nearest
   // grammar-depending package above the draw file, else above one of its --css stylesheets (the product's own).
-  const inferred = o.component ? (o.product ?? productDirOf(o.component) ?? [].concat(o.css ?? []).map(productDirOf).find(Boolean) ?? null) : null;
+  const inferred = o.component ? (o.product ?? productDirOf(o.component) ?? (o.css ?? []).flat().map(productDirOf).find(Boolean) ?? null) : null;
   const playwright = loadPlaywright([anchor, ...(inferred ? [inferred] : []), cwd]);
   if (o.mode === 'html') {
     const source = { mode: 'html', html: { path: o.html, sha256: sha256(fs.readFileSync(o.html)) } };
