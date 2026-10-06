@@ -128,7 +128,7 @@ export function pipelineOf(db, project, wf) {
       attempts: legAttempts.map(a => attemptBrief(a, project, db)),
       why: (() => { const latest = legAttempts.filter(a => a.dispatched_at != null).at(-1); return latest && status !== 'success' ? whyFor(db, latest) : null; })(),
       current: ['running', 'settling', 'retry'].includes(status),
-      info: opInfo(leg.op.split('#')[0], leg.yaml ? String(leg.yaml).split(String.fromCharCode(92)).join('/') : null),
+      info: opInfo(leg.op.split('#')[0], leg.yaml ? String(leg.yaml).split(String.fromCodePoint(92)).join('/') : null),
     };
   });
   const planLegs = legs.filter(leg => leg.inPlan);

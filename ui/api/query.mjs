@@ -19,9 +19,9 @@ export function readCursor(url) {
   if (!url.searchParams.has('cursor')) return null;
   try {
     const raw = url.searchParams.get('cursor');
-    if (!raw || raw.length > 16_384 || !/^[A-Za-z0-9_-]+$/.test(raw)) throw new Error();
+    if (!raw || raw.length > 16_384 || !/^[A-Za-z0-9_-]+$/.test(raw)) throw new Error('Invalid cursor encoding');
     const value = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
-    if (value?.v !== 1 || value.scope !== cursorScope(url)) throw new Error();
+    if (value?.v !== 1 || value.scope !== cursorScope(url)) throw new Error('Cursor scope does not match this read');
     return value;
   } catch { throw new ReadCursorError(); }
 }

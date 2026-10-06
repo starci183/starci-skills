@@ -113,7 +113,10 @@ export function validateWork(target, { strict = false } = {}) {
   // that resolves to nothing is refused. Prompts and captures are the op proof's, not the validator's.
   try {
     for (const item of shellBindingFindings(root, enclosingWorkRoot)) {
-      (item.level === 'refuse' ? refused : item.level === 'suspect' ? suspect : info).push(`${item.file}: ${item.message} [${item.code}]`);
+      let findings = info;
+      if (item.level === 'refuse') findings = refused;
+      else if (item.level === 'suspect') findings = suspect;
+      findings.push(`${item.file}: ${item.message} [${item.code}]`);
     }
   } catch (error) {
     refused.push(`${root}: shell binding validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);

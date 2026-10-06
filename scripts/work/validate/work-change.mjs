@@ -253,13 +253,13 @@ export function checkWorkChange({workRoot,baselineRoot=null}={}){
   for(const item of unreadable)
     findings.push({code:'RECORD_UNREADABLE',id:`path:${item.path}`,path:item.path,
       detail:'the record is not readable YAML 1.2, so no change about it was decided',observed:item.tree});
-  findings.sort((a,b)=>a.code.localeCompare(b.code)||a.id.localeCompare(b.id)||String(a.observed??'').localeCompare(String(b.observed??'')));
+  const sortedFindings = findings.toSorted((a,b)=>a.code.localeCompare(b.code)||a.id.localeCompare(b.id)||String(a.observed??'').localeCompare(String(b.observed??'')));
   return {schema:RESULT,workRoot:slash(current.root),baseline:baseline?slash(baseline.root):null,
     clean:findings.length===0,
     coverage:{records:current.records.size,governed:summaries.filter(item=>item.declaredKind!==null).length,
       proven:summaries.filter(item=>item.evidence).length,stale:summaries.filter(item=>item.evidence?.stale).length,compared:baseline?summaries.filter(item=>item.computedKind!==null).length:0,
       unreadable:unreadable.map(item=>item.path)},
-    records:summaries,findings,
+    records:summaries,findings:sortedFindings,
     limitations:[baseline?'The transition is computed between two given trees; neither is independently authenticated as the revision it claims to be.':'No baseline was given, so no transition was computed: the declared kind was not verified against the edit, withdrawals were not matched to a previous revision, and an undeclared edit cannot be seen. Pass --against a previous Work tree for those.',
       'Prose and lifecycle keys are excluded from the normative digest by name, so a normative obligation written into a description travels nowhere.',
       'Evidence staleness is judged from the evidence block the record carries, its recordDigest and its capture time; no proof was re-run and no assertion was re-observed.',

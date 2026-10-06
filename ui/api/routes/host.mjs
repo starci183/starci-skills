@@ -50,10 +50,10 @@ export function createHostReader({ clock = Date.now, osReader = os, probeReaders
       if (!inflight && (readAt == null || clock() - readAt >= ttl)) {
         inflight = Promise.resolve().then(load).then(next => {
           value = next; observedAt = clock(); error = null;
-        }, failed => { error = String(failed?.message ?? failed); }).finally(() => { readAt = clock(); inflight = null; });
+        }, error_ => { error = String(error_?.message ?? error_); }).finally(() => { readAt = clock(); inflight = null; });
       }
       return { value, source: observation(source, observedAt, readAt, { cached: observedAt != null,
-        refreshing: Boolean(inflight), availability: error ? 'unavailable' : observedAt == null ? 'pending' : 'available', error }) };
+        refreshing: Boolean(inflight), availability: (error && 'unavailable') || (observedAt == null && 'pending') || 'available', error }) };
     };
   }
   const topology = cache('cim:cpu-topology', 60_000, probeReaders.topology, null);
