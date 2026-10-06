@@ -33,7 +33,7 @@ export const defaultGrammarPackageRoot=()=>path.join(skillRoot,'packages','gramm
 /** Every `--name: value` declaration outside a comment, in document order, whitespace collapsed. */
 export function cssTokenDeclarations(text){
   const code=String(text).replace(/\/\*[\s\S]*?\*\//g,'');
-  return [...code.matchAll(/(--[A-Za-z0-9_-]+)\s*:\s*([^;{}]*)/g)].map(m=>({name:m[1],value:m[2].trim().replace(/\s+/g,' ')}));
+  return [...code.matchAll(/(--[A-Za-z0-9_-]+)\s*:([^;{}]*)/g)].map(m=>({name:m[1],value:m[2].trim().replace(/\s+/g,' ')}));
 }
 
 /** The families `packages/grammar/scripts/copy-css.mjs` copies: every `src/<family>` that has a `styles.css`. */
@@ -92,6 +92,36 @@ export function grammarPackageOf(file){
  * The freshness of one grammar package's dist. `state` is one of fresh, unverifiable (no source carried,
  * nothing to compare), missing, unstamped, stale, tampered; `ok` is true only for the first two.
  */
+/** The `; <token summary>` tail of a detail string, empty when no token differs. */
+const tokenTail=tokens=>tokens.differenceCount?'; '+tokenSummary(tokens):'';
+
+/** The result for a dist with no valid stamp: unstamped when source exists, unverifiable when it does not. */
+const unstampedResult=(hasSource,result,tokens,evidence,stampFile)=>
+  hasSource
+    ?result('unstamped',`dist/${STAMP_FILE} is ${fs.existsSync(stampFile)?'not a valid build stamp':'missing'}, so this dist was not produced by the current build script${tokenTail(tokens)}`,evidence)
+    :result('unverifiable','the package carries neither source nor a build stamp (a registry install from before stamps); nothing to compare',evidence);
+
+/** The result when the stamp's algorithm or source digest no longer binds the current source, or null. */
+const sourceStaleness=(root,stamp,tokens,evidence,result)=>{
+  if(stamp.algorithm!==DIGEST_ALGORITHM)
+    return result('stale',`the stamp was made with digest ${stamp.algorithm ?? '(none)'}, this check computes ${DIGEST_ALGORITHM}`,evidence);
+  const current=sourceDigest(root);
+  if(stamp.sourceDigest!==current)
+    return result('stale',`dist was built from source ${short(stamp.sourceDigest)} (${stamp.version}, ${stamp.builtAt}) but the source is now ${short(current)}${tokenTail(tokens)}`,{...evidence,sourceDigest:current});
+  return null;
+};
+
+/** The result when the stamp's version/dist digest no longer binds the package, or null. */
+const bindingStaleness=(root,manifest,stamp,tokens,evidence,result)=>{
+  if(stamp.version!==manifest.version)
+    return result('stale',`dist was built as version ${stamp.version} but package.json is ${manifest.version}`,evidence);
+  const built=distDigest(root);
+  if(stamp.distDigest!==built)
+    return result('tampered',`dist files changed after the build (stamp ${short(stamp.distDigest)}, now ${short(built)})${tokenTail(tokens)}`,{...evidence,distDigest:built});
+  if(tokens.differenceCount)return result('tampered',tokenSummary(tokens),evidence);
+  return null;
+};
+
 export function grammarDistStatus(packageRoot=defaultGrammarPackageRoot()){
   const root=path.resolve(packageRoot);
   const manifest=readJson(path.join(root,'package.json'));
@@ -106,23 +136,13 @@ export function grammarDistStatus(packageRoot=defaultGrammarPackageRoot()){
   const stamp=readJson(stampFile);
   const tokens=hasSource?compareCssTokens(root):{compared:0,differences:[],differenceCount:0};
   const evidence={stamp,tokens};
-  if(!stamp||stamp.schema!==STAMP_SCHEMA){
-    if(!hasSource)return result('unverifiable','the package carries neither source nor a build stamp (a registry install from before stamps); nothing to compare',evidence);
-    return result('unstamped',`dist/${STAMP_FILE} is ${fs.existsSync(stampFile)?'not a valid build stamp':'missing'}, so this dist was not produced by the current build script${tokens.differenceCount?`; ${tokenSummary(tokens)}`:''}`,evidence);
-  }
+  if(!stamp||stamp.schema!==STAMP_SCHEMA)return unstampedResult(hasSource,result,tokens,evidence,stampFile);
   if(hasSource){
-    if(stamp.algorithm!==DIGEST_ALGORITHM)
-      return result('stale',`the stamp was made with digest ${stamp.algorithm ?? '(none)'}, this check computes ${DIGEST_ALGORITHM}`,evidence);
-    const current=sourceDigest(root);
-    if(stamp.sourceDigest!==current)
-      return result('stale',`dist was built from source ${short(stamp.sourceDigest)} (${stamp.version}, ${stamp.builtAt}) but the source is now ${short(current)}${tokens.differenceCount?`; ${tokenSummary(tokens)}`:''}`,{...evidence,sourceDigest:current});
+    const stale=sourceStaleness(root,stamp,tokens,evidence,result);
+    if(stale)return stale;
   }
-  if(stamp.version!==manifest.version)
-    return result('stale',`dist was built as version ${stamp.version} but package.json is ${manifest.version}`,evidence);
-  const built=distDigest(root);
-  if(stamp.distDigest!==built)
-    return result('tampered',`dist files changed after the build (stamp ${short(stamp.distDigest)}, now ${short(built)})${tokens.differenceCount?`; ${tokenSummary(tokens)}`:''}`,{...evidence,distDigest:built});
-  if(tokens.differenceCount)return result('tampered',tokenSummary(tokens),evidence);
+  const bound=bindingStaleness(root,manifest,stamp,tokens,evidence,result);
+  if(bound)return bound;
   return hasSource
     ?result('fresh',`${manifest.name}@${manifest.version} built from source ${short(stamp.sourceDigest)} at ${stamp.builtAt}; ${tokens.compared} token declarations match src`,evidence)
     :result('unverifiable',`${manifest.name}@${manifest.version} carries no source; its stamp and built files agree`,evidence);
@@ -145,7 +165,7 @@ export function grammarDistMessage(status){
  */
 export function grammarDistRefusal(file){
   const owner=grammarPackageOf(file);
-  if(!owner||!owner.inDist)return null;
+  if(!owner?.inDist)return null;
   const status=grammarDistStatus(owner.root);
   return status.ok?null:{...status,message:grammarDistMessage(status)};
 }
@@ -154,6 +174,6 @@ export function grammarDistRefusal(file){
 export function assertGrammarDistFresh(packageRoot){
   if(readJson(path.join(packageRoot,'package.json'))?.name!==GRAMMAR_PACKAGE)return null;
   const status=grammarDistStatus(packageRoot);
-  if(!status.ok)throw Error(grammarDistMessage(status));
+  if(!status.ok)throw new Error(grammarDistMessage(status));
   return status;
 }

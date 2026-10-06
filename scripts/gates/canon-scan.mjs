@@ -43,36 +43,49 @@ const MACHINES = ['eslint', 'architecture'];
 const USAGE = 'usage: starci gate canon-scan --root <repo> [--stack-kind next|nest] [--families <csv>] [--paths <csv>] [--exclude <csv>] [--machines eslint,architecture] [--fix] [--json] [--out <scratch-file> | --blob]';
 
 const csv = splitList;
-const prefixOf = (value) => posixPath(value).replace(/\/+$/, '');
+const prefixOf = (value) => {
+  let out = posixPath(value);
+  while (out.endsWith('/')) out = out.slice(0, -1);
+  return out;
+};
 const under = sameOrUnder;
 const count = (map, key) => { map[key] = (map[key] ?? 0) + 1; };
+
+const ARG_ACTIONS = {
+  '--root': (out, take) => { out.root = take(); },
+  '--stack-kind': (out, take) => { out.profile = take(); },
+  '--families': (out, take) => { out.families = csv(take()).filter((family) => family !== 'all'); },
+  '--paths': (out, take) => { out.paths = csv(take()).map(prefixOf); },
+  '--exclude': (out, take) => { out.exclude = csv(take()).map(prefixOf); },
+  '--machines': (out, take) => { out.machines = csv(take()); },
+  '--fix': (out) => { out.fix = true; },
+  '--json': (out) => { out.json = true; },
+  '--out': (out, take) => { out.out = take(); },
+  '--blob': (out) => { out.blob = true; },
+};
 
 export function parseCanonScanArgs(argv) {
   const out = { families: [], paths: [], exclude: [], fix: false, json: false };
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index];
-    const take = () => { const value = argv[++index]; if (value === undefined) throw Error(`${key} needs a value; ${USAGE}`); return value; };
-    if (key === '--root') out.root = take();
-    else if (key === '--stack-kind') out.profile = take();
-    else if (key === '--families') out.families = csv(take()).filter((family) => family !== 'all');
-    else if (key === '--paths') out.paths = csv(take()).map(prefixOf);
-    else if (key === '--exclude') out.exclude = csv(take()).map(prefixOf);
-    else if (key === '--machines') out.machines = csv(take());
-    else if (key === '--fix') out.fix = true;
-    else if (key === '--json') out.json = true;
-    else if (key === '--out') out.out = take();
-    else if (key === '--blob') out.blob = true;
-    else throw Error(`unexpected argument ${key}; ${USAGE}`);
+    const take = () => {
+      const value = argv[++index];
+      if (value === undefined) throw new Error(`${key} needs a value; ${USAGE}`);
+      return value;
+    };
+    const action = ARG_ACTIONS[key];
+    if (!action) throw new Error(`unexpected argument ${key}; ${USAGE}`);
+    action(out, take);
   }
-  if (!out.root) throw Error(USAGE);
+  if (!out.root) throw new Error(USAGE);
   out.machines ??= out.families.length
     ? MACHINES.filter((machine) => (machine === 'architecture' ? out.families.includes('architecture') : out.families.some((family) => family !== 'architecture')))
     : [...MACHINES];
-  if (out.profile && !['next', 'nest'].includes(out.profile)) throw Error(`--stack-kind must be next or nest; ${USAGE}`);
+  if (out.profile && !['next', 'nest'].includes(out.profile)) throw new Error(`--stack-kind must be next or nest; ${USAGE}`);
   const unknown = out.machines.filter((machine) => !MACHINES.includes(machine));
-  if (unknown.length || !out.machines.length) throw Error(`--machines takes ${MACHINES.join(', ')}; ${USAGE}`);
-  if (out.fix && !out.paths.length) throw Error('--fix needs --paths: a codemod runs inside one slice only');
-  if (out.out && out.blob) throw Error('--out and --blob are mutually exclusive');
+  if (unknown.length || !out.machines.length) throw new Error(`--machines takes ${MACHINES.join(', ')}; ${USAGE}`);
+  if (out.fix && !out.paths.length) throw new Error('--fix needs --paths: a codemod runs inside one slice only');
+  if (out.out && out.blob) throw new Error('--out and --blob are mutually exclusive');
   return out;
 }
 
@@ -80,7 +93,7 @@ export function loadConformance() {
   const doc = readModuleJson('modules', 'models', 'canon-conformance.yaml');
   const waves = Array.isArray(doc?.waves) ? doc.waves : [];
   if (!waves.length || waves.some((wave) => !wave?.id || !Array.isArray(wave.roots) || !wave.roots.length)) {
-    throw Error('modules/models/canon-conformance.yaml must declare waves[{id, roots[]}]');
+    throw new Error('modules/models/canon-conformance.yaml must declare waves[{id, roots[]}]');
   }
   const rootWave = new Map();
   waves.forEach((wave, index) => { for (const root of wave.roots) rootWave.set(String(root), index); });
@@ -140,15 +153,21 @@ export function planSlices(findings, { conformance, maxFiles, seams = [] }) {
       const files = new Set(group.findings.map((finding) => finding.file));
       const deeper = files.size > maxFiles && [...files].some((file) => unitOf(file, conformance, depth + 1).unit !== unit);
       if (deeper) place(group.findings, depth + 1);
-      else byUnit.set(unit, { unit, wave: group.wave, files, findings: group.findings.length, byFamily: group.findings.reduce((acc, finding) => (count(acc, finding.family), acc), {}) });
+      else byUnit.set(unit, { unit, wave: group.wave, files, findings: group.findings.length, byFamily: group.findings.reduce((acc, finding) => { count(acc, finding.family); return acc; }, {}) });
     }
   };
   place(findings, 1);
+  mergeSeams(byUnit, seams);
+  return packSlices(bindRelatedUnits(byUnit, findings, conformance), maxFiles, conformance);
+}
+
+/** A declared seam takes wave 0: it either joins the unit already holding it or swallows every unit under it. */
+const mergeSeams = (byUnit, seams) => {
   for (const seam of seams) {
     const holder = [...byUnit.keys()].find((key) => under(seam.path, key));
     if (holder) { byUnit.get(holder).wave = 0; continue; }
     const merged = { unit: seam.path, wave: 0, files: new Set(), findings: 0, byFamily: {} };
-    for (const [key, inner] of [...byUnit]) {
+    for (const [key, inner] of byUnit) {
       if (!under(key, seam.path)) continue;
       for (const file of inner.files) merged.files.add(file);
       merged.findings += inner.findings;
@@ -157,15 +176,21 @@ export function planSlices(findings, { conformance, maxFiles, seams = [] }) {
     }
     byUnit.set(seam.path, merged);
   }
-  // A finding that names a second file (an import edge the fix must move) binds both units into one
-  // group that no slice boundary splits; a group takes its lowest wave.
+};
+
+/** A finding that names a second file (an import edge the fix must move) binds both units into one
+ * group that no slice boundary splits; a group takes its lowest wave. */
+const bindRelatedUnits = (byUnit, findings, conformance) => {
   for (const finding of findings) {
     if (!finding.related || [...byUnit.keys()].some((key) => under(finding.related, key))) continue;
     const { unit, wave } = unitOf(finding.related, conformance);
     if (![...byUnit.keys()].some((key) => under(key, unit))) byUnit.set(unit, { unit, wave, files: new Set([finding.related]), findings: 0, byFamily: {} });
   }
   const parent = new Map([...byUnit.keys()].map((key) => [key, key]));
-  const find = (key) => { while (parent.get(key) !== key) key = parent.get(key); return key; };
+  const find = (key) => {
+    while (parent.get(key) !== key) { key = parent.get(key); }
+    return key;
+  };
   const holderOf = (file) => [...byUnit.keys()].find((key) => under(file, key));
   for (const finding of findings) {
     if (!finding.related) continue;
@@ -180,6 +205,11 @@ export function planSlices(findings, { conformance, maxFiles, seams = [] }) {
     group.wave = Math.min(group.wave, unit.wave);
     group.units.push(unit);
   }
+  return groups;
+};
+
+/** The ordered unit groups packed into disjoint slices of at most `maxFiles` files, wave by wave. */
+const packSlices = (groups, maxFiles, conformance) => {
   const ordered = [...groups.values()].sort((a, b) => a.wave - b.wave || a.home.localeCompare(b.home) || a.units[0].unit.localeCompare(b.units[0].unit));
   const slices = [];
   let open = null;
@@ -199,7 +229,7 @@ export function planSlices(findings, { conformance, maxFiles, seams = [] }) {
   return slices.map((slice, index) => ({
     ...slice, ordinal: index + 1, wave: conformance.waves[slice.wave], overTarget: slice.files > maxFiles,
   }));
-}
+};
 
 /** The runtime's canon package source for a published canon package name. */
 function runtimeCanon(name) {
@@ -211,7 +241,7 @@ function runtimeCanon(name) {
     const pkg = JSON.parse(fs.readFileSync(manifest, 'utf8'));
     if (pkg.name === name) return { dir: path.join(base, entry.name), version: pkg.version, entry: path.join(base, entry.name, pkg.main ?? 'index.mjs') };
   }
-  throw Object.assign(Error(`no runtime package under packages/eslint publishes ${name}`), { code: 'CANON_SOURCE_UNAVAILABLE' });
+  throw Object.assign(new Error(`no runtime package under packages/eslint publishes ${name}`), { code: 'CANON_SOURCE_UNAVAILABLE' });
 }
 
 let redirected = null;
@@ -223,7 +253,7 @@ let redirected = null;
 function redirectCanon(name, entry, dir, root) {
   const url = pathToFileURL(entry).href;
   if (redirected) {
-    if (redirected.map[name] !== url) throw Object.assign(Error(`canon import already redirected to ${redirected.map[name] ?? 'another package'}`), { code: 'CANON_SOURCE_UNAVAILABLE' });
+    if (redirected.map[name] !== url) throw Object.assign(new Error(`canon import already redirected to ${redirected.map[name] ?? 'another package'}`), { code: 'CANON_SOURCE_UNAVAILABLE' });
     return;
   }
   const deps = {};
@@ -256,7 +286,7 @@ function detectProfile(root) {
     if (profile === 'be') return 'nest';
     if (profile === 'fe') return 'next';
   }
-  throw Object.assign(Error('cannot tell next from nest; pass --stack-kind'), { code: 'PROFILE_UNKNOWN' });
+  throw Object.assign(new Error('cannot tell next from nest; pass --stack-kind'), { code: 'PROFILE_UNKNOWN' });
 }
 
 function familyOf(ruleId, canonPrefix, ruleOwners) {
@@ -265,6 +295,19 @@ function familyOf(ruleId, canonPrefix, ruleOwners) {
   const slash = ruleId.lastIndexOf('/');
   return slash < 0 ? 'eslint-core' : ruleId.slice(0, slash);
 }
+
+/** The eslint findings of one result set, relative to the scanned root. */
+const lintFindings = (results, relative, canon, ruleOwners) => {
+  const findings = [];
+  for (const result of results) {
+    const file = relative(result.filePath);
+    for (const message of result.messages) {
+      if (message.severity < 1) continue;
+      findings.push({ machine: 'eslint', ruleId: message.ruleId ?? 'parse', family: familyOf(message.ruleId, canon.prefix, ruleOwners), file, line: message.line ?? 0, fixable: Boolean(message.fix) });
+    }
+  }
+  return findings;
+};
 
 async function lintRepository(root, options, canon, relative) {
   const require = createRequire(path.join(root, 'package.json'));
@@ -277,15 +320,7 @@ async function lintRepository(root, options, canon, relative) {
   const targets = options.paths.length ? options.paths.filter((item) => fs.existsSync(path.join(root, item))) : ['.'];
   const results = targets.length ? await eslint.lintFiles(targets) : [];
   if (options.fix) await ESLint.outputFixes(results);
-  const findings = [];
-  for (const result of results) {
-    const file = relative(result.filePath);
-    for (const message of result.messages) {
-      if (message.severity < 1) continue;
-      findings.push({ machine: 'eslint', ruleId: message.ruleId ?? 'parse', family: familyOf(message.ruleId, canon.prefix, loaded.ruleOwners ?? {}), file, line: message.line ?? 0, fixable: Boolean(message.fix) });
-    }
-  }
-  return { files: results.length, findings };
+  return { files: results.length, findings: lintFindings(results, relative, canon, loaded.ruleOwners ?? {}) };
 }
 
 function architectureInWorker(input) {
@@ -294,7 +329,7 @@ function architectureInWorker(input) {
     let settled = false;
     worker.once('message', result => { settled = true; resolve(result); });
     worker.once('error', reject);
-    worker.once('exit', code => { if (!settled) reject(Error(`architecture worker exited ${code}`)); });
+    worker.once('exit', code => { if (!settled) reject(new Error(`architecture worker exited ${code}`)); });
   });
 }
 
@@ -305,7 +340,7 @@ export async function scanCanon(options) {
   const conformance = loadConformance();
   const catalog = readModuleJson('modules', 'models', 'code-patterns.yaml');
   const packageName = catalog?.profiles?.[profile]?.canon?.package;
-  if (!packageName) throw Object.assign(Error(`code-patterns.yaml declares no canon package for ${profile}`), { code: 'CANON_SOURCE_UNAVAILABLE' });
+  if (!packageName) throw Object.assign(new Error(`code-patterns.yaml declares no canon package for ${profile}`), { code: 'CANON_SOURCE_UNAVAILABLE' });
   const source = runtimeCanon(packageName);
   const canon = { name: packageName, entry: source.entry, dir: source.dir, prefix: profile === 'nest' ? 'starci-be/' : 'starci-fe/' };
   const report = {
@@ -320,39 +355,51 @@ export async function scanCanon(options) {
       .then(result => ({ result }), error => ({ error })) : null;
   const eslintTask = options.machines.includes('eslint') ? lintRepository(root, options, canon, relative)
     .then(lint => ({ lint }), error => ({ error })) : null;
-  if (eslintTask !== null) {
-    try {
-      const { lint, error } = await eslintTask;
-      if (error) throw error;
-      report.machines.eslint = { status: 'ran', files: lint.files };
-      all.push(...lint.findings);
-    } catch (error) {
-      report.machines.eslint = { status: 'unavailable' };
-      report.issues.push({ machine: 'eslint', code: error.code ?? 'ESLINT_UNAVAILABLE', message: String(error.message ?? error) });
-    }
+  if (eslintTask !== null) await applyEslint(eslintTask, report, all);
+  if (options.machines.includes('architecture')) await applyArchitecture(architectureTask, report, all);
+  finishReport(report, all, options, root, profile, conformance);
+  return report;
+}
+
+/** The eslint machine's outcome folded into the report and the finding pool. */
+const applyEslint = async (eslintTask, report, all) => {
+  try {
+    const { lint, error } = await eslintTask;
+    if (error) throw error;
+    report.machines.eslint = { status: 'ran', files: lint.files };
+    all.push(...lint.findings);
+  } catch (error) {
+    report.machines.eslint = { status: 'unavailable' };
+    report.issues.push({ machine: 'eslint', code: error.code ?? 'ESLINT_UNAVAILABLE', message: String(error.message ?? error) });
   }
-  if (options.machines.includes('architecture')) {
-    let result;
-    try {
-      const outcome = await architectureTask;
-      if (outcome.error) throw outcome.error;
-      result = outcome.result;
-    }
-    catch (error) { result = { errors: [{ ruleId: 'ARCH_EXECUTION_UNAVAILABLE', message: String(error.message ?? error) }], violations: [] }; }
-    // An unresolved internal import located on a file is that file's finding (the slice holding it repoints it),
-    // never the machine's unavailability (@/i18n/navigation residue left by a moved
-    // seam once made every slice's canon-scan exit 3). Anything else the machine could not do stays unavailable.
-    const importGaps = (result.errors ?? []).filter((error) => error.ruleId === 'ARCH_INTERNAL_IMPORT_UNRESOLVED' && error.path);
-    const machineErrors = (result.errors ?? []).filter((error) => !importGaps.includes(error));
-    for (const error of importGaps) all.push({ machine: 'architecture', ruleId: error.ruleId, family: 'architecture', file: posixPath(error.path), line: error.line ?? 0, fixable: false, ...(error.specifier ? { specifier: error.specifier } : {}) });
-    if (machineErrors.length) {
-      report.machines.architecture = { status: 'unavailable', files: result.files ?? 0 };
-      for (const error of machineErrors) report.issues.push({ machine: 'architecture', code: error.ruleId, message: error.message, ...(error.path ? { path: posixPath(error.path) } : {}) });
-    } else report.machines.architecture = { status: 'ran', files: result.files ?? 0, ...(importGaps.length ? { importGaps: importGaps.length } : {}) };
-    for (const violation of result.violations ?? []) {
-      all.push({ machine: 'architecture', ruleId: violation.ruleId, family: 'architecture', file: posixPath(violation.path ?? violation.file ?? ''), line: violation.line ?? 0, fixable: false, ...(violation.resolvedPath ? { related: posixPath(violation.resolvedPath) } : {}) });
-    }
+};
+
+/** The architecture machine's outcome folded into the report and the finding pool. */
+const applyArchitecture = async (architectureTask, report, all) => {
+  let result;
+  try {
+    const outcome = await architectureTask;
+    if (outcome.error) throw outcome.error;
+    result = outcome.result;
   }
+  catch (error) { result = { errors: [{ ruleId: 'ARCH_EXECUTION_UNAVAILABLE', message: String(error.message ?? error) }], violations: [] }; }
+  // An unresolved internal import located on a file is that file's finding (the slice holding it repoints it),
+  // never the machine's unavailability (@/i18n/navigation residue left by a moved
+  // seam once made every slice's canon-scan exit 3). Anything else the machine could not do stays unavailable.
+  const importGaps = (result.errors ?? []).filter((error) => error.ruleId === 'ARCH_INTERNAL_IMPORT_UNRESOLVED' && error.path);
+  const machineErrors = (result.errors ?? []).filter((error) => !importGaps.includes(error));
+  for (const error of importGaps) all.push({ machine: 'architecture', ruleId: error.ruleId, family: 'architecture', file: posixPath(error.path), line: error.line ?? 0, fixable: false, ...(error.specifier ? { specifier: error.specifier } : {}) });
+  if (machineErrors.length) {
+    report.machines.architecture = { status: 'unavailable', files: result.files ?? 0 };
+    for (const error of machineErrors) report.issues.push({ machine: 'architecture', code: error.ruleId, message: error.message, ...(error.path ? { path: posixPath(error.path) } : {}) });
+  } else report.machines.architecture = { status: 'ran', files: result.files ?? 0, ...(importGaps.length ? { importGaps: importGaps.length } : {}) };
+  for (const violation of result.violations ?? []) {
+    all.push({ machine: 'architecture', ruleId: violation.ruleId, family: 'architecture', file: posixPath(violation.path ?? violation.file ?? ''), line: violation.line ?? 0, fixable: false, ...(violation.resolvedPath ? { related: posixPath(violation.resolvedPath) } : {}) });
+  }
+};
+
+/** The scoped findings, totals, seams and slices written onto the report. */
+const finishReport = (report, all, options, root, profile, conformance) => {
   const inScope = (finding) => (!options.paths.length || options.paths.some((prefix) => under(finding.file, prefix)))
     && (!options.families.length || options.families.includes(finding.family));
   const deferredOf = (finding) => options.exclude.some((prefix) => under(finding.file, prefix));
@@ -368,7 +415,7 @@ export async function scanCanon(options) {
   }
   const slicing = allocationSettings().slicing ?? {};
   const maxFiles = Math.floor(Number(slicing.targetMinutes?.[1]) / Number(slicing.weights?.file));
-  if (!Number.isInteger(maxFiles) || maxFiles < 1) throw Object.assign(Error('modules/models/runtimes.yaml allocation.slicing must declare targetMinutes and weights.file'), { code: 'slicing-undeclared' });
+  if (!Number.isInteger(maxFiles) || maxFiles < 1) throw Object.assign(new Error('modules/models/runtimes.yaml allocation.slicing must declare targetMinutes and weights.file'), { code: 'slicing-undeclared' });
   const seams = options.paths.length ? [] : seamPaths(root, findings, conformance.seams[profile]).filter((seam) => !options.exclude.some((prefix) => under(seam.path, prefix) || under(prefix, seam.path)));
   report.totals = totals;
   report.deferred = { findings: deferred.length, paths: options.exclude };
@@ -377,9 +424,8 @@ export async function scanCanon(options) {
   report.sliceBound = { maxFiles, source: 'modules/models/runtimes.yaml allocation.slicing targetMinutes[1] / weights.file' };
   report.findings = findings;
   const unavailable = options.machines.some((machine) => report.machines[machine]?.status !== 'ran');
-  report.status = unavailable ? 'unavailable' : findings.length ? 'findings' : 'ok';
-  return report;
-}
+  report.status = [unavailable && 'unavailable', findings.length && 'findings'].find(Boolean) ?? 'ok';
+};
 
 function human(report) {
   const lines = [`canon-scan ${report.repository} (${report.profile}, ${report.canon.package}@${report.canon.version} from ${report.canon.source}): ${report.status}`];
@@ -403,7 +449,7 @@ async function canonScanMain(argv, { write = (text) => process.stdout.write(text
   }
   await emitCheckOutput(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${human(report)}\n`,
     {...options, mediaType: options.json ? 'application/json' : 'text/plain', write});
-  return report.status === 'ok' ? 0 : report.status === 'findings' ? 1 : 3;
+  return { ok: 0, findings: 1 }[report.status] ?? 3;
 }
 
 const thread = workerContext();
