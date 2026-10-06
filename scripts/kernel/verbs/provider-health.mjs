@@ -4,6 +4,7 @@ import { readProviderCircuit, writeProviderCircuit } from '../../machine/provide
 import { QUOTA_FAILURE_KIND, quotaSpecOf, quotaProbeProviders } from '../../agent/provider-outage.mjs';
 import { credentialRotated } from '../../agent/credential-fingerprint.mjs';
 import { readEnv } from '../../lib/env.mjs';
+import { VerbExit } from './shared/verb-exit.mjs';
 
 const quotaProbeDue = (circuit, now, everyMs) => {
   const last = Number(circuit?.quotaProbe?.at) || 0;
@@ -22,7 +23,7 @@ const kernelCallerProof = (db, env = process.env) => {
 const refuseProviderRecover = (out, human) => {
   console.error(JSON.stringify(out));
   console.log(human);
-  process.exit(1);
+  throw new VerbExit(1);
 };
 async function quotaProbe(ledger, args, emit, internals) {
   const { normalizeProvider, providerHealthOf } = internals;

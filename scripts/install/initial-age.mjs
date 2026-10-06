@@ -5,6 +5,7 @@ import os from 'node:os';
 import { SECRET_ENV_FILE, CREDENTIAL_FILE_MAX_BYTES, secretEnv, readSecretBytes, sopsIdentityEnv } from '../../engine/secrets.mjs';
 import { INSTALL_MANIFEST_FILE, INSTALL_PROTOCOL_SCHEMA } from '../lib/install-custody.mjs';
 import { samePath } from '../lib/path-key.mjs';
+import { redactText } from '../lib/redact.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { publishSecret } from '../api/fs/publish-secret.mjs';
 import { withGeneratedAgeIdentity } from '../api/sops/with-generated-age-identity.mjs';
@@ -15,11 +16,15 @@ import { acquireHostLock, hostLockOwner, hostLockDir, releaseHostLock } from '..
 const SETUP_SCHEMA = 'starci/initial-age-setup@1';
 const refuse = reason => { throw Object.assign(new Error('initial age setup refused'), { setupReason: reason }); };
 const no = reason => ({ ok: false, outcome: 'held', reason });
+/** The cause of an unclassified setup failure: its code and message, secrets blanked (the message comes from path and tool handling, never key bytes by design). */
+const causeOf = error => redactText(`${error?.code ? `${error.code}: ` : ''}${error?.message ?? error}`.replace(/AGE-SECRET-KEY-[A-Z0-9]+/g, '[redacted:age-key]')).slice(0, 400);
 /** The capture reasons that name the identity tool (scripts/api/sops/lib.mjs withGeneratedAgeIdentity) rather than the install's own custody. */
 export const AGE_TOOL_REASONS = Object.freeze({ 'native-tool-unavailable': 'age-keygen was not found on PATH', 'unsupported-tool-profile': 'the age-keygen on PATH is not an accepted version' });
 const setupReasons = new Set(['canonical-target', 'foreign-target', 'old-ciphertext', 'private-file-custody',
   'ambiguous-identity', 'disabled-identity', 'prior-attempt', 'prior-install', 'lease-lost', 'manifest-custody', 'identity-reload']);
 const sameNode = (a, b) => a.dev === b.dev && a.ino === b.ino;
+// Whether `file` is its own canonical entry: the spelling of the parents above it (8.3 short name, symlinked prefix) is not a link.
+const ownSpelling = file => samePath(fs.realpathSync(file), path.join(fs.realpathSync(path.dirname(file)), path.basename(file)));
 
 function physicalTarget(repo) {
   if (typeof repo !== 'string' || !path.isAbsolute(repo)) refuse('canonical-target');
@@ -27,7 +32,7 @@ function physicalTarget(repo) {
   for (const entry of [root, target]) {
     const stat = fs.lstatSync(entry, { throwIfNoEntry: false });
     if (!stat) { if (entry === root) refuse('canonical-target'); continue; }
-    if (!stat.isDirectory() || isLinkLike(entry, { stat }) || !samePath(fs.realpathSync(entry), entry)) refuse('canonical-target');
+    if (!stat.isDirectory() || isLinkLike(entry, { stat }) || !ownSpelling(entry)) refuse('canonical-target');
     nodes[entry] = stat;
   }
   return { root, target, nodes };
@@ -67,7 +72,7 @@ function originalCiphertext(root, target) {
 function manifestOf(target) {
   const file = path.join(target, INSTALL_MANIFEST_FILE), stat = fs.lstatSync(file, { throwIfNoEntry: false });
   if (!stat) return null;
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || !samePath(fs.realpathSync(file), file)
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || !ownSpelling(file)
     || stat.size > CREDENTIAL_FILE_MAX_BYTES * 16) refuse('manifest-custody');
   let doc;
   try { doc = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { refuse('manifest-custody'); }
@@ -86,7 +91,7 @@ function identityBefore(root, target, prior, env, force) {
   try {
     const stat = fs.lstatSync(file, { throwIfNoEntry: false });
     if (stat) {
-      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || !samePath(fs.realpathSync(file), file)) refuse('private-file-custody');
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || !ownSpelling(file)) refuse('private-file-custody');
       before = readSecretBytes(file);
       const names = before.toString('utf8').split(/\r?\n/).flatMap(line => {
         const name = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line)?.[1];
@@ -220,7 +225,7 @@ export function runInitialAgeInstall({ repo, force = false, project } = {}, deps
     return finish({ ok: true, outcome: 'created', publication: result.effectState, publicRecipient: result.publicRecipient,
       durability: result.durability, reservationDurability: process.platform === 'win32' ? 'file-fsync-namespace-unqualified' : 'file-and-parent-fsync' });
   } catch (error) {
-    return finish(no(setupReasons.has(error?.setupReason) ? error.setupReason : 'setup-unknown'));
+    return finish(setupReasons.has(error?.setupReason) ? no(error.setupReason) : { ...no('setup-unknown'), detail: causeOf(error) });
   } finally {
     privateBefore?.fill(0);
     if (got?.ok) {

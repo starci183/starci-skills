@@ -19,6 +19,7 @@ import { isCanonSlice, requirePlannedCanonSlice } from '../canon-plan-gate.mjs';
 import { requirePhase, ACCEPTS_WORK } from './shared/workflow-transitions.mjs';
 import { seamPriorityOf } from '../seam-policy.mjs';
 import { deferralOf as testDeferralOf, deferJob, explicitAsksOf } from '../../route/spec-deferral.mjs';
+import { VerbExit } from './shared/verb-exit.mjs';
 
 export default {
   verb: 'enqueue',
@@ -63,13 +64,13 @@ export default {
     const out = { ok: false, workflowId, op: args.op, reason: 'autopilot-provision-deferred',
       detail: `autopilot (${AUTOPILOT_RULING}) opens no provision.ask mid-flow: build on the sandbox/stub path, record the need with starci kernel autopilot --workflow ${workflowId} --defer-to-handover --op <asking op> --class credential|real-money|shared-system|owner-decision --detail "<what is owed>" [--fields <FILE_OR_VAR,...>], and the end-of-flow checklist (--params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}') collects it once` };
     emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   const resolvedParams = resolveOpParams(brief, { leg: legSplit.owner, flag: kernelFlag, enforceRequired: true });
   if (!resolvedParams.ok && resolvedParams.param) {
     const out = { ok: false, workflowId, op: args.op, reason: resolvedParams.reason, param: resolvedParams.param, detail: resolvedParams.detail };
     emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   if (!resolvedParams.ok) throw Object.assign(new Error(resolvedParams.detail), { code: resolvedParams.reason });
   const ownedPaths = [...new Set(String(args.paths).split(',').map((s) => s.trim()).filter(Boolean))];
@@ -97,7 +98,7 @@ export default {
       const out = { ok: false, workflowId, op: args.op, reason: 'owned-paths-outside-writes', violations: wrongFamily, families: [...(familyGuard?.families ?? [])], owners: Object.fromEntries(owners),
         detail: `${wrongFamily.length} owned path(s) lie outside ${args.op}'s writes: ${wrongFamily.slice(0, 5).map((v) => `${v.path} (${v.why})`).join('; ')}${hint ? `. Route by family: ${hint}` : ''}` };
       emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
-      process.exit(1);
+      throw new VerbExit(1);
     }
   }
   const records = [...new Set(String(args.records ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
@@ -122,7 +123,7 @@ export default {
   if (!target.ok) {
     const out = { ok: false, workflowId, op: args.op, reason: target.reason, detail: target.detail };
     emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // A grant the worker could never satisfy (its directory does not exist in the target repository) is refused here,
   // unless it is an explicit --new-module grant (scripts/kernel/grant-parents.mjs).
@@ -132,7 +133,7 @@ export default {
     if (!grant.ok) {
       const out = { ok: false, workflowId, op: args.op, reason: grant.reason, violations: grant.violations.map(({ owned, dir, closest }) => ({ owned, dir, closest })), detail: grant.detail };
       emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
-      process.exit(1);
+      throw new VerbExit(1);
     }
   }
   // --after: jobs of this workflow that must settle succeeded before this one
@@ -168,7 +169,7 @@ export default {
     if (duty.required) {
       const out = { ok: false, workflowId, op: args.op, reason: 'foundations-undeclared', peers: duty.peers, detail: duty.detail };
       emit(out, `enqueue REFUSED for ${args.op}: foundations-undeclared — ${duty.detail}`, args.json);
-      process.exit(1);
+      throw new VerbExit(1);
     }
     if (duty.advised) foundationAdvisory = duty.detail;
   }

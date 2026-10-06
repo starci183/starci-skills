@@ -778,3 +778,14 @@ test('actual target-directory replacement during projection or captured setup re
     for (const capture of fx.captures) for (const bytes of [capture.stdout, capture.stderr]) assert.ok(bytes.every(byte => byte === 0));
   }
 });
+
+test('an unclassified setup failure carries its cause as detail, prints it, and never prints key material', t => {
+  const fx = initialAgeFixture(t);
+  fx.locks.acquire = () => { throw Object.assign(new Error(`unclassified fixture failure near ${fx.key}`), { code: 'EFIXTURE' }); };
+  assert.equal(fx.invoke(), 1);
+  const outcome = fx.outcome();
+  assert.equal(outcome.reason, 'setup-unknown');
+  assert.match(outcome.detail, /^EFIXTURE: unclassified fixture failure near /);
+  assert.ok(fx.errors.some(line => line.includes('initial age setup failed (setup-unknown): EFIXTURE: unclassified fixture failure')));
+  assert.equal([...fx.logs, ...fx.errors].join('\n').includes(fx.key), false);
+});

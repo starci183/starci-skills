@@ -269,6 +269,8 @@ function sourceWithAdditions(root, additions) {
   };
 }
 
+// Files the app authors itself: the upgrade never overwrites them and keeps an existing one (CONTEXT: declarations are preserved).
+const APP_OWNED = new Set([".starcistacks/application-stacks.yaml"]);
 const publicStep = ({ op, path: file, why }) => ({ op, path: file, why });
 
 async function model({ root, to, presets, manifest }) {
@@ -354,6 +356,10 @@ async function model({ root, to, presets, manifest }) {
   for (const file of desired) {
     const target = path.join(root, ...file.path.split("/"));
     if (fs.existsSync(target)) {
+      if (APP_OWNED.has(file.path)) {
+        steps.push({ op: "keep", path: file.path, why: "The app already declares its stacks; the declaration stays as the app wrote it.", kind: "keep" });
+        continue;
+      }
       if (!sameText(root, file.path, file.content))
         throw new UpgradeError(
           "HFS_UPGRADE_FILE_CONFLICT",
@@ -463,7 +469,7 @@ export async function upgradeEdition({
   const directories = [];
   try {
     for (const step of built.steps) {
-      if (step.kind === "lock") continue;
+      if (step.kind === "lock" || step.kind === "keep") continue;
       if (step.kind === "managed") {
         const target = built.managed.find(
           (candidate) => candidate.path === step.path,

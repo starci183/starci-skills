@@ -94,7 +94,7 @@ test('every workspace.manage mode writes its setup record onto the catalog the l
   const nodes = [op.writes, ...Object.values(op.policy.executionModes).map(m => m.writes)].map(ws => ws.find(w => w.id === 'node'));
   assert.equal(nodes.length, 4);
   for (const node of nodes) {
-    assert.match(node.path, /^\.starciwork\/index\.yaml(?: |$)/, node.path);
+    assert.equal(node.path, '.starciwork/index.yaml');
     assert.ok(node.fields.some(f => f.startsWith('extensions.work3.setup.<workflow>.')), JSON.stringify(node.fields));
     assert.ok(!node.fields.some(f => /^completion\b/.test(f)), 'a catalog entry binds no completion');
   }

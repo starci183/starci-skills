@@ -427,6 +427,7 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       log('initial age setup: ' + JSON.stringify(setup));
       // The init identity needs an accepted age-keygen (scripts/api/sops/selected-age-versions.mjs); the install never skips key generation.
       if (AGE_TOOL_REASONS[setup.toolReason]) error(pkg.name + ': ' + AGE_TOOL_REASONS[setup.toolReason] + '; init needs age-keygen ' + selectedAgeVersions().join(' or ') + ' on PATH (docs/installation.md, Prerequisites). Install it, then run starci runtime install again.');
+      if (setup.detail) error(pkg.name + ': initial age setup failed (' + setup.reason + '): ' + setup.detail);
       return setup.ok ? 0 : 1;
     }
     if (opts.command === 'doctor') return doctor(opts, log) ? 1 : 0;

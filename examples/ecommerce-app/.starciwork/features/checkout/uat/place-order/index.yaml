@@ -1,7 +1,7 @@
 schema: work/uat-flow@1
 id: uat.checkout.place-order
 title: Browse, confirm an order, replay it, and hit both refusals
-state: done
+state: todo
 entry: /browse
 actor: person
 accounts: accounts.yaml
@@ -22,4 +22,6 @@ cleanup:
 # state: todo and a done uat-flow may not prove a todo target, so proves names only the two done
 # records. If those records settle done, extend proves back over them.
 proves: [fr.checkout.place-order, br.checkout.place-order]
-change: {rev: 6, kind: clarifying, at: 2026-09-19T15:56:00.000Z, reason: "v9-10 settled the record: runs/20260919T155312Z-5c10a673 walked all seven steps against the live stack (fresh production shop on the projected :4069, identity :5070, order :6070) and recorded Outcome: pass - every authored check observed its expected value, including the repaired step 7 (buyer confirmation rendered for the run-registered person; GET /internal/buyers read-back answered hasOrders=true). Session revoked by the product's own sign-out and verified absent at the verify door; the person and the confirmed order stay per this record's cleanup note. The earlier runs are kept untouched as append-only history. blockedBy lifted - gap.checkout.live-proof closes on this done record."}
+blockedBy:
+  - {record: gap.checkout.live-proof, rev: 5, because: "the recorded run's result, screens and video are cited by digest in evidence.yaml but no artifact store holds those bytes, so the run cannot be verified; the flow is walked again to file a verifiable run"}
+change: {rev: 7, kind: clarifying, at: 2026-10-06T00:00:00.000Z, reason: "state returns to todo: the done claim cites run 20260919T155312Z-5c10a673 by digest, and the result, screen and video bytes it names are held by no artifact store, so the evidence cannot be verified; the record waits on gap.checkout.live-proof until the flow is walked again and its run is filed."}

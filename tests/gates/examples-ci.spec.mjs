@@ -274,10 +274,10 @@ test('the runtime scope follows its slot manifest: flipping a slot coverage chan
 
 test('the runtime scope: a none slot inside a required directory is excluded, a required slot of a non-source file is refused, the vendored yaml and the generated catalog stay out', () => {
   const nested = runtimeManifest();
-  nested.slots.push({ id: 'runtime.ui-fixtures', profiles: ['runtime'], path: 'ui/fixtures/', presence: 'optional', tracked: 'tracked', tier: 'none', tests: 'none', coverage: 'none' });
+  nested.slots.push({ id: 'runtime.ui-api-fixtures', profiles: ['runtime'], path: 'ui/api/fixtures/', presence: 'optional', tracked: 'tracked', tier: 'none', tests: 'none', coverage: 'none' });
   const scope = runtimeCoverageScope(nested);
-  assert.ok(scope.excludes.includes('ui/fixtures/**'), 'the none slot inside ui/ is excluded');
-  assert.ok(!runtimeCoverageScope(runtimeManifest()).excludes.includes('ui/fixtures/**'));
+  assert.ok(scope.excludes.includes('ui/api/fixtures/**'), 'the none slot inside ui/api/ is excluded');
+  assert.ok(!runtimeCoverageScope(runtimeManifest()).excludes.includes('ui/api/fixtures/**'));
   const real = runtimeCoverageScope(runtimeManifest());
   assert.ok(!real.include.includes('engine/yaml.mjs') && real.excludes.includes('packages/cli/src/catalog.generated.mjs'));
   const bad = runtimeManifest();

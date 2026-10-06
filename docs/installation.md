@@ -150,7 +150,9 @@ installed package's own `installRuntime` (the installer `init`, the dependency i
 (`CONTEXT.md`, `skills/starci/SKILL.md`, `skills/starci/references/host-startup.md`), no `.starci/host`, a `config.yaml` seeded verbatim from
 `config.example.yaml`, the `AGENTS.md` entry of `init/AGENTS.md`, the host ignores, the shim, `starci runtime version`, the entry check for the app, a fresh
 `machine-db init` and `status`, an idempotent second install, and that the real home was not written. Exit 0 every assertion passed, 1 an assertion failed,
-2 a step could not run; it prints a JSON summary and appends a table to `$GITHUB_STEP_SUMMARY` when GitHub sets it.
+2 a step could not run; it prints a JSON summary and appends a table to `$GITHUB_STEP_SUMMARY` when GitHub sets it. A failed child step (the tarball fetch, the
+runtime install, the second install) reports its exit, the installer's `initial age setup:` result line and the last 60 lines of its output in the assertion
+detail, in the console and in a block below the summary table. Assertions that cannot be meaningful after a failed install are listed as `skipped` with the reason. On Windows, when the temp volume has 8.3 short names, one more install runs with `HOME` and the app spelled in their short form (`install succeeds through a non-canonical (8.3) path spelling`); the sandbox never canonicalises its own root, so a `windows-latest` runner (short-named `TEMP`) exercises that spelling in every run; without short names the assertion is `skipped` with the reason.
 
 The script asserts the `age-keygen` prerequisite by name. Run either sandbox as `starci gate install-sandbox --tarball <temp-dir>/starci-<version>.tgz`:
 
@@ -171,6 +173,7 @@ The script asserts the `age-keygen` prerequisite by name. Run either sandbox as 
 | `npx @starci/cli` cannot find the release | Use a reviewed package version; it may not be published. |
 | Bootstrap entry missing or stale | Re-run `starci runtime install --cwd <host>`; the managed block is regenerated from `init/AGENTS.md`. `starci runtime check --only entry -- <host> [claimed-entry] [--hosts claude,devin|all]` judges `AGENTS.md` plus the `CLAUDE.md`/`DEVIN.md` copies that exist or are named by `--hosts`. |
 | Install exits 1 with "initial age setup" held | `age-keygen` 1.2.1 or 1.3.1 is missing from `PATH`; the message names the tool, see the prerequisites above. |
+| Install exits 1 with `initial age setup failed (setup-unknown): <cause>` | The cause is the error's code and message from the setup step (secrets redacted); the install is held, not half-applied. A path through a Windows 8.3 short name or a symlinked prefix is not a cause. |
 | `.claude` already exists | Inspect ownership/custom files; do not reflexively pass `--force`. |
 | `config.yaml` missing | Copy `config.example.yaml`; it is seeded only when absent. |
 | No project binding | Supply backend/frontend paths and verified remotes in `work.json`. Do not initialize `.starciwork` inside the frontend. |

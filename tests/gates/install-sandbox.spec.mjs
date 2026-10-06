@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { diffSnapshots, dockerArgs, exitCodeFor, findOnPath, missingIgnores, parseArgs, sandboxEnv, snapshotTree, summaryMarkdown, summaryOf, tarballVersion, watchedPaths } from '../../scripts/gates/install-sandbox.mjs';
+import { diffSnapshots, dockerArgs, exitCodeFor, findOnPath, missingIgnores, parseArgs, sandboxEnv, snapshotTree, summaryMarkdown, summaryOf, tailOf, tarballVersion, watchedPaths, childDetail, nonCanonicalSpelling } from '../../scripts/gates/install-sandbox.mjs';
 
 test('the tarball version comes from the npm pack name only', () => {
   assert.equal(tarballVersion('/x/starci-1.0.5.tgz'), '1.0.5');
@@ -79,11 +79,45 @@ test('the summary counts results and the markdown escapes table pipes', () => {
   const summary = summaryOf({ results, version: '1.0.5', platform: 'linux-x64', node: 'v22', sandbox: '<removed>' });
   assert.deepEqual([summary.passed, summary.failed, summary.errored], [1, 1, 0]);
   const md = summaryMarkdown(summary);
-  assert.match(md, /\| fail \| b \| x\/y z \|/);
+  assert.match(md, /\| fail \| b \| x\/y \|/);
+  assert.match(md, /<summary>b<\/summary>[\s\S]*x\|y\nz/);
   assert.match(md, /passed 1, failed 1, could not run 0/);
 });
 
 test('the arguments parse flags with values and switches', () => {
   assert.deepEqual(parseArgs(['--tarball', 't.tgz', '--docker', '--tools', 'd', '--keep', '--out', 'o.json']), { tarball: 't.tgz', keep: true, docker: true, tools: 'd', out: 'o.json' });
   assert.equal(parseArgs([]).tarball, undefined);
+});
+
+test('a failed child reports its exit, the installer result line and the output tail, bounded to 60 lines', () => {
+  const stdout = `${Array.from({ length: 100 }, (_, i) => `line ${i}`).join('\r\n')}\ninitial age setup: {"ok":false,"reason":"setup-unknown"}\n`;
+  const detail = childDetail({ label: 'runtime install', status: 1, stdout, stderr: 'starci: boom', report: 'starci: report' });
+  assert.match(detail, /^runtime install exit 1\ninstaller result: initial age setup: \{"ok":false,"reason":"setup-unknown"\}\n--- output tail/);
+  assert.match(detail, /starci: boom\nstarci: report$/);
+  assert.equal(detail.includes('line 0\n'), false);
+  assert.equal(tailOf(stdout).split('\n').length, 60);
+  assert.equal(tailOf('a\n\n  \nb\n'), 'a\nb');
+});
+
+test('skipped assertions are counted and named, never a failure', () => {
+  const results = [{ name: 'a', status: 'pass' }, { name: 'b', status: 'fail', detail: 'exit 1\ntail line' }, { name: 'c', status: 'skipped', detail: 'skipped: the install failed' }];
+  assert.equal(exitCodeFor(results), 1);
+  assert.equal(exitCodeFor([{ status: 'pass' }, { status: 'skipped' }]), 0);
+  const summary = summaryOf({ results, version: '1.0.5', platform: 'win32-x64', node: 'v22', sandbox: '<removed>' });
+  assert.equal(summary.skipped, 1);
+  const md = summaryMarkdown(summary);
+  assert.match(md, /passed 1, failed 1, could not run 0, skipped 1/);
+  assert.match(md, /\| skipped \| c \| skipped: the install failed \|/);
+  assert.match(md, /<summary>b<\/summary>[\s\S]*tail line/);
+});
+
+test('a non-canonical spelling of an existing directory names the same directory, or the reason none exists', t => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-spelling-')));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const spelled = nonCanonicalSpelling(root);
+  if (!spelled.path) { assert.match(spelled.reason, /8\.3 short name|symlink/); return; }
+  try {
+    assert.notEqual(spelled.path.toLowerCase(), root.toLowerCase());
+    assert.equal(fs.realpathSync.native(spelled.path).toLowerCase(), fs.realpathSync.native(root).toLowerCase());
+  } finally { if (spelled.holder) fs.unlinkSync(spelled.holder); }
 });

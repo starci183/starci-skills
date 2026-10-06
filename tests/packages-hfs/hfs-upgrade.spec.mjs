@@ -417,6 +417,10 @@ test("the committed lite example has a read-only, additions-only full upgrade pl
       assert.equal(before[step.path], undefined, `${step.path} is a new full-edition path`);
       continue;
     }
+    if (step.op === "keep") {
+      assert.notEqual(before[step.path], undefined, `${step.path} is an app-owned file the upgrade leaves as it is`);
+      continue;
+    }
     if (step.op === "rewrite-readme") {
       assert.equal(step.path, "README.md");
       continue;
@@ -510,7 +514,7 @@ test("already-full and invalid targets refuse with exit 2, and a failed lock res
   const conflicted = syntheticLite(t, "conflict-demo");
   put(
     conflicted,
-    ".starcistacks/application-stacks.yaml",
+    ".starcistacks/dev/infra/compose/api.yaml",
     "schema: custom/stack@1\n",
   );
   const conflictBefore = contents(conflicted);
@@ -524,12 +528,37 @@ test("already-full and invalid targets refuse with exit 2, and a failed lock res
     (error) =>
       error instanceof UpgradeError &&
       error.code === "HFS_UPGRADE_FILE_CONFLICT" &&
-      /application-stacks\.yaml/.test(error.message),
+      /compose\/api\.yaml/.test(error.message),
   );
   assert.deepEqual(
     contents(conflicted),
     conflictBefore,
-    "an existing non-canon addition is refused before apply",
+    "an existing non-canon managed addition is refused before apply",
+  );
+
+  const kept = syntheticLite(t, "kept-stacks-demo");
+  const declared = "schema: starci/application-stacks@1\nservices: [{ name: app-owned }]\n";
+  put(kept, ".starcistacks/application-stacks.yaml", declared);
+  const keptPlan = await upgradeEdition({ root: kept, to: "full", plan: true, presets: PRESETS });
+  assert.deepEqual(
+    keptPlan.filter((step) => step.path === ".starcistacks/application-stacks.yaml").map((step) => step.op),
+    ["keep"],
+    "an app that declares its stacks keeps the declaration; the plan reports it kept",
+  );
+  assert.ok(keptPlan.some((step) => step.op === "add" && step.path === ".starcistacks/dev/infra/compose/api.yaml"), "the rest of the scaffold is still added");
+  await upgradeEdition({ root: kept, to: "full", presets: PRESETS, lock: fakeLock });
+  assert.equal(
+    fs.readFileSync(path.join(kept, ".starcistacks/application-stacks.yaml"), "utf8"),
+    declared,
+    "the app-owned stacks declaration is byte-identical after the upgrade",
+  );
+  assert.ok(fs.existsSync(path.join(kept, ".starcistacks/dev/infra/compose/api.yaml")));
+
+  const absent = await upgradeEdition({ root: syntheticLite(t, "absent-stacks-demo"), to: "full", plan: true, presets: PRESETS });
+  assert.deepEqual(
+    absent.filter((step) => step.path === ".starcistacks/application-stacks.yaml").map((step) => step.op),
+    ["add"],
+    "an absent stacks declaration is added",
   );
 
   const failed = syntheticLite(t, "rollback-demo");

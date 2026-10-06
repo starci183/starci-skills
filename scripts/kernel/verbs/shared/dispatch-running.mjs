@@ -1,6 +1,7 @@
 import { setJobStatus, updateAttempt } from '../../../../engine/db/ledger.mjs';
 import { recordWhy } from '../../why-record.mjs';
 import { DISPATCHES, requirePhase } from './workflow-transitions.mjs';
+import { VerbExit } from './verb-exit.mjs';
 
 /**
  * The leased → running move, compare-and-set (H9): the job must still be leased under this dispatch's own
@@ -33,6 +34,6 @@ export function runningOrAbandon(commit, { ledger, db, job, jobId, op, dispatchI
     } catch { /* the refusal stands; events refuse an archived workflow */ }
     emit({ ok: false, jobId, op, refused: error.code, error: error.message, cleanup },
       `dispatch ABANDONED for ${jobId} (${op}): ${error.message}; the started worker was stopped`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
 }

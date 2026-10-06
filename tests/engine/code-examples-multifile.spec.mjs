@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { loadExampleCatalog, exampleSourcePaths } from '../../scripts/lib/example-refs.mjs';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { runNode } from '../../scripts/api/node/run-node.mjs';
 import { runGit } from '../../scripts/api/git/lib.mjs';
 import { installInto, uninstall, runtimeInstalls, missingFrom, LINT_DEPENDENCIES, STARCI_PACKAGES } from '../helpers/hfs-app-install.mjs';
@@ -135,6 +137,40 @@ test('a case-only sibling app cannot pass a folded real-path comparison', t => {
   fs.symlinkSync(physical, app, process.platform === 'win32' ? 'junction' : 'dir');
   fx.links.push(app);
   assert.throws(() => loadExampleCatalog(fx.root), /contained regular|linked|reference/);
+});
+
+// A spelling of the fixture root that is not its canonical path: a Windows 8.3 short name, or a path through a symlinked parent.
+function aliasOfRoot(fx) {
+  if (process.platform === 'win32') {
+    const run = spawnSync('cmd.exe', ['/d', '/s', '/c', `"for %I in ("${fx.root}") do @echo %~sI"`], { encoding: 'utf8', windowsVerbatimArguments: true });
+    const short = run.status === 0 ? run.stdout.trim() : '';
+    return short && short.toLowerCase() !== fx.root.toLowerCase() ? { alias: short } : { reason: 'this volume has no 8.3 short name for the temp directory (fsutil 8dot3name query <drive>:); enable short names on the volume so the short spelling exists' };
+  }
+  const holder = `${fx.root}-via`;
+  fs.symlinkSync(path.dirname(fx.root), holder, 'dir');
+  fx.links.push(holder);
+  return { alias: path.join(holder, path.basename(fx.root)) };
+}
+
+test('the canonical spelling of a root resolves its catalog', t => {
+  const fx = catalogFixture(t);
+  assert.deepEqual(loadExampleCatalog(fx.root).examples.map(row => row.id), ['current']);
+});
+
+test('a tree reached through a non-canonical root spelling is accepted: the root spelling is not a link inside the tree', t => {
+  const fx = catalogFixture(t), { alias, reason } = aliasOfRoot(fx);
+  if (!alias) return t.skip(`this host offers no non-canonical spelling of the fixture root (8.3 short names or a symlinked parent): ${reason}`);
+  assert.deepEqual(loadExampleCatalog(alias).examples.map(row => row.id), ['current']);
+  assert.deepEqual(exampleSourcePaths(alias, ['current']).sort(byCodeUnit), ['examples/current/be/owner.spec.ts', 'examples/current/be/owner.ts', 'examples/current/be/tsconfig.json']);
+});
+
+test('a link below a non-canonical root is still refused', t => {
+  const fx = catalogFixture(t), { alias } = aliasOfRoot(fx), target = path.join(fx.root, 'physical'), link = path.join(fx.root, 'examples/current/be/linked');
+  write(target, 'owner.ts', 'export const owner = 1;\n');
+  fs.symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir');
+  fx.links.push(link);
+  fx.example.files = ['be/linked/owner.ts']; fx.example.entrypoint = 'be/linked/owner.ts'; fx.save();
+  assert.throws(() => loadExampleCatalog(alias ?? fx.root), /linked example input/);
 });
 
 test('each knowledge relatedExamples identity resolves to current app source', () => {

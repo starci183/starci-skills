@@ -3,6 +3,7 @@ import { getWorkflow } from './shared/rows.mjs';
 import { setInboxStatusByKey } from '../../../engine/db/ledger.mjs';
 import { OWNER_ROUTED_REPLY, WORKER_QUESTION, drainWorkflowMessages, workerQuestionsOf } from './shared/worker-messages.mjs';
 import { reply as orcaReply } from '../../api/orca/reply.mjs';
+import { VerbExit } from './shared/verb-exit.mjs';
 
 export default {
   verb: 'reply',
@@ -29,7 +30,7 @@ export default {
     if (!sent.ok) {
       const out = { ok: false, workflowId, messageId, jobId: item.jobId, reason: 'reply-failed', error: sent.error ?? sent.outcome };
       emit(out, `reply FAILED for ${messageId}: ${out.error}`, args.json);
-      process.exit(1);
+      throw new VerbExit(1);
     }
     ledger.transaction(() => {
       const now = Date.now();

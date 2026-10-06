@@ -15,6 +15,7 @@ import {spawn,spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,reopenUnit,raiseTryBudget,recordJobResult,updateAttempt,markReportConsumed} from '../../engine/db/ledger.mjs';
 import {proofRepo} from '../helpers/sonar-scan.mjs';
 import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
+import {checkpointOp} from '../../scripts/kernel/workflow-checkpoint.mjs';
 import {fileDispatchContract} from '../helpers/filed-contract.mjs';
 import { recordArtifactProofs } from '../../scripts/kernel/proof-integrity.mjs';
 import { stageBlob, putArtifact, recordCheck } from '../../scripts/machine/evidence-store.mjs';
@@ -60,9 +61,11 @@ const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{r
 const read=(repo,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger.db);}finally{ledger.close();}};
 
 /** A running workflow whose approved chain is docs.author then the handover, with docs.author settled pass. */
-const seedWorkflow=(repo,wf)=>seed(repo,ledger=>ledger.transaction(db=>{
+// `worktree:false` is a workflow with no registered worktree: its finish is the approval only, no land (the land, with its full gate
+// and review.verify, is workflow-checkpoint.spec.mjs); a registered worktree makes finish land for real.
+const seedWorkflow=(repo,wf,{worktree=true}={})=>seed(repo,ledger=>ledger.transaction(db=>{
   const at=Date.now();
-  registerWorkflowWorktree({env:process.env},{workflowId:wf,orcaWorktreeId:`handover::${wf}`,path:repo,branch:'main'});
+  if(worktree)registerWorkflowWorktree({env:process.env},{workflowId:wf,orcaWorktreeId:`handover::${wf}`,path:repo,branch:'main'});
   ensureWorkflow(db,{workflowId:wf,phase:'queued',title:'handover spec',by:'test-fixture',reason:'seed',at});
   insertGoal(db,{workflowId:wf,revision:0,goalIdentity:'hgoal',markdown:'# goal',
     goal:{opChain:{legs:[{op:'docs.author'},{op:HANDOVER_OP}]},derivedPlan:{legs:[{op:'docs.author'},{op:HANDOVER_OP}],edges:[['docs.author',HANDOVER_OP]]}},createdAt:at});
@@ -153,6 +156,18 @@ const retire=(repo,wf,jobId)=>seed(repo,ledger=>{
   for(const row of ledger.db.prepare('SELECT attempt_id FROM reports WHERE workflow_id=? AND consumed_at IS NULL').all(wf))
     markReportConsumed(ledger.db,{attemptId:row.attempt_id});
 });
+/**
+ * finish on an approved handover. A registered workflow worktree makes finish land for real (full gate, review.verify, rebase, push;
+ * judged by workflow-checkpoint.spec.mjs), and this fixture has no installed canons, so the approval is proven by the finish getting
+ * PAST the handover gate to the land step: refused by a land code only, the workflow still running, nothing finished.
+ */
+const finishPastApproval=async(repo,wf)=>{
+  const r=await run('finish','--repo',repo,'--workflow',wf,'--json');
+  assert.notEqual(r.status,0,'the land refuses in this fixture');
+  assert.match(r.stdout+r.stderr,/"code":"workflow-finish-[a-z-]+"/,'refused by the land step, not by the handover gate');
+  assert.doesNotMatch(r.stdout+r.stderr,/handover-(not-approved|proof)/);
+  assert.equal(read(repo,db=>db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(wf).phase),'running','a land refusal keeps the workflow running');
+};
 const approvals=(repo,wf)=>read(repo,db=>db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='handover-approved' ORDER BY seq").all(wf).map(r=>JSON.parse(r.payload_json)));
 
 describe('handover',{concurrency:2},()=>{
@@ -199,7 +214,7 @@ test('a handover ask carries exactly the three options approve, feedback, questi
 
 test('finish is refused without the owner approval and allowed after it; a later business settle makes it stale',async t=>{
   const repo=fixture(t),wf='wf-handover-finish';
-  seedWorkflow(repo,wf);
+  seedWorkflow(repo,wf,{});
   const refused=await run('finish','--repo',repo,'--workflow',wf,'--json');
   assert.notEqual(refused.status,0,'no approval, no finish');
   assert.match(refused.stderr,/handover-not-approved/);
@@ -248,10 +263,7 @@ test('finish is refused without the owner approval and allowed after it; a later
   await handOver(repo,wf,{attempt:3,dispatchId:'ho-d3'});
   answer(repo,wf,{dispatchId:'ho-d3',optionIndex:0});
   assert.equal((await settleApproval(repo,wf,{attempt:4,dispatchId:'ho-d4'})).status,0);
-  const finished=await run('finish','--repo',repo,'--workflow',wf,'--json');
-  assert.equal(finished.status,0,finished.stderr||finished.stdout);
-  assert.equal(json(finished).handover.via,'handover-approved');
-  assert.equal(read(repo,db=>db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(wf).phase),'finished');
+  await finishPastApproval(repo,wf);
 });
 
 test('a non-owner answer never approves a handover',async t=>{
@@ -347,7 +359,7 @@ test('starci kernel plan does not count a trailing handover.review appended to a
 
 test('an accepted goal revision invalidates both handover approval routes and finish preserves pending input and kernel custody', async t => {
   const repo=fixture(t),wf='wf-handover-revised';
-  seedWorkflow(repo,wf);
+  seedWorkflow(repo,wf,{});
   await handOver(repo,wf,{attempt:1,dispatchId:'revision-ho-1'});
   answer(repo,wf,{dispatchId:'revision-ho-1',optionIndex:0});
   const approved=await settleApproval(repo,wf,{attempt:2,dispatchId:'revision-ho-2'});
@@ -385,8 +397,7 @@ test('an accepted goal revision invalidates both handover approval routes and fi
   answer(repo,wf,{dispatchId:'revision-ho-3',optionIndex:0});
   const fresh=await settleApproval(repo,wf,{attempt:4,dispatchId:'revision-ho-4'});
   assert.equal(fresh.status,0,fresh.stderr||fresh.stdout);
-  const done=await run('finish','--repo',repo,'--workflow',wf,'--json');
-  assert.equal(done.status,0,done.stderr||done.stdout);
+  await finishPastApproval(repo,wf);
 });
 
 
@@ -400,6 +411,8 @@ test('native handover and finish revalidate the actual required proof bytes and 
   fs.writeFileSync(path.join(repo,'tests/delivery.spec.mjs'),"import test from 'node:test';test('private delivery boundary',()=>{});\n");
   fs.writeFileSync(path.join(repo,'tests/e2e.spec.mjs'),"import test from 'node:test';test('private e2e boundary',()=>{});\n");
   seed(repo,l=>l.db.prepare("UPDATE jobs SET payload_json=? WHERE job_id='job-docs'").run(JSON.stringify({opId:'docs.author',records:[rel],owned_paths:['tests/']})));
+  // docs.author settled green, so the Kernel's settle checkpointed its owned files: they are committed, not stray work of a later blocked op.
+  seed(repo,l=>checkpointOp({env:process.env,db:l.db,repo,ledger:l},{workflowId:wf,opId:'job-docs'}));
   const jobId='job-ho-proof';const {scratch}=seed(repo,l=>seedJob(l,{repo,wf,jobId,op:HANDOVER_OP,unitKey:'ho',dispatchId:'proof-ho-1'}));
   const ask=writeReport(scratch,'missing-canonical.json',{outcome:'ask',question:{text:'delivery',options:OPTIONS}});
   const absent=await run('report','--repo',repo,'--job',jobId,'--report',ask,'--json');assert.notEqual(absent.status,0);assert.match(absent.stderr,/handover-proof-unjudged/);

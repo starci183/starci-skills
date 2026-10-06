@@ -5,6 +5,7 @@ import { sendEnterWithProof, sendWakeWithProof, deliveryFieldsOf } from '../wake
 import { answerAllowlistedGate } from '../../agent/lib.mjs';
 import { probeDraft } from '../clear-draft.mjs';
 import { draftOwnership } from '../../lib/terminal-liveness.mjs';
+import { VerbExit } from './shared/verb-exit.mjs';
 
 export default {
   verb: 'nudge',
@@ -52,20 +53,20 @@ export default {
   if (!worker.terminalHandle || !worker.connected || !worker.writable) {
     const out = { ok: false, jobId, nudged: false, reason: 'worker-unavailable', worker };
     emit(out, `nudge REFUSED for ${jobId}: worker-unavailable — exact terminal is disconnected/unwritable`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // The agent exited and left a bare shell: a wake would run as a shell command.
   // Nothing is typed; status reads it worker-dead and reconcile --dead-worker recovers it.
   if (worker.liveness === 'agent-exited') {
     const out = { ok: false, jobId, nudged: false, reason: 'agent-exited', delivery: 'agent-exited', worker };
     emit(out, `nudge REFUSED for ${jobId}: agent-exited — the worker's agent exited (its terminal shows the shell prompt '${worker.shellPrompt}'); nothing was typed - ${deadWorkerRecovery(jobId)}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // Quiet past its provider's timeout after a delivered nudge: a second wake changes nothing.
   if (worker.liveness === 'quiet') {
     const out = { ok: false, jobId, nudged: false, reason: 'worker-quiet', worker };
     emit(out, `nudge REFUSED for ${jobId}: worker-quiet — the worker printed nothing for ${Math.round((worker.quiet?.outputAgeMs ?? 0) / 60000)} min after its last nudge - ${deadWorkerRecovery(jobId)}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // A wedged worker's turn can never file its report, but it is not nudgeable either: a wake lands
   // behind a turn that never ends. Its recovery is the dead-worker settle-failed route, which quits
@@ -73,7 +74,7 @@ export default {
   if (worker.liveness === 'wedged') {
     const out = { ok: false, jobId, nudged: false, reason: 'worker-wedged', worker };
     emit(out, `nudge REFUSED for ${jobId}: worker-wedged — the worker's turn ran past the wedge threshold on one command with no output; a wake would land behind a turn that never ends - ${deadWorkerRecovery(jobId)}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   if (worker.liveness === 'active' || worker.liveness === 'active-unclassified') {
     const out = { ok: true, jobId, nudged: false, reason: 'worker-active', worker };
@@ -102,7 +103,7 @@ export default {
       const refused = recordSendRefused(ledger, job, { dispatchId, worker, proof });
       const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', delivery: 'failed', evidence: proof.evidence, sendErrorCode: proof.sendErrorCode, worker, error: sent.error, ...(refused ? { sendRefused: true } : {}) };
       emit(out, `nudge FAILED for ${jobId}: ${sent.error || proof.sendErrorCode || 'terminal send failed'}; the screen still shows the staged input${refused ? refusedNote(jobId) : ''}`, args.json);
-      process.exit(1);
+      throw new VerbExit(1);
     }
     ledger.transaction(() => ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
@@ -126,7 +127,7 @@ export default {
     emit(out, answer.answered
       ? `nudged ${jobId}: answered host dialog '${answer.gate}' on exact worker ${worker.terminalHandle} with '${answer.select}' (${answer.keystroke}; answer ${answers} of ${worker.gateAutoAnswer.limit} on attempt ${job.attempt})${answer.cleared ? '' : '; the dialog is still on screen'}`
       : `nudge FAILED for ${jobId}: host dialog '${answer.gate}' could not be answered (${answer.reason ?? 'no answer'}); nothing was recorded`, args.json);
-    if (!answer.answered) process.exit(1);
+    if (!answer.answered) throw new VerbExit(1);
     return;
   }
   // The same host dialog came back after the runtime answered it maxPerAttempt times on this attempt: the
@@ -139,17 +140,17 @@ export default {
         answers: worker.gateAutoAnswer?.answers ?? null, limit: worker.gateAutoAnswer?.limit ?? null } }));
     const out = { ok: false, jobId, nudged: false, reason: 'worker-gate-loop', worker };
     emit(out, `nudge REFUSED for ${jobId}: worker-gate-loop — host dialog '${worker.gateAutoAnswer?.gate ?? worker.gate}' is back after ${worker.gateAutoAnswer?.answers ?? '?'} answers on attempt ${job.attempt}; another answer is an endless continue - ${deadWorkerRecovery(jobId)} (Esc closes the dialog before the agent is quit); a repeat on the retry reads as a retry-loop finding`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   if (worker.liveness === 'interactive-gate' || worker.liveness === 'failed') {
     const out = { ok: false, jobId, nudged: false, reason: worker.liveness, worker };
     emit(out, `nudge REFUSED for ${jobId}: ${worker.liveness} — ${worker.liveness === 'interactive-gate' ? "permission/trust input the worker's card does not allowlist" : 'an agent process/authentication failure'} is a typed environment problem, not a wake; nothing was typed`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   if (!['turn-idle', 'live-idle'].includes(worker.liveness)) {
     const out = { ok: false, jobId, nudged: false, reason: 'worker-state-unknown', worker };
     emit(out, `nudge REFUSED for ${jobId}: worker-state-unknown — liveness ${worker.liveness} is neither turn-idle nor live-idle; weak observation never authorizes input`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   const prompt = [
     `Operation liveness wake for durable job ${jobId} (${job.op_id}) attempt ${job.attempt}.`,
@@ -190,14 +191,14 @@ export default {
       const draftProbe = { verdict: probe.verdict, sends: probe.sends, ...(probe.verdict === 'real' ? { restored: probe.restored, ...(probe.restored ? {} : { removed: probe.removed }) } : {}) };
       const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: draftOwner.draft.slice(0, 200), inputSource: 'draft', draftProbe, worker };
       emit(out, `nudge REFUSED for ${jobId}: foreign-input — the input box draft Orca reports holds '${draftOwner.draft.length > 80 ? `${draftOwner.draft.slice(0, 80)}…` : draftOwner.draft}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (a Ctrl+U probe ${probe.verdict === 'real' ? `changed it - real text${probe.restored ? ', its cut typed back' : ', NOT restored'}` : 'left it unreadable'}), no event is appended`, args.json);
-      process.exit(1);
+      throw new VerbExit(1);
     }
   }
   const inputText = nudgeFrame == null ? null : workerInputRowText(nudgeFrame);
   if (inputText && !INPUT_ROW_PLACEHOLDER.test(inputText) && !runtimeOwnedInput(inputText, stagedEvidence, prompt)) {
     const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: inputText.slice(0, 200), worker };
     emit(out, `nudge REFUSED for ${jobId}: foreign-input — the input row holds '${inputText.length > 80 ? `${inputText.slice(0, 80)}…` : inputText}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed, no event is appended`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // Delivery is proven from the screen, not Orca's receipt: agent_prompt_stalled
   // (text queued behind a running turn) and agent_prompt_blocked (Enter refused,
@@ -213,7 +214,7 @@ export default {
     emit(out, `nudge REFUSED for ${jobId}: ${proof.delivery} — ${proof.delivery === 'foreign-input'
       ? `the input box draft Orca reports holds '${String(proof.draft ?? '').slice(0, 80)}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (only a Ctrl+U probe and its restore)`
       : `the input box holds piled-up runtime text that bounded Ctrl+U shrank but could not empty ('${String(proof.draft ?? '').slice(0, 80)}'); the wake was not typed onto it`}, no event is appended`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // A dropped wake (ok receipt, idle frame, no text) is retried once split -
   // text, then Enter-only - and says so: splitRetried/splitOutcome.
@@ -230,13 +231,13 @@ export default {
     }));
     const out = { ok: false, jobId, nudged: false, reason: 'agent-exited', ...delivered, shellPrompt: proof.shellPrompt ?? null, typed, worker };
     emit(out, `nudge REFUSED for ${jobId}: agent-exited — ${typed ? `a shell received the wake: '${proof.shellPrompt}'` : `the worker's agent exited; its terminal shows the shell prompt '${proof.shellPrompt}'; nothing was typed`} - ${deadWorkerRecovery(jobId)}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   if (!proof.ok) {
     const refused = recordSendRefused(ledger, job, { dispatchId, worker, proof });
     const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', ...delivered, worker, error: sent.error, ...(refused ? { sendRefused: true } : {}) };
     emit(out, `nudge FAILED for ${jobId}: ${sent.error || proof.sendErrorCode || 'terminal send failed'}; the screen shows no wake (${proof.evidence})${refused ? refusedNote(jobId) : ''}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   ledger.transaction(() => ledger.appendEvent({
     workflowId: job.workflow_id, entityType: 'job', entityId: jobId,

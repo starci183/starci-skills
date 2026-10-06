@@ -24,6 +24,7 @@ const HOST_IGNORES = ['.starciwork/', '.claude/config.yaml', '.claude/secret.env
 const REQUIRED_FILES = ['CONTEXT.md', 'skills/starci/SKILL.md', 'skills/starci/references/host-startup.md', 'config.example.yaml', 'init/AGENTS.md', '.starci-skills.json'];
 const HOST_MARKER = '<!-- starci:prompt-entry -->';
 const STEP_TIMEOUT_MS = 15 * 60_000;
+const TAIL_LINES = 60;
 
 /** The installed version a tarball name `<name>-<x.y.z>[-pre].tgz` declares, or null when the name is not an npm pack name. Pure. */
 export function tarballVersion(file) {
@@ -97,19 +98,45 @@ export function missingIgnores(text, entries = HOST_IGNORES) {
   return entries.filter((entry) => !lines.includes(entry) && !lines.includes(`/${entry}`));
 }
 
+/** The last `lines` non-blank lines of `text` (CRLF folded): the part of a child's output that names its failure. Pure. */
+export function tailOf(text, lines = TAIL_LINES) { return String(text ?? '').replace(/\r\n/g, '\n').split('\n').filter((line) => line.trim()).slice(-lines).join('\n'); }
+
+/** The failure detail of a child step: its exit, the installer's JSON result line when it printed one, then the tail of its stdout, stderr and own report. Pure. */
+export function childDetail({ label, status, stdout = '', stderr = '', report = '' }) {
+  const result = String(stdout).replace(/\r\n/g, '\n').split('\n').filter((line) => line.startsWith('initial age setup: ')).at(-1);
+  return [`${label} exit ${status}`, ...(result ? [`installer result: ${result}`] : []), `--- output tail (last ${TAIL_LINES} lines of stdout, stderr and report)`, tailOf(`${stdout}\n${stderr}\n${report}`)].join('\n');
+}
+
+/**
+ * A second spelling of the directory `root` that is not its canonical path, or why none exists: on Windows its 8.3 short name (when the volume generates short
+ * names), elsewhere a path through a symlinked parent (the macOS /var -> /private/var shape). The directory must exist. Reads the host (cmd.exe, the filesystem).
+ */
+export function nonCanonicalSpelling(root, { platform = process.platform } = {}) {
+  if (platform === 'win32') {
+    const run = runProgram('cmd.exe', ['/d', '/s', '/c', `"for %I in ("${root}") do @echo %~sI"`], { windowsVerbatimArguments: true });
+    const short = run.status === 0 ? String(run.stdout).trim() : '';
+    return short && short.toLowerCase() !== fs.realpathSync.native(root).toLowerCase() ? { path: short } : { reason: 'this volume has no 8.3 short name for the sandbox directory (fsutil 8dot3name query <drive>:)' };
+  }
+  const holder = `${root}-via`;
+  try { fs.symlinkSync(path.dirname(root), holder, 'dir'); } catch (error) { return { reason: `a symlink to the temp directory could not be created: ${error.code ?? error.message}` }; }
+  return { path: path.join(holder, path.basename(root)), holder };
+}
+
 /** The compact summary document written to stdout and to the step summary. Pure. */
 export function summaryOf({ results, version, platform, node, sandbox }) {
   return {
     schema: 'starci/install-sandbox@1', platform, node, version, sandbox,
-    passed: results.filter((r) => r.status === 'pass').length, failed: results.filter((r) => r.status === 'fail').length, errored: results.filter((r) => r.status === 'error').length,
+    passed: results.filter((r) => r.status === 'pass').length, failed: results.filter((r) => r.status === 'fail').length, errored: results.filter((r) => r.status === 'error').length, skipped: results.filter((r) => r.status === 'skipped').length,
     results: results.map(({ name, status, detail }) => ({ name, status, ...(detail ? { detail } : {}) })),
   };
 }
 
 /** The markdown table of a summary for $GITHUB_STEP_SUMMARY. Pure. */
 export function summaryMarkdown(summary) {
-  const rows = summary.results.map((r) => `| ${r.status === 'pass' ? 'pass' : r.status} | ${r.name} | ${String(r.detail ?? '').replace(/\|/g, '/').replace(/\r?\n/g, ' ').slice(0, 300)} |`);
-  return [`## Install sandbox (${summary.platform}, node ${summary.node}, starci ${summary.version})`, '', `passed ${summary.passed}, failed ${summary.failed}, could not run ${summary.errored}`, '', '| result | assertion | detail |', '| --- | --- | --- |', ...rows, ''].join('\n');
+  const rows = summary.results.map((r) => `| ${r.status} | ${r.name} | ${String(r.detail ?? '').replace(/\|/g, '/').split(/\r?\n/)[0].slice(0, 200)} |`);
+  const fence = '`'.repeat(3);
+  const long = summary.results.filter((r) => r.status !== 'pass' && String(r.detail ?? '').includes('\n')).map((r) => `<details open><summary>${r.name}</summary>\n\n${fence}text\n${r.detail.replaceAll(fence, "'''")}\n${fence}\n</details>\n`);
+  return [`## Install sandbox (${summary.platform}, node ${summary.node}, starci ${summary.version})`, '', `passed ${summary.passed}, failed ${summary.failed}, could not run ${summary.errored}${summary.skipped ? `, skipped ${summary.skipped}` : ''}`, '', '| result | assertion | detail |', '| --- | --- | --- |', ...rows, '', ...long].join('\n');
 }
 
 /** The `docker run` arguments (after `--rm`) of the Linux sandbox: one named container, the staged directory mounted READ-ONLY at /in, no port, no other mount. Pure. */
@@ -210,6 +237,7 @@ async function runSandbox({ tarball, keep = false }) {
   const realBefore = new Map(watched.flatMap((target) => [...snapshotTree(target, 1)]));
   const realNamesBefore = new Set(fs.readdirSync(realHome));
 
+  // The root keeps the spelling the host gives (a Windows 8.3 short-named TEMP, as on a GitHub windows runner): the sandbox exists to catch a product that mistakes it for a link.
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-sandbox-')));
   const home = path.join(root, 'home');
   const app = path.join(root, 'app');
@@ -229,10 +257,12 @@ async function runSandbox({ tarball, keep = false }) {
   });
 
   const runtimeRoot = path.join(home, '.starci', 'runtime', 'node_modules', 'starci');
+  let fetched = false;
   await step('fetch the tarball', async () => {
     const r = finished('npm', runNpm(['install', '--prefix', path.join(home, '.starci', 'runtime'), tarballFile, '--no-audit', '--no-fund'], { timeout: STEP_TIMEOUT_MS, ...opts }));
-    record('npm install of the tarball into <home>/.starci/runtime', r.status === 0 && exists(path.join(runtimeRoot, 'scripts', 'install', 'install.mjs')), r.status === 0 ? '' : `${r.stderr}${r.stdout}`.trim().slice(-600));
+    record('npm install of the tarball into <home>/.starci/runtime', r.status === 0 && exists(path.join(runtimeRoot, 'scripts', 'install', 'install.mjs')), r.status === 0 ? '' : childDetail({ label: 'npm install', status: r.status, stdout: r.stdout, stderr: r.stderr }));
     if (r.status !== 0) throw new CouldNotRun('the tarball could not be fetched; nothing further can run');
+    fetched = true;
     const installed = JSON.parse(read(path.join(runtimeRoot, 'package.json'))).version;
     record('the fetched package version equals the tarball version', installed === version, `tarball ${version}, package ${installed}`);
   });
@@ -245,16 +275,30 @@ async function runSandbox({ tarball, keep = false }) {
 
   const claude = path.join(app, '.claude');
   let installStatus = null;
-  const install = async () => {
+  // The installer child runs with its output captured (and echoed), so a failed install reports what it printed instead of a bare exit code.
+  let lastRun = { stdout: '', stderr: '', report: '' };
+  const install = async ({ cwd = app, homeDir = home, environment = env } = {}) => {
+    lastRun = { stdout: '', stderr: '', report: '' };
+    const runNode = (args, options) => {
+      const r = runProgram(process.execPath, args, { ...options, env: environment, stdio: 'pipe', maxBuffer: 256 * 1024 * 1024, timeout: STEP_TIMEOUT_MS });
+      lastRun.stdout += r.stdout ?? ''; lastRun.stderr += r.stderr ?? '';
+      process.stdout.write(r.stdout ?? ''); process.stderr.write(r.stderr ?? '');
+      return r;
+    };
+    const stderr = (text) => { lastRun.report += text; process.stderr.write(text); };
     const { installRuntime } = await import(pathToFileURL(path.join(runtimeRoot, 'packages', 'cli', 'src', 'runtime-install.mjs')).href);
     // The tarball is already fetched by the npm step above (the same fetch installRuntime makes, with the tarball as its spec): the orchestration, the installer
     // entry and the shim writer that run here are the INSTALLED ones.
-    return installRuntime({ cwd: app, home, stderr: process.stderr }, { fetchRuntime: () => 0, env });
+    return installRuntime({ cwd, home: homeDir, stderr }, { fetchRuntime: () => 0, env: environment, runNode });
   };
-  await step('install into the app', async () => {
-    installStatus = await install();
-    record('runtime install into the app exits 0', installStatus === 0, `exit ${installStatus}`);
-  });
+  const failed = (label, status) => childDetail({ label, status, ...lastRun });
+  const skipped = (names, why) => { for (const name of names) results.push({ name, status: 'skipped', detail: why }); };
+  if (fetched) {
+    await step('install into the app', async () => {
+      installStatus = await install();
+      record('runtime install into the app exits 0', installStatus === 0, installStatus === 0 ? '' : failed('runtime install', installStatus));
+    });
+  } else skipped(['runtime install into the app exits 0'], 'skipped: the tarball fetch above did not succeed');
 
   if (installStatus === 0) {
     await step('configuration assertions', async () => {
@@ -309,11 +353,21 @@ async function runSandbox({ tarball, keep = false }) {
       const agentsBefore = read(path.join(app, 'AGENTS.md'));
       const ignoreBefore = read(path.join(app, '.gitignore'));
       const second = await install();
-      record('a second runtime install exits 0', second === 0, `exit ${second}`);
+      record('a second runtime install exits 0', second === 0, second === 0 ? '' : failed('second runtime install', second));
       record('the second install does not rewrite an existing config.yaml', read(config) === edited);
       record('the second install leaves AGENTS.md and .gitignore byte-identical', read(path.join(app, 'AGENTS.md')) === agentsBefore && read(path.join(app, '.gitignore')) === ignoreBefore);
     });
-  }
+    await step('install through a non-canonical path spelling', async () => {
+      const name = 'install succeeds through a non-canonical (8.3 or symlinked-prefix) path spelling', spelled = nonCanonicalSpelling(root);
+      if (!spelled.path) return skipped([name], `skipped: ${spelled.reason}`);
+      const other = path.join(spelled.path, 'app-spelled'), homeSpelled = path.join(spelled.path, 'home');
+      fs.mkdirSync(path.join(root, 'app-spelled'));
+      const made = gitInit(other, { env });
+      const code = made.ok ? await install({ cwd: other, homeDir: homeSpelled, environment: sandboxEnv({ base: env, home: homeSpelled, platform }) }) : null;
+      record(name, code === 0 && exists(path.join(root, 'app-spelled', '.claude', '.starci-skills.json')), code === 0 ? `through ${spelled.path}` : made.ok ? failed('runtime install through the spelled path', code) : made.stderr);
+      if (spelled.holder) fs.unlinkSync(spelled.holder);
+    });
+  } else if (fetched) skipped(['configuration assertions', 'shim and CLI assertions', 'second install'], 'skipped: the runtime install above failed, so there is no installed host to assert');
 
   // Leak check: every file the run left is inside the sandbox root, and the real-home places the install would write are unchanged.
   const homeAfter = snapshotTree(home, 8);

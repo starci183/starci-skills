@@ -92,7 +92,11 @@ flag_management:
         - "scripts/supervisor/*.mjs"
         - "scripts/uat/**/*.mjs"
         - "scripts/work/**/*.mjs"
-        - "ui/**/*.mjs"
+        - "ui/api/**/*.mjs"
+        - "ui/harness-process.mjs"
+        - "ui/harness-verbs.mjs"
+        - "ui/ports.mjs"
+        - "ui/server.mjs"
       statuses:
         - type: project
           informational: true

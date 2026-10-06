@@ -1,7 +1,7 @@
 schema: work/uat-flow@1
 id: uat.identity.sign-in
 title: Register a pair, be refused alike on a wrong one, sign in
-state: done
+state: todo
 entry: /account
 actor: person
 accounts: accounts.yaml
@@ -16,4 +16,6 @@ effects:
 cleanup:
   - "none - the example exposes no account deletion, so the disposable person's row and its sessions stay in the demo store; every run registers a fresh synthetic address"
 proves: [fr.identity.sign-in, br.identity.sign-in]
-change: {rev: 2, kind: editorial, at: 2026-09-19T15:25:00.000Z, reason: "state flips to done now that gap.identity.live-proof's one remaining absence is filled - runs/20260919T152145Z-5c10a673 walked all five steps against the live shop+identity stack with Outcome: pass (screens, video, cleanup verified); the blocker edge is removed rather than left pointing at a closed gap."}
+blockedBy:
+  - {record: gap.identity.live-proof, rev: 5, because: "the recorded run's result, screens and video are cited by digest in evidence.yaml but no artifact store holds those bytes, so the run cannot be verified; the flow is walked again to file a verifiable run"}
+change: {rev: 3, kind: clarifying, at: 2026-10-06T00:00:00.000Z, reason: "state returns to todo: the done claim cites run 20260919T152145Z-5c10a673 by digest, and the result, screen and video bytes it names are held by no artifact store, so the evidence cannot be verified; the record waits on gap.identity.live-proof until the flow is walked again and its run is filed."}

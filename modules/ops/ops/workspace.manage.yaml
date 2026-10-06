@@ -44,7 +44,7 @@ reads:
       vi: "API worktree và bộ khởi chạy agent của runtime: scripts/machine/worktrees.mjs (createWorktree với dòng registry trong machine.sqlite và giới hạn theo repo từ modules/kernel/product-land.yaml, worktreeList, worktreeCounts, removeWorktree, gcWorktrees), scripts/machine/worktree-git.mjs (safeRemoveWorktree: gỡ mọi liên kết như liên kết trước, rồi tới cây) và các lệnh worker điều phối của Orca (worker-start, worker-show, worker-read, worker-stop, worker-release)."
 writes:
   - id: node
-    path: .starciwork/index.yaml extensions.work3.setup.<workflow>.<mode>
+    path: .starciwork/index.yaml
     fields: [extensions.work3.setup.<workflow>.<mode>]
     content:
       en: "N, the completion target of every mode, is the root catalog .starciwork/index.yaml
@@ -755,7 +755,7 @@ policy:
               files, README.md runbook, <name>/<name>.enc secret pairs with the plaintext member
               gitignored, runtime config/env/files, seeds and infra.
         - id: node
-          path: .starciwork/index.yaml extensions.work3.setup.<workflow>.stacks
+          path: .starciwork/index.yaml
           fields: ["extensions.work3.setup.<workflow>.stacks: request, refs, assertions, review"]
           content:
             en: N is the catalog's stacks setup entry (the op-level writes.node says why); its review names

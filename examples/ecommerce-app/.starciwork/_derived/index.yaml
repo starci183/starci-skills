@@ -181,8 +181,11 @@ records:
   gap.checkout.live-proof:
     schema: work/gap@1
     feature: checkout
-    state: done
-    effectiveState: done
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - uat.checkout.place-order
   gap.checkout.second-example-gates:
     schema: work/gap@1
     feature: checkout
@@ -191,8 +194,11 @@ records:
   gap.identity.live-proof:
     schema: work/gap@1
     feature: identity
-    state: done
-    effectiveState: done
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - uat.identity.sign-in
   identity:
     schema: work/feature@1
     feature: identity
@@ -272,15 +278,29 @@ records:
   uat.checkout.place-order:
     schema: work/uat-flow@1
     feature: checkout
-    state: done
+    state: todo
     effectiveState: suspended
     suspensionReason: evidence-marked-stale
+    blockers:
+      - id: gap.checkout.live-proof
+        rootKind: gap
+        cyclic: false
+        because: the recorded run's result, screens and video are cited by digest in evidence.yaml but no
+          artifact store holds those bytes, so the run cannot be verified; the flow is walked again
+          to file a verifiable run
   uat.identity.sign-in:
     schema: work/uat-flow@1
     feature: identity
-    state: done
+    state: todo
     effectiveState: suspended
     suspensionReason: evidence-marked-stale
+    blockers:
+      - id: gap.identity.live-proof
+        rootKind: gap
+        cyclic: false
+        because: the recorded run's result, screens and video are cited by digest in evidence.yaml but no
+          artifact store holds those bytes, so the run cannot be verified; the flow is walked again
+          to file a verifiable run
   ui.checkout.cart:
     schema: work/ui-screen@1
     feature: checkout
@@ -313,28 +333,28 @@ records:
     suspensionReason: evidence-marked-stale
 tally:
   overall:
-    done: 3
-    todo: 16
+    done: 1
+    todo: 18
     stale: 17
     blocked: 0
     total: 36
   byFeature:
     checkout:
-      done: 2
-      todo: 13
+      done: 1
+      todo: 14
       stale: 10
       blocked: 0
       total: 25
     identity:
-      done: 1
-      todo: 3
+      done: 0
+      todo: 4
       stale: 7
       blocked: 0
       total: 11
   gaps:
     - id: gap.checkout.live-proof
       feature: checkout
-      state: done
+      state: todo
       closedBy:
         - uat.checkout.place-order
     - id: gap.checkout.second-example-gates
@@ -343,7 +363,7 @@ tally:
       closedBy: null
     - id: gap.identity.live-proof
       feature: identity
-      state: done
+      state: todo
       closedBy:
         - uat.identity.sign-in
   unbuiltModuleGaps: 0
@@ -372,6 +392,9 @@ frontier:
   - id: fr.checkout.download-receipt
     feature: checkout
     title: Download the receipt of an order
+  - id: gap.checkout.live-proof
+    feature: checkout
+    title: No verifiable UAT run of the place-order walk is on record
   - id: gap.checkout.second-example-gates
     feature: checkout
     title: No host port-registry entry exists for this example yet
@@ -405,6 +428,9 @@ frontier:
   - id: fr.identity.account
     feature: identity
     title: Read an account
+  - id: gap.identity.live-proof
+    feature: identity
+    title: No verifiable UAT run of the sign-in flow is on record
   - id: integration.identity.keycloak
     feature: identity
     title: Keycloak owns the shoppers' credentials

@@ -41,6 +41,7 @@ import { bindGuardTerminal } from '../../guards/hook-install.mjs';
 import { readEnv } from '../../lib/env.mjs';
 import { admitPacket, selectDispatchContract, captureDispatchInputs } from '../dispatch-admission.mjs';
 import { reserveDispatch } from '../dispatch-reservation.mjs';
+import { VerbExit } from './shared/verb-exit.mjs';
 
 export default {
   verb: 'dispatch',
@@ -69,7 +70,7 @@ export default {
   if (!dispatchTarget.ok) {
     const out = { ok: false, jobId, op, reason: dispatchTarget.reason, detail: dispatchTarget.detail };
     emit(out, `dispatch REFUSED for ${jobId} (${op}): ${out.reason} — ${out.detail}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // Placement authority is checked before environment preparation, leases, packet files or an agent spawn.
   const gitPlacement = Boolean(workflowAppRepo(repo) || (args.worktree && workflowAppRepo(path.resolve(repo, args.worktree))));
@@ -81,7 +82,7 @@ export default {
     if (!grant.ok) {
       const out = { ok: false, jobId, op, reason: grant.reason, violations: grant.violations.map(({ owned, dir, closest }) => ({ owned, dir, closest })), detail: grant.detail };
       emit(out, `dispatch REFUSED for ${jobId} (${op}): ${out.reason} — ${out.detail}; job stays queued`, args.json);
-      process.exit(1);
+      throw new VerbExit(1);
     }
   }
   if (!payload.repository && dispatchTarget.repository) {
@@ -104,7 +105,7 @@ export default {
   if (deferredBy) {
     const out = { ok: false, jobId, op, reason: deferredBy.queuedBecause, blockedBy: deferredBy.blockedBy, detail: deferredBy.detail };
     emit(out, `dispatch REFUSED for ${jobId} (${op}): ${deferredBy.queuedBecause} — ${deferredBy.detail}; job stays queued`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   refusePeerWait(ledger, { job, op, opKey: 'op', verb: 'dispatch', suffix: '; job stays queued', emit, args, internals });
   const slots = opSlotsOrRefuse(ledger, { job, op, opKey: 'op', verb: 'dispatch', suffix: '; job stays queued', emit, args, internals });
@@ -115,7 +116,7 @@ export default {
   if (seamFirst) {
     const out = { ok: false, jobId, op, reason: 'seam-priority', seam: seamFirst.job_id, slots };
     emit(out, `dispatch REFUSED for ${jobId} (${op}): seam-priority — the last free slot (${slots.running}/${slots.ceiling}) goes to queued cut seam ${seamFirst.job_id} (${seamFirst.op_id}); dispatch it first, then this job`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // A cut sibling dispatched before its seam passed runs on a stub and owes a reconcile (cut-seam.mjs):
   // payload.cut.seamStub rides into the packet (context.cut) and the op prompt.
@@ -137,7 +138,7 @@ export default {
     const out = { ok: false, jobId, op, reason: 'prerequisite-unmet', ...(designGate ? { code: designGate.code } : {}), unmet: prerequisites.unmet,
       detail: prerequisiteDetail({ op, jobId, unmet: prerequisites.unmet }) };
     emit(out, `dispatch REFUSED for ${jobId} (${op}): prerequisite-unmet — ${out.detail}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
 
   // The layout chain above an interface.draw is one shared foundation (`shell`), never a refusal: a draw starts from a
@@ -149,7 +150,7 @@ export default {
     if (gate.action === 'wait') {
       const out = { ok: false, jobId, op, reason: FOUNDATION_WAIT, foundation: gate.foundation, owner: gate.owner, detail: gate.detail, ...(gate.decision ? { decision: gate.decision } : {}) };
       emit(out, `dispatch REFUSED for ${jobId} (${op}): ${FOUNDATION_WAIT} — ${gate.detail}${gate.decision ? `; Supervisor Decision Item ${gate.decision} opened (the owner is past its stall limit)` : ''}; job stays queued`, args.json);
-      process.exit(1);
+      throw new VerbExit(1);
     }
   }
 
@@ -231,7 +232,7 @@ export default {
       const incidentId = raiseEnvironmentIncident(ledger, job, environmentHealth);
       const out = { ok: false, jobId, op, reason: 'environment-not-ready', incident: incidentId, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
       emit(out, `dispatch REFUSED for ${jobId} (${op}): environment-not-ready — ${environmentHealth.remedies.join(' | ')}; incident ${incidentId}. This is the environment, not the product: the job stays queued and costs no attempt; dispatch again once the port is free (or --env-gate off to walk anyway)`, args.json);
-      process.exit(1);
+      throw new VerbExit(1);
     }
   }
 
@@ -291,7 +292,7 @@ export default {
   if (outsideOrder) {
     emit({ ok: false, jobId, op, reason: 'model-outside-order', model: model.target, order: launchOrder.orderKey ?? null,
       difficulty: launchOrder.difficulty ?? null, allowed, detail: outsideOrder }, `dispatch REFUSED for ${jobId} (${op}): model-outside-order — ${outsideOrder}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // A route persisted before host tools gated routing, an unrouted job's
   // default pool or a --model override can name an agent without a tool the op
@@ -300,13 +301,13 @@ export default {
     const detail = `${model.target} (agent ${model.provider}) lacks host tool ${lackingTools.join(', ')} that ${op} requires (route.riskHints host-tool-required on modules/ops/ops/${op}.yaml). Re-run starci kernel route --job ${jobId} — it now selects only agents whose card lists the tool — then dispatch again${args.model ? ' without --model' : ''}. The job stays queued.`;
     emit({ ok: false, jobId, op, reason: 'tool-unavailable', tools: lackingTools, model: model.target, detail },
       `dispatch REFUSED for ${jobId} (${op}): tool-unavailable — ${detail}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   if (grammarMissing) {
     const detail = `${op} declares grammarContext: required and ${grammarMissing}. Fix the product's brand.sources or the Source knowledge, then dispatch again. The job stays queued.`;
     emit({ ok: false, jobId, op, reason: 'grammar-context-missing', missing: grammarContext.missing, detail },
       `dispatch REFUSED for ${jobId} (${op}): grammar-context-missing — ${detail}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // A live lease on the write set is a wait (livePathLeaseWait), checked before the provider circuit,
   // the leases and any Orca call: nothing is spawned, nothing is recorded as a rejection.
@@ -314,14 +315,14 @@ export default {
   if (leaseWait) {
     emit({ ok: false, jobId, op, reason: 'path-lease', waiting: true, ...leaseWait },
       `dispatch WAITING for ${jobId} (${op}): path-lease — ${leaseWait.detail}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // A busy side of the workflow worktree is the next wait (a path conflict above is the more precise answer).
   const sideWait = workflowTree ? workflowSideWait(db, job, payload) : null;
   if (sideWait) {
     emit({ ok: false, jobId, op, waiting: true, ...sideWait },
       `dispatch WAITING for ${jobId} (${op}): ${sideWait.reason} — ${sideWait.detail}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // Host resources are a launch gate on the same admission path as the provider circuit, checked before
   // it, the leases and any Orca call. Disk below allocation.resources.minFreeDiskGb never spawns another
@@ -356,7 +357,7 @@ export default {
     }
     emit({ ok: false, jobId, op, reason: HOST_RESOURCES_LOW, waiting: true, host: { ...host, lowRam: host.lowRam || Boolean(throttled) }, ...(throttled ? { throttle: throttled } : {}), detail },
       `dispatch WAITING for ${jobId} (${op}): ${HOST_RESOURCES_LOW} - ${detail}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   if (admission?.ok) releaseThrottled({ jobId, ledgerId: ledger.ledgerId ?? null });
   // A route decision may have been persisted before another job proves the
@@ -372,7 +373,7 @@ export default {
     });
     emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, providerHealth },
       `dispatch REJECTED for ${jobId} (provider-health): ${error}; logical attempt retained${circuitClearHint(providerHealth)}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // §6 admission — the repo-path leases and the job's fencing token are taken
   // BEFORE anything launches, for both launch kinds. A refusal (a live lease
@@ -405,7 +406,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection,
       managed: { step, dispatchId, effectState, ...(code ? { code } : {}), ...(observation ? { observation } : {}), ...(cleanup ? { cleanup } : {}) } };
     emit(out, `dispatch REJECTED for ${jobId} (${step}): ${reason} — job status=${rejection.status}, effect=${effectState}${cleanup ? `, worker ${dispatchId} cleanup stop=${cleanup.stop?.ok} release=${cleanup.release?.ok}` : ''}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   };
 
   // 1. Launch model (resolveWorkerLaunchModel, resolved with the launch plan).

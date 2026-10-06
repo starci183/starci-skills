@@ -5,6 +5,7 @@ import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from '.
 import { biasForRole } from '../../lib/owner-routing-bias.mjs';
 import { ownerReserveGrant, quotaForAdmission } from '../../agent/admission.mjs';
 import { prepareProviderBudget, providerBudgetUsage } from '../../agent/provider-budget.mjs';
+import { VerbExit } from './shared/verb-exit.mjs';
 export default {
   verb: 'route',
   required: ['job'],
@@ -48,7 +49,7 @@ export default {
   if (leaseWait) {
     emit({ ok: false, jobId, kind, reason: 'path-lease', waiting: true, ...leaseWait },
       `route WAITING for ${jobId} (${kind}): path-lease — ${leaseWait.detail}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
 
   const goalRow = latestGoal(db, job.workflow_id);
@@ -171,12 +172,12 @@ export default {
       + ' The job stays queued; never dispatch it on an agent without the tool.';
     const out = { ok: false, jobId, kind, difficulty: decision.difficulty, bias, ...routeFacts, reason: 'tool-unavailable', tools, holders: serving, detail };
     emit(out, `route REFUSED for ${jobId} (${kind}): tool-unavailable — ${detail}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   if (!decision || decision.error) {
     const out = { ok: false, jobId, kind, difficulty, bias, ...routeFacts, error: decision?.error ?? 'selectPool returned no decision', poolLoad: { running: runningByModel, routeHoldMs: poolLoad.routeHoldMs } };
     emit(out, `route REFUSED for ${jobId} (${kind}, ${difficulty}): ${out.error}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
 
   const decided = {

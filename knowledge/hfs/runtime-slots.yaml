@@ -8,7 +8,7 @@
 # named section of it and only shrinks.
 schema: starci/runtime-slots@1
 kind: runtime
-version: 1.1.0
+version: 1.2.0
 
 versioning:
   patch: wording, why text, examples; no check result can change.
@@ -322,8 +322,18 @@ slots:
     allows: [package.json, package-lock.json, .gitignore, README.md, CONTRACT.md, DESIGN.md, DEPLOYMENT.md, components.json, eslint.config.mjs, index.html, tsconfig.json, vite.config.ts, server.mjs, harness-process.mjs, harness-verbs.mjs, start.cmd, ports.mjs, ports.d.mts, "api/**", "src/**", "public/**", "fixtures/**"]
     forbids: [run-cloudflared.ps1]
     tests: none
-    coverage: required
+    coverage: none
     rules: [RT_EXTERNAL_OWNER, RT_TIER_DIRECTION]
+  - id: runtime.ui-server
+    profiles: [runtime]
+    # The executable server source of the harness UI, measured by the root suite; the tool configuration, the fixture seeder and the Vite client (src/**, measured by the UI's own tooling) stay under runtime.ui.
+    path: "ui/{api/,server.mjs,ports.mjs,harness-process.mjs,harness-verbs.mjs}"
+    presence: required
+    tracked: tracked
+    tier: entry
+    tests: none
+    coverage: required
+    rules: [RT_TIER_DIRECTION]
 
   # ----- engine ---------------------------------------------------------------------------------------------
   - id: runtime.foundation

@@ -7,6 +7,7 @@ import { jobPayloadOf, jobRowOf, operationTerminalHandleOf } from './shared/rows
 import { latestAttemptOf } from '../../machine/job-row.mjs';
 import { latestContractOf } from '../../machine/contract-version.mjs';
 import { leaseCanonOf } from './shared/peer-waits.mjs';
+import { VerbExit } from './shared/verb-exit.mjs';
 
 export default {
   verb: 'reconcile',
@@ -92,14 +93,14 @@ export default {
     const out = { ok: false, jobId, reconciled: false, dispatchId, effectState: 'unknown',
       reason: contract ? 'accepted-contract-exists' : 'worker-report-exists', contract: contract ?? null, report: report ?? null };
     emit(out, `reconcile REFUSED for ${jobId}: ${out.reason}; exact-path lease retained`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
 
   const cleanup = cleanupManagedWorker(dispatchId);
   if (cleanup.effectState !== 'none') {
     const out = { ok: false, jobId, reconciled: false, dispatchId, effectState: cleanup.effectState, cleanup };
     emit(out, `reconcile WAIT for ${jobId}: effect=${cleanup.effectState}; exact-path lease retained`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
 
   let leasesReleased = 0;

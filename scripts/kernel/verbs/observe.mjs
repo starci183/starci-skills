@@ -11,6 +11,7 @@ import { workerRead } from '../../api/orca/worker-read.mjs';
 import { jobPayloadOf, jobRowOf, operationTerminalHandleOf, operationDispatchOf } from './shared/rows.mjs';
 import { outputAgeOf, exitedAgentPromptRow, classifyAgentScreen, staleAwareState } from '../../lib/terminal-liveness.mjs';
 import { sessionIdentityOf } from '../op-session.mjs';
+import { VerbExit } from './shared/verb-exit.mjs';
 
 const OBSERVE_OUTPUT_LINES = 80;
 /**
@@ -52,7 +53,7 @@ export default {
   if (!handle) {
     const out = { ok: false, job: jobId, reason: 'no-live-worker', ledgerStatus: job.status };
     emit(out, `observe REFUSED for ${jobId}: no-live-worker (a ${job.status} job binds no worker terminal)`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // Host reads only — terminal-show and the rendered frame for the turn state, worker-read for the output.
   // A dead or unreadable terminal is a typed projection, not a refusal: the kernel still needs the context

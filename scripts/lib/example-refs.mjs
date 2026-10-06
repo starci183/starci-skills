@@ -68,15 +68,16 @@ function referenceFile(root, relative, { directory = false, exact = false } = {}
     || relative.split('/').some((part) => !part || part === '.' || part === '..')) throw new Error(`invalid example input: ${relative}`);
   const file = path.resolve(root, relative);
   if (!insidePath(root, file)) throw new Error(`example input is outside its declared root: ${relative}`);
-  let at = path.parse(file).root;
-  for (const segment of file.slice(at.length).split(path.sep).filter(Boolean)) {
-    at = path.join(at, segment);
-    if (fs.lstatSync(at).isSymbolicLink() || !samePath(fs.realpathSync.native(at), at)
+  const realRoot = fs.realpathSync.native(root), base = path.resolve(root);
+  let at = base, expected = realRoot; // the root's own spelling (8.3 short name, symlinked prefix) is not a link inside the tree
+  for (const segment of path.relative(base, file).split(path.sep).filter(Boolean)) {
+    at = path.join(at, segment); expected = path.join(expected, segment);
+    if (fs.lstatSync(at).isSymbolicLink() || !samePath(fs.realpathSync.native(at), expected)
       || (exact && !fs.readdirSync(path.dirname(at)).includes(path.basename(at))))
       throw new Error(`linked example input: ${relative}`);
   }
   if (!(directory ? fs.lstatSync(file).isDirectory() : fs.lstatSync(file).isFile())
-    || !insidePath(fs.realpathSync.native(root), fs.realpathSync.native(file)))
+    || !insidePath(realRoot, fs.realpathSync.native(file)))
     throw new Error(`example input is not a contained regular file: ${relative}`);
   return file;
 }

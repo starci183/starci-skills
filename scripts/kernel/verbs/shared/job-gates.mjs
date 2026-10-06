@@ -7,6 +7,7 @@
 import { jobPayloadOf, operationTerminalHandleOf } from './rows.mjs';
 import { refuseSettleBacklog } from '../../kernel-authority.mjs';
 import { openPeerWaits, PEER_WAIT } from './peer-waits.mjs';
+import { VerbExit } from './verb-exit.mjs';
 
 /**
  * The settle-first + live-worker + op-identity prelude: refuses while filed reports wait unconsumed
@@ -29,7 +30,7 @@ export function queuedJobOp(ledger, { job, verb, liveHint, internals }) {
 }
 
 /** A gate's refusal: emit `{ ok:false, ...out }` in the verb's wording and exit 1 (the job stays queued). */
-const refuseGate = (emit, args, out, text) => { emit(out, text, args.json); process.exit(1); };
+const refuseGate = (emit, args, out, text) => { emit(out, text, args.json); throw new VerbExit(1); };
 
 /**
  * The owner-gate refusal: an open owner-gate incident naming the job refuses the verb - no pool can run a step only

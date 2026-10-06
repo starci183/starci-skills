@@ -100,6 +100,7 @@ import { resolveJob, reportDispatchIdOf, REPORTABLE_JOB_STATUSES, requireDispatc
 import { AGENT_HIERARCHY_SCHEMA, workflowNodeId, kernelNodeId, operationNodeId, agentHierarchyFor } from './verbs/shared/agent-hierarchy.mjs';
 import { WORKER_QUESTION } from './verbs/shared/worker-messages.mjs';
 import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './verbs/shared/peer-waits.mjs';
+import { VerbExit } from './verbs/shared/verb-exit.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from '../guards/op-caller.mjs';
 import { callerAdmission, requireAdmittedKernelRead } from './caller-admission.mjs';
 import { slash } from '../lib/path-key.mjs';
@@ -345,9 +346,8 @@ const usage = (code) => {
            set the workflow's display name (workflow_id unchanged); renames its live [Kernel] and [Op] tabs
   run-deferred-tests --workflow <id> [--kind unit|e2e|integration] [--dry-run]
            re-queue the test legs the owner's config.yaml specs switches deferred (starci kernel status testsDeferred)`);
-  process.exit(code);
+  throw new VerbExit(code);
 };
-
 const parseArgs = (argv) => {
   const a = { _: [] };
   for (let i = 0; i < argv.length; i++) {
@@ -374,7 +374,6 @@ const parseArgs = (argv) => {
   return a;
 };
 const need = (cond, msg) => { if (!cond) { console.error(`api: ${msg}`); usage(2); } };
-
 const openRepoLedger = (repo) => {
   const file = ledgerFileFor(repo); // throws ledger-root-is-runtime on a runtime root — deliberate
   if (!fs.existsSync(file)) throw Object.assign(new Error(`ledger-missing: ${file} — no .starciwork/runtime.sqlite at that repo`), { code: 'ledger-missing' });
@@ -2514,7 +2513,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
   if (worker.liveness === 'launching') {
     const out = { ok: false, jobId, recovery: null, reason: 'dispatch-in-flight', worker };
     emit(out, `reconcile REFUSED for ${jobId}: dispatch-in-flight (leased with no worker until its lease deadline ${new Date(worker.leaseDeadline ?? 0).toISOString()}); nothing written`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   // A wedged worker is dead to its contract - the turn can never file the report - but only the
   // settle-failed route accepts it: a plain --dead-worker requeue spends nothing for an attempt
@@ -2525,7 +2524,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     const reason = worker.liveness === 'unknown' ? 'worker-liveness-unproven' : worker.liveness === 'gate-loop' ? 'worker-gate-loop' : wedged ? 'worker-wedged' : 'worker-alive';
     const out = { ok: false, jobId, recovery: null, reason, worker };
     emit(out, `reconcile REFUSED for ${jobId}: ${reason} (liveness ${worker.liveness}${worker.reason ? `: ${worker.reason}` : ''}); nothing written${wedged ? ` - a wedged worker recovers only through starci kernel reconcile --job ${jobId} --dead-worker --settle-failed` : ''}`, args.json);
-    process.exit(1);
+    throw new VerbExit(1);
   }
   const contract = latestContractOf(db, jobId);
   const dispatchId = payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? payload.hierarchy?.runtime?.dispatchId
@@ -3855,12 +3854,13 @@ const runExtensionVerb = async (spec, args, repo) => {
     const admitted = callerAdmission(ledger, args, { caller });
     return await admitted.run(() => spec.run({ ledger, args, repo, emit, need, caller: admitted.caller, ext: API_EXT, internals: API_INTERNALS }));
   } catch (error) {
-    console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));
-    process.exitCode = 1;
+    if (!(error instanceof VerbExit)) console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));
+    process.exitCode = error instanceof VerbExit ? error.exitCode : 1;
   } finally { ledger.close(); }
 };
 /* ------------------------------------------------------------------ main */
-export async function main() {
+export const main = () => runMain().catch((error) => { if (!(error instanceof VerbExit)) throw error; process.exitCode = error.exitCode; });
+async function runMain() {
   const argv = process.argv.slice(2);
   const cmd = argv[0];
   if (!cmd || cmd === '--help' || cmd === '-h') { const lines = extensionUsage(API_EXT); if (lines.length) console.log(`extension verbs (scripts/kernel/verbs):\n${lines.join('\n')}\n`); }
