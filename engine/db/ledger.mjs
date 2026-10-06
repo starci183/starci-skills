@@ -9,7 +9,7 @@ import {putBlob,blobPath,artifactRoot} from './blob.mjs';
 import {redactData,redactText} from '../../scripts/lib/redact.mjs';
 import {isBusyError,newSpanId,newTraceId,withMachine} from './machine.mjs';
 import {PROJECTS_ROOT_ENV,projectsRootFor,ledgerIdForRepo,repoRootKey,resolveLedgerFile,ledgerFixtureInit,assertOperationalLedger} from './ledger-paths.mjs';
-import { insertRowWith } from '../../scripts/lib/sqlite.mjs';
+import { hasTable, insertRowWith } from '../../scripts/lib/sqlite.mjs';
 // The machine-side path helpers have one definition (engine/db/machine.mjs); re-exported for the ledger's callers.
 export {isUnderTempDir,machineFileFor,starciLocalRoot,TEST_REGISTRY_ENV} from './machine.mjs';
 const require=createRequire(import.meta.url);
