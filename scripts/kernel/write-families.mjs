@@ -33,6 +33,11 @@ const familyOfPattern = (rest) => {
   const first = rest.split('/')[0];
   return first && !first.startsWith('<') ? { family: first } : { unfamilied: true };
 };
+const trimSlashes = (p) => {
+  let end = p.length;
+  while (end > 0 && p[end - 1] === '/') end -= 1;
+  return p.slice(0, end);
+};
 
 export function familyGuardOf(brief) {
   const writes = Array.isArray(brief?.writes) ? brief.writes.map((w) => (typeof w?.path === 'string' ? w.path.trim() : '')) : [];
@@ -43,16 +48,25 @@ export function familyGuardOf(brief) {
     if (EVIDENCE_WRITE.test(write)) continue;
     const m = FEATURE_WRITE.exec(write);
     if (!m) return null;
-    for (const alt of expandBraces(m[1])) {
-      const kind = familyOfPattern(alt);
-      if (kind.unfamilied) return null;
-      if (kind.overview) overview = true;
-      else families.add(kind.family);
-      featureWrites += 1;
-    }
+    const added = addFamilies(m[1], families);
+    if (added == null) return null;
+    overview = overview || added.overview;
+    featureWrites += added.count;
   }
   return featureWrites ? { families, overview } : null;
 }
+
+const addFamilies = (rest, families) => {
+  let overview = false, count = 0;
+  for (const alt of expandBraces(rest)) {
+    const kind = familyOfPattern(alt);
+    if (kind.unfamilied) return null;
+    if (kind.overview) overview = true;
+    else families.add(kind.family);
+    count += 1;
+  }
+  return { overview, count };
+};
 
 const slash = (p) => String(p).replaceAll('\\', '/').replace(/^\.\//, '');
 
@@ -60,23 +74,34 @@ export function familyViolations(guard, ownedPaths) {
   if (!guard) return [];
   const out = [];
   for (const raw of ownedPaths) {
-    const p = slash(typeof raw === 'string' ? raw : raw?.path ?? '').replace(/\/\*\*$/, '').replace(/\/+$/, '');
+    const p = trimSlashes(slash(typeof raw === 'string' ? raw : raw?.path ?? '').replace(/\/\*\*$/, ''));
     if (!p) continue;
-    const at = p.indexOf('.starciwork/');
-    if (at < 0) { out.push({ path: p, family: null, why: 'outside .starciwork: this op authors Work records, never source' }); continue; }
-    const work = p.slice(at);
-    const m = /^\.starciwork\/features\/[^/]+(?:\/(.*))?$/.exec(work);
-    if (!m) continue; // evidence, work graph, other Work areas: the op's report and graph writes
-    const rest = m[1] ?? '';
-    if (!rest || rest === 'index.yaml') {
-      if (!guard.overview && rest === 'index.yaml') out.push({ path: p, family: 'overview', why: 'the feature overview is not this op\'s to write' });
-      continue;
-    }
-    const family = rest.split('/')[0];
-    if (!guard.families.has(family)) out.push({ path: p, family, why: `family ${family}/ is not in this op's writes (${[...guard.families].join(', ')})` });
+    const violation = violationOf(guard, p);
+    if (violation) out.push(violation);
   }
   return out;
 }
+
+const violationOf = (guard, p) => {
+  const at = p.indexOf('.starciwork/');
+  if (at < 0) return { path: p, family: null, why: 'outside .starciwork: this op authors Work records, never source' };
+  const work = p.slice(at);
+  const m = /^\.starciwork\/features\/[^/]+(?:\/(.*))?$/.exec(work);
+  if (!m) return null; // evidence, work graph, other Work areas: the op's report and graph writes
+  const rest = m[1] ?? '';
+  if (!rest || rest === 'index.yaml') {
+    if (!guard.overview && rest === 'index.yaml') return { path: p, family: 'overview', why: 'the feature overview is not this op\'s to write' };
+    return null;
+  }
+  const family = rest.split('/')[0];
+  if (!guard.families.has(family)) return { path: p, family, why: `family ${family}/ is not in this op's writes (${[...guard.families].join(', ')})` };
+  return null;
+};
+
+const addOwner = (owners, family, id) => {
+  if (!owners.has(family)) owners.set(family, []);
+  if (!owners.get(family).includes(id)) owners.get(family).push(id);
+};
 
 export function familyOwners(briefs) {
   const owners = new Map();
@@ -86,9 +111,7 @@ export function familyOwners(briefs) {
       if (!m) continue;
       for (const alt of expandBraces(m[1])) {
         const kind = familyOfPattern(alt);
-        if (!kind.family) continue;
-        if (!owners.has(kind.family)) owners.set(kind.family, []);
-        if (!owners.get(kind.family).includes(brief.id)) owners.get(kind.family).push(brief.id);
+        if (kind.family) addOwner(owners, kind.family, brief.id);
       }
     }
   }
