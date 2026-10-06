@@ -65,7 +65,7 @@ writes:
       en: Write only state/blocker/completion here; the observed counts and failures belong to the evidence
         result, not node prose. Never add/remove refs/dependencies/acceptance to obtain pass.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, unit-run.json, result.md]
     content:

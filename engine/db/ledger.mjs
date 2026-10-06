@@ -97,7 +97,6 @@ export const ledgerFileFor=(repoRoot,{env=process.env}={})=>{
 // ---------------------------------------------------------------------------------------------------------
 const INIT_SQL_FILE=new URL('./migrations/runtime/0001-init.sql',import.meta.url);
 const INIT_SQL=fs.readFileSync(INIT_SQL_FILE,'utf8');
-const INIT_SQL_SHA=sha256(INIT_SQL);
 const LEDGER_BUSY_TIMEOUT_MS=15000;
 /**
  * Writer pragmas. wal_autocheckpoint=0 on EVERY connection except the one checkpointer (openLedger({checkpointer:true}),
@@ -176,14 +175,14 @@ const olderThan=(a,b)=>{const x=versionTuple(a),y=versionTuple(b);for(let i=0;i<
  */
 function verifyLedger(db,{file,sqliteVersion}){
   const version=userVersion(db);
-  const legacy=hasTable(db,'meta')?metaOf(db).schema:(hasTable(db,'jobs')||hasTable(db,'events')?'pre-meta':null);
-  need(version===LEDGER_VERSION&&legacy===LEDGER_SCHEMA,
-    `ledger-schema-refused: ${file} is ${legacy??'not a StarCi ledger'} at user_version ${version}, this runtime opens only ${LEDGER_SCHEMA} at user_version ${LEDGER_VERSION}; preserve the database and its WAL, use a compatible runtime, or resolve its identity with the owner`,'STARCI_LEDGER_SCHEMA_REFUSED');
+  const found=hasTable(db,'meta')?metaOf(db).schema:(hasTable(db,'jobs')||hasTable(db,'events')?'no-meta':null);
+  need(version===LEDGER_VERSION&&found===LEDGER_SCHEMA,
+    `ledger-schema-refused: ${file} is ${found??'not a StarCi ledger'} at user_version ${version}, this runtime opens only ${LEDGER_SCHEMA} at user_version ${LEDGER_VERSION}; preserve the database and its WAL, use a compatible runtime, or resolve its identity with the owner`,'STARCI_LEDGER_SCHEMA_REFUSED');
   const recorded=metaOf(db).sqlite_version;
   need(!recorded||!olderThan(sqliteVersion,recorded),`ledger-sqlite-downgrade: ${file} was last opened by SQLite ${recorded}, this process runs ${sqliteVersion}`,'STARCI_LEDGER_SQLITE_DOWNGRADE');
 }
 
-/** Create the ledger on an empty file: 0001-init.sql, user_version=LEDGER_VERSION, meta, schema_migrations — one transaction. */
+/** Create the ledger on an empty file: 0001-init.sql, user_version=LEDGER_VERSION, meta — one transaction. */
 function initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot=null,product=null,ledgerId=null,blobRoot=null,fixtureMarker=null}){
   const empty=()=>userVersion(db)===0&&!db.prepare("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' LIMIT 1").get();
   if(!empty())return false;
@@ -202,8 +201,6 @@ function initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot=null,product
     if(repoRoot)meta.repo_root=path.resolve(repoRoot);
     if(product)meta.product=product;
     for(const [k,v] of Object.entries(meta))if(v!=null)seed.run(k,String(v));
-    db.prepare("INSERT INTO schema_migrations(version,name,runtime_rev,sql_sha256,started_at,finished_at,status) VALUES(1,'0001-init',?,?,?,?,'done')")
-      .run(meta.runtime_rev,INIT_SQL_SHA,at,now());
     db.exec('COMMIT');
     return true;
   }catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}
@@ -284,7 +281,7 @@ export const REDACTED_COLUMNS=Object.freeze({
   logs:['msg','data_json','refs_json'],reports:['report_json'],check_runs:['command','note','summary_json','attribution_json'],
   incidents:['detail','last_progress'],inbox:['payload_json','disposition_json'],decision_items:['summary','payload_json','evidence_json'],
   decisions:['rationale','result_json'],contracts:['markdown','context_json'],api_requests:['result_json'],op_attempts:['settle_json','why_json'],
-  conditions:['message'],goals:['markdown','amendment_json'],settle_tails:['last_error'],product_lands:['reason','checks_json'],
+  conditions:['message'],goals:['markdown','amendment_json'],settle_tails:['last_error'],
   record_changes:['reason'],foundations:['detail'],foundation_declarations:['detail'],interface_audits:['findings_json'],
 });
 const redactValue=(col,val)=>{
@@ -616,15 +613,14 @@ export function updateAttempt(db,{attemptId,at=nowMs(),...fields}){
  * job goes back to ready) or effect-unknown (a worker may have started; reconcile decides). A requeued attempt is also
  * settled by the kernel (settled_at, no verdict: nothing was judged) and released, so every reader that asks "still open?"
  * answers no; task_closed_at is stamped when its Orca Task was closed. A refused launch is never a try of the unit and
- * never a dispatch it spent: work_units.dispatches (the "attempts" the UI counts) gives the slot back. The legacy shape
- * (end_state requeued written by the refusal, settled_at and released_at never stamped) is sealed the same way, once.
+ * never a dispatch it spent: work_units.dispatches (the "attempts" the UI counts) gives the slot back.
  * An attempt that is already sealed or ended otherwise is left alone (returns false).
  */
 export function endRejectedAttempt(db,{attemptId,endState,effectState,releasedAt=null,taskClosedAt=null,at=nowMs()}){
   need(['requeued','effect-unknown'].includes(endState),`a refused launch ends requeued or effect-unknown, not ${endState}`);
   const row=db.prepare('SELECT * FROM op_attempts WHERE attempt_id=?').get(attemptId);
   need(row,`attempt ${attemptId} not found`,'STARCI_ATTEMPT_NOT_FOUND');
-  if(row.settled_at!=null||!(row.end_state==null||row.end_state==='requeued'))return false;
+  if(row.settled_at!=null||row.end_state!=null)return false;
   updateAttempt(db,{attemptId,at,endState,effectState,...(releasedAt!=null?{releasedAt,settledAt:releasedAt,settledBy:'kernel'}:{}),...(taskClosedAt!=null?{taskClosedAt}:{})});
   if(row.unit_id)db.prepare('UPDATE work_units SET dispatches=max(dispatches-1,0),updated_at=? WHERE workflow_id=? AND unit_id=?').run(at,row.workflow_id,row.unit_id);
   return true;
@@ -936,16 +932,6 @@ function updateSettleTail(db,{attemptId,state,lastError=undefined,dueAt=undefine
   if(state==='done')fields.doneAt=at;
   return updateRow(db,'settle_tails',{attemptId},fields).changes>0;
 }
-function recordProductLand(db,{workflowId,repoRoot,wfBranch,result='queued',spanId=newSpanId(),startedAt=nowMs(),...fields}){
-  const {lastInsertRowid}=insertRow(db,'product_lands',{workflowId,spanId,repoRoot,wfBranch,result,startedAt,...fields});
-  appendEvent(db,{workflowId,entityType:'workflow',entityId:workflowId,spanId,kind:'product-land',payload:{landId:Number(lastInsertRowid),result},createdAt:startedAt});
-  return Number(lastInsertRowid);
-}
-function finishProductLand(db,{landId,result,at=nowMs(),...fields}){
-  const row=db.prepare('SELECT * FROM product_lands WHERE land_id=?').get(landId);need(row,`product land ${landId} not found`);
-  updateRow(db,'product_lands',{landId},{result,finishedAt:at,...fields});
-  appendEvent(db,{workflowId:row.workflow_id,entityType:'workflow',entityId:row.workflow_id,spanId:row.span_id,kind:'product-land',payload:{landId,result},createdAt:at});
-}
 
 // --- shared foundations, declarations, path transfers, record changes (A6) ------------------------------------------
 const FOUNDATION_KIND_ENUM=new Set(['brand','grammar','layout-tree','shell','module','contract','other']);
@@ -1025,7 +1011,7 @@ const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkfl
   createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,endRejectedAttempt,writeContract,
   declareResource,acquireLease,renewLeases,releaseLeases,idempotent,recordFailedRequest,fileReport,markReportConsumed,recordCheckRun,recordArtifact,attachToReport,
   recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,recordAttemptUsage,markAttemptUsageUnavailable,recordKernelUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
-  postInbox,setInboxStatus,setInboxStatusByKey,updateGoalJson,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail,recordProductLand,finishProductLand});
+  postInbox,setInboxStatus,setInboxStatusByKey,updateGoalJson,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail});
 
 /**
  * The read-write handle. A new (empty) file is created with 0001-init.sql; any other schema is refused (clean slate).

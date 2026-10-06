@@ -9,7 +9,6 @@ import { openMachine, openMachineReader, MACHINE_VERSION } from '../../engine/db
 
 const digest = text => createHash('sha256').update(text).digest('hex');
 const signalRows = db => db.prepare('SELECT * FROM sup_signals ORDER BY scope,key').all();
-const journal = db => db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
 const signalDdl = db => db.prepare("SELECT sql FROM sqlite_master WHERE name='sup_signals'").get().sql;
 function temporary(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'core-debug-schema-'));
@@ -19,7 +18,7 @@ function temporary(t) {
 const persistentBytes = directory => fs.readdirSync(directory).filter(name => !name.endsWith('-shm')).sort()
   .map(name => [name, digest(fs.readFileSync(path.join(directory, name)))]);
 
-test('existing current v3 renamed SQL and historical journal preserve signals, seats and unknown provider custody', t => {
+test('existing current v3 renamed SQL preserves signals, seats and unknown provider custody', t => {
   const fixture = temporary(t), options = { file: fixture.file }, machine = openMachine(options);
   try {
     machine.setSupSignal({ scope: 'supervisor-enabled', key: 'core-debug', token: 'supervisor-token', value: { enabled: false }, expiresAt: 999999 });
@@ -33,11 +32,9 @@ test('existing current v3 renamed SQL and historical journal preserve signals, s
   const raw = new DatabaseSync(fixture.file);
   let before;
   try {
-    // Genuine current constraints survive SQLite's rename spelling; journal hashes describe earlier authored SQL.
-    raw.exec('ALTER TABLE sup_signals RENAME TO saved_signals; ALTER TABLE saved_signals RENAME TO sup_signals; DELETE FROM schema_migrations;');
-    for (const version of [1, 2, 3]) raw.prepare("INSERT INTO schema_migrations(version,name,runtime_rev,sql_sha256,started_at,finished_at,status) VALUES(?,?,?,?,1,2,'done')")
-      .run(version, 'recorded-host-step-'+version, 'earlier-host-runtime', String(version).repeat(64));
-    before = { signals: signalRows(raw), journal: journal(raw), ddl: signalDdl(raw), seats: raw.prepare('SELECT * FROM seats').all(),
+    // Genuine current constraints survive SQLite's rename spelling.
+    raw.exec('ALTER TABLE sup_signals RENAME TO saved_signals; ALTER TABLE saved_signals RENAME TO sup_signals;');
+    before = { signals: signalRows(raw), ddl: signalDdl(raw), seats: raw.prepare('SELECT * FROM seats').all(),
       providers: raw.prepare('SELECT * FROM provider_reservations').all(), events: raw.prepare('SELECT * FROM provider_reservation_events').all() };
     assert.match(before.ddl, /CREATE TABLE "sup_signals"/);
   } finally { raw.close(); }
@@ -50,7 +47,6 @@ test('existing current v3 renamed SQL and historical journal preserve signals, s
       assert.equal(reader.db.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION);
       assert.equal(reader.db.prepare('PRAGMA query_only').get().query_only, 1);
       assert.equal(reader.db.prepare('SELECT total_changes() n').get().n, 0);
-      assert.deepEqual(journal(reader.db), before.journal);
       assert.deepEqual(signalRows(reader.db), before.signals);
       assert.equal(signalDdl(reader.db), before.ddl);
       assert.throws(() => reader.setSupSignal({ scope: 'core-debug-enabled', key: 'core-debug', value: {} }), /read.?only/i);
@@ -61,7 +57,6 @@ test('existing current v3 renamed SQL and historical journal preserve signals, s
   for (let pass = 0; pass < 2; pass++) {
     const writer = openMachine(options);
     try {
-      assert.deepEqual(journal(writer.db), before.journal);
       assert.deepEqual(signalRows(writer.db), before.signals);
       assert.equal(signalDdl(writer.db), before.ddl);
       assert.deepEqual(writer.db.prepare('SELECT * FROM seats').all(), before.seats);
@@ -112,18 +107,17 @@ function olderShape(t, mutate = () => {}) {
   return fixture;
 }
 
-test('a fresh store accepts the core-debug scopes from its one init DDL and records only that init', t => {
+test('a fresh store accepts the core-debug scopes from its one init DDL', t => {
   const { file } = temporary(t), machine = openMachine({ file });
   try {
     assert.equal(machine.db.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION);
     assert.match(signalDdl(machine.db), /core-debug-enabled.*core-debug-diagnostics/s);
-    assert.deepEqual(journal(machine.db).map(row => row.name), ['0001-init']);
     machine.setSupSignal({ scope: 'core-debug-enabled', key: 'core-debug', token: 't', value: { enabled: true } });
     assert.equal(machine.supSignal('core-debug-enabled', 'core-debug').token, 't');
   } finally { machine.close(); }
 });
 
-test('an older-shape store is refused unchanged by writer and reader and gains no migration journal row', t => {
+test('an older-shape store is refused unchanged by writer and reader', t => {
   const fixture = olderShape(t), options = { file: fixture.file }, before = persistentBytes(fixture.directory);
   assert.throws(() => openMachine(options), error => error.code === 'STARCI_MACHINE_SCHEMA_OLD' && /not the current schema/.test(error.message) && /replace it with a fresh store/.test(error.message));
   assert.deepEqual(persistentBytes(fixture.directory), before);
@@ -132,7 +126,6 @@ test('an older-shape store is refused unchanged by writer and reader and gains n
   const check = new DatabaseSync(fixture.file, { readOnly: true });
   try {
     assert.equal(check.prepare('PRAGMA user_version').get().user_version, 2);
-    assert.deepEqual(journal(check).map(row => row.name), ['0001-init']);
     assert.equal(check.prepare("SELECT 1 FROM sqlite_master WHERE name='sup_signals_v3'").get(), undefined);
     assert.doesNotMatch(signalDdl(check), /core-debug-enabled/);
   } finally { check.close(); }

@@ -84,7 +84,6 @@ test('the first actual worker launch reuses a current store and preserves host r
   const after = new DatabaseSync(options.file, { readOnly: true });
   try {
     assert.equal(after.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION);
-    assert.equal(after.prepare("SELECT count(*) n FROM schema_migrations WHERE version=? AND name='0001-init'").get(MACHINE_VERSION).n, 1);
     assert.equal(after.prepare("SELECT value FROM machine_meta WHERE key='test-preserved'").get().value, 'host-data');
     assert.deepEqual(after.prepare('SELECT * FROM services').all(), service);
     assert.deepEqual(after.prepare('SELECT * FROM service_events').all(), events);

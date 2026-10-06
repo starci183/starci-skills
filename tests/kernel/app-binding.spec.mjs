@@ -8,7 +8,6 @@ import { projectBinding, enqueueRepository, ownedPathPlacements } from '../../sc
 import { ensureWorkflowWorktree, workflowAppRepo, sideOf } from '../../scripts/kernel/workflow-worktree.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { boundRepos, defaultPushRepos } from '../../scripts/supervisor/push-mains.mjs';
-import { workspaceBoundRepoRoots } from '../../scripts/housekeeping/hk-orphan-ledgers.mjs';
 
 const git = (root, ...args) => {
   const run = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', windowsHide: true });
@@ -46,7 +45,6 @@ test('one app binding resolves both roles, app-root Work and the one workflow wo
   assert.deepEqual(binding.repos.map((r) => [r.role, r.root]), [['be', path.join(app, 'be')], ['fe', path.join(app, 'fe')]]);
   assert.deepEqual(boundRepos(app, { sourceRoot: source }), [app]);
   assert.equal(defaultPushRepos({ repos: ['../app'] }, { sourceRoot: source }).filter((r) => r === app).length, 1);
-  assert.deepEqual(workspaceBoundRepoRoots({ env: { STARCI_SOURCE_ROOT: source } }), [app.replace(/\\/g, '/')]);
   // Every owned path is app-relative: its first segment names its side.
   assert.deepEqual(enqueueRepository({ op: 'code.refactor', repository: null, ownedPaths: ['be/src/main.ts'], repo: app }), { ok: true, repository: 'be' });
   assert.deepEqual(enqueueRepository({ op: 'code.refactor', repository: null, ownedPaths: ['fe/src/page.tsx'], repo: app }), { ok: true, repository: 'fe' });

@@ -22,14 +22,12 @@ export const concept: Concept = 'C8';
 const short = (sha: string | null) => (sha ? sha.slice(0, 9) : '—');
 const TEXTY = new Set<EvidenceKind>(['json', 'yaml', 'markdown', 'text']);
 
-/** Files the server marks `key`; older servers: the `evidence/` group, without the manifest (shown as the checklist above) and without duplicates or empties. */
+/** Files the server marks `key`, without the manifest (shown as the checklist above) and without duplicates or empties. */
 function keyFiles(attempt: AttemptDetailV3): EvidenceFileV3[] {
-  const hasFlag = attempt.files.some(file => file.key === true);
   const seen = new Set<string>();
   const out: EvidenceFileV3[] = [];
   for (const file of attempt.files) {
-    const isKey = hasFlag ? file.key : file.group === 'evidence';
-    if (!isKey || isManifestFile(file) || file.empty || file.bytes === 0 || !TEXTY.has(file.kind) || seen.has(file.sha)) continue;
+    if (!file.key || isManifestFile(file) || file.empty || file.bytes === 0 || !TEXTY.has(file.kind) || seen.has(file.sha)) continue;
     seen.add(file.sha); out.push(file);
   }
   return out;

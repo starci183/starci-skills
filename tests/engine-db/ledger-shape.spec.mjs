@@ -28,7 +28,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 // schema metadata, or join tables whose owner is reached through another FK.
 const LEDGER_WIDE=['artifact_proofs','blob_ref_columns','blobs','foundations','job_transitions','log_cursors',
   'logs_fts','logs_fts_config','logs_fts_data','logs_fts_docsize','logs_fts_idx','meta','path_transfers',
-  'report_attachments','resources','schema_migrations','ui_state_map','ui_states','work_citations','workflow_transitions'];
+  'report_attachments','resources','ui_state_map','ui_states','work_citations','workflow_transitions'];
 // workflow_purges carries the workflow_id of a workflow the owner-approved purge DELETED: it is the tombstone naming the
 // verified evidence archive (path, sha256, events head), so it must outlive its workflow - the one deliberate exception.
 const TOMBSTONES=['workflow_purges'];
