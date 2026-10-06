@@ -31,11 +31,19 @@ const modulesIn = (dir) => {
   try { return fs.readdirSync(dir).filter((n) => n.endsWith('.mjs') && !n.startsWith('_')).sort(); } catch { return []; }
 };
 
+// `/#.*$/` without a regex: `.` never crosses a line terminator, so the match is the first '#'
+// whose tail to the very end is terminator-free — the first '#' after the string's last one.
+const stripComment = (l) => {
+  const marks = [...l.matchAll(/[\n\r\u2028\u2029]/g)];
+  const open = l.indexOf('#', (marks.at(-1)?.index ?? -1) + 1);
+  return open < 0 ? l : l.slice(0, open);
+};
+
 /** The boolean flags of the flags file: one per line, `#` comments and blanks ignored. */
 export function readFlagsFile(file) {
   let text = '';
   try { text = fs.readFileSync(file, 'utf8'); } catch { return []; }
-  return text.split(/\r?\n/).map((l) => l.replace(/#.*$/, '').trim().replace(/^--/, '')).filter((l) => SLUG.test(l));
+  return text.split(/\r?\n/).map((l) => stripComment(l).trim().replace(/^--/, '')).filter((l) => SLUG.test(l));
 }
 
 /** The verb names the verb directory declares (file names), without importing them. */
@@ -46,30 +54,40 @@ export const extensionVerbNames = (root) => modulesIn(path.join(root, VERBS_DIR)
  * kernelOnly: Set, status: [{key, compute, lines}], problems: [string]}. A module that fails to load or
  * declares a verb other than its file name is a problem, never a crash of the api.
  */
+/** One verb file's extension entry, or a problem string in `out`. A bad module never crashes the api. */
+async function loadVerb(root, name, out) {
+  const verb = name.slice(0, -4);
+  try {
+    const spec = (await import(pathToFileURL(path.join(root, VERBS_DIR, name)).href)).default;
+    if (!spec || spec.verb !== verb || typeof spec.run !== 'function') { out.problems.push(`${VERBS_DIR}/${name}: default export must be {verb: '${verb}', run, ...}`); return; }
+    out.verbs.set(verb, spec);
+    for (const f of Array.isArray(spec.flags) ? spec.flags : []) out.flags.add(String(f).replace(/^--/, ''));
+    if (spec.kernelOnly) out.kernelOnly.add(verb);
+  } catch (error) { out.problems.push(`${VERBS_DIR}/${name}: ${String(error?.message ?? error).slice(0, 200)}`); }
+}
+
+/** One status file's extension entry, or a problem string in `out`. */
+async function loadStatus(root, name, out) {
+  try {
+    const spec = (await import(pathToFileURL(path.join(root, STATUS_DIR, name)).href)).default;
+    if (!spec || typeof spec.key !== 'string' || typeof spec.compute !== 'function') { out.problems.push(`${STATUS_DIR}/${name}: default export must be {key, compute}`); return; }
+    out.status.push(spec);
+  } catch (error) { out.problems.push(`${STATUS_DIR}/${name}: ${String(error?.message ?? error).slice(0, 200)}`); }
+}
+
 export async function loadApiExtensions({ root = path.resolve(HERE, '..', '..') } = {}) {
   const out = { verbs: new Map(), flags: new Set(readFlagsFile(path.join(root, FLAGS_FILE))), kernelOnly: new Set(), status: [], problems: [] };
-  for (const name of modulesIn(path.join(root, VERBS_DIR))) {
-    const verb = name.slice(0, -4);
-    try {
-      const spec = (await import(pathToFileURL(path.join(root, VERBS_DIR, name)).href)).default;
-      if (!spec || spec.verb !== verb || typeof spec.run !== 'function') { out.problems.push(`${VERBS_DIR}/${name}: default export must be {verb: '${verb}', run, ...}`); continue; }
-      out.verbs.set(verb, spec);
-      for (const f of Array.isArray(spec.flags) ? spec.flags : []) out.flags.add(String(f).replace(/^--/, ''));
-      if (spec.kernelOnly) out.kernelOnly.add(verb);
-    } catch (error) { out.problems.push(`${VERBS_DIR}/${name}: ${String(error?.message ?? error).slice(0, 200)}`); }
-  }
-  for (const name of modulesIn(path.join(root, STATUS_DIR))) {
-    try {
-      const spec = (await import(pathToFileURL(path.join(root, STATUS_DIR, name)).href)).default;
-      if (!spec || typeof spec.key !== 'string' || typeof spec.compute !== 'function') { out.problems.push(`${STATUS_DIR}/${name}: default export must be {key, compute}`); continue; }
-      out.status.push(spec);
-    } catch (error) { out.problems.push(`${STATUS_DIR}/${name}: ${String(error?.message ?? error).slice(0, 200)}`); }
-  }
+  // Sequential on purpose: a later module's import sees the earlier modules' side effects in order.
+  for (const name of modulesIn(path.join(root, VERBS_DIR))) await loadVerb(root, name, out);
+  for (const name of modulesIn(path.join(root, STATUS_DIR))) await loadStatus(root, name, out);
   return out;
 }
 
 /** The required flags of an extension verb for these args. */
-export const requiredOf = (spec, args) => (typeof spec.required === 'function' ? spec.required(args) : Array.isArray(spec.required) ? spec.required : []);
+export const requiredOf = (spec, args) => {
+  if (typeof spec.required === 'function') return spec.required(args);
+  return Array.isArray(spec.required) ? spec.required : [];
+};
 
 /**
  * The status fields every status extension adds for one workflow: {fields, lines}. A field the core status
@@ -92,4 +110,4 @@ export function statusExtras(status, ctx, core = {}) {
 /** The usage lines of the extension verbs, for `api --help`. A verb split out of cli.mjs keeps its line
  * in that file's usage() (`usageInCore: true`) and prints nothing here, so `api --help` is unchanged. */
 export const extensionUsage = (ext) => [...ext.verbs.values()].filter((s) => s.usageInCore !== true)
-  .map((s) => String(s.usage ?? `  ${s.verb}`).replace(/\s+$/, ''));
+  .map((s) => String(s.usage ?? `  ${s.verb}`).trimEnd());

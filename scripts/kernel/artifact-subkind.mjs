@@ -101,7 +101,11 @@ function recordToolIndex(repo, recordDir) {
       if (!node || typeof node !== 'object' || depth > 12) return;
       if (Array.isArray(node)) { for (const v of node) visit(v, depth + 1); return; }
       const tool = toolOfNode(node);
-      if (tool) for (const name of namesOfNode(node)) for (const base of bases) { const k = resolvedKey(path.resolve(base, name)); if (!index.has(k)) index.set(k, String(tool)); }
+      if (tool) {
+        for (const name of namesOfNode(node)) {
+          for (const base of bases) { const k = resolvedKey(path.resolve(base, name)); if (!index.has(k)) index.set(k, String(tool)); }
+        }
+      }
       for (const v of Object.values(node)) visit(v, depth + 1);
     };
     visit(doc);
@@ -139,6 +143,40 @@ function hasDrawRenderRecord(abs) {
 }
 
 // ----------------------------------------------------------------------------------------- derivation
+/** The subkind a file NAME alone proves, or null. */
+const nameSubkind = (kind, base) => {
+  if (kind === 'patch' || base.endsWith('.patch')) return 'patch';
+  if (base.endsWith('.patch.json')) return 'patch-json';
+  if (kind === 'diff' || base.endsWith('.diff')) return 'diff';
+  if (kind === 'trace' || base === 'trace.zip' || base.endsWith('.trace.zip') || base.endsWith('.trace')) return 'playwright-trace';
+  if (/^critique(?:[-.][^/]*)?\.json$/.test(base)) return 'critique';
+  if (/^(?:metrics|[^/]+[-.]metrics)\.json$/.test(base) || base.endsWith('.score.json')) return 'metrics';
+  if (/^grammar-proposal(?:[-.][^/]*)?\.(?:md|ya?ml|json)$/.test(base)) return 'grammar-proposal';
+  if (/^asset-request(?:[-.][^/]*)?\.(?:md|ya?ml|json)$/.test(base)) return 'asset-request';
+  return null;
+};
+
+/** The capture subkind of one image, or null. */
+const imageSubkind = ({ lower, paths, segs, op, repo, file }) => {
+  if (segs.some((s) => TOKEN_DIR.test(s))) return 'draw-render';
+  if (repo && hasDrawRenderRecord(path.join(repo, file))) return 'draw-render';
+  if (op === 'interface.asset') return 'asset-gen';
+  if (UAT_OPS.has(op) || paths.some((p) => /(?:^|\/)features\/[^/]+\/uat\//.test(p))) return 'uat-capture';
+  if (E2E_OPS.has(op) || paths.some((p) => /(?:^|\/)features\/[^/]+\/e2e\//.test(p))) return 'e2e-capture';
+  const dirs = segs.slice(0, -1);
+  const captureDir = dirs.some((s) => CAPTURE_SEG.test(s)) && !dirs.includes('lcov-report') && !dirs.includes('coverage');
+  if (captureDir && /(?:^|\/)features\/[^/]+\/(?:impl|operations)\//.test(lower)) return 'app-capture';
+  if (captureDir && APP_OPS.has(op)) return 'app-capture';
+  return null;
+};
+
+/** The capture subkind of one video, or null. */
+const videoSubkind = (paths, op) => {
+  if (UAT_OPS.has(op) || paths.some((p) => /(?:^|\/)features\/[^/]+\/uat\//.test(p))) return 'uat-video';
+  if (E2E_OPS.has(op) || paths.some((p) => /(?:^|\/)features\/[^/]+\/e2e\//.test(p))) return 'e2e-video';
+  return null;
+};
+
 /**
  * The subkind of one artifact: {kind, path (repo-relative, the stored job_artifacts.path), opId, origin?, repo?}.
  * `origin` (a copied file's source path) is read as the path conventions' second witness. `repo` enables the
@@ -153,14 +191,8 @@ export function subkindOf({ kind, path: rel, opId = null, origin = null, repo = 
   const paths = [lower, ...(from ? [from] : [])];
   const op = String(opId ?? '');
 
-  if (kind === 'patch' || base.endsWith('.patch')) return 'patch';
-  if (base.endsWith('.patch.json')) return 'patch-json';
-  if (kind === 'diff' || base.endsWith('.diff')) return 'diff';
-  if (kind === 'trace' || base === 'trace.zip' || base.endsWith('.trace.zip') || base.endsWith('.trace')) return 'playwright-trace';
-  if (/^critique(?:[-.][^/]*)?\.json$/.test(base)) return 'critique';
-  if (/^(?:metrics|[^/]+[-.]metrics)\.json$/.test(base) || base.endsWith('.score.json')) return 'metrics';
-  if (/^grammar-proposal(?:[-.][^/]*)?\.(?:md|ya?ml|json)$/.test(base)) return 'grammar-proposal';
-  if (/^asset-request(?:[-.][^/]*)?\.(?:md|ya?ml|json)$/.test(base)) return 'asset-request';
+  const named = nameSubkind(kind, base);
+  if (named) return named;
 
   const inDrawLoopRound = paths.some((p) => /\/draw-loop\/[^/]+\/round-\d+\//.test(p));
   const isImage = kind === 'image';
@@ -170,23 +202,8 @@ export function subkindOf({ kind, path: rel, opId = null, origin = null, repo = 
     if (tool) return tool;
   }
   if (inDrawLoopRound && kind !== 'report' && kind !== 'log') return 'draw-render';
-  if (isImage) {
-    if (segs.some((s) => TOKEN_DIR.test(s))) return 'draw-render';
-    if (repo && hasDrawRenderRecord(path.join(repo, file))) return 'draw-render';
-    if (op === 'interface.asset') return 'asset-gen';
-    if (UAT_OPS.has(op) || paths.some((p) => /(?:^|\/)features\/[^/]+\/uat\//.test(p))) return 'uat-capture';
-    if (E2E_OPS.has(op) || paths.some((p) => /(?:^|\/)features\/[^/]+\/e2e\//.test(p))) return 'e2e-capture';
-    const dirs = segs.slice(0, -1);
-    const captureDir = dirs.some((s) => CAPTURE_SEG.test(s)) && !dirs.includes('lcov-report') && !dirs.includes('coverage');
-    if (captureDir && /(?:^|\/)features\/[^/]+\/(?:impl|operations)\//.test(lower)) return 'app-capture';
-    if (captureDir && APP_OPS.has(op)) return 'app-capture';
-    return null;
-  }
-  if (kind === 'video') {
-    if (UAT_OPS.has(op) || paths.some((p) => /(?:^|\/)features\/[^/]+\/uat\//.test(p))) return 'uat-video';
-    if (E2E_OPS.has(op) || paths.some((p) => /(?:^|\/)features\/[^/]+\/e2e\//.test(p))) return 'e2e-video';
-    return null;
-  }
+  if (isImage) return imageSubkind({ lower, paths, segs, op, repo, file });
+  if (kind === 'video') return videoSubkind(paths, op);
   if (kind === 'report') return 'report';
   if (kind === 'log') return 'log';
   return null;

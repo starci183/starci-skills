@@ -83,6 +83,9 @@ import { loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule } from '../age
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
+import { workerObservation } from './worker-observation.mjs';
+import { queuedDependencyDetail } from './queued-dependency-detail.mjs';
+import { deferredFieldOf, legStatusColorOf } from './leg-status-view.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { headShaOf } from '../lib/git-dir.mjs';
@@ -245,20 +248,13 @@ const summarizeCheckEvidence = (value) => {
     return { observed: value.checks.length, passed, failed, green: passed > 0 && failed === 0, ...(declared ? { declared } : {}), ...(unavailable ? { unavailable } : {}), ...(advisory ? { advisory } : {}), ...(peerBlocked ? { peerBlocked } : {}), ...(measured ? { measured } : {}) };
   }
   const summary = { observed: 0, passed: 0, failed: 0 };
-  const visit = (item, key = '') => {
-    const normalizedKey = String(key).trim().toLowerCase();
-    if (Array.isArray(item)) { for (const entry of item) visit(entry, normalizedKey); return; }
-    if (item && typeof item === 'object') {
-      for (const [childKey, child] of Object.entries(item)) visit(child, childKey);
-      return;
-    }
+  const countLeaf = (item, normalizedKey) => {
     if (normalizedKey === 'exitcode' || normalizedKey === 'exit_code') {
       const code = Number(item);
-      if (Number.isFinite(code)) {
-        summary.observed += 1;
-        if (code === 0) summary.passed += 1;
-        else summary.failed += 1;
-      }
+      if (!Number.isFinite(code)) return;
+      summary.observed += 1;
+      if (code === 0) summary.passed += 1;
+      else summary.failed += 1;
       return;
     }
     if (typeof item === 'boolean' && /^(?:ok|pass|passed|success|succeeded)$/.test(normalizedKey)) {
@@ -271,6 +267,18 @@ const summarizeCheckEvidence = (value) => {
     const word = item.trim().toLowerCase();
     if (CHECK_PASS_WORDS.has(word)) { summary.observed += 1; summary.passed += 1; }
     else if (CHECK_FAIL_WORDS.has(word)) { summary.observed += 1; summary.failed += 1; }
+  };
+  const visit = (item, key = '') => {
+    const normalizedKey = String(key).trim().toLowerCase();
+    if (Array.isArray(item)) {
+      for (const entry of item) visit(entry, normalizedKey);
+      return;
+    }
+    if (item && typeof item === 'object') {
+      for (const [childKey, child] of Object.entries(item)) visit(child, childKey);
+      return;
+    }
+    countLeaf(item, normalizedKey);
   };
   visit(value);
   return { ...summary, green: summary.observed > 0 && summary.failed === 0 && summary.passed > 0 };
@@ -345,6 +353,17 @@ const usage = (code) => {
            re-queue the test legs the owner's config.yaml specs switches deferred (starci kernel status testsDeferred)`);
   throw new VerbExit(code);
 };
+const BOOLEAN_FLAGS = new Set(['json', 'spawn', 'drop', 'to-owner', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'dry-run', 'sweep', 'bundle', 'checklist', 'defer-to-handover', 'declare-none', 'quota-probe', 'force', 'no-terminals', 'publish-interface', 'release', 'reconcile']);
+// A --until-<type> <spec> collects in order as [type, spec] (gate-conditions.mjs); a bare
+// --until-message keeps its peer-wait meaning (any next message from --peer).
+const untilSpecOf = (argv, i) => {
+  const k = argv[i];
+  if (!UNTIL_FLAGS.includes(k.slice(2))) return null;
+  if (k === '--until-message' && (argv[i + 1] === undefined || argv[i + 1].startsWith('--'))) return null;
+  const v = argv[i + 1];
+  if (v === undefined) usage(2);
+  return [k.slice('--until-'.length), v];
+};
 const parseArgs = (argv) => {
   const a = { _: [] };
   for (let i = 0; i < argv.length; i++) {
@@ -355,15 +374,11 @@ const parseArgs = (argv) => {
     // Typed release conditions repeat and collect in order as [type, spec] (gate-conditions.mjs). A bare
     // --until-message keeps its peer-wait meaning (any next message from --peer); with a value it is
     // the typed condition.
-    if (UNTIL_FLAGS.includes(k.slice(2)) && (k !== '--until-message' || (argv[i + 1] !== undefined && !argv[i + 1].startsWith('--')))) {
-      const v = argv[++i];
-      if (v === undefined) usage(2);
-      (a.until ??= []).push([k.slice('--until-'.length), v]);
-      continue;
-    }
+    const until = untilSpecOf(argv, i);
+    if (until) { a.until ??= []; a.until.push(until); i += 1; continue; }
     if (API_EXT.flags.has(k.slice(2))) { a[k.slice(2)] = true; continue; }   // scripts/kernel/api-extensions.mjs
     const name = k.slice(2);
-    if (['json', 'spawn', 'drop', 'to-owner', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'dry-run', 'sweep', 'bundle', 'checklist', 'defer-to-handover', 'declare-none', 'quota-probe', 'force', 'no-terminals', 'publish-interface', 'release', 'reconcile'].includes(name)) { a[name] = true; continue; }
+    if (BOOLEAN_FLAGS.has(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -648,6 +663,30 @@ const heartbeatAtOf = (job) => {
 // `frame: true` returns the raw screen and input-box draft of the one read this worker paid for, so a
 // caller that reasons on the same frame (starci kernel nudge's foreign-input check) does not read the terminal
 // a second time with a TOCTOU window between classification and send.
+// The screen read of a live, writable terminal: a bare-shell prompt, the input draft, the classified
+// state with its gate and an outage error row the provider CLI rendered (evidence for the provider
+// circuit; an active turn is getting completions, so an old error row above it proves nothing).
+const workerScreenRead = (db, job, terminalHandle, { frame }) => {
+  const out = { shellPrompt: null, inputDraft: null, screen: null, screenState: null, screenGate: null, providerOutage: null };
+  try {
+    const read = terminalRead({ terminal: terminalHandle, screen: true });
+    // A frame ending in a bare shell prompt: the agent exited and its
+    // terminal is a plain shell that would run a nudge as a command.
+    if (read?.ok) out.shellPrompt = exitedAgentPromptRow(read.screen);
+    // The input box's draft is read in its input row (Orca lifts it out of the frame): the
+    // contract left unsubmitted there is staged input, not an idle prompt.
+    if (read?.ok) out.inputDraft = read.draft ?? null;
+    if (read?.ok && frame) out.screen = read.screen ?? null;
+    if (read?.ok) {
+      const classified = out.shellPrompt ? { state: 'agent-exited' } : classifyAgentScreen(read.screen, { ...(db ? stagedInputEvidenceOf(db, job) : {}), draft: out.inputDraft });
+      out.screenState = classified.state;
+      out.screenGate = classified.state === 'interactive-gate' ? classified.gate ?? null : null;
+    }
+    if (read?.ok && out.screenState !== 'active') out.providerOutage = workerOutageEvidence(job, read.screen);
+  } catch { /* terminal-show fallback below remains conservative */ }
+  return out;
+};
+
 const observeOperationWorker = (job, now = Date.now(), db = null, { frame = false } = {}) => {
   const terminalHandle = operationTerminalHandleOf(job);
   // Released while its settle is held (reconcile --release-worker on a held job): its report is
@@ -673,27 +712,9 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
     const connected = shown?.connected === true, shownWritable = shown?.writable === true;
     const refusedAt = shownWritable ? sendRefusedAtOf(db, job, terminalHandle) : null;
     const refused = refusedAt != null && !(lastOutputAt >= refusedAt);
-    let screenState = null, shellPrompt = null, providerOutage = null, inputDraft = null, screenGate = null, screen = null;
-    if (shown?.ok && connected && shownWritable) {
-      try {
-        const read = terminalRead({ terminal: terminalHandle, screen: true });
-        // A frame ending in a bare shell prompt: the agent exited and its
-        // terminal is a plain shell that would run a nudge as a command.
-        if (read?.ok) shellPrompt = exitedAgentPromptRow(read.screen);
-        // The input box's draft is read in its input row (Orca lifts it out of the frame): the
-        // contract left unsubmitted there is staged input, not an idle prompt.
-        if (read?.ok) inputDraft = read.draft ?? null;
-        if (read?.ok && frame) screen = read.screen ?? null;
-        if (read?.ok) {
-          const classified = shellPrompt ? { state: 'agent-exited' } : classifyAgentScreen(read.screen, { ...(db ? stagedInputEvidenceOf(db, job) : {}), draft: inputDraft });
-          screenState = classified.state;
-          screenGate = classified.state === 'interactive-gate' ? classified.gate ?? null : null;
-        }
-        // An outage error row the provider CLI rendered: evidence for the provider circuit (starci kernel status
-        // records it). An active turn is getting completions, so an old error row above it proves nothing.
-        if (read?.ok && screenState !== 'active') providerOutage = workerOutageEvidence(job, read.screen);
-      } catch { /* terminal-show fallback below remains conservative */ }
-    }
+    const { shellPrompt, inputDraft, screen, screenState, screenGate, providerOutage } = shown?.ok && connected && shownWritable
+      ? workerScreenRead(db, job, terminalHandle, { frame })
+      : { shellPrompt: null, inputDraft: null, screen: null, screenState: null, screenGate: null, providerOutage: null };
     const activeStaleMs = livenessMsOf(job, 'activeStaleMs', ACTIVE_STALE_MS);
     // An active frame whose output time Orca does not know (a restarted Orca re-attaches its panes with
     // no lastOutputAt) is aged by its dispatch heartbeat instead, and with no heartbeat it is never stale.
@@ -707,40 +728,10 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
     const beating = heartbeatAgeMs != null && heartbeatAgeMs <= activeStaleMs;
     const unwritable = refused && !(heartbeatAt > refusedAt);
     const writable = shownWritable && !unwritable;
-    // A host dialog the worker's card allowlists (a loop-detection menu) is the runtime's to
-    // answer: starci kernel nudge picks it. Answered maxPerAttempt times on this attempt, it is a loop (gate-loop).
-    const gateAnswer = screenState === 'interactive-gate' && connected && writable ? workerGateAnswerOf(db, job, screenGate) : null;
-    // 'gone' is a running Orca's typed answer that the handle names no
-    // terminal (after a host reboot Orca knows none of them); an unreachable
-    // Orca stays 'unknown' and never proves a worker dead.
-    const liveness = !shown?.ok ? (TERMINAL_GONE_CODES.has(shown?.errorCode) ? 'gone' : 'unknown')
-      : !connected || !writable ? 'disconnected'
-      : screenState === 'agent-exited' ? 'agent-exited'
-      : screenState === 'staged-input' ? 'staged-input'
-      : screenState === 'wedged' ? 'wedged'
-      : stale.staleActive ? (beating ? 'active' : 'turn-idle')
-      : screenState === 'active' ? 'active'
-      : screenState === 'turn-idle' ? 'turn-idle'
-      : screenState === 'interactive-gate' ? (gateAnswer?.loop ? 'gate-loop' : 'interactive-gate')
-      : screenState === 'failed' ? 'failed'
-      : outputAgeMs != null && outputAgeMs <= ACTIVE_UNCLASSIFIED_MS ? 'active-unclassified'
-      : 'live-idle';
-    const quiet = db && ['turn-idle', 'live-idle'].includes(liveness) ? quietAfterNudge(db, job, { now, outputAgeMs }) : null;
-    // A managed worker still inside its launch grace reads `starting`, never nudge-ready (a staged
-    // paste already counts as ready - the grace exists because worker-start returns before the Task
-    // reaches the screen, not because the worker cannot already hold input).
-    const starting = !quiet && ['turn-idle', 'live-idle'].includes(liveness) ? launchGraceOf(db, job, { now }) : null;
-    return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: quiet ? 'quiet' : starting ? 'starting' : liveness, connected, writable, ...(quiet ? { quiet } : {}),
-      terminalStatus: shown?.terminal?.status ?? null, lastOutputAt,
-      outputAgeMs, screenState, ...(shellPrompt ? { shellPrompt } : {}), ...(inputDraft ? { inputDraft: clipDraft(inputDraft) } : {}),
-      ...(frame ? { screen, draft: inputDraft } : {}),
-      ...(screenGate ? { gate: screenGate } : {}), ...(gateAnswer ? { gateAutoAnswer: gateAnswer } : {}),
-      ...(stale.staleActive && connected && writable ? { livenessReason: beating ? 'heartbeat' : 'stale-active' } : {}),
-      ...(heartbeatAgeMs != null ? { heartbeatAgeMs } : {}),
-      ...(starting ? { livenessReason: 'launch-grace', launchGrace: starting } : {}),
-      ...(providerOutage ? { providerOutage } : {}),
-      ...(unwritable ? { livenessReason: 'terminal-incarnation-stale', sendRefusedAt: refusedAt } : {}),
-      ...(shown?.errorCode || unwritable ? { errorCode: shown?.errorCode ?? TERMINAL_NOT_WRITABLE } : {}), observedAt: now };
+    return workerObservation({ job, now, db, frame, terminalHandle, shown, connected, writable, lastOutputAt, outputAgeMs,
+      screenState, shellPrompt, inputDraft, screen, screenGate, providerOutage, stale, beating, heartbeatAgeMs, unwritable, refusedAt },
+    { workerGateAnswerOf, terminalGoneCodes: TERMINAL_GONE_CODES, activeUnclassifiedMs: ACTIVE_UNCLASSIFIED_MS,
+      quietAfterNudge, launchGraceOf, clipDraft, terminalNotWritable: TERMINAL_NOT_WRITABLE });
   } catch (error) {
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: 'unknown', reason: String(error?.message ?? error), observedAt: now };
   }
@@ -1046,13 +1037,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
       return {
         queuedBecause: dead ? 'dependency-failed' : 'dependency',
         blockedBy: { op: prior.op_id, job: prior.job_id },
-        detail: (priorId === seam
-          ? (seamHold?.hold ? seamHold.detail : `cut ${payload.cut.id} seam ${prior.job_id} is ${prior.status}; the other ordinals wait for it`)
-          : (recordDeps.get(job.job_id) ?? []).includes(priorId)
-            ? `a Work record this job owns dependsOn a record owned by ${prior.job_id}, which is ${prior.status}`
-            : `declared --after job ${prior.job_id} is ${prior.status}`)
-          + (prior.job_id !== priorId ? ` (the retry lineage of ${priorId})` : '')
-          + (dead ? '; it will not succeed on its own, so the Kernel retries it, re-points this job, or drops it' : ''),
+        detail: queuedDependencyDetail({ priorId, prior, seam, seamHold, payload, recordDeps, jobId: job.job_id, dead }),
       };
     }
   }
@@ -1331,15 +1316,9 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
       && rows.some((row) => deferredJobs.has(row.job_id)) && !rows.some((row) => row.status === 'succeeded')) {
       return { op, color: 'deferred', label: tr('deferred to the final review'), jobId: latest?.job_id ?? null, status: latest?.status ?? null };
     }
-    const color = !rows.length ? 'gray'
-      : rows.some((row) => LEG_IN_FLIGHT.includes(row.status)) ? 'yellow'
-      : failedRows.some((row) => row.op_id === op && unresolvedIds.has(row.job_id)) ? 'red'
-      : rows.some((row) => row.status === 'queued' && rowOf.get(jobPayloadOf(row).retry?.retryOf)?.status === 'failed') ? 'red'
-      : rows.some((row) => row.status === 'queued') || ownerWaitOps.has(op) ? 'yellow'
-      : rows.some((row) => row.status === 'succeeded') ? (reworkOps.has(op) ? 'red' : 'green')
-      : 'red';
+    const color = legStatusColorOf({ noRows: () => !rows.length, inFlight: () => rows.some((row) => LEG_IN_FLIGHT.includes(row.status)), unresolved: () => failedRows.some((row) => row.op_id === op && unresolvedIds.has(row.job_id)), failedRetry: () => rows.some((row) => row.status === 'queued' && rowOf.get(jobPayloadOf(row).retry?.retryOf)?.status === 'failed'), queued: () => rows.some((row) => row.status === 'queued'), ownerWait: () => ownerWaitOps.has(op), succeeded: () => rows.some((row) => row.status === 'succeeded'), rework: () => reworkOps.has(op) });
     const deferred = latest ? specDeferredJobs.get(latest.job_id) ?? null : null;
-    const deferredField = deferred ? { deferred } : !rows.length && deferredPlanOps.has(op) ? { deferred: deferredPlanOps.get(op).reason } : {};
+    const deferredField = deferredFieldOf(deferred, () => !rows.length && deferredPlanOps.has(op), () => deferredPlanOps.get(op).reason);
     if (color === 'green' && provisional.has(op)) return { op, color: 'green-provisional', label: tr(PROVISIONAL_LABEL), jobId: latest?.job_id ?? null, status: latest?.status ?? null, ...deferredField };
     // A leg whose latest try ended asking the owner is yellow and says so: it is a wait, never a failure.
     const waitsOnOwner = latest?.status === 'awaiting_owner' && ownerWaitOps.has(op) ? { awaitingOwner: true } : {};
