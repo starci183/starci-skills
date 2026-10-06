@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { byCodeUnit } from '../lib/list.mjs';
 import { fileURLToPath } from 'node:url';
-import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
+import { stringifyYaml } from '../../engine/yaml.mjs';
 import { readOpManifest } from '../lib/op-shared.mjs';
 import { stringItems, ROUTE_FIELDS } from './route-fields.mjs';
 
@@ -60,6 +60,26 @@ const ids = list => (Array.isArray(list) ? list : [])
   .map(item => String(typeof item === 'object' && item ? item.id ?? item.path ?? '' : item).trim())
   .filter(Boolean);
 
+function paramsFor(input) {
+  if (!input || typeof input !== 'object') return null;
+  const params = {};
+  for (const [name, def] of Object.entries(input)) {
+    params[name] = def?.required === true
+      ? { required: true, setBy: String(def?.setBy ?? '') }
+      : { default: def?.default ?? null, setBy: String(def?.setBy ?? '') };
+  }
+  return Object.keys(params).length ? params : null;
+}
+
+function routeFor(route) {
+  const fields = {};
+  for (const key of ROUTE_FIELDS) {
+    const values = stringItems(route[key]);
+    if (values.length) fields[key] = values;
+  }
+  return fields;
+}
+
 function entryFor(file, doc) {
   const id = String(doc?.id ?? file.replace(/\.yaml$/, ''));
   const entry = { id, family: id.split('.')[0] };
@@ -68,15 +88,8 @@ function entryFor(file, doc) {
   // Tunables are the registry's one numeric column: a reader sees what an owner
   // or the kernel may set without opening the manifest. The doc prose stays in
   // the manifest — the registry is an index.
-  if (doc?.params && typeof doc.params === 'object') {
-    const params = {};
-    for (const [name, def] of Object.entries(doc.params)) {
-      params[name] = def?.required === true
-        ? { required: true, setBy: String(def?.setBy ?? '') }
-        : { default: def?.default ?? null, setBy: String(def?.setBy ?? '') };
-    }
-    if (Object.keys(params).length) entry.params = params;
-  }
+  const params = paramsFor(doc?.params);
+  if (params) entry.params = params;
   if (doc?.nodeKinds) entry.nodeKinds = stringItems(doc.nodeKinds);
   if (doc?.completionProfile) entry.completionProfile = String(doc.completionProfile);
   const side = stringItems(doc?.sideEffects);
@@ -86,11 +99,7 @@ function entryFor(file, doc) {
   if (writes.length) entry.writes = writes;
   const route = doc?.route && typeof doc.route === 'object' ? doc.route : null;
   if (route) {
-    entry.route = {};
-    for (const k of ROUTE_FIELDS) {
-      const v = stringItems(route[k]);
-      if (v.length) entry.route[k] = v;
-    }
+    entry.route = routeFor(route);
     // Lifecycle position is the route phase an agent would file this op under;
     // richer analysis stays in the per-op yaml — the registry stays an index.
     if (entry.route.phase?.length) entry.lifecyclePosition = entry.route.phase.join(' | ');
@@ -99,19 +108,16 @@ function entryFor(file, doc) {
   return entry;
 }
 
-function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const opsDir = path.resolve(args.opsDir ?? path.join(skillRoot, 'modules', 'ops'));
-  const out = path.resolve(args.out ?? path.join(opsDir, 'registry.yaml'));
-  if (!fs.existsSync(opsDir)) { console.error(`ops catalog missing: ${opsDir}`); process.exit(1); }
-
-  // Per-op files live at <opsDir>/<id>.yaml or <opsDir>/ops/<id>.yaml.
-  const files = [opsDir, path.join(opsDir, 'ops')]
-    .filter(d => fs.existsSync(d))
-    .flatMap(d => fs.readdirSync(d)
-      .filter(f => f.endsWith('.yaml') && f !== 'registry.yaml' && !f.startsWith('_'))
-      .map(f => path.join(d, f)))
+function sourceFiles(opsDir) {
+  return [opsDir, path.join(opsDir, 'ops')]
+    .filter(dir => fs.existsSync(dir))
+    .flatMap(dir => fs.readdirSync(dir)
+      .filter(file => file.endsWith('.yaml') && file !== 'registry.yaml' && !file.startsWith('_'))
+      .map(file => path.join(dir, file)))
     .sort(byCodeUnit);
+}
+
+function entriesFrom(files) {
   const entries = [], problems = [];
   for (const file of files) {
     try {
@@ -122,10 +128,21 @@ function main() {
       else if (entry.route.phase?.length && !STAGES[entry.route.phase[0]] && !Object.values(COARSE).includes(entry.route.phase[0]))
         problems.push(`${path.basename(file)}: route.phase[0] '${entry.route.phase[0]}' is not a known stage`);
       entries.push(entry);
-    } catch (e) {
-      problems.push(`${path.basename(file)}: ${e.message}`);
+    } catch (error) {
+      problems.push(`${path.basename(file)}: ${error.message}`);
     }
   }
+  return { entries, problems };
+}
+
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const opsDir = path.resolve(args.opsDir ?? path.join(skillRoot, 'modules', 'ops'));
+  const out = path.resolve(args.out ?? path.join(opsDir, 'registry.yaml'));
+  if (!fs.existsSync(opsDir)) { console.error(`ops catalog missing: ${opsDir}`); process.exit(1); }
+
+  const files = sourceFiles(opsDir);
+  const { entries, problems } = entriesFrom(files);
   entries.sort((a, b) => a.id.localeCompare(b.id));
 
   const doc = {

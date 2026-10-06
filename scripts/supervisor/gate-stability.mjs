@@ -46,28 +46,38 @@ function acceptedLegsOf(ledgerFile, family) {
 }
 
 /** One side: the findings of `tree`'s gates on the accepted legs. {tree, family, gates[], legs:[{ledger, repo, workflowId, jobId, attempt, findings[], errors[]}]} */
-export async function gateSide({ tree = SELF_ROOT, family, ledgers = registeredLedgers(), gates = null }) {
-  const spec = gates;
-  if (!Array.isArray(spec) || !spec.length || spec.some((g) => !g?.module || !g?.export)) throw new Error('an explicit nonempty current --gate module#export set is required');
+async function loadGateFns(tree, spec) {
   const fns = [];
   for (const gate of spec) {
     const file = path.join(tree, gate.module);
     if (!fs.existsSync(file)) { fns.push({ gate, error: 'module absent in this tree' }); continue; }
     try { const mod = await import(pathToFileURL(file).href); fns.push({ gate, fn: mod[gate.export], error: typeof mod[gate.export] === 'function' ? null : 'export absent' }); } catch (error) { fns.push({ gate, error: String(error?.message ?? error).slice(0, 200) }); }
   }
+  return fns;
+}
+
+async function findingsForLeg(repo, leg, fns) {
+  const findings = [], errors = [];
+  for (const { gate, fn, error } of fns) {
+    if (error || !fn) { errors.push(`${gate.module}#${gate.export}: ${error}`); continue; }
+    try {
+      const verdict = await fn({ repo, files: leg.files });
+      for (const f of asList(verdict?.findings)) findings.push({ code: f.code, path: f.path ?? null, gate: `${gate.module}#${gate.export}` });
+    } catch (e) { errors.push(`${gate.module}#${gate.export}: ${String(e?.message ?? e).slice(0, 200)}`); }
+  }
+  return { findings, errors };
+}
+
+export async function gateSide({ tree = SELF_ROOT, family, ledgers = registeredLedgers(), gates = null }) {
+  const spec = gates;
+  if (!Array.isArray(spec) || !spec.length || spec.some((g) => !g?.module || !g?.export)) throw new Error('an explicit nonempty current --gate module#export set is required');
+  const fns = await loadGateFns(tree, spec);
   const legs = [];
   for (const ledger of ledgers) {
     const repo = path.dirname(path.dirname(path.resolve(ledger)));
     for (const leg of acceptedLegsOf(ledger, family)) {
-      const findings = [], errors = [];
-      for (const { gate, fn, error } of fns) {
-        if (error || !fn) { errors.push(`${gate.module}#${gate.export}: ${error}`); continue; }
-        try {
-          const verdict = await fn({ repo, files: leg.files });
-          for (const f of asList(verdict?.findings)) findings.push({ code: f.code, path: f.path ?? null, gate: `${gate.module}#${gate.export}` });
-        } catch (e) { errors.push(`${gate.module}#${gate.export}: ${String(e?.message ?? e).slice(0, 200)}`); }
-      }
-      legs.push({ ledger, repo, workflowId: leg.workflowId, jobId: leg.jobId, attempt: leg.attempt, findings, errors });
+      const result = await findingsForLeg(repo, leg, fns);
+      legs.push({ ledger, repo, workflowId: leg.workflowId, jobId: leg.jobId, attempt: leg.attempt, ...result });
     }
   }
   return { tree, family, gates: spec, legs, errors: fns.filter((g) => g.error).map(({ gate, error }) => `${gate.module}#${gate.export}: ${error}`) };
@@ -97,7 +107,9 @@ function runSide({ runner = SELF_ROOT, tree, family, ledgers = null, gates = nul
   const r = runNode(args, { cwd: runner, timeout, env, maxBuffer: 64 * 1024 * 1024 });
   if (r.status !== 0) return { error: String(r.stderr || r.error?.message || `exit ${r.status}`).trim().slice(-400) };
   const side = parseJson(r.stdout.trim().split(/\r?\n/).pop(), null);
-  return !side || !Array.isArray(side.legs) ? { error: 'unparseable side output' } : side.errors?.length ? { error: side.errors.join('; ') } : side;
+  if (!side || !Array.isArray(side.legs)) return { error: 'unparseable side output' };
+  if (side.errors?.length) return { error: side.errors.join('; ') };
+  return side;
 }
 
 /**
@@ -112,6 +124,23 @@ export function gateStability({ runner = SELF_ROOT, base, head, family, ledgers 
   return compareSides(b, h);
 }
 
+function perLegSummary(l) {
+  const flipped = l.flipped ? ' FLIP' : '';
+  const newFindings = l.newFindings.length ? ' new ' + [...new Set(l.newFindings.map((f) => f.code))].join(', ') : '';
+  return `  ${l.workflowId} ${l.jobId}: ${l.baseFindings} -> ${l.headFindings}${flipped}${newFindings}`;
+}
+
+function gateSummary(out, family) {
+  if (out.error) return `gate-stability ${family}: ${out.error}`;
+  const legs = out.perLeg.map(perLegSummary).join('\n');
+  return `gate-stability ${family}: ${out.flips} of ${out.legs} accepted leg(s) would flip, ${out.newlyFailing} get new findings\n${legs}`;
+}
+
+function sideLegSummary(l) {
+  const errors = l.errors.length ? ' errors ' + l.errors.join('; ') : '';
+  return `${l.workflowId} ${l.jobId}: ${l.findings.length} finding(s)${errors}`;
+}
+
 async function main(argv) {
   const values = (name) => argv.flatMap((a, i) => (a === name && i + 1 < argv.length ? [argv[i + 1]] : []));
   const one = (name) => values(name)[0] ?? null;
@@ -122,11 +151,11 @@ async function main(argv) {
   if (one('--base') || one('--head')) {
     if (!one('--base') || !one('--head')) { process.stderr.write('--base and --head go together\n'); return 2; }
     const out = gateStability({ base: path.resolve(one('--base')), head: path.resolve(one('--head')), family, ledgers, gates });
-    process.stdout.write(json ? `${JSON.stringify(out)}\n` : `${out.error ? `gate-stability ${family}: ${out.error}` : `gate-stability ${family}: ${out.flips} of ${out.legs} accepted leg(s) would flip, ${out.newlyFailing} get new findings\n${out.perLeg.map((l) => `  ${l.workflowId} ${l.jobId}: ${l.baseFindings} -> ${l.headFindings}${l.flipped ? ' FLIP' : ''}${l.newFindings.length ? ` new ${[...new Set(l.newFindings.map((f) => f.code))].join(', ')}` : ''}`).join('\n')}`}\n`);
+    process.stdout.write(json ? `${JSON.stringify(out)}\n` : `${gateSummary(out, family)}\n`);
     return out.error ? 2 : 0;
   }
   const side = await gateSide({ tree: path.resolve(one('--tree') ?? SELF_ROOT), family, ...(ledgers ? { ledgers } : {}), gates });
-  process.stdout.write(json ? `${JSON.stringify(side)}\n` : `${side.legs.map((l) => `${l.workflowId} ${l.jobId}: ${l.findings.length} finding(s)${l.errors.length ? ` errors ${l.errors.join('; ')}` : ''}`).join('\n')}\n`);
+  process.stdout.write(json ? `${JSON.stringify(side)}\n` : `${side.legs.map(sideLegSummary).join('\n')}\n`);
   return side.errors.length || side.legs.some((leg) => leg.errors.length) ? 2 : 0;
 }
 

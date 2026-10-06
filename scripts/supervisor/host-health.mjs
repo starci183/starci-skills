@@ -21,7 +21,10 @@ export function listProcessesAsync({ platform = process.platform, run = null } =
 const indexOf = (procs) => {
   const byPid = new Map(procs.map((p) => [p.pid, p]));
   const children = new Map();
-  for (const p of procs) { if (!children.has(p.ppid)) children.set(p.ppid, []); children.get(p.ppid).push(p); }
+  for (const p of procs) {
+    if (!children.has(p.ppid)) { children.set(p.ppid, []); }
+    children.get(p.ppid).push(p);
+  }
   return { byPid, children };
 };
 

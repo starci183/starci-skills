@@ -25,9 +25,9 @@ export function codeOf(text) {
   let inBlock = false;
   return String(text ?? '').split(/\r?\n/).filter((line) => {
     const s = line.trim();
-    if (inBlock) { if (s.includes('*/')) inBlock = false; return false; }
+    if (inBlock) { if (s.includes('*/')) { inBlock = false; } return false; }
     if (s.startsWith('//')) return false;
-    if (s.startsWith('/*')) { if (!s.includes('*/')) inBlock = true; return false; }
+    if (s.startsWith('/*')) { if (!s.includes('*/')) { inBlock = true; } return false; }
     return true;
   }).join('\n');
 }
@@ -89,9 +89,9 @@ export function specsDirect(changed, { specs, symbolsOf = () => null, hub = HUB_
     for (const s of named(f)) files.add(s);
     const needle = needleOf(f);
     const users = specs.filter((s) => code.get(s.file).includes(needle)).map((s) => s.file);
-    if (users.length <= hub) { for (const s of users) files.add(s); continue; }
+    if (users.length <= hub) { for (const s of users) { files.add(s); } continue; }
     const r = symbolsOf(f);
-    if (!r || !Array.isArray(r.symbols)) { for (const s of users) files.add(s); narrowed.push({ file: f, importers: users.length, kept: users.length, symbols: null, why: r?.why ?? 'not mapped' }); continue; }
+    if (!r || !Array.isArray(r.symbols)) { for (const s of users) { files.add(s); } narrowed.push({ file: f, importers: users.length, kept: users.length, symbols: null, why: r?.why ?? 'not mapped' }); continue; }
     const others = source.filter((g) => g !== f).map(needleOf);
     const keep = users.filter((s) => others.some((n) => code.get(s).includes(n)) || r.symbols.some((name) => uses(code.get(s), name)));
     for (const s of keep) files.add(s);

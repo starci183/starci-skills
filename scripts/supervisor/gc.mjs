@@ -151,7 +151,7 @@ export function writeState({ seen = {}, closed = [], report = null, trigger = 's
       for (const i of report.items) {
         m.recordGcItem({ runId, collector: collectorOf(i.class), kind: i.action ?? i.class, target: String(i.target), ownerRef: i.owner ? String(i.owner) : null,
           action: i.ok === false ? 'failed' : i.verdict ?? 'keep', reason: String(i.reason ?? '').slice(0, 2000), bytes: i.bytes ?? i.ramBytes ?? null,
-          lastError: i.error ? String(i.error).slice(0, 2000) : null, outcome: i.ok === true ? 'done' : i.ok === false ? 'gave-up' : 'dropped', verifiedGoneAt: i.ok === true ? m.now() : null });
+          lastError: i.error ? String(i.error).slice(0, 2000) : null, outcome: (i.ok === true && 'done') || (i.ok === false && 'gave-up') || 'dropped', verifiedGoneAt: i.ok === true ? m.now() : null });
       }
       m.finishGcRun(runId, { freedBytes: report.counts.freedBytes, counts: report.counts, errors: report.errors, report });
       return runId;
@@ -262,7 +262,7 @@ export function classifyLeases({ rows = [], now = Date.now(), minAgeMs = DEFAULT
     if (!settled && !ended) continue;
     const since = settled ? (r.jobUpdatedAt ?? r.acquiredAt ?? null) : (r.archivedAt ?? r.workflowUpdatedAt ?? null);
     if (since == null || now - Number(since) < minAgeMs) continue;
-    const why = r.jobStatus == null ? 'its job is gone from the ledger' : settled ? `its job ${r.jobId} is ${r.jobStatus}` : `its workflow ${r.workflowId} ended`;
+    const why = (r.jobStatus == null && 'its job is gone from the ledger') || (settled && 'its job ' + String(r.jobId) + ' is ' + String(r.jobStatus)) || 'its workflow ' + String(r.workflowId) + ' ended';
     out.push({ ledger: r.ledger ?? null, resourceKey: r.resourceKey, jobId: r.jobId, workflowId: r.workflowId, why, sinceMs: now - Number(since) });
   }
   return out;
@@ -500,7 +500,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     freedBytes += bytes;
   };
   const lanes = worktrees.filter((w) => { const k = pathKey(w.path); return k !== mainKey && k !== selfKey && k.startsWith(baseKey); })
-    .sort((a, b) => (pathKey(a.path) < pathKey(b.path) ? -1 : pathKey(a.path) > pathKey(b.path) ? 1 : 0));
+    .sort((a, b) => { if (pathKey(a.path) < pathKey(b.path)) return -1; if (pathKey(a.path) > pathKey(b.path)) return 1; return 0; });
   // Resume at the cursor and run to the end of the path order; a pass that reaches the end is complete (the next one
   // starts from the beginning again).
   const at = cursor ? lanes.findIndex((w) => pathKey(w.path) >= cursor) : 0;
@@ -731,7 +731,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
       report.counts.tmp += n;
       report.counts.freedBytes += Number(r.freedBytes) || 0;
       if (n) report.items.push({ class: 'tmp', action: 'remove-temp', target: `%TEMP% (${n} entr${n === 1 ? 'y' : 'ies'})`, verdict: 'collect', reason: apply ? 'runtime-prefixed temp entries past tmpMaxAgeMs removed' : 'would remove runtime-prefixed temp entries past tmpMaxAgeMs', bytes: Number(r.freedBytes) || 0, ok: apply ? r.ok !== false : null });
-      for (const e of r.errors ?? []) report.errors.push(`tmp: ${typeof e === 'string' ? e : `${e.path ?? ''} ${e.error ?? e.message ?? ''}`}`.slice(0, 200));
+      for (const e of r.errors ?? []) report.errors.push(('tmp: ' + (typeof e === 'string' ? e : String(e.path ?? '') + ' ' + String(e.error ?? e.message ?? ''))).slice(0, 200));
     } catch (error) { report.errors.push(`tmp: ${String(error?.message ?? error).slice(0, 200)}`); }
   }
 
@@ -768,7 +768,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
 
   // The machine log: one gc.collect per item, one gc.summary.
   const rows = report.items.map((i) => ({ kind: 'gc.collect', at: now, level: i.ok === false ? 'warn' : 'info',
-    msg: `${apply ? '' : '[dry-run] '}${i.verdict} ${i.class} ${i.action} ${i.target}${i.title ? ` "${String(i.title).slice(0, 60)}"` : ''}: ${String(i.reason ?? '').slice(0, 160)}`,
+    msg: `${apply ? '' : '[dry-run] '}${i.verdict} ${i.class} ${i.action} ${i.target}${i.title ? ' "' + String(i.title).slice(0, 60) + '"' : ''}: ${String(i.reason ?? '').slice(0, 160)}`,
     data: { class: i.class, action: i.action, target: String(i.target), ...(i.owner ? { owner: String(i.owner) } : {}), ...(typeof i.ok === 'boolean' ? { ok: i.ok } : {}),
       ...(i.proof ? { proof: i.proof } : {}), reason: `${i.verdict}: ${String(i.reason ?? '').slice(0, 400)}`, ...(i.bytes != null ? { bytes: i.bytes } : {}), apply, ...(i.leftover ? { leftover: true } : {}) },
     refs: i.owner ? String(i.owner).split(',').map((o) => (o.startsWith('wf-') ? `workflow:${o}` : `job:${o}`)) : [] }));
@@ -783,7 +783,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   // A leftover is a bug in its owner step: one lesson per class (lessons.mjs recordLeftover, deduped per day).
   if (apply) {
     const byClass = {};
-    for (const i of report.items) if (i.leftover && (i.ok || i.reportOnly)) (byClass[i.class] ??= []).push(`${i.target} ${String(i.title ?? '').slice(0, 50)}`.trim());
+    for (const i of report.items) if (i.leftover && (i.ok || i.reportOnly)) { byClass[i.class] ??= []; byClass[i.class].push(`${i.target} ${String(i.title ?? '').slice(0, 50)}`.trim()); }
     if (report.counts.terminals) byClass['idle-shell'] = report.items.filter((i) => i.class === 'idle-shell' && i.ok).map((i) => i.target);
     try {
       const record = deps.lesson ?? (await import('../machine/lessons.mjs')).recordLeftover;
@@ -803,8 +803,8 @@ export function describe(report) {
   for (const v of order) {
     const rows = report.items.filter((i) => i.verdict === v);
     if (!rows.length) continue;
-    lines.push(`--- ${v === 'collect' ? (report.apply ? 'collected' : 'would collect') : v === 'refuse' ? 'refused (runtime-owned, kept for a reason)' : 'left alone (not created by the runtime)'} (${rows.length}) ---`);
-    for (const i of rows) lines.push(`  [${i.class}] ${i.target}${i.title ? ` "${String(i.title).slice(0, 70)}"` : ''}${i.branch ? ` (${i.branch})` : ''}${i.bytes ? ` ${(i.bytes / 1024 ** 2).toFixed(0)} MB` : ''}: ${i.reason}${i.ok === false ? ` FAILED ${i.error ?? ''}` : ''}`);
+    lines.push('--- ' + (v === 'collect' && (report.apply && 'collected' || 'would collect') || v === 'refuse' && 'refused (runtime-owned, kept for a reason)' || 'left alone (not created by the runtime)') + ' (' + rows.length + ') ---');
+    for (const i of rows) lines.push('  [' + String(i.class) + '] ' + String(i.target) + (i.title ? ' "' + String(i.title).slice(0, 70) + '"' : '') + (i.branch ? ' (' + String(i.branch) + ')' : '') + (i.bytes ? ' ' + (i.bytes / 1024 ** 2).toFixed(0) + ' MB' : '') + ': ' + String(i.reason) + (i.ok === false ? ' FAILED ' + String(i.error ?? '') : ''));
   }
   for (const e of report.errors) lines.push(`ERROR ${e}`);
   return lines.join('\n');
@@ -828,7 +828,7 @@ if (isMain(import.meta.url)) {
   if (!args.ok) { console.error(`use: starci supervisor gc [--dry-run|--apply] [--only ${COLLECTORS.join(',')}] [--json] (${args.error})`); process.exit(2); }
   const language = ownerLanguage();
   // --plan: no seen-state, no log rows, no lessons; --holder: the host-lock holder of an apply (deps other than holder drop the lock, so name only it)
-  const deps = args.plan ? { writeState: () => {}, log: () => {}, lesson: () => null } : args.holder ? { holder: args.holder } : {};
+  const deps = args.plan && { writeState: () => {}, log: () => {}, lesson: () => null } || args.holder && { holder: args.holder } || {};
   const report = await runGc({ apply: args.apply, only: args.only, language, trigger: args.trigger ?? 'manual', deps });
   console.log(args.json ? JSON.stringify(report, null, 2) : describe(report));
   process.exit(report.ok ? 0 : 1);

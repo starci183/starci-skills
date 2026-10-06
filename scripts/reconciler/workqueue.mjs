@@ -28,7 +28,11 @@ export function memoryRows() {
     put: (row) => { rows.set(id(row.controller, row.key), { ...rows.get(id(row.controller, row.key)), ...row }); },
     remove: (controller, key) => { rows.delete(id(controller, key)); },
     due: (controller, now, limit) => [...rows.values()].filter((r) => r.controller === controller && r.due_at <= now)
-      .sort((a, b) => a.due_at - b.due_at || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)).slice(0, limit).map((r) => ({ ...r })),
+      .sort((a, b) => {
+        const dueOrder = a.due_at - b.due_at;
+        if (dueOrder) return dueOrder;
+        return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+      }).slice(0, limit).map((r) => ({ ...r })),
     all: () => [...rows.values()].map((r) => ({ ...r })),
   };
 }

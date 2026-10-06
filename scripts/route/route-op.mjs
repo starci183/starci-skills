@@ -113,6 +113,60 @@ function score(op, q) {
   return { total, parts, intentHits: hits };
 }
 
+function routeResult(q, opsDir, ops, skipped) {
+  const scored = ops
+    .map(op => ({ op, ...score(op, q) }))
+    .filter(r => r.total > 0)
+    .sort((a, b) => b.total - a.total || a.op.id.localeCompare(b.op.id));
+  const result = {
+    query: { kind: q.kind ?? null, nodeKind: q.nodeKind ?? null, phase: q.phase ?? null, intent: q.intents },
+    catalog: { dir: path.relative(skillRoot, opsDir), ops: ops.length, skipped },
+    pick: null,
+    runnersUp: [],
+  };
+  if (!scored.length) result.reasons = [
+    `no op scored on the given keys`,
+    q.kind ? `kind '${q.kind}' matched no op id or family` : 'no kind given',
+    q.nodeKind ? `nodeKind '${q.nodeKind}' matched no route.nodeKinds` : 'no nodeKind given',
+    q.phase ? `phase '${q.phase}' matched no route.phase` : 'no phase given',
+    q.intents.length ? `intent [${q.intents}] matched no route.intent` : 'no intent given',
+  ];
+  return { result, scored };
+}
+
+function setPick(result, scored) {
+  const [top, ...rest] = scored;
+  result.pick = {
+    op: top.op.id, score: top.total, breakdown: top.parts, yaml: top.op.file,
+    prerequisites: top.op.route.prerequisites,
+    riskHints: top.op.route.riskHints,
+    goal: top.op.goal,
+  };
+  result.runnersUp = rest.slice(0, 4).map(r => ({ op: r.op.id, score: r.total, breakdown: r.parts, yaml: r.op.file }));
+}
+
+function printNoRoute(result, skipped, json) {
+  if (json) { console.log(JSON.stringify(result, null, 2)); return; }
+  console.log('NO ROUTE ' + String.fromCodePoint(0x2014) + ' zero candidates matched.');
+  for (const r of result.reasons) console.log(`  - ${r}`);
+  for (const s of skipped) console.log(`  skipped ${s.file}: ${s.reason}`);
+}
+
+function printRoute(result, skipped, q) {
+  if (q.json) { console.log(JSON.stringify(result, null, 2)); return; }
+  console.log(`PICK ${result.pick.op}  (score ${result.pick.score})`);
+  console.log(`  yaml: ${result.pick.yaml}`);
+  console.log(`  breakdown: ${result.pick.breakdown.join('  ')}`);
+  if (result.pick.prerequisites.length) console.log(`  prerequisites: ${result.pick.prerequisites.join(', ')}`);
+  if (result.pick.riskHints.length) console.log(`  riskHints: ${result.pick.riskHints.join(', ')}`);
+  if (result.pick.goal) console.log(`  goal: ${result.pick.goal.replaceAll('\n', ' ').slice(0, 140)}`);
+  if (result.runnersUp.length) {
+    console.log('runners-up:');
+    for (const r of result.runnersUp) console.log(`  ${r.op}  (score ${r.score})  ${r.breakdown.join('  ')}`);
+  }
+  for (const s of skipped) console.log(`skipped ${s.file}: ${s.reason}`);
+}
+
 function main() {
   const q = parseArgs(process.argv.slice(2));
   if (!q.kind && !q.nodeKind && !q.phase && !q.intents.length) usage(2);
@@ -122,56 +176,15 @@ function main() {
     process.exit(1);
   }
   const { ops, skipped } = loadOps(opsDir);
-  const scored = ops
-    .map(op => ({ op, ...score(op, q) }))
-    .filter(r => r.total > 0)
-    .sort((a, b) => b.total - a.total || a.op.id.localeCompare(b.op.id));
-
-  const result = {
-    query: { kind: q.kind ?? null, nodeKind: q.nodeKind ?? null, phase: q.phase ?? null, intent: q.intents },
-    catalog: { dir: path.relative(skillRoot, opsDir), ops: ops.length, skipped },
-    pick: null,
-    runnersUp: [],
-  };
+  const { result, scored } = routeResult(q, opsDir, ops, skipped);
 
   if (!scored.length) {
-    result.reasons = [
-      `no op scored on the given keys`,
-      q.kind ? `kind '${q.kind}' matched no op id or family` : 'no kind given',
-      q.nodeKind ? `nodeKind '${q.nodeKind}' matched no route.nodeKinds` : 'no nodeKind given',
-      q.phase ? `phase '${q.phase}' matched no route.phase` : 'no phase given',
-      q.intents.length ? `intent [${q.intents}] matched no route.intent` : 'no intent given',
-    ];
-    if (q.json) console.log(JSON.stringify(result, null, 2));
-    else {
-      console.log('NO ROUTE — zero candidates matched.');
-      for (const r of result.reasons) console.log(`  - ${r}`);
-      for (const s of skipped) console.log(`  skipped ${s.file}: ${s.reason}`);
-    }
+    printNoRoute(result, skipped, q.json);
     process.exit(1);
   }
 
-  const [top, ...rest] = scored;
-  result.pick = {
-    op: top.op.id, score: top.total, breakdown: top.parts, yaml: top.op.file,
-    prerequisites: top.op.route.prerequisites,
-    riskHints: top.op.route.riskHints,
-    goal: top.op.goal,
-  };
-  result.runnersUp = rest.slice(0, 4).map(r => ({ op: r.op.id, score: r.total, breakdown: r.parts, yaml: r.op.file }));
-
-  if (q.json) { console.log(JSON.stringify(result, null, 2)); return; }
-  console.log(`PICK ${result.pick.op}  (score ${result.pick.score})`);
-  console.log(`  yaml: ${result.pick.yaml}`);
-  console.log(`  breakdown: ${result.pick.breakdown.join('  ')}`);
-  if (result.pick.prerequisites.length) console.log(`  prerequisites: ${result.pick.prerequisites.join(', ')}`);
-  if (result.pick.riskHints.length) console.log(`  riskHints: ${result.pick.riskHints.join(', ')}`);
-  if (result.pick.goal) console.log(`  goal: ${result.pick.goal.split('\n').join(' ').slice(0, 140)}`);
-  if (result.runnersUp.length) {
-    console.log('runners-up:');
-    for (const r of result.runnersUp) console.log(`  ${r.op}  (score ${r.score})  ${r.breakdown.join('  ')}`);
-  }
-  for (const s of skipped) console.log(`skipped ${s.file}: ${s.reason}`);
+  setPick(result, scored);
+  printRoute(result, skipped, q);
 }
 
 main();

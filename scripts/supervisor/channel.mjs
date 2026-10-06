@@ -59,6 +59,32 @@ export function splitText(text, max = TEXT_MAX) {
   return parts;
 }
 
+function localReply({ id, text, to, env }) {
+  if (!validSupervisorId(id)) return { handled: true, result: { ok: false, error: 'invalid supervisor id' } };
+  const origin = to ? readInbox(id, env).find((entry) => entry.id === to) : null;
+  if (!origin?.from) return { handled: false };
+  if (!String(text ?? '').trim()) return { handled: true, result: { ok: false, error: 'empty reply' } };
+  const via = origin.from === 'desktop' ? 'desktop' : 'local';
+  appendOutbox(id, { to, text, via }, { env });
+  takeInbox(id, { env, ids: [to] });
+  return { handled: true, result: { ok: true, via, parts: 0, replyTo: null } };
+}
+
+async function sendTelegramParts({ settings, label, text, replyTo, apiBase, fetchImpl, sleepImpl }) {
+  const prefix = `[${label}]`;
+  const parts = splitText(text, Math.max(500, TEXT_MAX - prefix.length - 12));
+  const sent = [];
+  for (let i = 0; i < parts.length; i += 1) {
+    const head = parts.length > 1 ? `${prefix} (${i + 1}/${parts.length})` : prefix;
+    const payload = { chat_id: settings.chatId, text: `${head} ${parts[i]}`, link_preview_options: { is_disabled: true } };
+    if (i === 0 && replyTo) payload.reply_parameters = { message_id: replyTo, allow_sending_without_reply: true };
+    const result = await botCall({ token: settings.token, method: 'sendMessage', payload, apiBase, fetchImpl, ...(sleepImpl ? { sleepImpl } : {}) });
+    if (!result.ok) return { ok: false, status: result.status, error: redact(result.error, settings.token), sent };
+    sent.push(result.result?.message_id ?? null);
+  }
+  return { ok: true, parts: parts.length, messageIds: sent };
+}
+
 /**
  * Send one supervisor's answer to the owner: every part prefixed "[<label>]" (numbered when split),
  * the first a reply to the Telegram message of inbox item `to` (which is marked read). Never throws.
@@ -68,17 +94,8 @@ export async function replyToOwner({ id, text, to = null }, {
 } = {}) {
   const s = settings ?? telegramSettings({ env });
   try {
-    if (!validSupervisorId(id)) return { ok: false, error: 'invalid supervisor id' };
-    const origin = to ? readInbox(id, env).find((entry) => entry.id === to) : null;
-    if (origin?.from) {
-      // Not a Telegram message: the desktop relay (tell.mjs) or a runtime alert (stall-alert, land-gate). Its
-      // answer is recorded, never sent to Telegram; a reply with no --to is how the owner is told.
-      if (!String(text ?? '').trim()) return { ok: false, error: 'empty reply' };
-      const via = origin.from === 'desktop' ? 'desktop' : 'local';
-      appendOutbox(id, { to, text, via }, { env });
-      takeInbox(id, { env, ids: [to] });
-      return { ok: true, via, parts: 0, replyTo: null };
-    }
+    const local = localReply({ id, text, to, env });
+    if (local.handled) return local.result;
     if (!s?.ready) return { ok: false, error: s?.warning ?? 'telegram is off (connectors.telegram)' };
     if (isSpecRun(env) && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch) return { ok: false, error: 'test context: refusing the real Bot API' };
     if (!String(text ?? '').trim()) return { ok: false, error: 'empty reply' };
@@ -90,20 +107,11 @@ export async function replyToOwner({ id, text, to = null }, {
       if (!item) return { ok: false, error: `no inbox message ${to}` };
       replyTo = item.messageId ?? null;
     }
-    const prefix = `[${label}]`;
-    const parts = splitText(text, Math.max(500, TEXT_MAX - prefix.length - 12));
-    const sent = [];
-    for (let i = 0; i < parts.length; i += 1) {
-      const head = parts.length > 1 ? `${prefix} (${i + 1}/${parts.length})` : prefix;
-      const payload = { chat_id: s.chatId, text: `${head} ${parts[i]}`, link_preview_options: { is_disabled: true } };
-      if (i === 0 && replyTo) payload.reply_parameters = { message_id: replyTo, allow_sending_without_reply: true };
-      const r = await botCall({ token: s.token, method: 'sendMessage', payload, apiBase, fetchImpl, ...(sleepImpl ? { sleepImpl } : {}) });
-      if (!r.ok) return { ok: false, status: r.status, error: redact(r.error, s.token), sent };
-      sent.push(r.result?.message_id ?? null);
-    }
+    const sent = await sendTelegramParts({ settings: s, label, text, replyTo, apiBase, fetchImpl, sleepImpl });
+    if (!sent.ok) return sent;
     if (to) takeInbox(id, { env, ids: [to] });
     appendOutbox(id, { to, text, via: 'telegram' }, { env });
-    return { ok: true, via: 'telegram', parts: parts.length, messageIds: sent, replyTo };
+    return { ok: true, via: 'telegram', parts: sent.parts, messageIds: sent.messageIds, replyTo };
   } catch (error) {
     return { ok: false, error: redact(error?.message ?? error, s?.token) };
   }
@@ -144,23 +152,26 @@ export function registrationRefusal({ id, terminal, force = false, seatTerminal 
  */
 export function drainRefusal({ id, terminal = null, session = undefined, seatTerminal = undefined, registeredTerminal = undefined, registered = undefined, mode = undefined, env = process.env }) {
   if (id !== SUPERVISOR_ID) return null;
-  if ((mode ?? supervisorMode({ env })) === 'chat') {
-    const record = registered !== undefined ? registered : getSupervisor(id, env);
-    const peek = '(inbox --peek reads without marking)';
-    if (terminal) return `channel '${SUPERVISOR_ID}' is drained by the owner's chat session only (config.yaml supervisor.mode chat), not the Orca terminal ${terminal} ${peek}`;
-    if (!record) return `channel '${SUPERVISOR_ID}' is not registered: the chat registers it first (starci supervisor channel register --id ${SUPERVISOR_ID} --label <text>) ${peek}`;
-    const recordTerminal = registeredTerminal !== undefined ? registeredTerminal : record.terminal ?? null;
-    if (recordTerminal) return `channel '${SUPERVISOR_ID}' is still registered to the Orca terminal ${recordTerminal}: register it from the chat first (starci supervisor channel register --id ${SUPERVISOR_ID} --label <text>) ${peek}`;
-    const caller = session !== undefined ? session : chatSessionOf(env);
-    if (record.session && caller !== record.session) return `channel '${SUPERVISOR_ID}' is drained by the chat session ${record.session} only, not ${caller ?? 'a session with no CLAUDE_CODE_SESSION_ID'} (re-register from this chat to take it over) ${peek}`;
-    return null;
-  }
+  if ((mode ?? supervisorMode({ env })) === 'chat') return chatDrainRefusal({ id, terminal, session, registeredTerminal, registered, env });
   const seat = seatTerminal !== undefined ? seatTerminal : readSupervisor((m) => seatOf(m)?.value?.terminal ?? null, null, { env });
-  const registeredAt = registeredTerminal !== undefined ? registeredTerminal
-    : (registered !== undefined ? registered : getSupervisor(id, env))?.terminal ?? null;
+  let registeredAt;
+  if (registeredTerminal !== undefined) registeredAt = registeredTerminal;
+  else registeredAt = (registered !== undefined ? registered : getSupervisor(id, env))?.terminal ?? null;
   const owner = seat ?? registeredAt;
   if (!owner) return `channel '${SUPERVISOR_ID}' has no [Supervisor] seat terminal yet; its inbox is not drained`;
   if (terminal !== owner) return `channel '${SUPERVISOR_ID}' is drained by the [Supervisor] seat ${owner} only, not ${terminal ?? 'a session with no ORCA_TERMINAL_HANDLE'} (--peek reads without marking)`;
+  return null;
+}
+
+function chatDrainRefusal({ id, terminal, session, registeredTerminal, registered, env }) {
+  const record = registered !== undefined ? registered : getSupervisor(id, env);
+  const peek = '(inbox --peek reads without marking)';
+  if (terminal) return `channel '${SUPERVISOR_ID}' is drained by the owner's chat session only (config.yaml supervisor.mode chat), not the Orca terminal ${terminal} ${peek}`;
+  if (!record) return `channel '${SUPERVISOR_ID}' is not registered: the chat registers it first (starci supervisor channel register --id ${SUPERVISOR_ID} --label <text>) ${peek}`;
+  const recordTerminal = registeredTerminal !== undefined ? registeredTerminal : record.terminal ?? null;
+  if (recordTerminal) return `channel '${SUPERVISOR_ID}' is still registered to the Orca terminal ${recordTerminal}: register it from the chat first (starci supervisor channel register --id ${SUPERVISOR_ID} --label <text>) ${peek}`;
+  const caller = session !== undefined ? session : chatSessionOf(env);
+  if (record.session && caller !== record.session) return `channel '${SUPERVISOR_ID}' is drained by the chat session ${record.session} only, not ${caller ?? 'a session with no CLAUDE_CODE_SESSION_ID'} (re-register from this chat to take it over) ${peek}`;
   return null;
 }
 
@@ -190,7 +201,7 @@ export function waitForInbox(id, { env = process.env, timeoutMs = Infinity, inte
   });
 }
 
-const format = (items) => items.map((item) => `[${item.at}] ${item.id}${item.from ? ` (from: ${item.from})` : ''}\n${item.text}`).join('\n\n');
+const format = (items) => items.map((item) => `[${item.at}] ${item.id}` + (item.from ? ` (from: ${item.from})` : '') + `\n${item.text}`).join('\n\n');
 
 /** The --flags each verb knows; anything else is a usage error (an ignored `--help` once drained the inbox). */
 const VERB_FLAGS = {
@@ -200,6 +211,53 @@ const VERB_FLAGS = {
   heartbeat: ['id'],
   wait: ['id', 'timeout-ms'],
 };
+
+function registerCommand(args, id, fail, out) {
+  if (typeof args.label !== 'string' || !args.label.trim()) return fail('register needs --label <text>');
+  const repos = typeof args.repos === 'string' ? args.repos.split(',').map((r) => r.trim()).filter(Boolean) : [];
+  const terminal = readEnv('ORCA_TERMINAL_HANDLE') || null;
+  const refused = registrationRefusal({ id, terminal, force: args.force === true });
+  if (refused) return fail(refused, 1);
+  const session = !terminal ? chatSessionOf() : null;
+  const record = registerSupervisor({ id, label: args.label, repos, terminal, ...(session ? { session } : {}) });
+  out({ ok: true, supervisor: record, bridge: ensureTelegramBridge() });
+}
+
+function heartbeatCommand(id, fail, out) {
+  const record = heartbeatSupervisor(id);
+  if (!record) return fail(`supervisor ${id} is not registered: run starci supervisor channel register first`, 1);
+  out({ ok: true, id, heartbeatAt: record.heartbeatAt, unread: readInbox(id).filter((item) => !item.read).length, bridge: ensureTelegramBridge() });
+}
+
+function inboxCommand(args, id, fail, out) {
+  const peek = args.peek === true;
+  if (!peek) {
+    const refused = drainRefusal({ id, terminal: readEnv('ORCA_TERMINAL_HANDLE') || null });
+    if (refused) return fail(refused, 1);
+  }
+  const items = takeInbox(id, { peek });
+  if (args.json === true) out({ ok: true, id, peek, messages: items });
+  else console.log(items.length ? format(items) : `no unread Telegram messages for ${id}`);
+}
+
+async function replyCommand(args, id, fail, out) {
+  let text = typeof args.text === 'string' ? args.text : null;
+  if (typeof args['text-file'] === 'string') {
+    try { text = fs.readFileSync(args['text-file'], 'utf8'); }
+    catch (error) { return fail(`cannot read --text-file: ${error.code ?? error.message}`); }
+  }
+  if (!text?.trim()) return fail('reply needs --text <t> or --text-file <f>');
+  const result = await replyToOwner({ id, text, to: typeof args.to === 'string' ? args.to : null });
+  out(result);
+  if (!result.ok) process.exitCode = 1;
+}
+
+async function waitCommand(args, id) {
+  const timeoutMs = args['timeout-ms'] !== undefined ? Number(args['timeout-ms']) : Infinity;
+  const items = await waitForInbox(id, { timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : Infinity });
+  if (!items) { process.exitCode = WAIT_TIMEOUT_EXIT; return; }
+  console.log(items.map(waitLine).join('\n'));
+}
 
 async function main() {
   const args = argsOf(process.argv.slice(2));
@@ -213,50 +271,16 @@ async function main() {
     process.exitCode = 2; return;
   }
   const unknown = Object.keys(args).filter((k) => k !== '_' && !VERB_FLAGS[verb].includes(k));
-  if (unknown.length) return fail(`unknown flag(s) for ${verb}: ${unknown.map((k) => `--${k}`).join(', ')}`);
+  if (unknown.length) return fail(`unknown flag(s) for ${verb}: ${unknown.map((k) => '--' + k).join(', ')}`);
   if (!validSupervisorId(id)) return fail('--id <id> is required: letters, digits, dot, dash or underscore, at most 60');
-  if (verb === 'register') {
-    if (typeof args.label !== 'string' || !args.label.trim()) return fail('register needs --label <text>');
-    const repos = typeof args.repos === 'string' ? args.repos.split(',').map((r) => r.trim()).filter(Boolean) : [];
-    const terminal = readEnv('ORCA_TERMINAL_HANDLE') || null;
-    const refused = registrationRefusal({ id, terminal, force: args.force === true });
-    if (refused) return fail(refused, 1);
-    // A chat registration (no Orca terminal) records its chat session: drainRefusal lets only that session drain 'main'.
-    const session = !terminal ? chatSessionOf() : null;
-    const record = registerSupervisor({ id, label: args.label, repos, terminal, ...(session ? { session } : {}) });
-    out({ ok: true, supervisor: record, bridge: ensureTelegramBridge() }); return;
-  }
-  if (verb === 'heartbeat') {
-    const record = heartbeatSupervisor(id);
-    if (!record) return fail(`supervisor ${id} is not registered: run starci supervisor channel register first`, 1);
-    out({ ok: true, id, heartbeatAt: record.heartbeatAt, unread: readInbox(id).filter((item) => !item.read).length, bridge: ensureTelegramBridge() }); return;
-  }
-  if (verb === 'inbox') {
-    const peek = args.peek === true;
-    if (!peek) {
-      const refused = drainRefusal({ id, terminal: readEnv('ORCA_TERMINAL_HANDLE') || null });
-      if (refused) return fail(refused, 1);
-    }
-    const items = takeInbox(id, { peek });
-    if (args.json === true) out({ ok: true, id, peek, messages: items });
-    else console.log(items.length ? format(items) : `no unread Telegram messages for ${id}`);
-    return;
-  }
-  if (verb === 'reply') {
-    let text = typeof args.text === 'string' ? args.text : null;
-    if (typeof args['text-file'] === 'string') {
-      try { text = fs.readFileSync(args['text-file'], 'utf8'); } catch (error) { return fail(`cannot read --text-file: ${error.code ?? error.message}`); }
-    }
-    if (!text?.trim()) return fail('reply needs --text <t> or --text-file <f>');
-    const r = await replyToOwner({ id, text, to: typeof args.to === 'string' ? args.to : null });
-    out(r); if (!r.ok) process.exitCode = 1; return;
-  }
-  if (verb === 'wait') {
-    const timeoutMs = args['timeout-ms'] !== undefined ? Number(args['timeout-ms']) : Infinity;
-    const items = await waitForInbox(id, { timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : Infinity });
-    if (!items) { process.exitCode = WAIT_TIMEOUT_EXIT; return; }
-    console.log(items.map(waitLine).join('\n'));
-  }
+  if (verb === 'register') return registerCommand(args, id, fail, out);
+  if (verb === 'heartbeat') return heartbeatCommand(id, fail, out);
+  if (verb === 'inbox') return inboxCommand(args, id, fail, out);
+  if (verb === 'reply') return replyCommand(args, id, fail, out);
+  if (verb === 'wait') return waitCommand(args, id);
 }
 
-if (isMain(import.meta.url)) await main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });
+if (isMain(import.meta.url)) {
+  try { await main(); }
+  catch (error) { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; }
+}

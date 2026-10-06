@@ -24,7 +24,7 @@ export function linkedNodeModules(root) {
       let stat;
       try { stat = fs.lstatSync(target); } catch { continue; }
       const linked = isLinkLike(target, { parentReal: real, stat });
-      if (entry.name === 'node_modules') { if (linked) found.push(target); continue; }
+      if (entry.name === 'node_modules') { if (linked) { found.push(target); } continue; }
       if (SKIP.has(entry.name) || linked || !stat.isDirectory()) continue;
       walk(target, depth + 1, real);
     }
