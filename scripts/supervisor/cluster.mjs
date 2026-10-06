@@ -11,13 +11,23 @@ import { fixTokens, citedIncidents } from './owed.mjs';
 import { slugify } from '../lib/slug.mjs';
 
 const GENERIC_LABEL = 'addressed-to-supervisor';
+const trimTrailingDashes = (value) => {
+  let result = value;
+  while (result.endsWith('-')) result = result.slice(0, -1);
+  return result;
+};
 
 
 /** Cluster `items`; returns [{id, label, token, items, workflows, incidents, fixedBy, summary}] largest first. */
 export function clusterOwed(items) {
   const n = items.length;
   const parent = items.map((_, i) => i);
-  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const find = (i) => {
+    if (parent[i] === i) return i;
+    const root = find(parent[i]);
+    parent[i] = root;
+    return root;
+  };
   const join = (a, b) => { const x = find(a), y = find(b); if (x !== y) parent[y] = x; };
   const facts = items.map((it) => {
     const text = `${it.summary ?? ''} ${it.text ?? ''}`;
@@ -38,16 +48,26 @@ export function clusterOwed(items) {
     }
   }
   const groups = new Map();
-  items.forEach((it, i) => { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(i); });
+  items.forEach((it, i) => {
+    const r = find(i);
+    if (!groups.has(r)) { groups.set(r, []); }
+    groups.get(r).push(i);
+  });
   const clusters = [...groups.values()].map((members) => {
-    const count = (pick) => { const m = new Map(); for (const i of members) for (const v of pick(i)) m.set(v, (m.get(v) ?? 0) + 1); return [...m].sort((x, y) => y[1] - x[1] || String(x[0]).localeCompare(String(y[0])))[0]?.[0] ?? null; };
+    const count = (pick) => {
+      const m = new Map();
+      for (const i of members) {
+        for (const v of pick(i)) m.set(v, (m.get(v) ?? 0) + 1);
+      }
+      return [...m].sort((x, y) => y[1] - x[1] || String(x[0]).localeCompare(String(y[0])))[0]?.[0] ?? null;
+    };
     const label = count((i) => facts[i].labels) ?? items[members[0]].pattern ?? items[members[0]].kind ?? 'owed';
     const token = count((i) => facts[i].tokens);
     const its = members.map((i) => items[i]);
     const keySeed = token ?? its.map((x) => x.incidentId ?? x.key).sort()[0] ?? crypto.randomUUID();
     const fixes = [...new Set(its.map((x) => x.fixedBy?.sha).filter(Boolean))];
     return {
-      id: `${slugify(label)}-${slugify(keySeed)}`.replace(/-+$/, ''),
+      id: trimTrailingDashes(`${slugify(label)}-${slugify(keySeed)}`),
       label, token, size: its.length,
       workflows: [...new Set(its.map((x) => x.workflowId))],
       incidents: its.map((x) => x.incidentId).filter(Boolean),
@@ -60,4 +80,3 @@ export function clusterOwed(items) {
   });
   return clusters.sort((a, b) => b.size - a.size || b.oldestMin - a.oldestMin);
 }
-
