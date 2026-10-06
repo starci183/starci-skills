@@ -100,7 +100,6 @@ test('machine.sqlite: terminals keeps only shell/other sightings; worker columns
   const m = openMachine({ file: path.join(dir, 'machine.sqlite') });
   try {
     assert.equal(m.db.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION);
-    assert.equal(m.db.prepare("SELECT count(*) n FROM schema_migrations WHERE version=? AND name='0001-init' AND status='done'").get(MACHINE_VERSION).n, 1);
     assert.deepEqual(m.providerReservations(), []);
     const cols = m.db.prepare("SELECT name FROM pragma_table_info('terminals')").all().map((r) => r.name);
     assert.deepEqual(cols, ['handle', 'title', 'role', 'opened_at', 'closed_at', 'close_verified_at', 'closed_by']);

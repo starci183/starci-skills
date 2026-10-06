@@ -106,7 +106,7 @@ test('the ledger schema carries every contract table, the meta identity, the dri
   assert.equal(Number(ledger.db.prepare('PRAGMA foreign_keys').get().foreign_keys),1);
   assert.equal(Number(ledger.db.prepare('PRAGMA synchronous').get().synchronous),1,'synchronous=NORMAL (LEDGER_PRAGMAS, owner ruling 2026-09-27: WAL commits without a per-commit fsync)');
   const names=ledger.db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table','trigger','index')").all().map(row=>row.name);
-  for(const table of ['meta','schema_migrations','workflows','lifecycle_changes','goals','work_units','op_attempts','events','jobs','resources','leases','incidents','reports','contracts','check_runs','inbox','signals','goal_inputs'])
+  for(const table of ['meta','workflows','lifecycle_changes','goals','work_units','op_attempts','events','jobs','resources','leases','incidents','reports','contracts','check_runs','inbox','signals','goal_inputs'])
     assert.ok(names.includes(table),`missing table ${table}`);
   assert.ok(names.includes('leases_match_job')&&names.includes('leases_match_job_update'),'the drift trigger covers INSERT and UPDATE');
   for(const index of ['ix_units_state','events_entity','events_kind','jobs_queue','jobs_op','leases_expiry'])assert.ok(names.includes(index),`missing index ${index}`);
@@ -335,7 +335,6 @@ test('a fresh ledger carries awaiting_owner: the status, its transitions, its ui
   try{
     const db=ledger.db;
     assert.ok(db.prepare("SELECT sql FROM sqlite_master WHERE name='jobs'").get().sql.includes("'awaiting_owner'"));
-    assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map(r=>[r.version,r.name]),[[1,'0001-init']]);
     assert.equal(db.prepare("SELECT count(*) n FROM job_transitions WHERE to_status='awaiting_owner'").get().n,2);
     assert.equal(db.prepare("SELECT ui FROM ui_state_map WHERE entity='job' AND native='awaiting_owner'").get().ui,'waiting');
     assert.deepEqual(db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'jobs_%' ORDER BY name").all().map(r=>r.name),['jobs_enqueue_guard','jobs_release_leases','jobs_status_guard']);

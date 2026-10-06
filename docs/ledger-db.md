@@ -4,7 +4,7 @@ Task: read the runtime's storage
 The executed schemas live under `engine/db/migrations/runtime/` and `engine/db/migrations/machine/`.
 `engine/db/ledger.mjs` owns project schema validation; `engine/db/machine.mjs` owns host schema validation
 and required physical objects. Each store has exactly one schema and no migration path. A fresh machine store
-executes the one `0001-init.sql` and atomically records its user_version. A host store that is not exactly that
+executes the one `0001-init.sql` and atomically sets its user_version. A host store that is not exactly that
 schema (any other identity or version, or a missing, changed or extra object) is refused unchanged by writers and
 readers alike; the operator replaces it with a fresh store. The current signal domains keep
 Supervisor keys, tokens, values and expiries separate from core-debug enabled/diagnostic scopes.
@@ -118,12 +118,12 @@ Timestamps are epoch milliseconds UTC in `*_at` columns. Order by `seq` or rowid
 
 | Domain | Tables | What they guarantee |
 | --- | --- | --- |
-| Identity and vocabulary | `meta`, `schema_migrations`, `ui_states`, `ui_state_map`, `blob_ref_columns`, `workflow_transitions`, `job_transitions` | One 7-value display state (`bad, warn, running, waiting, ok, done, unknown`) mapped from every native state; the only list of blob-referencing columns; the state machines as data. |
+| Identity and vocabulary | `meta`, `ui_states`, `ui_state_map`, `blob_ref_columns`, `workflow_transitions`, `job_transitions` | One 7-value display state (`bad, warn, running, waiting, ok, done, unknown`) mapped from every native state; the only list of blob-referencing columns; the state machines as data. |
 | Blobs | `blobs` | One row per sha256: bytes, media type, `redacted`, `file_uri`, and `http_path = '/api/blob/' \|\| sha256` as a generated column. |
 | Workflow | `workflows`, `lifecycle_changes`, `goals`, `goal_inputs`, `workflow_purges` | `trace_id` per workflow; the 7 phases (`awaiting-approval, queued, running, paused, stopped, finished, archived`); a phase changes only along `workflow_transitions` and only with a matching `lifecycle_changes` row. Goals keep the markdown a relaunch reads. |
 | Work graph | `work_graph_versions`, `work_units`, `unit_edges` | One unit per `(workflow, op, subject_key, goal_revision)`; a try budget per unit (default 5, raised only with `budget_raised_by/ref`); a done unit reruns only through a recorded reopen. |
 | Execution | `jobs`, `op_attempts`, `contracts`, `resources`, `leases`, `api_requests` | A job's status moves only along `job_transitions`; an attempt row is created only when its job has just gone `ready → leased` in a running workflow; `retry_of` points only at a failed job of the same unit with `try_no = parent + 1`; a job that ends drops its leases. Contracts are keyed by attempt, so a re-dispatch never overwrites the previous one. |
-| Results | `reports`, `check_runs`, `settle_tails`, `product_lands`, `job_artifacts`, `attempt_transcript_snapshots`, `report_attachments`, `artifact_proofs`, `work_citations`, `interface_audits`, `llm_usage` | One immutable report per attempt; one check row per `(attempt, runner, phase, name, run_seq)` with the raw `exit_code` separate from `declared_exit_code` and no `pass` with a nonzero raw exit; immutable artifacts keyed by `(attempt_id, name)`; Work citations by artifact id and sha256. Token counts only; no estimated cost. |
+| Results | `reports`, `check_runs`, `settle_tails`, `job_artifacts`, `attempt_transcript_snapshots`, `report_attachments`, `artifact_proofs`, `work_citations`, `interface_audits`, `llm_usage` | One immutable report per attempt; one check row per `(attempt, runner, phase, name, run_seq)` with the raw `exit_code` separate from `declared_exit_code` and no `pass` with a nonzero raw exit; immutable artifacts keyed by `(attempt_id, name)`; Work citations by artifact id and sha256. Token counts only; no estimated cost. |
 | Coordination | `inbox`, `decision_items`, `decisions`, `conditions`, `incidents`, `foundations`, `foundation_declarations`, `path_transfers`, `record_changes`, `signals` | Decision Item keys have no empty part; conditions follow the Kubernetes shape (`type`, `status True/False/Unknown`, `reason`, `owner`); an incident has a kind from a closed list, an owner, a due time, and a reason when closed; finishing a workflow closes its incidents. |
 | Observation | `events`, `logs`, `logs_fts`, `log_cursors` | Append-only (UPDATE refused; DELETE only during a purge, or for debug logs past retention); full-text search over logs; an archived workflow accepts no new event. |
 
@@ -164,7 +164,7 @@ machine.
 
 | Domain | Tables |
 | --- | --- |
-| Identity and registry | `machine_meta`, `schema_migrations`, `ui_states`, `ui_state_map`, `blob_ref_columns`, `ledgers` (the only ledger registry), `repositories`, `agents`, `models`, `blobs`, `archives`, `gc_marks` |
+| Identity and registry | `machine_meta`, `ui_states`, `ui_state_map`, `blob_ref_columns`, `ledgers` (the only ledger registry), `repositories`, `agents`, `models`, `blobs`, `archives`, `gc_marks` |
 | Supervisor | `sup_jobs`, `sup_leases`, `sup_attempts` (same column groups as `op_attempts`), `sup_reports`, `sup_events` (append-only), `sup_decision_items`, `sup_decisions`, `sup_owed`, `sup_learning`, `sup_owner_rulings`, `sup_bridges`, `sup_messages`, `sup_signals`, `llm_usage` |
 | Engine | `process_runs`, `engine_leader`, `leader_history`, `engine_cursors`, `engine_queue`, `schedules`, `engine_actions`, `action_steps`, `controller_modes`, `mode_changes`, `sla_episodes`, `invariant_violations` |
 | Host | `services`, `service_events`, `service_probes`, `seats`, `deliveries`, `seat_turns`, `seat_transcript_snapshots`, `terminals`, `host_locks`, `claims`, `agent_sessions` |

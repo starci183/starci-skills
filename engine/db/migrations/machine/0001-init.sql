@@ -1,6 +1,6 @@
 -- ############################################################################################################
 -- machine.sqlite (one per machine) - this file is the single schema step of the database.
--- Tables: machine_meta/schema_migrations - identity and migration journal; ui_states/ui_state_map - display
+-- Tables: machine_meta - identity; ui_states/ui_state_map - display
 -- vocabulary; blob_ref_columns - blob-referencing columns; ledgers/repositories - registered projects;
 -- agents/models - agent and model catalog; blobs/archives/gc_marks - content store and GC; sup_* - Supervisor;
 -- process_runs/engine_*/schedules/sla_episodes/invariant_violations - reconciler; services/seats/deliveries/
@@ -15,10 +15,6 @@
 -- ---------------------------------------------------------------------------------------------------------
 -- machine_meta: host_id, schema='starci/machine@1', created_at, blob_root, runtime_rev, sqlite_version, node_version.
 CREATE TABLE IF NOT EXISTS machine_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
-CREATE TABLE IF NOT EXISTS schema_migrations(
-  version INTEGER PRIMARY KEY, name TEXT NOT NULL, runtime_rev TEXT, sql_sha256 TEXT NOT NULL,
-  backup_path TEXT, backup_sha256 TEXT, started_at INTEGER NOT NULL, finished_at INTEGER,
-  status TEXT NOT NULL CHECK(status IN ('running','done','failed'))) STRICT;
 
 CREATE TABLE IF NOT EXISTS ui_states(
   ui TEXT PRIMARY KEY CHECK(ui IN ('bad','warn','running','waiting','ok','done','unknown')),

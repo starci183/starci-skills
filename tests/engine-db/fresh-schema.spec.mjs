@@ -7,7 +7,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { LEDGER_VERSION, openLedger, openLedgerReader, openLedgerConnection, ledgerFileFor, PROJECTS_ROOT_ENV, TEST_REGISTRY_ENV } from '../../engine/db/ledger.mjs';
-import { sha256 } from '../../engine/digest.mjs';
 import { slashPath } from '../fixtures/win-path.mjs';
 import { MACHINE_VERSION, openMachine } from '../../engine/db/machine.mjs';
 
@@ -21,9 +20,8 @@ const tmp = (t) => {
 };
 const columns = (db, table) => db.prepare(`SELECT name FROM pragma_table_info('${table}')`).all().map((r) => r.name);
 const views = (db) => db.prepare("SELECT name FROM sqlite_master WHERE type='view' ORDER BY name").all().map((r) => r.name);
-const common = (db, version, journal = [[1, '0001-init']]) => {
+const common = (db, version) => {
   assert.equal(Number(db.prepare('PRAGMA user_version').get().user_version), version);
-  assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map((r) => [r.version, r.name]), journal);
   assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
   assert.equal(db.prepare('PRAGMA foreign_key_check').all().length, 0);
   for (const view of views(db)) assert.doesNotThrow(() => db.prepare(`SELECT * FROM ${view} LIMIT 1`).all(), `${view} answers`);
@@ -37,7 +35,7 @@ test('runtime keeps its init schema; machine carries provider receipts and core 
 test('a fresh machine.sqlite has the columns, kinds and views the runtime queries need', (t) => {
   const m = openMachine({ file: path.join(tmp(t), 'machine.sqlite') });
   try {
-    common(m.db, MACHINE_VERSION, [[MACHINE_VERSION, '0001-init']]);
+    common(m.db, MACHINE_VERSION);
     assert.deepEqual(columns(m.db, 'terminals'), ['handle', 'title', 'role', 'opened_at', 'closed_at', 'close_verified_at', 'closed_by']);
     const worktrees = columns(m.db, 'worktrees');
     for (const column of ['path', 'kind', 'orca_id', 'checkpoint_sha', 'release_pending_at', 'removed_at']) assert.ok(worktrees.includes(column), `worktrees.${column}`);
@@ -100,16 +98,9 @@ test('a fresh basic sample keeps canonical schema/catalogs, frozen metadata and 
     assert.equal(meta.repo_root, undefined);
     assert.equal(meta.product, undefined);
     assert.equal(meta.sqlite_version, sample.db.prepare('SELECT sqlite_version() AS version').get().version);
-    const journal = sample.db.prepare('SELECT * FROM schema_migrations').all();
-    assert.equal(journal.length, 1);
-    assert.equal(journal[0].sql_sha256, sha256(fs.readFileSync(INIT_FILE)));
-    assert.equal(journal[0].started_at, SAMPLE.createdAt);
-    assert.equal(journal[0].finished_at, SAMPLE.createdAt);
-    assert.equal(journal[0].status, 'done');
-    assert.equal(journal[0].runtime_rev, meta.runtime_rev ?? null);
     for (const table of logicalTables(sample.db)) {
       if (catalogs.includes(table)) assert.deepEqual(sortedRows(sample.db, table), sortedRows(baseline.db, table), `${table} keeps the canonical seed`);
-      else if (!['meta', 'schema_migrations'].includes(table)) assert.equal(Number(sample.db.prepare(`SELECT count(*) AS n FROM ${table}`).get().n), 0, `${table} has no history`);
+      else if (table !== 'meta') assert.equal(Number(sample.db.prepare(`SELECT count(*) AS n FROM ${table}`).get().n), 0, `${table} has no history`);
     }
     assert.notEqual(baseline.ledgerId, SAMPLE.ledgerId);
     assert.throws(() => sample.transaction(() => assert.fail('sample transaction ran')), /ledger-fixture-read-only/);

@@ -1,10 +1,10 @@
 -- ############################################################################################################
 -- runtime.sqlite (one per project) - this file is the single schema step of the database.
--- Tables: meta/schema_migrations - identity and migration journal; ui_states/ui_state_map - display vocabulary;
+-- Tables: meta - identity; ui_states/ui_state_map - display vocabulary;
 -- blob_ref_columns - blob-referencing columns; workflow_transitions/job_transitions - legal state changes;
 -- blobs - content-store index; workflows/lifecycle_changes/goals/goal_inputs/workflow_purges - workflow and goal;
 -- work_graph_versions/work_units/unit_edges - work graph; jobs/op_attempts/contracts/resources/leases/
--- api_requests - tries, dispatches, fencing, idempotency; reports/check_runs/settle_tails/product_lands/
+-- api_requests - tries, dispatches, fencing, idempotency; reports/check_runs/settle_tails/
 -- job_artifacts/attempt_transcript_snapshots/report_attachments/artifact_proofs/work_citations/
 -- interface_audits/llm_usage - outcomes and evidence; inbox/decision_items/decisions/conditions/incidents/
 -- foundations/foundation_declarations/path_transfers/record_changes/signals - coordination; events/logs/
@@ -19,18 +19,6 @@
 CREATE TABLE IF NOT EXISTS meta(
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL) STRICT;
-
--- schema_migrations: 0001-init writes the first row; each later step: backup VACUUM INTO + integrity_check first,
--- foreign_key_check + quick_check before COMMIT. Code refuses to WRITE when user_version > CODE_VERSION.
-CREATE TABLE IF NOT EXISTS schema_migrations(
-  version       INTEGER PRIMARY KEY,
-  name          TEXT    NOT NULL,                -- '0001-init'
-  runtime_rev   TEXT,
-  sql_sha256    TEXT    NOT NULL,                -- digest of the migration file that ran
-  backup_path   TEXT, backup_sha256 TEXT,
-  started_at    INTEGER NOT NULL,
-  finished_at   INTEGER,
-  status        TEXT NOT NULL CHECK(status IN ('running','done','failed'))) STRICT;
 
 -- ui_states: the ONLY set of display states (UI-API sec. 3.4).
 CREATE TABLE IF NOT EXISTS ui_states(
@@ -61,9 +49,7 @@ INSERT OR IGNORE INTO ui_state_map VALUES
   ('decision','resolved','done'),('decision','superseded','done'),
   ('incident','open','bad'),('incident','resolved','done'),('incident','superseded','done'),
   ('condition','True','ok'),('condition','False','bad'),('condition','Unknown','waiting'),
-  ('settle-tail','queued','waiting'),('settle-tail','running','running'),('settle-tail','done','done'),('settle-tail','failed','bad'),
-  ('product-land','queued','waiting'),('product-land','landed','done'),('product-land','failed','bad'),('product-land','conflict','bad'),
-  ('product-land','red','bad'),('product-land','busy','warn'),('product-land','main-moving','warn');
+  ('settle-tail','queued','waiting'),('settle-tail','running','running'),('settle-tail','done','done'),('settle-tail','failed','bad');
 
 -- blob_ref_columns: the ONLY list of blob-referencing columns (GC mark reads this table; a spec diffs every
 -- *_sha / sha256 column against sqlite_master so no new column is missed).
@@ -73,7 +59,7 @@ INSERT OR IGNORE INTO blob_ref_columns VALUES
   ('goal_inputs','sha256'),('op_attempts','prompt_sha'),('op_attempts','transcript_sha'),('op_attempts','session_sha'),
   ('attempt_transcript_snapshots','sha256'),
   ('check_runs','stdout_sha'),('check_runs','stderr_sha'),('check_runs','output_sha'),('job_artifacts','sha256'),
-  ('work_citations','sha256'),('product_lands','output_sha'),('events','payload_sha');
+  ('work_citations','sha256'),('events','payload_sha');
 
 -- Valid state-transition tables (data, not code). Triggers in A2/A3/A4 refuse any pair not listed here.
 CREATE TABLE IF NOT EXISTS workflow_transitions(
@@ -514,22 +500,6 @@ CREATE TABLE IF NOT EXISTS settle_tails(
   tries       INTEGER NOT NULL DEFAULT 0,
   due_at      INTEGER, last_error TEXT,
   queued_at   INTEGER NOT NULL, started_at INTEGER, done_at INTEGER) STRICT;
-
--- product_lands: api product-land (merge wf/<wf> into the product repo main; separate from settle).
-CREATE TABLE IF NOT EXISTS product_lands(
-  land_id      INTEGER PRIMARY KEY AUTOINCREMENT,
-  workflow_id  TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,
-  span_id      TEXT NOT NULL CHECK(length(span_id)=16),
-  repo_root    TEXT NOT NULL,
-  wf_branch    TEXT NOT NULL,
-  main_before  TEXT, merged_sha TEXT,
-  result       TEXT NOT NULL CHECK(result IN ('queued','landed','failed','conflict','red','busy','main-moving')),
-  reason       TEXT,
-  checks_json  TEXT CHECK(checks_json IS NULL OR json_valid(checks_json)),   -- land checks + import scan (summary)
-  output_sha   TEXT REFERENCES blobs(sha256),
-  pushed       INTEGER NOT NULL DEFAULT 0 CHECK(pushed IN (0,1)),
-  started_at   INTEGER NOT NULL, finished_at INTEGER) STRICT;
-CREATE INDEX IF NOT EXISTS ix_lands_wf ON product_lands(workflow_id,started_at);
 
 -- job_artifacts: every output file, bytes in the blob store. Kernel artifacts (scan, dispatch-ready) have no attempt.
 CREATE TABLE IF NOT EXISTS job_artifacts(
@@ -1017,13 +987,6 @@ SELECT s.workflow_id, 'attempt', CAST(s.attempt_id AS TEXT), 'settle-tail', CAST
  WHERE s.state='failed'
    AND (w.phase IS NULL OR w.phase NOT IN ('archived','finished'))
 UNION ALL
-SELECT l.workflow_id, 'workflow', l.workflow_id, 'product-land', CAST(l.land_id AS TEXT), 'ProductLand:'||l.result, l.reason,
-       l.started_at, 'kernel'
-  FROM product_lands l LEFT JOIN workflows w ON w.workflow_id=l.workflow_id
- WHERE l.result IN ('failed','conflict','red')
-   AND NOT EXISTS(SELECT 1 FROM product_lands k WHERE k.workflow_id=l.workflow_id AND k.land_id>l.land_id AND k.result='landed')
-   AND (w.phase IS NULL OR w.phase NOT IN ('archived','finished'))
-UNION ALL
 -- H1: a filed report nobody settled within its SLA (the same rows as v_settle_overdue) blocks its job.
 SELECT a.workflow_id, 'attempt', CAST(a.attempt_id AS TEXT), 'settle', CAST(a.attempt_id AS TEXT),
        'SettleOverdue:'||COALESCE(a.report_outcome,'?'), a.job_id, a.reported_at,
@@ -1101,7 +1064,6 @@ SELECT b.sha256, b.bytes, b.pinned, b.archived_at, b.created_at,
      + (SELECT count(*) FROM attempt_transcript_snapshots t WHERE t.sha256=b.sha256)
      + (SELECT count(*) FROM work_citations w WHERE w.sha256=b.sha256)
      + (SELECT count(*) FROM goal_inputs g WHERE g.sha256=b.sha256)
-     + (SELECT count(*) FROM product_lands l WHERE l.output_sha=b.sha256)
      + (SELECT count(*) FROM events e WHERE e.payload_sha=b.sha256) AS refs
 FROM blobs b;
 

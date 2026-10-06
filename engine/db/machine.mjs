@@ -91,8 +91,7 @@ export function isUnderTempDir(file, { env = process.env, tempDirs = tempDirsOf(
   return forms.some((form) => tempDirs.map(normDir).some((dir) => form.startsWith(`${dir}/`)));
 }
 /**
- * machine.sqlite for `env`: TEST_REGISTRY_ENV when set; else <starciLocalRoot>/machine.sqlite (beside projects/,
- * NOT in the old runtime/ directory, so the new store never meets the old file at the same path) — except inside a node --test
+ * machine.sqlite for `env`: TEST_REGISTRY_ENV when set; else <starciLocalRoot>/machine.sqlite (beside projects/) — except inside a node --test
  * process tree whose runtime root is not under the temp directory, which gets a shared temp registry instead.
  */
 export const machineFileFor = (env = process.env) => {

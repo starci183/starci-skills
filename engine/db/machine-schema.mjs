@@ -4,7 +4,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { artifactRoot } from './blob.mjs';
-import { sha256 } from '../digest.mjs';
 import { hasTable } from '../../scripts/lib/sqlite.mjs';
 
 const require = createRequire(import.meta.url);
@@ -69,7 +68,7 @@ export function machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_
     db.exec('BEGIN IMMEDIATE');
     try {
       if (Number(pragma(db, 'user_version')) !== 0 || db.prepare("SELECT 1 FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' LIMIT 1").get()) {
-        // Another initializer may have committed while this connection waited for BEGIN; keep its current rows/journal.
+        // Another initializer may have committed while this connection waited for BEGIN; keep its current rows.
         checkSchema(db, file); db.exec('COMMIT'); return;
       }
       db.exec(sql);
@@ -77,8 +76,6 @@ export function machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_
       for (const [key, value] of Object.entries({ host_id: os.hostname(), schema: MACHINE_SCHEMA, created_at: String(at), blob_root: artifactRoot(env),
         runtime_rev: runtimeRev(), sqlite_version: db.prepare('select sqlite_version() v').get().v,
         node_version: process.version, journal_mode: 'wal' })) meta.run(key, String(value));
-      db.prepare("INSERT INTO schema_migrations(version,name,runtime_rev,sql_sha256,started_at,finished_at,status) VALUES(?,'0001-init',?,?,?,?,'done')")
-        .run(MACHINE_VERSION, runtimeRev(), sha256(sql), at, now());
       // Every controller starts in shadow until the owner switches it.
       for (const controller of CONTROLLERS) {
         db.prepare("INSERT INTO mode_changes(controller,from_mode,to_mode,by,reason,at) VALUES(?,NULL,'shadow','machine-db:init','0001-init',?)").run(controller, at);
