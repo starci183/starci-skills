@@ -639,7 +639,7 @@ const MEASURERS = {
   },
   'taste.yaml TASTE-1 case-2': (v) => {
     const heads = v.els.filter((e) => e.visible && /^h[1-6]$/.test(e.tag));
-    const title = heads.find((e) => e.tag === 'h1') ?? heads.sort((a, b) => b.style.fontSize - a.style.fontSize)[0];
+    const h1 = heads.find((e) => e.tag === 'h1'); if (!h1) heads.sort((a, b) => b.style.fontSize - a.style.fontSize); const title = h1 ?? heads[0];
     if (!title) return NONE('no heading rendered');
     const sections = heads.filter((e) => e.i !== title.i && e.tag !== 'h1');
     if (!sections.length) return NONE('no section title beside the page title');
