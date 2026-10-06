@@ -23,6 +23,7 @@ import { sleep } from '../lib/sleep.mjs';
 import { OWNED_PROCESS_SCHEMA } from '../lib/process-identity.mjs';
 import { stopOwnedProcess } from '../api/process/stop-owned-process.mjs';
 import { canonicalJSON } from '../../engine/canonical-json.mjs';
+import { stopConnectorFlow } from './stop.mjs';
 
 
 /** When this host last booted (ms). */
@@ -257,57 +258,7 @@ export function stopConnector(name, { source, child = false, env = process.env, 
       config_json: { ...row.config, pid: null, childPid: null, connected: false, stoppedAt, stopReceipt: receipt } }, ['name']);
     return true;
   }), { env }) } = {}) {
-  let original;
-  try { original = read(name, env); } catch (error) { return { ok: false, effectState: 'unknown', reason: 'connector-state-unreadable', error: String(error?.message ?? error) }; }
-  if (!original) return { ok: false, effectState: 'unknown', reason: 'connector-custody-missing' };
-  if (original.source !== source) return { ok: false, effectState: 'none', reason: 'connector-source-conflict', custody: original };
-  const prior = original.stopReceipt;
-  if (original.state === 'stopped' && closedProcess(prior?.manager, original.processIdentity)
-      && (!child || closedChild(prior?.child, original)))
-    return { ok: true, already: true, effectState: 'completed', stopped: original.processIdentity.pid, receipt: prior };
-  const identity = original.processIdentity;
-  if (!identity || identity.pid !== original.pid) return { ok: false, effectState: 'none', reason: 'connector-process-custody-required', custody: original };
-  let manager;
-  if (closedProcess(prior?.manager, identity)) manager = prior.manager;
-  else { try { manager = stop(identity); } catch (error) { manager = { ok: false, error: String(error?.message ?? error) }; } }
-  if (!closedProcess(manager, identity)) return { ok: false, effectState: manager?.outcome === 'refused' ? 'none' : 'unknown',
-    reason: 'connector-manager-closure-unverified', custody: original, receipt: { manager } };
-  let current;
-  try { current = read(name, env); } catch (error) { return { ok: false, effectState: 'unknown', reason: 'connector-state-unreadable', custody: original, receipt: { manager }, error: String(error?.message ?? error) }; }
-  if (!sameConnectorOwner(current, original)) return { ok: false, effectState: 'unknown', reason: 'connector-owner-changed', custody: original, receipt: { manager } };
-  if (child) {
-    try {
-      if (retain(current, { manager, child: current.stopReceipt?.child ?? null }) !== true)
-        return { ok: false, effectState: 'unknown', reason: 'connector-stop-record-refused', custody: current, receipt: { manager } };
-      current = read(name, env);
-      if (!sameConnectorOwner(current, original)) return { ok: false, effectState: 'unknown', reason: 'connector-owner-changed', custody: original, receipt: { manager } };
-    } catch (error) { return { ok: false, effectState: 'unknown', reason: 'connector-stop-record-refused', custody: current, receipt: { manager }, error: String(error?.message ?? error) }; }
-  }
-  let childReceipt = null;
-  if (child) {
-    if (closedChild(current.stopReceipt?.child, current)) childReceipt = current.stopReceipt.child;
-    else if (!current.childPid) {
-      if (!closedChild(current.childClosure, current)) return { ok: false, effectState: 'unknown', reason: 'connector-child-custody-unverified', custody: current, receipt: { manager } };
-      childReceipt = current.childClosure;
-    } else {
-      if (!current.childIdentity || current.childIdentity.pid !== current.childPid)
-        return { ok: false, effectState: 'unknown', reason: 'connector-child-custody-unverified', custody: current, receipt: { manager } };
-      try { childReceipt = { ...stop(current.childIdentity), launchNonce: current.childLaunchNonce }; } catch (error) { childReceipt = { ok: false, error: String(error?.message ?? error) }; }
-      if (!closedProcess(childReceipt, current.childIdentity)) return { ok: false, effectState: 'unknown',
-        reason: 'connector-child-closure-unverified', custody: current, receipt: { manager, child: childReceipt } };
-    }
-  }
-  const receipt = { manager, child: childReceipt };
-  try {
-    if (child) {
-      if (retain(current, receipt) !== true) return { ok: false, effectState: 'unknown', reason: 'connector-stop-record-refused', custody: current, receipt };
-      current = read(name, env);
-      if (!sameConnectorOwner(current, original) || !closedChild(current?.stopReceipt?.child, current))
-        return { ok: false, effectState: 'unknown', reason: 'connector-owner-changed', custody: original, receipt };
-    }
-    if (commit(current, receipt) !== true) return { ok: false, effectState: 'unknown', reason: 'connector-stop-record-refused', custody: current, receipt };
-  } catch (error) { return { ok: false, effectState: 'unknown', reason: 'connector-stop-record-refused', custody: current, receipt, error: String(error?.message ?? error) }; }
-  return { ok: true, effectState: 'completed', stopped: original.pid, receipt };
+  return stopConnectorFlow(name, { source, child, env, read, stop, retain, commit }, { sameConnectorOwner, closedProcess, closedChild });
 }
 
 /** One connector log line in machine_logs (actor connector, kind `<source>.<kind>`). Never throws. */
