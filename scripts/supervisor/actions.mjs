@@ -76,20 +76,23 @@ export function pushClass(p) {
  * Returns [{key, class, workflowId, repo, subject, evidence, do}]; one item per root cause (an incident a cluster
  * already carries is never listed again as a gate).
  */
-export function owedActions({ clusters = [], stalls = [], flows = {}, pushes = [], stuck = [], revertDue = [], progress = [] } = {}) {
-  const out = [];
-  const add = (item) => { if (!out.some((x) => x.key === item.key)) out.push({ ...item, do: item.do ?? CLASSES[item.class] }); };
-  // Outcome first: stalls past the Kernel's grace, runtime RCA clusters, kernel proposals (the Workflow controller's DIs).
-  for (const item of progress) add(item);
-  const inCluster = new Set(clusters.flatMap((c) => c.incidents ?? []));
+const STUCK_CLASS = { 'owner-gate': 'owner-gate-no-ask', 'peer-wait': 'peer-wait', dependency: 'peer-wait', 'retry-cap': 'retry-cap', 'deferred-settle': 'stalled', 'queued-ready': 'undispatched', throttled: 'stalled' };
+
+function addClusterActions(add, clusters) {
   for (const c of clusters) {
     const retry = ((c.items ?? []).length > 0 && c.items.every((i) => RETRY_PATTERNS.has(i.pattern))) || RETRY_CAP_TEXT.test(`${c.id} ${c.summary ?? ''}`);
-    add({ key: key('owed', c.id), class: c.fixedBy ? 'fixed-defect' : retry ? 'retry-cap' : 'runtime-defect', workflowId: c.workflows?.join(',') ?? null,
+    let actionClass = 'runtime-defect';
+    if (retry) actionClass = 'retry-cap';
+    if (c.fixedBy) actionClass = 'fixed-defect';
+    const fixed = c.fixedBy ? `, fixed-by ${c.fixedBy.slice(0, 9)}?` : '';
+    add({ key: key('owed', c.id), class: actionClass, workflowId: c.workflows?.join(',') ?? null,
       repo: c.items?.[0]?.repo ?? null, subject: c.id, incidents: c.incidents ?? [], fixedBy: c.fixedBy ?? null, size: c.size ?? (c.items ?? []).length,
       lastAt: Math.max(0, ...(c.items ?? []).map((i) => Number(i.lastFailureAt ?? i.updatedAt ?? i.raisedAt ?? 0))) || null,
-      evidence: one(`${c.size} item(s), oldest ${c.oldestMin}m${c.fixedBy ? `, fixed-by ${c.fixedBy.slice(0, 9)}?` : ''}: ${c.summary}`) });
+      evidence: one(`${c.size} item(s), oldest ${c.oldestMin}m${fixed}: ${c.summary}`) });
   }
-  const frontierOf = new Map((flows.workflows ?? []).map((w) => [w.workflowId, w]));
+}
+
+function addStallActions(add, stalls, inCluster, frontierOf) {
   for (const f of stalls) {
     const wf = f.workflowId;
     if (f.incidentId && inCluster.has(f.incidentId)) continue;
@@ -104,7 +107,10 @@ export function owedActions({ clusters = [], stalls = [], flows = {}, pushes = [
       add({ key: key(ready ? 'dispatch' : 'stalled', wf), class: ready ? 'undispatched' : 'stalled', workflowId: wf, repo: f.repo, subject: wf, evidence: one(f.line) });
     }
   }
-  for (const w of flows.workflows ?? []) {
+}
+
+function addWorkflowActions(add, workflows) {
+  for (const w of workflows) {
     if (w.error) continue;
     for (const j of [...(w.deadWorkerJobs ?? []), ...(w.wedgedJobs ?? [])])
       add({ key: key('worker', w.workflowId, j), class: 'dead-worker', workflowId: w.workflowId, repo: w.repo, subject: j, evidence: `starci kernel status lists ${j} dead or wedged` });
@@ -113,25 +119,47 @@ export function owedActions({ clusters = [], stalls = [], flows = {}, pushes = [
     if (w.kernelRevStale) add({ key: key('rev', w.workflowId), class: 'contract-stale', workflowId: w.workflowId, repo: w.repo, subject: w.kernelRevStale.current ?? null,
       evidence: one(`kernel read rev ${String(w.kernelRevStale.acked ?? '?').slice(0, 9)}, runtime is ${String(w.kernelRevStale.current ?? '?').slice(0, 9)} (${w.kernelRevStale.fileCount ?? 0} changed file(s))`) });
   }
-  for (const k of flows.deadKernels ?? []) add({ key: key('kernel', k.workflowId), class: 'dead-kernel', workflowId: k.workflowId, repo: k.repo, subject: k.workflowId, evidence: `watchdog read ${k.action} x${k.count}` });
-  for (const o of flows.orphaned ?? []) add({ key: key('orphaned', o.workflowId), class: 'orphaned', workflowId: o.workflowId, repo: o.repo, subject: o.workflowId, evidence: one(o.reason) });
-  // op-metrics stuck waits past their SLA (starci kernel status stuck[], lane op-telemetry): only what no finding above names.
-  const STUCK_CLASS = { 'owner-gate': 'owner-gate-no-ask', 'peer-wait': 'peer-wait', dependency: 'peer-wait', 'retry-cap': 'retry-cap', 'deferred-settle': 'stalled', 'queued-ready': 'undispatched', throttled: 'stalled' };
+}
+
+function addStuckActions(add, stuck, inCluster, out) {
   for (const s of stuck) {
     const cls = STUCK_CLASS[s.kind];
     if (!cls || s.owner === 'owner' || (s.incidentId && (inCluster.has(s.incidentId) || out.some((x) => x.subject === s.incidentId)))) continue;
     if (cls === 'undispatched' && out.some((x) => x.key === key('dispatch', s.workflowId))) continue;
+    const cause = s.cause && s.cause !== s.kind ? `/${s.cause}` : '';
+    const detail = s.detail ? `: ${s.detail}` : '';
     add({ key: key('stuck', s.workflowId, s.kind, s.incidentId ?? s.jobId), class: cls, workflowId: s.workflowId, repo: s.repo ?? null, subject: s.incidentId ?? s.jobId ?? s.workflowId,
-      evidence: one(`${s.severity ?? ''} ${s.kind}${s.cause && s.cause !== s.kind ? `/${s.cause}` : ''} for ${Math.round(Number(s.ageMs ?? 0) / 60_000)}m${s.detail ? `: ${s.detail}` : ''}`) });
+      evidence: one(`${s.severity ?? ''} ${s.kind}${cause} for ${Math.round(Number(s.ageMs ?? 0) / 60_000)}m${detail}`) });
   }
-  for (const e of revertDue) add({ key: key('experiment', e.id), class: 'experiment-revert', workflowId: null, repo: null, subject: e.id,
-    evidence: one(`${e.signature}: ${(e.commits ?? []).map((c) => c.slice(0, 9)).join(',')} - ${e.result?.reason ?? 'measured no improvement'}`) });
+}
+
+function addPushActions(add, pushes) {
   for (const p of pushes) {
     if (p.pushed || p.skipped || p.deferred || p.wouldPush || (!p.refused && !p.error && p.hooks !== 'red' && p.hooks !== 'failed')) continue;
     const cls = pushClass(p);
+    const findings = (p.scan?.findings ?? []).map((f) => ' [' + f.file + ':' + (f.line ?? '-') + ' ' + f.pattern + ']').join('');
     add({ key: key('push', path.basename(p.repo ?? ''), cls), class: 'push-refused', workflowId: null, repo: p.repo, subject: cls,
-      evidence: one(`${cls}: ${p.refused ?? p.error ?? p.hooks}${(p.scan?.findings ?? []).map((f) => ` [${f.file}:${f.line ?? '-'} ${f.pattern}]`).join('')}`) });
+      evidence: one(`${cls}: ${p.refused ?? p.error ?? p.hooks}${findings}`) });
   }
+}
+
+export function owedActions({ clusters = [], stalls = [], flows = {}, pushes = [], stuck = [], revertDue = [], progress = [] } = {}) {
+  const out = [];
+  const add = (item) => { if (!out.some((x) => x.key === item.key)) out.push({ ...item, do: item.do ?? CLASSES[item.class] }); };
+  // Outcome first: stalls past the Kernel's grace, runtime RCA clusters, kernel proposals (the Workflow controller's DIs).
+  for (const item of progress) add(item);
+  const inCluster = new Set(clusters.flatMap((c) => c.incidents ?? []));
+  addClusterActions(add, clusters);
+  const workflows = flows.workflows ?? [];
+  const frontierOf = new Map(workflows.map((w) => [w.workflowId, w]));
+  addStallActions(add, stalls, inCluster, frontierOf);
+  addWorkflowActions(add, workflows);
+  for (const k of flows.deadKernels ?? []) add({ key: key('kernel', k.workflowId), class: 'dead-kernel', workflowId: k.workflowId, repo: k.repo, subject: k.workflowId, evidence: `watchdog read ${k.action} x${k.count}` });
+  for (const o of flows.orphaned ?? []) add({ key: key('orphaned', o.workflowId), class: 'orphaned', workflowId: o.workflowId, repo: o.repo, subject: o.workflowId, evidence: one(o.reason) });
+  addStuckActions(add, stuck, inCluster, out);
+  for (const e of revertDue) add({ key: key('experiment', e.id), class: 'experiment-revert', workflowId: null, repo: null, subject: e.id,
+    evidence: one(`${e.signature}: ${(e.commits ?? []).map((c) => c.slice(0, 9)).join(',')} - ${e.result?.reason ?? 'measured no improvement'}`) });
+  addPushActions(add, pushes);
   return out;
 }
 
@@ -176,7 +204,11 @@ export function withSla(items, { seen = {}, acted = { byKey: {}, byWorkflow: {} 
   return { items: out, seen: next };
 }
 
-export const actionLine = (i) => `OWED-ACTION ${i.breach ? 'SLA-BREACH ' : ''}[${i.class}] ${i.key} age=${i.ageMin}m ${i.actedAt ? `acted ${hhmm(i.actedAt)}${i.heldUntil ? ` held until ${hhmm(i.heldUntil)}` : ''}` : 'no action yet'}: ${i.evidence}\n    do: ${i.do}${(i.lessons ?? []).map((l) => `\n    lesson: ${l}`).join('')}`;
+export const actionLine = (i) => {
+  const state = i.actedAt ? 'acted ' + hhmm(i.actedAt) + (i.heldUntil ? ' held until ' + hhmm(i.heldUntil) : '') : 'no action yet';
+  const lessons = (i.lessons ?? []).map((lesson) => '\n    lesson: ' + lesson).join('');
+  return `OWED-ACTION ${i.breach ? 'SLA-BREACH ' : ''}[${i.class}] ${i.key} age=${i.ageMin}m ${state}: ${i.evidence}\n    do: ${i.do}${lessons}`;
+};
 
 /** The longest an action may hold its item out of SLA-BREACH: a hold is re-affirmed at least this often. */
 const MAX_HOLD_MS = 12 * 3_600_000;
@@ -206,30 +238,42 @@ const digestTexts = (language) => {
   return { head: tr('StarCi supervisor digest'), fixed: tr('Handled'), open: tr('Still being handled'), none: tr('nothing new'), wf: tr('Workflows'), owner: tr('Waiting on you (credentials / handover only)'), unacted: tr('not yet acted on') };
 };
 
+const appendDigestContext = (lines, { progress, trend, gc }) => {
+  if (progress?.length) lines.push(...progress);
+  if (trend) lines.push(trend);
+  if (gc) lines.push(gc);
+};
+
+const appendDigestTail = (lines, learning, owed, texts) => {
+  if (learning?.length) lines.push(...learning);
+  if (owed?.ownerWaits?.length) {
+    lines.push(`${texts.owner}:`);
+    for (const item of owed.ownerWaits) lines.push(`- ${item}`);
+  }
+};
+
 /** The digest text from the ledger (actions since `since`, the newest owed actions). Pure over its inputs. */
 export function digestText({ actions = [], owed = null, learning = [], trend = null, gc = null, progress = [], language = ownerLanguage(), now = Date.now() }) {
   const t = digestTexts(language);
   const lines = [`${t.head} ${stampMinute(now)}`];
-  // Outcome first: progress per workflow, priority first, and why it is slow.
-  if (progress?.length) lines.push(...progress);
-  // The op-health trend line (op-metrics.mjs trendLine, from the tick's supervisor-op-metrics snapshots).
-  if (trend) lines.push(trend);
-  // The garbage collection since the last digest, one line (gc.mjs gcLine; owner 2026-09-28).
-  if (gc) lines.push(gc);
-  lines.push(`${t.fixed} (${actions.length}):${actions.length ? '' : ` ${t.none}`}`);
+  appendDigestContext(lines, { progress, trend, gc });
+  const noActions = actions.length ? '' : ` ${t.none}`;
+  lines.push(`${t.fixed} (${actions.length}):${noActions}`);
   for (const a of actions.slice(-12)) lines.push(`- ${a.action} ${a.item}: ${one(a.reason, 140)}`);
   const items = owed?.items ?? [];
   const open = items.filter((i) => !i.actedAt);
   lines.push(`${t.open}: ${items.length} (${open.length} ${t.unacted})`);
   const byClass = {};
   for (const i of items) byClass[i.class] = (byClass[i.class] ?? 0) + 1;
-  if (items.length) lines.push(`  ${Object.entries(byClass).map(([c, n]) => `${c} ${n}`).join(', ')}`);
+  if (items.length) lines.push('  ' + Object.entries(byClass).map(([className, count]) => className + ' ' + count).join(', '));
   if (owed?.workflows?.length) {
     lines.push(`${t.wf}:`);
-    for (const w of owed.workflows) lines.push(`- ${w.workflowId}: ${w.state ?? w.error ?? '?'}${w.ready ? `, ${w.ready} ready` : ''}`);
+    for (const w of owed.workflows) {
+      const ready = w.ready ? `, ${w.ready} ready` : '';
+      lines.push(`- ${w.workflowId}: ${w.state ?? w.error ?? '?'}${ready}`);
+    }
   }
-  if (learning?.length) lines.push(...learning);
-  if (owed?.ownerWaits?.length) { lines.push(`${t.owner}:`); for (const o of owed.ownerWaits) lines.push(`- ${o}`); }
+  appendDigestTail(lines, learning, owed, t);
   return lines.join('\n');
 }
 
@@ -273,9 +317,16 @@ if (isMain(import.meta.url)) {
         for (const i of items) console.log(actionLine(i));
       }
     } else if (verb === 'record') {
-      const until = value('until') ? Date.parse(value('until')) : value('hold-ms') ? Date.now() + Number(value('hold-ms')) : null;
+      let until = null;
+      const untilText = value('until');
+      if (untilText) until = Date.parse(untilText);
+      else {
+        const holdMs = value('hold-ms');
+        if (holdMs) until = Date.now() + Number(holdMs);
+      }
       const r = recordAction({ item: value('item'), action: value('action'), reason: value('reason'), workflowId: value('workflow'), refs: (value('refs') ?? '').split(',').filter(Boolean), until });
-      console.log(asJson ? JSON.stringify(r) : `recorded ${r.action} on ${r.item}${r.until ? ` (held until ${new Date(r.until).toISOString()})` : ''}`);
+      const held = r.until ? ` (held until ${new Date(r.until).toISOString()})` : '';
+      console.log(asJson ? JSON.stringify(r) : `recorded ${r.action} on ${r.item}${held}`);
     } else if (verb === 'digest') {
       if (argv.includes('--send') || argv.includes('--force')) throw Object.assign(new Error('digest delivery belongs to the Owner Notifier; run digest without --send or --force for a preview'), { code: 'action-incomplete' });
       const r = await ownerDigest();
