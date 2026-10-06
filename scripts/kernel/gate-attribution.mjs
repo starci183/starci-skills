@@ -52,7 +52,7 @@ import { insidePath, sameResolvedPath } from '../lib/path-key.mjs';
 
 /** The Work tree: a record file there is judged by the record alone, so an untouched one outside the slice is foreign. */
 const WORK_RECORD_PREFIX = '.starciwork/';
-const isWorkRecord = (file) => String(file).replaceAll(/\\/g, '/').replace(/^\.\//, '').startsWith(WORK_RECORD_PREFIX);
+const isWorkRecord = (file) => String(file).replaceAll('\\', '/').replace(/^\.\//, '').startsWith(WORK_RECORD_PREFIX);
 const payloadOf = (row) => parseJsonOr(row?.payload_json ?? '{}') ?? {};
 const LEASE_PREFIX = 'path:';
 const LOG_DEPTH = 200;
@@ -62,8 +62,8 @@ const POSITION = /(?:\(\d+,\d+\)|:\d+(?::\d+)?)$/;
 /** A failing file as the gate printed it, repo-relative with forward slashes; null when unusable. */
 export function failingPath(value, repo) {
   if (typeof value !== 'string' || !value.trim()) return null;
-  let file = value.trim().replaceAll(/\\/g, '/').replace(POSITION, '');
-  if (path.isAbsolute(file) && repo) file = path.relative(repo, file).replaceAll(/\\/g, '/');
+  let file = value.trim().replaceAll('\\', '/').replace(POSITION, '');
+  if (path.isAbsolute(file) && repo) file = path.relative(repo, file).replaceAll('\\', '/');
   try { return normalizeOwnedPath(file); } catch { return null; }
 }
 
@@ -103,7 +103,7 @@ function importsOwned(root, file, owned) {
   const forms = [...new Set(owned.flatMap((p) => [p, dropFirst(p)]).filter(Boolean))];
   const hits = (candidate) => forms.some((form) => candidate === form || candidate.startsWith(`${form}/`) || form.startsWith(`${candidate}/`));
   for (const match of body.matchAll(IMPORT_SPEC)) {
-    const spec = match[1].replaceAll(/\\/g, '/').replace(/\.(?:[cm]?[jt]sx?)$/, '').replace(/\/index$/, '');
+    const spec = match[1].replaceAll('\\', '/').replace(/\.(?:[cm]?[jt]sx?)$/, '').replace(/\/index$/, '');
     const candidates = spec.startsWith('.')
       ? [path.posix.normalize(path.posix.join(path.posix.dirname(file), spec))]
       : [spec, ...(/^[@~]/.test(spec) ? [dropFirst(spec)] : [])];
@@ -119,7 +119,7 @@ function importsOwned(root, file, owned) {
  */
 function locateFailing(value, { repo, roots }) {
   if (typeof value !== 'string' || !value.trim()) return null;
-  const raw = value.trim().replaceAll(/\\/g, '/').replace(POSITION, '');
+  const raw = value.trim().replaceAll('\\', '/').replace(POSITION, '');
   if (path.isAbsolute(raw)) {
     const other = roots.find((r) => !sameResolvedPath(r.root, repo) && insidePath(r.root, raw));
     if (other) {
