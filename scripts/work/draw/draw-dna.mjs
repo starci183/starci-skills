@@ -190,7 +190,7 @@ export const classesOf = (el) => String(el?.attrs?.class ?? '').split(/\s+/).fil
 const describe = (el) => {
   const cls = classesOf(el).slice(0, 3).join('.');
   const text = textOf(el).slice(0, 40);
-  return `<${el.tag}${el.attrs.id ? `#${el.attrs.id}` : ''}${cls ? `.${cls}` : ''}>${text ? ` "${text}"` : ''}`;
+  return '<' + el.tag + (el.attrs.id ? '#' + el.attrs.id : '') + (cls ? '.' + cls : '') + '>' + (text ? ' "' + text + '"' : '');
 };
 
 // ---------------------------------------------------------------------------------------------------------
@@ -414,7 +414,7 @@ export function anatomyFindings(anatomy, { label = 'the capture' } = {}) {
     const t = m.track;
     if (!t) continue;
     const want = m.segmented || (Array.isArray(m.segments) && m.segments.length > 1) ? METER_SEGMENTED_TRACK_PX : METER_TRACK_PX;
-    if (Math.abs(Number(t.height) - want) > 0.5) out.push({ code: DRAW_METER_TRACK, kind: 'Meter track off its height', detail: `${label}: ${m.desc ?? 'a Meter'} track renders ${t.height}px tall (${want === METER_TRACK_PX ? `HeroUI h-2 = ${METER_TRACK_PX}px` : `segmented h-1 = ${METER_SEGMENTED_TRACK_PX}px`})` });
+    if (Math.abs(Number(t.height) - want) > 0.5) out.push({ code: DRAW_METER_TRACK, kind: 'Meter track off its height', detail: label + ': ' + (m.desc ?? 'a Meter') + ' track renders ' + t.height + 'px tall (' + (want === METER_TRACK_PX ? 'HeroUI h-2 = ' + METER_TRACK_PX + 'px' : 'segmented h-1 = ' + METER_SEGMENTED_TRACK_PX + 'px') + ')' });
     const band = Number(m.band?.width) || 0;
     if (band > 0 && Number(t.width) < band * METER_FULL_WIDTH_SHARE) out.push({ code: DRAW_METER_TRACK, kind: 'Meter as a stub', detail: `${label}: ${m.desc ?? 'a Meter'} track is ${Math.round(t.width)}px of its band's ${Math.round(band)}px - it spans the full width` });
     const segs = Array.isArray(m.segments) ? m.segments.filter((s) => Number(s.width) > 0).sort((x, y) => x.x - y.x) : [];
@@ -443,7 +443,7 @@ export function dnaFindings(html, { dna = loadDna(), proposals = new Set(), labe
   const add = (code, kind, el, why) => {
     const key = `${code}|${kind}`;
     if (!groups.has(key)) groups.set(key, { code, kind, items: [] });
-    groups.get(key).items.push(`${describe(el)}${why ? ` (${why})` : ''}`);
+    groups.get(key).items.push(describe(el) + (why ? ' (' + why + ')' : ''));
   };
 
   // 1. Mapping, names, parts, closed values, proposals.
@@ -576,7 +576,7 @@ export function dnaFindings(html, { dna = loadDna(), proposals = new Set(), labe
     const want = segmentedMeter(el) ? METER_SEGMENTED_TRACK_PX : METER_TRACK_PX;
     for (const t of tracks) {
       const h = declaredPx(t, 'height', rules);
-      if (h != null && Math.abs(h - want) > 0.5) add(DRAW_METER_TRACK, 'Meter track off its height', t, `the track declares ${h}px: the ${want === METER_TRACK_PX ? `HeroUI Meter track is h-2 (${METER_TRACK_PX}px)` : `segmented Meter track is h-1 (${METER_SEGMENTED_TRACK_PX}px)`}`);
+      if (h != null && Math.abs(h - want) > 0.5) add(DRAW_METER_TRACK, 'Meter track off its height', t, 'the track declares ' + h + 'px: the ' + (want === METER_TRACK_PX ? 'HeroUI Meter track is h-2 (' + METER_TRACK_PX + 'px)' : 'segmented Meter track is h-1 (' + METER_SEGMENTED_TRACK_PX + 'px)'));
     }
     for (const d of [el, ...tracks]) {
       const w = declaredPx(d, 'width', rules) ?? declaredPx(d, 'max-width', rules);
@@ -618,7 +618,7 @@ export function dnaFindings(html, { dna = loadDna(), proposals = new Set(), labe
 
   for (const g of groups.values()) {
     out.push({ code: g.code, kind: g.kind, count: g.items.length, examples: g.items.slice(0, 8),
-      detail: `${label}: ${g.items.length} ${g.kind}${g.items.length > 1 ? 's' : ''} - ${g.items.slice(0, 4).join('; ')}${g.items.length > 4 ? ` (+${g.items.length - 4})` : ''}` });
+      detail: label + ': ' + g.items.length + ' ' + g.kind + (g.items.length > 1 ? 's' : '') + ' - ' + g.items.slice(0, 4).join('; ') + (g.items.length > 4 ? ' (+' + (g.items.length - 4) + ')' : '') });
   }
   return out;
 }
@@ -650,7 +650,7 @@ async function main(argv) {
   const findings = dnaFindingsOfFile(path.resolve(file), { family: at('--family') ?? DEFAULT_FAMILY, proposalFiles: at('--proposals') ? [path.resolve(at('--proposals'))] : null,
     assetRequests: assetRequestIdsFor(path.resolve(file)) });
   if (argv.includes('--json')) process.stdout.write(`${JSON.stringify({ ok: !findings.length, findings }, null, 2)}\n`);
-  else process.stdout.write(`${findings.length ? 'REFUSED' : 'ok'}: ${findings.length} finding group(s)\n${findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n')}\n`);
+  else process.stdout.write(`${findings.length ? 'REFUSED' : 'ok'}: ${findings.length} finding group(s)\n${findings.map((f) => '  [' + f.code + '] ' + f.detail).join('\n')}\n`);
   return findings.length ? 1 : 0;
 }
 

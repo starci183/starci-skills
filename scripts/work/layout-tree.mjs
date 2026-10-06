@@ -394,7 +394,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, name = nul
         }
         const labels = {};
         for (const c of catalogs) { const label = i18nKey ? getPath(c.messages, i18nKey) : undefined; if (typeof label === 'string' && label.trim()) labels[c.locale] = label; }
-        for (const c of catalogs) if (!labels[c.locale]) findings.push({ code: 'NAV_LABEL_MISSING', detail: `${item.key} has no ${c.locale} label${i18nKey ? ` at ${i18nKey}` : ''} in ${rel(c.files[0])}` });
+        for (const c of catalogs) if (!labels[c.locale]) findings.push({ code: 'NAV_LABEL_MISSING', detail: item.key + ' has no ' + c.locale + ' label' + (i18nKey ? ' at ' + i18nKey : '') + ' in ' + rel(c.files[0]) });
         const target = resolveNavRoute(nodes, item.route, localeParam);
         if (item.route === null) findings.push({ code: 'NAV_ROUTE_NULL', detail: `${item.key} has no route - the navigation draws it disabled and no page answers it` });
         else if (!target) findings.push({ code: 'NAV_ROUTE_MISSING', detail: `${item.key} navigates to ${item.route}, which no page under app/ answers` });
@@ -519,7 +519,7 @@ export function sourceDrift(record, scan) {
       if (!next) { changed.push(`${n.id} nav ${key} removed`); continue; }
       if ((item?.i18nKey ?? null) !== (next.i18nKey ?? null)) { changed.push(`${n.id} nav ${key} now reads ${next.i18nKey ?? 'no message key'}`); continue; }
       for (const locale of new Set([...Object.keys(item?.labels ?? {}), ...Object.keys(next.labels ?? {})])) {
-        if (item?.labels?.[locale] !== next.labels?.[locale]) changed.push(`${n.id} nav ${key} ${locale} label${item?.i18nKey ? ` (${item.i18nKey})` : ''}`);
+        if (item?.labels?.[locale] !== next.labels?.[locale]) changed.push(n.id + ' nav ' + key + ' ' + locale + ' label' + (item?.i18nKey ? ' (' + item.i18nKey + ')' : ''));
       }
     }
     for (const key of after.keys()) if (!before.has(key)) changed.push(`${n.id} nav ${key} added`);
@@ -533,7 +533,7 @@ export function sourceDrift(record, scan) {
       const was = list(used.locales).find((l) => l?.locale === c.locale)?.sha256;
       if (!was || keyedDigest(c.messages, used.keys) === was) continue;
       const gone = used.keys.filter((k) => getPath(c.messages, k) === undefined);
-      changed.push(`${c.locale} used key values${gone.length ? ` (absent now: ${gone.slice(0, 4).join(', ')})` : ''}`);
+        changed.push(c.locale + ' used key values' + (gone.length ? ' (absent now: ' + gone.slice(0, 4).join(', ') + ')' : ''));
     }
   }
   return { stale: changed.length > 0, changed: [...new Set(changed)] };
@@ -705,7 +705,7 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
         if (!design) reasons.push(`${node.id} is drawn by ${layout.design}, which does not exist`);
         else {
           const acceptance = drawingAcceptance(design.record, path.dirname(design.file));
-          if (!acceptance.accepted) reasons.push(`${node.id} is drawn by ${layout.design}, which is ${acceptance.reason}${design.record.state !== 'done' ? ` - ${ACCEPT_PATH}` : ''}`);
+          if (!acceptance.accepted) reasons.push(node.id + ' is drawn by ' + layout.design + ', which is ' + acceptance.reason + (design.record.state !== 'done' ? ' - ' + ACCEPT_PATH : ''));
           for (const bp of breakpoints) for (const theme of themes) {
             const hit = designCaptureOf(design, bp, theme);
             if (!hit) reasons.push(`${layout.design} has no accepted layout composite at ${bp}/${theme} with a measured childSlot`);
@@ -934,7 +934,7 @@ export function mergeScan(existing, scans, { at = now() } = {}) {
   const base = isLayoutTree(existing) ? existing : null;
   const scanList = scans;
   const several = scanList.length > 1 || appsOf(base).length > 1;
-  const said = (name, text) => `${several ? `${name}: ` : ''}${text}`;
+  const said = (name, text) => (several ? name + ': ' : '') + text;
   const entries = scanList.map((scan) => {
     const name = scan.app.name;
     const before = appsOf(base).find((x) => x.name === name);
@@ -1197,9 +1197,9 @@ function summarizeApp(record) {
     const depth = (chainOf(record, n.id)?.length ?? 1) - 1;
     const files = Object.keys(n.files ?? {}).join(',');
     const dests = n.layout ? destinationsOf(record, n) : [];
-    const extra = n.layout ? ` LAYOUT ${n.layout.component ?? '(no component)'} chrome=${n.layout.chrome} state=${n.layout.state} rev=${n.layout.rev} captures=${list(n.layout.captures).length}${dests.length ? ` destinations=${dests.map((d) => d.key).join(',')}` : ''}` : '';
-    lines.push(`${'  '.repeat(depth)}${n.segment} [${n.segmentKind}] url=${n.url}${files ? ` {${files}}` : ''}${n.intercepts ? ` intercepts=${n.intercepts}` : ''}${extra}`);
-    for (const item of list(n.layout?.nav?.items)) lines.push(`${'  '.repeat(depth + 2)}nav ${item.key} -> ${item.route ?? 'null'} target=${item.target ?? 'NONE'} ${Object.entries(item.labels ?? {}).map(([l, v]) => `${l}:"${v}"`).join(' ')}`);
+    const extra = n.layout ? ' LAYOUT ' + (n.layout.component ?? '(no component)') + ' chrome=' + n.layout.chrome + ' state=' + n.layout.state + ' rev=' + n.layout.rev + ' captures=' + list(n.layout.captures).length + (dests.length ? ' destinations=' + dests.map((d) => d.key).join(',') : '') : '';
+    lines.push('  '.repeat(depth) + n.segment + ' [' + n.segmentKind + '] url=' + n.url + (files ? ' {' + files + '}' : '') + (n.intercepts ? ' intercepts=' + n.intercepts : '') + extra);
+    for (const item of list(n.layout?.nav?.items)) lines.push('  '.repeat(depth + 2) + 'nav ' + item.key + ' -> ' + (item.route ?? 'null') + ' target=' + (item.target ?? 'NONE') + ' ' + Object.entries(item.labels ?? {}).map(([l, v]) => l + ':"' + v + '"').join(' '));
     for (const f of list(n.layout?.nav?.findings)) lines.push(`${'  '.repeat(depth + 2)}! ${f.code} ${f.detail}`);
   }
   return lines;
