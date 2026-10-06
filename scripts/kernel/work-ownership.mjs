@@ -66,8 +66,12 @@ export const inside = (file, dir) => Boolean(dir) && (file === dir || file.start
 const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const liveRow = (row) => Boolean(row) && row.phase !== 'finished' && row.archived_at == null;
 /** A job payload's owned paths (owned_paths, else ownedPaths), normalized. */
-export const ownedOf = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : Array.isArray(payload?.ownedPaths) ? payload.ownedPaths : [])
+export const ownedOf = (payload) => payloadPaths(payload)
   .filter((owned) => typeof owned === 'string' && owned.trim()).map(normWork);
+const payloadPaths = (payload) => {
+  if (Array.isArray(payload?.owned_paths)) return payload.owned_paths;
+  return Array.isArray(payload?.ownedPaths) ? payload.ownedPaths : [];
+};
 
 /**
  * The owner resolver of one ledger and product repository. ownerOf(rel) for a `.starciwork/...`
@@ -90,21 +94,27 @@ export function createOwnership(db, { repo = null, workDir = '.starciwork', foun
     scopes = [];
     if (!repo) return scopes;
     const abs = path.join(repo, workDir);
+    for (const dir of [...scopeDirs(abs)].sort(byCodeUnit)) {
+      if (dir.includes('..')) continue;
+      scopes.push(scopeOf(abs, dir));
+    }
+    return scopes;
+  };
+  const scopeDirs = (abs) => {
     const dirs = new Set();
     for (const feature of readYaml(path.join(abs, 'index.yaml'))?.features ?? []) {
       if (typeof feature?.directory === 'string' && feature.directory.trim()) dirs.add(normWork(feature.directory));
     }
     try { for (const entry of fs.readdirSync(path.join(abs, 'features'), { withFileTypes: true })) if (entry.isDirectory()) dirs.add(`features/${entry.name}`); } catch { /* no features */ }
-    for (const dir of [...dirs].sort(byCodeUnit)) {
-      if (dir.includes('..')) continue;
-      const scope = readYaml(path.join(abs, dir, 'index.yaml'))?.extensions?.work3?.scope;
-      const workflowId = typeof scope?.request?.workflow === 'string' ? scope.request.workflow : null;
-      const nodes = (Array.isArray(scope?.nodes) ? scope.nodes : [])
-        .filter((node) => typeof node?.path === 'string' && node.path.startsWith(WORK_PREFIX) && !READ_ONLY_NODE_KINDS.has(node.kind))
-        .map((node) => recordDirOf(node.path));
-      scopes.push({ dir: `${WORK_PREFIX}${dir}`, workflowId, nodes });
-    }
-    return scopes;
+    return dirs;
+  };
+  const scopeOf = (abs, dir) => {
+    const scope = readYaml(path.join(abs, dir, 'index.yaml'))?.extensions?.work3?.scope;
+    const workflowId = typeof scope?.request?.workflow === 'string' ? scope.request.workflow : null;
+    const nodes = (Array.isArray(scope?.nodes) ? scope.nodes : [])
+      .filter((node) => typeof node?.path === 'string' && node.path.startsWith(WORK_PREFIX) && !READ_ONLY_NODE_KINDS.has(node.kind))
+      .map((node) => recordDirOf(node.path));
+    return { dir: `${WORK_PREFIX}${dir}`, workflowId, nodes };
   };
   const loadCuts = () => {
     if (cuts) return cuts;
@@ -123,18 +133,45 @@ export function createOwnership(db, { repo = null, workDir = '.starciwork', foun
     load();
     for (const kind of REPO_OWNER_KINDS) {
       const owner = found.find((f) => f.kind === kind && live(f.owner?.workflowId))?.owner?.workflowId;
-      if (owner) return (repoOwner = { workflowId: owner, by: 'repo-owner', detail: `owner of the ${kind} foundation` });
+      if (owner) {
+        repoOwner = { workflowId: owner, by: 'repo-owner', detail: `owner of the ${kind} foundation` };
+        return repoOwner;
+      }
     }
     const oldest = [...workflows.values()].find(liveRow);
-    return (repoOwner = { workflowId: oldest?.workflow_id ?? null, by: 'repo-owner', detail: oldest ? 'oldest live workflow of the ledger' : 'no live workflow' });
+    repoOwner = { workflowId: oldest?.workflow_id ?? null, by: 'repo-owner', detail: oldest ? 'oldest live workflow of the ledger' : 'no live workflow' };
+    return repoOwner;
+  };
+  const movedOwner = (file) => {
+    const moved = transfers.find((t) => inside(file, t.path) && live(t.to));
+    if (!moved) return null;
+    const from = moved.from ? ` from ${moved.from}` : '';
+    const bridge = moved.bridgeId ? ` (${moved.bridgeId})` : '';
+    return { workflowId: moved.to, by: 'transfer', detail: `${moved.path} transferred${from} by the Supervisor${bridge}` };
+  };
+  const cutOrFallback = (file, named) => {
+    const owning = [...loadCuts().entries()].filter(([id, owned]) => (!named.length || named.includes(id)) && owned.some((p) => inside(file, p))).map(([id]) => id);
+    if (owning.length === 1) return { workflowId: owning[0], by: 'cut', detail: named.length ? `jobs own it among scope nodes of ${named.join(', ')}` : 'its jobs own it' };
+    const fallback = repoOwnerOf();
+    const why = named.length > 1 ? `scope nodes of ${named.join(', ')}` : owningWhy(owning);
+    return { ...fallback, detail: why ? `${fallback.detail}; ${why} all name it` : fallback.detail };
   };
   const cache = new Map();
   const resolve = (rel) => {
     load();
     const file = normWork(rel);
-    const segments = file.split('/');
-    const moved = transfers.find((t) => inside(file, t.path) && live(t.to));
-    if (moved) return { workflowId: moved.to, by: 'transfer', detail: `${moved.path} transferred${moved.from ? ` from ${moved.from}` : ''} by the Supervisor${moved.bridgeId ? ` (${moved.bridgeId})` : ''}` };
+    const moved = movedOwner(file);
+    if (moved) return moved;
+    const foundation = foundationOwner(file, file.split('/'));
+    if (foundation) return foundation;
+    const all = loadScopes();
+    const feature = all.find((scope) => inside(file, scope.dir));
+    if (feature && live(feature.workflowId)) return { workflowId: feature.workflowId, by: 'scope-record', detail: feature.dir };
+    const named = [...new Set(all.filter((scope) => live(scope.workflowId) && scope.nodes.some((node) => inside(file, node))).map((scope) => scope.workflowId))];
+    if (named.length === 1) return { workflowId: named[0], by: 'scope-node', detail: all.find((scope) => scope.workflowId === named[0]).dir };
+    return cutOrFallback(file, named);
+  };
+  const foundationOwner = (file, segments) => {
     for (const f of found) {
       if (!live(f.owner?.workflowId)) continue;
       const root = FOUNDATION_ROOTS[f.kind];
@@ -142,16 +179,7 @@ export function createOwnership(db, { repo = null, workDir = '.starciwork', foun
         return { workflowId: f.owner.workflowId, by: 'foundation', detail: f.name };
       }
     }
-    const all = loadScopes();
-    const feature = all.find((scope) => inside(file, scope.dir));
-    if (feature && live(feature.workflowId)) return { workflowId: feature.workflowId, by: 'scope-record', detail: feature.dir };
-    const named = [...new Set(all.filter((scope) => live(scope.workflowId) && scope.nodes.some((node) => inside(file, node))).map((scope) => scope.workflowId))];
-    if (named.length === 1) return { workflowId: named[0], by: 'scope-node', detail: all.find((scope) => scope.workflowId === named[0]).dir };
-    const owning = [...loadCuts().entries()].filter(([id, owned]) => (!named.length || named.includes(id)) && owned.some((p) => inside(file, p))).map(([id]) => id);
-    if (owning.length === 1) return { workflowId: owning[0], by: 'cut', detail: named.length ? `jobs own it among scope nodes of ${named.join(', ')}` : 'its jobs own it' };
-    const fallback = repoOwnerOf();
-    const why = named.length > 1 ? `scope nodes of ${named.join(', ')}` : owning.length > 1 ? `jobs of ${owning.join(', ')}` : null;
-    return { ...fallback, detail: why ? `${fallback.detail}; ${why} all name it` : fallback.detail };
+    return null;
   };
   const ownerOf = (rel) => {
     const key = normWork(rel);
@@ -163,6 +191,8 @@ export function createOwnership(db, { repo = null, workDir = '.starciwork', foun
   return ownerOf;
 }
 
+const owningWhy = (owning) => (owning.length > 1 ? `jobs of ${owning.join(', ')}` : null);
+
 const sha16 = (buffer) => sha256(buffer).slice(0, 16);
 /** The digests a committed blob may show in a working tree: its bytes, and its bytes with CRLF line ends (core.autocrlf). */
 const committedDigestsOf = (buffer) => {
@@ -170,7 +200,7 @@ const committedDigestsOf = (buffer) => {
   const raw = sha16(buffer);
   const text = buffer.toString('latin1');
   const crlf = sha16(Buffer.from(text.replaceAll(/\r?\n/g, '\r\n'), 'latin1'));
-  const lf = sha16(Buffer.from(text.replace(/\r\n/g, '\n'), 'latin1'));
+  const lf = sha16(Buffer.from(text.replaceAll(/\r\n/g, '\n'), 'latin1'));
   return [...new Set([raw, crlf, lf])];
 };
 /** Does the committed blob (Buffer, or null when HEAD has no such file) show as this 16-hex digest (null: no file)? */
@@ -190,7 +220,8 @@ export function committedReader(repo, { workDir = '.starciwork' } = {}) {
     if (!repo) return null;
     const out = new Map();
     if (!wanted.length) return out;
-    const input = `HEAD:./${dir}\n${wanted.map((rel) => `HEAD:./${dir}/${rel.slice(WORK_PREFIX.length)}`).join('\n')}\n`;
+    const relLines = wanted.map((rel) => `HEAD:./${dir}/${rel.slice(WORK_PREFIX.length)}`).join('\n');
+    const input = `HEAD:./${dir}\n${relLines}\n`;
     const r = catFile(['--batch'], { dir: repo, input, encoding: null, timeout: 60000, maxBuffer: 512 * 1024 * 1024 });
     if (r.status !== 0 || !Buffer.isBuffer(r.stdout)) return null;
     const buf = r.stdout;
