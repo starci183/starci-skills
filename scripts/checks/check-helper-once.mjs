@@ -157,7 +157,7 @@ export function helperOnceFindings({ tracked, read }) {
   for (const [name, homes] of byName) {
     if (new Set(homes.values()).size > 1) {
       findings.push({ code: 'RT_HELPER_REDEFINED', path: [...homes.keys()].sort(byCodeUnit)[0], line: 1,
-        message: `${name} is exported by ${[...homes.keys()].sort().join(' and ')} with different contracts: rename one` });
+        message: `${name} is exported by ${[...homes.keys()].sort(byCodeUnit).join(' and ')} with different contracts: rename one` });
     }
   }
   for (const file of parsed) {

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Existing publication owner: dependency-ordered canon packages, or the final --runtime-package phase.
 // Root publication follows finished notes and committed canon bindings, proves its actual archive
-// through a private native install, rechecks immutable inputs, and confirms the registry shasum.
+// through a private native install, rechecks immutable inputs, and confirms the registry integrity.
 // Plan mode performs registry reads only. The catalog owns flags, roles and exit semantics.
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { sriSha512 } from '../lib/hash.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { tarFiles } from '../lib/tar-files.mjs';
 import { fileURLToPath } from 'node:url';
@@ -26,7 +27,7 @@ export const EXIT = Object.freeze({ done: 0, failed: 1, usage: 2, unbound: 3, bl
 const POLL_STEP_MS = 20_000;
 
 /** Admit only the cold owner's exact regular tarball for this committed root identity. */
-function runtimeArchive(proof, row, root, head, expectedShasum) {
+function runtimeArchive(proof, row, root, head, expectedIntegrity) {
   if (proof.name !== row.name || proof.version !== row.version || proof.inputRoot !== path.resolve(root) || proof.inputSha !== head)
     throw new Error('cold proof is not bound to this root and committed identity');
   const archive = proof.archive;
@@ -35,7 +36,7 @@ function runtimeArchive(proof, row, root, head, expectedShasum) {
   if (!stat.isFile() || isLinkLike(archive.file, {stat})) throw new Error('cold archive is not a regular file');
   const bytes = fs.readFileSync(archive.file);
   if (bytes.length !== archive.bytes || createHash('sha256').update(bytes).digest('hex') !== archive.sha256
-    || createHash('sha1').update(bytes).digest('hex') !== archive.shasum || archive.shasum !== expectedShasum)
+    || sriSha512(bytes) !== archive.integrity || archive.integrity !== expectedIntegrity)
     throw new Error('cold archive bytes changed before publication');
   const manifest = JSON.parse(tarFiles(bytes).get('package/package.json')?.toString() ?? '{}');
   if (manifest.name !== row.name || manifest.version !== row.version) throw new Error('cold tarball identity differs from the publication row');
@@ -101,9 +102,9 @@ export function releasePublish({ root = runtimeRoot, publish = false, runtimePac
 
   for (const row of plan.toPublish) {
     out(`== ${row.name}@${row.version}`);
-    const localBefore = runtimePackage ? registry.localShasum(row.dir) : null;
+    const localBefore = runtimePackage ? registry.localIntegrity(row.dir) : null;
     const proof = runtimePackage
-      ? (deps.runtimeProof ?? proveRuntimePackage)({ root, sourceSha: head, expectedShasum: localBefore, env, deps: deps.runtimeProofDeps ?? {} })
+      ? (deps.runtimeProof ?? proveRuntimePackage)({ root, sourceSha: head, expectedIntegrity: localBefore, env, deps: deps.runtimeProofDeps ?? {} })
       : node([path.join(root, 'scripts', 'gates', 'package-clean-test.mjs'), '--changed', `${row.dir}/package.json`], { cwd: root, env });
     if (runtimePackage) out(`  runtime clean proof ${proof.status}; receipt ${proof.attempt ?? 'unavailable'}: ${proof.detail ?? ''}`);
     if (runtimePackage ? proof.status !== 'green' : proof.status !== 0) { out(`release-publish: ${row.name}: clean proof not green`); return EXIT.failed; }
@@ -113,7 +114,7 @@ export function releasePublish({ root = runtimeRoot, publish = false, runtimePac
     }
     if (runtimePackage) {
       const currentHead = git.head('HEAD'), currentDirty = git.dirty();
-      if (currentHead.ok === false || (currentHead.status !== undefined && currentHead.status !== 0) || String(currentHead.stdout ?? '').trim() !== head || !currentDirty.ok || currentDirty.stdout || registry.localShasum(row.dir) !== localBefore) { out('release-publish: runtime inputs changed during the cold proof; publication refused'); return EXIT.failed; }
+      if (currentHead.ok === false || (currentHead.status !== undefined && currentHead.status !== 0) || String(currentHead.stdout ?? '').trim() !== head || !currentDirty.ok || currentDirty.stdout || registry.localIntegrity(row.dir) !== localBefore) { out('release-publish: runtime inputs changed during the cold proof; publication refused'); return EXIT.failed; }
       const refreshed = buildPlan({ root, registry, scope: 'runtime' });
       if (refreshed.blockers.length) { out(`release-publish: runtime registry changed during the cold proof: ${refreshed.blockers.join('; ')}`); return EXIT.failed; }
       if (refreshed.rows[0].action !== 'publish') { out('release-publish: runtime version appeared during the cold proof; review the fresh immutable registry receipt before publication'); return EXIT.failed; }
@@ -133,9 +134,9 @@ export function releasePublish({ root = runtimeRoot, publish = false, runtimePac
       sleep(POLL_STEP_MS);
       seen = registry.state(row.name, row.version);
     }
-    const local = runtimePackage ? proof.archive.shasum : registry.localShasum(row.dir);
-    if (local !== seen.shasum) { out(`release-publish: ${row.name}@${row.version} shasum mismatch: registry ${seen.shasum}, local pack ${local}`); return EXIT.failed; }
-    out(`  published and confirmed (shasum ${local})`);
+    const local = runtimePackage ? proof.archive.integrity : registry.localIntegrity(row.dir);
+    if (local !== seen.integrity) { out(`release-publish: ${row.name}@${row.version} integrity mismatch: registry ${seen.integrity}, local pack ${local}`); return EXIT.failed; }
+    out(`  published and confirmed (integrity ${local})`);
   }
   if (runtimePackage) {
     out(`release-publish: done; ${plan.toPublish.length} runtime package(s) published and confirmed; no binding writes`);

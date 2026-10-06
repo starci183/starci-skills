@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {sha256} from '../../engine/digest.mjs';
 import {installedPayloadDigest} from '../lib/install-custody.mjs';
-import {isLinkLike} from '../api/fs/is-link-like.mjs';
+import {isLinkLike} from '../api/fs/is-link-like.mjs'; import {byCodeUnit} from '../lib/list.mjs';
 import {runNode} from '../api/node/run-node.mjs';
 
 const SOURCE_ENTRIES = ['scripts/cli/main.mjs', 'scripts/kernel/cli.mjs'];
@@ -125,8 +125,8 @@ export function doctorInstallation(input, log = console.log, deps = {}) {
       const report = childReport(['--input-type=module', '--eval', CAPABILITY_PROBE, target], target, node);
       if (report.ok !== true || report.sqlite?.status !== 'green' || report.sqlite.id !== 'node-sqlite'
         || typeof report.sqlite.detail !== 'string' || !report.sqlite.detail || !Array.isArray(report.dependencies)) throw new Error('installed runtime capability is unavailable or red');
-      const expected = Object.entries(packageManifest.dependencies ?? {}).sort();
-      const actual = report.dependencies.map(row => [row.name, row.version]).sort();
+      const expected = Object.entries(packageManifest.dependencies ?? {}).sort(byCodeUnit);
+      const actual = report.dependencies.map(row => [row.name, row.version]).sort(byCodeUnit);
       if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error('installed dependency result is incomplete');
       return report.sqlite.detail;
     });

@@ -109,3 +109,15 @@ export const processEnvRowsOfJson = (text) => {
   const v = t ? JSON.parse(t) : [];
   return (Array.isArray(v) ? v : [v]).map((r) => ({ pid: Number(r.pid), readable: r.readable === true, values: r.values ?? {} }));
 };
+
+/** The spawnSync-shaped result of a system tool the host does not carry (status null + error), for a caller that returns a spawn result. `refusal`: a systemTool refusal. */
+export const toolUnavailableResult = (refusal) => ({ status: null, stdout: '', stderr: '', error: Object.assign(new Error(`${refusal.tool} is not in its fixed system location on ${refusal.platform}`), { code: refusal.code }) });
+
+/** Promise<string | null>: stdout of one system tool run without blocking the calling thread (hidden window, 1 MiB), or null when the tool is absent, failed or timed out. `tool`: systemTool; `exec`: execFile. */
+export const execSystemTool = (name, args, timeout, { exec, tool }) => new Promise((resolve) => {
+  try {
+    const found = tool(name);
+    if (!found.ok) { resolve(null); return; }
+    exec(found.path, args, { timeout, windowsHide: true, maxBuffer: 1 << 20 }, (error, stdout) => resolve(error ? null : String(stdout)));
+  } catch { resolve(null); }
+});

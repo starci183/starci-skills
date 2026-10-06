@@ -28,7 +28,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { catFile } from '../../api/git/cat-file.mjs'; import { diff as gitDiff } from '../../api/git/diff.mjs'; import { revParseQuery } from '../../api/git/rev-parse-query.mjs'; import { lsTree } from '../../api/git/ls-tree.mjs';
-import { sameOrUnder } from '../../lib/path-key.mjs';
+import { containedPath, sameOrUnder } from '../../lib/path-key.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 
@@ -480,7 +480,8 @@ export async function parityFingerprint(item, { repo, resolveRoot = resolveOwned
 }
 // The lint child: node canon-parity.mjs --lint-child <job.json> -> one JSON line, runLintGate's result.
 if (isMain(import.meta.url) && process.argv[2] === '--lint-child') {
-  const job = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+  // The parent wrote the job file under the OS temp dir; a path anywhere else is not its job.
+  const job = JSON.parse(fs.readFileSync(containedPath(os.tmpdir(), process.argv[3], { label: '--lint-child job file' }), 'utf8'));
   const { runLintGate } = await import('../../gates/gate.mjs');
   const out = await runLintGate({ root: job.root, base: job.base, files: job.files });
   process.stdout.write(`${JSON.stringify({ exit: out.exit, findings: out.findings.slice(0, 500), preexisting: out.preexisting, errors: out.errors })}\n`);

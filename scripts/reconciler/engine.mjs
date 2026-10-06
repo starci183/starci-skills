@@ -388,15 +388,15 @@ export class Engine {
     } finally { clearTimeout(budget); this.runningLabels.delete(label); this.hb?.running(this.runningLabels); }
   }
 
-  /** Hand the due keys to their controllers, within each controller's concurrency. Returns the started promises. */
+  /** Hand the due keys to their controllers, within each controller's concurrency. Each launched reconcile tracks itself in this.running and a rejection that escapes reconcileOne is logged, never unhandled; returns how many were launched. */
   dispatch() {
-    const started = [];
+    let started = 0;
     for (const c of this.controllers) {
       if (c.mode === 'off') continue;
       for (const item of this.queue.take(c.name, c.concurrency)) {
-        const p = this.reconcileOne(c, item).finally(() => this.running.delete(p));
+        const p = this.reconcileOne(c, item).catch((error) => this.log('reconciler.error', `${c.name} ${item.key} reconcile crashed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.reconcile-failed', name: c.name, key: item.key, detail: String(error?.stack ?? error).slice(0, 800) })).finally(() => this.running.delete(p));
         this.running.add(p);
-        started.push(p);
+        started += 1;
       }
     }
     return started;

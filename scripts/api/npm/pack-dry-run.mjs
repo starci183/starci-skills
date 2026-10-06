@@ -1,10 +1,9 @@
 // pack-dry-run.mjs — `npm pack --dry-run --json --ignore-scripts` in a package directory: the file list npm would
 // publish (scripts/gates/canon-digest.mjs packedFiles shapes it).
-import { spawnSync } from 'node:child_process';
+import { npmSpawn } from './lib.mjs';
 
-/** {status, stdout, stderr, error} of the dry run. */
-export function packDryRun(directory) {
-  // One fixed command string (no arguments to escape): npm is a .cmd shim on Windows, so it runs through the shell.
-  const r = spawnSync('npm pack --dry-run --json --ignore-scripts', { cwd: directory, encoding: 'utf8', shell: true, windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
+/** {status, stdout, stderr, error} of the dry run. npm runs through the runner's absolute node + npm-cli.js target: no shell, no PATH lookup. */
+export function packDryRun(directory, { spawn = npmSpawn } = {}) {
+  const r = spawn(['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: directory });
   return { status: r.status, stdout: r.stdout, stderr: r.stderr, error: r.error ?? null };
 }

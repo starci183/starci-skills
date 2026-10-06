@@ -43,7 +43,7 @@
 // STARCI_TELEGRAM_API_BASE replaces https://api.telegram.org for tests.
 import fs from 'node:fs';
 import path from 'node:path';
-import { isMain } from '../lib/is-main.mjs';
+import { isMain } from '../lib/is-main.mjs'; import { logLine } from '../lib/escape.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { configRoot, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
@@ -577,7 +577,7 @@ export async function notifyAutoAccepted({ ledgerFile, workflowId, dispatchId, l
 async function main() {
   const args = argsOf(process.argv.slice(2));
   const verb = args._[0] ?? (args['discover-chat'] ? 'discover-chat' : null);
-  const out = (value) => console.log(JSON.stringify(value));
+  const out = (value) => console.log(logLine(value));
   const apiBase = readEnv('STARCI_TELEGRAM_API_BASE') || DEFAULT_API_BASE;
   if (verb === 'notify') {
     if (!args.ledger || !args.workflow || !args.dispatch) { out({ ok: false, error: 'notify needs --ledger <file> --workflow <id> --dispatch <id> [--repo <path>]' }); process.exit(2); }

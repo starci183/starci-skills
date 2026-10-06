@@ -85,7 +85,7 @@ export function createGateway({ resolve, exposeCredentialAsks = () => false, lan
     const headers = {};
     for (const [key, value] of Object.entries(req.headers)) if (!HOP_BY_HOP.has(key)) headers[key] = value;
     headers.host = target.host;
-    const upstream = request({ host: target.hostname, port: target.port, method: req.method, path: `${pathname}${search}`, headers, timeout: 30000 }, (up) => {
+    let upstream; try { upstream = request({ host: target.hostname, port: target.port, method: req.method, path: `${pathname}${search}`, headers, timeout: 30000 }, (up) => {
       const out = { ...PAGE_HEADERS };
       for (const [key, value] of Object.entries(up.headers)) if (!HOP_BY_HOP.has(key)) out[key] = value;
       // A redirect to the form's own loopback origin becomes a path on the public host.
@@ -94,7 +94,7 @@ export function createGateway({ resolve, exposeCredentialAsks = () => false, lan
       }
       res.writeHead(up.statusCode ?? 502, out);
       up.pipe(res);
-    });
+    }, 'loopback'); } catch { return deny(res, 502, t.upstream); }
     upstream.on('timeout', () => upstream.destroy(new Error('upstream timeout')));
     upstream.on('error', () => { if (!res.headersSent) deny(res, 502, t.upstream); else res.destroy(); });
     let seen = 0;

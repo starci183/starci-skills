@@ -19,7 +19,7 @@ import { init as gitInit } from '../api/git/init.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { runProgram } from '../api/process/run-program.mjs';
 import { DEFAULT_NODE } from '../lib/node-image.mjs';
-import { readEnv } from '../lib/env.mjs';
+import { readEnv } from '../lib/env.mjs'; import { byCodeUnit } from '../lib/list.mjs';
 const HOST_IGNORES = ['.starciwork/', '.claude/config.yaml', '.claude/secret.env'];
 const REQUIRED_FILES = ['CONTEXT.md', 'skills/starci/SKILL.md', 'skills/starci/references/host-startup.md', 'config.example.yaml', 'init/AGENTS.md', '.starci-skills.json'];
 const HOST_MARKER = '<!-- starci:prompt-entry -->';
@@ -46,9 +46,9 @@ export function sandboxEnv({ base, home, platform }) {
 
 /** What differs between two snapshots (Map path -> `size:mtimeMs`): {added, removed, changed} sorted. Pure. */
 export function diffSnapshots(before, after) {
-  const added = [...after.keys()].filter((key) => !before.has(key)).sort();
-  const removed = [...before.keys()].filter((key) => !after.has(key)).sort();
-  const changed = [...after.keys()].filter((key) => before.has(key) && before.get(key) !== after.get(key)).sort();
+  const added = [...after.keys()].filter((key) => !before.has(key)).sort(byCodeUnit);
+  const removed = [...before.keys()].filter((key) => !after.has(key)).sort(byCodeUnit);
+  const changed = [...after.keys()].filter((key) => before.has(key) && before.get(key) !== after.get(key)).sort(byCodeUnit);
   return { added, removed, changed };
 }
 

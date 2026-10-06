@@ -7,6 +7,9 @@
 // (diff.mjs, ls-files.mjs, worktree-*.mjs, ...), and a caller folds the spawn result it gets back with the pure
 // helpers of scripts/lib/git.mjs (gitResultOf, gitOutputOf).
 import { assertMutationFence } from '../../lib/mutation-fence.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { withoutGitLocalEnv } from '../../lib/git.mjs';
 
@@ -41,4 +44,28 @@ export const runGit = (args, { cwd = null, dir = null, git = 'git', config = nul
 export const gitRunner = (git = null) => (args, opts = {}) => {
   const r = git ? git(args, opts) : runGit(args, { timeout: 300_000, maxBuffer: 64 * 1024 * 1024, ...opts });
   return { ok: r?.ok ?? (!r?.error && r?.status === 0), stdout: String(r?.stdout ?? r?.out ?? '').trim(), stderr: String(r?.stderr ?? r?.err ?? r?.error?.message ?? r?.error ?? '').trim() };
+};
+
+let cachedGit;
+/**
+ * The absolute path of the real git binary, or null: the first PATH directory holding git (git.exe on Windows) that is not
+ * the StarCi shim directory <home>/.starci/bin (a seat's guard shim is never the git the runtime itself runs). A bare name is never
+ * spawned, so a writable directory cannot be reached by name lookup at spawn time. Resolved once per process; options (env,
+ * platform, home, exists) are for a spec and bypass the cache.
+ */
+export const gitExecutable = (options = null) => {
+  if (!options && cachedGit !== undefined) return cachedGit;
+  const { env = process.env, platform = process.platform, home = os.homedir(), exists = (file) => fs.statSync(file, { throwIfNoEntry: false })?.isFile() === true } = options ?? {};
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  const pathKey = Object.keys(env).find((name) => name.toLowerCase() === 'path');
+  const shim = p.join(home, '.starci', 'bin');
+  const same = (a, b) => (platform === 'win32' ? p.resolve(a).toLowerCase() === p.resolve(b).toLowerCase() : p.resolve(a) === p.resolve(b));
+  let found = null;
+  for (const raw of String(pathKey ? env[pathKey] : '').split(platform === 'win32' ? ';' : ':')) {
+    const dir = raw.replace(/^"(.*)"$/, '$1');
+    const file = dir && p.isAbsolute(dir) && !same(dir, shim) ? p.join(dir, platform === 'win32' ? 'git.exe' : 'git') : null;
+    if (file && exists(file)) { found = file; break; }
+  }
+  if (!options) cachedGit = found;
+  return found;
 };

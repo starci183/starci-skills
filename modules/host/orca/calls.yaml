@@ -47,7 +47,7 @@ idempotency:
       recovered by issuing the same call once more. No request id is sent, so a later deliberate repeat (the
       settle-dispatch recovery) is a fresh effect, never a recorded replay.
     - request: not idempotent (a second Run, a second rebind, a second worker). The FIRST issue already carries
-      --retry-request <id>. The id is a UUIDv5 (RFC 9562, the fixed ORCA_REQUEST_NAMESPACE of scripts/api/orca/lib.mjs) of the verb and the caller's ledger identity, because Orca 1.4.209 accepts only a UUID here; it is derived from
+      --retry-request <id>. The id is a UUIDv8 (RFC 9562, SHA-256 based, the fixed ORCA_REQUEST_NAMESPACE of scripts/api/orca/lib.mjs) of the verb and the caller's ledger identity, because Orca 1.4.209 accepts only a UUID here; it is derived from
       ledger identity only, so a restarted process derives the same id. After a lost receipt the runner reads
       `request-show`: completed or pending is replayed once under the same id (Orca answers the recorded outcome,
       result.mutation.replayed), and absent or unreadable is outcome unknown (reason request-absent or

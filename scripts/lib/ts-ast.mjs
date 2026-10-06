@@ -2,6 +2,9 @@
 // literal text, a node's 1-based position, a named property's initializer text. `ts` is the caller's
 // already-resolved compiler (see package-at.mjs loadTypescript); nothing here resolves a package.
 
+/** Whether the single-bit `flag` (a ts.NodeFlags member) is set in `flags`: the bit read as arithmetic, no bitwise operator in the condition. */
+export const hasFlag = (flags, flag) => Math.floor(flags / flag) % 2 === 1;
+
 /** The text of an identifier or a string-literal-like `node`, or null (property names, literal specifiers). */
 export const nameText = (ts, node) => (node && (ts.isIdentifier(node) || ts.isStringLiteralLike(node)) ? node.text : null);
 

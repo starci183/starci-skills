@@ -6422,6 +6422,17 @@ SURFACE_INVALID:
   owner: other-op:interface.scaffold
   kind: check-finding
 
+SYSTEM_TOOL_UNAVAILABLE:
+  title: "System tool not found in its fixed location"
+  title_vi: "Không tìm thấy công cụ hệ thống ở vị trí cố định"
+  meaning_vi: "Lệnh hệ điều hành (PowerShell, schtasks, netstat, tasklist, lsof, ps, nvidia-smi) không có trong các thư mục hệ thống cố định mà runtime tin cậy (System32 trên Windows; /usr/bin, /bin, /usr/sbin, /sbin trên POSIX) nên không được chạy qua PATH. Nơi gọi trả kết quả suy giảm (không rõ) thay vì lỗi."
+  causes_vi:
+    - "Máy không cài công cụ đó (ví dụ không có trình điều khiển NVIDIA hoặc lsof trong container tối giản)"
+    - "Công cụ nằm ngoài các thư mục hệ thống cố định"
+  nextStep_vi: "Cài công cụ vào thư mục hệ thống của máy, hoặc chấp nhận kết quả không rõ của phép thăm dò tùy chọn."
+  owner: runtime-core
+  kind: runtime-fault
+
 TAB_AS_INDENT:
   title: "Tab used as YAML indentation"
   title_vi: "Dùng phím Tab để thụt lề YAML"
@@ -16116,3 +16127,25 @@ kernel-read-unverified:
   nextStep_vi: "Lấy --plan, đọc đủ từng file và gửi manifest nguyên vẹn với --read-manifest từ Kernel hiện tại."
   owner: supervisor
   kind: verb-refusal
+
+PATH_OUTSIDE_BASE:
+  title: "Path outside its allowed directory"
+  title_vi: "Đường dẫn nằm ngoài thư mục được phép"
+  meaning_vi: "Một lệnh nhận đường dẫn từ người gọi nhưng đường dẫn đó, sau khi chuẩn hoá và theo liên kết, rơi ra ngoài thư mục mà lệnh được phép đọc."
+  causes_vi:
+    - "Đường dẫn có đoạn .. hoặc là đường dẫn tuyệt đối trỏ ra khỏi cây cho phép"
+    - "Một liên kết (symlink, junction) bên trong cây dẫn ra ngoài"
+  nextStep_vi: "Gọi lại lệnh với đường dẫn nằm trong cây của runtime, của repo đang chạy hoặc trong thư mục tạm của hệ điều hành; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: input-invalid
+
+URL_TARGET_REFUSED:
+  title: "Request target outside its allowed hosts"
+  title_vi: "Đích yêu cầu nằm ngoài các máy chủ được phép"
+  meaning_vi: "Một yêu cầu mạng bị từ chối trước khi gửi vì địa chỉ không thuộc chính sách của nơi gọi: giao thức không phải http hoặc https, địa chỉ có tài khoản đi kèm, cổng sai, hoặc máy chủ ngoài danh sách cho phép."
+  causes_vi:
+    - "Địa chỉ trỏ tới máy chủ khác máy này hoặc khác máy chủ API đã định"
+    - "Nơi gọi chưa khai báo chính sách cho phép"
+  nextStep_vi: "Dùng địa chỉ loopback của máy này hoặc máy chủ API đã định; sửa cấu hình trỏ sai thay vì mở rộng danh sách cho phép."
+  owner: runtime-core
+  kind: input-invalid

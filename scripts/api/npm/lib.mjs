@@ -1,22 +1,25 @@
-// scripts/api/npm/lib.mjs — the runner of npm and npx: on Windows the npm-cli.js / npx-cli.js that ship beside this node
-// binary, run by that node (no .cmd shim, no shell); elsewhere the npm / npx on PATH. Utf8 text, a hidden window. The call
+// scripts/api/npm/lib.mjs — the runner of npm and npx: the npm-cli.js / npx-cli.js that ship with this node install, run by
+// that node, or the npm / npx executable beside the node binary (no .cmd shim, no shell, no PATH lookup). Utf8 text, a hidden window. The call
 // files beside it (ci.mjs, pack-dry-run.mjs, run-npm.mjs, run-npx.mjs) each name one use; nothing outside scripts/api/npm
 // imports this runner.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-/** The `<tool>-cli.js` (npm or npx) of this node install on Windows, or null (another platform, or a node without its bundled npm). */
-const bundledCli = (tool = 'npm', platform = process.platform, execPath = process.execPath) => {
-  if (platform !== 'win32') return null;
-  const cli = path.join(path.dirname(execPath), 'node_modules', 'npm', 'bin', `${tool}-cli.js`);
-  return fs.existsSync(cli) ? cli : null;
+/** The `<tool>-cli.js` (npm or npx) of this node install (Windows: beside node; elsewhere: <prefix>/lib/node_modules) run by node, else the `<tool>` executable beside the node binary: an absolute spawn target fixed by the node install, never a PATH lookup; null when the node has neither. */
+const bundledCli = (tool = 'npm', platform = process.platform, execPath = process.execPath, exists = fs.existsSync) => {
+  const dir = path.dirname(execPath);
+  const cli = path.join(dir, ...(platform === 'win32' ? [] : ['..', 'lib']), 'node_modules', 'npm', 'bin', `${tool}-cli.js`);
+  if (exists(cli)) return { file: execPath, args: [cli] };
+  const sibling = path.join(dir, tool);
+  return platform !== 'win32' && exists(sibling) ? { file: sibling, args: [] } : null;
 };
 
 const toolSpawn = (tool, args, options) => {
   const spawn = { encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024, ...options };
-  const cli = bundledCli(tool);
-  return cli ? spawnSync(process.execPath, [cli, ...args], spawn) : spawnSync(tool, args, spawn);
+  const run = bundledCli(tool);
+  return run ? spawnSync(run.file, [...run.args, ...args], spawn)
+    : { status: null, stdout: '', stderr: '', signal: null, error: Object.assign(new Error(`${tool} was not found beside this node binary`), { code: 'ENOENT' }) };
 };
 
 /** `npm <args>`; options pass through last (cwd, timeout, env, maxBuffer, stdio). */

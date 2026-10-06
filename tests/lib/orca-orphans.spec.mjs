@@ -79,7 +79,7 @@ test('the ownership stamp round-trips, and any other comment is foreign', () => 
   const staging = runtimeStampOf({ kind: 'supervisor-staging', slot: 'sup-42', owner: { supJobId: 'sup-42' } });
   assert.equal(staging, 'starci:supervisor-staging:sup-42;sup=sup-42');
   assert.equal(parseRuntimeStamp(staging).supJobId, 'sup-42');
-  assert.match(orphanPreserveName({ slot: 'wf-a/b', orcaId: `repo::${path.join(os.tmpdir(), 'x')}`, digest: (x) => crypto.createHash('sha1').update(x).digest('hex') }), /^orphan\/wf-a_b-[0-9a-f]{10}$/);
+  assert.match(orphanPreserveName({ slot: 'wf-a/b', orcaId: `repo::${path.join(os.tmpdir(), 'x')}`, digest: (x) => crypto.createHash('sha256').update(x).digest('hex') }), /^orphan\/wf-a_b-[0-9a-f]{10}$/);
 });
 
 test('orphanVerdict: foreign never touched, in-flight left, a live owner adopted, an ended or long-unknown owner collected', () => {

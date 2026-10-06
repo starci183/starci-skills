@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { createHash } from 'node:crypto';
+import { sriSha512 } from '../lib/hash.mjs';
 import { fileURLToPath } from 'node:url';
 
 const FORBIDDEN_NAMES = new Set(['secret.env', 'settings.local.json', 'machine.sqlite']);
@@ -78,7 +79,7 @@ export function releaseMetadata({ manifest, packed, tarball, sha256, bytes, env,
     tarball,
     bytes,
     sha256,
-    npmShasum: packed.shasum ?? null,
+    integrity: packed.integrity ?? null,
     fileCount: packed.files.length,
     node: nodeVersion,
   };
@@ -116,9 +117,9 @@ export function main(argv = process.argv.slice(2), env = process.env) {
     process.stderr.write('runtime-artifact: the pack result lists no files\n');
     return 2;
   }
-  const sha1 = createHash('sha1').update(bytes).digest('hex');
-  if (packed.shasum !== sha1) {
-    process.stderr.write(`runtime-artifact: the tarball sha1 ${sha1} differs from the pack result ${packed.shasum}: the list does not describe this tarball\n`);
+  const integrity = sriSha512(bytes);
+  if (packed.integrity !== integrity) {
+    process.stderr.write(`runtime-artifact: the tarball integrity ${integrity} differs from the pack result ${packed.integrity}: the list does not describe this tarball\n`);
     return 2;
   }
   const sha256 = createHash('sha256').update(bytes).digest('hex');

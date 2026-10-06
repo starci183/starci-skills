@@ -232,9 +232,9 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
   }
   fs.mkdirSync(hooksDir, { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, body, { mode: 0o755 });
+  fs.writeFileSync(tmp, body, { mode: 0o700 });
   fs.renameSync(tmp, file);
-  try { fs.chmodSync(file, 0o755); } catch { /* windows */ }
+  try { fs.chmodSync(file, 0o700); } catch { /* windows */ }
   return { installed: true, path: file, changed: true };
 }
 
@@ -282,9 +282,9 @@ export function ensureWorkHook(repoRoot, { skillRoot = path.resolve(here, '..', 
   }
   fs.mkdirSync(hooksDir, { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, body, { mode: 0o755 });
+  fs.writeFileSync(tmp, body, { mode: 0o700 });
   fs.renameSync(tmp, file);
-  try { fs.chmodSync(file, 0o755); } catch { /* windows */ }
+  try { fs.chmodSync(file, 0o700); } catch { /* windows */ }
   return { installed: true, path: file, changed: true };
 }
 

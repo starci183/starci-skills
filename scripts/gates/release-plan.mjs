@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { byCodeUnit } from '../lib/list.mjs';
+import { isSriSha512 } from '../lib/hash.mjs';
 import { loadPins } from './canon-pins.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 
@@ -69,19 +70,19 @@ function judge(row, registry) {
   if (out.registry.state === 'unreachable') return { ...out, action: 'unreachable', blocker: `${row.name}: registry unreachable (${out.registry.detail ?? 'no answer'})` };
   if (row.runtimePackage && !['absent', 'present'].includes(out.registry.state)) return { ...out, action: 'blocked', blocker: `${row.name}@${row.version}: unknown runtime registry state` };
   if (out.registry.state !== 'present') return out;
-  if (row.runtimePackage && !/^[0-9a-f]{40}$/.test(String(out.registry.shasum ?? ''))) return { ...out, action: 'blocked', blocker: `${row.name}@${row.version}: registry returned no immutable runtime shasum` };
+  if (row.runtimePackage && !isSriSha512(out.registry.integrity)) return { ...out, action: 'blocked', blocker: `${row.name}@${row.version}: registry returned no immutable runtime integrity` };
   out.action = 'published';
-  const local = registry.localShasum(row.dir);
+  const local = registry.localIntegrity(row.dir);
   if (row.runtimePackage && !local) return { ...out, action: 'blocked', blocker: `${row.name}@${row.version}: local runtime pack could not be listed` };
   if (!local) return { ...out, note: 'local pack could not be listed' };
-  if (local === out.registry.shasum) return { ...out, note: 'shasum matches' };
+  if (local === out.registry.integrity) return { ...out, note: 'integrity matches' };
   const content = registry.contentClass(row.name, row.version, row.dir);
   if (content === 'same') return { ...out, note: 'every file is identical; only the pack metadata differs' };
   if (row.runtimePackage) return { ...out, action: 'blocked', note: content, blocker: `${row.name}@${row.version}: published runtime bytes differ or cannot be proved (${content}); its version is immutable` };
   if (content.startsWith('crlf')) return { ...out, note: 'differs only by CRLF line endings of the working tree' };
   if (content.startsWith('dist')) return { ...out, note: `WARN ${content}: stale build output here; publish rebuilds` };
   if (content.startsWith('drift')) return { ...out, action: 'drift', note: content, blocker: `${row.name}@${row.version} is on the registry but the source differs (${content}): bump it, republish, rebind` };
-  return { ...out, action: 'blocked', note: `content check inconclusive: ${content}`, blocker: `${row.name}@${row.version}: shasum differs and the content check was inconclusive (${content})` };
+  return { ...out, action: 'blocked', note: `content check inconclusive: ${content}`, blocker: `${row.name}@${row.version}: integrity differs and the content check was inconclusive (${content})` };
 }
 
 /**

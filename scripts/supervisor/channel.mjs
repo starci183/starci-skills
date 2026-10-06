@@ -32,7 +32,7 @@
 //       Run it under a Monitor so the supervisor wakes the moment the owner writes.
 import fs from 'node:fs';
 import path from 'node:path';
-import { isMain } from '../lib/is-main.mjs';
+import { isMain } from '../lib/is-main.mjs'; import { logLine } from '../lib/escape.mjs';
 import { argsOf } from '../connectors/lib.mjs';
 import { botCall, DEFAULT_API_BASE, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
 import { redact } from '../connectors/telegram-polite.mjs';
@@ -205,7 +205,7 @@ const VERB_FLAGS = {
 async function main() {
   const args = argsOf(process.argv.slice(2));
   const verb = args._[0];
-  const out = (value) => console.log(JSON.stringify(value));
+  const out = (value) => console.log(logLine(value));
   const fail = (error, code = 2) => { console.error(JSON.stringify({ ok: false, error })); process.exitCode = code; };
   const id = typeof args.id === 'string' ? args.id : null;
   if (!verb || !Object.hasOwn(VERB_FLAGS, verb)) {

@@ -4,3 +4,9 @@ import crypto from 'node:crypto';
 /** `text` hashed with `algo`, the hex digest cut to `n` characters. */
 export const shortHash = (text, { algo = 'sha256', n = 10 } = {}) =>
   crypto.createHash(algo).update(String(text)).digest('hex').slice(0, n);
+
+/** The Subresource Integrity string npm records for a tarball: `sha512-<base64 digest>`. */
+export const sriSha512 = (bytes) => `sha512-${crypto.createHash('sha512').update(bytes).digest('base64')}`;
+
+/** True when `value` is a well-formed sha512 SRI string. */
+export const isSriSha512 = (value) => /^sha512-[A-Za-z0-9+/]{86}==$/.test(String(value ?? ''));

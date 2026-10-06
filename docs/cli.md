@@ -2994,7 +2994,7 @@ Roles: release, owner
 Conventions:
 
 - plan mode is read-only and reports registry blockers, canon rebind drift and example pin drift
-- publication uses the existing clean proof, registry confirmation and shasum verification
+- publication uses the existing clean proof, registry confirmation and integrity verification
 - scripts/gates/release-plan.mjs publishOrder puts dependencies first and refuses cycles; packages without bundled canon pins win only among ready ties
 - the package phase rebinds code patterns, re-pins and installs examples, syncs them and proves every binding
 - runtime-package publishes root package.json after package publication, committed bindings and finished notes; it proves the real archive and private install

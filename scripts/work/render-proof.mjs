@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {decodePng, checkPalette, checkEntityListInCard, checkMascotSlot, cardClassesOf} from './ui/render.mjs';
 import {readWorkspace, loadRecords} from './record-ownership.mjs';
-import {slash} from '../lib/path-key.mjs';
+import {containedPath, slash} from '../lib/path-key.mjs';
 import {objectList} from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { walkFiles } from '../lib/walk.mjs';
@@ -196,7 +196,10 @@ if (isMain(import.meta.url)) {
     else { console.error(`REFUSED unrecognized argument: ${token}`); process.exit(1); }
   }
   if (!args.work || !args.record) { console.error('REFUSED --work <path-to-.starciwork> and --record <id> are both required'); process.exit(1); }
-  const workRoot = path.resolve(root, args.work);
+  // An agent-supplied --work stays inside the runtime tree (its examples) or the repository the command runs in.
+  let workRoot;
+  try { workRoot = containedPath(root, args.work, {label: '--work'}); }
+  catch { try { workRoot = containedPath(process.cwd(), args.work, {label: '--work'}); } catch (error) { console.error(`REFUSED ${error.message}`); process.exit(1); } }
   const records = loadRecords(workRoot, walkFiles);
   const workspaceDoc = readWorkspace(workRoot);
   const rec = records.get(args.record);

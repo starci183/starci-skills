@@ -71,6 +71,18 @@ export const insidePath = (root, file, { key = (p) => p, includeSelf = false } =
   return (includeSelf || Boolean(rel)) && !rel.startsWith('..') && !path.isAbsolute(rel);
 };
 /**
+ * `candidate` (absolute, or relative to `base`) resolved and dereferenced, required to sit under `base` (or be it):
+ * the boundary check for a path an operator, an agent or another process hands in. `base` is canonicalised once and the
+ * candidate is judged below it, so `..` segments and links leading out are refused; returns the canonical path, or throws
+ * a PATH_OUTSIDE_BASE refusal (`label` names the argument in the message).
+ */
+export const containedPath = (base, candidate, { label = 'path' } = {}) => {
+  const root = canonicalPath(base);
+  const resolved = canonicalPath(path.resolve(root, String(candidate ?? '')));
+  if (!insidePath(root, resolved, { includeSelf: true })) throw Object.assign(new Error(`${label} ${String(candidate)} is outside ${root} [PATH_OUTSIDE_BASE]`), { code: 'PATH_OUTSIDE_BASE' });
+  return resolved;
+};
+/**
  * A path-ish value (a string or a {path} entry) in relative compare form: trimmed, forward slashes,
  * no trailing '/**' glob or slashes, no leading './'; `fold` lowercases for a case-insensitive key.
  */

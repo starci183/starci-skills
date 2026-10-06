@@ -14,7 +14,7 @@
 //               `passThrough` marks the spawn inside a local runner whose callers name the command (their calls are
 //               listed as calls of the runner, callee = its name).
 import path from 'node:path';
-import { createRequire } from 'node:module';
+import { createRequire } from 'node:module'; import { hasFlag } from './ts-ast.mjs';
 
 const CHILD_PROCESS = new Set(['child_process', 'node:child_process']);
 const SPAWN_FNS = Object.freeze(['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork']);
@@ -98,7 +98,7 @@ export function spawnCalls(text, file = 'x.mjs') {
         else if (t.isObjectBindingPattern(node.name)) bindPattern(node.name);
       }
       const list = node.parent;
-      if (t.isIdentifier(node.name) && list && t.isVariableDeclarationList(list) && (list.flags & t.NodeFlags.Const) !== 0)
+      if (t.isIdentifier(node.name) && list && t.isVariableDeclarationList(list) && hasFlag(list.flags, t.NodeFlags.Const))
         consts.set(node.name.text, [...(consts.get(node.name.text) ?? []), node.initializer]);
     }
     t.forEachChild(node, collect);

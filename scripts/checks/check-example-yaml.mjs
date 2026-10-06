@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
-import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
+import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs'; import { containedPath } from '../lib/path-key.mjs';
 
 /**
  * The example tree is the readable statement of the layout, so it is checked with the runtime's own loader
@@ -38,7 +38,9 @@ export function checkExampleYaml(dir, {base = root} = {}) {
 
 if (isMain(import.meta.url)) {
   const target = process.argv[2] ?? 'examples';
-  const {files, refused} = checkExampleYaml(path.join(root, target));
+  let dir;
+  try { dir = containedPath(root, target, {label: 'directory'}); } catch (error) { console.log(`REFUSED ${error.message}`); process.exit(1); }
+  const {files, refused} = checkExampleYaml(dir);
   for (const item of refused) console.log(`REFUSED ${item.file}\n        ${item.reason}`);
   console.log(`${files.length} yaml file(s) under ${target}: ${refused.length ? `${refused.length} refused by the runtime loader` : 'all accepted'}`);
   process.exitCode = refused.length ? 1 : 0;

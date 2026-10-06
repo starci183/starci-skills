@@ -26,7 +26,7 @@ function fixture(t, options = {}) {
   for (const [file, bytes] of Object.entries(source)) write(path.join(root, file), bytes);
   const packed = Object.fromEntries(Object.entries(source).filter(([file]) => file !== options.omit).map(([file, bytes]) => [`package/${file}`, bytes]));
   if (options.identity) packed['package/package.json'] = JSON.stringify({ ...manifest, name: options.identity });
-  const archive = tgz(packed), expectedShasum = createHash('sha1').update(archive).digest('hex');
+  const archive = tgz(packed), expectedIntegrity = `sha512-${createHash('sha512').update(archive).digest('base64')}`;
   const files = tarFiles(archive), calls = [];
   const entries = [{ relative: '.agents/skills/starci/SKILL.md', source: 'skills/starci/SKILL.md' },
     { relative: '.agents/skills/starci/agents/openai.yaml', source: 'skills/starci/agents/openai.yaml' }];
@@ -99,18 +99,18 @@ function fixture(t, options = {}) {
     },
   };
   const run = extra => {
-    const result = proveRuntimePackage({ root, sourceSha: 'a'.repeat(40), expectedShasum, env: { ...process.env, NODE_PATH: 'ambient', NODE_OPTIONS: '--import ambient-preload', STARCI_LOCAL_ROOT: 'ambient-host', STARCI_MACHINE_DB: 'ambient-machine', STARCI_OWNER_ROOT: 'ambient-source', ORCA_TERMINAL_HANDLE: 'live' }, deps, ...extra });
+    const result = proveRuntimePackage({ root, sourceSha: 'a'.repeat(40), expectedIntegrity, env: { ...process.env, NODE_PATH: 'ambient', NODE_OPTIONS: '--import ambient-preload', STARCI_LOCAL_ROOT: 'ambient-host', STARCI_MACHINE_DB: 'ambient-machine', STARCI_OWNER_ROOT: 'ambient-source', ORCA_TERMINAL_HANDLE: 'live' }, deps, ...extra });
     if (result.attempt) t.after(() => fs.rmSync(result.attempt, { recursive: true, force: true }));
     return result;
   };
-  return { root, calls, expectedShasum, run };
+  return { root, calls, expectedIntegrity, run };
 }
 
 test('root archive proof uses real packed bytes and isolated owning dispatch, with immutable raw stage receipts', t => {
   const f = fixture(t), result = f.run();
   assert.equal(result.status, 'green', result.detail);
   assert.deepEqual(f.calls, ['pack', 'install', 'graph', 'dispatch', 'update', 'doctor']);
-  assert.equal(result.archive.shasum, f.expectedShasum);
+  assert.equal(result.archive.integrity, f.expectedIntegrity);
   assert.ok(result.projectedFiles.includes('skills/starci/references/host-startup.md')); assert.equal(result.discoveryFiles.length, 2);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(result.attempt, 'result.json'))), result);
   assert.equal(fs.readFileSync(path.join(result.attempt, 'install.stdout.txt'), 'utf8'), 'real API fixture install');
@@ -122,9 +122,9 @@ test('root proof requires exact public identity and frozen archive before instal
   const mismatch = fixture(t, { identity: 'other-runtime' });
   assert.equal(mismatch.run().status, 'red'); assert.deepEqual(mismatch.calls, ['pack']);
   const changed = fixture(t);
-  assert.equal(changed.run({ expectedShasum: '0'.repeat(40) }).status, 'red'); assert.deepEqual(changed.calls, ['pack']);
+  assert.equal(changed.run({ expectedIntegrity: 'sha512-' + 'A'.repeat(86) + '==' }).status, 'red'); assert.deepEqual(changed.calls, ['pack']);
   const missing = fixture(t);
-  assert.equal(missing.run({ expectedShasum: null }).status, 'unrun'); assert.deepEqual(missing.calls, []);
+  assert.equal(missing.run({ expectedIntegrity: null }).status, 'unrun'); assert.deepEqual(missing.calls, []);
 });
 
 test('root proof refuses omitted host prompts or UI inputs and unavailable tracked inventory', t => {

@@ -242,6 +242,30 @@ test('a throwing controller never stops the others; a broken module is skipped a
   assert.deepEqual(found.errors.map((x) => x.name).sort(), ['gc', 'host']);
 });
 
+test('a rejecting reconcile does not crash the loop: dispatch counts what it launched and records the crash', async (t) => {
+  const st = tempState();
+  t.after(() => st.close());
+  const logged = [];
+  const unhandled = [];
+  const onUnhandled = (reason) => unhandled.push(reason);
+  process.on('unhandledRejection', onUnhandled);
+  t.after(() => process.off('unhandledRejection', onUnhandled));
+  const job = { name: 'job', resyncMs: 60000, async list() { return ['job:x']; }, async reconcile() {} };
+  const e = new Engine({ env: st.env, numbers: NUMBERS, config: allShadow, ledgers: [], stateOptions: { file: st.file }, claimLock: noLock,
+    controllers: [{ name: 'job', module: job }], writeLog: (r) => logged.push(r), print: () => {} });
+  st.own(e);
+  await e.load();
+  assert.equal(e.acquire().ok, true);
+  await e.resyncDue();
+  e.reconcileOne = async () => { throw Error('escaped reconcileOne'); };
+  assert.equal(e.dispatch(), 1, 'dispatch returns the number of reconciles it launched');
+  await e.drain();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(unhandled, [], 'no unhandled rejection');
+  assert.equal(e.running.size, 0, 'the crashed reconcile left the running set');
+  assert.ok(logged.some((r) => r.kind === 'reconciler.error' && r.data.kind === 'reconciler.reconcile-failed' && /escaped reconcileOne/.test(r.data.detail)));
+});
+
 test('--once lists and reconciles every non-off controller once, in shadow unless --apply', async (t) => {
   const st = tempState();
   t.after(() => st.close());

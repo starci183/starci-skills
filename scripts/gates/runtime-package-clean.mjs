@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { byCodeUnit } from '../lib/list.mjs';
-import { createHash } from 'node:crypto';
+import { isSriSha512, sriSha512 } from '../lib/hash.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 import { SECRET_ENV_FILE } from '../../engine/secrets.mjs';
 import { LOCAL_ROOT_ENV, TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
@@ -63,7 +63,7 @@ export function unresolvedPackedImports(files) {
 }
 
 /** Real archive/install proof; seams replace only owned process APIs in focused fixtures. Scratch and receipts are retained. */
-export function proveRuntimePackage({ root, sourceSha, expectedShasum, env = process.env, deps = {} }) {
+export function proveRuntimePackage({ root, sourceSha, expectedIntegrity, env = process.env, deps = {} }) {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const result = { name: manifest.name, version: manifest.version, status: 'unrun', code: PROOF_CODES.unrun,
     schema: 'starci/runtime-package-clean@1', inputRoot: path.resolve(root), inputSha: sourceSha ?? null, stages: [] };
@@ -74,7 +74,7 @@ export function proveRuntimePackage({ root, sourceSha, expectedShasum, env = pro
     return result;
   };
   try {
-    if (manifest.name !== 'starci' || manifest.private || !/^[0-9a-f]{40}$/.test(String(sourceSha ?? '')) || typeof expectedShasum !== 'string' || !/^[0-9a-f]{40}$/.test(expectedShasum)) return finish('unrun', PROOF_CODES.unrun, 'public root identity, committed input SHA and an actual npm pack shasum are required');
+    if (manifest.name !== 'starci' || manifest.private || !/^[0-9a-f]{40}$/.test(String(sourceSha ?? '')) || !isSriSha512(expectedIntegrity)) return finish('unrun', PROOF_CODES.unrun, 'public root identity, committed input SHA and an actual npm pack integrity are required');
     attempt = fs.mkdtempSync(path.join(os.tmpdir(), 'release-runtime-'));
     result.attempt = attempt;
     for (let cursor = attempt; ; cursor = path.dirname(cursor)) {
@@ -106,9 +106,9 @@ export function proveRuntimePackage({ root, sourceSha, expectedShasum, env = pro
     const archive = path.join(archives, packed.file), archiveStat = fs.lstatSync(archive, { throwIfNoEntry: false });
     if (!archiveStat?.isFile() || isLinkLike(archive, { stat: archiveStat })) return finish('unrun', PROOF_CODES.unrun, 'pack did not produce a regular archive');
     const bytes = fs.readFileSync(archive), files = tarFiles(bytes);
-    const shasum = createHash('sha1').update(bytes).digest('hex');
-    result.archive = { file: archive, sha256: sha256(bytes), shasum, bytes: bytes.length, packedFiles: [...files.keys()].sort() };
-    if (shasum !== expectedShasum) return finish('red', PROOF_CODES.install, 'actual archive differs from the frozen publish pack');
+    const integrity = sriSha512(bytes);
+    result.archive = { file: archive, sha256: sha256(bytes), integrity, bytes: bytes.length, packedFiles: [...files.keys()].sort(byCodeUnit) };
+    if (integrity !== expectedIntegrity) return finish('red', PROOF_CODES.install, 'actual archive differs from the frozen publish pack');
     const identity = JSON.parse(files.get('package/package.json')?.toString() ?? '{}');
     if (identity.name !== manifest.name || identity.version !== manifest.version) return finish('red', PROOF_CODES.install, 'packed root package identity differs');
     // Consumer archives never carry local credentials or the releasing host's encrypted Sonar custody.

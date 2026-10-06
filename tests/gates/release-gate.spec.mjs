@@ -42,26 +42,26 @@ function tree(t, { versions = {} } = {}) {
   return root;
 }
 
-/** A fake registry: `published` maps name -> shasum; the local pack of every folder is `local`. */
+/** A fake registry: `published` maps name -> integrity; the local pack of every folder is `local`. */
 const runtimeBytes = tgz({'package/package.json': JSON.stringify({name: 'starci', version: '1.0.0-alpha.9'})});
-const runtimeShasum = createHash('sha1').update(runtimeBytes).digest('hex');
+const runtimeIntegrity = `sha512-${createHash('sha512').update(runtimeBytes).digest('base64')}`;
 const publicationSha = 'a'.repeat(40);
-function fakeRegistry({ published = {}, local = 'sha-local', runtimeLocal = runtimeShasum, unreachable = [], content = 'same', whoami = 'releaser', log = [] } = {}) {
+function fakeRegistry({ published = {}, local = 'sha-local', runtimeLocal = runtimeIntegrity, unreachable = [], content = 'same', whoami = 'releaser', log = [] } = {}) {
   return {
     log,
-    state: (name) => (unreachable.includes(name) ? { state: 'unreachable', detail: 'offline' } : name in published ? { state: 'present', shasum: published[name] } : { state: 'absent', latest: '-' }),
-    localShasum: (dir) => dir === '.' ? runtimeLocal : local,
+    state: (name) => (unreachable.includes(name) ? { state: 'unreachable', detail: 'offline' } : name in published ? { state: 'present', integrity: published[name] } : { state: 'absent', latest: '-' }),
+    localIntegrity: (dir) => dir === '.' ? runtimeLocal : local,
     contentClass: (name) => (typeof content === 'function' ? content(name) : content),
     whoami: () => whoami,
     publish: (dir) => { log.push(`publish ${dir}`); published[dir === '.' ? 'starci' : `@starci/${path.basename(dir)}`] = dir === '.' ? runtimeLocal : local; return { ok: true, status: 0, stderr: '' }; },
   };
 }
-const allPublished = (extra = {}) => fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local', starci: runtimeShasum }, ...extra });
+const allPublished = (extra = {}) => fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local', starci: runtimeIntegrity }, ...extra });
 
 function rootColdProof(root) {
   const file = path.join(root, 'proved-runtime.tgz'); fs.writeFileSync(file, runtimeBytes);
   return {status: 'green', name: 'starci', version: '1.0.0-alpha.9', inputRoot: root, inputSha: publicationSha,
-    archive: {file, bytes: runtimeBytes.length, shasum: runtimeShasum, sha256: createHash('sha256').update(runtimeBytes).digest('hex')}};
+    archive: {file, bytes: runtimeBytes.length, integrity: runtimeIntegrity, sha256: createHash('sha256').update(runtimeBytes).digest('hex')}};
 }
 
 test('tarFiles reads the regular files of an npm tarball and refuses a truncated one', () => {
@@ -192,7 +192,7 @@ test('release-check goes RED on a skipped app install, a failing spec, a pending
   assert.equal(verdict({ node: fakeNode({ fail: ['specs'] }) })[0], 'RED');
   assert.equal(verdict({ node: fakeNode({ fail: ['package-clean'] }) })[0], 'RED');
   assert.equal(verdict({ node: fakeNode({ fail: ['canon-pins'] }) })[0], 'RED');
-  const [pending, pendingRows] = verdict({ registry: fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', starci: runtimeShasum } }) });
+  const [pending, pendingRows] = verdict({ registry: fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', starci: runtimeIntegrity } }) });
   assert.equal(pending, 'RED');
   assert.match(pendingRows.find((r) => r.id === 'publish-plan').detail, /1 package\(s\) still to publish: @starci\/canon@2\.0\.0/);
   assert.equal(verdict({ git: { status: () => ({ ok: true, stdout: ' M a.mjs', stderr: '' }) } })[0], 'RED');
@@ -262,8 +262,8 @@ test('final publish-plan includes root availability and refuses inconclusive or 
     assert.match(changed.blockers.join('\n'), /runtime bytes differ or cannot be proved/);
   }
   assert.match(buildPlan({ root, registry: allPublished({ runtimeLocal: null }) }).blockers.join('\n'), /runtime pack could not be listed/);
-  const noShasum = allPublished({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local', starci: null } });
-  assert.match(buildPlan({ root, registry: noShasum }).blockers.join('\n'), /no immutable runtime shasum/);
+  const noIntegrity = allPublished({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local', starci: null } });
+  assert.match(buildPlan({ root, registry: noIntegrity }).blockers.join('\n'), /no immutable runtime integrity/);
 });
 
 test('runtime phase waits for package publication and publishes only the root after its own cold proof', (t) => {
@@ -271,7 +271,7 @@ test('runtime phase waits for package publication and publishes only the root af
   const git = { dirty: () => ({ ok: true, stdout: '' }), branch: () => ({ stdout: 'main' }), head: () => ({ ok: true, stdout: publicationSha }) };
   const registry = fakeRegistry({ published: { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local' }, log: calls });
   const deps = { registry, git, out: line => lines.push(line), node: fakeNode({ log: calls }),
-    runtimeProof: options => { assert.equal(options.root, root); assert.equal(options.sourceSha, publicationSha); assert.equal(options.expectedShasum, runtimeShasum); calls.push('root cold proof'); return rootColdProof(root); } };
+    runtimeProof: options => { assert.equal(options.root, root); assert.equal(options.sourceSha, publicationSha); assert.equal(options.expectedIntegrity, runtimeIntegrity); calls.push('root cold proof'); return rootColdProof(root); } };
   assert.equal(releasePublish({ root, runtimePackage: true, deps: { ...deps, registry: fakeRegistry() } }), EXIT.blocked);
   assert.deepEqual(calls, [], 'upstream blockers cause no proof or publication');
   assert.equal(releasePublish({ root, runtimePackage: true, publish: true, npmUser: 'releaser', deps }), EXIT.done, lines.join('\n'));
@@ -300,12 +300,12 @@ test('runtime publication rechecks HEAD, archive and registry after the cold pro
     let after = false;
     const calls = [], published = { '@starci/leaf-a': 'sha-local', '@starci/leaf-b': 'sha-local', '@starci/canon': 'sha-local' };
     const registry = fakeRegistry({ published, log: calls });
-    const originalLocal = registry.localShasum;
-    registry.localShasum = dir => after && drift === 'archive' && dir === '.' ? '2'.repeat(40) : originalLocal(dir);
+    const originalLocal = registry.localIntegrity;
+    registry.localIntegrity = dir => after && drift === 'archive' && dir === '.' ? '2'.repeat(40) : originalLocal(dir);
     const git = { dirty: () => ({ ok: true, stdout: after && drift === 'dirty' ? ' M skills/starci/SKILL.md' : '' }),
       branch: () => ({ stdout: 'main' }), head: () => ({ stdout: after && drift === 'head' ? 'other' : publicationSha }) };
     const code = releasePublish({ root, runtimePackage: true, publish: true, npmUser: 'releaser', deps: { registry, git, out: () => {}, node: fakeNode(),
-      runtimeProof: () => { after = true; if (drift === 'registry') published.starci = runtimeShasum; return rootColdProof(root); } } });
+      runtimeProof: () => { after = true; if (drift === 'registry') published.starci = runtimeIntegrity; return rootColdProof(root); } } });
     assert.equal(code, EXIT.failed, drift);
     assert.deepEqual(calls, [], `${drift} refuses an immutable publication`);
   }

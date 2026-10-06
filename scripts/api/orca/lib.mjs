@@ -14,7 +14,7 @@ import { listingOf, missingFrom } from '../../lib/orca-listing.mjs';
 import { readEnv } from '../../lib/env.mjs';
 import { dotGet } from '../../lib/dot-path.mjs';
 import { orcaRequestIdOf, requestValuePresent as filled } from '../../lib/orca-request-id.mjs';
-export { ORCA_REQUEST_NAMESPACE, uuidv5, orcaRequestIdOf } from '../../lib/orca-request-id.mjs';
+export { ORCA_REQUEST_NAMESPACE, uuidv8, orcaRequestIdOf } from '../../lib/orca-request-id.mjs';
 
 const CALLS = readModuleJson('modules', 'host', 'orca', 'calls.yaml');
 

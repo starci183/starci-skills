@@ -83,7 +83,7 @@ test('installGitHooks writes both hooks executable into the git common dir, rewr
   assert.equal(path.resolve(hooksDir), path.resolve(repo, '.git', 'hooks'));
   for (const name of HOOK_NAMES) {
     assert.equal(fs.readFileSync(path.join(hooksDir, name), 'utf8'), rendered[name], name);
-    if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(hooksDir, name)).mode & 0o111, 0o111, `${name} is executable`);
+    if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(hooksDir, name)).mode & 0o700, 0o700, `${name} is owner-executable (0o700)`);
   }
   assert.deepEqual(installGitHooks({ root: repo }).hooks.map((h) => h.state), ['current', 'current']);
   fs.writeFileSync(path.join(hooksDir, 'pre-push'), `#!/bin/sh\n# ${GIT_HOOKS_MARKER} old\nexit 0\n`);
@@ -136,7 +136,7 @@ test('installGitHooks takes an injected fs and an explicit hooks dir', () => {
   const result = installGitHooks({ root: ROOT, hooksDir: path.join('virtual', 'hooks'), fs: fake });
   assert.deepEqual(result.hooks.map((h) => h.state), ['installed', 'installed']);
   assert.equal(written.filter((w) => w.renamed).length, 2);
-  assert.ok(written.filter((w) => w.body).every((w) => w.opts.mode === 0o755));
+  assert.ok(written.filter((w) => w.body).every((w) => w.opts.mode === 0o700));
 });
 
 test('the push gate allows refs/backup/* and an empty push with no release', (t) => {

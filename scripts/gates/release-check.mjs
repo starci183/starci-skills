@@ -6,7 +6,7 @@
 //   starci release check [--final] [--only <id>,<id>] [--json]
 //
 // Proofs, in order (id: what it proves; the checklist row it replaces):
-//   publish-plan   B1  every published package is at its pin and matches the registry (shasum, or content); nothing is left to publish
+//   publish-plan   B1  every published package is at its pin and matches the registry (integrity, or content); nothing is left to publish
 //   canon-pins     B2  scripts/checks/check-canon-pins.mjs: every pin valid, every code-pattern profile bound to its published canon
 //   app-installs   B3  scripts/gates/release-app-installs.mjs: the published hfs scaffolds an app that installs fresh and runs, none skipped
 //   package-clean  B4  scripts/gates/package-clean-test.mjs: every published package passes its own tests from a clean install

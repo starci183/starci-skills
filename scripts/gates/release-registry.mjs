@@ -1,5 +1,5 @@
 // release-registry.mjs - the npm edge of the release gate: the one object release-plan.mjs and release-publish.mjs talk to.
-// {state(name, version), localShasum(dir), contentClass(name, version, dir), whoami(), publish(dir, options)}. Specs pass a fake with the
+// {state(name, version), localIntegrity(dir), contentClass(name, version, dir), whoami(), publish(dir, options)}. Specs pass a fake with the
 // same five functions, so the gate is judged without a network. Reads never write; `publish` is called only by
 // release-publish.mjs when --publish was given.
 import fs from 'node:fs';
@@ -44,10 +44,10 @@ export function npmRegistry({ root, pack: packArchive = pack }) {
   const abs = (dir) => path.resolve(root, dir);
   return {
     state: (name, version) => view(name, version),
-    /** The shasum `npm pack` would publish from the folder (no lifecycle script runs), null when it cannot be listed. */
-    localShasum(dir) {
+    /** The integrity (sha512 SRI) `npm pack` would publish from the folder (no lifecycle script runs), null when it cannot be listed. */
+    localIntegrity(dir) {
       const r = packDryRun(abs(dir));
-      try { return JSON.parse(String(r.stdout).slice(String(r.stdout).indexOf('[')))[0]?.shasum ?? null; } catch { return null; }
+      try { return JSON.parse(String(r.stdout).slice(String(r.stdout).indexOf('[')))[0]?.integrity ?? null; } catch { return null; }
     },
     /** `same | crlf | dist <n> | drift <n>: ... | unknown <why>`: the registry tarball against the folder's own pack. */
     contentClass(name, version, dir) {

@@ -29,7 +29,6 @@
 //   starci machine worktrees resume                   clear the stop a main-checkout violation set (after inspecting it)
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import {
@@ -111,7 +110,7 @@ function ledgerLookup(env) {
   return jobStatus;
 }
 
-const hashOf = (p) => shortHash(treeKey(p), { algo: 'sha1' });
+const hashOf = (p) => shortHash(treeKey(p));
 const ageOf = (p, now) => { try { return now - fs.statSync(p).mtimeMs; } catch { return Infinity; } };
 const supLookup = (jobId, env) => { try { return withRegistry((m) => m.supJob(jobId)?.status ?? null, env); } catch { return null; } };
 
@@ -312,7 +311,7 @@ function collectOrcaOrphans({ ps, items, halt, lookup, phaseOf, supOf, now, appl
       continue;
     }
     const r = removeOrcaWorktree({ repoRoot, orcaId: w.id, dir, branch: w.branch, deleteBranch: w.branch ? 'force' : null,
-      preserve: { name: orphanPreserveName({ slot: stamp.slot, orcaId: w.id, digest: (x) => crypto.createHash('sha1').update(x).digest('hex') }) }, env, git, orca });
+      preserve: { name: orphanPreserveName({ slot: stamp.slot, orcaId: w.id, digest: shortHash }) }, env, git, orca });
     orphanIncident({ level: r.ok ? 'warn' : 'error', msg: `orphaned Orca tree ${w.id} (${w.comment}), owner ${v.owner}: ${r.ok ? 'preserved and removed' : `removal failed: ${r.reason}`}`,
       owner, data: { orcaId: w.id, path: dir, stamp: w.comment, preserved: r.preserved?.ref ?? null, error: r.ok ? null : r.reason }, env });
     items.push({ ...base, reason: 'orca-orphan', action: 'remove', ok: r.ok, preserved: r.preserved?.ref ?? null, ...(r.ok ? {} : { error: r.reason }), ...(r.fatal ? { fatal: true, damage: r.damage } : {}) });

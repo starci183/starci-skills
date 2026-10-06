@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
-import {uuidv5,orcaRequestIdOf,requestStateFrom} from '../../scripts/api/orca/lib.mjs';
+import {uuidv8,orcaRequestIdOf,requestStateFrom} from '../../scripts/api/orca/lib.mjs';
 
 // scripts/api/orca/lib.mjs is the whole host boundary: argv comes from
 // modules/host/orca/calls.yaml and, before each new mutation, the verb about
@@ -60,7 +61,7 @@ test('argv is assembled from calls.yaml — declared flags only, in contract ord
   const start=logged(fx).find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
   assert.ok(start,'worker-start never reached the binary');
   const id=start[start.indexOf('--retry-request')+1];
-  assert.match(id,/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.match(id,/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.deepEqual(start,['orchestration','worker-start','--spec','do x','--task-title','x #1','--worktree','wt','--agent','codex',
     '--model','gpt-6.1-sol','--display-name','[Op] x','--run','run-1','--from','kernel-1','--retry-request',id,'--json'],
     'argv order and content are calls.yaml flags order plus defaults.jsonFlag');
@@ -210,7 +211,7 @@ test('the first issue already carries --retry-request, derived from the ledger i
     c('run-create',{objective:'o',from:'k'},{request:{replaces:null,kernel:'k',workflow:'wf-1'}}),
     c('run-create',{objective:'o',from:'k'},{request:{workflow:'wf-2',kernel:'k',replaces:null}})]`);
   const ids=argvOf(fx,'orchestration run-create').map(argv=>flagOf(argv,'--retry-request'));
-  assert.match(ids[0],/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.match(ids[0],/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(ids[1],ids[0],'the id ignores key order: the same identity is the same request after a restart');
   assert.notEqual(ids[2],ids[0],'another workflow is another request');
   assert.deepEqual(out.map(o=>[o.outcome,o.result.run.id,o.request.replayed]),[['ok','run-fake-1',false],['ok','run-fake-1',true],['ok','run-fake-2',false]],
@@ -301,14 +302,16 @@ test('every calls.yaml mutation declares a replay mode the runner enforces',asyn
 });
 
 // Orca 1.4.209 refuses every --retry-request that is not a UUID (invalid_argument); the fake refuses it the same way.
-test('uuidv5 matches the RFC 9562 vector (DNS namespace, www.example.com)',()=>{
-  assert.equal(uuidv5('6ba7b810-9dad-11d1-80b4-00c04fd430c8','www.example.com'),'2ed6657d-e927-568b-95e1-2665a8aea6a2');
+test('uuidv8 is the RFC 9562 custom UUID over SHA-256 of the namespace bytes then the name (version 8, variant 10)',()=>{
+  const ns='6ba7b810-9dad-11d1-80b4-00c04fd430c8',d=crypto.createHash('sha256').update(Buffer.from(ns.replace(/-/g,''),'hex')).update('www.example.com').digest().subarray(0,16);
+  d[6]=(d[6]&0x0f)|0x80;d[8]=(d[8]&0x3f)|0x80;const h=d.toString('hex');
+  assert.equal(uuidv8(ns,'www.example.com'),`${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`);
 });
 
-test('the request id is a deterministic UUIDv5: same inputs the same id, another verb, identity or attempt another id',()=>{
+test('the request id is a deterministic UUIDv8: same inputs the same id, another verb, identity or attempt another id',()=>{
   const ids=[orcaRequestIdOf('run-create',{a:1,b:2}),orcaRequestIdOf('run-create',{b:2,a:1}),orcaRequestIdOf('run-use',{a:1,b:2}),
     orcaRequestIdOf('run-create',{a:1,b:3}),orcaRequestIdOf('run-create',{a:1,b:2,attempt:2})];
-  for(const id of ids) assert.match(id,/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  for(const id of ids) assert.match(id,/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(ids[1],ids[0]);
   assert.equal(new Set(ids.filter((_,i)=>i!==1)).size,4);
 });

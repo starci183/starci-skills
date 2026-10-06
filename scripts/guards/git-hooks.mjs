@@ -90,9 +90,9 @@ export function installGitHooks({ root = skillRoot, hooksDir, templateRoot = ski
     if (current !== null && !owned) { hooks.push({ name, path: file, state: 'foreign' }); continue; }
     if (current === body) { hooks.push({ name, path: file, state: 'current' }); continue; }
     const tmp = `${file}.${process.pid}.tmp`;
-    fsApi.writeFileSync(tmp, body, { mode: 0o755 });
+    fsApi.writeFileSync(tmp, body, { mode: 0o700 });
     fsApi.renameSync(tmp, file);
-    try { fsApi.chmodSync(file, 0o755); } catch { /* windows has no mode bits */ }
+    try { fsApi.chmodSync(file, 0o700); } catch { /* windows has no mode bits */ }
     hooks.push({ name, path: file, state: exists ? 'updated' : 'installed' });
   }
   return { ok: true, hooksDir: dir, hooks };

@@ -1,4 +1,10 @@
-// escape.mjs — the HTML entity escape for text embedded in markup (Telegram HTML, report blocks).
+// escape.mjs — the escapes for text embedded in another syntax: HTML entities for markup (Telegram HTML, report blocks), one-line JSON for logs.
 
 /** `s` with &, < and > entity-escaped. */
 export const escapeHtml = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** `value` as JSON on ONE log line: CR, LF, every other C0 control character and U+2028/2029 written as \uXXXX (JSON.stringify already does so for C0 inside strings, so well-formed data prints byte-identically). */
+export const logLine = (value) => Array.from(String(JSON.stringify(value)), (c) => {
+  const n = c.charCodeAt(0);
+  return n < 0x20 || n === 0x2028 || n === 0x2029 ? `\\u${n.toString(16).padStart(4, '0')}` : c;
+}).join('');

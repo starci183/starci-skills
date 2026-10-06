@@ -3,11 +3,10 @@
 // envelope. `starci kernel report` prints this block after filing so the op terminal
 // shows the reports row's projection — the row is the truth, this is its view.
 //
-// Internal entry: spawned by scripts/kernel/verbs/report.mjs; not invoked directly.
-// Args: <report.json>.
+// The block passes through redactText: a report's summary, open items and blocker detail are agent-written text, and a
+// secret in them never reaches the terminal. A library of scripts/kernel/verbs/report.mjs; it has no command line.
 
-import fs from 'node:fs';
-import { isMain } from '../lib/is-main.mjs';
+import { redactText } from '../lib/redact.mjs';
 
 const checkToken = (c) =>
   `${c?.name ?? '?'} ${Number(c?.exitCode) === 0 ? 'ok' : `fail(${c?.exitCode ?? '?'})`}`;
@@ -23,11 +22,5 @@ export function renderReportBlock(report = {}) {
   if (Array.isArray(report.open) && report.open.length) lines.push(`open    : ${report.open.join('; ')}`);
   if (report.blocker) lines.push(`blocker : ${report.blocker.kind ?? '-'} — ${report.blocker.detail ?? ''}`);
   if (report.question?.text) lines.push(`question: ${report.question.text}`);
-  return lines.join('\n');
-}
-
-if (isMain(import.meta.url)) {
-  const file = process.argv[2];
-  if (!file) { console.error('args: <report.json>'); process.exit(2); }
-  console.log(renderReportBlock(JSON.parse(fs.readFileSync(file, 'utf8'))));
+  return redactText(lines.join('\n'));
 }
