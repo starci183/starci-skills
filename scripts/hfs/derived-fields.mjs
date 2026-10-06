@@ -69,7 +69,8 @@ export function derivePatternVerification(text, index, kinds = []) {
       if (owner === null) unowned.push({ rule: ruleId, item: unquote(item) });
       else if (!rules.includes(owner) && !added.includes(owner)) added.push(owner);
     }
-    const complete = [...rules, ...added.sort((a, b) => RULE_NUMBER(a) - RULE_NUMBER(b))];
+    added.sort((a, b) => RULE_NUMBER(a) - RULE_NUMBER(b));
+    const complete = [...rules, ...added];
     const derived = [...new Set(complete.flatMap((id) => index.codesOf.get(id) ?? []))];
     lines[rulesAt] = `    hfsRules: [${complete.join(', ')}]`;
     lines.splice(autoAt, end - autoAt, ...(derived.length ? ['      automated:', ...derived.map((code) => `        - ${code}`)] : ['      automated: []']));

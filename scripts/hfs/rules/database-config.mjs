@@ -38,7 +38,7 @@ const tomlLine = (text, key) => {
 export async function parseToml(text) {
   try {
     const module = await import('smol-toml');
-    return (module.default?.parse ?? module.parse)(text);
+    return module.parse(text);
   } catch {
     return null;
   }
@@ -51,7 +51,8 @@ export function configFindings({ file, text, toml, supabase }) {
     if (!isCredentialKey(key)) continue;
     const line = tomlLine(text, key);
     if (typeof value !== 'string' || !ENV_REF.test(value)) {
-      findings.push(found(DB_CONFIG_POLICY, file, `${file}${line ? `:${line}` : ''} ${at} holds a literal credential; a secret in config.toml is written env(NAME), never a value`, { ...(line ? { line } : {}), key: at }));
+      const lineNote = line ? `:${line}` : '';
+      findings.push(found(DB_CONFIG_POLICY, file, `${file}${lineNote} ${at} holds a literal credential; a secret in config.toml is written env(NAME), never a value`, { ...(line ? { line } : {}), key: at }));
     }
   }
   const auth = toml?.auth ?? {};

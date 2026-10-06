@@ -44,7 +44,10 @@ export function depFindings({ repoRoot, files }) {
   for (const [name, pin] of Object.entries(overrides && typeof overrides === 'object' ? overrides : {})) {
     if (typeof pin !== 'string' || pin.startsWith('$') || !specs.has(name)) continue;
     const off = [...specs.get(name)].filter(([spec]) => spec !== pin);
-    if (off.length) findings.push(found(DEP_VERSION_SKEW, off[0][1][0], `${name} is pinned to ${pin} by the root overrides but declared at ${off.map(([spec, where]) => `${spec} (${where.join(', ')})`).join('; ')}; declare the pinned version`, { dependency: name, versions: off.map(([spec]) => spec), pinned: pin }));
+    if (off.length) {
+      const declarations = off.map(([spec, where]) => `${spec} (${where.join(', ')})`).join('; ');
+      findings.push(found(DEP_VERSION_SKEW, off[0][1][0], `${name} is pinned to ${pin} by the root overrides but declared at ${declarations}; declare the pinned version`, { dependency: name, versions: off.map(([spec]) => spec), pinned: pin }));
+    }
   }
   const lock = files.includes('package-lock.json') ? readJson(repoRoot, 'package-lock.json') : null;
   if (lock?.packages) {
@@ -58,7 +61,9 @@ export function depFindings({ repoRoot, files }) {
       const nested = NESTED.exec(key);
       if (!nested || entry.link || entry.inBundle || HOISTED.test(key) || !declared.has(nested[1])) continue;
       const name = nested[1];
-      findings.push(found(DEP_VERSION_SKEW, 'package-lock.json', `${key} is a nested copy of ${name}${entry.version ? ` ${entry.version}` : ''}${hoisted.has(name) ? ` next to the hoisted ${hoisted.get(name)}` : ''}; the workspace keeps one copy (align the ranges or add a root override)`, { dependency: name, lockPath: key, version: entry.version }));
+      const versionNote = entry.version ? ` ${entry.version}` : '';
+      const hoistedNote = hoisted.has(name) ? ` next to the hoisted ${hoisted.get(name)}` : '';
+      findings.push(found(DEP_VERSION_SKEW, 'package-lock.json', `${key} is a nested copy of ${name}${versionNote}${hoistedNote}; the workspace keeps one copy (align the ranges or add a root override)`, { dependency: name, lockPath: key, version: entry.version }));
     }
   }
   return findings;

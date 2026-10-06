@@ -21,7 +21,7 @@ function unwrappedReturning(text) {
   let depth = 0;
   let verb = null;
   let returning = false;
-  const close = () => { if (verb && returning) found.push(verb); verb = null; returning = false; };
+  const close = () => { if (verb && returning) { found.push(verb); } verb = null; returning = false; };
   for (const token of tokenizeSql(text)) {
     if (token.t === 'punct') {
       if (token.v === '(') depth += 1;

@@ -69,7 +69,7 @@ function servicePlacementFindings({ files }) {
 /** The image reference with `${VAR:-default}` resolved to its default, or null when it cannot be (a bare `${VAR}`). */
 function resolvedImage(image) {
   let unresolved = false;
-  const resolved = image.replace(/\$\{[^}:]+(?::-([^}]*))?\}/g, (_all, fallback) => { if (fallback === undefined) unresolved = true; return fallback ?? ''; });
+  const resolved = image.replace(/\$\{[^}:]+(?::-([^}]*))?\}/g, (_all, fallback) => { if (fallback === undefined) { unresolved = true; } return fallback ?? ''; });
   return unresolved ? null : resolved;
 }
 

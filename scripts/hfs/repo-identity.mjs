@@ -34,8 +34,8 @@ export function repositoryName(root) {
   if (home) return path.basename(home);
   if (repositoryRoot) {
     try {
-      const remote = git(gitRemote, root, ['get-url', 'origin']).replace(/[\/]+$/u, '').replace(/\.git$/iu, '');
-      const name = remote.split(/[\/:]/u).pop();
+      const remote = git(gitRemote, root, ['get-url', 'origin']).replace(/\/+$/u, '').replace(/\.git$/iu, '');
+      const name = remote.split(/[/:]/u).pop();
       if (name) return name;
     } catch { /* No origin remote. */ }
   }

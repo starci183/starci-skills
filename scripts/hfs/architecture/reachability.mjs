@@ -149,7 +149,7 @@ function hrefResolves(href, routes) {
 /** The text of a string-ish expression with PLACEHOLDER for each ${...}; null when it is not a literal we can read. */
 function literalText(ts, node) {
   if (!node) return null;
-  while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || (ts.isNonNullExpression && ts.isNonNullExpression(node))) node = node.expression;
+  while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isNonNullExpression?.(node)) node = node.expression;
   if (ts.isStringLiteralLike(node)) return node.text;                 // includes NoSubstitutionTemplateLiteral
   if (ts.isTemplateExpression(node)) return node.head.text + node.templateSpans.map(span => PLACEHOLDER + span.literal.text).join('');
   return null;
@@ -167,9 +167,11 @@ function hrefTargets(ts, sourceFile) {
       found.push({ node: value ?? node, text: value ? literalText(ts, value) : null });
     } else if (ts.isCallExpression(node) && node.arguments.length) {
       const callee = node.expression;
+      let routerName = '';
+      if (ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression)) routerName = callee.expression.text;
+      else if (ts.isPropertyAccessExpression(callee) && ts.isPropertyAccessExpression(callee.expression)) routerName = callee.expression.name.text;
       const navigates = (ts.isIdentifier(callee) && NAVIGATION_CALLS.has(callee.text))
-        || (ts.isPropertyAccessExpression(callee) && ROUTER_METHODS.has(callee.name.text)
-          && /router$/i.test(ts.isIdentifier(callee.expression) ? callee.expression.text : ts.isPropertyAccessExpression(callee.expression) ? callee.expression.name.text : ''));
+        || (ts.isPropertyAccessExpression(callee) && ROUTER_METHODS.has(callee.name.text) && /router$/i.test(routerName));
       if (navigates) found.push({ node: node.arguments[0], text: literalText(ts, node.arguments[0]) });
     }
     ts.forEachChild(node, visit);

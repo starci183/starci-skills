@@ -326,7 +326,8 @@ export async function sqlAnalysis({ file, text, exposed, forceRls }) {
   } catch (error) {
     const position = error?.sqlDetails?.cursorPosition;
     const line = position ? lineAt(position - 1) : undefined;
-    return { findings: [found(DB_MIGRATION_SHAPE, file, `${file}${line ? `:${line}` : ''} is not valid PostgreSQL (${String(error?.message ?? error).split('\n')[0]})`, { ...(line ? { line } : {}) })], facts: null };
+    const lineNote = line ? `:${line}` : '';
+    return { findings: [found(DB_MIGRATION_SHAPE, file, `${file}${lineNote} is not valid PostgreSQL (${String(error?.message ?? error).split('\n')[0]})`, { ...(line ? { line } : {}) })], facts: null };
   }
   const facts = factsOf(statementList(parsed.stmts, lineAt));
   return { facts, findings: [

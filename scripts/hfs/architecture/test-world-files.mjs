@@ -189,9 +189,14 @@ export function checkTestWorldFiles(input) {
     if (!service) continue;
     if (declared.some(entry => entry.service === service.name && entry.fake === fake.name)) continue; // judged on its stacks entry above
     const why = statefulWhy(service);
+    let reason = `${service.name} is stateful (${why}), so no exception applies. `;
+    if (!why) {
+      const worldConfig = configPath ?? `${CONFIG_FILE} in the world`;
+      reason = `Only stateless compute that needs special hardware or an external model may be faked, and only when ${worldConfig} declares it in its stacks entry ({ fakedBy, reason }). `;
+    }
     violations.push({
       ruleId: RULE, path: fake.path, line: fake.line, column: fake.column, slot: WORLD_SLOT,
-      message: `${fake.what} fakes ${service.name} (${service.image}), which ${stackHint} declares: a service of the repository's own stack runs real in the test world. ${why ? `${service.name} is stateful (${why}), so no exception applies. ` : `Only stateless compute that needs special hardware or an external model may be faked, and only when ${configPath ?? `${CONFIG_FILE} in the world`} declares it in its stacks entry ({ fakedBy, reason }). `}Delete the fake and let the world run the real service; fakes are otherwise only for external SaaS the team does not operate.`,
+      message: `${fake.what} fakes ${service.name} (${service.image}), which ${stackHint} declares: a service of the repository's own stack runs real in the test world. ${reason}Delete the fake and let the world run the real service; fakes are otherwise only for external SaaS the team does not operate.`,
     });
   }
   return { violations, coverage: { status: 'checked', files } };

@@ -165,8 +165,9 @@ export function checkRequiredFiles({ config, graph }) {
       continue;
     }
     const kind = requirement.target.endsWith('/') ? 'directory' : 'file';
+    const rootNote = requirement.root ? ` (${requirement.root})` : '';
     report(ruleFor(requirement.slot, requirement.target, true), strip(requirement.target), requirement.slot, requirement.root, { kind },
-      `Required ${kind} ${strip(requirement.target)} is missing; slot ${requirement.slot} requires it in every instance${requirement.root ? ` (${requirement.root})` : ''}.`);
+      `Required ${kind} ${strip(requirement.target)} is missing; slot ${requirement.slot} requires it in every instance${rootNote}.`);
   }
 
   // 3. Minimums: at least minInstances instances of a required slot.
@@ -176,8 +177,9 @@ export function checkRequiredFiles({ config, graph }) {
       ? resolver.repo.apps.filter(app => app.kind === minimum.appKind).length
       : (found.get(minimum.slot)?.size ?? 0);
     if (count >= minimum.min) continue;
+    const appKindNote = minimum.appKind ? ' (an app of kind ' + minimum.appKind + ' declared in hfs.json)' : '';
     report('HFS_REQUIRED_FILE_MISSING', 'hfs.json', minimum.slot, '', { minimum: minimum.min, found: count },
-      `Slot ${minimum.slot} needs at least ${minimum.min} instance${minimum.min === 1 ? '' : 's'}${minimum.appKind ? ` (an app of kind ${minimum.appKind} declared in hfs.json)` : ''}; the repository has ${count}.`);
+      `Slot ${minimum.slot} needs at least ${minimum.min} instance${minimum.min === 1 ? '' : 's'}${appKindNote}; the repository has ${count}.`);
   }
 
   return { violations, coverage: { status: 'checked', instances: instances.size, requirements: requirements.size, missing: violations.length } };

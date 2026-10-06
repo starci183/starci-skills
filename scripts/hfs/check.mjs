@@ -261,7 +261,8 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
     if (missing.has(key) || present(p)) return;
     missing.add(key);
     const app = appOf(p);
-    findings.push({ code: 'HFS_SLOT_REQUIRED_MISSING', level: 'error', path: p, slot, via, ...(app ? { app } : {}), message: `${slot} requires ${p}${app ? ` (app ${app})` : ''}, which is not tracked` });
+    const appNote = app ? ` (app ${app})` : '';
+    findings.push({ code: 'HFS_SLOT_REQUIRED_MISSING', level: 'error', path: p, slot, via, ...(app ? { app } : {}), message: `${slot} requires ${p}${appNote}, which is not tracked` });
   };
   // The app's own required paths; each side reports its own (the resolver of the app lists them too, with their side).
   for (const entry of required.paths) if (!entry.side) missingFile(entry.slot, entry.path, entry.via);

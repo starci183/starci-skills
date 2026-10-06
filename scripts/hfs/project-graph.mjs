@@ -33,7 +33,10 @@ export function projectGraph({ repoRoot, runtimeRoot, injectedTypeScript }) {
   if (!cache.has(key)) {
     const opened = openHfs({ root: runtimeRoot, repoRoot: key });
     const report = checkArchitecture({ repositoryRoot: key, hfs: opened, injectedTypeScript, surface: 'lint' });
-    if (report.errors.length) throw new Error(`the project graph of ${key} cannot be built: ${report.errors.map((e) => `${e.ruleId}: ${e.message}`).join('; ')}`);
+    if (report.errors.length) {
+      const errors = report.errors.map((error) => `${error.ruleId}: ${error.message}`).join('; ');
+      throw new Error(`the project graph of ${key} cannot be built: ${errors}`);
+    }
     const listed = lsFiles(['-z', '--cached', '--exclude-standard'], { dir: key, maxBuffer: 256 * 1024 * 1024 });
     if (listed.error || listed.status !== 0) throw new Error(`the project graph of ${key} needs a Git work tree (git ls-files failed)`);
     const tracked = listed.stdout.split('\0').filter(Boolean).map(posixPath);

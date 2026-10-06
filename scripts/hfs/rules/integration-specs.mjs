@@ -179,9 +179,9 @@ function judgeSpec(ts, judge, rel, folder) {
     if (!chain || !worlds.has(chain[0])) return;
     const [, area, name, call] = chain;
     const called = ts.isCallExpression(node.parent) && node.parent.expression === node;
-    if (area === 'infra' && name !== undefined && INFRA_OUTAGES.has(call) && called) result.outage = true;
-    else if (area === 'interruptDatabase' && called) result.outage = true;
-    else if (OUTAGE_CALLS[area] !== undefined && name !== undefined && call === OUTAGE_CALLS[area] && called) result.outage = true;
+    if ((area === 'infra' && name !== undefined && INFRA_OUTAGES.has(call) && called)
+      || (area === 'interruptDatabase' && called)
+      || (OUTAGE_CALLS[area] !== undefined && name !== undefined && call === OUTAGE_CALLS[area] && called)) result.outage = true;
   });
   return result;
 }

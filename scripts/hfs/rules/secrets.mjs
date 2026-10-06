@@ -45,7 +45,8 @@ export function secretFindings({ repoRoot, files, resolver }) {
   for (const file of files) {
     const slot = resolver.classifyPath(file);
     if (slot.status === 'forbidden' && slotOwnsSecrets(resolver.slot(slot.slot))) {
-      findings.push(found(PLAINTEXT_SECRET, file, `${file} is a plaintext secret file tracked in ${slot.slot}${slot.goesTo ? `; it belongs at ${slot.goesTo}` : ''}`, { slot: slot.slot, goesTo: slot.goesTo }));
+      const destination = slot.goesTo ? `; it belongs at ${slot.goesTo}` : '';
+      findings.push(found(PLAINTEXT_SECRET, file, `${file} is a plaintext secret file tracked in ${slot.slot}${destination}`, { slot: slot.slot, goesTo: slot.goesTo }));
       continue;
     }
     findings.push(...secretFileFindings({ file, text: readText(repoRoot, file) }));

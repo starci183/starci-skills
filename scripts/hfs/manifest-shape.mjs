@@ -31,7 +31,7 @@ export function connectionShapeProblems(list, apps) {
   const keys = (c) => isPlainObject(c) && NAME.test(String(c.name)) && ENV_PREFIX.test(String(c.envPrefix)) && NAME.test(String(c.owner)) && CONTEXT_ISOLATIONS.includes(c.isolation)
     && (c.provider === undefined || CONNECTION_PROVIDERS.includes(c.provider))
     && Object.keys(c).every((k) => ['name', 'envPrefix', 'owner', 'isolation', 'provider'].includes(k)) && ['name', 'envPrefix', 'owner', 'isolation'].every((k) => k in c);
-  if (!list || !list.every(keys)) return [`connections must be a list of {name: kebab-case context name, envPrefix: UPPER_SNAKE prefix of its env keys, owner: the service app that owns the context, isolation: ${CONTEXT_ISOLATIONS.join(' | ')}, provider?: ${CONNECTION_PROVIDERS.join(' | ')}}`];
+  if (!list?.every(keys)) return [`connections must be a list of {name: kebab-case context name, envPrefix: UPPER_SNAKE prefix of its env keys, owner: the service app that owns the context, isolation: ${CONTEXT_ISOLATIONS.join(' | ')}, provider?: ${CONNECTION_PROVIDERS.join(' | ')}}`];
   const owns = (c) => Array.isArray(apps) && apps.some((app) => isPlainObject(app) && app.name === c.owner && CONTEXT_OWNER_KINDS.includes(app.kind));
   return list.filter((c) => !owns(c)).map((c) => `connections ${c.name} is owned by ${c.owner}, which is not a ${CONTEXT_OWNER_KINDS.join(' or ')} app declared in the same side`);
 }

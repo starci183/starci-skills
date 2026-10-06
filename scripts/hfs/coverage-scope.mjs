@@ -85,11 +85,15 @@ export function coverageScope(manifest, providers = []) {
     }
   }
   sonar.add('fe/**');
-  return { roles, roots, excludes, none: noneMinimal.sort(byCodeUnit), sonar: [...sonar].sort(byCodeUnit), codecovPaths: roots.map((root) => `be/${root}**`) };
+  noneMinimal.sort(byCodeUnit);
+  return { roles, roots, excludes, none: noneMinimal, sonar: [...sonar].sort(byCodeUnit), codecovPaths: roots.map((root) => `be/${root}**`) };
 }
 
 /** The glob a root measures: every file of a logic role below it (`src/modules/domain/*\/**\/*.{service,policy}.ts`). */
-export const rootGlob = (root, roles) => `${root}**/*.${roles.length === 1 ? roles[0] : `{${roles.join(',')}}`}.ts`;
+export const rootGlob = (root, roles) => {
+  const roleGlob = roles.length === 1 ? roles[0] : `{${roles.join(',')}}`;
+  return `${root}**/*.${roleGlob}.ts`;
+};
 
 /** The jest coverage options of the rendered be/jest.config.js: { roots, roles, excludes }. */
 export function jestCoverage(manifest, providers = []) {
@@ -147,9 +151,15 @@ export function coverageComponents(manifest, { files, read, apps, providers = []
       else platformPaths.push(`be/${base}${capability}/**`);
     }
   }
+  const components = services.filter((app) => ownedBy.get(app.name).length).map((app) => {
+    const paths = ownedBy.get(app.name);
+    paths.sort(byCodeUnit);
+    return { id: app.name, name: app.name, paths };
+  });
+  if (platformPaths.length) platformPaths.sort(byCodeUnit);
   return [
-    ...services.filter((app) => ownedBy.get(app.name).length).map((app) => ({ id: app.name, name: app.name, paths: ownedBy.get(app.name).sort(byCodeUnit) })),
-    ...(platformPaths.length ? [{ id: PLATFORM_COMPONENT, name: PLATFORM_COMPONENT, paths: platformPaths.sort(byCodeUnit) }] : []),
+    ...components,
+    ...(platformPaths.length ? [{ id: PLATFORM_COMPONENT, name: PLATFORM_COMPONENT, paths: platformPaths }] : []),
   ];
 }
 

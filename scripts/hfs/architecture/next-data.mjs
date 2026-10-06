@@ -372,8 +372,7 @@ function staticKeyExpression(ts, checker, expression, identities, seen = new Set
     && staticKeyExpression(ts, checker, expression.right, identities, seen, depth + 1);
   if (ts.isPrefixUnaryExpression(expression)) return staticKeyExpression(ts, checker, expression.operand, identities, seen, depth + 1);
   if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
-    if (identities.some(identity => expressionReferences(ts, checker, expression, identity))) return true;
-    return false;
+    return identities.some(identity => expressionReferences(ts, checker, expression, identity));
   }
   if (ts.isIdentifier(expression)) {
     if (expression.text === 'undefined' || identities.some(identity => identity.symbol === normalizedSymbol(ts, checker, expression))) return true;

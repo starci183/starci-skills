@@ -391,10 +391,11 @@ function checkFrontendAuthAndRoutes(input) {
             if (ts.isIdentifier(node) && sameSymbol(kit, checker, node, symbol)) references.push(node);
             return true;
           });
-          const firstUse = references.sort((a, b) => a.getStart() - b.getStart())[0];
+          references.sort((a, b) => a.getStart() - b.getStart());
+          const firstUse = references[0];
           if (firstUse && !parseUse(ts, firstUse)) reportAt(violations, kit, FE_WRITE_SHAPE, file, firstUse, `Server Action input ${parameter.text} is used before schema.parse(...) or schema.safeParse(...).`, { parameter: parameter.text });
         }
-        const sensitive = /(?:^|\/)(?:billing|payment|payout|refund|charge|subscription|password|credential|role|permission|membership)(?:\/|-|\.)/iu.test(file.rel);
+        const sensitive = /(?:^|\/)(?:billing|payment|payout|refund|charge|subscription|password|credential|role|permission|membership)[/.-]/iu.test(file.rel);
         if (sensitive && !contains(kit, action.body, node => ts.isCallExpression(node) && callName(ts, node) === 'getUser' && signatureFromSupabase(checker, node))) {
           reportAt(violations, kit, FE_SESSION_TRUST, file, action, 'A money, account-security or role-changing Server Action must call auth.getUser() before the mutation.');
         }

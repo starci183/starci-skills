@@ -31,7 +31,7 @@ export function peerIntegrationFindings({ repoRoot, files, pairs = peerIntegrati
   const pkg = readJson(repoRoot, MANIFEST);
   if (!pkg) return [];
   const runtime = pkg.dependencies ?? {};
-  const declared = { ...(pkg.devDependencies ?? {}), ...runtime };
+  const declared = { ...pkg.devDependencies, ...runtime };
   const findings = [];
   for (const pair of pairs) {
     const applies = pair.when.every((entry) => typeof declared[entry.package] === 'string' && (entry.major === undefined || majorOf(declared[entry.package]) === entry.major));

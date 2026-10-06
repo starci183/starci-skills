@@ -163,13 +163,14 @@ export function checkTiers(graph) {
     const hops = cycle.slice(0, -1).map((unit, i) => witness.get(`${unit}\0${cycle[i + 1]}`));
     const label = unit => unit.slice(unit.indexOf(':') + 1) || unit;
     const first = hops[0];
+    const connectedOwners = component.length > cycle.length - 1 ? ` (strongly connected with ${component.length} owners)` : '';
     violations.push({
       ruleId: 'ARCH_OWNER_CYCLE',
       path: first.from, line: first.line, column: first.column,
       cycle: cycle.map(label),
       cycleImports: hops.map(hop => ({ path: hop.from, line: hop.line, specifier: hop.specifier, typeOnly: !hop.runtime })),
       componentSize: component.length,
-      message: `Owner cycle: ${cycle.map(label).join(' -> ')}${component.length > cycle.length - 1 ? ` (strongly connected with ${component.length} owners)` : ''}; type-only imports count.`,
+      message: `Owner cycle: ${cycle.map(label).join(' -> ')}${connectedOwners}; type-only imports count.`,
     });
   }
   return {

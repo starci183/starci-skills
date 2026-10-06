@@ -78,7 +78,7 @@ function placementFindings({ repoRoot, app, tracked }) {
   const base = `apps/${app}`;
   const findings = [];
   if (!tracked.includes(`${base}/src/proxy.ts`)) findings.push(found(I18N_PLACEMENT, `${base}/src/proxy.ts`, `${app} has no src/proxy.ts; locale routing lives in proxy.ts`, { app }));
-  for (const file of tracked.filter((f) => new RegExp(`^${base}/src/middleware\.[cm]?[jt]s$`).test(f))) findings.push(found(I18N_PLACEMENT, file, `${file} is a middleware file; Next 16 routes through src/proxy.ts`, { app }));
+  for (const file of tracked.filter((f) => new RegExp(`^${base}/src/middleware.[cm]?[jt]s$`).test(f))) findings.push(found(I18N_PLACEMENT, file, `${file} is a middleware file; Next 16 routes through src/proxy.ts`, { app }));
   const appDir = `${base}/src/app/`;
   for (const file of tracked.filter((f) => f.startsWith(appDir) && ROUTE_FILE.test(f))) {
     const rel = file.slice(appDir.length);
