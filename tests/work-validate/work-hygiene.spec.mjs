@@ -88,7 +88,7 @@ test('the check refuses an unparseable Work YAML and a literal login and passwor
 test('a validation refusal counts only when it names a file the change touches', (t) => {
   const repo = repoOf(t);
   // a record another author left invalid, and a clean record beside it: touching the clean one is not blamed for the other
-  put(repo, `${FLOW}/fixtures.yaml`, 'schema: work/not-a-real-schema@9\nid: legacy\n');
+  put(repo, `${FLOW}/fixtures.yaml`, 'schema: work/not-a-real-schema@9\nid: stray\n');
   const touched = checkWorkFiles({ repo, files: [put(repo, `${FLOW}/accounts.yaml`, CLEAN_ACCOUNTS)] });
   assert.equal(touched.ok, true, JSON.stringify(touched.findings));
 });

@@ -229,7 +229,7 @@ export function computeDerived(workRoot) {
   const appliesToSources = new Map(); // targetId -> Set(sourceId) via the appliesTo edge kind
   for (const [targetId, byKind] of usedBy) if (byKind.has('appliesTo')) appliesToSources.set(targetId, byKind.get('appliesTo'));
   const workspaceDoc = readWorkspace(workRoot);
-  // Compact format: `P#frag` and collapsed bare `ac.*` ids resolve to the record carrying the criterion.
+  // Compact format: `P#frag` resolves to the record carrying the criterion.
   const inline = indexInlineCriteria(records);
   const canon = ref => resolveRecordRef(records, ref, inline) ?? ref;
 

@@ -728,7 +728,7 @@ test('v11 compact: `parent#frag` resolves an inlined criterion by short name, la
   assert.ok(malformed.some(p => p.includes('REF_MALFORMED')), malformed.join('\n'));
 });
 
-test('v11 compact: a bare collapsed ac id still resolves through the parent, but warns AC_UNREMAPPED_REF; the entry\'s own declaration never warns', () => {
+test('v11 compact: a bare inline ac id is a dangling ref (parent#ac-id is the form); the entry\'s own declaration is not a ref', () => {
   const workRoot = tree({
     'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.rule.works-when, name: works-when}\n',
     'features/f/br/other/index.yaml': 'schema: work/business-rule@1\nid: br.f.other\ntitle: t\nstate: todo\nrefs: [ac.f.rule.works-when]\n',
@@ -736,11 +736,8 @@ test('v11 compact: a bare collapsed ac id still resolves through the parent, but
   const problems = [];
   const warnings = [];
   checkWorkTree(workRoot, problems, warnings);
-  assert.equal(problems.length, 0, problems.join('\n'));
-  const remapped = warnings.filter(w => w.includes('AC_UNREMAPPED_REF'));
-  assert.equal(remapped.length, 1, warnings.join('\n')); // only br.f.other's ref warns
-  assert.ok(remapped[0].includes('br/other/index.yaml'), remapped[0]);
-  assert.ok(remapped[0].includes('br.f.rule#ac.f.rule.works-when'), remapped[0]);
+  assert.equal(problems.length, 1, problems.join('\n')); // only br.f.other's ref is dangling
+  assert.ok(problems[0].includes('br/other/index.yaml') && problems[0].includes('ac.f.rule.works-when'), problems[0]);
 });
 
 test('v11 compact: an inline criterion id must be the id its place implies, may not collide, and may not carry its own lifecycle', () => {
@@ -771,7 +768,7 @@ test('v11 compact: an inline criterion id must be the id its place implies, may 
   assert.ok(lifecycle.some(p => p.includes('AC_LIFECYCLE_INLINE')), lifecycle.join('\n'));
 });
 
-test('v11 compact: structured ref fields (blockedBy.record, closedBy, appliesTo) resolve `parent#frag` and collapsed ac ids to the carrying record', () => {
+test('v11 compact: structured ref fields (blockedBy.record, closedBy, appliesTo) resolve `parent#frag` to the carrying record', () => {
   // a blockedBy on one criterion of a record is a wait on that record - resolves, no dangling refusal
   const blocked = refusalsFor({
     'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.rule.works-when, name: works-when}\n',
@@ -779,12 +776,12 @@ test('v11 compact: structured ref fields (blockedBy.record, closedBy, appliesTo)
   });
   assert.equal(blocked.filter(p => p.includes('does not exist')).length, 0, blocked.join('\n'));
 
-  // closedBy naming a collapsed criterion's old id still finds the record that owns it
+  // closedBy naming a bare inline criterion id is dangling: the record owns it, the criterion is not a record
   const gapClosed = refusalsFor({
     'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: done\nacceptance:\n  - {id: ac.f.rule.works-when, name: works-when}\nverificationSource: authored-claim\nbecause: c\n',
     'features/f/gap/absence/index.yaml': 'schema: work/gap@1\nid: gap.f.absence\ntitle: t\nstate: done\nstatement: s\nclosedBy: ac.f.rule.works-when\nverificationSource: authored-claim\nbecause: closed\n',
   });
-  assert.equal(gapClosed.filter(p => p.includes('no record owns') || p.includes('closedBy')).length, 0, gapClosed.join('\n'));
+  assert.ok(gapClosed.some(p => p.includes('closedBy') || p.includes('no record owns')), gapClosed.join('\n'));
 });
 
 test('v11 compact: a kept-separate ac record still resolves as itself, and `parent#ac-id` reaches it through the parent', () => {
@@ -797,8 +794,7 @@ test('v11 compact: a kept-separate ac record still resolves as itself, and `pare
   const warnings = [];
   checkWorkTree(workRoot, problems, warnings);
   assert.equal(problems.length, 0, problems.join('\n'));
-  // the kept ac is still a live record, so the bare id is a normal ref - no remap warning
-  assert.equal(warnings.filter(w => w.includes('AC_UNREMAPPED_REF')).length, 0, warnings.join('\n'));
+  // the kept ac is a live record, so the bare id is a normal ref
 });
 
 test('scoped record validation resolves tree-level _resources refs via resolveRoot', () => {
@@ -830,7 +826,6 @@ test('a root import-cv-* folder is drift, not a known agent-data class', () => {
   checkStarciworkBoundary(workRoot, problems, warnings);
   assert.deepEqual(problems, [], 'drift never refuses');
   assert.ok(warnings.some(w => w.includes('import-cv-seam') && w.includes('[STARCIWORK_DRIFT]')), warnings.join('\n'));
-  assert.ok(!warnings.some(w => w.includes('legacy-import')), warnings.join('\n'));
 });
 
 // R07 HFS_AGENT_DATA_TRACKED: `starci runtime validate` on a .starciwork refuses known agent data and admits product records.

@@ -358,7 +358,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
   for (const collision of inline.collisions) {
     problems.push(`inline criterion ${collision.id} is declared under both ${collision.parents.join(' and ')} [AC_ID_COLLISION]`);
   }
-  // Structured fields below hold record references too: `P#frag` and collapsed bare `ac.*` ids resolve
+  // Structured fields below hold record references too: `P#frag` resolves
   // to the record that carries the criterion, so a blockedBy on one criterion of a record is a wait on
   // that record, and a dangling fragment surfaces through the same "does not exist / no record owns"
   // refusal a dangling plain id gets.
@@ -370,9 +370,8 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
   // ---- refs resolve (existing structural check, now also covers blockedBy/conflictsWith/appliesTo/subscribes/extends record ids) ----
   // Compact-format resolution: `P#frag` resolves when P is a record and frag names an inline criterion
   // P carries (full id, short name, or last id segment - or a live record id / kept-separate ac id under
-  // P). A bare `ac.*` id that no record owns but some record now carries inline still resolves - it is
-  // not dangling - but warns AC_UNREMAPPED_REF because `parent#ac-id` is the canonical form. The ref's
-  // own declaration trail (acceptance.id / statements.id inside the entry itself) never warns.
+  // P). A bare `ac.*` id that no record owns is dangling: `parent#ac-id` is the form. The ref's
+  // own declaration trail (acceptance.id / statements.id inside the entry itself) is the declaration, not a ref.
   const DECL_TRAIL = /^(?:acceptance|statements)\.(?:.+\.)?id$/;
   for (const ref of refs) {
     if (ref.malformedRef) {
@@ -391,12 +390,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       continue;
     }
     if (resolveMap.has(ref.id)) continue;
-    if (resolveInline.byAcId.has(ref.id)) {
-      if (!DECL_TRAIL.test(ref.trail)) {
-        warnings.push(`${ref.file}: ${ref.trail} references collapsed criterion ${ref.id} by its old ac id - the compact form is ${resolveInline.byAcId.get(ref.id)}#${ref.id} [AC_UNREMAPPED_REF]`);
-      }
-      continue;
-    }
+    if (resolveInline.byAcId.has(ref.id) && DECL_TRAIL.test(ref.trail)) continue;
     if (ref.trail === 'apps.nodes.layout.design' && plannedDesigns.has(`${ref.file}|${ref.id}`)) {
       warnings.push(`${ref.file}: ${ref.trail} names ${ref.id}, the surface-layout ui record interface.draw has not drawn yet - a planned pointer, resolved when interface.draw creates ${placeOfUiId(ref.id)} with surface: layout and route set to the layout node [DESIGN_PLANNED]`);
       continue;

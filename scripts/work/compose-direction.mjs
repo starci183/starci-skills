@@ -93,7 +93,7 @@ function resolveImageRef(workRoot, ref, uiRecords = null) {
     try { tree = parseYaml(fs.readFileSync(path.join(workRoot, 'shell', 'index.yaml'), 'utf8')); } catch { tree = null; }
     const cited = [...allNodesOf(tree ?? {}).flatMap((n) => [...list(n.layout?.captures), ...destinationsOf(tree, n).flatMap((d) => d.captures)]), ...list(tree?.brand?.lockups)]
       .find((c) => captureRelOf(c) === `shell/${shellRef[1]}`);
-    if (cited) return captureFileOf(path.join(workRoot, 'shell'), cited);
+    if (cited) return captureFileOf(cited);
   }
   return path.join(workRoot, ref);
 }

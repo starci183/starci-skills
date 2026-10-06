@@ -133,7 +133,7 @@ test('capture measures the #FF00FF slot, stores the bytes and bumps the layout r
   // The capture names the bytes by their blob-store name; the PNG itself is a blob the sha256 cites,
   // not a file under shell/assets (captureFileOf resolves the citation).
   assert.equal(capture.name, 'assets/layouts/app--locale-console--desktop--light.png');
-  const stored = captureFileOf(shellDir, capture);
+  const stored = captureFileOf(capture);
   assert.ok(stored && fs.existsSync(stored), 'the capture bytes are readable out of the blob store');
   assert.equal(nodeById(record, '/[locale]/(console)').layout.chrome, 'visible');
   const second = p.put('shot2.png', encodePng(layoutCapture(40, 30, { x: 12, y: 5, width: 26, height: 22 })));

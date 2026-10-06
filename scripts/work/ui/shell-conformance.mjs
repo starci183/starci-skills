@@ -128,9 +128,9 @@ function checkShellRecord(workRoot, shell, { verifySource = true, driftLevel = '
   if (!lockups.length && lockupDeferredFor) out.push(finding('info', 'SHELL_LOCKUP_DEFERRED', at, `no brand lockup yet: ${lockupDeferredFor} draws the planned layout it will be cropped from (layout-tree.mjs lockup --from ${lockupDeferredFor}:<layout composite>)`));
   else if (!lockups.length) out.push(finding('refuse', 'SHELL_LOCKUP_MISSING', at, 'no brand lockup: the rendered lockup is what every direction is handed instead of an invented logo'));
   for (const image of lockups) {
-    const file = captureFileOf(shell.dir, image);
-    const named = image.path ?? image.name ?? '(no name)';
-    if (!file || !fs.existsSync(file)) out.push(finding('refuse', 'SHELL_CAPTURE_MISSING', at, `lockup ${named} is neither in the blob store nor on disk`));
+    const file = captureFileOf(image);
+    const named = image.name ?? '(no name)';
+    if (!file || !fs.existsSync(file)) out.push(finding('refuse', 'SHELL_CAPTURE_MISSING', at, `lockup ${named} is not in the blob store`));
     else if (image.sha256 && sha256File(file) !== image.sha256) out.push(finding('refuse', 'SHELL_CAPTURE_DIGEST', at, `lockup ${named} no longer hashes to its recorded sha256`));
     if (image.source?.kind === 'layout-drawing') {
       const src = lockupSourceOf(r, workRoot, image.source.ref, (id) => (uiRecords ?? (uiRecords = loadUiRecords(workRoot))).get(id) ?? null);
@@ -550,7 +550,7 @@ function shellPaletteFindings(workRoot, shell, ctx = paletteContext(workRoot)) {
   for (const node of nodesOf(shell.record)) for (const bp of breakpoints) for (const th of themes) for (const c of capturesAt(shell.record, node, bp, th)) {
     if (seen.has(c.rel)) continue;
     seen.add(c.rel);
-    out.push(...imageFindings(workRoot, ctx, at, captureFileOf(path.join(workRoot, 'shell'), c), `layout capture of ${node.id}${c.destination ? ` (${c.destination})` : ''}`));
+    out.push(...imageFindings(workRoot, ctx, at, captureFileOf(c), `layout capture of ${node.id}${c.destination ? ` (${c.destination})` : ''}`));
   }
   return out;
 }

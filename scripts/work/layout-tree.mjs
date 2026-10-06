@@ -718,8 +718,8 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
         if (!capture) { reasons.push(`${node.id} has no capture at ${bp}/${theme}`); continue; }
         if (!capture.slot) reasons.push(`${node.id} capture ${captureRelOf(capture)} has no measured slot`);
         if (shellDir) {
-          const file = captureFileOf(shellDir, capture);
-          if (!file || !fs.existsSync(file)) reasons.push(`${node.id} capture ${captureRelOf(capture)} is neither in the blob store nor on disk`);
+          const file = captureFileOf(capture);
+          if (!file || !fs.existsSync(file)) reasons.push(`${node.id} capture ${captureRelOf(capture)} is not in the blob store`);
           else if (capture.sha256 && sha256File(file) !== capture.sha256) reasons.push(`${node.id} capture ${captureRelOf(capture)} no longer hashes to its recorded sha256`);
         }
       }
@@ -730,8 +730,8 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
           if (!capture) { reasons.push(`${node.id} destination ${d.key} has no capture at ${bp}/${theme}`); continue; }
           if (!capture.slot) reasons.push(`${node.id} destination ${d.key} capture ${captureRelOf(capture)} has no measured slot`);
           if (shellDir) {
-            const file = captureFileOf(shellDir, capture);
-            if (!file || !fs.existsSync(file)) reasons.push(`${node.id} destination ${d.key} capture ${captureRelOf(capture)} is neither in the blob store nor on disk`);
+            const file = captureFileOf(capture);
+            if (!file || !fs.existsSync(file)) reasons.push(`${node.id} destination ${d.key} capture ${captureRelOf(capture)} is not in the blob store`);
             else if (capture.sha256 && sha256File(file) !== capture.sha256) reasons.push(`${node.id} destination ${d.key} capture ${captureRelOf(capture)} no longer hashes to its recorded sha256`);
           }
         }
@@ -788,13 +788,13 @@ export function destinationFor(record, node, { route = null, activeNav = null, k
 // scratch/captures/layouts, which starci kernel report attaches by itself). A capture recorded with a `path` (a tree
 // written before) still reads from the tree.
 /** The readable PNG of one recorded capture: the blob it cites, else its file under `shellDir`; null when neither. */
-export function captureFileOf(shellDir, capture) {
+export function captureFileOf(capture) {
   if (!capture) return null;
   if (typeof capture.path === 'string' && capture.path) return shellDir ? path.join(shellDir, capture.path) : null;
   return blobAsFile({ sha256: capture.sha256 }, { ext: '.png' });
 }
-/** The name a capture is known by in composites and findings: shell/<name> (shell/<path> for a tree-kept one). */
-export const captureRelOf = (capture) => `shell/${slash(capture?.path ?? capture?.name ?? '')}`;
+/** The name a capture is known by in composites and findings: shell/<name>. */
+export const captureRelOf = (capture) => `shell/${slash(capture?.name ?? '')}`;
 /** Put a capture's bytes in the blob store (and the job scratch); returns the logical name recorded as `name`. */
 function storeCapture(bytes, name) {
   putBlob(bytes, { mediaType: 'image/png' });
@@ -807,18 +807,18 @@ function storeCapture(bytes, name) {
   return name;
 }
 
-/** Every recorded capture of a layout node (default and per destination) at bp/theme: [{rel, sha256, path|null, name|null, destination|null}]. */
+/** Every recorded capture of a layout node (default and per destination) at bp/theme: [{rel, sha256, name|null, destination|null}]. */
 export function capturesAt(record, node, bp, theme) {
   const out = [];
-  for (const c of list(node?.layout?.captures)) if (c?.breakpoint === bp && c?.theme === theme) out.push({ rel: captureRelOf(c), sha256: c.sha256, path: c.path ?? null, name: c.name ?? null, destination: null });
-  for (const d of destinationsOf(record, node)) for (const c of d.captures) if (c?.breakpoint === bp && c?.theme === theme) out.push({ rel: captureRelOf(c), sha256: c.sha256, path: c.path ?? null, name: c.name ?? null, destination: d.key });
+  for (const c of list(node?.layout?.captures)) if (c?.breakpoint === bp && c?.theme === theme) out.push({ rel: captureRelOf(c), sha256: c.sha256, name: c.name ?? null, destination: null });
+  for (const d of destinationsOf(record, node)) for (const c of d.captures) if (c?.breakpoint === bp && c?.theme === theme) out.push({ rel: captureRelOf(c), sha256: c.sha256, name: c.name ?? null, destination: d.key });
   return out;
 }
 
 /** A capture's slot and size: as recorded, else measured from the PNG on disk. */
 function measuredCapture(shellDir, capture) {
   if (capture.slot && capture.width && capture.height) return capture;
-  const file = captureFileOf(shellDir, capture);
+  const file = captureFileOf(capture);
   if (!file || !fs.existsSync(file)) return capture;
   const image = decodePng(fs.readFileSync(file));
   const key = keyRect(image, SLOT_KEY);
@@ -850,13 +850,13 @@ export function baseLayoutFor(record, route, bp, theme, { shellDir, uiLoader = n
     if (hit) {
       const c = measuredCapture(shellDir, hit);
       if (!c.slot) return { missing: `${node.id} destination ${picked.destination.key} capture ${captureRelOf(hit)} has no measured #FF00FF slot` };
-      return { node: node.id, file: captureFileOf(shellDir, c), rel: captureRelOf(c), sha256: c.sha256, slot: c.slot, width: c.width, height: c.height, destination: picked.destination.key, by: picked.by, equivalents: same(c.sha256) };
+      return { node: node.id, file: captureFileOf(c), rel: captureRelOf(c), sha256: c.sha256, slot: c.slot, width: c.width, height: c.height, destination: picked.destination.key, by: picked.by, equivalents: same(c.sha256) };
     }
     if (REQUIRED_BREAKPOINTS.includes(bp) && REQUIRED_THEMES.includes(theme)) return { missing: `${node.id} destination ${picked.destination.key} (active for ${ui?.route ?? route}) has no capture at ${bp}/${theme}` };
     destination = picked.destination.key;
   }
   const capture = list(node.layout.captures).find((c) => c?.breakpoint === bp && c?.theme === theme);
-  if (capture) return { node: node.id, file: captureFileOf(shellDir, capture), rel: captureRelOf(capture), sha256: capture.sha256, slot: capture.slot, width: capture.width, height: capture.height, destination: null, ...(destination ? { destinationFallback: destination } : {}), equivalents: same(capture.sha256) };
+  if (capture) return { node: node.id, file: captureFileOf(capture), rel: captureRelOf(capture), sha256: capture.sha256, slot: capture.slot, width: capture.width, height: capture.height, destination: null, ...(destination ? { destinationFallback: destination } : {}), equivalents: same(capture.sha256) };
   if (node.layout.design && uiLoader) {
     const design = uiLoader(node.layout.design);
     const hit = design && designCaptureOf(design, bp, theme);
@@ -1117,8 +1117,8 @@ export function lockupSourceOf(record, workRoot, ref, uiLoader = null) {
     const captures = [...list(node.layout.captures), ...destinationsOf(record, node).flatMap((d) => d.captures)];
     const hit = captures.find((c) => slash(c.path ?? c.name ?? '') === rel);
     if (!hit) continue;
-    const file = captureFileOf(shellDir, hit);
-    if (!file || !fs.existsSync(file)) return { error: `${rel} is neither in the blob store nor on disk` };
+    const file = captureFileOf(hit);
+    if (!file || !fs.existsSync(file)) return { error: `${rel} is not in the blob store` };
     const sha256 = sha256File(file);
     if (hit.sha256 && hit.sha256 !== sha256) return { error: `${rel} no longer hashes to its recorded sha256` };
     return { file, ref: `shell/${rel}`, kind: 'render', sha256, node: node.id, theme: hit.theme ?? null };
