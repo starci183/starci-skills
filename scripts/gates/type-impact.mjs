@@ -67,6 +67,41 @@ const nearestProject = (root, file) => {
 };
 const sharedImpact = (file) => /(?:^|\/)(?:tsconfig[^/]*\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|turbo\.json|hfs\.json)$/.test(file) || file.startsWith('scripts/');
 
+const addTo = (projects, project, source = null) => {
+  if (!projects.has(project)) projects.set(project, []);
+  if (source !== null) projects.get(project).push(source);
+};
+
+/** Whether one selected file is a dist-workspace member after its owner checks, recording errors and the project. */
+const scanSelected = (root, file, { removed, workspaces, projects, errors }) => {
+  const at = path.resolve(root, file);
+  if (!isInside(root, at)) { errors.push(`GATE_TSC_OWNER_UNPROVEN selected input is outside the app: ${file}`); return false; }
+  if (!TS_SOURCE.test(file)) return false;
+  const exists = fs.existsSync(at), project = nearestProject(root, file);
+  if (!exists && !removed.has(file)) { errors.push(`GATE_TSC_SOURCE_MISSING selected TypeScript does not exist: ${file}`); return false; }
+  if (!project && exists) { errors.push(`GATE_TSC_CONFIG_MISSING no tsconfig.json owns selected TypeScript ${file}`); return false; }
+  if (project) addTo(projects, project, exists ? file : null);
+  return workspaces.some((dir) => file.startsWith(`${dir}/`));
+};
+
+/** Whether a removed tsconfig still has TypeScript its siblings do not own. */
+const strandedConfig = (root, file) => {
+  const dir = path.dirname(path.join(root, file));
+  return fs.existsSync(dir) && sourceFiles(dir).filter((source) => TS_SOURCE.test(source)).some((source) => {
+    const owner = nearestProject(root, posixPath(path.relative(root, source)));
+    return !owner || !isInside(dir, path.dirname(path.join(root, owner)));
+  });
+};
+
+/** The whole-tree scan a broad impact triggers: every discovered program, stranded removals, and the no-program case. */
+const broadScan = (root, selected, inventory, projects, errors) => {
+  for (const config of inventory.filter((file) => path.basename(file) === 'tsconfig.json')) addTo(projects, posixPath(path.relative(root, config)));
+  for (const file of selected.filter((file) => /(?:^|\/)tsconfig\.json$/.test(file) && !fs.existsSync(path.join(root, file)))) {
+    if (strandedConfig(root, file)) errors.push(`GATE_TSC_CONFIG_MISSING removed tsconfig.json still has TypeScript without a retained nested owner: ${file}`);
+  }
+  if (!projects.size && inventory.some((file) => TS_SOURCE.test(file))) errors.push('GATE_TSC_CONFIG_MISSING configuration/install impact has TypeScript inputs but no tsconfig.json program');
+};
+
 /**
  * Selected TypeScript keeps its nearest compiler owner. Configuration, install and codegen changes,
  * or a changed dist workspace, affect the actual discovered programs, including typed consumers.
@@ -77,35 +112,13 @@ export function typeImpact(root, files, { deleted = [] } = {}) {
   root = path.resolve(root);
   const projects = new Map(), errors = [], removed = new Set(deleted.map(posixPath));
   const selected = [...new Set(files.map(posixPath))];
-  const add = (project, source = null) => {
-    if (!projects.has(project)) projects.set(project, []);
-    if (source !== null) projects.get(project).push(source);
-  };
   let broad = selected.some(sharedImpact);
   const workspaces = workspaceDirs(root, manifestAt(root)).filter((dir) => exposesDist(manifestAt(path.join(root, dir))));
+  const state = { removed, workspaces, projects, errors };
   for (const file of selected) {
-    const at = path.resolve(root, file);
-    if (!isInside(root, at)) { errors.push(`GATE_TSC_OWNER_UNPROVEN selected input is outside the app: ${file}`); continue; }
-    if (!TS_SOURCE.test(file)) continue;
-    const exists = fs.existsSync(at), project = nearestProject(root, file);
-    if (!exists && !removed.has(file)) { errors.push(`GATE_TSC_SOURCE_MISSING selected TypeScript does not exist: ${file}`); continue; }
-    if (!project && exists) { errors.push(`GATE_TSC_CONFIG_MISSING no tsconfig.json owns selected TypeScript ${file}`); continue; }
-    if (project) add(project, exists ? file : null);
-    if (workspaces.some((dir) => file.startsWith(`${dir}/`))) broad = true;
+    if (scanSelected(root, file, state)) broad = true;
   }
-  if (broad) {
-    const inventory = sourceFiles(root);
-    for (const config of inventory.filter((file) => path.basename(file) === 'tsconfig.json')) add(posixPath(path.relative(root, config)));
-    for (const file of selected.filter((file) => /(?:^|\/)tsconfig\.json$/.test(file) && !fs.existsSync(path.join(root, file)))) {
-      const dir = path.dirname(path.join(root, file));
-      const stranded = fs.existsSync(dir) && sourceFiles(dir).filter((source) => TS_SOURCE.test(source)).some((source) => {
-        const owner = nearestProject(root, posixPath(path.relative(root, source)));
-        return !owner || !isInside(dir, path.dirname(path.join(root, owner)));
-      });
-      if (stranded) errors.push(`GATE_TSC_CONFIG_MISSING removed tsconfig.json still has TypeScript without a retained nested owner: ${file}`);
-    }
-    if (!projects.size && inventory.some((file) => TS_SOURCE.test(file))) errors.push('GATE_TSC_CONFIG_MISSING configuration/install impact has TypeScript inputs but no tsconfig.json program');
-  }
+  if (broad) broadScan(root, selected, sourceFiles(root), projects, errors);
   return { projects: [...projects.keys()].sort(byCodeUnit), required: projects, errors };
 }
 
