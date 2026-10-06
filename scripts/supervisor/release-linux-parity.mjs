@@ -113,7 +113,7 @@ export function parityPlan({ workflows, apps }) {
   return { image: `node:${state.node ?? DEFAULT_NODE}`, steps, skipped };
 }
 
-const quote = (v) => `'${String(v).replaceAll(/'/g, String.raw`'\''`)}'`;
+const quote = (v) => "'" + String(v).replaceAll(/'/g, String.raw`'\''`) + "'";
 
 /** The bash script the container runs: extract HEAD, snapshot it as a git repository, then each step in order, `##STEP`/`##FAILED` markers in the log. Pure. */
 export function parityScript(plan) {
@@ -166,7 +166,10 @@ export function runParity(repo, deps = {}) {
 
   if (!plan.steps.length) return refuse('the workflows hold no step to run: nothing proves Linux parity');
   const daemon = docker.version();
-  if (daemon.error || daemon.status !== 0) return refuse(`no docker daemon answers (${tail(daemon.stderr || daemon.error?.message, 200) || `exit ${daemon.status}`}): start Docker, the parity step cannot run`);
+  if (daemon.error || daemon.status !== 0) {
+    const daemonOutput = tail(daemon.stderr || daemon.error?.message, 200) || `exit ${daemon.status}`;
+    return refuse(`no docker daemon answers (${daemonOutput}): start Docker, the parity step cannot run`);
+  }
 
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-l4-parity-'));
   const name = `starci-l4-parity-${process.pid}-${t0}`;
