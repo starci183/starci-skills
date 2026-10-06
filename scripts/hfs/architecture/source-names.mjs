@@ -206,7 +206,7 @@ function staticProperty(ts, object, name) {
     : { status: 'dynamic', node: matching[0].initializer };
 }
 
-function graphqlField(config, context, sourceFile, node, decorator, kind, namingReasons, violations) {
+function graphqlField({ config, context, sourceFile, node, decorator, kind, namingReasons, violations }) {
   const call = decorator.expression;
   if (!context.ts.isCallExpression(call)) {
     namingReasons.push(`${relativePath(config.root, sourceFile.fileName)} has a non-call @${kind} decorator`);
@@ -442,7 +442,7 @@ export function checkBackendSourceShape(config, context) {
             if (!['Entity', 'ViewEntity'].includes(dynamic)) namingReasons.push(detail);
           }
         }
-        if (kind === 'Mutation' || kind === 'Query') graphqlField(config, context, sourceFile, node, decorator, kind, namingReasons, violations);
+        if (kind === 'Mutation' || kind === 'Query') graphqlField({ config, context, sourceFile, node, decorator, kind, namingReasons, violations });
         if (kind === 'Args') graphqlArgument(config, context, sourceFile, node, decorator, namingReasons, violations);
       }
       if (ts.isCallExpression(node)) {
