@@ -1,5 +1,5 @@
 // release-notes.mjs - RELEASE_NOTES (knowledge/hfs/rules.yaml, gate runtime): a release tag `v<version>` on HEAD has its CHANGELOG.md section
-// `## [<version>]` with no TODO, PENDING or TBD left in it and no `in preparation` mark. The tag message and the GitHub Release are that section
+// `## [<version>]` with no unfinished markers left in it and no `in preparation` mark. The tag message and the GitHub Release are that section
 // (docs/git-governance.md), so a tag cut over an unfinished section would publish a half-written release. Only the tags that point at HEAD are
 // judged: the release being cut. Pure apart from ctx.read and the git read (ctx.tagsAtHead overrides it).
 import { tag } from '../../api/git/tag.mjs';

@@ -81,7 +81,8 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
   const overflow = { deleted: 0, truncated: 0, skipped: 0, errors: 0 };
   const push = (key, entry) => {
     if (out[key].length < LIST_MAX) return out[key].push(entry);
-    return overflow[key] += 1;
+    overflow[key] += 1;
+    return overflow[key];
   };
 
   const skip = (p, reason) => push('skipped', { path: p, reason });

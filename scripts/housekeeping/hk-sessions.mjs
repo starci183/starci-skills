@@ -243,7 +243,7 @@ export async function sweepAgentSessions({ apply = false, now = Date.now(), env 
  * Returns {ok, freedBytes, movedBytes, deleted: [], moved[{from,to}], skipped[{path,reason}], errors[{path,error}]}.
  */
 export async function archiveSessionFiles(paths, { archiveRoot, agent, now = Date.now(), apply = false } = {}) {
-  void now; // part of the settle-time contract; no age test applies here
+  // `now` stays in the settle-time signature; no age test applies here.
   if (typeof archiveRoot !== 'string' || !archiveRoot.trim() || typeof agent !== 'string' || !agent.trim()) {
     throw new Error('archiveSessionFiles needs {archiveRoot, agent}');
   }
