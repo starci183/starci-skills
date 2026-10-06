@@ -155,7 +155,7 @@ function workers(store, url) {
     live: workflowsObserved ? workflows.filter(row => row.phase === 'running').length : null,
     bad: workflowsObserved ? workflows.filter(row => row.ui === 'bad').length : null,
     warn: workflowsObserved ? workflows.filter(row => row.ui === 'warn').length : null,
-    ownerDecisions: observedCoverage(coverage.ownerDecisions) ? ownerReads.reduce((n, read) => n + (read.error ? 0 : read.result ?? 0), 0) : null,
+    ownerDecisions: (() => { if (!observedCoverage(coverage.ownerDecisions)) return null; return ownerReads.reduce((n, read) => n + (read.error ? 0 : read.result ?? 0), 0); })(),
     violationsOpen,
   } };
 }

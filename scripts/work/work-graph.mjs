@@ -150,7 +150,7 @@ export function main(argv = process.argv.slice(2)) {
     if (error.code === 'usage') { console.error(`${error.message}\n${USAGE}`); return 2; }
     const out = { ok: false, code: error.code ?? 'error', error: error.message, ...(error.findings ? { findings: error.findings } : {}) };
     if (args.json) console.log(JSON.stringify(out, null, 2));
-    else console.error(`${out.code}: ${out.error}${error.findings ? `\n${error.findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n')}` : ''}`);
+    else console.error(`${out.code}: ${out.error}${error.findings ? '\n' + error.findings.map((f) => ''.concat('  [', f.code, '] ', f.detail)).join('\n') : ''}`);
     return 1;
   }
 }
