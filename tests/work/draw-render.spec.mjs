@@ -6,8 +6,9 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { findPackage } from '../../scripts/lib/package-at.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
+import { chromiumGap } from '../helpers/chromium-gap.mjs';
 import {
-  SETTLE_MS, UsageError, captureBase, classCandidates, fixtureProps, judgeCapture, parseArgs, parseViewports, resolveFontStacks, splitFontStack,
+  SETTLE_MS, UsageError, captureBase, classCandidates, fixtureProps, judgeCapture, loadPlaywright, parseArgs, parseViewports, resolveFontStacks, splitFontStack,
 } from '../../scripts/work/draw-render.mjs';
 
 // scripts/work/draw-render.mjs is the capture interface.draw uses for code-native regions. The pure pieces run
@@ -19,7 +20,7 @@ const CLI = path.join(ROOT, 'scripts', 'work', 'draw-render.mjs');
 const PW_DIR = [process.env.STARCI_PLAYWRIGHT_DIR, ROOT].find((d) => d && findPackage([d], ['playwright', '@playwright/test']));
 const SHAPE_SLOT = [process.env.STARCI_SHAPE_SLOT_DIR, path.join(ROOT, 'examples', 'shape-slot')]
   .find((d) => d && fs.existsSync(path.join(d, 'node_modules', 'react-dom')) && fs.existsSync(path.join(d, 'node_modules', 'esbuild')));
-const NO_BROWSER = PW_DIR ? false : 'no project-local playwright (set STARCI_PLAYWRIGHT_DIR)';
+const NO_BROWSER = PW_DIR ? chromiumGap(loadPlaywright([PW_DIR]).chromium) : 'no project-local playwright (set STARCI_PLAYWRIGHT_DIR)';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-render-spec-'));
 const cli = (args, cwd) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: 'utf8', timeout: 180_000 });

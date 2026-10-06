@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { sweepClaudeTranscripts, claudeProjectSlug, claudeProjectsRoots } from '../../scripts/housekeeping/hk-claude.mjs';
 import { safeRemove } from '../../scripts/api/fs/safe-remove.mjs';
-import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs'; const DRIVE = path.parse(os.tmpdir()).root, F = DRIVE.replace(/\\/g, '/');
+import { winPath } from '../fixtures/win-path.mjs'; import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs'; const DRIVE = winPath('C', ''), F = DRIVE.replace(/\\/g, '/');
 
 // STORAGE-PROMPT.md item 10 on fake trees: ~/.claude/projects/<slug>/*.jsonl older than the archive
 // window moves to <archiveRoot>/claude/<slug>/<file>, except the supervisor's live session (the newest

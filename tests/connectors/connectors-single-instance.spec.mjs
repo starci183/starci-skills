@@ -76,7 +76,8 @@ setInterval(()=>{},1000);`);
 });
 
 test('two ask gateways started at once leave exactly one serving',async t=>{
-  const home=mkdtemp(t,'starci-gateway-single-',()=>{for(const r of runs)kill(r.child.pid);});
+  // The gateways are awaited gone before the rm: a gateway that outlives it writes its last rows into the removed directory (a POSIX rm does not wait for a handle).
+  const home=mkdtemp(t,'starci-gateway-single-',async()=>{for(const r of runs)kill(r.child.pid);await Promise.all(runs.map(r=>new Promise(done=>{if(r.child.exitCode!==null||r.child.signalCode)done();else r.child.once('exit',done);})));});
   const env={...process.env,STARCI_LOCAL_ROOT:home,...storeOf(home)};
   const config=parseYaml(fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8'));
   const entry="import {main} from "+JSON.stringify(pathToFileURL(GATEWAY).href)+"; await main(['run','--port','0'],{env:process.env,root:"+JSON.stringify(home)+",config:"+JSON.stringify(config)+"});";

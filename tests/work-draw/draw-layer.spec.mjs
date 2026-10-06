@@ -9,6 +9,7 @@ import {
 } from '../../scripts/work/draw/draw-layer.mjs';
 import { parseHtml, walkElements } from '../../scripts/work/draw/draw-dna.mjs';
 import { machineMetrics } from '../../scripts/work/draw-loop.mjs';
+import { chromiumGap } from '../helpers/chromium-gap.mjs';
 
 // Owner, 2026-09-28, StarCi Next SignInBase#signed-out round 2 (<tmp>/starci-draw10/loop/SignInBase/round-2):
 // the sign-in card stretched the whole 1184px content region, and on that Surface the "Remember me" Checkbox kept
@@ -96,6 +97,8 @@ test('a real render measures the form region (skipped without Playwright)', asyn
   let playwright = null;
   try { playwright = loadPlaywright([process.env.STARCI_PLAYWRIGHT_DIR, ROOT].filter(Boolean)); } catch { playwright = null; }
   if (!playwright) { t.skip('no playwright install resolvable (set STARCI_PLAYWRIGHT_DIR)'); return; }
+  const gap = chromiumGap(playwright.chromium);
+  if (gap) { t.skip(`no browser to drive: ${gap}`); return; }
   const dir = tmp(t);
   // The round-2 DOM without the product CSS: every block takes its column, as the card did when its form measure lost.
   const stretched = path.join(dir, 'stretched.html');

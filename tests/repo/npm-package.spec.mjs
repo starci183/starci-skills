@@ -94,8 +94,12 @@ test('actual npm tarball installs a runnable source command without development 
   assert.deepEqual([...shipped].filter(file=>file.split('/').includes('node_modules')),[],'npm tarball must not ship node_modules');
   assert.deepEqual([...shipped].filter(file=>file==='ext/sonar/secrets'||file.startsWith('ext/sonar/secrets/')),[],'npm tarball must not ship private Sonar custody');
   assert.equal(selectedExamples.size,18,'only BASIC13, three own Work catalog indexes and two declared system-health seeds are literal example inputs');
-  assert.deepEqual([...shipped].filter(file=>file.split('/').includes('.starciwork')).sort(),
+  // The hfs scaffold templates are the package's own source and ship whole; every other .starciwork file is a declared example index.
+  const scaffold=file=>file.startsWith('packages/hfs/templates/app/');
+  assert.deepEqual([...shipped].filter(file=>file.split('/').includes('.starciwork')&&!scaffold(file)).sort(),
     [...selectedExamples].filter(file=>file.split('/').includes('.starciwork')).sort(),'only declared public Work indexes ship');
+  for(const file of [...shipped].filter(file=>file.split('/').includes('.starciwork')&&scaffold(file)))
+    assert.ok(fs.existsSync(path.join(root,file)),`a shipped scaffold template is a file of the source tree: ${file}`);
   assert.deepEqual([...shipped].filter(file=>file.startsWith('examples/.runtimes/')).sort(),
     [...selectedExamples].filter(file=>file.startsWith('examples/.runtimes/')).sort(),'only approved basic source members ship');
   for(const relative of neighbors)assert.equal(shipped.has(relative),false,relative);

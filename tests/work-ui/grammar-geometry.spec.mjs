@@ -7,6 +7,7 @@ import {
   mediaMatches, normalizeShadowText, parseCss, resolveGeometry, selectorMatch,
 } from '../../scripts/work/ui/grammar-geometry.mjs';
 import { buildGeometryRepo, snapshotOf } from '../fixtures/grammar-geometry.mjs';
+import { chromiumGap } from '../helpers/chromium-gap.mjs';
 
 // Owner, 2026-09-27: a draw brief carries the geometry the product's CSS binds (HeroUI v3 + @starci/grammar +
 // the family sheet) - a pill Button, a borderless 12px field that turns `secondary` inside a surface, a card
@@ -150,6 +151,8 @@ test('the CLI fails closed: no repo, an unknown family, a repo with no HeroUI', 
 test('--check renders an html with the product Playwright when one is installed', async (t) => {
   const pw = await loadChromium(process.env.STARCI_PLAYWRIGHT_DIR ?? null);
   if (!pw) { t.skip('no Playwright resolvable from this runtime (STARCI_PLAYWRIGHT_DIR)'); return; }
+  const gap = chromiumGap(pw.chromium);
+  if (gap) { t.skip(`no browser to drive: ${gap}`); return; }
   const fx = buildGeometryRepo();
   t.after(fx.cleanup);
   const html = path.join(fx.repo, 'draw.html');

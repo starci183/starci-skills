@@ -333,7 +333,7 @@ for(const [model,agent,takesModel] of [['claude-agent','claude',true],['codex-ag
     assert.equal(start.includes('--task'),false,'a start never names an existing Task');
     assert.ok(flag(start,'--spec'),'the rendered packet rides on --spec');
     assert.equal(flag(start,'--task-title'),'code.refactor #1');
-    assert.match(flag(start,'--retry-request')??'',/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,'the start carries its request id from the first issue');
+    assert.match(flag(start,'--retry-request')??'',/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,'the start carries its request id from the first issue');
     assert.equal(flag(start,'--from'),'fake-kernel-terminal','the op is started from the Kernel terminal');
     assert.equal(flag(start,'--run'),flag(runCreate,'--run')??'run-fake-1');
     const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});

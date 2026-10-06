@@ -21,6 +21,17 @@ test('gitSpawn runs the binary with utf8 output and options pass through', () =>
   assert.equal(r.stdout.trim(), 'true');
 });
 
+test('gitSpawn spawns with a frozen caller env while the process runs under coverage (node adds NODE_V8_COVERAGE to the env object it is given)', (t) => {
+  const saved = process.env.NODE_V8_COVERAGE;
+  process.env.NODE_V8_COVERAGE = mkdtemp(t, 'starci-v8-cov-');
+  t.after(() => { if (saved === undefined) delete process.env.NODE_V8_COVERAGE; else process.env.NODE_V8_COVERAGE = saved; });
+  const { NODE_V8_COVERAGE, ...rest } = process.env;
+  const env = Object.freeze(rest);
+  const r = gitSpawn('git', ['--version'], { env });
+  assert.equal(r.status, 0, String(r.error ?? r.stderr));
+  assert.equal(Object.hasOwn(env, 'NODE_V8_COVERAGE'), false, 'the caller env is not mutated');
+});
+
 test('runGit composes -C dir before the args; the cwd form spawns inside the dir', () => {
   const r = runGit(['rev-parse', '--show-toplevel'], { dir: ROOT });
   assert.equal(r.status, 0, r.stderr);

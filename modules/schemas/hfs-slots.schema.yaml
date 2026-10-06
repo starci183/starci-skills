@@ -380,6 +380,7 @@ $defs:
       tracked: {enum: [tracked, ignored, external, generated]}
       tier: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
       tests: {enum: [unit-beside, e2e, none]}
+      coverage: {enum: [required, none], description: 'required: the subtree is measured at 100 per file on every logicRoles file of the runtime coverage scope; none: never measured. Declared by every tracked slot of a runtime manifest and by no other (scripts/hfs/manifest-shape.mjs)'}
       owner: {type: boolean}
       minInstances: {type: integer, minimum: 1}
       requires: {$ref: '#/$defs/stringList'}
@@ -411,7 +412,7 @@ $defs:
         then: {properties: {tracked: {const: generated}}}
       - if: {required: [retiredIn]}
         then: {required: [successor]}
-      - if: {properties: {profiles: {contains: {const: be}}, tracked: {const: tracked}}, required: [profiles, tracked]}
+      - if: {properties: {tracked: {const: tracked}}, required: [tracked]}
         then: {required: [coverage]}
         else: {not: {required: [coverage]}}
   side:

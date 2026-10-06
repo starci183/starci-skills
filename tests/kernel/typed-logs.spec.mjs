@@ -50,7 +50,9 @@ test('storage: the logs live in the ledger (WAL), and rows are append-only', (t)
   const ledger = track(t, openLedger({ file: ledgerFileFor(repo) }));
   assert.throws(() => ledger.db.prepare('UPDATE logs SET msg=? WHERE seq=?').run('x', r.seq), /append-only/);
   assert.throws(() => ledger.db.prepare('DELETE FROM logs').run(), /append-only/);
-  assert.throws(() => logs.db.prepare('DELETE FROM logs').run(), /not authorized/, 'the writer connection may not delete at all');
+  // The fence is SQLite's authorizer (engine/db/authorizer.mjs guardWrites): a node:sqlite without setAuthorizer (Node 22) fences nothing and says so.
+  if (typeof logs.db.setAuthorizer === 'function') assert.throws(() => logs.db.prepare('DELETE FROM logs').run(), /not authorized/, 'the writer connection may not delete at all');
+  else t.diagnostic('this node:sqlite has no setAuthorizer: the writer connection is not fenced');
   assert.throws(() => appendLog(logs, { workflowId: 'wf-not-in-ledger', actor: 'kernel', kind: 'decision', msg: 'x', data: { markdown: 'x' } }), /not in the ledger/);
   const page = readLogs(logs, { workflowId: WF, jobIds: ['op-a-1'] });
   assert.equal(page.rows.length, 1);

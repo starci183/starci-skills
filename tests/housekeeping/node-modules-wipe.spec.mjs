@@ -11,6 +11,8 @@ import assert from 'node:assert/strict';
 import { landCommits, removeScratch, liveDepsState } from '../../scripts/supervisor/land.mjs';
 import { runHousekeeping, describe as describeHousekeeping } from '../../scripts/housekeeping/housekeeping.mjs';
 
+// The land gate cherry-picks in its own scratch with the process environment: the spec brings the identity a bare CI host lacks.
+for (const who of ['AUTHOR', 'COMMITTER']) { process.env[`GIT_${who}_NAME`] ??= 'spec'; process.env[`GIT_${who}_EMAIL`] ??= 'spec@example.invalid'; }
 const LINK = process.platform === 'win32' ? 'junction' : 'dir';
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-nm-wipe-')); t.after(() => fs.rmSync(d, { recursive: true, force: true })); return d; };
 const git = (cwd, ...args) => {

@@ -50,3 +50,7 @@ if (!process.env[TEST_TEMP_ENV]) {
   process.env[GUARDS_ROOT_ENV] = guards;
   process.on('exit', () => { try { fs.rmSync(guards, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); } catch { /* a detached child may still hold it */ } });
 }
+
+// Node 22 prints the node:sqlite ExperimentalWarning on the stderr of every runtime process (Node 24 does not); a spec that reads the
+// last line of a child's stderr, or all of it as JSON, must see the child's own words only. Children inherit this, as they inherit the temp root.
+process.env.NODE_NO_WARNINGS ??= '1';

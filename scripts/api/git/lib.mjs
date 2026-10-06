@@ -23,6 +23,7 @@ export const gitSpawn = (file, args, options = {}) => {
   assertMutationFence({ kind: 'git-effect', args });
   const spawn = { encoding: 'utf8', windowsHide: true, ...options };
   if (spawn.encoding === 'buffer') spawn.encoding = null;
+  if (spawn.env) spawn.env = { ...spawn.env }; // node adds NODE_V8_COVERAGE to the env object it is given: a frozen caller env must not throw under coverage
   return spawnSync(file, args, spawn);
 };
 

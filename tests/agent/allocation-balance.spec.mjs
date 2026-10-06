@@ -415,8 +415,12 @@ test('the machine scan counts registered product ledgers only: never a fixture p
   // Everything lives under a temp root the spec made, on the runtime's drive (not os.tmpdir(), which the scan
   // skips), and the registry is injected: the host's machine.sqlite is never read or written.
   withLedger(t,({root,ledger,ledgerFile,machine,machineFile,track})=>{
-    const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-balance-temp-'));
-    t.after(()=>fs.rmSync(tempRoot,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+    // The scan's temp directory is whatever os.tmpdir() answers: a spec-owned one, so the fixture root (also a temp dir on a host with one
+    // filesystem tree) is not under it, and the temp ledger is.
+    const scanTemp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-balance-scan-'));
+    const tempRoot=fs.mkdtempSync(path.join(scanTemp,'starci-balance-temp-'));
+    const saved=['TMPDIR','TEMP','TMP'].map(key=>[key,process.env[key]]);
+    t.after(()=>{for(const [key,value] of saved){if(value===undefined)delete process.env[key];else process.env[key]=value;}fs.rmSync(scanTemp,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
     // A ledger opened by file path (not ledgerFileFor) seeds no meta.repo_root; registerLedger refuses a
     // new row without one (registry-no-repo-root), so the fixture names its root at open.
     const other=(dir,id,pool)=>{
@@ -432,6 +436,7 @@ test('the machine scan counts registered product ledgers only: never a fixture p
     machine.registerLedger({file:path.join(root,'gone','.starciwork','runtime.sqlite'),ledgerId:'ledger-gone',repoRoot:path.join(root,'gone')});
     seedWorkflow(ledger,{id:'wf-repo',now:T,jobs:[job('r-1',{op:'backend.implement',pool:'devin-agent',createdAt:T-H})]});
 
+    for(const [key] of saved)process.env[key]=scanTemp;
     const registered=machine.db.prepare('SELECT file FROM ledgers').all().map(row=>path.resolve(row.file));
     assert.equal(registered.length,5,'the repo ledger, product, fixture, temp and the missing ledger are all registered');
     const scanned=machineLedgerFiles({machineFile,exclude:[ledgerFile]}).map(file=>path.resolve(file).toLowerCase());

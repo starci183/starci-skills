@@ -22,7 +22,7 @@ if(!isMainThread&&workerData?.kind==='kernel-dead-worker-self-heal-cli'){
     const output=new Promise(resolve=>{emitted=resolve;});
     const log=console.log,error=console.error,argv=process.argv;
     console.log=(...parts)=>{const line=parts.join(' ');stdout.push(line);parentPort.postMessage({id,trace:'stdout',line});emitted();};
-    console.error=(...parts)=>{const line=parts.join(' ');stderr.push(line);parentPort.postMessage({id,trace:'stderr',line});emitted();};
+    console.error=(...parts)=>{const line=parts.join(' ');stderr.push(line);parentPort.postMessage({id,trace:'stderr',line});if(!/ExperimentalWarning|--trace-warnings/.test(line))emitted();};
     process.argv=[process.execPath,workerData.api,...args];
     try{
       await import(`${pathToFileURL(workerData.api).href}?self_heal_invocation=${++invocation}`);

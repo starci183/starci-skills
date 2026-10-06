@@ -20,11 +20,12 @@ const fixture = (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hk-sessions-'));
   t.after(() => { safeRemove(root, { hold: artifactHoldReason }); });
   const profile = path.join(root, 'profile');
-  const appData = path.join(root, 'appdata');
+  // Orca's user-data root: %APPDATA% on Windows, XDG_CONFIG_HOME on Linux, ~/Library/Application Support on macOS (hk-sessions orcaHome).
+  const appData = process.platform === 'darwin' ? path.join(profile, 'Library', 'Application Support') : path.join(root, 'appdata');
   const archiveRoot = path.join(root, 'archive');
   fs.mkdirSync(profile, { recursive: true });
   fs.mkdirSync(appData, { recursive: true });
-  return { root, profile, appData, archiveRoot, env: { USERPROFILE: profile, APPDATA: appData, STARCI_ARCHIVE_ROOT: archiveRoot } };
+  return { root, profile, appData, archiveRoot, env: { USERPROFILE: profile, APPDATA: appData, XDG_CONFIG_HOME: appData, STARCI_ARCHIVE_ROOT: archiveRoot } };
 };
 
 const file = (p, { ageMs = 0, content = 'session-bytes' } = {}) => {

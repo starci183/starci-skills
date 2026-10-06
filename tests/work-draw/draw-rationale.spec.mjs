@@ -13,6 +13,7 @@ import {
 } from '../../scripts/work/draw/draw-rationale.mjs';
 import { DRAW_QUALITY_CODES } from '../../scripts/work/draw/draw-quality.mjs';
 import { machineMetrics } from '../../scripts/work/draw-loop.mjs';
+import { chromiumGap } from '../helpers/chromium-gap.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rationale-')); t.after(() => fs.rmSync(d, { recursive: true, force: true })); return d; };
@@ -156,6 +157,8 @@ test('a real render: draw-render measures the values and captures the redline (s
   let playwright = null;
   try { playwright = loadPlaywright([process.env.STARCI_PLAYWRIGHT_DIR, ROOT].filter(Boolean)); } catch { playwright = null; }
   if (!playwright) { t.skip('no playwright install resolvable (set STARCI_PLAYWRIGHT_DIR)'); return; }
+  const gap = chromiumGap(playwright.chromium);
+  if (gap) { t.skip(`no browser to drive: ${gap}`); return; }
   const dir = tmp(t);
   const html = path.join(dir, 'screen.html');
   fs.writeFileSync(html, GOOD_HTML);

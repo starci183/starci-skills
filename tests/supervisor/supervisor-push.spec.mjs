@@ -95,6 +95,7 @@ const fixture = (t) => {
   write('.husky/_/h', HUSKY_H);
   write('.husky/_/pre-push', HUSKY_SHIM);
   write('.husky/_/.gitignore', '*\n');
+  for (const hook of ['h', 'pre-push']) fs.chmodSync(path.join(repo, '.husky', '_', hook), 0o755); // git runs a hook only when it is executable (POSIX)
   write('.gitignore', 'node_modules/\n');
   write('node_modules/keep.txt', 'live deps\n');
   write('apps/app/node_modules/keep.txt', 'live app deps\n');

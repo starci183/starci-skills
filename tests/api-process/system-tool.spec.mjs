@@ -96,6 +96,29 @@ test('portListener spawns absolute tools on both OS families and answers null wi
   assert.deepEqual(portListener(4321, { platform: 'linux', spawn: posixSpawn, tool }), { pid: 88, commandLine: 'node a.js' });
   assert.equal(calls.length, 4);
   assert.ok(calls.every(absolute), calls.join(', '));
-  assert.equal(portListener(4321, { platform: 'linux', spawn: posixSpawn, tool: noTool }), null);
+  const noProc = { readFileSync: () => { throw new Error('ENOENT'); }, readdirSync: () => { throw new Error('ENOENT'); }, readlinkSync: () => { throw new Error('ENOENT'); } };
+  assert.equal(portListener(4321, { platform: 'linux', spawn: posixSpawn, tool: noTool, fsx: noProc }), null);
+  assert.equal(portListener(4321, { platform: 'darwin', spawn: posixSpawn, tool: noTool, fsx: noProc }), null);
   assert.deepEqual(portListener(4321, { platform: 'win32', spawn: winSpawn, tool: (name) => (name === 'powershell' ? noTool(name) : winTool(name)) }), { pid: 77, commandLine: null });
+});
+
+test('portListener without lsof finds the process holding the LISTEN socket of a port from /proc, and null for a closed or unreadable one', () => {
+  const rows = (port, state, inode) => `  0: 0100007F:${port.toString(16).toUpperCase().padStart(4, '0')} 00000000:0000 ${state} 00000000:00000000 00:00000000 00000000  1000        0 ${inode} 1 0000000000000000 100 0 0 10 0`;
+  const header = '  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode';
+  const files = {
+    '/proc/net/tcp': [header, rows(4321, '0A', 555), rows(4322, '01', 777)].join('\n'),
+    '/proc/42/cmdline': 'node\0server.mjs\0',
+  };
+  const links = { '/proc/41/fd/3': 'socket:[999]', '/proc/42/fd/7': 'socket:[555]', '/proc/42/fd/8': '/dev/null' };
+  const dirs = { '/proc': ['self', '41', '42', 'net'], '/proc/41/fd': ['3'], '/proc/42/fd': ['7', '8'] };
+  const miss = (what) => { throw Object.assign(new Error(`ENOENT ${what}`), { code: 'ENOENT' }); };
+  const fsx = {
+    readFileSync: (file) => files[file] ?? miss(file),
+    readdirSync: (dir) => dirs[dir] ?? miss(dir),
+    readlinkSync: (link) => links[link] ?? miss(link),
+  };
+  assert.deepEqual(portListener(4321, { platform: 'linux', tool: noTool, fsx }), { pid: 42, commandLine: 'node server.mjs' });
+  assert.equal(portListener(4322, { platform: 'linux', tool: noTool, fsx }), null, 'an ESTABLISHED socket is not a listener');
+  assert.equal(portListener(9, { platform: 'linux', tool: noTool, fsx }), null);
+  assert.equal(portListener(4321, { platform: 'linux', tool: noTool, fsx: { ...fsx, readdirSync: (dir) => (dir === '/proc' ? ['42'] : miss(dir)) } }), null, 'a process whose fds are unreadable holds nothing for this user');
 });
