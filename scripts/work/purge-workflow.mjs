@@ -101,6 +101,38 @@ function assertCurrentArchive(db, root, workflowId) {
 
 
 /** Plan (and with `apply`, run) the purge of one finished workflow. */
+function ensureArchive(ledger, db, { workflowId, root, archive, files, missing, counts, approvedBy, approvalRef, now }) {
+  const row = purgeRow(db, workflowId);
+  let stillGood = false;
+  if (row.verified_at && fs.existsSync(row.archive_path)) try { const checked = zipVisit(row.archive_path, () => {}); stillGood = checked.sha256 === row.archive_sha256 && checked.entries.every(e => e.crcOk) && checked.entries.find(e => e.name === 'manifest.json')?.sha256 === row.manifest_sha256; } catch { /* retain rows; rebuild through the normal verified path */ }
+  if (!stillGood) {
+    const head = eventsHead(db, workflowId);
+    const entries = workflowEntries(db, workflowId);
+    for (const f of files) entries.push({ name: `files/${f.rel}`, file: f.abs });
+    fs.mkdirSync(path.dirname(archive), { recursive: true });
+    const tmp = `${archive}.partial-${process.pid}`;
+    // The manifest needs every entry's sha256 first: hash, then write the ZIP with the manifest as its last entry.
+    let total = 0;
+    if (entries.length + 1 > ZIP_RESOURCE_LIMITS.maxEntries) throw refuse('zip-limit', 'workflow archive has too many entries; workflow rows remain');
+    const described = entries.map(e => { const bytes = e.data != null ? Buffer.byteLength(e.data) : fs.statSync(e.file).size; if (bytes > ZIP_RESOURCE_LIMITS.maxEntryBytes || (total += bytes) > ZIP_RESOURCE_LIMITS.maxTotalBytes) { throw refuse('zip-limit', 'workflow archive exceeds the supported byte budget; workflow rows remain'); } return { name: e.name, sha256: e.data != null ? sha256(e.data) : sha256File(e.file), bytes }; });
+    const manifest = { schema: PURGE_MANIFEST_SCHEMA, workflowId, repo: root, product: path.basename(root), createdAt: new Date(now()).toISOString(),
+      approvedBy, approvalRef, eventsHead: head, counts, entries: described, missingFiles: missing };
+    const manifestBuf = Buffer.from(JSON.stringify(manifest, null, 2));
+    if (fs.existsSync(archive)) fs.renameSync(archive, `${archive}.stale-${Date.now()}`);
+    zipWrite(tmp, [...entries, { name: 'manifest.json', data: manifestBuf }]);
+    fs.renameSync(tmp, archive);
+    // Verify from disk: every entry inflates, its CRC holds and its sha256 is the manifest's.
+    const checked = zipVisit(archive, () => {});
+    const byName = new Map(checked.entries.map((e) => [e.name, e]));
+    const onDisk = byName.get('manifest.json');
+    if (!onDisk || !onDisk.crcOk || onDisk.sha256 !== sha256(manifestBuf)) throw refuse('archive-verify-failed', `${archive}: manifest.json does not read back`);
+    const bad = described.filter((d) => { const e = byName.get(d.name); return !e || !e.crcOk || e.sha256 !== d.sha256 || e.bytes !== d.bytes; });
+    if (bad.length || checked.entries.length !== described.length + 1) throw refuse('archive-verify-failed', `${archive}: ${bad.length} entr(ies) do not match the manifest (${bad.slice(0, 5).map((b) => b.name).join(', ')})`);
+    ledger.transaction(() => recordPurge(db, { workflowId, state: 'archived', archivePath: archive, archiveSha256: checked.sha256, archiveBytes: checked.bytes,
+      manifestSha256: sha256(manifestBuf), eventsHead: head, countsJson: JSON.stringify(counts), archivedAt: now(), verifiedAt: now() }));
+  }
+}
+
 export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = null, approvalRef = null, archiveRoot = archiveRootOf(), date = today(), now = Date.now }) {
   const root = path.resolve(repo);
   const ledger = openLedger({ file: ledgerFileFor(root) });
@@ -124,34 +156,7 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
     ledger.transaction(() => recordPurge(db, { workflowId, state: prior?.state ?? 'planned', approvedBy, approvalRef, at: now() }));
 
     // 2-3. Archive and verify (skipped only when an earlier run already verified this archive and it still matches).
-    const row = purgeRow(db, workflowId);
-    let stillGood=false;
-    if(row.verified_at&&fs.existsSync(row.archive_path))try{const checked=zipVisit(row.archive_path,()=>{});stillGood=checked.sha256===row.archive_sha256&&checked.entries.every(e=>e.crcOk)&&checked.entries.find(e=>e.name==='manifest.json')?.sha256===row.manifest_sha256;}catch{/* retain rows; rebuild through the normal verified path */}
-    if (!stillGood) {
-      const head = eventsHead(db, workflowId);
-      const entries = workflowEntries(db,workflowId);
-      for (const f of files) entries.push({ name: `files/${f.rel}`, file: f.abs });
-      fs.mkdirSync(path.dirname(archive), { recursive: true });
-      const tmp = `${archive}.partial-${process.pid}`;
-      // The manifest needs every entry's sha256 first: hash, then write the ZIP with the manifest as its last entry.
-      let total=0;if(entries.length+1>ZIP_RESOURCE_LIMITS.maxEntries)throw refuse('zip-limit','workflow archive has too many entries; workflow rows remain');
-      const described = entries.map(e=>{const bytes=e.data!=null?Buffer.byteLength(e.data):fs.statSync(e.file).size;if(bytes>ZIP_RESOURCE_LIMITS.maxEntryBytes||(total+=bytes)>ZIP_RESOURCE_LIMITS.maxTotalBytes){throw refuse('zip-limit','workflow archive exceeds the supported byte budget; workflow rows remain');}return {name:e.name,sha256:e.data!=null?sha256(e.data):sha256File(e.file),bytes};});
-      const manifest = { schema: PURGE_MANIFEST_SCHEMA, workflowId, repo: root, product: path.basename(root), createdAt: new Date(now()).toISOString(),
-        approvedBy, approvalRef, eventsHead: head, counts, entries: described, missingFiles: missing };
-      const manifestBuf = Buffer.from(JSON.stringify(manifest, null, 2));
-      if (fs.existsSync(archive)) fs.renameSync(archive, `${archive}.stale-${Date.now()}`);
-      zipWrite(tmp, [...entries, { name: 'manifest.json', data: manifestBuf }]);
-      fs.renameSync(tmp, archive);
-      // Verify from disk: every entry inflates, its CRC holds and its sha256 is the manifest's.
-      const checked = zipVisit(archive,()=>{});
-      const byName = new Map(checked.entries.map((e) => [e.name, e]));
-      const onDisk = byName.get('manifest.json');
-      if (!onDisk || !onDisk.crcOk || onDisk.sha256 !== sha256(manifestBuf)) throw refuse('archive-verify-failed', `${archive}: manifest.json does not read back`);
-      const bad = described.filter((d) => { const e = byName.get(d.name); return !e || !e.crcOk || e.sha256 !== d.sha256 || e.bytes !== d.bytes; });
-      if (bad.length || checked.entries.length !== described.length + 1) throw refuse('archive-verify-failed', `${archive}: ${bad.length} entr(ies) do not match the manifest (${bad.slice(0, 5).map((b) => b.name).join(', ')})`);
-      ledger.transaction(() => recordPurge(db, { workflowId, state: 'archived', archivePath: archive, archiveSha256: checked.sha256, archiveBytes: checked.bytes,
-        manifestSha256: sha256(manifestBuf), eventsHead: head, countsJson: JSON.stringify(counts), archivedAt: now(), verifiedAt: now() }));
-    }
+    ensureArchive(ledger, db, { workflowId, root, archive, files, missing, counts, approvedBy, approvalRef, now });
 
     // 4. Delete: the guard opens for this workflow only while its row says 'deleting'.
     const deleted = ledger.transaction(() => { assertCurrentArchive(db,root,workflowId); recordPurge(db, { workflowId, state: 'deleting' }); return deleteWorkflowRows(db, { workflowId }); });
