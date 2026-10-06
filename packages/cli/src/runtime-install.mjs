@@ -20,8 +20,8 @@ const npmEntryCandidates = ({ execPath = process.execPath, env = process.env } =
   if (typeof env?.npm_execpath === 'string' && path.basename(env.npm_execpath).toLowerCase() === 'npm-cli.js') {
     candidates.push(path.resolve(env.npm_execpath));
   }
-  candidates.push(path.join(nodeDirectory, 'node_modules', 'npm', 'bin', 'npm-cli.js'));
-  candidates.push(path.join(path.dirname(nodeDirectory), 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js'));
+  candidates.push(path.join(nodeDirectory, 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    path.join(path.dirname(nodeDirectory), 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js'));
   return [...new Set(candidates)];
 };
 
