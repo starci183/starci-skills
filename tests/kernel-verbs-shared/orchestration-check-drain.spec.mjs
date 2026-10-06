@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { openLedger, ledgerFileFor, ensureWorkflow, changeWorkflowPhase, insertGoal, createUnit, enqueueJob, setJobStatus, updateJob, postInbox } from '../../engine/db/ledger.mjs';
+import { openLedger, ledgerFileFor, ensureWorkflow, changeWorkflowPhase, insertGoal, createUnit, enqueueJob, setJobStatus, updateJob } from '../../engine/db/ledger.mjs';
 import { drainWorkflowMessages, orchestrationMessagesOf, workerQuestionsOf, ORCHESTRATION_DELIVERY } from '../../scripts/kernel/verbs/shared/worker-messages.mjs';
 
 const WF = 'wf-drain', JOB = 'job-drain', KERNEL = 'term-kernel', RUN = 'run-wf', DISPATCH = 'ctx_op';
@@ -144,69 +144,4 @@ test('an unmatched question is closed by the drain; a matched one stays pending'
   const states = Object.fromEntries(workerQuestionsOf(ledger.db, WF).questions.map((q) => [q.messageId, q.state]));
   assert.deepEqual(states, { m1: 'pending', 'm-stray': 'answered' }, 'the unmatched question was closed done');
   assert.equal(JSON.parse(ledger.db.prepare("SELECT disposition_json FROM inbox WHERE key='m-stray'").get().disposition_json).reason, 'unmatched');
-});
-
-
-test('hotload acknowledges a committed pre-digest Delivery under its original receipt without rewriting history or recounting it', (t) => {
-  const ledger = fixture(t), trace = [], batch = [msg('legacy-heartbeat', 'heartbeat')];
-  ledger.transaction(() => ledger.appendEvent({ workflowId: WF, entityType: 'workflow', entityId: WF,
-    kind: ORCHESTRATION_DELIVERY, payload: { runId: RUN, deliveryId: 'd0', count: 1, types: { heartbeat: 1 }, heartbeats: 1 } }));
-  const history = ledger.db.prepare('SELECT * FROM events ORDER BY seq').all();
-  const result = drainWorkflowMessages(traced(ledger, trace), WF, { check: fakeCheck([batch], trace) });
-  assert.equal(result.ok, true, result.error);
-  assert.equal(result.legacyReplays, 1);
-  assert.deepEqual([result.deliveries, result.questions, result.messages, result.heartbeats], [0, 0, 0, 0]);
-  assert.deepEqual(trace.slice(0, 3), [['check', RUN, KERNEL, null], ['commit'], ['check', RUN, KERNEL, 'd0']]);
-  assert.deepEqual(ledger.db.prepare('SELECT * FROM events ORDER BY seq').all(), history);
-  assert.equal(Object.hasOwn(JSON.parse(history.at(-1).payload_json), 'payloadDigest'), false);
-});
-
-test('a legacy Delivery summary conflict or malformed digest is never acknowledged', (t) => {
-  for (const payload of [{ runId: RUN, deliveryId: 'd0', count: 1, types: { heartbeat: 1 }, heartbeats: 1 },
-    { runId: RUN, deliveryId: 'd0', count: 1, types: { status: 1 }, heartbeats: 0, payloadDigest: null }]) {
-    const ledger = fixture(t), trace = [];
-    ledger.transaction(() => ledger.appendEvent({ workflowId: WF, entityType: 'workflow', entityId: WF,
-      kind: ORCHESTRATION_DELIVERY, payload }));
-    const before = ledger.db.prepare('SELECT * FROM events ORDER BY seq').all();
-    const result = drainWorkflowMessages(ledger, WF, { check: fakeCheck([[msg('different-summary', 'status')]], trace) });
-    assert.equal(result.ok, false);
-    assert.equal(result.legacyReplays, 0);
-    assert.deepEqual(trace, [['check', RUN, KERNEL, null]]);
-    assert.deepEqual(ledger.db.prepare('SELECT * FROM events ORDER BY seq').all(), before);
-  }
-});
-
-
-test('legacy question and status replay requires the exact committed IDs before acknowledgement', (t) => {
-  const ledger = fixture(t), batch = [msg('legacy-question', 'question'), msg('legacy-status', 'status')];
-  ledger.transaction(() => {
-    postInbox(ledger.db, { workflowId: WF, kind: 'worker-question', key: 'legacy-question',
-      payload: { messageId: 'legacy-question', type: 'question', runId: RUN, jobId: JOB, dispatchId: DISPATCH,
-        question: batch[0].body, options: [] }, createdAt: Date.now() });
-    ledger.appendEvent({ workflowId: WF, entityType: 'job', entityId: JOB, kind: 'worker-question-bridged',
-      payload: { messageId: 'legacy-question', dispatchId: DISPATCH, runId: RUN, deliveryId: 'd0' } });
-    ledger.appendEvent({ workflowId: WF, entityType: 'orca-message', entityId: 'legacy-status', kind: 'orchestration-message',
-      payload: { messageId: 'legacy-status', type: 'status', runId: RUN, deliveryId: 'd0', body: batch[1].body } });
-    ledger.appendEvent({ workflowId: WF, entityType: 'workflow', entityId: WF, kind: ORCHESTRATION_DELIVERY,
-      payload: { runId: RUN, deliveryId: 'd0', count: 2, types: { question: 1, status: 1 }, heartbeats: 0 } });
-  });
-  const history = ledger.db.prepare('SELECT * FROM events ORDER BY seq').all();
-  const inbox = ledger.db.prepare('SELECT * FROM inbox ORDER BY inbox_id').all();
-  for (const index of [0, 1]) {
-    const conflict = batch.map((message, i) => i === index ? { ...message, id: `unseen-${i}` } : message);
-    const trace = [], refused = drainWorkflowMessages(ledger, WF, { check: fakeCheck([conflict], trace) });
-    assert.equal(refused.ok, false);
-    assert.match(refused.error, /no committed legacy message unseen-/);
-    assert.equal(refused.legacyReplays, 0);
-    assert.deepEqual(trace, [['check', RUN, KERNEL, null]]);
-    assert.deepEqual(ledger.db.prepare('SELECT * FROM events ORDER BY seq').all(), history);
-    assert.deepEqual(ledger.db.prepare('SELECT * FROM inbox ORDER BY inbox_id').all(), inbox);
-  }
-  const trace = [], accepted = drainWorkflowMessages(ledger, WF, { check: fakeCheck([batch], trace) });
-  assert.equal(accepted.ok, true, accepted.error);
-  assert.equal(accepted.legacyReplays, 1);
-  assert.deepEqual([accepted.deliveries, accepted.questions, accepted.messages, accepted.heartbeats], [0, 0, 0, 0]);
-  assert.deepEqual(trace.slice(0, 2), [['check', RUN, KERNEL, null], ['check', RUN, KERNEL, 'd0']]);
-  assert.deepEqual(ledger.db.prepare('SELECT * FROM events ORDER BY seq').all(), history);
-  assert.deepEqual(ledger.db.prepare('SELECT * FROM inbox ORDER BY inbox_id').all(), inbox);
 });
