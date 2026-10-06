@@ -120,6 +120,12 @@ export function restoreJob(ledger, jobId, { editId, now = Date.now() }) {
 /* ------------------------------------------------------------ paths and leases */
 
 const overlaps = (a, b) => { const x = a.toLowerCase(), y = b.toLowerCase(); return x === y || x.startsWith(`${y}/`) || y.startsWith(`${x}/`); };
+const appendOverlapHits = (hits, paths, mine, canonicalPath, workflowId, jobId) => {
+  for (const pathValue of paths) {
+    const c = slash(canonicalPath(pathValue));
+    for (const m of mine) if (overlaps(m.c, c)) hits.push({ path: m.p, workflowId, jobId });
+  }
+};
 
 /**
  * Paths of `paths` that overlap an OPEN job or a held lease of ANOTHER workflow in this ledger: [{path, workflowId,
@@ -132,14 +138,11 @@ export function foreignOverlap(db, { repo, workflowId, op, payload = {}, paths }
   const others = db.prepare(`SELECT job_id, workflow_id, op_id, payload_json FROM jobs WHERE workflow_id<>? AND kind='op' AND status IN (${OPEN_JOB.map(() => '?').join(',')})`).all(workflowId, ...OPEN_JOB);
   for (const o of others) {
     const pl = parse(o.payload_json);
-    for (const theirs of pl.owned_paths ?? []) {
-      const c = slash(canon.canonical(theirs, { op: o.op_id, payload: pl }));
-      for (const m of mine) if (overlaps(m.c, c)) hits.push({ path: m.p, workflowId: o.workflow_id, jobId: o.job_id });
-    }
+    appendOverlapHits(hits, pl.owned_paths ?? [], mine, (p) => canon.canonical(p, { op: o.op_id, payload: pl }), o.workflow_id, o.job_id);
   }
   for (const l of db.prepare("SELECT resource_key, job_id, workflow_id FROM leases WHERE workflow_id<>? AND resource_key LIKE 'path:%'").all(workflowId)) {
-    const c = slash(canon.canonicalOf(l.resource_key.replace(/^path:/, ''), { job_id: l.job_id }));
-    for (const m of mine) if (overlaps(m.c, c)) hits.push({ path: m.p, workflowId: l.workflow_id, jobId: l.job_id });
+    const resourcePath = l.resource_key.replace(/^path:/, '');
+    appendOverlapHits(hits, [resourcePath], mine, (p) => canon.canonicalOf(p, { job_id: l.job_id }), l.workflow_id, l.job_id);
   }
   return hits;
 }
@@ -162,11 +165,17 @@ export function checkPaths(db, { repo, workflowId, op, payload = {}, current = [
   try {
     const guard = familyGuardOf(readOpManifest(briefFile));
     const wrong = familyViolations(guard, add);
-    if (wrong.length) throw refuse(`outside ${op}'s writes: ${wrong.map((v) => `${v.path} (${v.why})`).join('; ')}`, 'owned-paths-outside-writes');
+    if (wrong.length) {
+      const detail = wrong.map((v) => `${v.path} (${v.why})`).join('; ');
+      throw refuse(`outside ${op}'s writes: ${detail}`, 'owned-paths-outside-writes');
+    }
   } catch (e) { if (e.code) throw e; }
   const qualified = add.map((p) => (heads.size === 1 && !slash(p).startsWith(`${[...heads][0]}/`) && /^(apps|packages|src|libs|e2e)\//.test(slash(p)) ? `${[...heads][0]}/${slash(p)}` : slash(p)));
   const hits = foreignOverlap(db, { repo, workflowId, op, payload, paths: qualified });
-  if (hits.length) throw refuse(`another workflow holds ${hits.slice(0, 4).map((h) => `${h.path} (${h.workflowId} ${h.jobId})`).join(', ')}: never take its paths - message it (starci kernel notify) or wait`, 'path-held-by-other-workflow', { hits });
+  if (hits.length) {
+    const detail = hits.slice(0, 4).map((h) => `${h.path} (${h.workflowId} ${h.jobId})`).join(', ');
+    throw refuse(`another workflow holds ${detail}: never take its paths - message it (starci kernel notify) or wait`, 'path-held-by-other-workflow', { hits });
+  }
   return qualified;
 }
 
@@ -174,7 +183,7 @@ export function checkPaths(db, { repo, workflowId, op, payload = {}, current = [
 
 /** The shape of one unit attempt: op, sorted owned paths, params, per-job override, pinned model. */
 export const shapeOf = (op, payload = {}) => crypto.createHash('sha1').update(JSON.stringify([op,
-  [...(payload.owned_paths ?? [])].map(slash).sort(byCodeUnit), payload.params ?? {}, payload.kernelOverride ?? {}, payload.kernelModel ?? null])).digest('hex').slice(0, 12);
+  [...(payload.owned_paths ?? [])].map(slash).toSorted(byCodeUnit), payload.params ?? {}, payload.kernelOverride ?? {}, payload.kernelModel ?? null])).digest('hex').slice(0, 12);
 
 /** The shapes this unit already failed with for a shape-related cause (a dead worker is no shape verdict). */
 export function failedShapesOf(db, workflowId, job) {
@@ -208,30 +217,40 @@ export function requireDecision(db, workflowId, id) {
 const WEAKEN = /\b(skip|disable|ignore|bypass|weaken|relax|suppress|turn off|comment out|eslint-disable|no-verify)\b[^.]{0,60}\b(check|gate|test|lint|scan|validator|canon|rule|typecheck|tsc|spec|proof)s?\b/i;
 const DIFFICULTIES = ['easy', 'medium', 'hard', 'insane'];
 
+const overrideValidators = new Map([
+  ['notes', (value) => {
+    const notes = (Array.isArray(value) ? value : [value]).map((note) => String(note ?? '').trim()).filter(Boolean);
+    if (notes.length > 8 || notes.some((note) => note.length > 600)) throw refuse('notes: at most 8 notes of 600 characters', 'override-invalid');
+    const bad = notes.find((note) => WEAKEN.test(note));
+    if (bad) throw refuse(`a note may add guidance, never weaken a gate: "${one(bad, 120)}"`, 'override-weakens-gate');
+    return notes;
+  }],
+  ['commandTimeoutMs', (value) => {
+    if (!Number.isInteger(value) || value < 30_000 || value > 3_600_000) throw refuse('commandTimeoutMs: an integer 30000..3600000', 'override-invalid');
+    return value;
+  }],
+  ['difficulty', (value) => {
+    if (!DIFFICULTIES.includes(value)) throw refuse(`difficulty: one of ${DIFFICULTIES.join('|')}`, 'override-invalid');
+    return value;
+  }],
+  ['model', (value) => {
+    if (typeof value !== 'string' || !/^[a-z0-9-]+$/.test(value)) throw refuse('model: a pool target such as claude-agent', 'override-invalid');
+    return value;
+  }],
+  ['effort', (value) => {
+    if (!['low', 'medium', 'high'].includes(value)) throw refuse('effort: low|medium|high', 'override-invalid');
+    return value;
+  }],
+]);
+
 /** Validate an override: additive keys only (guardrail b). Returns the clean object or throws. */
 export function validateOverride(o) {
   if (!o || typeof o !== 'object' || Array.isArray(o)) throw refuse('--set must be a JSON object', 'override-invalid');
   const out = {};
   for (const [k, v] of Object.entries(o)) {
-    if (k === 'notes') {
-      const notes = (Array.isArray(v) ? v : [v]).map((n) => String(n ?? '').trim()).filter(Boolean);
-      if (notes.length > 8 || notes.some((n) => n.length > 600)) throw refuse('notes: at most 8 notes of 600 characters', 'override-invalid');
-      const bad = notes.find((n) => WEAKEN.test(n));
-      if (bad) throw refuse(`a note may add guidance, never weaken a gate: "${one(bad, 120)}"`, 'override-weakens-gate');
-      out.notes = notes;
-    } else if (k === 'commandTimeoutMs') {
-      if (!Number.isInteger(v) || v < 30_000 || v > 3_600_000) throw refuse('commandTimeoutMs: an integer 30000..3600000', 'override-invalid');
-      out.commandTimeoutMs = v;
-    } else if (k === 'difficulty') {
-      if (!DIFFICULTIES.includes(v)) throw refuse(`difficulty: one of ${DIFFICULTIES.join('|')}`, 'override-invalid');
-      out.difficulty = v;
-    } else if (k === 'model') {
-      if (typeof v !== 'string' || !/^[a-z0-9-]+$/.test(v)) throw refuse('model: a pool target such as claude-agent', 'override-invalid');
-      out.model = v;
-    } else if (k === 'effort') {
-      if (!['low', 'medium', 'high'].includes(v)) throw refuse('effort: low|medium|high', 'override-invalid');
-      out.effort = v;
-    } else throw refuse(`${k}: an override may set only notes, commandTimeoutMs, difficulty, model, effort - never checks, writes, steps or gates`, 'override-key-refused');
+    const validate = overrideValidators.get(k);
+    if (!validate) throw refuse(`${k}: an override may set only notes, commandTimeoutMs, difficulty, model, effort - never checks, writes, steps or gates`, 'override-key-refused');
+    out[k] = validate(v);
   }
   return out;
 }
@@ -286,6 +305,10 @@ export function refuseSettleBacklog(db, workflowId, verb, { now = Date.now() } =
   const s = progressSettings().settleBacklog;
   const backlog = kernelDecisionItems(db, workflowId, { now, ageMs: s.ageMs });
   if (backlog.length >= s.max) {
-    throw Object.assign(new Error(`settle-backlog: ${backlog.length} reported job(s) of ${workflowId} wait on your settle decision for more than ${Math.round(s.ageMs / 60_000)}m - DECIDE THEM FIRST (driver-loop.yaml progress.settleFirst; starci kernel status settleDecisions): starci kernel settle --job <id> --verdict <fail|blocked from its report>, or re-run its checks (starci kernel record-checks) and settle pass, for ${backlog.slice(0, 12).map((b) => `${b.jobId ?? `${b.op}#${b.attempt}`} (${b.outcome}${b.reason ? `, ${b.reason}` : ''}, ${b.ageMin}m)`).join(', ')}; then ${verb} again`), { code: 'settle-backlog', backlog });
+    const jobName = (b) => b.jobId ?? `${b.op}#${b.attempt}`;
+    const describeJob = (b) => `${jobName(b)} (${b.outcome}${b.reason ? `, ${b.reason}` : ''}, ${b.ageMin}m)`;
+    const waiting = backlog.slice(0, 12).map(describeJob).join(', ');
+    const age = Math.round(s.ageMs / 60_000);
+    throw Object.assign(new Error(`settle-backlog: ${backlog.length} reported job(s) of ${workflowId} wait on your settle decision for more than ${age}m - DECIDE THEM FIRST (driver-loop.yaml progress.settleFirst; starci kernel status settleDecisions): starci kernel settle --job <id> --verdict <fail|blocked from its report>, or re-run its checks (starci kernel record-checks) and settle pass, for ${waiting}; then ${verb} again`), { code: 'settle-backlog', backlog });
   }
 }

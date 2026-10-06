@@ -111,6 +111,7 @@ const groupRoute = (members, extra) => ({ ...members[0], members, fallThrough: t
 const memberLabel = (m) => `${m.agent}/${m.model ?? '(pool model)'}`;
 const memberSummary = (m) => ({ agent: m.agent, model: m.model ?? null, effort: m.effort ?? null,
   runtimePool: m.runtimePool ?? null, ...(m.availability ? { availability: m.availability.state } : {}) });
+const rejectedSummary = (rejected) => rejected.map((x) => `${x.target}: ${(x.reasons ?? [])[0] ?? 'rejected'}`).join('; ');
 
 async function routeKernel(db, owner) {
   if (agentOverride) {
@@ -194,14 +195,15 @@ async function routeKernel(db, owner) {
   const result = parseJson(r.stdout);
   const pick = result?.pick ?? null;
   if (r.error || r.status !== 0 || !pick?.target) {
+    const rejected = (result?.rejected ?? []).length ? ` — ${rejectedSummary(result.rejected)}` : '';
     return {
       agent: null, routedBy: 'route-model', effort: cfgEffort, config, warnings,
       error: r.error?.message ?? (r.status === 0 ? 'route-model returned no pick' : result?.rule ?? `route-model exited ${r.status}`)
-        + ((result?.rejected ?? []).length ? ` — ${result.rejected.map(x => `${x.target}: ${(x.reasons ?? [])[0] ?? 'rejected'}`).join('; ')}` : ''),
+        + rejected,
     };
   }
   const members = [];
-  for (const [, c] of [pick, ...(result.fallbackChain ?? [])].entries()) {
+  for (const c of [pick, ...(result.fallbackChain ?? [])]) {
     const agent = agentForTarget(c.target);
     if (!agent) { warn(`profile for runtimePool '${c.target}' declares no execution agent`); continue; }
     // Unpinned routing never invents a hard-coded Devin fallback: only

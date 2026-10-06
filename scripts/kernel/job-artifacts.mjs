@@ -55,6 +55,15 @@ const inside = (root, p) => isInside(path.resolve(root), path.resolve(p), { incl
 /** The job's working directory outside the repository: its STARCI_JOB_SCRATCH (dispatch writes the packet file there). */
 export const jobDirOf = (repo, workflowId, jobId) => jobScratchDirOf(repo, workflowId, jobId);
 
+const collectNamedFile = (p, searchRoots, missing, push) => {
+  const abs = path.isAbsolute(p) ? (statOf(p) ? path.resolve(p) : null) : searchRoots.map((r) => path.resolve(r, p)).find((c) => statOf(c));
+  if (!abs) {
+    if (/\.starciwork[\\/]/.test(p)) missing.push(slashed(p));
+    return;
+  }
+  if (statOf(abs).isFile()) push({ abs, source: 'named' });
+};
+
 /**
  * The report a job filed and the artifacts of that attempt: {reportId, envelope, attemptId, reportPath: null,
  * artifacts: [{artifactId, name, role, kind, subkind, sha256, mediaType, label, abs}]}. `dispatchId` names the
@@ -100,9 +109,7 @@ export function collectJobFiles({ repo, envelope = null, roots = [], jobId = nul
   const files = [], missing = [], seen = new Set();
   const push = (entry) => { const k = resolvedKey(entry.abs); if (!seen.has(k)) { seen.add(k); files.push(entry); } };
   for (const p of [...arr(envelope?.files), ...arr(envelope?.rootCause?.evidence)].filter((v) => typeof v === 'string' && v.trim())) {
-    const abs = path.isAbsolute(p) ? (statOf(p) ? path.resolve(p) : null) : searchRoots.map((r) => path.resolve(r, p)).find((c) => statOf(c));
-    if (!abs) { if (/\.starciwork[\\/]/.test(p)) missing.push(slashed(p)); continue; }
-    if (statOf(abs).isFile()) push({ abs, source: 'named' });
+    collectNamedFile(p, searchRoots, missing, push);
   }
   for (const a of artifacts) if (a?.abs) push({ abs: a.abs, source: 'artifact', kind: a.kind, name: a.name, artifactId: a.artifactId });
   const recordings = jobId ? recordingsRootOf(jobId) : null;
@@ -118,7 +125,9 @@ export function collectJobFiles({ repo, envelope = null, roots = [], jobId = nul
 export function jobShasOf({ envelope = null, result = null, payload = null }) {
   const landedRaw = result?.landed;
   const cherryPicked = typeof landedRaw === 'string';
-  const landed = cherryPicked ? landedRaw : (typeof landedRaw?.head === 'string' ? landedRaw.head : null);
+  let landed = null;
+  if (cherryPicked) landed = landedRaw;
+  else if (typeof landedRaw?.head === 'string') landed = landedRaw.head;
   const claimed = [envelope?.head, envelope?.commit].find((s) => typeof s === 'string' && SHA.test(s.trim()));
   const evidenced = arr(result?.evidence).map((e) => /^commit:([0-9a-f]{7,40})$/i.exec(String(e))?.[1]).find(Boolean);
   const base = [envelope?.base, payload?.staging?.base].find((s) => typeof s === 'string' && SHA.test(s)) ?? null;
@@ -126,6 +135,39 @@ export function jobShasOf({ envelope = null, result = null, payload = null }) {
 }
 
 const revParse = (root, ref, timeout) => { const r = gitResult(revParseQuery, ['--verify', '--quiet', `${ref}^{commit}`], { dir: root, timeout }); return r.ok ? r.stdout.trim() : null; };
+
+const patchBaseOf = (root, full, specs, shas, sinceMs, timeout) => {
+  let base = null;
+  if (shas.cherryPicked) base = revParse(root, `${full}^`, timeout);
+  else if (specs.length && Number.isFinite(sinceMs)) {
+    const since = `@${Math.floor(sinceMs / 1000)}`;
+    const commits = new Set();
+    for (const batch of specBatches(specs)) {
+      const log = gitResult(revList, [`--since=${since}`, full, '--', ...batch.map((s) => `:(literal)${s}`)], { dir: root, timeout });
+      if (!log.ok) { commits.clear(); break; }
+      for (const sha of log.stdout.split(/\s+/).filter(Boolean)) commits.add(sha);
+    }
+    // A batch's last commit need not be the oldest across the whole owned set.
+    if (commits.size) {
+      const history = gitResult(revList, [`--since=${since}`, full], { dir: root, timeout, maxBuffer: 64 * 1024 * 1024 });
+      const oldest = history.ok ? history.stdout.split(/\s+/).findLast((sha) => commits.has(sha)) : null;
+      if (oldest) base = revParse(root, `${oldest}^`, timeout) ?? 'root';
+    }
+  }
+  if (!base) base = shas.base && revParse(root, shas.base, timeout) ? revParse(root, shas.base, timeout) : (revParse(root, `${full}^`, timeout) ?? 'root');
+  return base;
+};
+
+const formatPatch = (root, timeout, revs, paths) => {
+  const parts = [];
+  for (const batch of paths.length ? specBatches(paths) : [[]]) {
+    const run = gitFormatPatch(['--stdout', '--binary', '--full-index', ...revs, ...(batch.length ? ['--', ...batch.map((s) => `:(literal)${s}`)] : [])],
+      { dir: root, timeout, encoding: null, maxBuffer: 1024 * 1024 * 1024 });
+    if (run.error || run.status !== 0) return run;
+    if (run.stdout?.length) parts.push(run.stdout);
+  }
+  return { status: 0, stdout: Buffer.concat(parts) };
+};
 
 /**
  * Write the job's commits as <job dir>/<job>.patch (git format-patch over its owned paths), once: an existing
@@ -155,41 +197,14 @@ export function writeJobPatch({ repo, job, envelope, result, payload, placements
     specs = [...grouped].find(([r]) => resolvedKey(r) === resolvedKey(root))?.[1]?.specs ?? null;
   }
   specs = arr(specs).filter((s) => typeof s === 'string' && s && s !== '.');
-  let base = null;
-  if (shas.cherryPicked) base = revParse(root, `${full}^`, timeout);
-  else if (specs.length && Number.isFinite(sinceMs)) {
-    const since = `@${Math.floor(sinceMs / 1000)}`;
-    const commits = new Set();
-    for (const batch of specBatches(specs)) {
-      const log = gitResult(revList, [`--since=${since}`, full, '--', ...batch.map((s) => `:(literal)${s}`)], { dir: root, timeout });
-      if (!log.ok) { commits.clear(); break; }
-      for (const sha of log.stdout.split(/\s+/).filter(Boolean)) commits.add(sha);
-    }
-    // A batch's last commit need not be the oldest across the whole owned set.
-    if (commits.size) {
-      const history = gitResult(revList, [`--since=${since}`, full], { dir: root, timeout, maxBuffer: 64 * 1024 * 1024 });
-      const oldest = history.ok ? history.stdout.split(/\s+/).findLast((sha) => commits.has(sha)) : null;
-      if (oldest) base = revParse(root, `${oldest}^`, timeout) ?? 'root';
-    }
-  }
-  if (!base) base = shas.base && revParse(root, shas.base, timeout) ? revParse(root, shas.base, timeout) : (revParse(root, `${full}^`, timeout) ?? 'root');
+  const base = patchBaseOf(root, full, specs, shas, sinceMs, timeout);
   const out = { file, state, head: shas.head, landed: shas.landed, base: base === 'root' ? null : base, repo: root, specs };
   if (fs.existsSync(file)) return { ...out, kept: true };
   if (dryRun) return { ...out, file: null, wouldWrite: true };
   const range = base === 'root' ? ['--root', full] : [`${base}..${full}`];
-  const formatPatch = (revs, paths) => {
-    const parts = [];
-    for (const batch of paths.length ? specBatches(paths) : [[]]) {
-      const run = gitFormatPatch(['--stdout', '--binary', '--full-index', ...revs, ...(batch.length ? ['--', ...batch.map((s) => `:(literal)${s}`)] : [])],
-        { dir: root, timeout, encoding: null, maxBuffer: 1024 * 1024 * 1024 });
-      if (run.error || run.status !== 0) return run;
-      if (run.stdout?.length) parts.push(run.stdout);
-    }
-    return { status: 0, stdout: Buffer.concat(parts) };
-  };
-  let run = formatPatch(range, shas.cherryPicked ? [] : specs);
+  let run = formatPatch(root, timeout, range, shas.cherryPicked ? [] : specs);
   // Commits that touch none of the owned paths: the patch is the named commit itself, never the whole range.
-  if (run.status === 0 && !run.stdout?.length && specs.length) run = formatPatch(['-1', full], []);
+  if (run.status === 0 && !run.stdout?.length && specs.length) run = formatPatch(root, timeout, ['-1', full], []);
   if (run.error || run.status !== 0 || !run.stdout?.length) return { ...out, error: String(run.stderr ?? run.error?.message ?? 'format-patch wrote nothing').trim() };
   fs.mkdirSync(jobDir, { recursive: true });
   fs.writeFileSync(file, run.stdout, { flag: 'wx' });
@@ -261,6 +276,54 @@ export function proofMediaGate({ policy, files, checks = [] }) {
   return { code: PROOF_MEDIA_MISSING, missing, detail: { images, videos, traces, browserRan, owes: policy } };
 }
 
+const stagePatchArtifacts = (patch, stage) => {
+  if (!patch?.file || !fs.existsSync(patch.file)) return null;
+  const shas = { baseSha: patch.base ?? null, headSha: patch.head ?? null, integratedSha: patch.landed ?? null };
+  stage(patch.file, { name: 'patch.diff', role: 'patch', kind: 'patch', mediaType: 'text/x-diff', label: patch.state, extra: shas });
+  let patchJson = null;
+  try { patchJson = writePatchJson(patch.file, { base: patch.base, head: patch.head, landed: patch.landed, state: patch.state }); }
+  catch (error) { patchJson = { error: String(error?.message ?? error) }; }
+  if (patchJson?.file && fs.existsSync(patchJson.file)) {
+    stage(patchJsonFileOf(patch.file), { name: 'patch.json', role: 'diff', kind: 'diff', subkind: 'patch-json', mediaType: 'application/json', extra: shas });
+    const assets = patchAssetsDirOf(patch.file);
+    for (const file of statOf(assets)?.isDirectory() ? fs.readdirSync(assets) : []) stage(path.join(assets, file), { name: `patch.assets/${file}`, role: 'diff', extra: shas });
+  }
+  return patchJson;
+};
+
+const stageRecordings = (jobId, stage) => {
+  const recordings = recordingsRootOf(jobId);
+  if (!statOf(recordings)?.isDirectory()) return;
+  const found = [];
+  walk(recordings, found, (file) => kindOf(file) !== 'file');
+  for (const abs of found) stage(abs, { name: `recordings/${slashed(path.relative(recordings, abs))}`, role: roleOf(abs) });
+};
+
+const indexStagedArtifacts = (ledger, { staged, repo, job, payload, envelope, reportArtifacts, attempt, patch, now, jobId }) => {
+  const byKind = {}, bySubkind = {};
+  for (const item of staged) {
+    byKind[item.kind] = (byKind[item.kind] ?? 0) + 1;
+    const sk = item.subkind ?? 'unknown';
+    bySubkind[sk] = (bySubkind[sk] ?? 0) + 1;
+  }
+  let added = 0, proofs = 0;
+  const indexed = [];
+  ledger.transaction((tx) => {
+    for (const item of staged) {
+      const r = putArtifact(tx, { workflowId: job.workflow_id, attemptId: attempt.attempt_id, role: item.role, kind: item.kind, subkind: item.subkind,
+        name: item.name, blob: item.blob, label: item.label, origin: 'settler', now, ...item.extra });
+      if (r.created) added += 1;
+      indexed.push({ id: r.artifactId, name: item.name, sha256: item.blob.sha });
+    }
+    const all = attemptArtifactsOf(tx, attempt.attempt_id);
+    proofs = recordArtifactProofs(tx, { repo, job, payload, envelope, artifacts: all, headSha: patch?.landed ?? patch?.head ?? null, now });
+    if (added || proofs) appendEvent(tx, { workflowId: job.workflow_id, entityType: 'job', entityId: jobId, attemptId: attempt.attempt_id, spanId: attempt.span_id, kind: ARTIFACTS_INDEXED, createdAt: now,
+      payload: { jobId, opId: job.op_id, attemptId: attempt.attempt_id, tryNo: job.try_no, status: job.status, indexed: indexed.length, added, proofs, byKind, bySubkind,
+        artifacts: indexed, reportArtifacts } });
+  });
+  return { byKind, bySubkind, added, proofs, indexed };
+};
+
 /**
  * Index what the settler owns of job `jobId` into job_artifacts (blobs first, then one transaction): the patch, the
  * pre-structured diff and its image assets, and the job's Playwright recordings; then the artifact_proofs rows of
@@ -291,45 +354,17 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
     const contract = db.prepare('SELECT created_at FROM contracts WHERE attempt_id=?').get(attempt.attempt_id);
     try { patch = writeJobPatch({ repo, job, envelope, result: parseJson(attempt.settle_json, null), payload, placements, roots: extraRoots, sinceMs: contract?.created_at ?? job.created_at, jobDir: tmp }); }
     catch (error) { patch = { error: String(error?.message ?? error) }; }
-    if (patch?.file && fs.existsSync(patch.file)) {
-      const shas = { baseSha: patch.base ?? null, headSha: patch.head ?? null, integratedSha: patch.landed ?? null };
-      stage(patch.file, { name: 'patch.diff', role: 'patch', kind: 'patch', mediaType: 'text/x-diff', label: patch.state, extra: shas });
-      try { patchJson = writePatchJson(patch.file, { base: patch.base, head: patch.head, landed: patch.landed, state: patch.state }); }
-      catch (error) { patchJson = { error: String(error?.message ?? error) }; }
-      if (patchJson?.file && fs.existsSync(patchJson.file)) {
-        stage(patchJsonFileOf(patch.file), { name: 'patch.json', role: 'diff', kind: 'diff', subkind: 'patch-json', mediaType: 'application/json', extra: shas });
-        const assets = patchAssetsDirOf(patch.file);
-        for (const file of statOf(assets)?.isDirectory() ? fs.readdirSync(assets) : []) stage(path.join(assets, file), { name: `patch.assets/${file}`, role: 'diff', extra: shas });
-      }
-    }
-    const recordings = recordingsRootOf(jobId);
-    if (statOf(recordings)?.isDirectory()) {
-      const found = [];
-      walk(recordings, found, (file) => kindOf(file) !== 'file');
-      for (const abs of found) stage(abs, { name: `recordings/${slashed(path.relative(recordings, abs))}`, role: roleOf(abs) });
-    }
+    patchJson = stagePatchArtifacts(patch, stage);
+    stageRecordings(jobId, stage);
   } finally { safeRemove(tmp, { hold: artifactHoldReason }); }
-  const byKind = {}, bySubkind = {};
-  for (const item of staged) { byKind[item.kind] = (byKind[item.kind] ?? 0) + 1; const sk = item.subkind ?? 'unknown'; bySubkind[sk] = (bySubkind[sk] ?? 0) + 1; }
-  let added = 0, proofs = 0;
-  const indexed = [];
-  ledger.transaction((tx) => {
-    for (const item of staged) {
-      const r = putArtifact(tx, { workflowId: job.workflow_id, attemptId: attempt.attempt_id, role: item.role, kind: item.kind, subkind: item.subkind,
-        name: item.name, blob: item.blob, label: item.label, origin: 'settler', now, ...item.extra });
-      if (r.created) added += 1;
-      indexed.push({ id: r.artifactId, name: item.name, sha256: item.blob.sha });
-    }
-    const all = attemptArtifactsOf(tx, attempt.attempt_id);
-    proofs = recordArtifactProofs(tx, { repo, job, payload, envelope, artifacts: all, headSha: patch?.landed ?? patch?.head ?? null, now });
-    if (added || proofs) appendEvent(tx, { workflowId: job.workflow_id, entityType: 'job', entityId: jobId, attemptId: attempt.attempt_id, spanId: attempt.span_id, kind: ARTIFACTS_INDEXED, createdAt: now,
-      payload: { jobId, opId: job.op_id, attemptId: attempt.attempt_id, tryNo: job.try_no, status: job.status, indexed: indexed.length, added, proofs, byKind, bySubkind,
-        artifacts: indexed, reportArtifacts: filed.length } });
-  });
+  const indexed = indexStagedArtifacts(ledger, { staged, repo, job, payload, envelope, reportArtifacts: filed.length, attempt, patch, now, jobId });
   const patchView = patch ? { state: patch.state ?? null, head: patch.head ?? null, landed: patch.landed ?? null, base: patch.base ?? null,
     ...(patch.missing ? { missing: patch.missing } : {}), ...(patch.error ? { error: patch.error } : {}) } : null;
-  const patchJsonView = patchJson ? (patchJson.error ? { error: patchJson.error } : { files: patchJson.files, truncated: patchJson.truncated }) : null;
-  return { ok: true, jobId, attemptId: attempt.attempt_id, indexed: indexed.length, added, proofs, byKind, bySubkind, patch: patchView, ...(patchJsonView ? { patchJson: patchJsonView } : {}), missing: [] };
+  let patchJsonView = null;
+  if (patchJson?.error) patchJsonView = { error: patchJson.error };
+  else if (patchJson) patchJsonView = { files: patchJson.files, truncated: patchJson.truncated };
+  return { ok: true, jobId, attemptId: attempt.attempt_id, indexed: indexed.indexed.length, added: indexed.added, proofs: indexed.proofs,
+    byKind: indexed.byKind, bySubkind: indexed.bySubkind, patch: patchView, ...(patchJsonView ? { patchJson: patchJsonView } : {}), missing: [] };
 }
 
 /**

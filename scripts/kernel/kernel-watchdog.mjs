@@ -119,8 +119,11 @@ const api = command => runNodeJson(apiFile, [command, '--repo', path.resolve(rep
 /** The watchdog answer of a start-workflow run {ok, value, stderr, stdout} past its host-unavailable and live-worker steps. Pure. */
 export function startAnswerOf(started, base = {}) {
   const live = started.ok && started.value?.replaced === false;
+  let action = 'restart-failed';
+  if (live) action = 'already-live';
+  else if (started.ok) action = 'restarted';
   return {
-    ...base, ok: started.ok && started.value?.ok !== false, action: live ? 'already-live' : started.ok ? 'restarted' : 'restart-failed',
+    ...base, ok: started.ok && started.value?.ok !== false, action,
     ...(live ? { note: started.value?.note ?? null } : {}),
     replacementTerminal: started.value?.terminal ?? null,
     detail: started.value ?? started.stderr ?? started.stdout,
@@ -242,7 +245,7 @@ export function idleWakesOf(rows, { now = Date.now() } = {}) {
   for (const row of rows) {
     if (KERNEL_MOVES.has(row.kind)) { wakes = 0; firstWakeAt = null; replacedAts = []; }
     else if (KERNEL_ACTIVITY.has(row.kind)) { wakes = 0; firstWakeAt = null; }
-    else if (row.kind === KERNEL_WOKEN_EVENT) { if (wakes === 0) firstWakeAt = Number(row.created_at) || null; wakes += 1; }
+    else if (row.kind === KERNEL_WOKEN_EVENT) { if (wakes === 0) { firstWakeAt = Number(row.created_at) || null; } wakes += 1; }
     else if (row.kind === KERNEL_IDLE_REPLACED_EVENT) { replacedAts.push(Number(row.created_at) || 0); wakes = 0; firstWakeAt = null; }
   }
   const replaced = replacedAts.filter((at) => now - at < IDLE_REPLACED_WINDOW_MS).length;
@@ -410,7 +413,8 @@ function kernelTick(status, phase) {
     if (earlier.dead) return replaceWakeDeadKernel({ phase, terminal, dispatch: signalValue.dispatch, stale, outputAgeMs, ...earlier });
     const proof = sendEnterWithProof({ terminal });
     if (!proof.ok) recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null });
-    return { ok: proof.ok, workflowId, phase, terminal, action: proof.ok ? `${classified.state}-sent` : 'wake-failed', outputAgeMs,
+    const action = proof.ok ? `${classified.state}-sent` : 'wake-failed';
+    return { ok: proof.ok, workflowId, phase, terminal, action, outputAgeMs,
       ...deliveryFieldsOf(proof), error: proof.ok ? null : (proof.sent?.error || proof.sendErrorCode || null) };
   }
   if (classified.state === 'turn-idle') {
@@ -442,7 +446,7 @@ function kernelTick(status, phase) {
     return {
       ok: proof.ok, workflowId, phase, terminal,
       // A shell got the wake (the agent exited under it): the next tick sees the shell and replaces the kernel.
-      action: proof.ok ? 'woken' : proof.delivery === 'agent-exited' ? 'kernel-exited' : 'wake-failed', ...stale, outputAgeMs, ...deliveryFieldsOf(proof),
+      action: wakeActionOf(proof), ...stale, outputAgeMs, ...deliveryFieldsOf(proof),
       ...(proof.shellPrompt ? { shellPrompt: proof.shellPrompt } : {}),
       receipt: proof.sent?.receipt ?? null, error: proof.ok ? null : (proof.sent?.error || proof.sendErrorCode || null),
     };
@@ -458,16 +462,31 @@ function kernelTick(status, phase) {
   };
   return {
     ok: true, workflowId, phase, terminal,
-    action: classified.state === 'active' ? 'active' : classified.state === 'wedged' ? 'kernel-wedged' : 'observed',
+    action: finalKernelAction(classified.state),
     state: classified.state, outputAgeMs,
   };
 }
 
+const wakeActionOf = (proof) => {
+  if (proof.ok) return 'woken';
+  return proof.delivery === 'agent-exited' ? 'kernel-exited' : 'wake-failed';
+};
+const finalKernelAction = (state) => {
+  if (state === 'active') return 'active';
+  return state === 'wedged' ? 'kernel-wedged' : 'observed';
+};
+const printLineOf = (result) => {
+  const terminal = result.terminal ? ` terminal=${result.terminal}` : ''; let restart = '';
+  if (/^reload|^already/.test(result.action ?? '')) {
+    const pid = result.pid ?? result.replacementPid ?? '?', reason = result.reason ? ` reason=${result.reason}` : '', error = result.error ? ` error=${result.error}` : '';
+    restart = ` pid=${pid}${reason}${error}`;
+  }
+  return `[Kernel watchdog] ${result.workflowId} phase=${result.phase ?? '?'} action=${result.action}${terminal}${restart}`;
+};
 const print = result => {
   if (asJson) console.log(JSON.stringify(result));
-  else console.log(`[Kernel watchdog] ${result.workflowId} phase=${result.phase ?? '?'} action=${result.action}${result.terminal ? ` terminal=${result.terminal}` : ''}${/^reload|^already/.test(result.action ?? '') ? ` pid=${result.pid ?? result.replacementPid ?? '?'}${result.reason ? ` reason=${result.reason}` : ''}${result.error ? ` error=${result.error}` : ''}` : ''}`);
+  else console.log(printLineOf(result));
 };
-
 
 if (isMain(import.meta.url)) {
   if (!repo || !workflowId || !once) {
