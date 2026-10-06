@@ -31,8 +31,9 @@ const LINEAGE_LIMIT = 64;
  */
 export function lineageJobsOf(db, job) {
   const out = [], seen = new Set([job?.job_id]);
-  const start = job && ('retry_of' in job || 'resume_of' in job) ? job
-    : (job?.job_id ? db.prepare('SELECT retry_of, resume_of FROM jobs WHERE job_id=?').get(job.job_id) : null);
+  let start = null;
+  if (job && ('retry_of' in job || 'resume_of' in job)) start = job;
+  else if (job?.job_id) start = db.prepare('SELECT retry_of, resume_of FROM jobs WHERE job_id=?').get(job.job_id);
   let id = start?.retry_of ?? start?.resume_of ?? null;
   while (id && !seen.has(id) && out.length < LINEAGE_LIMIT) {
     seen.add(id);

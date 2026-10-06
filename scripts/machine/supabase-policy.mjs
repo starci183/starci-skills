@@ -37,7 +37,9 @@ const entriesOf = (ports) => {
 
 const reservedRule = (port) => {
   const label = protectedPortLabel(port);
-  return label ? `${label} ${label.includes('-') ? 'are' : 'is'} never ours` : null;
+  if (!label) return null;
+  const verb = label.includes('-') ? 'are' : 'is';
+  return `${label} ${verb} never ours`;
 };
 
 /** Validate one app's seven configured ports. Returns only deterministic policy facts. */

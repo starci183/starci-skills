@@ -28,7 +28,9 @@ function affectedBoundarySpecs(changed, specs) {
   if (!io.length) return [];
   const owner = (file) => {
     const parts = file.split('/');
-    return ['examples', 'packages'].includes(parts[0]) ? parts.slice(0, 2).join('/') : ['be', 'fe'].includes(parts[0]) ? parts[0] : 'runtime';
+    if (['examples', 'packages'].includes(parts[0])) return parts.slice(0, 2).join('/');
+    if (['be', 'fe'].includes(parts[0])) return parts[0];
+    return 'runtime';
   };
   const roots = new Set(io.map(owner));
   return specs.filter((spec) => BOUNDARY_SPEC.test(spec) && roots.has(owner(spec)));
@@ -120,8 +122,11 @@ export async function testRun(ctx, deps = {}) {
     if (!ancestor) return ladderRefusal({ schema: SCHEMA, level, message: `starci test run: REFUSED (${against} is not merged into HEAD)` });
   }
 
-  const changed = pathList(args.changed).length ? pathList(args.changed)
-    : ['L2', 'L3'].includes(level) ? committedChanges(root, against, deps) : workingChanges(root, deps);
+  let changed = pathList(args.changed);
+  if (!changed.length) {
+    if (['L2', 'L3'].includes(level)) changed = committedChanges(root, against, deps);
+    else changed = workingChanges(root, deps);
+  }
   const allSpecs = tracked(root, '*.spec.mjs', deps).sort(byCodeUnit);
   const selected = selectedSpecs({ root, level, args, changed, allSpecs, deps });
   if (level !== 'L4' && sameSelection(selected, allSpecs) && allSpecs.length) {

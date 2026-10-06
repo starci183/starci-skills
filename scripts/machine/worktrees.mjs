@@ -179,8 +179,11 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
       if (row.claim_id != null) { try { pid = withRegistry((m) => m.db.prepare('SELECT owner_pid FROM claims WHERE claim_id=?').get(row.claim_id)?.owner_pid ?? null, env); } catch { pid = null; } }
       const workflowPhase = row.kind === 'workflow' && row.workflow_id ? phaseOf(row.ledger_id, row.workflow_id) : null;
       const terminalsLive = row.kind === 'workflow' ? liveTerminalsOf(row) : 0;
-      const ownerStatus = row.kind === 'workflow' ? null : row.job_id ? lookup(row.ledger_id, row.job_id)
-        : row.kind === 'supervisor-staging' && row.lane ? supOf(row.lane) : null;
+      let ownerStatus = null;
+      if (row.kind !== 'workflow') {
+        if (row.job_id) ownerStatus = lookup(row.ledger_id, row.job_id);
+        else if (row.kind === 'supervisor-staging' && row.lane) ownerStatus = supOf(row.lane);
+      }
       const reason = collectReason({ row, jobStatus: ownerStatus, workflowPhase, terminalsLive, merged, ownerAlive: pid == null ? false : ownerAlive(Number(pid)), now, ownerGoneMs: settings.ownerGoneMs });
       if (!reason) continue;
       if (halt()) return items;

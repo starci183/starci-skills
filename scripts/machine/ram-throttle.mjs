@@ -278,8 +278,16 @@ export function admitOp({ op, workflowId = null, ops = [], maxParallelOps = null
 /* ------------------------------------------------------------ IO */
 
 /** The DB mode (throttle_state / throttle_events enum normal|heavy|critical) of a code mode, and back. */
-export const dbMode = (mode) => (mode === 'heavy-paused' ? 'heavy' : MODES.includes(mode) ? mode : 'normal');
-const codeMode = (mode) => (mode === 'heavy' ? 'heavy-paused' : MODES.includes(mode) ? mode : null);
+export const dbMode = (mode) => {
+  if (mode === 'heavy-paused') return 'heavy';
+  if (MODES.includes(mode)) return mode;
+  return 'normal';
+};
+const codeMode = (mode) => {
+  if (mode === 'heavy') return 'heavy-paused';
+  if (MODES.includes(mode)) return mode;
+  return null;
+};
 
 
 /**
