@@ -146,7 +146,8 @@ export default {
     const gate = gateShellFoundation(ledger, { job, need: shellNeed, settings: allocationSettings() });
     if (gate.action === 'wait') {
       const out = { ok: false, jobId, op, reason: FOUNDATION_WAIT, foundation: gate.foundation, owner: gate.owner, detail: gate.detail, ...(gate.decision ? { decision: gate.decision } : {}) };
-      emit(out, `dispatch REFUSED for ${jobId} (${op}): ${FOUNDATION_WAIT} — ${gate.detail}${gate.decision ? `; Supervisor Decision Item ${gate.decision} opened (the owner is past its stall limit)` : ''}; job stays queued`, args.json);
+      const decisionNote = gate.decision ? `; Supervisor Decision Item ${gate.decision} opened (the owner is past its stall limit)` : '';
+      emit(out, `dispatch REFUSED for ${jobId} (${op}): ${FOUNDATION_WAIT} — ${gate.detail}${decisionNote}; job stays queued`, args.json);
       throw new VerbExit(1);
     }
   }
@@ -157,8 +158,13 @@ export default {
   // A named profile target (gpt-6.1-sol) counts as its provider's pool.
   const launchOrder = kindOrder({ kind: op, difficulty: payload.difficulty ?? 'medium', fanOut: isFanOutSlice(payload) });
   const allowed = launchOrder.chain ?? [];
-  const outsideOrder = allowed.some((p) => p === model.target || launchOrder.rt?.runtimes?.[p]?.provider === model.provider) ? null
-    : `${args.model ? '--model' : payload.model ? 'the persisted route' : 'the unrouted default'} ${model.target} is outside ${op}'s ${launchOrder.orderKey ?? '?'} order at ${launchOrder.difficulty ?? '?'} [${allowed.join(', ')}]${launchOrder.error ? ` (${launchOrder.error})` : ''}; ${args.model ? 'dispatch without --model or name a pool of that order' : `re-run starci kernel route --job ${jobId}`}. The job stays queued.`;
+  let selectedRoute = 'the unrouted default';
+  if (payload.model) selectedRoute = 'the persisted route';
+  if (args.model) selectedRoute = '--model';
+  const launchErrorNote = launchOrder.error ? ` (${launchOrder.error})` : '';
+  const correction = args.model ? 'dispatch without --model or name a pool of that order' : `re-run starci kernel route --job ${jobId}`;
+  const outsideDetail = `${selectedRoute} ${model.target} is outside ${op}'s ${launchOrder.orderKey ?? '?'} order at ${launchOrder.difficulty ?? '?'} [${allowed.join(', ')}]${launchErrorNote}; ${correction}. The job stays queued.`;
+  const outsideOrder = allowed.some((p) => p === model.target || launchOrder.rt?.runtimes?.[p]?.provider === model.provider) ? null : outsideDetail;
   const briefAbs = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
   const briefExists = fs.existsSync(briefAbs);
   const lackingTools = missingHostTools({ pool: { provider: model.provider }, kind: op });
@@ -264,11 +270,15 @@ export default {
       launch: launchModel.error ? { agent: model.provider, error: `${model.target} has no launch model: ${launchModel.error}` }
         : { agent: model.provider, model: launchModel.modelId, effort: launchModel.effort ?? null, modelSource: launchModel.source },
       orca: { worktree: checkoutRoot, title, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
-      ...(briefExists ? {} : { briefMissing: `modules/ops/ops/${op}.yaml not present — spawn will refuse` }),
-      ...(lackingTools.length ? { toolUnavailable: `${model.target} lacks host tool ${lackingTools.join(', ')} — spawn will refuse tool-unavailable` } : {}),
-      ...(outsideOrder ? { modelOutsideOrder: outsideOrder } : {}),
-      ...(grammarMissing ? { grammarContextMissing: `${grammarMissing} — spawn will refuse grammar-context-missing` } : {}),
+      ...(!briefExists && { briefMissing: `modules/ops/ops/${op}.yaml not present — spawn will refuse` }),
+      ...(lackingTools.length && { toolUnavailable: `${model.target} lacks host tool ${lackingTools.join(', ')} — spawn will refuse tool-unavailable` }),
+      ...(outsideOrder && { modelOutsideOrder: outsideOrder }),
+      ...(grammarMissing && { grammarContextMissing: `${grammarMissing} — spawn will refuse grammar-context-missing` }),
     };
+    const ownerAnswerValues = packet.context.owner_answers?.map((answer) => `${answer.dispatchId} -> ${answer.chosen?.label ?? answer.chosen?.index ?? 'answered'} (${answer.answeredBy})`).join(', ');
+    const ownerAnswersLine = packet.context.owner_answers ? `  owner_answers: ${ownerAnswerValues}` : null;
+    const launchCommand = out.launch.error ?? `worker-start --agent ${out.launch.agent} --model ${out.launch.model} (${out.launch.modelSource})`;
+    const orcaCommandLines = out.orca.commands.map((command) => `    $ ${command.cli}`);
     emit(out, [
       `PACKET job=${jobId} op=${op} model=${model.target}`,
       `  brief: ${packet.brief}${briefExists ? '' : ' — MISSING ON DISK'}`,
@@ -276,10 +286,10 @@ export default {
       ...(packet.context.grammar ? [`  grammar (${packet.context.grammar.family ?? 'unset'}): ${packet.context.grammar.sources.map((s) => s.path).join(', ')}`] : []),
       ...(grammarMissing ? [`  grammar MISSING: ${grammarMissing}`] : []),
       ...(packet.context.cut ? [`  cut: ${packet.context.cut.id} ${packet.context.cut.ordinal}/${packet.context.cut.total}`] : []),
-      ...(packet.context.owner_answers ? [`  owner_answers: ${packet.context.owner_answers.map((a) => `${a.dispatchId} -> ${a.chosen?.label ?? a.chosen?.index ?? 'answered'} (${a.answeredBy})`).join(', ')}`] : []),
+      ...(ownerAnswersLine ? [ownerAnswersLine] : []),
       `  owned_paths: ${packet.context.owned_paths.map((p) => renderOwnedPath(p, workerCwd)).join(', ') || '(none)'}`,
-      `  launch: ${out.launch.error ?? `worker-start --agent ${out.launch.agent} --model ${out.launch.model} (${out.launch.modelSource})`}`,
-      '  orca commands:', ...out.orca.commands.map((c) => `    $ ${c.cli}`),
+      `  launch: ${launchCommand}`,
+      '  orca commands:', ...orcaCommandLines,
       '  (dry run — pass --spawn to launch)',
     ].join('\n'), args.json);
     return;
@@ -402,7 +412,8 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     const reason = signal ?? error ?? `managed dispatch failed at ${step}`;
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection,
       managed: { step, dispatchId, effectState, ...(code ? { code } : {}), ...(observation ? { observation } : {}), ...(cleanup ? { cleanup } : {}) } };
-    emit(out, `dispatch REJECTED for ${jobId} (${step}): ${reason} — job status=${rejection.status}, effect=${effectState}${cleanup ? `, worker ${dispatchId} cleanup stop=${cleanup.stop?.ok} release=${cleanup.release?.ok}` : ''}`, args.json);
+    const cleanupNote = cleanup ? `, worker ${dispatchId} cleanup stop=${cleanup.stop?.ok} release=${cleanup.release?.ok}` : '';
+    emit(out, `dispatch REJECTED for ${jobId} (${step}): ${reason} — job status=${rejection.status}, effect=${effectState}${cleanupNote}`, args.json);
     throw new VerbExit(1);
   };
 

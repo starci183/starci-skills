@@ -60,8 +60,9 @@ export default {
   // (starci kernel autopilot --defer-to-handover). The one provision.ask is the end-of-flow credential checklist (params.subject
   // handover-credentials); a retry of an ask the owner already answered (--retry-of) still runs.
   if (args.op === 'provision.ask' && args['retry-of'] == null && provisionAskMidFlow(db, workflowId, { params: { ...legSplit.owner, ...kernelFlag } })) {
+    const checklistParams = `{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}`;
     const out = { ok: false, workflowId, op: args.op, reason: 'autopilot-provision-deferred',
-      detail: `autopilot (${AUTOPILOT_RULING}) opens no provision.ask mid-flow: build on the sandbox/stub path, record the need with starci kernel autopilot --workflow ${workflowId} --defer-to-handover --op <asking op> --class credential|real-money|shared-system|owner-decision --detail "<what is owed>" [--fields <FILE_OR_VAR,...>], and the end-of-flow checklist (--params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}') collects it once` };
+      detail: `autopilot (${AUTOPILOT_RULING}) opens no provision.ask mid-flow: build on the sandbox/stub path, record the need with starci kernel autopilot --workflow ${workflowId} --defer-to-handover --op <asking op> --class credential|real-money|shared-system|owner-decision --detail "<what is owed>" [--fields <FILE_OR_VAR,...>], and the end-of-flow checklist (--params '${checklistParams}') collects it once` };
     emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
     throw new VerbExit(1);
   }
@@ -149,7 +150,8 @@ export default {
     // A failed or cancelled job whose retry lineage carries on is waited on through it (lineageHeadOf).
     const head = FINAL_SETTLED.includes(row.status) && row.status !== 'succeeded' ? lineageHeadById(db, prior).row : row;
     if (FINAL_SETTLED.includes(head.status) && head.status !== 'succeeded') {
-      throw Object.assign(new Error(`--after names ${prior}, which already settled ${row.status} and can never succeed; a retry of it chains through its retry lineage (enqueue the same op${hasCut ? ' and cut ordinal' : ''} without --after)`), { code: 'after-settled' });
+      const cutNote = hasCut ? ' and cut ordinal' : '';
+      throw Object.assign(new Error(`--after names ${prior}, which already settled ${row.status} and can never succeed; a retry of it chains through its retry lineage (enqueue the same op${cutNote} without --after)`), { code: 'after-settled' });
     }
   }
   // Shared foundations (driver-loop.yaml foundations): --foundation <name> marks a leg that builds a
@@ -233,7 +235,16 @@ export default {
     peerOverlap: peers.overlap, peerHeadsUp: peers.messages, ...(testsDeferred ? { deferred: testsDeferred } : {}),
     ...(foundationLeg ? { foundation: foundationLeg } : {}), ...(foundationAdvisory ? { foundationAdvisory } : {}) };
   if (foundationAdvisory) process.stderr.write(`api: advisory: ${foundationAdvisory}\n`);
-  emit(out, `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${unit.retryOf ? ` retry of ${unit.retryOf}` : ''}${unit.reopen ? ` REOPENED: ${unit.reopen.reason}` : ''}, status ${job.status}${testsDeferred ? `, DEFERRED (${testsDeferred.reason}): not dispatched, no attempt spent; starci kernel run-deferred-tests --workflow ${workflowId} runs it later` : ''}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})${peers.overlap.length ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}` : ''}`, args.json);
+  const retryNote = unit.retryOf ? ` retry of ${unit.retryOf}` : '';
+  const reopenNote = unit.reopen ? ` REOPENED: ${unit.reopen.reason}` : '';
+  const deferredNote = testsDeferred ? `, DEFERRED (${testsDeferred.reason}): not dispatched, no attempt spent; starci kernel run-deferred-tests --workflow ${workflowId} runs it later` : '';
+  const repositoryNote = payload.repository ? `, repository ${payload.repository}` : '';
+  const cutNote = cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : '';
+  const paramsNote = payload.params ? `, params ${Object.entries(payload.params).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(' ')}` : '';
+  const overlapNote = peers.overlap.length
+    ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}`
+    : '';
+  emit(out, `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${retryNote}${reopenNote}, status ${job.status}${deferredNote}${repositoryNote}${cutNote}${paramsNote})${overlapNote}`, args.json);
 
   },
 };
