@@ -9,7 +9,7 @@ export const hasTable = (db, name, { views = false } = {}) =>
  * INSERT the [column, value] `pairs` into `table` (`orIgnore` spells OR IGNORE); returns the statement's
  * run() result. Column naming and value encoding are the caller's — this is only the statement shape.
  */
-export const insertPairs = (db, table, pairs, { orIgnore = false } = {}) =>
+const insertPairs = (db, table, pairs, { orIgnore = false } = {}) =>
   db.prepare(`INSERT ${orIgnore ? 'OR IGNORE ' : ''}INTO ${table}(${pairs.map((p) => p[0]).join(',')}) VALUES(${pairs.map(() => '?').join(',')})`)
     .run(...pairs.map((p) => p[1]));
 
