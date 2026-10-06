@@ -10,7 +10,11 @@ export default {
     const rest = { ...u }; delete rest.workflowId;
     return rest;
   },
-  lines: (u) => [`TOKENS ${tokenLine(u.total)}; ${u.coverage.measured}/${u.coverage.attempts} attempts measured${u.coverage.unavailable ? `, ${u.coverage.unavailable} unavailable` : ''}; kernel ${u.kernel.tokens.toLocaleString('en-US')}`
-    + (u.byOp.length ? `; top ops ${u.byOp.slice(0, 3).map((o) => `${o.opId} ${o.tokens.toLocaleString('en-US')}`).join(', ')}` : '')
-    + (u.byModel.length ? `; models ${u.byModel.slice(0, 3).map((m) => `${m.model} ${m.tokens.toLocaleString('en-US')}`).join(', ')}` : '')],
+  lines: (u) => {
+    const unavailable = u.coverage.unavailable ? `, ${u.coverage.unavailable} unavailable` : '';
+    const ops = u.byOp.slice(0, 3).map((o) => `${o.opId} ${o.tokens.toLocaleString('en-US')}`).join(', ');
+    const models = u.byModel.slice(0, 3).map((m) => `${m.model} ${m.tokens.toLocaleString('en-US')}`).join(', ');
+    return [`TOKENS ${tokenLine(u.total)}; ${u.coverage.measured}/${u.coverage.attempts} attempts measured${unavailable}; kernel ${u.kernel.tokens.toLocaleString('en-US')}`
+      + (ops ? `; top ops ${ops}` : '') + (models ? `; models ${models}` : '')];
+  },
 };

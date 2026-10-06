@@ -122,6 +122,25 @@ function planTerminalDedupe({ terminals = [], tabTitles = new Map(), scopes = []
 }
 
 /**
+ * Close one planned stray terminal (quit input for an agent session, then the tab close) and return {row, ok}.
+ * In dryRun nothing is closed and the row only marks wouldClose.
+ */
+function closePlannedEntry(terminals, entry, { dryRun, quit, close }) {
+  if (dryRun) return { row: { ...entry, wouldClose: true }, ok: true };
+  let quitResult = null;
+  if (entry.kind === 'agent') {
+    try { quitResult = quit({ handle: entry.handle, agent: agentOfTerminal(terminals.find((t) => t?.handle === entry.handle) ?? entry) }); }
+    catch (error) { quitResult = { error: String(error?.message ?? error) }; }
+  }
+  let closed;
+  try { closed = close(entry.handle); } catch (error) { closed = { ok: false, error: String(error?.message ?? error) }; }
+  // An agent that quit on its own may have taken its terminal with it: a refused close of a gone terminal is still closed.
+  const ok = closed?.ok === true || quitResult?.exited === true;
+  return { ok, row: { ...entry, ok, ...(quitResult ? { quit: quitResult } : {}), ...(closed?.tab ? { tab: closed.tab } : {}),
+    ...(closed?.ok ? {} : { error: String(closed?.error ?? 'close refused') }) } };
+}
+
+/**
  * List Orca's terminals, plan, and (unless dryRun) close every stray: an agent
  * session gets quit input only for explicit supported metadata, then the existing tab close. Never throws.
  * Returns {ok, dryRun, listed, closed:[...], kept:[...], deferred:[...], skipped?, error?}.
@@ -145,16 +164,9 @@ export function dedupeTerminals({ repos = [], dryRun = false, env = process.env,
     result.kept = plan.keep;
     result.deferred = plan.deferred;
     for (const entry of plan.close) {
-      if (dryRun) { result.closed.push({ ...entry, wouldClose: true }); continue; }
-      let quitResult = null;
-      if (entry.kind === 'agent') { try { quitResult = quit({ handle: entry.handle, agent: agentOfTerminal(terminals.find((terminal) => terminal?.handle === entry.handle) ?? entry) }); } catch (error) { quitResult = { error: String(error?.message ?? error) }; } }
-      let closed;
-      try { closed = close(entry.handle); } catch (error) { closed = { ok: false, error: String(error?.message ?? error) }; }
-      // An agent that quit on its own may have taken its terminal with it: a refused close of a gone terminal is still closed.
-      const ok = closed?.ok === true || quitResult?.exited === true;
+      const { row, ok } = closePlannedEntry(terminals, entry, { dryRun, quit, close });
       if (!ok) result.ok = false;
-      result.closed.push({ ...entry, ok, ...(quitResult ? { quit: quitResult } : {}), ...(closed?.tab ? { tab: closed.tab } : {}),
-        ...(closed?.ok ? {} : { error: String(closed?.error ?? 'close refused') }) });
+      result.closed.push(row);
     }
   } catch (error) {
     return { ...result, ok: false, error: String(error?.message ?? error) };

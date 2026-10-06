@@ -11,6 +11,8 @@ export default {
     const items = kernelDecisionItems(ctx.db, ctx.workflowId, { now: ctx.now ?? Date.now() });
     return items.length ? items : null;
   },
-  lines: (items) => [`NEEDS-KERNEL-DECISION ${items.length} (decide first; the runtime settles green reports): ${items.slice(0, 10)
-    .map((i) => `${i.jobId} ${i.op} ${i.outcome} [${i.reason}] ${i.ageMin}m`).join('; ')}${items.length > 10 ? '; ...' : ''}`],
+  lines: (items) => {
+    const listed = items.slice(0, 10).map((i) => `${i.jobId} ${i.op} ${i.outcome} [${i.reason}] ${i.ageMin}m`).join('; ');
+    return [`NEEDS-KERNEL-DECISION ${items.length} (decide first; the runtime settles green reports): ${listed}${items.length > 10 ? '; ...' : ''}`];
+  },
 };

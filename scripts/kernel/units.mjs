@@ -85,7 +85,8 @@ export function admitUnit(db, { workflowId, op, payload, goalRevision, retryOf =
     }
     const overlaps = failedOverlapsOf(db, { workflowId, op, goalRevision, payload, exclude: new Set(sources) });
     if (overlaps.length) {
-      throw refuse(`this ${op} work overlaps failed unit(s) ${overlaps.map((o) => `${o.unitId} (latest ${o.jobId}, ${o.tries}/${o.budget} tries)`).join(', ')}: a new unit would restart their budget. Retry it with --retry-of ${overlaps[0].jobId} (a widened shape stays in its unit), or reshape it through starci kernel graph-edit`,
+      const names = overlaps.map((o) => `${o.unitId} (latest ${o.jobId}, ${o.tries}/${o.budget} tries)`).join(', ');
+      throw refuse(`this ${op} work overlaps failed unit(s) ${names}: a new unit would restart their budget. Retry it with --retry-of ${overlaps[0].jobId} (a widened shape stays in its unit), or reshape it through starci kernel graph-edit`,
         'unit-overlaps-failed-unit', { overlaps });
     }
   }

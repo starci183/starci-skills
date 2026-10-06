@@ -91,9 +91,10 @@ export function recordSonarJudgment(ledger, { workflowId, jobId, opId = null, at
 
 /** What `starci kernel settle` prints when it refuses a pass the Sonar gate does not allow. */
 export function refusalText(op, judged, jobId) {
-  const next = judged.status === 'unavailable'
-    ? 'Sonar is unavailable: the Supervisor has been told (a runtime incident). Settle blocked or fail; never pass without the gate.'
-    : judged.status === 'red' ? 'Fix the listed findings in the op\'s own change, rerun the slice scan and report again.'
-    : 'Rerun sonar-local scan on the change (fresh coverage, --wait) and attach its sonar.json.';
+  let next = 'Rerun sonar-local scan on the change (fresh coverage, --wait) and attach its sonar.json.';
+  if (judged.status === 'unavailable')
+    next = 'Sonar is unavailable: the Supervisor has been told (a runtime incident). Settle blocked or fail; never pass without the gate.';
+  else if (judged.status === 'red')
+    next = 'Fix the listed findings in the op\'s own change, rerun the slice scan and report again.';
   return `settle REFUSED for ${jobId} (${op}): ${judged.code} - ${judged.detail}; the job stays reported. ${next}`;
 }
