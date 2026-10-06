@@ -74,7 +74,7 @@ export function gatheredPluginSpec({ side, dir, plugin, lawOwners, recommended, 
 
   test(`${side}: every rule is a rule, and the plugin exposes them all`, () => {
     for (const [name, rule] of Object.entries(rules)) {
-      assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
+      assert.ok(rule?.meta && rule.create, `${name} is not a rule`)
       assert.equal(plugin.rules[name], rule, `${name} is missing from the plugin object`)
     }
   })

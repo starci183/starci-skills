@@ -58,7 +58,7 @@ export const typeOrigins = (context, node) => {
 export const originsOfType = (checker, type) => {
     const parts = type?.isUnion?.() ? type.types : [type]
     return parts.flatMap((part) => declarationsOf(checker, part).map((declaration) => {
-        const file = String(declaration.getSourceFile().fileName).replace(/\\/g, "/")
+        const file = String(declaration.getSourceFile().fileName).replaceAll("\\", "/")
         return { name: declaration.name && ts.isIdentifier(declaration.name) ? declaration.name.text : "", file, module: moduleOf(declaration, file) }
     }))
 }
@@ -116,7 +116,7 @@ export const packageOfExport = (context, node) => {
     if (!symbol) return null
     const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
     for (const declaration of target.getDeclarations?.() ?? []) {
-        const module = moduleOf(declaration, String(declaration.getSourceFile().fileName).replace(/\\/g, "/"))
+        const module = moduleOf(declaration, String(declaration.getSourceFile().fileName).replaceAll("\\", "/"))
         if (module !== null) return module
     }
     return null

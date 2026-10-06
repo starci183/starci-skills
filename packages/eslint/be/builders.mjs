@@ -22,7 +22,7 @@ import { hfsOf } from "./lib/hfs.mjs"
 import { moduleOf, typed } from "./lib/types.mjs"
 
 /** The file name of a linted path, in forward-slash form. */
-const baseOf = (filename) => basename(String(filename || "").replace(/\\/g, "/"))
+const baseOf = (filename) => basename(String(filename || "").replaceAll("\\", "/"))
 
 // -- spec-no-raw-insert ----------------------------------------------------------------------------
 
@@ -73,7 +73,7 @@ const isEntityClass = (checker, declaration) => {
         const symbol = checker.getSymbolAtLocation(callee)
         if (!symbol) return false
         const target = (symbol.flags & ts.SymbolFlags.Alias) !== 0 ? checker.getAliasedSymbol(symbol) : symbol
-        return (target.getDeclarations?.() ?? []).some((found) => moduleOf(found, String(found.getSourceFile().fileName).replace(/\\/g, "/")) === "typeorm")
+        return (target.getDeclarations?.() ?? []).some((found) => moduleOf(found, String(found.getSourceFile().fileName).replaceAll("\\", "/")) === "typeorm")
     })
 }
 

@@ -73,7 +73,7 @@ const isInjectorDecorator = (context, decorator) => {
     const { checker, toTs } = typed(context)
     let symbol = checker.getSymbolAtLocation(toTs(callee))
     if (symbol && (symbol.flags & ts.SymbolFlags.Alias) !== 0) symbol = checker.getAliasedSymbol(symbol)
-    return (symbol?.getDeclarations() ?? []).some((declaration) => declaration.getSourceFile().fileName.replace(/\\/g, "/").endsWith(".decorators.ts"))
+    return (symbol?.getDeclarations() ?? []).some((declaration) => declaration.getSourceFile().fileName.replaceAll("\\", "/").endsWith(".decorators.ts"))
 }
 
 /** Counts the bus dispatches (`<bus>.execute(...)`) a method makes, closures included. */
@@ -123,7 +123,7 @@ export const transportIsThin = {
         const isMapper = (callee) => {
             if (callee.type !== "Identifier") return false
             const found = importOf(context, callee)
-            return found !== null && /(?:^|\/)[^/]+\.mapper(?:\.[cm]?[jt]s)?$/.test(found.source.replace(/\\/g, "/"))
+            return found !== null && /(?:^|\/)[^/]+\.mapper(?:\.[cm]?[jt]s)?$/.test(found.source.replaceAll("\\", "/"))
         }
         /** `unwrapOutcome` of `platform/primitives`, resolved by the symbol the name binds to, not by its spelling. */
         const isUnwrapOutcome = (callee) => {
@@ -315,7 +315,7 @@ export const noGraphqlJson = {
             if (source === "graphql-scalars" && JSON_SCALARS.has(importedName)) return context.report({ node, messageId: "scalar", data: { name: importedName } })
             let symbol = checker.getSymbolAtLocation(toTs(local))
             if (symbol && (symbol.flags & ts.SymbolFlags.Alias) !== 0) symbol = checker.getAliasedSymbol(symbol)
-            const origin = (symbol?.getDeclarations() ?? []).some((declaration) => /\/node_modules\/(?:graphql-type-json|graphql-scalars)\//.test(declaration.getSourceFile().fileName.replace(/\\/g, "/")) && (JSON_SCALARS.has(symbol.getName()) || symbol.getName() === "default"))
+            const origin = (symbol?.getDeclarations() ?? []).some((declaration) => /\/node_modules\/(?:graphql-type-json|graphql-scalars)\//.test(declaration.getSourceFile().fileName.replaceAll("\\", "/")) && (JSON_SCALARS.has(symbol.getName()) || symbol.getName() === "default"))
             if (origin) context.report({ node, messageId: "scalar", data: { name: importedName } })
         }
         return {

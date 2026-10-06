@@ -42,15 +42,15 @@ export const importOf = (context, identifier) => {
  * @returns {boolean} Whether the expression is one of those exports.
  */
 export const isImportedFrom = (context, expression, sources, names) => {
-    const wantedSources = [].concat(sources)
-    const wantedNames = [].concat(names)
+    const wantedSources = new Set([sources].flat())
+    const wantedNames = new Set([names].flat())
     if (expression?.type === "Identifier") {
         const found = importOf(context, expression)
-        return found !== null && wantedSources.includes(found.source) && wantedNames.includes(found.imported)
+        return found !== null && wantedSources.has(found.source) && wantedNames.has(found.imported)
     }
     if (expression?.type === "MemberExpression" && !expression.computed && expression.object.type === "Identifier") {
         const found = importOf(context, expression.object)
-        return found !== null && found.imported === "*" && wantedSources.includes(found.source) && wantedNames.includes(textOf(expression.property))
+        return found !== null && found.imported === "*" && wantedSources.has(found.source) && wantedNames.has(textOf(expression.property))
     }
     return false
 }

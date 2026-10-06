@@ -11,13 +11,12 @@
  * `platform/queue`, typeorm's `EntityManager`) and by the slot view (tiers, `be.transport.message`, `be.queues`); none matches a
  * variable, class or method name written in the source, except the contract's own members `publish`, `eventName` and `eventId`.
  */
-import ts from "typescript"
 import { walk } from "./lib/ast.mjs"
 import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { infraTypeOf } from "./lib/persistence.mjs"
 import { baseName, isOwnedType, ownerNameOf } from "./lib/ports.mjs"
 import { resolveVariable, transactionCallback } from "./lib/transactions.mjs"
-import { typeOrigins, typed } from "./lib/types.mjs"
+import { typed } from "./lib/types.mjs"
 
 /** The `EventBus` port of `platform/event-bus`. */
 const isEventBusType = (context, node) => isOwnedType(context, node, { name: "EventBus", capability: "event-bus", tier: "platform" })
@@ -44,7 +43,7 @@ const transactionParameterIndex = (checker, declaration) => {
     return parameters.findIndex((parameter) => {
         const type = checker.getTypeAtLocation(parameter)
         const symbol = type.getSymbol?.()
-        return symbol?.getName() === "EntityManager" && String(symbol.declarations?.[0]?.getSourceFile().fileName ?? "").replace(/\\/g, "/").includes("/node_modules/typeorm/")
+        return symbol?.getName() === "EntityManager" && String(symbol.declarations?.[0]?.getSourceFile().fileName ?? "").replaceAll("\\", "/").includes("/node_modules/typeorm/")
     })
 }
 
@@ -125,7 +124,7 @@ const readsDeliveryEventId = (context, node) =>
     node.type === "MemberExpression" && !node.computed && node.property.type === "Identifier" && node.property.name === "eventId" && isEventDeliveryType(context, node.object)
 
 /** The kebab stem of an event name: dots become dashes. */
-const stemOfEvent = (name) => name.split(".").join("-")
+const stemOfEvent = (name) => name.replaceAll(".", "-")
 
 /** A message consumer is the one door of an event: placed in `transport/message`, named after its event, and it forwards the event id. */
 export const eventConsumerShape = {

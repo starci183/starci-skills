@@ -30,7 +30,7 @@ const declarationsOfSymbol = (checker, symbol) => {
 }
 
 /** True when the symbol is the canon type `name` of the operations capability. */
-const isCanonType = (hfs, checker, symbol, name) => declarationsOfSymbol(checker, symbol).some((declaration) => declaration.name?.text === name && declaredByOperations(hfs, String(declaration.getSourceFile().fileName).replace(/\\/g, "/")))
+const isCanonType = (hfs, checker, symbol, name) => declarationsOfSymbol(checker, symbol).some((declaration) => declaration.name?.text === name && declaredByOperations(hfs, String(declaration.getSourceFile().fileName).replaceAll("\\", "/")))
 
 const F = ts.TypeFlags
 
@@ -102,7 +102,7 @@ export const operationContractDecidable = {
     create(context) {
         const hfs = hfsOf(context)
         const { checker, toTs } = typed(context)
-        if (declaredByOperations(hfs, context.filename.replace(/\\/g, "/"))) return {}
+        if (declaredByOperations(hfs, context.filename.replaceAll("\\", "/"))) return {}
         const judge = (node, contract) => {
             const symbol = contract.aliasSymbol ?? contract.getSymbol()
             if (!isCanonType(hfs, checker, symbol, "OperationContract")) return

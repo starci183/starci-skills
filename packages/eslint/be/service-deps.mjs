@@ -48,7 +48,7 @@ const isInjector = (context, decorator) => {
 const isNestClass = (context, node) =>
     (node.decorators ?? []).some((decorator) => {
         const callee = decorator.expression.type === "CallExpression" ? decorator.expression.callee : decorator.expression
-        return typeOrigins(context, callee).some((origin) => origin.module !== null && origin.module.startsWith("@nestjs/"))
+        return typeOrigins(context, callee).some((origin) => origin.module?.startsWith("@nestjs/"))
     })
 
 /** True when a written type is a plain reference to one class: the token Nest resolves from the emitted metadata. */
@@ -193,7 +193,7 @@ const DOUBLE_WORDS = new Set(["mock", "fake", "stub"])
 const wordsOf = (name) =>
     name
         .split(/[^A-Za-z0-9]+/)
-        .flatMap((part) => part.match(/[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+/g) ?? [])
+        .flatMap((part) => part.match(/[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+/g) ?? [])
 
 /** The double marker word an identifier carries, else null. */
 export const doubleWordOf = (name) => wordsOf(name).find((word) => DOUBLE_WORDS.has(word.toLowerCase())) ?? null

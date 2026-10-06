@@ -16,8 +16,8 @@ import { isConfigModule } from "./lib/scope.mjs"
 
 /** `process.env`, or `import.meta.env`. */
 const isEnvObject = (node) => {
-  if (!node || node.type !== "MemberExpression" || node.computed) return false
-  const name = node.property && node.property.name
+  if (node?.type !== "MemberExpression" || node.computed) return false
+  const name = node.property?.name
   if (name !== "env") return false
   const object = node.object
   if (object.type === "Identifier" && object.name === "process") return true
@@ -28,7 +28,7 @@ const isEnvObject = (node) => {
 
 /** The variable name of `process.env.NAME` / `process.env["NAME"]`, or null. */
 const envVariableName = (node) => {
-  if (!node || node.type !== "MemberExpression" || !isEnvObject(node.object)) return null
+  if (node?.type !== "MemberExpression" || !isEnvObject(node.object)) return null
   if (!node.computed && node.property.type === "Identifier") return node.property.name
   if (node.computed && node.property.type === "Literal" && typeof node.property.value === "string") {
     return node.property.value
@@ -66,7 +66,6 @@ export const noEnvOutsideConfig = {
     },
   },
   create(context) {
-    const filename = context.filename || context.getFilename()
     if (isConfigModule(context)) return {}
     return {
       MemberExpression(node) {

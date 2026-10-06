@@ -175,7 +175,7 @@ const releasesIn = (context, roots) => {
     if (!fn || visited.has(fn)) continue
     visited.add(fn)
     walk(context.sourceCode, fn, (node) => {
-      if (node.type === "Identifier" && [...Object.values(HANDLE_RELEASERS)].some((set) => set.has(node.name))) {
+      if (node.type === "Identifier" && Object.values(HANDLE_RELEASERS).some((set) => set.has(node.name))) {
         const parent = parentOf(node)
         const asCallee = parent?.type === "CallExpression" && unwrap(parent.callee) === node
         if (!asCallee && !(parent?.type === "MemberExpression" && parent.property === node)) releases.push({ kind: "release-ref", name: node.name, near: nearKeys(context, node) })

@@ -120,7 +120,7 @@ export const noIndexKey = {
         const callback = mapCallback(call)
         if (!callback) return
         const indexParam = callback.params[1]
-        const indexName = indexParam && indexParam.type === "Identifier" ? indexParam.name : null
+        const indexName = indexParam?.type === "Identifier" ? indexParam.name : null
         for (const element of returnedJsx(callback)) {
           if (element.type !== "JSXElement") continue
           const key = attribute(element.openingElement, "key")
@@ -170,7 +170,7 @@ export const noInlineLiteralPropInList = {
     return {
       JSXAttribute(node) {
         const opening = node.parent
-        if (!opening || opening.type !== "JSXOpeningElement" || !isComponentTag(opening)) return
+        if (opening?.type !== "JSXOpeningElement" || !isComponentTag(opening)) return
         if (node.name.type !== "JSXIdentifier" || node.name.name === "key") return
         const value = attributeValue(node)
         if (!value || (value.type !== "ObjectExpression" && value.type !== "ArrayExpression")) return

@@ -40,7 +40,7 @@ const ownerDirOf = (hfs, file) => {
 }
 
 /** The forward-slash absolute path of a repository-relative path. */
-const absolute = (hfs, rel) => `${hfs.repoRoot.replace(/\\/g, "/")}/${rel}`
+const absolute = (hfs, rel) => `${hfs.repoRoot.replaceAll("\\", "/")}/${rel}`
 
 /** The owner an import path (no extension, absolute) reaches: the owner of `<path>/index.ts`, which any file or folder of that owner shares. */
 const ownerOfTarget = (hfs, target) => ownerDirOf(hfs, `${target}/index.ts`)
@@ -52,7 +52,7 @@ const isBareFolderSpecifier = (specifier) =>
 const isRelative = (specifier) => specifier === "." || specifier === ".." || specifier.startsWith("./") || specifier.startsWith("../")
 
 /** The absolute path a relative specifier names from a file, without touching disk. */
-const resolveRelative = (filename, specifier) => posix.normalize(`${posix.dirname(filename.replace(/\\/g, "/"))}/${specifier}`)
+const resolveRelative = (filename, specifier) => posix.normalize(`${posix.dirname(filename.replaceAll("\\", "/"))}/${specifier}`)
 
 /** Calls `check(node, specifier)` for every import and re-export that names a module. */
 const onSpecifiers = (check) => ({

@@ -33,12 +33,12 @@ export const preferArrowExport = {
   create(context) {
     return {
       FunctionDeclaration(node) {
-        const parent = node.parent && node.parent.type
+        const parent = node.parent?.type
         if (!MODULE_LEVEL_PARENTS.has(parent)) return
         context.report({
           node: node.id || node,
           messageId: "fn",
-          data: { name: (node.id && node.id.name) || "default" },
+          data: { name: node.id?.name || "default" },
         })
       },
     }
@@ -64,13 +64,13 @@ export const handlerOnPrefix = {
     }
     return {
       VariableDeclarator(node) {
-        if (node.id && node.id.type === "Identifier") flag(node.id, node.id.name)
+        if (node.id?.type === "Identifier") flag(node.id, node.id.name)
       },
       JSXAttribute(node) {
         if (node.name) flag(node.name, node.name.name)
       },
       TSPropertySignature(node) {
-        if (node.key && node.key.type === "Identifier") flag(node.key, node.key.name)
+        if (node.key?.type === "Identifier") flag(node.key, node.key.name)
       },
     }
   },
@@ -122,15 +122,15 @@ const SECOND_LANGUAGE_PATH = /[\u00e0\u00e1\u00e2\u00e3\u00e8\u00e9\u00ea\u00ec\
  * in `dangerous` and `cap` in `capacity`, and a rule that fires on English words is one a
  * repository turns off.
  */
-const ROMANISED = [
+const ROMANISED = new Set([
   "dang-nhap", "dang-ky", "dang-xuat", "cap-phat", "khoa-hoc", "hoc-vien", "gioi-thieu",
   "lien-he", "tai-khoan", "thanh-toan", "gio-hang", "tin-tuc", "san-pham", "bang-gia",
   "dieu-khoan", "chinh-sach", "trang-chu", "quan-ly", "cai-dat", "ho-so",
-]
+])
 
 /** A route segment or folder name, lowercased, from a normalized path. */
 const segmentsOf = (filename) =>
-  String(filename || "").replace(/\\/g, "/").toLowerCase().split("/").filter(Boolean)
+  String(filename || "").replaceAll("\\", "/").toLowerCase().split("/").filter(Boolean)
 
 /**
  * A path names things in one language: the one every reader of this repository shares.
@@ -157,7 +157,7 @@ const noSecondLanguageInPath = {
   },
   create(context) {
     const offending = segmentsOf(hfsOf(context).relative(fileOf(context))).find(
-      (segment) => SECOND_LANGUAGE_PATH.test(segment) || ROMANISED.includes(segment.replace(/[()[\]]/g, "")),
+      (segment) => SECOND_LANGUAGE_PATH.test(segment) || ROMANISED.has(segment.replace(/[()[\]]/g, "")),
     )
     if (!offending) return {}
     return {

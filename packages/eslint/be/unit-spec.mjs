@@ -39,7 +39,7 @@ const testingModuleRoot = (context, node) => {
             const callee = cursor.callee
             if (callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" && callee.property.name === "createTestingModule" && callee.object.type === "Identifier") {
                 const found = importOf(context, callee.object)
-                return found && found.source === TESTING_PACKAGE && found.imported === "Test" ? cursor : null
+                return found?.source === TESTING_PACKAGE && found.imported === "Test" ? cursor : null
             }
             cursor = callee.type === "MemberExpression" ? callee.object : null
         } else if (cursor.type === "MemberExpression") cursor = cursor.object
@@ -91,7 +91,7 @@ export const specBuildsWithTestingModule = {
 // -- spec-no-new-subject ---------------------------------------------------------------------------------------
 
 /** The last path segment of a module specifier, without an extension. */
-const moduleStem = (specifier) => String(specifier).replace(/\\/g, "/").split("/").pop().replace(/\.[cm]?[jt]s$/, "")
+const moduleStem = (specifier) => String(specifier).replaceAll("\\", "/").split("/").pop().replace(/\.[cm]?[jt]s$/, "")
 
 /** The service under test is never constructed by hand. */
 export const specNoNewSubject = {

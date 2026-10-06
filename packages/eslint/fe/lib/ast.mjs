@@ -14,7 +14,7 @@ export const attribute = (opening, name) =>
 
 /** The expression an attribute carries: a literal, or the inside of `{...}`; null for a bare attribute. */
 export const attributeValue = (entry) => {
-  if (!entry || !entry.value) return null
+  if (!entry?.value) return null
   return entry.value.type === "JSXExpressionContainer" ? entry.value.expression : entry.value
 }
 

@@ -48,7 +48,6 @@ import { recommended as typographyRecommended, rules as typographyRules } from "
 import { recommended as vendorRecommended, rules as vendorRules } from "./vendor-boundary.mjs"
 import { recommended as projectGraphRecommended, rules as projectGraphRules } from "./project-graph.mjs"
 import { buildFeConfig } from "./lib/config.mjs"
-import { why } from "./lib/why.mjs"
 
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
 const CONTRIBUTIONS = [
@@ -145,7 +144,7 @@ export { loadHfs } from "./lib/hfs.mjs"
  *
  * Read by the harness, which quotes `vi` to the owner and files the finding under `code`.
  */
-export { why }
+export { why } from "./lib/why.mjs"
 
 /** The plugin object, shaped the way a flat config expects it. */
 const plugin = {

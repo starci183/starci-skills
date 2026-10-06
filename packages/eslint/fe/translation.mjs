@@ -118,7 +118,7 @@ const staticString = (node) => {
  * (a template of "the count, then installed" reads "# installed"); null for anything that is not such a template.
  */
 const templateText = (node) => {
-  if (!node || node.type !== "TemplateLiteral" || node.expressions.length === 0) return null
+  if (node?.type !== "TemplateLiteral" || node.expressions.length === 0) return null
   return node.quasis.map((quasi) => quasi.value.cooked ?? "").join("#")
 }
 
@@ -145,7 +145,7 @@ const looksLikeSentence = (text) => {
 
 /** Static string carried by a JSX attribute value, else null. */
 const attributeText = (node) => {
-  const value = node && node.value
+  const value = node?.value
   if (!value) return null
   if (value.type === "JSXExpressionContainer") return staticString(value.expression)
   return staticString(value)
@@ -153,7 +153,7 @@ const attributeText = (node) => {
 
 /** The value node behind a JSX attribute, for de-duplication against the second-language walk. */
 const attributeValueNode = (node) =>
-  node.value && node.value.type === "JSXExpressionContainer" ? node.value.expression : node.value
+  node.value?.type === "JSXExpressionContainer" ? node.value.expression : node.value
 
 /** The name of an object property key, else null. */
 const keyName = (property) => {
@@ -181,7 +181,7 @@ export const noCopyResolutionBelowBlock = {
     return {
       CallExpression(node) {
         const callee = node.callee
-        if (!callee || callee.type !== "Identifier" || !RESOLVES_COPY.test(callee.name)) return
+        if (callee?.type !== "Identifier" || !RESOLVES_COPY.test(callee.name)) return
         context.report({ node, messageId: "resolves", data: { name: callee.name } })
       },
     }
@@ -225,7 +225,7 @@ export const noHardcodedCopy = {
         context.report({ node, messageId: "text", data: { text: text.trim() } })
       },
       JSXAttribute(node) {
-        const attr = node.name && node.name.type === "JSXIdentifier" ? node.name.name : null
+        const attr = node.name?.type === "JSXIdentifier" ? node.name.name : null
         if (!attr) return
         const strict = STRICT_ATTRS.has(attr)
         if (!strict && !PROSE_ATTRS.has(attr)) return

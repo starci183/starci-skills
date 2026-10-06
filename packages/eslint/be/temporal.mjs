@@ -114,12 +114,12 @@ export const noAmbientClock = {
             },
             NewExpression(node) {
                 const root = rootIdentifier(node.callee)
-                if (root && root.name === "Date" && isAmbientRoot(context, root) && node.arguments.length === 0) context.report({ node, messageId: "date" })
+                if (root?.name === "Date" && isAmbientRoot(context, root) && node.arguments.length === 0) context.report({ node, messageId: "date" })
             },
             CallExpression(node) {
                 // `Date()` called as a function returns the current time as a string: the same ambient read.
                 const root = rootIdentifier(node.callee)
-                if (root && root.name === "Date" && isAmbientRoot(context, root) && node.arguments.length === 0) context.report({ node, messageId: "date" })
+                if (root?.name === "Date" && isAmbientRoot(context, root) && node.arguments.length === 0) context.report({ node, messageId: "date" })
             },
         }
     },

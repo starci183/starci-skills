@@ -87,10 +87,10 @@ const LOCALE_LINK_CALLEES = new Set(["createAttachLocaleLink", "createLocaleLink
 
 /** The callee name of a call or `new` expression, when it has a plain one. */
 const calleeName = (node) => {
-  const callee = node && node.callee
+  const callee = node?.callee
   if (!callee) return null
   if (callee.type === "Identifier") return callee.name
-  if (callee.type === "MemberExpression" && callee.property && callee.property.type === "Identifier") {
+  if (callee.type === "MemberExpression" && callee.property?.type === "Identifier") {
     return callee.property.name
   }
   return null
@@ -98,7 +98,7 @@ const calleeName = (node) => {
 
 /** Every string-ish key a property can carry, so `"x-locale"` and `["x-locale"]` read the same. */
 const propertyKeyOf = (property) => {
-  if (!property || property.type !== "Property") return null
+  if (property?.type !== "Property") return null
   const key = property.key
   if (!key) return null
   if (key.type === "Identifier" && !property.computed) return key.name

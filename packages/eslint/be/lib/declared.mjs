@@ -39,7 +39,7 @@ export const isOwnedType = (context, node, name, tier, capability) => {
 export const originsOf = (context, node) => {
     const type = typeOf(context, node)
     const alias = type?.aliasSymbol?.declarations?.[0]
-    if (alias) return [{ name: type.aliasSymbol.name, file: String(alias.getSourceFile().fileName).replace(/\\/g, "/"), module: null }]
+    if (alias) return [{ name: type.aliasSymbol.name, file: String(alias.getSourceFile().fileName).replaceAll("\\", "/"), module: null }]
     return typeOrigins(context, node)
 }
 
@@ -76,7 +76,7 @@ export const isOwnedEnumMember = (context, node, enumName, tier, capability) => 
             owner !== undefined &&
             ts.isEnumDeclaration(owner) &&
             owner.name.text === enumName &&
-            isOwnedBy(hfs, String(declaration.getSourceFile().fileName).replace(/\\/g, "/"), tier, capability)
+            isOwnedBy(hfs, String(declaration.getSourceFile().fileName).replaceAll("\\", "/"), tier, capability)
         )
     })
 }
@@ -101,7 +101,7 @@ export const presentParts = (type) => partsOf(type).filter((part) => !(part.flag
 export const derives = (checker, type, test, depth = 0) => {
     if (!type || depth > 24) return false
     const symbol = type.getSymbol?.()
-    if (symbol?.declarations?.some((declaration) => test(symbol.name, String(declaration.getSourceFile().fileName).replace(/\\/g, "/")))) return true
+    if (symbol?.declarations?.some((declaration) => test(symbol.name, String(declaration.getSourceFile().fileName).replaceAll("\\", "/")))) return true
     const target = type.target ?? type
     if (!target.isClassOrInterface?.()) return false
     return checker.getBaseTypes(target).some((base) => derives(checker, base, test, depth + 1))

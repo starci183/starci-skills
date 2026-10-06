@@ -119,7 +119,7 @@ export const specNoSourceRead = {
 const TYPEORM_DOUBLES = ["EntityManager", "QueryRunner", "DataSource", "SelectQueryBuilder", "QueryBuilder"]
 
 /** The kit functions that build the database double. */
-const DATABASE_DOUBLES = ["mockEntityManager", "fakeTransaction"]
+const DATABASE_DOUBLES = new Set(["mockEntityManager", "fakeTransaction"])
 
 export const specTypedEntityManager = {
     meta: {
@@ -133,7 +133,7 @@ export const specTypedEntityManager = {
     create(context) {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
-        if (!/\.spec\.ts$/.test(basename(filename)) || /\.e2e-spec\.ts$/.test(basename(filename))) return {}
+        if (!basename(filename).endsWith(".spec.ts") || basename(filename).endsWith(".e2e-spec.ts")) return {}
         const kit = hfs.ruleParams.specDoubles.kit
         const doubleType = (node) => {
             const { checker, toTs } = typed(context)
@@ -145,7 +145,7 @@ export const specTypedEntityManager = {
         }
         const fromKit = (callee) => {
             const found = callee.type === "Identifier" ? importOf(context, callee) : null
-            return found !== null && (found.source === kit || found.source.startsWith(`${kit}/`)) && DATABASE_DOUBLES.includes(found.imported)
+            return found !== null && (found.source === kit || found.source.startsWith(`${kit}/`)) && DATABASE_DOUBLES.has(found.imported)
         }
         return {
             CallExpression(node) {

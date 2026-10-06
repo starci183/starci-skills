@@ -12,7 +12,7 @@
  * lint rule is for - the one nothing else will ever report.
  */
 
-import { classOf, fileOf, isComponentFile } from "./lib/scope.mjs"
+import { classOf, isComponentFile } from "./lib/scope.mjs"
 
 /** Product component source these rules govern: a component owner's file, and not a spec (a placeholder in a test fixture is a fixture, not a second tree). */
 const isGoverned = (context) => isComponentFile(context)
@@ -25,7 +25,7 @@ const TWIN_NAME = /^[A-Za-z0-9]*Skeleton$/
 
 /** JSX element name, including `Foo.Bar`. */
 const jsxElementName = (opening) => {
-  const name = opening && opening.name
+  const name = opening?.name
   if (!name) return null
   if (name.type === "JSXIdentifier") return name.name
   if (name.type === "JSXMemberExpression" && name.object && name.property) {
@@ -78,20 +78,20 @@ export const noPlaceholderProp = {
     if (!isGoverned(context)) return {}
     return {
       JSXAttribute(node) {
-        const name = node.name && node.name.type === "JSXIdentifier" ? node.name.name : null
+        const name = node.name?.type === "JSXIdentifier" ? node.name.name : null
         if (name !== "skeleton" && name !== "placeholder" && name !== "fallback") return
         const value = node.value
-        if (!value || value.type !== "JSXExpressionContainer") return
+        if (value?.type !== "JSXExpressionContainer") return
         const expression = value.expression
         if (expression.type === "JSXElement" || expression.type === "JSXFragment") {
           context.report({ node, messageId: "prop" })
         }
       },
       ImportDeclaration(node) {
-        const source = node.source && node.source.value
+        const source = node.source?.value
         if (typeof source !== "string" || !/^\.\.?\//.test(source)) return
         for (const specifier of node.specifiers || []) {
-          const local = specifier.local && specifier.local.name
+          const local = specifier.local?.name
           // A bare `Skeleton` is the primitive a component rests WITH, not a twin of one.
           if (!local || local === "Skeleton" || !TWIN_NAME.test(local)) continue
           context.report({ node: specifier, messageId: "import", data: { name: local } })

@@ -14,7 +14,7 @@
  * `modules/i18n/**` is exempt: it is where the formatters are configured.
  */
 
-import { fileOf, inSlot } from "./lib/scope.mjs"
+import { inSlot } from "./lib/scope.mjs"
 
 /** The locale-sensitive `Date` and `Number` methods. */
 const LOCALE_METHODS = new Set(["toLocaleString", "toLocaleDateString", "toLocaleTimeString"])

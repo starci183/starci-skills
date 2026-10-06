@@ -131,7 +131,7 @@ export const featureThin = {
         const isMapperCall = (callee) => {
             if (callee.type !== "Identifier") return false
             const found = importOf(context, callee)
-            return found !== null && /(?:^|\/)[^/]+\.mapper(?:\.[cm]?[jt]s)?$/.test(found.source.replace(/\\/g, "/"))
+            return found !== null && /(?:^|\/)[^/]+\.mapper(?:\.[cm]?[jt]s)?$/.test(found.source.replaceAll("\\", "/"))
         }
 
         /** True for a call `f(...)` where `f` is imported and its declaration lives outside the feature tier (a function of the modules). */

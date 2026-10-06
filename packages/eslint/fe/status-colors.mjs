@@ -26,7 +26,7 @@ import { STATUS_TONES } from "./lib/status-tones.generated.mjs"
 const TEXT_PAINT = ["text", "fill", "stroke", "decoration"]
 
 /** `text-success`, `text-success/60`, `text-success-hover`, with an optional `!` and any variants before it. */
-const SOLID_TEXT = new RegExp(`^!?(${TEXT_PAINT.join("|")})-(${STATUS_TONES.join("|")})(?:-hover)?(?:/(?:\\d+|\\[[^\\]]*\\]))?$`)
+const SOLID_TEXT = new RegExp(String.raw`^!?(${TEXT_PAINT.join("|")})-(${STATUS_TONES.join("|")})(?:-hover)?(?:/(?:\d+|\[[^\]]*\]))?$`)
 
 /** The class after its variants: `md:hover:text-success` and `[&>svg]:text-success` both end at `text-success`. */
 const utilityOf = (token) => {
@@ -61,6 +61,9 @@ function* stringNodes(node) {
       yield { node, text: node.quasis.map((quasi) => quasi.value.cooked ?? "").join(" ") }
       return
     case "JSXExpressionContainer":
+    case "TSAsExpression":
+    case "TSSatisfiesExpression":
+    case "TSNonNullExpression":
       yield* stringNodes(node.expression)
       return
     case "ConditionalExpression":
@@ -70,11 +73,6 @@ function* stringNodes(node) {
     case "LogicalExpression":
       yield* stringNodes(node.left)
       yield* stringNodes(node.right)
-      return
-    case "TSAsExpression":
-    case "TSSatisfiesExpression":
-    case "TSNonNullExpression":
-      yield* stringNodes(node.expression)
       return
     case "ArrayExpression":
       for (const element of node.elements) yield* stringNodes(element)

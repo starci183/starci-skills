@@ -47,7 +47,7 @@ const isInjectorDecorator = (context, decorator) => {
     if (found?.source === "@nestjs/common" && found.imported === "Inject") return true
     if (found?.source === "@nestjs/typeorm") return true
     const symbol = aliasTarget(context, callee)
-    return (symbol?.getDeclarations() ?? []).some((declaration) => declaration.getSourceFile().fileName.split("\\").join("/").endsWith(".decorators.ts"))
+    return (symbol?.getDeclarations() ?? []).some((declaration) => declaration.getSourceFile().fileName.replaceAll("\\", "/").endsWith(".decorators.ts"))
 }
 
 /** The symbol an identifier names, with an import alias resolved to its target. */

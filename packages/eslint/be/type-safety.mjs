@@ -40,7 +40,7 @@ export const noInlineParamType = {
         const param = unwrapParam(raw)
         if (param.type !== "ObjectPattern" || !param.typeAnnotation) continue
         const annotation = param.typeAnnotation.typeAnnotation
-        if (annotation && annotation.type === "TSTypeLiteral") {
+        if (annotation?.type === "TSTypeLiteral") {
           context.report({ node: param.typeAnnotation, messageId: "inline" })
         }
       }
@@ -99,7 +99,7 @@ const isInsideAmbientModule = (node) => {
 const inlineObjectTypeOf = (typeAnnotation, scopeNode) => {
   if (!typeAnnotation) return null
   const literal = typeAnnotation.typeAnnotation
-  if (!literal || literal.type !== "TSTypeLiteral") return null
+  if (literal?.type !== "TSTypeLiteral") return null
   if (isEmptyTypeLiteral(literal)) return null
   if (isInsideAmbientModule(scopeNode)) return null
   return literal
@@ -274,7 +274,7 @@ export const explicitHandlerReturnType = {
         }
         if (node.accessibility === "private" || node.accessibility === "protected" || node.override) return
         const klass = node.parent?.parent
-        if (!klass || klass.type !== "ClassDeclaration") return
+        if (klass?.type !== "ClassDeclaration") return
         const exported = klass.parent?.type === "ExportNamedDeclaration" || klass.parent?.type === "ExportDefaultDeclaration"
         const decorators = [...(klass.decorators ?? []), ...(klass.parent?.decorators ?? [])].map(decoratorIdentifier)
         if (!exported || !decorators.some((name) => SURFACE_CLASS_DECORATORS.has(name))) return

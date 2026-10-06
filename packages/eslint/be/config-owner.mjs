@@ -313,11 +313,11 @@ const isCryptoDigest = (context, node) => {
     const { checker, toTs } = typed(context)
     const tsCall = toTs(node)
     const declaration = tsCall ? checker.getResolvedSignature(tsCall)?.declaration : undefined
-    if (!declaration || !declaration.name || declaration.name.getText() !== "digest") return false
+    if (!declaration?.name || declaration.name.getText() !== "digest") return false
     const owner = declaration.parent
     const ownerName = (ts.isInterfaceDeclaration(owner) || ts.isClassDeclaration(owner)) && owner.name ? owner.name.text : ""
     if (ownerName !== "Hash" && ownerName !== "Hmac") return false
-    return CRYPTO_PACKAGES.has(moduleOf(declaration, String(declaration.getSourceFile().fileName).split("\\").join("/")))
+    return CRYPTO_PACKAGES.has(moduleOf(declaration, String(declaration.getSourceFile().fileName).replaceAll("\\", "/")))
 }
 
 /** A secret is compared with `timingSafeEqual`, never with an equality operator. */

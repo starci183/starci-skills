@@ -29,7 +29,7 @@ const APPLICATION_LAYER = new Set([APPLICATION, "be.feature.application.support"
 const CQRS_PACKAGE = "@nestjs/cqrs"
 
 /** The base name of a filename. */
-const baseName = (filename) => String(filename).replace(/\\/g, "/").split("/").pop()
+const baseName = (filename) => String(filename).replaceAll("\\", "/").split("/").pop()
 
 /** The bus receivers of `@nestjs/cqrs`. */
 const isBus = (context, node) => isPackageType(context, node, "CommandBus", CQRS_PACKAGE) || isPackageType(context, node, "QueryBus", CQRS_PACKAGE)
@@ -77,7 +77,7 @@ const processIsAbstract = (context, node) => {
     const { checker, toTs } = typed(context)
     const symbol = checker.getPropertyOfType(checker.getTypeAtLocation(toTs(node)), "process")
     const declarations = symbol?.getDeclarations() ?? []
-    return declarations.length === 0 || declarations.every((declaration) => (ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Abstract) !== 0)
+    return declarations.every((declaration) => (ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Abstract) !== 0)
 }
 
 /** A handler implements the template's `process` and never overrides its public `execute`. */
@@ -275,7 +275,7 @@ const isEntityClass = (checker, declaration) => {
         if (!ts.isIdentifier(call)) return false
         let symbol = checker.getSymbolAtLocation(call)
         if (symbol && (symbol.flags & ts.SymbolFlags.Alias) !== 0) symbol = checker.getAliasedSymbol(symbol)
-        return symbol?.getName() === "Entity" && (symbol.getDeclarations() ?? []).some((entity) => /\/node_modules\/typeorm\//.test(entity.getSourceFile().fileName.replace(/\\/g, "/")))
+        return symbol?.getName() === "Entity" && (symbol.getDeclarations() ?? []).some((entity) => /\/node_modules\/typeorm\//.test(entity.getSourceFile().fileName.replaceAll("\\", "/")))
     })
 }
 
@@ -297,7 +297,7 @@ const reachableEntity = (context, root) => {
         if ((type.flags & ts.TypeFlags.Object) !== 0 && (type.objectFlags & ts.ObjectFlags.Reference) !== 0) stack.push(...checker.getTypeArguments(type))
         const symbol = type.getSymbol() ?? type.aliasSymbol
         const declarations = symbol?.getDeclarations() ?? []
-        const entity = declarations.find((declaration) => isEntityClass(checker, declaration))
+        const entity = declarations.some((declaration) => isEntityClass(checker, declaration))
         if (entity) return symbol.getName()
         const own = declarations.some((declaration) => {
             const file = declaration.getSourceFile()
@@ -390,7 +390,7 @@ export const noUseCase = {
                 if (name.endsWith(".use-case.ts")) context.report({ node, loc: { line: 1, column: 0 }, messageId: "file", data: { file: name } })
             }
             visitors.ClassDeclaration = (node) => {
-                if (node.id && node.id.name.endsWith("UseCase")) context.report({ node: node.id, messageId: "klass", data: { name: node.id.name } })
+                if (node.id?.name.endsWith("UseCase")) context.report({ node: node.id, messageId: "klass", data: { name: node.id.name } })
             }
         }
         if ((slot === APPLICATION || isTransportSlot(slot)) && baseName(filename).endsWith(".service.ts")) {

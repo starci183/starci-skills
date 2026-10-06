@@ -27,7 +27,6 @@ import { posix } from "node:path"
 import ts from "typescript"
 import { paramParts, staticText } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
-import { isImportedFrom } from "./lib/import-source.mjs"
 import { normalizePath } from "./lib/path.mjs"
 import { isPackageExport, packageOfExport, typed, typeOrigins } from "./lib/types.mjs"
 
@@ -213,7 +212,7 @@ export const injectorOnly = {
 const jsdocBefore = (context, statement) => {
     const comments = context.sourceCode.getCommentsBefore(statement)
     const last = comments[comments.length - 1]
-    return last && last.type === "Block" && last.value.startsWith("*") && last.value.replace(/[*\s]/g, "") !== "" ? last.value : null
+    return last?.type === "Block" && last.value.startsWith("*") && last.value.replace(/[*\s]/g, "") !== "" ? last.value : null
 }
 
 /** The single expression a function returns (arrow expression body, or a block that is one `return`), else null. */
@@ -345,7 +344,7 @@ const checkInjector = (context, hfs, statement, { name, fn, id }) => {
     if (!built) context.report({ node: call ?? fn, messageId: "body", data })
     const doc = jsdocBefore(context, statement)
     const mention = injectedText.match(/[A-Za-z_$][\w$]*/)?.[0] ?? injectedText
-    if (doc === null || !new RegExp(`\\b${mention.replace(/\$/g, "\\$")}\\b`).test(doc)) context.report({ node: id, messageId: "jsdoc", data })
+    if (doc === null || !new RegExp(String.raw`\b${mention.replaceAll("$", String.raw`\$`)}\b`).test(doc)) context.report({ node: id, messageId: "jsdoc", data })
 }
 
 // -- injector-type-match ---------------------------------------------------------------------------

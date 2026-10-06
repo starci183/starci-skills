@@ -12,7 +12,7 @@ import { hfsOf } from "./hfs.mjs"
 import { typeOrigins, typed } from "./types.mjs"
 
 /** The last segment of a forward-slash path. */
-export const baseName = (file) => String(file).replace(/\\/g, "/").split("/").pop() ?? ""
+export const baseName = (file) => String(file).replaceAll("\\", "/").split("/").pop() ?? ""
 
 /**
  * The capability or feature an HFS slot binds a file to (`logging` for `src/modules/platform/logging/x.ts`), or null.
@@ -104,7 +104,7 @@ export const enumsOf = (context, node) => {
         const symbol = part.getSymbol?.()
         const owner = enumOf(symbol?.valueDeclaration ?? symbol?.declarations?.[0])
         if (!owner) return null
-        found.push({ name: owner.name.text, file: String(owner.getSourceFile().fileName).replace(/\\/g, "/") })
+        found.push({ name: owner.name.text, file: String(owner.getSourceFile().fileName).replaceAll("\\", "/") })
     }
     return found.length > 0 ? found : null
 }
@@ -133,7 +133,7 @@ export const enumMemberOf = (context, node) => {
  * @returns {string | null} The package name.
  */
 export const packageOfFile = (file) => {
-    const normal = String(file).replace(/\\/g, "/")
+    const normal = String(file).replaceAll("\\", "/")
     const at = normal.lastIndexOf("/node_modules/")
     if (at < 0) return null
     const parts = normal.slice(at + "/node_modules/".length).split("/")

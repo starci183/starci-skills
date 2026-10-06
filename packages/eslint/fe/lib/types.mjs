@@ -60,4 +60,4 @@ export const declarationsOf = (context, identifier) => {
  * @param {object} declaration - A TypeScript declaration.
  * @returns {string} Its source file name.
  */
-export const fileOf = (declaration) => String(declaration.getSourceFile().fileName).split("\\").join("/")
+export const fileOf = (declaration) => String(declaration.getSourceFile().fileName).replaceAll("\\", "/")

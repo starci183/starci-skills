@@ -119,8 +119,8 @@ export const noRawBrandValue = {
     const scan = (node, text) => {
       if (claimed.has(node) || typeof text !== "string" || text.startsWith("data:")) return
       const parent = node.parent
-      if (parent && parent.type === "JSXAttribute" && NON_COLOR_ATTRS.has(parent.name.name)) return
-      if (parent && parent.type === "JSXExpressionContainer" && parent.parent.type === "JSXAttribute") {
+      if (parent?.type === "JSXAttribute" && NON_COLOR_ATTRS.has(parent.name.name)) return
+      if (parent?.type === "JSXExpressionContainer" && parent.parent.type === "JSXAttribute") {
         if (NON_COLOR_ATTRS.has(parent.parent.name.name)) return
       }
       if (parent && (parent.type === "ImportDeclaration" || parent.type === "ExportAllDeclaration" || parent.type === "ExportNamedDeclaration")) return
@@ -135,11 +135,11 @@ export const noRawBrandValue = {
         scan(node, node.value)
       },
       TemplateElement(node) {
-        scan(node, node.value && node.value.cooked)
+        scan(node, node.value?.cooked)
       },
       JSXAttribute(node) {
         if (node.name.type !== "JSXIdentifier" || !PAINT_ATTRS.has(node.name.name)) return
-        const value = node.value && node.value.type === "JSXExpressionContainer" ? node.value.expression : node.value
+        const value = node.value?.type === "JSXExpressionContainer" ? node.value.expression : node.value
         const text = staticString(value)
         if (text === null || NEUTRAL_COLOR.test(text) || HEX_COLOR.test(text) || COLOR_FUNCTION.test(text)) return
         claimed.add(value)

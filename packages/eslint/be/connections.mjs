@@ -93,7 +93,7 @@ const isEntityManagerInjector = (context, hfs, node) => {
 const callsPackage = (context, node, names, pkg) => typeOrigins(context, node).some((origin) => origin.module === pkg && names.has(origin.name))
 
 /** The constant a declared connection name is exported as: `expert-academy` gives `EXPERT_ACADEMY_CONNECTION`. */
-const constantOf = (name) => `${name.toUpperCase().replace(/-/g, "_")}_CONNECTION`
+const constantOf = (name) => `${name.toUpperCase().replaceAll("-", "_")}_CONNECTION`
 
 /** The string an env key argument spells, or null when it is not a plain string. */
 const keyText = (node) => {

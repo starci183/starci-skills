@@ -1,7 +1,7 @@
 /** Rules for named React props, ordinary children, and local visual ownership. */
 
 import { declarationsOf, fileOf as declarationFile } from "./lib/types.mjs"
-import { fileOf, isComponentFile, isComponentPath, isProductSource, kindOfFile } from "./lib/scope.mjs"
+import { isComponentFile, isComponentPath, isProductSource, kindOfFile } from "./lib/scope.mjs"
 
 const propertyName = (node) => {
   const key = node?.key ?? node?.property
