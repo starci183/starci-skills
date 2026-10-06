@@ -172,7 +172,7 @@ export function nextMode(prev, { freeRamPct, cpuBusy = null }, t = throttleThres
  * overrides on top: {<workflowId>: {weight, reserve}}. A weight <= 0 or missing entry is weight 1, reserve 0.
  */
 export function priorityTable(settings = null, state = {}) {
-  const fromYaml = (settings ?? allocationSettings())?.resources?.ramThrottle?.priorities ?? {};
+  const fromYaml = (settings ?? allocationSettings())?.resources?.ramThrottle?.priorities;
   const out = {};
   for (const [wf, v] of Object.entries({ ...fromYaml, ...state?.priorities })) {
     if (v == null) continue;

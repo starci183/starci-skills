@@ -28,9 +28,13 @@ export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.ur
 let cachedRev = null;
 export function runtimeRevOf() {
   if (cachedRev) return cachedRev;
-  if (readEnv('STARCI_RUNTIME_REV')) return (cachedRev = String(readEnv('STARCI_RUNTIME_REV')));
+  if (readEnv('STARCI_RUNTIME_REV')) {
+    cachedRev = String(readEnv('STARCI_RUNTIME_REV'));
+    return cachedRev;
+  }
   const head = headTime(SKILL_ROOT);
-  return (cachedRev = head ? `${String(head.time * 1000).padStart(13, '0')}:${head.sha}` : 'unknown');
+  cachedRev = head ? `${String(head.time * 1000).padStart(13, '0')}:${head.sha}` : 'unknown';
+  return cachedRev;
 }
 export const SUPERVISOR_ID = 'main';
 /** The seats row of the one Supervisor seat. */

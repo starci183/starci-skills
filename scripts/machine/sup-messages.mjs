@@ -15,7 +15,11 @@ const READ_LIMIT = 1000;
 const iso = (ms) => (ms == null ? null : new Date(ms).toISOString());
 const msOf = (at) => { const ms = typeof at === 'number' ? at : Date.parse(at ?? ''); return Number.isFinite(ms) ? ms : Date.now(); };
 const idText = (v) => (v == null || v === '' ? null : String(v));
-const idValue = (v) => (v == null ? null : /^-?\d{1,15}$/.test(v) ? Number(v) : v);
+const idValue = (v) => {
+  if (v == null) return null;
+  if (/^-?\d{1,15}$/.test(v)) return Number(v);
+  return v;
+};
 const inboxItem = (row) => ({ id: row.msg_id, at: iso(row.at), chatId: row.chat_id ?? null, messageId: idValue(row.message_id), text: row.text, read: row.read_at != null,
   ...(row.read_at != null ? { readAt: iso(row.read_at) } : {}), ...(row.from_ref ? { from: row.from_ref } : {}) });
 const outboxItem = (row) => ({ id: row.msg_id, at: iso(row.at), to: row.to_ref ?? null, via: row.via ?? null, ok: row.ok !== 0, text: row.text });
@@ -65,4 +69,3 @@ export function takeInbox(id, { env = process.env, peek = false, ids = null, now
     return rows.map(inboxItem);
   }), { env });
 }
-

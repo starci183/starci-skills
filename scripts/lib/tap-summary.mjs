@@ -8,7 +8,7 @@ const COUNTS = ['tests', 'pass', 'fail', 'cancelled', 'skipped', 'todo'];
 export function tapSummary(tap) {
   const text = String(tap ?? '');
   const out = Object.fromEntries(COUNTS.map((key) => {
-    const m = new RegExp(`^# ${key} (\\d+)\\s*$`, 'm').exec(text);
+    const m = new RegExp(String.raw`^# ${key} (\d+)\s*$`, 'm').exec(text);
     return [key, m ? Number(m[1]) : null];
   }));
   const stack = [];

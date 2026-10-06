@@ -40,7 +40,11 @@ export function reserveOrcaSlot({ repoRoot, kind, slotKey, owner = {}, cap = und
   if (!ORCA_KINDS.includes(kind)) throw new Error(`reserveOrcaSlot: ${kind} is not an Orca kind (${ORCA_KINDS.join(', ')})`);
   const home = mainRootOf(repoRoot, { git });
   const pending = pendingPathOf(home, kind, slotKey);
-  const limit = cap === undefined ? (kind === 'workflow' ? settings.capPerRepo : null) : cap;
+  let limit = cap;
+  if (limit === undefined) {
+    if (kind === 'workflow') limit = settings.capPerRepo;
+    else limit = null;
+  }
   try {
     const r = withRegistry((m) => m.reserveWorktree({ path: pending, kind, repoRoot: home, branch: null, baseSha: null, ledgerId: owner.ledgerId ?? null,
       workflowId: owner.workflowId ?? null, jobId: owner.jobId ?? null, lane: owner.lane ?? null }, { cap: limit }), env);

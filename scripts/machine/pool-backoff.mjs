@@ -39,7 +39,9 @@ export function aimdStep(prev, { max, rateLimitAt = null, now, floor = DEFAULTS.
   // Multiplicative decrease: a new signal, and the last decrease is older than the cooldown.
   if (fresh && (base.lastDecreaseAt == null || now - base.lastDecreaseAt >= decreaseCooldownMs)) {
     const cap = Math.max(lo, Math.floor(cur / 2));
-    return { ...base, cap, floorSince: cap === lo ? (prev?.cap === lo && prev?.floorSince ? prev.floorSince : now) : null, lastDecreaseAt: now, halvings: base.halvings + 1, reason: `rate limited: ${cur} -> ${cap}${cap === lo ? ' (floor)' : ''}` };
+    let floorSince = null;
+    if (cap === lo) floorSince = prev?.cap === lo && prev?.floorSince ? prev.floorSince : now;
+    return { ...base, cap, floorSince, lastDecreaseAt: now, halvings: base.halvings + 1, reason: `rate limited: ${cur} -> ${cap}${cap === lo ? ' (floor)' : ''}` };
   }
   if (!prev) return null;
   // Additive increase: quiet for increaseAfterMs since the last signal, one step per increaseStepMs.

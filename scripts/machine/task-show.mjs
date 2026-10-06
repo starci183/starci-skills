@@ -74,7 +74,9 @@ export async function taskList(ctx, deps = {}) {
   let rows;
   try {
     const payload = payloadOf(result);
-    rows = payload == null ? [] : Array.isArray(payload) ? payload : [payload];
+    if (payload == null) rows = [];
+    else if (Array.isArray(payload)) rows = payload;
+    else rows = [payload];
   } catch (error) {
     return { code: 1, stderr: `starci task list: invalid Task Scheduler response (${error.message})`,
       data: { schema: 'starci/task-list@1', ok: false, tasks: [] } };
