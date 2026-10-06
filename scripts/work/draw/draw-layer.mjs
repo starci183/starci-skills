@@ -133,19 +133,28 @@ export function measureLayer({ fields, primary, chat }) {
   const fieldSel = fields.map((n) => `[data-component="${n}"],[data-grammar-component="${n}"]`).join(',');
   const forms = [];
   const seen = new Set();
-  for (const button of document.querySelectorAll(primary)) {
+  const isVisible = (button) => {
     const cs = getComputedStyle(button);
-    if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+    return cs.display !== 'none' && cs.visibility !== 'hidden';
+  };
+  const regionOf = (button) => {
     let region = button.parentElement;
     while (region && region !== document.body && !region.querySelector(fieldSel)) region = region.parentElement;
+    return region;
+  };
+  // A chat / messaging composer (a text input and a send button in a chat workspace) follows its conversation column.
+  const isExcludedRegion = (region) => region.querySelector('table,[role="grid"],[role="table"]')
+    || region.closest(chat) || region.querySelector(chat) || [...region.classList].some((c) => c.startsWith('starci-core-chat-'));
+  for (const button of document.querySelectorAll(primary)) {
+    if (!isVisible(button)) continue;
+    const region = regionOf(button);
     if (!region || region === document.body || seen.has(region)) continue;
     seen.add(region);
-    if (region.querySelector('table,[role="grid"],[role="table"]')) continue;
-    // A chat / messaging composer (a text input and a send button in a chat workspace) follows its conversation column.
-    if (region.closest(chat) || region.querySelector(chat) || [...region.classList].some((c) => c.startsWith('starci-core-chat-'))) continue;
+    if (isExcludedRegion(region)) continue;
     const names = [...region.querySelectorAll(fieldSel)].map((el) => el.getAttribute('data-component') ?? el.getAttribute('data-grammar-component'));
     const cls = typeof region.className === 'string' ? region.className.trim().split(/\s+/).slice(0, 3).join('.') : '';
-    forms.push({ desc: `<${region.tagName.toLowerCase()}${cls ? `.${cls}` : ''}>`, width: region.getBoundingClientRect().width, fields: names });
+    const classLabel = cls ? `.${cls}` : '';
+    forms.push({ desc: `<${region.tagName.toLowerCase()}${classLabel}>`, width: region.getBoundingClientRect().width, fields: names });
   }
   return { viewport: { width: window.innerWidth, height: window.innerHeight }, forms };
 }
