@@ -286,8 +286,10 @@ async function currentCanon(fx, side) {
 }
 
 test('actual catalog programs resolve current module APIs and complete current canon factories measure every listed TS source', async t => {
-  const catalog = loadExampleCatalog(runtime);
-  for (const name of [...new Set(catalog.examples.map(row => row.path))]) {
+  const catalog = loadExampleCatalog(runtime), names = [...new Set(catalog.examples.map(row => row.path))];
+  const uninstalled = names.filter(name => !fs.existsSync(path.join(runtime, 'examples', name, 'node_modules')));
+  if (uninstalled.length) return t.skip(`the reference apps' own installs are absent (${uninstalled.join(', ')}): provide them with npm ci in examples/<name>`);
+  for (const name of names) {
     const phase = label => t.diagnostic(`${name}: ${label}; memory=${JSON.stringify(process.memoryUsage())}`);
     phase('install authored app and private Git index');
     const rows = catalog.examples.filter(row => row.path === name);

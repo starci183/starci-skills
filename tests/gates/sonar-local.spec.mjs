@@ -220,6 +220,8 @@ fs.writeFileSync(file,'ENC:'+fs.readFileSync(from,'utf8'));`);
 // that exercises the timeout itself passes its own timeoutMs.
 const CHILD_TIMEOUT_MS=allocationMs('landGate.perSpecMs');
 
+// The scanner runs through the shell: a child env without PATH finds no npm or node off Windows, so a scanning case brings the host's.
+const PATH_ENV={PATH:process.env.PATH};
 function configFor(host,custody,extra={}){
   // record: a re-mint event of a spec never reaches the supervisor ledger.
   // specs: the owner switches are fixed (unit on), never the developer's config.yaml.
@@ -925,7 +927,7 @@ test('rejected supplied analysis stops isolation before admin reads, minting or 
   fs.rmSync(path.join(custody.stack,'runtime/files/sonarqube-admin-token.key'));
   write(custody.stack,'runtime/files/sonarqube-admin-token.key.enc','ENC:'+ADMIN);
   fs.writeFileSync(custody.sops,"import fs from 'node:fs';fs.writeFileSync("+JSON.stringify(marker)+",'called');process.stdout.write("+JSON.stringify(ADMIN)+");");
-  const run=await sonarLocalMain(['scan','--cwd',repo,'--wait','--isolate'],{env:{SONAR_TOKEN:ANALYSIS},config:configFor(host,custody)});
+  const run=await sonarLocalMain(['scan','--cwd',repo,'--wait','--isolate'],{env:{...PATH_ENV,SONAR_TOKEN:ANALYSIS},config:configFor(host,custody)});
   assert.equal(run.exitCode,2);assert.equal(run.report.custody.analysis.rejected,true);
   assert.match(run.report.reason,/SONAR_TOKEN is rejected/);
   assert.equal(fs.existsSync(marker),false,'analysis rejection precedes administrative custody');
@@ -962,7 +964,7 @@ test('shared analysis cannot borrow custody configured for another administrativ
   write(custody.stack,'runtime/files/sonarqube-admin-token.key.enc','ENC:'+ADMIN);
   fs.writeFileSync(custody.sops,"import fs from 'node:fs';fs.writeFileSync("+JSON.stringify(marker)+",'called');process.stdout.write("+JSON.stringify(ADMIN)+");");
   const run=await sonarLocalMain(['scan','--cwd',repo,'--wait','--isolate'],{
-    env:{SONAR_TOKEN:ANALYSIS,SONAR_HOST_URL:analysisServer.host,STARCI_SONAR_HOST_URL:adminServer.host},
+    env:{...PATH_ENV,SONAR_TOKEN:ANALYSIS,SONAR_HOST_URL:analysisServer.host,STARCI_SONAR_HOST_URL:adminServer.host},
     config:configFor(undefined,custody,{runtimeSecretEnv:value=>value}),
   });
   assert.equal(run.exitCode,0,JSON.stringify(run.report));assert.equal(run.report.host,analysisServer.host);
@@ -1211,7 +1213,7 @@ services:
 `;
   write(repo,'.starcistacks/application-stacks.yaml',declaration);
   const {identity,sops,stackSecret}=custody;
-  const {exitCode,report}=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{env:{SONAR_TOKEN:ANALYSIS},config:{identity,sops,stackSecret,docker:'starci-no-such-docker',pollMs:5,runtimeSecretEnv:value=>value}});
+  const {exitCode,report}=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{env:{...PATH_ENV,SONAR_TOKEN:ANALYSIS},config:{identity,sops,stackSecret,docker:'starci-no-such-docker',pollMs:5,runtimeSecretEnv:value=>value}});
   assert.equal(exitCode,0,JSON.stringify(report));
   assert.equal(report.host,host);
   assert.equal(report.projectKey,'declared-key');
@@ -1585,7 +1587,7 @@ test('lite Sonar selects its canonical conditions and requires an actual process
   assert.equal(serverConditions(full).filter(row=>/coverage/.test(row.metric)).length,2);
   const {host,state}=await fakeSonar(t,{projectMeasures:{bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:0,duplicated_lines_density:0}});
   const cfg=configFor(host,custody,{coverageRunner:()=>{throw Error('a lite app has no test world');}});
-  const report=await scan(resolveConfig(cfg,{}),{cwd:repo,wait:true,projectGate:true,ensure:true});
+  const report=await scan(resolveConfig(cfg,PATH_ENV),{cwd:repo,wait:true,projectGate:true,ensure:true});
   assert.equal(report.outcome,'pass',JSON.stringify(report));
   assert.deepEqual([report.scanner.exitCode,report.ceTask.status,report.analysisId,report.projectGate.status],[0,'SUCCESS','AN-1','OK']);
   assert.equal(state.gateSelected.get('product-repo'),'starci-quality-lite');
