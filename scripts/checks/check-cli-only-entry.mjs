@@ -41,8 +41,8 @@ Exit 0 is clean, 1 reports findings, and 2 is bad usage or unreadable input.`;
 
 class CliOnlyEntryInputError extends Error {}
 
-const posix = (file) => String(file).replace(/\\/g, '/');
-const slashPattern = (value) => posix(value).split('/').map(escapeRegExp).join('[\\\\/]');
+const posix = (file) => String(file).replaceAll('\\', '/');
+const slashPattern = (value) => posix(value).split('/').map(escapeRegExp).join(String.raw`[\\/]`);
 const lineAt = (text, at) => text.slice(0, at).split('\n').length;
 
 const fullyExempt = (file) => file.startsWith('packages/cli/src/')
@@ -89,8 +89,8 @@ const routeFor = (routes, script, rest) => {
 const nodeMatcher = (scripts) => {
   const body = [...scripts].sort((a, b) => b.length - a.length || a.localeCompare(b)).map(slashPattern).join('|');
   if (!body) return null;
-  const variable = '(?:\\$\\{?[A-Za-z_][A-Za-z0-9_]*\\}?[\\\\/]|%[A-Za-z_][A-Za-z0-9_]*%[\\\\/])?';
-  return new RegExp(`(?<![\\w.-])["']?node(?:\\.exe)?["']?[ \\t]+["']?${variable}(?:\\.claude[\\\\/])?(?<script>${body})["']?`, 'gi');
+  const variable = String.raw`(?:\$\{?[A-Za-z_][A-Za-z0-9_]*\}?[\\/]|%[A-Za-z_][A-Za-z0-9_]*%[\\/])?`;
+  return new RegExp(String.raw`(?<![\w.-])["']?node(?:\.exe)?["']?[ \t]+["']?${variable}(?:\.claude[\\/])?(?<script>${body})["']?`, 'gi');
 };
 
 /** Direct node and npm-run calls in one file. Pure; context is built once per scan. */
@@ -200,8 +200,7 @@ export function scanCliOnlyEntry(root = DEFAULT_ROOT, { files = null, read = nul
     if (bytes.includes(0)) continue;
     checked += 1;
     const text = bytes.toString('utf8');
-    findings.push(...cliOnlyCallsInText(text, file, context));
-    findings.push(...rawCommandFindingsInText(text, file, { policy: commandPolicy, cwd: root }));
+    findings.push(...cliOnlyCallsInText(text, file, context), ...rawCommandFindingsInText(text, file, { policy: commandPolicy, cwd: root }));
   }
   for (const source of generated ?? generatedEntrySources()) findings.push(...cliOnlyCallsInText(source.text, source.file, context));
   const unique = [...new Map(findings.map((finding) => [`${finding.file}\0${finding.line}\0${finding.kind}\0${finding.spelling}`, finding])).values()];
@@ -225,7 +224,7 @@ export function main(argv = [], io = process, deps = {}) {
     scan: deps.scan ?? scanCliOnlyEntry,
     cleanText: (report) => `check-cli-only-entry: no direct entry calls or raw side-effecting guidance in ${report.files} tracked text file(s)`,
     findingText: (finding) => {
-      if (finding.kind === 'raw-guidance') return `  ${finding.file}:${finding.line} raw ${finding.program}${finding.sub ? ` ${finding.sub}` : ''} in guidance: use ${finding.use}`;
+      if (finding.kind === 'raw-guidance') return `  ${finding.file}:${finding.line} raw ${finding.program}${finding.sub ? ' ' + finding.sub : ''} in guidance: use ${finding.use}`;
       const replacement = finding.use
         ? `use "${finding.use}"`
         : 'internal script: not invokable; use "starci <group> <verb>" of its owner';
@@ -233,7 +232,8 @@ export function main(argv = [], io = process, deps = {}) {
     },
     redText: (report) => {
       const counts = Object.entries(report.rawUseCounts ?? {});
-      const summary = counts.length ? `\nraw guidance by use:\n${counts.map(([use, count]) => `  ${count} ${use}`).join('\n')}` : '';
+      const lines = counts.map(([use, count]) => `  ${count} ${use}`).join('\n');
+      const summary = counts.length ? `\nraw guidance by use:\n${lines}` : '';
       return `check-cli-only-entry: red (${report.findings.length} finding(s))${summary}`;
     },
   });

@@ -18,6 +18,7 @@ import { trackedTextFiles } from '../hfs/runtime-rules/tracked-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { runCheckCli } from '../lib/check-cli.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { tokenize as tokenizeSource } from '../hfs/architecture/clones.mjs';
 
 const CLONE_LINES = 8;
@@ -30,7 +31,11 @@ const VENDORED = /(^|\/)(node_modules|dist|reference-renders)\//;
 // packages/grammar is a published React component library judged by its own Sonar duplication gate (its markup and Storybook files repeat by design); it is not runtime code.
 const OUT_OF_SCOPE = /^packages\/grammar\//;
 /** The unit a file belongs to: a package (packages/eslint/<be|fe> is one) or the runtime proper. Blocks are compared inside one unit: two packages are published apart and cannot import each other. */
-export const unitOf = (rel) => (rel.startsWith('packages/eslint/') ? rel.split('/').slice(0, 3).join('/') : rel.startsWith('packages/') ? rel.split('/').slice(0, 2).join('/') : 'runtime');
+export const unitOf = (rel) => {
+  if (rel.startsWith('packages/eslint/')) return rel.split('/').slice(0, 3).join('/');
+  if (rel.startsWith('packages/')) return rel.split('/').slice(0, 2).join('/');
+  return 'runtime';
+};
 const MAX_FINDINGS = 400;
 
 let typescript = null;
@@ -38,7 +43,9 @@ const tsOf = () => { typescript ??= createRequire(path.join(skillRoot, 'packages
 /** The normalised node sequence of a source file: {kinds, lines, types} (the line of each node, and whether it sits in a type declaration). */
 function tokenize(rel, text) {
   const ts = tsOf();
-  const kindOfFile = rel.endsWith('.tsx') ? ts.ScriptKind.TSX : rel.endsWith('.ts') ? ts.ScriptKind.TS : ts.ScriptKind.JS;
+  let kindOfFile = ts.ScriptKind.JS;
+  if (rel.endsWith('.ts')) kindOfFile = ts.ScriptKind.TS;
+  if (rel.endsWith('.tsx')) kindOfFile = ts.ScriptKind.TSX;
   return tokenizeSource(ts, ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, false, kindOfFile));
 }
 
@@ -55,8 +62,45 @@ const windowKey = (kinds, start, end) => `${end - start}:${crypto.createHash('sh
  * The findings of a source set: [{code, path, line, message}], one per duplicated block, on the later location, naming
  * the first. files: [{rel, text}].
  */
+/** The duplicated-block findings of one equal-window pair, on the later location. */
+const pairFindings = (fa, fb, ai, bi, offset, hits, N) => {
+  const findings = [];
+  hits.sort((x, y) => fa.lines[x.a[1]] - fa.lines[y.a[1]]);
+  let block = null;
+  const flush = () => {
+    if (!block) return;
+    const lineSpan = block.endLine - block.startLine + 1;
+    let typeNodes = 0;
+    for (let i = block.aStart; i < block.aEnd; i += 1) typeNodes += fa.types[i];
+    const shapes = new Set();
+    let shape = [];
+    for (let i = block.aStart; i < block.aEnd; i += 1) {
+      if (i > block.aStart && fa.lines[i] !== fa.lines[i - 1]) { shapes.add(shape.join(',')); shape = []; }
+      shape.push(fa.kinds[i]);
+    }
+    shapes.add(shape.join(','));
+    // A table of one repeated row shape is a list, not copied logic; a block matching itself shifted by less than its own length is a repetition.
+    const repetition = shapes.size < N / 3 || (ai === bi && Math.abs(offset) < lineSpan);
+    if (lineSpan >= N && typeNodes * 2 < block.aEnd - block.aStart && !repetition) {
+      findings.push({ code: 'RT_DUPLICATE_CODE', path: fb.rel, line: block.startLine + offset,
+        message: `${lineSpan} duplicated lines also at ${fa.rel}:${block.startLine}: ${homeText(fa.rel, fb.rel)}` });
+    }
+    block = null;
+  };
+  for (const hit of hits) {
+    const startLine = fa.lines[hit.a[1]];
+    const endLine = fa.lines[hit.a[2] - 1];
+    if (block && startLine <= block.endLine + 1) {
+      block.endLine = Math.max(block.endLine, endLine);
+      block.aEnd = Math.max(block.aEnd, hit.a[2]);
+    } else { flush(); block = { startLine, endLine, aStart: hit.a[1], aEnd: hit.a[2] }; }
+  }
+  flush();
+  return findings;
+};
+
 export function cloneFindings(files, { lines: N = CLONE_LINES, tokens: T = CLONE_TOKENS } = {}) {
-  const entries = files.filter((f) => SOURCE.test(f.rel) && !isTest(f.rel)).sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0)).map((f) => ({ rel: f.rel, ...tokenize(f.rel, f.text) }));
+  const entries = files.filter((f) => SOURCE.test(f.rel) && !isTest(f.rel)).sort((a, b) => byCodeUnit(a.rel, b.rel)).map((f) => ({ rel: f.rel, ...tokenize(f.rel, f.text) }));
   const buckets = new Map();
   entries.forEach((file, fileIndex) => {
     const { kinds, lines } = file;
@@ -89,43 +133,11 @@ export function cloneFindings(files, { lines: N = CLONE_LINES, tokens: T = CLONE
   const findings = [];
   for (const [key, hits] of pairs) {
     const [ai, bi, offset] = key.split(':').map(Number);
-    const fa = entries[ai];
-    const fb = entries[bi];
-    hits.sort((x, y) => fa.lines[x.a[1]] - fa.lines[y.a[1]]);
-    let block = null;
-    const flush = () => {
-      if (!block) return;
-      const lineSpan = block.endLine - block.startLine + 1;
-      let typeNodes = 0;
-      for (let i = block.aStart; i < block.aEnd; i += 1) typeNodes += fa.types[i];
-      const shapes = new Set();
-      let shape = [];
-      for (let i = block.aStart; i < block.aEnd; i += 1) {
-        if (i > block.aStart && fa.lines[i] !== fa.lines[i - 1]) { shapes.add(shape.join(',')); shape = []; }
-        shape.push(fa.kinds[i]);
-      }
-      shapes.add(shape.join(','));
-      // A table of one repeated row shape is a list, not copied logic; a block matching itself shifted by less than its own length is a repetition.
-      const repetition = shapes.size < N / 3 || (ai === bi && Math.abs(offset) < lineSpan);
-      if (lineSpan >= N && typeNodes * 2 < block.aEnd - block.aStart && !repetition) {
-        findings.push({ code: 'RT_DUPLICATE_CODE', path: fb.rel, line: block.startLine + offset,
-          message: `${lineSpan} duplicated lines also at ${fa.rel}:${block.startLine}: ${homeText(fa.rel, fb.rel)}` });
-      }
-      block = null;
-    };
-    for (const hit of hits) {
-      const startLine = fa.lines[hit.a[1]];
-      const endLine = fa.lines[hit.a[2] - 1];
-      if (block && startLine <= block.endLine + 1) {
-        block.endLine = Math.max(block.endLine, endLine);
-        block.aEnd = Math.max(block.aEnd, hit.a[2]);
-      } else { flush(); block = { startLine, endLine, aStart: hit.a[1], aEnd: hit.a[2] }; }
-    }
-    flush();
+    findings.push(...pairFindings(entries[ai], entries[bi], ai, bi, offset, hits, N));
   }
   const seen = new Set();
-  return findings.filter((f) => { const k = `${f.path}:${f.line}`; if (seen.has(k)) return false; seen.add(k); return true; })
-    .sort((x, y) => (x.path < y.path ? -1 : x.path > y.path ? 1 : x.line - y.line)).slice(0, MAX_FINDINGS);
+  return findings.filter((f) => { const k = `${f.path}:${f.line}`; const fresh = !seen.has(k); seen.add(k); return fresh; })
+    .sort((x, y) => byCodeUnit(x.path, y.path) || x.line - y.line).slice(0, MAX_FINDINGS);
 }
 
 /** Run the check on the runtime at `root`. */

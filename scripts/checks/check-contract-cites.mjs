@@ -31,6 +31,7 @@ import { RETIRED_PATHS_FILE, generatedRootsOf, isHistoryPath } from '../lib/chec
 import { ts } from '../hfs/runtime-rules/source-ast.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
+import { checkReportResult } from '../lib/check-cli.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 const HELP = `Usage: starci runtime check --only contract-cites -- [--root <tree>] [--scan <rel-path> ...] [--json]
@@ -42,10 +43,10 @@ const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
 const DEFAULT_SCAN = ['modules/kernel', 'modules/goal', 'modules/ops'];
 const EXTENSIONS = 'mjs|yaml|yml|md|sql';
 const CITE_KEYS = /^\s*(?:-\s*)?(?:citation|enforcedBy|source|sources)\s*:/;
-const PATH_TOKEN = new RegExp(`\\.?[A-Za-z0-9_][A-Za-z0-9_@./{},<>*+-]*\\.(?:${EXTENSIONS})\\b`, 'g');
-const BACKTICKED = new RegExp('`([^`\\n]+)`', 'g');
-const SYMBOL_CITE = new RegExp(`([A-Za-z0-9_][A-Za-z0-9_./-]*\\.(?:${EXTENSIONS}))::([A-Za-z0-9_.$-]+)`, 'g');
-const SYMBOL_IN_FILE = new RegExp('`([A-Za-z0-9_.$]+)\\(\\)`\\s+in\\s+([A-Za-z0-9_][A-Za-z0-9_./-]*\\.(?:' + EXTENSIONS + '))', 'g');
+const PATH_TOKEN = new RegExp(String.raw`\.?[A-Za-z0-9_][A-Za-z0-9_@./{},<>*+-]*\.(?:${EXTENSIONS})\b`, 'g');
+const BACKTICKED = /`([^`\n]+)`/g;
+const SYMBOL_CITE = new RegExp(String.raw`([A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:${EXTENSIONS}))::([A-Za-z0-9_.$-]+)`, 'g');
+const SYMBOL_IN_FILE = new RegExp(String.raw`\x60([\w.$]+)\(\)\x60\s+in\s+(\w[\w./-]*\.(?:${EXTENSIONS}))`, 'g');
 
 class CiteInputError extends Error {}
 
@@ -118,7 +119,10 @@ function collectScanFiles(root, scan = DEFAULT_SCAN) {
 /** The comments of one source file re-laid on their own lines (everything else blank), so a cite keeps its real line number. */
 function commentsAsText(file, text) {
   const t = ts();
-  const kind = /\.tsx$/i.test(file) ? t.ScriptKind.TSX : /\.ts$/i.test(file) ? t.ScriptKind.TS : /\.jsx$/i.test(file) ? t.ScriptKind.JSX : t.ScriptKind.JS;
+  let kind = t.ScriptKind.JS;
+  if (/\.ts$/i.test(file)) kind = t.ScriptKind.TS;
+  if (/\.tsx$/i.test(file)) kind = t.ScriptKind.TSX;
+  if (/\.jsx$/i.test(file)) kind = t.ScriptKind.JSX;
   const source = t.createSourceFile(file, String(text), t.ScriptTarget.Latest, true, kind);
   const ranges = new Map();
   const collect = (node) => {
@@ -128,7 +132,7 @@ function commentsAsText(file, text) {
   };
   collect(source);
   const starts = [0];
-  for (let i = 0; i < text.length; i += 1) if (text.charCodeAt(i) === 10) starts.push(i + 1);
+  for (let i = 0; i < text.length; i += 1) if (text.codePointAt(i) === 10) starts.push(i + 1);
   const lineOfPos = (pos) => { let lo = 0, hi = starts.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid] <= pos) lo = mid; else hi = mid - 1; } return lo; };
   const lines = [];
   for (const range of [...ranges.values()].sort((a, b) => a.pos - b.pos)) {
@@ -160,7 +164,7 @@ export function citesIn(text) {
   let inCite = false;
   let citeIndent = 0;
   // `{skillRoot}/x` and friends are the tree root spelled for a prompt.
-  const untemplate = (line) => line.replace(/\{[A-Za-z_][A-Za-z0-9_]*\}\//g, '');
+  const untemplate = (line) => line.replace(/\{[A-Za-z_]\w*\}\//g, '');
   lines.forEach((source, index) => {
     const raw = untemplate(source);
     const line = index + 1;
@@ -189,6 +193,28 @@ export function citesIn(text) {
   return cites;
 }
 
+/** 'skip' (not a cite of this tree), 'checked' (judged), or 'historic' (a retired path named by the registry itself). */
+const judgeCite = (root, cite, rel, readTarget, retiredOrMoved, moved, dead) => {
+  // Outside a cite key, only a token rooted at a real top-level entry is
+  // a reference to this tree; `evidence/manifest.yaml` names a record artifact.
+  if (cite.kind === 'path' && cite.form !== 'cite value'
+    && !fs.existsSync(path.join(root, cite.target.split('/')[0]))) return 'skip';
+  if (cite.kind === 'bare') {
+    dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: 'bare filename — a cite names a repo-relative path' });
+    return 'checked';
+  }
+  if (retiredOrMoved(cite.target) && HISTORY(rel) && !fs.existsSync(path.join(root, cite.target))) return 'historic';
+  let body = readTarget(path.join(root, cite.target));
+  // A markdown-style cite is also legal relative to the citing file (a package README's `docs/x.md`,
+  // a knowledge index's `ui/index.yaml`); the repo-root reading wins.
+  if (body === null) body = readTarget(path.join(root, path.posix.join(path.posix.dirname(rel), cite.target)));
+  if (body === null) { dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: moved(cite.target) ? `moved to ${moved(cite.target)}` : 'no such file' }); return 'checked'; }
+  if (cite.kind === 'symbol' && !body.includes(cite.symbol)) {
+    dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, symbol: cite.symbol, why: 'symbol not in file' });
+  }
+  return 'checked';
+};
+
 export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
   const dead = [];
   const contents = new Map();
@@ -212,27 +238,10 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
       const key = `${cite.line}:${cite.kind}:${cite.target}:${cite.symbol ?? ''}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      // Outside a cite key, only a token rooted at a real top-level entry is
-      // a reference to this tree; `evidence/manifest.yaml` names a record artifact.
-      // A cite key must name a repo-relative path; elsewhere only a token
-      // rooted at a real top-level entry refers to this tree (`evidence/manifest.yaml`
-      // names a record artifact, not a file here).
-      if (cite.kind === 'path' && cite.form !== 'cite value'
-        && !fs.existsSync(path.join(root, cite.target.split('/')[0]))) continue;
+      const verdict = judgeCite(root, cite, rel, readTarget, retiredOrMoved, moved, dead);
+      if (verdict === 'skip') continue;
       checked += 1;
-      if (cite.kind === 'bare') {
-        dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: 'bare filename — a cite names a repo-relative path' });
-        continue;
-      }
-      if (retiredOrMoved(cite.target) && HISTORY(rel) && !fs.existsSync(path.join(root, cite.target))) { historic += 1; continue; }
-      let body = readTarget(path.join(root, cite.target));
-      // A markdown-style cite is also legal relative to the citing file (a package README's `docs/x.md`,
-      // a knowledge index's `ui/index.yaml`); the repo-root reading wins.
-      if (body === null) body = readTarget(path.join(root, path.posix.join(path.posix.dirname(rel), cite.target)));
-      if (body === null) { dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: moved(cite.target) ? `moved to ${moved(cite.target)}` : 'no such file' }); continue; }
-      if (cite.kind === 'symbol' && !body.includes(cite.symbol)) {
-        dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, symbol: cite.symbol, why: 'symbol not in file' });
-      }
+      if (verdict === 'historic') historic += 1;
     }
   }
   return { schema: 'starci/contract-cites@1', ok: dead.length === 0, filesScanned: files.length, citesChecked: checked, retiredCites: historic, dead };
@@ -263,39 +272,34 @@ export function runtimeCiteScan(root = DEFAULT_ROOT) {
 export function citedPathFindings(root = DEFAULT_ROOT) {
   return checkContractCites(root, runtimeCiteScan(root)).dead.map((d) => ({
     code: CITED_PATH_MISSING, level: 'error', path: d.file, line: d.line,
-    message: `${d.file}:${d.line} cites ${d.target}${d.symbol ? `::${d.symbol}` : ''}: ${d.why} (${d.form})`,
+    message: `${d.file}:${d.line} cites ${d.target}${d.symbol ? '::' + d.symbol : ''}: ${d.why} (${d.form})`,
   }));
 }
+
+const citeMainText = (report) => {
+  if (report.ok) return { exitCode: 0, text: `check-contract-cites: ${report.citesChecked} cites in ${report.filesScanned} files all resolve\n` };
+  const lines = [`check-contract-cites: ${report.dead.length} dead cite(s) of ${report.citesChecked} checked`];
+  for (const entry of report.dead) {
+    lines.push(`  ${entry.file}:${entry.line}  ${entry.target}${entry.symbol ? '::' + entry.symbol : ''} — ${entry.why} (${entry.form})`);
+  }
+  return { exitCode: 1, text: `${lines.join('\n')}\n` };
+};
 
 export function checkContractCitesMain(argv) {
   let root = DEFAULT_ROOT, json = false;
   const scan = [];
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
+    const takesValue = key === '--root' || key === '--scan';
+    if (takesValue) i += 1;
     if (key === '--help' || key === '-h') return { exitCode: 0, text: `${HELP}\n` };
     if (key === '--json') { json = true; continue; }
-    if (key === '--root' || key === '--scan') {
-      const value = argv[++i];
-      if (value === undefined) return { exitCode: 2, text: `check-contract-cites: ${key} needs a value\n` };
-      if (key === '--root') root = path.resolve(value); else scan.push(value);
-      continue;
-    }
+    if (takesValue && argv[i] === undefined) return { exitCode: 2, text: `check-contract-cites: ${key} needs a value\n` };
+    if (key === '--root') { root = path.resolve(argv[i]); continue; }
+    if (key === '--scan') { scan.push(argv[i]); continue; }
     return { exitCode: 2, text: `check-contract-cites: unknown argument ${key}\n${HELP}\n` };
   }
-  let report;
-  try {
-    report = checkContractCites(root, scan.length ? scan : DEFAULT_SCAN);
-  } catch (error) {
-    if (error instanceof CiteInputError) return { exitCode: 2, text: `check-contract-cites: ${error.message}\n` };
-    throw error;
-  }
-  if (json) return { exitCode: report.ok ? 0 : 1, text: `${JSON.stringify(report, null, 2)}\n` };
-  if (report.ok) return { exitCode: 0, text: `check-contract-cites: ${report.citesChecked} cites in ${report.filesScanned} files all resolve\n` };
-  const lines = [`check-contract-cites: ${report.dead.length} dead cite(s) of ${report.citesChecked} checked`];
-  for (const entry of report.dead) {
-    lines.push(`  ${entry.file}:${entry.line}  ${entry.target}${entry.symbol ? `::${entry.symbol}` : ''} — ${entry.why} (${entry.form})`);
-  }
-  return { exitCode: 1, text: `${lines.join('\n')}\n` };
+  return checkReportResult(json, CiteInputError, 'check-contract-cites', () => checkContractCites(root, scan.length ? scan : DEFAULT_SCAN), citeMainText);
 }
 
 if (isMain(import.meta.url)) {
