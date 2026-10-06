@@ -72,12 +72,18 @@ export function publishSet(root = runtimeRoot) {
     .map(([name, pin]) => ({ name, dir: posixPath(path.dirname(pin.source)) }));
 }
 
+const stripTrailingSlashes = (value) => {
+  let out = String(value ?? '');
+  while (out.endsWith('/')) out = out.slice(0, -1);
+  return out;
+};
+
 /** The generated roots of the runtime manifest under `root` (ruleParams.runtime.generated), runtime-relative posix; [] when the runtime has no manifest. */
 function generatedRoots(root = runtimeRoot) {
   const file = path.join(root, 'knowledge', 'hfs', 'runtime-slots.yaml');
   if (!fs.existsSync(file)) return [];
   return (parseYaml(fs.readFileSync(file, 'utf8'))?.ruleParams?.runtime?.generated ?? [])
-    .map((g) => String(g.root ?? '').replace(/\/+$/, ''))
+    .map((g) => stripTrailingSlashes(g.root ?? ''))
     .filter(Boolean);
 }
 
@@ -181,13 +187,8 @@ const npmRun = (args, { cwd, env, timeout }) => {
   return { status: r.status, error: r.error ?? null, timedOut: r.error?.code === 'ETIMEDOUT' || (r.signal && r.status === null), output: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 };
 
-function preparePackedDependencies({ dirs, own, temp, locked, env, pack }) {
-  const candidates = new Map();
-  for (const dir of dirs) {
-    const manifest = readJson(path.join(dir, 'package.json'));
-    if (candidates.has(manifest.name)) return { status: 'unrun', output: `duplicate local package ${manifest.name}` };
-    candidates.set(manifest.name, { dir, manifest });
-  }
+/** The candidate-tarball substitutions the unit's manifests request: {requested, changes}, or a {status, output} refusal. */
+const collectRequests = ({ own, candidates, locked }) => {
   const requested = new Map();
   const changes = [];
   const sections = ['dependencies', 'devDependencies', 'optionalDependencies'];
@@ -202,24 +203,44 @@ function preparePackedDependencies({ dirs, own, temp, locked, env, pack }) {
       changes.push({ dir, section, name });
     }
   }
+  return { requested, changes };
+};
+
+/** Pack one candidate and prove its payload is safe and identical: {name, version, archive, files}, or a {status, output} refusal. */
+const packCandidate = ({ name, candidate, candidates, destination, env, pack }) => {
+  for (const [nested, version] of Object.entries({ ...candidate.manifest.dependencies, ...candidate.manifest.optionalDependencies, ...candidate.manifest.peerDependencies })) {
+    if (nested.startsWith('@starci/') && candidates.has(nested)) return { status: 'unrun', output: `${name} declares transitive local ${nested}@${version}: a direct tarball substitution cannot prove that install` };
+  }
+  const packed = pack(candidate.dir, destination, { cwd: candidate.dir, run: (args, options) => runNpm(args, { ...options, env }) });
+  if (!packed.ok) return { status: NETWORK.test(packed.detail ?? '') ? 'unrun' : 'red', output: `candidate pack ${name} failed: ${packed.detail}` };
+  if (!packed.file || path.basename(packed.file) !== packed.file) return { status: 'red', output: `candidate pack ${name} returned an unsafe tarball path` };
+  const archive = path.join(destination, packed.file);
+  if (!fs.lstatSync(archive).isFile()) return { status: 'red', output: `candidate pack ${name} is not a regular tarball file` };
+  const files = tarFiles(fs.readFileSync(archive));
+  if ([...files.keys()].some((file) => !file.startsWith('package/') || file.includes('\\') || file.split('/').some((part) => !part || part === '.' || part === '..'))) return { status: 'red', output: `candidate pack ${name} contains an unsafe payload path` };
+  const identity = JSON.parse(files.get('package/package.json')?.toString('utf8') ?? 'null');
+  if (identity?.name !== name || identity?.version !== candidate.manifest.version) return { status: 'red', output: `candidate pack ${name} has a different package name or version` };
+  return { name, version: identity.version, archive, files };
+};
+
+function preparePackedDependencies({ dirs, own, temp, locked, env, pack }) {
+  const candidates = new Map();
+  for (const dir of dirs) {
+    const manifest = readJson(path.join(dir, 'package.json'));
+    if (candidates.has(manifest.name)) return { status: 'unrun', output: `duplicate local package ${manifest.name}` };
+    candidates.set(manifest.name, { dir, manifest });
+  }
+  const found = collectRequests({ own, candidates, locked });
+  if (found.status) return found;
+  const { requested, changes } = found;
   const payloads = [];
   if (!requested.size) return { payloads };
   const destination = path.join(temp, 'packed-dependencies');
   fs.mkdirSync(destination);
   for (const [name, candidate] of requested) {
-    for (const [nested, version] of Object.entries({ ...candidate.manifest.dependencies, ...candidate.manifest.optionalDependencies, ...candidate.manifest.peerDependencies })) {
-      if (nested.startsWith('@starci/') && candidates.has(nested)) return { status: 'unrun', output: `${name} declares transitive local ${nested}@${version}: a direct tarball substitution cannot prove that install` };
-    }
-    const packed = pack(candidate.dir, destination, { cwd: candidate.dir, run: (args, options) => runNpm(args, { ...options, env }) });
-    if (!packed.ok) return { status: NETWORK.test(packed.detail ?? '') ? 'unrun' : 'red', output: `candidate pack ${name} failed: ${packed.detail}` };
-    if (!packed.file || path.basename(packed.file) !== packed.file) return { status: 'red', output: `candidate pack ${name} returned an unsafe tarball path` };
-    const archive = path.join(destination, packed.file);
-    if (!fs.lstatSync(archive).isFile()) return { status: 'red', output: `candidate pack ${name} is not a regular tarball file` };
-    const files = tarFiles(fs.readFileSync(archive));
-    if ([...files.keys()].some((file) => !file.startsWith('package/') || file.includes('\\') || file.split('/').some((part) => !part || part === '.' || part === '..'))) return { status: 'red', output: `candidate pack ${name} contains an unsafe payload path` };
-    const identity = JSON.parse(files.get('package/package.json')?.toString('utf8') ?? 'null');
-    if (identity?.name !== name || identity?.version !== candidate.manifest.version) return { status: 'red', output: `candidate pack ${name} has a different package name or version` };
-    payloads.push({ name, version: identity.version, archive, files });
+    const packed = packCandidate({ name, candidate, candidates, destination, env, pack });
+    if (packed.status) return packed;
+    payloads.push(packed);
   }
   for (const { dir, section, name } of changes) {
     const file = path.join(dir, 'package.json');
@@ -230,27 +251,79 @@ function preparePackedDependencies({ dirs, own, temp, locked, env, pack }) {
   return { payloads };
 }
 
+/** The installed payload must equal the packed file: a failure string, or null when it does. */
+const checkPayloadFile = ({ name, version, file, expected, packageRoot, installRoot }) => {
+  if (!file.startsWith('package/') || file.includes('\\') || file.includes(':') || file.split('/').some((part) => !part || part === '.' || part === '..')) return `${name}@${version}: invalid packed path ${file}`;
+  let target = packageRoot ?? installRoot;
+  const parts = [...(packageRoot ? [] : ['node_modules', ...name.split('/')]), ...file.slice('package/'.length).split('/')];
+  for (const [index, part] of parts.entries()) {
+    target = path.join(target, part);
+    const stat = fs.lstatSync(target, { throwIfNoEntry: false });
+    if (!stat || isLinkLike(target, { stat }) || (index === parts.length - 1 ? !stat.isFile() : !stat.isDirectory())) return `${name}@${version}: installed payload ${file} is missing or linked`;
+  }
+  if (!fs.readFileSync(target).equals(expected)) return `${name}@${version}: installed payload differs from the candidate tarball at ${file}`;
+  return null;
+};
+
+const checkPayload = ({ name, version, files, packageRoots, installRoot }) => {
+  const packageRoot = packageRoots.get(name);
+  if (packageRoot) {
+    const stat = fs.lstatSync(packageRoot, { throwIfNoEntry: false });
+    if (!stat?.isDirectory() || isLinkLike(packageRoot, { stat })) return `${name}@${version}: installed package root is missing or linked`;
+  }
+  for (const [file, expected] of files) {
+    const failure = checkPayloadFile({ name, version, file, expected, packageRoot, installRoot });
+    if (failure) return failure;
+  }
+  return null;
+};
+
 export function verifyPackedDependencies(payloads, installRoot, { packageRoots = new Map() } = {}) {
-  for (const { name, version, files } of payloads) {
-    const packageRoot = packageRoots.get(name);
-    if (packageRoot) {
-      const stat = fs.lstatSync(packageRoot, { throwIfNoEntry: false });
-      if (!stat?.isDirectory() || isLinkLike(packageRoot, { stat })) return `${name}@${version}: installed package root is missing or linked`;
-    }
-    for (const [file, expected] of files) {
-      if (!file.startsWith('package/') || file.includes('\\') || file.includes(':') || file.split('/').some((part) => !part || part === '.' || part === '..')) return `${name}@${version}: invalid packed path ${file}`;
-      let target = packageRoot ?? installRoot;
-      const parts = [...(packageRoot ? [] : ['node_modules', ...name.split('/')]), ...file.slice('package/'.length).split('/')];
-      for (const [index, part] of parts.entries()) {
-        target = path.join(target, part);
-        const stat = fs.lstatSync(target, { throwIfNoEntry: false });
-        if (!stat || isLinkLike(target, { stat }) || (index === parts.length - 1 ? !stat.isFile() : !stat.isDirectory())) return `${name}@${version}: installed payload ${file} is missing or linked`;
-      }
-      if (!fs.readFileSync(target).equals(expected)) return `${name}@${version}: installed payload differs from the candidate tarball at ${file}`;
-    }
+  for (const payload of payloads) {
+    const failure = checkPayload({ ...payload, packageRoots, installRoot });
+    if (failure) return failure;
   }
   return null;
 }
+
+const inside = (dir, parent) => {
+  const rel = path.relative(parent, dir);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+};
+
+/** Stage the unit into the temp tree: {at, installRoot, own, copied}. Comments mark the source vs generated copies. */
+const stageUnit = (unit, { root, temp, sources }) => {
+  const at = (abs) => path.join(temp, 'r', path.relative(root, abs));
+  const installRoot = at(unit.dir);
+  const own = unit.kind === 'workspace' ? unit.members : [unit.dir];
+  if (unit.kind === 'workspace') {
+    fs.mkdirSync(installRoot, { recursive: true });
+    for (const name of ['package.json', ...LOCKFILES, '.npmrc']) if (fs.existsSync(path.join(unit.dir, name))) fs.copyFileSync(path.join(unit.dir, name), path.join(installRoot, name));
+  }
+  for (const dir of own) copyTracked(dir, at(dir));
+  // the other published packages' sources, never inside a folder copied above
+  const sourcesCopied = sources.map((d) => path.resolve(root, d)).filter((d) => !own.some((o) => inside(d, o) || inside(o, d)));
+  for (const dir of sourcesCopied) copyTracked(dir, at(dir));
+  // The generated runtime copies are untracked but shipped content the packages' own tests read; the fresh sync's
+  // output is carried like the tracked files (a copied dir's generated root inside it, or a generated root holding it).
+  const copied = [...own, ...sourcesCopied];
+  for (const g of generatedRoots(root)) {
+    const abs = path.resolve(root, g);
+    if (copied.some((d) => inside(abs, d) || inside(d, abs)) && fs.existsSync(abs)) fs.cpSync(abs, at(abs), { recursive: true });
+  }
+  return { at, installRoot, own, copied };
+};
+
+/** One package's test result inside an installed unit. */
+const testPackage = (pkg, { placed, install, localDependencies, childEnv, npm, result }) => {
+  const dir = placed.get(pkg.name);
+  const manifest = readJson(path.join(dir, 'package.json'));
+  if (typeof manifest.scripts?.test !== 'string' || !manifest.scripts.test.trim()) return result(pkg, 'red', PROOF_CODES.noTest, { install, output: `${pkg.dir}/package.json declares no test script: a published package proves itself` });
+  const tested = npm(['test'], { cwd: dir, env: childEnv, timeout: TEST_TIMEOUT_MS });
+  if (tested.error && !tested.timedOut) return result(pkg, 'unrun', PROOF_CODES.unrun, { install, output: `npm could not start: ${tested.error.message}` });
+  if (tested.status !== 0) return result(pkg, 'red', PROOF_CODES.test, { install, output: tail(tested.output.split(/\r?\n/).filter((l) => !/^\s+at /.test(l)).join('\n'), 60) });
+  return result(pkg, 'green', null, { install, ...(localDependencies.length ? { localDependencies } : {}) });
+};
 
 /**
  * Prove one install unit in a fresh temp directory. Returns one result per published package:
@@ -265,25 +338,7 @@ function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, 
   try {
     const above = nodeModulesAbove(temp);
     if (above) return every('unrun', PROOF_CODES.unrun, { output: `${above} holds a node_modules above the temp directory ${temp}: an install there would not be clean` });
-    const at = (abs) => path.join(temp, 'r', path.relative(root, abs));
-    const installRoot = at(unit.dir);
-    const own = unit.kind === 'workspace' ? unit.members : [unit.dir];
-    if (unit.kind === 'workspace') {
-      fs.mkdirSync(installRoot, { recursive: true });
-      for (const name of ['package.json', ...LOCKFILES, '.npmrc']) if (fs.existsSync(path.join(unit.dir, name))) fs.copyFileSync(path.join(unit.dir, name), path.join(installRoot, name));
-    }
-    for (const dir of own) copyTracked(dir, at(dir));
-    // the other published packages' sources, never inside a folder copied above
-    const inside = (dir, parent) => { const rel = path.relative(parent, dir); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
-    const sourcesCopied = sources.map((d) => path.resolve(root, d)).filter((d) => !own.some((o) => inside(d, o) || inside(o, d)));
-    for (const dir of sourcesCopied) copyTracked(dir, at(dir));
-    // The generated runtime copies are untracked but shipped content the packages' own tests read; the fresh sync's
-    // output is carried like the tracked files (a copied dir's generated root inside it, or a generated root holding it).
-    const copied = [...own, ...sourcesCopied];
-    for (const g of generatedRoots(root)) {
-      const abs = path.resolve(root, g);
-      if (copied.some((d) => inside(abs, d) || inside(d, abs)) && fs.existsSync(abs)) fs.cpSync(abs, at(abs), { recursive: true });
-    }
+    const { at, installRoot, own, copied } = stageUnit(unit, { root, temp, sources });
     const placed = new Map(unit.packages.map((pkg) => [pkg.name, at(path.resolve(root, pkg.dir))]));
     const locked = LOCKFILES.some((name) => fs.existsSync(path.join(installRoot, name)));
     const install = locked ? 'npm ci' : 'npm install (no lockfile)';
@@ -299,15 +354,7 @@ function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, 
     }
     const dependencyFailure = verifyPackedDependencies(prepared.payloads, installRoot);
     if (dependencyFailure) return every('red', PROOF_CODES.install, { install, localDependencies, output: dependencyFailure });
-    return unit.packages.map((pkg) => {
-      const dir = placed.get(pkg.name);
-      const manifest = readJson(path.join(dir, 'package.json'));
-      if (typeof manifest.scripts?.test !== 'string' || !manifest.scripts.test.trim()) return result(pkg, 'red', PROOF_CODES.noTest, { install, output: `${pkg.dir}/package.json declares no test script: a published package proves itself` });
-      const tested = npm(['test'], { cwd: dir, env: childEnv, timeout: TEST_TIMEOUT_MS });
-      if (tested.error && !tested.timedOut) return result(pkg, 'unrun', PROOF_CODES.unrun, { install, output: `npm could not start: ${tested.error.message}` });
-      if (tested.status !== 0) return result(pkg, 'red', PROOF_CODES.test, { install, output: tail(tested.output.split(/\r?\n/).filter((l) => !/^\s+at /.test(l)).join('\n'), 60) });
-      return result(pkg, 'green', null, { install, ...(localDependencies.length ? { localDependencies } : {}) });
-    });
+    return unit.packages.map((pkg) => testPackage(pkg, { placed, install, localDependencies, childEnv, npm, result }));
   } catch (error) {
     return every('unrun', PROOF_CODES.unrun, { output: String(error?.stack ?? error) });
   } finally {
@@ -322,30 +369,54 @@ export function provePackages(packages, { root = runtimeRoot, env = process.env,
     log(`package-clean-test: installing ${unit.packages.map((p) => p.name).join(', ')} (${unit.kind}) from ${posixPath(path.relative(root, unit.dir)) || '.'}`);
     for (const r of proveUnit(unit, { root, env, npm, pack, sources })) { results.push(r); log(line(r)); }
   }
-  const exit = results.some((r) => r.status === 'unrun') ? PROOF_EXIT.unrun : results.some((r) => r.status === 'red') ? PROOF_EXIT.red : PROOF_EXIT.green;
+  let exit = PROOF_EXIT.green;
+  if (results.some((r) => r.status === 'unrun')) exit = PROOF_EXIT.unrun;
+  else if (results.some((r) => r.status === 'red')) exit = PROOF_EXIT.red;
   return { exit, results };
 }
 
-const line = (r) => `package-clean-test: ${r.name} ${r.status.toUpperCase()}${r.code ? ` ${r.code}` : ''} (${r.install ?? 'not installed'}, ${Math.round(r.ms / 1000)}s)${r.status === 'green' ? '' : `\n${String(r.output ?? '').split(/\r?\n/).map((l) => `    ${l}`).join('\n')}`}`;
+const line = (r) => {
+  const code = r.code ? ` ${r.code}` : '';
+  const detail = String(r.output ?? '').split(/\r?\n/).map((l) => `    ${l}`).join('\n');
+  const tail = r.status === 'green' ? '' : `\n${detail}`;
+  return `package-clean-test: ${r.name} ${r.status.toUpperCase()}${code} (${r.install ?? 'not installed'}, ${Math.round(r.ms / 1000)}s)${tail}`;
+};
 
-function packageCleanTestMain(argv = [], { root = runtimeRoot, out = (s) => process.stdout.write(s) } = {}) {
+/** The --changed/--base file list the proof is limited to: {changed}, or {code} when a flag failed. */
+const readChanges = (argv, root, out) => {
   let changed = null;
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === '--changed') { changed = [...(changed ?? [])]; while (argv[i + 1] !== undefined && !argv[i + 1].startsWith('--')) changed.push(argv[(i += 1)]); }
-    else if (argv[i] === '--base' && argv[i + 1]) {
-      const range = `${argv[(i += 1)]}..HEAD`;
+    if (argv[i] === '--changed') {
+      changed = [...(changed ?? [])];
+      while (argv[i + 1] !== undefined && !argv[i + 1].startsWith('--')) { i += 1; changed.push(argv[i]); }
+    } else if (argv[i] === '--base' && argv[i + 1]) {
+      i += 1;
+      const range = `${argv[i]}..HEAD`;
       const names = diff(['--name-only', '--no-renames', range], { cwd: root, encoding: 'utf8' });
-      if (names.status !== 0) { out(`package-clean-test: git diff ${range} failed: ${String(names.stderr || names.error?.message || '').trim()}\n`); return PROOF_EXIT.unrun; }
+      if (names.status !== 0) { out(`package-clean-test: git diff ${range} failed: ${String(names.stderr || names.error?.message || '').trim()}\n`); return { code: PROOF_EXIT.unrun }; }
       changed = [...(changed ?? []), ...String(names.stdout).split(/\r?\n/).filter(Boolean)];
-    } else { out(`${USAGE}\n`); return PROOF_EXIT.unrun; }
+    } else { out(`${USAGE}\n`); return { code: PROOF_EXIT.unrun }; }
   }
-  // The proof copies tracked files plus the generated runtime copies; the copies are refreshed first so what the temp
-  // install reads is what a pack would ship.
+  return { changed };
+};
+
+/** The generated copies are refreshed first so what the temp install reads is what a pack would ship. */
+const refreshGenerated = (root, out) => {
   const syncScript = path.join(root, 'scripts', 'hfs', 'sync-runtime.mjs');
   if (fs.existsSync(syncScript) && generatedRoots(root).length) {
     const status = runScript(syncScript, [], { cwd: root });
-    if (status !== 0) { out(`package-clean-test: the runtime sync failed (exit ${status}); the generated copies cannot be trusted\n`); return PROOF_EXIT.unrun; }
+    if (status !== 0) { out(`package-clean-test: the runtime sync failed (exit ${status}); the generated copies cannot be trusted\n`); return false; }
   }
+  return true;
+};
+
+function packageCleanTestMain(argv = [], { root = runtimeRoot, out = (s) => process.stdout.write(s) } = {}) {
+  const parsed = readChanges(argv, root, out);
+  if (parsed.code !== undefined) return parsed.code;
+  const changed = parsed.changed;
+  // The proof copies tracked files plus the generated runtime copies; the copies are refreshed first so what the temp
+  // install reads is what a pack would ship.
+  if (!refreshGenerated(root, out)) return PROOF_EXIT.unrun;
   const set = publishSet(root);
   const packages = changed ? packagesChanged(changed, set, root) : set;
   if (!packages.length) { out(`package-clean-test: no published package changed (${set.length} in the publish set)\n`); return PROOF_EXIT.green; }

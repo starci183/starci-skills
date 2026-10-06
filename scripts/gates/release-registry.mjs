@@ -14,7 +14,17 @@ import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { tarFiles } from '../lib/tar-files.mjs';
 
-const norm = (buffer) => buffer.toString('latin1').replace(/\r\n/g, '\n');
+const norm = (buffer) => buffer.toString('latin1').replaceAll('\r\n', '\n');
+
+/** How one path compares across the two packs: a bucket entry, 'crlf', or null when identical. */
+const fileDiff = (registryFiles, localFiles, file) => {
+  const a = registryFiles.get(file);
+  const b = localFiles.get(file);
+  const bare = file.replace(/^package\//, '');
+  if (!a || !b) return `${a ? 'only-registry' : 'only-local'} ${bare}`;
+  if (a.equals(b)) return null;
+  return norm(a) === norm(b) ? 'crlf' : `differs ${bare}`;
+};
 
 /**
  * Compare two tarballs' files (Map path -> Buffer) the way the release plan classifies a published version: `same`, `crlf`
@@ -26,13 +36,10 @@ export function classifyContent(registryFiles, localFiles) {
   const dist = [];
   const drift = [];
   for (const file of new Set([...registryFiles.keys(), ...localFiles.keys()])) {
-    const bucket = /^package\/dist\//.test(file) ? dist : drift;
-    const a = registryFiles.get(file);
-    const b = localFiles.get(file);
-    const bare = file.replace(/^package\//, '');
-    if (!a || !b) { bucket.push(`${a ? 'only-registry' : 'only-local'} ${bare}`); continue; }
-    if (a.equals(b)) continue;
-    if (norm(a) === norm(b)) crlf += 1; else bucket.push(`differs ${bare}`);
+    const diff = fileDiff(registryFiles, localFiles, file);
+    if (!diff) continue;
+    if (diff === 'crlf') crlf += 1;
+    else (file.startsWith('package/dist/') ? dist : drift).push(diff);
   }
   if (drift.length) return `drift ${drift.length}: ${drift.slice(0, 4).join('; ')}${drift.length > 4 ? '; ...' : ''}`;
   if (dist.length) return `dist ${dist.length}`;

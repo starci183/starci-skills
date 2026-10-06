@@ -30,7 +30,7 @@ export const VERDICTS=['proven','weak','contradiction','checks-only'];
 
 const unique=list=>[...new Set(list)];
 const normalize=value=>posixPath(value).replace(/^\/+/,'');
-const tail=(text,max=400)=>String(text??'').replace(/\s+$/,'').slice(-max);
+const tail=(text,max=400)=>String(text??'').trimEnd().slice(-max);
 const native=file=>path.join(...normalize(file).split('/'));
 const base=file=>normalize(file).split('/').at(-1);
 const short=head=>String(head??'').slice(0,12)||'(unknown)';
@@ -43,9 +43,14 @@ export const policyFor=kind=>PROOF_POLICY[kind]??PROOF_POLICY.default;
 function scopeCovers(entry,spec){
   const pattern=normalize(entry);
   if(!pattern)return false;
-  const root=pattern.replace(/\/?\*+$/,'').replace(/\/+$/,'');
+  let root=pattern;
+  if(root.endsWith('*')){
+    while(root.endsWith('*'))root=root.slice(0,-1);
+    if(root.endsWith('/'))root=root.slice(0,-1);
+  }
+  while(root.endsWith('/'))root=root.slice(0,-1);
   if(root&&!root.includes('*')&&(spec===root||spec.startsWith(`${root}/`)))return true;
-  const expression=pattern.replace(/[.+^${}()|[\]\\]/g,'\\$&').replaceAll('**','\u0000').replaceAll('*','[^/]*').replaceAll('\u0000','.*');
+  const expression=pattern.replace(/[.+^${}()|[\]\\]/g,String.raw`\$&`).replaceAll('**','\u0000').replaceAll('*','[^/]*').replaceAll('\u0000','.*');
   try{return new RegExp(`^${expression}$`).test(spec);}catch{return false;}
 }
 
@@ -67,10 +72,11 @@ export function proofPlan(op,{changedFiles=[]}={}){
   const commands=specs.length
     ?(op?.checks??[]).filter(check=>check?.command&&runsSpec(check,specs)).map(check=>({name:check.name??check.command,command:check.command}))
     :[];
-  const reason=!specs.length?'the operation changed no spec file, so there is nothing to contrast'
-    :policy!=='fail-before'?`the policy for ${op?.kind??'this kind'} is ${policy}`
-      :!commands.length?`no declared check runs the changed spec ${specs.map(spec=>`\`${spec}\``).join(', ')}`
-        :null;
+  const named=specs.map(spec=>`\`${spec}\``).join(', ');
+  let reason=null;
+  if(!specs.length)reason='the operation changed no spec file, so there is nothing to contrast';
+  else if(policy!=='fail-before')reason=`the policy for ${op?.kind??'this kind'} is ${policy}`;
+  else if(!commands.length)reason=`no declared check runs the changed spec ${named}`;
   const mode=reason?'checks-only':'fail-before';
   return {schema:VERIFY_PROOF,mode,policy,specs,commands,...(reason?{reason}:{})};
 }
@@ -127,7 +133,9 @@ export function runAtBase({worktree,baseHead,opHead=null,specs=[],commands=[],gi
     const headResults=runAll(exec,commands,worktree,timeoutMs);
     const headRed=headResults.some(result=>result.exitCode!==0);
     const discriminating=baseResults.some(result=>result.exitCode!==0&&!result.timedOut);
-    const verdict=headRed?'contradiction':discriminating?'proven':'weak';
+    let verdict='weak';
+    if(headRed)verdict='contradiction';
+    else if(discriminating)verdict='proven';
     const stalled=baseResults.some(result=>result.timedOut);
     return {schema:VERIFY_PROOF,mode:'fail-before',specs:plan,commands,copied,missing,
       base:{head:baseHead,worktree:slash(scratch),results:baseResults},
@@ -142,9 +150,9 @@ export function proofFinding(result){
   const specs=(result.specs??[]).map(spec=>`\`${spec}\``);
   const named=specs.length?specs.join(', '):'the operation spec';
   if(result.verdict==='contradiction'){
-    const failed=(result.head?.results??[]).filter(item=>item.exitCode!==0);
-    const first=failed[0];
-    return `the proof command ${first?`\`${first.name}\` exits ${first.exitCode}`:'fails'} in the operation worktree at head `+
+    const first=(result.head?.results??[]).find(item=>item.exitCode!==0);
+    const command=first?`\`${first.name}\` exits ${first.exitCode}`:'fails';
+    return `the proof command ${command} in the operation worktree at head `+
       `${short(result.head?.head)}: the change contradicts ${named}${first?.timedOut?' (it timed out)':''}`;
   }
   if(result.error)
@@ -208,19 +216,28 @@ const classifyBase=(result,oracle)=>{
   catch{return {outcome:'inconclusive',reason:'oracle expectedBaseFailure is not a valid regular expression'};}
 };
 
+const equivalenceBase=baseResult=>{
+  if(baseResult.exitCode===0)return {outcome:'pass'};
+  return {outcome:baseResult.timedOut?'inconclusive':'unavailable',reason:'equivalence baseline did not run cleanly'};
+};
+
+const oracleResult=(exec,oracle,{mode,baseRoot,candidateRoot,timeoutMs})=>{
+  const baseResult=runOne(exec,oracle.command,{cwd:baseRoot,timeoutMs});
+  const candidateResult=runOne(exec,oracle.command,{cwd:candidateRoot,timeoutMs});
+  const baseVerdict=mode==='equivalence'?equivalenceBase(baseResult):classifyBase(baseResult,oracle);
+  let outcome;
+  if(candidateResult.timedOut)outcome='inconclusive';
+  else if(candidateResult.exitCode!==0)outcome='fail';
+  else outcome=baseVerdict.outcome;
+  const reason=candidateResult.exitCode!==0?'candidate oracle failed':baseVerdict.reason??null;
+  return {oracleId:oracle.id,assertionIds:oracle.assertionIds,base:baseResult,candidate:candidateResult,outcome,reason};
+};
+
 /** Run protected commands against immutable base/candidate roots. Only a discriminating, candidate-green result passes. */
 export function runProtectedProof({plan,baseRoot,candidateRoot,oracleRoot,exec=runCommand,timeoutMs=PROOF_TIMEOUT_MS}={}){
   if(plan?.schema!==CANDIDATE_PROOF||!plan.ready)return {schema:CANDIDATE_PROOF,verdict:'inconclusive',results:[],errors:plan?.errors??['proof plan is not ready']};
   if(!baseRoot||!candidateRoot||!oracleRoot)return {schema:CANDIDATE_PROOF,verdict:'unavailable',results:[],errors:['proof roots are unavailable']};
-  const results=[];
-  for(const oracle of plan.oracles){
-    const baseResult=runOne(exec,oracle.command,{cwd:baseRoot,timeoutMs});
-    const candidateResult=runOne(exec,oracle.command,{cwd:candidateRoot,timeoutMs});
-    const baseVerdict=plan.mode==='equivalence'?(baseResult.exitCode===0?{outcome:'pass'}:{outcome:baseResult.timedOut?'inconclusive':'unavailable',reason:'equivalence baseline did not run cleanly'})
-      :classifyBase(baseResult,oracle);
-    const outcome=candidateResult.timedOut?'inconclusive':candidateResult.exitCode!==0?'fail':baseVerdict.outcome;
-    results.push({oracleId:oracle.id,assertionIds:oracle.assertionIds,base:baseResult,candidate:candidateResult,outcome,reason:candidateResult.exitCode!==0?'candidate oracle failed':baseVerdict.reason??null});
-  }
+  const results=plan.oracles.map(oracle=>oracleResult(exec,oracle,{mode:plan.mode,baseRoot,candidateRoot,timeoutMs}));
   const order=['fail','inconclusive','unavailable'];
   const verdict=order.find(value=>results.some(result=>result.outcome===value))??'pass';
   return {schema:CANDIDATE_PROOF,mode:plan.mode,manifestDigest:plan.manifestDigest,verdict,results};
