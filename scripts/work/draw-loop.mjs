@@ -177,7 +177,7 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
   // 4. Copy, badges, commands (draw-quality.mjs).
   const quality = [];
   const leaks = internalCopyOf(visibleTextOf(text));
-  if (leaks.length) quality.push(finding('quality', DRAW_COPY_INTERNAL, `${label} shows internal copy: ${leaks.slice(0, 5).map((l) => `"${l.match}" (${l.why})`).join('; ')}`));
+  if (leaks.length) quality.push(finding('quality', DRAW_COPY_INTERNAL, `${label} shows internal copy: ${leaks.slice(0, 5).map((l) => '"' + l.match + '" (' + l.why + ')').join('; ')}`));
   for (const b of badgesOf(text)) if (!b.tone) quality.push(finding('quality', DRAW_BADGE_UNTONED, `${label} badge "${b.text}" binds no tone token`));
   if (ui?.record && ui.state) {
     const commands = commandsFrom(ui.record, ui.state);
