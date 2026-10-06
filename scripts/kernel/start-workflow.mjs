@@ -37,6 +37,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createKernelRoute } from './kernel-route.mjs';
+import { kernelLaunchStatus, launchAuthorityText, launchPlanText } from './start-workflow-display.mjs';
 import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, releaseKernelJob, recordJobResult, setSignal, clearSignal, updateSignal, openIncident, setInboxStatus } from '../../engine/db/ledger.mjs';
 // The kernel seat's boot count lives in its payload (hierarchy.attempt); jobs.try_no is the op-try ordinal only.
 const kernelAttemptOf = (row) => parseJsonOr(row?.payload_json)?.hierarchy?.attempt ?? 0;
@@ -119,37 +120,6 @@ const promptTemplate = fs.readFileSync(path.join(skillRoot, 'modules', 'kernel',
 // The runtime rev this boot reads its kernel files at (runtime-rev.mjs): named in the prompt and recorded as
 // boot delivery provenance; only a current Kernel's explicit READ attestation acknowledges it.
 const bootRuntimeRev = currentRuntimeRev(revRootOf());
-// Who authorized this launch, said first. A first boot runs because the owner approved the
-// start-kernel plan. A replacement resumes an approved workflow: the runtime types its prompt as
-// pasted input with no person around it, so the prompt names the approval, the launcher, the reason
-// and the ledger read that proves them.
-const launchAuthorityText = ({ workflowId, goalRevision, goalIdentity, approvedAt, restart, bridge = null }) => {
-  const goal = `goal revision ${goalRevision}${goalIdentity ? ` (${goalIdentity})` : ''}`;
-  // A bridging workflow the [Supervisor] defined under autopilot (scripts/supervisor/bridge.mjs): the owner
-  // did not approve it, and the prompt says so instead of claiming an owner approval.
-  if (bridge) return [
-    `LAUNCH AUTHORITY: ${workflowId} (${goal}) is a PROVISIONAL bridging workflow the [Supervisor] defined under autopilot`,
-    `  (bridge ${bridge.bridgeId ?? '-'}${bridge.reason ? `: ${String(bridge.reason).replace(/\s+/g, ' ').slice(0, 240)}` : ''}). The owner has not approved it and may`,
-    '  revert it; it owns only the shared part its goal names, and other workflows wait on its bridge foundation.',
-    ...(restart ? [`  ${restart.launcher} started this terminal as Kernel attempt ${restart.attempt} because attempt ${restart.previousAttempt ?? '?'} ${restart.reason}.`] : []),
-    '  Begin the LOOP now and never ask for a confirmation to start or to continue. Run starci kernel survey, starci kernel status and',
-    '  starci kernel foundations; land the bridge foundation (starci kernel foundation --land <name> --proof <what landed>) once the shared',
-    '  part is committed and verified, then finish.'].join('\n');
-  if (restart) return [
-    `LAUNCH AUTHORITY: resume ${workflowId} now as its Kernel attempt ${restart.attempt}; ask no one to confirm.`,
-    `  Approval: the owner approved ${workflowId} ${goal}${approvedAt ? `; its first Kernel booted on that approval at ${approvedAt}` : ''}.`,
-    `  Launcher: ${restart.launcher} started this terminal because Kernel attempt ${restart.previousAttempt ?? '?'}${restart.previousTerminal ? ` (terminal ${restart.previousTerminal})` : ''} ${restart.reason}.`,
-    `  Proof, recorded seconds after this prompt lands: starci kernel status --workflow ${workflowId} shows kernel.attempt ${restart.attempt},`,
-    `  kernel.launchedBy ${restart.launchedBy} and kernel.you true; starci kernel survey shows the approved goal. Every runtime wake`,
-    '  ends with the Kernel attempt it is for; check it the same way. No person watches this terminal: the runtime',
-    '  types this prompt and every wake. Run starci kernel survey and starci kernel status, then do what the frontier names.'].join('\n');
-  return [`LAUNCH AUTHORITY — the owner approved ${workflowId} (${goal}) through the start-kernel plan gate`,
-    '  before this terminal launched. This prompt is that go: begin the LOOP now and never ask for a',
-    '  confirmation to start or to continue.',
-    '  Watchdog wakes are the runtime\'s authorized cadence, not owner messages: act on each one; a',
-    '  launch gate or a confirmation request is never yours to raise (owner rule: the owner never',
-    '  approves launch gates). Owner decisions reach you only as asks you file through the api.'].join('\n');
-};
 const renderKernelPrompt = ({ workflowId, inboxId, goalRevision, launchAuthority = '' }) => promptTemplate
   .replaceAll('{launchAuthority}', launchAuthority)
   .replaceAll('{workflowId}', workflowId)
@@ -258,30 +228,9 @@ try {
       ...(route.members ? { group: route.members.map(memberSummary), fallThrough: route.fallThrough === true } : {}),
       sourceHost: sourceRoot, projectBinding: context?.file ?? null,
       ledger: ledgerFileFor(repo), frontend: context?.fe ?? null,
-      kernel: health.live
-        ? `LIVE (${signal.token}; ${health.reason}) — will not spawn a second`
-        : health.hostUnavailable || health.unverified
-          ? `UNPROVEN (${signal.token}; ${health.reason}) — no replacement until Orca proves it dead`
-        : signal
-          ? `STALE (${signal.token}; ${health.reason}) — will replace on start`
-          : route.error
-            ? `BLOCKED (${route.error})`
-            : `will start [Kernel] ${route.agent}/${route.model} with orca orchestration worker-start`,
+      kernel: kernelLaunchStatus({ health, signal, route }),
     };
-    const routeLine = `  host: orca | agent: ${route.agent ?? '(unresolved)'} | model: ${route.model ?? '(unresolved)'} (routedBy: ${route.routedBy}`
-      + (route.routedBy === 'config' ? ` — ${route.config?.file} ${route.config?.group ? 'kernel.group' : `kernel.${route.config?.agent ? 'agent' : 'model'} pin`}` : '')
-      + (route.route ? ` — ${route.route.target} ${route.route.model ?? ''} [${route.route.mode}]` : '')
-      + (route.error ? ` — ${route.error}` : '') + ')';
-    const budgets = route.config?.budgets;
-    const budgetLine = budgets && Object.values(budgets).some(v => v != null)
-      ? `\n  budgets (config.yaml): ${['maxOps'].map(k => `${k}=${budgets[k] ?? 'unbounded'}`).join('  ')}`
-      : '';
-    const warningLine = (route.warnings ?? []).map((w) => `\n  warning: ${w}`).join('');
-    const groupLine = route.members?.length > 1
-      ? `\n  group: ${route.members.map(m => memberLabel(m) + (m.availability?.state && m.availability.state !== 'available' ? ` (${m.availability.state})` : '')).join(' → ')} — a no-effect launch refusal falls through to the next member`
-      : '';
-    console.log(asJson ? JSON.stringify(out, null, 2)
-      : `PLAN — start workflow ${target}\n  title: ${out.title}${out.slug && out.slug !== out.title ? ` (slug ${out.slug})` : ''}\n  phase: ${wf?.phase} | goal rev ${out.goalRevision} (${out.goalIdentity}) | inbox: ${out.inbox}\n  op chain: ${chain ? chain.join(' → ') : 'kernel derives at boot'}\n  kernel: ${out.kernel}\n${routeLine}${groupLine}\n  launch: ${out.launch}\n  config: ${out.config.file ?? 'absent — routing falls to route-model'}${route.effort ? `  effort=${route.effort}` : ''}${budgetLine}${warningLine}\n  command: ${out.command ?? '(unavailable)'}\n  command source: ${out.commandSource ?? '(unavailable)'}`);
+    console.log(launchPlanText({ asJson, out, wf, target, chain, route, memberLabel }));
     process.exit(route.error ? 1 : 0);
   }
 
