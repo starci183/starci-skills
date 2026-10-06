@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import {
   canonParityVerdict, checkFamilyOf, sliceBaseOf, parityEligible, tscParity, baseBlobsOf, declaredProjectsOf, lintParity, parityFingerprint,
 } from '../../scripts/kernel/settle/canon-parity.mjs';
+import { recordCheck } from '../../scripts/machine/evidence-store.mjs';
 import { verifyReported, classifyCheck, isBaselineCheck, settlerSettings, parityCacheFile, EVENTS } from '../../scripts/kernel/settle/job-settle.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
@@ -38,6 +39,10 @@ const sliceItem = (base, checks, extra = {}) => ({
     ...checks,
   ] },
 });
+const declareChecks = (ledger, item) => {
+  const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(item.jobId).attempt_id;
+  ledger.transaction((db) => { for (const c of item.report.checks) recordCheck(db, { attemptId, name: c.name, phase: 'after', runner: 'op', command: c.command, exitCode: c.exitCode }); });
+};
 const settings = { ...settlerSettings({}), itemBudgetMs: 60_000 };
 const seams = (root, over = {}) => ({
   repo: root, settings, classify: (c) => classifyCheck(c), baseline: isBaselineCheck,
@@ -166,13 +171,14 @@ test('verifyReported runs parity only for a canon cut slice the declared checks 
   // No native result is manufactured by this fixture.
   seedWorkflow(ledger, { id: item.workflowId, state: { phase: 'running' }, jobs: [{ jobId: item.jobId, opId: item.op, status: 'running', dispatchId: item.dispatchId, payload: item.payload }] });
   fileDispatchContract(ledger, { jobId: item.jobId, repo: root });
+  declareChecks(ledger, item);
   const db = ledger.db;
   let calls = 0;
   const parity = async () => { calls += 1; return { green: false, reason: 'parity-lint-new', detail: ['x'] }; };
   const parityDeps = { resolveRoot: async () => ({ ok: true, root, ownedRels: ['src/slice'] }) };
   const missingItem = { ...item, jobId: 'private-missing-job', dispatchId: 'private-missing-dispatch' };
   const missing = await verifyReported(db, missingItem, { repo: root, parity, parityDeps });
-  assert.equal(missing.reason, 'checker-unavailable'); assert.equal(missing.unavailable, true);
+  assert.equal(missing.reason, 'check-run-missing'); assert.equal(missing.green, false);
   assert.equal(calls, 0, 'an absent job identity cannot reach parity');
   assert.equal(fs.existsSync(parityCacheFile(root, missingItem.jobId)), false, 'an unavailable identity creates no parity refusal cache');
   const first = await verifyReported(db, item, { repo: root, parity, parityDeps });
@@ -200,6 +206,7 @@ test('same-size content edits retaining exact mtime invalidate only cached non-g
   const item = sliceItem(base, RED);
   seedWorkflow(ledger, { id: item.workflowId, state: { phase: 'running' }, jobs: [{ jobId: item.jobId, opId: item.op, status: 'running', dispatchId: item.dispatchId, payload: item.payload }] });
   fileDispatchContract(ledger, { jobId: item.jobId, repo: root });
+  declareChecks(ledger, item);
   const db = ledger.db;
   const parityDeps = { resolveRoot: async () => ({ ok: true, root, ownedRels: ['src/slice'] }) };
   let calls = 0;

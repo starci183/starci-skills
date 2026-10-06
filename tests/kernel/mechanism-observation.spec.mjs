@@ -162,6 +162,7 @@ test('the deterministic settler carries the bound inspection raw 1, but not a ge
   fx.ledger.transaction((db) => fileReport(db, { attemptId: fx.item.attemptId, outcome: 'done', report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'inspection', files: [findingsPath], checks } }));
   const invoke = (cls, { repo }) => rerunCheck(cls, { repo, timeoutMs: 30, run: () => ({ status: 1, stdout: JSON.stringify(lint()), stderr: '' }) });
   const recorded = (run) => recordSettlerCheck(fx.ledger, fx.item, run);
+  fx.ledger.transaction((db) => { for (const c of checks) recordCheck(db, { attemptId: fx.item.attemptId, name: c.name, phase: 'after', runner: 'op', command: c.command, exitCode: c.exitCode }); });
   const result = await verifyReported(fx.ledger.db, { ...fx.item, report: { checks } }, { repo: fx.repoRoot, env: process.env, parity: null, rerun: invoke, record: recorded });
   assert.equal(result.green, true, JSON.stringify(result));
   assert.equal(fx.ledger.db.prepare("SELECT exit_code FROM check_runs WHERE runner='settler' ORDER BY check_id DESC").get().exit_code, 1);
@@ -188,6 +189,7 @@ test('the default canon cut keeps Windows paths normalized and retains a real un
   const checks = [{ name: 'canonical-parser-help', command: `node "${path.join(ROOT, 'scripts/checks/check-runtime-public-docs.mjs')}" --help`, exitCode: 0 }];
   const item = { ...fx.item, payload: { owned_paths: [String.raw`src\a.ts`], params: { canonFamilies: 'architecture' },
     cut: { id: 'private-canon-cut', ordinal: 1, total: 2 } }, report: { checks } };
+  fx.ledger.transaction((db) => { for (const c of checks) recordCheck(db, { attemptId: fx.item.attemptId, name: c.name, phase: 'after', runner: 'op', command: c.command, exitCode: c.exitCode }); });
   const recorded = [];
   // Both rerun and canon stay at their production defaults. Only the recording
   // sink is local; no native receipt is fabricated or counted as a gate pass.

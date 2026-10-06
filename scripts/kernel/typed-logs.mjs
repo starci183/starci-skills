@@ -344,17 +344,15 @@ export function rowsOfEvent(event, ctx = {}) {
       for (const a of (Array.isArray(p.artifacts) ? p.artifacts : [])) {
         if (media >= DERIVED_ARTIFACT_ROWS_MAX) break;
         if (typeof a?.path !== 'string') continue;
-        const row = ctx.artifactOf ? ctx.artifactOf(jobId, a.path) : null;
-        const kind = row?.kind ?? strOr(a.kind);
+        const kind = strOr(a.kind);
         const logKind = kind === 'image' ? 'render' : kind === 'video' ? 'video' : kind === 'trace' ? 'trace' : null;
         if (!logKind) continue;
         media += 1;
-        const subkind = strOr(row?.subkind) ?? strOr(a.subkind);
-        const label = strOr(row?.label);
+        const subkind = strOr(a.subkind);
         const noun = logKind === 'render' ? tr('Image') : logKind === 'video' ? tr('Video') : tr('Trace');
         rows.push({ ...base, jobId, kind: logKind, src: `ev:${ak}:a:${shortHash(`${jobId}\n${a.path}\n${a.sha256 ?? ''}`, { n: 24 })}`,
-          msg: `${noun}${subkind ? ` ${subkind}` : ''}: ${clipLine(label ?? a.path.split('/').pop(), 160)}`, refs: [a.path],
-          data: compact({ artifactRef: a.path, label, subkind, bytes: intOr(row?.bytes), mime: logKind === 'trace' ? undefined : strOr(row?.mime), sha256: strOr(a.sha256) ?? strOr(row?.sha256) }) });
+          msg: `${noun}${subkind ? ` ${subkind}` : ''}: ${clipLine(a.path.split('/').pop(), 160)}`, refs: [a.path],
+          data: compact({ artifactRef: a.path, subkind, sha256: strOr(a.sha256) }) });
       }
       return rows;
     }
@@ -417,13 +415,10 @@ export function syncDerivedLogs(logs, ledgerDb, { batch = 1000, maxBatches = 300
   const kinds = DERIVED_EVENT_KINDS.map(() => '?').join(',');
   const eventsAfter = ledgerDb.prepare(`SELECT seq,workflow_id,entity_type,entity_id,attempt_id,kind,payload_json,created_at FROM events WHERE seq>? AND kind IN (${kinds}) ORDER BY seq LIMIT ?`);
   const jobStmt = ledgerDb.prepare(`SELECT op_id,try_no AS attempt,${jobResultSql('jobs')} AS result_json FROM jobs WHERE job_id=?`);
-  let artifactStmt = null;
-  try { artifactStmt = ledgerDb.prepare('SELECT * FROM job_artifacts WHERE job_id=? AND path=?'); } catch { artifactStmt = null; }
   const patchDocs = new Map();
   const ctx = {
     ledgerKey,
     jobOf: (id) => jobStmt.get(id) ?? null,
-    artifactOf: (jobId, p) => { try { return artifactStmt?.get(jobId, p) ?? null; } catch { return null; } },
     // The pre-structured diff (<patch>.json) of a repo-relative patch path; null when absent or unreadable.
     patchJsonOf: (rel) => {
       if (!repo) return null;
