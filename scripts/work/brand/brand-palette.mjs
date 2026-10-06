@@ -431,7 +431,7 @@ export async function scanTargets(workRoot) {
     for (const node of appNamesOf(shell).flatMap((name) => nodesOf(treeOf(shell, name)))) for (const bp of breakpoints) for (const th of themes) for (const c of capturesAt(shell, node, bp, th)) {
       if (seen.has(c.rel)) continue;
       seen.add(c.rel);
-      targets.push({ record: `shell ${node.id}${c.destination ? ` (${c.destination})` : ''}`, recordFile: shellFile, kind: 'layout capture', file: captureFileOf(path.join(workRoot, 'shell'), c), declared: true });
+      targets.push({ record: 'shell ' + node.id + (c.destination ? ' (' + c.destination + ')' : ''), recordFile: shellFile, kind: 'layout capture', file: captureFileOf(path.join(workRoot, 'shell'), c), declared: true });
     }
   }
   return targets;
@@ -469,7 +469,7 @@ async function main(argv) {
     const findings = paletteFindings({ file, shownAs: slash(file), brand: b.brand, palette, subject: 'image', at: slash(file) });
     const refused = findings.filter((f) => f.level === 'refuse');
     if (json) return { exitCode: refused.length ? 1 : 0, text: `${JSON.stringify({ file: slash(file), findings, measure: measureImage(readImage(file), palette, artworkExclusions({ file, palette })) }, null, 2)}\n` };
-    return { exitCode: refused.length ? 1 : 0, text: `${findings.map((f) => `  ${f.level.toUpperCase()} ${f.message} [${f.code}]`).join('\n')}${findings.length ? '\n' : ''}${refused.length ? 'FAIL' : 'OK'}: brand palette\n` };
+  return { exitCode: refused.length ? 1 : 0, text: `${findings.map((f) => '  ' + f.level.toUpperCase() + ' ' + f.message + ' [' + f.code + ']').join('\n')}${findings.length ? '\n' : ''}${refused.length ? 'FAIL' : 'OK'}: brand palette\n` };
   }
   if (arg('--scan')) {
     const result = await scanWork(path.resolve(arg('--scan')));

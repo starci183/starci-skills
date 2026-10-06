@@ -538,7 +538,7 @@ function drawFeedbackMain(argv = []) {
     }
     if (command === 'status') {
       const s = feedbackStatus(dir);
-      return { exitCode: 0, text: json ? `${JSON.stringify(s, null, 2)}\n` : `${s.id}: ${s.rounds.length} review round(s); ${s.open.length} open note(s), ${s.unaddressed} unaddressed${s.golden ? '; golden' : ''}\n${s.open.map((n) => `  [${n.id}] ${n.addressed ? 'addressed' : 'UNADDRESSED'}: ${n.text}${n.addressed ? '' : ' - ' + n.reasons.join('; ')}`).join('\n')}\n` };
+      return { exitCode: 0, text: json ? `${JSON.stringify(s, null, 2)}\n` : `${s.id}: ${s.rounds.length} review round(s); ${s.open.length} open note(s), ${s.unaddressed} unaddressed${s.golden ? '; golden' : ''}\n${s.open.map((n) => '  [' + n.id + '] ' + (n.addressed ? 'addressed' : 'UNADDRESSED') + ': ' + n.text + (n.addressed ? '' : ' - ' + n.reasons.join('; '))).join('\n')}\n` };
     }
     if (command === 'check') {
       const f = feedbackFindings(dir);

@@ -163,7 +163,7 @@ async function main(argv) {
   const r = await drawGates({ ui: path.resolve(repo, ui), repo, files: (get('--files') ?? '').split(',').map((s) => s.trim()).filter(Boolean), remeasure: !argv.includes('--no-remeasure') });
   if (get('--checks-out')) fs.writeFileSync(path.resolve(get('--checks-out')), `${JSON.stringify({ checks: r.checks }, null, 2)}\n`);
   if (argv.includes('--json')) process.stdout.write(`${JSON.stringify(r, null, 2)}\n`);
-  else process.stdout.write([`${r.ok ? 'GREEN' : 'RED'}: ${r.ui}`, ...r.gates.map((g) => `  ${g.exitCode === 0 ? 'ok  ' : 'FAIL'} ${g.name}${g.codes.length && g.exitCode ? ` [${g.codes.join(', ')}]` : ''}: ${g.evidence.slice(0, 300)}`),
+  else process.stdout.write([`${r.ok ? 'GREEN' : 'RED'}: ${r.ui}`, ...r.gates.map((g) => `  ${g.exitCode === 0 ? 'ok  ' : 'FAIL'} ${g.name}${g.codes.length && g.exitCode ? ' [' + g.codes.join(', ') + ']' : ''}: ${g.evidence.slice(0, 300)}`),
     `  owner gate: ${r.owner.owed ? 'owed (file the draw-review ask)' : 'not owed'}`, `next: ${r.next}`].join('\n') + '\n');
   return r.ok ? 0 : 1;
 }
