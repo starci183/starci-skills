@@ -175,21 +175,40 @@ const NAVIGATION_CALLS = new Set(['redirect', 'permanentRedirect']);
 const ROUTER_METHODS = new Set(['push', 'replace', 'prefetch']);
 
 /** Every href-like target in a source file: {node, text|null (null = computed)}. */
+function jsxHrefTarget(ts, node) {
+  if (!ts.isJsxAttribute(node) || !ts.isIdentifier(node.name) || node.name.text !== 'href' || !node.initializer) return null;
+  const value = ts.isJsxExpression(node.initializer) ? node.initializer.expression : node.initializer;
+  return { node: value ?? node, text: value ? literalText(ts, value) : null };
+}
+
+function routerNameOf(ts, callee) {
+  if (ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression)) return callee.expression.text;
+  if (ts.isPropertyAccessExpression(callee) && ts.isPropertyAccessExpression(callee.expression)) return callee.expression.name.text;
+  return '';
+}
+
+function isNavigationTarget(ts, callee) {
+  const routerName = routerNameOf(ts, callee);
+  return (ts.isIdentifier(callee) && NAVIGATION_CALLS.has(callee.text))
+    || (ts.isPropertyAccessExpression(callee) && ROUTER_METHODS.has(callee.name.text) && /router$/i.test(routerName));
+}
+
+function callHrefTarget(ts, node) {
+  if (!ts.isCallExpression(node) || !node.arguments.length) return null;
+  const callee = node.expression;
+  if (!isNavigationTarget(ts, callee)) return null;
+  return { node: node.arguments[0], text: literalText(ts, node.arguments[0]) };
+}
+
+function hrefTargetOf(ts, node) {
+  return jsxHrefTarget(ts, node) ?? callHrefTarget(ts, node);
+}
+
 function hrefTargets(ts, sourceFile) {
   const found = [];
   const visit = node => {
-    if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && node.name.text === 'href' && node.initializer) {
-      const value = ts.isJsxExpression(node.initializer) ? node.initializer.expression : node.initializer;
-      found.push({ node: value ?? node, text: value ? literalText(ts, value) : null });
-    } else if (ts.isCallExpression(node) && node.arguments.length) {
-      const callee = node.expression;
-      let routerName = '';
-      if (ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression)) routerName = callee.expression.text;
-      else if (ts.isPropertyAccessExpression(callee) && ts.isPropertyAccessExpression(callee.expression)) routerName = callee.expression.name.text;
-      const navigates = (ts.isIdentifier(callee) && NAVIGATION_CALLS.has(callee.text))
-        || (ts.isPropertyAccessExpression(callee) && ROUTER_METHODS.has(callee.name.text) && /router$/i.test(routerName));
-      if (navigates) found.push({ node: node.arguments[0], text: literalText(ts, node.arguments[0]) });
-    }
+    const target = hrefTargetOf(ts, node);
+    if (target) found.push(target);
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
