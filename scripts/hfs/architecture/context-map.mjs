@@ -106,23 +106,22 @@ export function collectRegistrations({ kit, graph, persistenceOf }) {
   for (const file of graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
     kit.walk(file.sourceFile, node => {
-      if (!ts.isObjectLiteralExpression(node)) return true;
+      if (!ts.isObjectLiteralExpression(node)) return;
       const arrays = [];
       for (const key of ['entities', 'migrations']) {
         const property = kit.propertyOf(node, key);
         if (property) arraysIn(checker, kit.valueOfProperty(property), arrays, 0);
       }
-      if (!arrays.length) return true;
+      if (!arrays.length) return;
       registrations += 1;
       const connection = nameOfLiteral(checker, node, 0);
       all.push({ file, node, connection });
-      if (connection === null) return true;
+      if (connection === null) return;
       for (const { key, name } of new Map(arrays.map(item => [item.key, item])).values()) {
         if (!registered.has(key)) registered.set(key, { name, connections: new Map() });
         const sites = registered.get(key).connections;
         if (!sites.has(connection)) sites.set(connection, { file, node });
       }
-      return true;
     });
   }
   return { registered, registrations, all };
@@ -234,9 +233,9 @@ export function connectionsComposedBy(kit, app) {
   const checker = kit.checkerOf(root.sourceFile);
   const items = [];
   kit.walk(root.sourceFile, node => {
-    if (!(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register')) return true;
+    if (!(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register')) return;
     const owner = kit.declarationsOf(checker, node.expression.expression).map(kit.ownerOfDeclaration).find(Boolean);
-    if (owner?.tier !== 'platform' || owner.name !== 'database') return true;
+    if (owner?.tier !== 'platform' || owner.name !== 'database') return;
     for (const argument of node.arguments) {
       kit.walk(argument, inner => {
         const parent = inner.parent;
@@ -248,7 +247,6 @@ export function connectionsComposedBy(kit, app) {
         return false;
       });
     }
-    return true;
   });
   return { root, items };
 }

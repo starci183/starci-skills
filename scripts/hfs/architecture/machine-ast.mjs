@@ -146,9 +146,11 @@ export function machineKit({ config, context, graph }) {
             const use = propertyOf(node, 'useClass');
             found.push({ node: anchor ?? node, useClass: use ? valueOfProperty(use) : null, checker });
           }
-          return true;
+          return;
         }
-        const reference = ts.isSpreadElement(node) ? node.expression : (ts.isCallExpression(node) ? node : null);
+        let reference = null;
+        if (ts.isSpreadElement(node)) reference = node.expression;
+        else if (ts.isCallExpression(node)) reference = node;
         if (reference && depth < HELPER_DEPTH) {
           const helper = helperBodyOf(checker, reference);
           if (helper && !seen.has(helper.declaration)) {
@@ -156,7 +158,6 @@ export function machineKit({ config, context, graph }) {
             scan(helper.body, anchor ?? node, depth + 1);
           }
         }
-        return true;
       });
     };
     scan(file.sourceFile, null, 0);

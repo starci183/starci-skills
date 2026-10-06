@@ -178,6 +178,19 @@ function stable(items) {
   return items.sort((a, b) => `${a.path ?? ''}:${a.line ?? 0}:${a.column ?? 0}:${a.ruleId}`.localeCompare(`${b.path ?? ''}:${b.line ?? 0}:${b.column ?? 0}:${b.ruleId}`));
 }
 
+const ownerPublicApiOf = (owners, missingEntries) => {
+  if (!owners.length) return { status: 'unavailable', reason: 'no slot owner instance with an entry file exists in the repository' };
+  if (missingEntries.length) return { status: 'unavailable', reason: 'one or more declared owner entries are outside the checked production TypeScript or JavaScript program',
+    missingEntries: missingEntries.map(owner => owner.entry).sort(byCodeUnit) };
+  return { status: 'checked', declarations: owners.length };
+};
+
+const grammarContractOf = config => {
+  if (!config.kinds.includes('frontend')) return { status: 'not-applicable' };
+  if (config.frontend.grammar) return { status: 'checked', package: config.frontend.grammar.package };
+  return { status: 'unavailable', reason: 'no app has a src/app/globals.css to judge against the Grammar style entry' };
+};
+
 /**
  * Check a target repository. injectedTypeScript exists only for hermetic rule fixtures. `fast` leaves out the checks
  * that read the whole repository to answer (clones, dead exports, repository-wide symbols); the pre-push check of the changed owners uses it.
@@ -282,17 +295,8 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     frontendDataLifecycle,
     moduleRegistration,
     hfsMachine: hfsChecks,
-    ownerPublicApi: !config.owners.length
-      ? { status: 'unavailable', reason: 'no slot owner instance with an entry file exists in the repository' }
-      : missingOwnerEntries.length
-        ? { status: 'unavailable', reason: 'one or more declared owner entries are outside the checked production TypeScript or JavaScript program',
-          missingEntries: missingOwnerEntries.map(owner => owner.entry).sort(byCodeUnit) }
-      : { status: 'checked', declarations: config.owners.length },
-    grammarContract: !config.kinds.includes('frontend')
-      ? { status: 'not-applicable' }
-      : config.frontend.grammar
-        ? { status: 'checked', package: config.frontend.grammar.package }
-        : { status: 'unavailable', reason: 'no app has a src/app/globals.css to judge against the Grammar style entry' },
+    ownerPublicApi: ownerPublicApiOf(config.owners, missingOwnerEntries),
+    grammarContract: grammarContractOf(config),
   };
   coverage.checkedRuleIds = [...new Set([
     ...COMMON_RULE_IDS,

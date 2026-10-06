@@ -118,7 +118,8 @@ export function checkI18nKeys({ config, graph, context }) {
       const read = node => {
         if (ts.isCallExpression(node)) {
           const callee = node.expression;
-          const owner = ts.isIdentifier(callee) ? callee : (ts.isPropertyAccessExpression(callee) && READERS.has(callee.name.text) && ts.isIdentifier(callee.expression) ? callee.expression : null);
+          let owner = ts.isIdentifier(callee) ? callee : null;
+          if (ts.isPropertyAccessExpression(callee) && READERS.has(callee.name.text) && ts.isIdentifier(callee.expression)) owner = callee.expression;
           const [first] = node.arguments;
           const declaration = owner ? checker.getSymbolAtLocation(owner)?.valueDeclaration : null;
           if (owner && first !== undefined && namespaces.has(declaration)) {

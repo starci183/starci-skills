@@ -258,9 +258,7 @@ export function checkRepoPresentation({ root, runtime = false, tree = treeView(r
     const development = sectionBody('Development');
     const scripts = DEVELOPMENT_SCRIPTS.filter(name => managedScriptNames(profile, edition).has(name));
     const commands = [/npm (?:ci|install)/u, ...scripts.map(scriptCommand)];
-    if (commands.some(command => !command.test(development)))
-      finding('HFS_README_DEVELOPMENT_INCOMPLETE', 'README.md',
-        `Development must show npm install and the managed script commands: ${scripts.map(name => (name === 'test' ? 'npm test' : `npm run ${name}`)).join(', ')}.`);
+    if (commands.some(command => !command.test(development))) finding('HFS_README_DEVELOPMENT_INCOMPLETE', 'README.md', 'Development must show npm install and the managed script commands: ' + scripts.map(name => (name === 'test' ? 'npm test' : `npm run ${name}`)).join(', ') + '.');
   }
   if (tree.hasDir('.starciwork') && headings.some(item => item.name === 'Work') &&
       !/\.starciwork\b/u.test(sectionBody('Work')))
