@@ -22,7 +22,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { valueFlags } from '../lib/cli-arg.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
@@ -62,7 +61,10 @@ function useTestWorldArgs(text) {
     for (; i < text.length; i += 1) {
       const c = text[i];
       if (c === '(' || c === '{' || c === '[') depth += 1;
-      else if (c === ')' || c === '}' || c === ']') { if (depth === 0) break; depth -= 1; }
+      else if (c === ')' || c === '}' || c === ']') {
+        if (depth === 0) break;
+        depth -= 1;
+      }
     }
     out.push(text.slice(start, i));
   }
@@ -72,11 +74,11 @@ function useTestWorldArgs(text) {
 /** One spec judged: {path, useTestWorld, modes[], outage, forbidden[]}; `sandbox` is a mode when the spec calls useSandbox. */
 export function judgeSpec(rel, text, rules) {
   const args = useTestWorldArgs(text);
-  const modes = [...new Set(args.flatMap((a) => ['apps', 'modules'].filter((k) => new RegExp(`(^|[{,\\s])${k}\\s*:`).test(a))))];
+  const modes = [...new Set(args.flatMap((a) => ['apps', 'modules'].filter((k) => new RegExp(String.raw`(^|[{,\s])${k}\s*:`).test(a))))];
   const sandbox = /useSandbox\s*\(/.test(text);
   if (sandbox) modes.push('sandbox');
   // A comment may name a forbidden word to explain its absence; only code counts.
-  const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n\r\u2028\u2029]*/gm, '$1');
   return { path: rel, useTestWorld: args.length > 0 || sandbox, modes, outage: rules.outage.reduce((n, needle) => n + code.split(needle).length - 1, 0),
     forbidden: rules.forbidden.filter((needle) => code.includes(needle)) };
 }
@@ -103,10 +105,12 @@ export function testRunCountsError(run) {
   return null;
 }
 
-/** Validate the Jest JSON and its real process result before any producer can call the measurement clean. */
-export function jestRunError(report, run) {
-  if (run?.error || run?.signal || !Number.isSafeInteger(run?.status) || run.status < 0)
-    return `jest did not complete: ${run?.error?.message ?? run?.signal ?? `exit ${run?.status ?? 'unknown'}`}`;
+/** The shape checks of the report and its process: an error string or null. */
+const reportShapeError = (report, run) => {
+  if (run?.error || run?.signal || !Number.isSafeInteger(run?.status) || run.status < 0) {
+    const detail = run?.error?.message ?? run?.signal ?? `exit ${run?.status ?? 'unknown'}`;
+    return `jest did not complete: ${detail}`;
+  }
   if (!report || typeof report !== 'object' || Array.isArray(report) || !Array.isArray(report.testResults)) return 'jest wrote no valid --json report';
   if (JEST_COUNTS.some((key) => !Number.isSafeInteger(report[key]) || report[key] < 0)) return 'jest counters must be non-negative safe integers';
   if (typeof report.success !== 'boolean' || typeof report.wasInterrupted !== 'boolean') return 'jest result is missing completion flags';
@@ -114,20 +118,35 @@ export function jestRunError(report, run) {
   if (report.numTotalTestSuites !== report.numPassedTestSuites + report.numFailedTestSuites + report.numPendingTestSuites
     || report.numRuntimeErrorTestSuites > report.numFailedTestSuites || report.testResults.length !== report.numTotalTestSuites)
     return 'jest suite counters do not describe a complete run';
+  return null;
+};
+
+/** The assertion and suite tallies of a valid report: {totals, suites}, or {error}. */
+const tallySuites = (report) => {
   const totals = { passed: 0, failed: 0, skipped: 0 }, suites = { passed: 0, failed: 0, skipped: 0 };
   for (const suite of report.testResults) {
     if (!suite || !['passed', 'failed', 'skipped', 'focused'].includes(suite.status) || !Array.isArray(suite.assertionResults))
-      return 'jest wrote an invalid suite result';
+      return { error: 'jest wrote an invalid suite result' };
     if (suite.status === 'focused' && (report.numPendingTests === 0 || !suite.assertionResults.some(a => ['pending', 'skipped', 'disabled'].includes(a?.status))))
-      return 'jest focused suite reports no pending assertion';
+      return { error: 'jest focused suite reports no pending assertion' };
     suites[suite.status === 'focused' ? 'passed' : suite.status] += 1;
     for (const assertion of suite.assertionResults) {
       if (assertion?.status === 'passed') totals.passed += 1;
       else if (assertion?.status === 'failed') totals.failed += 1;
       else if (['pending', 'todo', 'skipped', 'disabled'].includes(assertion?.status)) totals.skipped += 1;
-      else return 'jest wrote an invalid assertion result';
+      else return { error: 'jest wrote an invalid assertion result' };
     }
   }
+  return { totals, suites };
+};
+
+/** Validate the Jest JSON and its real process result before any producer can call the measurement clean. */
+export function jestRunError(report, run) {
+  const shapeError = reportShapeError(report, run);
+  if (shapeError) return shapeError;
+  const tally = tallySuites(report);
+  if (tally.error) return tally.error;
+  const { totals, suites } = tally;
   const countsError = testRunCountsError(reduceJest(report));
   if (countsError) return countsError;
   if (suites.passed !== report.numPassedTestSuites || suites.failed !== report.numFailedTestSuites
@@ -192,7 +211,8 @@ export function buildTestWorldRun({ root, project, tests = null, rules = testWor
   summary.findings = testWorldFindings(summary);
   summary.run = run ? runWorldProject(abs, project, tests, { npm }) : null;
   const red = !summary.run || summary.run.error || summary.run.exit !== 0 || summary.run.failed > 0 || summary.run.skipped > 0 || summary.run.total === 0;
-  summary.exit = summary.run?.error ? 2 : summary.findings.length || red ? 1 : 0;
+  if (summary.run?.error) summary.exit = 2;
+  else summary.exit = summary.findings.length || red ? 1 : 0;
   return summary;
 }
 
