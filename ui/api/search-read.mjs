@@ -2,7 +2,12 @@ import { one, many } from './query.mjs';
 import { uiState } from './state.mjs';
 
 const states = new Set(['bad', 'warn', 'running', 'waiting', 'ok', 'done', 'unknown']);
-const state = value => states.has(value) ? value : value === 'awaiting-owner' ? 'waiting' : value === 'rejected' ? 'bad' : 'unknown';
+const state = value => {
+  if (states.has(value)) return value;
+  if (value === 'awaiting-owner') return 'waiting';
+  if (value === 'rejected') return 'bad';
+  return 'unknown';
+};
 const encoded = value => encodeURIComponent(String(value));
 const sha = value => /^[a-f0-9]{64}$/.test(String(value ?? ''));
 
@@ -71,9 +76,9 @@ export function machineSearchHit(db, hit) {
   const scope = { store: 'machine', ledgerId: null, workflow: null };
   if (hit.kind === 'sup-decision') {
     const item = one(db, 'SELECT d.*,v.ui FROM sup_decision_items d LEFT JOIN v_open_sup_decisions v ON v.di_id=d.di_id WHERE d.di_id=?', hit.id);
-    if (item) { scope.ledgerId = item.ledger_id ?? null; scope.workflow = item.workflow_id ?? null; }
-    return hitOf(item?.kind === 'credential-missing' ? { ...hit, title: item.kind } : hit, scope,
-      item ? reference(scope, 'di', item.di_id, `#/decisions?store=machine&id=${encoded(item.di_id)}`) : null, item?.ui);
+    const resolvedScope = item ? { ...scope, ledgerId: item.ledger_id ?? null, workflow: item.workflow_id ?? null } : scope;
+    return hitOf(item?.kind === 'credential-missing' ? { ...hit, title: item.kind } : hit, resolvedScope,
+      item ? reference(resolvedScope, 'di', item.di_id, `#/decisions?store=machine&id=${encoded(item.di_id)}`) : null, item?.ui);
   }
   const service = { service: ['v_services', 'name'], seat: ['v_seats', 'seat_id'], terminal: ['terminals', 'handle'] }[hit.kind];
   if (service) {
