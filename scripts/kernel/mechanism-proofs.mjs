@@ -19,7 +19,7 @@ const FINDINGS_LISTED = 40;
 
 const pass = () => ({ status: 'pass', code: null, detail: null, findings: [] });
 const refused = ({ status, code }, detail, findings = []) => ({ status, code, detail, findings: findings.slice(0, FINDINGS_LISTED) });
-const listed = (rows) => rows.map((f) => `${f.path ?? '-'}${f.line ? `:${f.line}` : ''} ${f.rule ?? f.engine ?? ''} ${oneLine(f.message, 200)}`.trim());
+const listed = (rows) => rows.map((f) => `${f.path ?? '-'}${f.line ? ':' + f.line : ''} ${f.rule ?? f.engine ?? ''} ${oneLine(f.message, 200)}`.trim());
 /** Whether the shared gate document measures the document profile. */
 export const isDocGate = (doc) => doc?.profile === DOC_PROFILE;
 const nameOfDefect = (d) => oneLine(d?.id ?? d?.title ?? JSON.stringify(d), 160);
@@ -58,9 +58,9 @@ export function judgeKnowledgeRead(digest) {
 
 export function judgeDocGate(gate) {
   if (gate?.schema !== GATE_SCHEMA || !isDocGate(gate)) return refused({ status: 'missing', code: 'op-doc-gate-missing' }, `no document gate (schema ${GATE_SCHEMA}, profile ${DOC_PROFILE}) is attached: run starci gate run --scope docs [--tree <app>/.starciwork] --out doc-gate.json`);
-  if (gate.exit === GATE_EXIT.toolFailed || (gate.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-doc-gate-tool-failed' }, `a document check could not run: ${oneLine((gate.errors ?? []).join('; ') || `exit ${gate.exit}`)}`, (gate.errors ?? []).map(String));
+  if (gate.exit === GATE_EXIT.toolFailed || (gate.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-doc-gate-tool-failed' }, `a document check could not run: ${oneLine((gate.errors ?? []).join('; ') || 'exit ' + gate.exit)}`, (gate.errors ?? []).map(String));
   const findings = Array.isArray(gate.findings) ? gate.findings : [];
-  if (gate.exit !== GATE_EXIT.clean || findings.length) return refused({ status: 'red', code: 'op-doc-gate-red' }, `${findings.length} document finding(s); first: ${listed(findings)[0] ?? `exit ${gate.exit}`}`, listed(findings));
+  if (gate.exit !== GATE_EXIT.clean || findings.length) return refused({ status: 'red', code: 'op-doc-gate-red' }, `${findings.length} document finding(s); first: ${listed(findings)[0] ?? 'exit ' + gate.exit}`, listed(findings));
   return pass();
 }
 
@@ -70,8 +70,10 @@ export function judgeTestWorld(summary) {
   const findings = testWorldFindings(summary);
   if (findings.length) return refused({ status: 'red', code: 'op-test-world-hand-rolled' }, `${findings.length} test-world finding(s); first: ${listed(findings)[0]}`, listed(findings));
   const run = summary.run;
+  const runError = run?.error ? ` (${oneLine(run.error, 200)})` : '';
+  const runDetail = run ? `the ${summary.project} run is not green: exit ${run.exit}, ${run.total} test(s), ${run.failed} failed, ${run.skipped} skipped${runError}` : 'the summary records no run';
   if (!run || run.error || testRunCountsError(run) || run.exit !== 0 || !(run.total > 0) || !(run.files > 0) || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0)
-    return refused({ status: 'red', code: 'op-test-world-run-red' }, run ? `the ${summary.project} run is not green: exit ${run.exit}, ${run.total} test(s), ${run.failed} failed, ${run.skipped} skipped${run.error ? ` (${oneLine(run.error, 200)})` : ''}` : 'the summary records no run',
+    return refused({ status: 'red', code: 'op-test-world-run-red' }, runDetail,
       (run?.failures ?? []).map((f) => `${f.file} ${f.test}: ${oneLine(f.message, 160)}`));
   return pass();
 }
@@ -79,8 +81,10 @@ export function judgeTestWorld(summary) {
 export function judgeUnitRun(summary) {
   if (summary?.schema !== UNIT_RUN_SCHEMA) return refused({ status: 'missing', code: 'op-unit-proof-missing' }, `no unit run summary (schema ${UNIT_RUN_SCHEMA}) is attached: run starci gate unit --root <app> --out unit-run.json`);
   const run = summary.run;
+  const runError = run?.error ? ` (${oneLine(run.error, 200)})` : '';
+  const runDetail = run ? `the unit run is not green: exit ${run.exit}, ${run.total} test(s), ${run.failed} failed, ${run.skipped} skipped${runError}` : 'the summary records no run';
   if (!run || run.error || testRunCountsError(run) || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0 || !(run.total > 0) || !(run.files > 0))
-    return refused({ status: 'red', code: 'op-unit-run-red' }, run ? `the unit run is not green: exit ${run.exit}, ${run.total} test(s), ${run.failed} failed, ${run.skipped} skipped${run.error ? ` (${oneLine(run.error, 200)})` : ''}` : 'the summary records no run',
+    return refused({ status: 'red', code: 'op-unit-run-red' }, runDetail,
       (run?.failures ?? []).map((f) => `${f.file} ${f.test}: ${oneLine(f.message, 160)}`));
   const findings = unitFindings(summary);
   const coverage = findings.filter((f) => f.rule === 'coverage-below' || f.rule === 'spec-missing');
@@ -155,7 +159,7 @@ function judgeInspectionCarriage(report, findingsDoc, relevant) {
 
 export function judgeReviewGate(gate) {
   if (gate?.schema !== GATE_SCHEMA || isDocGate(gate)) return refused({ status: 'missing', code: 'op-gate-proof-missing' }, `no gate JSON (schema ${GATE_SCHEMA}) over the reviewed range is attached: run starci gate run --root <app> --base <first reviewed commit>^ --out gate.json`);
-  if (gate.exit === GATE_EXIT.toolFailed || (gate.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-gate-tool-failed' }, `the gate could not run a tool: ${oneLine((gate.errors ?? []).join('; ') || `exit ${gate.exit}`)}`, (gate.errors ?? []).map(String));
+  if (gate.exit === GATE_EXIT.toolFailed || (gate.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-gate-tool-failed' }, `the gate could not run a tool: ${oneLine((gate.errors ?? []).join('; ') || 'exit ' + gate.exit)}`, (gate.errors ?? []).map(String));
   const fresh = Array.isArray(gate.findings) ? gate.findings : [];
   if (gate.exit !== GATE_EXIT.clean || Number(gate.counts?.new ?? fresh.length) > 0)
     return refused({ status: 'red', code: 'op-gate-new-findings' }, `the reviewed range has ${gate.counts?.new ?? fresh.length} new finding(s) over ${String(gate.base ?? '').slice(0, 12)}: a review cannot pass it`, listed(fresh));
@@ -178,7 +182,7 @@ export function judgeRelease(proof) {
   const skipped = RELEASE_STEPS.filter((id) => !byId.has(id) || byId.get(id)?.status === STEP_STATUS.skipped);
   if (skipped.length) return refused({ status: 'red', code: 'op-release-step-skipped' }, `release step(s) missing or skipped: ${skipped.join(', ')}`, skipped.map((id) => `${id} ${oneLine(byId.get(id)?.detail ?? 'not run', 200)}`));
   const red = RELEASE_STEPS.filter((id) => byId.get(id)?.status !== STEP_STATUS.pass);
-  if (red.length) return refused({ status: 'red', code: 'op-release-step-red' }, `release step(s) not green: ${red.map((id) => `${id} (${byId.get(id)?.status})`).join(', ')}`, red.map((id) => `${id} ${oneLine(byId.get(id)?.detail, 200)}`));
+  if (red.length) return refused({ status: 'red', code: 'op-release-step-red' }, `release step(s) not green: ${red.map((id) => id + ' (' + byId.get(id)?.status + ')').join(', ')}`, red.map((id) => `${id} ${oneLine(byId.get(id)?.detail, 200)}`));
   return pass();
 }
 
@@ -218,23 +222,27 @@ function judgeCurrentProof(proof, files, doc, { op, projects, observations, cont
   }
   if (proof === 'test-world') return judgeTestWorlds(rows.map((row) => row.doc), projects);
   for (const row of rows) {
-    let judged;
-    switch (proof) {
-      case 'doc-gate': judged = judgeDocGate(row.doc); break;
-      case 'unit-kit': judged = judgeUnitRun(row.doc); break;
-      case 'security-lint': judged = row.exitCode === 1
-        ? judgeInspectionCarriage(row.doc, readAttached(files, SECURITY_FINDINGS_SCHEMA)?.doc, securityRelevant(doc))
-        : judgeSecurityLint(row.doc, readAttached(files, SECURITY_FINDINGS_SCHEMA)?.doc, securityRelevant(doc)); break;
-      case 'fe-lint': judged = judgeLint(row.doc, feRelevant, 'fe/'); break;
-      case 'produced-lint': judged = judgeLint(row.doc, () => true, 'produced-file'); break;
-      case 'review-gate': judged = judgeReviewGate(row.doc); break;
-      case 'release': judged = judgeRelease(row.doc); break;
-      default: throw new Error(`unknown mechanical proof ${proof}`);
-    }
+    const judged = judgedProofRow(proof, row, files, doc);
     if (judged.status !== 'pass') return judged;
   }
   return pass();
 }
+
+/** The specialized judgment of one native proof row. */
+const judgedProofRow = (proof, row, files, doc) => {
+  switch (proof) {
+    case 'doc-gate': return judgeDocGate(row.doc);
+    case 'unit-kit': return judgeUnitRun(row.doc);
+    case 'security-lint': return row.exitCode === 1
+      ? judgeInspectionCarriage(row.doc, readAttached(files, SECURITY_FINDINGS_SCHEMA)?.doc, securityRelevant(doc))
+      : judgeSecurityLint(row.doc, readAttached(files, SECURITY_FINDINGS_SCHEMA)?.doc, securityRelevant(doc));
+    case 'fe-lint': return judgeLint(row.doc, feRelevant, 'fe/');
+    case 'produced-lint': return judgeLint(row.doc, () => true, 'produced-file');
+    case 'review-gate': return judgeReviewGate(row.doc);
+    case 'release': return judgeRelease(row.doc);
+    default: throw new Error(`unknown mechanical proof ${proof}`);
+  }
+};
 
 /** The judgment of one proof over a job's files. */
 function judgeProof(proof, files, doc = loadOpGate(), { projects = [] } = {}) {
@@ -289,5 +297,5 @@ export function recordProofJudgment(ledger, { attemptId, judgment, now = Date.no
 export function proofRefusalText(op, judgment, jobId, doc = loadOpGate()) {
   const { judged, proof } = judgment;
   const script = doc.proofs?.[proof]?.script;
-  return `settle REFUSED for ${jobId} (${op}): ${judged.code} - ${judged.detail}; the job stays reported. The ${proof} proof is mandatory for ${op} (knowledge/op-gate.yaml opProofs): ${script ? `run ${script}, ` : ''}fix what it reports and attach its document, or settle blocked or failed with these findings; never done.`;
+  return `settle REFUSED for ${jobId} (${op}): ${judged.code} - ${judged.detail}; the job stays reported. The ${proof} proof is mandatory for ${op} (knowledge/op-gate.yaml opProofs): ${script ? 'run ' + script + ', ' : ''}fix what it reports and attach its document, or settle blocked or failed with these findings; never done.`;
 }

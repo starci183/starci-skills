@@ -75,7 +75,8 @@ const B85_INDEX = new Map([...B85].map((c, i) => [c, i]));
 /** One `GIT binary patch` data line decoded: its first char gives the byte count, the rest is base85. */
 export function decodeBase85Line(line) {
   const c = line[0];
-  const len = c >= 'A' && c <= 'Z' ? c.codePointAt(0) - 64 : c >= 'a' && c <= 'z' ? c.codePointAt(0) - 96 + 26 : -1;
+  let len = -1;
+  if (c >= 'A' && c <= 'Z') len = c.codePointAt(0) - 64; else if (c >= 'a' && c <= 'z') len = c.codePointAt(0) - 96 + 26;
   if (len < 0) throw new Error('bad base85 length');
   const out = [];
   for (let i = 1; i + 5 <= line.length; i += 5) {
@@ -135,32 +136,63 @@ function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
     hunk.lines.push({ t, o: t === '+' ? null : oldNo, n: t === '-' ? null : newNo, s: redactText(text) });
     file.lineCount += 1; totalLines += 1;
   };
+  const onHunkLine = (l) => {
+    if (l.startsWith('\\')) return;
+    const t = l[0] === '+' || l[0] === '-' ? l[0] : ' ';
+    const s = l.length ? l.slice(1) : '';
+    addLine(t, s);
+    if (t !== '+') { oldNo += 1; oldLeft -= 1; }
+    if (t !== '-') { newNo += 1; newLeft -= 1; }
+  };
+  /** A binary-literal line; false only when the awaited `literal|delta N` kind never came and normal parsing resumes. */
+  const onBinaryLine = (l) => {
+    if (binary.side === 'wait-forward' || binary.side === 'wait-reverse') {
+      const m = /^(literal|delta) (\d+)$/.exec(l);
+      if (m) { binary = { side: binary.side === 'wait-forward' ? 'after' : 'before', kind: m[1], size: Number(m[2]), lines: [] }; return true; }
+      binary = null;
+      return false;
+    }
+    if (l === '') { const side = binary.side; flushBinary(); binary = side === 'after' ? { side: 'wait-reverse' } : null; return true; }
+    binary.lines.push(l);
+    return true;
+  };
+  /** A mail-mode line; false when no mail rule consumed it (a diff --git header can follow it). */
+  const onMailLine = (l) => {
+    if (mode !== 'mail') return false;
+    if (l.startsWith('Subject: ')) { subject = l.slice(9).replace(/^\[PATCH[^\]]*\]\s*/, ''); return true; }
+    if (subject != null && l.startsWith(' ') && commits.length && commits.at(-1).subject == null) { subject += l; return true; }
+    if (subject != null && commits.length && commits.at(-1).subject == null && l === '') { commits.at(-1).subject = redactText(subject.trim()).slice(0, 300); return true; }
+    return false;
+  };
+  /** A diff file-header line; false only for the @@ hunk header, which starts the file and falls through. */
+  const onPendingLine = (l) => {
+    if (l.startsWith('new file mode')) { pending.status = 'A'; return true; }
+    if (l.startsWith('deleted file mode')) { pending.status = 'D'; return true; }
+    if (l.startsWith('rename from ')) { pending.a = unquoteGitPath(l.slice(12)); pending.status = 'R'; return true; }
+    if (l.startsWith('rename to ')) { pending.b = unquoteGitPath(l.slice(10)); pending.status = 'R'; return true; }
+    if (l.startsWith('copy from ')) { pending.a = unquoteGitPath(l.slice(10)); pending.status = 'A'; return true; }
+    if (l.startsWith('copy to ')) { pending.b = unquoteGitPath(l.slice(8)); return true; }
+    if (l.startsWith('index ')) { const m = /^index ([0-9a-f]+)\.\.([0-9a-f]+)/.exec(l); if (m) blobs = [m[1], m[2]]; return true; }
+    if (l.startsWith('--- ')) { const a = stripSide(l.slice(4)); if (a) pending.a = a; return true; }
+    if (l.startsWith('+++ ')) { const b = stripSide(l.slice(4)); if (b) pending.b = b; else if (pending.status === 'D') pending.b = null; startFile(); return true; }
+    if (l.startsWith('GIT binary patch') || (l.startsWith('Binary files ') && l.endsWith(' differ'))) {
+      startFile();
+      if (!file.omitted) file.binary = true;
+      if (l.startsWith('GIT binary patch')) binary = { side: 'wait-forward' };
+      return true;
+    }
+    if (/^(old|new) mode |^similarity index |^dissimilarity index /.test(l)) return true;
+    if (!l.startsWith('@@')) return true;
+    startFile();
+    return false;
+  };
   return {
     line(raw) {
       const l = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
-      if (hunk && (oldLeft > 0 || newLeft > 0)) {
-        if (l.startsWith('\\')) return;
-        const t = l[0] === '+' || l[0] === '-' ? l[0] : ' ';
-        const s = l.length ? l.slice(1) : '';
-        addLine(t, s);
-        if (t !== '+') { oldNo += 1; oldLeft -= 1; }
-        if (t !== '-') { newNo += 1; newLeft -= 1; }
-        return;
-      }
-      if (binary) {
-        if (binary.side === 'wait-forward' || binary.side === 'wait-reverse') {
-          const m = /^(literal|delta) (\d+)$/.exec(l);
-          if (m) { binary = { side: binary.side === 'wait-forward' ? 'after' : 'before', kind: m[1], size: Number(m[2]), lines: [] }; return; }
-          binary = null;
-        } else if (l === '') { const side = binary.side; flushBinary(); binary = side === 'after' ? { side: 'wait-reverse' } : null; return; }
-        else { binary.lines.push(l); return; }
-      }
+      if (hunk && (oldLeft > 0 || newLeft > 0)) { onHunkLine(l); return; }
+      if (binary && onBinaryLine(l)) return;
       if (l.startsWith('From ') && /^From [0-9a-f]{40} /.test(l)) { commits.push({ sha: l.slice(5, 45), subject: null }); mode = 'mail'; subject = null; file = null; hunk = null; return; }
-      if (mode === 'mail') {
-        if (l.startsWith('Subject: ')) { subject = l.slice(9).replace(/^\[PATCH[^\]]*\]\s*/, ''); return; }
-        if (subject != null && l.startsWith(' ') && commits.length && commits.at(-1).subject == null) { subject += l; return; }
-        if (subject != null && commits.length && commits.at(-1).subject == null && l === '') { commits.at(-1).subject = redactText(subject.trim()).slice(0, 300); return; }
-      }
+      if (onMailLine(l)) return;
       if (l.startsWith('diff --git ')) {
         startFile();
         mode = 'diff'; hunk = null; blobs = null;
@@ -170,26 +202,7 @@ function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
         return;
       }
       if (mode !== 'diff') return;
-      if (pending) {
-        if (l.startsWith('new file mode')) { pending.status = 'A'; return; }
-        if (l.startsWith('deleted file mode')) { pending.status = 'D'; return; }
-        if (l.startsWith('rename from ')) { pending.a = unquoteGitPath(l.slice(12)); pending.status = 'R'; return; }
-        if (l.startsWith('rename to ')) { pending.b = unquoteGitPath(l.slice(10)); pending.status = 'R'; return; }
-        if (l.startsWith('copy from ')) { pending.a = unquoteGitPath(l.slice(10)); pending.status = 'A'; return; }
-        if (l.startsWith('copy to ')) { pending.b = unquoteGitPath(l.slice(8)); return; }
-        if (l.startsWith('index ')) { const m = /^index ([0-9a-f]+)\.\.([0-9a-f]+)/.exec(l); if (m) blobs = [m[1], m[2]]; return; }
-        if (l.startsWith('--- ')) { const a = stripSide(l.slice(4)); if (a) pending.a = a; return; }
-        if (l.startsWith('+++ ')) { const b = stripSide(l.slice(4)); if (b) pending.b = b; else if (pending.status === 'D') pending.b = null; startFile(); return; }
-        if (l.startsWith('GIT binary patch') || (l.startsWith('Binary files ') && l.endsWith(' differ'))) {
-          startFile();
-          if (!file.omitted) file.binary = true;
-          if (l.startsWith('GIT binary patch')) binary = { side: 'wait-forward' };
-          return;
-        }
-        if (/^(old|new) mode |^similarity index |^dissimilarity index /.test(l)) return;
-        if (l.startsWith('@@')) startFile();
-        else return;
-      }
+      if (pending && onPendingLine(l)) return;
       const h = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/.exec(l);
       if (h && file) {
         oldNo = Number(h[1]); newNo = Number(h[3]);

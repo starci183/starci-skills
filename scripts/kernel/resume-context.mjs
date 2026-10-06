@@ -15,7 +15,9 @@ const LOG_TAIL = 12;
 
 export function resumeContextOf(db, job) {
   const payload = parseJsonOr(job?.payload_json ?? '{}');
-  const retryOf = 'retry_of' in (job ?? {}) ? job.retry_of : (job?.job_id ? db.prepare('SELECT retry_of FROM jobs WHERE job_id=?').get(job.job_id)?.retry_of : null);
+  let retryOf = null;
+  if ('retry_of' in (job ?? {})) retryOf = job.retry_of;
+  else if (job?.job_id) retryOf = db.prepare('SELECT retry_of FROM jobs WHERE job_id=?').get(job.job_id)?.retry_of ?? null;
   const of = retryOf ?? (payload.retryReason?.reason === 'failed-no-report' ? payload.retryReason.of : null);
   if (!of) return null;
   const dead = db.prepare(`SELECT job_id, try_no AS attempt, ${jobResultSql('jobs')} AS result_json, workflow_id FROM jobs WHERE job_id=?`).get(of);
@@ -38,11 +40,13 @@ export function resumeContextOf(db, job) {
 
 export function resumePromptLines(resume) {
   if (!resume) return [];
+  const environment = resume.environment ? `, a ${resume.environment} - the environment, not the op` : '';
+  const typedLog = resume.log.map((row) => `[${row.kind}] ${row.msg}`).join(' | ');
   return [
-    `resume_from: attempt ${resume.attempt} (${resume.of}) died with no report (worker ${resume.liveness ?? 'dead'}${resume.environment ? `, a ${resume.environment} - the environment, not the op` : ''}; effect ${resume.effectState ?? 'unknown'}).`,
+    `resume_from: attempt ${resume.attempt} (${resume.of}) died with no report (worker ${resume.liveness ?? 'dead'}${environment}; effect ${resume.effectState ?? 'unknown'}).`,
     `  What it left under your owned_paths is where you continue: re-verify each file below against your brief, keep what is correct, finish what is missing; do not restart finished steps or discard its work without a reason.`,
     ...resume.evidence.map((item) => `  - ${item}`),
     ...(resume.evidenceMore ? [`  - +${resume.evidenceMore} more (git status under your owned paths)`] : []),
-    ...(resume.log.length ? [`  its last typed log rows: ${resume.log.map((row) => `[${row.kind}] ${row.msg}`).join(' | ')}`] : []),
+    ...(resume.log.length ? [`  its last typed log rows: ${typedLog}`] : []),
   ];
 }

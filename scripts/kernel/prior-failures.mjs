@@ -7,8 +7,11 @@ import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
 const EVIDENCE_CHARS = 400;
 
 /** The retry_of of `job`: its own column, else read back by id (a partial job object). */
-const retryOfJob = (db, job) => ('retry_of' in (job ?? {}) ? job.retry_of
-  : (job?.job_id ? db.prepare('SELECT retry_of FROM jobs WHERE job_id=?').get(job.job_id)?.retry_of : null)) ?? null;
+const retryOfJob = (db, job) => {
+  if ('retry_of' in (job ?? {})) return job.retry_of ?? null;
+  if (job?.job_id) return db.prepare('SELECT retry_of FROM jobs WHERE job_id=?').get(job.job_id)?.retry_of ?? null;
+  return null;
+};
 
 /**
  * The checks of `job`'s predecessor try as {attempt (its try_no), checks: [...]}, or null (a first try, or a

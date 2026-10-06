@@ -82,33 +82,14 @@ export function attemptCauseOf(db, row, previous = null) {
     return { cause: 'blocked', attributable: false, detail: `settled ${result.verdict} (owner or environment)` };
   }
   if (result.peerBlocked) return { cause: 'peer-blocked', attributable: false, detail: `red only on a peer's change (${(result.peerBlocked.checks ?? []).join(', ')})` };
-  // A worker the host killed with every other terminal (cli.mjs hostTerminalWipeOf) says nothing of its pool.
-  if (result.reason === FAILED_NO_REPORT && result.retryClass === RETRY_CLASS_ENVIRONMENT) {
-    return { cause: result.environment ?? RETRY_CLASS_ENVIRONMENT, attributable: false, detail: `the worker died with no report in a ${result.environment ?? 'host event'} (the environment, not the pool)` };
-  }
-  // The first worker the sweep reconciled in a host wipe settles before the other deaths reach a ledger
-  // (2026-09-28 04:19Z op-code.refactor-b7f1b77a67): the proof that lands after it still clears its pool.
-  if (result.reason === FAILED_NO_REPORT && hostDeadWorker(result.worker)) {
-    const wide = hostEventAround(db, result.at ?? row.updated_at);
-    if (wide) return { cause: 'host-terminal-wipe-hindsight', attributable: false, detail: `the worker's terminal died (${result.worker.liveness}) in a host event across ${wide.length} workflows (the environment, not the pool)` };
-  }
+  const environmental = environmentalCause(db, row, result);
+  if (environmental) return environmental;
   if (result.reason !== 'dispatch-rejected' && !result.report && !reportOutcomeOf(db, row)) {
     const outage = outageDuringOf(db, row, attemptPoolOf(row));
     if (outage) return { cause: 'provider-outage', attributable: true, detail: `settled with no report while ${outage.provider ?? 'the provider'} was out of ${outage.failureKind}` };
   }
-  if (result.reason === FAILED_NO_REPORT) {
-    const loop = result.worker?.liveness === 'gate-loop' || Boolean(db.prepare(
-      "SELECT 1 FROM events WHERE entity_id=? AND kind='op-worker-gate-loop' AND json_extract(payload_json,'$.attempt')=?").get(row.job_id, row.attempt));
-    return loop
-      ? { cause: 'gate-loop', attributable: true, detail: 'the worker looped on a host dialog and settled with no report' }
-      : { cause: 'no-report', attributable: true, detail: `the worker died with no report${result.worker?.liveness ? ` (${result.worker.liveness})` : ''}` };
-  }
-  if (result.reason === 'dispatch-rejected') {
-    const health = result.providerHealth;
-    if (health?.failureKind === 'quota') return { cause: 'quota', attributable: true, detail: `launch refused on ${health.provider ?? 'the provider'}'s quota` };
-    if (health) return { cause: 'agent-crash', attributable: true, detail: `launch failed at ${result.step ?? '-'} (${health.failureKind ?? 'provider'})` };
-    return { cause: 'dispatch-rejected', attributable: false, detail: `dispatch refused at ${result.step ?? '-'} with no provider fault` };
-  }
+  if (result.reason === FAILED_NO_REPORT) return noReportCause(db, row, result);
+  if (result.reason === 'dispatch-rejected') return dispatchRejectedCause(result);
   if (result.claimOverruled) return { cause: 'report-rejected', attributable: true, detail: 'reported done; the recorded checks were red' };
   const outcome = reportOutcomeOf(db, row);
   if (outcome === 'partial') {
@@ -118,6 +99,50 @@ export function attemptCauseOf(db, row, previous = null) {
   }
   return { cause: outcome ? `report-${outcome}` : 'fail', attributable: false, detail: 'the work or its environment, not the pool' };
 }
+
+/** The environment-attributed cause of a failed-no-report settle (host event), or null. */
+const environmentalCause = (db, row, result) => {
+  if (result.reason !== FAILED_NO_REPORT) return null;
+  // A worker the host killed with every other terminal (cli.mjs hostTerminalWipeOf) says nothing of its pool.
+  if (result.retryClass === RETRY_CLASS_ENVIRONMENT) {
+    return { cause: result.environment ?? RETRY_CLASS_ENVIRONMENT, attributable: false, detail: `the worker died with no report in a ${result.environment ?? 'host event'} (the environment, not the pool)` };
+  }
+  // The first worker the sweep reconciled in a host wipe settles before the other deaths reach a ledger
+  // (2026-09-28 04:19Z op-code.refactor-b7f1b77a67): the proof that lands after it still clears its pool.
+  if (!hostDeadWorker(result.worker)) return null;
+  const wide = hostEventAround(db, result.at ?? row.updated_at);
+  if (!wide) return null;
+  return { cause: 'host-terminal-wipe-hindsight', attributable: false, detail: `the worker's terminal died (${result.worker.liveness}) in a host event across ${wide.length} workflows (the environment, not the pool)` };
+};
+
+/** The gate-loop/no-report split of a failed-no-report settle. */
+const noReportCause = (db, row, result) => {
+  const loop = result.worker?.liveness === 'gate-loop' || Boolean(db.prepare(
+    "SELECT 1 FROM events WHERE entity_id=? AND kind='op-worker-gate-loop' AND json_extract(payload_json,'$.attempt')=?").get(row.job_id, row.attempt));
+  return loop
+    ? { cause: 'gate-loop', attributable: true, detail: 'the worker looped on a host dialog and settled with no report' }
+    : { cause: 'no-report', attributable: true, detail: `the worker died with no report${result.worker?.liveness ? ' (' + result.worker.liveness + ')' : ''}` };
+};
+
+/** The quota/agent-crash/dispatch-rejected cause of a refused launch. */
+const dispatchRejectedCause = (result) => {
+  const health = result.providerHealth;
+  if (health?.failureKind === 'quota') return { cause: 'quota', attributable: true, detail: `launch refused on ${health.provider ?? 'the provider'}'s quota` };
+  if (health) return { cause: 'agent-crash', attributable: true, detail: `launch failed at ${result.step ?? '-'} (${health.failureKind ?? 'provider'})` };
+  return { cause: 'dispatch-rejected', attributable: false, detail: `dispatch refused at ${result.step ?? '-'} with no provider fault` };
+};
+
+/** Per-pool failure counts and causes of the attributable attempts. */
+const poolsOf = (attempts) => {
+  const pools = {};
+  for (const a of attempts) {
+    if (!a.attributable || !a.pool) continue;
+    pools[a.pool] ??= { failures: 0, causes: [] };
+    pools[a.pool].failures += 1;
+    pools[a.pool].causes.push(`${a.cause} (${a.jobId})`);
+  }
+  return pools;
+};
 
 /**
  * The lineage adjustment for routing `job`: null for a first attempt (no lineage), else
@@ -133,12 +158,7 @@ export function lineageRouteAdjust(db, job) {
     const { cause, attributable, detail } = attemptCauseOf(db, row, lineage[i + 1] ?? null);
     return { jobId: row.job_id, attempt: row.attempt, pool: attemptPoolOf(row), cause, attributable, detail };
   });
-  const pools = {};
-  for (const a of attempts) {
-    if (!a.attributable || !a.pool) continue;
-    (pools[a.pool] ??= { failures: 0, causes: [] }).failures += 1;
-    pools[a.pool].causes.push(`${a.cause} (${a.jobId})`);
-  }
+  const pools = poolsOf(attempts);
   const entries = Object.entries(pools);
   return {
     attempts,
