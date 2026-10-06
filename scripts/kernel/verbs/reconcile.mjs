@@ -8,6 +8,54 @@ import { latestContractOf } from '../../machine/contract-version.mjs';
 import { leaseCanonOf } from './shared/peer-waits.mjs';
 import { VerbExit } from './shared/verb-exit.mjs';
 
+// A requeued job waits queued or ready (running -> ready after a dead worker, H13).
+function reconcileHeldJob({ ledger, job, jobId, payload, repo, internals, emit, args }) {
+  const db = ledger.db;
+  const worker = operationTerminalHandleOf(job) ? internals.observeOperationWorker(job) : null;
+  const dispatchId = payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? payload.hierarchy?.runtime?.dispatchId ?? null;
+  const contract = latestContractOf(db, jobId);
+  if (worker?.connected && worker?.writable && contract && (!dispatchId || contract.dispatch_id === dispatchId)) {
+    const reserve = internals.reserveOpLeases(ledger, job, payload, { repo });
+    if (!reserve?.ok) {
+      throw Object.assign(new Error(`live worker ${worker.terminalHandle} cannot recover its exact lease: ${(reserve?.reasons ?? [reserve?.reason]).filter(Boolean).join('; ') || 'reservation refused'}`), {
+        code: 'live-worker-lease-conflict', worker, reserve,
+      });
+    }
+    const workerId = payload.managed?.dispatchId ?? worker.terminalHandle;
+    ledger.transaction(() => {
+      const now = Date.now();
+      const result = { reason: 'live-worker-reconciled', effectState: 'committed', attemptConsumed: false,
+        worker: worker.terminalHandle, dispatchId: contract.dispatch_id, leaseToken: reserve.leaseToken, at: now };
+      // reserveOpLeases moved the job to leased with its fencing token; the live worker takes it on.
+      setJobStatus(db, { jobId, to: 'running', reason: 'live-worker-reconciled', expect: 'leased', workerId, at: now });
+      recordJobResult(db, { jobId, result, at: now });
+      ledger.appendEvent({
+        workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+        kind: 'live-worker-reconciled', payload: { terminal: worker.terminalHandle, dispatchId: contract.dispatch_id,
+          attempt: job.attempt, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+      });
+    });
+    const out = { ok: true, jobId, reconciled: true, status: 'running', attempt: job.attempt,
+      effectState: 'committed', worker, dispatchId: contract.dispatch_id, leasesRecovered: reserve.leases?.length ?? internals.opLeaseRequests(payload, leaseCanonOf(db, repo), job.op_id).length };
+    emit(out, `reconciled ${jobId}: reattached live worker ${worker.terminalHandle}; exact leases restored; no duplicate spawned`, args.json);
+    return;
+  }
+  const out = { ok: true, jobId, reconciled: false, alreadyQueued: true, attempt: job.attempt };
+  emit(out, `reconcile ${jobId}: already queued (attempt ${job.attempt})`, args.json);
+}
+
+// What reconcile must prove no-effect is the launch that left the job
+// effect_unknown — the newest rejected dispatch that is not already settled
+// (payload.rejectedDispatches, where rejectDispatch records the evidence,
+// never over managed.dispatchId). Only when no rejection owns this
+// state is the job's own managed binding the thing to reconcile.
+function dispatchIdentityOf(payload, job) {
+  const unsettled = [...(payload.rejectedDispatches ?? [])].reverse()
+    .find((entry) => entry?.dispatchId && entry.effectState && entry.effectState !== 'none')?.dispatchId ?? null;
+  return unsettled ?? payload.managed?.dispatchId
+    ?? (String(job.worker_id ?? '').startsWith('ctx_') || String(job.worker_id ?? '').startsWith('dispatch-') ? job.worker_id : null);
+}
+
 export default {
   verb: 'reconcile',
   required: [],
@@ -20,7 +68,7 @@ export default {
   run({ ledger, args, repo, emit, internals }) {
     const { reconcileOrphanKernelJobs,
       reconcileDrop, reconcileReap, reconcileReleaseWorker, reconcileDeadWorker,
-      observeOperationWorker, reserveOpLeases, opLeaseRequests, cleanupManagedWorker } = internals;
+      cleanupManagedWorker } = internals;
   if (args['orphan-kernel-jobs']) return reconcileOrphanKernelJobs(ledger, args);
   const db = ledger.db, jobId = args.job;
   const job = jobRowOf(db, jobId);
@@ -33,53 +81,14 @@ export default {
     throw Object.assign(new Error(`job ${jobId} was fenced by --dead-worker on effect evidence (${(parseJson(job.result_json, {})?.evidence ?? []).join(', ')}); no host proof can requeue it - inspect the evidence and starci kernel settle it fail or blocked, then retry as a new attempt`), { code: 'dead-worker-fenced' });
   }
   const payload = jobPayloadOf(job);
-  // A requeued job waits queued or ready (running -> ready after a dead worker, H13).
   if (job.status === 'queued' || job.status === 'ready') {
-    const worker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;
-    const dispatchId = payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? payload.hierarchy?.runtime?.dispatchId ?? null;
-    const contract = latestContractOf(db, jobId);
-    if (worker?.connected && worker?.writable && contract && (!dispatchId || contract.dispatch_id === dispatchId)) {
-      const reserve = reserveOpLeases(ledger, job, payload, { repo });
-      if (!reserve?.ok) {
-        throw Object.assign(new Error(`live worker ${worker.terminalHandle} cannot recover its exact lease: ${(reserve?.reasons ?? [reserve?.reason]).filter(Boolean).join('; ') || 'reservation refused'}`), {
-          code: 'live-worker-lease-conflict', worker, reserve,
-        });
-      }
-      const workerId = payload.managed?.dispatchId ?? worker.terminalHandle;
-      ledger.transaction(() => {
-        const now = Date.now();
-        const result = { reason: 'live-worker-reconciled', effectState: 'committed', attemptConsumed: false,
-          worker: worker.terminalHandle, dispatchId: contract.dispatch_id, leaseToken: reserve.leaseToken, at: now };
-        // reserveOpLeases moved the job to leased with its fencing token; the live worker takes it on.
-        setJobStatus(db, { jobId, to: 'running', reason: 'live-worker-reconciled', expect: 'leased', workerId, at: now });
-        recordJobResult(db, { jobId, result, at: now });
-        ledger.appendEvent({
-          workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-          kind: 'live-worker-reconciled', payload: { terminal: worker.terminalHandle, dispatchId: contract.dispatch_id,
-            attempt: job.attempt, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
-        });
-      });
-      const out = { ok: true, jobId, reconciled: true, status: 'running', attempt: job.attempt,
-        effectState: 'committed', worker, dispatchId: contract.dispatch_id, leasesRecovered: reserve.leases?.length ?? opLeaseRequests(payload, leaseCanonOf(db, repo), job.op_id).length };
-      emit(out, `reconciled ${jobId}: reattached live worker ${worker.terminalHandle}; exact leases restored; no duplicate spawned`, args.json);
-      return;
-    }
-    const out = { ok: true, jobId, reconciled: false, alreadyQueued: true, attempt: job.attempt };
-    emit(out, `reconcile ${jobId}: already queued (attempt ${job.attempt})`, args.json);
+    reconcileHeldJob({ ledger, job, jobId, payload, repo, internals, emit, args });
     return;
   }
   if (job.status !== 'effect_unknown') {
     throw Object.assign(new Error(`job ${jobId} is ${job.status}; reconcile requires effect_unknown`), { code: 'job-not-reconcilable' });
   }
-  // What reconcile must prove no-effect is the launch that left the job
-  // effect_unknown — the newest rejected dispatch that is not already settled
-  // (payload.rejectedDispatches, where rejectDispatch records the evidence,
-  // never over managed.dispatchId). Only when no rejection owns this
-  // state is the job's own managed binding the thing to reconcile.
-  const unsettledRejection = [...(payload.rejectedDispatches ?? [])].reverse()
-    .find((entry) => entry?.dispatchId && entry.effectState && entry.effectState !== 'none')?.dispatchId ?? null;
-  const dispatchId = unsettledRejection ?? payload.managed?.dispatchId
-    ?? (String(job.worker_id ?? '').startsWith('ctx_') || String(job.worker_id ?? '').startsWith('dispatch-') ? job.worker_id : null);
+  const dispatchId = dispatchIdentityOf(payload, job);
   if (!dispatchId) throw Object.assign(new Error(`job ${jobId} has no managed dispatch identity`), { code: 'dispatch-identity-missing' });
 
   // An accepted contract or worker report is evidence that the operation may

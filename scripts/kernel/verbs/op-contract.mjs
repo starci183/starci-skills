@@ -5,6 +5,23 @@ import { admittedContractOf } from '../../machine/contract-version.mjs';
 import { sleepSync } from '../../lib/sleep-sync.mjs';
 const OP_CONTRACT_WAIT_MS = 120_000;
 
+// Dispatch commits the contract row together with status running, after the
+// terminal is up, the preamble sent and the model attested (~20s+); a worker
+// whose first action is `starci kernel op-contract` lands inside that window and read
+// contract-missing for a row the Kernel saw seconds later (a product's Modules
+// inc-e09140ad9c22, WSPV inc-7f437d11edae). While the job is still leased,
+// wait for the dispatch to commit it instead of answering missing.
+function contractWhileLeased(db, job, read, row) {
+  const deadline = Date.now() + OP_CONTRACT_WAIT_MS;
+  while (!row && Date.now() < deadline) {
+    const status = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job.job_id)?.status;
+    if (status !== 'leased') break;
+    sleepSync(1000);
+    row = read();
+  }
+  return row;
+}
+
 export default {
   verb: 'op-contract',
   required: [],
@@ -25,26 +42,13 @@ export default {
     const read = () => {
       if (job && (attempt == null || attempt === job.try_no)) return db.prepare(`${CONTRACT_ROW} WHERE a.job_id=? ORDER BY a.attempt_id DESC LIMIT 1`).get(job.job_id) ?? null;
       if (job?.unit_id) return db.prepare(`${CONTRACT_ROW} WHERE a.workflow_id=? AND a.unit_id=? AND a.try_no=? ORDER BY a.attempt_id DESC LIMIT 1`).get(workflowId, job.unit_id, attempt) ?? null;
+      const bind = attempt == null ? [workflowId, op] : [workflowId, op, attempt];
       return db.prepare(`${CONTRACT_ROW} WHERE a.workflow_id=? AND a.op_id=?${attempt == null ? '' : ' AND a.try_no=?'} ORDER BY a.attempt_id DESC LIMIT 1`)
-        .get(workflowId, op, ...(attempt == null ? [] : [attempt])) ?? null;
+        .get(...bind) ?? null;
     };
     if (job && attempt == null) attempt = job.try_no;
     let row = read();
-    // Dispatch commits the contract row together with status running, after the
-    // terminal is up, the preamble sent and the model attested (~20s+); a worker
-    // whose first action is `starci kernel op-contract` lands inside that window and read
-    // contract-missing for a row the Kernel saw seconds later (a product's Modules
-    // inc-e09140ad9c22, WSPV inc-7f437d11edae). While the job is still leased,
-    // wait for the dispatch to commit it instead of answering missing.
-    if (!row && job) {
-      const deadline = Date.now() + OP_CONTRACT_WAIT_MS;
-      while (!row && Date.now() < deadline) {
-        const status = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job.job_id)?.status;
-        if (status !== 'leased') break;
-        sleepSync(1000);
-        row = read();
-      }
-    }
+    if (!row && job) row = contractWhileLeased(db, job, read, row);
     if (!row) throw Object.assign(new Error(`no contract row for ${workflowId}/${op} attempt ${attempt ?? '(none filed)'}`), { code: 'contract-missing' });
     if (args.json) {
       // The exact filed admission and its captured input identity; current checks are never demoted by its age.

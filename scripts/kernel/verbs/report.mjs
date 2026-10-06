@@ -57,6 +57,124 @@ function sendOpWorkerDone(ledger, job, payload, report, reportPath, dispatchCapa
   return workerDone;
 }
 
+// The report is read from the attempt's scratch only: a Work path or any other file is refused (H10). A filed
+// attempt's scratch is gone: filing again answers with the stored row instead of a missing file - the guard emits
+// the replay and returns null.
+function reportFileTextOf(db, job, attempt, args, emit) {
+  let scratch, reportAbs;
+  try { scratch = scratchOf(attempt); reportAbs = scratchFile(args.report, scratch, 'report file'); }
+  catch (error) {
+    const prior = db.prepare('SELECT report_id,outcome FROM reports WHERE attempt_id=?').get(attempt.attempt_id);
+    if (prior && ['report-scratch-missing', 'report-attachment-missing'].includes(error.code)) {
+      emit({ ok: true, replayed: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId: attempt.dispatch_id, outcome: prior.outcome, reportId: prior.report_id },
+        `report already filed for ${job.job_id} (dispatch ${attempt.dispatch_id}, report ${prior.report_id})`, args.json);
+      return null;
+    }
+    const code = { 'report-attachment-missing': 'report-missing', 'report-attachment-outside-scratch': 'report-outside-scratch' }[error.code] ?? error.code;
+    throw Object.assign(error, { code });
+  }
+  // One guarded read: the file that resolved but vanished before the read is a typed refusal,
+  // not a raw throw mid-command (G26); everything below parses this same text.
+  let reportRaw;
+  try { reportRaw = readReportEnvelope(reportAbs); }
+  catch (error) {
+    if (error.code === 'report-invalid') throw error;
+    throw Object.assign(new Error(`report file unreadable: ${reportAbs}`), { code: 'report-unreadable' });
+  }
+  return { scratch, reportAbs, reportRaw };
+}
+
+// The handover ask is the one ask whose answer the kernel routes: its three options are closed and ordered
+// (scripts/kernel/handover.mjs). Autopilot: the handover is the owner's one review, so its ask carries the owner
+// review ledger bundle - every provisional acceptance (with its images), deferred leg, deferred-to-handover proof
+// and autopilot decision.
+function handoverAskGuard(db, job, repo, report, handoverProofGate, skillRoot) {
+  const handoverProblem = jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' ? handoverAskProblem(report.question) : null;
+  if (handoverProblem) throw Object.assign(new Error(`report fails the handover ask: ${handoverProblem}`), { code: 'report-invalid' });
+  if (jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask') handoverProofGate(db, job, repo);
+  if (jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' && autopilotOn(db, job.workflow_id)) {
+    const bundle = autopilotBundle(db, job.workflow_id);
+    const carried = report.question?.autopilot;
+    const total = bundle.counts.provisional + bundle.counts.deferred + bundle.counts.deferredToHandover;
+    if (total > 0 && (carried?.schema !== bundle.schema || ['provisional', 'deferred', 'deferredToHandover'].some((k) => Number(carried?.counts?.[k]) !== bundle.counts[k]))) {
+      throw Object.assign(new Error(`report fails the handover ask: under autopilot it carries the final review bundle as question.autopilot, verbatim from the .autopilot block of \`node ${path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs')} survey --repo <repo> --workflow ${job.workflow_id} --deliveries --json\` (now ${JSON.stringify(bundle.counts)}), and lists the provisional images in question.assets`), { code: 'report-invalid' });
+    }
+  }
+}
+
+// A drawing another leg waits on (a planned layout's design record, a record another dependsOn) is done only once
+// the owner accepted its drawn parts (inc-a4b5b1abdd90): a done interface.draw report that leaves one unreviewed
+// is refused draw-review-owed, and the attempt files the draw-review ask instead (scripts/work/draw-review.mjs). A
+// ui record the guard cannot judge - one that does not parse, a layout tree or a dependent record that does not,
+// a guard that crashes - may owe the review, so the report is refused draw-review-unjudged. The owner's feedback
+// loop (scripts/work/draw-feedback.mjs): an interface.draw ask or done report whose ui record carries an owner
+// redraw answer not yet applied, or an owner note the redraw does not address (the rejected bytes, a brief without
+// the note id, a critic that does not pass it), is refused draw-feedback-unaddressed.
+function drawReviewGuards(db, job, repo, report, skillRoot) {
+  if (jobOpOf(job) !== DRAW_REVIEW_OP) return;
+  if (report.outcome === 'done') {
+    let judged;
+    try { judged = drawReviewsOwed(repo, report.files); }
+    catch (error) { judged = { owed: [], unjudged: [{ path: 'draw-review.mjs drawReviewsOwed', error: String(error?.message ?? error) }] }; }
+    const owed = judged.owed;
+    if (judged.unjudged.length) {
+      const what = judged.unjudged.map((u) => `${u.path}: ${u.error}`).join('; ').slice(0, 800);
+      throw Object.assign(new Error(`draw-review-unjudged: the owner-review guard could not judge ${what}. Repair the record and file the report again`), { code: 'draw-review-unjudged', unjudged: judged.unjudged });
+    }
+    if (owed.length) {
+      const owedText = owed.map((o) => {
+        const gatesNote = o.gates.length ? `gates another leg (${o.gates.join(', ')})` : 'is a drawing, and every drawing goes to the owner to accept';
+        return `${o.id} (${o.dir}) ${gatesNote} and ${o.why}`;
+      }).join('; ');
+      throw Object.assign(new Error(`draw-review-owed: ${owedText}. File outcome ask with the question \`node ${path.join(skillRoot, 'scripts', 'work', 'draw-review.mjs')} question --ui <ui-record-dir>\` prints, verbatim (one ask, even with candidatesPerScreen 1); the owner's accept answer is applied by draw-review.mjs apply --receipt <receipt> --write on the re-enqueued attempt`), { code: 'draw-review-owed', owed });
+    }
+  }
+  if (['ask', 'done'].includes(report.outcome)) {
+    let verdict;
+    try { verdict = reportFeedbackFindings(db, { repo, report }); }
+    catch (error) { verdict = { findings: [], error: String(error?.message ?? error) }; }
+    if (verdict.error) console.error(`starci kernel report WARNING: the owner-feedback guard could not run: ${verdict.error.slice(0, 300)}`);
+    if (verdict.findings.length) {
+      throw Object.assign(new Error(`draw-feedback-unaddressed: ${verdict.findings.map((f) => f.detail).join(' | ').slice(0, 1600)}. Address the owner's notes through the current drawing feedback loop before reporting`), { code: 'draw-feedback-unaddressed', findings: verdict.findings.slice(0, 50) });
+    }
+  }
+}
+
+// An ask for what the repository's stack declaration says the runtime already holds (a service declared
+// ownerAction none with its custody present: a Sonar token or host, a GitHub CI setting) never reaches the owner
+// (owner ruling 2026-09-24; scripts/gates/starcistacks.mjs ownerAskConflict). The guard fails open: a declaration
+// it cannot read never blocks a report.
+function stackAskGuard(repo, report) {
+  if (report.outcome !== 'ask') return;
+  let declared = null;
+  try { declared = ownerAskConflict({ repo, question: report.question }); } catch (error) { console.error(`starci kernel report WARNING: stack declaration ask guard unavailable: ${String(error?.message ?? error).slice(0, 200)}`); }
+  if (declared) throw Object.assign(new Error(`ask-declared-in-stack: ${declared.message} File done|partial|failed|blocked using the declared custody instead; a custody or server gap is repaired in the stack, never asked of the owner.`), { code: 'ask-declared-in-stack', declared });
+}
+
+// An ask the job's retry lineage already had answered is never filed again (scripts/machine/owner-answers.mjs):
+// the answer rides in the packet as context.owner_answers. The one way past is a declared re-ask,
+// question.reasks {dispatchId: <the answered ask>, reason}, for an answer that could not take effect.
+function reaskOf(db, job, report) {
+  if (report.outcome !== 'ask') return null;
+  const repeated = repeatedAnswerOf(report.question, ownerAnswersOf(db, job), { op: jobOpOf(job) });
+  if (!repeated) return null;
+  const declared = report.question?.reasks;
+  const reason = typeof declared?.reason === 'string' ? declared.reason.trim() : '';
+  if (declared?.dispatchId !== repeated.dispatchId || !reason) {
+    let chosenNote = '';
+    if (repeated.chosen) {
+      const optionIndex = repeated.chosen.index != null ? repeated.chosen.index + 1 : '?';
+      const optionLabel = repeated.chosen.label ? ` "${repeated.chosen.label}"` : '';
+      chosenNote = `with option ${optionIndex}${optionLabel}`;
+    }
+    const receiptNote = repeated.receipt ? ` (receipt ${repeated.receipt})` : '';
+    throw Object.assign(new Error(`ask-already-answered: this question repeats ask ${repeated.dispatchId} (attempt ${repeated.attempt}), which ${repeated.answeredBy} already answered ${chosenNote} at ${repeated.answeredAt}${receiptNote}. Apply that answer (packet context.owner_answers) and file done|partial|failed|blocked; ask only a question the answer left open. When the answer provably could not take effect, re-ask it with question.reasks {"dispatchId":"${repeated.dispatchId}","reason":"<why>"}`), {
+      code: 'ask-already-answered', answered: repeated,
+    });
+  }
+  return { dispatchId: repeated.dispatchId, reason };
+}
+
 export default {
   verb: 'report',
   required: ['job', 'report'],
@@ -72,102 +190,19 @@ export default {
   const db = ledger.db, job = resolveJob(db, args.job);
   const jobPayload = jobPayloadOf(job);
   const attempt = requireReportAttempt(db, job);
-  // The report is read from the attempt's scratch only: a Work path or any other file is refused (H10).
-  let scratch, reportAbs;
-  try { scratch = scratchOf(attempt); reportAbs = scratchFile(args.report, scratch, 'report file'); }
-  catch (error) {
-    // A filed attempt's scratch is gone: filing again answers with the stored row instead of a missing file.
-    const prior = db.prepare('SELECT report_id,outcome FROM reports WHERE attempt_id=?').get(attempt.attempt_id);
-    if (prior && ['report-scratch-missing', 'report-attachment-missing'].includes(error.code)) {
-      emit({ ok: true, replayed: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId: attempt.dispatch_id, outcome: prior.outcome, reportId: prior.report_id },
-        `report already filed for ${job.job_id} (dispatch ${attempt.dispatch_id}, report ${prior.report_id})`, args.json);
-      return;
-    }
-    throw Object.assign(error, { code: error.code === 'report-attachment-missing' ? 'report-missing' : error.code === 'report-attachment-outside-scratch' ? 'report-outside-scratch' : error.code });
-  }
-  // One guarded read: the file that resolved but vanished before the read is a typed refusal,
-  // not a raw throw mid-command (G26); everything below parses this same text.
-  let reportRaw;
-  try { reportRaw = readReportEnvelope(reportAbs); }
-  catch (error) { if (error.code === 'report-invalid') throw error; throw Object.assign(new Error(`report file unreadable: ${reportAbs}`), { code: 'report-unreadable' }); }
+  const read = reportFileTextOf(db, job, attempt, args, emit);
+  if (!read) return;
+  const { scratch, reportAbs, reportRaw } = read;
   const parsed = parseJson(reportRaw);
   const valid = validateOpReport(parsed, { ownedPaths: reportOwnedPaths(db, job, repo), identity: reportIdentityOf(db, job) });
   if (!valid.ok) throw Object.assign(new Error(`report fails starci/op-report@1: ${valid.reasons.join('; ')}`), { code: 'report-invalid' });
   const report = valid.report;
   if (args.outcome && args.outcome !== report.outcome)
     throw Object.assign(new Error(`--outcome '${args.outcome}' contradicts the envelope's '${report.outcome}'`), { code: 'outcome-mismatch' });
-  // The handover ask is the one ask whose answer the kernel routes: its three
-  // options are closed and ordered (scripts/kernel/handover.mjs).
-  const handoverProblem = jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' ? handoverAskProblem(report.question) : null;
-  if (handoverProblem) throw Object.assign(new Error(`report fails the handover ask: ${handoverProblem}`), { code: 'report-invalid' });
-  if (jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask') handoverProofGate(db, job, repo);
-  // Autopilot: the handover is the owner's one review, so its ask carries the owner review ledger bundle - every
-  // provisional acceptance (with its images), deferred leg, deferred-to-handover proof and autopilot decision.
-  if (jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' && autopilotOn(db, job.workflow_id)) {
-    const bundle = autopilotBundle(db, job.workflow_id);
-    const carried = report.question?.autopilot;
-    const total = bundle.counts.provisional + bundle.counts.deferred + bundle.counts.deferredToHandover;
-    if (total > 0 && (carried?.schema !== bundle.schema || ['provisional', 'deferred', 'deferredToHandover'].some((k) => Number(carried?.counts?.[k]) !== bundle.counts[k]))) {
-      throw Object.assign(new Error(`report fails the handover ask: under autopilot it carries the final review bundle as question.autopilot, verbatim from the .autopilot block of \`node ${path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs')} survey --repo <repo> --workflow ${job.workflow_id} --deliveries --json\` (now ${JSON.stringify(bundle.counts)}), and lists the provisional images in question.assets`), { code: 'report-invalid' });
-    }
-  }
-  // A drawing another leg waits on (a planned layout's design record, a record another dependsOn) is done only once
-  // the owner accepted its drawn parts (inc-a4b5b1abdd90): a done interface.draw report that leaves one
-  // unreviewed is refused draw-review-owed, and the attempt files the draw-review ask instead
-  // (scripts/work/draw-review.mjs). A ui record the guard cannot judge - one that does not parse, a layout tree or a
-  // dependent record that does not, a guard that crashes - may owe the review, so the report is refused
-  // draw-review-unjudged.
-  if (jobOpOf(job) === DRAW_REVIEW_OP && report.outcome === 'done') {
-    let judged;
-    try { judged = drawReviewsOwed(repo, report.files); }
-    catch (error) { judged = { owed: [], unjudged: [{ path: 'draw-review.mjs drawReviewsOwed', error: String(error?.message ?? error) }] }; }
-    const owed = judged.owed;
-    if (judged.unjudged.length) {
-      const what = judged.unjudged.map((u) => `${u.path}: ${u.error}`).join('; ').slice(0, 800);
-      throw Object.assign(new Error(`draw-review-unjudged: the owner-review guard could not judge ${what}. Repair the record and file the report again`), { code: 'draw-review-unjudged', unjudged: judged.unjudged });
-    }
-    if (owed.length) {
-      throw Object.assign(new Error(`draw-review-owed: ${owed.map((o) => `${o.id} (${o.dir}) ${o.gates.length ? `gates another leg (${o.gates.join(', ')})` : 'is a drawing, and every drawing goes to the owner to accept'} and ${o.why}`).join('; ')}. File outcome ask with the question \`node ${path.join(skillRoot, 'scripts', 'work', 'draw-review.mjs')} question --ui <ui-record-dir>\` prints, verbatim (one ask, even with candidatesPerScreen 1); the owner's accept answer is applied by draw-review.mjs apply --receipt <receipt> --write on the re-enqueued attempt`), { code: 'draw-review-owed', owed });
-    }
-  }
-  // The owner's feedback loop (scripts/work/draw-feedback.mjs): an interface.draw ask or done report whose ui record
-  // carries an owner redraw answer not yet applied, or an owner note the redraw does not address (the rejected bytes,
-  // a brief without the note id, a critic that does not pass it), is refused draw-feedback-unaddressed.
-  if (jobOpOf(job) === DRAW_REVIEW_OP && ['ask', 'done'].includes(report.outcome)) {
-    let verdict;
-    try { verdict = reportFeedbackFindings(db, { repo, report }); }
-    catch (error) { verdict = { findings: [], error: String(error?.message ?? error) }; }
-    if (verdict.error) console.error(`starci kernel report WARNING: the owner-feedback guard could not run: ${verdict.error.slice(0, 300)}`);
-    if (verdict.findings.length) {
-      throw Object.assign(new Error(`draw-feedback-unaddressed: ${verdict.findings.map((f) => f.detail).join(' | ').slice(0, 1600)}. Address the owner's notes through the current drawing feedback loop before reporting`), { code: 'draw-feedback-unaddressed', findings: verdict.findings.slice(0, 50) });
-    }
-  }
-  // An ask for what the repository's stack declaration says the runtime already holds (a service declared
-  // ownerAction none with its custody present: a Sonar token or host, a GitHub CI setting) never
-  // reaches the owner (owner ruling 2026-09-24; scripts/gates/starcistacks.mjs ownerAskConflict).
-  // The guard fails open: a declaration it cannot read never blocks a report.
-  if (report.outcome === 'ask') {
-    let declared = null;
-    try { declared = ownerAskConflict({ repo, question: report.question }); } catch (error) { console.error(`starci kernel report WARNING: stack declaration ask guard unavailable: ${String(error?.message ?? error).slice(0, 200)}`); }
-    if (declared) throw Object.assign(new Error(`ask-declared-in-stack: ${declared.message} File done|partial|failed|blocked using the declared custody instead; a custody or server gap is repaired in the stack, never asked of the owner.`), { code: 'ask-declared-in-stack', declared });
-  }
-  // An ask the job's retry lineage already had answered is never filed again (scripts/machine/owner-answers.mjs):
-  // the answer rides in the packet as context.owner_answers. The one way past is a declared re-ask,
-  // question.reasks {dispatchId: <the answered ask>, reason}, for an answer that could not take effect.
-  let reask = null;
-  if (report.outcome === 'ask') {
-    const repeated = repeatedAnswerOf(report.question, ownerAnswersOf(db, job), { op: jobOpOf(job) });
-    if (repeated) {
-      const declared = report.question?.reasks;
-      const reason = typeof declared?.reason === 'string' ? declared.reason.trim() : '';
-      if (declared?.dispatchId !== repeated.dispatchId || !reason) {
-        throw Object.assign(new Error(`ask-already-answered: this question repeats ask ${repeated.dispatchId} (attempt ${repeated.attempt}), which ${repeated.answeredBy} already answered ${repeated.chosen ? `with option ${repeated.chosen.index != null ? repeated.chosen.index + 1 : '?'}${repeated.chosen.label ? ` "${repeated.chosen.label}"` : ''}` : ''} at ${repeated.answeredAt}${repeated.receipt ? ` (receipt ${repeated.receipt})` : ''}. Apply that answer (packet context.owner_answers) and file done|partial|failed|blocked; ask only a question the answer left open. When the answer provably could not take effect, re-ask it with question.reasks {"dispatchId":"${repeated.dispatchId}","reason":"<why>"}`), {
-          code: 'ask-already-answered', answered: repeated,
-        });
-      }
-      reask = { dispatchId: repeated.dispatchId, reason };
-    }
-  }
+  handoverAskGuard(db, job, repo, report, handoverProofGate, skillRoot);
+  drawReviewGuards(db, job, repo, report, skillRoot);
+  stackAskGuard(repo, report);
+  const reask = reaskOf(db, job, report);
   const dispatchId = report.dispatch, op = jobOpOf(job);
   const attach = attachedArgs();
   const repoRoots = [repo, attempt.worktree_path, attempt.repo_root].filter(Boolean);
@@ -220,7 +255,12 @@ export default {
   });
   const workerDone = sendOpWorkerDone(ledger, job, jobPayload, report, reportAbs, args['dispatch-capability'] ?? null);
   const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, attemptId: attempt.attempt_id, outcome: report.outcome, reportId, attachments, artifacts, ...(audit ? { audit } : {}), kernelWake, ...(reask ? { reask } : {}), ...(workerDone ? { workerDone } : {}) };
-  emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${report.outcome})${workerDone ? `; worker_done ${workerDone.outcome} ${workerDone.ok ? 'sent' : `NOT sent (${workerDone.errorCode})`}` : ''}`, args.json);
+  let workerDoneNote = '';
+  if (workerDone) {
+    const sentNote = workerDone.ok ? 'sent' : `NOT sent (${workerDone.errorCode})`;
+    workerDoneNote = `; worker_done ${workerDone.outcome} ${sentNote}`;
+  }
+  emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${report.outcome})${workerDoneNote}`, args.json);
   // The op terminal gets the canonical human rendering of the filed row — the
   // reports row is the truth, this block is its projection.
   console.log(renderReportBlock(report));

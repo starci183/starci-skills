@@ -50,44 +50,27 @@ export default {
     return;
   }
   const worker = observeOperationWorker(job, Date.now(), db, { frame: true });
-  if (!worker.terminalHandle || !worker.connected || !worker.writable) {
-    const out = { ok: false, jobId, nudged: false, reason: 'worker-unavailable', worker };
-    emit(out, `nudge REFUSED for ${jobId}: worker-unavailable — exact terminal is disconnected/unwritable`, args.json);
-    throw new VerbExit(1);
-  }
+  const refuseNudge = (out, text) => { emit(out, text, args.json); throw new VerbExit(1); };
+  const refuseUnavailable = () => refuseNudge({ ok: false, jobId, nudged: false, reason: 'worker-unavailable', worker },
+    `nudge REFUSED for ${jobId}: worker-unavailable — exact terminal is disconnected/unwritable`);
   // The agent exited and left a bare shell: a wake would run as a shell command.
   // Nothing is typed; status reads it worker-dead and reconcile --dead-worker recovers it.
-  if (worker.liveness === 'agent-exited') {
-    const out = { ok: false, jobId, nudged: false, reason: 'agent-exited', delivery: 'agent-exited', worker };
-    emit(out, `nudge REFUSED for ${jobId}: agent-exited — the worker's agent exited (its terminal shows the shell prompt '${worker.shellPrompt}'); nothing was typed - ${deadWorkerRecovery(jobId)}`, args.json);
-    throw new VerbExit(1);
-  }
+  const refuseAgentExited = () => refuseNudge({ ok: false, jobId, nudged: false, reason: 'agent-exited', delivery: 'agent-exited', worker },
+    `nudge REFUSED for ${jobId}: agent-exited — the worker's agent exited (its terminal shows the shell prompt '${worker.shellPrompt}'); nothing was typed - ${deadWorkerRecovery(jobId)}`);
   // Quiet past its provider's timeout after a delivered nudge: a second wake changes nothing.
-  if (worker.liveness === 'quiet') {
-    const out = { ok: false, jobId, nudged: false, reason: 'worker-quiet', worker };
-    emit(out, `nudge REFUSED for ${jobId}: worker-quiet — the worker printed nothing for ${Math.round((worker.quiet?.outputAgeMs ?? 0) / 60000)} min after its last nudge - ${deadWorkerRecovery(jobId)}`, args.json);
-    throw new VerbExit(1);
-  }
+  const refuseQuiet = () => refuseNudge({ ok: false, jobId, nudged: false, reason: 'worker-quiet', worker },
+    `nudge REFUSED for ${jobId}: worker-quiet — the worker printed nothing for ${Math.round((worker.quiet?.outputAgeMs ?? 0) / 60000)} min after its last nudge - ${deadWorkerRecovery(jobId)}`);
   // A wedged worker's turn can never file its report, but it is not nudgeable either: a wake lands
   // behind a turn that never ends. Its recovery is the dead-worker settle-failed route, which quits
   // the agent first (inc-2c1ac4ff3e48). Nothing is typed.
-  if (worker.liveness === 'wedged') {
-    const out = { ok: false, jobId, nudged: false, reason: 'worker-wedged', worker };
-    emit(out, `nudge REFUSED for ${jobId}: worker-wedged — the worker's turn ran past the wedge threshold on one command with no output; a wake would land behind a turn that never ends - ${deadWorkerRecovery(jobId)}`, args.json);
-    throw new VerbExit(1);
-  }
-  if (worker.liveness === 'active' || worker.liveness === 'active-unclassified') {
-    const out = { ok: true, jobId, nudged: false, reason: 'worker-active', worker };
-    emit(out, `nudge skipped for ${jobId}: exact worker is active`, args.json);
-    return;
-  }
+  const refuseWedged = () => refuseNudge({ ok: false, jobId, nudged: false, reason: 'worker-wedged', worker },
+    `nudge REFUSED for ${jobId}: worker-wedged — the worker's turn ran past the wedge threshold on one command with no output; a wake would land behind a turn that never ends - ${deadWorkerRecovery(jobId)}`);
+  const skipActive = () => emit({ ok: true, jobId, nudged: false, reason: 'worker-active', worker },
+    `nudge skipped for ${jobId}: exact worker is active`, args.json);
   // A managed worker inside its launch grace is still starting: worker-start returned before Orca
   // injected the Task, and a wake would land in front of it. Nothing is typed.
-  if (worker.liveness === 'starting') {
-    const out = { ok: true, jobId, nudged: false, reason: 'worker-starting', worker };
-    emit(out, `nudge skipped for ${jobId}: the managed worker's dispatch is ${Math.round((worker.launchGrace?.ageMs ?? 0) / 1000)}s old (launch grace ${Math.round((worker.launchGrace?.graceMs ?? LAUNCH_GRACE_MS) / 1000)}s); its first turn is still starting`, args.json);
-    return;
-  }
+  const skipStarting = () => emit({ ok: true, jobId, nudged: false, reason: 'worker-starting', worker },
+    `nudge skipped for ${jobId}: the managed worker's dispatch is ${Math.round((worker.launchGrace?.ageMs ?? 0) / 1000)}s old (launch grace ${Math.round((worker.launchGrace?.graceMs ?? LAUNCH_GRACE_MS) / 1000)}s); its first turn is still starting`, args.json);
   // A staged, unsubmitted paste (the dispatch contract still in the input
   // row) is not started work and not an idle prompt: typing a wake on top of
   // it would bury it. One Enter-only send submits exactly what is there
@@ -95,8 +78,7 @@ export default {
   // awaitSubmission).
   // A stalled/blocked receipt is not a failure when the next frame no longer
   // reads staged-input (scripts/kernel/wake-delivery.mjs).
-  const stagedEvidence = stagedInputEvidenceOf(db, job);
-  if (worker.liveness === 'staged-input') {
+  const submitStaged = (stagedEvidence) => {
     const proof = sendEnterWithProof({ terminal: worker.terminalHandle, ...stagedEvidence });
     const sent = proof.sent ?? {};
     if (!proof.ok) {
@@ -111,60 +93,70 @@ export default {
     }));
     const out = { ok: true, jobId, nudged: true, action: 'submit-staged-input', delivery: proof.delivery, evidence: proof.evidence, ...(proof.sendErrorCode ? { sendErrorCode: proof.sendErrorCode } : {}), worker, receipt: sent.receipt ?? null };
     emit(out, `nudged ${jobId}: submitted the staged input on exact worker ${worker.terminalHandle} with one Enter`, args.json);
-    return;
-  }
+  };
   // A host dialog the worker's card allowlists is answered, never typed over: the card's option is picked
   // (arrow keys, Enter) and the answer recorded, so a repeat on this attempt reads gate-loop.
-  if (worker.liveness === 'interactive-gate' && worker.gateAutoAnswer && !worker.gateAutoAnswer.loop) {
+  const answerGate = () => {
     const { card } = workerCardOf(job);
     const answer = answerAllowlistedGate(worker.terminalHandle, card, worker.gateAutoAnswer.gate);
     const answers = worker.gateAutoAnswer.answers + (answer.answered ? 1 : 0);
-    const payload = { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, gate: answer.gate, select: answer.select,
+    const gatePayload = { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, gate: answer.gate, select: answer.select,
       answered: answer.answered, cleared: answer.cleared, keystroke: answer.keystroke, answers, limit: worker.gateAutoAnswer.limit,
       ...(answer.reason ? { reason: answer.reason } : {}) };
-    if (answer.answered) ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: GATE_ANSWERED_EVENT, payload }));
-    const out = { ok: answer.answered, jobId, nudged: answer.answered, action: 'answer-gate', ...payload, worker };
-    emit(out, answer.answered
-      ? `nudged ${jobId}: answered host dialog '${answer.gate}' on exact worker ${worker.terminalHandle} with '${answer.select}' (${answer.keystroke}; answer ${answers} of ${worker.gateAutoAnswer.limit} on attempt ${job.attempt})${answer.cleared ? '' : '; the dialog is still on screen'}`
-      : `nudge FAILED for ${jobId}: host dialog '${answer.gate}' could not be answered (${answer.reason ?? 'no answer'}); nothing was recorded`, args.json);
+    if (answer.answered) ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: GATE_ANSWERED_EVENT, payload: gatePayload }));
+    const out = { ok: answer.answered, jobId, nudged: answer.answered, action: 'answer-gate', ...gatePayload, worker };
+    const clearedNote = answer.cleared ? '' : '; the dialog is still on screen';
+    const text = answer.answered
+      ? `nudged ${jobId}: answered host dialog '${answer.gate}' on exact worker ${worker.terminalHandle} with '${answer.select}' (${answer.keystroke}; answer ${answers} of ${worker.gateAutoAnswer.limit} on attempt ${job.attempt})${clearedNote}`
+      : `nudge FAILED for ${jobId}: host dialog '${answer.gate}' could not be answered (${answer.reason ?? 'no answer'}); nothing was recorded`;
+    emit(out, text, args.json);
     if (!answer.answered) throw new VerbExit(1);
-    return;
-  }
+  };
   // The same host dialog came back after the runtime answered it maxPerAttempt times on this attempt: the
   // worker is looping, and another answer is an endless continue. Nothing is typed; the attempt recovers
   // like a wedged one and its retry is routed again (a repeat there reads as a retry-loop finding).
-  if (worker.liveness === 'gate-loop') {
+  const refuseGateLoop = () => {
     const already = db.prepare("SELECT 1 FROM events WHERE entity_id=? AND kind='op-worker-gate-loop' AND json_extract(payload_json,'$.attempt')=?").get(jobId, job.attempt);
     if (!already) ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'op-worker-gate-loop',
       payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, gate: worker.gateAutoAnswer?.gate ?? worker.gate ?? null,
         answers: worker.gateAutoAnswer?.answers ?? null, limit: worker.gateAutoAnswer?.limit ?? null } }));
-    const out = { ok: false, jobId, nudged: false, reason: 'worker-gate-loop', worker };
-    emit(out, `nudge REFUSED for ${jobId}: worker-gate-loop — host dialog '${worker.gateAutoAnswer?.gate ?? worker.gate}' is back after ${worker.gateAutoAnswer?.answers ?? '?'} answers on attempt ${job.attempt}; another answer is an endless continue - ${deadWorkerRecovery(jobId)} (Esc closes the dialog before the agent is quit); a repeat on the retry reads as a retry-loop finding`, args.json);
-    throw new VerbExit(1);
-  }
-  if (worker.liveness === 'interactive-gate' || worker.liveness === 'failed') {
-    const out = { ok: false, jobId, nudged: false, reason: worker.liveness, worker };
-    emit(out, `nudge REFUSED for ${jobId}: ${worker.liveness} — ${worker.liveness === 'interactive-gate' ? "permission/trust input the worker's card does not allowlist" : 'an agent process/authentication failure'} is a typed environment problem, not a wake; nothing was typed`, args.json);
-    throw new VerbExit(1);
-  }
-  if (!['turn-idle', 'live-idle'].includes(worker.liveness)) {
-    const out = { ok: false, jobId, nudged: false, reason: 'worker-state-unknown', worker };
-    emit(out, `nudge REFUSED for ${jobId}: worker-state-unknown — liveness ${worker.liveness} is neither turn-idle nor live-idle; weak observation never authorizes input`, args.json);
-    throw new VerbExit(1);
-  }
-  const prompt = [
-    `Operation liveness wake for durable job ${jobId} (${job.op_id}) attempt ${job.attempt}.`,
-    'Your accepted contract remains running but no durable report is filed.',
-    'Re-read the exact contract with starci kernel op-contract, continue only inside its existing authority, and file exactly one starci kernel report.',
-    'Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.',
-    ...(() => {
-      // op-rev-drift while running: the worker hears that its op contract moved and that it is judged by its admission.
-      try {
-        const drift = runningOpRevDriftOf(db, job.workflow_id).find((w) => w.jobId === jobId);
-        return drift ? [`Notice: this op's contract changed on the runtime since your dispatch (${drift.files.slice(0, 4).join(', ')}${drift.files.length > 4 ? ', ...' : ''}); you are judged by the contract you were admitted under${drift.advisoryChanges.length ? ` - findings of ${drift.advisoryChanges.slice(0, 6).join(', ')} are advisory for you, do not loop on them` : ''}.`] : [];
-      } catch { return []; }
-    })(),
-  ].join(' ');
+    refuseNudge({ ok: false, jobId, nudged: false, reason: 'worker-gate-loop', worker },
+      `nudge REFUSED for ${jobId}: worker-gate-loop — host dialog '${worker.gateAutoAnswer?.gate ?? worker.gate}' is back after ${worker.gateAutoAnswer?.answers ?? '?'} answers on attempt ${job.attempt}; another answer is an endless continue - ${deadWorkerRecovery(jobId)} (Esc closes the dialog before the agent is quit); a repeat on the retry reads as a retry-loop finding`);
+  };
+  const refuseTypedGate = () => refuseNudge({ ok: false, jobId, nudged: false, reason: worker.liveness, worker },
+    `nudge REFUSED for ${jobId}: ${worker.liveness} — ${worker.liveness === 'interactive-gate' ? "permission/trust input the worker's card does not allowlist" : 'an agent process/authentication failure'} is a typed environment problem, not a wake; nothing was typed`);
+  const refuseUnknown = () => refuseNudge({ ok: false, jobId, nudged: false, reason: 'worker-state-unknown', worker },
+    `nudge REFUSED for ${jobId}: worker-state-unknown — liveness ${worker.liveness} is neither turn-idle nor live-idle; weak observation never authorizes input`);
+  // Returns false once an early liveness state was already answered (emitted, or refused by a thrown VerbExit).
+  const earlyGate = () => {
+    if (!worker.terminalHandle || !worker.connected || !worker.writable) refuseUnavailable();
+    if (worker.liveness === 'agent-exited') refuseAgentExited();
+    if (worker.liveness === 'quiet') refuseQuiet();
+    if (worker.liveness === 'wedged') refuseWedged();
+    if (worker.liveness === 'active' || worker.liveness === 'active-unclassified') { skipActive(); return false; }
+    if (worker.liveness === 'starting') { skipStarting(); return false; }
+    return true;
+  };
+  // Answers a staged paste, a gate answer, a gate loop, a typed gate and a weak observation; 'send' says the
+  // worker is turn-idle/live-idle and the wake may be typed.
+  const midGate = (stagedEvidence) => {
+    if (worker.liveness === 'staged-input') { submitStaged(stagedEvidence); return 'handled'; }
+    if (worker.liveness === 'interactive-gate' && worker.gateAutoAnswer && !worker.gateAutoAnswer.loop) { answerGate(); return 'handled'; }
+    if (worker.liveness === 'gate-loop') refuseGateLoop();
+    if (worker.liveness === 'interactive-gate' || worker.liveness === 'failed') refuseTypedGate();
+    if (!['turn-idle', 'live-idle'].includes(worker.liveness)) refuseUnknown();
+    return 'send';
+  };
+  // op-rev-drift while running: the worker hears that its op contract moved and that it is judged by its admission.
+  const driftNotice = () => {
+    try {
+      const drift = runningOpRevDriftOf(db, job.workflow_id).find((w) => w.jobId === jobId);
+      if (!drift) return [];
+      const more = drift.files.length > 4 ? ', ...' : '';
+      const advisory = drift.advisoryChanges.length ? ` - findings of ${drift.advisoryChanges.slice(0, 6).join(', ')} are advisory for you, do not loop on them` : '';
+      return [`Notice: this op's contract changed on the runtime since your dispatch (${drift.files.slice(0, 4).join(', ')}${more}); you are judged by the contract you were admitted under${advisory}.`];
+    } catch { return []; }
+  };
   // A wake is typed into whatever the input row already holds. Text that is neither the provider's
   // painted placeholder nor the runtime's own (a staged paste marker, the dispatched contract, or
   // this same wake left staged) is foreign input: appending the wake would submit words this job
@@ -172,7 +164,6 @@ export default {
   // worker's input row at its session-turn limit. Nothing is typed.
   // The frame the observation already read: the foreign-input check judges the same screen and
   // draft the liveness classification did, not a second read that could have moved on (L-6).
-  const nudgeFrame = typeof worker.screen === 'string' ? worker.screen : null;
   // Orca lifts the input box's text out of the frame and answers it as `draft`: text left there that
   // the runtime did not type is foreign input exactly as a visible input row is (a collab Kernel,
   // 2026-09-25: a hidden draft took every later send as its tail). The runtime's own - this wake or
@@ -182,69 +173,96 @@ export default {
   // key cleared while the box was empty): foreign text gets one Ctrl+U probe (clear-draft.mjs
   // probeDraft). Text that changed is real - the deleted part is typed back and the nudge refuses;
   // text the Ctrl+U left unchanged is stale - noted draft-stale, never refused, and the wake is typed.
-  const draftOwner = worker.draft ? draftOwnership(worker.draft, { texts: [prompt, stagedEvidence.sentText], stagedPattern: stagedEvidence.stagedPattern }) : null;
-  const staleDrafts = [];
-  if (draftOwner?.kind === 'foreign') {
-    const probe = probeDraft({ terminal: worker.terminalHandle });
-    if (probe.verdict === 'stale') staleDrafts.push(probe.draft);
-    else if (probe.verdict !== 'none') {
-      const draftProbe = { verdict: probe.verdict, sends: probe.sends, ...(probe.verdict === 'real' ? { restored: probe.restored, ...(probe.restored ? {} : { removed: probe.removed }) } : {}) };
-      const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: draftOwner.draft.slice(0, 200), inputSource: 'draft', draftProbe, worker };
-      emit(out, `nudge REFUSED for ${jobId}: foreign-input — the input box draft Orca reports holds '${draftOwner.draft.length > 80 ? `${draftOwner.draft.slice(0, 80)}…` : draftOwner.draft}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (a Ctrl+U probe ${probe.verdict === 'real' ? `changed it - real text${probe.restored ? ', its cut typed back' : ', NOT restored'}` : 'left it unreadable'}), no event is appended`, args.json);
+  const foreignDraftGate = (prompt, stagedEvidence) => {
+    const draftOwner = worker.draft ? draftOwnership(worker.draft, { texts: [prompt, stagedEvidence.sentText], stagedPattern: stagedEvidence.stagedPattern }) : null;
+    const staleDrafts = [];
+    if (draftOwner?.kind === 'foreign') {
+      const probe = probeDraft({ terminal: worker.terminalHandle });
+      if (probe.verdict === 'stale') staleDrafts.push(probe.draft);
+      else if (probe.verdict !== 'none') {
+        const draftProbe = { verdict: probe.verdict, sends: probe.sends, ...(probe.verdict === 'real' ? { restored: probe.restored, ...(probe.restored ? {} : { removed: probe.removed }) } : {}) };
+        const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: draftOwner.draft.slice(0, 200), inputSource: 'draft', draftProbe, worker };
+        const shown = draftOwner.draft.length > 80 ? `${draftOwner.draft.slice(0, 80)}…` : draftOwner.draft;
+        const probeNote = probe.verdict === 'real' ? `changed it - real text${probe.restored ? ', its cut typed back' : ', NOT restored'}` : 'left it unreadable';
+        emit(out, `nudge REFUSED for ${jobId}: foreign-input — the input box draft Orca reports holds '${shown}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (a Ctrl+U probe ${probeNote}), no event is appended`, args.json);
+        throw new VerbExit(1);
+      }
+    }
+    return staleDrafts;
+  };
+  const inputRowGate = (prompt, stagedEvidence) => {
+    const nudgeFrame = typeof worker.screen === 'string' ? worker.screen : null;
+    const inputText = nudgeFrame == null ? null : workerInputRowText(nudgeFrame);
+    if (inputText && !INPUT_ROW_PLACEHOLDER.test(inputText) && !runtimeOwnedInput(inputText, stagedEvidence, prompt)) {
+      const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: inputText.slice(0, 200), worker };
+      const shown = inputText.length > 80 ? `${inputText.slice(0, 80)}…` : inputText;
+      emit(out, `nudge REFUSED for ${jobId}: foreign-input — the input row holds '${shown}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed, no event is appended`, args.json);
       throw new VerbExit(1);
     }
-  }
-  const inputText = nudgeFrame == null ? null : workerInputRowText(nudgeFrame);
-  if (inputText && !INPUT_ROW_PLACEHOLDER.test(inputText) && !runtimeOwnedInput(inputText, stagedEvidence, prompt)) {
-    const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: inputText.slice(0, 200), worker };
-    emit(out, `nudge REFUSED for ${jobId}: foreign-input — the input row holds '${inputText.length > 80 ? `${inputText.slice(0, 80)}…` : inputText}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed, no event is appended`, args.json);
-    throw new VerbExit(1);
-  }
-  // Delivery is proven from the screen, not Orca's receipt: agent_prompt_stalled
-  // (text queued behind a running turn) and agent_prompt_blocked (Enter refused,
-  // then retried) left wakes on the worker's screen while nudge reported
-  // terminal-send-failed (inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f).
-  const proof = sendWakeWithProof({ terminal: worker.terminalHandle, text: prompt, stagedPattern: stagedEvidence.stagedPattern,
-    ownTexts: [stagedEvidence.sentText].filter(Boolean), staleDrafts });
-  const sent = proof.sent ?? {};
-  // The input box changed between the check above and the send: foreign text appeared, or a pile of
-  // runtime text would not clear. Nothing was typed onto it.
-  if (!proof.ok && (proof.delivery === 'foreign-input' || proof.delivery === 'draft-stuck')) {
-    const out = { ok: false, jobId, nudged: false, reason: proof.delivery, input: proof.draft ?? null, inputSource: 'draft', ...deliveryFieldsOf(proof), worker };
-    emit(out, `nudge REFUSED for ${jobId}: ${proof.delivery} — ${proof.delivery === 'foreign-input'
-      ? `the input box draft Orca reports holds '${String(proof.draft ?? '').slice(0, 80)}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (only a Ctrl+U probe and its restore)`
-      : `the input box holds piled-up runtime text that bounded Ctrl+U shrank but could not empty ('${String(proof.draft ?? '').slice(0, 80)}'); the wake was not typed onto it`}, no event is appended`, args.json);
-    throw new VerbExit(1);
-  }
-  // A dropped wake (ok receipt, idle frame, no text) is retried once split -
-  // text, then Enter-only - and says so: splitRetried/splitOutcome.
-  const delivered = deliveryFieldsOf(proof);
-  // The agent exited after the observation: the frame read right before typing
-  // ended in a shell (nothing typed), or the frames after the send show a shell
-  // got the text. Never a delivery; reconcile --dead-worker recovers the job.
-  if (!proof.ok && proof.delivery === 'agent-exited') {
-    const typed = Boolean(proof.sent);
-    if (typed) ledger.transaction(() => ledger.appendEvent({
+  };
+  const sendWake = (prompt, stagedEvidence, staleDrafts) => {
+    // Delivery is proven from the screen, not Orca's receipt: agent_prompt_stalled
+    // (text queued behind a running turn) and agent_prompt_blocked (Enter refused,
+    // then retried) left wakes on the worker's screen while nudge reported
+    // terminal-send-failed (inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f).
+    const proof = sendWakeWithProof({ terminal: worker.terminalHandle, text: prompt, stagedPattern: stagedEvidence.stagedPattern,
+      ownTexts: [stagedEvidence.sentText].filter(Boolean), staleDrafts });
+    const sent = proof.sent ?? {};
+    // The input box changed between the check above and the send: foreign text appeared, or a pile of
+    // runtime text would not clear. Nothing was typed onto it.
+    if (!proof.ok && (proof.delivery === 'foreign-input' || proof.delivery === 'draft-stuck')) {
+      const out = { ok: false, jobId, nudged: false, reason: proof.delivery, input: proof.draft ?? null, inputSource: 'draft', ...deliveryFieldsOf(proof), worker };
+      const why = proof.delivery === 'foreign-input'
+        ? `the input box draft Orca reports holds '${String(proof.draft ?? '').slice(0, 80)}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (only a Ctrl+U probe and its restore)`
+        : `the input box holds piled-up runtime text that bounded Ctrl+U shrank but could not empty ('${String(proof.draft ?? '').slice(0, 80)}'); the wake was not typed onto it`;
+      emit(out, `nudge REFUSED for ${jobId}: ${proof.delivery} — ${why}, no event is appended`, args.json);
+      throw new VerbExit(1);
+    }
+    // A dropped wake (ok receipt, idle frame, no text) is retried once split -
+    // text, then Enter-only - and says so: splitRetried/splitOutcome.
+    const delivered = deliveryFieldsOf(proof);
+    // The agent exited after the observation: the frame read right before typing
+    // ended in a shell (nothing typed), or the frames after the send show a shell
+    // got the text. Never a delivery; reconcile --dead-worker recovers the job.
+    if (!proof.ok && proof.delivery === 'agent-exited') {
+      const typed = Boolean(proof.sent);
+      if (typed) ledger.transaction(() => ledger.appendEvent({
+        workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+        kind: 'op-worker-wake-to-shell', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle,
+          priorLiveness: worker.liveness, shellPrompt: proof.shellPrompt ?? null, ...deliveredForEvent(delivered) },
+      }));
+      const out = { ok: false, jobId, nudged: false, reason: 'agent-exited', ...delivered, shellPrompt: proof.shellPrompt ?? null, typed, worker };
+      const what = typed ? `a shell received the wake: '${proof.shellPrompt}'` : `the worker's agent exited; its terminal shows the shell prompt '${proof.shellPrompt}'; nothing was typed`;
+      emit(out, `nudge REFUSED for ${jobId}: agent-exited — ${what} - ${deadWorkerRecovery(jobId)}`, args.json);
+      throw new VerbExit(1);
+    }
+    if (!proof.ok) {
+      const refused = recordSendRefused(ledger, job, { dispatchId, worker, proof });
+      const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', ...delivered, worker, error: sent.error, ...(refused ? { sendRefused: true } : {}) };
+      emit(out, `nudge FAILED for ${jobId}: ${sent.error || proof.sendErrorCode || 'terminal send failed'}; the screen shows no wake (${proof.evidence})${refused ? refusedNote(jobId) : ''}`, args.json);
+      throw new VerbExit(1);
+    }
+    ledger.transaction(() => ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-      kind: 'op-worker-wake-to-shell', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle,
-        priorLiveness: worker.liveness, shellPrompt: proof.shellPrompt ?? null, ...deliveredForEvent(delivered) },
+      kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, ...(worker.livenessReason ? { livenessReason: worker.livenessReason } : {}), ...deliveredForEvent(delivered) },
     }));
-    const out = { ok: false, jobId, nudged: false, reason: 'agent-exited', ...delivered, shellPrompt: proof.shellPrompt ?? null, typed, worker };
-    emit(out, `nudge REFUSED for ${jobId}: agent-exited — ${typed ? `a shell received the wake: '${proof.shellPrompt}'` : `the worker's agent exited; its terminal shows the shell prompt '${proof.shellPrompt}'; nothing was typed`} - ${deadWorkerRecovery(jobId)}`, args.json);
-    throw new VerbExit(1);
-  }
-  if (!proof.ok) {
-    const refused = recordSendRefused(ledger, job, { dispatchId, worker, proof });
-    const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', ...delivered, worker, error: sent.error, ...(refused ? { sendRefused: true } : {}) };
-    emit(out, `nudge FAILED for ${jobId}: ${sent.error || proof.sendErrorCode || 'terminal send failed'}; the screen shows no wake (${proof.evidence})${refused ? refusedNote(jobId) : ''}`, args.json);
-    throw new VerbExit(1);
-  }
-  ledger.transaction(() => ledger.appendEvent({
-    workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-    kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, ...(worker.livenessReason ? { livenessReason: worker.livenessReason } : {}), ...deliveredForEvent(delivered) },
-  }));
-  const out = { ok: true, jobId, nudged: true, action: 'wake', ...delivered, worker, receipt: sent.receipt ?? null };
-  emit(out, `nudged ${jobId}: ${proof.delivery === 'queued' ? 'queued the wake behind the running turn of' : 'resumed'} exact worker ${worker.terminalHandle} to file its durable report (${proof.evidence})${proof.draftNote ? `; Orca's draft '${String(proof.staleDraft ?? '').slice(0, 80)}' was stale (Ctrl+U left it unchanged), typed over as an empty box` : ''}`, args.json);
-
+    const out = { ok: true, jobId, nudged: true, action: 'wake', ...delivered, worker, receipt: sent.receipt ?? null };
+    const deliveryVerb = proof.delivery === 'queued' ? 'queued the wake behind the running turn of' : 'resumed';
+    const staleNote = proof.draftNote ? `; Orca's draft '${String(proof.staleDraft ?? '').slice(0, 80)}' was stale (Ctrl+U left it unchanged), typed over as an empty box` : '';
+    emit(out, `nudged ${jobId}: ${deliveryVerb} exact worker ${worker.terminalHandle} to file its durable report (${proof.evidence})${staleNote}`, args.json);
+  };
+  if (!earlyGate()) return;
+  const stagedEvidence = stagedInputEvidenceOf(db, job);
+  if (midGate(stagedEvidence) !== 'send') return;
+  const prompt = [
+    `Operation liveness wake for durable job ${jobId} (${job.op_id}) attempt ${job.attempt}.`,
+    'Your accepted contract remains running but no durable report is filed.',
+    'Re-read the exact contract with starci kernel op-contract, continue only inside its existing authority, and file exactly one starci kernel report.',
+    'Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.',
+    ...driftNotice(),
+  ].join(' ');
+  const staleDrafts = foreignDraftGate(prompt, stagedEvidence);
+  inputRowGate(prompt, stagedEvidence);
+  sendWake(prompt, stagedEvidence, staleDrafts);
   },
 };
