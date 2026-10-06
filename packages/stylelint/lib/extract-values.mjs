@@ -29,7 +29,7 @@ export function extractValues(grammarSrcDir) {
       }
       if (child.type !== "rule") return
       const roots = child.selectors.map((selector) => ROOT.exec(selector.trim()))
-      if (roots.some((match) => match === null)) return
+      if (roots.includes(null)) return
       for (const [, family, dark] of roots) {
         const bucket = ((table[dark ? "dark" : "light"])[family ?? "common"] ??= {})
         child.each((decl) => {

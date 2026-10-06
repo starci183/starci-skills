@@ -63,7 +63,7 @@ function isOn(entry) {
   const primary = Array.isArray(entry) ? entry[0] : entry
   if (primary !== true) return false
   const secondary = Array.isArray(entry) ? entry[1] : undefined
-  return !secondary || secondary.severity === undefined || secondary.severity === "error"
+  return secondary?.severity === undefined || secondary?.severity === "error"
 }
 
 /**
