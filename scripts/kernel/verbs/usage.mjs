@@ -6,14 +6,19 @@ import { tokenLine, usageOfLedger, usageOfWorkflow } from '../usage-report.mjs';
 
 export const usageLines = (u) => {
   const cov = u.coverage;
-  const lines = [`usage ${u.workflowId}: ${tokenLine(u.total)}; ${cov.measured}/${cov.attempts} attempts measured${cov.unavailable ? `, ${cov.unavailable} unavailable` : ''}${cov.pending ? `, ${cov.pending} pending` : ''}${cov.open ? `, ${cov.open} open` : ''}`];
+  const unavailable = cov.unavailable ? `, ${cov.unavailable} unavailable` : '';
+  const pending = cov.pending ? `, ${cov.pending} pending` : '';
+  const open = cov.open ? `, ${cov.open} open` : '';
+  const lines = [`usage ${u.workflowId}: ${tokenLine(u.total)}; ${cov.measured}/${cov.attempts} attempts measured${unavailable}${pending}${open}`];
   for (const o of u.byOp.slice(0, 20)) lines.push(`  op ${o.opId}: ${tokenLine(o)} (${o.attempts} attempt(s); ${o.models.map((m) => m.model).join(', ')})`);
   for (const m of u.byModel.slice(0, 10)) lines.push(`  model ${m.model}: ${tokenLine(m)}`);
   if (u.kernel.sessions) lines.push(`  kernel (${u.kernel.sessions} session(s)): ${tokenLine(u.kernel)} [${u.kernel.models.map((m) => m.model).join(', ')}]`);
   for (const a of cov.unavailableAttempts.slice(0, 5)) lines.push(`  unavailable attempt ${a.attemptId} ${a.opId}: ${a.reason}`);
-  for (const l of u.legs ?? []) lines.push(`  leg #${l.attemptId} ${l.opId} try ${l.tryNo} ${l.agent ?? '-'}/${l.model ?? '-'} [${l.state}]${l.tokens != null ? ` ${tokenLine(l)}` : ''}`);
+  for (const l of u.legs ?? []) lines.push(`  leg #${l.attemptId} ${l.opId} try ${l.tryNo} ${l.agent ?? '-'}/${l.model ?? '-'} [${l.state}]${legTokens(l)}`);
   return lines.join('\n');
 };
+
+const legTokens = (l) => (l.tokens != null ? ` ${tokenLine(l)}` : '');
 
 export default {
   verb: 'usage',

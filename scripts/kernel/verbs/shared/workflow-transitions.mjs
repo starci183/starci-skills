@@ -16,7 +16,10 @@ export const ACCEPTS_WORK = Object.freeze(['queued', 'running']);
 export const DISPATCHES = Object.freeze(['queued', 'running']);
 
 /** The phase a workflow row is in; an archived row is `archived` whatever its phase column says. */
-export const phaseOf = (wf) => (!wf ? null : wf.archived_at != null ? 'archived' : wf.phase ?? 'queued');
+export const phaseOf = (wf) => {
+  if (!wf) return null;
+  return wf.archived_at != null ? 'archived' : wf.phase ?? 'queued';
+};
 export const canTransition = (from, to) => WORKFLOW_TRANSITIONS.some(([a, b]) => a === from && b === to);
 
 /** Throw a typed refusal unless `wf` is in one of `phases`. */
@@ -24,6 +27,9 @@ export function requirePhase(wf, phases, verb) {
   const phase = phaseOf(wf);
   if (!wf) throw Object.assign(new Error(`${verb}: unknown workflow`), { code: 'workflow-unknown' });
   if (phases.includes(phase)) return phase;
+  let code = 'workflow-not-accepting-work';
+  if (phase === 'finished') code = 'workflow-finished';
+  else if (phase === 'archived') code = 'workflow-archived';
   throw Object.assign(new Error(`${verb} refused: workflow ${wf.workflow_id} is ${phase}; ${verb} runs only while ${phases.join('|')}`),
-    { code: phase === 'finished' ? 'workflow-finished' : phase === 'archived' ? 'workflow-archived' : 'workflow-not-accepting-work', phase });
+    { code, phase });
 }
