@@ -100,21 +100,24 @@ export function releaseOrcaSlot(pending, { env = process.env } = {}) {
  *   branch-merged   (no owner) its branch moved past its base and is in main
  *   owner-gone      (no owner) its creating process is gone and the row is older than ownerGoneMs
  */
+const workflowCollectReason = (row, workflowPhase, terminalsLive, age, ownerGoneMs) => {
+  if (Number(terminalsLive) > 0) return null;
+  if (row.release_pending_at != null) return 'release-pending';
+  if (workflowPhase && ENDED.has(workflowPhase)) return 'owner-settled';
+  if (!workflowPhase && age > ownerGoneMs) return 'owner-unknown';
+  return null;
+};
+
+const jobCollectReason = (jobStatus, age, ownerGoneMs) => {
+  if (jobStatus && SETTLED_JOBS.has(jobStatus)) return 'owner-settled';
+  if (!jobStatus && age > ownerGoneMs) return 'owner-unknown';
+  return null;
+};
+
 export function collectReason({ row, jobStatus = null, workflowPhase = null, terminalsLive = 0, merged = false, ownerAlive = true, now = Date.now(), ownerGoneMs = WORKTREE_DEFAULTS.ownerGoneMs }) {
   const age = now - Number(row.created_at ?? now);
-  if (row.kind === 'workflow') {
-    // Never removed while the Kernel or an op still works in it (a removal from inside itself is never made).
-    if (Number(terminalsLive) > 0) return null;
-    if (row.release_pending_at != null) return 'release-pending';
-    if (workflowPhase && ENDED.has(workflowPhase)) return 'owner-settled';
-    if (!workflowPhase && age > ownerGoneMs) return 'owner-unknown';
-    return null; // a live workflow keeps its tree whatever its branch
-  }
-  if (row.job_id || (row.kind === 'supervisor-staging' && row.lane)) {
-    if (jobStatus && SETTLED_JOBS.has(jobStatus)) return 'owner-settled';
-    if (!jobStatus && age > ownerGoneMs) return 'owner-unknown';
-    return null;
-  }
+  if (row.kind === 'workflow') return workflowCollectReason(row, workflowPhase, terminalsLive, age, ownerGoneMs);
+  if (row.job_id || (row.kind === 'supervisor-staging' && row.lane)) return jobCollectReason(jobStatus, age, ownerGoneMs);
   if (merged) return 'branch-merged';
   if (!ownerAlive && age > ownerGoneMs) return 'owner-gone';
   return null;
