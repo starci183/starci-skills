@@ -148,11 +148,11 @@ export function planWake({ now = Date.now(), wakes = [], unread = [], reported =
   if (!registered) tags.push('register');
   const parts = [];
   if (tags.includes('register')) parts.push(`[register] channel '${SUPERVISOR_ID}' is not registered from this terminal: starci supervisor channel register --id ${SUPERVISOR_ID} --label "Supervisor".`);
-  if (tags.includes('inbox')) parts.push(`[inbox] ${unread.length} unread message(s)${fresh.length ? ` (new ${fresh.map(shortId).join(',')})` : ''}${remind.length ? ` (still unread ${remind.map(shortId).join(',')})` : ''}: starci supervisor channel inbox --id ${SUPERVISOR_ID}, then reply to each (--to <inboxId>).`);
-  if (tags.includes('decide')) parts.push(`[decide] ${openDis.length} open Supervisor decision(s)${diFresh.length ? ` (new ${diFresh.join(',')})` : ''}${diRemind.length ? ` (still open ${diRemind.join(',')})` : ''}: starci machine decisions supervisor --list, then claim and resolve each.`);
+  if (tags.includes('inbox')) parts.push('[inbox] ' + unread.length + ' unread message(s)' + (fresh.length ? ' (new ' + fresh.map(shortId).join(',') + ')' : '') + (remind.length ? ' (still unread ' + remind.map(shortId).join(',') + ')' : '') + `: starci supervisor channel inbox --id ${SUPERVISOR_ID}, then reply to each (--to <inboxId>).`);
+  if (tags.includes('decide')) parts.push('[decide] ' + openDis.length + ' open Supervisor decision(s)' + (diFresh.length ? ' (new ' + diFresh.join(',') + ')' : '') + (diRemind.length ? ' (still open ' + diRemind.join(',') + ')' : '') + ': starci machine decisions supervisor --list, then claim and resolve each.');
   if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: starci supervisor workers list, then land (starci supervisor land --job <id>) or redirect.`);
   if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: starci supervisor workers show --job <id>, then decide.`);
-  if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => `${d.jobId} (${d.reason})`).join(', ')}: respawn, reassign or take it yourself.`);
+  if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => d.jobId + ' (' + d.reason + ')').join(', ')}: respawn, reassign or take it yourself.`);
   const text = parts.length ? `${WAKE_TAG} ${parts.join(' ')} Act until nothing is executable, then yield; never sleep or poll in a turn.` : null;
   if (text && wakes.some((w) => w.payload.text === text)) return { tags: [], inbox: [], land: [], report: [], decisions: [], text: null, duplicate: true };
   return { tags, inbox, land, report, decisions: decide, text };
@@ -306,7 +306,8 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
       return { ok: proof?.ok === true, action: `${state}-sent`, terminal, tags: plan.tags };
     }
     let frame = null;
-    const busy = state !== 'turn-idle' ? state : (busyScreen(frame = deps.screen(terminal)) ? 'subagents-running' : null);
+    let busy = state;
+    if (state === 'turn-idle') { frame = deps.screen(terminal); busy = busyScreen(frame) ? 'subagents-running' : null; }
     if (busy && FROZEN_BUSY.has(busy)) {
       frame ??= deps.screen(terminal);
       const signature = frame == null ? null : busySignature(frame);
@@ -371,6 +372,7 @@ if (isMain(import.meta.url)) {
     process.exit(2);
   }
   const r = await watchdogPass();
-  console.log(process.argv.includes('--json') ? JSON.stringify(r) : `[Supervisor watchdog] ${r.action}${r.terminal ? ` ${r.terminal}` : ''}${r.tags ? ` ${r.tags.join(',')}` : ''}`);
+  if (process.argv.includes('--json')) console.log(JSON.stringify(r));
+  else console.log('[Supervisor watchdog] ' + r.action + (r.terminal ? ' ' + r.terminal : '') + (r.tags ? ' ' + r.tags.join(',') : ''));
   process.exit(r.ok ? 0 : 1);
 }
