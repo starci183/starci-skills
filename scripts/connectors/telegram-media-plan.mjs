@@ -128,7 +128,9 @@ function uiNodeDirOf(file) {
 /** "feature/name" for a ui record directory (".../features/<feature>/ui/<name>"), or its base name. */
 const uiLabelOf = (dir) => {
   const m = /\/features\/([^/]+)\/ui(?:\/(.+))?$/.exec(posix(dir));
-  return m ? (m[2] ? `${m[1]}/${m[2]}` : m[1]) : path.basename(dir);
+  if (!m) return path.basename(dir);
+  if (m[2]) return `${m[1]}/${m[2]}`;
+  return m[1];
 };
 
 const bandOf = (value) => {
@@ -140,7 +142,12 @@ const bandOf = (value) => {
   if (/desktop|wide|large|expanded/.test(v) || n >= 1024) return 'desktop';
   return null;
 };
-export const themeOf = (value) => { const v = String(value ?? '').toLowerCase(); return /dark/.test(v) ? 'dark' : /light/.test(v) ? 'light' : null; };
+export const themeOf = (value) => {
+  const v = String(value ?? '').toLowerCase();
+  if (/dark/.test(v)) return 'dark';
+  if (/light/.test(v)) return 'light';
+  return null;
+};
 
 /**
  * The drawings one draw/asset report produced, in the order they were drawn:
@@ -320,20 +327,24 @@ const flowFromNamedRecord = (file) => {
   return isFile(record) ? flowFromRecord(record, base) : null;
 };
 
+const flowFromRequestData = (request, file, repo) => {
+  const flows = arr(request?.flows);
+  if (!flows.length) return null;
+  const flow = flows.length === 1 ? flows[0]
+    : flows.find((row) => arr(row?.steps).some((step) => JSON.stringify(step?.evidence ?? '').includes(path.basename(file))));
+  if (!flow) return { flow: null };
+  const record = recordOfNodeId(flow.id, repo);
+  const fromRecord = record ? flowFromRecord(record, flow.id) : null;
+  const steps = fromRecord?.steps.length ? fromRecord.steps : arr(flow.steps).map(stepText).filter(Boolean);
+  return { flow: { id: flow.id, name: fromRecord?.name ?? flow.title ?? flow.id, slug: flow.id, steps } };
+};
+
 const flowFromRequest = (file, repo) => {
   let dir = path.dirname(file);
   for (let i = 0; i < 5; i++) {
-    const request = readYaml(path.join(dir, 'request.yaml'));
-    const flows = arr(request?.flows);
-    if (flows.length) {
-      const flow = flows.length === 1 ? flows[0]
-        : flows.find((row) => arr(row?.steps).some((step) => JSON.stringify(step?.evidence ?? '').includes(path.basename(file))));
-      if (flow) {
-        const record = recordOfNodeId(flow.id, repo);
-        const fromRecord = record ? flowFromRecord(record, flow.id) : null;
-        const steps = fromRecord?.steps.length ? fromRecord.steps : arr(flow.steps).map(stepText).filter(Boolean);
-        return { id: flow.id, name: fromRecord?.name ?? flow.title ?? flow.id, slug: flow.id, steps };
-      }
+    const result = flowFromRequestData(readYaml(path.join(dir, 'request.yaml')), file, repo);
+    if (result) {
+      if (result.flow) return result.flow;
       break;
     }
     const up = path.dirname(dir);
