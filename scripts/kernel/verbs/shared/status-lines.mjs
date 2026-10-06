@@ -1,9 +1,9 @@
 // The text half of `starci kernel status` (verbs/status.mjs): one line per signal, in the same order the
 // Kernel reads them.
-import { OP_REV_DRIFT, shortRev } from '../runtime-rev.mjs';
-import { nameWithId } from '../../lib/display-names.mjs';
-import { shortWorkflow } from '../dependency-graph.mjs';
-import { stuckLine } from '../../machine/op-metrics.mjs';
+import { OP_REV_DRIFT, shortRev } from '../../runtime-rev.mjs';
+import { nameWithId } from '../../../lib/display-names.mjs';
+import { shortWorkflow } from '../../dependency-graph.mjs';
+import { stuckLine } from '../../../machine/op-metrics.mjs';
 
 const headline = (s, out) => {
   const mark = s.actionable ? ' ACTIONABLE' : ' (no actionable work)';

@@ -1,7 +1,7 @@
 // The settle frontier of `starci kernel status` (verbs/status.mjs): consumed reports whose jobs are still
 // open, split into the settles the Kernel owes now and the ones a recorded wait holds.
-import { PEER_WAIT } from '../verbs/shared/peer-waits.mjs';
-import { parkedBehindWaits, waitHeldOperations } from '../frontier-parked.mjs';
+import { PEER_WAIT } from './peer-waits.mjs';
+import { parkedBehindWaits, waitHeldOperations } from '../../frontier-parked.mjs';
 
 // A filed report moves its job to reported (starci kernel report); a job still running/answering has a
 // report filed on it by settle's fallback.

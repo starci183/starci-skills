@@ -1,7 +1,7 @@
 // The frontier's state word and reason text (verbs/status.mjs): the first state of the Kernel's priority
 // order that holds, then the prose that says what the Kernel does next.
-import { AUTOPILOT_RULING, SUPERVISOR_GATE } from '../autopilot-run.mjs';
-import { handoverReason } from '../handover.mjs';
+import { AUTOPILOT_RULING, SUPERVISOR_GATE } from '../../autopilot-run.mjs';
+import { handoverReason } from '../../handover.mjs';
 
 const STATE_ORDER = [
   [(s) => s.wf.phase === 'finished', 'finished'],

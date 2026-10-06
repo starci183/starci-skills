@@ -1,13 +1,13 @@
 // The owner-ask pipeline of `starci kernel status` (verbs/status.mjs): which settled asks still wait on the
 // owner, which serve-ask forms are live, which are credential asks, and which approved legs the main line owes.
-import { sameUnit } from '../../../engine/admission.mjs';
-import { isAwaitingOwner } from '../failure-steps.mjs';
-import { parseJson } from '../../lib/json.mjs';
-import { jobResultSql } from '../../machine/job-row.mjs';
-import { jobResultOf } from '../verbs/shared/rows.mjs';
-import { askClassOf, isLiveProofOp } from '../ask-server.mjs';
-import { deferralOf } from '../autopilot-run.mjs';
-import { HANDOVER_OP } from '../handover.mjs';
+import { sameUnit } from '../../../../engine/admission.mjs';
+import { isAwaitingOwner } from '../../failure-steps.mjs';
+import { parseJson } from '../../../lib/json.mjs';
+import { jobResultSql } from '../../../machine/job-row.mjs';
+import { jobResultOf } from './rows.mjs';
+import { askClassOf, isLiveProofOp } from '../../ask-server.mjs';
+import { deferralOf } from '../../autopilot-run.mjs';
+import { HANDOVER_OP } from '../../handover.mjs';
 
 // The last lifecycle event wins; an ask parked again (served, or notified
 // for on-demand serving) after a supersede is pending again until answered.
