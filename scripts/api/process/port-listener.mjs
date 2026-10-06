@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { systemTool } from './system-tool.mjs';
 
 /** Linux without lsof: {pid, commandLine} of the process holding the LISTEN socket of `port` that /proc lets this user read, or null. */
-export function procListener(port, { fsx = fs } = {}) {
+function procListener(port, fsx) {
   const inodes = new Set();
   for (const table of ['/proc/net/tcp', '/proc/net/tcp6']) {
     let text;
@@ -35,7 +35,7 @@ export function procListener(port, { fsx = fs } = {}) {
 }
 
 /** {pid, commandLine} of the listener on `port`, or null (nothing listens, or the host could not say). */
-export function portListener(port, { platform = process.platform, spawn = spawnSync, tool = (name) => systemTool(name, { platform }), proc = procListener } = {}) {
+export function portListener(port, { platform = process.platform, spawn = spawnSync, tool = (name) => systemTool(name, { platform }), fsx = fs } = {}) {
   try {
     if (platform === 'win32') {
       const netstat = tool('netstat');
@@ -50,7 +50,7 @@ export function portListener(port, { platform = process.platform, spawn = spawnS
       return { pid, commandLine: String(cmd.stdout ?? '').trim() || null };
     }
     const lsof = tool('lsof');
-    if (!lsof.ok) return platform === 'linux' ? proc(port) : null;
+    if (!lsof.ok) return platform === 'linux' ? procListener(port, fsx) : null;
     const out = spawn(lsof.path, ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], { encoding: 'utf8', timeout: 15000 }).stdout ?? '';
     const pid = Number(out.split(/\s+/).find(Boolean));
     if (!pid) return null;

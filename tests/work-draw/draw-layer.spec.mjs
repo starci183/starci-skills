@@ -98,7 +98,7 @@ test('a real render measures the form region (skipped without Playwright)', asyn
   try { playwright = loadPlaywright([process.env.STARCI_PLAYWRIGHT_DIR, ROOT].filter(Boolean)); } catch { playwright = null; }
   if (!playwright) { t.skip('no playwright install resolvable (set STARCI_PLAYWRIGHT_DIR)'); return; }
   const gap = chromiumGap(playwright.chromium);
-  if (gap) { t.skip(gap); return; }
+  if (gap) { t.skip(`no browser to drive: ${gap}`); return; }
   const dir = tmp(t);
   // The round-2 DOM without the product CSS: every block takes its column, as the card did when its form measure lost.
   const stretched = path.join(dir, 'stretched.html');

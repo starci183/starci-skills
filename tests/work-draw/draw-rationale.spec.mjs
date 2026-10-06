@@ -158,7 +158,7 @@ test('a real render: draw-render measures the values and captures the redline (s
   try { playwright = loadPlaywright([process.env.STARCI_PLAYWRIGHT_DIR, ROOT].filter(Boolean)); } catch { playwright = null; }
   if (!playwright) { t.skip('no playwright install resolvable (set STARCI_PLAYWRIGHT_DIR)'); return; }
   const gap = chromiumGap(playwright.chromium);
-  if (gap) { t.skip(gap); return; }
+  if (gap) { t.skip(`no browser to drive: ${gap}`); return; }
   const dir = tmp(t);
   const html = path.join(dir, 'screen.html');
   fs.writeFileSync(html, GOOD_HTML);

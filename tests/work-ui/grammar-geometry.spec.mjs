@@ -152,7 +152,7 @@ test('--check renders an html with the product Playwright when one is installed'
   const pw = await loadChromium(process.env.STARCI_PLAYWRIGHT_DIR ?? null);
   if (!pw) { t.skip('no Playwright resolvable from this runtime (STARCI_PLAYWRIGHT_DIR)'); return; }
   const gap = chromiumGap(pw.chromium);
-  if (gap) { t.skip(gap); return; }
+  if (gap) { t.skip(`no browser to drive: ${gap}`); return; }
   const fx = buildGeometryRepo();
   t.after(fx.cleanup);
   const html = path.join(fx.repo, 'draw.html');
