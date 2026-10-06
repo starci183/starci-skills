@@ -27,25 +27,31 @@ function nativeAccounts(adapters) {
   return [...accounts.values()];
 }
 
+function appendAskTunnelRequirements(selected, input, requirements) {
+  if (!selected.has('ask-tunnel')) return;
+  const cf = input.connectors?.cloudflare;
+  if (!['off', 'quick', 'named'].includes(cf?.mode)) throw new TypeError('selected ask tunnel needs normalized cloudflare settings');
+  if (cf.mode === 'named') {
+    if (cf.auth === 'credentials-file') requirements.push(requirement('ask-tunnel', 'file', 'connectors.cloudflare.credentialsFile', cf.credentialsPresent));
+    else if (cf.auth === 'token') requirements.push(requirement('ask-tunnel', 'env', cf.tokenEnv, cf.tokenPresent));
+    else throw new TypeError('selected named ask tunnel needs a normalized authentication mode');
+  }
+}
+
+function appendTelegramRequirements(selected, input, requirements) {
+  if (!selected.has('telegram-bridge')) return;
+  const tg = input.connectors?.telegram;
+  if (typeof tg?.enabled !== 'boolean') throw new TypeError('selected Telegram action needs normalized settings');
+  if (tg.enabled || selected.get('telegram-bridge'))
+    requirements.push(requirement('telegram-bridge', 'env', tg.botTokenEnv, tg.botTokenPresent));
+}
+
 /** Select names and presence only; normalized connector settings and selected native cards remain their owners' data. */
 export function credentialRequirements(input = {}) {
   const { services = [], adapters = [], declaredRequirements = [] } = input;
   const selected = selectedServices(services), requirements = [];
-  if (selected.has('ask-tunnel')) {
-    const cf = input.connectors?.cloudflare;
-    if (!['off', 'quick', 'named'].includes(cf?.mode)) throw new TypeError('selected ask tunnel needs normalized cloudflare settings');
-    if (cf.mode === 'named') {
-      if (cf.auth === 'credentials-file') requirements.push(requirement('ask-tunnel', 'file', 'connectors.cloudflare.credentialsFile', cf.credentialsPresent));
-      else if (cf.auth === 'token') requirements.push(requirement('ask-tunnel', 'env', cf.tokenEnv, cf.tokenPresent));
-      else throw new TypeError('selected named ask tunnel needs a normalized authentication mode');
-    }
-  }
-  if (selected.has('telegram-bridge')) {
-    const tg = input.connectors?.telegram;
-    if (typeof tg?.enabled !== 'boolean') throw new TypeError('selected Telegram action needs normalized settings');
-    if (tg.enabled || selected.get('telegram-bridge'))
-      requirements.push(requirement('telegram-bridge', 'env', tg.botTokenEnv, tg.botTokenPresent));
-  }
+  appendAskTunnelRequirements(selected, input, requirements);
+  appendTelegramRequirements(selected, input, requirements);
   if (!Array.isArray(declaredRequirements)) throw new TypeError('declared credential requirements must be an array');
   for (const row of declaredRequirements) {
     if (typeof row?.feature !== 'string' || !row.feature.trim() || !['env', 'file', 'config'].includes(row.kind))
