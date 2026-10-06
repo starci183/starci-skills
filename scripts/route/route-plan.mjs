@@ -773,8 +773,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
       } else if (req.kind === 'var') {
         // which impl qualifier does this consumer want? uat proofs read the
         // frontend slice; api/integration/perf proofs read the backend one.
-        const qual = req.family === 'impl'
-          ? (/uat/.test(leg.op) ? 'frontend' : 'backend') : undefined;
+        let qual; if (req.family === 'impl') qual = /uat/.test(leg.op) ? 'frontend' : 'backend';
         satisfyVar({ family: req.family, suffix: 'X', state: req.state, _qual: qual }, leg);
       } else if (req.kind === 'compound') {
         for (const n of req.needs) {
@@ -1236,7 +1235,7 @@ function main() {
   if (args.json) { console.log(JSON.stringify(result, null, 2)); }
   else {
     console.log(`S*: ${result.sstar.join('  |  ')}`);
-    console.log(`S0: ${typeof result.s0 === 'string' ? result.s0 : `${result.s0.records} records (${result.s0.settled} settled, ${result.s0.openGaps.length} open gaps)`}`);
+    console.log('S0: ' + (typeof result.s0 === 'string' ? result.s0 : String(result.s0.records) + ' records (' + String(result.s0.settled) + ' settled, ' + String(result.s0.openGaps.length) + ' open gaps)'));
     if (alreadySatisfied.length) for (const s of alreadySatisfied) console.log(`  already true: ${s.var} (via ${s.by})`);
     console.log(`delta: ${result.delta.join('  |  ') || '(none)'}`);
     console.log('chain:');
