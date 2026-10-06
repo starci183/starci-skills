@@ -39,7 +39,7 @@ import { isFile } from '../../lib/fs-kind.mjs';
 import { assetsOf, list, slash, workRootOf } from '../work-io.mjs';
 import { sha256File } from '../../../engine/digest.mjs';
 import { ownerAcceptanceOf } from '../direction-part.mjs';
-import { DRAW_TOOL, SHAPE_DUPLICATE, assetStateOf, dataStatusOf } from '../ui/ui-shapes.mjs';
+import { DRAW_TOOL, SHAPE_DUPLICATE, assetStateOf } from '../ui/ui-shapes.mjs';
 import { DRAW_DNA_CODES, anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw-dna.mjs';
 import { DRAW_TASTE_CODES, accentBudgetOf, drawLoopSettings, htmlTasteFindings } from './draw-taste.mjs';
 import { assetRequestIdsFor } from '../asset-slot.mjs';
@@ -324,7 +324,5 @@ export function drawQualityFindings(recordDir, record, repo) {
     else if (!acceptance.current) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `the owner's acceptance no longer holds (${acceptance.reasons.join('; ')}): review it again` });
     else if (by !== OWNER) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `the acceptance was answered by ${by ?? 'nobody named'}, not the owner: a drawing never turns green on checks or an automatic accept` });
   }
-  // A drawn data status the vocabulary names is DATA_STATUS_DRAWN (ui-shapes.mjs); nothing to add here.
-  dataStatusOf;
   return out;
 }

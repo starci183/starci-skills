@@ -1,11 +1,11 @@
 // The frontier decorations of `starci kernel status` (verbs/status.mjs): typed-wait views, lints, the
 // draw-review board's retry pushes, and the open cut sets with their seam duties.
-import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../../machine/owner-claim.mjs';
-import { DRAW_REVIEW_OP } from '../../work/draw-review.mjs';
-import { drawReviewBoard, openKnowledgeRequests } from '../../work/draw-feedback.mjs';
-import { openGrammarProposals } from '../../work/grammar-proposal.mjs';
-import { gateConditionView } from '../gate-conditions.mjs';
-import { jobPayloadOf } from '../verbs/shared/rows.mjs';
+import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../../../machine/owner-claim.mjs';
+import { DRAW_REVIEW_OP } from '../../../work/draw-review.mjs';
+import { drawReviewBoard, openKnowledgeRequests } from '../../../work/draw-feedback.mjs';
+import { openGrammarProposals } from '../../../work/grammar-proposal.mjs';
+import { gateConditionView } from '../../gate-conditions.mjs';
+import { jobPayloadOf } from './rows.mjs';
 
 const autoResolvedView = ({ incidentId, kind, holds, evidence }) => ({ incidentId, kind, holds, evidence });
 

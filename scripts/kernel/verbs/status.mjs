@@ -1,6 +1,6 @@
 // starci kernel status: workflow projection, action frontier, and bounded host reads.
-// The projection lives in scripts/kernel/status/render.mjs (status/<view>.mjs slot); this is the verb shell.
-import { cmdStatus } from '../status/render.mjs';
+// The projection lives in scripts/kernel/verbs/shared/status-render.mjs; this is the verb shell.
+import { cmdStatus } from './shared/status-render.mjs';
 
 export default {
   verb: 'status',

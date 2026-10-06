@@ -79,7 +79,8 @@ export const insidePath = (root, file, { key = (p) => p, includeSelf = false } =
 export const containedPath = (base, candidate, { label = 'path' } = {}) => {
   const root = canonicalPath(base);
   const resolved = canonicalPath(path.resolve(root, String(candidate ?? '')));
-  if (!insidePath(root, resolved, { includeSelf: true })) throw Object.assign(new Error(`${label} ${String(candidate)} is outside ${root} [PATH_OUTSIDE_BASE]`), { code: 'PATH_OUTSIDE_BASE' });
+  const prefix = root.endsWith(path.sep) ? root : root + path.sep;
+  if (!insidePath(root, resolved, { includeSelf: true }) || (resolved !== root && !resolved.startsWith(prefix))) throw Object.assign(new Error(`${label} ${String(candidate)} is outside ${root} [PATH_OUTSIDE_BASE]`), { code: 'PATH_OUTSIDE_BASE' });
   return resolved;
 };
 /**

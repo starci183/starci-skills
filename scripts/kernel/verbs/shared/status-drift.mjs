@@ -1,13 +1,13 @@
 // The drift and handover side of `starci kernel status` (verbs/status.mjs): settled results whose inputs
 // moved, indexed proofs gone stale, artwork slots still owed, the autopilot projection, and the owner
 // handover projection.
-import { openAssetSlots } from '../../work/asset-slot.mjs';
-import { staleProofsOf } from '../proof-integrity.mjs';
-import { peerDriftSummaryOf, sourceDriftSummaryOf, staleOperationsOf } from '../input-digests.mjs';
-import { HANDOVER_CREDENTIALS_SUBJECT, autopilotOn, autopilotProjection, credentialsOwed, deferredLegsOf, provisionalOps, reopenedOwed } from '../autopilot-run.mjs';
-import { isLiveProofOp } from '../ask-server.mjs';
-import { HANDOVER_OP, handoverProjection } from '../handover.mjs';
-import { jobPayloadOf } from '../verbs/shared/rows.mjs';
+import { openAssetSlots } from '../../../work/asset-slot.mjs';
+import { staleProofsOf } from '../../proof-integrity.mjs';
+import { peerDriftSummaryOf, sourceDriftSummaryOf, staleOperationsOf } from '../../input-digests.mjs';
+import { HANDOVER_CREDENTIALS_SUBJECT, autopilotOn, autopilotProjection, credentialsOwed, deferredLegsOf, provisionalOps, reopenedOwed } from '../../autopilot-run.mjs';
+import { isLiveProofOp } from '../../ask-server.mjs';
+import { HANDOVER_OP, handoverProjection } from '../../handover.mjs';
+import { jobPayloadOf } from './rows.mjs';
 
 // A settled result whose product Work inputs changed and owe work is work the Kernel owes now: an
 // owner-declared breaking change owes ONE follow-up leg (followUp), an unattributed edit of a record
