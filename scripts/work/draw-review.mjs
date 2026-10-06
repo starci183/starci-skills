@@ -46,7 +46,7 @@
 // (direction-part.mjs drawingAcceptance, read by layout-tree.mjs for the lockup crop and the planned layout's settlement).
 import { opContextOf } from '../guards/op-context.mjs';
 import fs from 'node:fs';
-import { isBlobFile, readAnswerReceipt, receiptFileOf, receiptRefOf } from '../machine/ask-receipts.mjs';
+import { readAnswerReceipt } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { stringifyYaml } from '../../engine/yaml.mjs';
@@ -79,7 +79,7 @@ export const AUTOPILOT_BY = 'autopilot';
 /** Who may accept a drawing: the owner, the runtime for a drawing the owner did not ask for (auto-accept), or autopilot provisionally. */
 const ACCEPTORS = Object.freeze([OWNER, AUTO_ACCEPTED_BY, AUTOPILOT_BY]);
 /** Whether an acceptance block is autopilot's provisional one (machine gates passed; the owner reviews it at handover). */
-const isProvisionalAcceptance = (acceptance) => Boolean(acceptance && acceptance.answeredBy === AUTOPILOT_BY && acceptance.provisional === true);
+const isProvisionalAcceptance = (acceptance) => Boolean(acceptance?.answeredBy === AUTOPILOT_BY && acceptance?.provisional === true);
 
 /** The ui record at `uiDir`: {dir, file, record, workRoot, repoRoot}. Throws when it is not a work/ui-screen@1 record. */
 function loadDrawing(uiDir) {
@@ -104,7 +104,7 @@ function dependentsOf(workRoot, id) {
     try { doc = readYaml(file); } catch (error) { unreadable.push(`${slash(path.relative(workRoot, file))} (${error.message})`); continue; }
     if (list(doc?.dependsOn).some((d) => (typeof d === 'string' ? d : d?.id) === id)) records.push(doc.id ?? slash(file));
   }
-  return { records: records.sort(byCodeUnit), unreadable };
+  return { records: records.toSorted(byCodeUnit), unreadable };
 }
 
 /**
@@ -438,7 +438,7 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
       ? `The drawn parts (desktop and mobile, light) were accepted without the owner in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}, answeredBy ${AUTO_ACCEPTED_BY}): config.yaml asks.autoAcceptRecommended accepts a drawing the owner did not ask to review (owner ruling 2026-09-26). A design direction is accepted, not proved by a run. Implementation captures and browser UAT remain separate proof.`
       : `The owner accepted the drawn parts (desktop and mobile, light) in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}): a design direction is accepted by its owner, not proved by a run. Implementation captures and browser UAT remain separate proof.`,
     ui: { ...record.ui, status: `${pilot ? 'Provisionally accepted by autopilot (provisional; owner review at handover)' : auto ? 'Auto-accepted (unrequested by the owner)' : 'Owner-accepted'} design direction (draw-review ask ${owner.dispatchId}, ${owner.at}); implementation and real-render review remain pending.`,
-      review: { ...(withFeedbackRound(record, feedbackRound).ui?.review ?? {}), owner, ...(golden?.promoted ? { golden: { archetype: golden.archetype, shapes: golden.shapes, dispatchId: owner.dispatchId, promotedAt: owner.appliedAt, archetypeAccepted: golden.archetypeAccepted } } : {}) } },
+      review: { ...withFeedbackRound(record, feedbackRound).ui?.review, owner, ...(golden?.promoted ? { golden: { archetype: golden.archetype, shapes: golden.shapes, dispatchId: owner.dispatchId, promotedAt: owner.appliedAt, archetypeAccepted: golden.archetypeAccepted } } : {}) } },
     ...(Number.isInteger(record.change?.rev) ? { change: { rev: record.change.rev + 1, kind: 'clarifying', at: owner.appliedAt, reason: `${pilot ? 'The drawn parts were accepted provisionally by autopilot' : auto ? 'The drawn parts were auto-accepted' : 'The owner accepted the drawn parts'} in draw-review ask ${owner.dispatchId}; the record is done on that acceptance.` } } : {}),
   };
   if (write) writeRecordFile(file, stringifyYaml(next, { lineWidth: 110 }));

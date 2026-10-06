@@ -2,13 +2,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import {sha256, sha256File} from '../../engine/digest.mjs';
 import { list } from '../lib/list.mjs';
 import { renameOver } from '../api/fs/rename-over.mjs';
-import { slash } from '../lib/path-key.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
-export { slash };
+export { slash } from '../lib/path-key.mjs';
 
 /** How many directories below its start a record walk descends (features/<f>/ui/<r> is 3). */
 export const RECORD_DEPTH = 12;
@@ -18,8 +16,7 @@ const RECORD_SKIP = Object.freeze(['node_modules', 'assets', 'evidence', 'runs',
 export const SLOT_FILL_MIN = 0.98;
 
 export { list };
-export const sha256Of = sha256;
-export { sha256File };
+export { sha256 as sha256Of, sha256File } from '../../engine/digest.mjs';
 export { isFile, isDir } from '../lib/fs-kind.mjs';
 /** A record state label folded for comparison ('default' when absent). */
 export const stateKey = (s) => String(s ?? 'default').trim().toLowerCase();
@@ -41,7 +38,7 @@ export function assetsOf(record) {
 
 /** A `ui.<id>:<path>` image reference: {id, path}, or null for any other reference. */
 export function parseUiRef(ref) {
-  const m = String(ref ?? '').match(/^(ui\.[^:]+):(.+)$/);
+  const m = /^(ui\.[^:]+):(.+)$/.exec(String(ref ?? ''));
   return m ? { id: m[1], path: m[2] } : null;
 }
 

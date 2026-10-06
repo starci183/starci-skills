@@ -35,7 +35,7 @@ export const WORK_SECRET_PATTERN = 'WORK_SECRET_PATTERN';
 export const WORK_SECRET_LITERAL = 'WORK_SECRET_LITERAL';
 export const WORK_ACCOUNT_LITERAL = 'WORK_ACCOUNT_LITERAL';
 
-const slashed = (p) => String(p).replace(/\\/g, '/');
+const slashed = (p) => String(p).replaceAll('\\', '/');
 const WORK_PATH = /(^|\/)\.starciwork\//;
 const STACK_PATH = /(^|\/)\.starcistacks\//;
 const YAML_FILE = /\.ya?ml$/i;
@@ -47,7 +47,7 @@ export const inSecretScope = (rel) => (WORK_PATH.test(slashed(rel)) || STACK_PAT
 // ---------------------------------------------------------------------------------------------- secret scan
 const STANDIN = /(?:^\.{2,})|fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock|todo|tbd|xxx|n\/a|not[-_ ]?set|none|null|undefined|disposable|generated|your[-_ ]|\*{3,}/i;
 const REFERENCE = /^(?:\$|<|\{\{|%|@|secret[:.]|secrets[:.]|ref[:.]|env[:.]|sops[:.]|file[:.]|vault[:.]|kms[:.]|\/run\/secrets\/|identity\.|\[redacted|ENC\[)/i;
-const CODE_OR_STYLE = /(?:^[-./@~])|[(){}\[\]<>`$]|\.\.\./;
+const CODE_OR_STYLE = /(?:^[-./@~])|[(){}[\]<>`$]|\.\.\./;
 const PROSE_OR_CODE = /\.(?:md|mdx|markdown|java|kt|tf|ts|tsx|js|mjs|cjs|py|go|sql|sh|ps1|cs|rb)$/i;
 const PASSWORD_WORDS = new Set(['password', 'passwd', 'pwd', 'passphrase']);
 const CREDENTIAL_WORDS = new Set(['secret', 'token', 'apikey', 'credential', 'credentials']);
@@ -58,11 +58,11 @@ const wordsOf = (key) => String(key).replace(/([a-z0-9])([A-Z])/g, '$1 $2').spli
 /** 'password' | 'credential' | null: what kind of credential a key names by its LAST word (passwordHash, tokenRef, secretName are not it). */
 function credentialKind(key) {
   const words = wordsOf(key);
-  const last = words[words.length - 1];
+  const last = words.at(-1);
   if (!last) return null;
   if (PASSWORD_WORDS.has(last)) return 'password';
   if (CREDENTIAL_WORDS.has(last)) return 'credential';
-  if (last === 'key' && words.length > 1 && ['api', 'private', 'secret', 'access', 'auth', 'signing', 'encryption'].includes(words[words.length - 2])) return 'credential';
+  if (last === 'key' && words.length > 1 && ['api', 'private', 'secret', 'access', 'auth', 'signing', 'encryption'].includes(words.at(-2))) return 'credential';
   if (last === 'apikey' || last === 'privatekey') return 'credential';
   return null;
 }
@@ -111,7 +111,7 @@ export function scanSecrets(rel, text) {
       if (rule.skipFile?.test(file)) continue;
       const m = rule.re.exec(line);
       if (!m) continue;
-      if (rule.placeholder && rule.placeholder.test(m[1] ?? line)) continue;
+      if (rule.placeholder?.test(m[1] ?? line)) continue;
       pushOnce({ code: WORK_SECRET_PATTERN, file, line: at, detail: `${rule.name} in the text` });
     }
     if (proseOrCode) return; // prose explains "password: ..." fields and code assigns expressions; only the provider shapes above apply
@@ -165,7 +165,7 @@ export function checkWorkFiles({ repo, files, read = null, strict = true } = {})
     try { report = scopeToOwned(validateWork(dir, { strict }), owned); }
     catch (error) { findings.push({ code: WORK_VALIDATE_REFUSED, file: relTo(root, dir), line: 0, detail: `validation crashed closed: ${String(error?.message ?? error).slice(0, 200)}` }); continue; }
     checked.validate += 1;
-    for (const refusal of report.refused) findings.push({ code: WORK_VALIDATE_REFUSED, file: relTo(root, dir), line: 0, detail: String(refusal).replace(root, '').replace(/\\/g, '/').slice(0, 300) });
+    for (const refusal of report.refused) findings.push({ code: WORK_VALIDATE_REFUSED, file: relTo(root, dir), line: 0, detail: String(refusal).replace(root, '').replaceAll('\\', '/').slice(0, 300) });
   }
   for (const rel of rels) {
     if (BINARY.test(rel)) { for (const f of scanSecrets(rel, null)) findings.push(f); continue; }

@@ -26,14 +26,13 @@
 // Exit 0 when every gate is green (the owner gate may still be owed: then file the draw-review ask), 1 when one is
 // red (fix it, or report blocked naming it - never pass), 2 usage.
 import fs from 'node:fs';
-import { loopFileOfRef, loopLabelOf } from './draw/draw-loop-coverage.mjs';
+import { livePartsOf, loopFileOfRef, loopLabelOf } from './draw/draw-loop-coverage.mjs';
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { drawAcceptanceFindings } from './draw/draw-acceptance.mjs';
-import { livePartsOf } from './draw/draw-loop-coverage.mjs';
 import { settleDrawMetricFindings } from './draw-loop-settle.mjs';
 import { layerFindingsForParts } from './draw/draw-layer.mjs';
 import { slash } from './work-io.mjs';
@@ -170,5 +169,5 @@ async function main(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-gates: ${e?.stack ?? e}\n`); process.exitCode = 2; });
+  try { process.exitCode = await main(process.argv.slice(2)); } catch (e) { process.stderr.write(`draw-gates: ${e?.stack ?? e}\n`); process.exitCode = 2; }
 }

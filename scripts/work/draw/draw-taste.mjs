@@ -40,9 +40,9 @@ export const ACCENT_EXEMPT_SELECTOR = '[data-brand-art], [data-accent-exempt], [
 /** modules/models/runtimes.yaml allocation.drawLoop - the draw loop's and the taste metrics' numbers. Throws when absent. */
 export function drawLoopSettings() {
   const s = allocationSettings().drawLoop;
-  if (!s || typeof s !== 'object') throw Error('modules/models/runtimes.yaml allocation.drawLoop must declare the draw loop settings');
+  if (!s || typeof s !== 'object') throw new Error('modules/models/runtimes.yaml allocation.drawLoop must declare the draw loop settings');
   for (const k of ['maxRounds', 'stallRounds', 'beautyMin', 'accentBudget', 'bandsPerCardMax', 'badgesPerEntityMax']) {
-    if (!Number.isFinite(Number(s[k]))) throw Error(`modules/models/runtimes.yaml allocation.drawLoop.${k} must be a number`);
+    if (!Number.isFinite(Number(s[k]))) throw new Error(`modules/models/runtimes.yaml allocation.drawLoop.${k} must be a number`);
   }
   return s;
 }
@@ -55,7 +55,7 @@ const BADGE_CLASS = /(^|[-_])(badge|chip|pill|status-pill)($|[-_]{2}|$)/i;
 const nameOf = (el) => String(el?.attrs?.[COMPONENT_ATTR] ?? '').trim();
 const partOf = (el) => String(el?.attrs?.[PART_ATTR] ?? '').trim();
 /** A component root (not one of its own parts that repeats the component attribute). */
-const rootOf = (el, names) => names.has(nameOf(el)) && !(partOf(el) && ancestorsOf(el).find((a) => nameOf(a)) && nameOf(ancestorsOf(el).find((a) => nameOf(a))) === nameOf(el));
+const rootOf = (el, names) => names.has(nameOf(el)) && !(partOf(el) && ancestorsOf(el).some((a) => nameOf(a)) && nameOf(ancestorsOf(el).find((a) => nameOf(a))) === nameOf(el));
 const isSeparator = (el) => nameOf(el) === 'Divider' || el.tag === 'hr' || /divider/.test(partOf(el)) || classesOf(el).some((c) => SEPARATOR_CLASS.test(c));
 const isBandMarked = (el) => /(^|-)band$/.test(partOf(el)) || classesOf(el).some((c) => BAND_CLASS.test(c) && !/(badge|brand)/i.test(c));
 const isBadge = (el) => ['Badge', 'StateMark'].includes(nameOf(el)) && !(partOf(el) && nameOf(el.parent ?? {}) === nameOf(el))

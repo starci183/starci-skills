@@ -45,12 +45,12 @@ function skipString(s, i) {
 }
 
 function matchClose(s, i, open, close) {
-  let depth = 0;
-  for (let j = i; j < s.length; j++) {
+  let depth = 0, j = i;
+  while (j < s.length) {
     const c = s[j];
-    if (c === '"' || c === "'") { j = skipString(s, j) - 1; continue; }
-    if (c === open) depth++;
-    else if (c === close && --depth === 0) return j;
+    j = c === '"' || c === "'" ? skipString(s, j) : j + 1;
+    if (c === open) depth += 1;
+    else if (c === close && --depth === 0) return j - 1;
   }
   return s.length;
 }
@@ -58,13 +58,13 @@ function matchClose(s, i, open, close) {
 /** Split on top-level commas (outside parentheses, brackets and strings). */
 function splitTop(text, sep = ',') {
   const out = [];
-  let depth = 0, start = 0;
-  for (let i = 0; i < text.length; i++) {
+  let depth = 0, start = 0, i = 0;
+  while (i < text.length) {
     const c = text[i];
-    if (c === '"' || c === "'") { i = skipString(text, i) - 1; continue; }
-    if (c === '(' || c === '[') depth++;
-    else if (c === ')' || c === ']') depth--;
-    else if (c === sep && depth === 0) { out.push(text.slice(start, i).trim()); start = i + 1; }
+    i = c === '"' || c === "'" ? skipString(text, i) : i + 1;
+    if (c === '(' || c === '[') depth += 1;
+    else if (c === ')' || c === ']') depth -= 1;
+    else if (c === sep && depth === 0) { out.push(text.slice(start, i - 1).trim()); start = i; }
   }
   out.push(text.slice(start).trim());
   return out.filter(Boolean);
@@ -155,7 +155,7 @@ export function expandShorthand(prop, value) {
   if (prop === 'border' || /^border-(top|right|bottom|left)$/.test(prop)) {
     const sides = prop === 'border' ? SIDES : [prop.split('-')[1]];
     let width = 'medium', style = 'none', color = 'currentcolor';
-    if (tokens.length === 1 && /^var\(/.test(tokens[0])) width = style = color = tokens[0];
+    if (tokens.length === 1 && tokens[0].startsWith('var(')) width = style = color = tokens[0];
     else for (const t of tokens) { if (BORDER_STYLES.test(t)) style = t; else if (isLengthToken(t)) width = t; else color = t; }
     if (tokens.length === 1 && (tokens[0] === '0' || /^none$/i.test(tokens[0]))) { width = '0'; style = 'none'; }
     return sides.flatMap((side) => [[`border-${side}-width`, width], [`border-${side}-style`, style], [`border-${side}-color`, color]]);
@@ -188,7 +188,7 @@ export function loadSheet(entries, { resolveBare = () => [], sourceOf = (file, s
       if (/^\.\.?\//.test(imp.target)) { load(path.resolve(path.dirname(abs), imp.target), source, layer); continue; }
       const bare = resolveBare(imp.target, abs);
       if (bare && !Array.isArray(bare)) { for (const l of bare.layers ?? []) addLayer(l); continue; }
-      for (const b of bare ?? []) load(b.file, b.source, layer);
+      for (const b of bare ?? []) { if (b.layers) { for (const l of b.layers) addLayer(l); continue; } load(b.file, b.source, layer); }
     }
     for (const l of parsed.layers) addLayer(prefixed(l));
     for (const r of parsed.rules) { const layer = prefixed(r.layer); addLayer(layer); sheet.rules.push({ ...r, layer, source, order: sheet.rules.length }); }
@@ -269,7 +269,7 @@ export function selectorMatch(selector, chain) {
   if (!compounds.length || compounds.some((c) => c.combinator === '+' || c.combinator === '~')) return -1;
   const holds = (parts, el) => parts.every((p) => p === '*' || el.has(p));
   let at = chain.length - 1;
-  const last = compounds[compounds.length - 1];
+  const last = compounds.at(-1);
   if (!holds(last.parts, chain[at])) return -1;
   for (let c = compounds.length - 2; c >= 0; c--) {
     const via = compounds[c + 1].combinator;
@@ -317,7 +317,7 @@ export function evalLength(text, { vw = null, rootPx = ROOT_FONT_PX, unitless = 
   while (re.lastIndex < src.length) {
     const at = re.lastIndex;
     m = re.exec(src);
-    if (!m || m.index !== at) { if (/^\s*$/.test(src.slice(at))) break; return null; }
+    if (m?.index !== at) { if (/^\s*$/.test(src.slice(at))) break; return null; }
     if (m[1] !== undefined) tokens.push({ num: Number(m[1]), unit: m[2].toLowerCase() });
     else if (m[3] !== undefined) tokens.push({ fn: m[3].toLowerCase() });
     else tokens.push({ op: m[4] });
@@ -422,7 +422,7 @@ function repoCssFiles(repo, maxDepth = 8) {
     filter: name => name.endsWith('.css')}).sort(byCodeUnit);
 }
 
-const familyScopeRe = (id) => new RegExp(`data-grammar-family\\s*=\\s*["']?${id}["']?\\s*\\]`);
+const familyScopeRe = (id) => new RegExp(String.raw`data-grammar-family\s*=\s*["']?${id}["']?\s*\]`);
 const readText = (file) => { try { return fs.readFileSync(file, 'utf8'); } catch { return ''; } };
 const scopesFamily = (file, id) => { const t = readText(file); return familyScopeRe(id).test(t) && /--[\w-]+\s*:/.test(t); };
 
@@ -478,7 +478,7 @@ export function discoverSources(repo, family = null, { app = null, grammarDist =
   if (family && !FAMILIES[family]) return { errors: [`family ${family} is not one of ${Object.keys(FAMILIES).join(', ')}`], family, familyId: null, repo: repoAbs };
   const css = repoCssFiles(repoAbs);
   const bareOf = (fromFile) => (spec) => {
-    if (spec === 'tailwindcss') return { layers: ['properties', 'theme', 'base', 'components', 'utilities'] };
+    if (spec === 'tailwindcss') return [{ layers: ['properties', 'theme', 'base', 'components', 'utilities'] }];
     const { name, subpath } = splitSpecifier(spec);
     const dir = name === '@starci/grammar' && grammarDist ? path.resolve(grammarDist) : packageDirFrom(path.dirname(fromFile), name);
     if (!dir) return [];
@@ -492,7 +492,7 @@ export function discoverSources(repo, family = null, { app = null, grammarDist =
     const visit = (file, depth) => {
       if (depth > 3) return;
       for (const imp of parseCss(readText(file)).imports) {
-        const hits = /^\.\.?\//.test(imp.target) ? [{ file: path.resolve(path.dirname(file), imp.target) }] : [bareOf(file)(imp.target)].flat().filter((t) => t && t.file);
+        const hits = /^\.\.?\//.test(imp.target) ? [{ file: path.resolve(path.dirname(file), imp.target) }] : [bareOf(file)(imp.target)].flat().filter((t) => t?.file);
         for (const t of hits) if (fs.existsSync(t.file) && !files.includes(t.file)) { files.push(t.file); visit(t.file, depth + 1); }
       }
     };
@@ -554,7 +554,7 @@ export function discoverSources(repo, family = null, { app = null, grammarDist =
 // ---------------------------------------------------------------------------------------------------------
 
 /** The element chains the geometry reads (selectors only; every value comes out of the cascade). */
-export const geometryChains = (familyId) => {
+const geometryChains = (familyId) => {
   const html = [':root', 'html', 'body'];
   const root = ['div', '.grammar-common-root', `[data-grammar-family=${familyId}]`, '[data-grammar-theme=light]'];
   const button = (variant, extra = []) => [...root.slice(0, 0), 'button', '.button', `.button--${variant}`, '.button--md', '.starci-core-button', '[data-width=hug]', ...extra];
@@ -600,9 +600,9 @@ function createResolver(sources) {
       const fontPx = prop === 'line-height' ? get('font-size')?.px ?? null : null;
       let px = value == null ? null : evalLength(value, { vw: width });
       if (px == null && fontPx != null && value != null) { const ratio = evalLength(value, { unitless: true }); if (ratio != null) px = Math.round(ratio * fontPx * 100) / 100; }
-      return { prop, declared: d.value, value, px, trace: trace.reverse(), file: d.rule.file, selector: d.rule.selectors.join(', '), source: d.rule.source, important: d.important };
+      return { prop, declared: d.value, value, px, trace: trace.toReversed(), file: d.rule.file, selector: d.rule.selectors.join(', '), source: d.rule.source, important: d.important };
     };
-    const variable = (name) => { const hit = lookup(name, last); if (!hit) return null; const trace = []; const value = substitute(hit.value, lookup, hit.level, trace); return { name, declared: hit.value, value, px: value == null ? null : evalLength(value, { vw: width }), trace: trace.reverse(), file: hit.file }; };
+    const variable = (name) => { const hit = lookup(name, last); if (!hit) return null; const trace = []; const value = substitute(hit.value, lookup, hit.level, trace); return { name, declared: hit.value, value, px: value == null ? null : evalLength(value, { vw: width }), trace: trace.toReversed(), file: hit.file }; };
     return { get, variable, levels };
   };
   const memo = (key, chain, width) => { const k = `${key}@${width}`; if (!cache.has(k)) cache.set(k, element(chain, width)); return cache.get(k); };
@@ -659,7 +659,7 @@ function fontOf(resolver, chains, width) {
   return { binding, tokens, surfaces, allowed: [...families].filter(Boolean) };
 }
 
-export const firstFamily = (value) => String(value ?? '').split(',').map((x) => x.trim().replace(/^["']|["']$/g, '')).find((x) => x && !/\(set at runtime\)$/.test(x) && !/^--/.test(x))?.toLowerCase() ?? null;
+export const firstFamily = (value) => String(value ?? '').split(',').map((x) => x.trim().replace(/^["']|["']$/g, '')).find((x) => x && !x.endsWith('(set at runtime)') && !x.startsWith('--'))?.toLowerCase() ?? null;
 
 /**
  * The resolved geometry of one product: button, input, card, badge and font, each value with the
@@ -736,46 +736,46 @@ export function geometryPrompt(g) {
   const a = g.at[0];
   const lines = [];
   const b = a.button;
-  lines.push(`GEOMETRY - mandatory, resolved from the product CSS (family ${g.family}, widths ${g.widths.join(' and ')}px). Draw these values; never a token the CSS does not bind.`);
-  lines.push(`Cascade: ${g.sources.entry ? `${shortFile(g.sources.entry, repo)} and its imports` : 'installed packages'} - ${[...(g.sources.heroui?.files ?? []), g.sources.grammar.common, g.sources.familyFile].filter(Boolean).map((f) => shortFile(f, repo)).join('; ')} (@heroui/styles ${g.sources.heroui?.version}, @starci/grammar ${g.sources.grammar.version}${g.sources.grammar.installed ? '' : ' source'}).`);
-  lines.push('');
-  lines.push('Button (HeroUI .button, Grammar Button)');
-  lines.push(`- radius ${byWidth(g, (w) => w.button['border-radius'])} = ${declared(b['border-radius'], repo)}${isPill(b['border-radius']?.px, b.heightPx) ? ' - a pill (radius >= height/2)' : ''}.`);
-  lines.push(`- height ${byWidth(g, (w) => ({ px: w.button.heightPx }))} (${declared(b.height, repo)}); full width (width="fill"): height auto, min-height ${px(b.fill['min-height'])} (${declared(b.fill['min-height'], repo)}).`);
-  lines.push(`- padding-inline ${byWidth(g, (w) => w.button['padding-left'])}; font ${px(b['font-size'])} / weight ${b['font-weight']?.value ?? 'unset'}.`);
+  lines.push(`GEOMETRY - mandatory, resolved from the product CSS (family ${g.family}, widths ${g.widths.join(' and ')}px). Draw these values; never a token the CSS does not bind.`,
+    `Cascade: ${g.sources.entry ? `${shortFile(g.sources.entry, repo)} and its imports` : 'installed packages'} - ${[...(g.sources.heroui?.files ?? []), g.sources.grammar.common, g.sources.familyFile].filter(Boolean).map((f) => shortFile(f, repo)).join('; ')} (@heroui/styles ${g.sources.heroui?.version}, @starci/grammar ${g.sources.grammar.version}${g.sources.grammar.installed ? '' : ' source'}).`,
+    '',
+    'Button (HeroUI .button, Grammar Button)',
+    `- radius ${byWidth(g, (w) => w.button['border-radius'])} = ${declared(b['border-radius'], repo)}${isPill(b['border-radius']?.px, b.heightPx) ? ' - a pill (radius >= height/2)' : ''}.`,
+    `- height ${byWidth(g, (w) => ({ px: w.button.heightPx }))} (${declared(b.height, repo)}); full width (width="fill"): height auto, min-height ${px(b.fill['min-height'])} (${declared(b.fill['min-height'], repo)}).`,
+    `- padding-inline ${byWidth(g, (w) => w.button['padding-left'])}; font ${px(b['font-size'])} / weight ${b['font-weight']?.value ?? 'unset'}.`);
   for (const v of ['primary', 'secondary', 'outline']) {
     const s = b.variants[v];
     const border = noBorder(s['border-top-width']) ? ', no border' : `, border ${px(s['border-top-width'])} ${s['border-top-style']?.value ?? 'solid'} ${s['border-top-color']?.value ?? ''} (${s['border-top-color']?.declared ?? ''}${chainText(s['border-top-color'])})`;
     lines.push(`- ${v}: fill ${s['background-color']?.value ?? 'unset'} (${s['background-color']?.declared ?? ''}${chainText(s['background-color'])}), text ${s.color?.value ?? 'unset'}${border}.`);
   }
   const inp = a.input;
-  lines.push('');
-  lines.push('Input (HeroUI .input, Grammar Input)');
-  lines.push(`- radius ${byWidth(g, (w) => w.input.primary['border-radius'])} = ${declared(inp.primary['border-radius'], repo)}.`);
-  lines.push(`- border ${noBorder(inp.primary['border-top-width']) ? 'none' : px(inp.primary['border-top-width'])}: ${declared(inp.primary['border-top-width'], repo)}.`);
-  lines.push(`- height ${byWidth(g, (w) => ({ px: w.input.primary.heightPx }))}; padding ${px(inp.primary['padding-top'])} ${px(inp.primary['padding-left'])}; font ${byWidth(g, (w) => w.input.primary['font-size'])}.`);
-  lines.push(`- inside a surface (card, panel, band) the field is the \`secondary\` variant: fill ${inp.secondary['background-color']?.value} (${inp.secondary['background-color']?.declared}${chainText(inp.secondary['background-color'])}), shadow ${normalizeShadowText(inp.secondary['box-shadow']?.value)} - knowledge/ui/proof/anatomy-source.yaml ANATOMY-2 case-1. Its low fill contrast is accepted (owner ruling, knowledge/ui/proof/contrast.yaml COLOR-3 case-6).`);
-  lines.push(`- on the page canvas the \`primary\` variant: fill ${inp.primary['background-color']?.value} (${inp.primary['background-color']?.declared}${chainText(inp.primary['background-color'])}), shadow ${normalizeShadowText(inp.primary['box-shadow']?.value)}.`);
+  lines.push('',
+    'Input (HeroUI .input, Grammar Input)',
+    `- radius ${byWidth(g, (w) => w.input.primary['border-radius'])} = ${declared(inp.primary['border-radius'], repo)}.`,
+    `- border ${noBorder(inp.primary['border-top-width']) ? 'none' : px(inp.primary['border-top-width'])}: ${declared(inp.primary['border-top-width'], repo)}.`,
+    `- height ${byWidth(g, (w) => ({ px: w.input.primary.heightPx }))}; padding ${px(inp.primary['padding-top'])} ${px(inp.primary['padding-left'])}; font ${byWidth(g, (w) => w.input.primary['font-size'])}.`,
+    `- inside a surface (card, panel, band) the field is the \`secondary\` variant: fill ${inp.secondary['background-color']?.value} (${inp.secondary['background-color']?.declared}${chainText(inp.secondary['background-color'])}), shadow ${normalizeShadowText(inp.secondary['box-shadow']?.value)} - knowledge/ui/proof/anatomy-source.yaml ANATOMY-2 case-1. Its low fill contrast is accepted (owner ruling, knowledge/ui/proof/contrast.yaml COLOR-3 case-6).`,
+    `- on the page canvas the \`primary\` variant: fill ${inp.primary['background-color']?.value} (${inp.primary['background-color']?.declared}${chainText(inp.primary['background-color'])}), shadow ${normalizeShadowText(inp.primary['box-shadow']?.value)}.`);
   const c = a.card;
-  lines.push('');
-  lines.push('Card / SurfaceCard (Grammar SurfaceCard, SurfaceListCard)');
-  lines.push(`- radius ${byWidth(g, (w) => w.card.top['border-radius'])} = ${declared(c.top['border-radius'], repo)}, painted by the ${c.top.part}${c.labelled.part !== c.top.part ? `; a labelled card paints its ${c.labelled.part}: radius ${px(c.labelled['border-radius'])}` : ''}.`);
-  lines.push(`- border ${noBorder(c.top['border-top-width']) ? 'none' : px(c.top['border-top-width'])} (${declared(c.top['border-top-width'], repo)}); shadow ${normalizeShadowText(c.top['box-shadow']?.value)} (${c.top['box-shadow']?.declared}${chainText(c.top['box-shadow'])}); fill ${c.top['background-color']?.value}.`);
-  lines.push(`- a surface nested inside another: border ${px(c.nested['border-top-width'])} ${c.nested['border-top-style']?.value ?? ''} ${c.nested['border-top-color']?.value ?? ''}, shadow ${normalizeShadowText(c.nested['box-shadow']?.value)}.`);
-  lines.push(`- content inset ${px(c.content['padding-top'])} (${declared(c.content['padding-top'], repo)}); joined bands: card inset ${px(c.joined['padding-top'])}, gap ${px(c.joined['row-gap'])}; external label to card ${px(c.labelGap)}.`);
+  lines.push('',
+    'Card / SurfaceCard (Grammar SurfaceCard, SurfaceListCard)',
+    `- radius ${byWidth(g, (w) => w.card.top['border-radius'])} = ${declared(c.top['border-radius'], repo)}, painted by the ${c.top.part}${c.labelled.part !== c.top.part ? `; a labelled card paints its ${c.labelled.part}: radius ${px(c.labelled['border-radius'])}` : ''}.`,
+    `- border ${noBorder(c.top['border-top-width']) ? 'none' : px(c.top['border-top-width'])} (${declared(c.top['border-top-width'], repo)}); shadow ${normalizeShadowText(c.top['box-shadow']?.value)} (${c.top['box-shadow']?.declared}${chainText(c.top['box-shadow'])}); fill ${c.top['background-color']?.value}.`,
+    `- a surface nested inside another: border ${px(c.nested['border-top-width'])} ${c.nested['border-top-style']?.value ?? ''} ${c.nested['border-top-color']?.value ?? ''}, shadow ${normalizeShadowText(c.nested['box-shadow']?.value)}.`,
+    `- content inset ${px(c.content['padding-top'])} (${declared(c.content['padding-top'], repo)}); joined bands: card inset ${px(c.joined['padding-top'])}, gap ${px(c.joined['row-gap'])}; external label to card ${px(c.labelGap)}.`);
   const cardTokens = g.unbound.filter((t) => /radius|shadow|surface/.test(t.name));
   for (const t of cardTokens) lines.push(`- ${t.name}: ${t.value} is declared by the family and read by no var() and no source file - it does not render; the card draws ${px(c.top['border-radius'])} (owner ruling: follow the CSS).`);
   const bd = a.badge;
-  lines.push('');
-  lines.push('Badge (Grammar Badge = HeroUI Chip, size sm, soft)');
-  lines.push(`- radius ${px(bd['border-radius'])} = ${declared(bd['border-radius'], repo)}, height ${bd.heightPx}px${isPill(bd['border-radius']?.px, bd.heightPx) ? ' - a pill' : ''}; padding ${px(bd['padding-top'])} ${px(bd['padding-left'])}; font ${px(bd['font-size'])} / ${bd['font-weight']?.value}; fill ${bd['background-color']?.value}.`);
-  lines.push('');
-  lines.push('Font');
-  lines.push(`- the family root binds font-family ${declared(g.font.binding, repo)} = ${g.font.binding?.value}.`);
+  lines.push('',
+    'Badge (Grammar Badge = HeroUI Chip, size sm, soft)',
+    `- radius ${px(bd['border-radius'])} = ${declared(bd['border-radius'], repo)}, height ${bd.heightPx}px${isPill(bd['border-radius']?.px, bd.heightPx) ? ' - a pill' : ''}; padding ${px(bd['padding-top'])} ${px(bd['padding-left'])}; font ${px(bd['font-size'])} / ${bd['font-weight']?.value}; fill ${bd['background-color']?.value}.`,
+    '',
+    'Font',
+    `- the family root binds font-family ${declared(g.font.binding, repo)} = ${g.font.binding?.value}.`);
   for (const t of g.font.tokens) lines.push(`- family token ${t.name}: ${t.resolved ?? t.value}.`);
   for (const s of g.font.surfaces) lines.push(`- ${s.selector} (${shortFile(s.file, repo)}) binds ${s.value}.`);
   const others = g.unbound.filter((t) => !cardTokens.includes(t));
-  if (others.length) { lines.push(''); lines.push(`Declared by the family, read by no var() and no source file (they do not render): ${others.map((t) => `${t.name} ${t.value}`).join('; ')}.`); }
+  if (others.length) lines.push('', `Declared by the family, read by no var() and no source file (they do not render): ${others.map((t) => `${t.name} ${t.value}`).join('; ')}.`);
   return `${lines.join('\n')}\n`;
 }
 
@@ -837,7 +837,7 @@ function collectPage(probes) {
   probe.remove();
   const all = [...document.querySelectorAll('body *')].filter((e) => !['SCRIPT', 'STYLE', 'LINK', 'META', 'NOSCRIPT', 'TEMPLATE', 'BR'].includes(e.tagName));
   const index = new Map(all.map((e, i) => [e, i]));
-  all.forEach((e, i) => e.setAttribute('data-gg-i', String(i)));
+  all.forEach((e, i) => { e.dataset.ggI = String(i); });
   const n = (v) => Number.parseFloat(v) || 0;
   const elements = all.slice(0, 5000).map((e, i) => {
     const s = getComputedStyle(e);
@@ -859,7 +859,7 @@ function collectPage(probes) {
       i, parent: p ? index.get(p) : null, tag: e.tagName.toLowerCase(), id: e.id || null, cls: typeof e.className === 'string' ? e.className : '',
       // A real grammar render (draw-render fixture mode of a <XBase>.draw.tsx): the component root it is, and whether it
       // is a layout element the drawing itself wrote (draw-source.mjs LAYOUT_ATTR).
-      comp: e.getAttribute('data-component'), drawLayout: e.hasAttribute('data-draw-layout'), dataWidth: e.getAttribute('data-width'),
+      comp: e.dataset.component ?? null, drawLayout: e.dataset.drawLayout !== undefined, dataWidth: e.dataset.width ?? null,
       role: e.getAttribute('role'), type: e.getAttribute('type'), href: e.getAttribute('href'),
       aria: { selected: e.getAttribute('aria-selected'), current: e.getAttribute('aria-current'), hidden: e.getAttribute('aria-hidden'), required: e.getAttribute('aria-required'), invalid: e.getAttribute('aria-invalid') },
       required: Boolean(e.required), disabled: Boolean(e.disabled), labelText, described, placeholder: e.getAttribute('placeholder'), value: 'value' in e && typeof e.value === 'string' ? e.value.slice(0, 80) : null,
@@ -908,7 +908,7 @@ export async function snapshotFiles(files, { repo = null, viewport = DEFAULT_VIE
           const e = document.activeElement;
           if (!e || e === document.body) return null;
           const s = getComputedStyle(e);
-          return { i: Number(e.getAttribute('data-gg-i')), outline: { style: s.outlineStyle, w: Number.parseFloat(s.outlineWidth) || 0, offset: Number.parseFloat(s.outlineOffset) || 0 }, shadow: s.boxShadow, focusVisible: e.matches(':focus-visible') };
+          return { i: Number(e.dataset.ggI ?? null), outline: { style: s.outlineStyle, w: Number.parseFloat(s.outlineWidth) || 0, offset: Number.parseFloat(s.outlineOffset) || 0 }, shadow: s.boxShadow, focusVisible: e.matches(':focus-visible') };
         }));
       }
       shots.push({ file, viewport, ...snap, focus });
@@ -1028,7 +1028,7 @@ export function geometryFindings(snap, g, { file = snap.file } = {}) {
     const label = e.own ? e : (view.kids.get(e.i) ?? []).find((k) => k.own) ?? e;
     if (a.button['font-size']?.px != null && label.own && !near(label.style.fontSize, a.button['font-size'].px, 0.5)) off('button', e, 'font-size', `${label.style.fontSize}px`, `${a.button['font-size'].px}px`, a.button['font-size'].file);
     const bg = e.style.bg;
-    const variant = variantColors.find((vc) => (alphaOf(bg) < 0.02 ? alphaOf(vc.bg) < 0.02 : sameColor(bg, vc.bg)));
+    const variant = variantColors.some((vc) => (alphaOf(bg) < 0.02 ? alphaOf(vc.bg) < 0.02 : sameColor(bg, vc.bg)));
     if (!variant) off('button', e, 'fill', bg ? `rgba(${bg.join(', ')})` : 'none', `one of the Button variants: ${variantColors.filter((x) => x.bg).map((x) => `${x.v} ${P[`button.${x.v}.bg`]?.value}`).join('; ')}`, a.button.variants.primary['background-color']?.file);
     else if (alphaOf(bg) < 0.02 && view.borderOn(e)) {
       const b = e.style.border[0];
@@ -1102,7 +1102,7 @@ export function geometryFindings(snap, g, { file = snap.file } = {}) {
 function resolveAt(g, width) {
   const hit = g.at.find((w) => w.width === width);
   if (hit) return hit;
-  const again = resolveGeometry({ repo: g.sources.repo, family: g.family, widths: [width], ...(g.sources.drawCss ?? {}) });
+  const again = resolveGeometry({ repo: g.sources.repo, family: g.family, widths: [width], ...g.sources.drawCss });
   return again.ok ? again.at[0] : g.at[0];
 }
 
@@ -1129,7 +1129,7 @@ const USAGE = `Usage:
 `;
 
 export function parseViewport(text) {
-  const m = String(text ?? '').match(/^(\d+)x(\d+)$/);
+  const m = /^(\d+)x(\d+)$/.exec(String(text ?? ''));
   return m ? { width: Number(m[1]), height: Number(m[2]) } : null;
 }
 

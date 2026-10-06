@@ -247,7 +247,7 @@ export function drawAcceptanceFindings({ repo, files }) {
       const assetRel = slash(path.relative(owner.dir, p));
       const asset = assetsOf(owner.record).find((a) => slash(a.path) === assetRel);
       // A retired asset or a rejected candidate (role rejected-*) is a kept proof, never a drawing.
-      if (asset?.retired || /^rejected-/.test(String(asset?.role ?? ''))) continue;
+      if (asset?.retired || String(asset?.role ?? '').startsWith('rejected-')) continue;
       if (!named.has(slash(path.resolve(p)).toLowerCase()) && !asset && !boundByRecord(owner.record, owner.dir, p, repo)) {
         // A loose draw-render capture still proves the pass drew; it is not a live asset to judge.
         const sha = shaOf(p);
@@ -332,5 +332,5 @@ async function main(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  main(process.argv.slice(2)).then((code) => process.exit(code), (error) => { process.stderr.write(`${error?.stack ?? error}\n`); process.exit(2); });
+  try { process.exit(await main(process.argv.slice(2))); } catch (error) { process.stderr.write(`${error?.stack ?? error}\n`); process.exit(2); }
 }

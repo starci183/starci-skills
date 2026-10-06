@@ -23,18 +23,18 @@ import { refuse } from '../../engine/refuse.mjs';
 import { workGraphContext } from './work-graph-context.mjs';
 
 const USAGE = 'use: starci work graph show|validate|diff|propose --repo <repo> --workflow <id> [...] [--json]';
-const VERBS = ['show', 'validate', 'diff', 'propose'];
-const VALUE_FLAGS = ['repo', 'workflow', 'version', 'file', 'from', 'to', 'job', 'reason', 'slice'];
+const VERBS = new Set(['show', 'validate', 'diff', 'propose']);
+const VALUE_FLAGS = new Set(['repo', 'workflow', 'version', 'file', 'from', 'to', 'job', 'reason', 'slice']);
 
 
 export function parseArgs(argv) {
   const [verb, ...rest] = argv;
-  if (!VERBS.includes(verb)) return null;
+  if (!VERBS.has(verb)) return null;
   const args = { verb, json: false };
   for (let i = 0; i < rest.length; i++) {
     const key = rest[i].replace(/^--/, '');
     if (key === 'json') args.json = true;
-    else if (VALUE_FLAGS.includes(key) && i + 1 < rest.length) args[key] = rest[++i];
+    else if (VALUE_FLAGS.has(key) && i + 1 < rest.length) args[key] = rest[++i];
     else return null;
   }
   return args.repo && (args.workflow || (verb === 'propose' && args.job)) ? args : null;

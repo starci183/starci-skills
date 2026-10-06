@@ -64,7 +64,7 @@ const digest=sha256;
 // Colour mathematics: sRGB <-> linear <-> OKLab <-> oklch, and WCAG contrast.
 // ---------------------------------------------------------------------------
 
-const clamp01=value=>value<0?0:value>1?1:value;
+const clamp01=value=>value<0?0:Math.min(1,value);
 /** sRGB transfer function and its inverse; the piecewise form, not the 2.2 approximation. */
 const srgbToLinear=channel=>channel<=0.04045?channel/12.92:((channel+0.055)/1.055)**2.4;
 const linearToSrgb=channel=>channel<=0.0031308?channel*12.92:1.055*channel**(1/2.4)-0.055;
@@ -141,13 +141,13 @@ export function parseColor(input){
     const lightness=number(parts[0],{percentOf:1});
     const chroma=number(parts[1],{percentOf:0.4});
     const hue=number(parts[2]==='none'?'0':String(parts[2]).replace(/deg$/i,''));
-    if([lightness,chroma,hue].some(part=>part===null))return null;
+    if([lightness,chroma,hue].includes(null))return null;
     const lab=oklchToOklab({L:lightness,C:chroma,h:hue});
     const {rgb,clipped}=oklabToRgb(lab);
     return color({notation:'oklch',rgb,alpha:alpha??1,raw:value,lab,clipped});
   }
   const channels=parts.slice(0,3).map(part=>number(part,{percentOf:255}));
-  if(channels.some(channel=>channel===null))return null;
+  if(channels.includes(null))return null;
   return color({notation:'rgb',rgb:channels.map(channel=>Math.round(channel)),alpha:alpha??1,raw:value});
 }
 
@@ -241,7 +241,7 @@ export function parseTokenData(data){
 
 const readText=file=>{
   const stat=fs.lstatSync(file);
-  if(stat.isSymbolicLink()||!stat.isFile()||stat.size>SOURCE_BYTES_LIMIT)throw Error('A brand source must be a bounded real file.');
+  if(stat.isSymbolicLink()||!stat.isFile()||stat.size>SOURCE_BYTES_LIMIT)throw new Error('A brand source must be a bounded real file.');
   return fs.readFileSync(file,'utf8');
 };
 
@@ -282,7 +282,7 @@ function lookupToken(sources,token,seen=new Set()){
       if(css){
         const found=css[scope].get(token);
         if(found){
-          const reference=String(found.value).trim().match(/^var\(\s*(--[A-Za-z0-9_-]+)\s*\)$/)?.[1]??null;
+          const reference=/^var\(\s*(--[A-Za-z0-9_-]+)\s*\)$/.exec(String(found.value).trim())?.[1]??null;
           if(reference){
             const resolved=lookupToken(sources,reference,nextSeen);
             if(resolved)return {...resolved,file:source.path,selector:found.selector,scope,declaredValue:found.value,resolvedFrom:reference};
@@ -318,14 +318,14 @@ export function readBrandRecord(tree){
   const root=path.resolve(tree);
   const candidates=[path.join(root,'brand','index.yaml'),path.join(root,'.starciwork','brand','index.yaml')];
   const file=candidates.find(candidate=>fs.existsSync(candidate)&&fs.lstatSync(candidate).isFile());
-  if(!file)throw Error(`No brand record: expected ${candidates.map(candidate=>slash(path.relative(root,candidate))).join(' or ')}.`);
+  if(!file)throw new Error(`No brand record: expected ${candidates.map(candidate=>slash(path.relative(root,candidate))).join(' or ')}.`);
   const source=readText(file);
   const record=parseYaml(source);
   // work/brand@1 is the one family modules/schemas/work-layout.yaml allows for the brand record; the retired
   // recursive work/node@N envelope is refused, never read.
-  if(/^work[/]node@/.test(record?.schema??''))throw Error('HFS_WORK_NODE_RETIRED: the brand record is a retired work/node record; restate it as a work/brand@1 record.');
-  if(record?.schema!=='work/brand@1'||record?.kind!=='brand')throw Error('A brand record must be a work/brand@1 record of kind brand.');
-  if(!record.brand||typeof record.brand!=='object'||Array.isArray(record.brand))throw Error('The brand record carries no brand specification.');
+  if(/^work\/node@/.test(record?.schema??''))throw new Error('HFS_WORK_NODE_RETIRED: the brand record is a retired work/node record; restate it as a work/brand@1 record.');
+  if(record?.schema!=='work/brand@1'||record?.kind!=='brand')throw new Error('A brand record must be a work/brand@1 record of kind brand.');
+  if(!record.brand||typeof record.brand!=='object'||Array.isArray(record.brand))throw new Error('The brand record carries no brand specification.');
   const declared=record.rev??record.revision??record.brand.rev;
   return {file,dir:path.dirname(file),record,brand:record.brand,
     rev:declared===undefined?digest(source).slice(0,12):String(declared),
@@ -366,7 +366,7 @@ const STAGE_ALIASES=Object.freeze({decide:'decide','brand.decide':'decide',verif
 export function brandStage(value){
   if(value===undefined||value===null||value==='')return 'decide';
   const stage=STAGE_ALIASES[String(value)];
-  if(!stage)throw Error(`Unknown brand check stage ${JSON.stringify(value)}: expected one of ${Object.keys(STAGE_ALIASES).join(', ')}.`);
+  if(!stage)throw new Error(`Unknown brand check stage ${JSON.stringify(value)}: expected one of ${Object.keys(STAGE_ALIASES).join(', ')}.`);
   return stage;
 }
 /** The statuses tokens-match-source accepts: the app source carries the colour, or (decide only) its reference does. */
@@ -523,7 +523,7 @@ export function findOwnerReceipt({acceptedBy,receipt=null,brandDir=null,answerer
   };
   if(receipt!==null&&receipt!==undefined){
     if(typeof receipt!=='string'||!receipt.trim())return {ok:false,why:'receipt must be blob:<sha256> or the path of the owner answer receipt'};
-    const stored=/^blob:/.test(receipt.trim())?receiptFileOf(receipt):null;
+    const stored=receipt.trim().startsWith('blob:')?receiptFileOf(receipt):null;
     const file=stored??[path.resolve(roots.repoRoot,receipt),path.resolve(roots.work,receipt)]
       .filter(candidate=>inside(roots.repoRoot,candidate))
       .find(candidate=>fs.existsSync(candidate)&&fs.lstatSync(candidate).isFile());
@@ -883,7 +883,7 @@ function judgeProvisional({provisional,rev,brandDir,archetype,golden=[]}){
   if(!receipt.provisional||!receipt.gatesOk)return {ok:false,why:`${receipt.file} is not a provisional autopilot answer with passing gates`};
   if(receipt.optionIndex!==DIRECTION_ACCEPT_OPTION)return {ok:false,why:`${receipt.file} chose option ${receipt.optionIndex}, not accept`};
   const review=receipt.review;
-  if(!review||review.schema!==DIRECTION_REVIEW_SCHEMA||review.archetype!==archetype)return {ok:false,why:`${receipt.file} does not review archetype ${archetype}`};
+  if(review?.schema!==DIRECTION_REVIEW_SCHEMA||review.archetype!==archetype)return {ok:false,why:`${receipt.file} does not review archetype ${archetype}`};
   const seen=new Set(objectList(review.golden).map(entry=>entry.sha256));
   const unseen=golden.filter(entry=>!seen.has(entry.sha256));
   if(!golden.length||unseen.length)return {ok:false,why:`golden ${unseen.map(entry=>entry.png).join(', ')||'(none)'} changed after autopilot reviewed it`};
@@ -1013,7 +1013,7 @@ export function checkDirection({brand,family,grammarRoot,brandDir}){
  * is `ok` only when no check failed - a skipped check never makes a brand proven.
  */
 export function runBrandChecks({tree,sourceRoot=null,grammarRoot=defaultGrammarRoot(),stage='decide'}={}){
-  if(!tree)throw Error('runBrandChecks needs a Work tree.');
+  if(!tree)throw new Error('runBrandChecks needs a Work tree.');
   const phase=brandStage(stage);
   const record=readBrandRecord(tree);
   const context={brand:record.brand,tree:path.resolve(tree),brandDir:record.dir,

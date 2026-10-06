@@ -87,11 +87,11 @@ export function readAssetRequests(files) {
       const slotLine = /^\s*[-*]?\s*(?:slot|id)\s*:\s*`?([\w.-]+)`?\s*$/i.exec(line);
       if (heading) {
         const h = heading[1].trim();
-        const id = new RegExp(`${ASSET_SLOT_ATTR}\\s*=\\s*["']([^"']+)["']`).exec(h)?.[1] ?? /`([^`]+)`/.exec(h)?.[1] ?? (SLUG.test(h) ? h : null);
+        const id = new RegExp(String.raw`${ASSET_SLOT_ATTR}\s*=\s*["']([^"']+)["']`).exec(h)?.[1] ?? /`([^`]+)`/.exec(h)?.[1] ?? (SLUG.test(h) ? h : null);
         if (id) push(id.trim());
         else current = null;
       } else if (slotLine) {
-        if (!current || current.id !== slotLine[1]) push(slotLine[1]);
+        if (current?.id !== slotLine[1]) push(slotLine[1]);
       } else if (current && line.trim()) current.brief = `${current.brief} ${line.trim()}`.trim().slice(0, 400);
     }
   }

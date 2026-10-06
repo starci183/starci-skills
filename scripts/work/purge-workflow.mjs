@@ -37,7 +37,7 @@ const USAGE = 'Internal entry: spawned by scripts/housekeeping/hk-ledger.mjs; no
 const PURGE_MANIFEST_SCHEMA = 'starci/workflow-archive@1';
 const ZIP_RESOURCE_LIMITS = Object.freeze(zipLimits());
 const LIVE = new Set([...JOB_STATUSES.dispatchable, ...JOB_STATUSES.fenced]);
-const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, '');
+const today = () => new Date().toISOString().slice(0, 10).replaceAll('-', '');
 const refuse = (code, message) => Object.assign(new Error(message), { code });
 
 /** Every table of the ledger with a workflow_id column (never workflow_purges, the tombstone). */
@@ -151,7 +151,6 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
       if (bad.length || checked.entries.length !== described.length + 1) throw refuse('archive-verify-failed', `${archive}: ${bad.length} entr(ies) do not match the manifest (${bad.slice(0, 5).map((b) => b.name).join(', ')})`);
       ledger.transaction(() => recordPurge(db, { workflowId, state: 'archived', archivePath: archive, archiveSha256: checked.sha256, archiveBytes: checked.bytes,
         manifestSha256: sha256(manifestBuf), eventsHead: head, countsJson: JSON.stringify(counts), archivedAt: now(), verifiedAt: now() }));
-      row = purgeRow(db, workflowId);
     }
 
     // 4. Delete: the guard opens for this workflow only while its row says 'deleting'.

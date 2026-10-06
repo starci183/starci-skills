@@ -55,11 +55,11 @@ const LEARNED_KINDS = Object.freeze(['antiPattern', 'vocabulary', 'rubric']);
 const OWNER_NOTE_GROUP = 'owner-note';
 const OWNER_LEARNED_GROUP = 'owner-learned';
 /** The owner marks an accepted drawing golden in the note (or the form's golden box: receipt.golden). The Vietnamese alternatives of every word class below are lexicon data (modules/goal/source-phrases.yaml drawNote). */
-const GOLDEN_WORDS = new RegExp(`\\bgolden\\b|${altOf('drawNote.golden')}`, 'i');
+const GOLDEN_WORDS = new RegExp(String.raw`\bgolden\b|${altOf('drawNote.golden')}`, 'i');
 const RULE_ID = /\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+\b/;
-const PRODUCT_WORDS = new RegExp(`\\b(always|never|every|everywhere|all (pages|screens|cards)|from now on|brand|colou?rs?|palette|accent|tones?|fonts?|typography|style|spacing|density|radius|shadow|icons?)\\b|${altOf('drawNote.product')}`, 'i');
-const GRAMMAR_WORDS = new RegExp(`\\b(grammar|DNA|variant|new component|missing component|anatomy|slot)\\b|${altOf('drawNote.grammar')}`, 'i');
-const KNOWLEDGE_WORDS = new RegExp(`\\bknowledge\\b|\\bguideline\\b|${altOf('drawNote.knowledge')}`, 'i');
+const PRODUCT_WORDS = new RegExp(String.raw`\b(always|never|every|everywhere|all (pages|screens|cards)|from now on|brand|colou?rs?|palette|accent|tones?|fonts?|typography|style|spacing|density|radius|shadow|icons?)\b|${altOf('drawNote.product')}`, 'i');
+const GRAMMAR_WORDS = new RegExp(String.raw`\b(grammar|DNA|variant|new component|missing component|anatomy|slot)\b|${altOf('drawNote.grammar')}`, 'i');
+const KNOWLEDGE_WORDS = new RegExp(String.raw`\bknowledge\b|\bguideline\b|${altOf('drawNote.knowledge')}`, 'i');
 const OWNER = 'owner';
 
 
@@ -82,7 +82,7 @@ export function classifyNote(words, { dnaNames = [] } = {}) {
   const s = String(words ?? '');
   const rule = RULE_ID.exec(s)?.[0] ?? null;
   if (rule || KNOWLEDGE_WORDS.test(s)) return { class: 'knowledge', target: rule, as: null, why: rule ? `cites the knowledge rule ${rule}` : 'speaks of a knowledge rule' };
-  const component = [...dnaNames].sort((a, b) => b.length - a.length).find((n) => new RegExp(`\\b${n}\\b`).test(s)) ?? null;
+  const component = [...dnaNames].sort((a, b) => b.length - a.length).find((n) => new RegExp(String.raw`\b${n}\b`).test(s)) ?? null;
   if (GRAMMAR_WORDS.test(s)) return { class: 'grammar', target: component, as: null, why: component ? `asks for a grammar change to ${component}` : 'asks for a component or variant the grammar lacks' };
   if (PRODUCT_WORDS.test(s)) return { class: 'product-direction', target: null, as: 'antiPattern', why: 'a product-wide rule (brand, colour, type, spacing, always/never)' };
   return { class: 'one-off', target: null, as: null, why: 'about this drawing only' };
@@ -101,7 +101,7 @@ function confirmClass({ cls, target = null, as = null, dnaNames = [], knowledgeR
   }
   if (cls === 'knowledge') {
     const t = String(target ?? '');
-    const isPath = knowledgeRoot && /^knowledge\//.test(t) && fs.existsSync(path.join(knowledgeRoot, t));
+    const isPath = knowledgeRoot && t.startsWith('knowledge/') && fs.existsSync(path.join(knowledgeRoot, t));
     if (!RULE_ID.test(t) && !isPath) return { ok: false, why: 'a knowledge ruling names the rule id (e.g. ACCENT-6) or the knowledge/ file it changes (--target)' };
   }
   if (cls === 'product-direction' && !LEARNED_KINDS.includes(as ?? 'antiPattern')) return { ok: false, why: `--as must be one of ${LEARNED_KINDS.join(', ')}` };
@@ -181,7 +181,7 @@ export function withFeedbackRound(record, round) {
   const entry = { round: prior?.round ?? others.length + 1, dispatchId: round.dispatchId, receipt: round.receipt, receiptSha256: round.receiptSha256, at: round.at,
     answeredBy: round.answeredBy, decision: round.decision, ...(round.golden ? { golden: true } : {}), parts: round.parts, notes };
   const rounds = [...others, entry].sort((a, b) => a.round - b.round);
-  return { ...record, ui: { ...record.ui, review: { ...(record.ui?.review ?? {}), feedback: { schema: DRAW_FEEDBACK_SCHEMA, rounds } } } };
+  return { ...record, ui: { ...record.ui, review: { ...record.ui?.review, feedback: { schema: DRAW_FEEDBACK_SCHEMA, rounds } } } };
 }
 
 /**

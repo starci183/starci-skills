@@ -280,8 +280,8 @@ function checkTree(workRoot, out, baseline) {
         const testsRoot = path.join(beRoot, 'src', 'tests');
         const words = filter.toLowerCase().split(/[\s/.\\_-]+/).filter(Boolean);
         const hit = fs.existsSync(testsRoot) && walk(testsRoot).some(f => {
-          const fwords = f.toLowerCase().replaceAll('\\', '/').split(/[\s/.\\_-]+/).filter(Boolean);
-          return words.every(w => fwords.includes(w));
+          const fwords = new Set(f.toLowerCase().replaceAll('\\', '/').split(/[\s/.\\_-]+/).filter(Boolean));
+          return words.every(w => fwords.has(w));
         });
         if (!hit) suspect(indexFile, 'PROOF_FILTER_EMPTY', `${label}: filter "-- ${filter}" matches no spec under be/src/tests`);
       }
@@ -341,7 +341,7 @@ function checkTree(workRoot, out, baseline) {
 
   // ---- PAYLOAD_AS_RECORD: asset payloads the base gate walks as records ----
   const payloads = walk(workRoot).filter(f => f.replaceAll('\\', '/').includes('/assets/') && f.endsWith('.yaml'))
-    .map(f => parseYaml(fs.readFileSync(f, 'utf8'))).filter(d => d && d.schema && !String(d.schema).startsWith('work/'));
+    .map(f => parseYaml(fs.readFileSync(f, 'utf8'))).filter(d => d?.schema && !String(d.schema).startsWith('work/'));
   if (payloads.length) info(workRoot, 'PAYLOAD_AS_RECORD', `${payloads.length} asset payload(s) carry non-work schemas - they are artifacts of their parent record, not records; the base gate should not walk them as such`);
 
   // ---- CATALOG_DRIFT ----
@@ -398,7 +398,7 @@ function checkTree(workRoot, out, baseline) {
     if (level === null) suspect(o.file ?? workRoot, 'CAPABILITY_WITHOUT_SPEC', `graphql ${o.kind} ${o.cap}/${o.op} ships but no spec record names "${o.cap}" - capability with no record at all`);
     else if (level === 'design') suspect(o.file ?? workRoot, 'CAPABILITY_WITHOUT_FR', `graphql ${o.kind} ${o.cap}/${o.op} ships; only impl/sds records touch "${o.cap}" - designed but no fr/br/contract describes the operation`);
   }
-  const routeCaps = new Set(routes.map(r => r.path.split('/').filter(Boolean)[0]).filter(Boolean));
+  const routeCaps = new Set(routes.map(r => r.path.split('/').find(Boolean)).filter(Boolean));
   for (const cap of routeCaps) {
     const level = capLevel(cap);
     if (level === null) suspect(workRoot, 'CAPABILITY_WITHOUT_SPEC', `http routes under /${cap} serve but no spec record names it`);
@@ -421,7 +421,7 @@ function checkTree(workRoot, out, baseline) {
     for (const s of shapes) {
       const [method, p] = s.split(' ');
       const norm = `${method} ${p.replace(/\/:[^/]+/g, '/:_').replace(/\/$/, '') || '/'}`;
-      if (servedPaths.size && ![...servedPaths].some(sp => sp === norm)) {
+      if (servedPaths.size && !servedPaths.has(norm)) {
         suspect(path.join(rec.dir, 'index.yaml'), 'GHOST_SURFACE', `${id} declares "${s}" but no controller under be/src serves it - contract describes a wire that does not exist`);
       }
     }

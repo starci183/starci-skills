@@ -48,9 +48,9 @@ const surfaces = (s) => (typeof s === 'string' ? [s] : s && typeof s === 'object
 
 // The title/intent/route words that derive an archetype (the record's words are lower-cased first); the Vietnamese
 // lists are lexicon data (modules/goal/source-phrases.yaml uiArchetype).
-const WIZARD_WORDS = new RegExp(`\\b(?:wizard|onboarding|setup|step|steps|checkout)\\b|${altOf('uiArchetype.wizard')}`);
-const FORM_WORDS = new RegExp(`\\b(?:edit|create|new|settings|configure|sign[- ]?in|login|register|form)\\b|${altOf('uiArchetype.form')}`);
-const DASHBOARD_WORDS = new RegExp(`\\b(?:overview|dashboard|home)\\b|${altOf('uiArchetype.dashboard')}`);
+const WIZARD_WORDS = new RegExp(String.raw`\b(?:wizard|onboarding|setup|step|steps|checkout)\b|${altOf('uiArchetype.wizard')}`);
+const FORM_WORDS = new RegExp(String.raw`\b(?:edit|create|new|settings|configure|sign[- ]?in|login|register|form)\b|${altOf('uiArchetype.form')}`);
+const DASHBOARD_WORDS = new RegExp(String.raw`\b(?:overview|dashboard|home)\b|${altOf('uiArchetype.dashboard')}`);
 
 /** {archetype, derived:boolean, why} for a work/ui-screen@1 record. */
 export function archetypeOf(record) {
@@ -64,7 +64,7 @@ export function archetypeOf(record) {
   if (surf.some((s) => s === 'modal' || s === 'drawer') || FORM_WORDS.test(words)) {
     return { archetype: 'form', derived: true, why: surf.some((s) => s === 'modal' || s === 'drawer') ? `surface ${surf.join('/')}` : 'an editing task' };
   }
-  const last = route.split('/').filter(Boolean).pop() ?? '';
+  const last = route.split('/').findLast(Boolean) ?? '';
   if (/^\[[^\]]+\]$/.test(last) && !/^\[\[?\.\.\./.test(last) && !/locale|lang/i.test(last)) return { archetype: 'detail', derived: true, why: `dynamic route segment ${last}` };
   if (DASHBOARD_WORDS.test(words)) return { archetype: 'dashboard', derived: true, why: 'an overview' };
   return { archetype: 'list', derived: true, why: 'the default: a collection of peers' };

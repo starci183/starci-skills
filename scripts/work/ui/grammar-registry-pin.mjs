@@ -43,11 +43,11 @@ function parseArgs(argv) {
     const value = argv[index];
     if (value === '--repo' && repo === undefined) {
       repo = argv[++index];
-      if (!repo || repo.startsWith('--')) throw Error(USAGE);
+      if (!repo || repo.startsWith('--')) throw new Error(USAGE);
     } else if (value === '--json' && !json) json = true;
-    else throw Error(`unexpected argument ${value}; ${USAGE}`);
+    else throw new Error(`unexpected argument ${value}; ${USAGE}`);
   }
-  if (!repo) throw Error(USAGE);
+  if (!repo) throw new Error(USAGE);
   return { repo, json };
 }
 

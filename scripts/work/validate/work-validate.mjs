@@ -27,7 +27,7 @@ import { byCodeUnit } from '../../lib/list.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-const uniqueSorted = (items) => [...new Set(items.map((item) => String(item)))].sort(byCodeUnit);
+const uniqueSorted = (items) => [...new Set(items.map(String))].sort(byCodeUnit);
 
 export function validateWork(target, { strict = false } = {}) {
   const requested = path.resolve(target ?? '.');
@@ -151,7 +151,7 @@ export function validateWork(target, { strict = false } = {}) {
     refused: uniqueSorted(refused),
     suspect: uniqueSorted(suspect),
     info: uniqueSorted(info),
-    counts: { ...counts, yamlFiles: yamlFiles.length, ...(schemaCounts ?? {}) },
+    counts: { ...counts, yamlFiles: yamlFiles.length, ...schemaCounts },
   };
   return result;
 }
@@ -170,7 +170,7 @@ function findingFile(finding, { roots = [] } = {}) {
   }
   return null;
 }
-const keyOf = (p) => { const k = path.resolve(p).replace(/\\/g, '/').replace(/\/+$/, ''); return process.platform === 'win32' ? k.toLowerCase() : k; };
+const keyOf = (p) => { const k = path.resolve(p).replaceAll('\\', '/').replace(/\/+$/, ''); return process.platform === 'win32' ? k.toLowerCase() : k; };
 /** The target and every directory above it: a finding names its file relative to the .starciwork root, which is an
  * ancestor when the target is a feature or record dir (validate .starciwork/features/x --owned <file> scopes like the tree). */
 function ancestorsOf(target) {

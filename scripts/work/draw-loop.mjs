@@ -54,7 +54,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { assetsOf, flag, isFile, list, sha256File, slash, workRootOf } from './work-io.mjs';
+import { flag, isFile, list, sha256File, slash, workRootOf } from './work-io.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { insidePath } from '../lib/path-key.mjs';
 import { writeJsonFile } from '../api/fs/write-json-file.mjs';
@@ -72,10 +72,10 @@ import { parseColor } from './brand/brand.mjs';
 import { contextualCriticFor, runCritic, rubricFor } from './draw-critic.mjs';
 import { archetypeOf } from './ui-archetype.mjs';
 import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
-import { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings } from './draw/draw-loop-coverage.mjs';
+import { LOOP_SCHEMA, livePartsOf } from './draw/draw-loop-coverage.mjs';
 import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw/draw-rationale.mjs'; import { isMain } from '../lib/is-main.mjs'; import { byCodeUnit } from '../lib/list.mjs';
 
-export { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings };
+export { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings } from './draw/draw-loop-coverage.mjs';
 
 const METRICS_SCHEMA = 'starci/draw-metrics@1';
 export const DRAW_RENDER_RED = 'DRAW_RENDER_RED';
@@ -297,7 +297,7 @@ async function defaultComponentRender({ source, fixtures, css = [], productDir, 
   const groups = new Map();
   for (const v of viewports) {
     const f = fixtures.byWidth[String(v.width)] ?? fixtures.default;
-    if (!f) throw Error(`no fixture for the ${v.width}px viewport`);
+    if (!f) throw new Error(`no fixture for the ${v.width}px viewport`);
     if (!groups.has(f)) groups.set(f, []);
     groups.get(f).push(v);
   }
@@ -331,8 +331,8 @@ const openLoop = (o, sourcePath, { settings, extra = {} }) => {
   const out = path.resolve(o.out ?? defaultOutOf(uiDir ?? path.dirname(sourcePath), o.base, o.state));
   const name = `${o.base}#${o.state}`;
   let loop = readLoop(out);
-  if (loop && (loop.base !== o.base || loop.state !== o.state)) throw Error(`${out} is the loop of ${loop.base}#${loop.state}, not ${name}`);
-  if (loop?.stop) throw Error(`the loop stopped at round ${loop.stop.atRound} (${loop.stop.reason}): run finish`);
+  if (loop && (loop.base !== o.base || loop.state !== o.state)) throw new Error(`${out} is the loop of ${loop.base}#${loop.state}, not ${name}`);
+  if (loop?.stop) throw new Error(`the loop stopped at round ${loop.stop.atRound} (${loop.stop.reason}): run finish`);
   const ui = loadUi(uiDir);
   const archetype = ui?.record ? archetypeOf(ui.record) : null;
   // Paths are relative to the loop directory, so the record reads the same from any checkout.
@@ -353,7 +353,7 @@ export async function runRound(o) {
   if (o.source) return runComponentRound(o);
   const settings = o.settings ?? drawLoopSettings();
   const html = path.resolve(o.html);
-  if (!isFile(html)) throw Error(`${o.html} does not exist`);
+  if (!isFile(html)) throw new Error(`${o.html} does not exist`);
   const { uiDir, out, name, loop, ui, archetype } = openLoop(o, html, { settings });
   const n = loop.rounds.length + 1;
   const roundDir = path.join(out, `round-${n}`);
@@ -404,7 +404,7 @@ export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir =
   } catch (error) {
     critique = { schema: 'starci/draw-critique@1', outcome: 'launch-failed', critic: { independent: false }, verdict: null, error: String(error?.message ?? error) };
   }
-  critique.critic = { ...(critique.critic ?? {}), drawer: typeof who === 'string' ? who : who?.provider ?? null };
+  critique.critic = { ...critique.critic, drawer: typeof who === 'string' ? who : who?.provider ?? null };
   critique.round = n;
   writeJsonFile(path.join(roundDir, 'critique.json'), critique);
   return critique;
@@ -481,13 +481,13 @@ async function componentMeasure({ source, fixtures, fixtureFiles, productDir, cs
 async function runComponentRound(o) {
   const settings = o.settings ?? drawLoopSettings();
   const source = path.resolve(o.source);
-  if (!isFile(source)) throw Error(`${o.source} does not exist`);
-  if (!source.endsWith(DRAW_SOURCE_SUFFIX)) throw Error(`${o.source} is not a <XBase>${DRAW_SOURCE_SUFFIX} draw file`);
-  if (!o.product) throw Error('--product <app dir> is required for a --source drawing');
+  if (!isFile(source)) throw new Error(`${o.source} does not exist`);
+  if (!source.endsWith(DRAW_SOURCE_SUFFIX)) throw new Error(`${o.source} is not a <XBase>${DRAW_SOURCE_SUFFIX} draw file`);
+  if (!o.product) throw new Error('--product <app dir> is required for a --source drawing');
   const productDir = path.resolve(o.product);
   const fixtures = o.fixtures ?? fixturesByWidth(o.fixture ? [o.fixture] : []);
   const fixtureFiles = [...new Set([fixtures.default, ...Object.values(fixtures.byWidth)].filter(Boolean))];
-  if (!fixtureFiles.length) throw Error('--fixture <fixture.json> is required for a --source drawing');
+  if (!fixtureFiles.length) throw new Error('--fixture <fixture.json> is required for a --source drawing');
   const { uiDir, out, name, loop, ui, archetype } = openLoop(o, source, { settings, extra: { mode: 'component', product: slash(productDir) } });
   const n = loop.rounds.length + 1;
   const roundDir = path.join(out, `round-${n}`);
@@ -533,7 +533,7 @@ const TEMP_REF = 'temp:';
 const WIN = process.platform === 'win32';
 const pathKey = (p) => { const r = path.resolve(p); return WIN ? r.toLowerCase() : r; };
 const withReal = (d) => { const out = [path.resolve(d)]; try { out.push(fs.realpathSync.native(d)); } catch { /* missing */ } return out; };
-const reEscape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const reEscape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
 /** The scratch roots of a loop (the loop dir, the job scratch, the OS temp dirs), with a mapper of a path under them. */
 function scratchRewriter({ out, env = process.env, context = opContextOf({ env }), installed = new Map() }) {
@@ -542,8 +542,8 @@ function scratchRewriter({ out, env = process.env, context = opContextOf({ env }
   const roots = [...new Set([...loopRoots, ...jobRoots, ...[os.tmpdir(), env.TEMP, env.TMP].filter(Boolean).flatMap(withReal)])]
     .filter((d) => path.parse(d).root !== d).sort((a, b) => b.length - a.length);
   // Each root as written with either separator, optionally as a file URL; the tail runs to the first quote or space.
-  const forms = [...new Set(roots.flatMap((r) => [r, r.replace(/\\/g, '/'), r.replace(/\//g, '\\')]))].sort((a, b) => b.length - a.length);
-  const re = forms.length ? new RegExp(`(file:\\/\\/\\/?)?(?:${forms.map(reEscape).join('|')})(?:[\\\\/][^\\s"'<>|*?]*)?(?![^\\\\/\\s"'<>|*?])`, WIN ? 'gi' : 'g') : null;
+  const forms = [...new Set(roots.flatMap((r) => [r, r.replaceAll(/\\/g, '/'), r.replaceAll(/\//g, '\\')]))].sort((a, b) => b.length - a.length);
+  const re = forms.length ? new RegExp(String.raw`(file:\/\/\/?)?(?:${forms.map(reEscape).join('|')})(?:[\\/][^\s"'<>|*?]*)?(?![^\\/\s"'<>|*?])`, WIN ? 'gi' : 'g') : null;
   const map = (abs) => {
     const hit = installed.get(pathKey(abs));
     if (hit) return hit;
@@ -583,9 +583,9 @@ function installJson(from, to, { out, installed }) {
  */
 export function finishLoop({ out, parts = null, prompt = null, repo = null, settings = drawLoopSettings(), force = false }) {
   const loop = readLoop(out);
-  if (!loop) throw Error(`${out} holds no draw loop (loop.json)`);
-  if (!loop.rounds.length) throw Error('the loop has no round');
-  if (!loop.stop && !force) throw Error(`the loop has not stopped (round ${loop.rounds.length} of at most ${settings.maxRounds}): fix the source and run another round`);
+  if (!loop) throw new Error(`${out} holds no draw loop (loop.json)`);
+  if (!loop.rounds.length) throw new Error('the loop has no round');
+  if (!loop.stop && !force) throw new Error(`the loop has not stopped (round ${loop.rounds.length} of at most ${settings.maxRounds}): fix the source and run another round`);
   const best = bestRound(loop.rounds);
   const roundDir = path.join(out, best.dir);
   const metrics = readJsonFile(path.join(roundDir, 'metrics.json'));
@@ -636,9 +636,9 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
       installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, source: slash(path.relative(relTo, tsx)), fixture: slash(path.relative(relTo, fx)) });
       assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(p), theme: 'light', sha256: sha,
         generation: { tool: 'draw-render', mode: 'draw-loop-component', promptPath, loop: loopRef, grammarSource: best.grammarSource ?? null,
-          ...(best.grammarUpgradeOwed ? { grammarUpgradeOwed: best.grammarUpgradeOwed } : {}) } });
-      assets.push({ path: slash(path.relative(relTo, tsx)), role: 'render-source', sha256: sha256File(tsx) });
-      assets.push({ path: slash(path.relative(relTo, fx)), role: 'render-fixture', sha256: sha256File(fx) });
+          ...(best.grammarUpgradeOwed ? { grammarUpgradeOwed: best.grammarUpgradeOwed } : {}) } },
+        { path: slash(path.relative(relTo, tsx)), role: 'render-source', sha256: sha256File(tsx) },
+        { path: slash(path.relative(relTo, fx)), role: 'render-fixture', sha256: sha256File(fx) });
       for (const [ext, role] of [['.rationale.json', 'rationale'], ['.redline.png', 'direction-redline']]) {
         const f = path.join(partsDir, `${p.part}${ext}`);
         if (isFile(f)) assets.push({ path: slash(path.relative(relTo, f)), role, breakpoint: breakpointOf(p), theme: 'light', sha256: sha256File(f) });
@@ -647,8 +647,8 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
     }
     installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, html: slash(path.relative(relTo, path.join(partsDir, `${p.part}.html`))) });
     assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(p), theme: 'light', sha256: sha,
-      generation: { tool: 'draw-render', promptPath, mode: 'draw-loop', loop: loopRef } });
-    assets.push({ path: slash(path.relative(relTo, path.join(partsDir, `${p.part}.html`))), role: 'render-source' });
+      generation: { tool: 'draw-render', promptPath, mode: 'draw-loop', loop: loopRef } },
+      { path: slash(path.relative(relTo, path.join(partsDir, `${p.part}.html`))), role: 'render-source' });
     for (const [ext, role] of [['.rationale.json', 'rationale'], ['.redline.png', 'direction-redline']]) {
       const f = path.join(partsDir, `${p.part}${ext}`);
       if (isFile(f)) assets.push({ path: slash(path.relative(relTo, f)), role, breakpoint: breakpointOf(p), theme: 'light', sha256: sha256File(f) });
@@ -817,5 +817,5 @@ async function drawLoopMain(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  drawLoopMain(process.argv.slice(2)).then((r) => { process.stdout.write(r.text); process.exitCode = r.code; }, (error) => { process.stderr.write(`draw-loop: ${error?.message ?? error}\n`); process.exitCode = 2; });
+  try { const r = await drawLoopMain(process.argv.slice(2)); process.stdout.write(r.text); process.exitCode = r.code; } catch (error) { process.stderr.write(`draw-loop: ${error?.message ?? error}\n`); process.exitCode = 2; }
 }

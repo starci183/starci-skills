@@ -6,7 +6,7 @@ import { allocationSettings, slicingGears } from '../../engine/config.mjs';
 // The plural `from:` keys of allocation.slicing.size.<class> against the singular count names the weights use.
 const SIZE_MEASURE_KEYS = Object.freeze({ files: 'file', assertions: 'assertion', components: 'component', records: 'record' });
 // Size classes that never fan out, whatever the gear: the owner's table applies to the declared classes only.
-const SINGLE_AGENT_SIZES = ['s', 'm'];
+const SINGLE_AGENT_SIZES = new Set(['s', 'm']);
 
 const refuse = (message, code) => Object.assign(new Error(message), { code });
 
@@ -53,7 +53,7 @@ export function sizeOf(counts, contract = slicingContract()) {
 
 /** agentsRequested: 1 for s/m, else allocation.slicing.size.<class>.agents[gear]. */
 export function agentsFor(size, gear, contract = slicingContract()) {
-  if (SINGLE_AGENT_SIZES.includes(size)) return 1;
+  if (SINGLE_AGENT_SIZES.has(size)) return 1;
   const declared = Number(contract.sizes[size]?.agents?.[gear]);
   if (!Number.isInteger(declared) || declared < 1) throw refuse(`modules/models/runtimes.yaml allocation.slicing.size.${size}.agents declares no agent count for gear ${gear}`, 'slicing-undeclared');
   return declared;

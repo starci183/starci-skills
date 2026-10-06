@@ -2,7 +2,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {parseYaml} from '../../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {isLocaleSegment} from '../layout-tree.mjs';
 import {createRequire} from 'node:module';

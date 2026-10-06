@@ -245,7 +245,7 @@ export function recolor(prevColors, prev, next, diff) {
     if (hit.has(n.id) && was !== GRAY) { colors[n.id] = RED; if (was !== RED) red.push(n.id); }
     else colors[n.id] = was;
   }
-  return { colors, red: red.sort(byCodeUnit) };
+  return { colors, red: red.toSorted(byCodeUnit) };
 }
 
 /**

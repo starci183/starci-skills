@@ -142,7 +142,7 @@ export function measureLayer({ fields, primary, chat }) {
     if (region.querySelector('table,[role="grid"],[role="table"]')) continue;
     // A chat / messaging composer (a text input and a send button in a chat workspace) follows its conversation column.
     if (region.closest(chat) || region.querySelector(chat) || [...region.classList].some((c) => c.startsWith('starci-core-chat-'))) continue;
-    const names = [...region.querySelectorAll(fieldSel)].map((el) => el.getAttribute('data-component') ?? el.getAttribute('data-grammar-component'));
+    const names = [...region.querySelectorAll(fieldSel)].map((el) => el.dataset.component ?? el.dataset.grammarComponent);
     const cls = typeof region.className === 'string' ? region.className.trim().split(/\s+/).slice(0, 3).join('.') : '';
     forms.push({ desc: `<${region.tagName.toLowerCase()}${cls ? `.${cls}` : ''}>`, width: region.getBoundingClientRect().width, fields: names });
   }
@@ -263,5 +263,5 @@ async function main(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-layer: ${e?.stack ?? e}\n`); process.exitCode = 2; });
+  try { process.exitCode = await main(process.argv.slice(2)); } catch (e) { process.stderr.write(`draw-layer: ${e?.stack ?? e}\n`); process.exitCode = 2; }
 }

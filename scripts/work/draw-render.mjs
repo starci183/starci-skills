@@ -239,7 +239,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
           x0 = Math.max(x0, c.left); y0 = Math.max(y0, c.top); x1 = Math.min(x1, c.right); y1 = Math.min(y1, c.bottom);
         }
       }
-      return { src: el.currentSrc || el.src, slot: el.closest('[data-artwork-slot]')?.getAttribute('data-artwork-slot') ?? null,
+      return { src: el.currentSrc || el.src, slot: el.closest('[data-artwork-slot]')?.dataset.artworkSlot ?? null,
         x: x0 + scrollX, y: y0 + scrollY, width: Math.max(0, x1 - x0), height: Math.max(0, y1 - y0) };
     }).filter((a) => a.width > 0 && a.height > 0);
   } catch { artwork = []; }
@@ -254,10 +254,10 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
     document.body.appendChild(probe);
     const surface = getComputedStyle(probe).backgroundColor;
     probe.remove();
-    const partIn = (root, names) => [...root.querySelectorAll('[data-grammar-part]')].find((d) => names.includes(d.getAttribute('data-grammar-part').trim()));
+    const partIn = (root, names) => [...root.querySelectorAll('[data-grammar-part]')].find((d) => names.includes(d.dataset.grammarPart.trim()));
     // A real grammar render marks its roots data-component (a hand-drawn html one data-grammar-component).
     for (const el of document.querySelectorAll('[data-grammar-component="Alert"],[data-component="Alert"]')) {
-      if (el.hasAttribute('data-grammar-part')) continue;
+      if (el.dataset.grammarPart !== undefined) continue;
       const indicator = partIn(el, ['alert-indicator', 'indicator']) ?? el.querySelector('.alert__indicator');
       const title = partIn(el, ['alert-title', 'title']) ?? el.querySelector('.alert__title');
       const box = indicator?.getBoundingClientRect();
@@ -266,7 +266,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
         indicatorColor: indicator ? getComputedStyle(indicator.querySelector('svg') ?? indicator).color : null, titleColor: title ? getComputedStyle(title).color : null });
     }
     for (const el of document.querySelectorAll('[data-grammar-component="Meter"],[data-component="Meter"]')) {
-      if (el.hasAttribute('data-grammar-part')) continue;
+      if (el.dataset.grammarPart !== undefined) continue;
       const track = partIn(el, ['meter-track', 'track']) ?? el.querySelector('.meter__track');
       const band = el.parentElement;
       if (!track || !band) continue;
@@ -274,9 +274,9 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
       const t = track.getBoundingClientRect();
       const segments = [...el.querySelectorAll('[data-grammar-part*="segment"]:not([data-grammar-part$="segments"]), .starci-core-meter-segment, [data-grammar-meter-segment]')]
         .map((d) => d.getBoundingClientRect()).map((r) => ({ x: r.left, width: r.width }));
-      const segmented = el.hasAttribute('data-grammar-meter-segments') || el.hasAttribute('data-segments') || segments.length > 1;
+      const segmented = el.dataset.grammarMeterSegments !== undefined || el.dataset.segments !== undefined || segments.length > 1;
       anatomy.meters.push({ desc: tag(el), segmented, track: { width: t.width, height: t.height },
-        band: { width: band.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0') }, segments });
+        band: { width: band.clientWidth - Number.parseFloat(cs.paddingLeft || '0') - Number.parseFloat(cs.paddingRight || '0') }, segments });
     }
   } catch { /* the anatomy is advisory measurement; the static gate still runs */ }
   // A real grammar drawing (fixture mode of a .draw.tsx): who owns every element that PAINTS - the nearest grammar
@@ -284,7 +284,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
   // by the bundle). Paint owned by layout is raw HTML imitating a component. Plus the DOM snapshot the html metrics read.
   let ownership = null, dom = null;
   if (document.documentElement.dataset.drawHarness === 'component' && root) {
-    const marked = (a) => a.hasAttribute('data-component') || [...a.attributes].some((n) => n.name.startsWith('data-grammar-')) || [...a.classList].some((c) => c.startsWith('starci-core-'));
+    const marked = (a) => a.dataset.component !== undefined || [...a.attributes].some((n) => n.name.startsWith('data-grammar-')) || [...a.classList].some((c) => c.startsWith('starci-core-'));
     const paints = (el) => {
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden') return false;
@@ -292,14 +292,14 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
       if ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return true;
       if (cs.backgroundColor && !/^(?:transparent|rgba\(0, 0, 0, 0\))$/.test(cs.backgroundColor)) return true;
       if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
-      if (['Top', 'Right', 'Bottom', 'Left'].some((side) => parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(cs[`border${side}Color`]))) return true;
+      if (['Top', 'Right', 'Bottom', 'Left'].some((side) => Number.parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(cs[`border${side}Color`]))) return true;
       return Boolean(cs.boxShadow && cs.boxShadow !== 'none');
     };
     const components = new Set();
     const unowned = [];
     let layoutElements = 0;
     for (const el of root.querySelectorAll('*')) {
-      if (el.hasAttribute('data-component')) components.add(el.getAttribute('data-component'));
+      if (el.dataset.component !== undefined) components.add(el.dataset.component);
       if (el.hasAttribute(layoutAttr)) layoutElements += 1;
       if (el.closest('svg') && el.tagName.toLowerCase() !== 'svg') continue;
       if (!paints(el)) continue;
@@ -312,7 +312,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
     }
     ownership = { components: [...components].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)), layoutElements, unownedCount: unowned.length, unowned: unowned.slice(0, 20) };
     const clone = document.documentElement.cloneNode(true);
-    for (const el of clone.querySelectorAll('[data-component]')) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', el.getAttribute('data-component'));
+    for (const el of clone.querySelectorAll('[data-component]')) if (el.dataset.grammarComponent === undefined) el.dataset.grammarComponent = el.dataset.component;
     for (const el of clone.querySelectorAll('script')) el.remove();
     dom = `<!doctype html>
 ${clone.outerHTML}`;
@@ -336,7 +336,7 @@ export async function artworkDigests(images, page = null) {
       let digest = null;
       try {
         if (src.startsWith('file:')) digest = sha256(fs.readFileSync(fileURLToPath(src)));
-        else if (src.startsWith('data:')) { const m = src.match(/^data:[^,]*;base64,(.*)$/s); if (m) digest = sha256(Buffer.from(m[1], 'base64')); }
+        else if (src.startsWith('data:')) { const m = /^data:[^,]*;base64,(.*)$/s.exec(src); if (m) digest = sha256(Buffer.from(m[1], 'base64')); }
         else if (/^https?:/i.test(src) && page?.request) { const r = await page.request.get(src); if (r.ok()) digest = sha256(await r.body()); }
       } catch { digest = null; }
       cache.set(src, digest);
@@ -377,14 +377,12 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
       // The DNA name of every grammar root, for the html-reading gates, the redline and the snapshot: data-component
       // where the grammar emits it (every root since grammar 0.6.0), else - a 0.5.x install - the root hook of the
       // components that emitted none (PageContainer, SectionHeader, SurfaceCard, MediaFrame, ...).
-      for (const el of document.querySelectorAll('[data-component]')) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', el.getAttribute('data-component'));
-      for (const [selector, name] of markers) for (const el of document.querySelectorAll(selector)) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', name);
-      {
-        for (const e of entries) {
-          let els = [];
-          try { els = [...document.querySelectorAll(e.selector)]; } catch { els = []; }
-          for (const el of els) el.setAttribute(whyAttr, [...new Set([...(el.getAttribute(whyAttr) ?? '').split(/\s+/).filter(Boolean), e.id])].join(' '));
-        }
+      for (const el of document.querySelectorAll('[data-component]')) if (el.dataset.grammarComponent === undefined) el.dataset.grammarComponent = el.dataset.component;
+      for (const [selector, name] of markers) for (const el of document.querySelectorAll(selector)) if (el.dataset.grammarComponent === undefined) el.dataset.grammarComponent = name;
+      for (const e of entries) {
+        let els = [];
+        try { els = [...document.querySelectorAll(e.selector)]; } catch { els = []; }
+        for (const el of els) el.setAttribute(whyAttr, [...new Set([...(el.getAttribute(whyAttr) ?? '').split(/\s+/).filter(Boolean), e.id])].join(' '));
       }
     }, { entries: (rationale?.entries ?? []).filter((e) => typeof e?.selector === 'string' && typeof e?.id === 'string').map((e) => ({ id: e.id, selector: e.selector })), whyAttr: WHY_ATTR, markers: GRAMMAR_ROOT_MARKERS });
     const raw = await page.evaluate(measurePage, { generic: GENERIC_FAMILIES, exemptSelector: ACCENT_EXEMPT_SELECTOR, layoutAttr: LAYOUT_ATTR });
@@ -639,7 +637,7 @@ export async function run(argv, { cwd = process.cwd() } = {}) {
   const anchor = o.html ? path.dirname(o.html) : path.dirname(o.component);
   // The product app of a drawing that lives outside it (a ui record dir, a temp dir): --product, else the nearest
   // grammar-depending package above the draw file, else above one of its --css stylesheets (the product's own).
-  const inferred = o.component ? (o.product ?? productDirOf(o.component) ?? [].concat(o.css ?? []).map(productDirOf).find(Boolean) ?? null) : null;
+  const inferred = o.component ? (o.product ?? productDirOf(o.component) ?? [o.css ?? []].flat().map(productDirOf).find(Boolean) ?? null) : null;
   const playwright = loadPlaywright([anchor, ...(inferred ? [inferred] : []), cwd]);
   if (o.mode === 'html') {
     const source = { mode: 'html', html: { path: o.html, sha256: sha256(fs.readFileSync(o.html)) } };

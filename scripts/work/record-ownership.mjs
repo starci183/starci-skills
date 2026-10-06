@@ -86,7 +86,7 @@ export const APP_SIDES = Object.freeze(['be', 'fe']);
 function ownerPathProblem(rawPath, appRoot) {
   const rel = String(rawPath).replaceAll('\\', '/');
   const hint = 'an owner path is app-relative: be/<path>, fe/<path> or a directory of the app root';
-  if (/^repository:/.test(rel)) return `${rawPath} names a repository; ${hint}`;
+  if (rel.startsWith('repository:')) return `${rawPath} names a repository; ${hint}`;
   if (path.isAbsolute(rawPath) || /^[A-Za-z]:/.test(rel)) return `${rawPath} is absolute; ${hint}`;
   if (rel === '..' || rel.startsWith('../') || rel.startsWith('./')) return `${rawPath} is relative to another directory; ${hint}`;
   const head = moduleRootOf(rel).split('/')[0];

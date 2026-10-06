@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import {sha256} from '../../../engine/digest.mjs';
 import {
-  DEFAULT_VIEWPORT, alphaOf, firstFamily, geometryChains, geometryProbes, normalizeShadowText, parseViewport, readSnapshot,
+  DEFAULT_VIEWPORT, alphaOf, firstFamily, geometryProbes, normalizeShadowText, parseViewport, readSnapshot,
   resolveGeometry, sameColor, snapshotFiles,
 } from './grammar-geometry.mjs';
 import { contrastRatio as wcagRatio } from '../brand/brand.mjs';
@@ -104,14 +104,14 @@ export function surfaceElements(record, { extra = [] } = {}) {
   const present = new Map();
   for (const k of KINDS) {
     if (k.always) continue;
-    const m = (STATE_KINDS.has(k.id) ? text : structure).match(k.detect);
+    const m = k.detect.exec(STATE_KINDS.has(k.id) ? text : structure);
     if (m) present.set(k.id, `record: "${m[0]}"`);
   }
   if (['modal', 'drawer'].includes(record?.surface) || (record?.surface && typeof record.surface === 'object' && Object.values(record.surface).some((v) => ['modal', 'drawer'].includes(v)))) present.set('overlay', 'record: surface modal/drawer');
   if (present.has('field') && present.has('card')) present.set('nested', present.get('nested') ?? 'record: fields inside a card');
   for (const e of extra) if (KIND_IDS.includes(e)) present.set(e, '--elements');
   const keys = new Set(present.keys());
-  for (const k of KINDS) if (k.always && k.always(keys)) { present.set(k.id, 'every surface'); keys.add(k.id); }
+  for (const k of KINDS) if (k.always?.(keys)) { present.set(k.id, 'every surface'); keys.add(k.id); }
   const named = new Set();
   for (const m of structure.matchAll(/\b([A-Z][a-z]+(?:[A-Z][a-z]+)+|Button|Input|Tabs|Badge|Text|Label|Heading|Icon|Tooltip|Select|Chip)\b/g)) named.add(m[1]);
   for (const k of KINDS) if (present.has(k.id) && k.components.length) named.add(k.components[0]);
@@ -168,7 +168,7 @@ export function classifyCase(rule, c, elements) {
 // Numbers: rem values, Tailwind classes and CSS tokens resolved through the product cascade
 // ---------------------------------------------------------------------------------------------------------
 
-const remPx = (v) => { const m = String(v ?? '').trim().match(/^(-?\d*\.?\d+)(rem|px)?$/); return m ? Number(m[1]) * (m[2] === 'px' ? 1 : REM_PX) : null; };
+const remPx = (v) => { const m = /^(-?\d*\.?\d+)(rem|px)?$/.exec(String(v ?? '').trim()); return m ? Number(m[1]) * (m[2] === 'px' ? 1 : REM_PX) : null; };
 const fmtPx = (n) => (n == null ? '?' : `${Math.round(n * 10) / 10}px`);
 
 /** A token lookup over the family root at one width: `variable(name)` -> {value, px}. */
@@ -215,7 +215,7 @@ export function classValue(cls, scope) {
   return null;
 }
 
-const evalRatio = (v) => { const m = String(v).replace(/\s+/g, '').match(/^calc\(([\d.]+)\/([\d.]+)\)$/); if (m) return Number(m[1]) / Number(m[2]); const n = Number(v); return Number.isFinite(n) ? n : null; };
+const evalRatio = (v) => { const m = /^calc\(([\d.]+)\/([\d.]+)\)$/.exec(String(v).replace(/\s+/g, '')); if (m) return Number(m[1]) / Number(m[2]); const n = Number(v); return Number.isFinite(n) ? n : null; };
 
 /** Every utility class spelled in a render/title string, with its resolved value. */
 export function classesIn(text, scope) {
@@ -327,28 +327,26 @@ export function buildBrief({ record, recordFile = null, repo = null, family = nu
 function fontPx(knowledge, ruleId, scope) {
   const font = knowledge.find((k) => k.rel.endsWith('presentation/font.yaml'));
   const rule = font?.doc.rules?.find((r) => r.id === ruleId);
-  const v = classesIn(rule?.title, scope).find((x) => /^text-/.test(x.cls.replace(/^([a-z0-9-]+:)+/, '')));
+  const v = classesIn(rule?.title, scope).find((x) => x.cls.replace(/^([a-z0-9-]+:)+/, '').startsWith('text-'));
   return v?.px ?? null;
 }
 
 /** The brief as text. */
 export function briefText(b) {
   const lines = [];
-  lines.push(`UI PROOF BRIEF - ${b.record ?? 'surface'}${b.surface ? ` (${path.relative(process.cwd(), b.surface).split(path.sep).join('/')})` : ''}`);
-  lines.push(`Elements: ${Object.entries(b.elements.kinds).map(([k, why]) => `${k} [${why}]`).join('; ')}.`);
-  lines.push(`Components: ${b.elements.components.join(', ') || 'none named'}.`);
-  lines.push(b.geometry.ok ? `Numbers resolved through the product CSS (family ${b.geometry.family}, ${b.geometry.sources.entry ? path.relative(b.geometry.sources.repo, b.geometry.sources.entry).split(path.sep).join('/') : 'installed packages'}).` : `Numbers: knowledge values only (${b.geometry.errors.join('; ')}).`);
-  lines.push('');
-  lines.push(`CONFLICTS (${b.conflicts.length}) - named, not resolved here:`);
+  lines.push(`UI PROOF BRIEF - ${b.record ?? 'surface'}${b.surface ? ` (${path.relative(process.cwd(), b.surface).split(path.sep).join('/')})` : ''}`,
+    `Elements: ${Object.entries(b.elements.kinds).map(([k, why]) => `${k} [${why}]`).join('; ')}.`,
+    `Components: ${b.elements.components.join(', ') || 'none named'}.`,
+    b.geometry.ok ? `Numbers resolved through the product CSS (family ${b.geometry.family}, ${b.geometry.sources.entry ? path.relative(b.geometry.sources.repo, b.geometry.sources.entry).split(path.sep).join('/') : 'installed packages'}).` : `Numbers: knowledge values only (${b.geometry.errors.join('; ')}).`,
+    '',
+    `CONFLICTS (${b.conflicts.length}) - named, not resolved here:`);
   for (const c of b.conflicts) lines.push(`- [${c.kind}] ${c.text}`);
   if (!b.conflicts.length) lines.push('- none found');
   for (const layer of LAYERS) {
-    lines.push('');
-    lines.push(`== ${layer.toUpperCase()} ==`);
+    lines.push('', `== ${layer.toUpperCase()} ==`);
     for (const t of b.topics.filter((x) => x.layer === layer)) {
       if (!t.cases.length && !t.skipped.length) continue;
-      lines.push('');
-      lines.push(`# ${t.path} - ${t.title} (${t.cases.length} applicable, ${t.skipped.length} not)`);
+      lines.push('', `# ${t.path} - ${t.title} (${t.cases.length} applicable, ${t.skipped.length} not)`);
       if (t.scaleNotes) lines.push(`  scale: ${squash(t.scaleNotes)}`);
       for (const c of t.cases) {
         lines.push(`- ${t.path} ${c.rule} ${c.case} [${c.title ? squash(c.title) : ''}] when: ${squash(c.when)}`);
@@ -362,8 +360,7 @@ export function briefText(b) {
     }
   }
   if (b.ownedRows.length) {
-    lines.push('');
-    lines.push('== COMPONENT-OWNED VALUES (compose the component; never restate them in app classes) ==');
+    lines.push('', '== COMPONENT-OWNED VALUES (compose the component; never restate them in app classes) ==');
     for (const r of b.ownedRows) {
       const fact = b.cssFacts.find((f) => f.path === r.path && f.component === r.component && f.element === r.element);
       lines.push(`- ${r.path} ${r.component} "${r.element}": ${r.rule ?? '(no rule)'}${r.px != null ? ` = ${fmtPx(r.px)}` : ''}${fact?.css != null ? `; CSS ${fact.prop} ${fmtPx(fact.css)} (\`${fact.declared}\`)` : ''}`);
@@ -371,10 +368,10 @@ export function briefText(b) {
   }
   if (b.geometry.ok) {
     const a = b.geometry.at[0];
-    lines.push('');
-    lines.push('== GRAMMAR GEOMETRY (grammar-geometry.mjs) ==');
-    lines.push(`- button radius ${fmtPx(a.button['border-radius']?.px)}, height ${fmtPx(a.button.heightPx)} (full width min ${fmtPx(a.button.fill['min-height']?.px)}), padding-inline ${fmtPx(a.button['padding-left']?.px)}; input radius ${fmtPx(a.input.primary['border-radius']?.px)}, height ${fmtPx(a.input.primary.heightPx)}, padding ${fmtPx(a.input.primary['padding-top']?.px)} ${fmtPx(a.input.primary['padding-left']?.px)}, no border, secondary fill ${a.input.secondary['background-color']?.value} inside a surface.`);
-    lines.push(`- card radius ${fmtPx(a.card.top['border-radius']?.px)}, no border, shadow ${normalizeShadowText(a.card.top['box-shadow']?.value)}; content inset ${fmtPx(a.card.content['padding-top']?.px)}; joined inset ${fmtPx(a.card.joined['padding-top']?.px)} gap ${fmtPx(a.card.joined['row-gap']?.px)}; external label to card ${fmtPx(a.card.labelGap?.px)}; badge radius ${fmtPx(a.badge['border-radius']?.px)} height ${fmtPx(a.badge.heightPx)}; font ${b.geometry.font.binding?.value}.`);
+    lines.push('',
+      '== GRAMMAR GEOMETRY (grammar-geometry.mjs) ==',
+      `- button radius ${fmtPx(a.button['border-radius']?.px)}, height ${fmtPx(a.button.heightPx)} (full width min ${fmtPx(a.button.fill['min-height']?.px)}), padding-inline ${fmtPx(a.button['padding-left']?.px)}; input radius ${fmtPx(a.input.primary['border-radius']?.px)}, height ${fmtPx(a.input.primary.heightPx)}, padding ${fmtPx(a.input.primary['padding-top']?.px)} ${fmtPx(a.input.primary['padding-left']?.px)}, no border, secondary fill ${a.input.secondary['background-color']?.value} inside a surface.`,
+      `- card radius ${fmtPx(a.card.top['border-radius']?.px)}, no border, shadow ${normalizeShadowText(a.card.top['box-shadow']?.value)}; content inset ${fmtPx(a.card.content['padding-top']?.px)}; joined inset ${fmtPx(a.card.joined['padding-top']?.px)} gap ${fmtPx(a.card.joined['row-gap']?.px)}; external label to card ${fmtPx(a.card.labelGap?.px)}; badge radius ${fmtPx(a.badge['border-radius']?.px)} height ${fmtPx(a.badge.heightPx)}; font ${b.geometry.font.binding?.value}.`);
     const inset = b.geometry.resolver.memo('inset-root', [b.geometry.chains.html, b.geometry.chains.root], 390).variable('--grammar-page-inset');
     const unbound = b.geometry.unbound.filter((u) => /radius|shadow|surface|font/.test(u.name));
     if (unbound.length) lines.push(`- declared by the ${b.geometry.family} family and read by nothing, so never drawn: ${unbound.map((u) => `${u.name} ${u.value}`).join('; ')}.`);
@@ -449,7 +446,7 @@ function hairlines(v, card) {
     if (e.rect.h > 0 && e.rect.h <= 2 && alphaOf(e.style.bg) > 0) ys.push({ y: e.rect.y, left: e.rect.x, right: e.rect.x + e.rect.w });
   }
   const unique = [];
-  for (const h of ys.sort((a, b) => a.y - b.y)) if (!unique.length || h.y - unique[unique.length - 1].y > 2) unique.push(h);
+  for (const h of ys.toSorted((a, b) => a.y - b.y)) if (!unique.length || h.y - unique.at(-1).y > 2) unique.push(h);
   return unique.filter((h) => h.y > cr.y + 1 && h.y < cr.y + cr.h - 1);
 }
 
@@ -633,7 +630,7 @@ const MEASURERS = {
   },
   'accessibility.yaml A11Y-4 case-4': (v) => (v.snap.root.scrollWidth > v.snap.root.clientWidth + 1 ? FAIL(`horizontal overflow: scrollWidth ${v.snap.root.scrollWidth} > ${v.snap.root.clientWidth}`) : PASS(`no horizontal overflow at ${v.snap.root.clientWidth}px`)),
   'accessibility.yaml A11Y-4 case-1': (v, ctx, c) => {
-    const m = String(c.observe).match(/(\d+)px\s*[x×]\s*(\d+)px/);
+    const m = /(\d+)px\s*[x×]\s*(\d+)px/.exec(String(c.observe));
     if (!m) return NONE('the case names no size');
     const targets = v.els.filter((e) => e.visible && (e.role === 'button' || e.tag === 'button') && v.els.some((x) => x.i === e.i) && (e.cls.includes('accordion') || v.ancestors(e).some((a) => /rail|accordion/i.test(a.cls))));
     if (!targets.length) return NONE('no accordion trigger or rail control rendered (the only targets the case sizes)');
@@ -642,7 +639,7 @@ const MEASURERS = {
   },
   'taste.yaml TASTE-1 case-2': (v) => {
     const heads = v.els.filter((e) => e.visible && /^h[1-6]$/.test(e.tag));
-    const title = heads.filter((e) => e.tag === 'h1')[0] ?? heads.sort((a, b) => b.style.fontSize - a.style.fontSize)[0];
+    const title = heads.find((e) => e.tag === 'h1') ?? heads.sort((a, b) => b.style.fontSize - a.style.fontSize)[0];
     if (!title) return NONE('no heading rendered');
     const sections = heads.filter((e) => e.i !== title.i && e.tag !== 'h1');
     if (!sections.length) return NONE('no section title beside the page title');
@@ -663,7 +660,7 @@ const MEASURERS = {
     return off.length ? FAIL(`vertical gaps ${distinct.join('/')}px; off the closed steps: ${off.join('/')}px`) : PASS(`vertical gaps ${distinct.join('/')}px, all on the closed steps`);
   },
   'taste.yaml TASTE-5 case-1': (v, ctx, c) => {
-    const m = String(c.observe).match(/Exactly (\w+) accent-filled/i);
+    const m = /Exactly (\w+) accent-filled/i.exec(String(c.observe));
     const allowed = m ? numberWord(m[1]) : null;
     const filled = v.buttons.filter((e) => sameColor(e.style.bg, ctx.probes['button.primary.bg']?.rgba));
     if (allowed == null) return NONE('the case names no count');
@@ -671,7 +668,7 @@ const MEASURERS = {
     return filled.length > allowed ? FAIL(`${filled.length} accent-filled controls (${filled.map(tag).join(', ')}), the case allows ${allowed}`) : PASS(`${filled.length} accent-filled control`);
   },
   'taste.yaml TASTE-6 case-1': (v, ctx, c) => {
-    const m = String(c.observe).match(/At most (\w+) distinct sizes, and at most (\w+) weights/i);
+    const m = /At most (\w+) distinct sizes, and at most (\w+) weights/i.exec(String(c.observe));
     if (!m) return NONE('the case names no limits');
     const [maxSizes, maxWeights] = [numberWord(m[1]), numberWord(m[2])];
     const bad = [];
@@ -687,7 +684,7 @@ const MEASURERS = {
     return bad.length ? FAIL(bad.join('; ')) : PASS(`every card within ${maxSizes} sizes and ${maxWeights} weights`);
   },
   'taste.yaml TASTE-7 case-2': (v, ctx, c) => {
-    const m = String(c.observe).match(/more than (\w+) levels/i);
+    const m = /more than (\w+) levels/i.exec(String(c.observe));
     const max = m ? numberWord(m[1]) : null;
     if (max == null) return NONE('the case names no depth');
     const depth = (el) => v.ancestors(el).filter((a) => v.cards.some((x) => x.el.i === a.i)).length + 1;
@@ -751,10 +748,10 @@ function fromSpacing(ctx, idRe, sourceRe = null) {
 }
 
 function textContrast(v, ctx, large) {
-  const m = String(ctx.case.observe ?? '').match(/(\d+(?:\.\d+)?):1/);
+  const m = /(\d+(?:\.\d+)?):1/.exec(String(ctx.case.observe ?? ''));
   const floor = m ? Number(m[1]) : null;
   if (floor == null) return NONE('the case names no ratio');
-  const lm = String(ctx.largeWhen ?? '').match(/`(\d+(?:\.\d+)?)px`.*?`(\d+(?:\.\d+)?)px`/);
+  const lm = /`(\d+(?:\.\d+)?)px`.*?`(\d+(?:\.\d+)?)px`/.exec(String(ctx.largeWhen ?? ''));
   const [big, bigBold] = lm ? [Number(lm[1]), Number(lm[2])] : [null, null];
   if (big == null) return NONE('COLOR-5 case-2 names no large-text size');
   const isLarge = (e) => e.style.fontSize >= big || (e.style.fontSize >= bigBold && e.style.fontWeight >= 700);
@@ -789,7 +786,7 @@ export async function scoreRender(brief, html, { repo = null, viewport = DEFAULT
   const width = viewport.width;
   const scope = g.ok ? tokenScope(g, width) : null;
   const knowledge = loadKnowledge();
-  const geoAt = g.ok ? (g.at.find((w) => w.width === width) ?? resolveGeometry({ repo, family: g.family, widths: [width], ...(g.sources?.drawCss ?? {}) }).at?.[0] ?? g.at[0]) : null;
+  const geoAt = g.ok ? (g.at.find((w) => w.width === width) ?? resolveGeometry({ repo, family: g.family, widths: [width], ...(g.sources?.drawCss) }).at?.[0] ?? g.at[0]) : null;
   const scale = (name, id) => remPx(knowledge.find((k) => k.rel.endsWith(`presentation/${name}.yaml`))?.doc.scale?.steps?.find((s) => s.id === id)?.value);
   const ctx = {
     knowledge, probes: snap.probes ?? {}, width, height: viewport.height,
