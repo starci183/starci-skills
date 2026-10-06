@@ -265,20 +265,24 @@ export function pushGit({ repos = null, check = false, deps = {} } = {}) {
 }
 
 /** Human text of a run: one line per repository and step, then the failure groups of the red step(s). */
+function describeStep(s, out) {
+  out.push('  ' + s.status.padEnd(7) + ' ' + s.name + (s.ms != null ? ' (' + Math.round(s.ms / 1000) + 's)' : '') + (s.note ? ' - ' + s.note : '') + (s.log && s.status === 'red' ? '  log: ' + s.log : ''));
+  for (const g of s.failures ?? []) {
+    out.push(`      ${g.file}`);
+    for (const item of g.items) out.push(`        - ${item}`);
+    if (g.more) out.push(`        - ... ${g.more} more`);
+  }
+}
+
+function describeRepo(r, out) {
+  out.push(r.name + ': ' + String(r.verdict).toUpperCase() + (r.why ? ' - ' + r.why : '') + (r.pushed ? ' (pushed ' + r.pushed + ')' : ''));
+  if (r.dirty?.length) for (const d of r.dirty.slice(0, 15)) out.push(`    dirty ${d}`);
+  for (const s of r.steps ?? []) describeStep(s, out);
+}
+
 export function describeRun(run) {
   const out = [];
-  for (const r of run.repos) {
-    out.push(r.name + ': ' + String(r.verdict).toUpperCase() + (r.why ? ' - ' + r.why : '') + (r.pushed ? ' (pushed ' + r.pushed + ')' : ''));
-    if (r.dirty?.length) for (const d of r.dirty.slice(0, 15)) out.push(`    dirty ${d}`);
-    for (const s of r.steps ?? []) {
-      out.push('  ' + s.status.padEnd(7) + ' ' + s.name + (s.ms != null ? ' (' + Math.round(s.ms / 1000) + 's)' : '') + (s.note ? ' - ' + s.note : '') + (s.log && s.status === 'red' ? '  log: ' + s.log : ''));
-      for (const g of s.failures ?? []) {
-        out.push(`      ${g.file}`);
-        for (const item of g.items) out.push(`        - ${item}`);
-        if (g.more) out.push(`        - ... ${g.more} more`);
-      }
-    }
-  }
+  for (const r of run.repos) describeRepo(r, out);
   if (run.notRun?.length) out.push(`not run (stopped at the first red): ${run.notRun.join(', ')}`);
   out.push(run.ok ? 'PUSH-GIT ' + (run.check ? 'CHECK ' : '') + 'GREEN' + (run.check ? '' : ': ' + run.pushed + ' commit(s) pushed') : 'PUSH-GIT RED: fix the failing groups, land the fixes (starci supervisor land --specs touching), then run starci supervisor push again');
   return out.join('\n');
