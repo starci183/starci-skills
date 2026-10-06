@@ -83,7 +83,11 @@ function readEvidenceFile(file, limit, code) {
       throw refuse('evidence input changed or exceeds its byte limit; scratch is retained', code);
     const bytes = Buffer.alloc(stat.size + 1);
     let count = 0;
-    while (count < bytes.length) { const n = fs.readSync(fd, bytes, count, bytes.length - count, null); if (!n) break; count += n; }
+    while (count < bytes.length) {
+      const n = fs.readSync(fd, bytes, count, bytes.length - count, null);
+      if (!n) break;
+      count += n;
+    }
     const after = fs.fstatSync(fd);
     if (count > stat.size || after.size !== stat.size || after.mtimeMs !== stat.mtimeMs)
       throw refuse('evidence input changed during staging; scratch is retained', code);
@@ -226,6 +230,22 @@ function auditMatrixScope(value, shape) {
 }
 
 /**
+ * A typed audit's admitted scope, refused when the filed verdict does not match the admitted params.audit
+ * (the same checks the inline block made).
+ */
+function admittedScopeOf({ packet, definition, doc, feature, attempt }) {
+  const admitted = packet.params?.audit, error = paramValueError('audit', definition, admitted);
+  const matrixShape = definition.valueSchema?.properties?.selectedMatrix;
+  const measured = auditMatrixScope(doc.selectedMatrix, matrixShape);
+  if (error || attempt.op_id !== 'interface.audit' || packet.context.selected_op.contract.id !== attempt.op_id
+    || admitted.id !== doc.id || admitted.feature !== feature || feature !== String(doc.id).split('.')[1]
+    || !isDeepStrictEqual(measured, admitted.selectedMatrix)
+    || (Object.hasOwn(doc, 'scope') && !isDeepStrictEqual(doc.scope, admitted.selectedMatrix)))
+    throw refuse('the audit verdict does not match its admitted params.audit scope', 'report-attachment-invalid');
+  return admitted.selectedMatrix;
+}
+
+/**
  * interface.audit's verdict (docs/ledger-db.md: features/<f>/operations/** → interface_audits): an attached
  * interface-audit.json {schema starci/interface-audit-operation@1, id operation.<feature>.<name>, feature?, scope |
  * selectedMatrix, verdict?, findings?, routeTo?} becomes the interface_audits row of that audit, bound to this attempt.
@@ -246,18 +266,7 @@ function interfaceAuditOf(db, { attempt, staged, report, now }) {
   if (doc?.schema !== INTERFACE_AUDIT_SCHEMA || !/^operation\.[a-z0-9-]+\.[a-z0-9-]+$/.test(String(doc.id ?? '')))
     throw refuse(`${item.name} is not a ${INTERFACE_AUDIT_SCHEMA} verdict with id operation.<feature>.<name>`, 'report-attachment-invalid');
   const feature = doc.feature ?? String(doc.id).split('.')[1];
-  let scope = doc.scope ?? doc.selectedMatrix ?? {};
-  if (typed) {
-    const admitted = packet.params?.audit, error = paramValueError('audit', definition, admitted);
-    const matrixShape = definition.valueSchema?.properties?.selectedMatrix;
-    const measured = auditMatrixScope(doc.selectedMatrix, matrixShape);
-    if (error || attempt.op_id !== 'interface.audit' || packet.context.selected_op.contract.id !== attempt.op_id
-      || admitted.id !== doc.id || admitted.feature !== feature || feature !== String(doc.id).split('.')[1]
-      || !isDeepStrictEqual(measured, admitted.selectedMatrix)
-      || (Object.hasOwn(doc, 'scope') && !isDeepStrictEqual(doc.scope, admitted.selectedMatrix)))
-      throw refuse('the audit verdict does not match its admitted params.audit scope', 'report-attachment-invalid');
-    scope = admitted.selectedMatrix;
-  }
+  const scope = typed ? admittedScopeOf({ packet, definition, doc, feature, attempt }) : doc.scope ?? doc.selectedMatrix ?? {};
   const prior = db.prepare('SELECT workflow_id,feature FROM interface_audits WHERE audit_id=?').get(doc.id);
   if (prior && (prior.workflow_id !== attempt.workflow_id || prior.feature !== feature))
     throw refuse('the audit identity is already owned by another workflow or feature', 'report-attachment-invalid');
