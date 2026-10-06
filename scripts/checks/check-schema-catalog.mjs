@@ -11,6 +11,7 @@
 // kind the generated modules/ops/registry.yaml indexes.
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -38,19 +39,8 @@ function stampOf(text) {
   return match[1] ?? match[2] ?? match[3] ?? null;
 }
 
-export function checkSchemaCatalog({ root = skillRoot } = {}) {
-  const modulesDir = root === skillRoot ? MODULES_DIR : path.join(root, 'modules');
-  const catalogFile = root === skillRoot ? CATALOG_FILE : path.join(root, 'modules', 'schemas', 'index.yaml');
-  const errors = [];
-
-  let catalog = null;
-  try {
-    catalog = parseYaml(fs.readFileSync(catalogFile, 'utf8'));
-  } catch (error) {
-    return { ok: false, errors: [`modules/schemas/index.yaml is unreadable: ${error.message}`], stamps: [], uncatalogued: [], unused: [] };
-  }
-
-  // `id` may carry a trailing parenthetical note; the const is the first token.
+// `id` may carry a trailing parenthetical note; the const is the first token.
+const catalogMaps = (catalog, errors) => {
   const catalogued = new Map();
   for (const entry of catalog?.schemas ?? []) {
     const id = String(entry?.id ?? '').trim().split(/\s+/)[0];
@@ -67,18 +57,28 @@ export function checkSchemaCatalog({ root = skillRoot } = {}) {
     if (!declared.length) errors.push(`moduleLocalDocumentKinds entry ${id} declares no files[]`);
     moduleLocal.set(id, declared);
   }
+  return { catalogued, moduleLocal };
+};
 
+/** The schema: stamps of every yaml file under `dir`, as [{file, id}]. */
+const moduleStamps = (root, modulesDir) => {
   const stamps = [];
-  for (const file of yamlFilesUnder(modulesDir).sort()) {
+  for (const file of yamlFilesUnder(modulesDir).sort(byCodeUnit)) {
     const relative = rel(root, file);
     if (relative.startsWith(EXCLUDED_PREFIX)) continue;
     const id = stampOf(fs.readFileSync(file, 'utf8'));
     if (id) stamps.push({ file: relative, id });
   }
+  return stamps;
+};
 
+/** The stamps that name an id the index does not know, plus the module-local file-list errors. */
+const stampFindings = (stamps, catalogued, moduleLocal, errors) => {
   const uncatalogued = [];
   for (const { file, id } of stamps) {
-    const where = catalogued.has(id) ? 'schemas' : (moduleLocal.has(id) ? 'module-local' : null);
+    let where = null;
+    if (catalogued.has(id)) where = 'schemas';
+    else if (moduleLocal.has(id)) where = 'module-local';
     if (!where) {
       uncatalogued.push({ file, id });
       errors.push(`${file} stamps ${id}, which modules/schemas/index.yaml does not list (add a schemas[] entry or a moduleLocalDocumentKinds[] entry)`);
@@ -88,9 +88,12 @@ export function checkSchemaCatalog({ root = skillRoot } = {}) {
     if (where === 'module-local' && !moduleLocal.get(id).includes(file))
       errors.push(`${file} stamps module-local kind ${id}, which modules/schemas/index.yaml does not list under its files[]`);
   }
+  return uncatalogued;
+};
 
-  // Stale entries: a module-local kind nothing stamps, or a listed file that
-  // does not stamp the kind it is listed under.
+// Stale entries: a module-local kind nothing stamps, or a listed file that
+// does not stamp the kind it is listed under.
+const staleFindings = (stamps, moduleLocal, errors) => {
   const stampedIds = new Set(stamps.map((s) => s.id));
   const stampByFile = new Map(stamps.map((s) => [s.file, s.id]));
   const unused = [...moduleLocal.keys()].filter((id) => !stampedIds.has(id));
@@ -101,6 +104,25 @@ export function checkSchemaCatalog({ root = skillRoot } = {}) {
       else if (stampByFile.get(file) !== id) errors.push(`moduleLocalDocumentKinds lists ${file} under ${id}, but it stamps ${stampByFile.get(file)}`);
     }
   }
+  return unused;
+};
+
+export function checkSchemaCatalog({ root = skillRoot } = {}) {
+  const modulesDir = root === skillRoot ? MODULES_DIR : path.join(root, 'modules');
+  const catalogFile = root === skillRoot ? CATALOG_FILE : path.join(root, 'modules', 'schemas', 'index.yaml');
+  const errors = [];
+
+  let catalog = null;
+  try {
+    catalog = parseYaml(fs.readFileSync(catalogFile, 'utf8'));
+  } catch (error) {
+    return { ok: false, errors: [`modules/schemas/index.yaml is unreadable: ${error.message}`], stamps: [], uncatalogued: [], unused: [] };
+  }
+
+  const { catalogued, moduleLocal } = catalogMaps(catalog, errors);
+  const stamps = moduleStamps(root, modulesDir);
+  const uncatalogued = stampFindings(stamps, catalogued, moduleLocal, errors);
+  const unused = staleFindings(stamps, moduleLocal, errors);
 
   return { ok: errors.length === 0, errors, stamps, uncatalogued, unused };
 }
@@ -111,9 +133,10 @@ function schemaCatalogMain(argv = []) {
   const result = checkSchemaCatalog();
   if (argv.includes('--json'))
     return { exitCode: result.ok ? 0 : 1, text: `${JSON.stringify({ schema: 'starci/schema-catalog-check@1', ok: result.ok, errors: result.errors, stampCount: result.stamps.length }, null, 2)}\n` };
+  const errorLines = result.errors.map((e) => `  ${e}`).join('\n');
   const text = result.ok
     ? `OK: ${result.stamps.length} schema stamps under modules/ are all catalogued.\n`
-    : `${result.errors.map((e) => `  ${e}`).join('\n')}\nFAIL: ${result.errors.length} schema catalog gap(s).\n`;
+    : `${errorLines}\nFAIL: ${result.errors.length} schema catalog gap(s).\n`;
   return { exitCode: result.ok ? 0 : 1, text };
 }
 

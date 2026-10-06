@@ -2,8 +2,7 @@
 // This module only extracts explicit command spans; command admission remains command-policy.yaml plus policyVerdict().
 import { policyVerdict } from '../../guards/command-policy.mjs';
 import { maskTextRange } from '../../lib/text-mask.mjs';
-import { lineTextAt, sentenceRanges, sentenceTextAt } from '../../lib/tracked-text-scan.mjs';
-import { sentencesOf } from '../../lib/tracked-text-scan.mjs';
+import { lineTextAt, sentenceRanges, sentenceTextAt, sentencesOf } from '../../lib/tracked-text-scan.mjs';
 
 const POLICY_PROGRAMS = new Set([
   'git', 'npm', 'npx', 'pnpm', 'yarn',
@@ -15,12 +14,38 @@ const PROHIBITION = /\b(?:forbidden|refused|removed|retired|never|denied|raw)\b/
 const HISTORY = /(?:^|\/)CHANGELOG[^/]*$/i;
 const CATALOG_TEXT_FIELDS = new Set(['conventions', 'removed']);
 
-const posix = (value) => String(value).replace(/\\/g, '/');
+const posix = (value) => String(value).replaceAll('\\', '/');
 const programName = (value) => {
   const word = posix(value).toLowerCase().replace(/\.(?:exe|cmd|bat|ps1)$/, '');
   return word.includes('/') ? null : word;
 };
 const lineAt = (text, at) => text.slice(0, at).split('\n').length;
+
+const LINE_TERMINATOR = new Set(['\n', '\r', ' ', ' ']);
+
+/**
+ * Each /.*(?:\n|$)/g match of `text`, with its offset: [{index, line}] — a run of
+ * non-line-terminator chars ending at `\n` or end-of-text. `.` excludes every line
+ * terminator, so a `\r` (or U+2028/U+2029) before a `\n` leaves only the empty `\n`
+ * match; the empty end-of-text match is excluded as `!match[0]` excluded it.
+ */
+const lineSpans = (text) => {
+  const spans = [];
+  let run = null;
+  for (let i = 0; i < text.length; i += 1) {
+    if (!LINE_TERMINATOR.has(text[i])) {
+      if (run === null) run = i;
+      continue;
+    }
+    if (text[i] === '\n') spans.push({ index: run ?? i, line: text.slice(run ?? i, i + 1) });
+    run = null;
+  }
+  if (run !== null) spans.push({ index: run, line: text.slice(run) });
+  return spans;
+};
+
+/** A span's text without its line ending (a span holds no `\r`). */
+const lineContent = (line) => (line.endsWith('\n') ? line.slice(0, -1) : line);
 
 /** Whether a tracked path is agent-facing guidance in the R201 raw-command scope. */
 function isRawGuidanceFile(file) {
@@ -51,15 +76,13 @@ function maskCatalogGuidanceFields(text, file) {
   if (!rel.startsWith('modules/cli/commands/') || !/\.ya?ml$/i.test(rel)) return String(text);
   let result = String(text);
   let blockIndent = null;
-  for (const match of result.matchAll(/.*(?:\n|$)/g)) {
-    if (!match[0]) continue;
-    const line = match[0];
-    const content = line.replace(/[\r\n]+$/, '');
+  for (const { index, line } of lineSpans(result)) {
+    const content = lineContent(line);
     const indent = /^\s*/.exec(content)[0].length;
     const key = /^\s*([A-Za-z][A-Za-z0-9-]*)\s*:/.exec(content)?.[1] ?? null;
     const starts = key && CATALOG_TEXT_FIELDS.has(key);
     const continues = blockIndent !== null && (!content.trim() || indent > blockIndent);
-    if (starts || continues) result = maskTextRange(result, match.index, match.index + line.length);
+    if (starts || continues) result = maskTextRange(result, index, index + line.length);
     if (starts) blockIndent = /:\s*$/.test(content) ? indent : null;
     else if (blockIndent !== null && content.trim() && indent <= blockIndent) blockIndent = null;
   }
@@ -80,13 +103,12 @@ function rawCommandSpans(text) {
   const source = String(text);
   const out = [], seen = new Set();
   let fenced = false;
-  for (const match of source.matchAll(/.*(?:\n|$)/g)) {
-    if (!match[0]) continue;
-    const line = match[0].replace(/[\r\n]+$/, '');
+  for (const { index, line: rawLine } of lineSpans(source)) {
+    const line = lineContent(rawLine);
     if (/^\s*(?:```|~~~)/.test(line)) { fenced = !fenced; continue; }
-    const prompt = /^\s*(?:[-*]\s+)?(?:\$|PS>|>)\s+(.+)$/i.exec(line);
-    if (fenced) addCandidate(out, seen, line, match.index + (/^\s*/.exec(line)?.[0].length ?? 0));
-    else if (prompt) addCandidate(out, seen, prompt[1], match.index + prompt.index + prompt[0].indexOf(prompt[1]));
+    const prompt = /^\s*(?:[-*]\s+)?(?:\$|PS>|>)\s+(\S.*)$/i.exec(line);
+    if (fenced) addCandidate(out, seen, line, index + (/^\s*/.exec(line)?.[0].length ?? 0));
+    else if (prompt) addCandidate(out, seen, prompt[1], index + prompt.index + prompt[0].indexOf(prompt[1]));
   }
   for (const match of source.matchAll(/`([^`\r\n]+)`/g)) addCandidate(out, seen, match[1], match.index + 1);
   return out.sort((a, b) => a.at - b.at || a.text.localeCompare(b.text));
@@ -105,22 +127,28 @@ const npxProgram = (args) => {
   return programName(args[index]);
 };
 
+/** The {program, args, text} one trimmed segment describes, or null when it is not a policy command. */
+const commandOf = (segment) => {
+  const words = shellWords(segment);
+  while (words.length && /^[A-Za-z_]\w*=/.test(words[0])) words.shift();
+  if (!words.length || words[0].toLowerCase() === 'cd') return null;
+  const program = programName(words.shift());
+  if (!program) return null;
+  const args = words;
+  if (program === 'node' && !args.some((arg) => arg === '--test' || arg.startsWith('--test='))) return null;
+  if (program === 'npx' && !NPX_PROGRAMS.has(npxProgram(args))) return null;
+  if (program !== 'node' && !POLICY_PROGRAMS.has(program)) return null;
+  return { program, args, text: segment };
+};
+
 /** Split the permitted simple shell separators; command text is guidance, never executed. */
 function commandsFromSpan(text) {
   const out = [];
   for (let segment of String(text).replace(/^\s*(?:\$|PS>|>)\s*/i, '').split(/&&|[;|]/)) {
     segment = segment.trim();
     if (!segment) continue;
-    const words = shellWords(segment);
-    while (words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0])) words.shift();
-    if (!words.length || words[0].toLowerCase() === 'cd') continue;
-    const program = programName(words.shift());
-    if (!program) continue;
-    const args = words;
-    if (program === 'node' && !args.some((arg) => arg === '--test' || arg.startsWith('--test='))) continue;
-    if (program === 'npx' && !NPX_PROGRAMS.has(npxProgram(args))) continue;
-    if (program !== 'node' && !POLICY_PROGRAMS.has(program)) continue;
-    out.push({ program, args, text: segment });
+    const command = commandOf(segment);
+    if (command) out.push(command);
   }
   return out;
 }

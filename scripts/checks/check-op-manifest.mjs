@@ -16,6 +16,7 @@
 // Exit 0 is clean; any finding exits 1.
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -40,7 +41,7 @@ const UNITS = [
 ];
 // `five rounds` and `five-round` are the same restatement.
 const NUMBER_RE = new RegExp(
-  `\\b(${NUMBER_WORDS.join('|')}|\\d+)[\\s-]+(${UNITS.map((u) => u.prose).join('|')})\\b`, 'gi');
+  String.raw`\b(${NUMBER_WORDS.join('|')}|\d+)[\s-]+(${UNITS.map((u) => u.prose).join('|')})\b`, 'gi');
 
 const flatten = (s) => String(s).replace(/\s+/g, ' ').trim();
 const normalize = (s) => flatten(s).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -80,6 +81,149 @@ const unitOf = (word) => {
 };
 
 // -------------------------------------------------------------------- rules
+
+/** The schema findings of one variant of one op: duplicate section keys, undeclared step refs. */
+const variantSectionFindings = (id, full, mode, effective, add) => {
+  for (const section of ['reads', 'writes', 'proofs', 'blockers']) {
+    const key = section === 'blockers' ? 'code' : 'id', seen = new Set();
+    const entries = mode === 'envelope' ? full[section] : full.policy.executionModes[mode][section];
+    for (const entry of Array.isArray(entries) ? entries : []) {
+      if (seen.has(entry?.[key])) add(id, 'SCHEMA_INVALID', 'error', `${mode}.${section}: duplicate ${key} ${entry?.[key]}`);
+      seen.add(entry?.[key]);
+    }
+  }
+  for (const [i, step] of (Array.isArray(effective?.steps) ? effective.steps : []).entries()) {
+    for (const section of ['reads', 'writes']) {
+      const declared = new Set((effective?.[section] ?? []).map((entry) => entry.id));
+      for (const ref of step?.[section] ?? []) if (!declared.has(ref)) {
+        add(id, 'SCHEMA_INVALID', 'error', `${mode}.steps[${i}].${section}: undeclared ${ref}`);
+      }
+    }
+  }
+};
+
+/** The variant-only findings of one non-envelope variant: on-disk checks and joined write paths. */
+const variantDiskFindings = (id, mode, effective, root, add) => {
+  for (const [i, proof] of (effective?.proofs ?? []).entries()) if (typeof proof.check === 'string' && !fs.existsSync(path.join(root, proof.check))) {
+    add(id, 'CHECK_MISSING', 'error', `${mode}.proofs[${i}] (${proof.id}).check names ${proof.check}, which is not on disk`);
+  }
+  for (const [i, write] of (effective?.writes ?? []).entries()) if (write.path?.includes(' + ')) {
+    add(id, 'PATH_JOINED', 'error', `${mode}.writes[${i}] (${write.id}).path joins several paths with ' + '`);
+  }
+};
+
+/** Every schema-level finding of one op's envelope and declared execution-mode variants. */
+const variantFindings = (id, full, root, add) => {
+  const variants = [['envelope', full]];
+  for (const mode of Object.keys(full?.policy?.executionModes ?? {})) {
+    const selected = resolveOpContract(full, { mode });
+    if (!selected.ok) add(id, 'SCHEMA_INVALID', 'error', selected.detail);
+    else variants.push([mode, selected.contract]);
+    if (!full.params?.mode?.enum?.includes(mode)) add(id, 'SCHEMA_INVALID', 'error', `executionModes.${mode} is not declared by params.mode.enum`);
+  }
+  for (const [mode, effective] of variants) {
+    variantSectionFindings(id, full, mode, effective, add);
+    if (mode !== 'envelope') variantDiskFindings(id, mode, effective, root, add);
+  }
+};
+
+// PARAM_DEFAULT — a param either has a value that stands when nobody sets it, or is required
+// of its setter at enqueue; a JSON schema walker without oneOf cannot say "exactly one".
+const paramFindings = (id, full, add) => {
+  for (const [name, def] of Object.entries(full?.params && typeof full.params === 'object' ? full.params : {})) {
+    const definitionError = paramDefinitionError(name, def);
+    if (definitionError) add(id, 'SCHEMA_INVALID', 'error', `params.${name}: ${definitionError}`);
+    const hasDefault = Object.hasOwn(def ?? {}, 'default'), required = def?.required === true;
+    if (hasDefault === required) add(id, 'PARAM_DEFAULT', 'error', `params.${name} ${hasDefault ? 'carries both a default and required: true' : 'carries neither a default nor required: true'} — exactly one`);
+    if (hasDefault) {
+      const error = paramValueError(name, def, def.default);
+      if (error) add(id, 'PARAM_DEFAULT', 'error', `params.${name}.default: ${error}`);
+    }
+  }
+};
+
+// (a) PARAM_RESTATED — a tunable's value spelled out in prose the agent reads as law.
+const restatedFindings = (id, full, add) => {
+  const covered = unitsCoveredBy(full?.params);
+  if (!covered.size) return;
+  const proseFields = [
+    ...(Array.isArray(full?.steps) ? full.steps.map((s, i) => ({ at: `steps[${i}].action.en`, text: s?.action?.en })) : []),
+    ...(Array.isArray(full?.proofs) ? full.proofs.map((p, i) => ({ at: `proofs[${i}].requirement.en`, text: p?.requirement?.en })) : []),
+  ];
+  for (const { at, text } of proseFields) {
+    if (typeof text !== 'string') continue;
+    for (const match of flatten(text).matchAll(NUMBER_RE)) {
+      const unit = unitOf(match[2]);
+      if (unit && covered.has(unit)) add(id, 'PARAM_RESTATED', 'error', `${at}: "${match[0]}" restates a value params already carry — cite params.<name>`);
+    }
+  }
+};
+
+// (b) RULE_DUPLICATED — one rule, one place.
+const duplicatedFindings = (id, full, add) => {
+  const seen = new Map();
+  for (const { at, text } of proseStrings(full)) {
+    for (const sentence of sentencesOf(text)) {
+      const key = normalize(sentence);
+      if (wordCount(key) < 12) continue;
+      if (seen.has(key)) add(id, 'RULE_DUPLICATED', 'error', `${at} repeats ${seen.get(key)}: "${flatten(sentence).slice(0, 90)}…"`);
+      else seen.set(key, at);
+    }
+  }
+};
+
+// (c) RULE_IN_DATA — reads describe data; the rule belongs to the step.
+const ruleInDataFindings = (id, full, add) => {
+  for (const [i, read] of (Array.isArray(full?.reads) ? full.reads : []).entries()) {
+    const purpose = read?.purpose?.en;
+    if (typeof purpose !== 'string') continue;
+    // A hyphenated compound is a name, not a rule: `read-only` access is data.
+    const words = [...new Set([...purpose.matchAll(/(?<![-\w])(must|never|only|reject)(?![-\w])/gi)].map((m) => m[1].toLowerCase()))];
+    if (words.length) add(id, 'RULE_IN_DATA', 'warn', `reads[${i}] (${read?.id ?? '?'}).purpose.en carries a rule (${words.join(', ')}) — move it to the step that applies it`);
+  }
+};
+
+// (d) PATH_JOINED — one write entry, one path.
+const pathJoinedFindings = (id, full, add) => {
+  for (const [i, write] of (Array.isArray(full?.writes) ? full.writes : []).entries()) {
+    if (typeof write?.path === 'string' && write.path.includes(' + ')) add(id, 'PATH_JOINED', 'error', `writes[${i}] (${write?.id ?? '?'}).path joins several paths with ' + ' — one path (or one glob) per entry`);
+  }
+};
+
+// (e) CHECK_MISSING — a claim that executes.
+const checkMissingFindings = (id, full, root, add) => {
+  for (const [i, proof] of (Array.isArray(full?.proofs) ? full.proofs : []).entries()) {
+    const check = proof?.check;
+    if (typeof check !== 'string' || !check.trim()) continue;
+    if (!fs.existsSync(path.join(root, check))) add(id, 'CHECK_MISSING', 'error', `proofs[${i}] (${proof?.id ?? '?'}).check names ${check}, which is not on disk`);
+  }
+};
+
+/** Every finding of one op manifest file; a file that cannot be judged (parse or shared-fragment error) stops there. */
+const opFileFindings = ({ file, dir, root, schema, add }) => {
+  const id = file.replace(/\.yaml$/, '');
+  let doc;
+  try { doc = parseYaml(fs.readFileSync(path.join(dir, file), 'utf8')); }
+  catch (e) { add(id, 'SCHEMA_INVALID', 'error', `unparseable: ${e.message}`); return; }
+
+  for (const error of validateAgainstSchema(doc, schema)) add(id, 'SCHEMA_INVALID', 'error', error);
+  if (doc?.id && doc.id !== id) add(id, 'SCHEMA_INVALID', 'error', `$.id is ${doc.id} but the file is ${file}`);
+
+  // `shared:` markers expand to the _common.yaml fragments — the rules below
+  // judge the effective manifest text, not the stub (scripts/lib/op-shared.mjs).
+  let full;
+  try { full = mergeOpShared(doc, opSharedOf(dir)); }
+  catch (e) { add(id, 'SCHEMA_INVALID', 'error', `shared fragment: ${e.message}`); return; }
+
+  variantFindings(id, full, root, add);
+  paramFindings(id, full, add);
+  restatedFindings(id, full, add);
+  duplicatedFindings(id, full, add);
+  ruleInDataFindings(id, full, add);
+  pathJoinedFindings(id, full, add);
+  checkMissingFindings(id, full, root, add);
+};
+
 export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
   const dir = opsDir ? path.resolve(opsDir) : path.join(root, 'modules', 'ops', 'ops');
   const schemaFile = path.join(root, SCHEMA_FILE);
@@ -90,120 +234,11 @@ export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
   const schema = parseYaml(fs.readFileSync(schemaFile, 'utf8'));
 
   const files = fs.existsSync(dir)
-    ? fs.readdirSync(dir).filter((f) => f.endsWith('.yaml') && !f.startsWith('_')).sort()
+    ? fs.readdirSync(dir).filter((f) => f.endsWith('.yaml') && !f.startsWith('_')).sort(byCodeUnit)
     : [];
   if (!files.length) return { ok: false, opCount: 0, findings: [{ op: '-', code: 'SCHEMA_MISSING', level: 'error', message: `no op manifests under ${dir}` }] };
 
-  for (const file of files) {
-    const id = file.replace(/\.yaml$/, '');
-    let doc;
-    try { doc = parseYaml(fs.readFileSync(path.join(dir, file), 'utf8')); }
-    catch (e) { add(id, 'SCHEMA_INVALID', 'error', `unparseable: ${e.message}`); continue; }
-
-    for (const error of validateAgainstSchema(doc, schema)) add(id, 'SCHEMA_INVALID', 'error', error);
-    if (doc?.id && doc.id !== id) add(id, 'SCHEMA_INVALID', 'error', `$.id is ${doc.id} but the file is ${file}`);
-
-    // `shared:` markers expand to the _common.yaml fragments — the rules below
-    // judge the effective manifest text, not the stub (scripts/lib/op-shared.mjs).
-    let full;
-    try { full = mergeOpShared(doc, opSharedOf(dir)); }
-    catch (e) { add(id, 'SCHEMA_INVALID', 'error', `shared fragment: ${e.message}`); continue; }
-
-    const variants = [['envelope', full]];
-    for (const mode of Object.keys(full?.policy?.executionModes ?? {})) {
-      const selected = resolveOpContract(full, { mode });
-      if (!selected.ok) add(id, 'SCHEMA_INVALID', 'error', selected.detail);
-      else variants.push([mode, selected.contract]);
-      if (!full.params?.mode?.enum?.includes(mode)) add(id, 'SCHEMA_INVALID', 'error', `executionModes.${mode} is not declared by params.mode.enum`);
-    }
-    for (const [mode, effective] of variants) {
-      for (const section of ['reads', 'writes', 'proofs', 'blockers']) {
-        const key = section === 'blockers' ? 'code' : 'id', seen = new Set();
-        const entries = mode === 'envelope' ? full[section] : full.policy.executionModes[mode][section];
-        for (const entry of Array.isArray(entries) ? entries : []) {
-          if (seen.has(entry?.[key])) add(id, 'SCHEMA_INVALID', 'error', `${mode}.${section}: duplicate ${key} ${entry?.[key]}`);
-          seen.add(entry?.[key]);
-        }
-      }
-      for (const [i, step] of (Array.isArray(effective?.steps) ? effective.steps : []).entries()) {
-        for (const section of ['reads', 'writes']) {
-          const declared = new Set((effective?.[section] ?? []).map((entry) => entry.id));
-          for (const ref of step?.[section] ?? []) if (!declared.has(ref)) {
-            add(id, 'SCHEMA_INVALID', 'error', `${mode}.steps[${i}].${section}: undeclared ${ref}`);
-          }
-        }
-      }
-      if (mode !== 'envelope') {
-        for (const [i, proof] of (effective?.proofs ?? []).entries()) if (typeof proof.check === 'string' && !fs.existsSync(path.join(root, proof.check))) {
-          add(id, 'CHECK_MISSING', 'error', `${mode}.proofs[${i}] (${proof.id}).check names ${proof.check}, which is not on disk`);
-        }
-        for (const [i, write] of (effective?.writes ?? []).entries()) if (write.path?.includes(' + ')) {
-          add(id, 'PATH_JOINED', 'error', `${mode}.writes[${i}] (${write.id}).path joins several paths with ' + '`);
-        }
-      }
-    }
-
-    // PARAM_DEFAULT — a param either has a value that stands when nobody sets it, or is required
-    // of its setter at enqueue; a JSON schema walker without oneOf cannot say "exactly one".
-    for (const [name, def] of Object.entries(full?.params && typeof full.params === 'object' ? full.params : {})) {
-      const definitionError = paramDefinitionError(name, def);
-      if (definitionError) add(id, 'SCHEMA_INVALID', 'error', `params.${name}: ${definitionError}`);
-      const hasDefault = Object.hasOwn(def ?? {}, 'default'), required = def?.required === true;
-      if (hasDefault === required) add(id, 'PARAM_DEFAULT', 'error', `params.${name} ${hasDefault ? 'carries both a default and required: true' : 'carries neither a default nor required: true'} — exactly one`);
-      if (hasDefault) {
-        const error = paramValueError(name, def, def.default);
-        if (error) add(id, 'PARAM_DEFAULT', 'error', `params.${name}.default: ${error}`);
-      }
-    }
-
-    // (a) PARAM_RESTATED — a tunable's value spelled out in prose the agent reads as law.
-    const covered = unitsCoveredBy(full?.params);
-    if (covered.size) {
-      const proseFields = [
-        ...(Array.isArray(full?.steps) ? full.steps.map((s, i) => ({ at: `steps[${i}].action.en`, text: s?.action?.en })) : []),
-        ...(Array.isArray(full?.proofs) ? full.proofs.map((p, i) => ({ at: `proofs[${i}].requirement.en`, text: p?.requirement?.en })) : []),
-      ];
-      for (const { at, text } of proseFields) {
-        if (typeof text !== 'string') continue;
-        for (const match of flatten(text).matchAll(NUMBER_RE)) {
-          const unit = unitOf(match[2]);
-          if (unit && covered.has(unit)) add(id, 'PARAM_RESTATED', 'error', `${at}: "${match[0]}" restates a value params already carry — cite params.<name>`);
-        }
-      }
-    }
-
-    // (b) RULE_DUPLICATED — one rule, one place.
-    const seen = new Map();
-    for (const { at, text } of proseStrings(full)) {
-      for (const sentence of sentencesOf(text)) {
-        const key = normalize(sentence);
-        if (wordCount(key) < 12) continue;
-        if (seen.has(key)) add(id, 'RULE_DUPLICATED', 'error', `${at} repeats ${seen.get(key)}: "${flatten(sentence).slice(0, 90)}…"`);
-        else seen.set(key, at);
-      }
-    }
-
-    // (c) RULE_IN_DATA — reads describe data; the rule belongs to the step.
-    for (const [i, read] of (Array.isArray(full?.reads) ? full.reads : []).entries()) {
-      const purpose = read?.purpose?.en;
-      if (typeof purpose !== 'string') continue;
-      // A hyphenated compound is a name, not a rule: `read-only` access is data.
-      const words = [...new Set([...purpose.matchAll(/(?<![-\w])(must|never|only|reject)(?![-\w])/gi)].map((m) => m[1].toLowerCase()))];
-      if (words.length) add(id, 'RULE_IN_DATA', 'warn', `reads[${i}] (${read?.id ?? '?'}).purpose.en carries a rule (${words.join(', ')}) — move it to the step that applies it`);
-    }
-
-    // (d) PATH_JOINED — one write entry, one path.
-    for (const [i, write] of (Array.isArray(full?.writes) ? full.writes : []).entries()) {
-      if (typeof write?.path === 'string' && write.path.includes(' + ')) add(id, 'PATH_JOINED', 'error', `writes[${i}] (${write?.id ?? '?'}).path joins several paths with ' + ' — one path (or one glob) per entry`);
-    }
-
-    // (e) CHECK_MISSING — a claim that executes.
-    for (const [i, proof] of (Array.isArray(full?.proofs) ? full.proofs : []).entries()) {
-      const check = proof?.check;
-      if (typeof check !== 'string' || !check.trim()) continue;
-      if (!fs.existsSync(path.join(root, check))) add(id, 'CHECK_MISSING', 'error', `proofs[${i}] (${proof?.id ?? '?'}).check names ${check}, which is not on disk`);
-    }
-  }
+  for (const file of files) opFileFindings({ file, dir, root, schema, add });
 
   return { ok: findings.length === 0, opCount: files.length, findings };
 }

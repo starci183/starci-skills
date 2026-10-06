@@ -63,7 +63,7 @@ const byId = (list) => new Map((Array.isArray(list) ? list : [])
 
 function checkWorkSchemas(root, findings) {
   const dir = path.join(root, 'modules', 'schemas');
-  const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => WORK_SCHEMA.test(f)).sort() : [];
+  const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => WORK_SCHEMA.test(f)).sort(byCodeUnit) : [];
   const seen = new Map(); // signature -> {files:Set, trail, lines}
   for (const file of files) {
     let doc;
@@ -88,6 +88,63 @@ function checkWorkSchemas(root, findings) {
   }
 }
 
+/** The restated-fragment and restated-leaf checks of one reads/writes entry that has a shared fragment. */
+const entryFindings = (rel, section, i, entry, frag, leafRestated, findings) => {
+  if (restates(frag, entry)) {
+    findings.push({ code: 'RT_OP_FIELD_NOT_COMMON', path: rel,
+      message: `${rel} ${section}[${i}] ${entry.id} restates the shared ${section} fragment '${entry.id}' verbatim — mark it (path: shared) so _common.yaml stays the one copy` });
+    return;
+  }
+  // A text leaf identical to the fragment's, in an entry that carries every fragment key,
+  // could be marked `<leaf>: shared` without changing the merged manifest. It counts once
+  // it repeats in MIN_FILES manifests, the same bar the schema half applies.
+  if (!Object.keys(frag).every((k) => k in entry)) return;
+  for (const field of ['purpose', 'content']) {
+    for (const lang of ['en', 'vi']) {
+      const leaf = entry[field]?.[lang];
+      if (leaf == null || leaf === 'shared' || !eq(leaf, frag[field]?.[lang])) continue;
+      const key = `${section}.${entry.id}.${field}.${lang}`;
+      if (!leafRestated.has(key)) leafRestated.set(key, new Set());
+      leafRestated.get(key).add(rel);
+    }
+  }
+};
+
+/** The shared-fragment findings of one op manifest's reads and writes. */
+const sectionFindings = (rel, doc, shared, leafRestated, findings) => {
+  for (const section of ['reads', 'writes']) {
+    const table = byId(shared[section]);
+    for (const [i, entry] of (Array.isArray(doc?.[section]) ? doc[section] : []).entries()) {
+      if (!isObj(entry) || entry.id == null) continue;
+      const frag = table.get(String(entry.id));
+      if (!frag) continue;
+      entryFindings(rel, section, i, entry, frag, leafRestated, findings);
+    }
+  }
+};
+
+/** The placeholder and graphPolicy.location restatement findings of one op manifest. */
+const literalFindings = (rel, doc, shared, findings) => {
+  for (const [k, v] of Object.entries(doc?.placeholders ?? {})) {
+    if (v !== 'shared' && k in (shared.placeholders ?? {}) && eq(v, shared.placeholders[k]))
+      findings.push({ code: 'RT_OP_FIELD_NOT_COMMON', path: rel,
+        message: `${rel} placeholders.${k} restates the shared placeholder verbatim — write ${k}: shared` });
+  }
+  const loc = doc?.graphPolicy?.location;
+  if (loc != null && loc !== 'shared' && shared.graphPolicy?.location != null && eq(loc, shared.graphPolicy.location))
+    findings.push({ code: 'RT_OP_FIELD_NOT_COMMON', path: rel,
+      message: `${rel} graphPolicy.location restates the shared location verbatim — write location: shared` });
+};
+
+/** The leaf keys restated in MIN_FILES or more manifests. */
+const leafRestatedFindings = (leafRestated, findings) => {
+  for (const [key, files] of leafRestated) {
+    if (files.size < MIN_FILES) continue;
+    findings.push({ code: 'RT_OP_FIELD_NOT_COMMON', path: [...files].sort(byCodeUnit).join(', '),
+      message: `${key} is restated literally in ${files.size} op manifests — mark it shared so _common.yaml stays the one copy` });
+  }
+};
+
 function checkOpManifests(root, findings) {
   const opsDir = path.join(root, 'modules', 'ops', 'ops');
   const commonFile = path.join(root, 'modules', 'ops', '_common.yaml');
@@ -98,53 +155,15 @@ function checkOpManifests(root, findings) {
     catch { shared = {}; }
   }
   const leafRestated = new Map(); // `${section}.${id}.${leaf}` -> Set(file)
-  for (const file of fs.readdirSync(opsDir).filter((f) => f.endsWith('.yaml')).sort()) {
+  for (const file of fs.readdirSync(opsDir).filter((f) => f.endsWith('.yaml')).sort(byCodeUnit)) {
     let doc;
     try { doc = parseYaml(fs.readFileSync(path.join(opsDir, file), 'utf8')); }
     catch { continue; }
     const rel = `modules/ops/ops/${file}`;
-    for (const section of ['reads', 'writes']) {
-      const table = byId(shared[section]);
-      for (const [i, entry] of (Array.isArray(doc?.[section]) ? doc[section] : []).entries()) {
-        if (!isObj(entry) || entry.id == null) continue;
-        const frag = table.get(String(entry.id));
-        if (!frag) continue;
-        const where = `${rel} ${section}[${i}] ${entry.id}`;
-        if (restates(frag, entry)) {
-          findings.push({ code: 'RT_OP_FIELD_NOT_COMMON', path: rel,
-            message: `${where} restates the shared ${section} fragment '${entry.id}' verbatim — mark it (path: shared) so _common.yaml stays the one copy` });
-          continue;
-        }
-        // A text leaf identical to the fragment's, in an entry that carries every fragment key,
-        // could be marked `<leaf>: shared` without changing the merged manifest. It counts once
-        // it repeats in MIN_FILES manifests, the same bar the schema half applies.
-        if (!Object.keys(frag).every((k) => k in entry)) continue;
-        for (const field of ['purpose', 'content']) {
-          for (const lang of ['en', 'vi']) {
-            const leaf = entry[field]?.[lang];
-            if (leaf == null || leaf === 'shared' || !eq(leaf, frag[field]?.[lang])) continue;
-            const key = `${section}.${entry.id}.${field}.${lang}`;
-            if (!leafRestated.has(key)) leafRestated.set(key, new Set());
-            leafRestated.get(key).add(rel);
-          }
-        }
-      }
-    }
-    for (const [k, v] of Object.entries(doc?.placeholders ?? {})) {
-      if (v !== 'shared' && k in (shared.placeholders ?? {}) && eq(v, shared.placeholders[k]))
-        findings.push({ code: 'RT_OP_FIELD_NOT_COMMON', path: rel,
-          message: `${rel} placeholders.${k} restates the shared placeholder verbatim — write ${k}: shared` });
-    }
-    const loc = doc?.graphPolicy?.location;
-    if (loc != null && loc !== 'shared' && shared.graphPolicy?.location != null && eq(loc, shared.graphPolicy.location))
-      findings.push({ code: 'RT_OP_FIELD_NOT_COMMON', path: rel,
-        message: `${rel} graphPolicy.location restates the shared location verbatim — write location: shared` });
+    sectionFindings(rel, doc, shared, leafRestated, findings);
+    literalFindings(rel, doc, shared, findings);
   }
-  for (const [key, files] of leafRestated) {
-    if (files.size < MIN_FILES) continue;
-    findings.push({ code: 'RT_OP_FIELD_NOT_COMMON', path: [...files].sort(byCodeUnit).join(', '),
-      message: `${key} is restated literally in ${files.size} op manifests — mark it shared so _common.yaml stays the one copy` });
-  }
+  leafRestatedFindings(leafRestated, findings);
 }
 
 export function checkSchemaShared({ root = skillRoot } = {}) {

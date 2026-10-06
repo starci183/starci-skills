@@ -51,6 +51,39 @@ const usage = (message) => {
   process.exit(2);
 };
 
+/** The {terminals, workers} a --terminals/--workers pair of receipt files carries. */
+const readInput = (file, workersFile) => {
+  if (!fs.existsSync(file)) usage(`check-orca-tree: no terminal listing at ${file}`);
+  const terminals = readTerminals(parseJson(fs.readFileSync(file, 'utf8')));
+  if (!terminals) usage(`check-orca-tree: ${file} holds no terminal listing (expected a terminal-list --json receipt)`);
+  const workers = [];
+  if (workersFile) {
+    if (!fs.existsSync(workersFile)) usage(`check-orca-tree: no worker listing at ${workersFile}`);
+    const listed = readWorkers(parseJson(fs.readFileSync(workersFile, 'utf8')));
+    if (!listed) usage(`check-orca-tree: ${workersFile} holds no worker listing (expected a worker-list --json receipt)`);
+    workers.push(...listed);
+  }
+  return { terminals, workers };
+};
+
+/** The live terminal listing, or usage-exit when Orca cannot produce one. */
+const liveTerminals = () => {
+  const listed = terminalList({});
+  if (!listed.ok) usage(`check-orca-tree: terminal-list failed: ${listed.error ?? 'no listing'}`);
+  return readTerminals(listed) ?? [];
+};
+
+/** The live workers of every Run the ledger's jobs name. */
+const liveWorkers = (db) => {
+  const workers = [];
+  for (const run of ledgerRuns(db)) {
+    const listed = workerListAll({ run });
+    if (!listed.ok) usage(`check-orca-tree: WORKER_LIST_UNAVAILABLE: worker-list --run ${run} failed: ${listed.error ?? 'no listing'}`);
+    workers.push(...listed.workers);
+  }
+  return workers;
+};
+
 function main(argv) {
   const value = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : null; };
   const has = (name) => argv.includes(`--${name}`);
@@ -63,33 +96,15 @@ function main(argv) {
   if (workersFile && !file) usage('check-orca-tree: --workers goes with --terminals (--live lists the workers itself)');
 
   let terminals, workers = [];
-  if (file) {
-    if (!fs.existsSync(file)) usage(`check-orca-tree: no terminal listing at ${file}`);
-    terminals = readTerminals(parseJson(fs.readFileSync(file, 'utf8')));
-    if (!terminals) usage(`check-orca-tree: ${file} holds no terminal listing (expected a terminal-list --json receipt)`);
-    if (workersFile) {
-      if (!fs.existsSync(workersFile)) usage(`check-orca-tree: no worker listing at ${workersFile}`);
-      workers = readWorkers(parseJson(fs.readFileSync(workersFile, 'utf8')));
-      if (!workers) usage(`check-orca-tree: ${workersFile} holds no worker listing (expected a worker-list --json receipt)`);
-    }
-  } else {
-    const listed = terminalList({});
-    if (!listed.ok) usage(`check-orca-tree: terminal-list failed: ${listed.error ?? 'no listing'}`);
-    terminals = readTerminals(listed) ?? [];
-  }
+  if (file) ({ terminals, workers } = readInput(file, workersFile));
+  else terminals = liveTerminals();
 
   const ledgerFile = ledgerFileFor(path.resolve(repo));
   if (!fs.existsSync(ledgerFile)) usage(`check-orca-tree: no ledger at ${ledgerFile}`);
   const ledger = inspectLedger({ file: ledgerFile });
   let findings;
   try {
-    if (!file) {
-      for (const run of ledgerRuns(ledger.db)) {
-        const listed = workerListAll({ run });
-        if (!listed.ok) usage(`check-orca-tree: WORKER_LIST_UNAVAILABLE: worker-list --run ${run} failed: ${listed.error ?? 'no listing'}`);
-        workers.push(...listed.workers);
-      }
-    }
+    if (!file) workers.push(...liveWorkers(ledger.db));
     findings = orcaTreeFindings(ledger.db, terminals, { repo: path.resolve(repo), workers });
   } finally { ledger.close(); }
 

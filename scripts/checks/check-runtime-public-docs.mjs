@@ -23,6 +23,24 @@ const inputError = (detail) => { throw new Error(`${INPUT}: ${detail}`); };
 const exported = (t, node) => node.modifiers?.some((m) => m.kind === t.SyntaxKind.ExportKeyword);
 const defaulted = (t, node) => node.modifiers?.some((m) => m.kind === t.SyntaxKind.DefaultKeyword);
 
+/** The authored definition a local name resolves to inside `source` (a declaration or an import binding). */
+const localDefinition = ({ t, source, result, through, key, selected }) => {
+  for (const node of source.statements) {
+    if ((t.isFunctionDeclaration(node) || t.isClassDeclaration(node)) && node.name?.text === selected) return result(node);
+    if (t.isVariableStatement(node) && node.declarationList.declarations.some((d) => t.isIdentifier(d.name) && d.name.text === selected)) return result(node);
+    if (t.isImportDeclaration(node) && t.isStringLiteral(node.moduleSpecifier)) {
+      const clause = node.importClause;
+      if (clause?.name?.text === selected) return through(node.moduleSpecifier.text, 'default');
+      const bindings = clause?.namedBindings;
+      if (bindings && t.isNamedImports(bindings)) {
+        const binding = bindings.elements.find((el) => el.name.text === selected);
+        if (binding) return through(node.moduleSpecifier.text, (binding.propertyName ?? binding.name).text);
+      }
+    }
+  }
+  return inputError(`${key} has no authored definition for ${selected}`);
+};
+
 /** Resolve a contract-named export to its authored definition without loading executable modules. */
 function publicDefinition(file, name, context, chain = new Set()) {
   const { t, sourceOf, fileSet } = context;
@@ -37,22 +55,7 @@ function publicDefinition(file, name, context, chain = new Set()) {
     if (!target.endsWith('.mjs') || target.startsWith('../') || !fileSet.has(target)) inputError(`${key} refers to an unavailable runtime module ${target}`);
     return publicDefinition(target, selected, context, next);
   };
-  const local = (selected) => {
-    for (const node of source.statements) {
-      if ((t.isFunctionDeclaration(node) || t.isClassDeclaration(node)) && node.name?.text === selected) return result(node);
-      if (t.isVariableStatement(node) && node.declarationList.declarations.some((d) => t.isIdentifier(d.name) && d.name.text === selected)) return result(node);
-      if (t.isImportDeclaration(node) && t.isStringLiteral(node.moduleSpecifier)) {
-        const clause = node.importClause;
-        if (clause?.name?.text === selected) return through(node.moduleSpecifier.text, 'default');
-        const bindings = clause?.namedBindings;
-        if (bindings && t.isNamedImports(bindings)) {
-          const binding = bindings.elements.find((el) => el.name.text === selected);
-          if (binding) return through(node.moduleSpecifier.text, (binding.propertyName ?? binding.name).text);
-        }
-      }
-    }
-    return inputError(`${key} has no authored definition for ${selected}`);
-  };
+  const local = (selected) => localDefinition({ t, source, result, through, key, selected });
   for (const node of source.statements) {
     if (exported(t, node)) {
       if ((t.isFunctionDeclaration(node) || t.isClassDeclaration(node)) && (defaulted(t, node) ? name === 'default' : node.name?.text === name)) return result(node);
@@ -85,6 +88,24 @@ function descriptionOf({ node, source }, t) {
   return hasJsdocDescription(description) ? description : null;
 }
 
+/** Select every contract-bound binding: native API call exports and catalog-named CLI handlers. */
+const selectBindings = ({ files, resolver, sourceOf, catalog, add }) => {
+  for (const file of files.filter((entry) => entry.endsWith('.mjs'))) {
+    if (resolver.tierOf(file) !== 'api' || !ownerIdOf(resolver, file) || path.posix.basename(file) === RUNNER) continue;
+    const shape = callExportFinding(file, sourceOf(file));
+    if (shape) inputError(shape.message);
+    add(file, callFunctionName(path.posix.basename(file, '.mjs')), 'native-api-shape');
+  }
+  if (!Array.isArray(catalog?.groups)) inputError('CLI catalog has no groups');
+  for (const group of catalog.groups) {
+    if (!Array.isArray(group?.verbs)) inputError('CLI catalog group has no verbs');
+    for (const verb of group.verbs) {
+      if (!verb.impl || !Object.hasOwn(verb.impl, 'module')) continue;
+      add(verb.impl.module, verb.impl.export, `starci ${group.group} ${verb.verb}`);
+    }
+  }
+};
+
 /** Check only contract-selected bindings; factories and classes are not skipped as ordinary data exports. */
 export function publicDocFindings({ files, read, resolver, catalog, parse = parseSource, compiler = ts }) {
   const t = compiler();
@@ -109,20 +130,7 @@ export function publicDocFindings({ files, read, resolver, catalog, parse = pars
     selection.contracts.push(contract);
     selected.set(key, selection);
   };
-  for (const file of files.filter((entry) => entry.endsWith('.mjs'))) {
-    if (resolver.tierOf(file) !== 'api' || !ownerIdOf(resolver, file) || path.posix.basename(file) === RUNNER) continue;
-    const shape = callExportFinding(file, sourceOf(file));
-    if (shape) inputError(shape.message);
-    add(file, callFunctionName(path.posix.basename(file, '.mjs')), 'native-api-shape');
-  }
-  if (!Array.isArray(catalog?.groups)) inputError('CLI catalog has no groups');
-  for (const group of catalog.groups) {
-    if (!Array.isArray(group?.verbs)) inputError('CLI catalog group has no verbs');
-    for (const verb of group.verbs) {
-      if (!verb.impl || !Object.hasOwn(verb.impl, 'module')) continue;
-      add(verb.impl.module, verb.impl.export, `starci ${group.group} ${verb.verb}`);
-    }
-  }
+  selectBindings({ files, resolver, sourceOf, catalog, add });
   const findings = [];
   const context = { t, sourceOf, fileSet };
   const definitions = new Map();
