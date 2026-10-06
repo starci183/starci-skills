@@ -39,15 +39,20 @@ const variantsOf = (slot) => braceVariants(slot.path).map(star);
 const beSlots = (manifest, providers) => manifest.slots.filter((slot) => slot.profiles.includes('be') && slot.tracked === 'tracked' && (slot.provider === undefined || providers.includes(slot.provider)));
 
 function addRequiredPatterns(sonar, required, suffixes) {
-  const isRole = new RegExp(String.raw`\.(?:${suffixes.map((s) => s.replaceAll('-', '\\-')).join('|')})\.ts$`);
+  const escapedSuffixes = suffixes.map((suffix) => suffix.replaceAll('-', String.raw`\-`)).join('|');
+  const isRole = new RegExp(String.raw`\.(?:${escapedSuffixes})\.ts$`);
   for (const slot of required) {
     for (const entry of [...(slot.requires ?? []), ...(slot.allows ?? [])]) {
-      if (!/\.ts$/.test(entry) || entry.includes('<role>')) continue;
-      for (const name of braceVariants(entry)) {
-        if (isRole.test(star(name).replaceAll('*', 'x'))) continue;
-        for (const dir of variantsOf(slot)) sonar.add(`be/${dir}${star(name)}`.replace(/\/\/+/g, '/'));
-      }
+      addEntryPatterns(sonar, slot, entry, isRole);
     }
+  }
+}
+
+function addEntryPatterns(sonar, slot, entry, isRole) {
+  if (!/\.ts$/.test(entry) || entry.includes('<role>')) return;
+  for (const name of braceVariants(entry)) {
+    if (isRole.test(star(name).replaceAll('*', 'x'))) continue;
+    for (const dir of variantsOf(slot)) sonar.add(`be/${dir}${star(name)}`.replace(/\/\/+/g, '/'));
   }
 }
 
@@ -123,6 +128,10 @@ function capabilityOf(root, file) {
   return parts.slice(0, at).every((part, index) => part === own[index]) && own.length > at + 1 ? own[at] : null;
 }
 
+function escapeImportPart(part) {
+  return part.replace(/[/.]/g, String.raw`\$&`);
+}
+
 /**
  * The Codecov components of an app, [{ id, name, paths }] (paths repository-relative from the app root): one per service app (api or worker)
  * that composes the capabilities nothing else composes, then `platform`. A capability of a root whose last segment is a placeholder
@@ -148,7 +157,7 @@ export function coverageComponents(manifest, { files, read, apps, providers = []
       continue;
     }
     for (const capability of capabilities) {
-      const spec = new RegExp(String.raw`from\s+["']@modules/${module.replace(/[/.]/g, String.raw`\$&`)}/${capability.replace(/[/.]/g, String.raw`\$&`)}["']`);
+      const spec = new RegExp(String.raw`from\s+["']@modules/${escapeImportPart(module)}/${escapeImportPart(capability)}["']`);
       const importers = services.filter((app) => spec.test(imports.get(app.name)));
       const owners = importers.length === 1 ? importers : importers.filter((app) => app.name === capability);
       if (owners.length === 1) ownedBy.get(owners[0].name).push(`be/${base}${capability}/**`);
