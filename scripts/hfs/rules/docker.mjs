@@ -141,10 +141,10 @@ function nextOutput(ts, text) {
 function entryFindings({ repoRoot, file, parsed, side, app, kind, project, ts }) {
   const findings = [];
   const runtime = parsed.stages.at(-1);
-  if (!runtime || runtime.name !== RUNTIME_STAGE) return findings;
+  if (runtime?.name !== RUNTIME_STAGE) return findings;
   const entry = side === 'be' ? beEntry(app) : feEntry(app);
   const starts = [...instructionsOf(runtime, 'ENTRYPOINT'), ...instructionsOf(runtime, 'CMD')].map((item) => execForm(item.text));
-  if (!starts.some((exec) => exec && exec[0] === 'node' && exec[1] === entry)) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage does not start \`["node", "${entry}"]\` in exec form (CMD or ENTRYPOINT); the app runs its own built entry.`, { expected: entry }));
+  if (!starts.some((exec) => exec?.[0] === 'node' && exec[1] === entry)) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage does not start \`["node", "${entry}"]\` in exec form (CMD or ENTRYPOINT); the app runs its own built entry.`, { expected: entry }));
   const exposes = instructionsOf(runtime, 'EXPOSE').flatMap((item) => words(item.text).map((port) => port.replace(/\/(tcp|udp)$/i, '')));
   const health = instructionsOf(runtime, 'HEALTHCHECK').map((item) => words(item.text));
   const none = health.some((parts) => parts[0]?.toUpperCase() === 'NONE');
@@ -180,7 +180,7 @@ function resolvedImage(parsed, image) {
     if (name && rest.length) defaults.set(name, rest.join('='));
   }
   let unresolved = false;
-  const text = image.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (whole, braced, bare) => {
+  const text = image.replace(/\$\{([A-Za-z_]\w*)\}|\$([A-Za-z_]\w*)/g, (whole, braced, bare) => {
     const value = defaults.get(braced ?? bare);
     if (value === undefined) unresolved = true;
     return value ?? whole;

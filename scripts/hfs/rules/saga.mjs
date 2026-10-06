@@ -71,7 +71,9 @@ function statesVersion(ts, sourceFile) {
   const memberNames = (members) => new Map(members.filter((member) => ts.isPropertySignature(member) && ts.isIdentifier(member.name)).map((member) => [member.name.text, member.type]));
   for (const statement of sourceFile.statements) {
     if (!statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue;
-    const members = ts.isInterfaceDeclaration(statement) ? statement.members : ts.isTypeAliasDeclaration(statement) && ts.isTypeLiteralNode(statement.type) ? statement.type.members : null;
+    let members = null;
+    if (ts.isInterfaceDeclaration(statement)) members = statement.members;
+    else if (ts.isTypeAliasDeclaration(statement) && ts.isTypeLiteralNode(statement.type)) members = statement.type.members;
     if (members === null) continue;
     const named = memberNames(members);
     if (named.has('status') && named.get('version')?.kind === ts.SyntaxKind.NumberKeyword) versioned = true;

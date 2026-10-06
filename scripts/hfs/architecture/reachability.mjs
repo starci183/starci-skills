@@ -52,7 +52,7 @@ function ownerFiles(graph) {
 /** The file that stands for an owner in a finding: its public entry when the graph holds one, else its first file. */
 function entryOf(root, files) {
   const base = root.replace(/\/$/, '');
-  return files.find(rel => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/index\\.[tj]sx?$`).test(rel)) ?? [...files].sort(byCodeUnit)[0];
+  return files.find(rel => new RegExp(String.raw`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/index\.[tj]sx?$`).test(rel)) ?? [...files].sort(byCodeUnit)[0];
 }
 
 function checkBackend(graph) {
@@ -120,7 +120,7 @@ function routeTable(graph, app) {
 function segmentMatches(hrefSegment, routeSegment) {
   if (!hrefSegment.includes(PLACEHOLDER)) return routeSegment.kind === 'dyn' || routeSegment.text === hrefSegment;
   if (routeSegment.kind === 'dyn' || routeSegment.kind === 'catch' || routeSegment.kind === 'optcatch') return true;
-  const parts = hrefSegment.split(PLACEHOLDER).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const parts = hrefSegment.split(PLACEHOLDER).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`));
   return new RegExp(`^${parts.join('.*')}$`).test(routeSegment.text);
 }
 

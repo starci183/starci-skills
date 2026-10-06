@@ -121,7 +121,7 @@ export function derivedFiles({ files, read, catalog, classify }) {
   const index = catalogIndex(catalog);
   const out = [];
   for (const dir of PATTERN_DIRS) {
-    for (const file of files.filter((f) => new RegExp(`^knowledge/patterns/${dir}/[^/]+\\.yaml$`).test(f)).sort(byCodeUnit)) {
+    for (const file of files.filter((f) => new RegExp(String.raw`^knowledge/patterns/${dir}/[^/]+\.yaml$`).test(f)).sort(byCodeUnit)) {
       const before = read(file);
       if (before === null || before === undefined) continue;
       const verification = derivePatternVerification(before, index, { be: ['eslint-be'], fe: ['eslint-fe', 'stylelint'], repo: [] }[dir]);
@@ -144,7 +144,7 @@ if (isMain(import.meta.url)) {
   const manifest = loadSlotManifest({ root });
   const examples = [REFERENCE_APP_MANIFEST].filter((f) => fs.existsSync(path.join(root, f)));
   const resolver = createProseResolver({ files: examples, read: (f) => fs.readFileSync(path.join(root, f), 'utf8') }, manifest);
-  const classify = (p) => resolver.classify(`be/${sample(p.replace(/<kind>/g, 'api'))}`).slot ?? null;
+  const classify = (p) => resolver.classify(`be/${sample(p.replaceAll('<kind>', 'api'))}`).slot ?? null;
   const files = gitOutputOf(lsFiles([], { dir: root, maxBuffer: 1 << 28 }), 'git ls-files').split('\n').filter(Boolean);
   const stale = derivedFiles({ files, read: (f) => fs.readFileSync(path.join(root, f), 'utf8'), catalog: loadRuleCatalog({ root }), classify });
   const write = process.argv.includes('--write');

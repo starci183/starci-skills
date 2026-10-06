@@ -20,7 +20,9 @@ export function effectiveSlot(slot, profile, edition) {
   if (edition !== 'lite') return slot;
   const { lite, litePresence, ...base } = slot;
   const presence = litePresenceOf(slot, profile);
-  const tracked = presence === 'forbidden' ? 'external' : (slot.tracked === 'external' ? 'tracked' : slot.tracked);
+  let tracked = slot.tracked;
+  if (presence === 'forbidden') tracked = 'external';
+  else if (tracked === 'external') tracked = 'tracked';
   return { ...base, ...(lite ?? {}), presence, tracked, tests: 'none' };
 }
 

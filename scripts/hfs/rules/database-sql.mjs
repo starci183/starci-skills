@@ -37,7 +37,8 @@ function statementList(stmts, lineAt) {
   return (stmts ?? []).map((entry, index) => {
     const type = Object.keys(entry.stmt ?? {})[0] ?? '';
     const node = entry.stmt?.[type] ?? {};
-    const offset = entry.stmt_location >= 0 ? entry.stmt_location : (node.location >= 0 ? node.location : 0);
+    const nodeOffset = node.location >= 0 ? node.location : 0;
+    const offset = entry.stmt_location >= 0 ? entry.stmt_location : nodeOffset;
     return { type, node, index, line: lineAt(offset) };
   });
 }
@@ -192,7 +193,8 @@ function localPolicyFindings(file, facts) {
     if (WRITE_COMMANDS.has(policy.cmd) && isTrue(policy.withCheck)) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} is FOR ${policy.cmd.toUpperCase()} with WITH CHECK (true)`, { line: policy.line, policy: policy.name }));
     if (policy.cmd === 'select' && isTrue(policy.qual) && !publicRead) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} is FOR SELECT with USING (true); a world-readable table declares it with *_public_read`, { line: policy.line, policy: policy.name }));
     if ((policy.roles.includes('anon') || policy.roles.includes('public')) && !(policy.cmd === 'select' && publicRead)) {
-      const role = policy.implicitPublic ? 'the implicit TO public default' : `TO ${policy.roles.includes('anon') ? 'anon' : 'public'}`;
+      const roleName = policy.roles.includes('anon') ? 'anon' : 'public';
+      const role = policy.implicitPublic ? 'the implicit TO public default' : `TO ${roleName}`;
       findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} reaches ${role}; anonymous access is only FOR SELECT with *_public_read`, { line: policy.line, policy: policy.name }));
     }
   }
@@ -251,7 +253,7 @@ export function migrationSetPolicyFindings(analyses) {
 
 const valueRows = (node) => (node.selectStmt?.SelectStmt?.valuesLists ?? []).map((list) => list?.List?.items ?? []);
 const unwrap = (expression) => expression?.TypeCast ? unwrap(expression.TypeCast.arg) : expression;
-const columnName = (expression) => unwrap(expression)?.ColumnRef?.fields?.map(sval).filter(Boolean).at(-1);
+const columnName = (expression) => unwrap(expression)?.ColumnRef?.fields?.map(sval).findLast(Boolean);
 const literalString = (expression) => asString(unwrap(expression));
 
 function expressionScopesBucket(expression, bucket) {

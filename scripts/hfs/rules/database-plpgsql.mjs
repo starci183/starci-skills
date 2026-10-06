@@ -12,10 +12,10 @@ const nameOf = (list, defaultSchema) => {
 
 const functionOption = (node, key) => (node.options ?? []).filter((option) => option?.DefElem?.defname === key).map((option) => option.DefElem);
 const securityDefiner = (node) => functionOption(node, 'security').some((option) => option.arg?.Boolean?.boolval === true || option.arg?.Integer?.ival === 1);
-const functionLanguage = (node) => functionOption(node, 'language').map((option) => option.arg?.String?.sval).filter(Boolean).at(-1) ?? 'sql';
+const functionLanguage = (node) => functionOption(node, 'language').map((option) => option.arg?.String?.sval).findLast(Boolean) ?? 'sql';
 const functionBody = (node) => functionOption(node, 'as').flatMap((option) => (option.arg?.List?.items ?? []).map((item) => item?.String?.sval ?? '')).join('') || null;
 const functionReturnKind = (node) => {
-  const name = node.returnType?.names?.map(sval).filter(Boolean).at(-1);
+  const name = node.returnType?.names?.map(sval).findLast(Boolean);
   if (name === 'void') return 'void';
   if (name === 'trigger' || name === 'event_trigger') return 'trigger';
   return node.returnType?.setof ? 'setof' : 'scalar';

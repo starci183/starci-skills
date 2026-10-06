@@ -29,7 +29,7 @@ const TEST_CALLEES = new Set(['it', 'test']);
 const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 
 /** The event-bus pattern file name of an event name: dots become dashes (`order.placed` -> `order-placed`). */
-export const stemOfEvent = (name) => name.split('.').join('-');
+export const stemOfEvent = (name) => name.replaceAll('.', '-');
 
 /** The `eventName` and `version` literals a class declares as `static readonly` members, with the line of the class. */
 function readEventClass(ts, text, file) {

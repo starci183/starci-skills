@@ -222,7 +222,7 @@ function treeFindings({ repoRoot, resolver }) {
   const findings = [];
   const facts = treeFacts(readTree(repoRoot, { isIgnored: inIgnoredSlot }));
   for (const { path: dir, below } of facts.empty) {
-    findings.push({ code: 'HFS_EMPTY_DIR', level: 'error', path: dir, below, message: `${dir} has no file below it${below ? ` (nor in its ${below} sub-director${below === 1 ? 'y' : 'ies'})` : ''}; git tracks no empty directory, so it is a leftover` });
+    findings.push({ code: 'HFS_EMPTY_DIR', level: 'error', path: dir, below, message: `${dir} has no file below it` + (below ? ` (nor in its ${below} sub-director${below === 1 && 'y' || 'ies'})` : '') + '; git tracks no empty directory, so it is a leftover' });
   }
   for (const { path: dir, of, distance } of facts.ghosts) {
     findings.push({ code: 'HFS_GHOST_TREE', level: 'error', path: dir, of, distance, message: `${dir} is empty and ${distance} edit${distance === 1 ? '' : 's'} from its sibling ${of}: a renamed or misspelt structure that was never removed` });
@@ -387,7 +387,7 @@ function changedSince(repoRoot, base) {
 
 /** The machine's violations and errors as findings: each keeps the machine's rule id as its code. */
 function machineFindings(report) {
-  const of = (item) => ({ code: item.ruleId, level: 'error', ...(item.path ? { path: item.path } : {}), ...(item.line ? { line: item.line, column: item.column } : {}), source: 'machine', message: `${item.path ? `${item.path}${item.line ? `:${item.line}` : ''}: ` : ''}${item.message}` });
+  const of = (item) => ({ code: item.ruleId, level: 'error', ...(item.path ? { path: item.path } : {}), ...(item.line ? { line: item.line, column: item.column } : {}), source: 'machine', message: ((item.path && item.path + (item.line && ':' + item.line || '') + ': ') || '') + item.message });
   return [...report.errors.map(of), ...report.violations.map(of)];
 }
 
@@ -486,7 +486,7 @@ export function explainPath({ repoRoot, input, root = skillRoot, declaration, ma
     tier: tier ?? 'none',
     owner: owner ? { slot: owner.slot, root: owner.root } : null,
     allowedImports: mayImport,
-    importRule: mayImport ? manifest.crossOwner : (tier === 'none' ? 'the slot takes no part in import checks' : null),
+    importRule: mayImport ? manifest.crossOwner : (tier === 'none' && 'the slot takes no part in import checks' || null),
     tests: slot.tests,
     testsMeaning: TEST_KIND[slot.tests],
     requiredFiles: resolver.requiredFiles(c.path),

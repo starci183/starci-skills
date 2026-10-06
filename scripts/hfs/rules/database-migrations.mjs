@@ -24,7 +24,9 @@ export function defaultGit(args, { cwd }) {
   const [verb, ...rest] = args;
   const env = withoutGitLocalEnv(process.env);
   if (verb === 'merge-base') { const sha = mergeBase(cwd, rest[0], rest[1]); return { ok: sha !== null, stdout: sha ?? '' }; }
-  const call = verb === 'ls-tree' ? lsTree : verb === 'log' ? log : show;
+  let call = show;
+  if (verb === 'ls-tree') call = lsTree;
+  else if (verb === 'log') call = log;
   const result = call(rest, { cwd, env, maxBuffer: 64 * 1024 * 1024 });
   return { ok: !result.error && result.status === 0, stdout: result.stdout };
 }

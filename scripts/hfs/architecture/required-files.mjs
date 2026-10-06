@@ -69,7 +69,11 @@ export function checkerScope({ config, graph, context }) {
 }
 
 const strip = entry => entry.replace(/\/+$/u, '');
-const rootOfTarget = target => (target.endsWith('/') ? strip(target) : (path.posix.dirname(target) === '.' ? '' : path.posix.dirname(target)));
+const rootOfTarget = target => {
+  if (target.endsWith('/')) return strip(target);
+  const parent = path.posix.dirname(target);
+  return parent === '.' ? '' : parent;
+};
 
 function ruleFor(slotId, target, rootExists) {
   if (slotId === 'fe.app.next' && rootExists && ERROR_BOUNDARY_FILE.test(path.posix.basename(strip(target)))) return 'FE_ERROR_BOUNDARY_MISSING';

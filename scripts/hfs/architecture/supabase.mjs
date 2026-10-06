@@ -99,7 +99,9 @@ const fromAwaitedSupabase = (kit, checker, node, seen = new Set()) => {
 const callIsToOutcome = (kit, checker, graph, call) => {
   if (!kit.ts.isCallExpression(call)) return false;
   const expression = call.expression;
-  const name = kit.ts.isIdentifier(expression) ? expression.text : (kit.ts.isPropertyAccessExpression(expression) ? expression.name.text : null);
+  let name = null;
+  if (kit.ts.isIdentifier(expression)) name = expression.text;
+  else if (kit.ts.isPropertyAccessExpression(expression)) name = expression.name.text;
   if (name !== 'toOutcome') return false;
   return kit.declarationsOf(checker, kit.ts.isPropertyAccessExpression(expression) ? expression.name : expression)
     .some(declaration => {
@@ -293,8 +295,8 @@ const contains = (kit, root, predicate) => {
 
 const principalCall = (kit, checker, graph, node) => kit.ts.isCallExpression(node) && (() => {
   const expression = node.expression;
-  const name = kit.ts.isIdentifier(expression) ? expression : (kit.ts.isPropertyAccessExpression(expression) ? expression.name : null);
-  if (!name || name.text !== 'getPrincipal') return false;
+  const name = kit.ts.isPropertyAccessExpression(expression) ? expression.name : expression;
+  if (!kit.ts.isIdentifier(name) || name.text !== 'getPrincipal') return false;
   return kit.declarationsOf(checker, name).some(declaration => {
     const rel = kit.graphPath(declaration);
     return rel !== null && FE_DB_SLOTS.has(graph.files.get(rel)?.slot);

@@ -97,7 +97,9 @@ function declarationFindings(repo, gone) {
 export function editionFindings({ repoRoot, files, repo, resolver, withDeclaration = true }) {
   const gone = editionGone(resolver);
   const noTestWorld = resolver.slots().every((slot) => slot.tests === 'none');
-  const beView = !withDeclaration ? null : (repo.profile === 'app' ? repo.sides?.be : (repo.profile === 'be' ? repo : null));
+  let beView = null;
+  if (withDeclaration && repo.profile === 'app') beView = repo.sides?.be;
+  else if (withDeclaration && repo.profile === 'be') beView = repo;
   const findings = beView ? declarationFindings(beView, gone) : [];
   for (const file of noTestWorld ? files : []) {
     if (file.includes('node_modules/')) continue;

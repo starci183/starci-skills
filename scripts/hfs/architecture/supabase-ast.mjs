@@ -16,7 +16,7 @@ export const importedFrom = (kit, checker, node, modules, names = null) => {
 };
 
 const declarationFromSupabase = (declaration) => /(?:^|\/)node_modules\/@supabase\/(?:ssr|supabase-js|auth-js|postgrest-js|storage-js)(?:\/|$)/u
-  .test(String(declaration?.getSourceFile?.().fileName ?? '').replace(/\\/gu, '/'));
+  .test(String(declaration?.getSourceFile?.().fileName ?? '').replaceAll('\\', '/'));
 
 const typeFromSupabase = (checker, node) => {
   let type;

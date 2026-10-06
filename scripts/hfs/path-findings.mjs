@@ -45,7 +45,7 @@ function sourceFormFindings({ files, resolver }) {
     if (FREE_NAMES.has(base)) continue;
     // A literal file name the owning slot itself requires or allows (persistence/connection.ts, world/global-setup.ts) is its role.
     const slot = resolver.slot(c.slot);
-    if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].some((entry) => entry === base)) continue;
+    if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].includes(base)) continue;
     // So is an allows entry below the slot root whose last segment is that literal name (be.tests.world fakes/<provider>/server.ts).
     const admitted = allowsFile(resolver, file);
     if (admitted?.allowed && admitted.entry?.includes('/') && path.posix.basename(admitted.entry) === base) continue;

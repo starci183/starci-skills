@@ -103,7 +103,7 @@ function supabaseDeclarations(graph, appRoot, ts) {
     if (file.slot !== 'be.persistence' || !file.owner) continue;
     const key = capabilityTable(file.owner.root);
     const declaration = tables.get(key);
-    if (declaration && declaration.owner === null) tables.set(key, { ...declaration, owner: file.owner.root, rel: file.rel });
+    if (declaration?.owner === null) tables.set(key, { ...declaration, owner: file.owner.root, rel: file.rel });
   }
   return tables;
 }
@@ -126,7 +126,7 @@ export function checkSqlOwner(input) {
     kit.walk(file.sourceFile, node => {
       if (!ts.isTaggedTemplateExpression(node)) return true;
       const home = kit.declarationsOf(checker, node.tag).map(kit.ownerOfDeclaration).find(Boolean);
-      if (!home || home.tier !== 'platform' || home.name !== 'database') { foreignTags += 1; return true; }
+      if (home?.tier !== 'platform' || home?.name !== 'database') { foreignTags += 1; return true; }
       templates += 1;
       const template = node.template;
       const text = ts.isNoSubstitutionTemplateLiteral(template) ? template.text

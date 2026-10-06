@@ -49,7 +49,7 @@ export function checkSqlReturning(input) {
     kit.walk(file.sourceFile, node => {
       if (!ts.isTaggedTemplateExpression(node)) return true;
       const home = kit.declarationsOf(checker, node.tag).map(kit.ownerOfDeclaration).find(Boolean);
-      if (!home || home.tier !== 'platform' || home.name !== 'database') return true;
+      if (home?.tier !== 'platform' || home?.name !== 'database') return true;
       templates += 1;
       const template = node.template;
       const text = ts.isNoSubstitutionTemplateLiteral(template) ? template.text

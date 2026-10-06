@@ -25,7 +25,7 @@ export const SCHEMA_OWNER_RULE_IDS = ['BE_SCHEMA_OWNER'];
 
 const RULE = 'BE_SCHEMA_OWNER';
 const PERSISTENCE_SLOT = 'be.persistence';
-const SCHEMA_FOLDERS = ['entities', 'migrations'];
+const SCHEMA_FOLDERS = new Set(['entities', 'migrations']);
 const MIGRATION_FILE = /^(\d{13})-([a-z0-9]+(?:-[a-z0-9]+)*)\.ts$/u;
 const camel = name => { const text = pascal(name); return text[0].toLowerCase() + text.slice(1); };
 
@@ -53,12 +53,12 @@ export function checkSchemaOwner(input) {
   for (const rel of [...tree.files].sort(byCodeUnit)) {
     const classified = resolver.classifyPath(rel);
     if (classified.status === 'no-slot' || !classified.slot?.startsWith('be.') || classified.slot === PERSISTENCE_SLOT) continue;
-    const folder = rel.split('/').slice(0, -1).find(segment => SCHEMA_FOLDERS.includes(segment));
+    const folder = rel.split('/').slice(0, -1).find(segment => SCHEMA_FOLDERS.has(segment));
     if (folder) plain(rel, `${rel} sits in a ${folder}/ folder outside the persistence of a capability; ${folder} live only in src/modules/{domain,platform}/<capability>/persistence/${folder}/ of the capability that owns the table.`, { folder });
   }
   for (const rel of [...tree.files].sort(byCodeUnit)) {
     const persistence = persistenceOf(rel);
-    if (!persistence || persistence.folder !== 'migrations') continue;
+    if (persistence?.folder !== 'migrations') continue;
     if (/\.spec\.[cm]?tsx?$/u.test(rel)) plain(rel, `${rel} is a unit spec of a migration; a migration has no spec, the e2e run over the same migrations is its proof. Delete it.`);
     else if (!MIGRATION_FILE.test(persistence.below.at(-1)) || persistence.below.length !== 2) plain(rel, `${rel} is not named <epochMs13>-<kebab-name>.ts (13 digits of epoch milliseconds, a dash, a kebab-case name) directly in persistence/migrations/.`);
   }

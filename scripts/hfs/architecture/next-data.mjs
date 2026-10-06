@@ -2,7 +2,7 @@ import path from 'node:path';
 import { canonical, isInside } from './config.mjs';
 import { parseContract, installedSWR } from './next-data-contract.mjs';
 import { relativePath, unwrapExpression } from './typescript.mjs';
-import { anyDescendant, normalizedSymbol, normalizedSymbolValue, selectedNode, valueSymbol as sharedValueSymbol } from './ast-walks.mjs';
+import { anyDescendant, normalizedSymbol, normalizedSymbolValue, valueSymbol as sharedValueSymbol } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 export const SWR_KEY_RULE_ID = 'FE_SWR_KEY_IDENTITY';
@@ -105,7 +105,7 @@ function configMutateSymbols(config, context, targets) {
         && callKind(context.ts, checker, unwrapExpression(context.ts, node.initializer), targets) === 'config') {
         for (const element of node.name.elements) {
           const property = element.propertyName && context.ts.isIdentifier(element.propertyName) ? element.propertyName.text
-            : context.ts.isIdentifier(element.name) ? element.name.text : null;
+            : (context.ts.isIdentifier(element.name) && element.name.text) || null;
           if (property === 'mutate' && context.ts.isIdentifier(element.name)) symbols.add(normalizedSymbol(context.ts, checker, element.name));
         }
       }
@@ -294,23 +294,23 @@ function identityContribution(ts, checker, expression, identity, seen = new Set(
     }
     const left = identityContribution(ts, checker, expression.left, identity, seen, depth + 1);
     const right = identityContribution(ts, checker, expression.right, identity, seen, depth + 1);
-    return left === 'yes' || right === 'yes' ? 'yes' : left === 'unproven' || right === 'unproven' ? 'unproven' : 'no';
+    return (left === 'yes' || right === 'yes') && 'yes' || (left === 'unproven' || right === 'unproven') && 'unproven' || 'no';
   }
   if (ts.isPrefixUnaryExpression(expression)) return expressionReferences(ts, checker, expression, identity) ? 'unproven' : 'no';
   if (ts.isTemplateExpression(expression)) {
-    const values = expression.templateSpans.map(span => identityContribution(ts, checker, span.expression, identity, seen, depth + 1));
-    return values.includes('yes') ? 'yes' : values.includes('unproven') ? 'unproven' : 'no';
+    const values = new Set(expression.templateSpans.map(span => identityContribution(ts, checker, span.expression, identity, seen, depth + 1)));
+    return values.has('yes') && 'yes' || values.has('unproven') && 'unproven' || 'no';
   }
   if (ts.isArrayLiteralExpression(expression)) {
     if (expression.elements.some(element => ts.isSpreadElement(element))) return 'unproven';
-    const values = expression.elements.map(element => identityContribution(ts, checker, element, identity, seen, depth + 1));
-    return values.includes('yes') ? 'yes' : values.includes('unproven') ? 'unproven' : 'no';
+    const values = new Set(expression.elements.map(element => identityContribution(ts, checker, element, identity, seen, depth + 1)));
+    return values.has('yes') && 'yes' || values.has('unproven') && 'unproven' || 'no';
   }
   if (ts.isObjectLiteralExpression(expression)) {
     const values = effectiveObjectValues(ts, expression);
     if (!values || values.length !== expression.properties.length) return 'unproven';
-    const states = values.map(([, value]) => identityContribution(ts, checker, value, identity, seen, depth + 1));
-    return states.includes('yes') ? 'yes' : states.includes('unproven') ? 'unproven' : 'no';
+    const states = new Set(values.map(([, value]) => identityContribution(ts, checker, value, identity, seen, depth + 1)));
+    return states.has('yes') && 'yes' || states.has('unproven') && 'unproven' || 'no';
   }
   if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) return 'no';
   if (ts.isCallExpression(expression) || ts.isNewExpression(expression) || ts.isAwaitExpression(expression)) return 'unproven';
@@ -443,7 +443,7 @@ function isUnshadowedCommonJsRequire(ts, checker, expression, seen = new Set(), 
   if (!ts.isIdentifier(expression) || depth > 10) return false;
   const symbol = checker.getSymbolAtLocation(expression);
   const declarations = symbol?.getDeclarations?.() ?? [];
-  if (expression.text === 'require' && (!symbol || declarations.length === 0
+  if (expression.text === 'require' && (!symbol
     || declarations.every(declaration => declaration.getSourceFile().isDeclarationFile))) return true;
   const normalized = symbolOfRequireAlias(ts, checker, expression);
   if (!normalized || seen.has(normalized)) return false;
@@ -531,7 +531,7 @@ function inspectKey(config, context, entry, call, identities, violations, reason
   const containerRisks = keyContainerRisks(context.ts, call.checker, key, call.owner);
   if (containerRisks.length) {
     const locations = containerRisks.map(node => sourceLocation(call.source, node).line).filter((line, index, all) => all.indexOf(line) === index);
-    reasons.push(`${entry.path}#${entry.export} key container is referenced outside its declaration and selected SWR key${locations.length ? ` (line${locations.length === 1 ? '' : 's'} ${locations.join(', ')})` : ''}`);
+    reasons.push(`${entry.path}#${entry.export} key container is referenced outside its declaration and selected SWR key` + (locations.length ? ` (line${'s'.repeat(Number(locations.length !== 1))} ${locations.join(', ')})` : ''));
     return;
   }
   const leaves = keyLeaves(context.ts, call.checker, key, identities);
@@ -549,10 +549,10 @@ function inspectKey(config, context, entry, call, identities, violations, reason
         { lifecycle: entry.id, identity: identity.id }));
       continue;
     }
-    const contributions = active.map(leaf => identityContribution(context.ts, call.checker, leaf.expression, identity));
-    if (contributions.includes('unproven')) {
+    const contributions = new Set(active.map(leaf => identityContribution(context.ts, call.checker, leaf.expression, identity)));
+    if (contributions.has('unproven')) {
       reasons.push(`${entry.path}#${entry.export} key value contribution for identity ${identity.id} (${identity.binding}) cannot be proved on every active path`);
-    } else if (contributions.includes('no')) {
+    } else if (contributions.has('no')) {
       const ruleId = entry.kind === 'mutation' && identity.resource ? SWR_MUTATION_RULE_ID : SWR_KEY_RULE_ID;
       violations.push(violation(config, call, ruleId,
         `${entry.id} key must include declared ${identity.resource ? 'resource ' : ''}identity ${identity.id} (${identity.binding}) on every active key path.`,

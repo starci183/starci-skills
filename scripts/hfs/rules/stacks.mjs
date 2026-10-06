@@ -34,7 +34,7 @@ export function stacksFindings({ repoRoot, files, resolver }) {
     if (SEALED.test(rel) && !INSIDE_SECRETS.test(rel)) findings.push(shapeFinding(file, `${file} is a sealed secret outside <env>/secrets/<slug>.enc; move it to .starcistacks/<env>/secrets/`));
     else if (!allowed.some((expression) => expression.test(rel))) findings.push(shapeFinding(file, `${file} is not part of the standard .starcistacks shape (application-stacks.yaml and <env>/{README.md, environment.json, infra, runtime/{config,env}, secrets/<slug>.enc, seeds}); move or delete it`));
   }
-  if (!files.some((f) => f === `${prefix}application-stacks.yaml`)) return findings;
+  if (!files.includes(`${prefix}application-stacks.yaml`)) return findings;
   const declaration = findStackDeclaration(repoRoot);
   const declared = `${prefix}application-stacks.yaml`;
   if (declaration.error) return [...findings, shapeFinding(declared, `${declared} cannot be read: ${declaration.error}`)];

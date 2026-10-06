@@ -47,7 +47,7 @@ function compilerError(ts, root, diagnostic, project, ruleId = 'ARCH_TSCONFIG_IN
  */
 function loadTargetTypeScript(repositoryRoot) {
   const packageFile = path.join(locateDeclaration(repositoryRoot).appRoot, 'package.json');
-  if (!fs.existsSync(packageFile)) throw Error('ARCH_TYPESCRIPT_MISSING: target package.json is required to resolve target-installed TypeScript.');
+  if (!fs.existsSync(packageFile)) throw new Error('ARCH_TYPESCRIPT_MISSING: target package.json is required to resolve target-installed TypeScript.');
   const targetRequire = createRequire(packageFile);
   let resolved;
   let ts;
@@ -55,10 +55,10 @@ function loadTargetTypeScript(repositoryRoot) {
     resolved = targetRequire.resolve('typescript');
     ts = targetRequire('typescript');
   } catch {
-    throw Error('ARCH_TYPESCRIPT_MISSING: install TypeScript in the checked repository; StarCi does not substitute its own parser.');
+    throw new Error('ARCH_TYPESCRIPT_MISSING: install TypeScript in the checked repository; StarCi does not substitute its own parser.');
   }
   if (!ts?.createProgram || !ts?.resolveModuleName || !ts?.readConfigFile) {
-    throw Error('ARCH_TYPESCRIPT_INVALID: the target TypeScript package does not expose the compiler API.');
+    throw new Error('ARCH_TYPESCRIPT_INVALID: the target TypeScript package does not expose the compiler API.');
   }
   return { ts, resolved, version: String(ts.version ?? 'unknown') };
 }
@@ -581,4 +581,3 @@ export function referencedExports(ts, statement, expected) {
   }
   return [...expected];
 }
-

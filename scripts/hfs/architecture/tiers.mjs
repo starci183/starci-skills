@@ -125,14 +125,20 @@ export function checkTiers(graph) {
     const fromKind = featureToFeature ? triggerOf(resolver, edge.from) : null;
     const toKind = featureToFeature ? triggerOf(resolver, edge.to) : null;
     const crossKind = fromKind !== null && toKind !== null && fromKind !== toKind;
+    let ruleId = tierRule;
+    if (featureToFeature) ruleId = 'BE_FEATURE_IMPORTS_FEATURE';
+    if (crossKind) ruleId = 'BE_KIND_ISOLATION';
+    if (verdict.reason === 'crossApp') ruleId = 'FE_APP_ISOLATION';
+    const typeOnly = edge.runtime ? '' : ' (type-only imports count)';
+    const message = crossKind
+      ? `${edge.from} -> ${edge.to}: a ${fromKind} feature imports a ${toKind} feature; no kind imports another, every cross-kind call is an event published with eventBus.publish(event, tx) from a domain service${typeOnly}.`
+      : `${edge.from} -> ${edge.to}: ${REASON_TEXT[verdict.reason](verdict)}${typeOnly}.`;
     violations.push({
-      ruleId: verdict.reason === 'crossApp' ? 'FE_APP_ISOLATION' : crossKind ? 'BE_KIND_ISOLATION' : featureToFeature ? 'BE_FEATURE_IMPORTS_FEATURE' : tierRule,
+      ruleId,
       path: edge.from, line: edge.line, column: edge.column,
       specifier: edge.specifier, resolvedPath: edge.to, typeOnly: !edge.runtime,
       fromTier: verdict.fromTier ?? null, toTier: verdict.toTier ?? null,
-      message: crossKind
-        ? `${edge.from} -> ${edge.to}: a ${fromKind} feature imports a ${toKind} feature; no kind imports another, every cross-kind call is an event published with eventBus.publish(event, tx) from a domain service${edge.runtime ? '' : ' (type-only imports count)'}.`
-        : `${edge.from} -> ${edge.to}: ${REASON_TEXT[verdict.reason](verdict)}${edge.runtime ? '' : ' (type-only imports count)'}.`,
+      message,
     });
   }
 

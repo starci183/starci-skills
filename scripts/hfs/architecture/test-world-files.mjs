@@ -75,7 +75,7 @@ function environmentOf(ts, literal) {
   const node = literal ? propertyOf(ts, literal, 'stack') : null;
   const value = node ? unwrap(ts, node) : null;
   if (!value || !ts.isStringLiteralLike(value)) return null;
-  return value.text.split(/[\\/]+/u).filter(Boolean).at(-1) ?? null;
+  return value.text.split(/[\\/]+/u).filter(Boolean).findLast(Boolean) ?? null;
 }
 
 /** The keys of the declaration's `fakes` object literal, with their positions. */
@@ -121,7 +121,7 @@ export function checkTestWorldFiles(input) {
   for (const file of [...tree.files].sort(byCodeUnit)) {
     if (!file.endsWith('.ts')) continue;
     const verdict = allowsFile(resolver, file);
-    if (!verdict || verdict.slot !== WORLD_SLOT) continue;
+    if (verdict?.slot !== WORLD_SLOT) continue;
     files += 1;
     worldRoot ??= file.slice(0, file.length - verdict.relative.length);
     if (verdict.relative.startsWith(FAKES_DIRECTORY)) {
@@ -157,7 +157,10 @@ export function checkTestWorldFiles(input) {
     for (const service of stack?.services ?? []) if (service.role !== 'service' && !services.some(known => known.name === service.name)) services.push({ ...service, environment });
   }
   const stackHint = `${STACKS_DIRECTORY}/${environments.join(', ')}`;
-  const statefulWhy = service => (STATEFUL_KINDS.has(service.kind) ? `a ${service.kind} holds data the app reads back` : service.persistent ? 'the stack gives it a persistent volume' : null);
+  const statefulWhy = service => {
+    if (STATEFUL_KINDS.has(service.kind)) return `a ${service.kind} holds data the app reads back`;
+    return service.persistent ? 'the stack gives it a persistent volume' : null;
+  };
   const declared = literal ? fakedByOf(ts, configFile.sourceFile, literal) : [];
   const fakeEntries = literal ? fakeEntriesOf(ts, configFile.sourceFile, literal) : [];
 

@@ -13,19 +13,19 @@ const HOOK_KEYS = new Set(['id', 'path', 'export', 'kind', 'resultBinding', 'ide
 const IDENTITY_KEYS = new Set(['id', 'binding', 'gatesRequest', 'resource']);
 function relativeSource(repository, value, label) {
   repository = path.resolve(repository);
-  if (typeof value !== 'string' || !value.trim() || path.isAbsolute(value)) throw Error(`${label} must be a non-empty repository-relative source path.`);
+  if (typeof value !== 'string' || !value.trim() || path.isAbsolute(value)) throw new Error(`${label} must be a non-empty repository-relative source path.`);
   const relative = slash(value.trim()).replace(/^\.\//, '');
   if (relative.split('/').includes('..') || !SOURCE.test(relative) || /\.d\.[cm]?[jt]s$/i.test(relative)) {
-    throw Error(`${label} must be a production TypeScript or JavaScript source path.`);
+    throw new Error(`${label} must be a production TypeScript or JavaScript source path.`);
   }
   const absolute = path.resolve(repository, ...relative.split('/'));
-  if (!isInside(repository, absolute)) throw Error(`${label} must stay inside the repository.`);
+  if (!isInside(repository, absolute)) throw new Error(`${label} must stay inside the repository.`);
   for (let current = absolute; current !== repository; current = path.dirname(current)) {
     const stat = fs.lstatSync(current);
-    if (stat.isSymbolicLink()) throw Error(`${label} must not cross a symbolic-link or junction ancestor.`);
+    if (stat.isSymbolicLink()) throw new Error(`${label} must not cross a symbolic-link or junction ancestor.`);
   }
   const stat = fs.lstatSync(absolute);
-  if (!stat.isFile() || !isInside(canonical(repository), canonical(absolute))) throw Error(`${label} must be a regular source file inside the repository.`);
+  if (!stat.isFile() || !isInside(canonical(repository), canonical(absolute))) throw new Error(`${label} must be a regular source file inside the repository.`);
   return relative;
 }
 
@@ -35,39 +35,39 @@ export function parseContract(config) {
   const next = manifest?.starci?.codePatterns?.next;
   const value = next?.dataLifecycle;
   if (value === undefined) return null;
-  if (next.schema !== 'starci/next-code-pattern-contract@1') throw Error('package.json#starci.codePatterns.next must use starci/next-code-pattern-contract@1.');
+  if (next.schema !== 'starci/next-code-pattern-contract@1') throw new Error('package.json#starci.codePatterns.next must use starci/next-code-pattern-contract@1.');
   exactKeys(value, TOP_KEYS, 'package.json#starci.codePatterns.next.dataLifecycle');
-  if (value.schema !== CONTRACT_SCHEMA) throw Error(`dataLifecycle.schema must be ${CONTRACT_SCHEMA}.`);
+  if (value.schema !== CONTRACT_SCHEMA) throw new Error(`dataLifecycle.schema must be ${CONTRACT_SCHEMA}.`);
   exactKeys(value.swr, SWR_KEYS, 'dataLifecycle.swr');
   if (value.swr.package !== 'swr' || !Number.isInteger(value.swr.major) || value.swr.major < 1) {
-    throw Error('dataLifecycle.swr must bind package swr and one positive integer major version.');
+    throw new Error('dataLifecycle.swr must bind package swr and one positive integer major version.');
   }
-  if (!Array.isArray(value.hooks) || value.hooks.length === 0) throw Error('dataLifecycle.hooks must contain at least one declared lifecycle call.');
+  if (!Array.isArray(value.hooks) || value.hooks.length === 0) throw new Error('dataLifecycle.hooks must contain at least one declared lifecycle call.');
   const ids = new Set();
   const hooks = value.hooks.map((hook, index) => {
     const label = `dataLifecycle.hooks[${index}]`;
     exactKeys(hook, HOOK_KEYS, label);
-    if (typeof hook.id !== 'string' || !hook.id.trim() || ids.has(hook.id.trim())) throw Error(`${label}.id must be unique and non-empty.`);
+    if (typeof hook.id !== 'string' || !hook.id.trim() || ids.has(hook.id.trim())) throw new Error(`${label}.id must be unique and non-empty.`);
     ids.add(hook.id.trim());
     const source = relativeSource(config.root, hook.path, `${label}.path`);
-    if (typeof hook.export !== 'string' || !/^use[A-Z0-9_$][\w$]*$/.test(hook.export)) throw Error(`${label}.export must name one exported use* hook.`);
-    if (!['query', 'mutation'].includes(hook.kind)) throw Error(`${label}.kind must be query or mutation.`);
+    if (typeof hook.export !== 'string' || !/^use[A-Z0-9_$][\w$]*$/.test(hook.export)) throw new Error(`${label}.export must name one exported use* hook.`);
+    if (!['query', 'mutation'].includes(hook.kind)) throw new Error(`${label}.kind must be query or mutation.`);
     if (hook.resultBinding !== undefined && (typeof hook.resultBinding !== 'string' || !IDENTIFIER.test(hook.resultBinding))) {
-      throw Error(`${label}.resultBinding must be one local identifier.`);
+      throw new Error(`${label}.resultBinding must be one local identifier.`);
     }
-    if (!Array.isArray(hook.identities)) throw Error(`${label}.identities must be an array.`);
+    if (!Array.isArray(hook.identities)) throw new Error(`${label}.identities must be an array.`);
     const identityIds = new Set(), bindings = new Set();
     const identities = hook.identities.map((identity, identityIndex) => {
       const identityLabel = `${label}.identities[${identityIndex}]`;
       exactKeys(identity, IDENTITY_KEYS, identityLabel);
-      if (typeof identity.id !== 'string' || !identity.id.trim() || identityIds.has(identity.id.trim())) throw Error(`${identityLabel}.id must be unique and non-empty.`);
-      if (typeof identity.binding !== 'string' || !BINDING.test(identity.binding) || bindings.has(identity.binding)) throw Error(`${identityLabel}.binding must be a unique identifier or property path.`);
-      if (typeof identity.gatesRequest !== 'boolean' || typeof identity.resource !== 'boolean') throw Error(`${identityLabel} must explicitly declare gatesRequest and resource booleans.`);
+      if (typeof identity.id !== 'string' || !identity.id.trim() || identityIds.has(identity.id.trim())) throw new Error(`${identityLabel}.id must be unique and non-empty.`);
+      if (typeof identity.binding !== 'string' || !BINDING.test(identity.binding) || bindings.has(identity.binding)) throw new Error(`${identityLabel}.binding must be a unique identifier or property path.`);
+      if (typeof identity.gatesRequest !== 'boolean' || typeof identity.resource !== 'boolean') throw new Error(`${identityLabel} must explicitly declare gatesRequest and resource booleans.`);
       identityIds.add(identity.id.trim());
       bindings.add(identity.binding);
       return { id: identity.id.trim(), binding: identity.binding, gatesRequest: identity.gatesRequest, resource: identity.resource };
     });
-    if (hook.kind === 'mutation' && !identities.some(identity => identity.resource)) throw Error(`${label} mutation must declare at least one resource identity.`);
+    if (hook.kind === 'mutation' && !identities.some(identity => identity.resource)) throw new Error(`${label} mutation must declare at least one resource identity.`);
     return { id: hook.id.trim(), path: source, export: hook.export, kind: hook.kind,
       ...(hook.resultBinding === undefined ? {} : { resultBinding: hook.resultBinding }), identities };
   });
@@ -79,7 +79,7 @@ export function installedSWR(repository) {
   let manifest;
   try { manifest = require.resolve('swr/package.json'); } catch {
     let entry;
-    try { entry = require.resolve('swr'); } catch { throw Error('Installed swr package is unavailable.'); }
+    try { entry = require.resolve('swr'); } catch { throw new Error('Installed swr package is unavailable.'); }
     let current = path.dirname(entry);
     while (isInside(repository, current) && current !== repository) {
       const candidate = path.join(current, 'package.json');
@@ -87,10 +87,10 @@ export function installedSWR(repository) {
       current = path.dirname(current);
     }
   }
-  if (!manifest) throw Error('Installed swr package.json is unavailable.');
+  if (!manifest) throw new Error('Installed swr package.json is unavailable.');
   const actualManifest = canonical(manifest);
   const parsed = JSON.parse(fs.readFileSync(actualManifest, 'utf8'));
   const major = Number.parseInt(String(parsed.version ?? '').split('.')[0], 10);
-  if (parsed.name !== 'swr' || !Number.isInteger(major)) throw Error('Installed swr package identity or version is invalid.');
+  if (parsed.name !== 'swr' || !Number.isInteger(major)) throw new Error('Installed swr package identity or version is invalid.');
   return { name: parsed.name, version: parsed.version, major, root: canonical(path.dirname(actualManifest)) };
 }

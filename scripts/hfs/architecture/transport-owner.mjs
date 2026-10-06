@@ -93,8 +93,9 @@ export function checkTransportOwner(input) {
         else report(file, node, `fetch is used outside the transport client (called, aliased or passed as a value); ${owned}`);
         return false;
       }
-      const specifier = ts.isImportDeclaration(node) || ts.isExportDeclaration(node) ? node.moduleSpecifier
-        : ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require')) ? node.arguments[0] : null;
+      let specifier = null;
+      if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) specifier = node.moduleSpecifier;
+      else if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require'))) specifier = node.arguments[0];
       if (specifier && ts.isStringLiteralLike(specifier) && HTTP_LIBRARIES.has(specifier.text.split('/')[0])) {
         report(file, node, `${specifier.text} is a second HTTP transport; the repository's one transport is built on fetch (${clients.length ? list(clients) : 'no client exists yet'}). Use the client.`, { library: specifier.text });
       }

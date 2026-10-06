@@ -97,7 +97,7 @@ function placementFindings({ repoRoot, app, tracked }) {
 
 function catalogFindings({ repoRoot, app, tracked }) {
   const messages = `apps/${app}/src/modules/i18n/messages/`;
-  const catalogs = tracked.filter((f) => f.startsWith(messages) && f.endsWith('.json') && f.slice(messages.length).indexOf('/') === -1);
+  const catalogs = tracked.filter((f) => f.startsWith(messages) && f.endsWith('.json') && !f.slice(messages.length).includes('/'));
   const keys = new Map();
   for (const file of catalogs) {
     const parsed = readJson(repoRoot, file);

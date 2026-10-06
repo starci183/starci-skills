@@ -72,14 +72,14 @@ export function coverageScope(manifest, providers = []) {
   const noneMinimal = noneUnique.filter((path) => !noneUnique.some((other) => other !== path && isDir(other) && nested(dirOf(path), other)));
   const excludes = noneMinimal.filter((path) => isDir(path) && roots.some((root) => nested(path, root))).sort(byCodeUnit);
   const suffixes = manifest.ruleParams.be.suffixes;
-  const isRole = new RegExp(`\\.(?:${suffixes.map((s) => s.replace(/-/g, '\\-')).join('|')})\\.ts$`);
+  const isRole = new RegExp(String.raw`\.(?:${suffixes.map((s) => s.replaceAll('-', '\\-')).join('|')})\.ts$`);
   const sonar = new Set(noneMinimal.map((path) => `be/${path}${isDir(path) ? '**' : ''}`));
   for (const role of suffixes.filter((suffix) => !roles.includes(suffix))) sonar.add(`be/**/*.${role}.ts`);
   for (const slot of required) {
     for (const entry of [...(slot.requires ?? []), ...(slot.allows ?? [])]) {
       if (!/\.ts$/.test(entry) || entry.includes('<role>')) continue;
       for (const name of braceVariants(entry)) {
-        if (isRole.test(star(name).replace(/\*/g, 'x'))) continue;
+        if (isRole.test(star(name).replaceAll('*', 'x'))) continue;
         for (const dir of variantsOf(slot)) sonar.add(`be/${dir}${star(name)}`.replace(/\/\/+/g, '/'));
       }
     }
@@ -140,7 +140,7 @@ export function coverageComponents(manifest, { files, read, apps, providers = []
       continue;
     }
     for (const capability of capabilities) {
-      const spec = new RegExp(`from\\s+["']@modules/${module.replace(/[/.]/g, '\\$&')}/${capability.replace(/[/.]/g, '\\$&')}["']`);
+      const spec = new RegExp(String.raw`from\s+["']@modules/${module.replace(/[/.]/g, String.raw`\$&`)}/${capability.replace(/[/.]/g, String.raw`\$&`)}["']`);
       const importers = services.filter((app) => spec.test(imports.get(app.name)));
       const owners = importers.length === 1 ? importers : importers.filter((app) => app.name === capability);
       if (owners.length === 1) ownedBy.get(owners[0].name).push(`be/${base}${capability}/**`);

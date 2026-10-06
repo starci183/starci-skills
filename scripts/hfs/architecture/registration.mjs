@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { canonical } from './config.mjs';
 import { referencedExports, relativePath, unwrapExpression } from './typescript.mjs';
-import { commonJsRequireReasons, decoratorCallee, moduleExportsOf, mutableDecoratorKind, normalizedSymbol, normalizedSymbolValue, programSourcesOf, selectedNode, valueSymbol } from './ast-walks.mjs';
+import { commonJsRequireReasons, decoratorCallee, moduleExportsOf, mutableDecoratorKind, programSourcesOf, selectedNode, valueSymbol } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 

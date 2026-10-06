@@ -3,7 +3,7 @@
 import { sameText } from '../../lib/same-text.mjs';
 import { found, readText } from './read.mjs';
 import { DB_CONFIG_POLICY, DB_TYPES_DRIFT, TYPES_FILE } from './database-constants.mjs';
-const ENV_REF = /^env\([A-Za-z_][A-Za-z0-9_]*\)$/;
+const ENV_REF = /^env\([A-Za-z_]\w*\)$/;
 const PUBLIC_KEYS = new Set(['anon_key', 'publishable_key', 'public_key']);
 
 
@@ -29,7 +29,7 @@ const isCredentialKey = (key) => {
 };
 
 const tomlLine = (text, key) => {
-  const expression = new RegExp(`^\\s*["']?${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']?\\s*=`, 'm');
+  const expression = new RegExp(String.raw`^\s*["']?${key.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}["']?\s*=`, 'm');
   const match = expression.exec(text);
   return match ? text.slice(0, match.index).split('\n').length : undefined;
 };
