@@ -576,8 +576,6 @@ dead-script-entries:
     reason: "typed call of modules/host/orca/calls.yaml that only the live smoke spec reads (tests/api-orca/orca-settle-live.spec.mjs, the E3 proof that a worker_done settles its Dispatch); no runtime code lists Tasks"
   - path: scripts/api/orca/project-setup-delete.mjs
     reason: "typed call of modules/host/orca/calls.yaml with no code importer; KEEP by owner ruling"
-  - path: scripts/checks/check-entry.mjs
-    reason: "CLI that CONTEXT.md tells an agent to run when an entry path errors (installed-entry sanity); kept because a live instruction names it"
   - path: scripts/checks/check-example-architecture.mjs
     reason: "CLI run by the owner (RED14: the examples meet their own standard); a spec reads it"
   - path: scripts/checks/check-example-derived.mjs

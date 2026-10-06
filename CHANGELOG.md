@@ -18,6 +18,7 @@ Theme: the runtime's version line leaves alpha and the host prompts move into th
 ### Added
 - The runtime itself is measured: `npm run test:coverage` runs the root suite under Node's built-in coverage and writes `coverage/lcov.info` over the first-party source (`scripts/hfs/runtime-coverage-scope.mjs`), the tag-run `ci.yml` uploads it to Codecov under the informational `runtime` flag and scans it on SonarCloud (the root `sonar-project.properties`, with the organization and project key from the repository variables `SONAR_ORGANIZATION` and `SONAR_PROJECT_KEY` and `secrets.SONAR_TOKEN`, waiting for the quality gate; apps and examples keep the local SonarQube of `ext/sonar`); both files are rendered by `starci runtime check --only examples-ci -- --write`.
 - A GitHub Actions workflow produces a downloadable runtime artifact carrying version, commit SHA and hash metadata.
+- An install sandbox (`scripts/gates/install-sandbox.mjs`, the `install-sandbox` workflow and a local Docker mode) installs the packed runtime into an empty home on a clean Linux and Windows machine and asserts the host configuration.
 
 ### Evidence
 - Targeted checks only: `node --check` on edited `.mjs`, the generated catalog check and the version-pin, README and CHANGELOG runtime checks. Broad QA is not part of this cut's evidence: no Sonar scan, no Linux parity run, no L3 or L4 ladder, no UAT and no full unit or e2e suite.

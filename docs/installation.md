@@ -137,6 +137,31 @@ under a different protocol is not upgraded in place: remove `.claude` by hand
 and run `starci runtime install --cwd <host>`. Existing ledgers, goals, reports, receipts and local
 settings are preserved.
 
+## Install sandboxes
+
+`scripts/gates/install-sandbox.mjs` proves on a clean machine that the packaged runtime installs and that its host configuration works. It takes the packed
+tarball of the root package (the one release inventory, see [releasing](releasing.md): the `runtime-artifact` or `install-sandbox` workflow produces it, or the
+owner packs the root package into a temp directory outside the tree), redirects `HOME`, `USERPROFILE`, `LOCALAPPDATA` and `APPDATA` into one temp directory,
+creates an empty `app` git repository there and installs the way a host gets it: the fetch `starci runtime install` makes, with the tarball as its spec, then the
+installed package's own `installRuntime` (the installer `init`, the dependency install and the per-user shim). It asserts the `.claude` payload
+(`CONTEXT.md`, `skills/starci/SKILL.md`, `skills/starci/references/host-startup.md`), no `.starci/host`, a `config.yaml` seeded verbatim from
+`config.example.yaml`, the `AGENTS.md` entry of `init/AGENTS.md`, the host ignores, the shim, `starci runtime version`, the entry check for the app, a fresh
+`machine-db init` and `status`, an idempotent second install, and that the real home was not written. Exit 0 every assertion passed, 1 an assertion failed,
+2 a step could not run; it prints a JSON summary and appends a table to `$GITHUB_STEP_SUMMARY` when GitHub sets it.
+
+The init identity setup needs `age-keygen` 1.2.1 or 1.3.1 on `PATH` (`scripts/api/sops/lib.mjs`); without it the install projects the files and exits 1 as
+"held". The script asserts the prerequisite by name. Run either sandbox as `node scripts/gates/install-sandbox.mjs --tarball <temp-dir>/starci-<version>.tgz`:
+
+- **Windows (or any host), direct:** the command as written; the temp HOME is the only home the run sees.
+- **Linux, in a throwaway Docker container:** add `--docker [--tools <dir>]`. The container is the node image of the release parity step, started through
+  `scripts/api/docker/run.mjs` with `--rm`; only the tarball and the script are mounted, read-only, and nothing is published. `--tools <dir>` mounts a directory
+  holding a Linux `age-keygen` (read-only, first on `PATH`); build one with Go: `go install filippo.io/age/cmd/age-keygen@v1.3.1` with `GOOS=linux`,
+  `GOARCH=amd64` and `GOBIN=<dir>`.
+- **GitHub, both OSes:** dispatch the `install-sandbox` workflow; it packs once and runs the same script on `ubuntu-latest` and `windows-latest`.
+- **Full OS clean room:** Windows Sandbox is a Windows optional feature the owner enables once (nothing here enables or launches it). A `.wsb` file maps host
+  folders by absolute path, which source must not carry, so it is described instead: map a folder holding the tarball and the script read-only into the
+  sandbox, install Node 22 and `age-keygen` inside it, and run the same command against the mapped tarball.
+
 ## Troubleshooting
 
 | Symptom | Check |

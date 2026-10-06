@@ -26,7 +26,8 @@ const STEP_NAME = 'linux-parity';
 export const LINUX_SPECS_LABEL = 'linux-specs';
 /** The spec setup the root `npm test` runs under (package.json scripts.test): the same isolation for the files the container runs. */
 const SPEC_IMPORTS = ['low-priority', 'isolated-temp', 'isolated-registry', 'runtime-copies'].map((name) => `--import ./tests/setup/${name}.mjs`).join(' ');
-const DEFAULT_NODE = '22';
+/** The node major of the Linux container when no workflow names one; the install sandbox (scripts/gates/install-sandbox.mjs) runs in the same image. */
+export const DEFAULT_NODE = '22';
 const RUN_TIMEOUT_MS = 90 * 60_000;
 /** The spec suites: the root `npm test` and an example app's npm test / test:<layer> runs. The host ran them in this L4 row. */
 const SPEC_SUITE = /^npm (?:run )?test(?::[\w:-]+)?(?: -- .*)?$/;
