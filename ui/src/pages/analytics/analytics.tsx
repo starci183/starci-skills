@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { isReadErrorEnvelope, readEnvelope, refreshQuery, useApiQuery } from '../../api/query';
+import { isReadErrorEnvelope, readEnvelope, useApiQuery } from '../../api/query';
 import type { AttemptRow, WorkersViewV2 } from '../../contract';
 import type { Concept } from '../../components/concept';
 import { Advanced, Ticker } from '../../components/motion';
@@ -10,7 +10,7 @@ import { ModelRates } from '../../components/charts/model-rates';
 import { OpOutcomes } from '../../components/charts/op-outcomes';
 import { Retries } from '../../components/charts/retries';
 import { Throughput } from '../../components/charts/throughput';
-import { UsagePanel, type OpsMetric } from '../../components/charts/usage-panel';
+import { UsagePanel } from '../../components/charts/usage-panel';
 import { WorkflowProgress } from '../../components/charts/workflow-progress';
 import { t } from '../../i18n/t';
 import { Button } from '../../components/ui/button';
@@ -110,8 +110,6 @@ export default function AnalyticsPage() {
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(timer); }, []);
 
   const attempts = useAllAttempts(project, win, retryKey);
-  const metricsUrl = `/api/metrics/ops?window=${win}${project ? `&project=${encodeURIComponent(project)}` : ''}`;
-  const metrics = useApiQuery<OpsMetric[]>(metricsUrl, { topics: ['workers'], intervalMs: 30_000 });
   const workers = useApiQuery<WorkersViewV2>('/api/workers', { topics: ['workers'], intervalMs: 30_000 });
   const projects = useApiQuery<{ id: string; name: string; product: string | null }[]>('/api/projects', { topics: ['workers'], intervalMs: 60_000 });
 
@@ -164,7 +162,7 @@ export default function AnalyticsPage() {
     <Advanced variant="card" title={t('Detailed analytics')} summary={t('Rates by model, durations, retries, tokens and cost')}>
       <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-6">
         {chartable ? <><ModelRates rows={rows} /><DurationPlot rows={rows} now={now} /><Retries rows={rows} /></> : null}
-        <UsagePanel metrics={metrics} window={win} project={project} onRetryMetrics={() => refreshQuery(metricsUrl)} />
+        <UsagePanel window={win} project={project} />
       </div>
     </Advanced>
   </section>;

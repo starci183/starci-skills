@@ -2,14 +2,12 @@ import type { Concept } from '../concept';
 export const concept: Concept = 'C16';
 import { motion } from 'motion/react';
 import { EASE } from '../motion';
-import { useApiQuery, type QuerySnapshot } from '../../api/query';
+import { useApiQuery } from '../../api/query';
 import { ChartCard, ReadQuality, partialSources } from './chart-card';
 import { compactVi, costVi, sourceLabel, TokenBar, type UsageRow } from '../usage-view';
 import { t } from '../../i18n/t';
 import { FeedbackState } from '../feedback-state';
-import type { MetricOpRow } from '../../contract';
 
-export type OpsMetric = MetricOpRow;
 type Group = UsageRow & { k: string };
 type UsageWindow = { window: '24h' | '7d'; recorded: boolean; byModel: Group[]; byOp: Group[]; byProvider: Group[]; byDay: Group[]; sources: string[] };
 
@@ -54,35 +52,29 @@ function PerDay({ rows }: Readonly<{ rows: Group[] }>) {
   </div>;
 }
 
-export function UsagePanel({ metrics, window: win, project, onRetryMetrics }: Readonly<{ metrics: QuerySnapshot<OpsMetric[]>; window: '24h' | '7d'; project: string; onRetryMetrics: () => void }>) {
+export function UsagePanel({ window: win, project }: Readonly<{ window: '24h' | '7d'; project: string }>) {
   const url = `/api/metrics/usage?window=${win}${project ? `&project=${encodeURIComponent(project)}` : ''}`;
   const query = useApiQuery<UsageWindow>(url, { topics: ['workers'], intervalMs: 30_000 });
   const usage = query.data;
-  const list = metrics.data ?? [];
-  const legacyIn = list.some(m => m.tokensIn != null) ? list.reduce((s, m) => s + (m.tokensIn ?? 0), 0) : null, legacyOut = list.some(m => m.tokensOut != null) ? list.reduce((s, m) => s + (m.tokensOut ?? 0), 0) : null;
-  const legacyCost = list.some(m => m.costUsd != null) ? list.reduce((s, m) => s + (m.costUsd ?? 0), 0) : null;
   const sum = (key: keyof UsageRow) => { const values = (usage?.byModel ?? []).flatMap(r => typeof r[key] === 'number' ? [r[key] as number] : []); return values.length ? values.reduce((s, value) => s + value, 0) : null; };
   const fromLog = Boolean(usage?.recorded);
-  const tin = fromLog ? sum('input') : legacyIn, tout = fromLog ? sum('output') : legacyOut;
+  const tin = sum('input'), tout = sum('output');
   const cacheRead = sum('cacheRead'), cacheWrite = sum('cacheWrite');
-  const cache = fromLog && cacheRead != null && cacheWrite != null ? cacheRead + cacheWrite : null;
-  const cost = fromLog ? ((usage?.byModel ?? []).some(r => r.costUsd != null) ? sum('costUsd') : null) : legacyCost;
-  const recorded = fromLog || metrics.data !== null && (legacyIn != null || legacyOut != null || legacyCost != null);
+  const cache = cacheRead != null && cacheWrite != null ? cacheRead + cacheWrite : null;
+  const cost = (usage?.byModel ?? []).some(r => r.costUsd != null) ? sum('costUsd') : null;
   const coverage = (field: 'input' | 'output' | 'costUsd') => {
-    const metricKey = field === 'input' ? 'tokensIn' : field === 'output' ? 'tokensOut' : 'costUsd';
     const groups = usage?.byModel ?? [];
-    const known = fromLog ? groups.reduce((n, row) => n + (row.completeness?.fields[field]?.known ?? 0), 0) : list.reduce((n, row) => n + (row.usageCoverage?.[metricKey] ?? 0), 0);
-    const total = fromLog ? groups.reduce((n, row) => n + (row.completeness?.fields[field]?.total ?? row.n ?? 0), 0) : list.reduce((n, row) => n + (row.usageCoverage?.rows ?? row.attempts), 0);
+    const known = groups.reduce((n, row) => n + (row.completeness?.fields[field]?.known ?? 0), 0);
+    const total = groups.reduce((n, row) => n + (row.completeness?.fields[field]?.total ?? row.n ?? 0), 0);
     return { known, total, complete: total > 0 && known === total };
   };
   const inputCoverage = coverage('input'), outputCoverage = coverage('output'), costCoverage = coverage('costUsd');
-  const cacheComplete = fromLog && (usage?.byModel ?? []).every(row => row.completeness?.fields.cacheRead?.complete && row.completeness?.fields.cacheWrite?.complete);
+  const cacheComplete = (usage?.byModel ?? []).every(row => row.completeness?.fields.cacheRead?.complete && row.completeness?.fields.cacheWrite?.complete);
   const windowText = win === '24h' ? t('24 hours') : t('7 days');
   return <ChartCard title={t('Tokens and cost')} hint={t('Recorded project-ledger usage over the last {window}; machine Supervisor and Worker usage is outside this scope.', { window: windowText })} empty={false}>
     <ReadQuality query={query} url={url} />
-    {!fromLog ? <ReadQuality query={metrics} onRetry={onRetryMetrics} /> : null}
     <p className="mb-3 text-xs text-muted-foreground">{t('Scope: {scope}', { scope: project || t('Active project ledgers') })}</p>
-    {recorded ? <div className="flex flex-col gap-4">
+    {fromLog ? <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label={t('Input tokens')} value={compactVi(tin)} hint={String(tin)} /><Stat label={t('Output tokens')} value={compactVi(tout)} hint={String(tout)} />
         <Stat label={t('Cache read + write')} value={compactVi(cache)} hint={cache != null ? String(cache) : undefined} /><Stat label={t('Recorded cost (known part)')} value={cost == null ? t('not reported') : costVi(cost)} />
@@ -91,14 +83,14 @@ export function UsagePanel({ metrics, window: win, project, onRetryMetrics }: Re
       <p className="text-xs text-muted-foreground">{t('Totals include reported measurements only; missing measurements remain unknown.')}</p>
       <p className="text-xs text-muted-foreground">{t('Measurement coverage: input {input}, output {output}, cost {cost}.', { input: `${inputCoverage.known}/${inputCoverage.total}`, output: `${outputCoverage.known}/${outputCoverage.total}`, cost: `${costCoverage.known}/${costCoverage.total}` })}</p>
       {usage?.sources?.length ? <p className="m-0 text-xs text-muted-foreground">{t('Data sources: {list}', { list: usage.sources.map(sourceLabel).join(' · ') })}</p> : null}
-      {fromLog ? <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         <TokenRows title={t('Tokens by model')} rows={usage!.byModel} name={k => k ?? t('unknown model')} />
         <TokenRows title={t('Tokens by op')} rows={usage!.byOp} name={k => k === 'kernel' ? t('Kernel (coordinator turns)') : k} />
-      </div> : <p className="m-0 text-xs text-muted-foreground">{t('Attempt totals from the dispatch cohort; the grouped usage source is empty or unavailable.')}</p>}
-      {fromLog && usage!.byProvider.length > 1 ? <TokenRows title={t('Tokens by provider')} rows={usage!.byProvider} name={k => k} /> : null}
-      {fromLog && usage!.byDay.length ? <PerDay rows={usage!.byDay} /> : null}
-    </div> : usage !== null && metrics.data !== null && !query.error && !metrics.error && !partialSources(query).length && !partialSources(metrics).length ? <div className="rounded-lg border p-4 text-sm"><p className="font-medium">{t('Nothing recorded yet')}</p>
+      </div>
+      {usage!.byProvider.length > 1 ? <TokenRows title={t('Tokens by provider')} rows={usage!.byProvider} name={k => k} /> : null}
+      {usage!.byDay.length ? <PerDay rows={usage!.byDay} /> : null}
+    </div> : usage !== null && !query.error && !partialSources(query).length ? <div className="rounded-lg border p-4 text-sm"><p className="font-medium">{t('Nothing recorded yet')}</p>
       <p className="mt-1 text-muted-foreground">{t('No attempt in this range has reported token or cost figures yet. Once the provider returns them the numbers will show here.')}</p>
-      </div> : partialSources(query).length || partialSources(metrics).length ? <FeedbackState>{t('Available sources returned no usage; the full scope is incomplete.')}</FeedbackState> : null}
+      </div> : partialSources(query).length ? <FeedbackState>{t('Available sources returned no usage; the full scope is incomplete.')}</FeedbackState> : null}
   </ChartCard>;
 }

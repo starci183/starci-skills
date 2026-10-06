@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronRight, Copy, TriangleAlert } from 'lucide-react';
-import type { AttemptDetailV2, CheckPair, CheckRow, EvidenceFile } from '../../contract';
+import type { AttemptDetailV3, CheckPair, CheckRow, EvidenceFile } from '../../contract';
 import type { Concept } from '../concept';
 import { BlobText } from '../blob-text';
 import { PathLink } from '../path-link';
@@ -113,7 +113,7 @@ function PairRow({ pair, files, onOpenFile }: Readonly<{ pair: CheckPair; files:
 }
 
 /** One latest run per exact runner/authority/phase/name, selected by the read API. */
-export function CheckList({ attempt, onOpenFile }: Readonly<{ attempt: AttemptDetailV2; onOpenFile: (file: EvidenceFile) => void }>) {
+export function CheckList({ attempt, onOpenFile }: Readonly<{ attempt: AttemptDetailV3; onOpenFile: (file: EvidenceFile) => void }>) {
   const summary = verificationSummary(attempt);
   const pairs = summary.pairs;
   const confirmed = summary.passed;
