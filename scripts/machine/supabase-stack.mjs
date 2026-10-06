@@ -35,17 +35,22 @@ const policyRefusal = (text, refusals = [text]) => result('start', 2, `[SUPABASE
 });
 
 function withoutTomlComment(line) {
-  let quote = null;
-  let escaped = false;
+  const state = { quote: null, escaped: false };
   for (let index = 0; index < line.length; index += 1) {
     const character = line[index];
-    if (quote === '"' && escaped) { escaped = false; continue; }
-    if (quote === '"' && character === '\\') { escaped = true; continue; }
-    if (quote) { if (character === quote) { quote = null; } continue; }
-    if (character === '"' || character === "'") { quote = character; continue; }
+    if (consumeQuotedTomlCharacter(state, character)) continue;
+    if (character === '"' || character === "'") { state.quote = character; continue; }
     if (character === '#') return line.slice(0, index);
   }
   return line;
+}
+
+function consumeQuotedTomlCharacter(state, character) {
+  if (state.quote === '"' && state.escaped) { state.escaped = false; return true; }
+  if (state.quote === '"' && character === '\\') { state.escaped = true; return true; }
+  if (!state.quote) return false;
+  if (character === state.quote) state.quote = null;
+  return true;
 }
 
 function tomlScalar(text) {
@@ -68,7 +73,7 @@ export function parseSupabaseConfig(text) {
     if (!line) continue;
     const table = /^\[([^\]]+)\]$/u.exec(line);
     if (table) { section = table[1].trim(); continue; }
-    const assignment = /^([A-Za-z0-9_-]+)\s*=\s*(.+)$/u.exec(line);
+    const assignment = /^([A-Za-z0-9_-]+)\s*=\s*([^\n\r\u2028\u2029]+)$/u.exec(line);
     if (!assignment) continue;
     const [, key, source] = assignment;
     const value = tomlScalar(source);
