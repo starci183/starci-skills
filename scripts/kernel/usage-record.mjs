@@ -47,8 +47,24 @@ const readHead = (file, bytes = SESSION_HEAD_BYTES) => {
   } catch { return ''; } finally { if (fd !== null) try { fs.closeSync(fd); } catch { /* closed */ } }
 };
 const tryParse = (line) => { try { return JSON.parse(line); } catch { return null; } };
-const textOf = (content) => (typeof content === 'string' ? content
-  : Array.isArray(content) ? content.map((c) => (typeof c === 'string' ? c : c?.text ?? '')).join('\n') : '');
+const textOf = (content) => {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content.map((c) => (typeof c === 'string' ? c : c?.text ?? '')).join('\n');
+};
+
+const timestampOf = (entry) => {
+  const stamp = Date.parse(entry.timestamp ?? entry.payload?.timestamp ?? '');
+  return Number.isFinite(stamp) ? stamp : null;
+};
+const firstUserOf = (agent, entry) => {
+  if (agent === 'claude' && entry.type === 'user' && !entry.isMeta) return textOf(entry.message?.content);
+  if (agent === 'codex' && entry.type === 'response_item' && entry.payload?.role === 'user') {
+    const text = textOf(entry.payload.content);
+    return text.trimStart().startsWith('<environment_context>') ? null : text;
+  }
+  return null;
+};
 
 /** {startMs, firstUser} of a session file's head: the first timestamp and the first real user message text. */
 function readSessionHead(agent, head) {
@@ -59,14 +75,10 @@ function readSessionHead(agent, head) {
     if (!line.trim()) continue;
     const o = tryParse(line);
     if (!o) continue;
-    const stamp = Date.parse(o.timestamp ?? o.payload?.timestamp ?? '');
-    if (startMs === null && Number.isFinite(stamp)) startMs = stamp;
-    if (firstUser !== null) { if (startMs !== null) break; continue; }
-    if (agent === 'claude' && o.type === 'user' && !o.isMeta) firstUser = textOf(o.message?.content);
-    else if (agent === 'codex' && o.type === 'response_item' && o.payload?.role === 'user') {
-      const t = textOf(o.payload.content);
-      if (!t.trimStart().startsWith('<environment_context>')) firstUser = t;
-    }
+    const stamp = timestampOf(o);
+    if (startMs === null && stamp !== null) startMs = stamp;
+    if (firstUser === null) firstUser = firstUserOf(agent, o);
+    if (firstUser !== null && startMs !== null) break;
   }
   return { startMs, firstUser };
 }
@@ -96,25 +108,31 @@ const jsonlIn = (dir, sinceMs, out, where, agent, depth = 0) => {
   }
 };
 
+function appendClaudeLiveSessions(homes, sinceMs, out) {
+  let dirs = [];
+  try { dirs = fs.readdirSync(path.join(homes.claude, 'projects'), { withFileTypes: true }); } catch { dirs = []; }
+  for (const d of dirs) if (d.isDirectory()) jsonlIn(path.join(homes.claude, 'projects', d.name), sinceMs, out, 'live', 'claude', 3);
+}
+
+function appendCodexLiveSessions(homes, sinceMs, out) {
+  for (const h of homes.codex) {
+    const base = path.join(h, 'sessions');
+    const first = new Date(sinceMs - DAY_MS);
+    for (let t = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), first.getUTCDate()); t <= Date.now() + DAY_MS; t += DAY_MS) {
+      const d = new Date(t);
+      jsonlIn(path.join(base, String(d.getUTCFullYear()), String(d.getUTCMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')), sinceMs, out, 'live', 'codex', 4);
+    }
+  }
+}
+
 /** Every session file of `agents` touched since `sinceMs`: the live session homes plus the archive root. */
 function listSessionFiles({ agents = USAGE_AGENTS, sinceMs, env = process.env, home = os.homedir(), archiveRoot = null } = {}) {
   const homes = sessionHomes({ env, home });
   const out = [];
   const root = archiveRoot ?? env.STARCI_SESSION_ARCHIVE_ROOT ?? archiveRootOf({ env });
   if (!homes.skipped) {
-    if (agents.includes('claude')) {
-      let dirs = [];
-      try { dirs = fs.readdirSync(path.join(homes.claude, 'projects'), { withFileTypes: true }); } catch { dirs = []; }
-      for (const d of dirs) if (d.isDirectory()) jsonlIn(path.join(homes.claude, 'projects', d.name), sinceMs, out, 'live', 'claude', 3);
-    }
-    if (agents.includes('codex')) for (const h of homes.codex) {
-      const base = path.join(h, 'sessions');
-      const first = new Date(sinceMs - DAY_MS);
-      for (let t = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), first.getUTCDate()); t <= Date.now() + DAY_MS; t += DAY_MS) {
-        const d = new Date(t);
-        jsonlIn(path.join(base, String(d.getUTCFullYear()), String(d.getUTCMonth() + 1).padStart(2, '0'), String(d.getUTCDate()).padStart(2, '0')), sinceMs, out, 'live', 'codex', 4);
-      }
-    }
+    if (agents.includes('claude')) appendClaudeLiveSessions(homes, sinceMs, out);
+    if (agents.includes('codex')) appendCodexLiveSessions(homes, sinceMs, out);
   }
   for (const agent of agents) {
     const dir = path.join(root, agent);
@@ -282,6 +300,89 @@ function planSeatUsage(db, { role, workflowId = null, entry, prices = loadPrices
 
 /* ------------------------------------------------------------------------------------------------------- sweep */
 
+const ledgerUsagePlan = (l, { since, out, openLedgerReader }) => {
+  let db = null;
+  try {
+    db = openLedgerReader(l.file);
+    const pending = attemptsMissingUsage(db, { sinceMs: since });
+    const skippedAttempts = archivedAttemptsMissingUsage(db, since);
+    const workflowRows = db.prepare('SELECT workflow_id,phase,archived_at FROM workflows').all();
+    const workflows = new Set(workflowRows.map((r) => r.workflow_id));
+    const writableWorkflows = new Set(workflowRows.filter((r) => r.archived_at == null && r.phase !== 'archived').map((r) => r.workflow_id));
+    return { ledger: l, pending, skippedAttempts, workflows, writableWorkflows };
+  } catch (error) {
+    out.errors.push(`${l.name}: ${message(error).slice(0, 160)}`);
+    return null;
+  } finally { try { db?.close(); } catch { /* closed */ } }
+};
+
+function recordLedgerUsage(plan, { index, out, detail, dryRun, now, openLedger, openLedgerReader }) {
+  const { ledger: l, pending, skippedAttempts, workflows, writableWorkflows } = plan;
+  out.attempts.pending += pending.length;
+  out.attempts.skippedEnded += skippedAttempts;
+  const kernelEntries = index.filter((e) => e.role === 'kernel' && writableWorkflows.has(e.workflowId));
+  out.kernels.skippedEnded += index.filter((e) => e.role === 'kernel' && workflows.has(e.workflowId) && !writableWorkflows.has(e.workflowId)).length;
+  let handle = null;
+  try {
+    const plans = pending.map((a) => planAttemptUsage(a, entriesOfAttempt(index, a)));
+    const seatPlans = [];
+    if (kernelEntries.length) {
+      const dbr = openLedgerReader(l.file);
+      try { for (const e of kernelEntries) seatPlans.push({ e, plan: planSeatUsage(dbr, { role: 'kernel', workflowId: e.workflowId, entry: e }) }); } finally { dbr.close(); }
+    }
+    out.kernels.sessions += kernelEntries.length;
+    if (detail) for (const p of plans) out.detail.attempts.push({ ledger: l.name, ...p });
+    if (detail) for (const s of seatPlans) out.detail.kernels.push({ ledger: l.name, workflowId: s.e.workflowId, ...s.plan });
+    for (const p of plans) if (!p.ok) { out.attempts.unavailable += 1; if (out.unavailable.length < 50) out.unavailable.push({ ledger: l.name, attemptId: p.attemptId, agent: p.agent, reason: p.reason }); }
+    const work = plans;
+    const seatWork = seatPlans.filter((s) => s.plan.ok && s.plan.rows.length);
+    if (dryRun) {
+      out.attempts.recorded += work.filter((p) => p.ok).length;
+      out.kernels.recorded += seatWork.length;
+      out.kernels.rows += seatWork.reduce((n, s) => n + s.plan.rows.length, 0);
+      return;
+    }
+    if (!work.length && !seatWork.length) return;
+    handle = openLedger({ file: l.file, repoRoot: l.repoRoot ?? null });
+    for (const p of work) {
+      try {
+        if (applyAttemptUsage(handle, p, { at: now }).recorded) out.attempts.recorded += 1;
+      } catch (error) {
+        if (archivedRefusal(error)) out.attempts.skippedEnded += 1;
+        else out.errors.push(`${l.name} attempt ${p.attemptId}: ${message(error).slice(0, 160)}`);
+      }
+    }
+    for (const { e, plan: seatPlan } of seatWork) {
+      try {
+        const r = handle.write.recordKernelUsage({ workflowId: e.workflowId, turnRef: seatPlan.turnRef, rows: seatPlan.rows, provider: e.agent, at: now });
+        if (r.recorded) { out.kernels.recorded += 1; out.kernels.rows += r.rows; }
+      } catch (error) {
+        if (archivedRefusal(error)) out.kernels.skippedEnded += 1;
+        else out.errors.push(`${l.name} kernel ${e.workflowId}: ${message(error).slice(0, 160)}`);
+      }
+    }
+  } catch (error) { out.errors.push(`${l.name}: ${message(error).slice(0, 160)}`); } finally { try { handle?.close(); } catch { /* closed */ } }
+}
+
+function recordSupervisorUsage(supervisors, { out, detail, dryRun, env, openMachineReader, withMachine, recordMachineLlmUsage }) {
+  const run = (m) => {
+    for (const e of supervisors) {
+      try {
+        const plan = planSeatUsage(m.db, { role: 'supervisor', entry: e });
+        if (!plan.ok || !plan.rows.length) continue;
+        if (detail) out.detail.supervisor.push({ ...plan });
+        out.supervisor.recorded += 1;
+        out.supervisor.rows += plan.rows.length;
+        if (dryRun) continue;
+        m.transaction(() => { for (const r of plan.rows) recordMachineLlmUsage(m, { subjectType: 'supervisor-turn', turnRef: plan.turnRef, provider: e.agent, responseModel: r.model, source: plan.source, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cacheReadTokens: r.cacheReadTokens, cacheWriteTokens: r.cacheWriteTokens, reasoningTokens: r.reasoningTokens, costUsd: r.costUsd, turns: r.turns, toolCalls: r.toolCalls, toolErrors: r.toolErrors }); });
+      } catch (error) { out.errors.push(`supervisor ${path.basename(e.file)}: ${message(error).slice(0, 160)}`); }
+    }
+  };
+  try {
+    if (dryRun) { const m = openMachineReader({ env }); try { run(m); } finally { m?.close(); } } else withMachine(run, { env });
+  } catch (error) { out.errors.push(`supervisor: ${message(error).slice(0, 160)}`); }
+}
+
 /**
  * One pass: settled attempts without usage (every registered ledger), every Kernel session (its workflow's ledger) and the
  * Supervisor sessions (machine.sqlite). `dryRun` reads and reports, writes nothing. Returns a summary.
@@ -298,79 +399,26 @@ export async function sweepUsage({ env = process.env, home = os.homedir(), now =
   if (ledgerFiles) ledgers = ledgerFiles;   // explicit [{name, file}] (a copy of a ledger, a spec): the registry is not consulted
   else try { ledgers = reader.listLedgers().filter((l) => l.file && fs.existsSync(l.file) && (!ledgerName || l.name === ledgerName)); } finally { reader.close(); }
 
-  const perLedger = [];
-  for (const l of ledgers) {
-    let db = null;
-    try {
-      db = openLedgerReader(l.file);
-      const pending = attemptsMissingUsage(db, { sinceMs: since });
-      const skippedAttempts = archivedAttemptsMissingUsage(db, since);
-      const workflowRows = db.prepare('SELECT workflow_id,phase,archived_at FROM workflows').all();
-      const workflows = new Set(workflowRows.map((r) => r.workflow_id));
-      const writableWorkflows = new Set(workflowRows.filter((r) => r.archived_at == null && r.phase !== 'archived').map((r) => r.workflow_id));
-      perLedger.push({ ledger: l, pending, skippedAttempts, workflows, writableWorkflows });
-    } catch (error) { out.errors.push(`${l.name}: ${message(error).slice(0, 160)}`); } finally { try { db?.close(); } catch { /* closed */ } }
-  }
+  const perLedger = ledgers.map((l) => ledgerUsagePlan(l, { since, out, openLedgerReader })).filter(Boolean);
   const wantedAgents = new Set(['claude', 'codex']);
   const index = indexSessions({ agents: [...wantedAgents], sinceMs: Math.min(since, ...perLedger.flatMap((p) => p.pending.map((a) => (a.dispatched_at ?? since) - SESSION_LEAD_MS)).concat(since)), env, home, archiveRoot });
 
-  for (const { ledger: l, pending, skippedAttempts, workflows, writableWorkflows } of perLedger) {
-    out.attempts.pending += pending.length;
-    out.attempts.skippedEnded += skippedAttempts;
-    const kernelEntries = index.filter((e) => e.role === 'kernel' && writableWorkflows.has(e.workflowId));
-    out.kernels.skippedEnded += index.filter((e) => e.role === 'kernel' && workflows.has(e.workflowId) && !writableWorkflows.has(e.workflowId)).length;
-    let handle = null;
-    try {
-      const plans = pending.map((a) => planAttemptUsage(a, entriesOfAttempt(index, a)));
-      const seatPlans = [];
-      if (kernelEntries.length) {
-        const dbr = openLedgerReader(l.file);
-        try { for (const e of kernelEntries) seatPlans.push({ e, plan: planSeatUsage(dbr, { role: 'kernel', workflowId: e.workflowId, entry: e }) }); } finally { dbr.close(); }
-      }
-      out.kernels.sessions += kernelEntries.length;
-      if (detail) for (const p of plans) out.detail.attempts.push({ ledger: l.name, ...p });
-      if (detail) for (const s of seatPlans) out.detail.kernels.push({ ledger: l.name, workflowId: s.e.workflowId, ...s.plan });
-      for (const p of plans) if (!p.ok) { out.attempts.unavailable += 1; if (out.unavailable.length < 50) out.unavailable.push({ ledger: l.name, attemptId: p.attemptId, agent: p.agent, reason: p.reason }); }
-      const work = plans;   // every plan is applied: ok = measured, not ok = unavailable once decided (applyAttemptUsage)
-      const seatWork = seatPlans.filter((s) => s.plan.ok && s.plan.rows.length);
-      if (dryRun) { out.attempts.recorded += work.filter((p) => p.ok).length; out.kernels.recorded += seatWork.length; out.kernels.rows += seatWork.reduce((n, s) => n + s.plan.rows.length, 0); continue; }
-      if (!work.length && !seatWork.length) continue;
-      handle = openLedger({ file: l.file, repoRoot: l.repoRoot ?? null });
-      for (const p of work) { try { if (applyAttemptUsage(handle, p, { at: now }).recorded) out.attempts.recorded += 1; } catch (error) { if (archivedRefusal(error)) out.attempts.skippedEnded += 1; else out.errors.push(`${l.name} attempt ${p.attemptId}: ${message(error).slice(0, 160)}`); } }
-      for (const { e, plan } of seatWork) {
-        try {
-          const r = handle.write.recordKernelUsage({ workflowId: e.workflowId, turnRef: plan.turnRef, rows: plan.rows, provider: e.agent, at: now });
-          if (r.recorded) { out.kernels.recorded += 1; out.kernels.rows += r.rows; }
-        } catch (error) { if (archivedRefusal(error)) out.kernels.skippedEnded += 1; else out.errors.push(`${l.name} kernel ${e.workflowId}: ${message(error).slice(0, 160)}`); }
-      }
-    } catch (error) { out.errors.push(`${l.name}: ${message(error).slice(0, 160)}`); } finally { try { handle?.close(); } catch { /* closed */ } }
-  }
+  for (const plan of perLedger) recordLedgerUsage(plan, { index, out, detail, dryRun, now, openLedger, openLedgerReader });
   const known = new Set(perLedger.flatMap((p) => [...p.workflows]));
   out.kernels.unmatched = index.filter((e) => e.role === 'kernel' && !known.has(e.workflowId)).length;
 
   const supervisors = index.filter((e) => e.role === 'supervisor');
   out.supervisor.sessions = supervisors.length;
-  if (supervisors.length && !ledgerName) {
-    const run = (m) => {
-      for (const e of supervisors) {
-        try {
-          const plan = planSeatUsage(m.db, { role: 'supervisor', entry: e });
-          if (!plan.ok || !plan.rows.length) continue;
-          if (detail) out.detail.supervisor.push({ ...plan });
-          out.supervisor.recorded += 1;
-          out.supervisor.rows += plan.rows.length;
-          if (dryRun) continue;
-          m.transaction(() => { for (const r of plan.rows) recordMachineLlmUsage(m, { subjectType: 'supervisor-turn', turnRef: plan.turnRef, provider: e.agent, responseModel: r.model, source: plan.source, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cacheReadTokens: r.cacheReadTokens, cacheWriteTokens: r.cacheWriteTokens, reasoningTokens: r.reasoningTokens, costUsd: r.costUsd, turns: r.turns, toolCalls: r.toolCalls, toolErrors: r.toolErrors }); });
-        } catch (error) { out.errors.push(`supervisor ${path.basename(e.file)}: ${message(error).slice(0, 160)}`); }
-      }
-    };
-    try {
-      if (dryRun) { const m = openMachineReader({ env }); try { run(m); } finally { m?.close(); } } else withMachine(run, { env });
-    } catch (error) { out.errors.push(`supervisor: ${message(error).slice(0, 160)}`); }
-  }
+  if (supervisors.length && !ledgerName) recordSupervisorUsage(supervisors, { out, detail, dryRun, env, openMachineReader, withMachine, recordMachineLlmUsage });
   out.ok = out.errors.length === 0;
   return out;
 }
+
+const usageSummary = (r) => {
+  const mode = r.dryRun ? '(dry run) ' : '';
+  const errors = r.errors.length ? `, ${r.errors.length} error(s)` : '';
+  return `usage ${mode}attempts ${r.attempts.recorded}/${r.attempts.pending} recorded (${r.attempts.unavailable} unavailable), kernels ${r.kernels.recorded} of ${r.kernels.sessions} sessions, supervisor ${r.supervisor.recorded} of ${r.supervisor.sessions}${errors}`;
+};
 
 if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
@@ -380,8 +428,7 @@ if (isMain(import.meta.url)) {
     process.exit(2);
   }
   const r = await sweepUsage({ lookbackMs: Number(arg('lookback-ms') ?? DEFAULT_LOOKBACK_MS), dryRun: argv.includes('--dry-run') });
-  console.log(argv.includes('--json') ? JSON.stringify(r)
-    : `usage ${r.dryRun ? '(dry run) ' : ''}attempts ${r.attempts.recorded}/${r.attempts.pending} recorded (${r.attempts.unavailable} unavailable), kernels ${r.kernels.recorded} of ${r.kernels.sessions} sessions, supervisor ${r.supervisor.recorded} of ${r.supervisor.sessions}${r.errors.length ? `, ${r.errors.length} error(s)` : ''}`);
+  console.log(argv.includes('--json') ? JSON.stringify(r) : usageSummary(r));
   process.exit(r.ok ? 0 : 1);
 }
 
