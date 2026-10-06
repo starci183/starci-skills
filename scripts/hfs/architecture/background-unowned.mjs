@@ -85,7 +85,7 @@ const checkBackgroundMethods = ({ graph, kit, ts, reachable, report }) => {
   for (const file of graph.files.values()) {
     if (file.tier === 'platform') continue;
     kit.walk(file.sourceFile, node => {
-      if (!ts.isClassDeclaration(node)) return true;
+      if (!ts.isClassDeclaration(node)) return;
       for (const member of node.members) {
         if (!ts.isMethodDeclaration(member) || !member.name) continue;
         const name = kit.propertyNameText(member.name);
@@ -93,7 +93,6 @@ const checkBackgroundMethods = ({ graph, kit, ts, reachable, report }) => {
         methods += 1;
         if (!reachable.has(file.rel)) report(file, member.name, `${name} is background work (a ${BACKGROUND_WORDS.join(', ')} method) that no processor or consumer composed by a worker or api app can reach. Add a processor in features/jobs/<job> or a consumer in transport/message of a feature that runs it, and compose its module in a worker or api app.`, { method: name });
       }
-      return true;
     });
   }
   return methods;
