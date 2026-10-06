@@ -140,6 +140,21 @@ function closePlannedEntry(terminals, entry, { dryRun, quit, close }) {
     ...(closed?.ok ? {} : { error: String(closed?.error ?? 'close refused') }) } };
 }
 
+function applyTerminalDedupe({ repos, env, listed, read, quit, close, bindings, worktrees, dryRun, result }) {
+  const terminals = listed.terminals ?? [];
+  result.listed = terminals.length;
+  const scopes = repos.filter((repo) => fs.existsSync(repo)).map((repo) => ({ repo, worktrees: worktrees(repo), ...bindings(repo) }));
+  const plan = planTerminalDedupe({ terminals, tabTitles: tabTitlesOf(listed.visualLayouts ?? [], terminals), scopes,
+    protectedHandles: new Set([env.ORCA_TERMINAL_HANDLE].filter(Boolean)), readScreen: read });
+  result.kept = plan.keep;
+  result.deferred = plan.deferred;
+  for (const entry of plan.close) {
+    const { row, ok } = closePlannedEntry(terminals, entry, { dryRun, quit, close });
+    if (!ok) result.ok = false;
+    result.closed.push(row);
+  }
+}
+
 /**
  * List Orca's terminals, plan, and (unless dryRun) close every stray: an agent
  * session gets quit input only for explicit supported metadata, then the existing tab close. Never throws.
@@ -156,18 +171,7 @@ export function dedupeTerminals({ repos = [], dryRun = false, env = process.env,
   try {
     const listed = list();
     if (!listed?.ok) return { ...result, ok: false, skipped: listed?.hostUnavailable ? 'orca-unavailable' : 'terminal-list-failed', error: listed?.error ?? null };
-    const terminals = listed.terminals ?? [];
-    result.listed = terminals.length;
-    const scopes = repos.filter((repo) => fs.existsSync(repo)).map((repo) => ({ repo, worktrees: worktrees(repo), ...bindings(repo) }));
-    const plan = planTerminalDedupe({ terminals, tabTitles: tabTitlesOf(listed.visualLayouts ?? [], terminals), scopes,
-      protectedHandles: new Set([env.ORCA_TERMINAL_HANDLE].filter(Boolean)), readScreen: read });
-    result.kept = plan.keep;
-    result.deferred = plan.deferred;
-    for (const entry of plan.close) {
-      const { row, ok } = closePlannedEntry(terminals, entry, { dryRun, quit, close });
-      if (!ok) result.ok = false;
-      result.closed.push(row);
-    }
+    applyTerminalDedupe({ repos, env, listed, read, quit, close, bindings, worktrees, dryRun, result });
   } catch (error) {
     return { ...result, ok: false, error: String(error?.message ?? error) };
   }
