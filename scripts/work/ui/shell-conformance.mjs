@@ -255,12 +255,12 @@ function checkUiRecord(workRoot, uiFile, record, shell, { mode = 'op', uiRecords
   const node = nodeById(tree, route);
   const values = surfaceValues(record);
   const surfaceDefault = typeof record.surface === 'string' ? record.surface : null;
-  const needsFile = surfaceDefault && SURFACE_FILE[surfaceDefault] ? SURFACE_FILE[surfaceDefault] : isOverlayRecord(record) && record.routed === true ? 'page' : null;
+  const needsFile = (()=>{if(surfaceDefault&&SURFACE_FILE[surfaceDefault])return SURFACE_FILE[surfaceDefault];if(isOverlayRecord(record)&&record.routed===true)return 'page';return null;})();
   const declaredNew = !node || (needsFile && !node.files?.[needsFile]);
   let anchor = route;
   if (declaredNew) {
     const parent = record.routeParent;
-    if (typeof parent !== 'string' || !nodeById(tree, parent)) out.push(finding('refuse', 'UI_ROUTE_UNKNOWN', at, `${route} is not a node of the layout tree${inApp}${node ? ` with a ${needsFile} file` : ''} and routeParent ${parent ?? '(none)'} names no existing node - declare the nearest existing parent it will sit under`));
+    if (typeof parent !== 'string' || !nodeById(tree, parent)) out.push(finding('refuse', 'UI_ROUTE_UNKNOWN', at, `${route} is not a node of the layout tree${inApp}${node ? ' with a ' + needsFile + ' file' : ''} and routeParent ${parent ?? '(none)'} names no existing node - declare the nearest existing parent it will sit under`));
     else if (!(route === parent || route.startsWith(parent === '/' ? '/' : `${parent}/`))) out.push(finding('refuse', 'UI_ROUTE_UNKNOWN', at, `routeParent ${parent} is not an ancestor of ${route}`));
     else anchor = node ? route : parent;
   }
@@ -346,7 +346,7 @@ export function checkDrawGeometry(workRoot, uiFile, record, shell, { run = runNo
     const file = path.join(path.dirname(uiFile), a.path);
     if (!fs.existsSync(file)) { out.push(finding('refuse', 'GEOMETRY_CHECK_FAILED', at, `${a.path} is not on disk`)); continue; }
     const named = a.viewport?.width && a.viewport?.height ? [{ name: 'asset', width: a.viewport.width, height: a.viewport.height }] : breakpoints.filter((b) => b.name === (a.composite?.breakpoint ?? a.breakpoint));
-    const views = named.length ? named : breakpoints.length ? breakpoints : [{ name: 'default', width: 390, height: 844 }];
+    const views = (()=>{if(named.length)return named;if(breakpoints.length)return breakpoints;return [{ name: 'default', width: 390, height: 844 }];})();
     for (const view of views) {
       const r = run([GEOMETRY_SCRIPT, '--check', file, '--repo', repo, '--viewport', `${view.width}x${view.height}`, '--json'], { timeout: 240000, maxBuffer: 32 * 1024 * 1024 });
       let parsed = null;
@@ -356,7 +356,7 @@ export function checkDrawGeometry(workRoot, uiFile, record, shell, { run = runNo
         for (const f of parsed.findings) out.push(finding('refuse', 'GEOMETRY_OFF_GRAMMAR', at, `${a.path} at ${view.width}px: ${f.element} ${f.at} ${f.property} is ${f.got}, the product grammar renders ${f.expected}`));
         continue;
       }
-      out.push(finding('refuse', 'GEOMETRY_CHECK_FAILED', at, `${a.path} at ${view.width}px: grammar-geometry.mjs could not measure it (${parsed?.error ?? (r.error?.message || String(r.stderr ?? '').trim().split('\n').pop() || `exit ${r.status}`)})`));
+      out.push(finding('refuse', 'GEOMETRY_CHECK_FAILED', at, `${a.path} at ${view.width}px: grammar-geometry.mjs could not measure it (${parsed?.error ?? (r.error?.message || String(r.stderr ?? '').trim().split('\n').pop() || 'exit ' + r.status)})`));
     }
   }
   return out;
@@ -393,8 +393,8 @@ function checkComposites(workRoot, uiFile, record, shell, { mode, level, records
       const otherRenderOfNode = expected && !expected.missing && nodeById(tree, expected.node) ? capturesAt(tree, nodeById(tree, expected.node), c.breakpoint, c.theme).find((x) => x.rel === c.layout?.capture) : null;
       if (expected?.missing) out.push(finding(mode === 'op' ? 'refuse' : 'suspect', 'COMPOSITE_LAYOUT_MISMATCH', at, `${where}: ${expected.missing}`));
       else if (!expected && c.layout) out.push(finding(level.stale, 'COMPOSITE_LAYOUT_MISMATCH', at, `${where} is composed into ${c.layout.capture}, but no visible layout wraps ${record.route}`));
-      else if (expected && !sameBase && expected.destination && otherRenderOfNode && otherRenderOfNode.sha256 === c.layout?.sha256) out.push(finding(level.stale, 'COMPOSITE_DESTINATION_MISMATCH', at, `${where} is composed into ${c.layout.capture} (${otherRenderOfNode.destination ? `destination ${otherRenderOfNode.destination}` : `the default render of ${expected.node}`}), but ${record.route} shows destination ${expected.destination} active (by ${expected.by}) - recompose into ${expected.rel}`));
-      else if (expected && !sameBase) out.push(finding(level.stale, 'COMPOSITE_LAYOUT_MISMATCH', at, `${where} is composed into ${c.layout?.capture ?? 'a blank canvas'}${c.layout?.sha256 ? ` (${c.layout.sha256.slice(0, 12)})` : ''}, not the current ${expected.node} capture ${expected.rel}${expected.destination ? ` (destination ${expected.destination})` : ''} (${expected.sha256?.slice(0, 12)}) - recompose`));
+      else if (expected && !sameBase && expected.destination && otherRenderOfNode && otherRenderOfNode.sha256 === c.layout?.sha256) out.push(finding(level.stale, 'COMPOSITE_DESTINATION_MISMATCH', at, `${where} is composed into ${c.layout.capture} (${otherRenderOfNode.destination ? 'destination ' + otherRenderOfNode.destination : 'the default render of ' + expected.node}), but ${record.route} shows destination ${expected.destination} active (by ${expected.by}) - recompose into ${expected.rel}`));
+      else if (expected && !sameBase) out.push(finding(level.stale, 'COMPOSITE_LAYOUT_MISMATCH', at, `${where} is composed into ${c.layout?.capture ?? 'a blank canvas'}${c.layout?.sha256 ? ' (' + c.layout.sha256.slice(0, 12) + ')' : ''}, not the current ${expected.node} capture ${expected.rel}${expected.destination ? ' (destination ' + expected.destination + ')' : ''} (${expected.sha256?.slice(0, 12)}) - recompose`));
       if (drawingOwnLayout && !c.childSlot) out.push(finding('refuse', 'COMPOSITE_CHILD_SLOT_MISSING', at, `${where}: a layout drawing leaves its page slot keyed #FF00FF and records the measured childSlot`));
     } else if (c.presentation === 'overlay') {
       if (!overlay) out.push(finding('refuse', 'COMPOSITE_INCONSISTENT', at, `${where}: only a modal or drawer has an overlay presentation`));
@@ -534,8 +534,8 @@ function uiPaletteFindings(workRoot, uiFile, record, ctx = paletteContext(workRo
   if (!ctx.brand) return ctx.note ? [ctx.note] : [];
   const at = shown(workRoot, uiFile);
   return assetsOf(record).flatMap((a) => {
-    const subject = a.composite ? 'composite' : (a.role === 'direction-content' || isPartName(a.path)) ? 'drawn part' : null;
-    return subject ? imageFindings(workRoot, ctx, at, path.join(path.dirname(uiFile), a.path), subject, a.composite ? { composite: a.composite, uiDir: path.dirname(uiFile) } : {}) : [];
+    const subject = (()=>{if(a.composite)return 'composite';if(a.role==='direction-content'||isPartName(a.path))return 'drawn part';return null;})();
+    return (()=>{if(!subject)return [];return imageFindings(workRoot,ctx,at,path.join(path.dirname(uiFile),a.path),subject,a.composite?{composite:a.composite,uiDir:path.dirname(uiFile)}:{});})();
   });
 }
 
@@ -550,7 +550,7 @@ function shellPaletteFindings(workRoot, shell, ctx = paletteContext(workRoot)) {
   for (const node of nodesOf(shell.record)) for (const bp of breakpoints) for (const th of themes) for (const c of capturesAt(shell.record, node, bp, th)) {
     if (seen.has(c.rel)) continue;
     seen.add(c.rel);
-    out.push(...imageFindings(workRoot, ctx, at, captureFileOf(path.join(workRoot, 'shell'), c), `layout capture of ${node.id}${c.destination ? ` (${c.destination})` : ''}`));
+    out.push(...imageFindings(workRoot, ctx, at, captureFileOf(path.join(workRoot, 'shell'), c), `layout capture of ${node.id}${c.destination ? ' (' + c.destination + ')' : ''}`));
   }
   return out;
 }

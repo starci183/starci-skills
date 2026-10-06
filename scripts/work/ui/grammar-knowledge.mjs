@@ -31,7 +31,7 @@ export const GRAMMAR_FAMILIES=Object.freeze([
 ]);
 
 const read=file=>fs.readFileSync(file,'utf8');
-const lineAt=(text,offset)=>{let line=1;for(let i=0;i<offset&&i<text.length;i++)if(text.codePointAt(i)===10)line++;return line;};
+const lineAt=(text,offset)=>{let line=1;for(let i=0;i<offset&&i<text.length;i++){if(text.codePointAt(i)===10)line++;}return line;};
 const uniq=values=>[...new Set(values)];
 const byName=(a,b)=>{if(a<b)return -1;if(a>b)return 1;return 0;};
 
@@ -148,7 +148,7 @@ export function cssReads(css){
     if(match[2]){
       let depth=1,j=pattern.lastIndex;
       const start=j;
-      while(j<code.length&&depth){if(code[j]==='(')depth++;else if(code[j]===')')depth--;j++;}
+    while(j<code.length&&depth){if(code[j]==='('){depth++;}else if(code[j]===')'){depth--;}j++;}
       fallback=code.slice(start,j-1).replace(/\s+/g,' ').trim();
     }
     reads.push({name:match[1],fallback,line:lineAt(code,match.index)});
@@ -595,9 +595,7 @@ const flow=list=>`[${list.map(q).join(', ')}]`;
 /** A nested plain object as block YAML at `indent`. */
 function yamlObject(object,indent){
   const pad=' '.repeat(indent);
-  return Object.entries(object).map(([name,value])=>value&&typeof value==='object'&&!Array.isArray(value)
-    ?`${pad}${key(name)}:\n${yamlObject(value,indent+2)}`
-    :`${pad}${key(name)}: ${Array.isArray(value)?flow(value):scalar(value)}`).join('\n');
+  return Object.entries(object).map(([name,value])=>{if(value&&typeof value==='object'&&!Array.isArray(value))return `${pad}${key(name)}:\n${yamlObject(value,indent+2)}`;return `${pad}${key(name)}: ${Array.isArray(value)?flow(value):scalar(value)}`;}).join('\n');
 }
 
 function yamlRenderers(renderers,{closedValues=false,source=true}={}){

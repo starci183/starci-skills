@@ -165,12 +165,7 @@ export function checkPalette({png,brand,buckets=DEFAULT_BUCKETS}={}){
     if(match.distance>PALETTE_TOLERANCE)offenders.push({hex:bucket.hex,share:bucket.share,pixels:bucket.count,
       nearest:match.label,nearestHex:match.hex,nearestScope:match.scope,deltaE:match.distance});
   }
-  const offBrand=!found.saturated
-    ?check('palette-off-brand','skip','The capture carries no saturated pixel at all, so it holds no palette to compare against the brand.',evidence)
-    :offenders.length
-      ?check('palette-off-brand','fail',`${offenders.length} dominant colour${offenders.length===1?'':'s'} of the capture match no brand token or scale step: ${offenders.map(entry=>`${entry.hex} (${Math.round(entry.share*100)}% of the saturated pixels, nearest ${entry.nearest} at deltaE ${entry.deltaE})`).join(', ')}.`,
-        {...evidence,offenders:offenders.slice(0,OFFENDER_CAP),offenderCount:offenders.length,capped:offenders.length>OFFENDER_CAP})
-      :check('palette-off-brand','pass',`Every colour the capture is largely made of is a brand token or scale step within deltaE ${PALETTE_TOLERANCE}.`,{...evidence,offenders:[],offenderCount:0});
+  const offBrand=(()=>{if(!found.saturated)return check('palette-off-brand','skip','The capture carries no saturated pixel at all, so it holds no palette to compare against the brand.',evidence);if(offenders.length)return check('palette-off-brand','fail',`${offenders.length} dominant colour${offenders.length===1?'':'s'} of the capture match no brand token or scale step: ${offenders.map(entry=>entry.hex+' ('+Math.round(entry.share*100)+'% of the saturated pixels, nearest '+entry.nearest+' at deltaE '+entry.deltaE+')').join(', ')}.`,{...evidence,offenders:offenders.slice(0,OFFENDER_CAP),offenderCount:offenders.length,capped:offenders.length>OFFENDER_CAP});return check('palette-off-brand','pass',`Every colour the capture is largely made of is a brand token or scale step within deltaE ${PALETTE_TOLERANCE}.`,{...evidence,offenders:[],offenderCount:0});})();
   const primary=palette.find(entry=>entry.role==='primary'&&entry.scope==='base')??palette.find(entry=>entry.role==='primary');
   const absent=(()=>{
     const at={...evidence,primary:primary?{token:primary.label,value:primary.value,hex:primary.hex}:null};
@@ -333,7 +328,7 @@ export function checkEntityListInCard(html,{family='starci',grammarRoot=defaultG
   }
   const measured={...evidence,elements:root.nodes,inCards:inCards.slice(0,OFFENDER_CAP),inSections:inSections.slice(0,OFFENDER_CAP),
     inCardCount:inCards.length,inSectionCount:inSections.length};
-  if(inCards.length)return check(id,'fail',`${inCards.length} list${inCards.length===1?'':'s'} of repeated entities sit inside a card surface: ${inCards.slice(0,OFFENDER_CAP).map(entry=>`${entry.items} \`${entry.item}\` items in a \`${entry.list}\` inside \`${entry.card}\``).join(', ')}. A list of entities is a page section with a heading; a card is one item.`,measured);
+  if(inCards.length)return check(id,'fail',`${inCards.length} list${inCards.length===1?'':'s'} of repeated entities sit inside a card surface: ${inCards.slice(0,OFFENDER_CAP).map(entry=>entry.items+' `'+entry.item+'` items in a `'+entry.list+'` inside `'+entry.card+'`').join(', ')}. A list of entities is a page section with a heading; a card is one item.`,measured);
   return check(id,'pass',inSections.length
     ?`Every list of repeated entities in the kept markup (${inSections.length}) sits outside a card surface.`
     :'The kept markup carries no list of three or more repeated entities, so no collection is wrapped in a card.',measured);
@@ -378,9 +373,8 @@ export function checkMascotSlot(first,second){
   });
   const measured={...evidence,allowedBy:allowed,slotsOnScreen:slots.map(slot=>slot.id??slot.purpose??'(unnamed)'),
     carrying:carrying.map(slot=>slot.id??slot.purpose??'(unnamed)')};
-  return carrying.length
-    ?check(id,'pass',`The brand allows the mascot \`${mascot.name}\` on \`${surface.name??surface.route}\` (${allowed.join(', ')}) and the record declares ${carrying.length} artwork slot${carrying.length===1?'':'s'} for it.`,measured)
-    :check(id,'fail',`The brand allows the mascot \`${mascot.name}\` on \`${surface.name??surface.route}\` (${allowed.join(', ')}) but the record declares no artwork slot naming it or a brand/assets/mascot master.`,measured);
+  if(carrying.length)return check(id,'pass',`The brand allows the mascot \`${mascot.name}\` on \`${surface.name??surface.route}\` (${allowed.join(', ')}) and the record declares ${carrying.length} artwork slot${carrying.length===1?'':'s'} for it.`,measured);
+  return check(id,'fail',`The brand allows the mascot \`${mascot.name}\` on \`${surface.name??surface.route}\` (${allowed.join(', ')}) but the record declares no artwork slot naming it or a brand/assets/mascot master.`,measured);
 }
 
 // ---------------------------------------------------------------------------
@@ -445,7 +439,7 @@ export function runRenderChecks({uiDir,captureDir=null,brandTree,family=null,gra
   const candidates=[];
   for(const candidate of found){
     const captureRoot=path.resolve(captureDir??uiDir);
-    const at={...candidate,png:candidate.png?(captureDir?candidate.path:slash(path.relative(captureRoot,candidate.png))):null,
+    const at={...candidate,png:(()=>{if(!candidate.png)return null;if(captureDir)return candidate.path;return slash(path.relative(captureRoot,candidate.png));})(),
       markup:candidate.markup?slash(path.relative(captureRoot,candidate.markup)):null};
     if(candidate.error){
       candidates.push({...at,decoded:false});
@@ -517,27 +511,23 @@ export function renderChecksFor({op={},state=null,ctx={},files=[]}={}){
   if(!declared)return null;
   const at=ctx?.work?.at??{};
   const repoRoot=at.repoRoot?path.resolve(String(at.repoRoot)):null;
-  const workRoot=at.workRoot?path.resolve(String(at.workRoot)):repoRoot?path.join(repoRoot,'.starciwork'):null;
+  const workRoot=(()=>{if(at.workRoot)return path.resolve(String(at.workRoot));if(repoRoot)return path.join(repoRoot,'.starciwork');return null;})();
   if(!workRoot)return required?{ok:false,checks:[check('implementation-render-proof-unavailable','fail',
     'The frontend implementation names a UI design input but its canonical Work root is not bound.',{declared:slash(declared)})]}:null;
   const normalized=slash(declared).replace(/^\.\//,'');
   // Work references are normally relative to the Work root, while authored repository references retain their
   // `.starciwork/` namespace. Both must resolve to the same node instead of nesting `.starciwork/.starciwork`.
-  const uiDir=path.isAbsolute(declared)?path.resolve(declared):normalized.startsWith('.starciwork/')
-    ?path.resolve(repoRoot??path.dirname(workRoot),...normalized.split('/'))
-    :path.resolve(workRoot,...normalized.split('/'));
+  const uiDir=(()=>{if(path.isAbsolute(declared))return path.resolve(declared);if(normalized.startsWith('.starciwork/'))return path.resolve(repoRoot??path.dirname(workRoot),...normalized.split('/'));return path.resolve(workRoot,...normalized.split('/'));})();
   if(!fs.existsSync(path.join(uiDir,'index.yaml')))return required?{ok:false,checks:[check('implementation-ui-input-missing','fail',
     'The frontend implementation explicitly references a UI design input whose index.yaml is missing.',{declared:normalized,uiDir:slash(uiDir),workRoot:slash(workRoot)})]}:null;
   try{
     const node=implementation&&op.nodeId&&typeof ctx?.work?.node==='function'?ctx.work.node(op.nodeId):null;
     const inferred=(Array.isArray(op.allowlist)?op.allowlist:[]).map(slash).find(item=>/(^|\/)implementation\/frontend(\/|$)/.test(item)&&/(^|\/)assets(\/|$)/.test(item));
-    const captureDeclared=node?.path?path.posix.dirname(slash(node.path)):inferred?inferred.replace(/\/assets(?:\/.*)?$/,''):null;
+    const captureDeclared=(()=>{if(node?.path)return path.posix.dirname(slash(node.path));if(inferred)return inferred.replace(/\/assets(?:\/.*)?$/,'');return null;})();
     if(required&&!captureDeclared)return {ok:false,checks:[check('implementation-capture-owner-unbound','fail',
       'The frontend implementation has a UI design reference but no bound implementation node to own its running-page captures.',{uiDir:slash(uiDir),nodeId:op.nodeId??null})]};
     const captureNormalized=slash(captureDeclared??'').replace(/^\.\//,'');
-    const captureDir=!captureDeclared?null:path.isAbsolute(captureDeclared)?path.resolve(captureDeclared):captureNormalized.startsWith('.starciwork/')
-      ?path.resolve(repoRoot??path.dirname(workRoot),...captureNormalized.split('/'))
-      :path.resolve(workRoot,...captureNormalized.split('/'));
+    const captureDir=(()=>{if(!captureDeclared)return null;if(path.isAbsolute(captureDeclared))return path.resolve(captureDeclared);if(captureNormalized.startsWith('.starciwork/'))return path.resolve(repoRoot??path.dirname(workRoot),...captureNormalized.split('/'));return path.resolve(workRoot,...captureNormalized.split('/'));})();
     const result=runRenderChecks({uiDir,captureDir,brandTree:workRoot});
     if(result.node.candidates===0){
       if(!required)return null;

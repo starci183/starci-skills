@@ -181,7 +181,7 @@ export function loadSheet(entries, { resolveBare = () => [], sourceOf = (file, s
     const source = sourceOf(abs, inherited);
     const parsed = parseCss(fs.readFileSync(abs, 'utf8'), { file: abs });
     sheet.files.push({ file: abs, source });
-    const prefixed = (layer) => (layerPrefix ? (layer ? `${layerPrefix}.${layer}` : layerPrefix) : layer);
+    const prefixed = (layer) => { if (!layerPrefix) return layer; if (layer) return `${layerPrefix}.${layer}`; return layerPrefix; };
     for (const l of parsed.early) addLayer(prefixed(l));
     for (const imp of parsed.imports) {
       const layer = prefixed(imp.layer ?? imp.parentLayer);
@@ -248,7 +248,7 @@ function simpleParts(compound) {
 }
 
 function specificity(parts) {
-  return parts.reduce((n, p) => n + (p.startsWith('#') ? 100 : p === '*' ? 0 : /^[a-z]/i.test(p) ? 1 : 10), 0);
+  return parts.reduce((n, p) => { if (p.startsWith('#')) return n + 100; if (p === '*') return n; if (/^[a-z]/i.test(p)) return n + 1; return n + 10; }, 0);
 }
 
 /**
@@ -445,7 +445,7 @@ function exportTarget(pkgDir, subpath) {
   let exp = null;
   try { exp = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8')).exports ?? null; } catch { exp = null; }
   const key = subpath ? `./${subpath}` : '.';
-  const pickTarget = (v) => (typeof v === 'string' ? v : v && typeof v === 'object' ? pickTarget(v.style ?? v.default ?? v.import ?? null) : null);
+  const pickTarget = (v) => { if (typeof v === 'string') return v; if (v && typeof v === 'object') return pickTarget(v.style ?? v.default ?? v.import ?? null); return null; };
   if (exp && typeof exp === 'object') {
     if (exp[key] !== undefined) { const t = pickTarget(exp[key]); if (t) return path.join(pkgDir, t); }
     for (const [pattern, v] of Object.entries(exp)) {
@@ -538,7 +538,7 @@ export function discoverSources(repo, family = null, { app = null, grammarDist =
   if (!heroFiles.length) errors.push(`no installed @heroui/styles (dist/heroui.min.css) resolvable from ${chosen ? chosen.entry : repoAbs}`);
   const common = path.join(grammarDir, 'common', 'styles.css');
   if (!fs.existsSync(common)) errors.push(`no Grammar common/styles.css at ${grammarDir}`);
-  if (!familyFile || !fs.existsSync(familyFile)) errors.push(`no css ${chosen ? `reached from ${chosen.entry}` : `in ${repoAbs}`} scopes [data-grammar-family="${familyId}"]`);
+  if (!familyFile || !fs.existsSync(familyFile)) errors.push(`no css ${chosen ? 'reached from ' + chosen.entry : 'in ' + repoAbs} scopes [data-grammar-family="${familyId}"]`);
   return {
     family: fam, familyId, repo: repoAbs, errors,
     entry: chosen?.entry ?? null, otherEntries: ranked.slice(1).map((e) => e.entry),
@@ -718,7 +718,7 @@ const shortFile = (file, repo) => {
   return rel.split(path.sep).join('/');
 };
 const px = (v) => (v?.px == null ? (v?.value ?? 'unset') : `${Math.round(v.px * 10) / 10}px`);
-const chainText = (v) => (v?.trace?.length ? ` <- ${v.trace.map((t) => `${t.name}: ${t.value}`).join(' <- ')}` : '');
+const chainText = (v) => v?.trace?.length ? ' <- ' + v.trace.map((t) => t.name + ': ' + t.value).join(' <- ') : '';
 const filesOf = (v, repo) => [...new Set([v.file, ...(v.trace ?? []).map((t) => t.file)].filter(Boolean).map((f) => shortFile(f, repo)))].join('; ');
 const declared = (v, repo) => (v ? `\`${v.declared}\`${chainText(v)} (${filesOf(v, repo)})` : 'undeclared');
 const isPill = (radiusPx, heightPx) => radiusPx != null && heightPx != null && radiusPx >= heightPx / 2;
@@ -737,7 +737,7 @@ export function geometryPrompt(g) {
   const lines = [];
   const b = a.button;
   lines.push(`GEOMETRY - mandatory, resolved from the product CSS (family ${g.family}, widths ${g.widths.join(' and ')}px). Draw these values; never a token the CSS does not bind.`,
-    `Cascade: ${g.sources.entry ? `${shortFile(g.sources.entry, repo)} and its imports` : 'installed packages'} - ${[...(g.sources.heroui?.files ?? []), g.sources.grammar.common, g.sources.familyFile].filter(Boolean).map((f) => shortFile(f, repo)).join('; ')} (@heroui/styles ${g.sources.heroui?.version}, @starci/grammar ${g.sources.grammar.version}${g.sources.grammar.installed ? '' : ' source'}).`,
+    `Cascade: ${g.sources.entry ? shortFile(g.sources.entry, repo) + ' and its imports' : 'installed packages'} - ${[...(g.sources.heroui?.files ?? []), g.sources.grammar.common, g.sources.familyFile].filter(Boolean).map((f) => shortFile(f, repo)).join('; ')} (@heroui/styles ${g.sources.heroui?.version}, @starci/grammar ${g.sources.grammar.version}${g.sources.grammar.installed ? '' : ' source'}).`,
     '',
     'Button (HeroUI .button, Grammar Button)',
     `- radius ${byWidth(g, (w) => w.button['border-radius'])} = ${declared(b['border-radius'], repo)}${isPill(b['border-radius']?.px, b.heightPx) ? ' - a pill (radius >= height/2)' : ''}.`,
@@ -759,7 +759,7 @@ export function geometryPrompt(g) {
   const c = a.card;
   lines.push('',
     'Card / SurfaceCard (Grammar SurfaceCard, SurfaceListCard)',
-    `- radius ${byWidth(g, (w) => w.card.top['border-radius'])} = ${declared(c.top['border-radius'], repo)}, painted by the ${c.top.part}${c.labelled.part !== c.top.part ? `; a labelled card paints its ${c.labelled.part}: radius ${px(c.labelled['border-radius'])}` : ''}.`,
+    `- radius ${byWidth(g, (w) => w.card.top['border-radius'])} = ${declared(c.top['border-radius'], repo)}, painted by the ${c.top.part}${c.labelled.part !== c.top.part ? '; a labelled card paints its ' + c.labelled.part + ': radius ' + px(c.labelled['border-radius']) : ''}.`,
     `- border ${noBorder(c.top['border-top-width']) ? 'none' : px(c.top['border-top-width'])} (${declared(c.top['border-top-width'], repo)}); shadow ${normalizeShadowText(c.top['box-shadow']?.value)} (${c.top['box-shadow']?.declared}${chainText(c.top['box-shadow'])}); fill ${c.top['background-color']?.value}.`,
     `- a surface nested inside another: border ${px(c.nested['border-top-width'])} ${c.nested['border-top-style']?.value ?? ''} ${c.nested['border-top-color']?.value ?? ''}, shadow ${normalizeShadowText(c.nested['box-shadow']?.value)}.`,
     `- content inset ${px(c.content['padding-top'])} (${declared(c.content['padding-top'], repo)}); joined bands: card inset ${px(c.joined['padding-top'])}, gap ${px(c.joined['row-gap'])}; external label to card ${px(c.labelGap)}.`);
@@ -775,7 +775,7 @@ export function geometryPrompt(g) {
   for (const t of g.font.tokens) lines.push(`- family token ${t.name}: ${t.resolved ?? t.value}.`);
   for (const s of g.font.surfaces) lines.push(`- ${s.selector} (${shortFile(s.file, repo)}) binds ${s.value}.`);
   const others = g.unbound.filter((t) => !cardTokens.includes(t));
-  if (others.length) lines.push('', `Declared by the family, read by no var() and no source file (they do not render): ${others.map((t) => `${t.name} ${t.value}`).join('; ')}.`);
+  if (others.length) lines.push('', `Declared by the family, read by no var() and no source file (they do not render): ${others.map((t) => String(t.name) + ' ' + String(t.value)).join('; ')}.`);
   return `${lines.join('\n')}\n`;
 }
 
@@ -932,7 +932,7 @@ export function readSnapshot(snap) {
   const els = snap.elements;
   const byI = new Map(els.map((e) => [e.i, e]));
   const kids = new Map();
-  for (const e of els) if (e.parent != null) { if (!kids.has(e.parent)) kids.set(e.parent, []); kids.get(e.parent).push(e); }
+  for (const e of els) { if (e.parent != null) { if (!kids.has(e.parent)) kids.set(e.parent, []); kids.get(e.parent).push(e); } }
   const ancestors = (e) => { const out = []; let p = e.parent; while (p != null && byI.has(p)) { out.push(byI.get(p)); p = byI.get(p).parent; } return out; };
   const pageBg = [snap.root.bodyBg, snap.root.htmlBg].find((c) => c && c[3] > 0) ?? [255, 255, 255, 1];
   const composed = new Map();
@@ -983,7 +983,7 @@ export function readSnapshot(snap) {
 // The check
 // ---------------------------------------------------------------------------------------------------------
 
-const describe = (e) => `${e.tag}${e.id ? `#${e.id}` : ''}${e.own ? ` "${e.own.slice(0, 40)}"` : e.value ? ` [${e.value.slice(0, 30)}]` : ''}`;
+const describe = (e) => { let content = ''; if (e.own) content = ' "' + e.own.slice(0, 40) + '"'; else if (e.value) content = ' [' + e.value.slice(0, 30) + ']'; return e.tag + (e.id ? '#' + e.id : '') + content; };
 const near = (a, b, tol = 1) => a != null && b != null && Math.abs(a - b) <= tol;
 
 /** Probes the page must normalise: every expected colour and shadow in computed form. */
@@ -1029,7 +1029,7 @@ export function geometryFindings(snap, g, { file = snap.file } = {}) {
     if (a.button['font-size']?.px != null && label.own && !near(label.style.fontSize, a.button['font-size'].px, 0.5)) off('button', e, 'font-size', `${label.style.fontSize}px`, `${a.button['font-size'].px}px`, a.button['font-size'].file);
     const bg = e.style.bg;
     const variant = variantColors.some((vc) => (alphaOf(bg) < 0.02 ? alphaOf(vc.bg) < 0.02 : sameColor(bg, vc.bg)));
-    if (!variant) off('button', e, 'fill', bg ? `rgba(${bg.join(', ')})` : 'none', `one of the Button variants: ${variantColors.filter((x) => x.bg).map((x) => `${x.v} ${P[`button.${x.v}.bg`]?.value}`).join('; ')}`, a.button.variants.primary['background-color']?.file);
+    if (!variant) off('button', e, 'fill', bg ? `rgba(${bg.join(', ')})` : 'none', `one of the Button variants: ${variantColors.filter((x) => x.bg).map((x) => x.v + ' ' + P[`button.${x.v}.bg`]?.value).join('; ')}`, a.button.variants.primary['background-color']?.file);
     else if (alphaOf(bg) < 0.02 && view.borderOn(e)) {
       const b = e.style.border[0];
       const ow = a.button.variants.outline;
@@ -1135,7 +1135,7 @@ export function parseViewport(text) {
 
 function plain(g) {
   const strip = (v) => (v && typeof v === 'object' && 'declared' in v ? { value: v.value, px: v.px, declared: v.declared, trace: v.trace, file: v.file } : v);
-  const walk = (o) => (Array.isArray(o) ? o.map(walk) : o && typeof o === 'object' ? ('declared' in o ? strip(o) : Object.fromEntries(Object.entries(o).map(([k, v]) => [k, walk(v)]))) : o);
+  const walk = (o) => { if (Array.isArray(o)) return o.map(walk); if (o && typeof o === 'object') { if ('declared' in o) return strip(o); return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, walk(v)])); } return o; };
   return { schema: 'starci/grammar-geometry@1', ok: g.ok, family: g.family, sources: g.sources, widths: g.widths, at: walk(g.at), font: walk(g.font), unbound: g.unbound, touchFloor: walk(g.touchFloor) };
 }
 
