@@ -32,6 +32,68 @@ const selection = (overrides = {}) => ({
   ...overrides,
 });
 
+test('L1 retains Node TAP, spec and plain reporter summaries from stdout or stderr', async (t) => {
+  const tempDir = mkdtemp(t, 'starci-ladder-summary-');
+  const runs = [
+    { status: 0, stdout: 'TAP version 13\n# Subtest: one\nok 1 - one\n1..1\n# tests 1\n# pass 1\n# fail 0\n', stderr: '', counts: { tests: 1, pass: 1, fail: 0 } },
+    { status: 0, stdout: '', stderr: 'ℹ tests 2\r\nℹ pass 2\r\nℹ fail 0\r\n', counts: { tests: 2, pass: 2, fail: 0 } },
+    { status: 0, stdout: 'tests 3\npass 3\nfail 0\n', stderr: '', counts: { tests: 3, pass: 3, fail: 0 } },
+    { status: 1, stdout: 'TAP version 13\nnot ok 1 - one\nok 2 - two\n1..2\n# tests 2\n# pass 1\n# fail 1\n', stderr: '', counts: { tests: 2, pass: 1, fail: 1 } },
+  ];
+  for (const run of runs) {
+    let calls = 0;
+    const result = await testRun(context({ level: 'L1', concurrency: 1 }), selection({
+      tempDir, runNode: () => { calls += 1; return { status: run.status, stdout: run.stdout, stderr: run.stderr }; },
+    }));
+    assert.equal(result.code, run.status);
+    assert.equal(result.data.ok, run.status === 0);
+    assert.deepEqual(result.data.counts, run.counts);
+    assert.equal(calls, 1);
+  }
+});
+
+test('selected specs cannot pass on an absent, incomplete, malformed or empty successful summary', async (t) => {
+  const tempDir = mkdtemp(t, 'starci-ladder-no-summary-');
+  for (const stdout of ['', '# tests 1\n# pass 1\n', '# tests 0\n# pass 0\n# fail 0\n',
+    'ℹ tests 1.5\nℹ pass 1\nℹ fail 0\n', 'ℹ tests 1garbage\nℹ pass 1\nℹ fail 0\n',
+    '# tests 1\n# pass 0\n# fail 1\n']) {
+    let calls = 0;
+    const result = await testRun(context({ level: 'L1', concurrency: 1 }), selection({
+      tempDir, runNode: () => { calls += 1; return { status: 0, stdout, stderr: '' }; },
+    }));
+    assert.equal(result.code, 1);
+    assert.equal(result.data.ok, false);
+    assert.equal(result.data.findings[0].kind, 'spec-summary');
+    assert.equal(calls, 1);
+  }
+  const injected = await testRun(context({ level: 'L1', concurrency: 1 }), selection({
+    tempDir, runTests: () => ({ ok: true, counts: { tests: 1.5, pass: 1, fail: 0 } }),
+  }));
+  assert.equal(injected.code, 1);
+  assert.equal(injected.data.counts, null);
+});
+
+test('an empty successful L2 serial retry cannot become an accepted flake', async (t) => {
+  const tempDir = mkdtemp(t, 'starci-ladder-retry-summary-');
+  const calls = [];
+  const result = await testRun(context({ level: 'L2', concurrency: 2 }), selection({
+    tempDir, cleanTree: () => true, isAncestor: () => true, changedAgainst: () => ['scripts/a.mjs'],
+    underHostLock: async (_options, fn) => await fn(), checkRun: async () => ({ code: 0, text: 'check green' }),
+    runTests: ({ concurrency }) => {
+      calls.push(concurrency);
+      return concurrency === 2
+        ? { ok: false, stdout: '# tests 1\n# pass 0\n# fail 1\n', failedFiles: ['tests/a.spec.mjs'] }
+        : { ok: true, stdout: '', failedFiles: [] };
+    },
+  }));
+  assert.equal(result.code, 1);
+  assert.equal(result.data.ok, false);
+  assert.equal(result.data.findings[0].kind, 'spec-summary');
+  assert.equal(result.data.counts, null);
+  assert.deepEqual(result.data.flakes ?? [], []);
+  assert.deepEqual(calls, [2, 1]);
+});
+
 test('test run refuses L4 outside release cut, L5 locally and all-spec L1 selection', async () => {
   const l4 = await testRun(context({ level: 'L4' }), selection());
   assert.equal(l4.code, 2);

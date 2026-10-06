@@ -65,6 +65,7 @@ test('actual npm tarball installs a runnable source command without development 
     'examples/.runtimes/ecommerce-app/artifacts/ff/'+ 'f'.repeat(64),
     'examples/.runtimes/ecommerce-app/artifacts/ff/'+ 'f'.repeat(64)+'.json',
     'examples/ecommerce-app/.starciwork/private.yaml','examples/ecommerce-app/.starciwork/features/private/index.yaml',
+    'examples/lite-app/.starciwork/features/private/index.yaml','examples/shape-slot/.starciwork/features/private/index.yaml',
     'examples/ecommerce-app/.starcistacks/dev/secrets/fixture.key.enc',
     'examples/lite-app/.starcistacks/dev/secrets/fixture.key.enc',
     'examples/shape-slot/.starcistacks/dev/secrets/fixture.key.enc'];
@@ -83,6 +84,8 @@ test('actual npm tarball installs a runnable source command without development 
     'scripts/install/install.mjs',
     'scripts/kernel/cli.mjs',
     'engine/db/ledger.mjs',
+    'examples/lite-app/.starciwork/features/system-health/index.yaml',
+    'examples/shape-slot/.starciwork/features/system-health/index.yaml',
     'scripts/gates/stacks-gate.mjs',
   ])
     assert.ok(shipped.has(file),`npm tarball must ship ${file}`);
@@ -90,7 +93,7 @@ test('actual npm tarball installs a runnable source command without development 
   assert.equal([...shipped].some(file=>file.startsWith('packages/cli/')&&file.endsWith('.spec.mjs')),false,'npm tarball must not ship CLI source specs');
   assert.deepEqual([...shipped].filter(file=>file.split('/').includes('node_modules')),[],'npm tarball must not ship node_modules');
   assert.deepEqual([...shipped].filter(file=>file==='ext/sonar/secrets'||file.startsWith('ext/sonar/secrets/')),[],'npm tarball must not ship private Sonar custody');
-  assert.equal(selectedExamples.size,16,'only BASIC13 plus the three own Work indexes are literal example inputs');
+  assert.equal(selectedExamples.size,18,'only BASIC13, three own Work catalog indexes and two declared system-health seeds are literal example inputs');
   assert.deepEqual([...shipped].filter(file=>file.split('/').includes('.starciwork')).sort(),
     [...selectedExamples].filter(file=>file.split('/').includes('.starciwork')).sort(),'only declared public Work indexes ship');
   assert.deepEqual([...shipped].filter(file=>file.startsWith('examples/.runtimes/')).sort(),

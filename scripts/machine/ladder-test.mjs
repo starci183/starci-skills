@@ -77,9 +77,15 @@ function selectedSpecs({ root, level, args, changed, allSpecs, deps }) {
 }
 
 function runSummary(run) {
-  const text = `${run.stdout ?? ''}\n${run.stderr ?? ''}`;
-  const count = (name) => Number(new RegExp(`(?:^|\\n)\\s*(?:ℹ\\s*)?${name}\\s+(\\d+)`, 'i').exec(text)?.[1] ?? 0);
-  return run.counts ?? { tests: count('tests'), pass: count('pass'), fail: count('fail') };
+  const text = (run.stdout ?? '') + '\n' + (run.stderr ?? '');
+  const count = (name) => {
+    const matches = text.matchAll(new RegExp('^[ \\t]*(?:[ℹ#][ \\t]*)?' + name + '[ \\t]+(\\d+)[ \\t]*\\r?$', 'gim'));
+    const match = [...matches].at(-1);
+    return match ? Number(match[1]) : null;
+  };
+  const counts = run.counts ?? { tests: count('tests'), pass: count('pass'), fail: count('fail') };
+  return ['tests', 'pass', 'fail'].every((key) => Number.isSafeInteger(counts[key]) && counts[key] >= 0)
+    && counts.pass + counts.fail <= counts.tests ? counts : null;
 }
 
 /** `starci test run`; all process, Git, lock and check edges are injectable through deps. */
@@ -143,19 +149,25 @@ export async function testRun(ctx, deps = {}) {
     writeLog(log, `[concurrency]\n${JSON.stringify(decision)}\n`, deps, true);
     const first = await runSpecs(root, selected, concurrency, deps);
     writeLog(log, `[specs concurrency=${concurrency}]\n${first.stdout ?? ''}${first.stderr ?? ''}\n`, deps, true);
-    if (first.ok) return ladderResult({ schema: SCHEMA, level, scope: selected, ok: true, findings: [], log, tip, selected, changed, concurrency: decision, counts: runSummary(first), model: scopeFor(level).specs });
+    const firstCounts = runSummary(first);
+    if (first.ok && (!firstCounts || firstCounts.tests === 0 || firstCounts.fail !== 0)) return ladderResult({ schema: SCHEMA, level, scope: selected, ok: false,
+      findings: [{ kind: 'spec-summary', message: 'the successful spec process did not report a nonempty passing test summary' }], log, tip, selected, changed, concurrency: decision, counts: firstCounts, model: scopeFor(level).specs });
+    if (first.ok) return ladderResult({ schema: SCHEMA, level, scope: selected, ok: true, findings: [], log, tip, selected, changed, concurrency: decision, counts: firstCounts, model: scopeFor(level).specs });
 
     const red = pathList(first.failedFiles ?? failedSpecFiles(`${first.stdout ?? ''}\n${first.stderr ?? ''}`, root)).filter((file) => selected.includes(file));
     if (!['L2', 'L3'].includes(level) || !red.length) return ladderResult({ schema: SCHEMA, level, scope: selected, ok: false,
-      findings: [{ kind: 'spec-red', files: red, message: red.length ? `${red.length} spec file(s) red` : 'the spec run was red but named no failing file' }], log, tip, selected, changed, concurrency: decision, counts: runSummary(first), model: scopeFor(level).specs });
+      findings: [{ kind: 'spec-red', files: red, message: red.length ? `${red.length} spec file(s) red` : 'the spec run was red but named no failing file' }], log, tip, selected, changed, concurrency: decision, counts: firstCounts, model: scopeFor(level).specs });
     const retry = await runSpecs(root, red, 1, deps);
     writeLog(log, `[red re-run concurrency=1]\n${retry.stdout ?? ''}${retry.stderr ?? ''}\n`, deps, true);
+    const retryCounts = runSummary(retry);
+    if (retry.ok && (!retryCounts || retryCounts.tests === 0 || retryCounts.fail !== 0)) return ladderResult({ schema: SCHEMA, level, scope: selected, ok: false,
+      findings: [{ kind: 'spec-summary', files: red, message: 'the successful serial spec re-run did not report a nonempty passing test summary' }], log, tip, selected, changed, concurrency: decision, counts: retryCounts, model: scopeFor(level).specs });
     const flakes = retry.ok ? red : [];
     const findings = retry.ok
       ? [{ kind: 'flake', files: flakes, message: `${flakes.length} red spec file(s) passed on the one serial re-run` }]
       : [{ kind: 'spec-red', files: pathList(retry.failedFiles ?? red), message: 'red spec files failed again on the one serial re-run' }];
     return ladderResult({ schema: SCHEMA, level, scope: selected, ok: retry.ok, findings, log, tip, selected, changed,
-      counts: runSummary(retry), flakes, concurrency: decision, model: scopeFor(level).specs });
+      counts: retryCounts, flakes, concurrency: decision, model: scopeFor(level).specs });
   };
 
   if (['L2', 'L3', 'L4'].includes(level)) {

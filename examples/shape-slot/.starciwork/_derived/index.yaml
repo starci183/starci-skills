@@ -10,6 +10,11 @@ records:
     feature: null
     state: null
     effectiveState: null
+  system-health:
+    schema: work/feature@1
+    feature: system-health
+    state: null
+    effectiveState: null
 tally:
   overall:
     done: 0
