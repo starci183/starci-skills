@@ -49,7 +49,7 @@ export function ownerClaimOf(text) {
   for (const re of OWNER_CLAIM_PATTERNS) {
     re.lastIndex = 0;
     for (let m = re.exec(folded); m; m = re.exec(folded)) {
-      const before = folded.slice(Math.max(0, m.index - 24), m.index).replace(/[([]/g, ' ');
+      const before = folded.slice(Math.max(0, m.index - 24), m.index).replace(/[[(]/g, ' ');
       if (!NOT_A_CLAIM_BEFORE.test(before)) return m[0].trim();
       if (m[0].length === 0) re.lastIndex += 1;
     }
