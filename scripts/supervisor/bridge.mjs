@@ -168,7 +168,7 @@ export function detect(repos, { now = Date.now() } = {}) {
     catch (error) { return { repo, ok: false, error: clip(error?.message ?? error, 300), findings: [], edges: [], nodes: [], bridges: [] }; }
   });
 }
-const q = (s) => `"${String(s).replaceAll(/"/g, '\'')}"`;
+const q = (s) => `"${String(s).replaceAll('"', '\'')}"`;
 /** The command line the Supervisor would run for a clear-cut finding. */
 export function commandFor(repo, f) {
   const p = f.proposal ?? {};
@@ -388,16 +388,26 @@ async function cmdRevise(args, { env = process.env } = {}) {
   }
   const now = Date.now();
   const rec = withWrite(repo, (ledger) => {
-    const rec = { schema: BRIDGE_SCHEMA, id: bridgeId, action: 'revise', state: applied?.ok ? 'applied' : applied ? 'refused' : 'requested', by: 'supervisor', ...approval, reason, finding: args.finding ?? null,
+    let state = 'requested';
+    if (applied) {
+      state = 'refused';
+      if (applied.ok) state = 'applied';
+    }
+    const rec = { schema: BRIDGE_SCHEMA, id: bridgeId, action: 'revise', state, by: 'supervisor', ...approval, reason, finding: args.finding ?? null,
       workflowId, text: clip(text, 2000), preview: { baseRevision: preview.baseRevision, nextRevision: preview.nextRevision, opChainDiff: preview.opChainDiff, token: preview.approval.token },
       ...(applied && !applied.ok ? { error: applied.error } : {}), at: now, updatedAt: now };
     writeBridge(ledger.db, rec, now);
     appendEvents(ledger, [workflowId], 'supervisor-revision-requested', { bridgeId, state: rec.state, reason, ...approval, opChainDiff: preview.opChainDiff });
     return rec;
   });
-  const noticeText = rec.state === 'applied'
-    ? `${TAG} ${bridgeId}: the Supervisor revised your goal to rev ${preview.nextRevision} (provisional, ${clip(reason, 200)}): run starci kernel survey and resurvey the pending goal-revision inbox; queued legs it removed were superseded.`
-    : `${TAG} ${bridgeId}: the Supervisor requests a goal revision (${clip(reason, 200)}): ` + (rec.state === 'refused' ? `it could not be applied (${clip(rec.error, 160)}) - settle or reconcile the open legs it names, ` : '') + 'the owner or autopilot applies it; keep the duplicated legs parked meanwhile.';
+  let noticeText;
+  if (rec.state === 'applied') {
+    noticeText = `${TAG} ${bridgeId}: the Supervisor revised your goal to rev ${preview.nextRevision} (provisional, ${clip(reason, 200)}): run starci kernel survey and resurvey the pending goal-revision inbox; queued legs it removed were superseded.`;
+  } else {
+    let refusedText = '';
+    if (rec.state === 'refused') refusedText = `it could not be applied (${clip(rec.error, 160)}) - settle or reconcile the open legs it names, `;
+    noticeText = `${TAG} ${bridgeId}: the Supervisor requests a goal revision (${clip(reason, 200)}): ` + refusedText + 'the owner or autopilot applies it; keep the duplicated legs parked meanwhile.';
+  }
   const notice = await notify(repo, workflowId, noticeText, args);
   supervisorAction({ item: args.finding ?? `revise|${workflowId}`, action: 'revise', reason, workflowId, refs: [bridgeId], env });
   return { ok: rec.state !== 'refused', action: 'revise', bridgeId, workflowId, state: rec.state, ...approval, preview: rec.preview, ...(applied ? { applied } : {}), notice };
@@ -476,7 +486,12 @@ if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   try {
     const out = await main(argv), verb = argv[0];
-    console.log(argv.includes('--json') || !human[verb] ? JSON.stringify(out, null, argv.includes('--json') ? 0 : 2) : human[verb](out));
+    if (argv.includes('--json') || !human[verb]) {
+      const indent = argv.includes('--json') ? 0 : 2;
+      console.log(JSON.stringify(out, null, indent));
+    } else {
+      console.log(human[verb](out));
+    }
     if (out?.ok === false) process.exitCode = 1;
   } catch (error) {
     console.log(JSON.stringify({ ok: false, code: error.code ?? 'error', error: error.message }));
