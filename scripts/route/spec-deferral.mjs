@@ -209,8 +209,12 @@ export function specsBriefLines({ skillRoot, op, settings = null, forced = false
       'defer-leg': 'this leg is deferred and should not be running; report done with the check "specs.e2e" evidence "deferred: specs.e2e=false" and author nothing.',
     },
   };
+  const offSettings = off.map((kind) => {
+    if (kind === 'e2e') return 'specs.e2e is not true - its default: e2e runs only when the goal or the owner asks';
+    return 'specs.' + kind + ': false';
+  }).join(', ');
   return [
-    `specs: product testing is off (config.yaml ${off.map((kind) => (kind === 'e2e' ? 'specs.e2e is not true - its default: e2e runs only when the goal or the owner asks' : `specs.${kind}: false`)).join(', ')}; owner 2026-09-28/29 "speed up development; test later when asked"). This overrides every test, coverage and e2e step, proof and blocker in your brief:`,
+    'specs: product testing is off (config.yaml ' + offSettings + '; owner 2026-09-28/29 "speed up development; test later when asked"). This overrides every test, coverage and e2e step, proof and blocker in your brief:',
     ...off.map((kind) => `  ${kind}: ${say[kind][toggle[kind]]}`),
   ];
 }
