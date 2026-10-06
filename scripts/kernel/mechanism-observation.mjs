@@ -93,9 +93,12 @@ export function observeCheck(check, context, run) {
  * value is never accepted from the caller's checks JSON. */
 export function stageObservation(run, roots) {
   const blob = (value, mediaType) => {
-    if (value == null || value.length === 0) return null;
-    const text = typeof value === 'string' ? value : JSON.stringify(value);
-    const bytes = Buffer.isBuffer(value) ? value : Buffer.from(text);
+   if (value == null || value.length === 0) return null;
+    let bytes = value;
+    if (!Buffer.isBuffer(value)) {
+      const text = typeof value === 'string' ? value : JSON.stringify(value);
+      bytes = Buffer.from(text);
+    }
     return stageBlob(bytes, { mediaType, repoRoots: roots });
   };
   return { cwd: run.cwd, inputDigest: run.inputDigest, exitCode: run.exitCode, status: run.status,
