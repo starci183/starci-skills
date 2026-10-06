@@ -12,9 +12,9 @@ import { slugify } from '../lib/slug.mjs';
 
 const GENERIC_LABEL = 'addressed-to-supervisor';
 const trimTrailingDashes = (value) => {
-  let end = value.length;
-  while (end > 0 && value[end - 1] === '-') end -= 1;
-  return value.slice(0, end);
+  const kept = [...value];
+  while (kept.at(-1) === '-') kept.pop();
+  return kept.join('');
 };
 
 
