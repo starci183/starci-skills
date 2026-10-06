@@ -161,7 +161,7 @@ export function runParity(repo, deps = {}) {
   const log = path.join(logDir, `${STEP_NAME}-${t0}.log`);
   const docker = deps.docker ?? { version: dockerVersion, run: dockerRun, rm: containerRm };
   const plan = { ...parityPlan({ workflows: (deps.workflows ?? readWorkflows)(repo), apps: (deps.apps ?? (() => []))(repo) }), specs: [...(deps.specs ?? [])] };
-  const result = (ok, why, extra = {}) => ({ name: STEP_NAME, ok, log, ms: now() - t0, skips: [], image: plan.image, steps: plan.steps.map((s) => s.name), skipped: plan.skipped, ...(why ? { why } : {}), ...extra });
+  const result = (ok, why, extra = {}) => ({ name: STEP_NAME, ok, log, ms: now() - t0, skips: [], image: plan.image, steps: plan.steps.map((s) => s.name), skipped: plan.skipped, ...(why && { why }), ...extra });
   const refuse = (why) => { fs.writeFileSync(log, `${why}\n`); return result(false, why); };
 
   if (!plan.steps.length) return refuse('the workflows hold no step to run: nothing proves Linux parity');
@@ -193,7 +193,7 @@ export function runParity(repo, deps = {}) {
       else if (r.error) why = `the container run failed: ${r.error.message}`;
       else why = `the container exited ${r.status} before the last step`;
     }
-    return result(ok, why, { ...(out.failed ? { failedStep: out.failed } : {}) });
+    return result(ok, why, { ...(out.failed && { failedStep: out.failed }) });
   } finally {
     safeRemove(work, { hold: artifactHoldReason });
   }
