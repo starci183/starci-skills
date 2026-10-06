@@ -741,7 +741,7 @@ export function citeBlob(db,{recordId,recordPath,field,sha256:sha,artifactId=nul
     .run(recordId,recordPath,field,artifactId,sha,role,recordRev,createdAt);
   db.prepare('UPDATE blobs SET pinned=1 WHERE sha256=?').run(sha);
 }
-/** A periodic scrollback snapshot (UI-API §2.10); an unchanged scrollback adds nothing. */
+/** A periodic scrollback snapshot; an unchanged scrollback adds nothing. */
 export function recordTranscriptSnapshot(db,{attemptId,sha256:sha,lines,bytes,at=nowMs()}){
   const a=db.prepare('SELECT workflow_id FROM op_attempts WHERE attempt_id=?').get(attemptId);
   need(a,`attempt ${attemptId} not found`,'STARCI_ATTEMPT_NOT_FOUND');

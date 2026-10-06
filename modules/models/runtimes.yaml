@@ -107,8 +107,7 @@ allocation:
   #     review.verify, handover.review, security.verify, goal.validate, uat.assisted.verify, interface.audit and
   #     the hands-on e2e/integration/perf/uat verify kinds - and work.author walk the review order: Devin,
   #     then Opus and Sol as overflow only (overflowByOrder.review). The cross-family rule sends a review of
-  #     what Devin implemented to Opus or Sol. An experiment, measured in
-  #     benchmark/findings/2026-09-25-review-hands.md.
+  #     what Devin implemented to Opus or Sol. An experiment.
   # Claude and Codex keep strategy: request.analyze, scope.define, business/architecture/goal decide and
   # revise, decision.prepare and implementation.plan (the cut) stay on think/decide/plan (Opus, Sol); brand.decide
   # walks its own brand order (Opus, then Sol).
@@ -228,8 +227,7 @@ allocation:
     # `l.from.files: 12` is ledger-derived: of 52 settled implement/refactor/author jobs in the
     # measured product ledger, closures at or above 12 authored files ran a median 46 min against 12 min below
     # it, the first cutoff where the majority exceeds one targetMinutes[1] window
-    # (benchmark/findings/2026-09-23-parallel-gear.md). Every other `from` bound is the
-    # benchmark/findings/fable.md sketch value carried as an ASSUMPTION: that ledger holds exactly one job over three
+    #. Every other `from` bound is a sketch value carried as an ASSUMPTION: that ledger holds exactly one job over three
     # windows and no assertion or component measurement at all, so `xl.from` and both `assertions`
     # bounds have no observation behind them and are re-derived when estimate inputs are recorded.
     size:

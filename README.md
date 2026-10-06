@@ -137,7 +137,7 @@ modules/host/       per-host contracts — orca call surface (data only)
 skills/starci/      one explicit public entry, provider policy and conditional internal references
 init/               AGENTS.md bootstrap template
 knowledge/          authored YAML doctrine the checks and skills cite
-benchmark/          model-pool evidence: expectations.yaml, append-only snapshots/, findings/
+benchmark/          model-pool evidence: expectations.yaml, append-only snapshots/
 docs/               documentation
 examples/           ecommerce-app (a reference product with recorded .starciwork evidence), lite-app (a tools-produced lite booking app), shape-slot (a slot-teaching fixture, not a product) and starcistacks-services (service declarations)
 tests/              node:test specs — npm test

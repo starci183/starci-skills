@@ -16,8 +16,6 @@ benchmark/
                         plus public benchmark figures (null unless a public source is cited)
   snapshots/            ACTUAL: model-scorecard output, one file per date x window, append-only
     <YYYY-MM-DD>-<N>h.json
-  findings/             ANALYSIS: expected vs actual for one snapshot, and the decision it led to
-    <YYYY-MM-DD>.md
 ```
 
 - **expectations.yaml** follows the contract. Every entry cites the file it was derived from, and its `asOf`
@@ -29,11 +27,7 @@ benchmark/
   job count, duration sources, errors, and per pool x op kind the jobs, pass/fail/blocked rates, rework
   and median duration. Snapshots are **append-only**. A snapshot is
   never edited, re-generated or deleted, even when it later proves misleading. The correction goes into a
-  new snapshot or a findings note.
-- **findings/** hold the supervisor's written analysis of one snapshot: per-pool figures, same-kind
-  comparisons, expectation vs actual, caveats, and the proposal with the owner's decision on it. A findings
-  note is written in the language the owner approved it in. It is dated and not rewritten after the owner
-  decides. A later note supersedes it by citing it.
+  new snapshot.
 
 ## Update process
 
@@ -48,20 +42,19 @@ benchmark/
    It writes `benchmark/snapshots/<today>-<N>h.json` and prints a short per-pool delta against the newest
    earlier snapshot of the same window. When that file already exists it refuses and writes nothing. Pick
    another window or wait a day; never delete the old file to make room.
-2. Compare the snapshot with `expectations.yaml` and write `findings/<date>.md`: which pools and kinds
-   match, fall below or exceed the expectation, with the job counts behind each claim. Only compare kinds
-   with enough jobs, and name the caveats (runtime defects inside the window, owner or gate waits counted as
-   blocked, a model switch inside the window).
-3. Any routing or profile proposal goes to the owner with the findings note. Record the decision (approved,
-   rejected or amended, with its date) in that note. Then land the contract change in its own lane and
-   update `expectations.yaml` to match.
-4. Commit snapshots, findings and expectation updates through the normal land gate.
+2. Compare the snapshot with `expectations.yaml`: which pools and kinds match, fall below or exceed the
+   expectation, with the job counts behind each claim. Only compare kinds with enough jobs, and name the
+   caveats (runtime defects inside the window, owner or gate waits counted as blocked, a model switch inside
+   the window).
+3. Any routing or profile proposal goes to the owner with the comparison. Then land the contract change in
+   its own lane and update `expectations.yaml` to match.
+4. Commit snapshots and expectation updates through the normal land gate.
 
 ## Citing the benchmark
 
 A routing or profile change built on this evidence cites it in the changed file's comment and in its
-`modules/kernel/contract-changes/<id>.yaml` entry. Name the snapshot file, the findings note and the specific
+`modules/kernel/contract-changes/<id>.yaml` entry. Name the snapshot file and the specific
 figure, for example:
-`benchmark/snapshots/2026-09-25-72h.json: backend.scaffold devin 73% pass (45 jobs) vs codex 43% (23); benchmark/findings/2026-09-25.md`.
+`benchmark/snapshots/2026-09-25-72h.json: backend.scaffold devin 73% pass (45 jobs) vs codex 43% (23)`.
 A claim with no snapshot behind it is marked `INFERRED`, as the profiles already do. Public benchmark figures
 are cited only through `expectations.yaml` `publicBenchmarks` sources, never inline from memory.

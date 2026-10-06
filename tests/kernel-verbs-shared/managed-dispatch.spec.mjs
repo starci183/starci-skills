@@ -625,7 +625,7 @@ test('Claude auth fallback advances only after partial effects reconcile and nev
 });
 
 test('a dispatch refused after the worker exists closes that worker in the same rejection',async t=>{
-  // benchmark/findings/fable.md orca-hierarchy row 2: interface.audit a4 was rejected at
+  // orca-hierarchy row 2: interface.audit a4 was rejected at
   // worker-start and its terminal stayed open, so the sidebar kept an "Idle"
   // [Op] row under the kernel for a job the ledger had already failed.
   const fx=fixture(t);

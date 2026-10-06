@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations(
   finished_at   INTEGER,
   status        TEXT NOT NULL CHECK(status IN ('running','done','failed'))) STRICT;
 
--- ui_states: the ONLY set of display states (UI-API sec. 3.4).
+-- ui_states: the ONLY set of display states.
 CREATE TABLE IF NOT EXISTS ui_states(
   ui    TEXT PRIMARY KEY CHECK(ui IN ('bad','warn','running','waiting','ok','done','unknown')),
   rank  INTEGER NOT NULL) STRICT;                -- sort order: bad first
@@ -350,7 +350,7 @@ CREATE TABLE IF NOT EXISTS op_attempts(
   contract_sha      TEXT,                        -- digest contracts.markdown
   config_sha        TEXT,                        -- digest of the effective config.yaml
   prompt_sha        TEXT REFERENCES blobs(sha256),       -- the real prompt sent to the terminal
-  transcript_sha    TEXT REFERENCES blobs(sha256),       -- the WHOLE terminal scrollback at end, redacted (UI-API sec. 2.10);
+  transcript_sha    TEXT REFERENCES blobs(sha256),       -- the WHOLE terminal scrollback at end, redacted;
                                                          -- while running: attempt_transcript_snapshots (every 60 seconds)
   session_sha       TEXT REFERENCES blobs(sha256),       -- the CLI session file (~/.claude/projects/*.jsonl, ~/.codex/sessions/...), redacted
   -- where
@@ -564,7 +564,7 @@ CREATE TRIGGER IF NOT EXISTS job_artifacts_immutable BEFORE UPDATE OF sha256, by
     SELECT RAISE(ABORT,'artifacts are immutable: file a new name');
   END;
 
--- attempt_transcript_snapshots (UI-API sec. 2.10): periodic (60 s) redacted scrollback snapshots of a running op terminal.
+-- attempt_transcript_snapshots: periodic (60 s) redacted scrollback snapshots of a running op terminal.
 -- No new row when the scrollback is unchanged (UNIQUE attempt+sha). The final one is op_attempts.transcript_sha.
 CREATE TABLE IF NOT EXISTS attempt_transcript_snapshots(
   snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,

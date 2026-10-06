@@ -286,7 +286,7 @@ test('a replacement launch proceeds on its recorded authority alone — no confi
 });
 
 test('the workflow Orca Run survives a kernel restart — one workflow Run, one runId, the new kernel terminal',t=>{
-  // benchmark/findings/fable.md orca-hierarchy root cause 1: the restart wrote a fresh payload_json over the kernel job, so
+  // orca-hierarchy root cause 1: the restart wrote a fresh payload_json over the kernel job, so
   // orca.runId was lost and the next dispatch's ensureWorkflowRun created a SECOND Run - two trees in the sidebar.
   // Every Kernel is a worker of its own entry Run (run-fake-1, reused by the restart); the workflow Run its ops
   // join is created once, from the Kernel's own terminal, and re-bound to the new Kernel after a restart.
@@ -348,7 +348,7 @@ test('the workflow Orca Run survives a kernel restart — one workflow Run, one 
 });
 
 test('a kernel restart fences and releases the previous kernel worker before the new one is recorded',t=>{
-  // benchmark/findings/fable.md orca-hierarchy root cause 2: clearing the stale signal removed the ledger's handle on the old
+  // orca-hierarchy root cause 2: clearing the stale signal removed the ledger's handle on the old
   // Kernel, not the process. The old Dispatch is stopped, released and its terminal is affirmatively closed first.
   const f=fixture(t);
   const defined=f.run(DEFINE_GOAL,'--repo',f.repo,'--text','one live kernel per workflow','--json');

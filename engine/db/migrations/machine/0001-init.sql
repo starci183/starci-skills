@@ -303,7 +303,7 @@ CREATE TRIGGER IF NOT EXISTS process_runs_no_delete BEFORE DELETE ON process_run
   WHEN OLD.started_at > CAST(unixepoch('subsec')*1000 AS INTEGER) - 7776000000 BEGIN   -- only GC deletes rows older than 90 days
     SELECT RAISE(ABORT,'process_runs are append-only (90-day retention)');
   END;
--- UI-API compatibility (/api/reconciler starts24h): engine starts = view.
+-- /api/reconciler starts24h: engine starts = view.
 CREATE VIEW IF NOT EXISTS v_engine_starts AS
 SELECT run_id, started_at AS at, pid, rev, epoch, start_reason AS reason, ended_at, exit_reason, killed_by
 FROM process_runs WHERE role='engine';
@@ -514,7 +514,7 @@ CREATE TABLE IF NOT EXISTS seat_turns(
   span_id      TEXT) STRICT;
 CREATE INDEX IF NOT EXISTS ix_seat_turns ON seat_turns(seat_id,started_at);
 
--- seat_transcript_snapshots (UI-API sec. 2.10): periodic redacted scrollback snapshots of Kernel/Supervisor seats.
+-- seat_transcript_snapshots: periodic redacted scrollback snapshots of Kernel/Supervisor seats.
 CREATE TABLE IF NOT EXISTS seat_transcript_snapshots(
   snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,
   seat_id     TEXT NOT NULL REFERENCES seats(seat_id),
