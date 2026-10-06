@@ -52,7 +52,7 @@ function workflowRow(store, row, db, progress, extra = {}) {
     latest = metricPayload(recorded, 'starci/progress@1') ?? {};
     progressSnapshot = recorded?.snapshot ?? null;
   } catch (error) { progressReadError = String(error?.message ?? error); }
-  const eta = typeof latest.eta === 'string' ? Date.parse(latest.eta) : NaN;
+  const eta = typeof latest.eta === 'string' ? Date.parse(latest.eta) : Number.NaN;
   const dIs = many(db, `SELECT di_id,kind,decider,status,due_at,opened_at,summary,ui FROM v_decision_rows WHERE workflow_id=? AND status IN ${OPEN_DI}`, wf);
   const violations = many(machine, 'SELECT code,severity,violated_at,ui FROM v_sla_open WHERE ledger_id=? AND workflow_id=?', row.ledgerId, wf);
   const seat = seatOf(machine, p, wf);

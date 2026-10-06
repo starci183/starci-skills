@@ -17,7 +17,7 @@ const VERB_MODULE = fileURLToPath(new URL('./harness-verbs.mjs', import.meta.url
 const VITE_TOOL_ENTRY = path.join('node_modules', 'vite', 'bin', 'vite.js');
 const STATE_SCHEMA = 'starci/harness-processes@1';
 const modeOf = (tunnel) => tunnel ? 'tunnel' : 'app';
-const normalize = (value) => String(value ?? '').replace(/\\/g, '/').toLowerCase();
+const normalize = (value) => String(value ?? '').replaceAll('\\', '/').toLowerCase();
 
 const harnessStateFile = (env = process.env) => path.join(starciLocalRoot(env), 'services', 'harness-processes.json');
 

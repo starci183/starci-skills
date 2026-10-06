@@ -56,8 +56,8 @@ export function loadWorkSchemaValidators(root = runtimeRoot) {
 
 const describe = (error) => {
   const at = error.instancePath || '/';
-  const detail = error.params?.additionalProperty !== undefined ? ` (${error.params.additionalProperty})`
-    : Array.isArray(error.params?.allowedValues) ? ` (${error.params.allowedValues.join(', ')})` : '';
+  const detail = (error.params?.additionalProperty !== undefined && ` (${error.params.additionalProperty})`)
+    || (Array.isArray(error.params?.allowedValues) && ` (${error.params.allowedValues.join(', ')})`) || '';
   return `${at} ${error.message}${detail}`;
 };
 

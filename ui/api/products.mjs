@@ -103,7 +103,7 @@ export async function attemptProducts(repo, report, { checkpoint = null } = {}) 
   const reportHead = typeof report?.head === 'string' && HEX.test(report.head) ? report.head.toLowerCase() : null;
   const checkpointHead = typeof checkpoint?.sha === 'string' && HEX.test(checkpoint.sha) ? checkpoint.sha.toLowerCase() : null;
   const head = checkpointHead ?? reportHead;
-  const headSource = checkpointHead ? 'runtime-checkpoint' : reportHead ? 'report-tested' : null;
+  const headSource = (checkpointHead && 'runtime-checkpoint') || (reportHead && 'report-tested') || null;
   const empty = { head, headSource, headAt: checkpointHead ? checkpoint.at ?? null : null, reportHead,
     parent: null, repo: repo ?? null, files: [], otherChanged: [], claims: [], error: null, errorCode: null,
     scope: { listed: 0, returned: 0, truncated: false } };
@@ -116,7 +116,7 @@ export async function attemptProducts(repo, report, { checkpoint = null } = {}) 
   if (info.error) return { ...empty, claims, error: info.error, errorCode: 'PRODUCT_COMMIT_UNAVAILABLE' };
   const declared = [...new Set([...(Array.isArray(report?.files) ? report.files : []),
     ...claims.flatMap(claim => Array.isArray(claim?.paths) ? claim.paths : [])].filter(item => typeof item === 'string'))];
-  const wanted = (declared.length ? declared : checkpointHead ? [...info.changed.keys()] : []).slice(0, MAX_FILES);
+  const wanted = ((declared.length && declared) || (checkpointHead && [...info.changed.keys()]) || []).slice(0, MAX_FILES);
   const listedCount = declared.length || (checkpointHead ? info.changed.size : 0);
   const files = await pool(wanted, async file => {
     const refusal = refusePath(repo, file);

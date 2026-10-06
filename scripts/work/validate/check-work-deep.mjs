@@ -392,7 +392,7 @@ function checkTree(workRoot, out, baseline) {
     for (const s of segSet(rec.data)) claimsAny.add(s);
     if (/^(fr|br|contract)\./.test(rec.id)) for (const s of segSet(rec.data)) claimsFunc.add(s);
   }
-  const capLevel = cap => claimsFunc.has(cap) ? 'fr' : claimsAny.has(cap) ? 'design' : null;
+  const capLevel = cap => (claimsFunc.has(cap) && 'fr') || (claimsAny.has(cap) && 'design') || null;
   for (const o of ops) {
     const level = capLevel(o.cap) ?? capLevel(o.op);
     if (level === null) suspect(o.file ?? workRoot, 'CAPABILITY_WITHOUT_SPEC', `graphql ${o.kind} ${o.cap}/${o.op} ships but no spec record names "${o.cap}" - capability with no record at all`);

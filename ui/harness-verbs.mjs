@@ -12,7 +12,7 @@ export async function harnessStartVerb(ctx, deps = {}) {
       tunnel,
       env: ctx.env,
       now: ctx.now,
-      ...(deps.startOptions ?? {}),
+      ...deps.startOptions,
     });
     ctx.io?.stdout?.(`StarCi harness: ${target}\n`);
     const result = await run.done;
@@ -31,9 +31,9 @@ export async function harnessStartVerb(ctx, deps = {}) {
  */
 export async function harnessStopVerb(ctx, deps = {}) {
   try {
-    const result = await (deps.stopHarness ?? stopHarness)({ env: ctx.env, ...(deps.stopOptions ?? {}) });
-    const stopped = result.stopped.length ? `: ${result.stopped.map((item) => `${item.mode} pid ${item.pid}`).join(', ')}` : '';
-    const refused = result.refused.length ? `; refused ${result.refused.map((item) => `${item.mode} pid ${item.pid}: ${item.reason}`).join(', ')}` : '';
+    const result = await (deps.stopHarness ?? stopHarness)({ env: ctx.env, ...deps.stopOptions });
+    const stopped = result.stopped.length ? `: ${result.stopped.map((item) => String(item.mode) + ' pid ' + String(item.pid)).join(', ')}` : '';
+    const refused = result.refused.length ? `; refused ${result.refused.map((item) => String(item.mode) + ' pid ' + String(item.pid) + ': ' + String(item.reason)).join(', ')}` : '';
     return { code: result.ok ? 0 : 1, text: `harness ${result.action}${stopped}${refused}`, data: result };
   } catch (error) {
     return { code: 1, stderr: errorText('stop', error) };
@@ -51,7 +51,7 @@ export async function harnessStatusVerb(_ctx, deps = {}) {
     const result = await (deps.harnessStatus ?? harnessStatus)(deps.statusOptions ?? {});
     return {
       code: result.ok ? 0 : 1,
-      text: `harness ${result.running ? 'UP' : 'DOWN'}: ${result.url}${result.error ? ` (${result.error})` : ''}`,
+      text: `harness ${result.running ? 'UP' : 'DOWN'}: ${result.url}${result.error ? ' (' + String(result.error) + ')' : ''}`,
       data: result,
     };
   } catch (error) {

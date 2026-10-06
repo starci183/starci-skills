@@ -101,7 +101,7 @@ export function declaredStateValues(schema) {
 const fieldOf = (record, dottedPath) => String(dottedPath).split('.').reduce((holder, key) =>
   holder && typeof holder === 'object' ? holder[key] : undefined, record);
 
-const isList = value => Array.isArray(value) ? value : (value == null || value === '' ? [] : [value]);
+const isList = value => (Array.isArray(value) && value) || (value == null || value === '' ? [] : [value]);
 const normaliseSentence = value => String(value ?? '').trim().replace(/[.!?]+$/, '').replace(/\s+/g, ' ');
 const shownFile = rec => path.relative(root, path.join(rec.dir, 'index.yaml')).replaceAll('\\', '/');
 
