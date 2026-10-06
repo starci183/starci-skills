@@ -20,7 +20,7 @@ export function withWindowsHide(list, hasArgv) {
 
 // ---- the host process table (process-list.mjs, process-list-async.mjs) ------------------------------------------
 
-const psQuote = (s) => String(s).replace(/'/g, "''");
+const psQuote = (s) => String(s).replaceAll("'", "''");
 
 /** The PowerShell script of one process-table read: Win32_Process rows (optionally filtered), with CPU when asked. */
 export function processListScript({ where = null, cmdMax = 4000, cpu = false } = {}) {
@@ -48,7 +48,7 @@ export const processRowsOfPs = (text, cmdMax = 4000) => String(text ?? '').split
 
 // Windows keeps a process's environment block in its PEB: PEB.ProcessParameters (+0x20) -> Environment (+0x80) and
 // EnvironmentSize (+0x3F0), x64 only. A same-user process opens with PROCESS_QUERY_INFORMATION | PROCESS_VM_READ (0x0410).
-export const PROCESS_ENV_NATIVE = `
+export const PROCESS_ENV_NATIVE = String.raw`
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -82,7 +82,7 @@ public static class StarciProcessEnv {
       if (size <= 0 || size > 4 * 1024 * 1024) return null;
       var block = Read(h, (IntPtr)BitConverter.ToInt64(envPtr, 0), (int)size); if (block == null) return null;
       var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-      foreach (var entry in Encoding.Unicode.GetString(block).Split('\\0')) {
+      foreach (var entry in Encoding.Unicode.GetString(block).Split('\0')) {
         if (entry.Length == 0) continue;
         int i = entry.IndexOf('=', 1); if (i < 0) continue;
         d[entry.Substring(0, i)] = entry.Substring(i + 1);
@@ -94,7 +94,7 @@ public static class StarciProcessEnv {
 /** The PowerShell script reading `names` from the environment of `pids` (every process when null): JSON [{pid, readable, values}]. */
 export function processEnvScript({ names, pids = null }) {
   const wanted = JSON.stringify([...names].map(String));
-  const ids = pids ? `@(${[...pids].map((p) => Number(p)).filter(Number.isInteger).join(',')})` : '(Get-Process).Id';
+  const ids = pids ? `@(${[...pids].map(Number).filter(Number.isInteger).join(',')})` : '(Get-Process).Id';
   return [
     `Add-Type -TypeDefinition @'${PROCESS_ENV_NATIVE}\n'@ -Language CSharp`,
     `$names = '${psQuote(wanted)}' | ConvertFrom-Json`,

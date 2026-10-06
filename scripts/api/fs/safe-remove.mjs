@@ -65,7 +65,7 @@ export function safeRemove(root, { retries = 5, checkoutsUnder = null, hold } = 
   // the root itself or strictly under the root's real path. A link is unlinked above (the link only); any other
   // entry that resolves outside the tree is refused, whatever made it look like a plain entry.
   const rootReal = realpathOr(target);
-  const insideRoot = (p) => { const real = realpathOr(p); if (!real || !rootReal) return false; if (same(real, rootReal)) return true;
+  const insideRoot = (p) => { const real = realpathOr(p); if (!real || !rootReal) { return false; } if (same(real, rootReal)) { return true; }
     const rel = path.relative(rootReal, real); return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel); };
   const walk = (dir, st, parentReal) => {
     if (isLinkLike(dir, { parentReal, stat: st })) {

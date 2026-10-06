@@ -50,7 +50,7 @@ export function zipWrite(file, entries, { now = new Date(), ...options } = {}) {
       local.writeUInt16LE(dosTime(now), 10); local.writeUInt16LE(dosDate(now), 12); local.writeUInt32LE(crc, 14);
       local.writeUInt32LE(body.length, 18); local.writeUInt32LE(data.length, 22); local.writeUInt16LE(nameBuf.length, 26); local.writeUInt16LE(0, 28);
       const at = offset;
-      if (at + 30 + nameBuf.length + body.length >= U32) throw refuse('the archive would pass 4 GiB');
+      if (at + 30 + nameBuf.length + body.length >= U32) { throw refuse('the archive would pass 4 GiB'); }
       write(local); write(nameBuf); write(body);
       central.push({ nameBuf, crc, csize: body.length, size: data.length, method: stored ? 0 : 8, at });
       out.push({ name, bytes: data.length, sha256: sha256(data), crc32: crc });

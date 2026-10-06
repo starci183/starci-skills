@@ -143,7 +143,7 @@ export function codexKeyForms(dir, platform = process.platform) {
 
 /* ------------------------------------------------------ atomic rewriting */
 
-const readText = (file) => { try { return fs.readFileSync(file, 'utf8'); } catch (e) { if (e.code === 'ENOENT') return null; throw e; } };
+const readText = (file) => { try { return fs.readFileSync(file, 'utf8'); } catch (e) { if (e.code === 'ENOENT') { return null; } throw e; } };
 
 /**
  * Read-modify-write `file` with an atomic rename, then re-read and verify.
@@ -210,7 +210,7 @@ export function writeClaudeTrust({ file, keys, hooks }) {
     for (const key of keys) {
       const existing = doc.projects[key];
       if (existing?.hasTrustDialogAccepted === true) { already.push(key); continue; }
-      if (existing?.hasTrustDialogAccepted === false) throw Error(`${file}: owner declined trust for ${key}`);
+      if (existing?.hasTrustDialogAccepted === false) throw new Error(`${file}: owner declined trust for ${key}`);
       doc.projects[key] = existing && typeof existing === 'object' ? { ...existing, hasTrustDialogAccepted: true } : CLAUDE_PROJECT_DEFAULT();
       written.push(key);
     }
@@ -290,7 +290,7 @@ const decodeKey = (seg) => {
   if (seg.startsWith("'")) return seg.slice(1, -1);
   if (!seg.startsWith('"')) return seg;
   return seg.slice(1, -1).replace(/\\(u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|.)/g, (m, e) => {
-    if (e[0] === 'u' || e[0] === 'U') return String.fromCodePoint(parseInt(e.slice(1), 16));
+    if (e[0] === 'u' || e[0] === 'U') return String.fromCodePoint(Number.parseInt(e.slice(1), 16));
     return { b: '\b', t: '\t', n: '\n', f: '\f', r: '\r', '"': '"', '\\': '\\' }[e] ?? e;
   });
 };
@@ -299,7 +299,7 @@ const decodeValue = (v) => (v.startsWith("'") ? v.slice(1, -1) : decodeKey(v));
 /** The header Codex would write for `key`: a literal for its lowercase form, else a basic string. */
 export function codexHeader(key) {
   const literal = !/['\r\n]/.test(key) && key === key.toLowerCase() && key.includes('\\');
-  return literal ? `[projects.'${key}']` : `[projects."${key.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"]`;
+  return literal ? `[projects.'${key}']` : String.raw`[projects."${key.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"]`;
 }
 
 /** {key → {header line index, trust line index|null, trust value|null, end}} for every [projects.<key>] table. */
@@ -310,7 +310,7 @@ export function codexProjectTables(text) {
   lines.forEach((line, i) => {
     const bare = line.replace(/\r$/, '');
     const m = PROJECT_HEADER.exec(bare);
-    if (m) { current = { key: decodeKey(m[1]), header: i, trustLine: null, trust: null, end: i }; if (!tables.has(current.key)) tables.set(current.key, current); return; }
+    if (m) { current = { key: decodeKey(m[1]), header: i, trustLine: null, trust: null, end: i }; if (!tables.has(current.key)) { tables.set(current.key, current); } return; }
     if (ANY_HEADER.test(bare)) { current = null; return; }
     if (!current) return;
     if (bare.trim()) current.end = i;
@@ -337,7 +337,7 @@ export function writeCodexTrust({ file, keys, hooks }) {
     for (const key of keys) {
       const table = tables.get(key);
       if (table?.trust === 'trusted') { already.push(key); continue; }
-      if (table?.trust!==null && table?.trust!==undefined) throw Error(`${file}: owner set ${key} trust_level=${table.trust}; refusing to override`);
+      if (table?.trust!==null && table?.trust!==undefined) throw new Error(`${file}: owner set ${key} trust_level=${table.trust}; refusing to override`);
       written.push(key);
       if (!table) { append.push(key); continue; }
       if (table.trustLine !== null) {
@@ -347,7 +347,7 @@ export function writeCodexTrust({ file, keys, hooks }) {
       } else inserts.push(table.header);
     }
     if (!written.length) return { text: null, result: { written, already } };
-    for (const at of inserts.sort((a, b) => b - a)) lines.splice(at + 1, 0, `trust_level = "trusted"${eol === '\r\n' ? '\r' : ''}`);
+    for (const at of inserts.toSorted((a, b) => b - a)) lines.splice(at + 1, 0, `trust_level = "trusted"${eol === '\r\n' ? '\r' : ''}`);
     let next = lines.join('\n');
     if (append.length) {
       if (next && !next.endsWith('\n')) next += eol;
@@ -450,7 +450,7 @@ export function assertJsonToolGuard({ file, command, matcher = null, hooks }) {
     if (d === undefined || !d || typeof d !== 'object' || Array.isArray(d)) throw new Error(`${file} is not a JSON object`);
     if (d.hooks != null && (typeof d.hooks !== 'object' || Array.isArray(d.hooks))) throw new Error(`${file} hooks is not an object`);
     if (holds(d)) return { text: null, result: null };
-    d.hooks = { ...(d.hooks ?? {}) };
+    d.hooks = { ...d.hooks };
     const others = Array.isArray(d.hooks.PreToolUse) ? d.hooks.PreToolUse.filter((g) => !isGuardGroup(g)) : [];
     d.hooks.PreToolUse = [...others, group];
     const next = JSON.stringify(d, null, 2) + (text?.endsWith('\n') ? '\n' : '');
@@ -469,7 +469,7 @@ export function writeDevinProfile({ file, command, hooks }) {
 // A Codex hook lives in the home's config.toml as an array-of-tables block the runtime owns, marked on its first line.
 const CODEX_GUARD_BEGIN = '# starci-command-guard (scripts/agent/trust.mjs): the op command guard, a PreToolUse hook';
 export function codexGuardBlock(command, eol = '\n') {
-  const q = (v) => `"${String(v).replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+  const q = (v) => String.raw`"${String(v).replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
   return [CODEX_GUARD_BEGIN, '[[hooks.PreToolUse]]', 'matcher = "^Bash$"', '', '[[hooks.PreToolUse.hooks]]', 'type = "command"', `command = ${q(command)}`, 'timeout = 30', ''].join(eol);
 }
 /** Put the guard block in a Codex config.toml: appended, or an older block (another runtime path) replaced in place. */
@@ -493,14 +493,14 @@ export function writeCodexToolGuard({ file, command, hooks }) {
   return updated.ok ? { file, ok: true, written: updated.result.written } : { file, ok: false, error: updated.error };
 }
 
-const APP_SERVER_CLIENT = `
+const APP_SERVER_CLIENT = String.raw`
 const { spawn } = require('node:child_process');
 const reqs = JSON.parse(process.argv[1]);
 const p = spawn('codex app-server', { shell: true, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
 const out = []; let buf = ''; let next = 0;
-const send = (o) => p.stdin.write(JSON.stringify(o) + '\\n');
+const send = (o) => p.stdin.write(JSON.stringify(o) + '\n');
 const ask = () => { if (next >= reqs.length) { console.log(JSON.stringify(out)); p.kill(); process.exit(0); } send({ id: 100 + next, ...reqs[next] }); };
-p.stdout.on('data', (d) => { buf += d; let i; while ((i = buf.indexOf('\\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); let m; try { m = JSON.parse(line); } catch { continue; }
+p.stdout.on('data', (d) => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); let m; try { m = JSON.parse(line); } catch { continue; }
   if (m.id === 1) { send({ method: 'initialized' }); ask(); }
   else if (m.id === 100 + next) { out.push(m.error ? { error: m.error } : m.result); next += 1; ask(); } } });
 send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'starci-launch-trust', version: '1' } } });
@@ -513,7 +513,7 @@ export function codexAppServer({ home, requests, timeoutMs = 60_000 }) {
   const r = runNode(['-e', APP_SERVER_CLIENT, JSON.stringify(requests)], { timeout: timeoutMs,
     env: { ...process.env, CODEX_HOME: home } });
   const results = parseJson(String(r.stdout ?? '').trim().split(/\r?\n/).pop() ?? '', null);
-  if (!Array.isArray(results)) throw new Error(`codex app-server answered nothing (exit ${r.status}${r.error ? `: ${r.error.message}` : ''})`);
+  if (!Array.isArray(results)) { const detail = r.error ? ': ' + r.error.message : ''; throw new Error('codex app-server answered nothing (exit ' + r.status + detail + ')'); }
   return results;
 }
 
@@ -554,7 +554,7 @@ export function ensureLaunchTrust({ agent, cwd, config, env = process.env, platf
     if(agent==='claude'){
       const user=readText(targets.claudeJson),doc=user===null?{}:jsonOf(user);
       const local=readText(project.claudeSettings),settings=local===null?{}:jsonOf(local);
-      if(!doc||!settings)throw Error('Claude trust/settings file is unreadable');
+      if(!doc||!settings)throw new Error('Claude trust/settings file is unreadable');
       if(claudeKeyForms(dir,platform).some(key=>doc.projects?.[key]?.hasTrustDialogAccepted===false)||settings.skipDangerousModePermissionPrompt===false)
         return {...receipt,status:'declined',reason:'owner declined Claude project trust or bypass consent'};
     }
@@ -571,7 +571,7 @@ export function ensureLaunchTrust({ agent, cwd, config, env = process.env, platf
   };
   const guard = (file, fn) => { try { return fn(); } catch (e) { return { file, ok: false, error: String(e?.message ?? e) }; } };
   // A project file the runtime wrote stays out of `git status` (the repository's own info/exclude).
-  const excluded = (file) => { const x = guard(file, () => excludeFromGit(dir, file)); if (x) (receipt.gitExclude ??= []).push(x); if (x?.ok === false) receipt.errors.push({ file, error: x.error }); };
+  const excluded = (file) => { const x = guard(file, () => excludeFromGit(dir, file)); if (x) { receipt.gitExclude ??= []; receipt.gitExclude.push(x); } if (x?.ok === false) receipt.errors.push({ file, error: x.error }); };
   const command = toolGuardCommand();
   if (agent === 'devin') {
     // Devin's LOCAL project config (<dir>/.devin/config.local.json): the guard hook.
@@ -611,10 +611,10 @@ export function ensureLaunchTrust({ agent, cwd, config, env = process.env, platf
       collect(guard(file, () => writeCodexTrust({ file, keys, hooks })));
       if(receipt.errors.length)return {...receipt,status:'failed'};
       const noUpdate = guard(file, () => writeCodexNoUpdateCheck({ file, hooks }));
-      (receipt.updateCheck ??= []).push({ file, off: noUpdate.ok === true, ...(noUpdate.written ? { written: true } : {}), ...(noUpdate.ok ? {} : { error: noUpdate.error }) });
+      receipt.updateCheck ??= []; receipt.updateCheck.push({ file, off: noUpdate.ok === true, ...(noUpdate.written ? { written: true } : {}), ...(noUpdate.ok ? {} : { error: noUpdate.error }) });
       if (!noUpdate.ok) receipt.errors.push({ file, error: noUpdate.error });
       const noNudge = guard(file, () => writeCodexNoModelNudge({ file, hooks }));
-      (receipt.modelNudge ??= []).push({ file, off: noNudge.ok === true, ...(noNudge.written ? { written: true } : {}), ...(noNudge.ok ? {} : { error: noNudge.error }) });
+      receipt.modelNudge ??= []; receipt.modelNudge.push({ file, off: noNudge.ok === true, ...(noNudge.written ? { written: true } : {}), ...(noNudge.ok ? {} : { error: noNudge.error }) });
       if (!noNudge.ok) receipt.errors.push({ file, error: noNudge.error });
     }
     const file = project.codexConfig;
@@ -626,10 +626,10 @@ export function ensureLaunchTrust({ agent, cwd, config, env = process.env, platf
     receipt.toolGuard = [{ file, ...(hook.written ? { written: true } : {}), trustedIn: homes.map((home) => {
       const trusted = hook.ok && server ? guard(file, () => trustCodexToolGuard({ home: home.dir, cwd: dir, command, appServer: server })) : null;
       if (trusted && !trusted.ok) receipt.errors.push({ file: path.join(home.dir, 'config.toml'), error: trusted.error });
-      return { home: home.dir, trusted: trusted ? (trusted.ok ? trusted.trusted : 'failed') : 'not-checked' };
+      return { home: home.dir, trusted: trusted ? ['failed', trusted.trusted][Number(Boolean(trusted.ok))] : 'not-checked' };
     }) }];
   }
-  receipt.status = receipt.errors.length ? 'failed' : (receipt.written.length ? 'written' : 'already');
+  receipt.status = receipt.errors.length ? 'failed' : ['already', 'written'][Number(receipt.written.length > 0)];
   if (!receipt.errors.length) delete receipt.errors;
   return receipt;
 }

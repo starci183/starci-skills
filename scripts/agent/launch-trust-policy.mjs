@@ -26,7 +26,12 @@ export function codexTrustPaths(cwd) {
   const common = git('--path-format=absolute', '--git-common-dir');
   if (common && path.basename(common) === '.git') out.push(path.resolve(path.dirname(common)));
   const seen = new Set();
-  return out.filter((p) => { const k = process.platform==='win32'?p.toLowerCase():p; if (seen.has(k)) { return false; } seen.add(k); return true; });
+  return out.filter((p) => {
+    const k = process.platform === 'win32' ? p.toLowerCase() : p;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 /** Resolve an existing checkout to exact current owner roots; never authorize by path prefix. */

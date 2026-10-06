@@ -12,7 +12,7 @@ export function zipVisit(file,visit,options={}){
     const stat=fs.fstatSync(fd),length=stat.size;
     if(length<22)throw refuse(`${file}: truncated ZIP`);
     if(length>limits.maxArchiveBytes)throw refuse(`${file}: archive exceeds resource cap`,'zip-limit');
-    const read=(at,n)=>{if(!Number.isInteger(at)||!Number.isInteger(n)||at<0||n<0||at+n>length)throw refuse(`${file}: out-of-bounds ZIP record`);const data=Buffer.alloc(n);let done=0;while(done<n){const got=fs.readSync(fd,data,done,n-done,at+done);if(!got)throw refuse(`${file}: truncated ZIP record`);done+=got;}return data;};
+    const read=(at,n)=>{if(!Number.isInteger(at)||!Number.isInteger(n)||at<0||n<0||at+n>length){throw refuse(`${file}: out-of-bounds ZIP record`);}const data=Buffer.alloc(n);let done=0;while(done<n){const got=fs.readSync(fd,data,done,n-done,at+done);if(!got){throw refuse(`${file}: truncated ZIP record`);}done+=got;}return data;};
     const tailAt=Math.max(0,length-22-0xffff),tail=read(tailAt,length-tailAt);
     let end=-1;for(let i=tail.length-22;i>=0;i--)if(tail.readUInt32LE(i)===0x06054b50&&i+22+tail.readUInt16LE(i+20)===tail.length){end=i;break;}
     if(end<0)throw refuse(`${file}: no end-of-central-directory record`);
@@ -29,7 +29,7 @@ export function zipVisit(file,visit,options={}){
       if(size>limits.maxEntryBytes||csize>limits.maxCompressedEntryBytes||(total+=size)>limits.maxTotalBytes||nlen>limits.maxNameBytes)throw refuse(`${file}: entry exceeds resource cap`,'zip-limit');
       if(p+46+nlen+xlen+clen>eocd)throw refuse(`${file}: central name/extra exceeds directory`);
       const name=read(p+46,nlen).toString('utf8');p+=46+nlen+xlen+clen;
-      if(!validZipName(name)||names.has(name))throw refuse(`${file}: unsafe/duplicate ZIP entry name`);names.add(name);
+      if(!validZipName(name)||names.has(name)){throw refuse(`${file}: unsafe/duplicate ZIP entry name`);}names.add(name);
       if(at+30>cdStart)throw refuse(`${file}: local header overlaps central directory`);
       const local=read(at,30),localN=local.readUInt16LE(26),start=at+30+localN+local.readUInt16LE(28);
       if(local.readUInt32LE(0)!==0x04034b50||local.readUInt16LE(6)!==flags||local.readUInt16LE(8)!==method||local.readUInt32LE(14)!==crc||local.readUInt32LE(18)!==csize||local.readUInt32LE(22)!==size||localN!==nlen||start+csize>cdStart||read(at+30,localN).toString('utf8')!==name)throw refuse(`${file}: local/central header mismatch`);
