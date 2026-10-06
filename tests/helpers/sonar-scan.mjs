@@ -55,7 +55,7 @@ export const writeGreenProofs = (dir, bound = null) => {
     if (!target?.head || !target.owned?.length) throw new Error('the fixture needs its actual admitted target binding');
     const snapshot = gateInputSnapshot(root, target.head, [], target.owned);
     const doc = loadOpGate({ base: baseRoot });
-    const args = [path.join(baseRoot, 'scripts/gates/read-digest.mjs'), '--root', root,
+    const args = [path.join(baseRoot, 'scripts/cli/gate-read.mjs'), '--root', root,
       ...(snapshot.changed.length ? ['--touch', ...snapshot.changed] : []), '--knowledge', ...(doc.digest.required ?? [])];
     const read = spawnSync(process.execPath, args, { cwd: baseRoot, encoding: 'utf8', windowsHide: true,
       timeout: 30000, env: { ...process.env, STARCI_RUNTIME: baseRoot } });

@@ -2,7 +2,7 @@ group: gate
 verb: read
 owner: runtime
 summary: build the recorded READ digest for an operation
-impl: {script: scripts/gates/read-digest.mjs}
+impl: {script: scripts/cli/gate-read.mjs}
 flags:
   - {name: root, type: string, summary: application root}
   - {name: touch, type: list, summary: files the operation will touch}

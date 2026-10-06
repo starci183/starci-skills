@@ -19,7 +19,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { starciLocalRoot, runtimeStateDir } from '../runtime-root.mjs';
 import { isSpecRun } from '../../scripts/lib/env.mjs';
-import { insidePath, pathKey } from '../../scripts/lib/path-key.mjs';
+import { canonicalPath, insidePath, pathKey } from '../../scripts/lib/path-key.mjs';
 import { byCodeUnit } from '../by-code-unit.mjs';
 
 export const ARTIFACT_ROOT_ENV = 'STARCI_ARTIFACT_ROOT';
@@ -43,7 +43,7 @@ const location = (sha, root = null, suffix = '') => {
     throw new TypeError('blob read root must be an absolute path');
   const file = path.join(root === null ? artifactRoot() : path.resolve(root), assertSha(sha).slice(0, 2), `${sha}${suffix}`);
   if (root !== null) {
-    regularParents(file, { strict: true });
+    regularParents(file, { strict: true, base: root });
     const stat = fs.lstatSync(file, { throwIfNoEntry: false });
     if (stat && (!stat.isFile() || stat.isSymbolicLink()
       || fs.realpathSync.native(file) !== path.join(fs.realpathSync.native(path.dirname(file)), path.basename(file))
@@ -78,11 +78,12 @@ const stateIgnored = (top, stateDir) => {
 // A writer root is outside every checkout (including worktrees whose .git is a file), or it is under this runtime's own
 // .runtime directory AND that directory is listed in the checkout's .gitignore (or .git/info/exclude), so a blob store can
 // never be committed. Fail closed: a root under any other path in a checkout, or a .runtime nobody ignores, refuses.
-export function ensureExternalRoot(root, stateDir = runtimeStateDir()) {
-  let cursor = root;
+export function ensureExternalRoot(root, stateDirectory = runtimeStateDir()) {
+  const real = canonicalPath(root), stateDir = canonicalPath(stateDirectory); // canonical on both sides: a link into a checkout cannot hide it
+  let cursor = real;
   while (true) {
     if (fs.existsSync(path.join(cursor, '.git'))) {
-      if (!insidePath(stateDir, root, { key: pathKey, includeSelf: true })) throw new Error(`artifact root is inside a git checkout: ${root}`);
+      if (!insidePath(stateDir, real, { key: pathKey, includeSelf: true })) throw new Error(`artifact root is inside a git checkout: ${root}`);
       if (!stateIgnored(cursor, stateDir)) throw new Error(`artifact root is inside a git checkout and not git-ignored: ${root}`);
       return;
     }
@@ -207,7 +208,7 @@ export function blobAsFile(ref, { ext = '', db = null, root = null } = {}) {
   if (typeof ext !== 'string' || (ext !== '' && !/^\.[a-z0-9]{1,16}$/i.test(ext))) throw new TypeError('blob view extension must be a simple suffix');
   const bytes = getBlob(hit.sha256, { root });
   const file = path.join(viewRoot(root), 'files', `${hit.sha256}${ext}`);
-  regularParents(file, { strict: root !== null });
+  regularParents(file, { strict: root !== null, base: path.dirname(viewRoot(root)) });
   publishOnce(file, bytes);
   if (!fs.lstatSync(file).isFile() || fs.lstatSync(file).isSymbolicLink() || digest(fs.readFileSync(file)) !== hit.sha256)
     throw new Error(`blob view hash mismatch: ${hit.sha256}`);
@@ -217,21 +218,20 @@ export function blobAsFile(ref, { ext = '', db = null, root = null } = {}) {
   return file;
 }
 
-function regularParents(file, { strict = false } = {}) {
-  let cursor = path.dirname(file);
-  while (true) {
-    const stat = strict ? fs.lstatSync(cursor, { throwIfNoEntry: false }) : (fs.existsSync(cursor) ? fs.lstatSync(cursor) : null);
-    if (stat) {
-      if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`blob view parent is not a regular directory: ${cursor}`);
-      const parent = path.dirname(cursor);
-      if (strict && parent !== cursor
-        && (fs.realpathSync.native(cursor) !== path.join(fs.realpathSync.native(parent), path.basename(cursor))
-          || !fs.readdirSync(parent).includes(path.basename(cursor))))
-        throw new Error(`blob read parent is linked or has a different spelling: ${cursor}`);
-    }
-    const parent = path.dirname(cursor);
-    if (parent === cursor) return;
-    cursor = parent;
+// The trusted base (the read root, or the directory holding the store and its views) is canonicalised once; only directories BELOW it must be regular and exactly spelled.
+function regularParents(file, { strict = false, base }) {
+  const top = path.resolve(base), levels = []; let real = null;
+  for (let at = path.dirname(path.resolve(file)); at !== top; at = path.dirname(at)) {
+    if (!insidePath(top, at)) throw new Error(`blob path is outside its trusted root: ${file}`); else levels.unshift(at);
+  }
+  for (const cursor of levels) {
+    const stat = fs.lstatSync(cursor, { throwIfNoEntry: false }), name = path.basename(cursor);
+    if (!stat) return;
+    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`blob view parent is not a regular directory: ${cursor}`);
+    if (!strict) continue;
+    real = path.join(real ?? fs.realpathSync.native(top), name);
+    if (fs.realpathSync.native(cursor) !== real || !fs.readdirSync(path.dirname(cursor)).includes(name))
+      throw new Error(`blob read parent is linked or has a different spelling: ${cursor}`);
   }
 }
 
@@ -258,8 +258,8 @@ function bundleEntries(manifest) {
   return entries;
 }
 
-function verifiedBundle(dir, entries, { strict = false } = {}) {
-  regularParents(path.join(dir, '.complete'), { strict });
+function verifiedBundle(dir, entries, opts) {
+  const { strict } = opts; regularParents(path.join(dir, '.complete'), opts);
   if (!fs.existsSync(dir)) return false;
   const expected = new Map(entries);
   const seen = new Set();
@@ -330,10 +330,10 @@ export function bundleDir(ref, { db = null, root = null } = {}) {
     try { members.push([rel, getBlob(fileSha, { root })]); }
     catch (error) { if (error?.code === 'ENOENT') return null; throw error; }
   }
-  const dir = path.join(viewRoot(root), 'bundles', sha);
-  if (verifiedBundle(dir, entries, { strict: root !== null })) return dir;
+  const dir = path.join(viewRoot(root), 'bundles', sha), opts = { strict: root !== null, base: path.dirname(viewRoot(root)) };
+  if (verifiedBundle(dir, entries, opts)) return dir;
   if (fs.existsSync(dir)) throw new Error(`blob bundle view is incomplete: ${sha}`);
-  regularParents(dir, { strict: root !== null });
+  regularParents(dir, opts);
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   const staging = fs.mkdtempSync(path.join(path.dirname(dir), `.${sha}-`));
   const written = [];
@@ -349,11 +349,11 @@ export function bundleDir(ref, { db = null, root = null } = {}) {
     written.push(path.join(staging, '.complete'));
     fs.writeFileSync(written.at(-1), sha, { flag: 'wx' });
     try { fs.renameSync(staging, dir); }
-    catch (error) { if (!fs.existsSync(dir) || !verifiedBundle(dir, entries, { strict: root !== null })) throw error; }
+    catch (error) { if (!fs.existsSync(dir) || !verifiedBundle(dir, entries, opts)) throw error; }
   } finally {
     dropStaging(staging, written);
   }
-  if (!verifiedBundle(dir, entries, { strict: root !== null })) throw new Error(`blob bundle publication is incomplete: ${sha}`);
+  if (!verifiedBundle(dir, entries, opts)) throw new Error(`blob bundle publication is incomplete: ${sha}`);
   return dir;
 }
 

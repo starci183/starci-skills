@@ -17,6 +17,8 @@ purpose: >-
   checkpoint, so only the op's own new findings block. A green settle commits the op's checkpoint on wf-<workflowId>; a
   failed or blocked op is preserved to preserved/<workflowId>/<op> and the worktree reset to the last checkpoint. Main is
   touched only at the workflow's finish.
+  The READ set an op owes is the one filed at admission (filedRequiredReads, scripts/lib/filed-reads.mjs): run inside the op,
+  `starci gate read` records every filed required ref whatever --touch names; --touch adds the slice's own pattern and example files.
   Before CODE, READ docs/architecture.md and docs/code-pattern-enforcement.md (REF-COMMENT-1) and applicable comment topics,
   recording them in the operation's existing READ proof. Within each existing round, CHECK comment
   meaning against source, callers and relevant tests alongside actual owning lint, typecheck and tests.
@@ -43,7 +45,7 @@ gate:
   schema: starci/gate@1
   attach: gate.json
 digest:
-  script: scripts/gates/read-digest.mjs
+  script: scripts/cli/gate-read.mjs
   schema: starci/read-digest@1
   attach: read-digest.json
   required: [docs/architecture.md, docs/code-pattern-enforcement.md]
@@ -75,7 +77,7 @@ proofs:
   read-knowledge:
     schema: starci/read-digest@1
     attach: read-digest.json
-    script: scripts/gates/read-digest.mjs
+    script: scripts/cli/gate-read.mjs
     purpose: >-
       The READ step of a deciding or authoring op: the knowledge/patterns files of the kinds it touches, the knowledge files its
       decision cites (--knowledge), and the hfs slot map of the records it writes, each with its sha256. A done whose digest names

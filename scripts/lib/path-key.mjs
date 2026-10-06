@@ -49,6 +49,15 @@ export const realPath = (p) => {
   const resolved = path.resolve(p);
   try { return fs.realpathSync.native(resolved); } catch { return resolved; }
 };
+/** `p` with its nearest existing ancestor dereferenced and the not-yet-created rest appended: a root's canonical spelling before it exists. */
+export const canonicalPath = (p) => {
+  const rest = [];
+  for (let at = path.resolve(p); ; at = path.dirname(at)) {
+    try { return path.join(fs.realpathSync.native(at), ...rest); } catch { /* not created yet */ }
+    if (path.dirname(at) === at) return path.resolve(p);
+    rest.unshift(path.basename(at));
+  }
+};
 /** `p` resolved and case-folded where the filesystem ignores case — the Map key of an absolute path. */
 export const resolvedKey = (p) => foldCase(path.resolve(p));
 /** Whether `a` and `b` resolve to the same path (always case-folded, so differently-cased spellings count). */

@@ -174,7 +174,7 @@ const checkout = (t) => {
   return repo;
 };
 const seedJob = (repo, { jobId, wf, files, admittedAt, env = process.env }) => {
-  const read = spawnSync(process.execPath, [path.join(ROOT, 'scripts/gates/read-digest.mjs'), '--root', repo, '--knowledge', 'docs/architecture.md'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 30000 });
+  const read = spawnSync(process.execPath, [path.join(ROOT, 'scripts/cli/gate-read.mjs'), '--root', repo, '--knowledge', 'docs/architecture.md'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 30000 });
   assert.equal(read.status, 0, read.stderr || read.stdout);
   // Native READ records the physical target root; keep this operational proof outside portable Work records.
   const evidence = put(repo, 'docs/checks/read-digest.json', JSON.stringify(JSON.parse(read.stdout)));

@@ -471,7 +471,7 @@ test('native settlement refuses an unbound e2e loop before attachments can claim
 test('current deciding-op route needs a real record-checks READ before native settle; a green attachment alone refuses', (t) => {
   const create = (label) => seedOp(t, { label, op: 'architecture.decide', current: true, admittedAt: Date.now() - 1000,
     docs: ({ tree, env }) => {
-      const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts/gates/read-digest.mjs'), '--root', tree, '--knowledge', 'docs/architecture.md'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 30000 });
+      const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts/cli/gate-read.mjs'), '--root', tree, '--knowledge', 'docs/architecture.md'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 30000 });
       assert.equal(r.status, 0, r.stderr || r.stdout);
       return { 'read-digest.json': JSON.parse(r.stdout) };
     } });

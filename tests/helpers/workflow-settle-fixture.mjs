@@ -96,7 +96,7 @@ export function settleFixture(t, { baseText = 'base\n' } = {}) {
     // The READ is the declared-law form `starci gate read --knowledge <filed knowledge>`: a --touch slice names only its slot's examples, while the filed READ owes the whole declared catalog.
     const knowledge = context.readRefs.filter((row) => row.rootKind === 'source' && row.path.startsWith('knowledge/')).map((row) => row.path);
     const commands = [
-      ['read-knowledge', ['node', path.join(ROOT, 'scripts/gates/read-digest.mjs'), '--root', tree, '--knowledge', ...knowledge]],
+      ['read-knowledge', ['node', path.join(ROOT, 'scripts/cli/gate-read.mjs'), '--root', tree, '--knowledge', ...knowledge]],
       ['doc-gate', ['node', path.join(ROOT, 'scripts/cli/gate-run.mjs'), '--root', tree, '--scope', 'docs', '--tree', path.join(tree, 'docs')]],
     ];
     const files = [], scratch = path.join(base, 'proofs', jobId);

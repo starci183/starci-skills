@@ -1,7 +1,6 @@
-#!/usr/bin/env node
 // read-digest.mjs - the READ step of the op loop (knowledge/op-gate.yaml) and its digest (schema starci/read-digest@1).
 //
-//   starci gate read --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]
+//   starci gate read --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]   (entry: scripts/cli/gate-read.mjs)
 //
 // For the files a slice will touch it prints, and records with their sha256, exactly what the slice must read before coding:
 //   - the slot map: `starci app explain <path> --json` of each touched file (its slot, tier, allowed imports, rules);
@@ -12,9 +11,10 @@
 // `--read` adds any other file the slice read (app-relative); `--knowledge` adds contained knowledge files or declared common law (a
 // deciding or authoring op's READ: the patterns, catalogs and declared common law its decision cites), role `knowledge`. A deciding op that
 // writes no file yet may give --knowledge alone. The op attaches the digest to its report; `starci kernel settle` re-reads it
-// (scripts/kernel/gate-settle.mjs). Every applicable pattern/common input and matching example must carry its current hash.
+// (scripts/kernel/gate-settle.mjs). Every applicable pattern/common input and matching example must carry its current hash. The entry adds, inside an op, every required
+// ref of that op's filed READ (`filed`, filedRequiredReads in scripts/lib/filed-reads.mjs): --touch adds slot files, never removes one.
 // A digest records supplied inputs, not comprehension.
-// Exit 0 recorded, 2 the digest could not be built (a touched path hfs cannot explain is recorded with slot null, not an error).
+// A touched path hfs cannot explain is recorded with slot null, not an error.
 import fs from 'node:fs';
 import path from 'node:path';
 import { byCodeUnit } from '../lib/list.mjs';
@@ -23,7 +23,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { posixPath, sameResolvedPath, samePath, insidePath } from '../lib/path-key.mjs';
-import { isMain } from '../lib/is-main.mjs';
 import { exampleSourcePaths } from '../lib/example-refs.mjs';
 import { hfsEntry } from '../lib/package-at.mjs';
 
@@ -33,7 +32,6 @@ const OP_GATE_FILE = 'knowledge/op-gate.yaml';
 const PATTERN_ROOT = 'knowledge/patterns';
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const firstLine = (text) => String(text ?? '').trim().split(/\r?\n/)[0];
-const USAGE = 'usage: read-digest.mjs --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]';
 const KNOWLEDGE_ROOT = 'knowledge';
 
 let cache = null;
@@ -209,7 +207,7 @@ function examplesForSlot(explained, doc = loadOpGate(), base = runtimeRoot) {
 }
 
 /** The digest of a slice: what it must read, each file with its sha256. */
-export async function buildReadDigest({ root, touch, read = [], knowledge = [], doc = loadOpGate(), hfs = hfsEntry(root), base = runtimeRoot }) {
+export async function buildReadDigest({ root, touch, read = [], knowledge = [], filed = null, doc = loadOpGate(), hfs = hfsEntry(root), base = runtimeRoot }) {
   const touched = [...new Set((touch ?? []).map((f) => posixPath(path.isAbsolute(f) ? path.relative(root, f) : f)))].sort(byCodeUnit);
   const explained = await explainPaths(root, touched, hfs);
   const slotMap = touched.map((file, i) => {
@@ -243,6 +241,8 @@ export async function buildReadDigest({ root, touch, read = [], knowledge = [], 
     for (const example of examplesForSlot(kind, doc, base)) add(example, 'example', base);
   }
   for (const extra of read) add(posixPath(extra), 'read', path.isAbsolute(extra) ? '' : root);
+  // The op's filed READ owns its required refs: --touch adds slot files, it never removes one of these.
+  for (const rel of [...filed ?? []].sort(byCodeUnit)) add(rel, rel.startsWith(`${PATTERN_ROOT}/`) ? 'pattern' : /^(?:knowledge|docs)\//.test(rel) ? 'knowledge' : 'example', base);
   for (const rel of knowledge) {
     const clean = posixPath(path.isAbsolute(rel) ? path.relative(base, rel) : rel);
     if ((!clean.startsWith(`${KNOWLEDGE_ROOT}/`) && !(doc.digest.required ?? []).includes(clean))
@@ -250,29 +250,4 @@ export async function buildReadDigest({ root, touch, read = [], knowledge = [], 
     add(clean, clean.startsWith(`${PATTERN_ROOT}/`) ? 'pattern' : 'knowledge', base);
   }
   return { schema: DIGEST_SCHEMA, at: new Date().toISOString(), root: posixPath(path.resolve(root)), touched, slotMap, files: [...files.values()] };
-}
-
-function parseDigestArgs(argv) {
-  const opts = { root: null, touch: [], read: [], knowledge: [], out: null };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg === '--touch' || arg === '--read' || arg === '--knowledge') { while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts[arg.slice(2)].push(argv[++i]); }
-    else if (arg === '--root' || arg === '--out') { if (argv[i + 1] === undefined) throw new Error(`${arg} needs a value; ${USAGE}`); opts[arg.slice(2)] = argv[++i]; }
-    else throw new Error(`unknown argument ${arg}; ${USAGE}`);
-  }
-  if (!opts.touch.length && !opts.knowledge.length) throw new Error(`--touch or --knowledge names at least one file; ${USAGE}`);
-  return opts;
-}
-
-if (isMain(import.meta.url)) {
-  try {
-    const opts = parseDigestArgs(process.argv.slice(2));
-    const digest = await buildReadDigest({ root: path.resolve(opts.root ?? process.cwd()), touch: opts.touch, read: opts.read, knowledge: opts.knowledge });
-    const text = `${JSON.stringify(digest, null, 2)}\n`;
-    if (opts.out) { fs.mkdirSync(path.dirname(path.resolve(opts.out)), { recursive: true }); fs.writeFileSync(path.resolve(opts.out), text); }
-    process.stdout.write(text);
-  } catch (error) {
-    process.stderr.write(`read-digest: ${error.message}\n`);
-    process.exitCode = 2;
-  }
 }

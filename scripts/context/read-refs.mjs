@@ -8,6 +8,7 @@ import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { bindOpPath } from '../lib/op-shared.mjs';
 import { insidePath } from '../lib/path-key.mjs';
 import { lines } from '../lib/verb-call.mjs';
+import { READ_SEPARATOR } from '../lib/filed-reads.mjs';
 
 const SKIP = new Set(['node_modules', '.git', '.next', 'dist']);
 const INSPECTION_LIMIT = 10000;
@@ -19,7 +20,7 @@ export const readParamName=token=>/^params\.([A-Za-z][A-Za-z0-9]*)$/.exec(token)
 /** Split declared references while preserving brace alternation; a trailing field
  * selector annotates its leading concrete path rather than becoming another file. */
 export function declaredReadTokens(raw) {
-  return lines(raw, { separator: /[+\n]/ });
+  return lines(raw, { separator: READ_SEPARATOR });
 }
 
 /** Resolve one READ reference with an explicit Source, Work or app root. Values

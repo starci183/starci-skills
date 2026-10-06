@@ -658,7 +658,7 @@ test('the prescribed no-touch unit READ producer carries the required common inp
   const {root,base}=appFixture(t);
   const binding={...captureGateBinding([{base:root,path:'be/**'}],{at:Date.now()}),placements:[{base:root,path:'be/**'}]};
   const file=path.join(tmp(t),'unit-read.json');
-  const run=spawnSync(process.execPath,[path.join(ROOT,'scripts','gates','read-digest.mjs'),'--root',root,
+  const run=spawnSync(process.execPath,[path.join(ROOT,'scripts','cli','gate-read.mjs'),'--root',root,
     '--knowledge','knowledge/patterns/be/test.yaml','--out',file],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
   assert.equal(run.status,0,run.stderr||run.stdout);
   const digest=JSON.parse(fs.readFileSync(file,'utf8'));

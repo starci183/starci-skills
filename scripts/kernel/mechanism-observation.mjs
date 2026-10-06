@@ -10,8 +10,7 @@ import { DIGEST_SCHEMA } from '../gates/read-digest.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { insidePath, sameResolvedPath, normRel } from '../lib/path-key.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { declaredReadTokens } from '../context/read-refs.mjs';
-import { EXAMPLE_CATALOG_FILE } from '../lib/example-refs.mjs';
+import { filedRequiredReads } from '../lib/filed-reads.mjs';
 
 const independent = new Set(['kernel', 'settler', 'parity', 'integrate']);
 const unavailable = (detail) => ({ status: 'unavailable', code: 'op-gate-tool-failed', detail, findings: [] });
@@ -174,14 +173,7 @@ export function judgeFiledRead(digest, context, doc, observations) {
   }
   // Admission's concrete READ expansion owns these law identities. A later
   // Source law addition cannot retroactively enlarge this attempt's duties.
-  const lawInputs = new Set((context.selected?.contract?.reads ?? []).filter((row) => row.id === 'standard')
-    .flatMap((row) => declaredReadTokens(row.path)).filter((token) => token === EXAMPLE_CATALOG_FILE
-      || (/^docs\/[^*?<>\\:]+\.md$/.test(token) && !token.split('/').includes('..'))));
-  const catalogReads = (context.selected?.contract?.reads ?? []).filter((row) => declaredReadTokens(row.path).includes(EXAMPLE_CATALOG_FILE));
-  const catalogProvenance = catalogReads.map((row) => `brief read [${row.id ?? '?'}] — `);
-  const required = new Set(context.readRefs.filter((row) => row.rootKind === 'source'
-    && (row.path.startsWith('knowledge/') || lawInputs.has(row.path)
-      || catalogProvenance.some((prefix) => row.why?.split('\n').some((why) => why.startsWith(prefix))))).map((row) => row.path));
+  const required = filedRequiredReads(context.readRefs, context.selected?.contract?.reads ?? []);
   if (!required.size || [...required].some((rel) => !named.has(rel) || named.get(rel).role === 'read')) return bad('READ omits required filed common law, knowledge or declared example inputs');
   return null;
 }
