@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnNode } from '../api/node/spawn-node.mjs';
-import { inspectLedger, ledgerFileFor, isRuntimeRoot, hasLedger } from '../../engine/db/ledger.mjs';
+import { inspectLedger, ledgerFileFor, hasLedger } from '../../engine/db/ledger.mjs';
 import { machineLog, pidAlive, readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { skillRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { loadConfig } from '../../engine/config.mjs';
@@ -86,7 +86,7 @@ function takeLock(m, name) {
     const custody = recordOf(m.connectorOf(name));
     if (connectorManagerBlocked(custody)) return { ok: false, holder: custody, reason: 'connector-child-custody-unreconciled' };
     const cur = m.hostLock(name);
-    if (cur && cur.state === 'held' && cur.holder_pid !== process.pid && liveRow(cur)) return { ok: false, holder: lockRecord(cur) };
+    if (cur?.state === 'held' && cur.holder_pid !== process.pid && liveRow(cur)) return { ok: false, holder: lockRecord(cur) };
     if (cur && cur.state !== 'released' && cur.holder_pid !== process.pid) m.releaseHostLock({ name, force: true });
     const got = m.acquireHostLock({ name, holder: holderLabel(), ttlMs: LOCK_TTL_MS, state: 'held' });
     return got.ok ? { ok: true } : { ok: false, holder: lockRecord(got.holder) };
@@ -157,7 +157,7 @@ export const markStarting = (name, pid, env = process.env) => {
   return withMachine((m) => m.transaction(() => {
     const cur = m.hostLock(name);
     // A live holder (the launched manager already claimed, or another one) is never overwritten.
-    if (cur && cur.state === 'held' && liveRow(cur)) return false;
+    if (cur?.state === 'held' && liveRow(cur)) return false;
     if (cur && cur.state !== 'released' && cur.holder_pid !== pid) m.releaseHostLock({ name, force: true });
     return m.acquireHostLock({ name, holder: 'starting', pid, ttlMs: STARTING_MS, state: 'starting' }).ok;
   }), { env });
@@ -196,7 +196,7 @@ export const CONNECTOR_LAUNCH_ENV = 'STARCI_CONNECTOR_LAUNCH';
 
 /* ------------------------------------------------------------ connectors rows (machine.sqlite connectors) */
 
-const recordOf = (row) => (row ? { ...(row.config ?? {}), pid: row.pid ?? row.config?.pid ?? null, port: row.port ?? row.config?.port ?? null,
+const recordOf = (row) => (row ? { ...row.config, pid: row.pid ?? row.config?.pid ?? null, port: row.port ?? row.config?.port ?? null,
   publicUrl: row.public_url ?? null, state: row.state ?? null, cursor: row.cursor ?? null, updatedAt: row.updated_at } : null);
 /**
  * One connector's record, or null: its config_json spread, with the row's pid, port, publicUrl, state, cursor and
@@ -217,7 +217,7 @@ export const writeConnectorState = (name, { kind, state, pid, port, publicUrl, c
         || canonicalJSON(config.childCapture ?? null) !== canonicalJSON(current.childCapture ?? null)
         || closedProcess(current.stopReceipt?.manager, current.processIdentity)
           && canonicalJSON(config.stopReceipt?.manager ?? null) !== canonicalJSON(current.stopReceipt.manager)))
-    throw Error('connector-child-custody-unreconciled');
+    throw new Error('connector-child-custody-unreconciled');
   const row = { name, updated_at: m.now(), kind, state, pid, port, public_url: publicUrl, config_json: config, cursor_json: cursor };
   m.upsert('connectors', Object.fromEntries(Object.entries(row).filter(([, v]) => v !== undefined)), ['name']);
   return true;
@@ -242,7 +242,7 @@ export const connectorManagerBlocked = (record) => connectorChildUnresolved(reco
 const retainConnectorClosure = (name, expected, receipt, env) => withMachine((m) => m.transaction(() => {
   const row = m.connectorOf(name), current = recordOf(row);
   if (!sameConnectorOwner(current, expected) || canonicalJSON(current) !== canonicalJSON(expected)) return false;
-  m.upsert('connectors', { name, updated_at: m.now(), config_json: { ...(row.config ?? {}), stopReceipt: receipt } }, ['name']);
+  m.upsert('connectors', { name, updated_at: m.now(), config_json: { ...row.config, stopReceipt: receipt } }, ['name']);
   return true;
 }), { env });
 
@@ -254,7 +254,7 @@ export function stopConnector(name, { source, child = false, env = process.env, 
     if (!sameConnectorOwner(current, expected) || canonicalJSON(current) !== canonicalJSON(expected)) return false;
     const stoppedAt = new Date(m.now()).toISOString();
     m.upsert('connectors', { name, state: 'stopped', pid: null, public_url: null, updated_at: m.now(),
-      config_json: { ...(row.config ?? {}), pid: null, childPid: null, connected: false, stoppedAt, stopReceipt: receipt } }, ['name']);
+      config_json: { ...row.config, pid: null, childPid: null, connected: false, stoppedAt, stopReceipt: receipt } }, ['name']);
     return true;
   }), { env }) } = {}) {
   let original;
@@ -321,6 +321,22 @@ export const spawnDetached = (script, args = [], { env = process.env } = {}) => 
   return child.pid ?? null;
 };
 
+const askRepoCandidates = (connectors, source) => {
+  const listed = (connectors?.repos ?? []).map((repo) => path.resolve(source, repo));
+  if (listed.length) return listed;
+  const candidates = [source];
+  const projects = path.join(source, '.workspaces', 'projects');
+  let entries = [];
+  try { entries = fs.readdirSync(projects, { withFileTypes: true }); } catch { /* no bindings */ }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const doc = readJsonFile(path.join(projects, entry.name, 'work.json'));
+    const rel = doc?.schema === 'starci/workspace-binding@2' ? doc?.repository?.pathFromSource : null;
+    if (typeof rel === 'string' && rel.trim()) candidates.push(path.resolve(source, rel));
+  }
+  return candidates;
+};
+
 
 
 
@@ -331,20 +347,7 @@ export const spawnDetached = (script, args = [], { env = process.env } = {}) => 
  */
 export function askRepos(connectors, { env = process.env, extra = [] } = {}) {
   const source = starciSourceRoot(env);
-  const listed = (connectors?.repos ?? []).map((repo) => path.resolve(source, repo));
-  let candidates = listed;
-  if (!listed.length) {
-    candidates = [source];
-    const projects = path.join(source, '.workspaces', 'projects');
-    let entries = [];
-    try { entries = fs.readdirSync(projects, { withFileTypes: true }); } catch { /* no bindings */ }
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const doc = readJsonFile(path.join(projects, entry.name, 'work.json'));
-      const rel = doc?.schema === 'starci/workspace-binding@2' ? doc?.repository?.pathFromSource : null;
-      if (typeof rel === 'string' && rel.trim()) candidates.push(path.resolve(source, rel));
-    }
-  }
+  const candidates = askRepoCandidates(connectors, source);
   const seen = new Set(), out = [];
   for (const repo of [...candidates, ...extra.map((r) => path.resolve(r))]) {
     const key = process.platform === 'win32' ? repo.toLowerCase() : repo;
@@ -416,7 +419,9 @@ export function askState(db, workflowId, dispatchId, { now = Date.now() } = {}) 
   const last = (kinds) => db.prepare(`SELECT seq, payload_json, created_at FROM events WHERE workflow_id=? AND kind IN (${kinds.map(() => '?').join(',')})
     AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(workflowId, ...kinds, dispatchId) ?? null;
   const answered = last(['ask-answered']), superseded = last(['ask-superseded']), reopened = last(['ask-serving', 'ask-notified']);
-  const closed = answered ? 'answered' : superseded && !(reopened && reopened.seq > superseded.seq) ? 'superseded' : null;
+  let closed = null;
+  if (answered) closed = 'answered';
+  else if (superseded && !(reopened && reopened.seq > superseded.seq)) closed = 'superseded';
   let serving = null;
   const row = last(['ask-serving']);
   if (!closed && row) {

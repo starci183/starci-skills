@@ -3,6 +3,7 @@ import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {agentContext} from '../api/orca/agent-context.mjs';
 import {missingFrom} from '../lib/orca-listing.mjs';
+import {byCodeUnit} from '../lib/list.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
@@ -24,18 +25,14 @@ const registryFile=root=>path.join(root,'modules','models','registry.yaml');
 const AGENT_CARD_SCHEMA='starci/agent-card@1';
 
 const yamlFilesIn=dir=>fs.existsSync(dir)
-  ?fs.readdirSync(dir).filter(name=>name.endsWith('.yaml')||name.endsWith('.yml')).sort()
+  ?fs.readdirSync(dir).filter(name=>name.endsWith('.yaml')||name.endsWith('.yml')).sort(byCodeUnit)
   :[];
 
 const readYamlFile=file=>parseYaml(fs.readFileSync(file,'utf8'));
 
-/** Validate the provider contract tree before an operation launch is planned. */
-function validateProviderContracts({root=skillRoot}={}){
-  const errors=[];
-  const AGENTS_DIR=agentsDir(root),HOSTS_DIR=hostsDir(root),PROFILES_DIR=profilesDir(root),REGISTRY_FILE=registryFile(root);
-
-  // 1. Every agent card parses, carries the agent-card schema id and attests an
-  //    `agent` identity equal to its file stem.
+// 1. Every agent card parses, carries the agent-card schema id and attests an
+//    `agent` identity equal to its file stem.
+const agentCards=(AGENTS_DIR,errors)=>{
   add(errors,fs.existsSync(AGENTS_DIR),'Agent card directory is missing: modules/models/agents/');
   const cardNames=yamlFilesIn(AGENTS_DIR).map(name=>name.replace(/\.ya?ml$/i,''));
   add(errors,cardNames.length>0,'No agent cards under modules/models/agents/');
@@ -49,46 +46,53 @@ function validateProviderContracts({root=skillRoot}={}){
     add(errors,card?.schema===AGENT_CARD_SCHEMA,`Agent card ${rel} must declare schema: ${AGENT_CARD_SCHEMA}`);
     add(errors,card?.agent===agent,`Agent card ${rel} agent field must equal its file stem '${agent}'`);
   }
+  return cards;
+};
 
-  // 2. Every host contract document under modules/host/<provider>/ parses, and
-  //    each host's index.yaml attests its own identity: a starci/ schema id, a
-  //    `provider` equal to its directory name, and every relative file path it
-  //    names (`agentCard`, `files.*`) resolving to a file that exists. orca is
-  //    required — it is the execution host.
+// 2. Every host contract document under modules/host/<provider>/ parses, and
+//    each host's index.yaml attests its own identity: a starci/ schema id, a
+//    `provider` equal to its directory name, and every relative file path it
+//    names (`agentCard`, `files.*`) resolving to a file that exists. orca is
+//    required — it is the execution host.
+const hostContracts=(HOSTS_DIR,errors)=>{
   add(errors,fs.existsSync(HOSTS_DIR),'Host contract directory is missing: modules/host/');
   const hosts=fs.existsSync(HOSTS_DIR)
-    ?fs.readdirSync(HOSTS_DIR,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort()
+    ?fs.readdirSync(HOSTS_DIR,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort(byCodeUnit)
     :[];
   add(errors,hosts.includes('orca'),'Orca host contract directory is missing: modules/host/orca/');
-  for(const host of hosts){
-    const hostDir=path.join(HOSTS_DIR,host);
-    const docs=yamlFilesIn(hostDir);
-    add(errors,docs.length>0,`No host contract documents under modules/host/${host}/`);
-    let index=null;
-    for(const name of docs){
-      let doc=null;
-      try{doc=readYamlFile(path.join(hostDir,name));}
-      catch(error){errors.push(`Host document modules/host/${host}/${name} does not parse: ${error.message}`);continue;}
-      if(path.basename(name).replace(/\.ya?ml$/i,'')==='index')index=doc;
-    }
-    add(errors,index!==null,`Host contract modules/host/${host}/ has no index.yaml`);
-    if(!index)continue;
-    add(errors,typeof index.schema==='string'&&index.schema.startsWith('starci/'),
-      `Host contract modules/host/${host}/index.yaml must declare a starci/ schema id`);
-    add(errors,index.provider===host,
-      `Host contract modules/host/${host}/index.yaml provider must equal its directory name '${host}'`);
-    const referenced=[index.agentCard,...(plain(index.files)?Object.values(index.files):[])]
-      .filter(value=>typeof value==='string'&&/\.ya?ml$/i.test(value));
-    for(const rel of referenced){
-      const resolved=path.resolve(hostDir,rel);
-      add(errors,fs.existsSync(resolved),
-        `Host contract modules/host/${host}/index.yaml names a missing file: ${rel}`);
-    }
-  }
+  for(const host of hosts)hostContract(host,path.join(HOSTS_DIR,host),errors);
+};
 
-  // 3. Every launch names a real agent card — the registry's targets.<t>.orcaLaunch.agent and every
-  //    pool's provider alike: the one launch is worker-start --agent <card>. A behavioral profile's
-  //    `target` must name a registry.yaml pool or launch target.
+/** The contract checks of one host document directory. */
+const hostContract=(host,hostDir,errors)=>{
+  const docs=yamlFilesIn(hostDir);
+  add(errors,docs.length>0,`No host contract documents under modules/host/${host}/`);
+  let index=null;
+  for(const name of docs){
+    let doc=null;
+    try{doc=readYamlFile(path.join(hostDir,name));}
+    catch(error){errors.push(`Host document modules/host/${host}/${name} does not parse: ${error.message}`);continue;}
+    if(path.basename(name).replace(/\.ya?ml$/i,'')==='index')index=doc;
+  }
+  add(errors,index!==null,`Host contract modules/host/${host}/ has no index.yaml`);
+  if(!index)return;
+  add(errors,typeof index.schema==='string'&&index.schema.startsWith('starci/'),
+    `Host contract modules/host/${host}/index.yaml must declare a starci/ schema id`);
+  add(errors,index.provider===host,
+    `Host contract modules/host/${host}/index.yaml provider must equal its directory name '${host}'`);
+  const referenced=[index.agentCard,...(plain(index.files)?Object.values(index.files):[])]
+    .filter(value=>typeof value==='string'&&/\.ya?ml$/i.test(value));
+  for(const rel of referenced){
+    const resolved=path.resolve(hostDir,rel);
+    add(errors,fs.existsSync(resolved),
+      `Host contract modules/host/${host}/index.yaml names a missing file: ${rel}`);
+  }
+};
+
+// 3. Every launch names a real agent card — the registry's targets.<t>.orcaLaunch.agent and every
+//    pool's provider alike: the one launch is worker-start --agent <card>. A behavioral profile's
+//    `target` must name a registry.yaml pool or launch target.
+const registryFindings=({PROFILES_DIR,REGISTRY_FILE},cards,errors)=>{
   let registry=null;
   try{registry=fs.existsSync(REGISTRY_FILE)?readYamlFile(REGISTRY_FILE):null;}
   catch(error){errors.push(`modules/models/registry.yaml does not parse: ${error.message}`);}
@@ -110,6 +114,16 @@ function validateProviderContracts({root=skillRoot}={}){
     const agent=pool?.provider;
     add(errors,typeof agent==='string'&&Object.hasOwn(cards,agent),`Registry pool ${name} provider names no agent card: ${agent}`);
   }
+};
+
+/** Validate the provider contract tree before an operation launch is planned. */
+function validateProviderContracts({root=skillRoot}={}){
+  const errors=[];
+  const AGENTS_DIR=agentsDir(root),HOSTS_DIR=hostsDir(root),PROFILES_DIR=profilesDir(root),REGISTRY_FILE=registryFile(root);
+
+  const cards=agentCards(AGENTS_DIR,errors);
+  hostContracts(HOSTS_DIR,errors);
+  registryFindings({PROFILES_DIR,REGISTRY_FILE},cards,errors);
 
   // 4. The Orca call contract is the argv source scripts/api/orca/lib.mjs
   //    reads, so every flag it names must be one of the call's own declared
@@ -129,48 +143,65 @@ const readCallContract=(root=skillRoot)=>{
   catch{return null;}
 };
 
+/** The flag-consistency findings of one calls.yaml entry. */
+const callFlagFindings=(name,call,declared,errors)=>{
+  for(const flag of call?.required??[])
+    add(errors,declared.has(flag),`calls.${name} requires --${flag} but does not declare it in flags`);
+  for(const flag of call?.forbidden??[])
+    add(errors,!declared.has(flag),`calls.${name} forbids --${flag} and also declares it in flags`);
+  for(const flag of Object.keys(call?.forbiddenValues??{}))
+    add(errors,(call?.forbidden??[]).includes(flag),
+      `calls.${name} constrains --${flag} values but does not forbid it`);
+};
+
+/** The kind/replay findings of one calls.yaml entry. */
+const callKindFindings=(name,call,calls,declared,errors)=>{
+  add(errors,['read','mutation'].includes(call?.kind),`calls.${name} must declare kind read or mutation`);
+  const modes=calls.idempotency?.modes??[];
+  if(call?.kind==='mutation')
+    add(errors,modes.includes(call?.replay),`calls.${name} is a mutation and must declare replay ${modes.join('|')} — scripts/api/orca/lib.mjs refuses it otherwise`);
+  else
+    add(errors,call?.replay===undefined,`calls.${name} is a read and must not declare replay`);
+  if(call?.replay==='request')
+    add(errors,declared.has(calls.idempotency?.flag),`calls.${name} is replay: request and must declare --${calls.idempotency?.flag}`);
+};
+
+/** The classify-block findings of one calls.yaml entry. */
+const classifyFindings=(name,call,calls,errors)=>{
+  if(!Array.isArray(call?.classify))return;
+  const last=call.classify.at(-1);
+  add(errors,last&&Object.keys(last.when??{}).length===0,
+    `calls.${name} classify must end with an unconditional rule — otherwise the outcome falls to an undeclared default`);
+  for(const rule of call.classify){
+    add(errors,(calls.envelope?.outcomes??[]).includes(rule?.outcome),`calls.${name} classify outcome ${rule?.outcome} is not in envelope.outcomes`);
+    add(errors,(calls.envelope?.effectStates??[]).includes(rule?.effectState),`calls.${name} classify effectState ${rule?.effectState} is not in envelope.effectStates`);
+  }
+};
+
+/** Every finding of one calls.yaml call entry. */
+const callFindings=(name,call,{calls,publicCommands,forbidden,recoveries},errors)=>{
+  const declared=new Set([...(call?.flags??[]),calls.defaults?.jsonFlag].filter(Boolean));
+  callFlagFindings(name,call,declared,errors);
+  if(publicCommands){
+    add(errors,publicCommands.has(call?.command),`calls.${name} names an unknown Orca command: ${call?.command}`);
+    add(errors,!forbidden.has(call?.command),`calls.${name} names a forbidden command: ${call?.command}`);
+  }
+  callKindFindings(name,call,calls,declared,errors);
+  classifyFindings(name,call,calls,errors);
+  for(const target of Object.values(call?.recovery??{}))
+    add(errors,recoveries.has(target),`calls.${name} names an undefined recovery: ${target}`);
+};
+
 /** Static checks on modules/host/orca/calls.yaml — no Orca process is run. */
 export function validateCallContract(docs){
   const errors=[];
   if(!docs?.calls)return errors;
   const {calls,api}=docs;
-  const jsonFlag=calls.defaults?.jsonFlag;
   const publicCommands=Array.isArray(api?.publicCommands)?new Set(api.publicCommands):null;
   const forbidden=new Set(calls.forbiddenCalls??[]);
   const recoveries=new Set(Object.keys(calls.recoveries??{}));
-  for(const [name,call] of Object.entries(calls.calls??{})){
-    const declared=new Set([...(call?.flags??[]),jsonFlag].filter(Boolean));
-    for(const flag of call?.required??[])
-      add(errors,declared.has(flag),`calls.${name} requires --${flag} but does not declare it in flags`);
-    for(const flag of call?.forbidden??[])
-      add(errors,!declared.has(flag),`calls.${name} forbids --${flag} and also declares it in flags`);
-    for(const flag of Object.keys(call?.forbiddenValues??{}))
-      add(errors,(call?.forbidden??[]).includes(flag),
-        `calls.${name} constrains --${flag} values but does not forbid it`);
-    if(publicCommands){
-      add(errors,publicCommands.has(call?.command),`calls.${name} names an unknown Orca command: ${call?.command}`);
-      add(errors,!forbidden.has(call?.command),`calls.${name} names a forbidden command: ${call?.command}`);
-    }
-    add(errors,['read','mutation'].includes(call?.kind),`calls.${name} must declare kind read or mutation`);
-    const modes=calls.idempotency?.modes??[];
-    if(call?.kind==='mutation')
-      add(errors,modes.includes(call?.replay),`calls.${name} is a mutation and must declare replay ${modes.join('|')} — scripts/api/orca/lib.mjs refuses it otherwise`);
-    else
-      add(errors,call?.replay===undefined,`calls.${name} is a read and must not declare replay`);
-    if(call?.replay==='request')
-      add(errors,declared.has(calls.idempotency?.flag),`calls.${name} is replay: request and must declare --${calls.idempotency?.flag}`);
-    if(Array.isArray(call?.classify)){
-      const last=call.classify.at(-1);
-      add(errors,last&&Object.keys(last.when??{}).length===0,
-        `calls.${name} classify must end with an unconditional rule — otherwise the outcome falls to an undeclared default`);
-      for(const rule of call.classify){
-        add(errors,(calls.envelope?.outcomes??[]).includes(rule?.outcome),`calls.${name} classify outcome ${rule?.outcome} is not in envelope.outcomes`);
-        add(errors,(calls.envelope?.effectStates??[]).includes(rule?.effectState),`calls.${name} classify effectState ${rule?.effectState} is not in envelope.effectStates`);
-      }
-    }
-    for(const target of Object.values(call?.recovery??{}))
-      add(errors,recoveries.has(target),`calls.${name} names an undefined recovery: ${target}`);
-  }
+  const context={calls,publicCommands,forbidden,recoveries};
+  for(const [name,call] of Object.entries(calls.calls??{}))callFindings(name,call,context,errors);
   add(errors,calls.liveSchema?.onMismatch==='refuse-before-effects',
     'calls.yaml liveSchema must state onMismatch: refuse-before-effects — scripts/api/orca/lib.mjs enforces it');
   if(calls.liveSchema)
@@ -193,7 +224,7 @@ function compareCallsToLiveSchema({root=skillRoot,listing}={}){
     const missing=missingFrom(live,call,jsonFlag);
     if(!missing)continue;
     drift.push({call:name,command:call?.command??null,
-      missingCommand:missing.flags?false:true,missingFlags:missing.flags??[]});
+      missingCommand:!missing.flags,missingFlags:missing.flags??[]});
   }
   return {ok:drift.length===0,drift};
 }

@@ -90,30 +90,34 @@ export function specFacts(text, rel = 'x.spec.mjs') {
   };
   const sourceReads = [];
   const skips = [];
-  const visit = (node) => {
-    if (t.isCallExpression(node)) {
-      const callee = node.expression;
-      const name = t.isPropertyAccessExpression(callee) ? callee.name.text : t.isIdentifier(callee) ? callee.text : null;
-      if ((name === 'readFileSync' || name === 'readFile') && node.arguments.length && anchored(node.arguments[0])) {
-        const joined = literalsOf(node.arguments[0]).join('/').replaceAll('\\', '/').replace(/^(\.\.?\/)+/, '');
-        const rootSegment = joined.split('/').filter(Boolean)[0];
-        if (SOURCE_ROOTS.includes(rootSegment) && SOURCE_FILE.test(joined) && !SPEC.test(joined)) sourceReads.push({ line: lineOf(source, node), path: joined });
-      }
-      if (t.isPropertyAccessExpression(callee) && callee.name.text === 'skip' && t.isIdentifier(callee.expression) && /^(t|it|test|describe|suite|ctx|context)$/.test(callee.expression.text)) {
-        skips.push({ line: lineOf(source, node), explained: node.arguments.some(yieldsReason) || node.arguments.some(explainedByDefinition) });
-      }
-      if (name && TEST_CALLEES.has(name) || (t.isPropertyAccessExpression(callee) && TEST_CALLEES.has(callee.expression.getText(source)))) {
-        for (const arg of node.arguments) {
-          if (!t.isObjectLiteralExpression(arg)) continue;
-          for (const prop of arg.properties) {
-            if (!t.isPropertyAssignment(prop) || prop.name.getText(source) !== 'skip') continue;
-            const value = prop.initializer;
-            if (value.kind === t.SyntaxKind.FalseKeyword) continue;
-            skips.push({ line: lineOf(source, prop), explained: yieldsReason(value) || explainedByDefinition(value) });
-          }
-        }
-      }
+  const readCall = (node) => {
+    const joined = literalsOf(node.arguments[0]).join('/').replaceAll('\\', '/').replace(/^(\.\.?\/)+/, '');
+    const rootSegment = joined.split('/').find(Boolean);
+    if (SOURCE_ROOTS.includes(rootSegment) && SOURCE_FILE.test(joined) && !SPEC.test(joined)) sourceReads.push({ line: lineOf(source, node), path: joined });
+  };
+  const skipOption = (arg) => {
+    for (const prop of arg.properties) {
+      if (!t.isPropertyAssignment(prop) || prop.name.getText(source) !== 'skip') continue;
+      const value = prop.initializer;
+      if (value.kind === t.SyntaxKind.FalseKeyword) continue;
+      skips.push({ line: lineOf(source, prop), explained: yieldsReason(value) || explainedByDefinition(value) });
     }
+  };
+  const visitCall = (node) => {
+    const callee = node.expression;
+    let name = null;
+    if (t.isPropertyAccessExpression(callee)) name = callee.name.text;
+    else if (t.isIdentifier(callee)) name = callee.text;
+    if ((name === 'readFileSync' || name === 'readFile') && node.arguments.length && anchored(node.arguments[0])) readCall(node);
+    if (t.isPropertyAccessExpression(callee) && callee.name.text === 'skip' && t.isIdentifier(callee.expression) && /^(t|it|test|describe|suite|ctx|context)$/.test(callee.expression.text)) {
+      skips.push({ line: lineOf(source, node), explained: node.arguments.some(yieldsReason) || node.arguments.some(explainedByDefinition) });
+    }
+    if (name && TEST_CALLEES.has(name) || (t.isPropertyAccessExpression(callee) && TEST_CALLEES.has(callee.expression.getText(source)))) {
+      for (const arg of node.arguments) if (t.isObjectLiteralExpression(arg)) skipOption(arg);
+    }
+  };
+  const visit = (node) => {
+    if (t.isCallExpression(node)) visitCall(node);
     t.forEachChild(node, visit);
   };
   visit(source);

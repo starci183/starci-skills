@@ -67,7 +67,7 @@ export function main(argv = process.argv.slice(2), io = {}) {
   const split = splitCommand(argv, catalog.global ?? []);
   if (!split.group) return refuse(stderr, 'missing runtime command group');
   const group = catalog.groups?.[split.group];
-  if (!group || group.owner !== 'runtime') return refuse(stderr, `unknown runtime group "${split.group}"`);
+  if (group?.owner !== 'runtime') return refuse(stderr, `unknown runtime group "${split.group}"`);
   if (!split.verb) {
     if (!split.help) return refuse(stderr, `missing verb for group "${split.group}"`);
     writeTo(stdout, groupHelp(catalog, split.group));

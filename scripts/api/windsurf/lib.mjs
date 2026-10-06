@@ -31,6 +31,6 @@ export async function connectPost(endpoint, payload, timeoutMs) {
     const text = await res.text();
     return { status: res.status, body: text.slice(0, 65536) };
   } catch (error) {
-    return { status: 0, error: String((error && error.message) || error) };
+    return { status: 0, error: String(error?.message || error) };
   }
 }

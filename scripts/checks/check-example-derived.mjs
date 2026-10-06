@@ -31,16 +31,8 @@ import { isMain } from '../lib/is-main.mjs';
  */
 const FORBIDDEN_TOP_LEVEL_FIELDS = ['usedBy', 'effectiveState', 'frontier', 'provenBy', 'derived'];
 
-export function checkExampleDerived(workRoot, problems) {
-  for (const rel of ['_derived/index.yaml', '_derived/frontier.md', '_derived/critique.yaml', '_derived/critique.md']) {
-    if (!isProductPath(rel)) problems.push(`${rel}: generated Work output is outside the product boundary`);
-  }
-  const result = runDerive(workRoot, {write: false});
-  if (!result.ok) problems.push(`${workRoot}/_derived/index.yaml is missing or stale; run \`starci work example-derive --work ${workRoot} --write\` to refresh it`);
-
-  const critiqueResult = runCritique(workRoot, {write: false});
-  if (!critiqueResult.ok) problems.push(`${workRoot}/_derived/critique.yaml or critique.md is missing or stale; run \`starci work example-critique --work ${workRoot} --write\` to refresh them`);
-
+/** Refuse any real record that authors a top-level field shaped like a derived one. */
+const authoredFieldProblems = (workRoot, problems) => {
   for (const file of walk(workRoot).filter(f => f.endsWith('.yaml'))) {
     const rel = path.relative(workRoot, file).replaceAll('\\', '/');
     if (rel === '_derived' || rel.startsWith('_derived/')) continue;
@@ -51,6 +43,19 @@ export function checkExampleDerived(workRoot, problems) {
       if (Object.hasOwn(data, field)) problems.push(`${rel}: authors a top-level "${field}" field, which is derived-only vocabulary (scripts/example/example-derive.mjs); remove it and let the derivation compute it`);
     }
   }
+};
+
+export function checkExampleDerived(workRoot, problems) {
+  for (const rel of ['_derived/index.yaml', '_derived/frontier.md', '_derived/critique.yaml', '_derived/critique.md']) {
+    if (!isProductPath(rel)) problems.push(`${rel}: generated Work output is outside the product boundary`);
+  }
+  const result = runDerive(workRoot, {write: false});
+  if (!result.ok) problems.push(`${workRoot}/_derived/index.yaml is missing or stale; run \`starci work example-derive --work ${workRoot} --write\` to refresh it`);
+
+  const critiqueResult = runCritique(workRoot, {write: false});
+  if (!critiqueResult.ok) problems.push(`${workRoot}/_derived/critique.yaml or critique.md is missing or stale; run \`starci work example-critique --work ${workRoot} --write\` to refresh them`);
+
+  authoredFieldProblems(workRoot, problems);
   return {checked: true};
 }
 
@@ -66,6 +71,7 @@ if (isMain(import.meta.url)) {
   const problems = [];
   const roots = checkExampleDerivedTrees(root, problems);
   for (const problem of problems) console.log(`REFUSED ${problem}`);
-  console.log(`${roots.length} work tree(s) checked: ${problems.length ? `${problems.length} refused` : 'every derived index is fresh and no record authors derived vocabulary'}`);
+  const verdict = problems.length ? `${problems.length} refused` : 'every derived index is fresh and no record authors derived vocabulary';
+  console.log(`${roots.length} work tree(s) checked: ${verdict}`);
   process.exitCode = problems.length ? 1 : 0;
 }

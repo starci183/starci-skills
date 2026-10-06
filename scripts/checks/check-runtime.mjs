@@ -104,7 +104,8 @@ function checkRuntime({ root = skillRoot, json = false } = {}) {
     if (status !== 0) { failed.push(check.id); err(`self-check ${check.id} (${check.run}) failed with exit ${status}`); }
     else out(`self-check ${check.id}: ok`);
   }
-  out(`self-checks: ${selfChecks.length - failed.length} of ${selfChecks.length} passed${failed.length ? ` (failed: ${failed.join(', ')})` : ''}`);
+  const failedTail = failed.length ? ` (failed: ${failed.join(', ')})` : '';
+  out(`self-checks: ${selfChecks.length - failed.length} of ${selfChecks.length} passed${failedTail}`);
   return { ok: bad.length === 0 && runtime.ok && failed.length === 0, syntax: { files: files.length, failed: bad.length }, runtime, selfChecks: { run: selfChecks.length, failed } };
 }
 

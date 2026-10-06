@@ -22,33 +22,42 @@ export function custodyInputType(file, override) {
   return type;
 }
 
+const sopsNames = (env, win, pathext) => {
+  if (!win) return ['sops'];
+  if (!pathext) return ['sops.exe', 'sops'];
+  return String(env.PATHEXT || '.EXE;.CMD;.BAT').split(';').filter(Boolean).map((ext) => `sops${ext}`);
+};
+
+const wingetDirs = (filesystem, paths, env, wingetPackageTree) => {
+  const dirs = [];
+  if (!env.LOCALAPPDATA) return dirs;
+  const winget = paths.join(env.LOCALAPPDATA, 'Microsoft', 'WinGet');
+  dirs.push(paths.join(winget, 'Links'));
+  const packages = paths.join(winget, 'Packages');
+  try {
+    for (const entry of filesystem.readdirSync(packages)) {
+      if (!wingetPackageTree && !/sops/i.test(entry)) continue;
+      const directory = paths.join(packages, entry);
+      dirs.push(directory);
+      if (wingetPackageTree) {
+        try {
+          for (const nested of filesystem.readdirSync(directory, { withFileTypes: true })) {
+            if (nested.isDirectory()) dirs.push(paths.join(directory, nested.name));
+          }
+        } catch { /* unreadable package */ }
+      }
+    }
+  } catch { /* no WinGet packages */ }
+  return dirs;
+};
+
 /** Resolve SOPS from PATH and WinGet. Consumers select PATHEXT names and the full package tree for their launcher. */
 export function resolveSops(env = process.env, { platform = process.platform, pathext = false, wingetPackageTree = false, filesystem = fs } = {}) {
   const win = platform === 'win32';
   const paths = win ? path.win32 : path.posix;
-  const names = win
-    ? (pathext ? String(env.PATHEXT || '.EXE;.CMD;.BAT').split(';').filter(Boolean).map((ext) => `sops${ext}`) : ['sops.exe', 'sops'])
-    : ['sops'];
+  const names = sopsNames(env, win, pathext);
   const dirs = String(env.PATH ?? '').split(win ? ';' : ':').filter(Boolean);
-  if (win && env.LOCALAPPDATA) {
-    const winget = paths.join(env.LOCALAPPDATA, 'Microsoft', 'WinGet');
-    dirs.push(paths.join(winget, 'Links'));
-    const packages = paths.join(winget, 'Packages');
-    try {
-      for (const entry of filesystem.readdirSync(packages)) {
-        if (!wingetPackageTree && !/sops/i.test(entry)) continue;
-        const directory = paths.join(packages, entry);
-        dirs.push(directory);
-        if (wingetPackageTree) {
-          try {
-            for (const nested of filesystem.readdirSync(directory, { withFileTypes: true })) {
-              if (nested.isDirectory()) dirs.push(paths.join(directory, nested.name));
-            }
-          } catch { /* unreadable package */ }
-        }
-      }
-    } catch { /* no WinGet packages */ }
-  }
+  if (win) dirs.push(...wingetDirs(filesystem, paths, env, wingetPackageTree));
   for (const directory of dirs) for (const name of names) {
     const file = paths.join(directory, name);
     try { if (filesystem.statSync(file).isFile()) return file; } catch { /* next candidate */ }
@@ -119,7 +128,7 @@ const auditAbsent = cwd => {
   try { fs.lstatSync(path.resolve(cwd ?? process.cwd(), '/etc/sops/audit.yaml')); return false; }
   catch (error) { return error.code === 'ENOENT'; }
 };
-const captured = r => r && r.status === 0 && r.signal == null && !r.error && Buffer.isBuffer(r.stdout) && Buffer.isBuffer(r.stderr);
+const captured = r => r?.status === 0 && r.signal == null && !r.error && Buffer.isBuffer(r.stdout) && Buffer.isBuffer(r.stderr);
 const decoded = bytes => new TextDecoder('utf-8', { fatal: true }).decode(bytes);
 const ownedRequest = request => {
   if (request.operation === 'seal') {
@@ -141,15 +150,48 @@ const ownedRequest = request => {
   return { inputType: flags['--input-type'], outputType: flags['--output-type'], file: args.at(-1), recipient: flags['--age'] };
 };
 
+/** The admitted identity key, or the unchanged refusal/failure result (admitted.key is absent then). */
+const selectedAdmission = (selection, spec, invocation, env) => {
+  const fail = () => ({ status: null, stdout: '', stderr: '', error: selection.error });
+  if (!spec || !['binary', 'json', 'yaml', 'dotenv'].includes(spec.inputType) || !['binary', 'json', 'yaml', 'dotenv'].includes(spec.outputType)) return fail();
+  if (!invocation || typeof invocation.runProgram !== 'function' || typeof invocation.resolveRealTool !== 'function') return fail();
+  if (!['win32', 'linux', 'darwin'].includes(process.platform)) return held('unsupported-platform');
+  const key = env[selection.inlineName];
+  if (typeof key !== 'string' || !/^AGE-SECRET-KEY-1[0-9A-Z]+$/.test(key.trim())) return fail();
+  return { key };
+};
+
+const decryptArgs = (file, inputType, outputType) => ['decrypt', '--input-type', inputType, '--output-type', outputType, '--filename-override', file, '--enable-local-keyservice=true', '--decryption-order', 'age'];
+
+const decryptSelected = (run, exe, file, input, spec, recipient) => {
+  const envelope = selectedAgeEnvelope(decoded(input), spec.inputType, recipient);
+  if (!envelope.ok) return held(envelope.reason);
+  const result = run(exe, decryptArgs(file, spec.inputType, spec.outputType), input);
+  if (!captured(result)) return held('selected-decryption-failed');
+  return { status: 0, stdout: decoded(result.stdout), stderr: '', error: null };
+};
+
+const encryptSelected = (run, exe, file, input, spec, recipient) => {
+  if (spec.recipient !== recipient) return held('recipient-mismatch');
+  const args = ['encrypt', '--input-type', spec.inputType, '--output-type', spec.outputType, '--filename-override', file, '--enable-local-keyservice=true', '--age', recipient];
+  const result = run(exe, args, input);
+  if (!captured(result)) return held('selected-encryption-failed');
+  if (result.stdout.length > CREDENTIAL_FILE_MAX_BYTES) return held('document-over-budget');
+  const text = decoded(result.stdout);
+  const envelope = selectedAgeEnvelope(text, spec.outputType, recipient);
+  if (!envelope.ok) return held(envelope.reason);
+  const readback = run(exe, decryptArgs(file, spec.outputType, spec.inputType), result.stdout);
+  if (!captured(readback)) return held('selected-readback-failed');
+  return { status: 0, stdout: text, stderr: '', error: null };
+};
+
 /** The domain composes the existing process owner: invocation={runProgram(file,args,options),resolveRealTool(program,{env})}. No API imports another system. */
 export function runSelectedSops(bin, request, { selection, invocation, env, cwd, maxBuffer, timeout } = {}) {
   if (selection?.error?.identityRefusal !== 'inline-context-unqualified' || typeof selection.inlineName !== 'string' || !env || typeof env !== 'object') return held('selected-context-missing');
   const spec = ownedRequest(request);
-  if (!spec || !['binary', 'json', 'yaml', 'dotenv'].includes(spec.inputType) || !['binary', 'json', 'yaml', 'dotenv'].includes(spec.outputType)) return { status: null, stdout: '', stderr: '', error: selection.error };
-  if (!invocation || typeof invocation.runProgram !== 'function' || typeof invocation.resolveRealTool !== 'function') return { status: null, stdout: '', stderr: '', error: selection.error };
-  if (!['win32', 'linux', 'darwin'].includes(process.platform)) return held('unsupported-platform');
-  const key = env[selection.inlineName];
-  if (typeof key !== 'string' || !/^AGE-SECRET-KEY-1[0-9A-Z]+$/.test(key.trim())) return { status: null, stdout: '', stderr: '', error: selection.error };
+  const admitted = selectedAdmission(selection, spec, invocation, env);
+  if (!admitted.key) return admitted;
+  const key = admitted.key;
   let input, identity, selectedEnv;
   const captures = [];
   try {
@@ -170,32 +212,15 @@ export function runSelectedSops(bin, request, { selection, invocation, env, cwd,
     };
     const version = run(exe, ['--disable-version-check', '--version'], undefined, publicEnv);
     const ageVersion = run(age, ['--version'], undefined, publicEnv);
-    if (!captured(version) || !captured(ageVersion) || !SELECTED_SOPS_VERSIONS.has(/^sops\s+([0-9]+\.[0-9]+\.[0-9]+)/.exec(decoded(version.stdout))?.[1]) || !SELECTED_AGE_VERSIONS.has(/^v?([0-9]+\.[0-9]+\.[0-9]+)/.exec(decoded(ageVersion.stdout))?.[1])) return held('unsupported-tool-profile');
+    if (!captured(version) || !captured(ageVersion) || !SELECTED_SOPS_VERSIONS.has(/^sops\s+(\d+\.\d+\.\d+)/.exec(decoded(version.stdout))?.[1]) || !SELECTED_AGE_VERSIONS.has(/^v?(\d+\.\d+\.\d+)/.exec(decoded(ageVersion.stdout))?.[1])) return held('unsupported-tool-profile');
     identity = Buffer.from(key.trim(), 'utf8');
     const derived = run(age, ['-y'], identity, publicEnv);
     if (!captured(derived)) return held('recipient-unproven');
     const recipients = decoded(derived.stdout).trim().split(/\r?\n/);
     if (recipients.length !== 1 || !/^age1[ac-hj-np-z02-9]+$/.test(recipients[0])) return held('recipient-unproven');
     const recipient = recipients[0];
-    const decryptArgs = (inputType, outputType) => ['decrypt', '--input-type', inputType, '--output-type', outputType, '--filename-override', file, '--enable-local-keyservice=true', '--decryption-order', 'age'];
-    if (request.operation === 'decrypt') {
-      const envelope = selectedAgeEnvelope(decoded(input), spec.inputType, recipient);
-      if (!envelope.ok) return held(envelope.reason);
-      const result = run(exe, decryptArgs(spec.inputType, spec.outputType), input);
-      if (!captured(result)) return held('selected-decryption-failed');
-      return { status: 0, stdout: decoded(result.stdout), stderr: '', error: null };
-    }
-    if (spec.recipient !== recipient) return held('recipient-mismatch');
-    const args = ['encrypt', '--input-type', spec.inputType, '--output-type', spec.outputType, '--filename-override', file, '--enable-local-keyservice=true', '--age', recipient];
-    const result = run(exe, args, input);
-    if (!captured(result)) return held('selected-encryption-failed');
-    if (result.stdout.length > CREDENTIAL_FILE_MAX_BYTES) return held('document-over-budget');
-    const text = decoded(result.stdout);
-    const envelope = selectedAgeEnvelope(text, spec.outputType, recipient);
-    if (!envelope.ok) return held(envelope.reason);
-    const readback = run(exe, decryptArgs(spec.outputType, spec.inputType), result.stdout);
-    if (!captured(readback)) return held('selected-readback-failed');
-    return { status: 0, stdout: text, stderr: '', error: null };
+    if (request.operation === 'decrypt') return decryptSelected(run, exe, file, input, spec, recipient);
+    return encryptSelected(run, exe, file, input, spec, recipient);
   } catch { return held('selected-native-refused'); }
   finally {
     identity?.fill(0); input?.fill(0);
@@ -204,12 +229,23 @@ export function runSelectedSops(bin, request, { selection, invocation, env, cwd,
   }
 }
 
+const identityRequestValid = ({ env, cwd, invocation, assertLease, consume }) =>
+  env && typeof env === 'object' && path.isAbsolute(cwd ?? '') && typeof consume === 'function'
+    && typeof assertLease === 'function' && typeof invocation?.runProgram === 'function'
+    && typeof invocation?.resolveRealTool === 'function';
+const identityLinesValid = (lines, identities) => identities.length === 1 && /^AGE-SECRET-KEY-1[0-9A-Z]+$/.test(identities[0])
+  && !lines.some(line => line.startsWith('#') && !/^# (?:created:|public key:)/.test(line));
+const declaredRecipientMatches = (lines, recipient) => {
+  const declared = lines.filter(line => line.startsWith('# public key:'));
+  return declared.length === 1 && declared[0].slice('# public key:'.length).trim() === recipient;
+};
+const publicationShaped = (publication) => publication && typeof publication.ok === 'boolean' && ['none', 'unknown', 'complete'].includes(publication.effectState);
+const publicationDurable = (publication) => [true, false].includes(publication.created) && ['file-fsync', 'file-and-parent-fsync', 'file-fsync-namespace-unqualified'].includes(publication.durability);
+
 /** One real private capture for an admitted initial request; the installer owns its durable attempt. */
 export function withGeneratedAgeIdentity({ env, cwd, invocation, assertLease, consume } = {}) {
   const failure = (reason, generated) => ({ ok: false, reason, captureState: generated ? 'unknown' : 'none', effectState: generated ? 'unknown' : 'none' });
-  if (!env || typeof env !== 'object' || !path.isAbsolute(cwd ?? '') || typeof consume !== 'function'
-    || typeof assertLease !== 'function' || typeof invocation?.runProgram !== 'function'
-    || typeof invocation?.resolveRealTool !== 'function') return failure('invalid-request', false);
+  if (!identityRequestValid({ env, cwd, invocation, assertLease, consume })) return failure('invalid-request', false);
   const captures = [];
   let generated = false, identity;
   try {
@@ -225,23 +261,22 @@ export function withGeneratedAgeIdentity({ env, cwd, invocation, assertLease, co
       return result;
     };
     const version = run(['--version']);
-    if (!SELECTED_AGE_VERSIONS.has(/^v?([0-9]+\.[0-9]+\.[0-9]+)/.exec(decoded(version.stdout))?.[1])) return failure('unsupported-tool-profile', false);
+    if (!SELECTED_AGE_VERSIONS.has(/^v?(\d+\.\d+\.\d+)/.exec(decoded(version.stdout))?.[1])) return failure('unsupported-tool-profile', false);
     if (assertLease() !== true) return failure('lease-lost', false);
     generated = true;
     const made = run([]), lines = decoded(made.stdout).trim().split(/\r?\n/);
     const identities = lines.filter(line => line && !line.startsWith('#'));
-    if (identities.length !== 1 || !/^AGE-SECRET-KEY-1[0-9A-Z]+$/.test(identities[0])
-      || lines.some(line => line.startsWith('#') && !/^# (?:created:|public key:)/.test(line))) return failure('capture-incomplete', true);
+    if (!identityLinesValid(lines, identities)) return failure('capture-incomplete', true);
     identity = Buffer.from(identities[0], 'utf8');
     const derived = run(['-y'], identity), recipients = decoded(derived.stdout).trim().split(/\r?\n/);
     if (recipients.length !== 1 || !/^age1[ac-hj-np-z02-9]+$/.test(recipients[0])) return failure('recipient-unproven', true);
-    const recipient = recipients[0], declared = lines.filter(line => line.startsWith('# public key:'));
-    if (declared.length !== 1 || declared[0].slice('# public key:'.length).trim() !== recipient || assertLease() !== true) return failure('recipient-unproven', true);
+    const recipient = recipients[0];
+    if (!declaredRecipientMatches(lines, recipient) || assertLease() !== true) return failure('recipient-unproven', true);
     const publication = consume(identity, recipient);
-    if (!publication || typeof publication.ok !== 'boolean' || !['none', 'unknown', 'complete'].includes(publication.effectState)) return failure('publication-unknown', true);
+    if (!publicationShaped(publication)) return failure('publication-unknown', true);
     if (!publication.ok || publication.effectState !== 'complete') return { ok: false, captureState: 'generated', effectState: publication.effectState,
       reason: 'publication-held' };
-    if (![true, false].includes(publication.created) || !['file-fsync', 'file-and-parent-fsync', 'file-fsync-namespace-unqualified'].includes(publication.durability)) return failure('publication-unknown', true);
+    if (!publicationDurable(publication)) return failure('publication-unknown', true);
     return { ok: true, captureState: 'generated', effectState: 'complete', created: publication.created,
       durability: publication.durability, publicRecipient: recipient };
   } catch { return failure('capture-or-publication-unknown', generated); }

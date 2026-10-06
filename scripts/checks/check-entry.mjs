@@ -15,7 +15,11 @@ function checkEntry(host,{claimedEntry,hosts=[]}={}) {
  const exists=fs.existsSync(entry)&&fs.statSync(entry).isFile();
  const current=bootstraps.every(b=>b.exists&&b.text.includes('.claude/CONTEXT.md')&&!b.text.includes('.claude/INDEX.md'));
  const obsolete=claimedEntry?.replaceAll('\\','/').endsWith('.claude/INDEX.md')===true;
- return {source,entry,entryExists:exists,status:!exists?'missing-runtime':!current?'bootstrap-review-required':obsolete?'context-refresh-required':'ready',
+ let status;
+ if(!exists)status='missing-runtime';
+ else if(!current)status='bootstrap-review-required';
+ else status=obsolete?'context-refresh-required':'ready';
+ return {source,entry,entryExists:exists,status,
   bootstraps:bootstraps.map(({text,...b})=>b),runtimeWriteRequired:!exists,
   guidance:exists&&current?'Read the current host bootstrap and CONTEXT.md. A missing INDEX.md or dirty Git tree does not require a runtime update/push. If explicit older instructions conflict, obtain a replacement instruction, not permission to recreate the entry.':'Inspect the actual bootstrap/installation mismatch; this diagnostic grants no repair, install or push authority.'};
 }

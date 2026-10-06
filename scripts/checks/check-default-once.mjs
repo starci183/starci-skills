@@ -49,9 +49,9 @@ const OUT = /node_modules\/|\/dist\/|^packages\/[^/]+\/runtime\/|^tests\/|\.spec
 // product's own defaults, not the runtime config's keys restated.
 const inScope = scopeFilter({ scope: SCOPE, ext: CODE_EXT, out: OUT, exclude: OWNER_FILES });
 
-const LANGUAGE_KEYS = ['language', 'lang', 'owner_language', 'ownerLanguage'];
-const LANG_RE = String.raw`(?:language|lang|owner_language|ownerLanguage)`;
-const ASSIGN = String.raw`(?<![=!<>])=(?![=>])`; // `=` that is not ==/===/=>/</>/<=
+const LANGUAGE_KEYS = new Set(['language', 'lang', 'owner_language', 'ownerLanguage']);
+const LANG_RE = '(?:language|lang|owner_language|ownerLanguage)';
+const ASSIGN = '(?<![=!<>])=(?![=>])'; // `=` that is not ==/===/=>/</>/<=
 /** `language|lang === 'en' ? 'en' : 'vi'` — the owner language re-derived inline. */
 const LANGUAGE_TERNARY = new RegExp(String.raw`\b${LANG_RE}\b[^;\n]{0,40}?===\s*['"](en|vi)['"]\s*\?\s*['"]\1['"]\s*:\s*['"](en|vi)['"]`, 'g');
 /** `<language key> ... ?? 'en'|'vi'` — a language literal anywhere in a fallback chain headed by a language key. */
@@ -62,7 +62,7 @@ export function documentedLeaves(doc) {
   const leaves = new Map();
   const walk = (node) => {
     if (!node || typeof node !== 'object') return;
-    if (Array.isArray(node)) { for (const v of node) walk(v); return; } // element indices are not key names
+    if (Array.isArray(node)) { for (const v of node) { walk(v); } return; } // element indices are not key names
     for (const [k, v] of Object.entries(node)) {
       if (v && typeof v === 'object') walk(v);
       else if (typeof v === 'string' || typeof v === 'number') (leaves.get(k) ?? leaves.set(k, new Set()).get(k)).add(String(v));
@@ -78,12 +78,12 @@ export function commentedLeaves(exampleText) {
   const leaves = new Map();
   for (const line of exampleText.split('\n')) {
     if (!/^\s*#/.test(line)) continue;
-    for (const m of line.matchAll(/\b([a-z][\w]*)\s*:\s*([a-z][\w]*(?:\|[a-z][\w]*)*)/g))
+    for (const m of line.matchAll(/\b([a-z]\w*)\s*:\s*([a-z]\w*(?:\|[a-z]\w*)*)/g))
       for (const v of m[2].split('|')) (leaves.get(m[1]) ?? leaves.set(m[1], new Set()).get(m[1])).add(v);
-    for (const m of line.matchAll(/\{([^}]*)\}/g))
-      for (const name of m[1].split(',').map((s) => s.trim()).filter((s) => /^[a-zA-Z][\w]*$/.test(s)))
+    for (let i = 0, j; (i = line.indexOf('{', i)) >= 0 && (j = line.indexOf('}', i + 1)) >= 0; i = j + 1)
+      for (const name of line.slice(i + 1, j).split(',').map((s) => s.trim()).filter((s) => /^[a-zA-Z]\w*$/.test(s)))
         leaves.set(name, leaves.get(name) ?? new Set()); // `{base, max}` names leaves with no literal
-    const keyed = /^[\s#]*([a-z][\w]*)\s*:/.exec(line)?.[1];
+    const keyed = /^[\s#]*([a-z]\w*)\s*:/.exec(line)?.[1];
     if (keyed) leaves.set(keyed, leaves.get(keyed) ?? new Set()); // `# frozenMinutes: <n>` documents the key
   }
   return leaves;
@@ -93,8 +93,8 @@ export function commentedLeaves(exampleText) {
 export function ownerDefaults(homeText, configText = '') {
   const defaults = /DEFAULTS\s*=\s*Object\.freeze\(\{([\s\S]*?)\}\)\)/.exec(homeText)?.[1] ?? '';
   const values = new Map();
-  for (const m of defaults.matchAll(/\b([a-zA-Z][\w]*)\s*:\s*([\d_]+|'[^']*')/g))
-    (values.get(m[1]) ?? values.set(m[1], new Set()).get(m[1])).add(m[2].replace(/'/g, '').replace(/_/g, ''));
+  for (const m of defaults.matchAll(/\b([a-zA-Z]\w*)\s*:\s*([\d_]+|'[^']*')/g))
+    (values.get(m[1]) ?? values.set(m[1], new Set()).get(m[1])).add(m[2].replaceAll("'", '').replaceAll('_', ''));
   const lang = /DEFAULT_OWNER_LANGUAGE\s*=\s*'([^']+)'/.exec(configText)?.[1];
   return { values, language: lang ?? null };
 }
@@ -108,29 +108,37 @@ const FALLBACK = String.raw`(?:\?\?|\|\||${ASSIGN})`;
  * The DEFAULT_ONCE findings over {rel: text}: [{code, path, message}].
  * `leaves` is the documentedLeaves() map; `ownerValues` the ownerDefaults().values map.
  */
+const languageLiteralFindings = (text, langValues, push) => {
+  for (const m of text.matchAll(LANGUAGE_TERNARY)) push('language', `'${m[1]}' ? '${m[1]}' : '${m[2]}'`);
+  for (const m of text.matchAll(LANGUAGE_CHAIN)) {
+    const lineStart = text.lastIndexOf('\n', m.index) + 1;
+    if (/<[a-zA-Z!][^<>]*$/.test(text.slice(lineStart, m.index))) continue; // a markup attribute (html lang="en"), not a config default
+    if (langValues.has(m[1])) push('language', m[1]);
+  }
+};
+
+const leafLiteralFindings = (text, leaf, values, distinctive, push) => {
+  const re = new RegExp(String.raw`\b${leaf}\b\s*${FALLBACK}\s*${LITERAL}`, 'g');
+  for (const m of text.matchAll(re)) {
+    const literal = m[1] ?? m[2]?.replaceAll('_', '');
+    if (!distinctive && !values.has(literal)) continue;
+    push(leaf, literal);
+  }
+};
+
 export function defaultOnceFindings(files, { leaves, ownerValues = new Map(), ownerLanguage = 'en' } = {}) {
   const findings = [];
   const langValues = new Set(['en', 'vi', ...(ownerLanguage ? [ownerLanguage] : [])]);
   for (const [rel, text] of Object.entries(files)) {
     if (!inScope(rel)) continue;
     const push = (key, literal) => findings.push({ code: CODE, path: rel, message: `${rel} restates the default ${key}=${literal} — read it through the owner (scripts/machine/home.mjs / engine config) instead` });
-    for (const m of text.matchAll(LANGUAGE_TERNARY)) push('language', `'${m[1]}' ? '${m[1]}' : '${m[2]}'`);
-    for (const m of text.matchAll(LANGUAGE_CHAIN)) {
-      const lineStart = text.lastIndexOf('\n', m.index) + 1;
-      if (/<[a-zA-Z!][^<>]*$/.test(text.slice(lineStart, m.index))) continue; // a markup attribute (html lang="en"), not a config default
-      if (langValues.has(m[1])) push('language', m[1]);
-    }
+    languageLiteralFindings(text, langValues, push);
     for (const [leaf, docValues] of leaves) {
-      if (LANGUAGE_KEYS.includes(leaf)) continue;
+      if (LANGUAGE_KEYS.has(leaf)) continue;
       const distinctive = /[A-Z]/.test(leaf); // camelCase leaf names are config keys by shape; lowercase ones gate on vocabulary
       const values = new Set([...(docValues ?? []), ...(ownerValues.get(leaf) ?? [])]);
       if (!distinctive && !values.size) continue;
-      const re = new RegExp(String.raw`\b${leaf}\b\s*${FALLBACK}\s*${LITERAL}`, 'g');
-      for (const m of text.matchAll(re)) {
-        const literal = m[1] ?? m[2]?.replace(/_/g, '');
-        if (!distinctive && !values.has(literal)) continue;
-        push(leaf, literal);
-      }
+      leafLiteralFindings(text, leaf, values, distinctive, push);
     }
   }
   return findings;

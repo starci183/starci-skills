@@ -6,7 +6,7 @@ import { readEnv } from '../../lib/env.mjs';
 const CMD_META = /([()\][%!^"`<>&|;, *?])/g;
 const escapeCommand = (value) => String(value).replace(CMD_META, '^$1');
 const escapeArgument = (value) => {
-  let escaped = String(value).replace(/(?=(\\+?)?)\1"/g, '$1$1\\"');
+  let escaped = String(value).replace(/(?=(\\+?)?)\1"/g, String.raw`$1$1\"`);
   escaped = escaped.replace(/(?=(\\+?)?)\1$/, '$1$1');
   return `"${escaped}"`.replace(CMD_META, '^$1');
 };

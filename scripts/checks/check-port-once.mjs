@@ -48,12 +48,14 @@ const inScope = scopeFilter({ scope: SCOPE, ext: TEXT_EXT, out: OUT, exclude: SE
 /** The port-position contexts, each capturing the port literal in group 1. */
 const CONTEXTS = [
   /:\/\/[\w.-]+:(\d{4,5})\b/g,                                          // scheme://host:port
-  /\b(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[(?:[0-9a-f:]*)\]|[a-z][\w.-]*\.[\w.-]+):(\d{4,5})\b/gi, // host:port
+  /\b(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[[0-9a-f:]*\]|[a-z][\w.-]*\.[\w.-]+):(\d{4,5})\b/gi, // host:port
   /\b[a-z_]*port[a-z_]*\s*[:=]\s*['"`]?(\d{4,5})\b/gi,                  // port: NNNN / port = NNNN / containerPort
   /\b[A-Z][A-Z0-9_]*PORT\s*[:=]\s*['"`]?(\d{4,5})\b/g,                  // SOME_PORT = NNNN
   /\.listen\(\s*(\d{4,5})\b/g,                                        // .listen(NNNN)
 ];
-const DECLARATION = /\bexport\s+const\s+[A-Za-z_$][\w$]*\s*=\s*['"`]?(\d{4,5})\b|\b(?:port|devPort|appPort)\s*:\s*(\d{4,5})\b/;
+const DECLARATION_EXPORT = /\bexport\s+const\s+[A-Za-z_$][\w$]*\s*=\s*['"`]?(\d{4,5})\b/;
+const DECLARATION_PORT = /\b(?:port|devPort|appPort)\s*:\s*(\d{4,5})\b/;
+const DECLARATION = { test: (text) => DECLARATION_EXPORT.test(text) || DECLARATION_PORT.test(text) };
 
 /** The port literals a text puts in a port position, as a Set of digit strings. */
 export function portLiteralsOf(text) {
@@ -93,25 +95,33 @@ export function portOnceFindings(files, { owned = null } = {}) {
   const findings = [];
   const codeFiles = new Set(Object.keys(files).filter((rel) => inScope(rel) && CODE_EXT.test(rel) && RUNTIME_CODE.test(rel)));
   for (const [port, rels] of [...literals].sort(([a], [b]) => a.localeCompare(b))) {
-    const owner = owned?.get(port);
-    if (owner) {
-      const exempt = new Set(ownerFilesOf(owner));
-      for (const rel of [...rels].sort(byCodeUnit)) {
-        if (!exempt.has(rel)) findings.push({ code: CODE, path: rel, message: `${rel} restates port ${port} — read the owner (${owner}) instead of spelling the literal` });
-      }
-      continue;
-    }
-    const code = [...rels].filter((rel) => codeFiles.has(rel)).sort(byCodeUnit);
-    if (code.length < 2) continue;
-    // A file that declares the literal as an exported constant is its de-facto owner and is not itself a finding.
-    const declarers = code.filter((rel) => DECLARATION.test(files[rel]));
-    const guilty = declarers.length ? code.filter((rel) => !declarers.includes(rel)) : code;
-    for (const rel of guilty) {
-      findings.push({ code: CODE, path: rel, message: `${rel} spells port ${port}${declarers.length ? ` that ${declarers.join(', ')} owns — reference the constant` : ` in ${code.join(', ')} — declare one owning constant and reference it`}` });
-    }
+    portFindings(port, rels, owned, codeFiles, files, findings);
   }
   return findings;
 }
+
+/** The findings one port literal yields: owner-exempt restatements, or every spelling site when it has no owner. */
+const portFindings = (port, rels, owned, codeFiles, files, findings) => {
+  const owner = owned?.get(port);
+  if (owner) {
+    const exempt = new Set(ownerFilesOf(owner));
+    for (const rel of [...rels].sort(byCodeUnit)) {
+      if (!exempt.has(rel)) findings.push({ code: CODE, path: rel, message: `${rel} restates port ${port} — read the owner (${owner}) instead of spelling the literal` });
+    }
+    return;
+  }
+  const code = [...rels].filter((rel) => codeFiles.has(rel)).sort(byCodeUnit);
+  if (code.length < 2) return;
+  // A file that declares the literal as an exported constant is its de-facto owner and is not itself a finding.
+  const declarers = code.filter((rel) => DECLARATION.test(files[rel]));
+  const guilty = declarers.length ? code.filter((rel) => !declarers.includes(rel)) : code;
+  const tail = declarers.length
+    ? ` that ${declarers.join(', ')} owns — reference the constant`
+    : ` in ${code.join(', ')} — declare one owning constant and reference it`;
+  for (const rel of guilty) {
+    findings.push({ code: CODE, path: rel, message: `${rel} spells port ${port}${tail}` });
+  }
+};
 
 /** Run PORT_ONCE on the runtime at `root`. */
 export function checkPortOnce(root = skillRoot) {

@@ -65,17 +65,17 @@ export function commandSpans(sentence, { prose = true } = {}) {
   const out = [];
   for (const m of s.matchAll(/`([^`]+)`/g)) out.push({ text: m[1], at: m.index, end: m.index + m[0].length });
   if (prose) for (const m of s.matchAll(/"([^"]+)"/g)) out.push({ text: m[1], at: m.index, end: m.index + m[0].length });
-  for (const p of parenSpans(s)) out.push({ text: p.text.replace(/`/g, ''), at: p.at, end: p.at + p.text.length + 2 });
+  for (const p of parenSpans(s)) out.push({ text: p.text.replaceAll('`', ''), at: p.at, end: p.at + p.text.length + 2 });
   for (const m of s.matchAll(/\brun\s+(?!`)([^,;:`]+?)(?=\s+-\s|[,;:]|\.(?:\s|$)|$)/gi)) out.push({ text: m[1], at: m.index, end: m.index + m[0].length });
   return out;
 }
 
 // The Vietnamese alternatives are matcher data, not source: modules/goal/source-phrases.yaml (source-phrases.mjs).
-const NEGATION = new RegExp(`\\b(?:never|not|no|nor|without|avoid|instead of|rather than|don't|do not|must not|cannot|${altOf('guidance.negation')})\\b`, 'i');
-const REFUSED_AFTER = new RegExp(`^[^.;]*?\\b(?:refuses?|is refused|are refused|is blocked|are blocked|${altOf('guidance.refused')})\\b`, 'i');
+const NEGATION = new RegExp(String.raw`\b(?:never|not|no|nor|without|avoid|instead of|rather than|don't|do not|must not|cannot|${altOf('guidance.negation')})\b`, 'i');
+const REFUSED_AFTER = new RegExp(String.raw`^[^.;]*?\b(?:refuses?|is refused|are refused|is blocked|are blocked|${altOf('guidance.refused')})\b`, 'i');
 const PAST_BEFORE = /\b(?:was|were|ran|had)\b[^,;:]*$/i;
 const PAST_AFTER = /^\W{0,3}(?:,?\s*which\s+)?(?:ran|followed|deleted|emptied|restarted|wiped)\b/i;
-const RUNTIME_ACTOR = /(?:\bthe runtime\b|\bruntime's\b|[\w/.-]+\.mjs\b|\b[a-z]+[A-Z]\w*\b)(?:\s+\w+){0,3}?\s+(?:[\w-]+s|is the only)\b[^,;:]*$/;
+const RUNTIME_ACTOR = /(?:\b(?:the runtime|runtime's|[a-z]+[A-Z]\w*)\b|[\w/.-]+\.mjs\b)(?:\s+\w+){0,3}\s+(?:[\w-]+s|is the only)\b[^,;:]*$/;
 // A clause whose SUBJECT is a runtime actor (the runtime, the host-side controller, the reconciler, the GC, the finish, a script
 // file) describes what the runtime itself does, whatever punctuation follows: the clause is the text after the last . ; | or
 // table cell break before the command.
@@ -112,13 +112,14 @@ export async function refusalOf(command) {
 
 /** The findings of one text unit: [{command, code, sentence}]. `prose`: double-quoted spans count (Markdown, not YAML). */
 export async function textFindings(text, { prose = true } = {}) {
+  const items = [];
+  for (const sentence of sentencesOf(text)) for (const span of commandSpans(sentence, { prose })) items.push({ sentence, span });
+  const verdicts = await Promise.all(items.map((item) => refusalOf(item.span.text)));
   const out = [];
-  for (const sentence of sentencesOf(text)) {
-    for (const span of commandSpans(sentence, { prose })) {
-      const verdict = await refusalOf(span.text);
-      if (!verdict || excusedBy(sentence, span)) continue;
-      out.push({ command: span.text.trim().slice(0, 200), code: verdict.code, sentence: sentence.slice(0, 300) });
-    }
+  for (const [i, { sentence, span }] of items.entries()) {
+    const verdict = verdicts[i];
+    if (!verdict || excusedBy(sentence, span)) continue;
+    out.push({ command: span.text.trim().slice(0, 200), code: verdict.code, sentence: sentence.slice(0, 300) });
   }
   return out;
 }
@@ -143,10 +144,16 @@ export function markdownUnits(text) {
   };
   String(text).split(/\r?\n/).forEach((line, i) => {
     if (/^\s*(?:```|~~~)/.test(line)) { flush(); fence = !fence; return; }
-    if (fence) { if (line.trim()) out.push({ key: `line ${i + 1}`, text: `${lastSentence} \`${line.trim().replace(/`/g, '')}\``, fenced: true }); return; }
+    if (fence) {
+      if (line.trim()) out.push({ key: `line ${i + 1}`, text: `${lastSentence} \`${line.trim().replaceAll('`', '')}\``, fenced: true });
+      return;
+    }
     if (/^\s*\|/.test(line)) { flush(); line.split('|').map((c) => c.trim()).filter(Boolean).forEach((c) => out.push({ key: `line ${i + 1}`, text: c })); return; }
     if (!line.trim() || /^\s*(?:[-*+]|\d+\.|#+)\s/.test(line)) flush();
-    if (line.trim()) { if (!para.length) line0 = i + 1; para.push(line.trim()); }
+    if (line.trim()) {
+      if (!para.length) line0 = i + 1;
+      para.push(line.trim());
+    }
   });
   flush();
   return out;
@@ -157,15 +164,18 @@ export async function scanGuidance(root = skillRoot, { files = null } = {}) {
   const listed = files ?? (() => { const r = lsFiles([], { cwd: root, maxBuffer: 64 * 1024 * 1024 }); return r.status === 0 ? r.stdout.split('\n').filter(Boolean) : []; })();
   const findings = [];
   let count = 0;
-  for (const rel of listed.map((f) => f.replace(/\\/g, '/')).filter(isGuidanceFile)) {
+  const tasks = [];
+  for (const rel of listed.map((f) => f.replaceAll('\\', '/')).filter(isGuidanceFile)) {
     let text;
     try { text = fs.readFileSync(path.join(root, rel), 'utf8'); } catch { continue; }
     count += 1;
     let units;
     if (rel.endsWith('.md')) units = markdownUnits(text);
     else { try { units = stringLeaves(parseYaml(text)); } catch { continue; } }
-    for (const u of units) for (const f of await textFindings(u.text, { prose: rel.endsWith('.md') })) findings.push({ file: rel, key: u.key, ...f });
+    for (const u of units) tasks.push({ rel, u });
   }
+  const perUnit = await Promise.all(tasks.map((t) => textFindings(t.u.text, { prose: t.rel.endsWith('.md') })));
+  for (const [i, t] of tasks.entries()) for (const f of perUnit[i]) findings.push({ file: t.rel, key: t.u.key, ...f });
   return { ok: findings.length === 0, findings, files: count };
 }
 

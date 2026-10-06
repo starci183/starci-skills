@@ -89,23 +89,23 @@ const GENERATED_MIRROR_SET = new Set(GENERATED_MIRROR_ROOTS);
 /** One allowlist entry's path: a non-empty relative skill path, forward slashes, no wildcard. */
 function entryPath(entry, list) {
   if (!entry || typeof entry.path !== 'string' || !entry.path.trim()) {
-    throw Error(`Each json-exceptions ${list} entry needs a non-empty path string`);
+    throw new Error(`Each json-exceptions ${list} entry needs a non-empty path string`);
   }
   if (entry.path.includes('*') || entry.path.includes('?') || entry.path.includes('[')) {
-    throw Error(`Wildcards are not allowed in json-exceptions: ${entry.path}`);
+    throw new Error(`Wildcards are not allowed in json-exceptions: ${entry.path}`);
   }
   if (path.isAbsolute(entry.path) || entry.path.split(/[/\\]/).includes('..')) {
-    throw Error(`json-exceptions path must be a relative skill path: ${entry.path}`);
+    throw new Error(`json-exceptions path must be a relative skill path: ${entry.path}`);
   }
   const normalized = entry.path.replaceAll('\\', '/');
   if (normalized !== entry.path) {
-    throw Error(`json-exceptions path must use forward slashes: ${entry.path}`);
+    throw new Error(`json-exceptions path must use forward slashes: ${entry.path}`);
   }
   if (normalized.endsWith('/') || normalized.split('/').includes('.')) {
-    throw Error(`json-exceptions path must be exact, without a trailing slash or '.': ${entry.path}`);
+    throw new Error(`json-exceptions path must be exact, without a trailing slash or '.': ${entry.path}`);
   }
   if (typeof entry.reason !== 'string' || !entry.reason.trim()) {
-    throw Error(`json-exceptions entry needs reason: ${entry.path}`);
+    throw new Error(`json-exceptions entry needs reason: ${entry.path}`);
   }
   return normalized;
 }
@@ -113,24 +113,24 @@ function entryPath(entry, list) {
 function sortedUnique(paths, list) {
   const sorted = [...paths].sort((a, b) => a.localeCompare(b));
   if (paths.some((p, i) => p !== sorted[i])) {
-    throw Error(`json-exceptions ${list} paths must be uniquely sorted (localeCompare)`);
+    throw new Error(`json-exceptions ${list} paths must be uniquely sorted (localeCompare)`);
   }
   if (new Set(paths).size !== paths.length) {
-    throw Error(`json-exceptions ${list} paths must be unique`);
+    throw new Error(`json-exceptions ${list} paths must be unique`);
   }
   return Object.freeze(sorted);
 }
 
 function loadAllowlist(allowlistFile) {
   if (!fs.existsSync(allowlistFile)) {
-    throw Error(`JSON exceptions allowlist is required: ${path.relative(root, allowlistFile).replaceAll('\\', '/')}`);
+    throw new Error(`JSON exceptions allowlist is required: ${path.relative(root, allowlistFile).replaceAll('\\', '/')}`);
   }
   const section = readAllowlistFile('json-exceptions', allowlistFile);
   if (!section || typeof section !== 'object' || !Array.isArray(section.exceptions)) {
-    throw Error(`${ALLOWLIST_FILE} json-exceptions must define exceptions[]`);
+    throw new Error(`${ALLOWLIST_FILE} json-exceptions must define exceptions[]`);
   }
   if (section.directories !== undefined && !Array.isArray(section.directories)) {
-    throw Error(`${ALLOWLIST_FILE} json-exceptions.directories must be a list when present`);
+    throw new Error(`${ALLOWLIST_FILE} json-exceptions.directories must be a list when present`);
   }
   return {
     files: sortedUnique(section.exceptions.map(entry => entryPath(entry, 'exceptions')), 'exceptions'),
@@ -146,6 +146,13 @@ function shouldSkipDir(relativePosix, name) {
   return false;
 }
 
+/** The relative path of a regular .json file entry, or null when the entry is not one. */
+const jsonFileRel = (entry, relativePosix) => {
+  const name = entry.name;
+  if (!entry.isFile() || entry.isSymbolicLink() || !name.endsWith('.json')) return null;
+  return (relativePosix ? `${relativePosix}/${name}` : name).replaceAll('\\', '/');
+};
+
 function walkJsonFiles(dir, relativePosix, out) {
   let entries;
   try {
@@ -156,17 +163,49 @@ function walkJsonFiles(dir, relativePosix, out) {
   for (const entry of entries) {
     const name = entry.name;
     const childRel = relativePosix ? `${relativePosix}/${name}` : name;
-    const childAbs = path.join(dir, name);
     if (entry.isDirectory()) {
       if (shouldSkipDir(relativePosix, name)) continue;
       if (entry.isSymbolicLink()) continue;
-      walkJsonFiles(childAbs, childRel, out);
+      walkJsonFiles(path.join(dir, name), childRel, out);
       continue;
     }
-    if (!entry.isFile() || entry.isSymbolicLink()) continue;
-    if (!name.endsWith('.json')) continue;
-    out.push(childRel.replaceAll('\\', '/'));
+    const rel = jsonFileRel(entry, relativePosix);
+    if (rel) out.push(rel);
   }
+}
+
+/** The parent directory of a relative path ('' for a root file). */
+const dirOf = rel => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
+
+/** Splits the walked .json files into offenders (unregistered) and generatedPresent. */
+function partitionFound(found, ignoreLocks, allow, allowDirs) {
+  const offenders = [];
+  const generatedPresent = [];
+  for (const rel of found) {
+    if (LOCAL_ONLY.has(rel)) continue;
+    if (ignoreLocks && /(^|\/)package-lock\.json$/.test(rel)) continue;
+    if (BLOB_SIDECAR.test(rel)) continue;
+    if (GENERATED_SET.has(rel)) {
+      generatedPresent.push(rel);
+      continue;
+    }
+    if (!allow.has(rel) && !allowDirs.has(dirOf(rel))) offenders.push(rel);
+  }
+  return { offenders, generatedPresent };
+}
+
+/** The allowlist paths and registered directories that are not on disk under `skillRoot`. */
+function missingEntries(skillRoot, allowlist, directories, ignoreLocks) {
+  const missing = [];
+  for (const rel of allowlist) {
+    if (ignoreLocks && /(^|\/)package-lock\.json$/.test(rel)) continue;
+    if (!fs.existsSync(path.join(skillRoot, rel))) missing.push(rel);
+  }
+  for (const rel of directories) {
+    const abs = path.join(skillRoot, rel);
+    if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) missing.push(`${rel}/`);
+  }
+  return missing;
 }
 
 export function checkJsonExceptions({
@@ -178,36 +217,12 @@ export function checkJsonExceptions({
   const skillRoot = optionRoot ?? skillRootOption ?? root;
   const listFile = allowlistFile ?? path.join(skillRoot, ...ALLOWLIST_FILE.split('/'));
   const { files: allowlist, directories } = loadAllowlist(listFile);
-  const allow = new Set(allowlist);
-  const allowDirs = new Set(directories);
-  const dirOf = rel => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
   const found = [];
   walkJsonFiles(skillRoot, '', found);
   found.sort((a, b) => a.localeCompare(b));
 
-  const offenders = [];
-  const generatedPresent = [];
-  const missingAllowlist = [];
-  for (const rel of found) {
-    if (LOCAL_ONLY.has(rel)) continue;
-    if (ignoreLocks && /(^|\/)package-lock\.json$/.test(rel)) continue;
-    if (BLOB_SIDECAR.test(rel)) continue;
-    if (GENERATED_SET.has(rel)) {
-      generatedPresent.push(rel);
-      continue;
-    }
-    if (!allow.has(rel) && !allowDirs.has(dirOf(rel))) offenders.push(rel);
-  }
-
-  for (const rel of allowlist) {
-    if (ignoreLocks && /(^|\/)package-lock\.json$/.test(rel)) continue;
-    const abs = path.join(skillRoot, rel);
-    if (!fs.existsSync(abs)) missingAllowlist.push(rel);
-  }
-  for (const rel of directories) {
-    const abs = path.join(skillRoot, rel);
-    if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) missingAllowlist.push(`${rel}/`);
-  }
+  const { offenders, generatedPresent } = partitionFound(found, ignoreLocks, new Set(allowlist), new Set(directories));
+  const missingAllowlist = missingEntries(skillRoot, allowlist, directories, ignoreLocks);
 
   return {
     ok: offenders.length === 0 && missingAllowlist.length === 0,

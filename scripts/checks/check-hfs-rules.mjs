@@ -82,7 +82,7 @@ function readEmitters(root) {
 function readTests(root) {
   const texts = (dir, re) => (fs.existsSync(path.join(root, dir)) ? fs.readdirSync(path.join(root, dir)).filter((f) => re.test(f)).sort().map((f) => fs.readFileSync(path.join(root, dir, f), 'utf8')) : []);
   // Runtime specs are read at any depth: tests/<area>/<module>.spec.mjs is their layout (RT_SPEC_PLACEMENT).
-  const specs = walkFiles(path.join(root, 'tests'), { sorted: true, filter: (name) => /\.spec\.mjs$/.test(name), exclude: (name) => name === 'node_modules' || name === 'fixtures' }).map((file) => fs.readFileSync(file, 'utf8'));
+  const specs = walkFiles(path.join(root, 'tests'), { sorted: true, filter: (name) => name.endsWith('.spec.mjs'), exclude: (name) => name === 'node_modules' || name === 'fixtures' }).map((file) => fs.readFileSync(file, 'utf8'));
   return { 'eslint-be': texts('packages/eslint/be', /\.spec\.mjs$/).join('\n'), 'eslint-fe': texts('packages/eslint/fe', /\.spec\.mjs$/).join('\n'), stylelint: texts('packages/stylelint', /\.spec\.mjs$/), specs };
 }
 
@@ -114,9 +114,9 @@ const stylelintProven = (files, id) => files.some((text) => {
 const specProven = (specs, code) => specs.some((text) => {
   // A spec may bind the code once (`const hits = (report) => findings(report, 'CODE')`) and use that name in its tests.
   // A top-level declaration runs until the next top-level `const`/`test(`/`function` line.
-  const declarations = [...text.matchAll(/^(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*=([\s\S]*?)(?=^(?:export\s+)?(?:const|test\(|function|async function)\b|$(?![\s\S]))/gm)];
+  const declarations = [...text.matchAll(/^(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*=([^]*?)(?=^(?:export\s+)?(?:const|test\(|(?:async )?function)\b|(?![^]))/gm)];
   const names = [code, ...declarations.filter((m) => m[2].includes(code)).map((m) => m[1])];
-  return text.split(/\btest\(/).slice(1).filter((block) => names.some((name) => new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(block))).length >= 2;
+  return text.split(/\btest\(/).slice(1).filter((block) => names.some((name) => new RegExp(String.raw`\b${name.replaceAll('$', '\\$')}\b`).test(block))).length >= 2;
 });
 
 /** The knowledge files under `root` that may name a rule code, as [{rel, text}] (YAML only). */
@@ -140,7 +140,7 @@ export function stylelintRuleIds(root) {
     const source = fs.readFileSync(path.join(root, PLUGIN_ENTRY.stylelint), 'utf8');
     const body = /export const rules = \{([\s\S]*?)\n\}/.exec(source)?.[1];
     if (body === undefined) return { error: `${PLUGIN_ENTRY.stylelint} exports no rules` };
-    const ids = new Set([...body.matchAll(/^\s*"([a-z0-9-]+)"\s*:/gm)].map((m) => m[1]));
+    const ids = new Set([...body.matchAll(/(?<=^|[\n\r\u2028\u2029])[^\S\n]*"([a-z0-9-]+)"\s*:/gm)].map((m) => m[1]));
     const reported = fs.readFileSync(path.join(root, STYLELINT_WHY), 'utf8');
     const why = new Map([...reported.matchAll(/^ {2}"([a-z0-9-]+)":\s*\{\s*code:\s*"([A-Z0-9_]+)"/gm)].map((m) => [m[1], m[2]]));
     return { ids, why };
@@ -170,110 +170,154 @@ export async function pluginRuleIds(root, kind) {
  * plugins: {'eslint-be': {ids: Set} | {error}, 'eslint-fe': ...}; failureCodes: the parsed catalog; files: {exists(rel), read(rel)};
  * codes: {machine, hfs, refusals}, every code the architecture machine and `starci app check` can emit and the refusal codes among them.
  */
-export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, tests, knowledge, codes, infrastructure }) {
-  const findings = [];
-  const add = (code, rule, message, enforcer) => findings.push({ code, rule, ...(enforcer ? { enforcer } : {}), message });
-  for (const rule of catalog.rules) {
-    if (!rule.enforcers.length) add('HFS_RULE_NO_ENFORCER', rule.id, `${rule.id} (${rule.code}) has no enforcer`);
-    // Owner acceptance 2026-09-30: every rule ships at error on the day the canon ships; an owed enforcer is a gap, not a plan.
-    for (const e of rule.enforcers) if (e.planned) add('HFS_RULE_ENFORCER_PLANNED', rule.id, `${rule.id} lists ${e.kind}:${e.id} as planned: build it (with a violating and a passing test) or delete it; the catalog carries no owed enforcer`, `${e.kind}:${e.id}`);
-    for (const [kind, family, what] of [['lint', LINT_FAMILY, 'an eslint or stylelint rule'], ['check', CHECK_FAMILY, 'a machine, hfs, work-validate or runtime check']]) {
-      if (rule.kinds.includes(kind) && !rule.enforcers.some((e) => family.includes(e.kind))) add('HFS_RULE_NO_ENFORCER', rule.id, `${rule.id} (${rule.code}) is kind ${kind} but names no ${what}`);
-    }
-    for (const enforcer of rule.enforcers) {
-      const label = `${enforcer.kind}:${enforcer.id}`;
-      if (LINT_FAMILY.includes(enforcer.kind)) {
-        const plugin = plugins[enforcer.kind];
-        if (plugin?.ids === undefined) {
-          if (!enforcer.planned) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} but ${plugin?.error ?? 'the plugin was not loaded'}`, label);
-        } else if (enforcer.planned && plugin.ids.has(enforcer.id)) add('HFS_RULE_ENFORCER_STALE', rule.id, `${rule.id} lists ${label} as planned but the plugin already ships it; remove its status`, label);
-        else if (!enforcer.planned && !plugin.ids.has(enforcer.id)) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label}, which is not a rule of ${PLUGIN_ENTRY[enforcer.kind]}`, label);
-      } else if (!enforcer.planned && enforcer.at !== undefined) {
-        if (!files.exists(enforcer.at)) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} at ${enforcer.at}, which does not exist`, label);
-        else if (!rule.failureCodes.some((c) => files.read(enforcer.at).includes(c))) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} at ${enforcer.at}, but that file emits none of ${rule.failureCodes.join(', ')}`, label);
-      }
-    }
-    const lintBuilt = rule.enforcers.some((e) => LINT_FAMILY.includes(e.kind) && !e.planned);
-    const lintCodes = new Set(rule.enforcers.filter((e) => !e.planned && plugins[e.kind]?.why?.has(e.id)).map((e) => plugins[e.kind].why.get(e.id)));
-    for (const e of rule.enforcers) {
-      const code = !e.planned && plugins[e.kind]?.why?.get(e.id);
-      if (code && !rule.failureCodes.includes(code)) add('HFS_RULE_UNCATALOGUED', rule.id, `${e.kind}:${e.id} reports under ${code}, which ${rule.id} does not list in failureCodes`, `${e.kind}:${e.id}`);
-    }
-    const builtAt = new Set(rule.enforcers.filter((e) => !e.planned && e.at).map((e) => e.at));
-    const anyPlanned = rule.enforcers.some((e) => e.planned);
-    const emittedBy = (code, families = CHECK_FAMILY) => families.flatMap((family) => (emitters?.[family] ?? []).filter((f) => quoted(code).test(f.text)).map((f) => f.rel));
-    for (const enforcer of rule.enforcers) {
-      if (!enforcer.planned || !CHECK_FAMILY.includes(enforcer.kind) || emitters === undefined) continue;
-      // A file another built enforcer of this rule already names is that enforcer's emission, not this one's.
-      const shipped = rule.failureCodes.flatMap((code) => emittedBy(code, [enforcer.kind])).filter((rel) => !builtAt.has(rel));
-      if (shipped.length) add('HFS_RULE_ENFORCER_STALE', rule.id, `${rule.id} lists ${enforcer.kind}:${enforcer.id} as planned but ${shipped[0]} already emits its code; remove its status and name that file as \`at\``, `${enforcer.kind}:${enforcer.id}`);
-    }
-    if (emitters !== undefined && !anyPlanned) {
-      for (const code of rule.failureCodes) {
-        if ((code === rule.code && lintBuilt) || lintCodes.has(code) || emittedBy(code).length) continue;
-        add('HFS_RULE_CODE_UNEMITTED', rule.id, `${rule.id} claims every enforcer is built, but no enforcer emits ${code}: no eslint or stylelint rule reports the rule's own code and no check file spells it`);
-      }
-    }
-    if (tests !== undefined) for (const e of rule.enforcers) {
-      if (e.planned) continue;
-      if (e.kind === 'stylelint') {
-        if (!stylelintProven(tests.stylelint ?? [], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no packages/stylelint/*.spec.mjs that lints it (lintRule("${e.id}") with a test asserting no warning and a test asserting one`, `${e.kind}:${e.id}`);
-      } else if (LINT_FAMILY.includes(e.kind)) {
-        if (!lintProven(tests[e.kind], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no RuleTester run with both valid and invalid cases in packages/eslint/${e.kind.slice(7)}/*.spec.mjs`, `${e.kind}:${e.id}`);
-      } else if (CHECK_FAMILY.includes(e.kind) && !rule.failureCodes.some((code) => specProven(tests.specs, code))) {
-        add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no tests/*.spec.mjs naming one of ${rule.failureCodes.join(', ')} in a violating and a passing test`, `${e.kind}:${e.id}`);
-      }
-    }
-    for (const failureCode of rule.failureCodes) {
-      const entry = failureCodes?.[failureCode];
-      if (!entry) { add('HFS_RULE_CODE_UNCATALOGUED', rule.id, `${rule.id} reports ${failureCode}, which has no entry in ${FAILURE_CODES_FILE}`); continue; }
-      for (const field of ['title_vi', 'meaning_vi', 'nextStep_vi']) {
-        const value = entry[field];
-        if (typeof value !== 'string' || !value.trim()) add('HFS_RULE_CODE_UNCATALOGUED', rule.id, `${failureCode} (${rule.id}) has no ${field}`);
-        else if (!hasSecondLanguage(value)) add('HFS_RULE_CODE_UNCATALOGUED', rule.id, `${failureCode} (${rule.id}) has a ${field} that is not Vietnamese`);
-      }
+/** The missing/stale/planned-enforcer findings of one rule's enforcer entries. */
+const enforcerFindings = (rule, plugins, files, add) => {
+  for (const enforcer of rule.enforcers) {
+    const label = `${enforcer.kind}:${enforcer.id}`;
+    if (LINT_FAMILY.includes(enforcer.kind)) {
+      const plugin = plugins[enforcer.kind];
+      if (plugin?.ids === undefined) {
+        if (!enforcer.planned) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} but ${plugin?.error ?? 'the plugin was not loaded'}`, label);
+      } else if (enforcer.planned && plugin.ids.has(enforcer.id)) add('HFS_RULE_ENFORCER_STALE', rule.id, `${rule.id} lists ${label} as planned but the plugin already ships it; remove its status`, label);
+      else if (!enforcer.planned && !plugin.ids.has(enforcer.id)) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label}, which is not a rule of ${PLUGIN_ENTRY[enforcer.kind]}`, label);
+    } else if (!enforcer.planned && enforcer.at !== undefined) {
+      if (!files.exists(enforcer.at)) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} at ${enforcer.at}, which does not exist`, label);
+      else if (!rule.failureCodes.some((c) => files.read(enforcer.at).includes(c))) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} at ${enforcer.at}, but that file emits none of ${rule.failureCodes.join(', ')}`, label);
     }
   }
+};
+
+/** The uncatalogued-code, stale-planned and unemitted-code findings of one rule (the emission pass). */
+const emissionFindings = (rule, plugins, emitters, add) => {
+  const lintBuilt = rule.enforcers.some((e) => LINT_FAMILY.includes(e.kind) && !e.planned);
+  const lintCodes = new Set(rule.enforcers.filter((e) => !e.planned && plugins[e.kind]?.why?.has(e.id)).map((e) => plugins[e.kind].why.get(e.id)));
+  for (const e of rule.enforcers) {
+    const code = !e.planned && plugins[e.kind]?.why?.get(e.id);
+    if (code && !rule.failureCodes.includes(code)) add('HFS_RULE_UNCATALOGUED', rule.id, `${e.kind}:${e.id} reports under ${code}, which ${rule.id} does not list in failureCodes`, `${e.kind}:${e.id}`);
+  }
+  const builtAt = new Set(rule.enforcers.filter((e) => !e.planned && e.at).map((e) => e.at));
+  const anyPlanned = rule.enforcers.some((e) => e.planned);
+  const emittedBy = (code, families = CHECK_FAMILY) => families.flatMap((family) => (emitters?.[family] ?? []).filter((f) => quoted(code).test(f.text)).map((f) => f.rel));
+  for (const enforcer of rule.enforcers) {
+    if (!enforcer.planned || !CHECK_FAMILY.includes(enforcer.kind) || emitters === undefined) continue;
+    // A file another built enforcer of this rule already names is that enforcer's emission, not this one's.
+    const shipped = rule.failureCodes.flatMap((code) => emittedBy(code, [enforcer.kind])).filter((rel) => !builtAt.has(rel));
+    if (shipped.length) add('HFS_RULE_ENFORCER_STALE', rule.id, `${rule.id} lists ${enforcer.kind}:${enforcer.id} as planned but ${shipped[0]} already emits its code; remove its status and name that file as \`at\``, `${enforcer.kind}:${enforcer.id}`);
+  }
+  if (emitters !== undefined && !anyPlanned) {
+    for (const code of rule.failureCodes) {
+      if ((code === rule.code && lintBuilt) || lintCodes.has(code) || emittedBy(code).length) continue;
+      add('HFS_RULE_CODE_UNEMITTED', rule.id, `${rule.id} claims every enforcer is built, but no enforcer emits ${code}: no eslint or stylelint rule reports the rule's own code and no check file spells it`);
+    }
+  }
+};
+
+/** The untested-enforcer findings of one rule (called only when test sources were read). */
+const testedFindings = (rule, tests, add) => {
+  for (const e of rule.enforcers) {
+    if (e.planned) continue;
+    if (e.kind === 'stylelint') {
+      if (!stylelintProven(tests.stylelint ?? [], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no packages/stylelint/*.spec.mjs that lints it (lintRule("${e.id}") with a test asserting no warning and a test asserting one`, `${e.kind}:${e.id}`);
+    } else if (LINT_FAMILY.includes(e.kind)) {
+      if (!lintProven(tests[e.kind], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no RuleTester run with both valid and invalid cases in packages/eslint/${e.kind.slice(7)}/*.spec.mjs`, `${e.kind}:${e.id}`);
+    } else if (CHECK_FAMILY.includes(e.kind) && !rule.failureCodes.some((code) => specProven(tests.specs, code))) {
+      add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no tests/*.spec.mjs naming one of ${rule.failureCodes.join(', ')} in a violating and a passing test`, `${e.kind}:${e.id}`);
+    }
+  }
+};
+
+/** The failure-catalog findings of one rule's own codes (missing entry, missing or non-Vietnamese fields). */
+const failureEntryFindings = (rule, failureCodes, add) => {
+  for (const failureCode of rule.failureCodes) {
+    const entry = failureCodes?.[failureCode];
+    if (!entry) { add('HFS_RULE_CODE_UNCATALOGUED', rule.id, `${rule.id} reports ${failureCode}, which has no entry in ${FAILURE_CODES_FILE}`); continue; }
+    for (const field of ['title_vi', 'meaning_vi', 'nextStep_vi']) {
+      const value = entry[field];
+      if (typeof value !== 'string' || !value.trim()) add('HFS_RULE_CODE_UNCATALOGUED', rule.id, `${failureCode} (${rule.id}) has no ${field}`);
+      else if (!hasSecondLanguage(value)) add('HFS_RULE_CODE_UNCATALOGUED', rule.id, `${failureCode} (${rule.id}) has a ${field} that is not Vietnamese`);
+    }
+  }
+};
+
+/** Every finding of one catalog rule, in the order the passes below produce them. */
+const ruleFindings = (rule, { plugins, files, emitters, tests, failureCodes }, add) => {
+  if (!rule.enforcers.length) add('HFS_RULE_NO_ENFORCER', rule.id, `${rule.id} (${rule.code}) has no enforcer`);
+  // Owner acceptance 2026-09-30: every rule ships at error on the day the canon ships; an owed enforcer is a gap, not a plan.
+  for (const e of rule.enforcers) if (e.planned) add('HFS_RULE_ENFORCER_PLANNED', rule.id, `${rule.id} lists ${e.kind}:${e.id} as planned: build it (with a violating and a passing test) or delete it; the catalog carries no owed enforcer`, `${e.kind}:${e.id}`);
+  for (const [kind, family, what] of [['lint', LINT_FAMILY, 'an eslint or stylelint rule'], ['check', CHECK_FAMILY, 'a machine, hfs, work-validate or runtime check']]) {
+    if (rule.kinds.includes(kind) && !rule.enforcers.some((e) => family.includes(e.kind))) add('HFS_RULE_NO_ENFORCER', rule.id, `${rule.id} (${rule.code}) is kind ${kind} but names no ${what}`);
+  }
+  enforcerFindings(rule, plugins, files, add);
+  emissionFindings(rule, plugins, emitters, add);
+  if (tests !== undefined) testedFindings(rule, tests, add);
+  failureEntryFindings(rule, failureCodes, add);
+};
+
+/** The shipped plugin rules no catalog rule names (HFS_RULE_UNCATALOGUED). */
+const uncataloguedPluginFindings = (catalog, plugins, add) => {
   for (const kind of Object.keys(PLUGIN_ENTRY)) {
     const ids = plugins[kind]?.ids;
     if (ids === undefined) continue;
     const named = new Set(catalog.rules.flatMap((r) => r.enforcers.filter((e) => e.kind === kind).map((e) => e.id)));
     for (const id of [...ids].sort(byCodeUnit)) if (!named.has(id)) add('HFS_RULE_UNCATALOGUED', '-', `${kind}:${id} ships in ${PLUGIN_ENTRY[kind]} but no rule of the catalog names it; give it an R-id enforcer entry or delete the rule`, `${kind}:${id}`);
   }
-  if (codes !== undefined) {
-    // RED19: every emitted code belongs to exactly one rule; only an infrastructure refusal ("cannot judge") is owned by none.
-    const owned = new Set(catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]));
-    const refusals = new Set(codes.refusals ?? []);
-    const reported = new Set();
-    for (const [source, list] of Object.entries({ machine: codes.machine ?? [], 'starci app': codes.hfs ?? [] })) {
-      for (const code of [...new Set(list)].sort(byCodeUnit)) {
-        if (owned.has(code) || refusals.has(code) || reported.has(code)) continue;
-        reported.add(code);
-        add('HFS_RULE_CODE_UNOWNED', '-', `${code} can be emitted by the ${source} check but no rule of knowledge/hfs/rules.yaml lists it in failureCodes; list it under the one rule whose law it serves, or delete it. Only an infrastructure refusal ("cannot judge") is exempt, and its owner exports it in ERROR_RULE_IDS (architecture machine) or REFUSAL_CODES (starci app check)`);
-      }
+};
+
+/** The emitted codes no rule owns (RED19; skipped when `codes` was not supplied). */
+const unownedCodeFindings = (catalog, codes, add) => {
+  if (codes === undefined) return;
+  // RED19: every emitted code belongs to exactly one rule; only an infrastructure refusal ("cannot judge") is owned by none.
+  const owned = new Set(catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]));
+  const refusals = new Set(codes.refusals ?? []);
+  const reported = new Set();
+  for (const [source, list] of Object.entries({ machine: codes.machine ?? [], 'starci app': codes.hfs ?? [] })) {
+    for (const code of [...new Set(list)].sort(byCodeUnit)) {
+      if (owned.has(code) || refusals.has(code) || reported.has(code)) continue;
+      reported.add(code);
+      add('HFS_RULE_CODE_UNOWNED', '-', `${code} can be emitted by the ${source} check but no rule of knowledge/hfs/rules.yaml lists it in failureCodes; list it under the one rule whose law it serves, or delete it. Only an infrastructure refusal ("cannot judge") is exempt, and its owner exports it in ERROR_RULE_IDS (architecture machine) or REFUSAL_CODES (starci app check)`);
     }
   }
-  if (infrastructure !== undefined) {
-    // S7-02: every HFS_/BE_/FE_/ARCH_ code of the failure catalog is a code of a rule, a "cannot judge" refusal, or declared
-    // infrastructure (the harness's own tools reporting about themselves, scripts/hfs/infrastructure-codes.mjs).
-    const owned = new Set(catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]));
-    const exempt = new Set([...(codes?.refusals ?? []), ...Object.keys(infrastructure)]);
-    for (const code of Object.keys(failureCodes ?? {}).filter((c) => /^(HFS|BE|FE|ARCH)_/.test(c)).sort(byCodeUnit)) {
-      if (!owned.has(code) && !exempt.has(code)) add('HFS_RULE_CODE_UNOWNED', '-', `${code} is in ${FAILURE_CODES_FILE} but no rule of knowledge/hfs/rules.yaml lists it in failureCodes and it is not declared infrastructure (scripts/hfs/infrastructure-codes.mjs): list it under the one rule whose law it serves, declare it infrastructure with its emitter, or delete it`);
-    }
-    for (const code of Object.keys(infrastructure).sort(byCodeUnit)) {
-      if (owned.has(code) || !Object.hasOwn(failureCodes ?? {}, code)) add('HFS_RULE_CODE_UNOWNED', '-', `${code} is declared infrastructure but ${owned.has(code) ? 'a rule owns it' : `${FAILURE_CODES_FILE} has no entry for it`}: delete it from scripts/hfs/infrastructure-codes.mjs`);
+};
+
+/** The catalog-code/infrastructure-code mismatches (S7-02; skipped when `infrastructure` was not supplied). */
+const infrastructureFindings = (catalog, failureCodes, codes, infrastructure, add) => {
+  if (infrastructure === undefined) return;
+  // S7-02: every HFS_/BE_/FE_/ARCH_ code of the failure catalog is a code of a rule, a "cannot judge" refusal, or declared
+  // infrastructure (the harness's own tools reporting about themselves, scripts/hfs/infrastructure-codes.mjs).
+  const owned = new Set(catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]));
+  const exempt = new Set([...(codes?.refusals ?? []), ...Object.keys(infrastructure)]);
+  for (const code of Object.keys(failureCodes ?? {}).filter((c) => /^(HFS|BE|FE|ARCH)_/.test(c)).sort(byCodeUnit)) {
+    if (!owned.has(code) && !exempt.has(code)) add('HFS_RULE_CODE_UNOWNED', '-', `${code} is in ${FAILURE_CODES_FILE} but no rule of knowledge/hfs/rules.yaml lists it in failureCodes and it is not declared infrastructure (scripts/hfs/infrastructure-codes.mjs): list it under the one rule whose law it serves, declare it infrastructure with its emitter, or delete it`);
+  }
+  for (const code of Object.keys(infrastructure).sort(byCodeUnit)) {
+    if (owned.has(code) || !Object.hasOwn(failureCodes ?? {}, code)) {
+      const why = owned.has(code) ? 'a rule owns it' : `${FAILURE_CODES_FILE} has no entry for it`;
+      add('HFS_RULE_CODE_UNOWNED', '-', `${code} is declared infrastructure but ${why}: delete it from scripts/hfs/infrastructure-codes.mjs`);
     }
   }
-  if (knowledge !== undefined) {
-    // RED20: a knowledge file states an obligation under the catalog's code or the failure catalog's, never under a third name.
-    const known = new Set([...catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]), ...Object.keys(failureCodes ?? {})]);
-    for (const file of knowledge) {
-      for (const code of new Set(String(file.text).match(RULE_CODE) ?? [])) {
-        if (!known.has(code)) add('HFS_RULE_CODE_UNCATALOGUED', '-', `${file.rel} names ${code}, which is neither a code of knowledge/hfs/rules.yaml nor a key of ${FAILURE_CODES_FILE}; name the catalog code of the rule that judges it or delete the sentence`);
-      }
+};
+
+/** The rule codes a knowledge file names that are neither catalog codes nor failure codes (RED20). */
+const knowledgeFindings = (catalog, failureCodes, knowledge, add) => {
+  if (knowledge === undefined) return;
+  // RED20: a knowledge file states an obligation under the catalog's code or the failure catalog's, never under a third name.
+  const known = new Set([...catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]), ...Object.keys(failureCodes ?? {})]);
+  for (const file of knowledge) {
+    for (const code of new Set(String(file.text).match(RULE_CODE) ?? [])) {
+      if (!known.has(code)) add('HFS_RULE_CODE_UNCATALOGUED', '-', `${file.rel} names ${code}, which is neither a code of knowledge/hfs/rules.yaml nor a key of ${FAILURE_CODES_FILE}; name the catalog code of the rule that judges it or delete the sentence`);
     }
   }
+};
+
+export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, tests, knowledge, codes, infrastructure }) {
+  const findings = [];
+  const add = (code, rule, message, enforcer) => findings.push({ code, rule, ...(enforcer ? { enforcer } : {}), message });
+  const context = { plugins, files, emitters, tests, failureCodes };
+  for (const rule of catalog.rules) ruleFindings(rule, context, add);
+  uncataloguedPluginFindings(catalog, plugins, add);
+  unownedCodeFindings(catalog, codes, add);
+  infrastructureFindings(catalog, failureCodes, codes, infrastructure, add);
+  knowledgeFindings(catalog, failureCodes, knowledge, add);
   return findings;
 }
 

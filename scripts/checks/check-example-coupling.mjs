@@ -64,8 +64,25 @@ const PRODUCT_RE = new RegExp(`(?<![A-Za-z0-9])(?:${PRODUCT_NAMES.join('|')})(?!
 /** A concrete example directory named in text: `examples/<name>` at the tree root (a bare `examples/`,
  *  `examples/${x}` or a `examples/` segment inside another tree such as knowledge/ui/examples/ stays generic). */
 const EXAMPLE_PATH_RE = /(?:^|[^A-Za-z0-9_/-]|\.{1,2}\/)examples\/([A-Za-z0-9_-][\w.-]*)/gm;
-/** A hyphen-joined token ending in an incident id, `inc-<hash>` with a prefix (allowed only when the prefix is not a product name). */
-const INCIDENT_TOKEN_RE = /(?<![A-Za-z0-9])([A-Za-z0-9._-]*?)-?inc-[0-9a-z]{4,}[A-Za-z0-9._-]*/gi;
+/** The characters a hyphen-joined token is made of; an `inc-<hash>` token is always exactly one run of them. */
+const TOKEN_RUN = /[a-z0-9._-]+/gi;
+
+/**
+ * The incident tokens of `body` as {token, index, prefix}: the same matches
+ * `(?<![A-Za-z0-9])([A-Za-z0-9._-]*?)-?inc-[0-9a-z]{4,}[A-Za-z0-9._-]*` yields (a run whose prefix is the part before
+ * `inc-`, minus the one dash the `-?` drops; a run's first character is never preceded by an alphanumeric, so the
+ * lookbehind holds at every run start) - scanned run by run instead of by backtracking.
+ */
+const incidentTokens = function* (body) {
+  for (const run of body.matchAll(TOKEN_RUN)) {
+    const lowered = run[0].toLowerCase();
+    for (let at = lowered.indexOf('inc-'); at >= 0; at = lowered.indexOf('inc-', at + 1)) {
+      if (!/^[0-9a-z]{4}/.test(lowered.slice(at + 4))) continue;
+      yield { token: run[0], index: run.index, prefix: run[0].slice(0, at).replace(/-$/, '') };
+      break;
+    }
+  }
+};
 
 
 /** The live tracked source files of `root` under SCAN_ROOTS (git ls-files, or the filesystem of a spec fixture tree). */
@@ -96,9 +113,9 @@ function spanHits(rel, text, body, at) {
     push(RT_EXAMPLE_COUPLING, `examples/${m[1]}`, m.index + m[0].indexOf('examples/'), 'a literal examples/<name> path: a source file names one example tree');
   for (const m of body.matchAll(PRODUCT_RE))
     push(RT_PRODUCT_NAME_IN_SOURCE, m[0], m.index, 'a product name in runtime source: the canon ships into every product');
-  for (const m of body.matchAll(INCIDENT_TOKEN_RE)) {
+  for (const hit of incidentTokens(body)) {
     PRODUCT_RE.lastIndex = 0;
-    if (m[1] && PRODUCT_RE.test(m[1])) push(RT_PRODUCT_NAME_IN_SOURCE, m[0], m.index, 'an inc-<hash> token prefixed by a product name');
+    if (hit.prefix && PRODUCT_RE.test(hit.prefix)) push(RT_PRODUCT_NAME_IN_SOURCE, hit.token, hit.index, 'an inc-<hash> token prefixed by a product name');
   }
   for (const hit of hostPathHits(body))
     push(RT_HOST_PATH_IN_TEMPLATE, hit.sample, hit.offset, `a hard-coded ${hit.kind}: templates and runtime sources carry relative paths, the runtime root, os.tmpdir() or a config value`);
@@ -109,7 +126,9 @@ function spanHits(rel, text, body, at) {
 export function couplingHits(rel, text) {
   if (!SOURCE.test(rel)) return spanHits(rel, text, text, 0).sort((a, b) => a.line - b.line || a.code.localeCompare(b.code));
   const t = ts();
-  const kind = /\.tsx$/.test(rel) ? t.ScriptKind.TSX : /\.(?:ts|mts|cts)$/.test(rel) ? t.ScriptKind.TS : t.ScriptKind.JS;
+  let kind = t.ScriptKind.JS;
+  if (rel.endsWith('.tsx')) kind = t.ScriptKind.TSX;
+  else if (/\.(?:ts|mts|cts)$/.test(rel)) kind = t.ScriptKind.TS;
   const source = t.createSourceFile(rel, text, t.ScriptTarget.Latest, true, kind);
   const found = [];
   const seenComments = new Set();

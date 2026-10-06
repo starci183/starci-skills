@@ -169,6 +169,65 @@ ${componentsYaml(components)}
 
 const read = readTextFile;
 
+/** The workflow findings: the derived matrix contract, the dispatch-only stack layers, and no hard-coded example path. */
+const workflowFindings = (doc, text, apps, add) => {
+  const jobs = doc.jobs ?? {};
+  const lister = jobs[MATRIX_JOB];
+  if (!lister || !(lister.steps ?? []).some((step) => runsCommand(step, MATRIX_COMMAND)) || !String(lister.outputs?.apps ?? '').includes('steps.'))
+    add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, `job ${MATRIX_JOB} must run \`${MATRIX_COMMAND}\` and expose its output as outputs.apps`);
+  const matrixJobs = Object.entries(jobs).filter(([id, job]) => id !== IMAGES_JOB && job?.strategy?.matrix);
+  if (!matrixJobs.length) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, 'no job runs the example apps as a matrix');
+  for (const [id, job] of matrixJobs) {
+    if (String(job.strategy.matrix.app ?? '') !== MATRIX_EXPRESSION || Object.keys(job.strategy.matrix).length !== 1)
+      add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `the matrix must be exactly app: ${MATRIX_EXPRESSION} (never a hand-written list)`);
+    if (![job.needs].flat().includes(MATRIX_JOB)) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `needs must include ${MATRIX_JOB}`);
+  }
+  // Owner ruling: integration, e2e and contract (the docker-stack layers) run on workflow_dispatch only.
+  for (const [id, job] of Object.entries(jobs)) for (const step of job?.steps ?? []) {
+    if (/\btest:(integration|e2e|contract)\b/.test(String(step.run ?? '')) && !/github\.event_name\s*==\s*'workflow_dispatch'/.test(String(step.if ?? '')))
+      add('EXAMPLES_CI_STACK_LAYER_AUTOMATIC', `${WORKFLOW}#jobs.${id}`, `the step "${step.name ?? step.run}" starts the docker stack and must run on workflow_dispatch only (if: github.event_name == 'workflow_dispatch' ...)`);
+  }
+  if (!doc.on?.workflow_dispatch) add('EXAMPLES_CI_NO_MANUAL_TRIGGER', WORKFLOW, 'the workflow needs a workflow_dispatch trigger for the manual integration and e2e layers');
+  for (const app of apps) if (new RegExp(String.raw`examples/${app}\b`).test(text)) add('EXAMPLES_CI_HARDCODED', WORKFLOW, `the workflow names examples/${app}: every app is reached through the matrix only`);
+};
+
+/** The stray-workflow findings: no other root workflow runs an example app by itself (the folded per-example workflows are gone, and stay gone). */
+const strayWorkflowFindings = (root, apps, add) => {
+  const workflows = path.join(root, '.github', 'workflows');
+  let files = [];
+  try { files = fs.readdirSync(workflows).filter((name) => /\.ya?ml$/.test(name)); } catch { /* no workflows */ }
+  for (const name of files) {
+    const rel = `.github/workflows/${name}`;
+    if (rel === WORKFLOW) continue;
+    const body = read(root, rel) ?? '';
+    for (const app of apps) if (new RegExp(String.raw`examples/${app}\b`).test(body)) add('EXAMPLES_CI_STRAY_WORKFLOW', rel, `runs examples/${app} outside ${WORKFLOW}; fold it into the examples matrix`);
+  }
+};
+
+/** The images-job findings: its matrix is the --images output, it builds and never pushes. */
+const imagesJobFindings = (doc, add) => {
+  const images = doc.jobs?.[IMAGES_JOB];
+  const steps = images?.steps ?? [];
+  if (!images || !steps.some((step) => runsCommand(step, IMAGES_COMMAND)) && !(doc.jobs?.[MATRIX_JOB]?.steps ?? []).some((step) => runsCommand(step, IMAGES_COMMAND)))
+    add('EXAMPLES_CI_IMAGES_NOT_DERIVED', WORKFLOW, `a job ${IMAGES_JOB} must build every image of every example from the output of \`${IMAGES_COMMAND}\` (never a hand-written list)`);
+  else if (!String(images.strategy?.matrix?.include ?? '').includes('fromJSON(needs.') || steps.some((step) => String(step.with?.push) === 'true' || /docker push|--push/.test(String(step.run ?? ''))))
+    add('EXAMPLES_CI_IMAGES_NOT_DERIVED', `${WORKFLOW}#jobs.${IMAGES_JOB}`, 'the images matrix must be include: fromJSON of the derived output, and the job never pushes an image');
+};
+
+/** The drift findings: the examples' own quality files are the render from the source preset; the runtime's Sonar project and codecov.yml are the render of the one coverage list. */
+const driftFindings = (root, apps, add) => {
+  for (const app of apps) for (const target of appQualityTargets(app, root)) {
+    const file = `examples/${app}/${target.path}`;
+    const have = read(root, file);
+    if (have === null || have.replaceAll('\r\n', '\n') !== target.content) add('EXAMPLES_CI_APP_QUALITY_DRIFT', file, `${file} differs from its render from the source jest preset: run starci runtime check --only examples-ci -- --write`);
+  }
+  const runtimeSonar = read(root, RUNTIME_SONAR);
+  if (runtimeSonar === null || runtimeSonar.replaceAll('\r\n', '\n') !== renderRuntimeSonar()) add('EXAMPLES_CI_APP_QUALITY_DRIFT', RUNTIME_SONAR, `${RUNTIME_SONAR} differs from its render from scripts/hfs/runtime-coverage-scope.mjs: run starci runtime check --only examples-ci -- --write`);
+  const codecov = read(root, CODECOV);
+  if (codecov === null) add('EXAMPLES_CI_CODECOV_MISSING', CODECOV, 'the root codecov.yml is missing: run starci runtime check --only examples-ci -- --write');
+  else if (codecov.replaceAll('\r\n', '\n') !== renderCodecov(root)) add('EXAMPLES_CI_CODECOV_DRIFT', CODECOV, 'codecov.yml differs from its render (a flag per example app over its coverage scope): run starci runtime check --only examples-ci -- --write');
+};
+
 /** Every finding of the examples CI contract at `root`: [{code, path, message}]. */
 export function checkExamplesCi(root = ROOT) {
   const findings = [];
@@ -179,58 +238,10 @@ export function checkExamplesCi(root = ROOT) {
   let doc = null;
   if (text === null) add('EXAMPLES_CI_WORKFLOW_MISSING', WORKFLOW, 'the root workflow that runs every example app is missing');
   else { try { doc = parseYaml(text); } catch (error) { add('EXAMPLES_CI_WORKFLOW_INVALID', WORKFLOW, error.message); } }
-  if (doc) {
-    const jobs = doc.jobs ?? {};
-    const lister = jobs[MATRIX_JOB];
-    if (!lister || !(lister.steps ?? []).some((step) => runsCommand(step, MATRIX_COMMAND)) || !String(lister.outputs?.apps ?? '').includes('steps.'))
-      add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, `job ${MATRIX_JOB} must run \`${MATRIX_COMMAND}\` and expose its output as outputs.apps`);
-    const matrixJobs = Object.entries(jobs).filter(([id, job]) => id !== IMAGES_JOB && job?.strategy?.matrix);
-    if (!matrixJobs.length) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, 'no job runs the example apps as a matrix');
-    for (const [id, job] of matrixJobs) {
-      if (String(job.strategy.matrix.app ?? '') !== MATRIX_EXPRESSION || Object.keys(job.strategy.matrix).length !== 1)
-        add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `the matrix must be exactly app: ${MATRIX_EXPRESSION} (never a hand-written list)`);
-      if (![job.needs].flat().includes(MATRIX_JOB)) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `needs must include ${MATRIX_JOB}`);
-    }
-    // Owner ruling: integration, e2e and contract (the docker-stack layers) run on workflow_dispatch only.
-    for (const [id, job] of Object.entries(jobs)) for (const step of job?.steps ?? []) {
-      if (/\btest:(integration|e2e|contract)\b/.test(String(step.run ?? '')) && !/github\.event_name\s*==\s*'workflow_dispatch'/.test(String(step.if ?? '')))
-        add('EXAMPLES_CI_STACK_LAYER_AUTOMATIC', `${WORKFLOW}#jobs.${id}`, `the step "${step.name ?? step.run}" starts the docker stack and must run on workflow_dispatch only (if: github.event_name == 'workflow_dispatch' ...)`);
-    }
-    if (!doc.on?.workflow_dispatch) add('EXAMPLES_CI_NO_MANUAL_TRIGGER', WORKFLOW, 'the workflow needs a workflow_dispatch trigger for the manual integration and e2e layers');
-    for (const app of apps) if (new RegExp(`examples/${app}\\b`).test(text)) add('EXAMPLES_CI_HARDCODED', WORKFLOW, `the workflow names examples/${app}: every app is reached through the matrix only`);
-  }
-  // No other root workflow runs an example app by itself (the folded per-example workflows are gone, and stay gone).
-  const workflows = path.join(root, '.github', 'workflows');
-  let files = [];
-  try { files = fs.readdirSync(workflows).filter((name) => /\.ya?ml$/.test(name)); } catch { /* no workflows */ }
-  for (const name of files) {
-    const rel = `.github/workflows/${name}`;
-    if (rel === WORKFLOW) continue;
-    const body = read(root, rel) ?? '';
-    for (const app of apps) if (new RegExp(`examples/${app}\\b`).test(body)) add('EXAMPLES_CI_STRAY_WORKFLOW', rel, `runs examples/${app} outside ${WORKFLOW}; fold it into the examples matrix`);
-  }
-  // The images job: its matrix is the --images output, it builds and never pushes.
-  if (doc) {
-    const images = doc.jobs?.[IMAGES_JOB];
-    const steps = images?.steps ?? [];
-    if (!images || !steps.some((step) => runsCommand(step, IMAGES_COMMAND)) && !(doc.jobs?.[MATRIX_JOB]?.steps ?? []).some((step) => runsCommand(step, IMAGES_COMMAND)))
-      add('EXAMPLES_CI_IMAGES_NOT_DERIVED', WORKFLOW, `a job ${IMAGES_JOB} must build every image of every example from the output of \`${IMAGES_COMMAND}\` (never a hand-written list)`);
-    else if (!String(images.strategy?.matrix?.include ?? '').includes('fromJSON(needs.') || steps.some((step) => String(step.with?.push) === 'true' || /docker push|--push/.test(String(step.run ?? ''))))
-      add('EXAMPLES_CI_IMAGES_NOT_DERIVED', `${WORKFLOW}#jobs.${IMAGES_JOB}`, 'the images matrix must be include: fromJSON of the derived output, and the job never pushes an image');
-  }
-  // The examples' own quality files are the render from the source preset.
-  for (const app of apps) for (const target of appQualityTargets(app, root)) {
-    const file = `examples/${app}/${target.path}`;
-    const have = read(root, file);
-    if (have === null || have.replace(/\r\n/g, '\n') !== target.content) add('EXAMPLES_CI_APP_QUALITY_DRIFT', file, `${file} differs from its render from the source jest preset: run starci runtime check --only examples-ci -- --write`);
-  }
-  // The runtime's own Sonar project is the render of the one coverage list.
-  const runtimeSonar = read(root, RUNTIME_SONAR);
-  if (runtimeSonar === null || runtimeSonar.replace(/\r\n/g, '\n') !== renderRuntimeSonar()) add('EXAMPLES_CI_APP_QUALITY_DRIFT', RUNTIME_SONAR, `${RUNTIME_SONAR} differs from its render from scripts/hfs/runtime-coverage-scope.mjs: run starci runtime check --only examples-ci -- --write`);
-  // codecov.yml is the render: one flag per app, paths from the coverage scope.
-  const codecov = read(root, CODECOV);
-  if (codecov === null) add('EXAMPLES_CI_CODECOV_MISSING', CODECOV, 'the root codecov.yml is missing: run starci runtime check --only examples-ci -- --write');
-  else if (codecov.replace(/\r\n/g, '\n') !== renderCodecov(root)) add('EXAMPLES_CI_CODECOV_DRIFT', CODECOV, 'codecov.yml differs from its render (a flag per example app over its coverage scope): run starci runtime check --only examples-ci -- --write');
+  if (doc) workflowFindings(doc, text, apps, add);
+  strayWorkflowFindings(root, apps, add);
+  if (doc) imagesJobFindings(doc, add);
+  driftFindings(root, apps, add);
   return { apps, findings };
 }
 

@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { checkReportResult } from '../lib/check-cli.mjs';
 import { escapeRegExp } from '../lib/regex.mjs';
 import { readTrackedTextFiles } from '../lib/tracked-text-scan.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
@@ -49,46 +50,58 @@ const read = (file) => {
   try { return fs.readFileSync(file, 'utf8'); } catch { throw new ParityInputError(`unreadable source: ${file}`); }
 };
 
-const posix = (file) => String(file).replace(/\\/g, '/');
+const posix = (file) => String(file).replaceAll('\\', '/');
 
 const declaresExport = (source, name) => {
   const id = escapeRegExp(name);
-  return new RegExp(`\\bexport\\s+(?:async\\s+)?function\\s+${id}\\b`).test(source)
-    || new RegExp(`\\bexport\\s+const\\s+${id}\\b`).test(source)
-    || new RegExp(`\\bexport\\s*\\{[^}]*\\b${id}\\b[^}]*\\}`).test(source);
+  return new RegExp(String.raw`\bexport\s+(?:async\s+)?function\s+${id}\b`).test(source)
+    || new RegExp(String.raw`\bexport\s+const\s+${id}\b`).test(source)
+    || new RegExp(String.raw`\bexport\s*\{[^}]*\b${id}\b[^}]*\}`).test(source);
 };
 
 const codeOnly = (text) => {
   let out = '', state = 'code', escaped = false, inClass = false, significant = '';
   const blank = (char) => (char === '\n' ? '\n' : ' ');
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i], next = text[i + 1];
-    if (state === 'line') { if (char === '\n') { state = 'code'; out += '\n'; } else out += ' '; continue; }
-    if (state === 'block') { if (char === '*' && next === '/') { out += '  '; i += 1; state = 'code'; } else out += blank(char); continue; }
-    if (state === 'quote' || state === 'template') {
-      if (escaped) { escaped = false; out += blank(char); continue; }
-      if (char === '\\') { escaped = true; out += ' '; continue; }
+  const handlers = {
+    line(char) {
+      if (char === '\n') { state = 'code'; out += '\n'; } else out += ' ';
+      return 0;
+    },
+    block(char, next) {
+      if (char === '*' && next === '/') { out += '  '; state = 'code'; return 1; }
+      out += blank(char);
+      return 0;
+    },
+    string(char) {
+      if (escaped) { escaped = false; out += blank(char); return 0; }
+      if (char === '\\') { escaped = true; out += ' '; return 0; }
       const end = state === 'template' ? '`' : significant;
       if (char === end) state = 'code';
       out += blank(char);
-      continue;
-    }
-    if (state === 'regex') {
+      return 0;
+    },
+    regex(char) {
       if (escaped) escaped = false;
       else if (char === '\\') escaped = true;
       else if (char === '[') inClass = true;
       else if (char === ']') inClass = false;
       else if (char === '/' && !inClass) state = 'code';
       out += blank(char);
-      continue;
-    }
-    if (char === '/' && next === '/') { out += '  '; i += 1; state = 'line'; continue; }
-    if (char === '/' && next === '*') { out += '  '; i += 1; state = 'block'; continue; }
-    if (char === "'" || char === '"') { significant = char; state = 'quote'; out += ' '; continue; }
-    if (char === '`') { state = 'template'; out += ' '; continue; }
-    if (char === '/' && (!significant || /[=(:,!&|?{};\[\]]/.test(significant))) { state = 'regex'; inClass = false; out += ' '; continue; }
-    out += char;
-    if (!/\s/.test(char)) significant = char;
+      return 0;
+    },
+    code(char, next) {
+      if (char === '/' && (next === '/' || next === '*')) { out += '  '; state = next === '/' ? 'line' : 'block'; return 1; }
+      if (char === "'" || char === '"') { significant = char; state = 'quote'; out += ' '; return 0; }
+      if (char === '`') { state = 'template'; out += ' '; return 0; }
+      if (char === '/' && (!significant || /[=(:,!&|?{};[\]]/.test(significant))) { state = 'regex'; inClass = false; out += ' '; return 0; }
+      out += char;
+      if (!/\s/.test(char)) significant = char;
+      return 0;
+    },
+  };
+  for (let i = 0; i < text.length; i += 1) {
+    const handler = state === 'quote' || state === 'template' ? handlers.string : handlers[state];
+    i += handler(text[i], text[i + 1]);
   }
   return out;
 };
@@ -113,6 +126,17 @@ function hasEntryGate(source) {
   return false;
 }
 
+const internalEntry = (item, i) => {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) throw new ParityInputError(`${INTERNAL_FILE}: internal[${i}] is not a map`);
+  for (const key of Object.keys(item)) if (!['path', 'why', 'usedBy'].includes(key)) throw new ParityInputError(`${INTERNAL_FILE}: internal[${i}] has unknown key "${key}"`);
+  if (typeof item.path !== 'string' || !item.path.trim()) throw new ParityInputError(`${INTERNAL_FILE}: internal[${i}].path must be a non-empty string`);
+  if (typeof item.why !== 'string' || !item.why.trim() || /[\r\n]/.test(item.why)) throw new ParityInputError(`${INTERNAL_FILE}: ${item.path}.why must be one short line`);
+  if (!Array.isArray(item.usedBy) || !item.usedBy.length || item.usedBy.some((value) => typeof value !== 'string' || !value.trim())) {
+    throw new ParityInputError(`${INTERNAL_FILE}: ${item.path}.usedBy must be a non-empty path list`);
+  }
+  return { path: posix(item.path), why: item.why, usedBy: item.usedBy.map(posix) };
+};
+
 /** Parse _internal.yaml without routing it through the command-catalog loader. */
 export function loadInternalRegistry(root = DEFAULT_ROOT) {
   const file = path.join(root, ...INTERNAL_FILE.split('/'));
@@ -123,16 +147,7 @@ export function loadInternalRegistry(root = DEFAULT_ROOT) {
   }
   const entries = [];
   for (let i = 0; i < doc.internal.length; i += 1) {
-    const item = doc.internal[i];
-    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new ParityInputError(`${INTERNAL_FILE}: internal[${i}] is not a map`);
-    const keys = Object.keys(item);
-    for (const key of keys) if (!['path', 'why', 'usedBy'].includes(key)) throw new ParityInputError(`${INTERNAL_FILE}: internal[${i}] has unknown key "${key}"`);
-    if (typeof item.path !== 'string' || !item.path.trim()) throw new ParityInputError(`${INTERNAL_FILE}: internal[${i}].path must be a non-empty string`);
-    if (typeof item.why !== 'string' || !item.why.trim() || /[\r\n]/.test(item.why)) throw new ParityInputError(`${INTERNAL_FILE}: ${item.path}.why must be one short line`);
-    if (!Array.isArray(item.usedBy) || !item.usedBy.length || item.usedBy.some((value) => typeof value !== 'string' || !value.trim())) {
-      throw new ParityInputError(`${INTERNAL_FILE}: ${item.path}.usedBy must be a non-empty path list`);
-    }
-    entries.push({ path: posix(item.path), why: item.why, usedBy: item.usedBy.map(posix) });
+    entries.push(internalEntry(doc.internal[i], i));
   }
   return entries;
 }
@@ -176,7 +191,7 @@ const usageLinesOf = (source) => {
   let cur = null;
   for (const raw of source.slice(open + 1, close).split('\n')) {
     const head = /^ {2}([a-z][a-z0-9-]*)(?:\s|$)/.exec(raw);
-    if (head) { cur = head[1]; (out[cur] ??= []).push(raw); }
+    if (head) { cur = head[1]; out[cur] ??= []; out[cur].push(raw); }
     else if (cur && /^\s{10,}\S/.test(raw)) out[cur].push(raw);
     else cur = null;
   }
@@ -199,28 +214,9 @@ const kernelVerbModules = (root) => {
   return out;
 };
 
-/** The whole parity report: {ok, findings, skipped, verbs}. */
-export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
-  const findings = [];
-  const skipped = [];
-  const bad = (what, detail) => findings.push({ rule: RULE, what, detail });
-  let cat;
-  try { cat = loadCatalog(root); } catch (e) {
-    if (e?.code === 'catalog-invalid') return { ok: false, findings: (e.errors ?? [e.message]).map((d) => ({ rule: RULE, what: 'catalog', detail: d })), skipped, verbs: [] };
-    throw e;
-  }
-  const groups = new Map(cat.groups.map((g) => [g.group, g]));
-  const implScripts = new Set(cat.groups.flatMap((g) => g.verbs.map((v) => v.impl?.script).filter(Boolean).map(posix)));
-  const implModules = new Set(cat.groups.flatMap((g) => g.verbs.map((v) => v.impl?.module).filter(Boolean).map(posix)));
-  const implementations = new Set([...implScripts, ...implModules]);
-  const routedEntries = new Set(implScripts);
-
-  // Every non-public entry point is declared once in _internal.yaml. The
-  // registry itself is deliberately outside catalog.mjs: it is not a route.
-  let internal = [];
-  try { internal = loadInternalRegistry(root); } catch (error) {
-    bad('internal', error.message);
-  }
+// Every non-public entry point is declared once in _internal.yaml. The
+// registry itself is deliberately outside catalog.mjs: it is not a route.
+const internalEntryFindings = (root, internal, implementations, bad) => {
   const internalPaths = new Set();
   for (const item of internal) {
     if (internalPaths.has(item.path)) { bad(`internal:${item.path}`, 'internal entry is duplicated'); continue; }
@@ -230,9 +226,11 @@ export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
     if (!hasEntryGate(read(absolute))) bad(`internal:${item.path}`, 'internal entry stale: file has no entry gate');
     if (implementations.has(item.path)) bad(`internal:${item.path}`, 'internal entry stale: file is also a catalog verb implementation');
   }
+  return internalPaths;
+};
 
-  const knownPublic = new Set([...routedEntries, ...ENTRY_EXEMPT]);
-  for (const file of files ?? readTrackedTextFiles(root, { listFiles: lsFiles, onGitError: () => fallbackFiles(root) })) {
+const strayEntryFindings = (root, files, knownPublic, internalPaths, bad) => {
+  for (const file of files) {
     const rel = posix(file);
     if (!entryCandidate(rel) || knownPublic.has(rel) || rel.startsWith('packages/cli/src/') || internalPaths.has(rel)) continue;
     const absolute = path.join(root, ...rel.split('/'));
@@ -240,16 +238,9 @@ export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
     try { source = read(absolute); } catch { continue; }
     if (hasEntryGate(source)) bad(`entry:${rel}`, 'entry script is neither a catalog verb nor listed internal');
   }
+};
 
-  // kernel: impl script + resolvable handler (extension module or cli.mjs case)
-  const cliFile = path.join(root, 'scripts', 'kernel', 'cli.mjs');
-  const cliSource = fs.existsSync(cliFile) ? read(cliFile) : null;
-  const switchVerbs = cliSource ? verbsFromSwitch(cliSource) : [];
-  const coreUsage = cliSource ? usageLinesOf(cliSource) : {};
-  const modules = kernelVerbModules(root);
-  const kernel = groups.get('kernel');
-  const catalogKernelVerbs = new Map((kernel?.verbs ?? []).map((v) => [v.verb, v]));
-
+const catalogDocFindings = (cat, root, modules, switchVerbs, bad) => {
   for (const g of cat.groups) {
     for (const v of g.verbs) {
       if (typeof v.summary !== 'string' || !v.summary.trim()) bad(`docs:${g.group}/${v.verb}`, 'catalog verb has no summary');
@@ -266,11 +257,10 @@ export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
       }
     }
   }
-  // every kernel verb module and every switch case has a catalog file
-  for (const [verb, mod] of modules) if (!catalogKernelVerbs.has(verb)) bad('catalog:kernel', `verb module ${mod.file} has no catalog file`);
-  for (const verb of switchVerbs) if (!catalogKernelVerbs.has(verb)) bad('catalog:kernel', `cli.mjs dispatches "${verb}" but no catalog file names it`);
+};
 
-  // flags: usage + required of each module, plus the shared boolean flag file
+// flags: usage + required of each module, plus the shared boolean flag file
+const kernelFlagFindings = (root, kernel, modules, catalogKernelVerbs, coreUsage, bad) => {
   const flagNames = (v) => new Set((v?.flags ?? []).map((f) => f.name));
   for (const [verb, mod] of modules) {
     const doc = catalogKernelVerbs.get(verb);
@@ -288,22 +278,76 @@ export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
       if (!union.has(line)) bad('flags:kernel', `api-boolean-flags.txt: --${line} is in no kernel verb's catalog flags`);
     }
   }
+};
 
-  // app group vs the hfs main's VERBS export (CLI-HFS lands packages/hfs/src/main.mjs)
+// app group vs the hfs main's VERBS export (CLI-HFS lands packages/hfs/src/main.mjs)
+const appParityFindings = (root, groups, bad, skipped) => {
   const appGroup = groups.get('app');
+  if (!appGroup) return;
   const hfsMain = path.join(root, 'packages', 'hfs', 'src', 'main.mjs');
-  if (appGroup) {
-    if (!fs.existsSync(hfsMain)) skipped.push('app: packages/hfs/src/main.mjs does not exist yet (CLI-HFS) — app verb parity skipped');
-    else {
-      const m = /export const VERBS\s*=\s*(?:Object\.freeze\s*\(\s*)?(\[[\s\S]*?\])/.exec(read(hfsMain));
-      const hfsVerbs = m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];
-      const catVerbs = new Set(appGroup.verbs.map((v) => v.verb));
-      for (const v of hfsVerbs) if (!catVerbs.has(v)) bad('catalog:app', `hfs verb "${v}" has no catalog file`);
-      for (const v of catVerbs) if (!hfsVerbs.includes(v)) bad('handler:app', `catalog verb "${v}" is not an hfs VERBS entry`);
-    }
+  if (!fs.existsSync(hfsMain)) { skipped.push('app: packages/hfs/src/main.mjs does not exist yet (CLI-HFS) — app verb parity skipped'); return; }
+  const m = /export const VERBS\s*=\s*(?:Object\.freeze\s*\(\s*)?(\[[\s\S]*?\])/.exec(read(hfsMain));
+  const hfsVerbs = m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];
+  const catVerbs = new Set(appGroup.verbs.map((v) => v.verb));
+  for (const v of hfsVerbs) if (!catVerbs.has(v)) bad('catalog:app', `hfs verb "${v}" has no catalog file`);
+  for (const v of catVerbs) if (!hfsVerbs.includes(v)) bad('handler:app', `catalog verb "${v}" is not an hfs VERBS entry`);
+};
+
+/** The whole parity report: {ok, findings, skipped, verbs}. */
+export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
+  const findings = [];
+  const skipped = [];
+  const bad = (what, detail) => findings.push({ rule: RULE, what, detail });
+  let cat;
+  try { cat = loadCatalog(root); } catch (e) {
+    if (e?.code === 'catalog-invalid') return { ok: false, findings: (e.errors ?? [e.message]).map((d) => ({ rule: RULE, what: 'catalog', detail: d })), skipped, verbs: [] };
+    throw e;
   }
+  const groups = new Map(cat.groups.map((g) => [g.group, g]));
+  const implScripts = new Set(cat.groups.flatMap((g) => g.verbs.map((v) => v.impl?.script).filter(Boolean).map(posix)));
+  const implModules = new Set(cat.groups.flatMap((g) => g.verbs.map((v) => v.impl?.module).filter(Boolean).map(posix)));
+  const implementations = new Set([...implScripts, ...implModules]);
+  const routedEntries = new Set(implScripts);
+
+  let internal = [];
+  try { internal = loadInternalRegistry(root); } catch (error) {
+    bad('internal', error.message);
+  }
+  const internalPaths = internalEntryFindings(root, internal, implementations, bad);
+
+  const knownPublic = new Set([...routedEntries, ...ENTRY_EXEMPT]);
+  const tracked = files ?? readTrackedTextFiles(root, { listFiles: lsFiles, onGitError: () => fallbackFiles(root) });
+  strayEntryFindings(root, tracked, knownPublic, internalPaths, bad);
+
+  // kernel: impl script + resolvable handler (extension module or cli.mjs case)
+  const cliFile = path.join(root, 'scripts', 'kernel', 'cli.mjs');
+  const cliSource = fs.existsSync(cliFile) ? read(cliFile) : null;
+  const switchVerbs = cliSource ? verbsFromSwitch(cliSource) : [];
+  const coreUsage = cliSource ? usageLinesOf(cliSource) : {};
+  const modules = kernelVerbModules(root);
+  const kernel = groups.get('kernel');
+  const catalogKernelVerbs = new Map((kernel?.verbs ?? []).map((v) => [v.verb, v]));
+
+  catalogDocFindings(cat, root, modules, switchVerbs, bad);
+  // every kernel verb module and every switch case has a catalog file
+  for (const [verb, mod] of modules) if (!catalogKernelVerbs.has(verb)) bad('catalog:kernel', `verb module ${mod.file} has no catalog file`);
+  for (const verb of switchVerbs) if (!catalogKernelVerbs.has(verb)) bad('catalog:kernel', `cli.mjs dispatches "${verb}" but no catalog file names it`);
+
+  kernelFlagFindings(root, kernel, modules, catalogKernelVerbs, coreUsage, bad);
+  appParityFindings(root, groups, bad, skipped);
   return { ok: findings.length === 0, rule: RULE, findings, skipped, verbs: cat.groups.flatMap((g) => g.verbs.map((v) => `${g.group} ${v.verb}`)) };
 }
+
+const parityText = (report) => {
+  const lines = [];
+  if (report.ok) lines.push(`check-cli-parity: ${report.verbs.length} catalog verbs, all agree`);
+  else {
+    lines.push(`check-cli-parity: ${RULE} — ${report.findings.length} parity finding(s)`);
+    for (const f of report.findings) lines.push(`  ${f.what}: ${f.detail}`);
+  }
+  for (const s of report.skipped) lines.push(`  skipped: ${s}`);
+  return { exitCode: report.ok ? 0 : 1, text: `${lines.join('\n')}\n` };
+};
 
 export function checkCliParityMain(argv) {
   let root = DEFAULT_ROOT;
@@ -320,20 +364,7 @@ export function checkCliParityMain(argv) {
     }
     return { exitCode: 2, text: `check-cli-parity: unknown argument ${key}\n${HELP}\n` };
   }
-  let report;
-  try { report = checkCliParity(root); } catch (error) {
-    if (error instanceof ParityInputError) return { exitCode: 2, text: `check-cli-parity: ${error.message}\n` };
-    throw error;
-  }
-  if (json) return { exitCode: report.ok ? 0 : 1, text: `${JSON.stringify(report, null, 2)}\n` };
-  const lines = [];
-  if (report.ok) lines.push(`check-cli-parity: ${report.verbs.length} catalog verbs, all agree`);
-  else {
-    lines.push(`check-cli-parity: ${RULE} — ${report.findings.length} parity finding(s)`);
-    for (const f of report.findings) lines.push(`  ${f.what}: ${f.detail}`);
-  }
-  for (const s of report.skipped) lines.push(`  skipped: ${s}`);
-  return { exitCode: report.ok ? 0 : 1, text: `${lines.join('\n')}\n` };
+  return checkReportResult(json, ParityInputError, 'check-cli-parity', () => checkCliParity(root), parityText);
 }
 
 if (isMain(import.meta.url)) {

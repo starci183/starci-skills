@@ -46,6 +46,32 @@ export function prefixesOf(doc) {
   return [];
 }
 
+/** The shape findings of one slot id. */
+const slotFinding = (file, slot, { ids, prefixes, families, appKinds }, push) => {
+  const id = String(slot?.id ?? '');
+  const segs = id.split('.');
+  if (!segs.every((s) => SEGMENT.test(s))) {
+    push(file, `${file} slot id "${id}" is not dot-separated lowercase kebab segments (no leading digit, empty or doubled dash)`);
+    return;
+  }
+  if (!prefixes.has(segs[0])) push(file, `${file} slot id "${id}" begins with "${segs[0]}", which is not a declared prefix (${[...prefixes].join(', ')})`);
+  if (slot.parent !== undefined) {
+    const parent = String(slot.parent);
+    if (!ids.has(parent)) push(file, `${file} slot ${id} names parent "${parent}", which is not a declared slot id`);
+    else if (!id.startsWith(`${parent}.`)) push(file, `${file} slot ${id} must extend its parent ${parent} (id starts with <parent>.)`);
+    return;
+  }
+  if (segs.length < 3) return;
+  if (segs[1] === 'app' && segs.length === 3) {
+    if (!appKinds?.[segs[0]]?.includes(segs[2])) push(file, `${file} slot ${id}: <side>.app.<kind> names an appKinds.${segs[0]} kind (${(appKinds?.[segs[0]] ?? []).join(', ')})`);
+    return;
+  }
+  const extendsDeclared = segs.slice(0, -1).some((_, i) => i >= 1 && ids.has(segs.slice(0, i + 1).join('.')));
+  if (!extendsDeclared && !(segs.length === 3 && (families.get(`${segs[0]}.${segs[1]}`) ?? 0) >= 2)) {
+    push(file, `${file} slot id "${id}" extends no declared slot id and shares no family — name a parent, or give the family a second member`);
+  }
+};
+
 /** The slot-id shape findings of one parsed manifest {file, doc}. */
 export function slotIdFindings({ file, doc }) {
   const findings = [];
@@ -60,34 +86,26 @@ export function slotIdFindings({ file, doc }) {
     const segs = id.split('.');
     if (segs.length >= 3) families.set(`${segs[0]}.${segs[1]}`, (families.get(`${segs[0]}.${segs[1]}`) ?? 0) + 1);
   }
-  const appKinds = doc?.appKinds ?? {};
+  const context = { ids, prefixes, families, appKinds: doc?.appKinds ?? {} };
 
-  for (const slot of slots) {
-    const id = String(slot?.id ?? '');
-    const segs = id.split('.');
-    if (!segs.every((s) => SEGMENT.test(s))) {
-      push(file, `${file} slot id "${id}" is not dot-separated lowercase kebab segments (no leading digit, empty or doubled dash)`);
-      continue;
-    }
-    if (!prefixes.has(segs[0])) push(file, `${file} slot id "${id}" begins with "${segs[0]}", which is not a declared prefix (${[...prefixes].join(', ')})`);
-    if (slot.parent !== undefined) {
-      const parent = String(slot.parent);
-      if (!ids.has(parent)) push(file, `${file} slot ${id} names parent "${parent}", which is not a declared slot id`);
-      else if (!id.startsWith(`${parent}.`)) push(file, `${file} slot ${id} must extend its parent ${parent} (id starts with <parent>.)`);
-      continue;
-    }
-    if (segs.length < 3) continue;
-    if (segs[1] === 'app' && segs.length === 3) {
-      if (!appKinds?.[segs[0]]?.includes(segs[2])) push(file, `${file} slot ${id}: <side>.app.<kind> names an appKinds.${segs[0]} kind (${(appKinds?.[segs[0]] ?? []).join(', ')})`);
-      continue;
-    }
-    const extendsDeclared = segs.slice(0, -1).some((_, i) => i >= 1 && ids.has(segs.slice(0, i + 1).join('.')));
-    if (!extendsDeclared && !(segs.length === 3 && (families.get(`${segs[0]}.${segs[1]}`) ?? 0) >= 2)) {
-      push(file, `${file} slot id "${id}" extends no declared slot id and shares no family — name a parent, or give the family a second member`);
-    }
-  }
+  for (const slot of slots) slotFinding(file, slot, context, push);
   return findings;
 }
+
+/** The suffix-vocabulary findings of one ruleParams profile. */
+const profileSuffixFindings = (file, doc, profile, rp, push) => {
+  const suffixes = new Set(rp?.suffixes ?? []);
+  const banned = new Set(rp?.bannedSuffixes ?? []);
+  for (const word of [...banned].sort(byCodeUnit)) {
+    if (suffixes.has(word)) push(`${file} ruleParams.${profile}: "${word}" is both a suffix and a bannedSuffix — a role word is declared once`);
+  }
+  for (const [a, b] of pairsOf(doc?.naming?.refusedPairs)) {
+    if (suffixes.has(a) && suffixes.has(b)) push(`${file} ruleParams.${profile}: suffixes holds the refused synonym pair ${a}/${b} — keep one, ban the other`);
+  }
+  for (const [a, b] of pairsOf(doc?.naming?.sameConceptPairs)) {
+    if (!(suffixes.has(a) && suffixes.has(b))) push(`${file} naming.sameConceptPairs: the declared exception ${a}/${b} is not both live in ruleParams.${profile}.suffixes — keep both or drop the pair`);
+  }
+};
 
 /** The suffix-vocabulary findings of one parsed manifest {file, doc}: disjoint lists, refused pairs, live exceptions. */
 export function suffixFindings({ file, doc }) {
@@ -95,17 +113,7 @@ export function suffixFindings({ file, doc }) {
   const push = (message) => findings.push({ code: CODE, path: file, message });
   for (const [profile, rp] of Object.entries(doc?.ruleParams ?? {})) {
     if (rp?.suffixes === undefined && rp?.bannedSuffixes === undefined) continue;
-    const suffixes = new Set(rp?.suffixes ?? []);
-    const banned = new Set(rp?.bannedSuffixes ?? []);
-    for (const word of [...banned].sort(byCodeUnit)) {
-      if (suffixes.has(word)) push(`${file} ruleParams.${profile}: "${word}" is both a suffix and a bannedSuffix — a role word is declared once`);
-    }
-    for (const [a, b] of pairsOf(doc?.naming?.refusedPairs)) {
-      if (suffixes.has(a) && suffixes.has(b)) push(`${file} ruleParams.${profile}: suffixes holds the refused synonym pair ${a}/${b} — keep one, ban the other`);
-    }
-    for (const [a, b] of pairsOf(doc?.naming?.sameConceptPairs)) {
-      if (!(suffixes.has(a) && suffixes.has(b))) push(`${file} naming.sameConceptPairs: the declared exception ${a}/${b} is not both live in ruleParams.${profile}.suffixes — keep both or drop the pair`);
-    }
+    profileSuffixFindings(file, doc, profile, rp, push);
   }
   return findings;
 }

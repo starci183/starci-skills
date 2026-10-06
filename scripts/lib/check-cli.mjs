@@ -8,3 +8,17 @@ export function runCheckCli(findings, okText) {
   }
   process.exit(findings.length ? 1 : 0);
 }
+
+/**
+ * The report tail of a check's own main(): `run()` under the check's input-error guard (`command: <message>` is a
+ * usage refusal, anything else rethrows), `--json` prints the envelope, otherwise `render(report)` gives the text.
+ */
+export const checkReportResult = (json, inputError, command, run, render) => {
+  let report;
+  try { report = run(); } catch (error) {
+    if (error instanceof inputError) return { exitCode: 2, text: `${command}: ${error.message}\n` };
+    throw error;
+  }
+  if (json) return { exitCode: report.ok ? 0 : 1, text: `${JSON.stringify(report, null, 2)}\n` };
+  return render(report);
+};

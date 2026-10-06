@@ -26,6 +26,7 @@ import { readAllowlist } from '../lib/allowlist.mjs';
 import { FAILURE_CODE_VIETNAMESE_FIELDS } from '../lib/language.mjs';
 import { createRequire } from 'node:module';
 import { isMain } from '../lib/is-main.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { CODE_FINDINGS, PLUGIN_ENFORCERS } from '../lib/failure-code-findings.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -57,17 +58,17 @@ function* walk(dir) {
 const UPPER_RE = /(['"`])([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\1/g;
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)+';
 // A constant naming environment variables (ARTIFACT_ROOT_ENV = 'STARCI_ARTIFACT_ROOT', CONTROLLED_ENV = new Set(['SOPS_AGE_KEY', ...])): its literals are env names, not codes.
-const ENV_LIST_RE = /\b[A-Z][A-Z0-9_]*_ENV[A-Z0-9_]*\s*=\s*(?:new Set\(|Object\.freeze\()?(?:\[([^\]]*)\]|('[^']*'|"[^"]*"))/g;
+const ENV_LIST_RE = /\b[A-Z][A-Z0-9_]*_ENV[A-Z0-9_]*\s*=\s*(?:(?:new Set|Object\.freeze)\()?(?:\[([^\]]*)\]|('[^']*'|"[^"]*"))/g;
 // A bracketed code in text: a message prefix ('[TARGET_MISSING] ...'), a comment or a YAML flow list. In JavaScript a
 // bracket around one identifier is code, not text: an element access (`baseline[KEY]`), an array literal (`[ROOT]`)
 // or a computed key (`{ [KEY]: v }`) reads a constant and emits nothing; `codeBrackets` finds those by parsing.
 const BRACKET_RE = /\[([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\]/g;
 const KEBAB_RES = [
-  new RegExp(`\\b(?:code|reason|rejected|failureCode|failureKind|signal|blocker)\\s*:\\s*(['"])(${KEBAB})\\1`, 'g'),
-  new RegExp(`\\breason\\s*:\\s*\`(${KEBAB})(?=[:\`$])`, 'g'),
-  new RegExp(`\\brefuse\\((?:[^;]*?),\\s*(['"])(${KEBAB})\\1`, 'g'),
-  new RegExp(`\\(\\s*message\\s*,\\s*code\\s*=\\s*(['"])(${KEBAB})\\1`, 'g'),
-  new RegExp(`\\bhand\\(\\s*(['"])(${KEBAB})\\1`, 'g'),
+  new RegExp(String.raw`\b(?:code|reason|rejected|failureCode|failureKind|signal|blocker)\s*:\s*(['"])(${KEBAB})\1`, 'g'),
+  new RegExp(String.raw`\breason\s*:\s*\`(${KEBAB})(?=[:\`$])`, 'g'),
+  new RegExp(String.raw`\brefuse\((?:[^;]*?),\s*(['"])(${KEBAB})\1`, 'g'),
+  new RegExp(String.raw`\(\s*message\s*,\s*code\s*=\s*(['"])(${KEBAB})\1`, 'g'),
+  new RegExp(String.raw`\bhand\(\s*(['"])(${KEBAB})\1`, 'g'),
 ];
 // A constant list of reasons/codes/classes: Object.freeze(['a-b', 'c-d']) or ['a-b'].
 const LIST_RE = /\b[A-Z][A-Z0-9_]*_(?:REASONS|CODES|KINDS|CLASSES)\s*=\s*(?:Object\.freeze\()?\[([^\]]*)\]/g;
@@ -109,15 +110,8 @@ function codeBrackets(rel, text) {
   return out;
 }
 
-/** Every emitted code: {code, kind: 'upper'|'kebab', sites: [{file, line}]}. Sorted by code. */
-export function emittedCodes(base = root) {
-  const found = new Map();
-  const add = (code, kind, file, line) => {
-    const e = found.get(code) ?? { code, kind, sites: [] };
-    if (e.sites.length < 6 && !e.sites.some((s) => s.file === file && s.line === line)) e.sites.push({ file, line });
-    found.set(code, e);
-  };
-  const NOT_CODES = readNotCodes(base);
+/** The scanned [rel, text] pairs and the names a file reads as an environment variable (never codes). */
+const sourceTexts = (base) => {
   const envNames = new Set();
   const texts = [];
   for (const file of [...SCAN_DIRS.flatMap((d) => [...walk(path.join(base, d))]), ...SCAN_FILES.map((f) => path.join(base, f)).filter((f) => fs.existsSync(f))]) {
@@ -128,28 +122,44 @@ export function emittedCodes(base = root) {
     for (const m of text.matchAll(/\b(?:(?:process\.)?env(?:\.|\[\s*['"])|readEnv\(\s*['"])([A-Z][A-Z0-9_]+)/g)) envNames.add(m[1]);
     for (const list of text.matchAll(ENV_LIST_RE)) for (const name of (list[1] ?? list[2]).matchAll(/['"]([A-Z][A-Z0-9_]+)['"]/g)) envNames.add(name[1]);
   }
-  for (const [rel, text] of texts) {
-    for (const m of text.matchAll(UPPER_RE)) {
-      const code = m[2];
-      if (NOT_CODES.has(code) || NOT_CODE_PREFIX.test(code) || envNames.has(code)) continue;
-      add(code, 'upper', rel, lineOf(text, m.index));
-    }
-    const brackets = [...text.matchAll(BRACKET_RE)];
-    const inCode = rel.endsWith('.mjs') && brackets.length ? codeBrackets(rel, text) : null;
-    for (const m of brackets) {
-      if (inCode?.has(m.index)) continue;
-      if (NOT_CODES.has(m[1]) || NOT_CODE_PREFIX.test(m[1]) || envNames.has(m[1])) continue;
-      add(m[1], 'upper', rel, lineOf(text, m.index));
-    }
-    if (!rel.endsWith('.mjs')) continue;
-    const addKebab = (code, at) => { if (!NOT_CODES.has(code)) add(code, 'kebab', rel, lineOf(text, at)); };
-    for (const m of text.matchAll(LIST_RE)) {
-      for (const item of m[1].matchAll(new RegExp(`['"](${KEBAB})['"]`, 'g'))) addKebab(item[1], m.index);
-    }
-    for (const re of KEBAB_RES) for (const m of text.matchAll(re)) addKebab(m[m.length - 1], m.index);
+  return { texts, envNames };
+};
+
+/** The codes one scanned source emits, pushed through `add`. */
+const fileEmittedCodes = (rel, text, { NOT_CODES, envNames, add }) => {
+  for (const m of text.matchAll(UPPER_RE)) {
+    const code = m[2];
+    if (NOT_CODES.has(code) || NOT_CODE_PREFIX.test(code) || envNames.has(code)) continue;
+    add(code, 'upper', rel, lineOf(text, m.index));
   }
+  const brackets = [...text.matchAll(BRACKET_RE)];
+  const inCode = rel.endsWith('.mjs') && brackets.length ? codeBrackets(rel, text) : null;
+  for (const m of brackets) {
+    if (inCode?.has(m.index)) continue;
+    if (NOT_CODES.has(m[1]) || NOT_CODE_PREFIX.test(m[1]) || envNames.has(m[1])) continue;
+    add(m[1], 'upper', rel, lineOf(text, m.index));
+  }
+  if (!rel.endsWith('.mjs')) return;
+  const addKebab = (code, at) => { if (!NOT_CODES.has(code)) add(code, 'kebab', rel, lineOf(text, at)); };
+  for (const m of text.matchAll(LIST_RE)) {
+    for (const item of m[1].matchAll(new RegExp(`['"](${KEBAB})['"]`, 'g'))) addKebab(item[1], m.index);
+  }
+  for (const re of KEBAB_RES) for (const m of text.matchAll(re)) addKebab(m[m.length - 1], m.index);
+};
+
+/** Every emitted code: {code, kind: 'upper'|'kebab', sites: [{file, line}]}. Sorted by code. */
+export function emittedCodes(base = root) {
+  const found = new Map();
+  const add = (code, kind, file, line) => {
+    const e = found.get(code) ?? { code, kind, sites: [] };
+    if (e.sites.length < 6 && !e.sites.some((s) => s.file === file && s.line === line)) e.sites.push({ file, line });
+    found.set(code, e);
+  };
+  const NOT_CODES = readNotCodes(base);
+  const { texts, envNames } = sourceTexts(base);
+  for (const [rel, text] of texts) fileEmittedCodes(rel, text, { NOT_CODES, envNames, add });
   for (const v of vocabularyCodes(base)) found.set(v.code, v);
-  return [...found.values()].sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+  return [...found.values()].sort((a, b) => byCodeUnit(a.code, b.code));
 }
 
 // The entry's scalar fields. Its Vietnamese fields (FAILURE_CODE_VIETNAMESE_FIELDS) are the one declared exception of the English-only document law (HFS_DOC_NOT_ENGLISH); causes_vi is their list companion.
@@ -161,6 +171,17 @@ export function readCatalog(base = root) {
   const file = path.join(base, CATALOG_FILE);
   return parseYaml(fs.readFileSync(file, 'utf8')) ?? {};
 }
+
+/** The field problems of one catalog entry (`ops` is the names of modules/ops/ops/*.yaml). */
+const entryProblems = (entry, ops) => {
+  const bad = [];
+  for (const f of FIELDS) if (typeof entry?.[f] !== 'string' || !entry[f].trim()) bad.push(`${f} missing`);
+  if (String(entry?.owner ?? '').startsWith('other-op:') && !ops.has(entry.owner.slice(9))) bad.push(`owner ${entry.owner} names an op with no modules/ops/ops/<op>.yaml`);
+  if (entry?.owner && !ownerValid(entry.owner)) bad.push(`owner '${entry.owner}' is not ${OWNERS.join('|')}|other-op:<op>`);
+  if (entry?.kind && !CODE_KINDS.includes(entry.kind)) bad.push(`kind '${entry.kind}' is not ${CODE_KINDS.join('|')}`);
+  if (!Array.isArray(entry?.causes_vi) || !entry.causes_vi.length || entry.causes_vi.some((c) => typeof c !== 'string' || !c.trim())) bad.push('causes_vi must be a non-empty list of strings');
+  return bad;
+};
 
 /** The catalog problems: {missing[], stale[], malformed[]}. */
 export function catalogProblems(base = root) {
@@ -175,12 +196,7 @@ export function catalogProblems(base = root) {
   const malformed = [];
   const ops = new Set(fs.readdirSync(path.join(base, 'modules/ops/ops')).filter((n) => n.endsWith('.yaml')).map((n) => n.slice(0, -5)));
   for (const [code, entry] of Object.entries(catalog)) {
-    const bad = [];
-    for (const f of FIELDS) if (typeof entry?.[f] !== 'string' || !entry[f].trim()) bad.push(`${f} missing`);
-    if (String(entry?.owner ?? '').startsWith('other-op:') && !ops.has(entry.owner.slice(9))) bad.push(`owner ${entry.owner} names an op with no modules/ops/ops/<op>.yaml`);
-    if (entry?.owner && !ownerValid(entry.owner)) bad.push(`owner '${entry.owner}' is not ${OWNERS.join('|')}|other-op:<op>`);
-    if (entry?.kind && !CODE_KINDS.includes(entry.kind)) bad.push(`kind '${entry.kind}' is not ${CODE_KINDS.join('|')}`);
-    if (!Array.isArray(entry?.causes_vi) || !entry.causes_vi.length || entry.causes_vi.some((c) => typeof c !== 'string' || !c.trim())) bad.push('causes_vi must be a non-empty list of strings');
+    const bad = entryProblems(entry, ops);
     if (bad.length) malformed.push({ code, problems: bad });
   }
   return { emitted: emitted.length, catalog: Object.keys(catalog).length, missing, stale, malformed, soleEmitter };

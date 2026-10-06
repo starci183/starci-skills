@@ -11,7 +11,7 @@ export function portListener(port, { platform = process.platform, spawn = spawnS
       const netstat = tool('netstat');
       if (!netstat.ok) return null;
       const out = spawn(netstat.path, ['-ano'], { encoding: 'utf8', windowsHide: true, timeout: 15000 }).stdout ?? '';
-      const line = out.split(/\r?\n/).find((l) => new RegExp(`^\\s*TCP\\s+\\S*:${port}\\s+\\S+\\s+LISTENING\\s+(\\d+)`, 'i').test(l));
+      const line = out.split(/\r?\n/).find((l) => new RegExp(String.raw`^\s*TCP\s+\S*:${port}\s+\S+\s+LISTENING\s+(\d+)`, 'i').test(l));
       const pid = line ? Number(/LISTENING\s+(\d+)/i.exec(line)[1]) : null;
       if (!pid) return null;
       const shell = tool('powershell');

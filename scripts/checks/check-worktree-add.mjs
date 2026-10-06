@@ -32,7 +32,10 @@ const WORKTREE_API = 'scripts/api/git/worktree-add.mjs';
 const WORKTREE_ADD_HOME = 'worktreeAdd';
 const EXTENSIONS = /\.(?:mjs|cjs|js|ts|ps1|sh)$/;
 const ARGV_FORM = /['"`]worktree['"`]\s*,\s*['"`]add['"`]/;
-const SHELL_FORM = /(?:^|['"`]|&&|;|\|\|)\s*git(?:\s+-C\s+(?:"[^"]*"|'[^']*'|\S+))?\s+worktree\s+add\b/;
+const SHELL_PREFIX = /(?:^|['"`]|&&|;|\|\|)\s*git/;
+const SHELL_BARE = new RegExp(`${SHELL_PREFIX.source}\\s+worktree\\s+add\\b`);
+const SHELL_C_DIR = new RegExp(`${SHELL_PREFIX.source}\\s+-C\\s+(?:"[^"]*"|'[^']*'|\\S+)\\s+worktree\\s+add\\b`);
+const SHELL_FORM = { test: (line) => SHELL_BARE.test(line) || SHELL_C_DIR.test(line) };
 const isComment = (line) => /^\s*(?:\/\/|\*|\/\*|#)/.test(line);
 /** A createScratchWorktree call and the literal kind it names on that line. */
 const SCRATCH_CALL = /\bcreateScratchWorktree\s*\(/;
@@ -74,7 +77,7 @@ export function scanWorktreeAdd(root, { files = null } = {}) {
   const listed = files ?? (() => { const r = lsFiles([], { cwd: root, maxBuffer: 64 * 1024 * 1024 }); return r.status === 0 ? r.stdout.split('\n').filter(Boolean) : []; })();
   const hits = [];
   let count = 0;
-  for (const rel of listed.map((f) => f.replace(/\\/g, '/'))) {
+  for (const rel of listed.map((f) => f.replaceAll('\\', '/'))) {
     if (!scanned(rel)) continue;
     let text;
     try { text = fs.readFileSync(path.join(root, rel), 'utf8'); } catch { continue; }

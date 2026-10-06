@@ -21,7 +21,6 @@
 import '../api/process/hide-child-windows.mjs';
 import { serve } from '../api/http/serve.mjs';
 import { request } from '../api/http/request.mjs';
-import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configRoot, connectorsConfig } from '../../engine/config.mjs';
 import { runtimeSecretEnv } from '../gates/runtime-host.mjs';
@@ -152,16 +151,18 @@ export function main(argv = process.argv.slice(2), { env = process.env, root = c
   const args = argsOf(argv);
   const verb = args._[0] ?? 'run';
   const state = gatewayState(env);
-  if (verb === 'status') { console.log(JSON.stringify({ ok: true, running: gatewayAlive(env), ...(state ?? {}) })); return; }
+  if (verb === 'status') { console.log(JSON.stringify({ ok: true, running: gatewayAlive(env), ...state })); return; }
   if (verb === 'stop') {
     const result = stopConnector('gateway', { source: GATEWAY_FILE, env });
-    console.log(JSON.stringify(result)); if (!result.ok) process.exitCode = 1; return result;
+    console.log(JSON.stringify(result));
+    if (!result.ok) { process.exitCode = 1; }
+    return result;
   }
   if (verb === 'start') {
     if (gatewayAlive(env)) { console.log(JSON.stringify({ ok: true, already: true, ...state })); return; }
     env = runtimeSecretEnv(env, root);
     const { port } = settings(args, env, root, config);
-    const pass = [].concat(args.repo ?? []).filter((r) => typeof r === 'string').flatMap((r) => ['--repo', r]);
+    const pass = [args.repo ?? []].flat().filter((r) => typeof r === 'string').flatMap((r) => ['--repo', r]);
     const pid = spawnDetached(GATEWAY_FILE, ['run', '--port', String(port), ...pass], { env });
     markStarting('gateway', pid, env);
     console.log(JSON.stringify({ ok: true, launched: pid, gateway: `http://127.0.0.1:${port}` })); return;
@@ -170,4 +171,9 @@ export function main(argv = process.argv.slice(2), { env = process.env, root = c
   console.error('usage: starci connect ask-gateway start|run|status|stop [--port <n>] [--repo <path>]...'); process.exit(2);
 }
 
-if (isMain(import.meta.url)) Promise.resolve(main()).catch((error) => { console.error(error); process.exit(1); });
+if (isMain(import.meta.url)) {
+  const result = main();
+  if (result && typeof result.then === 'function') {
+    try { await result; } catch (error) { console.error(error); process.exit(1); }
+  }
+}
