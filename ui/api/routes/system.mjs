@@ -187,9 +187,13 @@ function resources(store) {
     reason: state?.reason ?? null, priorities: parse(state?.priorities_json),
     ui: state ? uiState(machine, 'throttle', state.mode) : 'unknown', recent }, pools, providers, quotas, leases, budgets, deferred };
 }
-function gcRun(machine, row) { return { id: row.run_id, startedAt: row.started_at, finishedAt: row.finished_at,
+function gcRun(machine, row) {
+  let ui = 'running';
+  if (row.finished_at) ui = parse(row.errors_json, []).length ? 'warn' : 'done';
+  return { id: row.run_id, startedAt: row.started_at, finishedAt: row.finished_at,
   trigger: row.trigger, freedBytes: row.freed_bytes, counts: parse(row.counts_json, {}), errors: parse(row.errors_json, []).length,
-  report: blob(machine, row.report_sha), ui: row.finished_at ? parse(row.errors_json, []).length ? 'warn' : 'done' : 'running' }; }
+  report: blob(machine, row.report_sha), ui };
+}
 function leaks(store) {
   const machine = store.machine.db;
   const rows = many(machine, 'SELECT * FROM v_leaks').map(item => ({ kind: item.kind, target: relative(item.target),
@@ -212,8 +216,11 @@ function laneRow(machine, row) { return { scope: 'runtime', name: row.name, work
   state: row.state, ui: uiState(machine, 'lane', row.state), createdAt: row.created_at, landedAt: row.landed_at, removedAt: row.removed_at, report: blob(machine, row.report_sha) }; }
 function pushRow(store, row) {
   const m = store.machine.db, repo = one(m, 'SELECT name,role,ledger_id FROM repositories WHERE repo_root=?', row.repo_root);
+  let scope = 'unknown';
+  if (repo?.role === 'runtime') scope = 'runtime';
+  else if (['backend', 'frontend', 'service'].includes(repo?.role)) scope = 'project';
   return { id: row.push_id, repo: repo?.name ?? relative(row.repo_root), repoRole: repo?.role ?? null,
-    scope: repo?.role === 'runtime' ? 'runtime' : ['backend', 'frontend', 'service'].includes(repo?.role) ? 'project' : 'unknown',
+    scope,
     project: repo?.ledger_id ? projectName(store, repo.ledger_id) : null,
     branch: row.branch, head: row.head, from: row.from_sha, to: row.to_sha, result: row.result, reason: row.reason,
     failureSignature: row.failure_signature, stdout: blob(m, row.stdout_sha), stderr: blob(m, row.stderr_sha),

@@ -8,6 +8,8 @@ const many = (db, sql, ...args) => db.prepare(sql).all(...args);
 const one = (db, sql, ...args) => db.prepare(sql).get(...args) ?? null;
 const parse = (value, fallback = null) => { try { return value == null ? fallback : JSON.parse(value); } catch { return fallback; } };
 const LOG_LEVELS = ['debug', 'info', 'warn', 'error'];
+const LIKE_ESCAPE_PERCENT = String.raw`\%`;
+const LIKE_ESCAPE_UNDERSCORE = String.raw`\_`;
 const projectName = (store, ledgerId) => store.projects().find(row => row.ledgerId === ledgerId)?.name ?? null;
 const ref = (kind, id, project = null, namespace = null) => {
   const diParams = new URLSearchParams({ id: String(id) });
@@ -59,7 +61,10 @@ function queryRows(dbInfo, url, position = null, afterSeq = null, snapshot = nul
     if (name !== 'machine') return [];
     add('l.controller = ?', url.searchParams.get('controller'));
   }
-  if (url.searchParams.has('kind')) add("l.kind LIKE ? ESCAPE '\\'", `${url.searchParams.get('kind').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`);
+  if (url.searchParams.has('kind')) {
+    const kind = url.searchParams.get('kind').replaceAll('%', LIKE_ESCAPE_PERCENT).replaceAll('_', LIKE_ESCAPE_UNDERSCORE) + '%';
+    add(String.raw`l.kind LIKE ? ESCAPE '\'`, kind);
+  }
   if (url.searchParams.has('since')) add('l.at >= ?', Number(url.searchParams.get('since')));
   if (url.searchParams.has('until')) add('l.at <= ?', Number(url.searchParams.get('until')));
   if (name === 'machine' && url.searchParams.has('project')) {
