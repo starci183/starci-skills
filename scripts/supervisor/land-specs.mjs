@@ -42,6 +42,31 @@ function topLevelBlocks(source) {
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 const uses = (text, name) => new RegExp(String.raw`(^|[^\w$.])${escapeRe(name)}(?![\w$])`).test(text);
+const hasIndirectExport = (source) => /^export\s+\*|^export\s+default\s+(?!(async\s+)?(function|class))/m.test(source);
+const listedExports = (source) => new Set([...source.matchAll(/^export\s*\{([^}]*)\}(?!\s*from)/gm)].flatMap((m) => m[1].split(',').map((x) => x.trim().split(/\s+as\s+/)[0]).filter(Boolean)));
+
+function changedBlocks(blocks, ranges) {
+  const hit = new Set();
+  for (const [start, count] of ranges) {
+    const last = start + Math.max(count, 1) - 1;
+    for (let line = start; line <= last; line += 1) {
+      const block = blocks.find((entry) => line >= entry.start && line <= entry.end);
+      if (!block) return { hit, why: `line ${line} is outside every top-level declaration` };
+      hit.add(block.name);
+    }
+  }
+  return { hit, why: null };
+}
+
+function closeChangedDependencies(blocks, hit) {
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const block of blocks) {
+      if (!hit.has(block.name) && [...hit].some((name) => name !== block.name && uses(block.text, name))) { hit.add(block.name); grew = true; }
+    }
+  }
+}
 
 /**
  * The exports a change can reach: the declarations holding a changed line of the head file, then every declaration that
@@ -51,25 +76,15 @@ const uses = (text, name) => new RegExp(String.raw`(^|[^\w$.])${escapeRe(name)}(
 export function changedExports({ source, ranges }) {
   const blocks = topLevelBlocks(source);
   if (!blocks.length) return { symbols: null, why: 'no top-level declarations' };
-  if (/^export\s+\*|^export\s+default\s+(?!(async\s+)?(function|class))/m.test(source)) return { symbols: null, why: 'indirect export form' };
+  if (hasIndirectExport(source)) return { symbols: null, why: 'indirect export form' };
   // `export { a, b as c }` (local names): a listed declaration is exported under its local name.
-  const listed = new Set([...source.matchAll(/^export\s*\{([^}]*)\}(?!\s*from)/gm)].flatMap((m) => m[1].split(',').map((x) => x.trim().split(/\s+as\s+/)[0]).filter(Boolean)));
+  const listed = listedExports(source);
   for (const b of blocks) if (listed.has(b.name)) b.exported = true;
-  const hit = new Set();
-  for (const [start, count] of ranges) {
-    const last = start + Math.max(count, 1) - 1;
-    for (let line = start; line <= last; line += 1) {
-      const b = blocks.find((x) => line >= x.start && line <= x.end);
-      if (!b) return { symbols: null, why: `line ${line} is outside every top-level declaration` };
-      hit.add(b.name);
-    }
-  }
+  const changed = changedBlocks(blocks, ranges);
+  if (changed.why) return { symbols: null, why: changed.why };
+  const hit = changed.hit;
   if (!hit.size) return { symbols: null, why: 'no changed line on the head side' };
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const b of blocks) if (!hit.has(b.name) && [...hit].some((n) => n !== b.name && uses(b.text, n))) { hit.add(b.name); grew = true; }
-  }
+  closeChangedDependencies(blocks, hit);
   return { symbols: blocks.filter((b) => b.exported && hit.has(b.name)).map((b) => b.name) };
 }
 
@@ -79,7 +94,7 @@ export function changedExports({ source, ranges }) {
  * kept, symbols}]}.
  */
 export function specsDirect(changed, { specs, symbolsOf = () => null, hub = HUB_IMPORTERS }) {
-  const norm = changed.map((f) => String(f).replaceAll(/\\/g, '/'));
+  const norm = changed.map((f) => String(f).replaceAll('\\', '/'));
   const own = norm.filter((f) => /^tests\/[^/]+\.spec\.mjs$/.test(f));
   const source = norm.filter((f) => !f.startsWith('tests/'));
   const code = new Map(specs.map((s) => [s.file, codeOf(s.text)]));
