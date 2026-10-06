@@ -188,7 +188,7 @@ export function stopHarness({
     else refused.push({ mode: record.mode, pid: record.pid, reason: result?.output ?? 'stop failed' });
   }
   writeState(stateFile, state, io);
-  return { ok: refused.length === 0, action: refused.length ? 'refused' : stopped.length ? 'stopped' : 'not-running', stopped, stale, refused };
+  return { ok: refused.length === 0, action: (refused.length && 'refused') || (stopped.length && 'stopped') || 'not-running', stopped, stale, refused };
 }
 
 export async function harnessUrl({ tunnel = false } = {}) {
