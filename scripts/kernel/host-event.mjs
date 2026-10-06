@@ -31,7 +31,8 @@ const WORKER_DEATH_KINDS = ['dead-worker-requeued', 'worker-failed-no-report'];
 export const hostDeadWorker = (worker) => worker?.liveness === 'disconnected'
   || (worker?.liveness === 'gone' && HOST_DEAD_REASON.test(String(worker.errorCode ?? '')));
 
-const SQL = `SELECT workflow_id, kind, payload_json, created_at FROM events WHERE kind IN ('kernel-stale-cleared',${WORKER_DEATH_KINDS.map((k) => `'${k}'`).join(',')})
+const WORKER_KINDS_SQL = WORKER_DEATH_KINDS.map((k) => `'${k}'`).join(',');
+const SQL = `SELECT workflow_id, kind, payload_json, created_at FROM events WHERE kind IN ('kernel-stale-cleared',${WORKER_KINDS_SQL})
   AND created_at>=? AND created_at<=?`;
 const hostDeathOf = (row) => {
   const p = parseJsonOr(row.payload_json) ?? {};
