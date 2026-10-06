@@ -110,7 +110,7 @@ function loadProducesTable(goalDir) {
   const file = path.join(goalDir, 'legality.yaml');
   const doc = parseYaml(fs.readFileSync(file, 'utf8'));
   const table = doc?.producesVocabulary?.opProduces;
-  if (!table || typeof table !== 'object') throw Error(`no producesVocabulary.opProduces in ${file}`);
+  if (!table || typeof table !== 'object') throw new Error(`no producesVocabulary.opProduces in ${file}`);
   const byVar = []; // [{family, suffix, state, qualifier, op, raw}]
   for (const [op, vars] of Object.entries(table)) {
     for (const raw of stringItems(vars)) {
@@ -271,7 +271,7 @@ function loadArchetypeSignals(goalDir) {
   const expand = list => asList(list).flatMap(p => {
     if (typeof p !== 'string' || !p.startsWith('$')) return [p];
     const set = sets[p.slice(1)];
-    if (!Array.isArray(set)) throw Error(`${file}: phrase set '${p}' is not declared in signalMatching.phraseSets`);
+    if (!Array.isArray(set)) throw new Error(`${file}: phrase set '${p}' is not declared in signalMatching.phraseSets`);
     return set;
   });
   const expandAlt = alt => (alt && typeof alt === 'object' ? {
@@ -284,7 +284,7 @@ function loadArchetypeSignals(goalDir) {
   // phrase hits the prompt ("brand: settled" -> {family:'brand', state:'settled'}).
   const conditionalOf = entry => asList(entry?.conditionalLegs?.entries).map(c => {
     const m = /^([A-Za-z][A-Za-z0-9.]*)\s*:\s*(\S+)$/.exec(String(c?.var ?? '').trim());
-    if (!m) throw Error(`${file}: archetype '${entry.id}' conditionalLegs entry for '${c?.op}' has no parseable var`);
+    if (!m) throw new Error(`${file}: archetype '${entry.id}' conditionalLegs entry for '${c?.op}' has no parseable var`);
     const dot = m[1].indexOf('.');
     return { op: String(c.op), when: expand(c.when), var: { family: dot < 0 ? m[1] : m[1].slice(0, dot), suffix: dot < 0 ? '' : m[1].slice(dot + 1), state: m[2] } };
   });
@@ -295,12 +295,12 @@ function loadArchetypeSignals(goalDir) {
     }
   }
   const sequence = asList(doc?.signalMatching?.sequence).map(String);
-  if (!sequence.length) throw Error(`${file}: signalMatching.sequence is empty`);
+  if (!sequence.length) throw new Error(`${file}: signalMatching.sequence is empty`);
   const matchers = sequence.map(id => {
     const entry = byId.get(id);
-    if (!entry) throw Error(`${file}: signalMatching.sequence names '${id}', which no archetype or variant declares`);
-    if (!entry.signals.some(alt => asList(alt?.phrases).length)) throw Error(`${file}: archetype '${id}' is sequenced but has no signal phrases`);
-    if (!ARCHETYPE_STAR[id]) throw Error(`${file}: archetype '${id}' has no S* entry in scripts/route/route-plan.mjs`);
+    if (!entry) throw new Error(`${file}: signalMatching.sequence names '${id}', which no archetype or variant declares`);
+    if (!entry.signals.some(alt => asList(alt?.phrases).length)) throw new Error(`${file}: archetype '${id}' is sequenced but has no signal phrases`);
+    if (!ARCHETYPE_STAR[id]) throw new Error(`${file}: archetype '${id}' has no S* entry in scripts/route/route-plan.mjs`);
     return { ...entry, ...ARCHETYPE_STAR[id] };
   });
   // A refactor whose prompt hits $canonIntent is a canon-conformance cleanup (code.refactor params.canonFamilies).
@@ -514,7 +514,7 @@ function impactOf(text, s0, archetypeIds) {
     .filter(f => phraseHits(norm, f) || phraseHits(norm, f.replaceAll('-', ' ')));
   const inScope = s0.records.filter(r => r.family && r.family !== 'gap' && features.includes(r.feature));
   const build = archetypeIds.some(id => BUILD_SCOPES.has(id));
-  const shape = build && features.length ? 'EXTEND' : build ? 'BUILD' : 'REFERENCE';
+  const shape = (build && (features.length ? 'EXTEND' : 'BUILD')) || 'REFERENCE';
   return {
     shape, features,
     settledOutOfScope: s0.records.filter(r => r.family && r.state === 'done' && !features.includes(r.feature)).length,
@@ -728,7 +728,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
       return true;
     }
     const delivery = phase === 'implement' && hints.deliveryOps
-      ? [...legs.values()].filter(l => l !== consumerLeg && hints.deliveryOps.includes(l.op)).at(-1) : null;
+      ? [...legs.values()].findLast(l => l !== consumerLeg && hints.deliveryOps.includes(l.op)) : null;
     if (delivery) {
       consumerLeg.needsSatisfiedBy.push(`${delivery.legId} (delivery to inspect: the reconstructed Work and stack roots)`);
       edges.push([delivery.legId, consumerLeg.legId]);

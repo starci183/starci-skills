@@ -166,7 +166,7 @@ function main() {
   console.log(`  breakdown: ${result.pick.breakdown.join('  ')}`);
   if (result.pick.prerequisites.length) console.log(`  prerequisites: ${result.pick.prerequisites.join(', ')}`);
   if (result.pick.riskHints.length) console.log(`  riskHints: ${result.pick.riskHints.join(', ')}`);
-  if (result.pick.goal) console.log(`  goal: ${result.pick.goal.split('\n').join(' ').slice(0, 140)}`);
+  if (result.pick.goal) console.log(`  goal: ${result.pick.goal.replaceAll('\n', ' ').slice(0, 140)}`);
   if (result.runnersUp.length) {
     console.log('runners-up:');
     for (const r of result.runnersUp) console.log(`  ${r.op}  (score ${r.score})  ${r.breakdown.join('  ')}`);

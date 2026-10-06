@@ -2,6 +2,13 @@
 import { lastJson, SERVICES_FILE } from './services.mjs';
 import { workerClosureProven } from '../machine/worker-close.mjs';
 
+const actionForTurn = (turn, overdue, now, graceMs) => {
+  if (turn.effect?.state === 'unknown' || turn.closedAt != null) return null;
+  if (overdue && turn.interruptedAt == null) return 'interrupt';
+  if (turn.interruptedAt != null && turn.replacedAt == null && now - turn.interruptedAt >= graceMs) return 'replace';
+  return null;
+};
+
 /** Calculate intent only. Confirmed timestamps are written after the actuator's numeric and typed receipt. */
 export function turnStep(prev, obs, { now, budgetMs, graceMs, sameTurnSlackMs }) {
   if (!obs?.busy) return { turn: null, act: null, overdue: false, ended: prev != null };
@@ -11,9 +18,7 @@ export function turnStep(prev, obs, { now, budgetMs, graceMs, sameTurnSlackMs })
   const turn = same ? { ...prev, startedAt: est == null ? prev.startedAt : Math.min(prev.startedAt, est) }
     : { startedAt: est ?? now, interruptedAt: null, replacedAt: null };
   const overdue = now - turn.startedAt > budgetMs;
-  const act = turn.effect?.state === 'unknown' || turn.closedAt != null ? null
-    : overdue && turn.interruptedAt == null ? 'interrupt'
-    : turn.interruptedAt != null && turn.replacedAt == null && now - turn.interruptedAt >= graceMs ? 'replace' : null;
+  const act = actionForTurn(turn, overdue, now, graceMs);
   return { turn, act, overdue, ended: prev != null && !same };
 }
 
@@ -46,8 +51,12 @@ export async function reconcileTurnBudget(ctx, { key, rec, terminal, ledgerId = 
   if (!step.act) return { ok: true, state: obs.state, minutes, act: null, overdue: step.overdue };
   const watchdog = supervisor ? ['scripts/supervisor/supervisor-watchdog.mjs', '--once', '--json']
     : ['scripts/kernel/kernel-watchdog.mjs', '--repo', repo, '--workflow', workflowId, '--once', '--repair', '--json'];
-  const args = [SERVICES_FILE, `--turn-${step.act}`, '--terminal', obs.terminal, '--agent', obs.agent,
-    ...(step.act === 'interrupt' ? supervisor ? ['--supervisor'] : ['--repo', repo, '--workflow', workflowId] : []), '--json'];
+  const turnScope = [];
+  if (step.act === 'interrupt') {
+    if (supervisor) turnScope.push('--supervisor');
+    else turnScope.push('--repo', repo, '--workflow', workflowId);
+  }
+  const args = [SERVICES_FILE, `--turn-${step.act}`, '--terminal', obs.terminal, '--agent', obs.agent, ...turnScope, '--json'];
   if (ctx.mode !== 'active') {
     await ctx.run('node', args, { timeoutMs: step.act === 'interrupt' ? 120_000 : 180_000 });
     return { ok: true, shadow: true, state: obs.state, minutes, act: step.act, overdue: step.overdue };
@@ -68,7 +77,10 @@ export async function reconcileTurnBudget(ctx, { key, rec, terminal, ledgerId = 
   const noEffect = native?.fenced === true || native?.effectState === 'none'
     || Number.isInteger(native?.code) && !native.signal && !native.timedOut && data?.ok === false
       && data.terminal === obs.terminal && data.effectState === 'none';
-  rec.turn.effect = { ...rec.turn.effect, state: verified ? 'confirmed' : noEffect ? 'none' : 'unknown',
+  let effectState = 'unknown';
+  if (verified) effectState = 'confirmed';
+  else if (noEffect) effectState = 'none';
+  rec.turn.effect = { ...rec.turn.effect, state: effectState,
     result: { code: native?.code ?? null, signal: native?.signal ?? null, error: native?.error ?? null,
       actionId: native?.actionId ?? null, receipt: data } };
   if (verified) {
