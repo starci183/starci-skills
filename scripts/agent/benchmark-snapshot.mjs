@@ -13,11 +13,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
-import { isRuntimeRoot, ledgerFileFor, hasLedger } from '../../engine/db/ledger.mjs';
-import { skillRoot } from '../../engine/runtime-root.mjs';
+import { hasLedger } from '../../engine/db/ledger.mjs';
+import { skillRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { scorecardFor, UNROUTED, localDay, shortPool, pctText } from './model-scorecard.mjs';
 import { readJsonFile as readJson } from '../lib/json.mjs';
-import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 
 export const SNAPSHOTS_DIR = path.join(skillRoot, 'benchmark', 'snapshots');
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -54,7 +53,7 @@ export function boundRepos({ sourceRoot = starciSourceRoot() } = {}) {
 
 /** The newest snapshot in `dir` of the same window whose name sorts before `name`, or null. */
 export function previousSnapshot(dir, name, sinceHours) {
-  const same = new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${sinceHours}h\\.json$`);
+  const same = new RegExp(String.raw`^\d{4}-\d{2}-\d{2}-${sinceHours}h\.json$`);
   let files = [];
   try { files = fs.readdirSync(dir).filter((f) => same.test(f) && f < name).sort(); } catch { return null; }
   const file = files.at(-1);
@@ -84,7 +83,11 @@ export function snapshotDelta(next, prev) {
   return { jobs: next.jobs ?? 0, jobsDelta: (next.jobs ?? 0) - (prev?.jobs ?? 0), pools };
 }
 
-const signed = (x, unit = '') => (x == null ? '-' : `${x > 0 ? '+' : ''}${x}${unit}`);
+const signed = (x, unit = '') => {
+  if (x == null) return '-';
+  const sign = x > 0 ? '+' : '';
+  return `${sign}${x}${unit}`;
+};
 
 /** The short text the CLI prints: the written file, then one delta line per pool (or a first-snapshot note). */
 export function formatDelta({ file, snapshot, previous, delta }) {
@@ -105,13 +108,13 @@ export function formatDelta({ file, snapshot, previous, delta }) {
  */
 export function takeSnapshot({ repos = null, sinceHours, now = Date.now(), date = localDate(now), dir = SNAPSHOTS_DIR,
   sourceRoot = starciSourceRoot() } = {}) {
-  if (!(Number(sinceHours) > 0)) throw Object.assign(Error('--since-hours needs a positive number'), { code: 'EUSAGE' });
-  if (!DATE.test(date)) throw Object.assign(Error(`--date needs YYYY-MM-DD, got ${date}`), { code: 'EUSAGE' });
+  if (!(Number(sinceHours) > 0)) throw Object.assign(new Error('--since-hours needs a positive number'), { code: 'EUSAGE' });
+  if (!DATE.test(date)) throw Object.assign(new Error(`--date needs YYYY-MM-DD, got ${date}`), { code: 'EUSAGE' });
   const name = snapshotName(date, Number(sinceHours));
   const file = path.join(dir, name);
-  if (fs.existsSync(file)) throw Object.assign(Error(`${file} exists: snapshots are append-only and never overwritten`), { code: 'EEXIST' });
+  if (fs.existsSync(file)) throw Object.assign(new Error(`${file} exists: snapshots are append-only and never overwritten`), { code: 'EEXIST' });
   const targets = repos?.length ? repos : boundRepos({ sourceRoot });
-  if (!targets.length) throw Object.assign(Error(`no bound project repo with a ledger under ${sourceRoot}/.workspaces/projects; pass --repo`), { code: 'EUSAGE' });
+  if (!targets.length) throw Object.assign(new Error(`no bound project repo with a ledger under ${sourceRoot}/.workspaces/projects; pass --repo`), { code: 'EUSAGE' });
   const snapshot = scorecardFor({ repos: targets, sinceHours: Number(sinceHours), now });
   const previous = previousSnapshot(dir, name, Number(sinceHours));
   fs.mkdirSync(dir, { recursive: true });

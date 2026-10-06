@@ -27,7 +27,7 @@ const regexp = (source, fallback) => {
 // the watcher.
 const signalRegexp = (source) => {
   try { return new RegExp(source, 'i'); }
-  catch { return new RegExp(String(source).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); }
+  catch { return new RegExp(String(source).replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`), 'i'); }
 };
 
 // A bare '401' matched any number or id holding those digits (a job id '...-false-401-...' in the echoed launch
@@ -35,10 +35,10 @@ const signalRegexp = (source) => {
 // circuit (inc-7d452a3329ba). 401 counts only as a word next to an auth word or
 // an HTTP/status/error prefix.
 const GENERIC_FAILURE = [
-  '\\b401\\b[^\\n]{0,60}\\b(?:unauthori[sz]ed|authentication|not authenticated|invalid[^\\n]{0,20}(?:key|token|credential))',
-  '\\b(?:HTTP|status(?: code)?|error|code)\\W{0,3}401\\b',
+  String.raw`\b401\b[^\n]{0,60}\b(?:unauthori[sz]ed|authentication|not authenticated|invalid[^\n]{0,20}(?:key|token|credential))`,
+  String.raw`\b(?:HTTP|status(?: code)?|error|code)\W{0,3}401\b`,
   'Invalid API-key', 'not authenticated', 'authentication failed',
-  'OAuth[^\\n]*(?:expired|invalid|rejected)', 'token[^\\n]*(?:expired|invalid|rejected)', 'agent child exited',
+  String.raw`OAuth[^\n]*(?:expired|invalid|rejected)`, String.raw`token[^\n]*(?:expired|invalid|rejected)`, 'agent child exited',
 ].join('|');
 
 const failureMatchers = (adapter) => {
@@ -57,7 +57,7 @@ const withoutDelivered = (screen, delivered) => {
   const own = squash(Array.isArray(delivered) ? delivered.filter(Boolean).join('\n') : delivered);
   if (!own) return screen ?? '';
   return String(screen ?? '').split(/\r?\n/).filter((line) => {
-    const text = squash(line).replace(new RegExp(`^[${INPUT_GLYPH_CHARS}│|]\\s*`, 'u'), '');
+    const text = squash(line).replace(new RegExp(String.raw`^[${INPUT_GLYPH_CHARS}│|]\s*`, 'u'), '');
     return text.length < 12 || !own.includes(text);
   }).join('\n');
 };
@@ -162,7 +162,7 @@ export function answerAllowlistedGate(handle, adapter, gate, { screen = null, io
 // The tail of a terminal frame, kept on a failed launch so its cause is
 // visible after the terminal is gone: the last `rows` non-empty rows, capped.
 function lastOutputOf(screen, { rows = 30, chars = 3000 } = {}) {
-  const text = String(screen ?? '').split(/\r?\n/).map((row) => row.replace(/\s+$/u, '')).filter((row) => row.trim()).slice(-rows).join('\n');
+  const text = String(screen ?? '').split(/\r?\n/).map((row) => row.trimEnd()).filter((row) => row.trim()).slice(-rows).join('\n');
   return text.length > chars ? text.slice(-chars) : text;
 }
 
@@ -186,49 +186,56 @@ export function awaitSubmission(handle, adapter, { sentText = null, onWait = nul
   let staged = DEFAULT_STAGED_PATTERN;
   if (typeof spec.stagedPattern === 'string' && spec.stagedPattern.trim())
     staged = regexp(`${DEFAULT_STAGED_PATTERN.source}|${spec.stagedPattern}`, DEFAULT_STAGED_PATTERN.source);
-  const input = regexp(adapter?.readiness?.screenPattern, `(?:Ask|Message|Enter a prompt|(^|\\n)\\s*${INPUT_GLYPH_CLASS})`);
+  const input = regexp(adapter?.readiness?.screenPattern, String.raw`(?:Ask|Message|Enter a prompt|(^|\n)\s*${INPUT_GLYPH_CLASS})`);
   const timeoutMs = submissionTimeoutMs(adapter);
   const settleMs = Math.max(250, Number(spec.settleMs) || 1000);
   const maxEnter = Math.max(1, Number(spec.maxEnter) || 2);
   const stuckGraceMs = Math.max(settleMs, Number(spec.stuckGraceMs) || 5000);
-  let enters = 1, screen = '', stuckEnterAt = null;
+  const state = { enters: 1, screen: '', stuckEnterAt: null };
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += settleMs) {
     if (elapsed > 0) {
       if (typeof onWait === 'function') { try { onWait({ step: 'submission', elapsedMs: elapsed }); } catch { /* a heartbeat never fails the launch */ } }
       sleepSync(settleMs);
     }
-    const read = terminalRead({ terminal: handle });
-    // Orca lifts the input box text out of the frame as `draft`: a paste whose Enter was dropped reads
-    // as an empty prompt unless it is written back (terminal-liveness.mjs frameWithDraft).
-    screen = frameWithDraft(read.screen, read.draft);
-    const failure = failureOnScreen(adapter, screen, sentText);
-    if (read.ok && failure) return { ok: false, failureKind: 'failure-signature', transient: false, reason: `prompt submission rejected: ${failure.signal}`, screen, lastOutput: lastOutputOf(screen), enters, ...failure };
-    // Work that has begun wins: a staged-looking row under a live spinner is
-    // transcript or a queued follow-up, never a stuck first prompt. Activity
-    // counts only ABOVE the staged input region - the paste's own words are
-    // not a spinner.
-    const region = read.ok ? stagedInputRegion(screen, { stagedPattern: staged, sentText }) : null;
-    const begun = read.ok && activity.test(region ? region.above.join('\n') : screen);
-    const stuckRow = region && !begun ? region.row : null;
-    if (stuckRow) {
-      if (stuckEnterAt === null) {
-        terminalSend({ terminal: handle, text: '', enter: true });
-        enters += 1;
-        stuckEnterAt = elapsed;
-      } else if (elapsed - stuckEnterAt >= stuckGraceMs) {
-        return { ok: false, failureKind: 'prompt-stuck', transient: true, signal: 'prompt-stuck', stuckRow, screen, lastOutput: lastOutputOf(screen), enters,
-          reason: `dispatch paste stayed in the input box ('${stuckRow.slice(0, 80)}') ${elapsed - stuckEnterAt}ms after one extra Enter` };
-      }
-      continue;
-    }
-    if (begun) return { ok: true, screen, enters, ...(stuckEnterAt !== null ? { unstuckByEnter: true } : {}) };
-    if (read.ok && enters < maxEnter && (staged.test(screen) || input.test(screen))) {
-      terminalSend({ terminal: handle, text: '', enter: true });
-      enters += 1;
-    }
+    const result = submissionStep(handle, adapter, { sentText, staged, activity, input, maxEnter, stuckGraceMs }, state, elapsed);
+    if (result) return result;
   }
-  return { ok: false, failureKind: 'submission-not-consumed', transient: true, reason: `prompt was not consumed within ${timeoutMs}ms`, screen, lastOutput: lastOutputOf(screen), enters };
+  return { ok: false, failureKind: 'submission-not-consumed', transient: true, reason: `prompt was not consumed within ${timeoutMs}ms`,
+    screen: state.screen, lastOutput: lastOutputOf(state.screen), enters: state.enters };
 }
+
+const submissionStep = (handle, adapter, policy, state, elapsed) => {
+  const read = terminalRead({ terminal: handle });
+  // Orca lifts the input box text out of the frame as `draft`: a paste whose Enter was dropped reads
+  // as an empty prompt unless it is written back (terminal-liveness.mjs frameWithDraft).
+  state.screen = frameWithDraft(read.screen, read.draft);
+  const failure = failureOnScreen(adapter, state.screen, policy.sentText);
+  if (read.ok && failure) return { ok: false, failureKind: 'failure-signature', transient: false,
+    reason: `prompt submission rejected: ${failure.signal}`, screen: state.screen, lastOutput: lastOutputOf(state.screen), enters: state.enters, ...failure };
+  // Work above a staged input row wins; the paste's own words cannot prove activity.
+  const region = read.ok ? stagedInputRegion(state.screen, { stagedPattern: policy.staged, sentText: policy.sentText }) : null;
+  const begun = read.ok && policy.activity.test(region ? region.above.join('\n') : state.screen);
+  const stuckRow = region && !begun ? region.row : null;
+  if (stuckRow) {
+    if (state.stuckEnterAt === null) {
+      terminalSend({ terminal: handle, text: '', enter: true });
+      state.enters += 1;
+      state.stuckEnterAt = elapsed;
+    } else if (elapsed - state.stuckEnterAt >= policy.stuckGraceMs) {
+      return { ok: false, failureKind: 'prompt-stuck', transient: true, signal: 'prompt-stuck', stuckRow,
+        screen: state.screen, lastOutput: lastOutputOf(state.screen), enters: state.enters,
+        reason: `dispatch paste stayed in the input box ('${stuckRow.slice(0, 80)}') ${elapsed - state.stuckEnterAt}ms after one extra Enter` };
+    }
+    return null;
+  }
+  if (begun) return { ok: true, screen: state.screen, enters: state.enters,
+    ...(state.stuckEnterAt !== null ? { unstuckByEnter: true } : {}) };
+  if (read.ok && state.enters < policy.maxEnter && (policy.staged.test(state.screen) || policy.input.test(state.screen))) {
+    terminalSend({ terminal: handle, text: '', enter: true });
+    state.enters += 1;
+  }
+  return null;
+};
 
 // Post-submission attestation — submission proves the prompt was consumed, not
 // that the agent stays alive; a terminal can still die on auth failure while
@@ -276,9 +283,10 @@ export function deliverPrompt({ handle, adapter, prompt, worktree, dispatchId = 
   // worktree may be an Orca selector ('active') rather than a filesystem path — file-reference delivery only applies when it resolves to a real directory.
   if (d.mode === 'file-reference-above-inline-limit' && limit && prompt.length > limit && worktree && fs.existsSync(worktree)) {
     const transient = !(typeof d.fileDirectory === 'string' && d.fileDirectory.trim());
-    const dir = transient
-      ? fs.mkdtempSync(path.join(os.tmpdir(), 'starci-dispatch-'))
-      : (path.isAbsolute(d.fileDirectory) ? d.fileDirectory : path.join(worktree, d.fileDirectory));
+    let dir;
+    if (transient) dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-dispatch-'));
+    else if (path.isAbsolute(d.fileDirectory)) dir = d.fileDirectory;
+    else dir = path.join(worktree, d.fileDirectory);
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, (d.fileName ?? 'orca-dispatch-<dispatch>.md').replace('<dispatch>', dispatchId));
     fs.writeFileSync(file, prompt);
