@@ -181,7 +181,7 @@ export function loadSheet(entries, { resolveBare = () => [], sourceOf = (file, s
     const source = sourceOf(abs, inherited);
     const parsed = parseCss(fs.readFileSync(abs, 'utf8'), { file: abs });
     sheet.files.push({ file: abs, source });
-    const prefixed = (layer) => { if (!layerPrefix) return layer; if (layer) return `${layerPrefix}.${layer}`; return layerPrefix; };
+    const prefixed = (layer) => { if (!layerPrefix) { return layer; } if (layer) { return `${layerPrefix}.${layer}`; } return layerPrefix; };
     for (const l of parsed.early) addLayer(prefixed(l));
     for (const imp of parsed.imports) {
       const layer = prefixed(imp.layer ?? imp.parentLayer);
@@ -241,14 +241,14 @@ function simpleParts(compound) {
     if (m.index !== consumed) return null;
     consumed = m.index + m[0].length;
     const part = m[0];
-    if (part.startsWith(':')) { if (part === ':root' || part === ':host') { parts.push(':root'); } else return null; continue; }
+    if (part.startsWith(':')) { if (part === ':root' || part === ':host') { parts.push(':root'); } else { return null; } continue; }
     parts.push(part.startsWith('[') ? `[${part.slice(1, -1).replace(/\s+/g, '')}]` : part);
   }
   return consumed === compound.length ? parts : null;
 }
 
 function specificity(parts) {
-  return parts.reduce((n, p) => { if (p.startsWith('#')) return n + 100; if (p === '*') return n; if (/^[a-z]/i.test(p)) return n + 1; return n + 10; }, 0);
+  return parts.reduce((n, p) => { if (p.startsWith('#')) { return n + 100; } if (p === '*') { return n; } if (/^[a-z]/i.test(p)) { return n + 1; } return n + 10; }, 0);
 }
 
 /**
@@ -274,7 +274,7 @@ export function selectorMatch(selector, chain) {
   for (let c = compounds.length - 2; c >= 0; c--) {
     const via = compounds[c + 1].combinator;
     if (via === '>') { at -= 1; if (at < 0 || !holds(compounds[c].parts, chain[at])) return -1; }
-    else { let j = at - 1; while (j >= 0 && !holds(compounds[c].parts, chain[j])) { j -= 1; } if (j < 0) return -1; at = j; }
+    else { let j = at - 1; while (j >= 0 && !holds(compounds[c].parts, chain[j])) { j -= 1; } if (j < 0) { return -1; } at = j; }
   }
   return compounds.reduce((n, c) => n + specificity(c.parts), 0);
 }
@@ -340,7 +340,7 @@ export function evalLength(text, { vw = null, rootPx = ROOT_FONT_PX, unitless = 
     while (tokens[i]?.op === '*' || tokens[i]?.op === '/') { const op = tokens[i++].op; const b = factor(); a = { v: op === '*' ? a.v * b.v : a.v / b.v, len: a.len || b.len }; }
     return a;
   };
-  const args = () => { const list = [expr()]; while (tokens[i]?.op === ',') { i++; list.push(expr()); } if (tokens[i++]?.op !== ')') throw new Error('paren'); return list; };
+  const args = () => { const list = [expr()]; while (tokens[i]?.op === ',') { i++; list.push(expr()); } if (tokens[i++]?.op !== ')') { throw new Error('paren'); } return list; };
   const factor = () => {
     const t = tokens[i++];
     if (!t) throw new Error('end');
@@ -445,7 +445,7 @@ function exportTarget(pkgDir, subpath) {
   let exp = null;
   try { exp = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8')).exports ?? null; } catch { exp = null; }
   const key = subpath ? `./${subpath}` : '.';
-  const pickTarget = (v) => { if (typeof v === 'string') return v; if (v && typeof v === 'object') return pickTarget(v.style ?? v.default ?? v.import ?? null); return null; };
+  const pickTarget = (v) => { if (typeof v === 'string') { return v; } if (v && typeof v === 'object') { return pickTarget(v.style ?? v.default ?? v.import ?? null); } return null; };
   if (exp && typeof exp === 'object') {
     if (exp[key] !== undefined) { const t = pickTarget(exp[key]); if (t) return path.join(pkgDir, t); }
     for (const [pattern, v] of Object.entries(exp)) {
@@ -457,7 +457,7 @@ function exportTarget(pkgDir, subpath) {
   return path.join(pkgDir, subpath);
 }
 
-const packageRootOf = (file, stop) => { let dir = path.dirname(file); while (dir.startsWith(stop) && dir !== stop) { if (fs.existsSync(path.join(dir, 'package.json'))) return dir; dir = path.dirname(dir); } return stop; };
+const packageRootOf = (file, stop) => { let dir = path.dirname(file); while (dir.startsWith(stop) && dir !== stop) { if (fs.existsSync(path.join(dir, 'package.json'))) { return dir; } dir = path.dirname(dir); } return stop; };
 const heroFilesOf = (dir) => [path.join(dir, 'dist', 'heroui.min.css'), path.join(dir, 'dist', 'themes', 'shared', 'theme.css')].filter((f) => fs.existsSync(f));
 
 /**
@@ -602,10 +602,10 @@ function createResolver(sources) {
       if (px == null && fontPx != null && value != null) { const ratio = evalLength(value, { unitless: true }); if (ratio != null) px = Math.round(ratio * fontPx * 100) / 100; }
       return { prop, declared: d.value, value, px, trace: trace.toReversed(), file: d.rule.file, selector: d.rule.selectors.join(', '), source: d.rule.source, important: d.important };
     };
-    const variable = (name) => { const hit = lookup(name, last); if (!hit) return null; const trace = []; const value = substitute(hit.value, lookup, hit.level, trace); return { name, declared: hit.value, value, px: value == null ? null : evalLength(value, { vw: width }), trace: trace.toReversed(), file: hit.file }; };
+    const variable = (name) => { const hit = lookup(name, last); if (!hit) { return null; } const trace = []; const value = substitute(hit.value, lookup, hit.level, trace); return { name, declared: hit.value, value, px: value == null ? null : evalLength(value, { vw: width }), trace: trace.toReversed(), file: hit.file }; };
     return { get, variable, levels };
   };
-  const memo = (key, chain, width) => { const k = `${key}@${width}`; if (!cache.has(k)) cache.set(k, element(chain, width)); return cache.get(k); };
+  const memo = (key, chain, width) => { const k = `${key}@${width}`; if (!cache.has(k)) { cache.set(k, element(chain, width)); } return cache.get(k); };
   return { sheet, element, memo };
 }
 
@@ -634,7 +634,7 @@ function unboundFamilyTokens(sources, sheet) {
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
       const full = path.join(dir, e.name);
-      if (e.isDirectory()) { if (!PRUNE.has(e.name) && !e.name.startsWith('.')) walk(full, depth + 1); continue; }
+      if (e.isDirectory()) { if (!PRUNE.has(e.name) && !e.name.startsWith('.')) { walk(full, depth + 1); } continue; }
       if (!/\.(tsx?|jsx?|mdx|mjs)$/.test(e.name) || /\.(spec|test|stories)\./.test(e.name)) continue;
       const text = readText(full);
       for (const n of candidates) if (!inSource.has(n) && text.includes(n)) inSource.add(n);
@@ -932,7 +932,7 @@ export function readSnapshot(snap) {
   const els = snap.elements;
   const byI = new Map(els.map((e) => [e.i, e]));
   const kids = new Map();
-  for (const e of els) { if (e.parent != null) { if (!kids.has(e.parent)) kids.set(e.parent, []); kids.get(e.parent).push(e); } }
+  for (const e of els) { if (e.parent != null) { if (!kids.has(e.parent)) { kids.set(e.parent, []); } kids.get(e.parent).push(e); } }
   const ancestors = (e) => { const out = []; let p = e.parent; while (p != null && byI.has(p)) { out.push(byI.get(p)); p = byI.get(p).parent; } return out; };
   const pageBg = [snap.root.bodyBg, snap.root.htmlBg].find((c) => c && c[3] > 0) ?? [255, 255, 255, 1];
   const composed = new Map();
@@ -957,7 +957,7 @@ export function readSnapshot(snap) {
   // is nearer than any layout element the drawing wrote). Its spacing, type and shape are the grammar's - judged by the
   // grammar's own conformance, not by the drawing that composed it. Never true for a hand-written html render (no
   // data-component there).
-  const inGrammar = (e) => { if (e.comp) return true; for (const a of ancestors(e)) { if (a.drawLayout) return false; if (a.comp) return true; } return false; };
+  const inGrammar = (e) => { if (e.comp) { return true; } for (const a of ancestors(e)) { if (a.drawLayout) { return false; } if (a.comp) { return true; } } return false; };
   // A notice (Alert: its own anatomy gate, DRAW_ALERT_ANATOMY, and the HeroUI radius) or a media box (Image/MediaFrame)
   // is never a card.
   // A cell or bar ruled on ONE edge only (square, no shadow) is a divided region - a stat-strip cell's inline-start
@@ -983,7 +983,7 @@ export function readSnapshot(snap) {
 // The check
 // ---------------------------------------------------------------------------------------------------------
 
-const describe = (e) => { let content = ''; if (e.own) content = ' "' + e.own.slice(0, 40) + '"'; else if (e.value) content = ' [' + e.value.slice(0, 30) + ']'; return e.tag + (e.id ? '#' + e.id : '') + content; };
+const describe = (e) => { let content = ''; if (e.own) { content = ' "' + e.own.slice(0, 40) + '"'; } else if (e.value) { content = ' [' + e.value.slice(0, 30) + ']'; } return e.tag + (e.id ? '#' + e.id : '') + content; };
 const near = (a, b, tol = 1) => a != null && b != null && Math.abs(a - b) <= tol;
 
 /** Probes the page must normalise: every expected colour and shadow in computed form. */
@@ -1029,7 +1029,7 @@ export function geometryFindings(snap, g, { file = snap.file } = {}) {
     if (a.button['font-size']?.px != null && label.own && !near(label.style.fontSize, a.button['font-size'].px, 0.5)) off('button', e, 'font-size', `${label.style.fontSize}px`, `${a.button['font-size'].px}px`, a.button['font-size'].file);
     const bg = e.style.bg;
     const variant = variantColors.some((vc) => (alphaOf(bg) < 0.02 ? alphaOf(vc.bg) < 0.02 : sameColor(bg, vc.bg)));
-    if (!variant) off('button', e, 'fill', bg ? `rgba(${bg.join(', ')})` : 'none', `one of the Button variants: ${variantColors.filter((x) => x.bg).map((x) => x.v + ' ' + P[`button.${x.v}.bg`]?.value).join('; ')}`, a.button.variants.primary['background-color']?.file);
+    if (!variant) off('button', e, 'fill', bg ? `rgba(${bg.join(', ')})` : 'none', `one of the Button variants: ${variantColors.filter((x) => x.bg).map((x) => x.v + ' ' + P['button.' + x.v + '.bg']?.value).join('; ')}`, a.button.variants.primary['background-color']?.file);
     else if (alphaOf(bg) < 0.02 && view.borderOn(e)) {
       const b = e.style.border[0];
       const ow = a.button.variants.outline;
@@ -1094,7 +1094,7 @@ export function geometryFindings(snap, g, { file = snap.file } = {}) {
   // Font
   const allowed = new Set(g.font.allowed);
   const offFamilies = new Map();
-  for (const e of view.texts) { const fam = firstFamily(e.style.fontFamily); if (fam && !allowed.has(fam)) { if (!offFamilies.has(fam)) offFamilies.set(fam, []); offFamilies.get(fam).push(e); } }
+  for (const e of view.texts) { const fam = firstFamily(e.style.fontFamily); if (fam && !allowed.has(fam)) { if (!offFamilies.has(fam)) { offFamilies.set(fam, []); } offFamilies.get(fam).push(e); } }
   for (const [fam, list] of offFamilies) off('text', list[0], 'font-family', `${fam} (${list.length} text runs)`, `the family font: ${[...allowed].join(' or ')}`, g.font.binding?.file);
   return { findings: out, counts: { buttons: view.buttons.length, inputs: view.inputs.length, cards: view.cards.length, badges: view.badges.length, texts: view.texts.length } };
 }
@@ -1135,7 +1135,7 @@ export function parseViewport(text) {
 
 function plain(g) {
   const strip = (v) => (v && typeof v === 'object' && 'declared' in v ? { value: v.value, px: v.px, declared: v.declared, trace: v.trace, file: v.file } : v);
-  const walk = (o) => { if (Array.isArray(o)) return o.map(walk); if (o && typeof o === 'object') { if ('declared' in o) return strip(o); return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, walk(v)])); } return o; };
+  const walk = (o) => { if (Array.isArray(o)) { return o.map(walk); } if (o && typeof o === 'object') { if ('declared' in o) { return strip(o); } return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, walk(v)])); } return o; };
   return { schema: 'starci/grammar-geometry@1', ok: g.ok, family: g.family, sources: g.sources, widths: g.widths, at: walk(g.at), font: walk(g.font), unbound: g.unbound, touchFloor: walk(g.touchFloor) };
 }
 
