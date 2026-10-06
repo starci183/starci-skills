@@ -126,7 +126,7 @@ export function provisionalOf(db, workflowId) {
 export const credentialsOwed = (db, workflowId) => deferredToHandoverOf(db, workflowId).filter((item) => ['credential', 'real-money', 'shared-system'].includes(item.deferClass));
 
 /** The owner's answer to the end-of-flow credential checklist ask, if any: {dispatchId, receipt}. Only an owner answer counts. */
-export function checklistAnswerOf(db, workflowId) {
+function checklistAnswerOf(db, workflowId) {
   const rows = db.prepare("SELECT r.dispatch_id,r.report_json FROM reports r WHERE r.workflow_id=? AND r.outcome='ask' ORDER BY r.report_id DESC").all(workflowId);
   for (const row of rows) {
     const rj = parseJson(row.report_json, {}) ?? {};
@@ -219,7 +219,7 @@ const goldenGate = (brandDir, review) => {
  * recipe, rubric, golden bytes) with only the owner-acceptance problems set aside, the archetype declared with every
  * field, and the golden the ask showed still on disk. {ok, archetype, rev, findings[], golden[]}.
  */
-export function directionGateEvidence({ repo, review }) {
+function directionGateEvidence({ repo, review }) {
   const findings = [];
   let brand;
   try { brand = readBrandRecord(repo); } catch (error) { return { ok: false, archetype: review?.archetype ?? null, findings: [{ code: 'BRAND_UNREADABLE', detail: error.message }] }; }

@@ -38,7 +38,8 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   run({ ledger, args, repo, emit, internals }) {
-    const db = ledger.db, workflowId = args.workflow;
+    const workflowId = args.workflow;
+    const db = ledger.db;
     const wf = getWorkflow(db, workflowId);
     if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
     if (!workflowRunning(wf)) {
