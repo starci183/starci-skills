@@ -416,9 +416,10 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   const override = overrideOf(env);
   const testContext = Boolean(isSpecRun(env ?? {})) && !override;
   const host = hostResourcesFor({ env, repo, settings: s });
-  const cpuBusy = override ? (override.cpuBusy != null ? num(override.cpuBusy) : null)
-    : testContext && !load ? null
-    : (() => { try { return (load ?? (() => machineLoad({ sampleMs: 200 })))()?.cpuBusy ?? null; } catch { return null; } })();
+  let cpuBusy;
+  if (override) cpuBusy = override.cpuBusy != null ? num(override.cpuBusy) : null;
+  else if (testContext && !load) cpuBusy = null;
+  else { try { cpuBusy = (load ?? (() => machineLoad({ sampleMs: 200 })))()?.cpuBusy ?? null; } catch { cpuBusy = null; } }
   const workers = Array.isArray(override?.ops) ? { ops: override.ops.map((o) => ({ status: 'running', ...o })), kernels: num(override.kernels) }
     : (census ?? (() => workersCensus({ db, ledgerFile, env })))();
   const ops = workers.ops ?? [];

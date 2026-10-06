@@ -327,7 +327,8 @@ function collectOrcaOrphans({ ps, items, halt, lookup, phaseOf, supOf, now, appl
 /** Remove one collectable tree through the home that made it: Orca (the row has an orca_id) or git. */
 function collect({ row, repoRoot, dir, branch, name, reason, merged, apply, env, git, orca }) {
   if (!apply) return { path: dir, repoRoot, reason, action: 'would-remove', ok: null, home: row?.orca_id ? 'orca' : 'git' };
-  const deleteBranch = branch ? (merged || row?.release_pending_at != null ? 'merged' : 'force') : null;
+  let deleteBranch = null;
+  if (branch) deleteBranch = merged || row?.release_pending_at != null ? 'merged' : 'force';
   const r = row?.orca_id
     ? removeOrcaWorktree({ repoRoot, orcaId: row.orca_id, dir, branch, deleteBranch, preserve: { name }, env, git, orca })
     : removeScratchWorktree({ repoRoot, dir, branch, deleteBranch, preserve: { name }, env, git });

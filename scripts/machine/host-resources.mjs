@@ -128,7 +128,10 @@ export function hostResourcesFromOverride(raw, { settings = null } = {}) {
     : [{ drive: d.drive ?? null, path: d.path ?? null, freeDiskGb: d.freeDiskGb ?? null }];
   const drives = list.map((x) => ({ drive: x?.drive ?? null, path: x?.path ?? null, freeDiskGb: numOrNull(x?.freeDiskGb) }));
   const totalRamBytes = num(d.totalRamBytes), freeRamBytes = num(d.freeRamBytes);
-  const freeRamPct = d.freeRamPct != null ? num(d.freeRamPct) : (totalRamBytes > 0 ? (freeRamBytes / totalRamBytes) * 100 : 0);
+  let freeRamPct;
+  if (d.freeRamPct != null) freeRamPct = num(d.freeRamPct);
+  else if (totalRamBytes > 0) freeRamPct = (freeRamBytes / totalRamBytes) * 100;
+  else freeRamPct = 0;
   const ramKnown = totalRamBytes > 0 || d.freeRamPct != null;
   return finishProbe({ drives, totalRamBytes, freeRamBytes, freeRamPct, ramKnown, thresholds, override: true });
 }
