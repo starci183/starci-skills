@@ -63,7 +63,7 @@ const norm = posixPath;
 /** allocation.supervisorLearning, every number checked. */
 export function learningSettings(allocation = allocationSettings()) {
   const s = allocation?.supervisorLearning;
-  const need = (k) => { const v = Number(s?.[k]); if (!Number.isFinite(v) || v <= 0) throw new Error(`modules/models/runtimes.yaml allocation.supervisorLearning.${k} must be a positive number`); return v; };
+  const need = (k) => { const v = Number(s?.[k]); if (!Number.isFinite(v) || v <= 0) { throw new Error(`modules/models/runtimes.yaml allocation.supervisorLearning.${k} must be a positive number`); } return v; };
   return { minRepeats: need('minRepeats'), measureMs: need('measureMs'), dailyAutoLandCap: need('dailyAutoLandCap'), ownerWeight: need('ownerWeight'), successDrop: need('successDrop') };
 }
 
