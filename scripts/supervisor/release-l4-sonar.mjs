@@ -60,7 +60,11 @@ export function sonarSupplier(apps, deps = {}) {
     const d = deps.docker ?? dockerOf(cfg.docker);
     const states = containers.map((name) => ({ name, state: stateOf(d.inspect, name) }));
     const unusable = states.filter((s) => s.state === 'docker-unavailable' || s.state === 'missing');
-    if (unusable.length) { stack = { ok: false, reason: `the Sonar stack cannot be started: ${unusable.map((s) => `${s.name} is ${s.state}`).join(', ')}` }; return stack; }
+    if (unusable.length) {
+      const unavailable = unusable.map((s) => `${s.name} is ${s.state}`).join(', ');
+      stack = { ok: false, reason: `the Sonar stack cannot be started: ${unavailable}` };
+      return stack;
+    }
     const down = states.filter((s) => s.state !== 'running').map((s) => s.name);
     if (down.length) {
       started.push(...down); // stopped again by close() even when the start failed half way: a stop of a stopped container is harmless

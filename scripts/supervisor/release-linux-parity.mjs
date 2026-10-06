@@ -21,6 +21,7 @@ import { version as dockerVersion } from '../api/docker/version.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { DEFAULT_NODE } from '../lib/node-image.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const STEP_NAME = 'linux-parity';
 /** The label of the spec step the container runs for the tests the host run skipped (read back by release-l4.mjs through the `##STEP` marker). */
@@ -36,7 +37,7 @@ const BROWSER = /playwright install|test:a11y|test:browser/;
 export function readWorkflows(repo) {
   const dir = path.join(repo, '.github', 'workflows');
   if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir).filter((f) => /\.ya?ml$/.test(f)).sort().flatMap((file) => {
+  return fs.readdirSync(dir).filter((f) => /\.ya?ml$/.test(f)).sort(byCodeUnit).flatMap((file) => {
     try { return [{ file, doc: parseYaml(fs.readFileSync(path.join(dir, file), 'utf8')) }]; } catch { return []; }
   });
 }
@@ -171,7 +172,13 @@ export function runParity(repo, deps = {}) {
     const text = fs.readFileSync(log, 'utf8');
     const out = parityOutcome(text);
     const ok = r.status === 0 && !r.error && out.done && !out.failed;
-    return result(ok, ok ? null : out.failed ? `red at ${out.failed}` : r.error ? `the container run failed: ${r.error.message}` : `the container exited ${r.status} before the last step`, { ...(out.failed ? { failedStep: out.failed } : {}) });
+    let why = null;
+    if (!ok) {
+      if (out.failed) why = `red at ${out.failed}`;
+      else if (r.error) why = `the container run failed: ${r.error.message}`;
+      else why = `the container exited ${r.status} before the last step`;
+    }
+    return result(ok, why, { ...(out.failed ? { failedStep: out.failed } : {}) });
   } finally {
     safeRemove(work, { hold: artifactHoldReason });
   }

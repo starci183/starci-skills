@@ -29,7 +29,12 @@ const iso = (at) => isoOr(at, '');
 export function readSupervisorState({ env = process.env, now = Date.now(), limit = 50, settings = null } = {}) {
   let mode = DEFAULT_SUPERVISOR_MODE;
   try { mode = (settings ?? supervisorSettings()).mode; } catch { /* the default */ }
-  const message = (r) => ({ id: String(r.msg_id ?? ''), at: iso(r.at), from: r.from_ref ? String(r.from_ref) : (r.chat_id ? 'telegram' : null), text: txt(r.text, 600), read: r.read_at != null });
+  const message = (r) => {
+    let from = null;
+    if (r.from_ref) from = String(r.from_ref);
+    else if (r.chat_id) from = 'telegram';
+    return { id: String(r.msg_id ?? ''), at: iso(r.at), from, text: txt(r.text, 600), read: r.read_at != null };
+  };
   const reply = (r) => ({ id: String(r.msg_id ?? ''), at: iso(r.at), to: r.to_ref ? String(r.to_ref) : null, via: r.via ? String(r.via) : null, ok: r.ok !== 0, text: txt(r.text, 600) });
   const base = readSupervisor((m) => {
     const seat = seatOf(m, now);

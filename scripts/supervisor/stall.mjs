@@ -232,7 +232,7 @@ function pathEvidence(repo, rel, raisedAt) {
 /** Peer messages delivered to `workflowId` after `since`, from one of `peers` (ledger inbox rows). */
 const peerDeliveries = (db, workflowId, peers, since) => (peers.length ? db.prepare(
   "SELECT key, payload_json, status, created_at, applied_at FROM inbox WHERE workflow_id=? AND kind='peer-message' AND created_at>? ORDER BY inbox_id").all(workflowId, since)
-  .map((row) => ({ key: row.key, status: row.status, at: row.created_at, appliedAt: row.applied_at, ...(({ from, kind, subject }) => { return { from, kind, subject }; })(parse(row.payload_json)) }))
+  .map((row) => { const { from, kind, subject } = parse(row.payload_json); return { key: row.key, status: row.status, at: row.created_at, appliedAt: row.applied_at, from, kind, subject }; })
   .filter((m) => peers.includes(m.from)) : []);
 
 /** A gate whose release is a peer's message itself (a heads-up, a reply, a notice), not a record. */
