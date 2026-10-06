@@ -161,7 +161,7 @@ const stallOf = ({ core, queuedReady, running, allowed, now, remaining, minRate,
 
 /** The ETA of the remaining units: {etaHours, eta} (0/now when nothing remains, null when the rate is dead). */
 const etaOf = (remaining, etaRate, now) => {
-  if (remaining === 0) return { etaHours: 0, eta: new Date(now).toISOString() }; if (etaRate <= 0) return { etaHours: null, eta: null };
+  if (remaining === 0) { return { etaHours: 0, eta: new Date(now).toISOString() }; } if (etaRate <= 0) { return { etaHours: null, eta: null }; }
   return { etaHours: Math.round(remaining / etaRate * 10) / 10, eta: new Date(now + remaining / etaRate * HOUR).toISOString() };
 };
 
@@ -250,7 +250,7 @@ export function causesOf({ status = 'failed', result = {}, report = null }) {
   const blocker = report?.blocker ?? {}, kind = String(blocker.kind ?? '').toLowerCase();
   const text = [report?.summary, blocker.detail, report?.rootCause?.claim, JSON.stringify(report?.openItems ?? ''), ...(report?.checks ?? []).map((c) => `${c.name} ${c.evidence ?? ''} exit=${c.exitCode ?? ''}`)].join(' \n ');
   const causes = [], add = (c) => { if (!causes.includes(c)) causes.push(c); };
-  if (!report && (result?.worker?.liveness || result?.reportFiled === false)) add('dead-worker'); textCauses({ text, kind, causes, add });
+  if (!report && (result?.worker?.liveness || result?.reportFiled === false)) { add('dead-worker'); } textCauses({ text, kind, causes, add });
   if (report?.rootCause?.self === false && String(report?.rootCause?.node ?? '').startsWith('wf-')) add('upstream');
   if (report && preservedOf(result) && (report.outcome === 'blocked' || status === 'failed')) add('partial-work');
   if (!causes.length && report && (result?.verdict === 'fail' || report.outcome === 'failed')) add('product-defect');
@@ -344,7 +344,7 @@ const act = (key, tier, cause, unblocks, title, command, expected) => ({ key, ti
 
 /** The settle verdict an unsettled report's outcome maps to for starci kernel settle --verdict. */
 const settleVerdictOf = (it) => {
-  if (it.outcome === 'done') return 'pass'; if (it.outcome === 'blocked' || it.outcome === 'ask') return 'blocked';
+  if (it.outcome === 'done') { return 'pass'; } if (it.outcome === 'blocked' || it.outcome === 'ask') { return 'blocked'; }
   return it.outcome ? 'fail' : '<pass|fail|blocked from its report>';
 };
 // 0. NEEDS-KERNEL-DECISION first (owner ruling settle-runtime-service): the runtime settled every green report; what is left
