@@ -57,7 +57,7 @@ const upLinks = (nodes) => {
 export function coverageOf(graph, jobs) {
   const nodes = list(graph?.nodes);
   const { upOf } = upLinks(nodes);
-  const above = (id) => { const out = new Set(); for (let at = upOf.get(id); at && !out.has(at); at = upOf.get(at)) out.add(at); return out; };
+  const above = (id) => { const out = new Set(); for (let at = upOf.get(id); at && !out.has(at); at = upOf.get(at)) { out.add(at); } return out; };
   const keysOf = new Map(nodes.map((n) => [n.id, list(n.ownedPaths).map(ownedPathKey).filter(Boolean)]));
   const broad = (key) => {
     const inside = nodes.filter((n) => keysOf.get(n.id).some((k) => k === key || k.startsWith(`${key}/`))).map((n) => n.id);
