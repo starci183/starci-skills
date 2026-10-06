@@ -181,14 +181,14 @@ export function loadSheet(entries, { resolveBare = () => [], sourceOf = (file, s
     const source = sourceOf(abs, inherited);
     const parsed = parseCss(fs.readFileSync(abs, 'utf8'), { file: abs });
     sheet.files.push({ file: abs, source });
-    const prefixed = (layer) => (layerPrefix ? (layer ? `${layerPrefix}.${layer}` : layerPrefix) : layer);
+    const prefixed = (layer) => { if (!layerPrefix) return layer; if (layer) return `${layerPrefix}.${layer}`; return layerPrefix; };
     for (const l of parsed.early) addLayer(prefixed(l));
     for (const imp of parsed.imports) {
       const layer = prefixed(imp.layer ?? imp.parentLayer);
       if (/^\.\.?\//.test(imp.target)) { load(path.resolve(path.dirname(abs), imp.target), source, layer); continue; }
       const bare = resolveBare(imp.target, abs);
-      if (bare && !Array.isArray(bare)) { for (const l of bare.layers ?? []) addLayer(l); continue; }
-      for (const b of bare ?? []) { if (b.layers) { for (const l of b.layers) addLayer(l); continue; } load(b.file, b.source, layer); }
+      if (bare && !Array.isArray(bare)) { for (const l of bare.layers ?? []) { addLayer(l); } continue; }
+      for (const b of bare ?? []) { if (b.layers) { for (const l of b.layers) { addLayer(l); } continue; } load(b.file, b.source, layer); }
     }
     for (const l of parsed.layers) addLayer(prefixed(l));
     for (const r of parsed.rules) { const layer = prefixed(r.layer); addLayer(layer); sheet.rules.push({ ...r, layer, source, order: sheet.rules.length }); }
@@ -241,14 +241,14 @@ function simpleParts(compound) {
     if (m.index !== consumed) return null;
     consumed = m.index + m[0].length;
     const part = m[0];
-    if (part.startsWith(':')) { if (part === ':root' || part === ':host') parts.push(':root'); else return null; continue; }
+    if (part.startsWith(':')) { if (part === ':root' || part === ':host') { parts.push(':root'); } else return null; continue; }
     parts.push(part.startsWith('[') ? `[${part.slice(1, -1).replace(/\s+/g, '')}]` : part);
   }
   return consumed === compound.length ? parts : null;
 }
 
 function specificity(parts) {
-  return parts.reduce((n, p) => n + (p.startsWith('#') ? 100 : p === '*' ? 0 : /^[a-z]/i.test(p) ? 1 : 10), 0);
+  return parts.reduce((n, p) => { if (p.startsWith('#')) return n + 100; if (p === '*') return n; if (/^[a-z]/i.test(p)) return n + 1; return n + 10; }, 0);
 }
 
 /**
@@ -274,7 +274,7 @@ export function selectorMatch(selector, chain) {
   for (let c = compounds.length - 2; c >= 0; c--) {
     const via = compounds[c + 1].combinator;
     if (via === '>') { at -= 1; if (at < 0 || !holds(compounds[c].parts, chain[at])) return -1; }
-    else { let j = at - 1; while (j >= 0 && !holds(compounds[c].parts, chain[j])) j -= 1; if (j < 0) return -1; at = j; }
+    else { let j = at - 1; while (j >= 0 && !holds(compounds[c].parts, chain[j])) { j -= 1; } if (j < 0) return -1; at = j; }
   }
   return compounds.reduce((n, c) => n + specificity(c.parts), 0);
 }
@@ -317,7 +317,7 @@ export function evalLength(text, { vw = null, rootPx = ROOT_FONT_PX, unitless = 
   while (re.lastIndex < src.length) {
     const at = re.lastIndex;
     m = re.exec(src);
-    if (m?.index !== at) { if (/^\s*$/.test(src.slice(at))) break; return null; }
+    if (m?.index !== at) { if (/^\s*$/.test(src.slice(at))) { break; } return null; }
     if (m[1] !== undefined) tokens.push({ num: Number(m[1]), unit: m[2].toLowerCase() });
     else if (m[3] !== undefined) tokens.push({ fn: m[3].toLowerCase() });
     else tokens.push({ op: m[4] });
@@ -326,7 +326,7 @@ export function evalLength(text, { vw = null, rootPx = ROOT_FONT_PX, unitless = 
   const toPx = ({ num, unit }) => {
     if (unit === 'px') return { v: num, len: true };
     if (unit === 'rem' || unit === 'em') return { v: num * rootPx, len: true };
-    if (unit === 'vw') { if (vw == null) throw new Error('vw'); return { v: (num * vw) / 100, len: true }; }
+    if (unit === 'vw') { if (vw == null) { throw new Error('vw'); } return { v: (num * vw) / 100, len: true }; }
     if (unit === '') return { v: num, len: false };
     throw new Error(`unit ${unit}`);
   };
@@ -345,7 +345,7 @@ export function evalLength(text, { vw = null, rootPx = ROOT_FONT_PX, unitless = 
     const t = tokens[i++];
     if (!t) throw new Error('end');
     if (t.num !== undefined) return toPx(t);
-    if (t.op === '(') { const v = expr(); if (tokens[i++]?.op !== ')') throw new Error('paren'); return v; }
+    if (t.op === '(') { const v = expr(); if (tokens[i++]?.op !== ')') { throw new Error('paren'); } return v; }
     if (t.op === '-') { const v = factor(); return { v: -v.v, len: v.len }; }
     if (t.fn === 'calc') { const [v] = args(); return v; }
     if (t.fn === 'min' || t.fn === 'max') { const list = args(); return { v: Math[t.fn](...list.map((x) => x.v)), len: list.some((x) => x.len) }; }
@@ -445,7 +445,7 @@ function exportTarget(pkgDir, subpath) {
   let exp = null;
   try { exp = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8')).exports ?? null; } catch { exp = null; }
   const key = subpath ? `./${subpath}` : '.';
-  const pickTarget = (v) => (typeof v === 'string' ? v : v && typeof v === 'object' ? pickTarget(v.style ?? v.default ?? v.import ?? null) : null);
+  const pickTarget = (v) => { if (typeof v === 'string') return v; if (v && typeof v === 'object') return pickTarget(v.style ?? v.default ?? v.import ?? null); return null; };
   if (exp && typeof exp === 'object') {
     if (exp[key] !== undefined) { const t = pickTarget(exp[key]); if (t) return path.join(pkgDir, t); }
     for (const [pattern, v] of Object.entries(exp)) {
@@ -538,7 +538,7 @@ export function discoverSources(repo, family = null, { app = null, grammarDist =
   if (!heroFiles.length) errors.push(`no installed @heroui/styles (dist/heroui.min.css) resolvable from ${chosen ? chosen.entry : repoAbs}`);
   const common = path.join(grammarDir, 'common', 'styles.css');
   if (!fs.existsSync(common)) errors.push(`no Grammar common/styles.css at ${grammarDir}`);
-  if (!familyFile || !fs.existsSync(familyFile)) errors.push(`no css ${chosen ? `reached from ${chosen.entry}` : `in ${repoAbs}`} scopes [data-grammar-family="${familyId}"]`);
+  if (!familyFile || !fs.existsSync(familyFile)) errors.push(`no css ${chosen ? 'reached from ' + chosen.entry : 'in ' + repoAbs} scopes [data-grammar-family="${familyId}"]`);
   return {
     family: fam, familyId, repo: repoAbs, errors,
     entry: chosen?.entry ?? null, otherEntries: ranked.slice(1).map((e) => e.entry),
@@ -718,7 +718,7 @@ const shortFile = (file, repo) => {
   return rel.split(path.sep).join('/');
 };
 const px = (v) => (v?.px == null ? (v?.value ?? 'unset') : `${Math.round(v.px * 10) / 10}px`);
-const chainText = (v) => (v?.trace?.length ? ` <- ${v.trace.map((t) => `${t.name}: ${t.value}`).join(' <- ')}` : '');
+const chainText = (v) => v?.trace?.length ? ' <- ' + v.trace.map((t) => t.name + ': ' + t.value).join(' <- ') : '';
 const filesOf = (v, repo) => [...new Set([v.file, ...(v.trace ?? []).map((t) => t.file)].filter(Boolean).map((f) => shortFile(f, repo)))].join('; ');
 const declared = (v, repo) => (v ? `\`${v.declared}\`${chainText(v)} (${filesOf(v, repo)})` : 'undeclared');
 const isPill = (radiusPx, heightPx) => radiusPx != null && heightPx != null && radiusPx >= heightPx / 2;
@@ -737,7 +737,7 @@ export function geometryPrompt(g) {
   const lines = [];
   const b = a.button;
   lines.push(`GEOMETRY - mandatory, resolved from the product CSS (family ${g.family}, widths ${g.widths.join(' and ')}px). Draw these values; never a token the CSS does not bind.`,
-    `Cascade: ${g.sources.entry ? `${shortFile(g.sources.entry, repo)} and its imports` : 'installed packages'} - ${[...(g.sources.heroui?.files ?? []), g.sources.grammar.common, g.sources.familyFile].filter(Boolean).map((f) => shortFile(f, repo)).join('; ')} (@heroui/styles ${g.sources.heroui?.version}, @starci/grammar ${g.sources.grammar.version}${g.sources.grammar.installed ? '' : ' source'}).`,
+    `Cascade: ${g.sources.entry ? shortFile(g.sources.entry, repo) + ' and its imports' : 'installed packages'} - ${[...(g.sources.heroui?.files ?? []), g.sources.grammar.common, g.sources.familyFile].filter(Boolean).map((f) => shortFile(f, repo)).join('; ')} (@heroui/styles ${g.sources.heroui?.version}, @starci/grammar ${g.sources.grammar.version}${g.sources.grammar.installed ? '' : ' source'}).`,
     '',
     'Button (HeroUI .button, Grammar Button)',
     `- radius ${byWidth(g, (w) => w.button['border-radius'])} = ${declared(b['border-radius'], repo)}${isPill(b['border-radius']?.px, b.heightPx) ? ' - a pill (radius >= height/2)' : ''}.`,
@@ -759,7 +759,7 @@ export function geometryPrompt(g) {
   const c = a.card;
   lines.push('',
     'Card / SurfaceCard (Grammar SurfaceCard, SurfaceListCard)',
-    `- radius ${byWidth(g, (w) => w.card.top['border-radius'])} = ${declared(c.top['border-radius'], repo)}, painted by the ${c.top.part}${c.labelled.part !== c.top.part ? `; a labelled card paints its ${c.labelled.part}: radius ${px(c.labelled['border-radius'])}` : ''}.`,
+    `- radius ${byWidth(g, (w) => w.card.top['border-radius'])} = ${declared(c.top['border-radius'], repo)}, painted by the ${c.top.part}${c.labelled.part !== c.top.part ? '; a labelled card paints its ' + c.labelled.part + ': radius ' + px(c.labelled['border-radius']) : ''}.`,
     `- border ${noBorder(c.top['border-top-width']) ? 'none' : px(c.top['border-top-width'])} (${declared(c.top['border-top-width'], repo)}); shadow ${normalizeShadowText(c.top['box-shadow']?.value)} (${c.top['box-shadow']?.declared}${chainText(c.top['box-shadow'])}); fill ${c.top['background-color']?.value}.`,
     `- a surface nested inside another: border ${px(c.nested['border-top-width'])} ${c.nested['border-top-style']?.value ?? ''} ${c.nested['border-top-color']?.value ?? ''}, shadow ${normalizeShadowText(c.nested['box-shadow']?.value)}.`,
     `- content inset ${px(c.content['padding-top'])} (${declared(c.content['padding-top'], repo)}); joined bands: card inset ${px(c.joined['padding-top'])}, gap ${px(c.joined['row-gap'])}; external label to card ${px(c.labelGap)}.`);
@@ -775,7 +775,7 @@ export function geometryPrompt(g) {
   for (const t of g.font.tokens) lines.push(`- family token ${t.name}: ${t.resolved ?? t.value}.`);
   for (const s of g.font.surfaces) lines.push(`- ${s.selector} (${shortFile(s.file, repo)}) binds ${s.value}.`);
   const others = g.unbound.filter((t) => !cardTokens.includes(t));
-  if (others.length) lines.push('', `Declared by the family, read by no var() and no source file (they do not render): ${others.map((t) => `${t.name} ${t.value}`).join('; ')}.`);
+  if (others.length) lines.push('', `Declared by the family, read by no var() and no source file (they do not render): ${others.map((t) => String(t.name) + ' ' + String(t.value)).join('; ')}.`);
   return `${lines.join('\n')}\n`;
 }
 
@@ -859,7 +859,7 @@ function collectPage(probes) {
       i, parent: p ? index.get(p) : null, tag: e.tagName.toLowerCase(), id: e.id || null, cls: typeof e.className === 'string' ? e.className : '',
       // A real grammar render (draw-render fixture mode of a <XBase>.draw.tsx): the component root it is, and whether it
       // is a layout element the drawing itself wrote (draw-source.mjs LAYOUT_ATTR).
-      comp: e.dataset.component ?? null, drawLayout: e.dataset.drawLayout !== undefined, dataWidth: e.dataset.width ?? null,
+      comp: e.getAttribute('data-component'), drawLayout: e.hasAttribute('data-draw-layout'), dataWidth: e.getAttribute('data-width'),
       role: e.getAttribute('role'), type: e.getAttribute('type'), href: e.getAttribute('href'),
       aria: { selected: e.getAttribute('aria-selected'), current: e.getAttribute('aria-current'), hidden: e.getAttribute('aria-hidden'), required: e.getAttribute('aria-required'), invalid: e.getAttribute('aria-invalid') },
       required: Boolean(e.required), disabled: Boolean(e.disabled), labelText, described, placeholder: e.getAttribute('placeholder'), value: 'value' in e && typeof e.value === 'string' ? e.value.slice(0, 80) : null,
@@ -908,7 +908,7 @@ export async function snapshotFiles(files, { repo = null, viewport = DEFAULT_VIE
           const e = document.activeElement;
           if (!e || e === document.body) return null;
           const s = getComputedStyle(e);
-          return { i: Number(e.dataset.ggI ?? null), outline: { style: s.outlineStyle, w: Number.parseFloat(s.outlineWidth) || 0, offset: Number.parseFloat(s.outlineOffset) || 0 }, shadow: s.boxShadow, focusVisible: e.matches(':focus-visible') };
+          return { i: Number(e.getAttribute('data-gg-i')), outline: { style: s.outlineStyle, w: Number.parseFloat(s.outlineWidth) || 0, offset: Number.parseFloat(s.outlineOffset) || 0 }, shadow: s.boxShadow, focusVisible: e.matches(':focus-visible') };
         }));
       }
       shots.push({ file, viewport, ...snap, focus });
@@ -932,7 +932,7 @@ export function readSnapshot(snap) {
   const els = snap.elements;
   const byI = new Map(els.map((e) => [e.i, e]));
   const kids = new Map();
-  for (const e of els) if (e.parent != null) { if (!kids.has(e.parent)) kids.set(e.parent, []); kids.get(e.parent).push(e); }
+  for (const e of els) { if (e.parent != null) { if (!kids.has(e.parent)) kids.set(e.parent, []); kids.get(e.parent).push(e); } }
   const ancestors = (e) => { const out = []; let p = e.parent; while (p != null && byI.has(p)) { out.push(byI.get(p)); p = byI.get(p).parent; } return out; };
   const pageBg = [snap.root.bodyBg, snap.root.htmlBg].find((c) => c && c[3] > 0) ?? [255, 255, 255, 1];
   const composed = new Map();
@@ -983,7 +983,7 @@ export function readSnapshot(snap) {
 // The check
 // ---------------------------------------------------------------------------------------------------------
 
-const describe = (e) => `${e.tag}${e.id ? `#${e.id}` : ''}${e.own ? ` "${e.own.slice(0, 40)}"` : e.value ? ` [${e.value.slice(0, 30)}]` : ''}`;
+const describe = (e) => { let content = ''; if (e.own) content = ' "' + e.own.slice(0, 40) + '"'; else if (e.value) content = ' [' + e.value.slice(0, 30) + ']'; return e.tag + (e.id ? '#' + e.id : '') + content; };
 const near = (a, b, tol = 1) => a != null && b != null && Math.abs(a - b) <= tol;
 
 /** Probes the page must normalise: every expected colour and shadow in computed form. */
@@ -1029,7 +1029,7 @@ export function geometryFindings(snap, g, { file = snap.file } = {}) {
     if (a.button['font-size']?.px != null && label.own && !near(label.style.fontSize, a.button['font-size'].px, 0.5)) off('button', e, 'font-size', `${label.style.fontSize}px`, `${a.button['font-size'].px}px`, a.button['font-size'].file);
     const bg = e.style.bg;
     const variant = variantColors.some((vc) => (alphaOf(bg) < 0.02 ? alphaOf(vc.bg) < 0.02 : sameColor(bg, vc.bg)));
-    if (!variant) off('button', e, 'fill', bg ? `rgba(${bg.join(', ')})` : 'none', `one of the Button variants: ${variantColors.filter((x) => x.bg).map((x) => `${x.v} ${P[`button.${x.v}.bg`]?.value}`).join('; ')}`, a.button.variants.primary['background-color']?.file);
+    if (!variant) off('button', e, 'fill', bg ? `rgba(${bg.join(', ')})` : 'none', `one of the Button variants: ${variantColors.filter((x) => x.bg).map((x) => x.v + ' ' + P[`button.${x.v}.bg`]?.value).join('; ')}`, a.button.variants.primary['background-color']?.file);
     else if (alphaOf(bg) < 0.02 && view.borderOn(e)) {
       const b = e.style.border[0];
       const ow = a.button.variants.outline;
@@ -1135,7 +1135,7 @@ export function parseViewport(text) {
 
 function plain(g) {
   const strip = (v) => (v && typeof v === 'object' && 'declared' in v ? { value: v.value, px: v.px, declared: v.declared, trace: v.trace, file: v.file } : v);
-  const walk = (o) => (Array.isArray(o) ? o.map(walk) : o && typeof o === 'object' ? ('declared' in o ? strip(o) : Object.fromEntries(Object.entries(o).map(([k, v]) => [k, walk(v)]))) : o);
+  const walk = (o) => { if (Array.isArray(o)) return o.map(walk); if (o && typeof o === 'object') { if ('declared' in o) return strip(o); return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, walk(v)])); } return o; };
   return { schema: 'starci/grammar-geometry@1', ok: g.ok, family: g.family, sources: g.sources, widths: g.widths, at: walk(g.at), font: walk(g.font), unbound: g.unbound, touchFloor: walk(g.touchFloor) };
 }
 

@@ -43,8 +43,16 @@ export const ARCHETYPES = Object.freeze([...DIRECTION_ARCHETYPES, 'layout']);
 /** Archetypes that owe no brand.direction archetype: a layout record draws brand.decide's chrome. */
 export const DIRECTION_EXEMPT = Object.freeze(['layout']);
 
-const text = (v) => (typeof v === 'string' ? v : v && typeof v === 'object' ? Object.values(v).map(text).join(' ') : '');
-const surfaces = (s) => (typeof s === 'string' ? [s] : s && typeof s === 'object' ? Object.values(s).map(String) : []);
+const text = (v) => {
+  if (typeof v === 'string') return v;
+  if (v && typeof v === 'object') return Object.values(v).map(text).join(' ');
+  return '';
+};
+const surfaces = (s) => {
+  if (typeof s === 'string') return [s];
+  if (s && typeof s === 'object') return Object.values(s).map(String);
+  return [];
+};
 
 // The title/intent/route words that derive an archetype (the record's words are lower-cased first); the Vietnamese
 // lists are lexicon data (modules/goal/source-phrases.yaml uiArchetype).
@@ -62,7 +70,8 @@ export function archetypeOf(record) {
   if (surf.includes('layout')) return { archetype: 'layout', derived: true, why: 'surface layout' };
   if (WIZARD_WORDS.test(words)) return { archetype: 'wizard', derived: true, why: 'a stepped task' };
   if (surf.some((s) => s === 'modal' || s === 'drawer') || FORM_WORDS.test(words)) {
-    return { archetype: 'form', derived: true, why: surf.some((s) => s === 'modal' || s === 'drawer') ? `surface ${surf.join('/')}` : 'an editing task' };
+    const why = surf.some((s) => s === 'modal' || s === 'drawer') ? `surface ${surf.join('/')}` : 'an editing task';
+    return { archetype: 'form', derived: true, why };
   }
   const last = route.split('/').findLast(Boolean) ?? '';
   if (/^\[[^\]]+\]$/.test(last) && !/^\[\[?\.\.\./.test(last) && !/locale|lang/i.test(last)) return { archetype: 'detail', derived: true, why: `dynamic route segment ${last}` };
@@ -87,10 +96,11 @@ export function directionReadiness(workRoot, archetype, { grammarRoot = defaultG
     && (ev.golden ?? []).some((g) => g.archetype === archetype && g.pngSha256)) {
     return { ready: true, provisional: true, status, rev: ev.rev ?? null, why: `provisionally ready under autopilot: the ${archetype} archetype is ${status}, the direction check passes and its golden is on disk; the owner reviews it at handover` };
   }
-  const why = ready ? 'accepted by the owner'
-    : !record.brand?.direction ? 'the brand record carries no brand.direction'
-      : status == null ? `brand.direction declares no ${archetype} archetype`
-        : status !== 'accepted' ? `the ${archetype} archetype is ${status}`
-          : `the ${archetype} archetype says accepted but the owner's receipt does not back it (${(ev.problems ?? []).filter((p) => p.includes(archetype)).join('; ') || 'checkDirection'})`;
+  let why;
+  if (ready) why = 'accepted by the owner';
+  else if (!record.brand?.direction) why = 'the brand record carries no brand.direction';
+  else if (status == null) why = `brand.direction declares no ${archetype} archetype`;
+  else if (status !== 'accepted') why = `the ${archetype} archetype is ${status}`;
+  else why = `the ${archetype} archetype says accepted but the owner's receipt does not back it (${(ev.problems ?? []).filter((p) => p.includes(archetype)).join('; ') || 'checkDirection'})`;
   return { ready, status, rev: ev.rev ?? null, why };
 }

@@ -86,7 +86,7 @@ const RUN_ONLY = /(?:^(the )?run\b)|\bthe run (reaches|is driven|completes|submi
 // The surface
 // ---------------------------------------------------------------------------------------------------------
 
-const flatText = (v) => (v == null ? '' : typeof v === 'string' ? v : Array.isArray(v) ? v.map(flatText).join('\n') : typeof v === 'object' ? Object.entries(v).map(([k, x]) => `${k}: ${flatText(x)}`).join('\n') : String(v));
+const flatText = (v) => { if(v==null)return '';if(typeof v==='string')return v;if(Array.isArray(v))return v.map(flatText).join('\n');if(typeof v==='object')return Object.entries(v).map(([k,x])=>`${k}: ${flatText(x)}`).join('\n');return String(v); };
 
 /** The ui record file for a path (the index.yaml itself or its directory). */
 function surfaceFile(p) {
@@ -168,7 +168,7 @@ export function classifyCase(rule, c, elements) {
 // Numbers: rem values, Tailwind classes and CSS tokens resolved through the product cascade
 // ---------------------------------------------------------------------------------------------------------
 
-const remPx = (v) => { const m = /^(-?\d*\.?\d+)(rem|px)?$/.exec(String(v ?? '').trim()); return m ? Number(m[1]) * (m[2] === 'px' ? 1 : REM_PX) : null; };
+const remPx = (v) => { const m = /^(-?\d*\.?\d+)(rem|px)?$/.exec(String(v ?? '').trim()); if(!m)return null;return Number(m[1]) * (m[2] === 'px' ? 1 : REM_PX); };
 const fmtPx = (n) => (n == null ? '?' : `${Math.round(n * 10) / 10}px`);
 
 /** A token lookup over the family root at one width: `variable(name)` -> {value, px}. */
@@ -197,7 +197,7 @@ export function classValue(cls, scope) {
     if (size === 'none') return { cls, variant, px: 0, how: 'none' };
     if (size === 'full') return { cls, variant, px: Infinity, how: 'a corner larger than the box (pill)' };
     const v = size ? scope?.variable(`--radius-${size}`) : scope?.variable('--radius');
-    return v?.px != null ? { cls, variant, px: v.px, how: `--radius${size ? `-${size}` : ''}: ${v.value}` } : { cls, variant, px: null, how: `--radius-${size} is not bound by the cascade` };
+    if(v?.px!=null)return {cls,variant,px:v.px,how:'--radius'+(size?'-'+size:'')+': '+v.value};return {cls,variant,px:null,how:`--radius-${size} is not bound by the cascade`};
   }
   m = bare.match(/^text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl)$/);
   if (m) {
@@ -232,8 +232,8 @@ export function classesIn(text, scope) {
   return out;
 }
 
-const describeClass = (v) => `${v.cls} = ${v.px === Infinity ? 'pill' : v.px != null ? fmtPx(v.px) : v.weight ?? '?'}${v.lineHeight ? `/${fmtPx(v.lineHeight)}` : ''}${v.variant ? ` (at ${v.variant})` : ''}`;
-const withPx = (text) => String(text ?? '').replace(/(^|[^\w.])(\d*\.?\d+)rem\b/g, (all, pre, n) => `${pre}${n}rem (${fmtPx(Number(n) * REM_PX)})`);
+const describeClass = (v) => { let size;if(v.px===Infinity)size='pill';else if(v.px!=null)size=fmtPx(v.px);else size=v.weight??'?';return v.cls+' = '+size+(v.lineHeight?'/'+fmtPx(v.lineHeight):'')+(v.variant?' (at '+v.variant+')':''); };
+const withPx = (text) => String(text ?? '').replace(/(^|[^\w.])(\d*\.?\d+)rem\b/g, (all, pre, n) => pre+n+'rem ('+fmtPx(Number(n)*REM_PX)+')');
 
 /** The CSS each component-owned knowledge row can be checked against (selectors only). */
 const OWNED_CSS = (chains) => [
@@ -276,7 +276,7 @@ export function buildBrief({ record, recordFile = null, repo = null, family = nu
           const step = steps.get(rule.id);
           const stepPx = remPx(step?.value);
           entry.numbers = [
-            ...(step?.value != null ? [{ what: `${rule.id} scale step`, text: `${step.value}${stepPx != null ? ` = ${fmtPx(stepPx)}` : ''}${step.token ? ` (${step.token})` : ''}` }] : []),
+            ...(step?.value != null ? [{ what: `${rule.id} scale step`, text: String(step.value)+(stepPx!=null?' = '+fmtPx(stepPx):'')+(step.token?' ('+step.token+')':'') }] : []),
             ...classesIn(`${rule.title ?? ''} ${c.render ?? ''}`, scope).map((v) => ({ what: 'class', text: describeClass(v), value: v })),
           ];
           if (step?.token && scope) {
@@ -304,7 +304,7 @@ export function buildBrief({ record, recordFile = null, repo = null, family = nu
   for (const r of ownedRows) { const key = `${r.path} ${r.component} | ${r.element}`; if (!byElement.has(key)) byElement.set(key, []); byElement.get(key).push(r); }
   for (const [key, rows] of byElement) {
     const rules = [...new Set(rows.map((r) => r.rule).filter(Boolean))];
-    if (rules.length > 1) conflicts.push({ kind: 'two-owners', text: `${key.split(' ')[0]}: ${rows[0].component} "${rows[0].element}" is owned by ${rules.map((id) => `${id}${rows.find((r) => r.rule === id)?.px != null ? ` (${fmtPx(rows.find((r) => r.rule === id).px)})` : ''}`).join(' and ')} - the knowledge row does not say which condition selects each` });
+    if (rules.length > 1) conflicts.push({ kind: 'two-owners', text: `${key.split(' ')[0]}: ${rows[0].component} "${rows[0].element}" is owned by ${rules.map((id) => id+(rows.find((r) => r.rule === id)?.px != null?' ('+fmtPx(rows.find((r) => r.rule === id).px)+')':'')).join(' and ')} - the knowledge row does not say which condition selects each` });
   }
   // A component-owned knowledge value against what Grammar's CSS binds.
   const cssFacts = [];
@@ -334,10 +334,10 @@ function fontPx(knowledge, ruleId, scope) {
 /** The brief as text. */
 export function briefText(b) {
   const lines = [];
-  lines.push(`UI PROOF BRIEF - ${b.record ?? 'surface'}${b.surface ? ` (${path.relative(process.cwd(), b.surface).split(path.sep).join('/')})` : ''}`,
-    `Elements: ${Object.entries(b.elements.kinds).map(([k, why]) => `${k} [${why}]`).join('; ')}.`,
+  lines.push(`UI PROOF BRIEF - ${b.record ?? 'surface'}${b.surface ? ' ('+path.relative(process.cwd(), b.surface).split(path.sep).join('/')+')' : ''}`,
+    `Elements: ${Object.entries(b.elements.kinds).map(([k, why]) => k+' ['+why+']').join('; ')}.`,
     `Components: ${b.elements.components.join(', ') || 'none named'}.`,
-    b.geometry.ok ? `Numbers resolved through the product CSS (family ${b.geometry.family}, ${b.geometry.sources.entry ? path.relative(b.geometry.sources.repo, b.geometry.sources.entry).split(path.sep).join('/') : 'installed packages'}).` : `Numbers: knowledge values only (${b.geometry.errors.join('; ')}).`,
+    (()=>{if(!b.geometry.ok)return `Numbers: knowledge values only (${b.geometry.errors.join('; ')}).`;const entry=b.geometry.sources.entry?path.relative(b.geometry.sources.repo,b.geometry.sources.entry).split(path.sep).join('/'):'installed packages';return `Numbers resolved through the product CSS (family ${b.geometry.family}, ${entry}).`;})(),
     '',
     `CONFLICTS (${b.conflicts.length}) - named, not resolved here:`);
   for (const c of b.conflicts) lines.push(`- [${c.kind}] ${c.text}`);
@@ -356,14 +356,14 @@ export function briefText(b) {
         if (c.numbers?.length) lines.push(`    numbers: ${c.numbers.map((n) => n.text).join('; ')}`);
       }
       for (const gd of t.guidance) lines.push(`- ${t.path} guidance ${gd.id}: ${squash(gd.requirement)}`);
-      if (t.skipped.length) lines.push(`  not applicable: ${t.skipped.map((s) => `${s.id} (${s.reason})`).join('; ')}`);
+      if (t.skipped.length) lines.push(`  not applicable: ${t.skipped.map((s) => s.id+' ('+s.reason+')').join('; ')}`);
     }
   }
   if (b.ownedRows.length) {
     lines.push('', '== COMPONENT-OWNED VALUES (compose the component; never restate them in app classes) ==');
     for (const r of b.ownedRows) {
       const fact = b.cssFacts.find((f) => f.path === r.path && f.component === r.component && f.element === r.element);
-      lines.push(`- ${r.path} ${r.component} "${r.element}": ${r.rule ?? '(no rule)'}${r.px != null ? ` = ${fmtPx(r.px)}` : ''}${fact?.css != null ? `; CSS ${fact.prop} ${fmtPx(fact.css)} (\`${fact.declared}\`)` : ''}`);
+      lines.push('- '+r.path+' '+r.component+' "'+r.element+'": '+(r.rule??'(no rule)')+(r.px!=null?' = '+fmtPx(r.px):'')+(fact?.css!=null?'; CSS '+fact.prop+' '+fmtPx(fact.css)+' (`'+fact.declared+'`)':''));
     }
   }
   if (b.geometry.ok) {
@@ -374,8 +374,8 @@ export function briefText(b) {
       `- card radius ${fmtPx(a.card.top['border-radius']?.px)}, no border, shadow ${normalizeShadowText(a.card.top['box-shadow']?.value)}; content inset ${fmtPx(a.card.content['padding-top']?.px)}; joined inset ${fmtPx(a.card.joined['padding-top']?.px)} gap ${fmtPx(a.card.joined['row-gap']?.px)}; external label to card ${fmtPx(a.card.labelGap?.px)}; badge radius ${fmtPx(a.badge['border-radius']?.px)} height ${fmtPx(a.badge.heightPx)}; font ${b.geometry.font.binding?.value}.`);
     const inset = b.geometry.resolver.memo('inset-root', [b.geometry.chains.html, b.geometry.chains.root], 390).variable('--grammar-page-inset');
     const unbound = b.geometry.unbound.filter((u) => /radius|shadow|surface|font/.test(u.name));
-    if (unbound.length) lines.push(`- declared by the ${b.geometry.family} family and read by nothing, so never drawn: ${unbound.map((u) => `${u.name} ${u.value}`).join('; ')}.`);
-    if (inset) lines.push(`- page inset --grammar-page-inset ${inset.declared} = ${b.geometry.widths.map((w) => `${fmtPx(b.geometry.resolver.memo(`inset-${w}`, [b.geometry.chains.html, b.geometry.chains.root], w).variable('--grammar-page-inset')?.px)} at ${w}px`).join(', ')} (PageContainer).`);
+    if (unbound.length) lines.push(`- declared by the ${b.geometry.family} family and read by nothing, so never drawn: ${unbound.map((u) => String(u.name)+' '+String(u.value)).join('; ')}.`);
+    if (inset) lines.push(`- page inset --grammar-page-inset ${inset.declared} = ${b.geometry.widths.map((w) => fmtPx(b.geometry.resolver.memo('inset-'+w,[b.geometry.chains.html,b.geometry.chains.root],w).variable('--grammar-page-inset')?.px)+' at '+w+'px').join(', ')} (PageContainer).`);
   }
   return `${lines.join('\n')}\n`;
 }
@@ -454,7 +454,7 @@ function hairlines(v, card) {
 function pageInsetOf(v, card, width) {
   const anc = v.ancestors(card);
   const padded = anc.filter((a) => a.style.padding[1] > 0.5 || a.style.padding[3] > 0.5);
-  const page = anc.find((a) => a.comp === 'PageContainer') ?? padded[padded.length - 1] ?? null;
+  const page = anc.find((a) => a.comp === 'PageContainer') ?? padded.at(-1) ?? null;
   const cardRight = card.rect.x + card.rect.w;
   if (!page) return { left: card.rect.x, right: width - cardRight, via: 'viewport' };
   const [, pr, , pl] = page.style.padding;
@@ -462,7 +462,7 @@ function pageInsetOf(v, card, width) {
   const outerL = page.rect.x + bl, outerR = page.rect.x + page.rect.w - br;
   const left = card.rect.x < outerL + pl - 0.5 ? card.rect.x - outerL : pl;
   const right = cardRight > outerR - pr + 0.5 ? outerR - cardRight : pr;
-  return { left, right, via: `${tag(page)}${page.cls ? `.${page.cls.split(/\s+/)[0]}` : ''} padding` };
+  return { left, right, via: `${tag(page)}${page.cls ? '.'+page.cls.split(/\s+/)[0] : ''} padding` };
 }
 
 /** Full-width disclosure triggers of a card: a <details> root's <summary>, or a Grammar accordion trigger. */
@@ -613,7 +613,7 @@ const MEASURERS = {
   'accessibility.yaml A11Y-1 case-1': (v) => {
     if (!v.inputs.length) return NONE('no field rendered');
     const bad = v.inputs.filter((e) => !e.labelText);
-    return bad.length ? FAIL(`${bad.map((e) => `${e.tag}${e.placeholder ? ` placeholder "${e.placeholder}"` : ''}`).join(', ')} has no accessible name from a label`) : PASS(`${v.inputs.length} field(s) named by their visible label`);
+    return bad.length ? FAIL(`${bad.map((e) => e.tag+(e.placeholder?' placeholder "'+e.placeholder+'"':'')).join(', ')} has no accessible name from a label`) : PASS(`${v.inputs.length} field(s) named by their visible label`);
   },
   'ux.yaml UX-8 case-1': (v) => MEASURERS['accessibility.yaml A11Y-1 case-1'](v),
   'accessibility.yaml A11Y-1 case-2': (v) => {
@@ -626,7 +626,7 @@ const MEASURERS = {
     }
     if (!pairs.length) return NONE('no hint or message renders beside a field');
     const bad = pairs.filter((p) => !p.related);
-    return bad.length ? FAIL(`${bad.map((p) => `"${p.h.own.slice(0, 30)}" is not aria-describedby of ${tag(p.input)}`).join('; ')}`) : PASS(`${pairs.length} hint(s) related by aria-describedby`);
+    return bad.length ? FAIL(`${bad.map((p) => '"'+p.h.own.slice(0, 30)+'" is not aria-describedby of '+tag(p.input)).join('; ')}`) : PASS(`${pairs.length} hint(s) related by aria-describedby`);
   },
   'accessibility.yaml A11Y-4 case-4': (v) => (v.snap.root.scrollWidth > v.snap.root.clientWidth + 1 ? FAIL(`horizontal overflow: scrollWidth ${v.snap.root.scrollWidth} > ${v.snap.root.clientWidth}`) : PASS(`no horizontal overflow at ${v.snap.root.clientWidth}px`)),
   'accessibility.yaml A11Y-4 case-1': (v, ctx, c) => {
@@ -635,16 +635,16 @@ const MEASURERS = {
     const targets = v.els.filter((e) => e.visible && (e.role === 'button' || e.tag === 'button') && v.els.some((x) => x.i === e.i) && (e.cls.includes('accordion') || v.ancestors(e).some((a) => /rail|accordion/i.test(a.cls))));
     if (!targets.length) return NONE('no accordion trigger or rail control rendered (the only targets the case sizes)');
     const bad = targets.filter((e) => e.rect.w < Number(m[1]) - 0.5 || e.rect.h < Number(m[2]) - 0.5);
-    return bad.length ? FAIL(bad.map((e) => `${tag(e)} ${r1(e.rect.w)}x${r1(e.rect.h)}`).join(', ')) : PASS(`${targets.length} target(s) >= ${m[1]}x${m[2]}`);
+    return bad.length ? FAIL(bad.map((e) => tag(e)+' '+r1(e.rect.w)+'x'+r1(e.rect.h)).join(', ')) : PASS(`${targets.length} target(s) >= ${m[1]}x${m[2]}`);
   },
   'taste.yaml TASTE-1 case-2': (v) => {
     const heads = v.els.filter((e) => e.visible && /^h[1-6]$/.test(e.tag));
-    const title = heads.find((e) => e.tag === 'h1') ?? heads.sort((a, b) => b.style.fontSize - a.style.fontSize)[0];
+    const h1 = heads.find((e) => e.tag === 'h1'); if (!h1) heads.sort((a, b) => b.style.fontSize - a.style.fontSize); const title = h1 ?? heads[0];
     if (!title) return NONE('no heading rendered');
     const sections = heads.filter((e) => e.i !== title.i && e.tag !== 'h1');
     if (!sections.length) return NONE('no section title beside the page title');
     const bad = sections.filter((s) => s.style.fontSize >= title.style.fontSize && s.style.fontWeight >= title.style.fontWeight);
-    return bad.length ? FAIL(`${bad.map((s) => `${tag(s)} ${s.style.fontSize}px/${s.style.fontWeight}`).join(', ')} not below the title ${title.style.fontSize}px/${title.style.fontWeight}`) : PASS(`title ${title.style.fontSize}px/${title.style.fontWeight} above ${sections.length} section title(s)`);
+    return bad.length ? FAIL(`${bad.map((s) => tag(s)+' '+s.style.fontSize+'px/'+s.style.fontWeight).join(', ')} not below the title ${title.style.fontSize}px/${title.style.fontWeight}`) : PASS(`title ${title.style.fontSize}px/${title.style.fontWeight} above ${sections.length} section title(s)`);
   },
   'taste.yaml TASTE-4 case-3': (v, ctx) => {
     const scale = new Set([...scalePx(ctx.knowledge, 'gap'), ...scalePx(ctx.knowledge, 'padding')].map(Math.round));
@@ -743,7 +743,7 @@ function fromSpacing(ctx, idRe, sourceRe = null) {
   const rows = ctx.spacing.filter((s) => idRe.test(s.id) && (!sourceRe || sourceRe.test(s.source)));
   if (!rows.length || rows.every((r) => r.status === 'unmeasurable')) return NONE('nothing of that kind rendered');
   const bad = rows.filter((r) => r.status === 'fail');
-  const text = (r) => `${r.id} ${typeof r.got === 'number' ? `${r.got}px` : r.got} (want ${typeof r.exp === 'number' ? `${r.exp}px` : r.exp})${r.evidence ? ` ${r.evidence}` : ''}`;
+  const text = (r) => r.id+' '+(typeof r.got==='number'?r.got+'px':r.got)+' (want '+(typeof r.exp==='number'?r.exp+'px':r.exp)+')'+(r.evidence?' '+r.evidence:'');
   return bad.length ? FAIL(bad.map(text).join('; ')) : PASS(`${rows.length} measured: ${rows.slice(0, 4).map(text).join('; ')}`);
 }
 
@@ -759,7 +759,7 @@ function textContrast(v, ctx, large) {
   if (!runs.length) return NONE(`no ${large ? 'large' : 'normal'} text rendered`);
   const measured = runs.map((e) => { const bg = v.bgOf(e); const fg = alphaOver(e.style.color, bg); return { e, ratio: contrastRatio(fg, bg) }; });
   const bad = measured.filter((x) => x.ratio < floor - 0.005).sort((a, b) => a.ratio - b.ratio);
-  return bad.length ? FAIL(`${bad.length} run(s) under ${floor}:1, worst ${bad.slice(0, 3).map((x) => `${tag(x.e)} ${x.ratio.toFixed(2)}:1`).join(', ')}`) : PASS(`${runs.length} run(s) >= ${floor}:1 (lowest ${Math.min(...measured.map((x) => x.ratio)).toFixed(2)}:1)`);
+  return bad.length ? FAIL(`${bad.length} run(s) under ${floor}:1, worst ${bad.slice(0, 3).map((x) => tag(x.e)+' '+x.ratio.toFixed(2)+':1').join(', ')}`) : PASS(`${runs.length} run(s) >= ${floor}:1 (lowest ${Math.min(...measured.map((x) => x.ratio)).toFixed(2)}:1)`);
 }
 
 function focusCheck(v) {
