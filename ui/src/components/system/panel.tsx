@@ -13,7 +13,7 @@ import { t } from '../../i18n/t';
 export const concept: Concept = 'frame';
 
 export const isIssue = (state: UiState | null | undefined) => state === 'bad' || state === 'warn';
-export const dash = (value: unknown): string => value == null || value === '' ? '—' : String(value);
+export const dash = (value: string | number | boolean | null | undefined): string => value == null || value === '' ? '—' : String(value);
 export const at = (value: number | null | undefined) => value == null ? '—' : formatAbsolute(value);
 export const number = (value: number | null | undefined, digits = 0) => value == null ? '—' : new Intl.NumberFormat('vi-VN', { maximumFractionDigits: digits }).format(value);
 
@@ -23,13 +23,13 @@ export function stateOf(rows: { ui: UiState }[]): UiState {
   return priority.find((state) => rows.some((row) => row.ui === state)) ?? 'unknown';
 }
 
-export function RefLink({ refValue }: { refValue: Ref | null }) {
+export function RefLink({ refValue }: { readonly refValue: Ref | null }) {
   return refValue
     ? <a className="inline-flex items-center gap-1 text-primary hover:underline" href={refValue.href}>{refValue.id}<ArrowUpRight size={12} aria-hidden="true" /></a>
     : <span>—</span>;
 }
 
-export function BlobLinkButton({ blob, label }: { blob: BlobLink | null; label: string }) {
+export function BlobLinkButton({ blob, label }: { readonly blob: BlobLink | null; readonly label: string }) {
   return blob
     ? <a className="inline-flex items-center gap-1 text-primary hover:underline" href={blob.href} target="_blank" rel="noreferrer">{label}<ExternalLink size={12} aria-hidden="true" /></a>
     : <span className="text-muted-foreground">{t('No {label} yet', { label: label.toLowerCase() })}</span>;

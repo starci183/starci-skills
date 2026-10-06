@@ -44,4 +44,4 @@ export function CopyId({ value, copy, title }: Readonly<{ value: string | null |
   </span>;
 }
 
-export const ShaId = ({ sha }: { sha: string | null | undefined }) => <CopyId value={sha ? sha.slice(0, 10) : null} copy={sha ?? undefined} title={sha ?? undefined} />;
+export const ShaId = ({ sha }: Readonly<{ sha: string | null | undefined }>) => <CopyId value={sha ? sha.slice(0, 10) : null} copy={sha ?? undefined} title={sha ?? undefined} />;

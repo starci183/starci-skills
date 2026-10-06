@@ -7,11 +7,10 @@ import { formatDayTime } from './leg/time';
 import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C4';
-export type WorkGraph = { nodes: GraphNode[]; edges: Edge[]; groups: { op: string; total: number; byUi: Record<UiState, number> }[] };
+export type WorkGraph = { nodes: GraphNode[]; edges: GraphEdge[]; groups: { op: string; total: number; byUi: Record<UiState, number> }[] };
 type Predecessor = { unit: string; kind: string };
-export type GraphGroup = { id: string; op: string; nodes: GraphNode[]; incoming: Edge[]; recordedEdges: Edge[]; predecessors: Predecessor[]; ui: UiState; orderUnresolved: boolean };
-type Edge = GraphEdge;
-type GroupEdge = Edge & { records: Edge[] };
+export type GraphGroup = { id: string; op: string; nodes: GraphNode[]; incoming: GraphEdge[]; recordedEdges: GraphEdge[]; predecessors: Predecessor[]; ui: UiState; orderUnresolved: boolean };
+type GroupEdge = GraphEdge & { records: GraphEdge[] };
 type Dependency = { from: string; to: string };
 const severity: UiState[] = ['bad', 'warn', 'running', 'waiting', 'unknown', 'ok', 'done'];
 const nodeWidth = 208, nodeHeight = 76, colGap = 130, rowGap = 54;
@@ -104,7 +103,7 @@ function buildLayout(graph: WorkGraph) {
     group.recordedEdges = graph.edges.filter(edge => unitGroup.get(edge.to) === group.id);
   }
   const depth = new Map(groups.map(group => [group.id, 0]));
-  const outgoing = new Map<string, Edge[]>();
+  const outgoing = new Map<string, GraphEdge[]>();
   const remaining = new Map(groups.map(group => [group.id, 0]));
   for (const edge of edges) {
     outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), edge]);
@@ -146,7 +145,7 @@ export function GraphView({ graph, onUnit, onGroupSelect, selectionInInspector =
     const unknown = group.nodes.filter(node => node.ui === 'unknown').length;
     return t('{done}/{total} units done', { done, total: group.nodes.length }) + (unknown ? ` · ${t('{n} unknown', { n: unknown })}` : '');
   };
-  const edgeLabel = (edge: Edge) => `${edge.from} → ${edge.to} (${edge.kind}) · ${t('source: {source}', { source: edge.source ?? '—' })} · ${formatDayTime(edge.createdAt)}`;
+  const edgeLabel = (edge: GraphEdge) => `${edge.from} → ${edge.to} (${edge.kind}) · ${t('source: {source}', { source: edge.source ?? '—' })} · ${formatDayTime(edge.createdAt)}`;
   const anomalySections = [{ label: t('Missing endpoint'), rows: layout.evidence.dangling }, { label: t('Self dependency'), rows: layout.evidence.self }, { label: t('Cycle dependency'), rows: layout.evidence.cyclic }];
   const selectGroup = (group: GraphGroup) => {
     const next = selected === group.id ? null : group;

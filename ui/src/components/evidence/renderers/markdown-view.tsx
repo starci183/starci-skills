@@ -132,7 +132,7 @@ function blocks(src: string, base: string): ReactNode[] {
 
 /** Small safe markdown renderer (React nodes only, http(s) links only). */
 export function MarkdownView({ text }: Readonly<{ text: string }>) {
-  const src = text.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+  const src = text.replace(/^﻿/, '').replaceAll(/\r\n?/g, '\n');
   return (
     <Frame>
       <div className="flex justify-end border-b bg-muted/40 px-2 py-2"><CopyButton value={text} label={t('Copy source')} /></div>

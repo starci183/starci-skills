@@ -44,7 +44,7 @@ const icons: Partial<Record<Status, typeof CircleCheck>> = { success: CircleChec
 const toneOf = (s: Status) => (s === 'success' ? 'success' : s === 'failed' ? 'failed' : 'skipped');
 
 function Assertions({ manifest }: Readonly<{ manifest: AttemptManifest }>) {
-  const rows = manifest.assertions.map(a => ({ ...a, ...assertionStatus(a.outcome) }));
+  const rows = manifest.assertions.map((a, i) => ({ ...a, key: `${a.id}-${i}`, ...assertionStatus(a.outcome) }));
   const pass = rows.filter(r => r.status === 'success').length;
   const fail = rows.filter(r => r.status === 'failed').length;
   if (!rows.length) return <p className="text-sm text-muted-foreground">{t('The manifest declares no assertions.')}</p>;
@@ -55,12 +55,12 @@ function Assertions({ manifest }: Readonly<{ manifest: AttemptManifest }>) {
       <span className="ml-auto text-xs text-muted-foreground">{t('{pass}/{total} Op-declared criteria passed', { pass, total: rows.length })}{fail ? t(' · {n} failed', { n: fail }) : ''}</span>
     </div>
     <div className="mb-3 flex h-2 w-full gap-1 overflow-hidden rounded-full" role="img" aria-label={t('{pass} passed, {fail} failed, {other} other', { pass, fail, other: rows.length - pass - fail })}>
-      {rows.map((r, i) => <span key={`${r.id}-${i}`} data-tone={toneOf(r.status)} className="flex h-full min-w-1 flex-1"><Grow className="block size-full bg-[var(--tone)]" delay={i * 0.02} title={`${r.id}: ${r.label}`} /></span>)}
+      {rows.map((r, i) => <span key={r.key} data-tone={toneOf(r.status)} className="flex h-full min-w-1 flex-1"><Grow className="block size-full bg-[var(--tone)]" delay={i * 0.02} title={`${r.id}: ${r.label}`} /></span>)}
     </div>
     <ul className="divide-y rounded-lg border">
-      {rows.map((r, i) => {
+      {rows.map((r) => {
         const Icon = icons[r.status] ?? CircleHelp;
-        return <li key={`${r.id}-${i}`} data-tone={toneOf(r.status)} className="flex min-w-0 flex-wrap items-start gap-x-3 gap-y-1 p-3 text-sm">
+        return <li key={r.key} data-tone={toneOf(r.status)} className="flex min-w-0 flex-wrap items-start gap-x-3 gap-y-1 p-3 text-sm">
           <Icon className="mt-0.5 size-4 shrink-0 text-[var(--tone)]" aria-hidden="true" />
           <code className="min-w-0 break-all font-mono text-xs font-semibold">{r.id}</code>
           <StatusChip status={r.status} label={r.label} />
@@ -109,7 +109,7 @@ export function ResultCard({ attempt }: Readonly<{ attempt: AttemptDetailV3 }>) 
         </div>
         {attempt.why ? <WhyBlock why={attempt.why} className="mb-4 max-w-[80ch]" /> : null}
         {attempt.why?.provenance?.source === 'computed' ? <p className="text-xs text-muted-foreground">{t('Explanation computed from current reference data; it is not a stored settlement receipt.')}</p> : null}
-        {settle.lines.length ? <ul className="m-0 flex max-w-[72ch] list-disc flex-col gap-1 pl-6 text-sm">{settle.lines.map((line, i) => <li key={`${i}-${line}`} className="break-words">{line}</li>)}</ul>
+        {settle.lines.length ? <ul className="m-0 flex max-w-[72ch] list-disc flex-col gap-1 pl-6 text-sm">{settle.lines.map((line, i) => ({ key: `${i}-${line}`, line })).map(item => <li key={item.key} className="break-words">{item.line}</li>)}</ul>
           : <p className="m-0 text-sm text-muted-foreground">{attempt.verdict ? t('No additional verdict reason was recorded.') : t('No verdict has been recorded for this attempt yet.')}</p>}
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-4 text-sm">
           <span className="text-muted-foreground">{t('Next step:')}</span>

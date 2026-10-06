@@ -29,7 +29,7 @@ const tooltip = (agent: LinkedAgent) => [familyTint[agent.family].name, agent.po
   agent.modelAuthority !== 'attested' ? t('Model attestation has not been observed.') : null].filter(Boolean).join(' · ');
 
 /** Round family mark on a tinted circle. `live` adds a pulsing ring; `href` makes it a link. Tooltip: agent · pool · model. */
-export function AgentAvatar({ agent, size = 20, withLabel = false, live = false, href }: { agent: LinkedAgent; size?: number; withLabel?: boolean; live?: boolean; href?: string }) {
+export function AgentAvatar({ agent, size = 20, withLabel = false, live = false, href }: Readonly<{ agent: LinkedAgent; size?: number; withLabel?: boolean; live?: boolean; href?: string }>) {
   const tint = familyTint[agent.family];
   const target = href ?? agent.href;
   const isLive = live || agent.live;
@@ -45,5 +45,5 @@ export function AgentAvatar({ agent, size = 20, withLabel = false, live = false,
 
 /** Several agents (one per attempt/unit), overlapping, with "+N". */
 export function AgentStack({ agents, max = 4, size = 20 }: Readonly<{ agents: LinkedAgent[]; max?: number; size?: number }>) {
-  return <span className="inline-flex items-center"><span className="inline-flex -space-x-2">{agents.slice(0, max).map((a, i) => <span key={`${a.family}:${a.label}:${i}`} className="rounded-full ring-2 ring-card"><AgentAvatar agent={a} size={size} /></span>)}</span>{agents.length > max ? <span className="pl-2 text-xs text-muted-foreground">+{agents.length - max}</span> : null}</span>;
+  return <span className="inline-flex items-center"><span className="inline-flex -space-x-2">{agents.slice(0, max).map((a, i) => ({ key: `${a.family}:${a.label}:${i}`, agent: a })).map(item => <span key={item.key} className="rounded-full ring-2 ring-card"><AgentAvatar agent={item.agent} size={size} /></span>)}</span>{agents.length > max ? <span className="pl-2 text-xs text-muted-foreground">+{agents.length - max}</span> : null}</span>;
 }

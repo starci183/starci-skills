@@ -84,7 +84,7 @@ function tokenize(line: string): { nodes: ReactNode[]; block: boolean } {
 
 /** YAML with line numbers and light highlighting. Outcome values (pass/fail/blocked/done…) take status tones. */
 export function YamlView({ text }: Readonly<{ text: string }>) {
-  const src = text.replaceAll(/^﻿/g, '').replace(/\r\n/g, '\n');
+  const src = text.replaceAll(/^﻿/g, '').replaceAll(/\r\n/g, '\n');
   const lines = src.split('\n');
   if (lines.length > 5000) return <TextView text={text} query="" />;
   let block: number | null = null;
