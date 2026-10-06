@@ -85,7 +85,7 @@ const ROOTS = [
   /\$(\w+)\s*\|\s*(?:stop-process|spps)\b/gi,
   /\$(\w+)\.(?:terminate|kill)\s*\(/gi,
 ];
-const OWN_START = (root) => new RegExp(root === '!' ? '$^' : `(?:\\$${root}\\s*=\\s*\\(?\\s*(?:start-process|start-job|\\[[\\w.]+\\]::start)\\b|(?<![\\w$])${root}=\\$!)`, 'i');
+const OWN_START = (root) => new RegExp(root === '!' ? '$^' : String.raw`(?:\$${root}\s*=\s*\(?\s*(?:start-process|start-job|\[[\w.]+\]::start)\b|(?<![\w$])${root}=\$!)`, 'i');
 
 /** The refusal for a kill whose targets come from a process query, or null. `commands` are the parsed commands, `text` the raw call. */
 export function queryKillVerdict(parsed, text) {
