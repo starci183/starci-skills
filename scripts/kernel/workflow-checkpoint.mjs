@@ -185,6 +185,14 @@ function requireReceiptScope(ctx, rec, receipt) {
   const newer = [...mine, ...stray].filter((file) => !receipt.files.includes(file));
   if (newer.length) throw Object.assign(fail({ code: 'workflow-checkpoint-recovery-conflict' }, `newer files conflict with the prepared effect of ${receipt.opId}: ${newer.slice(0, 3).join(', ')}`), { files: newer });
 }
+/** The durable applied receipt re-verified against the live tree, or null when the effect was never applied. */
+const appliedReceipt = (ctx, rec, workflowId, head, state) => {
+  if (!state?.applied) return null;
+  requireCheckpointChain(ctx, rec, workflowId);
+  requireReceiptScope(ctx, rec, state.applied);
+  requireReceiptBytes(rec, state.applied, [head], git);
+  return publicReceipt(state.applied);
+};
 
 /**
  * Commit a green op's changes on the workflow branch as the new checkpoint, then setCheckpoint. Nothing changed in its scope: the
@@ -198,12 +206,8 @@ function checkpointOwned(ctx, { workflowId, opId }) {
   const head = revParse(rec.path, 'HEAD');
   if (!head) throw fail({ code: 'workflow-checkpoint-failed' }, `the workflow worktree ${rec.path} has no HEAD commit`);
   const state = receiptState(ctx, { workflowId, opId }, CHECKPOINT_EVENTS.checkpoint);
-  if (state?.applied) {
-    requireCheckpointChain(ctx, rec, workflowId);
-    requireReceiptScope(ctx, rec, state.applied);
-    requireReceiptBytes(rec, state.applied, [head], git);
-    return publicReceipt(state.applied);
-  }
+  const done = appliedReceipt(ctx, rec, workflowId, head, state);
+  if (done) return done;
   let receipt = state?.prepared;
   if (!receipt) {
     requireCheckpointChain(ctx, rec, workflowId);
@@ -246,25 +250,12 @@ function preserveOwned(ctx, { workflowId, opId }) {
   requireOnBranch(rec);
   const head = revParse(rec.path, 'HEAD');
   const state = receiptState(ctx, { workflowId, opId }, CHECKPOINT_EVENTS.preserved);
-  if (state?.applied) {
-    requireCheckpointChain(ctx, rec, workflowId);
-    requireReceiptScope(ctx, rec, state.applied);
-    requireReceiptBytes(rec, state.applied, [head], git);
-    return publicReceipt(state.applied);
-  }
+  const done = appliedReceipt(ctx, rec, workflowId, head, state);
+  if (done) return done;
   const leases = leasesOf(ctx, { workflowId, opId });
   const answer = () => { const { mine, stray } = splitChanges(rec.path, leases); return [...mine, ...stray]; };
   let receipt = state?.prepared;
-  if (!receipt) {
-    const base = gateBaseOf(ctx, workflowId), files = answer();
-    const snap = snapshotFiles(rec.path, head, files, `preserve ${workflowId}/${opId}: the work of a failed or blocked op`);
-    const kept = snap.sha ?? head;
-    const hasWork = kept !== base && git(gitDiff, rec.path, ['--quiet', base, kept]).status === 1;
-    const committedFiles = head === base ? [] : lines(git(gitDiff, rec.path, ['--name-only', '--no-renames', base, head]).stdout).filter((f) => under(f, leases.own) || !under(f, leases.others));
-    receipt = { ...(state?.identity ?? { workflowId, opId }), ...acceptedDecision(ctx), path: rec.path, branch: rec.branch, before: head, resetTo: base, preservedRef: hasWork ? `refs/heads/${PRESERVED_WORKFLOW_PREFIX}/${workflowId}/${opId}` : null,
-      sha: hasWork ? kept : null, scope: leases.own, files: [...new Set([...files, ...committedFiles])] };
-    saveReceipt(ctx, CHECKPOINT_EVENTS.preserved, 'prepared', receipt);
-  }
+  if (!receipt) receipt = preparePreserve(ctx, { workflowId, opId, rec, head, state, leases, answer });
   if (head !== receipt.before && head !== receipt.resetTo) throw fail({ code: 'workflow-foreign-commit' }, `${rec.branch} moved outside the prepared reset of ${opId}: ${head}`);
   requireReceiptScope(ctx, rec, receipt);
   requireReceiptBytes(rec, receipt, [receipt.sha ?? receipt.before, receipt.resetTo], git);
@@ -285,6 +276,19 @@ function preserveOwned(ctx, { workflowId, opId }) {
   if (left.length || revParse(rec.path, 'HEAD') !== receipt.resetTo) throw fail({ code: 'workflow-reset-failed' }, `${rec.path} is not back on ${receipt.resetTo}: ${left.slice(0, 3).join('; ') || 'HEAD moved'}`);
   saveReceipt(ctx, CHECKPOINT_EVENTS.preserved, 'applied', receipt);
   return publicReceipt(receipt);
+}
+
+/** The prepared preserved receipt of a failed or blocked op (the snapshot under refs/heads/preserved/...). */
+function preparePreserve(ctx, { workflowId, opId, rec, head, state, leases, answer }) {
+  const base = gateBaseOf(ctx, workflowId), files = answer();
+  const snap = snapshotFiles(rec.path, head, files, `preserve ${workflowId}/${opId}: the work of a failed or blocked op`);
+  const kept = snap.sha ?? head;
+  const hasWork = kept !== base && git(gitDiff, rec.path, ['--quiet', base, kept]).status === 1;
+  const committedFiles = head === base ? [] : lines(git(gitDiff, rec.path, ['--name-only', '--no-renames', base, head]).stdout).filter((f) => under(f, leases.own) || !under(f, leases.others));
+  const receipt = { ...(state?.identity ?? { workflowId, opId }), ...acceptedDecision(ctx), path: rec.path, branch: rec.branch, before: head, resetTo: base, preservedRef: hasWork ? `refs/heads/${PRESERVED_WORKFLOW_PREFIX}/${workflowId}/${opId}` : null,
+    sha: hasWork ? kept : null, scope: leases.own, files: [...new Set([...files, ...committedFiles])] };
+  saveReceipt(ctx, CHECKPOINT_EVENTS.preserved, 'prepared', receipt);
+  return receipt;
 }
 
 /* ------------------------------------------------------------ rebase + finish */
@@ -364,65 +368,82 @@ function finishOwned(ctx, { workflowId }) {
   try { requireCompletedEffects(ctx, { workflowId, opId: null }); recoverWorkflowRebase(ctx, { workflowId, opId: null }); rec = recordOf(ctx, workflowId); requireOnBranch(rec); } catch (error) { return refuse('gate', error.code ?? 'workflow-worktree-missing', error.message); }
   const dir = rec.path;
   const repoRoot = mainRootOf(dir);
-  const out = withLock(landLockName(repoRoot), () => {
-    const gate = ctx?.gate ?? runWorkflowGate;
-    const dirty = lines(git(gitStatus, dir, ['--porcelain', '--untracked-files=all', '--', '.', ...NO_MODULES]).stdout);
-    if (dirty.length) return refuse('gate', 'workflow-finish-dirty', `${dir} has work no checkpoint carries: ${dirty.slice(0, 3).join('; ')}`, { files: dirty.slice(0, 20) });
-    try { requireCheckpointChain(ctx, rec, workflowId); } catch (error) { return refuse('gate', 'workflow-foreign-commit', error.message, { commits: error.commits ?? [] }); }
-    const gateOn = (step) => {
-      const head = revParse(dir, 'HEAD');
-      const base = mergeBase(dir, `refs/heads/${main}`, head) ?? '';
-      const g = gate({ root: dir, base });
-      const summary = { exit: g.exit, base, head, counts: g.counts ?? null, findings: (g.findings ?? []).slice(0, 40), errors: g.errors ?? [] };
-      if (g.exit === 1) return refuse(step, 'workflow-finish-gate-red', `the whole branch ${rec.branch} has ${g.counts?.new ?? summary.findings.length} new finding(s) against ${main}`, { gate: summary });
-      if (g.exit !== 0) return refuse(step, 'workflow-finish-gate-unavailable', `the gate could not run a tool: ${summary.errors[0] ?? 'no report'}`, { gate: summary });
-      steps.push({ step, ok: true, base, head, counts: summary.counts });
-      return null;
-    };
-    // 1. the full gate on the whole branch against its merge-base with main.
-    const red = gateOn('gate');
-    if (red) return red;
-    // 2. the merge guard over the branch's own history.
-    const tip = revParse(dir, `refs/heads/${main}`);
-    const head = revParse(dir, 'HEAD');
-    const guarded = (ctx?.guard ?? mergeGuard)(dir, { base: mergeBase(dir, tip, head) ?? '', head, mainTip: tip });
-    if (guarded.errors?.length) return refuse('merge-guard', 'workflow-finish-guard-unavailable', `the merge guard could not recompute a merge: ${guarded.errors[0]}`);
-    if (guarded.findings?.length) return refuse('merge-guard', 'workflow-finish-merge-dropped-main', `a merge on ${rec.branch} kept the lane side over main's change of ${guarded.findings.length} path(s)`, { paths: guarded.findings.slice(0, 40).map((f) => f.path) });
-    steps.push({ step: 'merge-guard', ok: true, merges: (guarded.checked ?? []).length });
-    // 3. review.verify passed on exactly this head.
-    const verified = (ctx?.verify ?? reviewVerifiedOf)(ctx, { workflowId, head });
-    if (!verified.ok && verified.code === 'workflow-finish-verify-stale') return refuse('review-verify', 'workflow-finish-verify-stale', verified.detail, { verifiedHead: verified.verifiedHead ?? null, head });
-    if (!verified.ok) return refuse('review-verify', 'workflow-finish-verify-missing', verified.detail ?? 'no passing review.verify');
-    steps.push({ step: 'review-verify', ok: true, jobId: verified.jobId ?? null, head });
-    // 4. rebase onto main's tip. A rebase that moves the head lands nothing: the new head is gated and reviewed again first.
-    const rebased = rebaseWorkflow(ctx, { workflowId });
-    if (rebased.code === 'workflow-rebase-conflict') return refuse('rebase', 'workflow-finish-rebase-conflict', `${rec.branch} conflicts with ${main} on ${rebased.files.slice(0, 3).join(', ')}`, { files: rebased.files });
-    if (!rebased.ok) return refuse('rebase', 'workflow-finish-rebase-failed', rebased.detail ?? `${rec.branch} does not rebase onto ${main}`, { files: rebased.files ?? [] });
-    if (!rebased.already) {
-      const again = gateOn('gate');
-      if (again) return again;
-      return refuse('rebase', 'workflow-finish-verify-stale', `the rebase onto ${main} moved ${rec.branch} from ${head} to ${rebased.head}: run review.verify on the new head, then finish again`, { verifiedHead: head, head: rebased.head });
-    }
-    steps.push({ step: 'rebase', ok: true, onto: rebased.onto, head: rebased.head, already: true });
-    // 5. main fast-forwarded (compare-and-swap), then pushed.
-    const from = revParse(repoRoot, `refs/heads/${main}`);
-    if (from !== rebased.onto) return refuse('fast-forward', 'workflow-finish-main-moved', `${main} moved from ${rebased.onto} to ${from} during the finish: run the finish again`);
-    if (from !== rebased.head) {
-      const ff = fastForwardMain(ctx, { repoRoot, from, head: rebased.head });
-      if (ff.reason === 'main-moved') return refuse('fast-forward', 'workflow-finish-main-moved', `${main} moved during the fast-forward: run the finish again`);
-      if (!ff.ok) return refuse('fast-forward', 'workflow-finish-main-refused', `${main} could not be fast-forwarded: ${ff.reason ?? ''} ${ff.detail ?? ''}`.trim(), { dirty: ff.dirty ?? null });
-    }
-    steps.push({ step: 'fast-forward', ok: true, before: from, after: rebased.head });
-    const pushed = (ctx?.push ?? pushMain)(repoRoot, main);
-    if (!pushed.ok) return refuse('push', 'workflow-finish-push-failed', `${main} is advanced but its push failed: ${pushed.detail ?? ''}`);
-    steps.push({ step: 'push', ok: true, pushed: Boolean(pushed.pushed), ...(pushed.skipped ? { skipped: pushed.skipped } : {}) });
-    // 6. the worktree marked release-pending: the finish runs inside it (the Kernel's own terminal), so it never removes it;
-    // part A's GC removes it (link check, orca worktree rm) and deletes the workflow branch once the Kernel has left.
-    let pending;
-    try { pending = wt(ctx).markReleasePending(ctx, workflowId) ?? { ok: true }; } catch (error) { pending = { ok: false, detail: String(error?.message ?? error) }; }
-    if (pending === false || pending.ok === false) return refuse('release-pending', 'workflow-finish-release-pending-failed', `main is landed but ${dir} was not marked release-pending: ${pending?.detail ?? pending?.reason ?? ''}`.trim());
-    steps.push({ step: 'release-pending', ok: true });
-    return { ok: true, landed: true, releasePending: true, steps, head: rebased.head, main, repoRoot };
-  }, { waitMs: ctx?.lockWaitMs ?? 1_800_000, env: ctx?.env ?? process.env });
+  const out = withLock(landLockName(repoRoot), () => finishBody(ctx, { workflowId, rec, dir, repoRoot, main, steps, refuse }),
+    { waitMs: ctx?.lockWaitMs ?? 1_800_000, env: ctx?.env ?? process.env });
   return out.reason === 'lock-busy' ? refuse('gate', 'workflow-finish-lock-busy', `another land into ${repoRoot} holds ${out.lock}`) : out;
+}
+
+/** The full gate of the whole branch against its merge-base with main: a refusal, or the step recorded and null. */
+const finishGate = (ctx, { rec, dir, main, steps, refuse, step }) => {
+  const gate = ctx?.gate ?? runWorkflowGate;
+  const head = revParse(dir, 'HEAD');
+  const base = mergeBase(dir, `refs/heads/${main}`, head) ?? '';
+  const g = gate({ root: dir, base });
+  const summary = { exit: g.exit, base, head, counts: g.counts ?? null, findings: (g.findings ?? []).slice(0, 40), errors: g.errors ?? [] };
+  if (g.exit === 1) return refuse(step, 'workflow-finish-gate-red', `the whole branch ${rec.branch} has ${g.counts?.new ?? summary.findings.length} new finding(s) against ${main}`, { gate: summary });
+  if (g.exit !== 0) return refuse(step, 'workflow-finish-gate-unavailable', `the gate could not run a tool: ${summary.errors[0] ?? 'no report'}`, { gate: summary });
+  steps.push({ step, ok: true, base, head, counts: summary.counts });
+  return null;
+};
+
+/** Steps 4-6 of the finish: the rebase (re-gating a moved head), the fast-forward, the push and release-pending. */
+function landSteps(ctx, { workflowId, rec, dir, repoRoot, main, head, steps, refuse }) {
+  const gateOn = (step) => finishGate(ctx, { rec, dir, main, steps, refuse, step });
+  // 4. rebase onto main's tip. A rebase that moves the head lands nothing: the new head is gated and reviewed again first.
+  const rebased = rebaseWorkflow(ctx, { workflowId });
+  if (rebased.code === 'workflow-rebase-conflict') return refuse('rebase', 'workflow-finish-rebase-conflict', `${rec.branch} conflicts with ${main} on ${rebased.files.slice(0, 3).join(', ')}`, { files: rebased.files });
+  if (!rebased.ok) return refuse('rebase', 'workflow-finish-rebase-failed', rebased.detail ?? `${rec.branch} does not rebase onto ${main}`, { files: rebased.files ?? [] });
+  if (!rebased.already) {
+    const again = gateOn('gate');
+    if (again) return again;
+    return refuse('rebase', 'workflow-finish-verify-stale', `the rebase onto ${main} moved ${rec.branch} from ${head} to ${rebased.head}: run review.verify on the new head, then finish again`, { verifiedHead: head, head: rebased.head });
+  }
+  steps.push({ step: 'rebase', ok: true, onto: rebased.onto, head: rebased.head, already: true });
+  return landMain(ctx, { workflowId, dir, repoRoot, main, rebased, steps, refuse });
+}
+
+function landMain(ctx, { workflowId, dir, repoRoot, main, rebased, steps, refuse }) {
+  // 5. main fast-forwarded (compare-and-swap), then pushed.
+  const from = revParse(repoRoot, `refs/heads/${main}`);
+  if (from !== rebased.onto) return refuse('fast-forward', 'workflow-finish-main-moved', `${main} moved from ${rebased.onto} to ${from} during the finish: run the finish again`);
+  if (from !== rebased.head) {
+    const ff = fastForwardMain(ctx, { repoRoot, from, head: rebased.head });
+    if (ff.reason === 'main-moved') return refuse('fast-forward', 'workflow-finish-main-moved', `${main} moved during the fast-forward: run the finish again`);
+    if (!ff.ok) return refuse('fast-forward', 'workflow-finish-main-refused', `${main} could not be fast-forwarded: ${ff.reason ?? ''} ${ff.detail ?? ''}`.trim(), { dirty: ff.dirty ?? null });
+  }
+  steps.push({ step: 'fast-forward', ok: true, before: from, after: rebased.head });
+  const pushed = (ctx?.push ?? pushMain)(repoRoot, main);
+  if (!pushed.ok) return refuse('push', 'workflow-finish-push-failed', `${main} is advanced but its push failed: ${pushed.detail ?? ''}`);
+  steps.push({ step: 'push', ok: true, pushed: Boolean(pushed.pushed), ...(pushed.skipped ? { skipped: pushed.skipped } : {}) });
+  // 6. the worktree marked release-pending: the finish runs inside it (the Kernel's own terminal), so it never removes it;
+  // part A's GC removes it (link check, orca worktree rm) and deletes the workflow branch once the Kernel has left.
+  let pending;
+  try { pending = wt(ctx).markReleasePending(ctx, workflowId) ?? { ok: true }; } catch (error) { pending = { ok: false, detail: String(error?.message ?? error) }; }
+  if (pending === false || pending.ok === false) return refuse('release-pending', 'workflow-finish-release-pending-failed', `main is landed but ${dir} was not marked release-pending: ${pending?.detail ?? pending?.reason ?? ''}`.trim());
+  steps.push({ step: 'release-pending', ok: true });
+  return { ok: true, landed: true, releasePending: true, steps, head: rebased.head, main, repoRoot };
+}
+
+/** Steps 1-3 of the finish inside the land lock: the dirty-tree check, the whole-branch gate, the merge guard, review.verify. */
+function finishBody(ctx, { workflowId, rec, dir, repoRoot, main, steps, refuse }) {
+  const dirty = lines(git(gitStatus, dir, ['--porcelain', '--untracked-files=all', '--', '.', ...NO_MODULES]).stdout);
+  if (dirty.length) return refuse('gate', 'workflow-finish-dirty', `${dir} has work no checkpoint carries: ${dirty.slice(0, 3).join('; ')}`, { files: dirty.slice(0, 20) });
+  try { requireCheckpointChain(ctx, rec, workflowId); } catch (error) { return refuse('gate', 'workflow-foreign-commit', error.message, { commits: error.commits ?? [] }); }
+  const gateOn = (step) => finishGate(ctx, { rec, dir, main, steps, refuse, step });
+  // 1. the full gate on the whole branch against its merge-base with main.
+  const red = gateOn('gate');
+  if (red) return red;
+  // 2. the merge guard over the branch's own history.
+  const tip = revParse(dir, `refs/heads/${main}`);
+  const head = revParse(dir, 'HEAD');
+  const guarded = (ctx?.guard ?? mergeGuard)(dir, { base: mergeBase(dir, tip, head) ?? '', head, mainTip: tip });
+  if (guarded.errors?.length) return refuse('merge-guard', 'workflow-finish-guard-unavailable', `the merge guard could not recompute a merge: ${guarded.errors[0]}`);
+  if (guarded.findings?.length) return refuse('merge-guard', 'workflow-finish-merge-dropped-main', `a merge on ${rec.branch} kept the lane side over main's change of ${guarded.findings.length} path(s)`, { paths: guarded.findings.slice(0, 40).map((f) => f.path) });
+  steps.push({ step: 'merge-guard', ok: true, merges: (guarded.checked ?? []).length });
+  // 3. review.verify passed on exactly this head.
+  const verified = (ctx?.verify ?? reviewVerifiedOf)(ctx, { workflowId, head });
+  if (!verified.ok && verified.code === 'workflow-finish-verify-stale') return refuse('review-verify', 'workflow-finish-verify-stale', verified.detail, { verifiedHead: verified.verifiedHead ?? null, head });
+  if (!verified.ok) return refuse('review-verify', 'workflow-finish-verify-missing', verified.detail ?? 'no passing review.verify');
+  steps.push({ step: 'review-verify', ok: true, jobId: verified.jobId ?? null, head });
+  return landSteps(ctx, { workflowId, rec, dir, repoRoot, main, head, steps, refuse });
 }

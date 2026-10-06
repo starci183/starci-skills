@@ -13,6 +13,11 @@ export function workRecordFilesOf(repo, payload, envelope) {
   const owned = (payload?.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path))
     .filter((p) => typeof p === 'string' && /(^|\/)\.starciwork(\/|$)/.test(p.replaceAll('\\', '/')));
   const stack = owned.map((p) => path.resolve(repo, p.replace(/\/\*\*$/, '')));
+  walkYaml(stack, out);
+  return [...out];
+}
+
+function walkYaml(stack, out) {
   let seen = 0;
   while (stack.length && seen < WORK_WALK_MAX) {
     const at = stack.pop();
@@ -22,5 +27,4 @@ export function workRecordFilesOf(repo, payload, envelope) {
     let names = []; try { names = fs.readdirSync(at); } catch { continue; }
     for (const n of names) if (n !== 'node_modules' && !n.startsWith('.git')) stack.push(path.join(at, n));
   }
-  return [...out];
 }

@@ -51,20 +51,27 @@ export default {
       // so an op terminal may call it (modules/ops/ops/handover.review.yaml).
       ...(args.deliveries ? { ...deliveriesOf(db, workflowId), ...(autopilotOn(db, workflowId) ? { autopilot: autopilotBundle(db, workflowId) } : {}) } : {}),
     };
+    const slug = wf.display_name && wf.title ? ` (slug ${wf.title})` : '';
+    const openJobList = openJobs.map((j) => `${j.job_id}:${j.status}`).join(', ') || 'none';
+    const lastEvents = events.map((e) => `${e.seq}:${e.kind}`).join(', ') || 'none';
     emit(out, [
-      `workflow ${workflowId} — phase=${wf.phase ?? '-'} title=${workflowDisplayName(wf) ?? '-'}${wf.display_name && wf.title ? ` (slug ${wf.title})` : ''}`,
+      `workflow ${workflowId} — phase=${wf.phase ?? '-'} title=${workflowDisplayName(wf) ?? '-'}${slug}`,
       `goal rev ${g?.revision ?? '-'} (${g?.goal_identity ?? '-'}) chain: ${(gj.opChain?.legs ?? []).map((l) => l.op).join(' → ') || '(none stored)'}`,
-      `open jobs: ${openJobs.length} (${openJobs.map((j) => `${j.job_id}:${j.status}`).join(', ') || 'none'})`,
+      `open jobs: ${openJobs.length} (${openJobList})`,
       `inbox: ${inbox.length} rows (${inbox.filter((i) => i.status === 'pending').length} pending) | live signals: ${signals.length} | open incidents: ${incidents.length}`,
-      `last events: ${events.map((e) => `${e.seq}:${e.kind}`).join(', ') || 'none'}`,
+      `last events: ${lastEvents}`,
       ...staleOperationsOf(stale.staleInput).map((item) => internals.staleOperationLine(item)),
       ...internals.sourceDriftLines(sourceDriftSummaryOf(stale.sourceDrift)),
       ...internals.peerDriftLines(peerDriftSummaryOf(stale.peerDrift)),
       ...(out.deliveries ? [
         `deliveries: ${out.deliveries.length} settled job(s); credentialPending: ${out.credentialPending.join(', ') || 'none'}; handover asks: ${out.handoverHistory.length}`,
-        ...out.deliveries.map((d) => `  ${d.jobId} ${d.op} a${d.attempt} ${d.status}${d.outcome ? ` outcome=${d.outcome}` : ''}${d.head ? ` head=${d.head}` : ''}${d.summary ? ` — ${d.summary}` : ''}`),
-        ...out.handoverHistory.map((h) => `  handover ${h.dispatchId} a${h.attempt} ${h.state}${h.decision ? ` ${h.decision} by ${h.answeredBy ?? '-'}` : ''}${h.note ? ` — ${h.note}` : ''}`),
+        ...out.deliveries.map((d) => `  ${d.jobId} ${d.op} a${d.attempt} ${d.status}${deliveryDetail(d)}`),
+        ...out.handoverHistory.map((h) => `  handover ${h.dispatchId} a${h.attempt} ${h.state}${handoverDetail(h)}`),
       ] : []),
     ].join('\n'), args.json);
   },
 };
+
+const deliveryDetail = (d) => [d.outcome ? ` outcome=${d.outcome}` : '', d.head ? ` head=${d.head}` : '', d.summary ? ` — ${d.summary}` : ''].join('');
+
+const handoverDetail = (h) => [h.decision ? ` ${h.decision} by ${h.answeredBy ?? '-'}` : '', h.note ? ` — ${h.note}` : ''].join('');

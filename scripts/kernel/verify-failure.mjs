@@ -88,9 +88,14 @@ export function measurementSplit(checks) {
   return { findings, errors };
 }
 
+const checksOf = (report, checks) => {
+  if (Array.isArray(checks)) return checks;
+  return Array.isArray(report?.checks) ? report.checks : [];
+};
+
 /** A stable signature of an attempt's failure: HEAD plus every red check's name and exit code. Empty when there is nothing to compare. */
 export function failureSignature(report, checks = null) {
-  const red = (Array.isArray(checks) ? checks : Array.isArray(report?.checks) ? report.checks : [])
+  const red = checksOf(report, checks)
     .filter((c) => c && Number.isInteger(c.exitCode) && c.exitCode !== 0)
     .map((c) => `${String(c.name).trim()}=${c.exitCode}`).sort();
   if (!red.length) return '';
@@ -99,6 +104,18 @@ export function failureSignature(report, checks = null) {
 
 const envCheckRed = (checks) => (Array.isArray(checks) ? checks : []).some((c) => c && String(c.name ?? '').trim().toLowerCase() === ENV_HEALTH_CHECK && Number.isInteger(c.exitCode) && c.exitCode !== 0);
 const otherNode = (rc, op) => rc && typeof rc.node === 'string' && rc.node.trim() && rc.self !== true && rc.node.split('#')[0] !== op;
+const checkNames = (checks) => [...new Set(checks.map((c) => c.name))].join(', ');
+
+/**
+ * A read-only review never repairs: what it measured is findings for the build that made it
+ * (kinds.yaml review-findings-repair-the-build); a checker that did not run is a tool failure.
+ */
+const reviewFailure = ({ all, stated, report, op }) => {
+  const split = measurementSplit(all);
+  if (split.errors.length) return { class: 'tool', reason: `checker(s) did not measure: ${checkNames(split.errors)}` };
+  if (split.findings.length || stated === 'findings' || otherNode(report?.rootCause, op)) return { class: 'findings', reason: 'a review gate measured findings', ...(stated ? { stated } : {}) };
+  return null;
+};
 
 /**
  * The failure class of one failed attempt.
@@ -108,28 +125,32 @@ const otherNode = (rc, op) => rc && typeof rc.node === 'string' && rc.node.trim(
  *   prior       the previous attempt of the same lineage: {report, checks} or null
  * Returns {class, reason, stated?}.
  */
+const environmentFailure = (report, all, stated) => {
+  const blocker = report?.blocker?.kind === 'environment';
+  if (!blocker && !envCheckRed(all)) return null;
+  const reason = blocker ? 'blocker environment' : `${ENV_HEALTH_CHECK} check red: the stack under test was not ready`;
+  return { class: 'environment', reason, ...(stated ? { stated } : {}) };
+};
+
+const measurementFailure = (all) => {
+  const split = measurementSplit(all);
+  if (split.errors.length) return { class: 'tool', reason: `checker(s) did not measure: ${checkNames(split.errors)}` };
+  return { class: 'findings', reason: split.findings.length ? `measured findings: ${checkNames(split.findings)}` : 'measurement leg' };
+};
+
 export function classifyFailure({ op, report, checks = null, measurement = false, prior = null }) {
   const all = [...(Array.isArray(checks) ? checks : []), ...(Array.isArray(report?.checks) ? report.checks : [])];
   const stated = FAILURE_CLASSES.includes(report?.failureClass) ? report.failureClass : null;
-  if (report?.blocker?.kind === 'environment' || envCheckRed(all)) {
-    return { class: 'environment', reason: report?.blocker?.kind === 'environment' ? 'blocker environment' : `${ENV_HEALTH_CHECK} check red: the stack under test was not ready`, ...(stated ? { stated } : {}) };
-  }
+  const environment = environmentFailure(report, all, stated);
+  if (environment) return environment;
   const verify = VERIFY_OPS.has(op);
-  if (measurement) {
-    const split = measurementSplit(all);
-    if (split.errors.length) return { class: 'tool', reason: `checker(s) did not measure: ${[...new Set(split.errors.map((c) => c.name))].join(', ')}` };
-    return { class: 'findings', reason: split.findings.length ? `measured findings: ${[...new Set(split.findings.map((c) => c.name))].join(', ')}` : 'measurement leg' };
-  }
-  if ((stated === 'tool' || stated === 'transient') && op !== 'review.verify') {
-    // A report may call itself transient only when nothing names a product defect.
-    if (!otherNode(report?.rootCause, op)) return { class: stated, reason: 'stated by the report', stated };
-  }
+  if (measurement) return measurementFailure(all);
+  // A report may call itself transient only when nothing names a product defect.
+  if ((stated === 'tool' || stated === 'transient') && op !== 'review.verify' && !otherNode(report?.rootCause, op))
+    return { class: stated, reason: 'stated by the report', stated };
   if (op === 'review.verify') {
-    // A read-only review never repairs: what it measured is findings for the build that made it
-    // (kinds.yaml review-findings-repair-the-build); a checker that did not run is a tool failure.
-    const split = measurementSplit(all);
-    if (split.errors.length) return { class: 'tool', reason: `checker(s) did not measure: ${[...new Set(split.errors.map((c) => c.name))].join(', ')}` };
-    if (split.findings.length || stated === 'findings' || otherNode(report?.rootCause, op)) return { class: 'findings', reason: 'a review gate measured findings', ...(stated ? { stated } : {}) };
+    const got = reviewFailure({ all, stated, report, op });
+    if (got) return got;
   }
   if (otherNode(report?.rootCause, op)) return { class: 'product', reason: `rootCause names ${report.rootCause.node}`, ...(stated ? { stated } : {}) };
   if (stated === 'product') return { class: 'product', reason: 'stated by the report', stated };
@@ -176,7 +197,15 @@ export function findRecord(repo, id) {
   if (fs.existsSync(direct)) return direct;
   const want = String(id).split('#')[0];
   const stack = [path.join(featureDir, FAMILY_DIR[family] ?? family)];
+  return walkIndex(stack, want);
+}
+
+const idPattern = (want) => new RegExp(String.raw`^id:\s*['"]?${want.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}['"]?\s*$`, 'm');
+
+/** A bounded scan of a record family for the index.yaml whose `id:` line is `want`, or null. */
+function walkIndex(stack, want) {
   let seen = 0;
+  const pattern = idPattern(want);
   while (stack.length && seen < 400) {
     const dir = stack.pop();
     let entries = [];
@@ -186,7 +215,7 @@ export function findRecord(repo, id) {
       else if (e.isFile() && e.name === 'index.yaml') {
         seen += 1;
         const file = path.join(dir, e.name);
-        try { if (new RegExp(String.raw`^id:\s*['"]?${want.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}['"]?\s*$`, 'm').test(fs.readFileSync(file, 'utf8'))) return file; } catch { /* unreadable */ }
+        try { if (pattern.test(fs.readFileSync(file, 'utf8'))) return file; } catch { /* unreadable */ }
       }
     }
   }
@@ -211,32 +240,51 @@ export function resolveRootOwner({ repo, rootCause, kinds, failing = [], reporte
   const nodeKind = node.split('#')[0];
   if (!kind && catalog[nodeKind]) { kind = nodeKind; via = 'rootCause.node (op)'; }
   if (repo && /^[a-z]+\.[a-z0-9-]+\..+/.test(node)) {
-    const file = findRecord(repo, node);
-    if (file) {
-      const doc = readYaml(file) ?? {};
-      record = posix(path.relative(repo, path.dirname(file)));
-      repository = typeof doc.repository === 'string' ? doc.repository : null;
-      role = repository ? roles[repository] ?? null : null;
-      const family = node.split('.')[0];
+    const resolved = recordResolution(repo, node, roles);
+    if (resolved) {
+      record = resolved.record;
+      repository = resolved.repository;
+      role = resolved.role;
+      ownedPaths.push(...resolved.ownedPaths);
       if (!kind) {
+        const family = node.split('.')[0];
         kind = family === 'impl' ? ROLE_BUILD[role] ?? null : FAMILY_KIND[family] ?? null;
-        via = `record ${node}${repository ? ` (repository ${repository}, role ${role ?? '?'})` : ''}`;
+        const repoDetail = repository ? ` (repository ${repository}, role ${role ?? '?'})` : '';
+        via = `record ${node}${repoDetail}`;
       }
-      // Owner paths are app-relative (be/..., fe/...): the job's owned paths take them as written.
-      for (const owner of Array.isArray(doc.owners) ? doc.owners : []) if (typeof owner?.path === 'string') ownedPaths.push(posix(owner.path));
-      ownedPaths.push(record);
     }
   }
   if (!kind) return null;
   for (const f of declared) ownedPaths.unshift(posix(f));
-  if (!ownedPaths.length) {
-    // No record and no declared files: the reporter's own owned source paths of the owner's side.
-    const beSide = /backend|^be$/.test(role ?? '') || kind === 'backend.implement';
-    const own = (reporterPayload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean)
-      .filter((p) => !p.startsWith('.starciwork/'))
-      .filter((p) => (beSide ? p.startsWith('be/') : kind === 'interface.implement' ? p.startsWith('fe/') : true));
-    ownedPaths.push(...own, ...failing.filter((f) => /[\\/]/.test(f)));
-  }
+  if (!ownedPaths.length) ownedPaths.push(...fallbackPaths(role, kind, reporterPayload, failing));
   const unique = [...new Set(ownedPaths.map(posix))];
   return { kind, op: opOfKind(kind), family: catalog[kind]?.family ?? null, ...(repository ? { repository } : {}), ...(role ? { role } : {}), ...(record ? { record } : {}), ownedPaths: unique, via };
 }
+
+/** The record file of a rootCause node resolved: {record, repository, role, ownedPaths} or null. */
+const recordResolution = (repo, node, roles) => {
+  const file = findRecord(repo, node);
+  if (!file) return null;
+  const doc = readYaml(file) ?? {};
+  const record = posix(path.relative(repo, path.dirname(file)));
+  const repository = typeof doc.repository === 'string' ? doc.repository : null;
+  const role = repository ? roles[repository] ?? null : null;
+  // Owner paths are app-relative (be/..., fe/...): the job's owned paths take them as written.
+  const ownedPaths = [];
+  for (const owner of Array.isArray(doc.owners) ? doc.owners : []) if (typeof owner?.path === 'string') ownedPaths.push(posix(owner.path));
+  ownedPaths.push(record);
+  return { record, repository, role, ownedPaths };
+};
+
+// No record and no declared files: the reporter's own owned source paths of the owner's side.
+const fallbackPaths = (role, kind, reporterPayload, failing) => {
+  const beSide = /backend|^be$/.test(role ?? '') || kind === 'backend.implement';
+  const sideOk = (p) => {
+    if (beSide) return p.startsWith('be/');
+    return kind === 'interface.implement' ? p.startsWith('fe/') : true;
+  };
+  const own = (reporterPayload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean)
+    .filter((p) => !p.startsWith('.starciwork/'))
+    .filter(sideOk);
+  return [...own, ...failing.filter((f) => /[\\/]/.test(f))];
+};

@@ -49,7 +49,7 @@ export function commitWorkflowStart(ledger, { workflowId, expected, token, holde
     if (expected?.ok !== true || ['workflowId', 'goalIdentity', 'goalRevision', 'generation'].some((key) => authority[key] !== expected[key]))
       return { ok: false, reason: 'workflow-goal-unverified', authority };
     const signal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
-    if (!token || signal?.token !== token || signal.holder_pid !== holderPid
+    if (!token || signal?.token !== token || signal?.holder_pid !== holderPid
         || parseJsonOr(signal.value_json)?.state !== 'starting' || !(signal.expires_at > now()))
       return { ok: false, reason: 'kernel-start-reservation-lost', authority };
     publish({ workflow, goal, authority });
@@ -86,7 +86,7 @@ export function recordWorkflowStartFailure(ledger, { workflowId, token, holderPi
       }
     }
     const held = ledger.db.prepare("SELECT token,holder_pid FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
-    const owns = token && held?.token === token && held.holder_pid === holderPid;
+    const owns = token && held?.token === token && held?.holder_pid === holderPid;
     const signalRetained = unknown && owns ? updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, holderPid, at, expiresAt: null,
       value: { state: 'launch-unknown', terminal: handle, dispatch: extra.dispatch ?? null,
         admission: extra.admission ?? null, effectState: extra.effectState } }) : false;

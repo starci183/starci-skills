@@ -23,6 +23,7 @@ const git = (call, cwd, args) => { const r = call(args, { cwd, timeout: 600_000,
 const revParse = (cwd, ref) => commitShaOf(git, cwd, ref);
 const lines = (text) => String(text ?? '').split(/\r?\n/).filter(Boolean);
 const mainOf = (ctx) => ctx?.main ?? 'main';
+const extraFiles = (files) => (files.length > 3 ? ` (+${files.length - 3})` : '');
 
 /** The preserved ref of a milestone rebase that conflicted with main at `onto`: the branch head it could not move. */
 export const milestoneRefOf = (workflowId, onto) => `refs/heads/${PRESERVED_WORKFLOW_PREFIX}/${workflowId}/rebase-${String(onto).slice(0, 12)}`;
@@ -41,7 +42,7 @@ function escalateRebaseConflict(ctx, { workflowId, onto, head, files, preservedR
   const { di, created } = openDecisionRow(ctx.ledger, {
     kind: 'rebase-conflict', decider: 'kernel', workflowId, entity: { type: 'workflow', id: workflowId },
     idempotencyKey: `rebase-conflict:workflow:${workflowId}:${String(onto).slice(0, 12)}`, supersedeEntity: true, code: 'workflow-rebase-conflict',
-    summary: `the workflow branch conflicts with main ${String(onto).slice(0, 12)} on ${files.slice(0, 3).join(', ')}${files.length > 3 ? ` (+${files.length - 3})` : ''}: the branch stays at ${String(head).slice(0, 12)}, preserved as ${preservedRef}; route an op that resolves it before the finish`,
+    summary: `the workflow branch conflicts with main ${String(onto).slice(0, 12)} on ${files.slice(0, 3).join(', ')}${extraFiles(files)}: the branch stays at ${String(head).slice(0, 12)}, preserved as ${preservedRef}; route an op that resolves it before the finish`,
     evidence: [`onto ${onto}`, `head ${head}`, `preserved ${preservedRef}`, ...files.slice(0, 20).map((f) => `conflict ${f}`)],
     by: 'runtime:milestone-rebase',
   });
@@ -95,7 +96,8 @@ function requireWorkOwner(ctx, { workflowId, opId }) {
   if (!records.length) return;
   const ownerOf = ctx?.ownerOf ?? createOwnership(ctx.db, { repo: ctx.repo });
   const foreign = records.map((file) => ({ file, ...ownerOf(file) })).filter((o) => o.workflowId && o.workflowId !== workflowId && o.by !== 'repo-owner');
-  if (foreign.length) throw Object.assign(fail({ code: 'workflow-work-record-not-owner' }, `${opId} changed ${foreign.length} Work record file(s) another workflow owns (${foreign.slice(0, 3).map((o) => `${o.file}: ${o.workflowId} by ${o.by}`).join('; ')}): only the owner's workflow commits a record - ask it (starci kernel notify --kind request)`), { files: foreign.slice(0, 40) });
+  const named = foreign.slice(0, 3).map((o) => `${o.file}: ${o.workflowId} by ${o.by}`).join('; ');
+  if (foreign.length) throw Object.assign(fail({ code: 'workflow-work-record-not-owner' }, `${opId} changed ${foreign.length} Work record file(s) another workflow owns (${named}): only the owner's workflow commits a record - ask it (starci kernel notify --kind request)`), { files: foreign.slice(0, 40) });
 }
 
 /**
