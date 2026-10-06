@@ -73,7 +73,7 @@ function workersDecision({ kind, key, summary, entity, evidence = [], options = 
  */
 export function waitCycles(edges) {
   const adj = new Map();
-  for (const e of edges) { if (!e?.from || !e?.to || e.from === e.to) continue; if (!adj.has(e.from)) adj.set(e.from, new Set()); adj.get(e.from).add(e.to); if (!adj.has(e.to)) adj.set(e.to, new Set()); }
+  for (const e of edges) { if (!e?.from || !e?.to || e.from === e.to) { continue; } if (!adj.has(e.from)) { adj.set(e.from, new Set()); } adj.get(e.from).add(e.to); if (!adj.has(e.to)) { adj.set(e.to, new Set()); } }
   let index = 0;
   const idx = new Map(), low = new Map(), stack = [], on = new Set(), sccs = [];
   const strong = (v) => {

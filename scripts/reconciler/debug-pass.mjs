@@ -73,7 +73,9 @@ export function runPass(state, snap, { now, dispatch }) {
       continue;
     }
     const got = dispatch({ key, text, fixOwner: fixOwnerOf(key) }) ?? {};
-    const fix = got.lane ? { state: 'fixing', lane: got.lane } : got.reason ? { state: 'noted', reason: got.reason } : { state: 'dispatching' };
+    let fix = { state: 'dispatching' };
+    if (got.lane) fix = { state: 'fixing', lane: got.lane };
+    else if (got.reason) fix = { state: 'noted', reason: got.reason };
     state.fixes[key] = { ...fix, text, since: now };
     dispatched.push({ key, text, fixOwner: fixOwnerOf(key), state: fix.state });
     rows.push({ key, text, state: fix.state, fixOwner: fixOwnerOf(key), lane: fix.lane ?? null, since: now });
@@ -109,7 +111,8 @@ async function main(argv = process.argv.slice(2)) {
     const held = openMachineReader();
     try { requireDiagnosticSeat(held, dispatch ?? '', coreDebugProfile()); } finally { held?.close(); }
   }
-  const snap = verb === 'pass' ? fixture ? JSON.parse(fs.readFileSync(fixture, 'utf8')) : await snapshot(watchOptions(argv)) : null;
+  let snap = null;
+  if (verb === 'pass') snap = fixture ? JSON.parse(fs.readFileSync(fixture, 'utf8')) : await snapshot(watchOptions(argv));
   const m = openMachine();
   try {
     const result = diagnosticAction(m, verb, { snapshot: snap, dispatch, key: valueAfter(argv, '--key'), lane: valueAfter(argv, '--lane'), reason: valueAfter(argv, '--reason') });

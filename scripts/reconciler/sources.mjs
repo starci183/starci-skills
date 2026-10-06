@@ -37,7 +37,8 @@ export function ledgersOf({ env = process.env, repos = null, exists = fs.existsS
     try { file = ledgerFileFor(root); } catch { continue; }
     if (!exists(file)) continue;
     let id = path.basename(root) || 'repo';
-    let n = 2; while (taken.has(id)) { id = `${path.basename(root)}-${n}`; n += 1; }
+  let n = 2;
+  while (taken.has(id)) { id = `${path.basename(root)}-${n}`; n += 1; }
     taken.add(id);
     out.push({ ledgerId: id, repo: root, file });
   }
@@ -49,7 +50,10 @@ export function ledgersOf({ env = process.env, repos = null, exists = fs.existsS
 function keysOfRoute(route, event) {
   let value;
   try { value = typeof route === 'function' ? route(event) : route; } catch { return []; }
-  const list = Array.isArray(value) ? value : value == null ? [] : [value];
+  let list;
+  if (Array.isArray(value)) list = value;
+  else if (value == null) list = [];
+  else list = [value];
   return list.filter((k) => typeof k === 'string' && k);
 }
 
@@ -77,7 +81,10 @@ export function routeEvent(event, controllers) {
 
 /** Cursors kept in process memory, per machine handle: the Supervisor's sup_events and ledgers the registry does not know. */
 const memoryCursors = new WeakMap();
-const memoryOf = (m) => { if (!memoryCursors.has(m)) memoryCursors.set(m, new Map()); return memoryCursors.get(m); };
+const memoryOf = (m) => {
+  if (!memoryCursors.has(m)) memoryCursors.set(m, new Map());
+  return memoryCursors.get(m);
+};
 const payloadOf = (text) => { try { const p = text ? JSON.parse(text) : null; return p && typeof p === 'object' ? p : {}; } catch { return {}; } };
 
 /** One poll of the Supervisor's sup_events (machine.sqlite). */
@@ -92,7 +99,9 @@ function pollSupervisor(m, ledger, { batch = EVENT_BATCH } = {}) {
   const rows = m.db.prepare('SELECT seq, entity_type, entity_id, kind, payload_json FROM sup_events WHERE seq > ? ORDER BY seq LIMIT ?').all(memory.get(ledgerId), batch);
   const events = rows.map((r) => {
     const payload = payloadOf(r.payload_json);
-    const jobId = r.entity_type === 'job' || r.entity_type === 'sup-job' ? r.entity_id : typeof payload.jobId === 'string' ? payload.jobId : null;
+    let jobId = null;
+    if (r.entity_type === 'job' || r.entity_type === 'sup-job') jobId = r.entity_id;
+    else if (typeof payload.jobId === 'string') jobId = payload.jobId;
     return { ledgerId, repo: ledger.repo, seq: Number(r.seq), workflowId: null, entityType: r.entity_type, entityId: r.entity_id, ...(jobId ? { jobId } : {}), kind: r.kind, payload };
   });
   if (events.length) memory.set(ledgerId, events.at(-1).seq);
@@ -127,7 +136,9 @@ export function pollLedger(m, ledger, { now = Date.now(), reader = openLedgerRea
     const rows = db.prepare('SELECT seq, workflow_id, entity_type, entity_id, kind, payload_json FROM events WHERE seq > ? ORDER BY seq LIMIT ?').all(Number(last), batch);
     const events = rows.map((r) => {
       const payload = payloadOf(r.payload_json);
-      const jobId = r.entity_type === 'job' ? r.entity_id : typeof payload.jobId === 'string' ? payload.jobId : null;
+      let jobId = null;
+      if (r.entity_type === 'job') jobId = r.entity_id;
+      else if (typeof payload.jobId === 'string') jobId = payload.jobId;
       return { ledgerId, repo: ledger.repo, seq: Number(r.seq), workflowId: r.workflow_id, entityType: r.entity_type, entityId: r.entity_id, ...(jobId ? { jobId } : {}), kind: r.kind, payload };
     });
     if (events.length) save(events.at(-1).seq);

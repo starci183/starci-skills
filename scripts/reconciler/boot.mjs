@@ -138,11 +138,12 @@ export async function ensure({ env = process.env, now = Date.now(), numbers = re
   if (held?.pid && alive(held.pid)) {
     out.stopped = { pid: held.pid, ...stop(held.pid) };
     // G1/G2: the hung engine's process run ends `killed` by boot-ensure with its heartbeat age; its epoch is released `killed`.
+    const heartbeat = l.ageMs == null ? 'never' : `${Math.round(l.ageMs / 1000)}s old`;
     record((m) => m.transaction(() => {
       for (const run of m.openProcessRuns({ role: 'engine' }).filter((r) => r.pid === held.pid)) m.endProcessRun(run.run_id, { exitReason: 'killed', killedBy: 'boot-ensure' });
       const row = m.leaderOf(LEADER_NAME);
       if (row && row.pid === held.pid) m.releaseLeader({ name: LEADER_NAME, epoch: row.epoch, reason: 'killed' });
-      m.log({ actor: 'reconciler', kind: 'reconciler.engine-killed', level: 'warn', msg: `boot ensure stopped the hung engine pid ${held.pid} (heartbeat ${l.ageMs == null ? 'never' : `${Math.round(l.ageMs / 1000)}s old`})`,
+      m.log({ actor: 'reconciler', kind: 'reconciler.engine-killed', level: 'warn', msg: `boot ensure stopped the hung engine pid ${held.pid} (heartbeat ${heartbeat})`,
         data: { pid: held.pid, epoch: l.epoch, heartbeatAgeMs: l.ageMs, stopped: out.stopped } });
     }));
   }
@@ -155,10 +156,14 @@ export async function ensure({ env = process.env, now = Date.now(), numbers = re
   }
   // A caller-named reason (owner-restart, start) or a previous engine that ended on purpose is a planned start: never a crash.
   const planned = reason ?? (PLANNED_EXIT_REASONS.includes(l.exitReason) || l.killedBy === 'owner' ? 'planned-restart' : null);
-  const startReason = safe ? 'crash-restart' : planned ?? (l.holder ? 'ensure-stale-heartbeat' : 'boot');
+  let startReason;
+  if (safe) startReason = 'crash-restart';
+  else startReason = planned ?? (l.holder ? 'ensure-stale-heartbeat' : 'boot');
   const pid = spawnOne({ safe, startReason });
   if (pid) markStarting('reconciler', pid, env);
-  record((m) => m.log({ actor: 'reconciler', kind: SPAWNED_KIND, level: pid ? 'info' : 'error', msg: `boot ensure ${pid ? `started the engine pid ${pid}` : 'could not start the engine'} (${startReason}${safe ? ', safe' : ''})`,
+  const startLabel = pid ? `started the engine pid ${pid}` : 'could not start the engine';
+  const safetyLabel = safe ? ', safe' : '';
+  record((m) => m.log({ actor: 'reconciler', kind: SPAWNED_KIND, level: pid ? 'info' : 'error', msg: `boot ensure ${startLabel} (${startReason}${safetyLabel})`,
     data: { pid, safe, startReason, previous: l.pid ?? null, staleMs: l.ageMs ?? null }, at: now }));
   return { ...out, ok: Boolean(pid), pid, safe, startReason, ...(pid ? {} : { action: 'start-failed' }) };
 }
@@ -229,16 +234,33 @@ export function status({ env = process.env, now = Date.now(), numbers = reconcil
 const usageLines = (u) => {
   if (!u?.total) return [];
   const cost = (t) => (t.costUsd == null ? '' : ` ${t.costUsd}`);
-  const lines = [`  tokens ${u.total.tokens.toLocaleString('en-US')} all-time, ${u.window.tokens.toLocaleString('en-US')} in 24h${cost(u.total)}; supervisor seat ${(u.supervisor?.tokens ?? 0).toLocaleString('en-US')}; ${u.byModel.slice(0, 4).map((m) => `${m.model} ${m.tokens.toLocaleString('en-US')}`).join(', ') || 'no usage recorded yet'}`];
-  for (const l of u.ledgers) if (!l.error && (l.total.tokens || l.unavailableAttempts || l.pendingAttempts)) lines.push(`    ${l.name}: ${l.total.tokens.toLocaleString('en-US')} (attempts ${l.attempts.tokens.toLocaleString('en-US')}, kernels ${l.kernel.tokens.toLocaleString('en-US')})${l.unavailableAttempts ? `; ${l.unavailableAttempts} attempt(s) unavailable` : ''}${l.pendingAttempts ? `; ${l.pendingAttempts} pending` : ''}`);
+  const modelUsage = u.byModel.slice(0, 4).map((m) => `${m.model} ${m.tokens.toLocaleString('en-US')}`).join(', ') || 'no usage recorded yet';
+  const lines = [`  tokens ${u.total.tokens.toLocaleString('en-US')} all-time, ${u.window.tokens.toLocaleString('en-US')} in 24h${cost(u.total)}; supervisor seat ${(u.supervisor?.tokens ?? 0).toLocaleString('en-US')}; ${modelUsage}`];
+  for (const l of u.ledgers) if (!l.error && (l.total.tokens || l.unavailableAttempts || l.pendingAttempts)) {
+    const unavailable = l.unavailableAttempts ? `; ${l.unavailableAttempts} attempt(s) unavailable` : '';
+    const pending = l.pendingAttempts ? `; ${l.pendingAttempts} pending` : '';
+    lines.push(`    ${l.name}: ${l.total.tokens.toLocaleString('en-US')} (attempts ${l.attempts.tokens.toLocaleString('en-US')}, kernels ${l.kernel.tokens.toLocaleString('en-US')})${unavailable}${pending}`);
+  }
   return lines;
 };
 
 const describeStatus = (s) => {
   const l = s.leader;
-  const lines = [`[reconciler] ${l.fresh ? 'RUNNING' : l.holder ? 'STALE' : 'NOT RUNNING'}${l.safe ? ' (safe mode)' : ''}: leader ${l.holder ?? '-'} pid ${l.pid ?? '-'} epoch ${l.epoch ?? '-'} heartbeat ${l.ageMs == null ? 'never' : `${Math.round(l.ageMs / 1000)}s ago`}`,
-    `  enabled ${s.enabled}; modes ${Object.entries(s.modes).map(([n, m]) => `${n}=${m.effective}${m.configured !== m.effective ? `(cfg ${m.configured})` : ''}`).join(' ')}`,
-    `  queue ${s.queueDepth} (${Object.entries(s.queue).map(([c, q]) => `${c} ${q.queued}${q.failing ? `/${q.failing} failing` : ''}`).join(', ') || 'empty'}); open violations ${s.violations.open}; actions 1h ${Object.entries(s.actions).map(([k, n]) => `${k} ${n}`).join(', ') || 'none'}; engine starts 24h ${s.starts24h}`,
+  let state = 'NOT RUNNING';
+  if (l.fresh) state = 'RUNNING';
+  else if (l.holder) state = 'STALE';
+  const heartbeat = l.ageMs == null ? 'never' : `${Math.round(l.ageMs / 1000)}s ago`;
+  const modes = Object.entries(s.modes).map(([n, m]) => {
+    const configured = m.configured !== m.effective ? `(cfg ${m.configured})` : '';
+    return `${n}=${m.effective}${configured}`;
+  }).join(' ');
+  const queue = Object.entries(s.queue).map(([c, q]) => {
+    const failing = q.failing ? `/${q.failing} failing` : '';
+    return `${c} ${q.queued}${failing}`;
+  }).join(', ') || 'empty';
+  const lines = [`[reconciler] ${state}${l.safe ? ' (safe mode)' : ''}: leader ${l.holder ?? '-'} pid ${l.pid ?? '-'} epoch ${l.epoch ?? '-'} heartbeat ${heartbeat}`,
+    `  enabled ${s.enabled}; modes ${modes}`,
+    `  queue ${s.queueDepth} (${queue}); open violations ${s.violations.open}; actions 1h ${Object.entries(s.actions).map(([k, n]) => `${k} ${n}`).join(', ') || 'none'}; engine starts 24h ${s.starts24h}`,
     `  owned concerns: ${Object.entries(s.concerns).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none (every old loop keeps its duties)'}`,
     ...usageLines(s.usage),
     `  state ${s.stateFile}`];
@@ -260,18 +282,23 @@ export async function main(argv = process.argv.slice(2)) {
   if (argv.includes('--up') || argv[0] === 'up') { const { main: start } = await import('./start.mjs'); await start(argv.filter((a) => a !== '--up' && a !== 'up')); return; }
   if (argv.includes('--stop')) {
     const r = stopEngine();
-    console.log(json ? JSON.stringify(r) : `[reconciler boot] ${r.action}${r.stopped.length ? ` pid ${r.stopped.map((item) => item.pid).join(', ')}` : ''}`);
+    const stopped = r.stopped.length ? ` pid ${r.stopped.map((item) => item.pid).join(', ')}` : '';
+    console.log(json ? JSON.stringify(r) : `[reconciler boot] ${r.action}${stopped}`);
     process.exitCode = r.ok ? 0 : 1;
     return;
   }
   if (argv.includes('--restart')) {
     const r = await restartEngine();
-    console.log(json ? JSON.stringify(r) : `[reconciler boot] restart: ${r.action} pid ${r.pid ?? '-'}${r.safe ? ' SAFE' : ''}`);
+    const safe = r.safe ? ' SAFE' : '';
+    console.log(json ? JSON.stringify(r) : `[reconciler boot] restart: ${r.action} pid ${r.pid ?? '-'}${safe}`);
     process.exitCode = r.ok ? 0 : 1;
     return;
   }
   const r = await ensure();
-  console.log(json ? JSON.stringify(r) : `[reconciler boot] ${r.action}${r.pid ? ` pid ${r.pid}` : ''}${r.safe ? ' SAFE MODE' : ''}${r.ageMs != null ? ` heartbeat ${Math.round(r.ageMs / 1000)}s` : ''}`);
+  const pid = r.pid ? ` pid ${r.pid}` : '';
+  const safe = r.safe ? ' SAFE MODE' : '';
+  const heartbeat = r.ageMs != null ? ` heartbeat ${Math.round(r.ageMs / 1000)}s` : '';
+  console.log(json ? JSON.stringify(r) : `[reconciler boot] ${r.action}${pid}${safe}${heartbeat}`);
   process.exitCode = r.ok ? 0 : 1;
 }
 

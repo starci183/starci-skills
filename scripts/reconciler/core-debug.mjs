@@ -32,9 +32,11 @@ export function coreDebugRoute(caller, config, { registry = loadModelRegistry(),
   const model = caller.model ?? pool?.defaultModel;
   if (!model || registry.models?.[model]?.provider !== agent) throw new Error('invoking agent/model pair is not registered');
   if (!concrete && caller.model && caller.model !== pool?.defaultModel) throw new Error('the invoking agent cannot attest an exact underlying model');
+  let match = 'logical-runtime';
+  if (concrete) match = caller.model ? 'concrete' : 'configured-route';
   return { agent, model, effort: caller.effort ?? null, modelAuthority: authority,
     source: caller.source ?? (caller.model ? 'declared-ingress' : 'agent-card-default'),
-    match: concrete && caller.model ? 'concrete' : concrete ? 'configured-route' : 'logical-runtime' };
+    match };
 }
 
 /** Called only after the workflow ingress verifies its accepted goal and start authority. */
@@ -122,13 +124,18 @@ export async function watchCoreDebug({ env = process.env, deps = {}, config = lo
     supervisorEvent(m, { entityId: profile.id, kind: `${profile.eventPrefix}-wake`, now: now(), payload: {
       dispatch: seat.value.dispatch, terminal: health.terminal, delivered: wake?.delivered === true, action: wake?.action ?? null } });
     const recorded = finishDuty(ctx, { controller: 'host', duty: profile.id, result: ok ? 'done' : 'failed', now: now() });
-    return { ok: ok && recorded, action: busy ? 'busy' : ok ? 'woken' : 'wake-failed', terminal: health.terminal, wake };
+    let action = 'wake-failed';
+    if (busy) action = 'busy';
+    else if (ok) action = 'woken';
+    return { ok: ok && recorded, action, terminal: health.terminal, wake };
   } finally { m.close(); }
 }
 
 if (isMain(import.meta.url)) {
-  const result = process.argv.includes('--status') ? coreDebugStatus() : process.argv.includes('--once') ? await watchCoreDebug()
-    : { ok: false, error: 'use: core-debug.mjs --once | --status' };
+  let result;
+  if (process.argv.includes('--status')) result = coreDebugStatus();
+  else if (process.argv.includes('--once')) result = await watchCoreDebug();
+  else result = { ok: false, error: 'use: core-debug.mjs --once | --status' };
   console.log(JSON.stringify(result));
   process.exitCode = result.ok ? 0 : 1;
 }

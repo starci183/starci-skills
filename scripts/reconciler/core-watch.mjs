@@ -52,7 +52,12 @@ const LEG_BAD = /failed|blocked|cancel/;
 /** A read-only child call that always ends: {ok, stdout, error}. Never throws. */
 export function child(args, { timeoutMs, cwd = ROOT } = {}) {
   return execNode(args, { cwd, timeout: timeoutMs, killSignal: 'SIGKILL', maxBuffer: 64 * 1024 * 1024 })
-    .then(({ error, stdout, stderr }) => ({ ok: !error, stdout: stdout ?? '', error: error ? (error.killed ? `timeout ${Math.round(timeoutMs / 1000)}s` : `exit ${error.code}: ${String(stderr || error.message).trim().split('\n').findLast(Boolean)?.slice(0, 200)}`) : null }));
+    .then(({ error, stdout, stderr }) => {
+      let message = null;
+      if (error?.killed) message = `timeout ${Math.round(timeoutMs / 1000)}s`;
+      else if (error) message = `exit ${error.code}: ${String(stderr || error.message).trim().split('\n').findLast(Boolean)?.slice(0, 200)}`;
+      return { ok: !error, stdout: stdout ?? '', error: message };
+    });
 }
 
 /** The first balanced JSON object in text (a verb may print a banner before it), or null. */
@@ -62,7 +67,7 @@ export function firstJson(text) {
   let depth = 0, inStr = false, esc = false;
   for (let i = start; i < text.length; i++) {
     const c = text[i];
-    if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+    if (inStr) { if (esc) { esc = false; } else if (c === '\\') { esc = true; } else if (c === '"') { inStr = false; } continue; }
     if (c === '"') inStr = true; else if (c === '{') depth++; else if (c === '}' && --depth === 0) { try { return JSON.parse(text.slice(start, i + 1)); } catch { return null; } }
   }
   return null;
@@ -105,8 +110,10 @@ async function engineFacts() {
   const config = reconcilerConfig();
   const fresh = l && ageMs <= HEARTBEAT_STALE_MS;
   const bad = [...new Set([...CONTROLLER_NAMES, ...Object.keys(s.modes)])].map((n) => [n, configuredMode(n, config), fresh ? s.modes[n] ?? 'off' : 'off']).filter(([, c, e]) => c === 'active' && e !== 'active');
-  facts.set('engine-controllers', bad.length ? `configured active but running ${bad.map(([n, , e]) => `${n}=${e}`).join(' ')}` : null);
-  facts.set('engine-queue', s.failing.length ? `failing queue items: ${s.failing.map((q) => `${q.controller} ${q.n}`).join(' ')}` : null);
+  const badModes = bad.length ? bad.map(([n, , e]) => `${n}=${e}`).join(' ') : null;
+  const failingQueue = s.failing.length ? s.failing.map((q) => `${q.controller} ${q.n}`).join(' ') : null;
+  facts.set('engine-controllers', badModes === null ? null : `configured active but running ${badModes}`);
+  facts.set('engine-queue', failingQueue === null ? null : `failing queue items: ${failingQueue}`);
   return facts;
 }
 
@@ -126,8 +133,14 @@ async function serviceFacts(o) {
   for (const row of rows) {
     if (row.name.startsWith('ledger:') || row.name.startsWith('sched-task:')) continue;
     const okState = row.name.startsWith('seat:') ? row.state === 'live' : row.state === 'healthy';
-    const probe = row.lastProbe ?? {};
-    facts.set(`service:${row.name}`, okState ? null : `${row.state}${probe.error ? ` (${String(probe.error).slice(0, 100)})` : ''}${row.failStreak ? ` failStreak ${row.failStreak}` : ''}`);
+    if (okState) facts.set(`service:${row.name}`, null);
+    else {
+      const probe = row.lastProbe ?? {};
+      let details = '';
+      if (probe.error) details += ` (${String(probe.error).slice(0, 100)})`;
+      if (row.failStreak) details += ` failStreak ${row.failStreak}`;
+      facts.set(`service:${row.name}`, `${row.state}${details}`);
+    }
   }
   return facts;
 }
@@ -170,12 +183,20 @@ async function workflowFacts(o) {
       const st = leg.status ?? leg.state;
       const lk = `${k}:leg:${leg.op ?? leg.opId}:${leg.jobId ?? ''}`;
       // The leg's why (scripts/kernel/why.mjs): the owner-facing headline after the raw state.
-      facts.set(lk, LEG_BAD.test(st ?? '') ? `${leg.op ?? leg.opId} ${st}${leg.why?.headline ? ` - ${leg.why.headline}` : ''}` : null);
+      if (LEG_BAD.test(st ?? '')) {
+        const headline = leg.why?.headline ? ` - ${leg.why.headline}` : '';
+        facts.set(lk, `${leg.op ?? leg.opId} ${st}${headline}`);
+      } else facts.set(lk, null);
     }
     const counts = { wedged: count(f.wedgedJobs), dead: count(f.deadWorkerJobs), stale: count(f.staleOperations), stuck: count(j.stuck), owner: count(j.awaitingOwner), held: count(f.heldSettleJobs) + count(f.heldWorkerJobs) };
     const ids = (a, key) => (Array.isArray(a) ? a.slice(0, 3).map((x) => (typeof x === 'string' ? x : x?.[key] ?? x?.jobId ?? x?.id ?? x?.opId ?? '?')).join(',') : '');
     const detail = { wedged: ids(f.wedgedJobs, 'jobId'), dead: ids(f.deadWorkerJobs, 'jobId'), stale: ids(f.staleOperations, 'opId'), stuck: ids(j.stuck, 'jobId'), owner: ids(j.awaitingOwner, 'id'), held: '' };
-    for (const [name, n] of Object.entries(counts)) facts.set(`${k}:${name}`, n ? `${name}=${n}${detail[name] ? ` [${detail[name]}]` : ''}` : null);
+    for (const [name, n] of Object.entries(counts)) {
+      if (n) {
+        const detailText = detail[name] ? ` [${detail[name]}]` : '';
+        facts.set(`${k}:${name}`, `${name}=${n}${detailText}`);
+      } else facts.set(`${k}:${name}`, null);
+    }
   }));
   return facts;
 }
@@ -187,7 +208,10 @@ function tokenFacts(o) {
     const now = Date.now();
     const rows = readMachine((m) => m.db.prepare('SELECT provider, COALESCE(SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)),0) AS t, COUNT(*) AS n FROM llm_usage WHERE at >= ? GROUP BY provider ORDER BY t DESC').all(now - o.tokenWindowMs), []);
     const total = rows.reduce((a, r) => a + Number(r.t), 0);
-    facts.set('tokens', total > o.tokenSpike ? `${total} input+output tokens in ${Math.round(o.tokenWindowMs / 60000)} min (limit ${o.tokenSpike}); top ${rows.slice(0, 3).map((r) => `${r.provider} ${r.t}/${r.n} calls`).join(', ')}` : null);
+    if (total > o.tokenSpike) {
+      const top = rows.slice(0, 3).map((r) => `${r.provider} ${r.t}/${r.n} calls`).join(', ');
+      facts.set('tokens', `${total} input+output tokens in ${Math.round(o.tokenWindowMs / 60000)} min (limit ${o.tokenSpike}); top ${top}`);
+    } else facts.set('tokens', null);
   } catch (e) { facts.set('tokens', `llm_usage unreadable: ${String(e.message).slice(0, 100)}`); }
   return facts;
 }
@@ -249,11 +273,15 @@ export function integrityFacts(main, { git = (args, opts) => gitResultOf(lsFiles
   if (!deleted.ok) facts.set('integrity:tracked-deleted', `git ls-files --deleted failed in ${main}: ${deleted.error}`);
   else {
     const files = deleted.stdout.split(/\r?\n/).filter(Boolean);
-    facts.set('integrity:tracked-deleted', files.length ? `${files.length} tracked file(s) deleted in the main checkout ${main} (${files.slice(0, 3).join(', ')}${files.length > 3 ? ', ...' : ''})` : null);
+    const more = files.length > 3 ? ', ...' : '';
+    facts.set('integrity:tracked-deleted', files.length ? `${files.length} tracked file(s) deleted in the main checkout ${main} (${files.slice(0, 3).join(', ')}${more})` : null);
   }
   for (const rel of ['node_modules', 'packages/node_modules']) {
     const n = entryCount(path.join(main, rel));
-    facts.set(`integrity:${rel}`, n == null ? `${rel} is missing in the main checkout ${main}` : n === 0 ? `${rel} is empty in the main checkout ${main}` : null);
+    let issue = null;
+    if (n == null) issue = `${rel} is missing in the main checkout ${main}`;
+    else if (n === 0) issue = `${rel} is empty in the main checkout ${main}`;
+    facts.set(`integrity:${rel}`, issue);
   }
   return facts;
 }
@@ -277,8 +305,14 @@ function gateFacts() {
       pushes: q('SELECT repo_root, result, reason FROM pushes p WHERE at >= ? AND push_id = (SELECT MAX(push_id) FROM pushes WHERE repo_root = p.repo_root)'),
     };
   }, { lands: [], pushes: [] });
-  for (const l of rows.lands) if (l.result !== 'passed') facts.set(`gate:land:${l.lane ?? '-'}`, `land ${l.result} at ${String(l.commit_sha).slice(0, 9)}${l.reason ? `: ${String(l.reason).slice(0, 140)}` : ''}`);
-  for (const p of rows.pushes) if (p.result === 'failed' || p.result === 'refused') facts.set(`gate:push:${path.basename(p.repo_root)}`, `push ${p.result}${p.reason ? `: ${String(p.reason).slice(0, 140)}` : ''}`);
+  for (const l of rows.lands) if (l.result !== 'passed') {
+    const reason = l.reason ? `: ${String(l.reason).slice(0, 140)}` : '';
+    facts.set(`gate:land:${l.lane ?? '-'}`, `land ${l.result} at ${String(l.commit_sha).slice(0, 9)}${reason}`);
+  }
+  for (const p of rows.pushes) if (p.result === 'failed' || p.result === 'refused') {
+    const reason = p.reason ? `: ${String(p.reason).slice(0, 140)}` : '';
+    facts.set(`gate:push:${path.basename(p.repo_root)}`, `push ${p.result}${reason}`);
+  }
   return facts;
 }
 

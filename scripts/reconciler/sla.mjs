@@ -190,14 +190,29 @@ const lastInvariantKinds = (m, keys) => {
 const refsOf = ({ workflowId = null, extra = [] } = {}) => [...new Set([...String(workflowId ?? '').split(',').filter(Boolean).map((wf) => `workflow:${wf}`), ...extra.filter(Boolean).map(String)])];
 
 // The typed rows are the kinds invariant.violated / invariant.cleared (scripts/kernel/typed-logs.mjs), machine_logs actor 'reconciler'.
-const typedRow = (ev, { now, cleared = false }) => ({
-  kind: cleared ? 'invariant.cleared' : TYPED_EVENT, at: now, level: cleared ? 'info' : ev.severity === 'critical' ? 'error' : 'warn',
-  msg: `${cleared ? 'invariant.cleared' : TYPED_EVENT} ${ev.code} ${ev.entity.type} ${ev.entity.id}${cleared ? (ev.clearedBy ? ` (${ev.clearedBy}${ev.clearedWhy ? `: ${ev.clearedWhy}` : ''})` : '') : ` age ${Math.round(ev.ageMs / 60_000)}m > sla ${Math.round(ev.slaMs / 60_000)}m`}`,
-  workflowId: ev.entity.workflowId ?? null,
-  data: { code: ev.code, message: `${ev.state} ${ev.entity.type}:${ev.entity.id}${cleared && ev.clearedWhy ? `: ${ev.clearedWhy}` : ''}`, severity: ev.severity, dedupeKey: ev.dedupeKey,
-    ...(ev.owner ? { owner: ev.owner } : {}), state: String(ev.state), entity: ev.entity, ...(cleared ? {} : { ageMs: ev.ageMs, slaMs: ev.slaMs }) },
-  refs: refsOf({ workflowId: ev.entity.workflowId, extra: [`invariant:${ev.dedupeKey}`, ...(ev.entity.ledger ? [`ledger:${ev.entity.ledger}`] : [])] }),
-});
+const typedRow = (ev, { now, cleared = false }) => {
+  const kind = cleared ? 'invariant.cleared' : TYPED_EVENT;
+  let level = 'warn';
+  if (cleared) level = 'info';
+  else if (ev.severity === 'critical') level = 'error';
+  let detail = '';
+  if (cleared) {
+    if (ev.clearedBy) {
+      const reason = ev.clearedWhy ? `: ${ev.clearedWhy}` : '';
+      detail = ` (${ev.clearedBy}${reason})`;
+    }
+  } else detail = ` age ${Math.round(ev.ageMs / 60_000)}m > sla ${Math.round(ev.slaMs / 60_000)}m`;
+  const clearWhy = cleared && ev.clearedWhy ? `: ${ev.clearedWhy}` : '';
+  const message = `${ev.state} ${ev.entity.type}:${ev.entity.id}${clearWhy}`;
+  return {
+    kind, at: now, level,
+    msg: `${kind} ${ev.code} ${ev.entity.type} ${ev.entity.id}${detail}`,
+    workflowId: ev.entity.workflowId ?? null,
+    data: { code: ev.code, message, severity: ev.severity, dedupeKey: ev.dedupeKey,
+      ...(ev.owner ? { owner: ev.owner } : {}), state: String(ev.state), entity: ev.entity, ...(cleared ? {} : { ageMs: ev.ageMs, slaMs: ev.slaMs }) },
+    refs: refsOf({ workflowId: ev.entity.workflowId, extra: [`invariant:${ev.dedupeKey}`, ...(ev.entity.ledger ? [`ledger:${ev.entity.ledger}`] : [])] }),
+  };
+};
 
 /* ------------------------------------------------------------------------------------------------ truth */
 // Every pass re-checks each open clock against the ledger / host truth, independent of the controller that set it: a

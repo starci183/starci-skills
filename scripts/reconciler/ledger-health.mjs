@@ -16,6 +16,24 @@ import { sha256File } from '../../engine/digest.mjs';
 const openReadOnly = (file) => openLedgerReader(file, { verify: false });
 const openBackupSource = (file) => openLedgerReader(file, { queryOnly: false });
 
+function verifyLedgerIdentity(file, expectedLedgerId, verifiedOpen) {
+  let verified = null;
+  try {
+    verified = verifiedOpen(file);
+    if (expectedLedgerId !== null) {
+      const actual = verified.prepare("SELECT value FROM meta WHERE key='ledger_id'").get()?.value ?? null;
+      if (actual !== expectedLedgerId) return { ok: false, reason: 'identity-mismatch', result: [`ledger identity ${actual ?? 'missing'} differs from ${expectedLedgerId}`] };
+    }
+    return null;
+  } finally { try { verified?.close(); } catch { /* closed */ } }
+}
+
+function failureReason(error) {
+  if (error?.code === 'STARCI_LEDGER_SCHEMA_REFUSED') return 'schema-incompatible';
+  if (error?.code === 'STARCI_LEDGER_SQLITE_DOWNGRADE') return 'sqlite-downgrade';
+  return isCorruptError(error) ? 'integrity-failed' : 'inaccessible';
+}
+
 /**
  * Check pages, runtime compatibility and an optional registry identity without creating a missing file.
  */
@@ -26,19 +44,11 @@ export function quickCheck(file, { open = openReadOnly, verifiedOpen = (f) => op
     db = open(file);
     const rows = db.prepare('PRAGMA quick_check').all().map((r) => String(Object.values(r)[0]));
     if (!(rows.length === 1 && rows[0] === 'ok')) return { ok: false, reason: 'integrity-failed', result: rows.slice(0, 20) };
-    let verified = null;
-    try {
-      verified = verifiedOpen(file);
-      if (expectedLedgerId !== null) {
-        const actual = verified.prepare("SELECT value FROM meta WHERE key='ledger_id'").get()?.value ?? null;
-        if (actual !== expectedLedgerId) return { ok: false, reason: 'identity-mismatch', result: [`ledger identity ${actual ?? 'missing'} differs from ${expectedLedgerId}`] };
-      }
-    } finally { try { verified?.close(); } catch { /* closed */ } }
+    const identityFailure = verifyLedgerIdentity(file, expectedLedgerId, verifiedOpen);
+    if (identityFailure) return identityFailure;
     return { ok: true, result: rows.slice(0, 20) };
   } catch (error) {
-    const reason = error?.code === 'STARCI_LEDGER_SCHEMA_REFUSED' ? 'schema-incompatible'
-      : error?.code === 'STARCI_LEDGER_SQLITE_DOWNGRADE' ? 'sqlite-downgrade'
-        : isCorruptError(error) ? 'integrity-failed' : 'inaccessible';
+    const reason = failureReason(error);
     return { ok: false, reason, code: error?.code ?? null, result: [String(error?.message ?? error).slice(0, 300)], error: true };
   } finally { try { db?.close(); } catch { /* closed */ } }
 }

@@ -80,7 +80,7 @@ export function startHeartbeatWorker({ file, leaseMs, renewMs, stallMaxMs = DEFA
 function workerMain({ file, leaseMs, renewMs, stallMaxMs, t0, sab }, parentPort) {
   const stamp = new Int32Array(sab);
   let m = null;
-  const machine = () => { if (!m) m = openMachine({ file, env: process.env }); return m; };
+  const machine = () => { if (!m) { m = openMachine({ file, env: process.env }); } return m; };
   const st = { leader: false, epoch: 0, holder: null, runId: null, draining: false, phase: null, phaseAt: 0, running: [] };
   let stalledAt = null, loggedAt = null, withheldLogged = false, lastRenewAt = 0, prev = null;
 
