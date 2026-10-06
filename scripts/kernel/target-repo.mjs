@@ -51,7 +51,12 @@ export function boundRepoRoots(ledgerRepos) {
   return [...out.values()];
 }
 
-const repoName = (url) => (typeof url === 'string' ? url.replace(/[\\/]+$/, '').split(/[\\/:]/).pop().replace(/\.git$/i, '') : null);
+const trimEndWhile = (value, matches) => {
+  let end = value.length;
+  while (end > 0 && matches(value[end - 1])) end -= 1;
+  return value.slice(0, end);
+};
+const repoName = (url) => (typeof url === 'string' ? trimEndWhile(url, (c) => c === '/' || c === '\\').split(/[\\/:]/).pop().replace(/\.git$/i, '') : null);
 
 // A repo id is a side (be or fe), or the app repository's name or path.
 export function bindingRepo(binding, id) {
@@ -84,7 +89,13 @@ const FRONTEND_OPS = (() => {
 
 const REPO_PREFIX = /^repository:([^/\\]+)[/\\]?(.*)$/;
 // A path without the trailing glob a directory grant may use.
-const tidy = (p) => String(p).replace(/(^|\/)\*{1,2}$/, '').replace(/\/+$/, '') || '.';
+const tidy = (p) => {
+  let s = String(p);
+  if (s.endsWith('/**')) s = s.slice(0, -3);
+  else if (s.endsWith('/*')) s = s.slice(0, -2);
+  else if (s === '**' || s === '*') s = '';
+  return trimEndWhile(s, (c) => c === '/') || '.';
+};
 const slashed = (p) => String(p).replaceAll(/\\/g, '/');
 
 // In a bound app every owned path is app-relative - the ONE form gate.mjs (--root <app> --changed), the knowledge and every

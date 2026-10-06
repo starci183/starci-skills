@@ -428,7 +428,7 @@ try {
   const kernelName = workflowNameOf(ledger.db, workflowId);
   const title = `[Kernel] ${kernelName}`;
   const goal = ledger.db.prepare('SELECT revision,goal_identity,json,approved_by FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
-  const goalBridge = (() => { const j = parseJson(goal?.json, {}) ?? {}; return j.definedBy === 'supervisor' ? (j.bridge ?? { bridgeId: null }) : null; })();
+  const goalBridge = (() => { const j = parseJsonOr(goal?.json); return j.definedBy === 'supervisor' ? (j.bridge ?? { bridgeId: null }) : null; })();
   const firstBoot = ledger.db.prepare("SELECT created_at FROM events WHERE workflow_id=? AND kind='kernel-booted' ORDER BY seq LIMIT 1").get(workflowId);
   const priorKernelJob = ledger.db.prepare('SELECT payload_json,worker_id FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
   // restartAuthority: why this launch is a replacement, stated in the prompt and the receipt.
@@ -593,7 +593,7 @@ try {
     const payload = JSON.stringify({
       ...previousPayload,
       ...nextPayload,
-      ...(previousPayload.orca ? { orca: { ...previousPayload.orca } } : {}),
+      ...(previousPayload.orca && { orca: { ...previousPayload.orca } }),
       hierarchy: {
         ...previousPayload.hierarchy,
         ...nextPayload.hierarchy,
