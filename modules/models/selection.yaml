@@ -324,7 +324,7 @@ allocationFacts:
       ties. A pool missing from either list is not on the chain at all.
     bias: >-
       newAgentAdmission request.constraints supplies concrete prefer, avoid and require selectors.
-      Legacy pool strings normalize to pool selectors. Hard eligibility precedes preference and live pressure ranking.
+      Pool strings normalize to pool selectors. Hard eligibility precedes preference and live pressure ranking.
     overflow: >-
       runtimes.yaml allocation.overflowByOrder[key] names pools the chain takes only when no other eligible
       pool remains, under either policy - the review order's Opus and Sol (owner decision 2026-09-25

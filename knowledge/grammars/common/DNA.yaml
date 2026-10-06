@@ -49,7 +49,7 @@ provenance:
         barrels (`renderers.ts`, `renderers-<group>.ts`) to its module. `group` is `base` or the group
         map it came from. `kind` is the physical storage path under `src/core` (primitive/composite/
         branch/composition, or `core` for a file directly in it), which `renderers.ts` documents as
-        internal compatibility storage, not a public tier. `classes` are the `starci-core-*` and
+        internal storage, not a public tier. `classes` are the `starci-core-*` and
         `grammar-*` string literals in the renderer's own module (its directory, or its single file)
         plus those in the declarations of the non-renderer helpers it imports by name from another
         package module (class constants, the Field anatomy parts), one hop. A nested renderer's classes
@@ -88,7 +88,7 @@ provenance:
     - path: "packages/grammar/src/common/index.ts"
       sha256: "962c84f025a4cd7d53d27424c434b1b7d00d6ca82c3335c894c963ba498eb5a1"
     - path: "packages/grammar/src/common/renderers.ts"
-      sha256: "1ac19652d4ff47292351cc3a3c0aecdcc606543715efc7e224b0f93775b95103"
+      sha256: "714c5de2f645fef1a63935c683e82eeb55e0d1dc2fe5db24cda282a46f888c2c"
     - path: "packages/grammar/src/common/renderers-forms.ts"
       sha256: "139dbf64fa2afd57cbe9fc6551acc41bac25bf3568f41487991c22135813f499"
     - path: "packages/grammar/src/common/renderers-overlays.ts"
@@ -110,7 +110,7 @@ provenance:
     - path: "packages/grammar/src/common/state.ts"
       sha256: "367ff5ff3d2414a40962bb2908d26a0261178cfbe61ce87e0c6132ee957ce188"
     - path: "packages/grammar/src/common/conformance.ts"
-      sha256: "f1c52b9cf97a41c5a1d9822fe113a60f6d0e09501f13569574f57da7775fd024"
+      sha256: "38f05a8490cf44b00965b8ac50cf629dfaa806979e1c238fa1c52b2a1ea0959f"
     - path: "packages/grammar/src/common/rule-catalog.generated.ts"
       sha256: "5bdee2105eb112e6b74c051bc92e24b83fd721608023be38701487528e8a0c99"
     - path: "packages/grammar/src/core/overlayScope.tsx"

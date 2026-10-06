@@ -102,7 +102,7 @@ provenance:
     references are idioms.yaml and playbook.yaml.
   digests:
     - path: "packages/grammar/src/core/index.ts"
-      sha256: "439f23a34ec8b2369ada9aa3ac41ac9e5bbd0f87c4f0653a9c01855433cef779"
+      sha256: "0c315b461c3a26dc38219911393c09cf63fb1fa55b111b5d579611f40eb7046f"
     - path: "packages/grammar/src/core/dna.ts"
       sha256: "9fe62c245605c526f2a92b13c8fe91895bae08c1513535c4072f6b6c70cd522d"
     - path: "packages/grammar/src/core/styles.css"

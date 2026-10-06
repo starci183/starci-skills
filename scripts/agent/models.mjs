@@ -315,7 +315,7 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   const balanced = allocationPolicy === 'balanced';
   // Balanced keeps the tier order and lets `prefer` only break deficit ties;
   // `avoid` removes under both policies.
-  // Live selection keeps the whole declared group for common hard filters; legacy pool-string bias is only
+  // Live selection keeps the whole declared group for common hard filters; pool-string bias is only
   // used by static policy planning. A static plan never claims a fresh admission or starts a worker.
   const biased = capacity ? unbiased : balanced ? applyBias(unbiased, { avoid: bias?.avoid ?? [] }) : applyBias(unbiased, bias);
   const demote = (lineage?.demote ?? []).filter(Boolean), exclude = (lineage?.exclude ?? []).filter(Boolean);

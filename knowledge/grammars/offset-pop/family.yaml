@@ -105,15 +105,13 @@ dna:
     - fields (background surface, border ink, placeholder muted, radius control)
     - radius and field radius
     - shadow-surface (the hard offset)
-  compatibilityAliases:
-    - name: --offset-pop-surface-muted
-      targets: --offset-pop-surface-secondary
+  derivedNames:
     - name: --offset-pop-transition
       targets: "--offset-pop-motion-duration --offset-pop-motion-easing"
     - name: "--offset-pop-page-inset / -region-gap / -section-gap / -inline-gap / -row-gap"
       targets: "the matching --grammar-* value"
-  aliasNote: |
-    The rhythm names alias Common's `--grammar-*` scale exactly as Core's do; Offset Pop does not
+  derivedNote: |
+    The rhythm names carry Common's `--grammar-*` scale exactly as Core's do; Offset Pop does not
     re-space. The band names in `OFFSET_POP_BAND_TOKEN_NAMES` are Common's `--starci-core-band-*`
     names, re-exported so a consumer reads them from the family entry; the family never writes them.
 authority:

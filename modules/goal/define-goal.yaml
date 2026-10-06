@@ -39,7 +39,7 @@ input:
     or the host repo's ledger. Mutually exclusive with repo.
   title: optional short name; derived from the prompt when absent
   routing_bias: >-
-    Normalized owner intent: legacy prefer/avoid pool strings or concrete selectors,
+    Normalized owner intent: prefer/avoid pool strings or concrete selectors,
     optional hard require selector, roles (default op), and optional exact-attempt
     reserveOverride. Invalid JSON, hard constraints and conflicts are refused before
     persistence. An override may be recorded only from the owner context, never a
