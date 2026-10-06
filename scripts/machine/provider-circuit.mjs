@@ -47,6 +47,6 @@ export function writeProviderCircuit(provider, { value, expiresAt = null, ledger
 /** Every stored circuit: [{provider, value, at, expiresAt}]. */
 export function providerCircuits() {
   let m;
-  try { m = openMachineReader(); return providerHealth(m).map((r) => ({ provider: r.provider, value: { ...(parseJsonOr(r.detail_json) ?? {}), status: r.status, failureKind: r.failure_kind }, at: r.updated_at, expiresAt: r.circuit_open_until ?? null })); }
+  try { m = openMachineReader(); return providerHealth(m).map((r) => ({ provider: r.provider, value: { ...parseJsonOr(r.detail_json), status: r.status, failureKind: r.failure_kind }, at: r.updated_at, expiresAt: r.circuit_open_until ?? null })); }
   catch { return []; } finally { try { m?.close(); } catch { /* closed */ } }
 }

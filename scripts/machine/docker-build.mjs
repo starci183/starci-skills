@@ -19,7 +19,7 @@ export async function dockerBuild(ctx, deps = {}) {
   if (declaration?.kind !== 'app' || !/^[a-z0-9][a-z0-9-]*$/.test(project)) return { code: 2, stderr: 'starci docker build: hfs.json must declare kind app and a kebab-case project' };
   if (matches.length !== 1) return { code: 2, stderr: `starci docker build: ${app} must be declared exactly once under sides.be.apps or sides.fe.apps` };
   const tagName = String(ctx.args?.tag ?? 'dev');
-  if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(tagName)) return { code: 2, stderr: 'starci docker build: --tag is not a valid Docker tag' };
+  if (!/^\w[\w.-]{0,127}$/.test(tagName)) return { code: 2, stderr: 'starci docker build: --tag is not a valid Docker tag' };
   const tag = `${project}/${app}:${tagName}`;
   if (isForeignContainer(tag)) return {
     code: 2,

@@ -8,7 +8,7 @@ const ID = /^[A-Za-z0-9._-]{1,60}$/;   // 'sup:' + id stays within Telegram call
 /** Whether `id` is a valid supervisor channel id. */
 export const validSupervisorId = (id) => typeof id === 'string' && ID.test(id);
 /** `id` when valid; throws otherwise. */
-export const needSupervisorId = (id) => { if (!validSupervisorId(id)) throw Error(`supervisor id must match ${ID} (got ${JSON.stringify(String(id ?? ''))})`); return id; };
+export const needSupervisorId = (id) => { if (!validSupervisorId(id)) throw new Error(`supervisor id must match ${ID} (got ${JSON.stringify(String(id ?? ''))})`); return id; };
 
 // The newest rows a read returns (the history before them stays in the table).
 const READ_LIMIT = 1000;

@@ -53,7 +53,7 @@ export function artifactHoldOf(target, { env = process.env, repos = registeredRe
     // The repository's typed logs (scripts/kernel/typed-logs.mjs: the ledger's logs table, and the retired logs.sqlite
     // with its migrated copy) are append-only history: never swept.
     const work = path.join(repo, '.starciwork');
-    const logFiles = [path.basename(ledger), 'logs.sqlite', ...(fs.existsSync(work) && sameOrUnder(norm(work), t) ? fs.readdirSync(work).filter((n) => /^logs\.sqlite\.migrated-/.test(n)) : [])]
+    const logFiles = [path.basename(ledger), 'logs.sqlite', ...(fs.existsSync(work) && sameOrUnder(norm(work), t) ? fs.readdirSync(work).filter((n) => n.startsWith('logs.sqlite.migrated-')) : [])]
       .filter((name, i, all) => all.indexOf(name) === i).map((name) => path.join(work, name)).filter((file) => sameOrUnder(norm(file), t) && fs.existsSync(file));
     if (logFiles.length) return { ledger, repo, paths: logFiles.map((file) => `.starciwork/${path.basename(file)}`), count: logFiles.length };
     if (!fs.existsSync(ledger)) continue;

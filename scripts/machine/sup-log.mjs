@@ -36,7 +36,7 @@ export const machineRow = (r) => ({
  * never throws. One bad row never blocks the rest.
  */
 function supLogRows(rows, { env = process.env } = {}) {
-  const list = (Array.isArray(rows) ? rows : [rows]).filter((r) => r && r.kind);
+  const list = (Array.isArray(rows) ? rows : [rows]).filter((r) => r?.kind);
   if (!list.length) return { ok: true, written: 0 };
   try {
     return withMachine((m) => {

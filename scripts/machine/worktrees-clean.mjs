@@ -26,7 +26,7 @@ const globExpression = (glob) => {
   for (const char of String(glob)) {
     if (char === '*') source += '.*';
     else if (char === '?') source += '.';
-    else source += char.replace(/[\\^$+?.()|{}\[\]]/g, '\\$&');
+    else source += char.replace(/[\\^$+?.()|{}[\]]/g, String.raw`\$&`);
   }
   return new RegExp(`${source}$`, process.platform === 'win32' ? 'i' : '');
 };
@@ -46,8 +46,8 @@ export async function worktreesClean(ctx, deps = {}) {
   if (!Array.isArray(worktrees) || !worktrees.length) return { code: 1, stderr: 'starci machine worktrees-clean: Git reported no primary worktree' };
   const primary = path.resolve(worktrees[0].path);
   const configured = ctx.env?.STARCI_LANES_ROOT ? path.resolve(ctx.env.STARCI_LANES_ROOT) : null;
-  const discovered = [cwd, ...worktrees.map((row) => row.path)].map((entry) => namedAncestor(entry, 'starci-lanes')).filter(Boolean);
-  const lanesRoot = configured ?? discovered[0];
+  const discovered = [cwd, ...worktrees.map((row) => row.path)].map((entry) => namedAncestor(entry, 'starci-lanes')).find(Boolean);
+  const lanesRoot = configured ?? discovered;
   if (!lanesRoot) return { code: 2, stderr: 'starci machine worktrees-clean: set STARCI_LANES_ROOT when no starci-lanes ancestor can be derived' };
 
   const status = deps.status ?? realStatus;

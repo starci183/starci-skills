@@ -146,7 +146,7 @@ export function supervisorEvent(m, { entityType = 'supervisor', entityId = SUPER
 /** The newest event of `kind` as {at, ...payload}, or null. */
 export function newestEvent(m, kind) {
   const row = m.newestSupEvent(kind);
-  return row ? { at: row.created_at, ...(row.payload ?? {}) } : null;
+  return row ? { at: row.created_at, ...row.payload } : null;
 }
 
 /**

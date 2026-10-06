@@ -30,7 +30,7 @@ export const starciShimPath = ({ home = os.homedir(), platform = process.platfor
 
 const launcherLine = (starci) => starci
   ? `$starci = '${quote(starci)}'`
-  : "$starci = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.starci\\bin\\starci.cmd'";
+  : String.raw`$starci = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.starci\bin\starci.cmd'`;
 
 /** Build the exact idempotent, per-user Register-ScheduledTask script for one known runtime task. */
 function taskRegistrationScript(name, { taskName, starci, workdir, everyMinutes } = {}) {
@@ -53,8 +53,8 @@ function taskRegistrationScript(name, { taskName, starci, workdir, everyMinutes 
   const schedule = every == null ? 'at logon, restarted on failure' : `at logon and every ${every} minutes`;
   return [
     "$ErrorActionPreference = 'Stop'",
-    "$conhost = Join-Path $env:SystemRoot 'System32\\conhost.exe'",
-    "$cmd = Join-Path $env:SystemRoot 'System32\\cmd.exe'",
+    String.raw`$conhost = Join-Path $env:SystemRoot 'System32\conhost.exe'`,
+    String.raw`$cmd = Join-Path $env:SystemRoot 'System32\cmd.exe'`,
     launcherLine(starci),
     `$argLine = '--headless "' + $cmd + '" /d /s /c ""' + $starci + '" ${command}"'`,
     action,

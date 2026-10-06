@@ -41,7 +41,6 @@
 //   starci machine op-metrics [--repo <path>]... [--window-ms <ms>] [--by op|workflow] [--json]
 //   starci machine op-metrics --trend [--json]      the newest snapshots and the trend line
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { fullJson } from '../../engine/db/machine.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
@@ -67,14 +66,14 @@ export function telemetrySettings(allocation = allocationSettings()) {
   const t = allocation?.opTelemetry;
   const need = (value, dotted) => {
     const n = Number(value);
-    if (!Number.isFinite(n) || n <= 0) throw Error(`modules/models/runtimes.yaml allocation.opTelemetry.${dotted} must be a positive number`);
+    if (!Number.isFinite(n) || n <= 0) throw new Error(`modules/models/runtimes.yaml allocation.opTelemetry.${dotted} must be a positive number`);
     return n;
   };
   const stuckSla = {};
   for (const kind of WAIT_KINDS) {
     const warnMs = need(t?.stuckSla?.[kind]?.warnMs, `stuckSla.${kind}.warnMs`);
     const criticalMs = need(t?.stuckSla?.[kind]?.criticalMs, `stuckSla.${kind}.criticalMs`);
-    if (criticalMs < warnMs) throw Error(`modules/models/runtimes.yaml allocation.opTelemetry.stuckSla.${kind}.criticalMs must be >= warnMs`);
+    if (criticalMs < warnMs) throw new Error(`modules/models/runtimes.yaml allocation.opTelemetry.stuckSla.${kind}.criticalMs must be >= warnMs`);
     stuckSla[kind] = { warnMs, criticalMs };
   }
   return { windowMs: need(t?.windowMs, 'windowMs'), trendMs: need(t?.trendMs, 'trendMs'), stuckSla };
@@ -139,7 +138,7 @@ const inList = (n) => Array.from({ length: n }, () => '?').join(',');
  */
 export function jobRecords(db, { since, now = Date.now(), workflowId = null } = {}) {
   const jobs = db.prepare(`SELECT job_id, workflow_id, op_id, attempt, status, payload_json, result_json, created_at, updated_at FROM jobs
-    WHERE kind='op' AND (created_at>=? OR updated_at>=?)${workflowId ? ' AND workflow_id=?' : ''}`).all(...[since, since, ...(workflowId ? [workflowId] : [])]);
+    WHERE kind='op' AND (created_at>=? OR updated_at>=?)${workflowId ? ' AND workflow_id=?' : ''}`).all(since, since, ...(workflowId ? [workflowId] : []));
   if (!jobs.length) return [];
   const from = Math.min(...jobs.map((j) => Number(j.created_at)));
   const byJob = new Map();
@@ -173,7 +172,7 @@ export function jobRecords(db, { since, now = Date.now(), workflowId = null } = 
     const report = reports.get(key) ?? null;
     const reportAt = Number(first('report-filed')?.created_at ?? report?.at) || null;
     const settledEv = first('op-settled');
-    const settledAt = Number(settledEv?.created_at ?? (OPEN_STATUSES.has(job.status) ? NaN : result.at)) || null;
+    const settledAt = Number(settledEv?.created_at ?? (OPEN_STATUSES.has(job.status) ? Number.NaN : result.at)) || null;
     const verdict = result.verdict ?? parseJsonOr(settledEv?.payload_json, {})?.verdict ?? null;
     const deadEv = evs.find((e) => DEAD_KINDS.has(e.kind));
     const dead = deadEv ? (parseJsonOr(deadEv.payload_json, {})?.worker?.liveness ?? parseJsonOr(deadEv.payload_json, {})?.liveness ?? 'dead') : null;
@@ -444,7 +443,7 @@ export const snapshotPayload = (metrics, stuck = []) => ({ schema: 'starci/op-me
 export const recordSnapshot = (m, payload) => m.recordMetrics({ kind: METRICS_KIND, windowMs: payload?.windowMs ?? null, subject: SNAPSHOT_KIND, data: payload });
 /** The newest `limit` snapshots (machine.sqlite metrics_snapshots over the machine handle `m`), oldest first: [{at, ...payload}]. */
 export const readSnapshots = (m, { limit = 96 } = {}) => m.db.prepare('SELECT at, data_json, data_sha FROM metrics_snapshots WHERE kind=? AND ledger_id IS NULL ORDER BY snap_id DESC LIMIT ?')
-  .all(METRICS_KIND, limit).reverse().map((r) => ({ at: Number(r.at), ...(fullJson(JSON.parse(r.data_json ?? 'null')) ?? {}) }));
+  .all(METRICS_KIND, limit).reverse().map((r) => ({ at: Number(r.at), ...fullJson(JSON.parse(r.data_json ?? 'null')) }));
 
 const TREND_TEXT = (tr, d) => tr('Op health {window}: success {rate}{rateDelta}, median wait {wait}{waitDelta}, stuck {stuck} ({critical} critical){stuckDelta}{top}{vs}',
   { window: fmtMs(d.windowMs), rate: d.rate, rateDelta: d.rateDelta, wait: d.wait, waitDelta: d.waitDelta, stuck: d.stuck, critical: d.critical, stuckDelta: d.stuckDelta,

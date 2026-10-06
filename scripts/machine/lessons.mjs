@@ -41,18 +41,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { diffTree } from '../api/git/diff-tree.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { SKILL_ROOT, supervisorRead, supervisorEvent, withSupervisor } from './home.mjs';
 import { refsOf, supLog } from './sup-log.mjs';
-import { LESSONS_FILE, lessonsForChecks, parseLessonsFile } from './lessons-file.mjs';
+import { LESSONS_FILE } from './lessons-file.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { verbCli } from '../lib/cli-arg.mjs';
 
-export { LESSONS_FILE, lessonsForChecks, parseLessonsFile };
+export { LESSONS_FILE, lessonsForChecks, parseLessonsFile } from './lessons-file.mjs';
 
 export const KINDS = Object.freeze({
   hypothesis: 'supervisor-hypothesis', experiment: 'supervisor-experiment', result: 'supervisor-experiment-result',
@@ -64,7 +63,7 @@ const norm = posixPath;
 /** allocation.supervisorLearning, every number checked. */
 export function learningSettings(allocation = allocationSettings()) {
   const s = allocation?.supervisorLearning;
-  const need = (k) => { const v = Number(s?.[k]); if (!Number.isFinite(v) || v <= 0) throw Error(`modules/models/runtimes.yaml allocation.supervisorLearning.${k} must be a positive number`); return v; };
+  const need = (k) => { const v = Number(s?.[k]); if (!Number.isFinite(v) || v <= 0) throw new Error(`modules/models/runtimes.yaml allocation.supervisorLearning.${k} must be a positive number`); return v; };
   return { minRepeats: need('minRepeats'), measureMs: need('measureMs'), dailyAutoLandCap: need('dailyAutoLandCap'), ownerWeight: need('ownerWeight'), successDrop: need('successDrop') };
 }
 
@@ -158,7 +157,7 @@ export const write = (env, kind, payload, now = Date.now()) => {
   withSupervisor((m) => m.transaction(() => {
     const { seq } = supervisorEvent(m, { entityType: 'learning', entityId: payload.id ?? payload.signature ?? kind, kind, payload, now });
     const prior = m.db.prepare('SELECT detail_json, created_at FROM sup_learning WHERE item_id=?').get(item.itemId);
-    const merged = kind === KINDS.proposal && prior ? { ...(JSON.parse(prior.detail_json ?? '{}') ?? {}), ...payload } : payload;
+    const merged = kind === KINDS.proposal && prior ? { ...JSON.parse(prior.detail_json ?? '{}'), ...payload } : payload;
     const parentId = item.parentId && m.db.prepare('SELECT 1 FROM sup_learning WHERE item_id=?').get(item.parentId) ? item.parentId : null;
     m.upsert('sup_learning', { item_id: item.itemId, kind: item.kind, parent_id: parentId, title: item.title, state: item.state, source_ref: payload.signature ?? null,
       lane: item.lane ?? null, landed_sha: item.landedSha ?? null, detail_json: { ...merged, at: now, seq }, created_at: prior?.created_at ?? now, updated_at: now }, ['item_id']);

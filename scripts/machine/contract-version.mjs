@@ -20,7 +20,7 @@ export function contractFilesOf(root, op) {
   let text = '';
   try { text = fs.readFileSync(path.join(root, brief), 'utf8'); } catch { /* digested as absent */ }
   const cited = [...new Set(text.match(CITE_RX) ?? [])].filter((rel) => !rel.includes('..'));
-  return [brief, ...ALWAYS_CITED, ...cited.sort(byCodeUnit)].filter((rel, index, all) => all.indexOf(rel) === index);
+  return [brief, ...ALWAYS_CITED, ...cited.toSorted(byCodeUnit)].filter((rel, index, all) => all.indexOf(rel) === index);
 }
 
 /** The contract version one dispatch admits a leg under (contracts.context_json.contract). */
@@ -56,7 +56,8 @@ export function admittedContractOf(db, job) {
 export function classifyChecks(checks) {
   return asList(checks).map((check) => {
     if (!check || typeof check !== 'object') return check;
-    const { advisory: _ignored, ...clean } = check;
+    const clean = { ...check };
+    delete clean.advisory;
     return clean;
   });
 }

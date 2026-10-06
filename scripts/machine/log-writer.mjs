@@ -205,6 +205,6 @@ export function logWriterFor(file, options = {}) {
 
 /** Flush every writer of this process (on exit: the rows a CLI queued are durable before it ends). */
 function flushAllLogWriters({ force = true } = {}) {
-  for (const w of [...writers.values()]) { try { w.flush({ force }); } catch (error) { process.stderr.write(`log-writer exit flush failed: ${error?.message ?? error}\n`); } }
+  for (const w of writers.values()) { try { w.flush({ force }); } catch (error) { process.stderr.write(`log-writer exit flush failed: ${error?.message ?? error}\n`); } }
 }
 process.once('exit', () => flushAllLogWriters());

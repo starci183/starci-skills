@@ -82,7 +82,7 @@ const healthOf = (row) => {
   const explicit = row.Health ?? row.health;
   if (explicit) return String(explicit);
   const status = String(row.Status ?? row.status ?? '');
-  return status.match(/\((healthy|unhealthy|starting)\)/i)?.[1]?.toLowerCase() ?? String(row.State ?? row.state ?? 'unknown').toLowerCase();
+  return /\((healthy|unhealthy|starting)\)/i.exec(status)?.[1]?.toLowerCase() ?? String(row.State ?? row.state ?? 'unknown').toLowerCase();
 };
 
 /** Compose override that adds the ownership label to every resource this project creates. External resources are not created. */

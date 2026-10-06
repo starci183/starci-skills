@@ -37,7 +37,7 @@ export function reportedJobs(db, { workflowId = null, jobId = null } = {}) {
 export function kernelHandoverOf(db, item) {
   const row = db.prepare(`SELECT payload_json, created_at FROM events WHERE kind=? AND entity_id=? AND json_extract(payload_json,'$.dispatchId')=?
     ORDER BY seq DESC LIMIT 1`).get(NEEDS_KERNEL_EVENT, item.jobId, item.dispatchId);
-  return row ? { ...(parse(row.payload_json) ?? {}), at: Number(row.created_at) } : null;
+  return row ? { ...parse(row.payload_json), at: Number(row.created_at) } : null;
 }
 
 /**

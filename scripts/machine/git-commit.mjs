@@ -54,7 +54,7 @@ export async function gitCommit(ctx, deps = {}) {
   if (!summary) return refusal('--summary is required');
   if (!/^[a-z]/.test(summary)) return refusal('--summary must start with a lowercase letter');
   if (summary.endsWith('.')) return refusal('--summary must not end with a period');
-  if (/\r|\n/.test(summary) || /\r|\n/.test(scope)) return refusal('--summary and --scope must be one line');
+  if (/[\r\n]/.test(summary) || /[\r\n]/.test(scope)) return refusal('--summary and --scope must be one line');
   const subject = scope ? `${type}(${scope}): ${summary}` : `${type}: ${summary}`;
   if (subject.length > 100) return refusal(`subject is ${subject.length} characters; maximum is 100`);
 
