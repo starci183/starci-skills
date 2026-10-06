@@ -62,6 +62,29 @@ const trustedOverride = (requested, grant, { role, scopeId }) => {
     && (requested.account ?? 'default') === (grant.account ?? 'default') ? requested : null;
 };
 
+const heldAttemptFor = (usage, { attemptId, provider, account, model, role, scopeId, scope }) => usage.reservations?.find((receipt) =>
+  receipt.attemptId === attemptId && receipt.state !== 'released' && receipt.provider === provider && receipt.account === account
+  && receipt.model === model && receipt.role === role && receipt.scope?.scopeId === scopeId
+  && ['runId', 'jobId', 'seat'].every((key) => (receipt.scope?.[key] ?? null) === (scope?.[key] ?? null)));
+const poolMaxParallel = (member, poolEntries, backoff) => poolEntries.length === 0 ? 0
+  : Math.min(member.maxParallel ?? Infinity, ...poolEntries.map(([, row]) => row.maxParallel).filter(Number.isInteger),
+    ...poolEntries.flatMap(([id, row]) => [backoff[id], backoff[row.target]]).filter(Number.isInteger));
+const candidateEligibility = (member, registered, role) => {
+  if (member.eligibility !== null && member.eligibility !== undefined) return member.eligibility;
+  if (role === 'op') return { eligible: false, mode: null, reasons: ['operation eligibility was not established'] };
+  return { eligible: registered, mode: registered ? 'scoped-control-plane' : null,
+    reasons: registered ? [] : ['concrete model/provider or pool is not registered'] };
+};
+const runningFor = (usage, held) => Number.isInteger(usage.running) ? usage.running - (held ? 1 : 0) : usage.running;
+const heldAttemptsGate = (candidates, heldAttempts) => {
+  if (!heldAttempts.size) return;
+  const held = heldAttempts.size === 1 ? [...heldAttempts.values()][0] : null;
+  for (const candidate of candidates) {
+    if (!held || candidate.provider !== held.provider || candidate.account !== held.account || candidate.model !== held.model)
+      candidate.eligibility = { eligible: false, mode: null, reasons: ['this attempt already holds a different provider receipt'] };
+  }
+};
+
 /** A plan observes but never reserves. Callers must supply actual scoped eligibility for Op work. */
 export function planAgentAdmission({ role, scopeId, attemptId = null, kind = null, difficulty = null, allowGroup, qualityFloor = null, bias = null,
   ownerGrant = null, author = null, independence = null, scope = null, registry = null, runtimes = null, now = Date.now, env = process.env,
@@ -87,31 +110,22 @@ export function planAgentAdmission({ role, scopeId, attemptId = null, kind = nul
     const circuit = circuits.get(provider);
     const usage = (io?.usage ?? providerBudgetUsage)(provider, account, { env });
     const candidateAttemptId = `${role}:${attemptId ?? scopeId}:${provider}:${account}:${model}`;
-    const held = usage.reservations?.find((receipt) => receipt.attemptId === candidateAttemptId && receipt.state !== 'released'
-      && receipt.provider === provider && receipt.account === account && receipt.model === model && receipt.role === role
-      && receipt.scope?.scopeId === scopeId && ['runId', 'jobId', 'seat'].every((key) => (receipt.scope?.[key] ?? null) === (scope?.[key] ?? null)));
+    const held = heldAttemptFor(usage, { attemptId: candidateAttemptId, provider, account, model, role, scopeId, scope });
     if (held) heldAttempts.set(candidateAttemptId, { provider, account, model, receipt: held });
-    const maxParallel = poolEntries.length === 0 ? 0
-      : Math.min(member.maxParallel ?? Infinity, ...poolEntries.map(([, row]) => row.maxParallel).filter(Number.isInteger),
-        ...poolEntries.flatMap(([id, row]) => [backoff[id], backoff[row.target]]).filter(Number.isInteger));
+    const maxParallel = poolMaxParallel(member, poolEntries, backoff);
     const registered = catalog?.models?.[model]?.provider === provider && poolEntries.length > 0;
     const quota = quotaForAdmission({ quota: observations.get(identity), provider, pool, role, kind,
       difficulty: difficulty ?? 'medium', scopeId, registry: catalog, runtimes: rt, policy, now: clock(), io });
-    const eligibility = member.eligibility ?? (role === 'op' ? { eligible: false, mode: null, reasons: ['operation eligibility was not established'] }
-      : { eligible: registered, mode: registered ? 'scoped-control-plane' : null, reasons: registered ? [] : ['concrete model/provider or pool is not registered'] });
+    const eligibility = candidateEligibility(member, registered, role);
     return { ...member, id: member.id ?? `${provider}/${model}/${index}`, provider, agent: member.agent ?? provider, account, model, pool,
       qualityFloor: catalog?.models?.[model]?.tier ?? null, modelAuthority: adapterModelAuthority(loadAdapter(provider).card),
       eligibility: registered ? eligibility : { eligible: false, mode: null, reasons: ['concrete model/provider or pool is not registered'] },
-      quota, capacity: { ...member.capacity, running: Number.isInteger(usage.running) ? usage.running - (held ? 1 : 0) : usage.running,
+      quota, capacity: { ...member.capacity, running: runningFor(usage, held),
         maxParallel: Number.isFinite(maxParallel) ? maxParallel : 0,
         openIncident: Boolean(circuit) || member.capacity?.openIncident === true,
         ...(circuit?.expiresAt != null ? { blockedUntil: circuit.expiresAt } : {}) } };
   });
-  if (heldAttempts.size) {
-    const held = heldAttempts.size === 1 ? [...heldAttempts.values()][0] : null;
-    for (const candidate of candidates) if (!held || candidate.provider !== held.provider || candidate.account !== held.account || candidate.model !== held.model)
-      candidate.eligibility = { eligible: false, mode: null, reasons: ['this attempt already holds a different provider receipt'] };
-  }
+  heldAttemptsGate(candidates, heldAttempts);
   return selectAdmission({ request: { attemptId: attemptId ?? scopeId, scopeId, role, kind, difficulty,
     qualityFloor: qualityFloor ?? admissionQualityFloor(role, difficulty, policy),
     allowGroup: candidates.map(({ provider, model }) => ({ provider, model })),

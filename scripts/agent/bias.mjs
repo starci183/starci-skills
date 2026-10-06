@@ -25,8 +25,8 @@ import { altOf } from '../lib/source-phrases.mjs';
 import { normalizeOwnerRoutingBias, canonicalRoutingPool } from '../lib/owner-routing-bias.mjs';
 
 // Longest alias forms first so 'codex-agent' wins over 'codex' inside the token.
-const PREFER_RE = new RegExp(`(?:${altOf('bias.prefer')})\\s+([a-z][a-z-]*)`, 'gi');
-const AVOID_RE = new RegExp(`(?:${altOf('bias.avoid')})\\s+([a-z][a-z-]*)`, 'gi');
+const PREFER_RE = new RegExp(String.raw`(?:${altOf('bias.prefer')})\s+([a-z][a-z-]*)`, 'gi');
+const AVOID_RE = new RegExp(String.raw`(?:${altOf('bias.avoid')})\s+([a-z][a-z-]*)`, 'gi');
 
 const scan = (text, re) => {
   const out = [];

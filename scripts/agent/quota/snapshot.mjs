@@ -16,6 +16,18 @@ export function quotaWindows(entry, observedAt) {
   visit(entry, '');
   return windows;
 }
+/** The provider-window verdict chain: dead auth, stale evidence, exhaustion, admission blocks, then limited/ok. */
+const providerWindowVerdict = (input, auth, result, valid, inspected) => {
+  if (input.state === 'dead' || auth === 'unavailable') return { ...result, state: 'dead', detail: input.detail ?? 'provider authentication unavailable' };
+  if ((!valid && inspected.codes.some((code) => code !== 'quota-exhausted')) || input.state === 'unknown' || input.fresh === false)
+    return { ...result, fresh: false, detail: input.detail ?? 'quota missing, stale or invalid' };
+  if (inspected.exhausted) return { ...result, state: 'dead', detail: 'a provider quota window is exhausted' };
+  if (!inspected.limited && (input.normalAdmission === false || input.allowLaunchAttempt === false))
+    return { ...result, detail: input.detail ?? 'provider observation blocks normal admission' };
+  const limited = inspected.limited;
+  return { ...result, state: limited ? 'limited' : 'ok', normalAdmission: !limited, allowLaunchAttempt: !limited,
+    detail: input.detail ?? (limited ? 'a quota window is reserved for scoped recovery' : 'all observed quota windows have normal headroom') };
+};
 /** Policy numbers come from allocation.admission; unknown/stale evidence never becomes available. */
 export function normalizeQuotaSnapshot(input = {}, { policy, now = Date.now() } = {}) {
   const observedAt = timestamp(input.observedAt), auth = input.auth ?? 'unknown';
@@ -41,13 +53,5 @@ export function normalizeQuotaSnapshot(input = {}, { policy, now = Date.now() } 
   const resets = windows.map((window) => window.resetsAt).filter((at) => at !== null).sort((a, b) => a - b);
   const result = { ...base, windows, usedPercent, resetsAt: resets.length ? new Date(resets[0]).toISOString() : null,
     fresh: inspected.fresh && inspected.codes.every((code) => code === 'quota-exhausted') };
-  if (input.state === 'dead' || auth === 'unavailable') return { ...result, state: 'dead', detail: input.detail ?? 'provider authentication unavailable' };
-  if ((!valid && inspected.codes.some((code) => code !== 'quota-exhausted')) || input.state === 'unknown' || input.fresh === false)
-    return { ...result, fresh: false, detail: input.detail ?? 'quota missing, stale or invalid' };
-  if (inspected.exhausted) return { ...result, state: 'dead', detail: 'a provider quota window is exhausted' };
-  if (!inspected.limited && (input.normalAdmission === false || input.allowLaunchAttempt === false))
-    return { ...result, detail: input.detail ?? 'provider observation blocks normal admission' };
-  const limited = inspected.limited;
-  return { ...result, state: limited ? 'limited' : 'ok', normalAdmission: !limited, allowLaunchAttempt: !limited,
-    detail: input.detail ?? (limited ? 'a quota window is reserved for scoped recovery' : 'all observed quota windows have normal headroom') };
+  return providerWindowVerdict(input, auth, result, valid, inspected);
 }

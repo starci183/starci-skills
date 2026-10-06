@@ -18,7 +18,6 @@
 //             exist, else created_at -> updated_at. `durationSource` counts which was used.
 // Missing ledgers never crash: they are reported as errors.
 import fs from 'node:fs';
-import path from 'node:path';
 import { createRequire } from 'node:module';
 import { isMain } from '../lib/is-main.mjs';
 import { ledgerFileFor, openLedgerReader } from '../../engine/db/ledger.mjs';
@@ -56,7 +55,7 @@ export function median(values) {
  * Throws when the ledger file is missing; scorecardFor turns that into a per-repo error.
  */
 function readLedgerJobs(file, { sinceMs = null } = {}) {
-  if (!fs.existsSync(file)) throw Object.assign(Error(`no ledger at ${file}`), { code: 'ENOENT' });
+  if (!fs.existsSync(file)) throw Object.assign(new Error(`no ledger at ${file}`), { code: 'ENOENT' });
   const db = openLedgerReader(file);
   try {
     const where = sinceMs == null ? '' : ' AND created_at>=?';
@@ -99,7 +98,7 @@ const addJob = (cell, job, outcome, duration) => {
   if (duration) cell.durations.push(duration.ms);
 };
 const pct = (n, d) => (d ? n / d : null);
-const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+const byName = (a, b) => { if (a < b) return -1; if (a > b) return 1; return 0; };
 const finish = (cell, total) => ({
   jobs: cell.jobs, share: pct(cell.jobs, total), settled: cell.settled,
   pass: cell.pass, fail: cell.fail, blocked: cell.blocked, cancelled: cell.cancelled, open: cell.open, rework: cell.rework,
@@ -159,7 +158,7 @@ const minutes = (ms) => (ms == null ? '-' : (ms / 60000).toFixed(1));
 /** ONE short line for the supervisor digest: each pool's share of jobs (and pass rate; none for never-routed jobs). */
 export function summaryLine(sc) {
   const parts = Object.entries(sc.pools).filter(([, p]) => p.jobs > 0)
-    .map(([pool, p]) => `${shortPool(pool)} ${pctText(p.share)}${p.passRate == null || pool === UNROUTED ? '' : ` (p${pctText(p.passRate)})`}`);
+    .map(([pool, p]) => `${shortPool(pool)} ${pctText(p.share)}${p.passRate == null || pool === UNROUTED ? '' : ' (p' + pctText(p.passRate) + ')'}`);
   return `pools ${sc.window.label}: ${parts.length ? parts.join(' · ') : 'no op jobs'}`;
 }
 
@@ -173,7 +172,7 @@ export function formatTable(sc) {
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
   const fmt = (r) => r.map((c, i) => (i < 2 ? c.padEnd(widths[i]) : c.padStart(widths[i]))).join('  ');
   const lines = [
-    `model scorecard — window ${sc.window.label}${sc.window.sinceMs ? ` (since ${new Date(sc.window.sinceMs).toISOString()})` : ''} — repos: ${sc.repos.join(', ') || '(none)'}`,
+    `model scorecard — window ${sc.window.label}${sc.window.sinceMs ? ' (since ' + new Date(sc.window.sinceMs).toISOString() + ')' : ''} — repos: ${sc.repos.join(', ') || '(none)'}`,
     fmt(head), ...rows.map(fmt), '',
   ];
   for (const [pool, p] of Object.entries(sc.pools)) {

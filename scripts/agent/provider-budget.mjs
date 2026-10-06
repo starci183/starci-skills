@@ -66,11 +66,15 @@ export function markProviderBudget(receipt, observation, options = {}) {
 export function releaseProviderBudget(receipt, proof, options = {}) {
   return withMachine((m) => m.releaseProviderReservation({ ...receipt, proof }), optionsOf(options));
 }
+/** One observation: release on a proof, mark on an observation, refuse when it names neither. */
+const reconcileObservation = ({ receipt, proof, observation }, options) => {
+  if (proof) return releaseProviderBudget(receipt, proof, options);
+  if (observation) return markProviderBudget(receipt, observation, options);
+  return { ok: false, reason: 'observation-unknown', reservation: receipt };
+};
 /** Missing, stale or unknown observations retain capacity. This function never probes processes itself. */
 export function reconcileProviderBudget(observations = [], options = {}) {
-  return observations.map(({ receipt, proof, observation }) => proof
-    ? releaseProviderBudget(receipt, proof, options) : observation
-      ? markProviderBudget(receipt, observation, options) : { ok: false, reason: 'observation-unknown', reservation: receipt });
+  return observations.map((observation) => reconcileObservation(observation, options));
 }
 export function providerBudgetUsage(provider, account = 'default', options = {}) {
   return readMachine((m) => m.providerReservationUsage({ provider, account }),
