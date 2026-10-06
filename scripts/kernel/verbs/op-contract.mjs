@@ -26,7 +26,7 @@ export default {
       if (job && (attempt == null || attempt === job.try_no)) return db.prepare(`${CONTRACT_ROW} WHERE a.job_id=? ORDER BY a.attempt_id DESC LIMIT 1`).get(job.job_id) ?? null;
       if (job?.unit_id) return db.prepare(`${CONTRACT_ROW} WHERE a.workflow_id=? AND a.unit_id=? AND a.try_no=? ORDER BY a.attempt_id DESC LIMIT 1`).get(workflowId, job.unit_id, attempt) ?? null;
       return db.prepare(`${CONTRACT_ROW} WHERE a.workflow_id=? AND a.op_id=?${attempt == null ? '' : ' AND a.try_no=?'} ORDER BY a.attempt_id DESC LIMIT 1`)
-        .get(...[workflowId, op, ...(attempt == null ? [] : [attempt])]) ?? null;
+        .get(workflowId, op, ...(attempt == null ? [] : [attempt])) ?? null;
     };
     if (job && attempt == null) attempt = job.try_no;
     let row = read();

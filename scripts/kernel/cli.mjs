@@ -58,28 +58,28 @@ import { execAsSpawnSync } from '../api/process/exec-as-spawn-sync.mjs';
 import {
   openLedger, ledgerFileFor, newToken, JOB_STATUSES, OP_SLOT_HOLDING_STATUSES as SLOT_HOLDING_STATUSES, reserveTwoPhase,
   startAttempt, writeContract, updateContractContext, updateAttempt, endRejectedAttempt, setJobStatus, recordJobResult, releaseLeases, openIncident,
-  updateJob, updateIncident, resolveIncident, renewLeases, setSignal, clearSignal, setInboxStatus, jobResult, setUnitState, getUnit,
+  updateJob, updateIncident, renewLeases, clearSignal, setInboxStatus, jobResult, setUnitState, getUnit,
 } from '../../engine/db/ledger.mjs';
 import { machineFileFor, openMachine } from '../../engine/db/machine.mjs';
 import { recordWhy } from './why-record.mjs';
 import { opGateBasesOf } from './workflow-checkpoint.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
-  AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, workflowOpSlots,
+  RETRY_CLASS_ENVIRONMENT, workflowOpSlots,
   findOwnedPathLeaseConflicts, ownedPathLeaseRequests, retiredBeforeDispatch, ownedPathsIntersect,
 } from '../../engine/admission.mjs';
 import { admitUnit, spentTriesOf, unitStateOf, writeUnitTry } from './units.mjs';
 import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
-import { activeDelegation, allocationMs, allocationSettings, inspectOwnerConfig, loadConfig, runtimeProfile } from '../../engine/config.mjs';
+import { activeDelegation, allocationMs, allocationSettings, configuredAllocationPolicy, inspectOwnerConfig, loadConfig, runtimeProfile } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES } from './report-envelope.mjs';
 import { ownedPathEffects } from './owned-path-effects.mjs';
 import { lineageJobsOf } from '../machine/owner-answers.mjs';
 import { isAwaitingOwner, unresolvedFailures } from './failure-steps.mjs';
-import { planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
+import { planGraphOf } from '../route/plan-edges.mjs';
 import { domainsOfPaths, latestVersion as latestGraphVersion } from '../work/work-graph-store.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
-import { deliverPrompt, loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule } from '../agent/lib.mjs';
+import { loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule } from '../agent/lib.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
@@ -89,7 +89,7 @@ import { headShaOf } from '../lib/git-dir.mjs';
 import { ownerLanguage as ownerLanguageOf, translator } from '../lib/i18n.mjs';
 // The reads the split-out verbs share with what stays here: one definition per helper (scripts/kernel/verbs/shared/).
 import {
-  csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, latestReportOf, operationDispatchOf,
+  csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, recordPathsOf, workDirOf, operationDispatchOf,
 } from './verbs/shared/rows.mjs';
 import { JOB_ROW, jobResultSql, latestAttemptOf, latestKernelJobOf } from '../machine/job-row.mjs';
 import { agentOfJob } from '../lib/job-agent.mjs';
@@ -109,7 +109,7 @@ import { recordSettledAttemptUsage } from './usage-record.mjs';
 import { isLiveProofOp } from './ask-server.mjs';
 import {
   AUTOPILOT_BY, AUTOPILOT_EVENTS, AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, PROVISIONAL_LABEL,
-  SUPERVISOR_GATE, credentialsOwed, deferredQueueCause, openSupervisorGate, provisionalOps,
+  SUPERVISOR_GATE, deferredQueueCause, openSupervisorGate,
   routeCapUnderAutopilot,
 } from './autopilot-run.mjs';
 import {
@@ -127,13 +127,11 @@ import {
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/worker-start/worker-show/worker-stop/
 // worker-release).
-import { selectPool, providerCircuitOf, defaultOperationTarget } from '../agent/models.mjs';
+import { selectPool, providerCircuitOf, kindRoute as kindRouteOf, isFanOutSlice } from '../agent/models.mjs';
 import { readProviderCircuit, writeProviderCircuit as storeProviderCircuit } from '../machine/provider-circuit.mjs';
 import { credentialFingerprintOf, credentialRotated } from '../agent/credential-fingerprint.mjs';
 import { QUOTA_FAILURE_KIND, outageSpecsOf, outageInText, outageOnScreen } from '../agent/provider-outage.mjs';
-import { kindRoute as kindRouteOf, isFanOutSlice } from '../agent/models.mjs';
 import { recentDispatchCounts, auditAuthorOf } from '../agent/balance.mjs';
-import { configuredAllocationPolicy } from '../../engine/config.mjs';
 import { deferJob, deferralOf as testDeferralOf, ownerSpecs, deferredTestsOf, planLegDeferral, specsOff } from '../route/spec-deferral.mjs';
 import { HANDOVER_OP } from './handover.mjs';
 import { admittedVersionOf } from './dispatch-admission.mjs';
@@ -149,7 +147,6 @@ import { salvageUnfiledReport, unfiledReportCandidates } from './report-salvage.
 import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { gitResultOf } from '../lib/git.mjs';
 import { hostWideDisconnectOf } from './host-event.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
-import { workerStop } from '../api/orca/worker-stop.mjs';
 import { closeWorker } from '../machine/worker-close.mjs';
 import { workflowDisplayName } from '../lib/display-names.mjs';
 import {
@@ -179,7 +176,7 @@ import { legOrderExemption } from './leg-order.mjs';
 import { proofAcceptanceOf, coverageOf, verifyProofs } from './proof-integrity.mjs';
 import { classifyFailure, isMeasurementLeg, measurementCheckClass, resolveRootOwner } from './verify-failure.mjs';
 import { readEnv } from '../lib/env.mjs';
-import { bestEffortCall, bestEffortCallAsync } from '../agent/best-effort-call.mjs';
+import { bestEffortCall } from '../agent/best-effort-call.mjs';
 import { normalizeProvider } from '../lib/provider.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -675,7 +672,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
     const { lastOutputAt, outputAgeMs } = outputAgeOf(shown?.terminal?.lastOutputAt, now);
     const connected = shown?.connected === true, shownWritable = shown?.writable === true;
     const refusedAt = shownWritable ? sendRefusedAtOf(db, job, terminalHandle) : null;
-    const refused = refusedAt != null && !(lastOutputAt >= refusedAt);
+    const refused = refusedAt != null && lastOutputAt < refusedAt;
     let screenState = null, shellPrompt = null, providerOutage = null, inputDraft = null, screenGate = null, screen = null;
     if (shown?.ok && connected && shownWritable) {
       try {
@@ -708,7 +705,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
     const heartbeatAt = stale.staleActive || refused ? ageFallbackAt ?? heartbeatAtOf(job) : null;
     const heartbeatAgeMs = heartbeatAt != null ? Math.max(0, now - heartbeatAt) : null;
     const beating = heartbeatAgeMs != null && heartbeatAgeMs <= activeStaleMs;
-    const unwritable = refused && !(heartbeatAt > refusedAt);
+    const unwritable = refused && heartbeatAt <= refusedAt;
     const writable = shownWritable && !unwritable;
     // A host dialog the worker's card allowlists (a loop-detection menu) is the runtime's to
     // answer: starci kernel nudge picks it. Answered maxPerAttempt times on this attempt, it is a loop (gate-loop).
@@ -823,11 +820,11 @@ const QUEUED_BECAUSE = ['owner-gate', 'supervisor-gate', 'deferred', 'deferred-t
 const OWNER_GATE_KINDS = ['owner-gate', 'owner-gate-pending'];
 // Autopilot (scripts/kernel/autopilot-run.mjs): a supervisor-gate holds its jobs the way an owner gate does, but it is
 // the Supervisor's to resolve; `holds: ['*']` (a spent autopilot budget) holds every queued job.
-const HOLDING_GATE_KINDS = [...OWNER_GATE_KINDS, SUPERVISOR_GATE];
+const HOLDING_GATE_KINDS = new Set([...OWNER_GATE_KINDS, SUPERVISOR_GATE]);
 const openOwnerGates = (db, workflowId) => db.prepare("SELECT incident_id,op_id,last_progress FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId)
   .map((row) => {
     const kind = /^\[([^\]]+)\]/.exec(row.last_progress ?? '')?.[1] ?? null;
-    if (!HOLDING_GATE_KINDS.includes(kind)) return null;
+    if (!HOLDING_GATE_KINDS.has(kind)) return null;
     const raised = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, row.incident_id);
     const holds = parseJson(raised?.payload_json, {})?.holds;
     return { incidentId: row.incident_id, kind, holds: Array.isArray(holds) && holds.length ? holds : [row.op_id].filter(Boolean),
@@ -994,7 +991,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
   // plan edges do not lead from never holds it.
   // Nor does a job whose own wait's typed conditions name this one (scripts/kernel/leg-order.mjs legOrderExemption).
   // With a work graph, a business or architecture leg is held only by an ancestor of the same phase in a domain it shares.
-  const otherDomain = (row) => workGraph && DOMAIN_PARALLEL_OPS.includes(opId) && DOMAIN_PARALLEL_OPS.includes(row.op_id)
+  const otherDomain = (row) => workGraph && DOMAIN_PARALLEL_OPS.has(opId) && DOMAIN_PARALLEL_OPS.has(row.op_id)
     && disjointDomains(workGraph.graph, payload.owned_paths, jobPayloadOf(row).owned_paths);
   // Nor does a test leg the owner's config.yaml specs switches defer (spec-deferral.mjs): nothing waits on a deferred test.
   const specs = ownerSpecs(skillRoot);
@@ -1090,7 +1087,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
   try { conflict = findOwnedPathLeaseConflicts(db, opLeaseRequests(payload, canon, opId), { excludeJobId: job.job_id, canonicalOf: canon?.canonicalOf })[0] ?? null; }
   catch { conflict = null; }
   if (conflict) {
-    const expired = !(Number(conflict.expires_at) > Date.now());
+    const expired = Number(conflict.expires_at) <= Date.now();
     return {
       queuedBecause: 'path-lease',
       blockedBy: { path: conflict.held, job: conflict.job_id, op: conflict.op_id ?? null, expiresAt: conflict.expires_at ?? null },
@@ -1161,7 +1158,7 @@ function runningOpRevDriftOf(db, workflowId, { root = revRootOf() } = {}) {
 }
 /** The newest op-rev-drift warnings of a workflow (starci kernel settle): [{jobId, op, attempt, from, to, files, at}]. */
 const opRevDriftOf = (db, workflowId, limit = 5) => db.prepare('SELECT entity_id,payload_json,created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT ?')
-  .all(workflowId, OP_REV_DRIFT, limit).map((row) => ({ jobId: row.entity_id, ...(parseJson(row.payload_json) ?? {}), at: row.created_at }));
+  .all(workflowId, OP_REV_DRIFT, limit).map((row) => ({ jobId: row.entity_id, ...parseJson(row.payload_json), at: row.created_at }));
 
 /**
  * enqueue/dispatch refuse kernel-rev-stale for a leg whose current op contract
@@ -1182,7 +1179,7 @@ function refuseStaleKernelRev(db, workflowId, op, verb) {
 
 const NEXT_ACTION_KINDS = ['retry', 'root-verify', 'dispatch', 'impact-check', 'supervisor-gate', 'owner-gate', 'wait'];
 // Legs that run per domain in parallel once the workflow has a work graph (scripts/work/work-graph-store.mjs).
-const DOMAIN_PARALLEL_OPS = ['business.decide', 'architecture.decide'];
+const DOMAIN_PARALLEL_OPS = new Set(['business.decide', 'architecture.decide']);
 const disjointDomains = (graph, left, right) => {
   const a = domainsOfPaths(graph, left), b = domainsOfPaths(graph, right);
   return a.size > 0 && b.size > 0 && ![...a].some((domain) => b.has(domain));
@@ -1206,7 +1203,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   const deferredPlanOps = new Map(legOps.map((op) => [op, planLegDeferral({ skillRoot, op, settings: specs, goalText })]).filter(([, deferral]) => deferral));
   const specDeferredJobs = new Map(deferredTestsOf(db, wf.workflow_id).map((item) => [item.jobId, item.reason ?? 'deferred']));
   for (const row of unresolved) {
-    const step = (jobResult(db, row.job_id) ?? {}).nextStep;
+    const step = jobResult(db, row.job_id)?.nextStep;
     if (!step || ownerGateOf(ownerGates, row) || step.kind === 'deferred' || deferredJobs.has(row.job_id)) continue;
     actions.push({ kind: 'retry', op: row.op_id, jobId: row.job_id,
       reason: `${row.job_id} failed and nothing follows it (${['owner-gate', SUPERVISOR_GATE].includes(step.kind) ? `${step.kind} ${step.incidentId} resolved` : step.reason}): starci kernel enqueue --op ${row.op_id} with its paths and records --retry-of ${row.job_id}` });
@@ -1532,7 +1529,7 @@ const pruneGitMemo = (dir, { now = Date.now(), budget = GIT_MEMO_BUDGET_BYTES } 
       } catch { /* raced */ }
     }
     let total = entries.reduce((sum, entry) => sum + entry.size, 0);
-    for (const entry of entries.sort((a, b) => a.used - b.used)) {
+    for (const entry of entries.toSorted((a, b) => a.used - b.used)) {
       if (total <= budget) break;
       try { fs.rmSync(entry.file, { force: true }); total -= entry.size; } catch { /* raced */ }
     }
@@ -1583,14 +1580,16 @@ const statusWorkerRowsOf = (db, workflowId) => db.prepare(`SELECT ${JOB_ROW} FRO
   .all(workflowId, ...FINAL_SETTLED)
   .filter((job) => job.status === 'running' || job.status === 'leased' || operationTerminalHandleOf(job));
 
+function spawnSyncRecorder(calls, command, argv, options) {
+  calls.push({ command, argv: Array.isArray(argv) ? argv : [], options: (Array.isArray(argv) ? options : argv) ?? {} });
+  const error = Object.assign(new Error('recorded, not run'), { code: 'ERECORDED' });
+  return { pid: 0, output: [null, '', ''], stdout: '', stderr: '', status: null, signal: null, error };
+}
+
 /** The spawns `fn` makes, recorded instead of run (each answers a spawn error, which the wrappers absorb). */
 const recordSpawns = (fn) => {
   const calls = [];
-  spawnSyncOverride(() => function spawnSyncRecorder(command, argv, options) {
-    calls.push({ command, argv: Array.isArray(argv) ? argv : [], options: (Array.isArray(argv) ? options : argv) ?? {} });
-    const error = Object.assign(new Error('recorded, not run'), { code: 'ERECORDED' });
-    return { pid: 0, output: [null, '', ''], stdout: '', stderr: '', status: null, signal: null, error };
-  }, () => { try { fn(); } catch { /* a wrapper that throws records what it reached */ } });
+  spawnSyncOverride(() => (command, argv, options) => spawnSyncRecorder(calls, command, argv, options), () => { try { fn(); } catch { /* a wrapper that throws records what it reached */ } });
   return calls;
 };
 
@@ -1684,9 +1683,9 @@ const failureText = (...parts) => parts.map((part) => {
   try { return JSON.stringify(part); } catch { return String(part); }
 }).join(' ');
 const confirmedAuthFailure = ({ step, signal, error, details } = {}) => {
-  const stages = [step, details?.stage, details?.failedStage, details?.result?.stage, details?.result?.failedStage]
-    .filter(Boolean).map((value) => String(value).trim().toLowerCase());
-  if (stages.includes('auth') || stages.includes('authentication')) return true;
+  const stages = new Set([step, details?.stage, details?.failedStage, details?.result?.stage, details?.result?.failedStage]
+    .filter(Boolean).map((value) => String(value).trim().toLowerCase()));
+  if (stages.has('auth') || stages.has('authentication')) return true;
   const text = failureText(signal, error, details).toLowerCase();
   return /(?:\b401\b|not[_ -]?authenticated|authentication (?:failed|required)|oauth[^\n]*(?:expired|invalid|rejected)|(?:access[_ -]?)?token[^\n]*(?:expired|invalid|rejected)|invalid api[- ]?key|missing credentials|credential[^\n]*(?:expired|invalid|rejected))/.test(text);
 };
@@ -1769,7 +1768,7 @@ const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error,
     signal: signal ?? null, detail: error ?? null, observedAt: now,
     failures, trips, cooldownMs: cooldown,
     ...(auth ? { credentialFingerprint: credential?.fingerprint ?? null, credentialSource: credential?.source ?? null } : {}),
-    ...(extra ?? {}),
+    ...extra,
     ...(opens ? { recover: failureKind === QUOTA_FAILURE_KIND ? providerQuotaProbeCommand(key) : providerRecoverCommand(key) } : {}),
   };
   // The circuit is a machine.sqlite provider_health row (scripts/machine/provider-circuit.mjs), worker-wide.
@@ -2136,7 +2135,7 @@ const livePathLeaseWait = (db, job, payload, { conflicts = null, now = Date.now(
   for (const row of rows) {
     if (!holderStatus.has(row.jobId)) holderStatus.set(row.jobId, db.prepare('SELECT status FROM jobs WHERE job_id=?').get(row.jobId)?.status ?? null);
     const status = holderStatus.get(row.jobId);
-    if (!(row.expiresAt > now) || !status || FINAL_SETTLED.includes(status)) return null;
+    if (row.expiresAt <= now || !status || FINAL_SETTLED.includes(status)) return null;
   }
   const holders = [...new Map(rows.map((row) => [row.jobId, {
     jobId: row.jobId, opId: row.opId, workflowId: row.workflowId, status: holderStatus.get(row.jobId),
@@ -2155,7 +2154,7 @@ const livePathLeaseWait = (db, job, payload, { conflicts = null, now = Date.now(
 
 const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS, repo = null } = {}) => {
   const canon = repo ? leaseCanonOf(ledger.db, repo) : null;
-  const db = ledger.db, leases = opLeaseRequests(payload, canon, job.op_id);
+  const leases = opLeaseRequests(payload, canon, job.op_id);
   // An undeclared path resource has capacity 1 (no resources row is seeded); reserveTwoPhase flips the job
   // queued → ready → leased with its fencing token.
   let machine;
@@ -2285,7 +2284,7 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }, { bind = bindWorkflo
   ledger.transaction(() => {
     const now = Date.now();
     if (kernelJob) {
-      kernelPayload.orca = { ...(kernelPayload.orca ?? {}), runId,
+      kernelPayload.orca = { ...kernelPayload.orca, runId,
         ...(replacedRunId ? { previousRunIds: [...new Set([...(kernelPayload.orca?.previousRunIds ?? []), replacedRunId])] } : {}) };
       kernelPayload.hierarchy = kernelPayload.hierarchy ?? {
         schema: AGENT_HIERARCHY_SCHEMA, nodeId: kernelNodeId(job.workflow_id),
@@ -2293,17 +2292,17 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }, { bind = bindWorkflo
         workflowId: job.workflow_id, jobId: kernelJob.job_id,
         attempt: tryOf(kernelJob), generation: kernelJob.generation,
       };
-      kernelPayload.hierarchy.runtime = { ...(kernelPayload.hierarchy.runtime ?? {}), host: 'orca', runId };
+      kernelPayload.hierarchy.runtime = { ...kernelPayload.hierarchy.runtime, host: 'orca', runId };
       updateJob(db, { jobId: kernelJob.job_id, payload: kernelPayload, at: now });
     } else {
-      payload.orca = { ...(payload.orca ?? {}), runId };
+      payload.orca = { ...payload.orca, runId };
       payload.hierarchy = payload.hierarchy ?? {
         schema: AGENT_HIERARCHY_SCHEMA, nodeId: operationNodeId(jobId),
         parentNodeId: kernelNodeId(job.workflow_id), role: 'operation',
         workflowId: job.workflow_id, jobId, opId: job.op_id,
         attempt: tryOf(job), generation: job.generation,
       };
-      payload.hierarchy.runtime = { ...(payload.hierarchy.runtime ?? {}), host: 'orca', runId };
+      payload.hierarchy.runtime = { ...payload.hierarchy.runtime, host: 'orca', runId };
       updateJob(db, { jobId, payload, at: now });
     }
     ledger.appendEvent({
@@ -2429,7 +2428,7 @@ function reconcileDrop(ledger, args, job) {
 const DEAD_WORKER_REQUEUE_LIMIT = 3;
 // modules/ops/ops/<op>.yaml route.riskHints whose effects live outside the
 // owned paths, where git cannot prove their absence.
-const UNPROVABLE_EFFECT_HINTS = ['external-effects', 'runtime-effects', 'live-provider', 'destructive-gate'];
+const UNPROVABLE_EFFECT_HINTS = new Set(['external-effects', 'runtime-effects', 'live-provider', 'destructive-gate']);
 const opRiskHints = (op) => {
   try {
     const hints = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'))?.route?.riskHints;
@@ -2567,7 +2566,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
   for (const row of asked) evidence.push(`worker-question:${row.key}`);
   const hints = opRiskHints(op);
   if (hints == null) evidence.push('op-manifest-unreadable');
-  else for (const hint of hints) if (UNPROVABLE_EFFECT_HINTS.includes(hint)) evidence.push(`risk:${hint}`);
+  else for (const hint of hints) if (UNPROVABLE_EFFECT_HINTS.has(hint)) evidence.push(`risk:${hint}`);
   let paths;
   try {
     paths = ownedPathEffects({ base: repo, ownedPaths: ownedPathsOf(payload), placements: jobPlacements(db, job, repo),
@@ -2617,9 +2616,9 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     if (recovery === 'requeued') {
       leasesReleased = releaseLeases(db, { jobId });
       delete next.managed;
-      if (next.orca) { const { dispatchId: d, agentTerminalHandle: h, ...orca } = next.orca; next.orca = orca; }
+      if (next.orca) { const orca = { ...next.orca }; delete orca.dispatchId; delete orca.agentTerminalHandle; next.orca = orca; }
       if (next.hierarchy?.runtime) {
-        const { taskId, dispatchId: d, terminalHandle, ...runtime } = next.hierarchy.runtime;
+        const runtime = { ...next.hierarchy.runtime }; delete runtime.taskId; delete runtime.dispatchId; delete runtime.terminalHandle;
         next.hierarchy.runtime = runtime;
       }
       result = { reason: 'dead-worker-requeued', effectState: 'none', attemptConsumed: false, retryable: true, dispatchId,
@@ -2787,7 +2786,7 @@ const failureClassOf = (db, job, envelope, recordedChecks) => {
 /** A job of the owner's op that already works on the owner's record, else null: the one a repair reopens. */
 const ownerTemplateOf = (db, job, owner) => {
   const rows = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id=? AND status<>'cancelled' ORDER BY created_at DESC, try_no DESC`).all(job.workflow_id, owner.op);
-  const norm = (p) => String(typeof p === 'string' ? p : p?.path ?? '').replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, '');
+  const norm = (p) => String(typeof p === 'string' ? p : p?.path ?? '').replaceAll('\\', '/').replace(/\/\*\*$/, '').replace(/\/+$/, '');
   const want = new Set([owner.record, ...owner.ownedPaths].filter(Boolean).map(norm));
   return rows.find((row) => { const p = jobPayloadOf(row); return [...(p.records ?? []), ...(p.owned_paths ?? [])].some((x) => want.has(norm(x))); }) ?? null;
 };
@@ -2847,7 +2846,7 @@ const recordOwnerJobOf = (db, job, node, repo) => {
 const routeFiringsOf = (db, job, routeId) => {
   let fired = 0;
   for (const row of lineageJobsOf(db, job)) {
-    const step = (jobResult(db, row.job_id) ?? {}).nextStep;
+    const step = jobResult(db, row.job_id)?.nextStep;
     if (step?.route !== routeId) continue;
     if (step.kind === 'owner-gate' || step.kind === SUPERVISOR_GATE) break;
     if (step.counted !== false) fired += 1;
@@ -2861,8 +2860,6 @@ const openRouteGate = (ledger, job, detail, route) => {
     payload: { kind: 'owner-gate', detail, opId: op, holds: [job.job_id], auto: true, route } });
   return incidentId;
 };
-/** The .starciwork record directories a job owns: where a read-only verify of its node writes its evidence. */
-const recordPathsOf = (payload) => (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && /^\.starciwork\//.test(p));
 /**
  * The report's own red checks, attributed like starci kernel record-checks attributes the Kernel's (gate-attribution.mjs):
  * {peer:true, checks[], peers[], routes[]} when every red check (at least one) names files and reads
@@ -2920,7 +2917,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
       if (autopilot) {
         const blocker = route.on?.blocker ?? null;
         const evidence = { route: route.id, limit, fired, shape, jobId: job.job_id, attempt: tryOf(job),
-          lineage: lineageJobsOf(db, job).slice(-6).map((row) => ({ jobId: row.job_id, attempt: tryOf(row), status: row.status, ...(({ verdict = null, reason = null, report = null }) => ({ verdict, reason, report }))(jobResult(db, row.job_id) ?? {}) })) };
+          lineage: lineageJobsOf(db, job).slice(-6).map((row) => { const { verdict = null, reason = null, report = null } = jobResult(db, row.job_id) ?? {}; return { jobId: row.job_id, attempt: tryOf(row), status: row.status, verdict, reason, report }; }) };
         if (blocker === 'authority' || autopilot.kind === 'deferred') {
           const reason = blocker === 'authority'
             ? `${op} ${job.job_id}: an authority blocker (route ${route.id}) is the owner's decision - deferred to handover, independent legs proceed`
@@ -2956,7 +2953,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
       const failing = (Array.isArray(envelope.checks) ? envelope.checks : []).flatMap((c) => (Array.isArray(c?.failing) ? c.failing : []));
       let owner = null;
       try { owner = resolveRootOwner({ repo, rootCause: envelope.rootCause, kinds: catalog, failing, reporterPayload: jobPayloadOf(job) }); } catch { owner = null; }
-      if (owner && owner.family === 'build' && owner.op !== op) {
+      if (owner?.family === 'build' && owner.op !== op) {
         const ownerView = { op: owner.op, via: owner.via, ...(owner.record ? { record: owner.record } : {}), ...(owner.repository ? { repository: owner.repository } : {}), files: owner.ownedPaths.slice(0, 30) };
         const existing = ownerTemplateOf(db, job, owner);
         let repair = null;
@@ -3005,7 +3002,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     // product's foundation f920334582 -> a89b597df5: an hour or more each, identical open items). A red the
     // report's own checks pin on a peer's change settles peer-blocked like starci kernel record-checks's (no business
     // attempt, routes to the peer); any other foreign root waits for the Kernel to hand it to its owner.
-    const foreignRoot = envelope?.rootCause && envelope.rootCause.self === false && shape.verdict !== 'rejected' && shape.verdict !== 'no-report';
+    const foreignRoot = envelope?.rootCause?.self === false && shape.verdict !== 'rejected' && shape.verdict !== 'no-report';
     if (foreignRoot && route.then === 'retry' && targets.length === 1 && targets[0] === op) {
       const rootCause = { node: node || null, ...Object.fromEntries(['self', 'category', 'claim', 'evidence', 'expectedFix', 'recheck'].filter((k) => envelope.rootCause[k] != null).map((k) => [k, envelope.rootCause[k]])) };
       const attributed = reportPeerAttribution(db, job, envelope, repo);
@@ -3069,7 +3066,7 @@ function widenCanonWire(ledger, job, payload, paths, after = []) {
     return { jobId: queuedWire.job_id, widened: add };
   }
   const created = enqueueFollowOn(ledger, job, { reason: 'canon-wire', of: job.job_id, after, title: `code.refactor: canon-wire ${paths.slice(0, 2).map((p) => p.split('/').pop()).join(',')}`,
-    repair: { records: payload.records ?? [], ownedPaths: paths, repository: payload.repository ?? null, params: { ...(payload.params ?? {}), canonWire: true, resumeFrom: '' } } });
+    repair: { records: payload.records ?? [], ownedPaths: paths, repository: payload.repository ?? null, params: { ...payload.params, canonWire: true, resumeFrom: '' } } });
   return created?.jobId ? { jobId: created.jobId, created: true } : wire;
 }
 function canonSettleFollowUp(ledger, job, payload, envelope) {
@@ -3094,7 +3091,7 @@ function canonSettleFollowUp(ledger, job, payload, envelope) {
   if (follow?.jobId && follow.reason !== 'retry-exists') {
     const row = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(follow.jobId);
     const next = jobPayloadOf(row);
-    const params = { ...(next.params ?? {}), ...(plan.resumeFrom ? { resumeFrom: plan.resumeFrom } : {}) };
+    const params = { ...next.params, ...(plan.resumeFrom ? { resumeFrom: plan.resumeFrom } : {}) };
     const note = [
       plan.resumeFrom ? `Continuation of ${job.job_id}: the runtime preserved its in-ceiling work as ${plan.resumeFrom} - apply it to your owned paths first (git diff ${plan.resumeFrom}^ ${plan.resumeFrom} -- <owned paths> | git apply) and finish what its report left open; never redo it.` : `Follow-up of ${job.job_id}, which blocked ${plan.blocker ?? ''}: its report is your starting point.`,
       plan.grants.length ? `You now also own the relocation destinations ${plan.grants.join(', ')}.` : null,
@@ -3102,8 +3099,8 @@ function canonSettleFollowUp(ledger, job, payload, envelope) {
     ].filter(Boolean).join(' ');
     next.owned_paths = [...new Set([...(next.owned_paths ?? []), ...plan.grants])];
     next.params = params;
-    next.kernelEdit = { ...(next.kernelEdit ?? {}), unitOf: job.job_id, by: 'settle', ...(plan.resumeFrom ? { continuationOf: job.job_id, preserved: plan.resumeFrom } : { retryOf: job.job_id }) };
-    next.kernelOverride = { ...(next.kernelOverride ?? {}), notes: [...(next.kernelOverride?.notes ?? []), note] };
+    next.kernelEdit = { ...next.kernelEdit, unitOf: job.job_id, by: 'settle', ...(plan.resumeFrom ? { continuationOf: job.job_id, preserved: plan.resumeFrom } : { retryOf: job.job_id }) };
+    next.kernelOverride = { ...next.kernelOverride, notes: [...(next.kernelOverride?.notes ?? []), note] };
     updateJob(db, { jobId: follow.jobId, payload: next });
     if (plan.resumeFrom) ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: job.job_id, kind: 'unit-partial-continued', payload: { by: follow.jobId, preserved: plan.resumeFrom, via: 'settle' } });
   }
@@ -3147,7 +3144,7 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
     const at = Date.now();
     const next = jobPayloadOf(job);
     next.deadWorkers = [...(Array.isArray(next.deadWorkers) ? next.deadWorkers : []),
-      { attempt: tryOf(job), dispatchId, ...(workerProof ?? {}), recovery: 'settled-failed', at }];
+      { attempt: tryOf(job), dispatchId, ...workerProof, recovery: 'settled-failed', at }];
     next.verdict = 'fail';
     next.report = null;
     next.settledAt = at;
@@ -3436,10 +3433,10 @@ function reportOwnedPaths(db, job, repo) {
   const declared = ownedPathsOf(jobPayloadOf(job));
   let placements = [];
   try { placements = jobPlacements(db, job, repo); } catch { return declared; }
-  const checkouts = [repo, contractWorktreeOf(db, job, repo)].filter(Boolean).map((p) => path.resolve(p));
+  const checkouts = new Set([repo, contractWorktreeOf(db, job, repo)].filter(Boolean).map((p) => path.resolve(p)));
   const resolved = placements.filter((p) => !p.unresolved && p.via !== 'placement').flatMap((p) => {
     const rooted = slash(path.resolve(p.base, p.path));
-    return checkouts.includes(path.resolve(p.base)) ? [p.path, rooted] : [rooted];
+    return checkouts.has(path.resolve(p.base)) ? [p.path, rooted] : [rooted];
   });
   return [...new Set([...declared, ...resolved])];
 }
@@ -3529,7 +3526,7 @@ function settleWorkHygiene(db, jobId, repo, reportAbs, reportText) {
   const { envelope, roots, files } = settleJobFiles(db, s.job, repo, s.filed, { reportText });
   const changed = files.map((f) => f.abs);
   const { head, base } = jobShasOf({ envelope, result: null, payload: jobPayloadOf(s.job) });
-  if (head) for (const root of [...new Set([repo, ...roots].filter(Boolean).map((r) => path.resolve(r)))]) {
+  if (head) for (const root of new Set([repo, ...roots].filter(Boolean).map((r) => path.resolve(r)))) {
     for (const rel of rangeFiles(root, base ?? `${head}~1`, head)) if (inSecretScope(rel)) changed.push(path.join(root, rel));
   }
   const checked = checkWorkFilesAbs([...new Set(changed.filter((p) => inSecretScope(p)))]);
@@ -3695,7 +3692,7 @@ function attributeChecks(db, { repo, job, checks }) {
   let canon;
   return checks.map((check) => {
     if (!check || typeof check !== 'object') return check;
-    const { peerBlocked: _peer, attribution: _attr, failingDerived: _derived, ...clean } = check;
+    const clean = { ...check }; delete clean.peerBlocked; delete clean.attribution; delete clean.failingDerived;
     if (clean.exitCode === 0 || clean.advisory) return clean;
     const listed = Array.isArray(clean.failing) && clean.failing.length;
     const failing = listed ? clean.failing : failingFromText([clean.evidence, clean.output].filter((v) => typeof v === 'string').join('\n'));

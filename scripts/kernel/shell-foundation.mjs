@@ -161,7 +161,7 @@ export function gateShellFoundation(ledger, { job, need, now = Date.now(), setti
 export function landShellFoundationIfSettled(ledger, { job, brief, payload, repo, now = Date.now() }) {
   const db = ledger.db, workflowId = job.workflow_id;
   const existing = readFoundation(db, SHELL_FOUNDATION);
-  if (!existing || existing.state !== 'claimed' || existing.owner?.workflowId !== workflowId) return null;
+  if (existing?.state !== 'claimed' || existing.owner?.workflowId !== workflowId) return null;
   const need = shellFoundationNeed({ brief, payload, repo });
   if (!need || need.needed) return { landed: false, reasons: need?.reasons ?? [] };
   const { record } = landFoundation(existing, { name: SHELL_FOUNDATION, workflowId, proof: `interface.draw ${job.job_id} passed with every layout of the tree settled (shell-conformance)`, now });
@@ -176,7 +176,7 @@ export function landShellFoundationIfSettled(ledger, { job, brief, payload, repo
 export function shellFoundationWaitOf(db, workflowId) {
   const foundation = readFoundation(db, SHELL_FOUNDATION);
   const ownerId = foundation?.owner?.workflowId ?? null;
-  if (!foundation || foundation.state !== 'claimed' || !ownerId || ownerId === workflowId) return null;
+  if (foundation?.state !== 'claimed' || !ownerId || ownerId === workflowId) return null;
   if (!(foundation.dependents ?? []).some((d) => d.workflowId === workflowId)) return null;
   if (!workflowRunning(getWorkflow(db, ownerId))) return null;
   return { owner: ownerId, detail: `foundation ${SHELL_FOUNDATION} (shell + ancestor layouts) is drawn by ${ownerId}; the draw dispatches once it lands (starci kernel foundation --land) - never a second shell draft` };

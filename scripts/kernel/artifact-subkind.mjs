@@ -29,7 +29,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { resolvedKey } from '../lib/path-key.mjs';
+import { resolvedKey, slash } from '../lib/path-key.mjs';
 const DRAW_RENDER_SCHEMA = 'starci/draw-render@1';
 
 const UAT_OPS = new Set(['uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify']);
@@ -37,8 +37,6 @@ const E2E_OPS = new Set(['e2e.verify']);
 const APP_OPS = new Set(['interface.implement', 'interface.audit', 'interface.scaffold']);
 const CAPTURE_SEG = /^(?:evidence|screens|captures|live|observed|renders|calibration|tools)$/i;
 const TOKEN_DIR = /^(?:token-render(?:-.+)?|token-redraw(?:-.+)?|token-draft|token-\d[^/]*)$/i;
-
-const slashed = (p) => String(p ?? '').replace(/\\/g, '/');
 
 /** The generation tool a manifest names, as a subkind: draw-render, asset-gen, or null. */
 export function subkindOfTool(tool) {
@@ -119,7 +117,7 @@ function recordToolIndex(repo, recordDir) {
  */
 export function manifestToolOf(repo, rel) {
   if (!repo) return null;
-  const file = slashed(rel);
+  const file = slash(rel);
   const m = /^(\.starciwork\/features\/[^/]+\/(?:ui|impl))(\/[^/]+)?\//.exec(file);
   if (!m) return null;
   // The record: features/<f>/ui (or impl) when it is one record itself, else features/<f>/ui/<surface>.
@@ -147,11 +145,11 @@ function hasDrawRenderRecord(abs) {
  * manifest and draw-render record lookups; without it only the op id and the path decide. Null when unproven.
  */
 export function subkindOf({ kind, path: rel, opId = null, origin = null, repo = null }) {
-  const file = slashed(rel);
+  const file = slash(rel);
   const lower = file.toLowerCase();
   const base = lower.split('/').pop() ?? '';
   const segs = lower.split('/');
-  const from = slashed(origin).toLowerCase();
+  const from = slash(origin).toLowerCase();
   const paths = [lower, ...(from ? [from] : [])];
   const op = String(opId ?? '');
 

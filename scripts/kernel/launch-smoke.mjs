@@ -219,7 +219,7 @@ function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script = SCRI
   const prompt = noopSpec({ role, script });
   const { title } = ROLES[role];
   const objective = `${SMOKE_SCHEMA} ${role}`;
-  const record = (extra) => writeJsonFile(agentFile(state, role), { ...(agentOf(state, role) ?? {}), role, creatorTerminal: entry, ...extra });
+  const record = (extra) => writeJsonFile(agentFile(state, role), { ...agentOf(state, role), role, creatorTerminal: entry, ...extra });
   const onCreated = (terminal, dispatchId) => record({ terminal, dispatchId });
   const route = { provider: noop.provider, model: noop.model, effort: noop.effort };
   const request = { smoke: state, role }; let launched; // request: the launch's ledger identity (calls.yaml replay: request)
@@ -644,5 +644,5 @@ async function main(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (e) => { console.error(e?.stack ?? e); process.exitCode = 1; });
+  try { process.exitCode = await main(process.argv.slice(2)); } catch (e) { console.error(e?.stack ?? e); process.exitCode = 1; }
 }

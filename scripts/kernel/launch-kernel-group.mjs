@@ -8,17 +8,17 @@ export function launchKernelGroup({ ledger, workflowId, token, expected, route, 
   const fellThrough = [];
   let spawned = null;
   const remaining = [...members];
-  for (let index = 0; remaining.length; index += 1) {
+  while (remaining.length) {
     const member = remaining[0];
     const renewed = commitWorkflowStart(ledger, { workflowId, expected, token, holderPid: process.pid, now }, () => {
       const at = now();
       if (!updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, expiresAt: at + reservationMs }))
-        throw Error('kernel-start-reservation-lost');
+        throw new Error('kernel-start-reservation-lost');
     });
     if (!renewed.ok) {
       failStart(renewed.reason, 'Kernel group lost its accepted goal or starting reservation before launch', null,
         { effectState: 'none', authority: renewed.authority ?? null });
-      throw Error(renewed.reason);
+      throw new Error(renewed.reason);
     }
     spawned = start({ ...launch, provider: member.agent, model: member.model, effort: member.effort,
       allowGroup: remaining.map((m) => ({ provider: m.agent, model: m.model, effort: m.effort })) });
@@ -35,7 +35,7 @@ export function launchKernelGroup({ ledger, workflowId, token, expected, route, 
     // An Orca that stopped answering mid-boot proves nothing about any member: host-unavailable (exit 75), no fall-through.
     if (spawned.hostUnavailable) failStart('host-unavailable', spawned.error, spawned.terminal ?? null, { ...failure, launchStep: spawned.step }, hostUnavailableExit);
     const selectedIndex = remaining.findIndex((candidate) => candidate.agent === selected.provider && candidate.model === selected.model);
-    remaining.splice(selectedIndex >= 0 ? selectedIndex : 0, 1);
+    remaining.splice(Math.max(selectedIndex, 0), 1);
     const next = remaining[0] ?? null;
     if (!route.fallThrough || !next || spawned.effectState !== 'none')
       failStart(spawned.step, spawned.error, spawned.terminal ?? null,

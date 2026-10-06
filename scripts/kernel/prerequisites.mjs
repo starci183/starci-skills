@@ -126,7 +126,7 @@ export function designVerdicts(repo, records) {
     let impl = null;
     try { impl = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
     const uiIds = [...new Set([...(Array.isArray(impl?.proves) ? impl.proves : []), ...(Array.isArray(impl?.dependsOn) ? impl.dependsOn : [])]
-      .filter((id) => typeof id === 'string' && /^ui\./.test(id)))];
+      .filter((id) => typeof id === 'string' && id.startsWith('ui.')))];
     if (!uiIds.length) continue;
     const uiRecords = loadUiRecords(path.join(repo, ...workParts));
     for (const ui of uiIds) {

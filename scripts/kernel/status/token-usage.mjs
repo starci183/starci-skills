@@ -7,7 +7,7 @@ export default {
   compute(ctx) {
     const u = usageOfWorkflow(ctx.db, ctx.workflowId);
     if (!u.total.tokens && !u.coverage.unavailable) return null;
-    const { workflowId: _w, ...rest } = u;
+    const rest = { ...u }; delete rest.workflowId;
     return rest;
   },
   lines: (u) => [`TOKENS ${tokenLine(u.total)}; ${u.coverage.measured}/${u.coverage.attempts} attempts measured${u.coverage.unavailable ? `, ${u.coverage.unavailable} unavailable` : ''}; kernel ${u.kernel.tokens.toLocaleString('en-US')}`

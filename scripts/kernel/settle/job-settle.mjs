@@ -44,13 +44,13 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { runNode } from '../../api/node/run-node.mjs';
-import { classifyCheck, argvOf } from './check-command.mjs';
+import { classifyCheck } from './check-command.mjs';
 import { slash as norm } from '../../lib/path-key.mjs';
 import { observationContextOf, observeCheck } from '../mechanism-observation.mjs';
 import { judgeInspectionRun } from '../mechanism-proofs.mjs';
 import { filedReportOf, collectJobFiles } from '../job-artifacts.mjs';
 import { withWorkflowLock } from '../workflow-checkpoint.mjs';
-export { classifyCheck, argvOf };
+export { classifyCheck, argvOf } from './check-command.mjs';
 import { spawnNode } from '../../api/node/spawn-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor, updateAttempt, releaseLeases, setCondition } from '../../../engine/db/ledger.mjs';
@@ -202,7 +202,7 @@ async function canonSliceCheck(item, { repo }) {
 export async function recordSettlerCheck(ledger, item, run, { now = Date.now } = {}) {
   const { stageBlob, recordCheck, CHECK_STATUSES } = await import('../../machine/evidence-store.mjs');
   const bytes = (content) => (content == null ? null : Buffer.isBuffer(content) ? content : Buffer.from(typeof content === 'string' ? content : JSON.stringify(content)));
-  const blob = (content, mediaType) => { const b = bytes(content); return b && b.length ? stageBlob(b, { mediaType, repoRoots: [item.repo].filter(Boolean) }) : null; };
+  const blob = (content, mediaType) => { const b = bytes(content); return b?.length ? stageBlob(b, { mediaType, repoRoots: [item.repo].filter(Boolean) }) : null; };
   const stdout = blob(run.stdout, 'text/plain'), stderr = blob(run.stderr, 'text/plain'), output = blob(run.output, 'application/json');
   const at = now();
   const status = CHECK_STATUSES.includes(run.status) ? run.status : checkRunStatusOf(run);
@@ -213,7 +213,7 @@ export async function recordSettlerCheck(ledger, item, run, { now = Date.now } =
       cwd: run.cwd ?? null, inputDigest: run.inputDigest ?? null, exitCode: Number.isInteger(run.exitCode) ? run.exitCode : null,
       declaredExitCode: Number.isInteger(run.declaredExitCode) ? run.declaredExitCode : null, attribution: run.attribution ?? null, status,
       unavailable: status === 'unavailable' || run.exitCode === 124 || run.exitCode === 127, startedAt: run.startedAt ?? at, finishedAt: run.finishedAt ?? at,
-      stdout, stderr, output, summary: { ...(run.summary ?? {}), ...(run.native ? { native: run.native } : {}) }, note: run.note ?? null, now: at }).checkId;
+      stdout, stderr, output, summary: { ...(run.summary), ...(run.native ? { native: run.native } : {}) }, note: run.note ?? null, now: at }).checkId;
   });
   return run.native ? withWorkflowLock({ db: ledger.db, ledger, repo: item.repo, env: process.env }, { workflowId: item.workflowId }, store) : store();
 }
@@ -324,8 +324,8 @@ async function verifyDeclared(db, item, { repo, settings, rerun, canon, env, rec
         checks: { checks: [...checks, { name: CUT_SLICE_CHECKS[0], exitCode: slice.exitCode, command: `canon-scan (in-process) --root ${slice.root}`, evidence: `runtime settler: canon-scan ${slice.status}, ${slice.findings ?? '?'} finding(s) on the slice's owned paths` }] } };
     }
     checks.push({ name: CUT_SLICE_CHECKS[0], exitCode: 0, command: `canon-scan (in-process) --root ${slice.root} over the slice's ${slice.paths} owned path(s)`,
-      evidence: `runtime settler: canon-scan status ok, 0 findings on the slice's owned paths (families ${item.payload.params.canonFamilies})` });
-    checks.push({ name: CUT_SLICE_CHECKS[1], exitCode: 0, command: runtime.map((c) => c.check.name).join(' + '),
+      evidence: `runtime settler: canon-scan status ok, 0 findings on the slice's owned paths (families ${item.payload.params.canonFamilies})` },
+      { name: CUT_SLICE_CHECKS[1], exitCode: 0, command: runtime.map((c) => c.check.name).join(' + '),
       evidence: `runtime settler: the ${runtime.length} runtime check(s) re-ran with raw exit 0 - no new failure in the slice's regression inventory` });
   }
   return { green: true, via: 'rerun', checks: { checks } };
@@ -531,7 +531,7 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
 
 /** An open incident without a due time is overdue after this long (its owner still answers for it). */
 const INCIDENT_DEFAULT_DUE_MS = 24 * 3_600_000;
-const LIVE_JOB = ['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown'];
+const LIVE_JOB = new Set(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
 const DECIDER_OF = { owner: 'owner', supervisor: 'supervisor' };
 /**
  * H12: the ledger's leaks (DBTREE v_ledger_leaks), each closed through its owner:
@@ -548,7 +548,7 @@ function sweepLedgerLeaks(ledger, { workflowId = null, now = Date.now() } = {}) 
   const args = (...a) => (workflowId ? [...a, workflowId] : a);
   const leases = db.prepare(scoped('SELECT DISTINCT l.job_id, l.workflow_id, j.status FROM leases l JOIN jobs j ON j.job_id=l.job_id WHERE l.expires_at < ?').replace('AND workflow_id', 'AND l.workflow_id')).all(...args(now));
   for (const lease of leases) {
-    if (!LIVE_JOB.includes(lease.status)) {
+    if (!LIVE_JOB.has(lease.status)) {
       const released = ledger.transaction((tx) => releaseLeases(tx, { jobId: lease.job_id }));
       out.leases.push({ jobId: lease.job_id, status: lease.status, released });
       continue;

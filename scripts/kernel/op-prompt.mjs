@@ -6,7 +6,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
@@ -24,7 +23,7 @@ const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 // An owned path as the worker reads it: bare when it lives in the worker's
 // checkout, rooted at its own checkout otherwise.
 export const renderOwnedPath = (p, cwd) => (p.root && path.resolve(p.root) !== path.resolve(cwd)
-  ? `${p.root.replace(/\\/g, '/')}/${p.path}`.replace(/\/\.$/, '') : p.path);
+  ? `${p.root.replaceAll(/\\/g, '/')}/${p.path}`.replace(/\/\.$/, '') : p.path);
 
 // Whether the op's brief (its manifest text) names `needle`: a machine line is printed only for the ops
 // whose contract uses it. An unreadable brief names nothing.
@@ -33,7 +32,6 @@ const briefUses = (briefFile, needle) => { try { return fs.readFileSync(briefFil
 // The typed-log rule (scripts/kernel/typed-logs.mjs, modules/kernel/api.yaml log): the owner's console renders the
 // rows an op logs, never its terminal, so every step, command, edit, check and failure is one typed row.
 function loggingLines({ skillRoot, packet, jobLabel, repoLabel }) {
-  const api = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
   const wf = packet.context.workflow?.id ?? '<workflow-id>';
   return [
     `logging: the owner reads your work as TYPED LOG ROWS, not terminal text - log each step, command, file edit, check, test run, render and failure as it happens; --msg is one short line in owner_language, facts go in --data (JSON, at most 4 KB), bulk output goes in a file named in --refs:`,
@@ -209,7 +207,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `  only these fields exist: schema, outcome, run, task, dispatch, from, summary, files, checks, open, question, blocker, branch, head, credentialPending, rootCause, claims, failureClass.`,
   `  run/task/dispatch/from are stamped by the api — never write another job's identity.`,
   `  A check command must be re-runnable by the runtime AFTER starci kernel report deletes your scratch: never cite STARCI_JOB_SCRATCH, a starci-job-scratch or a temp/isolated-copy path in report.checks[].command (the settler re-runs it, gets TARGET_MISSING and fails your done). Validate the real tree path (e.g. starci runtime validate .starciwork --json --strict --owned <your record paths>); a private isolated copy is evidence you describe in prose, not a declared check. Do not declare a check with a non-zero exitCode as a done claim.`,
-  `  STARCI_JOB_SCRATCH, wherever this contract names it, is your job-private OS-temp directory outside every repository: ${scratchDir ? scratchDir.replace(/\\/g, '/') : 'the scratch starci kernel op-contract names'} - a path you write out, not an environment variable. Write raw check stdout, stderr, JSON output, patches, screenshots, videos, traces and DOM snapshots there, never in .starciwork. starci kernel report puts every file it carries in the blob store and deletes the scratch; a Work record cites that output by artifact id + sha256 (the ids starci kernel report returns), never by a path.`,
+  `  STARCI_JOB_SCRATCH, wherever this contract names it, is your job-private OS-temp directory outside every repository: ${scratchDir ? scratchDir.replaceAll(/\\/g, '/') : 'the scratch starci kernel op-contract names'} - a path you write out, not an environment variable. Write raw check stdout, stderr, JSON output, patches, screenshots, videos, traces and DOM snapshots there, never in .starciwork. starci kernel report puts every file it carries in the blob store and deletes the scratch; a Work record cites that output by artifact id + sha256 (the ids starci kernel report returns), never by a path.`,
   `  In report.checks keep each real command and the exitCode the shell returned (the runtime re-runs the checks it owns and never trusts a declared exit); set unavailable:true only for a checker that could not run (missing tool, host down) - that is infra, not red; set stdoutPath, stderrPath and outputPath to the corresponding scratch files so the ledger links them to the check run. Attach raw output with --attach <absolute-path-under-STARCI_JOB_SCRATCH>, one per file or directory (a directory attaches every file under it): evidence/ (your evidence folder), runs/<runId>/ (a UAT run), captures/ and interface-audit.json are read by their place; starci kernel report answers with every artifact {id, name, sha256} for evidence.yaml to cite. Include other raw artifacts the result needs in the same submission. Do not list scratch paths in report.files, which names authored owned_paths.`,
   ...loggingLines({ skillRoot, packet, jobLabel, repoLabel }),
   `completion: starci kernel report sends your one Orca worker_done for you, after it filed the report (none for an ask): pass it your own Dispatch capability, the dcap_ value of the --dispatch-capability flag in your Orca worker preamble, as starci kernel report --dispatch-capability <that value> (Orca authenticates the worker_done with it; never write it into a file or a report). Never send worker_done or any orchestration message yourself, whatever your Orca worker preamble says: a worker_done before the report row exists releases you with nothing filed. After starci kernel report answers, stay idle; never quit or exit the agent (the runtime releases your terminal).`,

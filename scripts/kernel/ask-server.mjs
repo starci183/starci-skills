@@ -143,7 +143,7 @@ export const fieldsOf = (text) => {
     .filter(v => !/^(JSON|HTTP|URL|API|E2E)$/.test(v));
   const paired = {};
   for (const v of vars.filter((v) => v.endsWith('_FILE'))) {
-    const base = v.slice(0, -5).toLowerCase().replace(/_/g, '-');
+    const base = v.slice(0, -5).toLowerCase().replaceAll('_', '-');
     if (!files.some((f) => pointerFor(f) === v)) files.push(`${base}.key`);
   }
   vars = vars.filter((v) => !v.endsWith('_FILE'));
@@ -205,7 +205,7 @@ const imagesOf = (text, repo) => {
   };
   const found = [];
   for (const t of tokens) {
-    const rel = t.replace(/\\/g, '/');
+    const rel = t.replaceAll('\\', '/');
     const abs = path.join(repo, rel);
     if (rel.includes('/') && fs.existsSync(abs)) { found.push({ label: rel, abs }); continue; }
     const hit = fs.existsSync(root) ? locate(path.basename(rel)) : null;
@@ -226,7 +226,7 @@ const assetsOf = (assets, repo) => {
   for (const a of assets ?? []) {
     const spec = typeof a === 'string' ? a : a?.path;
     if (!spec) continue;
-    const rel = String(spec).replace(/\\/g, '/');
+    const rel = String(spec).replaceAll('\\', '/');
     const abs = path.join(repo, rel);
     if (fs.existsSync(abs) && MIME[path.extname(abs).slice(1).toLowerCase()])
       out.push({ label: (typeof a === 'object' && a?.label) || rel, abs });
@@ -287,14 +287,14 @@ const drawsImages = (repo, drawsFile) => {
 // follows it, the original path stays an alias a declared pick still
 // matches), and a composite listed beside its own part collapses into one.
 export const toOwnerImages = (images, repo) => {
-  const repoRel = (abs) => path.relative(repo, abs).replace(/\\/g, '/');
+  const repoRel = (abs) => path.relative(repo, abs).replaceAll('\\', '/');
   const labels = new Map((images ?? []).map((img) => [img?.abs, img?.label]));
   return ownerImages(images).map((img) => {
     const aliases = [...new Set(img.aliases.flatMap((a) => [labels.get(a), repoRel(a)]).filter(Boolean))];
     if (!img.composite) return { ...img, aliases };
     // A label that is the composite's own file name follows the swap; a
     // draw id or a declared label stays.
-    const named = String(img.label ?? '').replace(/\\/g, '/');
+    const named = String(img.label ?? '').replaceAll('\\', '/');
     const label = !named || named.endsWith(path.basename(img.composite)) ? repoRel(img.abs) : img.label;
     return { ...img, label, aliases };
   });
@@ -303,7 +303,7 @@ export const toOwnerImages = (images, repo) => {
 export const reportImages = (files, repo) => {
   const out = [], seen = new Set();
   for (const spec of files ?? []) {
-    const rel = String(spec).replace(/\\/g, '/');
+    const rel = String(spec).replaceAll('\\', '/');
     const abs = path.join(repo, rel);
     if (/(^|\/)draws\.yaml$/.test(rel)) {
       for (const img of drawsImages(repo, abs)) if (!seen.has(img.abs)) { seen.add(img.abs); out.push(img); }
@@ -324,7 +324,7 @@ export const reportImages = (files, repo) => {
         const p = path.join(dir, e.name);
         if (e.isDirectory()) { if (!e.name.startsWith('.')) queue.push(p); continue; }
         if (!MIME[path.extname(e.name).slice(1).toLowerCase()] || seen.has(p)) continue;
-        seen.add(p); out.push({ label: path.relative(repo, p).replace(/\\/g, '/'), abs: p, mtime: e.mtimeMs ?? fs.statSync(p).mtimeMs });
+        seen.add(p); out.push({ label: path.relative(repo, p).replaceAll('\\', '/'), abs: p, mtime: e.mtimeMs ?? fs.statSync(p).mtimeMs });
       }
     }
   }
@@ -332,8 +332,8 @@ export const reportImages = (files, repo) => {
   // records drawn before the part rule, of the composite): when the report
   // also names images outside evidence/, those are the ones served — the
   // same rule telegram-media applies.
-  const sorted = out.sort((a, b) => b.mtime - a.mtime);
-  const outside = sorted.filter((img) => !/(^|\/)evidence\//.test(path.relative(repo, img.abs).replace(/\\/g, '/')));
+  const sorted = out.toSorted((a, b) => b.mtime - a.mtime);
+  const outside = sorted.filter((img) => !/(^|\/)evidence\//.test(path.relative(repo, img.abs).replaceAll('\\', '/')));
   return (outside.length ? outside : sorted).slice(0, 8);
 };
 
@@ -382,8 +382,8 @@ export const pickGroupsOf = (question, images) => {
         const obj = typeof c === 'string' ? { id: c, label: c } : { id: c?.id ?? c?.label, label: c?.label ?? c?.id };
         if (obj.id == null) return null;
         if (c?.image) {
-          const rel = String(c.image).replace(/\\/g, '/');
-          const idx = imgs.findIndex((img) => img.label === rel || img.abs.replace(/\\/g, '/').endsWith(rel) || (img.aliases ?? []).some((a) => a === rel || String(a).endsWith(`/${rel}`)));
+          const rel = String(c.image).replaceAll('\\', '/');
+          const idx = imgs.findIndex((img) => img.label === rel || img.abs.replaceAll('\\', '/').endsWith(rel) || (img.aliases ?? []).some((a) => a === rel || String(a).endsWith(`/${rel}`)));
           if (idx >= 0) obj.image = { idx, label: imgs[idx].label };
         }
         return obj;
@@ -415,7 +415,7 @@ export const pickGroupsOf = (question, images) => {
 // optionally "golden") accepts; any other reply is the owner's feedback - a redraw
 // whose notes are the reply's lines. A reply to one image of the album is a note on that image.
 const ACCEPT_WORDS = new Set(['ok', 'okay', 'oke', 'okie', 'accept', 'accepted', 'approve', 'approved', 'lgtm', 'good', 'yes', 'uh', ...phrasesOf('drawReply.accept')]);
-const GOLDEN_REPLY = new RegExp(`\\bgolden\\b|${altOf('drawReply.golden')}`, 'gi');
+const GOLDEN_REPLY = new RegExp(String.raw`\bgolden\b|${altOf('drawReply.golden')}`, 'gi');
 /** {decision: 'accept'|'redraw', optionIndex, golden, note} of an owner's Telegram reply to a draw-review notice. */
 export function drawReplyDecision(text) {
   const raw = String(text ?? '').trim();
@@ -441,7 +441,7 @@ export async function answerDrawReviewByReply({ repo, ledgerFile = null, workflo
     const db = ledger.db;
     const report = db.prepare('SELECT r.*,a.op_id FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.dispatch_id=?').get(workflowId, dispatchId);
     if (!report) return { ok: false, why: 'no ask report' };
-    const question = (parseJson(report.report_json, {}) ?? {}).question ?? null;
+    const question = parseJson(report.report_json, {})?.question ?? null;
     if (askKindOf(question) !== DRAW_REVIEW_KIND || !question?.review) return { ok: false, why: 'not a draw-review ask' };
     const closed = db.prepare(`SELECT kind FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded') AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(workflowId, dispatchId);
     if (closed) return { ok: false, why: `already ${closed.kind === 'ask-answered' ? 'answered' : 'retired'}` };
@@ -619,7 +619,7 @@ export function drawOwnerRequestOf(db, { workflowId, report, question, ownerOpen
        AND json_extract(payload_json,'$.onDemand')=1 ORDER BY seq LIMIT 1`,
   ).get(workflowId, report.dispatch_id);
   if (opened) return `the owner opened this drawing to review it (ask-serving on demand at ${new Date(Number(opened.created_at)).toISOString()})`;
-  const from = (parseJson(report.report_json, {}) ?? {}).from;
+  const from = parseJson(report.report_json, {})?.from;
   const job = (from ? db.prepare('SELECT * FROM jobs WHERE job_id=? AND workflow_id=?').get(from, workflowId) : null)
     ?? db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND json_extract(payload_json,'$.orca.dispatchId')=? ORDER BY created_at DESC LIMIT 1`).get(workflowId, report.dispatch_id)
     ?? null;
@@ -794,7 +794,7 @@ const main = async () => {
       res.end(renderForm({ nonce, question, fields, images, repo, workflowId: args.workflow, readonly }));
       return;
     }
-    const imgMatch = req.method === 'GET' && url.pathname.match(new RegExp(`^/${nonce}/img/(\\d+)$`));
+    const imgMatch = req.method === 'GET' && new RegExp(String.raw`^/${nonce}/img/(\d+)$`).exec(url.pathname);
     if (imgMatch) {
       const img = images[Number(imgMatch[1])];
       if (!img) { res.writeHead(404); res.end('not found'); return; }
@@ -826,7 +826,7 @@ const main = async () => {
         let delegation = null;
         if (answeredBy !== 'owner') {
           try { delegation = activeDelegation(); } catch { delegation = null; }
-          if (!delegation || delegation.asks !== answeredBy) {
+          if (delegation?.asks !== answeredBy) {
             res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
             res.end(`answered_by ${answeredBy} is not an active owner delegate (config.yaml delegation)`);
             return;

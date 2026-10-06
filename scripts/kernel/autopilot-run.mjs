@@ -33,7 +33,7 @@
 //
 // Every runtime decision is an `autopilot-*` event `by: autopilot`; nothing here ever writes answeredBy owner.
 import fs from 'node:fs';
-import { loopFileOfRef, loopLabelOf } from '../work/draw/draw-loop-coverage.mjs';
+import { loopFileOfRef, loopLabelOf, livePartsOf, LOOP_SCHEMA } from '../work/draw/draw-loop-coverage.mjs';
 import { commitAskAnswer, stageReceipt } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
@@ -48,7 +48,6 @@ import { foldText, ownerAnswerProof } from '../machine/owner-claim.mjs';
 import { isAwaitingOwner } from './failure-steps.mjs';
 import { JOB_ROW } from '../machine/job-row.mjs';
 import { askClassOf, custodyPresent, isLiveProofOp, questionFields } from './ask-server.mjs';
-import { livePartsOf, LOOP_SCHEMA } from '../work/draw/draw-loop-coverage.mjs';
 import { rationaleFileOf } from '../work/draw/draw-rationale.mjs';
 import { DIRECTION_REVIEW_SCHEMA, checkDirection, defaultGrammarRoot, readBrandRecord } from '../work/brand/brand.mjs';
 import { sha256File } from '../work/work-io.mjs';
@@ -103,7 +102,7 @@ export function autopilotSettings(source = null) {
 
 const latestEvent = (db, workflowId, kind) => db.prepare('SELECT seq,created_at,payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(workflowId, kind) ?? null;
 const eventsOf = (db, workflowId, kind) => db.prepare('SELECT seq,created_at,entity_id,payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(workflowId, kind)
-  .map((row) => ({ seq: row.seq, at: row.created_at, entityId: row.entity_id, ...(parseJson(row.payload_json, {}) ?? {}) }));
+  .map((row) => ({ seq: row.seq, at: row.created_at, entityId: row.entity_id, ...(parseJson(row.payload_json, {})) }));
 
 /** Whether autopilot drives this workflow: {on, source}. A ledger override (starci kernel autopilot --set) wins, then runtimes.yaml workflows.<id>, then enabled. */
 export function autopilotOf(db, workflowId, settings = autopilotSettings()) {
@@ -255,7 +254,7 @@ function directionGateEvidence({ repo, review }) {
 
 /** The job an ask report was filed for: its `from`, else the reports row's own job_id (reports are keyed by attempt). */
 const jobOfAsk = (db, workflowId, report) => {
-  const from = (parseJson(report.report_json, {}) ?? {}).from;
+  const from = parseJson(report.report_json, {})?.from;
   const read = (id) => (id ? db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=? AND workflow_id=?`).get(id, workflowId) ?? null : null);
   return read(from) ?? read(report.job_id) ?? null;
 };
@@ -271,7 +270,7 @@ export function deferralOf(db, workflowId, dispatchId) {
   if (!deferred) return null;
   const released = db.prepare(`SELECT seq FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(workflowId, AUTOPILOT_EVENTS.released, dispatchId);
   if (released && released.seq > deferred.seq) return null;
-  return { seq: deferred.seq, ...(parseJson(deferred.payload_json, {}) ?? {}) };
+  return { seq: deferred.seq, ...(parseJson(deferred.payload_json, {})) };
 }
 // A redraw whose only findings say the ask went stale (the record moved on after it was filed) spends no budget.
 const STALE_CODES = new Set(['DIRECTION_REV_MOVED', 'REVIEW_PART_REDRAWN', 'GOLDEN_CHANGED']);
@@ -471,7 +470,7 @@ export function routeCapUnderAutopilot(db, job, { lineage, routeId, settings = a
 
 const raisedOf = (db, workflowId, incidentId) => {
   const row = db.prepare("SELECT created_at,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind IN ('incident-raised',?) ORDER BY seq DESC LIMIT 1").get(workflowId, incidentId, AUTOPILOT_EVENTS.rerouted);
-  return row ? { at: row.created_at, ...(parseJson(row.payload_json, {}) ?? {}) } : null;
+  return row ? { at: row.created_at, ...(parseJson(row.payload_json, {})) } : null;
 };
 
 /** Budget use of one workflow against allocation.autopilot.budgets: {used, caps, exceeded[]}. */
@@ -634,7 +633,7 @@ export function reopenProvisional(ledger, { workflowId, dispatchId, handoverDisp
   if (!item) throw Object.assign(new Error(`${dispatchId} is no open provisional acceptance of ${workflowId}`), { code: 'provisional-unknown' });
   const proof = ownerAnswerProof(db, handoverDispatchId);
   if (!proof.ok) throw Object.assign(new Error(`the handover answer ${handoverDispatchId} is not a verified owner answer: ${proof.reason}`), { code: 'owner-claim-unproven' });
-  const handover = handoverAsks(db, workflowId).find((ask) => ask.dispatchId === handoverDispatchId);
+  const handover = handoverAsks(db, workflowId).some((ask) => ask.dispatchId === handoverDispatchId);
   if (!handover) throw Object.assign(new Error(`${handoverDispatchId} is no handover ask of ${workflowId}`), { code: 'handover-unknown' });
   const receipt = readJsonFile(proof.receiptPath) ?? {};
   const ownerNote = typeof receipt.note === 'string' && receipt.note.trim() ? receipt.note.trim() : null;

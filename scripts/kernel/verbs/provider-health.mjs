@@ -35,7 +35,7 @@ async function quotaProbe(ledger, args, emit, internals) {
     const spec = quotaSpecOf(key);
     if (!spec?.probe) { results.push({ provider: key, probed: false, reason: 'no-quota-probe' }); continue; }
     const circuit = providerHealthOf(db, key, now);
-    if (!circuit || circuit.failureKind !== QUOTA_FAILURE_KIND) {
+    if (circuit?.failureKind !== QUOTA_FAILURE_KIND) {
       results.push({ provider: key, probed: false, reason: circuit ? `circuit-open-${circuit.failureKind ?? 'auth'}` : 'no-open-quota-circuit' });
       continue;
     }
@@ -47,7 +47,7 @@ async function quotaProbe(ledger, args, emit, internals) {
       ?? (circuit.jobId ? db.prepare('SELECT workflow_id FROM jobs WHERE job_id=?').get(circuit.jobId)?.workflow_id : null) ?? null;
     const previous = { status: circuit.status, failureKind: circuit.failureKind, jobId: circuit.jobId ?? null, step: circuit.step ?? null,
       signal: circuit.signal ?? null, detail: circuit.detail ?? null, observedAt: circuit.observedAt ?? null, expiresAt: circuit.expiresAt ?? null };
-    const { at: _at, expiresAt: _exp, ...stored } = circuit;
+    const stored = Object.fromEntries(Object.entries(circuit).filter(([k]) => k !== 'at' && k !== 'expiresAt'));
     ledger.transaction(() => {
       if (probe.ok) {
         const recovered = { schema: 'starci/provider-health@1', provider: key, status: 'recovered', recoveredAt: now,

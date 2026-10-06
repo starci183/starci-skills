@@ -73,7 +73,7 @@ export function resolveIntroducer(db, { commits = [], roots = [], explicit = nul
     if (!info) continue;
     const named = workflows.filter((w) => info.message.includes(w.workflow_id));
     if (named.length === 1) return answer(named[0], 'commit-message-workflow', sha);
-    const cut = /\bcut\s+([A-Za-z0-9._-]+)\s+\d+\s*\/\s*\d+/i.exec(info.message)?.[1] ?? null;
+    const cut = /\bcut\s+([a-z0-9._-]+)\s+\d+\s*\/\s*\d+/i.exec(info.message)?.[1] ?? null;
     if (cut) {
       const owners = [...new Set(db.prepare("SELECT workflow_id FROM jobs WHERE json_extract(payload_json,'$.cut.id')=?").all(cut).map((r) => r.workflow_id))];
       if (owners.length === 1 && byId.has(owners[0])) return answer(byId.get(owners[0]), 'commit-message-cut', sha);

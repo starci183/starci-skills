@@ -83,7 +83,7 @@ export function claimFoundation(existing, { name, workflowId, ownerRunning, kind
 export function declareDependent(existing, { name, workflowId, detail = null, now = Date.now() }) {
   const record = existing ?? blank(name, now);
   if (record.owner?.workflowId === workflowId) fail(`workflow ${workflowId} owns foundation ${name}; an owner is not its own dependent`, 'foundation-self-dependent');
-  const already = (record.dependents ?? []).find((d) => d.workflowId === workflowId);
+  const already = (record.dependents ?? []).some((d) => d.workflowId === workflowId);
   const dependents = already
     ? record.dependents.map((d) => (d.workflowId === workflowId ? { ...d, detail: detail ?? d.detail } : d))
     : [...(record.dependents ?? []), { workflowId, detail, at: now }];

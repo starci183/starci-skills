@@ -20,7 +20,7 @@ import { byCodeUnit } from '../lib/list.mjs';
 
 export const SOURCE_EXT = Object.freeze(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']);
 const RESOLVE_EXT = [...SOURCE_EXT, '.d.ts', '.json'];
-const posix = (p) => String(p).replace(/\\/g, '/');
+const posix = (p) => String(p).replaceAll(/\\/g, '/');
 const SPEC_RE = [
   /\bimport\s+(?:type\s+)?[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/g,
   /\bexport\s+(?:type\s+)?[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/g,
@@ -63,7 +63,7 @@ const trackedList = (dir) => {
 /** Tracked source files of `root` (posix, relative), never under the worktrees dir or node_modules. */
 function trackedSources(root, { list = trackedList } = {}) {
   const r = list(root);
-  if (!r.ok) throw Object.assign(Error(`git ls-files failed in ${root}: ${String(r.error ?? '').slice(0, 200)}`), { code: 'IMPORT_SCAN_UNAVAILABLE' });
+  if (!r.ok) throw Object.assign(new Error(`git ls-files failed in ${root}: ${String(r.error ?? '').slice(0, 200)}`), { code: 'IMPORT_SCAN_UNAVAILABLE' });
   return r.files.map(posix)
     .filter((f) => !isWorktreesPath(f) && !f.includes('node_modules/') && SOURCE_EXT.some((e) => f.endsWith(e)) && !f.endsWith('.d.ts'));
 }
@@ -140,7 +140,7 @@ function resolveSpecifier(fromFile, spec, { scopes, exists, isDir }) {
       if (exists(c)) return { kind: 'file', file: c };
     }
     // `./foo.js` written for a TS source (NodeNext style): the .ts sibling.
-    const m = /^(.*)\.(?:m|c)?js$/.exec(b);
+    const m = /^(.*)\.[mc]?js$/.exec(b);
     if (m) for (const e of ['.ts', '.tsx', '.mts', '.cts']) if (exists(`${m[1]}${e}`)) return { kind: 'file', file: `${m[1]}${e}` };
     if (isDir(b)) candidates.push(`${b}/`);
   }

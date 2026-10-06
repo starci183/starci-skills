@@ -11,7 +11,7 @@ const WORK_WALK_MAX = 2000;
 export function workRecordFilesOf(repo, payload, envelope) {
   const out = new Set((Array.isArray(envelope?.files) ? envelope.files : []).filter((f) => typeof f === 'string' && WORK_YAML.test(f)));
   const owned = (payload?.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path))
-    .filter((p) => typeof p === 'string' && /(^|\/)\.starciwork(\/|$)/.test(p.replace(/\\/g, '/')));
+    .filter((p) => typeof p === 'string' && /(^|\/)\.starciwork(\/|$)/.test(p.replaceAll('\\', '/')));
   const stack = owned.map((p) => path.resolve(repo, p.replace(/\/\*\*$/, '')));
   let seen = 0;
   while (stack.length && seen < WORK_WALK_MAX) {

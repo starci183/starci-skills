@@ -75,7 +75,7 @@ const SHA = /^[0-9a-f]{40,64}$/;
 /* ------------------------------------------------------------ plumbing */
 
 /** The per-repository land lock: one workflow lands into a repository's main at a time. */
-const landLockName = (repoRoot) => `product-land-${crypto.createHash('sha1').update(String(path.resolve(repoRoot)).replace(/\\/g, '/').toLowerCase()).digest('hex').slice(0, 10)}`;
+const landLockName = (repoRoot) => `product-land-${crypto.createHash('sha1').update(String(path.resolve(repoRoot)).replaceAll(/\\/g, '/').toLowerCase()).digest('hex').slice(0, 10)}`;
 
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 /** One git call (a scripts/api/git call file) in `cwd`: {ok, status, stdout, stderr}. */
@@ -87,7 +87,7 @@ const revParse = (cwd, ref) => commitShaOf(git, cwd, ref);
 const lines = (text) => String(text ?? '').split(/\r?\n/).filter(Boolean);
 const mainOf = (ctx) => ctx?.main ?? 'main';
 /** Part A's functions: ctx.worktree in a spec, the module itself in the runtime. */
-const wt = (ctx) => ({ workflowWorktreeOf, workflowWorktreeAt, setCheckpoint, markReleasePending, TERMINAL_JOB_STATUSES, ...(ctx?.worktree ?? {}) });
+const wt = (ctx) => ({ workflowWorktreeOf, workflowWorktreeAt, setCheckpoint, markReleasePending, TERMINAL_JOB_STATUSES, ...ctx?.worktree });
 
 /** The registry row of the workflow's worktree, its directory present: {workflowId, orcaWorktreeId, path, branch, checkpoint}. */
 export function recordOf(ctx, workflowId) {
@@ -308,7 +308,7 @@ export function recoverWorkflowRebase(ctx, { workflowId, opId }) {
 /** The whole-branch gate: `starci gate run` over the worktree against `base`; its starci/gate@1 report. */
 function runWorkflowGate({ root, base, timeoutMs = 1_800_000 }) {
   const run = runNode([GATE_SCRIPT, '--root', root, '--base', base], { cwd: root, timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
-  try { return JSON.parse(run.stdout); } catch { return { exit: 2, errors: [`gate.mjs printed no report (exit ${run.status ?? 'timeout'}): ${String(run.stderr || run.error?.message || '').trim().split(/\r?\n/).slice(-1)[0]}`], findings: [], counts: { new: 0 } }; }
+  try { return JSON.parse(run.stdout); } catch { return { exit: 2, errors: [`gate.mjs printed no report (exit ${run.status ?? 'timeout'}): ${String(run.stderr || run.error?.message || '').trim().split(/\r?\n/).at(-1)}`], findings: [], counts: { new: 0 } }; }
 }
 
 /**

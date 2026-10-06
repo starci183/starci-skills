@@ -15,23 +15,23 @@ export default {
   run({ ledger, args, caller, emit }) {
     const db = ledger.db, workflowId = args.workflow, root = revRootOf();
     const wf = getWorkflow(db, workflowId);
-    if (!wf) throw Object.assign(Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+    if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
     const terminal = kernelCustodyOf(db, workflowId).terminal;
     const authority = kernelAuthorityOf(db,workflowId,args.plan ? terminal : caller?.handle);
     if (!args.plan && (caller?.role !== 'kernel' || caller.workflowId !== workflowId))
-      throw Object.assign(Error('only the current Kernel may attest its READ'), { code: 'kernel-caller-stale' });
+      throw Object.assign(new Error('only the current Kernel may attest its READ'), { code: 'kernel-caller-stale' });
     const options = { root,authority,ops: args.op ? [String(args.op)] : [] };
     const required = kernelReadManifest(db,workflowId,options);
     if (args.plan) return emit({ ok: true, workflowId, readManifest: required }, JSON.stringify(required), args.json);
     const rev = required.revision.kind === 'git' ? resolveRev(root,String(args.rev)) : String(args.rev);
-    if (!rev || rev !== required.rev) throw Object.assign(Error('READ revision is not the current deployed commit'), { code: KERNEL_REV_UNKNOWN });
+    if (!rev || rev !== required.rev) throw Object.assign(new Error('READ revision is not the current deployed commit'), { code: KERNEL_REV_UNKNOWN });
     const file = String(args['read-manifest']), stat = fs.lstatSync(file);
-    if (!stat.isFile() || stat.isSymbolicLink()) throw Object.assign(Error('READ manifest must be a regular file'), { code: 'kernel-read-unverified' });
+    if (!stat.isFile() || stat.isSymbolicLink()) throw Object.assign(new Error('READ manifest must be a regular file'), { code: 'kernel-read-unverified' });
     const submitted = JSON.parse(fs.readFileSync(file,'utf8'));
     ledger.transaction(() => {
       const current = kernelAuthorityOf(db,workflowId,caller.handle);
       const fresh = kernelReadManifest(db,workflowId,{ ...options,authority: current });
-      if (fresh.digest !== required.digest) throw Object.assign(Error('READ inputs changed before acknowledgement'), { code: 'kernel-read-unverified' });
+      if (fresh.digest !== required.digest) throw Object.assign(new Error('READ inputs changed before acknowledgement'), { code: 'kernel-read-unverified' });
       verifyKernelRead(submitted,fresh);
       ledger.appendEvent({ workflowId,entityType: 'kernel',entityId: workflowId,generation: current.generation,kind: KERNEL_REV_ACKED_EVENT,
         payload: { rev,files: fresh.files.map(row => row.path),source: 'ack',attempt: current.attempt,readManifest: fresh },createdAt: Date.now() });

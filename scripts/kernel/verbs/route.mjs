@@ -13,7 +13,7 @@ export default {
   usageInCore: true,
   async run({ ledger, args, emit, internals }) {
     const { FINAL_SETTLED, deferQueuedTestLeg, releaseTypedWaits,
-      livePathLeaseWait, goalJsonOf, latestGoal, csvList,
+      livePathLeaseWait, goalJsonOf, latestGoal,
       refuseKernelBias, lineageRouteAdjust, path, fs, skillRoot, parseYaml,
       poolLoadOf, accountList, normalizeProvider, probeQuotaSafe, providerHealthOf,
       circuitClearHint, ownerRoot, configuredAllocationPolicy, loadConfig, recentDispatchCounts,
@@ -79,7 +79,7 @@ export default {
   const regDoc = fs.existsSync(regFile) ? parseYaml(fs.readFileSync(regFile, 'utf8')) : null;
   const pools = regDoc?.pools ?? {};
   // The one merged view selectPool's helpers expect: allocation policy + pools.
-  const rtMerged = { ...(rtDoc ?? {}), runtimes: pools };
+  const rtMerged = { ...(rtDoc), runtimes: pools };
   // Pool load (poolLoadOf, shared with starci kernel status): running, leased and answering jobs hold their pool slot, and a
   // routed-but-queued one while its route hold lasts, so sequential route calls in one fan-out see the workers filling
   // instead of piling every slice onto the first preferred pool. The job being routed holds nothing yet.
@@ -207,7 +207,7 @@ export default {
       attempt: job.try_no, generation: job.generation,
     };
     hierarchy.runtime = {
-      ...(hierarchy.runtime ?? {}), host: 'orca',
+      ...(hierarchy.runtime), host: 'orca',
       agent: selectedRuntime?.provider ?? null,
       provider: selectedRuntime?.provider ?? null,
       model: decided.modelId,

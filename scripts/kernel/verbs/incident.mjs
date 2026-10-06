@@ -3,7 +3,7 @@ import path from 'node:path';
 import { newToken, openIncident, resolveIncident } from '../../../engine/db/ledger.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { csvList, getWorkflow } from './shared/rows.mjs';
-import { PEER_WAIT, openPeerWaits, peerRefusalOf, releaseTypedWaits, writePeerMessage } from './shared/peer-waits.mjs';
+import { PEER_WAIT, peerRefusalOf, releaseTypedWaits, writePeerMessage } from './shared/peer-waits.mjs';
 import { OWNER_CLAIM_UNPROVEN, RESOLVERS, incidentKindOf, resolutionOwnerCheck } from '../../machine/owner-claim.mjs';
 import { CONDITIONS_ATTACHED_EVENT, conditionLabel, parseConditions, sharedBlockerUntil } from '../gate-conditions.mjs';
 import { declareDependent, readFoundation, writeFoundation } from '../foundation-registry.mjs';
@@ -122,7 +122,7 @@ export default {
       openIncident(db, { incidentId, workflowId, kind: args.kind, opId: args.op ?? null, detail: args.detail, lastProgress: `[${args.kind}] ${args.detail}`, at: now });
       ledger.appendEvent({
         workflowId, entityType: 'incident', entityId: incidentId,
-        kind: 'incident-raised', payload: { kind: args.kind, ...(rerouted ? { rerouted, by: AUTOPILOT_BY } : {}), detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait ?? {}), ...(until.length ? { until } : {}) },
+        kind: 'incident-raised', payload: { kind: args.kind, ...(rerouted ? { rerouted, by: AUTOPILOT_BY } : {}), detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait), ...(until.length ? { until } : {}) },
       });
       // A wait on a foundation makes the waiter its dependent, so the landing notifies it.
       if (foundationWait && !(foundationWait.foundation.dependents ?? []).some((d) => d.workflowId === workflowId)) {
@@ -133,7 +133,7 @@ export default {
     // A condition that already holds resolves the wait now rather than at the next status.
     const released = until.length ? releaseTypedWaits(ledger, { repo: typedRepo, workflowId }).resolved.find((r) => r.incidentId === incidentId) ?? null : null;
     const sharedBlocker = args.kind === SHARED_BLOCKER ? routeSharedBlocker(ledger, { workflowId, incidentId, args, repo: typedRepo }) : null;
-    const out = { ok: true, incidentId, workflowId, kind: args.kind, status: released ? 'resolved' : 'open', ...(holds.length ? { holds } : {}), ...(peerWait ?? {}), ...(until.length ? { until } : {}), ...(released ? { autoResolved: released } : {}), ...(sharedBlocker ? { sharedBlocker } : {}) };
+    const out = { ok: true, incidentId, workflowId, kind: args.kind, status: released ? 'resolved' : 'open', ...(holds.length ? { holds } : {}), ...(peerWait), ...(until.length ? { until } : {}), ...(released ? { autoResolved: released } : {}), ...(sharedBlocker ? { sharedBlocker } : {}) };
     emit(out, `incident ${incidentId} open on ${workflowId} — ${args.kind}${peerWait ? ` on ${peerWait.peer}${peerWait.untilMessage ? ' (until its next message)' : ''}${peerWait.untilFoundation ? ` (until foundation ${peerWait.untilFoundation} lands)` : ''}` : ''}: ${args.detail}`, args.json);
     if (until.length && !args.json) console.log(`  typed release: ${until.map(conditionLabel).join(' AND ')}${released ? ` — already met, resolved: ${released.evidence.join('; ')}` : ''}`);
     if (sharedBlocker && !args.json) console.log(sharedBlocker.routed

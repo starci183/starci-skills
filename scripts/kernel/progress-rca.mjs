@@ -21,7 +21,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { allocationSettings } from '../../engine/config.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { clipLine } from '../lib/clip.mjs';
@@ -247,7 +246,7 @@ export function causesOf({ status = 'failed', result = {}, report = null }) {
   if (kind === 'grammar-gap' || /MONOREPO_TIER|monorepo-tier|canon rule .* forbids/i.test(text)) add('canon-conflict');
   if (/IMPORTS_BROKEN_AFTER_MOVE|broken-import|Cannot find module ['"]?[@./]|Module not found: (?:Error: )?Can't resolve|TS2307|unresolved import|Failed to resolve import/i.test(text)) add('broken-import');
   if (!causes.includes('broken-import') && CHECKER_UNAVAILABLE_RE.test(text) && kind === 'environment') add('checker-unavailable');
-  if (report?.rootCause && report.rootCause.self === false && /^wf-/.test(String(report.rootCause.node ?? ''))) add('upstream');
+  if (report?.rootCause?.self === false && String(report.rootCause.node ?? '').startsWith('wf-')) add('upstream');
   if (report && preservedOf(result) && (report.outcome === 'blocked' || status === 'failed')) add('partial-work');
   if (!causes.length && report && (result?.verdict === 'fail' || report.outcome === 'failed')) add('product-defect');
   if (!causes.length) add(kind === 'environment' ? 'checker-unavailable' : 'other');
@@ -261,7 +260,7 @@ export function causesOf({ status = 'failed', result = {}, report = null }) {
 /** The repository paths a report names that its unit does not own (the destinations a move needs). Pure. */
 export function destinationsOf(report, ownedPaths = []) {
   const text = [report?.summary, report?.blocker?.detail, report?.rootCause?.claim].join(' ');
-  const owned = ownedPaths.map((p) => String(p).replace(/\\/g, '/').replace(/^[^/]*\/(?=(?:apps|packages)\/)/, ''));
+  const owned = ownedPaths.map((p) => String(p).replaceAll('\\', '/').replace(/^[^/]*\/(?=(?:apps|packages)\/)/, ''));
   const out = new Set();
   for (const m of text.matchAll(PATH_RE)) {
     const p = m[1].replace(/[.,)]+$/, '').replace(/\/+$/, '');
@@ -345,7 +344,7 @@ export function decisionsOf(db, workflowId) {
 
 /* ------------------------------------------------------------ ranked actions */
 
-const q = (s) => (/[\s,;"'[\]()]/.test(String(s)) ? `"${String(s).replace(/"/g, '\\"')}"` : String(s));
+const q = (s) => (/[\s,;"'[\]()]/.test(String(s)) ? `"${String(s).replaceAll('"', String.raw`\"`)}"` : String(s));
 const actionKey = (...parts) => parts.join(':');
 
 /**
@@ -538,7 +537,7 @@ function recutTargetOf(units) {
 function missingQueuedOf(units, resolve) {
   const out = [];
   // A path a running unit of this workflow owns (or sits under/over) may be created by it: never called missing.
-  const low = (p) => String(p).replace(/\\/g, '/').toLowerCase();
+  const low = (p) => String(p).replaceAll('\\', '/').toLowerCase();
   const running = units.flatMap((u) => u.jobs.filter((j) => SLOT_STATUSES.includes(j.status))).flatMap((j) => (j.payload?.owned_paths ?? []).map(low));
   const near = (p) => running.some((r) => r === p || r.startsWith(`${p}/`) || p.startsWith(`${r}/`) || r.split('/').slice(0, -1).join('/') === p.split('/').slice(0, -1).join('/'));
   for (const u of units) {

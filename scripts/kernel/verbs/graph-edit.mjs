@@ -86,12 +86,12 @@ export default {
     const bound = (n) => { if (n > N) throw refuse(`this edit touches ${n} units; a light edit touches at most ${N} (allocation.progress.maxUnitsPerEdit) - a bigger change is a redesign: starci kernel redesign --op work.author|scope.define|goal.revise`, 'edit-too-big'); };
     const change = (job, patch) => {
       const before = Object.fromEntries(Object.keys(patch).map((k) => [k, job.payload[k] ?? null]));
-      const payload = { ...job.payload, ...patch, kernelEdit: { ...(job.payload.kernelEdit ?? {}), lastEdit: editId } };
+      const payload = { ...job.payload, ...patch, kernelEdit: { ...job.payload.kernelEdit, lastEdit: editId } };
       setPayload(ledger, job, payload, now);
       rec.changed.push({ jobId: job.job_id, before, after: patch });
       return payload;
     };
-    const tag = (jobId, patch) => { const j = jobRow(db, jobId); if (j) setPayload(ledger, j, { ...j.payload, kernelEdit: { ...(j.payload.kernelEdit ?? {}), edit, editId, decision: decision?.id ?? null, ...patch } }, now); };
+    const tag = (jobId, patch) => { const j = jobRow(db, jobId); if (j) setPayload(ledger, j, { ...j.payload, kernelEdit: { ...j.payload.kernelEdit, edit, editId, decision: decision?.id ?? null, ...patch } }, now); };
     let human = '';
 
     if (edit === 'drop') {
@@ -125,7 +125,7 @@ export default {
     } else if (edit === 'params') {
       const job = editableJob(db, wf, args.job);
       const o = validateOverride(parseJson(args.set, '--set'));
-      const patch = { kernelOverride: { ...(job.payload.kernelOverride ?? {}), ...o } };
+      const patch = { kernelOverride: { ...job.payload.kernelOverride, ...o } };
       if (o.difficulty) patch.difficulty = o.difficulty;
       if (o.model) patch.kernelModel = o.model;
       ledger.transaction(() => change(job, patch));
@@ -158,7 +158,7 @@ export default {
       rec.created.push(created);
       tag(created, { continuationOf: job.job_id, preserved, unitOf: job.job_id });
       const c = jobRow(db, created);
-      if (c) setPayload(ledger, c, { ...c.payload, kernelOverride: { ...(c.payload.kernelOverride ?? {}), notes: [...(c.payload.kernelOverride?.notes ?? []), `Continuation of ${job.job_id}: the runtime preserved its in-ceiling work as ${preserved}. Apply it to your owned paths first (git diff ${preserved}^ ${preserved} -- <owned paths> | git apply); finish what its report left open${add.length ? ` (you now also own ${add.join(', ')})` : ''}.`] } }, now);
+      if (c) setPayload(ledger, c, { ...c.payload, kernelOverride: { ...c.payload.kernelOverride, notes: [...(c.payload.kernelOverride?.notes ?? []), `Continuation of ${job.job_id}: the runtime preserved its in-ceiling work as ${preserved}. Apply it to your owned paths first (git diff ${preserved}^ ${preserved} -- <owned paths> | git apply); finish what its report left open${add.length ? ` (you now also own ${add.join(', ')})` : ''}.`] } }, now);
       ledger.transaction(() => ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: job.job_id, kind: 'unit-partial-continued', payload: { by: created, preserved, editId } }));
       human = `continuation ${created} of ${job.job_id} from ${preserved}`;
     } else if (edit === 'retry') {
@@ -170,7 +170,7 @@ export default {
       if (open) throw refuse(`${open.job_id} already retries ${job.job_id}: edit that queued unit (widen/params) instead`, 'retry-exists');
       const add = args['add-paths'] ? checkPaths(db, { repo, workflowId: wf, op: job.op_id, payload: job.payload, current: job.payload.owned_paths ?? [], add: csv(args['add-paths']) }) : [];
       const o = args.set ? validateOverride(parseJson(args.set, '--set')) : null;
-      const next = { ...job.payload, owned_paths: [...new Set([...(job.payload.owned_paths ?? []), ...add])], kernelOverride: { ...(job.payload.kernelOverride ?? {}), ...(o ?? {}) }, ...(o?.model ? { kernelModel: o.model } : {}) };
+      const next = { ...job.payload, owned_paths: [...new Set([...(job.payload.owned_paths ?? []), ...add])], kernelOverride: { ...job.payload.kernelOverride, ...o }, ...(o?.model ? { kernelModel: o.model } : {}) };
       const failedShapes = failedShapesOf(db, wf, { job_id: '__new__', op_id: job.op_id, payload: next });
       const same = shapeOf(job.op_id, next) === shapeOf(job.op_id, job.payload) || failedShapes.has(shapeOf(job.op_id, next));
       if (same) throw refuse(`the retry has the same shape as a failed attempt of this unit: widen its paths (--add-paths) or change its override (--set) - never the same failing shape`, 'shape-already-failed');
@@ -269,7 +269,7 @@ export default {
       const byWave = new Map();
       const waves = [...new Set(cutPlan.slices.map((sl) => sl.wave))];
       for (const sl of cutPlan.slices) {
-        const prior = waves.indexOf(sl.wave) > 0 ? byWave.get(waves[waves.indexOf(sl.wave) - 1]) ?? [] : [];
+        const prior = sl.wave !== waves[0] ? byWave.get(waves[waves.indexOf(sl.wave) - 1]) ?? [] : [];
         const id = enqueueUnit({ repo, wf, op: args.op, paths: prefixed(sl.owned), what: `recut ${sl.ordinal}/${total} ${sl.wave ?? ''}`.trim(), derivedFrom,
           extra: [...(total >= 2 ? ['--cut-id', newCut, '--cut-ordinal', String(sl.ordinal), '--cut-total', String(total), '--canon-scan', cutFile] : []),
             ...(prior.length ? ['--after', prior.join(',')] : [])] });

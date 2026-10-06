@@ -32,7 +32,7 @@ export default {
     if (!args.clear) {
       let parsed;
       try { parsed = JSON.parse(args.set); } catch (e) { throw refuse(`--set is not JSON: ${e.message}`, 'override-invalid'); }
-      override = { ...(opOverrideOf(db, wf, args.op) ?? {}), ...validateOverride(parsed) };
+      override = { ...opOverrideOf(db, wf, args.op), ...validateOverride(parsed) };
     }
     const prev = opOverrideOf(db, wf, args.op);
     const id = newId('ovr');

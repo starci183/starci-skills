@@ -5,13 +5,12 @@
 // apps/app/src/app could never be met). A create-new-module grant is explicit: `--new-module <repo-relative
 // dir,...>` on enqueue (payload.new_modules) exempts the grants under that module root, provided the module
 // root's own parent directory exists. Work paths (.starciwork/...) are authored by Work ops and are not checked.
-import fs from 'node:fs';
 import path from 'node:path';
 import { ownedPathPlacements, projectBinding } from './target-repo.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
 
-const slash = (p) => String(p).replace(/\\/g, '/');
-const isGlobOrDir = (p) => /(^|\/)\*{1,2}$/.test(p) || /\/$/.test(p);
+const slash = (p) => String(p).replaceAll('\\', '/');
+const isGlobOrDir = (p) => /(^|\/)\*{1,2}$/.test(p) || p.endsWith('/');
 const tidy = (p) => slash(p).replace(/(^|\/)\*{1,2}$/, '').replace(/\/+$/, '').replace(/^\.\//, '') || '.';
 
 const newModulesOf = (payload) => (Array.isArray(payload?.new_modules) ? payload.new_modules : []);

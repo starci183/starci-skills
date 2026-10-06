@@ -5,7 +5,7 @@ import { kernelReadManifest, requireKernelRead } from './required-read.mjs';
 import { revRootOf } from './runtime-rev.mjs';
 import { withMutationFence, mutationAuthority } from '../lib/mutation-fence.mjs';
 import { parseJson } from '../lib/json.mjs';
-const refuse = (detail, code = 'kernel-caller-stale') => Object.assign(Error(detail), { code });
+const refuse = (detail, code = 'kernel-caller-stale') => Object.assign(new Error(detail), { code });
 
 const targetWorkflow = (db, args) => {
   const ids = new Set(args.workflow ? [String(args.workflow)] : []);

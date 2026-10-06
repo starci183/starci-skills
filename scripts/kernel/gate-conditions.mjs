@@ -51,7 +51,7 @@ const AUTO_RESOLVED_EVENT = 'incident-auto-resolved';
 export const CONDITIONS_ATTACHED_EVENT = 'incident-conditions-attached';
 const JOB_WANTS = ['settled', 'succeeded'];
 // A settled pass or fail meets `settled`; a cancelled job is followed to its replacement.
-const SETTLED = ['succeeded', 'failed'];
+const SETTLED = new Set(['succeeded', 'failed']);
 const MAX_LINEAGE_HOPS = 32;
 // A job row: `attempt` = its try number (per unit), `result_json` = its settle result (machine/job-row.mjs jobResultSql).
 const JOB_COLS = `job_id,workflow_id,op_id,unit_id,try_no,try_no AS attempt,retry_of,resume_of,status,payload_json,${jobResultSql('jobs')} AS result_json,worker_id,created_at,updated_at`;
@@ -278,10 +278,10 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
       const evidence = `${chain ? `${chain}, replaced by ` : ''}${row.job_id} (${row.workflow_id}) ${row.status} at ${iso(row.updated_at)}`;
       if (cond.want === 'succeeded') {
         if (row.status === 'succeeded') return { met: true, evidence };
-        if (SETTLED.includes(row.status)) return { met: false, unmeetable: `job ${row.job_id} settled ${row.status}, not succeeded`, evidence };
+        if (SETTLED.has(row.status)) return { met: false, unmeetable: `job ${row.job_id} settled ${row.status}, not succeeded`, evidence };
         return { met: false, evidence };
       }
-      return { met: SETTLED.includes(row.status), evidence };
+      return { met: SETTLED.has(row.status), evidence };
     }
     if (cond.type === 'message') {
       const hit = db.prepare('SELECT key,payload_json,created_at FROM inbox WHERE workflow_id=? AND kind=? AND created_at>=? ORDER BY inbox_id')

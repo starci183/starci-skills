@@ -6,7 +6,7 @@ import { wakeKernelForTransition } from '../wake-delivery.mjs';
 import { ownerLanguage } from '../../lib/i18n.mjs';
 
 export default workflowVerb('autopilot', ({ ledger, args, repo, emit }) => {
-    const { db, workflowId, workflow: wf } = verbWorkflow(ledger, args);
+    const { db, workflowId } = verbWorkflow(ledger, args);
     const reason = typeof args.reason === 'string' && args.reason.trim() ? args.reason.trim() : null;
     const by = typeof args.by === 'string' && ['supervisor', 'kernel', AUTOPILOT_BY].includes(args.by.trim()) ? args.by.trim() : 'supervisor';
     const needReason = (flag) => { if (!reason) throw Object.assign(new Error(`autopilot ${flag} needs --reason <text>`), { code: 'reason-missing' }); };

@@ -8,7 +8,6 @@
 //   kernel-proposal --workflow <wf> --list
 import fs from 'node:fs';
 import { stageBlob, putArtifact } from '../../machine/evidence-store.mjs';
-import path from 'node:path';
 import { PROPOSAL_KIND, csv, newId, recordKernel, refuse } from '../kernel-authority.mjs';
 import { parseJsonOr } from '../../lib/json.mjs';
 import { appendInbox } from '../../machine/sup-messages.mjs';
@@ -23,7 +22,7 @@ export default {
     const db = ledger.db, wf = args.workflow;
     if (args.list) {
       const rows = db.prepare('SELECT entity_id, payload_json, created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(wf, PROPOSAL_KIND)
-        .map((r) => ({ id: r.entity_id, at: r.created_at, ...(parseJsonOr(r.payload_json, {}) ?? {}) }));
+        .map((r) => ({ id: r.entity_id, at: r.created_at, ...parseJsonOr(r.payload_json, {}) }));
       emit({ ok: true, workflowId: wf, proposals: rows }, rows.map((p) => `${p.id} [${p.tier}] ${p.title} (${p.files?.join(', ') || 'no files'})`).join('\n') || 'no proposals', args.json);
       return;
     }

@@ -25,7 +25,7 @@ const GRAMMAR_INPUTS = Object.freeze(['reference', 'component-source']);
 export const grammarInputsOf = (brief) => (GRAMMAR_INPUTS.includes(brief?.grammarInputs) ? brief.grammarInputs : 'reference');
 
 
-const slash = (p) => p.replace(/\\/g, '/');
+const slash = (p) => p.replaceAll(/\\/g, '/');
 const yamlFilesUnder = (dir) => fs.readdirSync(dir, { withFileTypes: true, recursive: true })
   .filter((e) => e.isFile() && /\.ya?ml$/i.test(e.name))
   .map((e) => slash(path.join(e.parentPath ?? e.path, e.name))).sort();

@@ -19,7 +19,7 @@ import { refuse } from '../../../../engine/refuse.mjs';
 import { resolvedKey } from '../../../lib/path-key.mjs';
 
 
-const slash = (s) => String(s).replace(/\\/g, '/');
+const slash = (s) => String(s).replaceAll('\\', '/');
 
 const inside = (root, file) => {
   const rel = path.relative(resolvedKey(root), resolvedKey(file));
@@ -147,7 +147,7 @@ export function stageReportEvidence({ report, scratch, attach = [], opId = null,
     if (names.size > ATTACH_MAX_FILES || size > limit || totalBytes > ATTACH_MAX_BYTES)
       throw refuse('report attachments exceed their file or byte limit; scratch is retained', 'report-attachment-invalid');
     const kind = kindOf(abs);
-    inventory.push({ abs, size, mediaType, limit, name: logical, role, kind, subkind: subkindOf({ kind, path: slash(logical), opId }), runId, round, checkIndex, stream });
+    inventory.push({ abs, mediaType, limit, name: logical, role, kind, subkind: subkindOf({ kind, path: slash(logical), opId }), runId, round, checkIndex, stream });
   };
   // The runtime's own agent-data folders in the scratch ride along even when the op did not name them: a draw loop's
   // rounds and bundle (draw-loop.mjs) and its captures must be ledger artifacts, or the blob GC could sweep them.
@@ -168,7 +168,7 @@ export function stageReportEvidence({ report, scratch, attach = [], opId = null,
     }
   });
   let stagedBytes = 0;
-  for (const { abs, size: _size, mediaType, limit, ...item } of inventory) {
+  for (const { abs, mediaType, limit, ...item } of inventory) {
     const bytes = readEvidenceFile(abs, limit, 'report-attachment-invalid');
     stagedBytes += bytes.length;
     if (stagedBytes > ATTACH_MAX_BYTES) throw refuse('report attachments exceed their aggregate byte limit; scratch is retained', 'report-attachment-invalid');
@@ -181,7 +181,7 @@ export function stageReportEvidence({ report, scratch, attach = [], opId = null,
 export function storedReportOf(report, staged) {
   if (!Array.isArray(report.checks)) return report;
   const checks = report.checks.map((check, index) => {
-    const { stdoutPath: _o, stderrPath: _e, outputPath: _p, ...rest } = check;
+    const rest = Object.fromEntries(Object.entries(check).filter(([key]) => !CHECK_FILE_FIELDS.some(([field]) => field === key)));
     const files = Object.fromEntries(staged.filter((s) => s.checkIndex === index).map((s) => [s.stream, s.name]));
     return Object.keys(files).length ? { ...rest, artifacts: files } : rest;
   });
@@ -203,7 +203,7 @@ export function fileReportEvidence(db, { attempt, reportId, report, staged, now 
   }
   const checks = (report.checks ?? []).map((check, index) => {
     const blobOf = (stream) => staged.find((s) => s.checkIndex === index && s.stream === stream)?.blob ?? null;
-    const { name, command, exitCode, phase, cwd, startedAt, finishedAt, unavailable, stdoutPath: _o, stderrPath: _e, outputPath: _p, ...summary } = check;
+    const { name, command, exitCode, phase, cwd, startedAt, finishedAt, unavailable, ...summary } = Object.fromEntries(Object.entries(check).filter(([key]) => !CHECK_FILE_FIELDS.some(([field]) => field === key)));
     const r = recordCheck(db, { attemptId: attempt.attempt_id, name, phase: phase ?? 'after', runner: 'op', command, cwd: cwd ?? null,
       exitCode, unavailable: unavailable === true, startedAt: startedAt ?? null, finishedAt: finishedAt ?? null,
       stdout: blobOf('stdout'), stderr: blobOf('stderr'), output: blobOf('output'), summary: Object.keys(summary).length ? summary : null, now });

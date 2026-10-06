@@ -19,7 +19,6 @@
 // restart (scripts/kernel/host-outage.mjs). The cadence is the Host controller's (modules/reconciler/host.yaml).
 
 import '../api/process/hide-child-windows.mjs';
-import fs from 'node:fs';
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
@@ -38,7 +37,7 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { stopAndRelease } from '../machine/worker-close.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
-import { readJsonFile, jsonFromStdout } from '../lib/json.mjs';
+import { jsonFromStdout } from '../lib/json.mjs';
 import { revWakeLine } from './runtime-rev.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { isMain } from '../lib/is-main.mjs';
@@ -98,8 +97,7 @@ export function repairKernelTabTitle(terminal, name, { list = () => terminalList
   try {
     const listed = list();
     if (!listed?.ok) return { ok: false, error: listed?.error ?? 'terminal list unavailable' };
-    const row = (listed.terminals ?? []).find((t) => t.handle === terminal && t.connected !== false);
-    if (!row) return { ok: false, error: 'terminal absent from listing' };
+    if (!(listed.terminals ?? []).some((t) => t.handle === terminal && t.connected !== false)) return { ok: false, error: 'terminal absent from listing' };
     const title = `[Kernel] ${name}`;
     if (tabTitles(listed.visualLayouts ?? [], listed.terminals).get(terminal) === title) return null;
     const result = rename(terminal, title);
@@ -228,10 +226,10 @@ const WAKE_IDLE_REPLACE = 3;
 export const WAKE_IDLE_WINDOW_MS = WAKE_FAIL_WINDOW_MS;
 const IDLE_REPLACED_WINDOW_MS = 60 * 60_000;
 // Kernel-authored job moves: reset the wakes and the idle-replaced streak.
-const KERNEL_MOVES = ['job-enqueued', 'follow-on-enqueued', 'job-dropped', 'kernel-graph-edit', 'lifecycle', 'phase-transition'];
+const KERNEL_MOVES = new Set(['job-enqueued', 'follow-on-enqueued', 'job-dropped', 'kernel-graph-edit', 'lifecycle', 'phase-transition']);
 // Progress the Kernel did not author, and the Kernel's own records: reset the wakes only.
-const KERNEL_ACTIVITY = ['op-dispatched', 'op-settled', 'kernel-decision', 'kernel-decision-result', 'kernel-proposal',
-  'autopilot-deferred-to-handover', 'ask-superseded', 'ask-answered', 'peer-message-acked', 'runtime-rev-acked'];
+const KERNEL_ACTIVITY = new Set(['op-dispatched', 'op-settled', 'kernel-decision', 'kernel-decision-result', 'kernel-proposal',
+  'autopilot-deferred-to-handover', 'ask-superseded', 'ask-answered', 'peer-message-acked', 'runtime-rev-acked']);
 const recordKernelWoken = (terminal, detail) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
   workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_WOKEN_EVENT, payload: { terminal, ...detail } })));
 /**
@@ -242,8 +240,8 @@ const recordKernelWoken = (terminal, detail) => withKernelLedger((ledger) => led
 export function idleWakesOf(rows, { now = Date.now() } = {}) {
   let wakes = 0, firstWakeAt = null, replacedAts = [];
   for (const row of rows) {
-    if (KERNEL_MOVES.includes(row.kind)) { wakes = 0; firstWakeAt = null; replacedAts = []; }
-    else if (KERNEL_ACTIVITY.includes(row.kind)) { wakes = 0; firstWakeAt = null; }
+    if (KERNEL_MOVES.has(row.kind)) { wakes = 0; firstWakeAt = null; replacedAts = []; }
+    else if (KERNEL_ACTIVITY.has(row.kind)) { wakes = 0; firstWakeAt = null; }
     else if (row.kind === KERNEL_WOKEN_EVENT) { if (wakes === 0) firstWakeAt = Number(row.created_at) || null; wakes += 1; }
     else if (row.kind === KERNEL_IDLE_REPLACED_EVENT) { replacedAts.push(Number(row.created_at) || 0); wakes = 0; firstWakeAt = null; }
   }

@@ -26,7 +26,7 @@ async function workflowHost({ caller, env }, run = execNode) {
 }
 
 export function workflowStartAuthority({ workflow, goal } = {}) {
-  if (!workflow || !goal || goal.approved_by !== 'owner')
+  if (!workflow || goal?.approved_by !== 'owner')
     return { ok: false, reason: 'workflow-approval-required' };
   if (!['queued', 'running'].includes(workflow.phase) || workflow.archived_at != null)
     return { ok: false, reason: 'workflow-not-startable', phase: workflow.phase };
@@ -50,7 +50,7 @@ export function commitWorkflowStart(ledger, { workflowId, expected, token, holde
       return { ok: false, reason: 'workflow-goal-unverified', authority };
     const signal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
     if (!token || signal?.token !== token || signal.holder_pid !== holderPid
-        || parseJsonOr(signal.value_json)?.state !== 'starting' || !(signal.expires_at > now()))
+        || parseJsonOr(signal.value_json)?.state !== 'starting' || signal.expires_at <= now())
       return { ok: false, reason: 'kernel-start-reservation-lost', authority };
     publish({ workflow, goal, authority });
     return { ok: true, authority };
