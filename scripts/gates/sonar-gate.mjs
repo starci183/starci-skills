@@ -34,9 +34,17 @@ export function loadSonarGate({ base = root, file = null, cwd = null } = {}) {
   }
   if (!file) cache = { base, gate };
   if (!cwd) return gate;
+  return gateForCwd(gate, { cwd, file });
+}
+
+/** The canonical gate limited to the repository's declared edition (the lite block may omit the coverage descriptor). */
+const gateForCwd = (gate, { cwd, file }) => {
   let declaration;
   try { declaration = JSON.parse(fs.readFileSync(path.join(cwd, 'hfs.json'), 'utf8')); }
-  catch (error) { if (error?.code === 'ENOENT') return gate; throw error; }
+  catch (error) {
+    if (error?.code === 'ENOENT') return gate;
+    throw error;
+  }
   const { edition, valid } = declarationEdition({}, declaration);
   if (!valid) throw new Error('hfs.json declares an unsupported Sonar edition');
   if (edition === 'full') return gate;
@@ -45,7 +53,7 @@ export function loadSonarGate({ base = root, file = null, cwd = null } = {}) {
   for (const key of ['gate', 'newCode', 'overall'])
     if (selected?.[key] == null) throw new Error(`${file ?? GATE_FILE}: ${edition}.${key} is required`);
   return { ...gate, ...selected };
-}
+};
 
 /**
  * The conditions the server gate carries: [{metric, op, error}] (SonarQube api/qualitygates conditions): the new-code ones
@@ -110,14 +118,18 @@ export function coverageTargetOf(scope) {
   const tests = patterns(scope.tests);
   const roots = (scope.sources ?? []).map((dir) => `${String(dir).replace(/\/+$/, '')}/`);
   return (file) => {
-    const rel = String(file).split('\\').join('/');
+    const rel = String(file).replaceAll('\\', '/');
     return SOURCE_FILE.test(rel) && (!roots.length || roots.some((dir) => rel.startsWith(dir)))
       && !excluded.some((pattern) => pattern.test(rel)) && !tests.some((pattern) => pattern.test(rel));
   };
 }
 
 const asNumber = (value) => (value === undefined || value === null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value));
-const byPath = (a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+const byPath = (a, b) => {
+  if (a.path < b.path) return -1;
+  if (a.path > b.path) return 1;
+  return 0;
+};
 
 /**
  * The per-file coverage verdict: `files` are [{path, coverage}] (coverage the Sonar `coverage` measure of the file, a number
@@ -133,7 +145,7 @@ export function judgeCoverage(files, { scope = coverageScopeOf(), minPercent }) 
   const result = { applied: scope.exclusions.length > 0, exclusions: [...scope.exclusions], minPercent, files: [], failures: [] };
   if (!result.applied) return { ...result, note: 'the repository declares no sonar.coverage.exclusions: no coverage scope' };
   for (const file of [...files].sort(byPath)) {
-    const rel = String(file.path).split('\\').join('/');
+    const rel = String(file.path).replaceAll('\\', '/');
     if (!isTarget(rel)) continue;
     const coverage = asNumber(file.coverage);
     const ok = coverage !== null && coverage >= minPercent;
@@ -144,17 +156,9 @@ export function judgeCoverage(files, { scope = coverageScopeOf(), minPercent }) 
   return result;
 }
 
-/**
- * The dashboard verdict of a whole project (`sonar-local dashboard`): `measures` the project's measures by metric key
- * (bugs, code_smells, vulnerabilities, security_hotspots, security_hotspots_reviewed, duplicated_lines_density, coverage), `files` the per-file
- * coverage of the project (as judgeCoverage takes it), `scope` its coverage scope (coverageScopeOf). It fails unless every
- * issue type of `overall.issues.types` is at `overall.issues.max`, every hotspot is reviewed (a project with no hotspot has
- * none to review), duplication meets its declared maximum, and required coverage meets its per-file threshold. Returns {verdict, numbers, coverage, failures}.
- */
-export function judgeDashboard({ measures = {}, files = [], scope = coverageScopeOf() }, gate) {
-  const o = gate.overall;
+/** The issue, hotspot and duplication measures of the dashboard: their numbers and failures. */
+const measureFailures = (o, measures, numbers) => {
   const failures = [];
-  const numbers = {};
   for (const metric of Object.keys(o.issues.types)) {
     numbers[metric] = asNumber(measures[metric]);
     if (numbers[metric] === null) failures.push(`${metric} is not measured`);
@@ -168,8 +172,14 @@ export function judgeDashboard({ measures = {}, files = [], scope = coverageScop
   numbers[o.duplication.metric] = asNumber(measures[o.duplication.metric]);
   if (numbers[o.duplication.metric] === null) failures.push(`${o.duplication.metric} is not measured`);
   else if (numbers[o.duplication.metric] > o.duplication.maxPercent) failures.push(`${o.duplication.metric} ${numbers[o.duplication.metric]}% > ${o.duplication.maxPercent}%`);
+  return failures;
+};
+
+/** The coverage block of the dashboard verdict: {coverage, failures}. */
+const coverageBlock = (o, files, scope, measures, numbers) => {
   const coverage = o.coverage ? judgeCoverage(files, { scope, minPercent: o.coverage.minPercent })
     : { applied: false, status: 'not-required', files: [], failures: [], note: 'the declared Sonar policy has no coverage condition' };
+  const failures = [];
   if (o.coverage) {
     numbers[o.coverage.metric] = asNumber(measures[o.coverage.metric]);
     if (!coverage.applied) failures.push("the repository declares no sonar.coverage.exclusions: the services' coverage cannot be judged");
@@ -178,7 +188,23 @@ export function judgeDashboard({ measures = {}, files = [], scope = coverageScop
     if (numbers[o.coverage.metric] === null) failures.push(`${o.coverage.metric} is not measured`);
     else if (numbers[o.coverage.metric] < o.coverage.minPercent) failures.push(`${o.coverage.metric} ${numbers[o.coverage.metric]}% < ${o.coverage.minPercent}%`);
   }
-  return { verdict: failures.length ? 'fail' : 'pass', numbers, coverage, failures };
+  return { coverage, failures };
+};
+
+/**
+ * The dashboard verdict of a whole project (`sonar-local dashboard`): `measures` the project's measures by metric key
+ * (bugs, code_smells, vulnerabilities, security_hotspots, security_hotspots_reviewed, duplicated_lines_density, coverage), `files` the per-file
+ * coverage of the project (as judgeCoverage takes it), `scope` its coverage scope (coverageScopeOf). It fails unless every
+ * issue type of `overall.issues.types` is at `overall.issues.max`, every hotspot is reviewed (a project with no hotspot has
+ * none to review), duplication meets its declared maximum, and required coverage meets its per-file threshold. Returns {verdict, numbers, coverage, failures}.
+ */
+export function judgeDashboard({ measures = {}, files = [], scope = coverageScopeOf() }, gate) {
+  const o = gate.overall;
+  const numbers = {};
+  const failures = [...measureFailures(o, measures, numbers)];
+  const block = coverageBlock(o, files, scope, measures, numbers);
+  failures.push(...block.failures);
+  return { verdict: failures.length ? 'fail' : 'pass', numbers, coverage: block.coverage, failures };
 }
 
 /**
