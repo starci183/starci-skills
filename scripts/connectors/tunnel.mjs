@@ -227,9 +227,8 @@ export function superviseTunnel(cf, { port, env = process.env, secretEnv = env, 
 }
 
 /**
- * The one tunnel manager for this host. `start` may be called by every serve-ask at once, and each
- * call used to launch its own manager before the first recorded itself (nine managers, nine
- * cloudflared). A manager claims the host lock 'tunnel' first and refuses while another live
+ * The one tunnel manager for this host. `start` may be called by every serve-ask at once, so
+ * exactly one manager runs. A manager claims the host lock 'tunnel' first and refuses while another live
  * manager holds the lock or owns the connectors row: {ok:false, holder}. Otherwise it supervises
  * cloudflared and returns {ok:true, handle, release}.
  */

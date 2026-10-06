@@ -76,7 +76,7 @@ const seedWorkflow=(repo,wf,{worktree=true}={})=>seed(repo,ledger=>ledger.transa
   ledger.appendEvent({workflowId:wf,entityType:'job',entityId:'job-docs',kind:'op-settled',payload:{verdict:'pass',status:'succeeded'}});
 }));
 /**
- * One op job of the migrated schema: unit -> queued -> ready -> leased -> a contract-bound open
+ * One op job of the current schema: unit -> queued -> ready -> leased -> a contract-bound open
  * attempt -> running (the state starci kernel report / check / settle accept), or further to reported ->
  * succeeded with its result on the attempt when `status` says so. Jobs of one `unitKey` are the
  * tries of one unit: a retry chains retry_of to the failed previous try, a try after a passed one

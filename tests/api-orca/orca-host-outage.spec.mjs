@@ -160,7 +160,7 @@ const createFixture=()=>{
     try{
       ledger.transaction(()=>{
         ledger.db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=?").run(workflowId);
-        // The migrated schema has no 'stopped' status and no result_json: a cleared kernel seat is
+        // The current schema has no 'stopped' status and no result_json: a cleared kernel seat is
         // running -> ready with its worker dropped (releaseKernelJob, engine/db/ledger.mjs) and the
         // result on a job-result event — the pair start-workflow writes on kernel-stale-cleared.
         releaseKernelJob(ledger.db,{workflowId,reason:'kernel-stopped',at});

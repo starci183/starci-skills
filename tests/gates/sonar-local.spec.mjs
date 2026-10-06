@@ -52,9 +52,9 @@ const write=(root,relative,body)=>{
 
 /**
  * The source lines of the fake repository's slice files, as /api/sources/lines answers them: every line of
- * src/app.js, src/new.js and src/legacy.js exists (the fake repository declares no coverage scope, so a line carries no hits).
+ * src/app.js, src/new.js and src/existing.js exists (the fake repository declares no coverage scope, so a line carries no hits).
  */
-const knownSources=({lines={'src/app.js':30,'src/new.js':3,'src/legacy.js':5}}={})=>Object.fromEntries(Object.entries(lines).map(([file,count])=>
+const knownSources=({lines={'src/app.js':30,'src/new.js':3,'src/existing.js':5}}={})=>Object.fromEntries(Object.entries(lines).map(([file,count])=>
   [file,Array.from({length:count},(_,i)=>({line:i+1}))]));
 
 /**
@@ -62,8 +62,8 @@ const knownSources=({lines={'src/app.js':30,'src/new.js':3,'src/legacy.js':5}}={
  * `hotspots` are [{path, line}] of the project; the default ones sit on lines no slice changed (debt).
  */
 async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=knownSources(),tests=[],
-  issues=[{path:'src/legacy.js',line:2,severity:'MAJOR',type:'CODE_SMELL'},{path:'src/app.js',line:2,severity:'MINOR',type:'CODE_SMELL'}],
-  hotspots=[{path:'src/legacy.js',line:3}],duplications={},coverage={},projectMeasures={}}={}){
+  issues=[{path:'src/existing.js',line:2,severity:'MAJOR',type:'CODE_SMELL'},{path:'src/app.js',line:2,severity:'MINOR',type:'CODE_SMELL'}],
+  hotspots=[{path:'src/existing.js',line:3}],duplications={},coverage={},projectMeasures={}}={}){
   const state={coverage,projectMeasures,gateConditions:null,gateName:null,gateSelected:new Map(),newCode:new Map(),duplications:{},projects:new Map(),requests:[],rejectedAnalysisPaths:new Set(),tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,mintValues:[],gate,firstAnalysis,sources,issues,hotspots,tests};
   state.duplications=duplications;
   const fileOf=component=>component.split(':').slice(1).join(':');
@@ -817,7 +817,7 @@ const gitIn=(cwd,...args)=>{
 const numbered=(count,label)=>Array.from({length:count},(_,i)=>`const ${label}${i+1} = ${i+1};`).join('\n')+'\n';
 
 /**
- * A product repository with one base commit (src/legacy.js, a 5-line src/app.js) and a slice on top in
+ * A product repository with one base commit (src/existing.js, a 5-line src/app.js) and a slice on top in
  * the working tree: src/app.js grows to 30 lines (6-30 changed) and src/new.js is added untracked.
  */
 function fakeRepo(root,{scanner=true,specFile=false,services=false}={}){
@@ -825,7 +825,7 @@ function fakeRepo(root,{scanner=true,specFile=false,services=false}={}){
   write(repo,'package.json',JSON.stringify({name:'product-repo',scripts:{'sonar:check':'node scanner.mjs'}}));
   // services: the repository declares the coverage scope the way the managed properties do (the complement of *.service.js is excluded).
   write(repo,'sonar-project.properties',`sonar.projectKey=product-repo\nsonar.host.url=https://sonar.example.invalid\nsonar.sources=src\nsonar.tests=src\nsonar.test.inclusions=**/*.spec.js\n${services?'sonar.javascript.lcov.reportPaths=coverage/lcov.info\nsonar.coverage.exclusions=src/*.js,src/**/*.resolver.js\n':''}`);
-  write(repo,'src/legacy.js',numbered(5,'legacy'));
+  write(repo,'src/existing.js',numbered(5,'existing'));
   write(repo,'src/app.js',numbered(5,'app'));
   // The fake scanner echoes the token (the helper must scrub it) and writes report-task.txt into the
   // work directory it is told to use; it fails like the real one when the host was not overridden.
@@ -856,7 +856,7 @@ const lcovRunner=(calls=[],{write=true,exitCode=0}={})=>Object.assign(({jestCwd,
   if(write){fs.mkdirSync(path.join(jestCwd,'coverage'),{recursive:true});fs.writeFileSync(path.join(jestCwd,'coverage','lcov.info'),files.map(f=>`SF:${f}\nend_of_record`).join('\n'));}
   return {exitCode,error:null};
 },{calls});
-const serviceSources=()=>knownSources({lines:{'src/app.js':30,'src/new.js':3,'src/legacy.js':5,...Object.fromEntries(SERVICE_SLICE.map(file=>[file,4]))}});
+const serviceSources=()=>knownSources({lines:{'src/app.js':30,'src/new.js':3,'src/existing.js':5,...Object.fromEntries(SERVICE_SLICE.map(file=>[file,4]))}});
 
 
 test('two runtime contexts use one canonical local file with actual environment precedence and no copies',async t=>{
@@ -977,7 +977,7 @@ test('analysis token-ref refuses before resolution and help requires no credenti
   let resolutions=0;
   const config={runtimeSecretEnv:()=>{resolutions+=1;throw Error('resolution must not run');}};
   for(const action of ['token','scan','dashboard']){
-    const run=await sonarLocalMain([action,'--token-ref','runtime/files/legacy.key'],{env:{},config});
+    const run=await sonarLocalMain([action,'--token-ref','runtime/files/existing.key'],{env:{},config});
     assert.equal(run.exitCode,2);assert.match(run.text,/administrative provisioning/);assertNoSecret(run,'token-ref refusal');
   }
   const help=await sonarLocalMain(['--help'],{env:{},config});
@@ -1090,7 +1090,7 @@ test('a sops that hangs is stopped at the configured timeout and named in the cu
 
 test('the slice fails on an issue or hotspot it introduced', async t => {
   const root=temporary(t,'slice-fail');
-  const {host}=await fakeSonar(t,{issues:[{path:'src/app.js',line:12,severity:'CRITICAL',type:'BUG'},{path:'src/legacy.js',line:1}],hotspots:[{path:'src/new.js',line:2}]});
+  const {host}=await fakeSonar(t,{issues:[{path:'src/app.js',line:12,severity:'CRITICAL',type:'BUG'},{path:'src/existing.js',line:1}],hotspots:[{path:'src/new.js',line:2}]});
   const custody=fakeCustody(root);
   const {exitCode,report}=await sonarLocalMain(['scan','--cwd',fakeRepo(root),'--wait'],{config:configFor(host,custody)});
   assert.equal(exitCode,1);
@@ -1119,7 +1119,7 @@ test('a slice holding spec (UTS) and source (FIL) files is judged: issues are as
   const {host,state}=await fakeSonar(t,{tests:['src/app.spec.js'],
     issues:[{path:'src/app.js',line:12,severity:'CRITICAL',type:'BUG'},{path:'src/app.spec.js',line:2,severity:'MAJOR',type:'CODE_SMELL'}],
     hotspots:[{path:'src/app.spec.js',line:3}],
-    sources:knownSources({lines:{'src/app.js':30,'src/new.js':3,'src/legacy.js':5,'src/app.spec.js':4}})});
+    sources:knownSources({lines:{'src/app.js':30,'src/new.js':3,'src/existing.js':5,'src/app.spec.js':4}})});
   const custody=fakeCustody(root);
   // Live defect: this slice's scan succeeded, then one mixed-qualifier issues query blocked it.
   const {exitCode,report}=await sonarLocalMain(['scan','--cwd',fakeRepo(root,{specFile:true}),'--wait'],{config:configFor(host,custody)});
@@ -1141,7 +1141,7 @@ test('a slice holding spec (UTS) and source (FIL) files is judged: issues are as
 test('a clean slice mixing spec and source files passes, and a misread qualifier falls back to one key at a time', async t => {
   const root=temporary(t,'qualifiers-pass');
   const {host,state}=await fakeSonar(t,{tests:['src/app.spec.js'],
-    sources:knownSources({lines:{'src/app.js':30,'src/new.js':3,'src/legacy.js':5,'src/app.spec.js':4}})});
+    sources:knownSources({lines:{'src/app.js':30,'src/new.js':3,'src/existing.js':5,'src/app.spec.js':4}})});
   const custody=fakeCustody(root);
   const pass=await sonarLocalMain(['scan','--cwd',fakeRepo(root,{specFile:true}),'--wait'],{config:configFor(host,custody)});
   assert.equal(pass.exitCode,0,JSON.stringify(pass.report));
@@ -1153,7 +1153,7 @@ test('a clean slice mixing spec and source files passes, and a misread qualifier
   const second=await fakeSonar(t,{tests:['src/util.test.js'],
     issues:[{path:'src/util.test.js',line:2,severity:'BLOCKER',type:'BUG'}],
     hotspots:[],
-    sources:knownSources({lines:{'src/app.js':30,'src/new.js':3,'src/legacy.js':5,'src/util.test.js':4}})});
+    sources:knownSources({lines:{'src/app.js':30,'src/new.js':3,'src/existing.js':5,'src/util.test.js':4}})});
   const repo=fakeRepo(root2);
   write(repo,'src/util.test.js',numbered(4,'utiltest'));
   const failed=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(second.host,custody)});
@@ -1474,7 +1474,7 @@ test('duplication on the changed lines fails the slice; lesser issues are listed
 
 test('a duplicated block outside the changed lines or under the small-change floor is not held', async t => {
   const root=temporary(t,'gate-dup-ok');
-  const {host}=await fakeSonar(t,{duplications:{'src/legacy.js':[{from:1,size:5}]}});
+  const {host}=await fakeSonar(t,{duplications:{'src/existing.js':[{from:1,size:5}]}});
   const custody=fakeCustody(root);
   const {exitCode,report}=await sonarLocalMain(['scan','--cwd',fakeRepo(root),'--wait'],{config:configFor(host,custody)});
   assert.equal(exitCode,0,JSON.stringify(report.slice));

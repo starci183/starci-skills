@@ -797,7 +797,7 @@ CREATE VIEW IF NOT EXISTS v_engine_actions AS
 SELECT a.*, COALESCE(m.ui,'unknown') AS ui FROM engine_actions a
 LEFT JOIN ui_state_map m ON m.entity='engine-action' AND m.native=a.state;
 
--- Open SLA clocks (replaces the old sla_clocks table).
+-- Open SLA clocks.
 CREATE VIEW IF NOT EXISTS v_sla_open AS
 SELECT e.*, e.entered_at + e.sla_ms AS due_at,
        CASE WHEN e.violated_at IS NULL THEN 'waiting' WHEN e.severity='critical' THEN 'bad' ELSE 'warn' END AS ui

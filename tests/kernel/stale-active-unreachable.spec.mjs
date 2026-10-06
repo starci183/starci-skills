@@ -87,7 +87,7 @@ const makeFixture=()=>{
   assert.equal(d.status,0,d.stderr||d.stdout);
   const handle=read(db=>{const p=json(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId).payload_json);
     return p.managed?.agentTerminalHandle??p.orca?.agentTerminalHandle??p.hierarchy?.runtime?.terminalHandle;});
-  // Age the dispatch past any launch grace. events are append-only in the migrated schema
+  // Age the dispatch past any launch grace. events are append-only in the current schema
   // (events_append_only trigger), so the backdate suspends the trigger for this one write and
   // restores it verbatim — the ledger ends in the same shape the runtime left it.
   const l=openLedger({file:ledgerFileFor(repo)});

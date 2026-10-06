@@ -53,16 +53,6 @@ AC_NAMING_ASYMMETRY:
   owner: op-retry
   kind: check-finding
 
-AC_UNREMAPPED_REF:
-  title: "Reference uses old criterion id"
-  title_vi: "Tham chiếu còn dùng mã tiêu chí cũ"
-  meaning_vi: "Một nơi vẫn gọi tiêu chí đã gộp bằng mã ac cũ thay vì dạng gọn mới."
-  causes_vi:
-    - "Gộp tiêu chí nhưng chưa cập nhật các chỗ tham chiếu"
-  nextStep_vi: "Đây chỉ là cảnh báo; op sẽ sửa tham chiếu sang dạng cha#mã ở lần chạy sau."
-  owner: op-retry
-  kind: check-finding
-
 AGENT_HEADLESS_LAUNCH:
   title: "Headless agent launch refused"
   title_vi: "Không được tự chạy agent ở chế độ không giao diện"

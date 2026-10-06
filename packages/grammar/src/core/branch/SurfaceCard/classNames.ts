@@ -14,8 +14,7 @@ export type SurfaceCardHeight = "auto" | "fill"
  * Every name below hooks a `.starci-core-*` rule in `src/common/styles.css`. The card, its header
  * and its content region are HeroUI `Card` parts, so the sheet re-states their box in the
  * `starci-grammar-common` layer with `!important` where the vendor's `components` layer sets the
- * same property; the utilities that used to do that only existed where a consumer's Tailwind build
- * scanned this package.
+ * same property.
  */
 
 /** Identifies the outer labelled surface-card anatomy. */
@@ -44,7 +43,7 @@ export const getSurfaceContentClassName = (measure: SurfaceCardMeasure, containe
     surfaceContentClassName,
     contained && (measure === "form" || measure === "formCompact") ? formScrollViewportClassName : undefined,
 )
-/** Anchor the singular legacy continuation highlight at the surface boundary. */
+/** Anchor the singular continuation highlight at the surface boundary. */
 export const surfaceHighlightClassName = cn("starci-core-surface-highlight") ?? "starci-core-surface-highlight"
 /** Decorative sweep layer painted behind the highlighted surface. */
 export const surfaceHighlightSweepClassName = cn("starci-core-surface-highlight-sweep") ?? "starci-core-surface-highlight-sweep"

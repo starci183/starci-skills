@@ -85,7 +85,7 @@ conventions:
   extensions: >-
     New verbs, boolean flags and status fields are FILES, never edits of cli.mjs's shared lists
     (scripts/kernel/api-extensions.mjs): a verb is scripts/kernel/verbs/<verb>.mjs with its contract
-    in modules/cli/commands/kernel/<verb>.yaml (the former commands.<verb> of this file); a status field is
+    in modules/cli/commands/kernel/<verb>.yaml; a status field is
     scripts/kernel/status/<key>.mjs; a boolean flag is a line of scripts/kernel/api-boolean-flags.txt.
     `starci kernel extensions` lists them; check-cli-parity reads both forms
   writes: >-

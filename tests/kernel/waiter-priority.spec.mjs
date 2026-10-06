@@ -51,7 +51,7 @@ const fixture=t=>{
   const status=wf=>ok(['status','--workflow',wf]);
   const enqueue=async(wf,op,paths,extra=[])=>(await ok(['enqueue','--workflow',wf,'--op',op,'--paths',paths,...extra])).job_id;
   // Age an incident's raise (and so its waiters) by `ms`.
-  // events are append-only in the migrated schema (events_append_only trigger): the backdate suspends
+  // events are append-only in the current schema (events_append_only trigger): the backdate suspends
   // the trigger for this one write and restores it verbatim.
   const age=(incidentId,ms)=>seed(l=>l.db.exec(`DROP TRIGGER events_append_only;
     UPDATE events SET created_at=created_at-${Number(ms)} WHERE entity_id='${incidentId}' AND kind='incident-raised';

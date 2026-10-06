@@ -121,8 +121,8 @@ test('a verified owner answer backs the claim; a kernel resolution without owner
 test('the audit lists a past resolution whose owner claim no answer backs, and starci kernel status flags a not-owner owner-gate',t=>{
   const repo=world(t);
   answerAsk(repo,'ctx_owner000002');
-  const fakeId=raise(repo,'foreign-file-committed','legacy');
-  const provenId=raise(repo,'foreign-file-committed','legacy proven');
+  const fakeId=raise(repo,'foreign-file-committed','seeded');
+  const provenId=raise(repo,'foreign-file-committed','seeded proven');
   // History as the old runtime wrote it: free text, no resolver, no answer.
   const l=openLedger({file:ledgerFileFor(repo)});
   try{

@@ -249,7 +249,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   const settleOwed = [...new Set(reports.filter((report) => report.consumed_at && report.job_id).filter((report) => {
     const row = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(report.job_id);
     // A filed report moves its job to reported (starci kernel report); a job still running/answering has a
-    // report filed on it by settle's fallback or an older path.
+    // report filed on it by settle's fallback.
     return row && ['running', 'answering', 'reported'].includes(row.status);
   }).map((report) => report.job_id))];
   // A settle the Kernel deliberately defers behind a recorded wait is not work it can do: an open

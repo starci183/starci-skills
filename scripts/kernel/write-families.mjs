@@ -3,7 +3,7 @@
 // Measured since 2026-09-27T05:50Z (the *mujek* restart workflows), most business.decide and
 // architecture.decide failures were one refusal the worker could only discover after launch: the Kernel
 // dispatched the op onto a node of another family - business.decide onto integration/ (sn-learn-content
-// a1, a2), impl/ + src/ (sn-subscription a1, a2) and records under the since-retired architecture/ grouping folder (modules-agentos a1);
+// a1, a2), impl/ + src/ (sn-subscription a1, a2) and records under the architecture/ grouping folder (modules-agentos a1);
 // architecture.decide onto journey/ (collab a1). Each worker read the brief, found its `writes` could
 // not touch any granted path, and reported blocked kind authority - an LLM attempt spent to learn what
 // the manifest already says.

@@ -87,9 +87,7 @@ sections:
         self-invalidating proof."
       - Source code remains in bound repositories; `impl` records track the requirements they prove,
         exact source ownership and completion.
-      - node.yaml and Markdown node files remain readable; exactly one node file
-        per work folder. New and edited canonical nodes use index.yaml. Do not automatically migrate
-        unrelated user Work.
+      - Exactly one index.yaml node file per work folder.
   - title: Mandatory lifecycle gates
     blocks:
       - "The owner gates are the StarCi entry's scope-bound approvals and the settle-time evidence

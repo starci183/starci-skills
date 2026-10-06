@@ -1,7 +1,7 @@
 # HFS slot manifest (owner-approved 2026-09-29, decisions 1-10 in the owner decisions record).
 # The one place that says what may exist in a StarCi product repository and where. A product is ONE app repository
 # (hfs 4, manifest major 2): the app root holds the one package.json, lockfile and node_modules, the hfs.json of kind app,
-# the CI, the hooks and .starciwork (slots of profile `app`); `be/` and `fe/` are its two sides, each laid out as the old
+# the CI, the hooks and .starciwork (slots of profile `app`); `be/` and `fe/` are its two sides, each laid out as a
 # standalone repository root (slots of profile be or fe, paths relative to the side folder). Every tracked path of every
 # repository must match exactly one slot. Checks, lint factories, the architecture machine, templates and the why
 # catalog READ this file through scripts/hfs/slots.mjs; none of them hardcodes a path.
@@ -696,7 +696,7 @@ slots:
     goesTo: "a be feature: webhooks/<provider> for a third-party callback, api for an endpoint, a cli command on a schedule (pg_cron / pg_net)"
     since: 2.1.0
 
-  # ----- side root (both sides): what the old standalone repository root held, less the app-root files ----------
+  # ----- side root (both sides): what a standalone repository root holds, less the app-root files ----------
   - id: repo.side-root-forbidden
     profiles: [be, fe]
     path: "{package.json,package-lock.json,hfs.json,README.md,.gitignore,.gitattributes,.husky/,.github/,.starciwork/,.starcistacks/,supabase/,.sops.yaml,sonar-project.properties,codecov.yml,.prettierrc,.prettierignore,scripts/}"

@@ -91,7 +91,7 @@ export type SurfaceCardProps = (LabelledSurfaceCard | SelfNamedSurfaceCard) & (P
     readonly measure?: SurfaceCardMeasure
     /** Let a peer grid stretch the complete surface anatomy without consumer descendant selectors. */
     readonly height?: SurfaceCardHeight
-    /** Draw one legacy accent sweep behind this surface; use for one featured card only. */
+    /** Draw one accent sweep behind this surface; use for one featured card only. */
     readonly isHighlight?: boolean
 }
 

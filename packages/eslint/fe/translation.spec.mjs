@@ -4,8 +4,8 @@
  *   node --test translation.spec.mjs
  *
  * The cases that earn their place are the ones that separate a SENTENCE from a TOKEN in an object or
- * a generic prop (`"sm"` is a size, `"Search courses"` is copy), and the ones where a block used to
- * be exempt and the pragma used to excuse a literal.
+ * a generic prop (`"sm"` is a size, `"Search courses"` is copy), and the ones where a block is
+ * not exempt and no pragma excuses a literal.
  */
 import assert from "node:assert/strict"
 import test from "node:test"

@@ -35,12 +35,12 @@ test('both rendered app editions have a root catalog with a real feature node an
 
 test('upgrading an older lite app adds those exact canonical Work seeds and passes hygiene', async (t) => {
   const into = mkdtemp(t, 'hfs-work-upgrade-');
-  const { root } = scaffold(into, 'legacy-lite', 'lite');
-  for (const seed of scaffoldWorkSeeds('legacy-lite')) fs.rmSync(path.join(root, seed.path));
+  const { root } = scaffold(into, 'reseed-lite', 'lite');
+  for (const seed of scaffoldWorkSeeds('reseed-lite')) fs.rmSync(path.join(root, seed.path));
   const plan = await upgradeEdition({ root, to: 'full', plan: true, presets: PRESETS });
-  for (const seed of scaffoldWorkSeeds('legacy-lite')) assert.ok(plan.some((step) => step.path === seed.path));
+  for (const seed of scaffoldWorkSeeds('reseed-lite')) assert.ok(plan.some((step) => step.path === seed.path));
   await upgradeEdition({ root, to: 'full', presets: PRESETS, prettier: FORMATTED, lock });
-  for (const seed of scaffoldWorkSeeds('legacy-lite')) assert.equal(fs.readFileSync(path.join(root, seed.path), 'utf8'), seed.content);
+  for (const seed of scaffoldWorkSeeds('reseed-lite')) assert.equal(fs.readFileSync(path.join(root, seed.path), 'utf8'), seed.content);
   hygiene(root);
 });
 

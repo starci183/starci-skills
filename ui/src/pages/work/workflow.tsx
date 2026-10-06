@@ -90,12 +90,12 @@ function UnitDetail({ project, wf, selected, state, graphMode }: { readonly proj
     </>}</div>;
 }
 
-function UnitsTab({ project, wf, graph, legacyGraph }: { readonly project: string; readonly wf: string; readonly graph: QuerySnapshot<WorkGraph>; readonly legacyGraph: boolean }) {
+function UnitsTab({ project, wf, graph, graphTab }: { readonly project: string; readonly wf: string; readonly graph: QuerySnapshot<WorkGraph>; readonly graphTab: boolean }) {
   const state = query().get('state');
   const url = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/units?limit=200${state ? `&state=${encodeURIComponent(state)}` : ''}`;
   const units = usePagedApiQuery<UnitRow>(url, { topics: [`wf:${project}:${wf}`, 'system'], intervalMs: 20_000, getKey: unit => `${unit.workflowId}:${unit.unit}` });
   const selected = query().get('unit');
-  const graphMode = legacyGraph || query().get('view') === 'graph';
+  const graphMode = graphTab || query().get('view') === 'graph';
   const href = (unit: string | null, filter = state, view = graphMode) => {
     const params = query(); params.set('tab', 'units'); params.delete('unit'); params.delete('state'); params.delete('view');
     if (unit) params.set('unit', unit); if (filter) params.set('state', filter); if (view) params.set('view', 'graph');
@@ -223,7 +223,7 @@ export function WorkflowPage({ project, wf, tab = 'units' }: { readonly project:
     {selectedLeg && pipe && <LegDrawer project={project} wf={wf} leg={selectedLeg} pipeline={pipe} onClose={() => withLeg(null)} />}
     <StaggerItem><nav aria-label={t('Workflow content')} className="flex gap-1 overflow-x-auto border-b pb-2">{tabs.map(item => <a key={item.id} href={`${rootHref(project, wf)}?tab=${item.id}${legOp ? `&leg=${encodeURIComponent(legOp)}` : ''}`} data-concept={item.concept} aria-current={tabActive(item.id) ? 'page' : undefined} className={`shrink-0 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring ${tabActive(item.id) ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}>{item.label}{item.id === 'units' && ` ${row.units.total}`}{item.id === 'attempts' && pipe && ` ${pipe.attempts}`}</a>)}</nav></StaggerItem>
     <StaggerItem><div id="workflow-tab-panel" className="scroll-mt-4">
-      {(tab === 'units' || tab === 'graph') && <UnitsTab key={`${project}:${wf}`} project={project} wf={wf} graph={graph} legacyGraph={tab === 'graph'} />}
+      {(tab === 'units' || tab === 'graph') && <UnitsTab key={`${project}:${wf}`} project={project} wf={wf} graph={graph} graphTab={tab === 'graph'} />}
       {tab === 'attempts' && <AttemptsTab project={project} wf={wf} />}
       {tab === 'decisions' && <DecisionsTab project={project} wf={wf} />}
       {tab === 'why' && <WhyTab project={project} wf={wf} />}

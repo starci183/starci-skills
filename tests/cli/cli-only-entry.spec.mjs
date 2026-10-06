@@ -66,8 +66,8 @@ test('direct node calls to catalog and internal entries have failing and passing
 
 test('npm run wrappers around entries fail while a starci-backed script and invocation pass', () => {
   const bad = scan({
-    'package.json': JSON.stringify({ scripts: { legacy: 'node scripts/private.mjs' } }),
-    'docs/actions.md': 'npm run legacy\n',
+    'package.json': JSON.stringify({ scripts: { stale: 'node scripts/private.mjs' } }),
+    'docs/actions.md': 'npm run stale\n',
   });
   assert.ok(bad.findings.some((finding) => finding.kind === 'node' && finding.file === 'package.json'), JSON.stringify(bad.findings));
   assert.ok(bad.findings.some((finding) => finding.kind === 'npm-run' && finding.file === 'docs/actions.md'), JSON.stringify(bad.findings));

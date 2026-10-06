@@ -19,7 +19,7 @@ import { fileOf, isComponentFile, isProductSource, kindOfFile, roleOfFile } from
 /** The one module allowed to name a glyph from a library: the entry of the leaf owner named `Icon`. */
 const ICON_LEAF = { kind: "leaves", owner: "Icon" }
 
-/** Repeated goal / metric cells are text-led in the legacy reference: the entry of the composite owner named `LabelledProgressRow`. */
+/** Repeated goal / metric cells are text-led in the reference: the entry of the composite owner named `LabelledProgressRow`. */
 const LABELLED_PROGRESS_ROW = { kind: "composites", owner: "LabelledProgressRow" }
 
 /**
@@ -169,7 +169,7 @@ export const noDecorativeIconInMetricCell = {
     schema: [],
     messages: {
       decorative:
-        "`LabelledProgressRow` is a repeated metric cell, not a feature entry. Its legacy reference is text-led, so an `Icon` here invents emphasis and repeats glyph meanings across the grid. Keep the label and figure; reserve tiny glyphs for generic state or action semantics actually present in the reference.",
+        "`LabelledProgressRow` is a repeated metric cell, not a feature entry. Its reference is text-led, so an `Icon` here invents emphasis and repeats glyph meanings across the grid. Keep the label and figure; reserve tiny glyphs for generic state or action semantics actually present in the reference.",
     },
   },
   create(context) {

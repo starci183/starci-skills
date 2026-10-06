@@ -148,7 +148,7 @@ test('every workflow with running peers declares its foundations before its firs
   // Once one workflow declares, the ledger plans foundations: a new undeclared workflow is refused.
   // (A registered foundation flips the ledger into planning; a bare --declare-none is recorded in
   // foundation_declarations but the duty gate's 'foundation-declared' signal probe is dead code -
-  // the migrated signals CHECK refuses that scope, so only a foundations row plans. RUNTIME-BUG.)
+  // the signals CHECK refuses that scope, so only a foundations row plans. RUNTIME-BUG.)
   fx.foundation(AUTH,'--claim','layout-tree','--kind','layout-tree','--detail','auth owns the shared shell');
   const refusal=fx.refused(['enqueue','--workflow',MOD,'--op','docs.author','--paths','docs/b'],'foundations-undeclared');
   assert.match(refusal.detail,/starci kernel foundation --claim/);

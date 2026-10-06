@@ -235,10 +235,9 @@ describe("Shipped Offset Pop rules land on rendered Common hooks", () => {
     })
 
     /*
-     * The row treatment used to be `[data-grammar-row]:has(:is(a, button):hover)` and
-     * `[data-grammar-row]:focus-within`, which no Common row could reach: StaticStateRow (the only
+     * No Common row holds a link or button inside a `data-grammar-row`: StaticStateRow (the only
      * `data-grammar-row` emitter) renders strings, and a ListBox option (`role="option"`) may not hold
-     * a link or button. Both were deleted; the rows that ARE interactive carry the treatment below.
+     * a link or button. The rows that ARE interactive carry the treatment below.
      * This renders them, drives each state for real (select, pointer hover, keyboard focus) and
      * proves every interactive-row selector the family ships lands on a live row.
      */

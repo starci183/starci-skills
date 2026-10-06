@@ -41,7 +41,7 @@ const ownerDi = (ledger, workflowId, key, extra = {}) => openDecisionRow(ledger,
 
 test('an owner DI on an ended workflow yields no ownerWaits line; one on a running workflow still does', async (t) => {
   const { repo, ledger, env } = repoWithLedger(t);
-  // The pre-close shape: the phase flips with the owner DI still open, locked forever (events_refuse_archived).
+  // The phase flips with the owner DI still open, locked forever (events_refuse_archived).
   ownerDi(ledger, WF_ARCH, 'worker-question:wf-owner-arch');
   ownerDi(ledger, WF_FIN, 'worker-question:wf-owner-fin');
   const run = ownerDi(ledger, WF_RUN, 'worker-question:wf-owner-run');

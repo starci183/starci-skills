@@ -1867,7 +1867,7 @@
     .starci-core-subnav[data-grammar-subnav-position="sticky"] {
         position: sticky;
         z-index: var(--starci-core-subnav-z, 40);
-        /* The band's own published height, so a stacked Subnav no longer needs a consumer's calc. */
+        /* The band's own published height, so a stacked Subnav needs no consumer calc. */
         top: var(--starci-core-subnav-offset, var(--starci-core-band-height, 4rem));
         backface-visibility: hidden;
         transform: translateZ(0);
@@ -1899,8 +1899,7 @@
     /*
      * The toggle is a HeroUI `Button`, whose own fill, corner and shadow live in the vendor's
      * `components` layer - declared after `starci-grammar-common`, so it wins every normal
-     * declaration here regardless of specificity. These are the ones the utilities used to carry,
-     * so they are the ones that have to be important - the 2.75rem target included, because the
+     * declaration here regardless of specificity. These are the declarations that have to be important - the 2.75rem target included, because the
      * vendor sizes its own button and a consumer was re-forcing `size-11` to get the target back.
      */
     .starci-core-subnav-toggle {
@@ -2131,18 +2130,15 @@
     /*
      * Sidebar geometry is SHIPPED, not generated.
      *
-     * Every rule below used to be a Tailwind utility string in the component's JSX, which means a
-     * consumer only saw a sidebar if its own Tailwind build happened to scan
-     * `node_modules/@starci/grammar`. One that scans only its own source got no separator, no rail
-     * width and square items - and `rounded-large` emitted nothing anywhere, because the theme's
-     * radius ramp is `--radius-*`, not a HeroUI v2 name. A composition object owns its layout in
-     * this stylesheet; the JSX carries class names and state attributes only.
+     * A utility string in the component's JSX only works where the consumer's own Tailwind build
+     * scans `node_modules/@starci/grammar`, so a composition object owns its layout in this
+     * stylesheet; the JSX carries class names and state attributes only.
      *
      * `!important` appears exactly where HeroUI's own `.list-box`, `.list-box-item`,
      * `.list-box-section` and `.header` rules set the same property. Those live in the vendor's
      * `components` layer, which is declared after `starci-grammar-common` and therefore wins every
      * normal declaration regardless of specificity; an important declaration in the earlier layer
-     * is the only thing that keeps the geometry the utilities used to produce.
+     * is the only thing that keeps the geometry.
      */
     .starci-core-sidebar {
         display: flex;
@@ -2518,10 +2514,9 @@
      * SHIPPED OBJECT GEOMETRY (0.4.4)
      * ============================================================================================
      *
-     * Everything below used to be a Tailwind utility string inside a Grammar component or its
-     * `classNames.ts`. A class only exists if the CONSUMER's Tailwind build scanned the file that
-     * spells it, and almost nobody scans `node_modules/@starci/grammar` - so those objects arrived
-     * in a consuming app with no box at all. The utilities are gone; the box lives here, selected
+     * A utility class only exists if the CONSUMER's Tailwind build scanned the file that
+     * spells it, and almost nobody scans `node_modules/@starci/grammar`, so a Grammar object's box
+     * lives here, selected
      * by the data attributes each component already emits.
      *
      * `!important` appears ONLY where the class lands on a HeroUI part - `Card`, `Accordion`,
@@ -2796,9 +2791,7 @@
      * --- Input ---
      *
      * The reveal toggle sits on top of the control, so the field RESERVES room for it rather than
-     * letting the value slide underneath. That inset used to be spelled `pr-9`, a utility no app in
-     * this repository writes, so it was generated nowhere and the toggle overlapped the text at
-     * every width.
+     * letting the value slide underneath, at every width.
      */
     .starci-core-input {
         display: grid !important;

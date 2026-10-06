@@ -169,7 +169,7 @@ test("no mutable state at module scope", () => {
         invalid: [
             { filename: MODULE, code: "let counter = 0", errors: [{ messageId: "mutable" }] },
             { filename: MODULE, code: "export let cache = new Map()", errors: [{ messageId: "mutable" }] },
-            { filename: MODULE, code: "var legacy = 1", errors: [{ messageId: "mutable" }] },
+            { filename: MODULE, code: "var counter = 1", errors: [{ messageId: "mutable" }] },
             { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: "let shared = 1", errors: [{ messageId: "mutable" }] },
         ],
     })

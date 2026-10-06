@@ -297,9 +297,9 @@ scenario('a contract without recorded digests never reports stale input and leav
   const fx=fixture(t);
   fx.write(RULES,'rules: v1\n');
   withLedger(fx,ledger=>{
-    settledRow(ledger,{jobId:'job-legacy',attempt:1});
-    settledRow(ledger,{jobId:'job-legacy-null',opId:'docs.author',attempt:1});
-    ledger.db.prepare("UPDATE contracts SET context_json=NULL WHERE job_id='job-legacy-null'").run();
+    settledRow(ledger,{jobId:'job-digest-free',attempt:1});
+    settledRow(ledger,{jobId:'job-digest-null',opId:'docs.author',attempt:1});
+    ledger.db.prepare("UPDATE contracts SET context_json=NULL WHERE job_id='job-digest-null'").run();
     holdEngaged(ledger);
   });
   const before=await status(fx);
@@ -426,17 +426,17 @@ scenario('cut: Work-stale slices list their ordinals; while the seam redo is ope
 
 /* ------------------------------------------ an existing ledger, as main left it */
 
-// Current migrated ledger with contracts written before input digests were recorded.
-const legacyLedger=file=>{
+// A current ledger whose contracts carry no input digests.
+const digestFreeLedger=file=>{
   const ledger=openLedger({file});
   try{
     const at=Date.now();
-    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running',job:'legacy'},now:at,jobs:[
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running',job:'digest-free'},now:at,jobs:[
       {jobId:'job-old-1',opId:OP,status:'succeeded',dispatchId:'job-old-1',payload:{opId:OP,owned_paths:['src/job-old-1/']}},
       {jobId:'job-old-2',opId:'docs.author',status:'succeeded',dispatchId:'job-old-2',payload:{opId:'docs.author',owned_paths:['src/job-old-2/']}},
     ]});
     const pending=usageOfWorkflow(ledger.db,WORKFLOW);
-    assert.deepEqual([pending.coverage.attempts,pending.coverage.measured,pending.coverage.pending,pending.coverage.unavailable,pending.coverage.open],[2,0,2,0,0],'completed legacy fixture attempts start with genuinely unknown usage');
+    assert.deepEqual([pending.coverage.attempts,pending.coverage.measured,pending.coverage.pending,pending.coverage.unavailable,pending.coverage.open],[2,0,2,0,0],'completed digest-free fixture attempts start with genuinely unknown usage');
     for(const row of ledger.db.prepare('SELECT attempt_id,job_id,op_id FROM op_attempts WHERE workflow_id=?').all(WORKFLOW)){
       ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
         .run(row.attempt_id,WORKFLOW,row.job_id,'# contract',JSON.stringify({packet:{op:row.op_id},worktree:'.',model:'devin-agent'}),at);
@@ -468,11 +468,11 @@ const openRace=(file,root,env)=>new Promise(resolve=>{
   child.on('close',status=>resolve({status,out,err}));
 });
 
-scenario('an existing ledger: no schema change, legacy rows never stale, new dispatches record digests, concurrent opens succeed',async t=>{
+scenario('an existing ledger: no schema change, digest-free rows never stale, new dispatches record digests, concurrent opens succeed',async t=>{
   const fx=fixture(t);
   fx.write(RULES,'rules: v1\n');
   const file=ledgerFileFor(fx.repo,{env:fx.env});
-  legacyLedger(file);
+  digestFreeLedger(file);
   const pristine=schemaOf(file);
 
   withLedger(fx,ledger=>holdEngaged(ledger));
@@ -480,13 +480,13 @@ scenario('an existing ledger: no schema change, legacy rows never stale, new dis
   assert.deepEqual(before.staleInput,[]);
   fx.write(RULES,'rules: v2\n');
   const after=await status(fx);
-  assert.deepEqual(after.staleInput,[],'a legacy contract row carries no digests and is never stale');
+  assert.deepEqual(after.staleInput,[],'a digest-free contract row is never stale');
   assert.equal(after.frontier.actionable,before.frontier.actionable);
   assert.equal(after.frontier.actionable,false);
 
   withLedger(fx,ledger=>{
-    // The synthetic running row has served the legacy frontier assertions; release its side before new admission.
-    ledger.write.setJobStatus({jobId:'job-engaged',to:'cancelled',reason:'legacy-fixture-complete'});
+    // The synthetic running row has served the digest-free frontier assertions; release its side before new admission.
+    ledger.write.setJobStatus({jobId:'job-engaged',to:'cancelled',reason:'fixture-complete'});
     assert.equal(ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get('job-engaged').status,'cancelled');
     ledger.write.createUnit({workflowId:WORKFLOW,unitId:'job-new',opId:OP,subjectKey:'job-new',goalRevision:1});
     enqueueSeed(ledger,{jobId:'job-new',workflowId:WORKFLOW,unitId:'job-new',opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/new/'],model:'devin-agent'}});
@@ -503,5 +503,5 @@ scenario('an existing ledger: no schema change, legacy rows never stale, new dis
   const reopenedSchema=schemaOf(file);
   assert.equal(reopenedSchema.version,pristine.version,'user_version is unchanged');
   assert.deepEqual(reopenedSchema.contracts,pristine.contracts,'contracts gains no column: digests ride in context_json');
-  assert.deepEqual(reopenedSchema.ddl,pristine.ddl,'opening with this code applies no migration');
+  assert.deepEqual(reopenedSchema.ddl,pristine.ddl,'opening with this code changes no schema');
 });

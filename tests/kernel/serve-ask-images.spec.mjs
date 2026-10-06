@@ -51,7 +51,7 @@ test('an ask serves each draw\'s part, not its composite; a declared pick on the
     const composite = put(`${UI}/assets/directions/offer--page--desktop--light.png`);
     const part = put(`${UI}/assets/directions/offer--page--desktop--light.content.png`);
     const mobile = put(`${UI}/assets/directions/offer--page--mobile--light.content.png`);
-    const legacy = put(`${UI}/assets/checkout.png`);
+    const plain = put(`${UI}/assets/checkout.png`);
     put(`${UI}/evidence/round-6/draws.yaml`, [
       'schema: starci/ui-draws@1', 'draws:',
       '  - id: offer-desktop', '    part:', '      path: assets/directions/offer--page--desktop--light.png', '      sha256: aa',
@@ -59,7 +59,7 @@ test('an ask serves each draw\'s part, not its composite; a declared pick on the
       '    composite: {path: assets/directions/offer--page--mobile--light.png}',
       '  - id: checkout', '    part: assets/checkout.png', ''].join('\n'));
     const fromDraws = toOwnerImages(reportImages([`${UI}/evidence/round-6/draws.yaml`], repo), repo);
-    assert.deepEqual(fromDraws.map((i) => [i.label, i.abs]), [['offer-desktop', part], ['offer-mobile', mobile], ['checkout', legacy]]);
+    assert.deepEqual(fromDraws.map((i) => [i.label, i.abs]), [['offer-desktop', part], ['offer-mobile', mobile], ['checkout', plain]]);
     // An ask that names the composite itself (question.assets, the question text or report files) is swapped.
     const named = toOwnerImages([{ label: `${UI}/assets/directions/offer--page--desktop--light.png`, abs: composite }, { label: 'part', abs: part }], repo);
     assert.equal(named.length, 1, 'a composite listed beside its own part collapses into one image');

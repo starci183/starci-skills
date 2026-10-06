@@ -602,12 +602,12 @@ test('unrecognized encrypted custody and a foreign nonempty target hold without 
   }
 });
 
-test('attempted, unknown, malformed and legacy installed custody never become a new generation request', t => {
-  for (const state of ['attempted', 'unknown', 'malformed', 'legacy', 'complete-missing']) {
+test('attempted, unknown, malformed and absent installed custody never become a new generation request', t => {
+  for (const state of ['attempted', 'unknown', 'malformed', 'absent', 'complete-missing']) {
     const fx = initialAgeFixture(t);
     init({ dir: fx.repo, bootstrap: false }, () => {});
     const file = path.join(fx.target, '.starci-skills.json'), manifest = JSON.parse(fs.readFileSync(file));
-    if (state !== 'legacy') manifest.initialAgeSetup = state === 'malformed' ? { state: 'complete' }
+    if (state !== 'absent') manifest.initialAgeSetup = state === 'malformed' ? { state: 'complete' }
       : { schema: 'starci/initial-age-setup@1', state: state === 'complete-missing' ? 'complete' : state };
     fs.writeFileSync(file, JSON.stringify(manifest));
     const before = fs.readFileSync(file);

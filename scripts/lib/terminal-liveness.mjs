@@ -530,9 +530,8 @@ const occurrences = (haystack, needle) => {
 
 /**
  * What the screen proves about a wake just typed into a provider terminal. Orca answers
- * agent_prompt_stalled when the agent queued the text behind a running turn, and nudge used to
- * call that terminal-send-failed while the wake sat on the worker's screen (inc-b87a42ec8690,
- * inc-e4f69f9ef061, inc-13ab4be5059f). `before`/`after` are the frames read around the send.
+ * agent_prompt_stalled when the agent queued the text behind a running turn, which is not a
+ * terminal-send-failed: the wake sits on the worker's screen. `before`/`after` are the frames read around the send.
  * Returns {delivery, wakeVisible, queuedMarker, screenState}; delivery is
  *  - 'staged': the frame is staged-input (the wake sits unsubmitted in the input row);
  *  - 'queued': a queued-message marker the frame before did not show, or one beside the wake text;

@@ -128,7 +128,7 @@ describe("Shipped Core geometry keeps its data-contract claims", () => {
     })
 })
 
-describe("Shipped Core geometry replaces the utilities it used to spell", () => {
+describe("Shipped Core geometry", () => {
     it("draws every converted object's own rule instead of a consumer's Tailwind build", () => {
         for (const selector of [
             ".starci-core-empty-notice",

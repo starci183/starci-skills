@@ -78,7 +78,7 @@ test('layout, dependency, hook ownership and connected-block pair checks resolve
     'apps/web/src/components/leaves/BadUiLeaf/index.tsx':'import {useBadScroll} from "@/hooks/ui/use-bad-scroll";export const BadUiLeaf=()=>{const value=useBadScroll();return <span>{value}</span>};',
     'apps/web/src/components/leaves/DynamicUiLeaf/index.tsx':'import {useDynamicScroll} from "@/hooks/ui/use-dynamic-scroll";export const DynamicUiLeaf=()=>{const value=useDynamicScroll();return <span>{String(value)}</span>};',
     'apps/web/src/components/leaves/Intrinsic/index.tsx':'import {useRef} from "react";const intrinsic=()=>useRef(null);export {intrinsic as useAutoScroll};',
-    'apps/web/src/components/pages/Legacy/index.tsx':'export const Legacy=()=> <main/>;',
+    'apps/web/src/components/pages/Archive/index.tsx':'export const Archive=()=> <main/>;',
     'apps/web/src/modules/catalog/types.ts':'import {useCatalog} from "@/hooks";export type CatalogValue=ReturnType<typeof useCatalog>;',
     'apps/web/src/hooks/ui/use-bad-scroll.ts':'import {readCatalog} from "@/modules/catalog/read-catalog";export const useBadScroll=()=>readCatalog();',
     'apps/web/src/hooks/ui/use-dynamic-scroll.ts':'import {useEffect} from "react";export const useDynamicScroll=()=>{useEffect(()=>{void import("@/modules/catalog/read-catalog")},[]);return null};',

@@ -98,7 +98,7 @@ provenance:
     - path: "packages/grammar/src/common/registry.tsx"
       sha256: "fad9ade65a1c07ed78d60ae5d84dec9ec4fba713788de69b63312b4d4db40d20"
     - path: "packages/grammar/src/common/styles.css"
-      sha256: "a4c5f0845eb235ae5012b98a6bcc41323bc658a61327f56562bca18fc9244636"
+      sha256: "8009f034e7737d039552467de0b5ab0bfb88b924252629c423f50cfff28eda64"
     - path: "packages/grammar/src/common/components-forms.css"
       sha256: "040d8eaf37ec3339f66d36ac6e1f5ff6a5818a95a68091b40509a642cf0a6229"
     - path: "packages/grammar/src/common/components-overlays.css"
@@ -110,7 +110,7 @@ provenance:
     - path: "packages/grammar/src/common/state.ts"
       sha256: "367ff5ff3d2414a40962bb2908d26a0261178cfbe61ce87e0c6132ee957ce188"
     - path: "packages/grammar/src/common/conformance.ts"
-      sha256: "38f05a8490cf44b00965b8ac50cf629dfaa806979e1c238fa1c52b2a1ea0959f"
+      sha256: "db30b77ca7ea36469e8eac8f05adc08f5e51c19020a42a14c9f0ae8b5a3906b7"
     - path: "packages/grammar/src/common/rule-catalog.generated.ts"
       sha256: "5bdee2105eb112e6b74c051bc92e24b83fd721608023be38701487528e8a0c99"
     - path: "packages/grammar/src/core/overlayScope.tsx"
@@ -607,13 +607,13 @@ tokens:
     readBy: "common"
     commonFallback: "var(--radius, 0.5rem)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2750"
+    source: "packages/grammar/src/common/styles.css:2745"
   - name: "--radius-md"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "calc(var(--radius, 0.5rem) * 0.75)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2851"
+    source: "packages/grammar/src/common/styles.css:2844"
   - name: "--radius-sm"
     assignedBy: "host"
     readBy: "common"
@@ -625,7 +625,7 @@ tokens:
     readBy: "common"
     commonFallback: "calc(var(--radius, 0.5rem) * 1.5)"
     uses: 3
-    source: "packages/grammar/src/common/styles.css:2241"
+    source: "packages/grammar/src/common/styles.css:2237"
   - name: "--scrollbar-color"
     value: "var(--scrollbar-thumb) var(--scrollbar-track)"
     assignedBy: "common"
@@ -850,7 +850,7 @@ tokens:
     readBy: "common"
     commonFallback: "999px"
     uses: 5
-    source: "packages/grammar/src/common/styles.css:2253"
+    source: "packages/grammar/src/common/styles.css:2249"
   - name: "--starci-core-rail-collapsed"
     assignedBy: "family"
     readBy: "common"
@@ -921,13 +921,13 @@ tokens:
     readBy: "common"
     commonFallback: "4rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2169"
+    source: "packages/grammar/src/common/styles.css:2165"
   - name: "--starci-core-sidebar-width"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "16rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2162"
+    source: "packages/grammar/src/common/styles.css:2158"
   - name: "--starci-core-subnav-offset"
     assignedBy: "family"
     readBy: "common"
@@ -993,43 +993,43 @@ tokens:
     readBy: "common"
     commonFallback: "1rem"
     uses: 4
-    source: "packages/grammar/src/common/styles.css:2123"
+    source: "packages/grammar/src/common/styles.css:2122"
   - name: "--starci-core-workspace-floating-max"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "22rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2125"
+    source: "packages/grammar/src/common/styles.css:2124"
   - name: "--starci-core-workspace-floating-z"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "40"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2122"
+    source: "packages/grammar/src/common/styles.css:2121"
   - name: "--starci-core-workspace-leading-seam"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "2rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2078"
+    source: "packages/grammar/src/common/styles.css:2077"
   - name: "--starci-core-workspace-navigation-track"
     value: "minmax(14rem, var(--starci-core-workspace-navigation-width, 18rem))"
     valueRules: 2
     assignedBy: "common"
     alsoReadBy: 4
-    source: "packages/grammar/src/common/styles.css:1995"
+    source: "packages/grammar/src/common/styles.css:1994"
   - name: "--starci-core-workspace-navigation-width"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "18rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1995"
+    source: "packages/grammar/src/common/styles.css:1994"
   - name: "--starci-core-workspace-rail-track"
     value: "minmax(16rem, var(--starci-core-rail-standard, 20rem))"
     valueRules: 3
     assignedBy: "common"
     alsoReadBy: 4
-    source: "packages/grammar/src/common/styles.css:1996"
+    source: "packages/grammar/src/common/styles.css:1995"
   - name: "--success"
     value: "oklch(73.29% 0.1935 150.81)"
     valueRules: 2

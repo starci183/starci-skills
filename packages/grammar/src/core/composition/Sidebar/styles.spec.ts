@@ -48,10 +48,7 @@ const hasProperty = (declarations: ReadonlyArray<Declaration>, ...propertyPrefix
 /**
  * A `data-contract` claim is a promise about the paint, so the sheet has to keep it.
  *
- * Sidebar used to make these claims while its geometry lived in JSX utility strings, which meant
- * the claims were only true where a consumer's Tailwind build happened to scan the package. This
- * is the same check 0.4.1 applied to the other Core objects: every id the component emits must be
- * backed by a declaration on the class that carries it.
+ * Every id the component emits must be backed by a declaration on the class that carries it.
  */
 const backsClaim = (claim: string, declarations: ReadonlyArray<Declaration>): boolean => {
     const [family = "", step = ""] = claim.split(/-(?=\d+$)/)

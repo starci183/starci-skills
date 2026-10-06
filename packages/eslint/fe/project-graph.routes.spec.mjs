@@ -325,8 +325,8 @@ test("route-files-thin: a route file mounts one feature and draws nothing, and h
 })
 
 test("route-files-thin: a route file that mounts its feature through the app's `@/` alias mounts one owner", (t) => {
-    // The former false positive: the side root tsconfig.json (no paths) also holds the route files, and its program used to own them,
-    // so `@/features/...` resolved to nothing and the layout mounted "0 feature owners". The app's own tsconfig owns its files.
+    // The side root tsconfig.json (no paths) also holds the route files, but its program does not own them: `@/features/...` would
+    // resolve to nothing and the layout would mount "0 feature owners". The app's own tsconfig owns its files.
     const files = {
         ...THIN_FEATURES,
         "apps/web/tsconfig.json": `${JSON.stringify({ extends: "../../tsconfig.json", compilerOptions: { paths: { "@/*": ["./src/*"] } }, include: ["src/**/*.ts", "src/**/*.tsx"] })}\n`,

@@ -180,7 +180,7 @@ try {
   db.write.updateAttempt({ attemptId:missing.attempt_id, terminalClosedAt:fixedNow - 600000, endState:'worker-dead', at:fixedNow - 600000 });
   const outputText = `tsc-app failed: ${secrets[0]}`;
   const output = db.write.storeBlob({ content: Buffer.from(redactText(outputText)), mediaType: 'text/plain', redaction: 'v1', createdAt: fixedNow });
-  // A legacy unmarked text blob exercises the server's defensive stream redaction.
+  // An unmarked text blob exercises the server's defensive stream redaction.
   const unmarked = db.write.storeBlob({ content: Buffer.from(outputText), mediaType: 'text/plain', createdAt: fixedNow });
   const stderr = db.write.storeBlob({ content: Buffer.from(redactText(`compile error ${secrets[1]}`)), mediaType: 'text/plain', redaction: 'v1', createdAt: fixedNow });
   for (const [name, present] of [['archived-readable.log', true], ['archived-unavailable.log', false]]) {
@@ -266,7 +266,7 @@ try {
     ['passed', 'backend.implement', 'done', 'pass', 'new'],
     ['owner', 'integration.verify', 'ask', 'blocked', null],
     ['unchanged', 'code.refactor', 'done', 'pass', 'unchanged'],
-    ['legacy', 'code.refactor', 'done', 'pass', 'legacy'],
+    ['unbound', 'code.refactor', 'done', 'pass', 'unbound'],
     ['missing-checkpoint', 'code.refactor', 'done', 'pass', null],
     ['checkpoint-unsettled', 'code.refactor', 'done', null, 'new'],
   ]) {
@@ -284,7 +284,7 @@ try {
     db.write.setJobStatus({ jobId, to:'reported', at:fixedNow - 230000 });
     if (verdict === 'pass') db.write.recordCheckRun({ attemptId:record.attempt_id, name:'preview-check', phase:'after', runner:'settler', status:'pass', exitCode:0, startedAt:fixedNow - 220000, finishedAt:fixedNow - 210000, createdAt:fixedNow - 220000 });
     if (commitAction) {
-      const payload = commitAction === 'legacy' ? {sha:fakeSha(32)} : {sha:commitAction === 'new' ? fakeSha(31) : testedHead,
+      const payload = commitAction === 'unbound' ? {sha:fakeSha(32)} : {sha:commitAction === 'new' ? fakeSha(31) : testedHead,
         committed:commitAction === 'new', scope:['be/source'], files:commitAction === 'new' ? ['be/source/table.ts'] : []};
       db.write.appendEvent({ eventId:`event-checkpoint-${suffix}`, workflowId:'wf-stuck', entityType:'job', entityId:jobId,
         attemptId:record.attempt_id, kind:'workflow-checkpoint', payload, createdAt:fixedNow - 201000 });

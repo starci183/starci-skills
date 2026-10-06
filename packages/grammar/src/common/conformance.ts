@@ -3,13 +3,9 @@ import { CANONICAL_RULE_IDS } from "./rule-catalog.generated.js"
 /**
  * The catalog is GENERATED, not transcribed.
  *
- * The table that used to live here was a hand-typed copy of the knowledge tree's family list, and
- * a copy is only correct on the day it is typed. By the time anyone looked, `accessibility` had
- * renamed its ids from `ACCESSIBILITY-n` to `A11Y-n`, `render-truth` published `TRUTH-n`,
- * `text-flow` published `FLOW-n`, and MEASURE, OVERFLOW and TONE had appeared - none of which the
- * table knew, while three of its families named rules that no longer existed anywhere. Every
- * conformance check went on passing against the wrong catalog, which is the worst outcome a check
- * can have.
+ * A hand-typed copy of the knowledge tree's family list is only correct on the day it is typed, and
+ * a conformance check against a wrong catalog keeps passing, which is the worst outcome a check
+ * can have, so the table is read from the tree.
  *
  * Regenerate with `node packages/grammar/scripts/generate-rule-catalog.mjs [knowledgeDir]` from the package root.
  */

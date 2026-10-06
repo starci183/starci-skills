@@ -118,7 +118,7 @@ test('starci kernel rename sets the display name, records workflow-renamed and r
   assert.equal(r.status, 0, r.stderr || r.stdout);
   const body = out(r);
   assert.deepEqual([body.title, body.from, body.slug, body.by, body.changed], ['Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c', null, 'nivo-app-auth', 'owner', true]);
-  assert.ok(hasLedgerColumn(ledger.db, 'workflows', 'display_name'), 'the api migrated the additive column');
+  assert.ok(hasLedgerColumn(ledger.db, 'workflows', 'display_name'), 'the ledger carries the display_name column');
   const row = ledger.db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(WF);
   assert.deepEqual([row.workflow_id, row.title, row.display_name], [WF, 'nivo-app-auth', 'Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c'], 'the id and the slug never change');
   const events = ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='workflow-renamed'").all(WF).map((e) => JSON.parse(e.payload_json));

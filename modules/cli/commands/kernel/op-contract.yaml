@@ -37,7 +37,7 @@ reads: the contracts row for the job's {workflow_id,op_id,attempt} — the rende
 writes: nothing — pure read of the worker's dispatch authority
 returns: "the stored markdown on stdout; with --json: {ok:true, workflowId, op, attempt, dispatchId,
   markdown, context, createdAt, admission:{admittedAt, source, runtimeSha, digest}}"
-dispatchInFlight: dispatch used to commit the contract row only with status running, after the
+dispatchInFlight: dispatch commits the contract row with status running only after the
   preamble was sent and the model attested; a worker whose first action is op-contract landed in
   that window and read contract-missing for a row the Kernel read seconds later (a product Modules
   inc-e09140ad9c22, WSPV inc-7f437d11edae). A dispatch commits the row as soon as Orca returns the

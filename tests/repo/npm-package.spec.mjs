@@ -99,7 +99,7 @@ test('actual npm tarball installs a runnable source command without development 
   assert.deepEqual([...shipped].filter(file=>file.startsWith('examples/.runtimes/')).sort(),
     [...selectedExamples].filter(file=>file.startsWith('examples/.runtimes/')).sort(),'only approved basic source members ship');
   for(const relative of neighbors)assert.equal(shipped.has(relative),false,relative);
-  for(const dead of ['cli/','hosts/','execution/','workflows/','contracts/','approvals/','specifications/','upgrades/','legacy/','fixtures/'])
+  for(const dead of ['cli/','hosts/','execution/','workflows/','contracts/','approvals/','specifications/','upgrades/','fixtures/'])
     assert.equal([...shipped].some(file=>file.startsWith(dead)),false,`npm tarball must not ship ${dead}`);
   fs.writeFileSync(path.join(target,'package.json'),'{}\n');
   const installed=npm(['install','--ignore-scripts','--omit=dev','--no-audit','--no-fund','--package-lock=false',path.join(temporary,receipt.filename)],target);

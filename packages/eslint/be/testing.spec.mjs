@@ -107,7 +107,7 @@ test("R47: only a service is unit-tested, its spec sits beside it, and there are
       { filename: at("src/tests/fixtures/orders.service.ts"), code: "export class Orders {}" },
       // the integration, e2e and contract layers and world infrastructure are not unit specs
       { filename: E2E, code: "export {}" },
-      { filename: at("src/tests/e2e/checkout/legacy.spec.ts"), code: "export {}" },
+      { filename: at("src/tests/e2e/checkout/archive.spec.ts"), code: "export {}" },
       { filename: at("src/tests/world/use-test-world.spec.ts"), code: "export {}" },
       // a declaration file carries no behaviour
       { filename: at("src/modules/domain/order/order.service.d.ts"), code: "export {}" },

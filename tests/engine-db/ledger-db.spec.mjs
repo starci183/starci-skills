@@ -84,7 +84,7 @@ function ledgerFileWithoutMeta(){
     CREATE TABLE inputs(workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), key TEXT NOT NULL,
       goal_revision INTEGER NOT NULL, sha256 TEXT NOT NULL, size INTEGER NOT NULL, media_type TEXT,
       origin TEXT NOT NULL, bytes BLOB NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(workflow_id,key));
-    CREATE TABLE migrations(source TEXT PRIMARY KEY, kind TEXT NOT NULL, rows_json TEXT NOT NULL, at INTEGER NOT NULL);
+    CREATE TABLE notes(source TEXT PRIMARY KEY, kind TEXT NOT NULL, rows_json TEXT NOT NULL, at INTEGER NOT NULL);
     PRAGMA user_version=1;
   `);
   const digest=text=>crypto.createHash('sha256').update(text).digest('hex');

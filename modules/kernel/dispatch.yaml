@@ -53,7 +53,7 @@ packet:
     owner_delegation: '{asks, until, excludes} | null'  # config.yaml delegation while active
     product_locale: '{locale, source} | null'  # layout tree productLocale.default, else brand voice default; UI copy language
     records: [...]                      # .starciwork records it touches (the read set)
-    selected_op: '{mode, contract, checks:{required,candidates}} | absent'  # immutable selected contract; absent on older attempts
+    selected_op: '{mode, contract, checks:{required,candidates}} | absent'  # immutable selected contract; absent on a planning preview
     readRefs: '[{path,absolute,rootKind,root,sha256,why}] | absent'  # resolved READ snapshot; no current-Source reconstruction
     owned_paths: [...]                  # what it may modify — boundary enforcement
     owner_answers: '[{dispatchId, jobId, attempt, question, options[], chosen:{index,label}|null, picks?, note?, answeredBy, answeredAt, receipt}]'  # present when the retry lineage holds answered asks
@@ -121,8 +121,8 @@ fields:
       The effective shared-expanded contract for exactly one concrete execution mode, with common
       obligations retained by ID and sibling permissions excluded. Required named layout checks and mechanical proof owners
       remain distinct from broad kind route candidates and semantic completion/proof obligations.
-      A planning preview may retain mode select; a launched attempt cannot. Older filed attempts without
-      this snapshot retain their admission and are never rebuilt from a current manifest or params.
+      A planning preview may retain mode select; a launched attempt cannot. A filed attempt keeps the
+      snapshot it was admitted with and is never rebuilt from a current manifest or params.
     enforcedBy: >-
       scripts/lib/op-shared.mjs resolveOpContract is the single selector. scripts/kernel/dispatch-admission.mjs
       selectDispatchContract validates the authored shape/defaults before effects and files selected_op

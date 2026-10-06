@@ -483,12 +483,12 @@ describe('the package.json scripts of the app', () => {
   });
   it('are compared as parsed JSON: key order and the rest of package.json are not drift, an extra or changed script is', async t => {
     const dir = repo(t);
-    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', dependencies: { a: '1' }, scripts: { legacy: 'x' } }, null, 4));
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', dependencies: { a: '1' }, scripts: { unmanaged: 'x' } }, null, 4));
     await run(['--write'], dir);
     const pkg = () => JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
     assert.equal(pkg().name, 'demo');
     assert.deepEqual(pkg().dependencies, { a: '1' });
-    assert.equal(pkg().scripts.legacy, undefined, 'a script outside the managed block is dropped by --write');
+    assert.equal(pkg().scripts.unmanaged, undefined, 'a script outside the managed block is dropped by --write');
     assert.equal((await run(['--check'], dir)).code, 0);
     const reordered = { ...pkg(), scripts: Object.fromEntries(Object.entries(pkg().scripts).reverse()) };
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(reordered));

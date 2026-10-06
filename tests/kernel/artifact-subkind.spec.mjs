@@ -22,7 +22,7 @@ import { adoptLaunchTrust } from '../helpers/launch-trust.mjs';
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_IMPLICIT_WORK_TREE', 'GIT_PREFIX', 'GIT_CONFIG', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_GRAFT_FILE', 'GIT_NO_REPLACE_OBJECTS', 'GIT_REPLACE_REF_BASE', 'GIT_SHALLOW_FILE']) delete process.env[key];
 
 // The harness data contract's runtime half: job_artifacts.subkind (what produced a file) derived from facts only, its
-// additive migration and idempotent backfill, the Playwright recordings a job's uat-slots runs leave, the typed rows the
+// idempotent backfill, the Playwright recordings a job's uat-slots runs leave, the typed rows the
 // runtime derives itself (cmd.run per check, file.edit per patch file, render/video/trace per artifact) and the
 // LOG_TYPED_MISSING warning when an op logged nothing of its own.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');

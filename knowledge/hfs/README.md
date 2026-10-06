@@ -12,7 +12,7 @@ managed `turbo.json`, the one `hfs.json` (kind `app`), the CI, the hooks, the fo
 (`@<project>/<app>`) and each fe package is a workspace with its own `package.json` and dependencies, and turbo runs their
 build, dev, lint and typecheck (a workspace lints with `starci app lint --workspace .`, the one lint scoped to it). The back end has
 no `package.json`: it is a Nest monorepo of `be/apps/<app>` (nest-cli `projects`), even for one service. Its two sides are `be/` (the back end) and `fe/` (the front end); each side holds everything a standalone
-back-end or front-end repository root used to hold, except `package.json`, the lockfile and the other files the root
+back-end or front-end repository root holds, except `package.json`, the lockfile and the other files the root
 owns. Every path in this file is relative to the app root: a back-end path starts with `be/`, a front-end path with
 `fe/`. The only cross-side reach is the front end reading `be/contracts/` (its codegen input), declared in `hfs.json`
 `sides.fe.reads`. `starci app lint`, `starci app sync` and `starci app scaffold` run at the app root.

@@ -667,7 +667,7 @@ test('Nest registration becomes unavailable for hidden or dynamic module metadat
     'src/features/api/orders/find.query.ts': 'export class FindOrderQuery {}\n',
     'src/features/api/orders/find.handler.ts': 'import { QueryHandler } from "@nestjs/cqrs"; import { FindOrderQuery } from "./find.query"; @QueryHandler(FindOrderQuery) export class FindOrderHandler {}\n',
     'src/features/api/orders/orders.module.ts': 'import { Module } from "@nestjs/common"; import { FindOrderHandler } from "./find.handler"; const providers=[FindOrderHandler]; @Module({providers}) export class OrdersModule {}\n',
-    'src/features/api/orders/legacy.module.ts': 'const {Module}=require("@nestjs/common"); @Module({}) export class LegacyModule {}\n',
+    'src/features/api/orders/archive.module.ts': 'const {Module}=require("@nestjs/common"); @Module({}) export class ArchiveModule {}\n',
     'src/features/api/orders/mutable.module.ts': 'import { Module } from "@nestjs/common"; let MutableModule=Module; @MutableModule({}) export class MutableIdentityModule {}\n',
   });
   installNestTypes(root);

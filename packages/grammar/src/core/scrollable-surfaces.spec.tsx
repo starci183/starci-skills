@@ -112,7 +112,7 @@ describe("scrollable Core surfaces", () => {
         expect(markup).toContain("starci-core-form-surface")
         expect(markup).toContain("starci-core-form-surface--compact")
         expect(markup).toContain("starci-core-form-scroll-viewport")
-        // Fill height is the data attribute alone; the unpainted modifier class is no longer emitted.
+        // Fill height is the data attribute alone; the unpainted modifier class is not emitted.
         expect(markup).not.toContain("starci-core-surface-card--fill")
         expect(markup).toContain("<h3")
         expect(markup).toContain("data-grammar-surface-composition=\"joined\"")
@@ -206,7 +206,7 @@ describe("scrollable Core surfaces", () => {
         expect(axisClaims(claimsOn(needed, marker))).toEqual(["OVERFLOW-4"])
     })
 
-    it("owns the singular legacy highlight boundary and suppresses it while pending", () => {
+    it("owns the singular highlight boundary and suppresses it while pending", () => {
         const highlighted = renderToStaticMarkup(
             <SurfaceCard ariaLabel="Featured card" isHighlight><p>Body</p></SurfaceCard>,
         )
