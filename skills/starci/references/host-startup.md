@@ -17,7 +17,7 @@ host effects, ensures engine, configured services, public harness and Supervisor
 without calling Kernel watchdogs recursively, then ensures caller-bound native
 maintenance when `config.yaml` has `debug: true`. Missing caller context may reuse
 an existing attested maintenance route; it cannot create or guess a route.
-The Kernel's `--agent` remains its own override. Follow [Host credentials](../../docs/host-secrets.md)
+The Kernel's `--agent` remains its own override. Follow [Host credentials](../../../docs/host-secrets.md)
 for the selected action's local inputs and native missing-input receipts.
 
 The native launcher retains its existing singleton, quota, provider reservation

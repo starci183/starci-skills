@@ -1,0 +1,72 @@
+name: runtime-artifact
+
+# A person dispatches this to download the runtime archive of one exact commit: the `npm pack` tarball of the root package, whose
+# `files` list is the one release inventory (no second inventory here). It builds, packs and verifies the inventory; it does not run
+# `npm run check` or `npm test` (the release flow runs those, see ci.yml). Trigger is workflow_dispatch only
+# (docs/git-governance.md, rule CI_TRIGGERS_RELEASE_ONLY).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-artifact-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  runtime-artifact:
+    name: build + pack + verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The packages' runtime copies and the ui catalog map are ignored generated roots that `files` ships: the release flow
+      # produces them with this same entry (starci release sync-runtime), and `npm pack` runs with --ignore-scripts like it.
+      - name: Generate the packaged runtime copies
+        run: npm run starci --silent -- release sync-runtime
+
+      - name: Pack the root package
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack" "$RUNNER_TEMP/out"
+          npm pack --ignore-scripts --json --pack-destination "$RUNNER_TEMP/pack" > "$RUNNER_TEMP/npm-pack.json"
+
+      # Writes release-metadata.json, inventory.txt and SHA256SUMS, and exits 1 when the tarball holds host-local or secret
+      # material (config.yaml, secret.env, *.sqlite journals, node_modules, .starciwork, logs, .git ...).
+      - name: Verify the inventory and write the metadata
+        run: node scripts/gates/runtime-artifact.mjs --pack "$RUNNER_TEMP/npm-pack.json" --dir "$RUNNER_TEMP/pack" --out "$RUNNER_TEMP/out"
+
+      - name: Stage and name the artifact
+        id: stage
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          SHORT=$(printf '%s' "$GITHUB_SHA" | cut -c1-7)
+          NAME="starci-runtime-${VERSION}-${SHORT}"
+          mkdir -p "$RUNNER_TEMP/upload"
+          cp "$RUNNER_TEMP"/pack/*.tgz "$RUNNER_TEMP/out/release-metadata.json" "$RUNNER_TEMP/out/inventory.txt" "$RUNNER_TEMP/out/SHA256SUMS" "$RUNNER_TEMP/upload/"
+          (cd "$RUNNER_TEMP/upload" && sha256sum --check SHA256SUMS)
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Runtime artifact"
+            echo "- artifact: \`$NAME\`"
+            echo "- version: \`$VERSION\`"
+            echo "- commit: \`$GITHUB_SHA\`"
+            echo "- tarball sha256: \`$(cut -d' ' -f1 "$RUNNER_TEMP/upload/SHA256SUMS")\`"
+            echo "- files: $(wc -l < "$RUNNER_TEMP/upload/inventory.txt")"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.stage.outputs.name }}
+          path: ${{ runner.temp }}/upload/
+          if-no-files-found: error
+          retention-days: 30

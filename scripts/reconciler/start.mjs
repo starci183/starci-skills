@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // scripts/reconciler/start.mjs — the shared host startup and actual readiness owner.
-// .starci/host/startup.md describes its lifecycle; workflow ingress excludes Kernel watchdogs.
+// skills/starci/references/host-startup.md describes its lifecycle; workflow ingress excludes Kernel watchdogs.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';

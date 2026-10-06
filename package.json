@@ -1,6 +1,6 @@
 {
   "name": "starci",
-  "version": "1.0.0-alpha.4",
+  "version": "1.0.5",
   "description": "StarCi: kernel-agent workflow runtime — one long-lived kernel agent per workflow, one ephemeral op agent per job, a sqlite ledger as the only state.",
   "license": "MIT",
   "type": "module",
@@ -13,7 +13,6 @@
     "ext/sonar/compose.yaml",
     "ext/sonar/README.md",
     "skills/",
-    ".starci/",
     "ui/",
     "modules/",
     "engine/",
@@ -80,8 +79,7 @@
     "starci"
   ],
   "publishConfig": {
-    "access": "public",
-    "tag": "alpha"
+    "access": "public"
   },
   "dependencies": {
     "libpg-query": "18.1.5",

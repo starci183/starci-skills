@@ -161,9 +161,9 @@ unfinished CHANGELOG notes. The model, the refusals and the risks are in [git go
 
 ## Editing contracts and prose
 
-Every canonical file — `CONTEXT.md`, `README.md`, `docs/**`, `modules/**`, `skills/**`, `.starci/host/**` — says
-one thing, once, in the present tense. These six rules are the bar for any edit on the alpha
-line; a review that finds a violation sends the change back.
+Every canonical file — `CONTEXT.md`, `README.md`, `docs/**`, `modules/**`, `skills/**` — says
+one thing, once, in the present tense. These six rules are the bar for any edit;
+a review that finds a violation sends the change back.
 
 1. **Present tense, no ghosts.** Describe the tree as it is. Never define something by negating
    a state the tree no longer has (a removed directory, a former layout, a compatibility mode). History goes to `CHANGELOG.md` or `benchmark/findings/`, never into the
@@ -179,7 +179,7 @@ line; a review that finds a violation sends the change back.
    that code reads; they are never prose repeated in several files.
 4. **Claims must execute.** `citation:`, `enforcedBy:`, `source:`, "validated by", "refuses",
    "verified before effects" name a file and a behaviour that exist. If the code does not do it,
-   the yaml says so or the claim is removed. On the alpha line the default is to make the yaml
+   the yaml says so or the claim is removed. The default is to make the yaml
    tell the truth; add code only where a test shows a real hole.
 5. **Host calls go through `scripts/api/orca/`.** No agent-facing prose tells an agent to run
    `orca` or to read `modules/host/**`; agents call `scripts/kernel/cli.mjs` or a wrapper.

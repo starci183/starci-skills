@@ -14,7 +14,7 @@ coreDebug:
   id: core-debug
   seatId: core-debug
   title: '[Debug] core'
-  prompt: .starci/host/maintenance.md
+  prompt: skills/starci/references/host-maintenance.md
   enabledScope: core-debug-enabled
   eventPrefix: core-debug
   stateScope: core-debug-diagnostics

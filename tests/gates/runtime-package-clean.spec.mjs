@@ -16,8 +16,8 @@ function fixture(t, options = {}) {
   const manifest = { name: 'starci', version: '1.0.0-alpha.9', scripts: { test: 'full-suite-must-not-run' } };
   const source = {
     'package.json': JSON.stringify(manifest), 'skills/starci/SKILL.md': 'entry\r\n',
-    'skills/starci/agents/openai.yaml': 'policy: manual\n', '.starci/host/startup.md': 'startup\n',
-    '.starci/host/maintenance.md': 'maintenance\n', 'ui/server.mjs': 'export const server = true;\n',
+    'skills/starci/agents/openai.yaml': 'policy: manual\n', 'skills/starci/references/host-startup.md': 'startup\n',
+    'skills/starci/references/host-maintenance.md': 'maintenance\n', 'ui/server.mjs': 'export const server = true;\n',
     'ui/api/index.mjs': 'export const api = true;\n', 'ui/package.json': '{}\n', 'ui/package-lock.json': '{}\n',
     'ui/src/main.tsx': 'export default null;\n', 'scripts/cli/main.mjs': 'dispatcher\n',
   };
@@ -49,7 +49,7 @@ function fixture(t, options = {}) {
       if (options.installRed) return { status: 1, stdout: 'actual install red', stderr: 'ETARGET unpublished' };
       if (options.installIncomplete) return { status: null, stdout: '', stderr: '', error: new Error('process unavailable') };
       for (const [file, bytes] of files) write(path.join(installRoot, 'node_modules', 'starci', file.slice('package/'.length)), bytes);
-      if (options.installedTamper) write(path.join(installRoot, 'node_modules/starci/.starci/host/startup.md'), 'tampered');
+      if (options.installedTamper) write(path.join(installRoot, 'node_modules/starci/skills/starci/references/host-startup.md'), 'tampered');
       return { status: 0, stdout: 'real API fixture install', stderr: '' };
     },
     runNode: (args, opts) => {
@@ -71,7 +71,7 @@ function fixture(t, options = {}) {
         if (options.doctorIncomplete) return {status: null, stdout: '', stderr: ''};
         if (options.doctorSignal) return {status: null, signal: 'SIGTERM', stdout: '', stderr: ''};
         if (options.doctorError) return {error: {code: 'ENOENT', message: 'fixture doctor runner missing'}, stdout: '', stderr: ''};
-        if (options.doctorTamper) write(path.join(opts.cwd, '.claude/.starci/host/maintenance.md'), 'changed during diagnosis');
+        if (options.doctorTamper) write(path.join(opts.cwd, '.claude/skills/starci/references/host-maintenance.md'), 'changed during diagnosis');
         return {status: 0, stdout: 'doctor: installed source and local runtime capabilities passed', stderr: ''};
       }
       assert.deepEqual(args.slice(1), ['runtime', args[2], '--cwd', opts.cwd, '--no-bootstrap']);
@@ -88,7 +88,7 @@ function fixture(t, options = {}) {
       const target = path.join(opts.cwd, '.claude');
       for (const [file, bytes] of Object.entries(source)) write(path.join(target, file), bytes);
       for (const entry of entries) write(path.join(opts.cwd, entry.relative), source[entry.source]);
-      if (options.projectedTamper) write(path.join(target, '.starci/host/maintenance.md'), 'different');
+      if (options.projectedTamper) write(path.join(target, 'skills/starci/references/host-maintenance.md'), 'different');
       if (options.entryTamper) write(path.join(opts.cwd, entries[0].relative), 'different');
       if (options.bootstrap) write(path.join(opts.cwd, 'AGENTS.md'), 'unexpected');
       write(path.join(target, '.starci-skills.json'), JSON.stringify({ ...manifest,
@@ -111,7 +111,7 @@ test('root archive proof uses real packed bytes and isolated owning dispatch, wi
   assert.equal(result.status, 'green', result.detail);
   assert.deepEqual(f.calls, ['pack', 'install', 'graph', 'dispatch', 'update', 'doctor']);
   assert.equal(result.archive.shasum, f.expectedShasum);
-  assert.ok(result.projectedFiles.includes('.starci/host/startup.md')); assert.equal(result.discoveryFiles.length, 2);
+  assert.ok(result.projectedFiles.includes('skills/starci/references/host-startup.md')); assert.equal(result.discoveryFiles.length, 2);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(result.attempt, 'result.json'))), result);
   assert.equal(fs.readFileSync(path.join(result.attempt, 'install.stdout.txt'), 'utf8'), 'real API fixture install');
   assert.equal(fs.readFileSync(path.join(result.attempt, 'runtime-install.stdout.txt'), 'utf8'), 'native installer completed');
@@ -128,7 +128,7 @@ test('root proof requires exact public identity and frozen archive before instal
 });
 
 test('root proof refuses omitted host prompts or UI inputs and unavailable tracked inventory', t => {
-  for (const omit of ['.starci/host/startup.md', 'ui/server.mjs', 'ui/src/main.tsx', 'skills/starci/agents/openai.yaml']) {
+  for (const omit of ['skills/starci/references/host-startup.md', 'ui/server.mjs', 'ui/src/main.tsx', 'skills/starci/agents/openai.yaml']) {
     const f = fixture(t, { omit }); assert.equal(f.run().status, 'red', omit); assert.deepEqual(f.calls, ['pack']);
   }
   const f = fixture(t, { noInventory: true }); assert.equal(f.run().status, 'unrun'); assert.deepEqual(f.calls, ['pack']);

@@ -30,7 +30,6 @@ function isRawGuidanceFile(file) {
     || (!rel.includes('/') && /^README/i.test(base))
     || (!rel.includes('/') && /^CONTEXT/i.test(base))
     || rel.startsWith('skills/')
-    || rel.startsWith('.starci/host/')
     || rel.startsWith('knowledge/')
     || /(?:^|\/)prompts?(?:\/|$)/i.test(rel)
     || (rel.startsWith('modules/') && /\.(?:md|ya?ml)$/i.test(rel));

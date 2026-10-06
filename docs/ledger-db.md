@@ -3,11 +3,10 @@ Task: read the runtime's storage
 
 The executed schemas live under `engine/db/migrations/runtime/` and `engine/db/migrations/machine/`.
 `engine/db/ledger.mjs` owns project schema validation; `engine/db/machine.mjs` owns host schema validation
-and required physical objects. A writer atomically migrates a recognized v2 host store to v3 by widening
-only the signal scope CHECK, preserving all signal columns, other host rows and historical `schema_migrations`
-entries. Required v2 objects match the canonical schema with that one scope difference; extra objects refuse.
-Readers require v3 and never migrate. Fresh machine stores execute one folded `0001-init.sql` and atomically
-record version 3. Other identities and shapes refuse without reset. The current signal domains keep
+and required physical objects. Each store has exactly one schema and no migration path. A fresh machine store
+executes the one `0001-init.sql` and atomically records its user_version. A host store that is not exactly that
+schema (any other identity or version, or a missing, changed or extra object) is refused unchanged by writers and
+readers alike; the operator replaces it with a fresh store. The current signal domains keep
 Supervisor keys, tokens, values and expiries separate from core-debug enabled/diagnostic scopes.
 These writers and their SQL files own the storage rules.
 
@@ -25,7 +24,7 @@ These writers and their SQL files own the storage rules.
 - There is no other store. No JSON state file, no JSONL inbox, no text log, no second SQLite file.
 - The writers refuse unsupported schema identities or versions. `openLedger` creates a fresh project
   store at `ledgerFileFor(<repo root>)`; `openMachine` creates a fresh host store at `machineFileFor`
-  and validates or migrates a recognized existing host store without rewriting its historical journal.
+  and validates an existing host store, refusing any store that is not exactly the current schema.
 - `openLedger({fixture:{ledgerId,createdAt,blobRoot},file,checkpointer:true})` initializes a fresh
   sample through the same canonical schema and seeds. Its identity is in the reserved synthetic namespace
   validated by `engine/db/ledger-paths.mjs`; its clock is frozen and `blobRoot` is a portable relative path.
@@ -39,7 +38,7 @@ These writers and their SQL files own the storage rules.
   `projectsRootFor`) — both `projects/` and `machine.sqlite` move under it. Narrower seams still win when set:
   `STARCI_PROJECTS_ROOT` (just the `projects/` directory), `STARCI_TEST_MACHINE_FILE` (the exact `machine.sqlite`
   file), `STARCI_ARTIFACT_ROOT` (the blob store, independent of the state base). A debug probe or throwaway repo
-  that would otherwise leave a fake ledger in the real store (`.starci/host/maintenance.md` §5) must set
+  that would otherwise leave a fake ledger in the real store (`skills/starci/references/host-maintenance.md` §5) must set
   `STARCI_LOCAL_ROOT` to a temp directory for its whole process tree.
 
 ## 2. One writer per database
@@ -118,7 +117,7 @@ Views: `v_attempt_state`, `v_op_history`, `v_units`, `v_checks`, `v_decision_row
 `v_ledger_leaks`, `v_blocking`, `v_open_work`, `v_search_ids`, `v_live_marks`, `v_blob_refs`.
 Each view that shows an entity carries its `ui` state. `v_decision_rows`, `v_blocking` and `v_open_work` never
 list a live row of an ended workflow (`phase` `archived`|`finished`; a missing `workflows` row still counts as
-live) — `v_decision_rows` keeps the ended workflow's resolved history (migration 0005).
+live) — `v_decision_rows` keeps the ended workflow's resolved history.
 
 ### The attempt row
 

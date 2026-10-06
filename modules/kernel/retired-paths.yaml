@@ -225,8 +225,10 @@ moved:
   - {from: skills/computer-use/SKILL.md, to: skills/starci/references/computer-use.md, movedIn: starci-explicit-entry, quiesced: false}
   - {from: skills/orca-cli/SKILL.md, to: skills/starci/references/orca-cli.md, movedIn: starci-explicit-entry, quiesced: false}
   - {from: skills/orchestration/SKILL.md, to: skills/starci/references/orchestration.md, movedIn: starci-explicit-entry, quiesced: false}
-  - {from: skills/start/SKILL.md, to: .starci/host/startup.md, movedIn: starci-explicit-entry, quiesced: false}
-  - {from: skills/debug/SKILL.md, to: .starci/host/maintenance.md, movedIn: starci-explicit-entry, quiesced: false}
+  - {from: skills/start/SKILL.md, to: skills/starci/references/host-startup.md, movedIn: starci-explicit-entry, quiesced: false}
+  - {from: .starci/host/startup.md, to: skills/starci/references/host-startup.md, movedIn: host-prompt-owner, quiesced: false}
+  - {from: skills/debug/SKILL.md, to: skills/starci/references/host-maintenance.md, movedIn: starci-explicit-entry, quiesced: false}
+  - {from: .starci/host/maintenance.md, to: skills/starci/references/host-maintenance.md, movedIn: host-prompt-owner, quiesced: false}
   - {from: docs/opensource-goal.md, to: docs/goal.md, movedIn: c0-relops, quiesced: false}
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
   - {from: .experiments/OPENSOURCE-GOAL.md, to: docs/goal.md, movedIn: C0, quiesced: false}

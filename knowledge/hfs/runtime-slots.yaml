@@ -465,7 +465,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "nowhere: no migration or backfill (owner ruling, clean slate); schema changes are engine/db/migrations/<store>/<nnnn>-<name>.sql"
+    goesTo: "nowhere: no migration or backfill (owner ruling, clean slate); each store has one schema, engine/db/migrations/<store>/0001-init.sql"
 
   # ----- scripts: gates and runtime self-checks ---------------------------------------------------------------
   - id: runtime.gates
@@ -572,14 +572,6 @@ slots:
     requires: [SKILL.md]
     allows: [SKILL.md, "references/**", agents/openai.yaml]
     rules: [RT_CITED_PATH_MISSING, RT_GUIDANCE_REFUSED_COMMAND]
-  - id: runtime.host-prompts
-    profiles: [runtime]
-    path: ".starci/host/{startup.md,maintenance.md}"
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
-    rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING, RT_GUIDANCE_REFUSED_COMMAND]
   - id: runtime.init
     profiles: [runtime]
     path: init/AGENTS.md

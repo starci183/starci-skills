@@ -6141,7 +6141,7 @@ STARCI_MACHINE_SCHEMA_OLD:
   meaning_vi: "machine.sqlite là bản cũ và không có bộ chuyển đổi nên runtime không mở."
   causes_vi:
     - "Tệp từ phiên bản trước"
-  nextStep_vi: "Mở bị từ chối; cần tạo lại cơ sở dữ liệu máy theo hướng dẫn nâng cấp."
+  nextStep_vi: "Mở bị từ chối; tệp giữ nguyên, chủ sở hữu quyết định thay bằng cơ sở dữ liệu máy mới."
   owner: owner
   kind: runtime-fault
 

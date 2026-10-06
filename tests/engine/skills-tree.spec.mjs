@@ -20,7 +20,6 @@ test('one shipped public skill declares native explicit-selection policies and t
   // package.json (the installer derives its payload from it).
   const files=JSON.parse(read('package.json')).files;
   assert.ok(files.some(entry=>entry==='skills'||entry==='skills/'),'package.json files[] ships skills/');
-  assert.ok(files.some(entry=>entry==='.starci'||entry==='.starci/'),'package.json files[] ships internal host prompts');
   const meta = frontmatter(read('skills/starci/SKILL.md'));
   assert.equal(meta['disable-model-invocation'], true, 'Claude requires explicit user selection');
   assert.deepEqual(meta.triggers, ['user'], 'Devin CLI permits only its user trigger');
@@ -33,9 +32,8 @@ test('all routed procedures exist without public discovery frontmatter',()=>{
   const references = [...entry.matchAll(/`(references\/[^`]+\.md)`/g)].map(match => match[1]);
   assert.ok(references.length > 0);
   for (const relative of references) assert.equal(read(`skills/starci/${relative}`).startsWith('---\n'), false, relative);
-  const host = fs.readdirSync(path.join(root, '.starci/host')).filter(name => name.endsWith('.md')).sort();
-  assert.deepEqual(host, ['maintenance.md', 'startup.md']);
-  for (const name of host) assert.equal(read(`.starci/host/${name}`).startsWith('---\n'), false, name);
+  assert.equal(fs.existsSync(path.join(root, '.starci')), false, 'the host-data namespace holds no release source');
+  for (const name of ['host-maintenance.md', 'host-startup.md']) assert.equal(read(`skills/starci/references/${name}`).startsWith('---\n'), false, name);
 });
 
 test('one bootstrap locates the runtime for supported host projections',()=>{

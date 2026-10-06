@@ -25,7 +25,7 @@
 //   reader   : readOnly, query_only=ON, busy_timeout=15000; observer diagnostics never persist
 //   startup  : sqlite_version, node_version, journal_mode and user_version are recorded in machine_meta; a file that is
 //              not 'starci/machine@1' at user_version MACHINE_VERSION is refused — a fresh machine.sqlite is created by
-//              openMachine on first use from engine/db/migrations/machine/0001-init.sql. Recognized v2 writers atomically widen the signal CHECK before current validation; readers and unsupported shapes refuse. Host rows and historical journals are preserved.
+//              openMachine on first use from engine/db/migrations/machine/0001-init.sql. The store has exactly one schema: an existing file that is not exactly that schema is refused unchanged, for writers and readers alike, and has no upgrade path.
 // Nothing outside engine/ opens machine.sqlite with `new DatabaseSync`: callers use openMachine / openMachineReader / openMachineObserver /
 // withMachine / readMachine and the typed functions on the handle.
 import { assertMutationFence } from '../../scripts/lib/mutation-fence.mjs';
@@ -63,7 +63,7 @@ export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host',
 /**
  * Overrides the per-host state base itself (machine.sqlite, projects/, archive/), the one seam starciLocalRoot and
  * engine/db/ledger.mjs (which re-exports starciLocalRoot for its own projectsRootFor) both read. Debug probes and
- * throwaway repos (.starci/host/maintenance.md) point this at a temp directory so they never touch the real
+ * throwaway repos (skills/starci/references/host-maintenance.md) point this at a temp directory so they never touch the real
  * %LOCALAPPDATA%/StarCi and leak fake ledgers/workflows into it (2026-09-30 incident: probe-*, dbg-ask-*, dbg-env*
  * repos left six fake-worker ledgers in the live store). STARCI_PROJECTS_ROOT (ledger-db.mjs) and
  * STARCI_TEST_MACHINE_FILE (TEST_REGISTRY_ENV) are narrower overrides that still win over this one when set.
@@ -155,7 +155,7 @@ export function runtimeRev() {
 /** Order of two runtime revs: <0 when a is older than b (time prefix; anything unparsable is oldest). */
 const compareRevs = (a, b) => { const t = (r) => (/^\d{13}:/.test(String(r ?? '')) ? Number(String(r).slice(0, 13)) : -1); return t(a) - t(b); };
 
-const { checkSchema, createSchema, upgradeSchema } = machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_VERSION, initSqlFile: INIT_SQL_FILE, controllers: CONTROLLERS, runtimeRev, pragma });
+const { checkSchema, createSchema } = machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_VERSION, initSqlFile: INIT_SQL_FILE, controllers: CONTROLLERS, runtimeRev, pragma });
 
 function openConnection(file, { readOnly = false, env = process.env, now = Date.now, onCorrupt = corruptIncident } = {}) {
   const { DatabaseSync } = require('node:sqlite');
@@ -172,10 +172,7 @@ function openConnection(file, { readOnly = false, env = process.env, now = Date.
       }
       db = new DatabaseSync(file, { timeout: busyTimeoutOf(env) });
       const empty = Number(pragma(db, 'user_version')) === 0 && !db.prepare("SELECT 1 FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' LIMIT 1").get();
-      if (!empty) {
-        upgradeSchema(db, { file, now });
-        checkSchema(db, file); // Refuse unsupported stores before persistent WAL/facts changes.
-      }
+      if (!empty) checkSchema(db, file); // Refuse a store that is not exactly the current schema before persistent WAL/facts changes.
       if (empty) db.exec('PRAGMA page_size=4096; PRAGMA auto_vacuum=INCREMENTAL;');
       const mode = String(pragma(db, 'journal_mode=WAL')).toLowerCase();
       need(mode === 'wal', `machine.sqlite journal_mode is '${mode}', not wal (${file})`, 'STARCI_MACHINE_NOT_WAL');

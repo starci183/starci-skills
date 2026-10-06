@@ -1,9 +1,25 @@
 # Changelog
 
-All notable changes to StarCi are documented here. The project is pre-publication on the
-`1.0.0-alpha.N` line: contracts are provisional until every S* row in
-`docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
+All notable changes to StarCi are documented here. Contracts may be revised by practice until every S* row in
+`docs/goal.md` holds with fresh evidence.
 `package.json` `version` is the only version authority.
+
+## [1.0.5] — 2026-10-06
+
+Theme: the runtime's version line leaves alpha and the host prompts move into the public skill.
+
+### Changed
+- The runtime version is `1.0.5`; the `1.0.0-alpha.N` prerelease line ends. The root package publishes under the default `latest` dist-tag, and `starci runtime install` pins `starci@1.0.5` from the generated `packages/cli/src/runtime-install.generated.mjs`.
+- The host startup and maintenance prompts move from `.starci/host/` to `skills/starci/references/host-startup.md` and `host-maintenance.md`; the package ships them through `skills/`, and `.starci/` leaves the package `files`.
+
+### Fixed
+- The machine store has one schema and no migration path: the v2→v3 upgrade introduced in `b01a8a703` is removed, and a store of an earlier shape is refused unchanged.
+
+### Added
+- A GitHub Actions workflow produces a downloadable runtime artifact carrying version, commit SHA and hash metadata.
+
+### Evidence
+- Targeted checks only: `node --check` on edited `.mjs`, the generated catalog check and the version-pin, README and CHANGELOG runtime checks. Broad QA is not part of this cut's evidence: no Sonar scan, no Linux parity run, no L3 or L4 ladder, no UAT and no full unit or e2e suite.
 
 ## [1.0.0-alpha.4] — TBD(release date), release commit `TBD(sha)`
 

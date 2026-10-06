@@ -5,8 +5,8 @@ job contract. It boots the one long-lived [Kernel] for an already-persisted, acc
 
 Contract: `modules/kernel/start-workflow.yaml`.
 Executable: `scripts/kernel/start-workflow.mjs`.
-Host readiness: `.starci/host/startup.md`.
-Optional runtime maintenance: `.starci/host/maintenance.md`.
+Host readiness: `host-startup.md`.
+Optional runtime maintenance: `host-maintenance.md`.
 Local action credentials: [Host credentials](../../../docs/host-secrets.md).
 
 ## Approval and identity

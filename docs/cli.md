@@ -2841,7 +2841,7 @@ json: flag
 
 ```sh
 starci release cut
-starci release cut --repo <path> --tag v1.0.0-alpha.4 --json
+starci release cut --repo <path> --tag v1.0.5 --json
 ```
 
 ### starci release images

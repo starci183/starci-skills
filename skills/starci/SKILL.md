@@ -32,8 +32,8 @@ Load only the reference needed for the requested action:
 | Owner chat worker coordination | `references/orchestration.md` |
 | Owner chat visible computer inspection | `references/computer-use.md` |
 | Inspect a selected action's credential requirements | `<Source>/.claude/docs/host-secrets.md` |
-| Inspect or recover host readiness | `<Source>/.claude/.starci/host/startup.md` |
-| Inspect runtime maintenance | `<Source>/.claude/.starci/host/maintenance.md` |
+| Inspect or recover host readiness | `<Source>/.claude/skills/starci/references/host-startup.md` |
+| Inspect runtime maintenance | `<Source>/.claude/skills/starci/references/host-maintenance.md` |
 
 For a new workflow, resolve missing project, goal, scope and expected outcome through a read-only context scan and
 clarification. Once sufficient, run the native read-only goal planner, present the exact draft and derived operation

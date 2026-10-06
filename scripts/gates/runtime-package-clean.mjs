@@ -86,7 +86,7 @@ export function proveRuntimePackage({ root, sourceSha, expectedShasum, env = pro
     // Consumer archives never carry local credentials or the releasing host's encrypted Sonar custody.
     const privateFile = [...files.keys()].find((file) => file.replaceAll('\\', '/').split('/').at(-1).toLowerCase() === SECRET_ENV_FILE.toLowerCase() || /^package[\\/]ext[\\/]sonar[\\/]secrets(?:[\\/]|$)/i.test(file));
     if (privateFile) return finish('red', PROOF_CODES.install, `root archive contains private host configuration or custody: ${privateFile}`);
-    const required = ['skills/starci/SKILL.md', 'skills/starci/agents/openai.yaml', '.starci/host/startup.md', '.starci/host/maintenance.md',
+    const required = ['skills/starci/SKILL.md', 'skills/starci/agents/openai.yaml', 'skills/starci/references/host-startup.md', 'skills/starci/references/host-maintenance.md',
       'ui/server.mjs', 'ui/api/index.mjs', 'ui/package.json', 'ui/package-lock.json'];
     const uiFiles = (deps.trackedUnder ?? gitTrackedUnder)(path.join(root, 'ui'));
     if (!uiFiles?.some((file) => file.startsWith('src/'))) return finish('unrun', PROOF_CODES.unrun, 'tracked UI source inventory is unavailable or empty');

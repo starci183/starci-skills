@@ -302,7 +302,7 @@ export type AttemptDetailV3 = Omit<AttemptDetailV2, 'files'> & Partial<AttemptWh
   manifestRead: { state: 'missing' | 'ready' | 'unavailable' | 'invalid'; artifactId: number | null; sha: string | null };
   prior: PriorAttempt | null; checkPairs: CheckPair[] };
 
-/* ---- why (docs/why.md, starci/why@1) and the token meter: runtime ledger user_version 4. ---- */
+/* ---- why (docs/why.md, starci/why@1) and the token meter. ---- */
 export type WhyRef = { kind: 'check' | 'report' | 'commit' | string; name?: string; runner?: string; status?: string; reportId?: number; sha?: string };
 export type Why = { headline: string; state: string; cause: string | null; disagreement: string | null; next: string | null;
   provenance?: { source: 'stored' | 'computed'; at: number | null };

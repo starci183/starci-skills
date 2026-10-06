@@ -36,7 +36,7 @@ test('internal skill references and host prompts retain executable-reader custod
     'scripts/gates/reference-reader.mjs': '',
     'scripts/reconciler/host-reader.mjs': '',
     'skills/starci/references/release.md': 'Run `node scripts/gates/reference-reader.mjs --json`.\n',
-    '.starci/host/startup.md': 'Run `node scripts/reconciler/host-reader.mjs --check`.\n',
+    'skills/starci/references/host-startup.md': 'Run `node scripts/reconciler/host-reader.mjs --check`.\n',
   }), []);
 });
 

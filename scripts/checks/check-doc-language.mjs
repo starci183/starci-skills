@@ -28,7 +28,7 @@ import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitResultOf } from '../lib/git.mjs';
 
 /** The runtime folders whose documents are read; the repository root's own Markdown is read too. */
-export const RUNTIME_DOCUMENT_ROOTS = Object.freeze(['knowledge', 'docs', 'modules', 'packages', 'examples', 'skills', '.starci', 'ui']);
+export const RUNTIME_DOCUMENT_ROOTS = Object.freeze(['knowledge', 'docs', 'modules', 'packages', 'examples', 'skills', 'ui']);
 const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', '.next', 'coverage']);
 
 /** The document files of a runtime checkout (repository-relative POSIX paths). */

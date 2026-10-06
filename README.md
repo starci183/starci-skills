@@ -33,7 +33,7 @@ with unflagged `node:sqlite`, and a coding agent host (`package.json` `engines.n
 comes from locally configured agent CLIs (Devin, Claude Code, Codex, Orca) — StarCi has no API key
 of its own.
 
-**Source version:** `1.0.0-alpha.4` (alpha line; contracts are provisional until `1.0.0`), MIT.
+**Source version:** `1.0.5`, MIT.
 
 [Overview](#overview) · [Stack](#stack) · [Repository layout](#repository-layout) ·
 [Development](#development) · [Install](#install) · [Documentation](#documentation)
@@ -135,7 +135,6 @@ scripts/            executables — kernel/cli.mjs, kernel/start-workflow.mjs, g
 packages/cli/       @starci/cli, the thin dispatcher and the only starci bin
 modules/host/       per-host contracts — orca call surface (data only)
 skills/starci/      one explicit public entry, provider policy and conditional internal references
-.starci/host/       internal startup and maintenance prompts; not host skill discovery
 init/               AGENTS.md bootstrap template
 knowledge/          authored YAML doctrine the checks and skills cite
 benchmark/          model-pool evidence: expectations.yaml, append-only snapshots/, findings/

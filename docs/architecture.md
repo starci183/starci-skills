@@ -164,7 +164,7 @@ repeatedly is replaced.
 
 ### Start
 
-`starci reconciler up` (`scripts/reconciler/start.mjs`, with `.starci/host/startup.md` as its internal
+`starci reconciler up` (`scripts/reconciler/start.mjs`, with `skills/starci/references/host-startup.md` as its internal
 procedure; `starci reconciler restart` is the restart lever) runs, in order: preflight (Node bundles
 SQLite >= 3.51.3, `machine.sqlite` quick_check, every registered ledger's quick_check, ledgers on temp/test paths or with a missing repo or file, legacy
 in-repo `.starciwork/runtime.sqlite`, kernel/supervisor pins whose agent card cannot attest the model, Orca reachable);
@@ -181,7 +181,7 @@ changes nothing.
 Accepted workflow startup uses this shared native host readiness before launching its Kernel and
 configuration-selected maintenance. It validates persisted goal acceptance before host or agent
 effects. The ingress does not recursively repair Kernel seats while preparing a new launch; the
-standalone host entry retains repair of already-running workflows. `.starci/host/maintenance.md`
+standalone host entry retains repair of already-running workflows. `skills/starci/references/host-maintenance.md`
 contains the core-only maintenance instructions; native lifecycle code owns its worker and cadence.
 
 ## Ownership

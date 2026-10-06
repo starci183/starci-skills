@@ -179,7 +179,7 @@ pin registry semver, never a `file:` link.
 
 ## Native core maintenance
 
-Accepted workflow startup follows `.starci/host/maintenance.md` when owner configuration enables
+Accepted workflow startup follows `skills/starci/references/host-maintenance.md` when owner configuration enables
 debug. Native host lifecycle owns a durable worker, its singleton and cadence, and retains the
 persisted caller's execution adapter and concrete model. The entry does not create a chat heartbeat,
 provider loop or second scheduler. Read the actual native receipt to establish activation.
