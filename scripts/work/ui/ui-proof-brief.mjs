@@ -613,7 +613,7 @@ const MEASURERS = {
   'accessibility.yaml A11Y-1 case-1': (v) => {
     if (!v.inputs.length) return NONE('no field rendered');
     const bad = v.inputs.filter((e) => !e.labelText);
-    return bad.length ? FAIL(`${bad.map((e) => `${e.tag}${e.placeholder ? ` placeholder "${e.placeholder}"` : ''}`).join(', ')} has no accessible name from a label`) : PASS(`${v.inputs.length} field(s) named by their visible label`);
+    return bad.length ? FAIL(`${bad.map((e) => e.tag+(e.placeholder?' placeholder "'+e.placeholder+'"':'')).join(', ')} has no accessible name from a label`) : PASS(`${v.inputs.length} field(s) named by their visible label`);
   },
   'ux.yaml UX-8 case-1': (v) => MEASURERS['accessibility.yaml A11Y-1 case-1'](v),
   'accessibility.yaml A11Y-1 case-2': (v) => {
@@ -626,7 +626,7 @@ const MEASURERS = {
     }
     if (!pairs.length) return NONE('no hint or message renders beside a field');
     const bad = pairs.filter((p) => !p.related);
-    return bad.length ? FAIL(`${bad.map((p) => `"${p.h.own.slice(0, 30)}" is not aria-describedby of ${tag(p.input)}`).join('; ')}`) : PASS(`${pairs.length} hint(s) related by aria-describedby`);
+    return bad.length ? FAIL(`${bad.map((p) => '"'+p.h.own.slice(0, 30)+'" is not aria-describedby of '+tag(p.input)).join('; ')}`) : PASS(`${pairs.length} hint(s) related by aria-describedby`);
   },
   'accessibility.yaml A11Y-4 case-4': (v) => (v.snap.root.scrollWidth > v.snap.root.clientWidth + 1 ? FAIL(`horizontal overflow: scrollWidth ${v.snap.root.scrollWidth} > ${v.snap.root.clientWidth}`) : PASS(`no horizontal overflow at ${v.snap.root.clientWidth}px`)),
   'accessibility.yaml A11Y-4 case-1': (v, ctx, c) => {
@@ -635,7 +635,7 @@ const MEASURERS = {
     const targets = v.els.filter((e) => e.visible && (e.role === 'button' || e.tag === 'button') && v.els.some((x) => x.i === e.i) && (e.cls.includes('accordion') || v.ancestors(e).some((a) => /rail|accordion/i.test(a.cls))));
     if (!targets.length) return NONE('no accordion trigger or rail control rendered (the only targets the case sizes)');
     const bad = targets.filter((e) => e.rect.w < Number(m[1]) - 0.5 || e.rect.h < Number(m[2]) - 0.5);
-    return bad.length ? FAIL(bad.map((e) => `${tag(e)} ${r1(e.rect.w)}x${r1(e.rect.h)}`).join(', ')) : PASS(`${targets.length} target(s) >= ${m[1]}x${m[2]}`);
+    return bad.length ? FAIL(bad.map((e) => tag(e)+' '+r1(e.rect.w)+'x'+r1(e.rect.h)).join(', ')) : PASS(`${targets.length} target(s) >= ${m[1]}x${m[2]}`);
   },
   'taste.yaml TASTE-1 case-2': (v) => {
     const heads = v.els.filter((e) => e.visible && /^h[1-6]$/.test(e.tag));
@@ -644,7 +644,7 @@ const MEASURERS = {
     const sections = heads.filter((e) => e.i !== title.i && e.tag !== 'h1');
     if (!sections.length) return NONE('no section title beside the page title');
     const bad = sections.filter((s) => s.style.fontSize >= title.style.fontSize && s.style.fontWeight >= title.style.fontWeight);
-    return bad.length ? FAIL(`${bad.map((s) => `${tag(s)} ${s.style.fontSize}px/${s.style.fontWeight}`).join(', ')} not below the title ${title.style.fontSize}px/${title.style.fontWeight}`) : PASS(`title ${title.style.fontSize}px/${title.style.fontWeight} above ${sections.length} section title(s)`);
+    return bad.length ? FAIL(`${bad.map((s) => tag(s)+' '+s.style.fontSize+'px/'+s.style.fontWeight).join(', ')} not below the title ${title.style.fontSize}px/${title.style.fontWeight}`) : PASS(`title ${title.style.fontSize}px/${title.style.fontWeight} above ${sections.length} section title(s)`);
   },
   'taste.yaml TASTE-4 case-3': (v, ctx) => {
     const scale = new Set([...scalePx(ctx.knowledge, 'gap'), ...scalePx(ctx.knowledge, 'padding')].map(Math.round));
@@ -743,7 +743,7 @@ function fromSpacing(ctx, idRe, sourceRe = null) {
   const rows = ctx.spacing.filter((s) => idRe.test(s.id) && (!sourceRe || sourceRe.test(s.source)));
   if (!rows.length || rows.every((r) => r.status === 'unmeasurable')) return NONE('nothing of that kind rendered');
   const bad = rows.filter((r) => r.status === 'fail');
-  const text = (r) => `${r.id} ${typeof r.got === 'number' ? `${r.got}px` : r.got} (want ${typeof r.exp === 'number' ? `${r.exp}px` : r.exp})${r.evidence ? ` ${r.evidence}` : ''}`;
+  const text = (r) => r.id+' '+(typeof r.got==='number'?r.got+'px':r.got)+' (want '+(typeof r.exp==='number'?r.exp+'px':r.exp)+')'+(r.evidence?' '+r.evidence:'');
   return bad.length ? FAIL(bad.map(text).join('; ')) : PASS(`${rows.length} measured: ${rows.slice(0, 4).map(text).join('; ')}`);
 }
 
@@ -759,7 +759,7 @@ function textContrast(v, ctx, large) {
   if (!runs.length) return NONE(`no ${large ? 'large' : 'normal'} text rendered`);
   const measured = runs.map((e) => { const bg = v.bgOf(e); const fg = alphaOver(e.style.color, bg); return { e, ratio: contrastRatio(fg, bg) }; });
   const bad = measured.filter((x) => x.ratio < floor - 0.005).sort((a, b) => a.ratio - b.ratio);
-  return bad.length ? FAIL(`${bad.length} run(s) under ${floor}:1, worst ${bad.slice(0, 3).map((x) => `${tag(x.e)} ${x.ratio.toFixed(2)}:1`).join(', ')}`) : PASS(`${runs.length} run(s) >= ${floor}:1 (lowest ${Math.min(...measured.map((x) => x.ratio)).toFixed(2)}:1)`);
+  return bad.length ? FAIL(`${bad.length} run(s) under ${floor}:1, worst ${bad.slice(0, 3).map((x) => tag(x.e)+' '+x.ratio.toFixed(2)+':1').join(', ')}`) : PASS(`${runs.length} run(s) >= ${floor}:1 (lowest ${Math.min(...measured.map((x) => x.ratio)).toFixed(2)}:1)`);
 }
 
 function focusCheck(v) {
