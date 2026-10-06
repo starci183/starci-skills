@@ -40,7 +40,7 @@ const CHECK_ENTRIES = ['scripts/hfs/check.mjs', 'scripts/hfs/architecture.mjs', 
 /** Static imports and `new URL(<relative>.yaml, import.meta.url)` reads (the framework-pinned knowledge file) are followed. */
 const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"]/g;
 /** A read of the migration DDL of one store: `migrations/runtime` or `migrations/machine`. */
-const MIGRATION_STORE = /migrations[\/'", ]+(runtime|machine)/g;
+const MIGRATION_STORE = /migrations[/'", ]+(runtime|machine)/g;
 const URL_SPEC = /new URL\(\s*['"](\.[^'"]+\.ya?ml)['"]\s*,\s*import\.meta\.url/g;
 
 /** The runtime-relative files reachable from `entries` through relative imports and `new URL(..., import.meta.url)` reads. */

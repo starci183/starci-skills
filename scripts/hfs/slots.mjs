@@ -833,7 +833,7 @@ export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_R
   let doc;
   try { doc = parseYaml(text ?? fs.readFileSync(file, 'utf8')); } catch (error) { fail('HFS_RULES_INVALID', `the rule catalog cannot be read (${String(error?.message ?? error).split('\n')[0]})`, { file }); }
   const problems = ruleCatalogProblems(doc);
-  if (problems.length) fail('HFS_RULES_INVALID', `the rule catalog breaks its schema: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? '; and ' + (problems.length - 5) + ' more' : ''}`, { file, problems });
+  if (problems.length) { fail('HFS_RULES_INVALID', `the rule catalog breaks its schema: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? '; and ' + (problems.length - 5) + ' more' : ''}`, { file, problems }); }
   const [major, minor, patch] = doc.version.split('.').map(Number);
   if (manifest && manifest.major !== major) fail('HFS_MANIFEST_MAJOR_MISMATCH', `the rule catalog is major ${major} but the slot manifest is major ${manifest.major}`, { catalog: major, manifest: manifest.major });
   const list = deepFreeze(doc.rules.map((r) => ({ ...r, enforcers: r.enforcers.map((e) => ({ ...e, planned: e.status === 'planned' })) })));
