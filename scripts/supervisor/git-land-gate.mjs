@@ -15,27 +15,54 @@ const BUILTINS = new Set([...builtinModules, ...builtinModules.map((name) => `no
 const TEMPLATE = (file) => file.startsWith('packages/hfs/templates/');
 const slash = (p) => p.replaceAll(String.fromCodePoint(92), '/');
 
+const quotedCharacter = (c, next) => {
+  if (c === '\\') return { next: next ?? '', advance: true };
+  if (c === '"') return { close: true };
+  return {};
+};
+const lineCommentEnd = (text, index) => {
+  while (index < text.length && text[index] !== '\n') { index += 1; }
+  return index;
+};
+const blockCommentEnd = (text, index) => {
+  index += 2;
+  while (index < text.length && !(text[index] === '*' && text[index + 1] === '/')) { index += 1; }
+  return index + 1;
+};
+
 const stripJsonc = (text) => {
   let out = '', quoted = false;
   for (let i = 0; i < text.length; i += 1) {
     const c = text[i], next = text[i + 1];
-    if (quoted) { out += c; if (c === '\\') { out += next ?? ''; i += 1; } else if (c === '"') quoted = false; continue; }
+    if (quoted) {
+      out += c;
+      const result = quotedCharacter(c, next);
+      out += result.next ?? '';
+      if (result.advance) { i += 1; }
+      if (result.close) { quoted = false; }
+      continue;
+    }
     if (c === '"') { quoted = true; out += c; continue; }
-    if (c === '/' && next === '/') { while (i < text.length && text[i] !== '\n') i += 1; out += '\n'; continue; }
-    if (c === '/' && next === '*') { i += 2; while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i += 1; i += 1; continue; }
+    if (c === '/' && next === '/') { i = lineCommentEnd(text, i); out += '\n'; continue; }
+    if (c === '/' && next === '*') { i = blockCommentEnd(text, i); continue; }
     out += c;
   }
   return out.replace(/,(\s*[}\]])/g, '$1');
 };
 const readJson = (file) => { try { return JSON.parse(stripJsonc(fs.readFileSync(file, 'utf8'))); } catch { return {}; } };
 
+const inheritedConfigPath = (worktree, dir, entry) => {
+  if (entry.startsWith('.')) return path.resolve(dir, entry);
+  const moduleConfig = entry.endsWith('.json') ? entry : path.join(entry, 'tsconfig.json');
+  return path.join(worktree, 'node_modules', moduleConfig);
+};
 const resolveConfig = (worktree, file, seen = new Set()) => {
   if (seen.has(file) || !fs.existsSync(file)) return {};
   seen.add(file);
   const json = readJson(file), dir = path.dirname(file);
   let merged = {};
   for (const entry of [json.extends ?? []].flat().filter(Boolean)) {
-    const candidate = entry.startsWith('.') ? path.resolve(dir, entry) : path.join(worktree, 'node_modules', entry.endsWith('.json') ? entry : path.join(entry, 'tsconfig.json'));
+    const candidate = inheritedConfigPath(worktree, dir, entry);
     merged = { ...merged, ...resolveConfig(worktree, candidate.endsWith('.json') ? candidate : `${candidate}.json`, seen) };
   }
   const own = json.compilerOptions ?? {};
@@ -89,26 +116,36 @@ const importSpecifiers = (worktree, text) => {
 };
 
 /** Import-resolution findings for changed executable source files. */
+function importProblemFor(worktree, file, aliases, specifier) {
+  if (BUILTINS.has(specifier)) return null;
+  if (specifier.startsWith('.')) {
+    const bare = specifier.replace(/[?#].*$/, '');
+    const target = path.join(worktree, path.dirname(file), bare).replace(/\.js$/, '');
+    if (!existsModule(target) && !binIntoBuildOutput(worktree, file, bare)) return `import: ${file} -> '${specifier}' does not resolve`;
+    return null;
+  }
+  const alias = aliases.find(({ pattern }) => {
+    if (pattern.endsWith('/*')) return specifier.startsWith(pattern.slice(0, -1));
+    return specifier === pattern;
+  });
+  if (alias) {
+    const rest = alias.pattern.endsWith('/*') ? specifier.slice(alias.pattern.length - 1) : '';
+    if (!alias.targets.some((target) => existsModule(path.join(alias.baseUrl, target.replace('*', rest))))) return `import: ${file} -> '${specifier}' does not resolve`;
+    return null;
+  }
+  const pkg = specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0];
+  if (!packageResolves(worktree, file, pkg)) return `import: ${file} -> package '${pkg}' is neither installed nor declared`;
+  return null;
+}
+
 function importProblems(worktree, code) {
   const problems = [];
   for (const file of code.filter((name) => !TEMPLATE(name))) {
     const text = fs.readFileSync(path.join(worktree, file), 'utf8');
     const project = projectOf(worktree, file), aliases = project ? aliasesOf(worktree, project) : [];
     for (const specifier of importSpecifiers(worktree, text)) {
-      if (BUILTINS.has(specifier)) continue;
-      if (specifier.startsWith('.')) {
-        const bare = specifier.replace(/[?#].*$/, '');
-        if (!existsModule(path.join(worktree, path.dirname(file), bare).replace(/\.js$/, '')) && !binIntoBuildOutput(worktree, file, bare)) problems.push(`import: ${file} -> '${specifier}' does not resolve`);
-        continue;
-      }
-      const alias = aliases.find(({ pattern }) => pattern.endsWith('/*') ? specifier.startsWith(pattern.slice(0, -1)) : specifier === pattern);
-      if (alias) {
-        const rest = alias.pattern.endsWith('/*') ? specifier.slice(alias.pattern.length - 1) : '';
-        if (!alias.targets.some((target) => existsModule(path.join(alias.baseUrl, target.replace('*', rest))))) problems.push(`import: ${file} -> '${specifier}' does not resolve`);
-        continue;
-      }
-      const pkg = specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0];
-      if (!packageResolves(worktree, file, pkg)) problems.push(`import: ${file} -> package '${pkg}' is neither installed nor declared`);
+      const problem = importProblemFor(worktree, file, aliases, specifier);
+      if (problem) problems.push(problem);
     }
   }
   return problems;
