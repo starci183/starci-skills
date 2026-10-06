@@ -426,8 +426,9 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   const workers = Array.isArray(override?.ops) ? { ops: override.ops.map((o) => ({ status: 'running', ...o })), kernels: num(override.kernels) }
     : (census ?? (() => workersCensus({ db, ledgerFile, env })))();
   const ops = workers.ops ?? [];
-  const samples = Array.isArray(override?.footprints) ? override.footprints
-    : override ? [] : (() => { try { return (footprints ?? (() => recentFootprints({ limit: thresholds.historySamples, env })))(); } catch { return []; } })();
+  let samples = [];
+  if (Array.isArray(override?.footprints)) samples = override.footprints;
+  else if (!override) { try { samples = (footprints ?? (() => recentFootprints({ limit: thresholds.historySamples, env })))(); } catch { samples = []; } }
   const estimates = opRamEstimates(table, samples, thresholds);
   const prev = state ?? readThrottleState({ env });
   const priorities = priorityTable(s, prev);
@@ -436,9 +437,10 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   // it published (fresh within RECONCILER_MODE_FRESH_MS); a stale or missing publication is computed locally and never
   // written (owner ruling 2026-09-28 "on an error, delete it outright": no dormant fallback writer).
   const published = prev.writer === RECONCILER_WRITER && MODES.includes(prev.mode) && now - Date.parse(prev.at ?? '') < RECONCILER_MODE_FRESH_MS;
-  const m = published ? { mode: prev.mode, ramMode: MODES.includes(prev.ramMode) ? prev.ramMode : prev.mode, cpuHot: Boolean(prev.cpuHot), why: prev.why ?? `${prev.mode} (published by ${RECONCILER_WRITER})` }
-    : ramKnown ? nextMode(prev, { freeRamPct: host.freeRamPct, cpuBusy }, thresholds)
-    : { mode: prev.mode ?? 'normal', ramMode: prev.ramMode ?? 'normal', cpuHot: Boolean(prev.cpuHot), why: 'RAM unmeasured: mode unchanged' };
+  let m;
+  if (published) m = { mode: prev.mode, ramMode: MODES.includes(prev.ramMode) ? prev.ramMode : prev.mode, cpuHot: Boolean(prev.cpuHot), why: prev.why ?? `${prev.mode} (published by ${RECONCILER_WRITER})` };
+  else if (ramKnown) m = nextMode(prev, { freeRamPct: host.freeRamPct, cpuBusy }, thresholds);
+  else m = { mode: prev.mode ?? 'normal', ramMode: prev.ramMode ?? 'normal', cpuHot: Boolean(prev.cpuHot), why: 'RAM unmeasured: mode unchanged' };
   const maxParallelOps = (() => { const n = Number(runtimeProfile()?.maxParallelOps); return Number.isInteger(n) && n > 0 ? n : null; })();
   const running = ops.filter((o) => o.status !== 'queued');
   const cap = effectiveCapOf({ maxParallelOps, running: running.length, host, mode: m.mode, estimates, thresholds });
