@@ -23,21 +23,27 @@ import fs from 'node:fs';
 import { sha256 } from '../../../engine/digest.mjs';
 import path from 'node:path';
 import { runNode } from '../../api/node/run-node.mjs';
-import { checkVerdictOf } from './check-verdict.mjs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { catFile } from '../../api/git/cat-file.mjs'; import { diff as gitDiff } from '../../api/git/diff.mjs'; import { revParseQuery } from '../../api/git/rev-parse-query.mjs'; import { lsTree } from '../../api/git/ls-tree.mjs';
-import { containedPath, sameOrUnder, slash } from '../../lib/path-key.mjs';
+import { catFile } from '../../api/git/cat-file.mjs'; import { revParseQuery } from '../../api/git/rev-parse-query.mjs'; import { lsTree } from '../../api/git/ls-tree.mjs';
+import { containedPath, slash } from '../../lib/path-key.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const PARITY_OPS = Object.freeze(['code.refactor']);
 export const PARITY_REASONS = Object.freeze(['declared-check-red', 'check-not-reverifiable', 'nothing-reverifiable', 'rerun-red', 'cut-postcondition-red']);
-const PARITY_CHECKS = Object.freeze({ lint: 'canon-parity-lint', tsc: 'canon-parity-typecheck', diff: 'canon-parity-diff-check' });
-const keyOf = (p) => { const k = slash(path.resolve(p)).replace(/\/+$/, ''); return process.platform === 'win32' ? k.toLowerCase() : k; };
-const trimOwned = (p) => slash(p).replace(/\/\*\*(?:\/\*)?$/, '').replace(/\/+$/, '');
+export const PARITY_CHECKS = Object.freeze({ lint: 'canon-parity-lint', tsc: 'canon-parity-typecheck', diff: 'canon-parity-diff-check' });
+/** `s` with every trailing `/` stripped — a `\/+$` match backtracks super-linearly, a loop does not. */
+export const stripSlashes = (s) => { let t = s; while (t.endsWith('/')) t = t.slice(0, -1); return t; };
+const keyOf = (p) => { const k = stripSlashes(slash(path.resolve(p))); return process.platform === 'win32' ? k.toLowerCase() : k; };
+const trimOwned = (p) => {
+  let s = slash(p);
+  if (s.endsWith('/**/*')) s = s.slice(0, -5);
+  else if (s.endsWith('/**')) s = s.slice(0, -3);
+  return stripSlashes(s);
+};
 
 /** A slice the parity verifier may judge: a done code.refactor canon cut slice. */
 export const parityEligible = (item) => item?.outcome === 'done' && PARITY_OPS.includes(item.op)
@@ -75,22 +81,39 @@ export function checkFamilyOf(check) {
   if (/^node(?:\.exe)?\s+--check\s+[^\s&|;<>`$'"-][^\s&|;<>`$'"]*$/.test(command.trim())) return 'syntax';
   return null;
 }
-/** The contract's record of a gate the owner switched off (code.refactor: specs.unit, exit 0, evidence "skipped: ..."): not a claim. */
-const isSkipRecord = (check) => String(check?.name ?? '').startsWith('specs.') && check?.exitCode === 0 && /^skipped:/i.test(String(check?.evidence ?? '').trim());
+/** The `cd <dir> &&` head of a declared command, or null: quoted or bare, the dir never holds `&` and `&&` follows. */
+const cdDirOf = (command) => {
+  const m = /^\s*cd\s+(?:\/d\s+)?/i.exec(command);
+  if (!m) return null;
+  const rest = command.slice(m[0].length);
+  const quoted = rest.startsWith('"');
+  const end = quoted ? rest.indexOf('"', 1) : rest.indexOf('&');
+  if (end <= 0) return null;
+  const dir = rest.slice(quoted ? 1 : 0, end);
+  if (dir === '' || dir.includes('&') || dir.includes('"')) return null;
+  return rest.slice(quoted ? end + 1 : end).trimStart().startsWith('&&') ? dir : null;
+};
+
+/** The tsconfig of one declared typecheck command (`cd <dir> && ... tsc`, `tsc -p|--project <path>`), or null. */
+const declaredProjectOf = (command, root) => {
+  const p = /(?:^|\s)(?:-p|--project)\s+("?)([^"\s]+)\1/.exec(command)?.[2];
+  const cd = cdDirOf(command);
+  const base = cd ? path.resolve(root, cd.trim()) : root;
+  let target = null;
+  if (p) target = path.resolve(base, p);
+  else if (cd) target = base;
+  if (!target) return null;
+  const file = /\.json$/i.test(target) ? target : path.join(target, 'tsconfig.json');
+  return fs.existsSync(file) && keyOf(file).startsWith(`${keyOf(root)}/`) ? file : null;
+};
 
 /** tsconfig projects a declared typecheck named: `cd <dir> && ... tsc`, `tsc -p|--project <path>`. Absolute paths only. */
 export function declaredProjectsOf(checks, root) {
   const out = [];
   for (const c of checks ?? []) {
     if (checkFamilyOf(c) !== 'tsc') continue;
-    const command = String(c?.command ?? '');
-    const p = /(?:^|\s)(?:-p|--project)\s+("?)([^"\s]+)\1/.exec(command)?.[2];
-    const cd = /^\s*cd\s+(?:\/d\s+)?("?)([^"&]+?)\1\s*&&/i.exec(command)?.[2];
-    const base = cd ? path.resolve(root, cd.trim()) : root;
-    const target = p ? path.resolve(base, p) : cd ? base : null;
-    if (!target) continue;
-    const file = /\.json$/i.test(target) ? target : path.join(target, 'tsconfig.json');
-    if (fs.existsSync(file) && keyOf(file).startsWith(`${keyOf(root)}/`)) out.push(file);
+    const file = declaredProjectOf(String(c?.command ?? ''), root);
+    if (file) out.push(file);
   }
   return [...new Set(out)];
 }
@@ -131,7 +154,7 @@ export function baseBlobsOf(root, base, ownedRels, { run = git } = {}) {
 }
 
 /** Every file sameOrUnder the owned paths in the working tree (root-relative posix), links never followed. */
-function ownedFilesOf(root, ownedRels) {
+export function ownedFilesOf(root, ownedRels) {
   const out = [];
   const walk = (rel) => {
     let st;
@@ -251,7 +274,9 @@ export function tscParity({ root, ownedRels, baseBlobs, extraProjects = [], ts: 
 export async function lintParity({ root, files, base, checker = null, timeoutMs = 1_200_000 }) {
   if (!files.length) return { ok: true, status: 'clean', counts: { new: 0, preexisting: 0 }, gating: [], note: 'no owned file' };
   const gated = await (checker ?? ((r, f, o) => lintInChild(r, f, { ...o, timeoutMs })))(root, files, { base });
-  const status = gated?.exit === 0 ? 'clean' : gated?.exit === 1 ? 'findings' : 'unavailable';
+  let status = 'unavailable';
+  if (gated?.exit === 0) status = 'clean';
+  else if (gated?.exit === 1) status = 'findings';
   const gating = [...(gated?.errors ?? []).map((message) => ({ code: 'GATE_TOOL_FAILED', message: String(message) })),
     ...(gated?.findings ?? []).map((f) => ({ code: `${f.engine}/${f.rule}`, file: f.path ?? null, line: f.line ?? null, message: f.message }))];
   return { ok: status === 'clean', status, counts: { new: (gated?.findings ?? []).length, preexisting: gated?.preexisting ?? 0 }, gating,
@@ -271,184 +296,18 @@ function lintInChild(root, files, { base, timeoutMs = 1_200_000, env = process.e
   try {
     const r = runNode([selfFile, '--lint-child', file], { timeout: timeoutMs, env, maxBuffer: 256 * 1024 * 1024 });
     const line = String(r.stdout ?? '').trim().split(/\r?\n/).pop() ?? '';
-    try { return JSON.parse(line); } catch { return { exit: 2, findings: [], errors: [`the parity lint child printed no result: ${String(r.stderr || r.error?.message || `exit ${r.status}`).slice(0, 300)}`] }; }
+    try {
+      return JSON.parse(line);
+    } catch {
+      const why = String(r.stderr || r.error?.message || `exit ${r.status}`).slice(0, 300);
+      return { exit: 2, findings: [], errors: [`the parity lint child printed no result: ${why}`] };
+    }
   } finally { try { fs.rmSync(file, { force: true }); } catch { /* temp */ } }
 }
 
-/* ------------------------------------------------------------ the verdict */
+/* ------------------------------------------------------------ the verdict (canon-parity-verdict.mjs) */
 
-const brief = (issue) => `${issue.code}${issue.ruleId ? `/${issue.ruleId}` : ''}${issue.file ?? issue.path ? ` ${issue.file ?? issue.path}${issue.line ? `:${issue.line}` : ''}` : ''}${issue.newBecause ? ` (${issue.newBecause})` : ''}`;
-
-/**
- * The parity verdict of one reported canon cut slice. {green, via: 'canon-parity', checks, reason?, detail?, parity}
- * `classify(check)` is the settler's classifyCheck; `rerun`/`canon` its seams; `lint`, `tsc`, `diffCheck`, `blobs` ours.
- */
-export async function canonParityVerdict(item, { repo, settings, env = process.env, classify, rerun, canon, baseline = () => false,
-  resolveRoot, lint = lintParity, tsc = tscParity, diffCheck = null, blobs = baseBlobsOf, now = Date.now, wireLegs = () => [],
-  canonBase = canonBaseFindings, record = async () => {} } = {}) {
-  const started = now();
-  const hand = (reason, detail, parity = null) => ({ green: false, reason, detail: (Array.isArray(detail) ? detail : [detail]).filter(Boolean).map((d) => String(d).slice(0, 300)).slice(0, 8), ...(parity ? { parity } : {}) });
-  // H7: a measurement that could not run is tooling, never the slice's red (scripts/kernel/settle/check-verdict.mjs).
-  const unavailable = (reason, detail) => ({ ...hand(reason, detail), unavailable: true });
-  const base = sliceBaseOf(item);
-  if (!base) return hand('parity-no-base', 'no --base in the report checks');
-  const where = await resolveRoot(item, { repo });
-  if (!where.ok) return hand('parity-unresolved', where.why);
-  const { root, ownedRels } = where;
-  if (!git(catFile, root, ['-e', `${base}^{commit}`]).ok) return hand('parity-base-unknown', `admission base ${base} is not a commit in ${root}`);
-
-  // (c) every declared check is an action, a baseline, covered by an owned-scope measurement, or re-runs green.
-  const declared = Array.isArray(item.report?.checks) ? item.report.checks : [];
-  const covered = { canon: [], lint: [], tsc: [], diff: [], syntax: [] };
-  const reruns = [];
-  const uncovered = [];
-  for (const c of declared) {
-    if (baseline(c) || isSkipRecord(c)) continue;
-    const cls = classify({ ...c, command: withoutNodePath(c?.command) });
-    const family = checkFamilyOf(c);
-    if (family) { covered[family].push(c); continue; }
-    if (cls.kind === 'action') { if (c?.exitCode !== 0 && c?.exitCode != null) uncovered.push(`${c.name}:${c.exitCode} (red action)`); continue; }
-    if (cls.kind === 'runtime') { reruns.push({ check: c, ...cls }); continue; }
-    uncovered.push(`${c?.name}:${c?.exitCode} (${cls.why ?? 'not re-verifiable'})`);
-  }
-  if (uncovered.length) return hand('parity-uncovered', uncovered);
-
-  const checks = [];
-  for (const c of reruns) {
-    if (now() - started > settings.itemBudgetMs) return hand('verify-budget-exceeded', 'parity re-runs');
-    const r = rerun(c, { repo, timeoutMs: settings.rerunTimeoutMs, env });
-    await record({ name: String(c.check.name ?? c.rel), command: String(c.check.command), cwd: repo, phase: 'parity', runner: 'parity', ...r });
-    const v = checkVerdictOf(r);
-    if (v.verdict === 'unavailable') return unavailable('parity-checker-unavailable', `${c.check.name}:${r.exitCode} ${r.tail ?? ''}`);
-    if (v.verdict === 'red') return hand('parity-rerun-red', `${c.check.name}:${r.exitCode} ${r.tail ?? ''}`);
-    checks.push({ name: String(c.check.name ?? c.rel), exitCode: 0, command: String(c.check.command).slice(0, 2000),
-      evidence: `runtime settler re-run: exit 0 in ${Math.round(r.ms / 100) / 10}s (worker declared exit ${c.check.exitCode})` });
-  }
-
-  // node --check <file>: re-run as argv (no shell) in the checkout; the file must parse.
-  for (const c of covered.syntax) {
-    const argv = String(c.command).trim().split(/\s+/).slice(1);
-    const syntaxStarted = now();
-    const r = runNode(argv, { cwd: root, timeout: 60_000 });
-    await record({ name: String(c.name), command: String(c.command), cwd: root, phase: 'parity', runner: 'parity',
-      exitCode: r.status ?? (r.error?.code === 'ETIMEDOUT' ? 124 : 127), startedAt: syntaxStarted, finishedAt: now(), stdout: r.stdout, stderr: r.stderr ?? r.error?.message });
-    if (r.status == null || r.error) return unavailable('parity-checker-unavailable', `${c.name}: ${r.error?.message ?? 'no exit'}`);
-    if (r.status !== 0) return hand('parity-rerun-red', `${c.name}:${r.status} ${String(r.stderr ?? '').trim().split(/\r?\n/)[0] ?? ''}`);
-    checks.push({ name: String(c.name), exitCode: 0, command: String(c.command).slice(0, 2000), evidence: `runtime settler re-run in ${root}: exit 0 (worker declared exit ${c.exitCode})` });
-  }
-
-  // (a) the slice's goal: canon-scan over its owned paths, 0 findings.
-  const slice = await canon(item, { repo });
-  await record({ name: 'cut-slice-postcondition', command: `canon-scan --root ${slice.root ?? root}`, cwd: slice.root ?? root,
-    phase: 'parity', runner: 'parity', exitCode: slice.exitCode, output: slice.output ?? slice,
-    summary: { status: slice.status, findings: slice.findings } });
-  let owedAccepted = null;
-  if (slice.exitCode === 1) {
-    // Coordinator ruling (canon-parity-settle, owedToWire): findings left on owned paths pass only when EVERY one is
-    // declared in report.owedToWire, maps to a queued/running canon-wire leg for its path, and was not introduced by
-    // the slice (present at base). Anything else stays strict.
-    const owed = await owedToWireAccept(item, slice, { root, base, ownedRels, wireLegs: wireLegs(), canonBase });
-    if (!owed.ok) return hand('cut-postcondition-red', [`canon-scan ${slice.status ?? '?'} ${slice.findings ?? '?'} finding(s)`, `owedToWire: ${owed.why}`]);
-    owedAccepted = owed;
-  } else if (checkVerdictOf({ exitCode: slice.exitCode, status: slice.status }).verdict === 'unavailable') return unavailable('parity-checker-unavailable', `canon-scan ${slice.status ?? '?'}${slice.why ? ` ${slice.why}` : ''}`);
-  else if (slice.exitCode !== 0) return hand('cut-postcondition-red', `canon-scan ${slice.status ?? '?'}${slice.findings != null ? ` ${slice.findings} finding(s)` : ''}${slice.why ? ` ${slice.why}` : ''}`);
-
-  // (d) typecheck parity against the overlay base.
-  const baseFiles = blobs(root, base, ownedRels);
-  if (!baseFiles.ok) return hand('parity-base-unreadable', baseFiles.reason);
-  let typed;
-  try { typed = await Promise.resolve(tsc({ root, ownedRels, baseBlobs: baseFiles.blobs, extraProjects: declaredProjectsOf(covered.tsc, root) })); }
-  catch (error) { typed = { ok: false, unavailable: String(error?.message ?? error) }; }
-  await record({ name: PARITY_CHECKS.tsc, command: `typescript owned-file parity at ${base}`, cwd: root, phase: 'parity', runner: 'parity',
-    exitCode: typed.ok ? 0 : typed.unavailable ? 127 : 1, output: typed,
-    summary: { projects: typed.projects?.length ?? 0, newErrors: typed.newErrors?.length ?? null, unavailable: typed.unavailable ?? null } });
-  if (typed.unavailable) return unavailable('parity-tsc-unavailable', typed.unavailable);
-  if (!typed.ok) return hand('parity-tsc-new', typed.newErrors.slice(0, 8).map((e) => `${e.owned ? 'owned' : 'importer'} ${e.file} ${e.code} x${e.count - e.baseCount}: ${e.message}`), { tsc: typed });
-
-  // (b) lint through the gate: no new finding over the owned files, and every tool ran.
-  const files = ownedFilesOf(root, ownedRels);
-  if (now() - started > settings.itemBudgetMs) return hand('verify-budget-exceeded', 'before the lint gate');
-  const linted = await lint({ root, files, base });
-  await record({ name: PARITY_CHECKS.lint, command: `gate.mjs lint --root ${root} --base ${base} --changed <${files.length} owned file(s)>`, cwd: root,
-    phase: 'parity', runner: 'parity', exitCode: linted.ok ? 0 : linted.status === 'unavailable' ? 2 : 1, output: linted,
-    summary: { status: linted.status, counts: linted.counts } });
-  if (linted.status === 'unavailable') return unavailable('parity-checker-unavailable', `lint gate: ${(linted.gating ?? []).slice(0, 3).map(brief).join('; ')}`);
-  if (!linted.ok) return hand('parity-lint-new', [`lint gate new=${linted.counts?.new ?? '?'} preexisting=${linted.counts?.preexisting ?? '?'} against ${base}`, ...(linted.gating ?? []).slice(0, 6).map(brief)], { lint: { ...linted, gating: (linted.gating ?? []).slice(0, 20) } });
-
-  // git diff --check over the slice's diff (only when the worker declared one).
-  let diffed = null;
-  if (covered.diff.length) {
-    diffed = diffCheck ? diffCheck({ root, base, ownedRels }) : (() => { const r = git(gitDiff, root, ['--check', base, '--', ...ownedRels]); return { ok: r.ok, tail: String(r.stdout ?? '').trim().split(/\r?\n/).slice(0, 3).join(' ') }; })();
-    await record({ name: PARITY_CHECKS.diff, command: `git diff --check ${base} -- <owned paths>`, cwd: root,
-      phase: 'parity', runner: 'parity', exitCode: diffed.ok ? 0 : 1, output: diffed,
-      summary: { ok: diffed.ok, tail: diffed.tail ?? null } });
-    if (!diffed.ok) return hand('parity-diff-check-red', diffed.tail ?? 'git diff --check reported whitespace/conflict errors in the slice diff');
-  }
-
-  const superseded = [...covered.canon, ...covered.lint, ...covered.tsc, ...covered.diff, ...covered.syntax].filter((c) => c?.exitCode !== 0).map((c) => `${c.name}:${c.exitCode}`);
-  const tscLine = typed.projects.map((p) => `${p.project} ${p.errors} error(s) now / ${p.baseErrors} at base, 0 new`).join('; ') || typed.note;
-  const lintLine = `lint gate ${linted.status}, new=${linted.counts?.new ?? 0} preexisting=${linted.counts?.preexisting ?? 0} against ${base}`;
-  checks.push({ name: 'cut-slice-postcondition', exitCode: 0, command: `canon-scan (in-process) --root ${slice.root} over the slice's ${slice.paths} owned path(s)`,
-    evidence: owedAccepted
-      ? `runtime settler (canon parity): canon-scan ${slice.findings} finding(s) on the owned paths, every one declared owedToWire, held by canon-wire leg(s) ${owedAccepted.wires.join(', ')} and present at base ${base} (not introduced by the slice)`
-      : `runtime settler (canon parity): canon-scan status ok, 0 findings on the slice's owned paths (families ${item.payload.params.canonFamilies})` },
-    { name: PARITY_CHECKS.lint, exitCode: 0, command: `gate.mjs lint (child) --root ${root} --base ${base} --changed <${files.length} owned file(s)>`,
-    evidence: `runtime settler (canon parity): ${lintLine}` },
-    { name: PARITY_CHECKS.tsc, exitCode: 0, command: `typescript (in-process) owned files at ${base} vs working tree`, evidence: `runtime settler (canon parity): ${tscLine}` });
-  if (diffed) checks.push({ name: PARITY_CHECKS.diff, exitCode: 0, command: `git diff --check ${base} -- <owned paths>`, evidence: 'runtime settler (canon parity): no whitespace/conflict error in the slice diff' });
-  checks.push({ name: 'cut-regression-inventory', exitCode: 0, command: `canon parity: canon-scan + lint gate + typecheck over the owned paths vs ${base}`,
-    evidence: `runtime settler (canon parity, contract change canon-parity-settle): no new finding and no new type error against the admission base; ${superseded.length ? `the worker's red declared check(s) ${superseded.join(', ')} are foreign residue outside the owned paths (superseded by the owned-scope measurements)` : 'no declared check was red'}${reruns.length ? `; ${reruns.length} runtime check(s) re-ran exit 0` : ''}` });
-  return { green: true, via: 'canon-parity', checks: { checks }, parity: { base, ...(owedAccepted ? { owedToWire: { findings: slice.findings, wires: owedAccepted.wires } } : {}), lint: { status: linted.status, counts: linted.counts }, tsc: typed.projects, superseded } };
-}
-
-/** A path of a report or payload (maybe prefixed with the repository folder, e.g. shop-fe/apps/...) relative to root. */
-const relOf = (p, root) => { const n = slash(p).replace(/\/+$/, ''); const head = path.basename(root); return n.startsWith(`${head}/`) ? n.slice(head.length + 1) : n; };
-
-/**
- * The owedToWire acceptance of canon findings left on the owned paths. {ok, why?, wires?}. Every finding must be
- * (1) declared in report.owedToWire (its file sameOrUnder the entry's file/path, the ruleId equal when both name one),
- * (2) held by a canon-wire leg of the workflow that is queued or running and owns its path - or a queued leg, which
- * settle widens with the owed paths - and (3) present at base at least as often as now (canonBase at base).
- */
-async function owedToWireAccept(item, slice, { root, base, ownedRels, wireLegs = [], canonBase = canonBaseFindings }) {
-  const owed = Array.isArray(item.report?.owedToWire) ? item.report.owedToWire : [];
-  const list = Array.isArray(slice.list) ? slice.list : [];
-  if (!owed.length) return { ok: false, why: 'the report declares no owedToWire' };
-  if (!list.length || list.length !== slice.findings) return { ok: false, why: 'the findings are not itemised' };
-  const entries = owed.map((o) => ({ at: relOf(o.file ?? o.path, root), path: relOf(o.path, root), ruleId: o.ruleId ?? null }));
-  const undeclared = list.filter((f) => !entries.some((e) => sameOrUnder(slash(f.file), e.at) && (!e.ruleId || !f.ruleId || e.ruleId === f.ruleId)));
-  if (undeclared.length) return { ok: false, why: `${undeclared.length} finding(s) not declared: ${undeclared.slice(0, 3).map((f) => `${f.file} ${f.ruleId}`).join('; ')}` };
-  const wires = wireLegs.filter((w) => ['queued', 'leased', 'running'].includes(w.status));
-  if (!wires.length) return { ok: false, why: 'no canon-wire leg is queued or running' };
-  const holders = new Set();
-  for (const e of entries) {
-    const w = wires.find((x) => x.ownedPaths.some((o) => sameOrUnder(e.path, relOf(o, root)) || sameOrUnder(relOf(o, root), e.path))) ?? wires.find((x) => x.status === 'queued');
-    if (!w) return { ok: false, why: `no queued or running canon-wire leg holds ${e.path}` };
-    holders.add(w.jobId);
-  }
-  const was = await canonBase({ root, base, ownedRels, families: String(item.payload.params?.canonFamilies ?? 'all') });
-  if (!was.ok) return { ok: false, why: `base measurement unavailable: ${was.reason}` };
-  const key = (f) => `${slash(f.file)} ${f.ruleId}`;
-  const count = (xs) => xs.reduce((m, f) => m.set(key(f), (m.get(key(f)) ?? 0) + 1), new Map());
-  const now = count(list), then = count(was.findings);
-  const introduced = [...now].filter(([k, n]) => n > (then.get(k) ?? 0)).map(([k]) => k);
-  if (introduced.length) return { ok: false, why: `introduced by the slice (absent at base): ${introduced.slice(0, 3).join('; ')}` };
-  return { ok: true, wires: [...holders] };
-}
-
-/**
- * The canon findings of the owned paths AT BASE, read-only from git objects: ESLint over each owned file's base blob through
- * the checkout's own install and flat config (scripts/gates/gate.mjs baseEslintFindings) - no base tree, no worktree, no
- * link. {ok, findings: [{file, ruleId}]} or {ok: false, reason}.
- */
-async function canonBaseFindings({ root, base, ownedRels }) {
-  try {
-    const blobs = baseBlobsOf(root, base, ownedRels);
-    if (!blobs.ok) return { ok: false, reason: blobs.reason };
-    const { baseEslintFindings } = await import('../../gates/gate.mjs');
-    return { ok: true, findings: (await baseEslintFindings({ root, base, files: [...blobs.blobs.keys()] })).map((f) => ({ file: slash(f.file), ruleId: f.ruleId })) };
-  } catch (error) { return { ok: false, reason: String(error?.message ?? error).slice(0, 200) }; }
-}
+export { canonParityVerdict } from './canon-parity-verdict.mjs';
 
 /** The one checkout the slice's owned paths resolve into, and the owned paths relative to it. */
 export async function resolveOwnedRoot(item, { repo }) {
