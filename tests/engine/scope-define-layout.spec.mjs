@@ -16,14 +16,6 @@ const ops = fs.readdirSync(opsDir).filter(f => f.endsWith('.yaml'))
 const scopeDefine = ops.find(op => op.doc.id === 'scope.define').doc;
 const scopeWrite = scopeDefine.writes.find(w => w.id === 'scope');
 
-test('work-layout forbids authoring work/node records, and no op manifest declares one as its output', () => {
-  assert.match(layout.shape.familiesNote, /HFS_WORK_NODE_RETIRED/);
-  const offenders = ops.flatMap(({ file, doc }) => (doc.writes ?? [])
-    .filter(w => /work\/node@\d/.test(JSON.stringify([w.path, w.fields, w.content])))
-    .map(w => `${file} writes.${w.id}`));
-  assert.deepEqual(offenders, []);
-});
-
 test('scope.define writes its scope record onto the feature record the layout declares', () => {
   assert.equal(`.starciwork/${layout.shape.feature}`, scopeWrite.path);
   assert.ok(!layout.shape.families.includes('scope'), 'the layout has no scope family');
@@ -37,7 +29,7 @@ test('scope.define writes its scope record onto the feature record the layout de
   assert.ok(featureSchema.properties.extensions.properties.work3.properties.scope);
 });
 
-test('the scope.define kind carries the feature record, not work/node', () => {
+test('the scope.define kind carries the feature and catalog records', () => {
   const kind = readYaml('modules/models/kinds.yaml').kinds['scope.define'];
   assert.deepEqual(kind.carries, ['work/feature@1', 'work/catalog@1']);
   assert.ok(kind.stacks.includes('modules/schemas/work-feature.schema.yaml'));
@@ -100,7 +92,6 @@ test('every workspace.manage mode writes its setup record onto the catalog the l
   }
   for (const id of ['workspace.manage', 'scope.finish']) {
     const kind = readYaml('modules/models/kinds.yaml').kinds[id];
-    assert.ok(!kind.carries.includes('work/node@1'), `${id} carries no work/node`);
     assert.ok(kind.carries.includes('work/catalog@1') && kind.stacks.includes('modules/schemas/work-catalog.schema.yaml'));
   }
   const common = JSON.stringify(readYaml('modules/ops/_common.yaml'));

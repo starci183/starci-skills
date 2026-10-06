@@ -56,7 +56,7 @@ writes:
         root-level .starciwork/<scope>/index.yaml record is outside the layout and
         is never authored. A catalog carries no state, so the entry carries none: the mode's completion
         is the kernel's settled verdict on its job, and the entry's review records that outcome and the
-        checks it rests on. A work/node record is retired and refused (HFS_WORK_NODE_RETIRED); this op never authors one."
+        checks it rests on."
   - id: evidence
     path: shared
     artifacts: [manifest.yaml, result.yaml]

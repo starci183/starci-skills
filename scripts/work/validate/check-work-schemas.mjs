@@ -9,8 +9,7 @@
 //
 // Membership is the tree walk's own (scripts/work/validate/check-example-work.mjs): kernel custody roots and
 // _derived projections are skipped, a foreign schema is an artifact payload, an evidence manifest is proof
-// payload checked by check-work-artifacts.mjs, and a retired recursive `work/node@*` record is refused as
-// HFS_WORK_NODE_RETIRED by check-example-work.mjs, not compiled here.
+// payload checked by check-work-artifacts.mjs is not compiled here.
 //
 // ajv is a devDependency of the runtime checkout, not of an installed tree. When it cannot be loaded the
 // strict mode fails closed with one refusal naming why, rather than reporting a green it did not compute.
@@ -24,7 +23,6 @@ import { isWorkRecordSchema, readWorkspace } from '../record-ownership.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SKIPPED_ROOTS = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals', '_derived']);
-const RETIRED_NODE = /^work\/node@\d+$/;
 
 let cached = null;
 
@@ -88,7 +86,7 @@ export function checkWorkSchemas(root, refused, info = [], { workRoot = root } =
     try { record = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; } // structural owns the parse refusal
     if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
     const family = record.schema;
-    if (typeof family !== 'string' || !isWorkRecordSchema(family, workspaceDoc) || RETIRED_NODE.test(family)) continue;
+    if (typeof family !== 'string' || !isWorkRecordSchema(family, workspaceDoc)) continue;
     if ((family === 'work/evidence@1' && path.basename(rel) !== 'evidence.yaml')
       || (path.basename(rel) === 'manifest.yaml' && segments.includes('evidence'))) continue;
     const shown = path.relative(workRoot, file).split(path.sep).join('/') || rel;

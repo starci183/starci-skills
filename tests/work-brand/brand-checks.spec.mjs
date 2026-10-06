@@ -523,12 +523,6 @@ test('runBrandChecks reports every check, resolves the record from a repository 
   assert.equal(fromRepository.brand.record,'.starciwork/brand/index.yaml');
   assert.equal(fromRepository.ok,true,JSON.stringify(fromRepository.checks.filter(entry=>entry.outcome!=='pass'),null,2));
 
-  // The retired recursive work/node envelope is refused, never read: a brand record is work/brand@1.
-  for(const schema of ['work/node@1','work/node@2']){
-    const retired=tree(t,{label:'run-'+schema.replace(/[^a-z0-9]/g,'-'),schema});
-    assert.throws(()=>runBrandChecks({tree:retired.work,sourceRoot:source,grammarRoot}),/HFS_WORK_NODE_RETIRED/,schema);
-  }
-
   const withoutSource=runBrandChecks({tree:work,grammarRoot});
   assert.equal(withoutSource.ok,true);
   assert.deepEqual(withoutSource.checks.filter(entry=>entry.outcome==='skip').map(entry=>entry.id),['tokens-match-source','icon-set-only']);

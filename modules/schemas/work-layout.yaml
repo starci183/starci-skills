@@ -14,11 +14,8 @@ shape:
     business/, architecture/, business/srs/ or architecture/sds/ segment anywhere.
     scripts/work/validate/check-example-work.mjs reads shape.families from this file at gate time and refuses
     (FAMILIES_DRIFT) the moment its own FAMILIES set and this list disagree, so the two cannot drift apart
-    silently. A work/node@N record (the retired recursive envelope, e.g. under business/{overview,srs} or
-    architecture/{overview,sds}) is refused by the gate (HFS_WORK_NODE_RETIRED): restate it as these flat
-    families. A root-level .starciwork/<name>/index.yaml operations or import record outside features/ is a
-    path outside the product list (drift) and belongs in the catalog's setup entries (shape.setup). Ops
-    never author or edit work/node records."
+    silently. A root-level .starciwork/<name>/index.yaml operations or import record outside features/ is a
+    path outside the product list (drift) and belongs in the catalog's setup entries (shape.setup)."
   br: features/<feature>/br/<name>/index.yaml, schema work/business-rule@1. May carry appliesTo, module
     (a string or list of module-root directory paths - never individual files, see the owners note under
     implementation below) and blockedBy.
@@ -253,8 +250,7 @@ rules:
     features/<feature>/index.yaml (work/feature@1); the specification itself lives in flat family
     records - fr for functional requirements, nfr for qualities, br for rules, data for data
     definitions, journey for customer journeys and decision for open or settled policy questions.
-    Every record is a complete typed document of its own family schema; the retired
-    work/node@1-plus-extensions.work3.srs shape is not authored into this layout."
+    Every record is a complete typed document of its own family schema."
   - Each fr record owns its actors, trigger, main/exception flows, postconditions, composes,
     requiresProof and provenBy in one file. Rule, quality, data, decision and journey records
     remain separate addressable owners and link through stable semantic IDs. Parent indexes

@@ -49,7 +49,6 @@ test('schema and loader agree on a broken manifest', () => {
     'unknown presence': (d) => { d.slots[0].presence = 'sometimes'; },
     'external slot that is not forbidden': (d) => { d.slots.find((s) => s.tracked === 'external').presence = 'optional'; },
     'unknown slot field': (d) => { d.slots[0].colour = 'red'; },
-    'retired slot without a successor': (d) => { d.slots[0].retiredIn = 3; },
     'version not semver': (d) => { d.version = '2.0'; },
   };
   for (const [name, mutate] of Object.entries(cases)) {

@@ -3,7 +3,7 @@ $id: urn:starci:hfs-slots:2
 title: HFS slot manifest (kind app or runtime)
 description: >-
   The shape of knowledge/hfs/slots.yaml. Semantic rules JSON Schema cannot state (unique ids, every tier named by a
-  slot or mayImport exists in the profile, a retired slot has a successor, an app-kind slot names a declared kind)
+  slot or mayImport exists in the profile, an app-kind slot names a declared kind)
   are checked by scripts/hfs/slots.mjs loadSlotManifest. Two kinds share the loader: `app` (knowledge/hfs/slots.yaml,
   no `kind` key) for product apps, and `runtime` (knowledge/hfs/runtime-slots.yaml) for the StarCi runtime repository.
 if: {required: [kind], properties: {kind: {const: runtime}}}
@@ -27,12 +27,11 @@ $defs:
       versioning:
         type: object
         additionalProperties: false
-        required: [patch, minor, major, retire, pins]
+        required: [patch, minor, major, pins]
         properties:
           patch: {type: string}
           minor: {type: string}
           major: {type: string}
-          retire: {type: string}
           pins: {type: string}
       presenceValues: {const: [required, optional, opt-in, forbidden]}
       trackedValues: {const: [tracked, ignored, external]}
@@ -269,12 +268,11 @@ $defs:
       versioning:
         type: object
         additionalProperties: false
-        required: [patch, minor, major, retire, pins]
+        required: [patch, minor, major, pins]
         properties:
           patch: {type: string}
           minor: {type: string}
           major: {type: string}
-          retire: {type: string}
           pins: {type: string}
       presenceValues: {const: [required, optional, opt-in, forbidden]}
       trackedValues: {const: [tracked, ignored, external, generated]}
@@ -396,8 +394,6 @@ $defs:
       goesTo: {type: string, minLength: 1}
       why: {type: string, minLength: 1}
       since: {$ref: '#/$defs/semver'}
-      retiredIn: {$ref: '#/$defs/major'}
-      successor: {type: string}
       generatedBy: {type: string, minLength: 1, description: 'the one writer of a generated slot (tracked: generated)'}
       parent: {type: string, pattern: '^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$', description: 'the declared slot id this id extends; RT_SLOT_ID_SHAPE requires the id to start with <parent>.'}
     allOf:
@@ -409,8 +405,6 @@ $defs:
         then: {required: [generatedBy]}
       - if: {required: [generatedBy]}
         then: {properties: {tracked: {const: generated}}}
-      - if: {required: [retiredIn]}
-        then: {required: [successor]}
       - if: {properties: {profiles: {contains: {const: be}}, tracked: {const: tracked}}, required: [profiles, tracked]}
         then: {required: [coverage]}
         else: {not: {required: [coverage]}}
@@ -602,13 +596,9 @@ $defs:
       goesTo: {type: string, minLength: 1}
       why: {type: string, minLength: 1}
       since: {$ref: '#/$defs/semver'}
-      retiredIn: {$ref: '#/$defs/major'}
-      successor: {type: string}
       parent: {type: string, pattern: '^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$', description: 'the declared slot id this id extends; RT_SLOT_ID_SHAPE requires the id to start with <parent>.'}
     allOf:
       - if: {properties: {tracked: {const: external}}, required: [tracked]}
         then: {required: [goesTo], properties: {presence: {const: forbidden}}}
       - if: {properties: {presence: {const: forbidden}}, required: [presence]}
         then: {properties: {tracked: {const: external}}}
-      - if: {required: [retiredIn]}
-        then: {required: [successor]}

@@ -62,22 +62,6 @@ function refusalsFor(extra) {
   return problems;
 }
 
-test('a recursive work/node record is refused as HFS_WORK_NODE_RETIRED, one refusal per record, and never read as a flat family', () => {
-  const problems = refusalsFor({
-    'features/chatbot/business/index.yaml': 'schema: work/node@1\nid: chatbot.business\nkind: business\nrequired: true\n',
-    'features/chatbot/business/overview/index.yaml': 'schema: work/node@1\nid: chatbot.business.overview\nkind: business-overview\nrequired: true\nstate: todo\n',
-    'features/chatbot/business/srs/index.yaml': 'schema: work/node@1\nid: chatbot.business.srs\nkind: business\nrequired: true\nextensions:\n  work3:\n    srs:\n      schema: starci/srs-aggregate@1\n',
-    'features/chatbot/architecture/sds/components/router/index.yaml': 'schema: work/node@2\nid: chatbot.architecture.sds.component.router\nkind: architecture\nrequired: true\nstate: done\n',
-    'features/chatbot/implementation/frontend/shell/evidence/proof/manifest.yaml': 'schema: work/evidence@1\nid: proof.chatbot.shell\nnodeId: chatbot.shell\noutcome: pass\nassets: []\n',
-    'kernel-strays/retired-copy/features/chatbot/fr/broken/index.yaml': 'schema: work/functional-requirement@1\nid: wrong\nstate: done\n',
-  });
-  const retired = problems.filter(problem => problem.includes('[HFS_WORK_NODE_RETIRED]'));
-  for (const rel of ['features/chatbot/business/index.yaml', 'features/chatbot/business/overview/index.yaml', 'features/chatbot/business/srs/index.yaml', 'features/chatbot/architecture/sds/components/router/index.yaml'])
-    assert.ok(retired.some(problem => problem.includes(rel)), `${rel} is refused: ${problems.join(' | ')}`);
-  assert.equal(retired.length, 4, problems.join('\n'));
-  assert.equal(problems.filter(problem => problem.includes('no record family in its path') || problem.includes('but its place says')).length, 0, 'a retired node is refused once, not also judged as a flat record\n' + problems.join('\n'));
-});
-
 test('concept 1: blocker edges - prose blockedBy is refused, dangling target is refused, a stale (done) blocker is refused', () => {
   const proseOnly = refusalsFor({
     'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: todo\nblockedBy:\n  - a plain sentence naming nothing\n',
@@ -834,13 +818,6 @@ test('a root import-cv-* folder is drift, not a known agent-data class', () => {
   assert.ok(!warnings.some(w => w.includes('legacy-import')), warnings.join('\n'));
 });
 
-test('work/node@1 and @2 are each refused at the tree walk', () => {
-  for (const schema of ['work/node@1', 'work/node@2']) {
-    const problems = refusalsFor({ 'features/f/index.yaml': `schema: ${schema}\nid: f\nkind: business\nrequired: true\n` });
-    assert.ok(problems.some(p => p.includes('[HFS_WORK_NODE_RETIRED]')), `${schema}: ${problems.join('\n')}`);
-  }
-});
-
 // R07 HFS_AGENT_DATA_TRACKED: `starci runtime validate` on a .starciwork refuses known agent data and admits product records.
 test('work-validate refuses TRACKED agent data inside .starciwork as HFS_AGENT_DATA_TRACKED', () => {
   const workRoot = tracked(tree({
@@ -870,14 +847,6 @@ test('work-validate raises no HFS_AGENT_DATA_TRACKED for a .starciwork of produc
     'features/f/uat/x/index.yaml': 'schema: work/uat-flow@1\nid: uat.f.x\ntitle: t\nstate: todo\n',
   });
   assert.deepEqual(validateWork(workRoot).refused.filter(line => line.includes('HFS_AGENT_DATA_TRACKED')), []);
-});
-
-// R08 HFS_WORK_NODE_RETIRED: only flat family records.
-test('a flat family record raises no HFS_WORK_NODE_RETIRED, and a work/node one does', () => {
-  const flat = refusalsFor({ 'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: todo\n' });
-  assert.deepEqual(flat.filter(p => p.includes('HFS_WORK_NODE_RETIRED')), []);
-  const node = refusalsFor({ 'features/f/br/rule/index.yaml': 'schema: work/node@1\nid: br.f.rule\nkind: business\nrequired: true\n' });
-  assert.equal(node.filter(p => p.includes('[HFS_WORK_NODE_RETIRED]')).length, 1, node.join('\n'));
 });
 
 // R09 HFS_IDENTITY_CUSTODY: an identity names its secret identity-<slug>.enc; a flow selects by a role the identity presents.

@@ -29,11 +29,7 @@ import {sealedLocationProblem} from './check-work-artifacts.mjs'; import { isMai
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
-// `work/node@*` is the retired recursive specification envelope from the pre-flat business/srs and
-// architecture/sds layouts. It has no reader: a record carrying it is refused (HFS_WORK_NODE_RETIRED) and
-// must be restated as flat family records.
 const EXEMPT = new Set(['work/catalog@1', 'work/workspace@1', 'work/brand@1', 'work/feature@1', 'work/disposable-accounts@1']);
-const isRetiredNodeSchema = schema => /^work\/node@\d+$/.test(schema ?? '');
 const KERNEL_CUSTODY_ROOTS = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals']);
 /** A reference-shaped id: a record family prefix and at least two dot segments. */
 export const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
@@ -122,7 +118,6 @@ const collectRecordMap = (scopeRoot) => {
     if ((record.schema === 'work/evidence@1' && !rel.endsWith('/evidence.yaml'))
       || (path.basename(rel) === 'manifest.yaml' && segments.includes('evidence'))) continue;
     if (rel.endsWith('/evidence.yaml')) continue;
-    if (isRetiredNodeSchema(record.schema)) continue;
     if (typeof record.id === 'string' && record.id) map.set(record.id, {
       schema: record.schema, state: record.state, change: record.change, file,
       shown: path.relative(root, file).replaceAll('\\', '/'), dir: path.dirname(file),
@@ -261,10 +256,6 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
 
     if (rel.endsWith('/evidence.yaml')) {
       evidenceFiles.push({record, shown, dir: path.dirname(file)});
-      continue;
-    }
-    if (isRetiredNodeSchema(record.schema)) {
-      problems.push(`${shown}: schema ${record.schema} is the retired recursive work/node envelope; restate it as flat family records (${[...FAMILIES].join(', ')}) [HFS_WORK_NODE_RETIRED]`);
       continue;
     }
     if (Object.hasOwn(record, 'id') && typeof record.id !== 'string') problems.push(`${shown}: id must be a string, not ${record.id === null ? 'null' : Array.isArray(record.id) ? 'array' : typeof record.id} [ID_TYPE]`); else if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record});
