@@ -27,7 +27,32 @@ const renderCatalogModule = async (cat) => {
   const catalog = { schema: CATALOG_SCHEMA, hash, global: cat.global.flags, commands: cat.global.commands, groups };
   return `// ${GENERATED}\nexport const CATALOG = ${JSON.stringify(catalog, null, 2)};\n`;
 };
-const flagSig = (f) => `--${f.name}${f.type === 'boolean' ? '' : f.type === 'enum' ? ` <${(f.enum ?? []).join('|')}>` : ' <v>'}${f.required ? ' (required)' : ''}`;
+const renderFlagDoc = (flag) => {
+  const enumText = flag.enum ? ` ${flag.enum.join('|')}` : '';
+  const defaultText = flag.default !== undefined ? ` (default ${flag.default})` : '';
+  const requiredText = flag.required ? 'required' : '';
+  return `| \`--${flag.name}\` | ${flag.type}${enumText}${defaultText} | ${requiredText} |`;
+};
+
+const renderVerbDocs = (out, group, verb) => {
+  out.push(`### starci ${group.group} ${verb.verb}`, '', `${verb.summary}`, '');
+  if (verb.flags?.length) {
+    out.push('| flag | type | |', '| --- | --- | --- |');
+    for (const flag of verb.flags) out.push(renderFlagDoc(flag));
+    out.push('');
+  }
+  if (verb.positional?.length) {
+    const positionals = verb.positional.map((item) => `${item.name}${item.required === false ? '?' : ''}`).join(', ');
+    out.push(`Positionals: ${positionals}`, '');
+  }
+  if (verb.effect) out.push(`Effect: ${verb.effect}`, '');
+  if (verb.roles?.length) out.push(`Roles: ${verb.roles.join(', ')}`, '');
+  if (verb.conventions?.length) out.push('Conventions:', '', ...verb.conventions.map((line) => `- ${line}`), '');
+  const exits = Object.entries(verb.exit ?? {}).map(([code, text]) => `${code} ${text}`).join('; ');
+  out.push(`exit: ${exits}`, '', `json: ${verb.json}`, '');
+  if (verb.examples?.length) out.push('```sh', ...verb.examples, '```', '');
+};
+
 const renderDocs = (cat) => {
   const out = [
     'Owner: modules/cli/commands/_global.yaml', '',
@@ -38,21 +63,7 @@ const renderDocs = (cat) => {
   ];
   for (const g of cat.groups) {
     out.push(`## starci ${g.group}`, '', `${g.summary}`, '');
-    for (const v of g.verbs) {
-      out.push(`### starci ${g.group} ${v.verb}`, '', `${v.summary}`, '');
-      if (v.flags?.length) {
-        out.push('| flag | type | |', '| --- | --- | --- |');
-        for (const f of v.flags) out.push(`| \`--${f.name}\` | ${f.type}${f.enum ? ` ${f.enum.join('|')}` : ''}${f.default !== undefined ? ` (default ${f.default})` : ''} | ${f.required ? 'required' : ''} |`);
-        out.push('');
-      }
-      if (v.positional?.length) out.push(`Positionals: ${v.positional.map((p) => `${p.name}${p.required === false ? '?' : ''}`).join(', ')}`, '');
-      if (v.effect) out.push(`Effect: ${v.effect}`, '');
-      if (v.roles?.length) out.push(`Roles: ${v.roles.join(', ')}`, '');
-      if (v.conventions?.length) out.push('Conventions:', '', ...v.conventions.map((line) => `- ${line}`), '');
-      out.push(`exit: ${Object.entries(v.exit ?? {}).map(([c, t]) => `${c} ${t}`).join('; ')}`, '',
-        `json: ${v.json}`, '');
-      if (v.examples?.length) out.push('```sh', ...v.examples, '```', '');
-    }
+    for (const v of g.verbs) renderVerbDocs(out, g, v);
   }
   return out.join('\n');
 };

@@ -6,6 +6,7 @@
 //   modules/cli/commands/<group>/<verb>.yaml     one verb
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { ROLES } from './roles.mjs';
@@ -22,7 +23,7 @@ const GROUP_REQUIRED = ['group', 'summary', 'owner'];
 const GROUP_KEYS = new Set([...GROUP_REQUIRED, 'schema']);
 const GLOBAL_KEYS = new Set(['schema', 'flags', 'commands']);
 const EDITIONS = ['full', 'lite'];
-const GLOBAL_FLAG_NAMES = ['json', 'cwd', 'quiet', 'help', 'edition'];
+const GLOBAL_FLAG_NAMES = new Set(['json', 'cwd', 'quiet', 'help', 'edition']);
 const EFFECTS = ['read', 'local-write', 'host', 'remote', 'publish'];
 const EFFECT_SET = new Set(EFFECTS);
 const ROLE_SET = new Set(ROLES);
@@ -42,21 +43,23 @@ const unknownKeys = (errors, file, obj, allowed, what) => {
   for (const k of Object.keys(obj)) if (!allowed.has(k)) err(errors, file, `unknown ${what} key "${k}"`);
 };
 
+const flagFindings = (errors, file, f, where, seen) => {
+  if (!f || typeof f !== 'object' || Array.isArray(f)) { err(errors, file, `${where}: flag entry is not a map`); return; }
+  unknownKeys(errors, file, f, FLAG_KEYS, 'flag');
+  if (typeof f.name !== 'string' || !NAME_RE.test(f.name)) { err(errors, file, `${where}: bad flag name ${JSON.stringify(f.name)}`); return; }
+  if (f.name === 'profile') err(errors, file, `${where}: a flag named "profile" is rejected (profile already means a slot side)`);
+  if (seen.has(f.name)) err(errors, file, `${where}: duplicate flag --${f.name}`);
+  seen.add(f.name);
+  if (!FLAG_TYPES.has(f.type)) err(errors, file, `${where}: --${f.name} type must be one of ${[...FLAG_TYPES].join('|')}`);
+  if (f.type === 'enum' && (!Array.isArray(f.enum) || !f.enum.length)) err(errors, file, `${where}: --${f.name} enum needs a non-empty enum list`);
+  if (f.name === 'edition' && JSON.stringify(f.enum ?? []) !== JSON.stringify(EDITIONS)) err(errors, file, `${where}: --edition enum is exactly [${EDITIONS.join(', ')}]`);
+  if (f.required !== undefined && typeof f.required !== 'boolean') err(errors, file, `${where}: --${f.name} required must be boolean`);
+};
+
 const checkFlags = (errors, file, flags, where) => {
   if (!Array.isArray(flags)) { err(errors, file, `${where}: flags must be a list`); return; }
   const seen = new Set();
-  for (const f of flags) {
-    if (!f || typeof f !== 'object' || Array.isArray(f)) { err(errors, file, `${where}: flag entry is not a map`); continue; }
-    unknownKeys(errors, file, f, FLAG_KEYS, 'flag');
-    if (typeof f.name !== 'string' || !NAME_RE.test(f.name)) { err(errors, file, `${where}: bad flag name ${JSON.stringify(f.name)}`); continue; }
-    if (f.name === 'profile') err(errors, file, `${where}: a flag named "profile" is rejected (profile already means a slot side)`);
-    if (seen.has(f.name)) err(errors, file, `${where}: duplicate flag --${f.name}`);
-    seen.add(f.name);
-    if (!FLAG_TYPES.has(f.type)) err(errors, file, `${where}: --${f.name} type must be one of ${[...FLAG_TYPES].join('|')}`);
-    if (f.type === 'enum' && (!Array.isArray(f.enum) || !f.enum.length)) err(errors, file, `${where}: --${f.name} enum needs a non-empty enum list`);
-    if (f.name === 'edition' && JSON.stringify(f.enum ?? []) !== JSON.stringify(EDITIONS)) err(errors, file, `${where}: --edition enum is exactly [${EDITIONS.join(', ')}]`);
-    if (f.required !== undefined && typeof f.required !== 'boolean') err(errors, file, `${where}: --${f.name} required must be boolean`);
-  }
+  for (const f of flags) flagFindings(errors, file, f, where, seen);
 };
 
 const checkStringList = (errors, file, value, name) => {
@@ -67,46 +70,67 @@ const checkStringList = (errors, file, value, name) => {
   return true;
 };
 
+const roleFindings = (errors, file, roles) => {
+  if (!checkStringList(errors, file, roles, 'roles')) return;
+  if (!roles.length) err(errors, file, 'roles is empty');
+  const seen = new Set();
+  for (const role of roles) {
+    if (!ROLE_SET.has(role)) err(errors, file, `roles names an unknown role ${JSON.stringify(role)} (known: ${ROLES.join(', ')})`);
+    if (seen.has(role)) err(errors, file, `roles repeats ${JSON.stringify(role)}`);
+    seen.add(role);
+  }
+};
+
+const conventionFindings = (errors, file, conventions) => {
+  if (!checkStringList(errors, file, conventions, 'conventions')) return;
+  for (const convention of conventions) {
+    if (!convention.trim()) err(errors, file, 'conventions entries must be non-empty');
+    else if (convention.length > 160) err(errors, file, 'conventions entries must be at most 160 chars');
+  }
+};
+
 const checkVerbPolicy = (errors, file, doc, moduleImpl) => {
   if (moduleImpl && doc.effect === undefined) err(errors, file, 'module impl requires effect');
-  if (doc.effect !== undefined && !EFFECT_SET.has(doc.effect)) {
-    err(errors, file, `effect must be one of ${EFFECTS.join(' | ')}`);
-  }
-
+  if (doc.effect !== undefined && !EFFECT_SET.has(doc.effect)) err(errors, file, `effect must be one of ${EFFECTS.join(' | ')}`);
   if (moduleImpl && doc.roles === undefined) err(errors, file, 'module impl requires roles');
-  if (doc.roles !== undefined) {
-    if (checkStringList(errors, file, doc.roles, 'roles')) {
-      if (!doc.roles.length) err(errors, file, 'roles is empty');
-      const seen = new Set();
-      for (const role of doc.roles) {
-        if (!ROLE_SET.has(role)) err(errors, file, `roles names an unknown role ${JSON.stringify(role)} (known: ${ROLES.join(', ')})`);
-        if (seen.has(role)) err(errors, file, `roles repeats ${JSON.stringify(role)}`);
-        seen.add(role);
-      }
-    }
-  }
-
-  if (doc.conventions !== undefined && checkStringList(errors, file, doc.conventions, 'conventions')) {
-    for (const convention of doc.conventions) {
-      if (!convention.trim()) err(errors, file, 'conventions entries must be non-empty');
-      else if (convention.length > 160) err(errors, file, 'conventions entries must be at most 160 chars');
-    }
-  }
+  if (doc.roles !== undefined) roleFindings(errors, file, doc.roles);
+  if (doc.conventions !== undefined) conventionFindings(errors, file, doc.conventions);
   if (doc.effect !== undefined && doc.effect !== 'read' && (!Array.isArray(doc.conventions) || doc.conventions.length === 0)) {
     err(errors, file, `effect ${doc.effect} requires at least one convention`);
   }
 };
 
-const checkVerb = (errors, file, groupName, doc) => {
-  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) { err(errors, file, 'not a map'); return null; }
-  for (const k of VERB_REQUIRED) if (!(k in doc)) err(errors, file, `missing required key "${k}"`);
-  if (doc.verb !== undefined && doc.verb !== path.basename(file, '.yaml')) err(errors, file, `verb "${doc.verb}" does not match the file name`);
-  if (doc.group !== undefined && doc.group !== groupName) err(errors, file, `group "${doc.group}" does not match directory "${groupName}"`);
-  if (doc.owner !== undefined && !OWNERS.has(doc.owner)) err(errors, file, `owner must be ${[...OWNERS].join(' | ')}`);
+const summaryFindings = (errors, file, doc) => {
   if (typeof doc.summary === 'string') {
     if (!doc.summary.trim() || doc.summary.length > 100) err(errors, file, 'summary must be one non-empty line of at most 100 chars');
     if (doc.summary.trimEnd().endsWith('.')) err(errors, file, 'summary has a trailing period');
   } else if ('summary' in doc) err(errors, file, 'summary must be a string');
+};
+
+const verbHeaderFindings = (errors, file, groupName, doc) => {
+  for (const k of VERB_REQUIRED) if (!(k in doc)) err(errors, file, `missing required key "${k}"`);
+  if (doc.verb !== undefined && doc.verb !== path.basename(file, '.yaml')) err(errors, file, `verb "${doc.verb}" does not match the file name`);
+  if (doc.group !== undefined && doc.group !== groupName) err(errors, file, `group "${doc.group}" does not match directory "${groupName}"`);
+  if (doc.owner !== undefined && !OWNERS.has(doc.owner)) err(errors, file, `owner must be ${[...OWNERS].join(' | ')}`);
+  summaryFindings(errors, file, doc);
+};
+
+const scriptImplFindings = (errors, file, impl) => {
+  if (typeof impl.script !== 'string' || !impl.script) err(errors, file, 'impl.script is required');
+  if (impl.args !== undefined && (!Array.isArray(impl.args) || impl.args.some((a) => typeof a !== 'string'))) err(errors, file, 'impl.args must be a string list');
+  if (Object.hasOwn(impl, 'export')) err(errors, file, 'impl.export is only valid with impl.module');
+};
+
+const moduleImplFindings = (errors, file, impl) => {
+  if (typeof impl.module !== 'string' || !impl.module) err(errors, file, 'impl.module is required');
+  else if (!MODULE_ROOTS.some((root) => impl.module.startsWith(root)) || !impl.module.endsWith('.mjs') || path.posix.normalize(impl.module) !== impl.module) {
+    err(errors, file, 'impl.module must be a repo-relative .mjs path under scripts/ or ui/');
+  }
+  if (typeof impl.export !== 'string' || !EXPORT_RE.test(impl.export)) err(errors, file, 'impl.export must be an identifier');
+  if (Object.hasOwn(impl, 'args')) err(errors, file, 'impl.args is only valid with impl.script');
+};
+
+const implementationFindings = (errors, file, doc) => {
   let moduleImpl = false;
   if (doc.impl === null) {
     if (doc.owner !== '@starci/hfs') err(errors, file, 'impl must be a script or module map');
@@ -117,32 +141,26 @@ const checkVerb = (errors, file, groupName, doc) => {
       const hasScript = Object.hasOwn(doc.impl, 'script');
       const hasModule = Object.hasOwn(doc.impl, 'module');
       if (hasScript === hasModule) err(errors, file, 'impl must name exactly one of script or module');
-      if (hasScript) {
-        if (typeof doc.impl.script !== 'string' || !doc.impl.script) err(errors, file, 'impl.script is required');
-        if (doc.impl.args !== undefined && (!Array.isArray(doc.impl.args) || doc.impl.args.some((a) => typeof a !== 'string'))) err(errors, file, 'impl.args must be a string list');
-        if (Object.hasOwn(doc.impl, 'export')) err(errors, file, 'impl.export is only valid with impl.module');
-      }
+      if (hasScript) scriptImplFindings(errors, file, doc.impl);
       if (hasModule) {
         moduleImpl = true;
-        if (typeof doc.impl.module !== 'string' || !doc.impl.module) err(errors, file, 'impl.module is required');
-        else if (!MODULE_ROOTS.some((root) => doc.impl.module.startsWith(root)) || !doc.impl.module.endsWith('.mjs') || path.posix.normalize(doc.impl.module) !== doc.impl.module) {
-          err(errors, file, 'impl.module must be a repo-relative .mjs path under scripts/ or ui/');
-        }
-        if (typeof doc.impl.export !== 'string' || !EXPORT_RE.test(doc.impl.export)) err(errors, file, 'impl.export must be an identifier');
-        if (Object.hasOwn(doc.impl, 'args')) err(errors, file, 'impl.args is only valid with impl.script');
+        moduleImplFindings(errors, file, doc.impl);
       }
     }
   }
-  checkVerbPolicy(errors, file, doc, moduleImpl);
-  if ('flags' in doc) checkFlags(errors, file, doc.flags, `verb ${doc.verb}`);
-  if (doc.positional !== undefined) {
-    if (!Array.isArray(doc.positional)) err(errors, file, 'positional must be a list');
-    else for (const p of doc.positional) {
-      if (!p || typeof p !== 'object') { err(errors, file, 'positional entry is not a map'); continue; }
-      unknownKeys(errors, file, p, POS_KEYS, 'positional');
-      if (typeof p.name !== 'string' || !NAME_RE.test(p.name)) err(errors, file, `bad positional name ${JSON.stringify(p.name)}`);
-    }
+  return moduleImpl;
+};
+
+const positionalFindings = (errors, file, positional) => {
+  if (!Array.isArray(positional)) { err(errors, file, 'positional must be a list'); return; }
+  for (const item of positional) {
+    if (!item || typeof item !== 'object') { err(errors, file, 'positional entry is not a map'); continue; }
+    unknownKeys(errors, file, item, POS_KEYS, 'positional');
+    if (typeof item.name !== 'string' || !NAME_RE.test(item.name)) err(errors, file, `bad positional name ${JSON.stringify(item.name)}`);
   }
+};
+
+const exitAndEditionFindings = (errors, file, doc) => {
   if (doc.exit !== undefined) {
     if (!doc.exit || typeof doc.exit !== 'object' || Array.isArray(doc.exit)) err(errors, file, 'exit must be a map of <code>: <text>');
     else for (const code of Object.keys(doc.exit)) if (!/^\d+$/.test(code)) err(errors, file, `exit code "${code}" is not numeric`);
@@ -151,6 +169,16 @@ const checkVerb = (errors, file, groupName, doc) => {
   for (const k of ['examples', 'editions']) if (doc[k] !== undefined) checkStringList(errors, file, doc[k], k);
   if (doc.editions !== undefined && !doc.editions.length) err(errors, file, 'editions is empty');
   for (const e of doc.editions ?? []) if (!EDITIONS.includes(e)) err(errors, file, `editions names an unknown edition ${JSON.stringify(e)} (known: ${EDITIONS.join(', ')})`);
+};
+
+const checkVerb = (errors, file, groupName, doc) => {
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) { err(errors, file, 'not a map'); return null; }
+  verbHeaderFindings(errors, file, groupName, doc);
+  const moduleImpl = implementationFindings(errors, file, doc);
+  checkVerbPolicy(errors, file, doc, moduleImpl);
+  if ('flags' in doc) checkFlags(errors, file, doc.flags, `verb ${doc.verb}`);
+  if (doc.positional !== undefined) positionalFindings(errors, file, doc.positional);
+  exitAndEditionFindings(errors, file, doc);
   return doc;
 };
 
@@ -161,6 +189,72 @@ const checkVerb = (errors, file, groupName, doc) => {
  * relpaths + bytes (sorted) the generator hashes.
  * Throws Error with .code 'catalog-invalid' and .errors = every finding.
  */
+const globalCommandFindings = (errors, commands) => {
+  if (!checkStringList(errors, '_global.yaml', commands, 'commands')) return;
+  const seen = new Set();
+  for (const command of commands) {
+    if (!NAME_RE.test(command)) err(errors, '_global.yaml', `bad global command name ${JSON.stringify(command)}`);
+    if (seen.has(command)) err(errors, '_global.yaml', `duplicate global command ${JSON.stringify(command)}`);
+    seen.add(command);
+  }
+};
+
+const globalDocument = (dir, errors, read) => {
+  const globalFile = path.join(dir, '_global.yaml');
+  if (!fs.existsSync(globalFile)) { err(errors, '_global.yaml', 'missing'); return { flags: [] }; }
+  const globalDoc = read(globalFile) ?? {};
+  unknownKeys(errors, '_global.yaml', globalDoc, GLOBAL_KEYS, 'global');
+  checkFlags(errors, '_global.yaml', globalDoc.flags, 'global');
+  const names = (globalDoc.flags ?? []).map((f) => f?.name);
+  for (const want of GLOBAL_FLAG_NAMES) if (!names.includes(want)) err(errors, '_global.yaml', `missing global flag --${want}`);
+  for (const got of names) if (!GLOBAL_FLAG_NAMES.has(got)) err(errors, '_global.yaml', `unknown global flag --${got}`);
+  if (globalDoc.commands !== undefined) globalCommandFindings(errors, globalDoc.commands);
+  return globalDoc;
+};
+
+const groupDocument = (entry, gdir, errors, read) => {
+  const gfile = path.join(gdir, '_group.yaml');
+  if (!fs.existsSync(gfile)) { err(errors, `${entry.name}/_group.yaml`, 'missing'); return {}; }
+  const gdoc = read(gfile) ?? {};
+  unknownKeys(errors, `${entry.name}/_group.yaml`, gdoc, GROUP_KEYS, 'group');
+  for (const k of GROUP_REQUIRED) if (!(k in gdoc)) err(errors, `${entry.name}/_group.yaml`, `missing required key "${k}"`);
+  if (gdoc.group !== undefined && gdoc.group !== entry.name) err(errors, `${entry.name}/_group.yaml`, `group "${gdoc.group}" does not match the directory name`);
+  if (gdoc.owner !== undefined && !OWNERS.has(gdoc.owner)) err(errors, `${entry.name}/_group.yaml`, `owner must be ${[...OWNERS].join(' | ')}`);
+  return gdoc;
+};
+
+const groupVerbs = (entry, gdir, errors, read) => {
+  const verbs = [];
+  const seenVerbs = new Map();
+  const files = fs.readdirSync(gdir).filter((name) => name.endsWith('.yaml') && !name.startsWith('_')).sort(byCodeUnit);
+  for (const vf of files) {
+    const file = path.join(gdir, vf);
+    const doc = checkVerb(errors, `${entry.name}/${vf}`, entry.name, read(file));
+    if (!doc || errors.length && doc.verb === undefined) continue;
+    if (doc.verb !== undefined) {
+      if (seenVerbs.has(doc.verb)) err(errors, `${entry.name}/${vf}`, `duplicate verb "${doc.verb}" (also ${seenVerbs.get(doc.verb)})`);
+      else seenVerbs.set(doc.verb, `${entry.name}/${vf}`);
+    }
+    verbs.push(doc);
+  }
+  if (!verbs.length) err(errors, `${entry.name}/`, 'an empty group is an error');
+  verbs.sort((a, b) => String(a?.verb).localeCompare(String(b?.verb)));
+  return verbs;
+};
+
+const catalogGroups = (dir, errors, read) => {
+  const groups = [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const gdir = path.join(dir, entry.name);
+    const gdoc = groupDocument(entry, gdir, errors, read);
+    const verbs = groupVerbs(entry, gdir, errors, read);
+    groups.push({ group: entry.name, summary: gdoc.summary, owner: gdoc.owner, verbs });
+  }
+  return groups;
+};
+
 export const loadCatalog = (root = skillRoot) => {
   const dir = path.join(root, CATALOG_DIR);
   const errors = [];
@@ -171,55 +265,8 @@ export const loadCatalog = (root = skillRoot) => {
     try { return parseYaml(bytes.toString('utf8')); } catch (e) { err(errors, file, `YAML: ${e.message}`); return undefined; }
   };
   if (!fs.existsSync(dir)) throw Object.assign(new Error(`catalog-invalid: ${dir} does not exist`), { code: 'catalog-invalid', errors: [`${CATALOG_DIR} missing`] });
-  const globalFile = path.join(dir, '_global.yaml');
-  let globalDoc = { flags: [] };
-  if (!fs.existsSync(globalFile)) err(errors, '_global.yaml', 'missing');
-  else {
-    globalDoc = read(globalFile) ?? {};
-    unknownKeys(errors, '_global.yaml', globalDoc, GLOBAL_KEYS, 'global');
-    checkFlags(errors, '_global.yaml', globalDoc.flags, 'global');
-    const names = (globalDoc.flags ?? []).map((f) => f?.name);
-    for (const want of GLOBAL_FLAG_NAMES) if (!names.includes(want)) err(errors, '_global.yaml', `missing global flag --${want}`);
-    for (const got of names) if (!GLOBAL_FLAG_NAMES.includes(got)) err(errors, '_global.yaml', `unknown global flag --${got}`);
-    if (globalDoc.commands !== undefined && checkStringList(errors, '_global.yaml', globalDoc.commands, 'commands')) {
-      const seen = new Set();
-      for (const command of globalDoc.commands) {
-        if (!NAME_RE.test(command)) err(errors, '_global.yaml', `bad global command name ${JSON.stringify(command)}`);
-        if (seen.has(command)) err(errors, '_global.yaml', `duplicate global command ${JSON.stringify(command)}`);
-        seen.add(command);
-      }
-    }
-  }
-  const groups = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-    if (!entry.isDirectory()) continue;
-    const gdir = path.join(dir, entry.name);
-    const gfile = path.join(gdir, '_group.yaml');
-    let gdoc = {};
-    if (!fs.existsSync(gfile)) err(errors, `${entry.name}/_group.yaml`, 'missing');
-    else {
-      gdoc = read(gfile) ?? {};
-      unknownKeys(errors, `${entry.name}/_group.yaml`, gdoc, GROUP_KEYS, 'group');
-      for (const k of GROUP_REQUIRED) if (!(k in gdoc)) err(errors, `${entry.name}/_group.yaml`, `missing required key "${k}"`);
-      if (gdoc.group !== undefined && gdoc.group !== entry.name) err(errors, `${entry.name}/_group.yaml`, `group "${gdoc.group}" does not match the directory name`);
-      if (gdoc.owner !== undefined && !OWNERS.has(gdoc.owner)) err(errors, `${entry.name}/_group.yaml`, `owner must be ${[...OWNERS].join(' | ')}`);
-    }
-    const verbs = [];
-    const seenVerbs = new Map();
-    for (const vf of fs.readdirSync(gdir).filter((x) => x.endsWith('.yaml') && !x.startsWith('_')).sort()) {
-      const file = path.join(gdir, vf);
-      const doc = checkVerb(errors, `${entry.name}/${vf}`, entry.name, read(file));
-      if (!doc || errors.length && doc.verb === undefined) continue;
-      if (doc.verb !== undefined) {
-        if (seenVerbs.has(doc.verb)) err(errors, `${entry.name}/${vf}`, `duplicate verb "${doc.verb}" (also ${seenVerbs.get(doc.verb)})`);
-        else seenVerbs.set(doc.verb, `${entry.name}/${vf}`);
-      }
-      verbs.push(doc);
-    }
-    if (!verbs.length) err(errors, `${entry.name}/`, 'an empty group is an error');
-    verbs.sort((a, b) => String(a?.verb).localeCompare(String(b?.verb)));
-    groups.push({ group: entry.name, summary: gdoc.summary, owner: gdoc.owner, verbs });
-  }
+  const globalDoc = globalDocument(dir, errors, read);
+  const groups = catalogGroups(dir, errors, read);
   sources.sort((a, b) => a.file.localeCompare(b.file));
   if (errors.length) throw Object.assign(new Error(`catalog-invalid:\n  ${errors.join('\n  ')}`), { code: 'catalog-invalid', errors });
   return { schema: CATALOG_SCHEMA, global: { flags: globalDoc.flags ?? [], commands: globalDoc.commands ?? [] }, groups, sources };

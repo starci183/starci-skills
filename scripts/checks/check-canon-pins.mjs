@@ -38,6 +38,21 @@ const DEP_KEYS = ['dependencies', 'devDependencies', 'peerDependencies', 'option
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
+const pinShapeFindings = (name, pin, errors) => {
+  if (pin.group === 'starci' && !pin.source) errors.push(`CANON_PIN_NO_SOURCE ${name}: a starci pin names the package.json it must equal`);
+  if (pin.group === 'starci' && pin.install !== 'registry') errors.push(`CANON_PIN_NO_SOURCE ${name}: a starci pin is installed from the npm registry (install: registry)`);
+  if (pin.group !== 'starci' && (pin.source || pin.install)) errors.push(`CANON_PIN_NO_SOURCE ${name}: only a starci pin carries a source or an install`);
+};
+
+const pinSourceFindings = (root, name, pin, errors) => {
+  if (!pin.source) return;
+  const file = path.join(root, pin.source);
+  if (!fs.existsSync(file)) { errors.push(`CANON_PIN_SOURCE ${name}: ${pin.source} does not exist`); return; }
+  const pkg = readJson(file);
+  if (pkg.name !== name) errors.push(`CANON_PIN_SOURCE ${name}: ${pin.source} is named ${pkg.name}`);
+  if (pkg.version !== pin.version) errors.push(`CANON_PIN_SOURCE ${name}: pinned ${pin.version} but ${pin.source} is ${pkg.version}`);
+};
+
 export function checkCanonPins({ root = skillRoot } = {}) {
   const errors = [];
   let doc;
@@ -50,15 +65,8 @@ export function checkCanonPins({ root = skillRoot } = {}) {
   for (const message of validateAgainstSchema(doc, schema)) errors.push(`CANON_PINS_INVALID ${message}`);
   for (const [name, pin] of Object.entries(doc?.pins ?? {})) {
     if (!pin || typeof pin !== 'object') continue;
-    if (pin.group === 'starci' && !pin.source) errors.push(`CANON_PIN_NO_SOURCE ${name}: a starci pin names the package.json it must equal`);
-    if (pin.group === 'starci' && pin.install !== 'registry') errors.push(`CANON_PIN_NO_SOURCE ${name}: a starci pin is installed from the npm registry (install: registry)`);
-    if (pin.group !== 'starci' && (pin.source || pin.install)) errors.push(`CANON_PIN_NO_SOURCE ${name}: only a starci pin carries a source or an install`);
-    if (!pin.source) continue;
-    const file = path.join(root, pin.source);
-    if (!fs.existsSync(file)) { errors.push(`CANON_PIN_SOURCE ${name}: ${pin.source} does not exist`); continue; }
-    const pkg = readJson(file);
-    if (pkg.name !== name) errors.push(`CANON_PIN_SOURCE ${name}: ${pin.source} is named ${pkg.name}`);
-    if (pkg.version !== pin.version) errors.push(`CANON_PIN_SOURCE ${name}: pinned ${pin.version} but ${pin.source} is ${pkg.version}`);
+    pinShapeFindings(name, pin, errors);
+    pinSourceFindings(root, name, pin, errors);
   }
   return { ok: errors.length === 0, errors, pins: Object.keys(doc?.pins ?? {}).length };
 }

@@ -34,7 +34,12 @@ function parseDigestArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--touch' || arg === '--read' || arg === '--knowledge') { while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts[arg.slice(2)].push(argv[++i]); }
-    else if (arg === '--root' || arg === '--out') { if (argv[i + 1] === undefined) throw new Error(`${arg} needs a value; ${USAGE}`); opts[arg.slice(2)] = argv[++i]; }
+    else if (arg === '--root' || arg === '--out') {
+      if (argv[i + 1] === undefined) {
+        throw new Error(`${arg} needs a value; ${USAGE}`);
+      }
+      opts[arg.slice(2)] = argv[++i];
+    }
     else throw new Error(`unknown argument ${arg}; ${USAGE}`);
   }
   return opts;

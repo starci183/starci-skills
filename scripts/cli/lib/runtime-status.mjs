@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { isMain } from '../../lib/is-main.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const normalizedHash = (file, read) => createHash('sha256').update(read(file, 'utf8').replace(/\r\n/g, '\n')).digest('hex');
+const normalizedHash = (file, read) => createHash('sha256').update(read(file, 'utf8').replaceAll('\r\n', '\n')).digest('hex');
 
 function runtimeStatus({ runtimeRoot = root, exists = existsSync, read = readFileSync } = {}) {
   const packageFile = path.join(runtimeRoot, 'package.json');
@@ -33,9 +33,10 @@ export function main(argv = process.argv.slice(2), io = {}) {
   const json = argv.includes('--json');
   const result = runtimeStatus(io);
   const write = io.stdout ?? ((text) => process.stdout.write(text));
+  const changeSummary = result.doctor.changed.length ? `; ${result.doctor.changed.length} changed or missing file(s)` : '';
   const text = json
     ? `${JSON.stringify({ schema: 'starci/runtime-status@1', ...result })}\n`
-    : `StarCi ${result.version ?? 'unknown'}\ntree: ${result.root}\ndoctor: ${result.doctor.manifest}${result.doctor.changed.length ? `; ${result.doctor.changed.length} changed or missing file(s)` : ''}\n`;
+    : `StarCi ${result.version ?? 'unknown'}\ntree: ${result.root}\ndoctor: ${result.doctor.manifest}${changeSummary}\n`;
   if (typeof write === 'function') write(text); else write.write(text);
   return result.ok ? 0 : 1;
 }
