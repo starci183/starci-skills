@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { systemTool } from '../../scripts/api/process/system-tool.mjs';
 import { gpuQuery } from '../../scripts/api/process/gpu-query.mjs';
-import { portListener } from '../../scripts/api/process/port-listener.mjs';
+import { portListener, procListener } from '../../scripts/api/process/port-listener.mjs';
 import { processNames } from '../../scripts/api/process/process-names.mjs';
 import { runPowershell } from '../../scripts/api/process/run-powershell.mjs';
 import { runPowershellAsync } from '../../scripts/api/process/run-powershell-async.mjs';
@@ -96,6 +96,29 @@ test('portListener spawns absolute tools on both OS families and answers null wi
   assert.deepEqual(portListener(4321, { platform: 'linux', spawn: posixSpawn, tool }), { pid: 88, commandLine: 'node a.js' });
   assert.equal(calls.length, 4);
   assert.ok(calls.every(absolute), calls.join(', '));
-  assert.equal(portListener(4321, { platform: 'linux', spawn: posixSpawn, tool: noTool }), null);
+  assert.equal(portListener(4321, { platform: 'linux', spawn: posixSpawn, tool: noTool, proc: () => null }), null);
+  assert.deepEqual(portListener(4321, { platform: 'linux', spawn: posixSpawn, tool: noTool, proc: (port) => ({ pid: 9, commandLine: `proc ${port}` }) }), { pid: 9, commandLine: 'proc 4321' }, 'a Linux host without lsof reads /proc');
+  assert.equal(portListener(4321, { platform: 'darwin', spawn: posixSpawn, tool: noTool, proc: () => ({ pid: 9 }) }), null, '/proc is Linux only');
   assert.deepEqual(portListener(4321, { platform: 'win32', spawn: winSpawn, tool: (name) => (name === 'powershell' ? noTool(name) : winTool(name)) }), { pid: 77, commandLine: null });
+});
+
+test('procListener finds the process holding the LISTEN socket of a port from /proc, and null for a closed or unreadable one', () => {
+  const rows = (port, state, inode) => `  0: 0100007F:${port.toString(16).toUpperCase().padStart(4, '0')} 00000000:0000 ${state} 00000000:00000000 00:00000000 00000000  1000        0 ${inode} 1 0000000000000000 100 0 0 10 0`;
+  const header = '  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode';
+  const files = {
+    '/proc/net/tcp': [header, rows(4321, '0A', 555), rows(4322, '01', 777)].join('\n'),
+    '/proc/42/cmdline': 'node\0server.mjs\0',
+  };
+  const links = { '/proc/41/fd/3': 'socket:[999]', '/proc/42/fd/7': 'socket:[555]', '/proc/42/fd/8': '/dev/null' };
+  const dirs = { '/proc': ['self', '41', '42', 'net'], '/proc/41/fd': ['3'], '/proc/42/fd': ['7', '8'] };
+  const miss = (what) => { throw Object.assign(new Error(`ENOENT ${what}`), { code: 'ENOENT' }); };
+  const fsx = {
+    readFileSync: (file) => files[file] ?? miss(file),
+    readdirSync: (dir) => dirs[dir] ?? miss(dir),
+    readlinkSync: (link) => links[link] ?? miss(link),
+  };
+  assert.deepEqual(procListener(4321, { fsx }), { pid: 42, commandLine: 'node server.mjs' });
+  assert.equal(procListener(4322, { fsx }), null, 'an ESTABLISHED socket is not a listener');
+  assert.equal(procListener(9, { fsx }), null);
+  assert.equal(procListener(4321, { fsx: { ...fsx, readdirSync: (dir) => (dir === '/proc' ? ['42'] : miss(dir)) } }), null, 'a process whose fds are unreadable holds nothing for this user');
 });
