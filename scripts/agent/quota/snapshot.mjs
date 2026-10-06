@@ -28,6 +28,26 @@ const providerWindowVerdict = (input, auth, result, valid, inspected) => {
   return { ...result, state: limited ? 'limited' : 'ok', normalAdmission: !limited, allowLaunchAttempt: !limited,
     detail: input.detail ?? (limited ? 'a quota window is reserved for scoped recovery' : 'all observed quota windows have normal headroom') };
 };
+const normalizeWindow = (window, observedAt) => ({
+  id: window?.id, usedPercent: typeof window?.usedPercent === 'number' ? window.usedPercent : null,
+  resetsAt: timestamp(window?.resetsAt ?? window?.resetAt), observedAt: observedOrParent(window?.observedAt, observedAt),
+  windowMinutes: window?.windowMinutes ?? null,
+});
+const windowsOf = (input, observedAt) => Array.isArray(input.windows)
+  ? input.windows.map((window) => normalizeWindow(window, observedAt)) : quotaWindows(input.entry, observedAt);
+const ownerGrantSnapshot = (evidence, input, valid, inspected) => {
+  const available = valid && input.fresh !== false && !['dead', 'unknown'].includes(input.state)
+    && input.normalAdmission !== false && input.allowLaunchAttempt !== false;
+  return { ...evidence, fresh: inspected.fresh && valid, state: available ? 'ok' : 'unknown',
+    normalAdmission: available, allowLaunchAttempt: available };
+};
+const providerWindowSnapshot = (base, windows, input, auth, valid, inspected) => {
+  const usedPercent = inspected.pressure;
+  const resets = windows.map((window) => window.resetsAt).filter((at) => at !== null).sort((a, b) => a - b);
+  const result = { ...base, windows, usedPercent, resetsAt: resets.length ? new Date(resets[0]).toISOString() : null,
+    fresh: inspected.fresh && inspected.codes.every((code) => code === 'quota-exhausted') };
+  return providerWindowVerdict(input, auth, result, valid, inspected);
+};
 /** Policy numbers come from allocation.admission; unknown/stale evidence never becomes available. */
 export function normalizeQuotaSnapshot(input = {}, { policy, now = Date.now() } = {}) {
   const observedAt = timestamp(input.observedAt), auth = input.auth ?? 'unknown';
@@ -37,21 +57,10 @@ export function normalizeQuotaSnapshot(input = {}, { policy, now = Date.now() } 
     authority: input.authority ?? 'provider-windows', auth, failureKind: input.failureKind ?? null,
     observedAt, expiresAt, windows: [], fresh: false, normalAdmission: false, allowLaunchAttempt: false,
     usedPercent: null, resetsAt: null, state: 'unknown', detail: input.detail ?? 'quota observation unknown' };
-  const windows = Array.isArray(input.windows) ? input.windows.map((window) => ({
-    id: window?.id, usedPercent: typeof window?.usedPercent === 'number' ? window.usedPercent : null,
-    resetsAt: timestamp(window?.resetsAt ?? window?.resetAt), observedAt: observedOrParent(window?.observedAt, observedAt),
-    windowMinutes: window?.windowMinutes ?? null,
-  })) : quotaWindows(input.entry, observedAt);
+  const windows = windowsOf(input, observedAt);
   const evidence = { ...base, windows, ...(input.authority === 'owner-grant' ? { grant: input.grant ?? null } : {}) };
   const inspected = inspectQuotaEvidence(evidence, { policy, now });
   const valid = inspected.codes.length === 0;
-  if (input.authority === 'owner-grant') {
-    const available = valid && input.fresh !== false && !['dead', 'unknown'].includes(input.state) && input.normalAdmission !== false && input.allowLaunchAttempt !== false;
-    return { ...evidence, fresh: inspected.fresh && valid, state: available ? 'ok' : 'unknown', normalAdmission: available, allowLaunchAttempt: available };
-  }
-  const usedPercent = inspected.pressure;
-  const resets = windows.map((window) => window.resetsAt).filter((at) => at !== null).sort((a, b) => a - b);
-  const result = { ...base, windows, usedPercent, resetsAt: resets.length ? new Date(resets[0]).toISOString() : null,
-    fresh: inspected.fresh && inspected.codes.every((code) => code === 'quota-exhausted') };
-  return providerWindowVerdict(input, auth, result, valid, inspected);
+  if (input.authority === 'owner-grant') return ownerGrantSnapshot(evidence, input, valid, inspected);
+  return providerWindowSnapshot(base, windows, input, auth, valid, inspected);
 }

@@ -109,8 +109,30 @@ export function planToResult(plan, { policy = allocationSettings()?.admission, n
 const cache = new Map();
 
 // The seat-quota child call: {ok:true, body} on an HTTP 2xx JSON body; else {ok:false, result} with the unknown state.
+const unknownSeatQuota = (detail) => ({ ok: false, result: { state: 'unknown', usedPercent: null, detail } });
+const seatApiResponse = (r, scrub) => {
+  if (r.error || r.status !== 0) {
+    const childError = r.error?.message ? ' (' + scrub(r.error.message) + ')' : '';
+    const stderr = r.stderr ? ': ' + scrub(r.stderr).slice(0, 200) : '';
+    return unknownSeatQuota('seat API child failed' + childError + stderr);
+  }
+  let out;
+  try { out = JSON.parse(r.stdout); } catch {
+    return unknownSeatQuota('seat API child returned unparsable output');
+  }
+  if (!Number.isInteger(out?.status) || out.status === 0) {
+    return unknownSeatQuota(`seat API unreachable: ${scrub(out?.error ?? 'network error')}`);
+  }
+  if (out.status < 200 || out.status >= 300) {
+    return unknownSeatQuota(`seat API answered HTTP ${out.status}`);
+  }
+  let body;
+  try { body = JSON.parse(out.body); } catch {
+    return unknownSeatQuota('seat API returned a non-JSON body');
+  }
+  return { ok: true, body };
+};
 const seatApiCall = (url, payload, timeoutMs, scrub) => {
-  const unknown = (detail) => ({ ok: false, result: { state: 'unknown', usedPercent: null, detail } });
   let r;
   try {
     r = runNode([SEAT_QUOTA_FILE], {
@@ -118,26 +140,9 @@ const seatApiCall = (url, payload, timeoutMs, scrub) => {
       encoding: 'utf8', timeout: timeoutMs + 8000, maxBuffer: 1 << 20, windowsHide: true,
     });
   } catch (error) {
-    return unknown(`seat API spawn failed: ${scrub(error?.message ?? error)}`);
+    return unknownSeatQuota(`seat API spawn failed: ${scrub(error?.message ?? error)}`);
   }
-  if (r.error || r.status !== 0) {
-    return unknown(`seat API child failed` + (r.error?.message ? ` (${scrub(r.error.message)})` : '') + (r.stderr ? `: ${scrub(r.stderr).slice(0, 200)}` : ''));
-  }
-  let out;
-  try { out = JSON.parse(r.stdout); } catch {
-    return unknown('seat API child returned unparsable output');
-  }
-  if (!Number.isInteger(out?.status) || out.status === 0) {
-    return unknown(`seat API unreachable: ${scrub(out?.error ?? 'network error')}`);
-  }
-  if (out.status < 200 || out.status >= 300) {
-    return unknown(`seat API answered HTTP ${out.status}`);
-  }
-  let body;
-  try { body = JSON.parse(out.body); } catch {
-    return unknown('seat API returned a non-JSON body');
-  }
-  return { ok: true, body };
+  return seatApiResponse(r, scrub);
 };
 
 /**
