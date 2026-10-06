@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger,changeWorkflowPhase,recordCheckRun,recordJobResult,setJobStatus,startAttempt,updateAttempt} from '../../engine/db/ledger.mjs';
 import {priorAttemptFailures} from '../../scripts/kernel/prior-failures.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
 
 // Dispatch read the
 // prompt's prior_attempt_failures from the newest checks row of the op with attempt < job.attempt. Cut
@@ -22,7 +23,7 @@ const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 const json=v=>JSON.stringify(v??null);
 
 const workRoot=t=>{
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-priorfail-'));fs.mkdirSync(path.join(dir,'docs'));
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-priorfail-'));proofRepo(t,dir);fs.mkdirSync(path.join(dir,'docs'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   return dir;
 };

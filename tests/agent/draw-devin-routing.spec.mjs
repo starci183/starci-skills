@@ -93,7 +93,7 @@ test('the critic is a different model from the drawer: Codex when Devin draws, C
     ledger.db.prepare("UPDATE op_attempts SET provider='devin' WHERE job_id='job-draw-1'").run();
     fs.mkdirSync(path.join(guardsRoot(), 'terminals'), { recursive: true });
     fs.writeFileSync(path.join(guardsRoot(), 'terminals', `${handle}.json`),
-      JSON.stringify({ schema: 'starci/op-guard@1', role: 'op', jobId: 'job-draw-1', workflowId: 'wf-draw', ledgerRepo: repoRoot }));
+      JSON.stringify({ schema: 'starci/op-guard@1', role: 'op', terminal: handle, jobId: 'job-draw-1', workflowId: 'wf-draw', ledgerRepo: repoRoot }));
     const saved = process.env.ORCA_TERMINAL_HANDLE;
     process.env.ORCA_TERMINAL_HANDLE = handle;
     t.after(() => { if (saved === undefined) delete process.env.ORCA_TERMINAL_HANDLE; else process.env.ORCA_TERMINAL_HANDLE = saved; });

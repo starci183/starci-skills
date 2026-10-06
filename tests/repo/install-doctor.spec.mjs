@@ -7,6 +7,7 @@ import {sha256} from '../../engine/digest.mjs';
 import {doctorInstallation} from '../../scripts/install/doctor.mjs';
 import {doctor, init, main} from '../../scripts/install/install.mjs';
 import {mkdtemp} from '../helpers/tmpdir.mjs';
+import {slashPath} from '../fixtures/win-path.mjs';
 
 const source = path.resolve(import.meta.dirname, '..', '..');
 const sourcePackage = JSON.parse(fs.readFileSync(path.join(source, 'package.json'), 'utf8'));
@@ -176,7 +177,7 @@ test('missing source entries and public discovery cannot pass a quick diagnostic
 });
 
 test('unsafe and excluded custody is refused before following or reading it', t => {
-  for (const relative of ['../outside', 'C:/outside', 'scripts/../outside', 'private-local']) {
+  for (const relative of ['../outside', slashPath('C', 'outside'), 'scripts/../outside', 'private-local']) {
     const f = fixture(t); f.input.quick = true;
     f.manifest.files[relative] = '0'.repeat(64);
     const before = inventory(f.repo);

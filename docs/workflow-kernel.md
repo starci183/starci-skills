@@ -148,7 +148,7 @@ Every code-writing op listed in `knowledge/op-gate.yaml` `enforcedOps`
    prefix) and the example files of the same slots. It records the READ digest
    (`starci/read-digest@1`, every file with its sha256).
 2. **CODE** — inside the owned paths, in the workflow worktree.
-3. **CHECK** — `scripts/gates/gate.mjs --root <app> --changed <files>
+3. **CHECK** — `starci gate run --root <app> --changed <files>
    [--tests <pattern>]`, forced every round. It runs, in order: the merge guard;
    `starci app lint --changed` at the app root (the BE canon under `be/`, the FE canon
    under `fe/`, the repository checks); the root `codegen` and the build of

@@ -8,6 +8,7 @@ import { hookDecision, boundGuard } from '../../scripts/guards/command-guard.mjs
 import { guardsRoot, guardLaunch, bindGuardTerminal, ensureHistoryHook, writeJobGuard, guardReceiptErrors, HOOK_VERSION } from '../../scripts/guards/hook-install.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
+import { adoptLaunchTrust } from '../helpers/launch-trust.mjs';
 
 // Contract change kernel-guard-file (lane C0-KGUARD): the Kernel had no job guard, so the PreToolUse command guard let
 // every Kernel shell command through. Its launch now writes a guard of role kernel (no owned path, its workflow
@@ -115,15 +116,12 @@ test('start-workflow binds the Kernel guard to the terminal worker-start names a
   const root = tempDir(t, 'kguard-start-');
   const repo = path.join(root, 'repo');
   fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
-  const ownerRoot = path.join(root, 'owner');
-  fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), 'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
   const fake = path.join(root, 'fake-orca.mjs');
   const state = path.join(root, 'orca-state.json');
   fs.writeFileSync(state, JSON.stringify({ sends: 0, counter: 0, terminals: {}, commands: [] }));
   fs.writeFileSync(fake, FAKE_ORCA);
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([fake]), STARCI_FAKE_ORCA_STATE: state,
-    STARCI_FAKE_ORCA_LOG: path.join(root, 'calls.jsonl'), STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1', STARCI_OWNER_ROOT: ownerRoot,
+    STARCI_FAKE_ORCA_LOG: path.join(root, 'calls.jsonl'), STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1', ...adoptLaunchTrust(root, { roots: [repo], ref: 'private kernel-guard fixture adoption', kernel: 'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}' }),
     STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), ORCA_TERMINAL_HANDLE: '' };
   const run = (script, ...args) => spawnSync(process.execPath, ['--loader', new URL('../helpers/workflow-startup-loader.mjs', import.meta.url).href, path.join(ROOT, 'scripts', ...script), ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
   const defined = run(['goal', 'define-goal.mjs'], '--repo', repo, '--text', 'guard the kernel', '--json');

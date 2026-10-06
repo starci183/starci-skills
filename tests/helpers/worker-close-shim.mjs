@@ -2,11 +2,12 @@
 export * from '../../scripts/machine/worker-close.mjs?closure-fixture';
 import { closeWorker as realCloseWorker } from '../../scripts/machine/worker-close.mjs?closure-fixture';
 import { workerShow } from '../../scripts/api/orca/worker-show.mjs';
+import { winPath } from '../fixtures/win-path.mjs';
 
 export function closeWorker({ dispatch, handle = null, stopFirst = false, retryRelease = false, env = process.env, deps = {} } = {}) {
   const shown = (deps.show ?? workerShow)({ dispatch });
   const terminal = handle ?? shown?.agentTerminalHandle ?? shown?.dispatch?.assigneeHandle ?? shown?.result?.worker?.agentTerminalHandle;
-  const object = { pid: 991, ppid: 0, name: 'fixture-agent', created: 1000, exe: 'C:\\fixture\\agent.exe' };
+  const object = { pid: 991, ppid: 0, name: 'fixture-agent', created: 1000, exe: winPath('C', 'fixture', 'agent.exe') };
   const identity = { pid: object.pid, birth: '116444736010000000', exe: object.exe };
   let reads = 0, table = [object];
   return realCloseWorker({ dispatch, handle: terminal, stopFirst, retryRelease, env, deps: {

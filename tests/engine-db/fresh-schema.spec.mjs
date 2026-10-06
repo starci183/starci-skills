@@ -8,6 +8,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { LEDGER_VERSION, openLedger, openLedgerReader, openLedgerConnection, ledgerFileFor, PROJECTS_ROOT_ENV, TEST_REGISTRY_ENV } from '../../engine/db/ledger.mjs';
 import { sha256 } from '../../engine/digest.mjs';
+import { slashPath } from '../fixtures/win-path.mjs';
 import { MACHINE_VERSION, openMachine } from '../../engine/db/machine.mjs';
 
 const require = createRequire(import.meta.url);
@@ -140,7 +141,7 @@ test('fixture input refuses live bindings, real IDs, nonportable metadata and ex
     { fixture: { ...SAMPLE, ledgerId: SAMPLE.ledgerId.toUpperCase().replace('0001', '000A') } },
     { fixture: { ...SAMPLE, createdAt: 0 } }, { fixture: { ...SAMPLE, createdAt: 1.5 } }, { fixture: { ...SAMPLE, createdAt: Number.MAX_SAFE_INTEGER } },
     { fixture: { ...SAMPLE, extra: true } }, { fixture: {} }, { fixture: false },
-    ...['', '/artifacts', 'C:/artifacts', '../artifacts', 'artifacts/..', 'artifacts\\nested', 'artifacts/', ' artifacts', 'artifacts?private', 'a\u0000b', 'a\rb', 'a\nb'].map((blobRoot) => ({ fixture: { ...SAMPLE, blobRoot } })),
+    ...['', '/artifacts', slashPath('C', 'artifacts'), '../artifacts', 'artifacts/..', 'artifacts\\nested', 'artifacts/', ' artifacts', 'artifacts?private', 'a\u0000b', 'a\rb', 'a\nb'].map((blobRoot) => ({ fixture: { ...SAMPLE, blobRoot } })),
     { repoRoot: dir }, { product: 'test-product' }, { machine: { registerLedger() { assert.fail('machine registration reached'); } } },
     { now: () => SAMPLE.createdAt }, { checkpointer: false }, { file: path.join(dir, 'other.sqlite') },
   ];

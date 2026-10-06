@@ -10,6 +10,8 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs
 import {withMachine} from '../../engine/db/machine.mjs';
 import {publishThrottle} from '../../scripts/machine/ram-throttle.mjs';
 import {placeOnRepo} from '../helpers/op-placement.mjs';
+import {addWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
+import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
@@ -60,8 +62,11 @@ const fixture=t=>{
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     STARCI_LOCAL_ROOT:path.join(root,'localappdata'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
+    ...adoptLaunchTrust(root,{roots:[repo],ref:'private host-resources fixture adoption'}),
   };
-  const run=(extraEnv,...args)=>spawnSync(process.execPath,[API,...placeOnRepo(args,repo),'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...env,...extraEnv}});
+  const run=(extraEnv,...args)=>spawnSync(process.execPath,[API,...placeOnRepo(args,treeOfJob(args[args.indexOf('--job')+1])),'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...env,...extraEnv}});
+  const trees=new Map([WORKFLOW,LIGHT_WORKFLOW].map(wf=>[wf,addWorkflowWorktree({repo,workflowId:wf,env}).path]));
+  const treeOfJob=job=>trees.get(inspect(db=>db.prepare('SELECT workflow_id FROM jobs WHERE job_id=?').get(job)?.workflow_id));
   const withWrite=fn=>{const l=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(l);}finally{l.close();}};
   withWrite(l=>{
     // Every unit belongs to an approved goal revision. LIGHT_WORKFLOW holds the light op: the fake Orca answers one

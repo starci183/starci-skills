@@ -12,6 +12,7 @@ import {inspectLedger,ledgerFileFor,openLedger,releaseTwoPhase,reserveTwoPhase} 
 import {isLeaseOverlapRefusal,patternFindings} from '../../scripts/supervisor/owed.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {placeOnRepo} from '../helpers/op-placement.mjs';
+import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
 
 // nivo wf-nivo-modules-agentos-mudqjov6 (repeat-reject cae2e44b): the Kernel dispatched a devin job
 // twice and both were rejected at step `reserve` — "resource path:apps/app/src/messages/en.json
@@ -62,6 +63,7 @@ const fixture=t=>{
     STARCI_LOCAL_ROOT:path.join(root,'localappdata'),
     STARCI_PROJECTS_ROOT:path.join(root,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
+    ...adoptLaunchTrust(root,{roots:[repo],ref:'private lease-wait fixture adoption'}),
   };
   // Every dispatch uses the real private workflow worktree and its native registry binding.
   const made=fakeOrcaWorktrees({root:path.join(root,'worktrees')}).create({repo:`path:${repo}`,name:WORKFLOW,baseBranch:'main'});

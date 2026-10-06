@@ -10,7 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runNode } from '../api/node/run-node.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { RUNTIME_LCOV, RUNTIME_TEST_GLOB, runtimeCoverageNodeArgs } from '../hfs/runtime-coverage-scope.mjs';
+import { RUNTIME_LCOV, runtimeCoverageNodeArgs, runtimeTestGlob } from '../hfs/runtime-coverage-scope.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PRELOADS = ['low-priority', 'isolated-temp', 'isolated-registry', 'runtime-copies'].map((name) => `./tests/setup/${name}.mjs`);
@@ -21,7 +21,7 @@ export const coverageArgs = (specs = []) => [
   ...runtimeCoverageNodeArgs(),
   '--test-reporter=spec', '--test-reporter-destination=stdout',
   '--test-reporter=lcov', `--test-reporter-destination=${RUNTIME_LCOV}`,
-  '--test', ...(specs.length ? specs : [RUNTIME_TEST_GLOB]),
+  '--test', ...(specs.length ? specs : [runtimeTestGlob()]),
 ];
 
 /** Runs the suite under coverage from `root`; returns the exit status (node does not create the lcov directory, so it is made here). */

@@ -1,4 +1,5 @@
 // The canon parity verifier (contract change canon-parity-settle) and the 60 s settle invariant.
+import { fileDispatchContract } from '../helpers/filed-contract.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -161,9 +162,10 @@ test('typecheck parity: a slice-caused error in an importer is new, a foreign er
 test('verifyReported runs parity only for a canon cut slice the declared checks cannot carry, and caches a refusal', async (t) => withLedger(t, async ({ repoRoot: root, ledger }) => {
   const { base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n' }, { root });
   const item = sliceItem(base, RED);
-  // The real jobs row gives observationContextOf its declared op identity.
-  // No native result or required READ obligation is manufactured by this fixture.
+  // The real jobs row and the dispatch contract filed through admission give observationContextOf its declared op identity and READ snapshot.
+  // No native result is manufactured by this fixture.
   seedWorkflow(ledger, { id: item.workflowId, state: { phase: 'running' }, jobs: [{ jobId: item.jobId, opId: item.op, status: 'running', dispatchId: item.dispatchId, payload: item.payload }] });
+  fileDispatchContract(ledger, { jobId: item.jobId, repo: root });
   const db = ledger.db;
   let calls = 0;
   const parity = async () => { calls += 1; return { green: false, reason: 'parity-lint-new', detail: ['x'] }; };
@@ -197,6 +199,7 @@ test('same-size content edits retaining exact mtime invalidate only cached non-g
   const before = fs.statSync(file);
   const item = sliceItem(base, RED);
   seedWorkflow(ledger, { id: item.workflowId, state: { phase: 'running' }, jobs: [{ jobId: item.jobId, opId: item.op, status: 'running', dispatchId: item.dispatchId, payload: item.payload }] });
+  fileDispatchContract(ledger, { jobId: item.jobId, repo: root });
   const db = ledger.db;
   const parityDeps = { resolveRoot: async () => ({ ok: true, root, ownedRels: ['src/slice'] }) };
   let calls = 0;

@@ -254,7 +254,7 @@ policy:
               equal to the tested commit (the slice's new issues, hotspots and duplication;
               projectGate is whole-project debt, a note and never a finding against the slice).
               The lint, typecheck and slice-spec proof of a slice is the producer's attached gate.json
-              (starci/gate@1 from scripts/gates/gate.mjs over the slice's changed files against its
+              (starci/gate@1 from `starci gate run` over the slice's changed files against its
               base) with exit 0 for the tested revision - only the slice's NEW findings gate it, and its
               preexisting count is repository debt already there at base - record it as code.refactor's
               note, never a finding against the slice; this op's own whole-repository starci app lint still

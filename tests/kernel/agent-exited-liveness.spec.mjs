@@ -10,6 +10,9 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs
 import {classifyAgentScreen,exitedAgentPromptRow,shellPromptPrefix,shellReceivedText} from '../../scripts/lib/terminal-liveness.mjs';
 import {sendWakeWithProof,sendEnterWithProof} from '../../scripts/kernel/wake-delivery.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
+import {registerRepoWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
 
 // A nudge was typed into a DEAD op terminal.
 // Its agent had exited and left a bare PowerShell prompt, and
@@ -94,16 +97,18 @@ const opFixture=t=>{
   process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
   t.after(()=>{if(savedMachine===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=savedMachine;
     if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;});
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});proofRepo(t,repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stubFile=path.join(root,'fake-orca.mjs');fs.writeFileSync(stubFile,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stubFile]),
-    STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile};
+    STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,
+    ...adoptLaunchTrust(root,{roots:[repo],ref:'private agent-exited fixture adoption'})};
   const run=args=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
   const sends=()=>fs.readFileSync(logFile,'utf8').trim().split('\n').map(json).filter(e=>e?.argv?.[0]==='terminal'&&e.argv[1]==='send');
   const workflowId='wf-agent-exited',jobId='job-agent-exited';
+  registerRepoWorkflowWorktree({repo,workflowId});
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     seedWorkflow(ledger,{id:workflowId,goal:{revision:1,markdown:'Agent liveness fixture',json:{}},jobs:[

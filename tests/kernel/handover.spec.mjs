@@ -13,6 +13,9 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,reopenUnit,raiseTryBudget,recordJobResult,updateAttempt,markReportConsumed} from '../../engine/db/ledger.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
+import {fileDispatchContract} from '../helpers/filed-contract.mjs';
 import { recordArtifactProofs } from '../../scripts/kernel/proof-integrity.mjs';
 import { stageBlob, putArtifact, recordCheck } from '../../scripts/machine/evidence-store.mjs';
 import { fileReport } from '../../engine/db/ledger.mjs';
@@ -50,6 +53,7 @@ const OPTIONS=['Duy\u1ec7t - workflow ho\u00e0n t\u1ea5t','G\u00f3p \u00fd / b\u
 const fixture=t=>{
   const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-handover-'));
   t.after(()=>fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  proofRepo(t,repo);
   return repo;
 };
 const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
@@ -58,6 +62,7 @@ const read=(repo,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});tr
 /** A running workflow whose approved chain is docs.author then the handover, with docs.author settled pass. */
 const seedWorkflow=(repo,wf)=>seed(repo,ledger=>ledger.transaction(db=>{
   const at=Date.now();
+  registerWorkflowWorktree({env:process.env},{workflowId:wf,orcaWorktreeId:`handover::${wf}`,path:repo,branch:'main'});
   ensureWorkflow(db,{workflowId:wf,phase:'queued',title:'handover spec',by:'test-fixture',reason:'seed',at});
   insertGoal(db,{workflowId:wf,revision:0,goalIdentity:'hgoal',markdown:'# goal',
     goal:{opChain:{legs:[{op:'docs.author'},{op:HANDOVER_OP}]},derivedPlan:{legs:[{op:'docs.author'},{op:HANDOVER_OP}],edges:[['docs.author',HANDOVER_OP]]}},createdAt:at});
@@ -76,7 +81,7 @@ const seedWorkflow=(repo,wf)=>seed(repo,ledger=>ledger.transaction(db=>{
  * Returns {scratch, attemptId}: the attempt's STARCI_JOB_SCRATCH dir (starci kernel report reads the report
  * file only from inside it) and the attempt row id.
  */
-function seedJob(ledger,{wf,jobId,op,unitKey=null,status='running',dispatchId=null,result=null}){
+function seedJob(ledger,{wf,jobId,op,unitKey=null,status='running',dispatchId=null,result=null,repo=null}){
   const db=ledger.db??ledger,at=Date.now();
   const unitId=unitKey??`unit-${jobId}`;
   const scratch=dispatchId?fs.mkdtempSync(path.join(os.tmpdir(),'starci-ho-scratch-')):null;
@@ -95,7 +100,7 @@ function seedJob(ledger,{wf,jobId,op,unitKey=null,status='running',dispatchId=nu
   setJobStatus(db,{jobId,to:'leased',reason:'seed',at});
   const attempt=startAttempt(db,{workflowId:wf,jobId,dispatchId:dispatchId??`ctx-${jobId}`,
     scratchDir:scratch,dispatchedAt:at,startedAt:at,at});
-  writeContract(db,{attemptId:attempt.attempt_id,markdown:'# contract',createdAt:at});
+  if(repo)fileDispatchContract(ledger,{jobId,repo,createdAt:at});else writeContract(db,{attemptId:attempt.attempt_id,markdown:'# contract',createdAt:at});
   setJobStatus(db,{jobId,to:'running',reason:'seed',at});
   if(status==='succeeded'){
     setJobStatus(db,{jobId,to:'reported',reason:'seed',attemptId:attempt.attempt_id,at});
@@ -113,7 +118,7 @@ const writeReport=(dir,name,body)=>{
 const status=async(repo,wf)=>{const r=await run('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return json(r);};
 /** Files the handover ask of `attempt`, settles it blocked (awaiting-owner) and serves it on a live pid. */
 const handOver=async(repo,wf,{attempt,dispatchId})=>{
-  const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,unitKey:'ho',dispatchId}));
+  const {scratch}=seed(repo,ledger=>seedJob(ledger,{repo,wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,unitKey:'ho',dispatchId}));
   const filed=await run('report','--repo',repo,'--job',`job-ho-${attempt}`,'--report',
     writeReport(scratch,`ask-${attempt}.json`,{outcome:'ask',question:{text:'B\u00e0n giao: \u1ee9ng d\u1ee5ng \u0111\u00e3 xong.',options:OPTIONS}}),'--json');
   assert.equal(filed.status,0,filed.stderr||filed.stdout);
@@ -134,7 +139,7 @@ const answer=(repo,wf,{dispatchId,optionIndex,answeredBy='owner',eventAnsweredBy
 };
 /** The attempt that runs after an approve: it files done, the kernel records its check, then settles pass. */
 const settleApproval=async(repo,wf,{attempt,dispatchId})=>{
-  const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,unitKey:'ho',dispatchId}));
+  const {scratch}=seed(repo,ledger=>seedJob(ledger,{repo,wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,unitKey:'ho',dispatchId}));
   const filed=await run('report','--repo',repo,'--job',`job-ho-${attempt}`,'--report',writeReport(scratch,`done-${attempt}.json`,{outcome:'done',summary:'approved by the owner'}),'--json');
   assert.equal(filed.status,0,filed.stderr||filed.stdout);
   const checked=await runSettler('record-checks','--repo',repo,'--job',`job-ho-${attempt}`,'--checks',JSON.stringify({checks:[{name:'handover-owner-approval',command:'starci kernel status --json',exitCode:0,evidence:'approve by owner'}]}),'--json');
@@ -181,7 +186,7 @@ test('a handover ask carries exactly the three options approve, feedback, questi
 
   const repo=fixture(t),wf='wf-handover-shape';
   seedWorkflow(repo,wf);
-  const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:'job-ho-1',op:HANDOVER_OP,unitKey:'ho',dispatchId:'ho-d1'}));
+  const {scratch}=seed(repo,ledger=>seedJob(ledger,{repo,wf,jobId:'job-ho-1',op:HANDOVER_OP,unitKey:'ho',dispatchId:'ho-d1'}));
   const two=await run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(scratch,'two.json',{outcome:'ask',question:{text:'B\u00e0n giao',options:OPTIONS.slice(0,2)}}),'--json');
   assert.notEqual(two.status,0,'a two-option handover ask is refused');
   assert.match(two.stderr,/report-invalid/);
@@ -387,14 +392,15 @@ test('an accepted goal revision invalidates both handover approval routes and fi
 
 test('native handover and finish revalidate the actual required proof bytes and canonical obligations',async t=>{
   const repo=fixture(t),wf='wf-handover-integrity';seedWorkflow(repo,wf);
-  const old=process.env.STARCI_ARTIFACT_ROOT;process.env.STARCI_ARTIFACT_ROOT=path.join(repo,'private-artifacts');
+  const old=process.env.STARCI_ARTIFACT_ROOT,artifacts=fs.mkdtempSync(path.join(os.tmpdir(),'starci-ho-artifacts-'));process.env.STARCI_ARTIFACT_ROOT=artifacts;
+  t.after(()=>fs.rmSync(artifacts,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   t.after(()=>{if(old===undefined)delete process.env.STARCI_ARTIFACT_ROOT;else process.env.STARCI_ARTIFACT_ROOT=old;});
   const rel='.starciwork/features/acceptance/fr/delivery',id='fr.acceptance.delivery',command='node --test tests/delivery.spec.mjs',e2eCommand='node --test tests/e2e.spec.mjs';
   fs.mkdirSync(path.join(repo,rel),{recursive:true});fs.mkdirSync(path.join(repo,'tests'));
   fs.writeFileSync(path.join(repo,'tests/delivery.spec.mjs'),"import test from 'node:test';test('private delivery boundary',()=>{});\n");
   fs.writeFileSync(path.join(repo,'tests/e2e.spec.mjs'),"import test from 'node:test';test('private e2e boundary',()=>{});\n");
   seed(repo,l=>l.db.prepare("UPDATE jobs SET payload_json=? WHERE job_id='job-docs'").run(JSON.stringify({opId:'docs.author',records:[rel],owned_paths:['tests/']})));
-  const jobId='job-ho-proof';const {scratch}=seed(repo,l=>seedJob(l,{wf,jobId,op:HANDOVER_OP,unitKey:'ho',dispatchId:'proof-ho-1'}));
+  const jobId='job-ho-proof';const {scratch}=seed(repo,l=>seedJob(l,{repo,wf,jobId,op:HANDOVER_OP,unitKey:'ho',dispatchId:'proof-ho-1'}));
   const ask=writeReport(scratch,'missing-canonical.json',{outcome:'ask',question:{text:'delivery',options:OPTIONS}});
   const absent=await run('report','--repo',repo,'--job',jobId,'--report',ask,'--json');assert.notEqual(absent.status,0);assert.match(absent.stderr,/handover-proof-unjudged/);
   assert.equal(read(repo,db=>db.prepare('SELECT count(*) n FROM reports WHERE job_id=?').get(jobId).n),0);assert.equal(fs.existsSync(ask),true);

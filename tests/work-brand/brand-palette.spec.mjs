@@ -113,10 +113,6 @@ test('shell-conformance runs the palette on every drawn part and composite of a 
   assert.deepEqual([...new Set(refused.map((f) => f.code))].sort(), ['PALETTE_OFF_BRAND', 'PRIMARY_ABSENT']);
   const subjects = refused.filter((f) => f.code === 'PALETTE_OFF_BRAND').map((f) => /the (drawn part|composite) is painted/.exec(f.message)?.[1]).sort();
   assert.deepEqual(subjects, ['composite', 'composite', 'drawn part', 'drawn part'], 'desktop and mobile, part and composite');
-  // A leg admitted before the change meets the new codes as advisory suspects, never refusals.
-  const advisory = checkShellConformance(blue.dir, { advisoryCodes: ['PALETTE_OFF_BRAND', 'PRIMARY_ABSENT'] });
-  assert.deepEqual(advisory.refused, []);
-  assert.ok(advisory.suspect.some((s) => s.includes('[PALETTE_OFF_BRAND]') && s.includes('added after this leg was admitted')));
 });
 
 test('shell-conformance runs it on brand.decide layout captures and interface.implement running-page captures', async (t) => {

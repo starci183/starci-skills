@@ -21,7 +21,7 @@ version: 2.0.0
 gates:
   pre-commit: the managed .husky/pre-commit at the app root - starci app hygiene (staged .starciwork and .starcistacks paths, secrets guard), typecheck, ESLint per side and stylelint on the staged files, prettier --check, the unit specs the staged files touch
   pre-push: typecheck, lint (starci app lint), format:check and the unit specs affected since origin/main; runs every pre-commit rule again
-  settle: the op gate scripts/gates/gate.mjs over the op's changed files (merge guard, starci app lint --changed, codegen, tsc, the slice's specs; only findings new against the workflow's previous checkpoint block), re-read at starci kernel settle, which refuses a red done; a green settle commits the op's checkpoint on wf-<workflowId>
+  settle: the op gate `starci gate run` over the op's changed files (merge guard, starci app lint --changed, codegen, tsc, the slice's specs; only findings new against the workflow's previous checkpoint block), re-read at starci kernel settle, which refuses a red done; a green settle commits the op's checkpoint on wf-<workflowId>
   land: the workflow's finish, the only time main is touched - gate.mjs over the whole workflow branch against its merge-base with main, the merge guard, review.verify of the exact head that lands, the branch rebased onto main, then main fast-forwarded and pushed
   ci: GitHub Actions runs the same pinned starci app lint, format:check, typecheck, unit with the per-file coverage threshold, build:be and build:fe, then the Sonar scan and gate
   sonar: Sonar quality gate (knowledge/sonar-gate.yaml) - the imported lint findings, duplication, cognitive complexity and the coverage of the logic of be/src/modules at 100
@@ -1736,7 +1736,7 @@ rules:
       - {kind: runtime, id: facts, at: scripts/hfs/runtime-rules/facts.mjs}
   - id: R193
     code: "RT_RULE_ID_UNKNOWN"
-    law: "Every rule id (R<digits>) that tracked knowledge, docs, code or data names is a rule of this catalog, and rule ids are unique and well-formed (a gap between two ids is fine), and every rule of the catalog is named by the `hfsRules:` of at least one knowledge/patterns topic or carries `scope: runtime` (RT_RULE_UNCITED). Specs and generated copies are not read."
+    law: "Every rule id (R<digits>) that tracked knowledge, docs, code or data names is a rule of this catalog, and rule ids are unique and well-formed (a gap between two ids is fine), and every rule of the catalog is named by the `hfsRules:` of at least one knowledge/patterns topic or carries `scope: runtime` (RT_RULE_UNCITED). History paths (changelogs, benchmark findings, .starciwork records), specs and generated copies are not read."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]

@@ -6,6 +6,8 @@ import {spawnSync} from 'node:child_process';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
+import {fileDispatchContract} from '../helpers/filed-contract.mjs';
 import {classifyAgentScreen,cardLivenessPatterns} from '../../scripts/lib/terminal-liveness.mjs';
 
 // "nobody tells you a job finished or hung" (owner, 2026-09-25). Four defects, one spec each:
@@ -84,7 +86,7 @@ const git=(cwd,args)=>{
   assert.equal(r.status,0,`git ${args.join(' ')}: ${r.stderr}`);
 };
 const world=(t,fn,{screen,provider,dispatchedAgo=HOUR}={})=>withLedger(t,({root,repoRoot,machineHome,ledger})=>{
-  git(repoRoot,['init','-q']);
+  git(repoRoot,['init','-q','-b','main']);
   fs.writeFileSync(path.join(repoRoot,'.gitignore'),'.starciwork/\n');
   fs.mkdirSync(path.join(repoRoot,'docs'),{recursive:true});
   fs.writeFileSync(path.join(repoRoot,'docs','readme.md'),'# docs\n');
@@ -104,8 +106,8 @@ const world=(t,fn,{screen,provider,dispatchedAgo=HOUR}={})=>withLedger(t,({root,
         orca:{dispatchId:HANDLE,agentTerminalHandle:HANDLE},managed:{dispatchId:HANDLE,agentTerminalHandle:HANDLE},hierarchy:{runtime:{host:'orca',agent:provider,dispatchId:HANDLE,terminalHandle:HANDLE}}}}],
     leases:[{resourceKey:'path:docs/',jobId:JOB,expiresAt:Date.now()+HOUR}]});
   const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(JOB).attempt_id;
-  ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
-    .run(attemptId,WF,JOB,'# busy-cards contract','{}',dispatchedAt);
+  registerWorkflowWorktree({env:process.env},{workflowId:WF,orcaWorktreeId:'busy-cards::tree',path:repoRoot,branch:'main'});
+  fileDispatchContract(ledger,{jobId:JOB,repo:repoRoot,createdAt:dispatchedAt});
   ledger.appendEvent({workflowId:WF,entityType:'job',entityId:JOB,kind:'op-dispatched',payload:{op:OP,dispatch:HANDLE,terminal:HANDLE},createdAt:dispatchedAt});
   const job=()=>ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(JOB);
   const leases=()=>ledger.db.prepare('SELECT * FROM leases WHERE job_id=?').all(JOB);

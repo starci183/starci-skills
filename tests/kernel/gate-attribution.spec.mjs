@@ -12,6 +12,8 @@ import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { retryDisposition } from '../../engine/admission.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
+import { fileDispatchContract } from '../helpers/filed-contract.mjs';
 import { JOB_ROW } from '../../scripts/machine/job-row.mjs';
 import { independentChecksOf } from '../../scripts/kernel/verbs/shared/check-evidence.mjs';
 import { attemptCauseOf } from '../../scripts/kernel/lineage-route.mjs';
@@ -57,6 +59,11 @@ const fixture = (t) => {
   // The checks these tests record are the settler's re-runs, not a caller's word: under H8 only the
   // runtime-settler caller's exits count as observed (any other caller is authority 'declared').
   const okSettler = (args) => ok(args, { STARCI_CALLER: 'runtime-settler' });
+  // Each workflow owns one registered tree: self works in the shared checkout, the peer in a linked worktree of it.
+  const peerTree = path.join(root, 'peer-tree');
+  git(repo, ['worktree', 'add', '-q', '-b', `wf-${PEER}`, peerTree, 'HEAD']);
+  registerWorkflowWorktree({ env: process.env }, { workflowId: SELF, orcaWorktreeId: `gates::${SELF}`, path: repo, branch: 'main' });
+  registerWorkflowWorktree({ env: process.env }, { workflowId: PEER, orcaWorktreeId: `gates::${PEER}`, path: peerTree, branch: `wf-${PEER}` });
   const seed = (fn) => { const l = openLedger({ file: ledgerFileFor(repo) }); try { return fn(l); } finally { l.close(); } };
   const read = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
   seed((l) => {
@@ -71,7 +78,7 @@ const fixture = (t) => {
     for (const wf of [SELF, PEER]) l.write.updateWorkflow({ workflowId: wf, title: wf, ledgerMode: 'durable', sourceRoots: [repo] });
     const report = (jobId, outcome) => {
       const attemptId = l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
-      l.write.writeContract({ attemptId, markdown: '# contract', context: {}, createdAt: began });
+      fileDispatchContract(l, { jobId, repo, tree: jobId === 'job-peer' ? peerTree : repo, createdAt: began });
       l.write.fileReport({ attemptId, outcome, createdAt: began,
         report: { schema: 'starci/op-report@1', outcome, summary: 'scoped gates green; repo-wide test:ci red outside the slice',
           ...(outcome === 'blocked' ? { blocker: { kind: 'shared-change', detail: 'test:ci red on a peer change' } } : {}) } });

@@ -11,6 +11,7 @@ import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import { proofRepo } from '../helpers/sonar-scan.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
+import { adoptLaunchTrust } from '../helpers/launch-trust.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
@@ -48,6 +49,7 @@ const fixture=t=>{
       // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
       STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
       STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_LOCAL_ROOT:path.join(root,'localappdata'),
+      ...adoptLaunchTrust(root,{roots:[mainRepo],ref:'private dispatch-handshake fixture adoption'}),
     };
     const workflowId='wf-dispatch',jobId=`job-${mode}`;
     const made=fakeOrcaWorktrees({root:path.join(root,'worktrees')}).create({repo:`path:${mainRepo}`,name:`wf-${workflowId}`,baseBranch:'main'});

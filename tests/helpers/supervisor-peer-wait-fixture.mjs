@@ -3,50 +3,21 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {runKernelCliEntry} from './kernel-cli-entry.mjs';
 
 const HERE=fileURLToPath(import.meta.url);
-const API=new URL('../../scripts/kernel/cli.mjs',import.meta.url);
 const pause=new Int32Array(new SharedArrayBuffer(4));
 const sleep=ms=>Atomics.wait(pause,0,0,ms);
-const waitFor=(file,timeout=120_000)=>{
+const waitFor=(file,timeout=120_000,alive=()=>true)=>{
   const until=Date.now()+timeout;
   while(!fs.existsSync(file)){
+    if(!alive())throw new Error(`peer-wait CLI fixture exited before writing ${path.basename(file)}`);
     if(Date.now()>=until)throw new Error(`peer-wait CLI fixture timed out waiting for ${path.basename(file)}`);
     sleep(2);
   }
 };
 
-const runEntry=async(args,sequence)=>{
-  const stdout=[];
-  const stderr=[];
-  const original={argv:process.argv,log:console.log,error:console.error,exitCode:process.exitCode};
-  let printed;
-  const output=new Promise(resolve=>{printed=resolve;});
-  process.argv=[process.execPath,fileURLToPath(API),...args];
-  process.exitCode=undefined;
-  console.log=(...parts)=>{stdout.push(parts.map(String).join(' '));printed();};
-  console.error=(...parts)=>{stderr.push(parts.map(String).join(' '));};
-  let outputTimer;
-  try{
-    const entry=new URL(API);
-    entry.searchParams.set('peerWaitFixtureRun',String(sequence));
-    await import(entry.href);
-    await Promise.race([
-      output,
-      new Promise((_,reject)=>{outputTimer=setTimeout(()=>reject(new Error(`CLI produced no output: ${args.join(' ')}`)),120_000);}),
-    ]);
-    await new Promise(resolve=>setImmediate(resolve));
-    return {status:process.exitCode??0,stdout:`${stdout.join('\n')}\n`,stderr:stderr.length?`${stderr.join('\n')}\n`:''};
-  }catch(error){
-    return {status:1,stdout:`${stdout.join('\n')}${stdout.length?'\n':''}`,stderr:`${stderr.join('\n')}${stderr.length?'\n':''}${error?.stack??error}\n`};
-  }finally{
-    clearTimeout(outputTimer);
-    process.argv=original.argv;
-    process.exitCode=original.exitCode;
-    console.log=original.log;
-    console.error=original.error;
-  }
-};
+const runEntry=(args,sequence)=>runKernelCliEntry({args,tag:'peerWaitFixtureRun',sequence});
 
 const serve=async root=>{
   fs.writeFileSync(path.join(root,'ready'),'ready');
@@ -78,7 +49,7 @@ export const startPeerWaitCli=()=>{
     fs.writeFileSync(`${requestFile}.tmp`,JSON.stringify({...payload,sequence:id}));
     fs.renameSync(`${requestFile}.tmp`,requestFile);
     const responseFile=path.join(root,`${id}.response.json`);
-    waitFor(responseFile);
+    waitFor(responseFile,120_000,()=>child.exitCode===null);
     const response=JSON.parse(fs.readFileSync(responseFile,'utf8'));
     fs.rmSync(responseFile,{force:true});
     return response;

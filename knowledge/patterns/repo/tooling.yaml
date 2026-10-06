@@ -89,7 +89,7 @@ rules:
     kind: mandatory
     hfsRules: [R13, R24]
     requirement: |
-      Pre-commit, pre-push, the op gate (`scripts/gates/gate.mjs`, which runs `starci app lint --changed` at the app root), the
+      Pre-commit, pre-push, the op gate (`starci gate run`, which runs `starci app lint --changed` at the app root), the
       Kernel's landing and CI run the same `@starci/hfs` at the version pinned in `canon-pins.yaml`. CI runs `starci app lint`,
       which includes the app check. Pre-commit is L0 only: work hygiene plus lint and format checks on staged
       files, with no typecheck or test run. Pre-push is only the release gate and runs no test, typecheck, lint or format

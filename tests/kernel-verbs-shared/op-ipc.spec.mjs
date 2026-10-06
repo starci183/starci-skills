@@ -11,6 +11,7 @@ import {stageReportEvidence} from '../../scripts/kernel/verbs/shared/report-evid
 import {jobRowOf} from '../../scripts/kernel/verbs/shared/rows.mjs';
 import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
 import {fakeOrcaWorktrees} from '../helpers/fake-orca-worktrees.mjs';
+import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
@@ -77,6 +78,7 @@ const fixture=(t,{mode='healthy'}={})=>{
     STARCI_LOCAL_ROOT:CLI.localAppData,
     STARCI_PROJECTS_ROOT:CLI.projectsRoot,
     STARCI_TEST_MACHINE_FILE:CLI.machineFile,
+    ...adoptLaunchTrust(root,{roots:[mainRepo],ref:'private op-ipc fixture adoption'}),
   };
   const placement=registerWorkflowWorktree({env},{workflowId:WORKFLOW,orcaWorktreeId:made.worktree.id,path:repo,branch:made.worktree.branch});
   assert.equal(path.resolve(placement.path),repo);assert.equal(placement.branch,git('branch','--show-current'));
@@ -92,6 +94,8 @@ const fixture=(t,{mode='healthy'}={})=>{
     STARCI_DEVIN_SEAT_ENDPOINT:env.STARCI_DEVIN_SEAT_ENDPOINT,
     STARCI_PROJECTS_ROOT:env.STARCI_PROJECTS_ROOT,
     STARCI_TEST_MACHINE_FILE:env.STARCI_TEST_MACHINE_FILE,
+    STARCI_OWNER_ROOT:env.STARCI_OWNER_ROOT,
+    STARCI_AGENT_TRUST_HOME:env.STARCI_AGENT_TRUST_HOME,
     STARCI_AUTOPILOT:env.STARCI_AUTOPILOT,
     STARCI_CALLER:env.STARCI_CALLER??null,
   });

@@ -143,8 +143,10 @@ test('starci kernel rename refuses a bad name, a bad --by, an unknown workflow a
   const WF = 'wf-nivo-app-auth-abc12345';
   const bad = run(['rename', '--workflow', WF, '--title', ' ', '--no-terminals']);
   assert.notEqual(bad.status, 0); assert.match(bad.stderr, /rename-bad-title/);
-  const by = run(['rename', '--workflow', WF, '--title', 'Nivo · X', '--by', 'kernel', '--no-terminals']);
+  const by = run(['rename', '--workflow', WF, '--title', 'Nivo · X', '--by', 'nobody', '--no-terminals']);
   assert.notEqual(by.status, 0); assert.match(by.stderr, /rename-bad-by/);
+  const claimed = run(['rename', '--workflow', WF, '--title', 'Nivo · X', '--by', 'kernel', '--no-terminals']);
+  assert.notEqual(claimed.status, 0); assert.match(claimed.stderr, /kernel-caller-actor/, 'an unbound owner cannot attest the Kernel');
   const unknown = run(['rename', '--workflow', 'wf-nope', '--title', 'Nivo · X', '--no-terminals']);
   assert.notEqual(unknown.status, 0); assert.match(unknown.stderr, /workflow-unknown/);
   ledger.db.prepare('UPDATE jobs SET worker_id=? WHERE job_id=?').run('term-op', 'op-uat.verify-1');

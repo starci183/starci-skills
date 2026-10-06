@@ -83,7 +83,7 @@ test('installed current examples reach the real current reference catalog and RE
     assert.deepEqual(actual, fs.readFileSync(path.join(source, relative)), relative);
     assert.equal(installed.files[relative], digest(actual), relative);
   }
-  assert.equal(selectedExampleFiles.length, 16, 'only BASIC13 and the three public own Work indexes');
+  assert.equal(selectedExampleFiles.length, 18, 'only BASIC13, three own Work catalog indexes and two declared system-health seeds');
   for (const relative of selectedExampleFiles) {
     const actual = fs.readFileSync(path.join(target, relative));
     assert.deepEqual(actual, fs.readFileSync(path.join(source, relative)), relative);
@@ -119,7 +119,7 @@ test('update admits newly required example closure from prior installer custody 
   const config = '# local owner preference\n' + fs.readFileSync(path.join(target, 'config.yaml'), 'utf8');
   write(repo, '.claude/config.yaml', config);
   const updated = update({dir: repo, bootstrap: false, hosts: []}, () => {});
-  assert.equal(loadExampleCatalog(target).examples.length, 11);
+  assert.equal(loadExampleCatalog(target).examples.length, 14);
   assert.equal(discoverExampleApps(target).length, 3);
   for (const relative of new Set(newlyRequired)) {
     const actual = fs.readFileSync(path.join(target, relative));
@@ -149,7 +149,7 @@ test('forced update repairs damaged current example inputs while normal update r
   assert.equal(fs.readFileSync(path.join(target, compiler), 'utf8'), '{ BROKEN');
   assert.equal(fs.readFileSync(path.join(target, changed), 'utf8'), local);
   const updated = update({dir: repo, bootstrap: false, hosts: [], force: true}, () => {});
-  assert.equal(loadExampleCatalog(target).examples.length, 11);
+  assert.equal(loadExampleCatalog(target).examples.length, 14);
   assert.deepEqual(fs.readFileSync(path.join(target, compiler)), fs.readFileSync(path.join(source, compiler)));
   assert.deepEqual(fs.readFileSync(path.join(target, declaration)), fs.readFileSync(path.join(source, declaration)));
   assert.equal(discoverExampleApps(target).length, 3);

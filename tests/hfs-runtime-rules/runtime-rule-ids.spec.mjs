@@ -31,9 +31,9 @@ test('RT_RULE_ID_UNKNOWN: an id no rule has is refused in knowledge, docs and co
   assert.deepEqual(live(found), [['knowledge/x.yaml', 2], ['scripts/a.mjs', 1]]);
 });
 
-test('RT_RULE_ID_UNKNOWN: an unknown id is refused in a changelog and in a live file alike', () => {
+test('RT_RULE_ID_UNKNOWN: an unknown id is refused in a live file; a changelog may still name a deleted rule', () => {
   const text = 'Dropped: R999\n';
-  assert.deepEqual(live(ruleIdFindings(ctxOf({ 'packages/hfs/CHANGELOG.md': text, 'modules/kernel/current.yaml': text }))), [['packages/hfs/CHANGELOG.md', 1], ['modules/kernel/current.yaml', 1]]);
+  assert.deepEqual(live(ruleIdFindings(ctxOf({ 'modules/kernel/current.yaml': text, 'packages/hfs/CHANGELOG.md': text }))), [['modules/kernel/current.yaml', 1]]);
 });
 
 test('RT_RULE_ID_UNKNOWN: specs, generated copies, lock files and other extensions are not read', () => {

@@ -9,6 +9,7 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {spawnAgent} from '../../scripts/agent/lib.mjs';
 import {fakeAdmission} from '../helpers/fake-admission.mjs';
+import {registerRepoWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
 
 // nivo inc-c1d5bdbea173 (2026-09-25, Collab): the Kernel wrapped `starci kernel dispatch --job
 // op-backend.implement-dd957e8395 --spawn` in a shell `timeout 115`, which killed the api mid-spawn. The row
@@ -27,14 +28,16 @@ const fixture=(t,{deadline,launchTerminal=null})=>{
   const repo=path.join(root,'repo');fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   fs.writeFileSync(path.join(repo,'docs','a.md'),'# a\n');fs.writeFileSync(path.join(repo,'.gitignore'),'.starciwork/\n');
   const git=(...a)=>spawnSync('git',['-C',repo,'-c','user.email=spec@starci','-c','user.name=spec',...a],{encoding:'utf8',windowsHide:true,env:{...process.env,GIT_AUTHOR_DATE:'2026-01-01T00:00:00Z',GIT_COMMITTER_DATE:'2026-01-01T00:00:00Z'}});
-  git('init','-q');git('add','-A');git('commit','-qm','base');
+  git('init','-q','-b','main');git('add','-A');git('commit','-qm','base');
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json');
   if(launchTerminal)fs.writeFileSync(stateFile,JSON.stringify({sends:0,terminals:{[launchTerminal]:{handle:launchTerminal,connected:true,writable:true}}}));
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:stateFile};
+    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:stateFile,
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
   const api=args=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const workflowId='wf-leased-abandoned',jobId='job-leased-abandoned';
+  registerRepoWorkflowWorktree({repo,workflowId,env});
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     // The kernel worker runs; the op job is seeded 'ready' (the attempt row is written only after

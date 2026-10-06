@@ -87,7 +87,7 @@ export const BUNDLES = Object.freeze({
 
 /** The catalog entries for `codes`, in the catalog's own text, keyed by top-level line. */
 function catalogSlice(text, codes) {
-  const blocks = text.replace(/\r\n/g, '\n').split(/\n(?=[A-Z][A-Z0-9_]+:\n)/);
+  const blocks = text.replace(/\r\n/g, '\n').split(/\n(?=[A-Za-z][A-Za-z0-9_-]*:\n)/);
   const byCode = new Map(blocks.map((b) => [b.slice(0, b.indexOf(':')), b.replace(/\s+$/, '')]));
   return `${[...codes].sort(byCodeUnit).map((code) => {
     if (!byCode.has(code)) throw new Error(`${CATALOG} has no entry for ${code}`);

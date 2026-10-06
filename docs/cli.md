@@ -653,6 +653,7 @@ prove the packed runtime tarball installs and runs in an empty home
 | `--keep` | boolean |  |
 | `--docker` | boolean |  |
 | `--tools` | string |  |
+| `--out` | string |  |
 
 exit: 0 every assertion passed; 1 an assertion failed; 2 bad usage or the sandbox could not run
 

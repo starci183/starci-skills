@@ -177,7 +177,7 @@ const KNOWN = [
   'modules/ops/ops/runtime.operate.yaml executionModes.service.reads.service PATH_UNADMITTED .starciwork/_resources/services/<resource>/resource.yaml',
   'modules/ops/ops/runtime.operate.yaml executionModes.service.writes.resource PATH_UNADMITTED .starciwork/_resources/services/<resource>/resource.yaml',
   'modules/ops/ops/workspace.manage.yaml executionModes.import.writes.resources PATH_UNADMITTED .starciwork/_resources/imports/<resource>/resource.yaml',
-  'modules/ops/ops/workspace.manage.yaml executionModes.import.writes.resources PATH_UNADMITTED .starciwork/_resources/imports/<resource>/assets/<asset>',
+  'modules/ops/ops/workspace.manage.yaml executionModes.import.writes.resources-asset PATH_UNADMITTED .starciwork/_resources/imports/<resource>/assets/<asset>',
   // The project ledger moved out of .starciwork (<runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite, decision Q1);
   // the manifest's prose read-path still names the in-repo file.
   'modules/ops/ops/interface.audit.yaml reads.workflow PATH_UNADMITTED .starciwork/runtime.sqlite',

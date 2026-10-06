@@ -61,7 +61,7 @@ test('status: the draw a deferred settle waits on reads ready, not dependency on
   const example=path.join(ROOT,'config.example.yaml');
   fs.copyFileSync(example,path.join(owner,'config.example.yaml'));
   fs.writeFileSync(path.join(owner,'config.yaml'),stringifyYaml({...parseYaml(fs.readFileSync(example,'utf8')),budgets:{maxOps:null}}));
-  const api=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_OWNER_ROOT:owner}});
+  const api=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_OWNER_ROOT:owner,STARCI_AUTOPILOT:'off'}});
   const ledger=openLedger({file:ledgerFileFor(repo)});
   const job=(jobId,opId,status,payload,extra={})=>({jobId,opId,status,role:'op',payload:{opId,...payload},...extra});
   try{

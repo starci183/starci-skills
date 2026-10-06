@@ -100,11 +100,14 @@ const runApi = (env, ...args) => new Promise((resolve) => {
   child.on('close', (status) => { clearTimeout(timer); resolve({ status, stdout, stderr }); });
 });
 const KERNEL_TERMINAL = 'term_kernel-provider-health';
+// The Kernel's current incarnation as caller admission proves it: job, hierarchy, managed dispatch and the singleton signal agree.
 const seedPhWorkflow = (repo, wf) => seed(repo, (l) => seedWorkflow(l, { id: wf,
-  state: { job: 'provider health' },
+  state: { job: 'provider health' }, generation: 1,
+  signals: [{ key: wf, token: 'token-ph', value: { terminal: KERNEL_TERMINAL, dispatch: 'dispatch-ph' }, expiresAt: null }],
   jobs: [
-    { jobId: `kernel-${wf}`, kind: 'kernel', role: 'kernel', status: 'running', workerId: KERNEL_TERMINAL,
-      payload: { hierarchy: { runtime: { terminalHandle: KERNEL_TERMINAL } } } },
+    { jobId: `kernel-${wf}`, kind: 'kernel', role: 'kernel', status: 'running', workerId: KERNEL_TERMINAL, generation: 1,
+      payload: { managed: { agentTerminalHandle: KERNEL_TERMINAL, dispatchId: 'dispatch-ph' },
+        hierarchy: { role: 'kernel', workflowId: wf, attempt: 1, generation: 1, runtime: { terminalHandle: KERNEL_TERMINAL } } } },
     { jobId: 'op-docs-queued', opId: 'docs.author', payload: { opId: 'docs.author', owned_paths: ['docs/'] } },
     { jobId: 'op-docs-running', opId: 'docs.author', status: 'running', workerId: 'term_op-running', payload: { opId: 'docs.author' } },
   ] }));

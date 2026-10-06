@@ -276,6 +276,8 @@ const watchdogWorld = async (t, { jobs = [], events = [], tabTitle = null, signa
         // The Kernel acked the current runtime rev: an unacked seat gets a rev paragraph that pushes the wake past the delivery proof's window.
         { kind: KERNEL_REV_ACKED_EVENT, entityType: 'kernel', payload: { rev: currentRuntimeRev(), files: [], source: 'ack', attempt: 2 } }, ...events],
       signals: [{ key: workflowId, value: signalValue ?? { terminal: KERNEL, dispatch: 'dispatch-kernel-1', host: 'orca', agent: 'claude', launch: 'worker' } }] });
+    // A replaced seat starts only on an owner-approved goal.
+    ledger.db.prepare("UPDATE goals SET approved_by='owner' WHERE workflow_id=?").run(workflowId);
     // A replaced seat re-binds the workflow's claimed goal: with none, start-workflow answers queue-empty and launches nothing.
     ledger.db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,'goal',?,'{}','claimed',?)").run(workflowId, workflowId, Date.now());
   } finally { ledger.close(); }
@@ -343,7 +345,9 @@ test('a repair tick renames a drifted Kernel tab title through Orca', async (t) 
 
 test('a repair retains a seat whose missing worker Dispatch leaves its execution identity unverified', async (t) => {
   const fx = await watchdogWorld(t, { signalValue: { terminal: KERNEL, host: 'orca', agent: 'claude', launch: 'worker' } });
-  const { status, result, stderr, stdout } = fx.tick();
+  // The repair re-enters start-workflow: its host readiness is the fixture boundary, so the verdict reached is the worker identity.
+  const startup = `data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/workflow-startup-loader.mjs', import.meta.url).href)});`)}`;
+  const { status, result, stderr, stdout } = fx.tick({ NODE_OPTIONS: `--import=${startup}` });
   t.diagnostic(JSON.stringify({ status, result, stderr, stdout }));
   assert.equal(status, 1, JSON.stringify({ status, result, stderr, stdout }));
   assert.equal(result.action, 'restart-failed', JSON.stringify(result));

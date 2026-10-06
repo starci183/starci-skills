@@ -2,7 +2,7 @@ group: gate
 verb: run
 owner: runtime
 summary: run the measured product or document gate
-impl: {script: scripts/gates/gate.mjs}
+impl: {script: scripts/cli/gate-run.mjs}
 flags:
   - {name: root, type: string, summary: application root}
   - {name: base, type: string, summary: explicit gate base commit}

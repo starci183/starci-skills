@@ -401,6 +401,7 @@ complete -c starci -n '__starci_using_command gate install-sandbox' -l tarball -
 complete -c starci -n '__starci_using_command gate install-sandbox' -l keep -d 'keep the sandbox directory after the run'
 complete -c starci -n '__starci_using_command gate install-sandbox' -l docker -d 'run the proof inside a throwaway Linux container'
 complete -c starci -n '__starci_using_command gate install-sandbox' -l tools -r -d 'directory holding a Linux age-keygen for the container run'
+complete -c starci -n '__starci_using_command gate install-sandbox' -l out -r -d 'write the JSON summary to this file'
 complete -c starci -n '__starci_using_command gate read' -l root -r -d 'application root'
 complete -c starci -n '__starci_using_command gate read' -l touch -r -d 'files the operation will touch'
 complete -c starci -n '__starci_using_command gate read' -l read -r -d 'additional application files read'

@@ -210,9 +210,9 @@ test('wakeKernel: no seat, a busy or gated Kernel and a shell refuse; an idle Ke
   ledger.db.prepare('UPDATE jobs SET worker_id=? WHERE job_id=?').run('term_k',`kernel-${WF}`);
   sends.length=0;
   assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([IDLE,IDLE,ACTIVE])}).action,'kernel-woken');
-  // Between them the runtime-rev sentence (scripts/kernel/runtime-rev.mjs): this seat never acked a rev, so it is asked for one full re-read.
+  // Between them the runtime-rev sentence (scripts/kernel/runtime-rev.mjs): this seat never acknowledged a complete runtime READ, so it is asked for one full re-read.
   assert.ok(sends[0].text.startsWith(`${text} Runtime rev `),sends[0].text);
-  assert.match(sends[0].text,/ Runtime rev [0-9a-f]{12}: no runtime rev acked yet - re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml in full, then starci kernel kernel-ack-rev /);
+  assert.match(sends[0].text,/ Runtime rev [0-9a-f]{12}: no complete runtime READ is acknowledged; re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml, then starci kernel kernel-ack-rev /);
   assert.ok(sends[0].text.endsWith(` Runtime wake for Kernel attempt 2 of ${WF}: starci kernel status --workflow ${WF} shows kernel.attempt 2 and kernel.you true on your terminal.`));
 }));
 

@@ -11,6 +11,8 @@ import {grammarContextRequired,resolveGrammarContext,renderGrammarContext} from 
 import {projectBinding} from '../../scripts/kernel/target-repo.mjs';
 import {buildOpPrompt} from '../../scripts/kernel/op-prompt.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {registerRepoWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
 
 // An op manifest with grammarContext: required gets its grammar sources in packet context.grammar at
 // dispatch: the family CSS from the product's brand record and installed @starci/grammar, the StarCi
@@ -106,13 +108,14 @@ test('buildOpPrompt renders packet context.grammar and nothing when the packet h
 
 test('starci kernel dispatch attaches context.grammar and refuses grammar-context-missing before any Orca call',t=>{
   const root=tmp(t);
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});proofRepo(t,repo);
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const log=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     STARCI_SOURCE_ROOT:root,STARCI_LOCAL_ROOT:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
   fs.mkdirSync(path.join(repo,'src','app'),{recursive:true});
+  registerRepoWorkflowWorktree({repo,workflowId:'wf-grammar',env});
   const ledger=openLedger({file:ledgerFileFor(repo,{env})});
   try{seedWorkflow(ledger,{id:'wf-grammar',jobs:[{jobId:'job-impl',opId:'interface.implement',
     payload:{opId:'interface.implement',records:[],owned_paths:['src/app'],model:'devin-agent'}}]});}

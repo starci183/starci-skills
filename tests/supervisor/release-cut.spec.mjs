@@ -161,7 +161,7 @@ test('a skip from missing infrastructure on the release host, or any undeclared 
 test('the L4 row: the runtime suite and check, every example script (lint, tsc, tests, builds, images) and the Sonar proof; a missing script or proof is absent and fails', async (t) => {
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-l4-plan-')));
   t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: 'x', check: 'x' } }));
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: 'node --test tests/a.spec.mjs', check: 'x' } }));
   const app = path.join(base, 'examples', 'shop');
   fs.mkdirSync(app, { recursive: true });
   fs.writeFileSync(path.join(app, 'hfs.json'), JSON.stringify({ kind: 'app' }));

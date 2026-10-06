@@ -8,6 +8,9 @@ import {endLaunchGrace,notGraceSeed} from '../helpers/launch-grace.mjs';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
+import {registerRepoWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
 
 // Orca's `terminal read` lifts the text of an agent's input box out of the frame and answers it as
 // `draft`. terminal-read.mjs dropped it, so no reader saw text waiting unsubmitted: a send without
@@ -190,9 +193,11 @@ test('quit-agent empties a draft before its quit command, and types nothing over
 
 const nudgeFixture=t=>{
   const w=orcaWorld(t);
-  const repo=path.join(w.root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  const repo=path.join(w.root,'repo');fs.mkdirSync(repo,{recursive:true});proofRepo(t,repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  Object.assign(w.env,adoptLaunchTrust(w.root,{roots:[repo],ref:'private input-draft fixture adoption'}));
   const run=(args,more={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...w.env,...more}});
   const workflowId='wf-nudge-draft',jobId='job-nudge-draft';
+  registerRepoWorkflowWorktree({repo,workflowId,env:w.env});
   // ledgerFileFor resolves under env.STARCI_LOCAL_ROOT — seed the file the spawned api will open.
   const ledgerFile=ledgerFileFor(repo,{env:w.env});
   const ledger=openLedger({file:ledgerFile});

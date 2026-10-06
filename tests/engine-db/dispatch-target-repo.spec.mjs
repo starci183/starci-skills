@@ -9,6 +9,9 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {placeOnRepo} from '../helpers/op-placement.mjs';
 import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
+import {registerRepoWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
@@ -21,10 +24,6 @@ process.env.STARCI_SLEEP_SCALE??='0.02';
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=v=>JSON.stringify(v??null);
-const git=(cwd,...args)=>{
-  const r=spawnSync('git',['-C',cwd,...args],{encoding:'utf8',windowsHide:true});
-  assert.equal(r.status,0,`git ${args.join(' ')}: ${r.stderr}`);
-};
 const slash=p=>p.replace(/\\/g,'/');
 const esc=s=>s.replace(/[\\^$.*+?()[\]{}|]/g,'\\$&');
 
@@ -34,8 +33,9 @@ const fixture=(t,{bound=true}={})=>{
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const be=path.join(dir,'shop'),backend=path.join(be,'be'),fe=path.join(be,'fe'),source=path.join(dir,'source');
+  fs.mkdirSync(be,{recursive:true});
+  proofRepo(t,be);
   for(const side of [backend,fe])fs.mkdirSync(path.join(side,'src'),{recursive:true});
-  git(be,'init','--quiet');
   fs.mkdirSync(path.join(source,'.workspaces','projects','shop'),{recursive:true});
   if(bound)fs.writeFileSync(path.join(source,'.workspaces','projects','shop','work.json'),json({
     schema:'starci/workspace-binding@2',project:'shop',
@@ -48,15 +48,16 @@ const fixture=(t,{bound=true}={})=>{
     STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(dir,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(dir,'state.json'),
     STARCI_LOCAL_ROOT:path.join(dir,'localappdata'),STARCI_PROJECTS_ROOT:path.join(dir,'projects'),
-    STARCI_TEST_MACHINE_FILE:path.join(dir,'machine.sqlite')};
+    STARCI_TEST_MACHINE_FILE:path.join(dir,'machine.sqlite'),...adoptLaunchTrust(dir,{roots:[be],ref:'private dispatch-target fixture adoption'})};
   const api=(...args)=>{
     const r=spawnSync(process.execPath,[API,...placeOnRepo(args,args[args.indexOf('--repo')+1])],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
     let body=null;try{body=JSON.parse(r.stdout);}catch{}
     return {r,body};
   };
-  const enqueue=(jobId,op,owned)=>{
+  const enqueue=(jobId,op,owned,tree=be)=>{
     // an unbound repository takes the spelling verbatim, so the directory it names is a real one inside the checkout
     if(!bound)for(const grant of owned)if(!grant.startsWith('.starciwork'))fs.mkdirSync(path.join(be,path.posix.dirname(grant)),{recursive:true});
+    registerRepoWorkflowWorktree({repo:tree,workflowId:'wf-dispatch-target',env});
     const ledger=openLedger({file:ledgerFileFor(be,{env})});
     // Op jobs are unit tries now: the fixture seeds the unit and keeps the workflow running for dispatch.
     try{seedWorkflow(ledger,{id:'wf-dispatch-target',jobs:[{jobId,opId:op,payload:{opId:op,owned_paths:owned}}]});}
@@ -119,7 +120,7 @@ test('fe/ paths reach the worker bare at the app root, labelled with their side'
 
 test('placed in fe/ by --worktree, the app-relative paths are rooted at the app checkout',t=>{
   const {be,fe,api,enqueue,contractOf}=fixture(t);
-  const jobId=enqueue('op-fe-placed','interface.scaffold',['fe/package.json','.starciwork/features/base/impl/fe/assets/cut-1']);
+  const jobId=enqueue('op-fe-placed','interface.scaffold',['fe/package.json','.starciwork/features/base/impl/fe/assets/cut-1'],fe);
   const d=api('dispatch','--repo',be,'--job',jobId,'--worktree',fe,'--spawn','--json');
   assert.equal(d.r.status,0,d.r.stderr||d.r.stdout);
   const {markdown}=contractOf(jobId);

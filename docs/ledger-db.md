@@ -226,7 +226,7 @@ The output cap and positional I/O APIs are documented by [Node.js zlib](https://
 
 Blob publication flushes temporary bytes/metadata before linking and hashes reused bytes before returning. A corrupt same-size destination or invalid sidecar refuses acknowledgement. Publication directory/link persistence and SQLite NORMAL remain dependent on the local filesystem, operating system and hardware; no power-loss guarantee for an acknowledged blob/DB reference is established.
 
-Repository identity preserves case on POSIX and uses the existing Windows case-insensitive policy. An existing pre-fix folded POSIX store is reused only when its own `meta.repo_root` proves the exact requested root. A mismatch refuses and preserves the database for owner migration; no automatic rename or row merge occurs. Case-sensitive Windows directories and synchronized/network storage are outside this profile.
+Repository identity preserves case on POSIX and uses the existing Windows case-insensitive policy. Case-sensitive Windows directories and synchronized/network storage are outside this profile.
 
 ### Recovery scope
 

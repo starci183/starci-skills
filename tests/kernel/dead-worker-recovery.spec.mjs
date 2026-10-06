@@ -5,6 +5,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {registerRepoWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
 import {jobResult} from '../../engine/db/ledger.mjs'; const DRIVE=path.parse(os.tmpdir()).root;
 
 // A host shutdown kills every Orca terminal while the ledger still says an op
@@ -36,13 +37,14 @@ const git=(cwd,args,env={})=>{
 // the dispatch, the fake Orca with the op's terminal record in `terminal`
 // ({connected:false} dead, {stale:true} unknown to Orca, null live).
 const world=(t,fn,{terminal={connected:false,writable:false}}={})=>withLedger(t,({root,repoRoot,machineHome,ledger})=>{
-  git(repoRoot,['init','-q']);
+  git(repoRoot,['init','-q','-b','main']);
   fs.writeFileSync(path.join(repoRoot,'.gitignore'),'.starciwork/\n');
   fs.mkdirSync(path.join(repoRoot,'docs'),{recursive:true});
   fs.writeFileSync(path.join(repoRoot,'docs','readme.md'),'# docs\n');
   const past=new Date(Date.now()-HOUR).toISOString();
   git(repoRoot,['add','-A']);
   git(repoRoot,['commit','-q','-m','seed'],{GIT_AUTHOR_DATE:past,GIT_COMMITTER_DATE:past});
+  registerRepoWorkflowWorktree({repo:repoRoot,workflowId:WF});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'orca-state.json');
   fs.writeFileSync(stateFile,JSON.stringify({sends:0,terminals:terminal?{[HANDLE]:{handle:HANDLE,...terminal}}:{}}));

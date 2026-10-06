@@ -8,6 +8,9 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
 import {startCutSetCli} from '../helpers/engine-db-cut-set-integration-fixture.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {fileDispatchContract} from '../helpers/filed-contract.mjs';
+import {registerRepoWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
 
 // Live incident (a base-repos backend.scaffold run): which cut pass runs the whole-set
 // integration gate. settle used to call ordinal === total "final", but once the seam passes the other
@@ -25,18 +28,20 @@ const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 const refusal=r=>{try{return JSON.parse(r.stderr.trim().split('\n').at(-1));}catch{return null;}};
 const json=v=>JSON.stringify(v??null);
 
-const workRoot=t=>{
+const repoOf=new Map();
+/** A committed repository that is `wf`'s registered worktree, the checkout its ordinals are dispatched in. */
+const workRoot=(t,wf)=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-cutset-'));
+  proofRepo(t,dir);registerRepoWorkflowWorktree({repo:dir,workflowId:wf});repoOf.set(wf,dir);
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   return dir;
 };
 const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
 const read=(repo,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
 
-const OP='docs.author',CUT='be-baseline-r1-g2',TOTAL=3;
-// docs.author owes its READ digest and document gate at settle (knowledge/op-gate.yaml opProofs): each ordinal attaches the green ones.
+const OP='code.refactor',CUT='be-baseline-r1-g2',TOTAL=3;
+// code.refactor owes the op loop's gate and READ digest at settle (knowledge/op-gate.yaml): each ordinal attaches the green ones, bound to its admission.
 const PROOF_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'starci-cutset-proofs-'));
-const PROOFS=writeGreenProofs(PROOF_DIR);
 after(()=>fs.rmSync(PROOF_DIR,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
 const jobsByAttempt=new Map();
 /** One dispatched cut ordinal: running, its contract written, a done report filed. */
@@ -55,10 +60,11 @@ const dispatchOrdinal=(ledger,wf,jobId,attempt,dispatch=`ctx-${jobId}`)=>{
   if(phase==='queued')ledger.write.changeWorkflowPhase({workflowId:wf,to:'running',by:'test-fixture',reason:'dispatch cut ordinal'});
   ledger.write.setJobStatus({jobId,to:'ready',reason:'fixture admission'});
   ledger.write.setJobStatus({jobId,to:'leased',reason:'fixture admission',leaseToken:`lease-${jobId}`});
-  const {attempt_id:attemptId}=ledger.write.startAttempt({workflowId:wf,jobId,dispatchId:dispatch});
+  const {attempt_id:attemptId}=ledger.write.startAttempt({workflowId:wf,jobId,dispatchId:dispatch,scratchDir:path.join(PROOF_DIR,`scratch-${jobId}`)});
   ledger.write.setJobStatus({jobId,to:'running',reason:'fixture dispatch'});
-  ledger.write.writeContract({attemptId,markdown:'# cut contract',context:{}});
-  ledger.write.fileReport({attemptId,outcome:'done',report:{outcome:'done',files:PROOFS}});
+  const repo=repoOf.get(wf),{packet}=fileDispatchContract(ledger,{jobId,repo});
+  const proofs=writeGreenProofs(path.join(PROOF_DIR,`scratch-${jobId}`,'proofs'),{root:repo,binding:packet.context.gate_binding});
+  ledger.write.fileReport({attemptId,outcome:'done',report:{schema:'starci/op-report@1',outcome:'done',summary:'cut ordinal done',files:proofs,checks:[{name:'self-check',command:'true',exitCode:0}]}});
   jobsByAttempt.set(`${wf}:${attempt}`,jobId);
   return jobId;
 };
@@ -73,7 +79,7 @@ const settlePass=(repo,jobId)=>runApi('settle','--repo',repo,'--job',jobId,'--ve
 const settlePassFresh=(repo,jobId)=>runApiFresh('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
 
 test('the last sibling to settle closes the cut set and alone owes full-regression-final',t=>{
-  const repo=workRoot(t),wf='wf-cut-set-close';
+  const wf='wf-cut-set-close',repo=workRoot(t,wf);
   seed(repo,l=>{
     l.ensureWorkflow({workflowId:wf,title:'cut set'});
     l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
@@ -120,7 +126,7 @@ test('the last sibling to settle closes the cut set and alone owes full-regressi
 });
 
 test('a failed sibling keeps the set open; its passing retry is the closing pass',t=>{
-  const repo=workRoot(t),wf='wf-cut-set-retry';
+  const wf='wf-cut-set-retry',repo=workRoot(t,wf);
   seed(repo,l=>l.ensureWorkflow({workflowId:wf,title:'cut set retry'}));
   const [o1,o2,o3]=seed(repo,l=>[1,2,3].map(n=>seedOrdinal(l,wf,n,n)));
   for(const [jobId,attempt] of [[o1,1],[o3,3]]){

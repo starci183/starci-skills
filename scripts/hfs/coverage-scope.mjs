@@ -23,7 +23,7 @@ const segments = (dir) => dir.replace(/\/+$/, '').split('/').filter(Boolean);
 const isDir = (path) => path.endsWith('/');
 
 /** True when directory pattern `inner` lies inside `outer` (an outer `*` segment matches any one inner segment) or is the same. */
-function nested(inner, outer) {
+export function nested(inner, outer) {
   const a = segments(inner);
   const b = segments(outer);
   return a.length >= b.length && b.every((segment, index) => segment === '*' ? true : segment === a[index]);

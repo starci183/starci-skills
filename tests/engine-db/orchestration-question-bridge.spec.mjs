@@ -5,6 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
+import {registerRepoWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
 import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus} from '../../engine/db/ledger.mjs';
 
 // Two live incidents on a base-repos backend.scaffold run (an orchestration message bridge gap and an
@@ -23,17 +26,19 @@ const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 let sharedFixture=null;
 const createSharedFixture=()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-question-bridge-'));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});proofRepo({after:()=>{}},repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json');
   const callsFile=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG:callsFile,STARCI_FAKE_ORCA_STATE:stateFile,
-    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db')};  // every fixture registers a repo named 'repo' — isolate the registry
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db'),
+    ...adoptLaunchTrust(root,{roots:[repo],ref:'private question-bridge fixture adoption'})};  // every fixture registers a repo named 'repo' — isolate the registry
   const rawApi=(args,more={})=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...more}});
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
   const workflowId='wf-question-bridge',jobId='job-question-bridge';
+  registerRepoWorkflowWorktree({repo,workflowId,env});
   const ledgerFile=ledgerFileFor(repo);
   const ledger=openLedger({file:ledgerFile});
   try{

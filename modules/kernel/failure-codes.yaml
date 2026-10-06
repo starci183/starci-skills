@@ -13465,7 +13465,7 @@ sonar-proof-missing:
 op-gate-proof-missing:
   title: "No gate result is attached"
   title_vi: "Chưa đính kèm kết quả cổng kiểm tra"
-  meaning_vi: "Op viết code nhưng report không đính kèm gate.json (schema starci/gate@1) do scripts/gates/gate.mjs in ra, nên runtime không có gì để chấm vòng kiểm tra bắt buộc."
+  meaning_vi: "Op viết code nhưng report không đính kèm gate.json (schema starci/gate@1) do `starci gate run` in ra, nên runtime không có gì để chấm vòng kiểm tra bắt buộc."
   causes_vi:
     - "Op chưa chạy gate.mjs sau khi viết code"
     - "Tệp gate.json không được đính kèm vào starci kernel report"

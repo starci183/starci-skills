@@ -12,9 +12,10 @@ import { readProperties } from '../../scripts/lib/properties.mjs';
 import { coverageScopeOf, coverageTargetOf } from '../../scripts/gates/sonar-gate.mjs';
 import { braceVariants, globExpression } from '../../scripts/lib/glob.mjs';
 import { isMeasured } from '../../scripts/hfs/coverage-scope.mjs';
-import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
+import { RUNTIME_MANIFEST_FILE, loadSlotManifest } from '../../scripts/hfs/slots.mjs';
+import { runtimeShapeProblems } from '../../scripts/hfs/manifest-shape.mjs';
 import { execFileSync } from 'node:child_process';
-import { RUNTIME_FLAG, RUNTIME_LCOV, runtimeCodecovPaths, runtimeCoverageNodeArgs } from '../../scripts/hfs/runtime-coverage-scope.mjs';
+import { RUNTIME_FLAG, RUNTIME_LCOV, renderRuntimeSonar, runtimeCodecovPaths, runtimeCoverageNodeArgs, runtimeCoverageScope } from '../../scripts/hfs/runtime-coverage-scope.mjs';
 import { coverageArgs } from '../../scripts/gates/runtime-coverage.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -254,4 +255,41 @@ test('the root sonar-project.properties of the runtime is a render: a hand edit 
   assert.deepEqual(codes(root), ['EXAMPLES_CI_APP_QUALITY_DRIFT']);
   examplesCiMain(['--write'], { root, out: () => {} });
   assert.deepEqual(codes(root), []);
+});
+
+const runtimeManifest = () => structuredClone(loadSlotManifest({ file: path.join(ROOT, RUNTIME_MANIFEST_FILE) }));
+const setCoverage = (manifest, id, coverage) => { manifest.slots.find((slot) => slot.id === id).coverage = coverage; return manifest; };
+
+test('the runtime scope follows its slot manifest: flipping a slot coverage changes the producer, the codecov paths and the sonar render', () => {
+  const base = runtimeManifest();
+  assert.ok(runtimeCodecovPaths(base).includes('scripts/hfs/**/*.mjs'));
+  assert.ok(renderRuntimeSonar(base).includes(',scripts/hfs,'));
+  const flipped = setCoverage(runtimeManifest(), 'runtime.hfs', 'none');
+  assert.ok(!runtimeCodecovPaths(flipped).includes('scripts/hfs/**/*.mjs'), 'a none slot is not a codecov path');
+  assert.ok(!runtimeCoverageNodeArgs(flipped).includes('--test-coverage-include=scripts/hfs/**/*.mjs'), 'the producer stops measuring it');
+  assert.ok(!renderRuntimeSonar(flipped).includes(',scripts/hfs,'), 'sonar stops analysing it');
+  const promoted = setCoverage(runtimeManifest(), 'runtime.contracts', 'required');
+  assert.ok(runtimeCodecovPaths(promoted).includes('modules/cli/**/*.mjs'), 'a required slot is measured');
+});
+
+test('the runtime scope: a none slot inside a required directory is excluded, a required slot of a non-source file is refused, the vendored yaml and the generated catalog stay out', () => {
+  const nested = runtimeManifest();
+  nested.slots.push({ id: 'runtime.ui-fixtures', profiles: ['runtime'], path: 'ui/fixtures/', presence: 'optional', tracked: 'tracked', tier: 'none', tests: 'none', coverage: 'none' });
+  const scope = runtimeCoverageScope(nested);
+  assert.ok(scope.excludes.includes('ui/fixtures/**'), 'the none slot inside ui/ is excluded');
+  assert.ok(!runtimeCoverageScope(runtimeManifest()).excludes.includes('ui/fixtures/**'));
+  const real = runtimeCoverageScope(runtimeManifest());
+  assert.ok(!real.include.includes('engine/yaml.mjs') && real.excludes.includes('packages/cli/src/catalog.generated.mjs'));
+  const bad = runtimeManifest();
+  bad.slots.push({ id: 'runtime.ui-data', profiles: ['runtime'], path: 'ui/data.json', presence: 'optional', tracked: 'tracked', tier: 'none', tests: 'none', coverage: 'required' });
+  assert.throws(() => runtimeCoverageScope(bad), /not a \*\.mjs source/);
+});
+
+test('a tracked runtime slot declares coverage required or none, and an ignored slot declares none at all', () => {
+  const missing = runtimeManifest();
+  delete missing.slots.find((slot) => slot.id === 'runtime.hfs').coverage;
+  assert.match(runtimeShapeProblems(missing).join('\n'), /runtime\.hfs: coverage must be one of required, none/);
+  const ignored = runtimeManifest();
+  ignored.slots.find((slot) => slot.tracked === 'ignored').coverage = 'none';
+  assert.match(runtimeShapeProblems(ignored).join('\n'), /coverage belongs to a tracked slot/);
 });

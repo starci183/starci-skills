@@ -8,7 +8,7 @@ import { CATALOG } from '../../packages/cli/src/catalog.generated.mjs';
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const WORKFLOWS = path.join(ROOT, '.github', 'workflows');
 const INSTALLS_CLI = /\b(?:npm\s+(?:install|i)|pnpm\s+(?:add|install)|yarn\s+add)\b[^\n;&|]*@starci\/cli\b/;
-const INVOCATION = /(?<launcher>npm\s+run\s+starci\b(?:\s+--[a-z][a-z-]*)*\s+--|node\s+packages[\\/]cli[\\/]bin[\\/]starci\.mjs|\bstarci)(?:\s+(?<args>[^\n;&|)>]+))?/g;
+const INVOCATION = /(?<launcher>npm\s+run\s+starci\b(?:\s+--[a-z][a-z-]*)*\s+--|node\s+packages[\\/]cli[\\/]bin[\\/]starci\.mjs|\bstarci(?![\w-]))(?:\s+(?<args>[^\n;&|)>]+))?/g;
 
 const workflowFiles = () => fs.readdirSync(WORKFLOWS)
   .filter((file) => file.endsWith('.yml'))

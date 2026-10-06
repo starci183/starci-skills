@@ -16,7 +16,7 @@ import { ciUploadFindings } from '../../scripts/hfs/runtime-rules/ci-upload.mjs'
 import { gitTriggerFindings, workflowTriggerFindings } from '../../scripts/hfs/runtime-rules/git-triggers.mjs';
 import { changelogSection, releaseNotesFindings, releaseNotesRepoFindings } from '../../scripts/hfs/runtime-rules/release-notes.mjs';
 import { callExportFinding, callFunctionName, contractCallIds } from '../../scripts/hfs/runtime-rules/api-shape.mjs';
-import { specPlacementFinding } from '../../scripts/hfs/runtime-rules/test-layout.mjs';
+import { packageSlotsOf, specPlacementFinding } from '../../scripts/hfs/runtime-rules/test-layout.mjs';
 import { nameFindings, sourceNameFindings } from '../../scripts/hfs/runtime-rules/source-name.mjs';
 import { pinnedFindings, retiredFindings } from '../../scripts/hfs/runtime-rules/retired.mjs';
 import { sizeFindings } from '../../scripts/hfs/runtime-rules/size.mjs';
@@ -134,17 +134,21 @@ test('RT_API_SHAPE: one exported call named after its file, and a contract id pe
 // ------------------------------------------------------------------------------------------- RT_SPEC_PLACEMENT
 
 test('RT_SPEC_PLACEMENT: a flat spec, a _ fixture, a package .test file and a spec under scripts/ are refused', () => {
-  assert.equal(specPlacementFinding('tests/gone-slots.spec.mjs', 'runtime.tests').code, 'RT_SPEC_PLACEMENT');
-  assert.equal(specPlacementFinding('tests/_gone-fixture.mjs', 'runtime.tests').code, 'RT_SPEC_PLACEMENT');
-  assert.equal(specPlacementFinding('tests/helpers/x.spec.mjs', 'runtime.tests').code, 'RT_SPEC_PLACEMENT', 'helpers is no source area');
-  assert.equal(specPlacementFinding('packages/eslint/be/gone-cqrs.test.mjs', 'runtime.package').code, 'RT_SPEC_PLACEMENT');
-  assert.equal(specPlacementFinding('scripts/kernel/x.spec.mjs', 'runtime.kernel').code, 'RT_SPEC_PLACEMENT');
+  const packages = packageSlotsOf(MANIFEST);
+  assert.equal(specPlacementFinding('tests/gone-slots.spec.mjs', 'runtime.tests', packages).code, 'RT_SPEC_PLACEMENT');
+  assert.equal(specPlacementFinding('tests/_gone-fixture.mjs', 'runtime.tests', packages).code, 'RT_SPEC_PLACEMENT');
+  assert.equal(specPlacementFinding('tests/helpers/x.spec.mjs', 'runtime.tests', packages).code, 'RT_SPEC_PLACEMENT', 'helpers is no source area');
+  assert.equal(specPlacementFinding('packages/eslint/be/gone-cqrs.test.mjs', 'runtime.package', packages).code, 'RT_SPEC_PLACEMENT');
+  assert.ok(packages.has('runtime.cli-source') && !packages.has('runtime.cli-generated'), 'the nested CLI source slot holds package source, its generated outputs do not');
+  assert.equal(specPlacementFinding('packages/cli/src/package-entry.test.mjs', 'runtime.cli-source', packages).code, 'RT_SPEC_PLACEMENT', 'a .test. spec under packages/cli/src/ is refused');
+  assert.equal(specPlacementFinding('scripts/kernel/x.spec.mjs', 'runtime.kernel', packages).code, 'RT_SPEC_PLACEMENT');
 });
 
 test('RT_SPEC_PLACEMENT: tests/<area>/<module>[.<topic>].spec.mjs, helpers, setup, fixtures and a package .spec are clean', () => {
   for (const p of ['tests/api-orca/worker-start.spec.mjs', 'tests/kernel-verbs/settle.retry.spec.mjs', 'tests/helpers/ledger-fixture.mjs', 'tests/setup/low-priority.mjs', 'tests/fixtures/any/thing.json'])
-    assert.equal(specPlacementFinding(p, 'runtime.tests'), null, p);
-  assert.equal(specPlacementFinding('packages/eslint/be/cqrs.spec.mjs', 'runtime.package'), null);
+    assert.equal(specPlacementFinding(p, 'runtime.tests', packageSlotsOf(MANIFEST)), null, p);
+  assert.equal(specPlacementFinding('packages/eslint/be/cqrs.spec.mjs', 'runtime.package', packageSlotsOf(MANIFEST)), null);
+  assert.equal(specPlacementFinding('packages/cli/src/package-entry.spec.mjs', 'runtime.cli-source', packageSlotsOf(MANIFEST)), null);
 });
 
 // ------------------------------------------------------------------------------------------- RT_SOURCE_NAME
@@ -341,10 +345,10 @@ ruleParams:
     pinned: [{path: scripts/kernel/cli.mjs, why: the fixture's pinned entry}]
     selfChecks: [{id: none, run: scripts/kernel/cli.mjs}]
 slots:
-  - {id: runtime.declaration, profiles: [runtime], path: hfs.json, presence: required, tracked: tracked, tier: none, tests: none}
-  - {id: runtime.manifest, profiles: [runtime], path: knowledge/hfs/runtime-slots.yaml, presence: required, tracked: tracked, tier: none, tests: none}
-  - {id: runtime.kernel, profiles: [runtime], path: scripts/kernel/, presence: required, tracked: tracked, tier: kernel, owner: true, tests: none}
-  - {id: runtime.lib, profiles: [runtime], path: "scripts/lib/<name>.mjs", presence: optional, tracked: tracked, tier: base, tests: none}
+  - {id: runtime.declaration, profiles: [runtime], path: hfs.json, presence: required, tracked: tracked, tier: none, tests: none, coverage: none}
+  - {id: runtime.manifest, profiles: [runtime], path: knowledge/hfs/runtime-slots.yaml, presence: required, tracked: tracked, tier: none, tests: none, coverage: none}
+  - {id: runtime.kernel, profiles: [runtime], path: scripts/kernel/, presence: required, tracked: tracked, tier: kernel, owner: true, tests: none, coverage: none}
+  - {id: runtime.lib, profiles: [runtime], path: "scripts/lib/<name>.mjs", presence: optional, tracked: tracked, tier: base, tests: none, coverage: none}
   - {id: runtime.generated-copy, profiles: [runtime], path: "packages/x/runtime/", presence: optional, tracked: generated, generatedBy: scripts/kernel/sync.mjs, tier: none, tests: none}
 `;
 

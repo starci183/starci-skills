@@ -7,8 +7,8 @@ import { createHash } from 'node:crypto';
 import { explicitWorkPaths, forbiddenEntries, inventoryText, main, releaseMetadata } from '../../scripts/gates/runtime-artifact.mjs';
 
 test('host-local and secret material is forbidden, the example secret file is not', () => {
-  const allowed = ['knowledge/patterns/be/config.yaml', 'secret.env.example', 'config.example.yaml', 'examples/.runtimes/app/runtime.sqlite', 'be/.env.example', 'docs/keys.md', 'examples/.runtimes/app/artifacts/ab/abcd'];
-  const bad = ['config.yaml', 'config.json', 'secret.env', 'x/settings.local.json', 'ui/.secrets/k', 'machine.sqlite', 'a/b.sqlite-wal', 'a/b.sqlite-shm', 'a/b.sqlite-journal', 'node_modules/x/i.js', 'ui/node_modules/y', 'run.log', '.git/HEAD', 'be/.env', 'be/.env.local', 'x/id.pem', 'x/tls.key', 'stacks/secrets/a.yaml', 'Secret.env', 'UI/Node_Modules/y', 'a\\secret.env', '.runtime/artifacts/ab/abcd', 'x/.runtime/projects/p/runtime.sqlite'];
+  const allowed = ['knowledge/patterns/be/config.yaml', 'secret.env.example', 'config.example.yaml', 'examples/.runtimes/app/runtime.sqlite', 'be/.env.example', 'docs/keys.md', 'examples/.runtimes/app/artifacts/ab/abcd', 'packages/hfs/templates/app/skeleton/.starciwork/index.yaml', 'packages/hfs/templates/app/skeleton-lite/.starcistacks/dev/secrets/.gitkeep'];
+  const bad = ['config.yaml', 'config.json', 'secret.env', 'x/settings.local.json', 'ui/.secrets/k', 'machine.sqlite', 'a/b.sqlite-wal', 'a/b.sqlite-shm', 'a/b.sqlite-journal', 'node_modules/x/i.js', 'ui/node_modules/y', 'run.log', '.git/HEAD', 'be/.env', 'be/.env.local', 'x/id.pem', 'x/tls.key', 'stacks/secrets/a.yaml', 'packages/hfs/templates/app/skeleton/.starcistacks/dev/secrets/db.txt', 'stacks/secrets/.gitkeep', 'packages/cli/.starciwork/index.yaml', 'Secret.env', 'UI/Node_Modules/y', 'a\\secret.env', '.runtime/artifacts/ab/abcd', 'x/.runtime/projects/p/runtime.sqlite'];
   assert.deepEqual(forbiddenEntries([...bad, ...allowed]).map((f) => f.path), bad);
 });
 

@@ -2,7 +2,7 @@
 // (scripts/kernel/sonar-settle.mjs).
 //
 // Every enforced op runs READ-CODE-CHECK-FIX-REPORT: it records a READ digest (scripts/gates/read-digest.mjs) before coding,
-// forces scripts/gates/gate.mjs every round, and attaches the last gate JSON and the digest to its report. At `starci kernel settle`
+// forces `starci gate run` every round, and attaches the last gate JSON and the digest to its report. At `starci kernel settle`
 // the runtime re-reads both itself - never the op's word - and resolves the kinds of the gate's changed files with the app's own
 // `starci app explain`. It refuses a done when:
 //   op-gate-proof-missing     no gate JSON (schema starci/gate@1) is attached

@@ -8,6 +8,8 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,bindKernelJob,createUnit,enqueueJob} from '../../engine/db/ledger.mjs';
 import {allocationMs} from '../../engine/config.mjs';
 import {placeOnRepo} from '../helpers/op-placement.mjs';
+import {registerRepoWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
+import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
 
 // A Codex op
 // froze its frame at "Working (5m 30s • esc to interrupt)" for 50
@@ -49,7 +51,7 @@ const makeFixture=()=>{
   const repo=path.join(root,'repo');fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   fs.writeFileSync(path.join(repo,'docs','a.md'),'# a\n');fs.writeFileSync(path.join(repo,'.gitignore'),'.starciwork/\n');
   const git=(...a)=>spawnSync('git',['-C',repo,'-c','user.email=spec@starci','-c','user.name=spec',...a],{encoding:'utf8',windowsHide:true,env:{...process.env,GIT_AUTHOR_DATE:'2026-01-01T00:00:00Z',GIT_COMMITTER_DATE:'2026-01-01T00:00:00Z'}});
-  git('init','-q');git('add','-A');git('commit','-qm','base');
+  git('init','-q','-b','main');git('add','-A');git('commit','-qm','base');
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
   // STARCI_ORCA_SKIP_LIVE_CHECK: this spec is about liveness, not the host-contract listing (orca-call-contract
@@ -61,11 +63,12 @@ const makeFixture=()=>{
   const savedRegistry=process.env.STARCI_TEST_MACHINE_FILE;
   process.env.STARCI_TEST_MACHINE_FILE=machineFile;
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_ORCA_SKIP_LIVE_CHECK:'1',STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,STARCI_TEST_MACHINE_FILE:machineFile};
+    STARCI_ORCA_SKIP_LIVE_CHECK:'1',STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,STARCI_TEST_MACHINE_FILE:machineFile,...adoptLaunchTrust(root,{roots:[repo],ref:'private stale-active fixture adoption'})};
   const api=args=>spawnSync(process.execPath,[API,...placeOnRepo(args,repo),'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
   const workflowId='wf-stale-unreachable',jobId='job-stale-unreachable';
+  registerRepoWorkflowWorktree({repo,workflowId});
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     ledger.transaction(db=>{

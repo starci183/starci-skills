@@ -7,6 +7,9 @@ import { spawnSync } from 'node:child_process';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { openLedger, inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { proofRepo } from '../helpers/sonar-scan.mjs';
+import { adoptLaunchTrust } from '../helpers/launch-trust.mjs';
+import { registerRepoWorkflowWorktree } from '../helpers/workflow-worktree-row.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const apiFile = path.join(root, 'scripts', 'kernel', 'cli.mjs');
@@ -16,18 +19,20 @@ test('a filed report makes its worker question inactive before job settlement', 
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo = path.join(tmp, 'repo'); fs.mkdirSync(repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  const repo = path.join(tmp, 'repo'); fs.mkdirSync(repo);proofRepo(t,repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stub = path.join(tmp, 'fake-orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
   const state = path.join(tmp, 'state.json');
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(tmp, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: state,
-    STARCI_PROJECTS_ROOT:path.join(tmp,'projects'),STARCI_TEST_MACHINE_FILE:path.join(tmp,'machine.sqlite'),STARCI_LOCAL_ROOT:path.join(tmp,'localappdata') };
+    STARCI_PROJECTS_ROOT:path.join(tmp,'projects'),STARCI_TEST_MACHINE_FILE:path.join(tmp,'machine.sqlite'),STARCI_LOCAL_ROOT:path.join(tmp,'localappdata'),
+    ...adoptLaunchTrust(tmp,{roots:[repo],ref:'private worker-question fixture adoption'}) };
   const api = (...args) => {
     const run = spawnSync(process.execPath, [apiFile, ...args, '--repo', repo, '--json'],
       { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
     return { run, body: JSON.parse(run.stdout || 'null') };
   };
   const workflowId = 'wf-question-inactive', jobId = 'job-question-inactive';
+  registerRepoWorkflowWorktree({ repo, workflowId, env });
   const ledger = openLedger({ file: ledgerFileFor(repo,{env}) });
   try {
     seedWorkflow(ledger,{id:workflowId,jobs:[

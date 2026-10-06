@@ -53,7 +53,7 @@ test('every added supervisor verb dispatches through the runtime seam', () => {
     bridge: ['detect'],
     channel: ['inbox', '--id', 'main', '--peek'],
     'direct-commits': [],
-    'gate-stability': ['--family', 'draw'],
+    'gate-stability': ['--family', 'draw', '--gate', 'scripts/gates/gate.mjs#checkDraw'],
     gc: [],
     land: ['--status'],
     'lesson-actions': ['revert', '--experiment', 'exp-1'],

@@ -2,7 +2,7 @@ schema: starci/op-gate@1
 # The READ-CODE-CHECK-FIX-REPORT loop every code-writing op follows (owner 2026-10-01), as data. Three readers use it:
 #   scripts/gates/read-digest.mjs   prints what a slice must READ before coding (the pattern files of its file kinds, the
 #                                    matching example files, the slot map) and records the READ digest with each file's sha256
-#   scripts/gates/gate.mjs          the one gate the op forces every round (its base is the workflow's previous checkpoint,
+#   starci gate run                 the one gate the op forces every round (its base is the workflow's previous checkpoint,
 #                                    the merge-base with main for the first op) and the workflow's finish runs over the
 #                                    whole branch against main's merge-base
 #   scripts/kernel/gate-settle.mjs   re-reads the attached gate JSON and READ digest at `starci kernel settle` and refuses a done that
@@ -10,7 +10,7 @@ schema: starci/op-gate@1
 # The round bound is each op's `params.gateRounds`; nothing here restates it.
 purpose: >-
   The loop an op runs: READ only what the slice needs (the pattern files of the file kinds it will touch, the example files of
-  the same slots, the slot map of its folders from `starci app explain`), CODE, FORCE THE CHECKS with gate.mjs, FIX and repeat up to
+  the same slots, the slot map of its folders from `starci app explain`), CODE, FORCE THE CHECKS with `starci gate run`, FIX and repeat up to
   params.gateRounds rounds, REPORT with the gate JSON and the READ digest attached. Still red after the last round is
   `blocked` with the exact findings; `done` while red is refused at settle. The op works in its workflow's one worktree
   (serially with the other ops of its side, in parallel with the other side); the gate's base is the previous
@@ -39,7 +39,7 @@ enforcedOps:
   - grammar.update
   - task.execute
 gate:
-  script: scripts/gates/gate.mjs
+  script: scripts/cli/gate-run.mjs
   schema: starci/gate@1
   attach: gate.json
 digest:
@@ -84,9 +84,9 @@ proofs:
     schema: starci/gate@1
     profile: docs
     attach: doc-gate.json
-    script: scripts/gates/gate.mjs
+    script: scripts/cli/gate-run.mjs
     purpose: >-
-      The document gate (gate.mjs --profile docs): the docChecks below over the runtime documents and, with --tree, the Work
+      The document gate (`starci gate run --scope docs`): the docChecks below over the runtime documents and, with --tree, the Work
       records the op wrote. A red or unrunnable document gate is never done.
   test-world:
     schema: starci/test-world-run@1
@@ -130,9 +130,9 @@ proofs:
   review-gate:
     schema: starci/gate@1
     attach: gate.json
-    script: scripts/gates/gate.mjs
+    script: scripts/cli/gate-run.mjs
     purpose: >-
-      gate.mjs read-only over the reviewed range (--base <first reviewed commit>^), merge guard included: a review cannot pass a
+      `starci gate run` read-only over the reviewed range (--base <first reviewed commit>^), merge guard included: a review cannot pass a
       range the gate finds red or could not judge.
   review-defects:
     schema: starci/review-defects@1
@@ -171,7 +171,7 @@ opProofs:
   business.decide: [read-knowledge]
   decision.prepare: [read-knowledge]
   brand.decide: [read-knowledge]
-# The document checks `gate.mjs --profile docs` runs, each from the runtime root. `tree: true` checks also take --tree <the Work
+# The document checks `starci gate run --scope docs` runs, each from the runtime root. `tree: true` checks also take --tree <the Work
 # root the op wrote> when the gate is given one (else they judge the runtime's examples).
 docChecks:
   - {id: doc-language, script: scripts/checks/check-doc-language.mjs}

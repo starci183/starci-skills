@@ -117,7 +117,12 @@ test('past the route limit an owner gate holds that job alone; resolving it name
   s=w.status();
   assert.equal(s.frontier.state,'awaiting-owner');
   assert.equal(s.frontier.actionable,false);
-  const resolved=w.api('incident','--workflow',w.wf,'--resolve',gated.incidentId,'--by','kernel');
+  // An owner gate resolves on the owner's recorded answer: the ask-answered event and its receipt both say answeredBy owner.
+  const answerDir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-gate-answer-')),askId='ctx_ownergate1',receiptPath=path.join(answerDir,`answer-${askId}.json`);
+  t.after(()=>fs.rmSync(answerDir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  fs.writeFileSync(receiptPath,json({schema:'starci/ask-answer@1',workflowId:w.wf,dispatchId:askId,answeredBy:'owner'}));
+  w.seed(l=>l.appendEvent({workflowId:w.wf,entityType:'report',entityId:askId,kind:'ask-answered',payload:{dispatchId:askId,receiptPath,answeredBy:'owner'}}));
+  const resolved=w.api('incident','--workflow',w.wf,'--resolve',gated.incidentId,'--owner-answer',askId);
   assert.equal(resolved.status,0,resolved.stderr);
   s=w.status();
   assert.equal(s.frontier.state,'next-ready');

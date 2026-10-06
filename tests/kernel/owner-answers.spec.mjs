@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
 import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,fileReport,markReportConsumed,recordJobResult,appendEvent} from '../../engine/db/ledger.mjs';
 import {lineageJobsOf,ownerAnswersOf,repeatedAnswerOf} from '../../scripts/machine/owner-answers.mjs';
 
@@ -31,6 +32,7 @@ const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-answers-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  proofRepo(t,repo);
   const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
   return {root,repo,seed,read};

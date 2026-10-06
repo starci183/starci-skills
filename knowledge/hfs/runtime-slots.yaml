@@ -171,6 +171,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     why: '{"hfs": 1, "kind": "runtime", "project": "starci"}: the runtime is judged by this manifest'
   - id: runtime.package-manifest
     profiles: [runtime]
@@ -179,6 +180,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
   - id: runtime.root-docs
     profiles: [runtime]
     path: "{README.md,CHANGELOG.md,CONTRIBUTING.md,CONTEXT.md,LICENSE,THIRD_PARTY_NOTICES.md}"
@@ -186,6 +188,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING]
   - id: runtime.config-example
     profiles: [runtime]
@@ -194,6 +197,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
   - id: runtime.secret-example
     profiles: [runtime]
     path: secret.env.example
@@ -201,6 +205,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
   - id: runtime.git-meta
     profiles: [runtime]
     path: "{.gitignore,.gitattributes}"
@@ -208,6 +213,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
   - id: runtime.ci
     profiles: [runtime]
     path: ".github/workflows/<workflow>.yml"
@@ -215,6 +221,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
   - id: runtime.coverage-config
     profiles: [runtime]
     path: codecov.yml
@@ -222,6 +229,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
   - id: runtime.sonar-config
     profiles: [runtime]
     path: sonar-project.properties
@@ -229,6 +237,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
   - id: runtime.agent-settings
     profiles: [runtime]
     path: .claude/settings.json
@@ -236,6 +245,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     rules: [RT_PINNED_PATH_MOVED]
   - id: runtime.local-config
     profiles: [runtime]
@@ -278,7 +288,28 @@ slots:
     tracked: tracked
     tier: entry
     tests: none
+    coverage: required
     rules: [RT_PINNED_PATH_MOVED, RT_TIER_DIRECTION]
+  - id: runtime.cli-source
+    profiles: [runtime]
+    # The dispatcher the one `starci` binary runs (packages/cli keeps its published identity under runtime.package): its source is measured by the root suite, its spec stays beside it.
+    path: packages/cli/src/
+    presence: required
+    tracked: tracked
+    tier: package
+    tests: unit-beside
+    coverage: required
+    rules: [RT_TIER_DIRECTION, RT_SPEC_PLACEMENT]
+  - id: runtime.cli-generated
+    profiles: [runtime]
+    # Rendered by `starci runtime gen-catalog --write` and the runtime-install generator; never authored, never measured.
+    path: "packages/cli/src/{catalog,runtime-install}.generated.mjs"
+    presence: required
+    tracked: tracked
+    tier: package
+    tests: none
+    coverage: none
+    rules: [RT_TIER_DIRECTION]
   - id: runtime.ui
     profiles: [runtime]
     # The harness UI app: a node API server (server.mjs, harness-*.mjs, api/**) and a Vite client (src/**), with its own package.json.
@@ -291,16 +322,28 @@ slots:
     allows: [package.json, package-lock.json, .gitignore, README.md, CONTRACT.md, DESIGN.md, DEPLOYMENT.md, components.json, eslint.config.mjs, index.html, tsconfig.json, vite.config.ts, server.mjs, harness-process.mjs, harness-verbs.mjs, start.cmd, ports.mjs, ports.d.mts, "api/**", "src/**", "public/**", "fixtures/**"]
     forbids: [run-cloudflared.ps1]
     tests: none
+    coverage: required
     rules: [RT_EXTERNAL_OWNER, RT_TIER_DIRECTION]
 
   # ----- engine ---------------------------------------------------------------------------------------------
   - id: runtime.foundation
     profiles: [runtime]
-    path: "engine/{runtime-root,config,secrets,invalid-config,orca-config,yaml,plain-object,canonical-json,by-code-unit,constants,digest,admission,refuse}.mjs"
+    path: "engine/{runtime-root,config,secrets,invalid-config,orca-config,plain-object,canonical-json,by-code-unit,constants,digest,admission,refuse}.mjs"
     presence: required
     tracked: tracked
     tier: base
     tests: none
+    coverage: required
+    rules: [RT_TIER_DIRECTION, RT_BASE_IMPURE, RT_EXTERNAL_OWNER]
+  - id: runtime.vendored-yaml
+    profiles: [runtime]
+    # The vendored, frozen YAML bundle (engine/yaml-license.json names its license): a dependency copy, not authored source.
+    path: engine/yaml.mjs
+    presence: required
+    tracked: tracked
+    tier: base
+    tests: none
+    coverage: none
     rules: [RT_TIER_DIRECTION, RT_BASE_IMPURE, RT_EXTERNAL_OWNER]
   - id: runtime.foundation-data
     profiles: [runtime]
@@ -309,6 +352,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
   - id: runtime.db
     profiles: [runtime]
     # Store connection owners and their schema and receipt modules. No api import: a value a store needs from git is passed in.
@@ -317,6 +361,7 @@ slots:
     tracked: tracked
     tier: db
     tests: none
+    coverage: required
     rules: [RT_EXTERNAL_OWNER, RT_TIER_DIRECTION]
   - id: runtime.db-migrations
     profiles: [runtime]
@@ -325,6 +370,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     why: "<migration> is <nnnn>-<kebab-name>; English comments only"
   - id: runtime.engine-retired
     profiles: [runtime]
@@ -350,6 +396,7 @@ slots:
     allows: [lib.mjs, "<call>.mjs"]
     forbids: [index.mjs]
     tests: none
+    coverage: required
     rules: [RT_API_SHAPE, RT_EXTERNAL_OWNER, RT_TIER_DIRECTION, RT_SOURCE_NAME]
   - id: runtime.api-retired
     profiles: [runtime]
@@ -368,6 +415,7 @@ slots:
     tracked: tracked
     tier: base
     tests: none
+    coverage: required
     rules: [RT_BASE_IMPURE, RT_EXTERNAL_OWNER, RT_TIER_DIRECTION, RT_HELPER_REDEFINED, RT_HELPER_NEAR_COPY, RT_SOURCE_NAME]
   - id: runtime.lib-retired
     profiles: [runtime]
@@ -390,6 +438,7 @@ slots:
     requires: [slots.mjs, check.mjs, runtime-check.mjs, sync-runtime.mjs, architecture.mjs, architecture/, rules/, runtime-rules/]
     allows: ["<name>.mjs", "rules/<rule>.mjs", "runtime-rules/<rule>.mjs", "architecture/<check>.mjs", "sql/<module>.mjs"]
     tests: none
+    coverage: required
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME]
   - id: runtime.machine
     profiles: [runtime]
@@ -398,6 +447,7 @@ slots:
     tracked: tracked
     tier: machine
     tests: none
+    coverage: required
     why: host-wide services over machine.sqlite shared by kernel, supervisor and reconciler (decisions, home, lessons, op-metrics, worktrees, lane-owner, host-resources, ram-throttle, pool-backoff, artifact-hold, terminal-ledger, close-verify)
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME]
 
@@ -413,6 +463,7 @@ slots:
     allows: ["<name>.mjs", "verbs/<verb>.mjs", "verbs/shared/<name>.mjs", "status/<view>.mjs", "settle/<name>.mjs", api-boolean-flags.txt]
     forbids: [api-verbs/, api-lib/, api-status/]
     tests: none
+    coverage: required
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH, RT_PINNED_PATH_MOVED]
   - id: runtime.kernel-verbs
     profiles: [runtime]
@@ -422,6 +473,7 @@ slots:
     tracked: tracked
     tier: inherit
     tests: none
+    coverage: required
     requires: ["/modules/cli/commands/kernel/<verb>.yaml"]
     rules: [RT_TIER_DIRECTION]
   - id: runtime.supervisor
@@ -431,6 +483,7 @@ slots:
     tracked: tracked
     tier: supervisor
     tests: none
+    coverage: required
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH, RT_PINNED_PATH_MOVED]
   - id: runtime.reconciler
     profiles: [runtime]
@@ -442,6 +495,7 @@ slots:
     requires: [boot.mjs, start.mjs, engine.mjs, controllers/]
     allows: ["<name>.mjs", "controllers/<controller>.mjs"]
     tests: none
+    coverage: required
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, RT_PINNED_PATH_MOVED]
   - id: runtime.reconcile-retired
     profiles: [runtime]
@@ -463,6 +517,7 @@ slots:
     owner: true
     allows: ["<name>.mjs", "<part>/<name>.mjs"]
     tests: none
+    coverage: required
     rules: [RT_TIER_DIRECTION, ARCH_OWNER_CYCLE, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH]
   - id: runtime.migrate-retired
     profiles: [runtime]
@@ -482,6 +537,7 @@ slots:
     tracked: tracked
     tier: gates
     tests: none
+    coverage: required
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH]
   - id: runtime.checks
     profiles: [runtime]
@@ -491,6 +547,7 @@ slots:
     tracked: tracked
     tier: checks
     tests: none
+    coverage: required
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME]
   - id: runtime.checks-lib
     profiles: [runtime]
@@ -500,6 +557,7 @@ slots:
     tracked: tracked
     tier: checks
     tests: none
+    coverage: required
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME]
   - id: runtime.checks-retired
     profiles: [runtime]
@@ -518,6 +576,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     rules: [RT_CITED_PATH_MISSING]
   - id: runtime.cli-catalog
     profiles: [runtime]
@@ -527,6 +586,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     rules: [RT_CITED_PATH_MISSING]
   - id: runtime.i18n-catalog
     profiles: [runtime]
@@ -536,6 +596,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
   - id: runtime.host-contract
     profiles: [runtime]
     path: "modules/host/<system>/"
@@ -543,6 +604,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     allows: ["<name>.yaml"]
     rules: [RT_API_SHAPE]
   - id: runtime.knowledge
@@ -552,6 +614,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING]
   - id: runtime.hfs-manifests
     profiles: [runtime]
@@ -560,6 +623,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
   - id: runtime.docs
     profiles: [runtime]
     path: "docs/{<topic>.md,examples/<topic>.md}"
@@ -567,6 +631,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING, RT_DOC_NO_OWNER]
   - id: runtime.skill
     profiles: [runtime]
@@ -575,6 +640,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     requires: [SKILL.md]
     allows: [SKILL.md, "references/**", agents/openai.yaml]
     rules: [RT_CITED_PATH_MISSING, RT_GUIDANCE_REFUSED_COMMAND]
@@ -585,6 +651,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
 
   # ----- tests ----------------------------------------------------------------------------------------------
   - id: runtime.tests
@@ -596,6 +663,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     rules: [RT_SPEC_PLACEMENT]
 
   # ----- packages, generated copies -----------------------------------------------------------------------------
@@ -606,6 +674,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
   - id: runtime.package
     profiles: [runtime]
     # A published @starci package: its own layout under its own package.json; specs beside the source as <name>.spec.*.
@@ -617,6 +686,7 @@ slots:
     requires: [package.json]
     forbids: [scripts/sync-runtime.mjs]
     tests: unit-beside
+    coverage: none
     rules: [RT_TIER_DIRECTION, RT_SPEC_PLACEMENT]
   - id: runtime.package-runtime-copy
     profiles: [runtime]
@@ -639,6 +709,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     allows: [compose.yaml, cloudflared.yaml, README.md, .gitignore, "secrets/*.enc", secrets/KEYS.md]
   - id: runtime.example-catalog
     profiles: [runtime]
@@ -647,6 +718,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
   - id: runtime.example
     profiles: [runtime]
     # A product example app; its inside is judged by the PRODUCT HFS (hfs.json kind app; check-example-architecture).
@@ -655,6 +727,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     requires: [hfs.json]
   - id: runtime.example-data
     profiles: [runtime]
@@ -663,6 +736,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     why: a .starcistacks services fixture, not an app (no hfs.json)
   - id: runtime.example-runtime-reserved
     profiles: [runtime]
@@ -681,6 +755,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     requires: [runtime.sqlite]
     allows: ["artifacts/<sha-prefix>/<sha256>", "artifacts/<sha-prefix>/<sha256>.json"]
     why: "CAS fixture paths follow engine/db/blob.mjs; path admission does not qualify the payload or grant runtime effects."
@@ -698,6 +773,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
 
 consumers:
   - scripts/hfs/slots.mjs

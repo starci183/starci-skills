@@ -100,7 +100,7 @@ export function settleFixture(t, { baseText = 'base\n' } = {}) {
     const knowledge = context.readRefs.filter((row) => row.rootKind === 'source' && row.path.startsWith('knowledge/')).map((row) => row.path);
     const commands = [
       ['read-knowledge', ['node', path.join(ROOT, 'scripts/gates/read-digest.mjs'), '--root', tree, ...(changed.length ? ['--touch', ...changed] : []), '--knowledge', ...knowledge]],
-      ['doc-gate', ['node', path.join(ROOT, 'scripts/gates/gate.mjs'), '--root', tree, '--scope', 'docs', '--tree', path.join(tree, 'docs')]],
+      ['doc-gate', ['node', path.join(ROOT, 'scripts/cli/gate-run.mjs'), '--root', tree, '--scope', 'docs', '--tree', path.join(tree, 'docs')]],
     ];
     const files = [], scratch = path.join(base, 'proofs', jobId);
     fs.mkdirSync(scratch, { recursive: true });

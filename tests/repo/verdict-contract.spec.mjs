@@ -12,15 +12,18 @@ const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 // accepted, anything else refused with exit!=0 — a misspelled verdict must never
 // write a settled row.
 //
-import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhase,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract} from '../../engine/db/ledger.mjs';
+import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhase,createUnit,enqueueJob,setJobStatus,startAttempt} from '../../engine/db/ledger.mjs';
+import {proofRepo,writeGreenProofs} from '../helpers/sonar-scan.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
+import {fileDispatchContract} from '../helpers/filed-contract.mjs';
 
 const runApi=(args,{env={}}={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,...env}});
 
-const scratches=[];
+const scratches=[],bindings=new Map();
 const fixture=t=>{
   const dirs=[];
   t.after(()=>{for(const dir of [...dirs,...scratches.splice(0)])fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
-  return {repo(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-verdict-'));dirs.push(dir);return dir;}};
+  return {repo(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-verdict-'));dirs.push(dir);fs.mkdirSync(path.join(dir,'docs'));proofRepo(t,dir);return dir;}};
 };
 
 /** One workflow + one dispatched op job (running + a contract-bound open attempt,
@@ -37,16 +40,17 @@ const seedJob=(repo,jobId)=>{
     ledger.transaction(db=>{
       ensureWorkflow(db,{workflowId:wf,phase:'queued',title:'verdict fixture',by:'test-fixture',reason:'seed',at});
       changeWorkflowPhase(db,{workflowId:wf,to:'running',by:'test-fixture',reason:'seed',at});
-      createUnit(db,{workflowId:wf,unitId,opId:'ex-test.probe',subjectKey:unitId,goalRevision:1,createdAt:at});
-      enqueueJob(db,{jobId,workflowId:wf,unitId,opId:'ex-test.probe',role:'op',
-        payload:{opId:'ex-test.probe',owned_paths:['docs/'],orca:{dispatchId,agentTerminalHandle:`term-${jobId}`}},createdAt:at});
+      createUnit(db,{workflowId:wf,unitId,opId:'code.refactor',subjectKey:unitId,goalRevision:1,createdAt:at});
+      enqueueJob(db,{jobId,workflowId:wf,unitId,opId:'code.refactor',role:'op',
+        payload:{opId:'code.refactor',owned_paths:['docs/'],orca:{dispatchId,agentTerminalHandle:`term-${jobId}`}},createdAt:at});
       setJobStatus(db,{jobId,to:'ready',reason:'seed',at});
       setJobStatus(db,{jobId,to:'leased',reason:'seed',at});
       const attempt=startAttempt(db,{workflowId:wf,jobId,dispatchId,
         terminalHandle:`term-${jobId}`,scratchDir:scratch,dispatchedAt:at,startedAt:at,at});
-      writeContract(db,{attemptId:attempt.attempt_id,markdown:'# contract',context:{},createdAt:at});
       setJobStatus(db,{jobId,to:'running',reason:'seed',at});
     });
+    registerWorkflowWorktree({env:process.env},{workflowId:wf,orcaWorktreeId:`verdict::${jobId}`,path:repo,branch:'main'});
+    bindings.set(jobId,fileDispatchContract(ledger,{jobId,repo,createdAt:at}).packet.context.gate_binding);
     return scratch;
   }finally{ledger.close();}
 };
@@ -62,6 +66,16 @@ const reportFile=(dir,outcome='done')=>{const f=path.join(dir,'report.json');fs.
   ...(outcome==='partial'?{open:['unfinished item']}:{}),
 }));return f;};
 
+/** The pass report carries the op's green proof files, which live outside the owned paths the CLI envelope admits: filed as the row the ledger keeps. */
+const fileGreenReport=(repo,jobId,scratch)=>{
+  const ledger=openLedger({file:ledgerFileFor(repo)});
+  try{
+    const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId).attempt_id;
+    const files=writeGreenProofs(path.join(scratch,'proofs'),{root:repo,binding:bindings.get(jobId)});
+    ledger.write.fileReport({attemptId,outcome:'done',report:{schema:'starci/op-report@1',outcome:'done',summary:'op done — verdict fixture',files,checks:[{name:'self-check',command:'true',exitCode:0}]}});
+  }finally{ledger.close();}
+};
+
 test('settle accepts the contract verdicts pass|fail|blocked',async t=>{
   // verdict -> the op-report outcome the envelope must carry (verdict-outcome-mismatch otherwise)
   for(const [verdict,outcome,expected] of [['pass','done','succeeded'],['fail','failed','failed'],['blocked','blocked','failed']]){
@@ -72,14 +86,17 @@ test('settle accepts the contract verdicts pass|fail|blocked',async t=>{
       // pass additionally needs the kernel's independently recorded green checks
       // (verdict-contract.yaml) — recorded the way the settler records them, with
       // runtime authority (a caller-declared green never counts, H8).
-      const filed=runApi(['report','--repo',repo,'--job',jobId,'--report',reportFile(scratch,outcome),'--json']);
-      assert.equal(filed.status,0,filed.stderr||filed.error?.message);
+      if(verdict==='pass')fileGreenReport(repo,jobId,scratch);
+      else{
+        const filed=runApi(['report','--repo',repo,'--job',jobId,'--report',reportFile(scratch,outcome),'--json']);
+        assert.equal(filed.status,0,filed.stderr||filed.error?.message);
+      }
       if(verdict==='pass'){
         const checked=runApi(['record-checks','--repo',repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'self-check',command:'true',exitCode:0}]}),'--json'],{env:{STARCI_CALLER:'runtime-settler'}});
         assert.equal(checked.status,0,checked.stderr||checked.error?.message);
       }
       const r=runApi(['settle','--repo',repo,'--job',jobId,'--verdict',verdict,'--json']);
-      assert.equal(r.status,0,r.stderr||r.error?.message);
+      assert.equal(r.status,0,r.stderr||r.stdout||r.error?.message);
       assert.equal(jobStatus(repo,jobId),expected);
     });
   }

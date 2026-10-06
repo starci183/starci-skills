@@ -19,6 +19,9 @@ import { spawnSync } from 'node:child_process';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { openLedger, inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
+import { proofRepo } from '../helpers/sonar-scan.mjs';
+import { adoptLaunchTrust } from '../helpers/launch-trust.mjs';
 
 // Contract change worker-depth-limit: Orca refuses a worker nested past its depth setting (nested_worker_depth_exceeded)
 // and exposes no read of it. config.yaml orca.maxWorkerDepth declares it (default 4, the owner's Orca setting); the
@@ -182,18 +185,15 @@ test('starci kernel dispatch refuses an op whose Kernel already sits at orca.max
   if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(root, 'repo');
   fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
-  const ownerRoot = path.join(root, 'owner');
-  fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), 'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
   const fake = path.join(root, 'fake-orca.mjs');
   const state = path.join(root, 'orca-state.json');
   const log = path.join(root, 'calls.jsonl');
   fs.writeFileSync(state, JSON.stringify({ sends: 0, counter: 0, terminals: {}, commands: [] }));
   fs.writeFileSync(fake, FAKE_ORCA.replaceAll("'dispatch-fake-1'", "(state.dispatchSeq=(state.dispatchSeq??0)+1,'dispatch-fake-'+state.dispatchSeq)"));
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([fake]), STARCI_FAKE_ORCA_STATE: state,
-    STARCI_FAKE_ORCA_LOG: log, STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1', STARCI_OWNER_ROOT: ownerRoot, STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'),
+    STARCI_FAKE_ORCA_LOG: log, STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1', ...adoptLaunchTrust(root, { roots: [repo], ref: 'private worker-depth fixture adoption', kernel: 'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}' }), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'),
     STARCI_SLEEP_SCALE: '0.02', ORCA_TERMINAL_HANDLE: '' };
-  const run = (rel, ...args) => spawnSync(process.execPath, [path.join(ROOT, ...rel), ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
+  const run = (rel, ...args) => spawnSync(process.execPath, ['--loader', new URL('../helpers/workflow-startup-loader.mjs', import.meta.url).href, path.join(ROOT, ...rel), ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
   const defined = run(['scripts', 'goal', 'define-goal.mjs'], '--repo', repo, '--text', 'depth limited workflow', '--json');
   assert.equal(defined.status, 0, defined.stderr);
   const workflowId = JSON.parse(defined.stdout).workflowId;
@@ -206,12 +206,15 @@ test('starci kernel dispatch refuses an op whose Kernel already sits at orca.max
   const s = JSON.parse(fs.readFileSync(state, 'utf8'));
   fs.writeFileSync(state, JSON.stringify({ ...s, dispatchDepths: { [kernelDispatch]: 4 } }));
   fs.mkdirSync(path.join(repo, 'docs', 'a'), { recursive: true });
+  // Once the Kernel runs, the repository gets its Git baseline and the workflow its registered tree: the op dispatch needs both.
+  proofRepo(t, repo);
+  registerWorkflowWorktree({ env }, { workflowId, orcaWorktreeId: 'depth::tree', path: repo, branch: 'main' });
   const ledger = openLedger({ file: ledgerFileFor(repo) });
   try { seedWorkflow(ledger, { id: workflowId, jobs: [{ jobId: 'job-deep', opId: 'code.refactor', payload: { opId: 'code.refactor', owned_paths: ['docs/a/'], model: 'claude-agent' } }] }); }
   finally { ledger.close(); }
   const callsBefore = fs.readFileSync(log, 'utf8').trim().split('\n').length;
   const d = run(['scripts', 'kernel', 'cli.mjs'], 'dispatch', '--repo', repo, '--job', 'job-deep', '--model', 'claude-agent', '--spawn', '--json');
-  assert.equal(d.status, 1, d.stdout);
+  assert.equal(d.status, 1, d.stdout || d.stderr);
   const out = JSON.parse(d.stdout);
   assert.equal(out.rejected, 'dispatch-rejected');
   assert.equal(out.managed.step, 'depth');
@@ -251,9 +254,6 @@ test('start-workflow from a worker terminal at the depth limit refuses the Kerne
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(root, 'repo');
   fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
-  const ownerRoot = path.join(root, 'owner');
-  fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), 'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
   const fake = path.join(root, 'fake-orca.mjs');
   const state = path.join(root, 'orca-state.json');
   const log = path.join(root, 'calls.jsonl');
@@ -262,9 +262,9 @@ test('start-workflow from a worker terminal at the depth limit refuses the Kerne
     workerRows: [{ dispatchId: 'ctx_sup', runId: 'run_sup', terminalState: 'active', resource: { terminalHandle: 'term_sup' } }], dispatchDepths: { ctx_sup: 4 } }));
   fs.writeFileSync(fake, FAKE_ORCA);
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([fake]), STARCI_FAKE_ORCA_STATE: state,
-    STARCI_FAKE_ORCA_LOG: log, STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1', STARCI_OWNER_ROOT: ownerRoot, STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'),
+    STARCI_FAKE_ORCA_LOG: log, STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1', ...adoptLaunchTrust(root, { roots: [repo], ref: 'private worker-depth fixture adoption', kernel: 'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}' }), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'),
     STARCI_SLEEP_SCALE: '0.02', ORCA_TERMINAL_HANDLE: 'term_sup' };
-  const run = (rel, ...args) => spawnSync(process.execPath, [path.join(ROOT, ...rel), ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
+  const run = (rel, ...args) => spawnSync(process.execPath, ['--loader', new URL('../helpers/workflow-startup-loader.mjs', import.meta.url).href, path.join(ROOT, ...rel), ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
   const defined = run(['scripts', 'goal', 'define-goal.mjs'], '--repo', repo, '--text', 'kernel from a deep worker', '--json');
   assert.equal(defined.status, 0, defined.stderr);
   const workflowId = JSON.parse(defined.stdout).workflowId;

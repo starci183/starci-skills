@@ -38,7 +38,7 @@ function world(t, legs) {
     seedWorkflow(ledger, { id: WF, jobs: [{ jobId, opId: op, kind: 'op', status, payload: { opId: op, records: [], owned_paths: paths } }] });
   });
   const status = () => {
-    const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(repo, 'machine.sqlite') };
+    const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(repo, 'machine.sqlite'), STARCI_AUTOPILOT: 'off' };
     const r = spawnSync(process.execPath, [API, 'status', '--workflow', WF, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
     assert.equal(r.status, 0, r.stderr);
     return JSON.parse(r.stdout);

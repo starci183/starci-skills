@@ -152,6 +152,7 @@ _starci() {
     'gate:hfs-sync:--repo') return 0 ;;
     'gate:install-sandbox:--tarball') return 0 ;;
     'gate:install-sandbox:--tools') return 0 ;;
+    'gate:install-sandbox:--out') return 0 ;;
     'gate:read:--root') return 0 ;;
     'gate:read:--touch') return 0 ;;
     'gate:read:--read') return 0 ;;
@@ -959,7 +960,7 @@ _starci() {
     'gate:custody-exec') _values 'flags' '--get' '--keys' '--input-type' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:env-health') _values 'flags' '--repo' '--env' '--paths' '--restart' '--probe-timeout-ms' '--ready-timeout-ms' '--service' '--url' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:hfs-sync') _values 'flags' '--repo' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'gate:install-sandbox') _values 'flags' '--tarball' '--keep' '--docker' '--tools' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'gate:install-sandbox') _values 'flags' '--tarball' '--keep' '--docker' '--tools' '--out' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:read') _values 'flags' '--root' '--touch' '--read' '--knowledge' '--out' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:reference-conventions') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:repo-presentation') _values 'flags' '--root' '--runtime' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

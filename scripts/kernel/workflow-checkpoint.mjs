@@ -64,7 +64,7 @@ import { applyWorkflowRebase } from './workflow-rebase.mjs';
 export { withWorkflowLock } from './workflow-checkpoint-state.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const GATE_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'gates', 'gate.mjs');
+const GATE_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'cli', 'gate-run.mjs');
 export const PRESERVED_WORKFLOW_PREFIX = 'preserved';
 export const FINISH_STEPS = Object.freeze(['gate', 'merge-guard', 'review-verify', 'rebase', 'fast-forward', 'push', 'release-pending']);
 export const CHECKPOINT_EVENTS = Object.freeze({ checkpoint: 'workflow-checkpoint', preserved: 'workflow-op-preserved', landed: 'workflow-landed' });
@@ -305,7 +305,7 @@ export function recoverWorkflowRebase(ctx, { workflowId, opId }) {
   return completed ? { ok: true, onto: completed.onto, head: completed.proposed, milestone: completed.milestone, recovered: true } : null;
 }
 
-/** The whole-branch gate: scripts/gates/gate.mjs over the worktree against `base`; its starci/gate@1 report. */
+/** The whole-branch gate: `starci gate run` over the worktree against `base`; its starci/gate@1 report. */
 function runWorkflowGate({ root, base, timeoutMs = 1_800_000 }) {
   const run = runNode([GATE_SCRIPT, '--root', root, '--base', base], { cwd: root, timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
   try { return JSON.parse(run.stdout); } catch { return { exit: 2, errors: [`gate.mjs printed no report (exit ${run.status ?? 'timeout'}): ${String(run.stderr || run.error?.message || '').trim().split(/\r?\n/).slice(-1)[0]}`], findings: [], counts: { new: 0 } }; }

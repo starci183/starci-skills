@@ -118,8 +118,6 @@ test('shell-conformance: a page drawn into another render of the layout is a des
   const stale = checkShellConformance(board.dir);
   assert.deepEqual(refused(stale), ['COMPOSITE_DESTINATION_MISMATCH']);
   assert.match(stale.refused[0], /shows destination reports active \(by route\) - recompose into shell\/assets\/layouts\/app--locale-console--reports--desktop--light\.png/);
-  const advisory = checkShellConformance(board.dir, { advisoryCodes: ['COMPOSITE_DESTINATION_MISMATCH'] });
-  assert.equal(advisory.ok, true, 'a leg admitted before the change sees it as an advisory suspect');
   const again = await drawUi(p, 'reports/ui/board', { ...board.record, assets: [] }, both);
   assert.deepEqual(checkShellConformance(again.dir).refused, [], 'recomposed into the destination render');
 });

@@ -53,7 +53,7 @@ test('every lite workflow is structurally valid and pins each action version', (
         assert.ok(jobNames.has(dependency), `${file}: ${jobName} needs unknown job ${dependency}`);
       }
       for (const step of job.steps ?? []) {
-        if (step.uses) assert.match(step.uses, /@v\d+(?:\.\d+)*$/, `${file}: ${step.uses} is not version-pinned`);
+        if (step.uses) assert.match(step.uses, /@(?:v\d+(?:\.\d+)*|[0-9a-f]{40})$/, `${file}: ${step.uses} is not version-pinned`);
         const uploadIdentity = `${step.name ?? ''} ${step.uses ?? ''}`;
         if (/upload|codecov|sonar|artifact|scan|quality[- ]gate/i.test(uploadIdentity)) {
           assert.doesNotMatch(String(step.if ?? ''), /\bsecrets\s*\./, `${file}: an upload step reads secrets in if`);

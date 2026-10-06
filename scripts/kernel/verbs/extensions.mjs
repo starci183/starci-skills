@@ -1,5 +1,6 @@
 // starci kernel extensions — what the file-based starci kernel extensions add (scripts/kernel/api-extensions.mjs): the extension
 // verbs, the status fields, the extra boolean flags and any module that failed to load. Read-only, no ledger.
+import { byCodeUnit } from '../../lib/list.mjs';
 export default {
   verb: 'extensions',
   required: [],

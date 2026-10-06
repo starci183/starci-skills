@@ -6,6 +6,7 @@ import test from 'node:test';
 import {spawnSync} from 'node:child_process';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
 import {checkApplicationStacks} from '../../scripts/gates/stacks-gate.mjs';
+import {importClosure} from '../../scripts/hfs/sync-runtime.mjs';
 
 const RUNBOOK=(extra=[])=>[
   '# runbook','','| command | what it does |','|---|---|',
@@ -186,9 +187,9 @@ test('rejects primitive, oversized, and unknown manifest shapes without throwing
 
 test('executes from a relocated installed payload using its authored schema YAML',async t=>{
   const f=fixture(t),payload=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stack-runtime-'));t.after(()=>fs.rmSync(payload,{recursive:true,force:true}));
-  const dist=path.join(payload,'payload');fs.mkdirSync(path.join(dist,'scripts','gates'),{recursive:true});fs.mkdirSync(path.join(dist,'engine'),{recursive:true});fs.mkdirSync(path.join(dist,'modules','schemas'),{recursive:true});
-  fs.copyFileSync(new URL('../../scripts/gates/stacks-gate.mjs',import.meta.url),path.join(dist,'scripts','gates','stacks-gate.mjs'));fs.copyFileSync(new URL('../../engine/yaml.mjs',import.meta.url),path.join(dist,'engine','yaml.mjs'));
-  for(const lib of ['api/git/ls-files.mjs','api/git/lib.mjs','lib/git.mjs','lib/path-key.mjs','lib/walk.mjs']){fs.mkdirSync(path.dirname(path.join(dist,'scripts',lib)),{recursive:true});fs.copyFileSync(new URL(`../../scripts/${lib}`,import.meta.url),path.join(dist,'scripts',lib));} // the installed payload carries the git call file and lib helpers stacks-gate.mjs imports
+  const dist=path.join(payload,'payload');
+  for(const file of importClosure(['scripts/gates/stacks-gate.mjs'])){fs.mkdirSync(path.dirname(path.join(dist,file)),{recursive:true});fs.copyFileSync(new URL(`../../${file}`,import.meta.url),path.join(dist,file));}
+  fs.mkdirSync(path.join(dist,'modules','schemas'),{recursive:true});
   fs.copyFileSync(new URL('../../modules/schemas/application-stacks.schema.yaml',import.meta.url),path.join(dist,'modules','schemas','application-stacks.schema.yaml'));
   const {pathToFileURL}=await import('node:url');
   const relocated=await import(`${pathToFileURL(path.join(dist,'scripts','gates','stacks-gate.mjs')).href}?relocated=${Date.now()}`);

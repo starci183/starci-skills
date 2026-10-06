@@ -49,10 +49,11 @@ test('runtime link writes the record and POSIX shim through injected seams', asy
   assert.equal(output.value.err, '');
 });
 
-test('runtime install and link use identical Windows shim text for the same runtime', async () => {
+test('runtime install and link record the same installed runtime and write the same Windows shim shape', async () => {
   const home = path.resolve('fake-home');
   const cwd = path.resolve('repo');
   const root = path.join(home, '.starci', 'runtime', 'node_modules', 'starci');
+  const installed = path.resolve(cwd, '.claude');
   const installWrites = new Map();
   assert.equal(installRuntime({ cwd, home }, {
     platform: 'win32',
@@ -66,17 +67,19 @@ test('runtime install and link use identical Windows shim text for the same runt
   }), 0);
 
   const linkWrites = new Map();
-  assert.equal(await linkRuntime({ cwd, home, root, quiet: true, stderr: () => {} }, {
+  assert.equal(await linkRuntime({ cwd, home, root: installed, quiet: true, stderr: () => {} }, {
     platform: 'win32',
     node: path.join(home, 'node.exe'),
-    exists: (file) => runtimeFiles(root).has(file),
+    exists: (file) => runtimeFiles(installed).has(file),
     mkdir: () => {},
     write: (file, text) => linkWrites.set(file, text),
     chmod: () => {},
     installGitHooks: () => ({ ok: false, reason: 'not-a-git-checkout', hooksDir: null, hooks: [] }),
   }), 0);
   assert.equal(linkWrites.get(path.join(home, '.starci', 'runtime.json')), installWrites.get(path.join(home, '.starci', 'runtime.json')));
-  assert.equal(linkWrites.get(path.join(home, '.starci', 'bin', 'starci.cmd')), installWrites.get(path.join(home, '.starci', 'bin', 'starci.cmd')));
+  const shimOf = (cli) => `@echo off\r\n"${path.join(home, 'node.exe')}" "${cli}" %*\r\n`;
+  assert.equal(installWrites.get(path.join(home, '.starci', 'bin', 'starci.cmd')), shimOf(path.resolve(import.meta.dirname, '..', '..', 'packages', 'cli', 'bin', 'starci.mjs')), 'install launches through the CLI that ran it');
+  assert.equal(linkWrites.get(path.join(home, '.starci', 'bin', 'starci.cmd')), shimOf(path.join(installed, 'packages', 'cli', 'bin', 'starci.mjs')), 'link launches through the runtime it records');
 });
 
 test('default discovery chooses the nearest checkout or .claude runtime', () => {

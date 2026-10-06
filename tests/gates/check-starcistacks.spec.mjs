@@ -103,13 +103,9 @@ test('custody that is missing, or an owner action for what custody holds, is ref
   assert.ok(refused.includes('STACKS_CUSTODY_MISSING'));
 });
 
-test('a leg admitted before the change reads the new codes as suspects', (t) => {
+test('an unknown sonar provider is refused', (t) => {
   const { product } = workspace(t, { services: { sonar: sonarEntry('product', { provider: 'sonarqube-x' }), 'error-tracking': sentryEntry('product') } });
-  const strict = checkStarciStacks(product);
-  assert.ok(codes(strict, 'refuse').includes('STACKS_PROVIDER_UNKNOWN'));
-  const older = checkStarciStacks(product, { advisoryCodes: CODES });
-  assert.equal(older.ok, true);
-  assert.ok(older.findings.some((finding) => finding.code === 'STACKS_PROVIDER_UNKNOWN' && finding.advisory));
+  assert.ok(codes(checkStarciStacks(product), 'refuse').includes('STACKS_PROVIDER_UNKNOWN'));
 });
 
 test('sonar-project.properties must name the declared project key', (t) => {
@@ -124,7 +120,6 @@ test('services.sonar.qualityGate must name the one gate knowledge/sonar-gate.yam
   assert.match(refused.findings.find((finding) => finding.code === 'STACKS_QUALITY_GATE_DRIFT').message, /starci-quality/);
   const absent = workspace(t, { services: { sonar: (({ qualityGate, ...rest }) => rest)(sonarEntry('product')), 'error-tracking': sentryEntry('product') } });
   assert.ok(codes(checkStarciStacks(absent.product), 'refuse').includes('STACKS_QUALITY_GATE_DRIFT'), 'a declaration with no qualityGate is refused');
-  assert.equal(checkStarciStacks(own.product, { advisoryCodes: CODES }).ok, true, 'a leg admitted before the change reads it as a suspect');
 });
 
 test('a product with no services block still resolves Sonar through the source host declaration', (t) => {

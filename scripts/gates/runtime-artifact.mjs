@@ -15,6 +15,9 @@ const FORBIDDEN_NAMES = new Set(['secret.env', 'settings.local.json', 'machine.s
 // The host-local owner config sits at the package root; knowledge/patterns/be/config.yaml and the like are shipped documents.
 const FORBIDDEN_ROOT_NAMES = new Set(['config.yaml', 'config.json']);
 const EXAMPLES_ROOT = 'examples/';
+// The app scaffold the package ships: its `.starciwork` skeleton and its empty `secrets/.gitkeep` placeholder are authored templates.
+const SCAFFOLD_ROOT = 'packages/hfs/templates/';
+const PLACEHOLDER = '.gitkeep';
 const FORBIDDEN_SEGMENTS = new Set(['node_modules', '.git', '.secrets', 'secrets', '.runtime']);
 const FORBIDDEN_SUFFIX = /\.sqlite-(?:wal|shm|journal)$|\.log$/;
 // A dotenv file or a private key; `.env.example` and the like are templates, like secret.env.example.
@@ -25,7 +28,8 @@ const WORK_SEGMENT = '.starciwork';
  * The forbidden entries of a packed file list: [{path, reason}]. `allowedWork` is the set of `.starciwork` paths the package
  * `files` list names explicitly. Tracked example fixtures under `examples/<app>/.starciwork/` ship today (npm does not apply the
  * negation of the `files` list after the broad `examples/` entry), so they are allowed and counted by the caller; a
- * `.starciwork` anywhere else is host-local work state. `secret.env.example` is allowed because only `secret.env` is private.
+ * scaffold templates under `packages/hfs/templates/` carry a `.starciwork` skeleton and an empty `secrets/.gitkeep` placeholder; a
+ * `.starciwork` anywhere else is host-local work state, and any other file in a `secrets/` directory is refused everywhere. `secret.env.example` is allowed because only `secret.env` is private.
  * Matching ignores letter case and reads a backslash as `/`, so a renamed copy from a case-insensitive host is still refused.
  */
 export function forbiddenEntries(paths, allowedWork = new Set()) {
@@ -34,13 +38,14 @@ export function forbiddenEntries(paths, allowedWork = new Set()) {
     const lowered = entry.replaceAll('\\', '/').toLowerCase();
     const segments = lowered.split('/');
     const name = segments.at(-1);
-    const directory = segments.slice(0, -1).find((segment) => FORBIDDEN_SEGMENTS.has(segment));
+    const scaffold = lowered.startsWith(SCAFFOLD_ROOT);
+    const directory = segments.slice(0, -1).find((segment) => FORBIDDEN_SEGMENTS.has(segment) && !(scaffold && segment === 'secrets' && name === PLACEHOLDER));
     let reason = null;
     if (FORBIDDEN_NAMES.has(name) || (segments.length === 1 && FORBIDDEN_ROOT_NAMES.has(name))) reason = `host-local or secret file ${name}`;
     else if (FORBIDDEN_SUFFIX.test(name)) reason = `database journal or log ${name}`;
     else if (FORBIDDEN_SECRET.test(name)) reason = `dotenv file or private key ${name}`;
     else if (directory) reason = `forbidden directory ${directory}/`;
-    else if (segments.includes(WORK_SEGMENT) && !allowedWork.has(entry) && !lowered.startsWith(EXAMPLES_ROOT)) reason = `${WORK_SEGMENT}/ entry outside the curated examples/ fixtures`;
+    else if (segments.includes(WORK_SEGMENT) && !allowedWork.has(entry) && !lowered.startsWith(EXAMPLES_ROOT) && !scaffold) reason = `${WORK_SEGMENT}/ entry outside the curated examples/ fixtures and the scaffold templates`;
     if (reason) found.push({ path: entry, reason });
   }
   return found;

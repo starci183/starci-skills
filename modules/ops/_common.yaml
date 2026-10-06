@@ -597,7 +597,7 @@ sections:
     blocks:
       - "Owner policy 2026-09-29: an op that writes or changes code also writes or updates the unit specs of that code and
         runs ONLY those - the specs of the changed or added source plus the specs that import it - through the op gate
-        (scripts/gates/gate.mjs --tests, beside starci app lint --changed, codegen and tsc). It never runs the app's whole unit suite:
+        (`starci gate run --tests`, beside starci app lint --changed, codegen and tsc). It never runs the app's whole unit suite:
         unit.verify runs it (npm test at the app root), dispatched only when the goal or the owner explicitly asks for the full
         unit run, and the owner's /starci release flow runs it before a main is pushed. e2e runs only when the goal or the
         owner asks (config.yaml specs.e2e, default off); e2e.verify then runs the FULL e2e suite. The .claude runtime

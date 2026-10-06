@@ -8,6 +8,9 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
+import {registerRepoWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
 import {bindWorkflowRun} from '../../scripts/kernel/orca-runs.mjs';
 
 // After the 2026-09-24 reboot every restarted Kernel was rejected at
@@ -27,7 +30,7 @@ const fixture=(t,runs)=>{
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});proofRepo(t,repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json');
   fs.writeFileSync(stateFile,JSON.stringify({sends:0,runs}));
@@ -40,13 +43,17 @@ const fixture=(t,runs)=>{
     // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
     // the card's settle/attestation windows are waits counted logically: they cost ms, not load-dependent seconds.
-    STARCI_SLEEP_SCALE:'0.02'};
-  for(const id of ['job-a','job-b'])fs.mkdirSync(path.join(repo,'docs',id),{recursive:true});
+    STARCI_SLEEP_SCALE:'0.02',
+    ...adoptLaunchTrust(root,{roots:[repo],ref:'private orca-run-rebind fixture adoption'})};
+  registerRepoWorkflowWorktree({repo,workflowId:WF,env});
+  // Two ops of one workflow run together only on different sides of its worktree (be/ and fe/).
+  const sideOf={'job-a':'be','job-b':'fe'};
+  for(const id of ['job-a','job-b'])fs.mkdirSync(path.join(repo,sideOf[id],id),{recursive:true});
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     seedWorkflow(ledger,{id:WF,state:{phase:'running',job:WF},
       jobs:[
-        ...['job-a','job-b'].map(id=>({jobId:id,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:[`docs/${id}/`]}})),
+        ...['job-a','job-b'].map(id=>({jobId:id,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:[`${sideOf[id]}/${id}/`]}})),
         {jobId:`kernel-${WF}`,kind:'kernel',status:'running',workerId:'term-new',
           payload:{orca:{runId:'run-fake-1'},hierarchy:{runtime:{runId:'run-fake-1',terminalHandle:'term-new'}}}},
       ]});

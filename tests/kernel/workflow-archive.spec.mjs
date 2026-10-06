@@ -112,8 +112,10 @@ test('archiving an archived workflow changes nothing and says so',t=>world(t,({l
   const missing=run('archive','--workflow',PEER,'--reason','  ');
   assert.notEqual(missing.status,0);
   assert.match(missing.stderr,/archive-needs-reason/);
-  const badBy=run('archive','--workflow',PEER,'--reason','x','--by','kernel');
+  const badBy=run('archive','--workflow',PEER,'--reason','x','--by','nobody');
   assert.match(badBy.stderr,/archive-bad-by/);
+  const claimed=run('archive','--workflow',PEER,'--reason','x','--by','kernel');
+  assert.match(claimed.stderr,/kernel-caller-actor/,'an unbound owner cannot attest the Kernel');
   assert.equal(ledger.db.prepare('SELECT archived_at FROM workflows WHERE workflow_id=?').get(PEER).archived_at,null,'a refused archive writes nothing');
 }));
 

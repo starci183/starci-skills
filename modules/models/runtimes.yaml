@@ -488,7 +488,11 @@ allocation:
       work-acceptance-, work-brand-test-, work-core-test-, work-custody-test-, work-external-,
       work-index-md-, work-module-spec-, example-critique-, example-derive-, example-evidence-, example-verify-,
       example-work-gate-, work-artifacts-, work-consistency-, work-surfaces-,
-      grammar-land-, kernel-replace-close-, nm-link-, rc-job-, rc-health-, release-gate-, seat-titles-, slice-typecheck-, unit-roles-, spec-budget-]
+      grammar-land-, kernel-replace-close-, nm-link-, rc-job-, rc-health-, release-gate-, seat-titles-, slice-typecheck-, unit-roles-, spec-budget-,
+      model-hotload-, price-hotload-, owner-trust-, fs-kind-contract-, private-publication-, private-create-, private-lease-, private-partial-,
+      private-unknown-, private-inode-, private-bound-, private-link-, check-entry-, core-tree-, runtime-public-docs-, blob-publication-,
+      core-debug-schema-, ledger-native-case-, sbx-spec-, runtime-artifact-, gc-archive-proof-, machine-retention-, zip-resource-,
+      core-seat-, core-diag-]
     sessionArchiveAfterMs: 259200000
     claudeTranscriptArchiveAfterMs: 604800000
     archiveMaxAgeMs: 2592000000

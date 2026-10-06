@@ -7,6 +7,9 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
+import {addWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {kindOrder} from '../../scripts/agent/models.mjs';
 
@@ -55,7 +58,7 @@ const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-strategy-pools-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});proofRepo(t,repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,
     STARCI_ORCA_COMMAND:process.execPath,
@@ -67,6 +70,7 @@ const fixture=t=>{
     // machineFileFor honours STARCI_TEST_MACHINE_FILE first; without it the spawned api lands on the
     // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
+    ...adoptLaunchTrust(root,{roots:[repo],ref:'private strategy-pools fixture adoption'}),
   };
   const run=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const callArgv=()=>fs.existsSync(path.join(root,'calls.jsonl'))
@@ -74,6 +78,7 @@ const fixture=t=>{
     :[];
   const seed=({jobId,opId='business.decide',payload})=>{
     const workflowId=`wf-${jobId}`;
+    addWorkflowWorktree({repo,workflowId,env});
     const ledger=openLedger({file:ledgerFileFor(repo)});
     try{
       seedWorkflow(ledger,{id:workflowId,state:{phase:'running',job:workflowId},

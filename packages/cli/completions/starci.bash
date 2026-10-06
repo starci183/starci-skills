@@ -125,6 +125,7 @@ _starci() {
         gate:hfs-sync:--repo) return 0;;
         gate:install-sandbox:--tarball) return 0;;
         gate:install-sandbox:--tools) return 0;;
+        gate:install-sandbox:--out) return 0;;
         gate:read:--root) return 0;;
         gate:read:--touch) return 0;;
         gate:read:--read) return 0;;
@@ -932,7 +933,7 @@ _starci() {
         gate:custody-exec) COMPREPLY=( $(compgen -W "--get --keys --input-type --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:env-health) COMPREPLY=( $(compgen -W "--repo --env --paths --restart --probe-timeout-ms --ready-timeout-ms --service --url --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:hfs-sync) COMPREPLY=( $(compgen -W "--repo --json --cwd --quiet --help --edition" -- "$cur") );;
-        gate:install-sandbox) COMPREPLY=( $(compgen -W "--tarball --keep --docker --tools --json --cwd --quiet --help --edition" -- "$cur") );;
+        gate:install-sandbox) COMPREPLY=( $(compgen -W "--tarball --keep --docker --tools --out --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:read) COMPREPLY=( $(compgen -W "--root --touch --read --knowledge --out --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:reference-conventions) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         gate:repo-presentation) COMPREPLY=( $(compgen -W "--root --runtime --json --cwd --quiet --help --edition" -- "$cur") );;

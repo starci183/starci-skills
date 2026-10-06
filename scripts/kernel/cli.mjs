@@ -84,6 +84,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { isMain } from '../lib/is-main.mjs';
 import { headShaOf } from '../lib/git-dir.mjs';
 import { ownerLanguage as ownerLanguageOf, translator } from '../lib/i18n.mjs';
 // The reads the split-out verbs share with what stays here: one definition per helper (scripts/kernel/verbs/shared/).
@@ -3839,7 +3840,7 @@ const runExtensionVerb = async (spec, args, repo) => {
   let ledger;
   try { ledger = openRepoLedger(repo); } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) }));
-    process.exit(1);
+    process.exitCode = 1; return;
   }
   const caller = callerOf(ledger.db, process.env, { file: ledger.path });
   if (caller.role === OP_ROLE && spec.kernelOnly) {
@@ -3855,12 +3856,11 @@ const runExtensionVerb = async (spec, args, repo) => {
     return await admitted.run(() => spec.run({ ledger, args, repo, emit, need, caller: admitted.caller, ext: API_EXT, internals: API_INTERNALS }));
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));
-    process.exit(1);
+    process.exitCode = 1;
   } finally { ledger.close(); }
 };
-
 /* ------------------------------------------------------------------ main */
-async function main() {
+export async function main() {
   const argv = process.argv.slice(2);
   const cmd = argv[0];
   if (!cmd || cmd === '--help' || cmd === '-h') { const lines = extensionUsage(API_EXT); if (lines.length) console.log(`extension verbs (scripts/kernel/verbs):\n${lines.join('\n')}\n`); }
@@ -3871,4 +3871,4 @@ async function main() {
   usage(2);
 }
 
-main().catch((error) => { console.error(error); process.exit(1); });
+if (isMain(import.meta.url)) main().catch((error) => { console.error(error); process.exitCode = 1; });

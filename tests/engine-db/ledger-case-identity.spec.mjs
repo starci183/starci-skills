@@ -4,17 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {ledgerIdForRepo,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
-import {sha256,sha256File} from '../../engine/digest.mjs';
+import {sha256File} from '../../engine/digest.mjs';
 import {repoRootKey} from '../../engine/db/ledger-paths.mjs';
 import {pathKey} from '../../scripts/lib/path-key.mjs';
-test('POSIX case-distinct roots do not share IDs and a legacy folded store needs exact ownership',{skip:process.platform==='win32'},t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'ledger-case-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const upper=path.join(root,'Repo'),lower=path.join(root,'repo');fs.mkdirSync(upper);fs.mkdirSync(lower);assert.notEqual(ledgerIdForRepo(upper),ledgerIdForRepo(lower));
-  // Seed the old, always-folded identity as an immutable migration fixture.
-  const h=sha256(`starci-ledger:${fs.realpathSync(upper).replaceAll('\\','/').toLowerCase()}`),id=`${h.slice(0,8)}-${h.slice(8,12)}-5${h.slice(13,16)}-${(8|(parseInt(h[16],16)&3)).toString(16)}${h.slice(17,20)}-${h.slice(20,32)}`;
-  const env={STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_TEST_MACHINE_FILE:path.join(root,'missing-machine.sqlite')},legacy=path.join(env.STARCI_PROJECTS_ROOT,id,'runtime.sqlite');
-  const ledger=openLedger({file:legacy});try{ledger.db.prepare("INSERT OR REPLACE INTO meta(key,value) VALUES('repo_root',?)").run(upper);}finally{ledger.close();}
-  const digest=sha256File(legacy);assert.equal(ledgerFileFor(upper,{env}),legacy);assert.throws(()=>ledgerFileFor(lower,{env}),e=>e.code==='STARCI_LEDGER_ROOT_MISMATCH');assert.equal(sha256File(legacy),digest);
-});
 test('Current-platform case identities preserve owned stores and refuse another physical root',t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'ledger-native-case-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const upper=path.join(root,'Repo'),lower=path.join(root,'repo');fs.mkdirSync(upper);

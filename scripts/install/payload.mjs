@@ -8,7 +8,7 @@ import {isLinkLike} from '../api/fs/is-link-like.mjs';
 import {globExpression} from '../lib/glob.mjs';
 import {EXAMPLE_CATALOG_FILE, EXAMPLES_ROOT, discoverExampleApps, exampleSourcePaths} from '../lib/example-refs.mjs';
 import {installedPayloadDigest} from '../lib/install-custody.mjs';
-
+import {byCodeUnit} from '../lib/list.mjs';
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
 
@@ -102,7 +102,7 @@ export const payloadFiles = (root) => {
       }
     }
   }
-  const files = PAYLOAD.flatMap((relative) => walk(root, relative, exampleInputs)).sort();
+  const files = [...new Set(PAYLOAD.flatMap((relative) => walk(root, relative, exampleInputs)))].sort(byCodeUnit);
   for (const relative of exampleInputs) if (!files.includes(relative))
     throw new Error(`required example input is missing from the payload: ${relative}`);
   return files;
@@ -118,7 +118,7 @@ export const hashTree = (root, priorManifest = null, repair = false) => {
     throw new Error('invalid installed payload custody; refusing target inventory before writes');
   const exampleInputs = new Set([...Object.keys(priorManifest.files), ...payloadFiles(packageRoot)]
     .filter(relative => relative === EXAMPLE_CATALOG_FILE || (relative.startsWith(`${EXAMPLES_ROOT}/`) && relative.endsWith('.json'))));
-  const files = PAYLOAD.flatMap(relative => walk(root, relative, exampleInputs)).sort();
+  const files = [...new Set(PAYLOAD.flatMap(relative => walk(root, relative, exampleInputs)))].sort(byCodeUnit);
   if (!repair) for (const relative of files) if (exampleInputs.has(relative) && relative.endsWith('.json')) {
     let value;
     try { value = JSON.parse(readFileSync(path.join(root, relative), 'utf8')); }

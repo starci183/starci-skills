@@ -22,6 +22,7 @@ import { fakeAdmission } from '../helpers/fake-admission.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { adoptLaunchTrust } from '../helpers/launch-trust.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -307,7 +308,7 @@ test('startAgent threads a new worktree\'s creation flags to worker-start, and n
     admission: fakeAdmission(),
     runShow: () => ({ ok: false }), runCreate: () => ({ ok: true, runId: 'run_1' }),
     spawn: {
-      trust: () => ({ status: 'skipped', paths: [] }),
+      trust: () => ({ status: 'ok', paths: [] }),
       start: (a) => { starts.push(a); return { ok: true, outcome: 'ok', dispatchId: `ctx_${starts.length}`, taskId: `task_${starts.length}`, agentTerminalHandle: 'term_1' }; },
       rename: () => ({ ok: true }),
       show: () => ({ ok: true, state: 'ready', effective: { agent: 'claude', model: 'claude-opus-5-5' } }),
@@ -340,16 +341,24 @@ test('guardLaunch writes the workflow worktree into an op guard file', async (t)
   assert.equal(JSON.parse(fs.readFileSync(outside.receipt.jobFile, 'utf8')).workflowWorktree, null, 'no workflow worktree, no field value');
 });
 
-test('starci kernel dispatch passes the registered workflow worktree to the guard, and null when there is none', (t) => {
+test('starci kernel dispatch passes the registered workflow worktree to the guard, and refuses a Git workflow that has none', (t) => {
   const { base, app, env, ctx } = fixture(t);
   if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'),
     { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const plain = path.join(base, 'plain');
+  fs.mkdirSync(path.join(plain, 'docs'), { recursive: true });
+  write(plain, 'docs/readme.md', 'plain\n');
+  git(plain, 'init', '-q', '-b', 'main');
+  git(plain, 'config', 'user.email', 'spec@starci.test');
+  git(plain, 'config', 'user.name', 'spec');
+  git(plain, 'add', '-A');
+  git(plain, 'commit', '-q', '-m', 'init');
   const rec = ensureWorkflowWorktree(ctx, { workflowId: 'wf-dispatch-guard', appRepo: app }).record;
   const fake = path.join(base, 'fake-orca.mjs'), state = path.join(base, 'orca-state.json');
   fs.writeFileSync(fake, FAKE_ORCA);
   const childEnv = { ...env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([fake]), STARCI_FAKE_ORCA_MODE: 'healthy',
     STARCI_FAKE_ORCA_LOG: path.join(base, 'orca-calls.jsonl'), STARCI_FAKE_ORCA_STATE: state, STARCI_LOCAL_ROOT: path.join(base, 'localappdata'),
-    STARCI_OWNER_ROOT: path.join(base, 'owner') };
+    ...adoptLaunchTrust(base, { roots: [app], ref: 'private workflow-worktree fixture adoption' }) };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_GUARD_FILE']) delete childEnv[key];
   const seed = (repo, workflowId, jobId, owned) => {
     const ledger = openLedger({ file: ledgerFileFor(repo) });
@@ -377,11 +386,9 @@ test('starci kernel dispatch passes the registered workflow worktree to the guar
   assert.equal(inTree.status, 0, inTree.stderr || inTree.stdout);
   assert.equal(guardOf(app, guarded).workflowWorktree, path.resolve(rec.path));
 
-  const plain = path.join(base, 'plain');
-  fs.mkdirSync(path.join(plain, 'docs'), { recursive: true });
   const unbound = 'op-code.refactor-unbound';
   seed(plain, 'wf-dispatch-no-tree', unbound, ['docs/']);
   const withoutTree = dispatch(plain, unbound);
-  assert.equal(withoutTree.status, 0, withoutTree.stderr || withoutTree.stdout);
-  assert.equal(guardOf(plain, unbound).workflowWorktree, null);
+  assert.notEqual(withoutTree.status, 0, 'a Git workflow with no registered worktree never spawns');
+  assert.equal(JSON.parse(withoutTree.stderr || withoutTree.stdout).code, 'workflow-worktree-missing');
 });

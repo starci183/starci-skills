@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { winPath } from '../fixtures/win-path.mjs';
 import { putBlob, getBlob, blobPath, blobAsFile, bundleDir, resolveBlob, assetFileOf } from '../../engine/db/blob.mjs';
 
 const fixture = t => {
@@ -16,7 +17,7 @@ const bundle = files => putBlob(Buffer.from(JSON.stringify({ schema: 'starci/blo
 
 test('portable bundle names reject traversal, drive paths, special names and colliding destinations before materialization', t => {
   const root = fixture(t), sha = putBlob(Buffer.from('verified member')).sha;
-  for (const rel of ['../escape.txt', '..\\escape.txt', 'C:\\escape.txt', '//server/share', 'a//b', 'a/./b', 'nul.txt', 'a:stream', '.complete', 'a.']) {
+  for (const rel of ['../escape.txt', '..\\escape.txt', winPath('C', 'escape.txt'), '//server/share', 'a//b', 'a/./b', 'nul.txt', 'a:stream', '.complete', 'a.']) {
     assert.throws(() => bundleDir(bundle({ [rel]: sha })), /unsafe blob bundle path/);
   }
   for (const files of [{ 'A.txt': sha, 'a.txt': sha }, { a: sha, 'a/b.txt': sha }]) assert.throws(() => bundleDir(bundle(files)), /collision|also a directory/);

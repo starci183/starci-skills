@@ -8,6 +8,7 @@ import {changeWorkflowPhase,inspectLedger,ledgerFileFor,openLedger} from '../../
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {stallFindings,peerWaits,judgePeerWait} from '../../scripts/supervisor/stall.mjs';
 import {startPeerWaitCli} from '../helpers/supervisor-peer-wait-fixture.mjs';
+import {bindCurrentKernel} from '../helpers/bound-kernel.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -51,11 +52,14 @@ const fixture=t=>{
   }finally{ledger.close();}
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
   const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
+  // The current Kernel's own call: a bound seat, the caller that may attest --by kernel.
+  let kernelEnv=null;
+  const asKernel=args=>{kernelEnv??=seed(l=>bindCurrentKernel(l,WORK));const r=spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...base,...kernelEnv}});assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
   const ok=args=>{const r=api(args);assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
   const refused=(args,code)=>{const r=freshApi(args);assert.equal(r.status,1,`${args.join(' ')} must be refused: ${r.stdout}`);assert.equal(lastLine(r.stderr)?.code,code,r.stderr);return lastLine(r.stderr);};
   const frontier=wf=>ok(['status','--workflow',wf]).frontier;
   const wait=(extra=[])=>ok(['incident','--workflow',WORK,'--kind','peer-wait','--peer',BASE,'--op','brand.decide','--detail',DETAIL,...extra]);
-  return {repo,api,ok,refused,read,seed,frontier,wait};
+  return {repo,api,ok,asKernel,refused,read,seed,frontier,wait};
 };
 
 test('incident --kind peer-wait names a running peer of this workflow; --peer goes with no other kind',t=>{
@@ -192,7 +196,7 @@ test('an owner-gate naming a consumed-but-unsettled job defers its settle: front
   assert.deepEqual([f.state,f.actionable,f.settleReadyJobs],['awaiting-owner',false,[]]);
   assert.deepEqual(f.heldSettleJobs.map(h=>[h.jobId,h.heldBecause,h.blockedBy]),[[SETTLE_JOB,'owner-gate',{incident:incidentId}]],'--op holds every settle of that op, as it holds queued jobs');
   assert.match(f.reason,new RegExp(`owner-gate incident\\(s\\) ${incidentId}; the settle of ${SETTLE_JOB}`));
-  fx.ok(['incident','--workflow',WORK,'--resolve',incidentId,'--detail','consent receipt landed','--by','kernel']);
+  fx.asKernel(['incident','--workflow',WORK,'--resolve',incidentId,'--detail','consent receipt landed','--by','kernel']);
   const after=fx.frontier(WORK);
   assert.deepEqual([after.state,after.actionable,after.settleReadyJobs,after.heldSettleJobs],['settle-ready',true,[SETTLE_JOB],[]]);
 });

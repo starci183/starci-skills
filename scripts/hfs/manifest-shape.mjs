@@ -42,7 +42,7 @@ export const TRACKED = ['tracked', 'ignored', 'external'];
 /** A runtime manifest adds `generated`: tracked, written only by the slot's generatedBy, judged by drift (RT_GENERATED_DRIFT). */
 const RUNTIME_TRACKED = [...TRACKED, 'generated'];
 export const TESTS = ['unit-beside', 'e2e', 'none'];
-/** The coverage mode of a tracked slot of the be profile (scripts/hfs/coverage-scope.mjs derives the three coverage consumers from it). */
+/** The coverage mode of a tracked slot of the be profile or of a runtime manifest (scripts/hfs/coverage-scope.mjs and scripts/hfs/runtime-coverage-scope.mjs derive the coverage consumers from it). */
 export const COVERAGE = ['required', 'none'];
 export const APP_KIND = 'app';
 
@@ -90,7 +90,7 @@ const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 
 /** The fields a slot's `lite` overlay may hold: the same keys it would carry in the slot body, resolved under edition lite. */
 const LITE_OVERLAY_KEYS = ['path', 'requires', 'allows', 'forbids', 'minInstances', 'requiredInstances'];
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */
-const RUNTIME_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'minInstances', 'requires', 'allows', 'forbids', 'budget', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'generatedBy', 'parent'];
+const RUNTIME_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'minInstances', 'requires', 'allows', 'forbids', 'budget', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'generatedBy', 'parent', 'coverage'];
 
 /** Shape problems of one slot of a manifest of `kind` (app or runtime). */
 export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] } = {}) {
@@ -118,11 +118,9 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   if (!NAME.test(String(slot.tier))) bad.push(`${at}: tier must be a tier name, none or inherit`);
   if (!TESTS.includes(slot.tests)) bad.push(`${at}: tests must be one of ${TESTS.join(', ')}`);
   if (slot.owner !== undefined && typeof slot.owner !== 'boolean') bad.push(`${at}: owner must be a boolean`);
-  if (!runtime) {
-    const measured = Array.isArray(slot.profiles) && slot.profiles.includes('be') && slot.tracked === 'tracked';
-    if (measured && !COVERAGE.includes(slot.coverage)) bad.push(`${at}: coverage must be one of ${COVERAGE.join(', ')} (every tracked slot of the be profile declares it)`);
-    if (!measured && slot.coverage !== undefined) bad.push(`${at}: coverage belongs to a tracked slot of the be profile only`);
-  }
+  const measured = slot.tracked === 'tracked' && (runtime || (Array.isArray(slot.profiles) && slot.profiles.includes('be')));
+  if (measured && !COVERAGE.includes(slot.coverage)) bad.push(`${at}: coverage must be one of ${COVERAGE.join(', ')} (every tracked slot of ${runtime ? 'a runtime manifest' : 'the be profile'} declares it)`);
+  if (!measured && slot.coverage !== undefined) bad.push(`${at}: coverage belongs to a tracked slot of ${runtime ? 'a runtime manifest' : 'the be profile'} only`);
   if (slot.appKind !== undefined && !NAME.test(String(slot.appKind))) bad.push(`${at}: appKind must be a name`);
   if (slot.trigger !== undefined && !NAME.test(String(slot.trigger))) bad.push(`${at}: trigger must be a trigger kind name`);
   if (slot.pattern !== undefined && !NAME.test(String(slot.pattern))) bad.push(`${at}: pattern must be a pattern name`);

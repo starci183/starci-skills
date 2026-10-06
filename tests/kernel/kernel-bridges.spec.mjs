@@ -8,6 +8,9 @@ import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { openLedger, inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { resolveIntroducer } from '../../scripts/kernel/introducer.mjs';
+import { proofRepo } from '../helpers/sonar-scan.mjs';
+import { adoptLaunchTrust } from '../helpers/launch-trust.mjs';
+import { registerRepoWorkflowWorktree } from '../helpers/workflow-worktree-row.mjs';
 
 // The runtime defects the running workflows filed, each proven through the api:
 //  - orchestration notices the Kernel could not read
@@ -24,7 +27,7 @@ const world = (t, { orca = false } = {}) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-bridges-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const repo = path.join(root, 'repo'); fs.mkdirSync(repo, { recursive: true }); fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
+  const repo = path.join(root, 'repo'); fs.mkdirSync(repo, { recursive: true }); proofRepo(t, repo); fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
   // A private machine registry per world: dispatch enrols the ledger and 'repo' collides on
   // ledgers.name in the suite-shared test registry otherwise. STARCI_LOCAL_ROOT stays: project
   // resolution runs through it.
@@ -33,7 +36,8 @@ const world = (t, { orca = false } = {}) => {
   const stateFile = path.join(root, 'orca-state.json');
   if (orca) {
     const stub = path.join(root, 'fake-orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
-    Object.assign(env, { STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]), STARCI_FAKE_ORCA_LOG: path.join(root, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: stateFile });
+    Object.assign(env, { STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]), STARCI_FAKE_ORCA_LOG: path.join(root, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: stateFile,
+      ...adoptLaunchTrust(root, { roots: [repo], ref: 'private kernel-bridges fixture adoption' }) });
   }
   const api = (args) => spawnSync(process.execPath, [API, ...args, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env });
   const apiAsync = (args) => new Promise((resolve) => {
@@ -69,7 +73,7 @@ const world = (t, { orca = false } = {}) => {
     for (const to of route ?? [status]) l.write.setJobStatus({ jobId, to, reason });
   };
   const writeOrca = (state) => fs.writeFileSync(stateFile, JSON.stringify(state));
-  return { root, repo, api, apiAsync, seed, read, workflow, unit, settleTo, writeOrca };
+  return { root, repo, env, api, apiAsync, seed, read, workflow, unit, settleTo, writeOrca };
 };
 
 test('starci kernel messages shows every orchestration message of the workflow\'s Runs, with its job and where it is handled', (t) => {
@@ -320,6 +324,7 @@ test('an answered ask stays awaiting its owner-answer retry until a job of ITS w
 test('dispatch files the contract row for the worker-start Dispatch; an early op-contract read waits for it', (t) => {
   const w = world(t, { orca: true });
   w.workflow('wf-cf');
+  registerRepoWorkflowWorktree({ repo: w.repo, workflowId: 'wf-cf', env: w.env });
   const enqueue = (jobId) => w.seed((l) => {
     l.enqueueJob({ jobId: `kernel-${jobId}`, workflowId: 'wf-cf', kind: 'kernel', role: 'kernel',
       payload: { hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: 'agent:kernel:wf-cf', parentNodeId: 'workflow:wf-cf', role: 'kernel' } } });

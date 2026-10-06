@@ -4,7 +4,8 @@
 // Rule ids are unique names, not a counted run: a gap between two ids is fine.
 //   RT_RULE_ID_UNKNOWN  an id no rule has.
 //   RT_RULE_UNCITED     a rule no pattern topic cites and that is not marked `scope: runtime`: product law exists to be taught.
-// Specs (tests/**) and generated copies are not read. Pure apart from ctx.read.
+// History paths (isHistoryPath: changelogs, benchmark findings, .starciwork records) record the rules of their day, so a deleted rule keeps its id there; specs (tests/**) and generated copies are not read. Pure apart from ctx.read.
+import { isHistoryPath } from '../../lib/check-scan.mjs';
 import { loadRuleCatalog } from '../slots.mjs';
 
 export const UNKNOWN = 'RT_RULE_ID_UNKNOWN';
@@ -22,7 +23,7 @@ export function ruleIdFindings(ctx) {
   const generated = (ctx.params.generated ?? []).map((entry) => `${entry.root}/`);
   const found = [];
   for (const file of ctx.files) {
-    if (!READ.test(file) || SKIPPED.test(file) || generated.some((root) => file.startsWith(root))) continue;
+    if (!READ.test(file) || SKIPPED.test(file) || isHistoryPath(file) || generated.some((root) => file.startsWith(root))) continue;
     const text = ctx.read(file);
     if (text === null || text === undefined) continue;
     text.split('\n').forEach((line, index) => {

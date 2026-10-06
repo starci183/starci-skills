@@ -83,7 +83,7 @@ rules:
       The gate verifies reporting integrity; it is not product acceptance.
     verification:
       automated:
-        - scripts/gates/gate.mjs
+        - scripts/cli/gate-run.mjs
       manual:
         - Audit disabled rules, aliases and structural omissions separately.
 

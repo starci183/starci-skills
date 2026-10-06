@@ -72,7 +72,7 @@ test('the repository\'s own workflows give a plan that holds the full check set,
   const runs = plan.steps.map((s) => `${s.dir}: ${s.run.split('\n').join(' && ')}`);
   for (const expected of ['.: npm run check', '.: npm run starci --silent -- release clean-test']) assert.ok(runs.includes(expected), expected);
   for (const app of exampleApps(ROOT).map((a) => a.name)) {
-    for (const cmd of ['npm ci', 'npm run typecheck', 'npm run build:be', 'npm run build:fe']) assert.ok(runs.includes(`examples/${app}: ${cmd}`), `${app}: ${cmd}`);
+    for (const cmd of ['npm ci --ignore-scripts', 'npm run typecheck', 'npm run build:be', 'npm run build:fe']) assert.ok(runs.includes(`examples/${app}: ${cmd}`), `${app}: ${cmd}`);
   }
   assert.ok(runs.some((r) => r.startsWith('.: npm run starci --silent -- app lint')), 'starci app lint');
   assert.ok(!runs.some((r) => /: npm (?:run )?test(?::\w+)?(?: -- .*)?$/.test(r) && !r.startsWith('packages/grammar')), 'no spec suite');

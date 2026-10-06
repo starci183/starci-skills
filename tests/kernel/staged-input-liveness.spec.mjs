@@ -8,6 +8,9 @@ import {pathToFileURL} from 'node:url';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
+import {registerRepoWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
 import {classifyAgentScreen,stagedInputRegion,stagedInputRow} from '../../scripts/lib/terminal-liveness.mjs';
 
 // A Devin
@@ -72,19 +75,21 @@ const opFixture=(t,extra={})=>{
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});proofRepo(t,repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_PREAMBLE:PREAMBLE,
     // machineFileFor honours STARCI_TEST_MACHINE_FILE first; without it the spawned api lands on the
     // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
-    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),...extra};
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
+    ...adoptLaunchTrust(root,{roots:[repo],ref:'private staged-input fixture adoption'}),...extra};
   const run=(args,more={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...more}});
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
   const sends=()=>fs.readFileSync(logFile,'utf8').trim().split('\n').map(json).filter(e=>e?.argv?.[0]==='terminal'&&e.argv[1]==='send').map(e=>e.argv);
   const workflowId='wf-staged-input',jobId='job-staged-input';
+  registerRepoWorkflowWorktree({repo,workflowId,env});
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     seedWorkflow(ledger,{id:workflowId,state:{phase:'running',job:workflowId},

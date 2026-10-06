@@ -3,10 +3,10 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {runKernelCliEntry,withEnv} from './kernel-cli-entry.mjs';
 
 const HERE=fileURLToPath(import.meta.url);
 const ROOT=fileURLToPath(new URL('../..',import.meta.url));
-const API=new URL('../../scripts/kernel/cli.mjs',import.meta.url);
 const pause=new Int32Array(new SharedArrayBuffer(4));
 const sleep=ms=>Atomics.wait(pause,0,0,ms);
 const waitFor=(file,timeout=120_000,alive=()=>true)=>{
@@ -19,55 +19,7 @@ const waitFor=(file,timeout=120_000,alive=()=>true)=>{
   return true;
 };
 
-const withEnv=(patch,fn)=>{
-  const saved=new Map();
-  for(const [key,value] of Object.entries(patch??{})){
-    saved.set(key,process.env[key]);
-    if(value===null)delete process.env[key];
-    else process.env[key]=String(value);
-  }
-  return Promise.resolve().then(fn).finally(()=>{
-    for(const [key,value] of saved){
-      if(value===undefined)delete process.env[key];
-      else process.env[key]=value;
-    }
-  });
-};
-
-// Re-importing the real entry with a distinct URL executes its own top-level main() again.
-// Commands whose contract is a process exit remain fresh child processes in the spec.
-const runEntry=async({args,env,sequence})=>withEnv(env,async()=>{
-  const stdout=[];
-  const stderr=[];
-  const original={argv:process.argv,log:console.log,error:console.error,exitCode:process.exitCode};
-  let printed;
-  const output=new Promise(resolve=>{printed=resolve;});
-  process.argv=[process.execPath,fileURLToPath(API),...args];
-  process.exitCode=undefined;
-  console.log=(...parts)=>{stdout.push(parts.map(String).join(' '));printed();};
-  console.error=(...parts)=>{stderr.push(parts.map(String).join(' '));};
-  let outputTimer;
-  try{
-    const entry=new URL(API);
-    entry.searchParams.set('kernelApiFixtureRun',String(sequence));
-    await import(entry.href);
-    await Promise.race([
-      output,
-      new Promise((_,reject)=>{outputTimer=setTimeout(()=>reject(new Error(`CLI produced no output: ${args.join(' ')}`)),120_000);}),
-    ]);
-    await new Promise(resolve=>setImmediate(resolve));
-    return {status:process.exitCode??0,stdout:`${stdout.join('\n')}\n`,stderr:stderr.length?`${stderr.join('\n')}\n`:''};
-  }catch(error){
-    return {status:1,stdout:`${stdout.join('\n')}${stdout.length?'\n':''}`,
-      stderr:`${stderr.join('\n')}${stderr.length?'\n':''}${error?.stack??error}\n`};
-  }finally{
-    clearTimeout(outputTimer);
-    process.argv=original.argv;
-    process.exitCode=original.exitCode;
-    console.log=original.log;
-    console.error=original.error;
-  }
-});
+const runEntry=({args,env,sequence})=>withEnv(env,()=>runKernelCliEntry({args,tag:'kernelApiFixtureRun',sequence}));
 
 const serve=async root=>{
   fs.writeFileSync(path.join(root,'ready'),'ready');

@@ -12,6 +12,8 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {writeGreenProofs,proofRepo} from '../helpers/sonar-scan.mjs';
 import {fakeOrcaWorktrees} from '../helpers/fake-orca-worktrees.mjs';
 import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
+import {fileDispatchContract} from '../helpers/filed-contract.mjs';
+import {bindCurrentKernel} from '../helpers/bound-kernel.mjs';
 import {openMachine,TEST_REGISTRY_ENV} from '../../engine/db/machine.mjs';
 import {startKernelApiCli} from '../helpers/engine-db-kernel-api-fixture.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
@@ -40,6 +42,8 @@ const runApi=(...args)=>CLI.run(args,cliEnv());
 const runApiAsOwnerFresh=(ownerRoot,...args)=>spawnSync(process.execPath,[API,...args],
   {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_OWNER_ROOT:ownerRoot}});
 const runApiAsOwner=(ownerRoot,...args)=>CLI.run(args,cliEnv(ownerRoot));
+/** The call of the workflow's bound current Kernel (its seat is seeded once), the caller that may attest --by kernel. */
+const runApiAsKernel=(repo,workflowId,ownerRoot,...args)=>CLI.run(args,{...cliEnv(ownerRoot),...(()=>{const l=openLedger({file:ledgerFileFor(repo)});try{return l.db.prepare("SELECT 1 FROM signals WHERE scope='kernel' AND key=?").get(workflowId)?{ORCA_TERMINAL_HANDLE:'term-kernel-current'}:bindCurrentKernel(l,workflowId);}finally{l.close();}})()});
 /** A temp owner root holding a valid config.yaml — the shipped example with `patch` merged over it. */
 const ownerConfig=(t,patch)=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-'));
@@ -383,7 +387,7 @@ test('an owner-gate incident holds the jobs it names until the Kernel resolves i
     '--detail','assisted run receipt landed','--repo',repo,'--json');
   assert.notEqual(unanswered.status,0);
   assert.match(unanswered.stderr,/owner-claim-unproven/);
-  const resolved=api('incident','--workflow',wf,'--resolve',incidentId,'--detail','assisted run receipt landed','--by','kernel');
+  const resolved=runApiAsKernel(repo,wf,owner,'incident','--workflow',wf,'--resolve',incidentId,'--detail','assisted run receipt landed','--repo',repo,'--json','--by','kernel');
   assert.equal(resolved.status,0,resolved.stderr||resolved.stdout);
   assert.equal(out(resolved).changed,true);
   fr=frontier();
@@ -396,7 +400,7 @@ test('an owner-gate incident holds the jobs it names until the Kernel resolves i
   // without --holds the incident's own --op is held; any other kind holds nothing
   const plain=out(api('incident','--workflow',wf,'--kind','owner-gate','--op','integration.verify','--detail','consent'));
   assert.equal(because(held,frontier()).queuedBecause,'owner-gate');
-  api('incident','--workflow',wf,'--resolve',plain.incidentId,'--by','kernel');
+  runApiAsKernel(repo,wf,owner,'incident','--workflow',wf,'--resolve',plain.incidentId,'--repo',repo,'--json','--by','kernel');
   api('incident','--workflow',wf,'--kind','infra-provider','--op','integration.verify','--detail','not a gate');
   assert.equal(because(held,frontier()).queuedBecause,'ready');
   assert.notEqual(runApiAsOwnerFresh(owner,'incident','--workflow',wf,'--resolve','inc-nope','--repo',repo,'--json').status,0,
@@ -634,7 +638,7 @@ test('no open operation plus an open owner-gate incident is awaiting-owner',t=>{
   assert.equal(f.state,'awaiting-owner');
   assert.equal(f.actionable,false);
   assert.match(f.reason,/owner-gate incident/);
-  runApi('incident','--repo',repo,'--workflow',wf,'--resolve',out(raised).incidentId,'--by','kernel','--json');
+  runApiAsKernel(repo,wf,null,'incident','--repo',repo,'--workflow',wf,'--resolve',out(raised).incidentId,'--by','kernel','--json');
   assert.equal(status().state,'orphaned-frontier','resolved, the Kernel owes the next transition again');
 });
 
@@ -947,17 +951,17 @@ test('settle --verdict fail --report marks the job settled and appends an event'
 });
 
 test('cut pass requires the cut-aware green check names before settlement',t=>{
-  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-cut-settle',jobId='op-k7-cut';
+  const fx=fixture(t),wf='wf-k7-cut-settle',repo=fx.repo(wf),jobId='op-k7-cut';
   const proofDir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-k7-proofs-'));
   t.after(()=>fs.rmSync(proofDir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   seedGoal(repo,wf);
   seed(repo,ledger=>{
-    seedOp(ledger,wf,{jobId,opId:'docs.author',status:'running',dispatchId:'ctx-k7-cut',
-      payload:{opId:'docs.author',owned_paths:['docs/'],cut:{id:'cut-a',ordinal:1,total:2},
+    seedOp(ledger,wf,{jobId,opId:'code.refactor',status:'running',dispatchId:'ctx-k7-cut',
+      payload:{opId:'code.refactor',owned_paths:['docs/'],cut:{id:'cut-a',ordinal:1,total:2},
         orca:{dispatchId:'ctx-k7-cut',agentTerminalHandle:'term-k7-cut'}}});
-    const attemptId=writeFixtureContract(ledger,jobId,'# cut contract');
-    // docs.author owes its READ digest and document gate at settle (knowledge/op-gate.yaml opProofs): the green ones ride along.
-    fileFixtureReport(ledger,jobId,{outcome:'done',summary:'cut done',files:writeGreenProofs(proofDir)});
+    const {attemptId,packet}=fileDispatchContract(ledger,{jobId,repo});
+    // code.refactor owes the op loop's gate and READ digest at settle (knowledge/op-gate.yaml): the green ones, bound to its admission, ride along.
+    fileFixtureReport(ledger,jobId,{outcome:'done',summary:'cut done',files:writeGreenProofs(proofDir,{root:repo,binding:packet.context.gate_binding})});
     ledger.write.recordCheckRun({attemptId,name:'generic-green',phase:'verify',runner:'kernel',status:'pass',exitCode:0});
   });
   const refused=runApiFresh('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
@@ -984,6 +988,7 @@ test('incident writes an incidents row for the workflow',t=>{
 
 test('finish finishes the workflow, closes its inbox and keeps the goals rows',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-finish';
+  proofRepo(t,repo);
   seedGoal(repo,wf);
   const fakeRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-finish-'));
   t.after(()=>fs.rmSync(fakeRoot,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
@@ -999,6 +1004,8 @@ test('finish finishes the workflow, closes its inbox and keeps the goals rows',t
     }});
     ledger.write.setSignal({scope:'kernel',key:wf,workflowId:wf,token:'token-k7',value:{terminal:'term-k7-kernel',modelAttested:true}});
     // Finish needs the owner's handover approval (tests/kernel/handover.spec.mjs owns that gate).
+    seedOp(ledger,wf,{jobId:'job-k7-handover',opId:'handover.review',status:'succeeded',payload:{opId:'handover.review',owned_paths:['docs/']}});
+    fileDispatchContract(ledger,{jobId:'job-k7-handover',repo});
     ledger.appendEvent({workflowId:wf,entityType:'job',entityId:'job-k7-handover',kind:'handover-approved',payload:{jobId:'job-k7-handover',dispatchId:'ask-k7',answeredBy:'owner'}});
   });
   const goalsBefore=read(repo,l=>l.db.prepare('SELECT count(*) n FROM goals WHERE workflow_id=?').get(wf).n);

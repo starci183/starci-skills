@@ -42,10 +42,6 @@ function assertLedgerRoot(file,root,openReader){
 function unregisteredLedgerFile(root,env,openReader){
   const base=projectsRootFor(env),current=path.join(base,ledgerIdForRepo(root),'runtime.sqlite');
   if(fs.existsSync(current)){assertLedgerRoot(current,root,openReader);return current;}
-  // Preserve a pre-fix POSIX binding only when its own exact repo_root proves
-  // this repository. Never silently move, rename or merge an old folded store.
-  const legacy=path.join(base,ledgerIdFromKey(repoRootKey(root).toLowerCase()),'runtime.sqlite');
-  if(legacy!==current&&fs.existsSync(legacy)){assertLedgerRoot(legacy,root,openReader);return legacy;}
   return current;
 }
 /** Resolve the registry or exact owned store; the ledger owner supplies its verified read-only opener. */

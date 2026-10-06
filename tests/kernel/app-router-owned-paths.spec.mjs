@@ -15,6 +15,7 @@ import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
 import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
 import {fakeOrcaWorktrees} from '../helpers/fake-orca-worktrees.mjs';
+import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
 
 // Next.js App Router route segments are literal directory names that look like globs
 // (inc-ed9f28ec0561 nivo Modules, inc-e3e7d183c3d5 mia base-repos: interface.scaffold/implement
@@ -182,6 +183,7 @@ const apiFixture=t=>withLedger(t,({root,repoRoot:mainRepo,ledger,ledgerFile})=>{
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     // Accepted dispatches retain distinct terminal and attempt identities in the shared project ledger.
     STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',
+    ...adoptLaunchTrust(root,{roots:[mainRepo],ref:'private app-router fixture adoption'}),
   };
   // The side scheduler stays active: separate workflows exercise the shared project's path-lease fence.
   const run=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',mainRepo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});

@@ -1,10 +1,9 @@
-#!/usr/bin/env node
 // gate.mjs - THE gate of a code-writing op and of the Kernel landing (schema starci/gate@1).
 //
 //   starci gate run --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>]
 //
 // An op forces it every round of its READ-CODE-CHECK-FIX-REPORT loop (knowledge/op-gate.yaml) and attaches the JSON it prints;
-// `starci kernel settle` re-reads that JSON (scripts/kernel/gate-settle.mjs), and the Kernel's landing re-runs this script on the op branch
+// `starci kernel settle` re-reads that JSON (scripts/kernel/gate-settle.mjs), and the Kernel's landing re-runs `starci gate run` on the op branch
 // against its base, so a branch green in the op is green at landing. Over the changed files of the app at --root:
 //   1. `starci app lint --changed <files> --format json` at the app root (starci/lint@1: ESLint only on the changed files - the BE canon
 //      under be/, the FE canon under fe/ - plus the repository checks on them);
@@ -47,13 +46,12 @@ import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { show as gitShow } from '../api/git/show.mjs'; import { mergeTree } from '../api/git/merge-tree.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { lsTree } from '../api/git/ls-tree.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { revList } from '../api/git/rev-list.mjs'; import { mergeBase as mergeBaseOf } from '../api/git/merge-base.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs';
 import { pathKey, posixPath, sameResolvedPath } from '../lib/path-key.mjs';
-import { opContextOf } from '../guards/op-context.mjs';
 import { hfsEntry } from '../lib/package-at.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, locateDeclaration } from '../hfs/slots.mjs';
-import { setPriority } from '../api/process/set-priority.mjs'; import { runNode } from '../api/node/run-node.mjs';
+import { runNode } from '../api/node/run-node.mjs';
 import { sha256 } from '../../engine/digest.mjs';
-import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
+import { walkFiles } from '../lib/walk.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { canonContentDigest, installedFiles } from './canon-digest.mjs';
 import { PROFILES_FILE, loadPins } from './canon-pins.mjs';
@@ -605,10 +603,10 @@ export function installedCanonFindings(root, { runtime = runtimeRoot } = {}) {
 /**
  * Run the gate; resolves the starci/gate@1 report. Never throws for a tool failure: it lands in errors[] with exit 2.
  * Spec seams: `hfs` ({dir, bin}) the starci CLI to lint with and its @starci/hfs, default hfsEntry(root); `ts` the TypeScript module, default
- * the app's own install per project.
+ * the app's own install per project; `context` the op context (its gateBinding scopes the run), injected by the entry (scripts/cli/gate-run.mjs), default none.
  */
 export async function runGate({ root, base = null, changed = null, tests = null, main = null, hfs = null, ts: typescript = null,
-  context = opContextOf({ contract: true }) }) {
+  context = null }) {
   const at = new Date().toISOString();
   const report = { schema: GATE_SCHEMA, at, root: posixPath(path.resolve(root)), base: null, head: null, dirty: null, changed: [], exit: GATE_EXIT.toolFailed, ok: false,
     steps: { canon: null, merges: null, lint: null, codegen: null, build: [], tsc: [], tests: null, staleBuildInfo: [] }, inputs: [], counts: { new: 0, preexisting: 0 }, findings: [], errors: [] };
@@ -763,20 +761,4 @@ export function runDocGate({ tree = null, runtime = runtimeRoot, checks = docChe
   report.counts = { new: fresh.length, preexisting: 0 };
   report.findings = fresh.slice(0, LISTED_MAX);
   return finish(report);
-}
-
-async function gateMain(argv, { stdout = (s) => process.stdout.write(s) } = {}) {
-  let opts;
-  try { opts = parseGateArgs(argv); } catch (error) { stdout(`${JSON.stringify({ schema: GATE_SCHEMA, ok: false, exit: GATE_EXIT.toolFailed, errors: [error.message] })}\n`); return GATE_EXIT.toolFailed; }
-  const report = opts.profile === DOC_PROFILE ? runDocGate({ tree: opts.tree })
-    : await runGate({ root: opts.root ?? process.cwd(), base: opts.base, main: opts.main, changed: opts.changed, tests: opts.tests });
-  const text = `${JSON.stringify(report, null, 2)}\n`;
-  if (opts.out) { fs.mkdirSync(path.dirname(path.resolve(opts.out)), { recursive: true }); fs.writeFileSync(path.resolve(opts.out), text); }
-  stdout(text);
-  return report.exit;
-}
-
-if (isMain(import.meta.url)) {
-  setPriority();
-  process.exitCode = await gateMain(process.argv.slice(2));
 }

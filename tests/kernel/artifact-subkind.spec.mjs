@@ -14,6 +14,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { proofRepo } from '../helpers/sonar-scan.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
+import { adoptLaunchTrust } from '../helpers/launch-trust.mjs';
 
 // git's repository-local variables (git rev-parse --local-env-vars) never reach a fixture: a hook or alias run in a linked
 // worktree exports GIT_DIR, and every fixture git then writes THAT repository whatever cwd or -C it names - a temp dir's
@@ -162,19 +163,17 @@ test('typedLogGaps: step.start, step.end and a cmd.run per reported check are ow
 
 // --------------------------------------------------------------------------------- prompts delivered through their real launchers
 const promptWorld = (t) => {
-  const root = tmp(t, 'starci-prompt-delivery-'), repo = path.join(root, 'repo'), ownerRoot = path.join(root, 'owner');
+  const root = tmp(t, 'starci-prompt-delivery-'), repo = path.join(root, 'repo');
   if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'),
     { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
-  fs.mkdirSync(ownerRoot, { recursive: true });
   const fake = path.join(root, 'fake-orca.mjs');
   fs.writeFileSync(fake, FAKE_ORCA);
-  const example = fs.readFileSync(path.join(ROOT, 'config.example.yaml'), 'utf8');
-  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), example.replace(/^kernel:.*$/m, 'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}'));
+  const adopted = adoptLaunchTrust(root, { roots: [repo], ref: 'private prompt-delivery fixture adoption', kernel: 'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}' });
   const stateFile = path.join(root, 'orca-state.json');
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([fake]), STARCI_FAKE_ORCA_MODE: 'healthy',
     STARCI_FAKE_ORCA_LOG: path.join(root, 'orca-calls.jsonl'), STARCI_FAKE_ORCA_STATE: stateFile, STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'),
-    STARCI_LOCAL_ROOT: path.join(root, 'localappdata'), STARCI_OWNER_ROOT: ownerRoot };
+    STARCI_LOCAL_ROOT: path.join(root, 'localappdata'), ...adopted };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_GUARD_FILE']) delete env[key];
   const run = (script, ...args) => spawnSync(process.execPath, ['--loader', new URL('../helpers/workflow-startup-loader.mjs', import.meta.url).href, script, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env });
   const state = () => JSON.parse(fs.readFileSync(stateFile, 'utf8'));
