@@ -1989,7 +1989,7 @@ rules:
       - {kind: runtime, id: hook-shape, at: scripts/hfs/runtime-rules/hook-shape.mjs}
   - id: R226
     code: "RT_SPEC_OVER_BUDGET"
-    law: "Every recorded spec duration should stay within the shared per-file land budget in modules/kernel/spec-durations.yaml: for alpha.4 an over-budget spec is an advisory info finding ranked by its excess (it does not fail the check stage; the budget turns blocking in alpha.5), and every recorded spec path must still exist. An over-budget spec is repaired without removing tests or assertions: share a per-process fixture, remove per-test install or boot, inject the clock and never lengthen a timeout; stale rows are refreshed from the current land record."
+    law: "Every recorded spec duration should stay within the shared per-file land budget in modules/kernel/spec-durations.yaml: an over-budget spec is an advisory info finding ranked by its excess (it does not fail the check stage), and every recorded spec path must still exist. An over-budget spec is repaired without removing tests or assertions: share a per-process fixture, remove per-test install or boot, inject the clock and never lengthen a timeout; stale rows are refreshed from the current land record."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]

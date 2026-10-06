@@ -93,8 +93,8 @@ examples:
 editions:
   - full
 reads: the workflow and job rows (identity only), the caller (an op terminal is bound to its job)
-writes: "one row into the ledger's logs table (<repo>/.starciwork/runtime.sqlite since 2026-09-27;
-  scripts/kernel/ typed-logs.mjs) through the process's buffered log writer
+writes: "one row into the ledger's logs table (the project's runtime.sqlite;
+  scripts/kernel/typed-logs.mjs) through the process's buffered log writer
   (scripts/machine/log-writer.mjs: its own connection, one short transaction, committed before the
   verb returns; no events row, never inside a ledger transaction). The row is validated per kind,
   redacted (the push secret-scan patterns of scripts/lib/secret-patterns.mjs plus OTPs, bearer

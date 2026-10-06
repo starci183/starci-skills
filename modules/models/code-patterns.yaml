@@ -11,7 +11,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 36a72feb6f2c0b8e9dec2fea5f602028f5d018a01782a2e1164c14e5986ae5a5
+        value: 9ec23d44ca0c073c76e42606b31719bc23506568fa65452c866e7c7480c9de65
         files: 190
     sourceRuleRoots:
       - knowledge/patterns/be

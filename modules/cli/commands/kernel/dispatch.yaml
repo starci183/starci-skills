@@ -73,7 +73,7 @@ reads: the job row + its workflow — including the PERSISTED `starci kernel rou
   target repository, the records its `mustExist` reads resolve to and the bound records
   (prerequisite-unmet below); the model resolution through route-model
   (modules/models/selection.yaml — eligibility first, budget orders the eligible)
-attempt: "alpha.3: a queued or ready job launches (ready: a launch refused before its op took the
+attempt: "a queued or ready job launches (ready: a launch refused before its op took the
   contract returns the SAME job to ready, H13 - no new try, attemptConsumed false; a launch whose
   effect is unknown fences the job effect_unknown for reconcile). Once Orca returns the dispatch id,
   one op_attempts row (dispatch_seq, scratch_dir = the job scratch, terminal, run, task, pool) and
