@@ -53,7 +53,7 @@ export function trackHandles(t){
  * `path.relative` across two Windows drives can only answer with an absolute path, which those paths refuse.
  * Never inside the runtime tree: `tests/engine-db/runtime-tree-hygiene.spec.mjs` enforces that.
  */
-export const sameDriveTmp=()=>path.join(path.parse(process.cwd()).root,'starci-tmp');
+export const sameDriveTmp=()=>process.platform==='win32'?path.join(path.parse(process.cwd()).root,'starci-tmp'):os.tmpdir();
 
 /**
  * Resolve once `pid` has exited (true) or `timeoutMs` passed (false). A detached child a spec launched
