@@ -91,7 +91,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   const red = acc.findings.filter((f) => f.code !== OWNER_GATE_CODE);
   gates.push({ name: 'draw-acceptance', command: cmd('scripts/work/draw/draw-acceptance.mjs', ['--repo', slash(root), '--files', bound.map((b) => rel(root, b)).join(',')]),
     exitCode: red.length ? 1 : 0, codes: uniq(red.map((f) => f.code)).sort(byCodeUnit), failing: uniq(red.map((f) => fileOf(f, recordFile))),
-    evidence: red.length ? `${red.length} finding(s): ${red.slice(0, 6).map((f) => `[${f.code}] ${f.detail}`).join(' | ').slice(0, 1500)}` : `records ${acc.records.join(', ') || '(none)'} accepted by the machine gates`, findings: red.slice(0, 50) });
+    evidence: red.length ? `${red.length} finding(s): ${red.slice(0, 6).map((f) => '[' + f.code + '] ' + f.detail).join(' | ').slice(0, 1500)}` : `records ${acc.records.join(', ') || '(none)'} accepted by the machine gates`, findings: red.slice(0, 50) });
 
   // 2. draw-metrics: the settle re-render and re-measure of every live part.
   if (remeasure) {
@@ -99,23 +99,31 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
     try { m = await (runners.metrics ?? settleDrawMetricFindings)({ repo: root, files: bound }); } catch (error) { m = { findings: [{ code: 'DRAW_METRICS_UNVERIFIED', path: recordFile, detail: `the re-measure could not run: ${String(error?.message ?? error).split('\n')[0]}` }], loops: [] }; }
     gates.push({ name: 'draw-metrics', command: cmd('scripts/work/draw-loop.mjs', ['verify', '--ui', slash(uiDir), '--repo', slash(root)]),
       exitCode: m.findings.length ? 1 : 0, codes: uniq(m.findings.flatMap((f) => [f.code, ...(f.codes ?? [])])).sort(byCodeUnit), failing: uniq(m.findings.map((f) => fileOf(f, recordFile))),
-      evidence: m.findings.length ? `${m.findings.length} finding(s): ${m.findings.slice(0, 4).map((f) => `[${f.code}] ${f.detail}`).join(' | ').slice(0, 1500)}` : 'every live part re-rendered and re-measured green', findings: m.findings.slice(0, 50) });
+      evidence: m.findings.length ? `${m.findings.length} finding(s): ${m.findings.slice(0, 4).map((f) => '[' + f.code + '] ' + f.detail).join(' | ').slice(0, 1500)}` : 'every live part re-rendered and re-measured green', findings: m.findings.slice(0, 50) });
   }
 
   // 3. validate-strict on the record dir; each refused record is a failing file (a child outside the slice is foreign).
   const v = runners.validate ? await runners.validate(uiDir, root) : spawnJson('packages/cli/bin/starci.mjs', ['runtime', 'validate', slash(uiDir), '--strict', '--json'], root);
   const refused = refusalsOf(v.doc?.refused, SKILL_ROOT, root);
+  const validateExit = v.doc ? Number(Boolean(v.doc.ok === false || refused.length)) : (v.exitCode || 2);
+  let validateEvidence;
+  if (!v.doc) validateEvidence = `validate did not answer JSON: ${v.stderr.slice(0, 400)}`;
+  else if (refused.length) validateEvidence = `${refused.length} refusal(s): ${refused.slice(0, 5).map((r) => r.file + ' [' + r.code + '] ' + r.message).join(' | ').slice(0, 1500)}`;
+  else validateEvidence = 'strict validation: 0 refused';
   gates.push({ name: 'validate-strict', command: `starci runtime validate ${uiRel} --strict --json`,
-    exitCode: v.doc ? (v.doc.ok === false || refused.length ? 1 : 0) : (v.exitCode || 2), codes: uniq(refused.map((r) => r.code)).sort(byCodeUnit), failing: uniq(refused.map((r) => r.file)),
-    evidence: v.doc ? (refused.length ? `${refused.length} refusal(s): ${refused.slice(0, 5).map((r) => `${r.file} [${r.code}] ${r.message}`).join(' | ').slice(0, 1500)}` : 'strict validation: 0 refused') : `validate did not answer JSON: ${v.stderr.slice(0, 400)}` });
+    exitCode: validateExit, codes: uniq(refused.map((r) => r.code)).sort(byCodeUnit), failing: uniq(refused.map((r) => r.file)), evidence: validateEvidence });
 
   // 4. shell-conformance.
   const s = runners.shell ? await runners.shell(uiDir, root) : spawnJson('scripts/work/ui/shell-conformance.mjs', [slash(uiDir), '--json'], root);
   const sFindings = [...(s.doc?.refused ?? []), ...(s.doc?.findings ?? []).filter((f) => f?.level === 'refuse')];
   const sCode = (f) => (typeof f === 'string' ? /\[([A-Z0-9_]+)\]/.exec(f)?.[1] : f?.code) ?? null;
+  const shellExit = s.doc ? Number(s.doc.ok === false) : (s.exitCode || 2);
+  let shellEvidence;
+  if (!s.doc) shellEvidence = `shell-conformance did not answer JSON: ${s.stderr.slice(0, 400)}`;
+  else if (s.doc.ok === false) shellEvidence = `${sFindings.length} refusal(s): ${sFindings.slice(0, 5).map((f) => (typeof f === 'string' ? f : '[' + f.code + '] ' + (f.message ?? f.detail ?? ''))).join(' | ').slice(0, 1500)}`;
+  else shellEvidence = 'shell conformance: 0 refused';
   gates.push({ name: 'shell-conformance', command: cmd('scripts/work/ui/shell-conformance.mjs', [uiRel, '--json']),
-    exitCode: s.doc ? (s.doc.ok === false ? 1 : 0) : (s.exitCode || 2), codes: uniq(sFindings.map(sCode)).sort(byCodeUnit), failing: s.doc?.ok === false ? [recordFile] : [],
-    evidence: s.doc ? (s.doc.ok === false ? `${sFindings.length} refusal(s): ${sFindings.slice(0, 5).map((f) => (typeof f === 'string' ? f : `[${f.code}] ${f.message ?? f.detail ?? ''}`)).join(' | ').slice(0, 1500)}` : 'shell conformance: 0 refused') : `shell-conformance did not answer JSON: ${s.stderr.slice(0, 400)}` });
+    exitCode: shellExit, codes: uniq(sFindings.map(sCode)).sort(byCodeUnit), failing: s.doc?.ok === false ? [recordFile] : [], evidence: shellEvidence });
 
   let record = null;
   try { record = parseYaml(fs.readFileSync(path.join(uiDir, 'index.yaml'), 'utf8')); } catch { record = null; }
@@ -125,10 +133,11 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   const layer = runners.layer ? await runners.layer(layerParts) : await layerFindingsForParts(layerParts);
   const layerRed = layer.filter((r) => r.findings.length);
   const layerFindings = layerRed.flatMap((r) => r.findings.map((f) => ({ ...f, path: rel(root, r.part) })));
+  const unmeasuredParts = layer.filter((r) => !r.forms).length;
   gates.push({ name: 'draw-layer', command: cmd('scripts/work/draw/draw-layer.mjs', [uiRel, '--playwright', '<product dir>']),
     exitCode: layerFindings.length ? 1 : 0, codes: uniq(layerFindings.map((f) => f.code)).sort(byCodeUnit), failing: uniq(layerFindings.map((f) => fileOf(f, recordFile))),
-    evidence: layerFindings.length ? `${layerFindings.length} finding(s): ${layerFindings.slice(0, 4).map((f) => `[${f.code}] ${f.detail}`).join(' | ').slice(0, 1500)}`
-      : `${layer.length} live part(s): every form control on a surface nested, every form region capped${layer.some((r) => !r.forms) ? ` (${layer.filter((r) => !r.forms).length} without a recorded measure; draw-metrics re-measures)` : ''}`, findings: layerFindings.slice(0, 50) });
+    evidence: layerFindings.length ? `${layerFindings.length} finding(s): ${layerFindings.slice(0, 4).map((f) => '[' + f.code + '] ' + f.detail).join(' | ').slice(0, 1500)}`
+      : `${layer.length} live part(s): every form control on a surface nested, every form region capped${unmeasuredParts && ' (' + unmeasuredParts + ' without a recorded measure; draw-metrics re-measures)' || ''}`, findings: layerFindings.slice(0, 50) });
 
   // 5. draw-loop: every loop a live part names finished and passed.
   const loops = [];
@@ -142,17 +151,18 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   const unfinished = loops.filter((l) => l.outcome !== 'passed');
   gates.push({ name: 'draw-loop', command: cmd('scripts/work/draw-loop.mjs', ['status', '--out', '<loop dir>']), exitCode: unfinished.length || (record && !loops.length && livePartsOf(uiDir, record).length) ? 1 : 0,
     codes: uniq(unfinished.flatMap((l) => l.remaining)).sort(byCodeUnit), failing: unfinished.length ? [recordFile] : [],
-    evidence: loops.length ? loops.map((l) => `${l.ref}: ${l.outcome ?? 'not finished'} (best round ${l.best ?? '-'}${l.remaining.length ? `; remaining ${uniq(l.remaining).join(', ')}` : ''})`).join('; ') : 'no live part names a draw loop' });
+    evidence: loops.length ? loops.map((l) => l.ref + ': ' + (l.outcome ?? 'not finished') + ' (best round ' + (l.best ?? '-') + (l.remaining.length ? '; remaining ' + uniq(l.remaining).join(', ') : '') + ')').join('; ') : 'no live part names a draw loop' });
 
   const failed = gates.filter((g) => g.exitCode !== 0);
   const checks = gates.map(({ name, command, exitCode, codes, failing, evidence }) => ({ name, command, exitCode, evidence, ...(exitCode !== 0 && codes.length ? { codes } : {}), ...(exitCode !== 0 && failing.length ? { failing } : {}) }));
+  let next;
+  if (failed.length) next = `red: ${failed.map((g) => g.name + ' [' + (g.codes.join(', ') || 'exit ' + g.exitCode) + ']').join('; ')} - fix and re-run this command; if a red gate is not yours to fix, report blocked naming it (report.checks below carry the failing files)`;
+  else if (owner.length) next = 'every machine gate is green; the owner gate is owed: file the draw-review ask (starci work draw-review question --job <id>) and report ask with these checks';
+  else next = 'every gate is green: report with these checks';
   return {
     schema: GATES_SCHEMA, ui: uiRel, ok: failed.length === 0, gates, checks,
     owner: { owed: owner.length > 0, detail: owner.map((f) => f.detail).join('; ') || null },
-    next: failed.length
-      ? `red: ${failed.map((g) => `${g.name} [${g.codes.join(', ') || 'exit ' + g.exitCode}]`).join('; ')} - fix and re-run this command; if a red gate is not yours to fix, report blocked naming it (report.checks below carry the failing files)`
-      : owner.length ? 'every machine gate is green; the owner gate is owed: file the draw-review ask (starci work draw-review question --job <id>) and report ask with these checks'
-        : 'every gate is green: report with these checks',
+    next,
   };
 }
 
@@ -163,7 +173,7 @@ async function main(argv) {
   const r = await drawGates({ ui: path.resolve(repo, ui), repo, files: (get('--files') ?? '').split(',').map((s) => s.trim()).filter(Boolean), remeasure: !argv.includes('--no-remeasure') });
   if (get('--checks-out')) fs.writeFileSync(path.resolve(get('--checks-out')), `${JSON.stringify({ checks: r.checks }, null, 2)}\n`);
   if (argv.includes('--json')) process.stdout.write(`${JSON.stringify(r, null, 2)}\n`);
-  else process.stdout.write([`${r.ok ? 'GREEN' : 'RED'}: ${r.ui}`, ...r.gates.map((g) => `  ${g.exitCode === 0 ? 'ok  ' : 'FAIL'} ${g.name}${g.codes.length && g.exitCode ? ` [${g.codes.join(', ')}]` : ''}: ${g.evidence.slice(0, 300)}`),
+  else process.stdout.write([`${r.ok ? 'GREEN' : 'RED'}: ${r.ui}`, ...r.gates.map((g) => `  ${g.exitCode === 0 ? 'ok  ' : 'FAIL'} ${g.name}${g.codes.length && g.exitCode ? ' [' + g.codes.join(', ') + ']' : ''}: ${g.evidence.slice(0, 300)}`),
     `  owner gate: ${r.owner.owed ? 'owed (file the draw-review ask)' : 'not owed'}`, `next: ${r.next}`].join('\n') + '\n');
   return r.ok ? 0 : 1;
 }

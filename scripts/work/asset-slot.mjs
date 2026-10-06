@@ -150,7 +150,9 @@ export function slotsOfHtml(html, { htmlFile = null, masters = new Set() } = {})
     }
     const master = Boolean(actual && masters.has(actual));
     const promptAttr = (el.attrs[ASSET_PROMPT_ATTR] ?? img.attrs[ASSET_PROMPT_ATTR] ?? '').trim();
-    const promptFile = promptAttr && htmlFile ? path.resolve(path.dirname(htmlFile), promptAttr) : (actual ? file.replace(/\.[^.\\/]+$/, '.prompt.txt') : null);
+    let promptFile = null;
+    if (promptAttr && htmlFile) promptFile = path.resolve(path.dirname(htmlFile), promptAttr);
+    else if (actual) promptFile = file.replace(/\.[^.\\/]+$/, '.prompt.txt');
     const prompt = promptFile && isFile(promptFile) ? promptFile : null;
     out.push({ id, tag: el.tag, component: el.attrs[COMPONENT_ATTR] ?? null, src, sha256: sha, file: actual ? file : null, master, prompt,
       filled: Boolean(sha && actual && sha === actual && !master && prompt) });
@@ -244,7 +246,10 @@ function main(argv) {
   const slots = assetSlotsOf(targets);
   const unrequested = slots.filter((s) => !s.requested);
   if (json) process.stdout.write(`${JSON.stringify({ ok: cmd === 'list' || !unrequested.length, slots }, null, 2)}\n`);
-  else process.stdout.write(`${slots.map((s) => `${s.filled ? 'filled' : 'OWED  '} ${s.key}${s.requested ? '' : ' (NO REQUEST in asset-request.md)'} ${s.html}`).join('\n') || 'no asset slots'}\n`);
+  else {
+    const lines = slots.map((s) => `${s.filled ? 'filled' : 'OWED  '} ${s.key}${s.requested ? '' : ' (NO REQUEST in asset-request.md)'} ${s.html}`).join('\n');
+    process.stdout.write(`${lines || 'no asset slots'}\n`);
+  }
   return cmd === 'check' && unrequested.length ? 1 : 0;
 }
 

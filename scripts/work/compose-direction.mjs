@@ -200,7 +200,10 @@ function composeOne({ uiDir, content, breakpoint, theme, state = 'default', pres
   if (scrimUsed !== null) composite.scrim = scrimUsed;
   if (surface === 'layout') {
     const child = keyRect(cropImage(image, rect), SLOT_KEY);
-    if (!child || child.fill < SLOT_FILL_MIN) return { ok: false, error: `a layout drawing must leave its page slot as a solid #FF00FF rectangle (found ${child ? `fill ${child.fill.toFixed(3)}` : 'none'})` };
+    if (!child || child.fill < SLOT_FILL_MIN) {
+      const found = child ? `fill ${child.fill.toFixed(3)}` : 'none';
+      return { ok: false, error: `a layout drawing must leave its page slot as a solid #FF00FF rectangle (found ${found})` };
+    }
     composite.childSlot = { x: rect.x + child.rect.x, y: rect.y + child.rect.y, width: child.rect.width, height: child.rect.height };
   }
   composite.pixelSha256 = pixelSha256(image);
@@ -208,7 +211,9 @@ function composeOne({ uiDir, content, breakpoint, theme, state = 'default', pres
   const bytes = encodePng(image);
   const promptPath = prompt ?? contentAbs.replace(/\.png$/i, '.prompt.txt');
   const contentAsset = { path: rel(contentAbs), role: 'direction-content', sha256: composite.content.sha256, width: contentImage.width, height: contentImage.height, breakpoint, theme, generation: { tool, promptPath: rel(path.resolve(promptPath)), mode: pres === 'overlay' ? 'panel' : 'slot' } };
-  const baseRef = composite.layout ? resolveImageRef(workRoot, composite.layout.capture, uiRecords) : composite.host ? resolveImageRef(workRoot, composite.host.asset, uiRecords) : null;
+  let baseRef = null;
+  if (composite.layout) baseRef = resolveImageRef(workRoot, composite.layout.capture, uiRecords);
+  else if (composite.host) baseRef = resolveImageRef(workRoot, composite.host.asset, uiRecords);
   const asset = {
     path: rel(outFile), role: 'direction', sha256: sha256Of(bytes), width: image.width, height: image.height, breakpoint, theme,
     generation: { tool, promptPath: rel(path.resolve(promptPath)), mode: 'composite', inputRefs: [repoRel(contentAbs), ...(baseRef ? [repoRel(baseRef)] : [])] },
@@ -258,7 +263,9 @@ export function composeDirectionMain(argv = []) {
   });
   if (!result.ok) return { exitCode: 1, text: `compose-direction: ${result.error}\n` };
   const payload = { ok: true, wrote: slash(result.outFile), promptExists: result.promptExists, assets: [result.contentAsset, result.asset] };
-  return { exitCode: 0, text: argv.includes('--json') ? `${JSON.stringify(payload, null, 2)}\n` : `wrote ${slash(result.outFile)}\nrecord these under the ui record's assets (and ui.assets):\n${JSON.stringify(payload.assets, null, 2)}\n${result.promptExists ? '' : 'WARNING: the content prompt file does not exist yet - keep the exact prompt beside the content image.\n'}` };
+  if (argv.includes('--json')) return { exitCode: 0, text: `${JSON.stringify(payload, null, 2)}\n` };
+  const warning = result.promptExists ? '' : 'WARNING: the content prompt file does not exist yet - keep the exact prompt beside the content image.\n';
+  return { exitCode: 0, text: `wrote ${slash(result.outFile)}\nrecord these under the ui record's assets (and ui.assets):\n${JSON.stringify(payload.assets, null, 2)}\n${warning}` };
 }
 
 if (isMain(import.meta.url)) {

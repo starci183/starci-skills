@@ -125,7 +125,7 @@ export function resolveDrawGrammar({ file = null, productDir, skillRoot = SKILL_
     inRange: satisfiesRange(pick.version, productRange), why: product ? `the product's installed ${GRAMMAR_PACKAGE}@${product.version} does not satisfy the drawing (it fails to type-check); ${pick.version} does` : `the product has no built ${GRAMMAR_PACKAGE} install` } : null;
   return {
     ok: Boolean(pick), pick, grammarSource: pick ? `${pick.source}@${pick.version}` : null, productVersion: product?.version ?? null, productRange, upgradeOwed, attempts,
-    ...(pick ? {} : { error: candidates.length ? `no grammar candidate type-checks the drawing (${candidates.map((c) => `${c.source}@${c.version}${c.dist && !c.dist.ok ? ` - its dist is ${c.dist.state}: ${c.dist.detail}; run npm run build in packages/grammar` : ''}`).join(', ')})` : `no built ${GRAMMAR_PACKAGE} (product install, ${path.join(skillRoot, 'packages', 'grammar', 'dist')} or the main worktree's; run npm run build in packages/grammar, or pass --grammar-dist)` }),
+    ...(pick ? {} : { error: candidates.length ? `no grammar candidate type-checks the drawing (${candidates.map((candidate) => candidate.source + '@' + candidate.version + (candidate.dist && !candidate.dist.ok ? ' - its dist is ' + candidate.dist.state + ': ' + candidate.dist.detail + '; run npm run build in packages/grammar' : '')).join(', ')})` : `no built ${GRAMMAR_PACKAGE} (product install, ${path.join(skillRoot, 'packages', 'grammar', 'dist')} or the main worktree's; run npm run build in packages/grammar, or pass --grammar-dist)` }),
   };
 }
 
@@ -146,7 +146,12 @@ async function main(argv) {
   if (!productDir) { process.stderr.write('use: starci work draw-grammar --product <app dir> [--file <X.draw.tsx>] [--grammar auto|product|claude-dist] [--json]\n'); return 2; }
   const r = resolveDrawGrammar({ file: val('--file') ? path.resolve(val('--file')) : null, productDir: path.resolve(productDir), prefer: val('--grammar') ?? 'auto', grammarDist: val('--grammar-dist') });
   if (argv.includes('--json')) process.stdout.write(`${JSON.stringify(r, null, 2)}\n`);
-  else process.stdout.write(`${r.ok ? `grammar ${r.grammarSource}` : `UNRESOLVED: ${r.error}`}${r.upgradeOwed ? `; product upgrade owed ${r.upgradeOwed.from} -> ${r.upgradeOwed.to} (range ${r.upgradeOwed.range}, in range ${r.upgradeOwed.inRange})` : ''}\n${r.attempts.map((a) => `  ${a.source}@${a.version}: ${a.ok ? 'type-checks' : `${a.errors.length} error(s): ${a.errors.slice(0, 3).map((e) => `${e.code} ${e.message}`).join(' | ')}`}`).join('\n')}\n`);
+  else {
+    const summary = r.ok ? 'grammar ' + r.grammarSource : 'UNRESOLVED: ' + r.error;
+    const upgrade = r.upgradeOwed ? `; product upgrade owed ${r.upgradeOwed.from} -> ${r.upgradeOwed.to} (range ${r.upgradeOwed.range}, in range ${r.upgradeOwed.inRange})` : '';
+    const attempts = r.attempts.map((a) => '  ' + a.source + '@' + a.version + ': ' + (a.ok ? 'type-checks' : a.errors.length + ' error(s): ' + a.errors.slice(0, 3).map((e) => e.code + ' ' + e.message).join(' | '))).join('\n');
+    process.stdout.write(`${summary}${upgrade}\n${attempts}\n`);
+  }
   return r.ok ? 0 : 1;
 }
 

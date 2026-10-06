@@ -202,7 +202,8 @@ export function promptPaletteBlock(brand, { name = null } = {}) {
     seen.add(key);
     lines.push(`- ${e.role ?? 'other'}: ${e.label} ${e.hex}${e.isPrimary && e.role !== 'primary' ? ' (the primary colour)' : ''}`);
   }
-  const head = `Brand colours${name ? ` (${name})` : ''} - use exactly these; every other saturated hue is refused (PALETTE_OFF_BRAND):`;
+  const label = name ? ` (${name})` : '';
+  const head = `Brand colours${label} - use exactly these; every other saturated hue is refused (PALETTE_OFF_BRAND):`;
   const rule = primary
     ? `Primary buttons, links, selected rows, focus rings, active tabs and every call to action are ${primary.hex} (${primary.label}). Never a default blue or any colour not listed; status colours only for their status.`
     : 'The brand declares no primary colour: use only the listed colours.';
@@ -261,7 +262,9 @@ export function measurePalette(image, palette, { exclude = null } = {}) {
     const at = (y * width + x) * 4;
     if (data[at + 3] < ALPHA_FLOOR) return 'ink';
     const v = classify(data[at], data[at + 1], data[at + 2]);
-    return v.kind === 'ink' ? 'ink' : v.kind === 'brand' ? 'brand' : v.name;
+    if (v.kind === 'ink') return 'ink';
+    if (v.kind === 'brand') return 'brand';
+    return v.name;
   };
   const coherent = (x, y, v) => {
     const own = v.kind === 'brand' ? 'brand' : v.name;
@@ -342,7 +345,14 @@ const measureImage = (image, palette, artwork = []) => measurePalette(image, pal
 const pct = (v) => `${(v * 100).toFixed(v < 0.01 ? 2 : 1).replace(/\.0$/, '')}%`;
 
 /** One offender, as the finding names it: colour, hue, area share and the nearest brand token. */
-const describeOffender = (o) => `${o.name} ${o.hex} on ${pct(o.share)} of the coloured area (${pct(o.area)} of the image), nearest brand token ${o.nearest ? `${o.nearest.token} ${o.nearest.hex}${o.nearest.role ? ` (${o.nearest.role})` : ''} at deltaE ${o.nearest.deltaE}` : '(none)'}`;
+const describeOffender = (o) => {
+  let nearest = '(none)';
+  if (o.nearest) {
+    const role = o.nearest.role ? ` (${o.nearest.role})` : '';
+    nearest = `${o.nearest.token} ${o.nearest.hex}${role} at deltaE ${o.nearest.deltaE}`;
+  }
+  return `${o.name} ${o.hex} on ${pct(o.share)} of the coloured area (${pct(o.area)} of the image), nearest brand token ${nearest}`;
+};
 
 /**
  * shell-conformance findings for one image. `subject` says what the image is (a drawn part, a composite, a layout
@@ -359,7 +369,8 @@ export function paletteFindings({ file, shownAs, brand, palette = null, subject 
   const out = [];
   if (m.refused.length) {
     const primary = pal.primary ? ` The brand's primary is ${pal.primary.label} ${pal.primary.hex}: redraw every button, link, selection and accent in it.` : '';
-    out.push(finding(level, PALETTE_CODES.offBrand, `${shownAs}: the ${subject} is painted in ${m.refused.length === 1 ? 'a colour' : `${m.refused.length} colours`} the brand does not declare - ${m.refused.map(describeOffender).join('; ')}.${primary}`));
+    const colours = m.refused.length === 1 ? 'a colour' : `${m.refused.length} colours`;
+    out.push(finding(level, PALETTE_CODES.offBrand, `${shownAs}: the ${subject} is painted in ${colours} the brand does not declare - ${m.refused.map(describeOffender).join('; ')}.${primary}`));
   }
   if (pal.primary && pal.primary.color.oklch.C >= CHROMATIC_TOKEN && !m.primary.present && m.refused.length) {
     out.push(finding(level, PALETTE_CODES.primaryAbsent, `${shownAs}: the brand primary ${pal.primary.label} ${pal.primary.hex} appears nowhere in the ${subject}, while ${m.refused[0].name} ${m.refused[0].hex} covers ${pct(m.refused[0].share)} of its coloured area - the off-brand colour stands in for the primary action`));
@@ -396,7 +407,9 @@ export async function scanTargets(workRoot) {
     if (record?.schema === 'work/ui-screen@1') {
       const seen = new Set();
       for (const a of assetsOf(record)) {
-        const kind = a.composite ? 'composite' : a.role === 'direction-content' || isPartName(a.path) ? 'part' : null;
+        let kind = null;
+        if (a.composite) kind = 'composite';
+        else if (a.role === 'direction-content' || isPartName(a.path)) kind = 'part';
         if (!kind || seen.has(a.path)) continue;
         seen.add(a.path);
         targets.push({ record: record.id, recordFile: index, kind, file: path.join(dir, a.path), declared: true, ...(a.composite ? { composite: a.composite, uiDir: dir } : {}) });
@@ -418,7 +431,7 @@ export async function scanTargets(workRoot) {
     for (const node of appNamesOf(shell).flatMap((name) => nodesOf(treeOf(shell, name)))) for (const bp of breakpoints) for (const th of themes) for (const c of capturesAt(shell, node, bp, th)) {
       if (seen.has(c.rel)) continue;
       seen.add(c.rel);
-      targets.push({ record: `shell ${node.id}${c.destination ? ` (${c.destination})` : ''}`, recordFile: shellFile, kind: 'layout capture', file: captureFileOf(path.join(workRoot, 'shell'), c), declared: true });
+      targets.push({ record: 'shell ' + node.id + (c.destination ? ' (' + c.destination + ')' : ''), recordFile: shellFile, kind: 'layout capture', file: captureFileOf(path.join(workRoot, 'shell'), c), declared: true });
     }
   }
   return targets;
@@ -456,14 +469,14 @@ async function main(argv) {
     const findings = paletteFindings({ file, shownAs: slash(file), brand: b.brand, palette, subject: 'image', at: slash(file) });
     const refused = findings.filter((f) => f.level === 'refuse');
     if (json) return { exitCode: refused.length ? 1 : 0, text: `${JSON.stringify({ file: slash(file), findings, measure: measureImage(readImage(file), palette, artworkExclusions({ file, palette })) }, null, 2)}\n` };
-    return { exitCode: refused.length ? 1 : 0, text: `${findings.map((f) => `  ${f.level.toUpperCase()} ${f.message} [${f.code}]`).join('\n')}${findings.length ? '\n' : ''}${refused.length ? 'FAIL' : 'OK'}: brand palette\n` };
+  return { exitCode: refused.length ? 1 : 0, text: `${findings.map((f) => '  ' + f.level.toUpperCase() + ' ' + f.message + ' [' + f.code + ']').join('\n')}${findings.length ? '\n' : ''}${refused.length ? 'FAIL' : 'OK'}: brand palette\n` };
   }
   if (arg('--scan')) {
     const result = await scanWork(path.resolve(arg('--scan')));
     if (json) return { exitCode: 0, text: `${JSON.stringify(result, null, 2)}\n` };
     if (!result.brand) return { exitCode: 2, text: `${result.error}\n` };
     const bad = result.results.filter((r) => r.findings.some((f) => f.level === 'refuse'));
-    const lines = bad.map((r) => `${r.record}  ${r.file}  [${r.kind}${r.declared ? '' : ', undeclared'}]\n    ${r.refused.map(describeOffender).join('\n    ')}${r.findings.some((f) => f.code === PALETTE_CODES.primaryAbsent) ? `\n    primary ${r.primary.token} ${r.primary.hex} absent` : ''}`);
+    const lines = bad.map((r) => `${r.record}  ${r.file}  [${r.kind}${r.declared ? '' : ', undeclared'}]\n    ${r.refused.map(describeOffender).join('\n    ')}${r.findings.some((f) => f.code === PALETTE_CODES.primaryAbsent) ? '\n    primary ' + r.primary.token + ' ' + r.primary.hex + ' absent' : ''}`);
     return { exitCode: 0, text: `${lines.join('\n')}${lines.length ? '\n' : ''}${bad.length} of ${result.results.length} images off-brand (brand ${result.brand.file} rev ${result.brand.rev}, primary ${result.brand.primary?.hex ?? 'none'})\n` };
   }
   return { exitCode: 2, text: 'Usage: starci work brand-palette --prompt <work-root> | --check <png> --brand <work-root> [--json] | --scan <work-root> [--json]\n' };

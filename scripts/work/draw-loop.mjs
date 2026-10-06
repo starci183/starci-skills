@@ -133,7 +133,7 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
 
   // 1. The capture itself (rendered-DOM ownership is judged by the DNA metric).
   const redOf = (c) => list(c.record?.failures).filter((f) => f !== 'off-grammar-dom');
-  push('render', captures.flatMap((c) => (c.record && (c.record.ok !== false || !redOf(c).length) ? [] : [finding('render', DRAW_RENDER_RED, `${stemOf(c.png)}: ${c.record ? `red capture (${redOf(c).join(', ')})` : 'no draw-render record'}`)])));
+  push('render', captures.flatMap((c) => (c.record && (c.record.ok !== false || !redOf(c).length) ? [] : [finding('render', DRAW_RENDER_RED, `${stemOf(c.png)}: ${c.record ? 'red capture (' + redOf(c).join(', ') + ')' : 'no draw-render record'}`)])));
 
   // 2. DNA: every element a DNA component, notices Alert, ratios Meter.
   const proposalFiles = proposalFilesFor(html, [...proposalDirs, ...(ui?.dir ? [ui.dir] : [])]);
@@ -143,8 +143,7 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
   const assetRequests = assetRequestIdsFor(html, [...proposalDirs, ...(ui?.dir ? [ui.dir] : [])]);
   // A real-component drawing: every painting element of the rendered DOM belongs to a grammar component (draw-render
   // record `ownership`); a hand-drawn html one: every element carries its DNA attribute.
-  const ownership = captures.flatMap((c) => (c.record?.ownership ? (c.record.ownership.unownedCount ? [finding('dna', DOM_OFF_GRAMMAR, `${stemOf(c.png)} rendered DOM: ${c.record.ownership.unownedCount} painting element(s) owned by a drawn layout element, not a grammar component - ${list(c.record.ownership.unowned).slice(0, 5).join('; ')}`)] : [])
-    : component ? [finding('dna', DRAW_METRICS_UNVERIFIED, `${stemOf(c.png)}: the capture measured no rendered-DOM ownership`)] : []));
+  const ownership = captures.flatMap((c) => { if (c.record?.ownership) return c.record.ownership.unownedCount ? [finding('dna', DOM_OFF_GRAMMAR, `${stemOf(c.png)} rendered DOM: ${c.record.ownership.unownedCount} painting element(s) owned by a drawn layout element, not a grammar component - ${list(c.record.ownership.unowned).slice(0, 5).join('; ')}`)] : []; if (component) return [finding('dna', DRAW_METRICS_UNVERIFIED, `${stemOf(c.png)}: the capture measured no rendered-DOM ownership`)]; return []; });
   push('dna', [...(component ? ownership : dnaFindings(text, { dna: loadDna({ family: family ?? undefined }), proposals, label, assetRequests }).map((f) => finding('dna', f.code, f.detail, { count: f.count }))), ...measuredAnatomy],
     { proposals: readProposals(proposalFiles).map((p) => ({ name: p.name, complete: p.complete, missing: p.missing })) });
 
@@ -178,7 +177,7 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
   // 4. Copy, badges, commands (draw-quality.mjs).
   const quality = [];
   const leaks = internalCopyOf(visibleTextOf(text));
-  if (leaks.length) quality.push(finding('quality', DRAW_COPY_INTERNAL, `${label} shows internal copy: ${leaks.slice(0, 5).map((l) => `"${l.match}" (${l.why})`).join('; ')}`));
+  if (leaks.length) quality.push(finding('quality', DRAW_COPY_INTERNAL, `${label} shows internal copy: ${leaks.slice(0, 5).map((l) => '"' + l.match + '" (' + l.why + ')').join('; ')}`));
   for (const b of badgesOf(text)) if (!b.tone) quality.push(finding('quality', DRAW_BADGE_UNTONED, `${label} badge "${b.text}" binds no tone token`));
   if (ui?.record && ui.state) {
     const commands = commandsFrom(ui.record, ui.state);
@@ -542,7 +541,7 @@ function scratchRewriter({ out, env = process.env, context = opContextOf({ env }
   const roots = [...new Set([...loopRoots, ...jobRoots, ...[os.tmpdir(), env.TEMP, env.TMP].filter(Boolean).flatMap(withReal)])]
     .filter((d) => path.parse(d).root !== d).sort((a, b) => b.length - a.length);
   // Each root as written with either separator, optionally as a file URL; the tail runs to the first quote or space.
-  const forms = [...new Set(roots.flatMap((r) => [r, r.replaceAll(/\\/g, '/'), r.replaceAll(/\//g, '\\')]))].sort((a, b) => b.length - a.length);
+  const forms = [...new Set(roots.flatMap((r) => [r, r.replaceAll('\\', '/'), r.replaceAll('/', '\\')]))].sort((a, b) => b.length - a.length);
   const re = forms.length ? new RegExp(String.raw`(file:\/\/\/?)?(?:${forms.map(reEscape).join('|')})(?:[\\/][^\s"'<>|*?]*)?(?![^\\/\s"'<>|*?])`, WIN ? 'gi' : 'g') : null;
   const map = (abs) => {
     const hit = installed.get(pathKey(abs));
@@ -561,8 +560,7 @@ function scratchRewriter({ out, env = process.env, context = opContextOf({ env }
     if (url) { try { p = fileURLToPath(m); } catch { p = decodeURIComponent(m.slice(url.length)); } }
     return map(p) ?? m;
   }) : s);
-  const value = (v) => (typeof v === 'string' ? text(v) : Array.isArray(v) ? v.map(value)
-    : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, value(x)])) : v);
+  const value = (v) => { if (typeof v === 'string') return text(v); if (Array.isArray(v)) return v.map(value); if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, value(x)])); return v; };
   return { roots, map, text, value };
 }
 
@@ -657,8 +655,8 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
   const remaining = passed ? [] : [
     ...list(metrics?.metrics).flatMap((m) => m.findings.map((f) => ({ code: f.code, detail: f.detail }))),
     ...(Number.isFinite(best.beauty) && best.beauty >= Number(settings.beautyMin) ? []
-      : Number.isFinite(best.beauty) ? [{ code: DRAW_BEAUTY_BELOW, detail: `the critic scored beauty ${best.beauty} (at least ${settings.beautyMin} is the bar)${best.criticFailed?.length ? `; failed ${best.criticFailed.join(', ')}` : ''}` }]
-        : [{ code: DRAW_CRITIC_MISSING, detail: `no critic scored round ${best.n}${best.critic?.error ? `: ${String(best.critic.error).slice(0, 300)}` : ' (drawn with --no-critic)'} - run finish without --no-critic (it critiques the best round) or fix the critic (runtimes.yaml allocation.drawLoop.critic)` }]),
+      : Number.isFinite(best.beauty) ? [{ code: DRAW_BEAUTY_BELOW, detail: `the critic scored beauty ${best.beauty} (at least ${settings.beautyMin} is the bar)${best.criticFailed?.length ? '; failed ' + best.criticFailed.join(', ') : ''}` }]
+        : [{ code: DRAW_CRITIC_MISSING, detail: `no critic scored round ${best.n}${best.critic?.error ? ': ' + String(best.critic.error).slice(0, 300) : ' (drawn with --no-critic)'} - run finish without --no-critic (it critiques the best round) or fix the critic (runtimes.yaml allocation.drawLoop.critic)` }]),
     ...(best.ownerFailed?.length ? [{ code: 'DRAW_FEEDBACK_UNADDRESSED', detail: `the critic fails the owner's note(s) ${best.ownerFailed.join(', ')} (draw-feedback.mjs brief lists them)` }] : []),
   ];
   loop.outcome = passed ? 'passed' : 'blocked';
@@ -781,9 +779,9 @@ async function drawLoopMain(argv) {
       ...(component ? { source: flag(rest, '--source'), fixtures: fixturesByWidth(all('--fixture')), product: flag(rest, '--product'), css: all('--css'), grammar: flag(rest, '--grammar') ?? 'auto', grammarDist: flag(rest, '--grammar-dist') } : {}), base: flag(rest, '--base'), state: flag(rest, '--state'), viewports: parseViewports(flag(rest, '--viewports')),
       repo: path.resolve(flag(rest, '--repo')), out: flag(rest, '--out'), family: flag(rest, '--family'), fullPage: !rest.includes('--no-full-page'), critic: rest.includes('--no-critic') ? false : undefined, drawer: flag(rest, '--drawer') ?? undefined });
     const next = r.stop ? `the loop stopped (${r.stop.reason}): starci work draw-loop finish --out ${r.out}` : 'fix the source against metrics.json and critique.json, then run round again';
-    const lines = [`round ${r.round.n}: ${r.round.failures} machine failure(s)${r.round.codes.length ? ` [${r.round.codes.join(', ')}]` : ''}; beauty ${r.round.beauty ?? '-'}${r.critique?.error ? ` (critic: ${r.critique.error.slice(0, 160)})` : ''}; ${r.round.progress ? 'progress' : 'NO progress'}; best round ${r.loop.best}`,
+    const lines = [`round ${r.round.n}: ${r.round.failures} machine failure(s)${r.round.codes.length ? ' [' + r.round.codes.join(', ') + ']' : ''}; beauty ${r.round.beauty ?? '-'}${r.critique?.error ? ' (critic: ' + r.critique.error.slice(0, 160) + ')' : ''}; ${r.round.progress ? 'progress' : 'NO progress'}; best round ${r.loop.best}`,
       ...r.metrics.metrics.filter((m) => !m.ok).flatMap((m) => m.findings.slice(0, 3).map((f) => `  [${f.code}] ${f.detail.slice(0, 300)}`)),
-      ...(r.critique?.verdict ? r.critique.verdict.checks.filter((c) => !c.pass).slice(0, 8).map((c) => `  critic ${c.id}: ${c.evidence}${c.fix ? ` -> ${c.fix}` : ''}`) : []),
+      ...(r.critique?.verdict ? r.critique.verdict.checks.filter((c) => !c.pass).slice(0, 8).map((c) => `  critic ${c.id}: ${c.evidence}${c.fix ? ' -> ' + c.fix : ''}`) : []),
       `next: ${next}`];
     return { code: 0, text: say({ out: r.out, round: r.round, stop: r.stop, best: r.loop.best, next }, lines.join('\n')) };
   }
@@ -811,7 +809,7 @@ async function drawLoopMain(argv) {
     const ui = flag(rest, '--ui'), repo = flag(rest, '--repo');
     if (!ui || !repo) return { code: 2, text: USAGE };
     const r = await verifyRecordParts({ recordDir: path.resolve(ui), repo: path.resolve(repo) });
-    return { code: r.findings.length ? 1 : 0, text: say(r, `${r.findings.length ? 'REFUSED' : 'ok'}: ${r.parts.length} render source(s) re-measured\n${r.findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n')}`) };
+    return { code: r.findings.length ? 1 : 0, text: say(r, `${r.findings.length ? 'REFUSED' : 'ok'}: ${r.parts.length} render source(s) re-measured\n${r.findings.map((f) => '  [' + f.code + '] ' + f.detail).join('\n')}`) };
   }
   return { code: 2, text: USAGE };
 }

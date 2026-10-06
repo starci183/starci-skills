@@ -52,7 +52,7 @@ export const digestValue=value=>sha256(canonicalText(value));
 const iso=()=>new Date().toISOString();
 const readYaml=file=>parseYaml(fs.readFileSync(file,'utf8'));
 const same=(a,b)=>path.resolve(a)===path.resolve(b);
-const relativePosix=(base,file)=>path.relative(base,file).replace(/\\/g,'/');
+const relativePosix=(base,file)=>path.relative(base,file).replaceAll('\\','/');
 const inside=(base,file)=>isInside(path.resolve(base),path.resolve(file));
 const need=(condition,message,code='assisted-uat-invalid')=>refuseUnless(condition,message,code);
 
@@ -65,7 +65,8 @@ const schemaValidators=()=>{
 };
 const validate=(kind,value)=>{
   const check=schemaValidators()[kind];
-  need(check(value),`${kind} schema: ${(check.errors??[]).map(error=>`${error.instancePath||'/'} ${error.message}`).join('; ')}`,'assisted-uat-schema-invalid');
+  const errors=(check.errors??[]).map(error=>`${error.instancePath||'/'} ${error.message}`).join('; ');
+  need(check(value),`${kind} schema: ${errors}`,'assisted-uat-schema-invalid');
 };
 const resolvePrepared=(base,declared,label)=>{
   need(typeof declared==='string'&&declared.length>0,`${label} path is missing`);
@@ -200,14 +201,14 @@ const validateFreshState=(prepared,state)=>{
   need(state.requestDigest===prepared.requestDigest&&state.sessionDigest===prepared.sessionDigest,'run state belongs to stale prepared bytes','assisted-uat-stale');
   need(same(state.receipt,prepared.receiptFile)&&same(state.runDir,prepared.runDir),'run state path binding changed','assisted-uat-stale');
 };
-const pidAlive=pid=>{if(!Number.isInteger(pid)||pid<1)return false;try{process.kill(pid,0);return true;}catch{return false;}};
+const pidAlive=pid=>{if(!Number.isInteger(pid)||pid<1){return false;}try{process.kill(pid,0);return true;}catch{return false;}};
 
 const waitForChange=(prepared,after,timeoutMs)=>new Promise((resolve,reject)=>{
   const current=()=>{try{return readState(prepared.runDir);}catch{return null;}};
   const ready=state=>state&&((state.revision??0)>after||TERMINAL_PHASES.has(state.phase));
   const control=path.dirname(stateFileOf(prepared.runDir));
   let done=false,watcher,timer;
-  const finish=(error,value)=>{if(done)return;done=true;try{watcher?.close();}catch{}clearTimeout(timer);error?reject(error):resolve(value);};
+  const finish=(error,value)=>{if(done){return;}done=true;try{watcher?.close();}catch{}clearTimeout(timer);error?reject(error):resolve(value);};
   const check=()=>{const next=current();if(ready(next))finish(null,next);};
   // Watch before the first read: a write landing between a read and the watch is otherwise lost until the timeout.
   watcher=fs.watch(control,check);
@@ -217,7 +218,7 @@ const waitForChange=(prepared,after,timeoutMs)=>new Promise((resolve,reject)=>{
 const waitForSignal=(prepared,gateId,timeoutMs)=>new Promise((resolve,reject)=>{
   const file=signalFileOf(prepared.runDir,gateId),read=()=>fs.existsSync(file)?readYaml(file):null;
   let done=false,watcher,timer;
-  const finish=(error,value)=>{if(done)return;done=true;try{watcher?.close();}catch{}clearTimeout(timer);error?reject(error):resolve(value);};
+  const finish=(error,value)=>{if(done){return;}done=true;try{watcher?.close();}catch{}clearTimeout(timer);error?reject(error):resolve(value);};
   const check=()=>{const signal=read();if(signal)finish(null,signal);};
   watcher=fs.watch(signalsDirOf(prepared.runDir),check);
   timer=setTimeout(()=>finish(Object.assign(new Error(`gate ${gateId} timed out`),{code:'assisted-uat-timeout'})),timeoutMs);
@@ -235,7 +236,7 @@ const sanitizer=(prepared)=>{
     let text=String(value??'');
     for(const secret of secretValues)text=text.split(secret).join('[REDACTED]');
     for(const rule of rules)text=text.replace(rule.pattern,rule.replacement);
-    return text.replace(/\bBearer\s+[A-Za-z0-9._~-]+/giu,'Bearer [REDACTED]').replace(/\b(otp|password|secret|token)\s*[:=]\s*\S+/giu,'$1=[REDACTED]');
+    return text.replace(/\bBearer\s+[a-z0-9._~-]+/giu,'Bearer [REDACTED]').replace(/\b(otp|password|secret|token)\s*[:=]\s*\S+/giu,'$1=[REDACTED]');
   };
 };
 const safeRefs=(prepared,refs=[])=>refs.map(ref=>{
@@ -286,7 +287,10 @@ const finishReceipt=(prepared,state,data,completionSignal,launchExit)=>{
   const flowEvents=new Map(data.steps.map(step=>[`${step.flowId}\0${step.id}`,step]));
   const flows=prepared.request.flows.map(flow=>{
     const steps=flow.steps.map(step=>flowEvents.get(`${flow.id}\0${step.id}`)??{id:step.id,status:'not-run',observed:null,evidenceRefs:[]});
-    const status=steps.every(step=>step.status==='completed')?'completed':steps.some(step=>step.status==='failed')?'failed':steps.some(step=>step.status==='cancelled')?'cancelled':'inconclusive';
+    let status='inconclusive';
+    if(steps.every(step=>step.status==='completed'))status='completed';
+    else if(steps.some(step=>step.status==='failed'))status='failed';
+    else if(steps.some(step=>step.status==='cancelled'))status='cancelled';
     return {id:flow.id,status,steps:steps.map(({id,status,observed,evidenceRefs})=>({id,status,observed,evidenceRefs}))};
   });
   const gateResults=new Map(data.gates.map(gate=>[gate.id,gate]));
@@ -337,7 +341,9 @@ const runSession=async(prepared,state,slot)=>{
         let signal;
         try{signal=await waitForSignal(prepared,gate.id,prepared.request.limits.timeoutMs);}catch(error){signal={value:'cancel',actor:'runner-timeout',recordedAt:iso()};protocolError=error;}
         need(SIGNALS.has(signal.value),`invalid signal for gate ${gate.id}`);
-        const status=signal.value==='ok'?'completed':signal.value==='fail'?'failed':'cancelled';
+        let status='cancelled';
+        if(signal.value==='ok')status='completed';
+        else if(signal.value==='fail')status='failed';
         data.gates.push({id:gate.id,status,response:signal.value,evidenceRefs:[]});
         completionSignal={value:signal.value,actor:signal.actor,recordedAt:signal.recordedAt};
         child.stdin.write(`${JSON.stringify({type:'human-signal',gateId:gate.id,value:signal.value})}\n`);
@@ -372,7 +378,7 @@ export function startSession({requestPath,receiptPath,skipRunnerCheck=false}={})
   const prepared=inspectPreparedRequest({requestPath,receiptPath,allowExistingReceipt:true});
   if(fs.existsSync(prepared.receiptFile)){const receipt=readYaml(prepared.receiptFile);validate('receipt',receipt);assertDigest(prepared.requestDigest,receipt.request.sha256,'existing receipt request');return {idempotent:true,runId:prepared.runId,phase:'finished',revision:null,receipt:prepared.receiptFile};}
   const stateFile=stateFileOf(prepared.runDir);
-  if(fs.existsSync(stateFile)){const state=readState(prepared.runDir);validateFreshState(prepared,state);if(!TERMINAL_PHASES.has(state.phase)&&!pidAlive(state.pid))return {...publicState(state),staleProcess:true};return {idempotent:true,...publicState(state)};}
+  if(fs.existsSync(stateFile)){const state=readState(prepared.runDir);validateFreshState(prepared,state);if(!TERMINAL_PHASES.has(state.phase)&&!pidAlive(state.pid)){return {...publicState(state),staleProcess:true};}return {idempotent:true,...publicState(state)};}
   need(!fs.existsSync(prepared.runDir),`run directory already exists without a valid state: ${prepared.runDir}`,'assisted-uat-run-collision');
   if(!skipRunnerCheck)validateLockedPlaywright(prepared);
   fs.mkdirSync(signalsDirOf(prepared.runDir),{recursive:true});fs.mkdirSync(path.join(prepared.runDir,'artifacts'),{recursive:true});
@@ -386,8 +392,7 @@ export function startSession({requestPath,receiptPath,skipRunnerCheck=false}={})
 
 export function signalSession({requestPath,receiptPath,value,actor='user'}={}){
   need(SIGNALS.has(value),'--value must be exactly ok, fail, or cancel');
-  let prepared;
-  try{prepared=inspectPreparedRequest({requestPath,receiptPath,allowExistingReceipt:true});}catch(error){throw error;}
+  const prepared=inspectPreparedRequest({requestPath,receiptPath,allowExistingReceipt:true});
   need(fs.existsSync(stateFileOf(prepared.runDir)),'assisted UAT session has not been started');
   const state=readState(prepared.runDir);
   try{validateFreshState(prepared,state);}catch(error){if(state.pendingGate){const file=signalFileOf(prepared.runDir,state.pendingGate);if(!fs.existsSync(file))fs.writeFileSync(file,stringifyYaml({schema:'starci/assisted-uat-signal@1',gateId:state.pendingGate,value:'cancel',actor:'runner-stale-detection',recordedAt:iso()}),{flag:'wx'});}throw error;}
@@ -415,7 +420,7 @@ export async function waitSession({requestPath,receiptPath,after=0}={}){
   validateFreshState(prepared,next);return publicState(next);
 }
 
-const parseArgs=argv=>{const out={};for(let i=0;i<argv.length;i++){const token=argv[i];if(!token.startsWith('--'))continue;const key=token.slice(2);out[key]=argv[i+1]&&!argv[i+1].startsWith('--')?argv[++i]:true;}return out;};
+const parseArgs=argv=>{const out={};for(let i=0;i<argv.length;i++){const token=argv[i];if(!token.startsWith('--')){continue;}const key=token.slice(2);out[key]=argv[i+1]&&!argv[i+1].startsWith('--')?argv[++i]:true;}return out;};
 const print=value=>process.stdout.write(`${JSON.stringify(value,null,2)}\n`);
 const use=()=>{console.error('use: starci uat assisted-runner <inspect|start|status|wait|signal|run> --request <absolute request.yaml> --receipt <absolute new receipt.yaml> [--after n] [--value ok|fail|cancel]');process.exit(2);};
 

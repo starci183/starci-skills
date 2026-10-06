@@ -64,7 +64,7 @@ const digest=sha256;
 // Colour mathematics: sRGB <-> linear <-> OKLab <-> oklch, and WCAG contrast.
 // ---------------------------------------------------------------------------
 
-const clamp01=value=>value<0?0:value>1?1:value;
+const clamp01=value=>{if(value<0)return 0;if(value>1)return 1;return value;};
 /** sRGB transfer function and its inverse; the piecewise form, not the 2.2 approximation. */
 const srgbToLinear=channel=>channel<=0.04045?channel/12.92:((channel+0.055)/1.055)**2.4;
 const linearToSrgb=channel=>channel<=0.0031308?channel*12.92:1.055*channel**(1/2.4)-0.055;
@@ -476,7 +476,7 @@ export function checkTokensMatchSource({brand,sourceRoot,stage='decide'}){
     ?`All ${findings.length} brand colour tokens are bound: ${findings.length-fromReference.length} present in the shipped source with the declared colour, ${fromReference.length} planned from their reference render until the app source declares them: ${planNote}.`
     :`All ${findings.length} brand colour tokens are present in the shipped source with the declared colour.`;
   return bad.length
-    ?check(id,'fail',`${bad.length} of ${findings.length} brand colour tokens do not match the shipped source: ${bad.map(finding=>`${finding.token} (${finding.status}${finding.valueSource?.why?`: ${finding.valueSource.why}`:''})`).join(', ')}.`,evidence)
+    ?check(id,'fail',`${bad.length} of ${findings.length} brand colour tokens do not match the shipped source: ${bad.map(finding=>finding.token+' ('+finding.status+(finding.valueSource?.why?': '+finding.valueSource.why:'')+')').join(', ')}.`,evidence)
     :check(id,'pass',passed,evidence);
 }
 
@@ -656,11 +656,11 @@ export function checkContrastAa({brand,brandDir=null}){
   const bad=pairs.filter(pair=>pair.outcome!=='pass');
   const evidence={minimum,nonTextMinimum:NON_TEXT_MIN_CONTRAST,softMinimum,exceptionTolerance:CONTRAST_EXCEPTION_TOLERANCE,pairs,
     ...(exceptions.length?{exceptions:reported}:{})};
-  const named=pair=>pair.declaredBy?`${pair.foregroundToken} on ${pair.token}`:`${pair.token}${pair.against?` on ${pair.against}`:''}`;
+  const named=pair=>pair.declaredBy?pair.foregroundToken+' on '+pair.token:pair.token+(pair.against&&' on '+pair.against||'');
   const failures=[
-    ...(bad.length?[`${bad.length} of ${pairs.length} declared colour pairs miss their contrast floor: ${bad.map(pair=>`${named(pair)} ${pair.ratio??'(unparseable)'}:1 < ${pair.minimum}:1`).join(', ')}.`]:[]),
-    ...(refused.length?[`${refused.length} contrast exception${refused.length===1?' is':'s are'} refused: ${refused.map(entry=>`${entry.foreground??'?'} on ${entry.background??'?'} (${entry.why})`).join('; ')}.`]:[])];
-  const accepted=applied.length?` ${applied.length} of them below it by an owner-accepted exception: ${applied.map(pair=>`${pair.exception.foreground} on ${pair.exception.background} ${pair.ratio}:1 (${pair.exception.acceptedBy})`).join(', ')}.`:'';
+    ...(bad.length?[`${bad.length} of ${pairs.length} declared colour pairs miss their contrast floor: ${bad.map(pair=>named(pair)+' '+(pair.ratio??'(unparseable)')+':1 < '+pair.minimum+':1').join(', ')}.`]:[]),
+    ...(refused.length?[`${refused.length} contrast exception${refused.length===1?' is':'s are'} refused: ${refused.map(entry=>(entry.foreground??'?')+' on '+(entry.background??'?')+' ('+entry.why+')').join('; ')}.`]:[])];
+  const accepted=applied.length?` ${applied.length} of them below it by an owner-accepted exception: ${applied.map(pair=>pair.exception.foreground+' on '+pair.exception.background+' '+pair.ratio+':1 ('+pair.exception.acceptedBy+')').join(', ')}.`:'';
   return failures.length
     ?check(id,'fail',failures.join(' '),evidence)
     :check(id,'pass',`All ${pairs.length} declared colour pairs meet their contrast floor (text ${minimum}:1, non-text ${NON_TEXT_MIN_CONTRAST}:1, status soft pair and glyph ${softMinimum}:1).${accepted}`,evidence);
@@ -675,8 +675,8 @@ export function checkPrimaryDangerDistinct({brand}){
   const tokens=brandTokens(brand);
   const primary=byRole(tokens,'primary'),danger=byRole(tokens,'danger');
   const allowed=brand?.color?.policy?.dangerMayMatchPrimary===true;
-  if(!primary||!danger)return check(id,'skip',`The brand declares no ${!primary&&!danger?'primary and no danger':!primary?'primary':'danger'} colour role, so the two cannot be compared.`,
-    {threshold:MIN_PRIMARY_DANGER_DELTA,dangerMayMatchPrimary:allowed});
+  if(!primary||!danger){let absent='danger';if(!primary&&!danger)absent='primary and no danger';else if(!primary)absent='primary';return check(id,'skip',`The brand declares no ${absent} colour role, so the two cannot be compared.`,
+    {threshold:MIN_PRIMARY_DANGER_DELTA,dangerMayMatchPrimary:allowed});}
   const one=parseColor(primary.value),two=parseColor(danger.value);
   const evidence={primary:{token:primary.token,value:primary.value??null},danger:{token:danger.token,value:danger.value??null},
     threshold:MIN_PRIMARY_DANGER_DELTA,scale:'OKLab delta-E x100',dangerMayMatchPrimary:allowed};
@@ -717,9 +717,9 @@ export function checkMascotAssetsPresent({brand,tree,brandDir}){
   });
   const bad=findings.filter(finding=>!['verified','present-unpinned'].includes(finding.status));
   const evidence={tree:slash(root),allowedFormats:ASSET_EXTENSIONS,assets:findings};
-  if(bad.length)return check(id,'fail',`${bad.length} of ${findings.length} declared mascot assets are not usable: ${bad.map(finding=>`${finding.path} (${finding.status})`).join(', ')}.`,evidence);
+  if(bad.length)return check(id,'fail',`${bad.length} of ${findings.length} declared mascot assets are not usable: ${bad.map(finding=>finding.path+' ('+finding.status+')').join(', ')}.`,evidence);
   const unpinned=findings.filter(finding=>finding.status==='present-unpinned').length;
-  return check(id,'pass',`All ${findings.length} declared mascot assets exist in a supported format${unpinned?`; ${unpinned} carry no declared sha256, so the computed hash is reported instead`:' and match their declared sha256'}.`,
+  return check(id,'pass',`All ${findings.length} declared mascot assets exist in a supported format${unpinned?'; '+unpinned+' carry no declared sha256, so the computed hash is reported instead':' and match their declared sha256'}.`,
     {...evidence,unpinned,assetsChecked:assets.length});
 }
 
@@ -764,7 +764,7 @@ export function checkIconSetOnly({brand,sourceRoot}){
       if(files.length>=SCAN_FILE_LIMIT)return;
       if(entry.isSymbolicLink())continue;
       const file=path.join(directory,entry.name);
-      if(entry.isDirectory()){if(!SCAN_EXCLUDED.has(entry.name)&&!entry.name.startsWith('.'))walk(file);continue;}
+      if(entry.isDirectory()){if(!SCAN_EXCLUDED.has(entry.name)&&!entry.name.startsWith('.')){walk(file);}continue;}
       if(entry.isFile()&&/\.tsx?$/i.test(entry.name)&&!/\.d\.ts$/i.test(entry.name)&&fs.statSync(file).size<=SCAN_BYTES_LIMIT)files.push(file);
     }
   };
@@ -1000,7 +1000,7 @@ export function checkDirection({brand,family,grammarRoot,brandDir}){
     dnaNote:canon.error,proposals,pendingRulings:pending,rubricChecks:checks.length,learned};
   if(problems.length)return check(id,'fail',`brand.direction rev ${rev??'?'} has ${problems.length} problem(s): ${problems.slice(0,OFFENDER_CAP).join('; ')}.`,{...evidence,problems});
   const dnaNote=canon.names.length?'every recipe maps onto a DNA component':`the DNA could not be read (${canon.error}), so recipes were not mapped`;
-  return check(id,'pass',`brand.direction rev ${rev} (${direction.status}): ${Object.keys(summary).length} archetype(s), ready ${ready.length?ready.join(', '):'none'}; ${dnaNote}${pending.length?`; open owner rulings ${pending.join(', ')}`:''}.`,{...evidence,problems:[]});
+  return check(id,'pass',`brand.direction rev ${rev} (${direction.status}): ${Object.keys(summary).length} archetype(s), ready ${ready.length?ready.join(', '):'none'}; ${dnaNote}${pending.length?'; open owner rulings '+pending.join(', '):''}.`,{...evidence,problems:[]});
 }
 
 // ---------------------------------------------------------------------------
@@ -1026,7 +1026,7 @@ export function runBrandChecks({tree,sourceRoot=null,grammarRoot=defaultGrammarR
 
 /** One line per check, for a person reading a terminal. */
 export function formatBrandChecks(result){
-  const header=`brand ${result.brand.family??'(no family)'} rev ${result.brand.rev}${result.stage?` (${result.stage} stage)`:''}: ${result.ok?'no failing check':'failing checks'}`;
+  const header=`brand ${result.brand.family??'(no family)'} rev ${result.brand.rev}${result.stage?' ('+result.stage+' stage)':''}: ${result.ok?'no failing check':'failing checks'}`;
   return formatCheckLines(header,result.checks);
 }
 

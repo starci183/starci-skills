@@ -130,7 +130,7 @@ function criticPrompt({ dir, images, html = 'screen.html', rubricFile = 'rubric.
   const at = (f) => slash(path.join(dir, f));
   return [
     'You are an independent senior product-design critic. You did NOT draw this screen and you have no other context.',
-    `Your directory is ${slash(dir)}. The images in it are the renders of ONE product surface - open and look at each: ${images.map((i) => `${at(i.file)} (${i.label})`).join(', ')}. The HTML source is ${at(html)}; the rubric is ${at(rubricFile)}.`,
+    `Your directory is ${slash(dir)}. The images in it are the renders of ONE product surface - open and look at each: ${images.map((i) => at(i.file) + ' (' + i.label + ')').join(', ')}. The HTML source is ${at(html)}; the rubric is ${at(rubricFile)}.`,
     `Judge strictly and only what you can observe in the images and the HTML. Read only these files. Do not edit, create, delete or run anything; the one file you may write is ${at(verdictFile)}.`,
     `For EVERY check in ${rubricFile}: pass true/false, one line of evidence (what you saw and where), and for a failure the concrete fix.`,
     'Then give the overall beauty score 1-10 by the rubric\'s beauty anchors (judge the desktop render first, then confirm on mobile); a failed gate check caps the score at the rubric\'s gateCap.',
@@ -334,7 +334,7 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
     const started = now();
     launched = launchCriticWorker({ critic, dir, prompt, entry, parentDispatch, orca });
     if (!launched?.ok) {
-      return failed('launch-failed', `the critic worker did not start (${launched?.step ?? 'worker-start'}${launched?.errorCode ? ` ${launched.errorCode}` : ''}): ${launched?.error ?? 'no receipt'}`);
+      return failed('launch-failed', `the critic worker did not start (${launched?.step ?? 'worker-start'}${launched?.errorCode ? ' ' + launched.errorCode : ''}): ${launched?.error ?? 'no receipt'}`);
     }
     Object.assign(base.critic, { provider: launched.provider, model: launched.admission?.selected?.model ?? launched.model,
       admission: launched.admission ?? null, independent: !orca && launched.effective?.agent !== critic.author.provider,
@@ -349,7 +349,7 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
     const file = path.join(dir, VERDICT_FILE);
     const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
     const raw = parseVerdict(text);
-    if (!raw) return failed('verdict-missing', `the critic reported worker_done without a verdict in ${VERDICT_FILE}${text ? `: ${text.slice(-400)}` : ' (no file)'}`);
+    if (!raw) return failed('verdict-missing', `the critic reported worker_done without a verdict in ${VERDICT_FILE}${text ? ': ' + text.slice(-400) : ' (no file)'}`);
     return { ...base, outcome: 'judged', verdict: normaliseVerdict(raw, rubric), raw, error: null };
   } catch (error) {
     return failed(launched?.ok ? 'refused' : 'launch-failed', String(error?.message ?? error));

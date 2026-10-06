@@ -92,7 +92,7 @@ export const READINESS_FAILS_PER_HOUR = 2;
 export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin' });
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-prompt.md');
 const parse = parseJsonOr;
-const csv = (v) => (typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean) : Array.isArray(v) ? v.map(String) : []);
+const csv = (v) => { if (typeof v === 'string') return v.split(',').map((s) => s.trim()).filter(Boolean); if (Array.isArray(v)) return v.map(String); return []; };
 export const normPath = (p) => posixPath(p).replace(/\/+$/, '');
 
 /** The supervisor's git runner (land, push-mains, push-git, direct-commits; their `run`/`git` seams take the same argv): `args[0]` names the scripts/api/git call file it runs, in `cwd`: {ok, status, stdout, stderr}. */
@@ -125,10 +125,9 @@ function rowJob(row) {
   if (!row) return null;
   const payload = parse(row.payload_json);
   const { terminal_handle: handle, ...rest } = row; delete rest.payload_json; delete rest.files_json;
-  return { ...rest, payload, result: payload.result ?? null, worker_id: payload.self ? (row.attempt_id != null ? 'supervisor' : null) : handle ?? null };
+  let workerId = handle ?? null; if (payload.self) workerId = row.attempt_id != null ? 'supervisor' : null; return { ...rest, payload, result: payload.result ?? null, worker_id: workerId };
 }
-export const jobsOf = (m, statuses = null) => m.db.prepare(`${JOB_SELECT} WHERE j.kind=? ${statuses ? `AND j.status IN (${statuses.map(() => '?').join(',')})` : ''} ORDER BY j.created_at, j.job_id`)
-  .all(FIX_KIND, ...(statuses ?? [])).map(rowJob);
+export const jobsOf = (m, statuses = null) => { const statusFilter = statuses ? `AND j.status IN (${statuses.map(() => '?').join(',')})` : ''; return m.db.prepare(`${JOB_SELECT} WHERE j.kind=? ${statusFilter} ORDER BY j.created_at, j.job_id`).all(FIX_KIND, ...(statuses ?? [])).map(rowJob); };
 export const jobOf = (m, jobId) => rowJob(m.db.prepare(`${JOB_SELECT} WHERE j.job_id=?`).get(jobId));
 /**
  * The worker terminals still physically held, including logically finished jobs without qualified closure.
@@ -232,7 +231,7 @@ export function removeStaging({ jobId, staging, root = SKILL_ROOT, env = process
     if (staging.branch && !out.branchDeleted) out.branchKept = staging.branch;
     return out;
   }
-  const detail = typeof r.detail === 'string' ? r.detail : r.detail ? JSON.stringify(r.detail).slice(0, 200) : '';
+  let detail = ''; if (typeof r.detail === 'string') detail = r.detail; else if (r.detail) detail = JSON.stringify(r.detail).slice(0, 200);
   const errors = (r.errors ?? []).map((e) => `${e.code ?? ''} ${e.path ?? ''}`.trim()).join('; ');
   return { ...out, reason: r.reason, code: 'WORKER_STAGING_REMOVE_FAILED', error: [r.reason, detail, errors].filter(Boolean).join(': '),
     ...(r.fatal ? { fatal: true, damage: r.damage } : {}) };
@@ -478,7 +477,7 @@ export function fileReport(m, { jobId, outcome, commit = null, specs = [], summa
     const attemptId = attemptIdOf(m, jobId);
     m.recordSupReport({ attemptId, jobId, outcome, report });
     m.updateSupAttempt(attemptId, { reportedAt: now, reportOutcome: outcome, ...(sha ? { headSha: sha } : {}) });
-    const status = outcome === 'done' ? 'reported' : outcome === 'diagnosed' ? 'succeeded' : 'failed';
+    let status = 'failed'; if (outcome === 'done') status = 'reported'; else if (outcome === 'diagnosed') status = 'succeeded';
     if (outcome !== 'done') releaseLeases(m, jobId);
     setJob(m, jobId, { status, payload: outcome === 'done' ? undefined : { ...job.payload, result: { reason: `worker-${outcome}`, summary, needs } } });
     supervisorEvent(m, { entityType: 'job', entityId: jobId, kind: 'worker-reported', payload: { outcome, commit: sha, specs: report.specs, needs }, now });
@@ -600,7 +599,7 @@ async function main() {
   if (!verb || has('help')) { console.log('use: starci supervisor workers create|spawn|stage|report|list|cap|show|cancel|ack|cleanup ... (see the header)'); return; }
   if (verb === 'list') {
     const board = readSupervisor((m) => workerBoard(m), { active: [], queued: [], reported: [], recent: [] });
-    const line = (j) => `  ${j.jobId} [${j.status}] ${j.cluster} ${j.agent ?? '-'} age ${j.ageMin}m${j.terminal ? ` ${j.terminal}` : ''}${j.report ? ` commit ${String(j.report.commit ?? '').slice(0, 9)}` : ''}${j.result ? ` ${JSON.stringify(j.result).slice(0, 120)}` : ''}`;
+    const line = (j) => { const terminal = j.terminal ? ` ${j.terminal}` : ''; const report = j.report ? ` commit ${String(j.report.commit ?? '').slice(0, 9)}` : ''; const result = j.result ? ` ${JSON.stringify(j.result).slice(0, 120)}` : ''; return `  ${j.jobId} [${j.status}] ${j.cluster} ${j.agent ?? '-'} age ${j.ageMin}m${terminal}${report}${result}`; };
     return out(board, [`active ${board.active.length}`, ...board.active.map(line), `queued ${board.queued.length}`, ...board.queued.map(line),
       `reported (land queue) ${board.reported.length}`, ...board.reported.map(line), 'recent', ...board.recent.map(line)].join('\n'));
   }
@@ -643,4 +642,4 @@ async function main() {
   } finally { m.close(); }
 }
 
-if (isMain(import.meta.url)) await main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });
+if (isMain(import.meta.url)) { try { await main(); } catch (error) { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; } }
