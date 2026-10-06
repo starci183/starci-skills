@@ -46,7 +46,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { normalizeDifficulty, chainFor, resolveLaunchModel, kindRoute, orderKeyOf, raiseToFloor, missingHostTools,
+import { chainFor, resolveLaunchModel, kindRoute, orderKeyOf, raiseToFloor, missingHostTools,
   providerAvailability, providerCircuitOf } from '../agent/models.mjs';
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
@@ -462,7 +462,7 @@ async function main() {
   const registry = readYaml(path.join(modelsDir, 'registry.yaml'));
   // The merged runtimes view: runtimes.yaml's allocation policy plus the ONE
   // catalog's pool map (registry.yaml pools) under `runtimes`.
-  const runtimes = { ...(readYaml(path.join(modelsDir, 'runtimes.yaml')) ?? {}), runtimes: registry?.pools ?? {} };
+  const runtimes = { ...readYaml(path.join(modelsDir, 'runtimes.yaml')), runtimes: registry?.pools ?? {} };
   const quals = readYaml(path.join(modelsDir, 'qualifications.yaml'));
   const evidenceByRuntime = {};
   for (const rec of quals?.qualifications ?? []) if (rec?.runtimeId) evidenceByRuntime[rec.runtimeId] = rec;
@@ -526,7 +526,9 @@ async function main() {
   // order) is held to that order; a kernel function to the sol-think order;
   // every other think kind to the think order.
   const hasRouteOrder = think && route.order && !w.modelFunction && Array.isArray(runtimes?.allocation?.preference?.[route.order]);
-  const thinkKey = hasRouteOrder ? route.order : w.modelFunction && solThink ? 'sol-think' : 'think';
+  let thinkKey = 'think';
+  if (w.modelFunction && solThink) thinkKey = 'sol-think';
+  if (hasRouteOrder) thinkKey = route.order;
   const thinkPools = thinkKey === 'think' ? frontier : runtimes.allocation.preference[thinkKey];
   const orderKey = orderKeyOf(route, w.role);
   let { order, source: orderSource } = candidateOrder(args.kind, orderKey, registry, runtimes);
