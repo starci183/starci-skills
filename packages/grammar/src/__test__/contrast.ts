@@ -257,7 +257,7 @@ const rgbToOklab = (r: number, g: number, b: number): Lab => {
 }
 
 const number = (token: string, percentScale = 1) =>
-    token.endsWith("%") ? (parseFloat(token) / 100) * percentScale : parseFloat(token)
+    token.endsWith("%") ? (Number.parseFloat(token) / 100) * percentScale : Number.parseFloat(token)
 
 const NAMED: Readonly<Record<string, Rgba>> = {
     white: { r: 1, g: 1, b: 1, a: 1 },
@@ -350,15 +350,15 @@ export const parseColor = (input: string): Rgba | null => {
     if (value.startsWith("#")) {
         const hex = value.slice(1)
         const full = hex.length <= 4 ? [...hex].map((c) => c + c).join("") : hex
-        const at = (i: number) => parseInt(full.slice(i, i + 2), 16) / 255
+        const at = (i: number) => Number.parseInt(full.slice(i, i + 2), 16) / 255
         return { r: at(0), g: at(2), b: at(4), a: full.length === 8 ? at(6) : 1 }
     }
-    const fn = value.match(/^([a-z-]+)\((.*)\)$/)
+    const fn = /^([a-z-]+)\((.*)\)$/.exec(value)
     if (fn === null) return null
     const [, name, args = ""] = fn
     if (name === "rgb" || name === "rgba") {
-        const parts = args.replace(/\//g, " ").split(/[\s,]+/).filter(Boolean)
-        const channel = (t: string) => (t.endsWith("%") ? parseFloat(t) / 100 : parseFloat(t) / 255)
+        const parts = args.replaceAll("/", " ").split(/[\s,]+/).filter(Boolean)
+        const channel = (t: string) => (t.endsWith("%") ? Number.parseFloat(t) / 100 : Number.parseFloat(t) / 255)
         return { r: channel(parts[0] ?? "0"), g: channel(parts[1] ?? "0"), b: channel(parts[2] ?? "0"), a: parts[3] === undefined ? 1 : number(parts[3]) }
     }
     if (name === "oklch" && args.startsWith("from ")) {
@@ -370,17 +370,17 @@ export const parseColor = (input: string): Rgba | null => {
         const channels = { l: lab[0], c: Math.hypot(lab[1], lab[2]), h: (Math.atan2(lab[2], lab[1]) * 180) / Math.PI }
         const channel = (token: string) => {
             if (token in channels) return channels[token as keyof typeof channels]
-            const inverted = token.match(/^calc\(1 - ([lch])\)$/)
+            const inverted = /^calc\(1 - ([lch])\)$/.exec(token)
             if (inverted !== null) return 1 - channels[inverted[1] as keyof typeof channels]
             // Channel arithmetic (`calc(l + 0.14)`, `calc(c * 0.25)`, `max(0.8, calc(l + 0.5))`): the channel
             // keywords, numbers, + - * / and min()/max()/clamp() only; anything else is not a colour this helper reads.
-            if (/^[lch\d\s.+\-*/(),]*$/.test(token.replace(/calc|min|max|clamp/g, ""))) {
-                const expression = token.replace(/calc\(/g, "(").replace(/clamp\(/g, "K(").replace(/([lch])/g, (_, key: keyof typeof channels) => String(channels[key]))
-                    .replace(/max\(/g, "Math.max(").replace(/min\(/g, "Math.min(")
+            if (/^[lch\d\s.+\-*/(),]*$/.test(token.replaceAll(/calc|min|max|clamp/g, ""))) {
+                const expression = token.replaceAll(/calc\(/g, "(").replaceAll(/clamp\(/g, "K(").replace(/([lch])/g, (_, key: keyof typeof channels) => String(channels[key]))
+                    .replaceAll(/max\(/g, "Math.max(").replaceAll(/min\(/g, "Math.min(")
                 const clamp = (low: number, value: number, high: number) => Math.min(Math.max(value, low), high)
                 return evaluateArithmetic(expression, clamp)
             }
-            return parseFloat(token)
+            return Number.parseFloat(token)
         }
         const [L, C, H] = [channel(rest[1] ?? "l"), channel(rest[2] ?? "c"), channel(rest[3] ?? "h")]
         const [r, g, b] = oklabToRgb([L, C * Math.cos((H * Math.PI) / 180), C * Math.sin((H * Math.PI) / 180)])
@@ -393,7 +393,7 @@ export const parseColor = (input: string): Rgba | null => {
         let lab: Lab
         if (name === "oklch") {
             const C = number(parts[1] ?? "0", 0.4)
-            const h = ((parseFloat(parts[2] ?? "0") || 0) * Math.PI) / 180
+            const h = ((Number.parseFloat(parts[2] ?? "0") || 0) * Math.PI) / 180
             lab = [L, C * Math.cos(h), C * Math.sin(h)]
         } else {
             lab = [L, number(parts[1] ?? "0", 0.4), number(parts[2] ?? "0", 0.4)]
@@ -405,9 +405,9 @@ export const parseColor = (input: string): Rgba | null => {
         const parts = splitTopLevel(args, ",")
         const space = (parts[0] ?? "").replace(/^in\s+/, "").trim()
         const operand = (part: string) => {
-            const match = part.match(/^(.*?)(?:\s+(\d+(?:\.\d+)?)%)?$/)
+            const match = /^(.*?)(?:\s+(\d+(?:\.\d+)?)%)?$/.exec(part)
             const colour = parseColor(match?.[1] ?? "")
-            return { colour, weight: match?.[2] === undefined ? undefined : parseFloat(match[2]) / 100 }
+            return { colour, weight: match?.[2] === undefined ? undefined : Number.parseFloat(match[2]) / 100 }
         }
         const one = operand(parts[1] ?? "")
         const two = operand(parts[2] ?? "")
@@ -416,7 +416,7 @@ export const parseColor = (input: string): Rgba | null => {
         let p2 = two.weight
         if (p1 === undefined && p2 === undefined) [p1, p2] = [0.5, 0.5]
         else if (p1 === undefined) p1 = 1 - (p2 ?? 0)
-        else if (p2 === undefined) p2 = 1 - p1
+        else p2 ??= 1 - p1
         const sum = (p1 ?? 0) + (p2 ?? 0)
         const mixed = mixIn(space, one.colour, two.colour, (p1 ?? 0) / sum)
         return sum < 1 ? { ...mixed, a: mixed.a * sum } : mixed

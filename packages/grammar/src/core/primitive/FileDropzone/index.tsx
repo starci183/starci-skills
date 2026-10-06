@@ -43,7 +43,7 @@ export const FileDropzone = ({
     isReadOnly,
     name,
 }: FileDropzoneProps) => {
-    const generated = useId().replace(/:/g, "")
+    const generated = useId().replaceAll(":", "")
     const id = idProp ?? `file${generated}`
     const [isDragging, setIsDragging] = useState(false)
     const [files, setFiles] = useState<Array<File>>([])

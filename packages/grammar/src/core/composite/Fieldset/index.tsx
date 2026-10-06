@@ -20,7 +20,7 @@ export type FieldsetProps = {
 
 /** A named group of related fields: a native `fieldset` + `legend` with the field rhythm. */
 export const Fieldset = ({ legend, isLegendHidden = false, description, errorMessage, children, actions, isDisabled = false }: FieldsetProps) => {
-    const id = useId().replace(/:/g, "")
+    const id = useId().replaceAll(":", "")
     const descriptionId = description == null ? undefined : `fieldset${id}-description`
     const errorId = errorMessage == null ? undefined : `fieldset${id}-error`
     const describedBy = [descriptionId, errorId].filter((part) => part !== undefined).join(" ")

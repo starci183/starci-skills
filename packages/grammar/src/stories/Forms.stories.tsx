@@ -552,7 +552,7 @@ const FormDemo = ({ label, isPending, withErrors }: { readonly label: string; re
       label={label}
       isPending={isPending === true}
       {...(withErrors === true ? { validationErrors: { message: 'Add a short note so they know who invited them.' } } : {})}
-      onSubmit={(data) => setSubmitted(String(data.get('role') ?? ''))}
+      onSubmit={(data) => setSubmitted(data.get('role')?.toString() ?? '')}
     >
       <G.Textarea label="Message" name="message" rows={2} placeholder="Optional note" />
       <G.Select label="Role" name="role" options={planOptions} defaultValue="team" />

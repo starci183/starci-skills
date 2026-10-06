@@ -58,7 +58,7 @@ export const Slider = ({
     isReadOnly,
     name,
 }: SliderProps) => {
-    const id = useId().replace(/:/g, "")
+    const id = useId().replaceAll(":", "")
     const [heldValue] = useState<SliderValue>(value ?? defaultValue ?? minValue)
     const invalid = isFieldInvalid({ isInvalid, errorMessage })
     const readOnly = isReadOnly === true

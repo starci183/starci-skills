@@ -47,7 +47,7 @@ export const SegmentedControl = ({
     isReadOnly,
     name,
 }: SegmentedControlProps) => {
-    const id = useId().replace(/:/g, "")
+    const id = useId().replaceAll(":", "")
     const [held, setHeld] = useState<string | undefined>(value ?? defaultValue ?? options[0]?.value)
     const selected = value ?? held
     const invalid = isFieldInvalid({ isInvalid, errorMessage })

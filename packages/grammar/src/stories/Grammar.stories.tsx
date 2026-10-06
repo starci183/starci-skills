@@ -10,8 +10,6 @@ import {
   Label,
   NavigationFeatureNav,
   PageContainer,
-  SectionHeader,
-  StaticStateRow,
   SurfaceCard,
   SurfaceListCard,
   Text,

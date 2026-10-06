@@ -55,7 +55,7 @@ export const describedTexts = (element: Element | null): ReadonlyArray<string> =
 
 /** The family scope a rendered tree sits under (`common` when no family root is present). */
 export const familyOf = (container: Element) =>
-    container.querySelector("[data-grammar-family]")?.getAttribute("data-grammar-family") ?? "common"
+    container.querySelector<HTMLElement>("[data-grammar-family]")?.dataset.grammarFamily ?? "common"
 
 /** The family scope a root installs (Common installs none). */
 export const expectedFamilyScope = (family: GrammarFamily): string | null => family === "common" ? null : family
@@ -66,14 +66,14 @@ export const expectedFamilyScope = (family: GrammarFamily): string | null => fam
  */
 export const expectInFamilyScope = (element: Element | null, family: string | null) => {
     expect(element).not.toBeNull()
-    const root = element?.closest(".grammar-common-root") ?? null
+    const root = element?.closest<HTMLElement>(".grammar-common-root") ?? null
     expect(root).not.toBeNull()
-    expect(root?.getAttribute("data-grammar-family") ?? null).toBe(family)
+    expect(root?.dataset.grammarFamily ?? null).toBe(family)
 }
 
 /** jsdom lacks the layout observers and animation API the vendor overlays and collections read. */
 export const installDomShims = () => {
-    if (typeof globalThis.ResizeObserver === "undefined") {
+    if (globalThis.ResizeObserver === undefined) {
         globalThis.ResizeObserver = class ResizeObserver {
             observe() {}
             unobserve() {}
