@@ -541,7 +541,7 @@ function scratchRewriter({ out, env = process.env, context = opContextOf({ env }
   const roots = [...new Set([...loopRoots, ...jobRoots, ...[os.tmpdir(), env.TEMP, env.TMP].filter(Boolean).flatMap(withReal)])]
     .filter((d) => path.parse(d).root !== d).sort((a, b) => b.length - a.length);
   // Each root as written with either separator, optionally as a file URL; the tail runs to the first quote or space.
-  const forms = [...new Set(roots.flatMap((r) => [r, r.replaceAll(/\\/g, '/'), r.replaceAll(/\//g, '\\')]))].sort((a, b) => b.length - a.length);
+  const forms = [...new Set(roots.flatMap((r) => [r, r.replaceAll('\\', '/'), r.replaceAll('/', '\\')]))].sort((a, b) => b.length - a.length);
   const re = forms.length ? new RegExp(String.raw`(file:\/\/\/?)?(?:${forms.map(reEscape).join('|')})(?:[\\/][^\s"'<>|*?]*)?(?![^\\/\s"'<>|*?])`, WIN ? 'gi' : 'g') : null;
   const map = (abs) => {
     const hit = installed.get(pathKey(abs));

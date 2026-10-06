@@ -202,7 +202,8 @@ export function promptPaletteBlock(brand, { name = null } = {}) {
     seen.add(key);
     lines.push(`- ${e.role ?? 'other'}: ${e.label} ${e.hex}${e.isPrimary && e.role !== 'primary' ? ' (the primary colour)' : ''}`);
   }
-  const head = `Brand colours${name ? ` (${name})` : ''} - use exactly these; every other saturated hue is refused (PALETTE_OFF_BRAND):`;
+  const label = name ? ` (${name})` : '';
+  const head = `Brand colours${label} - use exactly these; every other saturated hue is refused (PALETTE_OFF_BRAND):`;
   const rule = primary
     ? `Primary buttons, links, selected rows, focus rings, active tabs and every call to action are ${primary.hex} (${primary.label}). Never a default blue or any colour not listed; status colours only for their status.`
     : 'The brand declares no primary colour: use only the listed colours.';
@@ -344,7 +345,14 @@ const measureImage = (image, palette, artwork = []) => measurePalette(image, pal
 const pct = (v) => `${(v * 100).toFixed(v < 0.01 ? 2 : 1).replace(/\.0$/, '')}%`;
 
 /** One offender, as the finding names it: colour, hue, area share and the nearest brand token. */
-const describeOffender = (o) => `${o.name} ${o.hex} on ${pct(o.share)} of the coloured area (${pct(o.area)} of the image), nearest brand token ${o.nearest ? `${o.nearest.token} ${o.nearest.hex}${o.nearest.role ? ` (${o.nearest.role})` : ''} at deltaE ${o.nearest.deltaE}` : '(none)'}`;
+const describeOffender = (o) => {
+  let nearest = '(none)';
+  if (o.nearest) {
+    const role = o.nearest.role ? ` (${o.nearest.role})` : '';
+    nearest = `${o.nearest.token} ${o.nearest.hex}${role} at deltaE ${o.nearest.deltaE}`;
+  }
+  return `${o.name} ${o.hex} on ${pct(o.share)} of the coloured area (${pct(o.area)} of the image), nearest brand token ${nearest}`;
+};
 
 /**
  * shell-conformance findings for one image. `subject` says what the image is (a drawn part, a composite, a layout
@@ -361,7 +369,8 @@ export function paletteFindings({ file, shownAs, brand, palette = null, subject 
   const out = [];
   if (m.refused.length) {
     const primary = pal.primary ? ` The brand's primary is ${pal.primary.label} ${pal.primary.hex}: redraw every button, link, selection and accent in it.` : '';
-    out.push(finding(level, PALETTE_CODES.offBrand, `${shownAs}: the ${subject} is painted in ${m.refused.length === 1 ? 'a colour' : `${m.refused.length} colours`} the brand does not declare - ${m.refused.map(describeOffender).join('; ')}.${primary}`));
+    const colours = m.refused.length === 1 ? 'a colour' : `${m.refused.length} colours`;
+    out.push(finding(level, PALETTE_CODES.offBrand, `${shownAs}: the ${subject} is painted in ${colours} the brand does not declare - ${m.refused.map(describeOffender).join('; ')}.${primary}`));
   }
   if (pal.primary && pal.primary.color.oklch.C >= CHROMATIC_TOKEN && !m.primary.present && m.refused.length) {
     out.push(finding(level, PALETTE_CODES.primaryAbsent, `${shownAs}: the brand primary ${pal.primary.label} ${pal.primary.hex} appears nowhere in the ${subject}, while ${m.refused[0].name} ${m.refused[0].hex} covers ${pct(m.refused[0].share)} of its coloured area - the off-brand colour stands in for the primary action`));

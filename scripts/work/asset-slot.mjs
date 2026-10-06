@@ -246,7 +246,10 @@ function main(argv) {
   const slots = assetSlotsOf(targets);
   const unrequested = slots.filter((s) => !s.requested);
   if (json) process.stdout.write(`${JSON.stringify({ ok: cmd === 'list' || !unrequested.length, slots }, null, 2)}\n`);
-  else process.stdout.write(`${slots.map((s) => `${s.filled ? 'filled' : 'OWED  '} ${s.key}${s.requested ? '' : ' (NO REQUEST in asset-request.md)'} ${s.html}`).join('\n') || 'no asset slots'}\n`);
+  else {
+    const lines = slots.map((s) => `${s.filled ? 'filled' : 'OWED  '} ${s.key}${s.requested ? '' : ' (NO REQUEST in asset-request.md)'} ${s.html}`).join('\n');
+    process.stdout.write(`${lines || 'no asset slots'}\n`);
+  }
   return cmd === 'check' && unrequested.length ? 1 : 0;
 }
 

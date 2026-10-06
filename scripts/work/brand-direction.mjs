@@ -98,12 +98,16 @@ export function directionReviewQuestion(work, { archetype, lang = ownerLanguage(
   const learnedLine = !learned.length ? '' : tr(' Rulings learned from your draw feedback (accepted with this answer): {list}.', { list: learned.map((l) => `[${l.id}] ${l.text}`).join(' | ') });
   const text = tr('Please review the design direction (brand.direction rev {rev}) for the "{archetype}" page archetype: region order, grids, emphasis, primary-action placement and the reference renders. Accept it, or ask for a revision and say in the note what to change.{pendingLine}{learnedLine} [{digests}]',
     { rev: direction.rev, archetype, pendingLine, learnedLine, digests });
+  const assets = golden.map((g) => {
+    const label = g.breakpoint ? `${archetype} - ${g.breakpoint}` : archetype;
+    return { path: slash(path.relative(repoRoot, path.resolve(loaded.dir, g.png))), label };
+  });
   return {
     kind: DIRECTION_REVIEW_KIND,
     text,
     options: OPTIONS.map((o) => tr(o)),
     refs: ['brand'],
-    assets: golden.map((g) => ({ path: slash(path.relative(repoRoot, path.resolve(loaded.dir, g.png))), label: `${archetype}${g.breakpoint ? ` - ${g.breakpoint}` : ''}` })),
+    assets,
     review: { schema: DIRECTION_REVIEW_SCHEMA, record: 'brand', recordPath: slash(path.relative(repoRoot, loaded.file)), directionRev: direction.rev, archetype, golden,
       ...(learned.length ? { learned: learned.map((l) => l.id) } : {}) },
   };
@@ -206,7 +210,11 @@ export function applyDirectionReview(work, receiptFile, { write = false } = {}) 
     // learned into brand.direction.learned (kind rubric, proposed), so the revision and every later draw read it,
     // and the next direction review lists it for acceptance.
     const notes = receipt.answeredBy === OWNER ? String(note ?? '').split(/\r?\n/).map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean)
-      .map((words, i) => ({ id: `ON-${sha256(`${receipt.dispatchId ?? '-'}|${i}|${words}`).slice(0, 10)}`, text: words, class: 'product-direction', as: 'rubric', dispatchId: receipt.dispatchId ?? null, at: receipt.at ?? null, shape: archetype })) : [];
+      .map((words, i) => {
+        const seed = `${receipt.dispatchId ?? '-'}|${i}|${words}`;
+        const id = `ON-${sha256(seed).slice(0, 10)}`;
+        return { id, text: words, class: 'product-direction', as: 'rubric', dispatchId: receipt.dispatchId ?? null, at: receipt.at ?? null, shape: archetype };
+      }) : [];
     const learned = notes.length ? learnIntoDirection(work, notes, { record: 'brand', receipt: receiptRel, write }) : { added: [] };
     return { decision, written: false, archetype, dispatchId: receipt.dispatchId ?? null, note, learned: learned.added.map((l) => l.id), brief: note ?? 'the owner asked for a revision without a note: revise against the rubric and ask again' };
   }
