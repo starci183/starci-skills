@@ -22,7 +22,7 @@ test('containedPath returns a path under its base and refuses dot segments, abso
   assert.equal(path.relative(dir, containedPath(dir, 'a')), 'a');
   assert.equal(path.relative(dir, containedPath(dir, 'a/not-yet/created')), path.join('a', 'not-yet', 'created'));
   assert.equal(path.relative(dir, containedPath(dir, dir)), '', 'the base itself is inside');
-  for (const bad of ['..', '../x', 'a/../../x', outside, path.join(dir, '..', 'elsewhere')]) {
+  for (const bad of ['..', '../x', 'a/../../x', outside, path.join(dir, '..', 'elsewhere'), `${dir}-sibling`]) {
     assert.throws(() => containedPath(dir, bad), { code: 'PATH_OUTSIDE_BASE' }, bad);
   }
   fs.symlinkSync(outside, path.join(dir, 'link'), 'junction');
