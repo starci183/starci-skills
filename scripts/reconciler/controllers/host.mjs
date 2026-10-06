@@ -420,7 +420,7 @@ export function createHostController(deps = {}) {
     const r = await ctx.run('node', [SUPERVISOR_WATCHDOG, '--once', '--json'], { timeoutMs: settings().seats.supervisor.timeoutMs });
     const action = outputOf(r)?.action ?? (r?.shadow ? 'shadow' : 'unknown');
     const rec = rowOf(key, now);
-    const seat = action === 'shadow' ? rec.state : seatStateOf(action === 'replace-failed' ? 'restart-failed' : action);
+    const seat = action === 'shadow' ? rec.state : seatStateOf((action === 'replace-failed' && 'restart-failed') || action);
     const next = { ...rec, state: seat, since: rec.state === seat ? rec.since : now, lastAction: action, lastAt: now };
     // MB-05: consecutive refused inputs (the watchdog replaces the seat at SEAT_DEAF_MAX) ride on the SEAT_DEAF clock.
     const failures = Number(outputOf(r)?.inputFailures);
@@ -506,7 +506,7 @@ export function createHostController(deps = {}) {
     state.orphanClocks = seen;
     if (claimDue(ctx, { controller: 'host', duty: 'footprint', intervalMs: p.footprintEveryMs, now }).due) {
       const r = await ctx.run('node', [FOOTPRINT_SCAN, '--json'], { timeoutMs: 600_000 });
-      finishDuty(ctx, { controller: 'host', duty: 'footprint', result: r?.shadow ? 'skipped' : r?.ok === false ? 'failed' : 'done', actionId: r?.actionId ?? null, now: ctx.now() });
+      finishDuty(ctx, { controller: 'host', duty: 'footprint', result: (r?.shadow && 'skipped') || (r?.ok === false && 'failed') || 'done', actionId: r?.actionId ?? null, now: ctx.now() });
       out.footprint = true;
     }
     // INV-H2: Orca's terminals against the workers Orca itself holds active (every seat, op and [Worker] is a
@@ -566,7 +566,7 @@ export function createHostController(deps = {}) {
     const everyMs = deps.usageEveryMs ?? 300_000;
     if (!claimDue(ctx, { controller: 'host', duty: 'usage', intervalMs: everyMs, now }).due) return { skipped: 'fresh' };
     const r = await ctx.run('node', ['scripts/kernel/usage-record.mjs', 'sweep', '--json'], { timeoutMs: 180_000 });
-    finishDuty(ctx, { controller: 'host', duty: 'usage', result: r?.ok === false ? 'failed' : ctx.mode === 'active' ? 'done' : 'skipped', now: ctx.now() });
+    finishDuty(ctx, { controller: 'host', duty: 'usage', result: (r?.ok === false && 'failed') || (ctx.mode === 'active' && 'done') || 'skipped', now: ctx.now() });
     return { ok: r?.ok ?? null, shadow: Boolean(r?.shadow), attempts: r?.value?.attempts ?? null, kernels: r?.value?.kernels ?? null, supervisor: r?.value?.supervisor ?? null };
   }
 
@@ -595,7 +595,7 @@ export function createHostController(deps = {}) {
       }
       const was = rec.state;
       const reason = r.ok ? null : r.reason ?? 'integrity-failed';
-      const next = r.ok ? 'ok' : reason === 'integrity-failed' ? 'corrupt' : reason;
+      const next = (r.ok && 'ok') || (reason === 'integrity-failed' && 'corrupt') || reason;
       if (rec.state !== next) { rec.state = next; rec.since = now; }
       if (next !== 'corrupt') {
         await clear(ctx, key, 'LEDGER_CORRUPT');
@@ -611,9 +611,8 @@ export function createHostController(deps = {}) {
         }
       }
       else if (!r.ok && was !== next) {
-        const remedy = reason === 'schema-incompatible' || reason === 'sqlite-downgrade'
-          ? 'use a compatible runtime and SQLite version' : reason === 'identity-mismatch'
-            ? 'resolve the registry and database identity with the owner' : 'resolve storage access or locking';
+        const remedy = ((reason === 'schema-incompatible' || reason === 'sqlite-downgrade') && 'use a compatible runtime and SQLite version')
+          || (reason === 'identity-mismatch' && 'resolve the registry and database identity with the owner') || 'resolve storage access or locking';
         await ctx.openDecision(di({
           kind: 'runtime-defect', ledger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-health:${ledgerId}:${reason}:${now}`, severity: 'high',
           summary: `${ledgerId}: ${reason}; preserve the database and WAL and ${remedy}`,

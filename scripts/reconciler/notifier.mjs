@@ -62,7 +62,9 @@ function progressLines(rows, language = ownerLanguage()) {
   return rows.map((r) => {
     const p = r.progress;
     const eta = p.eta ? `ETA ${String(p.eta).slice(0, 16).replace('T', ' ')}Z` : 'ETA ?';
-    const head = `- ${r.name ?? r.workflowId}: ${p.unitsDone}/${p.unitsTotal} ${tr('units')}, ${p.unitsPerHour}/h, ${eta}${p.stall?.stalled ? ` - STALL ${p.stall.sinceMin}m` : ''}`;
+    const prefix = `- ${r.name ?? r.workflowId}: ${p.unitsDone}/${p.unitsTotal} ${tr('units')}, ${p.unitsPerHour}/h, ${eta}`;
+    const stall = p.stall?.stalled ? ` - STALL ${p.stall.sinceMin}m` : '';
+    const head = `${prefix}${stall}`;
     return r.why && (p.stall?.stalled || (p.minUnitsPerHour > 0 && p.unitsPerHour < p.minUnitsPerHour)) ? `${head}\n  ${t.slow}: ${String(r.why).replace(/^Why slow: /, '')}` : head;
   });
 }
@@ -77,9 +79,11 @@ export function composeDigest({ digestText, progress = [], actions = [], owed = 
   const lines = [base];
   const byCode = {};
   for (const v of violations) byCode[v.code ?? '?'] = (byCode[v.code ?? '?'] ?? 0) + 1;
-  lines.push(`${t.viol}: ${Object.keys(byCode).length ? Object.entries(byCode).map(([c, n]) => `${c} x${n}`).join(', ') : t.none}`);
+  const violationCounts = Object.keys(byCode).length ? Object.entries(byCode).map(([c, n]) => `${c} x${n}`).join(', ') : t.none;
+  lines.push(`${t.viol}: ${violationCounts}`);
   const today = lands.filter((l) => l.kind === 'land-passed' && now - l.at < DAY);
-  lines.push(`${t.lands}: ${today.length}${today.length ? ` (${today.slice(0, 8).map((l) => String(l.id).slice(0, 12)).join(', ')})` : ''}`);
+  const landDetails = today.length ? ` (${today.slice(0, 8).map((l) => String(l.id).slice(0, 12)).join(', ')})` : '';
+  lines.push(`${t.lands}: ${today.length}${landDetails}`);
   if (judgements.length) { lines.push(`${t.judge}:`); for (const j of judgements.slice(-3)) lines.push(`- ${clipLine(j.text, 300)}`); }
   return lines.join('\n');
 }
@@ -115,7 +119,7 @@ async function record(kind, entityId, payload, { env, now }) {
 
 /** The Supervisor's one-line judgement for the next digest (DESIGN §17.2). */
 export async function judge(text, { env = process.env, now = Date.now() } = {}) {
-  const line = clipLine(String(text ?? '').replace(/\s+/g, ' ').trim(), 400);
+  const line = clipLine(String(text ?? '').replaceAll(/\s+/g, ' ').trim(), 400);
   if (!line) return { ok: false, error: 'empty --text' };
   await record(JUDGEMENT_KIND, 'main', { text: line }, { env, now });
   return { ok: true, text: line };
@@ -127,6 +131,37 @@ async function languageOf() {
   return ownerLanguage();
 }
 
+function progressForLedger(db, repo, now, workflowView) {
+  const progress = [];
+  for (const w of db.prepare("SELECT * FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY created_at").all()) {
+    try {
+      const v = workflowView({ db, workflowId: w.workflow_id, repo, now });
+      progress.push({ workflowId: w.workflow_id, name: w.display_name ?? w.workflow_id, progress: v.progress, why: v.rca.why });
+    } catch { /* one workflow unreadable */ }
+  }
+  return progress;
+}
+
+function ownerWaitsForLedger(db, now, listDecisions) {
+  const ownerWaits = [];
+  try {
+    // listDecisions applies the ended-phase join, so stale owner DIs never reach the digest.
+    for (const d of listDecisions(db, { decider: 'owner', now })) ownerWaits.push(`${d.workflowId}: ${clipLine(d.summary ?? d.kind, 160)}`);
+  } catch { /* a ledger without decision_items */ }
+  return ownerWaits;
+}
+
+function ledgerDigest(repo, { env, now, workflowView, listDecisions, ledgerFileFor, openLedgerReader }) {
+  let db;
+  try {
+    const resolved = ledgerFileFor(repo, { env });
+    if (fs.existsSync(resolved)) db = openLedgerReader(resolved);
+  } catch { return null; }
+  if (!db) return null;
+  try { return { progress: progressForLedger(db, repo, now, workflowView), ownerWaits: ownerWaitsForLedger(db, now, listDecisions) }; }
+  finally { db.close(); }
+}
+
 /** Everything the digest reads: live workflows' progress (progress-rca.mjs), GC line, violations, owner waits. `repos` defaults to config.yaml supervisor.repos. */
 export async function digestInputs({ env = process.env, now = Date.now(), repos = null } = {}) {
   const [{ productRepos, supervisorSettings }, { openLedgerReader, ledgerFileFor }, { workflowView }, { listDecisions }] = await Promise.all([
@@ -134,28 +169,10 @@ export async function digestInputs({ env = process.env, now = Date.now(), repos 
   const progress = [], ownerWaits = [];
   if (repos == null) { try { repos = productRepos(supervisorSettings()); } catch { repos = []; } }
   for (const repo of repos) {
-    let db;
-    try {
-      // A repo's runtime ledger is the one file ledgerFileFor resolves (machine.ledgers names it).
-      const resolved = ledgerFileFor(repo, { env });
-      if (fs.existsSync(resolved)) db = openLedgerReader(resolved);
-    } catch { continue; }
-    if (!db) continue;
-    try {
-      for (const w of db.prepare("SELECT * FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY created_at").all()) {
-        try {
-          const v = workflowView({ db, workflowId: w.workflow_id, repo, now });
-          progress.push({ workflowId: w.workflow_id, name: w.display_name ?? w.workflow_id, progress: v.progress, why: v.rca.why });
-        } catch { /* one workflow unreadable */ }
-      }
-      try {
-        // listDecisions, not a raw read: it applies the ended-phase join (decisions.mjs ENDED), so a leftover
-        // owner DI of an archived|finished workflow — unresolvable there — never reaches the owner's digest.
-        for (const d of listDecisions(db, { decider: 'owner', now })) {
-          ownerWaits.push(`${d.workflowId}: ${clipLine(d.summary ?? d.kind, 160)}`);
-        }
-      } catch { /* a ledger without decision_items */ }
-    } finally { db.close(); }
+    const ledger = ledgerDigest(repo, { env, now, workflowView, listDecisions, ledgerFileFor, openLedgerReader });
+    if (!ledger) continue;
+    progress.push(...ledger.progress);
+    ownerWaits.push(...ledger.ownerWaits);
   }
   let violations = [];
   try { const { openViolations } = await import('./sla.mjs'); violations = openViolations({ env }); } catch { violations = []; }

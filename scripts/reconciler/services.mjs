@@ -177,7 +177,7 @@ async function connectorUp(script, { timeoutMs, tries = 1, run = runChild, extra
   for (let i = 1; i <= Math.max(1, tries); i += 1) {
     const r = await run(cmd, args, { timeoutMs });
     const value = lastJson(r.stdout);
-    last = value ? { ok: judge(value) === true, value, tries: i } : { ok: false, error: r.timedOut ? 'timeout' : String(r.stderr || `exit ${r.status}`).slice(0, 200), tries: i };
+    last = value ? { ok: judge(value) === true, value, tries: i } : { ok: false, error: (r.timedOut && 'timeout') || String(r.stderr || `exit ${r.status}`).slice(0, 200), tries: i };
     if (last.ok) return last;
   }
   return last;
@@ -352,14 +352,14 @@ export function machineStore(m) {
     const had = row ? restartsOf(rec.name, prev.restartsFrom) : [];
     const restarts = (rec.restarts ?? []).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
     const fresh = restarts.filter((t) => !had.includes(t));
-    const restartsFrom = restarts.length ? restarts[0] : had.length ? had.at(-1) + 1 : 0;
+    const restartsFrom = restarts[0] ?? (had.at(-1) ?? -1) + 1;
     const { name, state, since, ...fields } = rec; delete fields.restarts;
     const fromState = row && !prev.removed ? prev.state ?? row.state : null;
     m.upsert('services', { name, kind: row?.kind ?? serviceKindOf(name), state: serviceStateOf(state), since: since ?? at,
       last_probe_json: { ...fields, state, restartsFrom } }, ['name']);
     for (const t of fresh) m.insert('service_events', { name, at: t, from_state: fromState, to_state: state, action: 'restart' });
     if (!fresh.length && fromState !== state) {
-      const action = state === 'quarantined' ? 'quarantine' : fromState === 'quarantined' ? 'release' : null;
+      const action = state === 'quarantined' ? 'quarantine' : (fromState === 'quarantined' && 'release') || null;
       m.insert('service_events', { name, at, from_state: fromState, to_state: state, action, probe_error: fields.lastProbe?.ok === false ? String(fields.lastProbe?.error ?? '').slice(0, 500) || null : null });
     }
     const probe = fields.lastProbe;

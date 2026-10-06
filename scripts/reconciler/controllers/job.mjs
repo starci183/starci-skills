@@ -106,7 +106,7 @@ const jobRoute = (ev) => {
   if (ev?.workflowId) keys.push(wfKey(ev.ledgerId, ev.workflowId));
   return keys;
 };
-const wfRoute = (ev) => (ev?.ledgerId === SUPERVISOR_LEDGER ? null : ev?.workflowId ? wfKey(ev.ledgerId, ev.workflowId) : null);
+const wfRoute = (ev) => ev?.ledgerId !== SUPERVISOR_LEDGER && ev?.workflowId ? wfKey(ev.ledgerId, ev.workflowId) : null;
 
 /* ------------------------------------------------------------------------------------------------ reads */
 
@@ -270,7 +270,7 @@ ${JSON.stringify(r?.value ?? null)}`);
 
 async function reconcileJob(ctx, ledgerId, jobId, settings) {
   const f = ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings }));
-  if (!f) { for (const state of CLOCK_CODES) ctx.clear(jobKey(ledgerId, jobId), state); return { ok: true, action: 'gone' }; }
+  if (!f) { for (const state of CLOCK_CODES) { ctx.clear(jobKey(ledgerId, jobId), state); } return { ok: true, action: 'gone' }; }
   const status = OPEN.includes(f.status) ? await ctx.status(ledgerId, f.workflowId) : null;
   const plan = planJob(f, { frontier: status?.frontier ?? {}, questions: status?.workerQuestions ?? [], settings });
   await keepClocks(ctx, ledgerId, jobId, plan.clocks);
@@ -420,7 +420,7 @@ async function reconcileHealth(ctx, settings, { list = null } = {}) {
       const payload = parse(j.payload_json) ?? {};
       const who = { jobId: j.job_id, workflowId: j.workflow_id, op: j.op_id, terminal: j.worker_id, provider: term?.agentIdentity ?? payload.provider ?? null, pool: payload.agent ?? payload.provider ?? null, model: payload.model ?? null };
       if (c.state !== mem.state && c.state !== 'working') {
-        ctx.log('reconciler.worker-health', `${j.job_id} ${c.state}${c.resetMs != null ? ` (reset in ${Math.round(c.resetMs / 1000)}s)` : ''}`, { ...who, state: c.state, preview: String(term?.preview ?? '').slice(0, 200) });
+        ctx.log('reconciler.worker-health', j.job_id + ' ' + c.state + (c.resetMs != null ? ' (reset in ' + Math.round(c.resetMs / 1000) + 's)' : ''), { ...who, state: c.state, preview: String(term?.preview ?? '').slice(0, 200) });
         if (c.state === 'rate-limited') ctx.log('reconciler.provider-rate-limited', `provider ${who.provider ?? '?'} rate-limited (${j.job_id})`, { ...who, resetMs: c.resetMs ?? null });
       }
       let next = planned.mem;
@@ -449,7 +449,7 @@ async function reconcileHealth(ctx, settings, { list = null } = {}) {
       healthMem.set(j.job_id, next);
     }
   }
-  for (const id of healthMem.keys()) if (!seen.has(id)) healthMem.delete(id); // a job no longer live forgets its probe memory
+  for (const id of healthMem) if (!seen.has(id)) healthMem.delete(id); // a job no longer live forgets its probe memory
   return out;
 }
 export const _health = { reset: () => { healthMem.clear(); lastSendAt = 0; }, mem: healthMem };
@@ -518,5 +518,5 @@ if (isMain(import.meta.url)) {
     } finally { db.close(); }
   }
   if (argv.includes('--json')) console.log(JSON.stringify({ ok: true, plans: out }));
-  else for (const p of out) console.log(`${p.key} ${p.status} step=${p.step ?? '-'}${p.reason ? ` (${p.reason})` : ''} clocks=[${p.clocks.join(', ')}]`);
+  else for (const p of out) console.log(`${p.key} ${p.status} step=${p.step ?? '-'}${p.reason ? ' (' + p.reason + ')' : ''} clocks=[${p.clocks.join(', ')}]`);
 }

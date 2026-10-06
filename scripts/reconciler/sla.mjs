@@ -112,7 +112,7 @@ function violationEvent(row, { catalog = slaCatalog(), now = Date.now() } = {}) 
 const runtimeDefectDecision = (ev, { now = Date.now() } = {}) => ({
   schema: 'starci/decision-item@1', idempotencyKey: `runtime-defect:${ev.dedupeKey}`, kind: 'runtime-defect', decider: 'supervisor',
   ledger: 'supervisor', workflowId: ev.entity.workflowId ?? null, entity: { type: ev.entity.type, id: ev.entity.id },
-  summary: `${ev.code} ${ev.entity.type} ${ev.entity.id}: ${ev.state} for ${Math.round(ev.ageMs / 60_000)}m (SLA ${Math.round(ev.slaMs / 60_000)}m)${ev.autoAction ? `; auto: ${ev.autoAction}` : ''}`,
+  summary: `${ev.code} ${ev.entity.type} ${ev.entity.id}: ${ev.state} for ${Math.round(ev.ageMs / 60_000)}m (SLA ${Math.round(ev.slaMs / 60_000)}m)${(ev.autoAction && '; auto: ' + ev.autoAction) || ''}`,
   evidence: [{ ref: `invariant:${ev.dedupeKey}` }, ...ev.evidence.map((line) => ({ ref: line }))],
   openedBy: 'sla-layer', openedAt: now, escalateTo: 'owner', code: ev.code, severity: ev.severity,
 });
@@ -190,14 +190,29 @@ const lastInvariantKinds = (m, keys) => {
 const refsOf = ({ workflowId = null, extra = [] } = {}) => [...new Set([...String(workflowId ?? '').split(',').filter(Boolean).map((wf) => `workflow:${wf}`), ...extra.filter(Boolean).map(String)])];
 
 // The typed rows are the kinds invariant.violated / invariant.cleared (scripts/kernel/typed-logs.mjs), machine_logs actor 'reconciler'.
-const typedRow = (ev, { now, cleared = false }) => ({
-  kind: cleared ? 'invariant.cleared' : TYPED_EVENT, at: now, level: cleared ? 'info' : ev.severity === 'critical' ? 'error' : 'warn',
-  msg: `${cleared ? 'invariant.cleared' : TYPED_EVENT} ${ev.code} ${ev.entity.type} ${ev.entity.id}${cleared ? (ev.clearedBy ? ` (${ev.clearedBy}${ev.clearedWhy ? `: ${ev.clearedWhy}` : ''})` : '') : ` age ${Math.round(ev.ageMs / 60_000)}m > sla ${Math.round(ev.slaMs / 60_000)}m`}`,
-  workflowId: ev.entity.workflowId ?? null,
-  data: { code: ev.code, message: `${ev.state} ${ev.entity.type}:${ev.entity.id}${cleared && ev.clearedWhy ? `: ${ev.clearedWhy}` : ''}`, severity: ev.severity, dedupeKey: ev.dedupeKey,
-    ...(ev.owner ? { owner: ev.owner } : {}), state: String(ev.state), entity: ev.entity, ...(cleared ? {} : { ageMs: ev.ageMs, slaMs: ev.slaMs }) },
-  refs: refsOf({ workflowId: ev.entity.workflowId, extra: [`invariant:${ev.dedupeKey}`, ...(ev.entity.ledger ? [`ledger:${ev.entity.ledger}`] : [])] }),
-});
+const typedRow = (ev, { now, cleared = false }) => {
+  const kind = cleared ? 'invariant.cleared' : TYPED_EVENT;
+  let level = 'warn';
+  if (cleared) level = 'info';
+  else if (ev.severity === 'critical') level = 'error';
+  let detail = '';
+  if (cleared) {
+    if (ev.clearedBy) {
+      const reason = ev.clearedWhy ? `: ${ev.clearedWhy}` : '';
+      detail = ` (${ev.clearedBy}${reason})`;
+    }
+  } else detail = ` age ${Math.round(ev.ageMs / 60_000)}m > sla ${Math.round(ev.slaMs / 60_000)}m`;
+  const clearWhy = cleared && ev.clearedWhy ? `: ${ev.clearedWhy}` : '';
+  const message = `${ev.state} ${ev.entity.type}:${ev.entity.id}${clearWhy}`;
+  return {
+    kind, at: now, level,
+    msg: `${kind} ${ev.code} ${ev.entity.type} ${ev.entity.id}${detail}`,
+    workflowId: ev.entity.workflowId ?? null,
+    data: { code: ev.code, message, severity: ev.severity, dedupeKey: ev.dedupeKey,
+      ...(ev.owner ? { owner: ev.owner } : {}), state: String(ev.state), entity: ev.entity, ...(cleared ? {} : { ageMs: ev.ageMs, slaMs: ev.slaMs }) },
+    refs: refsOf({ workflowId: ev.entity.workflowId, extra: [`invariant:${ev.dedupeKey}`, ...(ev.entity.ledger ? [`ledger:${ev.entity.ledger}`] : [])] }),
+  };
+};
 
 /* ------------------------------------------------------------------------------------------------ truth */
 // Every pass re-checks each open clock against the ledger / host truth, independent of the controller that set it: a
@@ -259,7 +274,7 @@ async function clockTruth(row, code, src, { now = Date.now() } = {}) {
       // Two tries: the first request after idle can miss a short probe timeout while the service is up.
       for (let i = 0; i < 2; i++) {
         const r = await entry.probe();
-        if (r?.ok === true || r?.unmanaged === true) return { holds: false, why: `probe ok${r?.status ? ` (http ${r.status})` : ''}${i ? ' on the second try' : ''}` };
+        if (r?.ok === true || r?.unmanaged === true) return { holds: false, why: 'probe ok' + (r?.status ? ' (http ' + r.status + ')' : '') + (i ? ' on the second try' : '') };
       }
       return { holds: true };
     }
@@ -301,9 +316,9 @@ async function clockTruth(row, code, src, { now = Date.now() } = {}) {
     if ((p[0] === 'workflow' && p.length >= 3) || (p[0] === 'stuck' && p.length >= 4) || (p[0] === 'seat' && p[1] === 'kernel' && p.length >= 4)) {
       const db = src.ledgerOf(p[0] === 'seat' ? p[2] : p[1]);
       if (!db) return null;
-      const wf = p[0] === 'workflow' ? p.slice(2).join(':') : p[0] === 'seat' ? p.slice(3).join(':') : p[2];
+      let wf = p[2]; if (p[0] === 'workflow') wf = p.slice(2).join(':'); else if (p[0] === 'seat') wf = p.slice(3).join(':');
       const w = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(wf);
-      if (w?.phase !== 'running' || w?.archived_at != null) return { holds: false, why: `workflow ${w ? (w.archived_at != null ? 'archived' : w.phase ?? 'not running') : 'gone'}` };
+      if (w?.phase !== 'running' || w?.archived_at != null) return { holds: false, why: `workflow ${(w && w.archived_at != null && 'archived') || (w?.phase ?? (w ? 'not running' : 'gone'))}` };
       return { holds: true };
     }
     return null;
@@ -359,7 +374,7 @@ export async function transcriptPass(ctx, { catalog, now }) {
 }
 
 /** The clear_reason of a truth check's `why`: the entity is gone, its workflow stopped, or the condition resolved. Pure. */
-const clearReasonOf = (why) => (/\bgone$/.test(String(why ?? '')) ? 'entity-gone' : /^workflow (?:archived|stopped|finished|paused|not running)|^workflow \w+$/.test(String(why ?? '')) ? 'workflow-stopped' : 'resolved');
+const clearReasonOf = (why) => (/\bgone$/.test(String(why ?? '')) && 'entity-gone') || (/^workflow (?:archived|stopped|finished|paused|not running)|^workflow \w+$/.test(String(why ?? '')) && 'workflow-stopped') || 'resolved';
 
 /** Clear every open clock whose condition is gone. Returns Map(entity KEY_SEP state -> why). */
 async function truthPass(ctx, { catalog, now }) {
@@ -471,13 +486,13 @@ if (isMain(import.meta.url)) {
     openDecision: async (di) => { console.error(`would open DI ${di.idempotencyKey}`); return { ok: true, shadow: true }; } };
   if (argv.has('--list')) {
     const out = { stateFile: stateFileOf(ctx), clocks: clocksOf(ctx), open: openViolations(), catalog: slaCatalog() };
-    console.log(json ? JSON.stringify(out, null, 2) : [`state ${out.stateFile}`, ...out.clocks.map((c) => `${c.entity} ${c.state} entered ${new Date(c.enteredAt).toISOString()} sla ${c.slaMs}${c.violatedAt ? ' VIOLATED' : ''}`),
+    console.log(json ? JSON.stringify(out, null, 2) : [`state ${out.stateFile}`, ...out.clocks.map((c) => `${c.entity} ${c.state} entered ${new Date(c.enteredAt).toISOString()} sla ${c.slaMs}${(c.violatedAt && ' VIOLATED') || ''}`),
       `${out.open.length} open violation(s)`, ...out.open.map((v) => `  ${v.dedupeKey} ${v.severity}`)].join('\n'));
   } else if (argv.has('--once')) {
     const m = openMachine();
     let out;
     try { out = await slaPass({ ...ctx, machine: m, stateFile: m.file }); } finally { m.close(); }
-    console.log(json ? JSON.stringify(out, null, 2) : `sla pass: ${out.violated.length} violated, ${out.cleared.length} cleared${out.skipped.length ? `; skipped ${out.skipped.join(', ')}` : ''}`);
+    console.log(json ? JSON.stringify(out, null, 2) : 'sla pass: ' + out.violated.length + ' violated, ' + out.cleared.length + ' cleared' + (out.skipped.length && '; skipped ' + out.skipped.join(', ') || ''));
   } else {
     console.log('args: --once|--list [--json]');
   }

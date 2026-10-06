@@ -80,7 +80,7 @@ export function startHeartbeatWorker({ file, leaseMs, renewMs, stallMaxMs = DEFA
 function workerMain({ file, leaseMs, renewMs, stallMaxMs, t0, sab }, parentPort) {
   const stamp = new Int32Array(sab);
   let m = null;
-  const machine = () => { if (!m) m = openMachine({ file, env: process.env }); return m; };
+  const machine = () => { if (!m) { m = openMachine({ file, env: process.env }); } return m; };
   const st = { leader: false, epoch: 0, holder: null, runId: null, draining: false, phase: null, phaseAt: 0, running: [] };
   let stalledAt = null, loggedAt = null, withheldLogged = false, lastRenewAt = 0, prev = null;
 
@@ -133,7 +133,7 @@ function workerMain({ file, leaseMs, renewMs, stallMaxMs, t0, sab }, parentPort)
     if (plan.renew) renew();
     if (plan.log) {
       loggedAt = now;
-      write('warn', `engine main thread blocked ${Math.round(stallMs / 1000)}s in ${st.phase ?? 'an unknown phase'}${plan.withheld ? ' (heartbeat withheld: past the stall limit)' : st.leader ? ' (heartbeat carried by the worker)' : ''}`,
+      write('warn', `engine main thread blocked ${Math.round(stallMs / 1000)}s in ${st.phase ?? 'an unknown phase'}${(plan.withheld && ' (heartbeat withheld: past the stall limit)') || (st.leader && ' (heartbeat carried by the worker)') || ''}`,
         { stallMs, phase: st.phase, phaseAgeMs: st.phaseAt ? now - st.phaseAt : null, running: st.running, epoch: st.epoch, withheld: plan.withheld, stallMaxMs, ...sample() });
     }
     if (plan.withheld && !withheldLogged) {

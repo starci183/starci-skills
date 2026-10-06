@@ -204,7 +204,7 @@ export class Engine {
         for (const [name, mode] of Object.entries(this.modes)) {
           if (!MACHINE_CONTROLLERS.includes(name)) continue;
           const configured = configuredMode(name, (() => { try { return this.configFn(); } catch { return { enabled: false, controllers: {} }; } })());
-          const reason = mode !== configured ? `${this.safe ? 'safe mode' : 'no --apply'}: configured ${configured} runs ${mode}` : `config.yaml reconciler.controllers.${name}.mode`;
+          const reason = mode !== configured ? `${(this.safe && 'safe mode') || 'no --apply'}: configured ${configured} runs ${mode}` : `config.yaml reconciler.controllers.${name}.mode`;
           this.state.setControllerMode({ controller: name, mode, by: `engine:${this.holder}`, reason });
         }
       });
@@ -226,7 +226,7 @@ export class Engine {
     // handover; the previous epoch's row is closed as reload | lost); the holder's own row is renewed.
     const out = this.state.transaction(() => {
       const row = this.state.leaderOf(LEADER_NAME);
-      const handover = Boolean(handoverPid && row?.pid === handoverPid && row.holder !== this.holder);
+      const handover = Boolean(handoverPid && row?.pid === handoverPid && row?.holder !== this.holder);
       const r = this.state.acquireLeader({ name: LEADER_NAME, holder: this.holder, pid: process.pid, leaseMs, rev: this.rev ?? undefined, processRunId: this.processRunId, handover });
       if (!r.leader) return { ok: false, standby: `leader ${row?.holder ?? r.holder} epoch ${r.epoch} until ${row ? new Date(row.expires_at).toISOString() : '?'}` };
       return { ok: true, epoch: Number(r.epoch), tookOver: !r.renewed && Boolean(row) };
@@ -426,7 +426,7 @@ export class Engine {
   async escalatePass() {
     let mod = this.decisionsModule;
     if (mod === undefined) {
-      try { mod = this.loadDecisions ? await this.loadDecisions() : fs.existsSync(DECISIONS_FILE) ? await import(pathToFileURL(DECISIONS_FILE).href) : null; } catch { mod = null; }
+      try { if (this.loadDecisions) mod = await this.loadDecisions(); else if (fs.existsSync(DECISIONS_FILE)) mod = await import(pathToFileURL(DECISIONS_FILE).href); else mod = null; } catch { mod = null; }
       this.decisionsModule = mod;
     }
     if (typeof mod?.escalateDue !== 'function') return null;
@@ -500,7 +500,7 @@ export class Engine {
             watch.markAttempt();
             await this.drain();
             const handed = await reload(check);
-            this.log('reconciler.event', `${handed.ok ? `reloaded: pid ${handed.pid} took over` : `reload failed: ${handed.error}`} (${check.reason})`, { kind: 'reconciler.reload', ok: handed.ok === true });
+            this.log('reconciler.event', (handed.ok ? 'reloaded: pid ' + `${handed.pid}` + ' took over' : 'reload failed: ' + `${handed.error}`) + ' (' + `${check.reason}` + ')', { kind: 'reconciler.reload', ok: handed.ok === true });
             if (handed.ok) return { exitCode: 0, reloaded: handed.pid };
           }
         }
@@ -609,7 +609,7 @@ async function main(argv = process.argv.slice(2)) {
       }
       result = await engine.once({ controller: argValue(argv, '--controller'), key: argValue(argv, '--key') });
     } finally { engine.close({ releaseLead: apply }); }
-    console.log(json ? JSON.stringify(result) : `[reconciler --once] ${result.ok ? 'ok' : 'NOT OK'} ${result.controllers.map((c) => `${c.name}(${c.mode}) keys=${c.keys} ok=${c.ok} failed=${c.failed.length}`).join('; ') || 'no controller on'}${result.error ? ` ${result.error}` : ''}`);
+    console.log(json ? JSON.stringify(result) : '[reconciler --once] ' + ((result.ok && 'ok') || 'NOT OK') + ' ' + (result.controllers.map((c) => `${c.name}(${c.mode}) keys=${c.keys} ok=${c.ok} failed=${c.failed.length}`).join('; ') || 'no controller on') + ((result.error && ` ${result.error}`) || ''));
     process.exitCode = result.ok ? 0 : 1;
     return;
   }
@@ -652,7 +652,7 @@ async function main(argv = process.argv.slice(2)) {
   // --safe is not inherited: the new process re-evaluates the crash-loop plan itself (safeForStart).
   const reload = () => reexecSelf({ script: selfFile, args: argv.filter((a) => a !== '--safe'), logFile: null, lockName: LOCK_NAME, cwd: SKILL_ROOT, env: { ...process.env, [START_REASON_ENV]: 'self-reload' }, holder: lockHolder, reclaim: reassertManager });
   const r = await engine.run({ watch, reload });
-  endRun({ exitCode: r.exitCode ?? 0, exitReason: r.reloaded ? 'reload-handover' : r.lost ? 'lost-lease' : stopSignal ? 'stopped' : 'clean', killedBy: stopSignal ? `signal:${stopSignal}` : null });
+  endRun({ exitCode: r.exitCode ?? 0, exitReason: (r.reloaded && 'reload-handover') || (r.lost && 'lost-lease') || (stopSignal && 'stopped') || 'clean', killedBy: stopSignal ? `signal:${stopSignal}` : null });
   engine.close({ releaseLead: !r.reloaded && !r.lost, reason: 'stop' });
   process.exit(r.exitCode ?? 0);
 }

@@ -66,10 +66,18 @@ function errorLineOf(r) {
   };
   // A list answer (push-mains: one entry per repository): its first failing entry.
   const item = Array.isArray(r.value) ? r.value.find((x) => x && typeof x === 'object' && (x.ok === false || x.error || x.refused || x.scan?.ok === false)) : null;
-  const v = item ? { error: item.error, reason: [item.repo ? String(item.repo).split(/[\\/]/).pop() : null, item.refused ?? (item.scan?.ok === false ? `push scan: ${item.scan.findings?.length ?? '?'} finding(s)` : null)].filter(Boolean).join(': ') || null }
-    : r.value && typeof r.value === 'object' && !Array.isArray(r.value) ? r.value : null;
-  const fromJson = v ? firstReal(v.error) ?? (typeof v.reason === 'string' ? v.reason : null) ?? (typeof v.code === 'string' ? v.code : null) ?? (v.action ? `action ${v.action}` : null) : null;
-  return clip(r.fenced ? 'epoch-fenced: this engine is no longer the leader' : r.timedOut ? 'timed out' : fromJson ?? firstReal(r.error) ?? firstReal(r.stderr) ?? `exit ${r.code ?? '?'}`, 300);
+  let v = null;
+  if (item) {
+    const repo = item.repo ? String(item.repo).split(/[\\/]/).pop() : null;
+    const scan = item.scan?.ok === false ? `push scan: ${item.scan.findings?.length ?? '?'} finding(s)` : null;
+    v = { error: item.error, reason: [repo, item.refused ?? scan].filter(Boolean).join(': ') || null };
+  } else if (r.value && typeof r.value === 'object' && !Array.isArray(r.value)) v = r.value;
+  let fromJson = null;
+  if (v) fromJson = firstReal(v.error) ?? (typeof v.reason === 'string' ? v.reason : null) ?? (typeof v.code === 'string' ? v.code : null) ?? (v.action ? `action ${v.action}` : null);
+  let message = fromJson ?? firstReal(r.error) ?? firstReal(r.stderr) ?? `exit ${r.code ?? '?'}`;
+  if (r.fenced) message = 'epoch-fenced: this engine is no longer the leader';
+  else if (r.timedOut) message = 'timed out';
+  return clip(message, 300);
 }
 
 /**
@@ -127,13 +135,20 @@ export function statusFailureOf(r, { timeoutMs = null } = {}) {
   if (r?.ok && value) return null;
   const stderr = String(r?.stderr ?? '');
   const stderrHead = clip(stderr.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !isNodeWarningLine(l)).join(' | '), 300) || null;
-  const refusal = value?.ok === false ? value : (() => { const j = lastJsonLine(stderr); return j && typeof j === 'object' && j.ok === false ? j : null; })();
+  let refusal = null;
+  if (value?.ok === false) refusal = value;
+  else {
+    const stderrJson = lastJsonLine(stderr);
+    if (stderrJson && typeof stderrJson === 'object' && stderrJson.ok === false) refusal = stderrJson;
+  }
   const base = { code: Number.isInteger(r?.code) ? r.code : null, timedOut: Boolean(r?.timedOut), stderrHead };
   if (r?.timedOut) return { cause: 'timeout', error: `starci kernel status timed out after ${timeoutMs ?? '?'}ms`, ...base };
   if (r?.error) return { cause: 'spawn', error: clip(`starci kernel status did not spawn: ${r.error}`, 300), ...base };
   if (refusal) return { cause: 'refused', error: clip(`starci kernel status refused (exit ${base.code ?? '?'}): ${refusal.error ?? refusal.code ?? 'ok:false'}`, 300), refusal: refusal.code ?? null, ...base };
-  if (base.code !== 0) return { cause: 'exit', error: clip(`starci kernel status exited ${base.code ?? '?'}${stderrHead ? `: ${stderrHead}` : ' with no stderr'}`, 300), ...base };
-  return { cause: 'no-json', error: clip(`starci kernel status exited 0 with no JSON on stdout${stderrHead ? ` (stderr: ${stderrHead})` : ''}`, 300), ...base };
+  const exitDetail = stderrHead ? `: ${stderrHead}` : ' with no stderr';
+  if (base.code !== 0) return { cause: 'exit', error: clip(`starci kernel status exited ${base.code ?? '?'}${exitDetail}`, 300), ...base };
+  const noJsonDetail = stderrHead ? ` (stderr: ${stderrHead})` : '';
+  return { cause: 'no-json', error: clip(`starci kernel status exited 0 with no JSON on stdout${noJsonDetail}`, 300), ...base };
 }
 
 /** The typed-log kinds a ctx.log row may carry as is; any other kind rides under reconciler.event (or .error). */
@@ -146,7 +161,9 @@ const CTX_LOG_KINDS = Object.freeze(['reconciler.would', 'reconciler.act', 'reco
  */
 export function logRowOf(controller, kind, msg, data = {}, { key = null } = {}) {
   const k = String(kind ?? 'reconciler.event');
-  const rowKind = CTX_LOG_KINDS.includes(k) && Object.hasOwn(LOG_KINDS, k) ? k : k.endsWith('.error') ? 'reconciler.error' : 'reconciler.event';
+  let rowKind = 'reconciler.event';
+  if (CTX_LOG_KINDS.includes(k) && Object.hasOwn(LOG_KINDS, k)) rowKind = k;
+  else if (k.endsWith('.error')) rowKind = 'reconciler.error';
   const who = String(controller ?? 'engine');
   const payload = { ...(data && typeof data === 'object' ? data : {}), controller: who, ...(key && data?.key == null ? { key: String(key) } : {}) };
   if (rowKind !== k) payload.kind = k;
@@ -158,7 +175,7 @@ const valueOf = (v) => (typeof v === 'function' ? v() : v);
 
 /** The SLA catalogue, read at most once a minute (the code and severity of an episode). */
 let catalogCache = { at: 0, value: null };
-const catalogNow = (at) => { if (!catalogCache.value || at - catalogCache.at > 60_000) catalogCache = { at, value: slaCatalog() }; return catalogCache.value; };
+const catalogNow = (at) => { if (!catalogCache.value || at - catalogCache.at > 60_000) { catalogCache = { at, value: slaCatalog() }; } return catalogCache.value; };
 
 /**
  * Build the ctx of one controller. `key`, `epoch`, `ledgers` and `modes` may be functions (the engine passes live
@@ -225,7 +242,10 @@ export function createCtx({
     let r;
     try { r = await exec(); } catch (error) { r = { ok: false, error: String(error?.message ?? error) }; }
     try {
-      journal((m) => m.actionFinish(id, { state: r?.effectState === 'unknown' || r?.recoveryRequired ? 'unknown' : r?.ok === true ? 'done' : 'failed',
+      let state = 'failed';
+      if (r?.effectState === 'unknown' || r?.recoveryRequired) state = 'unknown';
+      else if (r?.ok === true) state = 'done';
+      journal((m) => m.actionFinish(id, { state,
         exitCode: Number.isInteger(r?.code) ? r.code : null, result: actionResultOf(r), summary: actionSummary(r),
         stdout: r?.stdout ?? null, stderr: r?.stderr ?? null, errorSignature: r?.ok === true ? null : errorLineOf(r) }));
     } catch (error) { return { ...journalFailure('finish', error, 'unknown'), result: actionResultOf(r) }; }
