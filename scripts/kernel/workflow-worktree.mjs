@@ -183,8 +183,10 @@ export function workflowSideWait(db, job, payload) {
   if (canDispatchConcurrently(rows, payload)) return null;
   const side = sideOf(payload);
   const busy = rows.map((r) => ({ jobId: r.job_id, op: r.op_id, side: sideOf(r) })).filter((r) => r.side && r.side !== WORK_SIDE && (r.side === 'both' || side === 'both' || r.side === side));
+  const sideText = side === 'both' ? 'whole app' : `${side}/ side`;
+  const busyText = busy.map((b) => `${b.jobId} (${b.side})`).join(', ');
   return { reason: WORKFLOW_SIDE_BUSY, side, busy,
-    detail: `the workflow worktree's ${side === 'both' ? 'whole app' : `${side}/ side`} is in use by ${busy.map((b) => `${b.jobId} (${b.side})`).join(', ')}; the job stays queued and reads ready when that op settles` };
+    detail: `the workflow worktree's ${sideText} is in use by ${busyText}; the job stays queued and reads ready when that op settles` };
 }
 
 /** The rules every op prompt of a workflow with a worktree carries (the path is explicit to every tool). '' without one. */
