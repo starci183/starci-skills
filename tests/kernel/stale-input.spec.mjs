@@ -53,7 +53,7 @@ const selectiveRun=[...process.execArgv,...process.argv].some(arg=>arg==='--test
 const scenario=(title,fn)=>{
   // Mutation proofs select one catching test; leave those runs lazy so Node does
   // not start work belonging to tests it will skip.
-  if(selectiveRun){test(title,t=>runScenario(()=>fn(t)));return;}
+  if(selectiveRun){test(title,t=>assert.doesNotReject(()=>runScenario(()=>fn(t))));return;}
   const cleanups=[];
   // Start independent work while the serial test runner is still registering the
   // file, then attribute its result to the unchanged test title when Node reaches it.
@@ -61,7 +61,7 @@ const scenario=(title,fn)=>{
     try{await fn({after:cleanup=>cleanups.push(cleanup)});}
     finally{for(const cleanup of cleanups.reverse())await cleanup();}
   }).then(()=>({error:null}),error=>({error}));
-  test(title,async()=>{const result=await execution;if(result.error)throw result.error;});
+  test(title,async()=>{const result=await execution;assert.ifError(result.error);});
 };
 
 const fixture=t=>{

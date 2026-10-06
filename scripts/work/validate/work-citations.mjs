@@ -31,7 +31,7 @@ function citationsOf(doc) {
     if (Array.isArray(node)) { node.forEach((v, i) => visit(v, `${field}[${i}]`)); return; }
     if (!node || typeof node !== 'object') return;
     if (typeof node.sha256 === 'string' && SHA.test(node.sha256) && (node.artifact != null || node.path == null)) {
-      out.push({ field: field || '(root)', sha256: node.sha256, artifactId: Number.isInteger(node.artifact) ? node.artifact : node.artifact != null ? Number(node.artifact) : null,
+      out.push({ field: field || '(root)', sha256: node.sha256, artifactId: node.artifact == null ? null : Number(node.artifact),
         role: CITATION_ROLES.includes(node.role) ? node.role : null });
       return;
     }
@@ -60,7 +60,10 @@ function resolveCitations(db, citations) {
 }
 
 /** The record id of a Work record document: its `record` (evidence) or `id`. */
-const recordIdOf = (doc) => (typeof doc?.record === 'string' ? doc.record : typeof doc?.id === 'string' ? doc.id : null);
+const recordIdOf = (doc) => {
+  if (typeof doc?.record === 'string') return doc.record;
+  return typeof doc?.id === 'string' ? doc.id : null;
+};
 
 /**
  * Inside the settle transaction: every resolvable citation of the Work records in `files` (repo-relative or

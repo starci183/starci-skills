@@ -392,7 +392,7 @@ function checkTree(workRoot, out, baseline) {
     for (const s of segSet(rec.data)) claimsAny.add(s);
     if (/^(fr|br|contract)\./.test(rec.id)) for (const s of segSet(rec.data)) claimsFunc.add(s);
   }
-  const capLevel = cap => claimsFunc.has(cap) ? 'fr' : claimsAny.has(cap) ? 'design' : null;
+  const capLevel = cap => (claimsFunc.has(cap) && 'fr') || (claimsAny.has(cap) && 'design') || null;
   for (const o of ops) {
     const level = capLevel(o.cap) ?? capLevel(o.op);
     if (level === null) suspect(o.file ?? workRoot, 'CAPABILITY_WITHOUT_SPEC', `graphql ${o.kind} ${o.cap}/${o.op} ships but no spec record names "${o.cap}" - capability with no record at all`);
@@ -411,7 +411,7 @@ function checkTree(workRoot, out, baseline) {
     if (rec.schema !== 'work/contract@1') continue;
     const shapes = [];
     const surf = rec.data?.surface;
-    for (const item of Array.isArray(surf?.http) ? surf.http : surf?.http ? [surf.http] : []) {
+    for (const item of (Array.isArray(surf?.http) && surf.http) || (surf?.http && [surf.http]) || []) {
       if (item?.method && item?.path) shapes.push(`${item.method.toUpperCase()} ${item.path}`);
     }
     for (const entry of Array.isArray(surf?.shape) ? surf.shape : surf?.requests ?? []) {

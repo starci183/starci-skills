@@ -40,6 +40,13 @@ function levelsOf(ops, edges) {
 }
 
 function graphAnomalies(ops, edges, recordedEdges) {
+  const out = recordedEdgeAnomalies(ops, recordedEdges);
+  const pending = pendingGraphOps(ops, edges);
+  for (const op of pending) out.push({ kind: 'cycle-or-dependent', from: op, to: null });
+  return out;
+}
+
+function recordedEdgeAnomalies(ops, recordedEdges) {
   const out = [];
   if (ops.length > 1 && !Array.isArray(recordedEdges)) out.push({ kind: 'missing-edges', from: null, to: null });
   for (const edge of Array.isArray(recordedEdges) ? recordedEdges : []) {
@@ -47,13 +54,29 @@ function graphAnomalies(ops, edges, recordedEdges) {
     else if (!ops.includes(edge[0]) || !ops.includes(edge[1])) out.push({ kind: 'dangling-edge', from: String(edge[0]), to: String(edge[1]) });
     else if (edge[0] === edge[1]) out.push({ kind: 'self-edge', from: edge[0], to: edge[1] });
   }
+  return out;
+}
+
+function pendingGraphOps(ops, edges) {
   const pending = new Set(ops), ready = ops.filter(op => !edges.some(([, to]) => to === op));
   while (ready.length) {
     const op = ready.shift(); pending.delete(op);
     for (const [from, to] of edges) if (from === op && pending.has(to) && !edges.some(([parent, child]) => child === to && pending.has(parent))) ready.push(to);
   }
-  for (const op of pending) out.push({ kind: 'cycle-or-dependent', from: op, to: null });
-  return out;
+  return pending;
+}
+
+function runtimeOpsOf(rawLegs, units, attempts) {
+  const ops = rawLegs.map(leg => leg.op);
+  for (const op of new Set([...units.map(unit => unit.op_id), ...attempts.map(attempt => attempt.op_id)])) {
+    if (!ops.includes(op)) {
+      const aggregate = ops.some(label => label.split('#')[0] === op);
+      ops.push(op);
+      rawLegs.push({ seq: rawLegs.length + 1, op, inPlan: false, runtimeAggregate: true,
+        injected: aggregate ? 'Recorded at operation scope; planner instance association is unproven' : 'Recorded operation outside the stored chain' });
+    }
+  }
+  return ops;
 }
 
 function legStatus(leg, units, attempts) {
@@ -84,22 +107,14 @@ export function pipelineOf(db, project, wf) {
   const goal = one(db, 'SELECT revision,json,approved_by,approval_ref FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1', wf);
   const goalJson = parse(goal?.json);
   const chain = goalJson?.opChain ?? null;
-  const recordedLegs = (Array.isArray(chain?.legs) ? chain.legs : []).filter(leg => leg && typeof leg.op === 'string')
+  const recordedLegs = (Array.isArray(chain?.legs) ? chain.legs : []).filter(leg => typeof leg?.op === 'string')
     .map(leg => ({ ...leg, inPlan: true, runtimeAggregate: false, op: leg.instance && !leg.op.includes('#') ? `${leg.op}#${leg.instance}` : leg.op }));
   const rawLegs = [...new Map(recordedLegs.map(leg => [leg.op, leg])).values()];
   const units = many(db, 'SELECT unit_id,op_id,goal_revision,subject_key,current_job_id,title,state,tries,dispatches,try_budget,updated_at,done_at FROM work_units WHERE workflow_id=? ORDER BY created_at,unit_id', wf);
   const attempts = many(db, 'SELECT * FROM v_op_history WHERE workflow_id=? ORDER BY attempt_id', wf);
   // Runtime records are keyed by base operation, not planner instance. Do not duplicate their
   // attempts onto several op#instance legs or infer which instance owns a base-op record.
-  const ops = rawLegs.map(leg => leg.op);
-  for (const op of new Set([...units.map(unit => unit.op_id), ...attempts.map(attempt => attempt.op_id)])) {
-    if (!ops.includes(op)) {
-      const aggregate = ops.some(label => label.split('#')[0] === op);
-      ops.push(op);
-      rawLegs.push({ seq: rawLegs.length + 1, op, inPlan: false, runtimeAggregate: true,
-        injected: aggregate ? 'Recorded at operation scope; planner instance association is unproven' : 'Recorded operation outside the stored chain' });
-    }
-  }
+  const ops = runtimeOpsOf(rawLegs, units, attempts);
   const plannedOps = rawLegs.filter(leg => leg.inPlan).map(leg => leg.op);
   const edges = (Array.isArray(chain?.edges) ? chain.edges : []).filter(e => Array.isArray(e) && e.length === 2 && plannedOps.includes(e[0]) && plannedOps.includes(e[1]));
   const anomalies = graphAnomalies(plannedOps, edges, chain?.edges);
@@ -116,7 +131,7 @@ export function pipelineOf(db, project, wf) {
     return {
       seq: leg.seq, op: leg.op, status, level: level[leg.op] ?? 0,
       inPlan: leg.inPlan, runtimeAggregate: leg.runtimeAggregate,
-      binding: !leg.inPlan ? 'operation-history' : legUnits.length ? 'recorded-unit' : 'unbound',
+      binding: (!leg.inPlan && 'operation-history') || (legUnits.length && 'recorded-unit') || 'unbound',
       goalRevision: leg.inPlan ? goal?.revision ?? null : null,
       external: Boolean(leg.external), deferred: leg.deferred ?? null, injected: leg.injected ?? null,
       needs: leg.needsSatisfiedBy ?? [], produces: leg.producesCovered ?? [], conditions: leg.conditions ?? [],
@@ -126,9 +141,9 @@ export function pipelineOf(db, project, wf) {
         updatedAt: u.updated_at, doneAt: u.done_at,
         href: `#/w/${encodeURIComponent(project)}/${encodeURIComponent(wf)}?tab=units&unit=${encodeURIComponent(u.unit_id)}` })),
       attempts: legAttempts.map(a => attemptBrief(a, project, db)),
-      why: (() => { const latest = legAttempts.filter(a => a.dispatched_at != null).at(-1); return latest && status !== 'success' ? whyFor(db, latest) : null; })(),
+      why: (() => { const latest = legAttempts.findLast(a => a.dispatched_at != null); return latest && status !== 'success' ? whyFor(db, latest) : null; })(),
       current: ['running', 'settling', 'retry'].includes(status),
-      info: opInfo(leg.op.split('#')[0], leg.yaml ? String(leg.yaml).split(String.fromCharCode(92)).join('/') : null),
+      info: opInfo(leg.op.split('#')[0], leg.yaml ? String(leg.yaml).split(String.fromCodePoint(92)).join('/') : null),
     };
   });
   const planLegs = legs.filter(leg => leg.inPlan);
@@ -152,9 +167,9 @@ export function pipelineOf(db, project, wf) {
     attempts: attempts.length, lastEventAt: lastEvent,
     workGraph: g ? { version: graph.version, digest: graph.digest, event: graph.event, reason: graph.reason, authorOp: graph.authorOp, authorJob: graph.authorJob, at: graph.createdAt,
       domains: g.domains ?? [], nodes: (g.nodes ?? []).map(n => ({ id: n.id, title: n.title ?? n.id, domain: n.domain ?? null, kind: n.kind ?? null,
-        parent: n.parent ?? null, slice: n.slice ?? null, ownedPaths: Array.isArray(n.ownedPaths) ? n.ownedPaths : null, color: colors[n.id] ?? null,
+        parent: n.parent ?? null, slice: n.slice ?? null, ownedPaths: (Array.isArray(n.ownedPaths) && n.ownedPaths) || null, color: colors[n.id] ?? null,
         ...Object.fromEntries(['reads', 'rollbackTo', 'size', 'frs', 'shapes', 'inferred'].filter(key => Object.hasOwn(n, key)).map(key => [key, n[key]])) })),
       colorSource: 'runtime-live',
-      edges: (g.edges ?? []).map(e => ({ from: e.from, to: e.to, kind: e.kind ?? null, reason: e.reason ?? null, ...(Object.hasOwn(e, 'inferred') ? { inferred: e.inferred } : {}) })) } : null,
+      edges: (g.edges ?? []).map(e => ({ from: e.from, to: e.to, kind: e.kind ?? null, reason: e.reason ?? null, ...(Object.hasOwn(e, 'inferred') && { inferred: e.inferred }) })) } : null,
   };
 }

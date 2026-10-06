@@ -7,7 +7,7 @@ const repoKey = value => {
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
 };
 const sameRepo = (a, b) => repoKey(a) != null && repoKey(a) === repoKey(b);
-const sha = value => typeof value === 'string' && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value) ? value : null;
+const sha = value => typeof value === 'string' && /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/i.test(value) ? value : null;
 const paths = value => Array.isArray(value) && value.every(item => typeof item === 'string') ? value : null;
 
 /** A recorded checkpoint effect exists independently of verdict and workflow finish/land. */
@@ -16,7 +16,7 @@ export function workflowCheckpoint(db, attempt) {
   const workflow = attempt.workflow_id;
   const dispatches = many(db, 'SELECT attempt_id,dispatched_at FROM op_attempts WHERE workflow_id=? AND job_id=? AND dispatched_at IS NOT NULL ORDER BY dispatched_at DESC',
     workflow, attempt.job_id);
-  const nextDispatchAt = dispatches.filter(row => row.dispatched_at > attempt.dispatched_at).at(-1)?.dispatched_at ?? null;
+  const nextDispatchAt = dispatches.findLast(row => row.dispatched_at > attempt.dispatched_at)?.dispatched_at ?? null;
   const candidates = many(db, "SELECT * FROM events WHERE workflow_id=? AND kind='workflow-checkpoint' AND entity_type='job' AND entity_id=? AND occurred_at>=? AND (? IS NULL OR occurred_at<=?) ORDER BY occurred_at DESC,seq DESC",
     workflow, attempt.job_id, attempt.dispatched_at, attempt.settled_at ?? null, attempt.settled_at ?? null).flatMap(event => {
     if (attempt.settled_at == null && nextDispatchAt != null && event.occurred_at >= nextDispatchAt) return [];

@@ -5,6 +5,8 @@ import { byCodeUnit } from '../../../scripts/lib/list.mjs';
 import { ledgerSearchHit, machineSearchHit, logSearchHit } from '../search-read.mjs';
 
 const maxHits = 40;
+const LIKE_ESCAPE_PERCENT = String.raw`\%`;
+const LIKE_ESCAPE_UNDERSCORE = String.raw`\_`;
 const unique = values => [...new Set(values.filter(value => value != null))].sort(byCodeUnit);
 const safeQuery = value => typeof value === 'string' ? value.trim().slice(0, 128) : '';
 
@@ -53,7 +55,7 @@ export function search(request, response, store, url) {
   if (!store.machine) return sendError(request, response, 503, 'DB_UNAVAILABLE', 'Database unavailable');
   const q = safeQuery(url.searchParams.get('q'));
   if (!q) return sendError(request,response,400,'QUERY_REQUIRED','Search query required');
-  const like = `%${q.replaceAll('%','\\%').replaceAll('_','\\_')}%`;
+  const like = `%${q.replaceAll('%', LIKE_ESCAPE_PERCENT).replaceAll('_', LIKE_ESCAPE_UNDERSCORE)}%`;
   const hits = [], seen = new Set();
   let truncated = false;
   const push = hit => {
@@ -64,10 +66,10 @@ export function search(request, response, store, url) {
     hits.push(hit);
   };
   const machine = store.machine.db;
-  const machineRows = machine.prepare("SELECT kind,id,title FROM v_search_ids WHERE id IS NOT NULL AND (id LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\') ORDER BY kind,id LIMIT ?").all(like,like,maxHits + 1);
+  const machineRows = machine.prepare(String.raw`SELECT kind,id,title FROM v_search_ids WHERE id IS NOT NULL AND (id LIKE ? ESCAPE '\' OR title LIKE ? ESCAPE '\') ORDER BY kind,id LIMIT ?`).all(like,like,maxHits + 1);
   for (const row of machineRows) push(machineSearchHit(machine,row.kind === 'ledger' || row.kind === 'worktree' ? { ...row, title: row.id } : row));
   const results = store.forEachLedger(({row,db}) => {
-    const records = db.prepare("SELECT kind,id,workflow_id,title FROM v_search_ids WHERE id IS NOT NULL AND (id LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\') ORDER BY kind,id,workflow_id LIMIT ?").all(like,like,maxHits + 1);
+    const records = db.prepare(String.raw`SELECT kind,id,workflow_id,title FROM v_search_ids WHERE id IS NOT NULL AND (id LIKE ? ESCAPE '\' OR title LIKE ? ESCAPE '\') ORDER BY kind,id,workflow_id LIMIT ?`).all(like,like,maxHits + 1);
     return {row,records: records.map(hit => ledgerSearchHit(db,row,hit)),mark:dbMark(db)};
   });
   for (const result of results) if (result.result) for (const hit of result.result.records) push(hit);

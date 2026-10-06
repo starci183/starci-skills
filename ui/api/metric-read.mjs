@@ -20,13 +20,23 @@ export function metricPayload(snapshot, schema) {
   if (snapshot) {
     const data = snapshot.payload;
     const numbers = (value, keys) => value && keys.every(key => Number.isFinite(value[key]));
-    const valid = schema === 'starci/rca@1' ? numbers(data, ['attempts', 'windowMs']) && Array.isArray(data.clusters)
-      && data.clusters.every(cluster => numbers(cluster, ['count', 'open']) && typeof cluster.cause === 'string' && typeof cluster.why === 'string' && typeof cluster.authority === 'string')
-      && (data.actions === undefined || Array.isArray(data.actions))
-      : schema === 'starci/proof-coverage@1' ? numbers(data.summary, ['total', 'proven', 'stale', 'missing', 'mustOwed'])
-      : schema === 'starci/proof-verify@1' ? typeof data.ok === 'boolean' && numbers(data.files, ['checked', 'intact', 'unchained']) && numbers(data.chain, ['events']) && typeof data.chain.ok === 'boolean'
-      : schema === 'starci/progress@1' ? numbers(data, ['unitsPerHour', 'minUnitsPerHour']) && (data.eta === null || typeof data.eta === 'string')
-      : false;
+    let valid = false;
+    switch (schema) {
+      case 'starci/rca@1':
+        valid = numbers(data, ['attempts', 'windowMs']) && Array.isArray(data.clusters)
+          && data.clusters.every(cluster => numbers(cluster, ['count', 'open']) && typeof cluster.cause === 'string' && typeof cluster.why === 'string' && typeof cluster.authority === 'string')
+          && (data.actions === undefined || Array.isArray(data.actions));
+        break;
+      case 'starci/proof-coverage@1':
+        valid = numbers(data.summary, ['total', 'proven', 'stale', 'missing', 'mustOwed']);
+        break;
+      case 'starci/proof-verify@1':
+        valid = typeof data.ok === 'boolean' && numbers(data.files, ['checked', 'intact', 'unchained']) && numbers(data.chain, ['events']) && typeof data.chain.ok === 'boolean';
+        break;
+      case 'starci/progress@1':
+        valid = numbers(data, ['unitsPerHour', 'minUnitsPerHour']) && (data.eta === null || typeof data.eta === 'string');
+        break;
+    }
     if (!valid) throw new Error(`Invalid metric snapshot payload: ${schema}`);
   }
   return snapshot?.payload ?? null;

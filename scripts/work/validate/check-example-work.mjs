@@ -159,7 +159,7 @@ export function checkStarciworkBoundary(workRoot, problems, warnings = [], resol
     const parts = rel.split('/');
     // Group a directory of agent data under its first denied segment (runs/<id>, evidence, assets, draw-loop, operations/<name>).
     const at = category ? parts.findIndex((seg, i) => i < parts.length - 1 && /^(evidence|runs|draw-loop|operations|assets|kernel-evidence|kernel-strays|kernel-approvals|worktrees|settle-parity|settle-tail|runtime|canon-seams)$/.test(seg)) : -1;
-    const cut = at < 0 ? parts.length : at + (['runs', 'operations', 'evidence'].includes(parts[at]) ? 2 : 1);
+    const cut = at < 0 ? parts.length : at + 1 + Number(['runs', 'operations', 'evidence'].includes(parts[at]));
     const key = `${category ?? 'drift'}|${parts.slice(0, Math.min(cut, parts.length)).join('/')}`;
     groups.set(key, (groups.get(key) ?? 0) + 1);
   }
@@ -267,7 +267,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       problems.push(`${shown}: schema ${record.schema} is the retired recursive work/node envelope; restate it as flat family records (${[...FAMILIES].join(', ')}) [HFS_WORK_NODE_RETIRED]`);
       continue;
     }
-    if (Object.hasOwn(record, 'id') && typeof record.id !== 'string') problems.push(`${shown}: id must be a string, not ${record.id === null ? 'null' : Array.isArray(record.id) ? 'array' : typeof record.id} [ID_TYPE]`); else if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record});
+    if (Object.hasOwn(record, 'id') && typeof record.id !== 'string') problems.push(`${shown}: id must be a string, not ${(record.id === null && 'null') || (Array.isArray(record.id) && 'array') || typeof record.id} [ID_TYPE]`); else if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record});
     if (segments[0] === 'features' && segments.length > 2 && !EXEMPT.has(record.schema)) {
       const want = expectedId(segments);
       if (want && record.id !== want) problems.push(`${shown}: id is ${record.id}, but its place says ${want}`);
@@ -463,7 +463,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       if (!['todo', 'done'].includes(data.state)) problems.push(`${rec.shown}: work/gap@1 state must be todo or done`);
       if (!data.statement) problems.push(`${rec.shown}: work/gap@1 needs a statement`);
       if (data.closedBy != null) {
-        const closers = typeof data.closedBy === 'string' ? [data.closedBy] : Array.isArray(data.closedBy) ? data.closedBy : null;
+        const closers = (typeof data.closedBy === 'string' && [data.closedBy]) || (Array.isArray(data.closedBy) && data.closedBy) || null;
         if (!closers) {
           problems.push(`${rec.shown}: closedBy must be a record id or a list of record ids, not ${JSON.stringify(data.closedBy)}`);
         } else {
@@ -640,7 +640,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       // Owner ruling 2026-09-27: a product artwork slot is a NEW interface.asset generation (sha + prompt), never a
       // brand master (the landing's art) and never a placeholder - the surface is not done while one is owed.
       for (const slot of assetSlotsOf([rec.dir], {repo: path.dirname(workRoot)}).filter(s => !s.filled)) {
-        problems.push(`${rec.shown}: state is done but artwork slot "${slot.id}" (${slot.html}) is owed - ${slot.master ? 'its bytes are a brand master (the landing art), not a new generation' : !slot.sha256 ? 'it is still the drawing placeholder' : !slot.prompt ? 'no prompt.txt names its generation' : 'data-asset-sha256 is not the bytes of its src'}; interface.asset fills it with a new generation (src, data-asset-sha256, data-asset-prompt) [${ASSET_SLOT_UNFILLED}]`);
+        problems.push(`${rec.shown}: state is done but artwork slot "${slot.id}" (${slot.html}) is owed - ${slot.master && 'its bytes are a brand master (the landing art), not a new generation' || !slot.sha256 && 'it is still the drawing placeholder' || !slot.prompt && 'no prompt.txt names its generation' || 'data-asset-sha256 is not the bytes of its src'}; interface.asset fills it with a new generation (src, data-asset-sha256, data-asset-prompt) [${ASSET_SLOT_UNFILLED}]`);
       }
       const uiSpec = data.ui;
       if (uiSpec) {
@@ -674,7 +674,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
         problems.push(`${rec.shown}: state is done but there is no sibling evidence.yaml naming the run it settled on`);
       } else {
         const ev = parseYaml(fs.readFileSync(evidenceFile, 'utf8'));
-        const cited = (v) => (Array.isArray(v) ? v : v ? [v] : []).filter((c) => c && typeof c === 'object' && /^[a-f0-9]{64}$/.test(String(c.sha256 ?? '')));
+        const cited = (v) => [].concat(v || []).filter((c) => c && typeof c === 'object' && /^[a-f0-9]{64}$/.test(String(c.sha256 ?? '')));
         if (ev?.run && typeof ev.run === 'object') {
           // The run is agent data in the blob store; evidence.yaml cites its files by sha256 (+ artifact id).
           const run = ev.run;
@@ -684,8 +684,8 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
           else {
             try {
               const file = blobOptions.root == null ? blobPath(cited(run.result)[0].sha256) : null;
-              const bytes = blobOptions.root == null ? (file ? fs.readFileSync(file) : null) : getBlob(cited(run.result)[0].sha256, blobOptions);
-              const outcome = bytes ? (/outcome:\s*pass/i.test(bytes.toString('utf8')) ? 'pass' : 'not-pass') : (run.outcome ?? ev.outcome ?? null);
+              const bytes = (() => { if (blobOptions.root != null) return getBlob(cited(run.result)[0].sha256, blobOptions); return file ? fs.readFileSync(file) : null; })();
+              const outcome = bytes ? (/outcome:\s*pass/i.test(bytes.toString('utf8')) && 'pass' || 'not-pass') : (run.outcome ?? ev.outcome ?? null);
               if (outcome !== 'pass') problems.push(`${rec.shown}: run ${run.id ?? '?'}'s result does not record outcome: pass`);
             } catch (error) {
               if (blobOptions.root == null) throw error;
@@ -723,7 +723,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
   // render/brand owner: capture PNG, markup, palette, anatomy and mascot rules.
   // It uses the same frontend predicate as IMPL_BEFORE_DIRECTION. Missing or
   // uncheckable selected capture bytes refuse; a core-check skip is not a pass.
-  for (const [, rec] of records) {
+  for (const rec of records.values()) {
     if (rec.schema !== 'work/implementation@1' || rec.data?.state !== 'done') continue;
     for (const problem of renderProofProblems({rec, records, workspaceDoc, workRoot, blobOptions}))
       problems.push(`${rec.shown}: ${problem}`);
@@ -731,7 +731,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
 
   // ---- concept 13 (continued): uat-flow environment/fixtures/accounts refs resolve to a real _resources entry ----
   const resourceKind = (id) => recOf(id)?.data?.kind;
-  for (const [, rec] of records) {
+  for (const rec of records.values()) {
     if (rec.schema !== 'work/uat-flow@1') continue;
     const data = rec.data;
     if (data.environment) {
@@ -771,7 +771,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     if (typeof sealed !== 'string') continue;
     const slug = path.basename(rec.dir);
     const misplaced = sealedLocationProblem(sealed);
-    if (misplaced || path.posix.basename(sealed.trim(), '.enc') !== `identity-${slug}`) problems.push(`${rec.shown}: identity ${id} points custody.sealed at ${sealed.trim()}${misplaced ? ` (${misplaced})` : ''}; it names its secret .starcistacks/<env>/secrets/identity-${slug}.enc [HFS_IDENTITY_CUSTODY]`);
+    if (misplaced || path.posix.basename(sealed.trim(), '.enc') !== `identity-${slug}`) problems.push(`${rec.shown}: identity ${id} points custody.sealed at ${sealed.trim()}${misplaced ? ' (' + misplaced + ')' : ''}; it names its secret .starcistacks/<env>/secrets/identity-${slug}.enc [HFS_IDENTITY_CUSTODY]`);
   }
 
   // ---- trust concept 5: blockers form a DAG rooted in gaps or open decisions ----
@@ -829,7 +829,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       const isOpenDecision = target.schema === 'work/policy-decision@1' && target.data?.outcome === 'open';
       const subEdges = blockedByOf(target);
       if (isGap || isOpenDecision || !subEdges.length) {
-        roots.set(targetId, isGap ? 'gap' : isOpenDecision ? 'decision' : 'record');
+        roots.set(targetId, (isGap && 'gap') || (isOpenDecision && 'decision') || 'record');
         return;
       }
       const nextVisited = new Set(visited);
@@ -903,6 +903,6 @@ if (isMain(import.meta.url)) {
   for (const problem of problems) console.log(`REFUSED ${problem}`);
   for (const warning of warnings) console.log(`WARN ${warning}`);
   for (const info of infos) console.log(`INFO ${info}`);
-  console.log(`${records} record(s), ${refs} ref(s), ${evidence} evidence file(s), ${payloads} artifact payload(s) skipped: ${problems.length ? `${problems.length} refused` : 'every id matches its place, every ref resolves, and every new-concept rule is satisfied'}${warnings.length ? `, ${warnings.length} warned` : ''}`);
+  console.log(`${records} record(s), ${refs} ref(s), ${evidence} evidence file(s), ${payloads} artifact payload(s) skipped: ${problems.length ? problems.length + ' refused' : 'every id matches its place, every ref resolves, and every new-concept rule is satisfied'}${warnings.length ? ', ' + warnings.length + ' warned' : ''}`);
   process.exitCode = problems.length ? 1 : 0;
 }

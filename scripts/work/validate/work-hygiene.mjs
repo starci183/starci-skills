@@ -223,7 +223,7 @@ export function rangeFiles(repo, base, head) {
 }
 
 export function formatFindings(result, { limit = 30 } = {}) {
-  const lines = result.findings.slice(0, limit).map((f) => `  ${f.code} ${f.file}${f.line ? `:${f.line}` : ''} - ${f.detail}`);
+  const lines = result.findings.slice(0, limit).map((f) => `  ${f.code} ${f.file}${f.line ? ':' + f.line : ''} - ${f.detail}`);
   if (result.findings.length > limit) lines.push(`  ... ${result.findings.length - limit} more`);
   return lines.join('\n');
 }

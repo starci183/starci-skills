@@ -95,7 +95,10 @@ export function colorsFromJobs(graph, jobs, { recorded = {}, since = 0 } = {}) {
     if (out[id]) return out[id];
     const n = nodes.find((x) => x.id === id);
     const all = [own(n), ...(kids.get(id) ?? []).map(color)];
-    out[id] = all.includes(RED) ? RED : all.includes(YELLOW) ? YELLOW : all.every((c) => c === GREEN) ? GREEN : GRAY;
+    if (all.includes(RED)) out[id] = RED;
+    else if (all.includes(YELLOW)) out[id] = YELLOW;
+    else if (all.every((c) => c === GREEN)) out[id] = GREEN;
+    else out[id] = GRAY;
     return out[id];
   };
   for (const n of nodes) color(n.id);
@@ -179,7 +182,7 @@ export function workGraphStatus(db, workflowId, { rework = new Set() } = {}) {
   const { colors, jobs } = liveCoverage(db, row, { rework });
   const counts = Object.values(colors).reduce((acc, c) => ({ ...acc, [c]: (acc[c] ?? 0) + 1 }), {});
   const frontier = frontierOf(row.graph, colors).map((n) => {
-    const last = (jobs.get(n.id) ?? []).filter((j) => j.op).sort((a, b) => a.createdAt - b.createdAt || a.jobId.localeCompare(b.jobId)).at(-1) ?? null;
+    const last = (jobs.get(n.id) ?? []).filter((j) => j.op).toSorted((a, b) => a.createdAt - b.createdAt || a.jobId.localeCompare(b.jobId)).findLast((j) => j.op) ?? null;
     return { id: n.id, domain: n.domain, slice: n.slice, kind: n.kind, color: colors[n.id], ownedPaths: n.ownedPaths, lastOp: last?.op ?? null, lastJob: last?.jobId ?? null };
   });
   return { version: row.version, event: row.event, graph: row.graph, colors, counts, frontier };

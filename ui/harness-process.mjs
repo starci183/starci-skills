@@ -17,7 +17,7 @@ const VERB_MODULE = fileURLToPath(new URL('./harness-verbs.mjs', import.meta.url
 const VITE_TOOL_ENTRY = path.join('node_modules', 'vite', 'bin', 'vite.js');
 const STATE_SCHEMA = 'starci/harness-processes@1';
 const modeOf = (tunnel) => tunnel ? 'tunnel' : 'app';
-const normalize = (value) => String(value ?? '').replace(/\\/g, '/').toLowerCase();
+const normalize = (value) => String(value ?? '').replaceAll('\\', '/').toLowerCase();
 
 const harnessStateFile = (env = process.env) => path.join(starciLocalRoot(env), 'services', 'harness-processes.json');
 
@@ -188,7 +188,7 @@ export function stopHarness({
     else refused.push({ mode: record.mode, pid: record.pid, reason: result?.output ?? 'stop failed' });
   }
   writeState(stateFile, state, io);
-  return { ok: refused.length === 0, action: refused.length ? 'refused' : stopped.length ? 'stopped' : 'not-running', stopped, stale, refused };
+  return { ok: refused.length === 0, action: (refused.length && 'refused') || (stopped.length && 'stopped') || 'not-running', stopped, stale, refused };
 }
 
 export async function harnessUrl({ tunnel = false } = {}) {

@@ -10,8 +10,10 @@ const skillRoot = path.resolve(import.meta.dirname, '..', '..');
 const checkerFile = path.join(skillRoot, 'scripts', 'checks', 'check-json-exceptions.mjs');
 const allowlistFile = path.join(skillRoot, 'modules', 'kernel', 'allowlist.yaml');
 
-assert.equal(fs.existsSync(checkerFile), true, 'scripts/checks/check-json-exceptions.mjs is required');
-assert.equal(fs.existsSync(allowlistFile), true, 'modules/kernel/allowlist.yaml is required');
+test('the JSON exception checker and its owner allowlist exist',()=>{
+  assert.equal(fs.existsSync(checkerFile), true, 'scripts/checks/check-json-exceptions.mjs is required');
+  assert.equal(fs.existsSync(allowlistFile), true, 'modules/kernel/allowlist.yaml is required');
+});
 
 /** A fixture allowlist document carrying only the json-exceptions section text given (already indented one level). */
 const allowlistDoc = (section) => `schema: starci/allowlist@1\njson-exceptions:\n${section}`;

@@ -8,20 +8,27 @@ const many = (db, sql, ...args) => db.prepare(sql).all(...args);
 const one = (db, sql, ...args) => db.prepare(sql).get(...args) ?? null;
 const parse = (value, fallback = null) => { try { return value == null ? fallback : JSON.parse(value); } catch { return fallback; } };
 const LOG_LEVELS = ['debug', 'info', 'warn', 'error'];
+const LIKE_ESCAPE_PERCENT = String.raw`\%`;
+const LIKE_ESCAPE_UNDERSCORE = String.raw`\_`;
 const projectName = (store, ledgerId) => store.projects().find(row => row.ledgerId === ledgerId)?.name ?? null;
 const ref = (kind, id, project = null, namespace = null) => {
   const diParams = new URLSearchParams({ id: String(id) });
   if (project) diParams.set('project', project);
   if (namespace) { diParams.set('store', namespace.store); if (namespace.ledgerId) diParams.set('ledger', namespace.ledgerId); }
-  const href = kind === 'attempt' && project && Number.isSafeInteger(Number(id)) ? `#/a/${encodeURIComponent(project)}/${encodeURIComponent(id)}`
-    : kind === 'workflow' && project ? `#/w/${encodeURIComponent(project)}/${encodeURIComponent(id)}`
-      : kind === 'di' ? `#/decisions?${diParams}` : null;
-  return href ? { kind, ...(project ? { project } : {}), ...(namespace ?? {}), id: String(id), href } : null;
+  let href = null;
+  if (kind === 'attempt' && project && Number.isSafeInteger(Number(id))) href = `#/a/${encodeURIComponent(project)}/${encodeURIComponent(id)}`;
+  else if (kind === 'workflow' && project) href = `#/w/${encodeURIComponent(project)}/${encodeURIComponent(id)}`;
+  else if (kind === 'di') href = `#/decisions?${diParams}`;
+  if (!href) return null;
+  return { kind, ...(project ? { project } : {}), ...namespace, id: String(id), href };
 };
 
 function wantedDatabases(store, url) {
   const exactSource = url.searchParams.get('source');
-  const scope = exactSource === 'machine' ? 'machine' : exactSource === 'ledger' ? 'project' : url.searchParams.get('scope') ?? 'all';
+  let scope;
+  if (exactSource === 'machine') scope = 'machine';
+  else if (exactSource === 'ledger') scope = 'project';
+  else scope = url.searchParams.get('scope') ?? 'all';
   const project = url.searchParams.get('project');
   if (project && !store.projects().some(row => row.name === project || row.ledgerId === project)) return null;
   if (!['all', 'machine', 'project'].includes(scope) || exactSource && !['machine', 'ledger'].includes(exactSource) || exactSource === 'ledger' && !project || url.searchParams.has('id') && !exactSource) return null;
@@ -55,7 +62,10 @@ function queryRows(dbInfo, url, position = null, afterSeq = null, snapshot = nul
     if (name !== 'machine') return [];
     add('l.controller = ?', url.searchParams.get('controller'));
   }
-  if (url.searchParams.has('kind')) add("l.kind LIKE ? ESCAPE '\\'", `${url.searchParams.get('kind').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`);
+  if (url.searchParams.has('kind')) {
+    const kind = url.searchParams.get('kind').replaceAll('%', LIKE_ESCAPE_PERCENT).replaceAll('_', LIKE_ESCAPE_UNDERSCORE) + '%';
+    add(String.raw`l.kind LIKE ? ESCAPE '\'`, kind);
+  }
   if (url.searchParams.has('since')) add('l.at >= ?', Number(url.searchParams.get('since')));
   if (url.searchParams.has('until')) add('l.at <= ?', Number(url.searchParams.get('until')));
   if (name === 'machine' && url.searchParams.has('project')) {
@@ -77,7 +87,7 @@ function logRow(row, dbName, store) {
   const ledgerId = dbName === 'machine' ? row.ledger_id ?? null : store.projects().find(item => item.name === dbName)?.ledgerId ?? null;
   const rawRefs = parse(row.refs_json, []);
   const refs = Array.isArray(rawRefs) ? rawRefs.filter(x => x && typeof x === 'object' && x.kind && x.id != null)
-    .map(x => ref(x.kind, x.id, x.project ?? project, ['machine', 'ledger'].includes(x.store) ? { store: x.store, ledgerId: x.ledgerId ?? x.ledger ?? null } : null)).filter(Boolean) : [];
+    .map(x => ref(x.kind, x.id, x.project ?? project, (['machine', 'ledger'].includes(x.store) && { store: x.store, ledgerId: x.ledgerId ?? x.ledger ?? null }) || null)).filter(Boolean) : [];
   return { key: `${dbName}:${row.seq}`, db: dbName, store: dbName === 'machine' ? 'machine' : 'ledger', ledgerId, seq: row.seq, at: row.at, actor: row.actor,
     controller: row.controller ?? null, project, wf: row.workflow_id, job: row.job_id,
     level: row.level, kind: row.kind, msg: row.msg, data: parse(row.data_json), refs,
@@ -112,27 +122,44 @@ function timeline(store, url) {
   const { row: ledger, db } = target, machine = store.machine.db;
   const allowed = new Set((url.searchParams.get('sources') ?? 'event,log,attempt,check,decision,violation,action').split(','));
   const since = Number(url.searchParams.get('since')) || -Infinity, until = Number(url.searchParams.get('until')) || Infinity;
+  const matchesJob = row => {
+    if (!job) return true;
+    if (row.source === 'log') return one(db, 'SELECT job_id FROM logs WHERE seq=?', row.seq)?.job_id === job;
+    if (row.attempt_id) return one(db, 'SELECT job_id FROM op_attempts WHERE attempt_id=?', row.attempt_id)?.job_id === job;
+    return false;
+  };
   const rows = many(db, 'SELECT * FROM v_timeline ORDER BY at DESC,source,seq DESC').filter(row => row.source !== 'decision' && (!wf || row.workflow_id === wf)
-    && (!job || (row.source === 'log' ? one(db, 'SELECT job_id FROM logs WHERE seq=?', row.seq)?.job_id === job
-      : row.attempt_id ? one(db, 'SELECT job_id FROM op_attempts WHERE attempt_id=?', row.attempt_id)?.job_id === job : false))
+    && matchesJob(row)
     && allowed.has(row.source) && row.at >= since && row.at <= until).map(row => {
-    const recorded = row.source === 'attempt' ? one(db, 'SELECT attempt_state,ui FROM v_op_history WHERE attempt_id=?', row.attempt_id)
-      : row.source === 'check' ? one(db, 'SELECT ui FROM v_checks WHERE check_id=?', row.entity_id) : null;
+    let recorded = null;
+    if (row.source === 'attempt') recorded = one(db, 'SELECT attempt_state,ui FROM v_op_history WHERE attempt_id=?', row.attempt_id);
+    else if (row.source === 'check') recorded = one(db, 'SELECT ui FROM v_checks WHERE check_id=?', row.entity_id);
     const nativeUi = recorded?.ui;
-    const ui = ['bad', 'warn', 'running', 'waiting', 'ok', 'done', 'unknown'].includes(nativeUi) ? nativeUi : nativeUi === 'awaiting-owner' ? 'waiting' : nativeUi === 'rejected' ? 'warn'
-      : row.source === 'log' && row.kind.startsWith('error:') ? 'bad' : row.source === 'log' && row.kind.startsWith('warn:') ? 'warn' : 'unknown';
+    let ui = 'unknown';
+    if (['bad', 'warn', 'running', 'waiting', 'ok', 'done', 'unknown'].includes(nativeUi)) ui = nativeUi;
+    else if (nativeUi === 'awaiting-owner') ui = 'waiting';
+    else if (nativeUi === 'rejected') ui = 'warn';
+    else if (row.source === 'log' && row.kind.startsWith('error:')) ui = 'bad';
+    else if (row.source === 'log' && row.kind.startsWith('warn:')) ui = 'warn';
+    let title = row.kind;
+    if (row.source === 'check') title = row.kind;
+    else if (row.source === 'log') title = row.detail;
+    let rowRef = null;
+    if (row.source === 'attempt' || row.source === 'check') rowRef = ref('attempt', row.attempt_id, project);
+    else if (row.workflow_id) rowRef = ref('workflow', row.workflow_id, ledger.name);
     return { id: `${ledger.ledgerId}:${row.source}:${row.seq}`, ledgerId: ledger.ledgerId, project: ledger.name, at: row.at,
     source: row.source, kind: row.kind, ui,
-    title: row.source === 'check' ? row.kind : row.source === 'log' ? row.detail : row.kind,
-    ref: row.source === 'attempt' || row.source === 'check' ? ref('attempt', row.attempt_id, project)
-      : row.workflow_id ? ref('workflow', row.workflow_id, ledger.name) : null,
+    title,
+    ref: rowRef,
     detail: row.source === 'check' ? null : parse(row.detail, row.detail) };
   });
   if (allowed.has('decision')) rows.push(...many(db, 'SELECT * FROM decisions ORDER BY decided_at DESC,decision_id').filter(row => (!wf || row.workflow_id === wf) && row.decided_at >= since && row.decided_at <= until
     && (!job || row.subject_type === 'job' && row.subject_id === job || row.subject_type === 'attempt' && one(db, 'SELECT job_id FROM op_attempts WHERE attempt_id=?', row.subject_id)?.job_id === job)).map(row => {
       const params = new URLSearchParams({ id: row.di_id, store: 'ledger', ledger: ledger.ledgerId, project: ledger.name });
-      const targetRef = row.di_id ? { kind: 'di', id: row.di_id, project: ledger.name, store: 'ledger', ledgerId: ledger.ledgerId, href: `#/decisions?${params}` }
-        : row.subject_type === 'attempt' ? ref('attempt', row.subject_id, ledger.name) : row.workflow_id ? ref('workflow', row.workflow_id, ledger.name) : null;
+      let targetRef = null;
+      if (row.di_id) targetRef = { kind: 'di', id: row.di_id, project: ledger.name, store: 'ledger', ledgerId: ledger.ledgerId, href: `#/decisions?${params}` };
+      else if (row.subject_type === 'attempt') targetRef = ref('attempt', row.subject_id, ledger.name);
+      else if (row.workflow_id) targetRef = ref('workflow', row.workflow_id, ledger.name);
       return { id: `${ledger.ledgerId}:decision:${row.decision_id}`, ledgerId: ledger.ledgerId, project: ledger.name, at: row.decided_at, source: 'decision', kind: row.choice, ui: uiState(db, 'decision', 'resolved'), title: row.choice, ref: targetRef, detail: { decisionId: row.decision_id, rationale: row.rationale, result: parse(row.result_json) } };
     }));
   if (allowed.has('violation')) rows.push(...many(machine, 'SELECT * FROM invariant_violations WHERE ledger_id=?', ledger.ledgerId)

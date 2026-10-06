@@ -52,7 +52,7 @@ function workflowRow(store, row, db, progress, extra = {}) {
     latest = metricPayload(recorded, 'starci/progress@1') ?? {};
     progressSnapshot = recorded?.snapshot ?? null;
   } catch (error) { progressReadError = String(error?.message ?? error); }
-  const eta = typeof latest.eta === 'string' ? Date.parse(latest.eta) : NaN;
+  const eta = typeof latest.eta === 'string' ? Date.parse(latest.eta) : Number.NaN;
   const dIs = many(db, `SELECT di_id,kind,decider,status,due_at,opened_at,summary,ui FROM v_decision_rows WHERE workflow_id=? AND status IN ${OPEN_DI}`, wf);
   const violations = many(machine, 'SELECT code,severity,violated_at,ui FROM v_sla_open WHERE ledger_id=? AND workflow_id=?', row.ledgerId, wf);
   const seat = seatOf(machine, p, wf);
@@ -70,8 +70,9 @@ function workflowRow(store, row, db, progress, extra = {}) {
   const state = workflowStateOf(current, { openDIs: dIs, openViolations: violations, seat,
     phaseUi: uiState(db, 'workflow', progress.phase) });
   const primaryDI = dIs.sort((a, b) => Number(b.ui === 'bad') - Number(a.ui === 'bad') || a.opened_at - b.opened_at)[0];
-  const onIt = primaryDI ? { who: primaryDI.decider, ref: ref('di', primaryDI.di_id, p), reason: reason('DECISION_OPEN', { kind: primaryDI.kind ?? 'decision' }) }
-    : state.ui === 'warn' || state.ui === 'bad' ? { who: 'kernel', ref: null, reason: state.reason ?? reason('PROGRESS', {}) } : null;
+  let onIt = null;
+  if (primaryDI) onIt = { who: primaryDI.decider, ref: ref('di', primaryDI.di_id, p), reason: reason('DECISION_OPEN', { kind: primaryDI.kind ?? 'decision' }) };
+  else if (state.ui === 'warn' || state.ui === 'bad') onIt = { who: 'kernel', ref: null, reason: state.reason ?? reason('PROGRESS', {}) };
   const pipe = pipelineOf(db, p, wf);
   return {
     pipeline: { goalRevision: pipe.goalRevision, chainStatus: pipe.chainStatus, approvedBy: pipe.approvedBy, approvalRef: pipe.approvalRef, approvalState: pipe.approvalState,
@@ -123,13 +124,21 @@ function compactHealth(machine) {
   const engine = one(machine, 'SELECT ui FROM v_engine_health');
   const critical = one(machine, "SELECT count(*) AS n FROM v_sla_open WHERE ui='bad'")?.n ?? 0;
   const warning = one(machine, "SELECT count(*) AS n FROM v_sla_open WHERE ui='warn'")?.n ?? 0;
+  let slaUi = 'ok', slaReason = null;
+  if (critical) { slaUi = 'bad'; slaReason = reason('SLA_CRITICAL', { count: critical }); }
+  else if (warning) { slaUi = 'warn'; slaReason = reason('SLA_WARNING', { count: warning }); }
   const items = [
     { key: 'engine', ui: engine?.ui ?? 'unknown', value: engine?.ui ?? 'unknown', reason: null, href: '#/system/engine' },
-    { key: 'sla', ui: critical ? 'bad' : warning ? 'warn' : 'ok', value: String(critical + warning),
-      reason: critical ? reason('SLA_CRITICAL', { count: critical }) : warning ? reason('SLA_WARNING', { count: warning }) : null,
+    { key: 'sla', ui: slaUi, value: String(critical + warning), reason: slaReason,
       href: '#/system/sla' },
   ];
-  return { ui: items.some(item => item.ui === 'bad') ? 'bad' : items.some(item => item.ui === 'warn') ? 'warn' : items.some(item => item.ui === 'unknown') ? 'unknown' : 'ok', items };
+  return { ui: summaryUi(items), items };
+}
+function summaryUi(items) {
+  if (items.some(item => item.ui === 'bad')) return 'bad';
+  if (items.some(item => item.ui === 'warn')) return 'warn';
+  if (items.some(item => item.ui === 'unknown')) return 'unknown';
+  return 'ok';
 }
 function workers(store, url) {
   const workflowReads = [];
@@ -146,7 +155,7 @@ function workers(store, url) {
     live: workflowsObserved ? workflows.filter(row => row.phase === 'running').length : null,
     bad: workflowsObserved ? workflows.filter(row => row.ui === 'bad').length : null,
     warn: workflowsObserved ? workflows.filter(row => row.ui === 'warn').length : null,
-    ownerDecisions: observedCoverage(coverage.ownerDecisions) ? ownerReads.reduce((n, read) => n + (read.error ? 0 : read.result ?? 0), 0) : null,
+    ownerDecisions: (() => { if (!observedCoverage(coverage.ownerDecisions)) return null; return ownerReads.reduce((n, read) => n + (read.error ? 0 : read.result ?? 0), 0); })(),
     violationsOpen,
   } };
 }
@@ -253,15 +262,33 @@ function projects(store) {
   });
 }
 function blockerRef(blocker, project, wf) {
-  const kind = blocker.blocker_type === 'decision' ? 'di' : blocker.blocker_type === 'unit' ? 'unit' : blocker.blocker_type === 'incident' ? 'incident' : 'workflow';
+  let kind = 'workflow';
+  if (blocker.blocker_type === 'decision') kind = 'di';
+  else if (blocker.blocker_type === 'unit') kind = 'unit';
+  else if (blocker.blocker_type === 'incident') kind = 'incident';
   return ref(kind, blocker.blocker_id, project, wf);
+}
+function blockerSort(type) {
+  if (type === 'decision') return 0;
+  if (type === 'unit') return 4;
+  return 3;
+}
+function decisionSubjectType(type, includeAttempt) {
+  if (type === 'unit') return 'unit';
+  if (includeAttempt && type === 'attempt') return 'attempt';
+  return 'workflow';
+}
+function worktreeUi(item) {
+  if (item.remove_error) return 'bad';
+  if (item.removed_at) return 'done';
+  return 'running';
 }
 function blockedBy(store, row, db, wf) {
   const machine = store.machine.db;
   const rows = many(db, 'SELECT * FROM v_blocking WHERE workflow_id=?', wf).map(blocker => ({
     ref: blockerRef(blocker, row.name, wf), ui: blocker.blocker_type === 'decision' ? 'warn' : 'waiting',
     reason: reason(blocker.reason_code, {}, blocker.detail ?? undefined), since: blocker.since, who: blocker.who,
-    sort: blocker.blocker_type === 'decision' ? 0 : blocker.blocker_type === 'condition' ? 3 : blocker.blocker_type === 'unit' ? 4 : 3,
+    sort: blockerSort(blocker.blocker_type),
   }));
   const diById = new Map(many(db, `SELECT di_id,ui,overdue FROM v_decision_rows WHERE workflow_id=? AND status IN ${OPEN_DI}`, wf).map(di => [di.di_id, di]));
   for (const item of rows) if (item.ref.kind === 'di') { const di = diById.get(item.ref.id); if (di) { item.ui = di.ui; item.sort = di.overdue || di.ui === 'bad' ? -1 : 0; } }
@@ -353,14 +380,14 @@ function decisionLog(store, url) {
     if (project && project !== ledger.name && project !== ledger.ledgerId) return [];
     return many(db, 'SELECT * FROM decisions WHERE (? IS NULL OR workflow_id=?) ORDER BY decided_at DESC', wf, wf).map(d => ({
       id: d.decision_id, store: 'ledger', ledgerId: ledger.ledgerId, workflowId: d.workflow_id, key: JSON.stringify(['ledger', ledger.ledgerId, d.decision_id]), decider: d.decider, di: d.di_id ? ref('di', d.di_id, ledger.name) : null,
-      subject: d.subject_type && d.subject_id ? ref(d.subject_type === 'unit' ? 'unit' : d.subject_type === 'attempt' ? 'attempt' : 'workflow', d.subject_id, ledger.name, d.workflow_id) : null,
+      subject: d.subject_type && d.subject_id ? ref(decisionSubjectType(d.subject_type, true), d.subject_id, ledger.name, d.workflow_id) : null,
       choice: d.choice, rationale: d.rationale, result: parse(d.result_json), at: d.decided_at,
     }));
   });
   const ledgerId = project ? store.projects().find(row => row.name === project || row.ledgerId === project)?.ledgerId ?? null : null;
   rows.push(...many(machine, 'SELECT * FROM sup_decisions WHERE (? IS NULL OR workflow_id=?) AND (? IS NULL OR ledger_id=?) ORDER BY decided_at DESC', wf, wf, ledgerId, ledgerId).filter(d => !project || d.ledger_id === ledgerId).map(d => ({
     id: d.decision_id, store: 'machine', ledgerId: d.ledger_id, workflowId: d.workflow_id, key: JSON.stringify(['machine', d.ledger_id, d.decision_id]), decider: d.decider, di: d.di_id ? ref('di', d.di_id) : null,
-    subject: d.subject_type && d.subject_id ? ref(d.subject_type === 'unit' ? 'unit' : 'workflow', d.subject_id,
+    subject: d.subject_type && d.subject_id ? ref(decisionSubjectType(d.subject_type, false), d.subject_id,
       store.projects().find(projectRow => projectRow.ledgerId === d.ledger_id)?.name ?? null, d.workflow_id) : null,
     choice: d.choice, rationale: d.rationale, result: parse(d.result_json), at: d.decided_at,
   })));
@@ -455,7 +482,7 @@ export function handleWork(request, response, store, url) {
       .filter(item => all || item.removed_at == null).map(item => ({ path: hostPath(item.path), repoRoot: hostPath(item.repo_root), lane: item.lane, port: item.port, attempt: item.attempt_id, kind: item.kind,
         branch: item.branch, baseSha: item.base_sha, headSha: item.head_sha, jobId: item.job_id,
         createdAt: item.created_at, removedAt: item.removed_at, removeError: item.remove_error,
-        ui: item.remove_error ? 'bad' : item.removed_at ? 'done' : 'running' }));
+        ui: worktreeUi(item) }));
     const result = pageData(rows, url, { identity: item => item.path });
     sendJson(request, response, result.data, { sources: source('machine', 'worktrees'), stale: staleOf(store), next: result.next }); return true;
   }

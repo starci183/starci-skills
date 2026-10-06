@@ -35,13 +35,16 @@ export function admissionReservation(value) {
   // Required receipt timestamps are recorded by the engine. Malformed evidence is unavailable.
   const createdAt = epoch(row.createdAt ?? row.created_at), updatedAt = epoch(row.updatedAt ?? row.updated_at);
   if (createdAt == null || updatedAt == null || number(row.slots) == null || number(row.maxParallel ?? row.max_parallel) == null) return null;
+  let quotaCodes = [];
+  if (Array.isArray(row.quotaCodes)) quotaCodes = row.quotaCodes;
+  else if (Array.isArray(quota?.codes)) quotaCodes = quota.codes;
   return { id: row.id, fence: row.fence, attemptId, provider: row.provider, account: row.account, model: row.model,
     role: row.role, state: row.state, slots: row.slots, maxParallel: row.maxParallel ?? row.max_parallel,
     scope: row.scope ?? parse(row.scope_json), handle: text(row.handle), pid: number(row.pid),
     launchIdentity: text(row.launchIdentity ?? row.launch_identity), hostRequestId: text(row.hostRequestId ?? row.host_request_id),
     createdAt, updatedAt, releasedAt: epoch(row.releasedAt ?? row.released_at),
     estimate: row.estimate ?? parse(row.estimate_json), override: row.override ?? parse(row.override_json), proof: row.proof ?? parse(row.proof_json),
-    quota: quotaOf(quota), quotaCodes: (Array.isArray(row.quotaCodes) ? row.quotaCodes : Array.isArray(quota?.codes) ? quota.codes : []).filter(code => typeof code === 'string') };
+    quota: quotaOf(quota), quotaCodes: quotaCodes.filter(code => typeof code === 'string') };
 }
 
 export const admissionObserved = db => hasTable(db, 'provider_reservations');

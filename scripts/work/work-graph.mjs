@@ -99,7 +99,10 @@ export function run(args) {
     case 'diff': return withLedger(repo, false, ({ db }) => {
       const latest = latestVersion(db, workflowId);
       const from = args.from != null ? versionOf(db, workflowId, Number(args.from)) : latest;
-      const to = args.file ? { graph: readCandidate(args.file), version: 'candidate' } : args.to != null ? versionOf(db, workflowId, Number(args.to)) : latest;
+      let to;
+      if (args.file) to = { graph: readCandidate(args.file), version: 'candidate' };
+      else if (args.to != null) to = versionOf(db, workflowId, Number(args.to));
+      else to = latest;
       if (!to) throw refuse(`nothing to diff: workflow ${workflowId} has no such version`, 'work-graph-missing');
       return { ok: true, workflowId, from: from?.version ?? null, to: to.version, diff: diffGraphs(from?.graph ?? null, to.graph) };
     });
@@ -111,7 +114,9 @@ export function run(args) {
         const exists = Boolean(latestVersion(ledger.db, workflowId));
         const author = authorOf(ledger.db, workflowId, args.job, exists ? ['draw', 'revise', 'cut'] : ['draw']);
         if (author.permission === 'cut' && !args.slice) throw refuse(`${author.op} cuts within one slice; name it with --slice`, 'usage');
-        const event = !exists ? 'draw' : author.permission === 'cut' ? 'cut' : 'revise';
+        let event = 'revise';
+        if (!exists) event = 'draw';
+        else if (author.permission === 'cut') event = 'cut';
         return recordVersion(ledger, { workflowId, graph, event, reason: args.reason, authorOp: author.op, authorJob: author.jobId,
           context: contextFor(repo, graph), scope: author.permission === 'cut' ? args.slice : null });
       });
@@ -127,11 +132,11 @@ const text = (out) => {
     const bySlice = new Map();
     for (const n of out.graph.nodes) (bySlice.get(`${n.domain} / ${n.slice}`) ?? bySlice.set(`${n.domain} / ${n.slice}`, []).get(`${n.domain} / ${n.slice}`)).push(`${n.id}:${out.colors[n.id]}`);
     return [`${out.workflowId} work graph v${out.version} (${out.event})`, ...[...bySlice].map(([k, v]) => `  ${k}: ${v.join(' ')}`),
-      `  frontier: ${out.frontier.join(', ') || '-'}`, ...out.history.map((h) => `  v${h.version} ${h.event} by ${h.authorOp}${h.authorJob ? ` ${h.authorJob}` : ''}: ${h.reason}`)].join('\n');
+      `  frontier: ${out.frontier.join(', ') || '-'}`, ...out.history.map((h) => `  v${h.version} ${h.event} by ${h.authorOp}${h.authorJob ? ' ' + h.authorJob : ''}: ${h.reason}`)].join('\n');
   }
   if (out.diff && out.to !== undefined) return `diff v${out.from ?? '-'} -> ${out.to}: +${out.diff.added.length} -${out.diff.removed.length} ~${out.diff.changed.length} nodes, +${out.diff.edgesAdded.length} -${out.diff.edgesRemoved.length} edges`;
   if (out.unchanged) return `unchanged: v${out.version} already holds this graph`;
-  return `recorded v${out.version} (${out.event})${out.diff?.red?.length ? `; red: ${out.diff.red.join(', ')}` : ''}`;
+  return `recorded v${out.version} (${out.event})${out.diff?.red?.length ? '; red: ' + out.diff.red.join(', ') : ''}`;
 };
 
 export function main(argv = process.argv.slice(2)) {
@@ -145,7 +150,7 @@ export function main(argv = process.argv.slice(2)) {
     if (error.code === 'usage') { console.error(`${error.message}\n${USAGE}`); return 2; }
     const out = { ok: false, code: error.code ?? 'error', error: error.message, ...(error.findings ? { findings: error.findings } : {}) };
     if (args.json) console.log(JSON.stringify(out, null, 2));
-    else console.error(`${out.code}: ${out.error}${error.findings ? `\n${error.findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n')}` : ''}`);
+    else console.error(`${out.code}: ${out.error}${error.findings ? '\n' + error.findings.map((f) => ''.concat('  [', f.code, '] ', f.detail)).join('\n') : ''}`);
     return 1;
   }
 }

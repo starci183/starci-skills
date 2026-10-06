@@ -30,8 +30,8 @@ const safePath = value => value ? String(value) : null;
 function ref(kind, id, project = null) {
   const p = encodeURIComponent(project ?? '');
   const key = encodeURIComponent(String(id));
-  const href = kind === 'attempt' ? `#/a/${p}/${key}` : kind === 'unit' ? `#/w/${p}?tab=units&unit=${key}`
-    : kind === 'di' ? `#/decisions?id=${key}` : kind === 'workflow' ? `#/w/${p}/${key}` : '#/system';
+  const href = (kind === 'attempt' && `#/a/${p}/${key}`) || (kind === 'unit' && `#/w/${p}?tab=units&unit=${key}`)
+    || (kind === 'di' && `#/decisions?id=${key}`) || (kind === 'workflow' && `#/w/${p}/${key}`) || '#/system';
   return { kind, ...(project ? { project } : {}), id: String(id), href };
 }
 function blobLink(db, sha) {
@@ -74,7 +74,7 @@ function timeline(attempt) {
     const at = attempt[field];
     const previous = index ? attempt[steps[index - 1][1]] : null;
     const max = code ? slaMs(code) : null;
-    return { step, at, ...(max ? { slaMs: max, late: at != null && previous != null ? at - previous > max : false } : {}) };
+    return { step, at, ...(max ? { slaMs: max, late: at != null && previous != null && at - previous > max } : {}) };
   });
 }
 const RUNTIME_ROOT = fileURLToPath(new URL('../../../', import.meta.url)).replace(/[\\/]$/, '');
@@ -154,7 +154,12 @@ function manifestOf(artifactRows) {
   let doc;
   try { doc = parseYaml(publicText(text)); } catch { return { ...base, read: { ...base.read, state: 'invalid' } }; }
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return { ...base, read: { ...base.read, state: 'invalid' } };
-  const outcomeOf = a => a.outcome ?? (a.passed === true ? 'passed' : a.passed === false ? 'failed' : null);
+  const outcomeOf = a => {
+    if (a.outcome != null) return a.outcome;
+    if (a.passed === true) return 'passed';
+    if (a.passed === false) return 'failed';
+    return null;
+  };
   return { ...base, read: { ...base.read, state: 'ready' }, manifest: {
     outcome: doc.outcome ?? null,
     assertions: (Array.isArray(doc.assertions) ? doc.assertions : []).filter(a => a && typeof a === 'object')
@@ -176,14 +181,15 @@ function filesOf(db, artifactRows, checks, project, manifestInfo) {
     const schema = kind === 'json' && x.bytes > 0 && x.bytes <= 2 * 1024 * 1024 && blobPath(x.sha256) ? jsonSchemaOf(x.sha256) : null;
     const first = firstBySha.get(x.sha256);
     if (first == null) firstBySha.set(x.sha256, x.artifact_id);
-    const key = group !== 'evidence' ? false
-      : assetNames ? assetNames.has(path.posix.normalize(x.name))
-      : x.bytes > 0 && (kind === 'markdown' || (kind === 'json' && !(schema && VALIDATOR_SCHEMA.test(schema))));
+    const key = group === 'evidence' && (assetNames ? assetNames.has(path.posix.normalize(x.name))
+      : x.bytes > 0 && (kind === 'markdown' || (kind === 'json' && !(schema && VALIDATOR_SCHEMA.test(schema)))));
+    let checkInfo = null;
+    if (check) checkInfo = { id: check.id, name: check.name, status: check.status, ui: check.ui, binding: 'sha', runner: check.runner, phase: check.phase, authority: check.authority };
+    else if (checkName || bound.length) checkInfo = { id: null, name: checkName ?? bound[0].name, status: null, ui: 'unknown', binding: bound.length ? 'sha' : 'unbound', runner: null, phase: null, authority: null };
     return { artifactId: x.artifact_id, name: x.name, base: x.name.split('/').pop(), group, role: x.role, kind, subkind: x.subkind,
       mediaType: x.media_type, bytes: x.bytes, sha: x.sha256, href: `/api/blob/${x.sha256}`, hostPath: hostNorm(blob?.file_uri ?? blobPath(x.sha256)),
       encoding: encodingOf(x.sha256, x.media_type), redaction: blob?.redaction ?? null, origin: x.origin, label: x.label, scopeRef: x.scope_ref, round: x.round,
-      check: check ? { id: check.id, name: check.name, status: check.status, ui: check.ui, binding: 'sha', runner: check.runner, phase: check.phase, authority: check.authority }
-        : checkName || bound.length ? { id: null, name: checkName ?? bound[0].name, status: null, ui: 'unknown', binding: bound.length ? 'sha' : 'unbound', runner: null, phase: null, authority: null } : null,
+      check: checkInfo,
       archived: x.archived_at != null, createdAt: x.created_at, project,
       dupOf: first ?? null, empty: x.bytes === 0, key, schema };
   });
@@ -243,7 +249,7 @@ function attemptDetail(store, ledger, db, row) {
     report: report ? { id: report.report_id, outcome: report.outcome, json: parse(report.report_json),
       attachments: many(db, 'SELECT m.* FROM v_media m JOIN report_attachments ra ON ra.artifact_id=m.artifact_id WHERE ra.report_id=?', report.report_id).map(m => mediaItem(m, ledger.name)) } : null,
     checks, artifacts: mediaRows, nonMedia,
-    settle: raw.settled_at ? { by: raw.settled_by, json: parse(raw.settle_json), decision: raw.decision_id ? ref('di', raw.decision_id, ledger.name) : null, nextStep: raw.next_step } : null,
+    settle: raw.settled_at ? { by: raw.settled_by, json: parse(raw.settle_json), decision: (raw.decision_id && ref('di', raw.decision_id, ledger.name)) || null, nextStep: raw.next_step } : null,
     lessons, decisions, actions, relatedScope: { actions: 'job', decisions: 'mixed', lessons: 'global-heuristic', logs: 'job' },
     terminal: terminal ? { handle: terminal.handle, live: terminal.closed_at == null,
       transcript: blobLink(db, transcript), snapshots: snapshots?.n ?? 0, lastSnapshotAt: snapshots?.last_at ?? null,
@@ -402,7 +408,9 @@ export async function handleAttempt(request, response, store, url) {
         const resolveSide = side => {
           if (!side) return null;
           const assetName = typeof side.asset === 'string' ? `patch.assets/${path.posix.basename(side.asset.replaceAll('\\', '/'))}` : null;
-          const sha = assetName ? assets.get(assetName) : indexed.has(side.blob) ? side.blob : null;
+          let sha = null;
+          if (assetName) sha = assets.get(assetName);
+          else if (indexed.has(side.blob)) sha = side.blob;
           return sha ? blobLink(db, sha) : null;
         };
         return { ...file, before: resolveSide(file.before), after: resolveSide(file.after) };
@@ -432,8 +440,10 @@ export async function handleAttempt(request, response, store, url) {
     try { window = await transcriptWindow(text, { q: url.searchParams.get('q'), around: url.searchParams.get('around'),
       from: url.searchParams.get('from'), to: url.searchParams.get('to') }); }
     catch (error) { sendError(request, response, 400, error.code ?? 'BAD_REGEX', error.message); return true; }
+    let timeSource = 'snapshot';
+    if (final) timeSource = blob.created_at == null ? null : 'blob';
     sendJson(request, response, { final, snapshotId: final ? null : snapshot.snapshot_id,
-      at: final ? blob.created_at ?? null : snapshot.at, timeSource: final ? blob.created_at == null ? null : 'blob' : 'snapshot',
+      at: final ? blob.created_at ?? null : snapshot.at, timeSource,
       totalLines: window.totalLines, bytes: blob.bytes, blob: blobLink(db, sha), redaction: blob.redaction ?? 'stream-v1',
       lines: window.lines, hits: window.hits, hitCount: window.hitCount },
     { sources: source(ledger.name, 'op_attempts', 'attempt_transcript_snapshots', 'blobs'), stale: staleOf(store) }); return true;

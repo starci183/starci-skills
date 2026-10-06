@@ -95,74 +95,94 @@ function findCycle(nodes, edges) {
  * workflow's domains, once business exists) and `shapes` (every Block / XBase#state, once drawings exist); an
  * empty list means the rule does not apply yet. Returns {ok, findings:[{code, node?, detail}]}.
  */
-export function validateGraph(graph, { workflowId = null, context = {} } = {}) {
-  const findings = [];
-  const find = (code, detail, node = null) => findings.push({ code, ...(node ? { node } : {}), detail });
-  for (const error of validateAgainstSchema(graph, WORK_GRAPH_SCHEMA)) find('SHAPE', error);
-  if (findings.length) return { ok: false, findings };
-  if (workflowId && graph.workflow !== workflowId) find('WORKFLOW_MISMATCH', `graph names workflow ${graph.workflow}, not ${workflowId}`);
-
-  const domains = new Set(graph.domains.map((d) => d.id));
+function nodeIndex(nodes, find) {
   const byId = new Map();
-  for (const n of graph.nodes) {
+  for (const n of nodes) {
     if (byId.has(n.id)) find('DUPLICATE_NODE', `node ${n.id} is declared twice`, n.id);
     byId.set(n.id, n);
   }
-  const nodes = [...byId.values()];
-  for (const n of nodes) {
-    if (!domains.has(n.domain)) find('UNKNOWN_DOMAIN', `node ${n.id} names domain ${n.domain}, which the graph does not declare`, n.id);
-    else if (!n.id.startsWith(`${n.domain}.`)) find('NODE_ID_DOMAIN', `node ${n.id} is not spelled under its domain ${n.domain}`, n.id);
-    if (ROOT_KINDS.has(n.kind)) {
-      if (n.slice !== n.id) find('SLICE_ROOT', `${n.kind} node ${n.id} must name itself as its slice`, n.id);
-    } else {
-      const root = byId.get(n.slice);
-      if (!root || !ROOT_KINDS.has(root.kind)) find('UNKNOWN_SLICE', `task ${n.id} names slice ${n.slice}, which is no slice or foundation node`, n.id);
-      else if (root.domain !== n.domain) find('UNKNOWN_SLICE', `task ${n.id} sits in domain ${n.domain} but its slice ${n.slice} is in ${root.domain}`, n.id);
-    }
-    if (n.parent && !byId.has(n.parent)) find('UNKNOWN_NODE', `node ${n.id} names parent ${n.parent}, which does not exist`, n.id);
-    else if (n.parent && byId.get(n.parent).slice !== n.slice) find('UNKNOWN_SLICE', `node ${n.id} is cut from ${n.parent} in another slice`, n.id);
-    if (!byId.has(n.rollbackTo)) find('UNKNOWN_NODE', `node ${n.id} rolls back to ${n.rollbackTo}, which does not exist`, n.id);
-    if (!n.ownedPaths.length) find('OWNED_PATHS_EMPTY', `node ${n.id} declares no owned path`, n.id);
-    for (const p of [...n.ownedPaths, ...n.reads]) if (ownedPathKey(p) === null) find('PATH_INVALID', `node ${n.id} names ${JSON.stringify(p)}, which is not a concrete workspace-relative prefix`, n.id);
+  return byId;
+}
+
+function validateNodeDomain(n, domains, byId, find) {
+  if (!domains.has(n.domain)) find('UNKNOWN_DOMAIN', `node ${n.id} names domain ${n.domain}, which the graph does not declare`, n.id);
+  else if (!n.id.startsWith(`${n.domain}.`)) find('NODE_ID_DOMAIN', `node ${n.id} is not spelled under its domain ${n.domain}`, n.id);
+  if (ROOT_KINDS.has(n.kind)) {
+    if (n.slice !== n.id) find('SLICE_ROOT', `${n.kind} node ${n.id} must name itself as its slice`, n.id);
+    return;
   }
-  const edges = [];
-  const seenEdges = new Set();
-  for (const e of graph.edges) {
+  const root = byId.get(n.slice);
+  if (!root || !ROOT_KINDS.has(root.kind)) find('UNKNOWN_SLICE', `task ${n.id} names slice ${n.slice}, which is no slice or foundation node`, n.id);
+  else if (root.domain !== n.domain) find('UNKNOWN_SLICE', `task ${n.id} sits in domain ${n.domain} but its slice ${n.slice} is in ${root.domain}`, n.id);
+}
+
+function validateNodeReferences(n, byId, find) {
+  if (n.parent && !byId.has(n.parent)) find('UNKNOWN_NODE', `node ${n.id} names parent ${n.parent}, which does not exist`, n.id);
+  else if (n.parent && byId.get(n.parent).slice !== n.slice) find('UNKNOWN_SLICE', `node ${n.id} is cut from ${n.parent} in another slice`, n.id);
+  if (!byId.has(n.rollbackTo)) find('UNKNOWN_NODE', `node ${n.id} rolls back to ${n.rollbackTo}, which does not exist`, n.id);
+}
+
+function validateNodePaths(n, find) {
+  if (!n.ownedPaths.length) find('OWNED_PATHS_EMPTY', `node ${n.id} declares no owned path`, n.id);
+  for (const p of [...n.ownedPaths, ...n.reads]) if (ownedPathKey(p) === null) find('PATH_INVALID', `node ${n.id} names ${JSON.stringify(p)}, which is not a concrete workspace-relative prefix`, n.id);
+}
+
+function validateNodes(nodes, domains, byId, find) {
+  for (const n of nodes) {
+    validateNodeDomain(n, domains, byId, find);
+    validateNodeReferences(n, byId, find);
+    validateNodePaths(n, find);
+  }
+}
+
+function validatedEdges(edges, byId, find) {
+  const valid = [];
+  const seen = new Set();
+  for (const e of edges) {
     if (!byId.has(e.from) || !byId.has(e.to)) { find('UNKNOWN_NODE', `edge ${e.from} -> ${e.to} names a node that does not exist`); continue; }
     if (e.from === e.to) { find('CYCLE', `edge ${e.from} -> ${e.to} loops on itself`, e.from); continue; }
-    if (seenEdges.has(edgeKey(e))) continue;
-    seenEdges.add(edgeKey(e));
-    edges.push(e);
+    if (seen.has(edgeKey(e))) continue;
+    seen.add(edgeKey(e));
+    valid.push(e);
   }
-  if (findings.length) return { ok: false, findings };
+  return valid;
+}
 
-  const cycle = findCycle(nodes, edges);
-  if (cycle) find('CYCLE', `edges form a cycle: ${cycle.join(' -> ')}`, cycle[0]);
+function relatedNodes(ancestors, a, b) {
+  return ancestors.get(a.id).has(b.id) || ancestors.get(b.id).has(a.id);
+}
 
-  // Owned paths: disjoint unless one node contains the other.
-  const ancestors = ancestorsIn(nodes);
-  const related = (a, b) => ancestors.get(a.id).has(b.id) || ancestors.get(b.id).has(a.id);
-  const owned = nodes.map((n) => ({ n, keys: n.ownedPaths.map(ownedPathKey).filter(Boolean) }));
+function validateReadOwner(n, read, owner, edges, related, find) {
+  if (owner.n.id === n.id || related(owner.n, n) || !owner.keys.some((p) => within(p, read))) return;
+  const linked = edges.filter((e) => [owner.n.id, owner.n.slice].includes(e.from) && [n.id, n.slice].includes(e.to));
+  if (owner.n.domain !== n.domain) {
+    if (!linked.some((e) => e.kind === 'contract')) find('CONTRACT_EDGE_MISSING', `${n.id} (domain ${n.domain}) reads ${read}, owned by ${owner.n.id} (domain ${owner.n.domain}), with no contract edge ${owner.n.id} -> ${n.id}`, n.id);
+  } else if (!linked.length) find('READ_WITHOUT_EDGE', `${n.id} reads ${read}, owned by ${owner.n.id}, with no edge ${owner.n.id} -> ${n.id}`, n.id);
+}
+
+function validateReadEdges(nodes, owned, edges, ancestors, find) {
+  for (const n of nodes) for (const read of n.reads.map(ownedPathKey).filter(Boolean)) {
+    for (const owner of owned) validateReadOwner(n, read, owner, edges, (a, b) => relatedNodes(ancestors, a, b), find);
+  }
+}
+
+function validateOwnedPathOverlaps(owned, ancestors, find) {
   for (let i = 0; i < owned.length; i++) for (let j = i + 1; j < owned.length; j++) {
     const a = owned[i], b = owned[j];
-    if (related(a.n, b.n)) continue;
+    if (relatedNodes(ancestors, a.n, b.n)) continue;
     const hit = a.keys.find((p) => b.keys.some((q) => within(p, q)));
     if (hit) find('OWNED_PATH_OVERLAP', `${a.n.id} (slice ${a.n.slice}) and ${b.n.id} (slice ${b.n.slice}) both own ${hit}`, a.n.id);
   }
+}
 
-  // A read of another node's owned path needs an edge between them (or their slices); across domains a contract edge.
-  const linked = (from, to) => edges.filter((e) => [from.id, from.slice].includes(e.from) && [to.id, to.slice].includes(e.to));
-  for (const n of nodes) for (const read of n.reads.map(ownedPathKey).filter(Boolean)) {
-    for (const o of owned) {
-      if (o.n.id === n.id || related(o.n, n) || !o.keys.some((p) => within(p, read))) continue;
-      const found = linked(o.n, n);
-      if (o.n.domain !== n.domain) {
-        if (!found.some((e) => e.kind === 'contract')) find('CONTRACT_EDGE_MISSING', `${n.id} (domain ${n.domain}) reads ${read}, owned by ${o.n.id} (domain ${o.n.domain}), with no contract edge ${o.n.id} -> ${n.id}`, n.id);
-      } else if (!found.length) find('READ_WITHOUT_EDGE', `${n.id} reads ${read}, owned by ${o.n.id}, with no edge ${o.n.id} -> ${n.id}`, n.id);
-    }
-  }
+function validateOwnership(nodes, edges, find) {
+  const ancestors = ancestorsIn(nodes);
+  const owned = nodes.map((n) => ({ n, keys: n.ownedPaths.map(ownedPathKey).filter(Boolean) }));
+  validateOwnedPathOverlaps(owned, ancestors, find);
+  validateReadEdges(nodes, owned, edges, ancestors, find);
+}
 
-  // Size: every slice and foundation declares one; every node without children stays inside the estimate bound.
+function validateNodeSizes(nodes, find) {
   const kids = containment(nodes);
   for (const n of nodes) {
     if (ROOT_KINDS.has(n.kind) && !n.size) { find('SIZE_MISSING', `${n.kind} ${n.id} declares no size estimate`, n.id); continue; }
@@ -174,24 +194,47 @@ export function validateGraph(graph, { workflowId = null, context = {} } = {}) {
     }
     if (bound.overTarget) find('OVERSIZED', `${n.id} sizes ${bound.minutes} agent-min (${bound.size}); ${bound.agents} agent(s) at gear ${bound.gear} still take ${bound.perSliceMinutes} min each, over ${bound.targetMinutes[1]} - cut it into child nodes, seam first`, n.id);
   }
+}
 
-  // Coverage once business and drawings exist.
-  const covered = (field) => {
-    const slices = new Map();
-    for (const n of nodes) for (const item of list(n[field])) {
-      if (!slices.has(item)) slices.set(item, new Set());
-      slices.get(item).add(n.slice);
-    }
-    return slices;
-  };
-  const frs = covered('frs');
+function coveredItems(nodes, field) {
+  const slices = new Map();
+  for (const n of nodes) for (const item of list(n[field])) {
+    if (!slices.has(item)) slices.set(item, new Set());
+    slices.get(item).add(n.slice);
+  }
+  return slices;
+}
+
+function validateCoverage(nodes, context, find) {
+  const frs = coveredItems(nodes, 'frs');
   for (const fr of list(context.frs)) if (!frs.has(fr)) find('FR_UNCOVERED', `${fr} is attached to no slice`);
-  const shapes = covered('shapes');
+  const shapes = coveredItems(nodes, 'shapes');
   for (const shape of list(context.shapes)) {
     const at = shapes.get(shape);
     if (!at) find('SHAPE_UNCOVERED', `${shape} is attached to no slice`);
     else if (at.size > 1) find('SHAPE_SPLIT', `${shape} is attached to ${at.size} slices (${[...at].join(', ')}); a shape belongs to exactly one`);
   }
+}
+
+export function validateGraph(graph, { workflowId = null, context = {} } = {}) {
+  const findings = [];
+  const find = (code, detail, node = null) => findings.push({ code, ...(node ? { node } : {}), detail });
+  for (const error of validateAgainstSchema(graph, WORK_GRAPH_SCHEMA)) find('SHAPE', error);
+  if (findings.length) return { ok: false, findings };
+  if (workflowId && graph.workflow !== workflowId) find('WORKFLOW_MISMATCH', `graph names workflow ${graph.workflow}, not ${workflowId}`);
+
+  const domains = new Set(graph.domains.map((d) => d.id));
+  const byId = nodeIndex(graph.nodes, find);
+  const nodes = [...byId.values()];
+  validateNodes(nodes, domains, byId, find);
+  const edges = validatedEdges(graph.edges, byId, find);
+  if (findings.length) return { ok: false, findings };
+
+  const cycle = findCycle(nodes, edges);
+  if (cycle) find('CYCLE', `edges form a cycle: ${cycle.join(' -> ')}`, cycle[0]);
+  validateOwnership(nodes, edges, find);
+  validateNodeSizes(nodes, find);
+  validateCoverage(nodes, context, find);
   return { ok: findings.length === 0, findings };
 }
 
@@ -271,5 +314,5 @@ export function frontierOf(graph, colors) {
     if (!waits.length) ready.push(n);
   }
   const rank = (n) => (n.kind === 'foundation' || byId.get(n.slice)?.kind === 'foundation' ? 0 : 1);
-  return ready.sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
+  return ready.toSorted((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
 }

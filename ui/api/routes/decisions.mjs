@@ -2,19 +2,28 @@ import { sendJson, sendError } from '../envelope.mjs';
 import { source, many, one, parse, staleOf, page } from '../query.mjs';
 import { uiState } from '../state.mjs';
 
+const DEFAULT_NAMESPACE = Object.freeze({ store: 'machine', ledgerId: null });
+
 function ref(kind, id, project = null, namespace = null, wf = null) {
   const p = encodeURIComponent(project ?? '');
   const key = encodeURIComponent(String(id));
   const params = new URLSearchParams({ id: String(id) });
   if (namespace) { params.set('store', namespace.store); if (namespace.ledgerId) params.set('ledger', namespace.ledgerId); }
   if (project) params.set('project', project);
-  const href = kind === 'di' ? `#/decisions?${params}` : kind === 'attempt' && project ? `#/a/${p}/${key}`
-    : kind === 'unit' && project && wf ? `#/w/${p}/${encodeURIComponent(wf)}?tab=units&unit=${key}` : kind === 'workflow' && project ? `#/w/${p}/${key}`
-      : kind === 'incident' && project ? `#/decisions?tab=incidents&incident=${key}&project=${p}${wf ? `&wf=${encodeURIComponent(wf)}` : ''}` : null;
-  return href ? { kind, ...(project ? { project } : {}), ...(namespace ?? {}), id: String(id), href } : null;
+  let href = null;
+  if (kind === 'di') href = `#/decisions?${params}`;
+  else if (kind === 'attempt' && project) href = `#/a/${p}/${key}`;
+  else if (kind === 'unit' && project && wf) href = `#/w/${p}/${encodeURIComponent(wf)}?tab=units&unit=${key}`;
+  else if (kind === 'workflow' && project) href = `#/w/${p}/${key}`;
+  else if (kind === 'incident' && project) {
+    const workflowParam = wf ? '&wf=' + encodeURIComponent(wf) : '';
+    href = `#/decisions?tab=incidents&incident=${key}&project=${p}${workflowParam}`;
+  }
+  if (!href) return null;
+  return { kind, ...(project ? { project } : {}), ...namespace, id: String(id), href };
 }
 function evidence(value, project, namespace, wf) {
-  const items = Array.isArray(value) ? value : value == null ? [] : [value];
+  const items = (Array.isArray(value) && value) || (value == null && []) || [value];
   return items.map(item => {
     if (typeof item === 'string') return { text: item };
     const kind = item?.kind ?? item?.type ?? item?.entity_type;
@@ -22,7 +31,9 @@ function evidence(value, project, namespace, wf) {
     const explicitNamespace = ['machine', 'ledger'].includes(item?.store) ? { store: item.store, ledgerId: item.ledgerId ?? item.ledger ?? null } : null;
     // Evidence links carry their recorded scope. A DI reference without a namespace
     // is resolved by the detail endpoint; the containing DI's store is not proof.
-    return kind && id != null && ['workflow', 'unit', 'attempt', 'di', 'incident'].includes(kind) ? ref(kind, id, item.project ?? project, kind === 'di' ? explicitNamespace : namespace, item.workflowId ?? item.wf ?? wf) ?? { text: JSON.stringify(item) } : { text: JSON.stringify(item) };
+    if (!kind || id == null || !['workflow', 'unit', 'attempt', 'di', 'incident'].includes(kind)) return { text: JSON.stringify(item) };
+    const targetNamespace = kind === 'di' ? explicitNamespace : namespace;
+    return ref(kind, id, item.project ?? project, targetNamespace, item.workflowId ?? item.wf ?? wf) ?? { text: JSON.stringify(item) };
   });
 }
 function channel(machine, item, ledgerId) {
@@ -30,9 +41,9 @@ function channel(machine, item, ledgerId) {
   if (ask?.channel === 'telegram' || ask?.channel === 'serve-ask') return ask.channel;
   const delivery = one(machine, "SELECT channel FROM deliveries WHERE message_kind='decision' AND message_ref=? AND ledger_id IS ? ORDER BY delivery_id DESC LIMIT 1", item.di_id, ledgerId);
   if (delivery?.channel === 'telegram' || delivery?.channel === 'serve-ask') return delivery.channel;
-  return item.decider === 'kernel' ? 'kernel-seat' : item.decider === 'supervisor' ? 'supervisor-seat' : null;
+  return (item.decider === 'kernel' && 'kernel-seat') || (item.decider === 'supervisor' && 'supervisor-seat') || null;
 }
-function decisionRow(machine, item, project = null, namespace = { store: 'machine', ledgerId: null }) {
+function decisionRow(machine, item, project = null, namespace = DEFAULT_NAMESPACE) {
   const now = Date.now();
   const expiry = item.claim_at != null && item.claim_ttl_ms != null ? item.claim_at + item.claim_ttl_ms : null;
   const overdue = Boolean(item.overdue ?? (item.due_at != null && item.due_at < now && ['open', 'claimed', 'escalated'].includes(item.status)));
@@ -94,7 +105,8 @@ function detail(store, id, url) {
   const events = supervisor
     ? many(machine, "SELECT kind,created_at AS at,payload_json FROM sup_events WHERE entity_id=? AND kind LIKE 'decision-%' ORDER BY seq", id)
     : many(db, "SELECT kind,created_at AS at,payload_json FROM events WHERE entity_id=? AND kind LIKE 'decision-%' ORDER BY seq", id);
-  const counterpart = supervisor ? ledgerId ? store.ledger(ledgerId) : null : null;
+  let counterpart = null;
+  if (supervisor && ledgerId) counterpart = store.ledger(ledgerId);
   const deliveryAmbiguous = supervisor ? Boolean(ledgerId && (!counterpart || one(counterpart.db, 'SELECT di_id FROM decision_items WHERE di_id=?', id)))
     : Boolean(one(machine, 'SELECT di_id FROM sup_decision_items WHERE di_id=? AND ledger_id IS ?', id, ledgerId));
   if (deliveryAmbiguous) row.channel = null;
@@ -109,11 +121,12 @@ function detail(store, id, url) {
     : one(db, 'SELECT * FROM decisions WHERE di_id=? ORDER BY decided_at DESC LIMIT 1', id);
   const options = parse(item.options_json, []);
   const credential = item.kind === 'credential-missing';
+  const resolutionResult = resolution && (credential ? null : parse(resolution.result_json));
   return { ...row, evidence: evidence(parse(item.evidence_json), project, namespace, item.workflow_id).map(entry => credential && 'text' in entry ? { text: 'Credential content hidden.' } : entry),
     options: Array.isArray(options) ? options.map(option => ({ key: option.key, verb: option.verb, recommended: Boolean(option.recommended) })) : [],
     allowedVerbs: parse(item.allowed_verbs_json, []), history,
     resolution: resolution ? { by: resolution.decider, verb: item.resolution_verb ?? resolution.choice,
-      decision: ref('di', id, project, namespace), result: credential ? null : parse(resolution.result_json) } : null,
+      decision: ref('di', id, project, namespace), result: resolutionResult } : null,
     payload: credential ? null : parse(item.payload_json) };
 }
 function listedAsks(store, url) {
@@ -132,9 +145,9 @@ function listedAsks(store, url) {
       const credentialIncident = ledger && ask.workflow_id ? one(ledger.db,
         "SELECT incident_id FROM incidents WHERE workflow_id=? AND kind='credential-missing' LIMIT 1", ask.workflow_id) : null;
       const credential = di?.kind === 'credential-missing' || Boolean(credentialIncident);
-      const credentialObserved = !Boolean(ask.ledger_id && !ledger) && !Boolean(ask.di_id && (!di || supervisorDI && ledgerDI));
+      const credentialObserved = !(ask.ledger_id && !ledger) && !(ask.di_id && (!di || supervisorDI && ledgerDI));
       const contentSuppressed = credential || !credentialObserved;
-      return { id: ask.ask_id, store: 'machine', ledgerId: ask.ledger_id ?? null, project: name, wf: ask.workflow_id, di: ask.di_id && di && !(supervisorDI && ledgerDI) ? ref('di', ask.di_id, name, { store: supervisorDI ? 'machine' : 'ledger', ledgerId: ask.ledger_id ?? null }) : null,
+      return { id: ask.ask_id, store: 'machine', ledgerId: ask.ledger_id ?? null, project: name, wf: ask.workflow_id, di: ask.di_id && di && !(supervisorDI && ledgerDI) ? ref('di', ask.di_id, name, { store: (supervisorDI && 'machine') || 'ledger', ledgerId: ask.ledger_id ?? null }) : null,
         channel: ask.channel, question: contentSuppressed ? null : ask.question, credential, credentialObserved, contentSuppressed,
         askedAt: ask.asked_at, answeredAt: ask.answered_at, state: ask.state };
     });

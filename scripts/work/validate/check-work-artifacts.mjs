@@ -71,7 +71,7 @@ function signatureProblem(file, head) {
   const tagOk = !expected.tag || head.subarray(expected.tagAt, expected.tagAt + 4).toString('ascii') === expected.tag;
   if (prefix.equals(expected.starts) && tagOk) return null;
   const asText = slash(head.subarray(0, 24).toString('utf8')).replace(/[^\x20-\x7e]/g, '.');
-  return `its first bytes are ${prefix.toString('hex')}${head.length ? ` ("${asText}")` : ' - the file is empty'}, not ${expected.name} (${expected.starts.toString('hex')})`;
+  return `its first bytes are ${prefix.toString('hex')}${head.length ? ' ("' + asText + '")' : ' - the file is empty'}, not ${expected.name} (${expected.starts.toString('hex')})`;
 }
 
 // ---- concept 2: what counts as a declared path, and what it is declared relative to ----
@@ -441,7 +441,7 @@ export function checkWorkArtifacts(workRoot, out, { runtimeRoot = root } = {}) {
   const failedDirs = new Set();
   const markFailure = file => { const dir = ownerDirOf(file); if (dir) failedDirs.add(dir); };
   const wrapped = {
-    refuse: (file, code, msg) => { if (/ASSET|PROMPT|RECEIPT|RUN_MEDIA|RESOURCE_FILE|EVIDENCE_ARTIFACT/.test(code)) markFailure(file); emit.refuse(file, code, msg); },
+    refuse: (file, code, msg) => { if (/ASSET|PROMPT|RECEIPT|RUN_MEDIA|RESOURCE_FILE|EVIDENCE_ARTIFACT/.test(code)) { markFailure(file); } emit.refuse(file, code, msg); },
     suspect: (file, code, msg) => emit.suspect(file, code, msg),
     info: (file, code, msg) => emit.info(file, code, msg),
   };
@@ -492,7 +492,7 @@ export function checkWorkArtifacts(workRoot, out, { runtimeRoot = root } = {}) {
   // same reading check-work-deep reports as PAYLOAD_AS_RECORD). Their declarations are verified once, below,
   // with the run dir / record dir they are actually relative to - checking them here would double-report
   // every line and resolve `videos/x.webm` against the wrong directory.
-  for (const [, rec] of records) {
+  for (const rec of records.values()) {
     const data = rec.data ?? {};
     if (typeof data.schema === 'string' && !data.schema.startsWith('work/')) continue;
     const indexFile = path.join(rec.dir, 'index.yaml');
@@ -501,12 +501,10 @@ export function checkWorkArtifacts(workRoot, out, { runtimeRoot = root } = {}) {
     const custody = data.schema === 'work/resource@1' && data.custody && typeof data.custody === 'object' ? data.custody : null;
     const sealed = custody?.sealed;
     // provider: none is the one "holds no secret" form and carries no sealed key; every other provider names its file.
-    const sealedMisplaced = custody
-      ? (custody.provider === 'none' ? sealed !== undefined : typeof sealed !== 'string' || !SEALED_LOCATION_RE.test(sealed.trim()))
-      : false;
+    const sealedMisplaced = Boolean(custody) && (custody.provider === 'none' ? sealed !== undefined : typeof sealed !== 'string' || !SEALED_LOCATION_RE.test(sealed.trim()));
     if (sealedMisplaced) {
       const why = custody.provider === 'none' || typeof sealed !== 'string' ? null : sealedLocationProblem(sealed);
-      wrapped.refuse(indexFile, 'SEALED_CUSTODY_LOCATION', `custody.sealed is ${sealed === undefined ? 'absent' : JSON.stringify(sealed)}${custody.provider === 'none' ? ' on a provider: none identity, which holds no secret and carries no sealed key;' : `; ${why ? `${why}; ` : ''}a sealed secret lives only at .starcistacks/<env>/secrets/<slug>.enc (app-relative) and`} the record here names it`);
+      wrapped.refuse(indexFile, 'SEALED_CUSTODY_LOCATION', `custody.sealed is ${sealed === undefined ? 'absent' : JSON.stringify(sealed)}${custody.provider === 'none' ? ' on a provider: none identity, which holds no secret and carries no sealed key;' : '; ' + (why && why + '; ' || '') + 'a sealed secret lives only at .starcistacks/<env>/secrets/<slug>.enc (app-relative) and'} the record here names it`);
     }
     for (const found of declarationsOf(data, table, ctx)) {
       if (sealedMisplaced && found.trail === 'custody.sealed') continue;
@@ -647,6 +645,6 @@ if (isMain(import.meta.url)) {
     + `${totals.receipts} receipt file(s) binding ${totals.receiptCalls} call(s), ${totals.evidence} evidence file(s)`;
   const verdict = `${out.refuse.length} refused, ${out.suspect.length} suspect, ${out.info.length} info`;
   console.log(`\n${totals.records} record(s) over ${trees.length} tree(s): ${surveyed} - ${verdict}`);
-  if (byCode.size) console.log(`findings by code: ${[...byCode.entries()].sort((a, b) => b[1] - a[1]).map(([code, n]) => `${code}=${n}`).join(', ')}`);
+  if (byCode.size) console.log(`findings by code: ${[...byCode.entries()].sort((a, b) => b[1] - a[1]).map(([code, n]) => code + '=' + n).join(', ')}`);
   process.exitCode = out.refuse.length ? 1 : 0;
 }

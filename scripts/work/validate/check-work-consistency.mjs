@@ -101,7 +101,7 @@ export function declaredStateValues(schema) {
 const fieldOf = (record, dottedPath) => String(dottedPath).split('.').reduce((holder, key) =>
   holder && typeof holder === 'object' ? holder[key] : undefined, record);
 
-const isList = value => Array.isArray(value) ? value : (value == null || value === '' ? [] : [value]);
+const isList = value => (Array.isArray(value) && value) || (value == null || value === '' ? [] : [value]);
 const normaliseSentence = value => String(value ?? '').trim().replace(/[.!?]+$/, '').replace(/\s+/g, ' ');
 const shownFile = rec => path.relative(root, path.join(rec.dir, 'index.yaml')).replaceAll('\\', '/');
 
@@ -364,7 +364,7 @@ function checkConsistencyTree(workRoot, records, sink) {
       let feature = null;
       try { feature = fs.existsSync(featureFile) ? parseYaml(fs.readFileSync(featureFile, 'utf8')) : null; } catch { feature = null; }
       if (feature?.schema !== 'work/feature@1') {
-        refuse(entryShown, 'CATALOG_DIRTY', `entry points at ${featureShown}, which is ${feature ? `a ${feature.schema}` : 'absent'} - every catalog entry needs a work/feature@1 node beside it`);
+        refuse(entryShown, 'CATALOG_DIRTY', `entry points at ${featureShown}, which is ${feature ? 'a ' + feature.schema : 'absent'} - every catalog entry needs a work/feature@1 node beside it`);
         continue;
       }
       if (feature.id !== entryId) refuse(entryShown, 'CATALOG_DIRTY', `entry id is ${entryId} but the feature record beside it is ${feature.id}`);
@@ -460,7 +460,7 @@ export function checkTreeParity(perTree, sink) {
     }).join(', ');
     const divergence = sides.map(side => `only ${side.label}: ${side.onlyHere.join(', ')}`).join('; ');
     sink.info.push(`(both trees): ${schema} is authored ${sides.length === 1 ? 'by one tree only' : 'two different ways'} (${counts} record(s)) - ${divergence}`
-      + `${foreignFields.length ? `; ${foreignFields.join(', ')} ${foreignFields.length > 1 ? 'are' : 'is'} not part of the current contract` : ''} [PARITY_FIELD]`);
+      + `${foreignFields.length ? '; ' + foreignFields.join(', ') + ' ' + (foreignFields.length > 1 && 'are' || 'is') + ' not part of the current contract' : ''} [PARITY_FIELD]`);
   }
 }
 

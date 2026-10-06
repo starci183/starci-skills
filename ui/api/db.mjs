@@ -50,7 +50,7 @@ export function openUiDb({ env = process.env } = {}) {
         if (entry && entry.file !== row.file) { entry.db.close(); cached.delete(row.ledgerId); entry = null; }
         if (!entry) {
           const db = openLedgerReader(row.file);
-          if (ledgerIdOf({ db }) !== row.ledgerId) { db.close(); throw Error('Registered ledger identity mismatch'); }
+          if (ledgerIdOf({ db }) !== row.ledgerId) { db.close(); throw new Error('Registered ledger identity mismatch'); }
           entry = { file: row.file, db }; cached.set(row.ledgerId, entry);
         }
         observe(row.ledgerId, { ...identity, availability: 'available' });

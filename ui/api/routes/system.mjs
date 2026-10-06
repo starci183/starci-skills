@@ -22,10 +22,15 @@ function relative(value, root = null) {
 }
 function ref(kind, id, project = null) {
   const p = encodeURIComponent(project ?? ''), key = encodeURIComponent(String(id));
-  const href = kind === 'workflow' ? `#/w/${p}/${key}` : kind === 'attempt' ? `#/a/${p}/${key}`
-    : kind === 'di' ? `#/decisions?id=${key}` : kind === 'terminal' || kind === 'seat' || kind === 'service'
-      ? `#/system/services?target=${kind}&id=${key}` : kind === 'land' || kind === 'lane'
-        ? `#/system/land?target=${kind === 'land' ? 'land-run' : 'lane'}&id=${key}` : `#/system/${kind}?id=${key}`;
+  let href;
+  if (kind === 'workflow') href = `#/w/${p}/${key}`;
+  else if (kind === 'attempt') href = `#/a/${p}/${key}`;
+  else if (kind === 'di') href = `#/decisions?id=${key}`;
+  else if (kind === 'terminal' || kind === 'seat' || kind === 'service') href = `#/system/services?target=${kind}&id=${key}`;
+  else if (kind === 'land' || kind === 'lane') {
+    const target = kind === 'land' ? 'land-run' : 'lane';
+    href = `#/system/land?target=${target}&id=${key}`;
+  } else href = `#/system/${kind}?id=${key}`;
   return { kind, ...(project ? { project } : {}), id: String(id), href };
 }
 function blob(machine, sha) {
@@ -50,14 +55,29 @@ function health(store) {
   const land = one(m, "SELECT count(*) AS n FROM land_queue WHERE state IN ('queued','running')")?.n ?? 0;
   const providerRows = store.machine.providerHealth().map(row => ({ ...row, ui: uiState(m, 'provider', row.status) }));
   const providers = providerRows.filter(row => row.ui === 'bad').length;
+  let ramUi = 'unknown';
+  if (throttle) {
+    if (throttle.mode === 'critical') ramUi = 'bad';
+    else if (throttle.mode === 'heavy') ramUi = 'warn';
+    else ramUi = 'ok';
+  }
+  let slaUi = 'ok';
+  if (slaBad) slaUi = 'bad';
+  else if (slaWarn) slaUi = 'warn';
+  let slaReason = null;
+  if (slaBad) slaReason = 'SLA_CRITICAL';
+  else if (slaWarn) slaReason = 'SLA_WARNING';
+  let leakUi = 'ok';
+  if (leaks) leakUi = 'warn';
+  else if (store.stale.size) leakUi = 'unknown';
   const item = (key, ui, value, href, code = null) => ({ key, ui, value: value == null ? '—' : String(value), reason: code ? reason(code, { count: value }) : null, href });
   const items = [
     item('engine', engine?.ui ?? 'unknown', engine?.ui ?? 'unknown', '#/system/engine', engine?.ui === 'bad' ? 'ENGINE_BAD' : null),
     item('services', aggregateUi(serviceRows), serviceRows.length ? badServices : null, '#/system/services', badServices ? 'SERVICE_DOWN' : null),
     item('seats', aggregateUi(seatRows), seatRows.length ? badSeats : null, '#/system/services', badSeats ? 'SEAT_BAD' : null),
-    item('ram', !throttle ? 'unknown' : throttle.mode === 'critical' ? 'bad' : throttle.mode === 'heavy' ? 'warn' : 'ok', throttle?.mode ?? 'unknown', '#/system/resources', throttle?.mode === 'critical' ? 'RAM_CRITICAL' : null),
-    item('sla', slaBad ? 'bad' : slaWarn ? 'warn' : 'ok', slaBad + slaWarn, '#/system/sla', slaBad ? 'SLA_CRITICAL' : slaWarn ? 'SLA_WARNING' : null),
-    item('leaks', leaks ? 'warn' : store.stale.size ? 'unknown' : 'ok', leaks, '#/system/cleanup', leaks ? 'LEAKS_OPEN' : null),
+    item('ram', ramUi, throttle?.mode ?? 'unknown', '#/system/resources', throttle?.mode === 'critical' ? 'RAM_CRITICAL' : null),
+    item('sla', slaUi, slaBad + slaWarn, '#/system/sla', slaReason),
+    item('leaks', leakUi, leaks, '#/system/cleanup', leaks ? 'LEAKS_OPEN' : null),
     item('gc', gc ? gcRun(m, gc).ui : 'unknown', gc?.run_id ?? null, '#/system/cleanup'),
     item('land', land ? 'waiting' : 'ok', land, '#/system/land'),
     item('providers', aggregateUi(providerRows), providerRows.length ? providers : null, '#/system/resources', providers ? 'PROVIDER_UNAVAILABLE' : null),
@@ -78,12 +98,15 @@ function reconciler(store) {
     const acts = many(m, 'SELECT state,count(*) AS n FROM v_engine_actions WHERE controller=? AND started_at>=? GROUP BY state', mode.controller, now - DAY);
     const counts = Object.fromEntries(acts.map(x => [x.state, x.n]));
     const last = one(m, 'SELECT started_at,error_signature,state,ui FROM v_engine_actions WHERE controller=? ORDER BY started_at DESC LIMIT 1', mode.controller);
+    let ui = last?.ui ?? 'unknown';
+    if (last?.ui === 'bad') ui = 'bad';
+    else if (mode.mode === 'shadow' || mode.mode === 'off') ui = 'waiting';
     return { name: mode.controller, mode: mode.mode, modeSetAt: mode.set_at, modeSetBy: mode.set_by,
       queue: { depth: queue?.depth ?? 0, failing: queue?.failing ?? 0, nextDueAt: queue?.next_due_at ?? null },
       actions24h: Object.fromEntries(['intent', 'running', 'done', 'failed', 'unknown', 'fenced'].map(state => [state, counts[state] ?? 0])),
       lastActionAt: last?.started_at ?? null,
       lastError: last && ['failed', 'unknown'].includes(last.state) ? { at: last.started_at, text: last.error_signature ?? 'Action failed' } : null,
-      ui: last?.ui === 'bad' ? 'bad' : mode.mode === 'shadow' || mode.mode === 'off' ? 'waiting' : last?.ui ?? 'unknown' };
+      ui };
   });
   const schedules = many(m, 'SELECT * FROM v_schedules ORDER BY controller,duty').map(row => ({ controller: row.controller, duty: row.duty,
     intervalMs: row.interval_ms, lastStartedAt: row.last_started_at, lastResult: row.last_result,
@@ -142,9 +165,13 @@ function resources(store) {
   const providers = reader.providerHealth().map(row => ({ provider: row.provider, status: row.status, observedAt: row.updated_at,
     failureKind: row.failure_kind, strikes: row.strikes, circuitOpenUntil: row.circuit_open_until, reason: row.reason,
     ui: uiState(machine, 'provider', row.status) }));
-  const quotas = reader.quotas().map(row => ({ provider: row.provider, window: row.window,
-    used: row.used, limit: row.limit_value, resetAt: row.reset_at, observedAt: row.observed_at,
-    ui: row.limit_value == null || row.used == null ? 'unknown' : row.used >= row.limit_value ? 'warn' : 'ok' }));
+  const quotas = reader.quotas().map(row => {
+    let ui = 'ok';
+    if (row.limit_value == null || row.used == null) ui = 'unknown';
+    else if (row.used >= row.limit_value) ui = 'warn';
+    return { provider: row.provider, window: row.window,
+      used: row.used, limit: row.limit_value, resetAt: row.reset_at, observedAt: row.observed_at, ui };
+  });
   const leaseRows = reader.hostLeases();
   const leases = many(machine, 'SELECT * FROM host_resources').map(row => { const holders = leaseRows.filter(lease => lease.resource_key === row.resource_key);
     return { resource: row.resource_key, capacity: row.capacity, used: holders.reduce((n, x) => n + x.units, 0),
@@ -160,9 +187,13 @@ function resources(store) {
     reason: state?.reason ?? null, priorities: parse(state?.priorities_json),
     ui: state ? uiState(machine, 'throttle', state.mode) : 'unknown', recent }, pools, providers, quotas, leases, budgets, deferred };
 }
-function gcRun(machine, row) { return { id: row.run_id, startedAt: row.started_at, finishedAt: row.finished_at,
+function gcRun(machine, row) {
+  let ui = 'running';
+  if (row.finished_at) ui = parse(row.errors_json, []).length ? 'warn' : 'done';
+  return { id: row.run_id, startedAt: row.started_at, finishedAt: row.finished_at,
   trigger: row.trigger, freedBytes: row.freed_bytes, counts: parse(row.counts_json, {}), errors: parse(row.errors_json, []).length,
-  report: blob(machine, row.report_sha), ui: row.finished_at ? parse(row.errors_json, []).length ? 'warn' : 'done' : 'running' }; }
+  report: blob(machine, row.report_sha), ui };
+}
 function leaks(store) {
   const machine = store.machine.db;
   const rows = many(machine, 'SELECT * FROM v_leaks').map(item => ({ kind: item.kind, target: relative(item.target),
@@ -185,8 +216,11 @@ function laneRow(machine, row) { return { scope: 'runtime', name: row.name, work
   state: row.state, ui: uiState(machine, 'lane', row.state), createdAt: row.created_at, landedAt: row.landed_at, removedAt: row.removed_at, report: blob(machine, row.report_sha) }; }
 function pushRow(store, row) {
   const m = store.machine.db, repo = one(m, 'SELECT name,role,ledger_id FROM repositories WHERE repo_root=?', row.repo_root);
+  let scope = 'unknown';
+  if (repo?.role === 'runtime') scope = 'runtime';
+  else if (['backend', 'frontend', 'service'].includes(repo?.role)) scope = 'project';
   return { id: row.push_id, repo: repo?.name ?? relative(row.repo_root), repoRole: repo?.role ?? null,
-    scope: repo?.role === 'runtime' ? 'runtime' : ['backend', 'frontend', 'service'].includes(repo?.role) ? 'project' : 'unknown',
+    scope,
     project: repo?.ledger_id ? projectName(store, repo.ledger_id) : null,
     branch: row.branch, head: row.head, from: row.from_sha, to: row.to_sha, result: row.result, reason: row.reason,
     failureSignature: row.failure_signature, stdout: blob(m, row.stdout_sha), stderr: blob(m, row.stderr_sha),
@@ -267,12 +301,19 @@ export function handleSystem(request, response, store, url) {
     for (const [param, field] of [['state', 'state'], ['code', 'code']]) if (url.searchParams.has(param)) rows = rows.filter(row => row[field] === url.searchParams.get(param));
     if (url.searchParams.get('violated') === '1') rows = rows.filter(row => row.violated_at != null);
     if (url.searchParams.has('project')) rows = rows.filter(row => projectName(store, row.ledger_id) === url.searchParams.get('project'));
-    data = rows.map(row => ({ id: row.episode_id, entity: row.entity, state: row.state, code: row.code,
-      severity: row.severity, project: projectName(store, row.ledger_id), wf: row.workflow_id,
-      enteredAt: row.entered_at, slaMs: row.sla_ms, dueAt: row.due_at ?? row.entered_at + row.sla_ms,
-      violatedAt: row.violated_at, clearedAt: row.cleared_at, clearReason: row.clear_reason,
-      di: row.di_id ? ref('di', row.di_id) : null,
-      ui: row.ui ?? (row.cleared_at ? 'done' : row.violated_at ? row.severity === 'critical' ? 'bad' : 'warn' : 'waiting') }));
+    data = rows.map(row => {
+      let ui = row.ui;
+      if (ui == null) {
+        if (row.cleared_at) ui = 'done';
+        else if (row.violated_at) ui = row.severity === 'critical' ? 'bad' : 'warn';
+        else ui = 'waiting';
+      }
+      return { id: row.episode_id, entity: row.entity, state: row.state, code: row.code,
+        severity: row.severity, project: projectName(store, row.ledger_id), wf: row.workflow_id,
+        enteredAt: row.entered_at, slaMs: row.sla_ms, dueAt: row.due_at ?? row.entered_at + row.sla_ms,
+        violatedAt: row.violated_at, clearedAt: row.cleared_at, clearReason: row.clear_reason,
+        di: row.di_id ? ref('di', row.di_id) : null, ui };
+    });
     sources = source('machine', open ? 'v_sla_open' : 'sla_episodes');
   }
   else if (pathname === '/api/sla/catalog') {
@@ -301,7 +342,7 @@ export function handleSystem(request, response, store, url) {
   else if (pathname === '/api/leaks') { data = leaks(store); sources = [...source('machine', 'v_leaks'), ...store.projects().flatMap(row => source(row.name, 'v_ledger_leaks'))]; }
   else if (pathname === '/api/land') { data = land(store); sources = source('machine', 'land_queue', 'land_runs', 'pushes', 'repositories', 'blobs'); }
   else if (pathname === '/api/land/target') { data = landTarget(store, url); sources = source('machine', 'land_queue', 'land_runs', 'lanes', 'pushes', 'repositories', 'blobs'); }
-  else if (pathname === '/api/land/runs') { let rows = many(m, 'SELECT * FROM land_runs ORDER BY run_id DESC'); if (url.searchParams.has('lane')) rows = rows.filter(row => row.lane === url.searchParams.get('lane')); if (url.searchParams.has('result')) rows = rows.filter(row => row.result === url.searchParams.get('result')); const result = page(rows.map(row => landRun(m, row)), url); data = result.rows; next = result.next; sources = source('machine', 'land_runs', 'blobs'); }
+  else if (pathname === '/api/land/runs') { let rows = many(m, 'SELECT * FROM land_runs ORDER BY run_id DESC'); if (url.searchParams.has('lane')) { rows = rows.filter(row => row.lane === url.searchParams.get('lane')); } if (url.searchParams.has('result')) { rows = rows.filter(row => row.result === url.searchParams.get('result')); } const result = page(rows.map(row => landRun(m, row)), url); data = result.rows; next = result.next; sources = source('machine', 'land_runs', 'blobs'); }
   else if (pathname === '/api/lanes') { data = many(m, 'SELECT * FROM lanes ORDER BY created_at DESC').filter(row => !url.searchParams.has('state') || row.state === url.searchParams.get('state')).map(row => laneRow(m, row)); sources = source('machine', 'lanes', 'blobs'); }
   else if (pathname === '/api/supervisor') { data = supervisor(store); sources = source('machine', 'v_seats', 'v_open_sup_decisions', 'sup_owed', 'sup_jobs', 'sup_attempts', 'notifications'); }
   else if (pathname === '/api/supervisor/workers') { let rows = many(m, 'SELECT j.*,a.* FROM sup_jobs j LEFT JOIN sup_attempts a ON a.attempt_id=(SELECT max(attempt_id) FROM sup_attempts WHERE job_id=j.job_id) ORDER BY j.created_at DESC');
@@ -312,7 +353,7 @@ export function handleSystem(request, response, store, url) {
         landedAt: row.landed_at, verdict: row.verdict, landedSha: row.landed_sha, tokensIn: row.tokens_in,
         tokensOut: row.tokens_out, costUsd: row.cost_usd, transcript: blob(m, row.transcript_sha) },
       ui: uiState(m, 'sup-job', row.status) })), url); data = result.rows; next = result.next; sources = source('machine', 'sup_jobs', 'sup_attempts', 'blobs'); }
-  else if (pathname === '/api/supervisor/lessons') { let rows = many(m, 'SELECT * FROM sup_learning ORDER BY updated_at DESC'); if (url.searchParams.has('kind')) rows = rows.filter(row => row.kind === url.searchParams.get('kind')); if (url.searchParams.has('state')) rows = rows.filter(row => row.state === url.searchParams.get('state')); const result = page(rows.map(row => ({ id: row.item_id, kind: row.kind, parent: row.parent_id, title: row.title, state: row.state,
+  else if (pathname === '/api/supervisor/lessons') { let rows = many(m, 'SELECT * FROM sup_learning ORDER BY updated_at DESC'); if (url.searchParams.has('kind')) { rows = rows.filter(row => row.kind === url.searchParams.get('kind')); } if (url.searchParams.has('state')) { rows = rows.filter(row => row.state === url.searchParams.get('state')); } const result = page(rows.map(row => ({ id: row.item_id, kind: row.kind, parent: row.parent_id, title: row.title, state: row.state,
     source: row.source_ref ? ref('workflow', row.source_ref) : null, lane: row.lane, landedSha: row.landed_sha,
     createdAt: row.created_at, updatedAt: row.updated_at })), url); data = result.rows; next = result.next; sources = source('machine', 'sup_learning'); }
   else if (pathname === '/api/supervisor/rulings') { data = many(m, 'SELECT * FROM sup_owner_rulings ORDER BY said_at DESC').filter(row => !url.searchParams.has('q') || `${row.verbatim} ${row.paraphrase}`.toLowerCase().includes(url.searchParams.get('q').toLowerCase())).map(row => ({ id: row.ruling_id, saidAt: row.said_at, channel: row.channel, verbatim: row.verbatim,
