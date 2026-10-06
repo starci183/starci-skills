@@ -93,7 +93,7 @@ export function observeCheck(check, context, run) {
  * value is never accepted from the caller's checks JSON. */
 export function stageObservation(run, roots) {
   const blob = (value, mediaType) => {
-   if (value == null || value.length === 0) return null;
+    if (value == null || value.length === 0) { return null; }
     let bytes = value;
     if (!Buffer.isBuffer(value)) {
       const text = typeof value === 'string' ? value : JSON.stringify(value);
