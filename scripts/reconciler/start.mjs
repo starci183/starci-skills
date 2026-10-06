@@ -163,8 +163,16 @@ async function probeServices({ registry = serviceRegistry() } = {}) {
 function supervisorItem({ mode, statusJson, startJson = null }) {
   if (mode !== 'kernel') return green('seats', 'supervisor', 'Supervisor seat', 'chat mode: the owner\'s desktop chat is the Supervisor (nothing to start)');
   const h = statusJson?.health;
-  if (startJson?.ok === false) return red('seats', 'supervisor', 'Supervisor seat', `start-supervisor: ${startJson.action ?? 'failed'}${startJson.error || startJson.reason ? ` - ${String(startJson.error ?? startJson.reason).slice(0, 160)}` : ''}`, 'starci supervisor start --json');
-  if (h?.live) return green('seats', 'supervisor', 'Supervisor seat', `live${h.terminal ? ` (${h.terminal})` : ''}${h.starting ? ', starting' : ''}`);
+  if (startJson?.ok === false) {
+    const error = startJson.error || startJson.reason;
+    const detail = `start-supervisor: ${startJson.action ?? 'failed'}` + (error ? ` - ${String(startJson.error ?? startJson.reason).slice(0, 160)}` : '');
+    return red('seats', 'supervisor', 'Supervisor seat', detail, 'starci supervisor start --json');
+  }
+  if (h?.live) {
+    const terminal = h.terminal ? ` (${h.terminal})` : '';
+    const starting = h.starting ? ', starting' : '';
+    return green('seats', 'supervisor', 'Supervisor seat', `live${terminal}${starting}`);
+  }
   return red('seats', 'supervisor', 'Supervisor seat', h ? `not live: ${h.reason ?? 'unknown'}` : 'status unreadable', 'starci supervisor start --json');
 }
 
@@ -174,7 +182,10 @@ function kernelSeatItem({ ledger, workflowId, answer, seatState }) {
   const id = `seat:kernel:${ledger}:${workflowId}`;
   const action = answer?.action ?? null;
   if (seatState === 'live' && answer?.ok !== false) return green('seats', id, name, `live (${action ?? 'ok'})`);
-  return red('seats', id, name, `${seatState ?? 'unknown'}${action ? ` (${action})` : ''}${answer?.error ? `: ${String(answer.error).slice(0, 120)}` : ''}`,
+  const state = seatState ?? 'unknown';
+  const actionText = action ? ` (${action})` : '';
+  const error = answer?.error ? `: ${String(answer.error).slice(0, 120)}` : '';
+  return red('seats', id, name, `${state}${actionText}${error}`,
     `starci machine kernel-watchdog --repo <repo> --workflow ${workflowId} --once --repair --json`);
 }
 
@@ -234,8 +245,13 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   if (mode === 'kernel' && seats && orcaProbe.ok) {
     const st = await json([path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--status', '--json'], { timeoutMs: 90_000 });
     push(supervisorItem({ mode, statusJson: st }));
-  } else push(mode === 'kernel' ? red('seats', 'supervisor', 'Supervisor seat', orca ? 'Orca is not reachable' : 'not checked', 'open Orca, then run start again') : supervisorItem({ mode }));
-  push(orcaProbe.ok === false ? red('preflight', 'orca', 'Orca reachable', `${orcaProbe.verdict}${orcaProbe.error ? `: ${orcaProbe.error}` : ''}`, 'open Orca yourself, then run start again') : orcaProbe.ok ? green('preflight', 'orca', 'Orca reachable', `${orcaProbe.terminals ?? 0} terminal(s)`) : []);
+  } else if (mode === 'kernel') push(red('seats', 'supervisor', 'Supervisor seat', orca ? 'Orca is not reachable' : 'not checked', 'open Orca, then run start again'));
+  else push(supervisorItem({ mode }));
+  if (orcaProbe.ok === false) {
+    const error = orcaProbe.error ? `: ${orcaProbe.error}` : '';
+    push(red('preflight', 'orca', 'Orca reachable', `${orcaProbe.verdict}${error}`, 'open Orca yourself, then run start again'));
+  } else if (orcaProbe.ok) push(green('preflight', 'orca', 'Orca reachable', `${orcaProbe.terminals ?? 0} terminal(s)`));
+  else push([]);
   if (seats && workflowSeats) push(await kernelSeatItems({ orcaOk: orcaProbe.ok !== false, config }));
   if (coreDebug && config?.debug === true) {
     let health;
@@ -261,7 +277,8 @@ async function worktreeItems({ env = process.env, repos = [], counts = null } = 
   if (!rows.length) return [green('preflight', 'worktrees', 'worktrees per repo', 'no runtime worktree', { required: false })];
   return rows.map((r) => {
     const id = `worktrees:${path.basename(r.repoRoot)}`, name = `worktrees ${path.basename(r.repoRoot)}`;
-    const detail = `${r.live}/${r.cap} runtime, ${r.linked} linked${r.orphans.length ? `, ${r.orphans.length} orphan(s): ${r.orphans.slice(0, 3).map((o) => `${o.path} (${o.why})`).join('; ')}` : ''}`;
+    const orphans = r.orphans.length ? `, ${r.orphans.length} orphan(s): ${r.orphans.slice(0, 3).map((o) => `${o.path} (${o.why})`).join('; ')}` : '';
+    const detail = `${r.live}/${r.cap} runtime, ${r.linked} linked${orphans}`;
     return r.over || r.orphans.length
       ? red('preflight', id, name, detail, 'the reconciler GC controller (key gc:worktrees, always active) preserves and removes them; to run it now: starci machine worktrees gc')
       : green('preflight', id, name, detail);
@@ -303,7 +320,7 @@ function renderText(items, { applied = [] } = {}) {
     if (!rows.length) continue;
     lines.push(`${group.toUpperCase()}`);
     for (const r of rows) {
-      lines.push(`  ${mark[r.status]} ${r.name}${r.detail ? ` - ${r.detail}` : ''}`);
+      lines.push('  ' + mark[r.status] + ' ' + r.name + (r.detail ? ' - ' + r.detail : ''));
       if (r.fix && r.status !== 'green') lines.push(`           fix: ${r.fix}`);
     }
   }
@@ -338,11 +355,16 @@ export async function applyHost(opts, deps = {}) {
   if (retire) {
     const stale = ledgerFindings(readMachine((m) => m.listLedgers(), [], { env })).filter((f) => f.problem === 'temp');
     if (stale.length) withMachine((m) => { for (const f of stale) m.setLedgerState(f.ledgerId, 'retired', { reason: 'start --retire-stale-ledgers: temp/test path' }); }, { env });
-    applied.push(`retired ${stale.length} temp/test ledger(s)${stale.length ? `: ${stale.map((f) => f.name ?? f.ledgerId).join(', ')}` : ''}`);
+    const names = stale.length ? `: ${stale.map((f) => f.name ?? f.ledgerId).join(', ')}` : '';
+    applied.push(`retired ${stale.length} temp/test ledger(s)${names}`);
   }
   if (setProfile) {
     const r = applyProfileFile({ profile: setProfile });
-    applied.push(r.error ? `profile NOT set: ${r.error}` : r.changed ? `config.yaml reconciler.profile: ${setProfile} (backup ${path.basename(r.backup)})` : `config.yaml already on profile ${setProfile}`);
+    let result;
+    if (r.error) result = `profile NOT set: ${r.error}`;
+    else if (r.changed) result = `config.yaml reconciler.profile: ${setProfile} (backup ${path.basename(r.backup)})`;
+    else result = `config.yaml already on profile ${setProfile}`;
+    applied.push(result);
   }
   let rebuilt = false;
   if (!noBuild) {
@@ -361,9 +383,17 @@ export async function applyHost(opts, deps = {}) {
   const shadowed = live ? safeShadowOf(live) : [];
   if (l.fresh && (l.safe || shadowed.length) && !plan.looping) {
     const r = await api.restartEngine({ env });
-    applied.push(`engine restarted out of safe mode (${l.safeModes?.length ? `controller_modes: ${l.safeModes.join(', ')}` : 'configured active but running shadow'}${shadowed.length ? `: ${shadowed.join(', ')}` : ''}): ${r.action} pid ${r.pid ?? '-'}${r.safe ? ' SAFE (real crash loop)' : ''}`);
+    const reasons = l.safeModes?.length ? `controller_modes: ${l.safeModes.join(', ')}` : 'configured active but running shadow';
+    const shadowNote = shadowed.length ? `: ${shadowed.join(', ')}` : '';
+    const safeNote = r.safe ? ' SAFE (real crash loop)' : '';
+    applied.push(`engine restarted out of safe mode (${reasons}${shadowNote}): ${r.action} pid ${r.pid ?? '-'}${safeNote}`);
   } else if (l.fresh && (l.safe || shadowed.length)) applied.push(`engine left in safe mode: a real crash loop is on record (${plan.starts.length} abnormal start(s) in the window)`);
-  else if (!l.fresh) { const r = await api.ensure({ env, reason: 'start' }); applied.push(`engine ${r.action}${r.pid ? ` pid ${r.pid}` : ''}${r.safe ? ' SAFE (real crash loop)' : ''}`); }
+  else if (!l.fresh) {
+    const r = await api.ensure({ env, reason: 'start' });
+    const pid = r.pid ? ` pid ${r.pid}` : '';
+    const safe = r.safe ? ' SAFE (real crash loop)' : '';
+    applied.push(`engine ${r.action}${pid}${safe}`);
+  }
   const deadline = Date.now() + waitMs;
   while (Date.now() < deadline) { l = api.leaderState({ env }); if (l.fresh) break; await api.sleep(3000); }
   // services that are down (never Orca)
@@ -371,7 +401,8 @@ export async function applyHost(opts, deps = {}) {
   for (const p of probes) {
     if (p.ok || NOT_ACTUATED.has(p.name) || !serviceWanted(p.name, safeRun(() => api.loadConfig(), null)) || p.name.startsWith('sched-task:') || !p.entry.restart) continue;
     const r = await api.startService(p.name);
-    applied.push(`service ${p.name}: ${r.ok ? 'start requested' : `start FAILED ${String(r.error ?? r.output ?? '').slice(0, 120)}`}`);
+    const result = r.ok ? 'start requested' : `start FAILED ${String(r.error ?? r.output ?? '').slice(0, 120)}`;
+    applied.push(`service ${p.name}: ${result}`);
   }
   if (rebuilt && probes.find((p) => p.name === 'harness-ui')?.ok) { const r = await api.startService('harness-ui'); applied.push(`service harness-ui restarted to serve the new build: ${r.ok ? 'ok' : 'FAILED'}`); }
   // Supervisor seat (kernel mode only) and the Kernel seats of running workflows
@@ -380,7 +411,8 @@ export async function applyHost(opts, deps = {}) {
   if (orcaUp) {
     if (api.supervisorMode({ env, config }) === 'kernel') {
       const r = await api.json([path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--json'], { timeoutMs: 300_000 });
-      applied.push(`Supervisor seat: ${r?.action ?? 'no answer'}${r?.ok === false ? ` (${String(r.error ?? r.reason ?? '').slice(0, 120)})` : ''}`);
+      const error = r?.ok === false ? ` (${String(r.error ?? r.reason ?? '').slice(0, 120)})` : '';
+      applied.push(`Supervisor seat: ${r?.action ?? 'no answer'}${error}`);
     }
     if (workflowSeats) {
       const seats = await api.kernelSeatItems({ orcaOk: true, config, repair: true });
