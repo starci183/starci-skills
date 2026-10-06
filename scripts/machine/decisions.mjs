@@ -56,10 +56,12 @@ export const RING_MIN_GAP_MS = 2 * 60_000;
 const RING_TAG = '[decide]';
 const PASS_THROUGH = ['productLedger', 'productWorkflowId', 'code', 'escalatedFrom'];
 
-const one = (s, n = 300) => oneLine(s, n);
-export const refuse = (message, code, extra = {}) => refuseError(message, code, extra);
-const diIdOf = (workflowId, key) => `di-${crypto.createHash('sha256').update(`${workflowId}\0${key}`).digest('hex').slice(0, 8)}`;
-const isSupervisorActor = (by) => /^supervisor\b/i.test(String(by ?? ''));
+const one = (s, n = 300) => oneLine(s, n); export const refuse = (message, code, extra = {}) => refuseError(message, code, extra);
+const diIdOf = (workflowId, key) => `di-${crypto.createHash('sha256').update(workflowId + '\0' + key).digest('hex').slice(0, 8)}`; const isSupervisorActor = (by) => /^supervisor\b/i.test(String(by ?? ''));
+const keySuffix = (kind, summary) => kind === 'supervisor-ruling' ? ':' + crypto.createHash('sha256').update(summary).digest('hex').slice(0, 8) : ''; const dueMsOf = (spec, now) => { if (Number.isFinite(Number(spec.dueMs)) && Number(spec.dueMs) > 0) return Number(spec.dueMs); if (Number.isFinite(spec.dueAt) && spec.dueAt > now) return spec.dueAt - now; return null; };
+const escalationTarget = (decider) => { if (decider === 'kernel') return 'supervisor'; if (decider === 'supervisor') return 'owner'; return null; }; const closeOldCommand = (outcome, failCheck, api, repoArgs, jobId) => { if (outcome === 'done') return `${failCheck} ; ${api} settle ${repoArgs} --job ${jobId} --verdict fail`; return `${api} settle ${repoArgs} --job ${jobId} --verdict ${outcome === 'blocked' || outcome === 'ask' ? 'blocked' : 'fail'}`; };
+const statusOf = (error) => { if (!error) return 0; if (typeof error.code === 'number') return error.code; return null; }; const templateText = (value) => `${value}`;
+const doorbellOption = (command, index) => `(${String.fromCodePoint(97 + index)}) ${command.title}: ${command.run}`;
 
 /* ------------------------------------------------------------ the store: runtime.sqlite decision_items */
 // Written only through engine/db/ledger.mjs (openDecisionItem, updateDecisionItem, recordDecision, appendEvent). A DI
@@ -144,6 +146,17 @@ const insert = (ledger, di, keyParts) => {
 const event = (ledger, prefix, di, verb, payload, now) => appendEvent(ledger.db, { workflowId: di.workflowId, entityType: 'decision', entityId: di.id,
   kind: `${prefix}-${verb}`, payload: { id: di.id, kind: di.kind, decider: di.decider, entity: di.entity, ...payload }, createdAt: now });
 
+function supersedeMatchingRows(ledger, { workflowId, now, key, kind, entity, decision, by, prefix, superseded }, matches) {
+  // MB-07: a new key supersedes older live rows that match the caller's entity rule.
+  for (const old of listDecisions(ledger.db, { workflowId, now }).filter((d) => d.idempotencyKey !== key)) {
+    if (!matches(old)) continue;
+    const next = { ...old, status: 'superseded', supersededBy: decision.id, resolution: { by, verb: 'superseded', decisionId: null, at: now } };
+    write(ledger, next, now);
+    event(ledger, prefix, next, 'superseded', { by: decision.id }, now);
+    superseded.push(old.id);
+  }
+}
+
 /**
  * Open a DI, idempotent on its key: a key already live returns that DI (`existing: true`); a resolved or superseded
  * key returns it too (a new occurrence needs a new key, e.g. with the report id). A `supervisor-ruling` supersedes
@@ -159,7 +172,7 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
   const summary = one(spec.summary, 600);
   if (!workflowId || !summary) throw refuse('a decision needs --workflow and --summary', 'decision-incomplete');
   if (!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId)) throw refuse(`workflow ${workflowId} is not in this ledger`, 'workflow-unknown');
-  const key = String(spec.idempotencyKey ?? '').trim() || `${kind}:${entity.type}:${entity.id}${kind === 'supervisor-ruling' ? `:${crypto.createHash('sha256').update(summary).digest('hex').slice(0, 8)}` : ''}`;
+  const key = String(spec.idempotencyKey ?? '').trim() || `${kind}:${entity.type}:${entity.id}${keySuffix(kind, summary)}`;
   checkKey(key);
   // MB-07: every DI row carries its key's named parts; a key opened without them is described by its own components.
   const keyParts = checkKeyParts(spec.keyParts ?? Object.fromEntries(key.split(':').map((part, i) => [i ? `part${i}` : 'kind', part])));
@@ -168,8 +181,7 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
   ledger.transaction(() => {
     const prior = ledger.db.prepare('SELECT * FROM decision_items WHERE idempotency_key=?').get(key);
     if (prior) { out = { di: effective(rowToDi(prior), now), created: false, existing: true, superseded: [] }; return; }
-    const asked = Number.isFinite(Number(spec.dueMs)) && Number(spec.dueMs) > 0 ? Number(spec.dueMs)
-      : Number.isFinite(spec.dueAt) && spec.dueAt > now ? spec.dueAt - now : null;
+    const asked = dueMsOf(spec, now);
     const dueMs = asked ?? DEFAULT_DUE_MS[decider];
     const di = {
       schema: DI_SCHEMA, id: diIdOf(workflowId, key), idempotencyKey: key, kind, decider,
@@ -179,7 +191,7 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
       allowedVerbs: Array.isArray(spec.allowedVerbs) ? spec.allowedVerbs.map(String) : [],
       severity: spec.severity === 'critical' ? 'critical' : 'normal',
       openedBy: by, openedAt: now, dueAt: now + dueMs,
-      escalateTo: decider === 'kernel' ? 'supervisor' : decider === 'supervisor' ? 'owner' : null, escalations: 0,
+      escalateTo: escalationTarget(decider), escalations: 0,
       claim: null, status: 'open', resolution: null,
       ...(spec.item ? { item: String(spec.item) } : {}), ...(spec.refs ? { refs: spec.refs } : {}),
       // What a controller's DI carries beyond the schema core (lanes rc-gc-resource, rc-host, rc-sla-workflow).
@@ -187,25 +199,10 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
     };
     const superseded = [];
     insert(ledger, di, keyParts); // first: superseded_by references it
-    if (spec.supersedeEntity === true) {
-      // MB-07: one live DI per (kind, entity): a new key (a changed failure signature or head) supersedes the older one.
-      for (const old of listDecisions(ledger.db, { workflowId, now }).filter((d) => d.idempotencyKey !== key)) {
-        if (old.kind !== kind || old.entity?.type !== entity.type || old.entity?.id !== entity.id) continue;
-        const next = { ...old, status: 'superseded', supersededBy: di.id, resolution: { by, verb: 'superseded', decisionId: null, at: now } };
-        write(ledger, next, now);
-        event(ledger, prefix, next, 'superseded', { by: di.id }, now);
-        superseded.push(old.id);
-      }
-    }
-    if (kind === 'supervisor-ruling') {
-      for (const old of listDecisions(ledger.db, { workflowId, now }).filter((d) => d.idempotencyKey !== key)) {
-        if (old.decider !== 'kernel' || old.kind === 'supervisor-ruling' || old.entity?.type !== entity.type || old.entity?.id !== entity.id) continue;
-        const next = { ...old, status: 'superseded', supersededBy: di.id, resolution: { by, verb: 'superseded', decisionId: null, at: now } };
-        write(ledger, next, now);
-        event(ledger, prefix, next, 'superseded', { by: di.id }, now);
-        superseded.push(old.id);
-      }
-    }
+    if (spec.supersedeEntity === true) supersedeMatchingRows(ledger, { workflowId, now, key, kind, entity, decision: di, by, prefix, superseded },
+      (old) => old.kind === kind && old.entity?.type === entity.type && old.entity?.id === entity.id);
+    if (kind === 'supervisor-ruling') supersedeMatchingRows(ledger, { workflowId, now, key, kind, entity, decision: di, by, prefix, superseded },
+      (old) => old.decider === 'kernel' && old.kind !== 'supervisor-ruling' && old.entity?.type === entity.type && old.entity?.id === entity.id);
     // openDecisionItem wrote the decision-opened event; what it supersedes rides on each superseded event.
     out = { di, created: true, existing: false, superseded };
   });
@@ -331,7 +328,7 @@ export function blockingDecisions(db, workflowId, { now = Date.now(), minAgeMs =
     .sort((a, b) => (b.severity === 'critical') - (a.severity === 'critical') || (a.openedAt ?? 0) - (b.openedAt ?? 0));
 }
 
-const q = (v) => (/[\s"'|;&<>]/.test(String(v)) ? `'${String(v).replaceAll("'", String.raw`'\''`)}'` : String(v));
+const q = (v) => (/[\s"'|;&<>]/.test(String(v)) ? `'${String(v).replaceAll("'", String.fromCharCode(39, 92, 39, 39))}'` : String(v));
 const lastRefusalsOf = (db, jobId) => db.prepare("SELECT kind, payload_json FROM events WHERE entity_type='job' AND entity_id=? AND (kind LIKE '%-refused' OR kind LIKE '%needs-kernel') ORDER BY seq DESC LIMIT 6").all(jobId)
   .map((e) => ({ kind: e.kind, ...parseJsonOr(e.payload_json) }));
 const reportOf = (db, dispatchId) => {
@@ -375,12 +372,11 @@ export function resolutionOf(db, di, { repo = '<repo>', now = Date.now() } = {})
   const params = { ...payload.params, ...(refusal?.continuation?.resumeFrom ? { resumeFrom: refusal.continuation.resumeFrom } : {}) };
   const paramsArg = Object.keys(params).length ? ` --params ${q(JSON.stringify(params))}` : '';
   const oneLine = String(report?.summary ?? di.summary).replace(/\s+/g, ' ').slice(0, 160);
-  const whatLine = `${op} ${jobId} reported ${outcome ?? '?'}; refused ${code}${failures.length ? ` (${failures[0].replace(/\s+/g, ' ').slice(0, 80)})` : ''}: ${oneLine}`;
-  const decide = `${api} decide ${R} --workflow ${wf} --hypothesis ${q(`${code} on ${jobId}`)} --action-key resolve-${code}-${jobId.slice(-10)} --metric ${q(`${jobId} decided and its unit moves`)}`;
-  const failCheck = `${api} check ${R} --job ${jobId} --checks ${q(JSON.stringify([{ name: code, command: 'runtime settle', exitCode: 1, evidence: `${code}: ${failures.join('; ').replace(/\s+/g, ' ').slice(0, 200) || 'refused by the runtime'}` }]))}`;
-  const closeOld = outcome === 'done' ? `${failCheck} ; ${api} settle ${R} --job ${jobId} --verdict fail`
-    : `${api} settle ${R} --job ${jobId} --verdict ${outcome === 'blocked' || outcome === 'ask' ? 'blocked' : 'fail'}`;
-  const enqueue = (ps, tag) => `${api} enqueue ${R} --workflow ${wf} --op ${op} --paths ${q(ps.join(','))} --retry-of ${jobId}${paramsArg} --what ${q(`${tag}: ${what}`.slice(0, 40))} --resolves ${di.id}`;
+  const whatLine = `${op} ${jobId} reported ${outcome ?? '?'}; refused ${code}${failures.length ? ' (' + failures[0].replace(/\s+/g, ' ').slice(0, 80) + ')' : ''}: ${oneLine}`;
+  const decide = `${api} decide ${R} --workflow ${wf} --hypothesis ${q(templateText(code) + ' on ' + templateText(jobId))} --action-key resolve-${code}-${jobId.slice(-10)} --metric ${q(templateText(jobId) + ' decided and its unit moves')}`;
+  const failCheck = `${api} check ${R} --job ${jobId} --checks ${q(JSON.stringify([{ name: code, command: 'runtime settle', exitCode: 1, evidence: templateText(code) + ': ' + (failures.join('; ').replace(/\s+/g, ' ').slice(0, 200) || 'refused by the runtime') }]))}`;
+  const closeOld = closeOldCommand(outcome, failCheck, api, R, jobId);
+  const enqueue = (ps, tag) => `${api} enqueue ${R} --workflow ${wf} --op ${op} --paths ${q(ps.join(','))} --retry-of ${jobId}${paramsArg} --what ${q((templateText(tag) + ': ' + templateText(what)).slice(0, 40))} --resolves ${di.id}`;
   const commands = [{ key: 'continue', title: `continue on the current base with the failing files added (${failing.length} file(s))`, run: `${closeOld} ; ${enqueue(paths, 'continue')}` }];
   const apps = [...new Set(paths.map(appOf))];
   if (apps.length > 1) {
@@ -389,7 +385,7 @@ export function resolutionOf(db, di, { repo = '<repo>', now = Date.now() } = {})
   if (outcome === 'done') {
     commands.push({ key: 'accept', title: 'accept it: settle pass re-runs integration and parity on the current tip (only when the blocker the refusal names has since landed)', run: `${api} settle ${R} --job ${jobId} --verdict pass` });
   } else {
-    commands.push({ key: 'drop', title: 'drop the unit (the goal no longer needs it)', run: `${closeOld} ; ${api} reconcile ${R} --job ${jobId} --drop --reason ${q(`${code}: dropped by the Kernel`)}` });
+    commands.push({ key: 'drop', title: 'drop the unit (the goal no longer needs it)', run: `${closeOld} ; ${api} reconcile ${R} --job ${jobId} --drop --reason ${q(templateText(code) + ': dropped by the Kernel')}` });
   }
   return { ...base, jobId, code, outcome, what: whatLine, failing, commands: commands.slice(0, 3), decide, resolve: resolve('<the option you ran>') };
 }
@@ -478,7 +474,7 @@ export function closeWorkflowDecisions(ledger, workflowId, { verb, now = Date.no
  */
 function runDecisionsVerbAsync(repo, argv, { env = process.env, timeoutMs = 60_000 } = {}) {
   return execNode([API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, timeout: timeoutMs, env, maxBuffer: 64 * 1024 * 1024 }).then(({ error, stdout, stderr }) => {
-    const status = error ? (typeof error.code === 'number' ? error.code : null) : 0;
+    const status = statusOf(error);
     let json = null;
     for (const text of [stdout, String(stderr ?? '').trim().split(/\r?\n/).pop()]) { try { json = JSON.parse(String(text ?? '').trim()); break; } catch { /* next */ } }
     return { ok: status === 0 && json?.ok !== false, status, json, err: String(stderr ?? '').slice(0, 1000) };
@@ -514,7 +510,7 @@ export function openDecision(repo, di, { env = process.env, run = runDecisionsVe
 
 const doorbellText = (n, workflowId, top = null) => [`${RING_TAG} ${n} waiting: starci kernel decisions --workflow ${workflowId}`,
   ...(top ? [`oldest ${top.id}: ${String(top.what).slice(0, 220)}`, top.decide ? `log: ${top.decide}` : null,
-    `pick ONE: ${top.commands.map((c, i) => `(${String.fromCodePoint(97 + i)}) ${c.title}: ${c.run}`).join(' || ')}`, `then: ${top.resolve}`] : [])].filter(Boolean).join(' | ');
+    `pick ONE: ${top.commands.map(doorbellOption).join(' || ')}`, `then: ${top.resolve}`] : [])].filter(Boolean).join(' | ');
 const RING_SCOPE = 'decision-doorbell';
 
 /**
@@ -612,6 +608,15 @@ function supKeyParts(key, named) {
   return parts.length > 1 ? Object.fromEntries(parts.map((v, i) => [i === 0 ? 'kind' : `part${i}`, v])) : { kind: 'key', key };
 }
 
+function supersedeSupervisorRows(m, decisionId, kind, entity, by, superseded) {
+  // MB-07: one live DI per (kind, entity): a new key supersedes the older one.
+  for (const old of m.listSupDecisions({ open: true }).map(supDiOf)) {
+    if (old.id === decisionId || old.kind !== kind || old.entity?.type !== entity.type || old.entity?.id !== entity.id) continue;
+    m.setSupDecision(old.id, { status: 'superseded', by, supersededBy: decisionId });
+    superseded.push(old.id);
+  }
+}
+
 /** Open a Supervisor DI (decider supervisor unless the opener names the owner) in machine.sqlite; `m` is a writer. */
 function openSupDecisionRow(m, spec, { now = Date.now() } = {}) {
   const kind = String(spec.kind ?? '').trim();
@@ -621,12 +626,12 @@ function openSupDecisionRow(m, spec, { now = Date.now() } = {}) {
   const entity = { type: String(spec.entity?.type ?? 'supervisor'), id: String(spec.entity?.id ?? 'main') };
   const summary = one(spec.summary, 600);
   if (!summary) throw refuse('a decision needs --summary', 'decision-incomplete');
-  const key = String(spec.idempotencyKey ?? '').trim() || `${kind}:${entity.type}:${entity.id}${kind === 'supervisor-ruling' ? `:${crypto.createHash('sha256').update(summary).digest('hex').slice(0, 8)}` : ''}`;
+  const key = String(spec.idempotencyKey ?? '').trim() || `${kind}:${entity.type}:${entity.id}${keySuffix(kind, summary)}`;
   checkKey(key);
   const keyParts = supKeyParts(key, spec.keyParts ?? null);
   const by = one(spec.by ?? spec.openedBy ?? 'unknown', 120);
   const productWorkflowId = spec.productWorkflowId ?? spec.workflowId ?? null;
-  const asked = Number.isFinite(Number(spec.dueMs)) && Number(spec.dueMs) > 0 ? Number(spec.dueMs) : Number.isFinite(spec.dueAt) && spec.dueAt > now ? spec.dueAt - now : null;
+  const asked = dueMsOf(spec, now);
   const dueAt = now + (asked ?? DEFAULT_DUE_MS[decider]);
   const escalateTo = decider === 'supervisor' ? 'owner' : null;
   const evidence = (Array.isArray(spec.evidence) ? spec.evidence : []).slice(0, 40);
@@ -644,14 +649,7 @@ function openSupDecisionRow(m, spec, { now = Date.now() } = {}) {
     const di = effective(supDiOf(supRow(m, r.diId)), now);
     if (!r.created) return { di, created: false, existing: true, superseded: [] };
     const superseded = [];
-    if (spec.supersedeEntity === true) {
-      // MB-07: one live DI per (kind, entity): a new key (a changed failure signature or head) supersedes the older one.
-      for (const old of m.listSupDecisions({ open: true }).map(supDiOf)) {
-        if (old.id === r.diId || old.kind !== kind || old.entity?.type !== entity.type || old.entity?.id !== entity.id) continue;
-        m.setSupDecision(old.id, { status: 'superseded', by, supersededBy: r.diId });
-        superseded.push(old.id);
-      }
-    }
+    if (spec.supersedeEntity === true) supersedeSupervisorRows(m, r.diId, kind, entity, by, superseded);
     return { di, created: true, existing: false, superseded };
   });
 }
@@ -791,7 +789,7 @@ if (isMain(import.meta.url)) {
     }
     if (cmd === 'escalate-due') {
       const r = await escalateDue({ apply: has('apply') });
-      return print(r, r.actions.map((a) => `${a.workflowId} ${a.id} ${a.kind}: ${a.step}${a.applied ? ' (applied)' : ' (plan)'}${a.supervisorDi ? ` -> ${a.supervisorDi}` : ''}`).join('\n') || 'nothing due');
+      return print(r, r.actions.map((a) => `${a.workflowId} ${a.id} ${a.kind}: ${a.step}${a.applied ? ' (applied)' : ' (plan)'}${a.supervisorDi ? ' -> ' + templateText(a.supervisorDi) : ''}`).join('\n') || 'nothing due');
     }
     if (cmd === 'supervisor') {
       if (has('ring')) { const r = await ringSupervisor(); return print({ ok: true, ...r }, `supervisor: ${r.action} (${r.open} open)`); }
