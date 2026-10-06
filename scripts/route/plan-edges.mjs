@@ -8,7 +8,11 @@
 // provable edges is refused (plan-edges-missing); there is no linear fallback.
 
 const opOfLabel = (label) => String(label).split('#')[0];
-const legOp = (leg) => (typeof leg === 'string' ? opOfLabel(leg) : leg?.op ? String(leg.op) : null);
+const legOp = (leg) => {
+  if (typeof leg === 'string') return opOfLabel(leg);
+  if (leg?.op) return String(leg.op);
+  return null;
+};
 
 /** Ordered, de-duplicated op ids of a leg list. */
 const legOpsOf = (legs) => (Array.isArray(legs) ? [...new Set(legs.map(legOp).filter(Boolean))] : []);

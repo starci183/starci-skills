@@ -13,7 +13,10 @@ export function landUnderHostLock(args, landLocked) {
   if (out?.ok === false && out.reason === 'held') {
     const o = out.owner ?? {};
     return { ok: false, commits, attempts: [], cleanup: { left: [] }, reason: 'host-lock-held', owner: o,
-      detail: `the host lock is held by ${o.role ?? 'an unknown owner'}${o.purpose ? ` (${o.purpose})` : ''}${o.pid ? ` pid ${o.pid}` : ''}${o.since ? ` since ${o.since}` : ''}`,
+      detail: `the host lock is held by ${o.role ?? 'an unknown owner'}`
+        + (o.purpose ? ` (${o.purpose})` : '')
+        + (o.pid ? ` pid ${o.pid}` : '')
+        + (o.since ? ` since ${o.since}` : ''),
       hint: 'another heavy host job holds the lock; land again once it finishes (a holder whose process died is taken over automatically); never delete the lock directory by hand' };
   }
   return out;

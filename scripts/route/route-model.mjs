@@ -44,7 +44,7 @@
 // nothing: routing is identical to the pre-config behavior.
 
 import fs from 'node:fs';
-import path from 'node:path'; import { byCodeUnit } from '../lib/list.mjs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeDifficulty, chainFor, resolveLaunchModel, kindRoute, orderKeyOf, raiseToFloor, missingHostTools,
@@ -53,6 +53,7 @@ import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { admittedModelSet } from './admitted-model-set.mjs';
+import { parseArgs } from './route-model-args.mjs';
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) : null);
 
@@ -103,53 +104,13 @@ function preflightFor(runtime) {
 // registry.yaml `pools` is the single capacity authority: no second copy of
 // maxParallel exists, so no drift check is possible or needed.
 
-function parseArgs(argv) {
-  const a = { tools: [] };
-  const take = i => {
-    const v = argv[i + 1];
-    if (v === undefined) { console.error(`missing value for ${argv[i]}`); process.exit(2); }
-    return v;
-  };
-  for (let i = 0; i < argv.length; i++) {
-    const k = argv[i];
-    if (k === '--help' || k === '-h') {
-      const header = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n');
-      const from = header.findIndex(line => line.startsWith('// Internal entry:'));
-      const to = header.findIndex(line => line.startsWith('// Owner config:'));
-      console.log(header.slice(from, to).map(line => line.replace(/^\/\/ ?/, '')).join('\n').trimEnd());
-      process.exit(0);
-    }
-    if (k === '--kind') a.kind = take(i), i++;
-    else if (k === '--role') a.role = take(i), i++;
-    else if (k === '--domain') a.domain = take(i), i++;
-    else if (k === '--risk') a.risk = take(i), i++;
-    else if (k === '--floor') a.floor = take(i), i++;
-    else if (k === '--tools') a.tools.push(...take(i).split(',')), i++;
-    else if (k === '--contextTokens') a.contextTokens = Number(take(i)), i++;
-    else if (k === '--external') a.external = true;
-    else if (k === '--unapproved') a.approved = false;
-    else if (k === '--no-review') a.review = false;
-    else if (k === '--no-checks') a.checks = false;
-    else if (k === '--difficulty') a.difficulty = take(i), i++;
-    else if (k === '--plan') a.plan = true;
-    else if (k === '--json') a.json = true;
-    else if (k === '--verbose') a.verbose = true;
-    else if (k === '--modelsDir') a.modelsDir = take(i), i++;
-    else if (k === '--repo') a.repo = take(i), i++;
-    else { console.error(`unknown arg ${k}`); process.exit(2); }
-  }
-  a.tools = [...new Set(a.tools.map(s => s.trim()).filter(Boolean))].sort(byCodeUnit);
-  if (a.difficulty != null) a.difficulty = normalizeDifficulty(a.difficulty) ?? a.difficulty;
-  return a;
-}
-
 // --- selection.yaml-driven data -------------------------------------------------
 
 function loadRules(modelsDir) {
   const file = path.join(modelsDir, 'selection.yaml');
   const doc = readYaml(file);
-  if (!doc || doc.schema !== 'starci/module-model-selection@1')
-    throw Error(`selection.yaml missing or wrong schema at ${file}`);
+  if (doc?.schema !== 'starci/module-model-selection@1')
+    throw new Error(`selection.yaml missing or wrong schema at ${file}`);
   return {
     file,
     riskOrder: doc.ladders.risk.order,
@@ -192,23 +153,41 @@ function deriveWorkload(args, rules, kindEntry, opChecks = []) {
 
 const rank = (order, v) => order.indexOf(v);
 
-function qualificationReasons(runtime, evidence, w, rules) {
-  if (!evidence || evidence.schema !== 'starci/model-qualification@1')
-    return ['model qualification evidence is missing'];
+function qualificationIdentityReasons(runtime, evidence) {
   const r = [];
   const selModel = runtime.model ?? runtime.target;
   if (!evidence.provider || !evidence.model || !evidence.version) r.push('model identity qualification is incomplete');
   if (evidence.provider !== runtime.provider || evidence.model !== selModel || !runtime.version || evidence.version !== runtime.version)
     r.push('qualification does not match selected runtime identity');
+  return r;
+}
+
+function qualificationRecordReasons(evidence) {
+  const r = [];
   if (!evidence.suite || !evidence.measuredAt || typeof evidence.outcomes !== 'object' || !evidence.outcomes)
     r.push('measurable qualification evidence is incomplete');
   if (evidence.verified !== true || evidence.receipt?.schema !== 'starci/model-evaluation-receipt@1' || !evidence.receipt?.artifact?.sha256)
     r.push('verified evaluator artifact receipt is missing');
+  return r;
+}
+
+function qualificationTimeReasons(evidence) {
+  const r = [];
   const measured = Date.parse(evidence.measuredAt), expires = Date.parse(evidence.expiresAt ?? '');
   if (!Number.isFinite(measured) || measured > Date.now()) r.push('qualification date is invalid');
   if ((evidence.expiresAt && !Number.isFinite(expires)) || (Number.isFinite(expires) && expires <= Date.now())) r.push('qualification is stale');
+  return r;
+}
+
+function qualificationProvenanceReasons(evidence) {
+  const r = [];
   if (!['independent-eval', 'verified-runtime-eval'].includes(evidence.source) || evidence.attestation === 'self-claimed')
     r.push('qualification provenance is not trusted');
+  return r;
+}
+
+function qualificationWorkloadReasons(evidence, w, rules) {
+  const r = [];
   if (!rules.riskOrder.includes(w.risk)) r.push(`unknown workload risk ${w.risk || '(empty)'}`);
   if (!rules.floorOrder.includes(w.qualityFloor)) r.push(`unknown quality floor ${w.qualityFloor || '(empty)'}`);
   if (!(evidence.workloads ?? []).some(x => x === w.kind || x === '*')) r.push(`workload ${w.kind || '(unknown)'} is not qualified`);
@@ -217,10 +196,27 @@ function qualificationReasons(runtime, evidence, w, rules) {
   if (w.contextTokens > Number(evidence.maxContextTokens ?? 0)) r.push('required context exceeds qualified context');
   if (rank(rules.floorOrder, evidence.qualityFloor) < rank(rules.floorOrder, w.qualityFloor)) r.push(`quality floor ${w.qualityFloor} is not met`);
   if (rank(rules.riskOrder, evidence.maxRisk) < rank(rules.riskOrder, w.risk)) r.push(`risk ${w.risk} is not qualified`);
+  return r;
+}
+
+function qualificationOutcomeReasons(evidence) {
+  const r = [];
   if (evidence.outcomes?.status !== 'pass' || Number(evidence.outcomes?.cases ?? 0) < 1
     || Number(evidence.outcomes?.passRate ?? 0) < Number(evidence.thresholds?.minPassRate ?? 1))
     r.push('qualification outcomes do not pass');
   return r;
+}
+
+function qualificationReasons(runtime, evidence, w, rules) {
+  if (evidence?.schema !== 'starci/model-qualification@1') return ['model qualification evidence is missing'];
+  return [
+    ...qualificationIdentityReasons(runtime, evidence),
+    ...qualificationRecordReasons(evidence),
+    ...qualificationTimeReasons(evidence),
+    ...qualificationProvenanceReasons(evidence),
+    ...qualificationWorkloadReasons(evidence, w, rules),
+    ...qualificationOutcomeReasons(evidence),
+  ];
 }
 
 function probationAdmissionReasons(w, rules) {
@@ -298,7 +294,7 @@ function planChain(runtimes, difficulty, role) {
 }
 
 function planEvidenceNote(evidence, qr) {
-  if (!evidence || evidence.schema !== 'starci/model-qualification@1')
+  if (evidence?.schema !== 'starci/model-qualification@1')
     return 'no qualification evidence on disk';
   if (qr.includes('qualification is stale')) return 'qualification evidence on disk is stale';
   if (qr.includes('qualification date is invalid')) return 'qualification evidence on disk has an invalid date';
@@ -326,7 +322,7 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
       preflight: pf.probes, ...(pf.declared ? { preflightDeclared: pf.declared } : {}) };
     if (w.role && rt.roles?.length && !rt.roles.includes(w.role) && !rt.roles.includes(serveKey))
       return { ...base, status: 'rejected', structural: true, reasons: [
-        `pool does not serve role '${w.role}'${serveKey !== w.role ? ` or order '${serveKey}'` : ''}`] };
+        `pool does not serve role '${w.role}'` + (serveKey !== w.role ? ` or order '${serveKey}'` : '')] };
     const missingTools = missingHostTools({ pool: rt, kind: w.kind });
     if (missingTools.length)
       return { ...base, status: 'rejected', structural: true, reasons: missingTools.map(tool => `pool agent '${rt.provider}' lacks host tool '${tool}' required by kind '${w.kind}' (route.riskHints host-tool-required:${tool})`) };
@@ -340,6 +336,13 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
     return { ...base, status: 'rejected', structural: false, reasons: [...qr, ...probationReasons], note, qr };
   });
 }
+
+const planReasonFor = (candidate) => {
+  if (candidate.status === 'qualified') return 'measured qualification evidence passes';
+  if (candidate.status === 'probation-only')
+    return candidate.note ? `${candidate.note}; scoped probation would admit` : 'scoped probation would admit';
+  return `what-if pick: ${candidate.note ?? 'no usable qualification evidence'} — launch still requires measured qualification (probation cannot satisfy this workload)`;
+};
 
 function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}) {
   const { chain, source } = planChain(runtimes, args.difficulty, orderKeyOf({ work: w.work, order: w.order }, w.role));
@@ -356,11 +359,6 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}) {
     || bias(a) - bias(b) || chain.indexOf(a.id) - chain.indexOf(b.id));
   const primary = ordered[0] ?? null;
   const fallbacks = ordered.slice(1);
-  const reasonFor = c => c.status === 'qualified'
-    ? 'measured qualification evidence passes'
-    : c.status === 'probation-only'
-      ? (c.note ? `${c.note}; scoped probation would admit` : 'scoped probation would admit')
-      : `what-if pick: ${c.note ?? 'no usable qualification evidence'} — launch still requires measured qualification (probation cannot satisfy this workload)`;
   const estimate = { difficulty: args.difficulty, coldMinutes: PLAN_COLD_MINUTES[args.difficulty] };
 
   const configLine = {
@@ -386,7 +384,7 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}) {
         ...(c.note ? { evidence: c.note } : {}), ...(c.reasons?.length ? { reasons: c.reasons } : {}),
       })),
       pick: primary
-        ? { primary: { target: primary.target, model: primary.model, status: primary.status, ...(primary.effort ? { effort: primary.effort } : {}) }, reason: reasonFor(primary),
+        ? { primary: { target: primary.target, model: primary.model, status: primary.status, ...(primary.effort ? { effort: primary.effort } : {}) }, reason: planReasonFor(primary),
             fallbacks: fallbacks.map(c => ({ target: c.target, model: c.model, status: c.status })) }
         : null,
       estimate,
@@ -411,8 +409,8 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}) {
       if (args.verbose && c.reasons?.length) console.log(`     reasons: ${c.reasons.join('; ')}`);
     });
     if (primary) {
-      console.log(`primary: ${primary.target} (${reasonFor(primary)})`);
-      console.log(`fallbacks: [${fallbacks.map(c => `${c.target} (${c.status})`).join(', ')}]`);
+      console.log(`primary: ${primary.target} (${planReasonFor(primary)})`);
+      console.log(`fallbacks: [${fallbacks.map((c) => c.target + ' (' + c.status + ')').join(', ')}]`);
     } else {
       console.log(`primary: none — no pool on the ${args.difficulty} tier can preview this workload`);
       for (const c of evaluated.filter(c => c.reasons?.length)) console.log(`  ${c.target}: ${c.reasons.join('; ')}`);
@@ -457,7 +455,7 @@ async function availabilityReader(repo) {
 // --- main -------------------------------------------------------------------------
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseArgs(process.argv.slice(2), fileURLToPath(import.meta.url));
   if (!args.kind) { console.error('--kind is required'); process.exit(2); }
   const modelsDir = path.resolve(args.modelsDir ?? path.join(skillRoot, 'modules', 'models'));
   const rules = loadRules(modelsDir);
@@ -528,9 +526,8 @@ async function main() {
   // A think kind with its own order (review, ui, implement — the kind's declared
   // order) is held to that order; a kernel function to the sol-think order;
   // every other think kind to the think order.
-  const thinkKey = think && route.order && !w.modelFunction && Array.isArray(runtimes?.allocation?.preference?.[route.order])
-    ? route.order
-    : w.modelFunction && solThink ? 'sol-think' : 'think';
+  const hasRouteOrder = think && route.order && !w.modelFunction && Array.isArray(runtimes?.allocation?.preference?.[route.order]);
+  const thinkKey = hasRouteOrder ? route.order : w.modelFunction && solThink ? 'sol-think' : 'think';
   const thinkPools = thinkKey === 'think' ? frontier : runtimes.allocation.preference[thinkKey];
   const orderKey = orderKeyOf(route, w.role);
   let { order, source: orderSource } = candidateOrder(args.kind, orderKey, registry, runtimes);
@@ -567,7 +564,7 @@ async function main() {
     // walks (scripts/agent/models.mjs::selectPool applies the same gate).
     if (w.role && c.roles.length && !c.roles.includes(w.role) && !c.roles.includes(orderKey))
       return { c, eligible: false, mode: null, reasons: [
-        `pool does not serve role '${w.role}'${orderKey !== w.role ? ` or order '${orderKey}'` : ''}`] };
+        `pool does not serve role '${w.role}'` + (orderKey !== w.role ? ` or order '${orderKey}'` : '')] };
     const missingTools = missingHostTools({ pool: runtimes?.runtimes?.[c.id] ?? { provider: c.provider }, kind: args.kind });
     if (missingTools.length)
       return { c, eligible: false, mode: null, reasons: missingTools.map(tool => `pool agent '${c.provider}' lacks host tool '${tool}' required by kind '${args.kind}' (route.riskHints host-tool-required:${tool})`) };
@@ -621,8 +618,8 @@ async function main() {
 
   if (args.json) console.log(JSON.stringify(result, null, 2));
   else {
-    console.log(`workload: kind=${w.kind} role=${w.role ?? '(none)'} work=${w.work ?? '(unclassified)'} difficulty=${difficulty}` +
-      (difficulty !== measured ? ` (raised from ${measured} to floor ${route.floor})` : '') + ` risk=${w.risk} floor=${w.qualityFloor} tools=[${w.tools}] ctx=${w.contextTokens}` +
+    const floorNote = difficulty !== measured ? ` (raised from ${measured} to floor ${route.floor})` : '';
+    console.log(`workload: kind=${w.kind} role=${w.role ?? '(none)'} work=${w.work ?? '(unclassified)'} difficulty=${difficulty}${floorNote} risk=${w.risk} floor=${w.qualityFloor} tools=[${w.tools}] ctx=${w.contextTokens}` +
       (w.elevated ? '  ELEVATED' : '') + (w.modelFunction ? '  KERNEL-FUNCTION' : ''));
     console.log(`assumed: approved=${w.approved} local noExternalEffects=${w.noExternalEffects} strictMachineGates=${w.strictMachineGates} freshIndependentReview=${w.freshIndependentReview}`);
     console.log(`config: ${result.config.file ?? 'absent'}` +
@@ -635,7 +632,7 @@ async function main() {
       console.log(`PICK ${pick.c.target}  model=${modelFor(pick.c)}  mode=${pick.mode}`);
       console.log(`  rule: ${rule}`);
       console.log(`  order: ${orderSource}`);
-      if (result.availability) console.log(`  availability: ${Object.entries(result.availability).map(([t, a]) => `${t}=${a.state}`).join(' ')}`);
+      if (result.availability) console.log(`  availability: ${Object.entries(result.availability).map(([t, a]) => t + '=' + a.state).join(' ')}`);
       if (result.fallbackChain.length) {
         console.log('fallback chain:');
         for (const f of result.fallbackChain) console.log(`  -> ${f.target} (${f.model}) [${f.mode}]`);

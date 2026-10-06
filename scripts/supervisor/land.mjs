@@ -75,7 +75,7 @@ import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
 import { fullCheckStep } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
-import { tailLines } from '../lib/clip.mjs'; import { landUnderHostLock } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, selfUpgradeNote, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs';
+import { tailLines } from '../lib/clip.mjs'; import { landUnderHostLock } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs'; import { describe, failList, specsRedOnMainOf } from './land-format.mjs'; export { describe };
 export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-worktree-add.mjs']);
 const MAX_MAIN_RETRIES = 3;
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
@@ -323,7 +323,6 @@ const FAIL_REPORTER = `export default async function* failures(source) {
 `;
 const failKey = (f) => `${f.file}\u0000${f.name}`;
 const uniqFailures = (list) => [...new Map(list.map((f) => [failKey(f), f])).values()];
-const failList = (list) => list.map((f) => `${f.file} :: ${f.name}`).join('; ');
 
 /**
  * Run `files` with node --test in `dir` (the gate's env, the tree's own test preload, `concurrency`): {ok, status,
@@ -816,20 +815,6 @@ export function landStatus({ env = process.env } = {}) {
   const queue = landQueue({ env });
   const current = queue.find((t) => t.state === 'running') ?? null;
   return { busy: Boolean(current), current, queued: queue.filter((t) => t.state === 'queued').length };
-}
-
-/** The "specs red on main (k)" advisory of a land result, or null. */
-const specsRedOnMainOf = (r) => (r?.checks ?? []).find((c) => c.specsRedOnMain && c.inherited?.length) ?? null;
-
-export function describe(r, { jobId = null } = {}) {
-  const inherited = specsRedOnMainOf(r);
-  const redOnMain = inherited ? `; ${inherited.name} (advisory, fix main): ${failList(inherited.inherited).slice(0, 400)}` : '';
-  const who = jobId ?? (r.commits ?? []).map((c) => String(c).slice(0, 9)).join(',');
-  if (r.ok && r.alreadyLanded) return `LAND already-landed ${who}: main has it at ${String(r.alreadyLanded).slice(0, 9)}, nothing moved`;
-  if (r.ok) return `LAND passed ${who}: main -> ${String(r.landed).slice(0, 9)}${r.push ? ` (push ${r.push.pushed ? 'ok' : r.push.skipped ?? `OWED: ${r.push.refused ?? r.push.error}`})` : ''}${r.grammarRebuild ? `; grammar rebuild ${r.grammarRebuild.ok ? 'ok' : `FAILED at ${r.grammarRebuild.step}: ${r.grammarRebuild.detail}`}${r.grammarRebuild.owed?.length ? `; owed ${r.grammarRebuild.owed.join(', ')}` : ''}` : ''}${selfUpgradeNote(r)}${redOnMain}`;
-  const red = (r.checks ?? []).filter((c) => !c.ok).map((c) => `${c.name}${c.output ? `: ${String(c.output).split(/\r?\n/).slice(-3).join(' / ').slice(0, 300)}` : ''}`);
-  const conflicts = (r.conflicts ?? []).map((c) => `CONFLICT ${c.file}${c.hunks?.length ? `\n${c.hunks.map((h) => `    @ line ${h.line}\n${h.text.split('\n').map((l) => `      ${l}`).join('\n')}`).join('\n')}` : ''}`);
-  return `LAND FAILED ${who}: ${r.reason}${r.preflight ? ' (preflight, before the queue)' : ''}${r.detail ? ` (${String(r.detail).slice(0, 300)})` : ''}${r.dirty ? ` dirty: ${r.dirty.join(', ')}` : ''}${red.length ? `\n  ${red.join('\n  ')}` : ''}${conflicts.length ? `\n  ${conflicts.join('\n  ')}` : ''}${r.hint ? `\n  next: ${r.hint}` : ''}`;
 }
 
 if (isMain(import.meta.url)) {
