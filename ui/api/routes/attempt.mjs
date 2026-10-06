@@ -98,8 +98,8 @@ function whereOf(ledger, raw, job, capture) {
 // Evidence files grouped by what they are, not by raw prefix. 'evidence' is the op's submitted
 // evidence folder (attachments/evidence/).
 function groupOf(name, role) {
-  if (/^attachments\/evidence\//.test(name)) return 'evidence';
-  if (/^checks\//.test(name) || role.startsWith('check-')) return 'check';
+  if (name.startsWith('attachments/evidence/')) return 'evidence';
+  if (name.startsWith('checks/') || role.startsWith('check-')) return 'check';
   if (role === 'patch' || role === 'diff') return 'diff';
   if (['screenshot', 'capture', 'render', 'video', 'uat-run', 'trace', 'dom', 'direction', 'redline'].includes(role)) return 'media';
   if (/^attachments\//.test(name) || role === 'report-attachment') return 'op-run';
