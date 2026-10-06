@@ -27,10 +27,11 @@ import { ALLOCATION_POLICIES } from '../../engine/config.mjs';
 import { credentialFingerprintOf, credentialRotated } from './credential-fingerprint.mjs';
 import { readProviderCircuit } from '../machine/provider-circuit.mjs';
 import { poolCapsNow } from '../machine/pool-backoff.mjs';
-import { DEFAULT_MODELS_DIR, loadModelRegistry, loadRuntimes, defaultOperationTarget } from './model-registry.mjs';
+import { DEFAULT_MODELS_DIR, loadModelRegistry, loadRuntimes } from './model-registry.mjs';
 import { selectPool as selectPoolPolicy } from './pool-selection.mjs';
 
-export { loadModelRegistry, loadRuntimes, defaultOperationTarget };
+export { loadModelRegistry, loadRuntimes };
+export { defaultOperationTarget } from './model-registry.mjs';
 import { normalizeProvider } from '../lib/provider.mjs';
 import { selectPoolAdmission } from './pool-admission.mjs';
 
