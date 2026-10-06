@@ -35,7 +35,9 @@ export function admissionReservation(value) {
   // Required receipt timestamps are recorded by the engine. Malformed evidence is unavailable.
   const createdAt = epoch(row.createdAt ?? row.created_at), updatedAt = epoch(row.updatedAt ?? row.updated_at);
   if (createdAt == null || updatedAt == null || number(row.slots) == null || number(row.maxParallel ?? row.max_parallel) == null) return null;
-  const quotaCodes = Array.isArray(row.quotaCodes) ? row.quotaCodes : Array.isArray(quota?.codes) ? quota.codes : [];
+  let quotaCodes = [];
+  if (Array.isArray(row.quotaCodes)) quotaCodes = row.quotaCodes;
+  else if (Array.isArray(quota?.codes)) quotaCodes = quota.codes;
   return { id: row.id, fence: row.fence, attemptId, provider: row.provider, account: row.account, model: row.model,
     role: row.role, state: row.state, slots: row.slots, maxParallel: row.maxParallel ?? row.max_parallel,
     scope: row.scope ?? parse(row.scope_json), handle: text(row.handle), pid: number(row.pid),

@@ -7,7 +7,7 @@ const repoKey = value => {
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
 };
 const sameRepo = (a, b) => repoKey(a) != null && repoKey(a) === repoKey(b);
-const sha = value => typeof value === 'string' && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value) ? value : null;
+const sha = value => typeof value === 'string' && /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/i.test(value) ? value : null;
 const paths = value => Array.isArray(value) && value.every(item => typeof item === 'string') ? value : null;
 
 /** A recorded checkpoint effect exists independently of verdict and workflow finish/land. */
