@@ -270,7 +270,7 @@ ${JSON.stringify(r?.value ?? null)}`);
 
 async function reconcileJob(ctx, ledgerId, jobId, settings) {
   const f = ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings }));
-  if (!f) { for (const state of CLOCK_CODES) ctx.clear(jobKey(ledgerId, jobId), state); return { ok: true, action: 'gone' }; }
+  if (!f) { for (const state of CLOCK_CODES) { ctx.clear(jobKey(ledgerId, jobId), state); } return { ok: true, action: 'gone' }; }
   const status = OPEN.includes(f.status) ? await ctx.status(ledgerId, f.workflowId) : null;
   const plan = planJob(f, { frontier: status?.frontier ?? {}, questions: status?.workerQuestions ?? [], settings });
   await keepClocks(ctx, ledgerId, jobId, plan.clocks);
