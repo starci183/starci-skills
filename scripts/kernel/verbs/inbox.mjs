@@ -11,6 +11,7 @@ export default {
   usageInCore: true,
   run({ ledger, args, repo, emit }) {
     const db = ledger.db, workflowId = args.workflow;
+    const dispositionNote = (message) => (message.disposition?.disposition ? `: ${message.disposition.disposition}` : '');
     if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
     if (args.ack != null) {
       const key = String(args.ack).trim();
@@ -24,7 +25,7 @@ export default {
         if (row.status !== 'pending') {
           if (row.status === 'applied' && message.disposition?.disposition === disposition)
             return { message, disposition: message.disposition.disposition, replayed: true };
-          throw Object.assign(new Error(`peer message ${key} is already ${row.status}${message.disposition?.disposition ? `: ${message.disposition.disposition}` : ''}`), { code: 'peer-message-not-pending' });
+          throw Object.assign(new Error(`peer message ${key} is already ${row.status}${dispositionNote(message)}`), { code: 'peer-message-not-pending' });
         }
         const now = Date.now();
         setInboxStatus(db, { inboxId: row.inbox_id, status: 'applied', disposition: { disposition, by: workflowId, at: now }, at: now });
@@ -45,9 +46,13 @@ export default {
     const out = { ok: true, workflowId, pending, sent };
     emit(out, [
       `inbox ${workflowId}: ${pending.length} pending peer message(s)`,
-      ...pending.map((m) => `  ${m.key} from ${m.from} [${m.kind}] ${m.subject}${m.replyTo ? ` (reply to ${m.replyTo})` : ''}\n    ${m.body}${m.refs.length ? `\n    refs: ${m.refs.join(', ')}` : ''}`),
+      ...pending.map((m) => {
+        const replyTo = m.replyTo ? ` (reply to ${m.replyTo})` : '';
+        const refs = m.refs.length ? `\n    refs: ${m.refs.join(', ')}` : '';
+        return `  ${m.key} from ${m.from} [${m.kind}] ${m.subject}${replyTo}\n    ${m.body}${refs}`;
+      }),
       ...(sent.length ? [`sent (latest ${sent.length}):`] : []),
-      ...sent.map((m) => `  ${m.key} to ${m.to} [${m.kind}] ${m.subject} — ${m.status}${m.disposition?.disposition ? `: ${m.disposition.disposition}` : ''}`),
+      ...sent.map((m) => `  ${m.key} to ${m.to} [${m.kind}] ${m.subject} — ${m.status}${dispositionNote(m)}`),
     ].join('\n'), args.json);
   },
 };

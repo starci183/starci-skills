@@ -50,6 +50,7 @@ const hierarchyNodeOf = (row, skillRoot) => {
   const runtime = stored.runtime ?? {};
   const profile = runtime.profile ?? route.profile ?? payload.model ?? null;
   const profileProvider = providerForProfile(profile, skillRoot);
+  const workerHandle = managed.dispatchId ? null : row.worker_id;
   return {
     nodeId: stored.nodeId ?? (kernel ? kernelNodeId(row.workflow_id) : operationNodeId(row.job_id)),
     parentNodeId: stored.parentNodeId ?? (kernel ? workflowNodeId(row.workflow_id) : kernelNodeId(row.workflow_id)),
@@ -71,7 +72,7 @@ const hierarchyNodeOf = (row, skillRoot) => {
       taskId: runtime.taskId ?? managed.taskId ?? orca.taskId ?? null,
       dispatchId: runtime.dispatchId ?? managed.dispatchId ?? orca.dispatchId ?? null,
       terminalHandle: runtime.terminalHandle ?? managed.agentTerminalHandle ?? orca.agentTerminalHandle
-        ?? (kernel ? row.worker_id : (managed.dispatchId ? null : row.worker_id)) ?? null,
+        ?? (kernel ? row.worker_id : workerHandle) ?? null,
     },
     createdAt: row.created_at,
     updatedAt: row.updated_at,

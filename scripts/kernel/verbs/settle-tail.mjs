@@ -38,8 +38,9 @@ export default {
         payload: { attempt: (rec.attempts ?? 0) + 1, ms, indexed: r.artifacts?.indexed ?? null, sessionReleased: r.sessionReleased?.released ?? null, ...(r.ok ? {} : { errors: r.errors }) } }));
       if (r.ok) { try { fs.rmSync(file, { force: true }); } catch { /* gone */ } }
       else { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify({ ...rec, attempts: (rec.attempts ?? 0) + 1, lastAt: Date.now(), lastError: (r.errors ?? []).join(' | ').slice(0, 600) })); }
+      const result = r.ok ? 'done' : `FAILED (${(r.errors ?? []).join('; ')}) - queued for retry`;
       emit({ ok: r.ok, jobId, ms, artifacts: r.artifacts ?? null, sessionReleased: r.sessionReleased ?? null, errors: r.errors ?? [] },
-        `settle-tail ${jobId}: ${r.ok ? 'done' : `FAILED (${(r.errors ?? []).join('; ')}) - queued for retry`} in ${ms}ms`, args.json);
+        `settle-tail ${jobId}: ${result} in ${ms}ms`, args.json);
       if (!r.ok) process.exitCode = 1;
     } finally { held.release(); }
   },

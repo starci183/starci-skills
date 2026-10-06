@@ -39,7 +39,8 @@ export default {
     if (!rule.from.includes(from)) throw refuse(`--${move} moves a ${rule.from.join('|')} workflow; ${workflowId} is ${from}`, 'lifecycle-phase-refused', { phase: from });
     // Resume: paused goes back to running; stopped goes back to queued (the Kernel seat is started again from there) and
     // only on the owner's word (Q14).
-    const to = move === 'resume' ? (from === 'stopped' ? 'queued' : 'running') : rule.to;
+    let to = rule.to;
+    if (move === 'resume') to = from === 'stopped' ? 'queued' : 'running';
     if (move === 'resume' && from === 'stopped' && by !== 'owner') throw refuse(`only the owner resumes a stopped workflow (Q14); ${by} cannot`, 'lifecycle-owner-only');
     if (!canTransition(from, to)) throw refuse(`${from} -> ${to} is not a workflow transition`, 'lifecycle-phase-refused', { phase: from });
     ledger.transaction((tx) => changeWorkflowPhase(tx, { workflowId, to, by, reason }));

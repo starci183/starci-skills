@@ -12,7 +12,11 @@ export default {
     if (args.workflow && !getWorkflow(db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
     const foundations = readFoundations(db);
     const running = db.prepare("SELECT * FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY created_at,workflow_id").all();
-    const phaseOf = (id) => { const wf = getWorkflow(db, id); return wf ? (wf.archived_at != null ? 'archived' : wf.phase ?? null) : 'unknown'; };
+    const phaseOf = (id) => {
+      const wf = getWorkflow(db, id);
+      if (!wf) return 'unknown';
+      return wf.archived_at != null ? 'archived' : wf.phase ?? null;
+    };
     const waits = running.flatMap((wf) => openPeerWaits(db, wf.workflow_id).filter((wait) => wait.untilFoundation)
       .map((wait) => ({ workflowId: wf.workflow_id, incidentId: wait.incidentId, foundation: wait.untilFoundation, holds: wait.holds })));
     const involved = (f) => !args.workflow || f.owner?.workflowId === args.workflow || (f.dependents ?? []).some((d) => d.workflowId === args.workflow);
@@ -30,14 +34,27 @@ export default {
     });
     const undeclared = workflows.filter((wf) => wf.peers > 0 && !wf.declared).map((wf) => wf.workflowId);
     const out = { ok: true, foundations: rows, workflows, undeclared };
+    const undeclaredNote = undeclared.length ? `; undeclared running workflow(s) with peers: ${undeclared.join(', ')}` : '';
+    const summaryOf = (wf) => {
+      if (wf.declared) return wf.none ? 'declared none' : `owns ${wf.owns.join(', ') || '-'}; needs ${wf.needs.join(', ') || '-'}`;
+      return wf.peers ? `UNDECLARED (${wf.required ? 'required' : 'advised'})` : 'no running peers';
+    };
     emit(out, [
-      `foundations: ${rows.length} registered${undeclared.length ? `; undeclared running workflow(s) with peers: ${undeclared.join(', ')}` : ''}`,
-      ...rows.flatMap((f) => [
-        `  ${f.name} [${f.kind}] ${f.state}${f.version ? ` ${f.version}` : ''} owner=${f.owner ? `${f.owner.workflowId} (${f.owner.phase})` : '-'}${f.landed ? ` landed ${new Date(f.landed.at).toISOString()}: ${f.landed.proof}` : ''}`,
-        ...f.dependents.map((d) => `    dependent ${d.workflowId} (${d.phase})${d.detail ? `: ${d.detail}` : ''}`),
-        ...f.waits.map((w) => `    wait ${w.incidentId} in ${w.workflowId} holds ${w.holds.join(', ') || '-'}`),
-      ]),
-      ...workflows.map((wf) => `  workflow ${wf.workflowId}: ${wf.declared ? (wf.none ? 'declared none' : `owns ${wf.owns.join(', ') || '-'}; needs ${wf.needs.join(', ') || '-'}`) : wf.peers ? `UNDECLARED (${wf.required ? 'required' : 'advised'})` : 'no running peers'}`),
+      `foundations: ${rows.length} registered${undeclaredNote}`,
+      ...rows.flatMap((f) => {
+        const version = f.version ? ` ${f.version}` : '';
+        const owner = f.owner ? `${f.owner.workflowId} (${f.owner.phase})` : '-';
+        const landed = f.landed ? ` landed ${new Date(f.landed.at).toISOString()}: ${f.landed.proof}` : '';
+        return [
+          `  ${f.name} [${f.kind}] ${f.state}${version} owner=${owner}${landed}`,
+          ...f.dependents.map((d) => {
+            const detail = d.detail ? `: ${d.detail}` : '';
+            return `    dependent ${d.workflowId} (${d.phase})${detail}`;
+          }),
+          ...f.waits.map((w) => `    wait ${w.incidentId} in ${w.workflowId} holds ${w.holds.join(', ') || '-'}`),
+        ];
+      }),
+      ...workflows.map((wf) => `  workflow ${wf.workflowId}: ${summaryOf(wf)}`),
     ].join('\n'), args.json);
   },
 };
