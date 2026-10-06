@@ -1197,7 +1197,7 @@ function summarizeApp(record) {
     const depth = (chainOf(record, n.id)?.length ?? 1) - 1;
     const files = Object.keys(n.files ?? {}).join(',');
     const dests = n.layout ? destinationsOf(record, n) : [];
-    const extra = n.layout ? ' LAYOUT ' + (n.layout.component ?? '(no component)') + ' chrome=' + n.layout.chrome + ' state=' + n.layout.state + ' rev=' + n.layout.rev + ' captures=' + list(n.layout.captures).length + (dests.length ? ' destinations=' + dests.map((d) => d.key).join(',') : '') : '';
+    const extra = n.layout ? ' LAYOUT ' + (n.layout.component ?? '(no component)') + ' chrome=' + n.layout.chrome + ' state=' + n.layout.state + ' rev=' + n.layout.rev + ' captures=' + list(n.layout.captures).length + (() => { if (!dests.length) return ''; return ' destinations=' + dests.map((d) => d.key).join(','); })() : '';
     lines.push('  '.repeat(depth) + n.segment + ' [' + n.segmentKind + '] url=' + n.url + (files ? ' {' + files + '}' : '') + (n.intercepts ? ' intercepts=' + n.intercepts : '') + extra);
     for (const item of list(n.layout?.nav?.items)) lines.push('  '.repeat(depth + 2) + 'nav ' + item.key + ' -> ' + (item.route ?? 'null') + ' target=' + (item.target ?? 'NONE') + ' ' + Object.entries(item.labels ?? {}).map(([l, v]) => l + ':"' + v + '"').join(' '));
     for (const f of list(n.layout?.nav?.findings)) lines.push(`${'  '.repeat(depth + 2)}! ${f.code} ${f.detail}`);

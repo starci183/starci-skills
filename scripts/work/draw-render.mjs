@@ -308,7 +308,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
       }
       if (owner !== 'grammar') unowned.push(el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '') + (el.textContent.trim() ? ' "' + el.textContent.trim().slice(0, 40) + '"' : '') + ` (${owner ?? 'no owner'})`);
     }
-    ownership = { components: [...components].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)), layoutElements, unownedCount: unowned.length, unowned: unowned.slice(0, 20) };
+    ownership = { components: [...components].sort((left, right) => { if (left < right) return -1; if (left > right) return 1; return 0; }), layoutElements, unownedCount: unowned.length, unowned: unowned.slice(0, 20) };
     const clone = document.documentElement.cloneNode(true);
     for (const el of clone.querySelectorAll('[data-component]')) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', el.getAttribute('data-component'));
     for (const el of clone.querySelectorAll('script')) el.remove();
@@ -334,7 +334,7 @@ export async function artworkDigests(images, page = null) {
       let digest = null;
       try {
         if (src.startsWith('file:')) digest = sha256(fs.readFileSync(fileURLToPath(src)));
-        else if (src.startsWith('data:')) { const m = src.match(/^data:[^,]*;base64,(.*)$/s); if (m) digest = sha256(Buffer.from(m[1], 'base64')); }
+        else if (src.startsWith('data:')) { const m = /^data:[^,]*;base64,(.*)$/s.exec(src); if (m) digest = sha256(Buffer.from(m[1], 'base64')); }
         else if (/^https?:/i.test(src) && page?.request) { const r = await page.request.get(src); if (r.ok()) digest = sha256(await r.body()); }
       } catch { digest = null; }
       cache.set(src, digest);
