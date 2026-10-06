@@ -12664,7 +12664,7 @@ HFS_CONTRACT_SNAPSHOT_DRIFT:
 HFS_ARCH_CONFIG_UNREAD:
   title: "The machine reads `hfs.json`; zero files analysed is red"
   title_vi: "Máy kiến trúc không đọc được hfs.json"
-  meaning_vi: "Kiểm tra kiến trúc không đọc được `hfs.json` phân tích 0 tệp, hoặc repo còn một tệp cấu hình mà máy không đọc nữa (`architecture.json`) — đây là đỏ, không phải 'chưa có dữ liệu'."
+  meaning_vi: "Kiểm tra kiến trúc không đọc được `hfs.json` phân tích 0 tệp — đây là đỏ, không phải 'chưa có dữ liệu'."
   causes_vi:
     - "Vi phạm luật R24: Máy kiến trúc tự đọc `hfs.json`; phân tích 0 tệp hay `unavailable` cho một profile đã khai = thất bại."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."

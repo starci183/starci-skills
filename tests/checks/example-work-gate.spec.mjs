@@ -642,6 +642,21 @@ test('concept 13: _resources custody is exactly the work/resource@1 schema, and 
   assert.equal(good.length, 0, good.join('\n'));
 });
 
+test('walk scope: kernel custody roots are not read, and an evidence manifest is proof payload that is skipped, not judged as a family record', () => {
+  const problems = [];
+  const infos = [];
+  const workRoot = tree({
+    'features/f/fr/ok/index.yaml': 'schema: work/functional-requirement@1\nid: fr.f.ok\nstate: todo\n',
+    'kernel-strays/copy/features/f/fr/broken/index.yaml': 'schema: work/functional-requirement@1\nid: wrong\nstate: done\n',
+    'kernel-evidence/features/f/fr/broken/index.yaml': 'schema: work/functional-requirement@1\nid: wrong\nstate: done\n',
+    'features/f/impl/shell/evidence/proof/manifest.yaml': 'schema: work/evidence@1\nid: proof.f.shell\nnodeId: impl.f.shell\noutcome: pass\nassets: []\n',
+  });
+  checkWorkTree(workRoot, problems, [], infos);
+  assert.equal(problems.filter(p => p.includes('kernel-strays') || p.includes('kernel-evidence') || p.includes('manifest.yaml')).length, 0, problems.join('\n'));
+  assert.ok(infos.some(i => i.includes('PAYLOAD_SKIPPED') && i.includes('proof/manifest.yaml')), infos.join('\n'));
+  assert.ok(!infos.some(i => i.includes('kernel-strays')), infos.join('\n'));
+});
+
 test('payload rule: a yaml whose schema is not a work/* record schema is an artifact payload - INFO PAYLOAD_SKIPPED, never id-matched to its path, never ref-collected', () => {
   // A tool receipt inside a family path: no id, foreign schema. Before the rule this drew
   // "id is undefined, but its place says ..."; now it is counted as a skipped payload.

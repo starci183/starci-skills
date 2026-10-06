@@ -109,7 +109,7 @@ schemas:
       - "scripts/work/compose-direction.mjs (the layout capture and slot a direction is composited into)"
       - "scripts/work/ui/shell-conformance.mjs (the record, each ui record's route/surface/ancestors/composites, an implementation's app/ files)"
       - "scripts/kernel/prerequisites.mjs (dispatch refuses a draw under an unsettled layout)"
-      - "scripts/work/validate/work-validate.mjs (ui record findings, legacy ones as suspects)"
+      - "scripts/work/validate/work-validate.mjs (ui record findings, drift ones as suspects)"
       - "scripts/kernel/product-locale.mjs (the packet's product_locale)"
     business:
       question: "Which layouts, with what chrome, navigation, language and demo personas, does every route of this product sit inside?"

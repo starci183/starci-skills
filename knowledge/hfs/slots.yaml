@@ -1637,7 +1637,7 @@ slots:
     coverage: none
     why: provider sandbox contracts, skipped without sandbox config; run only by test:contract, never part of test or test:e2e
     rules: [BE_TEST_TOPOLOGY]
-  - id: be.tests.e2e-world-retired
+  - id: be.tests.e2e-world-dir
     profiles: [be]
     path: "src/tests/e2e/world/"
     presence: forbidden
@@ -1691,15 +1691,15 @@ slots:
     tier: route
     roles: {proxy: proxy.ts, instrumentation: instrumentation.ts, instrumentation-client: instrumentation-client.ts}
     tests: none
-    rules: [FE_NEXT_CONVENTIONS]   # middleware.ts is refused on Next >= 16 (fe.source-root-retired)
-  - id: fe.source-root-retired
+    rules: [FE_NEXT_CONVENTIONS]   # middleware.ts is refused on Next >= 16 (fe.source-root-middleware)
+  - id: fe.source-root-middleware
     profiles: [fe]
     path: "apps/<app>/src/{middleware.ts,middleware.js}"
     presence: forbidden
     tracked: external
     tier: none
     tests: none
-    goesTo: "apps/<app>/src/proxy.ts: Next >= 16 renamed middleware to proxy and refuses the old name"
+    goesTo: "apps/<app>/src/proxy.ts: Next >= 16 reads proxy.ts and refuses middleware.ts"
     rules: [FE_NEXT_CONVENTIONS]
   - id: fe.route.callback
     profiles: [fe]

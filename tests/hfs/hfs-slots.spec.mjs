@@ -388,17 +388,17 @@ test('classification reports the folder kind and the role of a file from the slo
   assert.equal(openHfs({ declaration: APP }).classifyPath('fe/apps/web/src/app/[locale]/cart/page.tsx').role, 'page', 'the app resolver keeps the side answer');
 });
 
-test('BE side: test kinds agree folder with suffix, and the retired e2e/world folder is forbidden', () => {
+test('BE side: test kinds agree folder with suffix, and the e2e/world folder is forbidden', () => {
   const be = sideOf(APP, 'be');
   const owner = (p) => { const c = be.classifyPath(p); return `${c.status}:${c.slot ?? ''}`; };
   assert.equal(owner('src/tests/integration/inbox/claim.integration-spec.ts'), 'owned:be.tests.integration');
   assert.equal(owner('src/tests/contract/stripe/charge.contract-spec.ts'), 'owned:be.tests.contract');
   assert.equal(owner('src/tests/world/fakes/stripe/server.ts').split(':')[0], 'owned');
-  const retired = be.classifyPath('src/tests/e2e/world/use-e2e-world.ts');
-  assert.equal(retired.status, 'forbidden');
-  assert.equal(retired.slot, 'be.tests.e2e-world-retired');
-  assert.equal(retired.goesTo.startsWith('src/tests/world/'), true);
-  assert.equal(owner('src/tests/e2e/world/orders.e2e-spec.ts'), 'forbidden:be.tests.e2e-world-retired');
+  const world = be.classifyPath('src/tests/e2e/world/use-e2e-world.ts');
+  assert.equal(world.status, 'forbidden');
+  assert.equal(world.slot, 'be.tests.e2e-world-dir');
+  assert.equal(world.goesTo.startsWith('src/tests/world/'), true);
+  assert.equal(owner('src/tests/e2e/world/orders.e2e-spec.ts'), 'forbidden:be.tests.e2e-world-dir');
   assert.equal(owner('src/tests/e2e/orders/place.e2e-spec.ts'), 'owned:be.tests.e2e');
   // folder <-> suffix: a spec of the other kind matches no slot
   assert.equal(be.classifyPath('src/tests/integration/inbox/claim.e2e-spec.ts').status, 'no-slot');

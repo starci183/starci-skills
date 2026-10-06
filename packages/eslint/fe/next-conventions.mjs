@@ -28,15 +28,15 @@ export const noMiddlewareFile = {
     schema: [],
     messages: {
       file:
-        "`{{name}}` is the retired name of the request interceptor. Next 16 calls it `proxy.ts`: rename the file and export the handler as `proxy`.",
+        "`{{name}}` is not the request interceptor file: Next 16 reads `proxy.ts`. Rename the file and export the handler as `proxy`.",
       export:
-        "The handler in `proxy.ts` is exported as `middleware`, which is the retired name. Export it as `proxy`.",
+        "The handler in `proxy.ts` is exported as `middleware`, but Next 16 reads `proxy`. Export it as `proxy`.",
     },
   },
   create(context) {
     const file = fileOf(context)
-    // The retired name has a slot of its own (`fe.source-root-retired`, forbidden); the interceptor is the `proxy` role of `fe.source-root-pinned`.
-    if (inSlot(context, "fe.source-root-retired")) {
+    // `middleware.ts` has a slot of its own (`fe.source-root-middleware`, forbidden); the interceptor is the `proxy` role of `fe.source-root-pinned`.
+    if (inSlot(context, "fe.source-root-middleware")) {
       return { Program: (node) => context.report({ node, messageId: "file", data: { name: baseName(file) } }) }
     }
     if (!inSlot(context, "fe.source-root-pinned") || roleOfFile(context) !== "proxy") return {}

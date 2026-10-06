@@ -56,8 +56,8 @@ sections:
       - "The owner reviews shapes only - one per XBase#state of the record's ui.shapes - as the drawn PART,
         never the composite: a page shows its page slot content (<shape>--page--<bp>--<theme>.content.png,
         role direction-content); a modal or drawer shows the panel alone, not dimmed over its host; a
-        planned layout shows its own drawing and a repository layout its own capture. A retired
-        data-status image is never shown. The composite
+        planned layout shows its own drawing and a repository layout its own capture. A data-status image
+        is never shown. The composite
         (<state>--<presentation>--<bp>--<theme>.png) stays evidence and the reference interface.implement
         builds and interface.audit compares against. Every owner ask, handover package and drawing notice
         lists parts; scripts/work/direction-part.mjs swaps a composite an older record still names for its

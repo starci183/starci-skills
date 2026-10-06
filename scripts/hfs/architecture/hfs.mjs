@@ -49,8 +49,8 @@ const README_SECTIONS = ['Overview', 'Stack', 'Repository layout', 'Development'
 const BACKEND_SRC_CHILDREN = new Set(['features', 'modules', 'tests']);
 const moduleTiersOf = resolver => new Set(resolver.slots().filter(slot => slot.profiles.includes('be')).flatMap(slot => braceVariants(slot.path)).map(variant => /^src\/modules\/([a-z][a-z-]*)\//.exec(variant)?.[1]).filter(Boolean)); // the folders of src/modules/ the slot manifest knows (domain, platform, integrations, events, queues, projections)
 // Owner test layout 2026-09-30: unit `<name>.spec.ts`, integration, e2e and contract by folder and suffix; int-spec and harness-spec stay banned.
-const RETIRED_TEST_SUFFIX = /\.(?:int|harness)-spec\.[cm]?[jt]sx?$/u;
-const RETIRED_TEST_FOLDER = /^src\/tests\/(?:harness|live|e2e\/live)(?:\/|$)/u;
+const UNSUPPORTED_TEST_SUFFIX = /\.(?:int|harness)-spec\.[cm]?[jt]sx?$/u;
+const UNSUPPORTED_TEST_FOLDER = /^src\/tests\/(?:harness|live|e2e\/live)(?:\/|$)/u;
 const EXTRA_TEST_CONFIG = /(?:^|\/)(?:jest[.-][^/]*(?:config\.[cm]?[jt]s|\.json)|jest-(?:e2e|int|integration|harness)[^/]*)$/u;
 const NODE_ENTRIES_SKIPPED = new Set(['node_modules', '.git']);
 
@@ -469,13 +469,13 @@ export function checkHfs(config) {
     }
   }
 
-  // Retired test kinds and folders: int-spec and harness-spec are gone, so are src/tests/harness and
-  // live/; a backend spec sits by its kind (beside its subject, or under src/tests/{integration,e2e,contract}/).
+  // Test kinds and folders that do not exist: int-spec, harness-spec, src/tests/harness and live/;
+  // a backend spec sits by its kind (beside its subject, or under src/tests/{integration,e2e,contract}/).
   for (const file of tree.files()) {
-    if (RETIRED_TEST_SUFFIX.test(file))
-      finding('BE_TEST_TOPOLOGY', file, `${file} uses a retired test kind. Only unit *.spec.ts, *.integration-spec.ts, *.e2e-spec.ts and *.contract-spec.ts exist, each in its own folder under src/tests/.`);
-    else if (backend && RETIRED_TEST_FOLDER.test(file))
-      finding('BE_TEST_TOPOLOGY', file, `${file} sits in a retired test folder. Unit specs sit beside their subject, flows go under src/tests/e2e/<area>/ and test infrastructure under src/tests/world/.`);
+    if (UNSUPPORTED_TEST_SUFFIX.test(file))
+      finding('BE_TEST_TOPOLOGY', file, `${file} uses an unsupported test kind. Only unit *.spec.ts, *.integration-spec.ts, *.e2e-spec.ts and *.contract-spec.ts exist, each in its own folder under src/tests/.`);
+    else if (backend && UNSUPPORTED_TEST_FOLDER.test(file))
+      finding('BE_TEST_TOPOLOGY', file, `${file} sits in an unsupported test folder. Unit specs sit beside their subject, flows go under src/tests/e2e/<area>/ and test infrastructure under src/tests/world/.`);
     else if (backend && /^src\/tests\//u.test(file) && EXTRA_TEST_CONFIG.test(file))
       finding('BE_TEST_TOPOLOGY', file, `${file} is a per-lane test config. One root jest.config.js declares exactly the unit, integration, e2e and contract projects.`);
   }

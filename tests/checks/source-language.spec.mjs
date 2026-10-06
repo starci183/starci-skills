@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DECLARED_SOURCE_CATALOGS, sourceLanguageFindings } from '../../scripts/checks/check-doc-language.mjs';
+import { DECLARED_SOURCE_CATALOGS, RUNTIME_DOCUMENT_ROOTS, sourceLanguageFindings } from '../../scripts/checks/check-doc-language.mjs';
 import { declaredVietnameseFieldsOf, documentLanguageHits } from '../../scripts/lib/language.mjs';
 
 // HFS_SOURCE_NOT_ENGLISH: runtime source is English; Vietnamese lives only in a declared catalog. Vietnamese letters in this
@@ -57,4 +57,11 @@ test('the i18n catalog files declare their vi field, so a catalog is the one pla
   assert.deepEqual(documentLanguageHits(rel, `messages:\n  - {en: "Open, then close", vi: "M\u1edf, r\u1ed3i \u0111\u00f3ng"}\n`), [], 'a comma inside the quoted vi value stays inside the declared field');
   assert.equal(documentLanguageHits('modules/i18n/other.yaml', `note: ${VI}\n`).length, 1);
   assert.equal(documentLanguageHits(rel, `purpose: ${VI}\n`).length, 1);
+});
+
+test('benchmark/ is evidence, not a document root: the doc-language check does not read it and the package does not ship it', () => {
+  assert.ok(!RUNTIME_DOCUMENT_ROOTS.includes('benchmark'));
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  const files = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).files;
+  assert.ok(!files.some((entry) => entry.startsWith('benchmark')));
 });

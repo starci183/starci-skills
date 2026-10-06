@@ -318,8 +318,7 @@ tick:
       changed relevant bytes or incomplete acknowledgements refuse affected enqueue/dispatch.
       Preserve already admitted attempt custody and evidence; never restart yourself to reread.
     stallWake: >-
-      A `[stall]` wake came from the retired headless stall check; its findings
-      now reach you as Decision Items the Workflow controller opens
+      A `[stall]` finding reaches you as a Decision Item the Workflow controller opens
       (scripts/reconciler/controllers/workflow.mjs: stale-gate, stale-wait,
       stale-peer-wait, unread-peer, orphaned-frontier, progress-stall) through
       `starci kernel decisions`. Such an item names something this workflow

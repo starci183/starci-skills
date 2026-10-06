@@ -1,6 +1,6 @@
 // secret.mjs - `starci app secret list|show|set|gen`: the canon command over an app's sealed secrets.
 // (R06: a secret exists only as a sops envelope there). It is the one way an operator or an agent reads or writes one; a plain
-// `sops` command in a KEYS.md or a runbook is retired. Every sops use goes through scripts/api/sops (decrypt.mjs, seal.mjs):
+// `sops` command in a KEYS.md or a runbook is not the way. Every sops use goes through scripts/api/sops (decrypt.mjs, seal.mjs):
 //   starci app secret list [--env <name>]                       every secret of the env and the keys it holds (names only, nothing decrypted)
 //   starci app secret show <slug> [--key <NAME>] [--env <name>] decrypt one value to stdout
 //   starci app secret set <slug> [--key <NAME>] [--age <recipient>]... [--env <name>]

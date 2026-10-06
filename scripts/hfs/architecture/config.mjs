@@ -280,8 +280,7 @@ function derivedGrammar(root, packageRoot, workspaces, apps = []) {
 }
 
 /**
- * Resolve the layout contract from hfs.json and the slot manifest (knowledge/hfs/slots.yaml). architecture.json is
- * retired: a repository carries only hfs.json. Owners, roots and the tier of every path come from slots; the contract
+ * Resolve the layout contract from hfs.json and the slot manifest (knowledge/hfs/slots.yaml). A repository carries only hfs.json. Owners, roots and the tier of every path come from slots; the contract
  * has no ignore, waiver or baseline field.
  */
 export function loadArchitectureConfig(repositoryRoot, { hfs } = {}) {

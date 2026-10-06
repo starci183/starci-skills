@@ -523,6 +523,9 @@ test('runBrandChecks reports every check, resolves the record from a repository 
   assert.equal(fromRepository.brand.record,'.starciwork/brand/index.yaml');
   assert.equal(fromRepository.ok,true,JSON.stringify(fromRepository.checks.filter(entry=>entry.outcome!=='pass'),null,2));
 
+  const foreign=tree(t,{label:'run-foreign-schema',schema:'work/feature@1'});
+  assert.throws(()=>runBrandChecks({tree:foreign.work,sourceRoot:source,grammarRoot}),/must be a work\/brand@1 record/);
+
   const withoutSource=runBrandChecks({tree:work,grammarRoot});
   assert.equal(withoutSource.ok,true);
   assert.deepEqual(withoutSource.checks.filter(entry=>entry.outcome==='skip').map(entry=>entry.id),['tokens-match-source','icon-set-only']);

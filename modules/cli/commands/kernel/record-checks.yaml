@@ -32,7 +32,7 @@ editions:
   - full
 inputShape: "{checks:[{name:<non-empty string>, exitCode:<integer>, command?:<string>,
   evidence?:<string>, codes?:[<finding code>], failing?:[<repo-relative file>]}]}. The envelope and
-  checks array are mandatory and non-empty. JSON scalars, bare arrays, legacy key/value maps and
+  checks array are mandatory and non-empty. JSON scalars, bare arrays, key/value maps and
   double-encoded JSON strings are refused. `codes` names the finding codes that made a red check
   red; `failing` names the files a red repo-wide gate's failure implicates (each failing test file
   and the source file it points at, `path[:line]`)."

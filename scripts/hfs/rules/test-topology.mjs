@@ -3,7 +3,7 @@
 //   - there is no `testing/` folder: doubles and builders live in `src/tests/fixtures/`, next to the subject as `*.spec.ts`;
 //   - one `jest.config.js` at the root: a second jest config (`jest.config.<x>.js`, `jest.<x>.config.*`, one per app) and a
 //     `jest` key in a package.json are refused.
-// `int-spec`, `harness-spec`, the retired test folders and the per-lane configs under src/tests are the architecture machine's
+// `int-spec`, `harness-spec`, the unsupported test folders and the per-lane configs under src/tests are the architecture machine's
 // (reported under this same code, BE_TEST_TOPOLOGY); that jest.config.js is the rendered one (projects `unit`, `integration`, `e2e` and
 // `contract`, diagnostics off) is the managed-file check's (HFS_MANAGED_FILE_DRIFT); a spec whose suffix disagrees with its src/tests folder has no slot (HFS_SLOT_UNDECLARED).
 import { found, readJson } from './read.mjs';

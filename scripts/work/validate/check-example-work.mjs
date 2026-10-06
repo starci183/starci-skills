@@ -134,7 +134,7 @@ const BOUNDARY_TRANSITIONAL = Object.freeze([]);
  * product content (isProductPath) or it is refused. Known agent data - evidence/ and impl captures, uat runs, evidence
  * bundles, operations/ audits, kernel custody, stray report copies, caches, ledgers - is REFUSED
  * [HFS_AGENT_DATA_TRACKED], one line per agent-data directory (draw-loop rounds included: the loop is a blob bundle); its home is the project ledger and the blob store
- * (starci kernel report --attach). A path that is neither (a record in a legacy layout) is WARNED [STARCIWORK_DRIFT].
+ * (starci kernel report --attach). A path that is neither (a record off the product path list) is WARNED [STARCIWORK_DRIFT].
  * Paths are judged relative to the tree root (`resolveRoot`). The gate below runs it over every example tree.
  * Only TRACKED files are judged (`git ls-files`; supervisor decision 2026-09-30): ignored local agent data on disk is the
  * ledger/housekeeping hygiene check's business, never a validation refusal. A tree outside a git work tree has none.

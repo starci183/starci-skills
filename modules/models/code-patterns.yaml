@@ -11,7 +11,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: e35ef984466553b1aefecf6b2e22ed4ee68f46ae68f83d11b86c2455234ff2aa
+        value: 29c1831b170c8ac334c1f83ddde44c6b36e865c4073b63192be12986d78a1de4
         files: 190
     sourceRuleRoots:
       - knowledge/patterns/be
@@ -716,7 +716,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 047ab46ef00f07950fbf4ff94844e3de5425ca98a608ef8f74d73244a59de236
+        value: 0aacdc876ab5d06c3efa0ebff4f2ea1a694badfd775ff0f5fdc7dd17351ff8c8
         files: 187
     sourceRuleRoots:
       - knowledge/patterns/fe
@@ -1076,11 +1076,11 @@ profiles:
           guidance: knowledge/patterns/fe/naming.yaml
           review: Confirm the named value actually owns a public contract role.
         status: implemented
-      - id: NEXT-LEGACY-BLOCK-TWIN-GUARD
+      - id: NEXT-BLOCK-TWIN-GUARD
         sourceRuleIds: [FE-ARCHITECTURE-3, FE-FUNCTION-4]
         applicability: { include: ['src/components/blocks/**/index.tsx'] }
         mechanical:
-          requirement: Keep the unconditional filename twin heuristic explicitly disabled; the conditional world-owner architecture check is the replacement.
+          requirement: The unconditional filename twin heuristic stays disabled; the conditional world-owner architecture check judges the split.
           check:
             kind: eslint
             sourceOnly: true

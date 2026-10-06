@@ -6,7 +6,7 @@
 // reason is a string literal in scripts/ engine/ modules/. modules/kernel/failure-codes.yaml is the owner-facing catalog
 // (one entry per code: title, meaning, causes, next step, owner). This checker refuses:
 //   - an emitted code that has no catalog entry (a new code must be explained the day it is added),
-//   - a catalog entry no code emits any more (a retired code leaves the catalog),
+//   - a catalog entry no code emits any more,
 //   - an entry with a missing or malformed field, or an owner outside the closed set,
 //   - a code whose only literal source is the rule catalog (knowledge/hfs/rules.yaml) and that no lint plugin or Sonar enforcer of
 //     a rule reports: a catalog line is not an emitter, so a rule code needs a built plugin enforcer or a literal in code.

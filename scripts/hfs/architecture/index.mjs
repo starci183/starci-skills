@@ -205,7 +205,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
       errors: [{ ruleId: match?.[1] ?? 'ARCH_COMPILER_FAILURE', message: message.replace(/^(ARCH_[A-Z_]+):\s*/, '') }], limitations: LIMITATIONS };
   }
   const violations = [...hfs.violations];
-  const configUnread = checkConfigUnread({ config, context });
+  const configUnread = checkConfigUnread({ context });
   violations.push(...configUnread.violations);
   let moduleRegistration = { status: 'not-applicable' };
   let backendSourceShape = { status: 'not-applicable' };

@@ -99,7 +99,6 @@ schemaToSchema:
      source: "modules/schemas/knowledge-source.schema.yaml; modules/schemas/knowledge-rule.schema.yaml"}
 
   # --- code-pattern pipeline --------------------------------------------------
-  # (the aggregate starci/code-pattern-check@1 report retired with check-scoped-lint.mjs, op-gate-loop)
 
 # ----------------------------------------------------------------------------
 # Schema -> subsystem binding: which engine part each schema constrains.

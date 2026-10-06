@@ -475,7 +475,7 @@ rules:
     editions: [full]
     enforcers:
       - {kind: hfs, id: test-topology, at: scripts/hfs/rules/test-topology.mjs}
-      - {kind: machine, id: test-kind-retired, at: scripts/hfs/architecture/hfs.mjs}
+      - {kind: machine, id: test-kind-unsupported, at: scripts/hfs/architecture/hfs.mjs}
       - {kind: eslint-be, id: test-world-files}
       - {kind: machine, id: contract-fixture-guard, at: scripts/hfs/architecture/contract-fixture-guard.mjs}
       - {kind: eslint-be, id: unit-test-colocated}
@@ -1773,7 +1773,7 @@ rules:
       - {kind: runtime, id: cli-parity, at: scripts/checks/check-cli-parity.mjs}
   - id: R200
     code: "RT_CLI_APP_ONLY_TEMPLATES"
-    law: "Managed app templates and their generated runtime copies invoke product actions only through `starci app <verb>`; retired hfs and test-stack commands, and any other starci group, are forbidden there."
+    law: "Managed app templates and their generated runtime copies invoke product actions only through `starci app <verb>`; any other starci group is forbidden there."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]

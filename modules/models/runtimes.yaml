@@ -80,7 +80,7 @@ allocation:
   # (review-hands), reviews - the third audit family.
   hands: [devin-agent]
   # Owner decision 2026-09-25 ("ok"): route by the 72h evidence of scripts/agent/model-scorecard.mjs (1389 op jobs over the product ledgers of that window).
-  # Those historical Sol scores describe the pre-migration model; they are not GPT-6.1 Sol qualification evidence.
+  # Those historical Sol scores describe an earlier Sol model; they are not GPT-6.1 Sol qualification evidence.
   # Each kind walks ONE order, named by its roleOfKind `order` (default: `think` for think work, else its role),
   # at its difficulty tier:
   #   implement, write, verify (hands-on implementation: backend.implement, interface.implement, code.refactor,
@@ -273,9 +273,8 @@ allocation:
   # start waits for an Orca that does not answer, and how long after a responding Orca calls a kernel dead
   # it is asked again.
   hostOutage: {waitMs: 90000, deathSettleMs: 10000}
-  # supervisorTick: the numbers of the retired supervisor tick (2026-09-28) that the reconciler controllers still read
-  # (host thresholds, orca probes, statusApp port, owner digest cadence); everyMs is unused. The tick ran every
-  # everyMs (whole minutes: schtasks repetition). host: above maxNode node.exe or maxGit git.exe processes the host
+  # supervisorTick: the numbers the reconciler controllers read
+  # (host thresholds, orca probes, statusApp port, owner digest cadence). host: above maxNode node.exe or maxGit git.exe processes the host
   # controller logs the counts and the parents holding the most. orca: terminal-list is probed up to probes times, probeTimeoutMs each, gapMs apart; when every
   # probe fails the Orca app (never its terminal daemon) gets closeWaitMs to close before it is forced, is launched
   # again, and restart-all runs. deadKernelMs: a watchdog whose trailing ticks read tick-failed or restart-failed
@@ -288,7 +287,6 @@ allocation:
   # actions.mjs) no supervisor action touched this long is an SLA breach, alerted into the Supervisor's inbox.
   # ownerDigestMs: the Owner Notifier's periodic owner digest goes out at most this often.
   supervisorTick:
-    everyMs: 1800000
     host: {maxNode: 300, maxGit: 100}
     orca: {probeTimeoutMs: 30000, probes: 5, gapMs: 30000, closeWaitMs: 20000}
     deadKernelMs: 900000

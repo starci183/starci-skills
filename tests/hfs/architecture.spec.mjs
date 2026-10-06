@@ -987,10 +987,10 @@ test('the architecture CLI exits on the record: 0 ok, 1 violations or errors, 2 
   const cli = fileURLToPath(new URL('../../scripts/hfs/architecture.mjs', import.meta.url));
   const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', windowsHide: true });
   assert.equal(run().status, 2, 'no repository root is a usage error');
-  assert.equal(run('.', '--config').status, 2, '--config no longer exists: it is an unexpected argument');
+  assert.equal(run('.', '--config').status, 2, '--config is not a flag: it is an unexpected argument');
   assert.equal(run('.', '--base').status, 2, '--base without a commit is a usage error');
   const root = fixture(t, 'frontend', { 'apps/web/src/app/page.tsx': 'export default function Page() { return null; }\n' });
-  assert.equal(run(root, '--config', 'architecture.json').status, 2, 'the retired --config file flag is refused');
+  assert.equal(run(root, '--config', 'architecture.json').status, 2, '--config with a file is an unexpected argument');
   const unavailable = run(root);
   assert.equal(unavailable.status, 1, 'a check that cannot load the target TypeScript fails');
   const record = JSON.parse(unavailable.stdout);
