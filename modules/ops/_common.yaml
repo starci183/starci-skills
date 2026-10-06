@@ -296,8 +296,7 @@ sections:
         `brand/` and `_resources/` - a workflow's bounded scope lives on its owning feature record
         under `extensions.work3.scope`, and workspace.manage's setup record lives on the catalog
         under `extensions.work3.setup.<workflow>.<mode>` (work-layout.yaml shape.setup). A
-        root-level `.starciwork/<name>/index.yaml` record is refused. A work/node@N record anywhere is
-        refused too (HFS_WORK_NODE_RETIRED) and must be restated as flat family records. Add a new domain as a new family or resource
+        root-level `.starciwork/<name>/index.yaml` record is refused. Add a new domain as a new family or resource
         kind plus its explicit contract, never as an invented folder.
       - 'Accepted art direction/design assets are source inputs: store them in the selected design
         resource directory and declare `files:[{"path":"assets/direction.png"}]` using the real
@@ -765,7 +764,7 @@ shared:
       content:
         en: "The last round's document gate (gate.mjs --profile docs, profile docs): every docChecks result
           - doc-language, check-work-surfaces, check-work-deep, check-example-work,
-          check-contract-cites, check-retired-names, check-json-exceptions - its exit and every finding."
+          check-contract-cites, check-json-exceptions - its exit and every finding."
   placeholders:
     feature: Selected feature slug
     repository: Implementation repository segment under impl/

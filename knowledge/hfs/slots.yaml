@@ -20,9 +20,6 @@ versioning:
     change or remove an existing slot, make an optional slot required, promote a rule warn to error, change the
     direction matrix. Needs owner approval and a migration lane per repo. There is no compatibility window: the old
     MAJOR is refused the day the new one lands (owner ruling: no backward compatibility).
-  retire: >-
-    a slot is never edited in place; it gets retiredIn (a major) and a successor slot id. After that major a
-    path matching a retired slot is HFS_SLOT_RETIRED (error).
   pins: knowledge/hfs/canon-pins.yaml carries the exact versions of every @starci/* package and framework this MAJOR supports.
 # 2.1.0 is such a minor: it ADDS the edition mechanism (the `editions` list, the per-slot `editions`, `litePresence`, `lite`
 # overlays and `provider`, and `sides.<side>.reads` of an app-root tree) and the lite slots; an app without `edition` in its
@@ -83,7 +80,7 @@ versioning:
 #               requiredInstances), each shaped as the same field in the slot body; every other field is the edition's.
 #               Under lite `tests` is none on every slot: a lite app has no test world.
 #   provider    the hfs.json connections[].provider that enables this opt-in slot (supabase); never an app kind.
-#   since / retiredIn / successor   lifecycle.
+#   since       the manifest version that introduced the slot.
 presenceValues: [required, optional, opt-in, forbidden]
 trackedValues: [tracked, ignored, external]
 testValues: [unit-beside, e2e, none]
@@ -530,12 +527,12 @@ slots:
              "features/<feature>/<family>/<name>/index.yaml", "features/<feature>/br/<rule>/ac/<name>/index.yaml",
              "features/<feature>/ui/<name>/assets/<approved-file>", "features/<feature>/uat/<name>/{index,accounts,fixtures}.yaml",
              "features/<feature>/uat/<name>/{seed,cleanup}.sql", "_resources/{identities,environments,fixtures}/<slug>/resource.yaml"]
-    forbids: [evidence/, logs/, reports/, captures/, runs/, "kernel-*/", "*.sqlite*", _derived/, "work/node records"]
+    forbids: [evidence/, logs/, reports/, captures/, runs/, "kernel-*/", "*.sqlite*", _derived/]
     # Lite keeps the product catalog, feature overviews, grammar and brand drawing records; UAT records belong to the forbidden slot below.
     lite:
       requires: [.gitignore, workspace.yaml, index.yaml]
       allows: [workspace.yaml, index.yaml, "brand/**", shell/index.yaml, "features/<feature>/index.yaml", "features/<feature>/ui/<name>/index.yaml", "features/<feature>/ui/<name>/assets/<approved-file>"]
-    rules: [HFS_AGENT_DATA_TRACKED, HFS_WORK_NODE_RETIRED, HFS_IDENTITY_CUSTODY]
+    rules: [HFS_AGENT_DATA_TRACKED, HFS_IDENTITY_CUSTODY]
   - id: app.starciwork.uat
     profiles: [app]
     # The UAT records of the full edition: a lite app has no UAT (no tests, no record of one), so the trees are forbidden paths

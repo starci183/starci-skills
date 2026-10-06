@@ -19,7 +19,7 @@ test('the allowlist, its schema, the check and its spec are the only list-named 
   ]), []);
 });
 
-test('a file named like a retired list mechanism is sprawl wherever it lives', () => {
+test('a file named like a list mechanism is sprawl wherever it lives', () => {
   assert.deepEqual(codes(allowlistSprawlFindings([
     'modules/kernel/dead-codes.not-codes',
     'modules/schemas/yaml-exceptions.yaml',
@@ -50,8 +50,8 @@ test('a bare non-.mjs file under scripts/checks/ is a list a check should not ke
   ]);
 });
 
-test('current module list mechanisms are sprawl; the actual retired-paths declaration stays data', () => {
-  assert.deepEqual(codes(allowlistSprawlFindings(['modules/kernel/baseline-eslint-ignores-work.yaml', 'modules/kernel/json-exceptions-shape-slot-and-ui.yaml', 'modules/kernel/retired-paths.yaml'])), [['RT_ALLOWLIST_SPRAWL', 'modules/kernel/baseline-eslint-ignores-work.yaml'], ['RT_ALLOWLIST_SPRAWL', 'modules/kernel/json-exceptions-shape-slot-and-ui.yaml']]);
+test('current module list mechanisms are sprawl', () => {
+  assert.deepEqual(codes(allowlistSprawlFindings(['modules/kernel/baseline-eslint-ignores-work.yaml', 'modules/kernel/json-exceptions-shape-slot-and-ui.yaml'])), [['RT_ALLOWLIST_SPRAWL', 'modules/kernel/baseline-eslint-ignores-work.yaml'], ['RT_ALLOWLIST_SPRAWL', 'modules/kernel/json-exceptions-shape-slot-and-ui.yaml']]);
 });
 
 test('this runtime keeps exactly one allowlist', () => {

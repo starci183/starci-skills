@@ -6,7 +6,7 @@
 //      (runtime-rules/slot-allows.mjs)
 //   2. the runtime rules of knowledge/hfs/rules.yaml with gate runtime, one module each under scripts/hfs/runtime-rules/:
 //      RT_EXTERNAL_OWNER, RT_TIER_DIRECTION and ARCH_OWNER_CYCLE, RT_BASE_IMPURE, RT_API_SHAPE, RT_SPEC_PLACEMENT,
-//      RT_SOURCE_NAME, RT_RETIRED_PRESENT, RT_PINNED_PATH_MOVED, HFS_SIZE_GROWTH, RT_NODE_MODULES_LINK, RT_CONTROL_CHARACTER,
+//      RT_SOURCE_NAME, RT_PINNED_PATH_MOVED, HFS_SIZE_GROWTH, RT_NODE_MODULES_LINK, RT_CONTROL_CHARACTER,
 //      RT_ABSOLUTE_PATH, RT_HOOK_SHAPE (the app hook templates keep the gate model), RT_GENERATED_DRIFT (the generated copies against scripts/hfs/sync-runtime.mjs),
 //      GENERATED_UNTRACKED (no tracked path under a generated root) and
 //      RT_CLI_APP_ONLY_TEMPLATES (managed app templates invoke only starci app)
@@ -18,8 +18,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { mergeBase } from '../api/git/merge-base.mjs';
+import { diff } from '../api/git/diff.mjs';
 import { show } from '../api/git/show.mjs';
 import { checkRepo, readWhy, trackedFiles } from './check.mjs';
 import { GENERATED_DRIFT, driftOfRuntime, syncRuntime } from './sync-runtime.mjs';
@@ -43,8 +43,7 @@ import { ruleIdFindings } from './runtime-rules/rule-ids.mjs';
 import { factFindings } from './runtime-rules/facts.mjs';
 import { externalOwnerFindings } from './runtime-rules/external-owner.mjs';
 import { nodeModulesLinkFindings } from './runtime-rules/node-modules-link.mjs';
-import { pinnedFindings, retiredFindings } from './runtime-rules/retired.mjs';
-import { RETIRED_PATHS_FILE } from '../lib/check-scan.mjs';
+import { pinnedFindings } from './runtime-rules/pinned.mjs';
 import { sizeFindings } from './runtime-rules/size.mjs';
 import { slotAllowsFindings } from './runtime-rules/slot-allows.mjs';
 import { parseSource } from './runtime-rules/source-ast.mjs';
@@ -55,11 +54,31 @@ import { tierFindings } from './runtime-rules/tier-direction.mjs';
 
 const SOURCE = /\.(?:mjs|cjs|js)$/;
 
-/** The merge-base of HEAD with main (else origin/main) in `repoRoot` and a reader of files at it; null when none resolves. */
+/** The files git detects as renamed between `sha` and the working tree of `repoRoot`: new path -> path at `sha`. */
+function renamesSince(repoRoot, sha) {
+  const r = diff(['-M', '--name-status', '-z', sha], { cwd: repoRoot, maxBuffer: 64 * 1024 * 1024 });
+  const renames = new Map();
+  if (r.error || r.status !== 0) return renames;
+  const parts = r.stdout.split('\u0000');
+  for (let i = 0; i < parts.length; i += 1) {
+    const status = parts[i];
+    if (status.startsWith('R')) { renames.set(parts[i + 2], parts[i + 1]); i += 2; } else if (status.startsWith('C')) i += 2; else i += 1;
+  }
+  return renames;
+}
+
+/** The merge-base of HEAD with main (else origin/main) in `repoRoot`, a reader of files at it and the path a renamed file had there; null when none resolves. */
 export function baseRevision(repoRoot) {
   for (const ref of ['main', 'origin/main']) {
     const sha = mergeBase(repoRoot, 'HEAD', ref);
-    if (sha) return { sha, show: (file) => { const r = show([`${sha}:${file}`], { cwd: repoRoot, maxBuffer: 64 * 1024 * 1024 }); return !r.error && r.status === 0 ? r.stdout : null; } };
+    if (sha) {
+      let renames = null;
+      return {
+        sha,
+        show: (file) => { const r = show([`${sha}:${file}`], { cwd: repoRoot, maxBuffer: 64 * 1024 * 1024 }); return !r.error && r.status === 0 ? r.stdout : null; },
+        renamedFrom: (file) => { renames ??= renamesSince(repoRoot, sha); return renames.get(file) ?? null; },
+      };
+    }
   }
   return null;
 }
@@ -96,9 +115,8 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     if (!parsedCache.has(p)) parsedCache.set(p, parseSource(sources.find((s) => s.path === p)?.text ?? read(p) ?? '', p));
     return parsedCache.get(p);
   };
-  const retiredPaths = (() => { const text = read(RETIRED_PATHS_FILE); try { return text === null ? {} : (parseYaml(text) ?? {}); } catch { return {}; } })();
   const baseRev = base === undefined ? baseRevision(repoRoot) : base;
-  const ctx = { repoRoot, root, manifest: runtimeManifest, resolver, params, files: tracked, fileSet, sources, sourceSet: new Set(sourcePaths), parsed, read, readBytes, retiredPaths, base: baseRev };
+  const ctx = { repoRoot, root, manifest: runtimeManifest, resolver, params, files: tracked, fileSet, sources, sourceSet: new Set(sourcePaths), parsed, read, readBytes, base: baseRev };
 
   const findings = [];
   const treeResult = checkRepo({ repoRoot, root, manifest: runtimeManifest, files: tracked, tree });
@@ -111,7 +129,6 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...apiShapeFindings(ctx),
     ...specPlacementFindings(ctx),
     ...sourceNameFindings(ctx),
-    ...retiredFindings(ctx),
     ...pinnedFindings(ctx),
     ...sizeFindings(ctx),
     ...nodeModulesLinkFindings(ctx),

@@ -44,9 +44,9 @@ A standing loop every Kernel session runs, not a one-shot gate:
 |---|---|
 | **Self-settling ops** | An Op agent finishes its own task completely, including its own git and file conflicts. Escalation is only for goal-identity or scope changes. |
 | **Main-line development** | Code lands on `main`. Worktrees are disposable scratch owned by the runtime, not integration branches; the ledger carries state. |
-| **Pattern convergence** | One pattern, no legacy, no aliases. A superseded mechanism is deleted and recorded in `modules/kernel/retired-paths.yaml`. Drift is detected by `scripts/checks/`, never by re-reading. |
+| **Pattern convergence** | One pattern, no legacy, no aliases. A superseded mechanism is deleted. Drift is detected by `scripts/checks/`, never by re-reading. |
 | **Token discipline** | Budget is allocated per dispatch: `modules/models/selection.yaml` picks the model and the packet carries the budget. |
-| **Practice-driven upgrade** | `benchmark/findings/` records what a session did and the standard derived from it. A durable finding goes to `benchmark/findings/` or `docs/`; `.experiments/` does not exist. |
+| **Practice-driven upgrade** | A durable finding goes to `docs/`; `.experiments/` does not exist. |
 | **Fresh evidence only** | Every claim of done lands as a marker, a report and an artifact. |
 
 ## Explicitly out of scope
@@ -56,5 +56,4 @@ A standing loop every Kernel session runs, not a one-shot gate:
 
 ## Current known gaps
 
-The open drift list lives in `benchmark/findings/fable.md` (history, outside docs/). Read it there rather than keeping
-a second copy here. Per-product Sonar and Codecov tokens for the product monorepos are still pending.
+Per-product Sonar and Codecov tokens for the product monorepos are still pending.

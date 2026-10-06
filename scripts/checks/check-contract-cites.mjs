@@ -12,11 +12,11 @@
 // A `{a,b}` group expands; a `*` glob, an `<angle>` placeholder or a
 // .starciwork/ runtime path is unverifiable and is skipped by name.
 //
-// Live prose and source comments name current owners. The retired-path declaration alone names its dead paths.
+// Live prose and source comments name current owners.
 //
 // RT_CITED_PATH_MISSING (rule R122, gate runtime): citedPathFindings() runs the same reading over every tracked
 // .md/.yaml/.yml file and the comments of every tracked source file outside history (runtimeCiteScan; history is
-// the retired-path registry, CHANGELOG*.md and benchmark/, and generated copy roots are
+// CHANGELOG*.md and benchmark/, and generated copy roots are
 // never read) and returns each dead cite as a finding; `starci runtime check` judges it
 // with the runtime check. A token whose top-level segment is not in this tree is skipped, so product-repository
 // paths (src/..., apps/...) in knowledge text name no cite of this tree.
@@ -25,9 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { walkFiles } from '../lib/walk.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
-import { movedTo } from '../hfs/runtime-rules/retired.mjs';
-import { RETIRED_PATHS_FILE, generatedRootsOf, isHistoryPath } from '../lib/check-scan.mjs';
+import { generatedRootsOf, isHistoryPath } from '../lib/check-scan.mjs';
 import { ts } from '../hfs/runtime-rules/source-ast.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
@@ -49,7 +47,6 @@ const SYMBOL_IN_FILE = new RegExp('`([A-Za-z0-9_.$]+)\\(\\)`\\s+in\\s+([A-Za-z0-
 
 class CiteInputError extends Error {}
 
-const HISTORY = (rel) => rel === RETIRED_PATHS_FILE;
 /** A file the cite scan reads whole (prose) vs one whose comments alone are read (a string literal is data). */
 const PROSE_EXT = /\.(?:ya?ml|md)$/;
 const SOURCE_EXT = /\.(?:mjs|cjs|js|mts|cts|ts|tsx|jsx)$/;
@@ -67,23 +64,6 @@ const dropGeneratedBlocks = (text) => {
     return inside ? '' : line;
   }).join('\n');
 };
-/** A path inside a generated copy is the runtime path it mirrors (packages/hfs/runtime/scripts/x.mjs -> scripts/x.mjs). */
-const mirrored = (roots, target) => { const r = roots.find((g) => target.startsWith(g)); return r ? target.slice(r.length) : target; };
-
-const readRegistry = (root) => {
-  const file = path.join(root, RETIRED_PATHS_FILE);
-  return fs.existsSync(file) ? (parseYaml(fs.readFileSync(file, 'utf8')) ?? {}) : {};
-};
-
-/** The retired paths of `root` (modules/kernel/retired-paths.yaml `retired[].path`); an empty set when there is none. */
-export function retiredPaths(root = DEFAULT_ROOT) {
-  const doc = readRegistry(root);
-  return new Set((Array.isArray(doc.retired) ? doc.retired : []).map((r) => String(r?.path ?? '')).filter(Boolean));
-}
-
-/** (path) -> where it moved under `root`'s modules/kernel/retired-paths.yaml `moved[]` (a directory row covers what is below it), or null. */
-export const movedPaths = (root = DEFAULT_ROOT) => movedTo(readRegistry(root).moved);
-
 const expandBraces = (token) => {
   const open = token.indexOf('{');
   if (open < 0) return [token];
@@ -197,11 +177,7 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
     return contents.get(abs);
   };
   const files = collectScanFiles(root, scan);
-  const retired = retiredPaths(root);
-  const moved = movedPaths(root);
-  const roots = generatedRootsOf(root);
-  const retiredOrMoved = (target) => retired.has(target) || moved(target) || retired.has(mirrored(roots, target)) || moved(mirrored(roots, target));
-  let checked = 0, historic = 0;
+  let checked = 0;
   for (const file of files) {
     const rel = path.relative(root, file).replaceAll('\\', '/');
     const seen = new Set();
@@ -224,18 +200,17 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
         dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: 'bare filename — a cite names a repo-relative path' });
         continue;
       }
-      if (retiredOrMoved(cite.target) && HISTORY(rel) && !fs.existsSync(path.join(root, cite.target))) { historic += 1; continue; }
       let body = readTarget(path.join(root, cite.target));
       // A markdown-style cite is also legal relative to the citing file (a package README's `docs/x.md`,
       // a knowledge index's `ui/index.yaml`); the repo-root reading wins.
       if (body === null) body = readTarget(path.join(root, path.posix.join(path.posix.dirname(rel), cite.target)));
-      if (body === null) { dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: moved(cite.target) ? `moved to ${moved(cite.target)}` : 'no such file' }); continue; }
+      if (body === null) { dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: 'no such file' }); continue; }
       if (cite.kind === 'symbol' && !body.includes(cite.symbol)) {
         dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, symbol: cite.symbol, why: 'symbol not in file' });
       }
     }
   }
-  return { schema: 'starci/contract-cites@1', ok: dead.length === 0, filesScanned: files.length, citesChecked: checked, retiredCites: historic, dead };
+  return { schema: 'starci/contract-cites@1', ok: dead.length === 0, filesScanned: files.length, citesChecked: checked, dead };
 }
 
 export const CITED_PATH_MISSING = 'RT_CITED_PATH_MISSING';

@@ -5,9 +5,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readYamlFile } from './read-yaml.mjs';
 
-/** The registry of retired paths; it names what it declares dead, so a scan never reads it. */
-export const RETIRED_PATHS_FILE = 'modules/kernel/retired-paths.yaml';
-
 /** 1-based line number of the character at `offset` in `text`. */
 export const lineOf = (text, offset) => {
   let line = 1;
@@ -15,9 +12,9 @@ export const lineOf = (text, offset) => {
   return line;
 };
 
-/** Never scanned: a benchmark finding, a changelog, a .starciwork record and the retired registry. */
+/** Never scanned: a benchmark finding, a changelog and a .starciwork record. */
 export const isHistoryPath = (rel) => rel.startsWith('benchmark/')
-  || /(^|\/)CHANGELOG[^/]*\.md$/i.test(rel) || /(^|\/)\.starciwork\//.test(rel) || rel === RETIRED_PATHS_FILE;
+  || /(^|\/)CHANGELOG[^/]*\.md$/i.test(rel) || /(^|\/)\.starciwork\//.test(rel);
 
 /** The generated copy roots of the runtime (ruleParams.runtime.generated), each with a trailing slash. */
 export const generatedRootsOf = (root) => {

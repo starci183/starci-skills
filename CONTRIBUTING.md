@@ -95,9 +95,8 @@ is the one that goes stale. Eight principles, each held by a check that `npm run
 6. **One allowlist and one shared schema fragment.** Every exception lives in `modules/kernel/allowlist.yaml` with its
    reason and only shrinks; a field shared by several schemas or ops is declared once and referenced
    (`RT_ALLOWLIST_SPRAWL`, `RT_SCHEMA_NOT_SHARED`, `RT_OP_FIELD_NOT_COMMON`).
-7. **The runtime names no product, no example and no dead name.** Runtime source is generic; a path it cites exists; a
-   retired name appears only in history (`RT_EXAMPLE_COUPLING`, `RT_PRODUCT_NAME_IN_SOURCE`, `RT_HOST_PATH_IN_TEMPLATE`,
-   `RT_RETIRED_NAME_LIVE`, `RT_CITED_PATH_MISSING`).
+7. **The runtime names no product and no example.** Runtime source is generic; a path it cites exists
+   (`RT_EXAMPLE_COUPLING`, `RT_PRODUCT_NAME_IN_SOURCE`, `RT_HOST_PATH_IN_TEMPLATE`, `RT_CITED_PATH_MISSING`).
 8. **One document and one spec per behaviour.** Every `docs/*.md` carries an `Owner:` or `Task:` line and no two docs serve
    one task; a spec asserts behaviour, not source text, and a skip says why; a CI upload fails loudly
    (`RT_DOC_NO_OWNER`, `RT_SPEC_ASSERTS_SOURCE_TEXT`, `RT_SPEC_SKIP_UNEXPLAINED`, `CI_UPLOAD_NOT_SILENT`).
@@ -166,7 +165,7 @@ one thing, once, in the present tense. These six rules are the bar for any edit 
 line; a review that finds a violation sends the change back.
 
 1. **Present tense, no ghosts.** Describe the tree as it is. Never define something by negating
-   a state the tree no longer has (a removed directory, a former layout, a compatibility mode). History goes to `CHANGELOG.md` or `benchmark/findings/`, never into the
+   a state the tree no longer has (a removed directory, a former layout, a compatibility mode). History goes to `CHANGELOG.md`, never into the
    sentence that defines the present.
 2. **Replace, never append.** A feedback edit rewrites the sentence that holds the rule. Do not
    add a second sentence under the first, and do not leave the old condition clause standing

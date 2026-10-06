@@ -115,9 +115,8 @@ test('every cite under modules/goal and modules/ops resolves in the real tree', 
   assert.ok(report.citesChecked > 100, `expected a real scan, checked ${report.citesChecked}`);
 });
 
-test('a retired path is valid only in its registry and dead in former contract entries and live owner text', () => {
+test('a cite of a path that is not in the tree is dead in contract entries, rulings and live owner text', () => {
   const root = fixtureTree({
-    'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@1\nretired:\n  - {path: scripts/old/loop.mjs, retiredAt: 2026-09-28}\n',
     'modules/kernel/contract-changes/old.yaml': 'id: old\nsummary: "`scripts/old/loop.mjs` did it once"\n',
     'modules/kernel/owner-rulings.yaml': 'r:\n  citation: scripts/old/loop.mjs\n',
     'modules/kernel/live.yaml': 'a:\n  note: "run `scripts/old/loop.mjs`"\n',
@@ -126,32 +125,7 @@ test('a retired path is valid only in its registry and dead in former contract e
   try {
     const report = checkContractCites(root);
     assert.deepEqual(report.dead.map((d) => d.file), ['modules/kernel/contract-changes/old.yaml', 'modules/kernel/live.yaml', 'modules/kernel/owner-rulings.yaml'], JSON.stringify(report.dead));
-    assert.equal(report.retiredCites, 1, 'only the retired-path declaration keeps the missing cite as history');
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('moved paths in former contract entries and live text are dead; only their registry keeps history', () => {
-  const root = fixtureTree({
-    'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@2\nretired: []\nmoved:\n  - {from: scripts/old/gate.mjs, to: scripts/gates/gate.mjs, movedIn: C4, quiesced: false}\n  - {from: scripts/kernel/gone-verbs/, to: scripts/kernel/verbs/, movedIn: C6, quiesced: false}\n',
-    'modules/kernel/contract-changes/old.yaml': 'id: old\nsummary: "`scripts/old/gate.mjs` ran the gate"\n',
-    'modules/kernel/contract-changes/verb.yaml': 'id: verb\nsummary: "`scripts/kernel/gone-verbs/settle.mjs` settled"\n',
-    'modules/kernel/contract-changes/copy.yaml': 'id: copy\nsummary: "`packages/hfs/runtime/scripts/old/gate.mjs` was bundled"\n',
-    'knowledge/hfs/runtime-slots.yaml': 'ruleParams:\n  runtime:\n    generated:\n      - {root: packages/hfs/runtime, generatedBy: x.mjs}\n',
-    'packages/hfs/runtime/.keep': '',
-    'modules/kernel/live.yaml': 'a:\n  note: "run `scripts/old/gate.mjs`"\n',
-    'scripts/gates/gate.mjs': '',
-  });
-  try {
-    const report = checkContractCites(root);
-    assert.deepEqual(report.dead.map((d) => [d.file, d.why]), [
-      ['modules/kernel/contract-changes/copy.yaml', 'no such file'],
-      ['modules/kernel/contract-changes/old.yaml', 'moved to scripts/gates/gate.mjs'],
-      ['modules/kernel/contract-changes/verb.yaml', 'moved to scripts/kernel/verbs/settle.mjs'],
-      ['modules/kernel/live.yaml', 'moved to scripts/gates/gate.mjs'],
-    ]);
-    assert.equal(report.retiredCites, 1, 'only the registry keeps the old file cite; a live citation of a generated copy is still checked');
+    assert.ok(report.dead.every((d) => d.why === 'no such file'));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

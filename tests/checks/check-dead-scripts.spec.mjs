@@ -12,7 +12,7 @@ import { mkdtemp } from '../helpers/tmpdir.mjs';
 /** An allowlist fixture document carrying only a dead-script-entries section of {path, reason} pairs. */
 const allowlistWith = (entries) => `schema: starci/allowlist@1\ndead-script-entries:\n${entries.map(([path, reason]) => `  - {path: ${path}, reason: "${reason}"}`).join('\n')}\n`;
 
-// RED18: a runtime script is alive only when something executable names it. A doc, README, YAML prose line, retired-paths
+// RED18: a runtime script is alive only when something executable names it. A doc, README, YAML prose line
 // entry, YAML prose or benchmark finding is not a reader.
 const run = (files) => deadScriptFindings({ tracked: Object.keys(files), read: (rel) => files[rel] ?? '' });
 const codes = (findings) => findings.map((f) => [f.code, f.path]);
@@ -58,7 +58,7 @@ test('a runtime check-only command and a catalog impl are executable readers', (
   }), []);
 });
 
-test('a script named only by a doc, a README, YAML prose, retired-paths or a comment is dead', () => {
+test('a script named only by a doc, a README, YAML prose or a comment is dead', () => {
   const findings = run({
     'scripts/supervisor/why-gone.mjs': 'export const x = 1;',
     'scripts/work/gone-ui-shapes.mjs': '',

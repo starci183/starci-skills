@@ -14,7 +14,6 @@ versioning:
   patch: wording, why text, examples; no check result can change.
   minor: add a slot (optional), add a rule, add an api system.
   major: change or remove a slot, change the tier matrix or infraOwners, move a pinned path. Owner approval; no compatibility window.
-  retire: a moved or deleted path is recorded in modules/kernel/retired-paths.yaml (retired[] or moved[]); its slot becomes forbidden with goesTo naming the successor.
   pins: the runtime has no pins of its own; the packages it publishes are pinned in knowledge/hfs/canon-pins.yaml.
 
 presenceValues: [required, optional, opt-in, forbidden]
@@ -143,7 +142,6 @@ ruleParams:
       - {id: i18n-catalog, run: scripts/checks/check-i18n-catalog.mjs}
       - {id: grammar-dist, run: scripts/checks/check-grammar-dist.mjs}
       - {id: canon-pins, run: scripts/checks/check-canon-pins.mjs}
-      - {id: retired-names, run: scripts/checks/check-retired-names.mjs}
       - {id: example-coupling, run: scripts/checks/check-example-coupling.mjs}
       - {id: doc-owner, run: scripts/checks/check-doc-owner.mjs}
       - {id: dead-scripts, run: scripts/checks/check-dead-scripts.mjs}
@@ -277,7 +275,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "the agent scratchpad or <tmp>/<lane>/; a durable finding goes to benchmark/findings/<date>-<topic>.md or docs/<topic>.md"
+    goesTo: "the agent scratchpad or <tmp>/<lane>/; a durable finding goes to docs/<topic>.md"
     rules: [HFS_FORBIDDEN_PRESENT, HFS_UNTRACKED_ROOT_ENTRY]
 
   # ----- entry ----------------------------------------------------------------------------------------------
@@ -382,14 +380,6 @@ slots:
     tests: none
     coverage: none
     why: "<migration> is <nnnn>-<kebab-name>; English comments only"
-  - id: runtime.engine-retired
-    profiles: [runtime]
-    path: "{engine/ledger-db.mjs,engine/machine-db.mjs,engine/migrations/}"
-    presence: forbidden
-    tracked: external
-    tier: none
-    tests: none
-    goesTo: "engine/db/ledger.mjs, engine/db/machine.mjs, engine/db/migrations/ (chunk C3)"
 
   # ----- scripts: api (the only external-system callers) ------------------------------------------------------
   - id: runtime.api-system
@@ -408,14 +398,6 @@ slots:
     tests: none
     coverage: required
     rules: [RT_API_SHAPE, RT_EXTERNAL_OWNER, RT_TIER_DIRECTION, RT_SOURCE_NAME]
-  - id: runtime.api-retired
-    profiles: [runtime]
-    path: "scripts/api/quota/"
-    presence: forbidden
-    tracked: external
-    tier: none
-    tests: none
-    goesTo: "scripts/agent/quota/ (provider dispatch and viability) + scripts/api/windsurf/seat-quota.mjs (the one external call); Orca accounts through scripts/api/orca/account-list.mjs (chunk C2a)"
 
   # ----- scripts: base, hfs, machine ----------------------------------------------------------------------------
   - id: runtime.lib
@@ -427,15 +409,6 @@ slots:
     tests: none
     coverage: required
     rules: [RT_BASE_IMPURE, RT_EXTERNAL_OWNER, RT_TIER_DIRECTION, RT_HELPER_REDEFINED, RT_HELPER_NEAR_COPY, RT_SOURCE_NAME]
-  - id: runtime.lib-retired
-    profiles: [runtime]
-    # Every name is spelled out: a wildcard segment ranks below the <name>.mjs of runtime.lib.
-    path: "scripts/lib/{hfs-allows.mjs,hfs-check.mjs,hfs-path-findings.mjs,hfs-slots.mjs,hfs-tree.mjs,hfs-view.mjs,hfs-rules/,project-graph.mjs,project-rule.mjs,git-index-lock.mjs,low-priority.mjs,safe-remove.mjs,rename-over.mjs,zip-archive.mjs,sops-exec-env.mjs,test-secrets.mjs,canon-digest.mjs,self-reload.mjs,artifact-store.mjs,blob-lookup.mjs,worktrees.mjs,worktree-registry.mjs,lane-owner.mjs,host-resources.mjs,ram-throttle.mjs,pool-backoff.mjs,artifact-hold.mjs,terminal-ledger.mjs,close-verify.mjs,hk-claude.mjs,hk-devin.mjs,hk-git-locks.mjs,hk-lanes.mjs,hk-ledger.mjs,hk-logs.mjs,hk-orphan-ledgers.mjs,hk-sessions.mjs,hk-tmp.mjs,yaml.mjs}"
-    presence: forbidden
-    tracked: external
-    tier: none
-    tests: none
-    goesTo: "scripts/hfs/ (hfs-*, project-*: C1), scripts/api/<system>/ (git-index-lock: C5; low-priority, safe-remove, rename-over, zip-archive, sops-exec-env, test-secrets, canon-digest, self-reload: C2a), engine/db/blob.mjs (artifact-store, blob-lookup: C3), scripts/machine/ (worktrees ... close-verify: C3), scripts/housekeeping/ (hk-*: C3), scripts/lib/read-yaml.mjs (yaml: C6); the exact map lands in modules/kernel/retired-paths.yaml moved[]"
   - id: runtime.hfs
     profiles: [runtime]
     # The ONE standard engine: product HFS (slots, check, architecture machine) and this runtime HFS. Bundled into the
@@ -507,14 +480,6 @@ slots:
     tests: none
     coverage: required
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, RT_PINNED_PATH_MOVED]
-  - id: runtime.reconcile-retired
-    profiles: [runtime]
-    path: "scripts/reconcile/"
-    presence: forbidden
-    tracked: external
-    tier: none
-    tests: none
-    goesTo: "scripts/kernel/settle/ (job-settle, check-verdict, canon-parity: chunk C3)"
 
   # ----- scripts: domain owners -------------------------------------------------------------------------------
   - id: runtime.domain
@@ -529,14 +494,6 @@ slots:
     tests: none
     coverage: required
     rules: [RT_TIER_DIRECTION, ARCH_OWNER_CYCLE, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH]
-  - id: runtime.migrate-retired
-    profiles: [runtime]
-    path: "scripts/migrate/"
-    presence: forbidden
-    tracked: external
-    tier: none
-    tests: none
-    goesTo: "nowhere: no migration or backfill (owner ruling, clean slate); each store has one schema, engine/db/migrations/<store>/0001-init.sql"
 
   # ----- scripts: gates and runtime self-checks ---------------------------------------------------------------
   - id: runtime.gates
@@ -569,14 +526,6 @@ slots:
     tests: none
     coverage: required
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME]
-  - id: runtime.checks-retired
-    profiles: [runtime]
-    path: "scripts/checks/{architecture.mjs,architecture/,typescript-programs.mjs,common.mjs,gate.mjs,read-digest.mjs,proof.mjs,unit-run.mjs,test-world-run.mjs,release-proof.mjs,release-app-installs.mjs,acceptance.mjs,stacks.mjs,sonar-ext-custody.mjs,sonar-gate.mjs,sonar-local.mjs,canon-scan.mjs,repo-presentation.mjs,package-clean-test.mjs,output.mjs,probe-reference-conventions.mjs,draw-*.mjs,brand*.mjs,grammar-*.mjs,render.mjs,shell-conformance.mjs,ui-*.mjs,work-*.mjs,ledger-*.mjs,owner-claims-audit.mjs,providers.mjs,failure-codes.mjs,examples-ci.mjs,check-db-openers.mjs,check-starcistacks.mjs,check-hfs-sync.mjs,check-work-artifacts.mjs,check-work-consistency.mjs,check-work-deep.mjs,check-work-schemas.mjs,check-work-surfaces.mjs,check-evidence-binding.mjs,host-boundary.allow,failure-codes.not-codes,dead-scripts.entries,spec/}"
-    presence: forbidden
-    tracked: external
-    tier: none
-    tests: none
-    goesTo: "scripts/hfs/ (architecture machine, typescript-programs: C1), scripts/lib/{is-main,walk}.mjs (common: C1), scripts/gates/ (gates and proofs: C4), scripts/work/{draw,brand,ui,validate}/ (Work judges and validators: C4), scripts/housekeeping/ (ledger tools: C4), scripts/checks/check-{providers,failure-codes,examples-ci,grammar-dist}.mjs (renamed self-checks: C4); check-db-openers is superseded by RT_EXTERNAL_OWNER (C3); the check list files fold into the dead-script-entries section of modules/kernel/allowlist.yaml (H)"
 
   # ----- contracts, knowledge, docs, skills ---------------------------------------------------------------------
   - id: runtime.contracts
@@ -778,7 +727,7 @@ slots:
     tests: none
   - id: runtime.benchmark
     profiles: [runtime]
-    path: "benchmark/{README.md,expectations.yaml,findings/<finding>.md,snapshots/<snapshot>.json}"
+    path: "benchmark/{README.md,expectations.yaml,snapshots/<snapshot>.json}"
     presence: optional
     tracked: tracked
     tier: none

@@ -74,7 +74,7 @@ concerns:
   sla.report: workflow
 
 # No separate loop runs a concern the engine covers (kernel/watchdog loop, resume-all, supervisor tick/watchdog loop,
-# stall-alert; modules/kernel/retired-paths.yaml).
+# stall-alert).
 
 routing:
   source: every ledger's events (scripts/reconciler/sources.mjs), per allocation.reconciler.pollMs; the first run of a ledger starts at MAX(seq), no replay

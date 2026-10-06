@@ -421,8 +421,7 @@ and kernel over domain, gates, machine and hfs, down to the api, db and base tie
 `ruleParams.runtime.infraOwners` declares which api system may call which host surface
 (`node:child_process` only in `scripts/api/*`, `node:sqlite` only in `engine/db`, each program word
 only in its own system's folder). A path the target tree moves is a forbidden slot whose `goesTo`
-names its successor; files move with the move codemod, which appends the `moved[]` entries of
-`modules/kernel/retired-paths.yaml`.
+names its successor; files move with the move codemod.
 
 `starci runtime check` dispatches to `scripts/checks/check-runtime.mjs`: `node --check`
 over every `.mjs` of `engine/`, `scripts/`, `modules/` and `bin/`; the runtime HFS check
