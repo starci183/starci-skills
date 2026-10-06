@@ -254,7 +254,7 @@ writes:
         its brief, screen/shape/breakpoint/viewport/theme and `provenance.tool: draw-render`. The UI
         node owns the image, brief and source bytes; this file indexes them.
         scripts/kernel/ask-server.mjs and scripts/connectors/telegram-media.mjs read it and show the owner
-        each draw's part (then `content`, then `image` on an older draws.yaml), never the composite."
+        each draw's part, never the composite."
   - id: work-graph
     path: evidence/work-graph.json
     schema: starci/work-graph@1

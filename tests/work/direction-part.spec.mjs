@@ -86,8 +86,8 @@ test('records drawn before the rule: the .content sibling is found; an image wit
   assert.deepEqual([objects[0].label, objects[0].abs, objects[0].composite], ['pending', part, composite], 'object entries keep their fields');
 });
 
-test('a draws.yaml entry names its owner image part first, then content, then image; strings or {path}', () => {
-  assert.deepEqual(drawImageRefs({ image: { path: 'c.png', sha256: 'x' }, content: { path: 'c.content.png' }, part: 'p.png' }), ['p.png', 'c.content.png', 'c.png']);
-  assert.deepEqual(drawImageRefs({ image: 'legacy.png' }), ['legacy.png']);
+test('a draws.yaml entry names its owner image by its part; a string or {path}', () => {
+  assert.deepEqual(drawImageRefs({ composite: { path: 'c.png', sha256: 'x' }, part: { path: 'p.png' } }), ['p.png']);
+  assert.deepEqual(drawImageRefs({ part: 'p.png' }), ['p.png']);
   assert.deepEqual(drawImageRefs({}), []);
 });

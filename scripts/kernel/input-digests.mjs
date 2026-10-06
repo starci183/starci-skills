@@ -51,8 +51,6 @@ const INPUT_KINDS = new Set(['source', 'work']);
 const SOURCE_ROOTS = ['knowledge/', 'modules/schemas/'];
 const SOURCE_FILES = new Set(['modules/models/code-patterns.yaml']);
 export const WORK_PREFIX = '.starciwork/';
-// A leftover pre-migration ledger path is agent data, never a product input.
-const WORK_EXCLUDED = new Set(['.starciwork/runtime.sqlite']);
 const WORK_EXCLUDED_ROOTS = ['.starciwork/kernel-evidence/', '.starciwork/kernel-strays/', '.starciwork/kernel-approvals/'];
 const WORK_RECORD_FILES = new Set(['index.yaml', 'resource.yaml']);
 const WORK_SKIP_DIRS = new Set(['evidence', 'assets']);
@@ -63,10 +61,9 @@ const special = (segment) => /[*{<]/.test(segment);
 const isSourceLaw = (rel) => typeof rel === 'string' && !rel.includes('..')
   && (SOURCE_ROOTS.some((root) => rel.startsWith(root)) || SOURCE_FILES.has(rel));
 export const isWorkInput = (rel) => typeof rel === 'string' && rel.startsWith(WORK_PREFIX) && !rel.includes('..')
-  && !rel.split('/').some(special) && !WORK_EXCLUDED.has(rel) && !/^\.starciwork\/logs\.sqlite\.migrated-/.test(rel) && !WORK_EXCLUDED_ROOTS.some((root) => rel.startsWith(root));
-/** The kind of one recorded entry: its own `kind`, else what its path says (entries recorded before kinds). */
-export const inputKindOf = (entry) => (INPUT_KINDS.has(entry?.kind) ? entry.kind
-  : isSourceLaw(entry?.path) ? 'source' : isWorkInput(entry?.path) ? 'work' : null);
+  && !rel.split('/').some(special) && !WORK_EXCLUDED_ROOTS.some((root) => rel.startsWith(root));
+/** The kind of one recorded entry: its own `kind`, or null. */
+export const inputKindOf = (entry) => (INPUT_KINDS.has(entry?.kind) ? entry.kind : null);
 
 /** The Source-law path tokens a free-form manifest `path:` string names, in order. */
 export function lawTokens(text) {

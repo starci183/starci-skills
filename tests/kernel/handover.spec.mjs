@@ -195,9 +195,9 @@ test('a handover ask carries exactly the three options approve, feedback, questi
   assert.match(handoverAskProblem({text:'x',options:[...OPTIONS,'Kh\u00e1c']}),/exactly 3 options/);
   assert.match(handoverAskProblem({text:'x',options:[OPTIONS[0],OPTIONS[0],OPTIONS[2]]}),/distinct/);
   assert.match(handoverAskProblem({text:'x',options:OPTIONS,picks:[{id:'p',choices:['a','b']}]}),/no picks/);
-  assert.equal(decisionOf({optionIndex:0},{options:OPTIONS}),'approve');
-  assert.equal(decisionOf({option:OPTIONS[1]},{options:OPTIONS}),'feedback','an older receipt is matched by its label');
-  assert.equal(decisionOf({optionIndex:2},{options:OPTIONS}),'question');
+  assert.equal(decisionOf({optionIndex:0}),'approve');
+  assert.equal(decisionOf({option:OPTIONS[1]}),null,'a receipt without optionIndex decides nothing');
+  assert.equal(decisionOf({optionIndex:2}),'question');
 
   const repo=fixture(t),wf='wf-handover-shape';
   seedWorkflow(repo,wf);

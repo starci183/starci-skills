@@ -56,11 +56,11 @@ const seedDraw=(repoRoot)=>{
   put(repoRoot,`${UI}/assets/cart-desktop.png`,'desktop-bytes');
   put(repoRoot,`${UI}/assets/cart-desktop.source.png`,'edit-source-bytes');
   put(repoRoot,`${UI}/assets/cart-mobile-dark.png`,'mobile-bytes');
-  // draws[].image resolves against the draws file first, then the ui record.
+  // draws[].part resolves against the draws file first, then the ui record.
   put(repoRoot,`${UI}/evidence/r1/draws.yaml`,[
     'schema: starci/ui-draws@1','draws:',
-    '  - {id: cart-desktop, screen: cart, state: cart-ready, viewport: desktop-1440, theme: light, image: ../../assets/cart-desktop.png}',
-    '  - {id: cart-mobile, screen: cart, state: cart-empty, viewport: mobile-375, theme: dark, image: assets/cart-mobile-dark.png}',''].join('\n'));
+    '  - {id: cart-desktop, screen: cart, state: cart-ready, viewport: desktop-1440, theme: light, part: ../../assets/cart-desktop.png}',
+    '  - {id: cart-mobile, screen: cart, state: cart-empty, viewport: mobile-375, theme: dark, part: assets/cart-mobile-dark.png}',''].join('\n'));
   return [`${UI}/index.yaml`,`${UI}/assets/cart-desktop.png`,`${UI}/assets/cart-desktop.source.png`,`${UI}/assets/cart-mobile-dark.png`,`${UI}/evidence/r1/draws.yaml`];
 };
 const DRAW={workflowId:'wf-shop-x1',jobId:'job-draw-1',attempt:1,op:'interface.draw',verdict:'pass',dispatchId:'ctx_draw'};
@@ -314,12 +314,12 @@ test('a drawing notice sends each draw\'s part, never its composite; desktop and
       put(repoRoot,`${UI}/evidence/r7/draws.yaml`,[
         'schema: starci/ui-draws@1','draws:',
         '  - id: cart-desktop','    screen: cart','    state: cart-ready','    breakpoint: desktop','    theme: light',
-        '    image: {path: assets/directions/cart--page--desktop--light.png}','    content: {path: assets/directions/cart--page--desktop--light.content.png}',
+        '    part: {path: assets/directions/cart--page--desktop--light.content.png}','    composite: {path: assets/directions/cart--page--desktop--light.png}',
         '  - id: cart-mobile','    screen: cart','    state: cart-ready','    breakpoint: mobile','    theme: light',
-        '    image: assets/directions/cart--page--mobile--light.png',''].join('\n')),
+        '    part: assets/directions/cart--page--mobile--light.png',''].join('\n')),
     ];
     const {picks}=collectDrawings({files,repo:repoRoot});
-    assert.deepEqual(picks.map(p=>path.basename(p.file)),['cart--page--desktop--light.content.png','cart--page--mobile--light.content.png'],'a legacy image: composite still finds its .content part');
+    assert.deepEqual(picks.map(p=>path.basename(p.file)),['cart--page--desktop--light.content.png','cart--page--mobile--light.content.png'],'a part that names a composite still finds its .content part');
     assert.deepEqual(picks.map(p=>p.viewport),['desktop','mobile'],'the draw breakpoint names the band');
     const noDraws=collectDrawings({files:files.filter(f=>!f.endsWith('draws.yaml')),repo:repoRoot});
     assert.deepEqual(noDraws.picks.map(p=>path.basename(p.file)),['cart--page--desktop--light.content.png','cart--page--mobile--light.content.png'],'named composites collapse into their parts');
