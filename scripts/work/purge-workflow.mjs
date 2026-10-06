@@ -8,7 +8,7 @@
 //       dry run (the default): what would be archived and deleted, per table, and whether the workflow may be purged
 //       --repo <repo> --workflow <id> --apply --approved-by <owner> --approval-ref <ask/inbox id or message>
 //
-// --apply, in order (each step recorded in workflow_purges, engine/db/migrations/runtime/0001-init.sql; a re-run resumes):
+// --apply, in order (each step recorded in workflow_purges, engine/db/schema/runtime.sql; a re-run resumes):
 //   1. refuse unless the workflow is finished (phase 'finished') or archived (archived_at set) and no job of it is queued/leased/running/answering/
 //      effect_unknown;
 //   2. ARCHIVE to <archive-root>/<product>/<workflowId>-<YYYYMMDD>.zip (product = the repo's folder name): ledger/<table>.ndjson

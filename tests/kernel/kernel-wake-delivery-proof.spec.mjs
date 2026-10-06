@@ -96,7 +96,7 @@ const reportWorld=t=>{
   w.ledgerFile=()=>ledgerFileFor(w.repo,{env:w.env});
   const ledger=openLedger({file:w.ledgerFile()});
   try{
-    // jobs_enqueue_guard (migrations/runtime/0001-init.sql:278): an op job needs a workflow that accepts
+    // jobs_enqueue_guard (schema/runtime.sql:278): an op job needs a workflow that accepts
     // work and a work unit; op_attempts_dispatch_guard (line 376) wants the workflow already running.
     ledger.ensureWorkflow({workflowId,title:'transition wake proof'});
     ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'test-fixture',reason:'seed'});

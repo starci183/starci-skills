@@ -1,5 +1,5 @@
 // api-lib/lifecycle.mjs — the workflow phase machine the api verbs read and `starci kernel lifecycle` writes.
-// It is DBTREE workflow_transitions (engine/db/migrations/runtime/0001-init.sql): the phases, the allowed
+// It is DBTREE workflow_transitions (engine/db/schema/runtime.sql): the phases, the allowed
 // moves and who may take them. A stopped workflow comes back only through the owner (Q14, MB-08);
 // a paused one is resumed by the owner or the Supervisor. `archived_at` is the archived phase.
 const WORKFLOW_TRANSITIONS = Object.freeze([

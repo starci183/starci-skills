@@ -39,8 +39,8 @@ const SLOT_FILES = [
 const CHECK_ENTRIES = ['scripts/hfs/check.mjs', 'scripts/hfs/architecture.mjs', 'scripts/hfs/secret.mjs', 'scripts/hfs/coverage-scope.mjs'];
 /** Static imports and `new URL(<relative>.yaml, import.meta.url)` reads (the framework-pinned knowledge file) are followed. */
 const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"]/g;
-/** A read of the migration DDL of one store: `migrations/runtime` or `migrations/machine`. */
-const MIGRATION_STORE = /migrations[\/'", ]+(runtime|machine)/g;
+/** A read of the DDL of one store: `schema/runtime.sql` or `schema/machine.sql`. */
+const SCHEMA_STORE = /schema[\/'", ]+(runtime|machine)\.sql/g;
 const URL_SPEC = /new URL\(\s*['"](\.[^'"]+\.ya?ml)['"]\s*,\s*import\.meta\.url/g;
 
 /** The runtime-relative files reachable from `entries` through relative imports and `new URL(..., import.meta.url)` reads. */
@@ -53,10 +53,10 @@ export function importClosure(entries) {
     if (!file.endsWith('.mjs')) return;
     const text = fs.readFileSync(path.join(runtimeRoot, file), 'utf8');
     for (const match of [...text.matchAll(IMPORT_SPEC), ...text.matchAll(URL_SPEC)]) visit(path.posix.normalize(path.posix.join(path.posix.dirname(file), match[1])));
-    // A module that reads its DDL from engine/db/migrations/<store>/ (ledger-db, machine-db) carries every migration of that store.
-    for (const store of new Set([...text.matchAll(MIGRATION_STORE)].map((match) => match[1]))) {
-      const dir = `engine/db/migrations/${store}`;
-      if (fs.existsSync(path.join(runtimeRoot, dir))) for (const sql of fs.readdirSync(path.join(runtimeRoot, dir)).filter((name) => name.endsWith('.sql')).sort(byCodeUnit)) visit(`${dir}/${sql}`);
+    // A module that reads its DDL from engine/db/schema/<store>.sql (ledger, machine) carries that schema file.
+    for (const store of new Set([...text.matchAll(SCHEMA_STORE)].map((match) => match[1]))) {
+      const sql = `engine/db/schema/${store}.sql`;
+      if (fs.existsSync(path.join(runtimeRoot, sql))) visit(sql);
     }
   };
   for (const entry of entries) visit(entry);

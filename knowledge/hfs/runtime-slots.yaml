@@ -371,15 +371,15 @@ slots:
     tests: none
     coverage: required
     rules: [RT_EXTERNAL_OWNER, RT_TIER_DIRECTION]
-  - id: runtime.db-migrations
+  - id: runtime.db-schema
     profiles: [runtime]
-    path: "engine/db/migrations/{runtime,machine}/<migration>.sql"
+    path: "engine/db/schema/{runtime,machine}.sql"
     presence: required
     tracked: tracked
     tier: none
     tests: none
     coverage: none
-    why: "<migration> is <nnnn>-<kebab-name>; English comments only"
+    why: "One schema file per store, executed as data by its writer; English comments only"
 
   # ----- scripts: api (the only external-system callers) ------------------------------------------------------
   - id: runtime.api-system

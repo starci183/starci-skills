@@ -31,7 +31,7 @@ const repoDir = (t) => {
 };
 const track = (t, handle) => { scopes.get(t).push(() => handle.close()); return handle; };
 const logsOf = (t, repo, workflows = [WF]) => {
-  // A log row references its workflow (engine/db/migrations/runtime/0001-init.sql logs.workflow_id -> workflows): the ledger holds it first.
+  // A log row references its workflow (engine/db/schema/runtime.sql logs.workflow_id -> workflows): the ledger holds it first.
   const ledger = openLedger({ file: ledgerFileFor(repo) });
   try { for (const workflowId of workflows) ledger.ensureWorkflow({ workflowId }); } finally { ledger.close(); }
   return track(t, openLogs(repo));

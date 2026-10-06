@@ -1,7 +1,7 @@
 // ended-workflow-views.spec.mjs — the runtime views v_decision_rows, v_blocking and v_open_work never surface a
 // live row of an ended workflow (phase archived|finished). The views are baked into each runtime.sqlite, so the ENDED
 // predicate of scripts/machine/decisions.mjs listDecisions (LEFT JOIN workflows w, w.phase IS NULL OR w.phase NOT IN
-// ('archived','finished')) lives in engine/db/migrations/runtime/0001-init.sql.
+// ('archived','finished')) lives in engine/db/schema/runtime.sql.
 // A live owner DI on an archived workflow is locked by events_refuse_archived and can never be resolved, so a view that
 // listed it would read 'bad' forever: a permanent attention item on work that no longer runs.
 //   1. v_decision_rows drops the ended workflows' live-status rows and keeps their resolved history.

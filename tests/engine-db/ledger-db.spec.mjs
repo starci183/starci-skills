@@ -20,11 +20,10 @@ const sha256=text=>crypto.createHash('sha256').update(text).digest('hex');
 const chainHolds=rows=>rows.every((row,i)=>(row.prev_digest??null)===(i?rows[i-1].digest:null)&&row.digest===sha256(`${row.prev_digest??''}${row.event_id}${row.kind}${row.payload_json??''}${row.created_at}`));
 const temporary=()=>fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-db-'));
 /**
- * A v1 ledger exactly as it looked before the identity/anchor addendum: every §4 table except `meta`, and
- * `events.digest` with no default and no chain trigger — the shape a ledger built by an earlier agent
- * build (or any file that reached user_version=1 before this module carried `meta`) is stuck in.
+ * A user_version=1 ledger file that is not the current schema: every table except `meta`, and
+ * `events.digest` with no default and no chain trigger.
  */
-function preMetaLedgerFile(){
+function ledgerFileWithoutMeta(){
   const dir=temporary(),file=path.join(dir,'runtime.sqlite');
   const {DatabaseSync}=require('node:sqlite');
   const db=new DatabaseSync(file);
@@ -89,7 +88,7 @@ function preMetaLedgerFile(){
     PRAGMA user_version=1;
   `);
   const digest=text=>crypto.createHash('sha256').update(text).digest('hex');
-  db.prepare('INSERT INTO workflows(workflow_id,title,created_at,updated_at,generation,goal_identity) VALUES(?,?,?,?,?,?)').run('wf','pre-addendum',1000,1000,1,'goal-1');
+  db.prepare('INSERT INTO workflows(workflow_id,title,created_at,updated_at,generation,goal_identity) VALUES(?,?,?,?,?,?)').run('wf','no-meta',1000,1000,1,'goal-1');
   const d1=digest('e1kdone{"x":1}1000');
   db.prepare('INSERT INTO events(event_id,workflow_id,generation,entity_type,entity_id,kind,payload_json,prev_digest,digest,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
     .run('e1','wf',1,'workflow','wf','kdone','{"x":1}',null,d1,1000);
@@ -286,14 +285,14 @@ test('inspectLedger refuses a missing file, and reflects the identity and versio
   inspect.close();
 });
 
-test('openLedger refuses a pre-meta schema without changing its rows',t=>{
-  const {dir,file,firstDigest}=preMetaLedgerFile();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+test('openLedger refuses a ledger file without a meta table and leaves its rows unchanged',t=>{
+  const {dir,file,firstDigest}=ledgerFileWithoutMeta();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const {DatabaseSync}=require('node:sqlite'),precheck=new DatabaseSync(file,{readOnly:true});
-  assert.equal(precheck.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get(),undefined,'confirms the fixture predates meta');
+  assert.equal(precheck.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get(),undefined,'confirms the fixture has no meta table');
   precheck.close();
   assert.throws(()=>openLedger({file}),e=>e.code==='STARCI_LEDGER_SCHEMA_REFUSED');
   const after=new DatabaseSync(file,{readOnly:true});
-  assert.deepEqual({...after.prepare('SELECT workflow_id,title FROM workflows').get()},{workflow_id:'wf',title:'pre-addendum'});
+  assert.deepEqual({...after.prepare('SELECT workflow_id,title FROM workflows').get()},{workflow_id:'wf',title:'no-meta'});
   assert.deepEqual({...after.prepare('SELECT event_id,digest FROM events').get()},{event_id:'e1',digest:firstDigest});
   assert.equal(after.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get(),undefined);
   after.close();
@@ -328,7 +327,7 @@ test('inspectLedger exposes the same job and event read surface as openLedger',t
   inspect.close();
 });
 
-/** jobs.status `awaiting_owner`: a try that ended asking the owner settles there (never `failed`); 0001-init.sql carries it. */
+/** jobs.status `awaiting_owner`: a try that ended asking the owner settles there (never `failed`); the runtime schema carries it. */
 test('a fresh ledger carries awaiting_owner: the status, its transitions, its ui state and the job triggers',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
@@ -393,7 +392,7 @@ test('recordAttemptUsage writes llm_usage rows and the attempt summary once; rec
   ledger.close();
 });
 
-test('a fresh ledger carries the widened usage_source CHECK and usage_reason from 0001-init',t=>{
+test('a fresh ledger carries the widened usage_source CHECK and usage_reason from the schema',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
   try{

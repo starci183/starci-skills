@@ -36,7 +36,7 @@ export function machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_
   }
   /** Refuse any store that is not exactly the current schema, leaving it unchanged; the operator replaces it with a fresh store. */
   function refuseOld(file, why) {
-    throw Object.assign(Error(`machine-schema-old: ${path.resolve(file)} ${why}; expected '${MACHINE_SCHEMA}' (user_version ${MACHINE_VERSION}) with its current physical schema; the store is not the current schema and has been left unchanged: replace it with a fresh store (no upgrade or migration exists)`),
+    throw Object.assign(Error(`machine-schema-old: ${path.resolve(file)} ${why}; expected '${MACHINE_SCHEMA}' (user_version ${MACHINE_VERSION}) with its current physical schema; the store is not the current schema and has been left unchanged: replace it with a fresh store`),
       { code: 'STARCI_MACHINE_SCHEMA_OLD' });
   }
   function checkIdentity(db, file) {
@@ -78,7 +78,7 @@ export function machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_
         node_version: process.version, journal_mode: 'wal' })) meta.run(key, String(value));
       // Every controller starts in shadow until the owner switches it.
       for (const controller of CONTROLLERS) {
-        db.prepare("INSERT INTO mode_changes(controller,from_mode,to_mode,by,reason,at) VALUES(?,NULL,'shadow','machine-db:init','0001-init',?)").run(controller, at);
+        db.prepare("INSERT INTO mode_changes(controller,from_mode,to_mode,by,reason,at) VALUES(?,NULL,'shadow','machine-db:init','init',?)").run(controller, at);
         db.prepare("INSERT INTO controller_modes(controller,mode,set_at,set_by) VALUES(?,'shadow',?,'machine-db:init')").run(controller, at);
       }
       db.exec(`PRAGMA user_version=${MACHINE_VERSION}`);

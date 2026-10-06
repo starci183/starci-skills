@@ -1,10 +1,10 @@
 Task: read the runtime's storage
 # Storage: `runtime.sqlite`, `machine.sqlite` and the blob store
 
-The executed schemas live under `engine/db/migrations/runtime/` and `engine/db/migrations/machine/`.
+The executed schemas are `engine/db/schema/runtime.sql` and `engine/db/schema/machine.sql`.
 `engine/db/ledger.mjs` owns project schema validation; `engine/db/machine.mjs` owns host schema validation
-and required physical objects. Each store has exactly one schema and no migration path. A fresh machine store
-executes the one `0001-init.sql` and atomically sets its user_version. A host store that is not exactly that
+and required physical objects. Each store has exactly one schema. A fresh machine store
+executes `schema/machine.sql` and atomically sets its user_version. A host store that is not exactly that
 schema (any other identity or version, or a missing, changed or extra object) is refused unchanged by writers and
 readers alike; the operator replaces it with a fresh store. The current signal domains keep
 Supervisor keys, tokens, values and expiries separate from core-debug enabled/diagnostic scopes.
@@ -40,9 +40,11 @@ These writers and their SQL files own the storage rules.
 - The writers refuse unsupported schema identities or versions. `openLedger` creates a fresh project
   store at `ledgerFileFor(<repo root>)`; `openMachine` creates a fresh host store at `machineFileFor`
   and validates an existing host store, refusing any store that is not exactly the current schema.
-- `openLedger({fixture:{ledgerId,createdAt,blobRoot},file,checkpointer:true})` initializes a fresh
+- `openLedger({fixture:{ledgerId,createdAt,blobRoot[,sqliteVersion]},file,checkpointer:true})` initializes a fresh
   sample through the same canonical schema and seeds. Its identity is in the reserved synthetic namespace
   validated by `engine/db/ledger-paths.mjs`; its clock is frozen and `blobRoot` is a portable relative path.
+  The sample records the stated `sqliteVersion` (default the running one) so a tracked sample stays byte-stable
+  across SQLite upgrades; a version newer than the running SQLite is refused like any ledger recorded by a newer SQLite.
   A sample accepts no repository, product, machine or cached project binding. Typed mutations and later
   writable opens refuse it before writer setup; read-only inspection remains available. A real project
   initializes its own store through its normal lifecycle instead of copying or registering sample bytes.

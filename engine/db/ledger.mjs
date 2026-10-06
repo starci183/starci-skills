@@ -95,7 +95,7 @@ export const ledgerFileFor=(repoRoot,{env=process.env}={})=>{
 // ---------------------------------------------------------------------------------------------------------
 // Connection policy (DBTREE header "PRAGMA at open", RESEARCH-STORAGE §3)
 // ---------------------------------------------------------------------------------------------------------
-const INIT_SQL_FILE=new URL('./migrations/runtime/0001-init.sql',import.meta.url);
+const INIT_SQL_FILE=new URL('./schema/runtime.sql',import.meta.url);
 const INIT_SQL=fs.readFileSync(INIT_SQL_FILE,'utf8');
 const LEDGER_BUSY_TIMEOUT_MS=15000;
 /**
@@ -170,7 +170,7 @@ const versionTuple=v=>String(v).split('.').map(Number);
 const olderThan=(a,b)=>{const x=versionTuple(a),y=versionTuple(b);for(let i=0;i<Math.max(x.length,y.length);i++){if((x[i]??0)!==(y[i]??0))return (x[i]??0)<(y[i]??0);}return false;};
 
 /**
- * Refuse any file that is not a starci/runtime@1 ledger at user_version LEDGER_VERSION (no migration chain). Also refuses a
+ * Refuse any file that is not a starci/runtime@1 ledger at user_version LEDGER_VERSION. Also refuses a
  * running SQLite older than the one the ledger recorded.
  */
 function verifyLedger(db,{file,sqliteVersion}){
@@ -182,7 +182,7 @@ function verifyLedger(db,{file,sqliteVersion}){
   need(!recorded||!olderThan(sqliteVersion,recorded),`ledger-sqlite-downgrade: ${file} was last opened by SQLite ${recorded}, this process runs ${sqliteVersion}`,'STARCI_LEDGER_SQLITE_DOWNGRADE');
 }
 
-/** Create the ledger on an empty file: 0001-init.sql, user_version=LEDGER_VERSION, meta — one transaction. */
+/** Create the ledger on an empty file: schema/runtime.sql, user_version=LEDGER_VERSION, meta — one transaction. */
 function initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot=null,product=null,ledgerId=null,blobRoot=null,fixtureMarker=null}){
   const empty=()=>userVersion(db)===0&&!db.prepare("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' LIMIT 1").get();
   if(!empty())return false;
@@ -1014,11 +1014,11 @@ const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkfl
   postInbox,setInboxStatus,setInboxStatusByKey,updateGoalJson,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail});
 
 /**
- * The read-write handle. A new (empty) file is created with 0001-init.sql; any other schema is refused (clean slate).
+ * The read-write handle. A new (empty) file is created from schema/runtime.sql; any other schema is refused (clean slate).
  * `checkpointer:true` is the one connection that checkpoints (the reconciler engine): wal_autocheckpoint=8000 and
  * handle.checkpoint() for the periodic PASSIVE checkpoint; every other connection runs wal_autocheckpoint=0.
  * `write.<fn>(args)` runs one typed write in its own transaction; inside handle.transaction(db=>…) call the exported
- * functions with that db. `fixture:{ledgerId,createdAt,blobRoot}` creates only a fresh sample; its typed
+ * functions with that db. `fixture:{ledgerId,createdAt,blobRoot[,sqliteVersion]}` creates only a fresh sample that records the stated SQLite version (default the running one); its typed
  * mutations and later writable opens refuse. The clock is frozen and no registry binding is accepted.
  */
 export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,repoRoot=null,product=null,checkpointer=false,machine=null,fixture=null}={}){
@@ -1028,10 +1028,10 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_
   const {db,sqliteVersion,journalMode}=openDb({file,busyTimeoutMs,journalMode:'WAL',autoVacuum:true,label:'openLedger',pragmas});
   let created=false;
   try{
-    created=initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot:repoRoot??repoRootOfFile.get(path.resolve(file))??null,product,...(fixture?{ledgerId:fixture.ledgerId,blobRoot:fixture.blobRoot,fixtureMarker:fixture.marker}:{})});
+    created=initLedger(db,{file,now,sqliteVersion:fixture?.sqliteVersion??sqliteVersion,journalMode,repoRoot:repoRoot??repoRootOfFile.get(path.resolve(file))??null,product,...(fixture?{ledgerId:fixture.ledgerId,blobRoot:fixture.blobRoot,fixtureMarker:fixture.marker}:{})});
     verifyLedger(db,{file,sqliteVersion});
     const meta=metaOf(db);if(!fixture)assertOperationalLedger(meta);
-    if(meta.sqlite_version!==sqliteVersion)db.prepare("UPDATE meta SET value=? WHERE key='sqlite_version'").run(sqliteVersion);
+    if(!fixture&&meta.sqlite_version!==sqliteVersion)db.prepare("UPDATE meta SET value=? WHERE key='sqlite_version'").run(sqliteVersion);
   }catch(error){try{db.close();}catch{}throw error;}
   const transaction=makeTransaction(db,'ledger',fixture);
   const resolved=path.resolve(file),ledgerId=ledgerIdOf({db});

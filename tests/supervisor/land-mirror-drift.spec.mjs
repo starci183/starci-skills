@@ -118,7 +118,7 @@ test('the real generator mirrors the published closure only (no ledger writer: t
   assert.ok(bundles.includes('packages/hfs/runtime'));
   assert.ok(files.includes('scripts/hfs/check.mjs'));
   assert.ok(!files.includes('engine/db/ledger.mjs'), 'safe-remove takes its hold from the caller, so no bundle drags the ledger writer in');
-  for (const file of files.filter((f) => f.startsWith('engine/db/migrations/'))) assert.ok(fs.existsSync(path.join(ROOT, file)), file);
+  for (const file of files.filter((f) => f.startsWith('engine/db/schema/'))) assert.ok(fs.existsSync(path.join(ROOT, file)), file);
   const r = mirrorRun(ROOT);
   assert.equal(r.ok, true, r.full);
 });

@@ -72,7 +72,7 @@ const KEBAB_RES = [
 // A constant list of reasons/codes/classes: Object.freeze(['a-b', 'c-d']) or ['a-b'].
 const LIST_RE = /\b[A-Z][A-Z0-9_]*_(?:REASONS|CODES|KINDS|CLASSES)\s*=\s*(?:Object\.freeze\()?\[([^\]]*)\]/g;
 
-/** Closed vocabularies that are verdict reasons too: blocker kinds, failure classes, route verdicts (modules/models/kinds.yaml) and the ledger's own attempt/check enums (0001-init.sql). Keyed `<family>:<value>`. */
+/** Closed vocabularies that are verdict reasons too: blocker kinds, failure classes, route verdicts (modules/models/kinds.yaml) and the ledger's own attempt/check enums (schema/runtime.sql). Keyed `<family>:<value>`. */
 function vocabularyCodes(base = root) {
   const out = [];
   const kinds = parseYaml(fs.readFileSync(path.join(base, 'modules/models/kinds.yaml'), 'utf8'))?.vocabularies ?? {};
@@ -80,11 +80,11 @@ function vocabularyCodes(base = root) {
   fam('blocker', kinds.blockers, 'modules/models/kinds.yaml');
   fam('failure-class', kinds.failureClasses, 'modules/models/kinds.yaml');
   fam('route-verdict', kinds.verdicts, 'modules/models/kinds.yaml');
-  const sql = fs.readFileSync(path.join(base, 'engine/db/migrations/runtime/0001-init.sql'), 'utf8');
+  const sql = fs.readFileSync(path.join(base, 'engine/db/schema/runtime.sql'), 'utf8');
   const enumOf = (column, table = null) => { const text = table ? sql.slice(sql.indexOf(`CREATE TABLE IF NOT EXISTS ${table}(`)) : sql; const m = text.match(new RegExp(String.raw`\b${column}\s+TEXT[^\n]*?IN\s*\(([^)]*)\)`)); return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : []; };
-  fam('end-state', enumOf('end_state'), 'engine/db/migrations/runtime/0001-init.sql');
-  fam('attempt-verdict', enumOf('verdict'), 'engine/db/migrations/runtime/0001-init.sql');
-  fam('check-status', enumOf('status', 'check_runs'), 'engine/db/migrations/runtime/0001-init.sql');
+  fam('end-state', enumOf('end_state'), 'engine/db/schema/runtime.sql');
+  fam('attempt-verdict', enumOf('verdict'), 'engine/db/schema/runtime.sql');
+  fam('check-status', enumOf('status', 'check_runs'), 'engine/db/schema/runtime.sql');
   return out;
 }
 

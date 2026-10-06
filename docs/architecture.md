@@ -51,8 +51,8 @@ Rules that hold everywhere:
 - **`.starciwork` holds product content only**: Work records, SRS/SDS, UI specifications and brand.
   Agent output lives in SQL and blobs; a Work record cites it by artifact id and sha256.
 
-The schema itself is data: `engine/db/migrations/runtime/0001-init.sql` and
-`engine/db/migrations/machine/0001-init.sql`. See [storage](ledger-db.md) for the tables and
+The schema itself is data: `engine/db/schema/runtime.sql` and
+`engine/db/schema/machine.sql`. See [storage](ledger-db.md) for the tables and
 [debugging](debugging.md) for the queries that answer "why is this stuck".
 
 ## Roles
@@ -202,7 +202,7 @@ custody, encrypted with sops; they never enter a database or a blob.
 | Host runtime loop | `modules/reconciler/reconciler.yaml`, `scripts/reconciler/engine.mjs` |
 | Operation contracts | `modules/ops/ops/*.yaml` ([ops-source-ownership](ops-source-ownership.md)) |
 | Model routing | `modules/models/selection.yaml`, `scripts/route/route-model.mjs` |
-| Schemas | `engine/db/migrations/runtime/0001-init.sql`, `engine/db/migrations/machine/0001-init.sql` |
+| Schemas | `engine/db/schema/runtime.sql`, `engine/db/schema/machine.sql` |
 | Writers | `engine/db/ledger.mjs`, `engine/db/machine.mjs`, `engine/db/blob.mjs` |
 | Redaction | `scripts/lib/redact.mjs` (applied before every blob put and every log write) |
 | Host contract and agent cards | `modules/host/**`, `modules/models/agents/**` ([host contract](host-contract.md)) |

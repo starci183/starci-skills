@@ -17,7 +17,7 @@
 #
 # Sources (all under .claude/, relative to the skill root):
 #   scripts/kernel/cli.mjs      — the executable half; this file is its contract
-#   engine/db/ledger.mjs        — the tables named below (DDL: engine/db/migrations/runtime/0001-init.sql)
+#   engine/db/ledger.mjs        — the tables named below (DDL: engine/db/schema/runtime.sql)
 #   scripts/agent/lib.mjs       — spawnAgent + terminal lifecycle the api drives;
 #                                 the kernel never calls Orca itself
 #   modules/kernel/driver-loop.yaml    — the caller's tick
@@ -95,7 +95,7 @@ conventions:
   identity: >-
     a job's durable identity is {workflow_id, op_id, attempt, generation} +
     lease_token; lease writes that do not match the job's complete identity
-    abort at the trigger (engine/db/migrations/runtime/0001-init.sql leases_match_job
+    abort at the trigger (engine/db/schema/runtime.sql leases_match_job
     RAISE(ABORT,'lease-identity-drift')); a report whose identity fields
     contradict the job's bound {run, task, dispatch, from} fails
     starci/op-report@1 at filing (report-invalid)

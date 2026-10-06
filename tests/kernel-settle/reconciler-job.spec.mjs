@@ -21,7 +21,7 @@ function fixture({ status = 'running', payload = {}, report = null, handover = n
   const ledger = openLedger({ file });
   const at = NOW - updatedAgoMs;
   const sha = (s, n) => crypto.createHash('sha256').update(s).digest('hex').slice(0, n);
-  // The migrated schema (engine/db/migrations/runtime/0001-init.sql): workflows need a trace_id, an op job
+  // The migrated schema (engine/db/schema/runtime.sql): workflows need a trace_id, an op job
   // needs its work unit (jobs_enqueue_guard), and a dispatch row goes in only while the job is 'leased'
   // under a 'running' workflow (op_attempts_dispatch_guard) - then the job walks job_transitions to `status`.
   const needsAttempt = report != null || !['queued', 'ready', 'cancelled'].includes(status);
