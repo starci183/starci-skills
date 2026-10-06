@@ -109,7 +109,7 @@ export async function startSourceCanonRegistry({ root = RUNTIME } = {}) {
     try { return npmLock(app); } finally { fs.rmSync(npmrc, { force: true }); }
   };
   const close = async () => {
-    if (child.exitCode === null) { const exited = new Promise((resolve) => child.once('exit', resolve)); child.kill(); await exited; }
+    if (child.exitCode === null && child.signalCode === null) { const exited = new Promise((resolve) => child.once('exit', resolve)); child.kill(); await exited; }
     fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
   };
   return { packages, origin, lock, close };

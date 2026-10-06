@@ -490,3 +490,67 @@ test('current deciding-op route needs a real record-checks READ before native se
   assert.equal(accepted.r.status, 0, accepted.r.stderr || accepted.r.stdout);
   assert.equal(read(seeded, (db) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(seeded.jobId).status), 'succeeded');
 });
+
+test('release: canon child exits determine the whole proof even when its JSON is positive', (t) => {
+  const repo = tmp(t, 'starci-op-proof-canon-exit-');
+  const git = gitIn(repo);
+  git('init', '-q', '-b', 'main');
+  for (const [key, value] of [['user.email', 'spec@starci.test'], ['user.name', 'spec'], ['commit.gpgsign', 'false']]) git('config', key, value);
+  put(repo, 'a.txt', 'a\n'); git('add', '-A'); git('commit', '-q', '-m', 'a');
+  put(repo, 'b.txt', 'b\n'); git('add', '-A'); git('commit', '-q', '-m', 'b');
+  const positive = JSON.stringify({ ok: true, errors: [], pins: 3, profiles: 1 });
+  const cases = [
+    ['nonzero exit with positive JSON', { status: 1, stdout: positive }, 'red', 1],
+    ['null exit with positive JSON', { status: null, stdout: positive }, 'tool-failed', 2],
+    ['absent status with positive JSON', { stdout: positive }, 'tool-failed', 2],
+    ['zero exit with positive JSON', { status: 0, stdout: positive }, 'pass', 0],
+    ['zero exit with a negative judgment', { status: 0, stdout: JSON.stringify({ ok: false, profiles: 1 }) }, 'red', 1],
+    ['zero exit without a bound runtime profile', { status: 0, stdout: JSON.stringify({ ok: true, profiles: 0 }) }, 'red', 1],
+    ['zero exit with malformed JSON', { status: 0, stdout: '{' }, 'tool-failed', 2],
+    ['zero exit with a process error', { status: 0, stdout: positive, error: new Error('fake process failure') }, 'tool-failed', 2],
+  ];
+  for (const [label, child, expectedStatus, expectedExit] of cases) {
+    const checkerRuns = [];
+    const node = (args) => {
+      if (args[0].endsWith('check-canon-pins.mjs')) {
+        checkerRuns.push(args.includes('--repo') ? 'app' : 'runtime');
+        return { stderr: '', ...child };
+      }
+      return { status: 0, stdout: 'release-app-installs: OK', stderr: '' };
+    };
+    const proof = buildReleaseProof({ repo, base: 'HEAD~1', runtime: ROOT, node, npm: () => ({ status: 0, stdout: '', stderr: '' }) });
+    assert.deepEqual(checkerRuns, ['runtime'], label);
+    assert.equal(proof.schema, RELEASE_PROOF_SCHEMA, label);
+    assert.deepEqual(proof.steps.map((step) => step.id), [...RELEASE_STEPS], label);
+    assert.equal(proof.steps.find((step) => step.id === 'canon-pins').status, expectedStatus, label);
+    assert.ok(proof.steps.filter((step) => step.id !== 'canon-pins').every((step) => step.status === 'pass'), label);
+    assert.equal(proof.ok, expectedStatus === 'pass', label);
+    assert.equal(proof.exit, expectedExit, label);
+    if (expectedStatus === 'pass') assert.equal(judgeRelease(proof).status, 'pass', label);
+    else assert.equal(codeOf(judgeRelease(proof)), 'op-release-step-red', label);
+  }
+  put(repo, 'hfs.json', JSON.stringify({ kind: 'app' }));
+  git('add', 'hfs.json'); git('commit', '-q', '-m', 'app declaration');
+  for (const [label, runtimeStatus, appStatus, expectedStatus, expectedExit] of [
+    ['successful runtime cannot hide a nonzero app exit', 0, 1, 'red', 1],
+    ['successful runtime cannot hide a null app exit', 0, null, 'tool-failed', 2],
+    ['null app exit takes precedence over a red runtime exit', 1, null, 'tool-failed', 2],
+    ['runtime and app zero exits retain a passing proof', 0, 0, 'pass', 0],
+  ]) {
+    const checkerRuns = [];
+    const node = (args) => {
+      if (args[0].endsWith('check-canon-pins.mjs')) {
+        const app = args.includes('--repo');
+        checkerRuns.push(app ? 'app' : 'runtime');
+        return { status: app ? appStatus : runtimeStatus, stdout: positive, stderr: '' };
+      }
+      return { status: 0, stdout: 'release-app-installs: OK', stderr: '' };
+    };
+    const proof = buildReleaseProof({ repo, base: 'HEAD~1', runtime: ROOT, node, npm: () => ({ status: 0, stdout: '', stderr: '' }) });
+    assert.deepEqual(checkerRuns, ['runtime', 'app'], label);
+    assert.equal(proof.steps.find((step) => step.id === 'canon-pins').status, expectedStatus, label);
+    assert.ok(proof.steps.filter((step) => step.id !== 'canon-pins').every((step) => step.status === 'pass'), label);
+    assert.equal(proof.ok, expectedStatus === 'pass', label);
+    assert.equal(proof.exit, expectedExit, label);
+  }
+});

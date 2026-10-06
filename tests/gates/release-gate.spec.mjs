@@ -390,3 +390,38 @@ test('root flow is locked and does not invoke package rebind or example installa
   assert.equal((await releasePublishFlow({ ...ctx, args: { 'runtime-package': true, publish: true } }, deps)).code, 2);
   assert.equal((await releasePublishFlow({ ...ctx, args: { ...ctx.args, examples: ['any'] } }, deps)).code, 2);
 });
+
+test('release-check consumes canon child exit status despite positive JSON and keeps successful subsets partial', (t) => {
+  const root = tree(t);
+  const ids = [...PROOFS, ...FINAL_PROOFS];
+  const positive = JSON.stringify({ ok: true, errors: [], pins: 3, profiles: 1 });
+  for (const [label, child, expectedStatus, expectedVerdict] of [
+    ['nonzero exit with positive JSON', { status: 1, stdout: positive }, 'red', 'RED'],
+    ['null exit with positive JSON', { status: null, stdout: positive }, 'tool-failed', 'UNRUN'],
+    ['absent status with positive JSON', { stdout: positive }, 'tool-failed', 'UNRUN'],
+    ['zero exit with positive JSON', { status: 0, stdout: positive }, 'pass', 'GREEN'],
+  ]) {
+    const checkerRuns = [];
+    const passingNode = fakeNode();
+    const node = (args) => {
+      if (args[0].endsWith('check-canon-pins.mjs')) {
+        checkerRuns.push(args.includes('--repo') ? 'app' : 'runtime');
+        return { stderr: '', ...child };
+      }
+      return passingNode(args);
+    };
+    const deps = { node, npm: fakeNpm(), registry: allPublished(), git: cleanGit, branch: () => ({ stdout: 'main\n' }) };
+    const rows = runProofs({ root, ids, deps });
+    assert.deepEqual(checkerRuns, ['runtime'], label);
+    assert.deepEqual(rows.map((row) => row.id), ids, label);
+    assert.equal(rows.find((row) => row.id === 'canon-pins').status, expectedStatus, label);
+    assert.ok(rows.filter((row) => row.id !== 'canon-pins').every((row) => row.status === 'pass'), label);
+    assert.equal(verdictOf(rows), expectedVerdict, label);
+    assert.deepEqual(deps.registry.log, [], label);
+    if (expectedStatus === 'pass') {
+      const subset = runProofs({ root, ids: ['canon-pins'], deps });
+      assert.equal(subset[0].status, 'pass');
+      assert.equal(verdictOf(subset, { complete: false }), 'PARTIAL');
+    }
+  }
+});

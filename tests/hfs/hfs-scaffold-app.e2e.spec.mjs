@@ -141,3 +141,34 @@ test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app li
     await client.end().catch(() => undefined);
   }
 });
+
+
+test('source canon registry close settles after prior real cleanup', { timeout: 360_000 }, async (t) => {
+  const root = mkdtemp(t, 'hfs-registry-close-');
+  const pkg = path.join(root, 'packages', 'close-probe');
+  fs.mkdirSync(pkg, { recursive: true });
+  fs.writeFileSync(path.join(pkg, 'package.json'), JSON.stringify({ name: '@starci/close-probe', version: '0.0.0', files: ['index.mjs'] }) + '\n');
+  fs.writeFileSync(path.join(pkg, 'index.mjs'), 'export const closeProbe = true;\n');
+  const registry = await startSourceCanonRegistry({ root });
+  let closed = false;
+  t.after(async () => { if (!closed) await registry.close(); });
+  const url = `${registry.origin}/@starci%2fclose-probe`;
+  const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+  assert.equal(response.status, 200, 'the real loopback registry serves its packed package');
+  const metadata = await response.json();
+  assert.equal(metadata.versions['0.0.0'].name, '@starci/close-probe');
+
+  // The fixture's first close signals its real child and awaits exit; a repeat must not await another exit event.
+  await registry.close();
+  closed = true;
+  await assert.rejects(fetch(url, { signal: AbortSignal.timeout(5_000) }), 'the closed registry no longer serves requests');
+  let deadline;
+  try {
+    await Promise.race([
+      registry.close(),
+      new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('repeated source canon registry close did not settle after cleanup')), 5_000); }),
+    ]);
+  } finally {
+    clearTimeout(deadline);
+  }
+});

@@ -67,8 +67,8 @@ export function canonPinsStep({ repo, runtime = runtimeRoot, node = defaultNode 
     try { doc = JSON.parse(run.stdout); } catch { doc = null; }
     return { label, exit: run.status ?? null, ok: doc?.ok === true, pins: doc?.pins ?? null, profiles: doc?.profiles ?? null, errors: doc?.errors ?? [], parsed: Boolean(doc), error: run.error };
   });
-  const broken = results.find((r) => r.error || !r.parsed);
-  const red = results.filter((r) => !r.ok);
+  const broken = results.find((r) => r.error || !r.parsed || r.exit === null);
+  const red = results.filter((r) => !r.ok || r.exit !== 0);
   const runtimeResult = results[0];
   // The runtime judgment must have bound at least one code-pattern profile to its published canon by the content digest.
   const unbound = !broken && !(Number(runtimeResult.profiles) > 0);
