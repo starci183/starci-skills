@@ -33,8 +33,8 @@ const WORKTREE_ADD_HOME = 'worktreeAdd';
 const EXTENSIONS = /\.(?:mjs|cjs|js|ts|ps1|sh)$/;
 const ARGV_FORM = /['"`]worktree['"`]\s*,\s*['"`]add['"`]/;
 const SHELL_PREFIX = /(?:^|['"`]|&&|;|\|\|)\s*git/;
-const SHELL_BARE = new RegExp(`${SHELL_PREFIX.source}\\s+worktree\\s+add\\b`);
-const SHELL_C_DIR = new RegExp(`${SHELL_PREFIX.source}\\s+-C\\s+(?:"[^"]*"|'[^']*'|\\S+)\\s+worktree\\s+add\\b`);
+const SHELL_BARE = new RegExp(String.raw`${SHELL_PREFIX.source}\s+worktree\s+add\b`);
+const SHELL_C_DIR = new RegExp(String.raw`${SHELL_PREFIX.source}\s+-C\s+(?:"[^"]*"|'[^']*'|\S+)\s+worktree\s+add\b`);
 const SHELL_FORM = { test: (line) => SHELL_BARE.test(line) || SHELL_C_DIR.test(line) };
 const isComment = (line) => /^\s*(?:\/\/|\*|\/\*|#)/.test(line);
 /** A createScratchWorktree call and the literal kind it names on that line. */
