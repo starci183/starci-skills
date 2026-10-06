@@ -167,9 +167,9 @@ export function pipelineOf(db, project, wf) {
     attempts: attempts.length, lastEventAt: lastEvent,
     workGraph: g ? { version: graph.version, digest: graph.digest, event: graph.event, reason: graph.reason, authorOp: graph.authorOp, authorJob: graph.authorJob, at: graph.createdAt,
       domains: g.domains ?? [], nodes: (g.nodes ?? []).map(n => ({ id: n.id, title: n.title ?? n.id, domain: n.domain ?? null, kind: n.kind ?? null,
-        parent: n.parent ?? null, slice: n.slice ?? null, ownedPaths: Array.isArray(n.ownedPaths) ? n.ownedPaths : null, color: colors[n.id] ?? null,
+        parent: n.parent ?? null, slice: n.slice ?? null, ownedPaths: (Array.isArray(n.ownedPaths) && n.ownedPaths) || null, color: colors[n.id] ?? null,
         ...Object.fromEntries(['reads', 'rollbackTo', 'size', 'frs', 'shapes', 'inferred'].filter(key => Object.hasOwn(n, key)).map(key => [key, n[key]])) })),
       colorSource: 'runtime-live',
-      edges: (g.edges ?? []).map(e => ({ from: e.from, to: e.to, kind: e.kind ?? null, reason: e.reason ?? null, ...(Object.hasOwn(e, 'inferred') ? { inferred: e.inferred } : {}) })) } : null,
+      edges: (g.edges ?? []).map(e => ({ from: e.from, to: e.to, kind: e.kind ?? null, reason: e.reason ?? null, ...(Object.hasOwn(e, 'inferred') && { inferred: e.inferred }) })) } : null,
   };
 }

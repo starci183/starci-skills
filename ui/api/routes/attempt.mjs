@@ -74,7 +74,7 @@ function timeline(attempt) {
     const at = attempt[field];
     const previous = index ? attempt[steps[index - 1][1]] : null;
     const max = code ? slaMs(code) : null;
-    return { step, at, ...(max ? { slaMs: max, late: at != null && previous != null ? at - previous > max : false } : {}) };
+    return { step, at, ...(max ? { slaMs: max, late: at != null && previous != null && at - previous > max } : {}) };
   });
 }
 const RUNTIME_ROOT = fileURLToPath(new URL('../../../', import.meta.url)).replace(/[\\/]$/, '');
@@ -249,7 +249,7 @@ function attemptDetail(store, ledger, db, row) {
     report: report ? { id: report.report_id, outcome: report.outcome, json: parse(report.report_json),
       attachments: many(db, 'SELECT m.* FROM v_media m JOIN report_attachments ra ON ra.artifact_id=m.artifact_id WHERE ra.report_id=?', report.report_id).map(m => mediaItem(m, ledger.name)) } : null,
     checks, artifacts: mediaRows, nonMedia,
-    settle: raw.settled_at ? { by: raw.settled_by, json: parse(raw.settle_json), decision: raw.decision_id ? ref('di', raw.decision_id, ledger.name) : null, nextStep: raw.next_step } : null,
+    settle: raw.settled_at ? { by: raw.settled_by, json: parse(raw.settle_json), decision: (raw.decision_id && ref('di', raw.decision_id, ledger.name)) || null, nextStep: raw.next_step } : null,
     lessons, decisions, actions, relatedScope: { actions: 'job', decisions: 'mixed', lessons: 'global-heuristic', logs: 'job' },
     terminal: terminal ? { handle: terminal.handle, live: terminal.closed_at == null,
       transcript: blobLink(db, transcript), snapshots: snapshots?.n ?? 0, lastSnapshotAt: snapshots?.last_at ?? null,

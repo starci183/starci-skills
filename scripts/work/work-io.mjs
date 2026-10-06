@@ -95,7 +95,8 @@ export function reviewMain(argv, { targetFlag, usage, tag, status, question, app
   try {
     if (command === 'status') {
       const s = status(target, args);
-      return 'exitCode' in s ? s : { exitCode: 0, text: json ? `${JSON.stringify(s.result, null, 2)}\n` : s.text };
+      if ('exitCode' in s) return s;
+      return { exitCode: 0, text: json ? `${JSON.stringify(s.result, null, 2)}\n` : s.text };
     }
     if (command === 'question') {
       const q = question(target, args);
@@ -104,7 +105,8 @@ export function reviewMain(argv, { targetFlag, usage, tag, status, question, app
     const receipt = flag(args, '--receipt');
     if (!receipt) return { exitCode: 2, text: usage };
     const r = apply(target, receipt, args);
-    return 'exitCode' in r ? r : { exitCode: 0, text: json ? `${JSON.stringify(r.result, null, 2)}\n` : r.text };
+    if ('exitCode' in r) return r;
+    return { exitCode: 0, text: json ? `${JSON.stringify(r.result, null, 2)}\n` : r.text };
   } catch (error) {
     return { exitCode: 1, text: `${tag}: ${error.message}\n` };
   }

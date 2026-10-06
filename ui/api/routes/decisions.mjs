@@ -19,7 +19,8 @@ function ref(kind, id, project = null, namespace = null, wf = null) {
     const workflowParam = wf ? '&wf=' + encodeURIComponent(wf) : '';
     href = `#/decisions?tab=incidents&incident=${key}&project=${p}${workflowParam}`;
   }
-  return href ? { kind, ...(project ? { project } : {}), ...namespace, id: String(id), href } : null;
+  if (!href) return null;
+  return { kind, ...(project ? { project } : {}), ...namespace, id: String(id), href };
 }
 function evidence(value, project, namespace, wf) {
   const items = (Array.isArray(value) && value) || (value == null && []) || [value];
@@ -120,11 +121,12 @@ function detail(store, id, url) {
     : one(db, 'SELECT * FROM decisions WHERE di_id=? ORDER BY decided_at DESC LIMIT 1', id);
   const options = parse(item.options_json, []);
   const credential = item.kind === 'credential-missing';
+  const resolutionResult = resolution && (credential ? null : parse(resolution.result_json));
   return { ...row, evidence: evidence(parse(item.evidence_json), project, namespace, item.workflow_id).map(entry => credential && 'text' in entry ? { text: 'Credential content hidden.' } : entry),
     options: Array.isArray(options) ? options.map(option => ({ key: option.key, verb: option.verb, recommended: Boolean(option.recommended) })) : [],
     allowedVerbs: parse(item.allowed_verbs_json, []), history,
     resolution: resolution ? { by: resolution.decider, verb: item.resolution_verb ?? resolution.choice,
-      decision: ref('di', id, project, namespace), result: credential ? null : parse(resolution.result_json) } : null,
+      decision: ref('di', id, project, namespace), result: resolutionResult } : null,
     payload: credential ? null : parse(item.payload_json) };
 }
 function listedAsks(store, url) {
@@ -145,7 +147,7 @@ function listedAsks(store, url) {
       const credential = di?.kind === 'credential-missing' || Boolean(credentialIncident);
       const credentialObserved = !(ask.ledger_id && !ledger) && !(ask.di_id && (!di || supervisorDI && ledgerDI));
       const contentSuppressed = credential || !credentialObserved;
-      return { id: ask.ask_id, store: 'machine', ledgerId: ask.ledger_id ?? null, project: name, wf: ask.workflow_id, di: ask.di_id && di && !(supervisorDI && ledgerDI) ? ref('di', ask.di_id, name, { store: supervisorDI ? 'machine' : 'ledger', ledgerId: ask.ledger_id ?? null }) : null,
+      return { id: ask.ask_id, store: 'machine', ledgerId: ask.ledger_id ?? null, project: name, wf: ask.workflow_id, di: ask.di_id && di && !(supervisorDI && ledgerDI) ? ref('di', ask.di_id, name, { store: (supervisorDI && 'machine') || 'ledger', ledgerId: ask.ledger_id ?? null }) : null,
         channel: ask.channel, question: contentSuppressed ? null : ask.question, credential, credentialObserved, contentSuppressed,
         askedAt: ask.asked_at, answeredAt: ask.answered_at, state: ask.state };
     });

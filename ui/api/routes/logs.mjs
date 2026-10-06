@@ -19,7 +19,8 @@ const ref = (kind, id, project = null, namespace = null) => {
   if (kind === 'attempt' && project && Number.isSafeInteger(Number(id))) href = `#/a/${encodeURIComponent(project)}/${encodeURIComponent(id)}`;
   else if (kind === 'workflow' && project) href = `#/w/${encodeURIComponent(project)}/${encodeURIComponent(id)}`;
   else if (kind === 'di') href = `#/decisions?${diParams}`;
-  return href ? { kind, ...(project ? { project } : {}), ...namespace, id: String(id), href } : null;
+  if (!href) return null;
+  return { kind, ...(project ? { project } : {}), ...namespace, id: String(id), href };
 };
 
 function wantedDatabases(store, url) {
@@ -86,7 +87,7 @@ function logRow(row, dbName, store) {
   const ledgerId = dbName === 'machine' ? row.ledger_id ?? null : store.projects().find(item => item.name === dbName)?.ledgerId ?? null;
   const rawRefs = parse(row.refs_json, []);
   const refs = Array.isArray(rawRefs) ? rawRefs.filter(x => x && typeof x === 'object' && x.kind && x.id != null)
-    .map(x => ref(x.kind, x.id, x.project ?? project, ['machine', 'ledger'].includes(x.store) ? { store: x.store, ledgerId: x.ledgerId ?? x.ledger ?? null } : null)).filter(Boolean) : [];
+    .map(x => ref(x.kind, x.id, x.project ?? project, (['machine', 'ledger'].includes(x.store) && { store: x.store, ledgerId: x.ledgerId ?? x.ledger ?? null }) || null)).filter(Boolean) : [];
   return { key: `${dbName}:${row.seq}`, db: dbName, store: dbName === 'machine' ? 'machine' : 'ledger', ledgerId, seq: row.seq, at: row.at, actor: row.actor,
     controller: row.controller ?? null, project, wf: row.workflow_id, job: row.job_id,
     level: row.level, kind: row.kind, msg: row.msg, data: parse(row.data_json), refs,

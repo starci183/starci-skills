@@ -411,7 +411,7 @@ function checkTree(workRoot, out, baseline) {
     if (rec.schema !== 'work/contract@1') continue;
     const shapes = [];
     const surf = rec.data?.surface;
-    for (const item of Array.isArray(surf?.http) ? surf.http : surf?.http ? [surf.http] : []) {
+    for (const item of (Array.isArray(surf?.http) && surf.http) || (surf?.http && [surf.http]) || []) {
       if (item?.method && item?.path) shapes.push(`${item.method.toUpperCase()} ${item.path}`);
     }
     for (const entry of Array.isArray(surf?.shape) ? surf.shape : surf?.requests ?? []) {

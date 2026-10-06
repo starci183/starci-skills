@@ -297,11 +297,11 @@ const GQL_LOOSE_RES = [
 
 const surfaceEntriesOf = data => {
   const surf = data?.surface;
-  const entries = Array.isArray(surf) ? surf : surf && typeof surf === 'object' ? [surf] : [];
+  const entries = (Array.isArray(surf) && surf) || (surf && typeof surf === 'object' && [surf]) || [];
   const out = [];
   for (const entry of entries) {
     if (!entry || typeof entry !== 'object') { out.push({name: null, text: String(entry ?? '')}); continue; }
-    const httpItems = Array.isArray(entry.http) ? entry.http : entry.http ? [entry.http] : [];
+    const httpItems = (Array.isArray(entry.http) && entry.http) || (entry.http && [entry.http]) || [];
     for (const item of httpItems) {
       if (item?.method && item?.path) {
         out.push({name: entry.name ?? item.name ?? null,
@@ -566,9 +566,9 @@ export function checkWorkSurfaces(workRoot, out) {
     const names = [o.name, o.dir, o.dir && camelOf(o.dir)].filter(Boolean);
     const named = set => names.some(n => set.has(n));
     o.claim = owner?.id ?? namedImpl
-      ?? (named(contractNamedOps) ? 'contract-surface' : named(sdsNamedOps) ? 'sds-flow' : null);
+      ?? ((named(contractNamedOps) && 'contract-surface') || (named(sdsNamedOps) && 'sds-flow') || null);
     if (!o.claim) {
-      const group = o.cap ? `${o.kind === 'query' ? 'queries' : 'mutations'}/${o.cap}` : `decorated ${o.kind}`;
+      const group = o.cap ? `${(o.kind === 'query' && 'queries') || 'mutations'}/${o.cap}` : `decorated ${o.kind}`;
       if (!unclaimed.has(group)) unclaimed.set(group, []);
       unclaimed.get(group).push(o);
     }
@@ -615,7 +615,7 @@ export function checkWorkSurfaces(workRoot, out) {
   for (const r of feRoutesAll) {
     if (!claimedFe.has(`${r.repo}#${r.app ?? ''}#${r.norm}`)) {
       suspect(r.file, 'UI_ROUTE_UNDECLARED',
-        `${r.app ? `apps/${r.app} ` : ''}route ${r.route} is served but no ui-screen's surfaces[].route claims it`);
+        `${r.app ? 'apps/' + r.app + ' ' : ''}route ${r.route} is served but no ui-screen's surfaces[].route claims it`);
     }
   }
 

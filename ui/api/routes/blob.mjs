@@ -80,7 +80,10 @@ export async function blob(request,response,store,url,sha) {
   const length = bytes?.length ?? (streamingRedaction && (request.method === 'HEAD' || request.headers.range) ? await redactedLength(file) : metadata.size);
   const etag = readRedaction ? null : `"${sha}"`;
   const sourceEncoding = storedText ? textEncodingOf(storedText) : null;
-  const headers = {'Content-Type':mode?'text/plain; charset=utf-8':textMedia&&readRedaction&&!/charset=/i.test(row.media_type)?`${row.media_type}; charset=utf-8`:row.media_type,...(sourceEncoding&&sourceEncoding!=='utf-8'?{'X-StarCi-Source-Encoding':sourceEncoding}:{}),'Cache-Control':readRedaction?'no-store':'public, max-age=31536000, immutable',...(etag?{'ETag':etag}:{}),'Accept-Ranges':'bytes','Content-Disposition':url.searchParams.get('download')==='1'?`attachment; filename="${sha}.txt"`:'inline','X-Content-Type-Options':'nosniff'};
+  let contentType = row.media_type;
+  if (mode) contentType = 'text/plain; charset=utf-8';
+  else if (textMedia && readRedaction && !/charset=/i.test(row.media_type)) contentType = `${row.media_type}; charset=utf-8`;
+  const headers = {'Content-Type':contentType,...(sourceEncoding&&sourceEncoding!=='utf-8'?{'X-StarCi-Source-Encoding':sourceEncoding}:{}),'Cache-Control':readRedaction?'no-store':'public, max-age=31536000, immutable',...(etag?{'ETag':etag}:{}),'Accept-Ranges':'bytes','Content-Disposition':url.searchParams.get('download')==='1'?`attachment; filename="${sha}.txt"`:'inline','X-Content-Type-Options':'nosniff'};
   if (readRedaction) headers['X-StarCi-Redacted']=changedText?'read-v1':'stream-v1';
   if (etag && request.headers['if-none-match']===etag) {response.writeHead(304,headers);response.end();return;}
   const range = rangeOf(request.headers.range,length);

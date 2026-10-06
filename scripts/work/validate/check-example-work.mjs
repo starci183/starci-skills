@@ -829,7 +829,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       const isOpenDecision = target.schema === 'work/policy-decision@1' && target.data?.outcome === 'open';
       const subEdges = blockedByOf(target);
       if (isGap || isOpenDecision || !subEdges.length) {
-        roots.set(targetId, isGap ? 'gap' : isOpenDecision ? 'decision' : 'record');
+        roots.set(targetId, (isGap && 'gap') || (isOpenDecision && 'decision') || 'record');
         return;
       }
       const nextVisited = new Set(visited);
