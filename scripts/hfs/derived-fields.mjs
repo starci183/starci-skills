@@ -43,6 +43,30 @@ function ownerOfItem(item, index, kinds) {
   return kinds.map((k) => index.byEnforcer.get(`${k}:${value}`)).find(Boolean) ?? null;
 }
 
+function verifyPatternBlock(lines, starts, position, index, kinds, unowned) {
+  const from = starts[position];
+  const to = position + 1 < starts.length ? starts[position + 1] : lines.length;
+  const ruleId = lines[from].replace(/^ {2}- id: /, '').trim();
+  const rulesAt = lines.findIndex((line, i) => i >= from && i < to && /^ {4}hfsRules: \[/.test(line));
+  const autoAt = lines.findIndex((line, i) => i >= from && i < to && /^ {6}automated:/.test(line));
+  if (rulesAt < 0 || autoAt < 0) return;
+  let end = autoAt + 1;
+  while (end < to && /^ {8}- /.test(lines[end])) end += 1;
+  const typed = lines.slice(autoAt + 1, end).map((line) => line.replace(/^ {8}- /, ''));
+  const rules = lines[rulesAt].replace(/^ {4}hfsRules: \[/, '').replace(/\].*$/, '').split(',').map((r) => r.trim()).filter(Boolean);
+  const added = [];
+  for (const item of typed) {
+    const owner = ownerOfItem(item, index, kinds);
+    if (owner === null) unowned.push({ rule: ruleId, item: unquote(item) });
+    else if (!rules.includes(owner) && !added.includes(owner)) added.push(owner);
+  }
+  added.sort((a, b) => RULE_NUMBER(a) - RULE_NUMBER(b));
+  const complete = [...rules, ...added];
+  const derived = [...new Set(complete.flatMap((id) => index.codesOf.get(id) ?? []))];
+  lines[rulesAt] = `    hfsRules: [${complete.join(', ')}]`;
+  lines.splice(autoAt, end - autoAt, ...(derived.length ? ['      automated:', ...derived.map((code) => `        - ${code}`)] : ['      automated: []']));
+}
+
 /**
  * `text` of a pattern topic with every rule's `hfsRules` completed and `verification.automated` rewritten from the catalog.
  * Returns { text, unowned: [{rule, item}] }: the typed items no catalog rule owns (left out of the list, reported).
@@ -52,28 +76,7 @@ export function derivePatternVerification(text, index, kinds = []) {
   const unowned = [];
   const starts = lines.map((line, i) => (/^ {2}- id: /.test(line) ? i : -1)).filter((i) => i >= 0);
   // Bottom-up, so a rewritten block never moves the lines of the blocks above it.
-  for (let s = starts.length - 1; s >= 0; s -= 1) {
-    const from = starts[s];
-    const to = s + 1 < starts.length ? starts[s + 1] : lines.length;
-    const ruleId = lines[from].replace(/^ {2}- id: /, '').trim();
-    const rulesAt = lines.findIndex((line, i) => i >= from && i < to && /^ {4}hfsRules: \[/.test(line));
-    const autoAt = lines.findIndex((line, i) => i >= from && i < to && /^ {6}automated:/.test(line));
-    if (rulesAt < 0 || autoAt < 0) continue;
-    let end = autoAt + 1;
-    while (end < to && /^ {8}- /.test(lines[end])) end += 1;
-    const typed = lines.slice(autoAt + 1, end).map((line) => line.replace(/^ {8}- /, ''));
-    const rules = lines[rulesAt].replace(/^ {4}hfsRules: \[/, '').replace(/\].*$/, '').split(',').map((r) => r.trim()).filter(Boolean);
-    const added = [];
-    for (const item of typed) {
-      const owner = ownerOfItem(item, index, kinds);
-      if (owner === null) unowned.push({ rule: ruleId, item: unquote(item) });
-      else if (!rules.includes(owner) && !added.includes(owner)) added.push(owner);
-    }
-    const complete = [...rules, ...added.sort((a, b) => RULE_NUMBER(a) - RULE_NUMBER(b))];
-    const derived = [...new Set(complete.flatMap((id) => index.codesOf.get(id) ?? []))];
-    lines[rulesAt] = `    hfsRules: [${complete.join(', ')}]`;
-    lines.splice(autoAt, end - autoAt, ...(derived.length ? ['      automated:', ...derived.map((code) => `        - ${code}`)] : ['      automated: []']));
-  }
+  for (let s = starts.length - 1; s >= 0; s -= 1) verifyPatternBlock(lines, starts, s, index, kinds, unowned);
   return { text: lines.join('\n'), unowned };
 }
 
@@ -121,7 +124,7 @@ export function derivedFiles({ files, read, catalog, classify }) {
   const index = catalogIndex(catalog);
   const out = [];
   for (const dir of PATTERN_DIRS) {
-    for (const file of files.filter((f) => new RegExp(`^knowledge/patterns/${dir}/[^/]+\\.yaml$`).test(f)).sort(byCodeUnit)) {
+    for (const file of files.filter((f) => new RegExp(String.raw`^knowledge/patterns/${dir}/[^/]+\.yaml$`).test(f)).sort(byCodeUnit)) {
       const before = read(file);
       if (before === null || before === undefined) continue;
       const verification = derivePatternVerification(before, index, { be: ['eslint-be'], fe: ['eslint-fe', 'stylelint'], repo: [] }[dir]);
@@ -144,7 +147,7 @@ if (isMain(import.meta.url)) {
   const manifest = loadSlotManifest({ root });
   const examples = [REFERENCE_APP_MANIFEST].filter((f) => fs.existsSync(path.join(root, f)));
   const resolver = createProseResolver({ files: examples, read: (f) => fs.readFileSync(path.join(root, f), 'utf8') }, manifest);
-  const classify = (p) => resolver.classify(`be/${sample(p.replace(/<kind>/g, 'api'))}`).slot ?? null;
+  const classify = (p) => resolver.classify(`be/${sample(p.replaceAll('<kind>', 'api'))}`).slot ?? null;
   const files = gitOutputOf(lsFiles([], { dir: root, maxBuffer: 1 << 28 }), 'git ls-files').split('\n').filter(Boolean);
   const stale = derivedFiles({ files, read: (f) => fs.readFileSync(path.join(root, f), 'utf8'), catalog: loadRuleCatalog({ root }), classify });
   const write = process.argv.includes('--write');

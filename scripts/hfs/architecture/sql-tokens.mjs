@@ -19,7 +19,7 @@ export function tokenizeSql(text) {
   while (i < text.length) {
     const char = text[i];
     if (isSpace(char)) { i += 1; continue; }
-    if (char === '-' && text[i + 1] === '-') { while (i < text.length && text[i] !== '\n') i += 1; continue; }
+    if (char === '-' && text[i + 1] === '-') { while (i < text.length && text[i] !== '\n') { i += 1; } continue; }
     if (char === '/' && text[i + 1] === '*') {
       const end = text.indexOf('*/', i + 2);
       i = end === -1 ? text.length : end + 2;
@@ -138,7 +138,7 @@ function statementsOf(tokens) {
   for (const token of tokens) {
     if (token.t === 'punct' && token.v === '(') depth += 1;
     if (token.t === 'punct' && token.v === ')') depth -= 1;
-    if (token.t === 'punct' && token.v === ';' && depth <= 0) { if (current.length) statements.push(current); current = []; continue; }
+    if (token.t === 'punct' && token.v === ';' && depth <= 0) { if (current.length) { statements.push(current); } current = []; continue; }
     current.push(token);
   }
   if (current.length) statements.push(current);
@@ -155,7 +155,7 @@ function cteNames(tokens) {
     if (isWord(tokens[j], 'MATERIALIZED')) j += 1;
     if (tokens[j]?.v !== '(') continue;
     let k = i - 1;
-    if (tokens[k]?.v === ')') { let depth = 0; do { if (tokens[k].v === ')') depth += 1; else if (tokens[k].v === '(') depth -= 1; k -= 1; } while (k >= 0 && depth > 0); }
+    if (tokens[k]?.v === ')') { let depth = 0; do { if (tokens[k].v === ')') { depth += 1; } else if (tokens[k].v === '(') { depth -= 1; } k -= 1; } while (k >= 0 && depth > 0); }
     const before = tokens[k - 1];
     if (isName(tokens[k]) && (isWord(before, 'WITH') || isWord(before, 'RECURSIVE') || before?.v === ',')) names.add(nameOf(tokens[k]));
   }
@@ -221,7 +221,7 @@ function equalityColumns(conjunct, qualifiers) {
  */
 function selectBound(tokens, level, uniqueSetsOf, cte) {
   const at0 = index => level[index] === 0;
-  const find = (up, from = 0) => { for (let i = from; i < tokens.length; i += 1) if (at0(i) && isWord(tokens[i], up)) return i; return -1; };
+  const find = (up, from = 0) => { for (let i = from; i < tokens.length; i += 1) { if (at0(i) && isWord(tokens[i], up)) return i; } return -1; };
   if (find('LIMIT') >= 0 || find('FETCH') >= 0) return { bounded: true, basis: 'limit' };
   const select = find('SELECT');
   const from = find('FROM', select);
@@ -296,10 +296,10 @@ export function analyzeSql(text, { uniqueSetsOf = () => null } = {}) {
       if (token.t === 'punct' && token.v === ')') { parens.pop(); continue; }
       if (token.t !== 'word') continue;
       const previous = tokens[i - 1];
-      if (token.up === 'INSERT' && isWord(tokens[i + 1], 'INTO')) { if (level[i] === 0) hasWriteVerb = true; record(writes, tableRef(tokens, i + 2, { columns: true })); }
-      else if (token.up === 'UPDATE' && !(previous?.t === 'word' && NOT_A_WRITE_BEFORE_UPDATE.has(previous.up))) { if (level[i] === 0) hasWriteVerb = true; record(writes, tableRef(tokens, i + 1)); }
-      else if (token.up === 'DELETE' && isWord(tokens[i + 1], 'FROM')) { if (level[i] === 0) hasWriteVerb = true; record(writes, tableRef(tokens, i + 2)); i += 1; }
-      else if (token.up === 'MERGE' && isWord(tokens[i + 1], 'INTO')) { if (level[i] === 0) hasWriteVerb = true; record(writes, tableRef(tokens, i + 2)); }
+      if (token.up === 'INSERT' && isWord(tokens[i + 1], 'INTO')) { if (level[i] === 0) { hasWriteVerb = true; } record(writes, tableRef(tokens, i + 2, { columns: true })); }
+      else if (token.up === 'UPDATE' && !(previous?.t === 'word' && NOT_A_WRITE_BEFORE_UPDATE.has(previous.up))) { if (level[i] === 0) { hasWriteVerb = true; } record(writes, tableRef(tokens, i + 1)); }
+      else if (token.up === 'DELETE' && isWord(tokens[i + 1], 'FROM')) { if (level[i] === 0) { hasWriteVerb = true; } record(writes, tableRef(tokens, i + 2)); i += 1; }
+      else if (token.up === 'MERGE' && isWord(tokens[i + 1], 'INTO')) { if (level[i] === 0) { hasWriteVerb = true; } record(writes, tableRef(tokens, i + 2)); }
       else if (token.up === 'TRUNCATE') {
         let j = i + 1;
         if (isWord(tokens[j], 'TABLE')) j += 1;

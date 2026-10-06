@@ -39,8 +39,8 @@ export function ruleParamsProblems(m) {
     if (!roleList(rp.be.suffixes)) bad.push('ruleParams.be.suffixes must be a non-empty list of unique kebab-case role suffixes');
     if (!roleList(rp.be.bannedSuffixes)) bad.push('ruleParams.be.bannedSuffixes must be a non-empty list of unique kebab-case suffixes');
     else if (roleList(rp.be.suffixes) && rp.be.suffixes.some((x) => rp.be.bannedSuffixes.includes(x))) bad.push('ruleParams.be.suffixes and bannedSuffixes must be disjoint');
-    const formNames = ['call', 'new', 'curried', 'object', 'primitive', 'array'];
-    const formsOk = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => formNames.includes(x)) && new Set(v).size === v.length;
+    const formNames = new Set(['call', 'new', 'curried', 'object', 'primitive', 'array']);
+    const formsOk = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => formNames.has(x)) && new Set(v).size === v.length;
     const doubleOk = (v) => isPlainObject(v) && /^[A-Za-z][A-Za-z0-9]*$/.test(String(v.double)) && formsOk(v.forms);
     const regexOk = (v) => { try { return typeof v === 'string' && v.length > 0 && Boolean(new RegExp(v)); } catch { return false; } };
     const sd = rp.be.specDoubles;

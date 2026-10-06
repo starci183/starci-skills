@@ -103,7 +103,7 @@ function supabaseDeclarations(graph, appRoot, ts) {
     if (file.slot !== 'be.persistence' || !file.owner) continue;
     const key = capabilityTable(file.owner.root);
     const declaration = tables.get(key);
-    if (declaration && declaration.owner === null) tables.set(key, { ...declaration, owner: file.owner.root, rel: file.rel });
+    if (declaration?.owner === null) tables.set(key, { ...declaration, owner: file.owner.root, rel: file.rel });
   }
   return tables;
 }
@@ -126,7 +126,7 @@ export function checkSqlOwner(input) {
     kit.walk(file.sourceFile, node => {
       if (!ts.isTaggedTemplateExpression(node)) return true;
       const home = kit.declarationsOf(checker, node.tag).map(kit.ownerOfDeclaration).find(Boolean);
-      if (!home || home.tier !== 'platform' || home.name !== 'database') { foreignTags += 1; return true; }
+      if (home?.tier !== 'platform' || home?.name !== 'database') { foreignTags += 1; return true; }
       templates += 1;
       const template = node.template;
       const text = ts.isNoSubstitutionTemplateLiteral(template) ? template.text
@@ -148,7 +148,8 @@ export function checkSqlOwner(input) {
             ? `SQL writes table ${write.table}, which Database['public']['Tables'] does not declare; regenerate supabase/types/database.types.ts from the migrations.`
             : `SQL writes table ${write.table}, which no @Entity declares; declare the entity in the owning capability's persistence/entities.`, { table: write.table });
         } else if (supabase && write.table.toLowerCase() !== ownTable) {
-          report(`SQL in ${file.owner.root} writes table ${write.table}${declaration.owner ? `, owned by ${declaration.owner}` : ''}; under Supabase schema authority a capability writes only its own table (${ownTable}), named for that capability.`, { table: write.table, ...(declaration.owner ? { tableOwner: declaration.owner } : {}) });
+          const ownerNote = declaration.owner ? `, owned by ${declaration.owner}` : '';
+          report(`SQL in ${file.owner.root} writes table ${write.table}${ownerNote}; under Supabase schema authority a capability writes only its own table (${ownTable}), named for that capability.`, { table: write.table, ...(declaration.owner ? { tableOwner: declaration.owner } : {}) });
         } else if (!supabase && declaration.owner !== file.owner.root) {
           report(`SQL in ${file.owner.root} writes table ${write.table}, owned by ${declaration.owner}; a capability writes only the tables of its own entities, call the owner's public API instead.`, { table: write.table, tableOwner: declaration.owner });
         }
@@ -173,7 +174,8 @@ export function checkSqlOwner(input) {
       }
       for (const select of result.selects) {
         if (select.bounded || (select.table && !tables.has(select.table.toLowerCase()))) continue;
-        report(`SELECT ${select.table ? `on ${select.table} ` : ''}has no LIMIT and does not constrain a primary key or unique column with =; bound it with LIMIT (PAGE_SIZE_MAX, LIST_ROWS_MAX or BATCH_ROWS from platform/database), filter by key, or select only aggregates.`, { table: select.table ?? undefined });
+        const tableNote = select.table ? `on ${select.table} ` : '';
+        report(`SELECT ${tableNote}has no LIMIT and does not constrain a primary key or unique column with =; bound it with LIMIT (PAGE_SIZE_MAX, LIST_ROWS_MAX or BATCH_ROWS from platform/database), filter by key, or select only aggregates.`, { table: select.table ?? undefined });
       }
       return true;
     });

@@ -14,6 +14,14 @@ const SUPPRESSION_FLAG = /--(?:suppressions-location|suppress-all|suppress-rule|
 const ESLINT_CONFIG = /(?:^|\/)eslint\.config\.[cm]?[jt]s$/;
 const CONFIG_SUPPRESSION = /suppressions/i;
 
+function packageSuppressionFindings(file, pkg) {
+  const findings = [];
+  for (const [name, command] of Object.entries(pkg?.scripts ?? {})) {
+    if (SUPPRESSION_SCRIPT_NAME.test(name) || SUPPRESSION_FLAG.test(String(command))) findings.push(found(LINT_SUPPRESSION_FILE, file, `${file} script ${name} manages lint suppressions (${String(command).slice(0, 80)}); delete the script and fix the findings in the code`));
+  }
+  return findings;
+}
+
 /** The findings of R104 over the tracked paths `files` of the repository at `repoRoot`. */
 export function lintSuppressionFindings({ repoRoot, files }) {
   const findings = [];
@@ -25,9 +33,7 @@ export function lintSuppressionFindings({ repoRoot, files }) {
       if (text !== null && CONFIG_SUPPRESSION.test(text)) findings.push(found(LINT_SUPPRESSION_FILE, file, `${file} passes a suppressions configuration to eslint; a repository suppresses nothing`));
     } else if (file === 'package.json' || file.endsWith('/package.json')) {
       const pkg = readJson(repoRoot, file);
-      for (const [name, command] of Object.entries(pkg?.scripts ?? {})) {
-        if (SUPPRESSION_SCRIPT_NAME.test(name) || SUPPRESSION_FLAG.test(String(command))) findings.push(found(LINT_SUPPRESSION_FILE, file, `${file} script ${name} manages lint suppressions (${String(command).slice(0, 80)}); delete the script and fix the findings in the code`));
-      }
+      findings.push(...packageSuppressionFindings(file, pkg));
     }
   }
   return findings;

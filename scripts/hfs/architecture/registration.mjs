@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { canonical } from './config.mjs';
 import { referencedExports, relativePath, unwrapExpression } from './typescript.mjs';
-import { commonJsRequireReasons, decoratorCallee, moduleExportsOf, mutableDecoratorKind, normalizedSymbol, normalizedSymbolValue, programSourcesOf, selectedNode, valueSymbol } from './ast-walks.mjs';
+import { commonJsRequireReasons, decoratorCallee, moduleExportsOf, mutableDecoratorKind, programSourcesOf, selectedNode, valueSymbol } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 
@@ -149,8 +149,7 @@ function applicationGraphs(config, context, modules) {
     const queue = [canonical(path.resolve(config.root, ...root.path.split('/')))];
     const seen = new Set();
     const reachable = [];
-    for (let index = 0; index < queue.length; index += 1) {
-      const file = queue[index];
+    for (const file of queue) {
       if (seen.has(file)) continue;
       seen.add(file);
       for (const module of byFile.get(file) ?? []) {

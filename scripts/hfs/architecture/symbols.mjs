@@ -109,11 +109,13 @@ const isExported = (ts, statement) => (statement.modifiers ?? []).some(modifier 
 
 /** The declaration `node` (an identifier, a member or a qualified name) resolves to when a repository file declares it as one of `kinds`, else null. */
 function repositoryDeclaration(ts, checker, graph, node, kinds) {
-  const target = ts.isPropertyAccessExpression(node) ? node.name : ts.isQualifiedName(node) ? node.right : node;
+  let target = node;
+  if (ts.isPropertyAccessExpression(node)) target = node.name;
+  else if (ts.isQualifiedName(node)) target = node.right;
   const symbol = checker?.getSymbolAtLocation(target);
   if (!symbol) return null;
   const resolved = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
-  const home = (resolved?.declarations ?? []).find(declaration => kinds.includes(declaration.kind) && graph.abs(canonical(declaration.getSourceFile().fileName)));
+  const home = (resolved?.declarations ?? []).some(declaration => kinds.includes(declaration.kind) && graph.abs(canonical(declaration.getSourceFile().fileName)));
   return home ? resolved.getName() : null;
 }
 

@@ -52,7 +52,11 @@ export function checkRouteFilesThin(input) {
     }
     const isFunction = node => ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node);
     const jsxOf = node => ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
-    const tagOf = node => (ts.isJsxElement(node) ? node.openingElement.tagName : ts.isJsxSelfClosingElement(node) ? node.tagName : null);
+    const tagOf = node => {
+      if (ts.isJsxElement(node)) return node.openingElement.tagName;
+      if (ts.isJsxSelfClosingElement(node)) return node.tagName;
+      return null;
+    };
     /** True when the function contains JSX that is not inside a nested function. */
     const drawsDirectly = fn => {
       let found = false;

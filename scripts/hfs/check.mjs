@@ -58,7 +58,6 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { ARCHITECTURE_RULE_IDS, checkArchitecture } from './architecture/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadRuleCatalog, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './slots.mjs';
-import { allowsFile } from './allows.mjs';
 import { RUNTIME_KIND } from './manifest-shape.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { diff as gitDiff } from '../api/git/diff.mjs';
@@ -71,13 +70,12 @@ import { appRootFindings } from './rules/app-root.mjs';
 import { frontendFindings } from './rules/frontend-tree.mjs';
 import { lintSuppressionFindings } from './rules/lint-suppression.mjs';
 import { repoLocalCheckFindings } from './rules/repo-local-checks.mjs';
-import { readJson } from './rules/read.mjs';
 import { supabaseSecretFindings } from './rules/supabase-secrets.mjs';
 import { pathFindings } from './path-findings.mjs';
 import { onLintSurface } from './architecture/surface.mjs';
 import { checkAppRoot, trackedTreeView } from './architecture/hfs.mjs';
 import { testTopologyFindings } from './rules/test-topology.mjs';
-import { feNoTestsFindings, isFeTestPath } from './rules/fe-no-tests.mjs';
+import { feNoTestsFindings } from './rules/fe-no-tests.mjs';
 import { editionFindings } from './rules/edition.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 // The database rules (R213-R216) read SQL through a WASM parser, so they are async: `starci app check` calls them beside the other emitters and passes the findings in as `extraFindings`.
@@ -222,7 +220,7 @@ function treeFindings({ repoRoot, resolver }) {
   const findings = [];
   const facts = treeFacts(readTree(repoRoot, { isIgnored: inIgnoredSlot }));
   for (const { path: dir, below } of facts.empty) {
-    findings.push({ code: 'HFS_EMPTY_DIR', level: 'error', path: dir, below, message: `${dir} has no file below it${below ? ` (nor in its ${below} sub-director${below === 1 ? 'y' : 'ies'})` : ''}; git tracks no empty directory, so it is a leftover` });
+    findings.push({ code: 'HFS_EMPTY_DIR', level: 'error', path: dir, below, message: `${dir} has no file below it` + (below ? ` (nor in its ${below} sub-director${below === 1 && 'y' || 'ies'})` : '') + '; git tracks no empty directory, so it is a leftover' });
   }
   for (const { path: dir, of, distance } of facts.ghosts) {
     findings.push({ code: 'HFS_GHOST_TREE', level: 'error', path: dir, of, distance, message: `${dir} is empty and ${distance} edit${distance === 1 ? '' : 's'} from its sibling ${of}: a renamed or misspelt structure that was never removed` });
@@ -261,7 +259,8 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
     if (missing.has(key) || present(p)) return;
     missing.add(key);
     const app = appOf(p);
-    findings.push({ code: 'HFS_SLOT_REQUIRED_MISSING', level: 'error', path: p, slot, via, ...(app ? { app } : {}), message: `${slot} requires ${p}${app ? ` (app ${app})` : ''}, which is not tracked` });
+    const appNote = app ? ` (app ${app})` : '';
+    findings.push({ code: 'HFS_SLOT_REQUIRED_MISSING', level: 'error', path: p, slot, via, ...(app ? { app } : {}), message: `${slot} requires ${p}${appNote}, which is not tracked` });
   };
   // The app's own required paths; each side reports its own (the resolver of the app lists them too, with their side).
   for (const entry of required.paths) if (!entry.side) missingFile(entry.slot, entry.path, entry.via);
@@ -276,10 +275,10 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
   if (repo.kind === RUNTIME_KIND) return findings;
 
   const pins = readPins(root);
-  findings.push(...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }));
 
   // The tree checks of the rules that read file content or configuration (rules/*): whole-scope, cheap, no tool run.
   findings.push(
+    ...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }),
     ...supabaseSecretFindings({ repoRoot, files: files.filter(inScope), resolver, repo }),
     ...editionFindings({ repoRoot, files: files.filter(inScope), repo, resolver, withDeclaration: editionDeclaration }),
     ...repoLocalCheckFindings({ repoRoot, files }),
@@ -387,7 +386,7 @@ function changedSince(repoRoot, base) {
 
 /** The machine's violations and errors as findings: each keeps the machine's rule id as its code. */
 function machineFindings(report) {
-  const of = (item) => ({ code: item.ruleId, level: 'error', ...(item.path ? { path: item.path } : {}), ...(item.line ? { line: item.line, column: item.column } : {}), source: 'machine', message: `${item.path ? `${item.path}${item.line ? `:${item.line}` : ''}: ` : ''}${item.message}` });
+  const of = (item) => ({ code: item.ruleId, level: 'error', ...(item.path ? { path: item.path } : {}), ...(item.line ? { line: item.line, column: item.column } : {}), source: 'machine', message: ((item.path && item.path + (item.line && ':' + item.line || '') + ': ') || '') + item.message });
   return [...report.errors.map(of), ...report.violations.map(of)];
 }
 
@@ -486,7 +485,7 @@ export function explainPath({ repoRoot, input, root = skillRoot, declaration, ma
     tier: tier ?? 'none',
     owner: owner ? { slot: owner.slot, root: owner.root } : null,
     allowedImports: mayImport,
-    importRule: mayImport ? manifest.crossOwner : (tier === 'none' ? 'the slot takes no part in import checks' : null),
+    importRule: mayImport ? manifest.crossOwner : (tier === 'none' && 'the slot takes no part in import checks' || null),
     tests: slot.tests,
     testsMeaning: TEST_KIND[slot.tests],
     requiredFiles: resolver.requiredFiles(c.path),

@@ -20,7 +20,8 @@ const commandsOf = (text) => text.split(/\r?\n/).map((line) => RUN_LINE.exec(lin
 /** `npm run <script> -- <args>` spelled out as the root package.json script it runs; any other command is itself. */
 function expanded(command, scripts) {
   const run = NPM_RUN.exec(command);
-  return run && typeof scripts[run[1]] === 'string' ? `${scripts[run[1]]}${run[2] ? ` ${run[2]}` : ''}` : command;
+  if (!run || typeof scripts[run[1]] !== 'string') return command;
+  return run[2] ? `${scripts[run[1]]} ${run[2]}` : scripts[run[1]];
 }
 
 /** The findings of R13 over the repository at `repoRoot`; `pins` is the parsed canon-pins.yaml pin map. */

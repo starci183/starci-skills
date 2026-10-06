@@ -27,7 +27,9 @@ export function feNoTestsFindings({ repoRoot, files }) {
   const findings = [];
   for (const file of files) {
     if (isFeTestPath(file)) {
-      const what = SPEC_FILE.test(file) ? 'a test file' : TEST_DIRECTORY.test(file) ? 'inside a test directory' : 'test tooling';
+      let what = 'test tooling';
+      if (SPEC_FILE.test(file)) what = 'a test file';
+      else if (TEST_DIRECTORY.test(file)) what = 'inside a test directory';
       findings.push(found(FE_NO_TESTS, file, `${file} is ${what}; a front-end repository has no tests, no test tooling and no exception: delete it`));
       continue;
     }

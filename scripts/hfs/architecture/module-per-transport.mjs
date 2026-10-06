@@ -140,7 +140,8 @@ export function checkModulePerTransport(input) {
           report(root, node, `App ${app.name} lists ${module.name}, the application module of feature ${place.feature}; apps import only transport modules (${place.feature}-<protocol>.module.ts), which import the application module themselves.`, { app: app.name, module: module.name });
         } else if (!(composedBy.get(place.protocol) ?? []).includes(app.kind)) {
           const allowed = [...composedBy].filter(([, kinds]) => kinds.includes(app.kind)).map(([protocol]) => protocol).sort(byCodeUnit);
-          report(root, node, `App ${app.name} is of kind ${app.kind} and lists ${module.name}, a ${place.protocol} transport module; an app of kind ${app.kind} composes ${allowed.length ? `${allowed.join(', ')} transports only` : 'no transport module'}.`, { app: app.name, module: module.name, protocol: place.protocol });
+          const transports = allowed.length ? `${allowed.join(', ')} transports only` : 'no transport module';
+          report(root, node, `App ${app.name} is of kind ${app.kind} and lists ${module.name}, a ${place.protocol} transport module; an app of kind ${app.kind} composes ${transports}.`, { app: app.name, module: module.name, protocol: place.protocol });
         }
       }
     };

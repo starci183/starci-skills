@@ -38,6 +38,19 @@ const variantsOf = (slot) => braceVariants(slot.path).map(star);
  */
 const beSlots = (manifest, providers) => manifest.slots.filter((slot) => slot.profiles.includes('be') && slot.tracked === 'tracked' && (slot.provider === undefined || providers.includes(slot.provider)));
 
+function addRequiredPatterns(sonar, required, suffixes) {
+  const isRole = new RegExp(String.raw`\.(?:${suffixes.map((s) => s.replaceAll('-', '\\-')).join('|')})\.ts$`);
+  for (const slot of required) {
+    for (const entry of [...(slot.requires ?? []), ...(slot.allows ?? [])]) {
+      if (!/\.ts$/.test(entry) || entry.includes('<role>')) continue;
+      for (const name of braceVariants(entry)) {
+        if (isRole.test(star(name).replaceAll('*', 'x'))) continue;
+        for (const dir of variantsOf(slot)) sonar.add(`be/${dir}${star(name)}`.replace(/\/\/+/g, '/'));
+      }
+    }
+  }
+}
+
 /** The directory a path pattern lives in (itself when it is one). */
 const dirOf = (path) => (isDir(path) ? path : path.slice(0, path.lastIndexOf('/') + 1));
 
@@ -72,24 +85,19 @@ export function coverageScope(manifest, providers = []) {
   const noneMinimal = noneUnique.filter((path) => !noneUnique.some((other) => other !== path && isDir(other) && nested(dirOf(path), other)));
   const excludes = noneMinimal.filter((path) => isDir(path) && roots.some((root) => nested(path, root))).sort(byCodeUnit);
   const suffixes = manifest.ruleParams.be.suffixes;
-  const isRole = new RegExp(`\\.(?:${suffixes.map((s) => s.replace(/-/g, '\\-')).join('|')})\\.ts$`);
   const sonar = new Set(noneMinimal.map((path) => `be/${path}${isDir(path) ? '**' : ''}`));
   for (const role of suffixes.filter((suffix) => !roles.includes(suffix))) sonar.add(`be/**/*.${role}.ts`);
-  for (const slot of required) {
-    for (const entry of [...(slot.requires ?? []), ...(slot.allows ?? [])]) {
-      if (!/\.ts$/.test(entry) || entry.includes('<role>')) continue;
-      for (const name of braceVariants(entry)) {
-        if (isRole.test(star(name).replace(/\*/g, 'x'))) continue;
-        for (const dir of variantsOf(slot)) sonar.add(`be/${dir}${star(name)}`.replace(/\/\/+/g, '/'));
-      }
-    }
-  }
+  addRequiredPatterns(sonar, required, suffixes);
   sonar.add('fe/**');
-  return { roles, roots, excludes, none: noneMinimal.sort(byCodeUnit), sonar: [...sonar].sort(byCodeUnit), codecovPaths: roots.map((root) => `be/${root}**`) };
+  noneMinimal.sort(byCodeUnit);
+  return { roles, roots, excludes, none: noneMinimal, sonar: [...sonar].sort(byCodeUnit), codecovPaths: roots.map((root) => `be/${root}**`) };
 }
 
 /** The glob a root measures: every file of a logic role below it (`src/modules/domain/*\/**\/*.{service,policy}.ts`). */
-export const rootGlob = (root, roles) => `${root}**/*.${roles.length === 1 ? roles[0] : `{${roles.join(',')}}`}.ts`;
+export const rootGlob = (root, roles) => {
+  const roleGlob = roles.length === 1 ? roles[0] : `{${roles.join(',')}}`;
+  return `${root}**/*.${roleGlob}.ts`;
+};
 
 /** The jest coverage options of the rendered be/jest.config.js: { roots, roles, excludes }. */
 export function jestCoverage(manifest, providers = []) {
@@ -140,16 +148,22 @@ export function coverageComponents(manifest, { files, read, apps, providers = []
       continue;
     }
     for (const capability of capabilities) {
-      const spec = new RegExp(`from\\s+["']@modules/${module.replace(/[/.]/g, '\\$&')}/${capability.replace(/[/.]/g, '\\$&')}["']`);
+      const spec = new RegExp(String.raw`from\s+["']@modules/${module.replace(/[/.]/g, String.raw`\$&`)}/${capability.replace(/[/.]/g, String.raw`\$&`)}["']`);
       const importers = services.filter((app) => spec.test(imports.get(app.name)));
       const owners = importers.length === 1 ? importers : importers.filter((app) => app.name === capability);
       if (owners.length === 1) ownedBy.get(owners[0].name).push(`be/${base}${capability}/**`);
       else platformPaths.push(`be/${base}${capability}/**`);
     }
   }
+  const components = services.filter((app) => ownedBy.get(app.name).length).map((app) => {
+    const paths = ownedBy.get(app.name);
+    paths.sort(byCodeUnit);
+    return { id: app.name, name: app.name, paths };
+  });
+  if (platformPaths.length) platformPaths.sort(byCodeUnit);
   return [
-    ...services.filter((app) => ownedBy.get(app.name).length).map((app) => ({ id: app.name, name: app.name, paths: ownedBy.get(app.name).sort(byCodeUnit) })),
-    ...(platformPaths.length ? [{ id: PLATFORM_COMPONENT, name: PLATFORM_COMPONENT, paths: platformPaths.sort(byCodeUnit) }] : []),
+    ...components,
+    ...(platformPaths.length ? [{ id: PLATFORM_COMPONENT, name: PLATFORM_COMPONENT, paths: platformPaths }] : []),
   ];
 }
 

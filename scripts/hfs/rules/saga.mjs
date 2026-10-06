@@ -71,7 +71,9 @@ function statesVersion(ts, sourceFile) {
   const memberNames = (members) => new Map(members.filter((member) => ts.isPropertySignature(member) && ts.isIdentifier(member.name)).map((member) => [member.name.text, member.type]));
   for (const statement of sourceFile.statements) {
     if (!statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue;
-    const members = ts.isInterfaceDeclaration(statement) ? statement.members : ts.isTypeAliasDeclaration(statement) && ts.isTypeLiteralNode(statement.type) ? statement.type.members : null;
+    let members = null;
+    if (ts.isInterfaceDeclaration(statement)) members = statement.members;
+    else if (ts.isTypeAliasDeclaration(statement) && ts.isTypeLiteralNode(statement.type)) members = statement.type.members;
     if (members === null) continue;
     const named = memberNames(members);
     if (named.has('status') && named.get('version')?.kind === ts.SyntaxKind.NumberKeyword) versioned = true;
@@ -121,9 +123,9 @@ export function sagaFindings({ repoRoot, files }) {
       const text = readText(repoRoot, orchestrator);
       if (text === null) continue;
       const sourceFile = parse(ts, text);
-      const imported = specifiersOf(ts, sourceFile).map((specifier) => path.posix.normalize(path.posix.join(path.posix.dirname(orchestrator), specifier)));
+      const imported = new Set(specifiersOf(ts, sourceFile).map((specifier) => path.posix.normalize(path.posix.join(path.posix.dirname(orchestrator), specifier))));
       for (const file of [...steps.values(), ...compensations.values()]) {
-        if (!imported.includes(file.replace(/\.ts$/, ''))) findings.push(found(SAGA_STEP_COMPENSATION, orchestrator, `${orchestrator} does not list ${file}: the orchestrator imports every step and every compensation of its saga, so a step nobody runs cannot hide.`, { step: file }));
+        if (!imported.has(file.replace(/\.ts$/, ''))) findings.push(found(SAGA_STEP_COMPENSATION, orchestrator, `${orchestrator} does not list ${file}: the orchestrator imports every step and every compensation of its saga, so a step nobody runs cannot hide.`, { step: file }));
       }
       // R170
       const stem = ORCHESTRATOR.exec(orchestrator)[2];

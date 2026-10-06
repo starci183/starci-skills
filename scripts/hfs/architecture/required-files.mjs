@@ -69,7 +69,11 @@ export function checkerScope({ config, graph, context }) {
 }
 
 const strip = entry => entry.replace(/\/+$/u, '');
-const rootOfTarget = target => (target.endsWith('/') ? strip(target) : (path.posix.dirname(target) === '.' ? '' : path.posix.dirname(target)));
+const rootOfTarget = target => {
+  if (target.endsWith('/')) return strip(target);
+  const parent = path.posix.dirname(target);
+  return parent === '.' ? '' : parent;
+};
 
 function ruleFor(slotId, target, rootExists) {
   if (slotId === 'fe.app.next' && rootExists && ERROR_BOUNDARY_FILE.test(path.posix.basename(strip(target)))) return 'FE_ERROR_BOUNDARY_MISSING';
@@ -161,8 +165,9 @@ export function checkRequiredFiles({ config, graph }) {
       continue;
     }
     const kind = requirement.target.endsWith('/') ? 'directory' : 'file';
+    const rootNote = requirement.root ? ` (${requirement.root})` : '';
     report(ruleFor(requirement.slot, requirement.target, true), strip(requirement.target), requirement.slot, requirement.root, { kind },
-      `Required ${kind} ${strip(requirement.target)} is missing; slot ${requirement.slot} requires it in every instance${requirement.root ? ` (${requirement.root})` : ''}.`);
+      `Required ${kind} ${strip(requirement.target)} is missing; slot ${requirement.slot} requires it in every instance${rootNote}.`);
   }
 
   // 3. Minimums: at least minInstances instances of a required slot.
@@ -172,8 +177,9 @@ export function checkRequiredFiles({ config, graph }) {
       ? resolver.repo.apps.filter(app => app.kind === minimum.appKind).length
       : (found.get(minimum.slot)?.size ?? 0);
     if (count >= minimum.min) continue;
+    const appKindNote = minimum.appKind ? ' (an app of kind ' + minimum.appKind + ' declared in hfs.json)' : '';
     report('HFS_REQUIRED_FILE_MISSING', 'hfs.json', minimum.slot, '', { minimum: minimum.min, found: count },
-      `Slot ${minimum.slot} needs at least ${minimum.min} instance${minimum.min === 1 ? '' : 's'}${minimum.appKind ? ` (an app of kind ${minimum.appKind} declared in hfs.json)` : ''}; the repository has ${count}.`);
+      `Slot ${minimum.slot} needs at least ${minimum.min} instance${minimum.min === 1 ? '' : 's'}${appKindNote}; the repository has ${count}.`);
   }
 
   return { violations, coverage: { status: 'checked', instances: instances.size, requirements: requirements.size, missing: violations.length } };

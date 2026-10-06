@@ -22,22 +22,22 @@ const allowedExpressions = (allows) => allows.flatMap((entry) => braceVariants(e
 
 const shapeFinding = (file, message, extra) => found(STACKS_SHAPE, file, message, extra);
 
-/** The shape findings of the `.starcistacks` tree at the app root (`repoRoot` is the app root, `files` its own tracked paths). */
-export function stacksFindings({ repoRoot, files, resolver }) {
-  const slot = resolver.slot(STACKS_SLOT);
-  if (!slot) return [];
+function treeFindings(files, allowed, prefix) {
   const findings = [];
-  const allowed = allowedExpressions(slot.allows ?? []);
-  const prefix = `${STACK_ROOT}/`;
   for (const file of files.filter((f) => f.startsWith(prefix))) {
     const rel = file.slice(prefix.length);
     if (SEALED.test(rel) && !INSIDE_SECRETS.test(rel)) findings.push(shapeFinding(file, `${file} is a sealed secret outside <env>/secrets/<slug>.enc; move it to .starcistacks/<env>/secrets/`));
     else if (!allowed.some((expression) => expression.test(rel))) findings.push(shapeFinding(file, `${file} is not part of the standard .starcistacks shape (application-stacks.yaml and <env>/{README.md, environment.json, infra, runtime/{config,env}, secrets/<slug>.enc, seeds}); move or delete it`));
   }
-  if (!files.some((f) => f === `${prefix}application-stacks.yaml`)) return findings;
-  const declaration = findStackDeclaration(repoRoot);
+  return findings;
+}
+
+function declarationFindings(repoRoot, files, prefix) {
   const declared = `${prefix}application-stacks.yaml`;
-  if (declaration.error) return [...findings, shapeFinding(declared, `${declared} cannot be read: ${declaration.error}`)];
+  if (!files.includes(declared)) return [];
+  const findings = [];
+  const declaration = findStackDeclaration(repoRoot);
+  if (declaration.error) return [shapeFinding(declared, `${declared} cannot be read: ${declaration.error}`)];
   const services = declaration.doc?.services;
   if (services === undefined || typeof services.sonar !== 'object' || services.sonar === null) {
     findings.push(shapeFinding(declared, `${declared} declares no sonar service; every repository states its Sonar owner (a local one is owned by the host: stack.owner host, root ${HOST_SONAR_ROOT})`));
@@ -50,5 +50,15 @@ export function stacksFindings({ repoRoot, files, resolver }) {
       findings.push(shapeFinding(declared, `${declared} services.sonar is a local Sonar but is not owned by the host; declare stack.owner host with root ${HOST_SONAR_ROOT}`));
     }
   }
+  return findings;
+}
+
+/** The shape findings of the `.starcistacks` tree at the app root (`repoRoot` is the app root, `files` its own tracked paths). */
+export function stacksFindings({ repoRoot, files, resolver }) {
+  const slot = resolver.slot(STACKS_SLOT);
+  if (!slot) return [];
+  const prefix = `${STACK_ROOT}/`;
+  const findings = treeFindings(files, allowedExpressions(slot.allows ?? []), prefix);
+  findings.push(...declarationFindings(repoRoot, files, prefix));
   return findings;
 }

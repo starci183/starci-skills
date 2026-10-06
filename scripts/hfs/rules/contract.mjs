@@ -19,7 +19,7 @@ const SNAPSHOT_OF = { graphql: 'schema.graphql', json: 'openapi.json' };
 
 /** sha256 of a file's text with line endings folded, or null when it cannot be read. */
 function contractHash(file) {
-  try { return createHash('sha256').update(fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n')).digest('hex'); } catch { return null; }
+  try { return createHash('sha256').update(fs.readFileSync(file, 'utf8').replaceAll('\r\n', '\n')).digest('hex'); } catch { return null; }
 }
 
 /** The findings of R23 for the be side at `repoRoot` (a side of another profile has none). */

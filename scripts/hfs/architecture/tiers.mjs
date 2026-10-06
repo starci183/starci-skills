@@ -125,14 +125,20 @@ export function checkTiers(graph) {
     const fromKind = featureToFeature ? triggerOf(resolver, edge.from) : null;
     const toKind = featureToFeature ? triggerOf(resolver, edge.to) : null;
     const crossKind = fromKind !== null && toKind !== null && fromKind !== toKind;
+    let ruleId = tierRule;
+    if (featureToFeature) ruleId = 'BE_FEATURE_IMPORTS_FEATURE';
+    if (crossKind) ruleId = 'BE_KIND_ISOLATION';
+    if (verdict.reason === 'crossApp') ruleId = 'FE_APP_ISOLATION';
+    const typeOnly = edge.runtime ? '' : ' (type-only imports count)';
+    const message = crossKind
+      ? `${edge.from} -> ${edge.to}: a ${fromKind} feature imports a ${toKind} feature; no kind imports another, every cross-kind call is an event published with eventBus.publish(event, tx) from a domain service${typeOnly}.`
+      : `${edge.from} -> ${edge.to}: ${REASON_TEXT[verdict.reason](verdict)}${typeOnly}.`;
     violations.push({
-      ruleId: verdict.reason === 'crossApp' ? 'FE_APP_ISOLATION' : crossKind ? 'BE_KIND_ISOLATION' : featureToFeature ? 'BE_FEATURE_IMPORTS_FEATURE' : tierRule,
+      ruleId,
       path: edge.from, line: edge.line, column: edge.column,
       specifier: edge.specifier, resolvedPath: edge.to, typeOnly: !edge.runtime,
       fromTier: verdict.fromTier ?? null, toTier: verdict.toTier ?? null,
-      message: crossKind
-        ? `${edge.from} -> ${edge.to}: a ${fromKind} feature imports a ${toKind} feature; no kind imports another, every cross-kind call is an event published with eventBus.publish(event, tx) from a domain service${edge.runtime ? '' : ' (type-only imports count)'}.`
-        : `${edge.from} -> ${edge.to}: ${REASON_TEXT[verdict.reason](verdict)}${edge.runtime ? '' : ' (type-only imports count)'}.`,
+      message,
     });
   }
 
@@ -157,13 +163,14 @@ export function checkTiers(graph) {
     const hops = cycle.slice(0, -1).map((unit, i) => witness.get(`${unit}\0${cycle[i + 1]}`));
     const label = unit => unit.slice(unit.indexOf(':') + 1) || unit;
     const first = hops[0];
+    const connectedOwners = component.length > cycle.length - 1 ? ` (strongly connected with ${component.length} owners)` : '';
     violations.push({
       ruleId: 'ARCH_OWNER_CYCLE',
       path: first.from, line: first.line, column: first.column,
       cycle: cycle.map(label),
       cycleImports: hops.map(hop => ({ path: hop.from, line: hop.line, specifier: hop.specifier, typeOnly: !hop.runtime })),
       componentSize: component.length,
-      message: `Owner cycle: ${cycle.map(label).join(' -> ')}${component.length > cycle.length - 1 ? ` (strongly connected with ${component.length} owners)` : ''}; type-only imports count.`,
+      message: `Owner cycle: ${cycle.map(label).join(' -> ')}${connectedOwners}; type-only imports count.`,
     });
   }
   return {

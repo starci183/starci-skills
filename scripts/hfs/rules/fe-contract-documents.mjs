@@ -31,6 +31,20 @@ function contractsOf(repoRoot, files, findings) {
   return contracts;
 }
 
+function operationFindings(file, document, operation, contracts) {
+  const label = operation.name ?? `anonymous ${operation.operation}`;
+  const [first] = rootFieldsOf(operation);
+  const serving = contracts.filter(({ schema }) => schema.types.get(schema.roots[operation.operation])?.fields?.has(first));
+  if (serving.length === 0) {
+    const where = contracts.length === 0 ? 'the app keeps no be/contracts/<service>/schema.graphql' : `no contract of ${contracts.map((c) => c.path).join(', ')} declares ${operation.operation} ${first}`;
+    return [found(FE_GRAPHQL_CONTRACT, file, `${file}: ${label} asks ${operation.operation} ${first}, but ${where}; the front end sends only what a back end serves.`, { operation: label, service: null })];
+  }
+  const [contract] = serving;
+  const problems = operationProblems(contract.schema, document, operation);
+  if (problems.length > 0) return [found(FE_GRAPHQL_CONTRACT, file, `${file}: ${label} does not match the ${contract.service} contract (${contract.path}): ${problems.join('; ')}.`, { operation: label, service: contract.service, problems })];
+  return [];
+}
+
 /** The findings of R113 over the tracked paths `files` of the app at `repoRoot`. */
 export function feContractFindings({ repoRoot, files }) {
   const documents = files.filter(isDocument).sort(byCodeUnit);
@@ -47,21 +61,7 @@ export function feContractFindings({ repoRoot, files }) {
       findings.push(found(FE_GRAPHQL_CONTRACT, file, `${file} is not a GraphQL document: ${error.message}.`));
       continue;
     }
-    for (const operation of document.operations) {
-      const label = operation.name ?? `anonymous ${operation.operation}`;
-      const [first] = rootFieldsOf(operation);
-      const serving = contracts.filter(({ schema }) => schema.types.get(schema.roots[operation.operation])?.fields?.has(first));
-      if (serving.length === 0) {
-        const where = contracts.length === 0 ? 'the app keeps no be/contracts/<service>/schema.graphql' : `no contract of ${contracts.map((c) => c.path).join(', ')} declares ${operation.operation} ${first}`;
-        findings.push(found(FE_GRAPHQL_CONTRACT, file, `${file}: ${label} asks ${operation.operation} ${first}, but ${where}; the front end sends only what a back end serves.`, { operation: label, service: null }));
-        continue;
-      }
-      const [contract] = serving;
-      const problems = operationProblems(contract.schema, document, operation);
-      if (problems.length > 0) {
-        findings.push(found(FE_GRAPHQL_CONTRACT, file, `${file}: ${label} does not match the ${contract.service} contract (${contract.path}): ${problems.join('; ')}.`, { operation: label, service: contract.service, problems }));
-      }
-    }
+    for (const operation of document.operations) findings.push(...operationFindings(file, document, operation, contracts));
   }
   return findings;
 }

@@ -12,10 +12,10 @@ const nameOf = (list, defaultSchema) => {
 
 const functionOption = (node, key) => (node.options ?? []).filter((option) => option?.DefElem?.defname === key).map((option) => option.DefElem);
 const securityDefiner = (node) => functionOption(node, 'security').some((option) => option.arg?.Boolean?.boolval === true || option.arg?.Integer?.ival === 1);
-const functionLanguage = (node) => functionOption(node, 'language').map((option) => option.arg?.String?.sval).filter(Boolean).at(-1) ?? 'sql';
+const functionLanguage = (node) => functionOption(node, 'language').map((option) => option.arg?.String?.sval).findLast(Boolean) ?? 'sql';
 const functionBody = (node) => functionOption(node, 'as').flatMap((option) => (option.arg?.List?.items ?? []).map((item) => item?.String?.sval ?? '')).join('') || null;
 const functionReturnKind = (node) => {
-  const name = node.returnType?.names?.map(sval).filter(Boolean).at(-1);
+  const name = node.returnType?.names?.map(sval).findLast(Boolean);
   if (name === 'void') return 'void';
   if (name === 'trigger' || name === 'event_trigger') return 'trigger';
   return node.returnType?.setof ? 'setof' : 'scalar';
@@ -144,11 +144,12 @@ async function dynamicDdlFindings(file, queries, where, baseLine) {
   const findings = [];
   for (const { text, lineno } of queries) {
     const line = lineno ? baseLine + lineno - 1 : undefined;
+    const lineNote = line ? `${file}:${line}` : file;
     const analysis = await dynamicQueryAnalysis(text);
     if (analysis.buildsDdl) {
-      findings.push(found(DB_DYNAMIC_DDL, file, `${file}${line ? `:${line}` : ''} ${where} builds DDL dynamically (\`${String(text).slice(0, 120)}\`); write the create/alter/drop or grant/revoke out as statements so the parser sees every one`, { ...(line ? { line } : {}), query: text }));
+      findings.push(found(DB_DYNAMIC_DDL, file, `${lineNote} ${where} builds DDL dynamically (\`${String(text).slice(0, 120)}\`); write the create/alter/drop or grant/revoke out as statements so the parser sees every one`, { ...(line ? { line } : {}), query: text }));
     } else if (analysis.opaque) {
-      findings.push(found(DB_DYNAMIC_DDL, file, `${file}${line ? `:${line}` : ''} ${where} runs dynamic SQL the pass cannot read (\`${String(text).slice(0, 120)}\`); dynamic DDL is refused and a query built from an opaque value cannot be judged`, { ...(line ? { line } : {}), query: text }));
+      findings.push(found(DB_DYNAMIC_DDL, file, `${lineNote} ${where} runs dynamic SQL the pass cannot read (\`${String(text).slice(0, 120)}\`); dynamic DDL is refused and a query built from an opaque value cannot be judged`, { ...(line ? { line } : {}), query: text }));
     }
   }
   return findings;
@@ -170,9 +171,10 @@ async function definerDynamicFindings(file, fn, queries, baseLine) {
   const findings = [];
   for (const { text, lineno } of queries) {
     const line = lineno ? baseLine + lineno - 1 : undefined;
+    const lineNote = line ? `${file}:${line}` : file;
     const expression = await expressionOf(text);
     if (expression !== null && safeDefinerExpression(expression)) continue;
-    findings.push(found(DB_DEFINER_SAFE, file, `${file}${line ? `:${line}` : ''} security definer function ${fn.name} builds dynamic SQL without quoting every parameter through format() %I or %L (\`${String(text).slice(0, 120)}\`)`, { ...(line ? { line } : {}), function: fn.name, query: text }));
+    findings.push(found(DB_DEFINER_SAFE, file, `${lineNote} security definer function ${fn.name} builds dynamic SQL without quoting every parameter through format() %I or %L (\`${String(text).slice(0, 120)}\`)`, { ...(line ? { line } : {}), function: fn.name, query: text }));
   }
   return findings;
 }

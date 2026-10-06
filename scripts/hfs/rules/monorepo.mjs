@@ -160,7 +160,8 @@ function workspaceDepFindings(repoRoot, files, workspaces) {
     }
     for (const [name, file] of [...missing].sort(byCodeUnit)) {
       const sibling = names.get(name);
-      findings.push(found(MONO_WORKSPACE_DEP, manifest, `${file} imports ${name}, which ${manifest} does not declare; ${sibling ? `declare the workspace package ${name} as "*"` : `declare ${name} in the dependencies of ${manifest} (one version across the workspace, R14)`}.`, { dependency: name, importedBy: file }));
+      const declaration = sibling ? `declare the workspace package ${name} as "*"` : `declare ${name} in the dependencies of ${manifest} (one version across the workspace, R14)`;
+      findings.push(found(MONO_WORKSPACE_DEP, manifest, `${file} imports ${name}, which ${manifest} does not declare; ${declaration}.`, { dependency: name, importedBy: file }));
     }
   }
   return findings;

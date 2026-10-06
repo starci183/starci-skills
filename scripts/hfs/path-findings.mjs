@@ -45,7 +45,7 @@ function sourceFormFindings({ files, resolver }) {
     if (FREE_NAMES.has(base)) continue;
     // A literal file name the owning slot itself requires or allows (persistence/connection.ts, world/global-setup.ts) is its role.
     const slot = resolver.slot(c.slot);
-    if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].some((entry) => entry === base)) continue;
+    if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].includes(base)) continue;
     // So is an allows entry below the slot root whose last segment is that literal name (be.tests.world fakes/<provider>/server.ts).
     const admitted = allowsFile(resolver, file);
     if (admitted?.allowed && admitted.entry?.includes('/') && path.posix.basename(admitted.entry) === base) continue;
@@ -55,7 +55,8 @@ function sourceFormFindings({ files, resolver }) {
     const parts = base.slice(0, -'.ts'.length).split('.');
     const banned = parts.slice(1).find((part) => bannedSuffixes.includes(part));
     if (banned) {
-      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: banned, message: `${file}: the suffix .${banned} is banned; use a role from the closed suffix list (${suffixes.join(', ')})${BANNED_SUFFIX_HOME[banned] ? `. ${BANNED_SUFFIX_HOME[banned]}` : ''}` });
+      const homeNote = BANNED_SUFFIX_HOME[banned] ? `. ${BANNED_SUFFIX_HOME[banned]}` : '';
+      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: banned, message: `${file}: the suffix .${banned} is banned; use a role from the closed suffix list (${suffixes.join(', ')})${homeNote}` });
     } else if (boundSuffixes.has(parts.at(-1)) && parts.length >= 2 && boundSuffixes.get(parts.at(-1)).id !== c.slot) {
       findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: parts.at(-1), message: `${file}: the suffix .${parts.at(-1)}.ts belongs to ${boundSuffixes.get(parts.at(-1)).path} only; move the file there` });
     } else if (parts.length < 2 || !parts.every((part) => KEBAB.test(part)) || !suffixes.includes(parts.at(-1))) {
@@ -72,7 +73,8 @@ export function pathFindings({ files, resolver, profile }) {
     if (profile === 'fe' && isFeTestPath(file)) continue;   // a test path of a front end is FE_NO_TESTS's, the one finding of that file
     const c = resolver.classifyPath(file);
     if (c.status === 'no-slot') {
-      findings.push({ code: 'HFS_SLOT_UNDECLARED', level: 'error', path: file, nearest: c.nearest, message: `${file} matches no slot${c.nearest ? `; nearest slot ${c.nearest.slot} (${c.nearest.pattern}), matched ${c.nearest.matchedPrefix || '.'} then expected ${c.nearest.expectedNext ?? 'nothing'}` : ''}` });
+      const nearestNote = c.nearest ? `; nearest slot ${c.nearest.slot} (${c.nearest.pattern}), matched ${c.nearest.matchedPrefix || '.'} then expected ${c.nearest.expectedNext ?? 'nothing'}` : '';
+      findings.push({ code: 'HFS_SLOT_UNDECLARED', level: 'error', path: file, nearest: c.nearest, message: `${file} matches no slot${nearestNote}` });
     } else if (c.status === 'ambiguous') {
       findings.push({ code: 'HFS_SLOT_AMBIGUOUS', level: 'error', path: file, candidates: c.candidates, message: `${file} is owned equally by ${c.candidates.map((x) => x.slot ?? x).join(', ')}` });
     } else if (c.status === 'not-enabled') {
@@ -81,7 +83,8 @@ export function pathFindings({ files, resolver, profile }) {
       const slot = resolver.slot(c.slot);
       if (slotOwnsSecrets(slot)) continue;   // the secret scan reports the file (R06): one finding per file
       const own = slot.rules?.includes('HFS_TOOL_CONFIG_LOCAL') ? 'HFS_TOOL_CONFIG_LOCAL' : 'HFS_FORBIDDEN_PRESENT';
-      findings.push({ code: own, level: 'error', path: file, slot: c.slot, goesTo: c.goesTo, message: `${file} is tracked but ${c.slot} is forbidden in the tree${c.goesTo ? `; it belongs at ${c.goesTo}` : ''}` });
+      const goesToNote = c.goesTo ? `; it belongs at ${c.goesTo}` : '';
+      findings.push({ code: own, level: 'error', path: file, slot: c.slot, goesTo: c.goesTo, message: `${file} is tracked but ${c.slot} is forbidden in the tree${goesToNote}` });
     } else if (c.tracking === 'ignored') {
       findings.push({ code: 'HFS_TRACKED_MUST_BE_IGNORED', level: 'error', path: file, slot: c.slot, message: `${file} is tracked but ${c.slot} must be gitignored` });
     }

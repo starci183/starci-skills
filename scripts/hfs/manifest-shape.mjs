@@ -31,7 +31,7 @@ export function connectionShapeProblems(list, apps) {
   const keys = (c) => isPlainObject(c) && NAME.test(String(c.name)) && ENV_PREFIX.test(String(c.envPrefix)) && NAME.test(String(c.owner)) && CONTEXT_ISOLATIONS.includes(c.isolation)
     && (c.provider === undefined || CONNECTION_PROVIDERS.includes(c.provider))
     && Object.keys(c).every((k) => ['name', 'envPrefix', 'owner', 'isolation', 'provider'].includes(k)) && ['name', 'envPrefix', 'owner', 'isolation'].every((k) => k in c);
-  if (!list || !list.every(keys)) return [`connections must be a list of {name: kebab-case context name, envPrefix: UPPER_SNAKE prefix of its env keys, owner: the service app that owns the context, isolation: ${CONTEXT_ISOLATIONS.join(' | ')}, provider?: ${CONNECTION_PROVIDERS.join(' | ')}}`];
+  if (!list?.every(keys)) return [`connections must be a list of {name: kebab-case context name, envPrefix: UPPER_SNAKE prefix of its env keys, owner: the service app that owns the context, isolation: ${CONTEXT_ISOLATIONS.join(' | ')}, provider?: ${CONNECTION_PROVIDERS.join(' | ')}}`];
   const owns = (c) => Array.isArray(apps) && apps.some((app) => isPlainObject(app) && app.name === c.owner && CONTEXT_OWNER_KINDS.includes(app.kind));
   return list.filter((c) => !owns(c)).map((c) => `connections ${c.name} is owned by ${c.owner}, which is not a ${CONTEXT_OWNER_KINDS.join(' or ')} app declared in the same side`);
 }
@@ -171,7 +171,7 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
 
 /** The owners of an external call in a runtime manifest: an api system folder (`api/<system>`, `api/*` any system) or the DB tier. */
 const INFRA_OWNER = /^(?:api\/(?:\*|[a-z][a-z0-9-]*)|engine\/db)$/;
-const RUNTIME_PARAM_KEYS = ['fileLines', 'sourceRoots', 'infraOwners', 'baseWriteMembers', 'baseEnvSeams', 'apiContracts', 'sourceName', 'oneOffNames', 'sharedBasenames', 'generated', 'pinned', 'selfChecks'];
+const RUNTIME_PARAM_KEYS = new Set(['fileLines', 'sourceRoots', 'infraOwners', 'baseWriteMembers', 'baseEnvSeams', 'apiContracts', 'sourceName', 'oneOffNames', 'sharedBasenames', 'generated', 'pinned', 'selfChecks']);
 const relPath = (v) => typeof v === 'string' && v.length > 0 && !v.startsWith('/') && !v.includes('..') && !v.includes('\\');
 
 /** Shape problems of a parsed manifest of kind runtime (knowledge/hfs/runtime-slots.yaml), in the words of modules/schemas/hfs-slots.schema.yaml. */
@@ -201,7 +201,7 @@ export function runtimeShapeProblems(m) {
 /** Shape problems of ruleParams.runtime. */
 function runtimeParamProblems(rp) {
   const bad = [];
-  for (const key of Object.keys(rp)) if (!RUNTIME_PARAM_KEYS.includes(key)) bad.push(`ruleParams.runtime.${key} is not a runtime parameter`);
+  for (const key of Object.keys(rp)) if (!RUNTIME_PARAM_KEYS.has(key)) bad.push(`ruleParams.runtime.${key} is not a runtime parameter`);
   for (const key of RUNTIME_PARAM_KEYS) if (!(key in rp)) bad.push(`ruleParams.runtime.${key} is missing`);
   const fl = rp.fileLines;
   if (!(isPlainObject(fl) && Number.isInteger(fl.soft) && fl.soft >= 1 && typeof fl.hardGrowth === 'boolean' && Object.keys(fl).length === 2)) bad.push('ruleParams.runtime.fileLines must be {soft, hardGrowth}');

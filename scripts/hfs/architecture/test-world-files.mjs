@@ -75,7 +75,7 @@ function environmentOf(ts, literal) {
   const node = literal ? propertyOf(ts, literal, 'stack') : null;
   const value = node ? unwrap(ts, node) : null;
   if (!value || !ts.isStringLiteralLike(value)) return null;
-  return value.text.split(/[\\/]+/u).filter(Boolean).at(-1) ?? null;
+  return value.text.split(/[\\/]+/u).filter(Boolean).findLast(Boolean) ?? null;
 }
 
 /** The keys of the declaration's `fakes` object literal, with their positions. */
@@ -121,7 +121,7 @@ export function checkTestWorldFiles(input) {
   for (const file of [...tree.files].sort(byCodeUnit)) {
     if (!file.endsWith('.ts')) continue;
     const verdict = allowsFile(resolver, file);
-    if (!verdict || verdict.slot !== WORLD_SLOT) continue;
+    if (verdict?.slot !== WORLD_SLOT) continue;
     files += 1;
     worldRoot ??= file.slice(0, file.length - verdict.relative.length);
     if (verdict.relative.startsWith(FAKES_DIRECTORY)) {
@@ -157,7 +157,10 @@ export function checkTestWorldFiles(input) {
     for (const service of stack?.services ?? []) if (service.role !== 'service' && !services.some(known => known.name === service.name)) services.push({ ...service, environment });
   }
   const stackHint = `${STACKS_DIRECTORY}/${environments.join(', ')}`;
-  const statefulWhy = service => (STATEFUL_KINDS.has(service.kind) ? `a ${service.kind} holds data the app reads back` : service.persistent ? 'the stack gives it a persistent volume' : null);
+  const statefulWhy = service => {
+    if (STATEFUL_KINDS.has(service.kind)) return `a ${service.kind} holds data the app reads back`;
+    return service.persistent ? 'the stack gives it a persistent volume' : null;
+  };
   const declared = literal ? fakedByOf(ts, configFile.sourceFile, literal) : [];
   const fakeEntries = literal ? fakeEntriesOf(ts, configFile.sourceFile, literal) : [];
 
@@ -186,9 +189,14 @@ export function checkTestWorldFiles(input) {
     if (!service) continue;
     if (declared.some(entry => entry.service === service.name && entry.fake === fake.name)) continue; // judged on its stacks entry above
     const why = statefulWhy(service);
+    let reason = `${service.name} is stateful (${why}), so no exception applies. `;
+    if (!why) {
+      const worldConfig = configPath ?? `${CONFIG_FILE} in the world`;
+      reason = `Only stateless compute that needs special hardware or an external model may be faked, and only when ${worldConfig} declares it in its stacks entry ({ fakedBy, reason }). `;
+    }
     violations.push({
       ruleId: RULE, path: fake.path, line: fake.line, column: fake.column, slot: WORLD_SLOT,
-      message: `${fake.what} fakes ${service.name} (${service.image}), which ${stackHint} declares: a service of the repository's own stack runs real in the test world. ${why ? `${service.name} is stateful (${why}), so no exception applies. ` : `Only stateless compute that needs special hardware or an external model may be faked, and only when ${configPath ?? `${CONFIG_FILE} in the world`} declares it in its stacks entry ({ fakedBy, reason }). `}Delete the fake and let the world run the real service; fakes are otherwise only for external SaaS the team does not operate.`,
+      message: `${fake.what} fakes ${service.name} (${service.image}), which ${stackHint} declares: a service of the repository's own stack runs real in the test world. ${reason}Delete the fake and let the world run the real service; fakes are otherwise only for external SaaS the team does not operate.`,
     });
   }
   return { violations, coverage: { status: 'checked', files } };

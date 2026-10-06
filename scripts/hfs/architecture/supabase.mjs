@@ -60,7 +60,7 @@ function checkClientOwnership(input, { slots, ruleId }) {
         clients += 1;
         if (!isDatabaseType(ts, node.typeArguments?.[0])) reportAt(violations, kit, ruleId, file, node, 'SupabaseClient must carry the committed Database type as SupabaseClient<Database>.');
       }
-      if (!ts.isCallExpression(node)) return true;
+      if (!ts.isCallExpression(node)) return;
       const binding = kit.importBinding(checker, node.expression);
       if (binding && SUPABASE_MODULES.has(binding.module) && /^create(?:Client|ServerClient|BrowserClient)$/u.test(binding.name)) {
         clients += 1;
@@ -68,13 +68,12 @@ function checkClientOwnership(input, { slots, ruleId }) {
           reportAt(violations, kit, ruleId, file, node, `${binding.name} creates an untyped Supabase client; create it as ${binding.name}<Database>(...) (or give it the contextual type SupabaseClient<Database>).`);
         }
       }
-      if (!isSupabaseCall(kit, checker, node)) return true;
+      if (!isSupabaseCall(kit, checker, node)) return;
       const properties = chainParts(ts, node);
       const method = callName(ts, node);
-      if (!SUPABASE_CALLS.has(method) && !properties.includes('auth') && !properties.includes('storage')) return true;
+      if (!SUPABASE_CALLS.has(method) && !properties.includes('auth') && !properties.includes('storage')) return;
       calls += 1;
       if (!owned) reportAt(violations, kit, ruleId, file, node, `A Supabase ${method ?? 'client'} call is made from ${file.slot ?? 'an unowned path'}; database, auth and storage calls belong only to ${[...slots].join(' or ')}.`, { method, slot: file.slot ?? null });
-      return true;
     });
   }
   return { violations, coverage: { status: 'checked', imports, clients, calls, ownerSlots: [...slots] } };
@@ -99,7 +98,9 @@ const fromAwaitedSupabase = (kit, checker, node, seen = new Set()) => {
 const callIsToOutcome = (kit, checker, graph, call) => {
   if (!kit.ts.isCallExpression(call)) return false;
   const expression = call.expression;
-  const name = kit.ts.isIdentifier(expression) ? expression.text : (kit.ts.isPropertyAccessExpression(expression) ? expression.name.text : null);
+  let name = null;
+  if (kit.ts.isIdentifier(expression)) name = expression.text;
+  else if (kit.ts.isPropertyAccessExpression(expression)) name = expression.name.text;
   if (name !== 'toOutcome') return false;
   return kit.declarationsOf(checker, kit.ts.isPropertyAccessExpression(expression) ? expression.name : expression)
     .some(declaration => {
@@ -243,13 +244,12 @@ function checkFrontendSecretNames(input) {
       if (ts.isIdentifier(node) && serviceRoleText(node.text)) report(node, 'A SERVICE_ROLE identifier appears in the front end; the browser and Next process never hold the Supabase service role.', node.text);
       if (ts.isStringLiteralLike(node) && serviceRoleText(node.text)) report(node, 'A service_role string appears in the front end; the service role belongs behind the back-end guard chain.', node.text);
       const name = envRead(ts, node);
-      if (!name) return true;
+      if (!name) return;
       reads += 1;
       if (credentialEnv(name)) report(node, `${name} is a credential-shaped environment read in the front end; no *_SECRET, *_PRIVATE, *_TOKEN, *_PASSWORD or service-role value enters fe/.`, name);
       else if (name.startsWith('NEXT_PUBLIC_') && !CORE_PUBLIC_ENV.has(name) && file.slot !== FE_CONFIG_SLOT) {
         report(node, `${name} is not a core Supabase/site public variable and is read outside ${FE_CONFIG_SLOT}; product public configuration is declared by the one config owner.`, name);
       }
-      return true;
     });
   }
   return { violations, coverage: { status: 'checked', envReads: reads } };
@@ -293,8 +293,8 @@ const contains = (kit, root, predicate) => {
 
 const principalCall = (kit, checker, graph, node) => kit.ts.isCallExpression(node) && (() => {
   const expression = node.expression;
-  const name = kit.ts.isIdentifier(expression) ? expression : (kit.ts.isPropertyAccessExpression(expression) ? expression.name : null);
-  if (!name || name.text !== 'getPrincipal') return false;
+  const name = kit.ts.isPropertyAccessExpression(expression) ? expression.name : expression;
+  if (!kit.ts.isIdentifier(name) || name.text !== 'getPrincipal') return false;
   return kit.declarationsOf(checker, name).some(declaration => {
     const rel = kit.graphPath(declaration);
     return rel !== null && FE_DB_SLOTS.has(graph.files.get(rel)?.slot);
@@ -389,10 +389,11 @@ function checkFrontendAuthAndRoutes(input) {
             if (ts.isIdentifier(node) && sameSymbol(kit, checker, node, symbol)) references.push(node);
             return true;
           });
-          const firstUse = references.sort((a, b) => a.getStart() - b.getStart())[0];
+          references.sort((a, b) => a.getStart() - b.getStart());
+          const firstUse = references[0];
           if (firstUse && !parseUse(ts, firstUse)) reportAt(violations, kit, FE_WRITE_SHAPE, file, firstUse, `Server Action input ${parameter.text} is used before schema.parse(...) or schema.safeParse(...).`, { parameter: parameter.text });
         }
-        const sensitive = /(?:^|\/)(?:billing|payment|payout|refund|charge|subscription|password|credential|role|permission|membership)(?:\/|-|\.)/iu.test(file.rel);
+        const sensitive = /(?:^|\/)(?:billing|payment|payout|refund|charge|subscription|password|credential|role|permission|membership)[/.-]/iu.test(file.rel);
         if (sensitive && !contains(kit, action.body, node => ts.isCallExpression(node) && callName(ts, node) === 'getUser' && signatureFromSupabase(checker, node))) {
           reportAt(violations, kit, FE_SESSION_TRUST, file, action, 'A money, account-security or role-changing Server Action must call auth.getUser() before the mutation.');
         }

@@ -2,7 +2,6 @@ import path from 'node:path';
 import { isInside } from './config.mjs';
 import { relativePath, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
 import { commonJsRequireReasons, constructedDecoratorKind, decoratorCallee, moduleExportsOf, mutableDecoratorKind, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, returnedExpressions, selectedNode, tracedFrameworkKinds, valueSymbol, violation } from './ast-walks.mjs';
-import { sourceLocation } from '../../lib/ts-ast.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 
 const SOURCE_LAYOUT_RULE_ID = 'BE_FEATURE_LAYOUT_INVALID';
@@ -207,7 +206,7 @@ function staticProperty(ts, object, name) {
     : { status: 'dynamic', node: matching[0].initializer };
 }
 
-function graphqlField(config, context, sourceFile, node, decorator, kind, namingReasons, violations) {
+function graphqlField({ config, context, sourceFile, node, decorator, kind, namingReasons, violations }) {
   const call = decorator.expression;
   if (!context.ts.isCallExpression(call)) {
     namingReasons.push(`${relativePath(config.root, sourceFile.fileName)} has a non-call @${kind} decorator`);
@@ -443,7 +442,7 @@ export function checkBackendSourceShape(config, context) {
             if (!['Entity', 'ViewEntity'].includes(dynamic)) namingReasons.push(detail);
           }
         }
-        if (kind === 'Mutation' || kind === 'Query') graphqlField(config, context, sourceFile, node, decorator, kind, namingReasons, violations);
+        if (kind === 'Mutation' || kind === 'Query') graphqlField({ config, context, sourceFile, node, decorator, kind, namingReasons, violations });
         if (kind === 'Args') graphqlArgument(config, context, sourceFile, node, decorator, namingReasons, violations);
       }
       if (ts.isCallExpression(node)) {

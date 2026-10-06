@@ -3,7 +3,7 @@
 import { sameText } from '../../lib/same-text.mjs';
 import { found, readText } from './read.mjs';
 import { DB_CONFIG_POLICY, DB_TYPES_DRIFT, TYPES_FILE } from './database-constants.mjs';
-const ENV_REF = /^env\([A-Za-z_][A-Za-z0-9_]*\)$/;
+const ENV_REF = /^env\([A-Za-z_]\w*\)$/;
 const PUBLIC_KEYS = new Set(['anon_key', 'publishable_key', 'public_key']);
 
 
@@ -29,7 +29,7 @@ const isCredentialKey = (key) => {
 };
 
 const tomlLine = (text, key) => {
-  const expression = new RegExp(`^\\s*["']?${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']?\\s*=`, 'm');
+  const expression = new RegExp(String.raw`^\s*["']?${key.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}["']?\s*=`, 'm');
   const match = expression.exec(text);
   return match ? text.slice(0, match.index).split('\n').length : undefined;
 };
@@ -38,7 +38,7 @@ const tomlLine = (text, key) => {
 export async function parseToml(text) {
   try {
     const module = await import('smol-toml');
-    return (module.default?.parse ?? module.parse)(text);
+    return module.parse(text);
   } catch {
     return null;
   }
@@ -51,7 +51,8 @@ export function configFindings({ file, text, toml, supabase }) {
     if (!isCredentialKey(key)) continue;
     const line = tomlLine(text, key);
     if (typeof value !== 'string' || !ENV_REF.test(value)) {
-      findings.push(found(DB_CONFIG_POLICY, file, `${file}${line ? `:${line}` : ''} ${at} holds a literal credential; a secret in config.toml is written env(NAME), never a value`, { ...(line ? { line } : {}), key: at }));
+      const lineNote = line ? `:${line}` : '';
+      findings.push(found(DB_CONFIG_POLICY, file, `${file}${lineNote} ${at} holds a literal credential; a secret in config.toml is written env(NAME), never a value`, { ...(line ? { line } : {}), key: at }));
     }
   }
   const auth = toml?.auth ?? {};

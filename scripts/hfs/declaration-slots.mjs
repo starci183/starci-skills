@@ -8,7 +8,7 @@ export function optionalSlotProblems(manifest, side, s) {
   const bad = [];
   for (const id of s.optionalSlots ?? []) {
     const slot = manifest.slots.find((candidate) => candidate.id === id);
-    if (!slot || !slot.profiles.includes(side)) bad.push(`sides.${side}.optionalSlots names ${id}, which is not a ${side} slot`);
+    if (!slot?.profiles.includes(side)) bad.push(`sides.${side}.optionalSlots names ${id}, which is not a ${side} slot`);
     else if (slot.presence !== 'opt-in') bad.push(`sides.${side}.optionalSlots names ${id}, which is ${slot.presence}, not opt-in`);
     else if (slot.appKind !== undefined) bad.push(`sides.${side}.optionalSlots names ${id}; an app of kind ${slot.appKind} enables it`);
   }

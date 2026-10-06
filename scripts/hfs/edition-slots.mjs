@@ -20,8 +20,10 @@ export function effectiveSlot(slot, profile, edition) {
   if (edition !== 'lite') return slot;
   const { lite, litePresence, ...base } = slot;
   const presence = litePresenceOf(slot, profile);
-  const tracked = presence === 'forbidden' ? 'external' : (slot.tracked === 'external' ? 'tracked' : slot.tracked);
-  return { ...base, ...(lite ?? {}), presence, tracked, tests: 'none' };
+  let tracked = slot.tracked;
+  if (presence === 'forbidden') tracked = 'external';
+  else if (tracked === 'external') tracked = 'tracked';
+  return { ...base, ...lite, presence, tracked, tests: 'none' };
 }
 
 /** The template group starci app sync renders `slot` from under `edition`: `liteManagedBy` (else `managedBy`) in lite, `managedBy` otherwise; undefined when unmanaged. */
@@ -61,6 +63,6 @@ export function enforcerJudgedInEdition(rules, kind, id, edition = 'full') {
 export function editionRuleParams(params, edition) {
   const { lite, ...base } = params;
   const merged = edition === 'lite' && lite ? { ...base, ...lite } : base;
-  const deepFreeze = (value) => { if (value && typeof value === 'object') Object.values(value).forEach(deepFreeze); return Object.freeze(value); };
+  const deepFreeze = (value) => { if (value && typeof value === 'object') { Object.values(value).forEach(deepFreeze); } return Object.freeze(value); };
   return deepFreeze(structuredClone(merged));
 }

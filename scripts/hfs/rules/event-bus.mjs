@@ -29,7 +29,7 @@ const TEST_CALLEES = new Set(['it', 'test']);
 const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 
 /** The event-bus pattern file name of an event name: dots become dashes (`order.placed` -> `order-placed`). */
-export const stemOfEvent = (name) => name.split('.').join('-');
+export const stemOfEvent = (name) => name.replaceAll('.', '-');
 
 /** The `eventName` and `version` literals a class declares as `static readonly` members, with the line of the class. */
 function readEventClass(ts, text, file) {
@@ -74,7 +74,8 @@ export function eventClassContractFindings({ repoRoot, files, repo }) {
     if (text === null) continue;
     const classes = readEventClass(ts, text, file).filter((c) => c.name !== null || c.version !== null);
     if (classes.length !== 1 || classes[0].name === null || classes[0].version === null) {
-      findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} must declare exactly one event class with literal \`static readonly eventName\` and \`static readonly version\` members (the typed event of be/contracts/${service}/${CONTRACT_NAME}); found ${classes.length === 1 ? 'one without both literals' : `${classes.length} candidates`}.`, { service }));
+      const candidates = classes.length === 1 ? 'one without both literals' : `${classes.length} candidates`;
+      findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} must declare exactly one event class with literal \`static readonly eventName\` and \`static readonly version\` members (the typed event of be/contracts/${service}/${CONTRACT_NAME}); found ${candidates}.`, { service }));
       continue;
     }
     const [event] = classes;

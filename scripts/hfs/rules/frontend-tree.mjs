@@ -78,7 +78,7 @@ function placementFindings({ repoRoot, app, tracked }) {
   const base = `apps/${app}`;
   const findings = [];
   if (!tracked.includes(`${base}/src/proxy.ts`)) findings.push(found(I18N_PLACEMENT, `${base}/src/proxy.ts`, `${app} has no src/proxy.ts; locale routing lives in proxy.ts`, { app }));
-  for (const file of tracked.filter((f) => new RegExp(`^${base}/src/middleware\.[cm]?[jt]s$`).test(f))) findings.push(found(I18N_PLACEMENT, file, `${file} is a middleware file; Next 16 routes through src/proxy.ts`, { app }));
+  for (const file of tracked.filter((f) => new RegExp(`^${base}/src/middleware.[cm]?[jt]s$`).test(f))) findings.push(found(I18N_PLACEMENT, file, `${file} is a middleware file; Next 16 routes through src/proxy.ts`, { app }));
   const appDir = `${base}/src/app/`;
   for (const file of tracked.filter((f) => f.startsWith(appDir) && ROUTE_FILE.test(f))) {
     const rel = file.slice(appDir.length);
@@ -97,7 +97,7 @@ function placementFindings({ repoRoot, app, tracked }) {
 
 function catalogFindings({ repoRoot, app, tracked }) {
   const messages = `apps/${app}/src/modules/i18n/messages/`;
-  const catalogs = tracked.filter((f) => f.startsWith(messages) && f.endsWith('.json') && f.slice(messages.length).indexOf('/') === -1);
+  const catalogs = tracked.filter((f) => f.startsWith(messages) && f.endsWith('.json') && !f.slice(messages.length).includes('/'));
   const keys = new Map();
   for (const file of catalogs) {
     const parsed = readJson(repoRoot, file);
