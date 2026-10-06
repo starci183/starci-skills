@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { words } from './dockerfile.mjs';
+import { asList } from './list.mjs';
 
 /**
  * The services of a repository's own stack definition, read from `.starcistacks/application-stacks.yaml` and the compose
@@ -73,12 +74,6 @@ const imagePathOf = image => {
 
 /** True when the image reference carries a tag or digest (an external image, not a placeholder of the repository's own build). */
 const isTagged = image => image.includes('@') || image.slice(image.lastIndexOf('/') + 1).includes(':');
-
-const asList = value => {
-  if (Array.isArray(value)) return value;
-  if (value === undefined || value === null) return [];
-  return [value];
-};
 
 /** A compose `environment` (map or `KEY=VALUE` list) as a plain object; a `*_FILE` variable becomes the plain variable with the test value. */
 const environmentOf = value => {

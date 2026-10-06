@@ -1,7 +1,7 @@
 const LINE_TERMINATORS = ['\n', '\r', '\u2028', '\u2029'];
 const VALUE_EXTENSIONS = ['env', 'key', 'pem', 'tfvars'];
 
-/** The filenames matched by the declaration's former `INFRA_VALUE_FILE` expression. */
+/** The filenames matched by the declaration's former infrastructure-value-file expression. */
 export const isInfrastructureValueFile = (value) => {
   const name = String(value);
   if (LINE_TERMINATORS.some((line) => name.includes(line))) return false;

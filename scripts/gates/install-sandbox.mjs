@@ -19,6 +19,7 @@ import { init as gitInit } from '../api/git/init.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { runProgram } from '../api/process/run-program.mjs';
 import { DEFAULT_NODE } from '../lib/node-image.mjs';
+import { folded as lf } from '../lib/event-contract.mjs';
 import { readEnv } from '../lib/env.mjs'; import { byCodeUnit } from '../lib/list.mjs';
 const HOST_IGNORES = ['.starciwork/', '.claude/config.yaml', '.claude/secret.env'];
 const REQUIRED_FILES = ['CONTEXT.md', 'skills/starci/SKILL.md', 'skills/starci/references/host-startup.md', 'config.example.yaml', 'init/AGENTS.md', '.starci-skills.json'];
@@ -205,7 +206,6 @@ async function removeTree(dir) {
 class CouldNotRun extends Error {}
 
 const read = (file) => fs.readFileSync(file, 'utf8');
-const lf = (text) => text.replaceAll('\r\n', '\n');
 
 /** A finished child as {status, stdout, stderr}; a spawn error (`label` could not start) is CouldNotRun. */
 function finished(label, result) {
