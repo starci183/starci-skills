@@ -45,6 +45,24 @@ starci gate sonar dashboard --cwd examples/<app>
 
 It fails unless bugs, code smells and vulnerabilities are 0, every hotspot is reviewed and every measured file of the coverage scope is at 100.
 
+## The runtime itself: coverage and Sonar
+
+The runtime measures its own first-party source too. The scope is ONE list, `scripts/hfs/runtime-coverage-scope.mjs`: `engine/`, `scripts/`, `packages/cli/`, `ui/api/` and the `ui/*.mjs` entry files, never the specs, `node_modules`, the generated `packages/*/runtime/` copies, `examples/` (which keep their own flags and Sonar projects) or the vendored `engine/yaml.mjs` bundle. Three things are rendered from it and nothing is typed twice:
+`npm run test:coverage` (`scripts/gates/runtime-coverage.mjs`: the same suite and `tests/setup/` isolation as `npm test`, under Node's built-in coverage, writing the git-ignored `coverage/lcov.info`), the `runtime` flag of `codecov.yml`, and the root `sonar-project.properties` (project `starci-runtime`); `starci runtime check --only examples-ci -- --write` renders the last two and the check refuses drift.
+The `runtime` flag has never been measured, so its project and patch statuses are `informational: true` (never red) until a baseline exists; the overall Codecov statuses read the example flags only.
+
+In `.github/workflows/ci.yml` the coverage run replaces the plain test step (one run, never two). In the tag run (`startsWith(github.ref, 'refs/tags/v')`) it then uploads `coverage/lcov.info` under flag `runtime` through OIDC and, when `vars.SONAR_HOST_URL` and `secrets.SONAR_TOKEN` exist, scans and waits for the quality gate, otherwise it prints a "Sonar skipped" notice; a manual dispatch runs the tests and produces the coverage but uploads and scans nothing. The owner configures once: the Codecov app and OIDC for the repository, `vars.SONAR_HOST_URL` and `secrets.SONAR_TOKEN` (an analysis token of project `starci-runtime`).
+
+The local scan, with the local SonarQube up and `SONAR_TOKEN` in the environment (the analysis token; `ensure-project` and a scan that provisions use the host admin custody `ext/sonar/secrets/sonarqube-admin-token.key.enc`):
+
+```sh
+npm run test:coverage
+starci gate sonar ensure-project --key starci-runtime --name "StarCi runtime" --with-token
+starci gate sonar scan --cwd <runtime root> --project-gate --wait
+```
+
+The runtime's own `dashboard` gate is not used: it holds a per-file coverage of 100 that only the example apps are held to.
+
 ## Pre-workflow readiness
 
 Before the owner runs a workflow on a new runtime release, run the launch smoke once on the live host, from a plain Orca shell (or the owner's chat), never from an agent:

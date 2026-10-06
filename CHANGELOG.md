@@ -16,6 +16,7 @@ Theme: the runtime's version line leaves alpha and the host prompts move into th
 - The machine store has one schema and no migration path: the v2→v3 upgrade introduced in `b01a8a703` is removed, and a store of an earlier shape is refused unchanged.
 
 ### Added
+- The runtime itself is measured: `npm run test:coverage` runs the root suite under Node's built-in coverage and writes `coverage/lcov.info` over the first-party source (`scripts/hfs/runtime-coverage-scope.mjs`), the tag-run `ci.yml` uploads it to Codecov under the informational `runtime` flag and scans it with the root `sonar-project.properties` (project `starci-runtime`); both files are rendered by `starci runtime check --only examples-ci -- --write`.
 - A GitHub Actions workflow produces a downloadable runtime artifact carrying version, commit SHA and hash metadata.
 
 ### Evidence

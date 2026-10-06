@@ -223,6 +223,13 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+  - id: runtime.sonar-config
+    profiles: [runtime]
+    path: sonar-project.properties
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
   - id: runtime.agent-settings
     profiles: [runtime]
     path: .claude/settings.json

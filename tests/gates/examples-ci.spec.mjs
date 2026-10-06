@@ -7,13 +7,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { APP_QUALITY_FILES, CODECOV, WORKFLOW, appCoverageScope, appQualityTargets, checkExamplesCi, coverageExampleApps, examplesCiMain, exampleApps, exampleHasTests, exampleImages, renderCodecov } from '../../scripts/checks/check-examples-ci.mjs';
+import { APP_QUALITY_FILES, RUNTIME_SONAR, CODECOV, WORKFLOW, appCoverageScope, appQualityTargets, checkExamplesCi, coverageExampleApps, examplesCiMain, exampleApps, exampleHasTests, exampleImages, renderCodecov } from '../../scripts/checks/check-examples-ci.mjs';
 import { readProperties } from '../../scripts/lib/properties.mjs';
 import { coverageScopeOf, coverageTargetOf } from '../../scripts/gates/sonar-gate.mjs';
 import { braceVariants, globExpression } from '../../scripts/lib/glob.mjs';
 import { isMeasured } from '../../scripts/hfs/coverage-scope.mjs';
 import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 import { execFileSync } from 'node:child_process';
+import { RUNTIME_FLAG, RUNTIME_LCOV, RUNTIME_SONAR_KEY, runtimeCodecovPaths, runtimeCoverageNodeArgs } from '../../scripts/hfs/runtime-coverage-scope.mjs';
+import { coverageArgs } from '../../scripts/gates/runtime-coverage.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const codes = (root) => checkExamplesCi(root).findings.map((finding) => finding.code).sort();
@@ -25,7 +27,7 @@ test('the repository: every example app is in the derived matrix and has a flag;
   assert.ok(!apps.includes('starcistacks-services'), 'a folder without an app hfs.json is not an app');
   assert.deepEqual(checkExamplesCi(ROOT).findings, []);
   const flags = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8')).flag_management.individual_flags;
-  assert.deepEqual(flags.map((flag) => flag.name), coverageExampleApps(ROOT));
+  assert.deepEqual(flags.map((flag) => flag.name), [...coverageExampleApps(ROOT), RUNTIME_FLAG]);
   assert.equal(exampleHasTests('lite-app', ROOT), false);
   assert.equal(fs.existsSync(path.join(ROOT, 'examples', 'lite-app', 'codecov.yml')), false);
   const workflow = parseYaml(fs.readFileSync(path.join(ROOT, WORKFLOW), 'utf8'));
@@ -202,6 +204,42 @@ test('the quality files of each example are rendered from the source slot manife
   assert.deepEqual(codes(root), []);
   const sonar = path.join(root, 'examples', 'alpha', 'sonar-project.properties');
   fs.writeFileSync(sonar, fs.readFileSync(sonar, 'utf8').replace('be/**/*.args.ts,', ''));
+  assert.deepEqual(codes(root), ['EXAMPLES_CI_APP_QUALITY_DRIFT']);
+  examplesCiMain(['--write'], { root, out: () => {} });
+  assert.deepEqual(codes(root), []);
+});
+
+test('the runtime is measured by one scope: the codecov runtime flag (informational), the root sonar-project.properties, the coverage producer and the tag-run ci.yml all read it', () => {
+  const codecov = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8'));
+  const flag = codecov.flag_management.individual_flags.find((entry) => entry.name === RUNTIME_FLAG);
+  assert.deepEqual(flag.paths, runtimeCodecovPaths());
+  assert.deepEqual(flag.statuses, [{ type: 'project', informational: true }, { type: 'patch', informational: true }], 'no invented threshold: informational until a baseline exists');
+  assert.deepEqual(codecov.coverage.status.project.default.flags, coverageExampleApps(ROOT), 'the overall status reads the example flags only');
+  for (const glob of runtimeCodecovPaths()) assert.ok(runtimeCoverageNodeArgs().includes(`--test-coverage-include=${glob}`), `the producer measures ${glob}`);
+  const sonar = readProperties(path.join(ROOT, RUNTIME_SONAR));
+  assert.equal(sonar['sonar.projectKey'], RUNTIME_SONAR_KEY);
+  assert.equal(sonar['sonar.javascript.lcov.reportPaths'], RUNTIME_LCOV);
+  for (const source of sonar['sonar.sources'].split(',')) assert.ok(fs.existsSync(path.join(ROOT, source)), `${source} exists`);
+  assert.ok(coverageArgs().includes(`--test-reporter-destination=${RUNTIME_LCOV}`));
+  assert.ok(fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8').split('\n').includes('/coverage/'), 'coverage/ is git-ignored');
+  const ci = parseYaml(fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8')).jobs['check-and-test'];
+  assert.equal(ci.permissions['id-token'], 'write');
+  assert.ok(!ci.steps.some((step) => step.run === 'npm test'), 'the suite runs once, under coverage');
+  assert.ok(ci.steps.some((step) => step.run === 'npm run test:coverage'));
+  const upload = ci.steps.find((step) => String(step.uses ?? '').startsWith('codecov/codecov-action@'));
+  assert.equal(upload.with.flags, RUNTIME_FLAG);
+  assert.equal(upload.with.files, RUNTIME_LCOV);
+  assert.ok(String(upload.if).includes("startsWith(github.ref, 'refs/tags/v')"), 'Codecov uploads only from the release-tag run');
+  const sonarSteps = ci.steps.filter((step) => String(step.uses ?? '').startsWith('SonarSource/'));
+  assert.equal(sonarSteps.length, 2);
+  for (const step of sonarSteps) assert.ok(String(step.if).includes("startsWith(github.ref, 'refs/tags/v')"), 'Sonar runs only in the release-tag run');
+  assert.ok(ci.steps.some((step) => /Sonar skipped/.test(String(step.name ?? ''))), 'a missing server is announced, never a silent pass');
+});
+
+test('the root sonar-project.properties of the runtime is a render: a hand edit is refused and --write restores it', (t) => {
+  const root = fixture(t, ['alpha']);
+  assert.deepEqual(codes(root), []);
+  fs.writeFileSync(path.join(root, RUNTIME_SONAR), 'sonar.projectKey=other\n');
   assert.deepEqual(codes(root), ['EXAMPLES_CI_APP_QUALITY_DRIFT']);
   examplesCiMain(['--write'], { root, out: () => {} });
   assert.deepEqual(codes(root), []);

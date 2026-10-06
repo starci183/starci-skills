@@ -2,7 +2,9 @@
 # One flag per full-edition example app (lite has no tests or coverage), uploaded by .github/workflows/examples.yml. The paths are the app's coverage
 # scope (the logic of be/src/modules/**: the slot manifest's `coverage` field, derived once by scripts/hfs/coverage-scope.mjs, the same scope the
 # app's own codecov.yml, be/jest.config.js and sonar.coverage.exclusions render); every flag is held at 100 on the project and on the patch,
-# and so is every component (one per service app of each example, plus its platform).
+# and so is every component (one per service app of each example, plus its platform). The flag runtime is the runtime's own first-party source
+# (scripts/hfs/runtime-coverage-scope.mjs), uploaded by .github/workflows/ci.yml in the tag run; it has never been measured, so its project and patch
+# statuses are informational (never red) until a baseline exists, and the overall statuses above read the example flags only.
 codecov:
   require_ci_to_pass: true
 coverage:
@@ -11,10 +13,16 @@ coverage:
       default:
         target: 100%
         threshold: 0%
+        flags:
+          - ecommerce-app
+          - shape-slot
     patch:
       default:
         target: 100%
         threshold: 0%
+        flags:
+          - ecommerce-app
+          - shape-slot
 flag_management:
   default_rules:
     carryforward: false
@@ -38,6 +46,21 @@ flag_management:
         - "examples/shape-slot/be/src/modules/integrations/*/**"
         - "examples/shape-slot/be/src/modules/platform/*/**"
         - "examples/shape-slot/be/src/modules/projections/*/**"
+    - name: runtime
+      paths:
+        - "engine/**"
+        - "scripts/**"
+        - "packages/cli/**"
+        - "ui/api/**"
+        - "ui/harness-process.mjs"
+        - "ui/harness-verbs.mjs"
+        - "ui/ports.mjs"
+        - "ui/server.mjs"
+      statuses:
+        - type: project
+          informational: true
+        - type: patch
+          informational: true
 component_management:
   default_rules:
     statuses:

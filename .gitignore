@@ -35,6 +35,7 @@ __pycache__/
 
 # Generated build output under the examples and the packages tree: re-run, never committed.
 examples/**/coverage/
+/coverage/
 packages/**/storybook-static/
 
 # Generated roots (ruleParams.runtime.generated: scripts/hfs/sync-runtime.mjs writes the packages' runtime copies,

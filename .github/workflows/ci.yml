@@ -4,6 +4,13 @@ name: ci
 # freshness check, the provider validator) then the full `npm test` suite, on the Node 22 line the
 # engines field requires. It runs ONCE per release, on the push of a v* tag (and when a person dispatches it), never on a branch push or a pull
 # request (docs/git-governance.md, rule CI_TRIGGERS_RELEASE_ONLY): the release flow runs the same suite locally first.
+#
+# The suite runs ONCE, under Node's built-in coverage (`npm run test:coverage`, scripts/gates/runtime-coverage.mjs), over the runtime's own first-party
+# source (scripts/hfs/runtime-coverage-scope.mjs, docs/releasing.md): it writes coverage/lcov.info. Codecov (flag runtime, informational until a baseline
+# exists) and Sonar (project starci-runtime, the root sonar-project.properties) take it in the tag run only (startsWith(github.ref, refs/tags/v)); a manual
+# dispatch runs the tests and produces the coverage but publishes no measurement. The Codecov upload authenticates with GitHub's OIDC token (use_oidc,
+# permissions id-token: write) and a failed upload fails the job; Sonar runs only where vars.SONAR_HOST_URL and secrets.SONAR_TOKEN exist, and says so
+# when it does not (never a silent pass).
 
 on:
   push:
@@ -21,7 +28,13 @@ jobs:
   check-and-test:
     name: check + test
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -55,8 +68,33 @@ jobs:
       - name: Static checks
         run: npm run check
 
-      - name: Test suite
-        run: npm test
+      - name: Test suite with coverage (writes coverage/lcov.info)
+        run: npm run test:coverage
+
+      - name: Coverage upload (Codecov, flag runtime)
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
+        uses: codecov/codecov-action@v5
+        with:
+          use_oidc: true
+          files: coverage/lcov.info
+          flags: runtime
+          disable_search: true
+          fail_ci_if_error: true
+
+      - name: Sonar scan
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+        uses: SonarSource/sonarqube-scan-action@v7
+
+      - name: Sonar quality gate
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 10
+        with:
+          scanMetadataReportFile: .scannerwork/report-task.txt
+
+      - name: Sonar skipped (no server configured)
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && (env.SONAR_TOKEN == '' || env.SONAR_HOST_URL == '') }}
+        run: echo "::notice title=Sonar skipped::no Sonar server is configured for this repository (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN), so the runtime was not scanned; the local scan (docs/releasing.md) is a release-checklist item."
 
       # Every published @starci package (the starci pins of knowledge/hfs/canon-pins.yaml) passes its own tests from a
       # clean install of its own manifest and lock in a temp dir: nothing hoisted in this checkout can hide an undeclared
