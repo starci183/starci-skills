@@ -70,7 +70,10 @@ export function snapshotTree(dir, parent, files, git) {
     const stage = files.filter((file) => {
       if (tracked.has(file)) return true;
       try { return Boolean(fs.lstatSync(path.join(dir, file), { throwIfNoEntry: false })); }
-      catch (error) { if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return false; throw error; }
+      catch (error) {
+        if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return false;
+        throw error;
+      }
     });
     if (stage.length) {
       const result = git(gitAdd, dir, ['-A', '--', ...literalPaths(stage)], { env });
