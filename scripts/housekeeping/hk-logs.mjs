@@ -79,7 +79,11 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
       orchestrationDbBytes: null, orchestrationDbWalBytes: null, orchestrationDbShmBytes: null,
       notes: [] } };
   const overflow = { deleted: 0, truncated: 0, skipped: 0, errors: 0 };
-  const push = (key, entry) => { (out[key].length < LIST_MAX ? out[key].push(entry) : overflow[key] += 1); };
+  const push = (key, entry) => {
+    if (out[key].length < LIST_MAX) return out[key].push(entry);
+    overflow[key] += 1;
+    return overflow[key];
+  };
 
   const skip = (p, reason) => push('skipped', { path: p, reason });
   const fail = (p, error) => { out.ok = false; push('errors', { path: p, code: error?.code ?? 'ERROR', message: String(error?.message ?? error) }); };
@@ -119,7 +123,7 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
     for (const e of entries) {
       const p = path.join(dir, e.name);
       let st;
-      try { st = fs.lstatSync(p); } catch (error) { if (error?.code !== 'ENOENT') fail(p, error); continue; }
+      try { st = fs.lstatSync(p); } catch (error) { if (error?.code !== 'ENOENT') { fail(p, error); } continue; }
       if (st.isDirectory()) {
         if (isLinkLike(p, { parentReal, stat: st })) { skip(p, 'link'); continue; }
         if (SKIP_DIRS.has(e.name)) { skip(p, `excluded-dir:${e.name}`); continue; }

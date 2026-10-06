@@ -11,7 +11,7 @@ export const RETIRED_PATHS_FILE = 'modules/kernel/retired-paths.yaml';
 /** 1-based line number of the character at `offset` in `text`. */
 export const lineOf = (text, offset) => {
   let line = 1;
-  for (let i = 0; i < offset; i += 1) if (text.charCodeAt(i) === 10) line += 1;
+  for (let i = 0; i < offset; i += 1) if (text.codePointAt(i) === 10) line += 1;
   return line;
 };
 

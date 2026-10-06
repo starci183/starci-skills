@@ -2,4 +2,4 @@
 // carry CRLF): the one comparison the database rules use for a committed file against its base or against a regenerated one.
 
 /** True when both texts exist and are equal once CRLF is folded to LF and trailing whitespace at the end is dropped. */
-export const sameText = (a, b) => a !== null && b !== null && a.replace(/\r\n/g, '\n').trimEnd() === b.replace(/\r\n/g, '\n').trimEnd();
+export const sameText = (a, b) => a !== null && b !== null && a.replaceAll('\r\n', '\n').trimEnd() === b.replaceAll('\r\n', '\n').trimEnd();

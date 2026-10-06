@@ -49,10 +49,17 @@ export function proseRestateFindings(ctx) {
       const owned = (l) => new Set(pathTokens(l).flatMap(({ paths }) => paths.filter((p) => resolver.owned(p)))).size;
       if (/^\s*(?:- |# )?```/.test(line) || /^\s*```/.test(line)) {
         if (fenced === null) { fenced = new Set(); fenceFrom = index + 1; }
-        else { if (fenced.size >= PATH_LIMIT) add(file, fenceFrom, `a fenced block names ${fenced.size} slot paths`); fenced = null; }
+        else { if (fenced.size >= PATH_LIMIT) { add(file, fenceFrom, `a fenced block names ${fenced.size} slot paths`); } fenced = null; }
         return;
       }
-      if (fenced !== null) { for (const { paths } of pathTokens(line)) for (const p of paths) if (resolver.owned(p)) fenced.add(p); return; }
+      if (fenced !== null) {
+        for (const { paths } of pathTokens(line)) {
+          for (const p of paths) {
+            if (resolver.owned(p)) fenced.add(p);
+          }
+        }
+        return;
+      }
       if (owned(line) >= PATH_LIMIT) add(file, index + 1, `one line names ${owned(line)} slot paths`);
       for (const sentence of sentences(line)) {
         const named = new Set([...sentence.matchAll(/`([^`\s]+)`/g)].map((m) => m[1].replace(/^\.?\//, '')).filter((n) => names.has(n)));

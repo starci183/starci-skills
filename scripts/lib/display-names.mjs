@@ -12,7 +12,7 @@
 // the supervisor digest and progress report, Telegram notices and the harness UI.
 import fs from 'node:fs';
 import path from 'node:path';
-import { clipLine, squash } from './clip.mjs';
+import { squash } from './clip.mjs';
 import { ownerLanguage, translator } from './i18n.mjs';
 import { list } from './list.mjs';
 import { parseJson } from './json.mjs';
@@ -30,7 +30,7 @@ let labelsCache = null;
 /** {op: {vi, en}} from modules/ops/_labels.yaml; {} when the file is unreadable. */
 export function opLabelMap() {
   if (labelsCache) return labelsCache;
-  labelsCache = Object.freeze({ ...(readYamlFile(LABELS_FILE)?.labels ?? {}) });
+  labelsCache = Object.freeze({ ...readYamlFile(LABELS_FILE)?.labels });
   return labelsCache;
 }
 /** The human label of an op (a `op#instance` leg label reads as its op), else the op id itself. */
@@ -85,7 +85,7 @@ export function workflowNames(db, { displayOnly = false } = {}) {
 export const nameWithId = (name, id) => (name && name !== id ? `${name} (${id})` : String(id ?? name ?? ''));
 
 /** The name of an attached file record ({name?, abs}): its declared name, else its basename, forward-slashed. */
-export const attachedNameOf = (file) => String(file.name ?? path.basename(String(file.abs ?? ''))).replace(/\\/g, '/');
+export const attachedNameOf = (file) => String(file.name ?? path.basename(String(file.abs ?? ''))).replaceAll('\\', '/');
 
 // ---------------------------------------------------------------------------------- workflow names
 const BRAND_CASE = { starci: 'StarCi' };
@@ -116,7 +116,7 @@ export function deriveWorkflowDisplayName({ text, product = null, fallback = nul
   const head = prod ? `${prod}${NAME_SEPARATOR}` : '';
   const room = max - head.length;
   if (!clause || !/[\p{L}\p{N}]/u.test(clause) || room < 8) return fallback ? clipWords(fallback, max) : (prod || null);
-  return `${head}${clipWords(`${clause[0].toUpperCase()}${clause.slice(1)}`, room)}`;
+  return `${head}${clipWords(clause[0].toUpperCase() + clause.slice(1), room)}`;
 }
 
 // ------------------------------------------------------------------------------------ op job names

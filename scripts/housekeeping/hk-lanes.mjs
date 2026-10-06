@@ -121,7 +121,11 @@ const LANE_CALLS = {
   reflog: (rest, opts) => gitResultOf(gitReflog(rest, opts)),
   'rev-parse': (rest, opts) => gitResultOf(revParseQuery(rest, opts)),
   'merge-base': ([a, b], { cwd }) => { const sha = mergeBase(cwd, a, b); return { ok: Boolean(sha), stdout: sha ?? '', error: sha ? '' : `no merge-base of ${a} and ${b}` }; },
-  worktree: ([sub, ...rest], opts) => (sub === 'list' ? gitResultOf(worktreeListQuery(rest, opts)) : (({ ok, stdout, stderr }) => ({ ok, stdout, error: stderr }))(worktreePrune(opts.cwd))),
+  worktree: ([sub, ...rest], opts) => {
+    if (sub === 'list') return gitResultOf(worktreeListQuery(rest, opts));
+    const { ok, stdout, stderr } = worktreePrune(opts.cwd);
+    return { ok, stdout, error: stderr };
+  },
   status: (rest, opts) => gitResultOf(gitStatus(rest, opts)),
   cherry: (rest, opts) => gitResultOf(gitCherry(rest, opts)),
   'rev-list': (rest, opts) => gitResultOf(revList(rest, opts)),
@@ -132,6 +136,11 @@ const LANE_CALLS = {
 };
 /** The default lane git runner: (args, {cwd}) -> {ok, stdout, error}. */
 export const laneGit = ([verb, ...rest], opts) => LANE_CALLS[verb](rest, opts);
+
+const allocationForLaneGrace = (allocation) => {
+  if (allocation !== undefined) return allocation;
+  try { return allocationSettings(); } catch { return null; }
+};
 
 export function sweepLanes({ apply = false, now = Date.now(), env = process.env, allocation = undefined, config = undefined, root = SKILL_ROOT, git = null, owners = undefined } = {}) {
   const run = git ?? laneGit;
@@ -149,7 +158,7 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
   // A spec process with no owners passed reads none (never the live host's Orca).
   let ownerInfo = owners ?? null;
   const ownersNow = () => (ownerInfo ??= (isSpecRun() ? { workers: [], sup: { jobs: [] } } : liveLaneOwners({ env })));
-  const graceMs = laneGraceMs(allocation === undefined ? (() => { try { return allocationSettings(); } catch { return null; } })() : allocation);
+  const graceMs = laneGraceMs(allocationForLaneGrace(allocation));
   for (const w of worktrees) {
     const key = pathKey(w.path);
     if (key === mainKey) { skip(w.path, 'main-checkout'); continue; }

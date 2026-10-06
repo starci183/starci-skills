@@ -103,8 +103,8 @@ export function doctorInstallation(input, log = console.log, deps = {}) {
     }
     const entries = planEntries(repo, manifest);
     const custody = manifest.hostSkills;
-    if (!Object.keys(entries.files).length || entries.write.length || !custody || custody.hashMode !== 'sha256-bytes'
-      || !custody.files || Array.isArray(custody.files) || typeof custody.files !== 'object') throw new Error('public entry discovery is missing, changed or has no exact-byte custody');
+    if (!Object.keys(entries.files).length || entries.write.length || custody?.hashMode !== 'sha256-bytes'
+      || !custody?.files || Array.isArray(custody.files) || typeof custody.files !== 'object') throw new Error('public entry discovery is missing, changed or has no exact-byte custody');
     for (const [relative, digest] of Object.entries(custody.files)) {
       if (!/^[a-f0-9]{64}$/.test(digest) || sha256(fs.readFileSync(ownedFile(repo, relative))) !== digest) throw new Error(`recorded public entry custody differs: ${relative}`);
     }

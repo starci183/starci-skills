@@ -55,7 +55,7 @@ const reclaimSpace = (db) => { try { db.exec('PRAGMA incremental_vacuum'); retur
  * freelist. Call outside every transaction. Returns {retained, debugLogsDeleted, vacuumed}.
  */
 export function retainLedgerDb(db, { now = Date.now() } = {}) {
-  if (!db) throw Error('retainLedgerDb needs an open ledger db');
+  if (!db) throw new Error('retainLedgerDb needs an open ledger db');
   const debugLogsDeleted = pruneDebugLogs(db, { now });
   return { retained: true, debugLogsDeleted, vacuumed: reclaimSpace(db) };
 }

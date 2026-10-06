@@ -49,7 +49,7 @@ async function main(argv) {
   const report = await ledgerHygieneReport({ apply });
   if (json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   else {
-    process.stdout.write(`ledger-hygiene: ${report.orphans.length} orphan ledger(s), ${report.legacy.length} legacy store(s)${apply ? `, ${report.applied.length} archived` : ''}\n`);
+    process.stdout.write(`ledger-hygiene: ${report.orphans.length} orphan ledger(s), ${report.legacy.length} legacy store(s)${apply ? ', ' + report.applied.length + ' archived' : ''}\n`);
     const body = formatReport(report);
     if (body) process.stdout.write(`${body}\n`);
   }

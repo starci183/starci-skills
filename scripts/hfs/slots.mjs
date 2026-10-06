@@ -64,7 +64,7 @@ export function appRelativeMessages(side, sideRoot) {
   let entries = [];
   try { entries = fs.readdirSync(sideRoot).filter((name) => name !== 'node_modules' && !name.startsWith('.git')); } catch { /* no side folder: nothing to rewrite */ }
   if (!entries.length) return (message) => message;
-  const escaped = entries.sort((a, b) => b.length - a.length).map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const escaped = entries.sort((a, b) => b.length - a.length).map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`));
   const token = new RegExp(`(^|[\\s'"\`(\\[{,;=<>])((?:${escaped.join('|')})(?=/|[\\s'"\`)\\]},;:!?<>]|\\.(?:\\s|$)|$))`, 'g');
   return (message) => (typeof message === 'string' && message
     ? message.replace(token, (whole, before, entry, offset) => (message.startsWith('/', offset + whole.length) || entry.includes('.') ? `${before}${side}/${entry}` : whole))
@@ -271,14 +271,14 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
   try { doc = parseYaml(text ?? fs.readFileSync(file, 'utf8')); } catch (error) { fail('HFS_MANIFEST_INVALID', `the slot manifest cannot be read (${String(error?.message ?? error).split('\n')[0]})`, { file }); }
   const problems = manifestShapeProblems(doc);
   if (!problems.length) problems.push(...manifestSemanticProblems(doc));
-  if (problems.length) fail('HFS_MANIFEST_INVALID', `the slot manifest breaks its schema: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? `; and ${problems.length - 5} more` : ''}`, { file, problems });
+  if (problems.length) fail('HFS_MANIFEST_INVALID', `the slot manifest breaks its schema: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? '; and ' + (problems.length - 5) + ' more' : ''}`, { file, problems });
   const [major, minor, patch] = doc.version.split('.').map(Number);
   return Object.freeze({ ...doc, major, minor, patch });
 }
 
 // ------------------------------------------------------------------------------------- declaration
 
-const declarationInvalid = (problems, file) => fail('HFS_DECLARATION_INVALID', `hfs.json is refused: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? `; and ${problems.length - 5} more` : ''}`, { file, problems });
+const declarationInvalid = (problems, file) => fail('HFS_DECLARATION_INVALID', `hfs.json is refused: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? '; and ' + (problems.length - 5) + ' more' : ''}`, { file, problems });
 
 /** One side of a declaration checked against the manifest: app kinds of the profile, opt-in slots, required app kinds, reads. */
 function sideProblems(manifest, side, s) {
@@ -395,6 +395,16 @@ export function readRepoDeclaration(manifest, repoRoot) {
 
 const isEntryFile = (name) => name === 'index.ts' || name === 'index.tsx';
 
+/** The folder kind of a file in its slot, from a named layer or kind folder. */
+function kindOf({ variant, slot, root }, p) {
+  const names = [...(slot.layers ?? []), ...(slot.kinds ?? [])];
+  if (!names.length) return null;
+  const literal = variant.segments.find((segment) => names.includes(segment));
+  if (literal) return literal;
+  const below = root ? p.slice(root.length + 1) : p;
+  return below.split('/').slice(0, -1).find((segment) => names.includes(segment)) ?? null;
+}
+
 /**
  * The four questions for one scope: the app root (profile app, root paths) or one side (profile be or fe, paths relative to the
  * side folder). createSlotResolver composes them; nothing else calls this.
@@ -466,20 +476,6 @@ function createScopeResolver(manifest, repo) {
     };
   }
 
-  /**
-   * The folder kind of a file: the layer or kind folder its slot names (`layers`, `kinds`) that the file sits in. A slot whose
-   * path spells the choice (`components/{blocks,leaves}/<name>/`) answers from the matched pattern; a slot that owns a whole
-   * directory (`packages/<family>-ui/`) answers from the first folder below its root that the list names.
-   */
-  function kindOf({ variant, slot, root }, p) {
-    const names = [...(slot.layers ?? []), ...(slot.kinds ?? [])];
-    if (!names.length) return null;
-    const literal = variant.segments.find((segment) => names.includes(segment));
-    if (literal) return literal;
-    const below = root ? p.slice(root.length + 1) : p;
-    return below.split('/').slice(0, -1).find((segment) => names.includes(segment)) ?? null;
-  }
-
   /** The role of a file in its slot: the entry of `roles` whose file name (variables filled from the path, `*` a wildcard inside the name) matches the file's name. */
   function roleOf(slot, bindings, p) {
     const name = p.split('/').pop();
@@ -497,7 +493,7 @@ function createScopeResolver(manifest, repo) {
     if (ambiguous.length) return { path: p, status: 'ambiguous', candidates: ambiguous };
     if (!hit) return { path: p, status: 'no-slot', code: 'HFS_SLOT_UNDECLARED', nearest: nearest(p) };
     const { slot, root, bindings } = hit;
-    const status = slot.presence === 'forbidden' ? 'forbidden' : (slotEnabled(slot) ? 'owned' : 'not-enabled');
+    const status = (slot.presence === 'forbidden' && 'forbidden') || (slotEnabled(slot) ? 'owned' : 'not-enabled');
     const kind = kindOf(hit, p);
     const role = roleOf(slot, bindings, p);
     return { path: p, status, slot: slot.id, root, bindings, ...(kind ? { kind } : {}), ...(role ? { role } : {}), presence: slot.presence, tracking: slot.tracked, ...(status === 'forbidden' ? { goesTo: slot.goesTo } : {}) };
@@ -588,11 +584,11 @@ function createScopeResolver(manifest, repo) {
       if (slot.minInstances) minimums.push({ slot: slot.id, min: slot.minInstances, ...(slot.appKind ? { appKind: slot.appKind } : {}) });
       for (const variant of braceVariants(slot.path)) {
         const names = [...new Set(varsOf(variant))];
-        const fixed = { ...(slot.requiredInstances ?? {}) };
+        const fixed = { ...slot.requiredInstances };
         const open = names.filter((n) => n !== 'app' && !(n in fixed));
         if (open.length) continue;            // an instance-level slot: its instances are found by walking the tree
         const combos = [{}];
-        const grow = (name, values) => { const next = []; for (const c of combos) for (const v of values) next.push({ ...c, [name]: v }); combos.splice(0, combos.length, ...next); };
+        const grow = (name, values) => { const next = []; for (const c of combos) { for (const v of values) { next.push({ ...c, [name]: v }); } } combos.splice(0, combos.length, ...next); };
         if (names.includes('app')) grow('app', expandApps(slot).map((a) => a.name));
         for (const [name, values] of Object.entries(fixed)) grow(name, values);
         const isInstance = names.length > 0;
@@ -609,7 +605,7 @@ function createScopeResolver(manifest, repo) {
       }
     }
     const seen = new Set();
-    return { paths: paths.filter((p) => { const key = `${p.slot}|${p.path}`; if (seen.has(key)) return false; seen.add(key); return true; }), minimums };
+    return { paths: paths.filter((p) => { const key = `${p.slot}|${p.path}`; if (seen.has(key)) { return false; } seen.add(key); return true; }), minimums };
   }
 
   /** tracked | ignored | external for the slot owning `p`, or null when no slot owns it. */
@@ -745,7 +741,7 @@ const ENFORCER_FAMILIES = Object.freeze(['eslint-be', 'eslint-fe', 'stylelint', 
 const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
 const FINDING_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
 const ENFORCER_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
-const FILE_ENFORCERS = ['machine', 'hfs', 'work-validate', 'sonar', 'runtime'];
+const FILE_ENFORCERS = new Set(['machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
 
 /** Shape and semantic problems of a parsed knowledge/hfs/rules.yaml, in the words of modules/schemas/hfs-rules.schema.yaml. */
 function ruleCatalogProblems(d) {
@@ -814,8 +810,8 @@ function ruleCatalogProblems(d) {
       if (e.at !== undefined) {
         if (typeof e.at !== 'string' || !e.at.trim() || e.at.startsWith('/') || e.at.includes('..')) bad.push(`${eat}.at must be a repository-relative path`);
         if (e.status === 'planned') bad.push(`${eat} is planned, so it has no file yet (at)`);
-        if (!FILE_ENFORCERS.includes(e.kind)) bad.push(`${eat}.at belongs to a machine, hfs, work-validate, sonar or runtime enforcer only`);
-      } else if (FILE_ENFORCERS.includes(e.kind) && e.status !== 'planned') bad.push(`${eat} exists, so it names the file (at) that emits its code`);
+        if (!FILE_ENFORCERS.has(e.kind)) bad.push(`${eat}.at belongs to a machine, hfs, work-validate, sonar or runtime enforcer only`);
+      } else if (FILE_ENFORCERS.has(e.kind) && e.status !== 'planned') bad.push(`${eat} exists, so it names the file (at) that emits its code`);
     });
     if (Array.isArray(r.gates)) {
       const hasSonar = r.enforcers.some((e) => isPlainObject(e) && e.kind === 'sonar');
@@ -825,7 +821,7 @@ function ruleCatalogProblems(d) {
   return bad;
 }
 
-const deepFreeze = (v) => { if (v && typeof v === 'object') Object.values(v).forEach(deepFreeze); return Object.freeze(v); };
+const deepFreeze = (v) => { if (v && typeof v === 'object') { Object.values(v).forEach(deepFreeze); } return Object.freeze(v); };
 
 /**
  * The parsed and validated HFS rule catalog. `text` (or `file`, or `root`) selects the source; the default is the runtime's
@@ -837,7 +833,7 @@ export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_R
   let doc;
   try { doc = parseYaml(text ?? fs.readFileSync(file, 'utf8')); } catch (error) { fail('HFS_RULES_INVALID', `the rule catalog cannot be read (${String(error?.message ?? error).split('\n')[0]})`, { file }); }
   const problems = ruleCatalogProblems(doc);
-  if (problems.length) fail('HFS_RULES_INVALID', `the rule catalog breaks its schema: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? `; and ${problems.length - 5} more` : ''}`, { file, problems });
+  if (problems.length) { fail('HFS_RULES_INVALID', `the rule catalog breaks its schema: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? '; and ' + (problems.length - 5) + ' more' : ''}`, { file, problems }); }
   const [major, minor, patch] = doc.version.split('.').map(Number);
   if (manifest && manifest.major !== major) fail('HFS_MANIFEST_MAJOR_MISMATCH', `the rule catalog is major ${major} but the slot manifest is major ${manifest.major}`, { catalog: major, manifest: manifest.major });
   const list = deepFreeze(doc.rules.map((r) => ({ ...r, enforcers: r.enforcers.map((e) => ({ ...e, planned: e.status === 'planned' })) })));
@@ -860,7 +856,7 @@ export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_R
     /** The catalogued why code of a lint finding's rule id (`starci-be/<id>`, `starci-fe/<id>`), or undefined. */
     lintCode: (ruleId) => {
       const [plugin, id] = String(ruleId ?? '').split('/');
-      const kind = plugin === 'starci-be' ? 'eslint-be' : plugin === 'starci-fe' ? 'eslint-fe' : null;
+      const kind = (plugin === 'starci-be' && 'eslint-be') || (plugin === 'starci-fe' && 'eslint-fe') || null;
       return kind ? list.find((r) => r.enforcers.some((e) => e.kind === kind && e.id === id))?.code : undefined;
     },
     /** The rules one enforcer judges, e.g. forEnforcer('eslint-be', 'error-home'). */

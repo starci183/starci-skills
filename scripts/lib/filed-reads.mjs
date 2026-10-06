@@ -15,7 +15,7 @@ export const READ_SEPARATOR = /[+\n]/;
 export function filedRequiredReads(readRefs, reads) {
   const tokens = (row) => lines(row.path, { separator: READ_SEPARATOR });
   const lawInputs = new Set(reads.filter((row) => row.id === 'standard').flatMap(tokens)
-    .filter((token) => token === EXAMPLE_CATALOG_FILE || (/^docs\/[^*?<>\:]+\.md$/.test(token) && !token.split('/').includes('..'))));
+    .filter((token) => token === EXAMPLE_CATALOG_FILE || (/^docs\/[^*?<>:]+\.md$/.test(token) && !token.split('/').includes('..'))));
   const provenance = reads.filter((row) => tokens(row).includes(EXAMPLE_CATALOG_FILE)).map((row) => `brief read [${row.id ?? '?'}] — `);
   return new Set(readRefs.filter((row) => row.rootKind === 'source' && (row.path.startsWith('knowledge/') || lawInputs.has(row.path)
     || provenance.some((prefix) => row.why?.split('\n').some((why) => why.startsWith(prefix))))).map((row) => row.path));

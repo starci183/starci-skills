@@ -19,7 +19,9 @@ const QUOTA_CODE = Object.freeze(Object.fromEntries(QUOTA_CODES.map((code) => [c
 /** Provider epochs may be Unix seconds, epoch milliseconds or ISO dates. Invalid epochs stay unknown. */
 export function quotaTimestamp(value) {
   if (value === null || value === undefined || value === '') return null;
-  const at = typeof value === 'number' ? (value < 1e12 ? value * 1000 : value) : typeof value === 'string' ? Date.parse(value) : NaN;
+  let at = Number.NaN;
+  if (typeof value === 'number') at = value < 1e12 ? value * 1000 : value;
+  else if (typeof value === 'string') at = Date.parse(value);
   return Number.isFinite(at) && Number.isFinite(new Date(at).getTime()) ? at : null;
 }
 export const quotaFreshAt = (value, now, maxAgeMs) => {

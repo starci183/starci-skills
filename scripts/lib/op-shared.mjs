@@ -158,7 +158,7 @@ export function resolveOpContract(brief, { params = {}, mode = params.mode ?? br
   const selected = modes[mode];
   if (brief.id !== undefined && selected.id !== undefined && selected.id !== brief.id) return { ok: false, reason: 'params-invalid', detail: `mode ${mode} declares foreign op ${selected.id}` };
   const contract = { ...brief, ...selected };
-  contract.policy = { ...(brief.policy ?? {}), ...(selected.policy ?? {}) };
+  contract.policy = { ...brief.policy, ...selected.policy };
   delete contract.policy.executionModes;
   // Historical modes kept their specific policy at the mode root. The effective
   // manifest carries those policies in the same policy map as every other op.
@@ -167,10 +167,13 @@ export function resolveOpContract(brief, { params = {}, mode = params.mode ?? br
   }
   for (const section of ['reads', 'writes', 'proofs']) contract[section] = mergeByKey(brief[section], selected[section], 'id');
   contract.blockers = mergeByKey(brief.blockers, selected.blockers, 'code');
-  contract.placeholders = { ...(brief.placeholders ?? {}), ...(selected.placeholders ?? {}) };
+  contract.placeholders = { ...brief.placeholders, ...selected.placeholders };
   for (const section of ['context', 'knowledge', 'docs']) {
     if (brief[section] !== undefined || selected[section] !== undefined) {
-      const list = (value) => value == null ? [] : Array.isArray(value) ? value : [value];
+      const list = (value) => {
+        if (value == null) return [];
+        return Array.isArray(value) ? value : [value];
+      };
       contract[section] = [...list(brief[section]), ...list(selected[section])];
     }
   }
@@ -190,9 +193,18 @@ export function bindOpPath(pattern, params = {}) {
 export function opReadTexts(brief, { params = {}, mode } = {}) {
   const selected = resolveOpContract(brief, { params, ...(mode == null ? {} : { mode }), allowSelect: true });
   if (!selected.ok) throw new Error(selected.detail);
-  const reads = (entries) => (Array.isArray(entries) ? entries : typeof entries === 'string' ? [entries] : []).map((entry) => entry?.path ?? entry);
-  const strings = (value) => typeof value === 'string' ? [value] : Array.isArray(value) ? value.flatMap(strings)
-    : isObj(value) ? Object.values(value).flatMap(strings) : [];
+  const reads = (entries) => {
+    let values = [];
+    if (Array.isArray(entries)) values = entries;
+    else if (typeof entries === 'string') values = [entries];
+    return values.map((entry) => entry?.path ?? entry);
+  };
+  const strings = (value) => {
+    if (typeof value === 'string') return [value];
+    if (Array.isArray(value)) return value.flatMap(strings);
+    if (isObj(value)) return Object.values(value).flatMap(strings);
+    return [];
+  };
   return [...reads(selected.contract?.reads), ...reads(selected.contract?.context), ...reads(selected.contract?.knowledge), ...strings(params)];
 }
 

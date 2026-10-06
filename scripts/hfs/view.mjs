@@ -6,7 +6,7 @@ import path from 'node:path';
 import { allowsFile } from './allows.mjs';
 import { openHfs } from './slots.mjs';
 
-const posix = (p) => String(p).replace(/\\/g, '/');
+const posix = (p) => String(p).replaceAll('\\', '/');
 const isAbsoluteAny = (text) => path.isAbsolute(text) || /^[A-Za-z]:\//.test(text);
 
 /**

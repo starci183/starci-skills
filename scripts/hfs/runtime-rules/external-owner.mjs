@@ -29,7 +29,8 @@ const describe = (owners) => (owners.length ? owners.join(', ') : 'nowhere in ru
 export function fileExternalFindings({ path: file, text, source, owner, infraOwners }) {
   const t = ts();
   const found = [];
-  const add = (line, what, owners) => found.push({ code: CODE, level: 'error', path: file, line, message: `${file}:${line} ${what}; only ${describe(owners)} may (${owner ? `this file is ${owner}` : 'this file owns no external system'}) - move the call into its scripts/api/<system>/ call file and import that` });
+  const ownership = owner ? `this file is ${owner}` : 'this file owns no external system';
+  const add = (line, what, owners) => found.push({ code: CODE, level: 'error', path: file, line, message: `${file}:${line} ${what}; only ${describe(owners)} may (${ownership}) - move the call into its scripts/api/<system>/ call file and import that` });
   for (const ref of moduleRefs(source)) {
     const owners = infraOwners.modules[ref.module];
     if (owners && !ownedBy(owners, owner)) add(ref.line, `imports ${ref.module}`, owners);
@@ -40,8 +41,10 @@ export function fileExternalFindings({ path: file, text, source, owner, infraOwn
     const visit = (node) => {
       if (t.isCallExpression(node) || t.isNewExpression(node)) {
         const callee = node.expression;
-        const name = t.isIdentifier(callee) ? (bound.has(callee.text) ? null : callee.text)
-          : (t.isPropertyAccessExpression(callee) && t.isIdentifier(callee.expression) && ['globalThis', 'window', 'global'].includes(callee.expression.text) ? callee.name.text : null);
+        let name = null;
+        if (t.isIdentifier(callee) && !bound.has(callee.text)) name = callee.text;
+        else if (t.isPropertyAccessExpression(callee) && t.isIdentifier(callee.expression)
+          && ['globalThis', 'window', 'global'].includes(callee.expression.text)) name = callee.name.text;
         const owners = name && Object.hasOwn(infraOwners.globals, name) ? infraOwners.globals[name] : null;
         if (owners && !ownedBy(owners, owner)) add(lineOf(source, node), `calls the global ${name}`, owners);
       }

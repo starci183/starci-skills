@@ -123,7 +123,7 @@ function storeBlobs(root = artifactRoot()) {
 }
 
 const readOnly = (file, fn) => { const db = openLedgerReader(file); try { return fn(db); } finally { db.close(); } };
-const readMachineDb = (file, fn) => { const m = openMachineReader({ file }); if (!m) throw new Error('machine.sqlite does not exist'); try { return fn(m.db); } finally { m.close(); } };
+const readMachineDb = (file, fn) => { const m = openMachineReader({ file }); if (!m) { throw new Error('machine.sqlite does not exist'); } try { return fn(m.db); } finally { m.close(); } };
 
 /** The dry-run plan. Reads only. */
 export async function planBlobGc({ env = process.env, now = Date.now(), retention = RETENTION, machineFile = machineFileFor(env), root = artifactRoot(env) } = {}) {
@@ -157,8 +157,29 @@ export async function planBlobGc({ env = process.env, now = Date.now(), retentio
     (archived ? toSweep : toArchive).push({ ...item, archiveRef: archived ? rows[0].archive_ref : null,archiveRefs:archived?[...new Set(rows.map(r=>r.archive_ref))]:[] });
   }
   const archiveErrors=[],archiveChecks=new Map(),identities=sources.find(s=>s.kind==='machine')?.archiveIdentities??new Map();
-  const readArchive=(file)=>{if(!archiveChecks.has(file)){try{archiveChecks.set(file,zipVisit(file,()=>{}));}catch(error){archiveChecks.set(file,error);}}const checked=archiveChecks.get(file);if(checked instanceof Error)throw checked;return checked;};
-  for(const item of toSweep){try{for(const ref of item.archiveRefs){const file=String(ref).slice(0,String(ref).lastIndexOf('!')),expected=identities.get(file);if(!SHA.test(String(expected)))throw Error('recorded archive identity is absent');verifyBlobArchive(ref,item.sha,{expectedArchiveSha:expected,read:readArchive});}item.archiveVerified=true;}catch(error){item.archiveVerified=false;archiveErrors.push(`archive:${item.sha}: ${error.message}`);}}
+  const readArchive = (file) => {
+    if (!archiveChecks.has(file)) {
+      try { archiveChecks.set(file, zipVisit(file, () => {})); }
+      catch (error) { archiveChecks.set(file, error); }
+    }
+    const checked = archiveChecks.get(file);
+    if (checked instanceof Error) throw checked;
+    return checked;
+  };
+  for (const item of toSweep) {
+    try {
+      for (const ref of item.archiveRefs) {
+        const file = String(ref).slice(0, String(ref).lastIndexOf('!'));
+        const expected = identities.get(file);
+        if (!SHA.test(String(expected))) throw new Error('recorded archive identity is absent');
+        verifyBlobArchive(ref, item.sha, { expectedArchiveSha: expected, read: readArchive });
+      }
+      item.archiveVerified = true;
+    } catch (error) {
+      item.archiveVerified = false;
+      archiveErrors.push(`archive:${item.sha}: ${error.message}`);
+    }
+  }
   const bytes = (xs) => xs.reduce((s, x) => s + (x.bytes || 0), 0);
   return {
     schema: 'starci/blob-gc-plan@1', at: now, root, graceMs: retention.graceMs,
@@ -173,13 +194,13 @@ export async function planBlobGc({ env = process.env, now = Date.now(), retentio
 
 /** A recorded archive is evidence only after exact entry and archive verification. */
 export function verifyBlobArchive(ref,sha,{expectedArchiveSha=null,read=zipVisit}={}){
-  if(!SHA.test(String(sha)))throw Error('archive verification needs an exact blob sha');
+  if(!SHA.test(String(sha)))throw new Error('archive verification needs an exact blob sha');
   const at=String(ref??'').lastIndexOf('!');
-  if(at<1||String(ref).slice(at+1)!==sha)throw Error('archive reference does not name the exact blob entry');
+  if(at<1||String(ref).slice(at+1)!==sha)throw new Error('archive reference does not name the exact blob entry');
   const file=String(ref).slice(0,at),summary=read(file,()=>{});
   const entry=summary.entries.find(e=>e.name===sha);
-  if(!entry||!entry.crcOk||entry.sha256!==sha||summary.entries.some(e=>!e.crcOk))throw Error('archive blob digest/CRC verification failed');
-  if(expectedArchiveSha&&summary.sha256!==expectedArchiveSha)throw Error('archive identity mismatch');
+  if(!entry||!entry.crcOk||entry.sha256!==sha||summary.entries.some(e=>!e.crcOk))throw new Error('archive blob digest/CRC verification failed');
+  if(expectedArchiveSha&&summary.sha256!==expectedArchiveSha)throw new Error('archive identity mismatch');
   return {ok:true,file,sha,archiveSha256:summary.sha256,bytes:entry.bytes};
 }
 
@@ -200,12 +221,14 @@ export async function runBlobGc({apply=false,env=process.env,now=Date.now(),rete
 
 function describe(r) {
   const L = [`blob GC ${r.apply ? 'APPLY' : 'dry run'} - store ${r.root}: ${r.stored} blob(s)`];
-  for (const s of r.sources) L.push(`  mark ${s.name.padEnd(28)} ${String(s.marks).padStart(7)} sha (${s.pinned} pinned, ${s.rows} blob rows)${s.error ? `  ! ${s.error}` : ''}`);
-  L.push(`  marked ${r.marked}; kept ${r.kept} pinned-only, ${r.young} younger than the 24 h grace`);
-  L.push(`  archive then remove: ${r.toArchive.length} blob(s) ${(r.archiveBytes / 1024 ** 2).toFixed(1)} MB; remove (already archived): ${r.toSweep.length} blob(s) ${(r.sweepBytes / 1024 ** 2).toFixed(1)} MB`);
-  if (r.blocked.length) L.push(`  ! sweeping nothing: ${r.blocked.join('; ')}`);
-  if (r.refused) L.push(`  refused: ${r.refused}`);
-  if (r.apply) L.push(`  effect state ${r.effectState}; freed ${(r.freedBytes / 1024 ** 2).toFixed(1)} MB`);
+  L.push(
+    ...r.sources.map((s) => `  mark ${s.name.padEnd(28)} ${String(s.marks).padStart(7)} sha (${s.pinned} pinned, ${s.rows} blob rows)${s.error ? '  ! ' + s.error : ''}`),
+    `  marked ${r.marked}; kept ${r.kept} pinned-only, ${r.young} younger than the 24 h grace`,
+    `  archive then remove: ${r.toArchive.length} blob(s) ${(r.archiveBytes / 1024 ** 2).toFixed(1)} MB; remove (already archived): ${r.toSweep.length} blob(s) ${(r.sweepBytes / 1024 ** 2).toFixed(1)} MB`,
+    ...(r.blocked.length ? [`  ! sweeping nothing: ${r.blocked.join('; ')}`] : []),
+    ...(r.refused ? [`  refused: ${r.refused}`] : []),
+    ...(r.apply ? [`  effect state ${r.effectState}; freed ${(r.freedBytes / 1024 ** 2).toFixed(1)} MB`] : []),
+  );
   return L.join('\n');
 }
 
@@ -214,9 +237,10 @@ export const blobGcExitCode=r=>(r.ok===false||r.refused||r.blocked?.length||r.it
 if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const archiveAt = argv.indexOf('--archive-root');
-  runBlobGc({ apply: argv.includes('--apply'), ...(archiveAt >= 0 ? { archiveRoot: argv[archiveAt + 1] } : {}) }).then((r) => {
+  try {
+    const r = await runBlobGc({ apply: argv.includes('--apply'), ...(archiveAt >= 0 ? { archiveRoot: argv[archiveAt + 1] } : {}) });
     const { marksBySource, ...shown } = r;
     console.log(argv.includes('--json') ? JSON.stringify({ ...shown, marksBySource: Object.fromEntries(Object.entries(marksBySource).map(([k, v]) => [k, v.length])) }, null, 2) : describe(r));
     process.exitCode = blobGcExitCode(r);
-  }, (error) => { console.error(error?.stack ?? error); process.exitCode = 2; });
+  } catch (error) { console.error(error?.stack ?? error); process.exitCode = 2; }
 }

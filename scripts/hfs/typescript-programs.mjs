@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { byCodeUnit } from '../lib/list.mjs';
 
@@ -45,7 +44,10 @@ export function sharedInProgramRun(kind, ts, input, build) {
   const key = values ? keyOf(input) : null;
   if (key === null) return build();
   let byKey = values.get(ts);
-  if (!byKey) values.set(ts, byKey = new Map());
+  if (!byKey) {
+    byKey = new Map();
+    values.set(ts, byKey);
+  }
   const id = `${kind}\0${key}`;
   if (!byKey.has(id)) byKey.set(id, build());
   return byKey.get(id);
@@ -75,4 +77,3 @@ export function typeScriptProjectReferencePath(ts, reference) {
 export function resolveTypeScriptModule(ts, specifier, from, options, host = ts.sys) {
   return ts.resolveModuleName(specifier, from, options, host).resolvedModule?.resolvedFileName;
 }
-

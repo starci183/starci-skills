@@ -40,7 +40,7 @@ export function tokenize(source) {
       tokens.push({ kind: 'punct', value: char });
       index += 1;
     } else if (/[_A-Za-z]/.test(char)) {
-      const match = /^[_A-Za-z][_0-9A-Za-z]*/.exec(source.slice(index));
+      const match = /^[_A-Za-z]\w*/.exec(source.slice(index));
       tokens.push({ kind: 'name', value: match[0] });
       index += match[0].length;
     } else if (/[-0-9]/.test(char)) {
@@ -106,7 +106,9 @@ function skipValue(cursor) {
   const token = cursor.next();
   if (token.kind !== 'punct') return;
   if (token.value === '$') return void cursor.name();
-  const close = token.value === '{' ? '}' : token.value === '[' ? ']' : null;
+  let close = null;
+  if (token.value === '{') close = '}';
+  else if (token.value === '[') close = ']';
   if (close === null) return;
   while (!cursor.take(close)) {
     if (token.value === '{') {
@@ -222,7 +224,9 @@ export function parseSchema(source) {
         while (cursor.take('&')) cursor.name();
       }
       skipDirectives(cursor);
-      const kind = keyword === 'input' ? 'input' : keyword === 'interface' ? 'interface' : 'object';
+      let kind = 'object';
+      if (keyword === 'input') kind = 'input';
+      else if (keyword === 'interface') kind = 'interface';
       types.set(name, { kind, fields: parseFieldDefinitions(cursor, kind !== 'input') });
     } else {
       throw new SyntaxError(`unexpected "${keyword}" in a schema`);
@@ -373,18 +377,18 @@ function valueProblems(schema, value, type, where, operation, used) {
 }
 
 /** The problems of one selection set against its parent type. */
-function selectionProblems(schema, document, parentName, selections, path, operation, used, visiting = new Set()) {
+function selectionProblems({ schema, document, parentName, selections, path, operation, used, visiting = new Set() }) {
   const parent = schema.types.get(parentName);
   const problems = [];
   for (const selection of selections) {
     if (selection.kind === 'spread') {
       const fragment = document.fragments.get(selection.name);
       if (fragment === undefined) problems.push(`${path} spreads ...${selection.name}, which the document does not define`);
-      else if (!visiting.has(selection.name)) problems.push(...selectionProblems(schema, document, fragment.on, fragment.selections, path, operation, used, new Set([...visiting, selection.name])));
+      else if (!visiting.has(selection.name)) problems.push(...selectionProblems({ schema, document, parentName: fragment.on, selections: fragment.selections, path, operation, used, visiting: new Set([...visiting, selection.name]) }));
       continue;
     }
     if (selection.kind === 'inline') {
-      problems.push(...selectionProblems(schema, document, selection.on ?? parentName, selection.selections, path, operation, used, visiting));
+      problems.push(...selectionProblems({ schema, document, parentName: selection.on ?? parentName, selections: selection.selections, path, operation, used, visiting }));
       continue;
     }
     if (selection.name === '__typename') continue;
@@ -407,7 +411,7 @@ function selectionProblems(schema, document, parentName, selections, path, opera
     const leaf = BUILT_IN_SCALARS.has(field.type.name) || target?.kind === 'scalar' || target?.kind === 'enum';
     if (leaf && selection.selections !== null) problems.push(`${where} is a ${field.type.name}, which selects no fields`);
     else if (!leaf && selection.selections === null) problems.push(`${where} is a ${field.type.name}, which needs a selection of its fields`);
-    else if (!leaf) problems.push(...selectionProblems(schema, document, field.type.name, selection.selections, where, operation, used, visiting));
+    else if (!leaf) problems.push(...selectionProblems({ schema, document, parentName: field.type.name, selections: selection.selections, path: where, operation, used, visiting }));
   }
   return problems;
 }
@@ -421,7 +425,7 @@ export function operationProblems(schema, document, operation) {
   if (!schema.types.has(rootName)) return [`the contract has no ${operation.operation} type`];
   const used = new Set();
   const label = operation.name ?? `anonymous ${operation.operation}`;
-  const problems = selectionProblems(schema, document, rootName, operation.selections, label, operation, used);
+  const problems = selectionProblems({ schema, document, parentName: rootName, selections: operation.selections, path: label, operation, used });
   for (const variable of operation.variables.keys()) {
     if (!used.has(variable)) problems.push(`${label} declares $${variable}, which no argument uses`);
   }

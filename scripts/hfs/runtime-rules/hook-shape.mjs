@@ -34,7 +34,10 @@ export function fileHookShapeFindings({ path: file, name, text }) {
   }
   if (name === 'pre-push') {
     const missing = PRE_PUSH_MARKERS.filter((marker) => !body.includes(marker));
-    if (missing.length) found.push(finding(file, `the push gate lacks the release gate marker${missing.length === 1 ? '' : 's'} ${missing.map((m) => `\`${m}\``).join(', ')}; it must check the L4 record of HEAD and allow only the release cut and refs/backup/*`));
+    if (missing.length) {
+      const markers = missing.map((m) => `\`${m}\``).join(', ');
+      found.push(finding(file, `the push gate lacks the release gate marker${missing.length === 1 ? '' : 's'} ${markers}; it must check the L4 record of HEAD and allow only the release cut and refs/backup/*`));
+    }
   }
   return found;
 }

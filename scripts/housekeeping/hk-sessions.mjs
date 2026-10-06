@@ -114,7 +114,7 @@ function scanTree(root) {
     for (const name of entries) {
       const p = path.join(dir, name);
       let st;
-      try { st = fs.lstatSync(p); } catch (error) { if (error?.code !== 'ENOENT') out.errors.push({ path: p, error: message(error) }); continue; }
+      try { st = fs.lstatSync(p); } catch (error) { if (error?.code !== 'ENOENT') { out.errors.push({ path: p, error: message(error) }); } continue; }
       if (isLinkLike(p, { parentReal: dirReal, stat: st })) { out.links.push(p); continue; }
       if (st.isDirectory()) { out.dirs.push(p); stack.push(p); continue; }
       if (st.isFile()) { out.files.push({ path: p, size: st.size, mtimeMs: st.mtimeMs }); continue; }
@@ -243,9 +243,9 @@ export async function sweepAgentSessions({ apply = false, now = Date.now(), env 
  * Returns {ok, freedBytes, movedBytes, deleted: [], moved[{from,to}], skipped[{path,reason}], errors[{path,error}]}.
  */
 export async function archiveSessionFiles(paths, { archiveRoot, agent, now = Date.now(), apply = false } = {}) {
-  void now; // part of the settle-time contract; no age test applies here
+  // `now` stays in the settle-time signature; no age test applies here.
   if (typeof archiveRoot !== 'string' || !archiveRoot.trim() || typeof agent !== 'string' || !agent.trim()) {
-    throw Error('archiveSessionFiles needs {archiveRoot, agent}');
+    throw new Error('archiveSessionFiles needs {archiveRoot, agent}');
   }
   const out = result();
   const root = path.resolve(archiveRoot);

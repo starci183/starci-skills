@@ -53,7 +53,7 @@ export function createProseResolver(ctx, manifest) {
   const examples = ctx.files.filter((f) => /^examples\/[^/]+\/hfs\.json$/.test(f)).map((f) => JSON.parse(ctx.read(f)));
   if (!examples.length) return null;
   const resolver = createSlotResolver(manifest, resolveRepoDeclaration(manifest, proseDeclaration(manifest, examples)));
-  const slotPaths = resolver.slots().flatMap((slot) => slot.profiles.flatMap((profile) => braceVariants(slot.path).map((p) => `${['be', 'fe'].includes(profile) ? `${profile}/` : ''}${p}`.split('/').filter(Boolean))));
+  const slotPaths = resolver.slots().flatMap((slot) => slot.profiles.flatMap((profile) => braceVariants(slot.path).map((p) => ((['be', 'fe'].includes(profile) ? `${profile}/` : '') + p).split('/').filter(Boolean))));
   const appNames = new Set(examples.flatMap((d) => ['be', 'fe'].flatMap((side) => (d.sides?.[side]?.apps ?? []).map((a) => a.name))));
   const declaredApp = (p) => { const m = /^(?:be|fe)\/apps\/([^/]+)/.exec(p); return !m || m[1] === 'x' || appNames.has(m[1]); };
   const owned = (p) => declaredApp(p) && ([p, ...FOLDERS_BELOW.map((below) => `${p}/${below}`)].some((q) => resolver.classifyPath(q).status !== 'no-slot') || aboveSlot(p.split('/'), slotPaths));

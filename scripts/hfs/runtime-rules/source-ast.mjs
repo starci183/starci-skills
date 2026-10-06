@@ -46,7 +46,9 @@ export function fsBindings(source, wanted, { destructuredRequires = true } = {})
     if (t.isVariableDeclaration(node) && node.initializer && fsRequireCall(t, node.initializer)) {
       if (t.isIdentifier(node.name)) namespaces.add(node.name.text);
       else if (destructuredRequires && t.isObjectBindingPattern(node.name)) for (const el of node.name.elements) {
-        const imported = el.propertyName && t.isIdentifier(el.propertyName) ? el.propertyName.text : t.isIdentifier(el.name) ? el.name.text : null;
+        let imported = null;
+        if (el.propertyName && t.isIdentifier(el.propertyName)) imported = el.propertyName.text;
+        else if (t.isIdentifier(el.name)) imported = el.name.text;
         if (imported && wanted(imported) && t.isIdentifier(el.name)) members.set(el.name.text, imported);
       }
     }
@@ -68,7 +70,7 @@ export const fsMemberAccess = (t, callee, namespaces, wanted) => {
 /** The SourceFile of `text`; `.ts` files parse as TypeScript, everything else as JavaScript. */
 export function parseSource(text, file = 'x.mjs') {
   const t = ts();
-  return t.createSourceFile(file, String(text), t.ScriptTarget.Latest, true, /\.ts$/.test(file) ? t.ScriptKind.TS : t.ScriptKind.JS);
+  return t.createSourceFile(file, String(text), t.ScriptTarget.Latest, true, file.endsWith('.ts') ? t.ScriptKind.TS : t.ScriptKind.JS);
 }
 
 /** The 1-based line of `node` in `source`. */
@@ -134,8 +136,8 @@ export function declaredNames(source) {
   const t = ts();
   const out = [];
   const visit = (node) => {
-    if ((t.isFunctionDeclaration(node) || t.isClassDeclaration(node)) && node.name) out.push({ name: node.name.text, line: lineOf(source, node) });
-    else if (t.isVariableDeclaration(node) && t.isIdentifier(node.name)) out.push({ name: node.name.text, line: lineOf(source, node) });
+    if (((t.isFunctionDeclaration(node) || t.isClassDeclaration(node)) && node.name)
+      || (t.isVariableDeclaration(node) && t.isIdentifier(node.name))) out.push({ name: node.name.text, line: lineOf(source, node) });
     t.forEachChild(node, visit);
   };
   visit(source);

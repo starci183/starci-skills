@@ -37,7 +37,9 @@ const dirOf = (value) => (isDir(value) ? value : value.slice(0, value.lastIndexO
 const inside = (inner, outer) => nested(dirOf(inner), outer);
 /** The literal part of a pattern before its first wildcard segment: a directory (no trailing slash), or the file itself when it has none. */
 const literalRoot = (value) => {
-  const parts = segments(isDir(value) ? value : dirOf(value) + (value.includes('*') ? '' : value.slice(value.lastIndexOf('/') + 1)));
+  let literal = value;
+  if (!isDir(value)) literal = dirOf(value) + (value.includes('*') ? '' : value.slice(value.lastIndexOf('/') + 1));
+  const parts = segments(literal);
   const cut = parts.findIndex((part) => part.includes('*'));
   return (cut < 0 ? parts : parts.slice(0, cut)).join('/');
 };

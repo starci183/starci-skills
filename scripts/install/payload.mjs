@@ -43,7 +43,7 @@ const payloadDocAllowed = (root, relative, exampleInputs) => {
     if (/\/(runtime|generated|\.runtime|node_modules|\.scannerwork)(\/|$)/.test(relative)) return false;
     const absolute = path.join(root, relative);
     if (!relative.endsWith('.enc') && existsSync(absolute + '.enc')) return false;
-    if (/\.mjs$/.test(relative)) return false;
+    if (relative.endsWith('.mjs')) return false;
     return /\.(md|ya?ml|tsx?|png|svg|sh|ps1|conf)$/.test(relative)
       || ['Dockerfile', '.gitignore', '.dockerignore'].includes(path.basename(relative));
   }

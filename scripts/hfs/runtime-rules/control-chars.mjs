@@ -18,7 +18,9 @@ export function controlCharFinding(file, bytes) {
   let line = 1;
   for (let i = 0; i < first; i += 1) if (bytes[i] === 0x0a) line += 1;
   const hex = `U+${bytes[first].toString(16).toUpperCase().padStart(4, '0')}`;
-  return { code: CODE, level: 'error', path: file, line, message: `${file}:${line} holds a raw control character ${hex}${count > 1 ? ` (${count} in the file)` : ''}: write it as its escape (\\0, \\b, \\u001b ...)` };
+  const occurrence = count > 1 ? ` (${count} in the file)` : '';
+  const escapeExamples = String.raw`\0, \b, \u001b ...`;
+  return { code: CODE, level: 'error', path: file, line, message: `${file}:${line} holds a raw control character ${hex}${occurrence}: write it as its escape (${escapeExamples})` };
 }
 
 /** RT_CONTROL_CHARACTER over the tracked text source of the runtime (ctx of scripts/hfs/runtime-check.mjs). */

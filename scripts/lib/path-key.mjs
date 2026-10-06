@@ -87,7 +87,7 @@ export const containedPath = (base, candidate, { label = 'path' } = {}) => {
  * no trailing '/**' glob or slashes, no leading './'; `fold` lowercases for a case-insensitive key.
  */
 export const normRel = (p, { fold = false } = {}) => {
-  const s = String(typeof p === 'string' ? p : p?.path ?? '').trim().replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, '').replace(/^\.\//, '');
+  const s = String(typeof p === 'string' ? p : p?.path ?? '').trim().replaceAll('\\', '/').replace(/\/\*\*$/, '').replace(/\/+$/, '').replace(/^\.\//, '');
   return fold ? s.toLowerCase() : s;
 };
 /** Whether `file` equals or sits under one of `prefixes` (posix spellings; `dot` counts a '.' prefix as covering all). */

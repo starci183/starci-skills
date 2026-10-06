@@ -31,7 +31,10 @@ export function slotAllowsFindings(ctx) {
     if (!slot.allows?.length && !slot.forbids?.length) continue;
     if (slot.allows?.length) {
       const verdict = allowsFile(ctx.resolver, file);
-      if (verdict && !verdict.allowed) found.push({ code: CODE, level: 'error', path: file, slot: slot.id, message: `${file} is not admitted by ${slot.id} (${slot.path})${verdict.forbiddenBy ? `: its forbids names ${verdict.forbiddenBy}` : `: it admits only ${[...(slot.requires ?? []), ...slot.allows].join(', ')}`}` });
+      if (verdict && !verdict.allowed) {
+        const reason = verdict.forbiddenBy ? `: its forbids names ${verdict.forbiddenBy}` : `: it admits only ${[...(slot.requires ?? []), ...slot.allows].join(', ')}`;
+        found.push({ code: CODE, level: 'error', path: file, slot: slot.id, message: `${file} is not admitted by ${slot.id} (${slot.path})${reason}` });
+      }
       continue;
     }
     const entry = forbiddenBy(slot, relativeToRoot(c.path, c.root), c.bindings ?? {});

@@ -11,17 +11,18 @@ import { parseWorkflow, workflowFindings } from './workflow-source.mjs';
 export const CODE = 'CI_TRIGGERS_RELEASE_ONLY';
 const RELEASE_TAGS = 'v*';
 const RUNTIME_BRANCH = 'main';
-const RUNTIME_WORKFLOW = /^\.github\/workflows\//;
 
 /** The CI_TRIGGERS_RELEASE_ONLY findings of one workflow text; a text that is not YAML yields none (the other checks name it). A workflow at the root `.github/workflows/` is the runtime's own and may also push on main. */
 export function workflowTriggerFindings({ path: file, text }) {
   const doc = parseWorkflow(text);
   if (!doc || typeof doc !== 'object') return [];
-  const ownBranch = RUNTIME_WORKFLOW.test(file);
+  const ownBranch = file.startsWith('.github/workflows/');
   const refuse = (why) => ({ code: CODE, level: 'error', path: file, message: `${CODE} ${file}: ${why}` });
   const on = doc.on;
   if (on === undefined || on === null) return [refuse('the workflow has no `on` trigger block: it must declare push of tags [v*] and/or workflow_dispatch')];
-  const events = typeof on === 'string' ? { [on]: null } : Array.isArray(on) ? Object.fromEntries(on.map((event) => [String(event), null])) : on;
+  let events = on;
+  if (typeof on === 'string') events = { [on]: null };
+  else if (Array.isArray(on)) events = Object.fromEntries(on.map((event) => [String(event), null]));
   const found = [];
   for (const [event, config] of Object.entries(events)) {
     if (event === 'workflow_dispatch') continue;

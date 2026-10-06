@@ -7,7 +7,7 @@
  */
 export const unquoteDiffPath = (value) =>
   /^".*"$/.test(value)
-    ? JSON.parse(value.replace(/\\([0-7]{3})/g, (_, octal) => `\\u00${Number.parseInt(octal, 8).toString(16).padStart(2, '0')}`))
+    ? JSON.parse(value.replace(/\\([0-7]{3})/g, (_, octal) => String.raw`\u00${Number.parseInt(octal, 8).toString(16).padStart(2, '0')}`))
     : value;
 
 // git's repository-local variables (git rev-parse --local-env-vars). A hook or alias run in a linked worktree exports

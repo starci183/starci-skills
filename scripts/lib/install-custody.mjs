@@ -10,4 +10,4 @@ export const INSTALL_PROTOCOL_SCHEMA = 'starci/install-protocol@1';
  * @returns {string} Lowercase SHA-256 under the path's custody convention.
  */
 export const installedPayloadDigest = (bytes, relative = '') => sha256(relative.startsWith(`${EXAMPLE_RUNTIMES_ROOT}/`)
-  ? bytes : bytes.toString('utf8').replace(/\r\n/g,'\n'));
+  ? bytes : bytes.toString('utf8').replaceAll('\r\n','\n'));

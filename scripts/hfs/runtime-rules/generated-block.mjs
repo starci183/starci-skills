@@ -21,7 +21,7 @@ export function generatedBlockFindings(ctx) {
   const readme = ctx.read(README);
   if (readme !== null && readme !== undefined) for (const name of staleBlocks(readme, manifest, catalog)) add(README, `the generated block ${name} is missing or differs from slots.yaml / rules.yaml`);
   const resolver = createProseResolver(ctx, manifest);
-  const classify = resolver ? (p) => resolver.classify(`be/${resolver.sample(p.replace(/<kind>/g, 'api'))}`).slot ?? null : null;
+  const classify = resolver ? (p) => resolver.classify(`be/${resolver.sample(p.replaceAll('<kind>', 'api'))}`).slot ?? null : null;
   for (const item of derivedFiles({ files: ctx.files, read: ctx.read, catalog, classify })) {
     if (item.after !== item.before) add(item.file, 'a derived field (verification.automated, a files: slot id, a why code) differs from its derivation');
     for (const problem of item.problems) add(item.file, problem);
