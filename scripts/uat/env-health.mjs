@@ -184,7 +184,7 @@ function environmentFile(repo, id) {
 export function environmentIdsOfPaths(repo, paths) {
   const ids = new Set();
   for (const raw of paths ?? []) {
-    const p = String(typeof raw === 'string' ? raw : raw?.path ?? '').replaceAll(/\\/g, '/').replace(/\/\*\*$/, '');
+    const p = String(typeof raw === 'string' ? raw : raw?.path ?? '').replaceAll('\\', '/').replace(/\/\*\*$/, '');
     if (!/^\.starciwork\/features\/[^/]+\/(uat|e2e|integration)(\/|$)/.test(p)) continue;
     for (let dir = path.join(repo, p); dir.startsWith(path.join(repo, '.starciwork', 'features')); dir = path.dirname(dir)) {
       const doc = readYaml(path.join(dir, 'index.yaml'));
@@ -221,62 +221,75 @@ const serviceOfUrl = (doc, url) => {
 };
 
 
+const stateOfProbe = (probe) => {
+  if (probe.state === 'answered') return 'wrong-status';
+  if (probe.state === 'hung' || probe.state === 'down') return probe.state;
+  return 'error';
+};
+
+async function answeredProbe(doc, row, url, result, probeTimeoutMs) {
+  if (result.state !== 'answered') return null;
+  if (result.status === row.expect) return { ...row, state: 'ready', ready: true, status: result.status, ms: result.ms };
+  const discovered = result.status < 500
+    ? await discoverHealth(new URL(url).origin, { timeoutMs: Math.min(probeTimeoutMs, 8000), skip: [url] })
+    : null;
+  if (!discovered) return null;
+  return { ...row, state: 'probe-drift', ready: true, status: result.status, discovered,
+    remedy: `the declared probe ${url} answers ${result.status} while ${discovered.method} ${discovered.url} answers ${discovered.status}: the service is up; the environment declaration (${doc.id}) is stale - workspace.manage re-declares the probe` };
+}
+
+const startForService = (doc, name, repo, registered) => {
+  if (registered?.command) return { command: registered.command, cwd: registered.cwd, from: 'registry' };
+  const start = doc?.configuration?.start?.[name];
+  if (!start) return null;
+  return { command: splitCommand(start.command), cwd: path.resolve(repo ?? '.', start.cwd ?? '.'), from: 'resource', env: start.env ?? null };
+};
+
+async function failedProbe({ doc, row, url, expect, name, port, result, restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo }) {
+  if (result.state === 'answered') Object.assign(row, { status: result.status });
+  let state = stateOfProbe(result);
+  const registered = readRegistered(doc.id, name, env);
+  const listener = port && state !== 'down' ? portListener(port) : null;
+  const actions = [];
+  if (listener && ['hung', 'wrong-status'].includes(state)) {
+    const own = (registered && registered.pid === listener.pid) || ownedByWorkspace(listener.commandLine, roots);
+    if (!own) return { ...row, state: 'port-conflict', ready: false, listener,
+      remedy: `port ${port} is held by PID ${listener.pid} (${listener.commandLine ?? 'unknown command'}), which is not a server of this workspace and does not answer ${url} with ${expect}; free the port or re-declare it - env-health never stops a foreign process` };
+    if (restart) { const killed = stopListener(listener.pid); actions.push(`killed ${state} own listener PID ${listener.pid}${killed ? '' : ' (kill failed)'}`); if (killed) state = 'down'; }
+  }
+  const start = startForService(doc, name, repo, registered);
+  if (restart && state === 'down' && start?.command?.length) {
+    const started = startServer({ command: start.command, cwd: start.cwd, envId: doc.id, service: name, env: start.env ? { ...env, ...start.env } : env });
+    writeRegistered({ env: doc.id, service: name, repo, port, url, command: start.command, cwd: start.cwd, pid: started.pid, state: 'starting', startedAt: Date.now() }, env);
+    actions.push(`started ${name} (${start.from}) as PID ${started.pid}`);
+    const waited = await waitReady(url, expect, { readyTimeoutMs, probeTimeoutMs });
+    const logSha = judgeServer(doc.id, name, waited.ready, env);
+    if (waited.ready) return { ...row, state: 'restarted', ready: true, status: waited.last.status, action: actions.join('; '), ...(listener ? { listener } : {}) };
+    return { ...row, state: 'restart-failed', ready: false, action: actions.join('; '), last: waited.last, ...(logSha ? { logSha } : {}),
+      remedy: `${name} did not answer ${url} within ${readyTimeoutMs}ms after a restart; read its output: blob ${logSha ?? '(none written)'} (env_servers ${serverIdOf(doc.id, name)} log_sha)` };
+  }
+  const how = start ? 'starci gate env-health check --restart ...' : `starci gate env-health serve --env ${doc.id} --service ${name} --cwd <checkout> --url ${url} -- <start command>`;
+  return { ...row, state, ready: false, ...(listener ? { listener } : {}), ...(actions.length ? { action: actions.join('; ') } : {}),
+    remedy: `${name} is ${state} at ${url}: start it with ${how} (serve registers it, so the next pre-step restarts it itself)` };
+}
+
+async function checkProbe(doc, probe, { restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo }) {
+  if (probe?.method && probe.method !== 'http-get') return { service: probe.id, url: probe.target, state: 'unsupported', ready: true, remedy: `probe method ${probe.method} is not run by env-health; the walk checks it` };
+  const url = String(probe?.target ?? ''), expect = Number(probe?.expect ?? 200);
+  const { service, port } = serviceOfUrl(doc, url);
+  const name = service ?? probe?.id ?? url;
+  let result = await probeUrl(url, { timeoutMs: probeTimeoutMs, follow: 0 });
+  if (result.state === 'hung') result = await probeUrl(url, { timeoutMs: probeTimeoutMs, follow: 0 });
+  const row = { service: name, probe: probe?.id ?? null, url, expect, port };
+  const answered = await answeredProbe(doc, row, url, result, probeTimeoutMs);
+  if (answered) return answered;
+  return failedProbe({ doc, row, url, expect, name, port, result, restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo });
+}
+
 /** Check one environment resource. */
 async function checkEnvironment(doc, { restart = false, roots = [], probeTimeoutMs = DEFAULT_PROBE_TIMEOUT_MS, readyTimeoutMs = DEFAULT_READY_TIMEOUT_MS, env = process.env, repo = null } = {}) {
   const services = [];
-  for (const probe of Array.isArray(doc?.probes) ? doc.probes : []) {
-    if (probe?.method && probe.method !== 'http-get') { services.push({ service: probe.id, url: probe.target, state: 'unsupported', ready: true, remedy: `probe method ${probe.method} is not run by env-health; the walk checks it` }); continue; }
-    const url = String(probe?.target ?? ''), expect = Number(probe?.expect ?? 200);
-    const { service, port } = serviceOfUrl(doc, url);
-    const name = service ?? probe?.id ?? url;
-    let r = await probeUrl(url, { timeoutMs: probeTimeoutMs, follow: 0 });
-    if (r.state === 'hung') r = await probeUrl(url, { timeoutMs: probeTimeoutMs, follow: 0 }); // a first compile can be slow; a second wait decides
-    const row = { service: name, probe: probe?.id ?? null, url, expect, port };
-    if (r.state === 'answered' && r.status === expect) { services.push({ ...row, state: 'ready', ready: true, status: r.status, ms: r.ms }); continue; }
-    if (r.state === 'answered') {
-      const origin = new URL(url).origin;
-      const discovered = r.status < 500 ? await discoverHealth(origin, { timeoutMs: Math.min(probeTimeoutMs, 8000), skip: [url] }) : null;
-      if (discovered) {
-        services.push({ ...row, state: 'probe-drift', ready: true, status: r.status, discovered,
-          remedy: `the declared probe ${url} answers ${r.status} while ${discovered.method} ${discovered.url} answers ${discovered.status}: the service is up; the environment declaration (${doc.id}) is stale - workspace.manage re-declares the probe` });
-        continue;
-      }
-      Object.assign(row, { status: r.status });
-    }
-    let state = 'error';
-    if (r.state === 'answered') state = 'wrong-status';
-    else if (r.state === 'hung') state = 'hung';
-    else if (r.state === 'down') state = 'down';
-    const registered = readRegistered(doc.id, name, env);
-    const listener = port && state !== 'down' ? portListener(port) : null;
-    const actions = [];
-    if (listener && ['hung', 'wrong-status'].includes(state)) {
-      const own = (registered && registered.pid === listener.pid) || ownedByWorkspace(listener.commandLine, roots);
-      if (!own) {
-        services.push({ ...row, state: 'port-conflict', ready: false, listener,
-          remedy: `port ${port} is held by PID ${listener.pid} (${listener.commandLine ?? 'unknown command'}), which is not a server of this workspace and does not answer ${url} with ${expect}; free the port or re-declare it - env-health never stops a foreign process` });
-        continue;
-      }
-      if (restart) { const killed = stopListener(listener.pid); actions.push(`killed ${state} own listener PID ${listener.pid}${killed ? '' : ' (kill failed)'}`); if (killed) state = 'down'; }
-    }
-    let start = null;
-    if (registered?.command) start = { command: registered.command, cwd: registered.cwd, from: 'registry' };
-    else if (doc?.configuration?.start?.[name]) start = { command: splitCommand(doc.configuration.start[name].command), cwd: path.resolve(repo ?? '.', doc.configuration.start[name].cwd ?? '.'), from: 'resource', env: doc.configuration.start[name].env ?? null };
-    if (restart && state === 'down' && start?.command?.length) {
-      const started = startServer({ command: start.command, cwd: start.cwd, envId: doc.id, service: name, env: start.env ? { ...env, ...start.env } : env });
-      writeRegistered({ env: doc.id, service: name, repo, port, url, command: start.command, cwd: start.cwd, pid: started.pid, state: 'starting', startedAt: Date.now() }, env);
-      actions.push(`started ${name} (${start.from}) as PID ${started.pid}`);
-      const waited = await waitReady(url, expect, { readyTimeoutMs, probeTimeoutMs });
-      const logSha = judgeServer(doc.id, name, waited.ready, env);
-      if (waited.ready) { services.push({ ...row, state: 'restarted', ready: true, status: waited.last.status, action: actions.join('; '), ...(listener ? { listener } : {}) }); continue; }
-      services.push({ ...row, state: 'restart-failed', ready: false, action: actions.join('; '), last: waited.last, ...(logSha ? { logSha } : {}),
-        remedy: `${name} did not answer ${url} within ${readyTimeoutMs}ms after a restart; read its output: blob ${logSha ?? '(none written)'} (env_servers ${serverIdOf(doc.id, name)} log_sha)` });
-      continue;
-    }
-    const how = start ? 'starci gate env-health check --restart ...' : `starci gate env-health serve --env ${doc.id} --service ${name} --cwd <checkout> --url ${url} -- <start command>`;
-    services.push({ ...row, state, ready: false, ...(listener ? { listener } : {}), ...(actions.length ? { action: actions.join('; ') } : {}),
-      remedy: `${name} is ${state} at ${url}: start it with ${how} (serve registers it, so the next pre-step restarts it itself)` });
-  }
+  for (const probe of Array.isArray(doc?.probes) ? doc.probes : []) services.push(await checkProbe(doc, probe, { restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo }));
   return { id: doc?.id ?? null, services, ready: services.every((s) => s.ready) };
 }
 
@@ -289,7 +302,7 @@ export async function checkEnvironments({ repo, ids = [], paths = [], restart = 
     const file = environmentFile(repo, id);
     const declared = file ? readYaml(file) : null;
     if (!declared) { unresolved.push(id); continue; }
-    environments.push({ file: path.relative(repo, file).replaceAll(/\\/g, '/'), ...(await checkEnvironment(declared, { restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo })) });
+    environments.push({ file: path.relative(repo, file).replaceAll('\\', '/'), ...(await checkEnvironment(declared, { restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo })) });
   }
   const services = environments.flatMap((e) => e.services);
   const ready = environments.every((e) => e.ready);

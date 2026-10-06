@@ -29,7 +29,7 @@ export const DEFAULT_POLL_MS=2000;
 const SLOT_PREFIX='uat-slot-',TICKET_PREFIX='uat-ticket-';
 const SLOT_LOCK=/^uat-slot-(\d+)$/;
 // A slot or ticket is held for as long as its process lives; the expiry only feeds v_leaks.
-const HOLD_TTL_MS=24*3600_000;
+const HOLD_TTL_MS=24*3_600_000;
 
 /** The ceiling: STARCI_UAT_MAX_CONCURRENT, else config.yaml uat.maxConcurrent, else 10. A broken config never stops a run. */
 export function maxConcurrent({env=process.env,config}={}){

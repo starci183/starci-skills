@@ -52,7 +52,7 @@ export const digestValue=value=>sha256(canonicalText(value));
 const iso=()=>new Date().toISOString();
 const readYaml=file=>parseYaml(fs.readFileSync(file,'utf8'));
 const same=(a,b)=>path.resolve(a)===path.resolve(b);
-const relativePosix=(base,file)=>path.relative(base,file).replaceAll(/\\/g,'/');
+const relativePosix=(base,file)=>path.relative(base,file).replaceAll('\\','/');
 const inside=(base,file)=>isInside(path.resolve(base),path.resolve(file));
 const need=(condition,message,code='assisted-uat-invalid')=>refuseUnless(condition,message,code);
 
@@ -65,7 +65,8 @@ const schemaValidators=()=>{
 };
 const validate=(kind,value)=>{
   const check=schemaValidators()[kind];
-  need(check(value),`${kind} schema: ${(check.errors??[]).map(error=>`${error.instancePath||'/'} ${error.message}`).join('; ')}`,'assisted-uat-schema-invalid');
+  const errors=(check.errors??[]).map(error=>`${error.instancePath||'/'} ${error.message}`).join('; ');
+  need(check(value),`${kind} schema: ${errors}`,'assisted-uat-schema-invalid');
 };
 const resolvePrepared=(base,declared,label)=>{
   need(typeof declared==='string'&&declared.length>0,`${label} path is missing`);
@@ -235,7 +236,7 @@ const sanitizer=(prepared)=>{
     let text=String(value??'');
     for(const secret of secretValues)text=text.split(secret).join('[REDACTED]');
     for(const rule of rules)text=text.replace(rule.pattern,rule.replacement);
-    return text.replace(/\bBearer\s+[A-Za-z0-9._~-]+/giu,'Bearer [REDACTED]').replace(/\b(otp|password|secret|token)\s*[:=]\s*\S+/giu,'$1=[REDACTED]');
+    return text.replace(/\bBearer\s+[a-z0-9._~-]+/giu,'Bearer [REDACTED]').replace(/\b(otp|password|secret|token)\s*[:=]\s*\S+/giu,'$1=[REDACTED]');
   };
 };
 const safeRefs=(prepared,refs=[])=>refs.map(ref=>{
