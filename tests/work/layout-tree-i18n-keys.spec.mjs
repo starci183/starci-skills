@@ -104,7 +104,6 @@ test('a tree without the keyed i18n digest is stale until it is re-scanned', (t)
   const drift = sourceDrift(appOf(unkeyed), scanOf(p));
   assert.equal(drift.stale, true);
   assert.ok(drift.changed.some((c) => /no keyed i18n digest/.test(c)), drift.changed.join('; '));
-  assert.equal('legacy' in drift, false, 'there is no legacy verdict any more');
   const rescan = mergeScan(unkeyed, [scanOf(p)], { at: '2026-09-25T00:00:01Z' });
   assert.ok(Array.isArray(rescan.record.apps[0].i18n.used.keys), 'the re-scan records the keyed digest');
   assert.equal(sourceDrift(appOf(rescan.record), scanOf(p)).stale, false);

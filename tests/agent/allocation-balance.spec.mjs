@@ -300,7 +300,7 @@ test('cross-family review: what Devin implemented is reviewed by Opus or Sol as 
 test('Devin opens by an owner grant: none declared keeps it ungated, a declared list gates it',()=>{
   // Devin leads the implementation order, so its gate is what decides; a closed grant falls past it.
   const medium={kind:'backend.implement',difficulty:'medium',runtimes};
-  assert.equal(selectPool(medium).target,'devin-agent','no grants passed: legacy ungated routing');
+  assert.equal(selectPool(medium).target,'devin-agent','no grants passed: ungated routing');
   const closed=selectPool({...medium,grants:{}});
   assert.notEqual(closed.target,'devin-agent');
   assert.match(closed.rejected.find(x=>x.target==='devin-agent').reason,/owner grant/);

@@ -3,7 +3,7 @@
 # Observed 2026-09-24: GitHub carries secret SONAR_TOKEN and variable SONAR_HOST_URL. The local server
 # has an older project miamia-be; sonar-project.properties now names mia-mia-backend, which
 # sonar-local.mjs ensure-project creates. No per-project token is in mia-mia-backend custody yet: BEFORE
-# applying, copy the minted twin sonarqube-mia-mia-backend-token.key.enc from the legacy source-host
+# applying, copy the minted twin sonarqube-mia-mia-backend-token.key.enc from the source-host
 # stack into mia-mia-backend/.starcistacks/dev/runtime/files/ (or run
 #   node <Source>/.claude/scripts/gates/sonar-local.mjs ensure-project --key mia-mia-backend --with-token
 # to re-mint it) — until then check-starcistacks refuses this block with STACKS_CUSTODY_MISSING.

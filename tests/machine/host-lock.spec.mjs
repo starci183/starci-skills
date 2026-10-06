@@ -1,5 +1,5 @@
 // The host lock API (scripts/machine/host-lock.mjs): one atomic lock directory with a JSON owner file, a token-checked
-// release, a takeover of a dead holder, and the legacy plain-text owner read as held. The release cut (GOVERNANCE lane,
+// release, a takeover of a dead holder, and a lock directory without a readable owner read as held. The release cut (GOVERNANCE lane,
 // scripts/supervisor/release-cut.mjs) calls withHostLock({role: 'release', purpose: 'release-cut'}); the land gate calls
 // withHostLock({role: 'coordinator', purpose: 'land'}) and refuses a land while another holder has the lock.
 import test from 'node:test';
@@ -116,7 +116,7 @@ test('a ttl that ran out makes a live holder stale', (t) => {
   assert.equal(late.tookOverFrom.purpose, 'p');
 });
 
-test('a legacy plain-text owner is held, never stale by pid, and stale only past legacyStaleMs', (t) => {
+test('a lock directory with an unreadable owner is held, never stale by pid, and stale only past ownerlessStaleMs', (t) => {
   const dir = lockOf(t);
   fs.mkdirSync(dir);
   fs.writeFileSync(path.join(dir, 'owner'), 'term_7 preverify 2026-10-01\n');
@@ -124,14 +124,14 @@ test('a legacy plain-text owner is held, never stale by pid, and stale only past
   fs.utimesSync(path.join(dir, 'owner'), mtime, mtime);
   fs.utimesSync(dir, mtime, mtime);
   const owner = hostLockOwner(base(dir, { isAlive: dead }));
-  assert.equal(owner.legacy, true);
+  assert.equal(owner.ownerless, true);
   assert.match(owner.text, /term_7 preverify/);
   assert.equal(owner.stale, false);
   assert.equal(acquireHostLock({ ...base(dir, { isAlive: dead }), role: 'lead', purpose: 'p' }).reason, 'held');
   assert.equal(releaseHostLock({ ...base(dir), token: 'x' }).reason, 'not-owner');
   const old = acquireHostLock({ ...base(dir, { isAlive: dead, now: () => T0 + 7 * 3_600_000 }), role: 'lead', purpose: 'p' });
   assert.equal(old.ok, true);
-  assert.equal(old.tookOverFrom.legacy, true);
+  assert.equal(old.tookOverFrom.ownerless, true);
 });
 
 test('a takeover that finds a live lock where the stale one was puts it back and reports held', (t) => {

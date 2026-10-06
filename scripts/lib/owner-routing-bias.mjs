@@ -56,7 +56,7 @@ const canonicalList = value => {
   const result=[];
   const seen=new Set();
   for(const item of value){
-    // Legacy soft preferences retain their unknown-alias behavior. Hard selectors never drop fields.
+    // String preferences drop an unknown alias. Hard selectors never drop fields.
     const normalized=typeof item==='string'?canonicalRoutingPool(item):selector(item);
     if(!normalized)continue;
     const key=JSON.stringify(normalized);

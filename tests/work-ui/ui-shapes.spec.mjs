@@ -20,8 +20,8 @@ const sha = 'a'.repeat(64);
 const codes = (findings) => findings.map((f) => f.code);
 
 test('schema: ui.shapes and per-slot ui.dataStatus are additive; states stay readable', () => {
-  const legacy = example();
-  assert.equal(validate(legacy), true, `a record with only ui.states stays valid: ${errors()}`);
+  const statesOnly = example();
+  assert.equal(validate(statesOnly), true, `a record with only ui.states stays valid: ${errors()}`);
 
   const shaped = example();
   shaped.ui.shapes = [{ base: 'SignInBase', state: 'filled-welcome', viewports: ['desktop', 'mobile'] }, { base: 'SignInBase', state: 'first-run-empty', viewports: ['desktop'], nonDerivable: 'First-run onboarding with its own call to action.' }];
@@ -124,12 +124,12 @@ test('the ui record gate carries DATA_STATUS_DRAWN: refused on every record that
   const work = path.join(base, '.starciwork');
   const put = (rel, body) => { const file = path.join(work, rel); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, body); };
   put('index.yaml', 'schema: work/catalog@1\nid: fixture\nfeatures: []\n');
-  const legacy = example();
-  legacy.refs = []; // the example's FR records are not part of this fixture tree
-  legacy.assets = [];
-  legacy.assets.push({ path: 'assets/directions/loading--page--desktop--light.content.png', role: 'direction-content', sha256: sha });
-  put('features/identity/ui/sign-in/index.yaml', stringifyYaml(legacy));
-  const shaped = structuredClone(legacy);
+  const seedRecord = example();
+  seedRecord.refs = []; // the example's FR records are not part of this fixture tree
+  seedRecord.assets = [];
+  seedRecord.assets.push({ path: 'assets/directions/loading--page--desktop--light.content.png', role: 'direction-content', sha256: sha });
+  put('features/identity/ui/sign-in/index.yaml', stringifyYaml(seedRecord));
+  const shaped = structuredClone(seedRecord);
   shaped.id = 'ui.identity.sign-up';
   shaped.ui.shapes = [{ base: 'SignInBase', state: 'filled-welcome', viewports: ['desktop'] }];
   put('features/identity/ui/sign-up/index.yaml', stringifyYaml(shaped));
@@ -188,12 +188,12 @@ test('a record that draws a slot data status is refused', () => {
   assert.deepEqual(codes(uiShapeFindings(salesLike())), [DATA_STATUS_DRAWN, DATA_STATUS_DRAWN]);
 });
 
-test('generatedDrawingsOf: draw-render drawings make a record drawn; image_gen counts only on a record drawn before token rendering', () => {
+test('generatedDrawingsOf: draw-render drawings make a record drawn; image_gen counts only when the list has no draw-render drawing', () => {
   const gen = (path, tool, extra = {}) => ({ path, role: 'direction-content', sha256: sha, generation: { tool, promptPath: `${path}.prompt.txt` }, ...extra });
   const tokenRendered = [gen('a/default--page--desktop--light.content.png', DRAW_TOOL), gen('a/mascot.png', RASTER_TOOL, { role: 'raster-region' })];
   assert.deepEqual(generatedDrawingsOf(tokenRendered).map((a) => a.path), ['a/default--page--desktop--light.content.png'], 'a raster region is not a drawing');
-  const legacy = [gen('a/legacy.png', RASTER_TOOL, { role: 'direction' })];
-  assert.deepEqual(generatedDrawingsOf(legacy).map((a) => a.path), ['a/legacy.png'], 'a record drawn before token rendering keeps its image_gen directions');
+  const rasterOnly = [gen('a/raster-only.png', RASTER_TOOL, { role: 'direction' })];
+  assert.deepEqual(generatedDrawingsOf(rasterOnly).map((a) => a.path), ['a/raster-only.png'], 'a list with no draw-render drawing counts its image_gen directions');
   const retired = [gen('a/loading--page--desktop--light.content.png', DRAW_TOOL, { retired: 'data-status' })];
   assert.equal(generatedDrawingsOf(retired).length, 0);
 });

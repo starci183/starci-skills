@@ -19,7 +19,7 @@ import {DIGEST_ALGORITHM,STAMP_FILE,STAMP_SCHEMA,distDigest,sourceDigest} from '
  * digest algorithm from the current source digest, the built files still hash to the stamp's dist
  * digest, and every `--*` custom property the source CSS declares has the same value in the copied dist
  * CSS. A package that does not carry its source (a registry install) cannot be rebuilt or compared, so
- * it is `unverifiable` and allowed; if it carries a stamp, the version and dist digest still bind.
+ * it is `unverifiable` and allowed once its stamp binds: the version and dist digest must agree.
  */
 
 export const GRAMMAR_PACKAGE='@starci/grammar';
@@ -107,7 +107,6 @@ export function grammarDistStatus(packageRoot=defaultGrammarPackageRoot()){
   const tokens=hasSource?compareCssTokens(root):{compared:0,differences:[],differenceCount:0};
   const evidence={stamp,tokens};
   if(!stamp||stamp.schema!==STAMP_SCHEMA){
-    if(!hasSource)return result('unverifiable','the package carries neither source nor a build stamp (a registry install from before stamps); nothing to compare',evidence);
     return result('unstamped',`dist/${STAMP_FILE} is ${fs.existsSync(stampFile)?'not a valid build stamp':'missing'}, so this dist was not produced by the current build script${tokens.differenceCount?`; ${tokenSummary(tokens)}`:''}`,evidence);
   }
   if(hasSource){

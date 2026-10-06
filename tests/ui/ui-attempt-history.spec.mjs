@@ -177,16 +177,16 @@ test('dispatch-cohort metrics retain null measurements and exclude cancelled fro
   assert.equal(row.cohort.basis, 'dispatch');
 }));
 
-test('checkpoint receipt keeps committed, reused and legacy facts independently of workflow integration', t => withLedger(t, async fixture => {
+test('checkpoint receipt keeps committed, reused and unbound facts independently of workflow integration', t => withLedger(t, async fixture => {
   seedWorkflow(fixture.ledger, { id: 'wf', jobs: [
     { jobId: 'new', status: 'succeeded', result: { verdict: 'pass' }, dispatchedAt: at, updatedAt: at + 100 },
     { jobId: 'reused', status: 'succeeded', result: { verdict: 'pass' }, dispatchedAt: at, updatedAt: at + 100 },
-    { jobId: 'legacy', status: 'succeeded', result: { verdict: 'pass' }, dispatchedAt: at, updatedAt: at + 100 },
+    { jobId: 'unbound', status: 'succeeded', result: { verdict: 'pass' }, dispatchedAt: at, updatedAt: at + 100 },
     { jobId: 'missing', status: 'succeeded', result: { verdict: 'pass' }, dispatchedAt: at, updatedAt: at + 100 },
   ], events: [
     { kind: 'workflow-checkpoint', entityType: 'job', entityId: 'new', at: at + 40, payload: { sha: 'a'.repeat(40), committed: true, scope: ['ui/'], files: ['ui/output.ts'] } },
     { kind: 'workflow-checkpoint', entityType: 'job', entityId: 'reused', at: at + 40, payload: { sha: 'b'.repeat(40), committed: false, scope: ['ui/'], files: [] } },
-    { kind: 'workflow-checkpoint', entityType: 'job', entityId: 'legacy', at: at + 40, payload: { sha: 'c'.repeat(64) } },
+    { kind: 'workflow-checkpoint', entityType: 'job', entityId: 'unbound', at: at + 40, payload: { sha: 'c'.repeat(64) } },
   ] });
   const store = storeOf(fixture);
   const details = [];
@@ -237,7 +237,7 @@ test('recorded checkpoint effects remain observable with a pending or failed ver
   assert.equal(failed.land, null);
 }));
 
-test('legacy checkpoint collisions and a newer dispatch leave association unknown; exact dispatch binding remains usable', t => withLedger(t, fixture => {
+test('unbound checkpoint collisions and a newer dispatch leave association unknown; exact dispatch binding remains usable', t => withLedger(t, fixture => {
   seedWorkflow(fixture.ledger, { id: 'wf', jobs: [{ jobId: 'job', opId: 'test.op', status: 'leased', dispatchedAt: at }], events: [
     { kind: 'workflow-checkpoint', entityType: 'job', entityId: 'job', at: at + 40, payload: { sha: 'a'.repeat(40) } },
     { kind: 'workflow-checkpoint', entityType: 'job', entityId: 'job', at: at + 50, payload: { sha: 'b'.repeat(40) } },

@@ -9,7 +9,7 @@ import {inspectLedger} from '../../engine/db/ledger.mjs';
 import {ownerReserveGrant} from '../../scripts/agent/admission.mjs';
 
 const grant={authorized:true,scopeId:'wf/job.a1',role:'op',provider:'claude',model:'claude-opus-5-5',reason:'owner explicitly permits this attempt at 96 percent'};
-test('legacy soft aliases keep their shape and avoid wins',()=>{
+test('string aliases normalize to pool ids and avoid wins',()=>{
   assert.deepEqual(normalizeOwnerRoutingBias({prefer:['Codex','claude','codex-agent','unknown'],avoid:['CLAUDE']}),{prefer:['codex-agent'],avoid:['claude-agent']});
   assert.deepEqual(normalizeOwnerRoutingBias(null),{prefer:[],avoid:[]});
 });

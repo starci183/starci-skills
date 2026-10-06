@@ -45,7 +45,7 @@ function samePhysicalTarget(expected, current) {
   return current;
 }
 
-// Inspect custody names only: encrypted and legacy private payloads are never read here.
+// Inspect custody names only: encrypted and private payloads are never read here.
 function originalCiphertext(root, target) {
   let entries = 0;
   const visit = directory => {

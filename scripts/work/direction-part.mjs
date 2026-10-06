@@ -10,8 +10,7 @@
 // reviews. Every owner-facing image picker (scripts/kernel/ask-server.mjs for asks and the handover package,
 // scripts/connectors/telegram-media.mjs for drawing notices) runs its choice through partOf()/ownerImages().
 //
-// How a composite finds its part, most specific first (a record drawn before the compositor has no part and
-// keeps what it has):
+// How a composite finds its part, most specific first (an image with no part is shown as it is):
 //   1. the image is itself a part: role direction-content in its ui record, or a *.content.<ext> name;
 //   2. its ui record's asset for that path carries composite.content.path - the part it was placed from;
 //   3. the sibling <name>.content.<ext> exists on disk (the naming interface.draw writes).

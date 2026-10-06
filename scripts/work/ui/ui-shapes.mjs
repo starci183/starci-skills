@@ -19,7 +19,7 @@ const RETIRED_DATA_STATUS = 'data-status';
 export const DRAWING_ROLES = new Set(['direction', 'direction-content']);
 /** The tool that token-renders a drawing (scripts/work/draw-render.mjs); a ui record's drawings name it. */
 export const DRAW_TOOL = 'draw-render';
-/** The image generator: it paints raster regions, and it drew the directions of a record drawn before DRAW_TOOL. */
+/** The image generator: it paints raster regions, and it draws the directions of a record that has no DRAW_TOOL asset. */
 export const RASTER_TOOL = 'image_gen.imagegen';
 
 const schemaFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'modules', 'schemas', 'work-ui-screen.schema.yaml');
@@ -117,7 +117,7 @@ const generatedBy = (asset, tool) => Boolean(asset && typeof asset === 'object' 
 
 /**
  * The generated drawings among a ui record's assets (its `assets` or its `ui.assets` list) that make it drawn: the
- * DRAW_TOOL ones. A list with none is a record drawn before token rendering, and its RASTER_TOOL assets count; beside
+ * DRAW_TOOL ones. A list with none counts its RASTER_TOOL assets; beside
  * a DRAW_TOOL asset a RASTER_TOOL asset is a raster region the drawing embeds, never a drawing. Retired assets never
  * count.
  */

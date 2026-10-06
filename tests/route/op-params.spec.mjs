@@ -201,9 +201,9 @@ test('provision.ask declares params.subject as a required kernel string', () => 
   assert.equal(refused.param, 'subject');
   assert.match(refused.detail, /params\.subject/);
   assert.match(refused.detail, /--params '\{"subject"/);
-  const legacy = resolveOpParams(briefOf('provision.ask'), {});
-  assert.equal(legacy.ok, true, 'a job enqueued before the param existed still renders a packet');
-  assert.equal(Object.hasOwn(legacy.params, 'subject'), false);
+  const unenforced = resolveOpParams(briefOf('provision.ask'), {});
+  assert.equal(unenforced.ok, true, 'without enforceRequired a packet still renders');
+  assert.equal(Object.hasOwn(unenforced.params, 'subject'), false);
 });
 
 test('enqueue refuses provision.ask without params.subject and says how to re-enqueue', (t) => {

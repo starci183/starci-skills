@@ -77,7 +77,7 @@ export function verifyKernelRead(submitted, required) {
   return required;
 }
 
-/** New-leg READ admission; legacy/boot receipts never acquire a current incarnation by assertion. */
+/** New-leg READ admission; boot receipts never acquire a current incarnation by assertion. */
 export function requireKernelRead(db, workflowId, { root, authority, op, status } = {}) {
   const required = kernelReadManifest(db, workflowId, { root, authority, ops: op ? [op] : [], status });
   const row = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='runtime-rev-acked' ORDER BY seq DESC LIMIT 1").get(workflowId);

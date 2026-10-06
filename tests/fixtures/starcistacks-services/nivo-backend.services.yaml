@@ -5,7 +5,7 @@
 # Custody: sonarqube-nivo-be-token.key validated against the local server (valid). The shared server
 # itself is a host extension (.claude/ext/sonar) - the `owner: host` stack form below, so nivo-backend
 # never carries SonarQube compose files of its own; its project token twin lives in its own
-# .starcistacks custody (copied from the legacy source-host stack by the stacks lane).
+# .starcistacks custody (copied from the source-host stack by the stacks lane).
 repository: nivo-backend
 apply:
   file: .starcistacks/application-stacks.yaml

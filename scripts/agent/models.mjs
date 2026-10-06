@@ -60,7 +60,6 @@ export function raiseToFloor(difficulty, floor) {
 // role): scaffold, draw, asset, brand, ui, implement, review, sol-think.
 export function kindRoute(kind, runtimes) {
   const entry = runtimes?.roleOfKind?.[kind];
-  if (typeof entry === 'string') return { role: entry, work: null, floor: null, order: null };
   if (!entry || typeof entry !== 'object') return { role: null, work: null, floor: null, order: null };
   return { role: entry.role ?? null, work: entry.work ?? null, floor: normalizeDifficulty(entry.floor),
     order: typeof entry.order === 'string' && entry.order.trim() ? entry.order.trim() : null };

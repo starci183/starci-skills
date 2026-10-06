@@ -236,9 +236,9 @@ test('starci kernel settle refuses an unparseable Work YAML and a literal passwo
 
   const oldRepo = checkout(t);
   const old = seedJob(oldRepo, { jobId: 'op-scope-old', wf: 'wf-old', files: [put(oldRepo, `${FLOW}/index.yaml`, BROKEN_YAML)], admittedAt: at - 24 * 3600 * 1000 });
-  const legacy = settle(oldRepo, old);
-  assert.equal(legacy.r.status,1,legacy.r.stderr || legacy.r.stdout);
-  assert.equal(legacy.body?.reason,'work-hygiene-red','an earlier admission does not waive current hygiene');
+  const earlier = settle(oldRepo, old);
+  assert.equal(earlier.r.status,1,earlier.r.stderr || earlier.r.stdout);
+  assert.equal(earlier.body?.reason,'work-hygiene-red','an earlier admission does not waive current hygiene');
 
   // A passing Git op reaches native checkpointing, so use the existing real worktree/registry fixture.
   const cleanFixture = settleFixture(t), cleanRepo = cleanFixture.tree;

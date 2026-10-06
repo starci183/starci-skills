@@ -130,7 +130,7 @@ export function judgeSecurityLint(report, findingsDoc, relevant) {
 
 
 // Only the native exit-1 inspection exception uses this stricter carriage. The
-// public legacy judge above retains its admitted path/code-or-rule judgment.
+// public judge above retains its admitted path/code-or-rule judgment.
 function judgeInspectionCarriage(report, findingsDoc, relevant) {
   const ran = judgeLint(report, () => false, 'security');
   if (ran.status !== 'pass') return ran;

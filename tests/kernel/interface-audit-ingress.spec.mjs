@@ -152,16 +152,16 @@ test('a different operation cannot file a typed interface.audit verdict', (t) =>
   assert.deepEqual(fx.counts(), before);
 });
 
-test('a filed typed contract with a lost scope refuses instead of becoming a legacy report', (t) => {
+test('a filed typed contract with a lost scope refuses instead of becoming an untyped report', (t) => {
   const fx = fixture(t), packet = structuredClone(fx.packet), before = fx.counts(); delete packet.params.audit;
   fx.ledger.db.prepare('UPDATE contracts SET context_json=? WHERE attempt_id=?').run(JSON.stringify({ packet }), fx.attempt.attempt_id);
   assert.throws(() => fx.file(verdict()), (error) => error.code === 'report-attachment-invalid');
   assert.deepEqual(fx.counts(), before);
 });
 
-test('a legacy attempt without a filed typed definition keeps its admitted scope storage behavior', (t) => {
-  const fx = fixture(t, { typed: false }), doc = { schema: 'starci/interface-audit-operation@1', id: 'operation.checkout.old',
-    selectedMatrix: { legacyScope: 'previous contract' }, verdict: 'partial' };
-  assert.equal(fx.file(doc).audit.auditId, doc.id);
-  assert.deepEqual(JSON.parse(fx.ledger.db.prepare('SELECT scope_json FROM interface_audits').get().scope_json), doc.selectedMatrix);
+test('an attempt without a filed typed definition cannot file an audit verdict', (t) => {
+  const fx = fixture(t, { typed: false }), before = fx.counts(), doc = { schema: 'starci/interface-audit-operation@1', id: 'operation.checkout.purchase',
+    selectedMatrix: scope().selectedMatrix, verdict: 'partial' };
+  assert.throws(() => fx.file(doc), (error) => error.code === 'report-attachment-invalid');
+  assert.deepEqual(fx.counts(), before);
 });

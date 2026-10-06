@@ -900,7 +900,7 @@ test('missing or placeholder analysis input stops token, scan and dashboard befo
     assertNoSecret(run.report,action+' missing report');
   }
   assert.equal(state.requests.length,0,'presence refusal precedes the server probe');
-  assert.equal(fs.existsSync(marker),false,'legacy encrypted custody cannot replace missing input');
+  assert.equal(fs.existsSync(marker),false,'encrypted custody cannot replace missing input');
   assert.equal(fs.existsSync(path.join(root,'scanner-auth.json')),false);
   assert.deepEqual(fs.readFileSync(path.join(custody.stack,'runtime/files/sonarqube-analysis-token.txt.enc')),encrypted);
 });
