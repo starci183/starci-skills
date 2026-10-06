@@ -62,6 +62,98 @@ export function unresolvedPackedImports(files) {
   return missing;
 }
 
+/** The attempt's working layout: {archives, installRoot, host} and the scratch directories created. */
+const scratchLayout = (attempt) => {
+  const archives = path.join(attempt, 'archives'), installRoot = path.join(attempt, 'install'), host = path.join(attempt, 'host');
+  for (const dir of [archives, installRoot, host, 'home', 'local', 'projects', 'artifacts', 'temp'].map((dir) => path.isAbsolute(dir) ? dir : path.join(attempt, dir))) fs.mkdirSync(dir);
+  return { archives, installRoot, host };
+};
+
+/** The environment every child of the cold proof sees: the cleaned caller env plus the attempt's private roots. */
+const childEnvironment = (env, attempt) => {
+  const baseEnv = Object.fromEntries(Object.entries(cleanEnv(env)).filter(([key]) => !/^(STARCI_|ORCA_)/i.test(key) && key !== 'NODE_OPTIONS'));
+  return { ...baseEnv, HOME: path.join(attempt, 'home'), USERPROFILE: path.join(attempt, 'home'),
+    [LOCAL_ROOT_ENV]: path.join(attempt, 'local'), [TEST_REGISTRY_ENV]: path.join(attempt, 'local', 'machine.sqlite'),
+    [PROJECTS_ROOT_ENV]: path.join(attempt, 'projects'), [ARTIFACT_ROOT_ENV]: path.join(attempt, 'artifacts'),
+    TEMP: path.join(attempt, 'temp'), TMP: path.join(attempt, 'temp'), TMPDIR: path.join(attempt, 'temp'), STARCI_ROLE: 'owner' };
+};
+
+/** The archive checks after the tarball is read: {required, payload}, or {error: finish result}. */
+const verifyArchive = ({ files, manifest, expectedIntegrity, integrity, root, deps, finish }) => {
+  if (integrity !== expectedIntegrity) return { error: finish('red', PROOF_CODES.install, 'actual archive differs from the frozen publish pack') };
+  const identity = JSON.parse(files.get('package/package.json')?.toString() ?? '{}');
+  if (identity.name !== manifest.name || identity.version !== manifest.version) return { error: finish('red', PROOF_CODES.install, 'packed root package identity differs') };
+  // Consumer archives never carry local credentials or the releasing host's encrypted Sonar custody.
+  const unresolved = unresolvedPackedImports(files);
+  if (unresolved.length) return { error: finish('red', PROOF_CODES.install, `root archive scripts import modules the archive omits (${unresolved.length}): ${unresolved.slice(0, 5).join('; ')}`) };
+  const privateFile = [...files.keys()].find((file) => file.replaceAll('\\', '/').split('/').at(-1).toLowerCase() === SECRET_ENV_FILE.toLowerCase() || /^package[\\/]ext[\\/]sonar[\\/]secrets(?:[\\/]|$)/i.test(file));
+  if (privateFile) return { error: finish('red', PROOF_CODES.install, `root archive contains private host configuration or custody: ${privateFile}`) };
+  const required = ['skills/starci/SKILL.md', 'skills/starci/agents/openai.yaml', 'skills/starci/references/host-startup.md', 'skills/starci/references/host-maintenance.md',
+    'ui/server.mjs', 'ui/api/index.mjs', 'ui/package.json', 'ui/package-lock.json'];
+  const uiFiles = (deps.trackedUnder ?? gitTrackedUnder)(path.join(root, 'ui'));
+  if (!uiFiles?.some((file) => file.startsWith('src/'))) return { error: finish('unrun', PROOF_CODES.unrun, 'tracked UI source inventory is unavailable or empty') };
+  required.push(...uiFiles.filter((file) => /^(src|api)\//.test(file)).map((file) => `ui/${file}`));
+  if (required.some((file) => !files.has(`package/${file}`))) return { error: finish('red', PROOF_CODES.install, 'root archive omits an owning prompt or UI source input') };
+  const payload = { name: manifest.name, version: manifest.version, files };
+  const sourceFailure = verifyPackedDependencies([payload], root, { packageRoots: new Map([[manifest.name, root]]) });
+  if (sourceFailure) return { error: finish('red', PROOF_CODES.install, sourceFailure) };
+  return { required, payload };
+};
+
+/** The installed-graph probe and the runtime-install dispatch: {probe, projected}, or {error: finish result}. */
+const probeInstalled = ({ stage, finish, node, installedRoot, host, childEnv, manifest, files, required }) => {
+  const probed = stage('installed-graph', () => node(['--input-type=module', '-e', PROBE, installedRoot, host],
+    { cwd: host, env: childEnv, timeout: 300_000, maxBuffer: 64 * 1024 * 1024 }));
+  if (probed.error || probed.status === null) return { error: finish('unrun', PROOF_CODES.unrun, 'installed graph process did not complete') };
+  if (probed.status !== 0) return { error: finish('red', PROOF_CODES.test, 'installed runtime graph or fetch version failed') };
+  const probe = JSON.parse(String(probed.stdout));
+  if (probe.name !== manifest.name || probe.version !== manifest.version || !probe.payload?.length || !probe.entries?.length) return { error: finish('red', PROOF_CODES.test, 'installed payload owner returned an incomplete identity or projection') };
+  const projected = new Map(probe.payload.map((file) => [`package/${file}`, files.get(`package/${file}`)]));
+  if ([...projected.values()].some((value) => !Buffer.isBuffer(value)) || required.some((file) => !projected.has(`package/${file}`))) return { error: finish('red', PROOF_CODES.test, 'native installer omits an owning packed prompt or UI input') };
+  const dispatched = stage('runtime-install', () => node([path.join(installedRoot, 'scripts', 'cli', 'main.mjs'), 'runtime', 'install', '--cwd', host, '--no-bootstrap'],
+    { cwd: host, env: childEnv, timeout: 300_000, maxBuffer: 64 * 1024 * 1024 }));
+  if (dispatched.error || dispatched.status === null) return { error: finish('unrun', PROOF_CODES.unrun, 'runtime install process did not complete') };
+  if (dispatched.status !== 0) return { error: finish('red', PROOF_CODES.test, 'shipped runtime install dispatch failed') };
+  return { probe, projected };
+};
+
+/** The host projection, entry-file and custody checks after the install dispatch: a finish result or null. */
+const verifyProjection = ({ finish, manifest, files, payload, probe, projected, host, target, attempt }) => {
+  const projectionFailure = verifyPackedDependencies([{ ...payload, files: projected }], host, { packageRoots: new Map([[manifest.name, target]]) });
+  if (projectionFailure) return finish('red', PROOF_CODES.test, projectionFailure);
+  const entryFiles = new Map(probe.entries.map((entry) => [`package/${entry.relative}`, files.get(`package/${entry.source}`)]));
+  if ([...entryFiles.values()].some((value) => !Buffer.isBuffer(value))) return finish('red', PROOF_CODES.test, 'discovery owner names a source outside the archive');
+  const entryFailure = verifyPackedDependencies([{ ...payload, files: entryFiles }], host, { packageRoots: new Map([[manifest.name, host]]) });
+  if (entryFailure) return finish('red', PROOF_CODES.test, entryFailure);
+  const custody = JSON.parse(fs.readFileSync(path.join(target, '.starci-skills.json'), 'utf8'));
+  if (custody.name !== manifest.name || custody.version !== manifest.version ||
+    Object.keys(custody.files ?? {}).sort(byCodeUnit).join('\0') !== [...probe.payload].sort(byCodeUnit).join('\0') ||
+    probe.entries.some((entry) => custody.hostSkills?.files?.[entry.relative] !== sha256(entryFiles.get(`package/${entry.relative}`)))) return finish('red', PROOF_CODES.test, 'native installer custody does not bind the actual payload and discovery bytes');
+  if (fs.existsSync(path.join(host, 'AGENTS.md')) || fs.existsSync(path.join(host, '.gitignore'))) return finish('red', PROOF_CODES.test, 'no-bootstrap dispatch changed host bootstrap files');
+  fs.writeFileSync(path.join(attempt, 'install-custody.json'), `${JSON.stringify(custody, null, 2)}\n`, { flag: 'wx' });
+  return null;
+};
+
+/** The runtime-update and runtime-doctor stages of the fresh host: the finish result. */
+const updateAndDoctor = ({ stage, finish, node, installedRoot, host, target, childEnv, manifest, payload, projected, probe, result }) => {
+  const updated = stage('runtime-update', () => node([path.join(installedRoot, 'scripts', 'cli', 'main.mjs'), 'runtime', 'update', '--cwd', host, '--no-bootstrap'],
+    { cwd: host, env: childEnv, timeout: 300_000, maxBuffer: 64 * 1024 * 1024 }));
+  if (updated.error || updated.status === null) return finish('unrun', PROOF_CODES.unrun, 'runtime custody update process did not complete');
+  if (updated.status !== 0) return finish('red', PROOF_CODES.test, 'native installer refused its fresh custody');
+  const refreshedCustody = JSON.parse(fs.readFileSync(path.join(target, '.starci-skills.json'), 'utf8'));
+  if (refreshedCustody.keptLocal?.length || refreshedCustody.preservedStale?.length) return finish('red', PROOF_CODES.test, 'native installer detects changed or unowned payload custody on the fresh host');
+  const refreshedFailure = verifyPackedDependencies([{ ...payload, files: projected }], host, { packageRoots: new Map([[manifest.name, target]]) });
+  if (refreshedFailure) return finish('red', PROOF_CODES.test, refreshedFailure);
+  const diagnosed = stage('runtime-doctor', () => node([path.join(target, 'scripts', 'cli', 'main.mjs'), 'runtime', 'doctor', '--cwd', host],
+    { cwd: host, env: childEnv, timeout: 300_000, maxBuffer: 64 * 1024 * 1024 }));
+  if (diagnosed.error || diagnosed.signal || !Number.isInteger(diagnosed.status)) return finish('unrun', PROOF_CODES.unrun, 'full installed runtime doctor did not complete');
+  if (diagnosed.status !== 0) return finish('red', PROOF_CODES.test, 'full installed runtime doctor failed; see immutable diagnostics');
+  const diagnosedFailure = verifyPackedDependencies([{ ...payload, files: projected }], host, { packageRoots: new Map([[manifest.name, target]]) });
+  if (diagnosedFailure) return finish('red', PROOF_CODES.test, diagnosedFailure);
+  result.projectedFiles = probe.payload; result.discoveryFiles = probe.entries.map((entry) => entry.relative);
+  return finish('green', null, 'actual root archive, private native projection and full installed runtime doctor match');
+};
+
 /** Real archive/install proof; seams replace only owned process APIs in focused fixtures. Scratch and receipts are retained. */
 export function proveRuntimePackage({ root, sourceSha, expectedIntegrity, env = process.env, deps = {} }) {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -81,13 +173,8 @@ export function proveRuntimePackage({ root, sourceSha, expectedIntegrity, env = 
       if (isLinkLike(cursor) || fs.existsSync(path.join(cursor, 'node_modules'))) return finish('unrun', PROOF_CODES.unrun, 'scratch has a linked ancestor or an ambient node_modules');
       if (path.dirname(cursor) === cursor) break;
     }
-    const archives = path.join(attempt, 'archives'), installRoot = path.join(attempt, 'install'), host = path.join(attempt, 'host');
-    for (const dir of [archives, installRoot, host, 'home', 'local', 'projects', 'artifacts', 'temp'].map((dir) => path.isAbsolute(dir) ? dir : path.join(attempt, dir))) fs.mkdirSync(dir);
-    const baseEnv = Object.fromEntries(Object.entries(cleanEnv(env)).filter(([key]) => !/^(STARCI_|ORCA_)/i.test(key) && key !== 'NODE_OPTIONS'));
-    const childEnv = { ...baseEnv, HOME: path.join(attempt, 'home'), USERPROFILE: path.join(attempt, 'home'),
-      [LOCAL_ROOT_ENV]: path.join(attempt, 'local'), [TEST_REGISTRY_ENV]: path.join(attempt, 'local', 'machine.sqlite'),
-      [PROJECTS_ROOT_ENV]: path.join(attempt, 'projects'), [ARTIFACT_ROOT_ENV]: path.join(attempt, 'artifacts'),
-      TEMP: path.join(attempt, 'temp'), TMP: path.join(attempt, 'temp'), TMPDIR: path.join(attempt, 'temp'), STARCI_ROLE: 'owner' };
+    const { archives, installRoot, host } = scratchLayout(attempt);
+    const childEnv = childEnvironment(env, attempt);
     const stage = (name, callback) => {
       const value = callback();
       fs.writeFileSync(path.join(attempt, `${name}.stdout.txt`), String(value.stdout ?? ''), { flag: 'wx' });
@@ -108,23 +195,9 @@ export function proveRuntimePackage({ root, sourceSha, expectedIntegrity, env = 
     const bytes = fs.readFileSync(archive), files = tarFiles(bytes);
     const integrity = sriSha512(bytes);
     result.archive = { file: archive, sha256: sha256(bytes), integrity, bytes: bytes.length, packedFiles: [...files.keys()].sort(byCodeUnit) };
-    if (integrity !== expectedIntegrity) return finish('red', PROOF_CODES.install, 'actual archive differs from the frozen publish pack');
-    const identity = JSON.parse(files.get('package/package.json')?.toString() ?? '{}');
-    if (identity.name !== manifest.name || identity.version !== manifest.version) return finish('red', PROOF_CODES.install, 'packed root package identity differs');
-    // Consumer archives never carry local credentials or the releasing host's encrypted Sonar custody.
-    const unresolved = unresolvedPackedImports(files);
-    if (unresolved.length) return finish('red', PROOF_CODES.install, `root archive scripts import modules the archive omits (${unresolved.length}): ${unresolved.slice(0, 5).join('; ')}`);
-    const privateFile = [...files.keys()].find((file) => file.replaceAll('\\', '/').split('/').at(-1).toLowerCase() === SECRET_ENV_FILE.toLowerCase() || /^package[\\/]ext[\\/]sonar[\\/]secrets(?:[\\/]|$)/i.test(file));
-    if (privateFile) return finish('red', PROOF_CODES.install, `root archive contains private host configuration or custody: ${privateFile}`);
-    const required = ['skills/starci/SKILL.md', 'skills/starci/agents/openai.yaml', 'skills/starci/references/host-startup.md', 'skills/starci/references/host-maintenance.md',
-      'ui/server.mjs', 'ui/api/index.mjs', 'ui/package.json', 'ui/package-lock.json'];
-    const uiFiles = (deps.trackedUnder ?? gitTrackedUnder)(path.join(root, 'ui'));
-    if (!uiFiles?.some((file) => file.startsWith('src/'))) return finish('unrun', PROOF_CODES.unrun, 'tracked UI source inventory is unavailable or empty');
-    required.push(...uiFiles.filter((file) => /^(src|api)\//.test(file)).map((file) => `ui/${file}`));
-    if (required.some((file) => !files.has(`package/${file}`))) return finish('red', PROOF_CODES.install, 'root archive omits an owning prompt or UI source input');
-    const payload = { name: manifest.name, version: manifest.version, files };
-    const sourceFailure = verifyPackedDependencies([payload], root, { packageRoots: new Map([[manifest.name, root]]) });
-    if (sourceFailure) return finish('red', PROOF_CODES.install, sourceFailure);
+    const checked = verifyArchive({ files, manifest, expectedIntegrity, integrity, root, deps, finish });
+    if (checked.error) return checked.error;
+    const { required, payload } = checked;
     const installed = stage('install', () => (deps.runNpm ?? runNpm)(['install', '--prefix', installRoot, archive, '--no-save', '--package-lock=false', '--omit=dev', '--no-audit', '--no-fund'],
       { cwd: installRoot, env: childEnv, timeout: 1_200_000, maxBuffer: 256 * 1024 * 1024 }));
     if (installed.error || installed.status === null) return finish('unrun', PROOF_CODES.unrun, 'archive install did not complete');
@@ -133,47 +206,12 @@ export function proveRuntimePackage({ root, sourceSha, expectedIntegrity, env = 
     if (installFailure) return finish('red', PROOF_CODES.install, installFailure);
     const installedRoot = path.join(installRoot, 'node_modules', manifest.name);
     const node = deps.runNode ?? runNode;
-    const probed = stage('installed-graph', () => node(['--input-type=module', '-e', PROBE, installedRoot, host],
-      { cwd: host, env: childEnv, timeout: 300_000, maxBuffer: 64 * 1024 * 1024 }));
-    if (probed.error || probed.status === null) return finish('unrun', PROOF_CODES.unrun, 'installed graph process did not complete');
-    if (probed.status !== 0) return finish('red', PROOF_CODES.test, 'installed runtime graph or fetch version failed');
-    const probe = JSON.parse(String(probed.stdout));
-    if (probe.name !== manifest.name || probe.version !== manifest.version || !probe.payload?.length || !probe.entries?.length) return finish('red', PROOF_CODES.test, 'installed payload owner returned an incomplete identity or projection');
-    const projected = new Map(probe.payload.map((file) => [`package/${file}`, files.get(`package/${file}`)]));
-    if ([...projected.values()].some((value) => !Buffer.isBuffer(value)) || required.some((file) => !projected.has(`package/${file}`))) return finish('red', PROOF_CODES.test, 'native installer omits an owning packed prompt or UI input');
-    const dispatched = stage('runtime-install', () => node([path.join(installedRoot, 'scripts', 'cli', 'main.mjs'), 'runtime', 'install', '--cwd', host, '--no-bootstrap'],
-      { cwd: host, env: childEnv, timeout: 300_000, maxBuffer: 64 * 1024 * 1024 }));
-    if (dispatched.error || dispatched.status === null) return finish('unrun', PROOF_CODES.unrun, 'runtime install process did not complete');
-    if (dispatched.status !== 0) return finish('red', PROOF_CODES.test, 'shipped runtime install dispatch failed');
+    const probed = probeInstalled({ stage, finish, node, installedRoot, host, childEnv, manifest, files, required });
+    if (probed.error) return probed.error;
     const target = path.join(host, '.claude');
-    const projectionFailure = verifyPackedDependencies([{ ...payload, files: projected }], host, { packageRoots: new Map([[manifest.name, target]]) });
-    if (projectionFailure) return finish('red', PROOF_CODES.test, projectionFailure);
-    const entryFiles = new Map(probe.entries.map((entry) => [`package/${entry.relative}`, files.get(`package/${entry.source}`)]));
-    if ([...entryFiles.values()].some((value) => !Buffer.isBuffer(value))) return finish('red', PROOF_CODES.test, 'discovery owner names a source outside the archive');
-    const entryFailure = verifyPackedDependencies([{ ...payload, files: entryFiles }], host, { packageRoots: new Map([[manifest.name, host]]) });
-    if (entryFailure) return finish('red', PROOF_CODES.test, entryFailure);
-    const custody = JSON.parse(fs.readFileSync(path.join(target, '.starci-skills.json'), 'utf8'));
-    if (custody.name !== manifest.name || custody.version !== manifest.version ||
-      Object.keys(custody.files ?? {}).sort(byCodeUnit).join('\0') !== [...probe.payload].sort(byCodeUnit).join('\0') ||
-      probe.entries.some((entry) => custody.hostSkills?.files?.[entry.relative] !== sha256(entryFiles.get(`package/${entry.relative}`)))) return finish('red', PROOF_CODES.test, 'native installer custody does not bind the actual payload and discovery bytes');
-    if (fs.existsSync(path.join(host, 'AGENTS.md')) || fs.existsSync(path.join(host, '.gitignore'))) return finish('red', PROOF_CODES.test, 'no-bootstrap dispatch changed host bootstrap files');
-    fs.writeFileSync(path.join(attempt, 'install-custody.json'), `${JSON.stringify(custody, null, 2)}\n`, { flag: 'wx' });
-    const updated = stage('runtime-update', () => node([path.join(installedRoot, 'scripts', 'cli', 'main.mjs'), 'runtime', 'update', '--cwd', host, '--no-bootstrap'],
-      { cwd: host, env: childEnv, timeout: 300_000, maxBuffer: 64 * 1024 * 1024 }));
-    if (updated.error || updated.status === null) return finish('unrun', PROOF_CODES.unrun, 'runtime custody update process did not complete');
-    if (updated.status !== 0) return finish('red', PROOF_CODES.test, 'native installer refused its fresh custody');
-    const refreshedCustody = JSON.parse(fs.readFileSync(path.join(target, '.starci-skills.json'), 'utf8'));
-    if (refreshedCustody.keptLocal?.length || refreshedCustody.preservedStale?.length) return finish('red', PROOF_CODES.test, 'native installer detects changed or unowned payload custody on the fresh host');
-    const refreshedFailure = verifyPackedDependencies([{ ...payload, files: projected }], host, { packageRoots: new Map([[manifest.name, target]]) });
-    if (refreshedFailure) return finish('red', PROOF_CODES.test, refreshedFailure);
-    const diagnosed = stage('runtime-doctor', () => node([path.join(target, 'scripts', 'cli', 'main.mjs'), 'runtime', 'doctor', '--cwd', host],
-      { cwd: host, env: childEnv, timeout: 300_000, maxBuffer: 64 * 1024 * 1024 }));
-    if (diagnosed.error || diagnosed.signal || !Number.isInteger(diagnosed.status)) return finish('unrun', PROOF_CODES.unrun, 'full installed runtime doctor did not complete');
-    if (diagnosed.status !== 0) return finish('red', PROOF_CODES.test, 'full installed runtime doctor failed; see immutable diagnostics');
-    const diagnosedFailure = verifyPackedDependencies([{ ...payload, files: projected }], host, { packageRoots: new Map([[manifest.name, target]]) });
-    if (diagnosedFailure) return finish('red', PROOF_CODES.test, diagnosedFailure);
-    result.projectedFiles = probe.payload; result.discoveryFiles = probe.entries.map((entry) => entry.relative);
-    return finish('green', null, 'actual root archive, private native projection and full installed runtime doctor match');
+    const projection = verifyProjection({ finish, manifest, files, payload, probe: probed.probe, projected: probed.projected, host, target, attempt });
+    if (projection) return projection;
+    return updateAndDoctor({ stage, finish, node, installedRoot, host, target, childEnv, manifest, payload, projected: probed.projected, probe: probed.probe, result });
   } catch (error) {
     return finish('unrun', PROOF_CODES.unrun, String(error?.stack ?? error));
   }
