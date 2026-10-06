@@ -47,7 +47,7 @@ const fixture=t=>{
       // machineFileFor honours STARCI_TEST_MACHINE_FILE first; without it the spawned api lands on the
       // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
       STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
-      STARCI_PROJECTS_ROOT:path.join(root,'projects'),LOCALAPPDATA:path.join(root,'localappdata'),
+      STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_LOCAL_ROOT:path.join(root,'localappdata'),
     };
     const workflowId='wf-dispatch',jobId=`job-${mode}`;
     const made=fakeOrcaWorktrees({root:path.join(root,'worktrees')}).create({repo:`path:${mainRepo}`,name:`wf-${workflowId}`,baseBranch:'main'});

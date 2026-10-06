@@ -16,7 +16,7 @@ const MIN = 60_000;
 
 function world(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-sla-'));
-  const env = { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_CONNECTORS_OFF: '1',
+  const env = { ...process.env, STARCI_LOCAL_ROOT: path.join(root, 'la'), STARCI_CONNECTORS_OFF: '1',
     [TEST_REGISTRY_ENV]: path.join(root, 'machine.sqlite') };
   let now = Date.parse('2026-09-28T10:00:00Z');
   const m = openMachine({ env, now: () => now });

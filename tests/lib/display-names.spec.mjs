@@ -91,7 +91,7 @@ const world = (t, fn) => withLedger(t, ({ root, repoRoot, machineHome, ledger })
   fs.writeFileSync(stateFile, JSON.stringify({ sends: 0, terminals: {
     'term-k': { handle: 'term-k', connected: true, writable: true }, 'term-op': { handle: 'term-op', connected: true, writable: true } } }));
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_MODE: 'healthy', STARCI_FAKE_ORCA_STATE: stateFile, STARCI_FAKE_ORCA_LOG: callsFile, LOCALAPPDATA: machineHome };
+    STARCI_FAKE_ORCA_MODE: 'healthy', STARCI_FAKE_ORCA_STATE: stateFile, STARCI_FAKE_ORCA_LOG: callsFile, STARCI_LOCAL_ROOT: machineHome };
   delete env.ORCA_TERMINAL_HANDLE;
   const run = (args, extraEnv = {}) => spawnSync(process.execPath, [API, ...args, '--repo', repoRoot, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env: { ...env, ...extraEnv } });
   const calls = () => (fs.existsSync(callsFile) ? fs.readFileSync(callsFile, 'utf8').trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line).argv) : []);

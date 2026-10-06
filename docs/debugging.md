@@ -5,8 +5,8 @@ Every question about a workflow has an answer in SQL. Open the databases read-on
 close. Never call an API verb to look at state, and never open a database for writing by hand.
 
 ```text
-runtime.sqlite   %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite
-machine.sqlite   %LOCALAPPDATA%/StarCi/machine.sqlite
+runtime.sqlite   <runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite
+machine.sqlite   <runtime root>/.runtime/machine.sqlite
 blob             GET /api/blob/<sha256> on the harness, or blobs.file_uri
 ```
 

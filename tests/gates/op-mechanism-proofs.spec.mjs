@@ -380,7 +380,7 @@ test('judgeJobProofs refuses paper-only attachments even when every required sch
 function seedOp(t, { label, op, docs, admittedAt = null, current = false }) {
   const base = tmp(t, 'starci-op-proof-settle-'), repo = path.join(base, 'main'), tree = path.join(base, 'workflow');
   fs.mkdirSync(repo);
-  const env = { ...process.env, [TEST_REGISTRY_ENV]: path.join(base, 'machine.sqlite'), LOCALAPPDATA: path.join(base, 'localappdata'),
+  const env = { ...process.env, [TEST_REGISTRY_ENV]: path.join(base, 'machine.sqlite'), STARCI_LOCAL_ROOT: path.join(base, 'localappdata'),
     STARCI_PROJECTS_ROOT: path.join(base, 'projects'), STARCI_ARTIFACT_ROOT: path.join(base, 'artifacts'),
     STARCI_LOCAL_ROOT: path.join(base, 'local'), STARCI_OWNER_ROOT: path.join(base, 'owner'), STARCI_LANES_ROOT: path.join(base, 'lanes') };
   delete env.STARCI_CALLER;

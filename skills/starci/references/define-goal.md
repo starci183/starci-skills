@@ -94,7 +94,7 @@ change needs a new approval. Revisions retain their native content-bound token a
    CONFIG: <config.yaml path> — kernel group <agent>/<model> → … effort=…   (or: kernel pin agent=… model=… effort=…)
    WILL WRITE:
      - <row>
-   ledger: %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite
+   ledger: <runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite
    re-run without --plan to persist
    ```
 
@@ -121,7 +121,7 @@ change needs a new approval. Revisions retain their native content-bound token a
 
 ## Rules
 
-- All state lives in the project's runtime ledger (`%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`) — never
+- All state lives in the project's runtime ledger (`<runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite`) — never
   answer "what's queued" from memory; query `inbox`/`goals`/`jobs`. The ledger
   is written ONLY by the executables above (and at runtime by
   `starci kernel <cmd>`, the kernel agent's single

@@ -123,7 +123,7 @@ test('a settled job with a live terminal -> the settler closes it; in active a l
     assert.deepEqual(ctx.calls.run[0].args.slice(0, 1), [SETTLER_SCRIPT]);
     assert.ok(ctx.calls.clock.some((c) => c.state === 'WORKER_RELEASE_LEAK'));
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-job-home-'));
-    const active = ctxFor(fx, { mode: 'active', env: { ...process.env, LOCALAPPDATA: home },
+    const active = ctxFor(fx, { mode: 'active', env: { ...process.env, STARCI_LOCAL_ROOT: home },
       runResult: () => ({ ok: true, value: { ok: true, results: [{ released: [{ jobId: 'op-a', state: 'released', closedNow: true }] }] } }) });
     try {
       const a = await job.reconcile('job:shop-be:op-a', active);

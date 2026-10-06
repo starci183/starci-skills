@@ -77,7 +77,7 @@ not-codes:
   - literal: STARCI_KERNEL_DEATH_SETTLE_MS
     reason: "env var name (timing setting)"
   - literal: STARCI_LOCAL_ROOT
-    reason: "env var name (overrides the whole %LOCALAPPDATA%/StarCi state base)"
+    reason: "env var name (overrides the whole <runtime root>/.runtime state base)"
   - literal: STARCI_PROJECTS_ROOT
     reason: "env var name"
   - literal: STARCI_RELOADED_AT

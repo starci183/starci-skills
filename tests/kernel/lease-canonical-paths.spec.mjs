@@ -120,7 +120,7 @@ test('api: dispatch takes the app-relative lease, a parent of the same catalog w
   const env={...process.env,...fakeDevinQuotaEnv(t,path.join(dir,'appdata')),STARCI_SOURCE_ROOT:source,
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(dir,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(dir,'state.json'),
-    LOCALAPPDATA:path.join(dir,'localappdata')};
+    STARCI_LOCAL_ROOT:path.join(dir,'localappdata')};
   const api=(...args)=>{
     const r=spawnSync(process.execPath,[API,...placeOnRepo(args,be),'--repo',be,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
     let body=null;try{body=JSON.parse(r.stdout);}catch{}

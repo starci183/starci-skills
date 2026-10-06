@@ -5,7 +5,7 @@
 // (workers.mjs), the land gate's scratch (land.mjs) — lives under ONE root, lanesRoot():
 //   1. STARCI_LANES_ROOT            a one-off/spec override
 //   2. roots.lanes                  the owner config (config.yaml, gitignored)
-//   3. <starciLocalRoot>/lanes      the state-root default (the owner moves it off C: with STARCI_LANES_ROOT or the key)
+//   3. <profile>/StarCi/lanes       the default, kept OUT of the checkout's .runtime (STARCI_LOCAL_ROOT/lanes when that seam is set; the owner moves it with STARCI_LANES_ROOT or the key)
 //
 // sweepLanes removes the registered worktrees under that root whose branch is fully landed on main
 // (git cherry finds no '+') and that stayed idle for allocation.housekeeping.laneGraceMs, after

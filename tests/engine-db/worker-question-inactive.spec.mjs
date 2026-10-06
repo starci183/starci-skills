@@ -21,7 +21,7 @@ test('a filed report makes its worker question inactive before job settlement', 
   const state = path.join(tmp, 'state.json');
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(tmp, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: state,
-    STARCI_PROJECTS_ROOT:path.join(tmp,'projects'),STARCI_TEST_MACHINE_FILE:path.join(tmp,'machine.sqlite'),LOCALAPPDATA:path.join(tmp,'localappdata') };
+    STARCI_PROJECTS_ROOT:path.join(tmp,'projects'),STARCI_TEST_MACHINE_FILE:path.join(tmp,'machine.sqlite'),STARCI_LOCAL_ROOT:path.join(tmp,'localappdata') };
   const api = (...args) => {
     const run = spawnSync(process.execPath, [apiFile, ...args, '--repo', repo, '--json'],
       { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 120000, env });

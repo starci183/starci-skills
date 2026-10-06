@@ -136,13 +136,13 @@ shape:
     - "/_resources/* !/_resources/{environments,identities,fixtures,runtimes,grammar-captures}/"
     - "/_derived/* !/_derived/index.yaml !/_derived/frontier.md !/_derived/critique.yaml !/_derived/critique.md"
     - "evidence/ runs/ draw-loop/ operations/ report*.json *.tmp.json /features/**/impl/**/assets/ /shell/assets/"
-  workflowRunState: one SQLite file per project ledger, %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite
-    (decision Q1; engine/db/ledger.mjs ledgerFileFor resolves it through machine.ledgers), outside every repository. Untracked, never product content (shape.agentData). It holds workflows, units, jobs,
+  workflowRunState: one SQLite file per project ledger, <runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite
+    (decision Q1; engine/db/ledger.mjs ledgerFileFor resolves it through machine.ledgers), outside every product repository (in the git-ignored host-state directory of the runtime). Untracked, never product content (shape.agentData). It holds workflows, units, jobs,
     op attempts, contracts, reports, check runs, artifacts, blobs, events, logs, conditions, leases, inbox and
     citations. Report JSON lives only in reports.report_json. Query views expose op history, media, timeline and
     workflow progress. See ledger-db.md.
   operationalBlobs: "Raw check logs and JSON, patches, screenshots, videos, DOM snapshots, transcripts and report
-    attachments belong in the content-addressed blob store outside every repository (~/.starci/artifacts/, or
+    attachments belong in the content-addressed blob store outside every product repository (<runtime root>/.runtime/artifacts/, or
     STARCI_ARTIFACT_ROOT). The ledger references each blob by sha256 (blob_ref_columns lists every referencing
     column) and serves it at /api/blob/<sha256>. A product record cites a blob through work_citations, which pins
     it; scripts/housekeeping/blob-gc.mjs sweeps an unreferenced blob only after the 24 h grace and a verified archive."

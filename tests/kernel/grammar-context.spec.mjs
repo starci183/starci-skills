@@ -111,7 +111,7 @@ test('starci kernel dispatch attaches context.grammar and refuses grammar-contex
   const log=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
-    STARCI_SOURCE_ROOT:root,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
+    STARCI_SOURCE_ROOT:root,STARCI_LOCAL_ROOT:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
   fs.mkdirSync(path.join(repo,'src','app'),{recursive:true});
   const ledger=openLedger({file:ledgerFileFor(repo,{env})});
   try{seedWorkflow(ledger,{id:'wf-grammar',jobs:[{jobId:'job-impl',opId:'interface.implement',

@@ -13,12 +13,27 @@ These writers and their SQL files own the storage rules.
 ## 1. The layout
 
 ```text
-%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite   one per project (its workflows' complete history)
-%LOCALAPPDATA%/StarCi/machine.sqlite                        one per host (registry, Supervisor, engine, host state)
-~/.starci/artifacts/<sha[0:2]>/<sha256>  +  <sha256>.json    one blob store (bytes; the DBs hold the index)
+<runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite   one per project (its workflows' complete history)
+<runtime root>/.runtime/machine.sqlite                        one per host (registry, Supervisor, engine, host state)
+<runtime root>/.runtime/artifacts/<sha[0:2]>/<sha256>  +  <sha256>.json   one blob store (bytes; the DBs hold the index)
+<runtime root>/.runtime/archive/                              session files, blob retention, ledger backups
 <app>/.starciwork/                                           product content only, in git
 ```
 
+- `<runtime root>` is the `.claude` of the host Source: the checkout, or the copy `starci runtime install` places at
+  `<app>/.claude` inside the app's repository. `.runtime/` is host data: git-ignored (the installer adds `.claude/.runtime/` to the
+  app's `.gitignore`), never in the npm package or the GitHub archive. `~/.starci/runtime/node_modules/starci` is only the CLI's
+  download cache and holds no state. `engine/runtime-root.mjs` `starciLocalRoot` is the one owner of this path. The earlier
+  `%LOCALAPPDATA%/StarCi` and `~/.starci/artifacts` stores are not read, copied or removed: the new location starts empty and the
+  init owners create it.
+- The state base follows the code's own location: a lane worktree, or a runtime that `STARCI_RUNTIME` or `starci runtime link`
+  points elsewhere, resolves its own `<that root>/.runtime` and opens a different, empty store. `STARCI_LOCAL_ROOT` names one
+  shared base when several roots must see the same state. Lane worktrees themselves default outside the checkout
+  (`scripts/machine/home.mjs` `lanesRoot`).
+- The blob writer (`engine/db/blob.mjs`) accepts a root outside every checkout, or one under the runtime's own `.runtime` whose
+  directory the checkout's `.gitignore` (or `.git/info/exclude`) ignores, the last matching rule winning so a negation refuses;
+  any other root inside a checkout is refused. In a `node --test` process tree an unset `STARCI_ARTIFACT_ROOT` resolves to a temp
+  directory instead of the checkout.
 - A project ledger is found through `machine.ledgers` (`ledger_id → file`), never by walking a
   repository. `meta.ledger_id` is minted at create and moves with the bytes.
 - There is no other store. No JSON state file, no JSONL inbox, no text log, no second SQLite file.
@@ -33,11 +48,11 @@ These writers and their SQL files own the storage rules.
   initializes its own store through its normal lifecycle instead of copying or registering sample bytes.
   The fixture descriptor and selected artifact roots are explicit producer inputs; metadata alone does not
   redirect blob readers. Selected reads use the existing per-call blob-root contract.
-- `STARCI_LOCAL_ROOT` overrides the per-host state base (`%LOCALAPPDATA%/StarCi` itself, one shared helper:
-  `engine/db/machine.mjs` `starciLocalRoot`/`LOCAL_ROOT_ENV`, re-exported and honored by `engine/db/ledger.mjs`
-  `projectsRootFor`) — both `projects/` and `machine.sqlite` move under it. Narrower seams still win when set:
+- `STARCI_LOCAL_ROOT` overrides the per-host state base (`<runtime root>/.runtime` itself, one shared helper:
+  `engine/runtime-root.mjs` `starciLocalRoot`/`LOCAL_ROOT_ENV`, re-exported by `engine/db/machine.mjs` and honored by
+  `engine/db/ledger.mjs` `projectsRootFor`) — `projects/`, `machine.sqlite`, `archive/` and `artifacts/` move under it. Narrower seams still win when set:
   `STARCI_PROJECTS_ROOT` (just the `projects/` directory), `STARCI_TEST_MACHINE_FILE` (the exact `machine.sqlite`
-  file), `STARCI_ARTIFACT_ROOT` (the blob store, independent of the state base). A debug probe or throwaway repo
+  file), `STARCI_ARTIFACT_ROOT` (the blob store, default `<state base>/artifacts`). A debug probe or throwaway repo
   that would otherwise leave a fake ledger in the real store (`skills/starci/references/host-maintenance.md` §5) must set
   `STARCI_LOCAL_ROOT` to a temp directory for its whole process tree.
 

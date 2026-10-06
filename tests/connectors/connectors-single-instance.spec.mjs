@@ -56,7 +56,7 @@ const r=runManager({mode:'quick'},{port:7070,env:process.env});
 console.log(JSON.stringify({ok:r.ok,pid:process.pid,holder:r.holder?.pid??null}));
 if(!r.ok)process.exit(1);
 setInterval(()=>{},1000);`);
-  const env={...process.env,LOCALAPPDATA:home,...storeOf(home),STARCI_CLOUDFLARED_COMMAND:process.execPath,STARCI_CLOUDFLARED_ARGS:JSON.stringify([fake])};
+  const env={...process.env,STARCI_LOCAL_ROOT:home,...storeOf(home),STARCI_CLOUDFLARED_COMMAND:process.execPath,STARCI_CLOUDFLARED_ARGS:JSON.stringify([fake])};
   const runs=await Promise.all([firstLine([manager],env),firstLine([manager],env)]);
   const winners=runs.filter(r=>r.answer?.ok===true);
   assert.equal(winners.length,1,JSON.stringify(runs.map(r=>r.answer)));
@@ -77,7 +77,7 @@ setInterval(()=>{},1000);`);
 
 test('two ask gateways started at once leave exactly one serving',async t=>{
   const home=mkdtemp(t,'starci-gateway-single-',()=>{for(const r of runs)kill(r.child.pid);});
-  const env={...process.env,LOCALAPPDATA:home,...storeOf(home)};
+  const env={...process.env,STARCI_LOCAL_ROOT:home,...storeOf(home)};
   const config=parseYaml(fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8'));
   const entry="import {main} from "+JSON.stringify(pathToFileURL(GATEWAY).href)+"; await main(['run','--port','0'],{env:process.env,root:"+JSON.stringify(home)+",config:"+JSON.stringify(config)+"});";
   const argv=['--input-type=module','-e',entry];
@@ -101,7 +101,7 @@ const r=runManager({mode:'quick'},{port:7070,env:process.env,checkMs:100,onLost:
 console.log(JSON.stringify({ok:r.ok,pid:process.pid}));
 if(!r.ok)process.exit(1);
 setInterval(()=>{},1000);`);
-  const env={...process.env,LOCALAPPDATA:home,...storeOf(home),STARCI_CLOUDFLARED_COMMAND:process.execPath,STARCI_CLOUDFLARED_ARGS:JSON.stringify([fake])};
+  const env={...process.env,STARCI_LOCAL_ROOT:home,...storeOf(home),STARCI_CLOUDFLARED_COMMAND:process.execPath,STARCI_CLOUDFLARED_ARGS:JSON.stringify([fake])};
   const {child,answer}=await firstLine([manager],env);
   assert.equal(answer?.ok,true);
   const pids=()=>fs.existsSync(launched)?fs.readFileSync(launched,'utf8').split('\n').filter(Boolean).map(Number):[];
@@ -125,13 +125,13 @@ setInterval(()=>{},1000);`);
 
 test('ensureAskConnectors starts the gateway and one manager, never a second while one is alive or still starting',t=>{
   const home=tmp(t,'starci-ensure-');
-  const env={LOCALAPPDATA:home,STARCI_CLOUDFLARED_COMMAND:process.execPath};
+  const env={STARCI_LOCAL_ROOT:home,STARCI_CLOUDFLARED_COMMAND:process.execPath};
   const config={...parseYaml(fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')),connectors:{cloudflare:{mode:'quick'}}};
   const spawned=[];
   // The launched processes are stood in for by this live process, still starting (no lock yet).
   const spawn=(script,args)=>{spawned.push([path.basename(script),...args]);return process.pid;};
   assert.equal(ensureAskConnectors({env:{...env,STARCI_CONNECTORS_OFF:'1'},config,root:home,spawn}).skipped,'STARCI_CONNECTORS_OFF');
-  assert.equal(ensureAskConnectors({env:{LOCALAPPDATA:home,NODE_TEST_CONTEXT:'child'},config,root:home,spawn}).skipped,'test context','a spec never starts the real cloudflared');
+  assert.equal(ensureAskConnectors({env:{STARCI_LOCAL_ROOT:home,NODE_TEST_CONTEXT:'child'},config,root:home,spawn}).skipped,'test context','a spec never starts the real cloudflared');
   const first=ensureAskConnectors({env,config,root:home,spawn});
   assert.deepEqual([first.ok,first.gateway,first.tunnel],[true,{launched:process.pid},{launched:process.pid}]);
   assert.deepEqual(spawned,[['ask-gateway.mjs','run','--port','7070'],['tunnel.mjs','run','--port','7070']]);
@@ -146,7 +146,7 @@ test('ensureAskConnectors starts the gateway and one manager, never a second whi
 
 test('named ask connector refusal happens before gateway launch and private shared env reaches both children',t=>{
   const home=tmp(t,'starci-connector-shared-env-');
-  const env={LOCALAPPDATA:home,...storeOf(home),STARCI_CLOUDFLARED_COMMAND:process.execPath};
+  const env={STARCI_LOCAL_ROOT:home,...storeOf(home),STARCI_CLOUDFLARED_COMMAND:process.execPath};
   const config={...parseYaml(fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')),connectors:{cloudflare:{mode:'named',hostname:'ask.example.org',tokenEnv:'PRIVATE_TUNNEL_TOKEN'}}};
   const spawned=[];
   const spawn=(script,args,options)=>{spawned.push({script:path.basename(script),args,env:options.env});return process.pid;};
@@ -167,7 +167,7 @@ test('named ask connector refusal happens before gateway launch and private shar
 
 test('tunnel status reports health: manager, cloudflared, gateway reachability, and every extra manager',async t=>{
   const home=tmp(t,'starci-health-');
-  const env={LOCALAPPDATA:home,...storeOf(home)};
+  const env={STARCI_LOCAL_ROOT:home,...storeOf(home)};
   const server=createGateway({resolve:()=>null});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(()=>new Promise(resolve=>server.close(()=>resolve())));
@@ -192,7 +192,7 @@ test('tunnel status reports health: manager, cloudflared, gateway reachability, 
 
 test('a manager lock whose holder died, or that an earlier boot left, is taken over; a live one is not',t=>{
   const home=tmp(t,'starci-lock-stale-');
-  const env={LOCALAPPDATA:home,...storeOf(home)};
+  const env={STARCI_LOCAL_ROOT:home,...storeOf(home)};
   const write=record=>putLock(env,'probe',record);
 
   write({pid:deadPid()});

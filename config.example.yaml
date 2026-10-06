@@ -206,6 +206,6 @@ reconciler:
 #   runs them later. Read on every wake: flipping a switch needs no restart.
 # roots — where this host keeps the archive and the lane worktrees, when the owner moves them off the state root.
 # Both keys are optional absolute directories; env STARCI_ARCHIVE_ROOT / STARCI_LANES_ROOT win over them, and an
-# absent key means <starciLocalRoot>/archive and <starciLocalRoot>/lanes (%LOCALAPPDATA%/StarCi). No host location lives in
+# absent key means <starciLocalRoot>/archive (<runtime root>/.runtime/archive) and the per-user profile lanes directory, kept out of the checkout (scripts/machine/home.mjs lanesRoot). No host location lives in
 # a tracked file: set the real directories only in the gitignored config.yaml copy, e.g.
 #   roots: {archive: <absolute directory>, lanes: <absolute directory>}

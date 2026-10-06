@@ -2,7 +2,7 @@
 // the owner's desktop chat is the Supervisor again (modules/supervisor/supervise.yaml chatSeat, docs/supervisor.md).
 // The chat registers and drains channel 'main' with no Orca terminal; every other reader peeks. Nothing starts a
 // [Supervisor] kernel: start-supervisor answers chat-mode, and the supervisor
-// watchdog loop exits cleanly (also while the seat is DISABLED). Every spec runs on a temp LOCALAPPDATA and a temp
+// watchdog loop exits cleanly (also while the seat is DISABLED). Every spec runs on a temp STARCI_LOCAL_ROOT and a temp
 // supervisor home: no Orca, no agent, no network, never the live runtime.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,7 +27,7 @@ const tmp = (t, prefix) => {
   t.after(() => { try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }); } catch { /* a ledger handle closes after this hook */ } });
   return dir;
 };
-const envOf = (t, mode = 'chat') => { const root = tmp(t, 'sup-chat-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: mode }; };
+const envOf = (t, mode = 'chat') => { const root = tmp(t, 'sup-chat-'); return { STARCI_LOCAL_ROOT: path.join(root, 'la'), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: mode }; };
 /** The channel CLI as the chat (no ORCA_TERMINAL_HANDLE, session `session`) or as an Orca terminal. */
 const cli = (env, args, { terminal = null, session = null } = {}) => {
   const childEnv = { ...process.env, ...env, STARCI_CONNECTORS_OFF: '1', ORCA_TERMINAL_HANDLE: terminal ?? '', CLAUDE_CODE_SESSION_ID: session ?? '' };

@@ -407,10 +407,10 @@ test('starci kernel dispatch runs the environment pre-step for a walk: a foreign
   const baseline=seedTargetBaseline(repo);
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const log=path.join(root,'calls.jsonl');
-  // The spawned api resolves machine.sqlite/projects under ITS env's LOCALAPPDATA + the test registry;
+  // The spawned api resolves machine.sqlite/projects under ITS env's STARCI_LOCAL_ROOT + the test registry;
   // ledgerFileFor({env}) seeds the file that resolution lands on.
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',
-    STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),STARCI_LOCAL_ROOT:path.join(root,'localappdata'),
     STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_ENV_GATE:'',STARCI_ENV_PROBE_TIMEOUT_MS:'1500'};
   const hung=net.createServer(()=>{});
   const hungPort=await new Promise(r=>hung.listen(0,'127.0.0.1',()=>r(hung.address().port)));

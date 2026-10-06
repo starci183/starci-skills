@@ -178,14 +178,14 @@ const KNOWN = [
   'modules/ops/ops/runtime.operate.yaml executionModes.service.writes.resource PATH_UNADMITTED .starciwork/_resources/services/<resource>/resource.yaml',
   'modules/ops/ops/workspace.manage.yaml executionModes.import.writes.resources PATH_UNADMITTED .starciwork/_resources/imports/<resource>/resource.yaml',
   'modules/ops/ops/workspace.manage.yaml executionModes.import.writes.resources PATH_UNADMITTED .starciwork/_resources/imports/<resource>/assets/<asset>',
-  // The project ledger moved out of .starciwork (%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite, decision Q1);
+  // The project ledger moved out of .starciwork (<runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite, decision Q1);
   // the manifest's prose read-path still names the in-repo file.
   'modules/ops/ops/interface.audit.yaml reads.workflow PATH_UNADMITTED .starciwork/runtime.sqlite',
 ];
 
 test('the layout and schema catalog parse into path patterns this spec can use', () => {
   const keys = new Set(admitted.map((a) => a.key));
-  // workflowRunState lives outside every repository now (%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite,
+  // workflowRunState lives outside every repository now (<runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite,
   // decision Q1), so its shape entry names no .starciwork path to admit.
   for (const k of ['workspace', 'brand', 'featureCatalog', 'feature', 'resources', 'uat', 'uatFlow', 'impl', 'ac'])
     assert.ok(keys.has(k), `shape.${k} yields no admitted path`);

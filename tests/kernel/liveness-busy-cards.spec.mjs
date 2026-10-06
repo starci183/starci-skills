@@ -93,7 +93,7 @@ const world=(t,fn,{screen,provider,dispatchedAgo=HOUR}={})=>withLedger(t,({root,
   const stateFile=path.join(root,'orca-state.json');
   fs.writeFileSync(stateFile,JSON.stringify({sends:0,terminals:{[HANDLE]:{handle:HANDLE,connected:true,writable:true,command:provider,screen}}}));
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),LOCALAPPDATA:machineHome};
+    STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_LOCAL_ROOT:machineHome};
   delete env.ORCA_TERMINAL_HANDLE;
   const run=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repoRoot,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const dispatchedAt=Date.now()-dispatchedAgo;

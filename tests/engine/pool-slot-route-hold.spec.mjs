@@ -46,10 +46,10 @@ const fixture = (t, occupants) => {
   const stateFile = path.join(root, 'state.json'); fs.writeFileSync(stateFile, '{}');
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(root, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: stateFile, STARCI_FAKE_ORCA_MODE: 'healthy',
-    LOCALAPPDATA: path.join(root, 'localappdata'), STARCI_STATUS_MEMO: 'off' };
+    STARCI_LOCAL_ROOT: path.join(root, 'localappdata'), STARCI_STATUS_MEMO: 'off' };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
   const now = Date.now();
-  // ledgerFileFor resolves under env.LOCALAPPDATA — seed the file the spawned api will open.
+  // ledgerFileFor resolves under env.STARCI_LOCAL_ROOT — seed the file the spawned api will open.
   const ledgerFile = ledgerFileFor(repo, { env });
   const ledger = openLedger({ file: ledgerFile });
   try {

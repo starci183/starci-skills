@@ -1,6 +1,6 @@
 // evidence-store.mjs — agent output into runtime.sqlite + the blob store (alpha.3, ARCHITECTURE-DB §4.2, §4.9 H7/H8/H10).
 //
-// Bytes live in the content-addressed store (engine/db/blob.mjs, ~/.starci/artifacts/<sha[0:2]>/<sha>);
+// Bytes live in the content-addressed store (engine/db/blob.mjs, <runtime root>/.runtime/artifacts/<sha[0:2]>/<sha>);
 // the ledger holds only the index rows that point at them:
 //   blobs                         one row per sha this ledger references (media type, redaction, file uri)
 //   job_artifacts                 every file output, keyed (attempt_id, name) — or (workflow_id, name) for the Kernel's

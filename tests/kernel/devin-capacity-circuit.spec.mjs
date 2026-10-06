@@ -71,7 +71,7 @@ const fixture = (t) => {
   const stateFile = path.join(root, 'state.json'); fs.writeFileSync(stateFile, '{}');
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(root, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: stateFile, STARCI_FAKE_ORCA_MODE: 'healthy',
-    LOCALAPPDATA: path.join(root, 'localappdata'), STARCI_PROJECTS_ROOT:path.join(root,'projects'),
+    STARCI_LOCAL_ROOT: path.join(root, 'localappdata'), STARCI_PROJECTS_ROOT:path.join(root,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite') };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
   const at = Date.now() - 20 * 60000;

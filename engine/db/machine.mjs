@@ -42,6 +42,7 @@ import { pathKey } from '../../scripts/lib/path-key.mjs';
 import { insertPairs, insertRowWith } from '../../scripts/lib/sqlite.mjs';
 import { need as refuseUnless } from '../refuse.mjs';
 import { sha256 } from '../digest.mjs';
+import { LOCAL_ROOT_ENV, starciLocalRoot } from '../runtime-root.mjs';
 import { machineSchemaMethods } from './machine-schema.mjs';
 import { machineConnectionMethods, corruptDiagnostic, MACHINE_BUSY_TIMEOUT_MS, MACHINE_CORRUPT_CODE, CORRUPT_RETRY_DELAYS_MS,
   waitForRetry, isCorruptError, isBusyError, errText } from './machine-connection.mjs';
@@ -64,17 +65,14 @@ export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host',
  * Overrides the per-host state base itself (machine.sqlite, projects/, archive/), the one seam starciLocalRoot and
  * engine/db/ledger.mjs (which re-exports starciLocalRoot for its own projectsRootFor) both read. Debug probes and
  * throwaway repos (skills/starci/references/host-maintenance.md) point this at a temp directory so they never touch the real
- * %LOCALAPPDATA%/StarCi and leak fake ledgers/workflows into it (2026-09-30 incident: probe-*, dbg-ask-*, dbg-env*
+ * <runtime root>/.runtime and leak fake ledgers/workflows into it (2026-09-30 incident: probe-*, dbg-ask-*, dbg-env*
  * repos left six fake-worker ledgers in the live store). STARCI_PROJECTS_ROOT (ledger-db.mjs) and
  * STARCI_TEST_MACHINE_FILE (TEST_REGISTRY_ENV) are narrower overrides that still win over this one when set.
  */
-export const LOCAL_ROOT_ENV = 'STARCI_LOCAL_ROOT';
-/** %LOCALAPPDATA%/StarCi (or ~/.local/state/StarCi): the per-host state base. LOCAL_ROOT_ENV overrides it wholesale. */
-export const starciLocalRoot = (env = process.env) =>
-  env[LOCAL_ROOT_ENV] ? path.resolve(env[LOCAL_ROOT_ENV]) : path.join(env.LOCALAPPDATA || path.join(os.homedir(), '.local', 'state'), 'StarCi');
+export { LOCAL_ROOT_ENV, starciLocalRoot };
 /** <local root>/projects: one directory per ledger (decision Q1). */
 export const localProjectsRoot = (env = process.env) => path.join(starciLocalRoot(env), 'projects');
-/** The runtime.sqlite of one ledger (decision Q1): %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite. */
+/** The runtime.sqlite of one ledger (decision Q1): <runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite. */
 export const projectLedgerFile = (ledgerId, env = process.env) => {
   if (!/^[A-Za-z0-9-]{8,64}$/.test(String(ledgerId ?? ''))) throw Error(`projectLedgerFile needs a ledger id, got ${ledgerId}`);
   return path.join(localProjectsRoot(env), String(ledgerId), 'runtime.sqlite');
@@ -93,7 +91,7 @@ export function isUnderTempDir(file, { env = process.env, tempDirs = tempDirsOf(
   return forms.some((form) => tempDirs.map(normDir).some((dir) => form.startsWith(`${dir}/`)));
 }
 /**
- * machine.sqlite for `env`: TEST_REGISTRY_ENV when set; else %LOCALAPPDATA%/StarCi/machine.sqlite (beside projects/,
+ * machine.sqlite for `env`: TEST_REGISTRY_ENV when set; else <starciLocalRoot>/machine.sqlite (beside projects/,
  * NOT in the old runtime/ directory, so the new store never meets the old file at the same path) — except inside a node --test
  * process tree whose runtime root is not under the temp directory, which gets a shared temp registry instead.
  */

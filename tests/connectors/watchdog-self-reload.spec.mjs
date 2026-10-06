@@ -181,7 +181,7 @@ test('a replacement that never takes the lock is stopped and the lock stays with
 test('the singleton host lock is handed over, never freed: only the named predecessor\'s lock can be taken over', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-reload-lock-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const env = { LOCALAPPDATA: dir, STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
+  const env = { STARCI_LOCAL_ROOT: dir, STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
   const name = 'kernel-watchdog-wf-handover';
   // The running loop: a live process (this test's parent) holds the lock.
   const predecessor = process.ppid, at = Date.now();
@@ -201,7 +201,7 @@ test('the singleton host lock is handed over, never freed: only the named predec
 
 test('a real re-exec: the replacement takes the host lock over from the spawning loop, and the handover is logged', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-reload-e2e-'));
-  const env = { ...process.env, LOCALAPPDATA: dir, STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
+  const env = { ...process.env, STARCI_LOCAL_ROOT: dir, STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
   delete env.NODE_TEST_CONTEXT;
   const name = 'kernel-watchdog-wf-e2e';
   const held = claimManager(name, { env });

@@ -9,7 +9,7 @@ import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {boundRepos,previousSnapshot,snapshotDelta,formatDelta,takeSnapshot,snapshotName,SNAPSHOTS_DIR} from '../../scripts/agent/benchmark-snapshot.mjs';
 
 // benchmark-snapshot runs the model scorecard over the bound project ledgers and writes one append-only file
-// under benchmark/snapshots/. Every ledger here is a fixture (withLedger: temp dir, LOCALAPPDATA repointed) and
+// under benchmark/snapshots/. Every ledger here is a fixture (withLedger: temp dir, STARCI_LOCAL_ROOT repointed) and
 // every snapshot dir, source root is a temp dir, so no real ledger or benchmark file is touched.
 const SCRIPT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..', '..', 'scripts', 'agent', 'benchmark-snapshot.mjs');
 const T=Date.UTC(2026,8,24,12,0,0);

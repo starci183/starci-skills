@@ -38,7 +38,7 @@ export function trackHandles(t){
  * only answer with an absolute path: pass `sameDriveTmp()`.
  *
  * One temp world for a ledger-backed spec: a repo root that owns `.starciwork/`, the ledger opened on it,
- * and a machine DB inside the same temp root. `process.env.LOCALAPPDATA` and the test registry
+ * and a machine DB inside the same temp root. `process.env.STARCI_LOCAL_ROOT` and the test registry
  * (`process.env.STARCI_TEST_MACHINE_FILE`, which machineFileFor honours first) are repointed at it for
  * the test's duration so no code path can reach the real machine arbiter; the after hook restores it,
  * closes both handles (and anything `track`ed) and removes the tree.
@@ -75,9 +75,9 @@ export function withLedger(t,fn,{parentDir=os.tmpdir()}={}){
   fs.mkdirSync(path.join(repoRoot,'.starciwork'),{recursive:true});
   const machineHome=path.join(root,'machine');
   fs.mkdirSync(machineHome,{recursive:true});
-  const saved=process.env.LOCALAPPDATA,savedRegistry=process.env[TEST_REGISTRY_ENV];
+  const saved=process.env.STARCI_LOCAL_ROOT,savedRegistry=process.env[TEST_REGISTRY_ENV];
   const savedProjects=process.env.STARCI_PROJECTS_ROOT;
-  process.env.LOCALAPPDATA=machineHome;
+  process.env.STARCI_LOCAL_ROOT=machineHome;
   process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
   const machineFile=path.join(machineHome,'machine.sqlite');
   process.env[TEST_REGISTRY_ENV]=machineFile;
@@ -86,7 +86,7 @@ export function withLedger(t,fn,{parentDir=os.tmpdir()}={}){
   const tracked=[];
   const track=handle=>{tracked.push(handle);return handle;};
   t.after(()=>{
-    if(saved===undefined)delete process.env.LOCALAPPDATA;else process.env.LOCALAPPDATA=saved;
+    if(saved===undefined)delete process.env.STARCI_LOCAL_ROOT;else process.env.STARCI_LOCAL_ROOT=saved;
     if(savedRegistry===undefined)delete process.env[TEST_REGISTRY_ENV];else process.env[TEST_REGISTRY_ENV]=savedRegistry;
     if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;
     for(const handle of tracked.reverse())try{handle?.close();}catch{}

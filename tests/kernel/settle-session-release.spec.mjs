@@ -56,7 +56,7 @@ export function archiveSessionFiles(paths, { archiveRoot, agent, apply } = {}) {
     STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_STATE: stateFile,
     STARCI_FAKE_ORCA_LOG: path.join(root, 'orca-calls.jsonl'),
-    LOCALAPPDATA: path.join(root, 'localappdata'),
+    STARCI_LOCAL_ROOT: path.join(root, 'localappdata'),
   };
   delete env.ORCA_TERMINAL_HANDLE;
   env.STARCI_TEST_MACHINE_FILE = path.join(root, 'machine.sqlite');  // worker registry of this fixture only

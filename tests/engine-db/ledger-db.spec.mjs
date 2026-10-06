@@ -126,7 +126,7 @@ test('the machine schema carries ledgers, host leases and budgets at MACHINE_VER
   const names=machine.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name);
   for(const table of ['ledgers','host_resources','host_leases','budgets','budget_reservations'])assert.ok(names.includes(table),`missing table ${table}`);
   assert.equal(machine.db.prepare('PRAGMA journal_mode').get().journal_mode,'wal');
-  assert.ok(machineFileFor({LOCALAPPDATA:dir}).startsWith(dir));
+  assert.ok(machineFileFor({STARCI_LOCAL_ROOT:dir}).startsWith(dir));
   assert.ok(ledgerFileFor(dir).endsWith('runtime.sqlite'));
   assert.equal(ledgerFileFor(dir).includes('.starciwork'),false);
   machine.close();

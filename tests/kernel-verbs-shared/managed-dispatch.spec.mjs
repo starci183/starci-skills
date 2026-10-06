@@ -72,7 +72,7 @@ const fixture=(t,{dead=[],stale=[],allocationPolicy=null}={})=>{
     STARCI_FAKE_ORCA_STALE:stale.join(','),
     STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome,
     APPDATA:path.join(root,'appdata'),
-    LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_LOCAL_ROOT:path.join(root,'localappdata'),
     STARCI_PROJECTS_ROOT:path.join(root,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
     STARCI_GUARDS_ROOT:path.join(root,'guards'),

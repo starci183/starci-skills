@@ -46,7 +46,7 @@ function sideCommit(root, name, files) {
   git(root, 'worktree', 'remove', '--force', wt);
   return sha;
 }
-const envOf = (t) => { const r = tmp(t, 'sup-k-lt-env-'); return { LOCALAPPDATA: path.join(r, 'la'), STARCI_LANES_ROOT: path.join(r, 'lanes') }; };
+const envOf = (t) => { const r = tmp(t, 'sup-k-lt-env-'); return { STARCI_LOCAL_ROOT: path.join(r, 'la'), STARCI_LANES_ROOT: path.join(r, 'lanes') }; };
 const lightChecks = (opts) => runChecks({ ...opts, runSpecs: false });
 
 test('current module edits land through actual checks; unparseable edits refuse without moving main', (t) => {

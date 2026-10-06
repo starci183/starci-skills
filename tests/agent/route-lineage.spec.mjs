@@ -40,7 +40,7 @@ const tmp = (t, prefix) => {
 const worldEnv = (repo) => ({ ...process.env,
   STARCI_PROJECTS_ROOT: path.join(repo,'.starciwork','projects'),
   STARCI_TEST_MACHINE_FILE: path.join(repo,'.starciwork','machine.sqlite'),
-  LOCALAPPDATA: path.join(repo,'.starciwork','localappdata') });
+  STARCI_LOCAL_ROOT: path.join(repo,'.starciwork','localappdata') });
 const seed = (repo, fn) => { const l = openLedger({ file: ledgerFileFor(repo,{env:worldEnv(repo)}) }); try { return fn(l); } finally { l.close(); } };
 const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo,{env:worldEnv(repo)}) }); try { return fn(l); } finally { l.close(); } };
 const ownerRoot = (t, policy) => {

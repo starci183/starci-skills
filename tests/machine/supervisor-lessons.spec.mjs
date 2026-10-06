@@ -21,7 +21,7 @@ import { readSupervisorState } from '../../scripts/supervisor/state.mjs';
 const NOW = Date.parse('2026-09-28T12:00:00Z');
 const SETTINGS = { minRepeats: 2, measureMs: 6 * 3_600_000, dailyAutoLandCap: 2, ownerWeight: 3, successDrop: 0.1 };
 const tmp = (t, prefix) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 })); return d; };
-const envOf = (t) => { const root = tmp(t, 'starci-sup-learn-'); return { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), STARCI_CONNECTORS_OFF: '1' }; };
+const envOf = (t) => { const root = tmp(t, 'starci-sup-learn-'); return { ...process.env, STARCI_LOCAL_ROOT: path.join(root, 'la'), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), STARCI_CONNECTORS_OFF: '1' }; };
 const cluster = (id, size, extra = {}) => ({ key: `owed|${id}`, class: 'runtime-defect', subject: id, size, workflowId: 'wf-a', evidence: `${size} item(s): check draw-acceptance failed`, incidents: ['inc-aaaaaaaaaaaa'], ...extra });
 const logRows = (env) => readSupervisor((m) => m.logs({ actor: 'supervisor', limit: 1000 }), [], { env });
 

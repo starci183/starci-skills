@@ -89,7 +89,7 @@ const createFixture=()=>{
   fs.writeFileSync(fake,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome,
-    STARCI_HOST_WAIT_MS:'0',STARCI_KERNEL_DEATH_SETTLE_MS:'0',LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_HOST_WAIT_MS:'0',STARCI_KERNEL_DEATH_SETTLE_MS:'0',STARCI_LOCAL_ROOT:path.join(root,'localappdata'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_PROJECTS_ROOT:path.join(root,'projects')};
   // Both external boundaries belong to every descendant, including watchdog -> start-workflow.
   const closureImport=`data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});register(${JSON.stringify(new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href)});`)}`;
@@ -134,7 +134,7 @@ const createFixture=()=>{
     }
   };
   const ledgerRows=()=>{
-    // The spawned verbs resolve the ledger under the fixture's LOCALAPPDATA; the
+    // The spawned verbs resolve the ledger under the fixture's STARCI_LOCAL_ROOT; the
     // same env must name the file here or this process lands on the host's root
     // (engine/db/ledger.mjs ledgerFileFor/projectsRootFor).
     const ledger=inspectLedger({file:ledgerFile});

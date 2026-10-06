@@ -1,6 +1,6 @@
 // legacy-ledger-path-readers.spec.mjs — repo-keyed ledger readers resolve a repo's runtime.sqlite through the
 // machine registry (decision Q1: engine/db/ledger.mjs ledgerFileFor -> machine.sqlite ledgers.file ->
-// %LOCALAPPDATA%/StarCi/projects/<ledger id>/runtime.sqlite), never the pre-Q1 in-repo .starciwork/runtime.sqlite
+// <runtime root>/.runtime/projects/<ledger id>/runtime.sqlite), never the pre-Q1 in-repo .starciwork/runtime.sqlite
 // (cluster legacy-ledger-path-readers). The owner digest and the deps guard's peer-lease read opened the in-repo
 // path only: nivo-backend (no in-repo file) contributed nothing to the digest, and mia-mia-backend / starci-next
 // would have surfaced their stale in-repo stores (hygiene LEDGER_LEGACY_WORK_SQLITE) instead of the live ledger.

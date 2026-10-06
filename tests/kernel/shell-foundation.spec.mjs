@@ -27,7 +27,7 @@ function ledgerFixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-shell-foundation-'));
   const repo = path.join(root, 'repo');
   fs.mkdirSync(repo, { recursive: true });
-  const file = ledgerFileFor(repo, { env: { ...process.env, LOCALAPPDATA: path.join(root, 'localappdata') } });
+  const file = ledgerFileFor(repo, { env: { ...process.env, STARCI_LOCAL_ROOT: path.join(root, 'localappdata') } });
   const ledger = openLedger({ file });
   t.after(() => { try { ledger.close(); } catch { /* closed */ } fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); });
   for (const workflowId of [A, B]) {

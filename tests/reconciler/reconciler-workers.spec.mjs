@@ -130,7 +130,7 @@ test('notify: in shadow the controller only records the notifier run', async () 
 function home(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-notifier-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
-  return { ...process.env, LOCALAPPDATA: dir, STARCI_CONNECTORS_OFF: '1' };
+  return { ...process.env, STARCI_LOCAL_ROOT: dir, STARCI_CONNECTORS_OFF: '1' };
 }
 const inputs = { progress: [{ workflowId: 'wf-shop-fe-canon', name: 'Todo App · Chu\u1ea9n ho\u00e1 code FE', progress: { unitsDone: 14, unitsTotal: 36, unitsPerHour: 4, minUnitsPerHour: 3, eta: '2026-09-28T18:00:00Z', stall: { stalled: false } }, why: null }],
   ownerWaits: [], violations: [{ code: 'SETTLE_OVERDUE' }, { code: 'SETTLE_OVERDUE' }], gc: 'D\u1ecdn r\u00e1c: 0 agent, 0 terminal, 3 worktree, 0.4 GB', actions: [], owed: null };

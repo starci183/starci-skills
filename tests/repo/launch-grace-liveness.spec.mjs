@@ -35,7 +35,7 @@ const world=(t,fn,{screen=IDLE,dispatchedAgo=30*SEC,managed=true,nudgeAgo=null}=
   fs.writeFileSync(stateFile,JSON.stringify({sends:0,terminals:{[HANDLE]:{handle:HANDLE,connected:true,writable:true,command:'claude',screen,lastOutputAt:Date.now()}}}));
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
-    LOCALAPPDATA:machineHome};
+    STARCI_LOCAL_ROOT:machineHome};
   delete env.ORCA_TERMINAL_HANDLE;
   const run=(args,more={})=>spawnSync(process.execPath,[API,...args,'--repo',repoRoot,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...more}});
   const dispatchedAt=Date.now()-dispatchedAgo;

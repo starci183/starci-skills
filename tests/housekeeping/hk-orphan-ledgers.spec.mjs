@@ -19,7 +19,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 
 /** A sandbox whose state root is entirely its own: env.STARCI_LOCAL_ROOT resolves machine.sqlite, projects/ and
  * archive/ all under it (engine/db/machine.mjs starciLocalRoot), so every function under test stays inside the
- * fixture and never reads or writes the real %LOCALAPPDATA%/StarCi. Sitting under the OS temp dir also makes the
+ * fixture and never reads or writes the real <runtime root>/.runtime. Sitting under the OS temp dir also makes the
  * fixture's own machine.sqlite handle `live:false` (isUnderTempDir), so registerLedger accepts fixture repo roots
  * a live registry would refuse (registry-temp-repo) — exactly the gap that let the real incident's ledgers in. */
 function sandbox(t) {

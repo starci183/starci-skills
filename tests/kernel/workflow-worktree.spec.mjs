@@ -348,7 +348,7 @@ test('starci kernel dispatch passes the registered workflow worktree to the guar
   const fake = path.join(base, 'fake-orca.mjs'), state = path.join(base, 'orca-state.json');
   fs.writeFileSync(fake, FAKE_ORCA);
   const childEnv = { ...env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([fake]), STARCI_FAKE_ORCA_MODE: 'healthy',
-    STARCI_FAKE_ORCA_LOG: path.join(base, 'orca-calls.jsonl'), STARCI_FAKE_ORCA_STATE: state, LOCALAPPDATA: path.join(base, 'localappdata'),
+    STARCI_FAKE_ORCA_LOG: path.join(base, 'orca-calls.jsonl'), STARCI_FAKE_ORCA_STATE: state, STARCI_LOCAL_ROOT: path.join(base, 'localappdata'),
     STARCI_OWNER_ROOT: path.join(base, 'owner') };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_GUARD_FILE']) delete childEnv[key];
   const seed = (repo, workflowId, jobId, owned) => {

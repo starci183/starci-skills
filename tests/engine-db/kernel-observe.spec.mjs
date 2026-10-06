@@ -34,7 +34,7 @@ const fixture=(t,{mode='healthy',sends=0}={})=>{
     STARCI_FAKE_ORCA_MODE:mode,
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
     STARCI_FAKE_ORCA_STATE:stateFile,
-    LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_LOCAL_ROOT:path.join(root,'localappdata'),
     STARCI_PROJECTS_ROOT:path.join(root,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
   };

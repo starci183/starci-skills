@@ -11,6 +11,7 @@ Theme: the runtime's version line leaves alpha and the host prompts move into th
 ### Changed
 - The runtime version is `1.0.5`; the `1.0.0-alpha.N` prerelease line ends. The root package publishes under the default `latest` dist-tag, and `starci runtime install` pins `starci@1.0.5` from the generated `packages/cli/src/runtime-install.generated.mjs`.
 - The host startup and maintenance prompts move from `.starci/host/` to `skills/starci/references/host-startup.md` and `host-maintenance.md`; the package ships them through `skills/`, and `.starci/` leaves the package `files`.
+- Host state and artifacts live under `<runtime root>/.runtime` (the `.claude` of the host Source; git-ignored, never packed): `machine.sqlite`, `projects/<ledger_id>/runtime.sqlite`, `archive/` and the blob store `artifacts/` replace `%LOCALAPPDATA%/StarCi` and `~/.starci/artifacts`. Nothing is relocated: the new location starts empty, and the earlier directories are neither read nor removed. An installed host keeps it at `<app>/.claude/.runtime`, which the installer adds to the app's `.gitignore`; lane worktrees still default outside the checkout.
 
 ### Fixed
 - The machine store has one schema and no migration path: the v2→v3 upgrade introduced in `b01a8a703` is removed, and a store of an earlier shape is refused unchanged.

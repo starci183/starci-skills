@@ -73,7 +73,7 @@ test('a refused rename is retried on the next watchdog wake', () => {
 test('a Supervisor watchdog pass applies the seat title while handling a wake', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seat-titles-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
-  const env = { LOCALAPPDATA: path.join(root, 'local'), STARCI_SUPERVISOR_MODE: 'kernel' };
+  const env = { STARCI_LOCAL_ROOT: path.join(root, 'local'), STARCI_SUPERVISOR_MODE: 'kernel' };
   const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000,
     language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
   let startRequest = null;

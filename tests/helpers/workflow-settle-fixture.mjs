@@ -39,7 +39,7 @@ export function settleFixture(t, { baseText = 'base\n' } = {}) {
   git(repo, 'commit', '-q', '-m', 'init');
   const workflowId = 'wf-settle-caller', branch = `wf-${workflowId}`;
   git(repo, 'worktree', 'add', '-q', '-b', branch, tree, 'main');
-  const env = { ...process.env, [TEST_REGISTRY_ENV]: path.join(base, 'machine.sqlite'), LOCALAPPDATA: path.join(base, 'localappdata'),
+  const env = { ...process.env, [TEST_REGISTRY_ENV]: path.join(base, 'machine.sqlite'), STARCI_LOCAL_ROOT: path.join(base, 'localappdata'),
     STARCI_PROJECTS_ROOT: path.join(base, 'projects'), STARCI_ARTIFACT_ROOT: path.join(base, 'artifacts'),
     STARCI_LOCAL_ROOT: path.join(base, 'local'), STARCI_OWNER_ROOT: path.join(base, 'owner'), STARCI_LANES_ROOT: path.join(base, 'lanes') };
   registerWorkflowWorktree({ env }, { workflowId, orcaWorktreeId: 'repo-settle::workflow', path: tree, branch });

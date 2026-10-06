@@ -54,7 +54,7 @@ const world=t=>{
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-git-memo'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   // runtime.sqlite resolves under STARCI_PROJECTS_ROOT (ledgerFileFor): pin one root per world so the
-  // in-process seed/read and every spawned api subprocess (whose LOCALAPPDATA is faked) share a file.
+  // in-process seed/read and every spawned api subprocess (whose STARCI_LOCAL_ROOT is faked) share a file.
   const projectsRoot=path.join(root,'projects');
   const savedRoot=process.env[PROJECTS_ROOT_ENV];
   process.env[PROJECTS_ROOT_ENV]=projectsRoot;
@@ -75,7 +75,7 @@ const world=t=>{
   git(repo,['add','-A']);git(repo,['commit','-q','-m','seed']);
   const orca=path.join(root,'fake-orca.mjs');fs.writeFileSync(orca,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([orca]),STARCI_FAKE_ORCA_MODE:'healthy',
-    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),LOCALAPPDATA:path.join(root,'localappdata')};
+    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),STARCI_LOCAL_ROOT:path.join(root,'localappdata')};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB','STARCI_CONTRACT_CHANGES'])delete env[key];
   const api=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};

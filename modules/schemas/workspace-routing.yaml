@@ -20,7 +20,7 @@ rules:
   - The one app repository owns .starciwork at its root. Backend and frontend code live in the
     declared side folders, and both share that Work.
   - The app owns the one runtime ledger for both BE and FE workflow state, a runtime.sqlite under
-    the host's LOCALAPPDATA StarCi/projects/<ledger_id> directory, keyed by the app's Work root
+    the host's <runtime root>/.runtime/projects/<ledger_id> directory, keyed by the app's Work root
     (engine/db/ledger.mjs ledgerFileFor, registered in the machine.sqlite ledgers table), never inside
     .starciwork. The
     host registry is not project state; the host is an app only when its binding explicitly names it.

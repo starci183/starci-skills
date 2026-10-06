@@ -7,7 +7,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {sendSettleMedia,queueSettleMedia,collectDrawings,mediaKindOf,mediaSent,fitCaption} from '../../scripts/connectors/telegram-media.mjs';
 import {readMachine} from '../../engine/db/machine.mjs';
 // The media dedupe rows (machine.sqlite notifications, kind media) of a machine home.
-const mediaRows=machineHome=>readMachine(m=>m.db.prepare("SELECT * FROM notifications WHERE kind='media' ORDER BY dedupe_key").all(),[],{env:{LOCALAPPDATA:machineHome}});
+const mediaRows=machineHome=>readMachine(m=>m.db.prepare("SELECT * FROM notifications WHERE kind='media' ORDER BY dedupe_key").all(),[],{env:{STARCI_LOCAL_ROOT:machineHome}});
 
 // scripts/connectors/telegram-media.mjs sends the owner the drawings of a settled interface.draw and
 // the videos of a settled UAT op over Telegram. Every spec runs on a fake Bot API: no network.
@@ -33,7 +33,7 @@ const fakeBot=({fail=null}={})=>{
 };
 const deps=(machineHome,extra={})=>{
   fs.mkdirSync(machineHome,{recursive:true});
-  return {root:machineHome,config:ON,env:{LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN},apiBase:'http://bot.invalid',sleepImpl:async()=>{},warn:()=>{},...extra};
+  return {root:machineHome,config:ON,env:{STARCI_LOCAL_ROOT:machineHome,TELEGRAM_BOT_TOKEN:TOKEN},apiBase:'http://bot.invalid',sleepImpl:async()=>{},warn:()=>{},...extra};
 };
 
 const put=(root,rel,content='x')=>{const file=path.join(root,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,content);return file;};
@@ -111,7 +111,7 @@ test('a settled interface.draw sends its drawings as one album with a Vietnamese
     assert.match(caption,/Th\u1ea7y xem k\u1ef9 khi b\u00e0n giao \(handover\), ho\u1eb7c g\u00f3p \u00fd b\u1ea5t c\u1ee9 l\u00fac n\u00e0o\.$/);
     assert.ok(caption.length<=1024);
     const state=JSON.stringify(mediaRows(machineHome));
-    assert.equal(mediaSent('media|wf-shop-x1|job-draw-1|1',{LOCALAPPDATA:machineHome})?.delivery,'sent');
+    assert.equal(mediaSent('media|wf-shop-x1|job-draw-1|1',{STARCI_LOCAL_ROOT:machineHome})?.delivery,'sent');
     assert.ok(!state.includes(TOKEN)&&!JSON.stringify(r).includes(TOKEN),'the token never reaches the store or the result');
   });
 });
@@ -239,17 +239,17 @@ test('off: Telegram disabled, connectors off, a spec run, a non-media op or a dr
     const files=seedDraw(repoRoot);
     seedReport(ledger,{dispatchId:'ctx_draw',op:'interface.draw',summary:'s',files});
     const bot=fakeBot(),warned=[];
-    const off=await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW},deps(machineHome,{fetchImpl:bot.fetchImpl,config:OFF,env:{LOCALAPPDATA:machineHome},warn:w=>warned.push(w)}));
+    const off=await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW},deps(machineHome,{fetchImpl:bot.fetchImpl,config:OFF,env:{STARCI_LOCAL_ROOT:machineHome},warn:w=>warned.push(w)}));
     assert.equal(off.skipped,'telegram off');assert.deepEqual(warned,[]);
-    assert.equal((await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW},deps(machineHome,{fetchImpl:bot.fetchImpl,env:{LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN,STARCI_CONNECTORS_OFF:'1'}}))).skipped,'STARCI_CONNECTORS_OFF');
-    assert.equal((await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW},{...deps(machineHome),apiBase:undefined,env:{LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN,NODE_TEST_CONTEXT:'child-v8'}})).skipped,'test context','a spec never reaches the real Bot API');
+    assert.equal((await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW},deps(machineHome,{fetchImpl:bot.fetchImpl,env:{STARCI_LOCAL_ROOT:machineHome,TELEGRAM_BOT_TOKEN:TOKEN,STARCI_CONNECTORS_OFF:'1'}}))).skipped,'STARCI_CONNECTORS_OFF');
+    assert.equal((await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW},{...deps(machineHome),apiBase:undefined,env:{STARCI_LOCAL_ROOT:machineHome,TELEGRAM_BOT_TOKEN:TOKEN,NODE_TEST_CONTEXT:'child-v8'}})).skipped,'test context','a spec never reaches the real Bot API');
     assert.equal((await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW,verdict:'fail'},deps(machineHome,{fetchImpl:bot.fetchImpl}))).skipped,'a draw is sent when it settles pass');
     assert.equal((await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW,op:'backend.implement'},deps(machineHome,{fetchImpl:bot.fetchImpl}))).skipped,'not a media op');
     assert.equal(bot.calls.length,0);
 
     const spawned=[];const spawnImpl=(...a)=>{spawned.push(a);return {pid:4242,on(){},unref(){}};};
     const job={ledgerFile,repo:repoRoot,...DRAW};
-    const env={LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN,STARCI_TELEGRAM_API_BASE:'http://bot.invalid'};
+    const env={STARCI_LOCAL_ROOT:machineHome,TELEGRAM_BOT_TOKEN:TOKEN,STARCI_TELEGRAM_API_BASE:'http://bot.invalid'};
     assert.equal(queueSettleMedia(job,{env,config:OFF,root:machineHome,spawnImpl}).skipped,'telegram off');
     assert.equal(queueSettleMedia({...job,verdict:'fail'},{env,config:ON,root:machineHome,spawnImpl}).skipped,'a draw is sent when it settles pass');
     assert.equal(queueSettleMedia({...job,op:'scope.define'},{env,config:ON,root:machineHome,spawnImpl}).skipped,'not a media op');
@@ -270,7 +270,7 @@ test('settle never fails because Telegram failed: the hook is synchronous, never
   await withLedger(t,async({ledger,ledgerFile,repoRoot,machineHome})=>{
     const files=seedDraw(repoRoot);
     seedReport(ledger,{dispatchId:'ctx_draw',op:'interface.draw',summary:'s',files});
-    const env={LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN,STARCI_TELEGRAM_API_BASE:'http://bot.invalid'};
+    const env={STARCI_LOCAL_ROOT:machineHome,TELEGRAM_BOT_TOKEN:TOKEN,STARCI_TELEGRAM_API_BASE:'http://bot.invalid'};
     const saved=process.stderr.write;const errs=[];process.stderr.write=(s)=>{errs.push(String(s));return true;};
     let thrown,broken;
     try{

@@ -61,7 +61,7 @@ const callback = (data, { chat = OWNER, from = OWNER, messageId = 77 } = {}) => 
 
 function setup(t, bot, { language = 'vi', ...extra } = {}) {
   const home = tmp(t, 'starci-tg-bridge-');
-  const env = { LOCALAPPDATA: home };
+  const env = { STARCI_LOCAL_ROOT: home };
   const logs = [];
   const make = () => createBridge({
     env, apiBase: bot.apiBase, sleepImpl: async () => {}, log: (line) => logs.push(line), timeoutS: 0,
@@ -271,12 +271,12 @@ test('run hands the bridge to a replacement between rounds when the runtime chan
 
 test('ensureTelegramBridge leaves a live bridge alone, skips when off or unregistered, and launches otherwise', (t) => {
   const home = tmp(t, 'starci-tg-ensure-');
-  const env = { LOCALAPPDATA: home, STARCI_TELEGRAM_API_BASE: 'http://127.0.0.1:1' };
+  const env = { STARCI_LOCAL_ROOT: home, STARCI_TELEGRAM_API_BASE: 'http://127.0.0.1:1' };
   const config = withConnectors({ telegram: { enabled: true, chatId: String(OWNER) }, cloudflare: { mode: 'off' } });
   const spawned = [];
   const spawn = (script, args) => { spawned.push([path.basename(script), ...args]); return 4321; };
   assert.equal(ensureTelegramBridge({ env: { ...env, STARCI_CONNECTORS_OFF: '1' }, config, root: home, spawn }).skipped, 'STARCI_CONNECTORS_OFF');
-  assert.equal(ensureTelegramBridge({ env: { LOCALAPPDATA: home, NODE_TEST_CONTEXT: 'child' }, config, root: home, spawn }).skipped, 'test context', 'a spec never reaches the real Bot API');
+  assert.equal(ensureTelegramBridge({ env: { STARCI_LOCAL_ROOT: home, NODE_TEST_CONTEXT: 'child' }, config, root: home, spawn }).skipped, 'test context', 'a spec never reaches the real Bot API');
   assert.match(ensureTelegramBridge({ env, config, root: home, spawn }).skipped, /bot token/, 'no token: telegram is not ready');
   const ready = { ...env, TELEGRAM_BOT_TOKEN: TOKEN };
   assert.equal(ensureTelegramBridge({ env: ready, config, root: home, spawn, requireRegistered: true }).skipped, 'no supervisor registered');
@@ -292,7 +292,7 @@ test('ensureTelegramBridge leaves a live bridge alone, skips when off or unregis
 
 test('the registry heartbeats, validates ids, and ignores files that are not supervisors', (t) => {
   const home = tmp(t, 'starci-tg-registry-');
-  const env = { LOCALAPPDATA: home };
+  const env = { STARCI_LOCAL_ROOT: home };
   const old = Date.now() - 2 * ONLINE_MS;
   registerSupervisor({ id: 'sup-a', label: '  ', repos: [' x ', ''] }, { env, now: old });
   let [sup] = listSupervisors({ env });

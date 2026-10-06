@@ -112,7 +112,7 @@ owner yet: create it in the machine file first, then point both sites at it.
 Kernels run `.claude` main live, so no one edits the main checkout in place. A large change is cut
 into lanes with disjoint write-allowlists. Each lane works in an ephemeral worktree under
 `<lanesRoot>/<lane>` (the lanes root is `STARCI_LANES_ROOT`, else the owner config `roots.lanes`,
-else `<starciLocalRoot>/lanes`; `lanesRoot()` in `scripts/machine/home.mjs`), never with junctions or symlinks. It lands one commit at a time with
+else the per-user lanes directory outside the checkout; `lanesRoot()` in `scripts/machine/home.mjs`), never with junctions or symlinks. It lands one commit at a time with
 `starci supervisor land --commit <sha> --lane <lane>`, which cherry-picks, gates and fast-forwards local main.
 
 - `land.mjs` runs from the main checkout, never from the lane worktree.

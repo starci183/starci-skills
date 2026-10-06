@@ -2,7 +2,7 @@
 // a busy frame whose signature repeats across watchdog reads is FROZEN, not busy — the pending
 // wake is delivered (Escape first when the input row targets a subagent), and a frame still
 // frozen after that wake restarts the seat through start-supervisor --replace. Specs run on a
-// temp supervisor home and a temp LOCALAPPDATA: no Orca, no agent, never the live runtime.
+// temp supervisor home and a temp STARCI_LOCAL_ROOT: no Orca, no agent, never the live runtime.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,7 +22,7 @@ const tmp = (t, prefix) => {
   return dir;
 };
 // The watchdog serves the optional [Supervisor] kernel only: config.yaml supervisor.mode kernel (the default is chat).
-const envOf = (t) => { const root = tmp(t, 'sup-wd-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_MODE: 'kernel' }; };
+const envOf = (t) => { const root = tmp(t, 'sup-wd-'); return { STARCI_LOCAL_ROOT: path.join(root, 'la'), STARCI_SUPERVISOR_MODE: 'kernel' }; };
 
 /* ------------------------------------------------------------ fake Orca (launch) */
 

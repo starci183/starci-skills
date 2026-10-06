@@ -100,12 +100,12 @@ test('starci kernel dispatch refuses prerequisite-unmet before the packet and be
   const log=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
-    LOCALAPPDATA:path.join(root,'localappdata')};
+    STARCI_LOCAL_ROOT:path.join(root,'localappdata')};
   // interface.implement's designDrawn read: the implementation record proves a ui record no interface.draw ever settled,
   // so the job is refused with DESIGN_NOT_SETTLED before anything reaches the host.
   write(repo,'.starciwork/features/f/impl/fe/home/index.yaml','schema: work/implementation@1\nid: impl.f.home\nproves:\n  - ui.f.home\n');
   write(repo,'.starciwork/workspace.yaml','schema: work/workspace@1\nid: t\n');
-  // ledgerFileFor resolves under env.LOCALAPPDATA — seed the file the spawned api will open.
+  // ledgerFileFor resolves under env.STARCI_LOCAL_ROOT — seed the file the spawned api will open.
   const ledgerFile=ledgerFileFor(repo,{env});
   const ledger=openLedger({file:ledgerFile});
   try{seedWorkflow(ledger,{id:'wf-prereq',state:{phase:'running',job:'wf-prereq'},

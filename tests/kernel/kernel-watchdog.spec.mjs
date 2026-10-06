@@ -265,7 +265,7 @@ const watchdogWorld = async (t, { jobs = [], events = [], tabTitle = null, signa
     STARCI_FAKE_ORCA_LOG: logFile, STARCI_FAKE_ORCA_STATE: stateFile, STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1',
     // The fake Orca echoes a typed wake onto the screen only in this mode: the watchdog proves a delivery from the screen, never from the send receipt.
     STARCI_FAKE_ORCA_SEND_STALLED: 'landed',
-    LOCALAPPDATA: path.join(root, 'localappdata'), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') };
+    STARCI_LOCAL_ROOT: path.join(root, 'localappdata'), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') };
   const workflowId = 'wf-watchdog-e2e';
   const ledger = openLedger({ file: ledgerFileFor(repo, { env }) });
   try {

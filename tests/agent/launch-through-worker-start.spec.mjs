@@ -229,7 +229,7 @@ const fixture=t=>{
     .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private worker-start fixture adoption',roots:[repo]})}`));
   const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
-    STARCI_OWNER_ROOT:ownerRoot,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_PROJECTS_ROOT:path.join(root,'projects'),
+    STARCI_OWNER_ROOT:ownerRoot,STARCI_LOCAL_ROOT:path.join(root,'localappdata'),STARCI_PROJECTS_ROOT:path.join(root,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),USERPROFILE:path.join(root,'home'),HOME:path.join(root,'home'),
     CODEX_HOME:path.join(root,'home','.codex'),STARCI_AGENT_TRUST_HOME:path.join(root,'home'),ORCA_TERMINAL_HANDLE:''};
   const savedMachine = process.env.STARCI_TEST_MACHINE_FILE;

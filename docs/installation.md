@@ -89,9 +89,9 @@ is refused; only the exact prior installed entry may be refreshed, preserving cu
 ## Git hygiene in bound repositories
 
 `.starciwork/` holds product records only, at the app repository root. The runtime
-ledger is not in any repository: it lives at `%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`, found through
-`machine.ledgers` ([storage](ledger-db.md)), and agent output lives in the blob store under
-`~/.starci/artifacts`.
+ledger is not in any product repository: it lives at `<runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite` (git-ignored
+host data inside `.claude`), found through `machine.ledgers` ([storage](ledger-db.md)), and agent output lives in the blob store
+under `<runtime root>/.runtime/artifacts`.
 
 Commit durable records (goals, SRS/SDS, evidence your policy keeps); never
 commit `config.yaml` or secrets.
@@ -117,7 +117,7 @@ replace paths and remotes with verified real repositories:
 
 `be` and `fe` name directories in one app repository. The Work tree is at the
 app root. All relative paths resolve from the host. The ledger lives at
-`%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite` — see [architecture](architecture.md).
+`<runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite` — see [architecture](architecture.md).
 
 Open the coding agent at the host. If a task opens in the frontend or another
 repository, explicitly provide the absolute host, the `.claude/CONTEXT.md` path

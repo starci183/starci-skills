@@ -251,4 +251,4 @@ they then run their whole brief even while the switch is still off.
 retention, ledger backups) and the lane worktrees. Each key is an absolute directory or `null`; a relative path, a non-string or an
 unknown key is refused with `Invalid config.yaml: roots...`. Resolution, in one place (`archiveRoot()` and `lanesRoot()` in
 `scripts/machine/home.mjs`): the environment variable (`STARCI_ARCHIVE_ROOT`, `STARCI_LANES_ROOT`), then the owner key, then
-`<starciLocalRoot>/archive` and `<starciLocalRoot>/lanes`. The tracked config declares no host location.
+`<starciLocalRoot>/archive` (`<runtime root>/.runtime/archive`) and, for lanes, a per-user profile directory kept out of the checkout (`<LOCALAPPDATA>/StarCi/lanes`, `<STARCI_LOCAL_ROOT>/lanes` when that seam is set). The tracked config declares no host location.

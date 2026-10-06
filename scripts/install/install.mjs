@@ -53,7 +53,8 @@ const installProtocol = () => Object.freeze({ schema: INSTALL_PROTOCOL_SCHEMA, e
 const engineRank = (engine) => { const m = /^starci\/engine@(\d+)$/.exec(String(engine ?? '')); return m ? Number(m[1]) : null; };
 // Local owner files stay outside installer custody and Git even under a forced update.
 const INSTALLED_IGNORES = ['/config.yaml', `/${SECRET_ENV_FILE}`];
-const HOST_IGNORES = ['.starciwork/', ...INSTALLED_IGNORES.map(entry => '.claude' + entry)];
+// .claude/.runtime/ is the host state directory (engine/runtime-root.mjs): inside the app's repository, so the app must ignore it.
+const HOST_IGNORES = ['.starciwork/', ...INSTALLED_IGNORES.map(entry => '.claude' + entry), '.claude/.runtime/'];
 const ENTRY_MARKER = '<!-- starci:prompt-entry -->';
 const entryOf = text => text.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
 

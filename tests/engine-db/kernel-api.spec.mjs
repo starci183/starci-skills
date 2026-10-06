@@ -680,7 +680,7 @@ test('status projects exact host liveness and live jobs cannot route or dispatch
   const callsFile=path.join(fakeRoot,'calls.jsonl');
   fs.writeFileSync(path.join(fakeRoot,'state.json'),JSON.stringify({sends:1}));
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG:callsFile,STARCI_FAKE_ORCA_STATE:path.join(fakeRoot,'state.json'),LOCALAPPDATA:path.join(fakeRoot,'localappdata')};
+    STARCI_FAKE_ORCA_LOG:callsFile,STARCI_FAKE_ORCA_STATE:path.join(fakeRoot,'state.json'),STARCI_LOCAL_ROOT:path.join(fakeRoot,'localappdata')};
   const runLive=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const status=spawnSync(process.execPath,[API,'status','--repo',repo,'--workflow',wf,'--json'],
     {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
@@ -739,7 +739,7 @@ test('status distinguishes a turn-idle Op and nudge wakes the exact worker witho
   const stub=path.join(fakeRoot,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(fakeRoot,'state.json');fs.writeFileSync(stateFile,JSON.stringify({sends:0}));
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG:path.join(fakeRoot,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:stateFile,LOCALAPPDATA:path.join(fakeRoot,'localappdata')};
+    STARCI_FAKE_ORCA_LOG:path.join(fakeRoot,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:stateFile,STARCI_LOCAL_ROOT:path.join(fakeRoot,'localappdata')};
   const runLive=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
 
   const before=runLive('status','--repo',repo,'--workflow',wf,'--json');
@@ -832,7 +832,7 @@ test('two dispatch processes competing for one workflow slot reserve at most one
   const host=path.join(root,'fake-orca.mjs');fs.writeFileSync(host,FAKE_ORCA);
   const calls=path.join(root,'orca-calls.jsonl');
   const env={...process.env,STARCI_OWNER_ROOT:owner,STARCI_PRIVATE_CAP_BARRIER:root,
-    ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:'',APPDATA:path.join(root,'appdata'),LOCALAPPDATA:path.join(root,'localappdata'),
+    ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:'',APPDATA:path.join(root,'appdata'),STARCI_LOCAL_ROOT:path.join(root,'localappdata'),
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([host]),STARCI_FAKE_ORCA_LOG:calls,
     STARCI_FAKE_ORCA_STATE:path.join(root,'orca-state.json')};
   const children=jobs.map(jobId=>{
@@ -990,7 +990,7 @@ test('finish finishes the workflow, closes its inbox and keeps the goals rows',t
   const stub=path.join(fakeRoot,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const callsFile=path.join(fakeRoot,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG:callsFile,STARCI_FAKE_ORCA_STATE:path.join(fakeRoot,'state.json'),LOCALAPPDATA:path.join(fakeRoot,'localappdata')};
+    STARCI_FAKE_ORCA_LOG:callsFile,STARCI_FAKE_ORCA_STATE:path.join(fakeRoot,'state.json'),STARCI_LOCAL_ROOT:path.join(fakeRoot,'localappdata')};
   seed(repo,ledger=>{
     setPhase(ledger,wf,'running');
     ledger.write.bindKernelJob({workflowId:wf,workerId:'term-k7-kernel',payload:{

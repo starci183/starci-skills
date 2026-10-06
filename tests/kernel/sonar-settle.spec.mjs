@@ -201,7 +201,7 @@ const checkout=t=>{
   const git=(...args)=>mainGit('-C',repo,...args);
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
-    STARCI_PROJECTS_ROOT:path.join(root,'projects'),LOCALAPPDATA:path.join(root,'localappdata'),STARCI_ARTIFACT_ROOT:path.join(root,'artifacts'),
+    STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_LOCAL_ROOT:path.join(root,'localappdata'),STARCI_ARTIFACT_ROOT:path.join(root,'artifacts'),
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json')};
   return {repo,git,env,branch};

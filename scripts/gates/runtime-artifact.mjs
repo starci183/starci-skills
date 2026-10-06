@@ -15,7 +15,7 @@ const FORBIDDEN_NAMES = new Set(['secret.env', 'settings.local.json', 'machine.s
 // The host-local owner config sits at the package root; knowledge/patterns/be/config.yaml and the like are shipped documents.
 const FORBIDDEN_ROOT_NAMES = new Set(['config.yaml', 'config.json']);
 const EXAMPLES_ROOT = 'examples/';
-const FORBIDDEN_SEGMENTS = new Set(['node_modules', '.git', '.secrets', 'secrets']);
+const FORBIDDEN_SEGMENTS = new Set(['node_modules', '.git', '.secrets', 'secrets', '.runtime']);
 const FORBIDDEN_SUFFIX = /\.sqlite-(?:wal|shm|journal)$|\.log$/;
 // A dotenv file or a private key; `.env.example` and the like are templates, like secret.env.example.
 const FORBIDDEN_SECRET = /^\.env(?:\.(?!example$|sample$|template$).*)?$|\.(?:pem|key)$/;

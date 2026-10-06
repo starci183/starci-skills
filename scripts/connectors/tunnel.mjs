@@ -17,7 +17,7 @@
 //           or a remotely managed tunnel token from `tokenEnv`, passed to
 //           cloudflared as TUNNEL_TOKEN in its environment, never on argv.
 // cloudflared is always given an explicit --config the manager writes under
-// %LOCALAPPDATA%/StarCi/cloudflared (its text is also kept in the connectors
+// <runtime root>/.runtime/cloudflared (its text is also kept in the connectors
 // row), so ~/.cloudflared/config.yml (which may belong to another tunnel) is
 // never read.
 //
@@ -74,7 +74,7 @@ export const parseConnected = (text) => CONNECTED.test(String(text ?? ''));
 
 /** The tunnel manager's connectors row ({pid, childPid, baseUrl, connected, ...}), or null. */
 export const tunnelState = (env = process.env) => connectorState('tunnel', env);
-/** The config file cloudflared is started with: %LOCALAPPDATA%/StarCi/cloudflared/cloudflared.yml. */
+/** The config file cloudflared is started with: <runtime root>/.runtime/cloudflared/cloudflared.yml. */
 const cloudflaredConfigFile = (env = process.env) => path.join(starciLocalRoot(env), 'cloudflared', 'cloudflared.yml');
 
 /**

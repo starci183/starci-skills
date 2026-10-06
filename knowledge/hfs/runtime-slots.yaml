@@ -240,7 +240,7 @@ slots:
     rules: [RT_PINNED_PATH_MOVED]
   - id: runtime.local-config
     profiles: [runtime]
-    path: "{config.yaml,config.json,secret.env,settings.local.json,scheduled_tasks.lock}"
+    path: "{config.yaml,config.json,secret.env,settings.local.json,scheduled_tasks.lock,.runtime/}"
     presence: optional
     tracked: ignored
     tier: none
@@ -259,7 +259,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "the state root: guards under %LOCALAPPDATA%/StarCi/guards (scripts/guards/guards-root.mjs), lanes under <lanes root>/<project>/<lane>, workflow worktrees owned by Orca, secrets under %LOCALAPPDATA%/StarCi/secrets"
+    goesTo: "the state root: guards under <runtime root>/.runtime/guards (scripts/guards/guards-root.mjs), lanes under <lanes root>/<project>/<lane>, workflow worktrees owned by Orca, secrets under %LOCALAPPDATA%/StarCi/secrets"
     rules: [HFS_FORBIDDEN_PRESENT, HFS_UNTRACKED_ROOT_ENTRY]
   - id: runtime.agent-output
     profiles: [runtime]

@@ -75,7 +75,7 @@ test('parkAsk pushes an approval ask at once and only lists a credential ask (as
     seedAsk(ledger, { workflowId: 'wf-pay', dispatchId: 'ctx_vnpay', question: VNPAY });
     seedAsk(ledger, { workflowId: 'wf-pay', dispatchId: 'ctx_price', opId: 'business.decide', question: PRICING });
     const bot = fakeBot();
-    const notify = (a) => notifyAsk(a, { config: telegramConfig(), env: { LOCALAPPDATA: machineHome, TELEGRAM_BOT_TOKEN: TOKEN }, apiBase: 'http://bot.invalid', fetchImpl: bot.fetchImpl, sleepImpl: async () => {}, warn: () => {} });
+    const notify = (a) => notifyAsk(a, { config: telegramConfig(), env: { STARCI_LOCAL_ROOT: machineHome, TELEGRAM_BOT_TOKEN: TOKEN }, apiBase: 'http://bot.invalid', fetchImpl: bot.fetchImpl, sleepImpl: async () => {}, warn: () => {} });
     const report = (id) => ledger.db.prepare("SELECT r.*,a.op_id FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id='wf-pay' AND r.dispatch_id=?").get(id);
     const cred = await parkAsk({ ledger, ledgerFile, repo: repoRoot, workflowId: 'wf-pay', report: report('ctx_vnpay'), notify, close: async () => null });
     assert.deepEqual([cred.notified, cred.askClass, cred.telegram.listed], [true, 'credential', true]);
@@ -180,7 +180,7 @@ test('/asks lists approval asks only, including one from a supervisor.repos repo
     fs.mkdirSync(path.join(other, '.starciwork'), { recursive: true });
     const otherLedger = openLedger({ file: ledgerFileFor(other) });
     try { seedAsk(otherLedger, { workflowId: 'wf-shop-work-and-stacks', dispatchId: 'ctx_handover', opId: 'handover.review', question: HANDOVER }); } finally { otherLedger.close(); }
-    const env = { LOCALAPPDATA: machineHome };
+    const env = { STARCI_LOCAL_ROOT: machineHome };
     const config = { ...structuredClone(EXAMPLE), connectors: { ...EXAMPLE.connectors, repos: [repoRoot] }, supervisor: { ...(EXAMPLE.supervisor ?? {}), repos: [other] } };
     const repos = bridgeAskRepos({ env, config });
     assert.ok(repos.includes(repoRoot) && repos.includes(other), `the ask repos cover the connector repos and supervisor.repos: ${repos.join(', ')}`);
@@ -209,7 +209,7 @@ test('/creds batches every credential ask into ONE message with one button each;
         payload: { dispatchId, url, pid: process.pid, fields: { files: ['vnpay-hash-secret.key'], vars: ['VNPAY_TMN_CODE'] }, ttlMs: 3600000, onDemand: true, requestedBy: 'telegram' } });
       return process.pid;
     };
-    const bridge = bridgeFor(t, bot, { LOCALAPPDATA: machineHome }, { repos: () => [repoRoot], spawnServe, publicBaseOf: () => null, ensureConnectors: () => ({ ok: true }) });
+    const bridge = bridgeFor(t, bot, { STARCI_LOCAL_ROOT: machineHome }, { repos: () => [repoRoot], spawnServe, publicBaseOf: () => null, ensureConnectors: () => ({ ok: true }) });
     await bridge.handleUpdate(message('/creds'));
     const sent = bot.of('sendMessage');
     assert.equal(sent.length, 1, 'one message for every credential ask');

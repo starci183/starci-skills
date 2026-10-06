@@ -62,7 +62,7 @@ test('dedupe closes an agent terminal through a quit typed for ITS agent, never 
 test('the supervisor close-out passes explicit metadata independently of its configured agent', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-agentof-sup-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
-  const env = { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_MODE: 'kernel', ORCA_TERMINAL_HANDLE: 'term_me' };
+  const env = { STARCI_LOCAL_ROOT: path.join(root, 'la'), STARCI_SUPERVISOR_MODE: 'kernel', ORCA_TERMINAL_HANDLE: 'term_me' };
   // The recorded earlier session's listing names Devin while the configured supervisor uses Codex.
   // Explicit terminal metadata wins; configured agents and titles cannot select a quit command.
   withSupervisor((m) => supervisorEvent(m, { kind: 'supervisor-booted', payload: { terminal: 'term_old' } }), { env });
@@ -161,7 +161,7 @@ test('dedupe preserves exact listed metadata and holds an unverified close witho
 test('live supervisor duplicate closure uses exact metadata without adopting or replacing its seat', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-agentof-sup-live-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
-  const env = { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_MODE: 'kernel', ORCA_TERMINAL_HANDLE: 'term_me' };
+  const env = { STARCI_LOCAL_ROOT: path.join(root, 'la'), STARCI_SUPERVISOR_MODE: 'kernel', ORCA_TERMINAL_HANDLE: 'term_me' };
   const cases = [
     { handle: 'term_object', agentIdentity: { agent: 'devin' }, expected: 'devin' },
     { handle: 'term_provider', provider: 'claude', expected: 'claude' },

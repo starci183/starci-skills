@@ -74,7 +74,7 @@ const fixture=(t,{mode='healthy'}={})=>{
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     // machine.sqlite (the settle path's best-effort paired release) stays inside
     // the temp world — never the real arbiter.
-    LOCALAPPDATA:CLI.localAppData,
+    STARCI_LOCAL_ROOT:CLI.localAppData,
     STARCI_PROJECTS_ROOT:CLI.projectsRoot,
     STARCI_TEST_MACHINE_FILE:CLI.machineFile,
   };
@@ -87,7 +87,7 @@ const fixture=(t,{mode='healthy'}={})=>{
     STARCI_FAKE_ORCA_MODE:env.STARCI_FAKE_ORCA_MODE,
     STARCI_FAKE_ORCA_LOG:env.STARCI_FAKE_ORCA_LOG,
     STARCI_FAKE_ORCA_STATE:env.STARCI_FAKE_ORCA_STATE,
-    LOCALAPPDATA:env.LOCALAPPDATA,
+    STARCI_LOCAL_ROOT:env.STARCI_LOCAL_ROOT,
     APPDATA:env.APPDATA,
     STARCI_DEVIN_SEAT_ENDPOINT:env.STARCI_DEVIN_SEAT_ENDPOINT,
     STARCI_PROJECTS_ROOT:env.STARCI_PROJECTS_ROOT,

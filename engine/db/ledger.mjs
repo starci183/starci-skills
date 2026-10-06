@@ -1,16 +1,14 @@
 import { assertMutationFence } from '../../scripts/lib/mutation-fence.mjs';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 import {resourceAdmission,workflowOpSlots} from '../admission.mjs';
 import {sha256} from '../digest.mjs';
 import {SETTLED_JOB_LIST} from '../admission.mjs';
-import {putBlob,blobPath} from './blob.mjs';
+import {putBlob,blobPath,artifactRoot} from './blob.mjs';
 import {redactData,redactText} from '../../scripts/lib/redact.mjs';
 import {isBusyError,isUnderTempDir,machineFileFor,newSpanId,newTraceId,starciLocalRoot,TEST_REGISTRY_ENV,withMachine} from './machine.mjs';
-import { readEnv } from '../../scripts/lib/env.mjs';
 import {PROJECTS_ROOT_ENV,projectsRootFor,ledgerIdForRepo,repoRootKey,resolveLedgerFile,ledgerFixtureInit,assertOperationalLedger} from './ledger-paths.mjs';
 import { hasTable, insertPairs, insertRowWith } from '../../scripts/lib/sqlite.mjs';
 // The machine-side path helpers have one definition (engine/db/machine.mjs); re-exported for the ledger's callers.
@@ -59,7 +57,7 @@ const json=value=>value===undefined||value===null?null:JSON.stringify(value);
 const parseJson=text=>text===null||text===undefined?null:JSON.parse(text);
 
 // ---------------------------------------------------------------------------------------------------------
-// Paths (decision Q1: runtime.sqlite lives OUT of .starciwork, at %LOCALAPPDATA%/StarCi/projects/<ledger_id>/)
+// Paths (decision Q1: runtime.sqlite lives OUT of .starciwork, at <runtime root>/.runtime/projects/<ledger_id>/)
 // ---------------------------------------------------------------------------------------------------------
 /**
  * The runtime tree is never a Work root of its own: a project's Work root is its backend, reached through
@@ -199,7 +197,7 @@ function initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot=null,product
     const id=ledgerId??(UUID.test(dirId)?dirId:crypto.randomUUID());
     const seed=db.prepare('INSERT INTO meta(key,value) VALUES(?,?)');
     const meta={ledger_id:id,schema:LEDGER_SCHEMA,created_at:String(at),journal_mode:journalMode.toLowerCase(),sqlite_version:sqliteVersion,
-      blob_root:blobRoot??path.resolve(readEnv('STARCI_ARTIFACT_ROOT')||path.join(os.homedir(),'.starci','artifacts')),runtime_rev:runtimeRev()};
+      blob_root:blobRoot??artifactRoot(),runtime_rev:runtimeRev()};
     if(fixtureMarker)meta.fixture=fixtureMarker;
     if(repoRoot)meta.repo_root=path.resolve(repoRoot);
     if(product)meta.product=product;

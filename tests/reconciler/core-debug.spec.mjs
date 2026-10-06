@@ -14,7 +14,7 @@ const t0 = Date.UTC(2026, 9, 3, 20);
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'core-seat-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  return { root, env: { STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), LOCALAPPDATA: root } };
+  return { root, env: { STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), STARCI_LOCAL_ROOT: root } };
 }
 function host({ fail = null } = {}) {
   const calls = { start: [], stop: [], release: [] }, workers = new Map();

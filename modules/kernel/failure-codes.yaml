@@ -3319,11 +3319,11 @@ LEDGER_CORRUPT:
 LEDGER_LEGACY_WORK_SQLITE:
   title: "Legacy in-repo runtime.sqlite"
   title_vi: "Sổ ledger cũ còn nằm trong repo"
-  meaning_vi: "Một repo đã đăng ký (machine.sqlite repositories) vẫn còn tệp .starciwork/runtime.sqlite (hoặc -wal/-shm) từ trước quyết định Q1, trong khi sổ ledger thật đã chuyển ra %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite."
+  meaning_vi: "Một repo đã đăng ký (machine.sqlite repositories) vẫn còn tệp .starciwork/runtime.sqlite (hoặc -wal/-shm) từ trước quyết định Q1, trong khi sổ ledger thật đã chuyển ra <runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite."
   causes_vi:
     - "Repo được tạo trước quyết định Q1 và chưa dọn tệp ledger cũ"
     - "Một bản sao ledger cũ bị chép nhầm trở lại repo"
-  nextStep_vi: "Không có tương thích ngược: chủ xóa tệp .starciwork/runtime.sqlite (và -wal/-shm) khỏi repo bằng tay sau khi xác nhận sổ ledger sống ở %LOCALAPPDATA%/StarCi; bộ kiểm tra (starci runtime ledger-hygiene, starci reconciler up --check) chỉ báo cáo, không tự xóa tệp trong repo."
+  nextStep_vi: "Không có tương thích ngược: chủ xóa tệp .starciwork/runtime.sqlite (và -wal/-shm) khỏi repo bằng tay sau khi xác nhận sổ ledger sống ở <runtime root>/.runtime; bộ kiểm tra (starci runtime ledger-hygiene, starci reconciler up --check) chỉ báo cáo, không tự xóa tệp trong repo."
   owner: owner
   kind: check-finding
 

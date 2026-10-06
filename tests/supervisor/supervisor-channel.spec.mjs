@@ -18,7 +18,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const CHANNEL = path.join(ROOT, 'scripts', 'supervisor', 'channel.mjs');
 const TOKEN = '123456789:AAFakeTokenForSpecsOnly_abcdefghijklmnop';
 const tmp = (t, prefix) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return dir; };
-const envOf = (home, extra = {}) => ({ LOCALAPPDATA: home, STARCI_TEST_MACHINE_FILE: path.join(home, 'machine.sqlite'), ...extra });
+const envOf = (home, extra = {}) => ({ STARCI_LOCAL_ROOT: home, STARCI_TEST_MACHINE_FILE: path.join(home, 'machine.sqlite'), ...extra });
 const cliEnv = (home) => ({ ...process.env, ...envOf(home), STARCI_CONNECTORS_OFF: '1' });
 const cli = (home, args) => spawnSync(process.execPath, [CHANNEL, ...args], { cwd: ROOT, env: cliEnv(home), encoding: 'utf8', windowsHide: true, timeout: 30000 });
 const SETTINGS = { ready: true, token: TOKEN, chatId: '4242', language: 'vi' };

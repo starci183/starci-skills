@@ -286,7 +286,7 @@ test('the owner gets one plain Telegram message naming the pick and the question
     const calls=[];
     const fetchImpl=async(url,init)=>{calls.push({method:url.split('/').pop(),body:JSON.parse(init.body)});return {ok:true,status:200,json:async()=>({ok:true,result:{message_id:7}})};};
     const config={...structuredClone(EXAMPLE),language:'vi',connectors:{...structuredClone(EXAMPLE.connectors),telegram:{enabled:true,chatId:'4242'}}};
-    const deps={config,env:{LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN},apiBase:'http://bot.invalid',fetchImpl,sleepImpl:async()=>{},warn:()=>{}};
+    const deps={config,env:{STARCI_LOCAL_ROOT:machineHome,TELEGRAM_BOT_TOKEN:TOKEN},apiBase:'http://bot.invalid',fetchImpl,sleepImpl:async()=>{},warn:()=>{}};
     const first=await notifyAutoAccepted({ledgerFile,workflowId:WORKFLOW,dispatchId:'ctx_invite',label:'M\u1eddi b\u1eb1ng email'},deps);
     const second=await notifyAutoAccepted({ledgerFile,workflowId:WORKFLOW,dispatchId:'ctx_invite',label:'M\u1eddi b\u1eb1ng email'},deps);
     assert.equal(first.sent,1);

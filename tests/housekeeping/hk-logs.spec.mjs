@@ -1,5 +1,5 @@
 // hk-logs.spec.mjs — the log/transcript caps of the housekeeping sweep (scripts/housekeeping/hk-logs.mjs),
-// on fake roots: injected LOCALAPPDATA/USERPROFILE/APPDATA point at a temp dir, never the host's.
+// on fake roots: injected STARCI_LOCAL_ROOT/USERPROFILE/APPDATA point at a temp dir, never the host's.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -15,7 +15,7 @@ import { allocationMs } from '../../engine/config.mjs';
 const tmp = (t, before = null) => mkdtemp(t, 'hk-logs-', before);
 const envOf = (t, before = null) => {
   const root = tmp(t, before);
-  return { LOCALAPPDATA: path.join(root, 'la'), USERPROFILE: path.join(root, 'user'), HOME: path.join(root, 'user'), APPDATA: path.join(root, 'ro') };
+  return { STARCI_LOCAL_ROOT: path.join(root, 'la'), USERPROFILE: path.join(root, 'user'), HOME: path.join(root, 'user'), APPDATA: path.join(root, 'ro') };
 };
 const NOW = 1_800_000_000_000;                          // a fixed clock
 const OLD = NOW - DEFAULT_LOG_MAX_AGE_MS - 60_000;      // past the window
@@ -33,7 +33,7 @@ const paths = (list) => list.map((e) => e.path);
 
 test('age deletes covered *.log/*.jsonl under the StarCi roots; young files and other names stay', async (t) => {
   const env = envOf(t);
-  const starci = path.join(env.LOCALAPPDATA, 'StarCi');
+  const starci = env.STARCI_LOCAL_ROOT;
   const home = path.join(env.USERPROFILE, '.starci');
   const old1 = put(path.join(starci, 'runtime', 'deps', '.cache', '_logs', 'npm-debug.log'), 'n'.repeat(100), OLD);
   const old2 = put(path.join(home, 'redundancy', 'handoff-devin', 'land-queue.log'), 'l', OLD);
@@ -118,7 +118,7 @@ test('orchestration.db is reported by size and never touched', async (t) => {
 
 test('a junction inside a root is never descended into', { skip: process.platform !== 'win32' && 'junction points are a Windows reparse-point feature (fs.symlinkSync type "junction"); on other platforms a directory link needs privileges the suite cannot assume' }, async (t) => {
   const env = envOf(t);
-  const starci = path.join(env.LOCALAPPDATA, 'StarCi');
+  const starci = env.STARCI_LOCAL_ROOT;
   const outside = tmp(t);
   const inside = put(path.join(outside, 'real', 'evil.log'), 'e', OLD);
   const junction = path.join(starci, 'runtime', 'linked');
@@ -136,7 +136,7 @@ test('a symlinked log file is skipped, never deleted through', async (t) => {
   const env = envOf(t);
   const outside = tmp(t);
   const target = put(path.join(outside, 'target.log'), 't', OLD);
-  const link = path.join(env.LOCALAPPDATA, 'StarCi', 'runtime', 'app.log');
+  const link = path.join(env.STARCI_LOCAL_ROOT, 'runtime', 'app.log');
   fs.mkdirSync(path.dirname(link), { recursive: true });
   try {
     fs.symlinkSync(target, link, 'file');
@@ -178,7 +178,7 @@ test('a file the host will not release (FileShare.None) is skipped, not an error
     clearTimeout(timer);
   };
   const env = envOf(t, release);
-  const locked = put(path.join(env.LOCALAPPDATA, 'StarCi', 'runtime', 'held.log'), 'h', OLD);
+  const locked = put(path.join(env.STARCI_LOCAL_ROOT, 'runtime', 'held.log'), 'h', OLD);
   ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
     `$f=[System.IO.File]::Open('${locked.replaceAll("'", "''")}', 'Open', 'ReadWrite', 'None'); [Console]::ReadLine() | Out-Null; $f.Close()`],
     { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true });

@@ -77,7 +77,7 @@ const fixture = (t) => {
   fs.writeFileSync(orcaState, JSON.stringify({ terminals: { term_w1: { handle: 'term_w1', lastOutputAt: at }, term_w2: { handle: 'term_w2', lastOutputAt: at } } }));
   const baseEnv = { ...process.env, STARCI_KERNEL_REV_ROOT: rt, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: orcaLog, STARCI_FAKE_ORCA_STATE: orcaState, STARCI_GIT_MEMO_DIR: memo, SPEC_SPAWN_LOG: spawnLog,
-    LOCALAPPDATA: path.join(dir,'localappdata'), STARCI_PROJECTS_ROOT: path.join(dir,'projects'), STARCI_TEST_MACHINE_FILE: path.join(dir,'machine.sqlite') };
+    STARCI_LOCAL_ROOT: path.join(dir,'localappdata'), STARCI_PROJECTS_ROOT: path.join(dir,'projects'), STARCI_TEST_MACHINE_FILE: path.join(dir,'machine.sqlite') };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_STATUS_MEMO']) delete baseEnv[key];
   const wf = 'wf-status-perf';
   const api = (args, env = {}) => spawnSync(process.execPath, ['--import', pathToFileURL(tracer).href, API, ...args, '--repo', repo, '--json'],

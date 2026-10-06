@@ -44,7 +44,7 @@ function fixture(t, opts = {}) {
   git(root, 'commit', '-q', '-m', 'init');
   fs.mkdirSync(path.join(root, 'node_modules', 'dep'), { recursive: true });
   fs.writeFileSync(path.join(root, 'node_modules', 'dep', 'index.js'), 'module.exports = 1;\n');
-  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(base, 'machine.sqlite'), STARCI_SUPERVISOR_MODE: 'kernel', LOCALAPPDATA: path.join(base, 'la') };
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(base, 'machine.sqlite'), STARCI_SUPERVISOR_MODE: 'kernel', STARCI_LOCAL_ROOT: path.join(base, 'la') };
   const orca = fakeOrcaWorktrees({ root: path.join(base, 'orca'), ...opts });
   return { base, root, env, orca };
 }

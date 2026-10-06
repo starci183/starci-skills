@@ -26,7 +26,7 @@ const world = (t, { orca = false } = {}) => {
   if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(root, 'repo'); fs.mkdirSync(repo, { recursive: true }); fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
   // A private machine registry per world: dispatch enrols the ledger and 'repo' collides on
-  // ledgers.name in the suite-shared test registry otherwise. LOCALAPPDATA stays: project
+  // ledgers.name in the suite-shared test registry otherwise. STARCI_LOCAL_ROOT stays: project
   // resolution runs through it.
   const env = { ...process.env, [TEST_REGISTRY_ENV]: path.join(root, 'machine.sqlite') };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_GUARD_FILE']) delete env[key];

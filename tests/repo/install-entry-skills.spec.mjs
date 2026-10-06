@@ -280,6 +280,7 @@ test('install and forced update preserve local credentials and excluded prior cu
     assert.ok(fs.readFileSync(file, 'utf8').split(/\r?\n/).includes(expected));
   }
   assert.ok(fs.readFileSync(path.join(repo, '.gitignore'), 'utf8').includes('custom.ignore'));
+  assert.ok(fs.readFileSync(path.join(repo, '.gitignore'), 'utf8').split(/\r?\n/).map(line => line.trim()).includes('.claude/.runtime/'), 'the host state directory is ignored by the app repository');
   const local = 'synthetic-local-credential\n', custody = 'synthetic-administrative-custody\n';
   write(repo, `.claude/${SECRET_ENV_FILE}`, local);
   const config = '# Owner keeps these preferences\n' + fs.readFileSync(path.join(target, 'config.yaml'), 'utf8');

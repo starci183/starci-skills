@@ -8,7 +8,7 @@ import {outcomeOf,median,scorecardFor,summaryLine,formatTable,UNROUTED} from '..
 
 // The model scorecard reads a ledger READ-ONLY and reports each routed pool x op kind: jobs, pass/fail/
 // blocked, rework (retries) and median duration. These specs pin the numbers on a fixture ledger (withLedger
-// repoints LOCALAPPDATA and lives in a temp dir, so no real ledger or machine DB is touched).
+// repoints STARCI_LOCAL_ROOT and lives in a temp dir, so no real ledger or machine DB is touched).
 const T=Date.UTC(2026,8,24,12,0,0);
 const H=3600000,MIN=60000;
 const job=(jobId,{op,pool,status,verdict=null,retryOf=null,createdAt,updatedAt=createdAt})=>({

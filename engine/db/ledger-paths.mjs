@@ -9,7 +9,7 @@ import {pathKey} from '../../scripts/lib/path-key.mjs';
 /** Overrides the projects root (the directory holding <ledger_id>/runtime.sqlite) for this process tree; narrower than machine-db.mjs LOCAL_ROOT_ENV, which this still honors through starciLocalRoot when unset. */
 export const PROJECTS_ROOT_ENV='STARCI_PROJECTS_ROOT';
 const normDir=file=>pathKey(file);
-/** %LOCALAPPDATA%/StarCi/projects (starciLocalRoot, itself overridable by STARCI_LOCAL_ROOT; a node --test process tree gets one under the OS temp directory). */
+/** <runtime root>/.runtime/projects (starciLocalRoot, itself overridable by STARCI_LOCAL_ROOT; a node --test process tree gets one under the OS temp directory). */
 export const projectsRootFor=(env=process.env)=>{
   if(env[PROJECTS_ROOT_ENV])return path.resolve(env[PROJECTS_ROOT_ENV]);
   const root=localProjectsRoot(env);

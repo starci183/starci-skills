@@ -10,7 +10,7 @@ import {TEST_REGISTRY_ENV,isUnderTempDir,LOCAL_ROOT_ENV,machineFileFor,openMachi
 import {runSpecFiles} from '../../scripts/supervisor/land.mjs';
 
 /**
- * The host's machine registry (%LOCALAPPDATA%/StarCi/runtime/machine.sqlite `ledgers`) once held 7,829 rows,
+ * The host's machine registry (<runtime root>/.runtime/machine.sqlite `ledgers`) once held 7,829 rows,
  * four of them product ledgers: every spec that ran scripts/kernel/cli.mjs, or opened a ledger through a code
  * path that reserves, enrolled its temp-folder ledger on the live registry, and the rows outlived the specs
  * in every lease sweep and allocation scan. Two layers keep that from coming back, and each is held here:
@@ -35,21 +35,21 @@ const ledgerIn=(t,dir)=>{
 };
 
 test('the explicit test registry wins; inside node --test a live runtime root falls back to a temp registry',()=>{
-  const home=path.join(os.homedir(),'AppData','Local');
-  assert.equal(machineFileFor({LOCALAPPDATA:home}),path.join(home,'StarCi','machine.sqlite'),'outside a test run the host registry is %LOCALAPPDATA%/StarCi/machine.sqlite');
-  assert.equal(machineFileFor({LOCALAPPDATA:home,[TEST_REGISTRY_ENV]:'x/machine.sqlite'}),path.resolve('x/machine.sqlite'));
-  const fallback=machineFileFor({LOCALAPPDATA:home,NODE_TEST_CONTEXT:'child-v8'});
+  const state=path.join(runtimeRoot,'.runtime');
+  assert.equal(machineFileFor({}),path.join(state,'machine.sqlite'),'outside a test run the host registry is <runtime root>/.runtime/machine.sqlite');
+  assert.equal(machineFileFor({[TEST_REGISTRY_ENV]:'x/machine.sqlite'}),path.resolve('x/machine.sqlite'));
+  const fallback=machineFileFor({NODE_TEST_CONTEXT:'child-v8'});
   assert.ok(isUnderTempDir(fallback),`${fallback} is under the OS temp directory`);
-  // A runtime root a spec already moved under the temp directory is its own isolation and is kept.
+  // A state base a spec already moved under the temp directory is its own isolation and is kept.
   const moved=path.join(os.tmpdir(),'la');
-  assert.equal(machineFileFor({LOCALAPPDATA:moved,NODE_TEST_CONTEXT:'child-v8'}),path.join(moved,'StarCi','machine.sqlite'));
+  assert.equal(machineFileFor({[LOCAL_ROOT_ENV]:moved,NODE_TEST_CONTEXT:'child-v8'}),path.join(moved,'machine.sqlite'));
 });
 
 test('this spec and its child inherit the explicit private registry or use the isolated temp fallback',t=>{
   const file=machineFileFor(),explicit=process.env[TEST_REGISTRY_ENV];
   if(explicit)assert.equal(file,path.resolve(explicit),'the runner may place its private registry outside TEMP');
   else assert.ok(isUnderTempDir(file),`fallback ${file}`);
-  const hostFile=machineFileFor({LOCALAPPDATA:process.env.LOCALAPPDATA});
+  const hostFile=machineFileFor({});
   assert.notEqual(path.resolve(file).toLowerCase(),path.resolve(hostFile).toLowerCase(),'the spec does not open the host registry');
   const registry=openMachine();
   t.after(()=>registry.close());
@@ -78,21 +78,21 @@ test('npm test and the land gate load the per-run registry preload',t=>{
   assert.equal(fs.existsSync(path.dirname(probe.stdout)),false,'the run removes its registry when it exits');
 });
 
-test('STARCI_LOCAL_ROOT overrides the per-host state base wholesale, ahead of LOCALAPPDATA but behind the narrower seams',()=>{
-  const home=path.join(os.homedir(),'AppData','Local'),override=path.join(os.tmpdir(),'starci-local-root-spec');
-  // No override: the historical %LOCALAPPDATA%/StarCi behavior is unchanged.
-  assert.equal(starciLocalRoot({LOCALAPPDATA:home}),path.join(home,'StarCi'));
-  // The override wins over LOCALAPPDATA, and machineFileFor (which resolves through starciLocalRoot) follows it.
-  assert.equal(starciLocalRoot({LOCALAPPDATA:home,[LOCAL_ROOT_ENV]:override}),path.resolve(override));
-  assert.equal(machineFileFor({LOCALAPPDATA:home,[LOCAL_ROOT_ENV]:override}),path.join(path.resolve(override),'machine.sqlite'));
+test('STARCI_LOCAL_ROOT overrides the per-host state base wholesale, ahead of <runtime root>/.runtime but behind the narrower seams',()=>{
+  const override=path.join(os.tmpdir(),'starci-local-root-spec');
+  // No override: the state base is <runtime root>/.runtime, whatever LOCALAPPDATA says.
+  assert.equal(starciLocalRoot({LOCALAPPDATA:path.join(os.homedir(),'AppData','Local')}),path.join(runtimeRoot,'.runtime'));
+  // The override wins, and machineFileFor (which resolves through starciLocalRoot) follows it.
+  assert.equal(starciLocalRoot({[LOCAL_ROOT_ENV]:override}),path.resolve(override));
+  assert.equal(machineFileFor({[LOCAL_ROOT_ENV]:override}),path.join(path.resolve(override),'machine.sqlite'));
   // A relative override resolves against the current working directory, same as every other *_ROOT env seam.
   assert.equal(starciLocalRoot({[LOCAL_ROOT_ENV]:'rel/local-root'}),path.resolve('rel/local-root'));
   // The narrower TEST_REGISTRY_ENV (an exact file) still wins over LOCAL_ROOT_ENV when both are set.
-  assert.equal(machineFileFor({LOCALAPPDATA:home,[LOCAL_ROOT_ENV]:override,[TEST_REGISTRY_ENV]:'x/machine.sqlite'}),path.resolve('x/machine.sqlite'));
+  assert.equal(machineFileFor({[LOCAL_ROOT_ENV]:override,[TEST_REGISTRY_ENV]:'x/machine.sqlite'}),path.resolve('x/machine.sqlite'));
   // engine/db/ledger.mjs re-exports the same function; the projects root it derives (PROJECTS_ROOT_ENV unset) moves too.
-  assert.equal(projectsRootFor({LOCALAPPDATA:home,[LOCAL_ROOT_ENV]:override}),path.join(path.resolve(override),'projects'));
+  assert.equal(projectsRootFor({[LOCAL_ROOT_ENV]:override}),path.join(path.resolve(override),'projects'));
   // The narrower STARCI_PROJECTS_ROOT still wins over LOCAL_ROOT_ENV for the ledger projects root specifically.
-  assert.equal(projectsRootFor({LOCALAPPDATA:home,[LOCAL_ROOT_ENV]:override,[PROJECTS_ROOT_ENV]:'y/projects'}),path.resolve('y/projects'));
+  assert.equal(projectsRootFor({[LOCAL_ROOT_ENV]:override,[PROJECTS_ROOT_ENV]:'y/projects'}),path.resolve('y/projects'));
 });
 
 test('the live registry refuses a temp-directory ledger; a test registry enrols it',t=>{

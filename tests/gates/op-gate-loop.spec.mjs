@@ -579,7 +579,7 @@ test('the READ topic map derives from the topics\' own slots fields, in index.ya
 function seedOps(t, cases) {
   const base = tmp(t, 'starci-op-gate-settle-'), repo = path.join(base, 'main');
   fs.mkdirSync(repo);
-  const env = { ...process.env, [TEST_REGISTRY_ENV]: path.join(base, 'machine.sqlite'), LOCALAPPDATA: path.join(base, 'localappdata'),
+  const env = { ...process.env, [TEST_REGISTRY_ENV]: path.join(base, 'machine.sqlite'), STARCI_LOCAL_ROOT: path.join(base, 'localappdata'),
     STARCI_PROJECTS_ROOT: path.join(base, 'projects'), STARCI_ARTIFACT_ROOT: path.join(base, 'artifacts'),
     STARCI_LOCAL_ROOT: path.join(base, 'local'), STARCI_OWNER_ROOT: path.join(base, 'owner'), STARCI_LANES_ROOT: path.join(base, 'lanes') };
   const git = gitIn(repo);

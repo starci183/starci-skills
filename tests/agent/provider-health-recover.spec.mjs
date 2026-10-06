@@ -42,7 +42,7 @@ const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo)
 const machineFileFor = (t) => path.join(tmp(t, 'starci-machine-'), 'machine.sqlite');
 // A repo's runtime.sqlite resolves under STARCI_PROJECTS_ROOT (engine/db/ledger.mjs ledgerFileFor —
 // projects/<ledgerId>/runtime.sqlite, never <repo>/.starciwork). Pin one per test so the spec's
-// seed/read and every spawned api subprocess resolve the same file however LOCALAPPDATA is faked.
+// seed/read and every spawned api subprocess resolve the same file however STARCI_LOCAL_ROOT is faked.
 const projectsRoot = (t) => {
   const dir = path.join(tmp(t, 'starci-projects-'), 'projects');
   const saved = process.env[PROJECTS_ROOT_ENV];
@@ -81,7 +81,7 @@ const fakeOrcaEnv = (t) => {
   fs.writeFileSync(path.join(dir, 'state.json'), '{}');
   return { ...fakeDevinQuotaEnv(t, path.join(dir, 'appdata')), STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(dir, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: path.join(dir, 'state.json'),
-    LOCALAPPDATA: path.join(dir, 'localappdata') };
+    STARCI_LOCAL_ROOT: path.join(dir, 'localappdata') };
 };
 // The caller's identity comes only from what a test passes: an inherited Orca
 // handle or role marker would make the spec depend on where it runs.

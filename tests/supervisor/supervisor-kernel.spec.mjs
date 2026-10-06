@@ -1,6 +1,6 @@
 // The one [Supervisor] kernel, its [Worker] fix agents, the land gate and the chat relay
 // (modules/supervisor/supervise.yaml kernelSeat/workers/landGate/chat, docs/supervisor.md).
-// Every spec runs on a temp supervisor home, a temp LOCALAPPDATA and, for git, a temp repository:
+// Every spec runs on a temp supervisor home, a temp STARCI_LOCAL_ROOT and, for git, a temp repository:
 // no live Orca (a [Worker] staging checkout goes through the fake Orca worktree client,
 // tests/helpers/fake-orca-worktrees.mjs), no agent, no network, never the live runtime.
 import test, { after } from 'node:test';
@@ -61,7 +61,7 @@ const tmp = (t, prefix) => {
 const machineOf = (t, env) => { const m = openMachine({ env }); t.after(() => m.close()); return m; };
 /** The fake Orca worktree client of one spec: its trees under a temp workspace root. */
 const orcaOf = (t) => fakeOrcaWorktrees({ root: tmp(t, 'sup-orca-') });
-const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: 'kernel', STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') }; };
+const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { STARCI_LOCAL_ROOT: path.join(root, 'la'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: 'kernel', STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') }; };
 
 /* ------------------------------------------------------------ fake Orca */
 

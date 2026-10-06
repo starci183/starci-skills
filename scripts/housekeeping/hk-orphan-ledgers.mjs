@@ -25,7 +25,7 @@
 //                    LEDGER_LEGACY_WORK_SQLITE. Report only, here and in `/start --check` (both call
 //                    legacyWorkSqliteFindings so the two never drift): nothing in this codebase deletes a file
 //                    inside a product repository; the owner removes it once the ledger is confirmed to live only
-//                    in %LOCALAPPDATA%/StarCi (owner ruling: no legacy).
+//                    in <runtime root>/.runtime (owner ruling: no legacy).
 //
 //   starci runtime housekeeping --only orphanledgers [--apply] --json
 //   starci runtime ledger-hygiene [--apply] [--json]                  the standalone report (both findings)

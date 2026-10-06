@@ -16,7 +16,7 @@ const NOW = Date.parse('2026-09-28T12:00:00Z');
 const envOf = (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-sup-actions-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
-  return { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), STARCI_CONNECTORS_OFF: '1' };
+  return { ...process.env, STARCI_LOCAL_ROOT: path.join(root, 'la'), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), STARCI_CONNECTORS_OFF: '1' };
 };
 
 test('owed actions: each stuck item gets one class and one action; an incident a cluster carries is not listed twice', () => {

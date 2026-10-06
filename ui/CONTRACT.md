@@ -2,7 +2,7 @@
 
 The StarCi runtime is a control plane. The owner defines a Goal; one long-lived Kernel seat steers each Workflow; an ephemeral Op agent runs one job and reports; checks and the settler determine the verdict; the reconciler's seven controllers maintain mechanical progress; the Supervisor makes worker-wide decisions. The public UI observes these records and never performs their transitions.
 
-The engine owns the supported project-ledger and host-machine schema versions. The runtime source is `.claude`; the machine database path is resolved by `engine/db/machine.mjs` (normally `%LOCALAPPDATA%/StarCi/machine.sqlite`). Project ledger paths are resolved only through `machine.ledgers`. The UI opens both through the exported read-only engine readers and exposes actual schema versions through `/api/contract`. This contract owns projection identity, historical evidence, clocks, availability and completeness.
+The engine owns the supported project-ledger and host-machine schema versions. The runtime source is `.claude`; the machine database path is resolved by `engine/db/machine.mjs` (normally `<runtime root>/.runtime/machine.sqlite`). Project ledger paths are resolved only through `machine.ledgers`. The UI opens both through the exported read-only engine readers and exposes actual schema versions through `/api/contract`. This contract owns projection identity, historical evidence, clocks, availability and completeness.
 
 ## 0. Concept trace
 

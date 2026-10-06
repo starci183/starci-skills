@@ -28,6 +28,10 @@ dist/
 resources/settings.json
 settings.local.json
 
+# Host state: machine.sqlite, projects/<ledger_id>/runtime.sqlite, archive/, artifacts/ (engine/runtime-root.mjs starciLocalRoot).
+# Never tracked, never packed. The public example fixtures under examples/.runtimes are a separate tree.
+/.runtime/
+
 # Dependencies and process-local generated state
 node_modules/
 __pycache__/

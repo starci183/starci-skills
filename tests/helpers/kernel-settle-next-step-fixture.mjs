@@ -8,7 +8,7 @@ export function createKernelSettleNextStepFixture(){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-settle-next-'));
   const repo=path.join(root,'repo');
   const machineHome=path.join(root,'machine');
-  const env={...process.env,STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_TEST_MACHINE_FILE:path.join(machineHome,'machine.sqlite'),LOCALAPPDATA:machineHome};
+  const env={...process.env,STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_TEST_MACHINE_FILE:path.join(machineHome,'machine.sqlite'),STARCI_LOCAL_ROOT:machineHome};
   fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   fs.mkdirSync(machineHome,{recursive:true});
   openMachine({file:env.STARCI_TEST_MACHINE_FILE}).close();

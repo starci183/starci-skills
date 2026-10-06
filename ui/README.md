@@ -21,7 +21,7 @@ node --input-type=module -e 'import { startHarnessServer } from "./server.mjs"; 
 
 To prepare the fixture first, run `node ui/fixtures/seed.mjs` from the runtime root. The fixture uses the engine's database writers and stores its content-addressed blobs outside the Git worktree. Set `STARCI_MACHINE_DB` and `STARCI_ARTIFACT_ROOT` to the paths printed by that command. Use a separate preview port; the live harness service is outside this workflow.
 
-Without `STARCI_MACHINE_DB`, `engine/db/machine.mjs` resolves the host's real `machine.sqlite` (normally `%LOCALAPPDATA%/StarCi/machine.sqlite`). Each project `runtime.sqlite` is found through `machine.ledgers`. The UI never creates or repairs either database.
+Without `STARCI_MACHINE_DB`, `engine/db/machine.mjs` resolves the host's real `machine.sqlite` (normally `<runtime root>/.runtime/machine.sqlite`). Each project `runtime.sqlite` is found through `machine.ledgers`. The UI never creates or repairs either database.
 
 The built preview above calls the exported server in its own process; `server.mjs` has no standalone entry. For source development, `npm run dev:harness` runs the canonical `starci harness start` lifecycle with the API in its verb process and Vite as its child. Vite's proxy reads the API port from `ports.mjs`; its development port is declared there as well. `npm run build` runs lint, TypeScript and Vite build. The public server defaults to `127.0.0.1:<port>` with `<port>` from `statusApp.port` of `modules/models/runtimes.yaml`, unless `STARCI_STATUS_PORT` is set.
 

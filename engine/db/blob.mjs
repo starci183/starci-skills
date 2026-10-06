@@ -17,9 +17,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { starciLocalRoot, runtimeStateDir } from '../runtime-root.mjs';
+import { isSpecRun } from '../../scripts/lib/env.mjs';
+import { insidePath, pathKey } from '../../scripts/lib/path-key.mjs';
 
 export const ARTIFACT_ROOT_ENV = 'STARCI_ARTIFACT_ROOT';
-export const artifactRoot = (env = process.env) => path.resolve(env[ARTIFACT_ROOT_ENV] || path.join(os.homedir(), '.starci', 'artifacts'));
+/**
+ * The blob store: ARTIFACT_ROOT_ENV, else <starciLocalRoot>/artifacts (<runtime root>/.runtime/artifacts on a host). Inside a node --test
+ * process tree a default outside the OS temp directory is replaced by a temp one, so a bare spec never writes into the checkout.
+ */
+export const artifactRoot = (env = process.env) => {
+  if (env[ARTIFACT_ROOT_ENV]) return path.resolve(env[ARTIFACT_ROOT_ENV]);
+  const root = path.resolve(path.join(starciLocalRoot(env), 'artifacts'));
+  return isSpecRun(env) && !insidePath(os.tmpdir(), root, { key: pathKey }) ? path.join(os.tmpdir(), 'starci-test-artifacts') : root;
+};
 const SHA = /^[a-f0-9]{64}$/;
 const assertSha = sha => {
   if (typeof sha !== 'string' || !SHA.test(sha)) throw new TypeError('blob sha must be a lowercase sha256 hex digest');
@@ -43,11 +54,37 @@ const location = (sha, root = null, suffix = '') => {
 const metadataPath = (sha, root = null) => location(sha, root, '.json');
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
-// Reject roots inside a checkout, including worktrees whose .git is a file.
-function ensureExternalRoot(root) {
+// The last matching rule of a file wins, a negation un-ignores, and .gitignore outranks .git/info/exclude (git's own precedence).
+const ignoreVerdict = (file, forms) => {
+  let verdict = null;
+  try {
+    for (const raw of fs.readFileSync(file, 'utf8').split('\n')) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const negated = line.startsWith('!');
+      if (forms.has(negated ? line.slice(1) : line)) verdict = !negated;
+    }
+  } catch { /* absent or unreadable: no rule */ }
+  return verdict;
+};
+// The state dir relative to the checkout that actually holds it (<top>/.runtime on the source, <app>/.claude/.runtime in an app repo).
+const stateIgnored = (top, stateDir) => {
+  const rel = path.relative(top, stateDir).split(path.sep).join('/');
+  if (!rel || rel.startsWith('..')) return false;
+  const forms = new Set([rel, `${rel}/`, `/${rel}`, `/${rel}/`]);
+  return (ignoreVerdict(path.join(top, '.gitignore'), forms) ?? ignoreVerdict(path.join(top, '.git', 'info', 'exclude'), forms)) === true;
+};
+// A writer root is outside every checkout (including worktrees whose .git is a file), or it is under this runtime's own
+// .runtime directory AND that directory is listed in the checkout's .gitignore (or .git/info/exclude), so a blob store can
+// never be committed. Fail closed: a root under any other path in a checkout, or a .runtime nobody ignores, refuses.
+export function ensureExternalRoot(root, stateDir = runtimeStateDir()) {
   let cursor = root;
   while (true) {
-    if (fs.existsSync(path.join(cursor, '.git'))) throw new Error(`artifact root is inside a git checkout: ${root}`);
+    if (fs.existsSync(path.join(cursor, '.git'))) {
+      if (!insidePath(stateDir, root, { key: pathKey, includeSelf: true })) throw new Error(`artifact root is inside a git checkout: ${root}`);
+      if (!stateIgnored(cursor, stateDir)) throw new Error(`artifact root is inside a git checkout and not git-ignored: ${root}`);
+      return;
+    }
     const parent = path.dirname(cursor);
     if (parent === cursor) return;
     cursor = parent;
@@ -142,7 +179,7 @@ function canonical(value) {
 /* ------------------------------------------------------------ citations, views and bundles */
 
 const BUNDLE_SCHEMA = 'starci/blob-bundle@1';
-// Read-only views (files with an extension, materialized bundles) live beside the store, e.g. ~/.starci/artifacts-views.
+// Read-only views (files with an extension, materialized bundles) live beside the store, e.g. <runtime root>/.runtime/artifacts-views.
 const viewRoot = (root = null) => `${root === null ? artifactRoot() : path.resolve(root)}-views`;
 const slash = (p) => String(p).replace(/\\/g, '/');
 

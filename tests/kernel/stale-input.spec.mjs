@@ -97,7 +97,7 @@ const fixture=t=>{
   const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
-    STARCI_OWNER_ROOT:skill,STARCI_AGENT_TRUST_HOME:trustHome,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
+    STARCI_OWNER_ROOT:skill,STARCI_AGENT_TRUST_HOME:trustHome,STARCI_LOCAL_ROOT:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
     STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_TEST_TEMP_DIR:path.join(root,'tmp'),STARCI_GIT_MEMO_DIR:path.join(root,'git-memo')};
   registerWorkflowWorktree({env},{workflowId:WORKFLOW,orcaWorktreeId:'stale-input::workflow',path:repo,branch});
   const api=path.join(skill,'scripts','kernel','cli.mjs');

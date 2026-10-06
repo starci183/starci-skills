@@ -47,7 +47,7 @@ const fixture=(t,{bound=true}={})=>{
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(dir,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(dir,'state.json'),
-    LOCALAPPDATA:path.join(dir,'localappdata'),STARCI_PROJECTS_ROOT:path.join(dir,'projects'),
+    STARCI_LOCAL_ROOT:path.join(dir,'localappdata'),STARCI_PROJECTS_ROOT:path.join(dir,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(dir,'machine.sqlite')};
   const api=(...args)=>{
     const r=spawnSync(process.execPath,[API,...placeOnRepo(args,args[args.indexOf('--repo')+1])],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});

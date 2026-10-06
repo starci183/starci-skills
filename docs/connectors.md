@@ -29,7 +29,7 @@ Cloudflare edge -> cloudflared (tunnel.mjs) -> 127.0.0.1:<gateway.port> ask-gate
 | Piece | File | What it does |
 | --- | --- | --- |
 | Gateway | `scripts/connectors/ask-gateway.mjs` | One fixed local port. Proxies `/a-<nonce>` and `/a-<nonce>/...` (GET, HEAD, POST, redirects rewritten to paths) to the loopback form whose latest open `ask-serving` event carries that nonce and whose serve-ask process is alive, in the configured repos' ledgers plus every repo a Telegram notice named. Everything else is 404 and never forwarded (so the public host serves question forms and nothing else, and only while one is served); dot segments are refused; a non-loopback form URL is never a target. Adds `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, `X-Robots-Tag: noindex`. |
-| Tunnel | `scripts/connectors/tunnel.mjs` | Runs cloudflared at the gateway and restarts it when it dies (1 s doubling to 60 s). Always passes its own `--config` (`%LOCALAPPDATA%/StarCi/cloudflared/cloudflared.yml`), so `~/.cloudflared/config.yml` is never read. Records the public base URL in its `tunnel` connectors row. `status` carries `health` (below). |
+| Tunnel | `scripts/connectors/tunnel.mjs` | Runs cloudflared at the gateway and restarts it when it dies (1 s doubling to 60 s). Always passes its own `--config` (`<runtime root>/.runtime/cloudflared/cloudflared.yml`), so `~/.cloudflared/config.yml` is never read. Records the public base URL in its `tunnel` connectors row. `status` carries `health` (below). |
 | Notifier | `scripts/connectors/telegram.mjs` | Called by the kernel's `starci kernel serve-ask` (`serve-ask.mjs parkAsk`): one message with the workflow, the question and its numbered options, in config `language`, and one inline button **Generate URL** (the Vietnamese label for "Generate reply link" when `language` is vi; `callback_data` `ask:<16 hex>`), with NO link. Deduped per ask while its notice is in the chat. `markAskClosed` deletes every message of an ask once it is answered, auto-accepted, retired or superseded (edited to "answered" only where Telegram refuses a delete, e.g. older than 48 h); `sweepAskMessages` is the bridge's reconciler. A missing token or chat id is a no-op with one stderr line; it never throws into its caller. Also `sweep`, `discover-chat` and `test`. |
 | Media | `scripts/connectors/telegram-media.mjs` | Queued by the kernel's `starci kernel settle` (`cmdSettle` calls `queueSettleMedia`, which launches this file detached, so Telegram never slows or fails a settle; its output goes to `machine_logs`). An `interface.draw` / `interface.asset` settled pass sends its drawings as albums of up to 10 (the `draws[]` of the draws.yaml the report names, else the report's final images, else the ui record's `directionAsset`s) - always each drawing's part (page content, overlay panel, layout drawing), never the composite placed into the layout capture (`scripts/work/direction-part.mjs`) with one caption: what was drawn, screens, variants, states, the summary, "review at handover". A `uat.verify` / `uat.assisted.*` / `e2e.verify` settle sends every recorded video (any verdict) captioned with the verdict (PASS / FAIL, in Vietnamese) and the flow's steps from its uat record; a pass with no video sends its screenshots. Images over 10 MB and videos over 50 MB are named by local path instead. Deduped per workflow, job and attempt. |
 
@@ -49,7 +49,7 @@ All connector state lives in `machine.sqlite` ([storage](ledger-db.md) §4), wri
 | Manager output (cloudflared's notable lines, the bridge log, media sends) | `machine_logs` rows (actor `connector`) |
 
 The only file is the cloudflared configuration the tunnel starts with,
-`%LOCALAPPDATA%/StarCi/cloudflared/cloudflared.yml`, rewritten on every start so
+`<runtime root>/.runtime/cloudflared/cloudflared.yml`, rewritten on every start so
 `~/.cloudflared/config.yml` is never read.
 
 The gateway, the tunnel manager and the Telegram bridge are single-instance per host (18 tunnel managers
@@ -144,7 +144,7 @@ starci connect tunnel dry-run           # print the cloudflared argv + generated
 starci connect tunnel start             # detached manager; status | stop | run
 starci connect telegram discover-chat   # after sending the bot /start: chat ids
 starci connect telegram test            # one test message to connectors.telegram.chatId
-starci connect telegram notify --ledger %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite --workflow <id> --dispatch <id> [--repo <repo>]
+starci connect telegram notify --ledger <runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite --workflow <id> --dispatch <id> [--repo <repo>]
                                                      # (re-)send one open ask's notice (deduped while it is in the chat)
 starci connect telegram sweep           # delete the messages of closed asks, drop dead links
 starci connect telegram-media settle --ledger <file> --repo <repo> --workflow <id> --job <id> --attempt <n> --op <op> --verdict <v> [--dispatch <id>]
