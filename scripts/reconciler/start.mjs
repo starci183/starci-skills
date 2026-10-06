@@ -128,7 +128,7 @@ export function applyProfileText(text, profile = PROFILE) {
   let previous = {};
   if (at >= 0) { try { previous = parseYaml(lines.slice(at, end).join('\n'))?.reconciler ?? {}; } catch { previous = {}; } }
   const keep = Object.entries(previous.controllers ?? {}).filter(([n, v]) => profile === PROFILE && !REQUIRED_ACTIVE.includes(n) && ['off', 'shadow', 'active'].includes(v?.mode));
-  const block = ['reconciler:', '  enabled: true', `  profile: ${profile}`, `  controllers: {${keep.map(([n, v]) => `${n}: {mode: ${v.mode}}`).join(', ')}}`];
+  const block = ['reconciler:', '  enabled: true', `  profile: ${profile}`, '  controllers: {' + keep.map(([n, v]) => `${n}: {mode: ${v.mode}}`).join(', ') + '}'];
   const next = at < 0 ? [...lines.filter((l, i, a) => !(i === a.length - 1 && l === '')), ...block, ''] : [...lines.slice(0, at), ...block, ...lines.slice(end)];
   const out = next.join(eol);
   return { text: out, changed: out !== text };
@@ -277,7 +277,7 @@ async function worktreeItems({ env = process.env, repos = [], counts = null } = 
   if (!rows.length) return [green('preflight', 'worktrees', 'worktrees per repo', 'no runtime worktree', { required: false })];
   return rows.map((r) => {
     const id = `worktrees:${path.basename(r.repoRoot)}`, name = `worktrees ${path.basename(r.repoRoot)}`;
-    const orphans = r.orphans.length ? `, ${r.orphans.length} orphan(s): ${r.orphans.slice(0, 3).map((o) => `${o.path} (${o.why})`).join('; ')}` : '';
+    const orphans = r.orphans.length ? ', ' + r.orphans.length + ' orphan(s): ' + r.orphans.slice(0, 3).map((o) => `${o.path} (${o.why})`).join('; ') : '';
     const detail = `${r.live}/${r.cap} runtime, ${r.linked} linked${orphans}`;
     return r.over || r.orphans.length
       ? red('preflight', id, name, detail, 'the reconciler GC controller (key gc:worktrees, always active) preserves and removes them; to run it now: starci machine worktrees gc')
