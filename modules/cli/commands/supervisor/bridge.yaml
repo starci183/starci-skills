@@ -39,6 +39,3 @@ examples:
   - starci supervisor bridge list --repo <path> --json
   - starci supervisor bridge rewire --repo <path> --bridge <id>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/bridge.mjs

@@ -19,8 +19,5 @@ json: flag
 examples:
   - starci guard footprint-scan --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/guards/footprint-scan.mjs
 internal: true
 why: the reconciler Host controller invokes this implementation as an owned internal child

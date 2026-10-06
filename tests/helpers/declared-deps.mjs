@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire, isBuiltin } from 'node:module';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 
 const ts = createRequire(import.meta.url)('typescript');
 
@@ -41,7 +42,7 @@ export function sourceFiles(base, { include, skipDir = (name) => name === 'node_
     }
   };
   walk('');
-  return out.sort();
+  return out.sort(byCodeUnit);
 }
 
 /** Does `expr` anchor module resolution inside the scanned tree: import.meta.* or an anchor name? */

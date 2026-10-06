@@ -14,7 +14,3 @@ examples:
   - starci uat slots status
   - starci uat slots run --record-dir <dir> -- npm test
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/uat/uat-slots.mjs
-  - node .claude/scripts/uat/uat-slots.mjs

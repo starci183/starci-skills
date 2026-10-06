@@ -23,10 +23,6 @@ examples:
   - starci kernel foundations --repo <path> --workflow <workflow>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api foundations
-  - node scripts/kernel/cli.mjs foundations
 reads: every foundation row, every running workflow with its peers and declaration, and the open
   peer-waits with an untilFoundation condition
 writes: nothing

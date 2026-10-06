@@ -4,7 +4,7 @@ goal:
   en: Settle one product's visual identity in the single brand record - colour tokens traced to the
     real source files, typography, mascot, logo, iconography, imagery rules, voice and motion - and
     write the product's layout tree in the single shell record (interface.draw writes it too when it
-    starts from a todo shell - owner ruling 2026-09-29 draw-from-todo, layout capture is no longer
+    starts from a todo shell - owner ruling 2026-09-29 draw-from-todo, layout capture is not
     this op's exclusive gate, a draw never waits for it) - scanned from the frontend's app/
     directory (or planned before one exists), each visible layout captured at desktop and mobile in the
     light theme (dark optional) with its page slot measured, navigation labels out of the i18n catalogs, product locale, demo
@@ -216,7 +216,7 @@ writes:
     path: blob store (+ <STARCI_JOB_SCRATCH>/captures/layouts, attached by starci kernel report) - never .starciwork/shell/assets
     fields: [capture bytes cited by name + sha256 in shell/index.yaml]
     content:
-      en: "Agent data (ARCHITECTURE-DB §5.1): `layout-tree.mjs capture|lockup --write` puts the bytes in the blob store and
+      en: "Agent data (docs/ledger-db.md): `layout-tree.mjs capture|lockup --write` puts the bytes in the blob store and
         the layout tree cites each {name, sha256, ...}. Real browser renders of the running frontend named assets/layouts/<node>--<breakpoint>--<theme>.png -
         each visible layout rendered with the full chain above it, in the productLocale default, the page
         slot's children hidden and the slot filled #FF00FF so its rectangle is measured from the image -

@@ -1,6 +1,6 @@
 // canonical-json.mjs — the one canonical JSON the runtime digests structured values with: object keys
 // sorted, arrays in order, so two equal values always serialize to the same bytes. A leaf beside digest.mjs.
-import {byCodeUnit} from '../scripts/lib/list.mjs';
+import {byCodeUnit} from './by-code-unit.mjs';
 import {isPlainObject} from './plain-object.mjs';
 
 /** The canonical JSON text of `value`: keys sorted at every depth. */

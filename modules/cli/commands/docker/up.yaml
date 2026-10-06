@@ -25,5 +25,3 @@ examples:
   - starci docker up api
   - starci docker up api --env dev --wait-seconds 180 --build --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

@@ -32,5 +32,3 @@ exit: {"0": success, "1": "a refused record, missing layout tree, or slot not fo
 json: flag
 examples: ['starci work layout-tree scan --work .starciwork --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/layout-tree.mjs']

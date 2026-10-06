@@ -226,7 +226,7 @@ sections:
         attachments as content-addressed blobs, then removes scratch. `report.files` names authored
         owned paths, not scratch attachments. Never put operational output in `.starciwork`."
       - "`evidence/` in an op brief is the attempt's evidence folder INSIDE STARCI_JOB_SCRATCH (`<scratch>/evidence/`), never a
-        folder in `.starciwork` (ARCHITECTURE-DB §5.1: evidence/ is agent data). Write the proof manifest and its assets
+        folder in `.starciwork` (docs/ledger-db.md: evidence/ is agent data). Write the proof manifest and its assets
         there and file them with `starci kernel report --job <job> --report <report.json> --attach <scratch>/evidence` (a directory attaches every file under it); each
         becomes the artifact `attachments/evidence/<path>` of this attempt (blob + job_artifacts). The same holds for a
         UAT run (`<scratch>/runs/<runId>/**`, artifacts role uat-run with the run id), app and render captures
@@ -446,9 +446,8 @@ sections:
         index lock itself (no git process on the repository, older than the runtime window) and says
         so on stderr; while it says a git process may still hold it, retry the git command shortly,
         and report blocked environment only if it persists. Never create a git worktree, a junction, a symlink or a hard link, anywhere:
-        work in the checkout you were dispatched to (your workflow's worktree), with its own real node_modules from npm ci. A worker's private
-        worktree beside a product front end with node_modules junctions into the live checkout was removed with
-        a forced raw worktree removal that bypassed `starci machine worktrees-clean`, which followed the junctions and deleted 674 live files;
+        work in the checkout you were dispatched to (your workflow's worktree), with its own real node_modules from npm ci. A forced raw worktree
+        removal that bypasses `starci machine worktrees-clean` follows node_modules junctions into the live checkout and deletes live files;
         a need for another revision, a clean build tree or a linked dependency is
         reported (blocked environment), never made. Never kill processes by image name or pattern
         (`taskkill /IM` or `/FI`, `pkill`, `killall`, `Stop-Process -Name`, `wmic process where name=...`): the

@@ -14,5 +14,3 @@ examples:
   - starci runtime status
 editions:
   - full
-since: 1.0.0-alpha.4
-removed: []

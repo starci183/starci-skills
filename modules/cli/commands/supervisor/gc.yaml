@@ -18,6 +18,3 @@ examples:
   - starci supervisor gc --apply --only agents,shells
   - starci supervisor gc --plan --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/gc.mjs

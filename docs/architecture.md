@@ -47,7 +47,7 @@ Rules that hold everywhere:
 - **The state machines live in the database.** `workflow_transitions` and `job_transitions` are data,
   and triggers refuse every transition they do not list, whatever the calling code does. Reports and
   artifacts are immutable; histories are append-only.
-- **No JSON state files and no text logs.** A fact that used to live in a JSON file or a log is a row.
+- **No JSON state files and no text logs.** A fact is a row.
 - **`.starciwork` holds product content only**: Work records, SRS/SDS, UI specifications and brand.
   Agent output lives in SQL and blobs; a Work record cites it by artifact id and sha256.
 

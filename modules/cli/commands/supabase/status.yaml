@@ -19,5 +19,3 @@ examples:
   - starci supabase status --cwd <app>
   - starci supabase status --cwd <app> --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

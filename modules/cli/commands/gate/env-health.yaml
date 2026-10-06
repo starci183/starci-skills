@@ -25,7 +25,3 @@ examples:
   - starci gate env-health check --repo <repo> --env local --restart
   - starci gate env-health serve --env local --service api --cwd <checkout> -- npm start
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/uat/env-health.mjs
-  - node .claude/scripts/uat/env-health.mjs

@@ -2094,7 +2094,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
 // then reserveTwoPhase flips the job queued → leased with its fencing token
 // and registers the ledger on the machine arbiter. The arbiter is REQUIRED by
 // reserveTwoPhase's signature even for repo-only leases (it registers the
-// ledger; machine leases are gone — machine_ref is always NULL now) — the
+// ledger; machine_ref is always NULL) — the
 // same openMachine handle settle already uses. An open failure returns !ok:
 // a dispatch that cannot fence must not launch.
 // Bounds a crashed worker's fence; settle releases early. One authority:
@@ -2182,7 +2182,7 @@ const buildContractMarkdown = ({ op, jobId, prompt, packet }) =>
 /**
  * The dispatch's attempt and its contract (DBTREE op_attempts + contracts): one op_attempts row per dispatch - the
  * dispatch guard admits it only for a leased job of a running workflow - carrying the job scratch the op reports from
- * (a3-3: starci kernel report reads the report ONLY from op_attempts.scratch_dir), then the contract keyed by that attempt.
+ * (starci kernel report reads the report ONLY from op_attempts.scratch_dir), then the contract keyed by that attempt.
  * Returns the attempt id. Runs inside the caller's transaction.
  */
 const fileContract = (db, { job, op, dispatchId, markdown, context, now, attempt = {} }) => {
@@ -2672,9 +2672,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
 // `reconcile --job <id> --dead-worker --settle-failed`: a dead worker's attempt settled with no
 // human. The watchdog runs it under --repair for every frontier deadWorkerJobs entry: a worker
 // whose agent exited to a bare shell, whose terminal disconnected or vanished, or that stayed quiet
-// past its provider's timeout after a nudge will never file its report, and before this each one
-// became a hand-written incident and four manual steps for the Kernel (29 such
-// incidents in one day). Effect evidence
+// past its provider's timeout after a nudge will never file its report; the repair replaces the manual steps for the Kernel. Effect evidence
 // the owned paths bound (dirty files, commits, a checks row, a worker question, exhausted
 // infrastructure requeues) is what a retry continues from, so the attempt settles failed (reason
 // failed-no-report, reportFiled false: a business attempt spent, engine/admission.mjs
@@ -3216,10 +3214,8 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
 }
 
 // `reconcile --job <id> --release-worker`: prove, and if needed redo, a SETTLED job's worker
-// release. Idempotent: a job whose recorded custody is already released writes nothing. Settle
-// used to answer "release unknown/retained" for a worker whose path leases were released, whose
-// Task was closed and whose agent terminal was already disconnected, and each such receipt became
-// an incident (inc-eb9a21769d69, inc-a253fdf2deda, inc-fbff1e65b60f, inc-d1c5a963c8bb, inc-2ce5f44f858a).
+// release. Idempotent: a job whose recorded custody is already released writes nothing. A worker whose path leases are released, whose
+// Task is closed and whose agent terminal is already disconnected settles as released, not as "release unknown/retained".
 /**
  * The wait that alone holds a running job's settle, or null: its report is filed and consumed, and an
  * open owner-gate or peer-wait incident names it (--holds, else --op) - exactly status heldSettleJobs.
@@ -3721,7 +3717,7 @@ function attributeChecks(db, { repo, job, checks }) {
 
 /* ------------------------------------------------------ the worker's agent */
 // The worker's own agent CLI: its routed provider/model, else Claude for a managed Dispatch (the
-// managed pool's agent). A managed worker used to get Claude's quit input whatever it ran.
+// managed pool's agent).
 // Path leases of a running job whose worker is not proven dead are renewed to a full
 // dispatchLeaseTtlMs once less than half of it is left (starci kernel status). Settle and the dead-worker
 // recovery still release them; only a worker nobody observes can outlive its fence.

@@ -92,10 +92,6 @@ examples:
   - starci kernel graph-edit --repo <path> --workflow <workflow> --edit undo --undo <edit>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api graph-edit
-  - node scripts/kernel/cli.mjs graph-edit
 purpose: "Edit this workflow's own queued units, logged and reversible: drop units whose paths are
   absent, widen a unit inside its repository, add ONE serial wire unit for shared files, continue a
   failed unit's preserved work (preserved/<wf>/<job>) as a continuation unit, retry a failed unit

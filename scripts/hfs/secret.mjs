@@ -16,15 +16,13 @@ import { runProgram } from '../api/process/run-program.mjs';
 import { resolveRealTool } from '../api/process/resolve-real-tool.mjs';
 const sopsInvocation = Object.freeze({runProgram,resolveRealTool});
 import { randomBytes, randomUUID } from 'node:crypto';
-import { claimManager } from '../connectors/lib.mjs';
-import { sha256 } from '../../engine/digest.mjs';
+import { claimFile } from '../api/fs/claim-file.mjs';
 import { isSopsEnvelope } from '../lib/sops-envelope.mjs';
 import { decrypt as sopsDecrypt } from '../api/sops/decrypt.mjs';
 import { seal as sopsSeal } from '../api/sops/seal.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 class SecretError extends Error {}
-// claimManager is process-owned; refuse a recursive same-process write as well.
-const writingSecrets = new Set();
 
 const SLUG = /^[a-z0-9][a-z0-9-]*$/u;
 const KEY = /^[A-Za-z_][A-Za-z0-9_]*$/u;
@@ -118,14 +116,10 @@ function parse(argv) {
 const readStdin = () => fs.readFileSync(0, 'utf8');
 
 /** Seal `key = value` into the secret `slug`: an existing document keeps its other keys and its recipients. */
-function writeSecret({ file, values, age, sops, processEnv = process.env }) {
+function writeSecret({ file, values, age, sops }) {
   for (const key of Object.keys(values)) if (!KEY.test(key)) throw new SecretError(`${key} is not a key name`);
-  const absolute = path.resolve(file), target = process.platform === 'win32' ? absolute.toLowerCase() : absolute;
-  const name = `sealed-secret-${sha256(target)}`;
-  if (writingSecrets.has(name)) throw new SecretError('the sealed secret is being updated; retry after that write settles');
-  const held = claimManager(name, { env: processEnv });
+  const held = claimFile(path.resolve(file));
   if (!held.ok) throw new SecretError('the sealed secret is being updated; retry after that write settles');
-  writingSecrets.add(name);
   try {
   let format = 'json';
   let map = {};
@@ -148,7 +142,7 @@ function writeSecret({ file, values, age, sops, processEnv = process.env }) {
     fs.writeFileSync(temporary, sealed, { flag: 'wx', mode: 0o600, flush: true });
     fs.renameSync(temporary, file);
   } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
-  } finally { writingSecrets.delete(name); held.release(); }
+  } finally { held.release(); }
 }
 
 /** Update named keys through the same canonical sealed-secret owner used by the CLI. */
@@ -157,7 +151,7 @@ export function setSecretValues(repoRoot, { slug, values, env = null }, { sops =
   const file = fileOf(directory, slug);
   if (!values || typeof values !== 'object' || Array.isArray(values) || !Object.keys(values).length) throw new SecretError('secret update requires named values');
   for (const value of Object.values(values)) if (typeof value !== 'string' || value === '') throw new SecretError('secret values must be nonempty strings');
-  writeSecret({ file, values, age, sops: sops ?? defaultSops(processEnv), processEnv });
+  writeSecret({ file, values, age, sops: sops ?? defaultSops(processEnv) });
   return { file, via: 'sealed-secret' };
 }
 
@@ -172,7 +166,7 @@ export function secretMain(argv, { stdout = (s) => process.stdout.write(s), stde
     const key = opts.key ?? DEFAULT_KEY;
     if (verb === 'list') {
       if (opts.positional.length) throw new SecretError('starci app secret list takes no name');
-      const files = fs.existsSync(directory) ? fs.readdirSync(directory).filter((name) => name.endsWith('.enc')).sort() : [];
+      const files = fs.existsSync(directory) ? fs.readdirSync(directory).filter((name) => name.endsWith('.enc')).sort(byCodeUnit) : [];
       for (const name of files) stdout(`${name.slice(0, -'.enc'.length)}  ${envelopeOf(fs.readFileSync(path.join(directory, name), 'utf8')).keys.join(', ')}\n`);
       stdout(`${files.length} secret${files.length === 1 ? '' : 's'} in ${path.relative(repoRoot, directory).split(path.sep).join('/')}\n`);
       return 0;
@@ -193,13 +187,13 @@ export function secretMain(argv, { stdout = (s) => process.stdout.write(s), stde
     if (verb === 'set') {
       const value = String(stdin()).replace(/\r?\n$/u, '');
       if (value === '') throw new SecretError('the value on stdin is empty');
-      writeSecret({ file, values: { [key]: value }, age: opts.age, sops: seam, processEnv: env });
+      writeSecret({ file, values: { [key]: value }, age: opts.age, sops: seam });
       stdout(`sealed ${opts.positional[0]} (${key})\n`);
       return 0;
     }
     const bytes = opts.bytes === undefined ? 32 : Number(opts.bytes);
     if (!Number.isInteger(bytes) || bytes < 16 || bytes > 1024) throw new SecretError('--bytes is a whole number from 16 to 1024');
-    writeSecret({ file, values: { [key]: random(bytes).toString('base64url') }, age: opts.age, sops: seam, processEnv: env });
+    writeSecret({ file, values: { [key]: random(bytes).toString('base64url') }, age: opts.age, sops: seam });
     stdout(`generated and sealed ${opts.positional[0]} (${key}, ${bytes} bytes); read it with starci app secret show\n`);
     return 0;
   } catch (error) {

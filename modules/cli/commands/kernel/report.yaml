@@ -43,10 +43,6 @@ examples:
   - starci kernel report --repo <path> --job <job> --report <report> --attach <file> --outcome done --dispatch-capability <capability> --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api report
-  - node scripts/kernel/cli.mjs report
 reads: "the job row and its OPEN attempt (op_attempts: latest dispatch, no end_state, not settled)
   with its contracts row; the report file under the attempt's STARCI_JOB_SCRATCH
   (op_attempts.scratch_dir) - a starci/op-report@1 JSON envelope {outcome, summary, files[],

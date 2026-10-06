@@ -93,8 +93,7 @@ function renderSupervisorPrompt({ template, doc, settings, restart = null, skill
 /* ------------------------------------------------------------ the seat's denied tools */
 
 /**
- * Tools the Supervisor's own agent may not use. Its in-process subagents (Claude Code's Agent tool, formerly
- * Task) bypass the design - [Worker]s across four providers, leases, staging, the land gate and /status all
+ * Tools the Supervisor's own agent may not use. Its in-process subagents (Claude Code's Agent tool) bypass the design - [Worker]s across four providers, leases, staging, the land gate and /status all
  * see nothing of them (2026-09-24: four "general-purpose" subagents diagnosed clusters). Diagnosis is a
  * [Worker] job too (modules/supervisor/supervisor-prompt.md). worker-start takes no provider argv, so the denial is
  * a seat guard bound to the seat's terminal (bindSeatGuard) that the project PreToolUse hook enforces.

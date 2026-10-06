@@ -16,7 +16,3 @@ examples:
   - starci machine kernel-watchdog --repo <path> --workflow <id> --once
   - starci machine kernel-watchdog --repo <path> --workflow <id> --once --repair
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/kernel/kernel-watchdog.mjs
-  - node .claude/scripts/kernel/kernel-watchdog.mjs

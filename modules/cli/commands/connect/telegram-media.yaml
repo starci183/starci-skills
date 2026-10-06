@@ -19,7 +19,3 @@ json: always
 examples:
   - starci connect telegram-media settle --ledger <file> --workflow <id> --job <id> --op <op> --verdict pass
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/connectors/telegram-media.mjs
-  - node .claude/scripts/connectors/telegram-media.mjs

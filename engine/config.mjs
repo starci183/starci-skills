@@ -7,8 +7,8 @@ import {isPlainObject as plain} from './plain-object.mjs';
 import {invalid,validateRoots} from './invalid-config.mjs';
 import {validateOrca} from './orca-config.mjs';
 import {ENV_NAME,secretEnv,connectorSecret} from './secrets.mjs';
-// config.mjs is copied into a relocated install without scripts/lib, so the error-message name list sorts here (display only).
-const knownNames=names=>[...names].sort((a,b)=>a<b?-1:a>b?1:0).join(', ');
+import {byCodeUnit} from './by-code-unit.mjs';
+const knownNames=names=>[...names].sort(byCodeUnit).join(', ');
 export {readDotenv,connectorSecret} from './secrets.mjs';
 
 export const configRoot=skillRoot;

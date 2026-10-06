@@ -264,3 +264,18 @@ test('the skipped mirror roots are exactly the bundles sync-runtime.mjs writes a
   const { BUNDLES } = await import(pathToFileURL(path.join(skillRoot, 'scripts', 'hfs', 'sync-runtime.mjs')).href);
   assert.deepEqual([...GENERATED_MIRROR_ROOTS].sort(), Object.keys(BUNDLES).sort());
 });
+
+test('a content-addressed blob sidecar of a sample runtime is a store record, not authored JSON; a lookalike is', async t => {
+  const checkJsonExceptions = await loadChecker();
+  const dir = disposable(t, 'starci-json-blob-');
+  fs.mkdirSync(path.join(dir, 'modules', 'kernel'), { recursive: true });
+  const allowlist = path.join(dir, 'modules', 'kernel', 'allowlist.yaml');
+  fs.writeFileSync(allowlist, allowlistDoc('  exceptions: []\n'));
+  const sha = 'ab'.padEnd(64, '1');
+  const store = path.join(dir, 'examples', '.runtimes', 'demo', 'artifacts', 'ab');
+  fs.mkdirSync(store, { recursive: true });
+  fs.writeFileSync(path.join(store, `${sha}.json`), '{"size":1,"mediaType":"text/plain","createdAt":"2026-01-01T00:00:00.000Z"}\n');
+  fs.writeFileSync(path.join(store, 'notes.json'), '{}\n');
+  const result = checkJsonExceptions({ root: dir, allowlistFile: allowlist });
+  assert.deepEqual(result.offenders, ['examples/.runtimes/demo/artifacts/ab/notes.json']);
+});

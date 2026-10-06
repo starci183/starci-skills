@@ -36,7 +36,3 @@ examples:
   - starci gate sonar scan --cwd <repo> --base <rev> --paths src --wait
   - starci gate sonar dashboard --cwd <repo>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/sonar-local.mjs
-  - node .claude/scripts/gates/sonar-local.mjs

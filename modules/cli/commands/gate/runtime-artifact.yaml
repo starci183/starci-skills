@@ -1,0 +1,18 @@
+group: gate
+verb: runtime-artifact
+owner: runtime
+summary: describe the packed runtime archive and refuse forbidden material in it
+impl: {script: scripts/gates/runtime-artifact.mjs}
+flags:
+  - {name: pack, type: string, required: true, summary: the npm pack --json output file}
+  - {name: dir, type: string, required: true, summary: directory holding the tarball}
+  - {name: out, type: string, required: true, summary: "directory that receives the metadata, inventory and checksum files"}
+  - {name: root, type: string, summary: runtime root to read the package identity from}
+exit:
+  "0": archive is clean and the metadata is written
+  "1": forbidden material is in the tarball
+  "2": bad usage or an unreadable input
+json: none
+examples:
+  - starci gate runtime-artifact --pack npm-pack.json --dir pack --out artifact
+editions: [full]

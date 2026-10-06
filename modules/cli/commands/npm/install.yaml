@@ -22,5 +22,3 @@ examples:
   - starci npm install typescript
   - starci npm install left-pad@1.3.0 --dev
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

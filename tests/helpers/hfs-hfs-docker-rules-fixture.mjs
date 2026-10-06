@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 import { cleanup, gitAdd, installTypeScript, writeCleanRepo } from './hfs-cli-fixture.mjs';
 
@@ -14,7 +15,7 @@ const walk = (root, relative = '') => {
     if (entry.isDirectory()) files.push(...walk(root, child));
     else files.push(child);
   }
-  return files.sort();
+  return files.sort(byCodeUnit);
 };
 
 const snapshotOf = (dir) => new Map(dockerRuleFixtureFiles(dir).map((relative) => [relative, fs.readFileSync(path.join(dir, ...relative.split('/')))]));

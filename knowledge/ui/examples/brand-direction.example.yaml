@@ -7,7 +7,7 @@
 #     indicator glyph (size-4, p-1) LEFT of the title in the tone's soft-foreground, the title in that same tone
 #     colour, a muted description, its action the grammar Button in its tone's variant (accent→primary,
 #     danger→danger, else secondary; a warning or success Alert keeps secondary); it has NO tone-filled
-#     background and NO IconTile (an earlier text here wrongly said "tone fill");
+#     background and NO IconTile;
 #   - a capability ratio is DNA `Meter` (its segmented variant, grammar proposal `Meter.segments`, is accepted and
 #     shipped in @starci/grammar 0.5.2 as `Meter segments`); its track spans the full width of its band - the
 #     plain Meter the HeroUI h-2 (8px) track, the segmented one h-1 (4px) in equal segments with small gaps - never

@@ -1,6 +1,6 @@
 {
   "name": "starci",
-  "version": "1.0.5",
+  "version": "1.0.0-alpha.5",
   "description": "StarCi: kernel-agent workflow runtime — one long-lived kernel agent per workflow, one ephemeral op agent per job, a sqlite ledger as the only state.",
   "license": "MIT",
   "type": "module",
@@ -39,12 +39,14 @@
     "examples/.runtimes/shape-slot/runtime.sqlite",
     "scripts/",
     "packages/cli/",
-    "packages/hfs/runtime/",
-    "packages/hfs/templates/app/package-scripts/package.json",
+    "packages/hfs/",
+    "packages/grammar/scripts/build-stamp.mjs",
     "packages/eslint/be/runtime/",
     "packages/eslint/fe/runtime/",
     "!packages/cli/**/*.spec.mjs",
     "!packages/cli/**/node_modules/**",
+    "!packages/hfs/**/*.spec.mjs",
+    "!packages/hfs/**/node_modules/**",
     "!**/secret.env",
     "!ext/sonar/secrets/**",
     "!examples/**/node_modules/",
@@ -79,7 +81,8 @@
     "starci"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "tag": "alpha"
   },
   "dependencies": {
     "libpg-query": "18.1.5",
@@ -88,7 +91,7 @@
   "scripts": {
     "check": "node packages/cli/bin/starci.mjs runtime check",
     "test": "node --import ./tests/setup/low-priority.mjs --import ./tests/setup/isolated-temp.mjs --import ./tests/setup/isolated-registry.mjs --import ./tests/setup/runtime-copies.mjs --test \"tests/**/*.spec.mjs\"",
-    "test:coverage": "node scripts/gates/runtime-coverage.mjs",
+    "test:coverage": "node packages/cli/bin/starci.mjs gate runtime-coverage",
     "starci": "node packages/cli/bin/starci.mjs",
     "release:check": "node packages/cli/bin/starci.mjs release check",
     "release:publish": "node packages/cli/bin/starci.mjs release publish"

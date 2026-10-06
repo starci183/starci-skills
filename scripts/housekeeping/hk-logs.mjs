@@ -42,7 +42,7 @@ const DEFAULT_LOG_CAP_BYTES = LOG_CAP_BYTES;
 
 /**
  * Make the log's directory; a log past `cap` bytes moves to `<log>.1`, replacing the previous one. The one text-log cap
- * convention: the writers that still own a text log call it, the reload loops no longer write one.
+ * convention: the writers that own a text log call it.
  */
 export function rotateLog(log, { cap = LOG_CAP_BYTES } = {}) {
   fs.mkdirSync(path.dirname(log), { recursive: true });

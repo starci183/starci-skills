@@ -25,5 +25,3 @@ examples:
   - starci docker down api
   - starci docker down api --volumes --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

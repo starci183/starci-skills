@@ -64,10 +64,6 @@ examples:
   - starci kernel artifacts --repo <path> --workflow <workflow> --job <job> --kind video
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api artifacts
-  - node scripts/kernel/cli.mjs artifacts
 purpose: Every indexed proof file of the workflow's jobs (job_artifacts), per job; a pure projection.
 reads: the job_artifacts rows of the workflow (engine/db/migrations/runtime/0001-init.sql), joined
   to each job's status

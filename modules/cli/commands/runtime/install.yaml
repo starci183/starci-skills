@@ -26,7 +26,3 @@ examples:
   - starci runtime install --cwd <repo> --hosts claude,devin
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci init
-  - npx starci init

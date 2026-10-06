@@ -14,6 +14,3 @@ examples:
   - starci reconciler status
   - starci reconciler status --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/reconciler/boot.mjs --status

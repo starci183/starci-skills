@@ -66,7 +66,7 @@ and manager claims refuse replacement until that original child has exact closur
 Connector stop requests use the process birth and executable captured by the launching owner. On Windows,
 one verified process handle binds identity, termination and completed exit; the tunnel child also carries a
 fresh launch nonce verified on that handle. The exact manager is closed before its latest owned child is read.
-Missing legacy custody, an unsupported platform, identity conflict or an incomplete call refuses stop and
+Missing custody, an unsupported platform, identity conflict or an incomplete call refuses stop and
 retains the recorded custody. A concurrent new owner is never overwritten. These receipts prove the named
 processes only, not descendants. Native calls are owned by `scripts/api/process/owned-process.mjs`.
 Verified manager closure is retained in the same connector row before child closure is attempted. A retry
@@ -119,12 +119,8 @@ Two kinds of ask, never mixed in one list or one message (owner, 2026-09-25;
 4. **Answer.** serve-ask records `ask-answered`, deletes the ask's messages (`ask-message-closed`) and
    exits, so the gateway stops routing the nonce. `starci kernel retire-ask`, auto-accept and a superseding ask
    delete them the same way. Every poll round (at most once a minute) the bridge sweeps the store: the
-   messages of an ask that closed by any path (including forms started before this runtime) are
+   messages of an ask that closed by any path are
    deleted, and a message still linking to a form that ended goes back to the button notice.
-
-Migration: forms served before this change keep serving and keep their old messages; the next bridge
-run lists them in /asks (a press reuses the live form), and the sweep deletes their messages once they
-are answered.
 
 ## Health and restart
 

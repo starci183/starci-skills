@@ -21,7 +21,3 @@ examples:
   - starci gate run --root <app> --changed be/src/app.service.ts --out gate.json
   - starci gate run --scope docs --tree <app>/.starciwork --out doc-gate.json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/gate.mjs
-  - node .claude/scripts/gates/gate.mjs

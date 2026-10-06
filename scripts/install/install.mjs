@@ -28,6 +28,7 @@ import {entrySkillsPlan, applyEntrySkillsPlan} from './entry-skills.mjs';
 import {doctorInstallation} from './doctor.mjs';
 import {HOST_BOOTSTRAP_FILES, parseHosts} from './bootstrap-hosts.mjs';
 import {runInitialAgeInstall, AGE_TOOL_REASONS} from './initial-age.mjs';
+import {selectedAgeVersions} from '../api/sops/selected-age-versions.mjs';
 export {entrySkillsPlan, applyEntrySkillsPlan};
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -424,8 +425,8 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       const setup = runInitialAgeInstall({repo: path.resolve(opts.dir), force: opts.force, project},
         {...(deps.initialAge ?? {}), env: deps.env ?? process.env});
       log('initial age setup: ' + JSON.stringify(setup));
-      // The init identity needs age-keygen 1.2.1 or 1.3.1 (the versions scripts/api/sops/lib.mjs accepts); the install never skips key generation.
-      if (AGE_TOOL_REASONS[setup.toolReason]) error(pkg.name + ': ' + AGE_TOOL_REASONS[setup.toolReason] + '; init needs age-keygen 1.2.1 or 1.3.1 on PATH (docs/installation.md, Prerequisites). Install it, then run starci runtime install again.');
+      // The init identity needs an accepted age-keygen (scripts/api/sops/selected-age-versions.mjs); the install never skips key generation.
+      if (AGE_TOOL_REASONS[setup.toolReason]) error(pkg.name + ': ' + AGE_TOOL_REASONS[setup.toolReason] + '; init needs age-keygen ' + selectedAgeVersions().join(' or ') + ' on PATH (docs/installation.md, Prerequisites). Install it, then run starci runtime install again.');
       return setup.ok ? 0 : 1;
     }
     if (opts.command === 'doctor') return doctor(opts, log) ? 1 : 0;

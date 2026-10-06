@@ -27,8 +27,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
-import { parseJson } from '../lib/json.mjs';
-import { byCodeUnit } from '../lib/list.mjs';
+import { parseJson } from '../lib/json.mjs'; import { byCodeUnit } from '../lib/list.mjs';
 import { preservedRefOf } from './preserved-ref.mjs';
 import { jobResultSql } from '../machine/job-row.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
@@ -390,8 +389,7 @@ export function canonRedispatchOf(db, jobId, { extraPaths = [] } = {}) {
  * complete path-union manifest and passed-ordinal state"), read from the ledger's cut set at dispatch so the
  * packet carries it: every ordinal's latest live job with its owned paths and status, the path union, the
  * passed and open ordinals, ordinals no job holds yet (`absent`), any overlap between two ordinals' paths, and
- * the cut's canon-wire legs. Before this the packet held only {id, ordinal, total} and slices blocked
- * authority on the missing manifest.
+ * the cut's canon-wire legs.
  */
 export function cutManifestOf(db, { workflowId, op, cut, ownJobId = null }) {
   if (!cut || cut.id == null) return null;

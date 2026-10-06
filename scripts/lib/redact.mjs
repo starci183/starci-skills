@@ -1,4 +1,4 @@
-// redact.mjs — the ONE redaction module (alpha.3, ARCHITECTURE-DB §4.2). Every blob put of text bytes
+// redact.mjs — the ONE redaction module (docs/ledger-db.md). Every blob put of text bytes
 // (report attachments, check stdout/stderr/output, terminal transcripts, CLI sessions) and every log write
 // passes through here first; the harness UI server reuses it. A blob whose bytes went through redactText is
 // stamped blobs.redaction = REDACTION_VERSION; bytes that cannot be filtered (images, video, archives) are

@@ -30,12 +30,6 @@ examples:
   - starci kernel record-checks --repo <path> --job <job> --checks-file <file> --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api record-checks
-  - node scripts/kernel/cli.mjs record-checks
-  - starci api check
-  - node scripts/kernel/cli.mjs check
 inputShape: "{checks:[{name:<non-empty string>, exitCode:<integer>, command?:<string>,
   evidence?:<string>, codes?:[<finding code>], failing?:[<repo-relative file>]}]}. The envelope and
   checks array are mandatory and non-empty. JSON scalars, bare arrays, legacy key/value maps and

@@ -15,7 +15,3 @@ examples:
   - starci route op --kind backend.implement --json
   - starci route op --node-kind ui --intent implement
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/route/route-op.mjs
-  - node .claude/scripts/route/route-op.mjs

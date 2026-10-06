@@ -244,7 +244,7 @@ decisions:
     2 minutes, and never carries the message. The DI in the ledger is the
     message; a busy Kernel loses nothing.
   supervisorRuling: >-
-    The Supervisor never types notices any more: scripts/supervisor/notify.mjs
+    The Supervisor never types notices: scripts/supervisor/notify.mjs
     opens a supervisor-ruling DI (its text is the notice). A ruling supersedes
     your live DIs on the same entity (status superseded) and is first in the
     list: follow it, then resolve it with what you ran.

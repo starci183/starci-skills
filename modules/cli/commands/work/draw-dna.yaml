@@ -12,5 +12,3 @@ exit: {"0": the drawing matches the grammar DNA, "1": findings, "2": bad usage}
 json: flag
 examples: ['starci work draw-dna <render.html> --family starci --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/draw/draw-dna.mjs']

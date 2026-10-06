@@ -33,8 +33,7 @@ import {
 import { contrastRatio as wcagRatio } from '../brand/brand.mjs';
 import { flag as argOf } from '../work-io.mjs';
 import { squash } from '../../lib/clip.mjs'; import { isMain } from '../../lib/is-main.mjs';
-import { alphaOver } from '../../lib/color.mjs';
-import { byCodeUnit } from '../../lib/list.mjs';
+import { alphaOver } from '../../lib/color.mjs'; import { byCodeUnit } from '../../lib/list.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const KNOWLEDGE = path.join(ROOT, 'knowledge', 'ui');

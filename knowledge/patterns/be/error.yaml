@@ -38,30 +38,12 @@ rules:
     rationale: |-
       One class per case is hundreds of files of boilerplate with no type-level exhaustiveness, and a status derived from a
       name suffix is a heuristic; a code enum with a `Record` table makes the compiler prove every code has a kind.
-    cases:
-      - id: case-1
-        when: A capability family
-        write: |-
-          /** Codes of the purchase capability. */
-          export enum PurchaseErrorCode {
-              /** The offer does not exist or is not on sale. */
-              OfferNotFound = "PURCHASE_OFFER_NOT_FOUND",
-              /** The learner already owns the offer. */
-              AlreadyOwned = "PURCHASE_ALREADY_OWNED",
-          }
-          /** How each purchase code travels. */
-          export const PURCHASE_ERROR_KINDS: Record<PurchaseErrorCode, ErrorKind> = {
-              [PurchaseErrorCode.OfferNotFound]: "not-found",
-              [PurchaseErrorCode.AlreadyOwned]: "conflict",
-          }
-          /** The one error class of the purchase capability. */
-          export class PurchaseError extends DomainError<PurchaseErrorCode> {}
     verification:
       automated:
         - BE_ERROR_HOME
       manual:
         - Confirm the family ownership and the public and private error boundary fit the accepted SDS.
-    relatedExamples: []
+    relatedExamples: [named-exception]
   - id: BE-ERROR-2
     title: Codes are capability-prefixed and unique
     kind: mandatory

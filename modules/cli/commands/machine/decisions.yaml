@@ -24,7 +24,3 @@ examples:
   - starci machine decisions supervisor --list
   - starci machine decisions ring --repo <path> --workflow <id>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/machine/decisions.mjs
-  - node .claude/scripts/machine/decisions.mjs

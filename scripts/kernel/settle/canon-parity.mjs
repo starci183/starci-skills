@@ -2,8 +2,8 @@
 // "parity, no new findings" judgement of a canon cut slice, as code the runtime settler runs itself.
 //
 // A code.refactor cut slice (payload.cut + params.canonFamilies) whose worker reported `done` but whose declared
-// checks are red or not re-verifiable used to wait on the Kernel, even when every red was repository residue outside
-// the slice (a peer's moved seam, repo-wide debt, a sibling's edit on the shared checkout). The settler now measures
+// checks are red or not re-verifiable does not wait on the Kernel when every red is repository residue outside
+// the slice (a peer's moved seam, repo-wide debt, a sibling's edit on the shared checkout): the settler measures
 // the slice itself, over its OWNED paths, against its admission base, and settles it only when ALL hold:
 //
 //   (a) canon-scan over the owned paths returns 0 findings              - the slice's own goal is met;

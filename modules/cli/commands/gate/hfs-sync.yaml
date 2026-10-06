@@ -14,7 +14,3 @@ examples:
   - starci gate hfs-sync --repo <product-repo>
   - starci gate hfs-sync --repo <product-repo> --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/hfs-sync.mjs
-  - node .claude/scripts/gates/hfs-sync.mjs

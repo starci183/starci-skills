@@ -22,6 +22,3 @@ examples:
   - starci supervisor land --job <job-id>
   - starci supervisor land --commit <sha> --specs touching --lane <name>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/land.mjs

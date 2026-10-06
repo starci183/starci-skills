@@ -54,10 +54,6 @@ examples:
   - starci kernel decide --repo <path> --workflow <workflow> --close <decision> --result keep --observed <observed>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api decide
-  - node scripts/kernel/cli.mjs decide
 purpose: "Log every idea before acting on it: hypothesis -> action key -> metric, with a baseline
   snapshot of the units that passed their gates; close it next wake with keep|revert and what the
   metric showed. A restarted Kernel reads the log (starci kernel status rca.decisions, decide --list) and

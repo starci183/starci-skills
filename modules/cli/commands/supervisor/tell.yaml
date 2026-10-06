@@ -19,6 +19,3 @@ examples:
   - starci supervisor tell <text> --wait
   - starci supervisor tell --read --since 30m --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/tell.mjs

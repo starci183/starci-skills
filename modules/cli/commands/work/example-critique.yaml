@@ -10,5 +10,3 @@ exit: {"0": records are current or were written, "1": records are stale or the t
 json: none
 examples: ['starci work example-critique --work .starciwork --write']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/example/example-critique.mjs']

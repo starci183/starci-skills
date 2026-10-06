@@ -24,5 +24,3 @@ examples:
   - starci machine worktrees-clean --dry-run
   - starci machine worktrees-clean --only 'lane/dv-*' --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed: [bash cleanup-worktrees.sh]

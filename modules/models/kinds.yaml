@@ -243,8 +243,7 @@ kinds:
   # The identity every drawing and every build reads: one record, one spec, done with a `rev`. It is a decision
   # kind and not a build one - it settles what the product looks like, it never renders a product screen - and it
   # is the only kind that writes the `brand` record, because that record IS its decision.
-  # It also writes the `shell` record - the layout tree (work/layout-tree@1, which superseded the single
-  # work/app-shell@1) - but it is NOT the only writer and NOT the gate of interface.draw any more (owner ruling
+  # It also writes the `shell` record - the layout tree (work/layout-tree@1) - but it is NOT the only writer and NOT the gate of interface.draw (owner ruling
   # 2026-09-29 draw-from-todo: "a draw must start from todo"). The shell is a shared foundation across the workflows of
   # a project (scripts/kernel/shell-foundation.mjs): one workflow at a time draws it, the others wait, so parallel
   # drawings never invent chrome (wf-nivo-modules-agentos). The first `interface.draw` that finds the shell absent, todo

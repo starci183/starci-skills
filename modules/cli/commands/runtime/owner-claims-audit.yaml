@@ -13,6 +13,3 @@ examples:
   - starci runtime owner-claims-audit --repo <repo>
   - starci runtime owner-claims-audit --repo <repo>[,<repo>...] --workflow <id> --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/housekeeping/owner-claims-audit.mjs

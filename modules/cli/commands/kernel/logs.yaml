@@ -38,10 +38,6 @@ examples:
   - starci kernel logs --repo <path> --workflow <workflow> --kinds cmd.run,error --after 100 --limit 50
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api logs
-  - node scripts/kernel/cli.mjs logs
 purpose: The workflow's typed log rows, oldest first; the ledger's events are synced first.
 reads: "the ledger's logs table, after syncing it: the ledger events past the logs' cursor are
   derived into typed rows (op-dispatched -> dispatch, report-filed -> report, checks-recorded -> one

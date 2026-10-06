@@ -75,7 +75,7 @@ export default {
   if (replay && (replay.verdict !== verdict || replay.job.status !== initialJob.status)) {
     throw Object.assign(new Error(`settle ${jobId} must recover its prepared ${replay.verdict} decision without changing dispatch or status`), { code: 'workflow-checkpoint-recovery-conflict' });
   }
-  // A report lives only in the reports table (starci kernel report files it from the job scratch, a3-3 evidence-db-report):
+  // A report lives only in the reports table (starci kernel report files it from the job scratch):
   // settle judges the filed row and never reads a report file. A --report path is ignored.
   if (args.report) console.error(`starci kernel settle WARN: --report ${args.report} is ignored; settle reads the report the job filed (starci kernel report)`);
   {

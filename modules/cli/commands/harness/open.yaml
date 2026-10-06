@@ -17,6 +17,3 @@ json: none
 examples:
   - starci harness open
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node ui/harness-verbs.mjs open

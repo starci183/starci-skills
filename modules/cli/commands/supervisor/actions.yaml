@@ -22,6 +22,3 @@ examples:
   - starci supervisor actions record --item <key> --action <verb> --reason <text>
   - starci supervisor actions digest --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/actions.mjs

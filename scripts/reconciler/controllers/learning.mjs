@@ -2,7 +2,7 @@
 //
 //   learning:tick  every resyncMs (30 min), and at once on runtime-invariant-violated: the invariant violations of the
 //                  window become learning items with signature `inv:<code>` (one item per code, its size the number of
-//                  violations), next to nothing else the old tick fed (the owed actions stay the Workers controller's).
+//                  violations); the owed actions are the Workers controller's.
 //                  scripts/machine/lessons.mjs newHypotheses decides which signatures repeated >= minRepeats with no
 //                  open hypothesis -> ONE Supervisor DI `hypothesis` per signature; measureExperiments judges the
 //                  landed experiments -> ONE Supervisor DI `experiment-revert` per experiment whose revert is due.

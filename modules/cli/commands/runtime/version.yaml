@@ -15,7 +15,3 @@ examples:
   - starci runtime version
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci version
-  - npx starci version

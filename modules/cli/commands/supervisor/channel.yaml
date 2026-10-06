@@ -23,7 +23,3 @@ examples:
   - starci supervisor channel inbox --id main --peek
   - starci supervisor channel reply --id main --text <text> --to <message-id>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/channel.mjs
-  - node .claude/scripts/supervisor/channel.mjs

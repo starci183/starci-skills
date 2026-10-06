@@ -2,20 +2,23 @@ name: ci
 
 # The repository's own gate: `npm run check` (node --check over every runtime .mjs, the ops-registry
 # freshness check, the provider validator) then the full `npm test` suite, on the Node 22 line the
-# engines field requires. It runs ONCE per release, on the push of a v* tag (and when a person dispatches it), never on a branch push or a pull
+# engines field requires. It runs on every push to main, on the push of a v* tag and when a person dispatches it, never on another branch or a pull
 # request (docs/git-governance.md, rule CI_TRIGGERS_RELEASE_ONLY): the release flow runs the same suite locally first.
 #
-# The suite runs ONCE, under Node's built-in coverage (`npm run test:coverage`, scripts/gates/runtime-coverage.mjs), over the runtime's own first-party
-# source (scripts/hfs/runtime-coverage-scope.mjs, docs/releasing.md): it writes coverage/lcov.info. Codecov (flag runtime, informational until a baseline
-# exists) and Sonar (project starci-runtime, the root sonar-project.properties) take it in the tag run only (startsWith(github.ref, refs/tags/v)); a manual
-# dispatch runs the tests and produces the coverage but publishes no measurement. The Codecov upload authenticates with GitHub's OIDC token (use_oidc,
-# permissions id-token: write) and a failed upload fails the job. The runtime is analysed on SonarCloud (https://sonarcloud.io, fixed in this job; the apps and
-# examples use the host's local SonarQube in ext/sonar through examples.yml and never this job): in the tag run, one scan step waits for the quality gate and fails the
-# job on a red gate, and it runs only where secrets.SONAR_TOKEN, vars.SONAR_ORGANIZATION and vars.SONAR_PROJECT_KEY all exist; otherwise a notice names each missing
-# setting (never a silent pass). The root sonar-project.properties carries sources, tests, exclusions and the lcov path; the organization and the project key come from the variables.
+# The suite runs ONCE, under Node's built-in coverage (`starci gate runtime-coverage`), over the runtime's own first-party
+# source (scripts/hfs/runtime-coverage-scope.mjs, docs/releasing.md): it writes coverage/lcov.info. Every run, whichever of the three triggers started it,
+# uploads it to Codecov (flag runtime, informational until a baseline exists). The upload authenticates with GitHub's OIDC token (use_oidc,
+# permissions id-token: write) and a failed upload fails the job. Sonar (project starci-runtime, the root sonar-project.properties) takes it too, in
+# the runs of the branch main (a main push, or a dispatch of main): SonarCloud names an analysis after the checked-out ref, so a tag run would open a
+# branch named after the tag, and the commit of a release tag was already scanned by the main push that carried it. The runtime is analysed on SonarCloud
+# (https://sonarcloud.io, fixed in this job; the apps and examples use the host's local SonarQube in ext/sonar through examples.yml and never this job):
+# one scan step waits for the quality gate and fails the job on a red gate, and it runs only where secrets.SONAR_TOKEN, vars.SONAR_ORGANIZATION and
+# vars.SONAR_PROJECT_KEY all exist; otherwise a notice names each missing setting (never a silent pass). The root sonar-project.properties carries sources,
+# tests, exclusions and the lcov path; the organization and the project key come from the variables.
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 
@@ -24,7 +27,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 
 jobs:
   check-and-test:
@@ -75,10 +78,10 @@ jobs:
         run: npm run check
 
       - name: Test suite with coverage (writes coverage/lcov.info)
-        run: npm run test:coverage
+        run: npm run starci --silent -- gate runtime-coverage
 
       - name: Coverage upload (Codecov, flag runtime)
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
+        if: ${{ !cancelled() }}
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           use_oidc: true
@@ -90,7 +93,7 @@ jobs:
       # SonarCloud analysis of the runtime (full history from the checkout above, for blame and the new-code period). The scan waits for the quality gate
       # (sonar.qualitygate.wait, up to an hour: SonarCloud queues) and the step fails on a red gate.
       - name: Sonar scan (SonarCloud) and quality gate
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' && env.SONAR_PROJECT_KEY != '' }}
+        if: ${{ !cancelled() && github.ref == 'refs/heads/main' && env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' && env.SONAR_PROJECT_KEY != '' }}
         uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1
         timeout-minutes: 75
         with:
@@ -101,7 +104,7 @@ jobs:
             -Dsonar.qualitygate.timeout=3600
 
       - name: Sonar skipped (SonarCloud settings missing)
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && (env.SONAR_TOKEN == '' || env.SONAR_ORGANIZATION == '' || env.SONAR_PROJECT_KEY == '') }}
+        if: ${{ !cancelled() && github.ref == 'refs/heads/main' && (env.SONAR_TOKEN == '' || env.SONAR_ORGANIZATION == '' || env.SONAR_PROJECT_KEY == '') }}
         run: |
           missing=""
           [ -z "$SONAR_TOKEN" ] && missing="$missing secrets.SONAR_TOKEN"

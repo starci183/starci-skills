@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // watchdog.mjs — one liveness pass over one durable Kernel seat. The reconciler's Host controller runs it for every
-// running workflow (scripts/reconciler/controllers/host.mjs, concern host.kernel-seat); it is no longer a loop (owner
-// ruling 2026-09-28 "on error, delete it outright": the reconciler is the only loop). It never plans, routes, dispatches, settles or
+// running workflow (scripts/reconciler/controllers/host.mjs, concern host.kernel-seat); it is not a loop (owner
+// ruling 2026-09-28: the reconciler is the only loop). It never plans, routes, dispatches, settles or
 // finishes a workflow: settles and worker recovery are the Job controller's, quota probes the Resource controller's,
 // housekeeping the GC controller's, the footprint scan the Host controller's own step.
 //

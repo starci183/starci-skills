@@ -12,5 +12,3 @@ exit: {"0": files created, "2": refusal or bad usage}
 json: none
 examples: ['starci app new service be/src/modules/domain/order order', 'starci app new image']
 editions: [full, lite]
-since: 1.0.0
-removed: ['hfs new', 'npx hfs new']

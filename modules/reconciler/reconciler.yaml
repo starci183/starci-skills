@@ -1,7 +1,7 @@
 schema: starci/reconciler@1
 purpose: |-
   The contract of the host's ONE reconciler engine (scripts/reconciler/engine.mjs). Level-triggered controllers read the
-  ledgers and converge them through the existing api verbs; the old loops yield a duty only while the engine owns it.
+  ledgers and converge them through the existing api verbs; the engine owns every duty it covers.
   Design: <tmp>/reconciler-design/DESIGN.md (approved 2026-09-28) §5, §7 (engine), §8 (controllers),
   §8.8 (SLA/Invariant), §10.3 (Decision Item), §11 (decider contract), §12 (liveness). Lanes: LANES.md "Shared contract".
 design: <tmp>/reconciler-design/DESIGN.md
@@ -73,8 +73,8 @@ concerns:
   learning.tick: learning
   sla.report: workflow
 
-# The old loops that yielded per concern (kernel/watchdog loop, resume-all, supervisor tick/watchdog loop,
-# stall-alert) are deleted (owner ruling 2026-09-28 "delete on any error"; modules/kernel/retired-paths.yaml).
+# No separate loop runs a concern the engine covers (kernel/watchdog loop, resume-all, supervisor tick/watchdog loop,
+# stall-alert; modules/kernel/retired-paths.yaml).
 
 routing:
   source: every ledger's events (scripts/reconciler/sources.mjs), per allocation.reconciler.pollMs; the first run of a ledger starts at MAX(seq), no replay
@@ -102,7 +102,7 @@ shadow:
     duty, so a controller is only left in shadow for a first trial. --safe (crash loop) runs every active controller
     as shadow. Every controller lands in shadow; flipping one to active is a separate config change (order: job, host,
     gc, resource, workflow, workers, learning), each after >= 30 min of shadow with `boot.mjs --status` clean.
-  rollback: git revert of the change (there is no old loop to take a duty back); config.yaml reconciler.controllers.<name>.mode off stops the controller
+  rollback: git revert of the change (no separate loop exists to take a duty back); config.yaml reconciler.controllers.<name>.mode off stops the controller
 
 writes:
   rule: |-

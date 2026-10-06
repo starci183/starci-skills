@@ -79,7 +79,7 @@ export function checkHooksAreHooks(input) {
     for (const [name, list] of byName) {
       if (list.length < 2) continue;
       for (const item of list.slice(1)) {
-        const others = list.map(entry => entry.file.rel).filter(rel => rel !== item.file.rel).sort();
+        const others = list.map(entry => entry.file.rel).filter(rel => rel !== item.file.rel).sort(byCodeUnit);
         violations.push({ ruleId: RULE, path: item.file.rel, ...kit.at(item.file.rel, item.file.sourceFile, item.node), domain, helper: name,
           message: `${name} is declared again in hooks domain ${domain} (also in ${others.join(', ')}); a helper the hooks share is written once, in ${domain}.shared.ts.` });
       }

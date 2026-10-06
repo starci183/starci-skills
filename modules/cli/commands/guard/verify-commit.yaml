@@ -19,7 +19,5 @@ json: none
 examples:
   - starci guard verify-commit <old> <new>
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []
 internal: true
 why: git reference-transaction hooks cannot rely on the per-user starci shim being on PATH

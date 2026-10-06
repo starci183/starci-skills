@@ -13,7 +13,3 @@ examples:
   - starci runtime gen-catalog --check
   - starci runtime gen-catalog --write
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/cli/gen-catalog.mjs
-  - node .claude/scripts/cli/gen-catalog.mjs

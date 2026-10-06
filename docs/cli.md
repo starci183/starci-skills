@@ -643,6 +643,25 @@ starci gate hfs-sync --repo <product-repo>
 starci gate hfs-sync --repo <product-repo> --json
 ```
 
+### starci gate install-sandbox
+
+prove the packed runtime tarball installs and runs in an empty home
+
+| flag | type | |
+| --- | --- | --- |
+| `--tarball` | string | required |
+| `--keep` | boolean |  |
+| `--docker` | boolean |  |
+| `--tools` | string |  |
+
+exit: 0 every assertion passed; 1 an assertion failed; 2 bad usage or the sandbox could not run
+
+json: none
+
+```sh
+starci gate install-sandbox --tarball starci-1.0.0-alpha.5.tgz
+```
+
 ### starci gate read
 
 build the recorded READ digest for an operation
@@ -718,6 +737,40 @@ json: always
 ```sh
 starci gate run --root <app> --changed be/src/app.service.ts --out gate.json
 starci gate run --scope docs --tree <app>/.starciwork --out doc-gate.json
+```
+
+### starci gate runtime-artifact
+
+describe the packed runtime archive and refuse forbidden material in it
+
+| flag | type | |
+| --- | --- | --- |
+| `--pack` | string | required |
+| `--dir` | string | required |
+| `--out` | string | required |
+| `--root` | string |  |
+
+exit: 0 archive is clean and the metadata is written; 1 forbidden material is in the tarball; 2 bad usage or an unreadable input
+
+json: none
+
+```sh
+starci gate runtime-artifact --pack npm-pack.json --dir pack --out artifact
+```
+
+### starci gate runtime-coverage
+
+run the runtime spec suite under Node coverage and write coverage/lcov.info
+
+Positionals: specs?
+
+exit: 0 the suite is green; 1 a spec failed; 2 bad usage
+
+json: none
+
+```sh
+starci gate runtime-coverage
+starci gate runtime-coverage tests/cli/catalog.spec.mjs
 ```
 
 ### starci gate sonar
@@ -2841,7 +2894,7 @@ json: flag
 
 ```sh
 starci release cut
-starci release cut --repo <path> --tag v1.0.5 --json
+starci release cut --repo <path> --tag v1.0.0-alpha.5 --json
 ```
 
 ### starci release images

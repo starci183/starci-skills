@@ -26,7 +26,7 @@ watchdog:
     unarchived workflow of the managed ledgers (scripts/kernel/managed-repos.mjs), also after a host
     reboot once Orca answers; it replaces a dead Kernel through start-workflow. A kernel handle a running
     Orca answers terminal_handle_stale for is gone, so nothing is closed and no incident is opened for it.
-    There is no per-workflow watchdog loop and no resume-all (retired 2026-09-28).
+    The reconciler is the only loop that keeps a Kernel seat and resumes workflows.
   boundary: >-
     It never plans, enqueues, routes, dispatches, settles a verdict or finishes
     a workflow. It reads canonical status/survey and the attested Kernel

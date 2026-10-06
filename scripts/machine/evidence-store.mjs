@@ -1,4 +1,4 @@
-// evidence-store.mjs — agent output into runtime.sqlite + the blob store (alpha.3, ARCHITECTURE-DB §4.2, §4.9 H7/H8/H10).
+// evidence-store.mjs — agent output into runtime.sqlite + the blob store (docs/ledger-db.md).
 //
 // Bytes live in the content-addressed store (engine/db/blob.mjs, <runtime root>/.runtime/artifacts/<sha[0:2]>/<sha>);
 // the ledger holds only the index rows that point at them:

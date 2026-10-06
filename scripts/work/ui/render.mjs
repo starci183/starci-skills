@@ -400,7 +400,7 @@ const plainGeneration=value=>value&&typeof value==='object'&&!Array.isArray(valu
 // Generation is structural provenance: a PNG carrying a generation record is direction artwork; a PNG without
 // one is a captured implementation surface. Human prose is descriptive and cannot silently change that class.
 const browserCapture=asset=>!plainGeneration(asset?.generation);
-// alpha.3: an implementation node's captures are the blobs its assets[] cites (scripts/work/impl-captures.mjs),
+// An implementation node's captures are the blobs its assets[] cites (scripts/work/impl-captures.mjs),
 // never files kept under its assets/.
 const implementationCandidates=directory=>{
   const root=path.resolve(directory);

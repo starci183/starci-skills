@@ -10,5 +10,3 @@ exit: {"0": conformant, "1": refused or suspect records, "2": bad usage}
 json: flag
 examples: ['starci work shell-conformance .starciwork --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/ui/shell-conformance.mjs']

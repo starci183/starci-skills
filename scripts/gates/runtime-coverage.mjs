@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// runtime-coverage.mjs - `npm run test:coverage`: the runtime's root node:test suite under Node's built-in coverage, writing coverage/lcov.info.
-//   node scripts/gates/runtime-coverage.mjs [spec files or globs...]     default: tests/**/*.spec.mjs (the whole suite, ~25 minutes)
+// runtime-coverage.mjs - `starci gate runtime-coverage`: the runtime's root node:test suite under Node's built-in coverage, writing coverage/lcov.info.
+//   starci gate runtime-coverage [spec files or globs...]     default: tests/**/*.spec.mjs (the whole suite, ~25 minutes)
 // It is `npm test` (the same glob and the same --import isolation preloads of tests/setup/) plus the coverage options of
 // scripts/hfs/runtime-coverage-scope.mjs: the lcov denominator is the runtime's first-party source and nothing else. A normal spec
 // report goes to stdout and the lcov to coverage/lcov.info (git-ignored). Arguments narrow the run to a subset, which is a smoke test

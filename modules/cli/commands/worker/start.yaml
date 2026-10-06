@@ -28,5 +28,3 @@ examples:
   - starci worker start --agent devin --worktree <path> --spec @brief.md --task-title "CLI worker verbs"
   - starci worker start --agent codex --model gpt-6.1-sol --worktree <path> --spec "Read briefs/worker.md" --task-title "Review worker verbs"
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

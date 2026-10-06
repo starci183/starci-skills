@@ -7,7 +7,7 @@ import { INSTALL_MANIFEST_FILE, INSTALL_PROTOCOL_SCHEMA } from '../lib/install-c
 import { samePath } from '../lib/path-key.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { publishSecret } from '../api/fs/publish-secret.mjs';
-import { withGeneratedAgeIdentity } from '../api/sops/lib.mjs';
+import { withGeneratedAgeIdentity } from '../api/sops/with-generated-age-identity.mjs';
 import { resolveRealTool } from '../api/process/resolve-real-tool.mjs';
 import { runProgram } from '../api/process/run-program.mjs';
 import { acquireHostLock, hostLockOwner, hostLockDir, releaseHostLock } from '../machine/host-lock.mjs';

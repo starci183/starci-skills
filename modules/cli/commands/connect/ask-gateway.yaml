@@ -14,7 +14,3 @@ examples:
   - starci connect ask-gateway status
   - starci connect ask-gateway start --repo <path>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/connectors/ask-gateway.mjs
-  - node .claude/scripts/connectors/ask-gateway.mjs

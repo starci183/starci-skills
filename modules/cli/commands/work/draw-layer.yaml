@@ -11,5 +11,3 @@ exit: {"0": no layer finding, "1": a layer finding, "2": bad usage}
 json: flag
 examples: ['starci work draw-layer <render-dir> --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/draw/draw-layer.mjs']

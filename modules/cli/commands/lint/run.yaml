@@ -24,5 +24,3 @@ examples:
   - starci lint run --level L1 --changed scripts/machine/ladder-lint.mjs
   - starci lint run --level L4 --all
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

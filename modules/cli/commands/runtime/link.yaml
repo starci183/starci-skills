@@ -18,5 +18,3 @@ examples:
   - starci runtime link --root <runtime-checkout>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed: []

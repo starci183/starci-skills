@@ -20,5 +20,3 @@ examples:
   - starci worker read --dispatch <dispatch-id>
   - starci worker read --dispatch <dispatch-id> --lines 200
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

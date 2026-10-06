@@ -17,14 +17,13 @@ import { escapeRegExp } from '../lib/regex.mjs';
 import { loadCommandPolicy } from '../guards/command-policy.mjs';
 
 import { loadInternalRegistry } from './check-cli-parity.mjs';
-import { maskCatalogRemoved, retiredCallsInText, retiredMatchers } from './check-retired-cli.mjs';
 import { rawCommandFindingsInText, rawUseCounts } from './lib/raw-command-scan.mjs';
 
 export const CODE = 'CLI_ONLY_ENTRY';
 export const EXEMPTIONS = Object.freeze({
   dispatcher: Object.freeze(['packages/cli/src/**', 'scripts/cli/main.mjs']),
   testSpawnHelpers: Object.freeze(['tests/**/*.spec.mjs', 'tests/helpers/**']),
-  catalogDeclarations: Object.freeze(['modules/cli/commands/_internal.yaml', 'modules/cli/commands/** removed fields']),
+  catalogDeclarations: Object.freeze(['modules/cli/commands/_internal.yaml']),
   history: Object.freeze(['CHANGELOG*.md']),
   generatedRuntimeCopies: 'packages/*/runtime/**',
   generatedLockfiles: '**/package-lock.json',
@@ -75,10 +74,6 @@ function entryRoutes(catalog) {
     const script = verb.impl?.script ? posix(verb.impl.script) : null;
     const use = `starci ${group.group} ${verb.verb}`;
     if (script) add(script, { use, args: verb.impl.args ?? [] });
-    for (const spelling of verb.removed ?? []) {
-      const match = /^node\s+(?:\.claude[\\/])?((?:engine|scripts|ui|bin|packages[\\/][^\\/]+[\\/](?:bin|src))[\\/][^\s"']+)(?:\s+(.+))?$/.exec(spelling.trim());
-      if (match) add(posix(match[1]), { use, args: match[2]?.trim().split(/\s+/).filter(Boolean) ?? [] });
-    }
   }
   return routes;
 }
@@ -98,17 +93,12 @@ const nodeMatcher = (scripts) => {
   return new RegExp(`(?<![\\w.-])["']?node(?:\\.exe)?["']?[ \\t]+["']?${variable}(?:\\.claude[\\\\/])?(?<script>${body})["']?`, 'gi');
 };
 
-const retiredOverlap = (retired, finding) => retired.some((item) => item.line === finding.line
-  && (finding.spelling.includes(item.spelling) || item.spelling.includes(finding.spelling)));
-
 /** Direct node and npm-run calls in one file. Pure; context is built once per scan. */
 function cliOnlyCallsInText(text, file, context) {
   const rel = posix(file);
   if (fullyExempt(rel)) return [];
   const source = String(text);
-  const searchable = rel.startsWith('modules/cli/commands/') && /\.ya?ml$/.test(rel) ? maskCatalogRemoved(source) : source;
   const ranges = sentenceRanges(source, sentencesOf(source));
-  const retired = retiredCallsInText(source, rel, context.retiredMatchers);
   const findings = [];
   const add = (candidate) => {
     if (!rel.startsWith('modules/cli/commands/') && RETIREMENT_WORD.test(sentenceTextAt(ranges, candidate.at, source))) return;
@@ -124,16 +114,16 @@ function cliOnlyCallsInText(text, file, context) {
       internal: candidate.internal,
       text: lineTextAt(source, candidate.at),
     };
-    if (!retiredOverlap(retired, finding)) findings.push(finding);
+    findings.push(finding);
   };
 
   const matcher = context.nodeMatcher;
   if (matcher) {
     matcher.lastIndex = 0;
-    for (const match of searchable.matchAll(matcher)) {
+    for (const match of source.matchAll(matcher)) {
       const script = posix(match.groups.script);
-      const end = searchable.indexOf('\n', match.index);
-      const rest = searchable.slice(match.index + match[0].length, end < 0 ? searchable.length : end);
+      const end = source.indexOf('\n', match.index);
+      const rest = source.slice(match.index + match[0].length, end < 0 ? source.length : end);
       const use = routeFor(context.routes, script, rest);
       const internal = context.internal.has(script);
       if (!use && !internal) continue;
@@ -142,7 +132,7 @@ function cliOnlyCallsInText(text, file, context) {
   }
 
   const npm = /(?<![\w.-])npm[ \t]+run(?:-script)?[ \t]+([A-Za-z0-9:_-]+)/g;
-  for (const match of searchable.matchAll(npm)) {
+  for (const match of source.matchAll(npm)) {
     const wrapped = context.packageScripts.get(match[1]);
     if (!wrapped) continue;
     add({ at: match.index, kind: 'npm-run', spelling: match[0], script: wrapped.script, use: wrapped.use, internal: wrapped.internal });
@@ -159,7 +149,7 @@ const packageScriptMap = (root, files, read, baseContext) => {
     try { doc = JSON.parse(String(readValue(root, file, read))); } catch { continue; }
     for (const [name, command] of Object.entries(doc.scripts ?? {})) {
       if (typeof command !== 'string') continue;
-      const context = { ...baseContext, packageScripts: new Map(), retiredMatchers: [] };
+      const context = { ...baseContext, packageScripts: new Map() };
       const call = cliOnlyCallsInText(command, file, context).find((finding) => finding.kind === 'node');
       if (call && !out.has(name)) out.set(name, call);
     }
@@ -196,7 +186,6 @@ export function scanCliOnlyEntry(root = DEFAULT_ROOT, { files = null, read = nul
     routes,
     internal: internalPaths,
     nodeMatcher: nodeMatcher(scripts),
-    retiredMatchers: retiredMatchers(parsedCatalog),
   };
   const context = { ...baseContext, packageScripts: packageScriptMap(root, tracked, read, baseContext) };
   const commandPolicy = policy === undefined ? loadCommandPolicy({ root }) : policy;

@@ -1,11 +1,13 @@
 name: runtime-artifact
 
-# A person dispatches this to download the runtime archive of one exact commit: the `npm pack` tarball of the root package, whose
+# Every push to main, and a person dispatching it, produces the runtime archive of one exact commit: the `npm pack` tarball of the root package, whose
 # `files` list is the one release inventory (no second inventory here). It builds, packs and verifies the inventory; it does not run
-# `npm run check` or `npm test` (the release flow runs those, see ci.yml). Trigger is workflow_dispatch only
+# `npm run check` or `npm test` (ci.yml runs those). Triggers are a push to main and workflow_dispatch
 # (docs/git-governance.md, rule CI_TRIGGERS_RELEASE_ONLY).
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -43,7 +45,7 @@ jobs:
       # Writes release-metadata.json, inventory.txt and SHA256SUMS, and exits 1 when the tarball holds host-local or secret
       # material (config.yaml, secret.env, *.sqlite journals, node_modules, .starciwork, logs, .git ...).
       - name: Verify the inventory and write the metadata
-        run: node scripts/gates/runtime-artifact.mjs --pack "$RUNNER_TEMP/npm-pack.json" --dir "$RUNNER_TEMP/pack" --out "$RUNNER_TEMP/out"
+        run: npm run starci --silent -- gate runtime-artifact --pack "$RUNNER_TEMP/npm-pack.json" --dir "$RUNNER_TEMP/pack" --out "$RUNNER_TEMP/out"
 
       - name: Stage and name the artifact
         id: stage

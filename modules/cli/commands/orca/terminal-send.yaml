@@ -15,7 +15,3 @@ examples:
   - starci orca terminal-send --terminal <handle> --text <text>
   - starci orca terminal-send --terminal <handle> --text-file <file> --no-enter
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/api/orca/terminal-send.mjs
-  - node .claude/scripts/api/orca/terminal-send.mjs

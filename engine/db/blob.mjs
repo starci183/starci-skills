@@ -20,6 +20,7 @@ import crypto from 'node:crypto';
 import { starciLocalRoot, runtimeStateDir } from '../runtime-root.mjs';
 import { isSpecRun } from '../../scripts/lib/env.mjs';
 import { insidePath, pathKey } from '../../scripts/lib/path-key.mjs';
+import { byCodeUnit } from '../by-code-unit.mjs';
 
 export const ARTIFACT_ROOT_ENV = 'STARCI_ARTIFACT_ROOT';
 /**
@@ -109,7 +110,7 @@ function publishOnce(destination, bytes) {
     try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
     try { fs.linkSync(temp, destination); }
     catch (error) { if (error.code !== 'EEXIST') throw error; }
-  } finally { if(owned)try { fs.unlinkSync(temp); } catch (error) { if (error.code !== 'ENOENT') throw error; } }
+  } finally { if(owned)fs.rmSync(temp,{force:true}); }
 }
 
 /** Store original bytes under their sha256. A concurrent or repeated put never replaces published bytes. */
@@ -171,7 +172,7 @@ function canonical(value) {
   if (value && typeof value === 'object') {
     if (typeof value.toJSON === 'function') return canonical(value.toJSON());
     if (Array.isArray(value)) return value.map(item => item === undefined ? null : canonical(item));
-    return Object.fromEntries(Object.keys(value).sort().filter(key => value[key] !== undefined).map(key => [key, canonical(value[key])]));
+    return Object.fromEntries(Object.keys(value).sort(byCodeUnit).filter(key => value[key] !== undefined).map(key => [key, canonical(value[key])]));
   }
   return value;
 }
@@ -305,6 +306,19 @@ function bundleManifest(ref, { db = null, root = null } = {}) {
   return doc?.schema === BUNDLE_SCHEMA ? doc : null;
 }
 
+/**
+ * Remove a staging directory this call made: the files it wrote, then the directories above them, deepest first. It never walks a tree: the link-safe
+ * recursive delete is scripts/api/fs/safe-remove.mjs, which the db tier cannot import, and a staging tree holds only what this call created.
+ */
+function dropStaging(staging, written) {
+  const dirs = new Set([staging]);
+  for (const file of written) {
+    if (fs.existsSync(file)) fs.rmSync(file);
+    for (let dir = path.dirname(file); dir !== staging && !dirs.has(dir); dir = path.dirname(dir)) dirs.add(dir);
+  }
+  for (const dir of [...dirs].sort((a, b) => b.length - a.length)) if (fs.existsSync(dir)) fs.rmdirSync(dir);
+}
+
 /** The bundle as a directory beside the store (cached by sha), or null when it or one file is missing. */
 export function bundleDir(ref, { db = null, root = null } = {}) {
   const sha = shaOfRef(ref, { db });
@@ -322,19 +336,22 @@ export function bundleDir(ref, { db = null, root = null } = {}) {
   regularParents(dir, { strict: root !== null });
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   const staging = fs.mkdtempSync(path.join(path.dirname(dir), `.${sha}-`));
+  const written = [];
   try {
     for (const [rel, bytes] of members) {
       const to = path.resolve(staging, ...rel.split('/'));
       const relative = path.relative(staging, to);
       if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) throw new Error(`unsafe blob bundle target: ${rel}`);
       fs.mkdirSync(path.dirname(to), { recursive: true });
+      written.push(to);
       fs.writeFileSync(to, bytes, { flag: 'wx' });
     }
-    fs.writeFileSync(path.join(staging, '.complete'), sha, { flag: 'wx' });
+    written.push(path.join(staging, '.complete'));
+    fs.writeFileSync(written.at(-1), sha, { flag: 'wx' });
     try { fs.renameSync(staging, dir); }
     catch (error) { if (!fs.existsSync(dir) || !verifiedBundle(dir, entries, { strict: root !== null })) throw error; }
   } finally {
-    if (fs.existsSync(staging)) fs.rmSync(staging, { recursive: true, force: true });
+    dropStaging(staging, written);
   }
   if (!verifiedBundle(dir, entries, { strict: root !== null })) throw new Error(`blob bundle publication is incomplete: ${sha}`);
   return dir;

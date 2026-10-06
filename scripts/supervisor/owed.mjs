@@ -46,9 +46,7 @@
 // poll.mjs prints the OWED lines every cycle; the Workers controller opens their Decision Items.
 //
 // A pattern item stays OWED until a success breaks its streak, so a lineage whose causes are already
-// fixed used to re-alert every hour: one workflow's brand.decide a1-a8 failed, fixed by
-// 5069309f2, 7893dcbb0, 7535339ca and 69348e272, then queued behind an owner review ask - four items
-// remaining OWED until the next success. Two ways out:
+// fixed would re-alert every hour. Two ways out:
 //   ack      the supervisor's disposition (`ack --item <key> --commits <csv> --reason <t>`), kept in
 //            machine.sqlite (a sup_owed row in state acked, an owed-acked sup_events row): the item is quiet in
 //            the poll OWED lines until a failure NEWER than the ack lands on its lineage,
@@ -75,8 +73,7 @@ import { clipLine } from '../lib/clip.mjs';
 import { parseJsonOr, withPayload } from '../lib/json.mjs';
 import { minutes } from '../lib/time.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { DECISION_TEXT, CONTRACT_CONFLICT_TEXT, NOTE_KIND, OWNER_ONLY, SUPERVISOR_ADDRESSED, WORKER_DIED_TEXT } from './owed-text.mjs';
-import { shortHash } from '../lib/hash.mjs';
-import { byCodeUnit } from '../lib/list.mjs';
+import { shortHash } from '../lib/hash.mjs'; import { byCodeUnit } from '../lib/list.mjs';
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
 const RETRY_LOOP_MIN = 4;

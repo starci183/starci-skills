@@ -1,8 +1,7 @@
 // waiter-priority.mjs — which open jobs other work waits on, and how long it has waited.
 //
-// A job a peer workflow waits on used to be just another queued row of its own workflow: its Kernel
-// dispatched it in created order, and nothing told it that N workflows sat behind it (one product's AUTH waited
-// on WSPV's op-backend.implement-82b3110067 for hours under inc-9f2e1e7ff1f6). This read-only
+// A job a peer workflow waits on is more than another queued row of its own workflow: its Kernel
+// learns that N workflows sit behind it. This read-only
 // projection finds every waiter of every open job of the ledger:
 //
 //   until-job      an open incident's typed --until-job condition names the job

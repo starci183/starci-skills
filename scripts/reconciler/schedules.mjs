@@ -16,7 +16,7 @@
 //   listSchedules(ctx) -> the rows.
 //
 // `ctx` is the controller's ctx: an engine ctx (it has stateDb) uses machine.sqlite (ctx.env picks the file); a spec's
-// fake ctx (no stateDb) keeps the same rules in memory, per ctx object. A store that cannot be opened (an old-schema
+// fake ctx (no stateDb) keeps the same rules in memory, per ctx object. A store that cannot be opened (an unreadable
 // file) makes nothing due: a duty never runs on a guess.
 import { withMachine, readMachine, pidAlive } from '../../engine/db/machine.mjs';
 

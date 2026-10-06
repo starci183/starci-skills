@@ -22,7 +22,3 @@ examples:
   - starci release sync-runtime --check
   - starci release sync-runtime --prepare-grammar
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/hfs/sync-runtime.mjs
-  - node .claude/scripts/hfs/sync-runtime.mjs

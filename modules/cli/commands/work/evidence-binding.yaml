@@ -10,6 +10,3 @@ json: flag
 examples:
   - 'starci work evidence-binding --work "<.starciwork root>"'
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/work/validate/check-evidence-binding.mjs

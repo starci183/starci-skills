@@ -3,4 +3,3 @@
 group: workflow
 summary: workflow lifecycle — define a goal, start its kernel, status, stop
 owner: runtime
-since: 1.0.0-alpha.4

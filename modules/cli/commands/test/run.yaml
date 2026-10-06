@@ -31,5 +31,3 @@ examples:
   - starci test run --level L2 --against main --json
   - starci test run --level L3 --against main
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

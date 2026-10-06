@@ -17,7 +17,3 @@ examples:
   - starci supervisor gate-stability --family <op> --gate <module#export> --tree <dir>
   - starci supervisor gate-stability --family <op> --gate <module#export> --base <dir> --head <dir> --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/gate-stability.mjs
-  - node .claude/scripts/supervisor/gate-stability.mjs

@@ -7,10 +7,11 @@ import { connectorState, writeConnectorState, stopConnector, claimManager, claim
 import { ensureAskConnectors, managerAlive, runManager } from '../../scripts/connectors/tunnel.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
 import { OWNED_PROCESS_SCHEMA } from '../../scripts/lib/process-identity.mjs';
+import { winPath, slashPath } from '../fixtures/win-path.mjs';
 
-const source = 'D:/fixture-runtime/scripts/connectors/tunnel.mjs';
-const manager = { pid: 4123, birth: '134038224001234567', exe: 'C:\\fixture\\node.exe' };
-const child = { pid: 4124, birth: '134038224001234568', exe: 'C:\\fixture\\cloudflared.exe' };
+const source = slashPath('D', 'fixture-runtime', 'scripts', 'connectors', 'tunnel.mjs');
+const manager = { pid: 4123, birth: '134038224001234567', exe: winPath('C', 'fixture', 'node.exe') };
+const child = { pid: 4124, birth: '134038224001234568', exe: winPath('C', 'fixture', 'cloudflared.exe') };
 const closed = (identity) => ({ schema: OWNED_PROCESS_SCHEMA, pid: identity.pid, ok: true,
   outcome: 'stopped', proof: 'process-handle-signaled', identity });
 // Seed only the private fixture directly, including concurrent owner changes. Production writes are exercised separately below.
@@ -24,7 +25,7 @@ const assertCustody = (actual, expected) => {
 };
 
 test('legacy or conflicting connector custody refuses without any process call or row mutation', (t) => withLedger(t, () => {
-  for (const config of [{ processIdentity: null }, { source: 'D:/other-runtime/tunnel.mjs' }, { processIdentity: { ...manager, pid: 9999 } }]) {
+  for (const config of [{ processIdentity: null }, { source: slashPath('D', 'other-runtime', 'tunnel.mjs') }, { processIdentity: { ...manager, pid: 9999 } }]) {
     put('tunnel', config);
     const before = connectorState('tunnel');
     let calls = 0;

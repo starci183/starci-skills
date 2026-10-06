@@ -42,9 +42,8 @@ properties:
     type: array
     minItems: 1
     uniqueItems: true
-    description: "The criteria that decide whether the statements hold, carried inline since the v11
-      collapse. Each keeps the id its former ac/ record had, so a reference to the old id still resolves and
-      the canonical form is `<this record's id>#<criterion id>`. A criterion here carries no state, change,
+    description: "The criteria that decide whether the statements hold, carried inline.
+      Each keeps its own criterion id, and the canonical form is `<this record's id>#<criterion id>`. A criterion here carries no state, change,
       evidence or provenBy of its own: it shares the rule's, and one that needs its own belongs in a rule of
       its own."
     items:

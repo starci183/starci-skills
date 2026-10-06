@@ -9,5 +9,3 @@ exit: {"0": "knowledge matches the package, or was rewritten", "1": knowledge dr
 json: flag
 examples: ['starci work grammar-knowledge --write']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/ui/grammar-knowledge.mjs']

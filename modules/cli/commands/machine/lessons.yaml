@@ -22,7 +22,3 @@ examples:
   - starci machine lessons list --json
   - starci machine lessons feedback --text <text> --via chat
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/machine/lessons.mjs
-  - node .claude/scripts/machine/lessons.mjs

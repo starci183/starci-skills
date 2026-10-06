@@ -16,6 +16,3 @@ examples:
   - starci supervisor poll --repo <path> --once
   - starci supervisor poll --repo <path> --workflow <id> --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/poll.mjs

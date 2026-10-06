@@ -4,7 +4,7 @@ import path from 'node:path';
 const WORK_YAML = /(^|[\\/])\.starciwork[\\/].*\.ya?ml$/i;
 const WORK_WALK_MAX = 2000;
 /**
- * The Work records a settled job may cite blobs from (a3-3 work-citations, ARCHITECTURE-DB §5.3): the .starciwork yaml
+ * The Work records a settled job may cite blobs from (work-citations, docs/ledger-db.md): the .starciwork yaml
  * files its report names, plus every yaml under the .starciwork paths it owns (a draw-loop bundle's generation.loop,
  * impl assets[] and the shell layout captures are written there without being listed in report.files). Bounded walk.
  */

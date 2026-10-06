@@ -33,10 +33,6 @@ examples:
   - starci kernel retire-ask --repo <path> --workflow <workflow> --dispatch <dispatch> --reason <reason>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api retire-ask
-  - node scripts/kernel/cli.mjs retire-ask
 reads: the reports row that filed that ask; its ask-answered/ask-superseded events
 writes: one event ask-superseded {dispatchId, by:null, opId, retired:true, reason} - the terminal
   kind every open-ask reader already honours - so the owner is no longer asked a question the

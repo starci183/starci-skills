@@ -14,7 +14,3 @@ examples:
   - starci machine op-metrics --by workflow
   - starci machine op-metrics --trend --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/machine/op-metrics.mjs
-  - node .claude/scripts/machine/op-metrics.mjs

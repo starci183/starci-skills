@@ -5,8 +5,8 @@
 # <tmp>/reconciler-design/LANES.md "Shared contract".
 #
 # Mode: config.yaml reconciler.controllers.job.mode (off | shadow | active; lane rc-engine). In shadow every api call,
-# settler run and DI is a would-row (ctx.api / ctx.run / ctx.openDecision); SLA clocks are recorded in every mode. The
-# it is the only owner of these concerns (the old loops are deleted).
+# settler run and DI is a would-row (ctx.api / ctx.run / ctx.openDecision); SLA clocks are recorded in every mode. In
+# active mode the controller is the only owner of these concerns.
 #
 # Keys: job:<ledgerId>:<jobId> | wf:<ledgerId>:<workflowId> | workers:supervisor | overlap:<ledgerId>:<seq>.
 # One job pass does the FIRST due step (DESIGN §8.1 order):

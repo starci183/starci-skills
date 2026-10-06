@@ -1,0 +1,17 @@
+group: gate
+verb: runtime-coverage
+owner: runtime
+summary: run the runtime spec suite under Node coverage and write coverage/lcov.info
+impl: {script: scripts/gates/runtime-coverage.mjs}
+positional:
+  - {name: specs, required: false, variadic: true}
+flags: []
+exit:
+  "0": the suite is green
+  "1": a spec failed
+  "2": bad usage
+json: none
+examples:
+  - starci gate runtime-coverage
+  - starci gate runtime-coverage tests/cli/catalog.spec.mjs
+editions: [full]

@@ -41,6 +41,3 @@ examples:
   - starci reconciler up --check --json
   - starci reconciler up --caller-agent codex --caller-model gpt-6.1-sol --caller-effort high --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/reconciler/start.mjs

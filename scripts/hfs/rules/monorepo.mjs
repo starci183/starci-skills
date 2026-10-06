@@ -98,7 +98,7 @@ function nestFindings(repoRoot, files, beApps) {
   if (!cli) return [found(MONO_NEST_PROJECTS, NEST_CLI, `${NEST_CLI} is not readable JSON.`)];
   const findings = [];
   if (cli.monorepo !== true) findings.push(found(MONO_NEST_PROJECTS, NEST_CLI, `${NEST_CLI} is not \`"monorepo": true\`; the back end is a Nest monorepo of be/apps/<app>, even with one service.`));
-  const declared = beApps.map((app) => app.name).sort();
+  const declared = beApps.map((app) => app.name).sort(byCodeUnit);
   const projects = Object.keys(cli.projects ?? {}).sort(byCodeUnit);
   if (!sameList(projects, declared)) findings.push(found(MONO_NEST_PROJECTS, NEST_CLI, `${NEST_CLI} has projects ${JSON.stringify(projects)}, but hfs.json declares the be apps ${JSON.stringify(declared)}; one project per declared app, no other.`, { projects, declared }));
   for (const name of projects.filter((project) => declared.includes(project))) {

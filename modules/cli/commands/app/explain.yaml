@@ -10,5 +10,3 @@ exit: {"0": path has one owner, "1": path is unowned or ambiguous, "2": refusal 
 json: flag
 examples: ['starci app explain be/src/modules/domain/order/index.ts']
 editions: [full, lite]
-since: 1.0.0
-removed: ['hfs explain', 'npx hfs explain']

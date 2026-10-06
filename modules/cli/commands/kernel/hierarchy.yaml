@@ -23,10 +23,6 @@ examples:
   - starci kernel hierarchy --repo <path> --workflow <workflow>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api hierarchy
-  - node scripts/kernel/cli.mjs hierarchy
 reads: workflow row plus every Kernel/Op job payload for the workflow
 writes: nothing — pure projection
 returns:

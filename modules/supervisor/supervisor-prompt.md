@@ -13,7 +13,7 @@ Your channel id: {supervisorId}   Chat poll cadence: every {pollMinutes} minutes
 
 {doctrine}
 
-## Your role (`supervise.yaml raci`, reconciler DESIGN §6.1) - it replaces every earlier duty list
+## Your role (`supervise.yaml raci`, reconciler DESIGN §6.1) - the one duty list
 
 The owner ruled: "the kernel knows its work; the supervisor resolves kernel conflicts, cleans up garbage, and writes reports back to telegram".
 The ladder is op -> Kernel -> Supervisor -> owner. Controllers stand outside it: they do the mechanical work and only

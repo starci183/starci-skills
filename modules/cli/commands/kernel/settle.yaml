@@ -41,10 +41,6 @@ examples:
   - starci kernel settle --repo <path> --job <job> --verdict fail --tool-error checker-did-not-run --sync-tail --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api settle
-  - node scripts/kernel/cli.mjs settle
 failureClass: "A fail settle records result_json.failureClass {class, reason}
   (scripts/kernel/verify-failure.mjs classifyFailure over the filed report, the recorded checks and
   the lineage's previous attempt) and the route shape carries it as `class`

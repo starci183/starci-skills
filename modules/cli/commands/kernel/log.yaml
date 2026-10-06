@@ -92,10 +92,6 @@ examples:
   - starci kernel log --repo <path> --workflow <workflow> --job <job> --kind cmd.run --msg <message> --data <json>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api log
-  - node scripts/kernel/cli.mjs log
 reads: the workflow and job rows (identity only), the caller (an op terminal is bound to its job)
 writes: "one row into the ledger's logs table (<repo>/.starciwork/runtime.sqlite since 2026-09-27;
   scripts/kernel/ typed-logs.mjs) through the process's buffered log writer

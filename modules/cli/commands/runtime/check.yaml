@@ -22,5 +22,3 @@ examples:
   - starci runtime check --only cli-parity -- --root <tree>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed: []

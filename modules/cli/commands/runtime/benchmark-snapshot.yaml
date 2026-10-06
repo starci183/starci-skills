@@ -15,6 +15,3 @@ examples:
   - starci runtime benchmark-snapshot --since-hours 24
   - starci runtime benchmark-snapshot --since-hours 24 --repo <path> --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/agent/benchmark-snapshot.mjs

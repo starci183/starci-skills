@@ -38,8 +38,9 @@ const OWN_NAMESPACE = /^STARCI_[A-Z0-9_]+$/;
 const VARIABLE_NAME = /^[A-Z][A-Z0-9_]*$/;
 
 /**
- * The environment facts of one source: {reads: [{name, line, direct}], dynamic: [{line, direct}], mentions: [{name, line}]}.
- * `direct` is true for a read of `process.env` itself; a read of an injected `env` or an alias is not direct.
+ * The environment facts of one source: {reads: [{name, line, direct}], dynamic: [{line, direct}], mentions: [{name, line}], literals: [name]}.
+ * `direct` is true for a read of `process.env` itself; a read of an injected `env`, an alias or `readEnv('NAME', ...)` is not direct.
+ * `literals` lists every UPPER_SNAKE string literal: a catalogued name spelled that way (a set of controlled names) is named, not stale.
  */
 export function envFacts(text, rel = 'x.mjs') {
   const t = ts();
@@ -55,6 +56,7 @@ export function envFacts(text, rel = 'x.mjs') {
   const reads = [];
   const dynamic = [];
   const mentions = [];
+  const literals = [];
   const kindOf = (object) => (isProcessEnv(object) ? 'direct' : t.isIdentifier(object) && aliases.has(object.text) ? 'injected' : null);
   const assignedOrDeleted = (node) => {
     const p = node.parent;
@@ -73,12 +75,15 @@ export function envFacts(text, rel = 'x.mjs') {
       }
     } else if (t.isVariableDeclaration(node) && node.initializer && t.isObjectBindingPattern(node.name) && kindOf(node.initializer)) {
       for (const el of node.name.elements) if (t.isIdentifier(el.propertyName ?? el.name) && (kindOf(node.initializer) === 'direct' || VARIABLE_NAME.test((el.propertyName ?? el.name).text))) reads.push({ name: (el.propertyName ?? el.name).text, line: lineOf(source, node), direct: kindOf(node.initializer) === 'direct' });
+    } else if (t.isCallExpression(node) && t.isIdentifier(node.expression) && node.expression.text === 'readEnv' && node.arguments.length > 0 && t.isStringLiteralLike(node.arguments[0])) {
+      reads.push({ name: node.arguments[0].text, line: lineOf(source, node), direct: false });
     } else if (t.isStringLiteralLike(node) && OWN_NAMESPACE.test(node.text)) mentions.push({ name: node.text, line: lineOf(source, node) });
     else if (t.isIdentifier(node) && OWN_NAMESPACE.test(node.text)) mentions.push({ name: node.text, line: lineOf(source, node) });
+    if (t.isStringLiteralLike(node) && VARIABLE_NAME.test(node.text)) literals.push(node.text);
     t.forEachChild(node, visit);
   };
   visit(source);
-  return { reads, dynamic, mentions };
+  return { reads, dynamic, mentions, literals };
 }
 
 /** The catalog's variables: {NAME: {purpose, kind}} and the reader module; throws on an unreadable catalog. */
@@ -93,27 +98,29 @@ export function parseCatalog(text) {
  */
 export function envFindings(files, catalog, failureCodes = new Set()) {
   const findings = [];
-  const known = new Set(Object.keys(catalog.variables));
+  // Windows environment names are case-insensitive (ComSpec is COMSPEC), so names compare upper-cased.
+  const known = new Set(Object.keys(catalog.variables).map((n) => n.toUpperCase()));
   const seen = new Set();
   for (const { rel, text } of files) {
     if (!rel.endsWith('.mjs') || isSpec(rel) || !ENV_ROOTS.some((r) => rel.startsWith(`${r}/`))) continue;
     const owner = rel === catalog.reader;
     const facts = envFacts(text, rel);
     for (const read of facts.reads) {
-      seen.add(read.name);
-      if (!known.has(read.name)) findings.push({ code: 'RT_ENV_UNCATALOGUED', path: rel, line: read.line, message: `${read.name} is read from the environment and is not a variable of ${CATALOG_FILE}: add it with its purpose and kind` });
+      seen.add(read.name.toUpperCase());
+      if (!known.has(read.name.toUpperCase())) findings.push({ code: 'RT_ENV_UNCATALOGUED', path: rel, line: read.line, message: `${read.name} is read from the environment and is not a variable of ${CATALOG_FILE}: add it with its purpose and kind` });
       if (read.name === TEST_RUNNER_VARIABLE && !owner) findings.push({ code: 'RT_TEST_ENV_IN_PRODUCTION', path: rel, line: read.line, message: `${rel} branches on the test runner (${TEST_RUNNER_VARIABLE}): use isSpecRun() of ${catalog.reader}, the one seam` });
       else if (read.direct && !owner) findings.push({ code: 'RT_ENV_READ_OUTSIDE_OWNER', path: rel, line: read.line, message: `${read.name} is read straight from process.env in ${rel}: read it through ${catalog.reader} (readEnv), or take an injected env parameter` });
     }
     for (const d of facts.dynamic) if (d.direct && !owner) findings.push({ code: 'RT_ENV_READ_OUTSIDE_OWNER', path: rel, line: d.line, message: `a name computed at run time is read straight from process.env in ${rel}: read it through ${catalog.reader} (readEnv)` });
+    for (const l of facts.literals) seen.add(l.toUpperCase());
     for (const m of facts.mentions) {
       if (failureCodes.has(m.name)) continue; // a refusal code spelled STARCI_*, owned by the failure-code catalog, not a variable
-      seen.add(m.name);
-      if (!known.has(m.name)) findings.push({ code: 'RT_ENV_UNCATALOGUED', path: rel, line: m.line, message: `${m.name} is an environment variable of the runtime and is not a variable of ${CATALOG_FILE}: add it with its purpose and kind` });
+      seen.add(m.name.toUpperCase());
+      if (!known.has(m.name.toUpperCase())) findings.push({ code: 'RT_ENV_UNCATALOGUED', path: rel, line: m.line, message: `${m.name} is an environment variable of the runtime and is not a variable of ${CATALOG_FILE}: add it with its purpose and kind` });
     }
   }
   for (const [name, entry] of Object.entries(catalog.variables)) {
-    if (!seen.has(name)) findings.push({ code: 'RT_ENV_STALE_ENTRY', path: CATALOG_FILE, line: 1, message: `${name} is in ${CATALOG_FILE} but no production source reads or names it: delete the entry` });
+    if (!seen.has(name.toUpperCase())) findings.push({ code: 'RT_ENV_STALE_ENTRY', path: CATALOG_FILE, line: 1, message: `${name} is in ${CATALOG_FILE} but no production source reads or names it: delete the entry` });
     if (typeof entry?.purpose !== 'string' || !entry.purpose.trim() || !KINDS.includes(entry?.kind)) findings.push({ code: 'RT_ENV_UNCATALOGUED', path: CATALOG_FILE, line: 1, message: `${name} needs a purpose (a sentence) and a kind (${KINDS.join('|')})` });
   }
   return findings;

@@ -3,8 +3,8 @@
 /**
  * Test seam: STARCI_SLEEP_SCALE (a number >= 0, default 1) multiplies every wait. A spec that drives a real
  * dispatch/boot against a fake host sets it small so the card's settle/attestation windows (seconds of pure
- * waiting, counted logically by their callers, not by the wall clock) cost milliseconds and the run no longer
- * depends on machine load. Unset in production.
+ * waiting, counted logically by their callers, not by the wall clock) cost milliseconds and the run does not
+ * depend on machine load. Unset in production.
  */
 import { readEnv } from './env.mjs';
 const scaleOf = () => {

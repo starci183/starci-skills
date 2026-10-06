@@ -78,6 +78,8 @@ examples:
     relatedRules:
       - BE-API-1
       - BE-API-2
+      - BE-CQRS-3
+      - BE-TRANSPORT-1
     files:
       - be/src/features/api/checkout/application/place-order.handler.ts
       - be/src/features/api/checkout/transport/graphql/place-order.resolver.ts
@@ -299,6 +301,62 @@ examples:
       - be/src/features/webhooks/sepay/transport/http/sepay.webhook.spec.ts
       - be/src/modules/domain/payment/payment.service.spec.ts
       - be/src/tests/e2e/billing/sepay-transfer-pays-invoice.e2e-spec.ts
+  - id: cli
+    path: ecommerce-app
+    lane: backend
+    title: "A cli command group, its sub-command and their unit specs"
+    summary: "The migrate group shows its help without a sub-command; the run sub-command makes one delegating call to the migration runner."
+    relatedRules:
+      - BE-CLI-2
+      - BE-CLI-3
+      - BE-CLI-5
+    files:
+      - be/src/features/cli/migrate/migrate.cli.ts
+      - be/src/features/cli/migrate/migrate.cli.spec.ts
+      - be/src/features/cli/migrate/subs/run.cli.ts
+      - be/src/features/cli/migrate/subs/run.cli.spec.ts
+      - be/src/features/cli/migrate/migrate.module.ts
+      - be/src/features/cli/cli.module.ts
+    entrypoint: be/src/features/cli/migrate/migrate.cli.ts
+    projects:
+      - be/tsconfig.json
+    tests:
+      - be/src/features/cli/migrate/migrate.cli.spec.ts
+      - be/src/features/cli/migrate/subs/run.cli.spec.ts
+  - id: injector
+    path: ecommerce-app
+    lane: backend
+    title: "Injectors of a port token and of a module's options"
+    summary: "Each injector sits in its owner's decorators file with a unique-symbol token, a no-argument typed decorator and JSDoc naming the type."
+    relatedRules:
+      - BE-INJECTION-2
+    files:
+      - be/src/modules/platform/clock/clock.decorators.ts
+      - be/src/modules/domain/invoice/invoice.decorators.ts
+    entrypoint: be/src/modules/platform/clock/clock.decorators.ts
+    projects:
+      - be/tsconfig.json
+    tests: []
+  - id: service-spec
+    path: ecommerce-app
+    lane: backend
+    title: "Service specs built through the testing module with kit doubles"
+    summary: "The invoice spec provides an entity manager, clock, inbox, bus and options and asserts refusal and duplicate paths; the session spec provides a cache, a client and ids."
+    relatedRules:
+      - BE-TEST-2
+      - BE-TEST-3
+      - BE-TEST-6
+    files:
+      - be/src/modules/domain/invoice/invoice.service.spec.ts
+      - be/src/modules/domain/session/session.service.spec.ts
+      - be/src/modules/domain/invoice/invoice.service.ts
+      - be/src/modules/domain/session/session.service.ts
+    entrypoint: be/src/modules/domain/invoice/invoice.service.spec.ts
+    projects:
+      - be/tsconfig.json
+    tests:
+      - be/src/modules/domain/invoice/invoice.service.spec.ts
+      - be/src/modules/domain/session/session.service.spec.ts
   - id: connected-block
     path: shape-slot
     lane: frontend

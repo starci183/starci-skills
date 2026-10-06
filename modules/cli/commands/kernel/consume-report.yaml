@@ -23,10 +23,6 @@ examples:
   - starci kernel consume-report --repo <path> --job <job>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api consume-report
-  - node scripts/kernel/cli.mjs consume-report
 reads: the reports row for the job's dispatch_id
 writes: reports.consumed_at = now — the kernel has read and integrated the report into its view of
   the frontier. The kernel consumes BEFORE it re-runs checks and settles; `starci kernel settle` enforces

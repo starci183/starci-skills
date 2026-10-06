@@ -311,11 +311,10 @@ async function clockTruth(row, code, src, { now = Date.now() } = {}) {
 }
 
 /* ------------------------------------------------------------------------------------------------ transcripts */
-// TRANSCRIPT_MISSING (UI-API §2.10): a closed op attempt (op_attempts.terminal_closed_at set) whose full scrollback
+// TRANSCRIPT_MISSING (ui/CONTRACT.md): a closed op attempt (op_attempts.terminal_closed_at set) whose full scrollback
 // never became a blob (transcript_sha NULL), or an ended seat turn (machine seat_turns.ended_at) with no seat transcript
 // snapshot taken at or after its end. The clock starts at the close/end; the catalogue's grace (slaMs) is how long the
-// capture (a3-3: close-op-terminal.mjs, orca-runs.mjs) may take. A ledger or state DB without those tables (the old
-// schema) is skipped. The truth check clears the clock once the transcript exists.
+// capture (close-op-terminal.mjs, orca-runs.mjs) may take. A ledger or state DB without those tables is skipped. The truth check clears the clock once the transcript exists.
 
 const TRANSCRIPT_CODE = 'TRANSCRIPT_MISSING';
 const TRANSCRIPT_WINDOW_MS = 86_400_000;

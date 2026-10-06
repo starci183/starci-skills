@@ -16,7 +16,7 @@
 //              Qualified coverage requires every demanded kind to have exact-command green independent evidence on its settled attempt.
 //   tamper     the report-filed and artifacts-indexed events carry every artifact {id, name, sha256}, so the events
 //              digest chain covers them; verifyProofs re-reads each blob (the store re-hashes it) and walks the chain
-//              (starci kernel verify-proofs). A Work record cites an artifact by id + sha256, never by a path (ARCHITECTURE-DB §5.3).
+//              (starci kernel verify-proofs). A Work record cites an artifact by id + sha256, never by a path (docs/ledger-db.md).
 import fs from 'node:fs';
 import path from 'node:path';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';

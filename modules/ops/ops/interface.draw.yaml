@@ -153,7 +153,7 @@ writes:
     path: blob store (+ <STARCI_JOB_SCRATCH>/captures/layouts) - never .starciwork/shell/assets
     fields: [capture bytes cited by name + sha256 in shell/index.yaml]
     content:
-      en: Layout captures and the lockup crop are agent data (ARCHITECTURE-DB 5.1) exactly as brand.decide writes them
+      en: Layout captures and the lockup crop are agent data (docs/ledger-db.md) exactly as brand.decide writes them
         (`layout-tree.mjs capture|lockup --write` puts the bytes in the blob store and the tree cites name + sha256).
   - id: node
     path: .starciwork/features/<feature>/ui/<name>/index.yaml
@@ -388,7 +388,7 @@ steps:
         section, article, header, footer, main, aside, nav, ul, ol, li) with layout classes on the grammar
         spacing scale (gap/p/m steps 0 1 2 3 4 6 8 = GAP/PADDING-0..6; grid/flex/order/span); a free spacing
         value is named with its rule id in rationale.json (a spacing|layout decision), anything that paints is
-        a grammar component. Hand-written HTML/CSS and storybook or reference screenshots are no longer
+        a grammar component. Hand-written HTML/CSS and storybook or reference screenshots are not
         drawing inputs. Gate it first: `starci work draw-source <XBase>.draw.tsx --fixture <json>
         --product <app dir>` - TypeScript is the first gate (DRAW_TYPECHECK_FAILED: a prop or variant the
         grammar does not publish), then the AST gate (DRAW_OFF_GRAMMAR_COMPONENT, DRAW_RAW_STYLED_HTML,

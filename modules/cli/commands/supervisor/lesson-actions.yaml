@@ -28,7 +28,3 @@ examples:
   - starci supervisor lesson-actions revert --experiment <id> --apply
   - starci supervisor lesson-actions propose --title <text> --evidence <text> --options <text> --recommendation <text>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/lesson-actions.mjs
-  - node .claude/scripts/supervisor/lesson-actions.mjs

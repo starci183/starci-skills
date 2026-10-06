@@ -102,10 +102,6 @@ examples:
   - starci kernel autopilot --repo <path> --workflow <workflow> --defer-to-handover --op <op> --class credential --detail <detail>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api autopilot
-  - node scripts/kernel/cli.mjs autopilot
 reads: modules/models/runtimes.yaml allocation.autopilot; the workflow's asks, incidents, jobs and
   autopilot-* events; the product records a gate reads (draw loop, rationale, brand.direction) -
   scripts/kernel/autopilot-run.mjs

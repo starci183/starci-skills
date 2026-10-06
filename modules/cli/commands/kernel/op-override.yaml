@@ -37,10 +37,6 @@ examples:
   - starci kernel op-override --repo <path> --workflow <workflow> --op <op> --clear --decision <decision>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api op-override
-  - node scripts/kernel/cli.mjs op-override
 purpose: Store an additive override of one op for THIS workflow (notes, commandTimeoutMs,
   difficulty, model, effort); starci kernel dispatch renders it into every later packet of that op
   (context.kernel_override). The shared manifest is never touched - a shared fix is a

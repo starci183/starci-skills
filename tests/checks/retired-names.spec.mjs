@@ -9,6 +9,7 @@ import {
   checkRetiredNames, checkRetiredNamesMain, retiredNameFindings, retiredNameScan, retiredNameTokens,
 } from '../../scripts/checks/check-retired-names.mjs';
 import { RETIRED_PATHS_FILE } from '../../scripts/lib/check-scan.mjs';
+import { slashPath } from '../fixtures/win-path.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..');
 const CHECK = path.join(repoRoot, 'scripts/checks/check-retired-names.mjs');
@@ -212,7 +213,7 @@ test('only valid lock dependency identity, declared command and exact safe packa
     ['prefix path', lock({ ...entry, bin: { tool: 'prefix/bin/tool.mjs' } })],
     ['dot traversal', lock({ ...entry, bin: { tool: './other/../bin/tool.mjs' } })],
     ['absolute path', lock({ ...entry, bin: { tool: '/bin/tool.mjs' } })],
-    ['Windows drive path', lock({ ...entry, bin: { tool: 'C:/bin/tool.mjs' } })],
+    ['Windows drive path', lock({ ...entry, bin: { tool: slashPath('C', 'bin', 'tool.mjs') } })],
     ['backslash path', lock({ ...entry, bin: { tool: 'other\\bin/tool.mjs' } })],
     ['control character', lock({ ...entry, bin: { tool: '\u0001bin/tool.mjs' } })],
     ['not a lock file', lock(entry), canonical, 'examples/app/metadata.json'],

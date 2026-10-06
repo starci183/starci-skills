@@ -1,14 +1,13 @@
-// job-artifacts.mjs — every output a job produced, kept as proof and linked to exactly its attempt (alpha.3,
-// ARCHITECTURE-DB §4.2, §5.2). The bytes are blobs (engine/db/blob.mjs), the index is job_artifacts keyed
-// (attempt_id, name), and nothing is copied into the repository: the old <repo>/.starciwork/kernel-evidence job
-// directory is gone.
+// job-artifacts.mjs — every output a job produced, kept as proof and linked to exactly its attempt
+// (docs/ledger-db.md). The bytes are blobs (engine/db/blob.mjs), the index is job_artifacts keyed
+// (attempt_id, name), and nothing is copied into the repository.
 //   - starci kernel report files the op's own outputs (report attachments and check outputs, api-lib/report-evidence.mjs);
 //   - indexJobArtifacts, when the job settles, adds what the settler owns: the job's commits as a patch (patch.diff)
 //     and the same diff pre-structured for the status console (patch.json + patch.assets/*, patch-json.mjs), and the
 //     Playwright recordings its uat-slots runs wrote outside the repo (recordings/*: video, trace, screenshots);
 //   - every new artifact gets its artifact_proofs row (proof-integrity.mjs) and the event artifacts-indexed carries
 //     {id, name, sha256} of each, so the events digest chain covers them.
-// A Work record cites an artifact by id + sha256 (ARCHITECTURE-DB §5.3, work-citations.mjs), never by a path.
+// A Work record cites an artifact by id + sha256 (docs/ledger-db.md, work-citations.mjs), never by a path.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

@@ -330,6 +330,17 @@ ARCH_TYPESCRIPT_MISSING:
   owner: op-retry
   kind: check-finding
 
+ASSET_BUNDLE:
+  title: "Selected asset bytes fail bundle check"
+  title_vi: "Byte tài sản đã chọn không qua kiểm tra gói"
+  meaning_vi: "Một tài liệu dẫn tới khối lưu có tem sha256, nhưng byte được chọn nằm trong một gói lưu hỏng nên không xác minh được."
+  causes_vi:
+    - "Gói lưu của khối lưu bị cắt cụt hoặc bị sửa"
+    - "Tệp đã lưu không còn khớp với sha256 ghi trong tài liệu"
+  nextStep_vi: "Op sẽ được chạy lại: lưu lại tệp để tạo khối lưu mới rồi cập nhật tem sha256 trong tài liệu."
+  owner: op-retry
+  kind: check-finding
+
 ASSET_DIGEST:
   title: "Asset citation hash mismatch"
   title_vi: "Băm của ảnh dẫn chứng không khớp"
@@ -373,6 +384,17 @@ ASSET_MISSING:
   owner: op-retry
   kind: check-finding
 
+ASSET_ROOT:
+  title: "Artifact read context cannot be established"
+  title_vi: "Không dựng được ngữ cảnh đọc sản phẩm"
+  meaning_vi: "Bộ kiểm tra ví dụ không xác định được kho khối lưu và thư mục công việc để đọc các sản phẩm được dẫn, nên bỏ qua việc kiểm tra tệp đính kèm."
+  causes_vi:
+    - "Thư mục gốc runtime hoặc thư mục công việc không phân giải được"
+    - "Biến môi trường trỏ kho khối lưu tới đường dẫn không hợp lệ"
+  nextStep_vi: "Kiểm tra thư mục gốc runtime và biến STARCI_ARTIFACT_ROOT của lượt kiểm tra, sửa cho trỏ đúng kho khối lưu rồi chạy lại."
+  owner: runtime-core
+  kind: check-finding
+
 ASSET_SLOT_UNFILLED:
   title: "Artwork slot still unfilled"
   title_vi: "Ô ảnh minh hoạ chưa được điền"
@@ -392,6 +414,17 @@ ASSET_STAMP:
     - "Ghi tay mã băm sai độ dài hoặc ký tự"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
+  kind: check-finding
+
+ASSET_STORE:
+  title: "Selected asset bytes cannot be read from the store"
+  title_vi: "Không đọc được byte tài sản đã chọn từ kho"
+  meaning_vi: "Một tài liệu dẫn tới khối lưu có tem sha256, nhưng kho khối lưu được chọn không đọc hoặc không xác minh được byte của nó (lỗi khác với gói lưu hỏng)."
+  causes_vi:
+    - "Kho khối lưu không đọc được hoặc thiếu quyền"
+    - "Tệp khối lưu bị hỏng hoặc đang bị ghi dở"
+  nextStep_vi: "Kiểm tra kho khối lưu được chọn có đọc được không rồi chạy lại phép kiểm tra; nếu khối lưu hỏng thì lưu lại tệp."
+  owner: runtime-core
   kind: check-finding
 
 BAD_ALIAS:
@@ -942,6 +975,16 @@ CANON_INSTALL_MISSING:
   nextStep_vi: "Khai báo và cài đúng phiên bản canon đã ghim từ npm registry rồi chạy lại gate."
   owner: op-retry
   kind: check-finding
+
+FOLLOW_INVALID:
+  title: "HTTP probe follow limit invalid"
+  title_vi: "Giới hạn theo chuyển hướng của probe không hợp lệ"
+  meaning_vi: "Phép probe HTTP nhận số lần theo chuyển hướng không phải số nguyên không âm nên không gửi yêu cầu nào."
+  causes_vi:
+    - "Nơi gọi truyền follow là số âm, số thập phân hoặc không phải số"
+  nextStep_vi: "Sửa nơi gọi probe để truyền follow là số nguyên từ 0 trở lên."
+  owner: runtime-core
+  kind: runtime-fault
 
 GATE_INSTALL_MISSING:
   title: "The gate cannot type-check an app with no install"
@@ -3020,6 +3063,17 @@ HOST_FORBIDDEN:
   owner: op-retry
   kind: check-finding
 
+ID_TYPE:
+  title: "Record id is not a string"
+  title_vi: "Mã bản ghi không phải chuỗi"
+  meaning_vi: "Bản ghi công việc có trường id nhưng giá trị là null, mảng, số hay kiểu khác chứ không phải chuỗi, nên không đăng ký được bản ghi."
+  causes_vi:
+    - "Viết id trong tệp YAML mà không đặt dấu nháy nên bị đọc thành số hoặc null"
+    - "Để trống trường id"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; id phải là một chuỗi."
+  owner: op-retry
+  kind: check-finding
+
 IMPL_APP_DIR_UNREADABLE:
   title: "App folder cannot be read"
   title_vi: "Không đọc được thư mục app"
@@ -4161,6 +4215,27 @@ READY_UNDISPATCHED:
   owner: supervisor
   kind: runtime-fault
 
+READ_LINKED:
+  title: "READ path crosses a link"
+  title_vi: "Đường dẫn READ đi qua liên kết"
+  meaning_vi: "Một đường dẫn READ trong tham chiếu ngữ cảnh đi qua một liên kết tượng trưng (symlink) nên không được đọc."
+  causes_vi:
+    - "Thư mục hoặc tệp trên đường dẫn là symlink hoặc junction"
+  nextStep_vi: "Dẫn thẳng tới tệp thật nằm trong thư mục gốc rồi chạy lại."
+  owner: op-retry
+  kind: input-invalid
+
+READ_ROOT_ESCAPE:
+  title: "READ path leaves its root"
+  title_vi: "Đường dẫn READ thoát khỏi thư mục gốc"
+  meaning_vi: "Đường dẫn READ sau khi phân giải nằm ngoài thư mục gốc của tham chiếu nên không được đọc."
+  causes_vi:
+    - "Đường dẫn dùng .. để đi ra ngoài thư mục gốc"
+    - "Liên kết trỏ ra ngoài thư mục gốc"
+  nextStep_vi: "Dẫn tới tệp nằm trong thư mục gốc của tham chiếu rồi chạy lại."
+  owner: op-retry
+  kind: input-invalid
+
 READ_WITHOUT_EDGE:
   title: "Read of another node path without edge"
   title_vi: "Đọc đường dẫn của nút khác mà không có liên kết"
@@ -4226,6 +4301,16 @@ REDIRECT_INVALID:
   owner: runtime-core
   kind: runtime-fault
 
+REDIRECT_PROTOCOL:
+  title: "HTTP redirect leaves http and https"
+  title_vi: "Chuyển hướng HTTP sang giao thức không hỗ trợ"
+  meaning_vi: "Khi theo chuyển hướng, header Location trỏ tới địa chỉ không dùng http hoặc https nên probe dừng thay vì đi tiếp."
+  causes_vi:
+    - "Dịch vụ được probe chuyển hướng sang giao thức khác như ftp hoặc file"
+  nextStep_vi: "Kiểm tra cấu hình chuyển hướng của dịch vụ được probe rồi chạy lại."
+  owner: runtime-core
+  kind: runtime-fault
+
 REF_MALFORMED:
   title: "Malformed parent#criterion ref"
   title_vi: "Tham chiếu cha#tiêu chí sai dạng"
@@ -4256,6 +4341,17 @@ RENDER_BRAND_MISSING:
     - "Bản ghi thương hiệu lỗi"
   nextStep_vi: "Bằng chứng hiển thị không chạy được; cần bản ghi thương hiệu hợp lệ."
   owner: other-op:brand.decide
+  kind: check-finding
+
+RENDER_CAPTURE_INVALID:
+  title: "Render capture bytes cannot be verified"
+  title_vi: "Không xác minh được byte ảnh chụp kết xuất"
+  meaning_vi: "Bản ghi đã ở trạng thái done nhưng byte ảnh chụp kết xuất được chọn không đọc hoặc không xác minh được từ kho khối lưu."
+  causes_vi:
+    - "Khối lưu của ảnh chụp bị hỏng hoặc không có trong kho"
+    - "Ảnh chụp đã bị thay sau khi ghi sha256"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại: chụp và lưu lại ảnh kết xuất rồi cập nhật bản ghi."
+  owner: op-retry
   kind: check-finding
 
 RENDER_CAPTURE_MISSING:
@@ -4461,13 +4557,14 @@ RIGHTS_PROTECTED_ZONE:
   kind: verb-refusal
 
 RIGHTS_PUSH_NOT_RELEASE:
-  title: "Pre-push release gate refused the push"
-  title_vi: "Cổng phát hành pre-push từ chối lần đẩy"
-  meaning_vi: "Hook pre-push đã chặn một đích không phải refs/backup/* hoặc một lần đẩy main và thẻ v* do release cut tạo, vì HEAD thiếu thẻ annotated hợp lệ hoặc thiếu bản ghi L4 khớp HEAD và thẻ."
+  title: "Pre-push gate refused the push"
+  title_vi: "Cổng pre-push từ chối lần đẩy"
+  meaning_vi: "Hook pre-push đã chặn một đích không phải refs/backup/*, không phải lần đẩy fast-forward của main, và không phải thẻ v* do release cut tạo, vì HEAD thiếu thẻ annotated hợp lệ hoặc thiếu bản ghi L4 khớp HEAD và thẻ."
   causes_vi:
     - "Đích là một nhánh khác, một thẻ không bắt đầu bằng v, hoặc thao tác xóa ref"
+    - "Đẩy main không phải fast-forward của main trên remote (force push, rewind hoặc nhánh rẽ)"
     - "HEAD không mang thẻ annotated v[0-9]* hoặc bản ghi starci-release của HEAD thiếu hay không khớp"
-  nextStep_vi: "Không đẩy trực tiếp; dùng refs/backup/* cho bản sao lưu, hoặc chạy release cut đã được owner duyệt để ghi L4 rồi đẩy main và thẻ v* cùng nhau."
+  nextStep_vi: "Đẩy main fast-forward (không force), dùng refs/backup/* cho bản sao lưu, hoặc chạy release cut đã được owner duyệt để ghi L4 rồi đẩy main và thẻ v* cùng nhau."
   owner: supervisor
   kind: verb-refusal
 
@@ -6049,6 +6146,17 @@ STARCI_LEDGER_ROOT_IS_RUNTIME:
   owner: owner
   kind: input-invalid
 
+STARCI_LEDGER_ROOT_MISMATCH:
+  title: "Ledger belongs to another repository"
+  title_vi: "Sổ cái thuộc về kho mã khác"
+  meaning_vi: "Sổ cái đã đăng ký cho kho mã này ghi repo_root khác, hoặc không ghi, nên bị từ chối thay vì dùng nhầm sổ của kho khác."
+  causes_vi:
+    - "Đăng ký sổ cái trỏ nhầm tệp"
+    - "Tệp sổ cái được chép từ kho mã khác"
+  nextStep_vi: "Giữ nguyên tệp cơ sở dữ liệu, không di trú; chủ hệ thống xác định sổ này thuộc kho nào rồi sửa liên kết đăng ký trước khi chạy lại."
+  owner: owner
+  kind: runtime-fault
+
 STARCI_LEDGER_SCHEMA_REFUSED:
   title: "Ledger schema not supported"
   title_vi: "Lược đồ sổ cái không được hỗ trợ"
@@ -6367,6 +6475,16 @@ TERMINAL_COUNT_DRIFT:
   owner: runtime-core
   kind: runtime-fault
 
+TIMEOUT_INVALID:
+  title: "HTTP probe timeout invalid"
+  title_vi: "Thời hạn chờ của probe không hợp lệ"
+  meaning_vi: "Phép probe HTTP nhận thời hạn chờ không phải số hữu hạn trong khoảng 1 tới 2147483647 mili giây nên không gửi yêu cầu nào."
+  causes_vi:
+    - "Nơi gọi truyền timeoutMs bằng 0, âm, quá lớn hoặc không phải số"
+  nextStep_vi: "Sửa nơi gọi probe để truyền timeoutMs là số mili giây hợp lệ."
+  owner: runtime-core
+  kind: runtime-fault
+
 TITLE_DRIFT:
   title: "Worker tab title not renamed"
   title_vi: "Tên tab của worker chưa được đổi"
@@ -6387,6 +6505,17 @@ TRANSCRIPT_MISSING:
   nextStep_vi: "Chỉ báo cáo; đồng hồ tự tắt khi bản ghi xuất hiện, còn không thì cần xem lại bước chụp bản ghi."
   owner: runtime-core
   kind: runtime-fault
+
+UAT_RESULT_INVALID:
+  title: "UAT result bytes cannot be verified"
+  title_vi: "Không xác minh được byte kết quả nghiệm thu"
+  meaning_vi: "Một lượt chạy UAT dẫn tới tệp kết quả, nhưng byte được chọn không đọc hoặc không xác minh được từ kho khối lưu nên không biết kết quả là đạt hay không."
+  causes_vi:
+    - "Khối lưu của tệp kết quả bị hỏng hoặc không có trong kho"
+    - "Tệp kết quả đã bị thay sau khi ghi sha256"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại: lưu lại tệp kết quả của lượt chạy rồi cập nhật bản ghi."
+  owner: op-retry
+  kind: check-finding
 
 UAT_RUN_AGING:
   title: "UAT run older than code it proves"
@@ -6565,6 +6694,16 @@ URL_INVALID:
     - "URL gõ sai hoặc thiếu giao thức http/https"
     - "Cấu hình môi trường trống"
   nextStep_vi: "Phép kiểm tra môi trường trả trạng thái lỗi; sửa URL trong cấu hình rồi kiểm tra lại."
+  owner: op-retry
+  kind: input-invalid
+
+URL_PROTOCOL:
+  title: "HTTP probe URL is not http or https"
+  title_vi: "Địa chỉ của probe không dùng http hoặc https"
+  meaning_vi: "Phép probe HTTP chỉ hỗ trợ http và https; địa chỉ nhận được dùng giao thức khác nên không gửi yêu cầu nào."
+  causes_vi:
+    - "Cấu hình địa chỉ dùng giao thức như ftp, file hoặc ws"
+  nextStep_vi: "Sửa địa chỉ trong cấu hình để dùng http hoặc https rồi kiểm tra lại."
   owner: op-retry
   kind: input-invalid
 
@@ -7364,6 +7503,17 @@ class-invalid:
   nextStep_vi: "Lệnh bị từ chối; chạy lại với một trong bốn loại cho phép."
   owner: op-retry
   kind: verb-refusal
+close-failed:
+  title: "Publication handle close failed"
+  title_vi: "Đóng tay cầm khi ghi bí mật thất bại"
+  meaning_vi: "Sau khi ghi bí mật, việc đóng tệp hoặc thư mục cha báo lỗi nên không chắc nội dung đã bền; kết quả được ghi là chưa rõ nếu đã có thay đổi."
+  causes_vi:
+    - "Ổ đĩa lỗi hoặc đầy"
+    - "Tay cầm tệp đã bị đóng ở nơi khác"
+  nextStep_vi: "Không coi lần ghi là thành công; đọc lại tệp đích để xác minh trước khi ghi tiếp."
+  owner: runtime-core
+  kind: runtime-fault
+
 code-digest-mismatch:
   title: "Code changed since evidence"
   title_vi: "Mã nguồn đã đổi so với bằng chứng"
@@ -7391,6 +7541,110 @@ config-defect:
   nextStep_vi: "Sự cố giao cho Supervisor để sửa cấu hình rồi giải quyết sự cố."
   owner: supervisor
   kind: blocker
+connector-child-closure-unverified:
+  title: "Connector child closure unverified"
+  title_vi: "Chưa xác nhận tiến trình con của connector đã đóng"
+  meaning_vi: "Đã yêu cầu dừng tiến trình con của connector nhưng biên nhận không chứng minh tiến trình đó đã thoát."
+  causes_vi:
+    - "Tiến trình con không thoát trong thời hạn chờ"
+    - "Biên nhận dừng báo lỗi hoặc thiếu"
+  nextStep_vi: "Kiểm tra tiến trình con còn chạy không, dừng đúng danh tính của nó rồi chạy lại lệnh dừng connector."
+  owner: supervisor
+  kind: runtime-fault
+
+connector-child-custody-unreconciled:
+  title: "Connector child custody unreconciled"
+  title_vi: "Chưa đối chiếu quyền giữ tiến trình con của connector"
+  meaning_vi: "Bản ghi connector còn quyền giữ tiến trình con chưa được đối chiếu nên không cấp khóa máy chủ để khởi động lại."
+  causes_vi:
+    - "Lần dừng trước kết thúc dở, để lại tiến trình con chưa xác nhận"
+  nextStep_vi: "Chạy lệnh dừng connector để đóng và đối chiếu tiến trình con trước khi khởi động lại."
+  owner: supervisor
+  kind: runtime-fault
+
+connector-child-custody-unverified:
+  title: "Connector child custody unverified"
+  title_vi: "Chưa xác minh quyền giữ tiến trình con của connector"
+  meaning_vi: "Bản ghi connector không có danh tính tiến trình con khớp với pid đã ghi nên không dừng được đúng tiến trình đó."
+  causes_vi:
+    - "Bản ghi thiếu danh tính hoặc pid con không khớp danh tính"
+  nextStep_vi: "Kiểm tra tiến trình con bằng tay, dừng nó rồi cập nhật bản ghi connector trước khi chạy lại."
+  owner: supervisor
+  kind: runtime-fault
+
+connector-custody-missing:
+  title: "Connector custody record missing"
+  title_vi: "Thiếu bản ghi quyền giữ connector"
+  meaning_vi: "Lệnh dừng connector không tìm thấy bản ghi của connector nên không biết tiến trình nào cần dừng."
+  causes_vi:
+    - "Connector chưa từng được khởi động hoặc bản ghi đã bị xóa"
+  nextStep_vi: "Kiểm tra tên connector; nếu tiến trình vẫn chạy thì dừng bằng tay rồi khởi động lại connector."
+  owner: supervisor
+  kind: runtime-fault
+
+connector-manager-closure-unverified:
+  title: "Connector manager closure unverified"
+  title_vi: "Chưa xác nhận tiến trình quản lý connector đã đóng"
+  meaning_vi: "Đã yêu cầu dừng tiến trình quản lý connector nhưng biên nhận không chứng minh nó đã thoát hoặc việc dừng bị từ chối."
+  causes_vi:
+    - "Tiến trình quản lý không thoát trong thời hạn chờ"
+    - "Việc dừng bị từ chối vì danh tính không khớp"
+  nextStep_vi: "Kiểm tra tiến trình quản lý còn chạy không, dừng đúng danh tính của nó rồi chạy lại lệnh dừng."
+  owner: supervisor
+  kind: runtime-fault
+
+connector-owner-changed:
+  title: "Connector owner changed during stop"
+  title_vi: "Chủ connector đổi trong lúc dừng"
+  meaning_vi: "Bản ghi connector đổi chủ giữa lúc đọc và lúc ghi biên nhận dừng nên lệnh dừng không ghi đè."
+  causes_vi:
+    - "Một tiến trình khác khởi động hoặc dừng cùng connector đồng thời"
+  nextStep_vi: "Đọc lại trạng thái connector rồi chạy lại lệnh dừng khi không còn tiến trình nào khác thao tác."
+  owner: supervisor
+  kind: runtime-fault
+
+connector-process-custody-required:
+  title: "Connector process identity required"
+  title_vi: "Cần danh tính tiến trình của connector"
+  meaning_vi: "Bản ghi connector không có danh tính tiến trình khớp pid nên không được dừng theo pid trần."
+  causes_vi:
+    - "Bản ghi được ghi trước khi lấy danh tính tiến trình"
+    - "pid trong bản ghi không khớp danh tính"
+  nextStep_vi: "Xác minh tiến trình bằng tay, dừng nó nếu đúng rồi khởi động lại connector để có bản ghi đầy đủ."
+  owner: supervisor
+  kind: runtime-fault
+
+connector-source-conflict:
+  title: "Connector source conflict"
+  title_vi: "Nguồn connector xung đột"
+  meaning_vi: "Bản ghi connector thuộc về một nguồn khác với nguồn đang yêu cầu dừng nên không bị dừng."
+  causes_vi:
+    - "Hai nguồn dùng chung tên connector"
+  nextStep_vi: "Dùng đúng nguồn đã khởi động connector để dừng, hoặc đổi tên connector cho khác nhau."
+  owner: supervisor
+  kind: runtime-fault
+
+connector-state-unreadable:
+  title: "Connector state unreadable"
+  title_vi: "Không đọc được trạng thái connector"
+  meaning_vi: "Lệnh dừng không đọc được bản ghi connector từ cơ sở dữ liệu máy nên kết quả được ghi là chưa rõ."
+  causes_vi:
+    - "Cơ sở dữ liệu máy bị khóa hoặc hỏng"
+    - "Lỗi đọc thoáng qua"
+  nextStep_vi: "Kiểm tra cơ sở dữ liệu máy đọc được không rồi chạy lại lệnh dừng."
+  owner: runtime-core
+  kind: runtime-fault
+
+connector-stop-record-refused:
+  title: "Connector stop record refused"
+  title_vi: "Bản ghi dừng connector bị từ chối"
+  meaning_vi: "Tiến trình quản lý đã dừng nhưng việc ghi biên nhận dừng vào bản ghi connector bị từ chối hoặc lỗi nên trạng thái chưa rõ."
+  causes_vi:
+    - "Bản ghi đổi chủ hoặc cơ sở dữ liệu từ chối ghi"
+  nextStep_vi: "Đọc lại bản ghi connector, xác minh tiến trình con rồi chạy lại lệnh dừng để hoàn tất biên nhận."
+  owner: supervisor
+  kind: runtime-fault
+
 continue-exists:
   title: "Continuation already exists"
   title_vi: "Việc tiếp nối đã có sẵn"
@@ -8124,16 +8378,6 @@ feedback-empty:
   nextStep_vi: "Không ghi gì; người gọi gửi lại kèm nội dung."
   owner: supervisor
   kind: input-invalid
-follow-up-of-unknown:
-  title: "Follow-up source job unknown"
-  title_vi: "Không thấy việc gốc của việc nối tiếp"
-  meaning_vi: "Việc nối tiếp bị từ chối vì việc gốc được nêu không thuộc luồng việc này."
-  causes_vi:
-    - "sai mã việc gốc"
-    - "việc gốc thuộc luồng khác"
-  nextStep_vi: "Không tạo việc; người xếp việc nhập lại đúng mã việc gốc."
-  owner: supervisor
-  kind: input-invalid
 foreign-hook:
   title: "Foreign git hook present"
   title_vi: "Có hook git không phải của hệ thống"
@@ -8237,6 +8481,16 @@ foundations-undeclared:
   nextStep_vi: "Việc không được xếp; luồng việc khai báo nền tảng (hoặc khai báo không có) rồi xếp lại."
   owner: supervisor
   kind: dispatch-refusal
+frame-cue:
+  title: "Provider read from screen frame cue"
+  title_vi: "Nhà cung cấp chỉ đoán từ dấu hiệu trên màn hình"
+  meaning_vi: "Danh tính nhà cung cấp của terminal chỉ được suy ra từ dấu hiệu trên màn hình nên chỉ là gợi ý và không cho phép gõ lệnh thoát."
+  causes_vi:
+    - "Siêu dữ liệu và tiêu đề terminal không nêu nhà cung cấp"
+  nextStep_vi: "Không gõ lệnh dựa trên gợi ý này; đóng terminal qua đường đóng đã xác minh hoặc gắn danh tính rõ cho terminal."
+  owner: runtime-core
+  kind: dispatch-refusal
+
 gate-busy:
   title: "Land gate is busy"
   title_vi: "Cổng đưa mã vào đang bận"
@@ -8362,6 +8616,27 @@ hub-blocker:
   nextStep_vi: "Bộ phân tích phụ thuộc báo cho Supervisor để nối, chuyển hoặc chỉ định lại người làm việc chặn đó."
   owner: supervisor
   kind: blocker
+identity-ambiguous:
+  title: "Terminal metadata names several providers"
+  title_vi: "Siêu dữ liệu terminal nêu nhiều nhà cung cấp"
+  meaning_vi: "Một trường siêu dữ liệu của terminal nhắc tới nhiều nhà cung cấp nên danh tính không xác định và không được gõ lệnh thoát."
+  causes_vi:
+    - "Nhãn terminal chứa tên của hai nhà cung cấp"
+  nextStep_vi: "Đặt lại nhãn terminal cho nêu đúng một nhà cung cấp, hoặc đóng qua đường đóng đã xác minh."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+identity-mismatch:
+  title: "Ledger identity differs from registry"
+  title_vi: "Danh tính sổ cái khác với đăng ký"
+  meaning_vi: "Sổ cái được mở mang ledger_id khác với ledger_id mà đăng ký chờ đợi nên bị coi là sổ khác."
+  causes_vi:
+    - "Tệp sổ cái bị thay hoặc chép từ nơi khác"
+    - "Đăng ký trỏ nhầm tệp"
+  nextStep_vi: "Không dùng tệp này; xác định sổ cái đúng của đăng ký và khôi phục hoặc sửa đăng ký."
+  owner: supervisor
+  kind: runtime-fault
+
 in-flight:
   title: "Repair job already in flight"
   title_vi: "Việc sửa đang được chạy sẵn"
@@ -8409,6 +8684,28 @@ infra-provider:
   nextStep_vi: "Sự cố được mở với loại này; Supervisor xem xét, chờ mạch nhà cung cấp phục hồi hoặc đổi nhà cung cấp."
   owner: supervisor
   kind: blocker
+integrity-failed:
+  title: "Ledger quick check failed"
+  title_vi: "Kiểm tra nhanh sổ cái thất bại"
+  meaning_vi: "PRAGMA quick_check của sổ cái trả về lỗi thay vì ok nên tệp có thể bị hỏng."
+  causes_vi:
+    - "Ổ đĩa lỗi hoặc tệp bị ghi dở"
+    - "Tệp bị sửa ngoài runtime"
+  nextStep_vi: "Giữ nguyên tệp, khôi phục từ bản sao lưu gần nhất rồi kiểm tra lại."
+  owner: supervisor
+  kind: runtime-fault
+
+invalid-request:
+  title: "Secret publication request invalid"
+  title_vi: "Yêu cầu ghi bí mật không hợp lệ"
+  meaning_vi: "Yêu cầu ghi bí mật bị từ chối trước khi chạm vào đĩa vì tham số không hợp lệ: nền tảng không hỗ trợ, thư mục gốc không tuyệt đối, tên tệp không an toàn, dữ liệu rỗng hoặc vượt giới hạn."
+  causes_vi:
+    - "Tên tệp chứa dấu phân cách đường dẫn"
+    - "Phần thêm vào rỗng hoặc làm tệp vượt giới hạn byte"
+  nextStep_vi: "Sửa tham số của nơi gọi rồi gửi lại; không có gì đã bị ghi."
+  owner: runtime-core
+  kind: input-invalid
+
 job-foreign:
   title: "Job belongs to another workflow"
   title_vi: "Việc thuộc quy trình khác"
@@ -8586,6 +8883,17 @@ kernel-proposal:
   nextStep_vi: "Mục quyết định được đưa vào hàng đợi của Supervisor để chấp nhận hoặc từ chối."
   owner: supervisor
   kind: blocker
+kernel-seat-publication-failed:
+  title: "Kernel seat publication failed"
+  title_vi: "Công bố chỗ ngồi của Kernel thất bại"
+  meaning_vi: "Kernel đã được khởi chạy nhưng bước công bố cuối cùng vào sổ cái bị lỗi nên lần khởi động bị hủy và worker vừa tạo được thu dọn."
+  causes_vi:
+    - "Sổ cái bị khóa hoặc từ chối ghi"
+    - "Quyền khởi động đổi trong lúc chờ Orca"
+  nextStep_vi: "Kiểm tra sổ cái ghi được không rồi khởi động lại workflow; xem cleanup trong kết quả nếu chưa rõ worker đã đóng chưa."
+  owner: supervisor
+  kind: runtime-fault
+
 kernel-stale-cleared:
   title: "Stale Kernel seat cleared"
   title_vi: "Ghế Kernel chết đã được dọn"
@@ -8605,6 +8913,17 @@ kernel-stale-terminal-unclosed:
   nextStep_vi: "Một sự cố lỗi runtime được mở cho Supervisor dọn cửa sổ đó thủ công."
   owner: supervisor
   kind: runtime-fault
+kernel-start-reservation-lost:
+  title: "Kernel start reservation lost"
+  title_vi: "Mất giữ chỗ khởi động Kernel"
+  meaning_vi: "Khi công bố Kernel đã khởi chạy, phiếu giữ chỗ khởi động không còn thuộc tiến trình này (sai token, sai pid giữ, không ở trạng thái starting hoặc đã hết hạn) nên không công bố."
+  causes_vi:
+    - "Một lần khởi động khác đã chiếm chỗ"
+    - "Phiếu giữ chỗ hết hạn trong lúc chờ Orca"
+  nextStep_vi: "Khởi động lại workflow để lấy phiếu giữ chỗ mới."
+  owner: supervisor
+  kind: runtime-fault
+
 kind-invalid:
   title: "Provider kind is invalid"
   title_vi: "Loại lỗi nhà cung cấp không hợp lệ"
@@ -8882,6 +9201,16 @@ measurement-findings-are-the-result:
   nextStep_vi: "Chốt bị từ chối kiểu thất bại; ghi phát hiện làm kết quả đo rồi chốt lại."
   owner: op-retry
   kind: settle-reason
+metadata-label:
+  title: "Provider read from terminal metadata label"
+  title_vi: "Nhà cung cấp chỉ đoán từ nhãn siêu dữ liệu"
+  meaning_vi: "Nhãn siêu dữ liệu của terminal có nhắc tên một nhà cung cấp nhưng không phải trường khai báo rõ nên chỉ là gợi ý và không cho phép gõ lệnh thoát."
+  causes_vi:
+    - "Terminal chỉ có nhãn mô tả, không có trường nhà cung cấp"
+  nextStep_vi: "Không gõ lệnh dựa trên gợi ý này; gắn danh tính rõ cho terminal hoặc đóng qua đường đóng đã xác minh."
+  owner: runtime-core
+  kind: dispatch-refusal
+
 missing-account:
   title: "No account for provider"
   title_vi: "Không có tài khoản cho nhà cung cấp"
@@ -9022,6 +9351,89 @@ orca-worktree-create-failed:
   nextStep_vi: "Không có cây nào được tạo. Mở Orca, kiểm tra repo đã có trong Orca (scripts/api/orca/repo-add.mjs) rồi khởi động lại workflow."
   owner: runtime-core
   kind: runtime-fault
+process-call-incomplete:
+  title: "Process call did not complete"
+  title_vi: "Lời gọi xử lý tiến trình chưa hoàn tất"
+  meaning_vi: "Lời gọi PowerShell lấy danh tính hoặc dừng tiến trình không chạy xong (lỗi khởi chạy, mã thoát khác 0, bị ngắt hoặc quá hạn) nên kết quả là chưa rõ."
+  causes_vi:
+    - "PowerShell không chạy được hoặc quá hạn"
+    - "Lệnh bị ngắt bởi tín hiệu"
+  nextStep_vi: "Kiểm tra tiến trình còn sống không rồi chạy lại; không coi tiến trình là đã dừng."
+  owner: runtime-core
+  kind: runtime-fault
+
+process-custody-required:
+  title: "Process identity or ownership required"
+  title_vi: "Cần danh tính hoặc quyền sở hữu tiến trình"
+  meaning_vi: "Lời gọi bị từ chối vì pid không hợp lệ, danh tính tiến trình hoặc cặp khóa giá trị sở hữu có dạng sai."
+  causes_vi:
+    - "pid không phải số nguyên dương"
+    - "Danh tính thiếu birth hoặc exe, hoặc khóa sở hữu rỗng"
+  nextStep_vi: "Truyền pid và danh tính đã lấy từ lần chụp trước, cùng khóa và giá trị sở hữu không rỗng."
+  owner: runtime-core
+  kind: runtime-fault
+
+process-platform-unverified:
+  title: "Process custody unsupported on platform"
+  title_vi: "Nền tảng chưa được kiểm chứng cho quyền giữ tiến trình"
+  meaning_vi: "Chỉ Windows được kiểm chứng để chụp hoặc dừng tiến trình theo danh tính; nền tảng khác trả về chưa rõ và không làm gì."
+  causes_vi:
+    - "Chạy trên Linux hoặc macOS"
+  nextStep_vi: "Dừng tiến trình bằng công cụ của hệ điều hành sau khi tự xác minh danh tính."
+  owner: runtime-core
+  kind: runtime-fault
+
+process-receipt-incomplete:
+  title: "Process receipt incomplete"
+  title_vi: "Biên nhận tiến trình chưa đầy đủ"
+  meaning_vi: "PowerShell chạy xong nhưng đầu ra không phải JSON hợp lệ nên không có biên nhận về tiến trình."
+  causes_vi:
+    - "Đầu ra bị lẫn thông báo khác"
+    - "Script gốc hỏng giữa chừng"
+  nextStep_vi: "Chạy lại lời gọi và kiểm tra tiến trình còn sống không trước khi coi là đã dừng."
+  owner: runtime-core
+  kind: runtime-fault
+
+process-wait-invalid:
+  title: "Process wait time invalid"
+  title_vi: "Thời gian chờ tiến trình không hợp lệ"
+  meaning_vi: "Thời gian chờ xác minh dừng không phải số nguyên trong khoảng 1 tới 60000 mili giây nên lời gọi bị từ chối."
+  causes_vi:
+    - "Cấu hình thời gian chờ ngoài khoảng cho phép"
+  nextStep_vi: "Sửa thời gian chờ về khoảng 1 tới 60000 mili giây."
+  owner: runtime-core
+  kind: runtime-fault
+
+provider-unresolved:
+  title: "Terminal provider unresolved"
+  title_vi: "Chưa xác định nhà cung cấp của terminal"
+  meaning_vi: "Siêu dữ liệu, tiêu đề và màn hình của terminal không chỉ ra nhà cung cấp nào nên danh tính là không rõ và không được gõ lệnh thoát."
+  causes_vi:
+    - "Terminal là shell trơn hoặc chưa có agent"
+  nextStep_vi: "Đóng terminal qua đường đóng đã xác minh hoặc gắn danh tính rõ cho nó."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+publication-held:
+  title: "Secret publication not completed"
+  title_vi: "Việc ghi bí mật chưa hoàn tất"
+  meaning_vi: "Khóa mới đã sinh nhưng bước ghi công khai không đạt trạng thái complete nên kết quả được giữ lại, không coi là thành công."
+  causes_vi:
+    - "Bước ghi bị từ chối vì mất thuê, tệp đổi hoặc kiểm tra sau ghi thất bại"
+  nextStep_vi: "Đọc effectState trong kết quả; nếu không phải none thì xác minh tệp đích rồi chạy lại."
+  owner: supervisor
+  kind: runtime-fault
+
+release-unknown:
+  title: "Install lock release unknown"
+  title_vi: "Không rõ khóa cài đặt đã được nhả chưa"
+  meaning_vi: "Lệnh nhả khóa máy chủ của lần cài khóa age ban đầu báo lỗi nên không biết khóa còn giữ hay không và lần cài được ghi là không thành công."
+  causes_vi:
+    - "Cơ sở dữ liệu máy khóa hoặc lỗi lúc nhả"
+  nextStep_vi: "Kiểm tra khóa máy chủ còn bị giữ không và nhả đúng token trước khi chạy lại cài đặt."
+  owner: supervisor
+  kind: runtime-fault
+
 staging-install-failed:
   title: "npm ci failed in the [Worker] staging checkout"
   title_vi: "npm ci thất bại trong cây staging của [Worker]"
@@ -10583,6 +10995,26 @@ tick-items:
   nextStep_vi: "Lệnh bị từ chối; chạy lại với một mảng JSON."
   owner: op-retry
   kind: input-invalid
+title-ambiguous:
+  title: "Terminal title names several providers"
+  title_vi: "Tiêu đề terminal nêu nhiều nhà cung cấp"
+  meaning_vi: "Tiêu đề của terminal nhắc tới nhiều nhà cung cấp nên danh tính không xác định và không được gõ lệnh thoát."
+  causes_vi:
+    - "Tiêu đề chứa tên của hai nhà cung cấp"
+  nextStep_vi: "Đặt lại tiêu đề terminal hoặc đóng qua đường đóng đã xác minh."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+title-label:
+  title: "Provider read from terminal title"
+  title_vi: "Nhà cung cấp chỉ đoán từ tiêu đề terminal"
+  meaning_vi: "Tiêu đề terminal có nhắc tên một nhà cung cấp nhưng chỉ là gợi ý và không cho phép gõ lệnh thoát."
+  causes_vi:
+    - "Terminal không có siêu dữ liệu nhà cung cấp rõ ràng"
+  nextStep_vi: "Không gõ lệnh dựa trên gợi ý này; gắn danh tính rõ cho terminal hoặc đóng qua đường đóng đã xác minh."
+  owner: runtime-core
+  kind: dispatch-refusal
+
 tool-unavailable:
   title: "Agent lacks a required host tool"
   title_vi: "Agent thiếu công cụ cần thiết"
@@ -10871,6 +11303,17 @@ worker-active:
   nextStep_vi: "Không gõ gì vào terminal; Kernel chờ và thử nhắc lại sau nếu cần."
   owner: op-retry
   kind: verb-refusal
+worker-closure-unproven:
+  title: "Worker closure unproven"
+  title_vi: "Chưa chứng minh worker đã đóng"
+  meaning_vi: "Lệnh đóng terminal của worker để thay lượt không trả biên nhận chứng minh worker đã đóng nên kết quả là chưa rõ và cần khôi phục."
+  causes_vi:
+    - "Biên nhận đóng thiếu hoặc lỗi"
+    - "Terminal không đóng trong thời hạn chờ"
+  nextStep_vi: "Kiểm tra terminal của worker còn sống không, đóng qua đường đóng đã xác minh rồi thay lượt lại."
+  owner: supervisor
+  kind: runtime-fault
+
 worker-depth-exceeded:
   title: "Worker would nest deeper than the Orca depth setting"
   title_vi: "Worker sẽ lồng sâu hơn giới hạn độ sâu của Orca"
@@ -11287,6 +11730,17 @@ workflow-preserve-failed:
   owner: runtime-core
   kind: settle-reason
 # Proof: scripts/kernel/workflow-rebase.mjs propose; scripts/kernel/workflow-settle.mjs milestoneOwned.
+workflow-purge-policy-not-adopted:
+  title: "Workflow purge policy not adopted"
+  title_vi: "Chưa chấp nhận chính sách xóa workflow"
+  meaning_vi: "Workflow đã hết hạn lưu giữ nhưng kho mã của nó chưa có trong chính sách xóa workflow đã được chủ hệ thống chấp nhận nên bị bỏ qua, không xóa."
+  causes_vi:
+    - "Cấu hình chưa có chính sách xóa workflow"
+    - "Kho mã chưa nằm trong danh sách được chấp nhận"
+  nextStep_vi: "Chủ hệ thống thêm kho mã vào chính sách xóa workflow kèm người duyệt và tham chiếu duyệt nếu muốn dọn."
+  owner: owner
+  kind: blocker
+
 workflow-rebase-conflict:
   title: "The workflow branch conflicts with main"
   title_vi: "Nhánh workflow xung đột với main"
@@ -11505,6 +11959,17 @@ worktree-registry-unavailable:
   nextStep_vi: "Khôi phục khả năng truy cập machine.sqlite rồi gọi lại cùng thao tác. Job chưa giao vẫn xếp hàng; lượt chốt chưa thành công giữ phiếu chuẩn bị để khôi phục nếu đã có hiệu ứng. Nếu lặp lại, runtime owner kiểm tra sổ đăng ký; không bỏ qua nó để chạy trên cây khác."
   owner: runtime-core
   kind: verb-refusal
+zip-limit:
+  title: "Zip limit override invalid"
+  title_vi: "Giới hạn zip tùy chỉnh không hợp lệ"
+  meaning_vi: "Một giới hạn zip được truyền vào không phải số nguyên từ 1 tới mức tối đa được hỗ trợ; ghi đè chỉ được hạ thấp, không được nâng."
+  causes_vi:
+    - "Truyền giá trị lớn hơn mức tối đa"
+    - "Truyền giá trị không phải số nguyên dương"
+  nextStep_vi: "Truyền giới hạn nằm trong khoảng được hỗ trợ hoặc bỏ ghi đè để dùng mức mặc định."
+  owner: op-retry
+  kind: input-invalid
+
 zip-corrupt:
   title: "Zip archive corrupt"
   title_vi: "File zip bị hỏng"
@@ -14479,16 +14944,6 @@ HFS_DOCKER_SECRETS:
   owner: op-retry
   kind: check-finding
 
-RT_RETIRED_CLI_CALL:
-  title: "A removed CLI command is still invoked"
-  title_vi: "Một lệnh CLI đã bị gỡ vẫn được gọi"
-  meaning_vi: "Một file được theo dõi gọi lệnh đã bị CLI thống nhất gỡ (các cách gọi kernel, hfs, test-stack và các động từ runtime cấp cao nhất cũ, liệt kê trong trường removed của catalog và bảng của dispatcher); chỉ được gọi starci <group> <verb> mới."
-  causes_vi:
-    - "Vi phạm luật R197: tài liệu, prompt hoặc code còn chép cách gọi cũ."
-  nextStep_vi: "Đổi lời gọi sang lệnh thay thế mà bộ kiểm tra in ra (dòng use starci <group> <verb>) rồi chạy lại kiểm tra."
-  owner: op-retry
-  kind: check-finding
-
 CLI_ONLY_ENTRY:
   title: "A tracked file runs a runtime script directly"
   title_vi: "Một file được theo dõi chạy trực tiếp script của runtime"
@@ -14560,17 +15015,6 @@ RT_RULE_ID_UNKNOWN:
     - "Một luật bị xóa hoặc đánh số lại mà các chỗ trích dẫn không được sửa theo"
     - "Gõ nhầm mã luật"
   nextStep_vi: "Người giám sát đổi trích dẫn sang luật hiện có của danh mục hoặc bỏ mã, qua một lane đã land."
-  owner: supervisor
-  kind: check-finding
-
-RT_RULE_ID_GAP:
-  title: "A gap in the rule ids"
-  title_vi: "Khoảng trống trong dãy mã luật"
-  meaning_vi: "Dãy mã luật của knowledge/hfs/rules.yaml chạy từ R01 đến luật cuối nhưng thiếu một mã vừa không phải luật vừa không nằm trong danh sách retired. Mỗi mã vắng phải được khai báo là đã nghỉ hưu kèm lý do, và không bao giờ được dùng lại."
-  causes_vi:
-    - "Xóa một luật mà không ghi vào retired"
-    - "Đánh số lại khối luật làm bỏ qua một đoạn mã"
-  nextStep_vi: "Người giám sát thêm mã vào retired kèm lý do, hoặc khôi phục luật, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -14697,13 +15141,13 @@ CI_UPLOAD_NOT_SILENT:
   kind: check-finding
 
 CI_TRIGGERS_RELEASE_ONLY:
-  title: "Workflow trigger other than a release tag or a person"
-  title_vi: "Workflow có trigger không phải tag phát hành hay người chạy tay"
-  meaning_vi: "Một workflow CI (gốc, ví dụ hoặc template của packages/hfs) khai báo trigger ngoài hai loại được phép: push của tag v* (không kèm branches, paths hay bộ lọc ignore) và workflow_dispatch. Push nhánh, pull_request, schedule hay workflow_call làm CI chạy ở mỗi lần đẩy thay vì một lần cho mỗi bản phát hành, và mọi app scaffold từ template sẽ thừa hưởng lỗi đó."
+  title: "Workflow trigger other than a release tag, a person or the runtime's main"
+  title_vi: "Workflow có trigger không phải tag phát hành, người chạy tay hay main của runtime"
+  meaning_vi: "Một workflow CI (gốc, ví dụ hoặc template của packages/hfs) khai báo trigger ngoài các loại được phép: push của tag v*, workflow_dispatch và, chỉ ở workflow gốc của runtime, push của nhánh main (không kèm paths hay bộ lọc ignore). Push nhánh khác, push main trong ví dụ hoặc template, pull_request, schedule hay workflow_call làm CI chạy sai thời điểm, và mọi app scaffold từ template sẽ thừa hưởng lỗi đó."
   causes_vi:
     - "Giữ trigger push hoặc pull_request của mô hình CI cũ"
-    - "Thêm bộ lọc branches hoặc paths vào push của tag"
-  nextStep_vi: "Người giám sát đặt on thành push với tags: ['v*'] và workflow_dispatch, sửa template trong packages/hfs/templates/app/ci-workflows rồi render lại ví dụ bằng starci app sync --write; không thêm trigger khác (docs/git-governance.md)."
+    - "Thêm bộ lọc branches khác [main], hoặc paths, vào push; hoặc thêm push main vào ví dụ hoặc template của app"
+  nextStep_vi: "Người giám sát đặt on của workflow gốc thành push với tags: ['v*'] và/hoặc branches: [main] cùng workflow_dispatch; ví dụ và template trong packages/hfs/templates/app/ci-workflows chỉ giữ tags: ['v*'] và workflow_dispatch (render lại ví dụ bằng starci app sync --write); không thêm trigger khác (docs/git-governance.md)."
   owner: supervisor
   kind: check-finding
 

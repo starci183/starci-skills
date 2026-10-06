@@ -12,7 +12,7 @@ import { runGit } from '../../scripts/api/git/lib.mjs';
 import { installInto, uninstall, runtimeInstalls, missingFrom, LINT_DEPENDENCIES, STARCI_PACKAGES } from '../helpers/hfs-app-install.mjs';
 
 const runtime = path.resolve(import.meta.dirname, '../..');
-const stableIds = ['api', 'connected-block', 'domain', 'event-bus', 'fenced-job', 'named-exception', 'projection', 'queue', 'realtime', 'saga', 'webhooks'];
+const stableIds = ['api', 'cli', 'connected-block', 'domain', 'event-bus', 'fenced-job', 'injector', 'named-exception', 'projection', 'queue', 'realtime', 'saga', 'service-spec', 'webhooks'];
 const write = (root, relative, bytes) => {
   const file = path.join(root, relative);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -44,7 +44,7 @@ function catalogFixture(t) {
   return { root, doc, example, save, links };
 }
 
-test('one current-source catalog resolves all eleven stable references without a duplicate connected block', () => {
+test('one current-source catalog resolves all stable references without a duplicate connected block', () => {
   const catalog = loadExampleCatalog(runtime);
   assert.deepEqual(catalog.examples.map(row => row.id).sort(), stableIds);
   const connected = catalog.examples.find(row => row.id === 'connected-block');

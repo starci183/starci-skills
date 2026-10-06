@@ -2,9 +2,9 @@ name: install-sandbox
 
 # A person dispatches this to prove, on a clean Linux runner and a clean Windows runner, that the packaged runtime installs and that the host configuration
 # works. `pack` builds the same `npm pack` tarball as runtime-artifact.yml (same commands, the `files` list stays the one inventory); each `sandbox` leg then takes
-# ONLY that tarball and runs scripts/gates/install-sandbox.mjs, which installs it into an empty HOME and an empty app repository, asserts the configuration
+# ONLY that tarball and runs `starci gate install-sandbox`, which installs it into an empty HOME and an empty app repository, asserts the configuration
 # (payload, seeded config.yaml, bootstrap entry, host ignores, shim, entry check, machine database, idempotent second install) and fails when anything was written
-# to the runner's real home. The runtime under test is the installed tarball, never this checkout: the checkout holds the sandbox script and package.json only.
+# to the runner's real home. The runtime under test is the installed tarball, never this checkout: the checkout holds only the CLI dispatcher and the gate script it runs (no `npm ci`).
 # Trigger is workflow_dispatch only (docs/git-governance.md, rule CI_TRIGGERS_RELEASE_ONLY). Local equivalents: docs/installation.md, "Install sandboxes".
 
 on:
@@ -46,7 +46,7 @@ jobs:
           echo "tarball=$(node -p "require(process.env.RUNNER_TEMP + '/npm-pack.json')[0].filename")" >> "$GITHUB_OUTPUT"
 
       - name: Verify the inventory
-        run: node scripts/gates/runtime-artifact.mjs --pack "$RUNNER_TEMP/npm-pack.json" --dir "$RUNNER_TEMP/pack" --out "$RUNNER_TEMP/out"
+        run: npm run starci --silent -- gate runtime-artifact --pack "$RUNNER_TEMP/npm-pack.json" --dir "$RUNNER_TEMP/pack" --out "$RUNNER_TEMP/out"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -68,12 +68,15 @@ jobs:
       run:
         shell: bash
     steps:
-      # Only the sandbox script and package.json are taken from the repository; the runtime under test is the downloaded tarball.
+      # Only the CLI dispatcher and the gate script it runs are taken from the repository (no dependency install); the runtime under test is the downloaded tarball.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           sparse-checkout: |
-            scripts/gates/install-sandbox.mjs
-            package.json
+            /scripts/
+            /engine/
+            /modules/
+            /packages/cli/
+            /package.json
           sparse-checkout-cone-mode: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -94,4 +97,4 @@ jobs:
 
       # Exit 0 every assertion passed, 1 an assertion failed, 2 a step could not run. The script writes its table to $GITHUB_STEP_SUMMARY.
       - name: Run the install sandbox
-        run: node scripts/gates/install-sandbox.mjs --tarball "$RUNNER_TEMP/tarball/${{ needs.pack.outputs.tarball }}"
+        run: node packages/cli/bin/starci.mjs gate install-sandbox --tarball "$RUNNER_TEMP/tarball/${{ needs.pack.outputs.tarball }}"

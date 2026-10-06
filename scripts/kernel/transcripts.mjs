@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// transcripts.mjs — worker output as redacted blobs (alpha.3, UI-API §2.10, ARCHITECTURE-DB §4.3), read by Dispatch.
+// transcripts.mjs — worker output as redacted blobs (docs/ledger-db.md), read by Dispatch.
 //
 //   op attempt, live    attempt_transcript_snapshots: one row per 60 s (TRANSCRIPT_SNAPSHOT_MS) while the attempt
 //                       is open; an unchanged output adds no row (UNIQUE attempt+sha).

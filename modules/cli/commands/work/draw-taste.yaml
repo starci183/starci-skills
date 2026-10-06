@@ -10,5 +10,3 @@ exit: {"0": within the taste budgets, "1": a taste finding, "2": bad usage}
 json: flag
 examples: ['starci work draw-taste --html <render.html> --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/draw/draw-taste.mjs']

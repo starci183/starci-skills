@@ -78,7 +78,7 @@ rules:
         - BE_CONTRACT_UNGUARDED
         - BE_REALTIME_SHAPE
       manual:
-        - Confirm a query or mutation an old subscription door carried now lives in an api feature.
+        - Confirm no query or mutation lives in a subscription door; it lives in an api feature.
     relatedExamples: [realtime]
   - id: BE-REALTIME-2
     title: A realtime door reads and pushes, it never writes
@@ -95,19 +95,6 @@ rules:
     rationale: |-
       A door that can only touch the hub cannot change business state, so the biggest risk of a long-lived unauthenticated-looking
       connection, a write through it, is removed by type.
-    cases:
-      - id: case-1
-        when: A subscription that pushes order status changes
-        write: |-
-          @Resolver()
-          export class OrderStatusSubscription {
-              constructor(private readonly hub: RealtimeHub) {}
-
-              @Subscription(() => OrderStatusChangedType)
-              orderStatusChanged(@CurrentPrincipal() principal: Principal, @Args("orderId") orderId: string): AsyncIterable<OrderStatusChangedType> {
-                  return this.hub.subscribe(orderStatusTopic(principal.id, orderId))
-              }
-          }
     verification:
       automated:
         - BE_REALTIME_WRITES

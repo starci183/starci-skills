@@ -89,10 +89,6 @@ examples:
   - starci kernel incident --repo <path> --workflow <workflow> --attach <incident> --until-job <job>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api incident
-  - node scripts/kernel/cli.mjs incident
 reads: the workflows row for --workflow
 supervisorGate: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish;
   scripts/kernel/autopilot-run.mjs): nothing waits on the owner mid-flow. --kind owner-gate on an

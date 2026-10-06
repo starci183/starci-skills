@@ -44,8 +44,7 @@
 // nothing: routing is identical to the pre-config behavior.
 
 import fs from 'node:fs';
-import path from 'node:path';
-import { byCodeUnit } from '../lib/list.mjs';
+import path from 'node:path'; import { byCodeUnit } from '../lib/list.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeDifficulty, chainFor, resolveLaunchModel, kindRoute, orderKeyOf, raiseToFloor, missingHostTools,

@@ -1,4 +1,3 @@
 group: app
 summary: product application scaffolding, checks, managed output and local test infrastructure
 owner: "@starci/hfs"
-since: 1.0.0

@@ -60,10 +60,6 @@ examples:
   - starci kernel cut-seam --repo <path> --reconcile --job <job> --exit-code 0
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api cut-seam
-  - node scripts/kernel/cli.mjs cut-seam
 reads: the job row(s) of the cut (ordinal 1 attempts not retired before dispatch), the seam-* events
   of the cut, and for --publish-interface the named files in the repository
   (scripts/kernel/seam-policy.mjs)

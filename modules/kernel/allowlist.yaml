@@ -136,8 +136,6 @@ not-codes:
     reason: "ledger event kind name marking progress, not a failure"
   - literal: heads-up
     reason: "peer message kind label"
-  - literal: held-by-live-job
-    reason: "benign cleanup keep-reason label"
   - literal: impact-check
     reason: "next-action kind label"
   - literal: incident-auto-resolved
@@ -166,8 +164,6 @@ not-codes:
     reason: "benign terminal keep-reason label"
   - literal: not-a-file
     reason: "benign archive skip label"
-  - literal: not-starci
-    reason: "benign cleanup keep-reason label"
   - literal: nothing-open
     reason: "benign doorbell no-op label"
   - literal: one-off
@@ -186,8 +182,6 @@ not-codes:
     reason: "ledger event kind for progress tracking, not a failure code"
   - literal: planned-restart
     reason: "start reason label in PLANNED_START_REASONS, not a failure"
-  - literal: policy-shared
-    reason: "informational isolation-plan reason (brief opts out of worktree), not a failure"
   - literal: product-direction
     reason: "note class label in draw-feedback, not a failure code"
   - literal: push-scratch
@@ -210,8 +204,6 @@ not-codes:
     reason: "ledger event kind"
   - literal: runtime-flow
     reason: "lesson cause-class label"
-  - literal: runtime-repo
-    reason: "product-isolation skip reason (not a failure)"
   - literal: self-reload
     reason: "planned-start reason label"
   - literal: sessions-db-owned
@@ -228,19 +220,13 @@ not-codes:
     reason: "session archive skip reason (informational)"
   - literal: time-budget
     reason: "GC item label: a bounded worktree GC pass stopped at its time budget and resumes next pass, not a failure"
-  - literal: work-owner-only
-    reason: "product-isolation skip reason (not a failure)"
   - literal: workflow-ended
     reason: "incident close reason (success)"
   - literal: workflow-finished
     reason: "phase-transition reason (success)"
   - literal: BYTE_CENSUS
     reason: "constant, parser token or key name, not an emitted code"
-  - literal: CACHE_MANAGER
-    reason: "constant, parser token or key name, not an emitted code"
   - literal: ENV_VAR_OR_CUSTODY_KEY
-    reason: "constant, parser token or key name, not an emitted code"
-  - literal: MEMORY_CACHE_MANAGER
     reason: "constant, parser token or key name, not an emitted code"
   - literal: MISSING_CHAR
     reason: "constant, parser token or key name, not an emitted code"

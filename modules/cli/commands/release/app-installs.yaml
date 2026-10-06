@@ -14,7 +14,3 @@ examples:
   - starci release app-installs
   - starci release app-installs --keep
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/release-app-installs.mjs
-  - node .claude/scripts/gates/release-app-installs.mjs

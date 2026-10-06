@@ -44,10 +44,6 @@ examples:
   - starci kernel provider-backoff --repo <path> --provider <provider> --open-circuit --reason <reason> --by <by>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api provider-backoff
-  - node scripts/kernel/cli.mjs provider-backoff
 purpose: "Open the ledger's provider-health circuit for one provider (failureKind quota by default,
   or rate-limited) for allocation.cooldownMs.<kind>, when the Resource controller's AIMD backoff
   held the provider's pool at its floor and the rate limit still persisted. The same circuit api

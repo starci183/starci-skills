@@ -1736,11 +1736,11 @@ rules:
       - {kind: runtime, id: facts, at: scripts/hfs/runtime-rules/facts.mjs}
   - id: R193
     code: "RT_RULE_ID_UNKNOWN"
-    law: "Every rule id (R<digits>) that tracked knowledge, docs, code or data names is a rule of this catalog, and the ids run from R01 to the last rule with no undeclared gap: an id with no rule is listed under `retired` with its reason (RT_RULE_ID_GAP), and every rule of the catalog is named by the `hfsRules:` of at least one knowledge/patterns topic or carries `scope: runtime` (RT_RULE_UNCITED). A retired id is a history name that only changelogs may still spell; specs and generated copies are not read."
+    law: "Every rule id (R<digits>) that tracked knowledge, docs, code or data names is a rule of this catalog, and rule ids are unique and well-formed (a gap between two ids is fine), and every rule of the catalog is named by the `hfsRules:` of at least one knowledge/patterns topic or carries `scope: runtime` (RT_RULE_UNCITED). Specs and generated copies are not read."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
-    failureCodes: ["RT_RULE_ID_UNKNOWN", "RT_RULE_ID_GAP", "RT_RULE_UNCITED"]
+    failureCodes: ["RT_RULE_ID_UNKNOWN", "RT_RULE_UNCITED"]
     enforcers:
       - {kind: runtime, id: rule-ids, at: scripts/hfs/runtime-rules/rule-ids.mjs}
   - id: R194
@@ -1754,7 +1754,7 @@ rules:
       - {kind: runtime, id: generated-block, at: scripts/hfs/runtime-rules/generated-block.mjs}
   - id: R195
     code: "RT_PROSE_PATH_NO_SLOT"
-    law: "Every product path the knowledge, the docs and the READMEs name (a be/ or fe/ path, whole or with placeholders, globs and braces) is owned by a slot of knowledge/hfs/slots.yaml or is a folder above one; a path no slot owns is prose that invented a place or kept one a slot no longer has. App names are free: a literal app name is one the examples or the starter declare, a placeholder stands for any; a ** glob and a topic file of the knowledge are not paths."
+    law: "Every product path the knowledge, the docs and the READMEs name (a be/ or fe/ path, whole or with placeholders, globs and braces) is owned by a slot of knowledge/hfs/slots.yaml or is a folder above one; a path no slot owns is prose that invented a place or kept one a slot no longer has. App names are free: a literal app name is one a shipped examples/*/hfs.json declares, a placeholder stands for any; a ** glob and a topic file of the knowledge are not paths."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
@@ -1770,15 +1770,6 @@ rules:
     failureCodes: ["RT_PROSE_RESTATES_SLOTS"]
     enforcers:
       - {kind: runtime, id: prose-restates, at: scripts/hfs/runtime-rules/prose-restates.mjs}
-  - id: R197
-    code: "RT_RETIRED_CLI_CALL"
-    law: "No tracked file invokes a command the unified CLI removed: the retired kernel, hfs, test-stack and top-level runtime spellings listed in the `removed` fields of the catalog and in the dispatcher table; those fields and changelogs are exempt."
-    scope: runtime
-    kinds: [check]
-    gates: [land, runtime]
-    failureCodes: ["RT_RETIRED_CLI_CALL"]
-    enforcers:
-      - {kind: runtime, id: retired-cli, at: scripts/checks/check-retired-cli.mjs}
   - id: R198
     code: "RT_CLI_CATALOG_DRIFT"
     law: "Every generated output of the unified CLI catalog (packages/cli/src/catalog.generated.mjs, docs/cli.md, packages/cli/completions/*) equals what scripts/cli/gen-catalog.mjs writes from modules/cli/commands."
@@ -1979,7 +1970,7 @@ rules:
       - {kind: hfs, id: lite-secret-custody, at: scripts/hfs/rules/supabase-secrets.mjs}
   - id: R221
     code: "CI_TRIGGERS_RELEASE_ONLY"
-    law: "The only workflow triggers are a push of release tags and a person dispatching it: every tracked workflow of the runtime, its examples and the hfs app templates (so every scaffolded app inherits it) declares an `on` that holds only `push` filtered to `tags: ['v*']` (no branches, paths or ignore filter beside it) and `workflow_dispatch`. A branch push, a pull_request, a schedule, a workflow_call or any other event refuses the workflow: CI runs once per release, on its tag, and Codecov and Sonar upload only from that run."
+    law: "The only workflow triggers are a push of release tags, a person dispatching it and, in the runtime's own workflows (`.github/workflows/` at the root), a push to `main`: every tracked workflow declares an `on` that holds only `push` filtered to `tags: ['v*']` (and, in the runtime's own workflows, `branches: [main]`; no paths or ignore filter beside them) and `workflow_dispatch`. The examples and the hfs app templates (so every scaffolded app inherits it) take the tag and the dispatch only: an app's CI runs once per release, on its tag. A push to any other branch, a pull_request, a schedule, a workflow_call or any other event refuses the workflow."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
@@ -2015,7 +2006,7 @@ rules:
       - {kind: runtime, id: protected-zone, at: scripts/hfs/runtime-rules/rights-policy.mjs}
   - id: R225
     code: "RT_HOOK_SHAPE"
-    law: "The app hook templates keep the gate model: pre-commit is L0 only (no typecheck, no test run); pre-push checks the release gate (the starci-release L4 record, refs/backup/, v[0-9] tags) and runs no npm test, jest, typecheck or lint."
+    law: "The app hook templates keep the gate model: pre-commit is L0 only (no typecheck, no test run); pre-push checks the release gate (the starci-release L4 record, refs/backup/, v[0-9] tags; the runtime's own hook also lets main through fast-forward) and runs no npm test, jest, typecheck or lint."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
@@ -2040,20 +2031,3 @@ rules:
     failureCodes: ["RT_SYNTAX_INVALID"]
     enforcers:
       - {kind: runtime, id: syntax, at: scripts/hfs/runtime-rules/syntax.mjs}
-retired:
-  - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
-  - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
-  - {id: R123, reason: "RT_PENDING_STALE retired with the pending list itself: ruleParams.runtime.pending and its pending-ratchet enforcer are gone; nothing ratchets a tolerated-finding list"}
-  - {id: R128, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R129, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R130, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R131, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R132, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R133, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R134, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R135, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R136, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R137, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R138, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R139, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R140, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}

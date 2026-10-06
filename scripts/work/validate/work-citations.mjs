@@ -1,4 +1,4 @@
-// work-citations.mjs — how a Work record cites agent output (alpha.3, ARCHITECTURE-DB §5.3).
+// work-citations.mjs — how a Work record cites agent output (docs/ledger-db.md).
 //
 // A Work record (git, .starciwork) never names a file an agent produced: it cites the artifact by its id and the
 // bytes by their sha256 - {artifact: <job_artifacts.artifact_id>, sha256: <64 hex>, role?, label?} - anywhere in the

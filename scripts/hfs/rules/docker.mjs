@@ -163,7 +163,7 @@ function entryFindings({ repoRoot, file, parsed, side, app, kind, project, ts })
   if (side === 'fe') {
     const build = parsed.stages.find((stage) => stage.name === BUILD_STAGE);
     const filter = `--filter=@${project}/${app}`;
-    const builds = build && commandsOf(build).some((command) => command.words.includes('turbo') && command.words.includes('build') && command.words.includes(filter));
+    const builds = build && commandsOf(build).some((command) => command.words.some((word) => word === 'turbo' || word.endsWith('/turbo')) && command.words.includes('build') && command.words.includes(filter));
     if (!builds) findings.push(found(DOCKER_ENTRY, file, `${file} ${BUILD_STAGE} stage does not run \`turbo run build ${filter}\`; a Next image builds its own workspace (and the packages it imports) through turbo.`, { expected: filter }));
     const config = `fe/apps/${app}/next.config.ts`;
     const text = readText(repoRoot, config);

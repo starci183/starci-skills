@@ -13,5 +13,3 @@ examples:
   - 'starci work grammar-proposal check .starciwork'
   - 'starci work grammar-proposal list .starciwork --json'
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/grammar-proposal.mjs']

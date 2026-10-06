@@ -1,10 +1,8 @@
 // resume-context.mjs — the retry of a worker that died without a report resumes from what it left.
 //
 // A failed-no-report settle queues ONE retry of the same op (modules/models/kinds.yaml route
-// no-report-retries-on-another-pool), and the retry used to start cold: its prompt said nothing of the
-// dead attempt, so it re-derived and re-ran every step, and sometimes re-did work already on disk
-// (2026-09-27: a collab backend.implement a9 died with seven composition-r5 evidence files written;
-// a10 began again from nothing). resumeContextOf(db, job) reads the attempt the retry continues
+// no-report-retries-on-another-pool); its prompt carries the dead attempt, so the retry does not re-derive and
+// re-run steps whose work is already on disk. resumeContextOf(db, job) reads the attempt the retry continues
 // (jobs.retry_of) and, when that attempt settled failed-no-report, returns the packet's
 // context.resume_from: its liveness and environment, the effect evidence settle recorded (dirty files,
 // commits), and the tail of its typed op log (the rows it wrote through starci kernel log).

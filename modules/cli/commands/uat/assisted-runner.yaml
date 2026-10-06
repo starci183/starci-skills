@@ -17,7 +17,3 @@ examples:
   - starci uat assisted-runner inspect --request <request.yaml> --receipt <receipt.yaml>
   - starci uat assisted-runner signal --request <request.yaml> --receipt <receipt.yaml> --value ok
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/uat/assisted-runner.mjs
-  - node .claude/scripts/uat/assisted-runner.mjs

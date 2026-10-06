@@ -32,9 +32,3 @@ examples:
   - starci release publish --publish --npm-user <name> --expect-sha <sha>
   - starci release publish --runtime-package --publish --npm-user <name> --expect-sha <sha>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/release-publish.mjs
-  - node .claude/scripts/gates/release-publish.mjs
-  - npm run release:publish
-  - bash publish-final.sh

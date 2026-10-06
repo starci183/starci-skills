@@ -15,7 +15,3 @@ examples:
   - starci supervisor push-mains --repo <path> --dry-run
   - starci supervisor push-mains --hooks-only --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/push-mains.mjs
-  - node .claude/scripts/supervisor/push-mains.mjs

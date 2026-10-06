@@ -32,10 +32,6 @@ examples:
   - starci kernel route --repo <path> --job <job> --difficulty hard --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api route
-  - node scripts/kernel/cli.mjs route
 reads: "the job row + its payload (payload.difficulty is the fallback when --difficulty is absent);
   the workflow goal's routing_bias {prefer[], avoid[]} (define-goal: the owner's own bias, always
   applied, the ONLY bias); the job's retry lineage (lineageAdjust below);

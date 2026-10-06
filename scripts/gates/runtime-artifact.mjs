@@ -2,7 +2,7 @@
 // .github/workflows/runtime-artifact.yml uploads. The archive is the `npm pack` tarball of the root package, so its `files` list
 // stays the one release inventory; this script adds no second inventory, it only describes what npm packed and refuses what must
 // never ship. Node builtins only and no child process: the workflow runs `npm pack --json` and hands the result in.
-//   node scripts/gates/runtime-artifact.mjs --pack <npm-pack.json> --dir <tarball dir> --out <dir> [--root <runtime root>]
+//   starci gate runtime-artifact --pack <npm-pack.json> --dir <tarball dir> --out <dir> [--root <runtime root>]
 // Writes release-metadata.json, inventory.txt and SHA256SUMS into --out. Exit 0 clean, 1 forbidden material in the tarball,
 // 2 bad usage or an unreadable input.
 import fs from 'node:fs';

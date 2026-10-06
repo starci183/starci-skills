@@ -2,7 +2,7 @@
 // decisions.mjs — Decision Items (DI) and the doorbell (reconciler DESIGN §10.3-10.4, lane rc-decisions).
 //
 // A DI is the durable message a decider acts on; the doorbell is only a reminder that DIs wait. Nobody types a
-// notice into a Kernel terminal any more: a controller, the SLA layer or the Supervisor OPENS a DI and rings.
+// notice into a Kernel terminal: a controller, the SLA layer or the Supervisor OPENS a DI and rings.
 //
 //   store     product DIs: runtime.sqlite decision_items through engine/db/ledger.mjs (openDecisionItem,
 //             updateDecisionItem; a resolution is a decisions row via recordDecision), keys checked (MB-07),

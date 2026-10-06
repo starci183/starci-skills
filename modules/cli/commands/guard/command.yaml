@@ -12,6 +12,3 @@ json: none
 examples:
   - starci guard command
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/guards/command-guard.mjs

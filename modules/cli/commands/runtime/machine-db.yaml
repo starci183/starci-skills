@@ -20,7 +20,3 @@ examples:
   - starci runtime machine-db status
   - starci runtime machine-db ledgers --all
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node engine/db/machine.mjs
-  - node .claude/engine/db/machine.mjs

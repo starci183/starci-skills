@@ -32,7 +32,3 @@ examples:
   - starci supervisor workers create --cluster <id> --title <text> --files <csv>
   - starci supervisor workers report --job <id> --outcome done --commit <sha>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/workers.mjs
-  - node .claude/scripts/supervisor/workers.mjs

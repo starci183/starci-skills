@@ -11,6 +11,3 @@ json: none
 examples:
   - starci guard seat-tools
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/guards/seat-tools.mjs

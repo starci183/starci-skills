@@ -1,4 +1,4 @@
-// git-land-gate.mjs — the changed-code import, eslint and scoped-tsc gate formerly supplied by land-gate.mjs.
+// git-land-gate.mjs — the changed-code import, eslint and scoped-tsc gate.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

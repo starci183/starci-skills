@@ -14,7 +14,3 @@ examples:
   - starci work hygiene staged --repo <repo>
   - starci work hygiene files --repo <repo> <file>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/work/validate/work-hygiene.mjs
-  - node .claude/scripts/work/validate/work-hygiene.mjs

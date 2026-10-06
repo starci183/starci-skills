@@ -19,7 +19,3 @@ examples:
   - starci runtime doctor --cwd <repo> --quick
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci doctor
-  - npx starci doctor

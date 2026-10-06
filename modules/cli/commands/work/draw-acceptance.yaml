@@ -11,5 +11,3 @@ exit: {"0": every bound asset accepted, "1": a bound asset was refused, "2": bad
 json: flag
 examples: ['starci work draw-acceptance --repo <repo> --job <job> --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/draw/draw-acceptance.mjs']

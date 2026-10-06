@@ -33,10 +33,6 @@ examples:
   - starci kernel reply --repo <path> --workflow <workflow> --message <message> --to-owner --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api reply
-  - node scripts/kernel/cli.mjs reply
 reads: the pending worker question or escalation (questions above), the job it belongs to
 writes: "the workflow's Orca Run bound to the current Kernel terminal (orca-runs.mjs
   bindWorkflowRun, a no-op once bound; event run-rebound), then Orca `reply` to the exact question

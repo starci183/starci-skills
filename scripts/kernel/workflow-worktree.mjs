@@ -1,5 +1,5 @@
 // workflow-worktree.mjs — ONE worktree per Kernel workflow (owner decision WFWT, final; part A: creation, registry,
-// launches, side concurrency, release). It replaces the per-op worktree with no legacy.
+// launches, side concurrency, release).
 //
 //   create     ensureWorkflowWorktree, before the Kernel launch (scripts/kernel/start-workflow.mjs): Orca creates and owns
 //              the tree - `orca worktree create --repo path:<app repo> --name wf-<workflowId> --base-branch main

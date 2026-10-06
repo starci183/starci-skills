@@ -50,3 +50,9 @@ test('lowercase properties of an env object are not variables; parseCatalog read
   assert.deepEqual(envFacts("export const f = (env) => env.width + env.cache + env.STARCI_A;\n").reads.map((r) => r.name), ['STARCI_A']);
   assert.deepEqual(parseCatalog('reader: scripts/lib/env.mjs\nvariables:\n  STARCI_A: {purpose: p, kind: config}\n'), { reader: 'scripts/lib/env.mjs', variables: { STARCI_A: { purpose: 'p', kind: 'config' } } });
 });
+
+test('a readEnv call and a spelled-out name count as reading a catalogued variable; Windows names compare case-insensitively', () => {
+  assert.deepEqual(envFacts("export const a = () => readEnv('ORCA_CLI_COMMAND', env);\n").reads, [{ name: 'ORCA_CLI_COMMAND', line: 1, direct: false }]);
+  assert.deepEqual(run([{ rel: 'scripts/a.mjs', text: "export const a = (env) => readEnv('ORCA_CLI_COMMAND', env);\nexport const SET = new Set(['SOPS_AGE_KEY']);\nexport const c = () => readEnv('ComSpec');\n" }], ['ORCA_CLI_COMMAND', 'SOPS_AGE_KEY', 'COMSPEC']), []);
+  assert.deepEqual(run([{ rel: 'scripts/a.mjs', text: "export const a = (env) => readEnv('GONE_X', env);\n" }], []), [['RT_ENV_UNCATALOGUED', 'scripts/a.mjs']]);
+});

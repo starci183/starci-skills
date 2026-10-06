@@ -214,10 +214,6 @@ export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
   const implModules = new Set(cat.groups.flatMap((g) => g.verbs.map((v) => v.impl?.module).filter(Boolean).map(posix)));
   const implementations = new Set([...implScripts, ...implModules]);
   const routedEntries = new Set(implScripts);
-  for (const group of cat.groups) for (const verb of group.verbs) for (const spelling of verb.removed ?? []) {
-    const match = /^node\s+(?:\.claude[\\/])?((?:engine|scripts|ui|bin|packages[\\/][^\\/]+[\\/](?:bin|src))[\\/][^\s"']+)/.exec(spelling);
-    if (match) routedEntries.add(posix(match[1]));
-  }
 
   // Every non-public entry point is declared once in _internal.yaml. The
   // registry itself is deliberately outside catalog.mjs: it is not a route.

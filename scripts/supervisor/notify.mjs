@@ -8,7 +8,7 @@
 //   starci supervisor notify --repo <ledger-owner> --workflow <id> (--text <t> | --text-file <f>) [--item <owed-action key>]
 //        [--entity <type>:<id>] [--json]
 //
-// A busy Kernel is no longer a failure: the DI waits in the ledger and the answer is `queued` (delivered: true); the
+// A busy Kernel is not a failure: the DI waits in the ledger and the answer is `queued` (delivered: true); the
 // doorbell rings when the seat turns idle. --item names the owed action (scripts/supervisor/actions.mjs) the notice acts
 // on: a delivered notice stops that item's SLA clock (recordAction). Every notice is also a supervisor-notice event in
 // machine.sqlite sup_events.

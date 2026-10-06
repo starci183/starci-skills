@@ -24,6 +24,3 @@ examples:
   - starci runtime validate <work-root> --strict --owned <path>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci validate

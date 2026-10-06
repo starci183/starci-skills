@@ -52,10 +52,6 @@ examples:
   - starci kernel reconcile --repo <path> --orphan-kernel-jobs --dry-run --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api reconcile
-  - node scripts/kernel/cli.mjs reconcile
 salvage: "`--dead-worker` first looks for a report the dead worker wrote but never filed: an
   op-report@1 report*.json under its owned paths modified since its dispatch, stamped for this job
   or unstamped (scripts/kernel/report-salvage.mjs), filed through starci kernel report itself so every report

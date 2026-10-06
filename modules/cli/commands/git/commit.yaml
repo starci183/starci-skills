@@ -28,5 +28,3 @@ examples:
   - starci git commit --type fix --scope cli --summary "handle an empty index"
   - starci git commit --type docs --summary "explain backup refs" --paths docs/git-governance.md --dry-run
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

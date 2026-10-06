@@ -42,10 +42,6 @@ examples:
   - starci kernel provider-health --repo <path> --quota-probe --force --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api provider-health
-  - node scripts/kernel/cli.mjs provider-health
 quotaCircuit: A provider whose agent card declares quotaExhausted is parked with failureKind quota
   when a dispatch rejection's signal/error carries its quota codes (e.g. insufficient_quota,
   quota-exhausted, HTTP 429 with a quota code) or its refused screen shows the quota row, or when

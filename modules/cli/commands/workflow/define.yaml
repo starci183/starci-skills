@@ -59,7 +59,3 @@ examples:
   - starci workflow define --plan --text "Add password reset"
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci goal
-  - node scripts/goal/define-goal.mjs

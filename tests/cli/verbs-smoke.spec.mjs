@@ -4,9 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { CATALOG, RETIRED } from '../../packages/cli/src/catalog.generated.mjs';
+import { CATALOG } from '../../packages/cli/src/catalog.generated.mjs';
 import { main } from '../../packages/cli/src/main.mjs';
-import { retiredCallsInText, retiredMatchers } from '../../scripts/checks/check-retired-cli.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // `runtime link` and `runtime install` examples run in-process and write a launcher: they get a throwaway home, never a path in the checkout.
@@ -15,18 +14,11 @@ test.after(() => fs.rmSync(smokeHome, { recursive: true, force: true }));
 const commands = Object.entries(CATALOG.groups).flatMap(([group, groupSpec]) =>
   Object.entries(groupSpec.verbs).map(([verb, command]) => ({ group, verb, command })),
 );
-const retiredScanMatchers = retiredMatchers({
-  groups: Object.entries(CATALOG.groups).map(([group, groupSpec]) => ({
-    group,
-    verbs: Object.entries(groupSpec.verbs).map(([verb, command]) => ({ verb, removed: command.removed ?? [] })),
-  })),
-});
 
 const capture = async (argv) => {
   const output = { out: '', err: '', spawned: [] };
   const code = await main(argv, {
     catalog: CATALOG,
-    retired: RETIRED,
     version: 'smoke-test',
     cwd: repoRoot,
     home: smokeHome,
@@ -148,34 +140,4 @@ test('bad usage exits 2 without reaching a handler or throwing', async () => {
       assert.equal(missing.spawned.length, 0, `${group} ${verb} dispatched without required input`);
     }
   }
-});
-
-test('all catalog and built-in retired spellings refuse and name their replacements', async () => {
-  const replacements = new Map(RETIRED.map((entry) => [entry.spelling, entry.use]));
-  for (const { group, verb, command } of commands) {
-    for (const spelling of command.removed ?? []) {
-      assert.equal(replacements.get(spelling), `starci ${group} ${verb}`, `RETIRED omits ${spelling}`);
-    }
-  }
-
-  const failures = [];
-  for (const entry of RETIRED) {
-    const words = shellWords(entry.spelling);
-    if (words[0] === 'starci') {
-      const result = await capture(words.slice(1));
-      if (result.code !== 2 || !result.err.includes(`use "${entry.use}"`)) {
-        failures.push(`${entry.spelling} -> ${entry.use}: exit ${result.code}; ${result.err.trim()}`);
-      }
-    } else if (words.length === 1) {
-      // Bare removed binary names are table metadata, not text signatures: scanning
-      // the word "hfs", for example, would turn ordinary prose into a command call.
-      continue;
-    } else {
-      const findings = retiredCallsInText(`Run \`${entry.spelling}\`.`, 'tests/fixtures/verbs-smoke-retired.md', retiredScanMatchers);
-      if (!findings.some((finding) => finding.use === entry.use)) {
-        failures.push(`${entry.spelling} -> ${entry.use}: R197 emitted ${JSON.stringify(findings)}`);
-      }
-    }
-  }
-  assert.equal(failures.length, 0, failures.slice(0, 20).join('\n'));
 });

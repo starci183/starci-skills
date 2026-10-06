@@ -209,7 +209,7 @@ export default {
   // ordinal, never a sibling slice (scripts/kernel/prior-failures.mjs).
   // plus the Supervisor's lessons whose signature names one of those checks (scripts/machine/lessons-file.mjs).
   const priorFailures = withLessons(priorAttemptFailures(db, { ...job, op_id: op }), { root: skillRoot });
-  // The job scratch (a3-3 evidence contract): the op writes its report and attachments there and starci kernel report reads them
+  // The job scratch (evidence contract): the op writes its report and attachments there and starci kernel report reads them
   // only from op_attempts.scratch_dir / STARCI_JOB_SCRATCH. Created fresh right before the launch.
   const scratchDir = repo ? jobScratchDirOf(repo, job.workflow_id, jobId) : null;
   const { inputs, contextPack } = captureDispatchInputs({ skillRoot, op, packet, briefDoc, params: dispatchParams,

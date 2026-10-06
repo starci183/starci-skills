@@ -86,7 +86,7 @@ function resolveImageRef(workRoot, ref, uiRecords = null) {
     const ui = (uiRecords ?? loadUiRecords(workRoot)).get(m.id);
     return ui ? path.join(path.dirname(ui.file), m.path) : null;
   }
-  // shell/<name>: a layout capture or lockup the layout tree cites - a blob (alpha.3), or a file a tree kept.
+  // shell/<name>: a layout capture or lockup the layout tree cites - a blob, or a file a tree kept.
   const shellRef = /^shell\/(.+)$/.exec(String(ref));
   if (shellRef) {
     let tree = null;

@@ -5,8 +5,7 @@ import { isMain } from '../../lib/is-main.mjs';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
 import {slash} from '../../lib/path-key.mjs';
-import {skillRoot} from '../../../engine/runtime-root.mjs';
-import { byCodeUnit } from '../../lib/list.mjs';
+import {skillRoot} from '../../../engine/runtime-root.mjs'; import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * The grammar knowledge snapshots (`knowledge/grammars/<family>/DNA.yaml`) are measurements of

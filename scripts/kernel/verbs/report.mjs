@@ -1,4 +1,4 @@
-// starci kernel report: validate and durably file the worker's report (alpha.3, H10).
+// starci kernel report: validate and durably file the worker's report.
 //
 // The report file and every file it carries live under the attempt's STARCI_JOB_SCRATCH. The envelope is read once,
 // validated, and stored ONLY in `reports` (fileReport: immutable, one per attempt); attachments and check outputs go

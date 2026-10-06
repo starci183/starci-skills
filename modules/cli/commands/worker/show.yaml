@@ -18,5 +18,3 @@ json: starci/worker-show@1
 examples:
   - starci worker show --dispatch <dispatch-id>
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

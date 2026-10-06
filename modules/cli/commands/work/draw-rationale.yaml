@@ -13,5 +13,3 @@ exit: {"0": every decision is justified, "1": findings, "2": bad usage}
 json: flag
 examples: ['starci work draw-rationale <render.html> --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/draw/draw-rationale.mjs']

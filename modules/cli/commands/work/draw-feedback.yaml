@@ -18,5 +18,3 @@ exit: {"0": "brief or status printed, notes addressed or classified", "1": an ow
 json: flag
 examples: ['starci work draw-feedback status --ui <record> --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/draw-feedback.mjs']

@@ -23,10 +23,6 @@ examples:
   - starci kernel status --repo <path> --workflow <workflow>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api status
-  - node scripts/kernel/cli.mjs status
 reads: workflows.phase + generation; jobs grouped by status; leases joined to live jobs; exact
   running-operation terminal show receipts; and, for each queued job, what blocks it — the approved
   plan (legs and derivedPlan.edges) on the latest goals row, the workflow's slot-holding operation

@@ -16,5 +16,3 @@ exit: {"0": "status printed, question built or answer applied", "1": the review 
 json: flag
 examples: ['starci work draw-review status --ui <record> --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/draw-review.mjs']

@@ -27,10 +27,6 @@ examples:
   - starci kernel survey --repo <path> --workflow <workflow> --deliveries --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api survey
-  - node scripts/kernel/cli.mjs survey
 reads: workflows row; latest goals row (revision, goal_identity, json.opChain — the approved shape
   plan diffs against); all jobs; inbox rows; live signals; the tail of events; open incidents; the
   contracts rows of settled jobs and the current bytes of the inputs they recorded (staleInput and

@@ -12,7 +12,3 @@ examples:
   - starci supervisor direct-commits
   - starci supervisor direct-commits --repo <path> --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/direct-commits.mjs
-  - node .claude/scripts/supervisor/direct-commits.mjs

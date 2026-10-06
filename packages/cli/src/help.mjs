@@ -75,10 +75,7 @@ export function verbHelp(catalog, groupName, verbName) {
   ].join('\n');
 }
 
-/** Full verb help plus the retired raw spellings the catalogued verb replaces. */
+/** Full verb help for a catalogued verb; null when the verb is unknown. */
 export function explainHelp(catalog, groupName, verbName) {
-  const verb = catalog.groups?.[groupName]?.verbs?.[verbName];
-  if (!verb) return null;
-  const help = verbHelp(catalog, groupName, verbName).trimEnd();
-  return `${help}${verb.removed?.length ? `\n\nReplaces: ${verb.removed.join(', ')}` : ''}\n`;
+  return verbHelp(catalog, groupName, verbName);
 }

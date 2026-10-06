@@ -274,7 +274,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
   const sourceFiles = new Set(context.files.map(file => canonical(file.fileName)));
   const missingOwnerEntries = config.owners?.filter(owner => !sourceFiles.has(canonical(path.resolve(config.root, ...owner.entry.split('/'))))) ?? [];
   const coverage = {
-    sourceFiles: context.files.map(file => relativePath(config.root, canonical(file.fileName))).sort(),
+    sourceFiles: context.files.map(file => relativePath(config.root, canonical(file.fileName))).sort(byCodeUnit),
     hfs: hfs.coverage,
     configUnread: configUnread.coverage,
     backendContractTypeForm,

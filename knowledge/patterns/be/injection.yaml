@@ -66,22 +66,11 @@ rules:
     rationale: |-
       One declaration form ties the token to its type, keeps token choice out of call sites and makes "who uses the cache"
       a grep for one function name.
-    cases:
-      - id: case-1
-        when: A port with its own token
-        write: |-
-          /** Token of the Clock port. */
-          export const CLOCK: unique symbol = Symbol("platform.clock")
-          /** Injects the Clock port. Parameter type: Clock. */
-          export const InjectClock = (): TypedParameterDecorator<Clock> => injector<Clock>(CLOCK)
-      - id: case-2
-        when: A module's options
-        write: '/** Injects the options of the orders capability. Parameter type: OrdersOptions. */ export const InjectOrdersOptions = (): TypedParameterDecorator<OrdersOptions> => injector<OrdersOptions>(MODULE_OPTIONS_TOKEN)'
     verification:
       automated:
         - BE_RAW_INJECT
       manual: []
-    relatedExamples: []
+    relatedExamples: [injector]
   - id: BE-INJECTION-3
     title: The injector catalog has fixed names
     kind: mandatory

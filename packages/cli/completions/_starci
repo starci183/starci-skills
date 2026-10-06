@@ -34,7 +34,7 @@ _starci() {
     'workflow:workflow lifecycle — define a goal, start its kernel, status, stop'
     'help:show top-level help'
     'completion:print a shell completion script'
-    'explain:show a verb contract and the spellings it replaces'
+    'explain:show a verb contract'
   )
   if (( CURRENT == 2 )); then
     _describe 'group' groups
@@ -45,7 +45,7 @@ _starci() {
       connect) _values 'verbs' 'ask-gateway[operate the local owner-ask HTTP gateway]' 'telegram[deliver and maintain owner Telegram notifications]' 'telegram-media[deliver settled operation media through Telegram]' 'tunnel[operate the Cloudflare owner-ask tunnel]' ;;
       debug) _values 'verbs' 'pass[inspect core health and maintain diagnostic custody in the machine ledger]' 'run[run one allowlisted read-only runtime inspector]' ;;
       docker) _values 'verbs' 'build[build one declared application image from the application root]' 'down[remove only the labelled resources owned by one application stack]' 'ps[list StarCi-labelled containers with ports and health]' 'up[start one application stack and wait for its declared healthchecks]' ;;
-      gate) _values 'verbs' 'canon-scan[measure canon conformance debt and plan its disjoint slices]' 'custody-exec[decrypt one custody document for a command or a bounded read]' 'env-health[inspect and manage the served environment used by verification]' 'hfs-sync[check an app'\''s generated files and custody trees for drift]' 'read[build the recorded READ digest for an operation]' 'reference-conventions[probe the installed backend reference rules of a reference root]' 'repo-presentation[check repository presentation rules for a product or runtime tree]' 'run[run the measured product or document gate]' 'sonar[inspect, provision and run the local Sonar quality gate]' 'starcistacks[check a repository'\''s stack declaration and custody layout]' 'test-world[run and judge one managed test-world project]' 'unit[run unit tests and judge per-subject coverage and test-kit use]' ;;
+      gate) _values 'verbs' 'canon-scan[measure canon conformance debt and plan its disjoint slices]' 'custody-exec[decrypt one custody document for a command or a bounded read]' 'env-health[inspect and manage the served environment used by verification]' 'hfs-sync[check an app'\''s generated files and custody trees for drift]' 'install-sandbox[prove the packed runtime tarball installs and runs in an empty home]' 'read[build the recorded READ digest for an operation]' 'reference-conventions[probe the installed backend reference rules of a reference root]' 'repo-presentation[check repository presentation rules for a product or runtime tree]' 'run[run the measured product or document gate]' 'runtime-artifact[describe the packed runtime archive and refuse forbidden material in it]' 'runtime-coverage[run the runtime spec suite under Node coverage and write coverage/lcov.info]' 'sonar[inspect, provision and run the local Sonar quality gate]' 'starcistacks[check a repository'\''s stack declaration and custody layout]' 'test-world[run and judge one managed test-world project]' 'unit[run unit tests and judge per-subject coverage and test-kit use]' ;;
       git) _values 'verbs' 'backup[push local branch tips only to dated backup refs]' 'commit[commit staged work with the message convention and trailers]' 'land[verify a lane and fast-forward it onto local main without pushing]' 'sync[merge local main into a clean lane with rerere enabled]' ;;
       guard) _values 'verbs' 'command[judge one shell PreToolUse request from JSON on stdin]' 'footprint-scan[scan for fresh cross-repository links and linked worktrees]' 'raw[apply command policy and run the real host tool behind a PATH wrapper]' 'seat-tools[deny tools forbidden for the bound seat from JSON on stdin]' 'verify-commit[verify a protected-branch update carries only worker-owned paths]' ;;
       harness) _values 'verbs' 'open[open the local harness URL in the default browser]' 'start[start the harness API and UI or its named tunnel]' 'status[report whether the harness health endpoint is up]' 'stop[stop only harness processes recorded by harness start]' ;;
@@ -150,6 +150,8 @@ _starci() {
     'gate:env-health:--service') return 0 ;;
     'gate:env-health:--url') return 0 ;;
     'gate:hfs-sync:--repo') return 0 ;;
+    'gate:install-sandbox:--tarball') return 0 ;;
+    'gate:install-sandbox:--tools') return 0 ;;
     'gate:read:--root') return 0 ;;
     'gate:read:--touch') return 0 ;;
     'gate:read:--read') return 0 ;;
@@ -164,6 +166,10 @@ _starci() {
     'gate:run:--out') return 0 ;;
     'gate:run:--scope') _values 'values' 'code' 'docs'; return 0 ;;
     'gate:run:--tree') return 0 ;;
+    'gate:runtime-artifact:--pack') return 0 ;;
+    'gate:runtime-artifact:--dir') return 0 ;;
+    'gate:runtime-artifact:--out') return 0 ;;
+    'gate:runtime-artifact:--root') return 0 ;;
     'gate:sonar:--key') return 0 ;;
     'gate:sonar:--name') return 0 ;;
     'gate:sonar:--base') return 0 ;;
@@ -953,10 +959,13 @@ _starci() {
     'gate:custody-exec') _values 'flags' '--get' '--keys' '--input-type' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:env-health') _values 'flags' '--repo' '--env' '--paths' '--restart' '--probe-timeout-ms' '--ready-timeout-ms' '--service' '--url' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:hfs-sync') _values 'flags' '--repo' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'gate:install-sandbox') _values 'flags' '--tarball' '--keep' '--docker' '--tools' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:read') _values 'flags' '--root' '--touch' '--read' '--knowledge' '--out' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:reference-conventions') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:repo-presentation') _values 'flags' '--root' '--runtime' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:run') _values 'flags' '--root' '--base' '--main' '--changed' '--tests' '--out' '--scope' '--tree' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'gate:runtime-artifact') _values 'flags' '--pack' '--dir' '--out' '--root' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'gate:runtime-coverage') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:sonar') _values 'flags' '--key' '--name' '--with-token' '--wait' '--base' '--paths' '--project-gate' '--out' '--blob' '--log' '--token-ref' '--no-ensure' '--timeout' '--wait-timeout' '--isolate' '--keep-slice-project' '--declaration' '--host' '--stack' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:starcistacks') _values 'flags' '--new' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:test-world') _values 'flags' '--root' '--project' '--tests' '--out' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

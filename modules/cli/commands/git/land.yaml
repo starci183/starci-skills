@@ -31,6 +31,3 @@ examples:
   - starci git land <worktree> <ref> --verified <sha> --verified-log <file> --concurrency 2
   - starci git land <worktree> <ref> --dry-run --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - bash land-to-main.sh

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// check-spec-budget.mjs - TEST_BUDGET (rule R226), ADVISORY for alpha.4.
+// check-spec-budget.mjs - TEST_BUDGET (rule R226), ADVISORY.
 // modules/kernel/spec-durations.yaml records, per spec file, the seconds the last land/pre-verify run measured and the one
 // per-file limit. Every recorded spec over the limit is reported as an INFO finding ranked by its excess; it does not fail
-// the check stage (the release record lists them). The budget turns blocking once the heavy specs are sped up (alpha.5).
+// the check stage (the release record lists them).
 // A row whose spec no longer exists is stale data and is an error.
 import fs from 'node:fs';
 import path from 'node:path';

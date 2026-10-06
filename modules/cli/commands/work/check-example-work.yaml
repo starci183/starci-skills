@@ -9,6 +9,3 @@ json: none
 examples:
   - starci work check-example-work
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/work/validate/check-example-work.mjs

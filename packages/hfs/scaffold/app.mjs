@@ -65,7 +65,7 @@ export const packageJsonText = value => `${JSON.stringify(value, null, 2)}\n`;
  * The apps a new app starts with: on the be side the `core` api app and the `cli` app over one `primary` connection, two Next apps
  * (landing, app) on the fe side, which read the be contracts for their codegen.
  */
-export const STARTER_SIDES = Object.freeze({
+const STARTER_SIDES = Object.freeze({
   be: Object.freeze({ apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], kinds: ['api', 'cli'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }] }),
   // fe: the landing and the product app, over the shared ui and i18n packages (both opt-in slots, enabled here).
   fe: Object.freeze({ apps: [{ name: 'landing', kind: 'next' }, { name: 'app', kind: 'next' }], reads: ['be/contracts/'], optionalSlots: ['fe.package.ui', 'fe.package.i18n'] }),

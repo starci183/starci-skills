@@ -11,5 +11,3 @@ exit: {"0": every assertion replays as recorded, "1": "a replay differs, is stal
 json: none
 examples: ['starci work example-verify --work .starciwork --record <id> --cwd <repo>']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/example/example-verify.mjs']

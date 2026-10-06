@@ -60,8 +60,7 @@ export function artifactHoldOf(target, { env = process.env, repos = registeredRe
     let paths;
     try {
       const db = openReadOnly(ledger);
-      // alpha.3: job_artifacts index blobs by sha256 and hold no repository path (no `path` column), so an alpha.3
-      // ledger holds no tree; only a ledger that still indexes paths does.
+      // job_artifacts index blobs by sha256 and hold no repository path, so a ledger without a `path` column holds no tree.
       try { paths = hasLedgerTable(db, 'job_artifacts') && hasLedgerColumn(db, 'job_artifacts', 'path') ? db.prepare('SELECT DISTINCT path FROM job_artifacts').all().map((row) => row.path) : []; }
       finally { db.close(); }
     } catch (error) {

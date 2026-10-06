@@ -16,7 +16,3 @@ examples:
   - starci gate starcistacks <repo-root>
   - starci gate starcistacks <repo-root> --new --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/starcistacks.mjs
-  - node .claude/scripts/gates/starcistacks.mjs

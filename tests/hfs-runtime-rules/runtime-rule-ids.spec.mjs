@@ -1,21 +1,29 @@
-// runtime-rule-ids.spec.mjs - RT_RULE_ID_UNKNOWN, RT_RULE_ID_GAP and RT_RULE_UNCITED (scripts/hfs/runtime-rules/rule-ids.mjs):
-// every rule id the tracked text names is a rule of the catalog, the id run has no undeclared gap, and every catalog rule is
+// runtime-rule-ids.spec.mjs - RT_RULE_ID_UNKNOWN and RT_RULE_UNCITED (scripts/hfs/runtime-rules/rule-ids.mjs):
+// every rule id the tracked text names is a rule of the catalog, a gap between ids is accepted, and every catalog rule is
 // cited by a pattern topic or is scope: runtime.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadRuleCatalog } from '../../scripts/hfs/slots.mjs';
-import { gapIds, retiredProblems, ruleIdFindings } from '../../scripts/hfs/runtime-rules/rule-ids.mjs';
+import { ruleIdFindings } from '../../scripts/hfs/runtime-rules/rule-ids.mjs';
 
 const catalog = loadRuleCatalog();
 const ctxOf = (texts) => ({ root: process.cwd(), files: Object.keys(texts), params: { generated: [{ root: 'packages/x/runtime' }] }, read: (file) => texts[file] ?? null });
 const live = (found) => found.filter((f) => f.code === 'RT_RULE_ID_UNKNOWN').map((f) => [f.path, f.line]);
 
-test('RT_RULE_ID_GAP: the shipped catalog has no undeclared gap; a rule or a retired id fills each id', () => {
-  assert.deepEqual(gapIds(catalog), []);
-  assert.ok(catalog.retired.length > 0 && catalog.retired.every((entry) => entry.reason));
-  assert.deepEqual(gapIds({ rules: [{ id: 'R01' }, { id: 'R04' }], retired: [{ id: 'R02' }] }), ['R03']);
+const catalogText = fs.readFileSync(path.join(process.cwd(), 'knowledge/hfs/rules.yaml'), 'utf8');
+
+test('rule ids: a gap between two ids is accepted; a duplicate or malformed id is refused by the catalog loader', () => {
+  const lines = catalogText.split('\n');
+  const at = lines.indexOf('  - id: R03');
+  const next = lines.findIndex((line, i) => i > at && line.startsWith('  - id: R'));
+  const swap = (id) => lines.map((line, i) => (i === at ? `  - id: ${id}` : line)).join('\n');
+  const gapped = [...lines.slice(0, at), ...lines.slice(next)].join('\n');
+  assert.ok(at > 0 && next > at);
+  assert.ok(!loadRuleCatalog({ text: gapped }).rules.some((r) => r.id === 'R03'), 'a catalog without R03 loads');
+  assert.throws(() => loadRuleCatalog({ text: swap('R02') }), /ids must increase/);
+  assert.throws(() => loadRuleCatalog({ text: swap('R3') }), /R<two or three digits>/);
 });
 
 test('RT_RULE_ID_UNKNOWN: an id no rule has is refused in knowledge, docs and code, with its line', () => {
@@ -23,12 +31,9 @@ test('RT_RULE_ID_UNKNOWN: an id no rule has is refused in knowledge, docs and co
   assert.deepEqual(live(found), [['knowledge/x.yaml', 2], ['scripts/a.mjs', 1]]);
 });
 
-test('RT_RULE_ID_UNKNOWN: a retired id is refused in live files and allowed in the history files', () => {
-  const retired = catalog.retired[0].id;
-  const text = `Retired: ${retired}\n`;
-  assert.deepEqual(live(ruleIdFindings(ctxOf({ 'knowledge/patterns/x.yaml': text }))), [['knowledge/patterns/x.yaml', 1]]);
-  assert.deepEqual(live(ruleIdFindings(ctxOf({ 'packages/hfs/CHANGELOG.md': text }))), []);
-  assert.deepEqual(live(ruleIdFindings(ctxOf({ 'modules/kernel/current.yaml': text }))), [['modules/kernel/current.yaml',1]]);
+test('RT_RULE_ID_UNKNOWN: an unknown id is refused in a changelog and in a live file alike', () => {
+  const text = 'Dropped: R999\n';
+  assert.deepEqual(live(ruleIdFindings(ctxOf({ 'packages/hfs/CHANGELOG.md': text, 'modules/kernel/current.yaml': text }))), [['packages/hfs/CHANGELOG.md', 1], ['modules/kernel/current.yaml', 1]]);
 });
 
 test('RT_RULE_ID_UNKNOWN: specs, generated copies, lock files and other extensions are not read', () => {
@@ -52,12 +57,4 @@ test('RT_RULE_UNCITED: every rule of the real catalog is cited by a pattern topi
   const files = walk('knowledge/patterns').filter((f) => f.endsWith('.yaml'));
   const found = ruleIdFindings({ root, files, params: {}, read: (f) => fs.readFileSync(path.join(root, f), 'utf8') });
   assert.deepEqual(found.filter((f) => f.code === 'RT_RULE_UNCITED'), []);
-});
-
-test('RT_RULE_ID_GAP: a retired list that names a live rule, repeats an id or lacks a reason is refused', () => {
-  assert.deepEqual(retiredProblems(catalog), []);
-  const rules = [{ id: 'R01' }];
-  assert.match(retiredProblems({ rules, retired: [{ id: 'R01', reason: 'x' }] })[0], /both a rule and retired/);
-  assert.match(retiredProblems({ rules, retired: [{ id: 'R02', reason: 'x' }, { id: 'R02', reason: 'y' }] })[0], /retired twice/);
-  assert.match(retiredProblems({ rules, retired: [{ id: 'R02' }] })[0], /needs an id/);
 });

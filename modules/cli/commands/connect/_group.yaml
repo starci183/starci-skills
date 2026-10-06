@@ -1,4 +1,3 @@
 group: connect
 summary: operate owner connectors and their delivery services
 owner: runtime
-since: 1.0.0-alpha.4

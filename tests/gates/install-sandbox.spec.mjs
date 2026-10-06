@@ -84,6 +84,6 @@ test('the summary counts results and the markdown escapes table pipes', () => {
 });
 
 test('the arguments parse flags with values and switches', () => {
-  assert.deepEqual(parseArgs(['--tarball', 't.tgz', '--docker', '--tools', 'd', '--keep', '--json', 'o.json']), { tarball: 't.tgz', keep: true, docker: true, tools: 'd', json: 'o.json' });
+  assert.deepEqual(parseArgs(['--tarball', 't.tgz', '--docker', '--tools', 'd', '--keep', '--out', 'o.json']), { tarball: 't.tgz', keep: true, docker: true, tools: 'd', out: 'o.json' });
   assert.equal(parseArgs([]).tarball, undefined);
 });

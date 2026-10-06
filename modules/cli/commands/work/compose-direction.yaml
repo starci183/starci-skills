@@ -20,5 +20,3 @@ exit: {"0": composite written, "1": composition refused, "2": bad usage}
 json: flag
 examples: ['starci work compose-direction --ui <record> --content <png> --breakpoint mobile --theme light']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/compose-direction.mjs']

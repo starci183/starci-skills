@@ -16,5 +16,3 @@ examples:
   - starci task show reconciler
   - starci task show harness-tunnel --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

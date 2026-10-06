@@ -209,7 +209,7 @@ test('the quality files of each example are rendered from the source slot manife
   assert.deepEqual(codes(root), []);
 });
 
-test('the runtime is measured by one scope: the codecov runtime flag (informational), the root sonar-project.properties, the coverage producer and the tag-run ci.yml all read it', () => {
+test('the runtime is measured by one scope: the codecov runtime flag (informational), the root sonar-project.properties, the coverage producer and the main-and-tag-run ci.yml all read it', () => {
   const codecov = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8'));
   const flag = codecov.flag_management.individual_flags.find((entry) => entry.name === RUNTIME_FLAG);
   assert.deepEqual(flag.paths, runtimeCodecovPaths());
@@ -226,15 +226,15 @@ test('the runtime is measured by one scope: the codecov runtime flag (informatio
   const ci = parseYaml(fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8')).jobs['check-and-test'];
   assert.equal(ci.permissions['id-token'], 'write');
   assert.ok(!ci.steps.some((step) => step.run === 'npm test'), 'the suite runs once, under coverage');
-  assert.ok(ci.steps.some((step) => step.run === 'npm run test:coverage'));
+  assert.ok(ci.steps.some((step) => step.run === 'npm run starci --silent -- gate runtime-coverage'));
   const upload = ci.steps.find((step) => String(step.uses ?? '').startsWith('codecov/codecov-action@'));
   assert.equal(upload.with.flags, RUNTIME_FLAG);
   assert.equal(upload.with.files, RUNTIME_LCOV);
-  assert.ok(String(upload.if).includes("startsWith(github.ref, 'refs/tags/v')"), 'Codecov uploads only from the release-tag run');
+  assert.equal(upload.if, '${{ !cancelled() }}', 'Codecov uploads from every run (main push, release tag, dispatch), also after a red test');
   const sonarSteps = ci.steps.filter((step) => String(step.uses ?? '').startsWith('SonarSource/'));
   assert.equal(sonarSteps.length, 1, 'one scan step that also waits for the quality gate');
   const scan = sonarSteps[0];
-  assert.ok(String(scan.if).includes("startsWith(github.ref, 'refs/tags/v')"), 'Sonar runs only in the release-tag run');
+  assert.ok(String(scan.if).includes("github.ref == 'refs/heads/main'"), 'Sonar scans the branch main only, never a tag ref');
   for (const setting of ['SONAR_TOKEN', 'SONAR_ORGANIZATION', 'SONAR_PROJECT_KEY']) assert.ok(String(scan.if).includes(`env.${setting} != ''`), `the scan needs ${setting}`);
   assert.equal(ci.env.SONAR_HOST_URL, 'https://sonarcloud.io', 'the runtime job scans SonarCloud, never the self-hosted server of examples.yml');
   assert.equal(ci.env.SONAR_ORGANIZATION, '${{ vars.SONAR_ORGANIZATION }}');

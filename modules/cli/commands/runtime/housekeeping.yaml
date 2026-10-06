@@ -14,6 +14,3 @@ examples:
   - starci runtime housekeeping --dry-run
   - starci runtime housekeeping --apply --only tmp,logs
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/housekeeping/housekeeping.mjs

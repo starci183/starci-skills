@@ -32,8 +32,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import { putBlob, blobAsFile } from '../../engine/db/blob.mjs';
 import { cropImage, decodePng, encodePng, keyRect } from './png.mjs';
-import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, drawingAcceptance } from './direction-part.mjs';
-import { byCodeUnit } from '../lib/list.mjs';
+import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, drawingAcceptance } from './direction-part.mjs'; import { byCodeUnit } from '../lib/list.mjs';
 import {
   SLOT_FILL_MIN, assetsOf, flag, flags, indexFilesUnder, list, parseUiRef, readYamlOrNull, sha256File, sha256Of, slash, writeRecordFile,
 } from './work-io.mjs';
@@ -784,7 +783,7 @@ export function destinationFor(record, node, { route = null, activeNav = null, k
   return byNav ? { destination: byNav, by: 'activeNav' } : null;
 }
 
-// alpha.3 (ARCHITECTURE-DB §5.1): a layout capture is agent data - a blob the layout tree cites {name, sha256, ...},
+// a layout capture is agent data - a blob the layout tree cites {name, sha256, ...},
 // never a file under .starciwork/shell/assets. addCapture puts the bytes in the blob store (and a copy in the job's
 // scratch/captures/layouts, which starci kernel report attaches by itself). A capture recorded with a `path` (a tree
 // written before) still reads from the tree.

@@ -38,7 +38,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { putBlob as storeBlob, blobPath, getBlob } from './blob.mjs';
 import { redactBytes, redactData, redactText } from '../../scripts/lib/redact.mjs'; import { isMain } from '../../scripts/lib/is-main.mjs';
 import { isSpecRun, readEnv } from '../../scripts/lib/env.mjs';
-import { pathKey } from '../../scripts/lib/path-key.mjs';
+import { pathKey } from '../../scripts/lib/path-key.mjs'; import { pidAlive } from '../../scripts/lib/pid-alive.mjs';
 import { insertPairs, insertRowWith } from '../../scripts/lib/sqlite.mjs';
 import { need as refuseUnless } from '../refuse.mjs';
 import { sha256 } from '../digest.mjs';
@@ -117,8 +117,7 @@ const bool = (v) => (v === undefined || v === null ? null : v ? 1 : 0);
 const writerPragmas = (env) => ({ synchronous: 'NORMAL', busy_timeout: busyTimeoutOf(env), temp_store: 'MEMORY', cache_size: -16000,
   journal_size_limit: 67108864, trusted_schema: 'OFF' });
 const pragma = (db, name) => { const row = db.prepare(`PRAGMA ${name}`).get(); return row ? Object.values(row)[0] : null; };
-/** True while `pid` names a live process (EPERM counts as alive). */
-export const pidAlive = (pid) => { if (!Number.isInteger(pid) || pid <= 0) return false; try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
+export { pidAlive };
 const { openWithRetry, connectionState } = machineConnectionMethods({ reportIncident: corruptIncident });
 /** Operational failures also persist their incident through a fresh writer or the deferred outbox. */
 function corruptIncident(file, error, details) {

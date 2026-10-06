@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { refuse } from './refuse.mjs';
-import { byCodeUnit } from '../scripts/lib/list.mjs';
+import { byCodeUnit } from './by-code-unit.mjs';
 
 const PATH_LEASE_PREFIX='path:';
 const GLOB_META=/[*?[\]{}]/;

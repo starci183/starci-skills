@@ -22,10 +22,6 @@ examples:
   - starci kernel peers --repo <path> --workflow <workflow>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api peers
-  - node scripts/kernel/cli.mjs peers
 rule: "A peer is every OTHER workflow of the same ledger whose phase is running, that is not
   archived, and that shares a source root (workflows.source_roots_json) with --workflow; a workflow
   with no recorded roots shares every root. define-goal records the ledger's own repo as every

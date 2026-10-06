@@ -135,7 +135,7 @@ properties:
       - result
       - screens
       - videos
-    description: The one UAT run this manifest settled on. A run is agent output (ARCHITECTURE-DB §5.2) - its
+    description: The one UAT run this manifest settled on. A run is agent output (docs/ledger-db.md) - its
       files are blobs, cited here by sha256 (and the job_artifacts id when starci kernel report returned one), never a
       runs/ directory in the tree. A done work/uat-flow@1 must cite exactly one run with at least one
       screenshot, at least one recording and a result reporting a pass.

@@ -10,7 +10,3 @@ json: flag
 examples:
   - starci workflow assess --repo <path> --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/goal/assess.mjs
-  - node .claude/scripts/goal/assess.mjs

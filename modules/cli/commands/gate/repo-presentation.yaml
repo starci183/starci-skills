@@ -15,7 +15,3 @@ examples:
   - starci gate repo-presentation --root <repo>
   - starci gate repo-presentation --root <repo> --runtime --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/repo-presentation.mjs
-  - node .claude/scripts/gates/repo-presentation.mjs

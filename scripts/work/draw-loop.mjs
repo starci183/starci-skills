@@ -73,8 +73,7 @@ import { contextualCriticFor, runCritic, rubricFor } from './draw-critic.mjs';
 import { archetypeOf } from './ui-archetype.mjs';
 import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
 import { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings } from './draw/draw-loop-coverage.mjs';
-import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw/draw-rationale.mjs'; import { isMain } from '../lib/is-main.mjs';
-import { byCodeUnit } from '../lib/list.mjs';
+import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw/draw-rationale.mjs'; import { isMain } from '../lib/is-main.mjs'; import { byCodeUnit } from '../lib/list.mjs';
 
 export { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings };
 
@@ -232,7 +231,7 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
 // ---------------------------------------------------------------------------------------------------------
 
 const loopFileOf = (out) => path.join(out, 'loop.json');
-// The loop is agent data (ARCHITECTURE-DB §5.1): its rounds live in the op's job scratch (op-context.mjs; else an OS-temp
+// The loop is agent data (docs/ledger-db.md): its rounds live in the op's job scratch (op-context.mjs; else an OS-temp
 // folder keyed by the ui record), never in .starciwork. finish puts the whole loop in the blob store as one bundle
 // (engine/db/blob.mjs putBundle) and generation.loop cites it {sha256: <bundle manifest>, round}.
 export const defaultOutOf = (uiDir, base, state, context = opContextOf()) => path.join(
@@ -503,8 +502,8 @@ async function runComponentRound(o) {
   let critique = null;
   if (o.critic !== false) {
     // The critic reads the rendered DOM (what the images show), never the bundle harness; it is picked by criticFor
-    // exactly as for an html round - a real-component round used to hand settings.critic straight to runCritic, so a
-    // Codex drawer was judged by Codex and a missing critic threw (no critique.json, DRAW_BEAUTY_BELOW with no score).
+    // exactly as for an html round - a real-component round never hands settings.critic straight to runCritic, so a
+    // Codex drawer is not judged by Codex.
     critique = await critiqueRound({ loop, n, roundDir, captures, html: domFile ?? source, uiDir, archetype: archetype?.archetype ?? null, record: ui?.record ?? null, shape: name, settings, drawer: o.drawer, orca: o.criticOrca ?? null });
   }
   const beauty = critique?.verdict?.beauty ?? null;

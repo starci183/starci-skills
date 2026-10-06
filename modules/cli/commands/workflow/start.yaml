@@ -45,7 +45,3 @@ examples:
   - starci workflow start --repo <path> --goal <workflow_id> --caller-agent codex --caller-model gpt-6.1-sol --caller-effort high
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci start
-  - node scripts/kernel/start-workflow.mjs

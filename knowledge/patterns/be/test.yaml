@@ -112,20 +112,9 @@ rules:
       a partial application.
     cases:
       - id: case-1
-        when: The subject
-        write: |-
-          const moduleRef = await Test.createTestingModule({
-              providers: [
-                  CommissionService,
-                  { provide: PRIMARY_ENTITY_MANAGER, useValue: entityManager },
-                  { provide: CLOCK, useValue: clock },
-              ],
-          }).compile()
-          const service = moduleRef.get(CommissionService)
-      - id: case-2
         when: A real module is tempting
         write: 'list the doubles as providers instead: `imports: [PurchaseModule]` and `overrideProvider(TOKEN)` are findings (spec-builds-with-testing-module, spec-no-module-mock)'
-      - id: case-3
+      - id: case-2
         when: The call
         write: 'await service.accrue(params); assert the returned Outcome with toSucceedWith or toBeRefused, never a protected hook'
     verification:
@@ -134,7 +123,7 @@ rules:
         - BE_RAW_INJECT
       manual:
         - Review that a double matches the real dependency contract.
-    relatedExamples: []
+    relatedExamples: [service-spec]
   - id: BE-TEST-3
     title: The providers list equals the constructor dependencies
     kind: mandatory
@@ -163,7 +152,7 @@ rules:
         - BE_SPEC_QUALITY
         - BE_RAW_INJECT
       manual: []
-    relatedExamples: []
+    relatedExamples: [service-spec]
   - id: BE-TEST-4
     title: Doubles come from the kit; the ban list
     kind: mandatory
@@ -287,76 +276,24 @@ rules:
     kind: mandatory
     hfsRules: [R48, R47]
     requirement: |-
-      Write a service spec in the shape of these two owner-approved examples. `CommissionService.accrue` has three branches:
-      a self referral is refused with no database access, a duplicate returns the existing accrual with no save, and an accrual is
-      `floor(paid * bps / 10000)` stamped with `accruedAt` from the clock. Its spec provides ONLY `PRIMARY_ENTITY_MANAGER` and
-      `CLOCK` and uses `mockEntityManager` stubs whose absence proves no extra database call. `MemberProfileService.profile` reads
-      through a cache and a Keycloak admin wrapper. Its spec provides ONLY `CACHE` and `KEYCLOAK_ADMIN` (the clock belongs to
-      `fakeCache(clock)`, not to the service) and reaches 100% coverage. Test names are English sentences.
+      Write a service spec in the shape of the two owner-approved example specs (example reference `service-spec`).
+      `invoice.service.spec.ts` builds `InvoiceService` through the testing module and provides ONLY its constructor dependencies
+      (entity manager, clock, inbox, event bus, options), uses `fakeTransaction(mockEntityManager(...))` stubs whose absence proves
+      no extra database call, and asserts the success outcome, the refusal of an over-limit total and the replay of a duplicate
+      together with the transaction and the published events. `session.service.spec.ts` builds `SessionService`, which reads
+      through a cache and a provider client, and provides ONLY `CACHE`, `KEYCLOAK`, `LOGGER` and `IDS` (the clock belongs to
+      `fakeCache(clock)`, not to the service), asserts the cache TTL through the cache double and the refusal of an unknown token.
+      Every service spec meets the per-file coverage law of BE-TEST-13 (R47, R204) for its service. Test names are English
+      sentences.
     rationale: |-
       Two concrete specs fix the reading of every other rule: which doubles, what is provided, what a stub's absence proves.
-    cases:
-      - id: case-1
-        when: CommissionService.accrue
-        write: |-
-          describe("CommissionService.accrue", () => {
-              const clock = new FakeClock("2026-01-01T00:00:00.000Z")
-              const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
-                  const moduleRef = await Test.createTestingModule({
-                      providers: [
-                          CommissionService,
-                          { provide: PRIMARY_ENTITY_MANAGER, useValue: entityManager },
-                          { provide: CLOCK, useValue: clock },
-                      ],
-                  }).compile()
-                  return moduleRef.get(CommissionService)
-              }
-
-              it("accrues 30% of the paid amount, rounded down, stamped with the clock", async () => {
-                  const entityManager = mockEntityManager({ findOne: [Accrual, null], save: [Accrual, accrual] })
-                  const outcome = await (await build(entityManager)).accrue({ referrerId, buyerId, paid: 10_001, bps: 3000 })
-                  expect(outcome).toSucceedWith(expect.objectContaining({ amount: 3000, accruedAt: clock.now() }))
-              })
-
-              it("refuses a self referral without touching the database", async () => {
-                  const outcome = await (await build(mockEntityManager())).accrue({ referrerId, buyerId: referrerId, paid: 10_000, bps: 3000 })
-                  expect(outcome).toBeRefused("COMMISSION_SELF_REFERRAL")
-              })
-
-              it("returns the existing accrual for a duplicate and saves nothing", async () => {
-                  const entityManager = mockEntityManager({ findOne: [Accrual, accrual] })
-                  const outcome = await (await build(entityManager)).accrue({ referrerId, buyerId, paid: 10_000, bps: 3000 })
-                  expect(outcome).toSucceedWith(accrual)
-              })
-          })
-      - id: case-2
-        when: MemberProfileService.profile
-        write: |-
-          describe("MemberProfileService.profile", () => {
-              const clock = new FakeClock("2026-01-01T00:00:00.000Z")
-              const cache = fakeCache(clock)
-              const keycloakAdmin = mock<KeycloakAdminService>()
-              const build = async () => (await Test.createTestingModule({
-                  providers: [
-                      MemberProfileService,
-                      { provide: CACHE, useValue: cache },
-                      { provide: KEYCLOAK_ADMIN, useValue: keycloakAdmin },
-                  ],
-              }).compile()).get(MemberProfileService)
-
-              it("a miss reads Keycloak once and caches the profile for 300 seconds", async () => { /* cache.ttlOf(key) === 300 */ })
-              it("cache hit does not call Keycloak", async () => { /* expect(keycloakAdmin.findMember).toHaveBeenCalledTimes(1) after two reads */ })
-              it("re-reads Keycloak after the TTL expires", async () => { clock.advance(300_001) /* then one more call */ })
-              it("refuses a missing member and does not cache it", async () => { /* toBeRefused; cache.has(key) === false */ })
-              it("refuses when Keycloak is unavailable and does not cache it", async () => { /* toBeRefused; cache.has(key) === false */ })
-          })
     verification:
       automated:
         - BE_SPEC_QUALITY
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
       manual: []
-    relatedExamples: []
+    relatedExamples: [service-spec]
   - id: BE-TEST-7
     title: The feature tier is thin, so only the spec-required roles need unit specs
     kind: mandatory

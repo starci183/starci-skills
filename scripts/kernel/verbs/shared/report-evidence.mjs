@@ -1,4 +1,4 @@
-// report-evidence.mjs — what `starci kernel report` carries besides the envelope (alpha.3, ARCHITECTURE-DB §2.3 row 7, H10).
+// report-evidence.mjs — what `starci kernel report` carries besides the envelope (docs/ledger-db.md).
 //
 // A worker writes its report and every raw output under its job scratch (op_attempts.scratch_dir), a job-private
 // OS-temp directory outside every repository. starci kernel report reads the envelope ONCE, stores it only in `reports`, puts
@@ -226,7 +226,7 @@ function auditMatrixScope(value, shape) {
 }
 
 /**
- * interface.audit's verdict (ARCHITECTURE-DB §5.2: features/<f>/operations/** → interface_audits): an attached
+ * interface.audit's verdict (docs/ledger-db.md: features/<f>/operations/** → interface_audits): an attached
  * interface-audit.json {schema starci/interface-audit-operation@1, id operation.<feature>.<name>, feature?, scope |
  * selectedMatrix, verdict?, findings?, routeTo?} becomes the interface_audits row of that audit, bound to this attempt.
  */

@@ -84,10 +84,6 @@ examples:
   - starci kernel enqueue --repo <path> --workflow <workflow> --op <op> --paths <paths> --cut-id <cut> --cut-ordinal 1 --cut-total 3
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api enqueue
-  - node scripts/kernel/cli.mjs enqueue
 workUnit: "Every op job is a try of exactly one work unit (scripts/kernel/units.mjs; DBTREE
   work_units, jobs_enqueue_guard): one op, one subject key (engine/admission.mjs unitSubjectKey -
   cut:<id>#<ordinal>, else subject:<params.subject>, else the digest of the records, else of the

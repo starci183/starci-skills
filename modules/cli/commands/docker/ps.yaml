@@ -23,5 +23,3 @@ examples:
   - starci docker ps
   - starci docker ps --all --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

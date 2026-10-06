@@ -56,6 +56,8 @@ function* walk(dir) {
 
 const UPPER_RE = /(['"`])([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\1/g;
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)+';
+// A constant naming environment variables (ARTIFACT_ROOT_ENV = 'STARCI_ARTIFACT_ROOT', CONTROLLED_ENV = new Set(['SOPS_AGE_KEY', ...])): its literals are env names, not codes.
+const ENV_LIST_RE = /\b[A-Z][A-Z0-9_]*_ENV[A-Z0-9_]*\s*=\s*(?:new Set\(|Object\.freeze\()?(?:\[([^\]]*)\]|('[^']*'|"[^"]*"))/g;
 // A bracketed code in text: a message prefix ('[TARGET_MISSING] ...'), a comment or a YAML flow list. In JavaScript a
 // bracket around one identifier is code, not text: an element access (`baseline[KEY]`), an array literal (`[ROOT]`)
 // or a computed key (`{ [KEY]: v }`) reads a constant and emits nothing; `codeBrackets` finds those by parsing.
@@ -64,6 +66,7 @@ const KEBAB_RES = [
   new RegExp(`\\b(?:code|reason|rejected|failureCode|failureKind|signal|blocker)\\s*:\\s*(['"])(${KEBAB})\\1`, 'g'),
   new RegExp(`\\breason\\s*:\\s*\`(${KEBAB})(?=[:\`$])`, 'g'),
   new RegExp(`\\brefuse\\((?:[^;]*?),\\s*(['"])(${KEBAB})\\1`, 'g'),
+  new RegExp(`\\(\\s*message\\s*,\\s*code\\s*=\\s*(['"])(${KEBAB})\\1`, 'g'),
   new RegExp(`\\bhand\\(\\s*(['"])(${KEBAB})\\1`, 'g'),
 ];
 // A constant list of reasons/codes/classes: Object.freeze(['a-b', 'c-d']) or ['a-b'].
@@ -123,6 +126,7 @@ export function emittedCodes(base = root) {
     const text = fs.readFileSync(file, 'utf8');
     texts.push([rel, text]);
     for (const m of text.matchAll(/\b(?:(?:process\.)?env(?:\.|\[\s*['"])|readEnv\(\s*['"])([A-Z][A-Z0-9_]+)/g)) envNames.add(m[1]);
+    for (const list of text.matchAll(ENV_LIST_RE)) for (const name of (list[1] ?? list[2]).matchAll(/['"]([A-Z][A-Z0-9_]+)['"]/g)) envNames.add(name[1]);
   }
   for (const [rel, text] of texts) {
     for (const m of text.matchAll(UPPER_RE)) {

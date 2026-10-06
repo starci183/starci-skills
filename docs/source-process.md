@@ -3,7 +3,7 @@ Task: choose the test scope, the change path and the rights of each role for a c
 # Source management process
 
 Who may do what, and which test scope runs when, for `.claude` upgrades and for product coding (apps scaffolded by `starci app scaffold` / `starci app scaffold`, worked by
-workflows and ops). The git model (local lands, one push per release, CI triggers, tags, release notes) is [git governance](git-governance.md) and is not restated here.
+workflows and ops). The git model (lands, fast-forward pushes of main, CI triggers, tags, release notes) is [git governance](git-governance.md) and is not restated here.
 
 ## The test ladder
 
@@ -14,7 +14,7 @@ workflows and ops). The git model (local lands, one push per release, CI trigger
 | L2 dependent | the dependent-spec selection (imports and data paths) of the change against local main | lane to local main (pre-verify, land) | the lane lead (pre-verify), the coordinator (land) |
 | L3 boundary | the affected integration, contract and e2e specs when the change touches IO (database, queue, Kafka, webhook, saga, jobs) | at the land of that change only | the coordinator, opt-in by touched slot |
 | L4 full | every suite: runtime, packages, example unit, integration, e2e and contract, the Docker images, Sonar at zero, coverage per component, the Linux-parity CI jobs run locally | exactly once per release, before the tag | the release cut only |
-| L5 CI | the tag's CI on Linux | once per tag, as the confirmation | the CI service |
+| L5 CI | the CI run on Linux | every main push and every tag, as the confirmation | the CI service |
 
 On demand only: `unit.verify` and `e2e.verify` (the owner or the goal asks), and a debugging run of ONE red spec file. Never: the whole suite in a lane, a preview, an audit, a
 fresh clone or on main after a land; an install in a worktree someone else is editing; two heavy runs at once on the host (one lock).
@@ -31,7 +31,7 @@ the cause. There are no skip lists, no allowlists and no weakened specs.
 | L2 land (local main) | the dependent specs (imports and data paths) | the changed files | the FULL check set (`starci check run --level L2`): fast and structural | every affected project |
 | L3 land touching IO | L2 plus the affected integration, contract and e2e specs | as L2 | as L2 | as L2 |
 | L4 release cut (once, before the tag) | ALL: the runtime, the packages, and each example's unit, integration, e2e and contract runs | the whole repository and stylelint | the full check, `starci app check` of every example, Sonar at zero and the coverage per component (the existing local gate scans each example and reads its dashboard; the local SonarQube stack is started for it when stopped and put back as found) | every project; first a real `npm ci` in every example, and last the Linux-parity step: the CI-equivalent light jobs derived from `.github/workflows` (installs, the full check set, package clean installs, per example codegen, typecheck, starci app lint and the builds; never a spec suite) in a Linux container on this host |
-| L5 tag CI (Linux, once) | as L4 | as L4 | as L4 | as L4 |
+| L5 CI (Linux, every main push and tag) | as L4 | as L4 | as L4 | as L4 |
 
 Checks run in full from L2 because they are fast and catch structure errors early; the specs are the expensive part, so only L4 runs all of them. L4 is exactly the row above, each
 step to a recorded log; every skipped test is reported with its reason and every test must have passed in at least one leg, the host run or the Linux container run (the host-skipped spec files run in the container,
@@ -46,7 +46,7 @@ browser-conditional skips (draw-render, draw-rationale, draw-layer) may remain, 
 | commit | no (the runtime commits a passed slice) | yes, on its branch | land merge commits only | the release commit | yes |
 | merge local main into its branch | no | yes | yes | n/a | yes |
 | land to local main | no | no | yes (one serial slot) | n/a | yes |
-| push to the remote | no | no | backup refs only (`refs/backup/`) | yes: main and one tag, atomically | yes |
+| push to the remote | no | no | backup refs and fast-forward main | yes: main and one tag, atomically | yes |
 | create, move or delete a tag | no | no | no | creates the release tag only | decides the hygiene |
 | publish packages | no | no | no | yes, once per release | holds the credentials |
 | L0 and L1 tests | yes | yes | yes | yes | yes |
@@ -57,8 +57,8 @@ browser-conditional skips (draw-render, draw-rationale, draw-layer) may remain, 
 ## The two flows
 
 **A. A `.claude` upgrade.** A lane branch in its worktree, from local main. Workers run L0 and L1; the lead reviews, commits and runs pre-verify (L2). The coordinator lands L2
-(and L3) into local main and backs the refs up. The release cut then bumps the version, writes the CHANGELOG, publishes the packages, re-pins the examples, runs L4, and pushes main
-with its tag atomically; L5 confirms; the GitHub Release is made from the CHANGELOG section.
+(and L3) into local main backs the refs up and pushes main fast-forward (each main push starts CI). The release cut then bumps the version, writes the CHANGELOG, publishes the packages, re-pins the examples, runs L4, and pushes main
+with its tag atomically; L5 confirms the tag; the GitHub Release is made from the CHANGELOG section.
 
 **B. Product coding.** One workflow is one worktree from the app's local main. Ops run L0 and L1 through the op gate and the runtime commits each passed slice. The workflow finish
 lands into the app's local main with L2 (and L3 for touched IO). The app release (the owner) runs L4 (full unit, integration, e2e, build, images, Sonar), pushes main with its tag
@@ -82,7 +82,7 @@ path 2 or 1 picks up.
 
 ## Test budget
 
-A land run targets 15 minutes end to end, and each spec file has a 60-second budget. The measured seconds of every slow spec live in `modules/kernel/spec-durations.yaml` with the one limit; a spec over the limit is reported as an advisory INFO finding ranked by its excess (rule R226, `RT_SPEC_OVER_BUDGET`) in the check stage and listed in the release record. It does not fail the check in alpha.4; the budget becomes blocking once the heavy specs are sped up (alpha.5).
+A land run targets 15 minutes end to end, and each spec file has a 60-second budget. The measured seconds of every slow spec live in `modules/kernel/spec-durations.yaml` with the one limit; a spec over the limit is reported as an advisory INFO finding ranked by its excess (rule R226, `RT_SPEC_OVER_BUDGET`) in the check stage and listed in the release record. It does not fail the check.
 
 A file goes over budget by repeating setup that one process can share. Reduce it without weakening a test: build one fixture per spec process and reset it between cases, copy a template instead of re-seeding, keep one resident real entry instead of a process per call, inject the clock the production code already accepts, and never hide the cost with a longer timeout. Every test, every assertion and every production entry stays; a speed-up is accepted only with equal test and assertion counts and the mutations of the original spec still caught.
 
@@ -92,17 +92,7 @@ Every tracked JavaScript file must parse (rule R227, `RT_SYNTAX_INVALID`): a spe
 
 Shipped, as checks and code:
 
-- R221 `CI_TRIGGERS_RELEASE_ONLY`: workflows, in `.claude`, its examples and the hfs app templates (so every scaffolded app inherits it), start only on a release tag or by hand.
+- R221 `CI_TRIGGERS_RELEASE_ONLY`: the workflows of `.claude` start on a push to main, on a release tag or by hand; its examples and the hfs app templates (so every scaffolded app inherits it) start only on a release tag or by hand.
 - R222 `RELEASE_NOTES`: a release tag needs its finished CHANGELOG section.
-- The release flow (`starci release cut`, `scripts/supervisor/release-cut.mjs`) is the only path that pushes main, behind one lock function; it refuses a push of main without a new
-  annotated `v*` tag, a non-release tag, and a dirty tree, and it runs L4 once.
-
-Planned for alpha.4, owned by their own lanes (rule ids are claimed in their lanes, not here):
-
-1. Role rights in the PreToolUse command guard: deny a push, a tag, a publish and a commit to the worker and op roles; deny whole-suite test patterns outside the release cut and the
-   verify ops; deny an install without the host lock. The role comes from the seat or dispatch the guard already knows (the RIGHTS lane).
-2. App hook templates: the pre-commit hook is L0 only (typecheck moves to the op gate); the pre-push hook is a release gate check (HEAD carries a new release tag made by the release
-   cut and a recorded L4 log for it) and runs no tests (the RIGHTS lane).
-3. `.claude` gets the same two hooks (the RIGHTS lane).
-4. Test budgets: a land run targets 15 minutes or less, and a spec file over 60 seconds needs a shared fixture (the TEST-SPEED lane).
-5. The host lock as a runtime API: one heavy run at a time, owned by a role (the RIGHTS lane; the release cut calls it through one function until it lands).
+- The release flow (`starci release cut`, `scripts/supervisor/release-cut.mjs`) is the only path that pushes a release tag, behind one lock function; it pushes main with a new
+  annotated `v*` tag, refuses a non-release tag and a dirty tree, and runs L4 once. A main push without a tag is a fast-forward only (the pre-push gate refuses a force push).

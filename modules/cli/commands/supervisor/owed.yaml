@@ -21,6 +21,3 @@ examples:
   - starci supervisor owed ack --item <key> --commits <sha> --reason <text>
   - starci supervisor owed acks --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/owed.mjs

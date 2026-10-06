@@ -38,10 +38,6 @@ examples:
   - starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev> --read-manifest <file>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api kernel-ack-rev
-  - node scripts/kernel/cli.mjs kernel-ack-rev
 reads: current workflow, job, singleton signal and actual required runtime contract bytes
 writes: one runtime-rev-acked event bound to the exact current incarnation and complete required READ hashes
 returns: '{ok:true, workflowId, readManifest, rev?, attempt?}'

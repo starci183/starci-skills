@@ -7,6 +7,7 @@
 // an object without one is a finding on the document. The finding names the service and every problem.
 import { operationProblems, parseDocument, parseSchema, rootFieldsOf } from '../../lib/graphql-contract.mjs';
 import { found, readText } from './read.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 export const FE_GRAPHQL_CONTRACT = 'FE_GRAPHQL_CONTRACT';
 
@@ -32,7 +33,7 @@ function contractsOf(repoRoot, files, findings) {
 
 /** The findings of R113 over the tracked paths `files` of the app at `repoRoot`. */
 export function feContractFindings({ repoRoot, files }) {
-  const documents = files.filter(isDocument).sort();
+  const documents = files.filter(isDocument).sort(byCodeUnit);
   if (documents.length === 0) return [];
   const findings = [];
   const contracts = contractsOf(repoRoot, files, findings);

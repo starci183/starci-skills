@@ -16,7 +16,3 @@ json: always
 examples:
   - starci release proof --repo <repo> --base <range-start>^ --out release-proof.json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/release-proof.mjs
-  - node .claude/scripts/gates/release-proof.mjs

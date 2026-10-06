@@ -22,5 +22,3 @@ examples:
   - starci supabase stop --cwd <app>
   - starci supabase stop --cwd <app> --no-backup
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

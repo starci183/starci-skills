@@ -7,8 +7,9 @@ import { captureProcessIdentity } from '../../scripts/api/process/capture-proces
 import { stopOwnedProcess } from '../../scripts/api/process/stop-owned-process.mjs';
 import { OWNED_PROCESS_SCHEMA } from '../../scripts/lib/process-identity.mjs';
 import { CONNECTOR_LAUNCH_ENV } from '../../scripts/connectors/lib.mjs';
+import { winPath } from '../fixtures/win-path.mjs';
 
-const identity = { pid: 4123, birth: '134038224001234567', exe: 'C:\\fixture\\node.exe' };
+const identity = { pid: 4123, birth: '134038224001234567', exe: winPath('C', 'fixture', 'node.exe') };
 const reply = (extra = {}) => ({ status: 0, stdout: JSON.stringify({ schema: OWNED_PROCESS_SCHEMA, pid: identity.pid,
   ok: true, outcome: 'stopped', proof: 'process-handle-signaled', birth: identity.birth, exe: identity.exe, ...extra }) });
 
@@ -19,7 +20,7 @@ test('only an exact identity and completed same-handle native receipt can prove 
   assert.deepEqual(stopped.identity, identity);
   for (const made of [{ ...reply(), status: null }, { ...reply(), signal: 'SIGTERM' },
     { ...reply(), error: Error('native call incomplete') }, { status: 0, stdout: '{}' },
-    reply({ birth: '134038224001234568' }), reply({ exe: 'C:\\foreign\\node.exe' }),
+    reply({ birth: '134038224001234568' }), reply({ exe: winPath('C', 'foreign', 'node.exe') }),
     reply({ outcome: 'captured' }), reply({ proof: 'termination-requested' }), { status: 0, stdout: 'not-json' }]) {
     const result = stopOwnedProcess(identity, { platform: 'win32', run: () => made });
     assert.equal(result.ok, false);
@@ -87,7 +88,7 @@ test('real isolated native child refuses wrong birth/image/launch nonce, then ex
   assert.equal(actual.ok, true, JSON.stringify(actual));
   assert.equal(actual.outcome, 'captured');
   for (const wrong of [{ ...actual.identity, birth: String(BigInt(actual.identity.birth) + 1n) },
-    { ...actual.identity, exe: 'C:\\foreign-fixture\\node.exe' }]) {
+    { ...actual.identity, exe: winPath('C', 'foreign-fixture', 'node.exe') }]) {
     const refused = stopOwnedProcess(wrong);
     assert.equal(refused.ok, false, JSON.stringify(refused));
     assert.equal(refused.outcome, 'refused');
@@ -104,7 +105,7 @@ test('real isolated native child refuses wrong birth/image/launch nonce, then ex
 });
 
 test('the stop call keeps its original custody when options contain another identity', () => {
-  const foreign = { ...identity, pid: identity.pid + 1, birth: '134038224001234568', exe: 'C:\\foreign\\node.exe' };
+  const foreign = { ...identity, pid: identity.pid + 1, birth: '134038224001234568', exe: winPath('C', 'foreign', 'node.exe') };
   let calls = 0;
   const result = stopOwnedProcess(identity, { platform: 'win32', identity: foreign,
     run: () => { calls++; return reply(); } });

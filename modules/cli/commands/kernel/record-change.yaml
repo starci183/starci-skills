@@ -38,10 +38,6 @@ examples:
   - starci kernel record-change --repo <path> --workflow <workflow> --record <record> --reach advisory --reason <reason> --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api record-change
-  - node scripts/kernel/cli.mjs record-change
 reads: the record's files in the product checkout and their committed (git HEAD) bytes, the ledger's
   foundations, the catalog and feature scope records, every live workflow's op jobs (ownership), and
   with --reach follow-up the settled jobs of every other running workflow (inputDrift)

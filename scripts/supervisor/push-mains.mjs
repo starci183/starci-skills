@@ -57,8 +57,7 @@ import { FORBIDDEN_FILES, SECRET_PATTERNS, secretHits } from '../lib/secret-patt
 import { foldCase, realPath, slash } from '../lib/path-key.mjs';
 import { isSopsEnvelope, setCommand } from '../lib/sops-envelope.mjs';
 import { forEachFileLine } from '../lib/read-text.mjs';
-import { starciSourceRoot } from '../../engine/runtime-root.mjs'; import { isMain } from '../lib/is-main.mjs';
-import { byCodeUnit } from '../lib/list.mjs';
+import { starciSourceRoot } from '../../engine/runtime-root.mjs'; import { isMain } from '../lib/is-main.mjs'; import { byCodeUnit } from '../lib/list.mjs';
 export { FORBIDDEN_FILES, SECRET_PATTERNS };
 
 /**

@@ -1,0 +1,19 @@
+group: gate
+verb: install-sandbox
+owner: runtime
+summary: prove the packed runtime tarball installs and runs in an empty home
+impl: {script: scripts/gates/install-sandbox.mjs}
+flags:
+  - {name: tarball, type: string, required: true, summary: the npm pack tarball of the root package}
+  - {name: keep, type: boolean, summary: keep the sandbox directory after the run}
+  - {name: docker, type: boolean, summary: run the proof inside a throwaway Linux container}
+  - {name: tools, type: string, summary: directory holding a Linux age-keygen for the container run}
+  - {name: out, type: string, summary: write the JSON summary to this file}
+exit:
+  "0": every assertion passed
+  "1": an assertion failed
+  "2": bad usage or the sandbox could not run
+json: none
+examples:
+  - starci gate install-sandbox --tarball starci-1.0.0-alpha.5.tgz
+editions: [full]

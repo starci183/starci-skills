@@ -25,13 +25,11 @@ const catalog = {
         group: 'runtime', verb: 'check', summary: 'check the runtime', flags: [],
         effect: 'host', roles: ['lead', 'owner'], conventions: ['run the scoped checks only'],
         exit: { 0: 'clean', 1: 'findings', 2: 'bad usage' }, json: 'flag',
-        removed: ['node scripts/checks/check-runtime.mjs'],
       },
       install: { group: 'runtime', verb: 'install', summary: 'install the runtime', flags: [{ name: 'force', type: 'boolean' }], json: 'none' },
     } },
   },
 };
-const retired = [{ spelling: 'starci api survey', use: 'starci kernel survey' }];
 const capture = () => {
   const value = { out: '', err: '' };
   return { value, stdout: (text) => { value.out += text; }, stderr: (text) => { value.err += text; } };
@@ -45,25 +43,25 @@ test('@starci/cli pins the exact @starci/hfs package version', () => {
 
 test('help and completion are served without a runtime', async () => {
   const top = capture();
-  assert.equal(await main(['help'], { ...top, catalog, retired, version: 'test' }), 0);
+  assert.equal(await main(['help'], { ...top, catalog, version: 'test' }), 0);
   assert.match(top.value.out, /Groups:/);
   const group = capture();
-  assert.equal(await main(['runtime', '--help'], { ...group, catalog, retired }), 0);
+  assert.equal(await main(['runtime', '--help'], { ...group, catalog }), 0);
   assert.match(group.value.out, /check\s+\[host\] check the runtime/);
   const verb = capture();
-  assert.equal(await main(['runtime', 'check', '--help'], { ...verb, catalog, retired }), 0);
+  assert.equal(await main(['runtime', 'check', '--help'], { ...verb, catalog }), 0);
   assert.match(verb.value.out, /check the runtime/);
   assert.match(verb.value.out, /Effect: host\nRoles: lead, owner/);
   assert.match(verb.value.out, /Conventions:\n  - run the scoped checks only/);
   assert.match(verb.value.out, /Exit codes:/);
   const explain = capture();
-  assert.equal(await main(['explain', 'runtime', 'check'], { ...explain, catalog, retired }), 0);
-  assert.match(explain.value.out, /Replaces: node scripts\/checks\/check-runtime\.mjs/);
+  assert.equal(await main(['explain', 'runtime', 'check'], { ...explain, catalog }), 0);
+  assert.match(explain.value.out, /Effect: host/);
   const unknown = capture();
-  assert.equal(await main(['explain', 'runtime', 'nope'], { ...unknown, catalog, retired }), 2);
+  assert.equal(await main(['explain', 'runtime', 'nope'], { ...unknown, catalog }), 2);
   assert.match(unknown.value.err, /available: check, install/);
   const completion = capture();
-  assert.equal(await main(['completion', 'bash'], { ...completion, catalog, retired, completionFor: () => 'complete\n' }), 0);
+  assert.equal(await main(['completion', 'bash'], { ...completion, catalog, completionFor: () => 'complete\n' }), 0);
   assert.equal(completion.value.out, 'complete\n');
 });
 
@@ -71,7 +69,7 @@ test('app and runtime owners route through their injected seams', async () => {
   const app = capture();
   let appCall;
   assert.equal(await main(['--cwd', 'product', 'app', 'check', '--json'], {
-    ...app, catalog, retired, cwd: path.resolve('base'),
+    ...app, catalog, cwd: path.resolve('base'),
     importHfs: async () => ({ main: async (argv, io) => { appCall = { argv, cwd: io.cwd }; return 1; } }),
   }), 1);
   assert.deepEqual(appCall.argv, ['check', '--json']);
@@ -80,7 +78,7 @@ test('app and runtime owners route through their injected seams', async () => {
   const runtime = capture();
   let spawnCall;
   assert.equal(await main(['runtime', 'check', '--json'], {
-    ...runtime, catalog, retired,
+    ...runtime, catalog,
     locateRuntime: () => ({ root: path.resolve('runtime'), source: 'test' }),
     spawn: (command, args, options) => { spawnCall = { command, args, options }; return { status: 0 }; },
   }), 0);
@@ -89,7 +87,7 @@ test('app and runtime owners route through their injected seams', async () => {
 
   const wrapped = path.join(path.resolve('home'), '.starci', 'bin');
   await main(['runtime', 'check'], {
-    ...capture(), catalog, retired, home: path.resolve('home'), env: { PATH: [wrapped, path.resolve('tools')].join(path.delimiter) },
+    ...capture(), catalog, home: path.resolve('home'), env: { PATH: [wrapped, path.resolve('tools')].join(path.delimiter) },
     locateRuntime: () => ({ root: path.resolve('runtime'), source: 'test' }),
     spawn: (command, args, options) => { spawnCall = { command, args, options }; return { status: 0 }; },
   });
@@ -100,7 +98,7 @@ test('runtime install is in-process and never locates or spawns a runtime', asyn
   const output = capture();
   let installCall;
   assert.equal(await main(['runtime', 'install', '--force'], {
-    ...output, catalog, retired,
+    ...output, catalog,
     installRuntime: (options) => { installCall = options; return 0; },
     locateRuntime: () => { throw new Error('must not locate'); },
     spawn: () => { throw new Error('must not spawn'); },
@@ -131,23 +129,19 @@ test('runtime installer exposes npm/fetch and process seams without network acce
   assert.ok(writes.some(({ file }) => file.endsWith(path.join('.starci', 'bin', 'starci'))));
 });
 
-test('removed and bad commands are refusals, while runtime absence is exit 3', async () => {
-  const removedOutput = capture();
-  assert.equal(await main(['api', 'survey'], { ...removedOutput, catalog, retired }), 2);
-  assert.equal(removedOutput.value.err, 'starci: "starci api survey" was removed; use "starci kernel survey"\n');
-
+test('bad commands are refusals, while runtime absence is exit 3', async () => {
   const unknown = capture();
-  assert.equal(await main(['wat'], { ...unknown, catalog, retired }), 2);
+  assert.equal(await main(['wat'], { ...unknown, catalog }), 2);
   assert.match(unknown.value.err, /unknown group/);
   const edition = capture();
-  assert.equal(await main(['app', 'check', '--edition', 'lite'], { ...edition, catalog, retired }), 2);
+  assert.equal(await main(['app', 'check', '--edition', 'lite'], { ...edition, catalog }), 2);
   assert.match(edition.value.err, /not available in the lite edition/);
   const badEdition = capture();
-  assert.equal(await main(['app', 'check', '--edition', 'nope'], { ...badEdition, catalog, retired }), 2);
+  assert.equal(await main(['app', 'check', '--edition', 'nope'], { ...badEdition, catalog }), 2);
   assert.match(badEdition.value.err, /expects one of: full, lite/);
 
   const absent = capture();
-  assert.equal(await main(['runtime', 'check'], { ...absent, catalog, retired, locateRuntime: () => null }), 3);
+  assert.equal(await main(['runtime', 'check'], { ...absent, catalog, locateRuntime: () => null }), 3);
   assert.equal(absent.value.err, 'starci: the runtime group "runtime" needs the StarCi runtime, which is not installed (run: starci runtime install)\n');
 });
 
@@ -186,7 +180,7 @@ const runtimeCall = async (argv, extra = {}) => {
   const output = capture();
   let call = null;
   const code = await main(argv, {
-    ...output, catalog: passCatalog, retired, cwd: path.resolve('base'),
+    ...output, catalog: passCatalog, cwd: path.resolve('base'),
     locateRuntime: () => ({ root: path.resolve('runtime') }),
     spawn: (command, args, options) => { call = { args: args.slice(1), cwd: options.cwd }; return { status: 0 }; },
     ...extra,
@@ -234,29 +228,6 @@ test('help flags work in any position, stop at --, and help takes a group and ve
   assert.deepEqual(passed.call.args, ['runtime', 'check', '--', '--help']);
 });
 
-test('removed names are refused wherever the global flags sit, including the retired hfs bins', async () => {
-  const withRetired = [
-    { spelling: 'starci api survey', use: 'starci kernel survey' },
-    { spelling: 'starci init', use: 'starci runtime install' },
-    { spelling: 'hfs lint', use: 'starci app lint' },
-    { spelling: 'starci-test-stack', use: 'starci app stack' },
-  ];
-  const refuse = async (argv) => {
-    const output = capture();
-    const code = await main(argv, {
-      ...output, catalog: passCatalog, retired: withRetired,
-      importHfs: async () => { throw new Error('must not execute'); },
-      locateRuntime: () => { throw new Error('must not locate'); },
-      spawn: () => { throw new Error('must not spawn'); },
-    });
-    return { code, err: output.value.err };
-  };
-  assert.deepEqual(await refuse(['--json', 'api', 'survey']), { code: 2, err: 'starci: "starci api survey --json" was removed; use "starci kernel survey --json"\n' });
-  assert.deepEqual(await refuse(['--cwd', 'x', 'init']), { code: 2, err: 'starci: "starci init --cwd x" was removed; use "starci runtime install --cwd x"\n' });
-  assert.deepEqual(await refuse(['hfs', 'lint', '--fix']), { code: 2, err: 'starci: "starci hfs lint --fix" was removed; use "starci app lint --fix"\n' });
-  assert.deepEqual(await refuse(['starci-test-stack']), { code: 2, err: 'starci: "starci starci-test-stack" was removed; use "starci app stack"\n' });
-});
-
 test('a runtime child that cannot start or is killed is reported, never silently ok', async () => {
   const failed = await runtimeCall(['runtime', 'check'], { spawn: () => ({ error: Object.assign(new Error('boom'), { code: 'EACCES' }) }) });
   assert.equal(failed.code, 1);
@@ -291,7 +262,7 @@ test('a stale or corrupt runtime record falls through with a note and ends in ex
 
   const output = capture();
   const code = await main(['runtime', 'check'], {
-    ...output, catalog: passCatalog, retired,
+    ...output, catalog: passCatalog,
     locateRuntime: ({ skipped }) => { skipped.push('runtime.json is stale'); return null; },
   });
   assert.equal(code, 3);

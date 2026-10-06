@@ -7,14 +7,15 @@ import { closeWorker, survivorsOf, terminalTree, workerClosureProven, workerExit
 import { processEnv } from '../../scripts/api/process/process-env.mjs';
 import { OWNED_PROCESS_SCHEMA } from '../../scripts/lib/process-identity.mjs';
 import { withLedger } from '../helpers/ledger-fixture.mjs';
+import { winPath } from '../fixtures/win-path.mjs';
 
 const HANDLE = 'term_worker_1';
 const DISPATCH = 'ctx_worker_1';
 // The terminal's shell (carries the handle), the agent under it, and a codex.exe of another application that carries no handle.
-const SHELL = { pid: 100, ppid: 1, name: 'powershell.exe', exe: 'C:\\fixture\\powershell.exe', created: 1000 };
-const AGENT = { pid: 101, ppid: 100, name: 'cursor-agent.exe', exe: 'C:\\fixture\\cursor-agent.exe', created: 1001 };
-const GRAND = { pid: 102, ppid: 101, name: 'node.exe', exe: 'C:\\fixture\\node.exe', created: 1002 };
-const OTHER_CODEX = { pid: 300, ppid: 1, name: 'codex.exe', exe: 'C:\\other\\codex.exe', created: 900 };
+const SHELL = { pid: 100, ppid: 1, name: 'powershell.exe', exe: winPath('C', 'fixture', 'powershell.exe'), created: 1000 };
+const AGENT = { pid: 101, ppid: 100, name: 'cursor-agent.exe', exe: winPath('C', 'fixture', 'cursor-agent.exe'), created: 1001 };
+const GRAND = { pid: 102, ppid: 101, name: 'node.exe', exe: winPath('C', 'fixture', 'node.exe'), created: 1002 };
+const OTHER_CODEX = { pid: 300, ppid: 1, name: 'codex.exe', exe: winPath('C', 'other', 'codex.exe'), created: 900 };
 const envRows = [{ pid: 100, readable: true, values: { ORCA_TERMINAL_HANDLE: HANDLE } }, { pid: 101, readable: true, values: { ORCA_TERMINAL_HANDLE: HANDLE } },
   { pid: 102, readable: true, values: { ORCA_TERMINAL_HANDLE: HANDLE } },
   { pid: 300, readable: true, values: { ORCA_TERMINAL_HANDLE: null } }];
@@ -206,7 +207,7 @@ test('a same-named process outside the terminal tree is never touched, whatever 
   assert.deepEqual(w.calls.filter((c) => c.startsWith('stop-process:')), []);
   assert.equal(out.processes.verdict, 'none');
   // And when the worker itself ran a codex.exe that survives, only THAT pid (inside the tree) is stopped, not the other application's.
-  const inTree = { pid: 103, ppid: 100, name: 'codex.exe', exe: 'C:\\fixture\\codex.exe', created: 1003 };
+  const inTree = { pid: 103, ppid: 100, name: 'codex.exe', exe: winPath('C', 'fixture', 'codex.exe'), created: 1003 };
   const w2 = world({ survivors: [inTree], initialTable: [SHELL, AGENT, GRAND, OTHER_CODEX, inTree],
     envRowsOf: [...envRows, { pid: 103, readable: true, values: { ORCA_TERMINAL_HANDLE: HANDLE } }] });
   const out2 = closeWorker({ dispatch: DISPATCH, deps: w2.deps, env: {} });

@@ -126,7 +126,6 @@ ruleParams:
       - {id: providers, run: scripts/checks/check-providers.mjs}
       - {id: cli-catalog-drift, run: scripts/cli/gen-catalog.mjs, args: [--check]}
       - {id: cli-parity, run: scripts/checks/check-cli-parity.mjs}
-      - {id: retired-cli, run: scripts/checks/check-retired-cli.mjs}
       - {id: cli-only-entry, run: scripts/checks/check-cli-only-entry.mjs}
       - {id: runtime-public-docs, run: scripts/checks/check-runtime-public-docs.mjs}
       - {id: schema-catalog, run: scripts/checks/check-schema-catalog.mjs}
@@ -297,7 +296,7 @@ slots:
   # ----- engine ---------------------------------------------------------------------------------------------
   - id: runtime.foundation
     profiles: [runtime]
-    path: "engine/{runtime-root,config,secrets,invalid-config,orca-config,yaml,plain-object,canonical-json,constants,digest,admission,refuse}.mjs"
+    path: "engine/{runtime-root,config,secrets,invalid-config,orca-config,yaml,plain-object,canonical-json,by-code-unit,constants,digest,admission,refuse}.mjs"
     presence: required
     tracked: tracked
     tier: base
@@ -313,7 +312,7 @@ slots:
   - id: runtime.db
     profiles: [runtime]
     # Store connection owners and their schema and receipt modules. No api import: a value a store needs from git is passed in.
-    path: "engine/db/{ledger,machine,machine-connection,machine-schema,provider-reservations,blob,authorizer}.mjs"
+    path: "engine/db/{ledger,ledger-paths,machine,machine-connection,machine-schema,provider-reservations,blob,authorizer}.mjs"
     presence: required
     tracked: tracked
     tier: db

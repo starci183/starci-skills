@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// blob-gc.mjs — read-only retention planning for the content-addressed blob store (ARCHITECTURE-DB §4.2,
+// blob-gc.mjs — read-only retention planning for the content-addressed blob store (docs/ledger-db.md,
 // GC controller trigger `blob-sweep`). Destructive apply is unsupported until ordinary reference writers fence deletion.
 //
 // Internal entry: spawned by scripts/housekeeping/hk-ledger.mjs; not invoked directly.

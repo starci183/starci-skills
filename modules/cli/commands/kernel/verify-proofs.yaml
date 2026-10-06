@@ -26,10 +26,6 @@ examples:
   - starci kernel verify-proofs --repo <path> --workflow <workflow>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api verify-proofs
-  - node scripts/kernel/cli.mjs verify-proofs
 purpose: Re-read every artifact's blob (the store re-hashes it) and walk the events digest chain;
   exit 1 on tampering.
 reads: every job_artifacts row of the workflow, the blob each cites, and the workflow's events

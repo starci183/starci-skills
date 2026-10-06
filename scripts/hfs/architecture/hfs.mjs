@@ -424,7 +424,7 @@ export function checkHfs(config) {
     if (!tree.top.includes(entry)) finding('HFS_ROOT_ENTRY_MISSING', entry, `The ${profile} side requires root entry ${entry}.`);
   }
 
-  const apps = tree.children('apps').sort();
+  const apps = tree.children('apps').sort(byCodeUnit);
   if (!tree.hasDir('apps') || apps.length === 0) {
     finding('HFS_APPS_REQUIRED', 'apps', 'Every HFS repository is an apps/<app>/ monorepo; apps/ must hold at least one application.');
   }
@@ -450,18 +450,18 @@ export function checkHfs(config) {
   }
 
   if (backend) {
-    for (const child of tree.children('src').sort()) {
+    for (const child of tree.children('src').sort(byCodeUnit)) {
       if (!BACKEND_SRC_CHILDREN.has(child)) {
         finding('HFS_SRC_LAYOUT_INVALID', `src/${child}`, `Backend src/ holds only features/, modules/ and tests/; ${child} must move to its owner.`);
       }
     }
-    for (const tier of tree.children('src/modules').sort()) {
+    for (const tier of tree.children('src/modules').sort(byCodeUnit)) {
       if (!moduleTiersOf(resolver).has(tier)) {
         finding('HFS_MODULE_TIER_INVALID', `src/modules/${tier}`, `Module tier ${tier} is not one of ${[...moduleTiersOf(resolver)].sort(byCodeUnit).join(', ')}.`);
       }
     }
     const testChildren = slotTestChildren(resolver);
-    for (const child of tree.children('src/tests').sort()) {
+    for (const child of tree.children('src/tests').sort(byCodeUnit)) {
       // A file directly below src/tests/ that a slot owns (src/tests/tsconfig.json, be.tool-config) is that slot's, not a stray folder.
       if (!testChildren.has(child) && resolver.classifyPath(`src/tests/${child}`).status !== 'owned') {
         finding('HFS_SRC_LAYOUT_INVALID', `src/tests/${child}`, `Backend src/tests/ holds only ${[...testChildren].join(', ')} and the files a slot owns there; ${child} must move.`);

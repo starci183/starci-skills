@@ -10,7 +10,6 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { loadCatalog, CATALOG_DIR } from '../../scripts/cli/catalog.mjs';
 import { generateAll } from '../../scripts/cli/gen-catalog.mjs';
-import { retiredCallsInText, retiredMatchers } from '../../scripts/checks/check-retired-cli.mjs';
 import { checkCliParity } from '../../scripts/checks/check-cli-parity.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -25,7 +24,7 @@ flags:
   - {name: help, type: boolean}
   - {name: edition, type: enum, enum: [full, lite]}
 `;
-const GROUP_YAML = `group: kernel\nsummary: kernel verbs\nowner: runtime\nsince: 1.0.0-alpha.4\n`;
+const GROUP_YAML = `group: kernel\nsummary: kernel verbs\nowner: runtime\n`;
 const VERB = `group: kernel
 verb: settle
 owner: runtime
@@ -36,8 +35,6 @@ exit: {0: ok, 1: refused, 2: bad usage}
 json: flag
 examples: ['starci kernel settle --repo <p> --job <id>']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['starci api settle']
 `;
 const MODULE_VERB = VERB.replace('impl: {script: scripts/kernel/cli.mjs, args: [settle]}', `impl: {module: scripts/machine/settle.mjs, export: settle}
 effect: host
@@ -97,14 +94,14 @@ test('--edition must be exactly [full, lite], in _global.yaml or anywhere', () =
 });
 
 test('a duplicate verb name across files is rejected', () => {
-  const root = fixture((put) => put(`${CATALOG_DIR}/kernel/settle-dup.yaml`, VERB.replace('removed:', 'removed:')));
+  const root = fixture((put) => put(`${CATALOG_DIR}/kernel/settle-dup.yaml`, VERB));
   try {
     assert.ok(catalogErrors(root).some((e) => /duplicate verb "settle"/.test(e)), JSON.stringify(catalogErrors(root)));
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
 test('an empty group directory is an error', () => {
-  const root = fixture((put) => put(`${CATALOG_DIR}/debug/_group.yaml`, 'group: debug\nsummary: debug\nowner: runtime\nsince: 1.0.0-alpha.4\n'));
+  const root = fixture((put) => put(`${CATALOG_DIR}/debug/_group.yaml`, 'group: debug\nsummary: debug\nowner: runtime\n'));
   try {
     assert.ok(catalogErrors(root).some((e) => /an empty group is an error/.test(e)));
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
@@ -178,25 +175,7 @@ test('generated catalog and docs carry function-verb policy metadata', async () 
     assert.match(outputs['docs/cli.md'], /Effect: host/);
     assert.match(outputs['docs/cli.md'], /Conventions:\n\n- run only one settlement at a time/);
     assert.match(outputs['docs/cli.md'], /starci kernel settle --repo <p> --job <id>/);
-    assert.match(outputs['packages/cli/src/catalog.generated.mjs'], /"spelling": "starci api settle"/);
     assert.match(outputs['packages/cli/completions/starci.bash'], /\bexplain\b/);
-  } finally { fs.rmSync(root, { recursive: true, force: true }); }
-});
-
-test('generated current reference preserves retired metadata and rejects a live retired example', async () => {
-  const root = fixture();
-  try {
-    const catalog = loadCatalog(root), matchers = retiredMatchers(catalog);
-    const outputs = await generateAll(root);
-    assert.deepEqual(retiredCallsInText(outputs['docs/cli.md'], 'docs/cli.md', matchers), []);
-    assert.match(outputs['packages/cli/src/catalog.generated.mjs'], /"spelling": "starci api settle"/);
-    fs.writeFileSync(path.join(root, CATALOG_DIR, 'kernel/settle.yaml'),
-      VERB.replace("examples: ['starci kernel settle --repo <p> --job <id>']", "examples: ['starci api settle --repo <p> --job <id>']"));
-    const bad = await generateAll(root);
-    const findings = retiredCallsInText(bad['docs/cli.md'], 'docs/cli.md', matchers);
-    assert.equal(findings.length, 1, JSON.stringify(findings));
-    assert.equal(findings[0].spelling, 'starci api settle');
-    assert.equal(findings[0].use, 'starci kernel settle');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 

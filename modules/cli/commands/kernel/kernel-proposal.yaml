@@ -43,10 +43,6 @@ examples:
   - starci kernel kernel-proposal --repo <path> --workflow <workflow> --title <title> --evidence <evidence>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api kernel-proposal
-  - node scripts/kernel/cli.mjs kernel-proposal
 purpose: A change the Kernel needs in shared .claude (op manifest, knowledge, grammar, gate, runtime
   code) is filed as a proposal with evidence and an optional patch; the Supervisor lands AUTO-tier
   ones through a lane and forwards IMPORTANT ones (lessons.mjs tierOf) to the owner. The Kernel

@@ -57,7 +57,7 @@ export function checkI18nKeys({ config, graph, context }) {
     seen.add(app);
     const dir = `apps/${app}/src/modules/i18n/messages/`;
     let names = [];
-    try { names = fs.readdirSync(path.join(config.root, dir)).filter(name => name.endsWith('.json')).sort(); } catch { /* the app has no catalog directory: FE_I18N_PLACEMENT's finding */ }
+    try { names = fs.readdirSync(path.join(config.root, dir)).filter(name => name.endsWith('.json')).sort(byCodeUnit); } catch { /* the app has no catalog directory: FE_I18N_PLACEMENT's finding */ }
     if (names.length) catalogsByApp.set(dir, names.map(name => ({ rel: `${dir}${name}`, locale: name.slice(0, -5) })));
   }
 

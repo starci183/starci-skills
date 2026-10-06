@@ -14,5 +14,3 @@ exit: {"0": brief printed or the score is clean, "1": a scoring finding, "2": ba
 json: flag
 examples: ['starci work ui-proof-brief --surface <record> --repo <repo> --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/ui/ui-proof-brief.mjs']

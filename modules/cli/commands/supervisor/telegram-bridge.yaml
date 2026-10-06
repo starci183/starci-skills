@@ -14,7 +14,3 @@ examples:
   - starci supervisor telegram-bridge start
   - starci supervisor telegram-bridge run
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/telegram-bridge.mjs
-  - node .claude/scripts/supervisor/telegram-bridge.mjs

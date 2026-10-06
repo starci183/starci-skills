@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {configuredAllocationPolicy,coreDebugSettings,DEFAULT_MODEL_POOLS,defaultParallelGear,durationMs,effectiveNonOperationModels,loadConfig,nonOperationModels,parallelGear,slicingGears,validateConfig} from '../../engine/config.mjs';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
+import {winPath,slashPath} from '../fixtures/win-path.mjs';
 // config.example.yaml is the shipped default — the installer seeds config.yaml from it verbatim, so it
 // is what the seeded config.yaml (the installer copies the example) must produce. The spec reads it rather than keeping a copy.
 const EXAMPLE_NON_OPERATION={...parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8')).models.nonOperation};
@@ -50,7 +51,7 @@ test('local config initializes the three canonical quota-aware non-operation rol
 test('top-level supervisor/validator/critique sections are refused as unknown keys',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-old-'));try{const old=expected();old.supervisor={runtimes:['codex-agent','claude-agent']};old.critique={runtimes:['claude-agent','codex-agent']};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(old));assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('six-role nonOperation drafts are refused by the closed schema',()=>{const draft=expected();draft.models.nonOperation={goalAssessment:['claude-agent','codex-agent'],operationPlanner:['claude-agent','codex-agent'],kernelManager:['claude-agent','codex-agent'],technicalDecision:['claude-agent','codex-agent'],goalCritic:['claude-agent','codex-agent'],validator:['claude-agent','codex-agent']};assert.throws(()=>validateConfig(draft),/Invalid config/);});
 test('a lone config.json is not honored — config.yaml is the only owner file',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-json-'));try{fs.writeFileSync(path.join(root,'config.json'),JSON.stringify({language:'vi',model:null,effort:'medium',models:{selection:'quota-aware',pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...EXAMPLE_NON_OPERATION}}}));assert.throws(()=>loadConfig(root),/Missing config\.example\.yaml/,'config.json must not be read; with no example file the loader fails closed');}finally{fs.rmSync(root,{recursive:true,force:true});}});
-test('relocated installed config reads the source model registry',async()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-installed-'));try{for(const file of ['engine/config.mjs','engine/secrets.mjs','engine/runtime-root.mjs','engine/yaml.mjs','engine/plain-object.mjs','engine/invalid-config.mjs','engine/orca-config.mjs','config.example.yaml','modules/models/runtimes.yaml','modules/models/registry.yaml']){const target=path.join(root,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(new URL(`../../${file}`,import.meta.url),target);}const installed=await import(`${new URL(`file:///${path.join(root,'engine/config.mjs').replaceAll('\\','/')}`)}?fixture=${Date.now()}`);assert.deepEqual(installed.nonOperationModels('kernelManager',installed.loadConfig(root)),['claude-agent','codex-agent']);assert.equal(fs.existsSync(path.join(root,'model','runtimes.yaml')),false);}finally{fs.rmSync(root,{recursive:true,force:true});}});
+test('relocated installed config reads the source model registry',async()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-installed-'));try{for(const file of ['engine/config.mjs','engine/secrets.mjs','engine/runtime-root.mjs','engine/yaml.mjs','engine/plain-object.mjs','engine/by-code-unit.mjs','engine/invalid-config.mjs','engine/orca-config.mjs','config.example.yaml','modules/models/runtimes.yaml','modules/models/registry.yaml']){const target=path.join(root,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(new URL(`../../${file}`,import.meta.url),target);}const installed=await import(`${new URL(`file:///${path.join(root,'engine/config.mjs').replaceAll('\\','/')}`)}?fixture=${Date.now()}`);assert.deepEqual(installed.nonOperationModels('kernelManager',installed.loadConfig(root)),['claude-agent','codex-agent']);assert.equal(fs.existsSync(path.join(root,'model','runtimes.yaml')),false);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 
 // parallel.gear is the owner's ONE parallelism knob: an integer from
 // modules/models/runtimes.yaml allocation.slicing.gears, defaulting to the first
@@ -267,13 +268,13 @@ test('budgets accepts only the declared maxOps concurrency ceiling',()=>{
 
 test('current owner root declarations accept ordinary r/n/0 paths and refuse actual control characters',()=>{
   const approval={approvedBy:'owner',approvalRef:'private current-owner root validation fixture'};
-  const accepted=['D:/Repositories/runner0','D:\\Repositories\\runner0','/tmp/runner0'];
+  const accepted=[slashPath('D','Repositories','runner0'),winPath('D','Repositories','runner0'),'/tmp/runner0'];
   for(const root of accepted){
     assert.doesNotThrow(()=>validateConfig({...expected(),launchTrust:{...approval,profile:'automatic',roots:[root]}}),`launchTrust must accept ordinary root ${root}`);
     assert.doesNotThrow(()=>validateConfig({...expected(),retention:{workflowPurge:{...approval,repos:[root]}}}),`workflowPurge must accept ordinary root ${root}`);
   }
   for(const [name,control] of [['CR','\r'],['LF','\n'],['NUL','\0']]){
-    const root=`D:/Repositories/run${control}ner0`;
+    const root=`${slashPath('D','Repositories')}/run${control}ner0`;
     assert.throws(()=>validateConfig({...expected(),launchTrust:{...approval,profile:'automatic',roots:[root]}}),/exact absolute repository roots/,`launchTrust must refuse actual ${name}`);
     assert.throws(()=>validateConfig({...expected(),retention:{workflowPurge:{...approval,repos:[root]}}}),/exact absolute repository roots/,`workflowPurge must refuse actual ${name}`);
   }

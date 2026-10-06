@@ -34,10 +34,6 @@ examples:
   - starci kernel dispatch-ready --repo <path> --workflow <workflow> --max 2 --dry-run
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api dispatch-ready
-  - node scripts/kernel/cli.mjs dispatch-ready
 purpose: Route and dispatch this workflow's queued-ready units up to starci kernel status
   progress.allowedParallel (the worker RAM cap, the pools, the workflow's priority reserve) in one
   call, through the ordinary starci kernel route + starci kernel dispatch --spawn (every admission refusal holds). A

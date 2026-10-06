@@ -1,4 +1,3 @@
 group: supervisor
 summary: inspect, start or stop the one StarCi Supervisor seat
 owner: runtime
-since: 1.0.0-alpha.4

@@ -13,7 +13,3 @@ examples:
   - starci machine worktrees counts --json
   - starci machine worktrees gc --plan
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/machine/worktrees.mjs
-  - node .claude/scripts/machine/worktrees.mjs

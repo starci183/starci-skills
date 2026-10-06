@@ -13,7 +13,3 @@ examples:
   - starci orca terminal-read --terminal <handle>
   - starci orca terminal-read --terminal <handle> --tail --limit 100
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/api/orca/terminal-read.mjs
-  - node .claude/scripts/api/orca/terminal-read.mjs

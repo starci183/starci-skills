@@ -751,7 +751,7 @@ const FILE_ENFORCERS = ['machine', 'hfs', 'work-validate', 'sonar', 'runtime'];
 function ruleCatalogProblems(d) {
   const bad = [];
   if (!isPlainObject(d)) return ['the rule catalog is not a map'];
-  for (const key of Object.keys(d)) if (!['schema', 'version', 'gates', 'enforcerKinds', 'rules', 'retired'].includes(key)) bad.push(`unknown top-level key ${key}`);
+  for (const key of Object.keys(d)) if (!['schema', 'version', 'gates', 'enforcerKinds', 'rules'].includes(key)) bad.push(`unknown top-level key ${key}`);
   const schemaOk = /^starci\/hfs-rules@\d+$/.test(String(d.schema));
   if (!schemaOk) bad.push('schema must be starci/hfs-rules@<major>');
   if (!SEMVER.test(String(d.version))) bad.push('version must be MAJOR.MINOR.PATCH');
@@ -770,7 +770,7 @@ function ruleCatalogProblems(d) {
     if (!isPlainObject(r)) { bad.push(`${at} is not a map`); return; }
     const label = typeof r.id === 'string' ? r.id : at;
     for (const key of Object.keys(r)) if (!['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
-    // A retired rule leaves its id unused for good (never reused), so ids only have to increase.
+    // Ids are unique and increase; a gap between two of them is fine.
     if (!/^R\d{2,3}$/.test(String(r.id))) bad.push(`${at}.id must be R<two or three digits>`);
     else if (index > 0 && typeof d.rules[index - 1]?.id === 'string' && Number(r.id.slice(1)) <= Number(d.rules[index - 1].id.slice(1))) bad.push(`${label} is out of order: ids must increase, and ${d.rules[index - 1].id} comes before it`);
     if (!FINDING_CODE.test(String(r.code))) bad.push(`${label}.code must be an UPPER_SNAKE finding code`);
@@ -847,7 +847,7 @@ export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_R
     version: doc.version, major, minor, patch,
     gates: deepFreeze(structuredClone(doc.gates)),
     enforcerKinds: deepFreeze(structuredClone(doc.enforcerKinds)),
-    rules: list, retired: deepFreeze(structuredClone(doc.retired ?? [])),
+    rules: list,
     /** The rule with this id (R01..), or null. */
     rule: (id) => byId.get(id) ?? null,
     /** The rule that owns this failure code (its own or a sub-check code), or null. */

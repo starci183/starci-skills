@@ -5,7 +5,7 @@
 // on disk while starci kernel reconcile --dead-worker sees no reports row, settles the attempt failed-no-report,
 // spends a business attempt and re-runs the whole op (once, 5 such deaths across two product
 // ledgers in one 10-minute host disconnect). Before a dead worker is fenced or settled failed,
-// unfiledReportCandidates lists the op-report@1 files in its STARCI_JOB_SCRATCH (alpha.3: a report is written
+// unfiledReportCandidates lists the op-report@1 files in its STARCI_JOB_SCRATCH (a report is written
 // only there - op_attempts.scratch_dir, else op-prompt.mjs jobScratchDirOf) written since its dispatch (newest
 // first, stamped for this job or not stamped at all), and the caller files the first one that starci kernel report accepts -
 // through `starci kernel report` itself, so every report guard (the scratch boundary, validation, draw review, ask guards)

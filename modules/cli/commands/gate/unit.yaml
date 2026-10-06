@@ -14,7 +14,3 @@ json: always
 examples:
   - starci gate unit --root <app> --out unit-run.json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/unit-run.mjs
-  - node .claude/scripts/gates/unit-run.mjs

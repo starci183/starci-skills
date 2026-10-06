@@ -15,5 +15,3 @@ exit: {"0": the source is clean, "1": findings, "2": bad usage}
 json: flag
 examples: ['starci work draw-source <X.draw.tsx> --product <app> --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/draw/draw-source.mjs']

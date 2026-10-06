@@ -1,4 +1,3 @@
 group: lint
 summary: lint exactly the files or repository scope named by the test ladder
 owner: runtime
-since: 1.0.0-alpha.4

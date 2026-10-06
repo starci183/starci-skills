@@ -10,5 +10,3 @@ exit: {"0": artifacts are current or were written, "1": artifacts are stale or t
 json: none
 examples: ['starci work example-derive --work .starciwork --write']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/example/example-derive.mjs']

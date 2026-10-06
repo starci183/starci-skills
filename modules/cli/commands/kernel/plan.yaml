@@ -39,10 +39,6 @@ examples:
   - starci kernel plan --repo <path> --workflow <workflow> --file <file> --replanned-from <plan> --blocker <blocker> --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api plan
-  - node scripts/kernel/cli.mjs plan
 fileShape: "{legs: [{op, paths?, notes?}], edges: [[fromLeg, toLeg]]} —
   modules/schemas/goal-plan.yaml; edges are required (route-plan emits them); a single leg may omit
   them"

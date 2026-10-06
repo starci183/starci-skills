@@ -94,32 +94,15 @@ rules:
       `@CommandHandler(X)` or `@QueryHandler(X)` on a class that `extends ICQRSHandler<X, XResult>` and implements
       `protected override async process(message)`; it never overrides `execute`. `ICQRSHandler.execute` is load-bearing: it
       logs `OperationFailed` with the operation name and the error and rethrows, and counts refused outcomes. `<Action>Result`
-      is a plain projection type or an `Outcome<Value, Code>` and the return type of `process` is declared. The handler opens
-      the transaction (`this.entityManager.transaction(async (manager) => ...)`), stamps `this.clock.now()` once and passes
-      it down. The handler is thin (R203 `BE_FEATURE_THIN`): its `process` maps the message, makes one delegating call to an
-      injected `*.service` and returns the result, so it has no unit spec; the decisions (persisted state, the `where` that
-      holds ownership, nothing written on a refusal) live in the service and its `<name>.service.spec.ts` asserts them.
+      is a plain projection type or an `Outcome<Value, Code>` and the return type of `process` is declared. The handler is
+      thin (R203 `BE_FEATURE_THIN`): its `process` maps the message, makes one delegating call to an injected `*.service`
+      and returns the result, so it has no unit spec. The service owns the work: it opens the one transaction
+      (`this.entityManager.transaction(async (manager) => ...)`), stamps `this.clock.now()` once and passes it down, and it
+      holds the decisions (persisted state, the `where` that holds ownership, nothing written on a refusal), which its
+      `<name>.service.spec.ts` asserts under the per-file coverage law of BE-TEST-13.
     rationale: |-
       A single template gives every operation the same failure log and metric, and the service spec pins the decision the
       handler delegates.
-    cases:
-      - id: case-1
-        when: A handler
-        write: |-
-          @CommandHandler(StartCheckoutCommand)
-          /** Opens a checkout, or refuses with a purchase code. */
-          export class StartCheckoutHandler extends ICQRSHandler<StartCheckoutCommand, StartCheckoutResult> {
-              constructor(
-                  @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
-                  @InjectClock() private readonly clock: Clock,
-                  private readonly purchaseService: PurchaseService,
-              ) { super() }
-
-              protected override async process(command: StartCheckoutCommand): Promise<StartCheckoutResult> {
-                  const at = this.clock.now()
-                  return this.entityManager.transaction(async (manager) => this.purchaseService.open({ manager, learnerId: command.params.principal.id, offerId: command.params.request.offerId, at }))
-              }
-          }
     verification:
       automated:
         - BE_CQRS_SHAPE
@@ -129,7 +112,7 @@ rules:
         - BE_FEATURE_THIN
       manual:
         - Confirm the service spec the handler calls asserts refusal paths and ownership, not only that a mock was called.
-    relatedExamples: []
+    relatedExamples: [api]
   - id: BE-CQRS-4
     title: The bus is the only way into a handler; nothing forwards
     kind: mandatory

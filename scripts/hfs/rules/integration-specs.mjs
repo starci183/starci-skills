@@ -16,6 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadTypescript } from '../../lib/package-at.mjs';
 import { found, readText } from './read.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const INTEGRATION_SPEC_MISSING = 'BE_INTEGRATION_SPEC_MISSING';
 
@@ -199,7 +200,7 @@ export function integrationSpecFindings({ repoRoot, files }) {
   const findings = [];
   for (const { side, provider, folder } of integrations) {
     const specDir = `${side}src/tests/integration/${provider}/`;
-    const specs = files.filter((file) => file.startsWith(specDir) && file.endsWith(SPEC_SUFFIX) && !file.slice(specDir.length).includes('/')).sort();
+    const specs = files.filter((file) => file.startsWith(specDir) && file.endsWith(SPEC_SUFFIX) && !file.slice(specDir.length).includes('/')).sort(byCodeUnit);
     if (specs.length === 0) {
       findings.push(found(INTEGRATION_SPEC_MISSING, `${folder}/`, `${folder}/ is an integration with no integration spec: add ${specDir}<name>${SPEC_SUFFIX} that ${MISSING_PARTS.modules}, ${MISSING_PARTS.errorCode}, and ${MISSING_PARTS.outage}.`, { provider, missing: ['spec'] }));
       continue;

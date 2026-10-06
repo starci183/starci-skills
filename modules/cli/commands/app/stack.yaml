@@ -14,5 +14,3 @@ exit: {"0": action completed, "1": infrastructure failure, "2": refusal or bad u
 json: flag
 examples: ['starci app stack up', 'starci app stack status --json', 'starci app stack down --force']
 editions: [full]
-since: 1.0.0
-removed: ['starci-test-stack', 'npx starci-test-stack']

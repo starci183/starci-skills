@@ -1,4 +1,4 @@
-// starciwork-boundary.mjs — the executable form of the .starciwork boundary (ARCHITECTURE-DB §5.1,
+// starciwork-boundary.mjs — the executable form of the .starciwork boundary (docs/ledger-db.md,
 // modules/schemas/work-layout.yaml shape.productPaths). A repository's .starciwork holds product content only:
 // the explicit path list below. Every other path is agent data (reports, checks, captures, draw rounds, UAT runs,
 // logs, caches, ledgers, worktrees), which lives in runtime.sqlite rows and content-addressed blobs outside

@@ -87,22 +87,13 @@ rules:
       command and its spec are found from the name alone.
     cases:
       - id: case-1
-        when: The migrate group
-        write: |-
-          // be/src/features/cli/migrate/migrate.cli.ts
-          @Command({ name: "migrate", subCommands: [RunCli], description: "Schema migrations of every connection" })
-          /** The migrate group; without a sub-command it shows its help. */
-          export class MigrateCli extends CommandRunner {
-              async run(): Promise<void> { this.command.help() }
-          }
-      - id: case-2
         when: A `@SubCommand` declared in src/modules/platform/database/reindex.cli.ts or in features/api/
         write: 'Refused (BE_CLI_COMMAND_SHAPE, BE_CLI_OWNER): move it to src/features/cli/<group>/subs/reindex.cli.ts and register it in the group module.'
     verification:
       automated:
         - BE_CLI_COMMAND_SHAPE
       manual: []
-    relatedExamples: []
+    relatedExamples: [cli]
   - id: BE-CLI-3
     title: A command is an action runner with its own unit spec
     kind: mandatory
@@ -134,7 +125,7 @@ rules:
         - BE_FEATURE_THIN
       manual:
         - Confirm a command that writes is safe to re-run or refuses a second run explicitly.
-    relatedExamples: []
+    relatedExamples: [cli]
   - id: BE-CLI-4
     title: Only the cli parses the command line
     kind: mandatory
@@ -180,7 +171,7 @@ rules:
         - BE_CLI_REQUIRED
       manual:
         - Confirm the deploy runs `cli migrate run` to completion before the api and worker apps start.
-    relatedExamples: []
+    relatedExamples: [cli]
 files:
   - path: apps/cli/Dockerfile
     slot: repo.app-image

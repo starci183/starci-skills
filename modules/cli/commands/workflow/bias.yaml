@@ -13,7 +13,3 @@ examples:
   - starci workflow bias --normalize '{"prefer":["codex"],"avoid":["devin"]}'
   - starci workflow bias "don't use codex"
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/agent/bias.mjs
-  - node .claude/scripts/agent/bias.mjs

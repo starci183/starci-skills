@@ -25,7 +25,3 @@ examples:
   - starci runtime update --cwd <repo>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci update
-  - npx starci update

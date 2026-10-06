@@ -99,7 +99,7 @@ export const runtimeEnv = (env = process.env) => {
 
 /* ------------------------------------------------------------ reads */
 
-/** The latest run of each check of the item's attempt for one runner (check_runs, alpha.3). */
+/** The latest run of each check of the item's attempt for one runner (check_runs). */
 function checkRunsOf(db, item, runner = 'op') {
   const attemptId = attemptIdOf(db, item);
   if (attemptId == null) return [];

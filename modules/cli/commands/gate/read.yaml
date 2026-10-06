@@ -17,7 +17,3 @@ examples:
   - starci gate read --root <app> --touch be/src/app.service.ts --out read-digest.json
   - starci gate read --knowledge knowledge/op-gate.yaml
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/read-digest.mjs
-  - node .claude/scripts/gates/read-digest.mjs

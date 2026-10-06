@@ -19,9 +19,3 @@ examples:
   - starci task register reconciler
   - starci task register harness-tunnel --apply --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - starci harness install-task
-  - starci reconciler install-task
-  - node scripts/reconciler/tunnel-task.mjs --install-task
-  - node scripts/reconciler/boot.mjs --install-task

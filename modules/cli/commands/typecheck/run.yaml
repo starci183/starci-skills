@@ -23,5 +23,3 @@ examples:
   - starci typecheck run --level L1 --changed packages/hfs/src/main.mjs
   - starci typecheck run --level L2 --project ui/tsconfig.json
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

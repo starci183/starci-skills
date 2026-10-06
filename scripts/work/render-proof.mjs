@@ -103,7 +103,7 @@ function readExampleBrand(workRoot) {
  * its own skip, which is a refusal here rather than a pass.
  */
 function captureCandidates(implDir, record, blobOptions) {
-  // alpha.3: the captures are the blobs the record's assets[] cites (scripts/work/impl-captures.mjs), never files
+  // The captures are the blobs the record's assets[] cites (scripts/work/impl-captures.mjs), never files
   // kept under its assets/.
   return capturesOf(implDir, record, blobOptions).map(c => ({png: c.png, markup: c.markup, name: c.name}));
 }

@@ -7,7 +7,7 @@ import {skillRoot} from '../../engine/runtime-root.mjs';
 import {encrypt} from '../api/sops/encrypt.mjs';
 import {decrypt} from '../api/sops/decrypt.mjs';
 import {sonarAnalysisEnvironment} from './sonar-credentials.mjs';
-import {resolveSops} from '../api/sops/lib.mjs';
+import {resolveSops} from '../api/sops/resolve-sops.mjs';
 import {runProgram} from '../api/process/run-program.mjs';
 import {resolveRealTool} from '../api/process/resolve-real-tool.mjs';
 

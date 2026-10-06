@@ -14,5 +14,3 @@ conventions:
   - Scaffold preserves Git metadata and configuration. Failure unlinks its own entries; replaced or occupied entries remain with a visible cleanup message.
 examples: ['starci app scaffold demo', 'starci app scaffold demo --into projects']
 editions: [full, lite]
-since: 1.0.0
-removed: ['hfs scaffold app', 'npx hfs scaffold app']

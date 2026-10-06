@@ -23,10 +23,6 @@ examples:
   - starci kernel messages --repo <path> --workflow <workflow>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api messages
-  - node scripts/kernel/cli.mjs messages
 reads: "the drain of scripts/kernel/verbs/shared/worker-messages.mjs: each Run of the workflow
   (payload orca/managed/hierarchy runId of its jobs) through scripts/api/orca/check.mjs (calls.yaml
   `check`, Orca's consuming FIFO Delivery, --run <run> --terminal <Kernel terminal>; a

@@ -1,8 +1,7 @@
 // op-prompt.mjs — the one [Op] prompt builder for every dispatch path (OPS-07).
 // cli.mjs dispatch and scripts/kernel/dispatch-op.mjs's dry-run/spawn preview render the same
 // contract text from the same packet shape, so the preview can never drift from the prompt a real
-// worker receives (shared-checkout rules, report filing and questions used to exist
-// only in cli.mjs's private copy).
+// worker receives (shared-checkout rules, report filing and questions).
 
 import fs from 'node:fs';
 import os from 'node:os';

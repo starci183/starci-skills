@@ -38,10 +38,6 @@ examples:
   - starci kernel estimate --repo <path> --files 40 --assertions 120 --gear 2
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api estimate
-  - node scripts/kernel/cli.mjs estimate
 reads: modules/models/runtimes.yaml allocation.slicing only — {weights:{file, assertion, component,
   record}, targetMinutes:[lo,hi], maxSlices, gears, size:{<class>:{from, agents}}} — plus the
   owner's parallel.gear through the one reader engine/config.mjs (engine/config.mjs loadConfig();

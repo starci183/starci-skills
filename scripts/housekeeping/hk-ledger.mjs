@@ -1,4 +1,4 @@
-// hk-ledger.mjs — row retention of the project ledgers (ARCHITECTURE-DB §7 Q5 and Q6, alpha.3 schema).
+// hk-ledger.mjs — row retention of the project ledgers (docs/ledger-db.md).
 //
 // Two places call it: `starci kernel finish` / `starci kernel archive` (retainLedgerDb on the ending workflow's ledger) and the
 // housekeeping sweep (sweepLedgers over every ledger machine.ledgers enrols).

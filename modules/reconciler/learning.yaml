@@ -1,5 +1,5 @@
 # Learning controller (scripts/reconciler/controllers/learning.mjs; DESIGN §8.7, §18 step 7; lane rc-workers).
-# The self-learning pass the Supervisor tick used to run (scripts/machine/lessons.mjs), fed by the invariant
+# The self-learning pass (scripts/machine/lessons.mjs), fed by the invariant
 # violations of the SLA layer (signature inv:<code>). minRepeats, measureMs and successDrop stay in
 # modules/models/runtimes.yaml allocation.supervisorLearning.
 name: learning

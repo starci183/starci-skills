@@ -25,10 +25,6 @@ examples:
   - starci kernel coverage --repo <path> --workflow <workflow>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api coverage
-  - node scripts/kernel/cli.mjs coverage
 purpose: "Every FR, shape and proof case of the workflow's scope with its evidence: proven|stale|missing."
 reads: the workflow's scope - its latest work graph's FRs and XBase#state shapes, the FR and ui
   records its jobs bound, each ui record's ui.shapes and its applicable knowledge/ui proof cases

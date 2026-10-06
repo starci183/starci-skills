@@ -32,10 +32,6 @@ examples:
   - starci kernel op-contract --repo <path> --workflow <workflow> --op <op> --attempt 2 --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api op-contract
-  - node scripts/kernel/cli.mjs op-contract
 reads: the contracts row for the job's {workflow_id,op_id,attempt} — the rendered packet markdown
   dispatch wrote
 writes: nothing — pure read of the worker's dispatch authority

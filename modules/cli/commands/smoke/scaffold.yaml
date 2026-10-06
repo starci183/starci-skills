@@ -23,5 +23,3 @@ examples:
   - starci smoke scaffold --edition full
   - starci smoke scaffold --edition lite --into <dir> --keep --json
 editions: [full, lite]
-since: 1.0.0-alpha.4
-removed: [bash smoke-scaffold.sh]

@@ -1,4 +1,3 @@
 group: debug
 summary: run a fixed read-only inspector against the StarCi runtime
 owner: runtime
-since: 1.0.0-alpha.4

@@ -19,5 +19,3 @@ json: starci/worker-release@1
 examples:
   - starci worker release --dispatch <dispatch-id>
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

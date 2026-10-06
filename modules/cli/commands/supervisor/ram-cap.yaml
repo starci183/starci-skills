@@ -18,6 +18,3 @@ examples:
   - starci supervisor ram-cap prioritize --workflow <id> --weight 2 --reserve 1
   - starci supervisor ram-cap unprioritize --workflow <id>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/ram-cap.mjs

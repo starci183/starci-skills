@@ -8,8 +8,8 @@
 //
 // Append-only: a trigger refuses every UPDATE, and a DELETE unless the row's workflow is being purged by the
 // owner-approved workflow purge (workflow_purges.state 'deleting', scripts/work/purge-workflow.mjs: archive to a
-// verified ZIP first). Nothing in housekeeping removes a row. Rows come from three writers (alpha.3: no log file
-// anywhere in a repository - the retired .starciwork/kernel-evidence/<wf>/jobs/<job>/log.jsonl sidecar is gone):
+// verified ZIP first). Nothing in housekeeping removes a row. Rows come from three writers (no log file
+// exists anywhere in a repository):
 //   - `starci kernel log` (scripts/kernel/cli.mjs cmdLog): a Kernel or an op logs one typed row, no ledger write; the
 //     lines an op kept in <STARCI_JOB_SCRATCH>/log.jsonl instead are ingested by starci kernel report (ingestScratchLog)
 //     before it deletes the scratch;

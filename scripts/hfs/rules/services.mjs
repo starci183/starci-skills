@@ -127,7 +127,7 @@ function serviceStackFindings({ repoRoot, repo }) {
 function eventClassesOf({ repoRoot, files, ts }) {
   const classes = [];
   const problems = [];
-  for (const file of files.filter((candidate) => EVENT_CLASS_FILE.test(candidate)).sort()) {
+  for (const file of files.filter((candidate) => EVENT_CLASS_FILE.test(candidate)).sort(byCodeUnit)) {
     const service = EVENT_CLASS_FILE.exec(file)[1];
     const read = readEventClasses(ts, readText(repoRoot, file) ?? '', file);
     for (const event of read.events) classes.push({ service, file, ...event });

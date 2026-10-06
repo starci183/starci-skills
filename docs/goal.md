@@ -1,7 +1,8 @@
 Owner: modules/goal/
 # GOAL - StarCi
 
-> **Status:** every contract named here may be revised by practice until each S* row below holds with fresh evidence.
+> **Status: pre-1.0.** The runtime is in alpha. Every contract named here may be revised by practice until each S*
+> row below holds with fresh evidence; then `1.0.0` freezes them.
 
 The living target state of this runtime. Every workflow, every op chain and every verdict is measured against this
 file. Change an `S*` row only when the owner sharpens the target; never reinterpret it silently.

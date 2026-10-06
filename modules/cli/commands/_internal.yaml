@@ -70,7 +70,6 @@ internal:
   - {path: scripts/checks/check-op-manifest.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-orca-tree.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-providers.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
-  - {path: scripts/checks/check-retired-cli.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-schema-catalog.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-worktree-add.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/cli/main.mjs, why: "Runtime-side catalog dispatcher", usedBy: [packages/cli/src/main.mjs]}
@@ -105,3 +104,7 @@ internal:
   - {path: scripts/work/validate/check-work-surfaces.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
   - {path: tests/helpers/source-canon-registry.mjs, why: "Scaffold-test registry server", usedBy: [tests/packages-hfs/hfs-scaffold-app.spec.mjs]}
   - {path: packages/hfs/runtime/scripts/hfs/architecture.mjs, why: "Generated runtime copy of the HFS architecture entry", usedBy: [scripts/hfs/sync-runtime.mjs]}
+  - {path: scripts/agent/model-scorecard.mjs, why: "Model-scorecard probe run by the debug run verb", usedBy: [scripts/cli/lib/debug-run.mjs]}
+  - {path: scripts/reconciler/core-watch.mjs, why: "Core-watch probe run by the debug run verb", usedBy: [scripts/cli/lib/debug-run.mjs]}
+  - {path: scripts/gates/release-publish.mjs, why: "Publication owner called by the release publish flow", usedBy: [scripts/supervisor/release-publish-flow.mjs]}
+  - {path: scripts/hfs/sync-runtime.mjs, why: "Runtime-copy sync owner called by the release sync-runtime verb", usedBy: [scripts/supervisor/release-sync-runtime.mjs]}

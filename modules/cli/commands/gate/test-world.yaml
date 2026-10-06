@@ -16,7 +16,3 @@ json: always
 examples:
   - starci gate test-world --root <app> --project e2e --out test-world-run.json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/test-world-run.mjs
-  - node .claude/scripts/gates/test-world-run.mjs

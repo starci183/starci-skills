@@ -15,7 +15,3 @@ examples:
   - starci reconciler start
   - starci reconciler start --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/reconciler/boot.mjs
-  - node scripts/reconciler/boot.mjs ensure

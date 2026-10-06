@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { winPath } from '../fixtures/win-path.mjs';
 import { checkExamples, exampleDirs, formatResults, main } from '../../scripts/checks/check-example-architecture.mjs';
 
 // The examples gate runs `starci app lint --format json` at the root of each example app and reads the one lint report (starci/lint@1).
@@ -172,7 +173,7 @@ test('unsafe, private and missing finding paths are omitted without reducing the
   const paths = [
     'be/src/first\nsecond.ts', 'be/src/first\rsecond.ts', 'be/src/first\u0000second.ts', 'be/src/first\u007fsecond.ts',
     '../private.ts', 'be/../private.ts', 'be/./private.ts', 'be//private.ts',
-    '/tmp/private.ts', 'C:\\Users\\fixture\\private.ts', '\\\\server\\share\\private.ts',
+    '/tmp/private.ts', winPath('C', 'Users', 'fixture', 'private.ts'), '\\\\server\\share\\private.ts',
     '.git/config', 'be/.STARCIWORK/runtime.sqlite', 'fe/node_modules/package/index.ts',
     '.env', 'be/.env.local', 'credentials.toml', 'be/credentials.json',
     'be/src/invalid?.ts', 'a'.repeat(513), '', null, 42, undefined,

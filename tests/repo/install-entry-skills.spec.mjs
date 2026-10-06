@@ -68,11 +68,11 @@ test('the manifest ships UI source while cache, secret and test-capture paths re
     'ui/package-lock.json', 'ui/package.json', 'ui/server.mjs', 'ui/src/icon.png']);
 });
 
-test('installed current examples reach the real eleven-reference catalog and READ consumer', async t => {
+test('installed current examples reach the real current reference catalog and READ consumer', async t => {
   const repo = fixture(t), target = path.join(repo, '.claude');
   const installed = init({dir: repo, bootstrap: false, hosts: []}, () => {});
   const catalog = loadExampleCatalog(target);
-  assert.equal(catalog.examples.length, 11);
+  assert.equal(catalog.examples.length, 14);
   assert.deepEqual(catalog.examples.map(row => row.id), loadExampleCatalog(source).examples.map(row => row.id));
   assert.equal(discoverExampleApps(target).length, 3);
   assert.deepEqual(discoverExampleApps(target), discoverExampleApps(source));

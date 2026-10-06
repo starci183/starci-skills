@@ -23,5 +23,3 @@ examples:
   - starci worker list --by-lane
   - starci worker list --run <run-id> --worktree <path>
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

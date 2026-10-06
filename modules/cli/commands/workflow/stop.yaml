@@ -32,5 +32,3 @@ examples:
   - starci workflow stop --workflow <id> --reason "superseded by the redesign"
 editions:
   - full
-since: 1.0.0-alpha.4
-removed: []

@@ -49,6 +49,13 @@ export const GENERATED = Object.freeze([
 
 const GENERATED_SET = new Set(GENERATED);
 
+/**
+ * A blob-store metadata sidecar: engine/db/blob.mjs writes `<sha256>.json` ({size, mediaType, createdAt}) beside each
+ * content-addressed blob `artifacts/<sha[0:2]>/<sha256>`. The curated sample runtimes under examples/.runtimes track
+ * their blobs, so the sidecars are tracked too; they are machine-written store records, not authored source.
+ */
+const BLOB_SIDECAR = /^examples\/\.runtimes\/[^/]+\/artifacts\/[0-9a-f]{2}\/[0-9a-f]{64}\.json$/;
+
 /** Local runtime preferences; gitignored; not skill-authored declarative source. */
 const LOCAL_ONLY = new Set(['config.json', 'settings.local.json']);
 
@@ -184,6 +191,7 @@ export function checkJsonExceptions({
   for (const rel of found) {
     if (LOCAL_ONLY.has(rel)) continue;
     if (ignoreLocks && /(^|\/)package-lock\.json$/.test(rel)) continue;
+    if (BLOB_SIDECAR.test(rel)) continue;
     if (GENERATED_SET.has(rel)) {
       generatedPresent.push(rel);
       continue;

@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import * as secrets from '../../scripts/hfs/secret.mjs';
@@ -49,12 +48,10 @@ function run(argv, options) {
   return { code, out: out.join(''), err: err.join('') };
 }
 
-test('an existing live resource manager refuses a sealed write before decrypt or seal', async t => {
+test('another live process writing the same sealed secret refuses a write before decrypt or seal', async t => {
   const { root, dir } = app(t, { 'token.enc': sealedJson(['data']) });
-  const absolute = path.resolve(dir, 'token.enc'), target = process.platform === 'win32' ? absolute.toLowerCase() : absolute;
-  const name = `sealed-secret-${createHash('sha256').update(target).digest('hex')}`;
-  const owner = pathToFileURL(path.resolve(import.meta.dirname, '../../scripts/connectors/lib.mjs')).href;
-  const source = `import {claimManager} from ${JSON.stringify(owner)};const held=claimManager(${JSON.stringify(name)});`+
+  const owner = pathToFileURL(path.resolve(import.meta.dirname, '../../scripts/api/fs/claim-file.mjs')).href;
+  const source = `import {claimFile} from ${JSON.stringify(owner)};const held=claimFile(${JSON.stringify(path.resolve(dir, 'token.enc'))});`+
     `if(!held.ok)process.exit(2);console.log('held');setInterval(()=>{},1000);`;
   const child = spawn(process.execPath, ['--input-type=module', '-e', source], {
     env: { ...process.env }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
@@ -63,15 +60,15 @@ test('an existing live resource manager refuses a sealed write before decrypt or
   t.after(async () => { if (child.exitCode === null) child.kill('SIGTERM'); await exit; });
   try {
   await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('private resource manager did not become ready')), 10_000);
+    const timer = setTimeout(() => reject(new Error('the other writer did not become ready')), 10_000);
     let text = '', errors = '';
     child.stderr.on('data', chunk => { errors += chunk; });
     child.stdout.on('data', chunk => { text += chunk; if (text.includes('held')) { clearTimeout(timer); resolve(); } });
     child.once('error', error => { clearTimeout(timer); reject(error); });
-    child.once('close', code => { clearTimeout(timer); reject(new Error(`private manager exited ${code}: ${errors}`)); });
+    child.once('close', code => { clearTimeout(timer); reject(new Error(`the other writer exited ${code}: ${errors}`)); });
   });
   assert.throws(() => setSecretValues(root, { slug: 'token', values: { data: 'refused-private-value' } }, {
-    sops: { decrypt: () => assert.fail('a held manager must refuse before decrypt'), seal: () => assert.fail('a held manager must refuse before seal') },
+    sops: { decrypt: () => assert.fail('a held write must refuse before decrypt'), seal: () => assert.fail('a held write must refuse before seal') },
   }), /being updated/);
   assert.equal(fs.readFileSync(path.join(dir, 'token.enc'), 'utf8'), sealedJson(['data']));
   } finally { if (child.exitCode === null) child.kill('SIGTERM'); await exit; }

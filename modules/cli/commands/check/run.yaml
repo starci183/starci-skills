@@ -22,5 +22,3 @@ examples:
   - starci check run --level L1 --changed scripts/checks/check-doc-language.mjs
   - starci check run --level L2
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

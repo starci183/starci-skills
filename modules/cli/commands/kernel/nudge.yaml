@@ -22,10 +22,6 @@ examples:
   - starci kernel nudge --repo <path> --job <job>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api nudge
-  - node scripts/kernel/cli.mjs nudge
 reads: running operation job, exact report row, exact terminal show/read frame
 writes: sends a fixed liveness wake to the same exact operation terminal and appends
   op-worker-nudged. It creates no job, contract, lease, retry, verdict or authority.

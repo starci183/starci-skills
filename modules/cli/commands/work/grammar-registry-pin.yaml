@@ -9,5 +9,3 @@ exit: {"0": the grammar dependency matches the registry pin, "1": the dependency
 json: flag
 examples: ['starci work grammar-registry-pin --repo <repo> --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/ui/grammar-registry-pin.mjs']

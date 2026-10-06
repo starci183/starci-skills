@@ -25,5 +25,3 @@ examples:
   - starci docker build identity
   - starci docker build landing --tag dev --no-cache --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

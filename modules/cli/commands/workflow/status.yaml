@@ -23,5 +23,3 @@ examples:
   - starci workflow status --workflow <id>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed: []

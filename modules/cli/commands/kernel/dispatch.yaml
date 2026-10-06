@@ -41,10 +41,6 @@ examples:
   - starci kernel dispatch --repo <path> --job <job> --spawn --model <target>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api dispatch
-  - node scripts/kernel/cli.mjs dispatch
 environmentPreStep: "For uat.verify, uat.assisted.verify and e2e.verify (verify-failure.mjs
   ENV_GATED_OPS) dispatch first runs scripts/uat/env-health.mjs check --restart on the
   work/resource@1 environments the job's uat/e2e records reference: every declared probe,

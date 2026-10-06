@@ -46,10 +46,6 @@ examples:
   - starci kernel lifecycle --repo <path> --workflow <workflow> --resume --by owner --reason <reason>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api lifecycle
-  - node scripts/kernel/cli.mjs lifecycle
 purpose: The one verb that pauses, stops and resumes a workflow (DBTREE workflow_transitions +
   lifecycle_changes). A paused or stopped workflow takes no new job (starci kernel enqueue refuses
   workflow-not-accepting-work) and launches none (starci kernel dispatch refuses); an op already running

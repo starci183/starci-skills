@@ -23,7 +23,3 @@ examples:
   - starci gate canon-scan --root <repo> --stack-kind next --json
   - starci gate canon-scan --root <repo> --paths apps/web/src --fix
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/canon-scan.mjs
-  - node .claude/scripts/gates/canon-scan.mjs

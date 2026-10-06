@@ -15,6 +15,3 @@ examples:
   - starci runtime gen-ops --check
   - starci runtime gen-ops --ops-dir <dir> --out <file>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/route/build-ops-registry.mjs

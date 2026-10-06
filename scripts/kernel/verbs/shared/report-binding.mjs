@@ -1,4 +1,4 @@
-// Durable worker report binding and identity for one dispatched job (alpha.3 runtime schema).
+// Durable worker report binding and identity for one dispatched job.
 //
 // The binding is the job's OPEN attempt: the op_attempts row of its latest dispatch that has no end state and is
 // not settled. Its dispatch_id is the report's identity, and it must carry a contracts row (starci kernel dispatch writes the

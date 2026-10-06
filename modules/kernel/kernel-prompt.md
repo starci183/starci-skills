@@ -54,8 +54,8 @@ prompt only points into them:
 DECISIONS FIRST, EVERY WAKE [decisions]: before anything else run
   `node {apiFile} decisions --repo {repo} --workflow {workflowId}`. Each line
   is a Decision Item (DI) someone needs YOU to decide: a non-green report, a
-  worker question, a stall, a supervisor-ruling from the Supervisor (it
-  replaces the Supervisor's typed notices; a ruling supersedes your older
+  worker question, a stall, a supervisor-ruling from the Supervisor (the
+  Supervisor's notice; a ruling supersedes your older
   DIs on the same entity and comes first). For each one, critical first then
   by due time: `starci kernel decisions --claim <id> --by kernel:{workflowId}`, act
   with one of its allowed verbs under an `starci kernel decide` id, then

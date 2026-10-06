@@ -63,27 +63,6 @@ const guardFastPath = async (argv, io) => {
   }
 };
 
-// `starci <old>` spellings match from the program name; the retired `hfs` and `starci-test-stack` bins also match behind it.
-const RETIRED_BINS = new Set(['hfs', 'starci-test-stack']);
-const retiredMatch = (words, retired) => {
-  const input = ['starci', ...words];
-  const candidates = retired
-    .map((entry) => {
-      const tokens = entry.spelling.split(/\s+/);
-      if (tokens[0] === 'starci') return { ...entry, tokens, offset: 0 };
-      return RETIRED_BINS.has(tokens[0]) ? { ...entry, tokens, offset: 1 } : null;
-    })
-    .filter((entry) => entry && entry.tokens.every((token, index) => input[index + entry.offset] === token))
-    .sort((a, b) => b.tokens.length - a.tokens.length);
-  const match = candidates[0];
-  if (!match) return null;
-  const suffix = input.slice(match.offset + match.tokens.length);
-  return {
-    spelling: [...input.slice(0, match.offset), ...match.tokens, ...suffix].join(' '),
-    use: [...match.use.split(/\s+/), ...suffix].join(' '),
-  };
-};
-
 const handlerArgs = (validated, command, withFlagsBeforeDashes, { includeQuiet = true } = {}) => {
   const extra = [];
   if (validated.global.json === true && command.json !== 'always') extra.push('--json');
@@ -104,7 +83,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
     import('./runtime-link.mjs'),
     import('./validate-args.mjs'),
   ]);
-  const { CATALOG, RETIRED } = catalogModule;
+  const { CATALOG } = catalogModule;
   const { completionFor, completionShells } = completionModule;
   const { explainHelp, groupHelp, topHelp, verbHelp } = helpModule;
   const { installRuntime } = installModule;
@@ -113,7 +92,6 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   const stdout = io.stdout ?? process.stdout;
   const stderr = io.stderr ?? process.stderr;
   const catalog = io.catalog ?? CATALOG;
-  const retired = io.retired ?? RETIRED;
   const version = io.version ?? cliVersion();
   const home = io.home;
   const env = io.env ?? process.env;
@@ -129,8 +107,6 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   }
 
   const split = splitCommand(argv, catalog.global ?? []);
-  const removed = split.group ? retiredMatch([split.group, ...(split.verb ? [split.verb] : []), ...split.args], retired) : null;
-  if (removed) return fail(stderr, `"${removed.spelling}" was removed; use "${removed.use}"`);
 
   if (split.group === 'help') {
     const [verbName] = split.args.filter((token) => !token.startsWith('-'));

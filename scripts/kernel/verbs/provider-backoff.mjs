@@ -7,7 +7,7 @@
 //   provider-backoff --provider <p> --open-circuit [--kind quota|rate-limited] --reason <text> --by <actor>
 //
 // Idempotent: an open circuit of the provider is left as it is (answer alreadyOpen). The circuit is the machine.sqlite
-// provider_health row (scripts/machine/provider-circuit.mjs; alpha.3), written once per episode with its
+// provider_health row (scripts/machine/provider-circuit.mjs), written once per episode with its
 // provider_health_events row; the pools' backoff rows (pool_backoff, the controller's AIMD caps) are read back into the
 // answer. A caller may inject the machine handle (`machine`); otherwise the machine.sqlite of this host is opened.
 import { allocationMs } from '../../../engine/config.mjs';

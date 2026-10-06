@@ -1,4 +1,3 @@
 group: machine
 summary: inspect and maintain host machine state
 owner: runtime
-since: 1.0.0-alpha.4

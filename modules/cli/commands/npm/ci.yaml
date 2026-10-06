@@ -21,5 +21,3 @@ examples:
   - starci npm ci
   - starci npm ci --workspace packages/cli
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

@@ -155,15 +155,15 @@ Every runtime change meets these rules on top of the commit bar:
 
 ## Pushing and releasing
 
-Lands fast-forward local main and never push. The remote moves once per release, main and one annotated `v*` tag together, through the release flow
-(`starci release cut`); CI runs only on that tag and when a person dispatches it. R221 `CI_TRIGGERS_RELEASE_ONLY` refuses any other workflow trigger and R222 `RELEASE_NOTES` refuses a tag over
+Lands fast-forward local main, and main goes to the remote fast-forward (no force push); CI runs on every push to main, on every `v*` tag and when a person dispatches it.
+A release is main and one annotated `v*` tag pushed together through the release flow (`starci release cut`). R221 `CI_TRIGGERS_RELEASE_ONLY` refuses any other workflow trigger and R222 `RELEASE_NOTES` refuses a tag over
 unfinished CHANGELOG notes. The model, the refusals and the risks are in [git governance](docs/git-governance.md).
 
 ## Editing contracts and prose
 
 Every canonical file — `CONTEXT.md`, `README.md`, `docs/**`, `modules/**`, `skills/**` — says
-one thing, once, in the present tense. These six rules are the bar for any edit;
-a review that finds a violation sends the change back.
+one thing, once, in the present tense. These six rules are the bar for any edit on the alpha
+line; a review that finds a violation sends the change back.
 
 1. **Present tense, no ghosts.** Describe the tree as it is. Never define something by negating
    a state the tree no longer has (a removed directory, a former layout, a compatibility mode). History goes to `CHANGELOG.md` or `benchmark/findings/`, never into the
@@ -179,7 +179,7 @@ a review that finds a violation sends the change back.
    that code reads; they are never prose repeated in several files.
 4. **Claims must execute.** `citation:`, `enforcedBy:`, `source:`, "validated by", "refuses",
    "verified before effects" name a file and a behaviour that exist. If the code does not do it,
-   the yaml says so or the claim is removed. The default is to make the yaml
+   the yaml says so or the claim is removed. On the alpha line the default is to make the yaml
    tell the truth; add code only where a test shows a real hole.
 5. **Host calls go through `scripts/api/orca/`.** No agent-facing prose tells an agent to run
    `orca` or to read `modules/host/**`; agents call `scripts/kernel/cli.mjs` or a wrapper.

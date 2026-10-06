@@ -66,10 +66,6 @@ test('runtime link writes a launcher that runs the unified CLI outside the check
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /Usage: starci gate/);
 
-  const removed = invoke(['api', 'survey']);
-  assert.equal(removed.status, 2, removed.stderr);
-  assert.match(removed.stderr, /"starci api survey" was removed; use "starci kernel survey"/);
-
   const unknown = invoke(['runtime', 'version', '--not-a-real-flag']);
   assert.equal(unknown.status, 2, unknown.stderr);
   assert.match(unknown.stderr, /unknown (?:option|flag).*--not-a-real-flag/);

@@ -17,7 +17,3 @@ examples:
   - starci connect telegram discover-chat
   - starci connect telegram notify --ledger <file> --workflow <id> --dispatch <id>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/connectors/telegram.mjs
-  - node .claude/scripts/connectors/telegram.mjs

@@ -26,10 +26,6 @@ examples:
   - starci kernel observe --repo <path> --job <job> --lines 60
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api observe
-  - node scripts/kernel/cli.mjs observe
 reads: the job row; the exact operation terminal handle resolved from the dispatch binding
   (payload.managed/orca agentTerminalHandle, hierarchy runtime handle, or worker_id — the same
   source nudge/status use); Orca terminal-show for liveness plus a bounded terminal-read screen tail

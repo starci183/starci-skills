@@ -12,7 +12,3 @@ examples:
   - starci runtime readme-blocks --check
   - starci runtime readme-blocks --write
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/hfs/readme-blocks.mjs
-  - node .claude/scripts/hfs/readme-blocks.mjs

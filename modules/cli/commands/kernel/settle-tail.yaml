@@ -26,10 +26,6 @@ examples:
   - starci kernel settle-tail --repo <path> --job <job> --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api settle-tail
-  - node scripts/kernel/cli.mjs settle-tail
 purpose: "Run the heavy half of a settle for one settled job, off the settle's path: session
   retention, the Telegram media sender, the input re-baseline, artifact indexing with its evidence
   copy and typed logs. starci kernel settle queues it under <ledger dir>/settle-tail/<jobId>.json and starts

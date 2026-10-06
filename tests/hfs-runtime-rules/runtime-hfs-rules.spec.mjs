@@ -435,7 +435,13 @@ const triggers = (on, file = '.github/workflows/ci.yml') => workflowTriggerFindi
 
 test('CI_TRIGGERS_RELEASE_ONLY: a branch push, a pull_request, a schedule, a filtered or unfiltered push and a missing block are refused', () => {
   assert.deepEqual(codesOf(triggers('  push:\n  pull_request:')), ['CI_TRIGGERS_RELEASE_ONLY', 'CI_TRIGGERS_RELEASE_ONLY']);
-  assert.match(triggers('  push:\n    branches: [main]')[0].message, /filtered to `tags/);
+  assert.deepEqual(codesOf(triggers('  push:\n    branches: [dev]')), ['CI_TRIGGERS_RELEASE_ONLY'], 'the runtime pushes on main only');
+  assert.deepEqual(codesOf(triggers('  push:\n    branches: [main, dev]')), ['CI_TRIGGERS_RELEASE_ONLY']);
+  assert.deepEqual(codesOf(triggers("  push:\n    branches: [main]\n    paths: ['src/**']")), ['CI_TRIGGERS_RELEASE_ONLY'], 'a path filter beside the branch filter');
+  assert.deepEqual(codesOf(triggers('  pull_request:\n    branches: [main]')), ['CI_TRIGGERS_RELEASE_ONLY'], 'a pull request into main is no push');
+  const template = 'packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml';
+  for (const file of [template, 'examples/lite-app/.github/workflows/ci.yml']) assert.match(triggers('  push:\n    branches: [main]', file)[0].message, /not allowed in an example or an app template/, file);
+  assert.deepEqual(codesOf(triggers("  push:\n    branches: [main]\n    tags: ['v*']", template)), ['CI_TRIGGERS_RELEASE_ONLY'], 'an app template keeps the tag law');
   assert.deepEqual(codesOf(triggers("  push:\n    tags: ['v*']\n    paths: ['src/**']")), ['CI_TRIGGERS_RELEASE_ONLY'], 'a path filter beside the tag filter');
   assert.deepEqual(codesOf(triggers("  push:\n    tags: ['*']")), ['CI_TRIGGERS_RELEASE_ONLY'], 'every tag is not a release tag');
   assert.match(triggers('  schedule:\n    - cron: "0 3 * * *"')[0].message, /`schedule` is not allowed/);
@@ -447,11 +453,13 @@ test('CI_TRIGGERS_RELEASE_ONLY: a branch push, a pull_request, a schedule, a fil
 test('CI_TRIGGERS_RELEASE_ONLY: a release-tag push with workflow_dispatch (with inputs), a manual-only workflow and a template with placeholders are clean', () => {
   assert.deepEqual(triggers("  push:\n    tags: ['v*']\n  workflow_dispatch:\n    inputs:\n      layers:\n        type: string"), []);
   assert.deepEqual(triggers('  workflow_dispatch:'), []);
+  assert.deepEqual(triggers("  push:\n    branches: [main]\n    tags: ['v*']\n  workflow_dispatch:"), [], 'the runtime pushes on main, on a release tag and by hand');
+  assert.deepEqual(triggers('  push:\n    branches: [main]'), [], 'a push to main in the runtime workflows');
   assert.deepEqual(workflowTriggerFindings({ path: 'packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml', text: "{{header}}\nname: ci\non:\n  push:\n    tags: ['v*']\n  workflow_dispatch:\njobs:\n  a:\n    steps:\n      - uses: actions/setup-node@v4\n        with:\n          node-version: {{nodeMajor}}\n" }), []);
   assert.deepEqual(gitTriggerFindings(ctxOf({}, { files: ['tests/fixtures/w.yml', 'docs/notes.yml'], read: () => 'name: x\non: push\njobs: {}\n' })), [], 'only workflow files are read');
 });
 
-test('CI_TRIGGERS_RELEASE_ONLY: every workflow of this repository, its examples and the hfs templates starts only on a release tag or by hand', () => {
+test('CI_TRIGGERS_RELEASE_ONLY: every workflow of this repository, its examples and the hfs templates starts only on a release tag, by hand or on main in the runtime workflows', () => {
   const folders = ['.github/workflows', 'packages/hfs/templates/app/ci-workflows/github/workflows', ...fs.readdirSync(path.join(ROOT, 'examples')).map((app) => `examples/${app}/.github/workflows`)];
   const files = folders.filter((dir) => fs.existsSync(path.join(ROOT, dir))).flatMap((dir) => fs.readdirSync(path.join(ROOT, dir)).map((f) => `${dir}/${f}`));
   assert.ok(files.length >= 8, 'the root, example and template workflows are read');

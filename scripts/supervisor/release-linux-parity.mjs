@@ -20,14 +20,13 @@ import { containerRm } from '../api/docker/container-rm.mjs';
 import { version as dockerVersion } from '../api/docker/version.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
+import { DEFAULT_NODE } from '../lib/node-image.mjs';
 
 const STEP_NAME = 'linux-parity';
 /** The label of the spec step the container runs for the tests the host run skipped (read back by release-l4.mjs through the `##STEP` marker). */
 export const LINUX_SPECS_LABEL = 'linux-specs';
 /** The spec setup the root `npm test` runs under (package.json scripts.test): the same isolation for the files the container runs. */
 const SPEC_IMPORTS = ['low-priority', 'isolated-temp', 'isolated-registry', 'runtime-copies'].map((name) => `--import ./tests/setup/${name}.mjs`).join(' ');
-/** The node major of the Linux container when no workflow names one; the install sandbox (scripts/gates/install-sandbox.mjs) runs in the same image. */
-export const DEFAULT_NODE = '22';
 const RUN_TIMEOUT_MS = 90 * 60_000;
 /** The spec suites: the root `npm test` and an example app's npm test / test:<layer> runs. The host ran them in this L4 row. */
 const SPEC_SUITE = /^npm (?:run )?test(?::[\w:-]+)?(?: -- .*)?$/;

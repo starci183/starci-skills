@@ -65,8 +65,7 @@ import { rationaleFileOf, rationaleSummary } from './draw/draw-rationale.mjs';
 import { DRAW_FEEDBACK_UNADDRESSED, dnaNamesFor, feedbackFindings, feedbackOf, goldenMarkOf, notesOfReceipt, openNotesOf, withFeedbackRound } from './draw-feedback.mjs';
 import { learnIntoDirection, promoteGolden } from './brand-direction.mjs';
 import { DIRECTION_EXEMPT, archetypeOf } from './ui-archetype.mjs';
-import { readBrandRecord } from './brand/brand.mjs';
-import { byCodeUnit } from '../lib/list.mjs';
+import { readBrandRecord } from './brand/brand.mjs'; import { byCodeUnit } from '../lib/list.mjs';
 
 export const DRAW_REVIEW_KIND = 'draw-review';
 export const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';

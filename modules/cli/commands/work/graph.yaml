@@ -21,7 +21,3 @@ examples:
   - starci work graph show --repo <path> --workflow <id>
   - starci work graph propose --repo <path> --job <id> --file <candidate> --reason <text>
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/work/work-graph.mjs
-  - node .claude/scripts/work/work-graph.mjs

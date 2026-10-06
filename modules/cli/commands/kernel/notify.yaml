@@ -44,10 +44,6 @@ examples:
   - starci kernel notify --repo <path> --workflow <workflow> --to <to> --kind request --subject <subject> --body <body>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api notify
-  - node scripts/kernel/cli.mjs notify
 kinds: request (work the sender needs that lies in the peer's scope — the peer builds it or answers
   why not), heads-up (the sender changed or will change a shared contract, record or path the peer
   reads), handoff (the sender gives the peer a piece of work or ownership, e.g. a repo-wide change

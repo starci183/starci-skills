@@ -13,5 +13,3 @@ json: flag
 examples:
   - starci supervisor status
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

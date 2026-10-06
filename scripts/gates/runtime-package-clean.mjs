@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { byCodeUnit } from '../lib/list.mjs';
 import { createHash } from 'node:crypto';
 import { sha256 } from '../../engine/digest.mjs';
@@ -35,21 +36,28 @@ process.stdout.write(JSON.stringify({ name: manifest.name, version: manifest.ver
   entries: plan.write.map(item => ({ relative: item.relative, source: path.relative(root, item.source).split(path.sep).join('/') })) }));
 `;
 
-/** A relative module specifier of a packed script: `from './x.mjs'`, `import('./x.mjs')`, `import './x.mjs'`, `require('./x.cjs')`, or `import(new URL('./x.mjs', import.meta.url))`. */
-const PACKED_MODULE_SPEC = /(?:\bfrom\s*|\bimport\s*\(\s*(?:new URL\(\s*)?|\bimport\s+|\brequire\(\s*)['"](\.{1,2}\/[^'"]+\.(?:mjs|cjs|js))['"]/g;
+/** `import(new URL('./x.mjs', import.meta.url))`: the one import form whose specifier TypeScript's scanner does not report (a plain `new URL(...)` is a file read, not an import). */
+const URL_IMPORT = /\bimport\s*\(\s*new URL\(\s*['"]([^'"]+)['"]/g;
+const RESOLVE_EXTENSIONS = ['', '.mjs', '.js', '.cjs', '.json'];
+const RESOLVE_INDEXES = ['index.mjs', 'index.js', 'index.cjs', 'index.json'];
+const typescript = createRequire(import.meta.url)('typescript');
 
-/** The relative module imports of the packed scripts whose target is not in the archive: ["package/a.mjs:12 -> package/b/c.mjs"]. `files` is the tarFiles map. */
+/** Whether the archive holds what Node would load for `target`: the file itself, the file with an extension, or the directory's index. */
+const resolvesInArchive = (files, target) => [...RESOLVE_EXTENSIONS.map((ext) => `${target}${ext}`), ...RESOLVE_INDEXES.map((index) => path.posix.join(target, index))].some((candidate) => files.has(candidate));
+
+/** The relative module imports of the packed scripts whose target is not in the archive: ["package/a.mjs:12 -> package/b/c.mjs"]. `files` is the tarFiles map. Imports are read by TypeScript's scanner, so one shown inside a string or a comment (scaffold templates emit source text) is not an import. */
 export function unresolvedPackedImports(files) {
   const missing = [];
   for (const [file, bytes] of files) {
     if (!/\.(?:mjs|cjs|js)$/.test(file)) continue;
-    String(bytes).split('\n').forEach((line, index) => {
-      if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) return;
-      for (const match of line.matchAll(PACKED_MODULE_SPEC)) {
-        const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), match[1]));
-        if (!files.has(target)) missing.push(`${file}:${index + 1} -> ${target}`);
-      }
-    });
+    const text = String(bytes);
+    const imports = [...typescript.preProcessFile(text, true, true).importedFiles.map(({ fileName, pos }) => ({ specifier: fileName, pos })),
+      ...[...text.matchAll(URL_IMPORT)].filter((match) => !/^\s*(?:\/\/|\*|\/\*)/.test(text.slice(text.lastIndexOf('\n', match.index) + 1, match.index + 1))).map((match) => ({ specifier: match[1], pos: match.index }))];
+    for (const { specifier, pos } of imports) {
+      if (!/^\.{1,2}\//.test(specifier)) continue;
+      const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier)).replace(/\/$/, '');
+      if (!resolvesInArchive(files, target)) missing.push(`${file}:${text.slice(0, pos).split('\n').length} -> ${target}`);
+    }
   }
   return missing;
 }

@@ -36,10 +36,6 @@ examples:
   - starci kernel run-deferred-tests --repo <path> --workflow <workflow> --kind unit --dry-run --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api run-deferred-tests
-  - node scripts/kernel/cli.mjs run-deferred-tests
 reads: the workflow's jobs whose result verdict is deferred (starci kernel status testsDeferred); the owner
   config.yaml specs switches
 writes: "The owner's \"test later\" (owner 2026-09-28 \"speed up development; test later when

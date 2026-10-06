@@ -28,10 +28,6 @@ examples:
   - starci kernel usage --repo <path> --workflow <workflow> --legs --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api usage
-  - node scripts/kernel/cli.mjs usage
 reads: "llm_usage rows (subject attempt and kernel-turn) joined to op_attempts, and each attempt's
   settle state: written by scripts/kernel/usage-record.mjs from the agent CLI's own session file
   (Claude Code JSONL message.usage, Codex rollout token_count events; devin and any other agent have

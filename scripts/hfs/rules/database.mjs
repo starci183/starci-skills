@@ -5,6 +5,7 @@ import { configFindings, parseToml, typesFindings } from './database-config.mjs'
 import { defaultGit, migrationShapeFindings } from './database-migrations.mjs';
 import { migrationSetPolicyFindings, sqlAnalysis } from './database-sql.mjs';
 import { CONFIG_FILE, DB_CONFIG_POLICY, DB_MIGRATION_SHAPE, MIGRATIONS_DIR, TYPES_FILE } from './database-constants.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 export { migrationStamp } from './database-migrations.mjs';
 export {
@@ -27,7 +28,7 @@ export {
  */
 export async function checkDatabase({ repoRoot, files, base, git, edition, supabase, emitTypes, now = () => Date.now() } = {}) {
   const findings = [];
-  const migrations = files.filter((file) => file.startsWith(`${MIGRATIONS_DIR}/`)).sort();
+  const migrations = files.filter((file) => file.startsWith(`${MIGRATIONS_DIR}/`)).sort(byCodeUnit);
   const declaration = readJson(repoRoot, 'hfs.json');
   const declared = supabase === undefined ? declaration?.supabase : supabase;
   const hasConfig = files.includes(CONFIG_FILE);

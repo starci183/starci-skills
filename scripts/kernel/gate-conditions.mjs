@@ -1,9 +1,8 @@
 // gate-conditions.mjs — machine-checkable release conditions on an open wait incident.
 //
-// An owner-gate or peer-wait used to describe its release only in free text ("resolve when
-// .starciwork/shell/index.yaml exists", "wait for job X to settle + sha"). Nobody re-checked it and
-// workflows sat for hours after the condition held (inc-9f2e1e7ff1f6
-// waited on op-backend.implement-82b3110067; inc-28187662c4fe on the Modules shell rev).
+// An owner-gate or peer-wait describes its release as a typed condition, never only as free text ("resolve when
+// .starciwork/shell/index.yaml exists", "wait for job X to settle + sha"), so it is re-checked and
+// a workflow never sits after the condition holds.
 // `starci kernel incident ... --until-<type> <spec>` stores TYPED conditions on the incident; the runtime
 // evaluates them read-only on every `starci kernel status` (every watchdog tick), before route/dispatch, after
 // a settle and after a peer message, and resolves the incident itself once every condition holds

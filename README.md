@@ -33,7 +33,7 @@ with unflagged `node:sqlite`, and a coding agent host (`package.json` `engines.n
 comes from locally configured agent CLIs (Devin, Claude Code, Codex, Orca) — StarCi has no API key
 of its own.
 
-**Source version:** `1.0.5`, MIT.
+**Source version:** `1.0.0-alpha.5` (alpha line; contracts are provisional until `1.0.0`), MIT.
 
 [Overview](#overview) · [Stack](#stack) · [Repository layout](#repository-layout) ·
 [Development](#development) · [Install](#install) · [Documentation](#documentation)

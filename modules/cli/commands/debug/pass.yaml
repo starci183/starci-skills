@@ -22,6 +22,3 @@ examples:
   - starci debug pass claim --key <alert> --lane <lane>
   - starci debug pass status
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/reconciler/debug-pass.mjs

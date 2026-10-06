@@ -106,7 +106,7 @@ rules:
     kind: mandatory
     hfsRules: [R64]
     requirement: |-
-      Every `work/ui-screen@2` record declares `app`, a name from `hfs.json` `sides.fe.apps`, and its implementation records
+      Every `work/ui-screen@1` record declares `app`, a name from `hfs.json` `sides.fe.apps`, and its implementation records
       point to `fe/apps/<app>` of the app repository. Drawing and implementation read the app from the record and never guess it from the
       screen name or the route.
     rationale: |-

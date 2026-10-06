@@ -62,10 +62,6 @@ examples:
   - starci kernel foundation --repo <path> --workflow <workflow> --declare-none
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api foundation
-  - node scripts/kernel/cli.mjs foundation
 reads: the foundation row, the workflow and its running peers, open peer-waits naming the foundation
 writes: "--claim: the row's owner is --workflow and its state claimed (a new version of a landed
   foundation re-opens it; the landing stays in history); a foundation another RUNNING workflow owns

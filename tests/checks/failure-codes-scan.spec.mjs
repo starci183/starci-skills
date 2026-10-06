@@ -76,3 +76,23 @@ test('a code a check spells in code is emitted whatever the rule catalog says; a
   const drift = catalogProblems(catalogFixture(t, { source: "export const A = 'RT_NEW_CODE';\n", rules: RULE('BE_X_RULE', 'eslint-be'), catalogCodes: ['RT_OLD_CODE'] }));
   assert.deepEqual([drift.missing.map((e) => e.code), drift.stale], [['BE_X_RULE', 'RT_NEW_CODE'], ['RT_OLD_CODE']]);
 });
+
+test('the literals of a constant environment-name list are not emitted codes', (t) => {
+  const found = codes(t, [
+    "const CONTROLLED_ENV = new Set(['SOPS_AGE_KEY', 'SOPS_KMS_ARN', 'HOME']);",
+    "export const refuse = () => ({ code: 'REAL_CODE_HERE' });",
+  ]);
+  assert.ok(!found.includes('SOPS_AGE_KEY') && !found.includes('SOPS_KMS_ARN'), found.join(', '));
+  assert.ok(found.includes('REAL_CODE_HERE'), found.join(', '));
+});
+
+test('a constant holding one environment variable name is not an emitted code', (t) => {
+  const found = codes(t, ["export const ARTIFACT_ROOT_ENV = 'STARCI_ARTIFACT_ROOT';", "export const f = () => ({ reason: 'real-reason' });"]);
+  assert.ok(!found.includes('STARCI_ARTIFACT_ROOT'), found.join(', '));
+  assert.ok(found.includes('real-reason'), found.join(', '));
+});
+
+test('a kebab-case default for a code parameter is an emitted code', (t) => {
+  const found = codes(t, ["export const zipRefuse = (message, code = 'zip-corrupt') => Object.assign(new Error(message), { code });"]);
+  assert.ok(found.includes('zip-corrupt'), found.join(', '));
+});

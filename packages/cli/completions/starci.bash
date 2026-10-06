@@ -18,7 +18,7 @@ _starci() {
         connect) COMPREPLY=( $(compgen -W "ask-gateway telegram telegram-media tunnel" -- "$cur") );;
         debug) COMPREPLY=( $(compgen -W "pass run" -- "$cur") );;
         docker) COMPREPLY=( $(compgen -W "build down ps up" -- "$cur") );;
-        gate) COMPREPLY=( $(compgen -W "canon-scan custody-exec env-health hfs-sync read reference-conventions repo-presentation run sonar starcistacks test-world unit" -- "$cur") );;
+        gate) COMPREPLY=( $(compgen -W "canon-scan custody-exec env-health hfs-sync install-sandbox read reference-conventions repo-presentation run runtime-artifact runtime-coverage sonar starcistacks test-world unit" -- "$cur") );;
         git) COMPREPLY=( $(compgen -W "backup commit land sync" -- "$cur") );;
         guard) COMPREPLY=( $(compgen -W "command footprint-scan raw seat-tools verify-commit" -- "$cur") );;
         harness) COMPREPLY=( $(compgen -W "open start status stop" -- "$cur") );;
@@ -123,6 +123,8 @@ _starci() {
         gate:env-health:--service) return 0;;
         gate:env-health:--url) return 0;;
         gate:hfs-sync:--repo) return 0;;
+        gate:install-sandbox:--tarball) return 0;;
+        gate:install-sandbox:--tools) return 0;;
         gate:read:--root) return 0;;
         gate:read:--touch) return 0;;
         gate:read:--read) return 0;;
@@ -137,6 +139,10 @@ _starci() {
         gate:run:--out) return 0;;
         gate:run:--scope) COMPREPLY=( $(compgen -W "code docs" -- "$cur") ); return 0;;
         gate:run:--tree) return 0;;
+        gate:runtime-artifact:--pack) return 0;;
+        gate:runtime-artifact:--dir) return 0;;
+        gate:runtime-artifact:--out) return 0;;
+        gate:runtime-artifact:--root) return 0;;
         gate:sonar:--key) return 0;;
         gate:sonar:--name) return 0;;
         gate:sonar:--base) return 0;;
@@ -926,10 +932,13 @@ _starci() {
         gate:custody-exec) COMPREPLY=( $(compgen -W "--get --keys --input-type --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:env-health) COMPREPLY=( $(compgen -W "--repo --env --paths --restart --probe-timeout-ms --ready-timeout-ms --service --url --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:hfs-sync) COMPREPLY=( $(compgen -W "--repo --json --cwd --quiet --help --edition" -- "$cur") );;
+        gate:install-sandbox) COMPREPLY=( $(compgen -W "--tarball --keep --docker --tools --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:read) COMPREPLY=( $(compgen -W "--root --touch --read --knowledge --out --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:reference-conventions) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         gate:repo-presentation) COMPREPLY=( $(compgen -W "--root --runtime --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:run) COMPREPLY=( $(compgen -W "--root --base --main --changed --tests --out --scope --tree --json --cwd --quiet --help --edition" -- "$cur") );;
+        gate:runtime-artifact) COMPREPLY=( $(compgen -W "--pack --dir --out --root --json --cwd --quiet --help --edition" -- "$cur") );;
+        gate:runtime-coverage) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         gate:sonar) COMPREPLY=( $(compgen -W "--key --name --with-token --wait --base --paths --project-gate --out --blob --log --token-ref --no-ensure --timeout --wait-timeout --isolate --keep-slice-project --declaration --host --stack --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:starcistacks) COMPREPLY=( $(compgen -W "--new --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:test-world) COMPREPLY=( $(compgen -W "--root --project --tests --out --json --cwd --quiet --help --edition" -- "$cur") );;

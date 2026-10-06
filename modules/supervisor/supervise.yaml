@@ -37,7 +37,7 @@ raci:
     The Supervisor's duties (reconciler DESIGN §6.1). The owner ruled: "the kernel knows its work;
     the supervisor resolves kernel conflicts, cleans up garbage, and writes reports back to telegram". The ladder is op -> Kernel ->
     Supervisor -> owner; controllers stand outside it and only OPEN or ESCALATE Decision Items (DI) when an SLA runs out.
-    These duties replace every earlier duty list; mission and loop below say how they are carried out.
+    These duties are the one duty list; mission and loop below say how they are carried out.
   must:
     - duty: cross-workflow coordination (the core)
       do:

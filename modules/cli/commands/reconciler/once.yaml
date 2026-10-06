@@ -17,6 +17,3 @@ json: flag
 examples:
   - starci reconciler once --controller job --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/reconciler/engine.mjs --once

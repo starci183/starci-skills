@@ -1,22 +1,25 @@
 // install-sandbox.mjs - the clean-machine proof of the packaged runtime: it installs the `npm pack` tarball of the root package the way a user host gets it and
 // asserts that the host configuration works, without reading or writing the real home of the machine it runs on. Used by .github/workflows/install-sandbox.yml
 // (a Windows and a Linux runner) and by the two local sandboxes in docs/installation.md (this host, and a throwaway Docker container).
-//   node scripts/gates/install-sandbox.mjs --tarball <starci-x.y.z.tgz> [--keep] [--json <file>]
-//   node scripts/gates/install-sandbox.mjs --tarball <starci-x.y.z.tgz> --docker [--tools <dir with a Linux age-keygen>]      (the same run inside a throwaway Linux container, from a checkout)
+//   starci gate install-sandbox --tarball <starci-x.y.z.tgz> [--keep] [--out <file>]
+//   starci gate install-sandbox --tarball <starci-x.y.z.tgz> --docker [--tools <dir with a Linux age-keygen>]      (the same run inside a throwaway Linux container, from a checkout)
 // The sandbox is one temp directory holding an empty HOME/USERPROFILE (with an empty LOCALAPPDATA and APPDATA below it) and an empty git repository `app`. The
 // process environment is redirected to it before anything runs, so npm, the installer, the shim and the machine database all see only the sandbox.
 // The install is the real one: `npm install --prefix <home>/.starci/runtime <tarball>` (the fetch `starci runtime install` makes, with the tarball as the spec, since
 // the registry copy is not the artifact under proof), then `installRuntime` of THAT installed package (scripts/install/install.mjs init into <app>/.claude and the
 // per-user shim), then the shim is run for `--version`, `runtime check --only entry` and `runtime machine-db`. Nothing here copies the payload by hand.
-// Node builtins only, no bash syntax, so the same file runs on a Windows and a Linux runner. Exit 0 every assertion passed, 1 an assertion failed (a product defect or
+// Node builtins and the runtime's api call files only (git, npm, process), no bash syntax, so the same file runs on a Windows and a Linux runner. Exit 0 every assertion passed, 1 an assertion failed (a product defect or
 // a stale tarball), 2 the sandbox could not run (bad usage, unreadable tarball, npm or git or the shim could not start): a step that could not run is never a pass.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-
+import { init as gitInit } from '../api/git/init.mjs';
+import { runNpm } from '../api/npm/run-npm.mjs';
+import { runProgram } from '../api/process/run-program.mjs';
+import { DEFAULT_NODE } from '../lib/node-image.mjs';
+import { readEnv } from '../lib/env.mjs';
 const HOST_IGNORES = ['.starciwork/', '.claude/config.yaml', '.claude/secret.env'];
 const REQUIRED_FILES = ['CONTEXT.md', 'skills/starci/SKILL.md', 'skills/starci/references/host-startup.md', 'config.example.yaml', 'init/AGENTS.md', '.starci-skills.json'];
 const HOST_MARKER = '<!-- starci:prompt-entry -->';
@@ -117,22 +120,36 @@ export function dockerArgs({ name, stage, image, tarballName, script, tools = nu
   return ['--name', name, ...mounts, image, 'sh', '-c', command];
 }
 
+/** The runtime checkout holding this script, and the script's path inside it: the staged copy keeps that path so its relative imports resolve inside the container. */
+const CHECKOUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SCRIPT = path.relative(CHECKOUT, fileURLToPath(import.meta.url)).split(path.sep).join('/');
+
+/** The runtime files the container needs beside this script: everything its top-level static imports reach (the call files and what they import), derived from the import graph. */
+async function containerFiles() {
+  const { importClosure } = await import('../hfs/sync-runtime.mjs');
+  const entries = [...read(fileURLToPath(import.meta.url)).matchAll(/^import [^\n]*? from '(\.[^']+)';$/gm)].map((match) => path.posix.join(path.posix.dirname(SCRIPT), match[1]));
+  return importClosure(entries);
+}
+
 /**
  * Run the sandbox script inside a throwaway container of the node image the release parity step uses, through the docker call files (scripts/api/docker). Only the
- * tarball and this script are staged (copied into a temp directory that is mounted read-only); the container is removed on exit. Needs a checkout (the docker
- * owner and the parity image live there), so the imports are lazy: the CI legs never load them. Returns the exit code (the container's, or 2 when docker could not run).
+ * tarball, this script and the call files it imports are staged (copied into a temp directory that is mounted read-only); the container is removed on exit. Needs a
+ * checkout (the docker owner and the import graph live there), so the imports are lazy: the CI legs never load them. Returns the exit code (the container's, or 2 when
+ * docker could not run).
  */
 async function runInDocker({ tarball, tools = null }) {
   const { run } = await import('../api/docker/run.mjs');
-  const { DEFAULT_NODE } = await import('../supervisor/release-linux-parity.mjs');
   const tarballName = path.basename(tarball);
   if (!tarballVersion(tarballName) || !exists(tarball)) throw new CouldNotRun(`${tarball} is not an existing npm pack tarball`);
   const stage = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-sandbox-stage-')));
   try {
     fs.copyFileSync(tarball, path.join(stage, tarballName));
-    fs.copyFileSync(fileURLToPath(import.meta.url), path.join(stage, 'install-sandbox.mjs'));
+    for (const file of [SCRIPT, ...await containerFiles()]) {
+      fs.mkdirSync(path.dirname(path.join(stage, file)), { recursive: true });
+      fs.copyFileSync(path.join(CHECKOUT, file), path.join(stage, file));
+    }
     const name = `starci-install-sandbox-${process.pid}`;
-    const result = run(dockerArgs({ name, stage, image: `node:${DEFAULT_NODE}`, tarballName, script: 'install-sandbox.mjs', tools }), { stdio: 'inherit', timeout: STEP_TIMEOUT_MS });
+    const result = run(dockerArgs({ name, stage, image: `node:${DEFAULT_NODE}`, tarballName, script: SCRIPT, tools }), { stdio: 'inherit', timeout: STEP_TIMEOUT_MS });
     if (result.error) throw new CouldNotRun(`docker could not run: ${result.error.message}`);
     return result.status ?? 2;
   } finally {
@@ -162,22 +179,16 @@ class CouldNotRun extends Error {}
 const read = (file) => fs.readFileSync(file, 'utf8');
 const lf = (text) => text.split('\r\n').join('\n');
 
-/** Run a program and return {status, stdout, stderr}; a spawn error is CouldNotRun. */
-function exec(program, args, options) {
-  const result = spawnSync(program, args, { encoding: 'utf8', timeout: STEP_TIMEOUT_MS, windowsHide: true, shell: false, ...options });
-  if (result.error) throw new CouldNotRun(`${program} could not run: ${result.error.message}`);
+/** A finished child as {status, stdout, stderr}; a spawn error (`label` could not start) is CouldNotRun. */
+function finished(label, result) {
+  if (result.error) throw new CouldNotRun(`${label} could not run: ${result.error.message}`);
   return { status: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
-/** npm's JavaScript entry next to this node (so no command shell is needed, on Windows too). */
-function npmEntry() {
-  const nodeDir = path.dirname(process.execPath);
-  const found = [path.join(nodeDir, 'node_modules', 'npm', 'bin', 'npm-cli.js'), path.join(path.dirname(nodeDir), 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js')].find(exists);
-  if (!found) throw new CouldNotRun(`npm-cli.js not found next to ${process.execPath}`);
-  return found;
-}
+/** Run a program through the process call file (never a shell) and return {status, stdout, stderr}. */
+const exec = (program, args, options) => finished(program, runProgram(program, args, { timeout: STEP_TIMEOUT_MS, ...options }));
 
-/** Run the sandbox; returns the summary document. `argv` carries --tarball, --keep, --json. */
+/** Run the sandbox; returns the summary document. `argv` carries --tarball, --keep, --out. */
 async function runSandbox({ tarball, keep = false }) {
   const results = [];
   const record = (name, ok, detail = '') => results.push({ name, status: ok ? 'pass' : 'fail', detail: ok ? detail : detail || 'assertion false' });
@@ -194,7 +205,7 @@ async function runSandbox({ tarball, keep = false }) {
   if (!exists(tarballFile)) throw new CouldNotRun(`${tarballFile} does not exist`);
 
   const realHome = os.homedir();
-  const realLocal = process.env.LOCALAPPDATA;
+  const realLocal = readEnv('LOCALAPPDATA');
   const watched = watchedPaths({ realHome, realLocal, platform });
   const realBefore = new Map(watched.flatMap((target) => [...snapshotTree(target, 1)]));
   const realNamesBefore = new Set(fs.readdirSync(realHome));
@@ -213,13 +224,13 @@ async function runSandbox({ tarball, keep = false }) {
   const rel = (target) => path.relative(root, target).split(path.sep).join('/');
 
   await step('git init of the empty app repository', async () => {
-    const r = exec('git', ['-c', 'init.defaultBranch=main', 'init', '--quiet'], opts);
-    record('empty app git repository', r.status === 0 && exists(path.join(app, '.git')), r.stderr.trim());
+    const r = gitInit(app, { env });
+    record('empty app git repository', r.ok && exists(path.join(app, '.git')), r.stderr);
   });
 
   const runtimeRoot = path.join(home, '.starci', 'runtime', 'node_modules', 'starci');
   await step('fetch the tarball', async () => {
-    const r = exec(process.execPath, [npmEntry(), 'install', '--prefix', path.join(home, '.starci', 'runtime'), tarballFile, '--no-audit', '--no-fund'], opts);
+    const r = finished('npm', runNpm(['install', '--prefix', path.join(home, '.starci', 'runtime'), tarballFile, '--no-audit', '--no-fund'], { timeout: STEP_TIMEOUT_MS, ...opts }));
     record('npm install of the tarball into <home>/.starci/runtime', r.status === 0 && exists(path.join(runtimeRoot, 'scripts', 'install', 'install.mjs')), r.status === 0 ? '' : `${r.stderr}${r.stdout}`.trim().slice(-600));
     if (r.status !== 0) throw new CouldNotRun('the tarball could not be fetched; nothing further can run');
     const installed = JSON.parse(read(path.join(runtimeRoot, 'package.json'))).version;
@@ -273,7 +284,7 @@ async function runSandbox({ tarball, keep = false }) {
       record('the starci shim file exists', exists(shim), rel(shim));
       // The shim is the per-user launcher; a .cmd needs the command interpreter, a POSIX shim runs directly.
       const starci = (args, extra = {}) => platform === 'win32'
-        ? exec(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', `"${shim}" ${args.map((a) => (/[\s&]/.test(a) ? `"${a}"` : a)).join(' ')}`], { ...opts, windowsVerbatimArguments: true, ...extra })
+        ? exec(readEnv('ComSpec') ?? 'cmd.exe', ['/d', '/s', '/c', `"${shim}" ${args.map((a) => (/[\s&]/.test(a) ? `"${a}"` : a)).join(' ')}`], { ...opts, windowsVerbatimArguments: true, ...extra })
         : exec(shim, args, { ...opts, ...extra });
       // `starci --version` prints the version of the CLI package (packages/cli, its own semver); the runtime version is the one `runtime version` prints.
       const cliVersion = starci(['--version']);
@@ -320,13 +331,13 @@ async function runSandbox({ tarball, keep = false }) {
   return summary;
 }
 
-/** The options of an argv: {tarball, keep, docker, tools, json}; a flag with a value takes the next entry. Pure. */
+/** The options of an argv: {tarball, keep, docker, tools, out}; a flag with a value takes the next entry. Pure. */
 export function parseArgs(argv) {
-  const out = { tarball: undefined, keep: false, docker: false, tools: undefined, json: undefined };
+  const out = { tarball: undefined, keep: false, docker: false, tools: undefined, out: undefined };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--keep') out.keep = true;
     else if (argv[i] === '--docker') out.docker = true;
-    else if (['--tarball', '--tools', '--json'].includes(argv[i])) out[argv[i].slice(2)] = argv[++i];
+    else if (['--tarball', '--tools', '--out'].includes(argv[i])) out[argv[i].slice(2)] = argv[++i];
   }
   return out;
 }
@@ -335,7 +346,7 @@ export function parseArgs(argv) {
 export async function main(argv = process.argv.slice(2), env = process.env) {
   const args = parseArgs(argv);
   if (!args.tarball) {
-    process.stderr.write('usage: install-sandbox.mjs --tarball <starci-x.y.z.tgz> [--keep] [--json <file>] [--docker [--tools <dir>]]\n');
+    process.stderr.write('usage: install-sandbox.mjs --tarball <starci-x.y.z.tgz> [--keep] [--out <file>] [--docker [--tools <dir>]]\n');
     return 2;
   }
   if (args.docker) {
@@ -354,7 +365,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const text = JSON.stringify(summary, null, 2);
   process.stdout.write(`${text}\n`);
   for (const r of summary.results) process.stdout.write(`${r.status.toUpperCase().padEnd(5)} ${r.name}${r.status === 'pass' ? '' : `: ${r.detail}`}\n`);
-  if (args.json) fs.writeFileSync(args.json, `${text}\n`);
+  if (args.out) fs.writeFileSync(args.out, `${text}\n`);
   if (env.GITHUB_STEP_SUMMARY) fs.appendFileSync(env.GITHUB_STEP_SUMMARY, `${summaryMarkdown(summary)}\n`);
   return exitCodeFor(summary.results);
 }

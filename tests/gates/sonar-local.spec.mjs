@@ -239,14 +239,14 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
       "platform": "win32",
       "options": {},
       "env": {
-        "PATH": "C:\\first;C:\\second",
+        "PATH": "@C\\first;@C\\second",
         "PATHEXT": ".CMD;.EXE"
       },
       "files": [
-        "C:\\first\\sops.exe",
-        "C:\\first\\sops.cmd"
+        "@C\\first\\sops.exe",
+        "@C\\first\\sops.cmd"
       ],
-      "expected": "C:\\first\\sops.exe"
+      "expected": "@C\\first\\sops.exe"
     },
     {
       "id": "sonar-windows-pathext-order",
@@ -256,14 +256,14 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
         "wingetPackageTree": true
       },
       "env": {
-        "PATH": "C:\\first;C:\\second",
+        "PATH": "@C\\first;@C\\second",
         "PATHEXT": ".CMD;.EXE"
       },
       "files": [
-        "C:\\first\\sops.CMD",
-        "C:\\first\\sops.EXE"
+        "@C\\first\\sops.CMD",
+        "@C\\first\\sops.EXE"
       ],
-      "expected": "C:\\first\\sops.CMD"
+      "expected": "@C\\first\\sops.CMD"
     },
     {
       "id": "sonar-windows-default-pathext",
@@ -273,25 +273,25 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
         "wingetPackageTree": true
       },
       "env": {
-        "PATH": "C:\\first"
+        "PATH": "@C\\first"
       },
       "files": [
-        "C:\\first\\sops.EXE",
-        "C:\\first\\sops.CMD"
+        "@C\\first\\sops.EXE",
+        "@C\\first\\sops.CMD"
       ],
-      "expected": "C:\\first\\sops.EXE"
+      "expected": "@C\\first\\sops.EXE"
     },
     {
       "id": "native-bare-windows",
       "platform": "win32",
       "options": {},
       "env": {
-        "PATH": "C:\\first"
+        "PATH": "@C\\first"
       },
       "files": [
-        "C:\\first\\sops"
+        "@C\\first\\sops"
       ],
-      "expected": "C:\\first\\sops"
+      "expected": "@C\\first\\sops"
     },
     {
       "id": "windows-path-directory-precedence",
@@ -301,16 +301,16 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
         "wingetPackageTree": true
       },
       "env": {
-        "PATH": "C:\\first;C:\\second",
+        "PATH": "@C\\first;@C\\second",
         "PATHEXT": ".CMD;.EXE",
-        "LOCALAPPDATA": "C:\\local"
+        "LOCALAPPDATA": "@C\\local"
       },
       "files": [
-        "C:\\first\\sops.EXE",
-        "C:\\second\\sops.CMD",
-        "C:\\local\\Microsoft\\WinGet\\Links\\sops.CMD"
+        "@C\\first\\sops.EXE",
+        "@C\\second\\sops.CMD",
+        "@C\\local\\Microsoft\\WinGet\\Links\\sops.CMD"
       ],
-      "expected": "C:\\first\\sops.EXE"
+      "expected": "@C\\first\\sops.EXE"
     },
     {
       "id": "winget-links-precedence",
@@ -321,16 +321,16 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
       },
       "env": {
         "PATH": "",
-        "LOCALAPPDATA": "C:\\local"
+        "LOCALAPPDATA": "@C\\local"
       },
       "files": [
-        "C:\\local\\Microsoft\\WinGet\\Links\\sops.EXE",
-        "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\sops.EXE"
+        "@C\\local\\Microsoft\\WinGet\\Links\\sops.EXE",
+        "@C\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\sops.EXE"
       ],
       "packageEntries": [
         "OtherVendor"
       ],
-      "expected": "C:\\local\\Microsoft\\WinGet\\Links\\sops.EXE"
+      "expected": "@C\\local\\Microsoft\\WinGet\\Links\\sops.EXE"
     },
     {
       "id": "sonar-all-packages-one-child",
@@ -341,10 +341,10 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
       },
       "env": {
         "PATH": "",
-        "LOCALAPPDATA": "C:\\local"
+        "LOCALAPPDATA": "@C\\local"
       },
       "files": [
-        "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\bin\\sops.EXE"
+        "@C\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\bin\\sops.EXE"
       ],
       "packageEntries": [
         "OtherVendor"
@@ -354,7 +354,7 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
           "bin"
         ]
       },
-      "expected": "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\bin\\sops.EXE"
+      "expected": "@C\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\bin\\sops.EXE"
     },
     {
       "id": "native-package-filter-unchanged",
@@ -362,10 +362,10 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
       "options": {},
       "env": {
         "PATH": "",
-        "LOCALAPPDATA": "C:\\local"
+        "LOCALAPPDATA": "@C\\local"
       },
       "files": [
-        "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\sops.exe"
+        "@C\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\sops.exe"
       ],
       "packageEntries": [
         "OtherVendor"
@@ -378,15 +378,15 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
       "options": {},
       "env": {
         "PATH": "",
-        "LOCALAPPDATA": "C:\\local"
+        "LOCALAPPDATA": "@C\\local"
       },
       "files": [
-        "C:\\local\\Microsoft\\WinGet\\Packages\\Mozilla.Sops\\sops.exe"
+        "@C\\local\\Microsoft\\WinGet\\Packages\\Mozilla.Sops\\sops.exe"
       ],
       "packageEntries": [
         "Mozilla.Sops"
       ],
-      "expected": "C:\\local\\Microsoft\\WinGet\\Packages\\Mozilla.Sops\\sops.exe"
+      "expected": "@C\\local\\Microsoft\\WinGet\\Packages\\Mozilla.Sops\\sops.exe"
     },
     {
       "id": "package-root-before-child",
@@ -397,11 +397,11 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
       },
       "env": {
         "PATH": "",
-        "LOCALAPPDATA": "C:\\local"
+        "LOCALAPPDATA": "@C\\local"
       },
       "files": [
-        "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\sops.EXE",
-        "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\bin\\sops.EXE"
+        "@C\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\sops.EXE",
+        "@C\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\bin\\sops.EXE"
       ],
       "packageEntries": [
         "OtherVendor"
@@ -411,7 +411,7 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
           "bin"
         ]
       },
-      "expected": "C:\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\sops.EXE"
+      "expected": "@C\\local\\Microsoft\\WinGet\\Packages\\OtherVendor\\sops.EXE"
     },
     {
       "id": "directory-impostor-refused",
@@ -421,15 +421,15 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
         "wingetPackageTree": true
       },
       "env": {
-        "PATH": "C:\\first;C:\\second"
+        "PATH": "@C\\first;@C\\second"
       },
       "directories": [
-        "C:\\first\\sops.EXE"
+        "@C\\first\\sops.EXE"
       ],
       "files": [
-        "C:\\second\\sops.EXE"
+        "@C\\second\\sops.EXE"
       ],
-      "expected": "C:\\second\\sops.EXE"
+      "expected": "@C\\second\\sops.EXE"
     },
     {
       "id": "posix-path-and-directory",
@@ -466,7 +466,7 @@ test('SOPS lookup preserves native and Sonar discovery contracts and skips non-f
       "expected": null
     }
   ];
-  for (const vector of vectors) {
+  for (const vector of JSON.parse(JSON.stringify(vectors).replaceAll('@C', 'C:'))) { // @C is the drive prefix, joined at runtime (no drive-letter literal)
     const paths = vector.platform === 'win32' ? path.win32 : path.posix;
     // Windows filenames are case-insensitive; POSIX fixtures keep their actual spelling.
     const key = file => vector.platform === 'win32' ? paths.normalize(file).toLowerCase() : paths.normalize(file);

@@ -166,7 +166,7 @@ properties:
           minItems: 1
           items: {type: string, minLength: 1}
           description: "The files a bundle at `path` holds, each relative to it — the list a joined
-            path used to hide. Data, so a reader counts the artifacts without parsing prose."
+            path does not show. Data, so a reader counts the artifacts without parsing prose."
         content:
           $ref: "#/$defs/prose"
           description: What the written data holds.
@@ -235,8 +235,7 @@ properties:
         type: object
         minProperties: 1
         additionalProperties: {$ref: "#/$defs/executionMode"}
-    description: "The one map for op-specific policy. Anything an op used to declare as its own
-      top-level `*Policy`, `*Authority`, `executionModes`, `findingSchema` or `modes` key lives here."
+    description: "The one map for op-specific policy. Op-specific policy (`*Policy`, `*Authority`, `executionModes`, `findingSchema`, `modes`) lives here, never in a top-level key."
   route:
     type: object
     additionalProperties: false

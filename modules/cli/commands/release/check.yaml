@@ -16,8 +16,3 @@ examples:
   - starci release check --final --json
   - starci release check --only publish-plan,canon-pins
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/release-check.mjs
-  - node .claude/scripts/gates/release-check.mjs
-  - npm run release:check

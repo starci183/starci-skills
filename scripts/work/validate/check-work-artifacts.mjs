@@ -8,8 +8,7 @@ import {ID_RE, walk} from './check-example-work.mjs';
 import {appRootOf, loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
 import {slash} from '../../lib/path-key.mjs';
 import {resolveBlob, getBlob} from '../../../engine/db/blob.mjs';
-import {exampleArtifactReadOptions, exampleWorkRoots} from '../../lib/example-refs.mjs'; import { isMain } from '../../lib/is-main.mjs';
-import { byCodeUnit } from '../../lib/list.mjs';
+import {exampleArtifactReadOptions, exampleWorkRoots} from '../../lib/example-refs.mjs'; import { isMain } from '../../lib/is-main.mjs'; import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * Byte verification for Work declarations: file existence, size, media signatures

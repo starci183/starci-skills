@@ -1,4 +1,3 @@
 group: typecheck
 summary: typecheck only the projects selected by the test ladder
 owner: runtime
-since: 1.0.0-alpha.4

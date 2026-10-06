@@ -13,5 +13,3 @@ examples:
   - 'starci work asset-slot check .starciwork'
   - 'starci work asset-slot list .starciwork --json'
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/asset-slot.mjs']

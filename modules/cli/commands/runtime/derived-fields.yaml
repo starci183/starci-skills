@@ -12,7 +12,3 @@ examples:
   - starci runtime derived-fields --check
   - starci runtime derived-fields --write
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/hfs/derived-fields.mjs
-  - node .claude/scripts/hfs/derived-fields.mjs

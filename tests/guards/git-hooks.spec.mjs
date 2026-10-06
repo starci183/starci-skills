@@ -1,8 +1,8 @@
 // git-hooks.spec.mjs - the git hooks of the runtime repository (scripts/guards/git-hooks.mjs): the rendered files, their install
 // into <git common dir>/hooks, and the push gate they carry, run with `sh` in a temp git repository exactly as git runs it:
-// stdin lines `<local ref> <local sha> <remote ref> <remote sha>`; refs/backup/* is allowed; main and v* tags only when HEAD carries
-// an annotated v tag and the release cut recorded the full suite of HEAD (<git common dir>/starci-release/<HEAD sha>.l4.json);
-// anything else, and a delete, is refused with RIGHTS_PUSH_NOT_RELEASE.
+// stdin lines `<local ref> <local sha> <remote ref> <remote sha>`; refs/backup/* is allowed; main is allowed fast-forward (every main push starts CI);
+// a v* tag only when HEAD carries an annotated v tag and the release cut recorded the full suite of HEAD (<git common dir>/starci-release/<HEAD sha>.l4.json);
+// anything else, a non-fast-forward main and a delete, is refused with RIGHTS_PUSH_NOT_RELEASE.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -59,7 +59,10 @@ test('renderRuntimeHooks: the push gate is the app template with a generator hea
     assert.ok(text.includes(GIT_HOOKS_MARKER), name);
     assert.doesNotMatch(text, /\{\{|\r/, `${name}: no placeholder, LF only`);
   }
-  assert.ok(hooks['pre-push'].endsWith(`\n${rest}`), 'the push gate body is the template body');
+  const push = hooks['pre-push'];
+  assert.ok(push.includes(rest.slice(rest.indexOf('release_gate() {'), rest.indexOf('while read'))), 'the release gate function is the template one');
+  assert.ok(push.endsWith(rest.slice(rest.indexOf('      release_gate\n'))), 'the tag branch and the fallback are the template ones');
+  assert.ok(push.includes('refs/heads/main)\n') && push.includes('git merge-base --is-ancestor'), 'main is judged by fast-forward');
   assert.match(hooks['pre-commit'], /git diff --cached --check/);
   assert.match(hooks['pre-commit'], /node --check/);
   assert.ok(hooks['pre-commit'].includes(WORK_HOOK_MARKER), 'the generated commit hook chains the work guard');
@@ -143,10 +146,11 @@ test('the push gate allows refs/backup/* and an empty push with no release', (t)
   assert.equal(push(repo, []).status, 0, 'no ref lines, nothing to judge');
 });
 
-test('the push gate refuses main and v tags without an annotated v tag on HEAD, naming the allowed path', (t) => {
+test('the push gate refuses a v tag without an annotated v tag on HEAD, naming the allowed path, and allows main with no tag', (t) => {
   const { repo, head } = repoWithHooks(t);
   record(repo, head, {});
-  const bare = push(repo, [refLine('refs/heads/main')]);
+  assert.deepEqual(push(repo, [refLine('refs/heads/main')]), { status: 0, refusals: [], stderr: '' }, 'a first push of main needs no tag');
+  const bare = push(repo, [refLine('refs/tags/v1.0.0')]);
   assert.equal(bare.status, 1);
   assert.equal(bare.refusals.length, 1);
   assert.match(bare.refusals[0], /no annotated tag v\[0-9\]\* on HEAD/);
@@ -155,28 +159,46 @@ test('the push gate refuses main and v tags without an annotated v tag on HEAD, 
   assert.equal(push(repo, [refLine('refs/tags/v1.0.0')]).status, 1, 'a lightweight tag is no release tag');
   gitOk(repo, ['tag', '-d', 'v1.0.0']);
   gitOk(repo, ['tag', '-a', '-m', 'notes', 'rc-1']);
-  assert.equal(push(repo, [refLine('refs/heads/main')]).status, 1, 'an annotated tag that is not v[0-9]* is no release tag');
+  assert.equal(push(repo, [refLine('refs/tags/v1.0.0')]).status, 1, 'an annotated tag that is not v[0-9]* is no release tag');
 });
 
-test('the push gate needs the L4 record of HEAD, naming this head and this tag', (t) => {
+test('the push gate allows a fast-forward of main and refuses a rewind, a divergence and an unknown remote head', (t) => {
+  const { repo, head } = repoWithHooks(t);
+  gitOk(repo, ['commit', '-q', '--allow-empty', '-m', 'next']);
+  const next = gitOk(repo, ['rev-parse', 'HEAD']);
+  gitOk(repo, ['checkout', '-q', '-b', 'side', head]);
+  gitOk(repo, ['commit', '-q', '--allow-empty', '-m', 'side']);
+  const side = gitOk(repo, ['rev-parse', 'HEAD']);
+  const main = (local, remote) => `refs/heads/main ${local} refs/heads/main ${remote}`;
+  assert.deepEqual(push(repo, [main(next, head)]), { status: 0, refusals: [], stderr: '' }, 'a fast-forward');
+  assert.equal(push(repo, [main(next, next)]).status, 0, 'an up-to-date main');
+  for (const [name, local, remote] of [['a rewind', head, next], ['a divergence', side, next], ['a remote head this clone never had', next, 'c'.repeat(40)]]) {
+    const refused = push(repo, [main(local, remote)]);
+    assert.equal(refused.status, 1, name);
+    assert.match(refused.refusals[0], /refs\/heads\/main is not a fast-forward/, name);
+  }
+});
+
+test('the push gate needs the L4 record of HEAD for a v tag, naming this head and this tag', (t) => {
   const { repo, head } = repoWithHooks(t);
   gitOk(repo, ['tag', '-a', '-m', 'release', 'v1.0.0']);
-  const main = [refLine('refs/heads/main')];
-  assert.match(push(repo, main).refusals[0], /no L4 record/);
+  const tag = [refLine('refs/tags/v1.0.0')];
+  assert.match(push(repo, tag).refusals[0], /no L4 record/);
+  assert.equal(push(repo, [refLine('refs/heads/main')]).status, 0, 'main needs no record');
   record(repo, head, { head: 'f'.repeat(40) });
-  assert.match(push(repo, main).refusals[0], /does not name head/);
+  assert.match(push(repo, tag).refusals[0], /does not name head/);
   record(repo, head, { tag: 'v9.9.9' });
-  assert.match(push(repo, main).refusals[0], /does not name head/);
+  assert.match(push(repo, tag).refusals[0], /does not name head/);
   record(repo, head, '{not json');
-  assert.equal(push(repo, main).status, 1);
+  assert.equal(push(repo, tag).status, 1);
   record(repo, head, {});
-  assert.deepEqual(push(repo, main), { status: 0, refusals: [], stderr: '' });
-  assert.equal(push(repo, [refLine('refs/tags/v1.0.0')]).status, 0, 'the release tag goes with the same record');
+  assert.deepEqual(push(repo, tag), { status: 0, refusals: [], stderr: '' });
+  assert.equal(push(repo, [refLine('refs/heads/main'), ...tag]).status, 0, 'the release cut pushes main and its tag with the same record');
   record(repo, head, '{"tag":"v1.0.0","head":"' + head + '"}');
-  assert.equal(push(repo, main).status, 0, 'key order and spacing of the record do not matter');
+  assert.equal(push(repo, tag).status, 0, 'key order and spacing of the record do not matter');
 });
 
-test('the push gate refuses every other ref and a delete of a release ref, one line each, and still allows the backups of the same push', (t) => {
+test('the push gate refuses every other ref and a delete of main or a release ref, one line each, and still allows the backups of the same push', (t) => {
   const { repo, head } = repoWithHooks(t);
   gitOk(repo, ['tag', '-a', '-m', 'release', 'v1.0.0']);
   record(repo, head, {});
@@ -195,11 +217,12 @@ test('the push gate reads the record of the common dir from a linked worktree an
   record(repo, head, {});
   const wt = path.join(path.dirname(repo), 'wt');
   gitOk(repo, ['worktree', 'add', '-q', '--detach', wt, head]);
-  assert.equal(push(repo, [refLine('refs/heads/main')], wt).status, 0, 'the record sits in the shared git dir');
+  const tag = [refLine('refs/tags/v1.0.0')];
+  assert.equal(push(repo, tag, wt).status, 0, 'the record sits in the shared git dir');
   fs.mkdirSync(path.join(repo, 'sub'));
-  assert.equal(push(repo, [refLine('refs/heads/main')], path.join(repo, 'sub')).status, 0);
+  assert.equal(push(repo, tag, path.join(repo, 'sub')).status, 0);
   gitOk(repo, ['commit', '-q', '--allow-empty', '-m', 'next']);
-  assert.match(push(repo, [refLine('refs/heads/main')]).refusals[0], /no annotated tag/, 'a new HEAD carries no release tag');
+  assert.match(push(repo, tag).refusals[0], /no annotated tag/, 'a new HEAD carries no release tag');
 });
 
 test('the commit gate refuses whitespace errors and a syntax error of a staged .mjs, and passes a clean commit', (t) => {

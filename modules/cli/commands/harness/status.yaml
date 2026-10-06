@@ -18,6 +18,3 @@ examples:
   - starci harness status
   - starci harness status --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node ui/harness-verbs.mjs status

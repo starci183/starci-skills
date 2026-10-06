@@ -35,28 +35,13 @@ rules:
       (`<feature>-graphql.module.ts`), never one per operation.
     rationale: |-
       One flat shape per operation makes the operation, its input, its output and its mapper findable from the name alone.
-    cases:
-      - id: case-1
-        when: A mutation
-        write: |-
-          @Resolver()
-          /** GraphQL door of startCheckout. */
-          export class StartCheckoutResolver {
-              constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
-
-              @Mutation(() => StartCheckoutType, { name: "startCheckout" })
-              async startCheckout(@CurrentPrincipal() principal: Principal, @Args("input") input: StartCheckoutInput): Promise<StartCheckoutType> {
-                  const outcome = await this.commandBus.execute(new StartCheckoutCommand({ request: toStartCheckoutRequest(input), principal }))
-                  return toStartCheckoutType(unwrapOutcome(outcome, PurchaseError))
-              }
-          }
     verification:
       automated:
         - BE_TRANSPORT_SHAPE
         - BE_SOURCE_FORM
         - BE_PUBLIC_CONTRACT_FORM
       manual: []
-    relatedExamples: []
+    relatedExamples: [api]
   - id: BE-TRANSPORT-2
     title: A transport injects only the bus and dispatches one message
     kind: mandatory

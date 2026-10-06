@@ -43,10 +43,6 @@ examples:
   - starci kernel rename --repo <path> --workflow <workflow> --title <title> --dry-run
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api rename
-  - node scripts/kernel/cli.mjs rename
 reads: the workflows row; the Kernel signal and job (its terminal); the workflow's running/answering
   operation jobs and their terminals
 writes: "The human name of a workflow (owner request 2026-09-27); the owner or the supervisor runs

@@ -13,5 +13,3 @@ exit: {"0": clean, "1": findings, "2": refusal or tool failure}
 json: starci/lint@1
 examples: ['starci app lint', 'starci app lint --workspace .', 'starci app lint --json']
 editions: [full, lite]
-since: 1.0.0
-removed: ['hfs lint', 'npx hfs lint']

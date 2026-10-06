@@ -44,7 +44,6 @@ test('PreToolUse hooks use starci while the PATH-independent git hook stays inte
   assert.equal(toolGuardCommand(), 'starci guard command');
   const history = historyHookBody({ branches: ['main'], nodePath: '/runtime/node', root: '/runtime' });
   assert.match(history, /STARCI_RUNTIME='\/runtime' '\/runtime\/node' '\/runtime\/packages\/cli\/bin\/starci\.mjs' guard verify-commit/);
-  assert.equal(catalog.groups.guard.verbs['verify-commit'].removed.length, 0);
 });
 
 test('guard dispatcher preserves refusal exit, stdout and stderr byte-for-byte', (t) => {

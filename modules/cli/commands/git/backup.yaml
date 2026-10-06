@@ -23,5 +23,3 @@ examples:
   - starci git backup
   - starci git backup --branches lane/cli --branches main --dry-run
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

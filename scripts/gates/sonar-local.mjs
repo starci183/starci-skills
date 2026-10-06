@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import os from 'node:os';
-import path from 'node:path';
-import { byCodeUnit } from '../lib/list.mjs';
+import path from 'node:path'; import { byCodeUnit } from '../lib/list.mjs';
 import {containerInspect} from '../api/docker/container-inspect.mjs';import {scanRun} from '../api/sonar/scan-run.mjs';import {runShell} from '../api/process/run-shell.mjs';
 import {createHash} from 'node:crypto';
 import { isMain } from '../lib/is-main.mjs';

@@ -6,6 +6,7 @@ import {sha256} from '../digest.mjs';
 import {isUnderTempDir,localProjectsRoot,readMachine} from './machine.mjs';
 import {isSpecRun} from '../../scripts/lib/env.mjs';
 import {pathKey} from '../../scripts/lib/path-key.mjs';
+import {byCodeUnit} from '../by-code-unit.mjs';
 /** Overrides the projects root (the directory holding <ledger_id>/runtime.sqlite) for this process tree; narrower than machine-db.mjs LOCAL_ROOT_ENV, which this still honors through starciLocalRoot when unset. */
 export const PROJECTS_ROOT_ENV='STARCI_PROJECTS_ROOT';
 const normDir=file=>pathKey(file);
@@ -63,7 +64,7 @@ export function ledgerFixtureInit(fixture,{file,repoRoot,product,machine,mapped,
   }
   if(!fixture||typeof fixture!=='object'||Array.isArray(fixture)
     ||![Object.prototype,null].includes(Object.getPrototypeOf(fixture))
-    ||Object.keys(fixture).sort().join(',')!=='blobRoot,createdAt,ledgerId')fixtureRefused('needs exactly ledgerId, createdAt and blobRoot');
+    ||Object.keys(fixture).sort(byCodeUnit).join(',')!=='blobRoot,createdAt,ledgerId')fixtureRefused('needs exactly ledgerId, createdAt and blobRoot');
   if(typeof fixture.ledgerId!=='string'||!SYNTHETIC_LEDGER_ID.test(fixture.ledgerId))fixtureRefused('ledgerId must be a synthetic UUID');
   if(!Number.isSafeInteger(fixture.createdAt)||fixture.createdAt<=0||!Number.isFinite(new Date(fixture.createdAt).getTime()))fixtureRefused('createdAt must be a positive safe epoch millisecond');
   const root=fixture.blobRoot;

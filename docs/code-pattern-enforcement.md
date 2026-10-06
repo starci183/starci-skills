@@ -128,7 +128,7 @@ flowchart LR
 | Verdict and checkpoint | `scripts/kernel/verbs/settle.mjs`; `workflow-checkpoint.mjs`; `workflow-checkpoint-state.mjs`; `workflow-rebase.mjs` | Pass requires the filed outcome and independent green checks plus applicable READ/gate, mechanism, cut and owner gates. The same workflow lock protects acceptance and scoped effects. A changed owned delta creates its checkpoint; no-change reuses the SHA. Prepared effects retain dispatch attribution for recovery, with conflicting newer bytes held visibly. Tested HEAD, checkpoint SHA and later landed HEAD are separate identities. | `tests/kernel/workflow-checkpoint.spec.mjs`; `tests/kernel/workflow-rebase-milestone.spec.mjs` |
 
 The detailed proof policy remains in [verify-proof](verify-proof.md). Head-green
-checks alone do not prove that a test discriminates the change. The legacy
+checks alone do not prove that a test discriminates the change. The
 `runAtBase` path reports a base-green, failed-to-build or timed-out contrast as
 `weak`, which its existing policy accepts with a finding; that is not a proven
 fail-before result. The sealed protected-oracle path has its own stricter

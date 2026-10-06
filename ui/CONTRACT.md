@@ -142,7 +142,7 @@ The Attempt result displays the runtime checkpoint separately from its report an
 verdict. A uniquely attributed `workflow-checkpoint` event retains its SHA, timestamp, commit
 action and recorded scope/files. `committed: true` means a new commit was recorded;
 `false` retains the existing checkpoint SHA; missing action or path lists remain unknown.
-An empty recorded list is distinct from an unobserved list. Legacy job-only events must belong
+An empty recorded list is distinct from an unobserved list. Job-only events must belong
 to one dispatch window; conflicting receipts remain unconfirmed. A checkpoint can be recorded
 before settlement, so neither its presence nor its commit action establishes a pass verdict.
 `workflow-op-preserved` is separate evidence. Report-tested HEAD and checkpoint SHA keep

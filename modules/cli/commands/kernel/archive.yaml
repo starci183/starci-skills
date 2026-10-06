@@ -35,10 +35,6 @@ examples:
   - starci kernel archive --repo <path> --workflow <workflow> --reason <reason> --by supervisor
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api archive
-  - node scripts/kernel/cli.mjs archive
 reads: workflows row; the open ask reports; every unsettled operation job; the Kernel signal and job
 writes: "First, a job whose worker filed a report that is not settled refuses the archive
   (archive-unsettled-reports): a reported job is settled, never dropped unjudged (H9; DBTREE

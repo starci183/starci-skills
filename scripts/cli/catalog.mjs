@@ -2,7 +2,7 @@
 // (modules/cli/commands/). Pure: the only I/O is loadCatalog's read pass; every
 // check runs on the parsed data. Layout (cli/design.md):
 //   modules/cli/commands/_global.yaml            the 5 global flags
-//   modules/cli/commands/<group>/_group.yaml     {group, summary, owner, since}
+//   modules/cli/commands/<group>/_group.yaml     {group, summary, owner}
 //   modules/cli/commands/<group>/<verb>.yaml     one verb
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,14 +12,13 @@ import { ROLES } from './roles.mjs';
 
 export const CATALOG_DIR = 'modules/cli/commands';
 export const CATALOG_SCHEMA = 'starci/cli-catalog@1';
-const SINCE = '1.0.0-alpha.4';
 
 const OWNERS = new Set(['runtime', '@starci/hfs']);
 const FLAG_TYPES = new Set(['string', 'boolean', 'number', 'enum', 'list']);
 const FLAG_KEYS = new Set(['name', 'type', 'required', 'summary', 'enum', 'default', 'global']);
 const IMPL_KEYS = new Set(['script', 'args', 'module', 'export']);
 const POS_KEYS = new Set(['name', 'enum', 'required', 'variadic']);
-const GROUP_REQUIRED = ['group', 'summary', 'owner', 'since'];
+const GROUP_REQUIRED = ['group', 'summary', 'owner'];
 const GROUP_KEYS = new Set([...GROUP_REQUIRED, 'schema']);
 const GLOBAL_KEYS = new Set(['schema', 'flags', 'commands']);
 const EDITIONS = ['full', 'lite'];
@@ -31,7 +30,7 @@ const ROLE_SET = new Set(ROLES);
 // top-level key is the verb's prose contract (reads, writes, returns, refuses,
 // usedBy, inputShape, rawExit, ...) and passes through unchanged — the schema's
 // own keys are the only ones with structure to validate.
-const VERB_REQUIRED = ['group', 'verb', 'owner', 'summary', 'impl', 'flags', 'exit', 'json', 'examples', 'editions', 'since', 'removed'];
+const VERB_REQUIRED = ['group', 'verb', 'owner', 'summary', 'impl', 'flags', 'exit', 'json', 'examples', 'editions'];
 const JSON_RE = /^(always|flag|none|starci\/\S+@\d+)$/;
 const NAME_RE = /^[a-z][a-z0-9-]*$/;
 const EXPORT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
@@ -149,7 +148,7 @@ const checkVerb = (errors, file, groupName, doc) => {
     else for (const code of Object.keys(doc.exit)) if (!/^\d+$/.test(code)) err(errors, file, `exit code "${code}" is not numeric`);
   }
   if (doc.json !== undefined && (typeof doc.json !== 'string' || !JSON_RE.test(doc.json))) err(errors, file, 'json must be always | flag | none | starci/<schema>@<n>');
-  for (const k of ['examples', 'editions', 'removed']) if (doc[k] !== undefined) checkStringList(errors, file, doc[k], k);
+  for (const k of ['examples', 'editions']) if (doc[k] !== undefined) checkStringList(errors, file, doc[k], k);
   if (doc.editions !== undefined && !doc.editions.length) err(errors, file, 'editions is empty');
   for (const e of doc.editions ?? []) if (!EDITIONS.includes(e)) err(errors, file, `editions names an unknown edition ${JSON.stringify(e)} (known: ${EDITIONS.join(', ')})`);
   return doc;
@@ -158,7 +157,7 @@ const checkVerb = (errors, file, groupName, doc) => {
 /**
  * Load and validate the whole catalog under <root>/modules/cli/commands.
  * Returns {global, groups, sources}: global = {flags}, groups = [{group, summary,
- * owner, since, verbs: [verbDocs sorted by verb]}], sources = the catalog file
+ * owner, verbs: [verbDocs sorted by verb]}], sources = the catalog file
  * relpaths + bytes (sorted) the generator hashes.
  * Throws Error with .code 'catalog-invalid' and .errors = every finding.
  */
@@ -219,7 +218,7 @@ export const loadCatalog = (root = skillRoot) => {
     }
     if (!verbs.length) err(errors, `${entry.name}/`, 'an empty group is an error');
     verbs.sort((a, b) => String(a?.verb).localeCompare(String(b?.verb)));
-    groups.push({ group: entry.name, summary: gdoc.summary, owner: gdoc.owner, since: gdoc.since, verbs });
+    groups.push({ group: entry.name, summary: gdoc.summary, owner: gdoc.owner, verbs });
   }
   sources.sort((a, b) => a.file.localeCompare(b.file));
   if (errors.length) throw Object.assign(new Error(`catalog-invalid:\n  ${errors.join('\n  ')}`), { code: 'catalog-invalid', errors });

@@ -9,5 +9,3 @@ exit: {"0": already full, "2": refusal or bad usage}
 json: none
 examples: ['starci app upgrade', 'starci app upgrade --edition full --plan']
 editions: [full, lite]
-since: 1.0.0
-removed: []

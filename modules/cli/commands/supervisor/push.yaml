@@ -14,6 +14,3 @@ examples:
   - starci supervisor push --repo <path> --check
   - starci supervisor push --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/push-git.mjs

@@ -26,5 +26,3 @@ exit: {"0": every capture is green, "1": a capture is red or the draw file was r
 json: flag
 examples: ['starci work draw-render --html <file> --out <dir> --viewports 390x844 --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/draw-render.mjs']

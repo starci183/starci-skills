@@ -8,5 +8,3 @@ exit: {"0": contracts emitted, "2": refusal or bad usage}
 json: none
 examples: ['starci app emit']
 editions: [full, lite]
-since: 1.0.0
-removed: ['hfs emit-contracts', 'npx hfs emit-contracts']

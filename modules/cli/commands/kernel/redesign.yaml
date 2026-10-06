@@ -39,10 +39,6 @@ examples:
   - starci kernel redesign --repo <path> --workflow <workflow> --op <op> --paths <paths> --decision <decision>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api redesign
-  - node scripts/kernel/cli.mjs redesign
 purpose: "When the RCA says the cut, the scope or the leg plan is wrong, dispatch the op that owns
   it - work.author (re-cut), scope.define (re-scope), goal.revise (leg plan) - with the RCA
   (progress, clusters, examples) as its brief in packet context.kernel_override.redesign.

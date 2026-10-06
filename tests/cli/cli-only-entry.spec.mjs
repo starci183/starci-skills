@@ -14,25 +14,19 @@ const catalog = {
     {
       group: 'runtime',
       verbs: [
-        { verb: 'public', impl: { script: 'scripts/tools/public.mjs', args: [] }, removed: [] },
+        { verb: 'public', impl: { script: 'scripts/tools/public.mjs', args: [] } },
       ],
     },
     {
       group: 'guard',
       verbs: [
-        { verb: 'verify-commit', impl: { script: 'scripts/guards/verify-commit.mjs', args: [] }, removed: [] },
+        { verb: 'verify-commit', impl: { script: 'scripts/guards/verify-commit.mjs', args: [] } },
       ],
     },
     {
       group: 'harness',
       verbs: [
-        { verb: 'start', impl: { script: 'ui/start.mjs', args: [] }, removed: ['node ui/start.mjs'] },
-      ],
-    },
-    {
-      group: 'app',
-      verbs: [
-        { verb: 'lint', impl: null, removed: ['hfs lint', 'npx hfs lint'] },
+        { verb: 'start', impl: { script: 'ui/start.mjs', args: [] } },
       ],
     },
   ],
@@ -84,9 +78,9 @@ test('npm run wrappers around entries fail while a starci-backed script and invo
   assert.equal(good.ok, true, JSON.stringify(good.findings));
 });
 
-test('R197 owns retired spellings while R201 still catches a direct non-retired entry', () => {
-  const retired = scan({ 'docs/actions.md': 'node ui/start.mjs\nnpx hfs lint\n' });
-  assert.equal(retired.ok, true, JSON.stringify(retired.findings));
+test('R201 catches a direct entry of a routed script and of an internal script', () => {
+  const routed = scan({ 'docs/actions.md': 'node ui/start.mjs\n' });
+  assert.equal(routed.findings.length, 1, JSON.stringify(routed.findings));
   const direct = scan({ 'docs/actions.md': 'node scripts/private.mjs\n' });
   assert.equal(direct.findings.length, 1, JSON.stringify(direct.findings));
   assert.equal(direct.findings[0].code, CODE);
@@ -126,8 +120,7 @@ test('every declared exemption has a pass fixture and nearby non-exempt text sti
     ['test spawn helper', { 'tests/tool.spec.mjs': "spawnSync('node scripts/private.mjs', { shell: true });\n" }, true],
     ['test documentation is not a spawn helper', { 'tests/tool.spec.mjs': "const docs = 'node scripts/private.mjs';\n" }, false],
     ['internal catalog', { 'modules/cli/commands/_internal.yaml': direct }, true],
-    ['removed catalog field', { 'modules/cli/commands/runtime/public.yaml': "removed: ['node scripts/tools/public.mjs']\n" }, true],
-    ['catalog example is not exempt', { 'modules/cli/commands/runtime/public.yaml': "removed: []\nexamples: ['node scripts/tools/public.mjs']\n" }, false],
+    ['catalog example is not exempt', { 'modules/cli/commands/runtime/public.yaml': "examples: ['node scripts/tools/public.mjs']\n" }, false],
     ['changelog', { 'CHANGELOG-next.md': direct }, true],
     ['current kernel declaration', { 'modules/kernel/current.yaml': direct }, false],
     ['generated runtime copy', { 'packages/hfs/runtime/scripts/call.mjs': direct }, true],

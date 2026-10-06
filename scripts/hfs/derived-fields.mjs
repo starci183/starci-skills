@@ -14,6 +14,7 @@ import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { loadRuleCatalog, loadSlotManifest } from './slots.mjs';
 import { REFERENCE_APP_MANIFEST } from '../lib/example-refs.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const PATTERN_DIRS = Object.freeze(['be', 'fe', 'repo']);
 export const WHY_FILES = Object.freeze([
@@ -120,7 +121,7 @@ export function derivedFiles({ files, read, catalog, classify }) {
   const index = catalogIndex(catalog);
   const out = [];
   for (const dir of PATTERN_DIRS) {
-    for (const file of files.filter((f) => new RegExp(`^knowledge/patterns/${dir}/[^/]+\\.yaml$`).test(f)).sort()) {
+    for (const file of files.filter((f) => new RegExp(`^knowledge/patterns/${dir}/[^/]+\\.yaml$`).test(f)).sort(byCodeUnit)) {
       const before = read(file);
       if (before === null || before === undefined) continue;
       const verification = derivePatternVerification(before, index, { be: ['eslint-be'], fe: ['eslint-fe', 'stylelint'], repo: [] }[dir]);

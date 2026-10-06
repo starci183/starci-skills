@@ -24,5 +24,3 @@ examples:
   - starci git sync --dry-run
   - starci git sync --abort-on-conflict
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

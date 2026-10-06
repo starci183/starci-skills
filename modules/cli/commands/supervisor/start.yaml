@@ -21,6 +21,3 @@ examples:
   - starci supervisor start
   - starci supervisor start --plan
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/start-supervisor.mjs

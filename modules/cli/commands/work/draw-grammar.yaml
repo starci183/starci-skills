@@ -12,5 +12,3 @@ exit: {"0": grammar resolved, "1": no grammar resolved for the drawing, "2": bad
 json: flag
 examples: ['starci work draw-grammar --product <app> --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/draw-grammar.mjs']

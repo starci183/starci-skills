@@ -23,10 +23,6 @@ examples:
   - starci kernel finish --repo <path> --workflow <workflow>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api finish
-  - node scripts/kernel/cli.mjs finish
 reads: workflows row; every jobs row; the final verify verdict
 writes: "workflows.phase='finished' + finished_json {at, verdict}; the inbox goal row closed (status
   'done'); every open incident resolved with reason workflow-finished (H12); every live Decision

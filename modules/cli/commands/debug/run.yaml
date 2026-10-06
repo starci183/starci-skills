@@ -27,7 +27,3 @@ examples:
   - starci debug run model-scorecard --repo <path>
   - starci debug run core-watch
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/agent/model-scorecard.mjs
-  - node scripts/reconciler/core-watch.mjs

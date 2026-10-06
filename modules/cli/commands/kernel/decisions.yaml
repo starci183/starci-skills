@@ -114,10 +114,6 @@ examples:
   - starci kernel decisions --repo <path> --resolve <decision> --by <actor> --verb <command>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api decisions
-  - node scripts/kernel/cli.mjs decisions
 purpose: 'The one durable channel for "someone must decide": controllers and the SLA layer open a
   Decision Item (DI, starci/decision-item@1) for the Kernel, the Supervisor opens a
   supervisor-ruling DI instead of typing a notice (scripts/supervisor/notify.mjs), and a doorbell

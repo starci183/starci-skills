@@ -12,5 +12,3 @@ exit: {"0": "prompt printed, image clean, or scan reported (scan never exits 1)"
 json: flag
 examples: ['starci work brand-palette --scan .starciwork --json']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/brand/brand-palette.mjs']

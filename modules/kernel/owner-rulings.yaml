@@ -126,4 +126,3 @@ rulings:
     date: '2026-09-30'
     ruling: "One pattern, no exceptions, no legacy, no backward compatibility: a mechanism that is superseded or unusable is deleted with all its references, never kept as an alias, fallback or second path."
     confirmed: '2026-09-30 owner decision on the starci link removal, task pub1'
-    enforcedBy: [scripts/checks/check-retired-cli.mjs]

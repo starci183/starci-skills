@@ -19,7 +19,3 @@ examples:
   - starci gate custody-exec .starcistacks/dev/secrets/app.yaml.enc --keys
   - starci gate custody-exec .starcistacks/dev/secrets/app.yaml.enc --get TOKEN
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/custody-exec.mjs
-  - node .claude/scripts/gates/custody-exec.mjs

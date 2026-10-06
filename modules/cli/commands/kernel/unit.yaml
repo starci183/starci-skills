@@ -39,10 +39,6 @@ examples:
   - starci kernel unit --repo <path> --workflow <workflow> --unit <unit> --raise-budget 4 --by owner --ref <ref>
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api unit
-  - node scripts/kernel/cli.mjs unit
 purpose: "Every op job is a try of exactly one work unit (scripts/kernel/units.mjs; DBTREE
   work_units): one op, one subject key (cut id#ordinal, params.subject, else the digest of its
   records or owned paths) and one goal revision. A unit has a try budget (default 5, Q13); api

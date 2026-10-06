@@ -12,10 +12,8 @@ export const openAskDispatchesOf = (db, workflowId) => db.prepare(`SELECT r.disp
    GROUP BY r.dispatch_id ORDER BY MIN(r.report_id)`).all(workflowId).map((row) => row.dispatch_id);
 
 // `retire-ask --workflow <id> --dispatch <id> --reason <text>`: close an ask the
-// owner should no longer answer. A StarCi Next brand ask asked the owner to
-// rule on 0.4.13 contrast values that grammar 0.5.0 then fixed; with no way to
-// retire it the workflow read awaiting-owner on a stale question
-// (inc-6886d1399989). The ask is recorded ask-superseded with by:null and the
+// owner should not answer any more (a stale question must not leave the workflow
+// reading awaiting-owner). The ask is recorded ask-superseded with by:null and the
 // reason, the same terminal kind serve-ask writes for a replaced ask.
 export async function retireAsk(ledger, { workflowId, dispatchId, reason, repo }) {
   const db = ledger.db;

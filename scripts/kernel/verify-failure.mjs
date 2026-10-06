@@ -1,12 +1,8 @@
 // verify-failure.mjs — why a failed attempt failed, and who owns the fix (lane op-verify, 2026-09-28).
 //
-// Before this module a failed settle routed on the report outcome alone: every `failed` fell to
-// `failed-retries-the-same-op` unless a from-specific route found a build job to reopen, so a UAT that
-// named a backend defect re-ran the same walk three times at an unchanged HEAD (an app-auth
-// uat.verify a1-a5, inc-2a2228098860) and a lint MEASUREMENT leg whose findings were the very
-// measurement it was asked for failed three times into an owner gate (a fe-canon review.verify
-// a1-a4, inc-46ce3d247d77). The route table (modules/models/kinds.yaml) now keys failed routes on a
-// failure CLASS as well, computed here from the report and the kernel's recorded checks:
+// The route table (modules/models/kinds.yaml) keys failed routes on a failure CLASS, so a UAT that
+// names a backend defect does not re-run the same walk at an unchanged HEAD and a lint MEASUREMENT leg
+// whose findings are the measurement itself does not fail into an owner gate. The class is computed here from the report and the kernel's recorded checks:
 //
 //   environment    the stack under test was not ready (a failing env-health check, a blocked report of
 //                  kind environment); not a product defect and never counted against the product

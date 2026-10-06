@@ -16,7 +16,3 @@ examples:
   - starci release clean-test --changed packages/cli/package.json
   - starci release clean-test --base origin/main
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/gates/package-clean-test.mjs
-  - node .claude/scripts/gates/package-clean-test.mjs

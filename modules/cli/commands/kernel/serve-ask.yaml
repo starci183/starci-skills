@@ -35,10 +35,6 @@ examples:
   - starci kernel serve-ask --repo <path> --workflow <workflow> --dispatch <dispatch> --now --ttl 600000 --json
 editions:
   - full
-since: 1.0.0-alpha.4
-removed:
-  - starci api serve-ask
-  - node scripts/kernel/cli.mjs serve-ask
 reads: the workflow row; with --dispatch, the reports row that filed that ask
 writes: 'Parks the ask for the owner; it serves NO form by default (owner, 2026-09-24: a form URL is
   served only when the owner asks for it). scripts/kernel/ask-server.mjs parkAsk supersedes the

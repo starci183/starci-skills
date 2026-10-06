@@ -6,7 +6,7 @@
 //   - a dead holder is detected (its pid is gone) and the lock is taken over atomically instead of blocking everyone;
 //   - a release is refused for a stranger (the token must match), so one actor never drops another's lock;
 //   - the rights guard (scripts/guards/rights.mjs) reads the owner (hostLockOwner) and decides who may do what meanwhile.
-// A lock whose owner file is the legacy plain text (no pid to test) is held, never stale, until its file is older than
+// A lock whose owner file is ownerless plain text (no pid to test) is held, never stale, until its file is older than
 // legacyStaleMs. The release cut (scripts/supervisor/release-cut.mjs, GOVERNANCE lane) runs under
 // withHostLock({role: 'release', purpose: 'release-cut'}); the land gate under withHostLock({role: 'coordinator', purpose: 'land'}).
 //
@@ -91,7 +91,7 @@ function moveAside(dir, expected, { fs, newToken }) {
 /**
  * The owner of the lock: null when it is free, else {schema, token, pid, role, purpose, handle, host, since, ttlMs, stale}.
  * `stale` is true for a holder whose process is gone (or whose ttl ran out): callers report it, acquireHostLock takes it over.
- * A legacy plain-text owner reads {legacy: true, text, since: <file time>, stale} with null token/pid/role.
+ * An ownerless plain-text owner reads {legacy: true, text, since: <file time>, stale} with null token/pid/role.
  */
 export function hostLockOwner({ dir, env = process.env, ...seams } = {}) {
   const s = seamsOf(seams);
@@ -135,7 +135,7 @@ export function acquireHostLock({ role, purpose = null, handle, pid = process.pi
 
 /**
  * Release the lock `token` holds: {ok: true, released: true}; {ok: true, released: false} when there is no lock;
- * {ok: false, reason: 'not-owner', owner} when someone else (or a legacy owner) holds it - a stranger's release never removes it.
+ * {ok: false, reason: 'not-owner', owner} when someone else (or an ownerless owner) holds it - a stranger's release never removes it.
  */
 export function releaseHostLock({ token, env = process.env, dir, newToken = () => randomBytes(16).toString('hex'), remove = defaultRemove, ...seams } = {}) {
   const s = seamsOf(seams);

@@ -12,6 +12,7 @@ import { closeWorker } from '../../scripts/machine/worker-close.mjs';
 import { planAgentAdmission } from '../../scripts/agent/admission.mjs';
 import { spawnAgent } from '../../scripts/agent/lib.mjs';
 import { fakeAdmission } from '../helpers/fake-admission.mjs';
+import { winPath } from '../fixtures/win-path.mjs';
 
 const now = Date.parse('2026-10-03T08:00:00Z'), policy = allocationSettings().admission;
 const root = path.resolve(import.meta.dirname, '../..');
@@ -244,7 +245,7 @@ test('a store failure never produces a fallback admission or optimistic capacity
 test('generic closure releases capacity only after both terminal and process-tree exit are proved', (t) => {
   for (const verifiable of [true, false]) {
     const options = fixture(t), receipt = reserveProviderBudget(input(), options).reservation;
-    const object = { pid: 1234, ppid: 1, created: 10, exe: 'C:\\fixture\\agent.exe' };
+    const object = { pid: 1234, ppid: 1, created: 10, exe: winPath('C', 'fixture', 'agent.exe') };
     const identity = { pid: object.pid, birth: (116444736000000000n + BigInt(object.created) * 10000n).toString(), exe: object.exe };
     markProviderBudget(receipt, { state: 'live', handle: 'terminal-a', pid: object.pid }, options);
     let closed = false, captures = 0;

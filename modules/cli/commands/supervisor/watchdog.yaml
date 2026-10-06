@@ -12,7 +12,3 @@ examples:
   - starci supervisor watchdog --once
   - starci supervisor watchdog --once --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/supervisor/supervisor-watchdog.mjs
-  - node .claude/scripts/supervisor/supervisor-watchdog.mjs

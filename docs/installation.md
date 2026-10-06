@@ -152,7 +152,7 @@ installed package's own `installRuntime` (the installer `init`, the dependency i
 `machine-db init` and `status`, an idempotent second install, and that the real home was not written. Exit 0 every assertion passed, 1 an assertion failed,
 2 a step could not run; it prints a JSON summary and appends a table to `$GITHUB_STEP_SUMMARY` when GitHub sets it.
 
-The script asserts the `age-keygen` prerequisite by name. Run either sandbox as `node scripts/gates/install-sandbox.mjs --tarball <temp-dir>/starci-<version>.tgz`:
+The script asserts the `age-keygen` prerequisite by name. Run either sandbox as `starci gate install-sandbox --tarball <temp-dir>/starci-<version>.tgz`:
 
 - **Windows (or any host), direct:** the command as written; the temp HOME is the only home the run sees.
 - **Linux, in a throwaway Docker container:** add `--docker [--tools <dir>]`. The container is the node image of the release parity step, started through

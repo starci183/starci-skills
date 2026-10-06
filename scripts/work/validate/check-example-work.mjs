@@ -135,7 +135,7 @@ const collectRecordMap = (scopeRoot) => {
 // Agent-data categories still written in place while their op moves to blobs: a WARN, not a refusal.
 const BOUNDARY_TRANSITIONAL = Object.freeze([]);
 /**
- * The .starciwork boundary (ARCHITECTURE-DB §5.1, scripts/lib/starciwork-boundary.mjs): every file under the tree is
+ * The .starciwork boundary (docs/ledger-db.md, scripts/lib/starciwork-boundary.mjs): every file under the tree is
  * product content (isProductPath) or it is refused. Known agent data - evidence/ and impl captures, uat runs, evidence
  * bundles, operations/ audits, kernel custody, stray report copies, caches, ledgers - is REFUSED
  * [HFS_AGENT_DATA_TRACKED], one line per agent-data directory (draw-loop rounds included: the loop is a blob bundle); its home is the project ledger and the blob store
@@ -676,7 +676,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
         const ev = parseYaml(fs.readFileSync(evidenceFile, 'utf8'));
         const cited = (v) => (Array.isArray(v) ? v : v ? [v] : []).filter((c) => c && typeof c === 'object' && /^[a-f0-9]{64}$/.test(String(c.sha256 ?? '')));
         if (ev?.run && typeof ev.run === 'object') {
-          // alpha.3: the run is agent data in the blob store; evidence.yaml cites its files by sha256 (+ artifact id).
+          // The run is agent data in the blob store; evidence.yaml cites its files by sha256 (+ artifact id).
           const run = ev.run;
           if (!cited(run.screens).length) problems.push(`${rec.shown}: run ${run.id ?? '?'} cites no screenshot (run.screens[] {artifact?, sha256})`);
           if (!cited(run.videos).length) problems.push(`${rec.shown}: run ${run.id ?? '?'} cites no playable recording (run.videos[] {artifact?, sha256})`);

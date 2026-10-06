@@ -20,5 +20,3 @@ exit: {"0": capability created, "2": refusal or bad usage}
 json: none
 examples: ['starci app add api checkout --service CheckoutService=@modules/domain/order']
 editions: [full, lite]
-since: 1.0.0
-removed: ['hfs add', 'npx hfs add']

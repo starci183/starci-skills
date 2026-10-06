@@ -56,7 +56,7 @@ export function importClosure(entries) {
     // A module that reads its DDL from engine/db/migrations/<store>/ (ledger-db, machine-db) carries every migration of that store.
     for (const store of new Set([...text.matchAll(MIGRATION_STORE)].map((match) => match[1]))) {
       const dir = `engine/db/migrations/${store}`;
-      if (fs.existsSync(path.join(runtimeRoot, dir))) for (const sql of fs.readdirSync(path.join(runtimeRoot, dir)).filter((name) => name.endsWith('.sql')).sort()) visit(`${dir}/${sql}`);
+      if (fs.existsSync(path.join(runtimeRoot, dir))) for (const sql of fs.readdirSync(path.join(runtimeRoot, dir)).filter((name) => name.endsWith('.sql')).sort(byCodeUnit)) visit(`${dir}/${sql}`);
     }
   };
   for (const entry of entries) visit(entry);
@@ -66,7 +66,7 @@ export function importClosure(entries) {
 /** The pattern topics (knowledge/patterns/be) that carry a `files:` tree: `starci app add` generates a kind from them, so the hfs bundle carries them. */
 function patternTopicFiles() {
   const dir = path.join(runtimeRoot, 'knowledge', 'patterns', 'be');
-  return fs.readdirSync(dir).filter((name) => name.endsWith('.yaml') && Array.isArray(parseYaml(fs.readFileSync(path.join(dir, name), 'utf8'))?.files)).sort().map((name) => `knowledge/patterns/be/${name}`);
+  return fs.readdirSync(dir).filter((name) => name.endsWith('.yaml') && Array.isArray(parseYaml(fs.readFileSync(path.join(dir, name), 'utf8'))?.files)).sort(byCodeUnit).map((name) => `knowledge/patterns/be/${name}`);
 }
 
 export const CATALOG = 'modules/kernel/failure-codes.yaml';

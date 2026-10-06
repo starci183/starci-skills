@@ -522,7 +522,7 @@ export function createHostController(deps = {}) {
     return { ok: true, ...out };
   }
 
-  /* -------------------------------------------------------- transcripts (UI-API §2.10, lane a3-3) */
+  /* -------------------------------------------------------- transcripts (ui/CONTRACT.md) */
 
   /**
    * host:transcripts, every TRANSCRIPT_SNAPSHOT_MS (60 s; schedules host/transcripts): a scrollback snapshot of every

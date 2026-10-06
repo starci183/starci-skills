@@ -21,7 +21,3 @@ examples:
   - starci release launch-smoke stage --as kernel
   - starci release launch-smoke mark --as op
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node scripts/kernel/launch-smoke.mjs
-  - node .claude/scripts/kernel/launch-smoke.mjs

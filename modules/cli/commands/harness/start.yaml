@@ -21,7 +21,3 @@ examples:
   - starci harness start
   - starci harness start --tunnel
 editions: [full]
-since: 1.0.0-alpha.4
-removed:
-  - node ui/harness-verbs.mjs
-  - node ui/harness-verbs.mjs --tunnel

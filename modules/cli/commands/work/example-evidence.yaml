@@ -12,5 +12,3 @@ exit: {"0": every assertion passed, "1": an assertion failed or the arguments we
 json: none
 examples: ['starci work example-evidence --work .starciwork --record <id> --cwd <repo> --assert AC-1="npm test"']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/example/example-evidence.mjs']

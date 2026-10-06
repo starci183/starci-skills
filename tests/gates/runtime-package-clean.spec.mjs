@@ -205,3 +205,14 @@ test('the archive must carry every relative module its packed scripts import', (
   const cut = pack({ 'scripts/a.mjs': ["// import { z } from './commented.mjs';", "import { s } from '../packages/hfs/scaffold/app.mjs';", "export * from './x.mjs';", "const u = import(new URL('../p/main.mjs', import.meta.url));"], 'scripts/x.mjs': ['export const x = 1;'] });
   assert.deepEqual(unresolvedPackedImports(cut), ['package/scripts/a.mjs:2 -> package/packages/hfs/scaffold/app.mjs', 'package/scripts/a.mjs:4 -> package/p/main.mjs']);
 });
+
+test('the packed-import guard resolves like Node: directories by index, JSON, and never a file read or emitted source text', () => {
+  const pack = entries => new Map(Object.entries(entries).map(([file, lines]) => [`package/${file}`, Buffer.from(lines.join('\n'))]));
+  const resolved = pack({
+    'scripts/a.mjs': ["import { d } from './dir';", "import pkg from '../package.json' with { type: 'json' };", "const t = new URL('../data/', import.meta.url);", "const e = `import { g } from './generated.cli';`;"],
+    'scripts/dir/index.mjs': ['export const d = 1;'], 'package.json': ['{}'],
+  });
+  assert.deepEqual(unresolvedPackedImports(resolved), []);
+  const missing = pack({ 'scripts/a.mjs': ["import { d } from './dir';", "import j from './absent.json' with { type: 'json' };"], 'scripts/dir/other.mjs': ['export const o = 1;'] });
+  assert.deepEqual(unresolvedPackedImports(missing), ['package/scripts/a.mjs:1 -> package/scripts/dir', 'package/scripts/a.mjs:2 -> package/scripts/absent.json']);
+});

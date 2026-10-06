@@ -20,5 +20,3 @@ json: starci/supabase-start@1
 examples:
   - starci supabase start --cwd <app>
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []

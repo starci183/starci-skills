@@ -10,5 +10,3 @@ exit: {"0": proof rendered, "1": render refused or the arguments were refused, "
 json: none
 examples: ['starci work render-proof --work .starciwork --record <id>']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['node scripts/work/render-proof.mjs']

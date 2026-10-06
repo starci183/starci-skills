@@ -19,7 +19,7 @@ flags:
   - {name: help, type: boolean}
   - {name: edition, type: enum, enum: [full, lite]}
 `;
-const GROUP_YAML = `group: kernel\nsummary: kernel verbs\nowner: runtime\nsince: 1.0.0-alpha.4\n`;
+const GROUP_YAML = `group: kernel\nsummary: kernel verbs\nowner: runtime\n`;
 const flagSig = (f) => (typeof f === 'string' ? `{name: ${f}, type: string, required: true}` : `{name: ${f[0]}, type: ${f[1]}${f[2] ? ', required: true' : ''}}`);
 const verbYaml = (verb, flags) => `group: kernel
 verb: ${verb}
@@ -31,8 +31,6 @@ exit: {0: ok, 1: refused, 2: bad usage}
 json: flag
 examples: ['starci kernel ${verb} --repo <path>']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['starci api ${verb}']
 `;
 const moduleYaml = (verb, flags, extra = '') => `group: kernel
 verb: ${verb}
@@ -47,8 +45,6 @@ exit: {0: ok, 1: refused, 2: bad usage}
 json: flag
 examples: ['starci kernel ${verb}']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: []
 ${extra}`;
 const verbModule = (verb, usage, required) => `export default {
   verb: '${verb}',
@@ -114,7 +110,7 @@ test('a happy fixture passes and every resolved verb is reported', () => {
 
 test('an app group with no packages/hfs/src/main.mjs is skipped, not a finding', () => {
   const root = fixture((t, put) => {
-    put('modules/cli/commands/app/_group.yaml', 'group: app\nsummary: app verbs\nowner: "@starci/hfs"\nsince: 1.0.0-alpha.4\n');
+    put('modules/cli/commands/app/_group.yaml', 'group: app\nsummary: app verbs\nowner: "@starci/hfs"\n');
     put('modules/cli/commands/app/lint.yaml', `group: app
 verb: lint
 owner: "@starci/hfs"
@@ -125,8 +121,6 @@ exit: {0: ok, 1: findings, 2: bad usage}
 json: flag
 examples: ['starci app lint']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ['hfs lint']
 `);
   });
   try {
@@ -213,7 +207,7 @@ test('a host-effect module without a convention is a catalog parity finding', ()
 test('a direct kernel-owned script outside the kernel group needs no cli.mjs switch case', () => {
   const root = fixture((t, put) => {
     put('scripts/kernel/sample-tool.mjs', '#!/usr/bin/env node\nconsole.log("ok");\n');
-    put('modules/cli/commands/machine/_group.yaml', 'group: machine\nsummary: machine verbs\nowner: runtime\nsince: 1.0.0-alpha.4\n');
+    put('modules/cli/commands/machine/_group.yaml', 'group: machine\nsummary: machine verbs\nowner: runtime\n');
     put('modules/cli/commands/machine/sample-tool.yaml', verbYaml('sample-tool', [])
       .replace('group: kernel', 'group: machine')
       .replace('impl: {script: scripts/kernel/cli.mjs, args: [sample-tool]}', 'impl: {script: scripts/kernel/sample-tool.mjs}')

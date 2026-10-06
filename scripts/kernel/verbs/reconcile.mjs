@@ -73,8 +73,8 @@ export default {
   }
   // What reconcile must prove no-effect is the launch that left the job
   // effect_unknown — the newest rejected dispatch that is not already settled
-  // (payload.rejectedDispatches, where rejectDispatch records the evidence it
-  // used to write over managed.dispatchId). Only when no rejection owns this
+  // (payload.rejectedDispatches, where rejectDispatch records the evidence,
+  // never over managed.dispatchId). Only when no rejection owns this
   // state is the job's own managed binding the thing to reconcile.
   const unsettledRejection = [...(payload.rejectedDispatches ?? [])].reverse()
     .find((entry) => entry?.dispatchId && entry.effectState && entry.effectState !== 'none')?.dispatchId ?? null;

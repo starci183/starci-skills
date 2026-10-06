@@ -363,7 +363,7 @@ export function createResourceController(overrides = {}) {
         hitSignal({ ...p, jobPool: e.jobPool }, e.at);
       }
     }
-    // The provider circuits: one worker-wide row per provider in machine.sqlite provider_health (a3-4, provider-circuit.mjs).
+    // The provider circuits: one worker-wide row per provider in machine.sqlite provider_health (provider-circuit.mjs).
     for (const c of (deps.providerCircuits ?? providerCircuits)()) {
       const v = c.value ?? {};
       const at = Number(v.observedAt) || Number(c.at) || 0;

@@ -26,5 +26,3 @@ examples:
   - starci release images --app <app-root>
   - starci release images --app <app-root> --sides be --remove-images --json
 editions: [full]
-since: 1.0.0-alpha.4
-removed: [bash docker-proof.sh]

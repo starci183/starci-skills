@@ -18,7 +18,7 @@ flags:
   - {name: edition, type: enum, enum: [full, lite]}
 `;
 
-const verbYaml = ({ verb, module, exported, effect = 'read', roles = '[worker, lead, owner]', conventions = '', flags = '[]', positional = '', json = 'flag', removed = '[]' }) => `group: demo
+const verbYaml = ({ verb, module, exported, effect = 'read', roles = '[worker, lead, owner]', conventions = '', flags = '[]', positional = '', json = 'flag' }) => `group: demo
 verb: ${verb}
 owner: runtime
 summary: ${verb} fixture module
@@ -30,8 +30,6 @@ exit: {0: clean, 1: findings, 2: bad usage}
 json: ${json}
 examples: ['starci demo ${verb}']
 editions: [full]
-since: 1.0.0-alpha.4
-removed: ${removed}
 `;
 
 const capture = () => {
@@ -47,13 +45,12 @@ const fixture = (t) => {
     fs.writeFileSync(file, text);
   };
   put('modules/cli/commands/_global.yaml', GLOBAL_YAML);
-  put('modules/cli/commands/demo/_group.yaml', 'group: demo\nsummary: fixture verbs\nowner: runtime\nsince: 1.0.0-alpha.4\n');
+  put('modules/cli/commands/demo/_group.yaml', 'group: demo\nsummary: fixture verbs\nowner: runtime\n');
   put('modules/cli/commands/demo/ok.yaml', verbYaml({
     verb: 'ok', module: 'ok.mjs', exported: 'runOk', effect: 'host', roles: '[lead, owner]',
     conventions: 'run this fixture in its isolated temp directory',
     flags: '[{name: count, type: number, default: 2}, {name: tag, type: list}, {name: enabled, type: boolean}]',
     positional: '  - {name: item, required: true, variadic: false}',
-    removed: "['raw fixture ok']",
   }));
   put('modules/cli/commands/demo/fail.yaml', verbYaml({ verb: 'fail', module: 'fail.mjs', exported: 'runFail' }));
   put('modules/cli/commands/demo/explode.yaml', verbYaml({ verb: 'explode', module: 'explode.mjs', exported: 'explode' }));
@@ -148,10 +145,10 @@ test('module help and package-level explain expose policy and replacements', asy
   assert.match(help.value.out, /JSON: flag/);
 
   const explain = capture();
-  assert.equal(await packageMain(['explain', 'demo', 'ok'], { ...explain, catalog, retired: [], version: 'test' }), 0);
-  assert.match(explain.value.out, /Replaces: raw fixture ok/);
+  assert.equal(await packageMain(['explain', 'demo', 'ok'], { ...explain, catalog, version: 'test' }), 0);
+  assert.match(explain.value.out, /Effect: host/);
   const unknown = capture();
-  assert.equal(await packageMain(['explain', 'demo', 'missing'], { ...unknown, catalog, retired: [], version: 'test' }), 2);
+  assert.equal(await packageMain(['explain', 'demo', 'missing'], { ...unknown, catalog, version: 'test' }), 2);
   assert.match(unknown.value.err, /available: explode, fail, invalid, ok, plain/);
 });
 
