@@ -277,7 +277,7 @@ function gitRevision(repoRoot) {
 /** Page nodes a navigation route can land on: not inside a slot or an intercept, with a page file. */
 const landingPages = (nodes) => {
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const inside = (n) => { for (let at = n; at; at = byId.get(at.parent)) if (at.segmentKind === 'slot' || at.segmentKind === 'intercept') return true; return false; };
+  const inside = (n) => { for (let at = n; at; at = byId.get(at.parent)) { if (at.segmentKind === 'slot' || at.segmentKind === 'intercept') { return true; } } return false; };
   return nodes.filter((n) => n.files?.page && !inside(n));
 };
 
@@ -403,7 +403,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, name = nul
       // Top-level routes under this layout that no destination reaches.
       const baseParts = urlParts(localelessUrl(node.url, localeParam));
       const reached = new Set(items.map((i) => i.target).filter(Boolean).map((id) => urlParts(localelessUrl(byId.get(id).url, localeParam))[baseParts.length]));
-      const under = pages.filter((p) => { for (let at = p; at; at = byId.get(at.parent)) if (at.id === node.id) return true; return false; });
+      const under = pages.filter((p) => { for (let at = p; at; at = byId.get(at.parent)) { if (at.id === node.id) { return true; } } return false; });
       const heads = new Map();
       for (const p of under) {
         const head = urlParts(localelessUrl(p.url, localeParam))[baseParts.length];
@@ -454,7 +454,7 @@ const KEY_LISTS = new Set(['i18nKeys', 'messageKeys']);
 export function usedI18nKeys(record) {
   const keys = new Set();
   const walk = (v) => {
-    if (Array.isArray(v)) { for (const x of v) walk(x); return; }
+    if (Array.isArray(v)) { for (const x of v) { walk(x); } return; }
     if (!v || typeof v !== 'object') return;
     for (const [k, x] of Object.entries(v)) {
       if (KEY_FIELDS.has(k)) { if (typeof x === 'string' && x.trim()) keys.add(x.trim()); }
@@ -1005,7 +1005,7 @@ export function mergeScan(existing, scans, { at = now() } = {}) {
 /** Parents before children, siblings in id order. */
 function orderNodes(nodes) {
   const children = new Map();
-  for (const n of nodes) { const k = n.parent ?? ''; if (!children.has(k)) children.set(k, []); children.get(k).push(n); }
+  for (const n of nodes) { const k = n.parent ?? ''; if (!children.has(k)) { children.set(k, []); } children.get(k).push(n); }
   const out = [];
   const visit = (id) => { for (const n of (children.get(id) ?? []).sort((a, b) => a.id.localeCompare(b.id))) { out.push(n); visit(n.id); } };
   visit('');

@@ -86,7 +86,7 @@ export function loadRationale(file) {
     if (!e || typeof e !== 'object' || Array.isArray(e)) { errors.push(`#${i + 1} is not an object`); return; }
     const missing = REQUIRED_FIELDS.filter((k) => e[k] == null || (typeof e[k] === 'string' && !e[k].trim()));
     if (missing.length) errors.push(`${at} lacks ${missing.join(', ')}`);
-    if (e.id != null) { if (seen.has(String(e.id))) errors.push(`${at}: the id is used twice`); seen.add(String(e.id)); }
+    if (e.id != null) { if (seen.has(String(e.id))) { errors.push(`${at}: the id is used twice`); } seen.add(String(e.id)); }
     if (e.kind != null && !RATIONALE_KINDS.includes(e.kind)) errors.push(`${at}: kind "${e.kind}" is none of ${RATIONALE_KINDS.join('|')}`);
     if (e.rules != null && (!Array.isArray(e.rules) || !e.rules.length)) errors.push(`${at}: rules[] must cite at least one rule id`);
     if (e.alternativesRejected != null && (!Array.isArray(e.alternativesRejected) || e.alternativesRejected.some((a) => !a || typeof a !== 'object' || !str(a.option).trim() || !str(a.why).trim()))) {
@@ -126,7 +126,7 @@ function knowledgeIndex(root = KNOWLEDGE) {
   if (knowledgeCache?.root === root) return knowledgeCache;
   const ids = new Set(), cases = new Map();
   const visit = (node) => {
-    if (Array.isArray(node)) { for (const n of node) visit(n); return; }
+    if (Array.isArray(node)) { for (const n of node) { visit(n); } return; }
     if (!node || typeof node !== 'object') return;
     if (typeof node.id === 'string' && node.id.trim()) {
       const id = node.id.trim();
@@ -155,7 +155,7 @@ function knowledgeIndex(root = KNOWLEDGE) {
 }
 
 const idsUnder = (node, out = new Set()) => {
-  if (Array.isArray(node)) { for (const n of node) idsUnder(n, out); return out; }
+  if (Array.isArray(node)) { for (const n of node) { idsUnder(n, out); } return out; }
   if (!node || typeof node !== 'object') return out;
   if (typeof node.id === 'string' && node.id.trim()) out.add(node.id.trim());
   for (const v of Object.values(node)) if (v && typeof v === 'object') idsUnder(v, out);
@@ -230,7 +230,7 @@ export function ruleResolver({ workRoot = null, record = null, dna = loadDna(), 
     const tries = ns ? [ns === 'grammar' ? 'dna' : ns] : ['knowledge', 'dna', 'direction', 'owner'];
     let why = null;
     for (const t of tries) {
-      if (t === 'knowledge') { const r = inKnowledge(token, kase); if (r.ok) return { ok: true, via: 'knowledge', id: token }; why ??= r.why; }
+      if (t === 'knowledge') { const r = inKnowledge(token, kase); if (r.ok) { return { ok: true, via: 'knowledge', id: token }; } why ??= r.why; }
       if (t === 'dna' && dnaResolves(dna, token)) return { ok: true, via: 'dna', id: token };
       if (t === 'direction' && direction.all.has(token)) return { ok: true, via: 'direction', id: token };
       if (t === 'rubric' && direction.rubric.has(token)) return { ok: true, via: 'rubric', id: token };
@@ -483,7 +483,7 @@ export function measureRationale(arg) {
   const insetRules = [];
   const collect = (rules) => {
     for (const r of rules ?? []) {
-      if (r.cssRules && r.conditionText != null) { if (window.matchMedia(r.conditionText).matches) collect(r.cssRules); continue; }
+      if (r.cssRules && r.conditionText != null) { if (window.matchMedia(r.conditionText).matches) { collect(r.cssRules); } continue; }
       if (r.cssRules && !r.selectorText) { collect(r.cssRules); continue; }
       if (!r.selectorText || !r.style) continue;
       const sides = ['top', 'right', 'bottom', 'left'].filter((k) => { const v = r.style.getPropertyValue(k); return v && v !== 'auto'; });
@@ -511,7 +511,7 @@ export function measureRationale(arg) {
     if (at.length < 3) at.push(sel(el));
   };
   const colours = new Map();
-  const colour = (hex, use, el) => { if (!hex) return; const k = `${hex}|${use}`; if (!colours.has(k)) colours.set(k, { hex, use, at: [] }); const c = colours.get(k); if (c.at.length < 3) c.at.push(sel(el)); };
+  const colour = (hex, use, el) => { if (!hex) { return; } const k = `${hex}|${use}`; if (!colours.has(k)) { colours.set(k, { hex, use, at: [] }); } const c = colours.get(k); if (c.at.length < 3) { c.at.push(sel(el)); } };
   const grids = [], art = [];
   const all = [...document.querySelectorAll('body *')].filter((el) => !excluded(el) && !(el instanceof SVGElement && el.tagName.toLowerCase() !== 'svg') && !['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT'].includes(el.tagName) && visible(el));
   for (const el of all) {
@@ -582,7 +582,7 @@ export function drawRedlines(arg) {
   const RED = '#d4001a', BLUE = '#1d4ed8';
   const placed = [];
   const hits = (r) => placed.some((p) => r.x < p.x + p.w && r.x + r.w > p.x && r.y < p.y + p.h && r.y + r.h > p.y);
-  const el = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); svg.appendChild(n); return n; };
+  const el = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) { n.setAttribute(k, v); } svg.appendChild(n); return n; };
   const line = (x1, y1, x2, y2, c) => el('line', { x1, y1, x2, y2, stroke: c, 'stroke-width': 1 });
   const label = (x, y, text, c) => {
     const w = text.length * 6 + 6, h = 12;
