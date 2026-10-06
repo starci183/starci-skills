@@ -137,6 +137,11 @@ const LANE_CALLS = {
 /** The default lane git runner: (args, {cwd}) -> {ok, stdout, error}. */
 export const laneGit = ([verb, ...rest], opts) => LANE_CALLS[verb](rest, opts);
 
+const allocationForLaneGrace = (allocation) => {
+  if (allocation !== undefined) return allocation;
+  try { return allocationSettings(); } catch { return null; }
+};
+
 export function sweepLanes({ apply = false, now = Date.now(), env = process.env, allocation = undefined, config = undefined, root = SKILL_ROOT, git = null, owners = undefined } = {}) {
   const run = git ?? laneGit;
   const base = lanesRoot({ env, config });
@@ -153,7 +158,7 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
   // A spec process with no owners passed reads none (never the live host's Orca).
   let ownerInfo = owners ?? null;
   const ownersNow = () => (ownerInfo ??= (isSpecRun() ? { workers: [], sup: { jobs: [] } } : liveLaneOwners({ env })));
-  const graceMs = laneGraceMs(allocation === undefined ? (() => { try { return allocationSettings(); } catch { return null; } })() : allocation);
+  const graceMs = laneGraceMs(allocationForLaneGrace(allocation));
   for (const w of worktrees) {
     const key = pathKey(w.path);
     if (key === mainKey) { skip(w.path, 'main-checkout'); continue; }
