@@ -1,4 +1,4 @@
-# knowledge/hfs/rules.yaml - the machine-readable catalog of the HFS rules (the ids run R01 up; an id with no rule is listed under `retired` with its reason, never reused; count the rules, never type the count).
+# knowledge/hfs/rules.yaml - the machine-readable catalog of the HFS rules (count the rules, never type the count).
 #
 # One entry per rule: its id, its finding code, the law in one line, how a violation is fixed
 # (`kinds`), the gates it runs at, the failure codes it reports, and every enforcer that judges it. The prose of each
