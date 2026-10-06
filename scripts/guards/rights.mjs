@@ -43,10 +43,10 @@ export function boundIdentityOf(handle, { root, env = process.env } = {}) {
   const read = (family) => {
     const file = path.join(guardsRoot(root, env), family, `${safeName(handle)}.json`);
     let stat;
-    try { stat = fs.lstatSync(file); } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
-    if (!stat.isFile() || stat.isSymbolicLink()) throw Error('non-regular caller binding');
+    try { stat = fs.lstatSync(file); } catch (error) { if (error.code === 'ENOENT') { return null; } throw error; }
+    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('non-regular caller binding');
     const value = JSON.parse(fs.readFileSync(file, 'utf8'));
-    if (!value || typeof value !== 'object' || Array.isArray(value) || value.terminal !== handle) throw Error('contradictory caller binding');
+    if (!value || typeof value !== 'object' || Array.isArray(value) || value.terminal !== handle) throw new Error('contradictory caller binding');
     return value;
   };
   if (!handle) return { guard: null, seat: null };
@@ -94,7 +94,7 @@ export function pushTargets(rest) {
   for (let i = 0; i < rest.length; i += 1) {
     const a = rest[i];
     if (PUSH_VALUE_OPTIONS.has(a)) { i += 1; continue; }
-    if (a.startsWith('-')) { if (PUSH_ALL.test(a)) broad = true; continue; }
+    if (a.startsWith('-')) { if (PUSH_ALL.test(a)) { broad = true; } continue; }
     words.push(a);
   }
   const refs = words.slice(1).map((spec) => {
@@ -124,26 +124,30 @@ const TAG_READ = new Set(['-l', '--list', '-v', '--verify', '--points-at', '--co
 const TAG_VALUES = new Set(['--points-at', '--contains', '--merged']);
 const CONFIG_READ = new Set(['--get', '--get-all', '--get-regexp', '--list', '-l', '--show-origin']);
 
+const branchListRead = (list) => {
+  const { options, words } = optionWords(list, BRANCH_VALUES);
+  if (options.some((value) => !BRANCH_READ.has(optionName(value)))) return false;
+  const valueCount = options.filter((value) => BRANCH_VALUES.has(optionName(value)) && !value.includes('=')).length;
+  return options.some((value) => ['--list', '-l'].includes(optionName(value))) || words.length <= valueCount;
+};
+
+const tagListRead = (list) => {
+  if (!list.length) return true;
+  const { options, words } = optionWords(list, TAG_VALUES);
+  const normalized = options.map((value) => /^-n\d*$/.test(value) ? '-n' : optionName(value));
+  if (normalized.some((value) => !TAG_READ.has(value))) return false;
+  const valueCount = normalized.filter((value, index) => TAG_VALUES.has(value) && !options[index].includes('=')).length;
+  if (normalized.includes('-l') || normalized.includes('--list')) return true;
+  return normalized.some((value) => TAG_READ.has(value)) && (normalized.includes('-v') || normalized.includes('--verify') ? words.length <= valueCount + 1 : words.length <= valueCount);
+};
+
 /** Whether one of git's mixed read/write subcommands is in an explicitly read-only form. */
 export function gitListFormRead(sub, rest) {
   const list = rest.map(String);
-  if (sub === 'branch') {
-    const { options, words } = optionWords(list, BRANCH_VALUES);
-    if (options.some((value) => !BRANCH_READ.has(optionName(value)))) return false;
-    const valueCount = options.filter((value) => BRANCH_VALUES.has(optionName(value)) && !value.includes('=')).length;
-    return options.some((value) => ['--list', '-l'].includes(optionName(value))) || words.length <= valueCount;
-  }
-  if (sub === 'tag') {
-    if (!list.length) return true;
-    const { options, words } = optionWords(list, TAG_VALUES);
-    const normalized = options.map((value) => /^-n\d*$/.test(value) ? '-n' : optionName(value));
-    if (normalized.some((value) => !TAG_READ.has(value))) return false;
-    const valueCount = normalized.filter((value, index) => TAG_VALUES.has(value) && !options[index].includes('=')).length;
-    if (normalized.includes('-l') || normalized.includes('--list')) return true;
-    return normalized.some((value) => TAG_READ.has(value)) && (normalized.includes('-v') || normalized.includes('--verify') ? words.length <= valueCount + 1 : words.length <= valueCount);
-  }
+  if (sub === 'branch') return branchListRead(list);
+  if (sub === 'tag') return tagListRead(list);
   const words = list.filter((value) => !value.startsWith('-'));
-  if (sub === 'stash') return ['list', 'show'].includes(words[0]) && !words.slice(1).some((value) => value === 'push');
+  if (sub === 'stash') return ['list', 'show'].includes(words[0]) && !words.slice(1).includes('push');
   if (sub === 'worktree') return words[0] === 'list';
   if (sub === 'remote') {
     const options = list.filter((value) => value.startsWith('-'));
@@ -167,7 +171,7 @@ export function nodeWholeSuite(args) {
   const targets = [];
   for (let i = 0; i < list.length; i += 1) {
     if (NODE_VALUE_FLAGS.has(list[i])) { i += 1; continue; }
-    if (!list[i].startsWith('-')) targets.push(list[i].replace(/\\/g, '/'));
+    if (!list[i].startsWith('-')) targets.push(list[i].replaceAll(/\\/g, '/'));
   }
   return !targets.length || targets.some((x) => WHOLE_TREE.some((re) => re.test(x)));
 }
@@ -212,13 +216,19 @@ export function fileWriteVerdict({ role, filePath, tool = 'Edit', edit = null, g
       'file an owner proposal (what to change in the protected zone and why); only the owner path edits the guard, the release cut, the git hooks, the CI triggers, the test policy, the host lock and the permission settings');
   }
   if (zone.catalog) {
-    const named = shell || tool === 'Write' ? ['whole-file write'] : (zone.catalogNames?.(zone.catalog, `${edit?.old ?? ''}\n${edit?.new ?? ''}`) ?? []);
-    if (named.length) {
-      return refusal('RIGHTS_PROTECTED_ZONE', zone.rel, `${zone.rel} holds catalog entries that enforce the protected zone (${zone.catalog.ids.concat(zone.catalog.codes).slice(0, 6).join(', ')}...): this write ${shell || tool === 'Write' ? 'rewrites the whole file' : `names ${named.join(', ')}`}`,
-        'edit other entries with the Edit tool (an edit that names no protected rule id or code passes); a change to a protected entry is an owner proposal');
-    }
+    const verdict = catalogWriteVerdict({ zone, shell, tool, edit });
+    if (verdict) return verdict;
   }
   return null;
+}
+
+/** The protected-zone refusal for a catalog write, or null when no protected entry is named. */
+function catalogWriteVerdict({ zone, shell, tool, edit }) {
+  const named = shell || tool === 'Write' ? ['whole-file write'] : (zone.catalogNames?.(zone.catalog, `${edit?.old ?? ''}\n${edit?.new ?? ''}`) ?? []);
+  if (!named.length) return null;
+  const how = shell || tool === 'Write' ? 'rewrites the whole file' : `names ${named.join(', ')}`;
+  return refusal('RIGHTS_PROTECTED_ZONE', zone.rel, `${zone.rel} holds catalog entries that enforce the protected zone (${zone.catalog.ids.concat(zone.catalog.codes).slice(0, 6).join(', ')}...): this write ${how}`,
+    'edit other entries with the Edit tool (an edit that names no protected rule id or code passes); a change to a protected entry is an owner proposal');
 }
 
 const WRITE_LAST = new Set(['cp', 'install', 'copy', 'copy-item', 'cpi']);

@@ -18,10 +18,12 @@ export function managedScriptNames(profile, edition = 'full') {
     const slot = loadSlotManifest().slots.find((entry) => entry.id === `${profile}.package-manifest`);
     const group = slot && managedGroupOf(slot, edition);
     const templates = group && TEMPLATE_ROOTS.find((dir) => fs.existsSync(path.join(dir, profile, group, 'package.json')));
-    if (!templates) throw Error(`The managed package-scripts template of profile ${profile} cannot be found next to the runtime.`);
+    if (!templates) throw new Error(`The managed package-scripts template of profile ${profile} cannot be found next to the runtime.`);
     const text = fs.readFileSync(path.join(templates, profile, group, 'package.json'), 'utf8')
       .replace(/^\{\{> ([\w./-]+)\}\}\r?\n/gmu, (_, partial) => fs.readFileSync(path.join(templates, partial), 'utf8'));
-    managedScriptCache.set(key, new Set([...text.matchAll(/^\s*"([A-Za-z0-9:_.-]+)":\s*"/gmu)].map((match) => match[1])));
+    // The key is bounded by quotes, never the colon, so `[^"]` cannot backtrack; the strict script-name class filters after.
+    const names = [...text.matchAll(/^\s*"([^"\n]+)":\s*"/gmu)].map((match) => match[1]);
+    managedScriptCache.set(key, new Set(names.filter((name) => /^[A-Za-z0-9:_.-]+$/.test(name))));
   }
   return managedScriptCache.get(key);
 }

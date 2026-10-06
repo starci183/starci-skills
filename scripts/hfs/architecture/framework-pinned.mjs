@@ -15,7 +15,7 @@ const cache = new Map(); // only the installed knowledge file is cached; an expl
 const EXACT_NAME = /^[^\\/*?[\]{}\s]+$/;
 
 function unavailable(file, detail) {
-  return Error(`ARCH_KNOWLEDGE_UNAVAILABLE: ${file} ${detail}`);
+  return new Error(`ARCH_KNOWLEDGE_UNAVAILABLE: ${file} ${detail}`);
 }
 
 function load(file) {

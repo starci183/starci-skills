@@ -33,6 +33,11 @@ const fold = foldCase;
 /** The repositories root: the directory that holds the source host repository (its .claude is the runtime). */
 export const defaultRoot = (skillRoot = SKILL_ROOT) => path.resolve(skillRoot, '..', '..');
 const topOf = (root, p) => { const relative = path.relative(root, p); return relative && !relative.startsWith('..') && !path.isAbsolute(relative) ? relative.split(path.sep)[0] : null; };
+const linkKind = (into, to, from) => {
+  if (!into) return 'dangling';
+  if (to === null) return 'outside-root';
+  return fold(to) === fold(from) ? 'same-repo' : 'cross-repo';
+};
 
 /** Links under root to depth, never entered; inside node_modules only lstat is asked (a package dir is not walked). */
 function linksUnderRoot(root, { depth = DEFAULT_DEPTH } = {}) {
@@ -79,7 +84,7 @@ export function scanFootprint({ root = defaultRoot(), depth = DEFAULT_DEPTH, sta
   const links = listLinks(resolvedRoot, { depth }).map((entry) => {
     const into = entry.real ?? entry.target ?? '';
     const from = topOf(resolvedRoot, entry.link), to = into ? topOf(resolvedRoot, path.resolve(path.dirname(entry.link), into)) : null;
-    return { ...entry, kind: !into ? 'dangling' : to === null ? 'outside-root' : fold(to) === fold(from) ? 'same-repo' : 'cross-repo' };
+    return { ...entry, kind: linkKind(into, to, from) };
   }).filter((entry) => entry.kind === 'cross-repo');
   const worktrees = worktreesUnderRoot(resolvedRoot, git ? { git } : {});
   // seen holds what this scan saw (with its first sighting): a link or worktree gone since is dropped, and one

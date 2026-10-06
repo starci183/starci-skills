@@ -8,7 +8,7 @@ const subcommandOf = (args, valued) => {
   for (let i = 0; i < args.length; i += 1) {
     const a = args[i];
     if (a === '--') return args[i + 1] ?? null;
-    if (/^-/.test(a)) { if (valued.test(a)) i += 1; continue; }
+    if (a.startsWith('-')) { if (valued.test(a)) i += 1; continue; }
     return a;
   }
   return null;
@@ -31,34 +31,38 @@ const TEST_WORLD_RUNNER = /(?:^|[\\/])test-world-run\.mjs$/;
 const testWorldOf = (program, args) => {
   if (program === 'node' && args.some((a) => TEST_WORLD_RUNNER.test(a))) return 'test-world-run.mjs';
   if (program !== 'starci') return null;
-  const words = args.filter((a) => !/^-/.test(a));
+  const words = args.filter((a) => !a.startsWith('-'));
   return words[0] === 'gate' && words[1] === 'test-world' ? 'starci gate test-world' : null;
+};
+const headlessHow = (program, args) => {
+  if (program === 'codex') {
+    const sub = subcommandOf(args, CODEX_VALUED);
+    return sub === 'exec' || sub === 'e' ? `codex ${sub} runs a headless Codex agent` : null;
+  }
+  if (program === 'claude' || program === 'cursor-agent' || program === 'devin') {
+    const flag = printFlag(args, ['-p', '--print']);
+    return flag ? `${program} ${flag} runs a headless agent` : null;
+  }
+  if (program === 'gemini') {
+    const flag = printFlag(args, ['-p', '--prompt']);
+    return flag ? `gemini ${flag} runs a headless agent` : null;
+  }
+  if (program === 'opencode' && subcommandOf(args, /^(?:-m|--model|--agent|--log-level)$/) === 'run') return 'opencode run runs a headless agent';
+  return null;
 };
 export const launchVerdict = (program, args, guard = null) => {
   if (program === 'orca') {
-    const words = args.filter((a) => !/^-/.test(a));
+    const words = args.filter((a) => !a.startsWith('-'));
     if (words[0] === 'terminal' && words[1] === 'create') return { code: 'RAW_TERMINAL_CREATE', ...launchRefusal(program, args, 'a raw terminal create starts a terminal outside worker-start') };
     if (words[0] === 'worktree' && ORCA_WORKTREE_WRITES.has(words[1])) return { code: 'AGENT_ORCA_WORKTREE', command: [program, ...args].join(' ').slice(0, 200),
       reason: `orca worktree ${words[1]}: an agent never creates or removes a worktree - a removal without the runtime's link check follows node_modules junctions into the live tree (inc-c8fbf76aa499), and a tree outside the registry escapes its cap and GC`,
       remedy: 'inspect with `starci machine worktrees counts`; worktrees are created and removed only by the runtime worktree API (scripts/machine/worktree-orca.mjs createOrcaWorktree / removeOrcaWorktree, scripts/kernel/workflow-worktree.mjs releaseWorkflowWorktree); report a need you cannot meet as blocked environment' };
     return null;
   }
-  const testWorld = /^uat\./.test(String(guard?.op ?? '')) ? testWorldOf(program, args) : null;
+  const testWorld = String(guard?.op ?? '').startsWith('uat.') ? testWorldOf(program, args) : null;
   if (testWorld) return { code: 'UAT_TEST_WORLD', command: [program, ...args].join(' ').slice(0, 200),
     reason: `${guard.op} walks the app's real dev stack: a test world (${testWorld}) fakes what the walk must prove`,
     remedy: 'bring up the dev stack the app-root .starcistacks/<env> declares with its own start commands, check it with env-health, and walk it; a stack that will not come up is reported blocked environment' };
-  let how = null;
-  if (program === 'codex') {
-    const sub = subcommandOf(args, CODEX_VALUED);
-    if (sub === 'exec' || sub === 'e') how = `codex ${sub} runs a headless Codex agent`;
-  } else if (program === 'claude' || program === 'cursor-agent' || program === 'devin') {
-    const flag = printFlag(args, ['-p', '--print']);
-    if (flag) how = `${program} ${flag} runs a headless agent`;
-  } else if (program === 'gemini') {
-    const flag = printFlag(args, ['-p', '--prompt']);
-    if (flag) how = `gemini ${flag} runs a headless agent`;
-  } else if (program === 'opencode') {
-    if (subcommandOf(args, /^(?:-m|--model|--agent|--log-level)$/) === 'run') how = 'opencode run runs a headless agent';
-  }
+  const how = headlessHow(program, args);
   return how ? { code: 'AGENT_HEADLESS_LAUNCH', ...launchRefusal(program, args, how) } : null;
 };

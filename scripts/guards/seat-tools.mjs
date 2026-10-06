@@ -28,9 +28,11 @@ export function seatToolDecision({ handle, toolName, root = skillRoot }) {
 /** Exported hook entry for the published CLI's in-process guard fast path. */
 export async function main({ stdin = process.stdin, stdout = process.stdout, env = process.env, root = skillRoot } = {}) {
   let toolName = null;
-  try { toolName = JSON.parse(await readInput(stdin))?.tool_name ?? null; } catch { return 0; }
-  const decision = seatToolDecision({ handle: readEnv('ORCA_TERMINAL_HANDLE', env), toolName, root });
-  if (decision) stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: decision.reason } })}\n`);
+  try { toolName = JSON.parse(await readInput(stdin))?.tool_name ?? null; } catch { /* unparsable input passes */ }
+  if (toolName) {
+    const decision = seatToolDecision({ handle: readEnv('ORCA_TERMINAL_HANDLE', env), toolName, root });
+    if (decision) stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: decision.reason } })}\n`);
+  }
   return 0;
 }
 

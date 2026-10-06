@@ -15,6 +15,28 @@ export const FEATURE_SHAPE_RULE_IDS = ['BE_FEATURE_SHAPE'];
 
 const RULE = 'BE_FEATURE_SHAPE';
 
+// {message, extra} for one feature file the slot answer refuses, or null when it sits where a slot allows it.
+const featureFileFinding = (file, owner, verdict) => {
+  const feature = path.posix.basename(owner.root);
+  if (verdict.slot === owner.slot) {
+    // A file the feature root slot itself allows is in place (the cli feature root allows its <group>/ folders); any other file
+    // deeper than the root sits in a directory no slot claims.
+    // A directory entry (`transport/`, `application/`) is held by its own slots: below it, only those slots admit a file.
+    if (verdict.allowed && !String(verdict.entry ?? '').endsWith('/')) return null;
+    if (verdict.relative.includes('/')) {
+      const folder = verdict.relative.split('/')[0];
+      return { message: `${file} sits in ${owner.root}/${folder}/, which no slot owns; a feature root holds only ${verdict.allows.join(', ')}, and transport/ holds one folder per protocol a slot names. Move it to application/ or a transport/<protocol>/ folder, or delete it.`,
+        extra: { feature, folder } };
+    }
+    if (verdict.allowed) return null;
+    return { message: `${file} is not allowed at the root of feature ${feature}; the root holds only ${verdict.allows.join(', ')}. Move it under application/ or transport/<protocol>/.`, extra: { feature } };
+  }
+  if (verdict.allowed) return null;
+  const where = `${verdict.slot} (${verdict.root})`;
+  const forbidden = verdict.forbiddenBy ? ` ${verdict.forbiddenBy} is forbidden there;` : '';
+  return { message: `${file} is not allowed in ${where};${forbidden} that folder holds only ${verdict.allows.join(', ')}. Rename it to an allowed role or move it to the folder its role belongs to.`, extra: { feature, slot: verdict.slot } };
+};
+
 export function checkFeatureShape({ config, graph }) {
   const resolver = graph.resolver;
   const tree = treeOf(config.root);
@@ -29,25 +51,8 @@ export function checkFeatureShape({ config, graph }) {
     files += 1;
     const verdict = allowsFile(resolver, file);
     if (!verdict) continue;
-    const feature = path.posix.basename(owner.root);
-    const where = `${verdict.slot} (${verdict.root})`;
-    if (verdict.slot === owner.slot) {
-      // A file the feature root slot itself allows is in place (the cli feature root allows its <group>/ folders); any other file
-      // deeper than the root sits in a directory no slot claims.
-      // A directory entry (`transport/`, `application/`) is held by its own slots: below it, only those slots admit a file.
-      if (verdict.allowed && !String(verdict.entry ?? '').endsWith('/')) continue;
-      if (verdict.relative.includes('/')) {
-        const folder = verdict.relative.split('/')[0];
-        report(file, `${file} sits in ${owner.root}/${folder}/, which no slot owns; a feature root holds only ${verdict.allows.join(', ')}, and transport/ holds one folder per protocol a slot names. Move it to application/ or a transport/<protocol>/ folder, or delete it.`,
-          { feature, folder });
-      } else if (!verdict.allowed) {
-        report(file, `${file} is not allowed at the root of feature ${feature}; the root holds only ${verdict.allows.join(', ')}. Move it under application/ or transport/<protocol>/.`, { feature });
-      }
-      continue;
-    }
-    if (verdict.allowed) continue;
-    const forbidden = verdict.forbiddenBy ? ` ${verdict.forbiddenBy} is forbidden there;` : '';
-    report(file, `${file} is not allowed in ${where};${forbidden} that folder holds only ${verdict.allows.join(', ')}. Rename it to an allowed role or move it to the folder its role belongs to.`, { feature, slot: verdict.slot });
+    const finding = featureFileFinding(file, owner, verdict);
+    if (finding) report(file, finding.message, finding.extra);
   }
   return { violations, coverage: { status: 'checked', features: features.size, files } };
 }

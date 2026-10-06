@@ -93,24 +93,29 @@ const linkVerdict = (program, args, word) => {
 // node_modules the same way). The runtime's safeRemove removes every link as a
 // link first. One junction is removed on its own with `cmd /c rmdir <path>` (no /s), which removes the link only.
 const REMOVE_ITEM = new Set(['remove-item', 'ri', 'rm', 'del', 'erase', 'rd', 'rmdir']);
-const POWERSHELL_RECURSE = /^-r(?:e(?:c(?:u(?:r(?:se?)?)?)?)?)?(?::(?!\$?false$).*)?$/i;
+// PowerShell accepts any unambiguous prefix of -Recurse (then an optional :value other than false).
+const POWERSHELL_RECURSE = /^-(?:r|re|rec|recu|recur|recurs|recurse)(?::(?!\$?false$).*)?$/i;
 const cmdSwitches = (arg) => (/^\/\/?[a-z](?:\/[a-z])*$/i.test(arg) ? arg.toLowerCase().split('/').filter(Boolean) : []);
 const hasCmdSwitch = (args, letter) => args.some((a) => cmdSwitches(a).includes(letter));
+// The recursive-delete form of one program, or null: `${program} -Recurse`, 'rm -r', 'cmd /s' or the robocopy flag.
+const recursiveHow = (program, options, dialect) => {
+  if (dialect === 'powershell' && REMOVE_ITEM.has(program))
+    return options.some((a) => POWERSHELL_RECURSE.test(a) || /^-(?:rf|fr)$/i.test(a)) ? `${program} -Recurse` : null;
+  if (program === 'remove-item' || program === 'ri')
+    return options.some((a) => POWERSHELL_RECURSE.test(a)) ? `${program} -Recurse` : null;
+  if (program === 'rm')
+    return options.some((a) => a === '--recursive' || (/^-[A-Za-z]+$/.test(a) && /r/i.test(a))) ? 'rm -r' : null;
+  if (['rmdir', 'rd', 'del', 'erase'].includes(program))
+    return hasCmdSwitch(options, 's') ? `${program} /s` : null;
+  if (program === 'robocopy') {
+    const flag = options.find((a) => /^(?:\/\/?|-)(?:mir|purge)$/i.test(a));
+    return flag ? `robocopy ${flag.replace(/^\/\/|^-/, '/').toUpperCase()}` : null;
+  }
+  return null;
+};
 const recursiveDeleteVerdict = (program, args, dialect) => {
   const options = args.includes('--') ? args.slice(0, args.indexOf('--')) : args;
-  let how = null;
-  if (dialect === 'powershell' && REMOVE_ITEM.has(program)) {
-    if (options.some((a) => POWERSHELL_RECURSE.test(a) || /^-(?:rf|fr)$/i.test(a))) how = `${program} -Recurse`;
-  } else if (program === 'remove-item' || program === 'ri') {
-    if (options.some((a) => POWERSHELL_RECURSE.test(a))) how = `${program} -Recurse`;
-  } else if (program === 'rm') {
-    if (options.some((a) => a === '--recursive' || (/^-[A-Za-z]+$/.test(a) && /r/i.test(a)))) how = 'rm -r';
-  } else if (['rmdir', 'rd', 'del', 'erase'].includes(program)) {
-    if (hasCmdSwitch(options, 's')) how = `${program} /s`;
-  } else if (program === 'robocopy') {
-    const flag = options.find((a) => /^(?:\/\/?|-)(?:mir|purge)$/i.test(a));
-    if (flag) how = `robocopy ${flag.replace(/^\/\/|^-/, '/').toUpperCase()}`;
-  }
+  const how = recursiveHow(program, options, dialect);
   if (!how) return null;
   return { code: 'RECURSIVE_DELETE', command: [program, ...args].join(' ').slice(0, 200),
     reason: `${how} deletes a tree recursively and follows every junction or symlink inside it into the live tree it points at (a worktree removal through node_modules junctions deleted 674 live files)`,
@@ -124,8 +129,28 @@ const recursiveDeleteVerdict = (program, args, dialect) => {
 const WORKFLOW_HISTORY_VERBS = new Set(['commit', 'merge', 'rebase', 'push', 'pull', 'cherry-pick', 'revert', 'am', 'update-ref', 'switch', 'filter-branch', 'replace']);
 const RESET_MODES = new Set(['--hard', '--soft', '--mixed', '--merge', '--keep']);
 const BRANCH_WRITES = /^(?:-[dDmMcCfu]|--delete|--move|--copy|--force|--set-upstream-to(?:=.*)?|--unset-upstream|--edit-description|--track(?:=.*)?|--no-track)$/;
-const BRANCH_READS = /^(?:-[avrl]+|--list|--all|--remotes|--show-current|--contains|--no-contains|--merged|--no-merged|--points-at|--sort(?:=.*)?|--format(?:=.*)?|--color(?:=.*)?|--no-color|--column(?:=.*)?|--no-column|-vv|--verbose)$/;
+const BRANCH_READ_WORDS = new Set(['--list', '--all', '--remotes', '--show-current', '--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--sort', '--format', '--color', '--no-color', '--column', '--no-column', '-vv', '--verbose']);
+const BRANCH_READ_VALUES = /^--(?:sort|format|color|column)=/;
+const branchRead = (o) => BRANCH_READ_WORDS.has(o) || BRANCH_READ_VALUES.test(o) || /^-[avrl]+$/.test(o);
 const insideDir = (dir, root) => { const d = pathKey(dir); const r = pathKey(root); return d === r || d.startsWith(`${r}/`); };
+
+// Why each history-adjacent sub changes history, a ref or tracked work, or null when it only reads.
+const SUB_CHANGE = {
+  reset: (options, words) => (options.some((o) => RESET_MODES.has(o)) || words.length ? 'git reset to a revision or with a mode moves HEAD or discards tracked work' : null),
+  checkout: (options, words, before, dd) => (before.length || dd !== -1 ? 'git checkout switches the branch or discards tracked work' : null),
+  restore: (options) => (options.some((o) => o === '--worktree' || o === '-W') || !options.some((o) => o === '--staged' || o === '-S') ? 'git restore discards tracked work in the working tree' : null),
+  stash: (options, words) => (['list', 'show'].includes(words[0]) ? null : 'git stash takes tracked work out of the tree'),
+  tag: (options, words) => {
+    if (words.length && !options.some((o) => o === '-l' || o === '--list')) return 'git tag writes a ref';
+    return options.some((o) => o === '-d' || o === '--delete' || o === '-f' || o === '--force') ? 'git tag writes a ref' : null;
+  },
+  branch: (options, words) => {
+    if (options.some((o) => BRANCH_WRITES.test(o))) return 'git branch writes a ref';
+    return words.length && !options.some((o) => branchRead(o)) ? 'git branch creates a ref' : null;
+  },
+  reflog: (options, words) => (['expire', 'delete'].includes(words[0]) ? `git reflog ${words[0]} rewrites ref history` : null),
+  notes: (options, words) => (!words[0] || ['list', 'show'].includes(words[0]) ? null : 'git notes writes a ref'),
+};
 
 /** Why `git <sub> <rest>` changes history, a ref or tracked work, or null when it only reads. */
 export function workflowHistoryChange(sub, rest) {
@@ -134,21 +159,7 @@ export function workflowHistoryChange(sub, rest) {
   const options = before.filter((a) => a.startsWith('-'));
   const words = before.filter((a) => !a.startsWith('-'));
   if (WORKFLOW_HISTORY_VERBS.has(sub)) return `git ${sub} writes history or a ref`;
-  if (sub === 'reset') {
-    if (options.some((o) => RESET_MODES.has(o)) || words.length) return 'git reset to a revision or with a mode moves HEAD or discards tracked work';
-    return null;
-  }
-  if (sub === 'checkout') return before.length || dd !== -1 ? 'git checkout switches the branch or discards tracked work' : null;
-  if (sub === 'restore') return options.some((o) => o === '--worktree' || o === '-W') || !options.some((o) => o === '--staged' || o === '-S') ? 'git restore discards tracked work in the working tree' : null;
-  if (sub === 'stash') return ['list', 'show'].includes(words[0]) ? null : 'git stash takes tracked work out of the tree';
-  if (sub === 'tag') return words.length && !options.some((o) => o === '-l' || o === '--list') ? 'git tag writes a ref' : options.some((o) => o === '-d' || o === '--delete' || o === '-f' || o === '--force') ? 'git tag writes a ref' : null;
-  if (sub === 'branch') {
-    if (options.some((o) => BRANCH_WRITES.test(o))) return 'git branch writes a ref';
-    return words.length && !options.some((o) => BRANCH_READS.test(o)) ? 'git branch creates a ref' : null;
-  }
-  if (sub === 'reflog') return ['expire', 'delete'].includes(words[0]) ? `git reflog ${words[0]} rewrites ref history` : null;
-  if (sub === 'notes') return !words[0] || ['list', 'show'].includes(words[0]) ? null : 'git notes writes a ref';
-  return null;
+  return SUB_CHANGE[sub]?.(options, words, before, dd) ?? null;
 }
 
 /** The WORKFLOW_HISTORY_CHANGE refusal for one git call inside the guard's workflow worktree, or null. */
@@ -276,6 +287,25 @@ async function rightsOfCall({ commands, command, cwd, ctx, guard }) {
  * The first refusal for one shell call, or null: {tool, code, command, reason, remedy}. `dialect` is the text's shell
  * (PowerShell for Claude's PowerShell tool; bash otherwise, which also reads plain Windows command lines).
  */
+// The synchronous per-command refusals, in rule order: env dump, link create, name kill, recursive delete, launch.
+const syncCommandVerdict = (c, guard) => envDumpVerdict(c)
+  ?? linkVerdict(c.program, c.args, c.word)
+  ?? nameKillVerdict(c.program, c.args)
+  ?? recursiveDeleteVerdict(c.program, c.args, c.dialect)
+  ?? launchVerdict(c.program, c.args, guard);
+
+// push/tag outside an op's workflow tree have no older git-policy refusal. Return the shared role refusal before
+// loading the full git policy/dependency stack; inside the workflow tree, WORKFLOW_HISTORY_CHANGE still wins.
+const pushTagRoleVerdict = (c, ctx, guard) => {
+  let gitCwd = c.cwd;
+  for (let i = 0; i < c.args.length; i += 1) {
+    if (c.args[i] === '-C' && c.args[i + 1]) { i += 1; gitCwd = path.resolve(gitCwd, c.args[i]); }
+  }
+  if (guard?.workflowWorktree && insideDir(gitCwd, guard.workflowWorktree)) return null;
+  const byPolicy = policyVerdict({ role: ctx.role, command: c, guard, handle: ctx.handle, lockOwner: ctx.lockOwner, policy: ctx.policy });
+  return byPolicy ? policyToolVerdict(c, byPolicy) : null;
+};
+
 export async function commandVerdict({ command, cwd, guard, env = process.env, dialect = 'bash', deps = null, rights = null }) {
   let d = deps;
   const fullDeps = async () => { d ??= await loadDeps(); return d; };
@@ -285,25 +315,11 @@ export async function commandVerdict({ command, cwd, guard, env = process.env, d
   const byQuery = queryKillVerdict(commands, command);
   if (byQuery) return { tool: 'process-query', ...byQuery };
   for (const c of commands) {
-    const dump = envDumpVerdict(c);
-    if (dump) return { tool: c.program, ...dump };
-    const link = linkVerdict(c.program, c.args, c.word);
-    if (link) return { tool: c.program, ...link };
-    const kill = nameKillVerdict(c.program, c.args);
-    if (kill) return { tool: c.program, ...kill };
-    const del = recursiveDeleteVerdict(c.program, c.args, c.dialect);
-    if (del) return { tool: c.program, ...del };
-    const launch = launchVerdict(c.program, c.args, guard);
-    if (launch) return { tool: c.program, ...launch };
-    // push/tag outside an op's workflow tree have no older git-policy refusal. Return the shared role refusal before
-    // loading the full git policy/dependency stack; inside the workflow tree, WORKFLOW_HISTORY_CHANGE still wins.
+    const sync = syncCommandVerdict(c, guard);
+    if (sync) return { tool: c.program, ...sync };
     if (c.program === 'git' && ['push', 'tag'].includes(gitSubOf(c.args).sub)) {
-      let gitCwd = c.cwd;
-      for (let i = 0; i < c.args.length; i += 1) if (c.args[i] === '-C' && c.args[i + 1]) gitCwd = path.resolve(gitCwd, c.args[++i]);
-      if (!guard?.workflowWorktree || !insideDir(gitCwd, guard.workflowWorktree)) {
-        const byPolicy = policyVerdict({ role: ctx.role, command: c, guard, handle: ctx.handle, lockOwner: ctx.lockOwner, policy: ctx.policy });
-        if (byPolicy) return policyToolVerdict(c, byPolicy);
-      }
+      const byPolicy = pushTagRoleVerdict(c, ctx, guard);
+      if (byPolicy) return byPolicy;
     }
     if (c.program === 'git') {
       const loaded = await fullDeps();
@@ -375,7 +391,9 @@ async function rightsOnlyVerdict({ command, cwd, env, dialect, ctx }) {
 export async function hookDecision(input, { env = process.env, root = skillRoot, deps = null, bindings = null } = {}) {
   const handle = env.ORCA_TERMINAL_HANDLE;
   const guard = bindings ? bindings.guard : boundGuard(handle, { root, env });
-  const seat = bindings ? bindings.seat : (guard ? null : boundSeat(handle, { root, env }));
+  let seat = null;
+  if (bindings) seat = bindings.seat;
+  else if (!guard) seat = boundSeat(handle, { root, env });
   const file = fileCallOf(input);
   if (file) {
     // File rights do not consume the command table. A release claim without its lock resolves to owner here; both are

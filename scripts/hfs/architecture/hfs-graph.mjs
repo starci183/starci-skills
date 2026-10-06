@@ -15,8 +15,8 @@ import { relativePath } from './typescript.mjs';
  *   graph.ownerRoots         Map<unitKey, {slot, root, tier}> of every owner instance that holds a graph file
  *   graph.abs(file)          the repository-relative path of an absolute file the graph holds, else null
  */
-export function buildHfsGraph(config, context) {
-  const resolver = config.hfs;
+// Every production source file the TypeScript context loaded, as a graph.files node keyed by its repository-relative path.
+const collectFiles = (config, context, resolver) => {
   const files = new Map();
   const absolute = new Map();
   for (const sourceFile of context.files) {
@@ -35,6 +35,11 @@ export function buildHfsGraph(config, context) {
     });
     absolute.set(file, rel);
   }
+  return { files, absolute };
+};
+
+// Every import, re-export and type-only import between two graphed files, as rel-path edges.
+const collectEdges = (context, absolute) => {
   const edges = [];
   for (const [file, list] of context.edges) {
     const from = absolute.get(file);
@@ -45,6 +50,13 @@ export function buildHfsGraph(config, context) {
       edges.push({ from, to, runtime: edge.runtime, line: edge.line, column: edge.column, specifier: edge.specifier, reexport: Boolean(edge.reexport), edge });
     }
   }
+  return edges;
+};
+
+export function buildHfsGraph(config, context) {
+  const resolver = config.hfs;
+  const { files, absolute } = collectFiles(config, context, resolver);
+  const edges = collectEdges(context, absolute);
   const unit = rel => {
     const node = files.get(rel);
     if (!node) return null;

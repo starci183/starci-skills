@@ -36,9 +36,9 @@ export function slotAdmitsFile(resolver, file) {
   if (classified.status === 'no-slot' || classified.status === 'ambiguous' || !classified.slot) return null;
   const slot = resolver.slot(classified.slot);
   const relative = relativeToRoot(classified.path, classified.root);
-  const hit = matchersOf([...(slot.requires ?? []), ...(slot.allows ?? [])], classified.bindings).find(matcher => matcher.expression.test(relative));
-  const forbidden = matchersOf(slot.forbids, classified.bindings).find(matcher => matcher.expression.test(relative) || matcher.expression.test(`${relative}/`));
-  return Boolean(hit) && !forbidden;
+  const hit = matchersOf([...(slot.requires ?? []), ...(slot.allows ?? [])], classified.bindings).some(matcher => matcher.expression.test(relative));
+  const forbidden = matchersOf(slot.forbids, classified.bindings).some(matcher => matcher.expression.test(relative) || matcher.expression.test(`${relative}/`));
+  return hit && !forbidden;
 }
 
 /**

@@ -45,6 +45,28 @@ const supervisorCaller = (m, handle, now) => {
   return prior ? { role: 'stale', via: 'managed-delivery-history', handle } : null;
 };
 
+/** The local-ledger caller versus its managed binding: a contradiction is 'unknown', agreement is the local row. */
+const localCallerVerdict = (local, bound, handle) => {
+  if (bound.guard && (bound.guard.jobId !== local.jobId || bound.guard.workflowId !== local.workflowId))
+    return { role: 'unknown', jobId: local.jobId, handle, via: 'contradictory-managed-binding' };
+  if (bound.seat && bound.seat.role !== local.role) return { role: 'unknown', jobId: local.jobId, handle, via: 'contradictory-seat-binding' };
+  return local;
+};
+
+/** The handle's history in every OTHER registered ledger, as a foreign caller, or null. */
+const foreignLedgerCaller = (m, { handle, file, reader }) => {
+  for (const ledger of m.listLedgers({ includeRetired: true })) {
+    if (!ledger.file || (file && path.resolve(ledger.file) === path.resolve(file))) continue;
+    let other;
+    try {
+      other = reader(ledger.file);
+      const foreign = ledgerCaller(other, handle);
+      if (foreign) return { ...foreign, role: 'foreign', via: 'registered-ledger-history' };
+    } finally { other?.close(); }
+  }
+  return null;
+};
+
 /** Resolve actual custody; failed reads never become an unbound owner. No role/actor env claim is consulted. */
 export function callerOf(db, env = process.env, { file = null, root, machine = openMachineObserver, reader = openLedgerReader, binding = boundIdentityOf, now = Date.now() } = {}) {
   const handle = env.ORCA_TERMINAL_HANDLE || null;
@@ -53,25 +75,13 @@ export function callerOf(db, env = process.env, { file = null, root, machine = o
   try {
     const local = ledgerCaller(db, handle);
     const bound = binding(handle, { root, env });
-    if (local) {
-      if (bound.guard && (bound.guard.jobId !== local.jobId || bound.guard.workflowId !== local.workflowId))
-        return { role: 'unknown', jobId: local.jobId, handle, via: 'contradictory-managed-binding' };
-      if (bound.seat && bound.seat.role !== local.role) return { role: 'unknown', jobId: local.jobId, handle, via: 'contradictory-seat-binding' };
-      return local;
-    }
+    if (local) return localCallerVerdict(local, bound, handle);
     m = machine({ env });
     const supervisor = m ? supervisorCaller(m, handle, now) : null;
     if (supervisor) return supervisor;
     if (bound.guard || bound.seat) return { role: 'stale', jobId: bound.guard?.jobId ?? null, workflowId: bound.guard?.workflowId ?? null, handle, via: 'managed-binding' };
-    if (m) for (const ledger of m.listLedgers({ includeRetired: true })) {
-      if (!ledger.file || (file && path.resolve(ledger.file) === path.resolve(file))) continue;
-      let other;
-      try {
-        other = reader(ledger.file);
-        const foreign = ledgerCaller(other, handle);
-        if (foreign) return { ...foreign, role: 'foreign', via: 'registered-ledger-history' };
-      } finally { other?.close(); }
-    }
+    const foreign = m ? foreignLedgerCaller(m, { handle, file, reader }) : null;
+    if (foreign) return foreign;
     return { role: 'owner', jobId: null, handle, via: 'unbound' };
   } catch (error) { return { role: 'unknown', jobId: null, handle, via: 'read-unavailable', error: String(error?.message ?? error) }; }
   finally { m?.close(); }

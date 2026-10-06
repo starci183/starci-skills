@@ -11,6 +11,24 @@ export const ERROR_CODE_RULE_IDS = ['BE_ERROR_HOME'];
 
 const RULE = 'BE_ERROR_HOME';
 
+// Judge each member of one <C>ErrorCode enum; returns how many string-literal codes it held.
+const checkEnumCodes = (statement, { file, capability, shape, kit, ts, seen, violations }) => {
+  let checked = 0;
+  for (const member of statement.members) {
+    const report = message => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, member), message });
+    const name = kit.propertyNameText(member.name) ?? '?';
+    const value = member.initializer && ts.isStringLiteralLike(member.initializer) ? member.initializer.text : null;
+    if (value === null) { report(`${statement.name.text}.${name} must be a string literal code (\`${capability}_<WHAT>\`); a computed or numeric code cannot be checked or told apart in a log.`); continue; }
+    checked += 1;
+    if (!shape.test(value) || /_(?:ERROR|EXCEPTION)$/u.test(value)) {
+      report(`${statement.name.text}.${name} = "${value}" must match ${capability}_<WHAT> in UPPER_SNAKE with the capability prefix and no _ERROR or _EXCEPTION suffix.`);
+    }
+    if (seen.has(value)) report(`Error code "${value}" is already declared in ${seen.get(value)}; a code is unique across the repository.`);
+    else seen.set(value, file.rel);
+  }
+  return checked;
+};
+
 export function checkErrorCodes(input) {
   const { graph } = input;
   const kit = machineKit(input);
@@ -27,18 +45,7 @@ export function checkErrorCodes(input) {
     for (const statement of file.sourceFile.statements) {
       if (!ts.isEnumDeclaration(statement) || !statement.name.text.endsWith('ErrorCode')) continue;
       enums += 1;
-      for (const member of statement.members) {
-        const report = message => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, member), message });
-        const name = kit.propertyNameText(member.name) ?? '?';
-        const value = member.initializer && ts.isStringLiteralLike(member.initializer) ? member.initializer.text : null;
-        if (value === null) { report(`${statement.name.text}.${name} must be a string literal code (\`${capability}_<WHAT>\`); a computed or numeric code cannot be checked or told apart in a log.`); continue; }
-        codes += 1;
-        if (!shape.test(value) || /_(?:ERROR|EXCEPTION)$/u.test(value)) {
-          report(`${statement.name.text}.${name} = "${value}" must match ${capability}_<WHAT> in UPPER_SNAKE with the capability prefix and no _ERROR or _EXCEPTION suffix.`);
-        }
-        if (seen.has(value)) report(`Error code "${value}" is already declared in ${seen.get(value)}; a code is unique across the repository.`);
-        else seen.set(value, file.rel);
-      }
+      codes += checkEnumCodes(statement, { file, capability, shape, kit, ts, seen, violations });
     }
   }
   return { violations, coverage: { status: 'checked', enums, codes } };
