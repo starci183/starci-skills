@@ -27,349 +27,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnNode } from '../api/node/spawn-node.mjs';
 import { fileURLToPath } from 'node:url';
-import { inspectLedger } from '../../engine/db/ledger.mjs';
 import { configRoot, connectorsConfig } from '../../engine/config.mjs';
 import { runtimeSecretEnv } from '../gates/runtime-host.mjs';
-import { DEFAULT_API_BASE, botCall, endpoint, telegramSettings, TEXT_MAX } from './telegram.mjs';
+import { DEFAULT_API_BASE, botCall, endpoint, telegramSettings } from './telegram.mjs';
 import { botPolite, redact } from './telegram-polite.mjs';
-import { clip, clipLine } from '../lib/clip.mjs';
+import { clip } from '../lib/clip.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { argsOf, connectorLog, ownerConfig } from './lib.mjs';
-import { drawImageRefs, partOf } from '../work/direction-part.mjs';
-import { parseJson, readJsonFile } from '../lib/json.mjs';
-import { list as arr } from '../lib/list.mjs';
+import { parseJson } from '../lib/json.mjs';
 import { sleep } from '../lib/sleep.mjs';
-import { pathKey, slash } from '../lib/path-key.mjs';
-import { isFile, isDir } from '../lib/fs-kind.mjs';
-import { readYamlFile } from '../lib/read-yaml.mjs';
-import { translator } from '../lib/i18n.mjs';
 import { isSpecRun } from '../lib/env.mjs';
+import { LIMITS, MIME, mediaKindOf, planSettleMedia, readSettle } from './telegram-media-plan.mjs';
+export { collectDrawings, fitCaption, mediaKindOf } from './telegram-media-plan.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
-const DRAW_OPS = new Set(['interface.draw', 'interface.asset']);
-const UAT_OPS = new Set(['uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify', 'e2e.verify']);
-const LIMITS = {
-  photoBytes: 10 * 1024 * 1024, videoBytes: 50 * 1024 * 1024, album: 10, caption: 1024, text: TEXT_MAX,
-  screenshots: 20, walkFiles: 2000, walkDepth: 6,
-};
-const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.webm': 'video/webm', '.mp4': 'video/mp4' };
-const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp']);
-const VIDEO = new Set(['.webm', '.mp4']);
-// Working copies interface.draw keeps beside the final direction (edit sources, pre-final passes).
-const INTERMEDIATE = /\.(source|clean-source|pre-final|initial|draft)\.[a-z0-9]+$/i;
-
-const extOf = (file) => path.extname(file).toLowerCase();
-const isImage = (file) => IMAGE.has(extOf(file));
-const isVideo = (file) => VIDEO.has(extOf(file));
-const posix = slash;
-const keyOf = pathKey;
 const parse = parseJson;
-const readYaml = readYamlFile;
-
-const sizeOf = (file) => { try { return fs.statSync(file).size; } catch { return -1; } };
-const firstFile = (candidates) => candidates.find((c) => c && isFile(c)) ?? null;
-
-/** Which media an op's settle sends: 'draw', 'uat' or null. */
-export const mediaKindOf = (op) => (DRAW_OPS.has(op) ? 'draw' : (UAT_OPS.has(op) || /^uat\.assisted\./.test(String(op ?? ''))) ? 'uat' : null);
-
-/* ------------------------------------------------------------ texts */
-
-// The English sources translate through the i18n catalog (modules/i18n/messages, scripts/lib/i18n.mjs);
-// the width-band names are the same in every language.
-const textFor = (language) => {
-  const tr = translator(language);
-  return {
-    drawn: (title, names) => tr('🎨 [StarCi] {title} finished drawing the interface for {names}', { title, names }),
-    screens: tr('Screens'), states: tr('States'), variants: tr('Variants'), images: tr('Attached'), summary: tr('Summary'),
-    band: { desktop: 'desktop', tablet: 'tablet', mobile: 'mobile' }, theme: { light: tr('light'), dark: tr('dark') },
-    review: tr('Review it at handover, or send feedback any time.'),
-    tooBigPhoto: (n) => tr('{n} image(s) over 10 MB were not sent over Telegram; see them on the machine:', { n }),
-    more: (n) => tr('and {n} more on the machine', { n }),
-    uat: (name, verdict) => tr('🎬 [StarCi] UAT {name}: {verdict}', { name, verdict }),
-    pass: tr('PASSED'), fail: tr('FAILED'), blocked: tr('FAILED (blocked)'),
-    workflow: tr('Workflow'), steps: tr('Steps'), flows: tr('Flows'), video: tr('video'),
-    screenshotsOnly: (n) => tr('{n} screenshot(s) (no video)', { n }),
-    tooBigVideo: tr('The video is over 50 MB so it was not sent over Telegram; see it on the machine:'),
-    cont: (i, n) => tr('(continued {i}/{n})', { i, n }),
-    prepare: tr('preparation, browser probe video'),
-  };
-};
-const verdictText = (t, verdict) => (verdict === 'pass' ? t.pass : verdict === 'blocked' ? t.blocked : t.fail);
-
-/**
- * Join caption lines under `max`: the head and tail lines always stay, body lines are dropped from
- * the end (least important last) until it fits, and the result is hard-clipped as a last resort.
- */
-export function fitCaption(head, body, tail, max = LIMITS.caption) {
-  const lines = [...body];
-  const join = () => [...head, ...lines, ...tail].filter((l) => l !== null && l !== undefined).join('\n');
-  let out = join();
-  while (out.length > max && lines.length) { lines.pop(); out = join(); }
-  return clip(out, max);
-}
-
-/* ------------------------------------------------------------ finding the files */
-
-/** A report path resolved against the repo roots; null when it names nothing on disk. */
-const resolveIn = (p, roots) => {
-  if (typeof p !== 'string' || !p.trim()) return null;
-  if (path.isAbsolute(p)) return fs.existsSync(p) ? path.resolve(p) : null;
-  for (const root of roots) { const abs = path.resolve(root, p); if (fs.existsSync(abs)) return abs; }
-  return null;
-};
-
-/** Files named by `entries` (files or directories, walked to a bounded depth), deduplicated. */
-function expand(entries, { seen = new Map(), max = LIMITS.walkFiles } = {}) {
-  const walk = (dir, depth) => {
-    if (depth > LIMITS.walkDepth || seen.size >= max) return;
-    let list = [];
-    try { list = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const entry of list) {
-      if (seen.size >= max) return;
-      if (entry.name === 'node_modules' || entry.name === '.git') continue;
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full, depth + 1);
-      else if (entry.isFile() && !seen.has(keyOf(full))) seen.set(keyOf(full), full);
-    }
-  };
-  for (const entry of entries) {
-    if (!entry) continue;
-    if (isDir(entry)) walk(entry, 0);
-    else if (isFile(entry) && !seen.has(keyOf(entry))) seen.set(keyOf(entry), path.resolve(entry));
-  }
-  return seen;
-}
-
-/** The ui record directory owning `file`: the nearest ancestor with an index.yaml inside a ui/ tree. */
-function uiNodeDirOf(file) {
-  let dir = path.dirname(file);
-  for (let i = 0; i < 6; i++) {
-    if (/\/ui(\/|$)/.test(posix(dir)) && isFile(path.join(dir, 'index.yaml'))) return dir;
-    const up = path.dirname(dir);
-    if (up === dir) break;
-    dir = up;
-  }
-  return null;
-}
-
-/** "feature/name" for a ui record directory (".../features/<feature>/ui/<name>"), or its base name. */
-const uiLabelOf = (dir) => {
-  const m = posix(dir).match(/\/features\/([^/]+)\/ui(?:\/(.+))?$/);
-  return m ? (m[2] ? `${m[1]}/${m[2]}` : m[1]) : path.basename(dir);
-};
-
-const bandOf = (value) => {
-  const v = String(value ?? '').toLowerCase();
-  if (!v) return null;
-  const n = Number(v.match(/\d{3,4}/)?.[0] ?? NaN);
-  if (/mobile|phone|compact/.test(v) || n < 600) return 'mobile';
-  if (/tablet|medium/.test(v) || n < 1024) return 'tablet';
-  if (/desktop|wide|large|expanded/.test(v) || n >= 1024) return 'desktop';
-  return null;
-};
-export const themeOf = (value) => { const v = String(value ?? '').toLowerCase(); return /dark/.test(v) ? 'dark' : /light/.test(v) ? 'light' : null; };
-
-/**
- * The drawings one draw/asset report produced, in the order they were drawn:
- *  1. the draws[] of every draws.yaml the report names - each draw's `part`, else `content`, else `image`
- *     (paths resolve against the draws file, then its ui record, then the repo) - the op's own index of
- *     its representative directions;
- * and every pick is the drawn part, never its composite (scripts/work/direction-part.mjs).
- *  2. else the images the report names, without the working copies (.source/.clean-source/
- *     .pre-final/.initial) and without evidence/ copies when the ui record holds the same set;
- *  3. else the representativeScreens[].directionAsset of the ui records it wrote.
- * Returns {picks:[{file,screen,state,viewport,theme}], nodes:[{dir,label,doc}]}.
- */
-export function collectDrawings({ files, repo }) {
-  const all = [...expand(files).values()];
-  const nodeDirs = new Map();
-  for (const f of all) { if (!/\/ui\//.test(posix(f))) continue; const d = uiNodeDirOf(f); if (d && !nodeDirs.has(keyOf(d))) nodeDirs.set(keyOf(d), d); }
-  const nodes = [...nodeDirs.values()].map((dir) => ({ dir, label: uiLabelOf(dir), doc: readYaml(path.join(dir, 'index.yaml')) }));
-  const nodeOf = (file) => { const d = uiNodeDirOf(file); return d ? nodes.find((n) => keyOf(n.dir) === keyOf(d)) ?? null : null; };
-  const picks = new Map();
-  // The owner is sent the drawn PART (page content, overlay panel, layout drawing), never the composite
-  // placed into the layout capture (owner ruling 2026-09-24, scripts/work/direction-part.mjs); a composite
-  // named beside its own part collapses into one picture.
-  const partCache = new Map();
-  const add = (found, meta = {}) => {
-    if (!found || !isImage(found)) return;
-    const file = partOf(found, { cache: partCache }).file;
-    if (picks.has(keyOf(file))) return;
-    picks.set(keyOf(file), { file, screen: meta.screen ?? null, state: meta.state ?? null, viewport: meta.viewport ?? meta.breakpoint ?? null, theme: meta.theme ?? null });
-  };
-  for (const df of all.filter((f) => path.basename(f) === 'draws.yaml')) {
-    const node = uiNodeDirOf(df);
-    for (const d of arr(readYaml(df)?.draws)) {
-      const file = drawImageRefs(d).map((rel) => firstFile([path.resolve(path.dirname(df), rel), node && path.resolve(node, rel), path.resolve(repo, rel)])).find(Boolean);
-      add(file, d);
-    }
-  }
-  // A ui record names its direction images on coverage.representativeScreens[] or coverage.map[] entries.
-  const representative = (node) => {
-    const coverage = node?.doc?.ui?.coverage ?? {};
-    const seen = new Set();
-    return [...arr(coverage.representativeScreens), ...arr(coverage.map)]
-      .filter((r) => r && typeof r === 'object' && typeof r.directionAsset === 'string' && !seen.has(r.directionAsset) && seen.add(r.directionAsset));
-  };
-  const metaOf = (file) => {
-    const node = nodeOf(file);
-    const hit = representative(node).find((r) => keyOf(path.resolve(node.dir, r.directionAsset)) === keyOf(file));
-    const name = path.basename(file);
-    return hit ?? { viewport: bandOf(name.match(/mobile|tablet|desktop|\d{3,4}/i)?.[0]), theme: themeOf(name) };
-  };
-  if (!picks.size) {
-    const images = all.filter((f) => isImage(f) && !INTERMEDIATE.test(f));
-    const outside = images.filter((f) => !/\/evidence\//.test(posix(f)));
-    for (const f of (outside.length ? outside : images)) add(f, metaOf(f));
-  }
-  if (!picks.size) {
-    for (const node of nodes) for (const r of representative(node)) add(firstFile([path.resolve(node.dir, r.directionAsset)]), r);
-  }
-  return { picks: [...picks.values()], nodes };
-}
-
-/** Screens, states, width bands and themes the ui records (and the drawn picks) cover. */
-function drawingCounts(nodes, picks) {
-  const screens = new Set(), states = new Set(), bands = new Set(), themes = new Set();
-  const addBand = (v) => { const b = bandOf(v); if (b) bands.add(b); };
-  const addTheme = (v) => { const t = themeOf(v); if (t) themes.add(t); };
-  for (const { doc } of nodes) {
-    const ui = doc?.ui ?? {};
-    const coverage = ui.coverage ?? {};
-    const map = arr(coverage.map);
-    const surfaces = arr(ui.surfaces).map((s) => (typeof s === 'string' ? s : s?.name)).filter(Boolean);
-    const mapped = map.map((m) => m?.screen).filter(Boolean);
-    for (const s of (surfaces.length ? surfaces : mapped)) screens.add(String(s));
-    const named = arr(ui.states).map((s) => (typeof s === 'string' ? s : s?.name)).filter(Boolean);
-    const mappedStates = map.flatMap((m) => [m?.state, ...arr(m?.states)]).filter(Boolean);
-    for (const s of (named.length ? named : mappedStates)) states.add(String(s));
-    for (const v of [...arr(coverage.responsiveBands), ...arr(coverage.breakpoints), ...map.flatMap((m) => [m?.viewport, ...arr(m?.viewports), m?.breakpoint])]) addBand(v);
-    for (const v of [...arr(coverage.themes), ...map.map((m) => m?.theme)]) addTheme(v);
-  }
-  for (const p of picks) {
-    if (!nodes.length && p.screen) screens.add(String(p.screen));
-    if (!nodes.length && p.state) states.add(String(p.state));
-    addBand(p.viewport); addTheme(p.theme);
-  }
-  const order = (set, keys) => keys.filter((k) => set.has(k));
-  return { screens: [...screens], states: states.size, bands: order(bands, ['desktop', 'tablet', 'mobile']), themes: order(themes, ['light', 'dark']) };
-}
-
-/** The album caption for a settled draw. */
-function drawCaption({ workflow, nodes, picks, counts, summary, oversize = [], language }) {
-  const t = textFor(language);
-  const title = workflow.title || workflow.id;
-  const names = nodes.length ? nodes.map((n) => n.label).join(', ') : [...new Set(picks.map((p) => p.screen).filter(Boolean))].join(', ') || '?';
-  const variants = [counts.bands.map((b) => t.band[b]).join(', '), counts.themes.map((th) => t.theme[th]).join(', ')].filter(Boolean).join(' · ');
-  const body = [];
-  if (counts.screens.length) body.push(`${t.screens}: ${counts.screens.length} (${clipLine(counts.screens.join(', '), 200)})`);
-  if (variants) body.push(`${t.variants}: ${variants}`);
-  if (counts.states) body.push(`${t.states}: ${counts.states}`);
-  if (summary) body.push(`${t.summary}: ${clipLine(summary, 380)}`);
-  if (oversize.length) body.push(`${t.tooBigPhoto(oversize.length)} ${oversize.map((o) => o.file).join('; ')}`);
-  body.push(`${t.images} (${picks.length}):`);
-  const labels = picks.map((p) => [p.screen, p.state === p.screen ? null : p.state, t.band[bandOf(p.viewport)] ?? p.viewport, t.theme[themeOf(p.theme)]].filter(Boolean).join(' · '));
-  // Candidates of one screen (A/B directions) share a label: the file name tells them apart.
-  labels.forEach((label, i) => body.push(`${i + 1}. ${!label ? path.basename(picks[i].file) : labels.indexOf(label) !== labels.lastIndexOf(label) ? `${label} (${path.basename(picks[i].file)})` : label}`));
-  return fitCaption([clipLine(t.drawn(title, names), 300)], body, ['', t.review]);
-}
-
-/* ------------------------------------------------------------ UAT */
-
-const stepText = (s) => (typeof s === 'string' ? s : s?.action ?? s?.title ?? s?.name ?? s?.label ?? s?.text ?? s?.id ?? '');
-const stepsOf = (doc) => {
-  const steps = arr(doc?.steps).length ? doc.steps : arr(doc?.journey?.steps).length ? doc.journey.steps : arr(doc?.journey);
-  return steps.map(stepText).map((s) => String(s).trim()).filter(Boolean);
-};
-const flowFromRecord = (file, slug) => {
-  const doc = readYaml(file);
-  return doc ? { id: doc.id ?? slug, name: doc.title ?? slug ?? doc.id, slug: slug ?? doc.id, steps: stepsOf(doc) } : null;
-};
-
-/** The uat record a node id names (uat.<feature>.<flow>), under <repo>/.starciwork. */
-const recordOfNodeId = (id, repo) => {
-  const m = String(id ?? '').match(/^uat\.([^.]+)\.(.+)$/);
-  return m ? firstFile([path.join(repo, '.starciwork', 'features', m[1], 'uat', m[2], 'index.yaml')]) : null;
-};
-
-/**
- * The flow one video (or screenshot) belongs to: the uat/<flow>/runs/ run it sits in, a video named
- * after its flow, the assisted request.yaml beside it, or the only uat record the report names.
- */
-function flowOf(file, { records, repo }) {
-  const p = posix(file);
-  let m = p.match(/^(.*\/features\/[^/]+\/uat)\/([^/]+)\/runs\//);
-  if (m && m[2] !== 'runs') { const f = flowFromRecord(`${m[1]}/${m[2]}/index.yaml`, m[2]); if (f) return f; }
-  m = p.match(/^(.*\/features\/[^/]+\/uat)\//);
-  const base = path.basename(file, path.extname(file));
-  if (m && isFile(`${m[1]}/${base}/index.yaml`)) { const f = flowFromRecord(`${m[1]}/${base}/index.yaml`, base); if (f) return f; }
-  let dir = path.dirname(file);
-  for (let i = 0; i < 5; i++) {
-    const request = readYaml(path.join(dir, 'request.yaml'));
-    const flows = arr(request?.flows);
-    if (flows.length) {
-      const flow = flows.length === 1 ? flows[0]
-        : flows.find((f) => arr(f?.steps).some((s) => JSON.stringify(s?.evidence ?? '').includes(path.basename(file))));
-      if (flow) {
-        const record = recordOfNodeId(flow.id, repo);
-        const fromRecord = record ? flowFromRecord(record, flow.id) : null;
-        const steps = fromRecord?.steps.length ? fromRecord.steps : arr(flow.steps).map(stepText).filter(Boolean);
-        return { id: flow.id, name: fromRecord?.name ?? flow.title ?? flow.id, slug: flow.id, steps };
-      }
-      break;
-    }
-    const up = path.dirname(dir);
-    if (up === dir) break;
-    dir = up;
-  }
-  if (records.length === 1) return flowFromRecord(records[0], path.basename(path.dirname(records[0])));
-  return null;
-}
-
-/** The flows a multi-flow run recorded, in order (its flows.json order), for a video no flow claims. */
-function runFlowsOf(file) {
-  let dir = path.dirname(file);
-  for (let i = 0; i < 3; i++) {
-    const order = arr(readJsonFile(path.join(dir, 'flows.json'))?.order);
-    if (order.length) return order.map(String);
-    dir = path.dirname(dir);
-  }
-  return [];
-}
-
-/**
- * The UAT media one report produced: its videos (with their flows) and, for the album, its
- * screenshots. The run folders of the uat records it names are searched too.
- */
-function collectUat({ files, repo }) {
-  const seen = expand(files);
-  const records = [...seen.values()].filter((f) => /\/uat\/[^/]+\/index\.yaml$/.test(posix(f)) && !/\/uat\/runs\//.test(posix(f)));
-  const runDirs = records.map((r) => { const ev = readYaml(r)?.evidence; return typeof ev === 'string' ? path.resolve(path.dirname(r), ev) : null; }).filter((d) => d && isDir(d));
-  const all = [...expand(runDirs, { seen }).values()];
-  const videos = all.filter(isVideo).map((file) => ({ file, flow: flowOf(file, { records, repo }), runFlows: runFlowsOf(file) }));
-  const screenshots = all.filter(isImage);
-  const flow = records.length === 1 ? flowFromRecord(records[0], path.basename(path.dirname(records[0]))) : null;
-  return { videos, screenshots, records, flow };
-}
-
-const featureOf = (file) => posix(file).match(/\/features\/([^/]+)\//)?.[1] ?? null;
-
-/** The caption for one UAT video (or a screenshot album when `shots` is set). */
-function uatCaption({ workflow, flow, verdict, summary, language, index = 1, total = 1, runFlows = [], fallbackName = null, shots = 0, note = null, prepare = false }) {
-  const t = textFor(language);
-  const name = `${clipLine(flow?.name ?? fallbackName ?? workflow.title ?? workflow.id, 140)}${prepare ? ` (${t.prepare})` : ''}`;
-  const head = [`${t.uat(name, verdictText(t, verdict))}${total > 1 ? ` (${t.video} ${index}/${total})` : ''}`, `${t.workflow}: ${workflow.title || workflow.id}`];
-  if (shots) head.push(t.screenshotsOnly(shots));
-  if (note) head.push(note);
-  // The summary is clipped short so the steps keep most of the caption; a flow too long to fit
-  // loses its last steps, never its first.
-  const body = [];
-  if (summary) body.push(`${t.summary}: ${clipLine(summary, 250)}`);
-  if (flow?.steps?.length) { body.push(`${t.steps}:`); flow.steps.forEach((s, i) => body.push(`${i + 1}. ${clipLine(s, 160)}`)); }
-  else if (runFlows.length) body.push(`${t.flows}: ${runFlows.join(' → ')}`);
-  return fitCaption(head, body, []);
-}
-
+const extOf = (file) => path.extname(file).toLowerCase();
 /* ------------------------------------------------------------ Bot API uploads */
 
 const blobOf = async (file) => {
@@ -419,8 +92,6 @@ async function sendVideoFile(call, chatId, file, caption) {
 const sendNote = (call, chatId, text) => botCall({ ...call, method: 'sendMessage',
   payload: { chat_id: chatId, text: clip(text, LIMITS.text), link_preview_options: { is_disabled: true } } });
 
-const chunk = (list, n) => { const out = []; for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n)); return out; };
-
 /* ------------------------------------------------------------ dedupe store */
 
 // One send per workflow|job|attempt: a machine.sqlite notifications row (kind 'media', dedupe_key
@@ -440,63 +111,26 @@ const settleMedia = (key, { op, verdict, sent, failed, env }) => withMachine((m)
   ? m.update('notifications', { delivery: failed ? 'partial' : 'sent', sent_at: m.now(), ref: JSON.stringify({ op, verdict, sent, failed }) }, { dedupe_key: key })
   : m.update('notifications', { delivery: 'failed', dedupe_key: `${key}#failed-${m.now()}` }, { dedupe_key: key })), { env });
 
-/* ------------------------------------------------------------ the settle */
+const sendPlanItem = async (item, call, chatId) => {
+  if (item.type === 'album') return sendAlbum(call, chatId, item.files, item.caption);
+  if (item.type === 'video') return sendVideoFile(call, chatId, item.file, item.caption);
+  return sendNote(call, chatId, item.text);
+};
 
-function readSettle(ledgerFile, { workflowId, op, attempt, dispatchId }) {
-  const handle = inspectLedger({ file: ledgerFile });
-  try {
-    const db = handle.db;
-    const row = (dispatchId && db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=? ORDER BY report_id DESC LIMIT 1').get(workflowId, dispatchId))
-      || db.prepare('SELECT r.report_json FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND a.op_id=? AND a.try_no=? ORDER BY r.report_id DESC LIMIT 1').get(workflowId, op, Number(attempt));
-    const title = db.prepare('SELECT title FROM workflows WHERE workflow_id=?').get(workflowId)?.title ?? null;
-    return { report: parse(row?.report_json, null), workflow: { id: workflowId, title } };
-  } finally { try { handle.close(); } catch { /* closed */ } }
+async function sendPlanItems(plan, call, settings, op, jobId, warn) {
+  let sent = 0, failed = 0;
+  for (const item of plan.sends) {
+    const result = await sendPlanItem(item, call, settings.chatId);
+    if (result?.ok) sent++;
+    else { failed++; warn(`telegram-media: ${op} ${jobId} ${item.type} not sent: ${redact(result?.error ?? 'unknown error', settings.token)}`); }
+  }
+  return { sent, failed };
 }
 
-/** What a settle has to send: {kind, sends:[{type, files|file, caption|text}]} or {skip}. */
-function planSettleMedia({ op, verdict, report, workflow, repo, language }) {
-  const kind = mediaKindOf(op);
-  if (!kind) return { skip: 'not a media op' };
-  if (!report) return { skip: 'no report filed' };
-  const roots = [repo];
-  const files = arr(report.files).map((f) => resolveIn(f, roots)).filter(Boolean);
-  const summary = String(report.summary ?? '').trim();
-  const t = textFor(language);
-  if (kind === 'draw') {
-    if (verdict !== 'pass') return { skip: 'a draw is sent when it settles pass' };
-    const { picks, nodes } = collectDrawings({ files, repo });
-    const fit = picks.filter((p) => sizeOf(p.file) <= LIMITS.photoBytes);
-    const oversize = picks.filter((p) => sizeOf(p.file) > LIMITS.photoBytes);
-    if (!picks.length) return { skip: 'no drawings found' };
-    const caption = drawCaption({ workflow, nodes, picks, counts: drawingCounts(nodes, picks), summary, oversize, language });
-    if (!fit.length) return { kind, sends: [{ type: 'note', text: caption }] };
-    const albums = chunk(fit.map((p) => p.file), LIMITS.album);
-    const headline = caption.split('\n')[0];
-    return { kind, sends: albums.map((album, i) => ({ type: 'album', files: album, caption: i === 0 ? caption : `${headline} ${t.cont(i + 1, albums.length)}` })) };
-  }
-  const { videos, screenshots, flow } = collectUat({ files, repo });
-  if (videos.length) {
-    const byFlow = new Map();
-    for (const v of videos) { const k = v.flow?.id ?? ''; byFlow.set(k, (byFlow.get(k) ?? 0) + 1); }
-    const index = new Map();
-    const sends = videos.map((v) => {
-      const k = v.flow?.id ?? '';
-      const i = (index.get(k) ?? 0) + 1; index.set(k, i);
-      const base = { workflow, flow: v.flow, verdict, summary, language, index: i, total: byFlow.get(k), runFlows: v.runFlows, fallbackName: featureOf(v.file), prepare: op === 'uat.assisted.prepare' };
-      if (sizeOf(v.file) > LIMITS.videoBytes) return { type: 'note', text: uatCaption({ ...base, note: `${t.tooBigVideo} ${v.file}` }) };
-      return { type: 'video', file: v.file, caption: uatCaption(base) };
-    });
-    return { kind, sends };
-  }
-  if (verdict !== 'pass') return { skip: 'no UAT video; screenshots are sent only for a pass' };
-  const shots = screenshots.filter((f) => sizeOf(f) <= LIMITS.photoBytes);
-  if (!shots.length) return { skip: 'no UAT media found' };
-  const sent = shots.slice(0, LIMITS.screenshots);
-  const extra = shots.length - sent.length;
-  const caption = uatCaption({ workflow, flow, verdict, summary, language, shots: sent.length, fallbackName: featureOf(sent[0]), note: extra > 0 ? t.more(extra) : null });
-  const albums = chunk(sent, LIMITS.album);
-  return { kind, sends: albums.map((album, i) => ({ type: 'album', files: album, caption: i === 0 ? caption : `${caption.split('\n')[0]} ${t.cont(i + 1, albums.length)}` })) };
-}
+const readSettleSafely = (ledgerFile, request, warn) => {
+  try { return { ok: true, value: readSettle(ledgerFile, request) }; }
+  catch (error) { warn(`telegram-media: ledger unreadable (${error.message})`); return { ok: false }; }
+};
 
 /**
  * Send the media one settled op produced. Never throws: every failure is one stderr line (through
@@ -512,21 +146,19 @@ export async function sendSettleMedia({ ledgerFile, repo, workflowId, jobId, att
     if (isSpecRun(env) && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch) return { ok: true, skipped: 'test context' };
     if (!mediaKindOf(op)) return { ok: true, skipped: 'not a media op' };
     const settings = telegramSettings({ config, env, root });
-    if (!settings.ready) { if (settings.warning) warn(settings.warning); return { ok: true, skipped: settings.warning ?? 'telegram off' }; }
-    let read;
-    try { read = readSettle(ledgerFile, { workflowId, op, attempt, dispatchId }); } catch (error) { warn(`telegram-media: ledger unreadable (${error.message})`); return { ok: false, error: 'ledger unreadable' }; }
+    if (!settings.ready) {
+      if (settings.warning) { warn(settings.warning); }
+      return { ok: true, skipped: settings.warning ?? 'telegram off' };
+    }
+    const readResult = readSettleSafely(ledgerFile, { workflowId, op, attempt, dispatchId }, warn);
+    if (!readResult.ok) return { ok: false, error: 'ledger unreadable' };
+    const read = readResult.value;
     const plan = planSettleMedia({ op, verdict, report: read.report, workflow: read.workflow, repo: path.resolve(repo ?? path.dirname(path.dirname(ledgerFile))), language: settings.language });
     if (plan.skip) return { ok: true, skipped: plan.skip };
     const key = mediaDedupeKey(workflowId, jobId, attempt);
     if (!claimMedia(key, { op, verdict, env })) return { ok: true, skipped: 'already sent', key };
     const call = { token: settings.token, apiBase, fetchImpl, sleepImpl };
-    let sent = 0, failed = 0;
-    for (const item of plan.sends) {
-      const r = item.type === 'album' ? await sendAlbum(call, settings.chatId, item.files, item.caption)
-        : item.type === 'video' ? await sendVideoFile(call, settings.chatId, item.file, item.caption)
-          : await sendNote(call, settings.chatId, item.text);
-      if (r?.ok) sent++; else { failed++; warn(`telegram-media: ${op} ${jobId} ${item.type} not sent: ${redact(r?.error ?? 'unknown error', settings.token)}`); }
-    }
+    const { sent, failed } = await sendPlanItems(plan, call, settings, op, jobId, warn);
     settleMedia(key, { op, verdict, sent, failed, env });
     return { ok: failed === 0, kind: plan.kind, sent, failed, key };
   } catch (error) {
@@ -579,9 +211,17 @@ async function main() {
   const warn = (line) => connectorLog('telegram-media', line, { kind: 'settle', level: 'warn' });
   const result = await sendSettleMedia({ ledgerFile: args.ledger, repo: typeof args.repo === 'string' ? args.repo : null, workflowId: args.workflow, jobId: args.job,
     attempt: args.attempt ?? '1', op: args.op, verdict: args.verdict, dispatchId: typeof args.dispatch === 'string' ? args.dispatch : null }, { warn });
-  if (!result.ok || result.sent) connectorLog('telegram-media', `${args.op} ${args.job}: ${result.ok ? `sent ${result.sent}` : result.error ?? `${result.failed} failed`}`, { kind: 'settle', level: result.ok ? 'info' : 'warn', data: result });
+  if (!result.ok || result.sent) {
+    const outcome = result.ok ? `sent ${result.sent}` : result.error ?? `${result.failed} failed`;
+    connectorLog('telegram-media', `${args.op} ${args.job}: ${outcome}`, { kind: 'settle', level: result.ok ? 'info' : 'warn', data: result });
+  }
   out(result);
   if (!result.ok) process.exitCode = 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === SELF) main().catch((error) => { console.error(error); process.exit(1); });
+if (process.argv[1] && path.resolve(process.argv[1]) === SELF) {
+  const result = main();
+  if (result && typeof result.then === 'function') {
+    try { await result; } catch (error) { console.error(error); process.exit(1); }
+  }
+}
