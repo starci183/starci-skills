@@ -43,6 +43,30 @@ function ownerOfItem(item, index, kinds) {
   return kinds.map((k) => index.byEnforcer.get(`${k}:${value}`)).find(Boolean) ?? null;
 }
 
+function verifyPatternBlock(lines, starts, position, index, kinds, unowned) {
+  const from = starts[position];
+  const to = position + 1 < starts.length ? starts[position + 1] : lines.length;
+  const ruleId = lines[from].replace(/^ {2}- id: /, '').trim();
+  const rulesAt = lines.findIndex((line, i) => i >= from && i < to && /^ {4}hfsRules: \[/.test(line));
+  const autoAt = lines.findIndex((line, i) => i >= from && i < to && /^ {6}automated:/.test(line));
+  if (rulesAt < 0 || autoAt < 0) return;
+  let end = autoAt + 1;
+  while (end < to && /^ {8}- /.test(lines[end])) end += 1;
+  const typed = lines.slice(autoAt + 1, end).map((line) => line.replace(/^ {8}- /, ''));
+  const rules = lines[rulesAt].replace(/^ {4}hfsRules: \[/, '').replace(/\].*$/, '').split(',').map((r) => r.trim()).filter(Boolean);
+  const added = [];
+  for (const item of typed) {
+    const owner = ownerOfItem(item, index, kinds);
+    if (owner === null) unowned.push({ rule: ruleId, item: unquote(item) });
+    else if (!rules.includes(owner) && !added.includes(owner)) added.push(owner);
+  }
+  added.sort((a, b) => RULE_NUMBER(a) - RULE_NUMBER(b));
+  const complete = [...rules, ...added];
+  const derived = [...new Set(complete.flatMap((id) => index.codesOf.get(id) ?? []))];
+  lines[rulesAt] = `    hfsRules: [${complete.join(', ')}]`;
+  lines.splice(autoAt, end - autoAt, ...(derived.length ? ['      automated:', ...derived.map((code) => `        - ${code}`)] : ['      automated: []']));
+}
+
 /**
  * `text` of a pattern topic with every rule's `hfsRules` completed and `verification.automated` rewritten from the catalog.
  * Returns { text, unowned: [{rule, item}] }: the typed items no catalog rule owns (left out of the list, reported).
@@ -52,29 +76,7 @@ export function derivePatternVerification(text, index, kinds = []) {
   const unowned = [];
   const starts = lines.map((line, i) => (/^ {2}- id: /.test(line) ? i : -1)).filter((i) => i >= 0);
   // Bottom-up, so a rewritten block never moves the lines of the blocks above it.
-  for (let s = starts.length - 1; s >= 0; s -= 1) {
-    const from = starts[s];
-    const to = s + 1 < starts.length ? starts[s + 1] : lines.length;
-    const ruleId = lines[from].replace(/^ {2}- id: /, '').trim();
-    const rulesAt = lines.findIndex((line, i) => i >= from && i < to && /^ {4}hfsRules: \[/.test(line));
-    const autoAt = lines.findIndex((line, i) => i >= from && i < to && /^ {6}automated:/.test(line));
-    if (rulesAt < 0 || autoAt < 0) continue;
-    let end = autoAt + 1;
-    while (end < to && /^ {8}- /.test(lines[end])) end += 1;
-    const typed = lines.slice(autoAt + 1, end).map((line) => line.replace(/^ {8}- /, ''));
-    const rules = lines[rulesAt].replace(/^ {4}hfsRules: \[/, '').replace(/\].*$/, '').split(',').map((r) => r.trim()).filter(Boolean);
-    const added = [];
-    for (const item of typed) {
-      const owner = ownerOfItem(item, index, kinds);
-      if (owner === null) unowned.push({ rule: ruleId, item: unquote(item) });
-      else if (!rules.includes(owner) && !added.includes(owner)) added.push(owner);
-    }
-    added.sort((a, b) => RULE_NUMBER(a) - RULE_NUMBER(b));
-    const complete = [...rules, ...added];
-    const derived = [...new Set(complete.flatMap((id) => index.codesOf.get(id) ?? []))];
-    lines[rulesAt] = `    hfsRules: [${complete.join(', ')}]`;
-    lines.splice(autoAt, end - autoAt, ...(derived.length ? ['      automated:', ...derived.map((code) => `        - ${code}`)] : ['      automated: []']));
-  }
+  for (let s = starts.length - 1; s >= 0; s -= 1) verifyPatternBlock(lines, starts, s, index, kinds, unowned);
   return { text: lines.join('\n'), unowned };
 }
 

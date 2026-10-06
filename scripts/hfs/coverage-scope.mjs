@@ -38,6 +38,19 @@ const variantsOf = (slot) => braceVariants(slot.path).map(star);
  */
 const beSlots = (manifest, providers) => manifest.slots.filter((slot) => slot.profiles.includes('be') && slot.tracked === 'tracked' && (slot.provider === undefined || providers.includes(slot.provider)));
 
+function addRequiredPatterns(sonar, required, suffixes) {
+  const isRole = new RegExp(String.raw`\.(?:${suffixes.map((s) => s.replaceAll('-', '\\-')).join('|')})\.ts$`);
+  for (const slot of required) {
+    for (const entry of [...(slot.requires ?? []), ...(slot.allows ?? [])]) {
+      if (!/\.ts$/.test(entry) || entry.includes('<role>')) continue;
+      for (const name of braceVariants(entry)) {
+        if (isRole.test(star(name).replaceAll('*', 'x'))) continue;
+        for (const dir of variantsOf(slot)) sonar.add(`be/${dir}${star(name)}`.replace(/\/\/+/g, '/'));
+      }
+    }
+  }
+}
+
 /** The directory a path pattern lives in (itself when it is one). */
 const dirOf = (path) => (isDir(path) ? path : path.slice(0, path.lastIndexOf('/') + 1));
 
@@ -72,18 +85,9 @@ export function coverageScope(manifest, providers = []) {
   const noneMinimal = noneUnique.filter((path) => !noneUnique.some((other) => other !== path && isDir(other) && nested(dirOf(path), other)));
   const excludes = noneMinimal.filter((path) => isDir(path) && roots.some((root) => nested(path, root))).sort(byCodeUnit);
   const suffixes = manifest.ruleParams.be.suffixes;
-  const isRole = new RegExp(String.raw`\.(?:${suffixes.map((s) => s.replaceAll('-', '\\-')).join('|')})\.ts$`);
   const sonar = new Set(noneMinimal.map((path) => `be/${path}${isDir(path) ? '**' : ''}`));
   for (const role of suffixes.filter((suffix) => !roles.includes(suffix))) sonar.add(`be/**/*.${role}.ts`);
-  for (const slot of required) {
-    for (const entry of [...(slot.requires ?? []), ...(slot.allows ?? [])]) {
-      if (!/\.ts$/.test(entry) || entry.includes('<role>')) continue;
-      for (const name of braceVariants(entry)) {
-        if (isRole.test(star(name).replaceAll('*', 'x'))) continue;
-        for (const dir of variantsOf(slot)) sonar.add(`be/${dir}${star(name)}`.replace(/\/\/+/g, '/'));
-      }
-    }
-  }
+  addRequiredPatterns(sonar, required, suffixes);
   sonar.add('fe/**');
   noneMinimal.sort(byCodeUnit);
   return { roles, roots, excludes, none: noneMinimal, sonar: [...sonar].sort(byCodeUnit), codecovPaths: roots.map((root) => `be/${root}**`) };
