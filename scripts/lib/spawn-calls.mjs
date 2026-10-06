@@ -98,7 +98,7 @@ export function spawnCalls(text, file = 'x.mjs') {
         else if (t.isObjectBindingPattern(node.name)) bindPattern(node.name);
       }
       const list = node.parent;
-      if (t.isIdentifier(node.name) && list && t.isVariableDeclarationList(list) && (list.flags & t.NodeFlags.Const))
+      if (t.isIdentifier(node.name) && list && t.isVariableDeclarationList(list) && (list.flags & t.NodeFlags.Const) !== 0)
         consts.set(node.name.text, [...(consts.get(node.name.text) ?? []), node.initializer]);
     }
     t.forEachChild(node, collect);

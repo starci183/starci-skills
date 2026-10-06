@@ -122,7 +122,7 @@ export function applyProfileText(text, profile = PROFILE) {
   const eol = /\r\n/.test(text) ? '\r\n' : '\n';
   const lines = String(text).split(/\r?\n/);
   const at = lines.findIndex((l) => /^reconciler:\s*(?:#.*)?$/.test(l));
-  let end = at < 0 ? lines.length : lines.length;
+  let end = lines.length;
   if (at >= 0) for (let i = at + 1; i < lines.length; i += 1) if (/^\S/.test(lines[i])) { end = i; break; }
   let previous = {};
   if (at >= 0) { try { previous = parseYaml(lines.slice(at, end).join('\n'))?.reconciler ?? {}; } catch { previous = {}; } }

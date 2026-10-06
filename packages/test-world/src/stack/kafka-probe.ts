@@ -2,6 +2,7 @@
  * A minimal Kafka wire probe: one ApiVersions request (api key 18, version 0) over a plain TCP socket, so the library proves a
  * slot listener answers through its proxy without a Kafka client dependency.
  */
+import { randomInt } from "node:crypto"
 import { Socket } from "node:net"
 
 const API_VERSIONS = 18
@@ -32,7 +33,7 @@ export const apiVersionsResponse = (frame: Buffer): { readonly correlationId: nu
 /** Whether a broker answers ApiVersions with no error at host:port within the timeout. */
 export const kafkaAnswers = (host: string, port: number, timeoutMs = 5000): Promise<boolean> =>
     new Promise((resolve) => {
-        const correlationId = Math.floor(Math.random() * 0x7fffffff)
+        const correlationId = randomInt(0x7fffffff)
         const socket = new Socket()
         let received = Buffer.alloc(0)
         let settled = false

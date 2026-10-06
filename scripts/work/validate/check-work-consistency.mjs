@@ -7,6 +7,7 @@ import {walk} from './check-example-work.mjs';
 import {loadRecords, inlineCriteriaOf, INLINE_CRITERION_FIELDS, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 import { workCommonDef } from '../../lib/work-schemas.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * Every check so far reads one record and asks whether that record agrees with itself: an id
@@ -293,7 +294,7 @@ function checkConsistencyTree(workRoot, records, sink) {
     for (const edge of isList(rec.data.conflictsWith)) {
       const otherId = typeof edge?.record === 'string' ? canon(edge.record) : edge?.record;
       if (!otherId || !records.has(otherId)) continue; // dangling refs belong to the base gate
-      const pairKey = [id, otherId].sort().join('|');
+      const pairKey = [id, otherId].sort(byCodeUnit).join('|');
       if (settledPairs.has(pairKey)) continue;
       settledPairs.add(pairKey);
       const other = records.get(otherId);
@@ -443,12 +444,12 @@ export function checkTreeParity(perTree, sink) {
   });
   const sharedSchemas = [...fieldsByTree[0].bySchema.keys()]
     .filter(schema => fieldsByTree.every(tree => tree.bySchema.has(schema)))
-    .sort();
+    .sort(byCodeUnit);
 
   for (const schema of sharedSchemas) {
     const onlyHereOf = index => [...fieldsByTree[index].bySchema.get(schema)]
       .filter(field => fieldsByTree.some(other => !other.bySchema.get(schema).has(field)))
-      .sort();
+      .sort(byCodeUnit);
     const sides = fieldsByTree.map((tree, index) => ({label: tree.label, onlyHere: onlyHereOf(index)}))
       .filter(side => side.onlyHere.length);
     if (!sides.length) continue;
@@ -467,7 +468,7 @@ if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   const treeArg = args.includes('--tree') ? args[args.indexOf('--tree') + 1] : null;
   const workRoots = treeArg ? [path.resolve(treeArg)]
-    : walk(path.join(root, 'examples')).filter(file => file.endsWith(`.starciwork${path.sep}index.yaml`)).map(path.dirname);
+    : walk(path.join(root, 'examples')).filter(file => file.endsWith(`.starciwork${path.sep}index.yaml`)).map(dir => path.dirname(dir));
 
   const sink = {refuse: [], suspect: [], info: []};
   const perTree = [];

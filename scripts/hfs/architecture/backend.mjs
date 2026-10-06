@@ -3,6 +3,7 @@ import { isInside } from './config.mjs';
 import { slotAdmitsFile } from '../allows.mjs';
 import { reachableViolation, relativePath } from './typescript.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const FORBIDDEN_APP_ROLE = /(?:^|\.)(?:service|provider|providers|resolver|controller|handler|repository|entity|use-case|command|query|listener|consumer|processor)\.[cm]?[jt]sx?$/i;
 const FORBIDDEN_DECLARATION = /(?:Service|Provider|Resolver|Controller|Handler|Repository|Entity|UseCase|Command|Query|Listener|Consumer|Processor)$/;
@@ -259,7 +260,7 @@ function reexportedTransportEvidence(ts, context, sourceFiles, firstEdge) {
   const visited = new Set();
   while (queue.length) {
     const current = queue.shift();
-    const key = `${current.file}\0${current.selected === null ? '*' : [...current.selected].sort().join(',')}`;
+    const key = `${current.file}\0${current.selected === null ? '*' : [...current.selected].sort(byCodeUnit).join(',')}`;
     if (visited.has(key)) continue;
     visited.add(key);
     const sourceFile = sourceFiles.get(path.resolve(current.file));

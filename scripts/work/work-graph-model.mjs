@@ -8,7 +8,7 @@ import {canonicalJSON} from '../../engine/canonical-json.mjs';import {sha256} fr
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { validateAgainstSchema } from '../lib/json-schema.mjs';
 import { sliceBound } from './slice-estimate.mjs';
-import { list } from '../lib/list.mjs';
+import { list, byCodeUnit } from '../lib/list.mjs';
 import { pathsOverlap } from '../lib/path-key.mjs';
 
 const SCHEMA_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../modules/schemas/work-graph.schema.yaml');
@@ -204,7 +204,7 @@ export function diffGraphs(prev, next) {
   for (const [id, n] of after) {
     const old = before.get(id);
     if (!old) continue;
-    const fields = [...new Set([...Object.keys(old), ...Object.keys(n)])].filter((k) => canonicalJSON(old[k] ?? null) !== canonicalJSON(n[k] ?? null)).sort();
+    const fields = [...new Set([...Object.keys(old), ...Object.keys(n)])].filter((k) => canonicalJSON(old[k] ?? null) !== canonicalJSON(n[k] ?? null)).sort(byCodeUnit);
     if (fields.length) changed.push({ id, fields });
   }
   const edgesOf = (g) => new Map(list(g?.edges).map((e) => [edgeKey(e), e]));
@@ -212,13 +212,13 @@ export function diffGraphs(prev, next) {
   const domainsOf = (g) => new Set(list(g?.domains).map((d) => d.id));
   const db = domainsOf(prev), da = domainsOf(next);
   return {
-    added: [...after.keys()].filter((id) => !before.has(id)).sort(),
-    removed: [...before.keys()].filter((id) => !after.has(id)).sort(),
+    added: [...after.keys()].filter((id) => !before.has(id)).sort(byCodeUnit),
+    removed: [...before.keys()].filter((id) => !after.has(id)).sort(byCodeUnit),
     changed,
     edgesAdded: [...ea].filter(([k]) => !eb.has(k)).map(([, e]) => ({ from: e.from, to: e.to, kind: e.kind })),
     edgesRemoved: [...eb].filter(([k]) => !ea.has(k)).map(([, e]) => ({ from: e.from, to: e.to, kind: e.kind })),
-    domainsAdded: [...da].filter((d) => !db.has(d)).sort(),
-    domainsRemoved: [...db].filter((d) => !da.has(d)).sort(),
+    domainsAdded: [...da].filter((d) => !db.has(d)).sort(byCodeUnit),
+    domainsRemoved: [...db].filter((d) => !da.has(d)).sort(byCodeUnit),
   };
 }
 export const diffIsEmpty = (d) => !d.added.length && !d.removed.length && !d.changed.length && !d.edgesAdded.length && !d.edgesRemoved.length && !d.domainsAdded.length && !d.domainsRemoved.length;
@@ -245,7 +245,7 @@ export function recolor(prevColors, prev, next, diff) {
     if (hit.has(n.id) && was !== GRAY) { colors[n.id] = RED; if (was !== RED) red.push(n.id); }
     else colors[n.id] = was;
   }
-  return { colors, red: red.sort() };
+  return { colors, red: red.sort(byCodeUnit) };
 }
 
 /**

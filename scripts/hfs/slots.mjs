@@ -31,12 +31,12 @@ import { APP_KIND, EDITIONS, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME
 import { declaredSlotEnabled, optionalSlotProblems, triggerProblems } from './declaration-slots.mjs';
 import { declarationShapeProblems } from './declaration-shape.mjs';
 import { declarationEdition, editionRuleParams, effectiveSlot, enforcerJudgedInEdition, judgedInEdition, litePresenceOf, ruleEditionProblems, slotInEdition } from './edition-slots.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 export { litePresenceOf, slotInEdition } from './edition-slots.mjs';
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
 export const RUNTIME_MANIFEST_FILE = 'knowledge/hfs/runtime-slots.yaml';
 export const HFS_DECLARATION_FILE = 'hfs.json';
-
 /** A refusal with a catalogued code (modules/kernel/failure-codes.yaml) and the facts a check reports. */
 export class HfsSlotsError extends Error {
   constructor(code, message, details = {}) {
@@ -165,7 +165,7 @@ function manifestShapeProblems(m) {
   if (JSON.stringify(m.trackedValues) !== JSON.stringify(TRACKED)) bad.push(`trackedValues must be ${TRACKED.join(', ')}`);
   if (JSON.stringify(m.testValues) !== JSON.stringify(TESTS)) bad.push(`testValues must be ${TESTS.join(', ')}`);
   if (JSON.stringify(m.editions) !== JSON.stringify(EDITIONS)) bad.push(`editions must be ${EDITIONS.join(', ')}`);
-  if (!isPlainObject(m.sides) || Object.keys(m.sides).sort().join() !== PROFILES.join()) bad.push('sides must be a map with exactly be and fe');
+  if (!isPlainObject(m.sides) || Object.keys(m.sides).sort(byCodeUnit).join() !== PROFILES.join()) bad.push('sides must be a map with exactly be and fe');
   else for (const side of PROFILES) {
     const def = m.sides[side];
     if (!isPlainObject(def) || Object.keys(def).join() !== 'reads' || !Array.isArray(def.reads) || !def.reads.every((r) => typeof r === 'string' && /^[a-z][a-z0-9-]*\/([^/]+\/)+$/.test(r)) || new Set(def.reads).size !== def.reads.length) bad.push(`sides.${side} must be {reads: [unique <owner>/<dir>/ paths]}`);

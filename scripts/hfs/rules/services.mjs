@@ -20,6 +20,7 @@ import { loadTypescript } from '../../lib/package-at.mjs';
 import { propertyText } from '../../lib/ts-ast.mjs';
 import { folded, readEventClasses, snapshotText } from '../../lib/event-contract.mjs';
 import { found, readText } from './read.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const SERVICE_PLACEMENT = 'HFS_SERVICE_PLACEMENT';
 const IMAGE_UNPINNED = 'HFS_IMAGE_UNPINNED';
@@ -145,7 +146,7 @@ function eventContractFindings({ repoRoot, files }) {
   const tracked = new Set(files);
   const { classes, problems } = eventClassesOf({ repoRoot, files, ts });
   const findings = problems.map(({ service, file, problem }) => found(EVENT_CONTRACT, file, `${file} is not an event class the contract can be emitted from: ${problem}.`, { service }));
-  const services = [...new Set(classes.map((event) => event.service))].sort();
+  const services = [...new Set(classes.map((event) => event.service))].sort(byCodeUnit);
   const declared = new Set(classes.map((event) => event.name));
   for (const service of services) {
     const snapshot = `be/contracts/${service}/events.json`;

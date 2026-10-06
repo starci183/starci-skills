@@ -386,7 +386,6 @@ function mechanicalSettleOf(item, verdict) {
   const checks = verdict.checks?.checks?.length ? verdict.checks
     : { checks: [{ name: verdict.reason, exitCode: 1, command: 'runtime settler (canon parity)', evidence: (verdict.detail ?? []).join('; ').slice(0, 1500) || verdict.reason }] };
   return { verdict: 'fail', checks };
-  return null;
 }
 
 /**
@@ -659,4 +658,4 @@ if (isMain(import.meta.url)) (async () => {
   if (has('json')) console.log(JSON.stringify(out));
   else for (const r of results) console.log(`[settler] ${r.repo}${r.violations ? ` violations=${r.violations.length}` : ` settled=${r.settled?.length ?? 0} kernel=${r.kernel?.length ?? 0} released=${r.released?.filter((x) => x.state === 'released').length ?? 0}${r.action ? ` ${r.action}` : ''}${r.errors?.length ? ` errors=${r.errors.length}` : ''}`}`);
   process.exitCode = out.ok ? 0 : 1;
-})();
+})().catch((error) => { console.error(error); process.exit(1); });

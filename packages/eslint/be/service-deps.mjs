@@ -59,7 +59,7 @@ const isClassToken = (context, annotation) => {
     if (!tsNode) return false
     const type = checker.getTypeFromTypeNode(tsNode)
     const symbol = type.getSymbol()
-    if (!symbol || !(symbol.flags & ts.SymbolFlags.Class)) return false
+    if (!symbol || (symbol.flags & ts.SymbolFlags.Class) === 0) return false
     const declaration = symbol.declarations?.find((entry) => ts.isClassDeclaration(entry) || ts.isClassExpression(entry))
     return Boolean(declaration)
 }

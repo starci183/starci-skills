@@ -8,7 +8,7 @@ import { porcelainStatus } from '../api/git/porcelain-status.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { symbolicRef } from '../api/git/symbolic-ref.mjs';
-import { asList } from '../lib/list.mjs';
+import { asList, byCodeUnit } from '../lib/list.mjs';
 import { refusal as verbRefusal, resultOk as ok, resultOutput as output } from '../lib/verb-call.mjs';
 
 const TYPES = new Set(['feat', 'fix', 'refactor', 'test', 'docs', 'chore', 'land', 'release']);
@@ -89,7 +89,7 @@ export async function gitCommit(ctx, deps = {}) {
     if (addPaths.length) {
       const status = api.porcelainStatus(root, { pathspecs: addPaths, untracked: 'all', literal: true });
       if (!status.ok) return refusal(`could not inspect --paths: ${status.stderr || 'git status failed'}`, 1);
-      preview = [...new Set([...staged, ...statusPaths(status.stdout)])].sort();
+      preview = [...new Set([...staged, ...statusPaths(status.stdout)])].sort(byCodeUnit);
     }
     if (!preview.length) return refusal('nothing to commit', 1);
     return {

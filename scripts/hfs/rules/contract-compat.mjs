@@ -12,6 +12,7 @@
 import path from 'node:path';
 import { isPlainObject } from '../../../engine/plain-object.mjs';
 import { found, readJson } from './read.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 export const CONTRACT_BREAKING = 'BE_CONTRACT_BREAKING';
 
@@ -21,7 +22,7 @@ const same = (a, b) => JSON.stringify(sortKeys(a)) === JSON.stringify(sortKeys(b
 function sortKeys(value) {
   if (Array.isArray(value)) return value.map(sortKeys);
   if (!isPlainObject(value)) return value;
-  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sortKeys(value[key])]));
+  return Object.fromEntries(Object.keys(value).sort(byCodeUnit).map((key) => [key, sortKeys(value[key])]));
 }
 /** {type, optional} of a payload field spelling (`string`, `number?`, `string[]`). */
 const fieldOf = (spelling) => (typeof spelling === 'string' && spelling.endsWith('?') ? { type: spelling.slice(0, -1), optional: true } : { type: spelling, optional: false });
@@ -57,7 +58,7 @@ export function breakingChanges(pinned, current) {
 /** R177: the findings of every service whose contract is pinned. `files` are the repository-relative tracked paths. */
 export function contractCompatFindings({ repoRoot, files }) {
   const findings = [];
-  for (const rel of [...files].sort()) {
+  for (const rel of [...files].sort(byCodeUnit)) {
     const match = CONTRACTS.exec(rel);
     if (!match) continue;
     const current = `be/contracts/${match[1]}/events.json`;

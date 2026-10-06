@@ -34,6 +34,7 @@ import { contrastRatio as wcagRatio } from '../brand/brand.mjs';
 import { flag as argOf } from '../work-io.mjs';
 import { squash } from '../../lib/clip.mjs'; import { isMain } from '../../lib/is-main.mjs';
 import { alphaOver } from '../../lib/color.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const KNOWLEDGE = path.join(ROOT, 'knowledge', 'ui');
@@ -80,7 +81,7 @@ const STATE_KINDS = new Set(['loading', 'empty', 'error', 'success', 'disabled',
 
 /** Cases only an evaluation lens or a running UAT observes: listed as not applicable to a drawing. */
 const LENS_ONLY = /lens runs|verdict is computed|criterion has no observation|failure has been measured|lens is scored|score is recorded|audit scope selects|below-volume or data-bound|explicitly accepts a measured|every canon rule passed|taste criterion fails|references disagree with a canon|direction decision is read|placed beside those references|gap is described|declares a presentation delta|never measured|one of the two captures is missing|no store or authority|summari[sz]ed in the current/i;
-const RUN_ONLY = /^(the )?run\b|\bthe run (reaches|is driven|completes|submits|presses|reloads|navigates|leaves)|returning person|\bin the run\b|mid-flow|fresh session/i;
+const RUN_ONLY = /(?:^(the )?run\b)|\bthe run (reaches|is driven|completes|submits|presses|reloads|navigates|leaves)|returning person|\bin the run\b|mid-flow|fresh session/i;
 
 // ---------------------------------------------------------------------------------------------------------
 // The surface
@@ -321,7 +322,7 @@ export function buildBrief({ record, recordFile = null, repo = null, family = nu
       }
     }
   }
-  return { schema: 'starci/ui-proof-brief@1', surface: recordFile, record: record?.id ?? null, elements: { kinds: Object.fromEntries(elements.kinds), components: [...elements.components].sort() }, geometry: g, topics, ownedRows, cssFacts, conflicts };
+  return { schema: 'starci/ui-proof-brief@1', surface: recordFile, record: record?.id ?? null, elements: { kinds: Object.fromEntries(elements.kinds), components: [...elements.components].sort(byCodeUnit) }, geometry: g, topics, ownedRows, cssFacts, conflicts };
 }
 
 function fontPx(knowledge, ruleId, scope) {

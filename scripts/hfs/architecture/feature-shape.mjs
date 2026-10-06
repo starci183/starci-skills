@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { treeOf } from './required-files.mjs';
 import { allowsFile } from '../allows.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R29 `feature-shape` (BE_FEATURE_SHAPE). A feature root holds `index.ts`, `<feature>.module.ts`, `application/`,
@@ -21,7 +22,7 @@ export function checkFeatureShape({ config, graph }) {
   const features = new Set();
   let files = 0;
   const report = (file, message, extra = {}) => violations.push({ ruleId: RULE, path: file, line: 1, column: 1, message, ...extra });
-  for (const file of [...tree.files].sort()) {
+  for (const file of [...tree.files].sort(byCodeUnit)) {
     const owner = resolver.ownerOf(file);
     if (!owner || resolver.slot(owner.slot)?.tier !== 'feature') continue;
     features.add(owner.root);

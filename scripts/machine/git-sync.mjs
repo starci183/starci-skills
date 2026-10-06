@@ -9,6 +9,7 @@ import { revParse } from '../api/git/rev-parse.mjs';
 import { statusQuery } from '../api/git/status-query.mjs';
 import { worktreeListPorcelain } from '../api/git/worktree-list-porcelain.mjs';
 import { lines, refusal as verbRefusal, resultOk as ok, resultOutput as output } from '../lib/verb-call.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 function dirtyPaths(text) {
   const records = String(text ?? '').split('\0').filter(Boolean);
@@ -19,7 +20,7 @@ function dirtyPaths(text) {
     paths.push(record.slice(3));
     if (/^[RC]/.test(record.slice(0, 2)) || /[RC]$/.test(record.slice(0, 2))) index += 1;
   }
-  return [...new Set(paths)].sort();
+  return [...new Set(paths)].sort(byCodeUnit);
 }
 
 function mergeTreeConflicts(text) {
@@ -30,7 +31,7 @@ function mergeTreeConflicts(text) {
     if (stage) found.push(stage[1]);
     else if (conflict) found.push(conflict[1]);
   }
-  return [...new Set(found)].sort();
+  return [...new Set(found)].sort(byCodeUnit);
 }
 
 function isRemoteTracking(ref, cwd, gitRemote) {

@@ -49,7 +49,7 @@ function homeText(a, b) {
   return 'move it into one scripts/lib module (or the owning module) and import it from both files';
 }
 
-const windowKey = (kinds, start, end) => `${end - start}:${crypto.createHash('sha1').update(Buffer.from(kinds.buffer, kinds.byteOffset + start * 4, (end - start) * 4)).digest('base64')}`;
+const windowKey = (kinds, start, end) => `${end - start}:${crypto.createHash('sha256').update(Buffer.from(kinds.buffer, kinds.byteOffset + start * 4, (end - start) * 4)).digest('base64')}`;
 
 /**
  * The findings of a source set: [{code, path, line, message}], one per duplicated block, on the later location, naming

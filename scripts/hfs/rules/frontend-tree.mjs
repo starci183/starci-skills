@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { found, readJson } from './read.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const WIRE_GENERATED = 'FE_WIRE_GENERATED';
 const I18N_PLACEMENT = 'FE_I18N_PLACEMENT';
@@ -106,7 +107,7 @@ function catalogFindings({ repoRoot, app, tracked }) {
   const all = new Set([...keys.values()].flatMap((set) => [...set]));
   const findings = [];
   for (const [file, set] of keys) {
-    const missing = [...all].filter((key) => !set.has(key)).sort();
+    const missing = [...all].filter((key) => !set.has(key)).sort(byCodeUnit);
     if (missing.length) findings.push(found(I18N_CATALOG, file, `${file} lacks ${missing.length} key${missing.length === 1 ? '' : 's'} another locale has (${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ', ...' : ''}); every catalog holds the same keys`, { app, missing }));
   }
   return findings;

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { treeOf } from './required-files.mjs';
 import { documentLanguageHits, isDocument, isLocalizedDataFile } from '../../lib/language.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R96 `doc-language` (HFS_DOC_NOT_ENGLISH). Every Markdown and YAML document under knowledge/, docs/, src/ and apps/ is English:
@@ -23,7 +24,7 @@ export function checkDocLanguage({ config, graph }) {
   const tree = treeOf(config.root);
   const violations = [];
   let files = 0;
-  for (const file of [...tree.files].sort()) {
+  for (const file of [...tree.files].sort(byCodeUnit)) {
     if (!DOCUMENT_ROOTS.includes(file.split('/')[0]) || !isDocument(file) || file.split('/').includes('node_modules')) continue;
     const classified = resolver.classifyPath(file);
     if (isLocalizedDataFile(file, classified.status === 'owned' ? classified.slot : null)) continue;

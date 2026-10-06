@@ -3,6 +3,7 @@ import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {readYamlFile} from '../lib/read-yaml.mjs';
 import {sha256, sha256File} from '../../engine/digest.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 /**
  * Shared resolution of "what directories does this record's code live under" - the question concepts 1
@@ -195,7 +196,7 @@ export function hashOwnedDirs(dirs) {
     }
   }
   if (!files.size) return null;
-  const sortedPaths = [...files.keys()].sort();
+  const sortedPaths = [...files.keys()].sort(byCodeUnit);
   const fileDigests = sortedPaths.map(p => ({path: p, sha256: sha256File(files.get(p))}));
   const digest = sha256(fileDigests.map(f => `${f.path}:${f.sha256}`).join('\n'));
   return {algorithm: 'sha256', files: fileDigests, digest};

@@ -8,6 +8,7 @@ import { projectStop as callSupabaseStop } from '../api/supabase/project-stop.mj
 import { isProtectedContainer } from '../lib/protected-installations.mjs';
 import { underHostLock } from './verb-lock.mjs';
 import { checkPortBlock } from './supabase-policy.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const SUPABASE_CONFIG = path.join('supabase', 'config.toml');
 
@@ -194,12 +195,12 @@ const safeUrl = (value) => value == null ? null
   : String(value).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@]+@/iu, '$1[redacted]@');
 
 function keyNamesOf(value, names = new Set()) {
-  if (!value || typeof value !== 'object') return [...names].sort();
+  if (!value || typeof value !== 'object') return [...names].sort(byCodeUnit);
   for (const [key, nested] of Object.entries(value)) {
     if (/(?:key|secret|token|password)/iu.test(key)) names.add(key);
     else if (nested && typeof nested === 'object') keyNamesOf(nested, names);
   }
-  return [...names].sort();
+  return [...names].sort(byCodeUnit);
 }
 
 const stoppedOutput = (call) => /not running|not started|stopped|no such container/iu

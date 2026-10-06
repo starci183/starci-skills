@@ -28,6 +28,7 @@ import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { preservedRefOf } from './preserved-ref.mjs';
 import { jobResultSql } from '../machine/job-row.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
@@ -335,9 +336,9 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
       for (const moved of [move.moving, move.home]) movedByWave.get(slice.wave).add(moved);
     }
     for (const [wave, movedSet] of movedByWave) {
-      const moved = [...movedSet].sort();
+      const moved = [...movedSet].sort(byCodeUnit);
       let importers = [];
-      try { importers = [...new Set(importersOf(moved) ?? [])].sort(); } catch (error) { importers = []; wireOf(wave).reasons.push(`repoint importers unavailable: ${String(error?.message ?? error).slice(0, 120)}`); }
+      try { importers = [...new Set(importersOf(moved) ?? [])].sort(byCodeUnit); } catch (error) { importers = []; wireOf(wave).reasons.push(`repoint importers unavailable: ${String(error?.message ?? error).slice(0, 120)}`); }
       const wire = wireOf(wave);
       for (const file of importers) wire.paths.add(file);
       wire.reasons.push(`repoint: ${importers.length} importer(s) of ${moved.length} moved path(s)`);
@@ -348,7 +349,7 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
   const out = slices.map((slice) => ({ ...slice, owned: [...slice.paths, ...slice.grants] }));
   const waves = [...new Set(out.map((slice) => slice.wave))];
   const wires = waves.filter((wave) => wireByWave.get(wave)?.paths.size || repointByWave.has(wave)).map((wave) => ({
-    wave, paths: [...(wireByWave.get(wave)?.paths ?? [])].sort(), reasons: wireByWave.get(wave)?.reasons ?? [],
+    wave, paths: [...(wireByWave.get(wave)?.paths ?? [])].sort(byCodeUnit), reasons: wireByWave.get(wave)?.reasons ?? [],
     after: out.filter((slice) => slice.wave === wave).map((slice) => slice.ordinal),
     ...(repointByWave.has(wave) ? { repoint: repointByWave.get(wave), brief: REPOINT_BRIEF } : {}),
   })).filter((wire) => wire.paths.length);
@@ -421,7 +422,7 @@ export function cutManifestOf(db, { workflowId, op, cut, ownJobId = null }) {
     passed: ordinals.filter((o) => o.status === 'succeeded').map((o) => o.ordinal),
     open: ordinals.filter((o) => o.status !== 'succeeded').map((o) => o.ordinal),
     absent: ordinals.filter((o) => o.status === 'absent').map((o) => o.ordinal),
-    pathUnion: [...new Set(ordinals.flatMap((o) => o.paths))].sort(),
+    pathUnion: [...new Set(ordinals.flatMap((o) => o.paths))].sort(byCodeUnit),
     disjoint: overlapsOut.length === 0, overlaps: overlapsOut.slice(0, 20),
     ordinals, wires,
   };
@@ -511,4 +512,4 @@ async function main(argv) {
   console.error('use: starci machine seam-policy canon-plan --scan <file> --cut-id <id> | canon-redispatch --repo <repo> --job <id> [--paths <csv>]');
   return 2;
 }
-if (isMain(import.meta.url)) main(process.argv.slice(2)).then((code) => { process.exitCode = code; });
+if (isMain(import.meta.url)) main(process.argv.slice(2)).then((code) => { process.exitCode = code; }).catch((error) => { console.error(error); process.exit(1); });

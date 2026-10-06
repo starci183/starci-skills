@@ -3,6 +3,7 @@ import { isInside } from './config.mjs';
 import { relativePath, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
 import { commonJsRequireReasons, constructedDecoratorKind, decoratorCallee, moduleExportsOf, mutableDecoratorKind, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, returnedExpressions, selectedNode, tracedFrameworkKinds, valueSymbol, violation } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const SOURCE_LAYOUT_RULE_ID = 'BE_FEATURE_LAYOUT_INVALID';
 const SOURCE_NAME_RULE_ID = 'BE_SOURCE_FORM';
@@ -475,10 +476,10 @@ export function checkBackendSourceShape(config, context) {
   const coverage = {
     files: checkedFiles,
     layout: layoutReasons.length
-      ? { status: 'unavailable', reason: 'one or more backend source placement relations are not statically proved', details: [...new Set(layoutReasons)].sort() }
+      ? { status: 'unavailable', reason: 'one or more backend source placement relations are not statically proved', details: [...new Set(layoutReasons)].sort(byCodeUnit) }
       : { status: 'checked' },
     naming: namingReasons.length
-      ? { status: 'unavailable', reason: 'one or more backend source naming relations are not statically proved', details: [...new Set(namingReasons)].sort() }
+      ? { status: 'unavailable', reason: 'one or more backend source naming relations are not statically proved', details: [...new Set(namingReasons)].sort(byCodeUnit) }
       : { status: 'checked' },
   };
   return { violations, coverage };

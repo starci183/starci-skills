@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { ScaffoldError } from "./service.mjs"
+import { byCodeUnit } from "../report/order.mjs"
 
 const REGISTRATIONS = Object.freeze({
   api: [
@@ -126,7 +127,7 @@ function addExport(text, registration) {
   const line = new RegExp(`^${kind} \\{ ([^}]*) \\} from "${escape(registration.source)}"$`, "m")
   const found = line.exec(text)
   if (found) {
-    const names = [...new Set([...found[1].split(",").map((name) => name.trim()), ...registration.names])].sort()
+    const names = [...new Set([...found[1].split(",").map((name) => name.trim()), ...registration.names])].sort(byCodeUnit)
     return text.replace(line, `${kind} { ${names.join(", ")} } from "${registration.source}"`)
   }
   const added = `${kind} { ${registration.names.join(", ")} } from "${registration.source}"`

@@ -3,6 +3,7 @@
 // The registry is an owned API seam, allowing focused specs without provider effects.
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { loadPins } from './canon-pins.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 
@@ -53,7 +54,7 @@ export function publishOrder(rows) {
   while (pending.size) {
     const ready = [...pending.values()].filter((row) => !row.deps.some((name) => pending.has(name)))
       .sort((a, b) => Number(a.last) - Number(b.last) || a.name.localeCompare(b.name));
-    if (!ready.length) throw new Error(`dependency cycle among ${[...pending.keys()].sort().join(', ')}`);
+    if (!ready.length) throw new Error(`dependency cycle among ${[...pending.keys()].sort(byCodeUnit).join(', ')}`);
     const row = ready[0];
     ordered.push(row);
     pending.delete(row.name);

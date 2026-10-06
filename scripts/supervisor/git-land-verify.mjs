@@ -7,6 +7,7 @@ import { fullCheck as fullCheckCall } from './land-full-check.mjs';
 import { specsDependingOn as specsDependingOnCall } from '../lib/spec-deps.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 import { specRunEnv, specTimeoutMs } from './land.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const posix = (p) => p.replaceAll(String.fromCharCode(92), '/');
 const outputOf = (r) => `${String(r?.stdout ?? '')}${String(r?.stderr ?? r?.error?.message ?? '')}`;
@@ -57,14 +58,14 @@ function redSpecFiles(text, worktree, selected) {
     const match = /^✖\s+(tests[\\/][^\s]+\.spec\.mjs)(?:\s|$)/.exec(line.trim());
     if (match && allowed.has(posix(match[1]))) direct.add(posix(match[1]));
   }
-  if (direct.size) return [...direct].sort();
+  if (direct.size) return [...direct].sort(byCodeUnit);
   const titles = failedTitles(text), red = [];
   for (const file of selected) {
     let source = '';
     try { source = fs.readFileSync(path.join(worktree, file), 'utf8'); } catch { continue; }
     if (titles.some((title) => source.includes(title))) red.push(file);
   }
-  return [...new Set(red)].sort();
+  return [...new Set(red)].sort(byCodeUnit);
 }
 
 /** Prior-red files from a verified run log, even when the reporter named only test titles. */
@@ -78,7 +79,7 @@ export function selectLandSpecs({ worktree, changed, verifiedLog = null }, deps 
   const specs = deps.specFiles ? deps.specFiles(worktree) : specFiles(worktree);
   const depending = (deps.specsDependingOn ?? specsDependingOnCall)(worktree, changed, specs);
   const priorRed = verifiedLog ? priorRedSpecFiles(worktree, verifiedLog, specs) : [];
-  return { files: [...new Set([...depending, ...priorRed])].sort(), priorRed };
+  return { files: [...new Set([...depending, ...priorRed])].sort(byCodeUnit), priorRed };
 }
 
 const argsFor = (files, concurrency) => [

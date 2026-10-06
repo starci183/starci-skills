@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { sha256 } from '../../engine/digest.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { asList } from '../lib/list.mjs';
+import { asList, byCodeUnit } from '../lib/list.mjs';
 import { headShaOf } from '../lib/git-dir.mjs';
 
 export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
@@ -20,7 +20,7 @@ export function contractFilesOf(root, op) {
   let text = '';
   try { text = fs.readFileSync(path.join(root, brief), 'utf8'); } catch { /* digested as absent */ }
   const cited = [...new Set(text.match(CITE_RX) ?? [])].filter((rel) => !rel.includes('..'));
-  return [brief, ...ALWAYS_CITED, ...cited.sort()].filter((rel, index, all) => all.indexOf(rel) === index);
+  return [brief, ...ALWAYS_CITED, ...cited.sort(byCodeUnit)].filter((rel, index, all) => all.indexOf(rel) === index);
 }
 
 /** The contract version one dispatch admits a leg under (contracts.context_json.contract). */

@@ -763,7 +763,7 @@ if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   const treeArg = args.includes('--tree') ? args[args.indexOf('--tree') + 1] : null;
   const trees = treeArg ? [path.resolve(treeArg)]
-    : walk(path.join(root, 'examples')).filter(f => f.endsWith(`.starciwork${path.sep}index.yaml`)).map(path.dirname);
+    : walk(path.join(root, 'examples')).filter(f => f.endsWith(`.starciwork${path.sep}index.yaml`)).map(dir => path.dirname(dir));
 
   const out = {refuse: [], suspect: [], info: [], map: []};
   for (const workRoot of trees) checkWorkSurfaces(workRoot, out);

@@ -398,4 +398,4 @@ async function main() {
   console.error('usage: starci connect tunnel start|run|status|stop|dry-run [--port <n>]'); process.exit(2);
 }
 
-if (isMain(import.meta.url)) main();
+if (isMain(import.meta.url)) main().catch((error) => { console.error(error); process.exit(1); });

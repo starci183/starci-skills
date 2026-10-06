@@ -24,7 +24,7 @@ COPY scripts scripts
 COPY fe/tsconfig.json fe/tsconfig.json
 {{copyInputs}}COPY fe/apps/{{app}} fe/apps/{{app}}
 RUN npm run codegen --silent
-RUN npx turbo run build --filter=@{{project}}/{{app}}
+RUN node_modules/.bin/turbo run build --filter=@{{project}}/{{app}}
 
 FROM {{nodeImage}} AS runtime
 WORKDIR /app

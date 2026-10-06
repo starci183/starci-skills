@@ -8,6 +8,7 @@
 // `features/cli/` is the one cli feature root (its module and group folders), so it is in use as soon as it holds a file.
 import { loadSlotManifest, ruleParams } from '../slots.mjs';
 import { found } from './read.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const KIND_DECLARATION = 'BE_KIND_DECLARATION';
 const KIND_EMPTY = 'BE_KIND_EMPTY';
@@ -65,10 +66,10 @@ export function kindFindings({ files, repo }) {
   const present = new Set([...instances.keys(), ...roots]);
   const declared = new Set(be.kinds ?? []);
   const patterns = new Set(be.patterns ?? []);
-  for (const kind of [...present].sort()) {
+  for (const kind of [...present].sort(byCodeUnit)) {
     if (!declared.has(kind)) findings.push(found(KIND_DECLARATION, 'hfs.json', `hfs.json sides.be.kinds does not declare the kind \`${kind}\`, which ${FEATURES}${kind}/ uses; declare every kind in use (\`starci app add\` registers it).`, { kind }));
   }
-  for (const kind of [...declared].sort()) {
+  for (const kind of [...declared].sort(byCodeUnit)) {
     if (!present.has(kind)) {
       findings.push(found(KIND_DECLARATION, 'hfs.json', `hfs.json sides.be.kinds declares \`${kind}\` but no feature of that kind exists; a kind is declared only when it is used, so remove it or add its first member with \`starci app add\`.`, { kind }));
       continue;

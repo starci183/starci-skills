@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { treeOf } from './required-files.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R63 `package-shape` (FE_PACKAGE_SHAPE, knowledge/hfs/README.md 6.2). A shared package is built to `dist` and says what it
@@ -38,7 +39,7 @@ export function checkPackageShape({ config, graph }) {
     const owner = resolver.ownerOf(rel);
     if (owner && resolver.slot(owner.slot)?.tier === 'package') roots.add(owner.root);
   }
-  for (const root of [...roots].sort()) {
+  for (const root of [...roots].sort(byCodeUnit)) {
     const manifestRel = `${root}/package.json`;
     const report = (message, extra = {}) => violations.push({ ruleId: RULE, path: manifestRel, line: 1, column: 1, package: root, message, ...extra });
     let manifest;

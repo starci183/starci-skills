@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R106 `i18n-keys` (FE_I18N_KEYS). The catalogs of an app (`apps/<app>/src/modules/i18n/messages/<locale>.json`, slot fe.modules.i18n) and
@@ -136,7 +137,7 @@ export function checkI18nKeys({ config, graph, context }) {
 
     const [primary] = [...loaded].sort((a, b) => a.locale.localeCompare(b.locale));
     const every = new Set(loaded.flatMap(catalog => [...catalog.leaves]));
-    for (const leaf of [...every].sort()) {
+    for (const leaf of [...every].sort(byCodeUnit)) {
       const segments = leaf.split('.');
       if (patterns.some(pattern => tailMatches(pattern, segments))) continue;
       violations.push({ ruleId: RULE, path: primary.rel, line: 1, column: 1, message: `${primary.rel} holds the key "${leaf}" and no source of ${app} or the shared packages reads it; delete the key from every catalog`, key: leaf });

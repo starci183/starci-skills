@@ -26,7 +26,8 @@ import {PAYLOAD, isNegated, payloadFiles, hashTree, payloadHash as sha, copyPayl
 export {PAYLOAD, payloadFiles};
 import {entrySkillsPlan, applyEntrySkillsPlan} from './entry-skills.mjs';
 import {doctorInstallation} from './doctor.mjs';
-import {runInitialAgeInstall} from './initial-age.mjs';
+import {HOST_BOOTSTRAP_FILES, parseHosts} from './bootstrap-hosts.mjs';
+import {runInitialAgeInstall, AGE_TOOL_REASONS} from './initial-age.mjs';
 export {entrySkillsPlan, applyEntrySkillsPlan};
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -67,18 +68,9 @@ function selectedProfile(opts) {
   return 'full';
 }
 
-// Hosts the installer can write a bootstrap for. AGENTS.md is always the canonical write; claude/devin
-// emit copies of the same template only when the host names them (`--hosts claude,devin` or `all`).
-const HOST_BOOTSTRAP_FILES = { agents: 'AGENTS.md', claude: 'CLAUDE.md', devin: 'DEVIN.md' };
+// Hosts the installer can write a bootstrap for (bootstrap-hosts.mjs, also read by `starci runtime check --only entry`). AGENTS.md is always the
+// canonical write; claude/devin emit copies of the same template only when the host names them (`--hosts claude,devin` or `all`).
 const HOST_BOOTSTRAP_NAMES = Object.values(HOST_BOOTSTRAP_FILES);
-function parseHosts(value) {
-  const hosts = String(value ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
-  const known = new Set([...Object.keys(HOST_BOOTSTRAP_FILES), 'all']);
-  const bad = hosts.filter((h) => !known.has(h));
-  if (bad.length) throw new Error(`unknown --hosts value ${bad.join(', ')}; expected a comma list of ${[...known].join(', ')}`);
-  if (hosts.includes('all')) return Object.keys(HOST_BOOTSTRAP_FILES);
-  return hosts;
-}
 
 function parseArgs(argv) {
   const out = { command: argv[0] ?? 'help', dir: process.cwd(), force: false, quick: false, bootstrap: true, hosts: [] };
@@ -431,6 +423,8 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       const setup = runInitialAgeInstall({repo: path.resolve(opts.dir), force: opts.force, project},
         {...(deps.initialAge ?? {}), env: deps.env ?? process.env});
       log('initial age setup: ' + JSON.stringify(setup));
+      // The init identity needs age-keygen 1.2.1 or 1.3.1 (the versions scripts/api/sops/lib.mjs accepts); the install never skips key generation.
+      if (AGE_TOOL_REASONS[setup.toolReason]) error(pkg.name + ': ' + AGE_TOOL_REASONS[setup.toolReason] + '; init needs age-keygen 1.2.1 or 1.3.1 on PATH (docs/installation.md, Prerequisites). Install it, then run starci runtime install again.');
       return setup.ok ? 0 : 1;
     }
     if (opts.command === 'doctor') return doctor(opts, log) ? 1 : 0;

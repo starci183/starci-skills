@@ -8,7 +8,8 @@
 //   }
 // `starci app emit` writes `be/contracts/<service>/events.json` from them (name, version, compensates, and the payload fields of the
 // interface `create` takes); `starci app check` compares the committed file with the same reader. Nothing is executed: both walk the TypeScript
-// syntax tree. The functions take the `ts` module the caller loaded (the repository's own, else the runtime's); this file imports nothing.
+// syntax tree. The functions take the `ts` module the caller loaded (the repository's own, else the runtime's); this file imports only the code-unit comparator.
+import { byCodeUnit } from './list.mjs';
 
 const EVENT_CONTRACT_SCHEMA = 'starci/event-contract@1';
 const FIELD_TYPE = /^(?:string|number|boolean|string\[\]|number\[\])\??$/;
@@ -91,7 +92,7 @@ export function readEventClasses(ts, text, file = 'event.ts') {
 }
 
 /** The sorted object: keys in code-point order, recursively (what the snapshot prints). */
-const sorted = (value) => (value !== null && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, sorted(value[key])])) : value);
+const sorted = (value) => (value !== null && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.keys(value).sort(byCodeUnit).map((key) => [key, sorted(value[key])])) : value);
 
 /** The text of the snapshot of a service from its event classes: 2-space JSON, sorted keys, one final newline. */
 export function snapshotText(service, events) {

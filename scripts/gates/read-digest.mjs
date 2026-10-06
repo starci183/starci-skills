@@ -17,6 +17,7 @@
 // Exit 0 recorded, 2 the digest could not be built (a touched path hfs cannot explain is recorded with slot null, not an error).
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -209,7 +210,7 @@ function examplesForSlot(explained, doc = loadOpGate(), base = runtimeRoot) {
 
 /** The digest of a slice: what it must read, each file with its sha256. */
 export async function buildReadDigest({ root, touch, read = [], knowledge = [], doc = loadOpGate(), hfs = hfsEntry(root), base = runtimeRoot }) {
-  const touched = [...new Set((touch ?? []).map((f) => posixPath(path.isAbsolute(f) ? path.relative(root, f) : f)))].sort();
+  const touched = [...new Set((touch ?? []).map((f) => posixPath(path.isAbsolute(f) ? path.relative(root, f) : f)))].sort(byCodeUnit);
   const explained = await explainPaths(root, touched, hfs);
   const slotMap = touched.map((file, i) => {
     const e = explained[i] ?? {};

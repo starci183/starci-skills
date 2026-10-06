@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
 import { treeOf } from './required-files.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R56 `hooks-are-hooks` (FE_HOOKS_ARE_HOOKS), the repository half of the eslint rule `hooks-folder-holds-hooks-only`, which
@@ -28,7 +29,7 @@ export function checkHooksAreHooks(input) {
 
   const tree = treeOf(config.root);
   const shared = new Map(); // domain root -> [file]
-  for (const rel of [...tree.files].sort()) {
+  for (const rel of [...tree.files].sort(byCodeUnit)) {
     const classified = resolver.classifyPath(rel);
     if (classified.slot !== HOOKS_SLOT || !classified.root) continue;
     domains.add(classified.root);

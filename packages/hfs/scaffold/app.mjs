@@ -25,6 +25,7 @@ import { unlinkOnly } from '../runtime/scripts/api/fs/lib.mjs';
 import { revParseQuery } from '../runtime/scripts/api/git/rev-parse-query.mjs';
 import { lsFiles } from '../runtime/scripts/api/git/ls-files.mjs';
 import { insidePath, samePath } from '../runtime/scripts/lib/path-key.mjs';
+import { byCodeUnit } from '../report/order.mjs';
 
 const NAME = /^[a-z][a-z0-9-]*$/;
 const APP_DIR = '__app__';
@@ -486,7 +487,7 @@ export function scaffoldApp({ name, into, presets, edition = 'full', manifest = 
     let locked;
     try { locked = lock(root); } finally { writes.lockfile(); }
     if (!locked.ok) throw new ScaffoldError('HFS_SCAFFOLD_LOCK_FAILED', `\`${LOCK_STEP}\` could not resolve the lockfile of ${root} (${locked.detail}). Check the network and the npm registry, then run starci app scaffold ${name} again`);
-    return { root, files: [...new Set([...files.map(file => file.path), ...targets.map(target => target.path), ...(app.edition === 'lite' ? [dbTypesPath] : []), 'package-lock.json'])].sort() };
+    return { root, files: [...new Set([...files.map(file => file.path), ...targets.map(target => target.path), ...(app.edition === 'lite' ? [dbTypesPath] : []), 'package-lock.json'])].sort(byCodeUnit) };
   } catch (error) {
     const held = writes.rollback();
     if (held.length) error.message += `; cleanup retained replaced or occupied entries: ${held.join(', ')}`;

@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { parseJson } from '../lib/json.mjs';
 import { positiveNumber } from '../lib/number.mjs';
 import { list } from '../lib/list.mjs';
@@ -20,7 +21,7 @@ export function supervisorGatesOf(db, workflowId) {
   });
 }
 
-const newIncidentId = () => `inc-${Math.random().toString(16).slice(2, 8)}${Date.now().toString(16).slice(-6)}`;
+const newIncidentId = () => `inc-${randomBytes(3).toString('hex')}${Date.now().toString(16).slice(-6)}`;
 /** Open one supervisor-gate incident (inside the caller's transaction). */
 export function openSupervisorGate(ledger, { workflowId, opId = null, holds = [], detail, evidence = null, route = null, auto = true }) {
   const incidentId = newIncidentId();

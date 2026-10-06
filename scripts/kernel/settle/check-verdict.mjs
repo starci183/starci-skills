@@ -7,7 +7,6 @@
 // 0 -> pass, 124 (timeout) / 127 (spawn failure) -> unavailable, anything else -> red. A run is `pass` only with raw
 // exit 0 (DBTREE check_runs: no pass with a raw exit != 0) - a status word never lifts a red exit to green.
 const UNAVAILABLE = new Set(['unavailable', 'unresolved', 'invalid', 'error', 'timeout', 'not-run', 'not_run', 'skipped-unavailable']);
-const PASS = new Set(['ok', 'pass', 'passed', 'green', 'clean', 'success', 'succeeded']);
 const RED = new Set(['findings', 'fail', 'failed', 'red', 'new-findings']);
 
 /** The status word a run carries: its own `status`, else its JSON output's `slice.status` or `status`. */
@@ -26,7 +25,7 @@ export function checkVerdictOf(run) {
   if (exitCode === null || exitCode === 124 || exitCode === 127) return { verdict: 'unavailable', exitCode, word };
   if (exitCode !== 0) return { verdict: 'red', exitCode, word };
   if (word && RED.has(word)) return { verdict: 'red', exitCode, word };
-  return { verdict: 'pass', exitCode, word: word && PASS.has(word) ? word : word };
+  return { verdict: 'pass', exitCode, word };
 }
 
 /** The check_runs.status of a run (the ledger's vocabulary: pass | fail | unavailable). */

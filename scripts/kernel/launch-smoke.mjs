@@ -59,6 +59,7 @@ import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { show as gitShow } from '../api/git/show.mjs'; import { branchList } from '../api/git/branch-list.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs'; import { gitResultOf } from '../lib/git.mjs';
 import { holdStage, releaseStageHold } from './launch-smoke-hold.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { writeJsonFile } from '../api/fs/write-json-file.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
 import { bestEffortCall, bestEffortCallAsync } from '../agent/best-effort-call.mjs';
@@ -186,9 +187,9 @@ export function mainManifest({ appRoot, git }) {
 
 /** before -> after: {added, changed, removed} tracked paths, and whether the node_modules listing is unchanged. */
 export function manifestDiff(before, after) {
-  const added = Object.keys(after.files).filter((f) => !(f in before.files)).sort();
-  const removed = Object.keys(before.files).filter((f) => !(f in after.files) || after.files[f] === null).sort();
-  const changed = Object.keys(before.files).filter((f) => f in after.files && after.files[f] !== null && after.files[f] !== before.files[f]).sort();
+  const added = Object.keys(after.files).filter((f) => !(f in before.files)).sort(byCodeUnit);
+  const removed = Object.keys(before.files).filter((f) => !(f in after.files) || after.files[f] === null).sort(byCodeUnit);
+  const changed = Object.keys(before.files).filter((f) => f in after.files && after.files[f] !== null && after.files[f] !== before.files[f]).sort(byCodeUnit);
   return { added, changed, removed, nodeModulesSame: JSON.stringify(before.nodeModules) === JSON.stringify(after.nodeModules) };
 }
 
@@ -427,7 +428,7 @@ function workflowProblems(wf, spec) {
   const m = wf.main;
   if (!m) p.push('main was not compared');
   else {
-    const expected = ['op', 'opFe'].map((role) => ownedFileOf(role, wf.workflowId, wf.feApp)).sort();
+    const expected = ['op', 'opFe'].map((role) => ownedFileOf(role, wf.workflowId, wf.feApp)).sort(byCodeUnit);
     if (JSON.stringify(m.added) !== JSON.stringify(expected)) p.push(`main gained ${JSON.stringify(m.added)}, not exactly ${JSON.stringify(expected)}`);
     if (m.changed.length || m.removed.length) p.push(`main is not intact: changed ${JSON.stringify(m.changed)}, removed ${JSON.stringify(m.removed)}`);
     if (!m.nodeModulesSame) p.push("main's node_modules listing changed");

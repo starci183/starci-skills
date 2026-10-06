@@ -15,6 +15,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { readOpManifest } from '../lib/op-shared.mjs';
@@ -110,7 +111,7 @@ function main() {
     .flatMap(d => fs.readdirSync(d)
       .filter(f => f.endsWith('.yaml') && f !== 'registry.yaml' && !f.startsWith('_'))
       .map(f => path.join(d, f)))
-    .sort();
+    .sort(byCodeUnit);
   const entries = [], problems = [];
   for (const file of files) {
     try {

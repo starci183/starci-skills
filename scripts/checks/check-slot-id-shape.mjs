@@ -24,6 +24,7 @@
 //     both members must stay live or the exception is stale.
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { printFindings } from '../lib/check-scan.mjs';
@@ -96,7 +97,7 @@ export function suffixFindings({ file, doc }) {
     if (rp?.suffixes === undefined && rp?.bannedSuffixes === undefined) continue;
     const suffixes = new Set(rp?.suffixes ?? []);
     const banned = new Set(rp?.bannedSuffixes ?? []);
-    for (const word of [...banned].sort()) {
+    for (const word of [...banned].sort(byCodeUnit)) {
       if (suffixes.has(word)) push(`${file} ruleParams.${profile}: "${word}" is both a suffix and a bannedSuffix — a role word is declared once`);
     }
     for (const [a, b] of pairsOf(doc?.naming?.refusedPairs)) {

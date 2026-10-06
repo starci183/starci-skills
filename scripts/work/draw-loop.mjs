@@ -74,6 +74,7 @@ import { archetypeOf } from './ui-archetype.mjs';
 import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
 import { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings } from './draw/draw-loop-coverage.mjs';
 import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw/draw-rationale.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 export { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings };
 
@@ -221,7 +222,7 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
   const failures = metrics.flatMap((m) => m.findings);
   return {
     doc: { schema: METRICS_SCHEMA, html: path.basename(html), htmlSha256: sha256(text), ...(component ? { mode: 'component', source: sourceGate.file ? path.basename(sourceGate.file) : null, sourceSha256: sourceGate.sha256 ?? null } : {}), viewports: captures.map((c) => ({ width: c.viewport.width, height: c.viewport.height, part: stemOf(c.png) })),
-      metrics, failures: failures.length, codes: [...new Set(failures.map((f) => f.code))].sort(), allPass: failures.length === 0 },
+      metrics, failures: failures.length, codes: [...new Set(failures.map((f) => f.code))].sort(byCodeUnit), allPass: failures.length === 0 },
     scores,
   };
 }

@@ -3875,4 +3875,4 @@ async function main() {
   usage(2);
 }
 
-main();
+main().catch((error) => { console.error(error); process.exit(1); });

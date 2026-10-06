@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Envelope, ReadErrorEnvelope, ReadErrorMeta, ReadSource } from '../contract';
 import { t } from '../i18n/t';
+import { byCodeUnit } from '../lib/utils';
 
 export type QuerySnapshot<T> = {
   data: T | null;
@@ -196,7 +197,7 @@ async function request(record: QueryRecord, refreshAfterCurrent = false): Promis
 function activeTopics(): string[] {
   const topics = new Set<string>();
   records.forEach((record) => record.listeners.forEach((subscription) => subscription.topics.forEach((topic) => topics.add(topic))));
-  return [...topics].sort();
+  return [...topics].sort(byCodeUnit);
 }
 
 function closeLive(): void {

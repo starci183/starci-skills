@@ -5,7 +5,7 @@
  * the law to the rule catalog.
  */
 import assert from "node:assert/strict"
-import { execFileSync } from "node:child_process"
+import { runGit } from "../runtime/scripts/api/git/lib.mjs"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -24,7 +24,10 @@ export function sizeGrowthSharedSpec({ side, tester, fileSizeGrowth, budget, fil
   test(`${side}: the recorded size is the file's line count at the parent commit`, (t) => {
     const dir = mkdtempSync(join(tmpdir(), `starci-${side}-size-`))
     t.after(() => rmSync(dir, { recursive: true, force: true }))
-    const git = (...args) => execFileSync("git", ["-C", dir, "-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { stdio: "ignore" })
+    const git = (...args) => {
+      const run = runGit(args, { dir, config: { "user.email": "t@example.com", "user.name": "t" } })
+      if (run.error || run.status !== 0) throw run.error ?? new Error(`git ${args[0]} exited ${run.status}: ${run.stderr}`)
+    }
     try {
       git("init", "-q")
     } catch {

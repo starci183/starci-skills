@@ -39,6 +39,7 @@ import { SKILL_ROOT, supervisorLog } from '../machine/home.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { foldCase, realPath } from '../lib/path-key.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const key = (p) => foldCase(realPath(p));
 const samePath = (a, b) => key(a) === key(b);
@@ -82,7 +83,7 @@ export function planFor(repo, { runtimeRoot = SKILL_ROOT, pkg = readPackage(repo
   const npmStep = (script, extra = {}) => (scripts[script]
     ? { name: `npm run ${script}`, cmd: 'npm', args: ['run', script], ...extra }
     : { name: `npm run ${script}`, absent: true, ...extra });
-  const builds = Object.keys(scripts).filter((name) => /^build:[\w-]+$/.test(name)).sort();
+  const builds = Object.keys(scripts).filter((name) => /^build:[\w-]+$/.test(name)).sort(byCodeUnit);
   const after = { after: 'npm run typecheck' };
   return {
     kind: 'product',

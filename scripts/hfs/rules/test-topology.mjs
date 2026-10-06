@@ -10,7 +10,7 @@ import { found, readJson } from './read.mjs';
 
 const TEST_TOPOLOGY = 'BE_TEST_TOPOLOGY';
 const DOT_TEST = /\.test\.[cm]?[jt]sx?$/;
-const JEST_CONFIG = /(?:^|\/)jest(?:\.[^/]+)*\.config(?:\.[^/]+)*\.(?:[cm]?[jt]s|json)$|(?:^|\/)jest\.config\.[^/]+$/;
+const JEST_CONFIG = /(?:^|\/)jest(?:\.[^/]+)?\.config(?:\.[^/]+)?\.(?:[cm]?[jt]s|json)$|(?:^|\/)jest\.config\.[^/]+$/;
 const ROOT_JEST_CONFIG = 'jest.config.js';
 
 /** The findings of R47 over the tracked paths `files` of a back-end repository at `repoRoot`. */

@@ -49,6 +49,7 @@ import { checkI18nKeys, I18N_KEYS_RULE_IDS } from './i18n-keys.mjs';
 import { checkDocLanguage, DOC_LANGUAGE_RULE_IDS } from './doc-language.mjs';
 import { checkBackendSupabase, checkFrontendSupabase, BACKEND_SUPABASE_RULE_IDS, FRONTEND_SUPABASE_RULE_IDS } from './supabase.mjs';
 import { LINT_CODES, onLintSurface } from './surface.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
 
@@ -162,7 +163,7 @@ const machineIds = () => [
 export const HFS_MACHINE_RULE_IDS = Object.freeze((() => {
   const ordinary = new Set([...COMMON_RULE_IDS, ...BACKEND_RULE_IDS, ...FRONTEND_RULE_IDS, ...OWNER_RULE_IDS, ...GRAMMAR_RULE_IDS, ...REGISTRATION_RULE_IDS,
     ...SWR_DATA_RULE_IDS, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID, PUBLIC_CONTRACT_RULE_ID, READONLY_BOUNDARY_RULE_ID]);
-  return [...new Set(machineIds().filter((id) => !ordinary.has(id)))].sort();
+  return [...new Set(machineIds().filter((id) => !ordinary.has(id)))].sort(byCodeUnit);
 })());
 
 /** Every code the machine can emit, derived from the rule id lists of its checks (`starci app check` ships exactly these why entries). */
@@ -171,7 +172,7 @@ export const ARCHITECTURE_RULE_IDS = Object.freeze([...new Set([
   ...DEAD_EXPORT_RULE_IDS, ...DOC_LANGUAGE_RULE_IDS, ...REQUIRED_FILE_RULE_IDS, ...CLONE_RULE_IDS, ...OWNER_RULE_IDS, ...GRAMMAR_RULE_IDS,
   ...REGISTRATION_RULE_IDS, ...SWR_DATA_RULE_IDS, ...SYMBOL_RULE_IDS, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID, PUBLIC_CONTRACT_RULE_ID,
   READONLY_BOUNDARY_RULE_ID, ...ERROR_RULE_IDS, ...CONFIG_UNREAD_RULE_IDS, ...Object.values(BACKEND_MACHINE).flatMap(([, ids]) => ids), ...Object.values(FRONTEND_MACHINE).flatMap(([, ids]) => ids),
-])].sort());
+])].sort(byCodeUnit));
 
 function stable(items) {
   return items.sort((a, b) => `${a.path ?? ''}:${a.line ?? 0}:${a.column ?? 0}:${a.ruleId}`.localeCompare(`${b.path ?? ''}:${b.line ?? 0}:${b.column ?? 0}:${b.ruleId}`));
@@ -285,7 +286,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
       ? { status: 'unavailable', reason: 'no slot owner instance with an entry file exists in the repository' }
       : missingOwnerEntries.length
         ? { status: 'unavailable', reason: 'one or more declared owner entries are outside the checked production TypeScript or JavaScript program',
-          missingEntries: missingOwnerEntries.map(owner => owner.entry).sort() }
+          missingEntries: missingOwnerEntries.map(owner => owner.entry).sort(byCodeUnit) }
       : { status: 'checked', declarations: config.owners.length },
     grammarContract: !config.kinds.includes('frontend')
       ? { status: 'not-applicable' }
@@ -318,7 +319,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
   ])]
     // A back-end repository checked no FE_ rule and a front-end one no BE_ rule, whatever list a shared check (tiers, required files) carries.
     .filter(id => !(id.startsWith('FE_') && !config.kinds.includes('frontend')) && !(id.startsWith('BE_') && !config.kinds.includes('backend')))
-    .sort();
+    .sort(byCodeUnit);
   return {
     schema: 'starci/architecture-check@1',
     ok: errors.length === 0 && scopedViolations.length === 0,

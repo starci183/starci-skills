@@ -38,6 +38,7 @@ import { settleDrawMetricFindings } from './draw-loop-settle.mjs';
 import { layerFindingsForParts } from './draw/draw-layer.mjs';
 import { slash } from './work-io.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 export const GATES_SCHEMA = 'starci/draw-gates@1';
 const OWNER_GATE_CODE = 'DRAW_NOT_OWNER_ACCEPTED';
@@ -90,7 +91,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   const owner = acc.findings.filter((f) => f.code === OWNER_GATE_CODE);
   const red = acc.findings.filter((f) => f.code !== OWNER_GATE_CODE);
   gates.push({ name: 'draw-acceptance', command: cmd('scripts/work/draw/draw-acceptance.mjs', ['--repo', slash(root), '--files', bound.map((b) => rel(root, b)).join(',')]),
-    exitCode: red.length ? 1 : 0, codes: uniq(red.map((f) => f.code)).sort(), failing: uniq(red.map((f) => fileOf(f, recordFile))),
+    exitCode: red.length ? 1 : 0, codes: uniq(red.map((f) => f.code)).sort(byCodeUnit), failing: uniq(red.map((f) => fileOf(f, recordFile))),
     evidence: red.length ? `${red.length} finding(s): ${red.slice(0, 6).map((f) => `[${f.code}] ${f.detail}`).join(' | ').slice(0, 1500)}` : `records ${acc.records.join(', ') || '(none)'} accepted by the machine gates`, findings: red.slice(0, 50) });
 
   // 2. draw-metrics: the settle re-render and re-measure of every live part.
@@ -98,7 +99,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
     let m;
     try { m = await (runners.metrics ?? settleDrawMetricFindings)({ repo: root, files: bound }); } catch (error) { m = { findings: [{ code: 'DRAW_METRICS_UNVERIFIED', path: recordFile, detail: `the re-measure could not run: ${String(error?.message ?? error).split('\n')[0]}` }], loops: [] }; }
     gates.push({ name: 'draw-metrics', command: cmd('scripts/work/draw-loop.mjs', ['verify', '--ui', slash(uiDir), '--repo', slash(root)]),
-      exitCode: m.findings.length ? 1 : 0, codes: uniq(m.findings.flatMap((f) => [f.code, ...(f.codes ?? [])])).sort(), failing: uniq(m.findings.map((f) => fileOf(f, recordFile))),
+      exitCode: m.findings.length ? 1 : 0, codes: uniq(m.findings.flatMap((f) => [f.code, ...(f.codes ?? [])])).sort(byCodeUnit), failing: uniq(m.findings.map((f) => fileOf(f, recordFile))),
       evidence: m.findings.length ? `${m.findings.length} finding(s): ${m.findings.slice(0, 4).map((f) => `[${f.code}] ${f.detail}`).join(' | ').slice(0, 1500)}` : 'every live part re-rendered and re-measured green', findings: m.findings.slice(0, 50) });
   }
 
@@ -106,7 +107,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   const v = runners.validate ? await runners.validate(uiDir, root) : spawnJson('packages/cli/bin/starci.mjs', ['runtime', 'validate', slash(uiDir), '--strict', '--json'], root);
   const refused = refusalsOf(v.doc?.refused, SKILL_ROOT, root);
   gates.push({ name: 'validate-strict', command: `starci runtime validate ${uiRel} --strict --json`,
-    exitCode: v.doc ? (v.doc.ok === false || refused.length ? 1 : 0) : (v.exitCode || 2), codes: uniq(refused.map((r) => r.code)).sort(), failing: uniq(refused.map((r) => r.file)),
+    exitCode: v.doc ? (v.doc.ok === false || refused.length ? 1 : 0) : (v.exitCode || 2), codes: uniq(refused.map((r) => r.code)).sort(byCodeUnit), failing: uniq(refused.map((r) => r.file)),
     evidence: v.doc ? (refused.length ? `${refused.length} refusal(s): ${refused.slice(0, 5).map((r) => `${r.file} [${r.code}] ${r.message}`).join(' | ').slice(0, 1500)}` : 'strict validation: 0 refused') : `validate did not answer JSON: ${v.stderr.slice(0, 400)}` });
 
   // 4. shell-conformance.
@@ -114,7 +115,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   const sFindings = [...(s.doc?.refused ?? []), ...(s.doc?.findings ?? []).filter((f) => f?.level === 'refuse')];
   const sCode = (f) => (typeof f === 'string' ? /\[([A-Z0-9_]+)\]/.exec(f)?.[1] : f?.code) ?? null;
   gates.push({ name: 'shell-conformance', command: cmd('scripts/work/ui/shell-conformance.mjs', [uiRel, '--json']),
-    exitCode: s.doc ? (s.doc.ok === false ? 1 : 0) : (s.exitCode || 2), codes: uniq(sFindings.map(sCode)).sort(), failing: s.doc?.ok === false ? [recordFile] : [],
+    exitCode: s.doc ? (s.doc.ok === false ? 1 : 0) : (s.exitCode || 2), codes: uniq(sFindings.map(sCode)).sort(byCodeUnit), failing: s.doc?.ok === false ? [recordFile] : [],
     evidence: s.doc ? (s.doc.ok === false ? `${sFindings.length} refusal(s): ${sFindings.slice(0, 5).map((f) => (typeof f === 'string' ? f : `[${f.code}] ${f.message ?? f.detail ?? ''}`)).join(' | ').slice(0, 1500)}` : 'shell conformance: 0 refused') : `shell-conformance did not answer JSON: ${s.stderr.slice(0, 400)}` });
 
   let record = null;
@@ -126,7 +127,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   const layerRed = layer.filter((r) => r.findings.length);
   const layerFindings = layerRed.flatMap((r) => r.findings.map((f) => ({ ...f, path: rel(root, r.part) })));
   gates.push({ name: 'draw-layer', command: cmd('scripts/work/draw/draw-layer.mjs', [uiRel, '--playwright', '<product dir>']),
-    exitCode: layerFindings.length ? 1 : 0, codes: uniq(layerFindings.map((f) => f.code)).sort(), failing: uniq(layerFindings.map((f) => fileOf(f, recordFile))),
+    exitCode: layerFindings.length ? 1 : 0, codes: uniq(layerFindings.map((f) => f.code)).sort(byCodeUnit), failing: uniq(layerFindings.map((f) => fileOf(f, recordFile))),
     evidence: layerFindings.length ? `${layerFindings.length} finding(s): ${layerFindings.slice(0, 4).map((f) => `[${f.code}] ${f.detail}`).join(' | ').slice(0, 1500)}`
       : `${layer.length} live part(s): every form control on a surface nested, every form region capped${layer.some((r) => !r.forms) ? ` (${layer.filter((r) => !r.forms).length} without a recorded measure; draw-metrics re-measures)` : ''}`, findings: layerFindings.slice(0, 50) });
 
@@ -141,7 +142,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   }
   const unfinished = loops.filter((l) => l.outcome !== 'passed');
   gates.push({ name: 'draw-loop', command: cmd('scripts/work/draw-loop.mjs', ['status', '--out', '<loop dir>']), exitCode: unfinished.length || (record && !loops.length && livePartsOf(uiDir, record).length) ? 1 : 0,
-    codes: uniq(unfinished.flatMap((l) => l.remaining)).sort(), failing: unfinished.length ? [recordFile] : [],
+    codes: uniq(unfinished.flatMap((l) => l.remaining)).sort(byCodeUnit), failing: unfinished.length ? [recordFile] : [],
     evidence: loops.length ? loops.map((l) => `${l.ref}: ${l.outcome ?? 'not finished'} (best round ${l.best ?? '-'}${l.remaining.length ? `; remaining ${uniq(l.remaining).join(', ')}` : ''})`).join('; ') : 'no live part names a draw loop' });
 
   const failed = gates.filter((g) => g.exitCode !== 0);

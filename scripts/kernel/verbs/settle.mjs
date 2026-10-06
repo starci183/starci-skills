@@ -138,7 +138,7 @@ export default {
     // Every red check was a peer's change (starci kernel record-checks peerBlocked): the attempt is the peer's to
     // unblock, not this op's failure - retry accounting spends no business attempt on it
     // (engine/admission.mjs retryDisposition) and the routes hand it to the peer.
-    const peerChecks = recordedChecks.filter(isPeerBlockedCheck);
+    const peerChecks = recordedChecks.filter((check) => isPeerBlockedCheck(check));
     if (peerChecks.length && checkEvidence.failed === 0) {
       result.peerBlocked = { checks: peerChecks.map((check) => check.name), peers: peerChecks.flatMap((check) => check.peerBlocked.peers ?? []),
         routes: [...new Set(peerChecks.flatMap((check) => check.peerBlocked.routes ?? []))] };

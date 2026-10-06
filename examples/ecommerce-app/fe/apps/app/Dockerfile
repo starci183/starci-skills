@@ -25,7 +25,7 @@ COPY fe/tsconfig.json fe/tsconfig.json
 COPY fe/packages fe/packages
 COPY fe/apps/app fe/apps/app
 RUN npm run codegen --silent
-RUN npx turbo run build --filter=@ecommerce-app/app
+RUN node_modules/.bin/turbo run build --filter=@ecommerce-app/app
 
 FROM node:22.14.0-alpine3.21 AS runtime
 WORKDIR /app

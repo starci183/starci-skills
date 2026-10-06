@@ -36,9 +36,12 @@ function filesUnder(dir, keep = () => true) {
     })
 }
 
+/** The order `.sort()` gives without a compare function (UTF-16 code units): the stamp digest depends on it. */
+const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0)
+
 function hashEntries(entries) {
     const hash = createHash("sha256")
-    for (const [name, bytes] of entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+    for (const [name, bytes] of entries.sort(([a], [b]) => byCodeUnit(a, b))) {
         hash.update(name)
         hash.update("\0")
         hash.update(bytes === null ? "<absent>" : bytes)
@@ -51,7 +54,7 @@ function hashEntries(entries) {
 export function sourceInputs(packageRoot) {
     const src = filesUnder(join(packageRoot, "src"), (entry, isDir) =>
         isDir ? !DEV_ONLY_DIRS.has(entry.name) : !DEV_ONLY_FILE.test(entry.name))
-    return [...src.map((file) => slash(relative(packageRoot, file))), "tsconfig.build.json", "scripts/copy-css.mjs"].sort()
+    return [...src.map((file) => slash(relative(packageRoot, file))), "tsconfig.build.json", "scripts/copy-css.mjs"].sort(byCodeUnit)
 }
 
 /** The digest of everything that decides the content of `dist/`. */

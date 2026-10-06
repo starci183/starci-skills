@@ -25,6 +25,7 @@ import { managedGroupOf } from '../runtime/scripts/hfs/edition-slots.mjs';
 import { feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 import { DEFAULT_PORT, NODE_IMAGE, dockerfilePath } from '../runtime/scripts/hfs/rules/docker.mjs';
 import { readDeclaredSonarKey } from './sonar-key.mjs';
+import { byCodeUnit } from '../report/order.mjs';
 
 export const TEMPLATES_DIR = path.join(import.meta.dirname, '..', 'templates');
 const NODE_MAJOR = 22;
@@ -149,7 +150,7 @@ export function appSource(root) {
     }
   };
   for (const dir of ['apps', 'src']) walk(dir);
-  return { files: files.sort(), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8') };
+  return { files: files.sort(byCodeUnit), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8') };
 }
 
 /**
@@ -281,7 +282,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
 }
 
 // The scripts of a package.json as one comparable text: a line per script, sorted by name (order is not drift).
-const scriptsText = scripts => `${Object.keys(scripts).sort().map(name => `${name}: ${typeof scripts[name] === 'string' ? scripts[name] : JSON.stringify(scripts[name])}`).join('\n')}\n`;
+const scriptsText = scripts => `${Object.keys(scripts).sort(byCodeUnit).map(name => `${name}: ${typeof scripts[name] === 'string' ? scripts[name] : JSON.stringify(scripts[name])}`).join('\n')}\n`;
 
 function parseScripts(text) {
   try {

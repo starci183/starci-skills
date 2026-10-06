@@ -26,6 +26,7 @@ import { isMain } from '../../lib/is-main.mjs';
 import { withoutGitLocalEnv } from '../../lib/git.mjs';
 import { samePath } from '../../lib/path-key.mjs';
 import { readEnv } from '../../lib/env.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 export const WORK_YAML_UNPARSEABLE = 'WORK_YAML_UNPARSEABLE';
 export const WORK_VALIDATE_REFUSED = 'WORK_VALIDATE_REFUSED';
@@ -44,9 +45,9 @@ export const inWorkTree = (rel) => WORK_PATH.test(slashed(rel));
 export const inSecretScope = (rel) => (WORK_PATH.test(slashed(rel)) || STACK_PATH.test(slashed(rel))) && !ENCRYPTED.test(rel);
 
 // ---------------------------------------------------------------------------------------------- secret scan
-const STANDIN = /^\.{2,}|fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock|todo|tbd|xxx|n\/a|not[-_ ]?set|none|null|undefined|disposable|generated|your[-_ ]|\*{3,}/i;
+const STANDIN = /(?:^\.{2,})|fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock|todo|tbd|xxx|n\/a|not[-_ ]?set|none|null|undefined|disposable|generated|your[-_ ]|\*{3,}/i;
 const REFERENCE = /^(?:\$|<|\{\{|%|@|secret[:.]|secrets[:.]|ref[:.]|env[:.]|sops[:.]|file[:.]|vault[:.]|kms[:.]|\/run\/secrets\/|identity\.|\[redacted|ENC\[)/i;
-const CODE_OR_STYLE = /^[-./@~]|[(){}\[\]<>`$]|\.\.\./;
+const CODE_OR_STYLE = /(?:^[-./@~])|[(){}\[\]<>`$]|\.\.\./;
 const PROSE_OR_CODE = /\.(?:md|mdx|markdown|java|kt|tf|ts|tsx|js|mjs|cjs|py|go|sql|sh|ps1|cs|rb)$/i;
 const PASSWORD_WORDS = new Set(['password', 'passwd', 'pwd', 'passphrase']);
 const CREDENTIAL_WORDS = new Set(['secret', 'token', 'apikey', 'credential', 'credentials']);
@@ -144,7 +145,7 @@ const stagedGitEnv = (root) => {
  */
 export function checkWorkFiles({ repo, files, read = null, strict = true } = {}) {
   const root = path.resolve(repo ?? '.');
-  const rels = [...new Set((files ?? []).map((f) => (path.isAbsolute(f) ? relTo(root, f) : slashed(f))).filter((f) => f && !f.startsWith('..') && inSecretScope(f)))].sort();
+  const rels = [...new Set((files ?? []).map((f) => (path.isAbsolute(f) ? relTo(root, f) : slashed(f))).filter((f) => f && !f.startsWith('..') && inSecretScope(f)))].sort(byCodeUnit);
   const reader = read ?? ((rel) => { try { return fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return null; } });
   const findings = [];
   const checked = { parse: 0, validate: 0, secrets: 0 };

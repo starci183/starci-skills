@@ -26,6 +26,7 @@ import { addApp } from './add-app.mjs';
 import { ensureLiteCli, selectLiteCliEntries } from './add-cli-lite.mjs';
 import { addLiteWebhookInbox, selectLiteWebhookEntries } from './add-inbox-lite.mjs';
 import { jsonText } from './app.mjs';
+import { byCodeUnit } from '../report/order.mjs';
 import { registerLiteDomainService, registerLiteExports } from './lite-exports.mjs';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -290,8 +291,8 @@ function topicsOfPatterns(patterns) {
 function register({ declarationFile, spec }) {
   const declaration = JSON.parse(fs.readFileSync(declarationFile, 'utf8'));
   const be = declaration.sides.be;
-  const patterns = [...new Set([...(be.patterns ?? []), ...spec.patterns])].sort();
-  const kinds = [...new Set([...(be.kinds ?? []), ...(spec.trigger ? [spec.trigger] : [])])].sort();
+  const patterns = [...new Set([...(be.patterns ?? []), ...spec.patterns])].sort(byCodeUnit);
+  const kinds = [...new Set([...(be.kinds ?? []), ...(spec.trigger ? [spec.trigger] : [])])].sort(byCodeUnit);
   be.patterns = patterns;
   if (kinds.length) be.kinds = kinds;
   fs.writeFileSync(declarationFile, jsonText(declaration));

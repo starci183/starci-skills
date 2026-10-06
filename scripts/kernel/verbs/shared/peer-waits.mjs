@@ -20,6 +20,7 @@ import path from 'node:path';
 import { JOB_STATUSES, newToken, postInbox, resolveIncident } from '../../../../engine/db/ledger.mjs';
 import { leaseCompareForm, ownedPathsIntersect } from '../../../../engine/admission.mjs';
 import { parseJson } from '../../../lib/json.mjs';
+import { byCodeUnit } from '../../../lib/list.mjs';
 import { leaseCanonicalizer } from '../../lease-canon.mjs';
 import { autoResolveTypedIncidents } from '../../gate-conditions.mjs';
 import { wakeKernelForTransition } from '../../wake-delivery.mjs';
@@ -235,7 +236,7 @@ export const peerOverlapHeadsUp = (ledger, { self, jobId, op, ownedPaths, now = 
   const canon = repo ? leaseCanonOf(db, repo) : null;
   const formOf = (owned, context) => { try { return leaseCompareForm(canon ? canon.canonical(owned, context) : owned); } catch { return null; } };
   const ownForms = ownedPaths.map((own) => ({ own, form: formOf(own, { op, payload }) }));
-  const pairKey = (other) => [jobId, other].sort().join('|');
+  const pairKey = (other) => [jobId, other].sort(byCodeUnit).join('|');
   const announced = new Set(peerMessageRows(db).flatMap((row) => {
     const pairs = parseJson(row.payload_json, {})?.overlapPairs;
     return Array.isArray(pairs) ? pairs : [];

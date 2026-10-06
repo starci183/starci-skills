@@ -76,6 +76,7 @@ import { parseJsonOr, withPayload } from '../lib/json.mjs';
 import { minutes } from '../lib/time.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { DECISION_TEXT, CONTRACT_CONFLICT_TEXT, NOTE_KIND, OWNER_ONLY, SUPERVISOR_ADDRESSED, WORKER_DIED_TEXT } from './owed-text.mjs';
 import { shortHash } from '../lib/hash.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
 const RETRY_LOOP_MIN = 4;
@@ -322,7 +323,7 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
 
 const hash = (s) => shortHash(s, { algo: 'sha1', n: 8 });
 const ownedPaths = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : []).map(String);
-const pathsKey = (payload) => JSON.stringify([...ownedPaths(payload)].sort());
+const pathsKey = (payload) => JSON.stringify([...ownedPaths(payload)].sort(byCodeUnit));
 const bare = (p) => p.replace(/\\/g, '/').replace(/(\/\*\*?)+$/, '').replace(/\/+$/, '');
 // Every owned path of `tail` lies under (or is) a path some job in `jobs` owns: a cut set that re-sliced it.
 const pathsCovered = (tail, jobs) => {

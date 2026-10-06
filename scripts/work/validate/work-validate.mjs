@@ -23,10 +23,11 @@ import { shellBindingFindings } from '../ui/shell-conformance.mjs';
 import { checkStarciStacks } from '../../gates/starcistacks.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { isMain } from '../../lib/is-main.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-const uniqueSorted = (items) => [...new Set(items.map((item) => String(item)))].sort();
+const uniqueSorted = (items) => [...new Set(items.map((item) => String(item)))].sort(byCodeUnit);
 
 export function validateWork(target, { strict = false } = {}) {
   const requested = path.resolve(target ?? '.');

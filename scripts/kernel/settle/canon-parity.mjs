@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { catFile } from '../../api/git/cat-file.mjs'; import { diff as gitDiff } from '../../api/git/diff.mjs'; import { revParseQuery } from '../../api/git/rev-parse-query.mjs'; import { lsTree } from '../../api/git/ls-tree.mjs';
 import { sameOrUnder } from '../../lib/path-key.mjs';
 import { isMain } from '../../lib/is-main.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const PARITY_OPS = Object.freeze(['code.refactor']);
@@ -145,7 +146,7 @@ function ownedFilesOf(root, ownedRels) {
     }
   };
   for (const rel of ownedRels) walk(rel);
-  return [...new Set(out)].sort();
+  return [...new Set(out)].sort(byCodeUnit);
 }
 
 /* ------------------------------------------------------------ (d) typecheck parity */
@@ -165,7 +166,7 @@ function projectsOf(root, rels) {
       dir = path.dirname(dir);
     }
   }
-  return [...out].sort();
+  return [...out].sort(byCodeUnit);
 }
 
 /**
@@ -218,7 +219,7 @@ export function tscParity({ root, ownedRels, baseBlobs, extraProjects = [], ts: 
   if (!ts) try { ts = createRequire(path.join(root, 'package.json'))('typescript'); }
   catch { return { ok: false, unavailable: 'typescript is not installed in the checked repository' }; }
   const current = ownedFilesOf(root, ownedRels);
-  const projects = [...new Set([...projectsOf(root, [...current, ...baseBlobs.keys()]), ...extraProjects])].sort();
+  const projects = [...new Set([...projectsOf(root, [...current, ...baseBlobs.keys()]), ...extraProjects])].sort(byCodeUnit);
   if (!projects.length) return { ok: true, projects: [], newErrors: [], note: 'no TypeScript project holds an owned file' };
   const abs = new Map(), base = new Map(), keys = new Set();
   for (const rel of [...current, ...baseBlobs.keys()]) { const a = path.join(root, rel); keys.add(keyOf(a)); abs.set(keyOf(a), a); }

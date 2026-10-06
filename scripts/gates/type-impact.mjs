@@ -1,6 +1,7 @@
 // type-impact.mjs - compiler project impact and byte-bound prerequisite stamps of the code gate.
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { sha256, sha256File } from '../../engine/digest.mjs';
 import { pathKey, posixPath } from '../lib/path-key.mjs';
 import { walkFiles, isInside } from '../lib/walk.mjs';
@@ -14,12 +15,12 @@ const regular = (file) => {
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`type input is not a regular file: ${file}`);
   return stat;
 };
-const sourceFiles = (dir) => walkFiles(dir, { sorted: true, exclude: excluded }).sort();
+const sourceFiles = (dir) => walkFiles(dir, { sorted: true, exclude: excluded }).sort(byCodeUnit);
 
 /** Exact current file bytes, path membership and missing scopes; an M-to-M edit never retains a stamp. */
 export function inputStamp(root, paths) {
   const top = path.resolve(root), rows = ['type-input-bytes-v1\0'];
-  for (const scope of [...new Set(paths.map(posixPath))].sort()) {
+  for (const scope of [...new Set(paths.map(posixPath))].sort(byCodeUnit)) {
     const at = path.resolve(top, scope);
     if (!isInside(top, at)) throw new Error(`type input scope is outside the app: ${scope}`);
     rows.push(`scope\0${scope}\0`);
@@ -105,7 +106,7 @@ export function typeImpact(root, files, { deleted = [] } = {}) {
     }
     if (!projects.size && inventory.some((file) => TS_SOURCE.test(file))) errors.push('GATE_TSC_CONFIG_MISSING configuration/install impact has TypeScript inputs but no tsconfig.json program');
   }
-  return { projects: [...projects.keys()].sort(), required: projects, errors };
+  return { projects: [...projects.keys()].sort(byCodeUnit), required: projects, errors };
 }
 
 /** Selected source must occur in the compiler's actual program, including an imported excluded root. */

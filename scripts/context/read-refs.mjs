@@ -2,6 +2,7 @@
 // references remain explicit; missing Source inputs and bounded expansions refuse execution.
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { bindOpPath } from '../lib/op-shared.mjs';
@@ -82,7 +83,7 @@ export function resolveReadReference(token, { sourceRoot, stateDir = null, appRo
       const matches = /[*?]/.test(pattern) ? globExpression(pattern) : globExpression(`${pattern.replace(/\/$/, '')}/**`);
       if (![...hits].some((file) => file === path.resolve(root, pattern) || matches.test(path.relative(root, file).replaceAll('\\', '/')))) missing.push(pattern);
     }
-    const resolved = [...hits].sort().map((absolute) => ({
+    const resolved = [...hits].sort(byCodeUnit).map((absolute) => ({
       path: rootKind === 'work' ? `.starciwork/${path.relative(root, absolute).replaceAll('\\', '/')}` : path.relative(root, absolute).replaceAll('\\', '/'),
       absolute, rootKind, root, sha256: sha256(fs.readFileSync(absolute)),
     }));

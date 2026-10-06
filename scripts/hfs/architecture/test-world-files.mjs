@@ -4,6 +4,7 @@ import { locateDeclaration } from '../slots.mjs';
 import { DEFAULT_ENVIRONMENT, STACKS_DIRECTORY, STATEFUL_KINDS, namesOfService, readStack } from '../../lib/stack-services.mjs';
 import { unwrapEach } from './ast-walks.mjs';
 import { nameText, sourceLocation } from '../../lib/ts-ast.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R47 `test-world-files` (BE_TEST_TOPOLOGY). Judgements over the test world, read through slots, the repository's own
@@ -59,7 +60,8 @@ function defineLiteral(ts, expression) {
 function configLiteral(ts, sourceFile) {
   for (const statement of sourceFile.statements) {
     if (!ts.isVariableStatement(statement) || !isExported(ts, statement)) continue;
-    if ((statement.declarationList.flags & ts.NodeFlags.Const) === 0) continue;
+    const constFlag = statement.declarationList.flags & ts.NodeFlags.Const;
+    if (constFlag === 0) continue;
     for (const declaration of statement.declarationList.declarations) {
       const literal = declaration.initializer ? defineLiteral(ts, declaration.initializer) : null;
       if (literal) return literal;
@@ -116,7 +118,7 @@ export function checkTestWorldFiles(input) {
   const fakeProviders = new Map();
   let worldRoot = null;
   let files = 0;
-  for (const file of [...tree.files].sort()) {
+  for (const file of [...tree.files].sort(byCodeUnit)) {
     if (!file.endsWith('.ts')) continue;
     const verdict = allowsFile(resolver, file);
     if (!verdict || verdict.slot !== WORLD_SLOT) continue;

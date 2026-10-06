@@ -169,7 +169,8 @@ export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now 
     reasons.push(`under-dispatched: ${running} running of ${par.allowed} allowed with ${queuedReady} queued-ready`);
     since = readySince.length ? Math.min(...readySince) : now;
   }
-  const quietSince = lastDoneAt ?? Number(createdAt) ?? now;
+  const created = createdAt == null ? NaN : Number(createdAt);
+  const quietSince = lastDoneAt ?? (Number.isFinite(created) ? created : now);
   if (remaining > 0 && minRate > 0 && unitsPerHour < minRate && now - quietSince >= settings.graceMs) {
     reasons.push(`slow: ${unitsPerHour} units/h < ${minRate}/h${priority ? ' (priority workflow)' : ''}, last unit ${lastDoneAt ? `${Math.round((now - lastDoneAt) / 60_000)}m ago` : 'never'}`);
     since = since == null ? quietSince : Math.min(since, quietSince);

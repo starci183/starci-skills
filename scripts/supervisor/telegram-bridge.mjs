@@ -760,4 +760,4 @@ function main() {
   console.error('usage: starci supervisor telegram-bridge start|run|status|stop'); process.exit(2);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === BRIDGE_FILE) main();
+if (process.argv[1] && path.resolve(process.argv[1]) === BRIDGE_FILE) Promise.resolve().then(main).catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });

@@ -11,6 +11,7 @@ import { runNode } from '../api/node/run-node.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { lines } from '../lib/verb-call.mjs';
 import { pathList } from './test-ladder.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const slash = (value) => String(value).replaceAll(path.sep, '/').replace(/^\.\//, '');
 export const RUNTIME_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -32,7 +33,7 @@ export function workingChanges(root, deps = {}) {
   const runLsFiles = deps.lsFiles ?? lsFiles;
   const tracked = runOutcome(runDiff(['--name-only', '--diff-filter=ACMR', 'HEAD'], { cwd: root }));
   const untracked = runOutcome(runLsFiles(['--others', '--exclude-standard'], { cwd: root }));
-  return [...new Set([...lines(tracked.stdout).map(slash), ...lines(untracked.stdout).map(slash)])].sort();
+  return [...new Set([...lines(tracked.stdout).map(slash), ...lines(untracked.stdout).map(slash)])].sort(byCodeUnit);
 }
 
 /** Committed changes between the local-main reference and HEAD: the L2/L3 change set. */
@@ -103,5 +104,5 @@ export function projectsForChanges(projects, changed, { affected = false } = {})
     }
     if (affected) for (const item of dirs) if (item.dir.startsWith(`${file}/`) || item.project === file) selected.add(item.project);
   }
-  return [...selected].sort();
+  return [...selected].sort(byCodeUnit);
 }

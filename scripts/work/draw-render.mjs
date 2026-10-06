@@ -63,6 +63,7 @@ import { MEASURE_SCHEMA, REDLINE_ATTR, REDLINE_LEAF_COMPONENTS, WHY_ATTR, drawRe
 import { DRAW_SOURCE_SUFFIX, GRAMMAR_PACKAGE, LAYOUT_ATTR, markLayoutElements, rationaleFileFor, typecheckFindings } from './draw/draw-source.mjs';
 import { grammarDistStatus, grammarDistMessage } from '../gates/grammar-dist.mjs';
 import { PREFERENCES, grammarEntry, resolveDrawGrammar } from './draw-grammar.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const RECORD_SCHEMA = 'starci/draw-render@1';
 const DEVICE_SCALE_FACTOR = 2;
@@ -310,7 +311,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
       }
       if (owner !== 'grammar') unowned.push(`${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? `.${el.className.trim().split(/\s+/).slice(0, 3).join('.')}` : ''}${el.textContent.trim() ? ` "${el.textContent.trim().slice(0, 40)}"` : ''} (${owner ?? 'no owner'})`);
     }
-    ownership = { components: [...components].sort(), layoutElements, unownedCount: unowned.length, unowned: unowned.slice(0, 20) };
+    ownership = { components: [...components].sort(byCodeUnit), layoutElements, unownedCount: unowned.length, unowned: unowned.slice(0, 20) };
     const clone = document.documentElement.cloneNode(true);
     for (const el of clone.querySelectorAll('[data-component]')) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', el.getAttribute('data-component'));
     for (const el of clone.querySelectorAll('script')) el.remove();

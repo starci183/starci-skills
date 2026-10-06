@@ -3,6 +3,7 @@ import { machineKit, pascal } from './machine-ast.mjs';
 import { treeOf } from './required-files.mjs';
 import { DATABASE_DIR } from './connection-map.mjs';
 import { collectRegistrations, isPerConnection, persistenceOfFactory } from './context-map.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R35 `schema-owner` (BE_SCHEMA_OWNER, BE-CONVENTION 1.4.6). Schema lives with the capability that owns the table:
@@ -49,13 +50,13 @@ export function checkSchemaOwner(input) {
   };
 
   const tree = treeOf(config.root);
-  for (const rel of [...tree.files].sort()) {
+  for (const rel of [...tree.files].sort(byCodeUnit)) {
     const classified = resolver.classifyPath(rel);
     if (classified.status === 'no-slot' || !classified.slot?.startsWith('be.') || classified.slot === PERSISTENCE_SLOT) continue;
     const folder = rel.split('/').slice(0, -1).find(segment => SCHEMA_FOLDERS.includes(segment));
     if (folder) plain(rel, `${rel} sits in a ${folder}/ folder outside the persistence of a capability; ${folder} live only in src/modules/{domain,platform}/<capability>/persistence/${folder}/ of the capability that owns the table.`, { folder });
   }
-  for (const rel of [...tree.files].sort()) {
+  for (const rel of [...tree.files].sort(byCodeUnit)) {
     const persistence = persistenceOf(rel);
     if (!persistence || persistence.folder !== 'migrations') continue;
     if (/\.spec\.[cm]?tsx?$/u.test(rel)) plain(rel, `${rel} is a unit spec of a migration; a migration has no spec, the e2e run over the same migrations is its proof. Delete it.`);
@@ -101,10 +102,10 @@ export function checkSchemaOwner(input) {
   const { registered, registrations } = collectRegistrations({ kit, graph, persistenceOf });
   for (const [key, { name, connections: sites }] of registered) {
     for (const [connection, site] of sites) {
-      if (!connections.has(connection)) report(site.file, site.node, `The ${name} capability is registered on connection "${connection}", which hfs.json does not declare (declared: ${[...connections].sort().join(', ') || 'none'}); the tables of a capability live on one declared connection.`, { connection, capability: name });
+      if (!connections.has(connection)) report(site.file, site.node, `The ${name} capability is registered on connection "${connection}", which hfs.json does not declare (declared: ${[...connections].sort(byCodeUnit).join(', ') || 'none'}); the tables of a capability live on one declared connection.`, { connection, capability: name });
     }
     if (sites.size > 1 && !isPerConnection(resolver, key, name)) {
-      const all = [...sites.keys()].sort().join(' and ');
+      const all = [...sites.keys()].sort(byCodeUnit).join(' and ');
       for (const [connection, site] of [...sites].slice(1)) report(site.file, site.node, `The ${name} capability's entities and migrations are registered on connections ${all}; a capability's tables live on exactly one connection, so register its arrays under one connection across every app.`, { connection, capability: name });
     }
   }
@@ -129,7 +130,7 @@ export function checkSchemaOwner(input) {
         const declaration = kit.declarationsOf(checker, node.expression)[0];
         const rel = declaration ? kit.graphPath(declaration) : null;
         const used = rel ? [...connections].find(name => rel === `${DATABASE_DIR}/${name}.decorators.ts`) : null;
-        if (used && perConnection && !only.has(used)) report(file, node, `${file.rel} injects the entity manager of connection ${used}, but the ${kinds.name} capability's tables are registered on ${[...only.keys()].sort().join(' and ')}; register the capability on ${used} too or inject one of its connections.`, { connection: used, expected: [...only.keys()].sort().join(','), capability: kinds.name });
+        if (used && perConnection && !only.has(used)) report(file, node, `${file.rel} injects the entity manager of connection ${used}, but the ${kinds.name} capability's tables are registered on ${[...only.keys()].sort(byCodeUnit).join(' and ')}; register the capability on ${used} too or inject one of its connections.`, { connection: used, expected: [...only.keys()].sort(byCodeUnit).join(','), capability: kinds.name });
         else if (used && !perConnection && used !== home) report(file, node, `${file.rel} injects the entity manager of connection ${used}, but the ${kinds.name} capability's tables are registered on ${home}; a capability reads only its own database, so use Inject${pascal(home)}EntityManager or move the tables.`, { connection: used, expected: home, capability: kinds.name });
         return true;
       });

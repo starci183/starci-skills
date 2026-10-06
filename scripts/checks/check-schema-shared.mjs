@@ -21,6 +21,7 @@
 //   runs in the check stage (self-check schema-shared); --json prints the findings as JSON
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -81,7 +82,7 @@ function checkWorkSchemas(root, findings) {
     if (rec.files.size < MIN_FILES) continue;
     findings.push({
       code: 'RT_SCHEMA_NOT_SHARED',
-      path: [...rec.files].sort().join(', '),
+      path: [...rec.files].sort(byCodeUnit).join(', '),
       message: `the block at ${rec.trail || '(root)'} is identical in ${rec.files.size} work schemas — move it to modules/schemas/work-common.schema.yaml and bind it with a urn:work:common:1#/$defs/<name> $ref: ${signature.slice(0, 120)}`,
     });
   }
@@ -141,7 +142,7 @@ function checkOpManifests(root, findings) {
   }
   for (const [key, files] of leafRestated) {
     if (files.size < MIN_FILES) continue;
-    findings.push({ code: 'RT_OP_FIELD_NOT_COMMON', path: [...files].sort().join(', '),
+    findings.push({ code: 'RT_OP_FIELD_NOT_COMMON', path: [...files].sort(byCodeUnit).join(', '),
       message: `${key} is restated literally in ${files.size} op manifests — mark it shared so _common.yaml stays the one copy` });
   }
 }

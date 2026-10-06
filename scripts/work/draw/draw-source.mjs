@@ -42,7 +42,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findPackage, requirePackage } from '../../lib/package-at.mjs';
-import { list } from '../../lib/list.mjs';
+import { list, byCodeUnit } from '../../lib/list.mjs';
 import { isFile } from '../../lib/fs-kind.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT } from './draw-dna.mjs';
 import { isMain } from '../../lib/is-main.mjs';
@@ -242,7 +242,7 @@ export function fixtureFindings(fixtures) {
   for (const { file, value } of fixtures) {
     const label = path.basename(file);
     if (!value || typeof value !== 'object' || Array.isArray(value)) { out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} is not a props object` }); continue; }
-    const keys = Object.keys(value).sort();
+    const keys = Object.keys(value).sort(byCodeUnit);
     if (keys.join(',') !== 'on,props,state') out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} holds {${keys.join(', ')}}: an XBase fixture is exactly {state, props, on} (the drawing law)` });
     else if (typeof value.state !== 'string') out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} state is not a shape name` });
   }

@@ -48,6 +48,7 @@ import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { fmtMs } from '../lib/time.mjs';
 import { clipLine } from '../lib/clip.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 export const SNAPSHOT_KIND = 'supervisor-op-metrics';
 /** metrics_snapshots.kind of these snapshots (DBTREE B6). */
@@ -110,7 +111,7 @@ export function failureClassOf({ status, result = {}, report = null, checks = []
   const liveness = result?.worker?.liveness ?? (report ? null : dead);
   if (liveness && !report) return `dead-worker:${liveness}`;
   const category = typeof report?.rootCause?.category === 'string' && report.rootCause.category.trim() ? report.rootCause.category.trim().toLowerCase() : null;
-  const red = checks.filter((c) => c && (c.ok === false || (c.exitCode != null && Number(c.exitCode) !== 0))).map((c) => String(c.name ?? 'unnamed')).sort();
+  const red = checks.filter((c) => c && (c.ok === false || (c.exitCode != null && Number(c.exitCode) !== 0))).map((c) => String(c.name ?? 'unnamed')).sort(byCodeUnit);
   // The settle's own class (scripts/kernel/verify-failure.mjs: result_json.failureClass {class, reason}, or the
   // report's failureClass) leads, narrowed by the root-cause category or the red check.
   const settled = typeof result?.failureClass?.class === 'string' ? result.failureClass.class
@@ -125,7 +126,7 @@ export function failureClassOf({ status, result = {}, report = null, checks = []
 }
 
 /** One failed attempt's signature: its class plus every red check name, so two attempts failing alike compare equal. */
-export const failureSignature = (klass, checks = []) => [klass, ...checks.filter((c) => c && (c.ok === false || (c.exitCode != null && Number(c.exitCode) !== 0))).map((c) => String(c.name ?? '')).sort()].join('|');
+export const failureSignature = (klass, checks = []) => [klass, ...checks.filter((c) => c && (c.ok === false || (c.exitCode != null && Number(c.exitCode) !== 0))).map((c) => String(c.name ?? '')).sort(byCodeUnit)].join('|');
 
 /* ------------------------------------------------------------ per-job records */
 

@@ -5,13 +5,14 @@ import { runNode } from '../api/node/run-node.mjs';
 import { failedRunFinding } from '../lib/verb-call.mjs';
 import { ladderRefusal, ladderResult, pathList, scopeFor } from './test-ladder.mjs';
 import { projectsForChanges, repositoryKind, runOutcome, tracked, typeScriptProjects, workingChanges } from './ladder-select.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const SCHEMA = 'starci/typecheck-run@1';
 const RUNTIME_SOURCE = /^(?:engine|scripts|modules|bin)\/.*\.(?:mjs|cjs)$/i;
 
 function runtimeSources(root, level, changed, deps) {
   if (level === 'L0' || level === 'L1') return pathList(changed).filter((file) => RUNTIME_SOURCE.test(file));
-  return [...tracked(root, '*.mjs', deps), ...tracked(root, '*.cjs', deps)].filter((file) => RUNTIME_SOURCE.test(file)).sort();
+  return [...tracked(root, '*.mjs', deps), ...tracked(root, '*.cjs', deps)].filter((file) => RUNTIME_SOURCE.test(file)).sort(byCodeUnit);
 }
 
 function checkSyntax(root, files, deps) {

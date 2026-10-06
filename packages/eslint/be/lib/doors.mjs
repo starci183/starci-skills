@@ -55,7 +55,9 @@ export const aliasTarget = (context, identifier) => {
     const { checker, toTs } = typed(context)
     const tsNode = toTs(identifier)
     const symbol = tsNode && checker.getSymbolAtLocation(tsNode)
-    return symbol && (symbol.flags & ts.SymbolFlags.Alias) !== 0 ? checker.getAliasedSymbol(symbol) : symbol
+    if (!symbol) return symbol
+    const isAlias = (symbol.flags & ts.SymbolFlags.Alias) !== 0
+    return isAlias ? checker.getAliasedSymbol(symbol) : symbol
 }
 
 /** The methods of a class (instance, non-constructor) that carry one of the decorators `names` of `source`. */

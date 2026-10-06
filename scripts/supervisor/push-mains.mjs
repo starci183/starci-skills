@@ -58,6 +58,7 @@ import { foldCase, realPath, slash } from '../lib/path-key.mjs';
 import { isSopsEnvelope, setCommand } from '../lib/sops-envelope.mjs';
 import { forEachFileLine } from '../lib/read-text.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 export { FORBIDDEN_FILES, SECRET_PATTERNS };
 
 /**
@@ -164,7 +165,7 @@ export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, s
     out.scan = { ok: scan.ok, files: scan.files?.length ?? 0, findings: scan.findings };
     if (!scan.ok) {
       const hint = scan.error ? null : scanHint(scan.findings);
-      const signature = scan.error ? 'secret-scan:failed' : `secret-scan:${[...new Set(scan.findings.map((f) => f.pattern))].sort().join('+')}`;
+      const signature = scan.error ? 'secret-scan:failed' : `secret-scan:${[...new Set(scan.findings.map((f) => f.pattern))].sort(byCodeUnit).join('+')}`;
       return { ...out, refused: scan.error ? `scan failed: ${scan.error}` : 'secret scan found candidates (file/line/pattern only)', signature, ...(hint ? { hint } : {}) };
     }
     if (dryRun) return { ...out, wouldPush: true };

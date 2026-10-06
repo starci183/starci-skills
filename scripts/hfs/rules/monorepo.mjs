@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadTypescript } from '../../lib/package-at.mjs';
 import { found, readJson, readText } from './read.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const MONO_WORKSPACES = 'HFS_MONO_WORKSPACES';
 const MONO_FE_WORKSPACE = 'HFS_MONO_FE_WORKSPACE';
@@ -51,7 +52,7 @@ function workspacesOf(files) {
     const parts = file.split('/');
     if (parts.length === 4 && parts[0] === 'fe' && (parts[1] === 'apps' || parts[1] === 'packages') && parts[3] === MANIFEST) folders.add(parts.slice(0, 3).join('/'));
   }
-  return [...folders].sort();
+  return [...folders].sort(byCodeUnit);
 }
 
 /** R143: the root package.json declares the workspaces, the package manager and turbo. */
@@ -78,8 +79,8 @@ function workspaceManifestFindings(repoRoot, project, workspaces) {
     if (folder.startsWith('fe/apps/')) {
       const expected = feAppPackageName(project, name);
       if (pkg.name !== expected) findings.push(found(MONO_FE_WORKSPACE, file, `${file} is named ${JSON.stringify(pkg.name ?? null)}; the fe app ${name} is the workspace ${expected}.`, { expected }));
-      const want = Object.keys(FE_APP_SCRIPTS).sort();
-      const off = [...new Set([...want, ...Object.keys(scripts)])].sort().filter((key) => scripts[key] !== FE_APP_SCRIPTS[key]);
+      const want = Object.keys(FE_APP_SCRIPTS).sort(byCodeUnit);
+      const off = [...new Set([...want, ...Object.keys(scripts)])].sort(byCodeUnit).filter((key) => scripts[key] !== FE_APP_SCRIPTS[key]);
       if (off.length) findings.push(found(MONO_FE_WORKSPACE, file, `${file} has scripts ${JSON.stringify(scripts)}; an fe app workspace has exactly ${JSON.stringify(FE_APP_SCRIPTS)} (turbo runs build, dev, lint and typecheck; differs at ${off.join(', ')}).`, { scripts: off }));
     } else {
       const missing = FE_PACKAGE_SCRIPTS.filter((key) => typeof scripts[key] !== 'string' || !scripts[key]);
@@ -98,7 +99,7 @@ function nestFindings(repoRoot, files, beApps) {
   const findings = [];
   if (cli.monorepo !== true) findings.push(found(MONO_NEST_PROJECTS, NEST_CLI, `${NEST_CLI} is not \`"monorepo": true\`; the back end is a Nest monorepo of be/apps/<app>, even with one service.`));
   const declared = beApps.map((app) => app.name).sort();
-  const projects = Object.keys(cli.projects ?? {}).sort();
+  const projects = Object.keys(cli.projects ?? {}).sort(byCodeUnit);
   if (!sameList(projects, declared)) findings.push(found(MONO_NEST_PROJECTS, NEST_CLI, `${NEST_CLI} has projects ${JSON.stringify(projects)}, but hfs.json declares the be apps ${JSON.stringify(declared)}; one project per declared app, no other.`, { projects, declared }));
   for (const name of projects.filter((project) => declared.includes(project))) {
     const project = cli.projects[name] ?? {};
@@ -157,7 +158,7 @@ function workspaceDepFindings(repoRoot, files, workspaces) {
         if (!missing.has(name)) missing.set(name, file);
       }
     }
-    for (const [name, file] of [...missing].sort()) {
+    for (const [name, file] of [...missing].sort(byCodeUnit)) {
       const sibling = names.get(name);
       findings.push(found(MONO_WORKSPACE_DEP, manifest, `${file} imports ${name}, which ${manifest} does not declare; ${sibling ? `declare the workspace package ${name} as "*"` : `declare ${name} in the dependencies of ${manifest} (one version across the workspace, R14)`}.`, { dependency: name, importedBy: file }));
     }

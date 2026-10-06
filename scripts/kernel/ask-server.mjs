@@ -55,6 +55,7 @@ import { wakeKernelForTransition } from './wake-delivery.mjs';
 import { loadConfig, activeDelegation, allocationMs, askAutoAcceptPolicy, ASK_PORT_BAND } from '../../engine/config.mjs';
 import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/telegram.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 // notifyAsk is parkAsk's (the kernel api's) send point; this form never sends a message.
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
 import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, CREDENTIAL_ASK_KINDS, askKindOf, autoAcceptDecision } from '../machine/ask-recommendation.mjs';
@@ -404,7 +405,7 @@ export const pickGroupsOf = (question, images) => {
     if (choices.size < 2) return [];
     picks.push({
       id: screen, label: screen,
-      choices: [...choices.keys()].sort().map((k) => ({ id: k.toUpperCase(), label: k.toUpperCase(), image: choices.get(k) })),
+      choices: [...choices.keys()].sort(byCodeUnit).map((k) => ({ id: k.toUpperCase(), label: k.toUpperCase(), image: choices.get(k) })),
     });
   }
   return picks;
@@ -970,4 +971,4 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
   }, ttl).unref();
 };
 
-if (isMain(import.meta.url)) main();
+if (isMain(import.meta.url)) main().catch((error) => { console.error(error); process.exit(1); });

@@ -9,6 +9,7 @@
 // clean; any unparseable file exits 1 and is named.
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
@@ -18,7 +19,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const YAML_ROOTS = Object.freeze(['modules', 'knowledge']);
 
 export function moduleYamlFiles(dirs = YAML_ROOTS.map(name => path.join(root, name))) {
-  return [dirs].flat().flatMap(dir => walkFiles(dir, {filter: name => /\.ya?ml$/i.test(name)})).sort();
+  return [dirs].flat().flatMap(dir => walkFiles(dir, {filter: name => /\.ya?ml$/i.test(name)})).sort(byCodeUnit);
 }
 
 export function unparseableYaml(files = moduleYamlFiles()) {

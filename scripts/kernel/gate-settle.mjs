@@ -41,6 +41,7 @@ export { REVIEW_DEFECTS_SCHEMA, SECURITY_FINDINGS_SCHEMA, proofsOf, judgeTestWor
   judgeTestWorld, judgeUnitRun, judgeLint, securityRelevant, feRelevant, judgeSecurityLint, judgeReviewGate, judgeReviewDefects,
   judgeRelease, judgeJobProofs, recordProofJudgment, proofRefusalText } from './mechanism-proofs.mjs';
 import { oneLine } from '../lib/clip.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { normRel, sameResolvedPath } from '../lib/path-key.mjs';
 import { isAncestor } from '../api/git/is-ancestor.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
@@ -143,7 +144,7 @@ export async function judgeJobLoop({ op, files, roots = [], doc = loadOpGate(), 
     for (const root of known) {
       try {
         const target = targets.find((row) => sameResolvedPath(row.root, root));
-        const owned = [...new Set(placements.filter((p) => sameResolvedPath(p.base, root)).map((p) => normRel(p.path)))].sort();
+        const owned = [...new Set(placements.filter((p) => sameResolvedPath(p.base, root)).map((p) => normRel(p.path)))].sort(byCodeUnit);
         if (!target?.head || JSON.stringify(target.owned) !== JSON.stringify(owned))
           throw new Error('the admitted baseline or owned paths differ from the job placement');
         const gate = readAttached(files, GATE_SCHEMA, (g) => !isDocGate(g) && typeof g.root === 'string' && sameResolvedPath(g.root, root));

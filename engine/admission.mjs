@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { refuse } from './refuse.mjs';
+import { byCodeUnit } from '../scripts/lib/list.mjs';
 
 const PATH_LEASE_PREFIX='path:';
 const GLOB_META=/[*?[\]{}]/;
@@ -250,7 +251,7 @@ export function cutOf(job){
 export const UNIT_TRY_BUDGET=5;
 const shortDigest=value=>createHash('sha256').update(value).digest('hex').slice(0,16);
 const lineagePaths=list=>(Array.isArray(list)?list:[]).map(item=>typeof item==='string'?item:item?.path).filter(p=>typeof p==='string'&&p.trim());
-const normList=list=>[...new Set(lineagePaths(list).map(p=>p.replace(/\\/g,'/').replace(/\/\*\*$/,'').replace(/\/+$/,'')))].sort();
+const normList=list=>[...new Set(lineagePaths(list).map(p=>p.replace(/\\/g,'/').replace(/\/\*\*$/,'').replace(/\/+$/,'')))].sort(byCodeUnit);
 
 /**
  * The work identity of a job (DBTREE work_units.subject_key): a cut slice is `cut:<id>#<ordinal>`, an op about one

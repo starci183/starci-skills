@@ -5,7 +5,7 @@ import {parseYaml} from '../../../engine/yaml.mjs';
 import {decodePng} from '../png.mjs';
 import {TOKEN_TOLERANCE,defaultGrammarRoot,deltaEOk,formatHex,oklabToOklch,parseColor,readBrandRecord,rgbToOklab} from '../brand/brand.mjs';
 import {slash} from '../../lib/path-key.mjs';
-import {objectList} from '../../lib/list.mjs';
+import {objectList, byCodeUnit} from '../../lib/list.mjs';
 import {formatCheckLines} from '../../lib/check-format.mjs';
 import {generatedDrawingsOf} from './ui-shapes.mjs';
 
@@ -259,7 +259,7 @@ export function cardClassesOf({family,grammarRoot=defaultGrammarRoot()}={}){
     const classes=[...new Set(cards.flatMap(entry=>(Array.isArray(entry.classes)?entry.classes:[])
       .filter(name=>typeof name==='string')
       .map(name=>name.split('--')[0])
-      .filter(name=>/-surface(-card)?$/.test(name))))].sort();
+      .filter(name=>/-surface(-card)?$/.test(name))))].sort(byCodeUnit);
     return classes.length?{source:slash(file),classes,error:null}:{source:'fallback',classes:fallback,error:'the DNA snapshot declares no card surface class'};
   }catch(error){return {source:'fallback',classes:fallback,error:`unreadable DNA snapshot: ${String(error.message??error)}`};}
 }

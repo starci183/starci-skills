@@ -23,6 +23,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { linterReport, mergeReports, sonarReport, sourceRootsOf } from '../report/sonar.mjs';
 import { SIDES, appRelativeMessages, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { STYLE_GLOB } from '../sync/index.mjs';
+import { byCodeUnit } from '../report/order.mjs';
 import { braceVariants, globExpression } from '../runtime/scripts/lib/glob.mjs';
 
 export const LINT_SCHEMA = 'starci/lint@1';
@@ -137,7 +138,7 @@ async function sourceFiles({ repoRoot, cwd, side, scope }) {
     }
   };
   visit(scope ?? '');
-  return files.sort();
+  return files.sort(byCodeUnit);
 }
 
 /** Every requested source needs an explicit, well-formed result; suppressed findings and foreign paths cannot witness a completed lint. */
@@ -256,7 +257,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
     linterReport('eslint', raw.eslint, { root: repoRoot, sourceRoots, tracked }),
     linterReport('stylelint', raw.stylelint, { root: repoRoot, sourceRoots, tracked }),
   ]);
-  const report = { schema: LINT_SCHEMA, ok: findings.length === 0 && errors.length === 0, repoRoot, changed: changed ? [...changed].sort() : null, workspace, counts: { error: findings.length }, engines, errors, findings };
+  const report = { schema: LINT_SCHEMA, ok: findings.length === 0 && errors.length === 0, repoRoot, changed: changed ? [...changed].sort(byCodeUnit) : null, workspace, counts: { error: findings.length }, engines, errors, findings };
   return { report, sonar, exit: errors.length ? 2 : findings.length ? 1 : 0 };
 }
 

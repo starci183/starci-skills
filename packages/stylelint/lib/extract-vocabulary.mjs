@@ -10,6 +10,7 @@
  */
 import fs from "node:fs"
 import path from "node:path"
+import { byCodeUnit } from "./order.mjs"
 
 /** The four namespaces the grammar owns. */
 export const FAMILY_PREFIXES = ["--grammar-", "--starci-core-", "--heritage-", "--offset-pop-"]
@@ -68,7 +69,7 @@ export function extractVocabulary(grammarSrcDir) {
     }
     for (const name of softPairOf(tone)) declared.add(name)
   }
-  const own = [...declared].filter((name) => !inFamily(name)).sort()
-  const vendor = [...referenced].filter((name) => !declared.has(name) && !inFamily(name)).sort()
+  const own = [...declared].filter((name) => !inFamily(name)).sort(byCodeUnit)
+  const vendor = [...referenced].filter((name) => !declared.has(name) && !inFamily(name)).sort(byCodeUnit)
   return { declared: own, vendor, breakpoints: extractBreakpoints(texts), statusTones: [...STATUS_TONES] }
 }

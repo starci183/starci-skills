@@ -42,7 +42,7 @@ export function LogRowItem({ row, fresh = false }: { row: LogRow; fresh?: boolea
         {tone && <span className="shrink-0 text-[11px] font-semibold leading-5 text-[color:var(--tone)] md:hidden">{levelLabels[row.level]}</span>}
         <ChevronRight className="mt-1 size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90 md:hidden" aria-hidden="true" />
       </span>
-      <span className="hidden min-w-0 truncate font-mono text-[11px] text-muted-foreground md:block" onClick={(event) => { if ((event.target as HTMLElement).closest('a')) event.stopPropagation(); }}>
+      <span className="hidden min-w-0 truncate font-mono text-[11px] text-muted-foreground md:block" onClick={(event) => { if ((event.target as HTMLElement).closest('a')) event.stopPropagation(); }} onKeyDown={(event) => { if ((event.target as HTMLElement).closest('a')) event.stopPropagation(); }}>
         {wfRef ? <a href={wfRef.href} className={linkClass}>{shortWf(wfRef.id)}</a> : row.wf ? shortWf(row.wf) : row.db === 'machine' ? t('machine') : row.db}
         {attemptRef && <> · <a href={attemptRef.href} className={linkClass}>#{attemptRef.id}</a></>}
       </span>

@@ -66,6 +66,7 @@ import { DRAW_FEEDBACK_UNADDRESSED, dnaNamesFor, feedbackFindings, feedbackOf, g
 import { learnIntoDirection, promoteGolden } from './brand-direction.mjs';
 import { DIRECTION_EXEMPT, archetypeOf } from './ui-archetype.mjs';
 import { readBrandRecord } from './brand/brand.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 export const DRAW_REVIEW_KIND = 'draw-review';
 export const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';
@@ -104,7 +105,7 @@ function dependentsOf(workRoot, id) {
     try { doc = readYaml(file); } catch (error) { unreadable.push(`${slash(path.relative(workRoot, file))} (${error.message})`); continue; }
     if (list(doc?.dependsOn).some((d) => (typeof d === 'string' ? d : d?.id) === id)) records.push(doc.id ?? slash(file));
   }
-  return { records: records.sort(), unreadable };
+  return { records: records.sort(byCodeUnit), unreadable };
 }
 
 /**

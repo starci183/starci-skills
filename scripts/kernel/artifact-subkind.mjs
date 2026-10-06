@@ -45,7 +45,7 @@ export function subkindOfTool(tool) {
   const t = String(tool ?? '').trim().toLowerCase();
   if (!t) return null;
   if (t === 'draw-render') return 'draw-render';
-  if (/^image[_-]?gen\b|imagegen/.test(t)) return 'asset-gen';
+  if (/(?:^image[_-]?gen\b|imagegen)/.test(t)) return 'asset-gen';
   return null;
 }
 

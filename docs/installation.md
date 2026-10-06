@@ -13,6 +13,9 @@ npm are required. The runtime ships sources only — it bundles its own YAML par
 downloaded archive before executing it; `npx` executes package code. Pin a
 reviewed version instead of assuming `latest` is safe.
 
+The init identity setup needs `age-keygen` 1.2.1 or 1.3.1 on `PATH` (the versions `scripts/api/sops/lib.mjs` accepts); the installer never skips key
+generation, so without a supported `age-keygen` it projects the files, names the missing or unsupported tool and exits 1 as "held".
+
 Have the owner install the exact reviewed `@starci/cli` package globally, then run:
 
 ```sh
@@ -149,8 +152,7 @@ installed package's own `installRuntime` (the installer `init`, the dependency i
 `machine-db init` and `status`, an idempotent second install, and that the real home was not written. Exit 0 every assertion passed, 1 an assertion failed,
 2 a step could not run; it prints a JSON summary and appends a table to `$GITHUB_STEP_SUMMARY` when GitHub sets it.
 
-The init identity setup needs `age-keygen` 1.2.1 or 1.3.1 on `PATH` (`scripts/api/sops/lib.mjs`); without it the install projects the files and exits 1 as
-"held". The script asserts the prerequisite by name. Run either sandbox as `node scripts/gates/install-sandbox.mjs --tarball <temp-dir>/starci-<version>.tgz`:
+The script asserts the `age-keygen` prerequisite by name. Run either sandbox as `node scripts/gates/install-sandbox.mjs --tarball <temp-dir>/starci-<version>.tgz`:
 
 - **Windows (or any host), direct:** the command as written; the temp HOME is the only home the run sees.
 - **Linux, in a throwaway Docker container:** add `--docker [--tools <dir>]`. The container is the node image of the release parity step, started through
@@ -167,7 +169,8 @@ The init identity setup needs `age-keygen` 1.2.1 or 1.3.1 on `PATH` (`scripts/ap
 | Symptom | Check |
 | --- | --- |
 | `npx @starci/cli` cannot find the release | Use a reviewed package version; it may not be published. |
-| Bootstrap entry missing or stale | Re-run `starci runtime install --cwd <host>`; the managed block is regenerated from `init/AGENTS.md`. |
+| Bootstrap entry missing or stale | Re-run `starci runtime install --cwd <host>`; the managed block is regenerated from `init/AGENTS.md`. `starci runtime check --only entry -- <host> [claimed-entry] [--hosts claude,devin|all]` judges `AGENTS.md` plus the `CLAUDE.md`/`DEVIN.md` copies that exist or are named by `--hosts`. |
+| Install exits 1 with "initial age setup" held | `age-keygen` 1.2.1 or 1.3.1 is missing from `PATH`; the message names the tool, see the prerequisites above. |
 | `.claude` already exists | Inspect ownership/custom files; do not reflexively pass `--force`. |
 | `config.yaml` missing | Copy `config.example.yaml`; it is seeded only when absent. |
 | No project binding | Supply backend/frontend paths and verified remotes in `work.json`. Do not initialize `.starciwork` inside the frontend. |

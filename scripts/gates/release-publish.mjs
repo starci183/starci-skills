@@ -79,7 +79,7 @@ export function releasePublish({ root = runtimeRoot, publish = false, runtimePac
     const findings = releaseNotesFindings({ tags: [`v${version}`], changelog: fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8') });
     plan.blockers.push(...findings.map((finding) => finding.message));
   }
-  planLines(plan).forEach(out);
+  for (const line of planLines(plan)) out(line);
   if (!publish) return plan.blockers.length ? EXIT.blocked : EXIT.done;
   if (plan.blockers.length) { out('release-publish: refusing to publish with blockers'); return EXIT.failed; }
   const who = registry.whoami();

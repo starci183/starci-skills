@@ -11,11 +11,19 @@
 // LEDGER_LEGACY_WORK_SQLITE (COOK-BRIEF F4 handover, incident 2026-09-30). Any other repository — a product repo,
 // a bare repo — carries no scripts/housekeeping/ledger-hygiene.mjs at its root, so that section is silently absent:
 // never a crash, never machine-state findings blamed on a repository that does not own them.
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { secretFileFindings } from '../runtime/scripts/hfs/rules/secrets.mjs';
+import { runGit } from '../runtime/scripts/api/git/lib.mjs';
+
+// One git call through the runtime's git owner (scripts/api/git/lib.mjs): stdout, or the failure thrown the way execFileSync threw it (error.status carries the exit code). The caller's own env is passed on unchanged: a hook runs with GIT_INDEX_FILE set, which the staged reads must keep seeing.
+const git = (cwd, args, options = {}) => {
+  const run = runGit(args, { cwd, env: process.env, ...options });
+  if (run.error) throw run.error;
+  if (run.status !== 0) throw Object.assign(new Error(`git ${args[0]} exited ${run.status}`), { status: run.status });
+  return run.stdout;
+};
 
 const PLAINTEXT_NAME = /(^|\/)(\.env(\..*)?|[^/]*\.(pem|key|identity|age))$/;
 /** The app root's work tree and stack tree, app-relative (`starci app hygiene` runs at the app root). */
@@ -27,7 +35,7 @@ const GUARDED = file => file.startsWith(WORK) || file.startsWith(STACKS);
 function ignoredAmong(cwd, files) {
   if (files.length === 0) return new Set();
   try {
-    const out = execFileSync('git', ['check-ignore', '--no-index', '-z', '--stdin'], { cwd, input: files.join('\0'), encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const out = git(cwd, ['check-ignore', '--no-index', '-z', '--stdin'], { input: files.join('\0'), maxBuffer: 64 * 1024 * 1024 });
     return new Set(out.split('\0').filter(Boolean));
   } catch (error) {
     if (error.status === 1) return new Set();
@@ -50,7 +58,7 @@ export function hygieneFindings(files, ignored) {
   return findings;
 }
 
-const gitList = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).split('\0').filter(Boolean);
+const gitList = (cwd, args) => git(cwd, args, { maxBuffer: 64 * 1024 * 1024 }).split('\0').filter(Boolean);
 
 /** Files staged for the next commit (added, copied, modified, renamed). */
 export const stagedFiles = cwd => gitList(cwd, ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']);
@@ -63,7 +71,7 @@ const MAX_STAGED_BYTES = 1024 * 1024;
 /** The text of `file` as the index holds it (what the commit would record), or null when it is absent, binary or over 1 MB. */
 function stagedText(cwd, file) {
   try {
-    const blob = execFileSync('git', ['show', `:${file}`], { cwd, maxBuffer: MAX_STAGED_BYTES * 2, stdio: ['ignore', 'pipe', 'ignore'] });
+    const blob = git(cwd, ['show', `:${file}`], { encoding: 'buffer', maxBuffer: MAX_STAGED_BYTES * 2 });
     return blob.length > MAX_STAGED_BYTES || blob.includes(0) ? null : blob.toString('utf8');
   } catch {
     return null;
@@ -89,7 +97,7 @@ export function judge(cwd, files) {
 // bare repo — has no such file, so the section is silently absent wherever this module happens to be installed.
 const ledgerHygieneScript = cwd => {
   try {
-    const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8' }).trim();
+    const root = git(cwd, ['rev-parse', '--show-toplevel']).trim();
     return path.join(root, 'scripts', 'housekeeping', 'ledger-hygiene.mjs');
   } catch {
     return null;

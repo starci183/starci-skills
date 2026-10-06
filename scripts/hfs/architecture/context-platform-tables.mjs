@@ -1,5 +1,6 @@
 import { contextModelOf } from './context-map.mjs';
 import { machineKit } from './machine-ast.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R178 `context-platform-tables` (BE_CONTEXT_PLATFORM_TABLES). A platform capability the manifest lists as `perConnection` (the event-bus outbox,
@@ -38,7 +39,7 @@ export function checkContextPlatformTables(input) {
         const key = `${file.rel}|${node.getStart()}|${connection}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        violations.push({ ruleId: RULE, ...kit.at(file.rel, file.sourceFile, node), message: `${file.rel} passes the entity manager of connection ${connection} to ${home.name}, but the tables of ${home.name} are not registered on ${connection} (registered: ${[...registeredOn.keys()].sort().join(', ') || 'none'}); register its entities and migrations on ${connection} too, so the table exists in the database of that context.`, connection, capability: home.name });
+        violations.push({ ruleId: RULE, ...kit.at(file.rel, file.sourceFile, node), message: `${file.rel} passes the entity manager of connection ${connection} to ${home.name}, but the tables of ${home.name} are not registered on ${connection} (registered: ${[...registeredOn.keys()].sort(byCodeUnit).join(', ') || 'none'}); register its entities and migrations on ${connection} too, so the table exists in the database of that context.`, connection, capability: home.name });
       }
       return true;
     });

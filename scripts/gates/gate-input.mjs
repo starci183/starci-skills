@@ -1,6 +1,7 @@
 // gate-input.mjs - the one base, Git delta and current-input reader of a code gate and its settle observer.
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { diff as gitDiff } from '../api/git/diff.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
@@ -60,7 +61,7 @@ function gateDelta(root, base) {
     else { changed.add(rel); if (kind === 'A') added.add(rel); }
   }
   for (const file of String(untracked).split('\0').filter(Boolean)) { const rel = posixPath(file); changed.add(rel); added.add(rel); }
-  return { changed: [...changed].filter((file) => fs.existsSync(path.join(root, file))).sort(), added, deleted, renamed };
+  return { changed: [...changed].filter((file) => fs.existsSync(path.join(root, file))).sort(byCodeUnit), added, deleted, renamed };
 }
 
 /**
@@ -83,7 +84,7 @@ export function gateInputSnapshot(root, base = null, files = [], owned = null) {
   if (owned && (!Array.isArray(owned) || !owned.length || named.some((file) => !underAny(file, owned, { dot: true }))))
     throw new Error('the named gate inputs are outside the admitted owned scope');
   const inputs = [...new Set([...delta.changed, ...delta.deleted, ...named])]
-    .filter((file) => !owned || underAny(file, owned, { dot: true })).sort().map((file) => {
+    .filter((file) => !owned || underAny(file, owned, { dot: true })).sort(byCodeUnit).map((file) => {
     const absolute = path.join(root, file);
     return { path: file, sha256: fs.existsSync(absolute) ? sha256File(absolute) : null };
   });

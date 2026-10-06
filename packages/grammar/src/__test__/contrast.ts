@@ -14,6 +14,9 @@
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
+/** The order `.sort()` gives without a compare function (UTF-16 code units). */
+const byCodeUnit = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
+
 export type Theme = "light" | "dark"
 export type Family = "common" | "core" | "heritage" | "offset-pop"
 type Rgba = { readonly r: number; readonly g: number; readonly b: number; readonly a: number }
@@ -94,7 +97,7 @@ export const heroUiThemeVariables = (): ReadonlyArray<string> => {
         }
     }
     const read = new Set(Array.from(css.matchAll(/var\((--[a-z0-9-]+)/g), (m) => m[1] ?? ""))
-    return [...themed].filter((name) => read.has(name) && !/^--scrollbar-(?:gutter|width)$/.test(name)).sort()
+    return [...themed].filter((name) => read.has(name) && !/^--scrollbar-(?:gutter|width)$/.test(name)).sort(byCodeUnit)
 }
 
 /* ------------------------------------------------------------------ scope model */
@@ -291,6 +294,55 @@ const mixIn = (space: string, first: Rgba, second: Rgba, p: number): Rgba => {
     return { r, g, b, a }
 }
 
+/**
+ * Evaluates the arithmetic of a relative-colour channel (numbers, `+ - * /`, parentheses, `Math.max(...)`, `Math.min(...)` and
+ * `K(low, value, high)` as a clamp) with a small recursive-descent parser, so no text is ever run as code.
+ */
+const evaluateArithmetic = (source: string, clamp: (low: number, value: number, high: number) => number): number => {
+    const tokens = source.match(/(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?|NaN|Infinity|Math\.max|Math\.min|K|[()+\-*/,]/g) ?? []
+    let at = 0
+    const next = (): string | undefined => tokens[at++]
+    const args = (): Array<number> => {
+        next()
+        const values = [sum()]
+        while (tokens[at] === ",") {
+            next()
+            values.push(sum())
+        }
+        next()
+        return values
+    }
+    const factor = (): number => {
+        const token = next()
+        if (token === undefined) return Number.NaN
+        if (token === "-") return -factor()
+        if (token === "+") return factor()
+        if (token === "(") {
+            const inner = sum()
+            next()
+            return inner
+        }
+        if (token === "Math.max") return Math.max(...args())
+        if (token === "Math.min") return Math.min(...args())
+        if (token === "K") {
+            const [low = Number.NaN, value = Number.NaN, high = Number.NaN] = args()
+            return clamp(low, value, high)
+        }
+        return Number(token)
+    }
+    const product = (): number => {
+        let value = factor()
+        while (tokens[at] === "*" || tokens[at] === "/") value = next() === "*" ? value * factor() : value / factor()
+        return value
+    }
+    const sum = (): number => {
+        let value = product()
+        while (tokens[at] === "+" || tokens[at] === "-") value = next() === "+" ? value + product() : value - product()
+        return value
+    }
+    return sum()
+}
+
 /** A resolved CSS colour value as sRGB (gamut clipped), or null when it is not a colour. */
 export const parseColor = (input: string): Rgba | null => {
     const value = input.trim().toLowerCase()
@@ -326,7 +378,7 @@ export const parseColor = (input: string): Rgba | null => {
                 const expression = token.replace(/calc\(/g, "(").replace(/clamp\(/g, "K(").replace(/([lch])/g, (_, key: keyof typeof channels) => String(channels[key]))
                     .replace(/max\(/g, "Math.max(").replace(/min\(/g, "Math.min(")
                 const clamp = (low: number, value: number, high: number) => Math.min(Math.max(value, low), high)
-                return Number(new Function("K", `return (${expression})`)(clamp))
+                return evaluateArithmetic(expression, clamp)
             }
             return parseFloat(token)
         }

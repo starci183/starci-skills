@@ -34,6 +34,6 @@ export function tierFindings(ctx) {
   const { violations } = checkTiers(graph);
   return [...graph.missing, ...violations.map((v) => {
     const code = v.ruleId === 'ARCH_OWNER_CYCLE' ? CODES.cycle : CODES.direction;
-    return { code, level: 'error', path: v.path, line: v.line, message: code === CODES.direction ? `${v.path}:${v.line} ${v.message}` : `${v.path}:${v.line} ${v.message}`, ...(v.cycle ? { cycle: v.cycle } : {}) };
+    return { code, level: 'error', path: v.path, line: v.line, message: `${v.path}:${v.line} ${v.message}`, ...(v.cycle ? { cycle: v.cycle } : {}) };
   })];
 }

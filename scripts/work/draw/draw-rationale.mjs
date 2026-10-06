@@ -673,5 +673,5 @@ async function main(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  main(process.argv.slice(2)).then((c) => { process.exitCode = c; });
+  process.exitCode = await main(process.argv.slice(2));
 }

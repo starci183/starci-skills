@@ -33,6 +33,7 @@ import { stringifyYaml } from '../../engine/yaml.mjs';
 import { putBlob, blobAsFile } from '../../engine/db/blob.mjs';
 import { cropImage, decodePng, encodePng, keyRect } from './png.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, drawingAcceptance } from './direction-part.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import {
   SLOT_FILL_MIN, assetsOf, flag, flags, indexFilesUnder, list, parseUiRef, readYamlOrNull, sha256File, sha256Of, slash, writeRecordFile,
 } from './work-io.mjs';
@@ -464,7 +465,7 @@ export function usedI18nKeys(record) {
   };
   walk(record?.nodes);
   walk(record?.brand);
-  return [...keys].sort();
+  return [...keys].sort(byCodeUnit);
 }
 
 /** One digest of the used keys' values in a catalog: key and value per line, an absent key marked absent. */
@@ -480,7 +481,7 @@ function keyedI18n(catalogs, keys) {
   return { keys: [...keys], locales: list(catalogs).map((c) => ({ locale: c.locale, sha256: keyedDigest(c.messages, keys) })) };
 }
 
-const catalogSet = (catalogs) => list(catalogs).map((c) => `${c.locale} ${c.path}`).sort();
+const catalogSet = (catalogs) => list(catalogs).map((c) => `${c.locale} ${c.path}`).sort(byCodeUnit);
 
 /**
  * Whether app/ drifted from what the tree recorded, judged against a fresh scan. Returns {stale, changed}:
@@ -697,7 +698,7 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
   if (layout.chrome === 'unknown') reasons.push(`${node.id} chrome is unknown - brand.decide decides visible or passthrough`);
   if (layout.state !== 'done') reasons.push(`${node.id} layout is ${layout.state ?? 'stateless'}, not done`);
   if (layout.chrome === 'visible') {
-    const { breakpoints, themes } = requiredMatrixOf(record);
+    const { breakpoints, themes } = requiredMatrixOf();
     if (node.origin === 'planned' || (!list(layout.captures).length && layout.design)) {
       if (!layout.design) reasons.push(`${node.id} is planned with no design ui record to draw it`);
       else {

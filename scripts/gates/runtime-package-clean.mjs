@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { createHash } from 'node:crypto';
 import { sha256 } from '../../engine/digest.mjs';
 import { SECRET_ENV_FILE } from '../../engine/secrets.mjs';
@@ -33,6 +34,25 @@ process.stdout.write(JSON.stringify({ name: manifest.name, version: manifest.ver
   payload: installer.payloadFiles(root),
   entries: plan.write.map(item => ({ relative: item.relative, source: path.relative(root, item.source).split(path.sep).join('/') })) }));
 `;
+
+/** A relative module specifier of a packed script: `from './x.mjs'`, `import('./x.mjs')`, `import './x.mjs'`, `require('./x.cjs')`, or `import(new URL('./x.mjs', import.meta.url))`. */
+const PACKED_MODULE_SPEC = /(?:\bfrom\s*|\bimport\s*\(\s*(?:new URL\(\s*)?|\bimport\s+|\brequire\(\s*)['"](\.{1,2}\/[^'"]+\.(?:mjs|cjs|js))['"]/g;
+
+/** The relative module imports of the packed scripts whose target is not in the archive: ["package/a.mjs:12 -> package/b/c.mjs"]. `files` is the tarFiles map. */
+export function unresolvedPackedImports(files) {
+  const missing = [];
+  for (const [file, bytes] of files) {
+    if (!/\.(?:mjs|cjs|js)$/.test(file)) continue;
+    String(bytes).split('\n').forEach((line, index) => {
+      if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) return;
+      for (const match of line.matchAll(PACKED_MODULE_SPEC)) {
+        const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), match[1]));
+        if (!files.has(target)) missing.push(`${file}:${index + 1} -> ${target}`);
+      }
+    });
+  }
+  return missing;
+}
 
 /** Real archive/install proof; seams replace only owned process APIs in focused fixtures. Scratch and receipts are retained. */
 export function proveRuntimePackage({ root, sourceSha, expectedShasum, env = process.env, deps = {} }) {
@@ -84,6 +104,8 @@ export function proveRuntimePackage({ root, sourceSha, expectedShasum, env = pro
     const identity = JSON.parse(files.get('package/package.json')?.toString() ?? '{}');
     if (identity.name !== manifest.name || identity.version !== manifest.version) return finish('red', PROOF_CODES.install, 'packed root package identity differs');
     // Consumer archives never carry local credentials or the releasing host's encrypted Sonar custody.
+    const unresolved = unresolvedPackedImports(files);
+    if (unresolved.length) return finish('red', PROOF_CODES.install, `root archive scripts import modules the archive omits (${unresolved.length}): ${unresolved.slice(0, 5).join('; ')}`);
     const privateFile = [...files.keys()].find((file) => file.replaceAll('\\', '/').split('/').at(-1).toLowerCase() === SECRET_ENV_FILE.toLowerCase() || /^package[\\/]ext[\\/]sonar[\\/]secrets(?:[\\/]|$)/i.test(file));
     if (privateFile) return finish('red', PROOF_CODES.install, `root archive contains private host configuration or custody: ${privateFile}`);
     const required = ['skills/starci/SKILL.md', 'skills/starci/agents/openai.yaml', 'skills/starci/references/host-startup.md', 'skills/starci/references/host-maintenance.md',
@@ -124,7 +146,7 @@ export function proveRuntimePackage({ root, sourceSha, expectedShasum, env = pro
     if (entryFailure) return finish('red', PROOF_CODES.test, entryFailure);
     const custody = JSON.parse(fs.readFileSync(path.join(target, '.starci-skills.json'), 'utf8'));
     if (custody.name !== manifest.name || custody.version !== manifest.version ||
-      Object.keys(custody.files ?? {}).sort().join('\0') !== [...probe.payload].sort().join('\0') ||
+      Object.keys(custody.files ?? {}).sort(byCodeUnit).join('\0') !== [...probe.payload].sort(byCodeUnit).join('\0') ||
       probe.entries.some((entry) => custody.hostSkills?.files?.[entry.relative] !== sha256(entryFiles.get(`package/${entry.relative}`)))) return finish('red', PROOF_CODES.test, 'native installer custody does not bind the actual payload and discovery bytes');
     if (fs.existsSync(path.join(host, 'AGENTS.md')) || fs.existsSync(path.join(host, '.gitignore'))) return finish('red', PROOF_CODES.test, 'no-bootstrap dispatch changed host bootstrap files');
     fs.writeFileSync(path.join(attempt, 'install-custody.json'), `${JSON.stringify(custody, null, 2)}\n`, { flag: 'wx' });

@@ -18,6 +18,7 @@ import { Checkbox } from '../../components/ui/checkbox';
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
 import { Button } from '../../components/ui/button';
 import { ReadQuality, partialSources } from '../../components/charts/chart-card';
+import { byCodeUnit } from '../../lib/utils';
 
 export const concept: Concept = 'C12';
 
@@ -118,7 +119,7 @@ export function DecisionsPage() {
   const decisions = usePagedApiQuery<DecisionRow>(decisionsUrl, { topics: ['decisions'], intervalMs: 20_000, getKey: row => row.key });
   const asks = usePagedApiQuery<AskRow>(asksUrl, { topics: ['decisions'], intervalMs: 30_000, getKey: row => row.id });
   const incidents = usePagedApiQuery<IncidentRow>(incidentsUrl, { topics: ['decisions'], intervalMs: 30_000, getKey: row => `${row.ledgerId}:${row.id}` });
-  const kinds = [...new Set([kind, ...(decisions.data ?? []).map(row => row.kind)].filter(Boolean))].sort();
+  const kinds = [...new Set([kind, ...(decisions.data ?? []).map(row => row.kind)].filter(Boolean))].sort(byCodeUnit);
   const tabs = [
     { key: 'di', label: 'DI', count: decisions.data?.length ?? null, icon: CircleAlert },
     { key: 'asks', label: t('Ask the owner'), count: asks.data?.length ?? null, icon: MessageCircleQuestion },

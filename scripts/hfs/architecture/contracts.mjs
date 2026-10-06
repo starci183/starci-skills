@@ -3,7 +3,7 @@ import { isInside } from './config.mjs';
 import { referencedExports, relativePath, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
 import { anyDescendant, commonJsRequireReasons, constructedDecoratorKind as sharedConstructedDecoratorKind, decoratorCallee, moduleExportsOf, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, returnedExpressions, selectedNode, valueSymbol, violation } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
-
+import { byCodeUnit } from '../../lib/list.mjs';
 export const PUBLIC_CONTRACT_RULE_ID = 'BE_PUBLIC_CONTRACT_FORM';
 export const READONLY_BOUNDARY_RULE_ID = 'BE_READONLY_BOUNDARY';
 
@@ -649,8 +649,8 @@ export function checkBackendContracts(config, context) {
     }
   }
 
-  const publicDetails = [...new Set(publicReasons)].sort();
-  const readonlyDetails = [...new Set(readonlyReasons)].sort();
+  const publicDetails = [...new Set(publicReasons)].sort(byCodeUnit);
+  const readonlyDetails = [...new Set(readonlyReasons)].sort(byCodeUnit);
   return {
     violations,
     coverage: {

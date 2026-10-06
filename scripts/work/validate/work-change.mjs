@@ -3,7 +3,7 @@ import path from 'node:path';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {canonicalJSON} from '../../../engine/canonical-json.mjs';import {sha256} from '../../../engine/digest.mjs';
 import {slash} from '../../lib/path-key.mjs';
-import {list} from '../../lib/list.mjs';
+import {list, byCodeUnit} from '../../lib/list.mjs';
 import {isDir,isFile} from '../../lib/fs-kind.mjs';
 
 /**
@@ -244,7 +244,7 @@ export function checkWorkChange({workRoot,baselineRoot=null}={}){
 
     summaries.push({id:record.id,path:record.path,schema:text(record.meta.schema)?record.meta.schema:null,
       state:text(record.meta.state)?record.meta.state:null,rev:positiveInteger(rev)?rev:null,declaredKind:declared,computedKind:computed,
-      normativeDigest:digest,withdraws,criteria:[...record.criteria.keys()].sort(),
+      normativeDigest:digest,withdraws,criteria:[...record.criteria.keys()].sort(byCodeUnit),
       evidence:proof?{recordDigest:text(proof.recordDigest)?proof.recordDigest:null,outcome:text(proof.outcome)?proof.outcome:null,stale}:null});
   }
 

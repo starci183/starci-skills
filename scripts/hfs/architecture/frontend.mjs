@@ -6,7 +6,7 @@ import { frameworkPinnedRootFiles } from './framework-pinned.mjs';
 import { exportTargetStrings, isUnshadowedCommonJsRequire, reachableViolation, relativePath, unwrapExpression } from './typescript.mjs';
 import { normalizedSymbolValue, returnedExpressions as sharedReturnedExpressions } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
-
+import { byCodeUnit } from '../../lib/list.mjs';
 const FEATURE_TIERS = new Set(['pages', 'layouts', 'overlays']);
 const COMPONENT_TIERS = new Set(['blocks', 'composites', 'branches', 'leaves']);
 const LOWER_COMPONENT_TIERS = new Set(['composites', 'branches', 'leaves']);
@@ -132,8 +132,8 @@ function checkGrammar(config, context) {
     if (install.packageManifest?.name !== grammar.package) contractProblems.push(`installed package ${grammar.package} is unavailable or has a different name${where}`);
     if (!grammarExport(install.packageManifest, grammar.package, grammar.entry)) contractProblems.push(`${grammar.entry} is not a safe declared package export${where}`);
     if (!grammarExport(install.packageManifest, grammar.package, grammar.styleEntry)) contractProblems.push(`${grammar.styleEntry} is not a safe declared style export${where}`);
-    const actualPeers = Object.keys(install.packageManifest?.peerDependencies ?? {}).sort();
-    const selectedPeers = [...grammar.peers].sort();
+    const actualPeers = Object.keys(install.packageManifest?.peerDependencies ?? {}).sort(byCodeUnit);
+    const selectedPeers = [...grammar.peers].sort(byCodeUnit);
     if (JSON.stringify(actualPeers) !== JSON.stringify(selectedPeers)) {
       contractProblems.push(`${grammar.package} peerDependencies must exactly match the selected peers ${selectedPeers.join(', ')}${where}`);
     }

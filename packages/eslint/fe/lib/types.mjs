@@ -50,7 +50,7 @@ export const declarationsOf = (context, identifier) => {
   if (!tsNode) return []
   let symbol = checker.getSymbolAtLocation(tsNode)
   if (!symbol) return []
-  if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
+  if ((symbol.flags & ts.SymbolFlags.Alias) !== 0) symbol = checker.getAliasedSymbol(symbol)
   return symbol.getDeclarations?.() ?? []
 }
 

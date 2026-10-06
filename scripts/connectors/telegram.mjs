@@ -607,7 +607,7 @@ async function main() {
   }
 }
 
-if (isMain(import.meta.url)) main();
+if (isMain(import.meta.url)) main().catch((error) => { console.error(error); process.exit(1); });
 
 /**
  * The owner push. One message to the owner's Telegram chat: {ok, skipped?, messageId?, status?, error?}. `text` is a string or

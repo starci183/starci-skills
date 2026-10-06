@@ -19,6 +19,7 @@ import { unlinkNodeModulesLink } from '../api/fs/unlink-node-modules-link.mjs';
 import { LINUX_SPECS_LABEL, runParity } from './release-linux-parity.mjs';
 import { sonarSupplier } from './release-l4-sonar.mjs';
 import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 /** The only skips a release may keep: tests that need a browser the host may lack, matched by name. */
 const BROWSER_SKIPS = Object.freeze(['draw-render', 'draw-rationale', 'draw-layer']);
@@ -84,7 +85,7 @@ export function specFilesFor(repo, names) {
     const hits = texts.filter((entry) => entry.text.includes(name) || entry.text.includes(name.replace(/'/g, "\\'")));
     if (hits.length) hits.forEach((entry) => found.add(entry.file)); else unmatched.push(name);
   }
-  return { files: [...found].sort(), unmatched };
+  return { files: [...found].sort(byCodeUnit), unmatched };
 }
 
 /** What a skip is, for L4: 'declared' (a browser-conditional skip by name), 'infrastructure' or 'undeclared'. Pure. */
@@ -113,7 +114,7 @@ export function skipReport(steps, opts) {
   }));
   const failures = skips.filter((k) => k.class !== 'declared' && k.class !== 'covered');
   const covered = skips.filter((k) => k.class === 'covered').map((k) => ({ name: k.name, skippedIn: k.step, passedIn: k.passedIn }));
-  return { skips, failures, covered, declared: [...new Set(skips.filter((k) => k.class === 'declared').map((k) => k.name))].sort() };
+  return { skips, failures, covered, declared: [...new Set(skips.filter((k) => k.class === 'declared').map((k) => k.name))].sort(byCodeUnit) };
 }
 
 /** The example apps of `repo` (examples/<name>/hfs.json of kind app): [{name, dir, edition}], the edition `lite` or `full`. */

@@ -234,7 +234,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     if (mode === 'start' && !planOnly) { setEnabled(m, true, { by: `${profile.eventPrefix}-start`, now: now(), profile, route }); enabled = true; }
     const unfinished = !seat?.starting && unsettledStartup(m, seat, profile);
     const health = unfinished ? {live:false,unverified:true,reason:'startup reservation expired with an unsettled launch receipt',
-      terminal:unfinished.handle ?? null} : seatHealth(seat, d, now());
+      terminal:unfinished.handle ?? null} : seatHealth(seat, d);
     if (health.hostUnavailable) return { ok: false, exit: EXIT_HOST_UNAVAILABLE, action: 'host-unavailable', reason: health.reason };
     if (health.unverified) return { ok: false, exit: 1, action: 'seat-unverified', reason: health.reason, terminal: health.terminal };
 
@@ -396,4 +396,4 @@ async function main() {
   return out(r);
 }
 
-if (isMain(import.meta.url)) main();
+if (isMain(import.meta.url)) Promise.resolve().then(main).catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });

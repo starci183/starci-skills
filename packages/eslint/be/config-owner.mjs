@@ -213,7 +213,7 @@ export const configParsedInMain = {
 /** The brand classes of `platform/config` a default must never be given to. */
 const BRANDS = new Set(["Secret", "Url"])
 const SECRET_READERS = new Set(["secret", "url", "host"])
-const DEFAULT_LITERAL = /^(?:|localhost|127\.0\.0\.1|0\.0\.0\.0|https?:\/\/.*)$/i
+const DEFAULT_LITERAL = /^(?:localhost|127\.0\.0\.1|0\.0\.0\.0|https?:\/\/.*)?$/i
 
 /** No secret or URL value has a default of any kind: a missing value stops the boot. */
 export const noSecretDefault = {

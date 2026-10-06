@@ -25,7 +25,7 @@ import { JOB_STATUSES, recordArtifactProof, verifyEventChain } from '../../engin
 import { getBlob } from '../../engine/db/blob.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { list } from '../lib/list.mjs';
+import { byCodeUnit, list } from '../lib/list.mjs';
 import { createDigester, createWorkDigester, isWorkInput, WORK_PREFIX } from './input-digests.mjs';
 import { latestVersion } from '../work/work-graph-store.mjs';
 import { ARTIFACTS_INDEXED } from './job-artifacts.mjs';
@@ -74,7 +74,7 @@ const CHECK_OP = /\.(?:verify|audit)$/;
 const PROVEN_OUTCOMES = ['done', 'partial'];
 
 const slashed = (p) => String(p).replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/+$/, '');
-const uniq = (values) => [...new Set(values.filter((v) => typeof v === 'string' && v))].sort();
+const uniq = (values) => [...new Set(values.filter((v) => typeof v === 'string' && v))].sort(byCodeUnit);
 const emptyClaims = () => Object.fromEntries(CLAIM_KINDS.map((k) => [k, []]));
 const mergeClaims = (...all) => Object.fromEntries(CLAIM_KINDS.map((k) => [k, uniq(all.flatMap((c) => list(c?.[k])))]));
 const hasClaims = (c) => CLAIM_KINDS.some((k) => list(c?.[k]).length);
@@ -113,7 +113,7 @@ function frRecordsOf(repo) {
       const doc = readYaml(path.join(dir, 'index.yaml'));
       if (typeof doc?.id === 'string' && FR_ID.test(doc.id)) {
         const demands = Object.entries(doc.requiresProof && typeof doc.requiresProof === 'object' ? doc.requiresProof : {});
-        out.push({ id: doc.id, dir: slashed(path.relative(repo, dir)), required: demands.filter(([, d]) => d?.required === true).map(([k]) => k).sort(),
+        out.push({ id: doc.id, dir: slashed(path.relative(repo, dir)), required: demands.filter(([, d]) => d?.required === true).map(([k]) => k).sort(byCodeUnit),
           demands: Object.fromEntries(demands), commands: demands.map(([, d]) => d?.command).filter((c) => typeof c === 'string') });
       }
     }
@@ -136,7 +136,7 @@ function requiredFrOf(repo, id) {
   // The shared demand's forbidden conjunction stays schema-owned; this small walker does not interpret generic not.
   if (demands.some(([, demand]) => validateAgainstSchema(demand, demandShape.not).length === 0)) problems.push('a proof demand carries incompatible flags');
   if (problems.length) throw new Error(`scoped FR ${id} has malformed proof demands at ${dir}/index.yaml: ${problems.join('; ')}`);
-  return { id, dir, demands: Object.fromEntries(demands), required: demands.filter(([, d]) => d.required === true).map(([kind]) => kind).sort(),
+  return { id, dir, demands: Object.fromEntries(demands), required: demands.filter(([, d]) => d.required === true).map(([kind]) => kind).sort(byCodeUnit),
     commands: demands.map(([, d]) => d.command).filter(command => typeof command === 'string') };
 }
 
@@ -297,7 +297,7 @@ export function staleProofsOf(db, workflowId, { repo, artifacts = proofArtifacts
     entry.items.push(`${kind} ${id}`);
     for (const p of newest.changed) entry.changed.add(p);
   }
-  return [...byJob.values()].map((e) => ({ ...e, items: e.items.sort(), changed: [...e.changed].sort() }));
+  return [...byJob.values()].map((e) => ({ ...e, items: e.items.sort(byCodeUnit), changed: [...e.changed].sort(byCodeUnit) }));
 }
 
 /** The workflow's scope: FR ids, XBase#state shapes and ui record dirs, from its work graph and the records its jobs bound. */
@@ -362,9 +362,9 @@ export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts 
     items.push({ kind: 'fr', id, must: Boolean(counted.length), requires: counted, record: fr.dir, status, obligations,
       evidence: evidence.map(evidenceView), ...(waived.length ? { notCounted: waived } : {}) });
   }
-  for (const id of [...shapes].sort()) push('shape', id, { must: false });
+  for (const id of [...shapes].sort(byCodeUnit)) push('shape', id, { must: false });
   for (const [id, records] of [...cases].sort(([a], [b]) => (a < b ? -1 : 1))) push('case', id, { must: false, records: uniq(records) });
-  const count = (pred) => items.filter(pred).length;
+  const count = (pred) => items.filter((item) => pred(item)).length;
   const summary = Object.fromEntries(COVERAGE_STATUSES.map((s) => [s, count((i) => i.status === s)]));
   const owed = items.filter((i) => i.must && i.status !== 'proven').map((i) => ({ kind: i.kind, id: i.id, status: i.status }));
   return { schema: PROOF_COVERAGE_SCHEMA, workflowId, graphVersion: scope.graphVersion, summary: { ...summary, total: items.length, mustOwed: owed.length }, mustOwed: owed, items, ...(errors.length ? { errors } : {}) };

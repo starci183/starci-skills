@@ -19,6 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadTypescript } from '../../lib/package-at.mjs';
 import { found, readJson, readText } from './read.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const SAGA_STEP_COMPENSATION = 'BE_SAGA_STEP_COMPENSATION';
 const SAGA_STATE_VERSIONED = 'BE_SAGA_STATE_VERSIONED';
@@ -90,7 +91,7 @@ function readsEventId(ts, sourceFile) {
 }
 
 /** The sagas of the app: every folder of the saga kind (`be/src/features/saga/<saga>/`). */
-const featuresOf = (files) => [...new Set(files.map((file) => SAGA_FILE.exec(file)?.[1]).filter((feature) => feature !== undefined))].sort();
+const featuresOf = (files) => [...new Set(files.map((file) => SAGA_FILE.exec(file)?.[1]).filter((feature) => feature !== undefined))].sort(byCodeUnit);
 
 /** Findings of R169 to R173 over the tracked paths `files` of the app at `repoRoot`. */
 export function sagaFindings({ repoRoot, files }) {

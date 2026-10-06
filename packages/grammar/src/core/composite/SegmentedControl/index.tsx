@@ -22,8 +22,8 @@ export type SegmentedControlProps = FieldControlProps & {
 }
 
 const firstKey = (keys: Iterable<Key>): string | undefined => {
-    for (const key of keys) return String(key)
-    return undefined
+    const first = keys[Symbol.iterator]().next()
+    return first.done ? undefined : String(first.value)
 }
 
 /**

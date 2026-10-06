@@ -4,7 +4,7 @@
 // (sides, app kinds) and refuses a manifest whole on any problem (HFS_MANIFEST_INVALID). Pure: every function takes a
 // parsed manifest or slot and returns a list of problems in the words of modules/schemas/hfs-slots.schema.yaml.
 import { isPlainObject } from '../../engine/plain-object.mjs';
-import { stringList } from '../lib/list.mjs';
+import { stringList, byCodeUnit } from '../lib/list.mjs';
 
 export const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 export const NAME = /^[a-z][a-z0-9-]*$/;
@@ -209,7 +209,7 @@ function runtimeParamProblems(rp) {
   if (!(isPlainObject(fl) && Number.isInteger(fl.soft) && fl.soft >= 1 && typeof fl.hardGrowth === 'boolean' && Object.keys(fl).length === 2)) bad.push('ruleParams.runtime.fileLines must be {soft, hardGrowth}');
   const owners = rp.infraOwners;
   const ownerMap = (v) => isPlainObject(v) && Object.entries(v).every(([key, list]) => key && Array.isArray(list) && list.every((o) => INFRA_OWNER.test(String(o))) && new Set(list).size === list.length);
-  if (!isPlainObject(owners) || Object.keys(owners).sort().join() !== 'globals,modules,programs' || !['globals', 'modules', 'programs'].every((k) => ownerMap(owners[k]))) bad.push('ruleParams.runtime.infraOwners must be {modules, globals, programs}, each mapping a name to unique owners api/<system>, api/* or engine/db ([] means nowhere)');
+  if (!isPlainObject(owners) || Object.keys(owners).sort(byCodeUnit).join() !== 'globals,modules,programs' || !['globals', 'modules', 'programs'].every((k) => ownerMap(owners[k]))) bad.push('ruleParams.runtime.infraOwners must be {modules, globals, programs}, each mapping a name to unique owners api/<system>, api/* or engine/db ([] means nowhere)');
   for (const key of ['sourceRoots', 'baseWriteMembers', 'oneOffNames', 'sharedBasenames']) if (!(strList(rp[key]) && rp[key].length && new Set(rp[key]).size === rp[key].length)) bad.push(`ruleParams.runtime.${key} must be a non-empty list of unique strings`);
   if (!(Array.isArray(rp.baseEnvSeams) && rp.baseEnvSeams.every(relPath))) bad.push('ruleParams.runtime.baseEnvSeams must be a list of repository-relative paths');
   if (!(isPlainObject(rp.apiContracts) && Object.entries(rp.apiContracts).every(([system, file]) => NAME.test(system) && relPath(file)))) bad.push('ruleParams.runtime.apiContracts must map an api system to its calls contract path');

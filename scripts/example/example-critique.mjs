@@ -3,13 +3,12 @@ import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { workCli } from '../lib/work-cli.mjs';
 import {isPlainObject} from '../../engine/plain-object.mjs';
-import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
+import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from '../work/validate/check-example-work.mjs';
-import {computeDerived} from './example-derive.mjs';
+import {computeDerived, runGenerated} from './example-derive.mjs';
 import { readWorkTree } from '../lib/work-tree.mjs';
 import {APP_SIDES, appRootOf, indexInlineCriteria, repoRootFor, resolveRecordRef} from '../work/record-ownership.mjs';
-import {isProductPath} from '../lib/starciwork-boundary.mjs';
-import { canonicalJSON } from '../../engine/canonical-json.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 /**
  * `.starciwork` can already answer "what is done, what is stale, what is blocked" (example-derive.mjs).
@@ -141,7 +140,7 @@ function computeBlastRadiusFindings(derived, rawRecords, evidenceByDir) {
   const findings = [];
   const rules = [...derived.records.values()].filter(r => r.schema === 'work/business-rule@1').sort((a, b) => a.id.localeCompare(b.id));
   for (const rule of rules) {
-    const affected = [...blastRadiusOf(rule.id, derived.records, provesUsedBy)].sort();
+    const affected = [...blastRadiusOf(rule.id, derived.records, provesUsedBy)].sort(byCodeUnit);
     const staledEvidence = affected.filter(id => evidenceByDir.has(rawRecords.get(id)?.dir)).length;
     const paths = new Set();
     for (const id of [rule.id, ...affected]) {
@@ -155,7 +154,7 @@ function computeBlastRadiusFindings(derived, rawRecords, evidenceByDir) {
       kind: 'blast-radius',
       severity: affected.length >= 10 ? 'critical' : affected.length >= 3 ? 'warn' : 'info',
       records: [rule.id, ...affected],
-      because: `A breaking change to ${rule.id} sends ${affected.length} other record(s) back to todo, would stale ${staledEvidence} evidence file(s), and touches ${paths.size} code path(s) (${[...paths].sort().join(', ') || '(none owned yet)'}) - this is the number a reviewer wants before approving the change.`,
+      because: `A breaking change to ${rule.id} sends ${affected.length} other record(s) back to todo, would stale ${staledEvidence} evidence file(s), and touches ${paths.size} code path(s) (${[...paths].sort(byCodeUnit).join(', ') || '(none owned yet)'}) - this is the number a reviewer wants before approving the change.`,
       radius: affected.length,
     });
   }
@@ -190,7 +189,7 @@ function computeFanInFindings(derived) {
       kind: 'fan-in-hotspot',
       severity: sourceFeatures.size >= 3 ? 'warn' : 'info',
       records: [h.id],
-      because: `${h.id} is used ${h.total} time(s) (top decile of fan-in); it is owned by ${h.feature ?? '(no feature)'} and read by ${sourceFeatures.size} other feature(s) (${[...sourceFeatures].sort().join(', ') || 'none - fan-in is entirely within its own feature'}), so a change here is cross-feature coupling, not a local edit.`,
+      because: `${h.id} is used ${h.total} time(s) (top decile of fan-in); it is owned by ${h.feature ?? '(no feature)'} and read by ${sourceFeatures.size} other feature(s) (${[...sourceFeatures].sort(byCodeUnit).join(', ') || 'none - fan-in is entirely within its own feature'}), so a change here is cross-feature coupling, not a local edit.`,
     };
   });
 }
@@ -204,14 +203,14 @@ function computeFanInFindings(derived) {
  * chosen ring. Only edges between two nodes in `candidateIds` are considered - the cycle detector should not
  * wander into the whole tree's blockedBy graph, only the part example-derive.mjs already flagged `cyclic`. */
 function stronglyConnectedComponents(candidateIds, edgesOf) {
-  const ids = [...candidateIds].sort();
+  const ids = [...candidateIds].sort(byCodeUnit);
   const index = new Map(), lowlink = new Map(), onStack = new Set(), stack = [];
   const sccs = [];
   let counter = 0;
   function strongconnect(v) {
     index.set(v, counter); lowlink.set(v, counter); counter += 1;
     stack.push(v); onStack.add(v);
-    for (const w of [...edgesOf(v)].filter(x => candidateIds.has(x)).sort()) {
+    for (const w of [...edgesOf(v)].filter(x => candidateIds.has(x)).sort(byCodeUnit)) {
       if (!index.has(w)) {
         strongconnect(w);
         lowlink.set(v, Math.min(lowlink.get(v), lowlink.get(w)));
@@ -223,7 +222,7 @@ function stronglyConnectedComponents(candidateIds, edgesOf) {
       const component = [];
       let w;
       do { w = stack.pop(); onStack.delete(w); component.push(w); } while (w !== v);
-      sccs.push(component.sort());
+      sccs.push(component.sort(byCodeUnit));
     }
   }
   for (const v of ids) if (!index.has(v)) strongconnect(v);
@@ -239,8 +238,8 @@ function stronglyConnectedComponents(candidateIds, edgesOf) {
 function findRingIn(scc, edgesOf) {
   if (scc.length === 1) return [scc[0], scc[0]]; // self-loop
   const members = new Set(scc);
-  const start = [...scc].sort()[0];
-  const neighborsOf = node => [...edgesOf(node)].filter(n => members.has(n)).sort();
+  const start = [...scc].sort(byCodeUnit)[0];
+  const neighborsOf = node => [...edgesOf(node)].filter(n => members.has(n)).sort(byCodeUnit);
 
   function fullCoverageRing() {
     const path = [start];
@@ -309,7 +308,7 @@ function computeBlockerCycleFindings(derived, rawRecords) {
     const candidateAnchors = [...rawRecords.values()]
       .filter(r => features.has(r.feature) && !scc.includes(r.id))
       .filter(r => r.schema === 'work/gap@1' || (r.schema === 'work/policy-decision@1' && r.data.outcome === 'open'))
-      .map(r => r.id).sort();
+      .map(r => r.id).sort(byCodeUnit);
     findings.push({
       id: `blocker-cycle:${scc[0]}`,
       kind: 'blocker-cycle',
@@ -438,7 +437,7 @@ function computeOpenDecisionFindings(derived, rawRecords) {
     if (rec.schema !== 'work/policy-decision@1' || rec.data.outcome !== 'open') continue;
     const blocks = Array.isArray(rec.data.blocks) ? rec.data.blocks : [];
     const blockedByCiters = derived.records.get(rec.id)?.usedBy?.blockedBy ?? [];
-    const held = [...new Set([...blocks, ...blockedByCiters])].sort();
+    const held = [...new Set([...blocks, ...blockedByCiters])].sort(byCodeUnit);
     findings.push({
       id: `open-decision:${rec.id}`,
       kind: 'open-decision',
@@ -469,7 +468,7 @@ function computeTodoDesignFindings(derived, rawRecords) {
     });
     const designedGaps = gapRoots.filter(b => !leftoverGaps.includes(b));
     if (designedGaps.length || decisionRoots.length) {
-      const roots = [...designedGaps, ...decisionRoots].map(b => b.id).sort();
+      const roots = [...designedGaps, ...decisionRoots].map(b => b.id).sort(byCodeUnit);
       findings.push({
         id: `designed-todo:${rec.id}`,
         kind: 'designed-todo',
@@ -595,27 +594,15 @@ const CRITIQUE_YAML_REL = '_derived/critique.yaml';
 
 
 export function runCritique(workRoot, {write} = {}) {
-  if (write && [CRITIQUE_YAML_REL, CRITIQUE_MD_REL].some(rel => !isProductPath(rel))) {
-    throw new Error('Critique output is outside the product boundary');
-  }
-  const critique = computeCritique(workRoot);
-  const yamlDoc = buildCritiqueYamlDocument(critique);
-  const markdown = buildCritiqueMarkdown(critique);
-  const yamlPath = path.join(workRoot, CRITIQUE_YAML_REL);
-  const mdPath = path.join(workRoot, CRITIQUE_MD_REL);
-  if (write) {
-    fs.mkdirSync(path.dirname(yamlPath), {recursive: true});
-    fs.writeFileSync(yamlPath, '# GENERATED by scripts/example/example-critique.mjs - do not edit by hand.\n' +
-      '# Regenerate with: starci work example-critique --work <path-to-.starciwork> --write\n' + stringifyYaml(yamlDoc), 'utf8');
-    fs.writeFileSync(mdPath, markdown, 'utf8');
-    return {wrote: true, critique, yamlDoc, markdown};
-  }
-  let onDiskYaml = null;
-  try { onDiskYaml = parseYaml(fs.readFileSync(yamlPath, 'utf8')); } catch { onDiskYaml = null; }
-  let onDiskMd = null;
-  try { onDiskMd = fs.readFileSync(mdPath, 'utf8'); } catch { onDiskMd = null; }
-  const ok = onDiskYaml !== null && canonicalJSON(onDiskYaml) === canonicalJSON(yamlDoc) && onDiskMd === markdown;
-  return {ok, critique, yamlDoc, markdown, onDiskYaml, onDiskMd};
+  const run = runGenerated(workRoot, {write}, {
+    boundaryError: 'Critique output is outside the product boundary',
+    yamlRel: CRITIQUE_YAML_REL, textRel: CRITIQUE_MD_REL,
+    yamlHeader: '# GENERATED by scripts/example/example-critique.mjs - do not edit by hand.\n' +
+      '# Regenerate with: starci work example-critique --work <path-to-.starciwork> --write\n',
+    compute: computeCritique, buildDoc: buildCritiqueYamlDocument, buildText: buildCritiqueMarkdown,
+  });
+  if (run.wrote) return {wrote: true, critique: run.computed, yamlDoc: run.doc, markdown: run.text};
+  return {ok: run.ok, critique: run.computed, yamlDoc: run.doc, markdown: run.text, onDiskYaml: run.onDiskDoc, onDiskMd: run.onDiskText?.toString('utf8') ?? null};
 }
 
 if (isMain(import.meta.url)) {

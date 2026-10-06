@@ -13,6 +13,7 @@ import {
 } from "../runtime/scripts/hfs/slots.mjs";
 import { managedScriptNames } from "../runtime/scripts/hfs/architecture/managed-scripts.mjs";
 import { LOCK_STEP, npmLock, scaffoldWorkSeeds } from "../scaffold/app.mjs";
+import { byCodeUnit } from "../report/order.mjs";
 import {
   TEMPLATES_DIR,
   appSource,
@@ -263,7 +264,7 @@ function sourceWithAdditions(root, additions) {
       .map((file) => [file.path.slice("be/".length), file.content]),
   );
   return {
-    files: [...new Set([...current.files, ...added.keys()])].sort(),
+    files: [...new Set([...current.files, ...added.keys()])].sort(byCodeUnit),
     read: (file) => added.get(file) ?? current.read(file),
   };
 }

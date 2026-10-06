@@ -26,6 +26,7 @@ import { walkFiles } from '../../lib/walk.mjs'; import { isMain } from '../../li
 import { readEnv } from '../../lib/env.mjs';
 import { readJsonFile } from '../../lib/json.mjs';
 import { alphaOver } from '../../lib/color.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const GEOMETRY_CODE = 'GEOMETRY_OFF_GRAMMAR';
 export const FAMILIES = GRAMMAR_FAMILIES;
@@ -312,7 +313,7 @@ export function evalLength(text, { vw = null, rootPx = ROOT_FONT_PX, unitless = 
   const src = String(text ?? '').trim();
   if (!src) return null;
   const tokens = [];
-  const re = /\s*(-?(?:\d+\.?\d*|\.\d+)(?:e-?\d+)?)([a-z%]*)|\s*([a-z-]+)\(|\s*([()+\-*/,])/giy;
+  const re = /\s*(-?(?:\d+\.?\d*|\.\d+)(?:e-?\d+)?)([a-z%]*)|\s*([a-z-]+)\(|\s*([()+\-*/,])/iy;
   let m;
   while (re.lastIndex < src.length) {
     const at = re.lastIndex;
@@ -419,7 +420,7 @@ function installedPackages(repo, name) {
 function repoCssFiles(repo, maxDepth = 8) {
   return walkFiles(repo, {maxDepth, ignoreReadErrors: true,
     exclude: (name, _full, entry) => entry.isDirectory() && (PRUNE.has(name) || name.startsWith('.')),
-    filter: name => name.endsWith('.css')}).sort();
+    filter: name => name.endsWith('.css')}).sort(byCodeUnit);
 }
 
 const familyScopeRe = (id) => new RegExp(`data-grammar-family\\s*=\\s*["']?${id}["']?\\s*\\]`);
@@ -809,7 +810,7 @@ function htmlTargets(target) {
   const abs = path.resolve(target);
   if (!fs.existsSync(abs)) return [];
   if (fs.statSync(abs).isFile()) return /\.html?$/i.test(abs) ? [abs] : [];
-  return walkFiles(abs, {maxDepth: 2, filter: name => /\.html?$/i.test(name)}).sort();
+  return walkFiles(abs, {maxDepth: 2, filter: name => /\.html?$/i.test(name)}).sort(byCodeUnit);
 }
 
 /** In-page collector: every rendered element's box, computed geometry and colour (sRGB via canvas). */

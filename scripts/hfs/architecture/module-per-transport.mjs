@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
 import { treeOf } from './required-files.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R45 `module-per-transport` (BE_MODULE_SHAPE, BE-CONVENTION 1.2 and 1.6). A feature has one Nest module for its
@@ -63,7 +64,7 @@ export function checkModulePerTransport(input) {
 
   let transportModules = 0;
   const tree = treeOf(config.root);
-  for (const rel of [...tree.files].sort()) {
+  for (const rel of [...tree.files].sort(byCodeUnit)) {
     const place = placeOf(rel);
     if (!place) continue;
     const base = path.posix.basename(rel);
@@ -138,7 +139,7 @@ export function checkModulePerTransport(input) {
         } else if (place.protocol === null) {
           report(root, node, `App ${app.name} lists ${module.name}, the application module of feature ${place.feature}; apps import only transport modules (${place.feature}-<protocol>.module.ts), which import the application module themselves.`, { app: app.name, module: module.name });
         } else if (!(composedBy.get(place.protocol) ?? []).includes(app.kind)) {
-          const allowed = [...composedBy].filter(([, kinds]) => kinds.includes(app.kind)).map(([protocol]) => protocol).sort();
+          const allowed = [...composedBy].filter(([, kinds]) => kinds.includes(app.kind)).map(([protocol]) => protocol).sort(byCodeUnit);
           report(root, node, `App ${app.name} is of kind ${app.kind} and lists ${module.name}, a ${place.protocol} transport module; an app of kind ${app.kind} composes ${allowed.length ? `${allowed.join(', ')} transports only` : 'no transport module'}.`, { app: app.name, module: module.name, protocol: place.protocol });
         }
       }

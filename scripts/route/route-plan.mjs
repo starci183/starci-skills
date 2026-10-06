@@ -801,7 +801,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
   }
 
   // ---- injected legs (business rules that needs/produces alone miss) ----
-  const has = pred => [...legs.values()].some(pred);
+  const has = pred => [...legs.values()].some((leg) => pred(leg));
   // Workspace canonicalization is a distinct lifecycle scope. It first bounds
   // the migration/quiescence surface, pins behavior with migration tests,
   // refactors path consumers, reconstructs the canonical Work/stack roots,

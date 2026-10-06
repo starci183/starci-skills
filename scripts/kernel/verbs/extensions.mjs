@@ -6,8 +6,8 @@ export default {
   ledger: false,
   usage: '  extensions [--json]   the file-based starci kernel extensions: verbs, status fields, boolean flags, load problems',
   run({ args, emit, ext }) {
-    const out = { ok: ext.problems.length === 0, verbs: [...ext.verbs.keys()].sort(), kernelOnly: [...ext.kernelOnly].sort(),
-      status: ext.status.map((s) => s.key).sort(), flags: [...ext.flags].sort(), problems: ext.problems };
+    const out = { ok: ext.problems.length === 0, verbs: [...ext.verbs.keys()].sort(byCodeUnit), kernelOnly: [...ext.kernelOnly].sort(byCodeUnit),
+      status: ext.status.map((s) => s.key).sort(byCodeUnit), flags: [...ext.flags].sort(byCodeUnit), problems: ext.problems };
     emit(out, [`extension verbs: ${out.verbs.join(' ') || '-'}`, `status fields: ${out.status.join(' ') || '-'}`,
       `boolean flags: ${out.flags.join(' ') || '-'}`, ...out.problems.map((p) => `PROBLEM ${p}`)].join('\n'), args.json);
     if (!out.ok) process.exitCode = 1;

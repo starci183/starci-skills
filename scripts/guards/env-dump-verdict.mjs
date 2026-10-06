@@ -8,7 +8,7 @@
 // commands, so an echo, a commit message, a heredoc or a comment never reaches it.
 import { assignedCommand } from './assigned-command.mjs';
 
-const ENV_DRIVE = /^env:(?:[\\/]?\*?)?$/i;
+const ENV_DRIVE = /^env:[\\/]?\*?$/i;
 const LISTERS = new Set(['get-childitem', 'gci', 'dir', 'ls', 'get-item', 'gi']);
 const GET_ENV = /^\[(?:system\.)?environment\]::getenvironmentvariables$/i;
 const NODE_PROGRAMS = new Set(['node', 'nodejs']);

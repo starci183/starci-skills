@@ -21,6 +21,7 @@
 // a product declares the ports of the services it runs; it is the owner of those declarations.
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { printFindings, scopeFilter } from '../lib/check-scan.mjs';
@@ -95,12 +96,12 @@ export function portOnceFindings(files, { owned = null } = {}) {
     const owner = owned?.get(port);
     if (owner) {
       const exempt = new Set(ownerFilesOf(owner));
-      for (const rel of [...rels].sort()) {
+      for (const rel of [...rels].sort(byCodeUnit)) {
         if (!exempt.has(rel)) findings.push({ code: CODE, path: rel, message: `${rel} restates port ${port} — read the owner (${owner}) instead of spelling the literal` });
       }
       continue;
     }
-    const code = [...rels].filter((rel) => codeFiles.has(rel)).sort();
+    const code = [...rels].filter((rel) => codeFiles.has(rel)).sort(byCodeUnit);
     if (code.length < 2) continue;
     // A file that declares the literal as an exported constant is its de-facto owner and is not itself a finding.
     const declarers = code.filter((rel) => DECLARATION.test(files[rel]));

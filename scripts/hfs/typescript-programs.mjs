@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 
 // One TypeScript program per (compiler, root names, compiler options, project references) inside a program run, and
 // one value per (kind, compiler, input) for what callers derive from those programs (the architecture context).
@@ -27,7 +28,7 @@ function keyOf(value) {
   }
   if (typeof value !== 'object' || (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) return null;
   const entries = [];
-  for (const name of Object.keys(value).sort()) {
+  for (const name of Object.keys(value).sort(byCodeUnit)) {
     const item = keyOf(value[name]);
     if (item === null) return null;
     entries.push(`${JSON.stringify(name)}:${item}`);

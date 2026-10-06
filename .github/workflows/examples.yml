@@ -55,12 +55,12 @@ jobs:
       apps: ${{ steps.list.outputs.apps }}
       images: ${{ steps.images.outputs.images }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Install runtime dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - id: list
         run: echo "apps=$(npm run starci --silent -- runtime check --only examples-ci -- --matrix)" >> "$GITHUB_OUTPUT"
       - id: images
@@ -72,12 +72,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Install runtime dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Example YAML parses under the runtime's own loader
         run: npm run starci --silent -- runtime check --only example-yaml
       - name: Example Work-tree layout (ids, refs, evidence)
@@ -105,15 +105,15 @@ jobs:
       run:
         working-directory: examples/${{ matrix.app }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Install runtime dependencies (repository root)
         working-directory: .
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Install app dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Read generated test policy
         id: policy
         working-directory: .
@@ -138,7 +138,7 @@ jobs:
         run: npm test -- --ci
       - name: Coverage upload (Codecov, flag ${{ matrix.app }})
         if: ${{ !cancelled() && steps.policy.outputs.tests == 'true' && startsWith(github.ref, 'refs/tags/v') }}
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           use_oidc: true
           files: ${{ env.APP_DIR }}/be/coverage/lcov.info
@@ -149,7 +149,7 @@ jobs:
         run: npm run build:be
       # turbo builds the fe packages first, then every Next app; its cache is restored between runs.
       - name: Cache turbo
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: examples/${{ matrix.app }}/.turbo
           key: turbo-${{ matrix.app }}-${{ github.sha }}
@@ -165,12 +165,12 @@ jobs:
         run: npm run test:e2e -- --ci
       - name: Sonar scan
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
-        uses: SonarSource/sonarqube-scan-action@v7
+        uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1
         with:
           projectBaseDir: ${{ env.APP_DIR }}
       - name: Sonar quality gate
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
-        uses: SonarSource/sonarqube-quality-gate-action@v1
+        uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1.2.1
         timeout-minutes: 10
         with:
           scanMetadataReportFile: ${{ env.APP_DIR }}/.scannerwork/report-task.txt
@@ -196,12 +196,12 @@ jobs:
       run:
         working-directory: examples/${{ matrix.app }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Install app dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Read generated test policy
         id: policy
         working-directory: .
@@ -220,7 +220,7 @@ jobs:
         run: node browser/stack.mjs up
       - name: Install Chromium
         if: ${{ steps.policy.outputs.tests == 'true' }}
-        run: npx playwright install --with-deps chromium
+        run: node_modules/.bin/playwright install --with-deps chromium
       - name: Browser journey
         if: ${{ steps.policy.outputs.tests == 'true' }}
         run: npm run test:browser
@@ -239,9 +239,9 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.apps.outputs.images) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: examples/${{ matrix.app }}
           file: examples/${{ matrix.app }}/${{ matrix.file }}

@@ -2,6 +2,7 @@
 // (gates, work, the reconciler and land); scripts/checks/check-grammar-dist.mjs is its self-check CLI.
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {readJsonFile as readJson} from '../lib/json.mjs';
 import {slash} from '../lib/path-key.mjs';
@@ -60,7 +61,7 @@ function compareCssTokens(packageRoot){
       compared+=source.length;
       const group=list=>list.reduce((map,{name:token,value})=>map.set(token,[...(map.get(token)??[]),value]),new Map());
       const [want,have]=[group(source),group(dist)];
-      for(const token of [...new Set([...want.keys(),...have.keys()])].sort()){
+      for(const token of [...new Set([...want.keys(),...have.keys()])].sort(byCodeUnit)){
         const [a,b]=[want.get(token)??[],have.get(token)??[]];
         if(a.join('\0')!==b.join('\0'))differences.push({file,token,src:a.join(' | ')||null,dist:b.join(' | ')||null});
       }

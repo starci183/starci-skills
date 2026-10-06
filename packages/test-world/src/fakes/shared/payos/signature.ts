@@ -8,6 +8,7 @@
  * string; array values are JSON-stringified with each object's keys sorted, as the official SDK does.
  */
 import { createHmac, timingSafeEqual } from "node:crypto"
+import { byCodeUnit } from "../../../order"
 
 /** The five fields of a create request that are signed. */
 export interface PayosCreateSigned {
@@ -22,7 +23,7 @@ const sortedDeep = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(sortedDeep)
     if (value !== null && typeof value === "object") {
         const out: Record<string, unknown> = {}
-        for (const key of Object.keys(value).sort()) out[key] = sortedDeep((value as Record<string, unknown>)[key])
+        for (const key of Object.keys(value).sort(byCodeUnit)) out[key] = sortedDeep((value as Record<string, unknown>)[key])
         return out
     }
     return value
@@ -49,7 +50,7 @@ export const payosSignCreate = (input: PayosCreateSigned, checksumKey: string): 
 /** The canonical string of a `data` object (response and webhook): keys sorted, `key=value` joined by `&`. */
 export const payosDataCanonicalString = (data: object): string =>
     Object.keys(data)
-        .sort()
+        .sort(byCodeUnit)
         .map((key) => `${key}=${stringify((data as Readonly<Record<string, unknown>>)[key])}`)
         .join("&")
 

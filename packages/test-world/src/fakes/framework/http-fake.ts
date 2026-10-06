@@ -194,7 +194,7 @@ const toRequest = (
     params: Readonly<Record<string, string>>,
 ): FakeHttpRequest => {
     const path = incoming.url ?? "/"
-    const url = new URL(path, "http://fake.local")
+    const url = new URL(path, "https://fake.local")
     return {
         method: (incoming.method ?? "GET").toUpperCase(),
         path,

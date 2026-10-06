@@ -42,7 +42,7 @@ import { normWork } from '../lib/path-key.mjs';
 import { latestVersion } from '../work/work-graph-store.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { recordPathTransfer } from '../../engine/db/ledger.mjs';
-import { list } from '../lib/list.mjs';
+import { byCodeUnit, list } from '../lib/list.mjs';
 import { pathsOverlap } from '../lib/path-key.mjs';
 import { clipLine } from '../lib/clip.mjs';
 
@@ -108,7 +108,7 @@ function cyclesOf(nodes, edges) {
       const scc = [];
       let w;
       do { w = stack.pop(); on.delete(w); scc.push(w); } while (w !== v);
-      if (scc.length > 1) sccs.push(scc.sort());
+      if (scc.length > 1) sccs.push(scc.sort(byCodeUnit));
     }
   };
   for (const n of nodes) if (!idx.has(n)) visit(n);
@@ -337,7 +337,7 @@ export function dependencyGraph(db, { repo = null, now = Date.now(), light = fal
     .filter((j) => live.has(j.workflow_id)).map((j) => ({ ...j, owned: ownedOf(parseJson(j.payload_json)).map((p) => p.toLowerCase()) }));
   const dupPairs = new Map();
   const addDup = (a, b, detail) => {
-    const pair = [a.workflowId, b.workflowId].sort();
+    const pair = [a.workflowId, b.workflowId].sort(byCodeUnit);
     const k = pair.join('+');
     if (!dupPairs.has(k)) dupPairs.set(k, { workflows: pair, items: [] });
     if (dupPairs.get(k).items.length < 12) dupPairs.get(k).items.push(detail);

@@ -11,6 +11,7 @@ import { checkRun } from './ladder-check.mjs';
 import { cleanTree, committedChanges, tracked, workingChanges, runOutcome } from './ladder-select.mjs';
 import { ladderRefusal, ladderResult, pathList, scopeFor } from './test-ladder.mjs';
 import { resolveTestConcurrency } from './test-concurrency.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const SCHEMA = 'starci/test-run@1';
 const PRELOADS = Object.freeze(['tests/setup/low-priority.mjs', 'tests/setup/isolated-temp.mjs', 'tests/setup/isolated-registry.mjs']);
@@ -73,7 +74,7 @@ function selectedSpecs({ root, level, args, changed, allSpecs, deps }) {
   if (level === 'L4') return allSpecs;
   if (explicit.length) return explicit;
   const dependent = (deps.specsDependingOn ?? specsDependingOn)(root, changed, allSpecs);
-  return level === 'L3' ? [...new Set([...dependent, ...(deps.affectedBoundarySpecs ?? affectedBoundarySpecs)(changed, allSpecs)])].sort() : dependent;
+  return level === 'L3' ? [...new Set([...dependent, ...(deps.affectedBoundarySpecs ?? affectedBoundarySpecs)(changed, allSpecs)])].sort(byCodeUnit) : dependent;
 }
 
 function runSummary(run) {
@@ -121,7 +122,7 @@ export async function testRun(ctx, deps = {}) {
 
   const changed = pathList(args.changed).length ? pathList(args.changed)
     : ['L2', 'L3'].includes(level) ? committedChanges(root, against, deps) : workingChanges(root, deps);
-  const allSpecs = tracked(root, '*.spec.mjs', deps).sort();
+  const allSpecs = tracked(root, '*.spec.mjs', deps).sort(byCodeUnit);
   const selected = selectedSpecs({ root, level, args, changed, allSpecs, deps });
   if (level !== 'L4' && sameSelection(selected, allSpecs) && allSpecs.length) {
     return ladderRefusal({ schema: SCHEMA, level, scope: selected, message: 'starci test run: selecting every spec is refused outside L4; narrow the change or --spec' });

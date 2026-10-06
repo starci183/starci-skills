@@ -157,7 +157,7 @@ describe('.github/workflows', () => {
     assert.deepEqual(doc.on.push, { tags: ['v*'] }, 'a release tag only, never a branch push');
     assert.deepEqual(doc.concurrency, { group: 'ci-${{ github.ref }}', 'cancel-in-progress': false }, 'one group per ref');
     const runs = doc.jobs.ci.steps.map(step => step.run).filter(Boolean);
-    for (const command of ['npm ci', 'npm run lint -- --sonar reports/lint.sonar.json', 'npm run format:check', 'npm run typecheck', 'npm test -- --ci', 'npm run build:be', 'npm run build:fe']) assert.ok(runs.includes(command), command);
+    for (const command of ['npm ci --ignore-scripts', 'npm run lint -- --sonar reports/lint.sonar.json', 'npm run format:check', 'npm run typecheck', 'npm test -- --ci', 'npm run build:be', 'npm run build:fe']) assert.ok(runs.includes(command), command);
     assert.ok(!runs.some(command => command.includes('starci app sync')), 'starci app check is the one drift gate; there is no second sync step');
     assert.doesNotMatch(text, /starci link|STARCI_HOME|starci-runtime/);
     const uses = doc.jobs.ci.steps.map(step => step.uses).filter(Boolean);
@@ -170,7 +170,7 @@ describe('.github/workflows', () => {
     assert.equal(doc.jobs.ci.permissions['id-token'], 'write');
     assert.ok(doc.jobs.ci.steps.findIndex(step => step === upload) > doc.jobs.ci.steps.findIndex(step => step.run === 'npm test -- --ci'), 'the upload follows the unit run');
     assert.equal(doc.permissions['id-token'], undefined);
-    assert.doesNotMatch(text, /vitest|e2e/);
+    assert.doesNotMatch(text, /vitest|\be2e\b/);
     assert.match(text, /node-version: 22/);
   });
   it('the e2e workflow is dispatched by hand, runs the be test:e2e and installs no browser', () => {

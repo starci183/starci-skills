@@ -43,6 +43,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { readFoundations } from './foundation-registry.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { normWork } from '../lib/path-key.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { recordRecordChange } from '../../engine/db/ledger.mjs';
 import { workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 
@@ -95,7 +96,7 @@ export function createOwnership(db, { repo = null, workDir = '.starciwork', foun
       if (typeof feature?.directory === 'string' && feature.directory.trim()) dirs.add(normWork(feature.directory));
     }
     try { for (const entry of fs.readdirSync(path.join(abs, 'features'), { withFileTypes: true })) if (entry.isDirectory()) dirs.add(`features/${entry.name}`); } catch { /* no features */ }
-    for (const dir of [...dirs].sort()) {
+    for (const dir of [...dirs].sort(byCodeUnit)) {
       if (dir.includes('..')) continue;
       const scope = readYaml(path.join(abs, dir, 'index.yaml'))?.extensions?.work3?.scope;
       const workflowId = typeof scope?.request?.workflow === 'string' ? scope.request.workflow : null;

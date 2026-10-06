@@ -9,6 +9,8 @@
  *       must resolve to a route of that app (page.tsx / route.ts under src/app, route groups and [locale] transparent).
  * Only literals are judged: a computed href is counted as skipped, never guessed at.
  */
+import { byCodeUnit } from '../../lib/list.mjs';
+
 export const REACHABILITY_RULE_IDS = ['BE_FEATURE_NOT_COMPOSED', 'FE_OWNER_REACHABLE', 'FE_HREF_RESOLVES'];
 
 const BE_CAPABILITY_SLOTS = new Set(['be.domain', 'be.integrations', 'be.platform']);
@@ -50,7 +52,7 @@ function ownerFiles(graph) {
 /** The file that stands for an owner in a finding: its public entry when the graph holds one, else its first file. */
 function entryOf(root, files) {
   const base = root.replace(/\/$/, '');
-  return files.find(rel => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/index\\.[tj]sx?$`).test(rel)) ?? [...files].sort()[0];
+  return files.find(rel => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/index\\.[tj]sx?$`).test(rel)) ?? [...files].sort(byCodeUnit)[0];
 }
 
 function checkBackend(graph) {
@@ -63,7 +65,7 @@ function checkBackend(graph) {
     appRoots.add(key.slice(key.indexOf(':') + 1));
     for (const rel of files) if (!TEST_FILE.test(rel)) rootFiles.push(rel);
   }
-  const roots = [...appRoots].sort();
+  const roots = [...appRoots].sort(byCodeUnit);
   const counts = { features: 0, modules: 0, appRoots: roots.length, notComposed: 0 };
   if (!roots.length) return { violations: [], coverage: { status: 'unavailable', reason: 'no be.app.* owner instance holds a source file, so there is no app root to compose into', ...counts } };
   const reached = reachFrom(graph, rootFiles);
@@ -203,7 +205,7 @@ function checkFrontend(config, context, graph) {
       message: `${label} is not mounted: no runtime import path leads from a route file under apps/${app}/src/app to it (a type-only import mounts nothing), so the page is never shown.`,
     });
   }
-  for (const app of [...new Set([...apps.keys(), ...[...graph.files.keys()].map(rel => /^apps\/([^/]+)\/src\//.exec(rel)?.[1]).filter(Boolean)])].sort()) {
+  for (const app of [...new Set([...apps.keys(), ...[...graph.files.keys()].map(rel => /^apps\/([^/]+)\/src\//.exec(rel)?.[1]).filter(Boolean)])].sort(byCodeUnit)) {
     const routes = routeTable(graph, app);
     counts.routes += routes.length;
     const prefix = `apps/${app}/src/`;

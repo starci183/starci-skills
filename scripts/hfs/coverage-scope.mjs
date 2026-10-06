@@ -13,6 +13,7 @@
 // and `starci app check` compares the files with this derivation. Nothing here lists a path of a product: it all comes from slots.yaml.
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { logicRolesOf } from './manifest-shape.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 /** The component that holds the shared infrastructure: the platform tier and every capability more than one service app composes. */
 export const PLATFORM_COMPONENT = 'platform';
@@ -64,12 +65,12 @@ export function coverageScope(manifest, providers = []) {
     if (!isDir(dir)) throw new Error(`slot ${slot.id} is coverage: required but its path ${slot.path} is not a directory`);
     return dir;
   }));
-  const roots = minimal(requiredDirs).sort();
+  const roots = minimal(requiredDirs).sort(byCodeUnit);
   const nonePaths = none.flatMap((slot) => variantsOf(slot));
   for (const dir of nonePaths.filter(isDir)) if (requiredDirs.some((other) => nested(other, dir))) throw new Error(`a coverage: none directory ${dir} contains a coverage: required slot`);
   const noneUnique = [...new Set(nonePaths)];
   const noneMinimal = noneUnique.filter((path) => !noneUnique.some((other) => other !== path && isDir(other) && nested(dirOf(path), other)));
-  const excludes = noneMinimal.filter((path) => isDir(path) && roots.some((root) => nested(path, root))).sort();
+  const excludes = noneMinimal.filter((path) => isDir(path) && roots.some((root) => nested(path, root))).sort(byCodeUnit);
   const suffixes = manifest.ruleParams.be.suffixes;
   const isRole = new RegExp(`\\.(?:${suffixes.map((s) => s.replace(/-/g, '\\-')).join('|')})\\.ts$`);
   const sonar = new Set(noneMinimal.map((path) => `be/${path}${isDir(path) ? '**' : ''}`));
@@ -84,7 +85,7 @@ export function coverageScope(manifest, providers = []) {
     }
   }
   sonar.add('fe/**');
-  return { roles, roots, excludes, none: noneMinimal.sort(), sonar: [...sonar].sort(), codecovPaths: roots.map((root) => `be/${root}**`) };
+  return { roles, roots, excludes, none: noneMinimal.sort(byCodeUnit), sonar: [...sonar].sort(byCodeUnit), codecovPaths: roots.map((root) => `be/${root}**`) };
 }
 
 /** The glob a root measures: every file of a logic role below it (`src/modules/domain/*\/**\/*.{service,policy}.ts`). */
@@ -132,7 +133,7 @@ export function coverageComponents(manifest, { files, read, apps, providers = []
   const ownedBy = new Map(services.map((app) => [app.name, []]));
   for (const root of roots) {
     const module = /^src\/modules\/(.+)\/\*\/$/.exec(root)?.[1] ?? null;
-    const capabilities = [...new Set(files.map((file) => capabilityOf(root, file)).filter(Boolean))].sort();
+    const capabilities = [...new Set(files.map((file) => capabilityOf(root, file)).filter(Boolean))].sort(byCodeUnit);
     const base = root.slice(0, -2);
     if (module === null || module === 'platform' || !capabilities.length) {
       platformPaths.push(`be/${root}**`);
@@ -147,8 +148,8 @@ export function coverageComponents(manifest, { files, read, apps, providers = []
     }
   }
   return [
-    ...services.filter((app) => ownedBy.get(app.name).length).map((app) => ({ id: app.name, name: app.name, paths: ownedBy.get(app.name).sort() })),
-    ...(platformPaths.length ? [{ id: PLATFORM_COMPONENT, name: PLATFORM_COMPONENT, paths: platformPaths.sort() }] : []),
+    ...services.filter((app) => ownedBy.get(app.name).length).map((app) => ({ id: app.name, name: app.name, paths: ownedBy.get(app.name).sort(byCodeUnit) })),
+    ...(platformPaths.length ? [{ id: PLATFORM_COMPONENT, name: PLATFORM_COMPONENT, paths: platformPaths.sort(byCodeUnit) }] : []),
   ];
 }
 

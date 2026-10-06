@@ -1,10 +1,10 @@
 // prose-path.mjs - RT_PROSE_PATH_NO_SLOT (knowledge/hfs/rules.yaml, gate runtime): every product path the knowledge and the docs
 // name (`be/...`, `fe/...`, written whole or with `<placeholder>`, `*` and `{a,b}`) resolves against knowledge/hfs/slots.yaml:
 // the path is owned by a slot, or it is a folder above one (a prefix of a slot path). A path no slot owns is prose that invented
-// a place, or a place a slot no longer has. App names are free: a literal name must be an app the examples or the starter declare;
+// a place, or a place a slot no longer has. App names are free: a literal name must be an app the shipped examples declare (the starter's
+// apps are declared by them; the runtime never imports the scaffold of packages/hfs, which the runtime package does not ship);
 // a placeholder stands for any app; a `**` glob is a file set, not a path. Paths that name a file of the knowledge itself (`be/folder.yaml`, a topic of
 // knowledge/patterns/be) are topics, not product paths. Pure apart from ctx.read.
-import { STARTER_SIDES } from '../../../packages/hfs/scaffold/app.mjs';
 import { braceVariants } from '../../lib/glob.mjs';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../slots.mjs';
 
@@ -14,10 +14,10 @@ const TOKEN = /(?<![\w/.<>-])((?:be|fe)\/[\w<>{}.,*@-]+(?:\/[\w<>{}.,*@-]*)*)/g;
 const TOPIC_FILE = /\.(?:ya?ml|md)$/;
 const FOLDERS_BELOW = ['x.ts', 'index.ts', 'main.ts', 'x/index.ts', 'x/x.ts', 'x/x/x.ts', 'x/src/main.ts', 'package.json'];
 
-/** The declaration the prose is judged against: every app the examples declare plus the starter's, every kind, every optional slot. */
-function proseDeclaration(manifest, examples, starter) {
-  const apps = (side) => [...new Map([...examples, starter].flatMap((d) => d.sides?.[side]?.apps ?? []).map((a) => [a.name, a])).values()];
-  const union = (key, side) => [...new Set([...examples, starter].flatMap((d) => d.sides?.[side]?.[key] ?? []))];
+/** The declaration the prose is judged against: every app the examples declare, every kind, every optional slot. */
+function proseDeclaration(manifest, examples) {
+  const apps = (side) => [...new Map(examples.flatMap((d) => d.sides?.[side]?.apps ?? []).map((a) => [a.name, a])).values()];
+  const union = (key, side) => [...new Set(examples.flatMap((d) => d.sides?.[side]?.[key] ?? []))];
   const first = examples[0];
   return {
     ...first,
@@ -52,9 +52,9 @@ export function pathTokens(line) {
 export function createProseResolver(ctx, manifest) {
   const examples = ctx.files.filter((f) => /^examples\/[^/]+\/hfs\.json$/.test(f)).map((f) => JSON.parse(ctx.read(f)));
   if (!examples.length) return null;
-  const resolver = createSlotResolver(manifest, resolveRepoDeclaration(manifest, proseDeclaration(manifest, examples, { sides: STARTER_SIDES })));
+  const resolver = createSlotResolver(manifest, resolveRepoDeclaration(manifest, proseDeclaration(manifest, examples)));
   const slotPaths = resolver.slots().flatMap((slot) => slot.profiles.flatMap((profile) => braceVariants(slot.path).map((p) => `${['be', 'fe'].includes(profile) ? `${profile}/` : ''}${p}`.split('/').filter(Boolean))));
-  const appNames = new Set([...examples, { sides: STARTER_SIDES }].flatMap((d) => ['be', 'fe'].flatMap((side) => (d.sides?.[side]?.apps ?? []).map((a) => a.name))));
+  const appNames = new Set(examples.flatMap((d) => ['be', 'fe'].flatMap((side) => (d.sides?.[side]?.apps ?? []).map((a) => a.name))));
   const declaredApp = (p) => { const m = /^(?:be|fe)\/apps\/([^/]+)/.exec(p); return !m || m[1] === 'x' || appNames.has(m[1]); };
   const owned = (p) => declaredApp(p) && ([p, ...FOLDERS_BELOW.map((below) => `${p}/${below}`)].some((q) => resolver.classifyPath(q).status !== 'no-slot') || aboveSlot(p.split('/'), slotPaths));
   return { owned, classify: (p) => resolver.classifyPath(p), sample };

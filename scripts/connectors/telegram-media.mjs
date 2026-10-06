@@ -584,4 +584,4 @@ async function main() {
   if (!result.ok) process.exitCode = 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === SELF) main();
+if (process.argv[1] && path.resolve(process.argv[1]) === SELF) main().catch((error) => { console.error(error); process.exit(1); });

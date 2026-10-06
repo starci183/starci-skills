@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
-import { join, extname } from 'node:path'
+import { join, extname, resolve, sep } from 'node:path'
 import { chromium } from 'playwright'
 
 const root = new URL('./storybook-static', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')
@@ -8,6 +8,7 @@ const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 const server = createServer(async (req, res) => {
   try {
     const p = join(root, req.url === '/' ? 'index.html' : decodeURIComponent(req.url.split('?')[0]))
+    if (!resolve(p).startsWith(resolve(root) + sep)) { res.writeHead(403); res.end('forbidden'); return }
     const body = await readFile(p)
     res.writeHead(200, { 'content-type': mime[extname(p)] ?? 'application/octet-stream' })
     res.end(body)

@@ -70,7 +70,7 @@ export function readOperations({ ts, program, file }) {
     const output = guard('output', member('output'));
     const refusalType = member('refusal');
     let refusal = [];
-    if (!(refusalType.flags & ts.TypeFlags.Never)) {
+    if ((refusalType.flags & ts.TypeFlags.Never) === 0) {
       const members = refusalType.isUnion() ? refusalType.types : [refusalType];
       if (!members.every((each) => each.isStringLiteral())) fail(`refusal must be a closed union of string literals, found ${checker.typeToString(refusalType)}`);
       refusal = members.map((each) => each.value).sort();

@@ -185,7 +185,7 @@ const waitsThrough = (context, checker, call, depth, seen) => {
   const hfs = hfsOf(context)
   const target = ts.isPropertyAccessExpression(call.expression) ? call.expression.name : call.expression
   let symbol = checker.getSymbolAtLocation(target)
-  if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
+  if (symbol && (symbol.flags & ts.SymbolFlags.Alias) !== 0) symbol = checker.getAliasedSymbol(symbol)
   for (const declaration of symbol?.declarations ?? []) {
     if (seen.has(declaration)) continue
     seen.add(declaration)

@@ -15,6 +15,8 @@ import { acquireHostLock, hostLockOwner, hostLockDir, releaseHostLock } from '..
 const SETUP_SCHEMA = 'starci/initial-age-setup@1';
 const refuse = reason => { throw Object.assign(new Error('initial age setup refused'), { setupReason: reason }); };
 const no = reason => ({ ok: false, outcome: 'held', reason });
+/** The capture reasons that name the identity tool (scripts/api/sops/lib.mjs withGeneratedAgeIdentity) rather than the install's own custody. */
+export const AGE_TOOL_REASONS = Object.freeze({ 'native-tool-unavailable': 'age-keygen was not found on PATH', 'unsupported-tool-profile': 'the age-keygen on PATH is not an accepted version' });
 const setupReasons = new Set(['canonical-target', 'foreign-target', 'old-ciphertext', 'private-file-custody',
   'ambiguous-identity', 'disabled-identity', 'prior-attempt', 'prior-install', 'lease-lost', 'manifest-custody', 'identity-reload']);
 const sameNode = (a, b) => a.dev === b.dev && a.ino === b.ino;
@@ -213,7 +215,7 @@ export function runInitialAgeInstall({ repo, force = false, project } = {}, deps
           return published;
         } finally { addition?.fill(0); }
       } });
-    if (!result?.ok) return finish({ ...no('capture-or-publication-held'), capture: result?.captureState ?? 'unknown',
+    if (!result?.ok) return finish({ ...no('capture-or-publication-held'), ...(AGE_TOOL_REASONS[result?.reason] ? { toolReason: result.reason } : {}), capture: result?.captureState ?? 'unknown',
       publication: result?.effectState ?? 'unknown' });
     return finish({ ok: true, outcome: 'created', publication: result.effectState, publicRecipient: result.publicRecipient,
       durability: result.durability, reservationDurability: process.platform === 'win32' ? 'file-fsync-namespace-unqualified' : 'file-and-parent-fsync' });

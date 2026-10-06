@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { treeOf } from './required-files.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R24 `arch-config-unread` (HFS_ARCH_CONFIG_UNREAD). The machine reads `hfs.json` and nothing else; a config file it
@@ -20,7 +21,7 @@ export function checkConfigUnread({ config, context }) {
   const violations = [];
   const tree = treeOf(config.root);
   let retired = 0;
-  for (const file of [...tree.files].sort()) {
+  for (const file of [...tree.files].sort(byCodeUnit)) {
     if (!RETIRED_CONFIG_NAMES.includes(path.posix.basename(file))) continue;
     retired += 1;
     violations.push({ ruleId: RULE, path: file, line: 1, column: 1,

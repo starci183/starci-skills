@@ -9,6 +9,7 @@ import { readWorkTree } from '../lib/work-tree.mjs';
 import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../work/record-ownership.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
 import { canonicalJSON } from '../../engine/canonical-json.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 /**
  * The layout promises a reader can answer every work question from the tree without opening source
@@ -238,7 +239,7 @@ export function computeDerived(workRoot) {
     const blockedByEdges = Array.isArray(record.data.blockedBy) ? record.data.blockedBy : [];
     const byKind = usedBy.get(record.id);
     const usedByOut = {};
-    if (byKind) for (const kind of EDGE_KIND_ORDER) if (byKind.has(kind)) usedByOut[kind] = [...byKind.get(kind)].sort();
+    if (byKind) for (const kind of EDGE_KIND_ORDER) if (byKind.has(kind)) usedByOut[kind] = [...byKind.get(kind)].sort(byCodeUnit);
     derivedRecords.set(record.id, {
       id: record.id, schema: record.schema, feature: record.feature, state: record.state,
       effectiveState, suspensionReason: reason, usedBy: usedByOut,
@@ -292,7 +293,7 @@ export function computeDerived(workRoot) {
  * collection already in its final deterministic order, so `stringifyYaml` need not (and does not) reorder
  * anything itself. */
 export function buildYamlDocument(derived) {
-  const recordIds = [...derived.records.keys()].sort();
+  const recordIds = [...derived.records.keys()].sort(byCodeUnit);
   const records = {};
   for (const id of recordIds) {
     const r = derived.records.get(id);
@@ -333,7 +334,7 @@ function buildFrontierMarkdown(derived) {
     if (!byFeature.has(key)) byFeature.set(key, []);
     byFeature.get(key).push(item);
   }
-  const features = [...new Set([...derived.tally.byFeature.keys(), ...byFeature.keys()])].sort();
+  const features = [...new Set([...derived.tally.byFeature.keys(), ...byFeature.keys()])].sort(byCodeUnit);
   for (const feature of features) {
     lines.push(`## ${feature}`);
     const items = byFeature.get(feature) ?? [];
@@ -354,29 +355,41 @@ const DERIVED_FRONTIER_REL = `${DERIVED_DIR_NAME}/frontier.md`;
  * whitespace does not affect freshness. Frontier Markdown must match the rendered UTF-8 bytes exactly;
  * computeDerived is a pure function of the tree.
  */
-export function runDerive(workRoot, {write} = {}) {
-  if (write && [DERIVED_INDEX_REL, DERIVED_FRONTIER_REL].some(rel => !isProductPath(rel))) {
-    throw new Error('Derived Work output is outside the product boundary');
-  }
-  const derived = computeDerived(workRoot);
-  const doc = buildYamlDocument(derived);
-  const frontier = buildFrontierMarkdown(derived);
-  const derivedDir = path.join(workRoot, DERIVED_DIR_NAME);
-  const indexPath = path.join(workRoot, DERIVED_INDEX_REL);
-  const frontierPath = path.join(workRoot, DERIVED_FRONTIER_REL);
+/**
+ * The write-or-compare tail every generated Work artifact pair (a YAML index plus a rendered text file) shares: refuse a
+ * target outside the product boundary, compute and build both, then either write them or report whether the files on disk
+ * still match (YAML structurally by canonicalJSON, the text byte for byte). One owner; derive and critique each wrap it.
+ */
+export function runGenerated(workRoot, {write} = {}, {boundaryError, yamlRel, textRel, yamlHeader, compute, buildDoc, buildText}) {
+  if (write && [yamlRel, textRel].some(rel => !isProductPath(rel))) throw new Error(boundaryError);
+  const computed = compute(workRoot);
+  const doc = buildDoc(computed);
+  const text = buildText(computed);
+  const yamlPath = path.join(workRoot, yamlRel);
+  const textPath = path.join(workRoot, textRel);
   if (write) {
-    fs.mkdirSync(derivedDir, {recursive: true});
-    fs.writeFileSync(indexPath, HEADER + stringifyYaml(doc), 'utf8');
-    fs.writeFileSync(frontierPath, frontier, 'utf8');
-    return {wrote: true, derived, doc};
+    fs.mkdirSync(path.dirname(yamlPath), {recursive: true});
+    fs.writeFileSync(yamlPath, yamlHeader + stringifyYaml(doc), 'utf8');
+    fs.writeFileSync(textPath, text, 'utf8');
+    return {wrote: true, computed, doc, text};
   }
-  let onDisk = null;
-  try { onDisk = parseYaml(fs.readFileSync(indexPath, 'utf8')); } catch { onDisk = null; }
-  let onDiskFrontier = null;
-  try { onDiskFrontier = fs.readFileSync(frontierPath); } catch { onDiskFrontier = null; }
-  const ok = onDisk !== null && canonicalJSON(onDisk) === canonicalJSON(doc)
-    && onDiskFrontier !== null && onDiskFrontier.equals(Buffer.from(frontier, 'utf8'));
-  return {ok, derived, doc, onDisk};
+  let onDiskDoc = null;
+  try { onDiskDoc = parseYaml(fs.readFileSync(yamlPath, 'utf8')); } catch { onDiskDoc = null; }
+  let onDiskText = null;
+  try { onDiskText = fs.readFileSync(textPath); } catch { onDiskText = null; }
+  const ok = onDiskDoc !== null && canonicalJSON(onDiskDoc) === canonicalJSON(doc)
+    && onDiskText !== null && onDiskText.equals(Buffer.from(text, 'utf8'));
+  return {ok, computed, doc, text, onDiskDoc, onDiskText};
+}
+
+export function runDerive(workRoot, {write} = {}) {
+  const run = runGenerated(workRoot, {write}, {
+    boundaryError: 'Derived Work output is outside the product boundary',
+    yamlRel: DERIVED_INDEX_REL, textRel: DERIVED_FRONTIER_REL, yamlHeader: HEADER,
+    compute: computeDerived, buildDoc: buildYamlDocument, buildText: buildFrontierMarkdown,
+  });
+  if (run.wrote) return {wrote: true, derived: run.computed, doc: run.doc};
+  return {ok: run.ok, derived: run.computed, doc: run.doc, onDisk: run.onDiskDoc};
 }
 
 if (isMain(import.meta.url)) {

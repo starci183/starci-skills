@@ -3,6 +3,7 @@ import { canonical } from './config.mjs';
 import { referencedExports, relativePath, unwrapExpression } from './typescript.mjs';
 import { commonJsRequireReasons, decoratorCallee, moduleExportsOf, mutableDecoratorKind, normalizedSymbol, normalizedSymbolValue, programSourcesOf, selectedNode, valueSymbol } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const REGISTRATION_RULE_IDS = ['BE_MODULE_HANDLER_REGISTRATION', 'BE_MODULE_PROVIDER_REREGISTRATION'];
 const FRAMEWORK = new Map([
@@ -252,7 +253,7 @@ export function checkModuleRegistration(config, context) {
     });
   }
   const coverage = reasons.length
-    ? { status: 'unavailable', reason: 'one or more Nest module-registration relations are not statically provable', details: [...new Set(reasons)].sort() }
+    ? { status: 'unavailable', reason: 'one or more Nest module-registration relations are not statically provable', details: [...new Set(reasons)].sort(byCodeUnit) }
     : { status: 'checked', modules: modules.length, exportedClassTokenProviders: providerOwners.size, handlers: handlers.length,
       selectedHandlerDecorators: selected.handlerDecorators };
   return { violations, coverage };

@@ -79,7 +79,7 @@ test('the lite managed set has no test or coverage world and carries the databas
   assert.equal(ci.jobs['db-types'].if, undefined, 'the tag run regenerates and checks the database types unconditionally');
   assert.doesNotMatch(targets['.github/workflows/ci.yml'].content, /codecov|npm test|jest|lcov|coverage upload/i);
   const ciRuns = ci.jobs.ci.steps.map(step => step.run).filter(Boolean);
-  for (const command of ['npm ci', 'npm run lint', 'npm run lint -- --sonar reports/lint.sonar.json', 'npm run format:check', 'npm run typecheck', 'npm run build:be', 'npm run build:fe', 'npm run db:lint']) assert.ok(ciRuns.includes(command), command);
+  for (const command of ['npm ci --ignore-scripts', 'npm run lint', 'npm run lint -- --sonar reports/lint.sonar.json', 'npm run format:check', 'npm run typecheck', 'npm run build:be', 'npm run build:fe', 'npm run db:lint']) assert.ok(ciRuns.includes(command), command);
 
   const images = parseYaml(targets['.github/workflows/images.yml'].content).jobs.image.strategy.matrix.include;
   assert.deepEqual(images.map(entry => [entry.name, entry.file]), [['api', 'be/apps/api/Dockerfile']]);

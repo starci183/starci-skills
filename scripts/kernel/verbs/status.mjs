@@ -481,8 +481,8 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
       : actionable && readyOperations > 0
         ? 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'
       : staleReady.length > 0
-        ? [staleRedo.length ? `settled ${staleRedo.map(staleLabel).join(', ')} read product records their own workflow owns that changed since they settled with no peer job writing them (not by their own workflow's later legs); re-dispatch each as a new attempt of the same op and cut ordinal (a cut seam-first) before yielding` : null,
-          staleFollowUp.length ? `the owner of a record ${staleFollowUp.map(staleLabel).join(', ')} read declared its committed change breaking; enqueue ONE follow-up leg for each (a new attempt of that op and cut ordinal only - never a seam-first cascade, never a redo of other slices or peers) before yielding` : null].filter(Boolean).join('; ')
+        ? [staleRedo.length ? `settled ${staleRedo.map((item) => staleLabel(item)).join(', ')} read product records their own workflow owns that changed since they settled with no peer job writing them (not by their own workflow's later legs); re-dispatch each as a new attempt of the same op and cut ordinal (a cut seam-first) before yielding` : null,
+          staleFollowUp.length ? `the owner of a record ${staleFollowUp.map((item) => staleLabel(item)).join(', ')} read declared its committed change breaking; enqueue ONE follow-up leg for each (a new attempt of that op and cut ordinal only - never a seam-first cascade, never a redo of other slices or peers) before yielding` : null].filter(Boolean).join('; ')
       : null,
   };
   // Owner-declared product follow-up legs ride on the frontier: they are enqueued, never waited for.

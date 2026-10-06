@@ -33,7 +33,7 @@ function fixture(t, {dependency = false} = {}) {
   write(target, 'knowledge/fixture.yaml', 'fixture: valid\n');
   for (const file of ['scripts/checks/check-module-yaml.mjs', 'engine/yaml.mjs',
     'scripts/lib/walk.mjs', 'scripts/lib/is-main.mjs', 'scripts/api/fs/is-link-like.mjs',
-    'scripts/lib/path-key.mjs', 'scripts/lib/fs-kind.mjs']) {
+    'scripts/lib/path-key.mjs', 'scripts/lib/fs-kind.mjs', 'scripts/lib/list.mjs']) {
     write(target, file, fs.readFileSync(path.join(source, file)));
   }
   const expectedFiles = Object.fromEntries(Object.entries(inventory(target)).map(([file]) =>

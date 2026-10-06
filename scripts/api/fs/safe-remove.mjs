@@ -41,7 +41,7 @@ const retrying = (fn, retries) => {
 };
 const removeFile = (p, retries) => retrying(() => {
   try { fs.unlinkSync(p); } catch (error) {
-    if (WIN && (error?.code === 'EPERM' || error?.code === 'EACCES')) { fs.chmodSync(p, 0o666); fs.unlinkSync(p); } else throw error;
+    if (WIN && (error?.code === 'EPERM' || error?.code === 'EACCES')) { fs.chmodSync(p, 0o600); fs.unlinkSync(p); } else throw error;
   }
 }, retries);
 

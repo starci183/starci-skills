@@ -127,7 +127,7 @@ const pathspecBase = (spec, cwd, top) => {
 /** True when every pathspec names a place inside one owned path (absolute owned roots). */
 export function pathspecsWithinOwned(specs, { cwd, owned, top = null }) {
   if (!Array.isArray(owned) || !owned.length) return { ok: false, outside: [...specs] };
-  const roots = owned.map(norm);
+  const roots = owned.map((p) => norm(p));
   const outside = [];
   for (const spec of specs) {
     const base = pathspecBase(spec, cwd, top);

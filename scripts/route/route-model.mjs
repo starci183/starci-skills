@@ -45,6 +45,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeDifficulty, chainFor, resolveLaunchModel, kindRoute, orderKeyOf, raiseToFloor, missingHostTools,
@@ -138,7 +139,7 @@ function parseArgs(argv) {
     else if (k === '--repo') a.repo = take(i), i++;
     else { console.error(`unknown arg ${k}`); process.exit(2); }
   }
-  a.tools = [...new Set(a.tools.map(s => s.trim()).filter(Boolean))].sort();
+  a.tools = [...new Set(a.tools.map(s => s.trim()).filter(Boolean))].sort(byCodeUnit);
   if (a.difficulty != null) a.difficulty = normalizeDifficulty(a.difficulty) ?? a.difficulty;
   return a;
 }

@@ -11,6 +11,7 @@
 // A placeholder is `{name}`; the English and the Vietnamese of one entry carry exactly the same placeholders
 // (scripts/checks/check-i18n-catalog.mjs). An English source with no entry is returned as is: a missing translation degrades
 // to English, never to a blank.
+import { byCodeUnit } from './list.mjs';
 import { escapeRegExp } from './regex.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -54,7 +55,7 @@ export const resetCatalogCache = () => cache.clear();
 /** The names each `pattern` match captures (group 1) in `text`, in match order (`sort` sorts them). */
 export const captureNames = (text, pattern, { sort = false } = {}) => {
   const names = [...String(text).matchAll(pattern)].map((m) => m[1]);
-  return sort ? names.sort() : names;
+  return sort ? names.sort(byCodeUnit) : names;
 };
 
 /** The names of the placeholders of a message. */

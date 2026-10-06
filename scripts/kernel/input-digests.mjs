@@ -41,6 +41,7 @@ import { admittedContractOf } from '../machine/contract-version.mjs';
 import { changeNoteOf, committedMatches, createOwnership, inside, ownedOf, ownerDeclarationFor, readRecordChanges, workflowCommittedReader } from './work-ownership.mjs';
 import { normWork } from '../lib/path-key.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { opReadTexts, bindOpPath } from '../lib/op-shared.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
 
@@ -312,7 +313,7 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
   let peers;
   const peerWritersOf = (file, at) => {
     peers ??= db.prepare("SELECT job_id,workflow_id,status,payload_json,updated_at FROM jobs WHERE workflow_id<>? AND kind<>'kernel' AND status<>'queued'").all(workflowId).map(writerOf);
-    return [...new Set(peers.filter((writer) => (writer.settledAt == null || writer.settledAt > at) && writer.owned.some((owned) => inside(file, owned))).map((writer) => writer.workflowId))].sort();
+    return [...new Set(peers.filter((writer) => (writer.settledAt == null || writer.settledAt > at) && writer.owned.some((owned) => inside(file, owned))).map((writer) => writer.workflowId))].sort(byCodeUnit);
   };
   // The contract of each job's newest dispatch (contracts are keyed by attempt_id).
   const candidates = db.prepare(`SELECT j.job_id,j.workflow_id,j.op_id,j.try_no AS attempt,j.payload_json,
@@ -346,18 +347,18 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
         const now = workDigest.files(entry.path);
         const then = base.files && typeof base.files === 'object' ? base.files : null;
         const changedFiles = then
-          ? [...new Set([...Object.keys(then), ...Object.keys(now)])].filter((file) => (now[file]?.slice(0, 16) ?? null) !== (then[file] ?? null)).sort()
+          ? [...new Set([...Object.keys(then), ...Object.keys(now)])].filter((file) => (now[file]?.slice(0, 16) ?? null) !== (then[file] ?? null)).sort(byCodeUnit)
           : [entry.path];
         const at = Number(base.at) || 0;
         const unexplained = changedFiles.filter((file) => !attributed(file, row.job_id, at));
         if (!unexplained.length) continue;
-        workChanged.push({ row, cut, entry, base, then, at, current, unexplained });
+        workChanged.push({ row, cut, entry, base, thenFiles: then, at, current, unexplained });
       }
     }
   }
   // Only committed revisions count (its own records at its workflow branch, others at main: workflowCommittedReader). A
   // file whose committed bytes are still the ones the job read is an in-flight rewrite, never a change.
-  const perFile = workChanged.filter((item) => item.then);
+  const perFile = workChanged.filter((item) => item.thenFiles);
   const ownerOf = perFile.length ? (ownership ?? createOwnership(db, { repo, workDir })) : null;
   const heads = perFile.length && repo ? (committed === undefined ? workflowCommittedReader({ repo, workDir, workflowId, ownerOf }) : committed)?.(perFile.flatMap((item) => item.unexplained)) ?? null : null;
   let declarations;
@@ -365,7 +366,7 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
     if (heads) return heads.get(file)?.toString('utf8') ?? null;
     try { return fs.readFileSync(path.join(repo, workDir, file.slice(WORK_PREFIX.length)), 'utf8'); } catch { return null; }
   };
-  for (const { row, cut, entry, base, then, at, current, unexplained } of workChanged) {
+  for (const { row, cut, entry, base, thenFiles: then, at, current, unexplained } of workChanged) {
     const item = { jobId: row.job_id, op: row.op_id, attempt: row.attempt, ...(cut ? { cut } : {}), path: entry.path, kind: 'work' };
     if (!then) {
       // A record directory too large for a per-file map is judged by its digest, as before.
@@ -406,7 +407,7 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
       }
     }
     if (drift.length) peerDrift.push({ ...item, files: drift });
-    const changed = [...owed, ...breaking.map((b) => b.file)].sort();
+    const changed = [...owed, ...breaking.map((b) => b.file)].sort(byCodeUnit);
     if (!changed.length) continue;
     const followUp = owed.length === 0;
     const held = followUp ? null : heldBy(row.op_id, cut);
@@ -436,7 +437,7 @@ export function staleOperationsOf(staleInput) {
     if (!item.followUp) op.followUp = false;
     for (const b of item.breaking ?? []) op.breakingBy.add(b.owner);
   }
-  return [...byJob.values()].map(({ followUp, breakingBy, ...op }) => ({ ...op, ...(followUp ? { followUp: true } : {}), ...(breakingBy.size ? { breakingBy: [...breakingBy].sort() } : {}) }));
+  return [...byJob.values()].map(({ followUp, breakingBy, ...op }) => ({ ...op, ...(followUp ? { followUp: true } : {}), ...(breakingBy.size ? { breakingBy: [...breakingBy].sort(byCodeUnit) } : {}) }));
 }
 
 /**
@@ -457,7 +458,7 @@ export function peerDriftSummaryOf(peerDrift) {
   return {
     advisory: true,
     jobs: new Set(peerDrift.map((item) => item.jobId)).size,
-    records: [...byFile.values()].sort((a, b) => (a.file < b.file ? -1 : 1)).map((entry) => ({ file: entry.file, owner: entry.owner, ownerBy: entry.ownerBy, writers: [...entry.writers].sort(), jobs: entry.jobs.size,
+    records: [...byFile.values()].sort((a, b) => (a.file < b.file ? -1 : 1)).map((entry) => ({ file: entry.file, owner: entry.owner, ownerBy: entry.ownerBy, writers: [...entry.writers].sort(byCodeUnit), jobs: entry.jobs.size,
       foreignWrite: entry.foreignWrite, ...(entry.breakingIgnored ? { breakingIgnored: entry.breakingIgnored } : {}) })),
   };
 }

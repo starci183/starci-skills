@@ -3,6 +3,7 @@ import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
 import { constructorDependencies } from './constructor-deps.mjs';
 import { treeOf } from './required-files.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R48 `unit-spec-providers` (BE_SPEC_QUALITY), the unit test standard's rule 3: the unit spec of a service builds its
@@ -56,7 +57,7 @@ export function checkUnitSpecProviders(input) {
   const violations = [];
   let specs = 0;
   const tree = treeOf(config.root);
-  for (const rel of [...tree.files].filter(file => SPEC_ROOT.test(file) && SERVICE_SPEC.test(file)).sort()) {
+  for (const rel of [...tree.files].filter(file => SPEC_ROOT.test(file) && SERVICE_SPEC.test(file)).sort(byCodeUnit)) {
     const abs = path.join(config.root, ...rel.split('/'));
     if (!fs.existsSync(abs)) continue;
     specs += 1;

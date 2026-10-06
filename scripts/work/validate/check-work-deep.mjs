@@ -456,7 +456,7 @@ if (isMain(import.meta.url)) {
   const doBaseline = args.includes('--write-baseline');
   const treeArg = args.includes('--tree') ? args[args.indexOf('--tree') + 1] : null;
   const trees = treeArg ? [path.resolve(treeArg)]
-    : walk(path.join(root, 'examples')).filter(f => f.endsWith(`.starciwork${path.sep}index.yaml`)).map(path.dirname);
+    : walk(path.join(root, 'examples')).filter(f => f.endsWith(`.starciwork${path.sep}index.yaml`)).map(dir => path.dirname(dir));
 
   if (doBaseline) {
     for (const workRoot of trees) console.log(`baseline written: ${writeBaseline(workRoot)}`);

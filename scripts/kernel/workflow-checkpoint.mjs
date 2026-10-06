@@ -54,7 +54,7 @@ import { setCheckpoint, markReleasePending } from './workflow-worktree.mjs';
 import { gateBaseOf, gateBasesOf, workflowWorktreeAt, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { ownedPathsOf } from './verbs/shared/rows.mjs';
-import { splitList } from '../lib/list.mjs';
+import { byCodeUnit, splitList } from '../lib/list.mjs';
 import { underAny } from '../lib/path-key.mjs';
 import { commitShaOf } from './commit-sha.mjs';
 import { requireWorktreeRecord } from '../lib/worktree-record.mjs';
@@ -125,7 +125,7 @@ function changedFiles(dir) {
   const tracked = git(gitDiff, dir, ['--name-only', '--no-renames', '-z', 'HEAD', '--', '.', ...NO_MODULES]);
   const untracked = git(lsFiles, dir, ['--others', '--exclude-standard', '-z', '--', '.', ...NO_MODULES]);
   if (!tracked.ok || !untracked.ok) throw fail({ code: 'workflow-snapshot-failed' }, `the changes of ${dir} could not be listed: ${(tracked.stderr || untracked.stderr).slice(0, 200)}`);
-  return [...new Set([...zlist(tracked.stdout), ...zlist(untracked.stdout)])].sort();
+  return [...new Set([...zlist(tracked.stdout), ...zlist(untracked.stdout)])].sort(byCodeUnit);
 }
 /** The changed files an op answers for: `mine` under its owned paths, `stray` under no live op's leases at all. */
 export function splitChanges(dir, { own, others }) {

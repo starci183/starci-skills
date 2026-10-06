@@ -224,7 +224,7 @@ export const noRuntimeSchema = {
 const isEntityDecorator = (checker, decorator) => {
     const callee = ts.isCallExpression(decorator.expression) ? decorator.expression.expression : decorator.expression
     let symbol = checker.getSymbolAtLocation(callee)
-    if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
+    if (symbol && (symbol.flags & ts.SymbolFlags.Alias) !== 0) symbol = checker.getAliasedSymbol(symbol)
     return symbol?.name === "Entity" && (symbol.declarations ?? []).some((declaration) => packageOfFile(declaration.getSourceFile().fileName) === "typeorm")
 }
 

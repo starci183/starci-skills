@@ -23,7 +23,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { refuse as refuseError } from '../../engine/refuse.mjs';
-import { splitList } from '../lib/list.mjs';
+import { byCodeUnit, splitList } from '../lib/list.mjs';
 import { normPath } from '../lib/path-key.mjs';
 import { SETTLED_JOB_STATUSES, enqueueJob, jobResult, newToken, recordJobResult, setJobStatus, updateJob } from '../../engine/db/ledger.mjs';
 import { operationNodeId } from './verbs/shared/agent-hierarchy.mjs';
@@ -157,7 +157,7 @@ export function checkPaths(db, { repo, workflowId, op, payload = {}, current = [
     const s = slash(p);
     if (!s || s.split('/').includes('..') || path.isAbsolute(p)) throw refuse(`${p}: an added path is repository-relative, never absolute or ../ (it stays in the workflow's source roots)`, 'path-outside-roots');
     if (/(^|\/)\.starciwork\/(kernel-evidence|kernel-strays|kernel-approvals)(\/|$)/.test(s)) throw refuse(`${p} is kernel custody`, 'path-kernel-custody');
-    if (/(^|\/)\.claude(\/|$)|modules\/kernel\/owner-rulings\.yaml$/.test(s)) throw refuse(`${p} is the shared runtime (.claude): a tier-2 kernel-proposal, never a unit's owned path`, 'path-shared-runtime');
+    if (/(?:(^|\/)\.claude(\/|$)|modules\/kernel\/owner-rulings\.yaml$)/.test(s)) throw refuse(`${p} is the shared runtime (.claude): a tier-2 kernel-proposal, never a unit's owned path`, 'path-shared-runtime');
     if (current.length && heads.size === 1 && !heads.has(s.split('/')[0]) && !/^(apps|packages|src|libs|e2e)$/.test(s.split('/')[0])) throw refuse(`${p} leaves the unit's repository ${[...heads][0]}`, 'path-outside-repository');
   }
   const briefFile = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
@@ -176,7 +176,7 @@ export function checkPaths(db, { repo, workflowId, op, payload = {}, current = [
 
 /** The shape of one unit attempt: op, sorted owned paths, params, per-job override, pinned model. */
 export const shapeOf = (op, payload = {}) => crypto.createHash('sha1').update(JSON.stringify([op,
-  [...(payload.owned_paths ?? [])].map(slash).sort(), payload.params ?? {}, payload.kernelOverride ?? {}, payload.kernelModel ?? null])).digest('hex').slice(0, 12);
+  [...(payload.owned_paths ?? [])].map(slash).sort(byCodeUnit), payload.params ?? {}, payload.kernelOverride ?? {}, payload.kernelModel ?? null])).digest('hex').slice(0, 12);
 
 /** The shapes this unit already failed with for a shape-related cause (a dead worker is no shape verdict). */
 export function failedShapesOf(db, workflowId, job) {

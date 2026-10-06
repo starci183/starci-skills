@@ -17,6 +17,7 @@ import { createRequire } from 'node:module';
 import { explainPath } from '../runtime/scripts/hfs/check.mjs';
 import { createSlotResolver, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { refuseInEdition } from './edition-gate.mjs';
+import { byCodeUnit } from '../report/order.mjs';
 
 export class ScaffoldError extends Error {
   constructor(code, message) {
@@ -182,8 +183,8 @@ function specSkeleton({ shape, serviceFile, manifest = loadSlotManifest() }) {
   if (kit.size) lines.push(importLine([...kit].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' })), KIT));
   const modules = [...new Set([...imports.keys(), ...typeImports.keys()])].sort(compareModules);
   for (const module of modules) {
-    if (imports.has(module)) lines.push(importLine([...imports.get(module)].sort(), module));
-    if (typeImports.has(module)) lines.push(importLine([...typeImports.get(module)].sort(), module, true));
+    if (imports.has(module)) lines.push(importLine([...imports.get(module)].sort(byCodeUnit), module));
+    if (typeImports.has(module)) lines.push(importLine([...typeImports.get(module)].sort(byCodeUnit), module, true));
   }
   lines.push(`import { ${shape.className} } from "${subject}"`);
   lines.push('');
@@ -265,8 +266,8 @@ function serviceSource({ name, dependencies = [] }) {
   }
   const lines = [];
   for (const module of [...new Set([...values.keys(), ...types.keys()])].sort(compareModules)) {
-    if (values.has(module)) lines.push(importLine([...values.get(module)].sort(), module));
-    if (types.has(module)) lines.push(importLine([...types.get(module)].sort(), module, true));
+    if (values.has(module)) lines.push(importLine([...values.get(module)].sort(byCodeUnit), module));
+    if (types.has(module)) lines.push(importLine([...types.get(module)].sort(byCodeUnit), module, true));
   }
   lines.push('', '@Injectable()', `/** The ${words(name).join(' ')} service: state what it decides in one sentence. */`);
   if (dependencies.length === 0) lines.push(`export class ${className} {}`);

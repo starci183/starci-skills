@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { indexFilesUnder, list, readYamlOrNull } from './work-io.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const recordsUnder = (dir) => (fs.existsSync(dir) ? indexFilesUnder(dir).filter((f) => path.dirname(f) !== dir).map(readYamlOrNull).filter(Boolean) : []);
 
@@ -20,5 +21,5 @@ export function workGraphContext(repo, domains) {
     for (const r of recordsUnder(path.join(features, domain, 'fr'))) if (r.id && r.schema?.startsWith('work/functional-requirement')) frs.add(String(r.id));
     for (const r of recordsUnder(path.join(features, domain, 'ui'))) for (const s of shapesOfUiRecord(r)) shapes.add(s);
   }
-  return { frs: [...frs].filter((id) => !excluded.has(id)).sort(), shapes: [...shapes].sort() };
+  return { frs: [...frs].filter((id) => !excluded.has(id)).sort(byCodeUnit), shapes: [...shapes].sort(byCodeUnit) };
 }

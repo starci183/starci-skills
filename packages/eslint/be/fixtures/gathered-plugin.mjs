@@ -12,6 +12,9 @@ import assert from "node:assert/strict"
 import { readdirSync } from "node:fs"
 import test from "node:test"
 
+/** The order `.sort()` gives without a compare function (UTF-16 code units), spelt out. */
+const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0)
+
 /** Register the gathered-plugin contract against one side's index.mjs. */
 export function gatheredPluginSpec({ side, dir, plugin, lawOwners, recommended, ruleDeclarations, rules }) {
   const namespace = `starci-${side}`
@@ -21,10 +24,10 @@ export function gatheredPluginSpec({ side, dir, plugin, lawOwners, recommended, 
     readdirSync(dir)
       .filter((name) => name.endsWith(".mjs") && !name.endsWith(".spec.mjs") && name !== "index.mjs")
       .map((name) => name.replace(/\.mjs$/, ""))
-      .sort()
+      .sort(byCodeUnit)
 
   test(`${side}: every law in the folder is gathered - a new module cannot be forgotten here`, () => {
-    const gathered = [...new Set(lawOwners)].sort()
+    const gathered = [...new Set(lawOwners)].sort(byCodeUnit)
     assert.deepEqual(
       gathered,
       lawModules(),

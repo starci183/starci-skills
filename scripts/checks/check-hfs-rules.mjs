@@ -33,6 +33,7 @@
 //   - a `status: planned` enforcer: the catalog carries no owed work (owner acceptance 2026-09-30)  HFS_RULE_ENFORCER_PLANNED
 import fs from 'node:fs';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { pathToFileURL } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -237,7 +238,7 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     const ids = plugins[kind]?.ids;
     if (ids === undefined) continue;
     const named = new Set(catalog.rules.flatMap((r) => r.enforcers.filter((e) => e.kind === kind).map((e) => e.id)));
-    for (const id of [...ids].sort()) if (!named.has(id)) add('HFS_RULE_UNCATALOGUED', '-', `${kind}:${id} ships in ${PLUGIN_ENTRY[kind]} but no rule of the catalog names it; give it an R-id enforcer entry or delete the rule`, `${kind}:${id}`);
+    for (const id of [...ids].sort(byCodeUnit)) if (!named.has(id)) add('HFS_RULE_UNCATALOGUED', '-', `${kind}:${id} ships in ${PLUGIN_ENTRY[kind]} but no rule of the catalog names it; give it an R-id enforcer entry or delete the rule`, `${kind}:${id}`);
   }
   if (codes !== undefined) {
     // RED19: every emitted code belongs to exactly one rule; only an infrastructure refusal ("cannot judge") is owned by none.
@@ -245,7 +246,7 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     const refusals = new Set(codes.refusals ?? []);
     const reported = new Set();
     for (const [source, list] of Object.entries({ machine: codes.machine ?? [], 'starci app': codes.hfs ?? [] })) {
-      for (const code of [...new Set(list)].sort()) {
+      for (const code of [...new Set(list)].sort(byCodeUnit)) {
         if (owned.has(code) || refusals.has(code) || reported.has(code)) continue;
         reported.add(code);
         add('HFS_RULE_CODE_UNOWNED', '-', `${code} can be emitted by the ${source} check but no rule of knowledge/hfs/rules.yaml lists it in failureCodes; list it under the one rule whose law it serves, or delete it. Only an infrastructure refusal ("cannot judge") is exempt, and its owner exports it in ERROR_RULE_IDS (architecture machine) or REFUSAL_CODES (starci app check)`);
@@ -257,10 +258,10 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     // infrastructure (the harness's own tools reporting about themselves, scripts/hfs/infrastructure-codes.mjs).
     const owned = new Set(catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]));
     const exempt = new Set([...(codes?.refusals ?? []), ...Object.keys(infrastructure)]);
-    for (const code of Object.keys(failureCodes ?? {}).filter((c) => /^(HFS|BE|FE|ARCH)_/.test(c)).sort()) {
+    for (const code of Object.keys(failureCodes ?? {}).filter((c) => /^(HFS|BE|FE|ARCH)_/.test(c)).sort(byCodeUnit)) {
       if (!owned.has(code) && !exempt.has(code)) add('HFS_RULE_CODE_UNOWNED', '-', `${code} is in ${FAILURE_CODES_FILE} but no rule of knowledge/hfs/rules.yaml lists it in failureCodes and it is not declared infrastructure (scripts/hfs/infrastructure-codes.mjs): list it under the one rule whose law it serves, declare it infrastructure with its emitter, or delete it`);
     }
-    for (const code of Object.keys(infrastructure).sort()) {
+    for (const code of Object.keys(infrastructure).sort(byCodeUnit)) {
       if (owned.has(code) || !Object.hasOwn(failureCodes ?? {}, code)) add('HFS_RULE_CODE_UNOWNED', '-', `${code} is declared infrastructure but ${owned.has(code) ? 'a rule owns it' : `${FAILURE_CODES_FILE} has no entry for it`}: delete it from scripts/hfs/infrastructure-codes.mjs`);
     }
   }

@@ -20,6 +20,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { catalogEntries } from '../lib/i18n.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** The runtime files the slot resolver needs; both bundles carry them. */
@@ -59,7 +60,7 @@ export function importClosure(entries) {
     }
   };
   for (const entry of entries) visit(entry);
-  return [...seen].sort();
+  return [...seen].sort(byCodeUnit);
 }
 
 /** The pattern topics (knowledge/patterns/be) that carry a `files:` tree: `starci app add` generates a kind from them, so the hfs bundle carries them. */
@@ -79,16 +80,16 @@ const RULE_CATALOG_FILE = 'knowledge/hfs/rules.yaml';
 const MACHINE_DATA = Object.freeze(['packages/hfs/templates/app/package-scripts/package.json', 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml']);
 /** bundle directory (runtime-relative) -> the files it copies and whether it carries the failure-code slice. */
 export const BUNDLES = Object.freeze({
-  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml', RULE_CATALOG_FILE, ...patternTopicFiles()])].sort()), catalog: true }),
-  'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/language.mjs', 'scripts/lib/jsdoc.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA, RULE_CATALOG_FILE])].sort()), catalog: false }),
-  'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/next-contract.mjs', 'scripts/lib/language.mjs', 'scripts/lib/jsdoc.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA])].sort()), catalog: false }),
+  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml', RULE_CATALOG_FILE, ...patternTopicFiles()])].sort(byCodeUnit)), catalog: true }),
+  'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/language.mjs', 'scripts/lib/jsdoc.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA, RULE_CATALOG_FILE])].sort(byCodeUnit)), catalog: false }),
+  'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/next-contract.mjs', 'scripts/lib/language.mjs', 'scripts/lib/jsdoc.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA])].sort(byCodeUnit)), catalog: false }),
 });
 
 /** The catalog entries for `codes`, in the catalog's own text, keyed by top-level line. */
 function catalogSlice(text, codes) {
   const blocks = text.replace(/\r\n/g, '\n').split(/\n(?=[A-Z][A-Z0-9_]+:\n)/);
   const byCode = new Map(blocks.map((b) => [b.slice(0, b.indexOf(':')), b.replace(/\s+$/, '')]));
-  return `${[...codes].sort().map((code) => {
+  return `${[...codes].sort(byCodeUnit).map((code) => {
     if (!byCode.has(code)) throw new Error(`${CATALOG} has no entry for ${code}`);
     return byCode.get(code);
   }).join('\n\n')}\n`;

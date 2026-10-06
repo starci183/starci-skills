@@ -22,6 +22,8 @@
  * canonical shape of section 5 of BE-CONVENTION. A door or main.ts that grows logic is refused by those enforcers, not
  * excused here; every other file of the same slots (mappers, dto, app.module.ts) stays compared.
  */
+import { byCodeUnit } from '../../lib/list.mjs';
+
 export const CLONE_RULE_IDS = ['HFS_DUPLICATE_CODE'];
 
 const MAX_VIOLATIONS = 200;
@@ -90,7 +92,7 @@ export function checkClones({ config, context, graph } = {}) {
   const { lines: N, tokens: T } = graph.resolver.ruleParams().duplicateBlock;
   const ts = context.ts ?? context.loaded.ts;
   const entries = [];
-  for (const rel of [...graph.files.keys()].sort()) {
+  for (const rel of [...graph.files.keys()].sort(byCodeUnit)) {
     if (/\.d\.[cm]?tsx?$/.test(rel) || uniformByDesign(graph.resolver, rel)) continue;
     const unit = graph.unit(rel);
     if (!unit) continue;

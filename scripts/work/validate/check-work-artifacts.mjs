@@ -9,6 +9,7 @@ import {appRootOf, loadRecords, indexInlineCriteria, resolveRecordRef} from '../
 import {slash} from '../../lib/path-key.mjs';
 import {resolveBlob, getBlob} from '../../../engine/db/blob.mjs';
 import {exampleArtifactReadOptions, exampleWorkRoots} from '../../lib/example-refs.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * Byte verification for Work declarations: file existence, size, media signatures
@@ -632,7 +633,7 @@ if (isMain(import.meta.url)) {
   }
   // Sorted within each tier: two runs over an unchanged tree are then byte-identical, which is what makes a
   // diff across a lane's writes (or across concurrent lanes) mean something.
-  const sorted = lines => [...lines].sort();
+  const sorted = lines => [...lines].sort(byCodeUnit);
   for (const line of sorted(out.refuse)) console.log(`REFUSE  ${line}`);
   for (const line of sorted(out.suspect)) console.log(`SUSPECT ${line}`);
   for (const line of sorted(out.info)) console.log(`INFO    ${line}`);

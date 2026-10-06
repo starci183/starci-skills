@@ -1,4 +1,5 @@
 import { isServerActionModule } from './server-action.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * HFS checks 1 and 2 (knowledge/hfs/slots.yaml `tiers`):
@@ -151,7 +152,7 @@ export function checkTiers(graph) {
   const components = stronglyConnected(adjacency);
   for (const component of components) {
     const members = new Set(component);
-    const origin = [...component].sort()[0];
+    const origin = [...component].sort(byCodeUnit)[0];
     const cycle = cycleThrough(adjacency, members, origin);
     const hops = cycle.slice(0, -1).map((unit, i) => witness.get(`${unit}\0${cycle[i + 1]}`));
     const label = unit => unit.slice(unit.indexOf(':') + 1) || unit;

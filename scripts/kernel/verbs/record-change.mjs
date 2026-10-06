@@ -5,6 +5,7 @@ import { getWorkflow, workDirOf, workflowRunning } from './shared/rows.mjs';
 import { createWorkDigester, inputDrift, isWorkInput } from '../input-digests.mjs';
 import { RECORD_CHANGE_REACHES, changeNoteOf, committedMatches, committedReader, createOwnership, readRecordChange, writeRecordChange } from '../work-ownership.mjs';
 import { normWork } from '../../lib/path-key.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 import { RECORD_CHANGE_REFUSED } from '../dependency-graph.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 
@@ -27,7 +28,7 @@ export default {
     // The owner's records live in its workflow worktree (WFWT2 2.8): read and judge them there, committed at its branch.
     const workDir = workDirOf(repo), tree = workflowWorktreeOf({ env: process.env }, workflowId)?.path ?? repo;
     const files = createWorkDigester(tree, { workDir }).files(record);
-    const keys = Object.keys(files).sort();
+    const keys = Object.keys(files).sort(byCodeUnit);
     if (!keys.length) throw Object.assign(new Error(`${record} holds no record file (index.yaml/resource.yaml) in ${tree}`), { code: 'record-change-record-missing' });
     const ownerOf = createOwnership(db, { repo, workDir });
     const foreign = keys.map((file) => ({ file, ...ownerOf(file) })).filter((o) => o.workflowId !== workflowId);

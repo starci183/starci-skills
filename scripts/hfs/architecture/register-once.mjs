@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
 import { isTestWorldSlot } from '../test-world-slot.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R45 `register-once` (BE_MODULE_SHAPE), the module graph read from the app roots (owner rule of 2026-09-30, the
@@ -123,7 +124,7 @@ export function checkRegisterOnce(input) {
     const apps = inApps.get(declaration);
     if (apps) {
       for (const item of list) {
-        report(item.file, item.node, `${target.name} is registered in the root of app ${[...apps].sort().join(', ')}, so no other module imports it; consume it through its Inject*() decorators.`, { module: target.name });
+        report(item.file, item.node, `${target.name} is registered in the root of app ${[...apps].sort(byCodeUnit).join(', ')}, so no other module imports it; consume it through its Inject*() decorators.`, { module: target.name });
       }
       continue;
     }

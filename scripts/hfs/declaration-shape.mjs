@@ -3,6 +3,7 @@
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { APP_KIND, connectionShapeProblems, NAME, RUNTIME_KIND, SLOT_ID } from './manifest-shape.mjs';
 import { kindShapeProblems, patternShapeProblems } from './declaration-slots.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 /** Shape problems of the optional hfs.json `supabase` block whose auth posture DB_CONFIG_POLICY checks. */
 function supabaseBlockProblems(block) {
@@ -31,7 +32,7 @@ export function declarationShapeProblems(declaration, profiles) {
   bad.push(...supabaseBlockProblems(declaration.supabase));
   if (declaration.browser !== undefined && declaration.browser !== true) bad.push('browser is `true` when the app has a browser journey (slot app.browser), and is left out otherwise');
   if (declaration.kind !== APP_KIND) bad.push(`kind must be ${APP_KIND} (a product is one app repository with a be and an fe side) or ${RUNTIME_KIND} (the StarCi runtime repository)`);
-  if (!isPlainObject(declaration.sides) || Object.keys(declaration.sides).sort().join() !== profiles.join()) { bad.push('sides must declare exactly be and fe'); return bad; }
+  if (!isPlainObject(declaration.sides) || Object.keys(declaration.sides).sort(byCodeUnit).join() !== profiles.join()) { bad.push('sides must declare exactly be and fe'); return bad; }
   const names = new Map();
   for (const side of profiles) {
     const value = declaration.sides[side];

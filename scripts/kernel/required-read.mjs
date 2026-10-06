@@ -7,6 +7,7 @@ import { statusQuery } from '../api/git/status-query.mjs';
 import { INSTALL_MANIFEST_FILE, INSTALL_PROTOCOL_SCHEMA, installedPayloadDigest } from '../lib/install-custody.mjs';
 import { ENGINE_SCHEMA } from '../../engine/constants.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 export const KERNEL_BOOT_FILES = Object.freeze(['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml']);
 export const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/cli/commands/kernel', 'modules/kernel/owner-rulings.yaml']);
 const OP_PROMPT_FILE = 'scripts/kernel/op-prompt.mjs';
@@ -26,11 +27,11 @@ const expand = (root, relative) => {
 /** Derive required paths from the actual workflow/op contracts; caller-supplied paths cannot remove any. */
 export function kernelReadManifest(db, workflowId, { root, authority, ops = [], clean = true, status = statusQuery } = {}) {
   try {
-    const requiredOps = [...new Set([...db.prepare('SELECT DISTINCT op_id FROM jobs WHERE workflow_id=? AND op_id IS NOT NULL').all(workflowId).map(row => row.op_id), ...ops])].sort();
+    const requiredOps = [...new Set([...db.prepare('SELECT DISTINCT op_id FROM jobs WHERE workflow_id=? AND op_id IS NOT NULL').all(workflowId).map(row => row.op_id), ...ops])].sort(byCodeUnit);
     const paths = [...KERNEL_CONTRACT_FILES, ...requiredOps.flatMap(op => contractFilesOf(root, op)), ...(requiredOps.length ? [OP_PROMPT_FILE] : [])];
     const installed = !fs.existsSync(path.join(root,'.git'));
     const files = new Set([...paths, ...(installed ? ['package.json','engine/constants.mjs'] : [])].flatMap(relative => expand(root, relative)));
-    const rows = [...files].sort().map(relative => {
+    const rows = [...files].sort(byCodeUnit).map(relative => {
       // Validate parents too, not just a final file reached through an undeclared junction.
       const parts = relative.split('/');
       for (let i = 1; i <= parts.length; i++) if (fs.lstatSync(path.join(root, ...parts.slice(0,i))).isSymbolicLink()) throw refuse(`linked required read: ${relative}`);
@@ -57,7 +58,7 @@ export function kernelReadManifest(db, workflowId, { root, authority, ops = [], 
       revision = { kind: 'git',sha: rev };
     }
     if (clean && !installed) {
-      const checked = status(['--porcelain=v1', '-z', '--untracked-files=all', '--', ...KERNEL_CONTRACT_FILES, ...[...files].sort()], { dir: root, timeout: 30_000 });
+      const checked = status(['--porcelain=v1', '-z', '--untracked-files=all', '--', ...KERNEL_CONTRACT_FILES, ...[...files].sort(byCodeUnit)], { dir: root, timeout: 30_000 });
       if (checked?.error || checked?.signal || checked?.status !== 0) throw refuse('required read status unavailable');
       if (String(checked.stdout ?? '').length) throw refuse('required deployed read inputs differ from HEAD');
     }

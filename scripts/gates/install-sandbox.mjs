@@ -136,8 +136,24 @@ async function runInDocker({ tarball, tools = null }) {
     if (result.error) throw new CouldNotRun(`docker could not run: ${result.error.message}`);
     return result.status ?? 2;
   } finally {
-    fs.rmSync(stage, { recursive: true, force: true });
+    await removeTree(stage);
   }
+}
+
+/**
+ * Remove a scratch tree through the link-safe owner (scripts/api/fs/safe-remove.mjs), imported lazily: inside the throwaway container only this script and the tarball
+ * exist, so the owner is absent there and the tree is left for the container's own removal (`docker run --rm`). Any other import failure is real.
+ */
+async function removeTree(dir) {
+  let owner, hold;
+  try {
+    owner = await import('../api/fs/safe-remove.mjs');
+    hold = await import('../machine/artifact-hold.mjs');
+  } catch (error) {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND') return;
+    throw error;
+  }
+  owner.safeRemove(dir, { hold: hold.artifactHoldReason });
 }
 
 /** Thrown by a step that could not run at all (not an assertion that came out false). */
@@ -300,7 +316,7 @@ async function runSandbox({ tarball, keep = false }) {
   record('the sandbox home gained the install (listing before and after)', homeDiff.added.length > 0 || installStatus !== 0, `home entries ${homeBefore.size} -> ${homeAfter.size}`);
 
   const summary = summaryOf({ results, version, platform: `${platform}-${os.arch()}`, node: process.version, sandbox: keep ? root : '<removed>' });
-  if (!keep) fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  if (!keep) await removeTree(root);
   return summary;
 }
 

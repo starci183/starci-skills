@@ -35,6 +35,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { pack as packNpm } from '../api/npm/pack.mjs';
 import { fileURLToPath } from 'node:url';
@@ -289,7 +290,7 @@ function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, 
     const childEnv = { ...cleanEnv(env), npm_config_update_notifier: 'false' };
     const prepared = preparePackedDependencies({ dirs: copied.map(at), own: [...new Set([installRoot, ...own.map(at)])], temp, locked, env: childEnv, pack });
     if (prepared.status) return every(prepared.status, prepared.status === 'red' ? PROOF_CODES.install : PROOF_CODES.unrun, { install, output: prepared.output });
-    const localDependencies = prepared.payloads.map(({ name, version, files }) => ({ name, version, packedFiles: [...files.keys()].sort() }));
+    const localDependencies = prepared.payloads.map(({ name, version, files }) => ({ name, version, packedFiles: [...files.keys()].sort(byCodeUnit) }));
     const installed = npm([locked ? 'ci' : 'install', '--no-audit', '--no-fund'], { cwd: installRoot, env: childEnv, timeout: INSTALL_TIMEOUT_MS });
     if (installed.error && !installed.timedOut) return every('unrun', PROOF_CODES.unrun, { install, output: `npm could not start: ${installed.error.message}` });
     if (installed.status !== 0) {

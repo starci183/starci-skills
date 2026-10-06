@@ -7,6 +7,8 @@ import {isPlainObject as plain} from './plain-object.mjs';
 import {invalid,validateRoots} from './invalid-config.mjs';
 import {validateOrca} from './orca-config.mjs';
 import {ENV_NAME,secretEnv,connectorSecret} from './secrets.mjs';
+// config.mjs is copied into a relocated install without scripts/lib, so the error-message name list sorts here (display only).
+const knownNames=names=>[...names].sort((a,b)=>a<b?-1:a>b?1:0).join(', ');
 export {readDotenv,connectorSecret} from './secrets.mjs';
 
 export const configRoot=skillRoot;
@@ -250,7 +252,7 @@ function validateAllocationBalance(allocation,runtimes){
     const shares=allocation.shares;
     if(!plain(shares)||!Object.keys(shares).length)bad('shares must map runtime pools to non-negative weights, e.g. {claude-agent: 25, codex-agent: 25}.');
     for(const [pool,weight] of Object.entries(shares)){
-      if(!plain(runtimes[pool]))bad(`shares.${pool} is not a modules/models/registry.yaml pool (known: ${Object.keys(runtimes).sort().join(', ')}).`);
+      if(!plain(runtimes[pool]))bad(`shares.${pool} is not a modules/models/registry.yaml pool (known: ${knownNames(Object.keys(runtimes))}).`);
       if(typeof weight!=='number'||!Number.isFinite(weight)||weight<0)bad(`shares.${pool} must be a non-negative number.`);
     }
     if(!Object.values(shares).some(weight=>weight>0))bad('shares must give at least one pool a positive weight.');
@@ -283,14 +285,14 @@ function validateAgentSeat(seat,name,profile){
       throw Error(`Invalid config.yaml: ${name} group must be {group: [{agent, model?}, ...], effort?} with at least one member.`);
     if(new Set(group.map(member=>member.agent)).size!==group.length)throw Error(`Invalid config.yaml: ${name}.group names each agent once — availability is per provider.`);
     for(const {agent,model} of group){
-      if(!knownProviders.has(agent))throw Error(`Invalid config.yaml: ${name}.group agent ${agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
+      if(!knownProviders.has(agent))throw Error(`Invalid config.yaml: ${name}.group agent ${agent} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
       if(typeof model==='string'&&profile.models?.[model]?.provider!==agent&&!Object.values(runtimes).some(runtime=>runtime?.provider===agent&&(runtime.target===model||Object.values(runtime.models??{}).includes(model))))
         throw Error(`Invalid config.yaml: ${name}.group model ${model} is not declared by a ${agent} runtime.`);
     }
   }else{
     if(!plain(seat)||Object.keys(seat).some(key=>!['agent','model','effort'].includes(key))||Object.values(seat).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
       throw Error(`Invalid config.yaml: ${name} must be {agent?, model?, effort?} with string-or-null values, or {group: [{agent, model?}, ...], effort?}.`);
-    if(typeof seat.agent==='string'&&!knownProviders.has(seat.agent))throw Error(`Invalid config.yaml: ${name}.agent ${seat.agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
+    if(typeof seat.agent==='string'&&!knownProviders.has(seat.agent))throw Error(`Invalid config.yaml: ${name}.agent ${seat.agent} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
   }
   if(seat.effort!==undefined&&seat.effort!==null&&!EFFORT_LEVELS.includes(seat.effort))throw Error(`Invalid config.yaml: ${name}.effort must use the effort vocabulary.`);
 }
@@ -319,7 +321,7 @@ export function validateConfig(config){
     const allocation=config.allocation,preferred=allocation?.preferredProvider;
     if(!plain(allocation)||Object.keys(allocation).some(key=>!ALLOCATION_KEYS.includes(key))||allocation.mode!==ADAPTIVE_ALLOCATION_MODE||!(preferred===null||preferred===undefined||typeof preferred==='string'&&preferred.trim()))
       throw Error('Invalid config.yaml: allocation must be {mode:"adaptive", preferredProvider?: <provider|null>, policy?, shares?, windowHours?, grants?}.');
-    if(typeof preferred==='string'&&!knownProviders.has(preferred))throw Error(`Invalid config.yaml: allocation.preferredProvider ${preferred} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
+    if(typeof preferred==='string'&&!knownProviders.has(preferred))throw Error(`Invalid config.yaml: allocation.preferredProvider ${preferred} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
     validateAllocationBalance(allocation,runtimes);
   }
   if(config?.kernel!==undefined)validateAgentSeat(config.kernel,'kernel',profile);

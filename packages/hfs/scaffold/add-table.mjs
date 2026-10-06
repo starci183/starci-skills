@@ -316,7 +316,7 @@ export function addTable({
       fs.writeFileSync(target, file.body);
       created.push(target);
     }
-    if (emitTypes !== false) {
+    if (typeof emitTypes === "function") {
       const generated = emitTypes({ root });
       if (typeof generated === "string") {
         const target = path.join(root, ...dbTypesPath.split("/"));
@@ -339,6 +339,6 @@ export function addTable({
   }
   return {
     created: planned.map((file) => file.relative),
-    types: emitTypes === false ? "skipped" : dbTypesPath,
+    types: typeof emitTypes === "function" ? dbTypesPath : "skipped",
   };
 }

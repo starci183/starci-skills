@@ -337,7 +337,7 @@ function hasInstall(bound, root, project) {
  */
 export function boundedSys(ts, bound, base = ts.sys, allow = []) {
   const roots = [pathKey(bound), pathKey(path.dirname(ts.getDefaultLibFilePath({})))];
-  const extra = new Set(allow.map(pathKey));
+  const extra = new Set(allow.map((p) => pathKey(p)));
   const inside = (p) => { const key = pathKey(p); return extra.has(key) || roots.some((r) => key === r || key.startsWith(`${r}/`)); };
   return { ...base,
     fileExists: (p) => inside(p) && base.fileExists(p),

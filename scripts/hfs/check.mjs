@@ -79,6 +79,7 @@ import { checkAppRoot, trackedTreeView } from './architecture/hfs.mjs';
 import { testTopologyFindings } from './rules/test-topology.mjs';
 import { feNoTestsFindings, isFeTestPath } from './rules/fe-no-tests.mjs';
 import { editionFindings } from './rules/edition.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 // The database rules (R213-R216) read SQL through a WASM parser, so they are async: `starci app check` calls them beside the other emitters and passes the findings in as `extraFindings`.
 export { checkDatabase } from './rules/database.mjs';
 
@@ -106,7 +107,7 @@ export const CHECK_CODES = Object.freeze([
   ...REFUSAL_CODES,
 ]);
 /** Every code `starci app check` can report: its own and every code the architecture machine can emit (derived from the machine's rule id lists). */
-export const ALL_CHECK_CODES = Object.freeze([...new Set([...CHECK_CODES, ...ARCHITECTURE_RULE_IDS])].sort());
+export const ALL_CHECK_CODES = Object.freeze([...new Set([...CHECK_CODES, ...ARCHITECTURE_RULE_IDS])].sort(byCodeUnit));
 const SOURCE_EXT = /\.(?:[cm]?[jt]sx?)$/;
 const VAR = /<([a-z][a-z0-9-]*)>/g;
 const DEP_SECTIONS = ['dependencies', 'devDependencies'];
@@ -438,7 +439,7 @@ function machineOver({ scope, manifest, machine, changed }) {
   if (changed) {
     const resolver = createSlotResolver(manifest, readRepoDeclaration(manifest, scope.repoRoot));
     const mine = changed.files.filter((f) => f.startsWith(prefix)).map((f) => f.slice(prefix.length));
-    paths = [...new Set(mine.filter((f) => SOURCE_EXT.test(f) || resolver.ownerOf(f)).map((f) => resolver.ownerOf(f)?.root ?? f))].sort();
+    paths = [...new Set(mine.filter((f) => SOURCE_EXT.test(f) || resolver.ownerOf(f)).map((f) => resolver.ownerOf(f)?.root ?? f))].sort(byCodeUnit);
     if (!paths.length) return { info: { side, status: 'skipped', reason: `no changed source file in ${label}` }, findings: [] };
   }
   let report;

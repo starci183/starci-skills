@@ -4,7 +4,7 @@ import { parseContract, installedSWR } from './next-data-contract.mjs';
 import { relativePath, unwrapExpression } from './typescript.mjs';
 import { anyDescendant, normalizedSymbol, normalizedSymbolValue, selectedNode, valueSymbol as sharedValueSymbol } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
-
+import { byCodeUnit } from '../../lib/list.mjs';
 export const SWR_KEY_RULE_ID = 'FE_SWR_KEY_IDENTITY';
 export const SWR_MUTATION_RULE_ID = 'FE_SWR_MUTATION_RESOURCE_IDENTITY';
 export const SWR_DATA_RULE_IDS = [SWR_KEY_RULE_ID, SWR_MUTATION_RULE_ID];
@@ -637,7 +637,7 @@ export function checkFrontendDataLifecycle(config, context) {
   for (const call of lifecycleCalls) if (!declaredFunctions.has(call.owner)) {
     reasons.push(`${relativePath(config.root, call.source.fileName)}:${sourceLocation(call.source, call.node).line} SWR call is outside every declared lifecycle hook`);
   }
-  const details = [...new Set(reasons)].sort();
+  const details = [...new Set(reasons)].sort(byCodeUnit);
   return {
     violations,
     coverage: details.length ? { status: 'unavailable', ruleIds, hooks: contract.hooks.length, calls: lifecycleCalls.length,

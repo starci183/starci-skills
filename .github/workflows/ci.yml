@@ -40,35 +40,35 @@ jobs:
       SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
       SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # The eslint canons are npm workspaces of packages/ with their own lockfile: the runtime HFS check loads them
       # (R38 names eslint-be:error-home), so without this install it cannot resolve @typescript-eslint/parser.
       - name: Install the eslint canon workspace
         working-directory: packages
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # @starci/test-world is built by the scaffold end-to-end spec (tests/hfs/hfs-scaffold-app.e2e.spec.mjs) with ITS OWN pinned
       # TypeScript: it needs its own install (without one tsc resolves the newer compiler of packages/node_modules and refuses its tsconfig).
       - name: Install @starci/test-world
         working-directory: packages/test-world
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # packages/grammar/dist is untracked; `npm run check` refuses a missing or stale one
       # (scripts/checks/check-grammar-dist.mjs), so build it from this commit's source first.
       - name: Build @starci/grammar
         working-directory: packages/grammar
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npm run build
 
       - name: Static checks
@@ -79,7 +79,7 @@ jobs:
 
       - name: Coverage upload (Codecov, flag runtime)
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           use_oidc: true
           files: coverage/lcov.info
@@ -91,7 +91,7 @@ jobs:
       # (sonar.qualitygate.wait, up to an hour: SonarCloud queues) and the step fails on a red gate.
       - name: Sonar scan (SonarCloud) and quality gate
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' && env.SONAR_PROJECT_KEY != '' }}
-        uses: SonarSource/sonarqube-scan-action@v7
+        uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1
         timeout-minutes: 75
         with:
           args: >

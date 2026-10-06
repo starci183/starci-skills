@@ -7,11 +7,12 @@
  * object type with no members and no index signature, and a union with `undefined` where a member could not simply be absent.
  * Pure: takes the TypeScript module and a checker.
  */
+import { byCodeUnit } from '../report/order.mjs';
 
 /** Sorts object keys at every depth, so equal schemas print equal text. */
 export function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort(byCodeUnit).map((key) => [key, stable(value[key])]));
   return value;
 }
 

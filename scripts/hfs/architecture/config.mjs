@@ -4,6 +4,7 @@ import { slash } from '../../lib/path-key.mjs';
 import { readJsonFile as readJson } from '../../lib/json.mjs';
 import { isInside } from '../../lib/walk.mjs';
 import { openHfs } from '../slots.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 
 /** A file's identity: its resolved real path, or the resolved path when it does not exist. */
@@ -15,7 +16,7 @@ function canonical(file) {
 function exactKeys(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error(`${label} must be an object.`);
   const unknown = Object.keys(value).filter(key => !allowed.has(key));
-  if (unknown.length) throw Error(`${label} has unsupported fields: ${unknown.sort().join(', ')}.`);
+  if (unknown.length) throw Error(`${label} has unsupported fields: ${unknown.sort(byCodeUnit).join(', ')}.`);
 }
 
 /**
@@ -146,7 +147,7 @@ function workspaceDirectories(root, { packageRoot: appPackageRoot = root, side =
       }
     }
   }
-  return [...directories].sort();
+  return [...directories].sort(byCodeUnit);
 }
 
 function discoveredProjects(root, workspaces) {
@@ -293,9 +294,9 @@ export function loadArchitectureConfig(repositoryRoot, { hfs } = {}) {
   const packageRoot = side === null ? root : path.dirname(root);
   const workspaces = workspaceDirectories(root, { packageRoot, side });
   const appDirs = apps.map(app => `apps/${app.name}`);
-  const inferred = inferredLayout(root, [...new Set([...workspaces, ...appDirs])].sort());
+  const inferred = inferredLayout(root, [...new Set([...workspaces, ...appDirs])].sort(byCodeUnit));
   const kinds = [profile === 'be' ? 'backend' : 'frontend'];
-  const projects = discoveredProjects(root, [...new Set([...workspaces, ...appDirs])].sort());
+  const projects = discoveredProjects(root, [...new Set([...workspaces, ...appDirs])].sort(byCodeUnit));
   if (!projects.length) throw Error('The repository has no tsconfig.json to derive a TypeScript project from.');
   const backend = {
     modules: ['src/modules'],

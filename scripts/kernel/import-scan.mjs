@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { isWorktreesPath } from '../lib/worktree-exclude.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 export const SOURCE_EXT = Object.freeze(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']);
 const RESOLVE_EXT = [...SOURCE_EXT, '.d.ts', '.json'];
@@ -189,7 +190,7 @@ export function importersOf(root, moved, opts = {}) {
   if (!targets.length) return [];
   const hit = (file) => targets.some((t) => within(file, t) || file.replace(/\.[^./]+$/, '') === t);
   const { edges } = scanImports(root, opts);
-  return [...new Set(edges.filter((e) => e.kind === 'file' && hit(e.file) && !hit(e.from)).map((e) => e.from))].sort();
+  return [...new Set(edges.filter((e) => e.kind === 'file' && hit(e.file) && !hit(e.from)).map((e) => e.from))].sort(byCodeUnit);
 }
 
 /** Every broken relative/alias import: [{from, spec}] (capped by `limit`), plus the total. */

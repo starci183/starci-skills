@@ -1,10 +1,11 @@
 // Deterministic Orca replay identity is pure; the API runner and launch admission share this one owner.
 import crypto from 'node:crypto';
+import { byCodeUnit } from './list.mjs';
 export const requestValuePresent = (v) => v !== undefined && v !== null && v !== false && v !== '';
 
 const canonical = (v) => Array.isArray(v) ? `[${v.map(canonical).join(',')}]`
   : (v && typeof v === 'object'
-    ? `{${Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`
+    ? `{${Object.keys(v).filter((k) => v[k] !== undefined).sort(byCodeUnit).map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`
     : JSON.stringify(v ?? null));
 
 /**

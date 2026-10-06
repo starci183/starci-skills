@@ -30,6 +30,7 @@ import { providerCircuits } from '../../machine/provider-circuit.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 import { readSupervisor, withSupervisor } from '../../machine/home.mjs';
 import { normalizeProvider } from '../../lib/provider.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const NAME = 'resource';
@@ -442,7 +443,7 @@ export function createResourceController(overrides = {}) {
     const exhausted = open.length ? quotaExhausted({ jobs, openProviders: open.map((c) => c.provider), providerOf: await deps.providerOf() }) : [];
     for (const e of exhausted) {
       await ctx.openDecision({ schema: 'starci/decision-item@1', kind: 'quota-exhausted', decider: 'supervisor', ledger: ledgerId,
-        idempotencyKey: `quota-exhausted:${ledgerId}:${e.op}:${e.providers.slice().sort().join('+')}`, entity: { type: 'job', id: `${ledgerId}:${e.op}` },
+        idempotencyKey: `quota-exhausted:${ledgerId}:${e.op}:${e.providers.slice().sort(byCodeUnit).join('+')}`, entity: { type: 'job', id: `${ledgerId}:${e.op}` },
         summary: `${e.queued} ready ${e.op} op(s) on ${ledgerId} wait and every pool they name (${e.pools.join(', ')}) has an open circuit (${e.providers.join(', ')})`,
         evidence: open.filter((c) => e.providers.includes(c.provider)).map((c) => ({ ref: `circuit:${c.provider} ${c.failureKind} until ${c.expiresAt ? new Date(c.expiresAt).toISOString() : '?'}` })),
         options: [{ key: 'reroute', verb: 'starci kernel graph-edit / reroute the kind to a pool with quota', recommended: true }, { key: 'wait', verb: 'wait for the circuit to clear (quota probe every 5 min)' }],

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { checkerScope } from './required-files.mjs';
 import { allowsFile } from '../allows.mjs';
 import { unwrapEach } from './ast-walks.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R47 `contract-fixture-guard` (BE_CONTRACT_UNGUARDED). A fake at the network edge serves payload fixtures; a fixture drifts
@@ -81,7 +82,7 @@ export function checkContractFixtureGuard(input) {
   const violations = [];
   const fixtures = new Map(); // provider -> first payload fixture file
   const specs = new Map(); // provider -> [contract spec file]
-  for (const file of [...tree.files].sort()) {
+  for (const file of [...tree.files].sort(byCodeUnit)) {
     const classified = resolver.classifyPath(file);
     if (classified.status !== 'owned') continue;
     if (classified.slot === CONTRACT_SLOT) {

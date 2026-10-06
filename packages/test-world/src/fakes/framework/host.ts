@@ -95,7 +95,7 @@ export class FakesHost {
 
     private async route(request: IncomingMessage, response: ServerResponse): Promise<void> {
         const method = request.method ?? "GET"
-        const segments = new URL(request.url ?? "/", "http://control.local").pathname.split("/").filter((part) => part !== "")
+        const segments = new URL(request.url ?? "/", "https://control.local").pathname.split("/").filter((part) => part !== "")
         if (segments[0] !== "control") {
             answerJson(response, 404, { error: "not a control path" })
             return

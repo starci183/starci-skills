@@ -22,6 +22,7 @@ import { fileKind, fileOf } from "./lib/scope.mjs"
 import { resolveColor, themeEnvironment } from "./lib/theme-values.mjs"
 import { STATUS_TONES } from "./lib/vocabulary.generated.mjs"
 import { FAMILY_PREFIXES } from "./lib/vocabulary.mjs"
+import { byCodeUnit } from "./lib/order.mjs"
 
 /** The lowest contrast of a soft foreground on its tint and on the page, of a solid tone as text, and of body text. */
 const MIN_SOFT = 3
@@ -41,7 +42,7 @@ function familiesIn(blocks) {
       }
     })
   }
-  return [...found].sort()
+  return [...found].sort(byCodeUnit)
 }
 
 export const statusContrast = makeRule(

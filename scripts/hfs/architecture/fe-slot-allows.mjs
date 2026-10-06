@@ -1,6 +1,7 @@
 import { treeOf } from './required-files.mjs';
 import { allowsFile } from '../allows.mjs';
 import { isFeTestPath } from '../rules/fe-no-tests.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
  * R94 `fe-slot-allows` (FE_SLOT_FILE_ROLE). A front-end slot that owns a whole directory (`fe.route`, `fe.feature`,
@@ -23,7 +24,7 @@ export function checkFeSlotAllows({ config, graph }) {
   const violations = [];
   let files = 0;
   const report = (file, message, extra = {}) => violations.push({ ruleId: RULE, path: file, line: 1, column: 1, message, ...extra });
-  for (const file of [...tree.files].sort()) {
+  for (const file of [...tree.files].sort(byCodeUnit)) {
     if (isFeTestPath(file)) continue;   // FE_NO_TESTS's, the one finding of that file
     const classified = resolver.classifyPath(file);
     if (classified.status !== 'owned') continue;

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { sha256 } from '../../engine/digest.mjs';
 import { tarFiles } from '../../scripts/lib/tar-files.mjs';
-import { proveRuntimePackage } from '../../scripts/gates/runtime-package-clean.mjs';
+import { proveRuntimePackage, unresolvedPackedImports } from '../../scripts/gates/runtime-package-clean.mjs';
 import { verifyPackedDependencies } from '../../scripts/gates/package-clean-test.mjs';
 import { tgz } from '../helpers/npm-tarball.mjs';
 
@@ -196,4 +196,12 @@ test('shared installed-byte verifier rejects traversal and a linked projection r
   const target = path.join(f.root, 'plain'), link = path.join(f.root, 'linked'); fs.mkdirSync(target);
   fs.symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir');
   assert.match(verifyPackedDependencies([{ ...payload, files: new Map([['package/a', Buffer.from('x')]]) }], f.root, { packageRoots: new Map([['starci', link]]) }), /root is missing or linked/);
+});
+
+test('the archive must carry every relative module its packed scripts import', () => {
+  const pack = entries => new Map(Object.entries(entries).map(([file, lines]) => [`package/${file}`, Buffer.from(lines.join('\n'))]));
+  const whole = pack({ 'scripts/a.mjs': ["import { b } from './lib/b.mjs';", "const c = await import('../engine/c.mjs');"], 'scripts/lib/b.mjs': ['export const b = 1;'], 'engine/c.mjs': ['export const c = 1;'], 'README.md': ["import x from './absent.mjs'"] });
+  assert.deepEqual(unresolvedPackedImports(whole), []);
+  const cut = pack({ 'scripts/a.mjs': ["// import { z } from './commented.mjs';", "import { s } from '../packages/hfs/scaffold/app.mjs';", "export * from './x.mjs';", "const u = import(new URL('../p/main.mjs', import.meta.url));"], 'scripts/x.mjs': ['export const x = 1;'] });
+  assert.deepEqual(unresolvedPackedImports(cut), ['package/scripts/a.mjs:2 -> package/packages/hfs/scaffold/app.mjs', 'package/scripts/a.mjs:4 -> package/p/main.mjs']);
 });

@@ -58,6 +58,7 @@ import { brandOf, brandPalette, paletteFindings } from '../brand/brand-palette.m
 import { isPartName } from '../direction-part.mjs';
 import { generatedDrawingsOf } from './ui-shapes.mjs';
 import { assetsOf, indexFilesUnder, list, parseUiRef, readYamlOrNull as readRecord, sha256File, slash, workRootOf as enclosingWorkRoot } from '../work-io.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const UI_SCHEMA = 'work/ui-screen@1';
 const IMPL_SCHEMA = 'work/implementation@1';
@@ -429,7 +430,7 @@ function checkComposites(workRoot, uiFile, record, shell, { mode, level, records
   for (const [k, have] of cells) {
     const [state, presentation] = k.split(' ');
     const missing = required.breakpoints.flatMap((bp) => required.themes.map((th) => `${bp}/${th}`)).filter((cell) => !have.has(cell));
-    if (missing.length) out.push(finding(mode === 'op' ? 'refuse' : 'suspect', 'DRAW_MATRIX_INCOMPLETE', at, `state ${state} (${presentation}) is drawn at ${[...have].sort().join(', ')} but not at ${missing.join(', ')} - every drawn state has its part at desktop and mobile in the light theme`));
+    if (missing.length) out.push(finding(mode === 'op' ? 'refuse' : 'suspect', 'DRAW_MATRIX_INCOMPLETE', at, `state ${state} (${presentation}) is drawn at ${[...have].sort(byCodeUnit).join(', ')} but not at ${missing.join(', ')} - every drawn state has its part at desktop and mobile in the light theme`));
   }
   // A routed overlay is drawn both ways - over its dimmed host and as the full page inside its layout chain.
   if (overlay && record.routed === true && composites.length) {

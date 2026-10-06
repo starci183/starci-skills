@@ -35,7 +35,7 @@ import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { WORKTREES_IGNORE_GLOBS } from '../lib/worktree-exclude.mjs';
 import { emitCheckOutput } from './output.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { splitList } from '../lib/list.mjs';
+import { byCodeUnit, splitList } from '../lib/list.mjs';
 
 const CANON_FINDINGS = 'starci/canon-findings@1';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -116,7 +116,7 @@ export function seamPaths(root, findings, spec) {
     const src = segments.lastIndexOf('src', segments.length - 2);
     if (src >= 0) roots.add(segments.slice(0, src + 1).join('/'));
   }
-  return [...roots].sort().flatMap((source) => spec.paths.map((seam) => {
+  return [...roots].sort(byCodeUnit).flatMap((source) => spec.paths.map((seam) => {
     const relative = `${source}/${seam}`;
     return { path: relative, exists: fs.existsSync(path.join(root, relative)) };
   }));
@@ -320,7 +320,7 @@ export async function scanCanon(options) {
       .then(result => ({ result }), error => ({ error })) : null;
   const eslintTask = options.machines.includes('eslint') ? lintRepository(root, options, canon, relative)
     .then(lint => ({ lint }), error => ({ error })) : null;
-  if (eslintTask) {
+  if (eslintTask !== null) {
     try {
       const { lint, error } = await eslintTask;
       if (error) throw error;

@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { brokenImports } from '../import-scan.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 import { fileURLToPath } from 'node:url';
 import { revParseQuery } from '../../api/git/rev-parse-query.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
@@ -65,7 +66,7 @@ export function importsBrokenOf({ db, workflowId, repo, now = Date.now(), worktr
   const repointQueued = Boolean(db.prepare(`SELECT 1 FROM jobs WHERE workflow_id=? AND op_id='code.refactor'
     AND (json_extract(payload_json,'$.params.canonWire')=1 OR json_extract(payload_json,'$.kernelEdit.wire')=1)
     AND status IN (${LIVE.map(() => '?').join(',')}) LIMIT 1`).get(workflowId, ...LIVE));
-  return { code: 'IMPORTS_BROKEN_AFTER_MOVE', rcaCause: 'broken-import', count, files, sample: sample.slice(0, 10), brokenFiles: [...brokenFiles].sort().slice(0, 200),
+  return { code: 'IMPORTS_BROKEN_AFTER_MOVE', rcaCause: 'broken-import', count, files, sample: sample.slice(0, 10), brokenFiles: [...brokenFiles].sort(byCodeUnit).slice(0, 200),
     trees: scanned, repointQueued, blocksNextWave: !repointQueued };
 }
 

@@ -9,6 +9,7 @@
 // other place whose sequence equals an exported helper's is a copy: import the lib one. A copy with a different body is a
 // different contract and is not flagged. Two libs that export one NAME with different contracts are reported for a rename.
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import { createRequire } from 'node:module';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -155,7 +156,7 @@ export function helperOnceFindings({ tracked, read }) {
   }
   for (const [name, homes] of byName) {
     if (new Set(homes.values()).size > 1) {
-      findings.push({ code: 'RT_HELPER_REDEFINED', path: [...homes.keys()].sort()[0], line: 1,
+      findings.push({ code: 'RT_HELPER_REDEFINED', path: [...homes.keys()].sort(byCodeUnit)[0], line: 1,
         message: `${name} is exported by ${[...homes.keys()].sort().join(' and ')} with different contracts: rename one` });
     }
   }

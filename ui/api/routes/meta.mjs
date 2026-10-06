@@ -1,10 +1,11 @@
 import { sendJson, sendError } from '../envelope.mjs';
 import { dbMark } from '../etag.mjs';
 import { opLabelMap } from '../../../scripts/lib/display-names.mjs';
+import { byCodeUnit } from '../../../scripts/lib/list.mjs';
 import { ledgerSearchHit, machineSearchHit, logSearchHit } from '../search-read.mjs';
 
 const maxHits = 40;
-const unique = values => [...new Set(values.filter(value => value != null))].sort();
+const unique = values => [...new Set(values.filter(value => value != null))].sort(byCodeUnit);
 const safeQuery = value => typeof value === 'string' ? value.trim().slice(0, 128) : '';
 
 export function healthz(request, response, store) {

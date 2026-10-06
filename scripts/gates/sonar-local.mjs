@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import {containerInspect} from '../api/docker/container-inspect.mjs';import {scanRun} from '../api/sonar/scan-run.mjs';import {runShell} from '../api/process/run-shell.mjs';
 import {createHash} from 'node:crypto';
 import { isMain } from '../lib/is-main.mjs';
@@ -919,7 +920,7 @@ export function resolveScanCwd(value,base=process.cwd()){
 
 /** The throwaway project key an isolated slice analysis runs under: stable per repository key and scope. */
 export function isolatedKey(key,scope){
-  const hash=createHash('sha1').update(`${key}\n${[...scope].sort().join('\n')}`).digest('hex').slice(0,10);
+  const hash=createHash('sha1').update(`${key}\n${[...scope].sort(byCodeUnit).join('\n')}`).digest('hex').slice(0,10);
   return `${key}-slice-${hash}`.slice(0,400);
 }
 

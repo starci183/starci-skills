@@ -38,6 +38,7 @@ import { yamlNumberSettings } from '../../lib/read-yaml.mjs';
 import { ownerLanguage, translator } from '../../lib/i18n.mjs';
 import { DEFAULTS as SUPERVISOR_DEFAULTS, supervisorSettings } from '../../machine/home.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
+import { byCodeUnit } from '../../lib/list.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const WORKERS_FILE = path.join(ROOT, 'modules', 'reconciler', 'workers.yaml');
@@ -82,19 +83,19 @@ export function waitCycles(edges) {
     }
     if (low.get(v) === idx.get(v)) { const c = []; let w; do { w = stack.pop(); on.delete(w); c.push(w); } while (w !== v); if (c.length > 1) sccs.push(c); }
   };
-  for (const v of [...adj.keys()].sort()) if (!idx.has(v)) strong(v);
+  for (const v of [...adj.keys()].sort(byCodeUnit)) if (!idx.has(v)) strong(v);
   return sccs.map((members) => {
     // Walk the cycle from its smallest member along edges inside the component.
     const inside = new Set(members);
-    const start = [...members].sort()[0];
+    const start = [...members].sort(byCodeUnit)[0];
     const order = [start];
     let cur = start;
     while (order.length < members.length) {
-      const next = [...(adj.get(cur) ?? [])].filter((n) => inside.has(n) && !order.includes(n)).sort()[0];
+      const next = [...(adj.get(cur) ?? [])].filter((n) => inside.has(n) && !order.includes(n)).sort(byCodeUnit)[0];
       if (!next) break;
       order.push(next); cur = next;
     }
-    return order.length === members.length ? order : [...members].sort();
+    return order.length === members.length ? order : [...members].sort(byCodeUnit);
   });
 }
 
@@ -123,7 +124,7 @@ export function planDeps({ graphs = [], now, settings = DEFAULTS, language = own
   }
   for (const g of graphs) for (const f of g.findings ?? []) {
     if (!['hub-blocker', 'unowned-need'].includes(f.kind)) continue;
-    const wfs = [...new Set(f.workflows ?? [])].sort();
+    const wfs = [...new Set(f.workflows ?? [])].sort(byCodeUnit);
     decisions.push(workersDecision({
       kind: 'cross-workflow', key: `cross-workflow:${f.kind}:${wfs.join('+')}`, now, dueMs: settings.decisionDueMs, productLedger: g.ledgerId, workflowId: wfs[0] ?? null,
       entity: { type: 'workflow', id: wfs.join('+') || g.ledgerId }, summary: `${f.kind}: ${f.summary ?? ''}`,

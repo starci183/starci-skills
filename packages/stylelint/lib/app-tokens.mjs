@@ -14,6 +14,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { isGrammarToken } from "./vocabulary.mjs"
+import { byCodeUnit } from "./order.mjs"
 
 /** The trees whose `globals.css` files declare app tokens: every app and every workspace package (slots fe.route, fe.package.*). */
 const CONTAINERS = ["apps", "packages"]
@@ -56,5 +57,5 @@ export function loadAppTokens(metaUrl) {
       }
     }
   }
-  return [...names].sort()
+  return [...names].sort(byCodeUnit)
 }

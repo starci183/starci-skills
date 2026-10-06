@@ -9,7 +9,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { createRequire } from "node:module"
-import { execFileSync } from "node:child_process"
+import { runGit } from "../../runtime/scripts/api/git/lib.mjs"
 import tsParser from "@typescript-eslint/parser"
 import { RuleTester } from "eslint"
 import { resetProjectGraphs } from "../../runtime/scripts/hfs/project-graph.mjs"
@@ -48,8 +48,10 @@ export const projectFixture = ({ profile = "be", edition, files = {}, rootFiles 
     for (const [rel, content] of Object.entries({ ...baseline, ...files })) if (content !== null) write(root, rel, content)
     for (const [rel, content] of Object.entries(rootFiles)) write(appRoot, rel, content)
     // the project graph reads the tracked tree: the fixture app is a Git work tree with every file added
-    execFileSync("git", ["init", "-q"], { cwd: appRoot })
-    execFileSync("git", ["add", "-A"], { cwd: appRoot })
+    for (const args of [["init", "-q"], ["add", "-A"]]) {
+      const run = runGit(args, { cwd: appRoot })
+      if (run.error || run.status !== 0) throw run.error ?? new Error(`git ${args[0]} exited ${run.status}: ${run.stderr}`)
+    }
     resetProjectGraphs()
     const hfs = declaredHfsView({ runtimeRoot: RUNTIME, declaration: hfsJson, repoRoot: fs.realpathSync(root), side: profile })
     const tester = new RuleTester({

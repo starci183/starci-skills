@@ -7,7 +7,7 @@ import { createSlotResolver, loadSlotManifest, openHfs } from '../slots.mjs';
 import { isFeTestPath } from '../rules/fe-no-tests.mjs';
 import { readTextFile } from '../../lib/read-text.mjs';
 import { managedScriptNames } from './managed-scripts.mjs';
-
+import { byCodeUnit } from '../../lib/list.mjs';
 /**
  * HFS repository-tree check (knowledge/hfs/README.md): every StarCi repository is an
  * apps/<app>/ monorepo on npm with a fixed root-entry allowlist; backend composition lives in
@@ -369,7 +369,7 @@ function e2eInAutomaticGate({ root, tree, jestConfig, finding }) {
   for (const file of tree.files().filter(entry => /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(entry))) {
     const text = readText(root, file);
     if (text === null) continue;
-    const trigger = /^on:.*(?:\n(?:[ \t]+.*|)$)*/mu.exec(text)?.[0] ?? '';
+    const trigger = /^on:.*(?:\n(?:[ \t].*)?$)*/mu.exec(text)?.[0] ?? '';
     if (!/\b(?:push|pull_request)\b/u.test(trigger)) continue;
     if (runsE2e(withoutComments(text)))
       finding(rule, file, `${file} runs e2e on push or pull_request. Move the e2e job to its own workflow with on: workflow_dispatch only.`);
@@ -406,7 +406,7 @@ export function checkHfs(config) {
   // The README, the hooks, the workflows and the scripts are the app root's (checkAppRoot); a side folder is judged as the old
   // repository root it stands for, less those.
   const allowed = slotRootEntries(resolver, profile);
-  for (const entry of [...tree.top].sort()) {
+  for (const entry of [...tree.top].sort(byCodeUnit)) {
     if (NON_NPM_ENTRIES.has(entry) || /\.md$/iu.test(entry)) continue;
     if (entry === '.starcistacks') { finding('HFS_STACKS_IN_SIDE', entry, `The ${profile} side must not hold .starcistacks; stack declarations and sealed custody live in the app root .starcistacks.`); continue; }
     if (frontend && !backend) {
@@ -419,7 +419,7 @@ export function checkHfs(config) {
     }
   }
 
-  for (const entry of [...requiredRootEntries(resolver)].sort()) {
+  for (const entry of [...requiredRootEntries(resolver)].sort(byCodeUnit)) {
     if (entry === 'apps') continue;
     if (!tree.top.includes(entry)) finding('HFS_ROOT_ENTRY_MISSING', entry, `The ${profile} side requires root entry ${entry}.`);
   }
@@ -457,7 +457,7 @@ export function checkHfs(config) {
     }
     for (const tier of tree.children('src/modules').sort()) {
       if (!moduleTiersOf(resolver).has(tier)) {
-        finding('HFS_MODULE_TIER_INVALID', `src/modules/${tier}`, `Module tier ${tier} is not one of ${[...moduleTiersOf(resolver)].sort().join(', ')}.`);
+        finding('HFS_MODULE_TIER_INVALID', `src/modules/${tier}`, `Module tier ${tier} is not one of ${[...moduleTiersOf(resolver)].sort(byCodeUnit).join(', ')}.`);
       }
     }
     const testChildren = slotTestChildren(resolver);
@@ -504,11 +504,11 @@ export function checkAppRoot({ root, resolver, tree = treeView(root) }) {
   const finding = (ruleId, entry, message) => violations.push({ ruleId, path: entry, line: 1, column: 1, message });
   violations.push(...checkRepoPresentation({ root, tree, profile: 'app', edition: resolver.repo?.edition ?? 'full' }).violations);
   const allowed = slotRootEntries(resolver, 'app');
-  for (const entry of [...tree.top].sort()) {
+  for (const entry of [...tree.top].sort(byCodeUnit)) {
     if (NON_NPM_ENTRIES.has(entry) || /\.md$/iu.test(entry)) continue;
     if (!allowed.has(entry)) finding('HFS_ROOT_ENTRY_FORBIDDEN', entry, `Root entry ${entry} is not in the slots of the app root.`);
   }
-  for (const entry of [...requiredRootEntries(resolver)].sort()) {
+  for (const entry of [...requiredRootEntries(resolver)].sort(byCodeUnit)) {
     if (entry === 'README.md' || entry === '.gitattributes') continue;   // checkRepoPresentation reports these two
     if (!tree.top.includes(entry)) finding('HFS_ROOT_ENTRY_MISSING', entry, `The app root requires root entry ${entry}.`);
   }

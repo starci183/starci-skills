@@ -6,6 +6,7 @@ import { appScripts, imageFiles, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError } from "./service.mjs";
 import { jsonText, packageJsonText } from "./app.mjs";
 import { registerLiteExports } from "./lite-exports.mjs";
+import { byCodeUnit } from "../report/order.mjs";
 
 const read = (relative) =>
   fs
@@ -204,7 +205,7 @@ export function ensureLiteCli({ root, manifest, repo }) {
   declaration.sides.be.apps.push({ name: "cli", kind: "cli" });
   declaration.sides.be.kinds = [
     ...new Set([...(declaration.sides.be.kinds ?? []), "cli"]),
-  ].sort();
+  ].sort(byCodeUnit);
   const resolved = resolveRepoDeclaration(manifest, declaration);
   const image = imageFiles(resolved).find(
     (file) => file.path === "be/apps/cli/Dockerfile",

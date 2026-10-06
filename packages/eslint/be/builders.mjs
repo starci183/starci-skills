@@ -72,7 +72,7 @@ const isEntityClass = (checker, declaration) => {
         const callee = ts.isCallExpression(decorator.expression) ? decorator.expression.expression : decorator.expression
         const symbol = checker.getSymbolAtLocation(callee)
         if (!symbol) return false
-        const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
+        const target = (symbol.flags & ts.SymbolFlags.Alias) !== 0 ? checker.getAliasedSymbol(symbol) : symbol
         return (target.getDeclarations?.() ?? []).some((found) => moduleOf(found, String(found.getSourceFile().fileName).replace(/\\/g, "/")) === "typeorm")
     })
 }

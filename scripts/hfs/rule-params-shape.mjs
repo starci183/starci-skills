@@ -5,6 +5,7 @@ import { isPlainObject } from '../../engine/plain-object.mjs';
 import { paramNamesOk } from './param-names.mjs';
 import { kindParamProblems, scenarioProblem } from './declaration-slots.mjs';
 import { roleListProblems, SCHEMA_AUTHORITIES, unitRolesProblems } from './manifest-shape.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const PROFILES = ['be', 'fe'];
 
@@ -32,7 +33,7 @@ export function ruleParamsProblems(m) {
     const className = /^[A-Z][A-Za-z0-9]*$/;
     const memberMap = (v, allowEmpty) => isPlainObject(v) && Object.keys(v).length > 0 && Object.values(v).every((list) => Array.isArray(list) && (allowEmpty || list.length > 0) && list.every((x) => className.test(String(x))) && new Set(list).size === list.length);
     const eventBus = rp.be.eventBus;
-    if (!isPlainObject(eventBus) || Object.keys(eventBus).sort().join() !== 'classes,imports' || !memberMap(eventBus.imports, true) || !memberMap(eventBus.classes, false)) bad.push('ruleParams.be.eventBus must be {imports: {<module>: [unique PascalCase members]}, classes: {<module>: [non-empty unique PascalCase classes]}}');
+    if (!isPlainObject(eventBus) || Object.keys(eventBus).sort(byCodeUnit).join() !== 'classes,imports' || !memberMap(eventBus.imports, true) || !memberMap(eventBus.classes, false)) bad.push('ruleParams.be.eventBus must be {imports: {<module>: [unique PascalCase members]}, classes: {<module>: [non-empty unique PascalCase classes]}}');
     if (!paramNamesOk(rp.be.paramNames)) bad.push('ruleParams.be.paramNames must be a non-empty list of unique {type | typeSuffix, names, nameSuffix?} entries');
     const roleList = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => /^[a-z][a-z0-9-]*$/.test(String(x))) && new Set(v).size === v.length;
     if (!roleList(rp.be.suffixes)) bad.push('ruleParams.be.suffixes must be a non-empty list of unique kebab-case role suffixes');
@@ -43,7 +44,7 @@ export function ruleParamsProblems(m) {
     const doubleOk = (v) => isPlainObject(v) && /^[A-Za-z][A-Za-z0-9]*$/.test(String(v.double)) && formsOk(v.forms);
     const regexOk = (v) => { try { return typeof v === 'string' && v.length > 0 && Boolean(new RegExp(v)); } catch { return false; } };
     const sd = rp.be.specDoubles;
-    if (!isPlainObject(sd) || Object.keys(sd).sort().join() !== 'doubles,fallback,kit' || typeof sd.kit !== 'string' || !sd.kit || !Array.isArray(sd.doubles) || !sd.doubles.length || !sd.doubles.every((e) => doubleOk(e) && regexOk(e.token) && Object.keys(e).length === 3) || !doubleOk(sd.fallback) || Object.keys(sd.fallback).length !== 2) bad.push('ruleParams.be.specDoubles must be {kit, doubles: [{token: regex, double, forms}], fallback: {double, forms}} with forms drawn from call, new, curried, object, primitive, array');
+    if (!isPlainObject(sd) || Object.keys(sd).sort(byCodeUnit).join() !== 'doubles,fallback,kit' || typeof sd.kit !== 'string' || !sd.kit || !Array.isArray(sd.doubles) || !sd.doubles.length || !sd.doubles.every((e) => doubleOk(e) && regexOk(e.token) && Object.keys(e).length === 3) || !doubleOk(sd.fallback) || Object.keys(sd.fallback).length !== 2) bad.push('ruleParams.be.specDoubles must be {kit, doubles: [{token: regex, double, forms}], fallback: {double, forms}} with forms drawn from call, new, curried, object, primitive, array');
     if (rp.fe !== undefined && (!sideOk(rp.fe, [], ['lite']) || !liteOk(rp.fe.lite, ['fileLines', 'duplicateBlock']))) bad.push('ruleParams.fe may only restate fileLines and duplicateBlock of ruleParams.common, and carry a lite override of them');
   }
   return bad;

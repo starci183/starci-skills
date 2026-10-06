@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 import { lstat, readdir, readFile, readlink } from "node:fs/promises"
 import { join, posix } from "node:path"
+import { byCodeUnit } from "../../order"
 
 /** The lockfiles looked up at the build context root; every one that exists is part of the hash. */
 export const LOCKFILES: ReadonlyArray<string> = ["package-lock.json", "pnpm-lock.yaml", "yarn.lock"]
@@ -186,7 +187,7 @@ export const resolveSources = async (root: string, sources: ReadonlyArray<string
             }
         }
     }
-    return [...selected].sort()
+    return [...selected].sort(byCodeUnit)
 }
 
 const walkInto = async (root: string, relative: string, ignore: Ignore, out: Set<string>): Promise<void> => {

@@ -67,23 +67,26 @@ function propose(ctx, rec, { workflowId, opId, before, onto }, api) {
   const env = ctx?.env ?? process.env, root = landRoot(env);
   fs.mkdirSync(root, { recursive: true });
   const parent = path.join(root, `workflow-rebase-${crypto.randomUUID()}`), scratch = path.join(parent, 'tree');
-  let result;
+  let result, failure;
   try {
     const made = createScratchWorktree({ repoRoot: rec.path, dir: scratch, kind: 'land-scratch', detach: true, base: before,
       owner: { workflowId, jobId: opId, ledgerId: ctx?.ledger?.ledgerId }, env });
-    if (!made.ok) return { ok: false, code: 'workflow-rebase-failed', onto, detail: made.detail ?? made.reason };
-    const run = api.git(gitRebase, scratch, ['--no-autostash', onto], { config: api.identity });
-    if (run.ok) result = { ok: true, head: api.revParse(scratch, 'HEAD') };
+    if (!made.ok) result = { ok: false, code: 'workflow-rebase-failed', onto, detail: made.detail ?? made.reason };
     else {
-      const files = lines(api.git(gitDiff, scratch, ['--name-only', '--diff-filter=U']).stdout).slice(0, 20);
-      api.git(gitRebase, scratch, ['--abort']);
-      result = { ok: false, code: files.length ? 'workflow-rebase-conflict' : 'workflow-rebase-failed', onto, files, detail: run.stderr.slice(-300) };
+      const run = api.git(gitRebase, scratch, ['--no-autostash', onto], { config: api.identity });
+      if (run.ok) result = { ok: true, head: api.revParse(scratch, 'HEAD') };
+      else {
+        const files = lines(api.git(gitDiff, scratch, ['--name-only', '--diff-filter=U']).stdout).slice(0, 20);
+        api.git(gitRebase, scratch, ['--abort']);
+        result = { ok: false, code: files.length ? 'workflow-rebase-conflict' : 'workflow-rebase-failed', onto, files, detail: run.stderr.slice(-300) };
+      }
     }
-  } finally {
-    const removed = removeScratchWorktree({ repoRoot: rec.path, dir: scratch, env });
-    if (!removed.ok) throw fail({ code: 'workflow-rebase-failed' }, `the detached rebase scratch could not be safely removed: ${removed.reason}`);
-    try { fs.rmdirSync(parent); } catch { /* empty parent is collected later */ }
-  }
+  } catch (error) { failure = error; }
+  // Scratch removal runs on every path; its own failure outranks the replay's (a leaked scratch must surface).
+  const removed = removeScratchWorktree({ repoRoot: rec.path, dir: scratch, env });
+  if (!removed.ok) throw fail({ code: 'workflow-rebase-failed' }, `the detached rebase scratch could not be safely removed: ${removed.reason}`);
+  try { fs.rmdirSync(parent); } catch { /* empty parent is collected later */ }
+  if (failure) throw failure;
   return result;
 }
 

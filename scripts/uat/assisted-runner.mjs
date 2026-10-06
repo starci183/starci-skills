@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { byCodeUnit } from '../lib/list.mjs';
 import readline from 'node:readline';
 import {runProgram} from '../api/process/run-program.mjs';
 import {startProgram} from '../api/process/start-program.mjs';
@@ -46,12 +47,8 @@ const launchEnv=prepared=>Object.fromEntries([...SAFE_ENV,...prepared.session.la
 // How a manifest command is spawned: scripts/uat/launch.mjs (re-exported for existing callers).
 export {launchFor};
 
-const canonical=value=>{
-  if(Array.isArray(value))return value.map(canonical);
-  if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])]));
-  return value;
-};
-export const digestValue=value=>sha256(JSON.stringify(canonical(value)));
+const canonicalText=value=>JSON.stringify(value,(_key,node)=>node&&typeof node==='object'&&!Array.isArray(node)?Object.fromEntries(Object.keys(node).sort(byCodeUnit).map(key=>[key,node[key]])):node);
+export const digestValue=value=>sha256(canonicalText(value));
 const iso=()=>new Date().toISOString();
 const readYaml=file=>parseYaml(fs.readFileSync(file,'utf8'));
 const same=(a,b)=>path.resolve(a)===path.resolve(b);
@@ -148,7 +145,7 @@ export function inspectPreparedRequest({requestPath,receiptPath,allowExistingRec
   assertDigest(sha256(requestBytes),session.bindings.requestDigest,'session request binding');
   for(const key of ['inputDigest','buildDigest','environmentDigest','flowsDigest'])assertDigest(request.bindings[key],session.bindings[key],`session ${key}`);
   const requestScripts=request.scripts.map(({flowId,path,sha256})=>({flowId,path,sha256}));
-  need(JSON.stringify(canonical(requestScripts))===JSON.stringify(canonical(session.scripts)),'request and session script declarations differ','assisted-uat-stale');
+  need(canonicalText(requestScripts)===canonicalText(session.scripts),'request and session script declarations differ','assisted-uat-stale');
   assertDigest(digestValue(session.scripts),session.bindings.scriptsDigest,'session scripts');
   for(const script of session.scripts){
     const file=resolvePrepared(root,script.path,`script ${script.flowId}`);
@@ -238,7 +235,7 @@ const sanitizer=(prepared)=>{
     let text=String(value??'');
     for(const secret of secretValues)text=text.split(secret).join('[REDACTED]');
     for(const rule of rules)text=text.replace(rule.pattern,rule.replacement);
-    return text.replace(/\bBearer\s+[A-Za-z0-9._~-]+/giu,'Bearer [REDACTED]').replace(/\b(?:otp|password|secret|token)\s*[:=]\s*\S+/giu,'$1=[REDACTED]');
+    return text.replace(/\bBearer\s+[A-Za-z0-9._~-]+/giu,'Bearer [REDACTED]').replace(/\b(otp|password|secret|token)\s*[:=]\s*\S+/giu,'$1=[REDACTED]');
   };
 };
 const safeRefs=(prepared,refs=[])=>refs.map(ref=>{

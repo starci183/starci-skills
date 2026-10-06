@@ -206,7 +206,7 @@ export function WorkflowPage({ project, wf, tab = 'units' }: { project: string; 
       <p className="text-xs text-muted-foreground">{t('Each box is one leg of the plan. Columns show dependency depth; arrows are actual dependencies. Vertically stacked boxes can run in parallel. Click a box for details.')}</p>
       <ReadState snapshot={pipeline} url={`${base}/pipeline`} />
       {pipe && <p className="text-xs text-muted-foreground">{t('Goal revision {n} · chain status {status}', { n: pipe.goalRevision ?? '—', status: pipe.chainStatus })}</p>}
-      {pipe && <p className="text-xs text-muted-foreground">{pipe.approvalState === 'recorded' ? t('Approval recorded by {who}', { who: pipe.approvedBy ?? '—' }) : t('Approval evidence unproven')}{pipe.approvalRef ? ` · ${pipe.approvalRef}` : ''}</p>}
+      {pipe && <p className="text-xs text-muted-foreground">{pipe.approvalState === 'recorded' && pipe.approvedBy ? t('Approval recorded by {who}', { who: pipe.approvedBy }) : t('Approval evidence unproven')}{pipe.approvalRef ? ` · ${pipe.approvalRef}` : ''}</p>}
       {pipe && <PipelineGraph pipeline={pipe} selected={legOp} onSelect={leg => withLeg(legOp === leg.op ? null : leg.op)} />}
       <Advanced className="mt-4" summary={advancedSummary}>
         <div className="flex min-w-0 flex-col gap-6">

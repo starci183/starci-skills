@@ -57,7 +57,7 @@ export default {
       `open jobs: ${openJobs.length} (${openJobs.map((j) => `${j.job_id}:${j.status}`).join(', ') || 'none'})`,
       `inbox: ${inbox.length} rows (${inbox.filter((i) => i.status === 'pending').length} pending) | live signals: ${signals.length} | open incidents: ${incidents.length}`,
       `last events: ${events.map((e) => `${e.seq}:${e.kind}`).join(', ') || 'none'}`,
-      ...staleOperationsOf(stale.staleInput).map(internals.staleOperationLine),
+      ...staleOperationsOf(stale.staleInput).map((item) => internals.staleOperationLine(item)),
       ...internals.sourceDriftLines(sourceDriftSummaryOf(stale.sourceDrift)),
       ...internals.peerDriftLines(peerDriftSummaryOf(stale.peerDrift)),
       ...(out.deliveries ? [

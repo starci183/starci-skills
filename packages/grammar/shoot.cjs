@@ -10,4 +10,7 @@ const stories = ['sign-in-screen','tasks-screen','primitives','empty-state'];
     console.log('shot', s);
   }
   await browser.close();
-})();
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

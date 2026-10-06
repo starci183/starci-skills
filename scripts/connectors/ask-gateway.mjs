@@ -72,7 +72,7 @@ export function createGateway({ resolve, exposeCredentialAsks = () => false, lan
     // A dot segment could walk from one nonce to another; such a path is refused before it is normalized.
     if (/(?:^|\/)(?:\.|%2e){1,2}(?:[/?#]|$)/i.test(req.url ?? '')) return deny(res, 404, t.notFound);
     let pathname, search;
-    try { ({ pathname, search } = new URL(req.url ?? '/', 'http://gateway.invalid')); } catch { return deny(res, 404, t.notFound); }
+    try { ({ pathname, search } = new URL(req.url ?? '/', 'https://gateway.invalid')); } catch { return deny(res, 404, t.notFound); }
     const nonce = pathname.split('/')[1] ?? '';
     if (!NONCE.test(nonce) || (pathname !== `/${nonce}` && !pathname.startsWith(`/${nonce}/`)) ) return deny(res, 404, t.notFound);
     const ask = resolve(nonce);
@@ -170,4 +170,4 @@ export function main(argv = process.argv.slice(2), { env = process.env, root = c
   console.error('usage: starci connect ask-gateway start|run|status|stop [--port <n>] [--repo <path>]...'); process.exit(2);
 }
 
-if (isMain(import.meta.url)) main();
+if (isMain(import.meta.url)) Promise.resolve(main()).catch((error) => { console.error(error); process.exit(1); });
