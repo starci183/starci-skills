@@ -62,9 +62,8 @@ const GRAMMAR_WORDS = new RegExp(String.raw`\b(grammar|DNA|variant|new component
 const KNOWLEDGE_WORDS = new RegExp(String.raw`\bknowledge\b|\bguideline\b|${altOf('drawNote.knowledge')}`, 'i');
 const OWNER = 'owner';
 
-
 /** A note's stable id: the ask it answered, its place and its words. A rubric check id and a brief anchor. */
-export const noteIdOf = (dispatchId, index, words) => `ON-${sha256(`${dispatchId ?? '-'}|${index}|${words}`).slice(0, 10)}`;
+export const noteIdOf = (dispatchId, index, words) => 'ON-' + sha256(`${dispatchId ?? '-'}|${index}|${words}`).slice(0, 10);
 
 /** The DNA component names of the product's grammar family (for classification), [] when unknown. */
 export function dnaNamesFor(workRoot, { grammarRoot = defaultGrammarRoot() } = {}) {
@@ -209,7 +208,7 @@ export function ownerRubricChecks({ record = null, workRoot = null, shape = null
   for (const n of record ? openNotesOf(record) : []) {
     if (shape && n.shape && stateKey(n.shape) !== stateKey(shape) && stateKey(String(n.shape).split('#').pop()) !== stateKey(shape)) continue;
     checks.push({ id: n.id, group: OWNER_NOTE_GROUP, gate: true, cites: [`owner draw-review ask ${n.dispatchId} (round ${n.round})`],
-      test: `The owner rejected the previous drawing${n.shape ? ` of ${n.shape}` : ''}${n.part ? ` (${path.basename(n.part)})` : ''} and asked: "${n.text}". Pass only when this render visibly does what the owner asked; fail when it still shows what the owner rejected.` });
+      test: `The owner rejected the previous drawing${n.shape ? ' of ' + n.shape : ''}${n.part ? ' (' + path.basename(n.part) + ')' : ''} and asked: "${n.text}". Pass only when this render visibly does what the owner asked; fail when it still shows what the owner rejected.` });
   }
   for (const l of workRoot ? learnedOf(workRoot) : []) {
     if (!l?.id || !l.text) continue;
@@ -249,16 +248,16 @@ function noteAddressed(dir, record, note) {
     const now = fs.existsSync(file) ? sha256File(file) : null;
     if (!now) { reasons.push(`${p.path} is not on disk`); continue; }
     if (rejected.has(now)) { reasons.push(`${p.path} is still the image the owner rejected (not redrawn)`); continue; }
-    const asset = assets.get(p.path) ?? {};
-    const prompt = asset.generation?.promptPath ? path.resolve(dir, asset.generation.promptPath) : null;
+    const asset = assets.get(p.path);
+    const prompt = asset?.generation?.promptPath ? path.resolve(dir, asset.generation.promptPath) : null;
     const brief = prompt && fs.existsSync(prompt) ? fs.readFileSync(prompt, 'utf8') : null;
     if (brief == null) reasons.push(`${p.path} has no brief on disk (generation.promptPath) to carry ${note.id}`);
     else if (!brief.includes(note.id)) reasons.push(`the brief of ${p.path} does not carry ${note.id} (draw-feedback.mjs brief prints it)`);
-    const loopRef = loopLabelOf(asset.generation?.loop);
-    const loopFile = loopFileOfRef(asset.generation?.loop);
+    const loopRef = loopLabelOf(asset?.generation?.loop);
+    const loopFile = loopFileOfRef(asset?.generation?.loop);
     const critique = loopFile ? bestCritiqueOf(loopFile) : null;
     const check = list(critique?.verdict?.checks).find((c) => c.id === note.id);
-    if (!critique?.verdict) reasons.push(`${p.path} has no draw-loop critique${loopRef ? ` (${loopRef})` : ''} to judge ${note.id}`);
+    if (!critique?.verdict) reasons.push(`${p.path} has no draw-loop critique${loopRef ? ' (' + loopRef + ')' : ''} to judge ${note.id}`);
     else if (!check) reasons.push(`the critic of ${p.path} did not judge ${note.id} (the rubric lacked the owner's note)`);
     else if (check.pass !== true) reasons.push(`the critic fails ${note.id} on ${p.path}: ${String(check.evidence ?? '').slice(0, 200)}`);
   }
@@ -272,7 +271,7 @@ export function feedbackFindings(dir, record = null) {
   for (const n of openNotesOf(rec)) {
     const r = noteAddressed(dir, rec, n);
     if (!r.addressed) findings.push({ code: DRAW_FEEDBACK_UNADDRESSED, record: rec.id, path: slash(dir), note: n.id, round: n.round, shape: n.shape ?? null,
-      detail: `${rec.id}: owner note ${n.id} (round ${n.round}${n.shape ? `, ${n.shape}` : ''}) "${String(n.text).slice(0, 160)}" is not addressed - ${r.reasons.join('; ')}` });
+      detail: `${rec.id}: owner note ${n.id} (round ${n.round}${n.shape ? ', ' + n.shape : ''}) "${String(n.text).slice(0, 160)}" is not addressed - ${r.reasons.join('; ')}` });
   }
   return findings;
 }
@@ -295,7 +294,7 @@ export function briefBlock(dir, { shape = null } = {}) {
   const lines = [];
   if (notes.length) {
     lines.push('OWNER NOTES - the owner rejected the previous drawing; this redraw must address EVERY note (the critic gates each by its id):');
-    for (const n of notes) lines.push(`- [${n.id}] round ${n.round}${n.shape ? ` ${n.shape}` : ''}${n.part ? ` (${path.basename(n.part)})` : ''}: ${n.text}`);
+    for (const n of notes) lines.push(`- [${n.id}] round ${n.round}${n.shape ? ' ' + n.shape : ''}${n.part ? ' (' + path.basename(n.part) + ')' : ''}: ${n.text}`);
   }
   if (learned.length) {
     lines.push('OWNER PRODUCT RULINGS - never repeat these mistakes on any page of this product:');
@@ -408,7 +407,7 @@ export function drawReviewBoard(db, { workflowId, repo }) {
     let answer = null;
     if (closed?.kind === 'ask-answered') {
       const payload = (() => { try { return JSON.parse(closed.payload_json ?? '{}'); } catch { return {}; } })();
-      answer = (payload.receiptPath ? readJsonFile(path.isAbsolute(payload.receiptPath) ? payload.receiptPath : path.resolve(repo ?? '.', payload.receiptPath)) : null) ?? { ...payload, review };
+      answer = (payload.receiptPath ? readJsonFile(path.resolve(repo ?? '.', payload.receiptPath)) : null) ?? { ...payload, review };
       answer.review ??= review;
       answer.at ??= new Date(Number(closed.created_at)).toISOString();
     }
@@ -418,7 +417,7 @@ export function drawReviewBoard(db, { workflowId, repo }) {
       return { id: n.id, text: n.text, shape: n.shape, part: n.part, owed: n.owed, class: c?.class ?? n.class, target: c?.target ?? n.target, classifiedBy: c?.by ?? n.classifiedBy };
     }) : [];
     entry.rounds.push({ round: entry.rounds.length + 1, dispatchId: row.dispatch_id, jobId: rj.from ?? null, askedAt: row.created_at,
-      state: closed ? (closed.kind === 'ask-answered' ? 'answered' : 'superseded') : 'open',
+      state: ({ true: 'answered', false: closed ? 'superseded' : 'open' })[closed?.kind === 'ask-answered'],
       decision: answer ? DRAW_REVIEW_DECISIONS[Number(answer.optionIndex)] ?? null : null, answeredBy: answer?.answeredBy ?? null, answeredAt: answer?.at ?? null,
       golden: Boolean(answer && goldenMarkOf(answer)), parts: list(review.parts).map((p) => ({ path: slash(p.path), sha256: p.sha256 ?? null, shape: p.shape ?? null, breakpoint: p.breakpoint ?? null })), notes });
     byRecord.set(review.record, entry);
@@ -440,11 +439,11 @@ export function drawReviewBoard(db, { workflowId, repo }) {
       return { shape, round: lastRound?.round ?? null, parts: lastRound?.parts.filter((p) => p.shape === shape) ?? [],
         openNotes: mine.map(({ id, text: t, round, class: cls, addressed, reasons }) => ({ id, text: t, round, class: cls, addressed, reasons })),
         addressed: mine.filter((n) => n.addressed).length, unaddressed: mine.filter((n) => !n.addressed).length,
-        golden: goldenMark && list(goldenMark.shapes).includes(shape) ? 'golden' : lastAccept ? 'accepted' : 'none' };
+        golden: ({ 0: lastAccept ? 'accepted' : 'none', 1: 'golden' })[Number(Boolean(goldenMark && list(goldenMark.shapes).includes(shape)))] };
     });
     entry.awaitingOwner = latest?.state === 'open';
     entry.redrawOwed = latest?.state === 'answered' && latest.decision === 'redraw' ? { dispatchId: latest.dispatchId, jobId: latest.jobId, notes: latest.notes.map((n) => n.id) } : null;
-    entry.state = entry.awaitingOwner ? 'awaiting-owner' : entry.redrawOwed ? 'redraw-owed' : lastAccept && lastAccept === latest?.round ? 'accepted' : 'idle';
+    entry.state = [[entry.awaitingOwner, 'awaiting-owner'], [entry.redrawOwed, 'redraw-owed'], [lastAccept && lastAccept === latest?.round, 'accepted'], [true, 'idle']].find(([condition]) => condition)[1];
     out.push(entry);
   }
   return out;
@@ -539,7 +538,7 @@ function drawFeedbackMain(argv = []) {
     }
     if (command === 'status') {
       const s = feedbackStatus(dir);
-      return { exitCode: 0, text: json ? `${JSON.stringify(s, null, 2)}\n` : `${s.id}: ${s.rounds.length} review round(s); ${s.open.length} open note(s), ${s.unaddressed} unaddressed${s.golden ? '; golden' : ''}\n${s.open.map((n) => `  [${n.id}] ${n.addressed ? 'addressed' : 'UNADDRESSED'}: ${n.text}${n.addressed ? '' : ` - ${n.reasons.join('; ')}`}`).join('\n')}\n` };
+      return { exitCode: 0, text: json ? `${JSON.stringify(s, null, 2)}\n` : `${s.id}: ${s.rounds.length} review round(s); ${s.open.length} open note(s), ${s.unaddressed} unaddressed${s.golden ? '; golden' : ''}\n${s.open.map((n) => `  [${n.id}] ${n.addressed ? 'addressed' : 'UNADDRESSED'}: ${n.text}${n.addressed ? '' : ' - ' + n.reasons.join('; ')}`).join('\n')}\n` };
     }
     if (command === 'check') {
       const f = feedbackFindings(dir);
