@@ -15,10 +15,10 @@ const tree = () => {
   put('.starciwork/features/login/ui/assets/sign-in-desktop-candidate-a.png', png);
   put('.starciwork/features/login/ui/assets/sign-in-desktop-candidate-b.png', png);
   put('.starciwork/features/login/ui/evidence/redraw/draws.yaml',
-    'draws:\n  - id: desktop-a\n    image: assets/sign-in-desktop-candidate-a.png\n  - id: desktop-b\n    image: assets/sign-in-desktop-candidate-b.png\n');
+    'draws:\n  - id: desktop-a\n    part: assets/sign-in-desktop-candidate-a.png\n  - id: desktop-b\n    part: assets/sign-in-desktop-candidate-b.png\n');
   put('.starciwork/features/workspace-provision/ui/purchase-flow/assets/offer-selection-a-round-3.png', png);
   put('.starciwork/features/workspace-provision/ui/purchase-flow/evidence/r3/draws.yaml',
-    'draws:\n  - id: offer-selection-a-round-3\n    image: assets/offer-selection-a-round-3.png\n');
+    'draws:\n  - id: offer-selection-a-round-3\n    part: assets/offer-selection-a-round-3.png\n');
   // the other workflow's draws.yaml is the newest file in the tree
   const later = new Date(Date.now() + 60000);
   fs.utimesSync(path.join(repo, '.starciwork/features/workspace-provision/ui/purchase-flow/evidence/r3/draws.yaml'), later, later);
@@ -42,8 +42,7 @@ test('a question that lists options gets no pick groups derived from image names
 });
 
 // Owner ruling 2026-09-24: the owner reviews the drawn PART, never the
-// composite. WSPV's round-6 draws.yaml put the composite in `image:
-// {path, sha256}` beside `content: {path, sha256}`; its ask served composites.
+// composite. A draw that binds the composite in `part` is served as its part.
 test('an ask serves each draw\'s part, not its composite; a declared pick on the composite path still binds', () => {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'serve-ask-parts-'));
   const put = (rel, body = 'png') => { const abs = path.join(repo, rel); fs.mkdirSync(path.dirname(abs), { recursive: true }); fs.writeFileSync(abs, body); return abs; };
@@ -55,11 +54,10 @@ test('an ask serves each draw\'s part, not its composite; a declared pick on the
     const legacy = put(`${UI}/assets/checkout.png`);
     put(`${UI}/evidence/round-6/draws.yaml`, [
       'schema: starci/ui-draws@1', 'draws:',
-      '  - id: offer-desktop', '    image:', '      path: assets/directions/offer--page--desktop--light.png', '      sha256: aa',
-      '    content:', '      path: assets/directions/offer--page--desktop--light.content.png', '      sha256: bb',
+      '  - id: offer-desktop', '    part:', '      path: assets/directions/offer--page--desktop--light.png', '      sha256: aa',
       '  - id: offer-mobile', '    part: {path: assets/directions/offer--page--mobile--light.content.png}',
       '    composite: {path: assets/directions/offer--page--mobile--light.png}',
-      '  - id: checkout', '    image: assets/checkout.png', ''].join('\n'));
+      '  - id: checkout', '    part: assets/checkout.png', ''].join('\n'));
     const fromDraws = toOwnerImages(reportImages([`${UI}/evidence/round-6/draws.yaml`], repo), repo);
     assert.deepEqual(fromDraws.map((i) => [i.label, i.abs]), [['offer-desktop', part], ['offer-mobile', mobile], ['checkout', legacy]]);
     // An ask that names the composite itself (question.assets, the question text or report files) is swapped.

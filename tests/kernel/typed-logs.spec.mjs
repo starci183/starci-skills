@@ -194,19 +194,13 @@ test('starci kernel log: a kernel logs a typed row without a ledger write; an op
   after.close();
 });
 
-test('housekeeping never removes the ledger holding the logs, nor the retired logs.sqlite (artifact-hold)', (t) => {
+test('housekeeping never removes the ledger holding the logs (artifact-hold)', (t) => {
   const repo = repoDir(t);
-  const logs = openLogs(repo); logs.close();
-  // Q1: the ledger that now holds the logs lives outside .starciwork (ledgerFileFor -> projects root); what
-  // .starciwork still holds is the retired logs.sqlite and its migrated copies, so those stay held.
-  const ledger = ledgerFileFor(repo);
-  assert.ok(fs.existsSync(ledger), 'openLogs created the project ledger');
-  fs.mkdirSync(path.join(repo, '.starciwork'), { recursive: true });
-  fs.writeFileSync(path.join(repo, '.starciwork', 'logs.sqlite'), '');
+  const ledger = path.join(repo, '.starciwork', 'runtime.sqlite');
+  fs.mkdirSync(path.dirname(ledger), { recursive: true });
+  fs.writeFileSync(ledger, '');
   const hold = artifactHoldOf(path.join(repo, '.starciwork'), { repos: [{ repo, ledger }] });
   assert.ok(hold);
-  assert.deepEqual(hold.paths, ['.starciwork/logs.sqlite']);
-  fs.writeFileSync(path.join(repo, '.starciwork', 'logs.sqlite.migrated-20260927'), '');
-  assert.deepEqual(artifactHoldOf(path.join(repo, '.starciwork'), { repos: [{ repo, ledger }] }).paths, ['.starciwork/logs.sqlite', '.starciwork/logs.sqlite.migrated-20260927']);
+  assert.deepEqual(hold.paths, ['.starciwork/runtime.sqlite']);
   assert.equal(artifactHoldOf(path.join(repo, 'src'), { repos: [{ repo, ledger }] }), null);
 });

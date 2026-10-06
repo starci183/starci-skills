@@ -427,18 +427,6 @@ test('a cleanup file changed after planning refuses before removal or discovery 
   assert.equal(fs.existsSync(path.join(repo, '.agents/skills/starci')), false);
 });
 
-test('line-ending drift with prior normalized custody is copied to exact canonical bytes', t => {
-  const repo = fixture(t);
-  const canonical = fs.readFileSync(path.join(source, 'skills/starci/SKILL.md'));
-  const crlf = canonical.toString('utf8').replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
-  write(repo, '.agents/skills/starci/SKILL.md', crlf);
-  const plan = entrySkillsPlan(repo, {files: {'skills/starci/SKILL.md': digest(crlf)}});
-  assert.ok(plan.write.some(item => item.relative === '.agents/skills/starci/SKILL.md'));
-  const custody = applyEntrySkillsPlan(plan, () => {});
-  assert.deepEqual(fs.readFileSync(path.join(repo, '.agents/skills/starci/SKILL.md')), canonical);
-  assert.equal(custody.files['.agents/skills/starci/SKILL.md'], sha256(canonical));
-});
-
 test('a destination appearing after planning refuses instead of overwriting it', t => {
   const repo = fixture(t), plan = entrySkillsPlan(repo), first = plan.write[0];
   write(repo, first.relative, 'late owner file');

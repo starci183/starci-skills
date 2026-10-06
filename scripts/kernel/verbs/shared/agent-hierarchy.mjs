@@ -29,9 +29,7 @@ const providerForProfile = (profile, skillRoot) => {
   if (!profile) return null;
   if (profileProviderCache.has(profile)) return profileProviderCache.get(profile);
   const doc = modelRegistryOf(skillRoot);
-  // A stored `profile` may be the pool/target id itself or the legacy
-  // `profiles/<target>.yaml` label — both name the registry entry.
-  const key = String(profile).replace(/^profiles\//, '').replace(/\.yaml$/, '');
+  const key = String(profile);
   const provider = doc?.pools?.[key]?.provider ?? doc?.targets?.[key]?.runtime ?? null;
   profileProviderCache.set(profile, provider);
   return provider;

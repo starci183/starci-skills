@@ -22,7 +22,7 @@ const WF='wf-nivo-collab-group-chat-mudqjp5g';
 const PEER='wf-nivo-app-auth-mudqjob3';
 const TOKEN='123456789:AAFakeTokenForSpecsOnly_abcdefghijklmnop';
 const HELD=['op-interface.implement-0a1619a4ac','op-interface.implement-a485eea143','op-interface.implement-490960859c'];
-const GATE_TEXT=`Runtime now requires the product app shell record .starciwork/shell/index.yaml (work/app-shell@1) before interface.draw/implement dispatch; it is absent. Owner decision pending in peer ${PEER}'s ask. Resolve when the shell record exists (peer heads-up).`;
+const GATE_TEXT=`Runtime now requires the product app shell record .starciwork/shell/index.yaml (work/layout-tree@1) before interface.draw/implement dispatch; it is absent. Owner decision pending in peer ${PEER}'s ask. Resolve when the shell record exists (peer heads-up).`;
 
 const seedCollab=(ledger,{progressAgoMin=120,gateAgoMin=180,gateText=GATE_TEXT,queuedAgoMin=180}={})=>{
   seedWorkflow(ledger,{id:WF,now:NOW-600*MIN,

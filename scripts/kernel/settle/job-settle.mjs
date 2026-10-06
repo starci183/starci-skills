@@ -115,7 +115,6 @@ const attemptIdOf = (db, item) => item.attemptId ?? db.prepare(`SELECT attempt_i
 /** Blob references are read and verified before a recorded check is trusted. */
 async function checksFromStore(db, item, { store = null } = {}) {
   const rows = checkRunsOf(db, item);
-  if (!rows.length) return { item, source: 'report' }; // in-flight jobs dispatched before the migration
   const blobs = store ?? await import('../../../engine/db/blob.mjs');
   const declared = Array.isArray(item.report?.checks) ? item.report.checks : [];
   const byName = new Map(declared.map((c) => [String(c.name), c]));

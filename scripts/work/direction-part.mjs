@@ -95,12 +95,8 @@ export function ownerImages(items, { cache = new Map() } = {}) {
 
 const pathOfRef = (ref) => (typeof ref === 'string' ? ref : ref && typeof ref === 'object' && typeof ref.path === 'string' ? ref.path : null);
 
-/**
- * The image paths one draws.yaml entry names, the owner-facing one first: `part` (the drawn part), then
- * `content` (older name for the same), then `image` (a part, or on records drawn before this rule the
- * composite - partOf() still finds its part). Each value is a path string or {path, sha256}.
- */
-export const drawImageRefs = (draw) => [draw?.part, draw?.content, draw?.image].map(pathOfRef).filter(Boolean);
+/** The image path one draws.yaml entry names: its `part` (the drawn part), a path string or {path, sha256}. */
+export const drawImageRefs = (draw) => [draw?.part].map(pathOfRef).filter(Boolean);
 
 // ---------------------------------------------------------------------------------------------------------
 // Owner acceptance of a drawing (inc-a4b5b1abdd90): the owner reviews the drawn parts - desktop and mobile,

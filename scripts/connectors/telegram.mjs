@@ -268,10 +268,8 @@ const withStore = (env, fn) => withHostMutex(SENT_LOCK, async () => {
   return out;
 }, { env });
 
-/** The message ids that show one ask (a pre-button entry kept one `messageId`). */
-const messageIdsOf = (entry) => [...new Set([
-  ...(Array.isArray(entry?.messageIds) ? entry.messageIds : []), ...(Number.isInteger(entry?.messageId) ? [entry.messageId] : []),
-].filter(Number.isInteger))];
+/** The message ids that show one ask. */
+const messageIdsOf = (entry) => [...new Set((Array.isArray(entry?.messageIds) ? entry.messageIds : []).filter(Number.isInteger))];
 /** Read the store (no lock): a snapshot for lookups. */
 export const readSentStore = (env = process.env) => readMachine(storeOf, emptyStore(), { env });
 /** Change the store under its lock; `fn(store)` mutates it and returns the result. */
@@ -293,7 +291,7 @@ export const recordAskMessage = ({ workflowId, dispatchId, repo = null, ledgerFi
     const entry = prior && !prior.closed ? prior : { key, workflowId, dispatchId, messageIds: [], url: null, at: now };
     entry.key = key; entry.workflowId = workflowId; entry.dispatchId = dispatchId;
     entry.repo = repo ?? entry.repo ?? null; entry.ledgerFile = ledgerFile ?? entry.ledgerFile ?? (entry.repo ? ledgerFileFor(entry.repo) : null);
-    entry.messageIds = messageIdsOf(entry); delete entry.messageId;
+    entry.messageIds = messageIdsOf(entry);
     if (Number.isInteger(messageId) && !entry.messageIds.includes(messageId)) entry.messageIds.push(messageId);
     if (url !== undefined) entry.url = url;
     store.asks[askKey] = entry; store.keys[key] = askKey;
@@ -477,7 +475,7 @@ export async function markAskClosed({ ledgerFile, workflowId, dispatchId, reason
         out[how === 'edited' ? 'edited' : how === 'failed' ? 'failed' : 'deleted'].push(messageId);
       }
       if (out.failed.length) warn(`telegram: ${out.failed.length} message(s) of ask ${dispatchId} could not be removed; the bridge sweep retries`);
-      store.asks[askKey] = { ...sent, messageIds: out.failed, messageId: undefined, url: null, closed: closedAs, closedAt: now,
+      store.asks[askKey] = { ...sent, messageIds: out.failed, url: null, closed: closedAs, closedAt: now,
         deleted: [...(sent.deleted ?? []), ...out.deleted], edited: [...(sent.edited ?? []), ...out.edited] };
       return { ok: out.failed.length === 0, reason: closedAs, ...out };
     });
@@ -511,10 +509,10 @@ export async function sweepAskMessages({ repos = () => [] } = {}, {
       const repo = listed.find((r) => withLedgerRead(r, (db) => Boolean(db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId)), false));
       return repo ? ledgerFileFor(repo) : null;
     };
-    for (const [askKey, entry] of Object.entries(readSentStore(env).asks)) {
+    for (const entry of Object.values(readSentStore(env).asks)) {
       const ids = messageIdsOf(entry);
       if (!ids.length) continue;
-      const [workflowId, dispatchId] = entry.workflowId ? [entry.workflowId, entry.dispatchId] : askKey.split('|');
+      const { workflowId, dispatchId } = entry;
       const ledgerFile = entry.ledgerFile ?? (entry.repo ? ledgerFileFor(entry.repo) : locate(workflowId));
       let view = null;
       try { view = ledgerFile && fs.existsSync(ledgerFile) ? readAsk(ledgerFile, workflowId, dispatchId, now) : null; } catch { view = null; }

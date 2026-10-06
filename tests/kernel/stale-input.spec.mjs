@@ -152,9 +152,9 @@ const settledRow=(ledger,{jobId,opId=OP,attempt,cut=null,inputs,status='succeede
 
 test('law tokens: knowledge, schema paths and the named data-owned files, never other runtime paths; Work inputs are the .starciwork records',()=>{
   assert.deepEqual(lawTokens('modules/schemas/stacks-layout.yaml + modules/models/registry.yaml'),['modules/schemas/stacks-layout.yaml']);
-  assert.deepEqual(workInputPaths({records:['.starciwork/shell/index.yaml','.starciwork/features/x/fr/','src/a.ts','.starciwork/runtime.sqlite','.starciwork/kernel-evidence/w/x.json','.starciwork/kernel-approvals/w/x.json','.starciwork/features/<f>/**','.starciwork/../x']}),
+  assert.deepEqual(workInputPaths({records:['.starciwork/shell/index.yaml','.starciwork/features/x/fr/','src/a.ts','.starciwork/kernel-evidence/w/x.json','.starciwork/kernel-approvals/w/x.json','.starciwork/features/<f>/**','.starciwork/../x']}),
     ['.starciwork/shell/index.yaml','.starciwork/features/x/fr']);
-  assert.deepEqual([{path:'knowledge/a.yaml'},{path:'.starciwork/index.yaml'},{path:'docs/x.md'},{path:'knowledge/a.yaml',kind:'work'}].map(inputKindOf),['source','work',null,'work'],'an entry recorded before kinds is classified by its path');
+  assert.deepEqual([{path:'knowledge/a.yaml',kind:'source'},{path:'.starciwork/index.yaml',kind:'work'},{path:'docs/x.md'},{path:'knowledge/a.yaml',kind:'work'}].map(inputKindOf),['source','work',null,'work'],'an entry is classified by its own kind');
   assert.deepEqual(lawTokens('CONTEXT.md (fixed stack) + knowledge/churn-baseline.yaml (shapes common and nest)'),['knowledge/churn-baseline.yaml']);
   assert.deepEqual(lawTokens('scripts/hfs/architecture/*.mjs + modules/models/code-patterns.yaml + docs/architecture.md'),['modules/models/code-patterns.yaml']);
   assert.deepEqual(lawTokens('knowledge/patterns/be/* + knowledge/../CONTEXT.md'),['knowledge/patterns/be/*']);

@@ -169,7 +169,7 @@ test('the dispatch packet carries the brief defaults with the overrides on top',
   // interface.draw reads the product's shell record mustExist (dispatch refuses prerequisite-unmet
   // without it); its productLocale is what the packet carries as product_locale.
   fs.mkdirSync(path.join(repo, '.starciwork', 'shell'), { recursive: true });
-  fs.writeFileSync(path.join(repo, '.starciwork', 'shell', 'index.yaml'), 'schema: work/app-shell@1\nid: shell\nproductLocale: {default: vi, fallback: vi, locales: [vi, en]}\n');
+  fs.writeFileSync(path.join(repo, '.starciwork', 'shell', 'index.yaml'), 'schema: work/layout-tree@1\nid: shell\nproductLocale: {default: vi, fallback: vi, locales: [vi, en]}\n');
   const enqueued = out(runApi('enqueue', '--repo', repo, '--workflow', wf, '--op', owned.op, '--paths', 'src/', '--json'));
   assert.ok(enqueued?.job_id, 'enqueue produced no job');
 
