@@ -29,12 +29,14 @@ export function check({ run, terminal, ack = null }) {
   const messages = Array.isArray(r.result?.messages) ? r.result.messages : null;
   const errorCode = r.receipt?.error?.code ?? null;
   const ok = r.exitCode === 0 && Array.isArray(messages);
+  let error = null;
+  if (!ok) error = r.exitCode === 0 ? 'orchestration check returned no messages[]' : r.error;
   return {
     ok,
     deliveryId: ok ? r.result.deliveryId ?? null : null,
     messages: messages ?? [],
     acked: r.result?.acknowledged ?? null,
-    error: ok ? null : (r.exitCode === 0 ? 'orchestration check returned no messages[]' : r.error),
+    error,
     errorCode,
     fenced: errorCode === 'consumer_fenced',
     hostUnavailable: r.hostUnavailable === true,

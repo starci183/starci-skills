@@ -86,8 +86,9 @@ export function publishSecret({ root, name, before, addition, maxBytes, assertLe
     if (original === null && parentFd !== null) fs.fsyncSync(parentFd);
     lease(); rootCurrent(); fileCurrent();
     if (!matches(expected)) refuse('postcheck-failed');
-    outcome = { ok: true, effectState: 'complete', created: original === null,
-      durability: original === null ? (parentFd === null ? 'file-fsync-namespace-unqualified' : 'file-and-parent-fsync') : 'file-fsync' };
+    let durability = 'file-fsync';
+    if (original === null) durability = parentFd === null ? 'file-fsync-namespace-unqualified' : 'file-and-parent-fsync';
+    outcome = { ok: true, effectState: 'complete', created: original === null, durability };
   } catch (error) {
     outcome = { ok: false, effectState: mutated ? 'unknown' : 'none',
       reason: REASONS.has(error?.publicationReason) ? error.publicationReason : 'io-failed' };

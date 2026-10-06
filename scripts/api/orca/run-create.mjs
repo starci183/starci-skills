@@ -19,9 +19,9 @@ export function runCreate({ objective, from, request }) {
   const r = orcaCall('run-create', { objective, from }, { request });
   const result = r.result;
   const runId = result?.run?.id ?? null;
-  const receiptError = typeof r.receipt?.error === 'string'
-    ? r.receipt.error
-    : (r.receipt?.error ? JSON.stringify(r.receipt.error) : null);
+  let receiptError = null;
+  if (typeof r.receipt?.error === 'string') receiptError = r.receipt.error;
+  else if (r.receipt?.error) receiptError = JSON.stringify(r.receipt.error);
   const error = r.error || receiptError || (!runId ? r.stdout : null);
   return { ok: r.exitCode === 0 && Boolean(runId), runId, result, error, outcome: r.outcome, request: r.request, hostUnavailable: r.hostUnavailable === true };
 }

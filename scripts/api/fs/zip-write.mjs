@@ -25,25 +25,25 @@ export function zipWrite(file, entries, { now = new Date(), ...options } = {}) {
   const central = [], out = [];
   let offset = 0,total=0,archiveSha256=null;
   const names=new Set();
-  const write = (buf) => {if(offset+buf.length>limits.maxArchiveBytes)throw refuse('archive exceeds the supported resource cap');let done=0;while(done<buf.length){const n=fs.writeSync(fd,buf,done,buf.length-done);if(!n)throw Error('short ZIP write');done+=n;}offset+=buf.length;};
+  const write = (buf) => {if(offset+buf.length>limits.maxArchiveBytes){throw refuse('archive exceeds the supported resource cap');}let done=0;while(done<buf.length){const n=fs.writeSync(fd,buf,done,buf.length-done);if(!n){throw new Error('short ZIP write');}done+=n;}offset+=buf.length;};
   try {
     for (const entry of entries) {
-      const name = String(entry.name).replace(/\\/g, '/');
-      if (!validZipName(name)||names.has(name)||Buffer.byteLength(name)>limits.maxNameBytes) throw refuse(`bad/duplicate entry name ${name}`, 'zip-name');names.add(name);
+      const name = String(entry.name).replaceAll('\\', '/');
+      if (!validZipName(name)||names.has(name)||Buffer.byteLength(name)>limits.maxNameBytes) { throw refuse(`bad/duplicate entry name ${name}`, 'zip-name'); }names.add(name);
       let data;
-      if(entry.data!=null){const n=typeof entry.data==='string'?Buffer.byteLength(entry.data):entry.data.byteLength;if(!Number.isInteger(n)||n>limits.maxEntryBytes)throw refuse(`${name}: entry exceeds resource cap`);data=Buffer.from(entry.data);}
+      if(entry.data!=null){const n=typeof entry.data==='string'?Buffer.byteLength(entry.data):entry.data.byteLength;if(!Number.isInteger(n)||n>limits.maxEntryBytes){throw refuse(`${name}: entry exceeds resource cap`);}data=Buffer.from(entry.data);}
       else{
         const source=fs.openSync(entry.file,'r');
-        try{const stat=fs.fstatSync(source);if(!stat.isFile()||stat.size>limits.maxEntryBytes)throw refuse(`${name}: file exceeds resource cap`);data=Buffer.alloc(stat.size);let at=0;while(at<data.length){const n=fs.readSync(source,data,at,data.length-at,at);if(!n)throw refuse(`${name}: source truncated`);at+=n;}const after=fs.fstatSync(source);if(after.size!==stat.size||after.mtimeMs!==stat.mtimeMs)throw refuse(`${name}: source changed while archiving`);}
+        try{const stat=fs.fstatSync(source);if(!stat.isFile()||stat.size>limits.maxEntryBytes){throw refuse(`${name}: file exceeds resource cap`);}data=Buffer.alloc(stat.size);let at=0;while(at<data.length){const n=fs.readSync(source,data,at,data.length-at,at);if(!n){throw refuse(`${name}: source truncated`);}at+=n;}const after=fs.fstatSync(source);if(after.size!==stat.size||after.mtimeMs!==stat.mtimeMs){throw refuse(`${name}: source changed while archiving`);}}
         finally{fs.closeSync(source);}
       }
-      if(data.length>limits.maxEntryBytes||(total+=data.length)>limits.maxTotalBytes)throw refuse(`${name}: uncompressed resource cap exceeded`);
+      if(data.length>limits.maxEntryBytes||(total+=data.length)>limits.maxTotalBytes){throw refuse(`${name}: uncompressed resource cap exceeded`);}
       if (data.length >= U32) throw refuse(`${name} is ${data.length} bytes: over the 4 GiB entry limit`);
       const crc = zlib.crc32(data) >>> 0;
       const packed = zlib.deflateRawSync(data, { level: 6 });
       const stored = packed.length >= data.length;
       const body = stored ? data : packed;
-      if(body.length>limits.maxCompressedEntryBytes)throw refuse(`${name}: compressed resource cap exceeded`);
+      if(body.length>limits.maxCompressedEntryBytes){throw refuse(`${name}: compressed resource cap exceeded`);}
       const nameBuf = Buffer.from(name, 'utf8');
       const local = Buffer.alloc(30);
       local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(0x0800, 6); local.writeUInt16LE(stored ? 0 : 8, 8);
