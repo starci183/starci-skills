@@ -19,6 +19,38 @@ const DROP_PATH = { queued: ['cancelled'], ready: ['cancelled'], leased: ['cance
 // workflow_transitions: only stopped or finished reach archived; any other live phase is stopped first.
 const STOP_FIRST = new Set(['awaiting-approval', 'queued', 'running', 'paused']);
 
+async function retireWorkflowAsks(ledger, workflowId, reason, repo) {
+  const retired = [];
+  for (const dispatchId of openAskDispatchesOf(ledger.db, workflowId)) {
+    const result = await retireAsk(ledger, { workflowId, dispatchId, reason, repo });
+    if (result.retired) retired.push(dispatchId);
+  }
+  return retired;
+}
+
+function dropOpenWorkflowJobs(db, ledger, { workflowId, now, finalSettled }) {
+  const open = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN (${finalSettled.map(() => '?').join(',')}) ORDER BY created_at,job_id`)
+    .all(workflowId, ...finalSettled);
+  const dropped = [];
+  for (const job of open) {
+    const path = DROP_PATH[job.status];
+    if (!path) throw Object.assign(new Error(`archive refused: job ${job.job_id} is ${job.status} and cannot be dropped (job_transitions)`), { code: 'archive-job-not-droppable', jobId: job.job_id, status: job.status });
+    const leasesReleased = db.prepare('SELECT count(*) n FROM leases WHERE job_id=?').get(job.job_id).n;
+    for (const to of path) setJobStatus(db, { jobId: job.job_id, to, reason: WORKFLOW_ARCHIVED, at: now, ...(to === path.at(-1) ? { leaseToken: null, deadline: null } : {}) });
+    recordJobResult(db, { jobId: job.job_id, result: { verdict: 'dropped', reason: WORKFLOW_ARCHIVED, priorStatus: job.status, at: now }, at: now });
+    const attempt = latestAttemptOf(db, job.job_id);
+    if (attempt && attempt.end_state == null && attempt.settled_at == null) { updateAttempt(db, { attemptId: attempt.attempt_id, endState: 'cancelled', at: now }); recordWhy(db, attempt.attempt_id, { at: now }); }
+    const unit = job.unit_id ? getUnit(db, workflowId, job.unit_id) : null;
+    if (unit && !['done', 'dropped'].includes(unit.state) && (unit.current_job_id == null || unit.current_job_id === job.job_id)) {
+      setUnitState(db, { workflowId, unitId: job.unit_id, to: 'dropped', reason: WORKFLOW_ARCHIVED, at: now });
+    }
+    ledger.appendEvent({ workflowId, entityType: 'job', entityId: job.job_id, kind: 'job-dropped',
+      payload: { op: jobOpOf(job), attempt: job.attempt, reason: WORKFLOW_ARCHIVED, priorStatus: job.status, leasesReleased } });
+    dropped.push({ job, leasesReleased });
+  }
+  return dropped;
+}
+
 export default {
   verb: 'archive',
   required: ['workflow', 'reason'],
@@ -40,15 +72,12 @@ export default {
   // (DBTREE job_transitions has no reported -> cancelled). The settler (or starci kernel settle) settles it first.
   const unsettled = reportedJobs(db, { workflowId });
   if (unsettled.length) {
-    throw Object.assign(new Error(`archive refused: ${unsettled.length} job(s) of ${workflowId} filed a report that is not settled yet (${unsettled.slice(0, 8).map((it) => `${it.jobId} ${it.outcome}`).join(', ')}); wait for the reconciler-managed settler or use starci kernel settle for each job, then archive`),
+    const examples = unsettled.slice(0, 8).map((it) => `${it.jobId} ${it.outcome}`).join(', ');
+    throw Object.assign(new Error(`archive refused: ${unsettled.length} job(s) of ${workflowId} filed a report that is not settled yet (${examples}); wait for the reconciler-managed settler or use starci kernel settle for each job, then archive`),
       { code: 'archive-unsettled-reports', jobs: unsettled.map((it) => ({ jobId: it.jobId, outcome: it.outcome, dispatchId: it.dispatchId })) });
   }
 
-  const asksRetired = [];
-  for (const dispatchId of openAskDispatchesOf(db, workflowId)) {
-    const retired = await retireAsk(ledger, { workflowId, dispatchId, reason: WORKFLOW_ARCHIVED, repo });
-    if (retired.retired) asksRetired.push(dispatchId);
-  }
+  const asksRetired = await retireWorkflowAsks(ledger, workflowId, WORKFLOW_ARCHIVED, repo);
 
   const now = Date.now(), archived = { at: now, reason, by };
   const seat = kernelCustodyOf(db, workflowId), kernelTerminal = seat.terminal;
@@ -62,25 +91,7 @@ export default {
     for (const row of db.prepare("SELECT inbox_id FROM inbox WHERE workflow_id=? AND status NOT IN ('done','applied') ORDER BY inbox_id").all(workflowId)) {
       if (setInboxStatus(db, { inboxId: row.inbox_id, status: 'done', disposition: { reason: WORKFLOW_ARCHIVED }, at: now })) inboxClosed++;
     }
-    const open = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`)
-      .all(workflowId, ...FINAL_SETTLED);
-    for (const job of open) {
-      const path = DROP_PATH[job.status];
-      if (!path) throw Object.assign(new Error(`archive refused: job ${job.job_id} is ${job.status} and cannot be dropped (job_transitions)`), { code: 'archive-job-not-droppable', jobId: job.job_id, status: job.status });
-      // A terminal status drops the job's leases (jobs_release_leases trigger): count them first.
-      const leasesReleased = db.prepare('SELECT count(*) n FROM leases WHERE job_id=?').get(job.job_id).n;
-      for (const to of path) setJobStatus(db, { jobId: job.job_id, to, reason: WORKFLOW_ARCHIVED, at: now, ...(to === path.at(-1) ? { leaseToken: null, deadline: null } : {}) });
-      recordJobResult(db, { jobId: job.job_id, result: { verdict: 'dropped', reason: WORKFLOW_ARCHIVED, priorStatus: job.status, at: now }, at: now });
-      const attempt = latestAttemptOf(db, job.job_id);
-      if (attempt && attempt.end_state == null && attempt.settled_at == null) { updateAttempt(db, { attemptId: attempt.attempt_id, endState: 'cancelled', at: now }); recordWhy(db, attempt.attempt_id, { at: now }); }
-      const unit = job.unit_id ? getUnit(db, workflowId, job.unit_id) : null;
-      if (unit && !['done', 'dropped'].includes(unit.state) && (unit.current_job_id == null || unit.current_job_id === job.job_id)) {
-        setUnitState(db, { workflowId, unitId: job.unit_id, to: 'dropped', reason: WORKFLOW_ARCHIVED, at: now });
-      }
-      ledger.appendEvent({ workflowId, entityType: 'job', entityId: job.job_id, kind: 'job-dropped',
-        payload: { op: jobOpOf(job), attempt: job.attempt, reason: WORKFLOW_ARCHIVED, priorStatus: job.status, leasesReleased } });
-      dropped.push({ job, leasesReleased });
-    }
+    dropped.push(...dropOpenWorkflowJobs(db, ledger, { workflowId, now, finalSettled: FINAL_SETTLED }));
     // H12: an archived workflow keeps no open incident; each closes through its owner with the reason
     // (incidents.resolved_reason enum: workflow-ended; the trail keeps workflow-archived).
     for (const row of db.prepare("SELECT incident_id, last_progress FROM incidents WHERE workflow_id=? AND status='open'").all(workflowId)) {
@@ -113,7 +124,9 @@ export default {
   const retention = retainAfterEnd(db, now);
   const out = { ok: true, workflowId, archived: true, archivedAt: now, reason, by, inboxClosed, incidentsClosed, decisionsClosed, jobsDropped, asksRetired,
     kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal), retention };
-  emit(out, `workflow ${workflowId} archived by ${by}: ${reason} — inbox rows closed: ${inboxClosed}; decisions closed: ${decisionsClosed.length}; jobs dropped: ${jobsDropped.length}${asksRetired.length ? `; asks retired: ${asksRetired.length}` : ''}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
+  const askNote = asksRetired.length ? `; asks retired: ${asksRetired.length}` : '';
+  const terminalNote = kernelTerminal ? `, terminal ${kernelTerminal} close requested` : '';
+  emit(out, `workflow ${workflowId} archived by ${by}: ${reason} — inbox rows closed: ${inboxClosed}; decisions closed: ${decisionsClosed.length}; jobs dropped: ${jobsDropped.length}${askNote}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${terminalNote}; history preserved`, args.json);
   closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:archive` });
 
   },

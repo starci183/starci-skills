@@ -4,6 +4,27 @@ import { defaultParallelGear, loadConfig } from '../../../engine/config.mjs';
 import { agentsFor, countsOf, sizeOf, slicingContract } from '../../work/slice-estimate.mjs';
 import { csvList } from './shared/rows.mjs';
 
+const gearOf = (args, gears, ownerRoot) => {
+  if (args.gear === undefined) return loadConfig(ownerRoot)?.parallel?.gear ?? defaultParallelGear();
+  const gear = Number(args.gear);
+  if (!Number.isInteger(gear) || !gears.includes(gear)) {
+    throw Object.assign(
+      new Error(`--gear ${args.gear} is not declared by modules/models/runtimes.yaml allocation.slicing.gears (known: ${gears.join(', ')})`),
+      { code: 'gear-undeclared' });
+  }
+  return gear;
+};
+
+const pathGroupsOf = (args) => {
+  const pathArg = args.paths === undefined ? null : csvList(args.paths);
+  if (!pathArg) return null;
+  let groups;
+  try { groups = normalizeOwnedPaths(pathArg); }
+  catch (error) { throw Object.assign(new Error(`--paths: ${error.message}`), { code: 'estimate-paths-invalid' }); }
+  if (!groups.length) throw Object.assign(new Error('--paths resolved to no concrete prefix'), { code: 'estimate-paths-invalid' });
+  return groups;
+};
+
 export default {
   verb: 'estimate',
   required: [],
@@ -14,20 +35,10 @@ export default {
     const counts = countsOf(args);
     const { minutes, size } = sizeOf(counts, contract);
 
+    const gearSource = args.gear !== undefined ? 'flag' : 'config';
     // --gear is a dry run: the owner's config.yaml parallel.gear is the standing
     // answer and is never written by this command.
-    const gearSource = args.gear !== undefined ? 'flag' : 'config';
-    let gear;
-    if (gearSource === 'flag') {
-      gear = Number(args.gear);
-      if (!Number.isInteger(gear) || !gears.includes(gear)) {
-        throw Object.assign(
-          new Error(`--gear ${args.gear} is not declared by modules/models/runtimes.yaml allocation.slicing.gears (known: ${gears.join(', ')})`),
-          { code: 'gear-undeclared' });
-      }
-    } else {
-      gear = loadConfig(internals.ownerRoot)?.parallel?.gear ?? defaultParallelGear();
-    }
+    const gear = gearOf(args, gears, internals.ownerRoot);
     const agentsRequested = agentsFor(size, gear, contract);
 
     // The seam-first partition itself is derived by the Kernel agent from
@@ -35,23 +46,16 @@ export default {
     // what is computable here is an UPPER BOUND: the pairwise-disjoint concrete
     // prefixes the declared closure already holds. Without --paths there is no
     // closure to bound it with and the request stands unbounded.
-    const pathArg = args.paths === undefined ? null : csvList(args.paths);
-    let pathGroups = null;
-    if (pathArg) {
-      try { pathGroups = normalizeOwnedPaths(pathArg); }
-      catch (e) { throw Object.assign(new Error(`--paths: ${e.message}`), { code: 'estimate-paths-invalid' }); }
-      if (!pathGroups.length) {
-        throw Object.assign(new Error('--paths resolved to no concrete prefix'), { code: 'estimate-paths-invalid' });
-      }
-    }
+    const pathGroups = pathGroupsOf(args);
     const achievableBasis = pathGroups ? 'disjoint-owned-path-prefixes' : 'unbounded-no-path-closure';
     const bounds = [agentsRequested, maxSlices, ...(pathGroups ? [pathGroups.length] : [])];
     const agentsAchievable = Math.max(1, Math.min(...bounds));
-    const reason = agentsAchievable < agentsRequested
-      ? (pathGroups && pathGroups.length < agentsRequested
-        ? `closure partitions into ${pathGroups.length} pairwise-disjoint path prefix(es); size ${size} at gear ${gear} requests ${agentsRequested}`
-        : `allocation.slicing.maxSlices ${maxSlices} caps the ${agentsRequested} agents size ${size} requests at gear ${gear}`)
-      : null;
+    let reason = null;
+    if (agentsAchievable < agentsRequested) {
+      if (pathGroups && pathGroups.length < agentsRequested)
+        reason = `closure partitions into ${pathGroups.length} pairwise-disjoint path prefix(es); size ${size} at gear ${gear} requests ${agentsRequested}`;
+      else reason = `allocation.slicing.maxSlices ${maxSlices} caps the ${agentsRequested} agents size ${size} requests at gear ${gear}`;
+    }
 
     const slices = agentsAchievable;
     const perSliceMinutes = Math.round((minutes / slices) * 10) / 10;
