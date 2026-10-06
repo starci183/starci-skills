@@ -126,13 +126,12 @@ export function checkSchemaOwner(input) {
       if (!file.rel.startsWith(`${key}/`)) continue;
       const checker = kit.checkerOf(file.sourceFile);
       kit.walk(file.sourceFile, node => {
-        if (!ts.isCallExpression(node)) return true;
+        if (!ts.isCallExpression(node)) return;
         const declaration = kit.declarationsOf(checker, node.expression)[0];
         const rel = declaration ? kit.graphPath(declaration) : null;
         const used = rel ? [...connections].find(name => rel === `${DATABASE_DIR}/${name}.decorators.ts`) : null;
         if (used && perConnection && !only.has(used)) report(file, node, `${file.rel} injects the entity manager of connection ${used}, but the ${kinds.name} capability's tables are registered on ${[...only.keys()].sort(byCodeUnit).join(' and ')}; register the capability on ${used} too or inject one of its connections.`, { connection: used, expected: [...only.keys()].sort(byCodeUnit).join(','), capability: kinds.name });
         else if (used && !perConnection && used !== home) report(file, node, `${file.rel} injects the entity manager of connection ${used}, but the ${kinds.name} capability's tables are registered on ${home}; a capability reads only its own database, so use Inject${pascal(home)}EntityManager or move the tables.`, { connection: used, expected: home, capability: kinds.name });
-        return true;
       });
     }
   }

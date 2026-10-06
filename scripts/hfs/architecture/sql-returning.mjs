@@ -47,9 +47,9 @@ export function checkSqlReturning(input) {
     if (file.slot !== 'be.persistence' || !path.posix.basename(file.rel).endsWith('.sql.ts') || !file.owner) continue;
     const checker = kit.checkerOf(file.sourceFile);
     kit.walk(file.sourceFile, node => {
-      if (!ts.isTaggedTemplateExpression(node)) return true;
+      if (!ts.isTaggedTemplateExpression(node)) return;
       const home = kit.declarationsOf(checker, node.tag).map(kit.ownerOfDeclaration).find(Boolean);
-      if (home?.tier !== 'platform' || home?.name !== 'database') return true;
+      if (home?.tier !== 'platform' || home?.name !== 'database') return;
       templates += 1;
       const template = node.template;
       const text = ts.isNoSubstitutionTemplateLiteral(template) ? template.text
@@ -57,7 +57,6 @@ export function checkSqlReturning(input) {
       for (const verb of unwrappedReturning(text)) {
         violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message: `${verb} ... RETURNING in ${file.rel} is returned by EntityManager.query as [rows, affectedCount], not as rows, so a caller reading rows reads the wrong value. Wrap it: WITH changed AS (${verb} ... RETURNING ...) SELECT ... FROM changed.`, verb });
       }
-      return true;
     });
   }
   return { violations, coverage: { status: 'checked', templates } };
