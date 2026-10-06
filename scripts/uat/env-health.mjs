@@ -155,8 +155,8 @@ async function waitReady(url, expect, { readyTimeoutMs, probeTimeoutMs }) {
 
 const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const collectEnvIds = (value, out) => {
-  if (typeof value === 'string') { if (ENV_ID.test(value.trim())) out.add(value.trim()); return; }
-  if (Array.isArray(value)) { for (const v of value) collectEnvIds(v, out); return; }
+  if (typeof value === 'string') { if (ENV_ID.test(value.trim())) { out.add(value.trim()); } return; }
+  if (Array.isArray(value)) { for (const v of value) { collectEnvIds(v, out); } return; }
   if (value && typeof value === 'object') for (const v of Object.values(value)) collectEnvIds(v, out);
 };
 
@@ -184,7 +184,7 @@ function environmentFile(repo, id) {
 export function environmentIdsOfPaths(repo, paths) {
   const ids = new Set();
   for (const raw of paths ?? []) {
-    const p = String(typeof raw === 'string' ? raw : raw?.path ?? '').replace(/\\/g, '/').replace(/\/\*\*$/, '');
+    const p = String(typeof raw === 'string' ? raw : raw?.path ?? '').replaceAll(/\\/g, '/').replace(/\/\*\*$/, '');
     if (!/^\.starciwork\/features\/[^/]+\/(uat|e2e|integration)(\/|$)/.test(p)) continue;
     for (let dir = path.join(repo, p); dir.startsWith(path.join(repo, '.starciwork', 'features')); dir = path.dirname(dir)) {
       const doc = readYaml(path.join(dir, 'index.yaml'));
@@ -243,7 +243,10 @@ async function checkEnvironment(doc, { restart = false, roots = [], probeTimeout
       }
       Object.assign(row, { status: r.status });
     }
-    let state = r.state === 'answered' ? 'wrong-status' : r.state === 'hung' ? 'hung' : r.state === 'down' ? 'down' : 'error';
+    let state = 'error';
+    if (r.state === 'answered') state = 'wrong-status';
+    else if (r.state === 'hung') state = 'hung';
+    else if (r.state === 'down') state = 'down';
     const registered = readRegistered(doc.id, name, env);
     const listener = port && state !== 'down' ? portListener(port) : null;
     const actions = [];
@@ -256,8 +259,9 @@ async function checkEnvironment(doc, { restart = false, roots = [], probeTimeout
       }
       if (restart) { const killed = stopListener(listener.pid); actions.push(`killed ${state} own listener PID ${listener.pid}${killed ? '' : ' (kill failed)'}`); if (killed) state = 'down'; }
     }
-    const start = registered?.command ? { command: registered.command, cwd: registered.cwd, from: 'registry' }
-      : doc?.configuration?.start?.[name] ? { command: splitCommand(doc.configuration.start[name].command), cwd: path.resolve(repo ?? '.', doc.configuration.start[name].cwd ?? '.'), from: 'resource', env: doc.configuration.start[name].env ?? null } : null;
+    let start = null;
+    if (registered?.command) start = { command: registered.command, cwd: registered.cwd, from: 'registry' };
+    else if (doc?.configuration?.start?.[name]) start = { command: splitCommand(doc.configuration.start[name].command), cwd: path.resolve(repo ?? '.', doc.configuration.start[name].cwd ?? '.'), from: 'resource', env: doc.configuration.start[name].env ?? null };
     if (restart && state === 'down' && start?.command?.length) {
       const started = startServer({ command: start.command, cwd: start.cwd, envId: doc.id, service: name, env: start.env ? { ...env, ...start.env } : env });
       writeRegistered({ env: doc.id, service: name, repo, port, url, command: start.command, cwd: start.cwd, pid: started.pid, state: 'starting', startedAt: Date.now() }, env);
@@ -285,7 +289,7 @@ export async function checkEnvironments({ repo, ids = [], paths = [], restart = 
     const file = environmentFile(repo, id);
     const declared = file ? readYaml(file) : null;
     if (!declared) { unresolved.push(id); continue; }
-    environments.push({ file: path.relative(repo, file).replace(/\\/g, '/'), ...(await checkEnvironment(declared, { restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo })) });
+    environments.push({ file: path.relative(repo, file).replaceAll(/\\/g, '/'), ...(await checkEnvironment(declared, { restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo })) });
   }
   const services = environments.flatMap((e) => e.services);
   const ready = environments.every((e) => e.ready);

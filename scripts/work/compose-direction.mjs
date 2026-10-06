@@ -208,7 +208,9 @@ function composeOne({ uiDir, content, breakpoint, theme, state = 'default', pres
   const bytes = encodePng(image);
   const promptPath = prompt ?? contentAbs.replace(/\.png$/i, '.prompt.txt');
   const contentAsset = { path: rel(contentAbs), role: 'direction-content', sha256: composite.content.sha256, width: contentImage.width, height: contentImage.height, breakpoint, theme, generation: { tool, promptPath: rel(path.resolve(promptPath)), mode: pres === 'overlay' ? 'panel' : 'slot' } };
-  const baseRef = composite.layout ? resolveImageRef(workRoot, composite.layout.capture, uiRecords) : composite.host ? resolveImageRef(workRoot, composite.host.asset, uiRecords) : null;
+  let baseRef = null;
+  if (composite.layout) baseRef = resolveImageRef(workRoot, composite.layout.capture, uiRecords);
+  else if (composite.host) baseRef = resolveImageRef(workRoot, composite.host.asset, uiRecords);
   const asset = {
     path: rel(outFile), role: 'direction', sha256: sha256Of(bytes), width: image.width, height: image.height, breakpoint, theme,
     generation: { tool, promptPath: rel(path.resolve(promptPath)), mode: 'composite', inputRefs: [repoRel(contentAbs), ...(baseRef ? [repoRel(baseRef)] : [])] },

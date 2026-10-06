@@ -261,7 +261,9 @@ export function measurePalette(image, palette, { exclude = null } = {}) {
     const at = (y * width + x) * 4;
     if (data[at + 3] < ALPHA_FLOOR) return 'ink';
     const v = classify(data[at], data[at + 1], data[at + 2]);
-    return v.kind === 'ink' ? 'ink' : v.kind === 'brand' ? 'brand' : v.name;
+    if (v.kind === 'ink') return 'ink';
+    if (v.kind === 'brand') return 'brand';
+    return v.name;
   };
   const coherent = (x, y, v) => {
     const own = v.kind === 'brand' ? 'brand' : v.name;
@@ -396,7 +398,9 @@ export async function scanTargets(workRoot) {
     if (record?.schema === 'work/ui-screen@1') {
       const seen = new Set();
       for (const a of assetsOf(record)) {
-        const kind = a.composite ? 'composite' : a.role === 'direction-content' || isPartName(a.path) ? 'part' : null;
+        let kind = null;
+        if (a.composite) kind = 'composite';
+        else if (a.role === 'direction-content' || isPartName(a.path)) kind = 'part';
         if (!kind || seen.has(a.path)) continue;
         seen.add(a.path);
         targets.push({ record: record.id, recordFile: index, kind, file: path.join(dir, a.path), declared: true, ...(a.composite ? { composite: a.composite, uiDir: dir } : {}) });

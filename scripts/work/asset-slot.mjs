@@ -150,7 +150,9 @@ export function slotsOfHtml(html, { htmlFile = null, masters = new Set() } = {})
     }
     const master = Boolean(actual && masters.has(actual));
     const promptAttr = (el.attrs[ASSET_PROMPT_ATTR] ?? img.attrs[ASSET_PROMPT_ATTR] ?? '').trim();
-    const promptFile = promptAttr && htmlFile ? path.resolve(path.dirname(htmlFile), promptAttr) : (actual ? file.replace(/\.[^.\\/]+$/, '.prompt.txt') : null);
+    let promptFile = null;
+    if (promptAttr && htmlFile) promptFile = path.resolve(path.dirname(htmlFile), promptAttr);
+    else if (actual) promptFile = file.replace(/\.[^.\\/]+$/, '.prompt.txt');
     const prompt = promptFile && isFile(promptFile) ? promptFile : null;
     out.push({ id, tag: el.tag, component: el.attrs[COMPONENT_ATTR] ?? null, src, sha256: sha, file: actual ? file : null, master, prompt,
       filled: Boolean(sha && actual && sha === actual && !master && prompt) });

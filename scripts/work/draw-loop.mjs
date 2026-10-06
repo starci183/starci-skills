@@ -143,8 +143,7 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
   const assetRequests = assetRequestIdsFor(html, [...proposalDirs, ...(ui?.dir ? [ui.dir] : [])]);
   // A real-component drawing: every painting element of the rendered DOM belongs to a grammar component (draw-render
   // record `ownership`); a hand-drawn html one: every element carries its DNA attribute.
-  const ownership = captures.flatMap((c) => (c.record?.ownership ? (c.record.ownership.unownedCount ? [finding('dna', DOM_OFF_GRAMMAR, `${stemOf(c.png)} rendered DOM: ${c.record.ownership.unownedCount} painting element(s) owned by a drawn layout element, not a grammar component - ${list(c.record.ownership.unowned).slice(0, 5).join('; ')}`)] : [])
-    : component ? [finding('dna', DRAW_METRICS_UNVERIFIED, `${stemOf(c.png)}: the capture measured no rendered-DOM ownership`)] : []));
+  const ownership = captures.flatMap((c) => { if (c.record?.ownership) return c.record.ownership.unownedCount ? [finding('dna', DOM_OFF_GRAMMAR, `${stemOf(c.png)} rendered DOM: ${c.record.ownership.unownedCount} painting element(s) owned by a drawn layout element, not a grammar component - ${list(c.record.ownership.unowned).slice(0, 5).join('; ')}`)] : []; if (component) return [finding('dna', DRAW_METRICS_UNVERIFIED, `${stemOf(c.png)}: the capture measured no rendered-DOM ownership`)]; return []; });
   push('dna', [...(component ? ownership : dnaFindings(text, { dna: loadDna({ family: family ?? undefined }), proposals, label, assetRequests }).map((f) => finding('dna', f.code, f.detail, { count: f.count }))), ...measuredAnatomy],
     { proposals: readProposals(proposalFiles).map((p) => ({ name: p.name, complete: p.complete, missing: p.missing })) });
 
@@ -561,8 +560,7 @@ function scratchRewriter({ out, env = process.env, context = opContextOf({ env }
     if (url) { try { p = fileURLToPath(m); } catch { p = decodeURIComponent(m.slice(url.length)); } }
     return map(p) ?? m;
   }) : s);
-  const value = (v) => (typeof v === 'string' ? text(v) : Array.isArray(v) ? v.map(value)
-    : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, value(x)])) : v);
+  const value = (v) => { if (typeof v === 'string') return text(v); if (Array.isArray(v)) return v.map(value); if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, value(x)])); return v; };
   return { roots, map, text, value };
 }
 

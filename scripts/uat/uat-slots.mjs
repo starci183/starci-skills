@@ -129,7 +129,7 @@ export async function acquireUatSlot({runId=null,env=process.env,limit=maxConcur
       if(claimed){
         let released=false,unhook=()=>{};
         const release=()=>{
-          if(released)return;released=true;unhook();
+          if(released){return;}released=true;unhook();
           try{
             withMachine(m=>m.transaction(()=>{
               const cur=m.hostLock(claimed.name);

@@ -423,7 +423,7 @@ export function createBridge({
       say(`ask ${key}: serve-ask launched on demand (pid ${pid ?? '-'})`);
       let latest = null;
       serving = pid ? await waitFor(() => { latest = stateOf(target); return latest?.closed ? latest : latest?.serving ?? null; }, serveWaitMs) : null;
-      if (serving?.closed) { if (messageId) await removeMessage(messageId); return { closed: serving.closed }; }
+      if (serving?.closed) { if (messageId) { await removeMessage(messageId); } return { closed: serving.closed }; }
       if (!serving) {
         await showAsk(messageId, key, askText(state, { note: textFor(current.language).serveFailed }));
         say(`ask ${key}: the form did not bind within ${serveWaitMs} ms`);
@@ -507,15 +507,13 @@ export function createBridge({
       telegram: { chatId: current.chatId, messageId: message.message_id ?? null, replyTo } });
     say(`draw review ${entry.key}: owner reply ${r?.ok ? r.decision : `not recorded (${r?.why ?? 'error'})`}`);
     const tr = translator(current.language);
-    const ack = !r?.ok ? tr('Not recorded: {why}.', { why: r?.why ?? tr('error') })
-      : r.decision === 'accept' ? tr(r.golden ? 'Recorded: you accepted the drawing as the golden reference.' : 'Recorded: you accepted the drawing.')
-        : tr('Recorded your feedback: the drawing will be redrawn to address every note.');
+    const ack = (() => { if (!r?.ok) return tr('Not recorded: {why}.', { why: r?.why ?? tr('error') }); if (r.decision === 'accept') return tr(r.golden ? 'Recorded: you accepted the drawing as the golden reference.' : 'Recorded: you accepted the drawing.'); return tr('Recorded your feedback: the drawing will be redrawn to address every note.'); })();
     await send(ack, { replyTo: message.message_id });
     return r ?? { ok: false };
   };
 
   const onMessage = async (message) => {
-    const text = typeof message.text === 'string' ? message.text : typeof message.caption === 'string' ? message.caption : null;
+    const text = (() => { if (typeof message.text === 'string') return message.text; if (typeof message.caption === 'string') return message.caption; return null; })();
     if (!text?.trim()) return send(t().textOnly, { replyTo: message.message_id });
     if (message.reply_to_message && !text.trim().startsWith('/')) {
       const drawn = await onDrawReply(message, text);
@@ -755,9 +753,9 @@ function main() {
     if (live?.pid && pidAlive(live.pid)) { try { process.kill(live.pid); } catch { /* gone */ } }
     out({ ok: true, stopped: live?.pid ?? null }); return;
   }
-  if (verb === 'start') { const r = ensureTelegramBridge(); out(r); if (!r.ok) process.exitCode = 1; return; }
+  if (verb === 'start') { const r = ensureTelegramBridge(); out(r); if (!r.ok) { process.exitCode = 1; } return; }
   if (verb === 'run') return runMain();
   console.error('usage: starci supervisor telegram-bridge start|run|status|stop'); process.exit(2);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === BRIDGE_FILE) Promise.resolve().then(main).catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });
+if (process.argv[1] && path.resolve(process.argv[1]) === BRIDGE_FILE) { try { await main(); } catch (error) { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; } }

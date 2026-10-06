@@ -55,10 +55,12 @@ export function closeWorkerTerminalState(m, { jobId, env = process.env, now = Da
   catch (error) { r = { handle, ok: false, error: String(error?.message ?? error) }; }
   const physical = dispatch ? r?.dispatch === dispatch && workerClosureProven(r, handle)
     : r?.handle === handle && r?.ok === true && ['gone', 'disconnected'].includes(r?.proof);
+  let reason = r?.reason;
+  if (!reason && !physical) reason = 'worker-closure-unproven';
   const record = { handle, attemptId: job.attempt_id ?? null, ...(dispatch ? { dispatch, released: r?.ok === true,
     closed: r?.closed ?? null, processes: r?.processes ?? null } : {}), ok: physical, proof: (dispatch ? r?.closed?.proof : r?.proof) ?? null,
     ...(r?.detached ? { detached: true } : {}), ...(r?.pending ? { pending: true } : {}),
-    ...(r?.reason ? { reason: r.reason } : !physical ? { reason: 'worker-closure-unproven' } : {}),
+    ...(reason ? { reason } : {}),
     ...(r?.error ? { error: String(r.error).slice(0, 200) } : {}), at: new Date(now).toISOString() };
   try {
     m.transaction(() => {

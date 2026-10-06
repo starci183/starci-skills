@@ -64,7 +64,7 @@ const digest=sha256;
 // Colour mathematics: sRGB <-> linear <-> OKLab <-> oklch, and WCAG contrast.
 // ---------------------------------------------------------------------------
 
-const clamp01=value=>value<0?0:value>1?1:value;
+const clamp01=value=>{if(value<0)return 0;if(value>1)return 1;return value;};
 /** sRGB transfer function and its inverse; the piecewise form, not the 2.2 approximation. */
 const srgbToLinear=channel=>channel<=0.04045?channel/12.92:((channel+0.055)/1.055)**2.4;
 const linearToSrgb=channel=>channel<=0.0031308?channel*12.92:1.055*channel**(1/2.4)-0.055;
@@ -675,8 +675,8 @@ export function checkPrimaryDangerDistinct({brand}){
   const tokens=brandTokens(brand);
   const primary=byRole(tokens,'primary'),danger=byRole(tokens,'danger');
   const allowed=brand?.color?.policy?.dangerMayMatchPrimary===true;
-  if(!primary||!danger)return check(id,'skip',`The brand declares no ${!primary&&!danger?'primary and no danger':!primary?'primary':'danger'} colour role, so the two cannot be compared.`,
-    {threshold:MIN_PRIMARY_DANGER_DELTA,dangerMayMatchPrimary:allowed});
+  if(!primary||!danger){let absent='danger';if(!primary&&!danger)absent='primary and no danger';else if(!primary)absent='primary';return check(id,'skip',`The brand declares no ${absent} colour role, so the two cannot be compared.`,
+    {threshold:MIN_PRIMARY_DANGER_DELTA,dangerMayMatchPrimary:allowed});}
   const one=parseColor(primary.value),two=parseColor(danger.value);
   const evidence={primary:{token:primary.token,value:primary.value??null},danger:{token:danger.token,value:danger.value??null},
     threshold:MIN_PRIMARY_DANGER_DELTA,scale:'OKLab delta-E x100',dangerMayMatchPrimary:allowed};
@@ -764,7 +764,7 @@ export function checkIconSetOnly({brand,sourceRoot}){
       if(files.length>=SCAN_FILE_LIMIT)return;
       if(entry.isSymbolicLink())continue;
       const file=path.join(directory,entry.name);
-      if(entry.isDirectory()){if(!SCAN_EXCLUDED.has(entry.name)&&!entry.name.startsWith('.'))walk(file);continue;}
+      if(entry.isDirectory()){if(!SCAN_EXCLUDED.has(entry.name)&&!entry.name.startsWith('.')){walk(file);}continue;}
       if(entry.isFile()&&/\.tsx?$/i.test(entry.name)&&!/\.d\.ts$/i.test(entry.name)&&fs.statSync(file).size<=SCAN_BYTES_LIMIT)files.push(file);
     }
   };

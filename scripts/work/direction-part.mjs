@@ -83,7 +83,7 @@ export function ownerImages(items, { cache = new Map() } = {}) {
     if (typeof original !== 'string' || !original) continue;
     const part = partOf(original, { cache });
     const key = resolvedKey(part.file);
-    if (byKey.has(key)) { const seen = byKey.get(key); if (!seen.aliases.includes(original)) seen.aliases.push(original); continue; }
+    if (byKey.has(key)) { const seen = byKey.get(key); if (!seen.aliases.includes(original)) { seen.aliases.push(original); } continue; }
     const entry = typeof item === 'string'
       ? { file: part.file, composite: part.composite, kind: part.kind, aliases: [original] }
       : { ...item, ...(item.abs !== undefined ? { abs: part.file } : { file: part.file }), composite: part.composite, kind: part.kind, aliases: [original] };
@@ -93,7 +93,11 @@ export function ownerImages(items, { cache = new Map() } = {}) {
   return out;
 }
 
-const pathOfRef = (ref) => (typeof ref === 'string' ? ref : ref && typeof ref === 'object' && typeof ref.path === 'string' ? ref.path : null);
+const pathOfRef = (ref) => {
+  if (typeof ref === 'string') return ref;
+  if (ref && typeof ref === 'object' && typeof ref.path === 'string') return ref.path;
+  return null;
+};
 
 /**
  * The image paths one draws.yaml entry names, the owner-facing one first: `part` (the drawn part), then

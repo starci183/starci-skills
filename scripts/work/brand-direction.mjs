@@ -259,11 +259,15 @@ function brandDirectionMain(argv = []) {
     },
     apply: (work, receipt, args) => {
       const r = applyDirectionReview(work, receipt, { write: args.includes('--write') });
-      const text = r.decision === 'revise'
-        ? `the owner asked for a revision of ${r.archetype} (ask ${r.dispatchId}); nothing written. Brief: ${r.brief}`
-        : r.provisional
-          ? `${r.written ? 'wrote' : 'would write (dry run - pass --write)'} brand.direction.archetypes.${r.archetype}.provisional (autopilot, ask ${r.provisional.acceptedBy}, receipt ${r.provisional.receipt}); the status stays proposed until the owner reviews it at handover`
-          : `${r.written ? 'wrote' : 'would write (dry run - pass --write)'} brand.direction.archetypes.${r.archetype} accepted in ask ${r.acceptance.acceptedBy} (receipt ${r.acceptance.receipt})`;
+      let text;
+      if (r.decision === 'revise') text = `the owner asked for a revision of ${r.archetype} (ask ${r.dispatchId}); nothing written. Brief: ${r.brief}`;
+      else if (r.provisional) {
+        const action = r.written ? 'wrote' : 'would write (dry run - pass --write)';
+        text = `${action} brand.direction.archetypes.${r.archetype}.provisional (autopilot, ask ${r.provisional.acceptedBy}, receipt ${r.provisional.receipt}); the status stays proposed until the owner reviews it at handover`;
+      } else {
+        const action = r.written ? 'wrote' : 'would write (dry run - pass --write)';
+        text = `${action} brand.direction.archetypes.${r.archetype} accepted in ask ${r.acceptance.acceptedBy} (receipt ${r.acceptance.receipt})`;
+      }
       return { result: r, text: `${text}\n` };
     },
   });

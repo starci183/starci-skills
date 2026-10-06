@@ -28,7 +28,7 @@ function projectConfigOf(command, cwd) {
   return CONFIG_NAMES.map((name) => path.join(cwd, name)).find((file) => fs.existsSync(file)) ?? null;
 }
 
-const specifier = (file) => file.replace(/\\/g, '/').replace(/\.(ts|mts|cts)$/, '');
+const specifier = (file) => file.replaceAll(/\\/g, '/').replace(/\.(ts|mts|cts)$/, '');
 
 /** The wrapper config's source: the project config with recording on. */
 function recordingConfigSource({ projectConfig, cwd, outputDir }) {
@@ -37,8 +37,8 @@ function recordingConfigSource({ projectConfig, cwd, outputDir }) {
     "import path from 'node:path';",
     projectConfig ? `import base from ${JSON.stringify(specifier(projectConfig))};` : 'const base = {};',
     'const cfg: any = (base as any)?.default ?? base ?? {};',
-    `const dir = ${JSON.stringify(dir.replace(/\\/g, '/'))};`,
-    `const out = ${JSON.stringify(outputDir.replace(/\\/g, '/'))};`,
+    `const dir = ${JSON.stringify(dir.replaceAll(/\\/g, '/'))};`,
+    `const out = ${JSON.stringify(outputDir.replaceAll(/\\/g, '/'))};`,
     "const rec = (use: any = {}) => ({ ...use, video: 'on', trace: 'on', screenshot: 'on' });",
     "const at = (p: any) => (typeof p === 'string' ? path.resolve(dir, p) : p);",
     'const hooks = (key: string) => (cfg[key] ? { [key]: Array.isArray(cfg[key]) ? cfg[key].map(at) : at(cfg[key]) } : {});',
@@ -68,7 +68,7 @@ export function withRecording(command, { cwd, outputDir }) {
   for (let i = 0; i < command.length; i++) {
     const arg = String(command[i]);
     if (CONFIG_FLAGS.has(arg)) { i += 1; continue; }
-    if (/^--config=/.test(arg)) continue;
+    if (arg.startsWith('--config=')) continue;
     rest.push(command[i]);
   }
   return { command: [...rest, '--config', config], outputDir, config };

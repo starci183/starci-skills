@@ -125,10 +125,9 @@ function rowJob(row) {
   if (!row) return null;
   const payload = parse(row.payload_json);
   const { terminal_handle: handle, ...rest } = row; delete rest.payload_json; delete rest.files_json;
-  return { ...rest, payload, result: payload.result ?? null, worker_id: payload.self ? (row.attempt_id != null ? 'supervisor' : null) : handle ?? null };
+  let workerId = handle ?? null; if (payload.self) workerId = row.attempt_id != null ? 'supervisor' : null; return { ...rest, payload, result: payload.result ?? null, worker_id: workerId };
 }
-export const jobsOf = (m, statuses = null) => m.db.prepare(`${JOB_SELECT} WHERE j.kind=? ${statuses ? `AND j.status IN (${statuses.map(() => '?').join(',')})` : ''} ORDER BY j.created_at, j.job_id`)
-  .all(FIX_KIND, ...(statuses ?? [])).map(rowJob);
+export const jobsOf = (m, statuses = null) => { const statusFilter = statuses ? `AND j.status IN (${statuses.map(() => '?').join(',')})` : ''; return m.db.prepare(`${JOB_SELECT} WHERE j.kind=? ${statusFilter} ORDER BY j.created_at, j.job_id`).all(FIX_KIND, ...(statuses ?? [])).map(rowJob); };
 export const jobOf = (m, jobId) => rowJob(m.db.prepare(`${JOB_SELECT} WHERE j.job_id=?`).get(jobId));
 /**
  * The worker terminals still physically held, including logically finished jobs without qualified closure.
