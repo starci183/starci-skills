@@ -97,19 +97,10 @@ function runtimeSourceRoots(root){
 const COMMENT_LINE=/^\s*(?:\/\/|\/?\*|#)/;
 const IMPORTS_RUNNER=/import\s*\{[^}]*\b(?:ORCA|orcaRun|orcaCall)\b[^}]*\}\s*from\s*['"][^'"]*orca\/lib\.mjs['"]/;
 
-/** Every host-boundary violation in `root`. */
-export function findHostBoundaryViolations({root=skillRoot}={}){
-  const verbs=orcaVerbs(root);
-  const found=[];
-  const flag=(file,lineNo,rule,detail,code=null)=>{
-    const key=`${rel(root,file)}:${lineNo}`;
-    found.push({where:key,rule,...(code?{code}:{}),detail});
-  };
-
-  // (a) code: one place builds orca's argv. Who may spawn orca in the runtime's production source is RT_EXTERNAL_OWNER's
-  // rule (ruleParams.runtime.sourceRoots of knowledge/hfs/runtime-slots.yaml); the roots it does not read (tests/, packages/,
-  // modules/, init/) are read here with the same AST reading. A tree without a runtime manifest is read whole.
-  const layerScan=runtimeSourceRoots(root);
+// (a) code: one place builds orca's argv. Who may spawn orca in the runtime's production source is RT_EXTERNAL_OWNER's
+// rule (ruleParams.runtime.sourceRoots of knowledge/hfs/runtime-slots.yaml); the roots it does not read (tests/, packages/,
+// modules/, init/) are read here with the same AST reading. A tree without a runtime manifest is read whole.
+const spawnScan=(root,layerScan,flag)=>{
   for(const dir of CODE_ROOTS){
     for(const file of walk(path.join(root,dir),f=>f.endsWith('.mjs'))){
       const relative=rel(root,file);
@@ -125,8 +116,10 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
       });
     }
   }
+};
 
-  // (c) agent-launch: no runtime code creates an agent terminal - the wrappers under scripts/api/orca/ included.
+// (c) agent-launch: no runtime code creates an agent terminal - the wrappers under scripts/api/orca/ included.
+const launchScan=(root,flag)=>{
   for(const dir of LAUNCH_ROOTS){
     for(const file of walk(path.join(root,dir),f=>f.endsWith('.mjs'))){
       if(rel(root,file)===ALLOW_SELF)continue;
@@ -137,16 +130,20 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
       });
     }
   }
+};
 
-  // (d) agent-cli-spawn: no runtime script runs an agent CLI as its child process.
+// (d) agent-cli-spawn: no runtime script runs an agent CLI as its child process.
+const agentSpawnScan=(root,flag)=>{
   for(const dir of AGENT_SPAWN_ROOTS){
     for(const file of walk(path.join(root,dir),f=>AGENT_SPAWN_EXT.test(f))){
       for(const hit of agentCliSpawns(fs.readFileSync(file,'utf8'),file))
         flag(file,hit.line,'agent-cli-spawn',`${AGENT_CLI_SPAWN}: ${hit.callee}() runs the agent CLI ${hit.program} as a child process — launch it through ${WRAPPER_DIR}/worker-start.mjs (scripts/agent/lib.mjs startAgent) and supervise it with worker-show / worker-stop / worker-release`,AGENT_CLI_SPAWN);
     }
   }
+};
 
-  // (b) prose: no agent is told to run orca or to read the host contract.
+// (b) prose: no agent is told to run orca or to read the host contract.
+const proseScan=(root,verbs,flag)=>{
   for(const entry of PROSE_ROOTS){
     const target=path.join(root,entry);
     if(!fs.existsSync(target))continue;
@@ -168,6 +165,22 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
       });
     }
   }
+};
+
+/** Every host-boundary violation in `root`. */
+export function findHostBoundaryViolations({root=skillRoot}={}){
+  const verbs=orcaVerbs(root);
+  const found=[];
+  const flag=(file,lineNo,rule,detail,code=null)=>{
+    const key=`${rel(root,file)}:${lineNo}`;
+    found.push({where:key,rule,...(code?{code}:{}),detail});
+  };
+
+  const layerScan=runtimeSourceRoots(root);
+  spawnScan(root,layerScan,flag);
+  launchScan(root,flag);
+  agentSpawnScan(root,flag);
+  proseScan(root,verbs,flag);
   return {ok:found.length===0,violations:found};
 }
 

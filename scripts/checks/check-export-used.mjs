@@ -30,6 +30,14 @@ const MAX_TEXT_BYTES = 3_000_000;
 
 const acorn = () => createRequire(path.join(skillRoot, 'packages', 'node_modules', 'x.js'))('acorn');
 
+/** The bound names a declaration introduces (its id, or every binding of its declarator list). */
+const declaredNames = (declaration) => {
+  const names = [];
+  if (declaration.id) names.push(declaration.id.name);
+  else for (const d of declaration.declarations ?? []) boundNames(d.id, names);
+  return names;
+};
+
 /** [{name, line}] of the named exports of a module's source (declarations and `export { a, b as c }` lists; `default` and re-exports from another module are not judged). */
 export function exportedNames(text, parse = acorn().parse) {
   let ast;
@@ -37,12 +45,8 @@ export function exportedNames(text, parse = acorn().parse) {
   const out = [];
   for (const stmt of ast.body) {
     if (stmt.type !== 'ExportNamedDeclaration') continue;
-    if (stmt.declaration) {
-      const names = [];
-      if (stmt.declaration.id) names.push(stmt.declaration.id.name);
-      else for (const d of stmt.declaration.declarations ?? []) boundNames(d.id, names);
-      for (const name of names) out.push({ name, line: stmt.loc.start.line });
-    } else if (!stmt.source) for (const s of stmt.specifiers) out.push({ name: s.exported.name, line: stmt.loc.start.line });
+    if (stmt.declaration) for (const name of declaredNames(stmt.declaration)) out.push({ name, line: stmt.loc.start.line });
+    else if (!stmt.source) for (const s of stmt.specifiers) out.push({ name: s.exported.name, line: stmt.loc.start.line });
   }
   return out;
 }
@@ -66,7 +70,8 @@ export function publicEntries(packageRel, packageText) {
  * The findings of a tree: [{code, path, line, message}]. files: [{rel, text}] (every tracked text file; the judged ones are
  * the runtime `.mjs` sources among them).
  */
-export function exportUsedFindings(files) {
+/** word -> the files that name it, for every whole word of every file. */
+const mentionMap = (files) => {
   const mentions = new Map();
   for (const { rel, text } of files) {
     for (const word of new Set(text.match(/[A-Za-z_$][\w$]*/g) ?? [])) {
@@ -75,6 +80,11 @@ export function exportUsedFindings(files) {
       set.add(rel);
     }
   }
+  return mentions;
+};
+
+export function exportUsedFindings(files) {
+  const mentions = mentionMap(files);
   const entries = new Set(files.filter((f) => path.posix.basename(f.rel) === 'package.json').flatMap((f) => publicEntries(f.rel, f.text)));
   const findings = [];
   for (const { rel, text } of files) {

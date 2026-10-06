@@ -43,9 +43,9 @@ const isTest = (rel) => rel.startsWith('tests/') || /\.(test|spec)\.mjs$/.test(r
 const HISTORY = /^modules\/kernel\/(retired-paths\.yaml|owner-rulings\.yaml)/;
 const COMMENT_LINE = /^\s*(\/\/|\/\*|\*|#)/;
 const EXEC_POSITION = /\b(run|check|script|executable|entry|command|exec|cmd|handler)\s*:/;
-const EXEC_KEY = /\b(run|check|script|executable|entry|command|exec|cmd|handler)\s*:\s*['"]?(node\s+|npm run\s+)?[\w./-]+\.mjs/;
+const EXEC_KEY = /\b(?:run|check|script|executable|entry|command|exec|cmd|handler)\s*:\s*['"]?(?:(?:node|npm run)\s+)?[\w./-]+\.mjs/;
 const NODE_COMMAND = /(^|[\s`'"(])node\s+[\w./-]+\.mjs/;
-const runtimeCheckNames = (text) => new Set([...String(text).matchAll(/\b(?:(?:npx\s+)?starci\s+runtime\s+check|npm\s+run(?:\s+--silent)?\s+starci(?:\s+--silent)?\s+--\s+runtime\s+check)\s+--only(?:=|\s+)([a-z0-9-]+)/gi)].map((match) => match[1]));
+const runtimeCheckNames = (text) => new Set([...String(text).matchAll(/\b(?:(?:npx\s+)?starci|npm\s+run(?:\s+--silent)?\s+starci(?:\s+--silent)?\s+--)\s+runtime\s+check\s+--only(?:=|\s+)([a-z0-9-]+)/gi)].map((match) => match[1]));
 
 /** The part of a reader's text that counts: code without comment lines; YAML and skills only where executable. */
 function executableText(rel, text) {
@@ -70,6 +70,15 @@ function parseEntries(text) {
   }
   return entries;
 }
+
+/** The one finding a script's read status gives, or null (a live script or a held entry). */
+const scriptFinding = (rel, entries, reader) => {
+  if (entries.has(rel)) {
+    if (reader && CODE.test(reader)) return { code: 'RT_DEAD_ENTRY', path: rel, message: `${ALLOWLIST_FILE} dead-script-entries lists ${rel}, but ${reader} reads it: delete the entry` };
+    return null;
+  }
+  return reader ? null : { code: 'RT_DEAD_SCRIPT', path: rel, message: `${rel} is read by no code, package script, hook or agent command (a doc or YAML prose mention is not a reader): delete it with its tests, wire it where it is used, or declare a CLI in the dead-script-entries section of ${ALLOWLIST_FILE}` };
+};
 
 /**
  * The dead scripts of a tree: [{code, path, message}].
@@ -96,12 +105,8 @@ export function deadScriptFindings({ tracked, read }) {
   const findings = [];
   for (const rel of scripts) {
     if (Object.keys(DYNAMIC_ROOTS).some((root) => rel.startsWith(root))) continue;
-    const reader = readBy(rel);
-    if (entries.has(rel)) {
-      if (reader && CODE.test(reader)) findings.push({ code: 'RT_DEAD_ENTRY', path: rel, message: `${ALLOWLIST_FILE} dead-script-entries lists ${rel}, but ${reader} reads it: delete the entry` });
-      continue;
-    }
-    if (!reader) findings.push({ code: 'RT_DEAD_SCRIPT', path: rel, message: `${rel} is read by no code, package script, hook or agent command (a doc or YAML prose mention is not a reader): delete it with its tests, wire it where it is used, or declare a CLI in the dead-script-entries section of ${ALLOWLIST_FILE}` });
+    const finding = scriptFinding(rel, entries, readBy(rel));
+    if (finding) findings.push(finding);
   }
   for (const [entry] of entries) {
     if (!scripts.includes(entry)) findings.push({ code: 'RT_DEAD_ENTRY', path: entry, message: `${ALLOWLIST_FILE} dead-script-entries lists ${entry}, which is not a tracked runtime script: delete the entry` });

@@ -42,6 +42,7 @@ if (isMain(import.meta.url)) {
   try { dir = containedPath(root, target, {label: 'directory'}); } catch (error) { console.log(`REFUSED ${error.message}`); process.exit(1); }
   const {files, refused} = checkExampleYaml(dir);
   for (const item of refused) console.log(`REFUSED ${item.file}\n        ${item.reason}`);
-  console.log(`${files.length} yaml file(s) under ${target}: ${refused.length ? `${refused.length} refused by the runtime loader` : 'all accepted'}`);
+  const verdict = refused.length ? `${refused.length} refused by the runtime loader` : 'all accepted';
+  console.log(`${files.length} yaml file(s) under ${target}: ${verdict}`);
   process.exitCode = refused.length ? 1 : 0;
 }

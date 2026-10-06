@@ -35,7 +35,7 @@ the findings, 2 is a bad argument.`;
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const DOC_OWNER_MISSING = 'RT_DOC_NO_OWNER';
 const DOC_DIR = 'docs';
-const HEADER = /^(Owner|Task):[ \t]+(\S.*?)\s*$/;
+const HEADER = /^(Owner|Task):[ \t]+/;
 const ANY_HEADER = /^(Owner|Task):/m;
 const OWNER_ROOT = /^(?:knowledge|modules)\//;
 /** Words that mark a form, not a topic ("the", "a", ...): they never count toward a shared title. */
@@ -64,9 +64,10 @@ function readDocument(root, rel) {
   const lines = fs.readFileSync(path.join(root, ...rel.split('/')), 'utf8').split('\n');
   const first = lines.find((line) => line.trim() !== '') ?? '';
   const match = HEADER.exec(first);
+  const value = match ? first.slice(match[0].length).trim() : '';
   return {
     rel,
-    header: match ? { kind: match[1], value: match[2] } : null,
+    header: match && value && !value.includes('\r') ? { kind: match[1], value } : null,
     headerCount: lines.filter((line) => /^(Owner|Task):/.test(line)).length,
     title: (lines.find((line) => /^#\s+/.test(line)) ?? '').replace(/^#\s+/, '').trim(),
     topics: topicWords(lines.find((line) => /^#\s+/.test(line)) ?? ''),
@@ -91,12 +92,32 @@ function topicWords(title) {
   return new Set(String(title).toLowerCase().match(/[a-z][a-z0-9-]*/g)?.filter((w) => w.length >= 3 && !STOP_WORDS.has(w)) ?? []);
 }
 
+/** The body's text with each `[label](url)` replaced by ` url ` — the same spans a `\[[^\]]*\]\(([^)]*)\)` global replace covers, scanned linearly. */
+const stripLinkUrls = (body) => {
+  let out = '';
+  let i = 0;
+  while (i < body.length) {
+    const open = body.indexOf('[', i);
+    if (open < 0) return out + body.slice(i);
+    const close = body.indexOf(']', open + 1);
+    if (close < 0 || body[close + 1] !== '(') {
+      out += body.slice(i, close < 0 ? undefined : close + 1);
+      i = close < 0 ? body.length : close + 1;
+      continue;
+    }
+    const pclose = body.indexOf(')', close + 2);
+    if (pclose < 0) return out + body.slice(i);
+    out += `${body.slice(i, open)} ${body.slice(close + 2, pclose)} `;
+    i = pclose + 1;
+  }
+  return out;
+};
+
 /** The document's normalized prose sentences of MIN_SENTENCE_WORDS or more words, as a set. */
 export function sentences(body) {
   const out = new Set();
-  const normalized = String(body)
-    .replace(/\[[^\]]*\]\(([^)]*)\)/g, ' $1 ')
-    .replace(/[`*_>|\[\]()#]/g, ' ')
+  const normalized = stripLinkUrls(String(body))
+    .replace(/[`*_>|[\]()#]/g, ' ')
     .replace(/\s+/g, ' ');
   for (const s of normalized.split(/(?<=[.!?])\s+|(?<=\|)\s+/)) {
     const words = s.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -122,28 +143,26 @@ const taskKey = (value) => value.toLowerCase().replace(/\s+/g, ' ').trim();
  * The findings of `root`: one per document problem ({path}) and one per duplicated pair ({path, other}).
  * [{code: RT_DOC_NO_OWNER, path, other?, message}]
  */
-export function docOwnerFindings(root = DEFAULT_ROOT) {
-  const findings = [];
-  const add = (rel, message, other) => findings.push({ code: DOC_OWNER_MISSING, path: rel, ...(other ? { other } : {}), message });
-  const docs = docFiles(root).map((rel) => readDocument(root, rel));
-  const byTask = new Map();
-  for (const doc of docs) {
-    if (!doc.header) {
-      add(doc.rel, `${doc.rel}: the first non-empty line is not "Owner: <knowledge/|modules/ path>" or "Task: <one task>"`);
-    } else {
-      if (doc.headerCount !== 1) add(doc.rel, `${doc.rel}: ${doc.headerCount} Owner:/Task: lines; a document carries exactly one`);
-      if (doc.header.kind === 'Owner') {
-        if (!OWNER_ROOT.test(doc.header.value)) add(doc.rel, `${doc.rel}: Owner names "${doc.header.value}", which is not under knowledge/ or modules/`);
-        else if (!fs.existsSync(path.join(root, ...doc.header.value.split('/')))) add(doc.rel, `${doc.rel}: Owner names ${doc.header.value}, which does not exist`);
-      } else {
-        const key = taskKey(doc.header.value);
-        if (!key) add(doc.rel, `${doc.rel}: the Task line names no task`);
-        else if (byTask.has(key)) add(doc.rel, `${doc.rel} and ${byTask.get(key)} carry the same task "${doc.header.value}"; one task has one document`, byTask.get(key));
-        else byTask.set(key, doc.rel);
-      }
-    }
-    if (!doc.title) add(doc.rel, `${doc.rel}: no "# " title; a document names what it is`);
+/** The findings one document's header yields (and the byTask map update a valid Task header performs). */
+const headerFindings = (doc, root, byTask, add) => {
+  if (!doc.header) {
+    add(doc.rel, `${doc.rel}: the first non-empty line is not "Owner: <knowledge/|modules/ path>" or "Task: <one task>"`);
+    return;
   }
+  if (doc.headerCount !== 1) add(doc.rel, `${doc.rel}: ${doc.headerCount} Owner:/Task: lines; a document carries exactly one`);
+  if (doc.header.kind === 'Owner') {
+    if (!OWNER_ROOT.test(doc.header.value)) add(doc.rel, `${doc.rel}: Owner names "${doc.header.value}", which is not under knowledge/ or modules/`);
+    else if (!fs.existsSync(path.join(root, ...doc.header.value.split('/')))) add(doc.rel, `${doc.rel}: Owner names ${doc.header.value}, which does not exist`);
+    return;
+  }
+  const key = taskKey(doc.header.value);
+  if (!key) add(doc.rel, `${doc.rel}: the Task line names no task`);
+  else if (byTask.has(key)) add(doc.rel, `${doc.rel} and ${byTask.get(key)} carry the same task "${doc.header.value}"; one task has one document`, byTask.get(key));
+  else byTask.set(key, doc.rel);
+};
+
+/** The findings every duplicated pair of documents yields. */
+const pairFindings = (docs, add) => {
   for (let i = 0; i < docs.length; i += 1) {
     for (let j = i + 1; j < docs.length; j += 1) {
       const [a, b] = [docs[i], docs[j]];
@@ -155,6 +174,18 @@ export function docOwnerFindings(root = DEFAULT_ROOT) {
       }
     }
   }
+};
+
+export function docOwnerFindings(root = DEFAULT_ROOT) {
+  const findings = [];
+  const add = (rel, message, other) => findings.push({ code: DOC_OWNER_MISSING, path: rel, ...(other ? { other } : {}), message });
+  const docs = docFiles(root).map((rel) => readDocument(root, rel));
+  const byTask = new Map();
+  for (const doc of docs) {
+    headerFindings(doc, root, byTask, add);
+    if (!doc.title) add(doc.rel, `${doc.rel}: no "# " title; a document names what it is`);
+  }
+  pairFindings(docs, add);
   return findings;
 }
 

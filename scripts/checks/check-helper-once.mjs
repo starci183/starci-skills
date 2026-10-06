@@ -40,7 +40,10 @@ function declaredNames(node) {
   const visit = (n) => {
     if (!n || typeof n.type !== 'string') return;
     if (n.type === 'VariableDeclarator') bound(n.id, names);
-    if (/^Function/.test(n.type) || n.type === 'ArrowFunctionExpression') { if (n.id) names.add(n.id.name); n.params.forEach((p) => bound(p, names)); }
+    if (n.type.startsWith('Function') || n.type === 'ArrowFunctionExpression') {
+      if (n.id) names.add(n.id.name);
+      n.params.forEach((p) => bound(p, names));
+    }
     if (n.type === 'ClassDeclaration' && n.id) names.add(n.id.name);
     if (n.type === 'CatchClause') bound(n.param, names);
     for (const key of Object.keys(n)) {
@@ -73,7 +76,7 @@ function tokensOf(source, start, end, renames, extraNames) {
 export function normalise(source, node) {
   const renames = new Map();
   const names = declaredNames(node);
-  if (/^Function/.test(node.type) || node.type === 'ArrowFunctionExpression') {
+  if (node.type.startsWith('Function') || node.type === 'ArrowFunctionExpression') {
     const params = node.params.length ? tokensOf(source, node.params[0].start, node.params.at(-1).end, renames, names) : [];
     const body = node.body.type === 'BlockStatement'
       ? tokensOf(source, node.body.start + 1, node.body.end - 1, renames, names)
@@ -83,19 +86,22 @@ export function normalise(source, node) {
   return tokensOf(source, node.start, node.end, renames, names).join(' ');
 }
 
+/** The rows and export names one top-level statement contributes. */
+const topLevelRow = (stmt, add, exportedNames) => {
+  const decl = stmt.type === 'ExportNamedDeclaration' && stmt.declaration ? stmt.declaration : stmt;
+  const exported = decl !== stmt;
+  if (decl.type === 'FunctionDeclaration' && decl.id) add(decl.id.name, decl, exported);
+  else if (decl.type === 'VariableDeclaration' && decl.kind === 'const') {
+    for (const d of decl.declarations) if (d.id.type === 'Identifier' && d.init) add(d.id.name, d.init, exported);
+  } else if (stmt.type === 'ExportNamedDeclaration' && !stmt.source) stmt.specifiers.forEach((s) => exportedNames.add(s.local.name));
+};
+
 /** [{name, node, exported}] for each top-level function/const declaration of a program. */
 function topLevel(ast) {
   const exportedNames = new Set();
   const rows = [];
   const add = (name, node, exported) => rows.push({ name, node, exported });
-  for (const stmt of ast.body) {
-    const decl = stmt.type === 'ExportNamedDeclaration' && stmt.declaration ? stmt.declaration : stmt;
-    const exported = decl !== stmt;
-    if (decl.type === 'FunctionDeclaration' && decl.id) add(decl.id.name, decl, exported);
-    else if (decl.type === 'VariableDeclaration' && decl.kind === 'const') {
-      for (const d of decl.declarations) if (d.id.type === 'Identifier' && d.init) add(d.id.name, d.init, exported);
-    } else if (stmt.type === 'ExportNamedDeclaration' && !stmt.source) stmt.specifiers.forEach((s) => exportedNames.add(s.local.name));
-  }
+  for (const stmt of ast.body) topLevelRow(stmt, add, exportedNames);
   return rows.map((r) => ({ ...r, exported: r.exported || exportedNames.has(r.name) }));
 }
 
@@ -131,16 +137,8 @@ const lineOf = (source, offset) => source.slice(0, offset).split('\n').length;
  * The findings of a tree: [{code, path, line, message}].
  * files: {tracked: [rel], read: (rel) => text}.
  */
-export function helperOnceFindings({ tracked, read }) {
-  const scripts = tracked.filter((rel) => rel.endsWith('.mjs') && SCRIPT_ROOTS.some((r) => rel.startsWith(`${r}/`)) && !isTest(rel) && !GENERATED.test(rel));
-  const parsed = scripts.map((rel) => {
-    const source = read(rel);
-    const ast = parse(source);
-    const state = moduleState(ast);
-    return { rel, source, rows: topLevel(ast).filter((row) => !readsState(source, row.node, state)), ast: null };
-  });
-  const findings = [];
-  // The table: exported helpers of the libs, keyed by normalised sequence.
+/** The helper table the libs' exported helpers build: sequence -> [{rel, name}] and name -> rel -> sequence. */
+const libTable = (parsed) => {
   const table = new Map();
   const byName = new Map();
   for (const file of parsed.filter((f) => isLib(f.rel))) {
@@ -154,6 +152,20 @@ export function helperOnceFindings({ tracked, read }) {
       byName.get(row.name).set(file.rel, sequence);
     }
   }
+  return { table, byName };
+};
+
+export function helperOnceFindings({ tracked, read }) {
+  const scripts = tracked.filter((rel) => rel.endsWith('.mjs') && SCRIPT_ROOTS.some((r) => rel.startsWith(`${r}/`)) && !isTest(rel) && !GENERATED.test(rel));
+  const parsed = scripts.map((rel) => {
+    const source = read(rel);
+    const ast = parse(source);
+    const state = moduleState(ast);
+    return { rel, source, rows: topLevel(ast).filter((row) => !readsState(source, row.node, state)), ast: null };
+  });
+  const findings = [];
+  // The table: exported helpers of the libs, keyed by normalised sequence.
+  const { table, byName } = libTable(parsed);
   for (const [name, homes] of byName) {
     if (new Set(homes.values()).size > 1) {
       findings.push({ code: 'RT_HELPER_REDEFINED', path: [...homes.keys()].sort(byCodeUnit)[0], line: 1,
@@ -200,7 +212,8 @@ const dice = (a, b) => {
  * The members of a cluster agree on one home: the exported lib helper when there is one, else the first path. Every
  * other member is a finding. A copy RT_HELPER_REDEFINED already reported is not reported twice.
  */
-function nearCopyFindings(parsed, reported) {
+/** The function rows of `parsed` clustered by near-copy similarity (union-find over Dice-similar pairs). */
+const nearCopyClusters = (parsed) => {
   const rows = [];
   for (const file of parsed) {
     for (const row of file.rows) {
@@ -225,10 +238,14 @@ function nearCopyFindings(parsed, reported) {
     if (!clusters.has(root)) clusters.set(root, []);
     clusters.get(root).push(r);
   }
+  return clusters;
+};
+
+function nearCopyFindings(parsed, reported) {
   const findings = [];
-  for (const members of clusters.values()) {
+  for (const members of nearCopyClusters(parsed).values()) {
     if (new Set(members.map((m) => m.file.rel)).size < 2) continue;
-    const byPath = [...members].sort((a, b) => (a.file.rel < b.file.rel ? -1 : a.file.rel > b.file.rel ? 1 : 0));
+    const byPath = [...members].sort((a, b) => byCodeUnit(a.file.rel, b.file.rel));
     const home = byPath.find((m) => isLib(m.file.rel) && m.row.exported) ?? byPath[0];
     for (const m of members) {
       if (m.file.rel === home.file.rel) continue;
