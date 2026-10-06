@@ -169,7 +169,7 @@ export function conflictHunks(text) {
 }
 
 /** What a lane does about a conflict: one instruction, never a blind retry. */
-const conflictHint = (conflicts, commit = null) => `rebase the lane onto current main (git rebase main in its worktree), resolve ${conflicts.map((c) => c.file).join(', ') || 'the conflicting files'}${commit ? ` in ${String(commit).slice(0, 9)}` : ''}, run its specs, then land the new sha; the same sha on the same main conflicts again`;
+const conflictHint = (conflicts, commit = null) => 'rebase the lane onto current main (git rebase main in its worktree), resolve ' + (conflicts.map((c) => c.file).join(', ') || 'the conflicting files') + (commit ? ' in ' + String(commit).slice(0, 9) : '') + ', run its specs, then land the new sha; the same sha on the same main conflicts again';
 
 /**
  * Lock-free preflight: apply `commits` in order onto `onto` with `git merge-tree --write-tree` (no worktree, no
@@ -439,7 +439,7 @@ const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
 export function packageProofCheck({ dir, base, runner = node }) {
   if (!fs.existsSync(path.join(dir, PACKAGE_PROOF))) return null;
   const r = runner([PACKAGE_PROOF, '--base', base], { cwd: dir, timeout: PACKAGE_PROOF_TIMEOUT_MS, env: specRunEnv() });
-  return { name: 'package-clean-test', ok: r.ok, output: tailLines(`${r.stdout}${r.stderr}${r.error ? `\n${r.error}` : ''}`, r.ok ? 4 : 60) };
+  return { name: 'package-clean-test', ok: r.ok, output: tailLines(String(r.stdout) + String(r.stderr) + (r.error ? '\n' + String(r.error) : ''), r.ok ? 4 : 60) };
 }
 
 const readSpecs = (dir) => {
@@ -504,13 +504,13 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
       const v = specBaselineVerdict({ candidate, base: baseRun, changed });
       Object.assign(specCheck, { ok: v.ok, newFailures: v.newFailures, changedSpecFailures: v.changedSpecFailures, inherited: v.inherited, ...(baseRun ? { baseRun: { ok: baseRun.ok, files: rerun, ...(baseRun.error ? { error: baseRun.error } : {}) } } : {}) });
       if (v.ok) specCheck.note = 'red on main too: every failure is inherited from main (see specs red on main)';
-      else specCheck.output = `${specCheck.output}\nrefused: ${v.why}${v.changedSpecFailures.length ? `\n  in a changed spec: ${failList(v.changedSpecFailures)}` : ''}${v.newFailures.length ? `\n  new versus main: ${failList(v.newFailures)}` : ''}`;
+      else specCheck.output = String(specCheck.output) + '\nrefused: ' + String(v.why) + (v.changedSpecFailures.length ? '\n  in a changed spec: ' + String(failList(v.changedSpecFailures)) : '') + (v.newFailures.length ? '\n  new versus main: ' + String(failList(v.newFailures)) : '');
       checks.push(specCheck);
       if (v.ok && v.inherited.length) checks.push({ name: `specs red on main (${v.inherited.length})`, ok: true, advisory: true, specsRedOnMain: true, base, inherited: v.inherited,
         output: `red on main ${String(base).slice(0, 9)} too, not this change's fault - fix main: ${failList(v.inherited)}` });
     } else checks.push(specCheck);
   }
-  if (narrowed.length) checks.push({ name: 'specs direct: hub files', ok: true, advisory: true, narrowed, output: narrowed.map((n) => `${n.file}: ${n.importers} importing specs, kept ${n.kept}${n.symbols ? ` (exports reached: ${n.symbols.join(', ') || 'none'})` : ` (${n.why}: every importer kept)`}`).join('; ') });
+  if (narrowed.length) checks.push({ name: 'specs direct: hub files', ok: true, advisory: true, narrowed, output: narrowed.map((n) => String(n.file) + ': ' + String(n.importers) + ' importing specs, kept ' + String(n.kept) + (n.symbols ? ' (exports reached: ' + (n.symbols.join(', ') || 'none') + ')' : ' (' + String(n.why) + ': every importer kept)')).join('; ') });
   return { ok: checks.every((c) => c.ok), checks, changed, rows, specs: allSpecs };
 }
 
@@ -660,7 +660,7 @@ export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs =
   } catch (error) { process.removeListener('exit', drop); drop(); throw error; }
 }
 
-const landResultOf = (r) => (r.ok ? 'passed' : r.reason === 'conflict' ? 'conflict' : ['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy', 'git-unusable', 'host-lock-held'].includes(r.reason) ? 'refused' : 'failed');
+const landResultOf = (r) => { if (r.ok) return 'passed'; if (r.reason === 'conflict') return 'conflict'; if (['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy', 'git-unusable', 'host-lock-held'].includes(r.reason)) return 'refused'; return 'failed'; };
 /** MB-12: a land that moved main but whose push did not happen (refused or failed, not skipped). */
 const pushOwedOf = (r) => Boolean(r?.ok && r.landed && r.push && !r.push.pushed && !r.push.skipped);
 /**
@@ -670,15 +670,15 @@ const pushOwedOf = (r) => Boolean(r?.ok && r.landed && r.push && !r.push.pushed 
  */
 function landOutcomeOf(result, { root = SKILL_ROOT, ticketId = null, lane = null, commits, jobId = null, specMode = null, startedAt, spanId = newSpanId() }) {
   const p = result.push;
-  const push = p ? { repoRoot: root, branch: 'main', head: result.landed ?? commits[commits.length - 1], result: p.pushed ? 'pushed' : p.skipped ? 'skipped' : p.refused ? 'refused' : 'failed',
+  const push = p ? { repoRoot: root, branch: 'main', head: result.landed ?? commits[commits.length - 1], result: (p.pushed && 'pushed') || (p.skipped && 'skipped') || (p.refused && 'refused') || 'failed',
     reason: p.refused ?? p.skipped ?? p.error ?? null,
-    failureSignature: p.pushed || p.skipped ? null : p.refused ? `secret-scan:${(p.findings ?? []).map((x) => x.rule ?? x.id ?? 'finding')[0] ?? 'finding'}` : 'push:error',
+    failureSignature: p.pushed || p.skipped ? null : (p.refused && `secret-scan:${(p.findings ?? []).map((x) => x.rule ?? x.id ?? 'finding')[0] ?? 'finding'}`) || 'push:error',
     scan: p.findings ? { findings: p.findings } : null, stderr: p.error ?? null } : null;
   const run = { ticketId, commitSha: commits[commits.length - 1], commits, landedSha: result.landed ?? null, result: landResultOf(result),
     // an already-landed pick moved nothing: no landed_sha (direct-commit detection keys on the mains the gate produced)
     reason: result.reason ?? (result.alreadyLanded ? `already-landed ${result.alreadyLanded}` : null), specs: { mode: specMode, ...(result.specReason ? { reason: result.specReason } : {}), failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name) },
     stdout: JSON.stringify(result, null, 2), stderr: (result.checks ?? []).filter((c) => !c.ok).map((c) => `## ${c.name}\n${c.output ?? ''}`).join('\n') || null, startedAt, finishedAt: Date.now() };
-  const log = { actor: 'land', kind: result.ok ? (pushOwedOf(result) ? 'land.push-owed' : 'land.passed') : result.reason === 'gate-busy' ? 'land.gate-busy' : 'land.failed', level: result.ok ? 'info' : 'warn', msg: describe(result, { jobId }).slice(0, 2000),
+  const log = { actor: 'land', kind: (result.ok && (pushOwedOf(result) && 'land.push-owed' || 'land.passed')) || (!result.ok && result.reason === 'gate-busy' && 'land.gate-busy') || 'land.failed', level: result.ok ? 'info' : 'warn', msg: describe(result, { jobId }).slice(0, 2000),
     data: { ticketId, lane, jobId, commits, landed: result.landed ?? null, reason: result.reason ?? null }, refs: [...(lane ? [`lane:${lane}`] : []), ...commits.map((c) => `commit:${c}`)] };
   return { spanId, lane, push, run, laneHead: result.ok && lane ? (result.landed ?? result.alreadyLanded ?? null) : null, log };
 }
@@ -780,7 +780,7 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
   if (!lock.ok) {
     // MB-10: a busy gate is a visible, recorded outcome that names the lane, its commits, the wait and the holder.
     const result = { ok: false, commits, lane, reason: 'gate-busy', why: lock.why ?? 'gate-held', holder: lock.holder ?? null, ahead: lock.ahead ?? 0, waitedMs: Date.now() - startedAt,
-      detail: `${lock.why === 'db-busy' ? 'machine.sqlite locked; ' : ''}waited ${Math.round((Date.now() - startedAt) / 1000)}s${lock.holder ? ` behind ${lock.holder.lane ?? lock.holder.ticketId ?? 'a land'} (${String(lock.holder.commit ?? '').slice(0, 9)})` : ''}` };
+      detail: (lock.why === 'db-busy' ? 'machine.sqlite locked; ' : '') + 'waited ' + Math.round((Date.now() - startedAt) / 1000) + 's' + (lock.holder ? ' behind ' + String(lock.holder.lane ?? lock.holder.ticketId ?? 'a land') + ' (' + String(lock.holder.commit ?? '').slice(0, 9) + ')' : '') };
     try { withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt, orca: deps.orca }), { env }); } catch { /* the answer carries it */ }
     return result;
   }
