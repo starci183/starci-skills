@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {runCommand} from '../api/process/run-command.mjs';
 import { fileURLToPath } from 'node:url';
-import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
+import {stringifyYaml} from '../../engine/yaml.mjs';
 import {sha256File} from '../../engine/digest.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {normalizeHostPaths} from '../lib/host-path.mjs';
