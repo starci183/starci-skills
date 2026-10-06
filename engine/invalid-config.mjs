@@ -1,7 +1,7 @@
 import path from 'node:path';
 import {isPlainObject as plain} from './plain-object.mjs';
 /** The one `Invalid config.yaml:` raiser every section validator shares: bad('<rest>') throws it. */
-export const invalid=section=>message=>{throw Error(`Invalid config.yaml: ${section}${message}`);};
+export const invalid=section=>message=>{throw new Error(`Invalid config.yaml: ${section}${message}`);};
 
 /** The host roots the owner may relocate (config.yaml `roots`): the archive root and the lanes root. */
 const ROOT_KEYS=Object.freeze(['archive','lanes']);

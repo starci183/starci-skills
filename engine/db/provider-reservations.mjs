@@ -13,7 +13,8 @@ export function providerReservationMethods({ need, parse, toJson, hex }) {
     if (provider !== null) { where.push('provider=?'); args.push(provider); }
     if (account !== null) { where.push('account=?'); args.push(account); }
     if (activeOnly) where.push("state<>'released'");
-    return m.db.prepare(`SELECT * FROM provider_reservations${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY fence`).all(...args).map(providerReservationRow);
+    const clause = where.length ? ` WHERE ${where.join(' AND ')}` : '';
+    return m.db.prepare(`SELECT * FROM provider_reservations${clause} ORDER BY fence`).all(...args).map(providerReservationRow);
   }
   function providerReservationUsage(m, { provider, account = 'default' } = {}) {
     const reservations = providerReservations(m, { provider, account, activeOnly: true });

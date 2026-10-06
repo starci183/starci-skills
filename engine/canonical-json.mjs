@@ -6,6 +6,9 @@ import {isPlainObject} from './plain-object.mjs';
 /** The canonical JSON text of `value`: keys sorted at every depth. */
 export function canonicalJSON(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(',')}]`;
-  if (isPlainObject(value)) return `{${Object.keys(value).sort(byCodeUnit).map(k => `${JSON.stringify(k)}:${canonicalJSON(value[k])}`).join(',')}}`;
+  if (isPlainObject(value)) {
+    const members = Object.keys(value).sort(byCodeUnit).map(k => `${JSON.stringify(k)}:${canonicalJSON(value[k])}`);
+    return `{${members.join(',')}}`;
+  }
   return JSON.stringify(value);
 }

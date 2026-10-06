@@ -3,16 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
-import {resourceAdmission,workflowOpSlots} from '../admission.mjs';
+import {resourceAdmission,workflowOpSlots,SETTLED_JOB_LIST} from '../admission.mjs';
 import {sha256} from '../digest.mjs';
-import {SETTLED_JOB_LIST} from '../admission.mjs';
 import {putBlob,blobPath,artifactRoot} from './blob.mjs';
 import {redactData,redactText} from '../../scripts/lib/redact.mjs';
-import {isBusyError,isUnderTempDir,machineFileFor,newSpanId,newTraceId,starciLocalRoot,TEST_REGISTRY_ENV,withMachine} from './machine.mjs';
+import {isBusyError,newSpanId,newTraceId,withMachine} from './machine.mjs';
 import {PROJECTS_ROOT_ENV,projectsRootFor,ledgerIdForRepo,repoRootKey,resolveLedgerFile,ledgerFixtureInit,assertOperationalLedger} from './ledger-paths.mjs';
-import { hasTable, insertPairs, insertRowWith } from '../../scripts/lib/sqlite.mjs';
+import { insertRowWith } from '../../scripts/lib/sqlite.mjs';
 // The machine-side path helpers have one definition (engine/db/machine.mjs); re-exported for the ledger's callers.
-export {isUnderTempDir,machineFileFor,starciLocalRoot,TEST_REGISTRY_ENV};
+export {isUnderTempDir,machineFileFor,starciLocalRoot,TEST_REGISTRY_ENV} from './machine.mjs';
 const require=createRequire(import.meta.url);
 
 /*
@@ -52,7 +51,7 @@ export const JOB_ARTIFACT_ROLES=Object.freeze(['check-output','check-stdout','ch
 export const LEDGER_SCHEMA='starci/runtime@1';
 export const LEDGER_VERSION=1;
 
-const need=(ok,message,code)=>{if(!ok)throw Object.assign(Error(message),code?{code}:{});};
+const need=(ok,message,code)=>{if(!ok)throw Object.assign(new Error(message),code?{code}:{});};
 const json=value=>value===undefined||value===null?null:JSON.stringify(value);
 const parseJson=text=>text===null||text===undefined?null:JSON.parse(text);
 
@@ -68,7 +67,7 @@ const RUNTIME_MARKER=root=>fs.existsSync(path.join(root,'packages','cli','bin','
 export const isRuntimeRoot=root=>RUNTIME_MARKER(path.resolve(root));
 /** True when `root` is a repository with a ledger on this host (the runtime checkout itself never is one). */
 export const hasLedger=(root)=>{try{return !isRuntimeRoot(root)&&fs.existsSync(ledgerFileFor(root));}catch{return false;}};
-export {PROJECTS_ROOT_ENV,projectsRootFor,ledgerIdForRepo};
+export {PROJECTS_ROOT_ENV,projectsRootFor,ledgerIdForRepo} from './ledger-paths.mjs';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 // file → repo root, for the meta seed (and registration) of a ledger created through ledgerFileFor.
 const repoRootOfFile=new Map();
@@ -79,9 +78,9 @@ const resolvedFiles=new Map();
  * (meta.ledger_id = that id, meta.repo_root = the root) and registers in machine.ledgers. Resolved once per process.
  */
 export const ledgerFileFor=(repoRoot,{env=process.env}={})=>{
-  if(typeof repoRoot!=='string'||!repoRoot.trim())throw Error('ledgerFileFor needs a repository root');
+  if(typeof repoRoot!=='string'||!repoRoot.trim())throw new Error('ledgerFileFor needs a repository root');
   const root=path.resolve(repoRoot);
-  if(isRuntimeRoot(root))throw Object.assign(Error(`ledger-root-is-runtime: ${root} is the StarCi runtime, not a Work root; route the project through .workspaces`),{code:'STARCI_LEDGER_ROOT_IS_RUNTIME'});
+  if(isRuntimeRoot(root))throw Object.assign(new Error(`ledger-root-is-runtime: ${root} is the StarCi runtime, not a Work root; route the project through .workspaces`),{code:'STARCI_LEDGER_ROOT_IS_RUNTIME'});
   const key=`${repoRootKey(root)}\n${projectsRootFor(env)}`;
   let file=resolvedFiles.get(key);
   if(!file){
@@ -119,7 +118,7 @@ export function beginImmediate(db,{spinMs=LEDGER_SPIN_MS}={}){
       const until=performance.now()+spinMs;
       for(;;){
         try{db.exec('BEGIN IMMEDIATE');return;}
-        catch(error){if(!isBusyError(error))throw error;if(performance.now()>=until)break;}
+        catch(error){if(!isBusyError(error)){throw error;}if(performance.now()>=until)break;}
       }
     }finally{db.exec(`PRAGMA busy_timeout=${Math.trunc(busyTimeoutMs)}`);}
   }
@@ -159,12 +158,12 @@ function openDb({file,busyTimeoutMs,journalMode='WAL',autoVacuum=false,label,pra
 }
 // handle.transaction(fn): BEGIN IMMEDIATE … COMMIT; a nested call throws. transaction.active() tells whether one is open,
 // so the handle's one-call writes (write.*, ensureWorkflow, appendEvent, enqueueJob) join an open transaction instead.
-const makeTransaction=(db,label,fixture=null)=>{let inside=false;const tx=fn=>{if(fixture)assertOperationalLedger(metaOf(db));if(inside)throw Error(`${label}-nested-transaction`);inside=true;try{beginImmediate(db);}catch(error){inside=false;throw error;}openLedgerTransactions++;try{assertMutationFence({kind:'ledger-write',db});const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}finally{inside=false;openLedgerTransactions--;}};tx.active=()=>inside;return tx;};
+const makeTransaction=(db,label,fixture=null)=>{let inside=false;const tx=fn=>{if(fixture){assertOperationalLedger(metaOf(db));}if(inside){throw new Error(`${label}-nested-transaction`);}inside=true;try{beginImmediate(db);}catch(error){inside=false;throw error;}openLedgerTransactions++;try{assertMutationFence({kind:'ledger-write',db});const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{/* rollback may fail */}throw error;}finally{inside=false;openLedgerTransactions--;}};tx.active=()=>inside;return tx;};
 const userVersion=db=>Number(db.prepare('PRAGMA user_version').get().user_version);
 const metaOf=db=>Object.fromEntries(db.prepare('SELECT key,value FROM meta').all().map(row=>[row.key,row.value]));
-const assertWritableFile=(file,busyTimeoutMs)=>{if(fs.statSync(file).size===0)return;const reader=openLedgerReader(file,{verify:false,busyTimeoutMs});try{if(hasTable(reader,'meta'))assertOperationalLedger(metaOf(reader));}finally{reader.close();}};
+const assertWritableFile=(file,busyTimeoutMs)=>{if(fs.statSync(file).size===0){return;}const reader=openLedgerReader(file,{verify:false,busyTimeoutMs});try{if(hasTable(reader,'meta'))assertOperationalLedger(metaOf(reader));}finally{reader.close();}};
 /** True when the ledger `db` holds `table`. */
-export const hasLedgerTable=hasTable;
+export {hasTable as hasLedgerTable} from '../../scripts/lib/sqlite.mjs';
 /** True when `table` of the ledger `db` has `column`. */
 export const hasLedgerColumn=(db,table,column)=>db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name===column);
 const versionTuple=v=>String(v).split('.').map(Number);
@@ -176,7 +175,7 @@ const olderThan=(a,b)=>{const x=versionTuple(a),y=versionTuple(b);for(let i=0;i<
  */
 function verifyLedger(db,{file,sqliteVersion}){
   const version=userVersion(db);
-  const legacy=hasTable(db,'meta')?metaOf(db).schema:(hasTable(db,'jobs')||hasTable(db,'events')?'pre-meta':null);
+  let legacy=null;if(hasTable(db,'meta'))legacy=metaOf(db).schema;else if(hasTable(db,'jobs')||hasTable(db,'events'))legacy='pre-meta';
   need(version===LEDGER_VERSION&&legacy===LEDGER_SCHEMA,
     `ledger-schema-refused: ${file} is ${legacy??'not a StarCi ledger'} at user_version ${version}, this runtime opens only ${LEDGER_SCHEMA} at user_version ${LEDGER_VERSION}; preserve the database and its WAL, use a compatible runtime, or resolve its identity with the owner`,'STARCI_LEDGER_SCHEMA_REFUSED');
   const recorded=metaOf(db).sqlite_version;
@@ -271,7 +270,7 @@ export function eventsHead(db,workflowId){
 const snake=key=>key.replace(/[A-Z]/g,c=>`_${c.toLowerCase()}`);
 const columnCache=new WeakMap();
 const columnsOf=(db,table)=>{
-  let byDb=columnCache.get(db);if(!byDb)columnCache.set(db,byDb=new Map());
+  let byDb=columnCache.get(db);if(!byDb){byDb=new Map();columnCache.set(db,byDb);}
   if(!byDb.has(table)){const cols=db.prepare(`PRAGMA table_xinfo(${table})`).all().filter(c=>c.hidden!==2&&c.hidden!==3).map(c=>c.name);need(cols.length,`unknown table ${table}`);byDb.set(table,new Set(cols));}
   return byDb.get(table);
 };
@@ -311,7 +310,7 @@ const insertRow=insertRowWith(toColumns);
 function updateRow(db,table,where,fields){
   const pairs=toColumns(db,table,fields),keys=toColumns(db,table,where);
   if(!pairs.length)return {changes:0};
-  const sql=`UPDATE ${table} SET ${pairs.map(p=>`${p[0]}=?`).join(',')} WHERE ${keys.map(p=>`${p[0]} IS ?`).join(' AND ')}`;
+  const sql=`UPDATE ${table} SET ${pairs.map(p=>p[0]+'=?').join(',')} WHERE ${keys.map(p=>p[0]+' IS ?').join(' AND ')}`;
   return db.prepare(sql).run(...pairs.map(p=>p[1]),...keys.map(p=>p[1]));
 }
 const nowMs=()=>Date.now();
@@ -322,7 +321,7 @@ const EVENT_PAYLOAD_MAX=16384;
 export function recordBlob(db,{sha256:sha,bytes,mediaType,fileUri,encoding=null,redaction=null,pinned=0,createdAt=nowMs()}){
   need(/^[a-f0-9]{64}$/.test(sha??''),'recordBlob needs a sha256');
   need(Number.isInteger(bytes)&&bytes>=0&&mediaType&&fileUri,'recordBlob needs bytes, mediaType and fileUri');
-  insertRow(db,'blobs',{sha256:sha,bytes,mediaType,fileUri:String(fileUri).replace(/\\/g,'/'),encoding,redaction,pinned,createdAt},{orIgnore:true});
+  insertRow(db,'blobs',{sha256:sha,bytes,mediaType,fileUri:String(fileUri).replaceAll('\\','/'),encoding,redaction,pinned,createdAt},{orIgnore:true});
   if(pinned)db.prepare('UPDATE blobs SET pinned=1 WHERE sha256=?').run(sha);
   return db.prepare('SELECT * FROM blobs WHERE sha256=?').get(sha);
 }
@@ -517,7 +516,7 @@ export function setJobStatus(db,{jobId,to,reason=null,at=nowMs(),spanId=null,att
   const job=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   need(job,`job ${jobId} not found`,'STARCI_JOB_NOT_FOUND');
   if(expect)need([expect].flat().includes(job.status),`job ${jobId} is ${job.status}, expected ${[expect].flat().join('|')}`,'STARCI_JOB_STATUS_CONFLICT');
-  if(job.status===to){if(Object.keys(fields).length)updateRow(db,'jobs',{jobId},{...fields,updatedAt:at});return false;}
+  if(job.status===to){if(Object.keys(fields).length){updateRow(db,'jobs',{jobId},{...fields,updatedAt:at});}return false;}
   updateRow(db,'jobs',{jobId},{...fields,status:to,updatedAt:at});
   appendEvent(db,{workflowId:job.workflow_id,entityType:'job',entityId:jobId,kind:'job-status',attemptId,spanId,payload:{from:job.status,to,reason},createdAt:at});
   return true;
@@ -557,7 +556,7 @@ export function bindKernelJob(db,{workflowId,workerId,payload=undefined,generati
   const job=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if(!job){enqueueJob(db,{jobId,workflowId,kind:'kernel',role:'kernel',status:'running',payload:payload??null,generation,createdAt:at});updateRow(db,'jobs',{jobId},{workerId,updatedAt:at});return jobId;}
   need(!SETTLED_JOB_STATUSES.includes(job.status),`kernel-job-ended: ${jobId} is ${job.status}`,'STARCI_KERNEL_JOB_ENDED');
-  const fields={workerId};if(payload!==undefined)fields.payload=payload;if(generation!==undefined)fields.generation=generation;
+  const fields={workerId};if(payload!==undefined){fields.payload=payload;}if(generation!==undefined){fields.generation=generation;}
   if(job.status==='running'){updateRow(db,'jobs',{jobId},{...fields,updatedAt:at});return jobId;}
   if(job.status==='queued')setJobStatus(db,{jobId,to:'ready',reason,at});
   if(['queued','ready'].includes(job.status))setJobStatus(db,{jobId,to:'leased',reason,at});
@@ -651,7 +650,7 @@ export function acquireLease(db,{resourceKey,jobId,units=1,expiresAt,attemptId=n
   insertRow(db,'leases',{resourceKey,jobId,workflowId:job.workflow_id,opId:job.op_id,tryNo:job.try_no,generation:job.generation,token:job.lease_token,units,attemptId,holder,acquiredAt:at,expiresAt});
 }
 export function renewLeases(db,{jobId,expiresAt,attemptId=undefined,holder=undefined,at=nowMs()}){
-  const fields={renewedAt:at,expiresAt};if(attemptId!==undefined)fields.attemptId=attemptId;if(holder!==undefined)fields.holder=holder;
+  const fields={renewedAt:at,expiresAt};if(attemptId!==undefined){fields.attemptId=attemptId;}if(holder!==undefined){fields.holder=holder;}
   return updateRow(db,'leases',{jobId},fields).changes;
 }
 export function releaseLeases(db,{jobId}){return db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;}
@@ -842,7 +841,7 @@ const INCIDENT_KINDS=Object.freeze(['infra-provider','config-defect','owner-ask'
  */
 function incidentClassOf(freeKind){
   const k=String(freeKind??'').toLowerCase();
-  if(INCIDENT_KINDS.includes(k))return {kind:k,owner:['owner-ask','credential-missing','safety-block','scope-change','partial-effect'].includes(k)?'owner':['runtime-defect','config-defect'].includes(k)?'supervisor':'kernel'};
+  if(INCIDENT_KINDS.includes(k)){let owner='kernel';if(['owner-ask','credential-missing','safety-block','scope-change','partial-effect'].includes(k))owner='owner';else if(['runtime-defect','config-defect'].includes(k))owner='supervisor';return {kind:k,owner};}
   if(/owner|handover|approval/.test(k))return {kind:'owner-ask',owner:'owner'};
   if(/credential|secret|provision/.test(k))return {kind:'credential-missing',owner:'owner'};
   if(/safety/.test(k))return {kind:'safety-block',owner:'owner'};
@@ -882,7 +881,7 @@ export function postInbox(db,{workflowId,kind,payload,key=null,fromRef=null,atte
 export function setInboxStatus(db,{inboxId,status,disposition=undefined,at=nowMs()}){
   const row=db.prepare('SELECT * FROM inbox WHERE inbox_id=?').get(inboxId);need(row,`inbox ${inboxId} not found`);
   if(row.status===status)return false;
-  const fields={status};if(disposition!==undefined)fields.dispositionJson=json(disposition);if(['applied','done'].includes(status))fields.appliedAt=at;
+  const fields={status};if(disposition!==undefined){fields.dispositionJson=json(disposition);}if(['applied','done'].includes(status)){fields.appliedAt=at;}
   updateRow(db,'inbox',{inboxId},fields);
   appendEvent(db,{workflowId:row.workflow_id,entityType:'inbox',entityId:String(inboxId),kind:'inbox-status',payload:{from:row.status,to:status},createdAt:at});
   return true;
@@ -931,7 +930,7 @@ export function queueSettleTail(db,{attemptId,dueAt=null,at=nowMs()}){
   insertRow(db,'settle_tails',{attemptId,workflowId:a.workflow_id,state:'queued',dueAt,queuedAt:at},{orIgnore:true});
 }
 function updateSettleTail(db,{attemptId,state,lastError=undefined,dueAt=undefined,at=nowMs()}){
-  const fields={state};if(lastError!==undefined)fields.lastError=lastError;if(dueAt!==undefined)fields.dueAt=dueAt;
+  const fields={state};if(lastError!==undefined){fields.lastError=lastError;}if(dueAt!==undefined){fields.dueAt=dueAt;}
   if(state==='running'){fields.startedAt=at;db.prepare('UPDATE settle_tails SET tries=tries+1 WHERE attempt_id=?').run(attemptId);}
   if(state==='done')fields.doneAt=at;
   return updateRow(db,'settle_tails',{attemptId},fields).changes>0;
@@ -953,16 +952,17 @@ const FOUNDATION_KIND_ENUM=new Set(['brand','grammar','layout-tree','shell','mod
  * Upsert one foundations row. `kind` outside the table enum is stored as 'other'; `state` 'landed' is 'published'.
  * `detail` is the caller's full record (kept as JSON text: the table has no column for dependents and history).
  */
+const detailText=detail=>{if(detail==null)return null;return typeof detail==='string'?redactText(detail):JSON.stringify(redactData(detail));};
 export function upsertFoundation(db,{name,kind='other',state,ownerWorkflow=null,version=null,detail=null,workRef=null,at=nowMs()}){
   const k=FOUNDATION_KIND_ENUM.has(kind)?kind:'other',st=state==='landed'?'published':state;
-  const text=detail==null?null:typeof detail==='string'?redactText(detail):JSON.stringify(redactData(detail));
+  const text=detailText(detail);
   db.prepare(`INSERT INTO foundations(name,kind,state,owner_workflow,version,detail,work_ref,updated_at) VALUES(?,?,?,?,?,?,?,?)
     ON CONFLICT(name) DO UPDATE SET kind=excluded.kind,state=excluded.state,owner_workflow=excluded.owner_workflow,version=excluded.version,
     detail=excluded.detail,work_ref=excluded.work_ref,updated_at=excluded.updated_at`).run(name,k,st,ownerWorkflow,version,text,workRef,at);
 }
 /** A workflow's foundation declaration (builds_none, detail as JSON text). */
 export function declareFoundations(db,{workflowId,buildsNone,detail=null,at=nowMs()}){
-  const text=detail==null?null:typeof detail==='string'?redactText(detail):JSON.stringify(redactData(detail));
+  const text=detailText(detail);
   db.prepare('INSERT INTO foundation_declarations(workflow_id,builds_none,detail,at) VALUES(?,?,?,?) ON CONFLICT(workflow_id) DO UPDATE SET builds_none=excluded.builds_none,detail=excluded.detail,at=excluded.at')
     .run(workflowId,buildsNone?1:0,text,at);
 }
@@ -1027,6 +1027,10 @@ const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkfl
   recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,recordAttemptUsage,markAttemptUsageUnavailable,recordKernelUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
   postInbox,setInboxStatus,setInboxStatusByKey,updateGoalJson,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail,recordProductLand,finishProductLand});
 
+// initLedger + verifyLedger + the meta touch-ups of a fresh openLedger open; throws leaving the caller to close db.
+const initAndVerifyLedger=(db,{file,now,sqliteVersion,journalMode,repoRoot,product,fixture})=>{const created=initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot,product,...(fixture?{ledgerId:fixture.ledgerId,blobRoot:fixture.blobRoot,fixtureMarker:fixture.marker}:{})});verifyLedger(db,{file,sqliteVersion});const meta=metaOf(db);if(!fixture)assertOperationalLedger(meta);if(meta.sqlite_version!==sqliteVersion)db.prepare("UPDATE meta SET value=? WHERE key='sqlite_version'").run(sqliteVersion);return created;};
+// A new ledger enrols itself in machine.ledgers (repo_root from its meta); a refusal (temp file on the live registry) is fine.
+const registerNewLedger=(db,created,{file,resolved,ledgerId})=>{if(!created)return;const own=metaOf(db);if(own.repo_root)try{withMachine(m=>m.registerLedger({ledgerId,file:resolved,repoRoot:own.repo_root,product:own.product??null,schemaVersion:LEDGER_VERSION}));}catch{/* registry unavailable: resolved by name until it is */}};
 /**
  * The read-write handle. A new (empty) file is created with 0001-init.sql; any other schema is refused (clean slate).
  * `checkpointer:true` is the one connection that checkpoints (the reconciler engine): wal_autocheckpoint=8000 and
@@ -1040,17 +1044,11 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_
   if(fixture){fs.closeSync(fs.openSync(file,'wx'));now=()=>fixture.createdAt;}else if(typeof file==='string'&&fs.existsSync(file))assertWritableFile(file,busyTimeoutMs);
   const pragmas=checkpointer?{...LEDGER_PRAGMAS,wal_autocheckpoint:CHECKPOINTER_AUTOCHECKPOINT}:LEDGER_PRAGMAS;
   const {db,sqliteVersion,journalMode}=openDb({file,busyTimeoutMs,journalMode:'WAL',autoVacuum:true,label:'openLedger',pragmas});
+  const resolved=path.resolve(file);
   let created=false;
-  try{
-    created=initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot:repoRoot??repoRootOfFile.get(path.resolve(file))??null,product,...(fixture?{ledgerId:fixture.ledgerId,blobRoot:fixture.blobRoot,fixtureMarker:fixture.marker}:{})});
-    verifyLedger(db,{file,sqliteVersion});
-    const meta=metaOf(db);if(!fixture)assertOperationalLedger(meta);
-    if(meta.sqlite_version!==sqliteVersion)db.prepare("UPDATE meta SET value=? WHERE key='sqlite_version'").run(sqliteVersion);
-  }catch(error){try{db.close();}catch{}throw error;}
-  const transaction=makeTransaction(db,'ledger',fixture);
-  const resolved=path.resolve(file),ledgerId=ledgerIdOf({db});
-  // A new ledger enrols itself in machine.ledgers (repo_root from its meta); a refusal (temp file on the live registry) is fine.
-  if(created){const own=metaOf(db);if(own.repo_root)try{withMachine(m=>m.registerLedger({ledgerId,file:resolved,repoRoot:own.repo_root,product:own.product??null,schemaVersion:LEDGER_VERSION}));}catch{/* registry unavailable: resolved by name until it is */}}
+  try{created=initAndVerifyLedger(db,{file,now,sqliteVersion,journalMode,repoRoot:repoRoot??repoRootOfFile.get(resolved)??null,product,fixture});}catch(error){try{db.close();}catch{}throw error;}
+  const transaction=makeTransaction(db,'ledger',fixture),ledgerId=ledgerIdOf({db});
+  registerNewLedger(db,created,{file,resolved,ledgerId});
   if(machine?.registerLedger)machine.registerLedger({ledgerId,file:resolved});
   const inTx=fn=>transaction.active()?fn(db):transaction(fn);
   const write=Object.fromEntries(Object.entries(LEDGER_WRITES).map(([name,fn])=>[name,

@@ -7,5 +7,6 @@
 export const byCodeUnit = (a, b) => {
   const left = String(a);
   const right = String(b);
-  return left < right ? -1 : left > right ? 1 : 0;
+  if (left < right) return -1;
+  return left > right ? 1 : 0;
 };

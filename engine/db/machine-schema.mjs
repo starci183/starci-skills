@@ -10,7 +10,7 @@ import { hasTable } from '../../scripts/lib/sqlite.mjs';
 const require = createRequire(import.meta.url);
 // SQLite ALTER RENAME quotes identifiers. Preserve literals/constraints while ignoring that spelling and formatting.
 function sqlIdentity(sql) {
-  const tokens = String(sql).match(/--[^\r\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:[^"]|"")*"|`(?:[^`]|``)*`|\[[^\]]*\]|[a-z_][a-z_0-9]*|\d+(?:\.\d+)?|[^\s]/gi) ?? [];
+  const tokens = String(sql).match(/--[^\r\n]*|\/\*[\s\S]*?\*\/|'[^']*(?:''[^']*)*'|"[^"]*(?:""[^"]*)*"|`[^`]*(?:``[^`]*)*`|\[[^\]]*\]|[a-z_][a-z_0-9]*|\d+(?:\.\d+)?|[^\s]/gi) ?? [];
   const normalized = tokens.filter(token => !token.startsWith('--') && !token.startsWith('/*')).map(token => {
     if (token.startsWith("'")) return token;
     if (token.startsWith('"')) return token.slice(1, -1).replaceAll('""', '"').toLowerCase();
@@ -22,6 +22,11 @@ function sqlIdentity(sql) {
   return JSON.stringify(normalized);
 }
 const objects = db => db.prepare("SELECT type,name,sql FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' ORDER BY type,name").all();
+function rollbackSchema(db, error) {
+  try { db.exec('ROLLBACK'); }
+  catch (rollbackError) { throw new AggregateError([error, rollbackError], 'machine schema failed and rollback failed', { cause: error }); }
+  throw error;
+}
 
 /** Create the one host schema on an empty file, or validate that an existing store is exactly that schema; there is no upgrade path. */
 export function machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_VERSION, initSqlFile: INIT_SQL_FILE, controllers: CONTROLLERS, runtimeRev, pragma }) {
@@ -37,7 +42,7 @@ export function machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_
   }
   /** Refuse any store that is not exactly the current schema, leaving it unchanged; the operator replaces it with a fresh store. */
   function refuseOld(file, why) {
-    throw Object.assign(Error(`machine-schema-old: ${path.resolve(file)} ${why}; expected '${MACHINE_SCHEMA}' (user_version ${MACHINE_VERSION}) with its current physical schema; the store is not the current schema and has been left unchanged: replace it with a fresh store (no upgrade or migration exists)`),
+    throw Object.assign(new Error(`machine-schema-old: ${path.resolve(file)} ${why}; expected '${MACHINE_SCHEMA}' (user_version ${MACHINE_VERSION}) with its current physical schema; the store is not the current schema and has been left unchanged: replace it with a fresh store (no upgrade or migration exists)`),
       { code: 'STARCI_MACHINE_SCHEMA_OLD' });
   }
   function checkIdentity(db, file) {
@@ -58,11 +63,6 @@ export function machineSchemaMethods({ schema: MACHINE_SCHEMA, version: MACHINE_
   function checkSchema(db, file) {
     checkIdentity(db, file);
     checkObjects(db, file, expectedObjects());
-  }
-  function rollbackSchema(db, error) {
-    try { db.exec('ROLLBACK'); }
-    catch (rollbackError) { throw new AggregateError([error, rollbackError], 'machine schema failed and rollback failed', { cause: error }); }
-    throw error;
   }
   function createSchema(db, { file, env, now }) {
     const sql = fs.readFileSync(INIT_SQL_FILE, 'utf8'), at = now();

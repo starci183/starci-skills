@@ -37,7 +37,7 @@ export function readSecretBytes(file){
     if(!stat.isFile()||stat.dev!==before.dev||stat.ino!==before.ino)throw new Error('credential file changed during resolution');
     bytes=Buffer.alloc(CREDENTIAL_FILE_MAX_BYTES+1);
     let count=0;
-    while(count<bytes.length){const n=fs.readSync(fd,bytes,count,bytes.length-count,null);if(n===0)break;count+=n;}
+    while(count<bytes.length){const n=fs.readSync(fd,bytes,count,bytes.length-count,null);if(n===0){break;}count+=n;}
     if(count>CREDENTIAL_FILE_MAX_BYTES)throw new Error('credential file exceeds the byte budget');
     return bytes.subarray(0,count);
   }catch(error){bytes?.fill(0);throw error;}finally{fs.closeSync(fd);}
@@ -47,13 +47,13 @@ const readCredentialFile = file => { const bytes=readSecretBytes(file); try{retu
 
 /** Parse a dotenv file (KEY=VALUE lines, # comments, optional export/quotes). An absent file is {}. */
 export function readDotenv(file){
-  let text='';try{text=readCredentialFile(file);}catch(error){if(error?.code==='ENOENT')return {};throw error;}
+  let text='';try{text=readCredentialFile(file);}catch(error){if(error?.code==='ENOENT'){return {};}throw error;}
   const out={};
   for(const line of text.split(/\r?\n/)){
-    const m=line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    const m=/^\s*(?:export\s+)?([A-Za-z_]\w*)\s*=\s*([^\r\n\u2028\u2029]*)\s*$/.exec(line);
     if(!m)continue;
-    let value=m[2];
-    if(value.length>=2&&(value[0]==='"'||value[0]==="'")&&value.at(-1)===value[0])value=value.slice(1,-1);
+    let value=m[2].trimEnd();
+    if(value.length>=2&&(value.startsWith('"')||value.startsWith("'"))&&value.at(-1)===value[0])value=value.slice(1,-1);
     out[m[1]]=value;
   }
   return out;
@@ -84,7 +84,7 @@ export function secretEnv(verifiedRuntimeRoot,env=process.env){
   if(!root.isDirectory()||root.isSymbolicLink())throw new Error('secretEnv runtime root must be a regular directory');
   const file=path.join(verifiedRuntimeRoot,SECRET_ENV_FILE);
   let stat;
-  try{stat=fs.lstatSync(file);}catch(error){if(error?.code==='ENOENT')return {...env};throw error;}
+  try{stat=fs.lstatSync(file);}catch(error){if(error?.code==='ENOENT'){return {...env};}throw error;}
   if(!stat.isFile()||stat.isSymbolicLink())throw new Error('secret.env must be a regular file');
   const local = readDotenv(file);
   const resolved = {...local,...env};
@@ -92,39 +92,40 @@ export function secretEnv(verifiedRuntimeRoot,env=process.env){
   return resolved;
 }
 
+const sopsRefuse=(reason,message)=>{
+  const error=new Error(`SOPS identity [${reason}]: ${message}`);
+  error.name='SopsIdentityRefusal';error.identityRefusal=reason;
+  return {mode:'refused',env:null,error};
+};
+const sopsInlineIdentity=(env,name)=>{
+  if(!credentialPresent(env[name]))return sopsRefuse('disabled-inline','SOPS_AGE_KEY is explicitly empty or invalid');
+  remember(env[name].trim());
+  return {...sopsRefuse('inline-context-unqualified','the supplied SOPS_AGE_KEY awaits an owned selected-identity isolation capability; no SOPS process was launched'),inlineName:name};
+};
+const sopsFileIdentity=(env,file)=>{
+  if(!credentialPresent(file))return sopsRefuse('invalid-file','the original identity file selection is empty or invalid');
+  if(!path.isAbsolute(file))return sopsRefuse('identity-file-location-unqualified','select the original identity by its absolute path; caller and SOPS working directories may differ');
+  try{
+    const stat=fs.lstatSync(file);
+    if(!stat.isFile()||stat.isSymbolicLink())return sopsRefuse('identity-file-unavailable','the explicitly selected original identity must be a regular non-symlink file');
+  }catch{return sopsRefuse('identity-file-unavailable','the explicitly selected original identity file is unavailable');}
+  return {mode:'file',env:{...env,SOPS_AGE_KEY_FILE:file},error:null};
+};
 /** Select a supplied age identity without inventing custody or running a key tool. Inline execution awaits its owned isolation capability. */
 export function sopsIdentityEnv(env,{identity=null,required=false,platform=process.platform}={}){
-  const refuse=(reason,message)=>{
-    const error=new Error(`SOPS identity [${reason}]: ${message}`);
-    error.name='SopsIdentityRefusal';error.identityRefusal=reason;
-    return {mode:'refused',env:null,error};
-  };
-  if(!env||typeof env!=='object'||Array.isArray(env))return refuse('invalid-environment','an environment mapping is required');
+  if(!env||typeof env!=='object'||Array.isArray(env))return sopsRefuse('invalid-environment','an environment mapping is required');
   const names=name=>Object.keys(env).filter(key=>platform==='win32'?key.toUpperCase()===name:key===name);
   const inline=names('SOPS_AGE_KEY'),files=names('SOPS_AGE_KEY_FILE');
-  if(inline.length>1||files.length>1)return refuse('ambiguous-environment','multiple Windows aliases select an age identity');
-  if(inline.length){
-    const name=inline[0];
-    if(!credentialPresent(env[name]))return refuse('disabled-inline','SOPS_AGE_KEY is explicitly empty or invalid');
-    remember(env[name].trim());
-    return {...refuse('inline-context-unqualified','the supplied SOPS_AGE_KEY awaits an owned selected-identity isolation capability; no SOPS process was launched'),inlineName:name};
-  }
+  if(inline.length>1||files.length>1)return sopsRefuse('ambiguous-environment','multiple Windows aliases select an age identity');
+  if(inline.length)return sopsInlineIdentity(env,inline[0]);
   let file=identity;
   if(files.length){
     const value=env[files[0]];
-    if(!credentialPresent(value))return refuse('disabled-file','SOPS_AGE_KEY_FILE is explicitly empty or invalid');
-    if(identity!==null&&identity!==undefined&&identity!==value)return refuse('conflicting-files','two different original identity files were explicitly selected');
+    if(!credentialPresent(value))return sopsRefuse('disabled-file','SOPS_AGE_KEY_FILE is explicitly empty or invalid');
+    if(identity!==null&&identity!==undefined&&identity!==value)return sopsRefuse('conflicting-files','two different original identity files were explicitly selected');
     file=value;
   }
-  if(file!==null&&file!==undefined){
-    if(!credentialPresent(file))return refuse('invalid-file','the original identity file selection is empty or invalid');
-    if(!path.isAbsolute(file))return refuse('identity-file-location-unqualified','select the original identity by its absolute path; caller and SOPS working directories may differ');
-    try{
-      const stat=fs.lstatSync(file);
-      if(!stat.isFile()||stat.isSymbolicLink())return refuse('identity-file-unavailable','the explicitly selected original identity must be a regular non-symlink file');
-    }catch{return refuse('identity-file-unavailable','the explicitly selected original identity file is unavailable');}
-    return {mode:'file',env:{...env,SOPS_AGE_KEY_FILE:file},error:null};
-  }
-  if(required)return refuse('identity-not-supplied','supply SOPS_AGE_KEY locally or select the original SOPS_AGE_KEY_FILE; no home default was inferred');
+  if(file!==null&&file!==undefined)return sopsFileIdentity(env,file);
+  if(required)return sopsRefuse('identity-not-supplied','supply SOPS_AGE_KEY locally or select the original SOPS_AGE_KEY_FILE; no home default was inferred');
   return {mode:'public-recipient',env:{...env},error:null};
 }

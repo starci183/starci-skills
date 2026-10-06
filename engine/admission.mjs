@@ -22,7 +22,7 @@ export const isGlobSegment=part=>GLOB_META.test(String(part??''))&&!isAppRouterS
  * would also match a sibling `src/app/i`; `:(literal)` pins it to the named directory. Admission
  * refuses a glob, so every owned path is literal.
  */
-export const ownedPathspec=spec=>`:(literal)${String(spec??'').replace(/\\/g,'/')||'.'}`;
+export const ownedPathspec=spec=>`:(literal)${String(spec??'').replaceAll('\\','/')||'.'}`;
 
 const plainPath=value=>typeof value==='string'?value:value?.path;
 
@@ -35,17 +35,17 @@ const plainPath=value=>typeof value==='string'?value:value?.path;
  * `(group)`, `@slot`, `(.)photo`) is a literal directory name and is admitted as one.
  */
 export function normalizeOwnedPath(value){
-  let input=String(plainPath(value)??'').trim().replace(/\\/g,'/');
+  let input=String(plainPath(value)??'').trim().replaceAll('\\','/');
   input=input.replace(/\/\*\*\/$/,'').replace(/\/\*\*$/,'');
-  if(!input||input.startsWith('/')||/^[A-Za-z]:\//.test(input))throw Error(`owned path must be repository-relative: ${JSON.stringify(plainPath(value)??value)}`);
+  if(!input||input.startsWith('/')||/^[A-Za-z]:\//.test(input))throw new Error(`owned path must be repository-relative: ${JSON.stringify(plainPath(value)??value)}`);
   const parts=[];
   for(const part of input.split('/')){
     if(!part||part==='.')continue;
-    if(part==='..')throw Error(`owned path must not traverse its repository: ${JSON.stringify(plainPath(value)??value)}`);
-    if(isGlobSegment(part))throw Error(`owned path must be a concrete prefix, not a glob: ${JSON.stringify(plainPath(value)??value)}`);
+    if(part==='..')throw new Error(`owned path must not traverse its repository: ${JSON.stringify(plainPath(value)??value)}`);
+    if(isGlobSegment(part))throw new Error(`owned path must be a concrete prefix, not a glob: ${JSON.stringify(plainPath(value)??value)}`);
     parts.push(part);
   }
-  if(!parts.length)throw Error(`owned path must name a concrete repository-relative prefix: ${JSON.stringify(plainPath(value)??value)}`);
+  if(!parts.length)throw new Error(`owned path must name a concrete repository-relative prefix: ${JSON.stringify(plainPath(value)??value)}`);
   return parts.join('/');
 }
 
@@ -159,7 +159,7 @@ export function admitOpSlot({running=0,maxOps=null,maxParallelOps=null}={}){
 
 /** Count this workflow's durable held slots and judge the same declared ceiling at preflight and reservation. */
 export function workflowOpSlots(db,workflowId,{excludeJobId=null,holdingStatuses,maxOps=null,maxParallelOps=null}={}){
-  if(!Array.isArray(holdingStatuses)||!holdingStatuses.length)throw Error('workflowOpSlots requires canonical held statuses');
+  if(!Array.isArray(holdingStatuses)||!holdingStatuses.length)throw new Error('workflowOpSlots requires canonical held statuses');
   const running=db.prepare(`SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND job_id<>?
     AND status IN (${holdingStatuses.map(()=>'?').join(',')})`).get(workflowId,excludeJobId??'',...holdingStatuses).n;
   return admitOpSlot({running,maxOps,maxParallelOps});
@@ -196,6 +196,13 @@ export const spentTries=tries=>tries.filter(job=>job.status!==AWAITING_OWNER_STA
 // is a new durable attempt that continues the partial tree and spends no business retry.
 export const RETRY_CLASS_ENVIRONMENT='environment';
 
+const classifyRetry=({noEffect,ownerAnswer,peerBlocked,environment})=>{
+  if(noEffect)return 'infrastructure';
+  if(ownerAnswer)return 'owner-answer';
+  if(peerBlocked)return 'peer-blocked';
+  if(environment)return RETRY_CLASS_ENVIRONMENT;
+  return 'business';
+};
 /**
  * Classify a settled attempt for retry accounting. Infrastructure is free only when the durable result
  * explicitly proves `effectState: none`; unknown or partial effects consume the ordinary business budget.
@@ -213,7 +220,7 @@ export function retryDisposition(job){
   const peerBlocked=!noEffect&&!ownerAnswer&&result.verdict!=='pass'&&Boolean(result.peerBlocked&&typeof result.peerBlocked==='object');
   const environment=!noEffect&&!ownerAnswer&&!peerBlocked&&result.retryClass===RETRY_CLASS_ENVIRONMENT&&result.attemptConsumed===false;
   return {
-    retryClass:noEffect?'infrastructure':ownerAnswer?'owner-answer':peerBlocked?'peer-blocked':environment?RETRY_CLASS_ENVIRONMENT:'business',
+    retryClass:classifyRetry({noEffect,ownerAnswer,peerBlocked,environment}),
     effectState:result.effectState??'unknown',
     resumable:noEffect,
     consumesBusinessRetry:!noEffect&&!ownerAnswer&&!peerBlocked&&!environment,
@@ -241,7 +248,7 @@ export function retiredBeforeDispatch(job){
 /** The cut slice a job row carries, or null: {id, ordinal} identify one bounded SAME-op slice. */
 export function cutOf(job){
   const cut=payloadOf(job).cut;
-  return cut&&cut.id!=null&&cut.ordinal!=null?{id:String(cut.id),ordinal:Number(cut.ordinal),total:Number(cut.total)}:null;
+  return cut?.id!=null&&cut?.ordinal!=null?{id:String(cut.id),ordinal:Number(cut.ordinal),total:Number(cut.total)}:null;
 }
 
 
@@ -251,7 +258,12 @@ export function cutOf(job){
 export const UNIT_TRY_BUDGET=5;
 const shortDigest=value=>createHash('sha256').update(value).digest('hex').slice(0,16);
 const lineagePaths=list=>(Array.isArray(list)?list:[]).map(item=>typeof item==='string'?item:item?.path).filter(p=>typeof p==='string'&&p.trim());
-const normList=list=>[...new Set(lineagePaths(list).map(p=>p.replace(/\\/g,'/').replace(/\/\*\*$/,'').replace(/\/+$/,'')))].sort(byCodeUnit);
+const normPath=p=>{
+  let s=p.replaceAll('\\','/').replace(/\/\*\*$/,'');
+  while(s.endsWith('/'))s=s.slice(0,-1);
+  return s;
+};
+const normList=list=>[...new Set(lineagePaths(list).map(normPath))].sort(byCodeUnit);
 
 /**
  * The work identity of a job (DBTREE work_units.subject_key): a cut slice is `cut:<id>#<ordinal>`, an op about one
@@ -271,12 +283,15 @@ export function unitSubjectKey({cut=null,params=null,records=[],ownedPaths=[]}={
 /** Two jobs are tries of one work unit (jobs.unit_id). */
 export const sameUnit=(a,b)=>Boolean(a?.unit_id&&a.unit_id===b?.unit_id);
 
-const OPEN_TRY=['queued','ready','leased','running','answering','reported','deciding','effect_unknown'];
+const OPEN_TRY=new Set(['queued','ready','leased','running','answering','reported','deciding','effect_unknown']);
 
 /** The jobs.retry_class of a successor of `last` (DBTREE: business | infra | resume | follow-up). */
-const retryClassOf=(last,disposition)=>last.status==='cancelled'?'resume'
-  :disposition?.retryClass==='business'?'business'
-    :disposition?.retryClass==='infrastructure'||disposition?.retryClass===RETRY_CLASS_ENVIRONMENT?'infra':'follow-up';
+const retryClassOf=(last,disposition)=>{
+  if(last.status==='cancelled')return 'resume';
+  if(disposition?.retryClass==='business')return 'business';
+  if(disposition?.retryClass==='infrastructure'||disposition?.retryClass===RETRY_CLASS_ENVIRONMENT)return 'infra';
+  return 'follow-up';
+};
 /**
  * Admit one more try of a unit (the code side of DBTREE jobs_enqueue_guard + work_units_done_guard), pure over the
  * unit's row and its tries. `tries` are the unit's jobs with {job_id, status, try_no, result_json?} (result_json the
@@ -287,6 +302,10 @@ const retryClassOf=(last,disposition)=>last.status==='cancelled'?'resume'
  *   retry-lineage-invalid      retryOf is not the unit's latest try, or that try did not fail (H4)
  *   unit-try-budget-exhausted  try_no would pass work_units.try_budget; only the owner or the Supervisor raises it (H3)
  */
+const refuseDoneUnit=(unit,last,reopen)=>{
+  if(reopen?.reason&&reopen?.by)return;
+  throw refuse(`unit ${unit.unit_id} already passed (${last.job_id}); running it again needs an explicit reopen with a reason (--reopen <reason>)`,'unit-already-passed',{passed:last.job_id});
+};
 export function admitUnitTry({unit=null,tries=[],retryOf=null,reopen=null}={}){
   const ordered=[...tries].sort((a,b)=>Number(a.try_no)-Number(b.try_no));
   const last=ordered.at(-1)??null;
@@ -294,11 +313,14 @@ export function admitUnitTry({unit=null,tries=[],retryOf=null,reopen=null}={}){
     if(retryOf)throw refuse(`--retry-of ${retryOf} names no earlier try of this unit`,'retry-lineage-invalid');
     return {tryNo:1,retryOf:null,resumeOf:null,retryClass:null,reopen:null};
   }
-  const open=ordered.filter(job=>OPEN_TRY.includes(job.status));
-  if(open.length)throw refuse(`unit ${unit.unit_id} already has an open try ${open.map(j=>`${j.job_id} (${j.status})`).join(', ')}: edit that try (starci kernel graph-edit widen|params) or let it settle`,'unit-in-flight',{open:open.map(j=>j.job_id)});
+  const open=ordered.filter(job=>OPEN_TRY.has(job.status));
+  if(open.length){
+    const openList=open.map(j=>`${j.job_id} (${j.status})`).join(', ');
+    throw refuse(`unit ${unit.unit_id} already has an open try ${openList}: edit that try (starci kernel graph-edit widen|params) or let it settle`,'unit-in-flight',{open:open.map(j=>j.job_id)});
+  }
   if(retryOf&&retryOf!==last.job_id)throw refuse(`--retry-of ${retryOf} is not the latest try of unit ${unit.unit_id} (${last.job_id} is): a retry follows the unit's latest failed try`,'retry-lineage-invalid',{latest:last.job_id});
   const done=unit.state==='done'||last.status==='succeeded';
-  if(done&&!(reopen?.reason&&reopen?.by))throw refuse(`unit ${unit.unit_id} already passed (${last.job_id}); running it again needs an explicit reopen with a reason (--reopen <reason>)`,'unit-already-passed',{passed:last.job_id});
+  if(done)refuseDoneUnit(unit,last,reopen);
   if(retryOf&&!done&&!RETRYABLE_JOB_STATUSES.includes(last.status))throw refuse(`--retry-of ${retryOf} is ${last.status}: a retry follows a FAILED or awaiting_owner try of the same unit`,'retry-lineage-invalid');
   const tryNo=Number(last.try_no)+1;
   if(tryNo-(ordered.length-spentTries(ordered))>Number(unit.try_budget))throw refuse(`unit ${unit.unit_id} spent ${spentTries(ordered)} of its ${unit.try_budget} tries: the owner or the Supervisor decides (starci kernel unit --raise-budget), never another try`,'unit-try-budget-exhausted',{tries:Number(last.try_no),budget:Number(unit.try_budget)});

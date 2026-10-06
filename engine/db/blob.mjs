@@ -165,7 +165,7 @@ export function statBlob(sha, { root = null } = {}) {
   const { size } = fs.statSync(file);
   const metadata = JSON.parse(fs.readFileSync(metadataPath(sha, root), 'utf8'));
   if (metadata.size !== size) throw new Error(`blob sidecar size mismatch: ${sha}`);
-  if(typeof metadata.mediaType!=='string'||!metadata.mediaType.trim()||!Number.isFinite(Date.parse(metadata.createdAt)))throw Error(`blob sidecar metadata invalid: ${sha}`);
+  if(typeof metadata.mediaType!=='string'||!metadata.mediaType.trim()||!Number.isFinite(Date.parse(metadata.createdAt)))throw new Error(`blob sidecar metadata invalid: ${sha}`);
   return { sha, size, mediaType: metadata.mediaType, createdAt: metadata.createdAt };
 }
 
@@ -183,7 +183,7 @@ function canonical(value) {
 const BUNDLE_SCHEMA = 'starci/blob-bundle@1';
 // Read-only views (files with an extension, materialized bundles) live beside the store, e.g. <runtime root>/.runtime/artifacts-views.
 const viewRoot = (root = null) => `${root === null ? artifactRoot() : path.resolve(root)}-views`;
-const slash = (p) => String(p).replace(/\\/g, '/');
+const slash = (p) => String(p).replaceAll('\\', '/');
 
 /** The sha256 a citation names: {sha256}, 'blob:<sha>' or a bare sha; an {artifact} alone needs `db`. */
 function shaOfRef(ref, { db = null } = {}) {
@@ -319,6 +319,20 @@ function dropStaging(staging, written) {
   for (const dir of [...dirs].sort((a, b) => b.length - a.length)) if (fs.existsSync(dir)) fs.rmdirSync(dir);
 }
 
+/** Write one bundle member set into `staging` (unsafe rel paths refuse); `written` collects every path for dropStaging. */
+function writeBundleStaging(staging, members, sha, written) {
+  for (const [rel, bytes] of members) {
+    const to = path.resolve(staging, ...rel.split('/'));
+    const relative = path.relative(staging, to);
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) throw new Error(`unsafe blob bundle target: ${rel}`);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    written.push(to);
+    fs.writeFileSync(to, bytes, { flag: 'wx' });
+  }
+  written.push(path.join(staging, '.complete'));
+  fs.writeFileSync(written.at(-1), sha, { flag: 'wx' });
+}
+
 /** The bundle as a directory beside the store (cached by sha), or null when it or one file is missing. */
 export function bundleDir(ref, { db = null, root = null } = {}) {
   const sha = shaOfRef(ref, { db });
@@ -328,7 +342,7 @@ export function bundleDir(ref, { db = null, root = null } = {}) {
   const members = [];
   for (const [rel, fileSha] of entries) {
     try { members.push([rel, getBlob(fileSha, { root })]); }
-    catch (error) { if (error?.code === 'ENOENT') return null; throw error; }
+    catch (error) { if (error?.code === 'ENOENT') { return null; } throw error; }
   }
   const dir = path.join(viewRoot(root), 'bundles', sha), opts = { strict: root !== null, base: path.dirname(viewRoot(root)) };
   if (verifiedBundle(dir, entries, opts)) return dir;
@@ -338,16 +352,7 @@ export function bundleDir(ref, { db = null, root = null } = {}) {
   const staging = fs.mkdtempSync(path.join(path.dirname(dir), `.${sha}-`));
   const written = [];
   try {
-    for (const [rel, bytes] of members) {
-      const to = path.resolve(staging, ...rel.split('/'));
-      const relative = path.relative(staging, to);
-      if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) throw new Error(`unsafe blob bundle target: ${rel}`);
-      fs.mkdirSync(path.dirname(to), { recursive: true });
-      written.push(to);
-      fs.writeFileSync(to, bytes, { flag: 'wx' });
-    }
-    written.push(path.join(staging, '.complete'));
-    fs.writeFileSync(written.at(-1), sha, { flag: 'wx' });
+    writeBundleStaging(staging, members, sha, written);
     try { fs.renameSync(staging, dir); }
     catch (error) { if (!fs.existsSync(dir) || !verifiedBundle(dir, entries, opts)) throw error; }
   } finally {
