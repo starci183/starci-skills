@@ -25,6 +25,7 @@ export function unresolvedPlaceholders(text) {
 export function goalTextRefusal(text) {
   const found = unresolvedPlaceholders(text);
   if (!found.length) return null;
-  return `goal-text-unresolved: the goal text carries an unrendered value (${found.map((f) => `line ${f.line}: ${f.value}`).join('; ')}) - `
+  const foundText = found.map((f) => `line ${f.line}: ${f.value}`).join('; ');
+  return `goal-text-unresolved: the goal text carries an unrendered value (${foundText}) - `
     + 'a restart or carried goal must embed the predecessor goal\'s own markdown (goals.markdown of its newest revision), never a missing field';
 }
