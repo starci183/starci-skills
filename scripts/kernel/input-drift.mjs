@@ -67,14 +67,14 @@ const workChangeOf = (row, entry, cut, workDigest, attributed) => {
   const current = workDigest(entry.path);
   if (current === base.digest) return null;
   const fileMap = workDigest.files(entry.path);
-  const then = base.files && typeof base.files === 'object' ? base.files : null;
-  const changedFiles = then
-    ? [...new Set([...Object.keys(then), ...Object.keys(fileMap)])].filter((file) => (fileMap[file]?.slice(0, 16) ?? null) !== (then[file] ?? null)).toSorted(byCodeUnit)
+  const recordedFiles = base.files && typeof base.files === 'object' ? base.files : null;
+  const changedFiles = recordedFiles
+    ? [...new Set([...Object.keys(recordedFiles), ...Object.keys(fileMap)])].filter((file) => (fileMap[file]?.slice(0, 16) ?? null) !== (recordedFiles[file] ?? null)).toSorted(byCodeUnit)
     : [entry.path];
   const at = Number(base.at) || 0;
   const unexplained = changedFiles.filter((file) => !attributed(file, row.job_id, at));
   if (!unexplained.length) return null;
-  return { row, cut, entry, base, thenFiles: then, at, current, unexplained };
+  return { row, cut, entry, base, thenFiles: recordedFiles, at, current, unexplained };
 };
 
 const measureCandidateInputs = ({ row, newest, groupOf, db, digest, workDigest, attributed }) => {
@@ -100,8 +100,8 @@ const measureCandidateInputs = ({ row, newest, groupOf, db, digest, workDigest, 
   return { sourceDrift, workChanged };
 };
 
-const workFileDisposition = ({ file, then, at, base, workflowId, heads, ownerOf, peerWritersOf, textOf, declarationsOf }) => {
-  if (heads && committedMatches(heads.get(file) ?? null, then[file] ?? null)) return null;
+const workFileDisposition = ({ file, recordedFiles, at, base, workflowId, heads, ownerOf, peerWritersOf, textOf, declarationsOf }) => {
+  if (heads && committedMatches(heads.get(file) ?? null, recordedFiles[file] ?? null)) return null;
   const owner = ownerOf(file);
   const writersAfter = peerWritersOf(file, at);
   const note = changeNoteOf(textOf(file));
@@ -111,7 +111,7 @@ const workFileDisposition = ({ file, then, at, base, workflowId, heads, ownerOf,
     const declared = ownerDeclarationFor(declarationsOf(), file, { owner: owner.workflowId, after: at });
     const noteBreaking = note?.kind === 'breaking' && (readRev != null ? note.rev != null && note.rev > readRev : Number.isFinite(note.at) && note.at > at);
     const byNonOwner = writersAfter.length > 0 && !writersAfter.includes(owner.workflowId);
-    const alreadyRead = declared?.digests?.[file] != null && declared.digests[file] === then[file];
+    const alreadyRead = declared?.digests?.[file] != null && declared.digests[file] === recordedFiles[file];
     const noteWaived = declared?.reach === 'advisory' && (declared.rev == null || note?.rev == null || note.rev <= declared.rev);
     if (declared?.reach === 'follow-up' && !alreadyRead)
       return { breaking: { file, owner: owner.workflowId, via: 'declaration', ...(declared.rev != null ? { rev: declared.rev } : {}), reason: declared.reason, at: declared.at } };
@@ -140,16 +140,16 @@ const classifyWorkChanges = ({ workChanged, db, repo, workDir, workflowId, owner
     try { return fs.readFileSync(path.join(repo, workDir, file.slice(WORK_PREFIX.length)), 'utf8'); } catch { return null; }
   };
   for (const change of workChanged) {
-    const { row, cut, entry, base, thenFiles: then, at, current, unexplained } = change;
+    const { row, cut, entry, base, thenFiles: recordedFiles, at, current, unexplained } = change;
     const item = { jobId: row.job_id, op: row.op_id, attempt: row.attempt, ...(cut ? { cut } : {}), path: entry.path, kind: 'work' };
-    if (!then) {
+    if (!recordedFiles) {
       const held = heldBy(row.op_id, cut);
       stale.push({ ...item, recorded: base.digest, current, changed: unexplained.slice(0, 10), ...(held ? { heldBy: held } : {}) });
       continue;
     }
     const owed = [], breaking = [], drift = [];
     for (const file of unexplained) {
-      const disposition = workFileDisposition({ file, then, at, base, workflowId, heads, ownerOf, peerWritersOf, textOf, declarationsOf });
+      const disposition = workFileDisposition({ file, recordedFiles, at, base, workflowId, heads, ownerOf, peerWritersOf, textOf, declarationsOf });
       if (disposition?.owed) owed.push(disposition.owed);
       if (disposition?.breaking) breaking.push(disposition.breaking);
       if (disposition?.drift) drift.push(disposition.drift);
