@@ -21,6 +21,22 @@ const BOUND_ROLES = Object.freeze(['op', 'lead', 'supervisor', 'coordinator']);
 const finding = (code, file, message) => ({ code, level: 'error', path: file, message: `${code} ${file}: ${message}` });
 const parse = (text) => { try { const value = parseYaml(text); return value && typeof value === 'object' ? value : null; } catch { return null; } };
 
+function entryFindings(where, entry, bad) {
+  const found = [];
+  if (typeof entry?.use !== 'string' || !entry.use.trim()) found.push(bad(`${where} names no \`use\`: a refusal must send the agent to a starci verb`));
+  if (entry?.code !== undefined && !R223_CODES.includes(entry.code)) found.push(bad(`${where} names ${entry.code}, which is not a code of rule R223`));
+  return found;
+}
+
+function policyEntryFindings(policy, bad) {
+  const found = [];
+  for (const section of [policy.git?.deny, policy.npm?.deny]) {
+    for (const [name, entry] of Object.entries(section ?? {})) found.push(...entryFindings(`${name}`, entry, bad));
+  }
+  for (const [name, entry] of Object.entries(policy['raw-tools'] ?? {})) found.push(...entryFindings(`raw tool ${name}`, entry, bad));
+  return found;
+}
+
 /** R223 findings of one parsed command policy. */
 export function policyFindings({ file = POLICY_FILE, policy }) {
   const bad = (message) => finding('RIGHTS_ROLE_DENIED', file, message);
@@ -29,12 +45,7 @@ export function policyFindings({ file = POLICY_FILE, policy }) {
   const bound = policy.roles?.bound;
   if (!Array.isArray(bound) || !bound.length || bound.some((r) => !BOUND_ROLES.includes(r))) found.push(bad(`roles.bound must list roles of ${BOUND_ROLES.join(', ')}`));
   if (!Array.isArray(policy.runtime) || !policy.runtime.includes('starci')) found.push(bad('runtime must list the starci program: the runtime verbs are the allowed path'));
-  const check = (where, entry) => {
-    if (typeof entry?.use !== 'string' || !entry.use.trim()) found.push(bad(`${where} names no \`use\`: a refusal must send the agent to a starci verb`));
-    if (entry?.code !== undefined && !R223_CODES.includes(entry.code)) found.push(bad(`${where} names ${entry.code}, which is not a code of rule R223`));
-  };
-  for (const section of [policy.git?.deny, policy.npm?.deny]) for (const [name, entry] of Object.entries(section ?? {})) check(`${name}`, entry);
-  for (const [name, entry] of Object.entries(policy['raw-tools'] ?? {})) check(`raw tool ${name}`, entry);
+  found.push(...policyEntryFindings(policy, bad));
   return found;
 }
 
