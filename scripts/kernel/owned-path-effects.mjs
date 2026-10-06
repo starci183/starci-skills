@@ -107,28 +107,36 @@ export function ownedPathEffects({ base, ownedPaths = [], placements, sinceMs })
   const since = new Date(Number.isFinite(sinceMs) ? sinceMs : 0).toISOString();
   const dirty = [], commits = [], checked = [], preexisting = [];
   for (const [root, { specs, role }] of repos) {
-    const label = repos.size > 1 ? `${root}:` : '';
-    const d = dirtyOf(root, specs, timeoutMs, label);
-    if (d.error) return { provable: false, why: 'git-status', repo: root, error: d.error };
-    const shas = new Set();
-    for (const batch of specBatches(specs)) {
-      const log = git(gitLog, root, ['--all', `--since=${since}`, '--format=%H', '--', ...batch.map(ownedPathspec)], timeoutMs);
-      if (!log.ok) return { provable: false, why: 'git-log', repo: root, error: log.error };
-      for (const sha of log.stdout.split('\n').map((line) => line.trim()).filter(Boolean)) shas.add(sha);
-    }
-    // A dirty file last written before the attempt's dispatch (PREEXISTING_SLACK_MS) is debris the
-    // attempt found, not its effect: a product's modules-agentos brand.decide a1 never launched (launch-abandoned)
-    // yet settled "partial" on brand-check files written 2026-09-21. A deleted file has no mtime and stays.
-    const own = [], found = [];
-    for (const file of d.dirty) {
-      let mtime = null;
-      try { mtime = fs.statSync(path.join(root, file.slice(label.length))).mtimeMs; } catch { /* deleted or unreadable: evidence */ }
-      (Number.isFinite(sinceMs) && mtime != null && mtime < sinceMs - PREEXISTING_SLACK_MS ? found : own).push(file);
-    }
-    dirty.push(...own);
-    preexisting.push(...found);
-    commits.push(...shas);
-    checked.push({ repo: root, role, paths: specs, dirty: own, commits: [...shas], ...(found.length ? { preexisting: found.length } : {}) });
+    const r = repoEffects({ root, specs, role, repos, since, sinceMs, timeoutMs });
+    if (r.error) return { provable: false, why: r.error, repo: root, error: r.detail };
+    dirty.push(...r.own);
+    preexisting.push(...r.found);
+    commits.push(...r.shas);
+    checked.push(r.checked);
   }
   return { provable: true, clean: !dirty.length && !commits.length, since, repos: checked, dirty, commits, preexisting };
 }
+
+/** One checkout's owned-path evidence: dirty rows split from preexisting debris, commits and the checked record. */
+const repoEffects = ({ root, specs, role, repos, since, sinceMs, timeoutMs }) => {
+  const label = repos.size > 1 ? `${root}:` : '';
+  const d = dirtyOf(root, specs, timeoutMs, label);
+  if (d.error) return { error: 'git-status', repo: root, detail: d.error };
+  const shas = new Set();
+  for (const batch of specBatches(specs)) {
+    const log = git(gitLog, root, ['--all', `--since=${since}`, '--format=%H', '--', ...batch.map(ownedPathspec)], timeoutMs);
+    if (!log.ok) return { error: 'git-log', repo: root, detail: log.error };
+    for (const sha of log.stdout.split('\n').map((line) => line.trim()).filter(Boolean)) shas.add(sha);
+  }
+  // A dirty file last written before the attempt's dispatch (PREEXISTING_SLACK_MS) is debris the
+  // attempt found, not its effect: a product's modules-agentos brand.decide a1 never launched (launch-abandoned)
+  // yet settled "partial" on brand-check files written 2026-09-21. A deleted file has no mtime and stays.
+  const own = [], found = [];
+  for (const file of d.dirty) {
+    let mtime = null;
+    try { mtime = fs.statSync(path.join(root, file.slice(label.length))).mtimeMs; } catch { /* deleted or unreadable: evidence */ }
+    (Number.isFinite(sinceMs) && mtime != null && mtime < sinceMs - PREEXISTING_SLACK_MS ? found : own).push(file);
+  }
+  return { own, found, shas,
+    checked: { repo: root, role, paths: specs, dirty: own, commits: [...shas], ...(found.length ? { preexisting: found.length } : {}) } };
+};

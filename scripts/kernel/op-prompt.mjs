@@ -85,6 +85,18 @@ export function ownedPathsLine({ paths, repo = null, workflowId = null, jobId = 
 // and render as the <job-id>/<target-repo> placeholders a real dispatch would substitute.
 // contextPack: a resolved scripts/context/pack.mjs context; when given, the mandatory-reads block
 // enumerates its resolved file list instead of the fixed load order.
+/** One environment services row: `env/service state url[(status)][ - discovered X][ - action]`. */
+const serviceLine = (s) => `  - ${s.env}/${s.service} ${s.state} ${s.url}${s.status != null ? ' (' + s.status + ')' : ''}${s.discovered ? ' - discovered ' + s.discovered : ''}${s.action ? ' - ' + s.action : ''}`;
+
+/** The env-health block: what the runtime found, how to bring a service up, and the blocked-not-failed rule. */
+const environmentLines = (environment, repoLabel) => [
+  `environment: the runtime checked the stack this walk runs on before dispatch (scripts/uat/env-health.mjs) - ${environment.ready ? 'READY' : 'NOT READY'} at ${environment.checkedAt}:`,
+  ...environment.services.map(serviceLine),
+  ...(environment.remedies ?? []).map((r) => `  remedy: ${r}`),
+  `  Bring a down service up ONLY through: starci gate env-health serve --repo ${repoLabel} --env <id> --service <name> --cwd <checkout> [--url <probe>] -- <start command> (it registers the server so the next pre-step restarts it itself), then re-run starci gate env-health check and put its result in report.checks as name "env-health" with its exit code (0 ready, 3 not ready).`,
+  `  If the stack is still not ready, file outcome blocked with blocker kind environment - never failed: a walk on a dead stack proves nothing about the product. A probe-drift row is a stale declaration, not a failure.`,
+];
+
 /** The Kernel's local override of this op for this workflow (starci kernel op-override / graph-edit / redesign): additive only. */
 function kernelOverrideLines(o) {
   if (!o || typeof o !== 'object') return [];
@@ -121,13 +133,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
     `  starci kernel report refuses such an ask (ask-already-answered). Ask only a genuinely new question the answer left open:`,
     ...packet.context.owner_answers.map(ownerAnswerLine),
   ] : []),
-  ...(packet.context.environment ? [
-    `environment: the runtime checked the stack this walk runs on before dispatch (scripts/uat/env-health.mjs) - ${packet.context.environment.ready ? 'READY' : 'NOT READY'} at ${packet.context.environment.checkedAt}:`,
-    ...packet.context.environment.services.map((s) => `  - ${s.env}/${s.service} ${s.state} ${s.url}${s.status != null ? ` (${s.status})` : ''}${s.discovered ? ` - discovered ${s.discovered}` : ''}${s.action ? ` - ${s.action}` : ''}`),
-    ...(packet.context.environment.remedies ?? []).map((r) => `  remedy: ${r}`),
-    `  Bring a down service up ONLY through: starci gate env-health serve --repo ${repo ?? '<target-repo>'} --env <id> --service <name> --cwd <checkout> [--url <probe>] -- <start command> (it registers the server so the next pre-step restarts it itself), then re-run starci gate env-health check and put its result in report.checks as name "env-health" with its exit code (0 ready, 3 not ready).`,
-    `  If the stack is still not ready, file outcome blocked with blocker kind environment - never failed: a walk on a dead stack proves nothing about the product. A probe-drift row is a stale declaration, not a failure.`,
-  ] : []),
+  ...(packet.context.environment ? environmentLines(packet.context.environment, repoLabel) : []),
   ...(packet.context.repair_for ? [
     `repair_for: this job repairs what ${packet.context.repair_for.op} ${packet.context.repair_for.of} found (route ${packet.context.repair_for.route}, class ${packet.context.repair_for.class}). Its root-cause claim, evidence, counterCheck and expectedFix are packet context.repair_for.rootCause: confirm the claim against the code first (the counterCheck), fix it inside owned_paths, run the recheck the claim names if you can, and report done - ${packet.context.repair_for.op} runs again behind you.`,
   ] : []),
@@ -155,17 +161,17 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   ...(packet.context.selected_op ? [`selected_op: mode=${packet.context.selected_op.mode ?? '(single contract)'} — the immutable effective contract is packet context.selected_op.contract. Read it with starci kernel op-contract --json before acting; completionProfile, steps, reads, writes and proofs come only from it. Sibling execution modes grant no authority.`] : []),
   ...specsLines,
   ...verificationScopeLines({ settings: specs }),
-  ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')} — the resolved tunables for this dispatch; use these values, never a number you read in prose`] : []),
+  ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => k + '=' + JSON.stringify(v)).join(' ')} — the resolved tunables for this dispatch; use these values, never a number you read in prose`] : []),
   `workflow: ${packet.context.workflow?.id ?? '(unbound — packet preview)'} goal_revision=${packet.context.workflow?.goal_revision ?? '(unbound)'} goal_identity=${packet.context.workflow?.goal_identity ?? '(unbound)'}`,
   `owner_language: ${packet.context.owner_language ?? ownerLanguage()} — every string the owner reads (ask text, option and pick labels, owner-facing summaries) is written in this language in plain words; canonical records stay English`,
-  `product_locale: ${packet.context.product_locale ? `${packet.context.product_locale.locale} (${packet.context.product_locale.source})` : '(unset - no shell or brand locale)'} — every string a product user reads (UI copy, labels, sample data in prompts, message files) is written in this locale, never in owner_language; chrome, nav labels and the demo persona come from .starciwork/shell/index.yaml verbatim`,
+  `product_locale: ${packet.context.product_locale ? packet.context.product_locale.locale + ' (' + packet.context.product_locale.source + ')' : '(unset - no shell or brand locale)'} — every string a product user reads (UI copy, labels, sample data in prompts, message files) is written in this locale, never in owner_language; chrome, nav labels and the demo persona come from .starciwork/shell/index.yaml verbatim`,
   ...(packet.context.owner_delegation ? [`owner_delegation: the owner delegated ask answers to ${packet.context.owner_delegation.asks} until ${packet.context.owner_delegation.until} (config.yaml delegation); an answer receipt with answeredBy ${packet.context.owner_delegation.asks} inside that window IS the owner's answer, except for the excluded classes ${JSON.stringify(packet.context.owner_delegation.excludes)} which stay owner-only`] : []),
   `records: ${packet.context.records.join(', ') || '(none bound)'}`,
   ...renderGrammarContext(packet.context.grammar),
   ...(packet.context.cut ? [`cut: ${packet.context.cut.id} ordinal=${packet.context.cut.ordinal}/${packet.context.cut.total} — this job owns only this bounded SAME-op slice; never widen to sibling slices`] : []),
   ...seamPromptLines({ cut: packet.context.cut, jobLabel, api: path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs'), repoLabel }),
   ...cutManifestPromptLines(packet.context.cut?.manifest),
-  ...(roots.length ? [`writes_in: ${roots.map((p) => `${path.resolve(p.root)}${p.repository ? ` (repository ${p.repository})` : ''}`).join(', ')} — each owned path below is relative to your checkout ${cwd} unless it is written rooted at another checkout; edit it in the checkout that holds it`] : []),
+  ...(roots.length ? [`writes_in: ${roots.map((p) => path.resolve(p.root) + (p.repository ? ' (repository ' + p.repository + ')' : '')).join(', ')} — each owned path below is relative to your checkout ${cwd} unless it is written rooted at another checkout; edit it in the checkout that holds it`] : []),
   ownedPathsLine({ paths: [...new Set(owned.filter((p) => !p.unresolved).map((p) => renderOwnedPath(p, cwd)))], repo, workflowId: packet.context.workflow?.id ?? null, jobId, scratchDir }),
   `   only owned_paths may be modified; anything else is out of scope.`,
   `shared_checkout: other ops of this workflow edit and build in this same worktree while you run (modules/kernel/api.yaml conventions.sharedCheckout).`,
@@ -174,7 +180,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `  never create a git worktree, junction, symlink or hard link anywhere (git worktree add, mklink, New-Item -ItemType Junction/SymbolicLink, ln): work in this checkout with its own node_modules - a private worktree linked into the live repository deleted 674 live files when it was removed; report a need for another tree, never make one.`,
   `  your git and npm are the runtime guard: a refusal prints "starci guard: refused ..." and exits 3 - report the need, never work around it.`,
   ...(packet.context.goal ? [`goal: the owner's goal (revision ${packet.context.goal.revision}) is packet context.goal.statement - read it with starci kernel op-contract --json; never read the ledger for it.`] : []),
-  ...(unresolved.length ? [`unresolved_owned_paths: ${unresolved.map((p) => `${p.path} (${p.repository === 'not-app-relative' ? 'not app-relative' : `repository ${p.repository} is not bound`})`).join(', ')} — report blocked with kind authority; never guess a root`] : []),
+  ...(unresolved.length ? [`unresolved_owned_paths: ${unresolved.map((p) => p.path + ' (' + (p.repository === 'not-app-relative' ? 'not app-relative' : 'repository ' + p.repository + ' is not bound') + ')').join(', ')} — report blocked with kind authority; never guess a root`] : []),
   `constraints: lease=${packet.constraints.lease ?? '(none)'} model=${packet.constraints.model} budget=${packet.constraints.budget ?? '(unset)'}`,
   `machines: check names in your brief (layoutPolicy.checks, proofs) are executable canonical validators — run them verbatim, never invent placeholder commands (e.g. a made-up validate function):`,
   `  when any validator may exceed 25 s, launch its exact command in the background with stdout, stderr and exit status written under STARCI_JOB_SCRATCH; poll the exit-status file until it appears, then read stdout and record the actual exit code in report.checks. Keep polling across command windows rather than treating a terminal timeout as a validator result.`,

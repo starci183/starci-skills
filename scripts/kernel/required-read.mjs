@@ -24,6 +24,31 @@ const expand = (root, relative) => {
   return [relative];
 };
 
+/** The installed custody revision {rev, revision}; refuses when custody identity or any filed byte differs. */
+const installedRevision = (root, rows) => {
+  const descriptor = path.join(root,INSTALL_MANIFEST_FILE), stat = fs.lstatSync(descriptor);
+  if (!stat.isFile() || stat.isSymbolicLink()) throw refuse('installed custody descriptor is not regular');
+  const custody = JSON.parse(fs.readFileSync(descriptor,'utf8'));
+  const pkg = JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
+  if (custody.name !== pkg.name || custody.version !== pkg.version || typeof pkg.name !== 'string' || !pkg.name
+    || typeof pkg.version !== 'string' || !pkg.version || custody.installProtocol?.schema !== INSTALL_PROTOCOL_SCHEMA
+    || custody.installProtocol.engine !== ENGINE_SCHEMA || !custody.files || Array.isArray(custody.files)) throw refuse('installed package/custody identity is unavailable');
+  for (const row of rows) {
+    if (custody.files[row.path] !== installedPayloadDigest(fs.readFileSync(path.join(root,row.path))))
+      throw refuse(`required bytes differ from installation custody: ${row.path}`);
+  }
+  const revision = { kind: 'installed',package: { name: pkg.name,version: pkg.version },protocol: custody.installProtocol,
+    requiredDigest: sha256(JSON.stringify(rows)) };
+  return { rev: `installed:${revision.requiredDigest}`, revision };
+};
+
+/** The Git revision {rev, revision} of a source checkout. */
+const gitRevision = (root) => {
+  const rev = runtimeShaOf(root);
+  if (!rev) throw refuse('runtime Git revision unavailable');
+  return { rev, revision: { kind: 'git',sha: rev } };
+};
+
 /** Derive required paths from the actual workflow/op contracts; caller-supplied paths cannot remove any. */
 export function kernelReadManifest(db, workflowId, { root, authority, ops = [], clean = true, status = statusQuery } = {}) {
   try {
@@ -34,29 +59,11 @@ export function kernelReadManifest(db, workflowId, { root, authority, ops = [], 
     const rows = [...files].sort(byCodeUnit).map(relative => {
       // Validate parents too, not just a final file reached through an undeclared junction.
       const parts = relative.split('/');
-      for (let i = 1; i <= parts.length; i++) if (fs.lstatSync(path.join(root, ...parts.slice(0,i))).isSymbolicLink()) throw refuse(`linked required read: ${relative}`);
+      for (let i = 1; i <= parts.length; i++) { if (fs.lstatSync(path.join(root, ...parts.slice(0,i))).isSymbolicLink()) throw refuse(`linked required read: ${relative}`); }
       const bytes = fs.readFileSync(path.join(root, relative));
       return { path: relative, sha256: sha256(bytes), bytes: bytes.length };
     });
-    let rev, revision;
-    if (installed) {
-      const descriptor = path.join(root,INSTALL_MANIFEST_FILE), stat = fs.lstatSync(descriptor);
-      if (!stat.isFile() || stat.isSymbolicLink()) throw refuse('installed custody descriptor is not regular');
-      const custody = JSON.parse(fs.readFileSync(descriptor,'utf8'));
-      const pkg = JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
-      if (custody.name !== pkg.name || custody.version !== pkg.version || typeof pkg.name !== 'string' || !pkg.name
-        || typeof pkg.version !== 'string' || !pkg.version || custody.installProtocol?.schema !== INSTALL_PROTOCOL_SCHEMA
-        || custody.installProtocol.engine !== ENGINE_SCHEMA || !custody.files || Array.isArray(custody.files)) throw refuse('installed package/custody identity is unavailable');
-      for (const row of rows) if (custody.files[row.path] !== installedPayloadDigest(fs.readFileSync(path.join(root,row.path))))
-        throw refuse(`required bytes differ from installation custody: ${row.path}`);
-      revision = { kind: 'installed',package: { name: pkg.name,version: pkg.version },protocol: custody.installProtocol,
-        requiredDigest: sha256(JSON.stringify(rows)) };
-      rev = `installed:${revision.requiredDigest}`;
-    } else {
-      rev = runtimeShaOf(root);
-      if (!rev) throw refuse('runtime Git revision unavailable');
-      revision = { kind: 'git',sha: rev };
-    }
+    const { rev, revision } = installed ? installedRevision(root, rows) : gitRevision(root);
     if (clean && !installed) {
       const checked = status(['--porcelain=v1', '-z', '--untracked-files=all', '--', ...KERNEL_CONTRACT_FILES, ...[...files].sort(byCodeUnit)], { dir: root, timeout: 30_000 });
       if (checked?.error || checked?.signal || checked?.status !== 0) throw refuse('required read status unavailable');

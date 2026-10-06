@@ -3,6 +3,12 @@ import { startAgent } from '../agent/lib.mjs';
 import { updateSignal } from '../../engine/db/ledger.mjs';
 import { commitWorkflowStart } from './workflow-startup.mjs';
 
+/** The failure record of one refused start: the selected member, the effect and every receipt field it left. */
+const failureOf = (spawned, selected) => ({ agent: selected.provider, requestedModel: selected.model, effectState: spawned.effectState ?? 'unknown', admission: spawned.admission ?? null,
+  ...(spawned.errorCode ? { errorCode: spawned.errorCode } : undefined), ...(spawned.dispatchId ? { dispatch: spawned.dispatchId } : undefined),
+  ...(spawned.cleanup ? { cleanup: spawned.cleanup } : undefined), ...(spawned.observation ? { observation: spawned.observation } : undefined),
+  ...(spawned.trust ? { trust: spawned.trust } : undefined) });
+
 export function launchKernelGroup({ ledger, workflowId, token, expected, route, members, launch, reservationMs,
   hostUnavailableExit, memberLabel, failStart }, { start = startAgent, now = Date.now } = {}) {
   const fellThrough = [];
@@ -28,10 +34,7 @@ export function launchKernelGroup({ ledger, workflowId, token, expected, route, 
       break;
     }
     const selected = spawned.admission?.selected ?? { provider: member.agent, model: member.model };
-    const failure = { agent: selected.provider, requestedModel: selected.model, effectState: spawned.effectState ?? 'unknown', admission: spawned.admission ?? null,
-      ...(spawned.errorCode ? { errorCode: spawned.errorCode } : {}), ...(spawned.dispatchId ? { dispatch: spawned.dispatchId } : {}),
-      ...(spawned.cleanup ? { cleanup: spawned.cleanup } : {}), ...(spawned.observation ? { observation: spawned.observation } : {}),
-      ...(spawned.trust ? { trust: spawned.trust } : {}) };
+    const failure = failureOf(spawned, selected);
     // An Orca that stopped answering mid-boot proves nothing about any member: host-unavailable (exit 75), no fall-through.
     if (spawned.hostUnavailable) failStart('host-unavailable', spawned.error, spawned.terminal ?? null, { ...failure, launchStep: spawned.step }, hostUnavailableExit);
     const selectedIndex = remaining.findIndex((candidate) => candidate.agent === selected.provider && candidate.model === selected.model);
@@ -39,8 +42,8 @@ export function launchKernelGroup({ ledger, workflowId, token, expected, route, 
     const next = remaining[0] ?? null;
     if (!route.fallThrough || !next || spawned.effectState !== 'none')
       failStart(spawned.step, spawned.error, spawned.terminal ?? null,
-        { ...failure, ...(fellThrough.length ? { fellThrough } : {}),
-          ...(route.fallThrough && next ? { fallThroughRefused: `the start left effect '${spawned.effectState ?? 'unknown'}'` } : {}) });
+        { ...failure, ...(fellThrough.length ? { fellThrough } : undefined),
+          ...(route.fallThrough && next ? { fallThroughRefused: `the start left effect '${spawned.effectState ?? 'unknown'}'` } : undefined) });
     const failedAt = now();
     const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
     ledger.transaction(() => {

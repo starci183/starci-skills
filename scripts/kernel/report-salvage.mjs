@@ -31,6 +31,21 @@ function walkFiles(dir, out, budget) {
   }
 }
 
+/** One file's salvage candidate, or null when it is not this job's recent op-report@1. */
+const candidateOf = (file, { sinceMs, jobId, dispatchId }) => {
+  let mtimeMs;
+  try { mtimeMs = fs.statSync(file).mtimeMs; } catch { return null; }
+  if (Number.isFinite(sinceMs) && mtimeMs < sinceMs - SLACK_MS) return null;
+  const doc = readJsonFile(file);
+  if (doc?.schema !== 'starci/op-report@1' || typeof doc.outcome !== 'string') return null;
+  if (doc.from && jobId && doc.from !== jobId) return null;
+  if (doc.dispatch && dispatchId && doc.dispatch !== dispatchId) return null;
+  // A report named for another job (report.<otherJob>.json) is that job's.
+  const named = /^report\.(op-[A-Za-z0-9._-]+)\.json$/.exec(path.basename(file))?.[1];
+  if (named && jobId && named !== jobId) return null;
+  return { file, mtimeMs, outcome: doc.outcome };
+};
+
 /**
  * unfiledReportCandidates({scratch, sinceMs, jobId, dispatchId}) -> [{file, mtimeMs, outcome}] newest first:
  * op-report@1 files under the job's scratch modified since the dispatch, whose stamped `from`/`dispatch`, when
@@ -46,17 +61,8 @@ export function unfiledReportCandidates({ scratch = null, sinceMs = 0, jobId = n
   }
   const out = [];
   for (const file of new Set(files)) {
-    let mtimeMs;
-    try { mtimeMs = fs.statSync(file).mtimeMs; } catch { continue; }
-    if (Number.isFinite(sinceMs) && mtimeMs < sinceMs - SLACK_MS) continue;
-    const doc = readJsonFile(file);
-    if (doc?.schema !== 'starci/op-report@1' || typeof doc.outcome !== 'string') continue;
-    if (doc.from && jobId && doc.from !== jobId) continue;
-    if (doc.dispatch && dispatchId && doc.dispatch !== dispatchId) continue;
-    // A report named for another job (report.<otherJob>.json) is that job's.
-    const named = /^report\.(op-[A-Za-z0-9._-]+)\.json$/.exec(path.basename(file))?.[1];
-    if (named && jobId && named !== jobId) continue;
-    out.push({ file, mtimeMs, outcome: doc.outcome });
+    const candidate = candidateOf(file, { sinceMs, jobId, dispatchId });
+    if (candidate) out.push(candidate);
   }
   return out.sort((a, b) => b.mtimeMs - a.mtimeMs);
 }

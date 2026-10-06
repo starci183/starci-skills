@@ -91,15 +91,36 @@ function kernelRelevantOf(diff, ops, { root = revRootOf() } = {}) {
   return { files, contract: files.some((file) => underAny(file, KERNEL_CONTRACT_FILES)) };
 }
 
+/** The manifest-derive installed revision for a root that has no .git (installed tree). */
+const installedRev = (db, workflowId, { root, ack, ops }) => {
+  const authority = kernelAuthorityOf(db, workflowId, kernelCustodyOf(db, workflowId).terminal);
+  // An acknowledged upcoming op is still required before its first persisted job exists.
+  const readOps = [...new Set([...(Array.isArray(ack?.readManifest?.ops) ? ack.readManifest.ops : []), ...(ops ?? [])])];
+  return kernelReadManifest(db, workflowId, { root, authority, ops: readOps });
+};
+
+/** What the acked->current diff asks the wake for (state patch) and what the gate (opRevStale) sees. */
+const revGate = ({ root, db, workflowId, ack, current, now, ops }) => {
+  const diff = revDiff(root, ack.rev, current);
+  if (!diff.known) return { patch: { stale: true, full: true, unknownDiff: true }, gate: { stale: true, unknownDiff: true, allFiles: [] } };
+  const gate = { stale: diff.files.length > 0, unknownDiff: false, allFiles: diff.files };
+  const rel = kernelRelevantOf(diff, ops ?? workflowOpsOf(db, workflowId), { root });
+  const wants = rel.files.length > 0;
+  const coalesced = wants && !rel.contract && Number.isFinite(ack.at) && now - ack.at < REV_ACK_COALESCE_MS;
+  if (coalesced) return { patch: { deferred: { files: rel.files.slice(0, REV_DIFF_MAX_FILES), until: ack.at + REV_ACK_COALESCE_MS } }, gate };
+  const patch = {};
+  if (wants) Object.assign(patch, { stale: true, files: rel.files.slice(0, REV_DIFF_MAX_FILES), fileCount: rel.files.length,
+    ...(rel.files.length > REV_DIFF_MAX_FILES ? { full: true } : {}) });
+  if (!wants && diff.files.length) patch.silent = diff.files.length; // kernel-path files moved that are not this Kernel's contract
+  return { patch, gate };
+};
+
 export function kernelRevState(db, workflowId, { root = revRootOf(), current = currentRuntimeRev(root), now = Date.now(), ops = null } = {}) {
   const ack = latestRevAck(db, workflowId);
   let installedRead = null, readUnavailable = null;
   if (!current && !fs.existsSync(path.join(root,'.git'))) {
     try {
-      const authority = kernelAuthorityOf(db,workflowId,kernelCustodyOf(db,workflowId).terminal);
-      // An acknowledged upcoming op is still required before its first persisted job exists.
-      const readOps = [...new Set([...(Array.isArray(ack?.readManifest?.ops) ? ack.readManifest.ops : []), ...(ops ?? [])])];
-      installedRead = kernelReadManifest(db,workflowId,{ root,authority,ops: readOps });
+      installedRead = installedRev(db, workflowId, { root, ack, ops });
       current = installedRead.rev;
     } catch (error) { readUnavailable = String(error?.message ?? error); }
   }
@@ -112,20 +133,9 @@ export function kernelRevState(db, workflowId, { root = revRootOf(), current = c
   if (!current) state.unknownCurrent = true;
   else if (!ack) state.unacked = true;
   else if (ack.rev !== current) {
-    const diff = revDiff(root, ack.rev, current);
-    if (!diff.known) {
-      Object.assign(state, { stale: true, full: true, unknownDiff: true });
-      gate = { stale: true, unknownDiff: true, allFiles: [] };
-    } else {
-      gate = { stale: diff.files.length > 0, unknownDiff: false, allFiles: diff.files };
-      const rel = kernelRelevantOf(diff, ops ?? workflowOpsOf(db, workflowId), { root });
-      const wants = rel.files.length > 0;
-      const coalesced = wants && !rel.contract && Number.isFinite(ack.at) && now - ack.at < REV_ACK_COALESCE_MS;
-      if (coalesced) state.deferred = { files: rel.files.slice(0, REV_DIFF_MAX_FILES), until: ack.at + REV_ACK_COALESCE_MS };
-      else if (wants) Object.assign(state, { stale: true, files: rel.files.slice(0, REV_DIFF_MAX_FILES), fileCount: rel.files.length,
-        ...(rel.files.length > REV_DIFF_MAX_FILES ? { full: true } : {}) });
-      if (!wants && diff.files.length) state.silent = diff.files.length; // kernel-path files moved that are not this Kernel's contract
-    }
+    const r = revGate({ root, db, workflowId, ack, current, now, ops });
+    Object.assign(state, r.patch);
+    gate = r.gate;
   }
   Object.defineProperty(state, 'allFiles', { value: gate.allFiles, enumerable: false });
   Object.defineProperty(state, 'gate', { value: gate, enumerable: false });

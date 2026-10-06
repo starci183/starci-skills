@@ -110,24 +110,19 @@ const candidatesIn = (dir, match, { sinceMs, untilMs }) => {
   return out;
 };
 
+/** A directory's entry names, [] when it cannot be read. */
+const dirList = (dir) => { try { return fs.readdirSync(dir); } catch { return []; } };
+
 // Codex keys sessions by date, not by project: <home>/sessions/<YYYY>/<MM>/<DD>/rollout-*.jsonl
 // under every Codex home the runtime knows (CODEX_HOME, ~/.codex, Orca's codex-runtime-home).
 const codexSessionCandidates = (homes, window) => {
   const out = [];
   for (const home of homes.codex) {
     const root = path.join(home, 'sessions');
-    let years = [];
-    try { years = fs.readdirSync(root); } catch { continue; }
-    for (const year of years.filter((d) => /^\d{4}$/.test(d))) {
-      let months = [];
-      try { months = fs.readdirSync(path.join(root, year)); } catch { continue; }
-      for (const month of months.filter((d) => /^\d{2}$/.test(d))) {
-        let days = [];
-        try { days = fs.readdirSync(path.join(root, year, month)); } catch { continue; }
-        for (const day of days.filter((d) => /^\d{2}$/.test(d)))
+    for (const year of dirList(root).filter((d) => /^\d{4}$/.test(d)))
+      for (const month of dirList(path.join(root, year)).filter((d) => /^\d{2}$/.test(d)))
+        for (const day of dirList(path.join(root, year, month)).filter((d) => /^\d{2}$/.test(d)))
           out.push(...candidatesIn(path.join(root, year, month, day), (f) => f.endsWith('.jsonl'), window));
-      }
-    }
   }
   return out;
 };
@@ -192,6 +187,26 @@ const sessionArchiver = async (env) => {
   } catch { return null; }
 };
 
+/** The terminal-liveness gate reason, or null when the session may move. */
+const terminalGate = ({ handle, env, show }) => {
+  if (handle && env.ORCA_TERMINAL_HANDLE === handle) return 'caller-terminal';
+  if (!handle) return null;
+  let shown = null;
+  try { shown = show({ terminal: handle }); } catch { shown = null; }
+  if (shown?.ok && shown.connected === true) return 'terminal-still-open';
+  const gone = shown?.ok === true || (shown?.hostUnavailable !== true && TERMINAL_GONE_CODES.has(shown?.errorCode));
+  return gone ? null : (shown?.hostUnavailable ? 'orca-unavailable' : 'terminal-unreadable');
+};
+
+/** The attributed session files: identity matches plus the payload's learned list that still exists. */
+const attributedFiles = (identity, payload) => {
+  const attributed = new Set(identity.files.filter((f) => f.matched).map((f) => f.file));
+  // The identity observe already learned stands too (session files are stable once created).
+  for (const f of Array.isArray(payload?.session?.files) ? payload.session.files : [])
+    if (f?.matched && typeof f.file === 'string') { try { if (fs.existsSync(f.file)) attributed.add(f.file); } catch { /* gone */ } }
+  return [...attributed];
+};
+
 /**
  * Release the settled job's own session files to the archive root.
  * {released:true, files, archiveRoot} or {released:false, reason, files?} —
@@ -214,20 +229,10 @@ export async function releaseSettledSession({ db, job, payload, repo, env = proc
   // terminal-handle liveness the settle/dedupe code reads gates the archive.
   const handle = payload?.managed?.agentTerminalHandle ?? payload?.orca?.agentTerminalHandle ?? job.worker_id ?? payload?.launchTerminal?.handle ?? null;
   const skip = (reason, extra = {}) => ({ released: false, agent, reason, handle, ...extra });
-  if (handle && env.ORCA_TERMINAL_HANDLE === handle) return skip('caller-terminal');
-  if (handle) {
-    let shown = null;
-    try { shown = show({ terminal: handle }); } catch { shown = null; }
-    if (shown?.ok && shown.connected === true) return skip('terminal-still-open');
-    const gone = shown?.ok === true || (shown?.hostUnavailable !== true && TERMINAL_GONE_CODES.has(shown?.errorCode));
-    if (!gone) return skip(shown?.hostUnavailable ? 'orca-unavailable' : 'terminal-unreadable');
-  }
+  const gate = terminalGate({ handle, env, show });
+  if (gate) return skip(gate);
   const identity = sessionIdentityOf(db, job, payload, repo, { env, home, now });
-  const attributed = new Set(identity.files.filter((f) => f.matched).map((f) => f.file));
-  // The identity observe already learned stands too (session files are stable once created).
-  for (const f of Array.isArray(payload?.session?.files) ? payload.session.files : [])
-    if (f?.matched && typeof f.file === 'string') { try { if (fs.existsSync(f.file)) attributed.add(f.file); } catch { /* gone */ } }
-  const files = [...attributed];
+  const files = attributedFiles(identity, payload);
   if (!files.length) return skip(identity.files.length ? 'unattributed-session' : 'no-session-file', { cwds: identity.cwds, candidates: identity.files.length });
   const root = env.STARCI_SESSION_ARCHIVE_ROOT ?? archiveRoot ?? archiveRootOf({ env });
   const run = archive ?? await sessionArchiver(env);
