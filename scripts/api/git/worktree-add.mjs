@@ -9,8 +9,9 @@ import { gitRunner } from './lib.mjs';
  * `base`) or an existing `branch`. git: the caller's runner (a spec's fake) or null. {ok, stdout, stderr}
  */
 export function worktreeAdd({ repoRoot, target, base = null, branch = null, newBranch = false, detach = false, git = null }) {
-  const args = detach ? ['worktree', 'add', '--detach', target, base]
-    : newBranch ? ['worktree', 'add', '-b', branch, target, base]
-      : ['worktree', 'add', target, branch];
+  let args;
+  if (detach) args = ['worktree', 'add', '--detach', target, base];
+  else if (newBranch) args = ['worktree', 'add', '-b', branch, target, base];
+  else args = ['worktree', 'add', target, branch];
   return gitRunner(git)(args, { cwd: repoRoot });
 }

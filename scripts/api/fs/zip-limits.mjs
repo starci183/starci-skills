@@ -5,6 +5,8 @@ const ZIP_RESOURCE_LIMITS=Object.freeze({maxArchiveBytes:256*1024**2,maxEntryByt
 /** Resolve supported ZIP limits; options may lower each cap, never raise it. */
 export function zipLimits(options={}){
   const out={...ZIP_RESOURCE_LIMITS};
-  for(const key of Object.keys(out))if(options[key]!==undefined){const n=options[key];if(!Number.isInteger(n)||n<1||n>out[key])throw refuse(`invalid ${key}: supported maximum is ${out[key]}`,'zip-limit');out[key]=n;}
+  for(const key of Object.keys(out)){
+    if(options[key]!==undefined){const n=options[key];if(!Number.isInteger(n)||n<1||n>out[key]){throw refuse(`invalid ${key}: supported maximum is ${out[key]}`,'zip-limit');}out[key]=n;}
+  }
   return out;
 }

@@ -7,6 +7,8 @@ import { execFile } from 'node:child_process';
 export const execCapture = (cmd, args, { timeoutMs = 60_000, env = process.env, cwd } = {}) => new Promise((resolve) => {
   execFile(cmd, args, { cwd, env, timeout: timeoutMs, windowsHide: true, maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
     const timedOut = Boolean(error?.killed && error?.signal) || error?.code === 'ETIMEDOUT';
-    resolve({ status: error ? (typeof error.code === 'number' ? error.code : null) : 0, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') || (error && !timedOut ? String(error.message) : ''), timedOut });
+    let status = 0;
+    if (error) status = typeof error.code === 'number' ? error.code : null;
+    resolve({ status, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') || (error && !timedOut ? String(error.message) : ''), timedOut });
   });
 });

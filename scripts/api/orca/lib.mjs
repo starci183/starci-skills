@@ -95,11 +95,13 @@ const entryOf = (verb) => {
 
 const words = (command) => String(command ?? '').split(/\s+/).filter(Boolean);
 const at = (root, dotted) => dotGet(root, dotted);
-const nonEmpty = (v) => Array.isArray(v) ? v.length > 0
-  : (v && typeof v === 'object' ? Object.keys(v).length > 0 : Boolean(v));
+const nonEmpty = (v) => {
+  if (Array.isArray(v)) return v.length > 0;
+  if (v && typeof v === 'object') return Object.keys(v).length > 0;
+  return Boolean(v);
+};
 
-function buildArgv(verb, entry, params) {
-  const declared = entry.flags ?? [];
+function validateArgvParams(verb, entry, params, declared) {
   for (const key of Object.keys(params)) {
     if (key === JSON_FLAG) continue;
     if (!declared.includes(key))
@@ -108,7 +110,9 @@ function buildArgv(verb, entry, params) {
   for (const key of entry.required ?? []) {
     if (!filled(params[key])) throw new Error(`orcaCall ${verb}: missing required --${key}`);
   }
-  const argv = words(entry.command);
+}
+
+function appendArgvParams(argv, declared, params) {
   for (const key of declared) {
     if (key === JSON_FLAG) continue;
     const value = params[key];
@@ -116,6 +120,13 @@ function buildArgv(verb, entry, params) {
     if (value === true) { argv.push(`--${key}`); continue; }
     argv.push(`--${key}`, Array.isArray(value) ? JSON.stringify(value) : String(value));
   }
+}
+
+function buildArgv(verb, entry, params) {
+  const declared = entry.flags ?? [];
+  validateArgvParams(verb, entry, params, declared);
+  const argv = words(entry.command);
+  appendArgvParams(argv, declared, params);
   if (entry.json !== false) argv.push(`--${JSON_FLAG}`);
   return argv;
 }
@@ -161,7 +172,15 @@ function agentContextListing() {
 
 const liveDrift = (entry) => missingFrom(agentContextListing(), entry, JSON_FLAG);
 
-const driftEnvelope = (verb, entry, missing) => ({
+const driftEnvelope = (verb, entry, missing) => {
+  let error;
+  if (missing.listing === 'unreadable')
+    error = `host-contract-drift: ${verb} was refused because orca agent-context returned no command listing to compare '${entry.command}' against`;
+  else if (missing.flags) {
+    const missingFlags = missing.flags.map((flag) => '--' + flag).join(', ');
+    error = `host-contract-drift: ${verb} needs '${entry.command}' flags the live orca agent-context does not offer: ${missingFlags}`;
+  } else error = `host-contract-drift: ${verb} needs command '${entry.command}', which the live orca agent-context does not offer`;
+  return {
   hostUnavailable: missing.listing === 'unreadable' && listingHostUnavailable,
   schema: ENVELOPE_SCHEMA,
   verb,
@@ -176,12 +195,9 @@ const driftEnvelope = (verb, entry, missing) => ({
   result: null,
   stdout: '',
   stderr: '',
-  error: missing.listing === 'unreadable'
-    ? `host-contract-drift: ${verb} was refused because orca agent-context returned no command listing to compare '${entry.command}' against`
-    : missing.flags
-      ? `host-contract-drift: ${verb} needs '${entry.command}' flags the live orca agent-context does not offer: ${missing.flags.map((f) => `--${f}`).join(', ')}`
-      : `host-contract-drift: ${verb} needs command '${entry.command}', which the live orca agent-context does not offer`,
-});
+  error,
+  };
+};
 
 /**
  * The error text an Orca receipt carries: `<code>: <message>` from
@@ -292,15 +308,32 @@ export function runAsCli(file, call) {
  * request` mutation needs `request` (its ledger identity); no other call takes
  * one. Returns the starci/orca-call-result@1 envelope — never a raw SpawnResult.
  */
-export function orcaCall(verb, params = {}, { timeout, request } = {}) {
-  const entry = entryOf(verb);
-  const mode = entry.replay ?? null;
+function validateCallIdentity(verb, entry, params, request, mode) {
   if (entry.kind === 'mutation' && !REPLAY_MODES.includes(mode))
     throw new Error(`orcaCall ${verb}: calls.yaml must declare replay ${REPLAY_MODES.join('|')} for a mutation`);
   if (Object.hasOwn(params, RETRY_FLAG) && mode === 'request')
     throw new Error(`orcaCall ${verb}: --${RETRY_FLAG} is derived from the request identity, never passed`);
   if (request !== undefined && request !== null && mode !== 'request')
     throw new Error(`orcaCall ${verb}: a request identity is only for replay: request mutations (calls.yaml declares ${mode ?? 'a read'})`);
+}
+
+function replayReceiptLoss(verb, entry, argv, timeout, evidence) {
+  const retried = issue(verb, entry, argv, timeout);
+  // Even a retry that cannot spawn says nothing about the first issued mutation.
+  let unresolved = receiptLost(retried.r, retried.receipt) || notStarted(retried.r)
+    ? unknownReceipt('retry-receipt-lost') : null;
+  if (!unresolved) {
+    const settled = classify(entry, retried.r.status, retried.receipt);
+    // A refusal of this retry is not evidence that the first call had no effect.
+    if (settled.outcome !== 'ok' && settled.effectState === 'none') unresolved = unknownReceipt('retry-unsettled');
+  }
+  return envelopeOf(verb, entry, retried, evidence, unresolved);
+}
+
+export function orcaCall(verb, params = {}, { timeout, request } = {}) {
+  const entry = entryOf(verb);
+  const mode = entry.replay ?? null;
+  validateCallIdentity(verb, entry, params, request, mode);
   const requestId = mode === 'request' ? orcaRequestIdOf(verb, request) : null;
   const argv = buildArgv(verb, entry, requestId ? { ...params, [RETRY_FLAG]: requestId } : params);
   if (entry.kind === 'mutation' && readEnv('STARCI_ORCA_SKIP_LIVE_CHECK') !== '1') {
@@ -311,23 +344,11 @@ export function orcaCall(verb, params = {}, { timeout, request } = {}) {
   if (entry.kind !== 'mutation' || !receiptLost(first.r, first.receipt)) {
     return envelopeOf(verb, entry, first, requestId ? { id: requestId, replayed: first.receipt?.result?.mutation?.replayed === true, state: null } : null);
   }
-  const replay = evidence => {
-    const retried = issue(verb, entry, argv, timeout);
-    // Even a retry that cannot spawn says nothing about the first issued mutation.
-    let unresolved = receiptLost(retried.r, retried.receipt) || notStarted(retried.r)
-      ? unknownReceipt('retry-receipt-lost') : null;
-    if (!unresolved) {
-      const settled = classify(entry, retried.r.status, retried.receipt);
-      // A refusal of this retry is not evidence that the first call had no effect.
-      if (settled.outcome !== 'ok' && settled.effectState === 'none') unresolved = unknownReceipt('retry-unsettled');
-    }
-    return envelopeOf(verb, entry, retried, evidence, unresolved);
-  };
-  if (mode === 'reissue') return replay({ id: null, replayed: true, state: 'reissued' });
+  if (mode === 'reissue') return replayReceiptLoss(verb, entry, argv, timeout, { id: null, replayed: true, state: 'reissued' });
   if (mode === 'none') return envelopeOf(verb, entry, first);
   const state = requestStateOf(requestId);
   if (state === 'completed' || state === 'pending')
-    return replay({ id: requestId, replayed: true, state });
+    return replayReceiptLoss(verb, entry, argv, timeout, { id: requestId, replayed: true, state });
   // Absent is not proof that nothing happened (request-show): unknown, never a blind second issue.
   const unsettled = state === 'absent'
     ? { outcome: 'unknown', effectState: 'unknown', reason: 'request-absent' }

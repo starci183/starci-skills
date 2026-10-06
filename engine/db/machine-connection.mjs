@@ -20,13 +20,13 @@ export const isCorruptError = (error) => {
   return /database disk image is malformed|file is not a database|SQLITE_CORRUPT|SQLITE_NOTADB/i.test(String(error.message ?? error));
 };
 export const errText = (error) => String(error?.message ?? error).slice(0, 500);
-const busyError = (file, error, { retries, where }) => Object.assign(Error(`machine-db-busy: ${file} ${where}: database still locked after busy_timeout and ${retries} retries: ${String(error?.message ?? error).slice(0, 200)}`),
+const busyError = (file, error, { retries, where }) => Object.assign(new Error(`machine-db-busy: ${file} ${where}: database still locked after busy_timeout and ${retries} retries: ${String(error?.message ?? error).slice(0, 200)}`),
   { code: MACHINE_BUSY_CODE, cause: error, file, retries, where });
 
 /** Persistent corruption diagnostics observe the store and stderr without recording an incident. */
 export function corruptDiagnostic(file, error, { retries, where }) {
   if (error?.code === MACHINE_CORRUPT_CODE) return error;
-  const out = Object.assign(Error(`machine-db-corrupt: ${file} ${where}: SQLITE_CORRUPT persisted after ${retries} reopen(s): ${errText(error)}`),
+  const out = Object.assign(new Error(`machine-db-corrupt: ${file} ${where}: SQLITE_CORRUPT persisted after ${retries} reopen(s): ${errText(error)}`),
     { code: MACHINE_CORRUPT_CODE, cause: error, file, retries, where });
   let check = null;
   try {
@@ -39,6 +39,76 @@ export function corruptDiagnostic(file, error, { retries, where }) {
   return out;
 }
 
+/** Which open failure is retryable: a busy wait, an 'unable to open' reopen, or a first corrupt hit; null rethrows. */
+const openFailureKind = (error) => {
+  if (isBusyError(error) && !isCorruptError(error)) return 'busy';
+  if (/unable to open/i.test(String(error?.message ?? ''))) return 'open';
+  if (isCorruptError(error) && error.code !== MACHINE_CORRUPT_CODE) return 'corrupt';
+  return null;
+};
+
+const transientBusy = (error) => isBusyError(error) && !isMachineBusy(error) && !isCorruptError(error);
+
+function resilientConnection(openRaw, { file, inTransaction, onRecovered, onCorrupt }) {
+  let raw = openRaw(), generation = 0;
+  const reopen = () => { try { raw.close(); } catch { /* closed */ } raw = openRaw(); generation += 1; };
+  const recoverCorrupt = (error, retries, where) => {
+    if (!isCorruptError(error) || error.code === MACHINE_CORRUPT_CODE) throw error;
+    if (inTransaction() || raw.isTransaction) throw error;
+    if (retries >= CORRUPT_RETRY_DELAYS_MS.length) throw onCorrupt(file, error, { retries, where });
+    waitForRetry(CORRUPT_RETRY_DELAYS_MS[retries]);
+    try { reopen(); } catch (openError) { if (!isCorruptError(openError)) throw openError; }
+  };
+  const retrying = (where, op) => {
+    let busyRetries = 0;
+    for (let retries = 0; ; retries += 1) {
+      try {
+        const out = op();
+        if (retries) onRecovered({ where, retries });
+        return out;
+      } catch (error) {
+        if (!transientBusy(error)) { recoverCorrupt(error, retries, where); continue; }
+        if (inTransaction() || raw.isTransaction) throw error;
+        if (busyRetries >= BUSY_RETRY_DELAYS_MS.length) throw busyError(file, error, { retries: busyRetries, where });
+        scaledSleepSync(BUSY_RETRY_DELAYS_MS[busyRetries]);
+        busyRetries += 1;
+        retries -= 1;
+      }
+    }
+  };
+  const prepare = (sql) => {
+    let stmt = null, gen = -1;
+    const settings = [];
+    const current = () => {
+      if (gen !== generation) {
+        stmt = raw.prepare(sql);
+        for (const [k, a] of settings) stmt[k](...a);
+        gen = generation;
+      }
+      return stmt;
+    };
+    retrying(`prepare ${sql.slice(0, 80)}`, current);
+    return new Proxy({}, {
+      get(_, prop) {
+        if (prop === 'run' || prop === 'get' || prop === 'all' || prop === 'iterate') return (...args) => retrying(`${prop} ${sql.slice(0, 80)}`, () => current()[prop](...args));
+        if (typeof prop === 'string' && /^set[A-Z]/.test(prop)) return (...args) => { settings.push([prop, args]); return current()[prop](...args); };
+        const value = current()[prop];
+        return typeof value === 'function' ? value.bind(current()) : value;
+      },
+    });
+  };
+  return new Proxy({}, {
+    get(_, prop) {
+      if (prop === 'prepare') return prepare;
+      if (prop === 'exec') return (sql) => retrying(`exec ${String(sql).slice(0, 80)}`, () => raw.exec(sql));
+      if (prop === 'reopen') return reopen;
+      if (prop === 'raw') return raw;
+      const value = raw[prop];
+      return typeof value === 'function' ? value.bind(raw) : value;
+    },
+  });
+}
+
 /** Connection retries share one policy; the machine owner supplies operational incident persistence. */
 export function machineConnectionMethods({ reportIncident }) {
   function openWithRetry(openRaw, { file, onCorrupt = reportIncident }) {
@@ -47,10 +117,10 @@ export function machineConnectionMethods({ reportIncident }) {
       if (failures && OPEN_RETRY_DELAYS_MS[failures]) waitForRetry(OPEN_RETRY_DELAYS_MS[failures]);
       try { return openRaw(); }
       catch (error) {
-        const busy = isBusyError(error) && !isCorruptError(error);
-        if (!busy && !/unable to open/i.test(String(error?.message ?? '')) && !(isCorruptError(error) && error.code !== MACHINE_CORRUPT_CODE)) throw error;
         lastError = error;
-        if (busy) {
+        const kind = openFailureKind(error);
+        if (kind === null) throw error;
+        if (kind === 'busy') {
           if (busyOpens >= BUSY_RETRY_DELAYS_MS.length) throw busyError(path.resolve(file), error, { retries: busyOpens, where: 'open' });
           scaledSleepSync(BUSY_RETRY_DELAYS_MS[busyOpens]);
           busyOpens += 1;
@@ -59,66 +129,6 @@ export function machineConnectionMethods({ reportIncident }) {
     }
     if (isCorruptError(lastError)) throw onCorrupt(path.resolve(file), lastError, { retries: OPEN_RETRY_DELAYS_MS.length - 1, where: 'open' });
     throw lastError;
-  }
-
-  function resilientConnection(openRaw, { file, inTransaction, onRecovered, onCorrupt }) {
-    let raw = openRaw(), generation = 0;
-    const reopen = () => { try { raw.close(); } catch { /* closed */ } raw = openRaw(); generation += 1; };
-    const retrying = (where, op) => {
-      let busyRetries = 0;
-      for (let retries = 0; ; retries += 1) {
-        try {
-          const out = op();
-          if (retries) onRecovered({ where, retries });
-          return out;
-        } catch (error) {
-          if (isBusyError(error) && !isMachineBusy(error) && !isCorruptError(error)) {
-            if (inTransaction() || raw.isTransaction) throw error;
-            if (busyRetries >= BUSY_RETRY_DELAYS_MS.length) throw busyError(file, error, { retries: busyRetries, where });
-            scaledSleepSync(BUSY_RETRY_DELAYS_MS[busyRetries]);
-            busyRetries += 1;
-            retries -= 1;
-            continue;
-          }
-          if (!isCorruptError(error) || error.code === MACHINE_CORRUPT_CODE) throw error;
-          if (inTransaction() || raw.isTransaction) throw error;
-          if (retries >= CORRUPT_RETRY_DELAYS_MS.length) throw onCorrupt(file, error, { retries, where });
-          waitForRetry(CORRUPT_RETRY_DELAYS_MS[retries]);
-          try { reopen(); } catch (openError) { if (!isCorruptError(openError)) throw openError; }
-        }
-      }
-    };
-    const prepare = (sql) => {
-      let stmt = null, gen = -1;
-      const settings = [];
-      const current = () => {
-        if (gen !== generation) {
-          stmt = raw.prepare(sql);
-          for (const [k, a] of settings) stmt[k](...a);
-          gen = generation;
-        }
-        return stmt;
-      };
-      retrying(`prepare ${sql.slice(0, 80)}`, current);
-      return new Proxy({}, {
-        get(_, prop) {
-          if (prop === 'run' || prop === 'get' || prop === 'all' || prop === 'iterate') return (...args) => retrying(`${prop} ${sql.slice(0, 80)}`, () => current()[prop](...args));
-          if (typeof prop === 'string' && /^set[A-Z]/.test(prop)) return (...args) => { settings.push([prop, args]); return current()[prop](...args); };
-          const value = current()[prop];
-          return typeof value === 'function' ? value.bind(current()) : value;
-        },
-      });
-    };
-    return new Proxy({}, {
-      get(_, prop) {
-        if (prop === 'prepare') return prepare;
-        if (prop === 'exec') return (sql) => retrying(`exec ${String(sql).slice(0, 80)}`, () => raw.exec(sql));
-        if (prop === 'reopen') return reopen;
-        if (prop === 'raw') return raw;
-        const value = raw[prop];
-        return typeof value === 'function' ? value.bind(raw) : value;
-      },
-    });
   }
 
   function connectionState(openRaw, { file, inTransaction = () => false, onCorrupt = reportIncident }) {

@@ -36,7 +36,7 @@ export function loadRuntimes(modelsDir = DEFAULT_MODELS_DIR) {
   const file = path.join(modelsDir, 'runtimes.yaml');
   if (!fs.existsSync(file)) return null;
   const doc = parseYaml(fs.readFileSync(file, 'utf8'));
-  return { ...(doc ?? {}), runtimes: loadModelRegistry(modelsDir)?.pools ?? {} };
+  return { ...doc, runtimes: loadModelRegistry(modelsDir)?.pools ?? {} };
 }
 
 // The unrouted operation target is declared, never a literal: modules/models/registry.yaml

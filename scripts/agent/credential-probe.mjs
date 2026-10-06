@@ -37,7 +37,8 @@ export async function orcaAccountQuota(key, { quota = probeQuota } = {}) {
   const q = (await quota(key)) ?? {};
   const used = typeof q.usedPercent === 'number' ? q.usedPercent : null;
   const base = { provider: key, kind: 'orca-account', usedPercent: used };
-  const detail = `orca account ${key}: ${q.detail ?? q.state ?? 'no answer'}${used === null ? '' : ` (weekly ${used}% used)`}`;
+  const weekly = used === null ? '' : ` (weekly ${used}% used)`;
+  const detail = `orca account ${key}: ${q.detail ?? q.state ?? 'no answer'}${weekly}`;
   if (q.state === 'dead') return { ok: false, ...base, state: 'auth', detail };
   if (used !== null && used >= 100) return { ok: false, ...base, state: 'quota-exhausted', detail };
   if (q.auth === 'ok' && used !== null) return { ok: true, ...base, state: 'ok', detail };

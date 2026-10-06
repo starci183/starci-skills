@@ -39,10 +39,10 @@ import { putBlob as storeBlob, blobPath, getBlob } from './blob.mjs';
 import { redactBytes, redactData, redactText } from '../../scripts/lib/redact.mjs'; import { isMain } from '../../scripts/lib/is-main.mjs';
 import { isSpecRun, readEnv } from '../../scripts/lib/env.mjs';
 import { pathKey } from '../../scripts/lib/path-key.mjs'; import { pidAlive } from '../../scripts/lib/pid-alive.mjs';
-import { insertPairs, insertRowWith } from '../../scripts/lib/sqlite.mjs';
+import { insertRowWith } from '../../scripts/lib/sqlite.mjs';
 import { need as refuseUnless } from '../refuse.mjs';
 import { sha256 } from '../digest.mjs';
-import { LOCAL_ROOT_ENV, starciLocalRoot } from '../runtime-root.mjs';
+import { starciLocalRoot } from '../runtime-root.mjs';
 import { machineSchemaMethods } from './machine-schema.mjs';
 import { machineConnectionMethods, corruptDiagnostic, MACHINE_BUSY_TIMEOUT_MS, MACHINE_CORRUPT_CODE, CORRUPT_RETRY_DELAYS_MS,
   waitForRetry, isCorruptError, isBusyError, errText } from './machine-connection.mjs';
@@ -69,12 +69,12 @@ export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host',
  * repos left six fake-worker ledgers in the live store). STARCI_PROJECTS_ROOT (ledger-db.mjs) and
  * STARCI_TEST_MACHINE_FILE (TEST_REGISTRY_ENV) are narrower overrides that still win over this one when set.
  */
-export { LOCAL_ROOT_ENV, starciLocalRoot };
+export { LOCAL_ROOT_ENV, starciLocalRoot } from '../runtime-root.mjs';
 /** <local root>/projects: one directory per ledger (decision Q1). */
 export const localProjectsRoot = (env = process.env) => path.join(starciLocalRoot(env), 'projects');
 /** The runtime.sqlite of one ledger (decision Q1): <runtime root>/.runtime/projects/<ledger_id>/runtime.sqlite. */
 export const projectLedgerFile = (ledgerId, env = process.env) => {
-  if (!/^[A-Za-z0-9-]{8,64}$/.test(String(ledgerId ?? ''))) throw Error(`projectLedgerFile needs a ledger id, got ${ledgerId}`);
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(String(ledgerId ?? ''))) throw new Error(`projectLedgerFile needs a ledger id, got ${ledgerId}`);
   return path.join(localProjectsRoot(env), String(ledgerId), 'runtime.sqlite');
 };
 /** The explicit test registry: a machine.sqlite that replaces the host's for this process tree (tests/setup/isolated-registry.mjs). */
@@ -110,10 +110,10 @@ const hex = (bytes) => crypto.randomBytes(bytes).toString('hex');
 export const newTraceId = () => hex(16);
 export const newSpanId = () => hex(8);
 const JSON_LIMIT = 65536;
-const toJson = (value) => (value === undefined || value === null ? null : typeof value === 'string' ? (JSON.parse(value), value) : JSON.stringify(value));
-const parse = (text) => { if (text == null) return null; try { return JSON.parse(text); } catch { return null; } };
+const toJson = (value) => { if (value === undefined || value === null) return null; if (typeof value !== 'string') return JSON.stringify(value); JSON.parse(value); return value; };
+const parse = (text) => { if (text == null) { return null; } try { return JSON.parse(text); } catch { return null; } };
 const int = (v) => (v === undefined || v === null || v === '' ? null : Math.trunc(Number(v)));
-const bool = (v) => (v === undefined || v === null ? null : v ? 1 : 0);
+const bool = (v) => { if (v === undefined || v === null) return null; return v ? 1 : 0; };
 const writerPragmas = (env) => ({ synchronous: 'NORMAL', busy_timeout: busyTimeoutOf(env), temp_store: 'MEMORY', cache_size: -16000,
   journal_size_limit: 67108864, trusted_schema: 'OFF' });
 const pragma = (db, name) => { const row = db.prepare(`PRAGMA ${name}`).get(); return row ? Object.values(row)[0] : null; };
@@ -134,7 +134,7 @@ function corruptIncident(file, error, details) {
       db.prepare('INSERT INTO machine_logs(at,actor,level,kind,msg,data_json) VALUES(?,?,?,?,?,?)').run(Date.now(), row.actor, row.level, row.kind, row.msg, JSON.stringify(row.data));
     } finally { db.close(); }
   } catch (e) {
-    try { out.deferred = deferWrite({ op: 'log', args: [{ ...row, src: null }], file, error: e }); } catch (e2) { process.stderr.write(`[machine-db] INCIDENT could not be recorded: ${errText(e2)}\n`); }
+    try { out.deferred = deferWrite({ op: 'log', args: [{ ...row, src: null }], file, error: e }); } catch (error_) { process.stderr.write(`[machine-db] INCIDENT could not be recorded: ${errText(error_)}\n`); }
   }
   return out;
 }
@@ -229,13 +229,13 @@ function upsertRow(db, table, row, keys) {
   const entries = rowCells(db, table, row);
   const updates = entries.filter(([k]) => !keys.includes(k));
   const sql = `INSERT INTO ${table}(${entries.map(([k]) => k).join(',')}) VALUES(${entries.map(() => '?').join(',')}) ON CONFLICT(${keys.join(',')}) DO `
-    + (updates.length ? `UPDATE SET ${updates.map(([k]) => `${k}=excluded.${k}`).join(',')}` : 'NOTHING');
+    + (updates.length ? `UPDATE SET ${updates.map(([k]) => k + '=excluded.' + k).join(',')}` : 'NOTHING');
   return db.prepare(sql).run(...entries.map(([, v]) => v));
 }
 function updateRow(db, table, set, where) {
   const s = rowCells(db, table, set), w = rowCells(db, table, where);
   need(s.length && w.length, `machine-db: update ${table} needs set and where`);
-  return db.prepare(`UPDATE ${table} SET ${s.map(([k]) => `${k}=?`).join(',')} WHERE ${w.map(([k]) => `${k} IS ?`).join(' AND ')}`)
+  return db.prepare(`UPDATE ${table} SET ${s.map(([k]) => k + '=?').join(',')} WHERE ${w.map(([k]) => k + ' IS ?').join(' AND ')}`)
     .run(...s.map(([, v]) => v), ...w.map(([, v]) => v));
 }
 
@@ -278,10 +278,16 @@ export function withMachine(fn, options = {}) {
 export function readMachine(fn, fallback = null, options = {}) {
   let m = null;
   try { m = openMachineReader(options); return m ? fn(m) : fallback; }
-  catch (error) { if (isCorruptError(error)) throw error; return fallback; }
+  catch (error) { if (isCorruptError(error)) { throw error; } return fallback; }
   finally { try { m?.close(); } catch { /* closed */ } }
 }
 
+// The fenced unit of a transaction(): COMMIT or ROLLBACK-and-rethrow.
+const commitUnit = (db, fn) => { try { assertMutationFence({ kind: 'machine-write', db }); const out = fn(db); db.exec('COMMIT'); return out; } catch (error) { try { if (db.isTransaction) db.raw.exec('ROLLBACK'); } catch { /* none */ } throw error; } };
+// transaction()'s catch: a transient corrupt error waits, reopens and retries; anything else (or retries spent) throws.
+const retryCorrupt = (error, { file, retries, db }) => { if (!isCorruptError(error) || error.code === MACHINE_CORRUPT_CODE) { throw error; }
+  if (retries >= CORRUPT_RETRY_DELAYS_MS.length) { throw corruptIncident(file, error, { retries, where: 'transaction' }); }
+  waitForRetry(CORRUPT_RETRY_DELAYS_MS[retries]); try { db.reopen(); } catch (openError) { if (!isCorruptError(openError)) { throw openError; } } };
 function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tempDirs }) {
   let depth = 0;
   const { db, recovered, noteRecovered, close } = connectionState(openRaw, { file, inTransaction: () => depth > 0 });
@@ -298,15 +304,10 @@ function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tem
         db.exec('BEGIN IMMEDIATE');   // a refused BEGIN changed nothing: db.exec backs off (BUSY_RETRY_DELAYS_MS), then throws STARCI_MACHINE_BUSY
         depth += 1;
         let out;
-        try { assertMutationFence({ kind: 'machine-write', db }); out = fn(db); db.exec('COMMIT'); } catch (error) { try { if (db.isTransaction) db.raw.exec('ROLLBACK'); } catch { /* none */ } throw error; } finally { depth -= 1; }
+        try { out = commitUnit(db, fn); } finally { depth -= 1; }
         if (retries) noteRecovered({ where: 'transaction', retries });
         return out;
-      } catch (error) {
-        if (!isCorruptError(error) || error.code === MACHINE_CORRUPT_CODE) throw error;
-        if (retries >= CORRUPT_RETRY_DELAYS_MS.length) throw corruptIncident(file, error, { retries, where: 'transaction' });
-        waitForRetry(CORRUPT_RETRY_DELAYS_MS[retries]);
-        try { db.reopen(); } catch (openError) { if (!isCorruptError(openError)) throw openError; }
-      }
+      } catch (error) { retryCorrupt(error, { file, retries, db }); }
     }
   };
   const m = { schema: MACHINE_SCHEMA, file, path: file, db, env, now, live, readOnly, checkpointer: Boolean(checkpointer) && !readOnly, transaction,
@@ -318,7 +319,7 @@ function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tem
           data: { file, pid: process.pid, recovered: recovered.slice(0, 20), sqlite: process.versions.sqlite, node: process.version } };
         recovered.length = 0;
         // a reader cannot write: its notice waits in the outbox for the next flush
-        try { if (readOnly) throw Error('read-only handle'); API.log(m, row); } catch (error) { try { deferWrite({ op: 'log', args: [row], file, error }); } catch { /* stderr already has it */ } }
+        try { if (readOnly) { throw new Error('read-only handle'); } API.log(m, row); } catch (error) { try { deferWrite({ op: 'log', args: [row], file, error }); } catch { /* stderr already has it */ } }
       }
       close();
     } };
@@ -336,11 +337,11 @@ function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tem
 /** Store bytes (Buffer | string | file path via {file}) in the blob store and record the blobs row. Returns the sha. */
 function putMachineBlob(m, content, { mediaType = 'application/octet-stream', pinned = false } = {}) {
   // Every blob is redacted before it is stored (scripts/lib/redact.mjs): text media 'v1', anything else 'binary'.
-  const raw = Buffer.isBuffer(content) ? content : Buffer.from(typeof content === 'string' ? content : JSON.stringify(content));
+  let raw = content; if (!Buffer.isBuffer(raw)) raw = Buffer.from(typeof raw === 'string' ? raw : JSON.stringify(raw));
   const { bytes, redaction } = redactBytes(raw, mediaType);
   const { sha, size, mediaType: stored } = storeBlob(bytes, { mediaType });
   const file = blobPath(sha);
-  insertRow(m.db, 'blobs', { sha256: sha, bytes: size, media_type: stored, redaction, file_uri: String(file).replace(/\\/g, '/'), created_at: m.now(), pinned: pinned ? 1 : 0 }, { orIgnore: true });
+  insertRow(m.db, 'blobs', { sha256: sha, bytes: size, media_type: stored, redaction, file_uri: String(file).replaceAll('\\', '/'), created_at: m.now(), pinned: pinned ? 1 : 0 }, { orIgnore: true });
   return sha;
 }
 /** A JSON value as `{json, sha}`: inline when it fits `limit`, else a small stub inline and the full value as a blob. */
@@ -375,7 +376,7 @@ function ledgerMetaOf(file) {
     return Object.fromEntries(db.prepare('SELECT key, value FROM meta').all().map((r) => [r.key, r.value]));
   } catch { return {}; } finally { try { db?.close(); } catch { /* closed */ } }
 }
-const repoKey = (root) => path.resolve(String(root)).replace(/\\/g, '/').replace(/^[a-z]:/, (d) => d.toUpperCase());
+const repoKey = (root) => path.resolve(String(root)).replaceAll('\\', '/').replace(/^[a-z]:/, (d) => d.toUpperCase());
 export const repoKeyOf = repoKey;
 /**
  * Register (or refresh) a ledger. `ledgerId` is the ledger's own meta.ledger_id. A new row needs name and repoRoot;
@@ -392,6 +393,12 @@ function registerLedger(m, { ledgerId, name = null, repoRoot = null, file = null
   const tempRepo = (root) => (m.live && root && isUnderTempDir(String(root), { env: m.env, tempDirs: m.tempDirs })
     ? { ledgerId, registered: false, code: 'STARCI_REGISTRY_TEMP_REPO',
       refused: `registry-temp-repo: repo_root ${repoKey(root)} is under the OS temp directory and ${m.file} is the live registry; set ${TEST_REGISTRY_ENV}` } : null);
+  // A ledger opened by its writer names itself: repo_root / product come from its own meta when not given.
+  const insertLedger = (db, at) => { if (!repoRoot) { const own = ledgerMetaOf(target); repoRoot = own.repo_root ?? null; product = product ?? own.product ?? null; }
+    name = name ?? (repoRoot ? path.basename(path.resolve(repoRoot)) : null);
+    if (!name || !repoRoot) return { ledgerId, registered: false, refused: `registry-no-repo-root: ${target} names no repo_root in its meta and none was given` };
+    insertRow(db, 'ledgers', { ledger_id: ledgerId, name, product, repo_root: repoKey(repoRoot), file: target, state: 'active', schema_version: int(schemaVersion), registered_at: at, seen_at: at });
+    return null; };
   return m.transaction((db) => {
     const at = m.now();
     const existing = db.prepare('SELECT * FROM ledgers WHERE ledger_id=?').get(ledgerId);
@@ -402,12 +409,8 @@ function registerLedger(m, { ledgerId, name = null, repoRoot = null, file = null
         ...(product ? { product } : {}), ...(schemaVersion != null ? { schema_version: int(schemaVersion) } : {}),
         ...(existing.state === 'retired' ? {} : { state: 'active' }) }, { ledger_id: ledgerId });
     } else {
-      // A ledger opened by its writer names itself: repo_root / product come from its own meta when not given.
-      if (!repoRoot) { const own = ledgerMetaOf(target); repoRoot = own.repo_root ?? null; product = product ?? own.product ?? null; }
-      name = name ?? (repoRoot ? path.basename(path.resolve(repoRoot)) : null);
-      if (!name || !repoRoot) return { ledgerId, registered: false, refused: `registry-no-repo-root: ${target} names no repo_root in its meta and none was given` };
-      insertRow(db, 'ledgers', { ledger_id: ledgerId, name, product, repo_root: repoKey(repoRoot), file: target, state: 'active',
-        schema_version: int(schemaVersion), registered_at: at, seen_at: at });
+      const refusedInsert = insertLedger(db, at);
+      if (refusedInsert) return refusedInsert;
     }
     if (repoRoot) upsertRow(db, 'repositories', { repo_root: repoKey(repoRoot), name: name ?? existing?.name ?? path.basename(repoRoot), role: 'backend', ledger_id: ledgerId, seen_at: at }, ['repo_root']);
     return { ledgerId, registered: true, file: target };
@@ -428,12 +431,11 @@ function resolveLedger(m, { ledgerId = null, name = null, repoRoot = null, creat
   need(repoRoot, 'resolveLedger create needs repoRoot');
   const id = crypto.randomUUID();
   const made = registerLedger(m, { ledgerId: id, name: name ?? path.basename(path.resolve(repoRoot)), repoRoot, product });
-  if (made.refused) throw Object.assign(Error(made.refused), { code: made.code ?? 'STARCI_MACHINE_DB' });
+  if (made.refused) throw Object.assign(new Error(made.refused), { code: made.code ?? 'STARCI_MACHINE_DB' });
   return ledgerRow(db.prepare('SELECT * FROM ledgers WHERE ledger_id=?').get(id));
 }
 function listLedgers(m, { state = null, includeRetired = false } = {}) {
-  const rows = state ? m.db.prepare('SELECT * FROM ledgers WHERE state=? ORDER BY name').all(state)
-    : m.db.prepare(`SELECT * FROM ledgers ${includeRetired ? '' : "WHERE state<>'retired'"} ORDER BY name`).all();
+  let rows; if (state) rows = m.db.prepare('SELECT * FROM ledgers WHERE state=? ORDER BY name').all(state); else rows = m.db.prepare(`SELECT * FROM ledgers ${includeRetired ? '' : "WHERE state<>'retired'"} ORDER BY name`).all();
   return rows.map(ledgerRow);
 }
 function touchLedger(m, ledgerId, { at = m.now() } = {}) { return m.db.prepare('UPDATE ledgers SET seen_at=? WHERE ledger_id=?').run(at, ledgerId).changes > 0; }
@@ -492,7 +494,7 @@ function supEvents(m, { kind = null, kinds = null, entityType = null, entityId =
   if (entityType) { where.push('entity_type=?'); args.push(entityType); }
   if (entityId) { where.push('entity_id=?'); args.push(String(entityId)); }
   if (since != null) { where.push('seq>?'); args.push(since); }
-  const rows = m.db.prepare(`SELECT * FROM sup_events ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY seq ${order === 'asc' ? 'ASC' : 'DESC'} LIMIT ?`).all(...args, limit);
+  const rows = m.db.prepare(`SELECT * FROM sup_events ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY seq ${order === 'asc' ? 'ASC' : 'DESC'} LIMIT ?`).all(...args, limit);
   return rows.map((r) => ({ ...r, payload: fullJson(parse(r.payload_json)) }));
 }
 const newestSupEvent = (m, kind) => supEvents(m, { kind, limit: 1 })[0] ?? null;
@@ -516,7 +518,7 @@ function listSupJobs(m, { status = null, statuses = null, kind = null } = {}) {
   const list = statuses ?? (status ? [status] : null);
   if (list) { where.push(`status IN (${list.map(() => '?').join(',')})`); args.push(...list); }
   if (kind) { where.push('kind=?'); args.push(kind); }
-  return m.db.prepare(`SELECT * FROM sup_jobs ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at, job_id`).all(...args)
+  return m.db.prepare(`SELECT * FROM sup_jobs ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at, job_id`).all(...args)
     .map((r) => ({ ...r, files: parse(r.files_json), payload: parse(r.payload_json) }));
 }
 function acquireSupLeases(m, jobId, paths, { ttlMs = 3600000 } = {}) {
@@ -597,7 +599,7 @@ function listSupDecisions(m, { open = true, kind = null } = {}) {
 function openOwed(m, { owedId, kind, subject, cluster = null, dueAt = null, detail = null }) {
   return m.transaction((db) => {
     const hit = db.prepare('SELECT state FROM sup_owed WHERE owed_id=?').get(owedId);
-    if (hit) { if (detail !== null) updateRow(db, 'sup_owed', { detail_json: detail, ...(dueAt ? { due_at: dueAt } : {}) }, { owed_id: owedId }); return { owedId, created: false, state: hit.state }; }
+    if (hit) { if (detail !== null) { updateRow(db, 'sup_owed', { detail_json: detail, ...(dueAt ? { due_at: dueAt } : {}) }, { owed_id: owedId }); } return { owedId, created: false, state: hit.state }; }
     insertRow(db, 'sup_owed', { owed_id: owedId, kind, subject, cluster, state: 'open', opened_at: m.now(), due_at: dueAt, detail_json: detail });
     return { owedId, created: true, state: 'open' };
   });
@@ -611,8 +613,8 @@ function upsertLearning(m, { itemId, kind, parentId = null, title, state = null,
   return upsertRow(m.db, 'sup_learning', { item_id: itemId, kind, parent_id: parentId, title, state, source_ref: sourceRef, lane, landed_sha: landedSha, detail_json: detail, created_at: created, updated_at: at }, ['item_id']);
 }
 const listLearning = (m, { kind = null } = {}) => m.db.prepare(`SELECT * FROM sup_learning ${kind ? 'WHERE kind=?' : ''} ORDER BY created_at, item_id`).all(...(kind ? [kind] : [])).map((r) => ({ ...r, detail: parse(r.detail_json) }));
-const recordOwnerRuling = (m, { rulingId = `rul-${crypto.randomUUID()}`, saidAt, channel = null, verbatim, paraphrase = null, appliesTo = null, contractRef = null, recordedBy = null }) =>
-  (insertRow(m.db, 'sup_owner_rulings', { ruling_id: rulingId, said_at: saidAt, channel, verbatim, paraphrase, applies_to: appliesTo, contract_ref: contractRef, recorded_by: recordedBy, created_at: m.now() }), rulingId);
+const recordOwnerRuling = (m, { rulingId = `rul-${crypto.randomUUID()}`, saidAt, channel = null, verbatim, paraphrase = null, appliesTo = null, contractRef = null, recordedBy = null }) => {
+  insertRow(m.db, 'sup_owner_rulings', { ruling_id: rulingId, said_at: saidAt, channel, verbatim, paraphrase, applies_to: appliesTo, contract_ref: contractRef, recorded_by: recordedBy, created_at: m.now() }); return rulingId; };
 function upsertBridge(m, { bridgeId, ledgerId = null, action, state, approvedBy = null, detail = null }) {
   const at = m.now();
   const created = m.db.prepare('SELECT created_at FROM sup_bridges WHERE bridge_id=?').get(bridgeId)?.created_at ?? at;
@@ -624,7 +626,7 @@ function recordSupMessage(m, { msgId = `msg-${crypto.randomUUID()}`, direction, 
 }
 const supMessages = (m, { direction = null, unread = false, limit = 200 } = {}) => m.db.prepare(`SELECT * FROM sup_messages WHERE 1=1 ${direction ? 'AND direction=?' : ''} ${unread ? 'AND read_at IS NULL' : ''} ORDER BY at DESC LIMIT ?`)
   .all(...(direction ? [direction] : []), limit).reverse();
-const markSupMessagesRead = (m, ids) => { let n = 0; for (const id of ids) n += m.db.prepare('UPDATE sup_messages SET read_at=? WHERE msg_id=? AND read_at IS NULL').run(m.now(), id).changes; return n; };
+const markSupMessagesRead = (m, ids) => { let n = 0; for (const id of ids) { n += m.db.prepare('UPDATE sup_messages SET read_at=? WHERE msg_id=? AND read_at IS NULL').run(m.now(), id).changes; } return n; };
 function setSupSignal(m, { scope, key = 'main', value = null, token = null, holderPid = process.pid, expiresAt = null }) {
   return upsertRow(m.db, 'sup_signals', { scope, key, holder_pid: holderPid, token, value_json: value, at: m.now(), expires_at: expiresAt }, ['scope', 'key']);
 }
@@ -674,7 +676,8 @@ function acquireLeader(m, { name = 'reconciler', holder, pid = process.pid, leas
     const epoch = Math.max(Number(cur?.epoch ?? 0), Number(db.prepare('SELECT COALESCE(max(epoch),0) e FROM leader_history').get().e)) + 1;
     if (cur) db.prepare('UPDATE leader_history SET released_at=?, release_reason=? WHERE epoch=? AND released_at IS NULL').run(at, handover ? 'reload' : 'lost', cur.epoch);
     upsertRow(db, 'engine_leader', { name, holder, pid, epoch, process_run_id: processRunId, heartbeat_at: at, expires_at: at + leaseMs, rev, draining: 0, passes: 0, last_pass_ms: null, last_error: null }, ['name']);
-    insertRow(db, 'leader_history', { epoch, holder, pid, process_run_id: processRunId, rev, acquired_at: at, acquired_how: !cur ? 'fresh' : handover ? 'handover' : 'takeover-stale' });
+    let how = 'fresh'; if (cur) how = handover ? 'handover' : 'takeover-stale';
+    insertRow(db, 'leader_history', { epoch, holder, pid, process_run_id: processRunId, rev, acquired_at: at, acquired_how: how });
     return { leader: true, epoch, renewed: false };
   });
 }
@@ -762,7 +765,7 @@ const actionRunning = (m, id, { requestId = null, childRunId = null } = {}) => m
 function actionFinish(m, id, { state = 'done', exitCode = null, result: rawResult = null, summary: rawSummary = null, stdout = null, stderr = null, errorSignature = null }) {
   const result = rawResult == null ? null : redactData(rawResult);
   const summary = rawSummary == null ? null : redactData(rawSummary);
-  const full = result == null ? null : typeof result === 'string' ? result : JSON.stringify(result);
+  let full = null; if (result != null) full = typeof result === 'string' ? result : JSON.stringify(result);
   const resultSha = full == null ? null : putMachineBlob(m, full, { mediaType: typeof result === 'string' ? 'text/plain' : 'application/json' });
   let brief = summary ?? (full != null && Buffer.byteLength(full) <= 8192 && typeof result !== 'string' ? result : null);
   if (brief != null) { const s = JSON.stringify(brief); if (Buffer.byteLength(s) > 8192) brief = { truncated: true, bytes: Buffer.byteLength(s), sha256: resultSha }; }
@@ -779,7 +782,7 @@ function actions(m, { controller = null, state = null, sinceMs = null, limit = 2
   if (controller) { where.push('controller=?'); args.push(controller); }
   if (state) { where.push('state=?'); args.push(state); }
   if (sinceMs != null) { where.push('COALESCE(finished_at,started_at)>?'); args.push(m.now() - sinceMs); }
-  return m.db.prepare(`SELECT * FROM engine_actions ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY COALESCE(finished_at,started_at) DESC LIMIT ?`).all(...args, limit)
+  return m.db.prepare(`SELECT * FROM engine_actions ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY COALESCE(finished_at,started_at) DESC LIMIT ?`).all(...args, limit)
     .map((r) => ({ ...r, result: parse(r.result_json) }));
 }
 function actionStep(m, actionId, { step, ms = null, ok = null, detail = null }) {
@@ -1010,7 +1013,7 @@ const updateGcItem = (m, itemId, fields) => updateRow(m.db, 'gc_items', snake(fi
 const gcItems = (m, { runId = null, open = false, collector = null, limit = 500 } = {}) => m.db.prepare(`SELECT * FROM gc_items WHERE 1=1 ${runId != null ? 'AND run_id=?' : ''} ${open ? 'AND outcome IS NULL' : ''} ${collector ? 'AND collector=?' : ''} ORDER BY item_id DESC LIMIT ?`)
   .all(...(runId != null ? [runId] : []), ...(collector ? [collector] : []), limit);
 function gcMark(m, runId, entries) {
-  return m.transaction((db) => { const st = db.prepare('INSERT OR IGNORE INTO gc_marks(run_id,sha256,source,pinned) VALUES(?,?,?,?)'); for (const e of entries) st.run(runId, e.sha256, e.source, e.pinned ? 1 : 0); return entries.length; });
+  return m.transaction((db) => { const st = db.prepare('INSERT OR IGNORE INTO gc_marks(run_id,sha256,source,pinned) VALUES(?,?,?,?)'); for (const e of entries) { st.run(runId, e.sha256, e.source, e.pinned ? 1 : 0); } return entries.length; });
 }
 /** A blob whose bytes were archived (zip) before the sweep: archived_at + archive_ref on the machine's blobs row. */
 const markMachineBlobArchived = (m, { sha256: sha, archivedAt = m.now(), archiveRef }) => m.db.prepare('UPDATE blobs SET archived_at=?, archive_ref=? WHERE sha256=?').run(archivedAt, archiveRef, sha).changes > 0;
@@ -1089,7 +1092,7 @@ function recordLandOutcome(m, { spanId, lane = null, push = null, run, laneHead 
     const pushId = push ? recordPush(m, push) : null;
     const runId = recordLandRun(m, { ...run, lane, spanId, pushId });
     if (lane && laneHead) updateRow(db, 'lanes', { head_sha: laneHead }, { name: lane });
-    if (logRow) log(m, { ...logRow, data: { ...(logRow.data ?? {}), runId } });
+    if (logRow) log(m, { ...logRow, data: { ...logRow.data, runId } });
     return { runId, pushId, duplicate: false };
   });
 }
@@ -1181,7 +1184,7 @@ function logs(m, { actor = null, kind = null, level = null, ledgerId = null, wor
   if (jobId) { where.push('l.job_id=?'); args.push(jobId); }
   if (since != null) { where.push('l.seq>?'); args.push(since); }
   if (search) { where.push('l.seq IN (SELECT rowid FROM machine_logs_fts WHERE machine_logs_fts MATCH ?)'); args.push(search); }
-  return m.db.prepare(`SELECT l.* FROM machine_logs l ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY l.seq DESC LIMIT ?`).all(...args, limit)
+  return m.db.prepare(`SELECT l.* FROM machine_logs l ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY l.seq DESC LIMIT ?`).all(...args, limit)
     .map((r) => ({ ...r, data: fullJson(parse(r.data_json)), refs: parse(r.refs_json) }));
 }
 /** Retention (DBTREE B6): debug rows older than 14 days, the rest older than 90 days. Returns rows deleted. */
@@ -1243,15 +1246,18 @@ const meta = (m) => Object.fromEntries(m.db.prepare('SELECT key, value FROM mach
 const outboxFileFor = (machineFile) => `${path.resolve(machineFile)}.outbox.jsonl`;
 /** The writes that may wait in the outbox: each is idempotent (recordLandOutcome on spanId, log on src). */
 const DEFERRABLE = Object.freeze({ recordLandOutcome, log });
+// The outbox 'log' op stamps src:'outbox:<id>' on each row of its first arg; other ops keep args as passed.
+const outboxArgs = (op, args, id) => { if (op !== 'log') return args;
+  return args.map((a, i) => { if (i !== 0) return a; return (Array.isArray(a) ? a : [a]).map((r) => ({ ...r, src: r.src ?? `outbox:${id}` })); }); };
 /** Append one deferred write; returns its id. */
 function deferWrite({ op, args = [], file = null, env = process.env, error = null }) {
   need(Object.hasOwn(DEFERRABLE, op), `machine-db: ${op} is not a deferrable write (${Object.keys(DEFERRABLE).join(', ')})`);
   const id = `ob-${Date.now().toString(36)}-${hex(4)}`;
-  const list = op === 'log' ? args.map((a, i) => (i === 0 ? (Array.isArray(a) ? a : [a]).map((r) => ({ ...r, src: r.src ?? `outbox:${id}` })) : a)) : args;
+  const list = outboxArgs(op, args, id);
   const target = outboxFileFor(file ?? machineFileFor(env));
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.appendFileSync(target, `${JSON.stringify({ id, at: Date.now(), pid: process.pid, op, args: list, error: error ? errText(error) : null })}\n`);
-  process.stderr.write(`[machine-db] deferred ${op} ${id} to ${target}${error ? `: ${errText(error)}` : ''}\n`);
+  process.stderr.write(`[machine-db] deferred ${op} ${id} to ${target}` + (error ? `: ${errText(error)}` : '') + '\n');
   return id;
 }
 /** withMachine(API[op](m, ...args)); when the store refuses it, the write goes to the outbox. {ok, value} | {ok:false, deferred, error}. */
@@ -1260,41 +1266,33 @@ export function writeOrDefer(op, args = [], { env = process.env, file = null } =
   try { return { ok: true, value: withMachine((m) => DEFERRABLE[op](m, ...args), { env, file }) }; }
   catch (error) { return { ok: false, deferred: deferWrite({ op, args, file, env, error }), error: errText(error) }; }
 }
+// Flush one claimed outbox file: each line through its typed writer, failed lines appended back to `base`.
+const flushOutboxFile = (m, f, base) => { const back = []; let flushed = 0, failed = 0;
+  for (const line of fs.readFileSync(f, 'utf8').split(/\r?\n/).filter(Boolean)) {
+    let item = null; try { item = JSON.parse(line); } catch { back.push(line); failed += 1; continue; }
+    try { need(Object.hasOwn(DEFERRABLE, item.op), `unknown op ${item.op}`); m.transaction(() => DEFERRABLE[item.op](m, ...(item.args ?? []))); flushed += 1; }
+    catch (error) { back.push(JSON.stringify({ ...item, error: errText(error), tries: (item.tries ?? 1) + 1 })); failed += 1; } }
+  if (back.length) fs.appendFileSync(base, `${back.join('\n')}\n`); fs.rmSync(f, { force: true });
+  return { flushed, failed }; };
+// The outbox files this flusher owns: the live file renamed aside, plus dead flushers' leftovers.
+const claimOutboxFiles = (m) => { const base = outboxFileFor(m.file), dir = path.dirname(base), stem = path.basename(base); const claimed = [];
+  try { const to = `${base}.${process.pid}.${Date.now()}.flushing`; fs.renameSync(base, to); claimed.push(to); }
+  catch (error) { if (error.code !== 'ENOENT') return { claimed, busy: errText(error), base }; }
+  let names = []; try { names = fs.readdirSync(dir); } catch { /* none */ }
+  for (const n of names) { const hit = n.startsWith(`${stem}.`) && /^(\d+)\.\d+\.flushing$/.exec(n.slice(stem.length + 1)); const full = path.join(dir, n);
+    if (hit && !claimed.includes(full) && Number(hit[1]) !== process.pid && !pidAlive(Number(hit[1]))) claimed.push(full); }
+  return { claimed, busy: null, base }; };
 /**
  * Apply every outbox line through its typed writer (each in its own transaction). A line that fails again goes back to
  * the outbox; a claimed file of a dead flusher is taken over. {flushed, failed, pending}.
  */
 function flushOutbox(m) {
   need(!m.readOnly, 'machine-db: flushOutbox needs a writer');
-  const base = outboxFileFor(m.file), dir = path.dirname(base), stem = path.basename(base);
-  const claimed = [];
-  try { const to = `${base}.${process.pid}.${Date.now()}.flushing`; fs.renameSync(base, to); claimed.push(to); }
-  catch (error) { if (error.code !== 'ENOENT') return { flushed: 0, failed: 0, pending: base, busy: errText(error) }; }
-  let names = [];
-  try { names = fs.readdirSync(dir); } catch { /* none */ }
-  for (const n of names) {
-    const hit = n.startsWith(`${stem}.`) && /^(\d+)\.\d+\.flushing$/.exec(n.slice(stem.length + 1));
-    const full = path.join(dir, n);
-    if (hit && !claimed.includes(full) && Number(hit[1]) !== process.pid && !pidAlive(Number(hit[1]))) claimed.push(full);
-  }
+  const { claimed, busy, base } = claimOutboxFiles(m);
+  if (busy) return { flushed: 0, failed: 0, pending: base, busy };
   let flushed = 0, failed = 0;
-  for (const f of claimed) {
-    const back = [];
-    for (const line of fs.readFileSync(f, 'utf8').split(/\r?\n/).filter(Boolean)) {
-      let item = null;
-      try { item = JSON.parse(line); } catch { back.push(line); failed += 1; continue; }
-      try {
-        need(Object.hasOwn(DEFERRABLE, item.op), `unknown op ${item.op}`);
-        m.transaction(() => DEFERRABLE[item.op](m, ...(item.args ?? [])));
-        flushed += 1;
-      } catch (error) {
-        back.push(JSON.stringify({ ...item, error: errText(error), tries: (item.tries ?? 1) + 1 })); failed += 1;
-      }
-    }
-    if (back.length) fs.appendFileSync(base, `${back.join('\n')}\n`);
-    fs.rmSync(f, { force: true });
-  }
-  if (flushed) log(m, { actor: 'harness', kind: 'machine-db.outbox-flushed', level: failed ? 'warn' : 'info', msg: `outbox: ${flushed} deferred write(s) applied${failed ? `, ${failed} still pending` : ''}`, data: { flushed, failed } });
+  for (const f of claimed) { const r = flushOutboxFile(m, f, base); flushed += r.flushed; failed += r.failed; }
+  if (flushed) log(m, { actor: 'harness', kind: 'machine-db.outbox-flushed', level: failed ? 'warn' : 'info', msg: `outbox: ${flushed} deferred write(s) applied` + (failed ? `, ${failed} still pending` : ''), data: { flushed, failed } });
   return { flushed, failed, pending: failed ? base : null };
 }
 
@@ -1359,6 +1357,6 @@ if (isMain(import.meta.url)) {
       withMachine((m) => out(m.registerLedger({ ledgerId: flag('ledger-id'), name: flag('name'), repoRoot: flag('repo'), file: flag('ledger-file'), product: flag('product') })), { file });
     } else if (cmd === 'resolve') {
       withMachine((m) => out(m.resolveLedger({ ledgerId: flag('ledger-id'), name: flag('name'), repoRoot: flag('repo'), create: args.includes('--create') })), { file });
-    } else { throw Error(`unknown command ${cmd}: init | status | ledgers [--all] | register --ledger-id --name --repo | resolve (--repo|--name|--ledger-id) [--create]`); }
+    } else { throw new Error(`unknown command ${cmd}: init | status | ledgers [--all] | register --ledger-id --name --repo | resolve (--repo|--name|--ledger-id) [--create]`); }
   } catch (error) { process.stderr.write(`${error.code ?? 'error'}: ${error.message}\n`); process.exit(2); }
 }

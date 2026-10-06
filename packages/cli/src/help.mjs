@@ -14,10 +14,10 @@ const rows = (entries) => {
 
 export function topHelp(catalog, version = null) {
   const groups = Object.entries(catalog.groups ?? {}).map(([name, group]) => [name, group.summary ?? '']);
-  const options = (catalog.global ?? []).map((flag) => [`--${flag.name}${flag.type === 'boolean' ? '' : ` <${flag.name}>`}`, flag.summary ?? '']);
+  const options = (catalog.global ?? []).map((flag) => [`--${flag.name}` + (flag.type === 'boolean' ? '' : ` <${flag.name}>`), flag.summary ?? '']);
   const explainUsage = (catalog.commands ?? []).includes('explain') ? ['       starci explain <group> <verb>'] : [];
   return [
-    `starci${version ? ` ${version}` : ''} - one CLI for apps and the StarCi runtime`,
+    `starci${version ? ' ' + version : ''} - one CLI for apps and the StarCi runtime`,
     '',
     'Usage: starci <group> <verb> [options]',
     '       starci help',
@@ -55,7 +55,9 @@ export function verbHelp(catalog, groupName, verbName) {
   const verb = catalog.groups?.[groupName]?.verbs?.[verbName];
   if (!verb) return null;
   const local = (verb.flags ?? []).map((flag) => {
-    const value = flag.type === 'boolean' ? '' : flag.type === 'enum' ? ` <${(flag.enum ?? []).join('|')}>` : ` <${flag.name}>`;
+    let value = ` <${flag.name}>`;
+    if (flag.type === 'boolean') value = '';
+    else if (flag.type === 'enum') value = ` <${(flag.enum ?? []).join('|')}>`;
     const required = flag.required ? ' (required)' : '';
     return [`--${flag.name}${value}`, `${flag.summary ?? ''}${required}`];
   });

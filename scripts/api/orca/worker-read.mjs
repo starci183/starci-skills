@@ -33,9 +33,9 @@ export function workerRead({ dispatch, source = null, cursor = null, limit = nul
   const result = r.result;
   const errorCode = typeof r.receipt?.error?.code === 'string' ? r.receipt.error.code : null;
   const kind = result?.source ?? null;
-  const rows = kind === 'transcript'
-    ? (Array.isArray(result?.transcript?.messages) ? result.transcript.messages.map(messageText) : [])
-    : (Array.isArray(result?.terminal?.tail) ? result.terminal.tail.map((l) => String(l ?? '')) : []);
+  let rows = [];
+  if (kind === 'transcript' && Array.isArray(result?.transcript?.messages)) rows = result.transcript.messages.map(messageText);
+  else if (kind !== 'transcript' && Array.isArray(result?.terminal?.tail)) rows = result.terminal.tail.map((l) => String(l ?? ''));
   return {
     ok: r.exitCode === 0 && Boolean(result) && (kind === 'transcript' || kind === 'terminal'),
     source: kind,

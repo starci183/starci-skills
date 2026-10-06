@@ -20,19 +20,17 @@
 // Difficulty vocabulary: easy|medium|hard|insane, and nothing else; any other
 // spelling is unknown and refused where a difficulty enters.
 
-import fs from 'node:fs';
 import { readYamlFile } from '../lib/read-yaml.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { ALLOCATION_POLICIES } from '../../engine/config.mjs';
 import { credentialFingerprintOf, credentialRotated } from './credential-fingerprint.mjs';
 import { readProviderCircuit } from '../machine/provider-circuit.mjs';
 import { poolCapsNow } from '../machine/pool-backoff.mjs';
-import { DEFAULT_MODELS_DIR } from './model-registry.mjs';
+import { DEFAULT_MODELS_DIR, loadModelRegistry, loadRuntimes, defaultOperationTarget } from './model-registry.mjs';
+import { selectPool as selectPoolPolicy } from './pool-selection.mjs';
 
-export { loadModelRegistry, loadRuntimes, defaultOperationTarget } from './model-registry.mjs';
-import { loadModelRegistry, loadRuntimes } from './model-registry.mjs';
+export { loadModelRegistry, loadRuntimes, defaultOperationTarget };
 import { normalizeProvider } from '../lib/provider.mjs';
 import { selectPoolAdmission } from './pool-admission.mjs';
 
@@ -209,63 +207,6 @@ export function missingHostTools({ pool, kind, modelsDir, opsDir } = {}) {
   return hostToolsRequired(kind, { opsDir }).filter((tool) => !have.includes(tool));
 }
 
-// Eligibility reasons for one pool at one difficulty. [] = eligible. The
-// capacity map is caller-supplied live state: capacity[target] =
-// {auth, quota:normalizedSnapshot, running, openIncident}; common admission below refuses an absent live signal.
-// A pool serves a kind when it serves the kind's role, or when it serves the
-// order key the kind walks: an order that names a role (the implement order)
-// routes that order's work to the order's pools whatever the kind's role -
-// the mechanical ops are decide/plan/write-role kinds the hands take anyway
-// (owner routing 2026-09-26). Order keys that are not roles (think, ui,
-// review, draw, scaffold, sol-think) never widen serving.
-function poolRejectionReasons({ pool, target, role, kind, order = null, difficulty, capacity, grants, runtimes, modelsDir, opsDir, backoff = {} }) {
-  const reasons = [];
-  if (!pool) return [`no registry.yaml pool '${target}'`];
-  const orderServed = order && order !== role ? ` or order '${order}'` : '';
-  if (role && Array.isArray(pool.roles) && pool.roles.length && !pool.roles.includes(role) && !pool.roles.includes(order))
-    reasons.push(`pool does not serve role '${role}'${orderServed}`);
-  // An explicit-workflow-quota pool opens only under an owner grant
-  // (config.yaml allocation.grants, engine/config.mjs allocationGrants). A
-  // caller that passes no grants at all is a direct low-level consumer and is
-  // not gated; `starci kernel route` always passes the owner's grants.
-  if (grants && pool.capacityAuthority === 'explicit-workflow-quota') {
-    const grant = grants[pool.target ?? target] ?? grants[target] ?? null;
-    if (!grant) reasons.push(`pool needs an owner grant (capacityAuthority explicit-workflow-quota; config.yaml allocation.grants names none for ${target})`);
-    else {
-      if (role && Array.isArray(grant.roles) && !grant.roles.includes(role) && !grant.roles.includes(order))
-        reasons.push(`owner grant ${target}=${grant.slots}@${(grant.roles ?? []).join('+')} does not cover role '${role}'${orderServed}`);
-      const running = Number(capacity?.[target]?.running ?? 0);
-      if (Number.isFinite(Number(grant.slots)) && running >= Number(grant.slots))
-        reasons.push(`pool at granted capacity (${running}/${grant.slots} granted)`);
-    }
-  }
-  for (const tool of missingHostTools({ pool, kind, modelsDir, opsDir }))
-    reasons.push(`pool agent '${pool.provider}' lacks host tool '${tool}' required by kind '${kind}' (route.riskHints host-tool-required:${tool})`);
-  const lm = resolveLaunchModel(target, difficulty, { runtimes });
-  if (lm.error) reasons.push(lm.error);
-  const cap = capacity?.[target];
-  if (cap) {
-    // An open provider-health circuit names its own failureKind (quota, capacity, readiness, ...); only an
-    // auth circuit or a dead preflight probe is "auth".
-    if (cap.auth === 'dead') {
-      const kind = cap.providerHealth ? cap.providerHealth.failureKind ?? 'auth' : 'auth';
-      reasons.push(`provider ${kind} is unavailable${cap.authDetail ? `: ${cap.authDetail}` : ''}`);
-    }
-    if (cap.quota?.state === 'dead') reasons.push('capacity quota is dead');
-    const max = Number(pool.maxParallel);
-    const running = Number(cap.running ?? 0);
-    if (Number.isFinite(max) && Number.isFinite(running) && running >= max)
-      reasons.push(`pool at capacity (${running}/${max} running)`);
-    // Adaptive per-pool concurrency (scripts/machine/pool-backoff.mjs): after provider rate limits the reconciler's
-    // Resource controller halves the pool's effective parallelism; the next eligible pool of the order takes the job.
-    const backedOff = Number(backoff?.[target]);
-    if (Number.isInteger(backedOff) && backedOff > 0 && Number.isFinite(running) && running >= backedOff && !(Number.isFinite(max) && running >= max))
-      reasons.push(`pool backed off after provider rate limits (${running}/${backedOff} running, maxParallel ${Number.isFinite(max) ? max : '-'})`);
-    if (cap.openIncident === true) reasons.push('pool has an open incident');
-  }
-  return reasons;
-}
-
 export { ALLOCATION_POLICIES };
 
 // Balanced allocation: each pool's deficit is its owner target share minus its
@@ -275,8 +216,8 @@ export { ALLOCATION_POLICIES };
 // recent dispatches every actual share is 0, so the largest target (then chain
 // order) wins — the same pool prefer-then-overflow would pick at equal shares.
 export function balanceDeficits(pools, { shares = {}, recent = {} } = {}) {
-  const shareTotal = Object.values(shares ?? {}).reduce((sum, v) => sum + (Number(v) > 0 ? Number(v) : 0), 0);
-  const recentTotal = Object.values(recent ?? {}).reduce((sum, v) => sum + (Number(v) > 0 ? Number(v) : 0), 0);
+  const shareTotal = Object.values(shares ?? {}).reduce((sum, v) => sum + Math.max(0, Number(v) || 0), 0);
+  const recentTotal = Object.values(recent ?? {}).reduce((sum, v) => sum + Math.max(0, Number(v) || 0), 0);
   return Object.fromEntries(pools.map((pool) => {
     const target = shareTotal > 0 ? Math.max(0, Number(shares?.[pool] ?? 0)) / shareTotal : 0;
     const actual = recentTotal > 0 ? Math.max(0, Number(recent?.[pool] ?? 0)) / recentTotal : 0;
@@ -284,153 +225,9 @@ export function balanceDeficits(pools, { shares = {}, recent = {} } = {}) {
   }));
 }
 
-// The audit family a pool belongs to (its provider), for the cross-family
-// audit rule. The pools of runtimes.yaml allocation.frontier (the think order
-// when it is absent) and allocation.hands have one: Opus and Sol, and Devin
-// (owner decision 2026-09-25 review-hands).
-function auditFamilyOf(rt, target) {
-  const frontier = rt?.allocation?.frontier ?? rt?.allocation?.preference?.think ?? [];
-  const hands = Array.isArray(rt?.allocation?.hands) ? rt.allocation.hands : [];
-  if (!frontier.includes(target) && !hands.includes(target)) return null;
-  return rt?.runtimes?.[target]?.provider ?? target;
-}
-
-// selection.yaml allocationFacts.poolSelection owns this route. The declared
-// kind order and existing role/tool/grant/retry gates bound the common admission
-// group. Balance, audit family and overflow refine only its eligible candidates.
-// A static plan reports its declared model without claiming live admission.
-export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir, opsDir,
-  policy, shares, recent, grants, auditOf, fanOut = false, lineage = null, backoff = null,
-  scopeId, attemptId, now = Date.now(), modelRegistry, qualityFloor } = {}) {
-  // The backed-off pool caps apply to a live route (a capacity map); a caller may pass them, else they are read once.
-  const backoffCaps = backoff ?? (capacity ? poolCapsNow() : {});
-  // The kind's declared order, else think work the tier's `think` order whatever
-  // its role, else the role's order; the role - or an order that names a role -
-  // still gates each pool below.
-  const order = kindOrder({ kind, role, difficulty, fanOut, runtimes, modelsDir });
-  if (order.error) return { error: order.error };
-  const { rt, route, measured, difficulty: d, role: resolvedRole, orderKey: chainKey, chain: unbiased, tierSource } = order;
-  const allocationPolicy = ALLOCATION_POLICIES.includes(policy) ? policy
-    : (ALLOCATION_POLICIES.includes(rt?.allocation?.policy) ? rt.allocation.policy : 'prefer-then-overflow');
-  const balanced = allocationPolicy === 'balanced';
-  // Balanced keeps the tier order and lets `prefer` only break deficit ties;
-  // `avoid` removes under both policies.
-  // Live selection keeps the whole declared group for common hard filters; legacy pool-string bias is only
-  // used by static policy planning. A static plan never claims a fresh admission or starts a worker.
-  const biased = capacity ? unbiased : balanced ? applyBias(unbiased, { avoid: bias?.avoid ?? [] }) : applyBias(unbiased, bias);
-  const demote = (lineage?.demote ?? []).filter(Boolean), exclude = (lineage?.exclude ?? []).filter(Boolean);
-  const chain = [...biased.filter((t) => !demote.includes(t)), ...biased.filter((t) => demote.includes(t))];
-  const rejected = [];
-  let eligible = [];
-  // The order's overflow pools (overflowByOrder) never stop the scan: a later
-  // primary pool still outranks them, whatever a prefer bias hoisted.
-  const overflow = orderOverflowOf(rt, chainKey);
-  for (const target of chain) {
-    const pool = rt?.runtimes?.[target] ?? null;
-    if (exclude.includes(target)) {
-      const seen = lineage?.pools?.[target];
-      const reason = `excluded for this retry lineage: failed ${seen?.failures ?? 'twice'}x on it${seen?.causes?.length ? ` (${seen.causes.join(', ')})` : ''}`;
-      rejected.push({ target, reason, reasons: [reason] });
-      continue;
-    }
-    const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, order: chainKey, difficulty: d, capacity, grants, runtimes: rt, modelsDir, opsDir, backoff: backoffCaps });
-    if (reasons.length) { rejected.push({ target, reason: reasons[0], reasons }); continue; }
-    eligible.push(target);
-    // prefer-then-overflow stops at the first eligible pool
-    if (!capacity && !balanced && !auditOf && !overflow.includes(target)) break;
-  }
-  const { admission, constraintError } = selectPoolAdmission({ rt, targets: eligible, allowTargets: unbiased,
-    capacity, bias, kind, role: resolvedRole, difficulty: d, scopeId, attemptId, now, modelRegistry,
-    modelsDir, qualityFloor, backoffCaps, launchModel: (target) => resolveLaunchModel(target, d, { runtimes: rt }) });
-  if (capacity) {
-    for (const row of admission.rejected) rejected.push({ target: row.id, reason: row.codes[0], reasons: row.codes });
-    eligible = admission.eligible.map((candidate) => candidate.id);
-    if (!admission.ok && admission.reason !== 'no-eligible-candidate') return { error: `agent admission refused: ${admission.reason}`, admission,
-      role: resolvedRole, work: route.work, difficulty: d, measuredDifficulty: measured,
-      floor: route.floor, order: chainKey, chain, tierSource, rejected };
-  } else if (constraintError) {
-    return { error: constraintError, admission, rejected };
-  }
-  if (eligible.length) {
-    let candidates = eligible;
-    let crossFamily = null;
-    const authorFamily = auditOf && resolvedRole === 'verify'
-      && rt?.allocation?.thinkAuditCrossFamily !== false ? auditFamilyOf(rt, auditOf) : null;
-    if (authorFamily) {
-      const other = candidates.filter((t) => { const f = auditFamilyOf(rt, t); return f && f !== authorFamily; });
-      crossFamily = { author: auditOf, authorFamily, applied: other.length > 0 };
-      if (other.length) candidates = other;
-    }
-    // An order's overflow pools take the job only when no other candidate is eligible, under either policy.
-    let overflowUsed = false;
-    if (overflow.length) {
-      const primary = candidates.filter((t) => !overflow.includes(t));
-      if (primary.length) candidates = primary;
-      else overflowUsed = true;
-    }
-    // A pool the retry lineage failed on once is taken only when no other candidate is eligible.
-    if (demote.length) {
-      const primary = candidates.filter((t) => !demote.includes(t));
-      if (primary.length) candidates = primary;
-    }
-    let balance = null;
-    let target;
-    if (balanced) {
-      const workClass = route.work ?? 'hands-on';
-      // overflowOnly.<work class> is a list for every tier, or a map keyed by difficulty tier.
-      const declared = rt?.allocation?.balanced?.overflowOnly?.[workClass];
-      const overflowOnly = (Array.isArray(declared) ? declared : declared?.[d]) ?? [];
-      const primary = candidates.filter((t) => !overflowOnly.includes(t));
-      if (primary.length) candidates = primary;
-      const deficits = balanceDeficits(candidates, { shares, recent });
-      const preferred = new Set((bias?.prefer ?? []).map((item) => typeof item === 'string' ? item : item?.pool).filter(Boolean));
-      const EPS = 1e-9;
-      // The order ranks, the share caps: the first candidate still below its share takes it.
-      const underShare = candidates.find((t) => deficits[t].deficit > EPS) ?? null;
-      target = underShare ?? candidates.reduce((best, t) => {
-        if (best === null) return t;
-        const diff = deficits[t].deficit - deficits[best].deficit;
-        if (diff > EPS) return t;
-        if (Math.abs(diff) <= EPS && preferred.has(t) && !preferred.has(best)) return t;
-        return best;
-      }, null);
-      balance = { candidates, deficits, rule: underShare ? 'first-under-share' : 'least-over' };
-    } else {
-      target = candidates[0];
-    }
-    // prefer-then-overflow reports only the pools passed over before the pick.
-    const shownRejected = balanced ? rejected
-      : rejected.filter((r) => chain.indexOf(r.target) < chain.indexOf(target));
-    const pool = rt.runtimes[target];
-    const { modelId, effort } = resolveLaunchModel(target, d, { runtimes: rt });
-    return { target: pool.target ?? target, modelId, effort, role: resolvedRole, work: route.work, difficulty: d,
-      measuredDifficulty: measured, floor: route.floor, order: chainKey, chain, tierSource, rejected: shownRejected, policy: allocationPolicy,
-      admission: capacity ? { ...admission, selected: admission.eligible.find((candidate) => candidate.id === target) } : admission,
-      ...(balance ? { balance } : {}), ...(crossFamily ? { crossFamily } : {}),
-      ...(overflow.length ? { overflow: { pools: overflow, used: overflowUsed } } : {}),
-      ...(lineage ? { lineage: { demoted: demote, excluded: exclude, demotedTaken: demote.includes(target) } } : {}) };
-  }
-  // No capacity or health state can fix a missing host tool, so when no pool in
-  // the chain could ever take the job for want of one, the refusal says which.
-  const tools = hostToolsRequired(kind, { opsDir });
-  const structural = chain.filter((target) => {
-    const pool = rt?.runtimes?.[target];
-    return pool && !(Array.isArray(pool.roles) && pool.roles.length && !pool.roles.includes(resolvedRole) && !pool.roles.includes(chainKey))
-      && !resolveLaunchModel(target, d, { runtimes: rt }).error;
-  });
-  const toolRefusal = tools.length > 0 && structural.length > 0
-    && structural.every((target) => missingHostTools({ pool: rt.runtimes[target], kind, modelsDir, opsDir }).length > 0);
-  if (toolRefusal) {
-    const holders = Object.entries(rt?.runtimes ?? {})
-      .filter(([, pool]) => !missingHostTools({ pool, kind, modelsDir, opsDir }).length)
-      .map(([target, pool]) => ({ target: pool.target ?? target, difficulties: Object.keys(pool.models ?? {}), roles: pool.roles ?? [] }));
-    const missing = [...new Set(structural.flatMap((target) => missingHostTools({ pool: rt.runtimes[target], kind, modelsDir, opsDir })))];
-    return { error: `no ${resolvedRole} pool at ${d} difficulty has host tool ${(missing.length ? missing : tools).join(', ')}`,
-      toolUnavailable: { tools: missing.length ? missing : tools, holders }, role: resolvedRole, work: route.work, difficulty: d,
-      measuredDifficulty: measured, floor: route.floor, order: chainKey, chain, tierSource, rejected, admission };
-  }
-  return { error: `no eligible pool for role '${resolvedRole}' at ${d} difficulty`, role: resolvedRole, work: route.work, difficulty: d,
-    measuredDifficulty: measured, floor: route.floor, chain, tierSource, rejected, admission };
+export function selectPool(input = {}) {
+  return selectPoolPolicy(input, { allocationPolicies: ALLOCATION_POLICIES, poolCapsNow, kindOrder, applyBias,
+    orderOverflowOf, resolveLaunchModel, missingHostTools, hostToolsRequired, selectPoolAdmission, balanceDeficits });
 }
 
 // Health ordering hints precede the separate common-admission evidence gate.
@@ -456,8 +253,9 @@ export function providerCircuitOf(db, provider, now = Date.now(), { credential, 
   if (value.failureKind === 'auth' && value.credentialFingerprint) {
     let current = null;
     try {
-      current = typeof credential === 'function' ? credential(key)
-        : credential !== undefined ? credential : credentialFingerprintOf(key);
+      if (typeof credential === 'function') current = credential(key);
+      else if (credential !== undefined) current = credential;
+      else current = credentialFingerprintOf(key);
     } catch { current = null; }
     if (credentialRotated(value, current)) return null;
   }

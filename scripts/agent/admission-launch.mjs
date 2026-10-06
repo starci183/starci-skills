@@ -1,5 +1,4 @@
 // The one semantic agent launch lifecycle: admission, immutable host replay and attested cleanup.
-import path from 'node:path';
 import { ensureLaunchTrust } from './trust.mjs';
 import { hostAgentVerdict } from './host-agents.mjs';
 import { workerStart } from '../api/orca/worker-start.mjs';

@@ -71,115 +71,96 @@ const handlerArgs = (validated, command, withFlagsBeforeDashes, { includeQuiet =
   return withFlagsBeforeDashes(validated.localArgs, extra);
 };
 
-/** The published CLI entry, with I/O and process seams for deterministic specs. */
-export async function main(argv = process.argv.slice(2), io = {}) {
-  const guarded = await guardFastPath(argv, io);
-  if (guarded !== null) return guarded;
-  const [catalogModule, completionModule, helpModule, installModule, linkModule, argsModule] = await Promise.all([
-    import('./catalog.generated.mjs'),
-    import('./completion.mjs'),
-    import('./help.mjs'),
-    import('./runtime-install.mjs'),
-    import('./runtime-link.mjs'),
-    import('./validate-args.mjs'),
-  ]);
-  const { CATALOG } = catalogModule;
-  const { completionFor, completionShells } = completionModule;
-  const { explainHelp, groupHelp, topHelp, verbHelp } = helpModule;
-  const { installRuntime } = installModule;
-  const { linkRuntime } = linkModule;
-  const { splitCommand, validateArgs, withFlagsBeforeDashes } = argsModule;
-  const stdout = io.stdout ?? process.stdout;
-  const stderr = io.stderr ?? process.stderr;
-  const catalog = io.catalog ?? CATALOG;
-  const version = io.version ?? cliVersion();
-  const home = io.home;
-  const env = io.env ?? process.env;
-  const initialCwd = io.cwd ?? process.cwd();
+const ioCtx = (io) => ({ io, stdout: io.stdout ?? process.stdout, stderr: io.stderr ?? process.stderr, env: io.env ?? process.env, home: io.home });
 
+/** Bare `starci`, `help`/`--help`/`-h` and `--version`; null when argv needs the dispatcher. */
+const earlyOut = (argv, { catalog, version, help, stdout }) => {
   if (argv.length === 0 || (argv.length === 1 && ['help', '--help', '-h'].includes(argv[0]))) {
-    writeTo(stdout, topHelp(catalog, version));
+    writeTo(stdout, help.topHelp(catalog, version));
     return 0;
   }
   if (argv.length === 1 && argv[0] === '--version') {
     writeTo(stdout, `${version}\n`);
     return 0;
   }
+  return null;
+};
 
-  const split = splitCommand(argv, catalog.global ?? []);
+/** `starci help [group] [verb]`; null when argv is not a help invocation. */
+const helpDispatch = (split, { catalog, version, help, stdout, stderr }) => {
+  if (split.group !== 'help') return null;
+  const verbName = split.args.find((token) => !token.startsWith('-'));
+  const target = split.verb ? catalog.groups?.[split.verb] : null;
+  if (split.verb && !target) return fail(stderr, `unknown group "${split.verb}"`);
+  if (verbName && !target.verbs?.[verbName]) return fail(stderr, `unknown verb "${verbName}" for group "${split.verb}"`);
+  let text;
+  if (!split.verb) text = help.topHelp(catalog, version);
+  else if (verbName) text = help.verbHelp(catalog, split.verb, verbName);
+  else text = help.groupHelp(catalog, split.verb);
+  writeTo(stdout, text);
+  return 0;
+};
 
-  if (split.group === 'help') {
-    const [verbName] = split.args.filter((token) => !token.startsWith('-'));
-    const target = split.verb ? catalog.groups?.[split.verb] : null;
-    if (split.verb && !target) return fail(stderr, `unknown group "${split.verb}"`);
-    if (verbName && !target.verbs?.[verbName]) return fail(stderr, `unknown verb "${verbName}" for group "${split.verb}"`);
-    writeTo(stdout, !split.verb ? topHelp(catalog, version) : verbName ? verbHelp(catalog, split.verb, verbName) : groupHelp(catalog, split.verb));
+/** `starci completion <shell>`; null when argv is not a completion invocation. */
+const completionDispatch = (split, { io, completionFor, completionShells, stdout, stderr }) => {
+  if (split.group !== 'completion') return null;
+  const shell = split.verb;
+  if (split.help && !split.args.length) {
+    writeTo(stdout, `Usage: starci completion <${completionShells.join('|')}>\n`);
     return 0;
   }
-  if (split.group === 'completion') {
-    const shell = split.verb;
-    if (split.help && !split.args.length) {
-      writeTo(stdout, `Usage: starci completion <${completionShells.join('|')}>\n`);
-      return 0;
-    }
-    if (!completionShells.includes(shell) || split.args.length) {
-      return fail(stderr, `completion expects one of: ${completionShells.join(', ')}`);
-    }
-    const text = (io.completionFor ?? completionFor)(shell);
-    if (text == null) return fail(stderr, `completion expects one of: ${completionShells.join(', ')}`);
-    writeTo(stdout, text);
-    return 0;
-  }
-  if (split.group === 'explain' && (catalog.commands ?? []).includes('explain')) {
-    if (split.help && !split.verb && !split.args.length) {
-      writeTo(stdout, 'Usage: starci explain <group> <verb>\n');
-      return 0;
-    }
-    const groupName = split.verb;
-    const verbNames = split.args.filter((token) => !token.startsWith('-'));
-    if (!groupName || verbNames.length !== 1) return fail(stderr, 'explain expects <group> <verb>');
-    const target = catalog.groups?.[groupName];
-    if (!target) return fail(stderr, `unknown group "${groupName}"`);
-    const verbName = verbNames[0];
-    if (!target.verbs?.[verbName]) {
-      return fail(stderr, `unknown verb "${verbName}" for group "${groupName}" (available: ${Object.keys(target.verbs ?? {}).join(', ')})`);
-    }
-    writeTo(stdout, explainHelp(catalog, groupName, verbName));
-    return 0;
-  }
+  if (!completionShells.includes(shell) || split.args.length) return fail(stderr, `completion expects one of: ${completionShells.join(', ')}`);
+  const text = (io.completionFor ?? completionFor)(shell);
+  if (text == null) return fail(stderr, `completion expects one of: ${completionShells.join(', ')}`);
+  writeTo(stdout, text);
+  return 0;
+};
 
+/** `starci explain <group> <verb>`; null when argv is not explain or the catalog lacks the command. */
+const explainDispatch = (split, { catalog, help, stdout, stderr }) => {
+  if (split.group !== 'explain' || !(catalog.commands ?? []).includes('explain')) return null;
+  if (split.help && !split.verb && !split.args.length) {
+    writeTo(stdout, 'Usage: starci explain <group> <verb>\n');
+    return 0;
+  }
+  const groupName = split.verb;
+  const verbNames = split.args.filter((token) => !token.startsWith('-'));
+  if (!groupName || verbNames.length !== 1) return fail(stderr, 'explain expects <group> <verb>');
+  const target = catalog.groups?.[groupName];
+  if (!target) return fail(stderr, `unknown group "${groupName}"`);
+  const verbName = verbNames[0];
+  if (!target.verbs?.[verbName]) {
+    return fail(stderr, `unknown verb "${verbName}" for group "${groupName}" (available: ${Object.keys(target.verbs ?? {}).join(', ')})`);
+  }
+  writeTo(stdout, help.explainHelp(catalog, groupName, verbName));
+  return 0;
+};
+
+/** Resolve group/verb against the catalog (printing help or failing); {command, group} or {code}. */
+const resolveCommand = (split, { catalog, version, help, stdout, stderr }) => {
   const wantsHelp = split.help;
   if (!split.group) {
-    if (wantsHelp) {
-      writeTo(stdout, topHelp(catalog, version));
-      return 0;
-    }
-    return fail(stderr, 'missing command group');
+    if (wantsHelp) { writeTo(stdout, help.topHelp(catalog, version)); return { code: 0 }; }
+    return { code: fail(stderr, 'missing command group') };
   }
   const group = catalog.groups?.[split.group];
-  if (!group) return fail(stderr, `unknown group "${split.group}"`);
+  if (!group) return { code: fail(stderr, `unknown group "${split.group}"`) };
   if (!split.verb) {
-    if (wantsHelp) {
-      writeTo(stdout, groupHelp(catalog, split.group));
-      return 0;
-    }
-    return fail(stderr, `missing verb for group "${split.group}"`);
+    if (wantsHelp) { writeTo(stdout, help.groupHelp(catalog, split.group)); return { code: 0 }; }
+    return { code: fail(stderr, `missing verb for group "${split.group}"`) };
   }
   const command = group.verbs?.[split.verb];
-  if (!command) return fail(stderr, `unknown verb "${split.verb}" for group "${split.group}"`);
-  if (wantsHelp) {
-    writeTo(stdout, verbHelp(catalog, split.group, split.verb));
-    return 0;
-  }
+  if (!command) return { code: fail(stderr, `unknown verb "${split.verb}" for group "${split.group}"`) };
+  if (wantsHelp) { writeTo(stdout, help.verbHelp(catalog, split.group, split.verb)); return { code: 0 }; }
+  return { command, group };
+};
 
-  const validated = validateArgs(split.args, { ...command, group: split.group, verb: split.verb }, catalog.global ?? []);
-  if (!validated.ok) return fail(stderr, validated.error, validated.code);
-  const cwd = path.resolve(initialCwd, validated.global.cwd ?? '.');
-  const args = handlerArgs(validated, command, withFlagsBeforeDashes);
-
-  if (split.group === 'runtime' && split.verb === 'install') {
+/** `starci runtime install|link`; null for any other verb. */
+const runtimeVerb = (split, validated, { io, installRuntime, linkRuntime, home, cwd, stdout, stderr }) => {
+  if (split.group !== 'runtime') return null;
+  if (split.verb === 'install') {
     const install = io.installRuntime ?? installRuntime;
-    return await install({
+    return install({
       cwd,
       ...(home ? { home } : {}),
       force: validated.values.force === true,
@@ -187,10 +168,9 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       noBootstrap: validated.values['no-bootstrap'] === true,
     }, io.runtimeInstallDeps ?? {});
   }
-
-  if (split.group === 'runtime' && split.verb === 'link') {
+  if (split.verb === 'link') {
     const link = io.linkRuntime ?? linkRuntime;
-    return await link({
+    return link({
       cwd,
       ...(home ? { home } : {}),
       root: validated.values.root ?? null,
@@ -200,23 +180,29 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       stderr,
     }, io.runtimeLinkDeps ?? {});
   }
+  return null;
+};
 
-  if (group.owner === '@starci/hfs') {
-    try {
-      const hfs = await (io.importHfs ?? importHfs)();
-      const entry = hfs.main ?? hfs.default?.main;
-      if (typeof entry !== 'function') return fail(stderr, '@starci/hfs does not export main(argv, io)', 1);
-      return Number(await entry([split.verb, ...args], {
-        ...io,
-        cwd,
-        stdout: (text) => writeTo(stdout, text),
-        stderr: (text) => writeTo(stderr, text),
-      })) || 0;
-    } catch (error) {
-      return fail(stderr, `cannot load @starci/hfs: ${error?.message ?? error}`, 1);
-    }
+/** A group owned by @starci/hfs runs in-process; null for runtime-owned groups. */
+const hfsDispatch = async (split, group, args, { io, cwd, stdout, stderr }) => {
+  if (group.owner !== '@starci/hfs') return null;
+  try {
+    const hfs = await (io.importHfs ?? importHfs)();
+    const entry = hfs.main ?? hfs.default?.main;
+    if (typeof entry !== 'function') return fail(stderr, '@starci/hfs does not export main(argv, io)', 1);
+    return Number(await entry([split.verb, ...args], {
+      ...io,
+      cwd,
+      stdout: (text) => writeTo(stdout, text),
+      stderr: (text) => writeTo(stderr, text),
+    })) || 0;
+  } catch (error) {
+    return fail(stderr, `cannot load @starci/hfs: ${error?.message ?? error}`, 1);
   }
+};
 
+/** Spawn the located runtime for the resolved verb; its exit status is the command's. */
+const runRuntime = (split, args, { io, cwd, env, home, stderr }) => {
   const skipped = [];
   const located = (io.locateRuntime ?? locateRuntime)({ cwd, env, skipped, ...(home ? { home } : {}) });
   if (!located) return noRuntime(stderr, split.group, skipped);
@@ -238,4 +224,47 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   }
   if (result?.status == null) return fail(stderr, `the runtime stopped on signal ${result?.signal ?? 'unknown'}`, 1);
   return result.status;
+};
+
+/** The published CLI entry, with I/O and process seams for deterministic specs. */
+export async function main(argv = process.argv.slice(2), io = {}) {
+  const guarded = await guardFastPath(argv, io);
+  if (guarded !== null) return guarded;
+  const [catalogModule, completionModule, helpModule, installModule, linkModule, argsModule] = await Promise.all([
+    import('./catalog.generated.mjs'),
+    import('./completion.mjs'),
+    import('./help.mjs'),
+    import('./runtime-install.mjs'),
+    import('./runtime-link.mjs'),
+    import('./validate-args.mjs'),
+  ]);
+  const catalog = io.catalog ?? catalogModule.CATALOG;
+  const ctx = {
+    ...ioCtx(io), catalog, version: io.version ?? cliVersion(), initialCwd: io.cwd ?? process.cwd(), globals: catalog.global ?? [],
+    help: helpModule, completionFor: completionModule.completionFor, completionShells: completionModule.completionShells,
+    installRuntime: installModule.installRuntime, linkRuntime: linkModule.linkRuntime,
+  };
+  const { splitCommand, validateArgs, withFlagsBeforeDashes } = argsModule;
+
+  const early = earlyOut(argv, ctx);
+  if (early !== null) return early;
+  const split = splitCommand(argv, ctx.globals);
+  for (const dispatch of [helpDispatch, completionDispatch, explainDispatch]) {
+    const out = dispatch(split, ctx);
+    if (out !== null) return out;
+  }
+  const resolved = resolveCommand(split, ctx);
+  if (!resolved.command) return resolved.code;
+  const { command, group } = resolved;
+
+  const validated = validateArgs(split.args, { ...command, group: split.group, verb: split.verb }, ctx.globals);
+  if (!validated.ok) return fail(ctx.stderr, validated.error, validated.code);
+  const cwd = path.resolve(ctx.initialCwd, validated.global.cwd ?? '.');
+  const args = handlerArgs(validated, command, withFlagsBeforeDashes);
+
+  const runtimeOut = await runtimeVerb(split, validated, { ...ctx, cwd });
+  if (runtimeOut !== null) return runtimeOut;
+  const hfsOut = await hfsDispatch(split, group, args, { ...ctx, cwd });
+  if (hfsOut !== null) return hfsOut;
+  return runRuntime(split, args, { ...ctx, cwd });
 }

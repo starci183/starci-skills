@@ -79,7 +79,7 @@ export function readWindsurfApiKey(file = devinCredentialsFile()) {
 }
 
 const clampPct = (n) => Math.min(100, Math.max(0, n));
-const asNumber = (v) => { if (v === null || v === undefined || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
+const asNumber = (v) => { if (v === null || v === undefined || v === '') { return null; } const n = Number(v); return Number.isFinite(n) ? n : null; };
 const iso = (unix) => { const n = asNumber(unix); return n == null ? null : new Date(n * 1000).toISOString(); };
 
 /** The probe result for one planStatus body. Pure; exported for the spec. */
@@ -93,10 +93,11 @@ export function planToResult(plan, { policy = allocationSettings()?.admission, n
   const remaining = Math.min(daily ?? 100, weekly ?? 100);
   const usedPercent = clampPct(Math.round((100 - remaining) * 10) / 10);
   const overage = asNumber(plan?.overageBalanceMicros) > 0;
+  const windowPart = (label, resetsIso) => `${label}% left` + (resetsIso ? `, resets ${resetsIso}` : '');
   const parts = [
     `devin seat quota ${usedPercent}% used (${remaining}% remaining)`,
-    daily != null ? `daily ${daily}% left${iso(plan?.dailyQuotaResetAtUnix) ? `, resets ${iso(plan.dailyQuotaResetAtUnix)}` : ''}` : null,
-    weekly != null ? `weekly ${weekly}% left${iso(plan?.weeklyQuotaResetAtUnix) ? `, resets ${iso(plan.weeklyQuotaResetAtUnix)}` : ''}` : null,
+    daily != null ? windowPart(`daily ${daily}`, iso(plan?.dailyQuotaResetAtUnix)) : null,
+    weekly != null ? windowPart(`weekly ${weekly}`, iso(plan?.weeklyQuotaResetAtUnix)) : null,
     plan?.billingStrategy ? `plan ${plan.billingStrategy}` : null,
     overage ? 'overage balance present' : null,
   ].filter(Boolean).join(' — ');
@@ -106,6 +107,43 @@ export function planToResult(plan, { policy = allocationSettings()?.admission, n
 }
 
 const cache = new Map();
+
+// The seat-quota child call: {ok:true, body} on an HTTP 2xx JSON body; else {ok:false, result} with the unknown state.
+const unknownSeatQuota = (detail) => ({ ok: false, result: { state: 'unknown', usedPercent: null, detail } });
+const seatApiResponse = (r, scrub) => {
+  if (r.error || r.status !== 0) {
+    const childError = r.error?.message ? ' (' + scrub(r.error.message) + ')' : '';
+    const stderr = r.stderr ? ': ' + scrub(r.stderr).slice(0, 200) : '';
+    return unknownSeatQuota('seat API child failed' + childError + stderr);
+  }
+  let out;
+  try { out = JSON.parse(r.stdout); } catch {
+    return unknownSeatQuota('seat API child returned unparsable output');
+  }
+  if (!Number.isInteger(out?.status) || out.status === 0) {
+    return unknownSeatQuota(`seat API unreachable: ${scrub(out?.error ?? 'network error')}`);
+  }
+  if (out.status < 200 || out.status >= 300) {
+    return unknownSeatQuota(`seat API answered HTTP ${out.status}`);
+  }
+  let body;
+  try { body = JSON.parse(out.body); } catch {
+    return unknownSeatQuota('seat API returned a non-JSON body');
+  }
+  return { ok: true, body };
+};
+const seatApiCall = (url, payload, timeoutMs, scrub) => {
+  let r;
+  try {
+    r = runNode([SEAT_QUOTA_FILE], {
+      input: JSON.stringify({ endpoint: url, payload, timeoutMs }),
+      encoding: 'utf8', timeout: timeoutMs + 8000, maxBuffer: 1 << 20, windowsHide: true,
+    });
+  } catch (error) {
+    return unknownSeatQuota(`seat API spawn failed: ${scrub(error?.message ?? error)}`);
+  }
+  return seatApiResponse(r, scrub);
+};
 
 /**
  * The pinned probe. Options (all injectable for specs):
@@ -145,33 +183,9 @@ export function probe({ endpoint, credentialsFile, apiKey = null, metadata = {},
   const hit = cache.get(cacheKey);
   if (cacheMs > 0 && hit && Date.now() - hit.at < cacheMs)
     return planToResult(hit.plan, { policy, now: clock(), observedAt: hit.observedAt, account });
-  let r;
-  try {
-    r = runNode([SEAT_QUOTA_FILE], {
-      input: JSON.stringify({ endpoint: url, payload, timeoutMs }),
-      encoding: 'utf8', timeout: timeoutMs + 8000, maxBuffer: 1 << 20, windowsHide: true,
-    });
-  } catch (error) {
-    return { state: 'unknown', usedPercent: null, detail: `seat API spawn failed: ${scrub(error?.message ?? error)}` };
-  }
-  if (r.error || r.status !== 0) {
-    return { state: 'unknown', usedPercent: null,
-      detail: `seat API child failed${r.error?.message ? ` (${scrub(r.error.message)})` : ''}${r.stderr ? `: ${scrub(r.stderr).slice(0, 200)}` : ''}` };
-  }
-  let out;
-  try { out = JSON.parse(r.stdout); } catch {
-    return { state: 'unknown', usedPercent: null, detail: 'seat API child returned unparsable output' };
-  }
-  if (!Number.isInteger(out?.status) || out.status === 0) {
-    return { state: 'unknown', usedPercent: null, detail: `seat API unreachable: ${scrub(out?.error ?? 'network error')}` };
-  }
-  if (out.status < 200 || out.status >= 300) {
-    return { state: 'unknown', usedPercent: null, detail: `seat API answered HTTP ${out.status}` };
-  }
-  let body;
-  try { body = JSON.parse(out.body); } catch {
-    return { state: 'unknown', usedPercent: null, detail: 'seat API returned a non-JSON body' };
-  }
+  const child = seatApiCall(url, payload, timeoutMs, scrub);
+  if (!child.ok) return child.result;
+  const { body } = child;
   const plan = body?.userStatus?.planStatus;
   if (!plan || typeof plan !== 'object') {
     return { state: 'unknown', usedPercent: null, detail: 'GetUserStatus carried no userStatus.planStatus' };

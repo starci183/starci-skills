@@ -31,6 +31,79 @@ const typedValue = (flag, raw) => {
   return raw;
 };
 
+/** One `--name[=value]` token: type-check it into values/global, or pass it through to localArgs. */
+const applyOption = (argv, index, token, { known, values, global, localArgs }) => {
+  const name = optionName(token);
+  const flag = known.get(name);
+  if (!flag) throw new Error(`unknown option --${name}`);
+  const { value: raw, consumed } = optionValue(argv, index, flag, known);
+  const value = typedValue(flag, raw);
+  if (flag.type === 'list') {
+    values[name] = [...(values[name] ?? []), value];
+  } else if (Object.hasOwn(values, name)) {
+    throw new Error(`--${name} may be given only once`);
+  } else {
+    values[name] = value;
+  }
+  if (flag.global) { global[name] = values[name]; }
+  else {
+    localArgs.push(token);
+    if (consumed) localArgs.push(argv[index + consumed]);
+  }
+  return consumed;
+};
+
+/** Every required local option must have been given. */
+const requiredCheck = (locals, values) => {
+  for (const flag of locals.values()) {
+    if (flag.required && !Object.hasOwn(values, flag.name)) throw new Error(`missing required option --${flag.name}`);
+  }
+};
+
+/** Positional arity and enum checks; passthrough tokens fill free slots first. */
+const checkPositionals = (verb, positionals, passthrough) => {
+  const positionalSchema = verb.positional ?? [];
+  const variadicAt = positionalSchema.findIndex((entry) => entry.variadic === true);
+  const maximum = variadicAt >= 0 ? Infinity : positionalSchema.length;
+  if (positionals.length > maximum) throw new Error(`too many positional arguments for ${verb.verb ?? 'command'}`);
+  positionals.push(...passthrough.slice(0, Math.max(0, maximum - positionals.length)));
+  for (let index = 0; index < positionalSchema.length; index += 1) {
+    const schema = positionalSchema[index];
+    const supplied = variadicAt === index ? positionals.slice(index) : positionals[index];
+    const empty = Array.isArray(supplied) ? supplied.length === 0 : supplied === undefined;
+    if (schema.required && empty) throw new Error(`missing required positional ${schema.name}`);
+    let candidates = [];
+    if (Array.isArray(supplied)) candidates = supplied;
+    else if (supplied !== undefined) candidates = [supplied];
+    for (const candidate of candidates) {
+      if (schema.enum && !schema.enum.includes(candidate)) {
+        throw new Error(`${schema.name} expects one of: ${schema.enum.join(', ')}`);
+      }
+    }
+  }
+};
+
+/** Edition availability, --cwd emptiness and --json support. */
+const checkGlobals = (verb, global) => {
+  if (global.edition !== undefined && Array.isArray(verb.editions) && !verb.editions.includes(global.edition)) {
+    throw new Error(`${verb.group ?? 'this command'} ${verb.verb ?? ''}`.trim() + ` is not available in the ${global.edition} edition (editions: ${verb.editions.join(', ')})`);
+  }
+  if (global.cwd === '') throw new Error('--cwd needs a value');
+  if (global.json === true && verb.json === 'none') {
+    throw new Error(`${verb.group ?? 'this command'} ${verb.verb ?? ''}`.trim() + ' has no machine output');
+  }
+};
+
+/** args = supplied locals, else their declared defaults (a list flag's scalar default wraps in an array). */
+const defaultArgs = (locals, values) => {
+  const args = {};
+  for (const flag of locals.values()) {
+    if (Object.hasOwn(values, flag.name)) args[flag.name] = values[flag.name];
+    else if (flag.default !== undefined) args[flag.name] = flag.type === 'list' && !Array.isArray(flag.default) ? [flag.default] : flag.default;
+  }
+  return args;
+};
+
 /**
  * Validate the arguments after a catalog group and verb.
  *
@@ -64,24 +137,7 @@ export function validateArgs(argv, verb, globalFlags = []) {
         continue;
       }
       if (token.startsWith('--')) {
-        const name = optionName(token);
-        const flag = known.get(name);
-        if (!flag) throw new Error(`unknown option --${name}`);
-        const { value: raw, consumed } = optionValue(argv, index, flag, known);
-        const value = typedValue(flag, raw);
-        index += consumed;
-        if (flag.type === 'list') {
-          values[name] = [...(values[name] ?? []), value];
-        } else if (Object.hasOwn(values, name)) {
-          throw new Error(`--${name} may be given only once`);
-        } else {
-          values[name] = value;
-        }
-        if (flag.global) global[name] = values[name];
-        else {
-          localArgs.push(token);
-          if (consumed) localArgs.push(argv[index]);
-        }
+        index += applyOption(argv, index, token, { known, values, global, localArgs });
         continue;
       }
       if (token.startsWith('-')) throw new Error(`unknown option ${token}`);
@@ -89,41 +145,10 @@ export function validateArgs(argv, verb, globalFlags = []) {
       localArgs.push(token);
     }
 
-    for (const flag of locals.values()) {
-      if (flag.required && !Object.hasOwn(values, flag.name)) throw new Error(`missing required option --${flag.name}`);
-    }
-
-    const positionalSchema = verb.positional ?? [];
-    const variadicAt = positionalSchema.findIndex((entry) => entry.variadic === true);
-    const maximum = variadicAt >= 0 ? Infinity : positionalSchema.length;
-    if (positionals.length > maximum) throw new Error(`too many positional arguments for ${verb.verb ?? 'command'}`);
-    positionals.push(...passthrough.slice(0, Math.max(0, maximum - positionals.length)));
-    for (let index = 0; index < positionalSchema.length; index += 1) {
-      const schema = positionalSchema[index];
-      const supplied = variadicAt === index ? positionals.slice(index) : positionals[index];
-      const empty = Array.isArray(supplied) ? supplied.length === 0 : supplied === undefined;
-      if (schema.required && empty) throw new Error(`missing required positional ${schema.name}`);
-      const candidates = Array.isArray(supplied) ? supplied : supplied === undefined ? [] : [supplied];
-      for (const candidate of candidates) {
-        if (schema.enum && !schema.enum.includes(candidate)) {
-          throw new Error(`${schema.name} expects one of: ${schema.enum.join(', ')}`);
-        }
-      }
-    }
-
-    if (global.edition !== undefined && Array.isArray(verb.editions) && !verb.editions.includes(global.edition)) {
-      throw new Error(`${verb.group ?? 'this command'} ${verb.verb ?? ''}`.trim() + ` is not available in the ${global.edition} edition (editions: ${verb.editions.join(', ')})`);
-    }
-    if (global.cwd === '') throw new Error('--cwd needs a value');
-    if (global.json === true && verb.json === 'none') {
-      throw new Error(`${verb.group ?? 'this command'} ${verb.verb ?? ''}`.trim() + ' has no machine output');
-    }
-    const args = {};
-    for (const flag of locals.values()) {
-      if (Object.hasOwn(values, flag.name)) args[flag.name] = values[flag.name];
-      else if (flag.default !== undefined) args[flag.name] = flag.type === 'list' && !Array.isArray(flag.default) ? [flag.default] : flag.default;
-    }
-    return { ok: true, values, args, global, localArgs, positionals };
+    requiredCheck(locals, values);
+    checkPositionals(verb, positionals, passthrough);
+    checkGlobals(verb, global);
+    return { ok: true, values, args: defaultArgs(locals, values), global, localArgs, positionals };
   } catch (error) {
     return { ok: false, code: 2, error: String(error?.message ?? error) };
   }

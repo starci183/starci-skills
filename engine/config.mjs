@@ -18,7 +18,7 @@ export const DEFAULT_MODEL_POOLS={'sol-opus':['claude-agent','codex-agent']};
 export const DEFAULT_OWNER_LANGUAGE='en';
 const ADAPTIVE_ALLOCATION_MODE='adaptive';
 /** The effort vocabulary, ordered weakest to strongest — the only list of it. */
-const EFFORT_LEVELS=['none','minimal','low','medium','high','xhigh','max','ultra'];
+const EFFORT_LEVELS=new Set(['none','minimal','low','medium','high','xhigh','max','ultra']);
 // Parsed once per file version (mtime + size) per process; each caller gets its own copy.
 // The one runtimes.yaml loader: it throws on a missing or unparsable file, so no caller ever
 // reasons on a silent empty document. The pool map (provider, roles, models, maxParallel)
@@ -28,13 +28,13 @@ let runtimeProfileCache=null;
 export function runtimeProfile(){
   const source=fileURLToPath(new URL('../modules/models/runtimes.yaml',import.meta.url));
   const registryFile=fileURLToPath(new URL('../modules/models/registry.yaml',import.meta.url));
-  let stat;try{stat=fs.statSync(source);}catch{throw Error('Missing modules/models/runtimes.yaml');}
-  let rstat;try{rstat=fs.statSync(registryFile);}catch{throw Error('Missing modules/models/registry.yaml');}
+  let stat;try{stat=fs.statSync(source);}catch{throw new Error('Missing modules/models/runtimes.yaml');}
+  let rstat;try{rstat=fs.statSync(registryFile);}catch{throw new Error('Missing modules/models/registry.yaml');}
   const version=`${stat.mtimeMs}:${stat.size}:${rstat.mtimeMs}:${rstat.size}`;
   if(runtimeProfileCache?.version!==version){
     const doc=parseYaml(fs.readFileSync(source,'utf8'));
     const registry=parseYaml(fs.readFileSync(registryFile,'utf8'));
-    runtimeProfileCache={version,profile:{...(doc??{}),runtimes:registry?.pools??{},models:registry?.models??{}}};
+    runtimeProfileCache={version,profile:{...doc,runtimes:registry?.pools??{},models:registry?.models??{}}};
   }
   return structuredClone(runtimeProfileCache.profile);
 }
@@ -49,8 +49,8 @@ function validateOwnerProfile(value,name,pathsKey){
   if(value===null)return;
   const bad=invalid(name);
   if(!plain(value))bad(' must be an owner approval mapping or null.');
-  const keys=['approvedBy','approvalRef',pathsKey,...(name==='launchTrust'?['profile']:[])];
-  for(const key of Object.keys(value))if(!keys.includes(key))bad(` has unknown key ${key}.`);
+  const keys=new Set(['approvedBy','approvalRef',pathsKey,...(name==='launchTrust'?['profile']:[])]);
+  for(const key of Object.keys(value))if(!keys.has(key))bad(` has unknown key ${key}.`);
   if(value.approvedBy!=='owner')bad('.approvedBy must be owner; adoption must come from the current owner.');
   if(typeof value.approvalRef!=='string'||!value.approvalRef.trim())bad('.approvalRef must identify the current owner approval.');
   if(name==='launchTrust'&&!['automatic','declined'].includes(value.profile))bad('.profile must be automatic or declined.');
@@ -71,7 +71,7 @@ export function workflowPurgeSettings(config=loadConfig()){
 export function allocationMs(dotted){
   const raw=dotted.split('.').reduce((node,key)=>(node==null?node:node[key]),allocationSettings());
   const value=Number(raw);
-  if(!Number.isFinite(value)||value<=0)throw Error(`modules/models/runtimes.yaml allocation.${dotted} must declare a positive number of milliseconds`);
+  if(!Number.isFinite(value)||value<=0)throw new Error(`modules/models/runtimes.yaml allocation.${dotted} must declare a positive number of milliseconds`);
   return value;
 }
 /**
@@ -82,7 +82,7 @@ export function allocationMs(dotted){
 export function slicingGears(){
   const gears=allocationSettings()?.slicing?.gears;
   if(!Array.isArray(gears)||!gears.length||gears.some(value=>!Number.isInteger(value)||value<1))
-    throw Error('modules/models/runtimes.yaml allocation.slicing.gears must declare a non-empty list of positive integers');
+    throw new Error('modules/models/runtimes.yaml allocation.slicing.gears must declare a non-empty list of positive integers');
   return [...gears];
 }
 /** The gear an absent `parallel` block means. The first declared gear, never a literal. */
@@ -109,71 +109,62 @@ export const CONNECTOR_DEFAULTS=Object.freeze({
 });
 const HOSTNAME=/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
 const TUNNEL_REF=/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
-const CHAT_ID=/^(?:-?\d{1,20}|@[A-Za-z][A-Za-z0-9_]{4,31})$/;
-const SECRET_KEYS=['token','tunnelToken','botToken','secret','apiToken','password'];
+const CHAT_ID=/^(?:-?\d{1,20}|@[A-Za-z]\w{4,31})$/;
+const SECRET_KEYS=new Set(['token','tunnelToken','botToken','secret','apiToken','password']);
+const closedConnectorShape=(bad,node,where,keys)=>{
+  if(!plain(node))bad(`.${where} must be a mapping.`);
+  for(const key of Object.keys(node)){
+    if(SECRET_KEYS.has(key))bad(`.${where}.${key}: secrets never live in config.yaml — set the environment variable the *Env key names instead.`);
+    if(!keys.includes(key))bad(`.${where} has unknown key ${key} (allowed: ${keys.join(', ')}).`);
+  }
+};
+const connectorEnvName=(bad,where,value)=>{if(value!==undefined&&(typeof value!=='string'||!ENV_NAME.test(value)))bad(`.${where} must name an environment variable (UPPER_SNAKE), never hold the secret itself.`);};
+const validateCloudflareConnector=cf=>{
+  const bad=invalid('connectors');
+  closedConnectorShape(bad,cf,'cloudflare',['mode','tunnel','credentialsFile','tokenEnv','hostname','access']);
+  if(cf.mode!==undefined&&!CLOUDFLARE_MODES.includes(cf.mode))bad(`.cloudflare.mode must be one of ${CLOUDFLARE_MODES.join(' | ')}.`);
+  connectorEnvName(bad,'cloudflare.tokenEnv',cf.tokenEnv);
+  if(cf.hostname!==undefined&&cf.hostname!==null&&(typeof cf.hostname!=='string'||!HOSTNAME.test(cf.hostname)))bad('.cloudflare.hostname must be a bare hostname (no scheme, no path) or null.');
+  if(cf.access!==undefined&&typeof cf.access!=='boolean')bad('.cloudflare.access must be true or false.');
+  if(cf.tunnel!==undefined&&cf.tunnel!==null&&(typeof cf.tunnel!=='string'||!TUNNEL_REF.test(cf.tunnel)))bad('.cloudflare.tunnel must be the named tunnel UUID (or name) or null.');
+  if(cf.credentialsFile!==undefined&&cf.credentialsFile!==null&&(typeof cf.credentialsFile!=='string'||!cf.credentialsFile.trim()))bad('.cloudflare.credentialsFile must be the tunnel credentials JSON path or null.');
+  if(cf.credentialsFile&&!cf.tunnel)bad('.cloudflare.credentialsFile needs cloudflare.tunnel (the tunnel UUID the credentials belong to).');
+  if(cf.mode==='named'&&!cf.hostname)bad('.cloudflare.mode named needs cloudflare.hostname (the public hostname routed to the gateway).');
+  if(cf.mode==='quick'&&(cf.tunnel||cf.credentialsFile))bad('.cloudflare.mode quick runs no named tunnel; tunnel/credentialsFile are for mode named.');
+  if(cf.mode==='quick'&&cf.hostname)bad('.cloudflare.mode quick gets a random trycloudflare.com hostname; set hostname only for mode named.');
+};
+const validateTelegramConnector=tg=>{
+  const bad=invalid('connectors');
+  closedConnectorShape(bad,tg,'telegram',['enabled','botTokenEnv','chatId','exposeCredentialAsks']);
+  if(tg.enabled!==undefined&&typeof tg.enabled!=='boolean')bad('.telegram.enabled must be true or false.');
+  connectorEnvName(bad,'telegram.botTokenEnv',tg.botTokenEnv);
+  if(tg.chatId!==undefined&&tg.chatId!==null&&!((Number.isSafeInteger(tg.chatId))||(typeof tg.chatId==='string'&&CHAT_ID.test(tg.chatId))))
+    bad('.telegram.chatId must be a numeric chat id, an @channel name, or null.');
+  if(tg.exposeCredentialAsks!==undefined&&typeof tg.exposeCredentialAsks!=='boolean')bad('.telegram.exposeCredentialAsks must be true or false.');
+  if(tg.enabled===true&&(tg.chatId===undefined||tg.chatId===null))bad('.telegram.enabled needs telegram.chatId.');
+};
 function validateConnectors(connectors){
   if(connectors===null)return;
   const bad=invalid('connectors');
   if(!plain(connectors))bad(' must be {repos?, gateway?, cloudflare?, telegram?} or null.');
-  const closed=(node,where,keys)=>{
-    if(!plain(node))bad(`.${where} must be a mapping.`);
-    for(const key of Object.keys(node)){
-      if(SECRET_KEYS.includes(key))bad(`.${where}.${key}: secrets never live in config.yaml — set the environment variable the *Env key names instead.`);
-      if(!keys.includes(key))bad(`.${where} has unknown key ${key} (allowed: ${keys.join(', ')}).`);
-    }
-  };
-  closed(connectors,'',['repos','gateway','cloudflare','telegram']);
+  closedConnectorShape(bad,connectors,'',['repos','gateway','cloudflare','telegram']);
   if(connectors.repos!==undefined&&(!Array.isArray(connectors.repos)||connectors.repos.some(repo=>typeof repo!=='string'||!repo.trim())))bad('.repos must be a list of repository paths.');
   if(connectors.gateway!==undefined){
-    closed(connectors.gateway,'gateway',['port']);
+    closedConnectorShape(bad,connectors.gateway,'gateway',['port']);
     const port=connectors.gateway.port;
     if(port!==undefined&&(!Number.isInteger(port)||port<1024||port>65535||(port>=ASK_PORT_BAND[0]&&port<=ASK_PORT_BAND[1])))
       bad(`.gateway.port must be an integer port in 1024..65535 outside the serve-ask band ${ASK_PORT_BAND.join('..')}.`);
   }
-  const envName=(where,value)=>{if(value!==undefined&&(typeof value!=='string'||!ENV_NAME.test(value)))bad(`.${where} must name an environment variable (UPPER_SNAKE), never hold the secret itself.`);};
-  if(connectors.cloudflare!==undefined){
-    const cf=connectors.cloudflare;
-    closed(cf,'cloudflare',['mode','tunnel','credentialsFile','tokenEnv','hostname','access']);
-    if(cf.mode!==undefined&&!CLOUDFLARE_MODES.includes(cf.mode))bad(`.cloudflare.mode must be one of ${CLOUDFLARE_MODES.join(' | ')}.`);
-    envName('cloudflare.tokenEnv',cf.tokenEnv);
-    if(cf.hostname!==undefined&&cf.hostname!==null&&(typeof cf.hostname!=='string'||!HOSTNAME.test(cf.hostname)))bad('.cloudflare.hostname must be a bare hostname (no scheme, no path) or null.');
-    if(cf.access!==undefined&&typeof cf.access!=='boolean')bad('.cloudflare.access must be true or false.');
-    if(cf.tunnel!==undefined&&cf.tunnel!==null&&(typeof cf.tunnel!=='string'||!TUNNEL_REF.test(cf.tunnel)))bad('.cloudflare.tunnel must be the named tunnel UUID (or name) or null.');
-    if(cf.credentialsFile!==undefined&&cf.credentialsFile!==null&&(typeof cf.credentialsFile!=='string'||!cf.credentialsFile.trim()))bad('.cloudflare.credentialsFile must be the tunnel credentials JSON path or null.');
-    if(cf.credentialsFile&&!cf.tunnel)bad('.cloudflare.credentialsFile needs cloudflare.tunnel (the tunnel UUID the credentials belong to).');
-    if(cf.mode==='named'&&!cf.hostname)bad('.cloudflare.mode named needs cloudflare.hostname (the public hostname routed to the gateway).');
-    if(cf.mode==='quick'&&(cf.tunnel||cf.credentialsFile))bad('.cloudflare.mode quick runs no named tunnel; tunnel/credentialsFile are for mode named.');
-    if(cf.mode==='quick'&&cf.hostname)bad('.cloudflare.mode quick gets a random trycloudflare.com hostname; set hostname only for mode named.');
-  }
-  if(connectors.telegram!==undefined){
-    const tg=connectors.telegram;
-    closed(tg,'telegram',['enabled','botTokenEnv','chatId','exposeCredentialAsks']);
-    if(tg.enabled!==undefined&&typeof tg.enabled!=='boolean')bad('.telegram.enabled must be true or false.');
-    envName('telegram.botTokenEnv',tg.botTokenEnv);
-    if(tg.chatId!==undefined&&tg.chatId!==null&&!((Number.isSafeInteger(tg.chatId))||(typeof tg.chatId==='string'&&CHAT_ID.test(tg.chatId))))
-      bad('.telegram.chatId must be a numeric chat id, an @channel name, or null.');
-    if(tg.exposeCredentialAsks!==undefined&&typeof tg.exposeCredentialAsks!=='boolean')bad('.telegram.exposeCredentialAsks must be true or false.');
-    if(tg.enabled===true&&(tg.chatId===undefined||tg.chatId===null))bad('.telegram.enabled needs telegram.chatId.');
-  }
+  if(connectors.cloudflare!==undefined)validateCloudflareConnector(connectors.cloudflare);
+  if(connectors.telegram!==undefined)validateTelegramConnector(connectors.telegram);
 }
 /** Load connector credentials from the explicitly verified runtime main; never print the returned environment. */
-export function connectorEnv(config,env=process.env,verifiedRuntimeRoot){return secretEnv(verifiedRuntimeRoot,env);}
+export function connectorEnv(config,env=process.env,verifiedRuntimeRoot=undefined){return secretEnv(verifiedRuntimeRoot,env);}
 /**
  * The normalized `connectors` block: defaults filled in, the secrets' PRESENCE (booleans, never values),
  * whether each connector is ready to run, and the owner-facing warnings the security posture earns.
  */
-export function connectorsConfig(config=loadConfig(),env=process.env,root=configRoot){
-  validateConfig(config);
-  const raw=plain(config?.connectors)?config.connectors:{},d=CONNECTOR_DEFAULTS;
-  const cloudflare={...d.cloudflare,...(raw.cloudflare??{})},telegram={...d.telegram,...(raw.telegram??{})};
-  if(cloudflare.credentialsFile)cloudflare.credentialsFile=path.resolve(root,cloudflare.credentialsFile.replace(/^~(?=[\\/])/,env.USERPROFILE??env.HOME??'~'));
-  cloudflare.tokenPresent=connectorSecret(cloudflare.tokenEnv,env)!==null;
-  cloudflare.credentialsPresent=Boolean(cloudflare.credentialsFile&&fs.existsSync(cloudflare.credentialsFile));
-  cloudflare.auth=cloudflare.mode!=='named'?null:cloudflare.credentialsFile?'credentials-file':'token';
-  cloudflare.publicBase=cloudflare.mode==='named'?`https://${cloudflare.hostname}`:null;
-  telegram.chatId=telegram.chatId===null?null:String(telegram.chatId);
-  telegram.botTokenPresent=connectorSecret(telegram.botTokenEnv,env)!==null;
-  telegram.configured=telegram.enabled===true&&telegram.chatId!==null&&telegram.botTokenPresent;
+const connectorWarnings=(cloudflare,telegram)=>{
   const warnings=[];
   if(cloudflare.mode==='quick')warnings.push('cloudflare.mode quick: the ask link is public and unauthenticated — anyone holding the URL can open and answer the form; the hostname changes on every restart.');
   if(cloudflare.mode==='named'&&!cloudflare.access)warnings.push(`cloudflare.access is false: ${cloudflare.hostname} is not fronted by Cloudflare Access, so the nonce URL is the only credential.`);
@@ -181,7 +172,22 @@ export function connectorsConfig(config=loadConfig(),env=process.env,root=config
   if(cloudflare.auth==='token'&&!cloudflare.tokenPresent)warnings.push(`cloudflare.mode named: the tunnel token is not set — export ${cloudflare.tokenEnv} (or ${cloudflare.tokenEnv}_FILE).`);
   if(telegram.enabled&&!telegram.botTokenPresent)warnings.push(`telegram.enabled: the bot token is not set — export ${telegram.botTokenEnv} (or ${telegram.botTokenEnv}_FILE).`);
   if(telegram.exposeCredentialAsks)warnings.push('telegram.exposeCredentialAsks is true: credential asks are posted as public links; Telegram cloud chats are not end-to-end encrypted.');
-  return {repos:[...(raw.repos??d.repos)],gateway:{...d.gateway,...(raw.gateway??{})},cloudflare,telegram,warnings};
+  return warnings;
+};
+export function connectorsConfig(config=loadConfig(),env=process.env,root=configRoot){
+  validateConfig(config);
+  const raw=plain(config?.connectors)?config.connectors:{},d=CONNECTOR_DEFAULTS;
+  const cloudflare={...d.cloudflare,...raw.cloudflare},telegram={...d.telegram,...raw.telegram};
+  if(cloudflare.credentialsFile)cloudflare.credentialsFile=path.resolve(root,cloudflare.credentialsFile.replace(/^~(?=[\\/])/,env.USERPROFILE??env.HOME??'~'));
+  cloudflare.tokenPresent=connectorSecret(cloudflare.tokenEnv,env)!==null;
+  cloudflare.credentialsPresent=Boolean(cloudflare.credentialsFile&&fs.existsSync(cloudflare.credentialsFile));
+  const namedAuth=cloudflare.credentialsFile?'credentials-file':'token';
+  cloudflare.auth=cloudflare.mode==='named'?namedAuth:null;
+  cloudflare.publicBase=cloudflare.mode==='named'?`https://${cloudflare.hostname}`:null;
+  telegram.chatId=telegram.chatId===null?null:String(telegram.chatId);
+  telegram.botTokenPresent=connectorSecret(telegram.botTokenEnv,env)!==null;
+  telegram.configured=telegram.enabled===true&&telegram.chatId!==null&&telegram.botTokenPresent;
+  return {repos:[...(raw.repos??d.repos)],gateway:{...d.gateway,...raw.gateway},cloudflare,telegram,warnings:connectorWarnings(cloudflare,telegram)};
 }
 /**
  * config.yaml `asks` — whether an owner ask that carries a recommended option is answered with it
@@ -194,6 +200,11 @@ export function connectorsConfig(config=loadConfig(),env=process.env,root=config
 export const ASK_KINDS=Object.freeze(['information','credential','account','access','consent','authority','business-decision','irreversible-confirmation']);
 const ASK_EXCLUDE_CLASSES=Object.freeze([...ASK_KINDS,'handover','draw-review']);
 export const ASKS_DEFAULTS=Object.freeze({autoAcceptRecommended:false,excludes:Object.freeze(['credential','irreversible-confirmation','handover'])});
+const validateAskExcludes=(bad,excludes)=>{
+  if(!Array.isArray(excludes))bad(`.excludes must be a list of ask classes (${ASK_EXCLUDE_CLASSES.join(', ')}).`);
+  for(const entry of excludes)if(typeof entry!=='string'||!ASK_EXCLUDE_CLASSES.includes(entry))bad(`.excludes entry ${JSON.stringify(entry)} is not an ask class (${ASK_EXCLUDE_CLASSES.join(', ')}).`);
+  if(new Set(excludes).size!==excludes.length)bad('.excludes names each class once.');
+};
 function validateAsks(asks){
   if(asks===null)return;
   const bad=invalid('asks');
@@ -201,11 +212,7 @@ function validateAsks(asks){
   for(const key of Object.keys(asks))if(!['autoAcceptRecommended','excludes'].includes(key))bad(` has unknown key ${key} (allowed: autoAcceptRecommended, excludes).`);
   if(asks.autoAcceptRecommended!==undefined&&typeof asks.autoAcceptRecommended!=='boolean')bad('.autoAcceptRecommended must be true or false.');
   const excludes=asks.excludes;
-  if(excludes!==undefined&&excludes!==null){
-    if(!Array.isArray(excludes))bad(`.excludes must be a list of ask classes (${ASK_EXCLUDE_CLASSES.join(', ')}).`);
-    for(const entry of excludes)if(typeof entry!=='string'||!ASK_EXCLUDE_CLASSES.includes(entry))bad(`.excludes entry ${JSON.stringify(entry)} is not an ask class (${ASK_EXCLUDE_CLASSES.join(', ')}).`);
-    if(new Set(excludes).size!==excludes.length)bad('.excludes names each class once.');
-  }
+  if(excludes!==undefined&&excludes!==null)validateAskExcludes(bad,excludes);
 }
 /**
  * config.yaml `uat` — the machine-wide UAT ceiling: at most `maxConcurrent` UAT runs (browsers, players,
@@ -244,60 +251,117 @@ export function parseAllocationGrant(text){
   const m=typeof text==='string'?GRANT.exec(text.trim()):null;
   return m?{pool:m[1],slots:Number(m[2]),roles:m[3].split('+')}:null;
 }
+const validateShares=(bad,shares,runtimes)=>{
+  if(!plain(shares)||!Object.keys(shares).length)bad('shares must map runtime pools to non-negative weights, e.g. {claude-agent: 25, codex-agent: 25}.');
+  for(const [pool,weight] of Object.entries(shares)){
+    if(!plain(runtimes[pool]))bad(`shares.${pool} is not a modules/models/registry.yaml pool (known: ${knownNames(Object.keys(runtimes))}).`);
+    if(typeof weight!=='number'||!Number.isFinite(weight)||weight<0)bad(`shares.${pool} must be a non-negative number.`);
+  }
+  if(!Object.values(shares).some(weight=>weight>0))bad('shares must give at least one pool a positive weight.');
+};
+const validateGrants=(bad,grants,runtimes)=>{
+  if(!Array.isArray(grants))bad('grants must be a list of "<pool>=<slots>@<role>+<role>" strings.');
+  const seen=new Set();
+  for(const text of grants){
+    const grant=parseAllocationGrant(text);
+    if(!grant)bad(`grants entry ${JSON.stringify(text)} is not "<pool>=<slots>@<role>+<role>" (e.g. devin-agent=10@implement+verify+write).`);
+    const runtime=runtimes[grant.pool];
+    if(!plain(runtime))bad(`grants entry ${text}: ${grant.pool} is not a modules/models/registry.yaml pool.`);
+    if(seen.has(grant.pool))bad(`grants names ${grant.pool} more than once.`);
+    seen.add(grant.pool);
+    const max=Number(runtime.maxParallel);
+    if(!(grant.slots>=1&&(!Number.isFinite(max)||grant.slots<=max)))bad(`grants entry ${text}: slots must be 1..${Number.isFinite(max)?max:'maxParallel'} (registry.yaml maxParallel).`);
+    const unserved=grant.roles.filter(role=>!(runtime.roles??[]).includes(role));
+    if(unserved.length)bad(`grants entry ${text}: ${grant.pool} does not serve role ${unserved.join(', ')} (registry.yaml roles: ${(runtime.roles??[]).join(', ')}).`);
+  }
+};
 function validateAllocationBalance(allocation,runtimes){
   const bad=invalid('allocation.');
   if(allocation.policy!==undefined&&allocation.policy!==null&&!ALLOCATION_POLICIES.includes(allocation.policy))
     bad(`policy must be one of ${ALLOCATION_POLICIES.join(' | ')}.`);
-  if(allocation.shares!==undefined&&allocation.shares!==null){
-    const shares=allocation.shares;
-    if(!plain(shares)||!Object.keys(shares).length)bad('shares must map runtime pools to non-negative weights, e.g. {claude-agent: 25, codex-agent: 25}.');
-    for(const [pool,weight] of Object.entries(shares)){
-      if(!plain(runtimes[pool]))bad(`shares.${pool} is not a modules/models/registry.yaml pool (known: ${knownNames(Object.keys(runtimes))}).`);
-      if(typeof weight!=='number'||!Number.isFinite(weight)||weight<0)bad(`shares.${pool} must be a non-negative number.`);
-    }
-    if(!Object.values(shares).some(weight=>weight>0))bad('shares must give at least one pool a positive weight.');
-  }
+  if(allocation.shares!==undefined&&allocation.shares!==null)validateShares(bad,allocation.shares,runtimes);
   if(allocation.windowHours!==undefined&&allocation.windowHours!==null&&!(typeof allocation.windowHours==='number'&&Number.isFinite(allocation.windowHours)&&allocation.windowHours>0&&allocation.windowHours<=720))
     bad('windowHours must be a number of hours in (0, 720].');
-  if(allocation.grants!==undefined&&allocation.grants!==null){
-    if(!Array.isArray(allocation.grants))bad('grants must be a list of "<pool>=<slots>@<role>+<role>" strings.');
-    const seen=new Set();
-    for(const text of allocation.grants){
-      const grant=parseAllocationGrant(text);
-      if(!grant)bad(`grants entry ${JSON.stringify(text)} is not "<pool>=<slots>@<role>+<role>" (e.g. devin-agent=10@implement+verify+write).`);
-      const runtime=runtimes[grant.pool];
-      if(!plain(runtime))bad(`grants entry ${text}: ${grant.pool} is not a modules/models/registry.yaml pool.`);
-      if(seen.has(grant.pool))bad(`grants names ${grant.pool} more than once.`);
-      seen.add(grant.pool);
-      const max=Number(runtime.maxParallel);
-      if(!(grant.slots>=1&&(!Number.isFinite(max)||grant.slots<=max)))bad(`grants entry ${text}: slots must be 1..${Number.isFinite(max)?max:'maxParallel'} (registry.yaml maxParallel).`);
-      const unserved=grant.roles.filter(role=>!(runtime.roles??[]).includes(role));
-      if(unserved.length)bad(`grants entry ${text}: ${grant.pool} does not serve role ${unserved.join(', ')} (registry.yaml roles: ${(runtime.roles??[]).join(', ')}).`);
-    }
-  }
+  if(allocation.grants!==undefined&&allocation.grants!==null)validateGrants(bad,allocation.grants,runtimes);
 }
 /** Kernel and Supervisor seats share one authoritative pin/group grammar. */
+const validateSeatGroup=(seat,name,profile,runtimes,knownProviders)=>{
+  const group=seat.group;
+  if(Object.keys(seat).some(key=>!['group','effort'].includes(key))||!Array.isArray(group)||!group.length||group.some(member=>!plain(member)||Object.keys(member).some(key=>!['agent','model'].includes(key))||typeof member.agent!=='string'||!member.agent.trim()||!(member.model===undefined||member.model===null||typeof member.model==='string'&&member.model.trim())))
+    throw new Error(`Invalid config.yaml: ${name} group must be {group: [{agent, model?}, ...], effort?} with at least one member.`);
+  if(new Set(group.map(member=>member.agent)).size!==group.length)throw new Error(`Invalid config.yaml: ${name}.group names each agent once — availability is per provider.`);
+  for(const {agent,model} of group){
+    if(!knownProviders.has(agent))throw new Error(`Invalid config.yaml: ${name}.group agent ${agent} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
+    if(typeof model==='string'&&profile.models?.[model]?.provider!==agent&&!Object.values(runtimes).some(runtime=>runtime?.provider===agent&&(runtime.target===model||Object.values(runtime.models??{}).includes(model))))
+      throw new Error(`Invalid config.yaml: ${name}.group model ${model} is not declared by a ${agent} runtime.`);
+  }
+};
 function validateAgentSeat(seat,name,profile){
   const runtimes=profile?.runtimes??{},knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
-  if(plain(seat)&&Object.hasOwn(seat,'group')){
-    const group=seat.group;
-    if(Object.keys(seat).some(key=>!['group','effort'].includes(key))||!Array.isArray(group)||!group.length||group.some(member=>!plain(member)||Object.keys(member).some(key=>!['agent','model'].includes(key))||typeof member.agent!=='string'||!member.agent.trim()||!(member.model===undefined||member.model===null||typeof member.model==='string'&&member.model.trim())))
-      throw Error(`Invalid config.yaml: ${name} group must be {group: [{agent, model?}, ...], effort?} with at least one member.`);
-    if(new Set(group.map(member=>member.agent)).size!==group.length)throw Error(`Invalid config.yaml: ${name}.group names each agent once — availability is per provider.`);
-    for(const {agent,model} of group){
-      if(!knownProviders.has(agent))throw Error(`Invalid config.yaml: ${name}.group agent ${agent} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
-      if(typeof model==='string'&&profile.models?.[model]?.provider!==agent&&!Object.values(runtimes).some(runtime=>runtime?.provider===agent&&(runtime.target===model||Object.values(runtime.models??{}).includes(model))))
-        throw Error(`Invalid config.yaml: ${name}.group model ${model} is not declared by a ${agent} runtime.`);
-    }
-  }else{
+  if(plain(seat)&&Object.hasOwn(seat,'group'))validateSeatGroup(seat,name,profile,runtimes,knownProviders);
+  else{
     if(!plain(seat)||Object.keys(seat).some(key=>!['agent','model','effort'].includes(key))||Object.values(seat).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
-      throw Error(`Invalid config.yaml: ${name} must be {agent?, model?, effort?} with string-or-null values, or {group: [{agent, model?}, ...], effort?}.`);
-    if(typeof seat.agent==='string'&&!knownProviders.has(seat.agent))throw Error(`Invalid config.yaml: ${name}.agent ${seat.agent} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
+      throw new Error(`Invalid config.yaml: ${name} must be {agent?, model?, effort?} with string-or-null values, or {group: [{agent, model?}, ...], effort?}.`);
+    if(typeof seat.agent==='string'&&!knownProviders.has(seat.agent))throw new Error(`Invalid config.yaml: ${name}.agent ${seat.agent} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
   }
-  if(seat.effort!==undefined&&seat.effort!==null&&!EFFORT_LEVELS.includes(seat.effort))throw Error(`Invalid config.yaml: ${name}.effort must use the effort vocabulary.`);
+  if(seat.effort!==undefined&&seat.effort!==null&&!EFFORT_LEVELS.has(seat.effort))throw new Error(`Invalid config.yaml: ${name}.effort must use the effort vocabulary.`);
 }
+const validateReconcilerBlock=r=>{
+  const ctl=r?.controllers;
+  if(!plain(r)||Object.keys(r).some(key=>!['enabled','profile','controllers'].includes(key))||(r.enabled!==undefined&&typeof r.enabled!=='boolean')||!(r.profile===undefined||r.profile===null||['operational','observe'].includes(r.profile))||!(ctl===undefined||ctl===null||(plain(ctl)&&Object.entries(ctl).every(([name,c])=>/^[a-z][a-z0-9-]*$/.test(name)&&plain(c)&&Object.keys(c).every(key=>key==='mode')&&['off','shadow','active'].includes(c.mode)))))
+    throw new Error('Invalid config.yaml: reconciler must be {enabled?: boolean, profile?: operational|observe, controllers?: {<name>: {mode: off|shadow|active}}}, or null.');
+};
+const validateAllocationBlock=(allocation,knownProviders,runtimes)=>{
+  const preferred=allocation?.preferredProvider;
+  if(!plain(allocation)||Object.keys(allocation).some(key=>!ALLOCATION_KEYS.includes(key))||allocation.mode!==ADAPTIVE_ALLOCATION_MODE||!(preferred===null||preferred===undefined||typeof preferred==='string'&&preferred.trim()))
+    throw new Error('Invalid config.yaml: allocation must be {mode:"adaptive", preferredProvider?: <provider|null>, policy?, shares?, windowHours?, grants?}.');
+  if(typeof preferred==='string'&&!knownProviders.has(preferred))throw new Error(`Invalid config.yaml: allocation.preferredProvider ${preferred} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
+  validateAllocationBalance(allocation,runtimes);
+};
+const validateParallelBlock=parallel=>{
+  const gears=slicingGears();
+  if(!plain(parallel)||Object.keys(parallel).some(key=>key!=='gear')||!Number.isInteger(parallel.gear))
+    throw new Error('Invalid config.yaml: parallel must be {gear: <integer>}.');
+  if(!gears.includes(parallel.gear))
+    throw new Error(`Invalid config.yaml: parallel.gear ${parallel.gear} is not declared by modules/models/runtimes.yaml allocation.slicing.gears (known: ${gears.join(', ')}).`);
+};
+const validateSupervisorBlock=(supervisor,profile)=>{
+  const interval=supervisor?.pollIntervalMs,repos=supervisor?.repos,stall=supervisor?.stallMinutes;
+  if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['mode','pollIntervalMs','repos','stallMinutes','kernel','workers','landGate','frozenMinutes'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
+    throw new Error('Invalid config.yaml: supervisor must be {mode?, pollIntervalMs?, repos?, stallMinutes?, kernel?, workers?, landGate?, frozenMinutes?} with an integer of at least 60000 ms, or null.');
+  // mode: where the Supervisor role runs (scripts/machine/home.mjs supervisorMode) - chat (default: the owner's desktop
+  // chat session owns channel 'main' and ticks itself) or kernel (the optional [Supervisor] Orca kernel, start-supervisor.mjs).
+  if(!(supervisor.mode===undefined||supervisor.mode===null||['chat','kernel'].includes(supervisor.mode)))
+    throw new Error('Invalid config.yaml: supervisor.mode must be chat or kernel, or null.');
+  // The [Supervisor] kernel seat (scripts/machine/home.mjs supervisorSettings): kernel {agent?, model?, effort?}
+  // pins its agent (default: the kernel pin), workers {base?, max?} its adaptive [Worker] cap (max <= 10),
+  // landGate {mode?: shared|exclusive, push?} the land gate (scripts/supervisor/land.mjs).
+  const seat=supervisor.kernel,workers=supervisor.workers,gate=supervisor.landGate;
+  if(seat!==undefined&&seat!==null)validateAgentSeat(seat,'supervisor.kernel',profile);
+  if(!(workers===undefined||workers===null||(plain(workers)&&Object.keys(workers).every(key=>['base','max'].includes(key)&&Number.isInteger(workers[key])&&workers[key]>=1&&workers[key]<=10))))
+    throw new Error('Invalid config.yaml: supervisor.workers must be {base?, max?} integers from 1 to 10, or null.');
+  if(!(gate===undefined||gate===null||(plain(gate)&&Object.keys(gate).every(key=>(key==='mode'&&['shared','exclusive'].includes(gate.mode))||(key==='push'&&typeof gate.push==='boolean')))))
+    throw new Error('Invalid config.yaml: supervisor.landGate must be {mode?: shared|exclusive, push?: boolean}, or null.');
+  // stallMinutes: scripts/supervisor/stall.mjs calls a running workflow STALLED after this many minutes with no progress.
+  // frozenMinutes: scripts/supervisor/supervisor-watchdog.mjs reads a busy seat frame with no turn progress for this long as frozen.
+  const frozen=supervisor.frozenMinutes;
+  if(!(frozen===undefined||frozen===null||(Number.isInteger(frozen)&&frozen>=1)))
+    throw new Error('Invalid config.yaml: supervisor.frozenMinutes must be an integer of at least 1, or null.');
+  if(!(stall===undefined||stall===null||(Number.isInteger(stall)&&stall>=5)))
+    throw new Error('Invalid config.yaml: supervisor.stallMinutes must be an integer of at least 5, or null.');
+  if(!(repos===undefined||repos===null||(Array.isArray(repos)&&repos.every(repo=>typeof repo==='string'&&repo.trim()))))
+    throw new Error('Invalid config.yaml: supervisor.repos must be a list of ledger-owner repository paths, or null.');
+};
+const validateDelegationBlock=d=>{if(!plain(d)||Object.keys(d).some(key=>!['asks','until','excludes','note'].includes(key))||typeof d.asks!=='string'||!d.asks.trim()||typeof d.until!=='string'||Number.isNaN(Date.parse(d.until))||(d.excludes!==undefined&&(!Array.isArray(d.excludes)||d.excludes.some(x=>typeof x!=='string'))))throw new Error('Invalid config.yaml: delegation must be {asks: <delegate>, until: <ISO time>, excludes?: [<class>], note?} or null.');};
+const validateBudgetsBlock=budgets=>{if(!plain(budgets)||Object.keys(budgets).some(key=>!['maxOps'].includes(key))||Object.values(budgets).some(value=>value!==null&&!(Number.isInteger(value)&&value>0)))throw new Error('Invalid config.yaml: budgets must be {maxOps?} with positive-integer-or-null values.');};
+const validateModelPools=(config,models,runtimes)=>{
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','coreDebug','orca','roots','launchTrust','retention'];
+  if(!plain(config)||Object.keys(config).some(key=>!allowed.includes(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.has(config.effort)||!plain(models)||Object.keys(models).some(key=>!['pools','nonOperation','selection'].includes(key))||models.selection!=='quota-aware'||!plain(models.pools)||!plain(models.nonOperation)||Object.keys(models.pools).length!==Object.keys(DEFAULT_MODEL_POOLS).length||Object.keys(models.pools).some(key=>!Object.hasOwn(DEFAULT_MODEL_POOLS,key))||Object.keys(models.nonOperation).length!==Object.keys(NON_OPERATION_ROLES).length||Object.keys(models.nonOperation).some(key=>!Object.hasOwn(NON_OPERATION_ROLES,key)))throw new Error('Invalid config.yaml: expected language, model, effort and the closed quota-aware model pools/non-operation role map.');
+  for(const [pool,members] of Object.entries(models.pools))if(!Array.isArray(members)||members.length!==2||new Set(members).size!==2||members.some(id=>typeof id!=='string'||!plain(runtimes[id]))||!(members.length===DEFAULT_MODEL_POOLS[pool].length&&members.every(id=>DEFAULT_MODEL_POOLS[pool].includes(id))))throw new Error(`Invalid config.yaml: models.pools.${pool} must contain its canonical pair of two unique known runtime ids.`);
+  for(const [role,required] of Object.entries(NON_OPERATION_ROLES)){const pool=models.nonOperation[role],members=models.pools[pool];if(typeof pool!=='string'||!members||members.some(id=>!runtimes[id].roles?.includes(required)))throw new Error(`Invalid config.yaml: models.nonOperation.${role} must name a pool whose members carry the ${required} role.`);}
+};
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','coreDebug','orca','roots','launchTrust','retention'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.launchTrust!==undefined)launchTrustSettings(config);
   if(config?.retention!==undefined)workflowPurgeSettings(config);
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
@@ -307,71 +371,18 @@ export function validateConfig(config){
   if(config?.orca!==undefined)validateOrca(config.orca);
   if(config?.roots!==undefined)validateRoots(config.roots);
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
-  if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
+  if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw new Error('Invalid config.yaml: debug must be true or false.');
   // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: harness off, unit on, e2e off; specsSettings).
-  if(config?.specs!==undefined&&config.specs!==null&&(!plain(config.specs)||Object.keys(config.specs).some(key=>!SPEC_FAMILIES.includes(key)||typeof config.specs[key]!=='boolean')))throw Error(`Invalid config.yaml: specs must be {${SPEC_FAMILIES.map(k=>`${k}?: boolean`).join(', ')}}, or null.`);
+  if(config?.specs!==undefined&&config.specs!==null&&(!plain(config.specs)||Object.keys(config.specs).some(key=>!SPEC_FAMILIES.includes(key)||typeof config.specs[key]!=='boolean')))throw new Error(`Invalid config.yaml: specs must be {${SPEC_FAMILIES.map(k=>k+'?: boolean').join(', ')}}, or null.`);
   // reconciler (scripts/reconciler/state.mjs reconcilerConfig): {enabled?: boolean, profile?: operational|observe, controllers?: {<name>: {mode: off|shadow|active}}}, or null.
-  if(config?.reconciler!==undefined&&config.reconciler!==null){
-    const r=config.reconciler,ctl=r?.controllers;
-    if(!plain(r)||Object.keys(r).some(key=>!['enabled','profile','controllers'].includes(key))||(r.enabled!==undefined&&typeof r.enabled!=='boolean')||!(r.profile===undefined||r.profile===null||['operational','observe'].includes(r.profile))
-      ||!(ctl===undefined||ctl===null||(plain(ctl)&&Object.entries(ctl).every(([name,c])=>/^[a-z][a-z0-9-]*$/.test(name)&&plain(c)&&Object.keys(c).every(key=>key==='mode')&&['off','shadow','active'].includes(c.mode)))))
-      throw Error('Invalid config.yaml: reconciler must be {enabled?: boolean, profile?: operational|observe, controllers?: {<name>: {mode: off|shadow|active}}}, or null.');
-  }
-  if(config?.allocation!==undefined){
-    const allocation=config.allocation,preferred=allocation?.preferredProvider;
-    if(!plain(allocation)||Object.keys(allocation).some(key=>!ALLOCATION_KEYS.includes(key))||allocation.mode!==ADAPTIVE_ALLOCATION_MODE||!(preferred===null||preferred===undefined||typeof preferred==='string'&&preferred.trim()))
-      throw Error('Invalid config.yaml: allocation must be {mode:"adaptive", preferredProvider?: <provider|null>, policy?, shares?, windowHours?, grants?}.');
-    if(typeof preferred==='string'&&!knownProviders.has(preferred))throw Error(`Invalid config.yaml: allocation.preferredProvider ${preferred} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
-    validateAllocationBalance(allocation,runtimes);
-  }
+  if(config?.reconciler!==undefined&&config.reconciler!==null)validateReconcilerBlock(config.reconciler);
+  if(config?.allocation!==undefined)validateAllocationBlock(config.allocation,knownProviders,runtimes);
   if(config?.kernel!==undefined)validateAgentSeat(config.kernel,'kernel',profile);
-  if(config?.parallel!==undefined){
-    const parallel=config.parallel,gears=slicingGears();
-    if(!plain(parallel)||Object.keys(parallel).some(key=>key!=='gear')||!Number.isInteger(parallel.gear))
-      throw Error('Invalid config.yaml: parallel must be {gear: <integer>}.');
-    if(!gears.includes(parallel.gear))
-      throw Error(`Invalid config.yaml: parallel.gear ${parallel.gear} is not declared by modules/models/runtimes.yaml allocation.slicing.gears (known: ${gears.join(', ')}).`);
-  }
-  if(config?.supervisor!==undefined){
-    const supervisor=config.supervisor,interval=supervisor?.pollIntervalMs,repos=supervisor?.repos,stall=supervisor?.stallMinutes;
-    if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['mode','pollIntervalMs','repos','stallMinutes','kernel','workers','landGate','frozenMinutes'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
-      throw Error('Invalid config.yaml: supervisor must be {mode?, pollIntervalMs?, repos?, stallMinutes?, kernel?, workers?, landGate?, frozenMinutes?} with an integer of at least 60000 ms, or null.');
-    // mode: where the Supervisor role runs (scripts/machine/home.mjs supervisorMode) - chat (default: the owner's desktop
-    // chat session owns channel 'main' and ticks itself) or kernel (the optional [Supervisor] Orca kernel, start-supervisor.mjs).
-    if(!(supervisor.mode===undefined||supervisor.mode===null||['chat','kernel'].includes(supervisor.mode)))
-      throw Error('Invalid config.yaml: supervisor.mode must be chat or kernel, or null.');
-    // The [Supervisor] kernel seat (scripts/machine/home.mjs supervisorSettings): kernel {agent?, model?, effort?}
-    // pins its agent (default: the kernel pin), workers {base?, max?} its adaptive [Worker] cap (max <= 10),
-    // landGate {mode?: shared|exclusive, push?} the land gate (scripts/supervisor/land.mjs).
-    const seat=supervisor.kernel,workers=supervisor.workers,gate=supervisor.landGate;
-    if(seat!==undefined&&seat!==null)validateAgentSeat(seat,'supervisor.kernel',profile);
-    if(!(workers===undefined||workers===null||(plain(workers)&&Object.keys(workers).every(key=>['base','max'].includes(key)&&Number.isInteger(workers[key])&&workers[key]>=1&&workers[key]<=10))))
-      throw Error('Invalid config.yaml: supervisor.workers must be {base?, max?} integers from 1 to 10, or null.');
-    if(!(gate===undefined||gate===null||(plain(gate)&&Object.keys(gate).every(key=>(key==='mode'&&['shared','exclusive'].includes(gate.mode))||(key==='push'&&typeof gate.push==='boolean')))))
-      throw Error('Invalid config.yaml: supervisor.landGate must be {mode?: shared|exclusive, push?: boolean}, or null.');
-    // stallMinutes: scripts/supervisor/stall.mjs calls a running workflow STALLED after this many minutes with no progress.
-    // frozenMinutes: scripts/supervisor/supervisor-watchdog.mjs reads a busy seat frame with no turn progress for this long as frozen.
-    const frozen=supervisor.frozenMinutes;
-    if(!(frozen===undefined||frozen===null||(Number.isInteger(frozen)&&frozen>=1)))
-      throw Error('Invalid config.yaml: supervisor.frozenMinutes must be an integer of at least 1, or null.');
-    if(!(stall===undefined||stall===null||(Number.isInteger(stall)&&stall>=5)))
-      throw Error('Invalid config.yaml: supervisor.stallMinutes must be an integer of at least 5, or null.');
-    if(!(repos===undefined||repos===null||(Array.isArray(repos)&&repos.every(repo=>typeof repo==='string'&&repo.trim()))))
-      throw Error('Invalid config.yaml: supervisor.repos must be a list of ledger-owner repository paths, or null.');
-  }
-  if(config?.delegation!==undefined&&config.delegation!==null){
-    const d=config.delegation;
-    if(!plain(d)||Object.keys(d).some(key=>!['asks','until','excludes','note'].includes(key))||typeof d.asks!=='string'||!d.asks.trim()||typeof d.until!=='string'||Number.isNaN(Date.parse(d.until))||(d.excludes!==undefined&&(!Array.isArray(d.excludes)||d.excludes.some(x=>typeof x!=='string'))))
-      throw Error('Invalid config.yaml: delegation must be {asks: <delegate>, until: <ISO time>, excludes?: [<class>], note?} or null.');
-  }
-  if(config?.budgets!==undefined){
-    const budgets=config.budgets;
-    if(!plain(budgets)||Object.keys(budgets).some(key=>!['maxOps'].includes(key))||Object.values(budgets).some(value=>value!==null&&!(Number.isInteger(value)&&value>0)))
-      throw Error('Invalid config.yaml: budgets must be {maxOps?} with positive-integer-or-null values.');
-  }
-  if(!plain(config)||Object.keys(config).some(key=>!allowed.includes(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.includes(config.effort)||!plain(models)||Object.keys(models).some(key=>!['pools','nonOperation','selection'].includes(key))||models.selection!=='quota-aware'||!plain(models.pools)||!plain(models.nonOperation)||Object.keys(models.pools).length!==Object.keys(DEFAULT_MODEL_POOLS).length||Object.keys(models.pools).some(key=>!Object.hasOwn(DEFAULT_MODEL_POOLS,key))||Object.keys(models.nonOperation).length!==Object.keys(NON_OPERATION_ROLES).length||Object.keys(models.nonOperation).some(key=>!Object.hasOwn(NON_OPERATION_ROLES,key)))throw Error('Invalid config.yaml: expected language, model, effort and the closed quota-aware model pools/non-operation role map.');
-  for(const [pool,members] of Object.entries(models.pools))if(!Array.isArray(members)||members.length!==2||new Set(members).size!==2||members.some(id=>typeof id!=='string'||!plain(runtimes[id]))||!(members.length===DEFAULT_MODEL_POOLS[pool].length&&members.every(id=>DEFAULT_MODEL_POOLS[pool].includes(id))))throw Error(`Invalid config.yaml: models.pools.${pool} must contain its canonical pair of two unique known runtime ids.`);
-  for(const [role,required] of Object.entries(NON_OPERATION_ROLES)){const pool=models.nonOperation[role],members=models.pools[pool];if(typeof pool!=='string'||!members||members.some(id=>!runtimes[id].roles?.includes(required)))throw Error(`Invalid config.yaml: models.nonOperation.${role} must name a pool whose members carry the ${required} role.`);}
+  if(config?.parallel!==undefined)validateParallelBlock(config.parallel);
+  if(config?.supervisor!==undefined)validateSupervisorBlock(config.supervisor,profile);
+  if(config?.delegation!==undefined&&config.delegation!==null)validateDelegationBlock(config.delegation);
+  if(config?.budgets!==undefined)validateBudgetsBlock(config.budgets);
+  validateModelPools(config,models,runtimes);
   return config;
 }
 export function effectiveNonOperationModels(config=loadConfig()){const models=validateConfig(config).models;return Object.fromEntries(Object.keys(NON_OPERATION_ROLES).map(role=>[role,{pool:models.nonOperation[role],runtimes:[...models.pools[models.nonOperation[role]]],selection:models.selection}]));}
@@ -398,10 +409,10 @@ export function configuredAllocationPolicy(config=loadConfig()){
     source:allocation?'allocation':'default',
   };
 }
-export const nonOperationModels=(role,config=loadConfig())=>{if(!Object.hasOwn(NON_OPERATION_ROLES,role))throw Error(`Unknown non-operation model role ${role}`);return effectiveNonOperationModels(config)[role].runtimes;};
+export const nonOperationModels=(role,config=loadConfig())=>{if(!Object.hasOwn(NON_OPERATION_ROLES,role)){throw new Error(`Unknown non-operation model role ${role}`);}return effectiveNonOperationModels(config)[role].runtimes;};
 /** The validated config one yaml file holds, or null when the file is absent. */
 const readYamlConfig=(root,name)=>{const yaml=path.join(root,name);return fs.existsSync(yaml)?validateConfig(parseYaml(fs.readFileSync(yaml,'utf8'))):null;};
-function readExample(root=configRoot){const example=readYamlConfig(root,'config.example.yaml');if(example!==null)return example;throw Error('Missing config.example.yaml');}
+function readExample(root=configRoot){const example=readYamlConfig(root,'config.example.yaml');if(example!==null)return example;throw new Error('Missing config.example.yaml');}
 /**
  * The owner config reader: `config.yaml` is the per-project file (gitignored,
  * seeded verbatim from `config.example.yaml` by the installer — comments and
@@ -449,7 +460,7 @@ export function harnessSpecsEnabled(root=configRoot){return specsSettings(inspec
  *   worktreeLimit  integer >= 1 — more registered worktrees than this in one repository is a core-watch alert.
  * Both keys are required when the block is present; code carries no default (config.example.yaml does).
  */
-export const DURATION_PATTERN=/^(\d+)(s|m|h)$/;
+export const DURATION_PATTERN=/^(\d+)([smh])$/;
 /** '10m' | '90s' | '1h' in milliseconds, or null for anything else (zero included). */
 export function durationMs(text){const m=DURATION_PATTERN.exec(String(text??'').trim());const ms=m?Number(m[1])*{s:1000,m:60000,h:3600000}[m[2]]:0;return ms>0?ms:null;}
 function validateCoreDebug(block){
@@ -462,7 +473,7 @@ function validateCoreDebug(block){
 /** The owner's coreDebug block: {interval, intervalMs, worktreeLimit}. Refuses when config.yaml has none. */
 export function coreDebugSettings(config=loadConfig()){
   const block=config?.coreDebug;
-  if(block===undefined||block===null)throw Error('Invalid config.yaml: coreDebug is missing; copy the coreDebug block from config.example.yaml.');
+  if(block===undefined||block===null)throw new Error('Invalid config.yaml: coreDebug is missing; copy the coreDebug block from config.example.yaml.');
   validateCoreDebug(block);
   return {interval:block.interval,intervalMs:durationMs(block.interval),worktreeLimit:block.worktreeLimit};
 }
@@ -472,7 +483,7 @@ export function loadConfig(root=configRoot){
 }
 
 /** The owner's standing delegation of ask answers (config.yaml `delegation`), or null when absent or expired. */
-export function activeDelegation(config=loadConfig(),now=Date.now()){const d=config?.delegation;if(!d||Date.parse(d.until)<=now)return null;return {asks:d.asks,until:d.until,excludes:d.excludes??[],note:d.note??null};}
+export function activeDelegation(config=loadConfig(),now=Date.now()){const d=config?.delegation;if(!d||Date.parse(d.until)<=now){return null;}return {asks:d.asks,until:d.until,excludes:d.excludes??[],note:d.note??null};}
 
 /**
  * The owner's auto-accept policy for recommended asks (config.yaml `asks`): {autoAcceptRecommended,

@@ -25,7 +25,7 @@ export const repoRootKey=repoRoot=>{let root=path.resolve(repoRoot);try{root=fs.
  */
 const ledgerIdFromKey=key=>{
   const h=sha256(`starci-ledger:${key}`);
-  return `${h.slice(0,8)}-${h.slice(8,12)}-5${h.slice(13,16)}-${(8|(parseInt(h[16],16)&3)).toString(16)}${h.slice(17,20)}-${h.slice(20,32)}`;
+  return `${h.slice(0,8)}-${h.slice(8,12)}-5${h.slice(13,16)}-${(8|(Number.parseInt(h[16],16)&3)).toString(16)}${h.slice(17,20)}-${h.slice(20,32)}`;
 };
 export const ledgerIdForRepo=repoRoot=>ledgerIdFromKey(repoRootKey(repoRoot));
 /** The registered runtime.sqlite of `repoRoot` in machine.ledgers (a3-2 resolveLedger), or null. */
@@ -37,7 +37,7 @@ function registeredLedgerFile(root,env,openReader){
 }
 function assertLedgerRoot(file,root,openReader){
   const db=openReader(file);let own;try{own=db.prepare("SELECT value FROM meta WHERE key='repo_root'").get()?.value;}finally{db.close();}
-  if(!own||repoRootKey(own)!==repoRootKey(root))throw Object.assign(Error(`ledger-root-mismatch: ${file} belongs to another or unverified repository; preserve the database and resolve the owner binding before migration`),{code:'STARCI_LEDGER_ROOT_MISMATCH'});
+  if(!own||repoRootKey(own)!==repoRootKey(root))throw Object.assign(new Error(`ledger-root-mismatch: ${file} belongs to another or unverified repository; preserve the database and resolve the owner binding before migration`),{code:'STARCI_LEDGER_ROOT_MISMATCH'});
 }
 function unregisteredLedgerFile(root,env,openReader){
   const base=projectsRootFor(env),current=path.join(base,ledgerIdForRepo(root),'runtime.sqlite');
