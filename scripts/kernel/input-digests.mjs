@@ -92,7 +92,7 @@ const listFiles = (abs, skip = SKIP_DIRS, strict = false) => {
   const out = [];
   const visit = (dir) => {
     let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (error) { if (strict) throw error; return; }
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (error) { if (strict) { throw error; } return; }
     for (const entry of entries) {
       const p = path.join(dir, entry.name);
       if (entry.isDirectory()) { if (!skip.has(entry.name) && !underWorktrees(abs, p)) visit(p); }
@@ -104,17 +104,17 @@ const listFiles = (abs, skip = SKIP_DIRS, strict = false) => {
 };
 
 const globRegex = (pattern) => new RegExp(`^${pattern
-  .replace(/[.+?^$()|[\]\\]/g, String.raw`\$&`)
-  .replace(/<[A-Za-z0-9_-]+>/g, '[^/]+')
-  .replace(/\{([^{}]*)\}/g, (whole, body) => `(?:${body.replaceAll(',', '|')})`)
+  .replaceAll(/[.+?^$()|[\]\\]/g, String.raw`\$&`)
+  .replaceAll(/<[A-Za-z0-9_-]+>/g, '[^/]+')
+  .replaceAll(/\{([^{}]*)\}/g, (whole, body) => `(?:${body.replaceAll(',', '|')})`)
   .replaceAll(/\*\*\//g, '\0')
-  .replace(/\*+/g, '.*')
+  .replaceAll(/\*+/g, '.*')
   .replaceAll('\0', '(?:.*/)?')}$`);
 
 const fileSha = (cache, abs, strict = false) => {
   if (!cache.has(abs)) {
     let digest = null;
-    try { digest = sha256(fs.readFileSync(abs)); } catch (error) { if (strict) throw error; digest = null; }
+    try { digest = sha256(fs.readFileSync(abs)); } catch (error) { if (strict) { throw error; } digest = null; }
     cache.set(abs, digest);
   }
   return cache.get(abs);
@@ -139,7 +139,7 @@ export function createDigester(root, { skip = SKIP_DIRS, strict = false } = {}) 
     if (first < 0) {
       const abs = path.join(root, rel);
       let stat = null;
-      try { stat = fs.statSync(abs); } catch (error) { if (strict && !['ENOENT', 'ENOTDIR'].includes(error.code)) throw error; return ABSENT; }
+      try { stat = fs.statSync(abs); } catch (error) { if (strict && !['ENOENT', 'ENOTDIR'].includes(error.code)) { throw error; } return ABSENT; }
       if (stat.isFile()) return fileSha(fileCache, abs, strict) ?? ABSENT;
       return stat.isDirectory() ? setDigest(listFiles(abs, skip, strict)) : ABSENT;
     }
@@ -167,7 +167,7 @@ export function createWorkDigester(repo, { workDir = '.starciwork', strict = fal
   const resolve = (rel) => {
     const abs = absOf(rel);
     let stat = null;
-    try { stat = fs.statSync(abs); } catch (error) { if (strict && !['ENOENT', 'ENOTDIR'].includes(error.code)) throw error; return { digest: ABSENT, files: {} }; }
+    try { stat = fs.statSync(abs); } catch (error) { if (strict && !['ENOENT', 'ENOTDIR'].includes(error.code)) { throw error; } return { digest: ABSENT, files: {} }; }
     if (stat.isFile()) {
       const digest = fileSha(fileCache, abs, strict);
       return digest ? { digest, files: { [rel]: digest } } : { digest: ABSENT, files: {} };
