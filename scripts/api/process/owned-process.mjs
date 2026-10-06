@@ -44,8 +44,8 @@ const quote = (value) => value == null ? '$null' : `'${String(value).replaceAll(
 const refusalReason = (pid, identity, ownership, waitMs) => {
   if (!Number.isInteger(pid) || pid <= 0 || identity && !validIdentity(identity)
       || ownership && (typeof ownership.key !== 'string' || !ownership.key || typeof ownership.value !== 'string' || !ownership.value))
-    return 'process-custody-required';
-  if (!Number.isInteger(waitMs) || waitMs <= 0 || waitMs > 60000) return 'process-wait-invalid';
+    return { reason: 'process-custody-required' };
+  if (!Number.isInteger(waitMs) || waitMs <= 0 || waitMs > 60000) return { reason: 'process-wait-invalid' };
   return null;
 };
 
@@ -69,7 +69,7 @@ export function ownedProcess(pid, { identity = null, ownership = null, waitMs = 
   const base = { schema: OWNED_PROCESS_SCHEMA, pid, ok: false, outcome: 'unknown', identity: identity ?? null };
   if (platform !== 'win32') return { ...base, reason: 'process-platform-unverified' };
   const refused = refusalReason(pid, identity, ownership, waitMs);
-  if (refused) return { ...base, outcome: 'refused', reason: refused };
+  if (refused) return { ...base, outcome: 'refused', reason: refused.reason };
   const script = [`Add-Type -TypeDefinition @'\n${PROCESS_ENV_NATIVE}\n${NATIVE}\n'@ -Language CSharp`,
     `$r = [StarciOwnedProcess]::Call(${pid}, $${identity ? 'true' : 'false'}, ${quote(identity?.birth)}, ${quote(identity?.exe)}, ${quote(ownership?.key)}, ${quote(ownership?.value)}, ${waitMs})`,
     `@{ schema = '${OWNED_PROCESS_SCHEMA}'; pid = ${pid}; ok = $r[0]; outcome = $r[1]; proof = $r[2]; birth = $r[3]; exe = $r[4]; nativeError = $r[5] } | ConvertTo-Json -Compress`].join('\n');
