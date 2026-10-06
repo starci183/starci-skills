@@ -56,7 +56,7 @@ import { FORBIDDEN_FILES, secretHits } from '../lib/secret-patterns.mjs';
 import { foldCase, realPath, slash } from '../lib/path-key.mjs';
 import { isSopsEnvelope, setCommand } from '../lib/sops-envelope.mjs';
 import { forEachFileLine } from '../lib/read-text.mjs';
-import { starciSourceRoot } from '../../engine/runtime-root.mjs'; import { isMain } from '../lib/is-main.mjs'; import { byCodeUnit } from '../lib/list.mjs';
+import { starciSourceRoot } from '../../engine/runtime-root.mjs'; import { isMain } from '../lib/is-main.mjs'; import { byCodeUnit } from '../lib/list.mjs'; import { describePush } from './push-description.mjs';
 export { FORBIDDEN_FILES }; export { SECRET_PATTERNS } from '../lib/secret-patterns.mjs';
 
 /**
@@ -155,7 +155,7 @@ export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, s
     if (hooksOnly) {
       const hooks = (scratchPush ?? pushFromScratch)(repo, { run, hooksOnly: true });
       const green = hooks.ok && hooks.green;
-      return { ...out, via: 'scratch', hooksOnly: true, scratch: hooks.scratch, linked: hooks.linked, hooks: hooks.ok ? (green ? 'green' : 'red') : 'unavailable', ...(green ? {} : { error: hooks.error }) };
+      return { ...out, via: 'scratch', hooksOnly: true, scratch: hooks.scratch, linked: hooks.linked, hooks: (hooks.ok && green && 'green') || (hooks.ok && 'red') || 'unavailable', ...(green ? {} : { error: hooks.error }) };
     }
     if (!ahead) return { ...out, skipped: 'up to date' };
     const raw = scanRange({ cwd: repo, from: 'origin/main', to: 'main' });
@@ -474,7 +474,7 @@ function lastRefusals({ env = process.env } = {}) {
 }
 
 /** The pushes.result of one pushMain result. */
-const pushResultOf = (r) => (r.pushed ? 'pushed' : r.skipped || r.deferred ? 'skipped' : r.refused ? 'refused' : 'failed');
+const pushResultOf = (r) => (r.pushed && 'pushed') || ((r.skipped || r.deferred) && 'skipped') || (r.refused && 'refused') || 'failed';
 const blobText = (sha) => { if (!sha) return null; try { return getBlob(sha).toString('utf8'); } catch { return null; } };
 
 /** Push every listed main and record one pushes row per repository in machine.sqlite (MB-03: full stdout/stderr blobs). */
@@ -497,7 +497,7 @@ export function pushMains({ repos = null, dryRun = false, hooksOnly = false, env
   return results;
 }
 
-export const describePush = (r) => `${path.basename(r.repo)}: ${r.hooksOnly ? `pre-push hook on main ${r.hooks === 'green' ? 'green' : `${String(r.hooks).toUpperCase()} ${r.error ?? ''}`} (${r.linked?.length ?? 0} local-state link(s))` : r.pushed ? `pushed ${r.ahead} commit(s) -> ${r.head}` : r.wouldPush ? `would push ${r.ahead}` : r.deferred ? `deferred: ${r.deferred}` : r.skipped ? r.skipped : r.refused ? `REFUSED ${r.refused}${(r.scan?.findings ?? []).map((f) => ` [${f.file}:${f.line ?? '-'} ${f.pattern}]`).join('')}${r.hint ? ` - ${r.hint}` : ''}` : `FAILED ${r.error ?? ''}`}`;
+export { describePush };
 
 if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);

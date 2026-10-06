@@ -2,7 +2,7 @@
 // main and its tag together:
 //   1. the checkout is on `main` with no tracked change (nothing is stashed, reset or cleaned);
 //   2. the release tag `v<version>` is named, is not on the remote yet, and is either absent or an annotated tag already on HEAD; any other tag is refused;
-//   3. RELEASE_NOTES holds: the tag's CHANGELOG section exists and has no TODO, PENDING or TBD left (scripts/hfs/runtime-rules/release-notes.mjs);
+//   3. RELEASE_NOTES holds: the tag's CHANGELOG section exists and has no unfinished entries (scripts/hfs/runtime-rules/release-notes.mjs);
 //   4. the L4 row runs once (scripts/supervisor/release-l4.mjs: the example installs, every spec, lint, checks, tsc, images, the Sonar proof and the Linux parity step), each step to a log recorded in the result;
 //      every skipped test is reported with its reason, and a skip from missing infrastructure (or any skip but the declared browser ones) fails L4;
 //   5. main did not move meanwhile; the pushed range passes the secret scan;
@@ -63,7 +63,11 @@ export function pushRefusal({ refs, branch = 'main' }) {
 /** Run `work` while holding the host's one heavy-run lock (one heavy run at a time, role release); a held lock returns {ok: false, reason: 'held', owner} instead of the work's result. */
 const withHostLock = (work) => holdHostLock({ role: 'release', purpose: 'release-cut' }, work);
 const heldBy = (r) => (r && !Array.isArray(r) && r.ok === false && r.reason === 'held' ? r.owner ?? {} : null);
-const heldWhy = (o) => `the host lock is held by ${o.role ?? 'another heavy run'}${o.purpose ? ` (${o.purpose})` : ''}${o.pid ? ` pid ${o.pid}` : ''}: wait for it, never delete the lock by hand`;
+const heldWhy = (o) => {
+  const purpose = o.purpose ? ` (${o.purpose})` : '';
+  const pid = o.pid ? ` pid ${o.pid}` : '';
+  return `the host lock is held by ${o.role ?? 'another heavy run'}${purpose}${pid}: wait for it, never delete the lock by hand`;
+};
 
 /** The default L4 runner (scripts/supervisor/release-l4.mjs): every step of the L4 row once, each to a log: [{name, ok, log, ms, skips, absent?}]. The Sonar proofs come from the existing gate (release-l4-sonar.mjs), the Linux step from release-linux-parity.mjs. */
 const defaultSuite = (repo, deps = {}) => runL4(repo, { proofs: deps.proofs, supplier: deps.supplier, ...(deps.parity !== undefined ? { parity: deps.parity } : {}), parityDeps: deps.parityDeps ?? {} });
@@ -106,7 +110,11 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const steps = ran;
   out.suite = steps;
   const red = steps.filter((s) => !s.ok);
-  if (red.length) return refuse('suite-red', `${red.map((s) => `${s.name}${s.absent ? ' (absent)' : ''}`).join(', ')} red: fix, land, and cut again (logs: ${red.map((s) => s.log).filter(Boolean).join(', ')})`);
+  if (red.length) {
+    const names = red.map((s) => `${s.name}${s.absent ? ' (absent)' : ''}`).join(', ');
+    const logs = red.map((s) => s.log).filter(Boolean).join(', ');
+    return refuse('suite-red', `${names} red: fix, land, and cut again (logs: ${logs})`);
+  }
   if (!steps.length) return refuse('suite-red', 'the full suite did not run');
   // L4 reports every skipped test with its reason, and every test must have passed in at least one leg (the host run or the Linux container run): a skip that passed in the other leg is covered and listed with where it passed;
   // a skip nothing covered (missing infrastructure, a platform no leg has, any undeclared skip) fails L4.
@@ -115,7 +123,11 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   out.declaredSkips = skips.declared;
   out.coveredSkips = skips.covered;
   const unmatched = steps.flatMap((s) => s.unmatched ?? []);
-  if (skips.failures.length) return refuse('suite-skips', `${skips.failures.length} skipped test(s) executed in no leg and fail L4: ${skips.failures.slice(0, 8).map((k) => `${k.name} [${k.class}: ${k.reason || 'no reason'}]`).join('; ')}${unmatched.length ? `; no spec file holds the literal title of: ${unmatched.slice(0, 6).join(' | ')} (the Linux leg could not run it)` : ''}`);
+  if (skips.failures.length) {
+    const skipped = skips.failures.slice(0, 8).map((k) => `${k.name} [${k.class}: ${k.reason || 'no reason'}]`).join('; ');
+    const missingTitles = unmatched.length ? `; no spec file holds the literal title of: ${unmatched.slice(0, 6).join(' | ')} (the Linux leg could not run it)` : '';
+    return refuse('suite-skips', `${skips.failures.length} skipped test(s) executed in no leg and fail L4: ${skipped}${missingTitles}`);
+  }
 
   if (run(['rev-parse', 'HEAD'], { cwd }).stdout !== head || run(['status', '--porcelain', '--untracked-files=no'], { cwd }).stdout) return refuse('main-moved', 'the checkout changed while the suite ran: start over');
   const scan = (deps.scan ?? scanRange)({ cwd, from: `${remote}/${branch}`, to: branch });

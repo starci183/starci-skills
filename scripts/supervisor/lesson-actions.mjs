@@ -39,7 +39,8 @@ export async function landExperiment({ signature, commits, lane, specs = [], wro
   // default allocation.landGate.waitMs gave up behind a queue of lane lands and re-queued at the back (gate-busy).
   const landed = await doLand({ commits, specs, lane, env, ...(waitMs > 0 ? { waitMs } : {}) });
   if (!landed?.ok) return { ok: false, land: landed };
-  const id = `exp-${crypto.createHash('sha1').update(`${signature}|${commits.join(',')}`).digest('hex').slice(0, 10)}`;
+  const idSource = `${signature}|${commits.join(',')}`;
+  const id = `exp-${crypto.createHash('sha1').update(idSource).digest('hex').slice(0, 10)}`;
   const experiment = write(env, KINDS.experiment, { id, signature, commits, head: landed.head ?? null, lane, tier: guard.tier, files: files.map((f) => f.path), specs,
     reason: one(reason, 500), landedAt: now(), baseline: baseline ?? null }, now());
   return { ok: true, land: landed, experiment };
@@ -88,7 +89,8 @@ export async function revertExperiment({ id, apply = false, env = process.env, n
 
 export async function propose({ title, evidence, options, recommendation, send = false, env = process.env, now = Date.now, push = null }) {
   if (![title, evidence, options, recommendation].every((x) => String(x ?? '').trim())) throw Object.assign(new Error('propose needs --title, --evidence, --options and --recommendation'), { code: 'proposal-incomplete' });
-  const id = `prop-${crypto.createHash('sha1').update(`${title}|${now()}`).digest('hex').slice(0, 8)}`;
+  const idSource = `${title}|${now()}`;
+  const id = `prop-${crypto.createHash('sha1').update(idSource).digest('hex').slice(0, 8)}`;
   const text = [`StarCi .claude upgrade proposal ${id}: ${one(title, 200)}`, `Evidence: ${one(evidence, 800)}`, `Options: ${one(options, 600)}`, `Recommendation: ${one(recommendation, 400)}`,
     'Other work continues meanwhile. Reply in chat or Telegram with your choice.'].join('\n');
   let telegram = null;
@@ -105,15 +107,31 @@ if (isMain(import.meta.url)) {
   try {
     if (verb === 'land') {
       const r = await landExperiment({ signature: value('signature'), commits: csv(value('commit')), lane: value('lane'), specs: csv(value('specs')), wronglyBlocked: value('wrongly-blocked'), reason: value('reason'), waitMs: Number(value('wait-ms')) || null });
-      print(r, r.ok ? `landed ${r.experiment.id} (${r.experiment.signature}); measuring` : r.refused ? `REFUSED ${r.refused.map((x) => `${x.code}: ${x.detail}`).join(' | ')}` : `land failed: ${JSON.stringify(r.land).slice(0, 400)}`);
+      let summary;
+      if (r.ok) summary = `landed ${r.experiment.id} (${r.experiment.signature}); measuring`;
+      else if (r.refused) {
+        const refusals = r.refused.map((x) => `${x.code}: ${x.detail}`).join(' | ');
+        summary = `REFUSED ${refusals}`;
+      }
+      else summary = `land failed: ${JSON.stringify(r.land).slice(0, 400)}`;
+      print(r, summary);
       if (!r.ok) process.exitCode = 1;
     } else if (verb === 'revert') {
       const r = await revertExperiment({ id: value('experiment'), apply: argv.includes('--apply') });
-      print(r, r.planned ? `would revert ${r.commits.join(',')} in lane ${r.lane} (--apply)` : r.ok ? `reverted ${r.id} by ${r.revertCommit}` : `revert failed: ${JSON.stringify(r.land).slice(0, 400)}`);
+      let summary;
+      if (r.planned) summary = `would revert ${r.commits.join(',')} in lane ${r.lane} (--apply)`;
+      else if (r.ok) summary = `reverted ${r.id} by ${r.revertCommit}`;
+      else summary = `revert failed: ${JSON.stringify(r.land).slice(0, 400)}`;
+      print(r, summary);
       if (!r.ok) process.exitCode = 1;
     } else if (verb === 'propose') {
       const r = await propose({ title: value('title'), evidence: value('evidence'), options: value('options'), recommendation: value('recommendation'), send: argv.includes('--send') });
-      print(r, `${r.id} recorded${r.telegram ? ` (telegram ${r.telegram.ok ? r.telegram.skipped ?? 'sent' : 'FAILED'})` : ''}\n${r.text}`);
+      let telegram = '';
+      if (r.telegram) {
+        const status = r.telegram.ok ? r.telegram.skipped ?? 'sent' : 'FAILED';
+        telegram = ` (telegram ${status})`;
+      }
+      print(r, `${r.id} recorded${telegram}\n${r.text}`);
     } else {
       console.error('use: starci supervisor lesson-actions land | revert | propose (see the header)');
       process.exitCode = 2;

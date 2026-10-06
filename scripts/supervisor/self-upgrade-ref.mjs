@@ -38,20 +38,27 @@ export function selfUpgradeBranchContaining({ root = SKILL_ROOT, commit, list = 
   } catch { return null; }
 }
 
+function attemptSelfUpgradeRef({ root, ref, head, safeId, zeroOid, has, update }) {
+  try { if (has(ref)) return { occupied: true }; } catch (error) { return { ok: false, ref, error: String(error?.message ?? error) }; }
+  let written;
+  try { written = update(root, ref, head, { old: zeroOid, message: `self-upgrade ${safeId}` }); }
+  catch (error) { return { ok: false, ref, error: String(error?.message ?? error) }; }
+  if (written?.status === 0 || written?.ok === true) return { ok: true, ref };
+  try { if (has(ref)) return { occupied: true }; } catch { /* report the update failure below */ }
+  return { ok: false, ref, error: String(written?.stderr ?? written?.error?.message ?? written?.error ?? 'git update-ref failed').trim().slice(0, 500) };
+}
+
 /** Create the first free refs/self-upgrade/<id>[-N] ref without overwriting; failures are data, never throws. */
 export function writeSelfUpgradeRef({ root = SKILL_ROOT, id, head, exists = null, update = updateRef } = {}) {
   const safeId = sanitizeSelfUpgradeId(id);
   const zeroOid = '0'.repeat(/^[0-9a-f]{40,64}$/i.test(String(head ?? '')) ? String(head).length : 40);
   const has = exists ?? ((ref) => revParseQuery(['--verify', '--quiet', ref], { cwd: root }).status === 0);
   for (let serial = 1; serial <= 10_000; serial += 1) {
-    const ref = `${SELF_UPGRADE_PREFIX}${safeId}${serial === 1 ? '' : `-${serial}`}`;
-    try { if (has(ref)) continue; } catch (error) { return { ok: false, ref, error: String(error?.message ?? error) }; }
-    let written;
-    try { written = update(root, ref, head, { old: zeroOid, message: `self-upgrade ${safeId}` }); }
-    catch (error) { return { ok: false, ref, error: String(error?.message ?? error) }; }
-    if (written?.status === 0 || written?.ok === true) return { ok: true, ref };
-    try { if (has(ref)) continue; } catch { /* report the update failure below */ }
-    return { ok: false, ref, error: String(written?.stderr ?? written?.error?.message ?? written?.error ?? 'git update-ref failed').trim().slice(0, 500) };
+    const suffix = serial === 1 ? '' : `-${serial}`;
+    const ref = `${SELF_UPGRADE_PREFIX}${safeId}${suffix}`;
+    const attempt = attemptSelfUpgradeRef({ root, ref, head, safeId, zeroOid, has, update });
+    if (attempt.occupied) continue;
+    return attempt;
   }
   return { ok: false, ref: `${SELF_UPGRADE_PREFIX}${safeId}-10001`, error: 'no free self-upgrade ref name in the first 10000 candidates' };
 }
@@ -69,4 +76,8 @@ export function withSelfUpgradeRef(result, { root = SKILL_ROOT, id, write = writ
 }
 
 /** The describe() fragment of a land result that carries a self-upgrade ref receipt: '; self-upgrade ref refs/self-upgrade/<id>' (and its failure), or an empty string. */
-export const selfUpgradeNote = (r) => (r.selfUpgradeRef ? `; self-upgrade ref ${r.selfUpgradeRef}${r.selfUpgradeRefError ? ` FAILED: ${r.selfUpgradeRefError}` : ''}` : '');
+export const selfUpgradeNote = (r) => {
+  if (!r.selfUpgradeRef) return '';
+  const failure = r.selfUpgradeRefError ? ` FAILED: ${r.selfUpgradeRefError}` : '';
+  return `; self-upgrade ref ${r.selfUpgradeRef}${failure}`;
+};

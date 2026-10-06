@@ -58,8 +58,8 @@ export function doctrineOf(doc) {
   const seat = doc?.kernelSeat ?? {};
   const lines = [];
   if (seat.role) lines.push(`Role:\n${indent(seat.role)}`);
-  if (Array.isArray(seat.does)) lines.push(`You do:\n${seat.does.map((d) => `  - ${String(d).trim()}`).join('\n')}`);
-  if (Array.isArray(seat.never)) lines.push(`You never:\n${seat.never.map((d) => `  - ${String(d).trim()}`).join('\n')}`);
+  if (Array.isArray(seat.does)) lines.push('You do:\n' + seat.does.map((d) => '  - ' + String(d).trim()).join('\n'));
+  if (Array.isArray(seat.never)) lines.push('You never:\n' + seat.never.map((d) => '  - ' + String(d).trim()).join('\n'));
   const steps = (doc?.loop?.perCycle ?? []).map((s) => s?.step).filter(Boolean);
   if (steps.length) lines.push(`Tick steps (supervise.yaml loop.perCycle): ${steps.join(' -> ')}`);
   const rails = (doc?.guardrails ?? []).filter((g) => g?.id);
@@ -364,8 +364,16 @@ export async function stopSupervisor({ env = process.env, deps = null, now = Dat
 const bestEffort = bestEffortCall;
 
 const describe = (r) => {
-  if (r.action === 'status') return `[Supervisor] mode ${r.supervisorMode}; ${r.enabled === false ? 'DISABLED' : r.enabled ? 'enabled' : 'never started'}; seat ${r.seat?.terminal ?? 'none'} (${r.health?.reason ?? '-'})`;
-  return `[Supervisor] ${r.action}${r.terminal ? ` ${r.terminal}` : ''}${r.reason ? ` (${r.reason})` : ''}${r.error ? `: ${r.error}` : ''}`;
+  if (r.action === 'status') {
+    let enabled = 'never started';
+    if (r.enabled === false) enabled = 'DISABLED';
+    else if (r.enabled) enabled = 'enabled';
+    return `[Supervisor] mode ${r.supervisorMode}; ${enabled}; seat ${r.seat?.terminal ?? 'none'} (${r.health?.reason ?? '-'})`;
+  }
+  const terminal = r.terminal ? ` ${r.terminal}` : '';
+  const reason = r.reason ? ` (${r.reason})` : '';
+  const error = r.error ? `: ${r.error}` : '';
+  return `[Supervisor] ${r.action}${terminal}${reason}${error}`;
 };
 
 async function main() {

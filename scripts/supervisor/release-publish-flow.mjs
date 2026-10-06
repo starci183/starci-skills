@@ -15,7 +15,10 @@ import { resultDetail, resultOk } from '../lib/verb-call.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
 
 const exampleNames = (value, root) => {
-  const values = value === undefined ? discoverExampleApps(root) : Array.isArray(value) ? value : [value];
+  let values;
+  if (value === undefined) values = discoverExampleApps(root);
+  else if (Array.isArray(value)) values = value;
+  else values = [value];
   return values.flatMap((entry) => String(entry).split(',')).map((entry) => entry.trim()).filter(Boolean);
 };
 
@@ -96,7 +99,12 @@ export async function releasePublishFlow(ctx, deps = {}) {
     for (const name of examples) {
       const example = repinExample(root, name, pins, ctx.args?.publish === true);
       data.examples.push(example);
-      lines.push(`example ${name}: ${example.present ? `${example.changed} pin(s) ${ctx.args?.publish ? 'written' : 'would change'}` : 'not present, skipped'}`);
+      let status;
+      if (example.present) {
+        const action = ctx.args?.publish ? 'written' : 'would change';
+        status = `${example.changed} pin(s) ${action}`;
+      } else status = 'not present, skipped';
+      lines.push(`example ${name}: ${status}`);
     }
     if (ctx.args?.publish !== true) return { code: 0 };
     for (const example of data.examples.filter((entry) => entry.present)) {
@@ -115,9 +123,9 @@ export async function releasePublishFlow(ctx, deps = {}) {
   let result;
   try {
     const locked = await (deps.underHostLock ?? underHostLock)({ role: ctx.role ?? 'release', purpose: 'release-publish', env: ctx.env }, operation, deps);
-    result = locked?.ok === true && Object.hasOwn(locked, 'value') ? locked.value
-      : locked?.ok === false && locked?.code === undefined ? { code: 1, stderr: `starci release publish: host lock refused (${locked.reason ?? 'held'})` }
-        : locked;
+    if (locked?.ok === true && Object.hasOwn(locked, 'value')) result = locked.value;
+    else if (locked?.ok === false && locked?.code === undefined) result = { code: 1, stderr: `starci release publish: host lock refused (${locked.reason ?? 'held'})` };
+    else result = locked;
   } catch (error) { result = { code: 1, stderr: `starci release publish: ${error.message}` }; }
   return { ...result, text: [...lines, `starci release publish: ${ctx.args?.publish ? 'flow completed' : 'plan only'}`].join('\n'), data };
 }

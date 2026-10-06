@@ -331,4 +331,7 @@ export function runEvery(run, intervalMs) {
   return () => { stopped = true; clearTimeout(timer); };
 }
 
-if (isMain(import.meta.url)) Promise.resolve().then(main).catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });
+if (isMain(import.meta.url)) {
+  try { await main(); }
+  catch (error) { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; }
+}

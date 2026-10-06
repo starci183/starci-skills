@@ -44,7 +44,7 @@ export function skipsOf(text) {
   return found;
 }
 
-/** The passed tests of a node:test log, spec reporter (`✔ name (1ms)`) or TAP (`ok 3 - name`, not a SKIP or TODO): the names. Pure. */
+/** The passed tests of a node:test log, spec reporter (`✔ name (1ms)`) or TAP (`ok 3 - name`, excluding skipped or pending cases): the names. Pure. */
 export function passesOf(text) {
   const found = [];
   for (const line of String(text ?? '').split(/\r?\n/)) {

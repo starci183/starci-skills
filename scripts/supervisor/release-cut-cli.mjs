@@ -30,9 +30,15 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   try { options = parseArgs(argv); } catch (error) { fail(`starci release cut: ${error.message}\n`); return 2; }
   const cut = io.cutRelease ?? cutRelease;
   const result = await cut({ repo: path.resolve(options.repo ?? process.cwd()), remote: options.remote, branch: options.branch, tag: options.tag ?? null });
-  write(options.json
-    ? `${JSON.stringify(result)}\n`
-    : `starci release cut: ${result.ok ? 'cut' : 'refused'} (${result.verdict ?? 'unknown'})${result.tag ? ` ${result.tag}` : ''}${result.why ? `: ${result.why}` : ''}\n`);
+  let output;
+  if (options.json) output = `${JSON.stringify(result)}\n`;
+  else {
+    const verdict = result.ok ? 'cut' : 'refused';
+    const tag = result.tag ? ` ${result.tag}` : '';
+    const why = result.why ? `: ${result.why}` : '';
+    output = `starci release cut: ${verdict} (${result.verdict ?? 'unknown'})${tag}${why}\n`;
+  }
+  write(output);
   return result.ok ? 0 : 1;
 }
 

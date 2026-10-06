@@ -17,12 +17,10 @@ import { hostThrottle, setPriority, throttleLine, readThrottleState, priorityTab
 import { isMain } from '../lib/is-main.mjs';
 
 
-function main(argv) {
-  const [verb] = argv;
+function prioritize(argv, verb, json) {
   const opt = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : null; };
-  const json = argv.includes('--json');
   const out = (value, text) => console.log(json ? JSON.stringify(value) : text);
-  if (verb === 'prioritize' || verb === 'unprioritize') {
+  {
     const workflowId = opt('workflow');
     if (!workflowId) { console.error(`${verb} needs --workflow <id>`); return 2; }
     const weight = verb === 'prioritize' ? Number(opt('weight')) : null;
@@ -33,17 +31,38 @@ function main(argv) {
       `${ok ? 'set' : 'FAILED'}: ${workflowId} ${JSON.stringify(priorities[workflowId] ?? { weight: 1, reserve: 0 })} (machine.sqlite throttle_state)`);
     return ok ? 0 : 1;
   }
-  if (verb === 'status' || !verb) {
-    const t = hostThrottle({ op: opt('op'), workflowId: opt('workflow') });
-    const estimates = Object.entries(t.estimates).map(([kind, e]) => `  ${kind.padEnd(22)} ${String(e.mb).padStart(5)} MB ${e.class.padEnd(5)} ${e.source}${e.observations ? ` (${e.observations} obs)` : ''}`);
-    out({ ...t, host: { freeRamPct: t.host.freeRamPct, totalRamBytes: t.host.totalRamBytes, freeRamBytes: t.host.freeRamBytes }, line: throttleLine(t) }, [
-      throttleLine(t),
-      `running by kind: ${Object.entries(t.runningByKind).map(([k, n]) => `${k} ${n}`).join(', ') || '-'}; queued ${t.queued}; kernels ${t.kernels}`,
-      ...(t.admission ? [`admission of ${t.admission.op}${t.admission.workflowId ? ` for ${t.admission.workflowId}` : ''}: ${t.admission.ok ? 'ADMIT' : `WAIT ${t.admission.reason} - ${t.admission.detail}`}`] : []),
-      'estimates:', ...estimates,
-    ].join('\n'));
-    return 0;
+}
+
+function showStatus(argv, json) {
+  const opt = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : null; };
+  const out = (value, text) => console.log(json ? JSON.stringify(value) : text);
+  const t = hostThrottle({ op: opt('op'), workflowId: opt('workflow') });
+  const estimates = Object.entries(t.estimates).map(([kind, e]) => {
+    const observations = e.observations ? ` (${e.observations} obs)` : '';
+    return `  ${kind.padEnd(22)} ${String(e.mb).padStart(5)} MB ${e.class.padEnd(5)} ${e.source}${observations}`;
+  });
+  const runningByKind = Object.entries(t.runningByKind).map(([k, n]) => `${k} ${n}`).join(', ') || '-';
+  const running = `running by kind: ${runningByKind}; queued ${t.queued}; kernels ${t.kernels}`;
+  const admission = t.admission;
+  let admissionLine = null;
+  if (admission) {
+    const workflow = admission.workflowId ? ` for ${admission.workflowId}` : '';
+    let verdict = 'ADMIT';
+    if (!admission.ok) verdict = `WAIT ${admission.reason} - ${admission.detail}`;
+    admissionLine = `admission of ${admission.op}${workflow}: ${verdict}`;
   }
+  const lines = [throttleLine(t), running];
+  if (admissionLine) lines.push(admissionLine);
+  lines.push('estimates:', ...estimates);
+  out({ ...t, host: { freeRamPct: t.host.freeRamPct, totalRamBytes: t.host.totalRamBytes, freeRamBytes: t.host.freeRamBytes }, line: throttleLine(t) }, lines.join('\n'));
+  return 0;
+}
+
+function main(argv) {
+  const [verb] = argv;
+  const json = argv.includes('--json');
+  if (verb === 'prioritize' || verb === 'unprioritize') return prioritize(argv, verb, json);
+  if (verb === 'status' || !verb) return showStatus(argv, json);
   console.error('use: starci supervisor ram-cap status [--op <kind>] [--workflow <id>] | prioritize --workflow <id> --weight <n> [--reserve <slots>] | unprioritize --workflow <id> [--json]');
   return 2;
 }

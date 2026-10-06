@@ -97,9 +97,9 @@ export async function releaseProofImages(ctx, deps = {}) {
   let outcome;
   try {
     const locked = await (deps.underHostLock ?? underHostLock)({ role: ctx.role ?? 'release', purpose: 'release-images', env: ctx.env }, operation, deps);
-    outcome = locked?.ok === true && Object.hasOwn(locked, 'value') ? locked.value
-      : locked?.ok === false && locked?.code === undefined ? { code: 1, stderr: `starci release images: host lock refused (${locked.reason ?? 'held'})` }
-        : locked;
+    if (locked?.ok === true && Object.hasOwn(locked, 'value')) outcome = locked.value;
+    else if (locked?.ok === false && locked?.code === undefined) outcome = { code: 1, stderr: `starci release images: host lock refused (${locked.reason ?? 'held'})` };
+    else outcome = locked;
   } catch (error) { outcome = { code: 1, stderr: `starci release images: ${error.message}` }; }
   const passed = results.filter((row) => row.ok).length;
   return { ...outcome, text: `starci release images: ${passed}/${images.length} images passed`, data: { schema: 'starci/release-images@1', project, images: results } };

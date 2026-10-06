@@ -232,7 +232,7 @@ function pathEvidence(repo, rel, raisedAt) {
 /** Peer messages delivered to `workflowId` after `since`, from one of `peers` (ledger inbox rows). */
 const peerDeliveries = (db, workflowId, peers, since) => (peers.length ? db.prepare(
   "SELECT key, payload_json, status, created_at, applied_at FROM inbox WHERE workflow_id=? AND kind='peer-message' AND created_at>? ORDER BY inbox_id").all(workflowId, since)
-  .map((row) => ({ key: row.key, status: row.status, at: row.created_at, appliedAt: row.applied_at, ...(({ from, kind, subject }) => { return { from, kind, subject }; })(parse(row.payload_json)) }))
+  .map((row) => { const { from, kind, subject } = parse(row.payload_json); return { key: row.key, status: row.status, at: row.created_at, appliedAt: row.applied_at, from, kind, subject }; })
   .filter((m) => peers.includes(m.from)) : []);
 
 /** A gate whose release is a peer's message itself (a heads-up, a reply, a notice), not a record. */
@@ -268,8 +268,8 @@ export function judgeGate({ db, workflowId, gate, repo, dbOf = () => null, now =
   const paths = namedPaths(gate.text);
   for (const rel of paths) {
     const ev = pathEvidence(repo, rel, gate.raisedAt);
-    if (ev.landed) reasons.push(`${ev.path} exists${ev.state ? ` (${ev.state})` : ''}, ${ev.created ? `created ${clock(ev.born)}${ev.written - ev.born > 60_000 ? `, written ${clock(ev.written)}` : ''}` : `written ${clock(ev.written)}`} after the gate (${clock(gate.raisedAt)})`);
-    else if (ev.waiting) waits.push(`${ev.path} ${ev.exists ? `is ${ev.state}` : 'is absent'}`);
+    if (ev.landed) reasons.push(ev.path + ' exists' + (ev.state ? ' (' + ev.state + ')' : '') + ', ' + (ev.created ? 'created ' + clock(ev.born) + (ev.written - ev.born > 60_000 ? ', written ' + clock(ev.written) : '') : 'written ' + clock(ev.written)) + ' after the gate (' + clock(gate.raisedAt) + ')');
+    else if (ev.waiting) waits.push(ev.path + ' ' + (ev.exists ? 'is ' + ev.state : 'is absent'));
   }
   const messageReleases = !paths.length && MESSAGE_GATE.test(gate.text);
   for (const m of peerDeliveries(db, workflowId, peers, gate.raisedAt)) {
@@ -284,7 +284,7 @@ export function judgeGate({ db, workflowId, gate, repo, dbOf = () => null, now =
     .map((id) => { for (const wf of [workflowId, ...peers]) { const j = (wf === workflowId ? db : dbOf(wf))?.prepare('SELECT job_id, status, updated_at FROM jobs WHERE job_id=?').get(id); if (j) return j; } return null; })
     .filter(Boolean);
   if (jobs.length && jobs.every((j) => SETTLED.includes(j.status) && j.updated_at > gate.raisedAt)) {
-    reasons.push(`named job(s) settled after the gate: ${jobs.map((j) => `${j.job_id} ${j.status} ${clock(j.updated_at)}`).join(', ')}`);
+    reasons.push(`named job(s) settled after the gate: ${jobs.map((j) => j.job_id + ' ' + j.status + ' ' + clock(j.updated_at)).join(', ')}`);
   }
   if (ASK_GATE.test(gate.text) && !asks.length && (reasons.length || !waits.length)) reasons.unshift(`no owner ask open in ${[workflowId, ...peers].join(', ')}`);
   const young = now - gate.raisedAt < graceMs;
@@ -322,7 +322,7 @@ export function judgePeerWait({ db, workflowId, wait, repo = null, dbOf = () => 
   if (!peerRow) return { stale: false, young, unknown: true, reasons: [], unread: [], peerIdleMs: null, peerProgress: null };
   const reasons = [];
   const running = peerRow.archived_at == null && peerRow.phase === 'running';
-  if (!running) reasons.push(`peer ${wait.peer} is ${peerRow.archived_at != null ? 'archived' : `phase ${peerRow.phase ?? 'unset'}`}, so it will land nothing more`);
+  if (!running) reasons.push('peer ' + wait.peer + ' is ' + (peerRow.archived_at != null ? 'archived' : 'phase ' + (peerRow.phase ?? 'unset')) + ', so it will land nothing more');
   const unread = peerDeliveries(db, workflowId, [wait.peer], wait.raisedAt).filter((m) => m.status === 'pending');
   // The release: a wait with typed until conditions is judged by them alone, exactly as the runtime
   // judges them (an until-job X:succeeded that already
@@ -330,14 +330,14 @@ export function judgePeerWait({ db, workflowId, wait, repo = null, dbOf = () => 
   // wait with no until falls back to the job ids its text and refs name - each at its lineage head.
   const until = typedRelease(db, workflowId, wait.incidentId, { repo });
   if (until) {
-    if (until.met) reasons.push(`every until condition holds: ${until.results.map((r) => `${r.condition}: ${r.evidence}`).join('; ')}`);
+    if (until.met) reasons.push(`every until condition holds: ${until.results.map((r) => r.condition + ': ' + r.evidence).join('; ')}`);
     else if (until.unmeetable.length) reasons.push(`an until condition can no longer hold: ${until.unmeetable.join('; ')}`);
   } else {
     const headOf = (id) => { for (const d of [peerDb, db]) { const head = lineageHeadById(d, id); if (head) return head; } return null; };
     const jobs = [...new Set([...namedJobs(wait.text), ...wait.refs.filter((ref) => ref.startsWith('op-'))])].filter((id) => !wait.holds.includes(id))
       .map(headOf).filter(Boolean);
     if (jobs.length && jobs.every(({ row }) => SETTLED.includes(row.status) && row.updated_at > wait.raisedAt)) {
-      reasons.push(`named job(s) settled after the wait: ${jobs.map(({ row, via }) => `${via.length ? `${via.map((hop) => hop.jobId).join(' -> ')} -> ` : ''}${row.job_id} ${row.status} ${clock(row.updated_at)}`).join(', ')}`);
+      reasons.push(`named job(s) settled after the wait: ${jobs.map(({ row, via }) => (via.length ? via.map((hop) => hop.jobId).join(' -> ') + ' -> ' : '') + row.job_id + ' ' + row.status + ' ' + clock(row.updated_at)).join(', ')}`);
     }
   }
   const peerProgress = lastProgress(peerDb, wait.peer);
@@ -395,7 +395,7 @@ export function kernelTurnState(db, workflowId, { show = terminalShow, read = te
 }
 
 /** The label clause for settles a gate or wait defers: " (and) defers the settle of <jobs>". */
-const settleLabel = (jobs, joined) => (jobs.length ? `${joined ? ' and' : ''} defers the settle of ${jobs.map((j) => j.job_id).join(', ')}` : '');
+const settleLabel = (jobs, joined) => (jobs.length ? (joined && ' and' || '') + ' defers the settle of ' + jobs.map((j) => j.job_id).join(', ') : '');
 
 /** The ledger ({repo, db}) holding workflow `wf` among this one and every ledger in view, or null. */
 export const ledgerLookup = ({ repo = null, db, ledgers = [] }) => (wf) => {
@@ -493,16 +493,16 @@ export function stallFindings(db, {
     if (verdicts) for (const { gate, verdict } of gates) verdicts.set(verdictKey(wf, gate.incidentId), verdict);
     if (verdicts) for (const { wait, verdict } of waits) verdicts.set(verdictKey(wf, wait.incidentId), verdict);
     for (const { wait, held, heldSettle, verdict } of waits) {
-      const label = `${wait.incidentId} [${PEER_WAIT_KIND}] on ${wait.peer ?? '?'}${held.length ? ` holds ${held.length} queued job(s)` : heldSettle.length ? '' : wait.holds.length ? ` holds ${wait.holds.join(', ')}` : ''}${settleLabel(heldSettle, held.length > 0)}`;
+      const label = `${wait.incidentId} [${PEER_WAIT_KIND}] on ${wait.peer ?? '?'}` + (held.length && ' holds ' + held.length + ' queued job(s)' || (!heldSettle.length && wait.holds.length && ' holds ' + wait.holds.join(', ')) || '') + settleLabel(heldSettle, held.length > 0);
       if (verdict.stale) {
         out.push({ type: 'STALE-PEER-WAIT', key: `STALE-PEER-WAIT|${wf}|${wait.incidentId}`, workflowId: wf, repo, incidentId: wait.incidentId, peer: wait.peer, alert: true,
           reasons: verdict.reasons, line: `STALE-PEER-WAIT ${wf} ${label} for ${minutes(now - wait.raisedAt)}m: ${verdict.reasons.join('; ')}; tell its Kernel to re-check the prerequisite and resolve the wait (starci kernel incident --resolve), or the peer's Kernel to move` });
       } else {
-        const waitsOn = verdict.until ? `until ${verdict.until.results.map((r) => `${r.condition} (${r.met ? 'met' : clipLine(r.evidence, 80)})`).join(', ')}` : clipLine(wait.text, 120);
-        const why = verdict.young ? `raised ${minutes(now - wait.raisedAt)}m ago (inside the grace window)`
-          : verdict.unknown ? `peer ${wait.peer ?? '?'} is not in any ledger in view; waits on: ${clipLine(wait.text, 120)}`
-          : verdict.peerBusy ? `justified: peer ${wait.peer} is running and working (${verdict.peerBusy}; its ledger quiet ${minutes(verdict.peerIdleMs)}m); waits on: ${waitsOn}`
-          : `justified: peer ${wait.peer} is running and moved ${minutes(verdict.peerIdleMs)}m ago (${verdict.peerProgress.kind}); waits on: ${waitsOn}`;
+        const waitsOn = verdict.until ? 'until ' + verdict.until.results.map((r) => r.condition + ' (' + (r.met ? 'met' : clipLine(r.evidence, 80)) + ')').join(', ') : clipLine(wait.text, 120);
+        const why = (verdict.young && `raised ${minutes(now - wait.raisedAt)}m ago (inside the grace window)`)
+          || (verdict.unknown && `peer ${wait.peer ?? '?'} is not in any ledger in view; waits on: ${clipLine(wait.text, 120)}`)
+          || (verdict.peerBusy && `justified: peer ${wait.peer} is running and working (${verdict.peerBusy}; its ledger quiet ${minutes(verdict.peerIdleMs)}m); waits on: ${waitsOn}`)
+          || `justified: peer ${wait.peer} is running and moved ${minutes(verdict.peerIdleMs)}m ago (${verdict.peerProgress.kind}); waits on: ${waitsOn}`;
         out.push({ type: 'PEER-WAIT', key: `PEER-WAIT|${wf}|${wait.incidentId}`, workflowId: wf, repo, incidentId: wait.incidentId, peer: wait.peer, alert: false,
           line: `PEER-WAIT ${wf} ${label}: ${why}` });
       }
@@ -524,9 +524,9 @@ export function stallFindings(db, {
         out.push({ type: 'STALE-GATE', key: `STALE-GATE|${wf}|${gate.incidentId}`, workflowId: wf, repo, incidentId: gate.incidentId, gateKind: gate.kind, raisedAt: gate.raisedAt, alert: true,
           reasons: verdict.reasons, line: `STALE-GATE ${wf} ${label} for ${minutes(now - gate.raisedAt)}m: ${verdict.reasons.join('; ')}; ${gate.kind === 'supervisor-gate' ? 'the Supervisor resolves it --by supervisor' : 'tell its Kernel to resolve it (starci kernel incident --resolve) with this evidence'}` });
       } else {
-        const why = verdict.young ? `raised ${minutes(now - gate.raisedAt)}m ago (inside the grace window)`
-          : `justified: ${[...verdict.asks.map((a) => `ask ${a.dispatchId} open in ${a.workflowId}`), ...verdict.waits.map((w) => `waits: ${w}`)].join(', ')
-            || `no checkable condition, waits on: ${clipLine(gate.text, 120)}`}`;
+        const details = [...verdict.asks.map((a) => 'ask ' + a.dispatchId + ' open in ' + a.workflowId), ...verdict.waits.map((w) => 'waits: ' + w)].join(', ');
+        const why = (verdict.young && `raised ${minutes(now - gate.raisedAt)}m ago (inside the grace window)`)
+          || 'justified: ' + (details || 'no checkable condition, waits on: ' + clipLine(gate.text, 120));
         out.push({ type: 'GATE', key: `GATE|${wf}|${gate.incidentId}`, workflowId: wf, repo, incidentId: gate.incidentId, alert: false,
           gateKind: gate.kind, raisedAt: gate.raisedAt, young: verdict.young, asks: verdict.asks, waits: verdict.waits, text: clipLine(gate.text, 200),
           line: `GATE ${wf} ${label}: ${why}` });
@@ -566,7 +566,7 @@ export function stallFindings(db, {
       const running = runningJobs(db, wf);
       out.push({ type: 'STATUS-UNREADABLE', key: `STATUS-UNREADABLE|${wf}`, workflowId: wf, repo, idleMinutes: minutes(idleMs), idleSince: progress.at,
         error: status?.error ?? 'no status', runningJobs: running.map((j) => j.job_id), alert: false,
-        line: `STATUS-UNREADABLE ${wf} idle ${minutes(idleMs)}m: starci kernel status unreadable (${status?.error ?? 'no status'}); stall not judged${running.length ? `; running ${running.map((j) => `${j.job_id} (${j.op_id ?? '-'})`).join(', ')}` : ''}; last progress ${progress.kind} ${clock(progress.at)}` });
+        line: `STATUS-UNREADABLE ${wf} idle ${minutes(idleMs)}m: starci kernel status unreadable (${status?.error ?? 'no status'}); stall not judged${running.length ? '; running ' + running.map((j) => j.job_id + ' (' + (j.op_id ?? '-') + ')').join(', ') : ''}; last progress ${progress.kind} ${clock(progress.at)}` });
       continue;
     }
     // A worker or the Kernel itself mid-turn is the workflow moving (busyWhy, the same judgement a peer gets).
@@ -581,7 +581,7 @@ export function stallFindings(db, {
     }
     const since = `idle ${minutes(idleMs)}m`;
     const gateBits = gates.filter((g) => g.held.length || g.heldSettle.length || !queued.length)
-      .map(({ gate, held, heldSettle, verdict }) => `${gate.incidentId} ${verdict.stale ? 'STALE' : verdict.young ? 'new' : 'justified'}${held.length ? ` holds ${held.length}` : ''}${heldSettle.length ? ` defers settle of ${heldSettle.map((j) => j.job_id).join(', ')}` : ''}`);
+      .map(({ gate, held, heldSettle, verdict }) => `${gate.incidentId} ${verdict.stale && 'STALE' || verdict.young && 'new' || 'justified'}${held.length ? ' holds ' + held.length : ''}${heldSettle.length ? ' defers settle of ' + heldSettle.map((j) => j.job_id).join(', ') : ''}`);
     const causes = Object.entries(frontier.queuedCauses ?? {}).map(([c, n]) => `${c} ${n}`).join(', ');
     const reason = [
       `frontier ${frontier.state ?? '?'}${frontier.actionable ? ' ACTIONABLE but the Kernel has not moved' : ''}`,
@@ -605,7 +605,7 @@ export function stallFindings(db, {
       frontierState: frontier?.state ?? null, frontierReason: frontier ? clipLine(frontier.reason, 240) || null : null, idleSince: progress.at,
       justifiedGate: gates.some((g) => !g.verdict.stale && !g.verdict.young), justifiedPeerWait: peerParked, justifiedOwnerWait: ownerParked, alert: !peerParked && !ownerParked,
       ...(credentialAsks.length ? { credentialAsks } : {}), ...(credentialOnly ? { credentialOnly } : {}),
-      line: `STALLED ${wf} ${since}: ${reason}${peerParked ? ' (justified: every peer-wait still holds)' : ownerParked ? ' (justified: it waits on the owner)' : ''}` });
+      line: `STALLED ${wf} ${since}: ${reason}${(peerParked && ' (justified: every peer-wait still holds)') || (ownerParked && ' (justified: it waits on the owner)') || ''}` });
   }
   // Stalls first, then the gates and waits that explain them.
   const order = { STALLED: 0, 'SUPERVISOR-WAIT': 0, 'STALE-GATE': 1, 'STALE-PEER-WAIT': 1, 'STALE-WAIT': 2, 'STATUS-UNREADABLE': 2, 'UNREAD-PEER': 3, GATE: 4, 'PEER-WAIT': 4 };

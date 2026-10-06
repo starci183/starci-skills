@@ -29,7 +29,12 @@ const iso = (at) => isoOr(at, '');
 export function readSupervisorState({ env = process.env, now = Date.now(), limit = 50, settings = null } = {}) {
   let mode = DEFAULT_SUPERVISOR_MODE;
   try { mode = (settings ?? supervisorSettings()).mode; } catch { /* the default */ }
-  const message = (r) => ({ id: String(r.msg_id ?? ''), at: iso(r.at), from: r.from_ref ? String(r.from_ref) : (r.chat_id ? 'telegram' : null), text: txt(r.text, 600), read: r.read_at != null });
+  const message = (r) => {
+    let from = null;
+    if (r.from_ref) from = String(r.from_ref);
+    else if (r.chat_id) from = 'telegram';
+    return { id: String(r.msg_id ?? ''), at: iso(r.at), from, text: txt(r.text, 600), read: r.read_at != null };
+  };
   const reply = (r) => ({ id: String(r.msg_id ?? ''), at: iso(r.at), to: r.to_ref ? String(r.to_ref) : null, via: r.via ? String(r.via) : null, ok: r.ok !== 0, text: txt(r.text, 600) });
   const base = readSupervisor((m) => {
     const seat = seatOf(m, now);
@@ -40,18 +45,31 @@ export function readSupervisorState({ env = process.env, now = Date.now(), limit
     const digest = newestEvent(m, DIGEST_KIND);
     const acts = m.supEvents({ kinds: [ACTION_KIND, NOTICE_KIND], limit }).map((r) => ({ at: r.created_at, kind: r.kind, p: r.payload ?? {} }));
     const learning = learningState(m);
+    let seatState = null;
+    if (seat) {
+      if (seat.starting) seatState = 'starting';
+      else if (seat.expired) seatState = 'expired';
+      else seatState = seat.value?.state ?? 'live';
+    }
+    let tickState = null;
+    if (tick || duties) {
+      let ramThrottle = null;
+      if (duties?.ramThrottle) {
+        ramThrottle = { effectiveCap: num(duties.ramThrottle.effectiveCap), maxParallelOps: num(duties.ramThrottle.maxParallelOps),
+          running: int(duties.ramThrottle.running), queued: int(duties.ramThrottle.queued), mode: String(duties.ramThrottle.mode ?? ''),
+          why: orNull(duties.ramThrottle.why, 400), capWhy: orNull(duties.ramThrottle.capWhy, 400), freeRamPct: num(duties.ramThrottle.freeRamPct), cpuBusy: num(duties.ramThrottle.cpuBusy) };
+      }
+      tickState = { at: int(duties?.at ?? tick?.at), ok: duties?.ok !== false, alerts: int((duties?.alerts ?? []).length), errors: int((duties?.errors ?? []).length),
+        owed: int(tick?.owed), clusters: int(tick?.clusters), ramThrottle };
+    }
     let inbox = [], outbox = [];
     try { inbox = m.supMessages({ direction: 'in', limit }).map(message); } catch { inbox = []; }
     try { outbox = m.supMessages({ direction: 'out', limit }).map(reply); } catch { outbox = []; }
     return {
       seat: { mode, enabled: enabledOf(m), terminal: seat?.value?.terminal ?? null, agent: seat?.value?.agent ?? null, model: seat?.value?.model ?? null,
-        state: seat ? (seat.starting ? 'starting' : seat.expired ? 'expired' : seat.value?.state ?? 'live') : null,
+        state: seatState,
         since: num(seat?.at), lastBoot: num(boot?.created_at) },
-      tick: tick || duties ? { at: int(duties?.at ?? tick?.at), ok: duties?.ok !== false, alerts: int((duties?.alerts ?? []).length), errors: int((duties?.errors ?? []).length),
-        owed: int(tick?.owed), clusters: int(tick?.clusters),
-        ramThrottle: duties?.ramThrottle ? { effectiveCap: num(duties.ramThrottle.effectiveCap), maxParallelOps: num(duties.ramThrottle.maxParallelOps),
-          running: int(duties.ramThrottle.running), queued: int(duties.ramThrottle.queued), mode: String(duties.ramThrottle.mode ?? ''),
-          why: orNull(duties.ramThrottle.why, 400), capWhy: orNull(duties.ramThrottle.capWhy, 400), freeRamPct: num(duties.ramThrottle.freeRamPct), cpuBusy: num(duties.ramThrottle.cpuBusy) } : null } : null,
+      tick: tickState,
       workflows: (owed?.workflows ?? []).map((w) => ({ workflowId: String(w.workflowId), state: orNull(w.state, 80), ready: int(w.ready), holds: Object.fromEntries(Object.entries(w.causes ?? {}).map(([k, v]) => [String(k), int(v)])), error: orNull(w.error, 300) })),
       owed: { at: num(owed?.at), items: (owed?.items ?? []).map((i) => ({ key: String(i.key), class: String(i.class), workflowId: orNull(i.workflowId, 400), subject: orNull(i.subject, 200),
         evidence: txt(i.evidence), do: txt(i.do), ageMin: int(i.ageMin), firstSeenAt: int(i.firstSeenAt), actedAt: num(i.actedAt), breach: i.breach === true, lessons: (i.lessons ?? []).map((l) => txt(l, 300)) })) },
