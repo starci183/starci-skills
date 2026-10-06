@@ -2,12 +2,11 @@
 // (normalizeHostPaths). Fixtures are built from the temp dir's own root and never spell a drive.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import os from 'node:os';
-import path from 'node:path';
+import { winPath } from '../fixtures/win-path.mjs';
 import { hostPathHits, normalizeHostPaths } from '../../scripts/lib/host-path.mjs';
 
 const BS = String.fromCharCode(92);
-const ROOT = path.parse(os.tmpdir()).root; // e.g. a drive root with a backslash
+const ROOT = winPath('C', ''); // a drive root with a backslash
 const FWD = ROOT.split(BS).join('/');
 const REPO = `${FWD}work/repo`;
 const roots = { repo: REPO, worktree: `${FWD}lanes/wt`, runtime: `${FWD}rt/.claude`, tmp: `${FWD}tmp`, home: `${FWD}Users/someone` };

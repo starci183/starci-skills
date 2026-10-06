@@ -20,7 +20,7 @@ import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree
 // Owner instruction 2026-09-23: the owner never approves a launch prompt; the runtime does. Layer 1 pre-trusts
 // the launch directory in ~/.claude.json and every Codex config.toml; layer 2 answers an allowlisted launch gate
 // once from the screen. Every spec here writes only temp copies (STARCI_AGENT_TRUST_HOME / explicit files).
-const ROOT=path.resolve(import.meta.dirname,'..', '..');const UP=path.parse(os.tmpdir()).root[0].toUpperCase(),LO=UP.toLowerCase();const W=(c,s)=>`${c}:\\${s}`,F=(c,s)=>`${c}:/${s}`,T=(c,s)=>W(c,s).replace(/\\/g,'\\\\');const EA='Repositories\\ecommerce-app',EAL='repositories\\ecommerce-app',EAF='Repositories/ecommerce-app';
+const ROOT=path.resolve(import.meta.dirname,'..', '..');const UP=(process.platform==='win32'?path.parse(os.tmpdir()).root[0]:'C').toUpperCase(),LO=UP.toLowerCase();const W=(c,s)=>`${c}:\\${s}`,F=(c,s)=>`${c}:/${s}`,T=(c,s)=>W(c,s).replace(/\\/g,'\\\\');const EA='Repositories\\ecommerce-app',EAL='repositories\\ecommerce-app',EAF='Repositories/ecommerce-app';
 // The card's settle/attestation windows (~25s of pure waiting per dispatch) are counted logically; scale the real sleeps down (scripts/lib/sleep-sync.mjs).
 process.env.STARCI_SLEEP_SCALE??='0.02';
 // This spec is about dispatch delivery/liveness, not the host-contract listing (orca-call-contract covers it): left on,

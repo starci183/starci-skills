@@ -1,12 +1,13 @@
 // supervisor-gc.spec.mjs — the garbage collection's decisions (scripts/supervisor/gc.mjs) and the verified close
 // (scripts/machine/close-verify.mjs). Pure: every host seam is injected; nothing touches Orca, git or the ledgers.
-import test from 'node:test'; import os from 'node:os'; import path from 'node:path';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyTerminals, onlyPrompts, isShellTitle, tabTitles, gcLine } from '../../scripts/supervisor/gc.mjs';
 import { closeAndVerify, closeSelfSafe } from '../../scripts/machine/close-verify.mjs';
 import { translator } from '../../scripts/lib/i18n.mjs';
+import { winPath } from '../fixtures/win-path.mjs';
 
-const DRIVE = path.parse(os.tmpdir()).root, F = DRIVE.replace(/\\/g, '/'); const RT = `${F}Repositories/x/.claude`;
+const DRIVE = winPath('C', ''), F = DRIVE.replace(/\\/g, '/'); const RT = `${F}Repositories/x/.claude`;
 const REPO_PATH = `${F}Repositories/shop-be`;
 const term = (handle, title, extra = {}) => ({ handle, title, connected: true, worktreePath: RT, ...extra });
 const sup = { seat: { handle: 'term_seat', live: true }, jobs: [

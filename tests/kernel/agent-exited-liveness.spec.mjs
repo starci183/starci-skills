@@ -12,6 +12,7 @@ import {sendWakeWithProof,sendEnterWithProof} from '../../scripts/kernel/wake-de
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {proofRepo} from '../helpers/sonar-scan.mjs';
 import {adoptLaunchTrust} from '../helpers/launch-trust.mjs';
+import {winPath} from '../fixtures/win-path.mjs';
 import {registerRepoWorkflowWorktree} from '../helpers/workflow-worktree-row.mjs';
 
 // A nudge was typed into a DEAD op terminal.
@@ -25,7 +26,7 @@ process.env.STARCI_SLEEP_SCALE??='0.02';
 // every mutation spawns the fake orca's agent-context under a 15s timeout that misses under full-suite load.
 process.env.STARCI_ORCA_SKIP_LIVE_CHECK??='1';
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
-const json=text=>{try{return JSON.parse(text);}catch{return null;}};const DRIVE=path.parse(os.tmpdir()).root,BE=path.join(os.tmpdir(),'shop-be'),APPDIR=path.join(os.tmpdir(),'ecommerce-app');
+const json=text=>{try{return JSON.parse(text);}catch{return null;}};const DRIVE=winPath('C',''),BE=winPath('C','Temp','shop-be'),APPDIR=winPath('C','Temp','ecommerce-app');
 
 // A captured Codex op whose agent exited mid-turn. The
 // spinner residue ("Working", "Running hook") is still on screen; the last row is the shell prompt.

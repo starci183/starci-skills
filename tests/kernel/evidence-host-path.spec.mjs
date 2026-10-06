@@ -9,12 +9,13 @@ import path from 'node:path';
 import { EVIDENCE_HOST_PATH, evidenceHostPathGate } from '../../scripts/kernel/job-artifacts.mjs';
 import { hostPathHits, normalizeHostPaths } from '../../scripts/lib/host-path.mjs';
 import { generateEvidence } from '../../scripts/example/example-evidence.mjs';
+import { winPath } from '../fixtures/win-path.mjs';
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-evidence-path-'));
 test.after(() => fs.rmSync(TMP, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
 
 const BS = String.fromCharCode(92);
-const ROOT = path.parse(os.tmpdir()).root;
+const ROOT = winPath('C', '');
 const HOST = `${ROOT}Users${BS}someone${BS}work`; // a host location spelled the Windows way
 const write = (rel, text) => { const file = path.join(TMP, ...rel.split('/')); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); return file; };
 const filesOf = (...abs) => abs.map((a) => ({ abs: a, source: 'named' }));
@@ -38,7 +39,7 @@ test('EVIDENCE_HOST_PATH: a draw prompt and a visual review that read from a hos
 test('EVIDENCE_HOST_PATH: evidence normalized by the one normalizer settles (no refusal)', () => {
   const raw = `command: ${ROOT}PROGRA~1${BS}Git${BS}bin${BS}bash.exe -c "echo ${path.join(TMP, 'out')}"\nnote: read ${HOST}${BS}k.yaml\n`;
   assert.ok(hostPathHits(raw).length > 0, 'the fixture holds host paths before normalizing');
-  const evidence = write('.starciwork/features/g/br/y/evidence.yaml', normalizeHostPaths(raw, { tmp: TMP, home: path.join(ROOT, 'Users', 'someone') }));
+  const evidence = write('.starciwork/features/g/br/y/evidence.yaml', normalizeHostPaths(raw, { tmp: TMP, home: winPath('C', 'Users', 'someone') }));
   assert.equal(evidenceHostPathGate({ files: filesOf(evidence) }), null);
 });
 

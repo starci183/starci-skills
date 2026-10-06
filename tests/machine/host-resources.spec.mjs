@@ -21,6 +21,7 @@ const mem = (totalRamBytes, freeRamBytes) => () => ({ totalRamBytes, freeRamByte
 const SETTINGS = { resources: { minFreeDiskGb: 20, minFreeRamPct: 15 } };
 const DRIVE = path.parse(os.tmpdir()).root, TEMP = `${DRIVE}Temp`, DRV = DRIVE.slice(0, 2); // the drive holding %TEMP%
 const DRIVE2 = `${String.fromCharCode(DRIVE.charCodeAt(0) ^ 1)}:\\`, REPO = `${DRIVE2}repo`, DRV2 = `${DRIVE2[0]}:`; // a second drive letter
+const TWO_DRIVES = process.platform !== 'win32' && 'a second drive letter exists on Windows only: a POSIX path has the one root /, covered by the driveOf and same-root cases';
 const REPO_SAME = `${DRIVE}src\\repo`;
 
 test('the thresholds come from allocation.resources.*, falling back to the declared defaults', t => {
@@ -33,7 +34,7 @@ test('the thresholds come from allocation.resources.*, falling back to the decla
     { minFreeDiskGb: 20, minFreeRamPct: 15 }, 'a non-positive threshold is not a floor — the default stands');
 });
 
-test('a healthy host reads ok with both drives and the RAM figures reported', t => {
+test('a healthy host reads ok with both drives and the RAM figures reported', { skip: TWO_DRIVES }, t => {
   const p = probeHostResources({
     env: { TEMP }, repo: REPO, settings: SETTINGS,
     statfs: statfsOf({ [TEMP]: gb(50), [REPO]: gb(80) }),
@@ -46,7 +47,7 @@ test('a healthy host reads ok with both drives and the RAM figures reported', t 
   assert.equal(p.totalRamBytes, 64e9); assert.equal(p.freeRamBytes, 32e9); assert.equal(p.freeRamPct, 50);
 });
 
-test('the worst of the two drives binds: a low repo drive refuses even with a roomy %TEMP% drive', t => {
+test('the worst of the two drives binds: a low repo drive refuses even with a roomy %TEMP% drive', { skip: TWO_DRIVES }, t => {
   const p = probeHostResources({
     env: { TEMP }, repo: REPO, settings: SETTINGS,
     statfs: statfsOf({ [TEMP]: gb(500), [REPO]: gb(9.5) }),
@@ -114,7 +115,7 @@ test('a low-RAM host reads lowRam with the real percentage named', t => {
   assert.ok(Math.abs(p.freeRamPct - (6.4 / 68) * 100) < 0.01);
 });
 
-test('a drive the probe cannot read is reported with its error and does not count as low', t => {
+test('a drive the probe cannot read is reported with its error and does not count as low', { skip: TWO_DRIVES }, t => {
   const p = probeHostResources({
     env: { TEMP }, repo: REPO, settings: SETTINGS,
     statfs: statfsOf({ [REPO]: gb(50) }), // TEMP throws ENOENT
@@ -186,8 +187,12 @@ test('the probe falls back to os.tmpdir() when env.TEMP is unset', t => {
 });
 
 test('driveOf spells the binding drive the way the alert names it', t => {
-  assert.equal(driveOf(os.tmpdir()), DRV);
-  assert.equal(driveOf(`${DRIVE2}starci-lanes\\x`), DRV2);
-  assert.equal(driveOf(`${DRIVE.replace(/\\/g, '/')}src/x`), DRV);
-  if (process.platform !== 'win32') assert.equal(driveOf('/tmp/x'), '/');
+  if (process.platform === 'win32') {
+    assert.equal(driveOf(os.tmpdir()), DRV);
+    assert.equal(driveOf(`${DRIVE2}starci-lanes\\x`), DRV2);
+    assert.equal(driveOf(`${DRIVE.replace(/\\/g, '/')}src/x`), DRV);
+  } else {
+    assert.equal(driveOf(os.tmpdir()), '/');
+    assert.equal(driveOf('/tmp/x'), '/');
+  }
 });
