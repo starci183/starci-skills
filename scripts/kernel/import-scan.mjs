@@ -20,7 +20,7 @@ import { byCodeUnit } from '../lib/list.mjs';
 
 export const SOURCE_EXT = Object.freeze(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']);
 const RESOLVE_EXT = [...SOURCE_EXT, '.d.ts', '.json'];
-const posix = (p) => String(p).replaceAll(/\\/g, '/');
+const posix = (p) => String(p).replaceAll('\\', '/');
 const SPEC_RE = [
   /\bimport\s+(?:type\s+)?(?:(?!\bfrom\s*['"])[^'"`;])*\bfrom\s*['"]([^'"]+)['"]/g,
   /\bexport\s+(?:type\s+)?(?:(?!\bfrom\s*['"])[^'"`;])*\bfrom\s*['"]([^'"]+)['"]/g,
@@ -152,7 +152,11 @@ const probeBase = (b, { exists, isDir }, candidates) => {
     if (exists(c)) return c;
   }
   const m = /^(.*)\.[mc]?js$/.exec(b);
-  if (m) for (const e of ['.ts', '.tsx', '.mts', '.cts']) if (exists(`${m[1]}${e}`)) return `${m[1]}${e}`;
+  if (m) {
+    for (const e of ['.ts', '.tsx', '.mts', '.cts']) {
+      if (exists(`${m[1]}${e}`)) return `${m[1]}${e}`;
+    }
+  }
   if (isDir(b)) candidates.push(`${b}/`);
   return null;
 };
