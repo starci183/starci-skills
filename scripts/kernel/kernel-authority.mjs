@@ -120,6 +120,14 @@ export function restoreJob(ledger, jobId, { editId, now = Date.now() }) {
 /* ------------------------------------------------------------ paths and leases */
 
 const overlaps = (a, b) => { const x = a.toLowerCase(), y = b.toLowerCase(); return x === y || x.startsWith(`${y}/`) || y.startsWith(`${x}/`); };
+const addedPathProblem = (p, current, heads) => {
+  const s = slash(p);
+  if (!s || s.split('/').includes('..') || path.isAbsolute(p)) return refuse(`${p}: an added path is repository-relative, never absolute or ../ (it stays in the workflow's source roots)`, 'path-outside-roots');
+  if (/(^|\/)\.starciwork\/(kernel-evidence|kernel-strays|kernel-approvals)(\/|$)/.test(s)) return refuse(`${p} is kernel custody`, 'path-kernel-custody');
+  if (/(?:(^|\/)\.claude(\/|$)|modules\/kernel\/owner-rulings\.yaml$)/.test(s)) return refuse(`${p} is the shared runtime (.claude): a tier-2 kernel-proposal, never a unit's owned path`, 'path-shared-runtime');
+  if (current.length && heads.size === 1 && !heads.has(s.split('/')[0]) && !/^(apps|packages|src|libs|e2e)$/.test(s.split('/')[0])) return refuse(`${p} leaves the unit's repository ${[...heads][0]}`, 'path-outside-repository');
+  return null;
+};
 const appendOverlapHits = (hits, paths, mine, canonicalPath, workflowId, jobId) => {
   for (const pathValue of paths) {
     const c = slash(canonicalPath(pathValue));
@@ -155,11 +163,8 @@ export function checkPaths(db, { repo, workflowId, op, payload = {}, current = [
   if (!add.length) throw refuse('no path given', 'paths-empty');
   const heads = new Set(current.map((p) => slash(p).split('/')[0]));
   for (const p of add) {
-    const s = slash(p);
-    if (!s || s.split('/').includes('..') || path.isAbsolute(p)) throw refuse(`${p}: an added path is repository-relative, never absolute or ../ (it stays in the workflow's source roots)`, 'path-outside-roots');
-    if (/(^|\/)\.starciwork\/(kernel-evidence|kernel-strays|kernel-approvals)(\/|$)/.test(s)) throw refuse(`${p} is kernel custody`, 'path-kernel-custody');
-    if (/(?:(^|\/)\.claude(\/|$)|modules\/kernel\/owner-rulings\.yaml$)/.test(s)) throw refuse(`${p} is the shared runtime (.claude): a tier-2 kernel-proposal, never a unit's owned path`, 'path-shared-runtime');
-    if (current.length && heads.size === 1 && !heads.has(s.split('/')[0]) && !/^(apps|packages|src|libs|e2e)$/.test(s.split('/')[0])) throw refuse(`${p} leaves the unit's repository ${[...heads][0]}`, 'path-outside-repository');
+    const error = addedPathProblem(p, current, heads);
+    if (error) throw error;
   }
   const briefFile = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
   try {
