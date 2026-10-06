@@ -48,18 +48,12 @@ It fails unless bugs, code smells and vulnerabilities are 0, every hotspot is re
 ## The runtime itself: coverage and Sonar
 
 The runtime measures its own first-party source too. The scope is ONE list, `scripts/hfs/runtime-coverage-scope.mjs`: `engine/`, `scripts/`, `packages/cli/`, `ui/api/` and the `ui/*.mjs` entry files, never the specs, `node_modules`, the generated `packages/*/runtime/` copies, `examples/` (which keep their own flags and Sonar projects) or the vendored `engine/yaml.mjs` bundle. Three things are rendered from it and nothing is typed twice:
-`npm run test:coverage` (`scripts/gates/runtime-coverage.mjs`: the same suite and `tests/setup/` isolation as `npm test`, under Node's built-in coverage, writing the git-ignored `coverage/lcov.info`), the `runtime` flag of `codecov.yml`, and the root `sonar-project.properties` (project `starci-runtime`); `starci runtime check --only examples-ci -- --write` renders the last two and the check refuses drift.
+`npm run test:coverage` (`scripts/gates/runtime-coverage.mjs`: the same suite and `tests/setup/` isolation as `npm test`, under Node's built-in coverage, writing the git-ignored `coverage/lcov.info`), the `runtime` flag of `codecov.yml`, and the root `sonar-project.properties` (the SonarCloud project definition: sources, tests, exclusions and the lcov path, with no organization or key); `starci runtime check --only examples-ci -- --write` renders the last two and the check refuses drift.
 The `runtime` flag has never been measured, so its project and patch statuses are `informational: true` (never red) until a baseline exists; the overall Codecov statuses read the example flags only.
 
-In `.github/workflows/ci.yml` the coverage run replaces the plain test step (one run, never two). In the tag run (`startsWith(github.ref, 'refs/tags/v')`) it then uploads `coverage/lcov.info` under flag `runtime` through OIDC and, when `vars.SONAR_HOST_URL` and `secrets.SONAR_TOKEN` exist, scans and waits for the quality gate, otherwise it prints a "Sonar skipped" notice; a manual dispatch runs the tests and produces the coverage but uploads and scans nothing. The owner configures once: the Codecov app and OIDC for the repository, `vars.SONAR_HOST_URL` and `secrets.SONAR_TOKEN` (an analysis token of project `starci-runtime`).
+In `.github/workflows/ci.yml` the coverage run replaces the plain test step (one run, never two). In the tag run (`startsWith(github.ref, 'refs/tags/v')`) it then uploads `coverage/lcov.info` under flag `runtime` through OIDC and scans the runtime on SonarCloud (`https://sonarcloud.io`, fixed in that job) with the full git history, waits for the quality gate (up to an hour) and fails the job on a red gate. The scan runs only where all three repository settings exist; otherwise the job prints a "Sonar skipped" notice naming each missing one. A manual dispatch runs the tests and produces the coverage but uploads and scans nothing.
 
-The local scan, with the local SonarQube up and `SONAR_TOKEN` in the environment (the analysis token; `ensure-project` and a scan that provisions use the host admin custody `ext/sonar/secrets/sonarqube-admin-token.key.enc`):
-
-```sh
-npm run test:coverage
-starci gate sonar ensure-project --key starci-runtime --name "StarCi runtime" --with-token
-starci gate sonar scan --cwd <runtime root> --project-gate --wait
-```
+The runtime goes to SonarCloud; apps and examples go to the host's local SonarQube in `ext/sonar`. The owner configures once: the Codecov app and OIDC for the repository, and the repository settings `secrets.SONAR_TOKEN` (a SonarCloud token), `vars.SONAR_ORGANIZATION` (the organization key) and `vars.SONAR_PROJECT_KEY` (the project key, normally `<organization>_<repository>`); on SonarCloud the repository is imported with Automatic Analysis turned off, since the analysis comes from CI.
 
 The runtime's own `dashboard` gate is not used: it holds a per-file coverage of 100 that only the example apps are held to.
 

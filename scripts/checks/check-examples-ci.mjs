@@ -15,7 +15,7 @@
 //
 //                                   It also carries the `runtime` flag (the runtime's own first-party source, uploaded by .github/workflows/ci.yml, informational
 //                                   until a measured baseline exists), and the root sonar-project.properties of the runtime is rendered here from the same list
-//                                   (scripts/hfs/runtime-coverage-scope.mjs).
+//                                   (scripts/hfs/runtime-coverage-scope.mjs); it is the SonarCloud project definition, the organization and key come from repository variables.
 //
 //   starci runtime check --only examples-ci              check: the workflow derives its matrix from --matrix, no other root
 //                                                  workflow runs an example on its own, codecov.yml is its render (exit 1)

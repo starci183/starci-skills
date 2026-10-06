@@ -1,7 +1,7 @@
 # ext/sonar — the shared local SonarQube (host extension)
 
-One SonarQube Community Build (with a dedicated PostgreSQL) serves **every** StarCi product on this
-host. It is a host extension, not part of any product's `.starcistacks`: product repositories only
+One SonarQube Community Build (with a dedicated PostgreSQL) serves every StarCi product repository (apps and examples) on this
+host; the `.claude` runtime itself is analysed on SonarCloud by `.github/workflows/ci.yml` (docs/releasing.md). It is a host extension, not part of any product's `.starcistacks`: product repositories only
 *declare* it, via their `services.sonar.stack` block pointing at `owner: host` /
 `root: .claude/ext/sonar` (see `modules/schemas/application-stacks.schema.yaml` and
 `docs/application-stacks.md`).

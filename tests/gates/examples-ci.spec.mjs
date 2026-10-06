@@ -14,7 +14,7 @@ import { braceVariants, globExpression } from '../../scripts/lib/glob.mjs';
 import { isMeasured } from '../../scripts/hfs/coverage-scope.mjs';
 import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 import { execFileSync } from 'node:child_process';
-import { RUNTIME_FLAG, RUNTIME_LCOV, RUNTIME_SONAR_KEY, runtimeCodecovPaths, runtimeCoverageNodeArgs } from '../../scripts/hfs/runtime-coverage-scope.mjs';
+import { RUNTIME_FLAG, RUNTIME_LCOV, runtimeCodecovPaths, runtimeCoverageNodeArgs } from '../../scripts/hfs/runtime-coverage-scope.mjs';
 import { coverageArgs } from '../../scripts/gates/runtime-coverage.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -217,7 +217,8 @@ test('the runtime is measured by one scope: the codecov runtime flag (informatio
   assert.deepEqual(codecov.coverage.status.project.default.flags, coverageExampleApps(ROOT), 'the overall status reads the example flags only');
   for (const glob of runtimeCodecovPaths()) assert.ok(runtimeCoverageNodeArgs().includes(`--test-coverage-include=${glob}`), `the producer measures ${glob}`);
   const sonar = readProperties(path.join(ROOT, RUNTIME_SONAR));
-  assert.equal(sonar['sonar.projectKey'], RUNTIME_SONAR_KEY);
+  assert.equal(sonar['sonar.projectKey'], undefined, 'the key and the organization come from repository variables, never a typed value');
+  assert.equal(sonar['sonar.organization'], undefined);
   assert.equal(sonar['sonar.javascript.lcov.reportPaths'], RUNTIME_LCOV);
   for (const source of sonar['sonar.sources'].split(',')) assert.ok(fs.existsSync(path.join(ROOT, source)), `${source} exists`);
   assert.ok(coverageArgs().includes(`--test-reporter-destination=${RUNTIME_LCOV}`));
@@ -231,9 +232,19 @@ test('the runtime is measured by one scope: the codecov runtime flag (informatio
   assert.equal(upload.with.files, RUNTIME_LCOV);
   assert.ok(String(upload.if).includes("startsWith(github.ref, 'refs/tags/v')"), 'Codecov uploads only from the release-tag run');
   const sonarSteps = ci.steps.filter((step) => String(step.uses ?? '').startsWith('SonarSource/'));
-  assert.equal(sonarSteps.length, 2);
-  for (const step of sonarSteps) assert.ok(String(step.if).includes("startsWith(github.ref, 'refs/tags/v')"), 'Sonar runs only in the release-tag run');
-  assert.ok(ci.steps.some((step) => /Sonar skipped/.test(String(step.name ?? ''))), 'a missing server is announced, never a silent pass');
+  assert.equal(sonarSteps.length, 1, 'one scan step that also waits for the quality gate');
+  const scan = sonarSteps[0];
+  assert.ok(String(scan.if).includes("startsWith(github.ref, 'refs/tags/v')"), 'Sonar runs only in the release-tag run');
+  for (const setting of ['SONAR_TOKEN', 'SONAR_ORGANIZATION', 'SONAR_PROJECT_KEY']) assert.ok(String(scan.if).includes(`env.${setting} != ''`), `the scan needs ${setting}`);
+  assert.equal(ci.env.SONAR_HOST_URL, 'https://sonarcloud.io', 'the runtime job scans SonarCloud, never the self-hosted server of examples.yml');
+  assert.equal(ci.env.SONAR_ORGANIZATION, '${{ vars.SONAR_ORGANIZATION }}');
+  assert.equal(ci.env.SONAR_PROJECT_KEY, '${{ vars.SONAR_PROJECT_KEY }}');
+  assert.match(String(scan.with.args), /-Dsonar\.qualitygate\.wait=true/);
+  assert.equal(ci.steps[0].with['fetch-depth'], 0, 'the scan reads the full history');
+  const skipped = ci.steps.find((step) => /Sonar skipped/.test(String(step.name ?? '')));
+  assert.ok(skipped, 'missing settings are announced, never a silent pass');
+  for (const setting of ['secrets.SONAR_TOKEN', 'vars.SONAR_ORGANIZATION', 'vars.SONAR_PROJECT_KEY']) assert.ok(String(skipped.run).includes(setting), `the notice can name ${setting}`);
+  assert.ok(ci.steps.indexOf(skipped) > ci.steps.indexOf(scan));
 });
 
 test('the root sonar-project.properties of the runtime is a render: a hand edit is refused and --write restores it', (t) => {

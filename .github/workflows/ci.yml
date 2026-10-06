@@ -9,8 +9,10 @@ name: ci
 # source (scripts/hfs/runtime-coverage-scope.mjs, docs/releasing.md): it writes coverage/lcov.info. Codecov (flag runtime, informational until a baseline
 # exists) and Sonar (project starci-runtime, the root sonar-project.properties) take it in the tag run only (startsWith(github.ref, refs/tags/v)); a manual
 # dispatch runs the tests and produces the coverage but publishes no measurement. The Codecov upload authenticates with GitHub's OIDC token (use_oidc,
-# permissions id-token: write) and a failed upload fails the job; Sonar runs only where vars.SONAR_HOST_URL and secrets.SONAR_TOKEN exist, and says so
-# when it does not (never a silent pass).
+# permissions id-token: write) and a failed upload fails the job. The runtime is analysed on SonarCloud (https://sonarcloud.io, fixed in this job; the apps and
+# examples use the host's local SonarQube in ext/sonar through examples.yml and never this job): in the tag run, one scan step waits for the quality gate and fails the
+# job on a red gate, and it runs only where secrets.SONAR_TOKEN, vars.SONAR_ORGANIZATION and vars.SONAR_PROJECT_KEY all exist; otherwise a notice names each missing
+# setting (never a silent pass). The root sonar-project.properties carries sources, tests, exclusions and the lcov path; the organization and the project key come from the variables.
 
 on:
   push:
@@ -28,15 +30,19 @@ jobs:
   check-and-test:
     name: check + test
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 150
     permissions:
       contents: read
       id-token: write
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+      SONAR_HOST_URL: https://sonarcloud.io
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -81,20 +87,27 @@ jobs:
           disable_search: true
           fail_ci_if_error: true
 
-      - name: Sonar scan
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+      # SonarCloud analysis of the runtime (full history from the checkout above, for blame and the new-code period). The scan waits for the quality gate
+      # (sonar.qualitygate.wait, up to an hour: SonarCloud queues) and the step fails on a red gate.
+      - name: Sonar scan (SonarCloud) and quality gate
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' && env.SONAR_PROJECT_KEY != '' }}
         uses: SonarSource/sonarqube-scan-action@v7
-
-      - name: Sonar quality gate
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
-        uses: SonarSource/sonarqube-quality-gate-action@v1
-        timeout-minutes: 10
+        timeout-minutes: 75
         with:
-          scanMetadataReportFile: .scannerwork/report-task.txt
+          args: >
+            -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=3600
 
-      - name: Sonar skipped (no server configured)
-        if: ${{ startsWith(github.ref, 'refs/tags/v') && (env.SONAR_TOKEN == '' || env.SONAR_HOST_URL == '') }}
-        run: echo "::notice title=Sonar skipped::no Sonar server is configured for this repository (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN), so the runtime was not scanned; the local scan (docs/releasing.md) is a release-checklist item."
+      - name: Sonar skipped (SonarCloud settings missing)
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && (env.SONAR_TOKEN == '' || env.SONAR_ORGANIZATION == '' || env.SONAR_PROJECT_KEY == '') }}
+        run: |
+          missing=""
+          [ -z "$SONAR_TOKEN" ] && missing="$missing secrets.SONAR_TOKEN"
+          [ -z "$SONAR_ORGANIZATION" ] && missing="$missing vars.SONAR_ORGANIZATION"
+          [ -z "$SONAR_PROJECT_KEY" ] && missing="$missing vars.SONAR_PROJECT_KEY"
+          echo "::notice title=Sonar skipped::the runtime was not scanned on SonarCloud; missing repository settings:$missing"
 
       # Every published @starci package (the starci pins of knowledge/hfs/canon-pins.yaml) passes its own tests from a
       # clean install of its own manifest and lock in a temp dir: nothing hoisted in this checkout can hide an undeclared
