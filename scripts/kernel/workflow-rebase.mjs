@@ -61,7 +61,7 @@ function collectObstructions(rec, targets, leaf) {
         leaf(entry);
         return true;
       } });
-      found.forEach(leaf);
+      found.forEach((entry) => leaf(entry));
     }
   }
 }

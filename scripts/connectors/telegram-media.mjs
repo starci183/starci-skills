@@ -220,8 +220,5 @@ async function main() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === SELF) {
-  const result = main();
-  if (result && typeof result.then === 'function') {
-    try { await result; } catch (error) { console.error(error); process.exit(1); }
-  }
+  try { await main(); } catch (error) { console.error(error); process.exit(1); }
 }
