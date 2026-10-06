@@ -68,7 +68,12 @@ const asSelector = value => typeof value==='string'?{pool:value}:value;
 const covers = (excluded,required) => {
   const a=asSelector(excluded),b=asSelector(required);
   const family=value=>value.provider??value.pool?.replace(/-agent$/,'');
-  return Object.entries(a).every(([key,value])=>key==='provider'?family(b)===value:key==='pool'?b.pool===value || family(b)===value.replace(/-agent$/,''):b[key]===value);
+  const matches = ([key,value]) => {
+    if (key === 'provider') return family(b) === value;
+    if (key === 'pool') return b.pool === value || family(b) === value.replace(/-agent$/,'');
+    return b[key] === value;
+  };
+  return Object.entries(a).every(matches);
 };
 const override = value => {
   keys(value,['authorized','scopeId','role','provider','model','account','reason'],'reserveOverride');

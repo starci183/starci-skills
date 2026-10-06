@@ -3,10 +3,13 @@ import crypto from 'node:crypto';
 import { byCodeUnit } from './list.mjs';
 export const requestValuePresent = (v) => v !== undefined && v !== null && v !== false && v !== '';
 
-const canonical = (v) => Array.isArray(v) ? `[${v.map(canonical).join(',')}]`
-  : (v && typeof v === 'object'
-    ? `{${Object.keys(v).filter((k) => v[k] !== undefined).sort(byCodeUnit).map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`
-    : JSON.stringify(v ?? null));
+const canonical = (v) => {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
+  if (!v || typeof v !== 'object') return JSON.stringify(v ?? null);
+  const fields = Object.keys(v).filter((k) => v[k] !== undefined).sort(byCodeUnit)
+    .map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',');
+  return `{${fields}}`;
+};
 
 /**
  * The deterministic --retry-request id of one mutation: the verb plus the
@@ -21,7 +24,7 @@ export const ORCA_REQUEST_NAMESPACE = '96fe63b0-5b42-4411-8490-6b5ae7b7dcb2';
 
 /** RFC 9562 UUIDv8 (custom): SHA-256 over the namespace's 16 bytes then the name's UTF-8 bytes, first 16 bytes, version 8, variant 10. */
 export function uuidv8(namespace, name) {
-  const ns = Buffer.from(String(namespace).replace(/-/g, ''), 'hex');
+  const ns = Buffer.from(String(namespace).replaceAll('-', ''), 'hex');
   const b = crypto.createHash('sha256').update(ns).update(Buffer.from(String(name), 'utf8')).digest().subarray(0, 16);
   b[6] = (b[6] & 0x0f) | 0x80;
   b[8] = (b[8] & 0x3f) | 0x80;

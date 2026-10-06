@@ -84,12 +84,12 @@ export function housekeepingAllocation(allocation = allocationSettings()) {
 async function resolveSweep(name, { module: modulePath, sweep }, sweeps) {
   if (sweeps) {
     const fn = sweeps[name];
-    if (typeof fn !== 'function') throw Error(`no sweep supplied for area '${name}'`);
+    if (typeof fn !== 'function') throw new Error(`no sweep supplied for area '${name}'`);
     return fn;
   }
   const file = fileURLToPath(new URL(modulePath, import.meta.url));
   const mod = await import(pathToFileURL(file).href);
-  if (typeof mod[sweep] !== 'function') throw Error(`${modulePath} exports no ${sweep}()`);
+  if (typeof mod[sweep] !== 'function') throw new Error(`${modulePath} exports no ${sweep}()`);
   return mod[sweep];
 }
 

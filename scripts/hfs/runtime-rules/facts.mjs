@@ -11,7 +11,10 @@ const FACTS_FILE = 'knowledge/hfs/facts.yaml';
 const PROSE = /^(?:knowledge\/.+\.(?:ya?ml|md)|docs\/.+\.md|(?:.+\/)?README\.md)$/;
 const NEAR_LINES = 3;
 
-const finding = (file, line, message) => ({ code: CODE, level: 'error', path: file, ...(line ? { line } : {}), message: `${CODE} ${file}${line ? `:${line}` : ''}: ${message}` });
+const finding = (file, line, message) => {
+  const location = line ? `:${line}` : '';
+  return { code: CODE, level: 'error', path: file, ...(line ? { line } : {}), message: `${CODE} ${file}${location}: ${message}` };
+};
 
 /** The problem a fact's slot evaluation finds in `manifest`, or null when the fact holds. */
 export function slotProblem(fact, manifest) {

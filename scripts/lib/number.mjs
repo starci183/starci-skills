@@ -7,5 +7,7 @@
  */
 export const positiveNumber = (value, fallback = null, { orZero = false, int = false } = {}) => {
   const n = int ? Math.trunc(Number(value)) : Number(value);
-  return Number.isFinite(n) && (orZero ? n >= 0 : n > 0) ? n : fallback;
+  if (!Number.isFinite(n)) return fallback;
+  if (orZero ? n < 0 : n <= 0) return fallback;
+  return n;
 };

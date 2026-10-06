@@ -74,7 +74,7 @@ export function fileLinkFindings({ path: file, text, source }) {
   const visit = (node) => {
     if (t.isCallExpression(node)) {
       const args = linkArgs(node);
-      if (args && args.some((arg) => namesNodeModules(arg))) {
+      if (args?.some((arg) => namesNodeModules(arg))) {
         const line = lineOf(source, node);
         found.push({ code: CODE, level: 'error', path: file, line, message: `${file}:${line} links a node_modules folder (${node.expression.getText(source)}): a checkout installs its own dependencies with a real npm ci from the cache (scripts/api/npm/ci.mjs), never a junction or symlink into another checkout's node_modules` });
       }

@@ -121,7 +121,11 @@ const LANE_CALLS = {
   reflog: (rest, opts) => gitResultOf(gitReflog(rest, opts)),
   'rev-parse': (rest, opts) => gitResultOf(revParseQuery(rest, opts)),
   'merge-base': ([a, b], { cwd }) => { const sha = mergeBase(cwd, a, b); return { ok: Boolean(sha), stdout: sha ?? '', error: sha ? '' : `no merge-base of ${a} and ${b}` }; },
-  worktree: ([sub, ...rest], opts) => (sub === 'list' ? gitResultOf(worktreeListQuery(rest, opts)) : (({ ok, stdout, stderr }) => ({ ok, stdout, error: stderr }))(worktreePrune(opts.cwd))),
+  worktree: ([sub, ...rest], opts) => {
+    if (sub === 'list') return gitResultOf(worktreeListQuery(rest, opts));
+    const { ok, stdout, stderr } = worktreePrune(opts.cwd);
+    return { ok, stdout, error: stderr };
+  },
   status: (rest, opts) => gitResultOf(gitStatus(rest, opts)),
   cherry: (rest, opts) => gitResultOf(gitCherry(rest, opts)),
   'rev-list': (rest, opts) => gitResultOf(revList(rest, opts)),

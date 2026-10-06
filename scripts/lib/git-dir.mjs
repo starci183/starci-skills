@@ -73,7 +73,7 @@ const words = (line) => [...String(line ?? '').matchAll(/"([^"]*)"|(\S+)/g)].map
 export function reposNamed(commandLine) {
   const w = words(commandLine), out = [];
   for (let i = 0; i < w.length; i += 1) {
-    if (w[i] === '-C' || w[i] === '--git-dir' || w[i] === '--work-tree') { if (w[i + 1]) out.push(w[i + 1]); i += 1; continue; }
+    if (w[i] === '-C' || w[i] === '--git-dir' || w[i] === '--work-tree') { if (w[i + 1]) { out.push(w[i + 1]); } i += 1; continue; }
     const m = /^--(?:git-dir|work-tree)=(.+)$/.exec(w[i]);
     if (m) out.push(m[1]);
   }

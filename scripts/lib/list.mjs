@@ -4,7 +4,11 @@
 export const list = (v) => (Array.isArray(v) ? v : []);
 
 /** `v` as an array: itself when already one, [] for null/undefined, else [v]. */
-export const asList = (v) => (Array.isArray(v) ? v : v == null ? [] : [v]);
+export const asList = (v) => {
+  if (Array.isArray(v)) return v;
+  if (v == null) return [];
+  return [v];
+};
 
 /** The object entries of `v` (a non-array reads as []). */
 export const objectList = (v) => (Array.isArray(v) ? v : []).filter((item) => item && typeof item === 'object');

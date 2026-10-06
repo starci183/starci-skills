@@ -15,6 +15,6 @@ export const INPUT_GLYPH_CLASS = `[${INPUT_GLYPH_CHARS}]`;
 // (the footer/frame evidence above a bare shell prompt) keeps the two glyphs no shell prompt emits.
 export const AGENT_GLYPH_CLASS = '[›❯❭]';
 /** A row opening with an input glyph (whitespace either side): the strip/detect form. */
-export const INPUT_GLYPH = new RegExp(`^\\s*${INPUT_GLYPH_CLASS}\\s*`, 'u');
+export const INPUT_GLYPH = new RegExp(String.raw`^\s*${INPUT_GLYPH_CLASS}\s*`, 'u');
 /** A row that IS an input row: a glyph followed by whitespace or the end of the row. */
-export const INPUT_GLYPH_ROW = new RegExp(`^\\s*${INPUT_GLYPH_CLASS}(?:\\s|$)`, 'u');
+export const INPUT_GLYPH_ROW = new RegExp(String.raw`^\s*${INPUT_GLYPH_CLASS}(?:\s|$)`, 'u');

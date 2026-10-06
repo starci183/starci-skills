@@ -13,7 +13,7 @@ export function changelogSection(changelog, version) {
   const lines = String(changelog ?? '').split(/\r?\n/);
   const start = lines.findIndex((line) => { const m = /^## \[([^\]]+)\]/.exec(line); return m && m[1] === version; });
   if (start < 0) return { found: false, body: '' };
-  const end = lines.findIndex((line, i) => i > start && /^## \[/.test(line));
+  const end = lines.findIndex((line, i) => i > start && line.startsWith('## ['));
   return { found: true, body: lines.slice(start, end < 0 ? undefined : end).join('\n') };
 }
 
@@ -23,8 +23,12 @@ export function releaseNotesFindings({ tags, changelog, file = 'CHANGELOG.md' })
   for (const name of tags.filter((t) => RELEASE_TAG.test(t))) {
     const section = changelogSection(changelog, name.slice(1));
     if (!section.found) { found.push({ code: CODE, level: 'error', path: file, message: `${CODE} ${file}: the release tag ${name} has no \`## [${name.slice(1)}]\` section: write the release notes before the tag` }); continue; }
-    const marks = [...new Set(section.body.match(new RegExp(UNFINISHED.source, 'gi')) ?? [])];
-    if (marks.length) found.push({ code: CODE, level: 'error', path: file, message: `${CODE} ${file}: the section of ${name} still holds ${marks.map((m) => `\`${m}\``).join(', ')}: finish it before the tag` });
+    const unfinished = new RegExp(UNFINISHED.source, 'gi');
+    const marks = [...new Set([...section.body.matchAll(unfinished)].map(([mark]) => mark))];
+    if (marks.length) {
+      const listedMarks = marks.map((m) => `\`${m}\``).join(', ');
+      found.push({ code: CODE, level: 'error', path: file, message: `${CODE} ${file}: the section of ${name} still holds ${listedMarks}: finish it before the tag` });
+    }
   }
   return found;
 }

@@ -30,7 +30,9 @@ export function absolutePathFindings(file, text) {
     return found;
   }
   const t = ts();
-  const kind = /\.tsx$/.test(file) ? t.ScriptKind.TSX : /\.(?:ts|mts|cts)$/.test(file) ? t.ScriptKind.TS : t.ScriptKind.JS;
+  let kind = t.ScriptKind.JS;
+  if (/\.(?:ts|mts|cts)$/.test(file)) kind = t.ScriptKind.TS;
+  if (file.endsWith('.tsx')) kind = t.ScriptKind.TSX;
   const source = t.createSourceFile(file, text, t.ScriptTarget.Latest, true, kind);
   const lineOfPos = (pos) => source.getLineAndCharacterOfPosition(pos).line + 1;
   const literal = (node) => {

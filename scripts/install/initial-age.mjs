@@ -31,7 +31,7 @@ function physicalTarget(repo) {
   const root = path.resolve(repo), target = path.join(root, '.claude'), nodes = {};
   for (const entry of [root, target]) {
     const stat = fs.lstatSync(entry, { throwIfNoEntry: false });
-    if (!stat) { if (entry === root) refuse('canonical-target'); continue; }
+    if (!stat) { if (entry === root) { refuse('canonical-target'); } continue; }
     if (!stat.isDirectory() || isLinkLike(entry, { stat }) || !ownSpelling(entry)) refuse('canonical-target');
     nodes[entry] = stat;
   }
@@ -82,7 +82,7 @@ function manifestOf(target) {
 
 function identityBefore(root, target, prior, env, force) {
   const marker = prior?.initialAgeSetup;
-  if (marker !== undefined && (!marker || marker.schema !== SETUP_SCHEMA || marker.state !== 'complete'
+  if (marker !== undefined && (marker?.schema !== SETUP_SCHEMA || marker.state !== 'complete'
     || marker.release?.state !== 'released' || marker.release.ok !== true || marker.release.released !== true
     || marker.release.leftover !== null || !['reserved', 'reuse'].includes(marker.attempt)
     || !['none', 'complete'].includes(marker.publication))) refuse('prior-attempt');
@@ -94,7 +94,7 @@ function identityBefore(root, target, prior, env, force) {
       if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || !ownSpelling(file)) refuse('private-file-custody');
       before = readSecretBytes(file);
       const names = before.toString('utf8').split(/\r?\n/).flatMap(line => {
-        const name = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line)?.[1];
+        const name = /^\s*(?:export\s+)?([A-Za-z_]\w*)\s*=/.exec(line)?.[1];
         return name?.toUpperCase().startsWith('SOPS_AGE_') ? [process.platform === 'win32' ? name.toUpperCase() : name] : [];
       });
       if (new Set(names).size !== names.length) refuse('ambiguous-identity');
@@ -174,7 +174,7 @@ export function runInitialAgeInstall({ repo, force = false, project } = {}, deps
     } };
     lockOptions = { role: 'coordinator', purpose: 'runtime-install-initial-age', ttlMs: null, env, fs: lockFs };
     try { got = (locks.acquire ?? acquireHostLock)(lockOptions); }
-    catch (error) { if (error?.code === 'EAGAIN') return finish(no('lock-held')); throw error; }
+    catch (error) { if (error?.code === 'EAGAIN') { return finish(no('lock-held')); } throw error; }
     if (!got?.ok || got.tookOverFrom) return finish(no('lock-held'));
     const assertLease = () => {
       const current = samePhysicalTarget(physical, physicalTarget(repo));

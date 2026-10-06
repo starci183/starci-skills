@@ -51,9 +51,9 @@ const dirKey = (p) => pathKey(p, { fold: true });
  * repoKey), so a root discovered on disk (native, backslash on Windows) and one read back from the registry dedupe
  * as the same string instead of surviving as two `Set` entries that only differ by separator.
  */
-const canonicalRoot = (p) => path.resolve(String(p)).replace(/\\/g, '/');
+const canonicalRoot = (p) => path.resolve(String(p)).replaceAll('\\', '/');
 /** YYYYMMDD, the same stamp scripts/housekeeping/blob-gc.mjs and scripts/work/purge-workflow.mjs archive folders use. */
-export const dateStamp = (now = Date.now()) => new Date(now).toISOString().slice(0, 10).replace(/-/g, '');
+export const dateStamp = (now = Date.now()) => new Date(now).toISOString().slice(0, 10).replaceAll('-', '');
 
 
 /**
@@ -189,7 +189,7 @@ export function boundRepoRoots({ env = process.env, machineFile = null } = {}) {
  */
 export function legacyWorkSqliteFindings(repoRoots) {
   const out = [];
-  for (const repoRoot of [...new Set((repoRoots ?? []).filter(Boolean).map(canonicalRoot))]) {
+  for (const repoRoot of new Set((repoRoots ?? []).filter(Boolean).map(canonicalRoot))) {
     const base = path.join(repoRoot, '.starciwork', 'runtime.sqlite');
     const files = ['', '-wal', '-shm'].map((suffix) => `${base}${suffix}`).filter(exists);
     if (files.length) out.push({ code: LEGACY_WORK_SQLITE_CODE, repoRoot, files });
@@ -203,7 +203,7 @@ export function legacyWorkSqliteFindings(repoRoots) {
  */
 export function archiveOrphanLedger(finding, { env = process.env, now = Date.now() } = {}) {
   const from = path.dirname(finding.file);
-  if (!exists(from)) throw Error(`orphan ledger directory missing: ${from}`);
+  if (!exists(from)) throw new Error(`orphan ledger directory missing: ${from}`);
   const to = path.join(starciLocalRoot(env), 'archive', 'orphan-ledgers', dateStamp(now), finding.ledgerId);
   fs.mkdirSync(path.dirname(to), { recursive: true });
   try { fs.renameSync(from, to); } catch (error) {
@@ -215,9 +215,9 @@ export function archiveOrphanLedger(finding, { env = process.env, now = Date.now
     const wanted = fs.readdirSync(from).sort();
     const copied = fs.readdirSync(to).sort();
     if (wanted.length !== copied.length || wanted.some((name, i) => name !== copied[i]))
-      throw Error(`orphan ledger archive copy did not verify: ${to} holds [${copied.join(', ')}], expected [${wanted.join(', ')}]`);
+      throw new Error(`orphan ledger archive copy did not verify: ${to} holds [${copied.join(', ')}], expected [${wanted.join(', ')}]`);
     const removed = safeRemove(from, { hold: artifactHoldReason });
-    if (!removed.ok) throw Error(`orphan ledger source was not fully removed after a verified copy (${from}): ${removed.errors.map((e) => `${e.code} ${e.message}`).join('; ')}`);
+    if (!removed.ok) throw new Error(`orphan ledger source was not fully removed after a verified copy (${from}): ${removed.errors.map((e) => `${e.code} ${e.message}`).join('; ')}`);
   }
   withMachine((m) => m.setLedgerState(finding.ledgerId, 'retired', { reason: `orphan ledger archived (${finding.reason})` }), { env });
   return { moved: true, from, to };

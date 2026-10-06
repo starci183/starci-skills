@@ -40,7 +40,7 @@ export function tokenize(source) {
       tokens.push({ kind: 'punct', value: char });
       index += 1;
     } else if (/[_A-Za-z]/.test(char)) {
-      const match = /^[_A-Za-z][_0-9A-Za-z]*/.exec(source.slice(index));
+      const match = /^[_A-Za-z]\w*/.exec(source.slice(index));
       tokens.push({ kind: 'name', value: match[0] });
       index += match[0].length;
     } else if (/[-0-9]/.test(char)) {
@@ -106,7 +106,9 @@ function skipValue(cursor) {
   const token = cursor.next();
   if (token.kind !== 'punct') return;
   if (token.value === '$') return void cursor.name();
-  const close = token.value === '{' ? '}' : token.value === '[' ? ']' : null;
+  let close = null;
+  if (token.value === '{') close = '}';
+  else if (token.value === '[') close = ']';
   if (close === null) return;
   while (!cursor.take(close)) {
     if (token.value === '{') {
@@ -222,7 +224,9 @@ export function parseSchema(source) {
         while (cursor.take('&')) cursor.name();
       }
       skipDirectives(cursor);
-      const kind = keyword === 'input' ? 'input' : keyword === 'interface' ? 'interface' : 'object';
+      let kind = 'object';
+      if (keyword === 'input') kind = 'input';
+      else if (keyword === 'interface') kind = 'interface';
       types.set(name, { kind, fields: parseFieldDefinitions(cursor, kind !== 'input') });
     } else {
       throw new SyntaxError(`unexpected "${keyword}" in a schema`);

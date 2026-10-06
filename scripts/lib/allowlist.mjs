@@ -19,15 +19,15 @@ const ALLOWLIST_SECTIONS = Object.freeze(['not-codes', 'json-exceptions', 'dead-
 
 /** The `kind` section of one already-parsed allowlist document; a malformed document or an unknown section is an error, never a silent empty list. */
 export function allowlistSection(doc, kind, at = ALLOWLIST_FILE) {
-  if (!ALLOWLIST_SECTIONS.includes(kind)) throw Error(`${at}: unknown allowlist section "${kind}" (${ALLOWLIST_SECTIONS.join(', ')})`);
-  if (!doc || typeof doc !== 'object' || doc.schema !== ALLOWLIST_SCHEMA) throw Error(`${at} must stamp schema: ${ALLOWLIST_SCHEMA}`);
-  if (doc[kind] === undefined || doc[kind] === null) throw Error(`${at} needs a ${kind} section`);
+  if (!ALLOWLIST_SECTIONS.includes(kind)) throw new Error(`${at}: unknown allowlist section "${kind}" (${ALLOWLIST_SECTIONS.join(', ')})`);
+  if (!doc || typeof doc !== 'object' || doc.schema !== ALLOWLIST_SCHEMA) throw new Error(`${at} must stamp schema: ${ALLOWLIST_SCHEMA}`);
+  if (doc[kind] === undefined || doc[kind] === null) throw new Error(`${at} needs a ${kind} section`);
   return doc[kind];
 }
 
 /** The `kind` section of the allowlist document at `file` (absolute or cwd-relative). */
 export function readAllowlistFile(kind, file) {
-  if (!fs.existsSync(file)) throw Error(`the one allowlist is required: ${file}`);
+  if (!fs.existsSync(file)) throw new Error(`the one allowlist is required: ${file}`);
   return allowlistSection(parseYaml(fs.readFileSync(file, 'utf8')), kind, file);
 }
 

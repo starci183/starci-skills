@@ -56,7 +56,7 @@ function projectDirs(roots, out) {
     for (const entry of entries) {
       const dir = path.join(root, entry.name);
       let stat;
-      try { stat = fs.lstatSync(dir); } catch (error) { if (error?.code !== 'ENOENT') out.errors.push({ path: dir, error: String(error?.message ?? error) }); continue; }
+      try { stat = fs.lstatSync(dir); } catch (error) { if (error?.code !== 'ENOENT') { out.errors.push({ path: dir, error: String(error?.message ?? error) }); } continue; }
       // links first: lstat spells a junction/dir-symlink as not-a-directory, so the directory
       // test alone would silently pass a link by instead of reporting it.
       if (isLinkLike(dir, { stat })) { out.skipped.push({ path: dir, reason: 'link' }); continue; }
@@ -68,7 +68,7 @@ function projectDirs(roots, out) {
         if (!name.endsWith('.jsonl')) continue;
         const file = path.join(dir, name);
         let st;
-        try { st = fs.lstatSync(file); } catch (error) { if (error?.code !== 'ENOENT') out.errors.push({ path: file, error: String(error?.message ?? error) }); continue; }
+        try { st = fs.lstatSync(file); } catch (error) { if (error?.code !== 'ENOENT') { out.errors.push({ path: file, error: String(error?.message ?? error) }); } continue; }
         files.push({ name, path: file, stat: st });
       }
       dirs.push({ slug: entry.name, dir, files });

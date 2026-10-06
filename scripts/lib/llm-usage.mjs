@@ -67,7 +67,7 @@ function claudeUsage(lines) {
   const errSeen = new Set();
   const rows = new Map();
   let sessionId = null;
-  const rowOf = (model) => { if (!rows.has(model)) rows.set(model, emptyRow(model)); return rows.get(model); };
+  const rowOf = (model) => { if (!rows.has(model)) { rows.set(model, emptyRow(model)); } return rows.get(model); };
   for (const line of lines) {
     const isAssistant = line.includes('"type":"assistant"');
     if (!isAssistant && !line.includes('"is_error":true')) continue;
@@ -113,7 +113,7 @@ const CODEX_TOOL_CALLS = new Set(['function_call', 'custom_tool_call', 'local_sh
 function codexUsage(lines) {
   const rows = new Map();
   let model = 'unknown', sessionId = null, prev = null, turns = 0;
-  const rowOf = (m) => { if (!rows.has(m)) rows.set(m, emptyRow(m, { toolErrors: false })); return rows.get(m); };
+  const rowOf = (m) => { if (!rows.has(m)) { rows.set(m, emptyRow(m, { toolErrors: false })); } return rows.get(m); };
   for (const line of lines) {
     const tokenCount = line.includes('"token_count"');
     const turnContext = line.includes('"turn_context"');

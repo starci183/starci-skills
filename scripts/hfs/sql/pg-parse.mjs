@@ -37,8 +37,11 @@ export async function parsePlpgsqlBody(body, parameters = [], returnKind = 'void
   let tag = `$hfs_probe_${i}$`;
   while (body.includes(tag)) { i += 1; tag = `$hfs_probe_${i}$`; }
   const args = parameters.map((parameter) => parameter?.FunctionParameter?.name).filter(Boolean)
-    .map((name) => `"${name.replace(/"/g, '""')}" text`).join(', ');
-  const returns = returnKind === 'setof' ? 'setof text' : returnKind === 'trigger' ? 'trigger' : returnKind === 'scalar' ? 'text' : 'void';
+    .map((name) => `"${name.replaceAll('"', '""')}" text`).join(', ');
+  let returns = 'void';
+  if (returnKind === 'setof') returns = 'setof text';
+  else if (returnKind === 'trigger') returns = 'trigger';
+  else if (returnKind === 'scalar') returns = 'text';
   const result = await (await loadPgParser()).parsePlPgSQLSync(
     `create function hfs_probe(${args}) returns ${returns} language plpgsql as ${tag}${body}${tag};`,
   );

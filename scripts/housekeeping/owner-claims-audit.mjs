@@ -47,5 +47,6 @@ async function main(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  main(process.argv.slice(2)).then((code) => process.exit(code), (error) => { process.stderr.write(`${error?.stack ?? error}\n`); process.exit(2); });
+  try { process.exit(await main(process.argv.slice(2))); }
+  catch (error) { process.stderr.write(`${error?.stack ?? error}\n`); process.exit(2); }
 }

@@ -56,7 +56,8 @@ function payloadOf(ts, sourceFile, typeName, problems, where) {
       continue;
     }
     const type = fieldType(ts, member.type);
-    const written = type === null ? null : `${type}${member.questionToken ? '?' : ''}`;
+    let written = null;
+    if (type !== null) written = `${type}${member.questionToken ? '?' : ''}`;
     if (written === null || !FIELD_TYPE.test(written)) problems.push(`${where}: payload field ${member.name.text} must be string, number, boolean, string[] or number[]`);
     else payload[member.name.text] = written;
   }
@@ -101,4 +102,4 @@ export function snapshotText(service, events) {
 }
 
 /** The snapshot's text with line endings folded, for comparing a committed file to a fresh one. */
-export const folded = (text) => text.replace(/\r\n/g, '\n');
+export const folded = (text) => text.replaceAll('\r\n', '\n');

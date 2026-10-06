@@ -16,7 +16,6 @@ import {SECRET_ENV_FILE} from '../../engine/secrets.mjs';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, rmdirSync, statSync, lstatSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { runNode } from '../api/node/run-node.mjs';
 import {runNpm} from '../api/npm/run-npm.mjs';
 import {isLinkLike} from '../api/fs/is-link-like.mjs';
 import { fileURLToPath } from 'node:url';
@@ -135,7 +134,7 @@ export function bootstrapPlan(repo, opts, manifest = null) {
   const bootstrap = BOOTSTRAP;
   const priorTemplate = path.join(repo, '.claude', 'init', 'AGENTS.md');
   const priorEntry = manifest?.files?.['init/AGENTS.md'] && existsSync(priorTemplate)
-    && sha(priorTemplate) === manifest.files['init/AGENTS.md'] ? entryOf(readFileSync(priorTemplate, 'utf8').replace(/\r\n/g, '\n')) : null;
+    && sha(priorTemplate) === manifest.files['init/AGENTS.md'] ? entryOf(readFileSync(priorTemplate, 'utf8').replaceAll('\r\n', '\n')) : null;
   return names.map(name => {
     const file = path.join(repo, name);
     if (!existsSync(file)) return { name, file, text: bootstrap, action: 'wrote' };
@@ -143,11 +142,11 @@ export function bootstrapPlan(repo, opts, manifest = null) {
     // The only managed block this installer knows is the one it writes. A file already carrying it is
     // left byte-identical; a file carrying any other starci:prompt-entry block is a conflict a person
     // resolves by hand - the installer never rewrites an entry it did not author.
-    if (current.replace(/\r\n/g, '\n').includes(entry)) {
+    if (current.replaceAll('\r\n', '\n').includes(entry)) {
       return { name, file, text: current, action: 'unchanged' };
     }
-    if (priorEntry && current.replace(/\r\n/g, '\n').includes(priorEntry)) {
-      return {name, file, text: current.replace(/\r\n/g, '\n').replace(priorEntry, entry), action: 'updated'};
+    if (priorEntry && current.replaceAll('\r\n', '\n').includes(priorEntry)) {
+      return {name, file, text: current.replaceAll('\r\n', '\n').replace(priorEntry, entry), action: 'updated'};
     }
     if (current.includes(ENTRY_MARKER)) {
       throw new Error(name + ': carries a StarCi entry this installer did not write; reconcile it by hand or pass --no-bootstrap');
@@ -423,7 +422,7 @@ export function main(argv = process.argv.slice(2), deps = {}) {
       };
       if (opts.command === 'update') return project().status;
       const setup = runInitialAgeInstall({repo: path.resolve(opts.dir), force: opts.force, project},
-        {...(deps.initialAge ?? {}), env: deps.env ?? process.env});
+        {...deps.initialAge, env: deps.env ?? process.env});
       log('initial age setup: ' + JSON.stringify(setup));
       // The init identity needs an accepted age-keygen (scripts/api/sops/selected-age-versions.mjs); the install never skips key generation.
       if (AGE_TOOL_REASONS[setup.toolReason]) error(pkg.name + ': ' + AGE_TOOL_REASONS[setup.toolReason] + '; init needs age-keygen ' + selectedAgeVersions().join(' or ') + ' on PATH (docs/installation.md, Prerequisites). Install it, then run starci runtime install again.');

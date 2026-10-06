@@ -4,7 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 /** The application-data base directory of this platform: {env, platform, home}: the caller passes the environment. */
-export const appDataBase = ({ env, platform = process.platform, home = os.homedir() } = {}) =>
-  platform === 'win32' ? (env.APPDATA || path.join(home, 'AppData', 'Roaming'))
-    : platform === 'darwin' ? path.join(home, 'Library', 'Application Support')
-      : (env.XDG_CONFIG_HOME || path.join(home, '.config'));
+export const appDataBase = ({ env, platform = process.platform, home = os.homedir() } = {}) => {
+  if (platform === 'win32') return env.APPDATA || path.join(home, 'AppData', 'Roaming');
+  if (platform === 'darwin') return path.join(home, 'Library', 'Application Support');
+  return env.XDG_CONFIG_HOME || path.join(home, '.config');
+};

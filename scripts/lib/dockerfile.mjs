@@ -77,7 +77,7 @@ export function shellCommands(body) {
  * argument text of the logical line; `stage` is the index of the stage the instruction belongs to (-1 before the first FROM).
  */
 export function parseDockerfile(source) {
-  const lines = String(source).replace(/\r\n/g, '\n').split('\n');
+  const lines = String(source).replaceAll('\r\n', '\n').split('\n');
   const instructions = [];
   const comments = [];
   let escape = '\\';
@@ -89,7 +89,7 @@ export function parseDockerfile(source) {
     if (trimmed.startsWith('#')) {
       const body = trimmed.slice(1).trim();
       const directive = directives ? /^(syntax|escape|check)\s*=\s*(\S+)$/i.exec(body) : null;
-      if (directive) { if (directive[1].toLowerCase() === 'escape') escape = directive[2]; continue; }
+      if (directive) { if (directive[1].toLowerCase() === 'escape') { escape = directive[2]; } continue; }
       directives = false;
       comments.push({ text: body, line: i + 1 });
       continue;

@@ -8,7 +8,7 @@ import {isLinkLike} from '../api/fs/is-link-like.mjs';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Prior runtime manifests normalized line endings; new discovery custody binds exact copied bytes.
-const legacySha = file => sha256(readFileSync(file).toString('utf8').replace(/\r\n/g, '\n'));
+const legacySha = file => sha256(readFileSync(file).toString('utf8').replaceAll('\r\n', '\n'));
 
 const ENTRY_SKILL = 'starci';
 const HOST_SKILL_DIRS = ['.devin/skills', '.agents/skills'];
@@ -99,7 +99,7 @@ export function applyEntrySkillsPlan(plan, log = console.log) {
     while (directory !== boundary) {
       entryPath(plan.repo, path.relative(plan.repo, directory).split(path.sep).join('/'));
       try { rmdirSync(directory); }
-      catch (error) { if (error.code === 'ENOTEMPTY' || error.code === 'EEXIST') break; throw error; }
+      catch (error) { if (error.code === 'ENOTEMPTY' || error.code === 'EEXIST') { break; } throw error; }
       directory = path.dirname(directory);
     }
     log(`removed unchanged retired entry ${item.relative}`);

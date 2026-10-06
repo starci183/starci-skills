@@ -7,7 +7,6 @@ import { ts } from './source-ast.mjs';
 export const CODE = 'RT_SYNTAX_INVALID';
 const JAVASCRIPT = /\.(?:mjs|cjs|js)$/;
 // A managed template carries render tokens ({{name}}) that are not JavaScript until `starci app sync` renders them: not authored source.
-const TEMPLATE_TREE = /^packages\/hfs\/templates\//;
 const RENDER_TOKEN = /\{\{[A-Za-z][A-Za-z0-9.]*\}\}/;
 const VENDORED_BUILD = /(?:^|\/)(?:node_modules|dist|reference-renders)\//;
 
@@ -26,7 +25,7 @@ export function syntaxFindings(ctx) {
   for (const file of syntaxSourceFiles(ctx.files, ctx.params)) {
     const text = ctx.read(file);
     if (text === null || text === undefined) continue;
-    if (TEMPLATE_TREE.test(file) && RENDER_TOKEN.test(text)) continue;
+    if (file.startsWith('packages/hfs/templates/') && RENDER_TOKEN.test(text)) continue;
     const kind = file.endsWith('.mjs') ? (compiler.ScriptKind.MJS ?? compiler.ScriptKind.JS) : compiler.ScriptKind.JS;
     const source = compiler.createSourceFile(file, text, compiler.ScriptTarget.Latest, true, kind);
     for (const diagnostic of source.parseDiagnostics) {

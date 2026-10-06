@@ -87,7 +87,7 @@ export const BUNDLES = Object.freeze({
 
 /** The catalog entries for `codes`, in the catalog's own text, keyed by top-level line. */
 function catalogSlice(text, codes) {
-  const blocks = text.replace(/\r\n/g, '\n').split(/\n(?=[A-Za-z][A-Za-z0-9_-]*:\n)/);
+  const blocks = text.replaceAll('\r\n', '\n').split(/\n(?=[A-Za-z][A-Za-z0-9_-]*:\n)/);
   const byCode = new Map(blocks.map((b) => [b.slice(0, b.indexOf(':')), b.replace(/\s+$/, '')]));
   return `${[...codes].sort(byCodeUnit).map((code) => {
     if (!byCode.has(code)) throw new Error(`${CATALOG} has no entry for ${code}`);
@@ -119,13 +119,13 @@ export function driftOfRuntime(root = runtimeRoot) {
     for (const [file, text] of expected) {
       const target = path.join(bundleRoot, file);
       if (!fs.existsSync(target)) problems.push(`missing ${bundle}/${file}`);
-      else if (fs.readFileSync(target, 'utf8').replace(/\r\n/g, '\n') !== text.replace(/\r\n/g, '\n')) problems.push(`stale ${bundle}/${file}`);
+      else if (fs.readFileSync(target, 'utf8').replaceAll('\r\n', '\n') !== text.replaceAll('\r\n', '\n')) problems.push(`stale ${bundle}/${file}`);
     }
     if (fs.existsSync(bundleRoot)) for (const file of listed(bundleRoot)) if (!expected.has(file)) problems.push(`extra ${bundle}/${file}`);
   }
   const target = path.join(root, UI_CATALOG_FILE);
   if (!fs.existsSync(target)) problems.push(`missing ${UI_CATALOG_FILE}`);
-  else if (fs.readFileSync(target, 'utf8').replace(/\r\n/g, '\n') !== uiCatalogText(root)) problems.push(`stale ${UI_CATALOG_FILE}`);
+  else if (fs.readFileSync(target, 'utf8').replaceAll('\r\n', '\n') !== uiCatalogText(root)) problems.push(`stale ${UI_CATALOG_FILE}`);
   return problems;
 }
 

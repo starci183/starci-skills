@@ -20,7 +20,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { DEFAULT_OWNER_LANGUAGE, loadConfig } from '../../engine/config.mjs';
 
 export const CATALOG_DIR = 'modules/i18n/messages';
-export const PLACEHOLDER = /\{([A-Za-z_][\w]*)\}/g;
+export const PLACEHOLDER = /\{([A-Za-z_]\w*)\}/g;
 
 const cache = new Map();
 

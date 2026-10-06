@@ -53,7 +53,7 @@ const listSafe = (dir) => { try { return fs.readdirSync(dir, { withFileTypes: tr
 /** A value this process must never write out (a secret it resolved itself). Values under 6 chars are ignored. */
 function addSecretValue(value) {
   const v = typeof value === 'string' ? value.trim() : '';
-  if (v.length >= 6 && !/^\[redacted/.test(v)) secretValues.add(v);
+  if (v.length >= 6 && !v.startsWith('[redacted')) secretValues.add(v);
 }
 
 /** Learn the declared secrets of every .starcistacks stack under `repoRoot` (idempotent). */
@@ -114,7 +114,7 @@ export function redactText(text, { repoRoots = [] } = {}) {
 /** A path that is a secret by being one (an env file, a key file, .secrets/): blanked, its rule named. */
 export function redactPath(p) {
   if (typeof p !== 'string') return p;
-  const slashed = p.replace(/\\/g, '/');
+  const slashed = p.replaceAll('\\', '/');
   const rule = FORBIDDEN_FILES.find((r) => r.test(slashed));
   return rule ? `[redacted:${rule.name}]` : redactText(p);
 }

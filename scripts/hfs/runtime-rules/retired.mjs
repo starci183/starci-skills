@@ -39,7 +39,10 @@ export function retiredFindings(ctx) {
   const { retired = [], moved = [], retiredSymbols = [] } = ctx.retiredPaths;
   const found = [];
   for (const entry of retired) {
-    if (entry?.path && tracked(ctx, entry.path)) found.push({ code: CODES.retired, level: 'error', path: entry.path, message: `${entry.path} is retired (${RETIRED_PATHS_FILE}${entry.replacedBy ? `: ${entry.replacedBy}` : ''}) but is tracked again: delete it, or remove the registry entry in the commit that deliberately restores it` });
+    if (entry?.path && tracked(ctx, entry.path)) {
+      const replacement = entry.replacedBy ? `: ${entry.replacedBy}` : '';
+      found.push({ code: CODES.retired, level: 'error', path: entry.path, message: `${entry.path} is retired (${RETIRED_PATHS_FILE}${replacement}) but is tracked again: delete it, or remove the registry entry in the commit that deliberately restores it` });
+    }
   }
   for (const entry of moved) {
     if (entry?.from && tracked(ctx, entry.from)) found.push({ code: CODES.retired, level: 'error', path: entry.from, message: `${entry.from} moved to ${entry.to} (${RETIRED_PATHS_FILE} moved[], ${entry.movedIn}) but is tracked again: no alias or forwarding copy is left behind` });
@@ -58,7 +61,7 @@ export function retiredFindings(ctx) {
       String(ctx.read(file) ?? '').split(/\r?\n/).forEach((text, i) => {
         const at = text.indexOf('--');
         if (at < 0) return;
-        for (const [name, s] of symbols) if (new RegExp(`\\b${name}\\b`).test(text.slice(at))) found.push({ code: CODES.retired, level: 'error', path: file, line: i + 1, message: `${file}:${i + 1} names ${name} in a comment, a retired symbol (${RETIRED_PATHS_FILE} retiredSymbols: replaced by ${s.replacedBy}): cite the replacement` });
+        for (const [name, s] of symbols) if (new RegExp(String.raw`\b${name}\b`).test(text.slice(at))) found.push({ code: CODES.retired, level: 'error', path: file, line: i + 1, message: `${file}:${i + 1} names ${name} in a comment, a retired symbol (${RETIRED_PATHS_FILE} retiredSymbols: replaced by ${s.replacedBy}): cite the replacement` });
       });
     }
   }
@@ -73,7 +76,7 @@ export function pinnedFindings(ctx) {
   const isPinned = (p) => pins.find((pin) => (pin.pattern ? pin.pattern.test(p) : pin.path === p));
   for (const pin of pins) {
     if (pin.pattern || tracked(ctx, pin.path)) continue;
-    const via = moved.find((m) => m?.from === pin.path);
+    const via = moved.some((m) => m?.from === pin.path);
     if (!via) found.push({ code: CODES.pinned, level: 'error', path: pin.path, message: `${pin.path} is pinned (${pin.why}) but is gone and no ${RETIRED_PATHS_FILE} moved[] entry records where it went` });
   }
   for (const entry of moved) {
