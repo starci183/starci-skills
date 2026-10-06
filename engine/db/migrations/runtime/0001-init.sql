@@ -578,7 +578,7 @@ CREATE TABLE IF NOT EXISTS work_citations(
 CREATE INDEX IF NOT EXISTS ix_citations_blob ON work_citations(sha256);
 CREATE INDEX IF NOT EXISTS ix_citations_path ON work_citations(record_path);
 
--- interface_audits: scope + verdict of interface.audit (replaces features/<f>/operations/<name>/index.yaml + E/**).
+-- interface_audits: scope + verdict of interface.audit.
 CREATE TABLE IF NOT EXISTS interface_audits(
   audit_id      TEXT PRIMARY KEY,                -- operation.<feature>.<name>
   workflow_id   TEXT REFERENCES workflows(workflow_id) ON DELETE CASCADE,
