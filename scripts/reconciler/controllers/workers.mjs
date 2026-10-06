@@ -263,93 +263,110 @@ const languageOf = async (deps) => {
   return deps.language ?? ownerLanguage();
 };
 
+async function reconcileDeps(key, ctx, settings, now, force, language, deps) {
+  if (!force && !due(ctx, key, settings.depsEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
+  const depGraph = deps.dependencyGraph ?? (await import('../../kernel/dependency-graph.mjs')).dependencyGraph;
+  const graphs = withReaders(ctx, (readers) => readers.map((r) => {
+    try { const g = depGraph(r.db, { repo: r.repo, now, light: true }); return { ledgerId: r.ledgerId, edges: g.edges.filter((e) => e.strength === 'hard'), findings: g.findings }; }
+    catch { return { ledgerId: r.ledgerId, edges: [], findings: [] }; }
+  }));
+  const plan = planDeps({ graphs, now, settings, language });
+  return { ok: true, key, cycles: plan.filter((d) => d.kind === 'deadlock').length, ...(await openAll(ctx, plan)) };
+}
+
+async function reconcileOwed(key, ctx, settings, now, force, language, deps) {
+  if (!force && !due(ctx, key, settings.owedEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
+  const [{ owedFindings }, { clusterOwed }] = await Promise.all([deps.owed ?? import('../../supervisor/owed.mjs'), deps.cluster ?? import('../../supervisor/cluster.mjs')]);
+  const owed = withReaders(ctx, (readers) => readers.flatMap((r) => {
+    try { return owedFindings(r.db, { repo: r.repo, ledgers: readers.map((x) => ({ repo: x.repo, db: x.db })), now }).map((i) => ({ ...i, repo: r.repo })); } catch { return []; }
+  }));
+  const plan = planOwed({ clusters: clusterOwed(owed), now, settings, language });
+  return { ok: true, key, owed: owed.length, clusters: plan.length, ...(await openAll(ctx, plan)) };
+}
+
+async function reconcileLand(key, ctx, settings, now, deps) {
+  const land = deps.landStatus ? deps.landStatus() : (await import('../../supervisor/land.mjs')).landStatus({ env: ctx.env ?? process.env });
+  const events = deps.landEvents ?? await landEventsOf(ctx, now);
+  let dist = deps.dist ?? null;
+  if (!dist && !deps.landStatus) { try { dist = (await import('../../gates/grammar-dist.mjs')).grammarDistStatus(); } catch { dist = null; } }
+  const plan = planLand({ land, events, dist, now, settings });
+  for (const c of plan.set) await ctx.clock(c.entity, c.state, c.slaMs, { ledgerId: SUPERVISOR, controller: 'workers', ...(c.enteredAt ? { enteredAt: c.enteredAt } : {}) });
+  for (const c of plan.clear) await ctx.clear(c.entity, c.state);
+  return { ok: true, key, clocks: plan.set.map((c) => `${c.state}:${c.entity}`), cleared: plan.clear.length };
+}
+
+async function reconcilePush(key, ctx, settings, now, force, language) {
+  if (!force && !due(ctx, key, settings.pushEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
+  const r = await ctx.run('node', ['scripts/supervisor/push-mains.mjs', '--json'], { timeoutMs: PUSH_RUN_TIMEOUT_MS });
+  if (r?.shadow) return { ok: true, key, shadow: true };
+  const results = Array.isArray(r?.value) ? r.value : [];
+  const plan = planPush({ results, now, settings, language });
+  if (plan.incomplete.length) ctx.log('reconciler.error', `push: ${plan.incomplete.length} refusal(s) lack a repo, head or signature; no Decision Item opened`, { kind: 'reconciler.workers.push-key-incomplete', incomplete: plan.incomplete });
+  return { ok: r?.ok !== false, key, actionId: r?.actionId ?? null, pushed: results.filter((x) => x.pushed).length, held: results.filter((x) => x.held).length, ...(await openAll(ctx, plan)) };
+}
+
+async function reconcileMetrics(key, ctx, now, force, settings, deps) {
+  if (!force && !due(ctx, key, settings.metricsEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
+  const om = deps.opMetrics ?? await import('../../machine/op-metrics.mjs');
+  const windowMs = om.telemetrySettings().windowMs;
+  const { records, running } = withReaders(ctx, (readers) => {
+    const out = { records: [], running: [] };
+    for (const r of readers) {
+      try { out.records.push(...om.jobRecords(r.db, { since: now - windowMs, now }).map((x) => ({ ...x, repo: r.repo }))); } catch { /* unreadable */ }
+      try { for (const w of r.db.prepare("SELECT workflow_id FROM workflows WHERE phase='running' AND archived_at IS NULL").all()) out.running.push({ ledgerId: r.ledgerId, workflowId: w.workflow_id }); } catch { /* unreadable */ }
+    }
+    return out;
+  });
+  // The stuck waits come from the cached starci kernel status (ctx.status, shared by every controller; never a fresh spawn per pass).
+  const stuck = [];
+  for (const w of running) { try { const st = await ctx.status(w.ledgerId, w.workflowId); if (Array.isArray(st?.stuck)) stuck.push(...st.stuck); } catch { /* unreadable */ } }
+  const payload = om.snapshotPayload(om.aggregate(records, { now, windowMs }), stuck);
+  const record = deps.recordSnapshot ?? (async (p) => {
+    const { withSupervisor } = await import('../../machine/home.mjs');
+    withSupervisor((m) => om.recordSnapshot(m, p), { env: ctx.env ?? process.env });
+  });
+  await record(payload);
+  return { ok: true, key, jobs: payload.totals.jobs, stuck: payload.stuck };
+}
+
+async function reconcileDirect(key, ctx, settings, now, force, language, deps) {
+  if (!force && !due(ctx, key, settings.directEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
+  let mode = deps.landGateMode;
+  if (mode === undefined) { try { mode = supervisorSettings().landGate.mode; } catch { mode = SUPERVISOR_DEFAULTS.landGate.mode; } }
+  if (mode !== 'exclusive') return { ok: true, key, skipped: `land gate ${mode}` };
+  const commits = deps.directCommits ? deps.directCommits() : (await import('../../supervisor/direct-commits.mjs')).directCommits({ env: ctx.env ?? process.env });
+  return { ok: true, key, direct: commits.length, ...(await openAll(ctx, planDirect({ commits, now, settings, language }))) };
+}
+
+async function reconcileNotify(key, ctx, settings, now, force, language) {
+  if (!force && !due(ctx, key, settings.notifyEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
+  const digest = await ctx.run('node', ['scripts/reconciler/notifier.mjs', 'digest', '--send', '--json'], { timeoutMs: 180_000 });
+  let urgentItems = [];
+  try {
+    // Read-only: the Supervisor's DIs (machine.sqlite sup_decision_items, decisions.mjs supervisorDecisions).
+    const [{ supervisorDecisions }, { readSupervisor }] = await Promise.all([import('../../machine/decisions.mjs'), import('../../machine/home.mjs')]);
+    const dis = readSupervisor((m) => supervisorDecisions(m, { now }), [], { env: ctx.env ?? process.env });
+    urgentItems = overdueUrgent(dis, { now, min: settings.urgentOverdueEscalations, language });
+  } catch { urgentItems = []; }
+  const urgent = [];
+  for (const u of urgentItems) urgent.push(await ctx.run('node', ['scripts/reconciler/notifier.mjs', 'urgent', '--class', u.class, '--key', u.key, '--text', u.text, '--send', '--json'], { timeoutMs: 60_000 }));
+  let digestResult = 'not-due';
+  if (digest?.shadow) digestResult = 'shadow';
+  else if (digest?.value?.sent) digestResult = 'sent';
+  return { ok: true, key, digest: digestResult, urgent: urgent.length };
+}
+
 export async function reconcileWorkers(key, ctx, { settings = workersSettings(), deps = {} } = {}) {
   const now = ctx.now();
   const force = deps.force === true;
   const language = await languageOf(deps);
-  if (key === KEYS.deps) {
-    if (!force && !due(ctx, key, settings.depsEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
-    const depGraph = deps.dependencyGraph ?? (await import('../../kernel/dependency-graph.mjs')).dependencyGraph;
-    const graphs = withReaders(ctx, (readers) => readers.map((r) => {
-      try { const g = depGraph(r.db, { repo: r.repo, now, light: true }); return { ledgerId: r.ledgerId, edges: g.edges.filter((e) => e.strength === 'hard'), findings: g.findings }; }
-      catch { return { ledgerId: r.ledgerId, edges: [], findings: [] }; }
-    }));
-    const plan = planDeps({ graphs, now, settings, language });
-    return { ok: true, key, cycles: plan.filter((d) => d.kind === 'deadlock').length, ...(await openAll(ctx, plan)) };
-  }
-  if (key === KEYS.owed) {
-    if (!force && !due(ctx, key, settings.owedEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
-    const [{ owedFindings }, { clusterOwed }] = await Promise.all([deps.owed ?? import('../../supervisor/owed.mjs'), deps.cluster ?? import('../../supervisor/cluster.mjs')]);
-    const owed = withReaders(ctx, (readers) => readers.flatMap((r) => {
-      try { return owedFindings(r.db, { repo: r.repo, ledgers: readers.map((x) => ({ repo: x.repo, db: x.db })), now }).map((i) => ({ ...i, repo: r.repo })); } catch { return []; }
-    }));
-    const plan = planOwed({ clusters: clusterOwed(owed), now, settings, language });
-    return { ok: true, key, owed: owed.length, clusters: plan.length, ...(await openAll(ctx, plan)) };
-  }
-  if (key === KEYS.land) {
-    const land = deps.landStatus ? deps.landStatus() : (await import('../../supervisor/land.mjs')).landStatus({ env: ctx.env ?? process.env });
-    const events = deps.landEvents ?? await landEventsOf(ctx, now);
-    let dist = deps.dist ?? null;
-    if (!dist && !deps.landStatus) { try { dist = (await import('../../gates/grammar-dist.mjs')).grammarDistStatus(); } catch { dist = null; } }
-    const plan = planLand({ land, events, dist, now, settings });
-    for (const c of plan.set) await ctx.clock(c.entity, c.state, c.slaMs, { ledgerId: SUPERVISOR, controller: 'workers', ...(c.enteredAt ? { enteredAt: c.enteredAt } : {}) });
-    for (const c of plan.clear) await ctx.clear(c.entity, c.state);
-    return { ok: true, key, clocks: plan.set.map((c) => `${c.state}:${c.entity}`), cleared: plan.clear.length };
-  }
-  if (key === KEYS.push) {
-    if (!force && !due(ctx, key, settings.pushEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
-    const r = await ctx.run('node', ['scripts/supervisor/push-mains.mjs', '--json'], { timeoutMs: PUSH_RUN_TIMEOUT_MS });
-    if (r?.shadow) return { ok: true, key, shadow: true };
-    const results = Array.isArray(r?.value) ? r.value : [];
-    const plan = planPush({ results, now, settings, language });
-    if (plan.incomplete.length) ctx.log('reconciler.error', `push: ${plan.incomplete.length} refusal(s) lack a repo, head or signature; no Decision Item opened`, { kind: 'reconciler.workers.push-key-incomplete', incomplete: plan.incomplete });
-    return { ok: r?.ok !== false, key, actionId: r?.actionId ?? null, pushed: results.filter((x) => x.pushed).length, held: results.filter((x) => x.held).length, ...(await openAll(ctx, plan)) };
-  }
-  if (key === KEYS.metrics) {
-    if (!force && !due(ctx, key, settings.metricsEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
-    const om = deps.opMetrics ?? await import('../../machine/op-metrics.mjs');
-    const windowMs = om.telemetrySettings().windowMs;
-    const { records, running } = withReaders(ctx, (readers) => {
-      const out = { records: [], running: [] };
-      for (const r of readers) {
-        try { out.records.push(...om.jobRecords(r.db, { since: now - windowMs, now }).map((x) => ({ ...x, repo: r.repo }))); } catch { /* unreadable */ }
-        try { for (const w of r.db.prepare("SELECT workflow_id FROM workflows WHERE phase='running' AND archived_at IS NULL").all()) out.running.push({ ledgerId: r.ledgerId, workflowId: w.workflow_id }); } catch { /* unreadable */ }
-      }
-      return out;
-    });
-    // The stuck waits come from the cached starci kernel status (ctx.status, shared by every controller; never a fresh spawn per pass).
-    const stuck = [];
-    for (const w of running) { try { const st = await ctx.status(w.ledgerId, w.workflowId); if (Array.isArray(st?.stuck)) stuck.push(...st.stuck); } catch { /* unreadable */ } }
-    const payload = om.snapshotPayload(om.aggregate(records, { now, windowMs }), stuck);
-    const record = deps.recordSnapshot ?? (async (p) => {
-      const { withSupervisor } = await import('../../machine/home.mjs');
-      withSupervisor((m) => om.recordSnapshot(m, p), { env: ctx.env ?? process.env });
-    });
-    await record(payload);
-    return { ok: true, key, jobs: payload.totals.jobs, stuck: payload.stuck };
-  }
-  if (key === KEYS.direct) {
-    if (!force && !due(ctx, key, settings.directEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
-    let mode = deps.landGateMode;
-    if (mode === undefined) { try { mode = supervisorSettings().landGate.mode; } catch { mode = SUPERVISOR_DEFAULTS.landGate.mode; } }
-    if (mode !== 'exclusive') return { ok: true, key, skipped: `land gate ${mode}` };
-    const commits = deps.directCommits ? deps.directCommits() : (await import('../../supervisor/direct-commits.mjs')).directCommits({ env: ctx.env ?? process.env });
-    return { ok: true, key, direct: commits.length, ...(await openAll(ctx, planDirect({ commits, now, settings, language }))) };
-  }
-  if (key === KEYS.notify) {
-    if (!force && !due(ctx, key, settings.notifyEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
-    const digest = await ctx.run('node', ['scripts/reconciler/notifier.mjs', 'digest', '--send', '--json'], { timeoutMs: 180_000 });
-    let urgentItems = [];
-    try {
-      // Read-only: the Supervisor's DIs (machine.sqlite sup_decision_items, decisions.mjs supervisorDecisions).
-      const [{ supervisorDecisions }, { readSupervisor }] = await Promise.all([import('../../machine/decisions.mjs'), import('../../machine/home.mjs')]);
-      const dis = readSupervisor((m) => supervisorDecisions(m, { now }), [], { env: ctx.env ?? process.env });
-      urgentItems = overdueUrgent(dis, { now, min: settings.urgentOverdueEscalations, language });
-    } catch { urgentItems = []; }
-    const urgent = [];
-    for (const u of urgentItems) urgent.push(await ctx.run('node', ['scripts/reconciler/notifier.mjs', 'urgent', '--class', u.class, '--key', u.key, '--text', u.text, '--send', '--json'], { timeoutMs: 60_000 }));
-    return { ok: true, key, digest: digest?.shadow ? 'shadow' : digest?.value?.sent ? 'sent' : 'not-due', urgent: urgent.length };
-  }
+  if (key === KEYS.deps) return reconcileDeps(key, ctx, settings, now, force, language, deps);
+  if (key === KEYS.owed) return reconcileOwed(key, ctx, settings, now, force, language, deps);
+  if (key === KEYS.land) return reconcileLand(key, ctx, settings, now, deps);
+  if (key === KEYS.push) return reconcilePush(key, ctx, settings, now, force, language);
+  if (key === KEYS.metrics) return reconcileMetrics(key, ctx, now, force, settings, deps);
+  if (key === KEYS.direct) return reconcileDirect(key, ctx, settings, now, force, language, deps);
+  if (key === KEYS.notify) return reconcileNotify(key, ctx, settings, now, force, language);
   return { ok: false, key, skipped: 'unknown-key' };
 }
 
@@ -364,7 +381,12 @@ export default {
   async reconcile(key, ctx) {
     const r = await reconcileWorkers(key, ctx, { settings: workersSettings() });
     // The claimed run's outcome (workers:land is event-driven, not a schedule).
-    if (key !== KEYS.land && r && !r.skipped) finishDuty(ctx, { controller: 'workers', duty: dutyOf(key), result: r.shadow ? 'skipped' : r.ok === false ? 'failed' : 'done', actionId: r.actionId ?? null, now: ctx.now() });
+    if (key !== KEYS.land && r && !r.skipped) {
+      let result = 'done';
+      if (r.shadow) result = 'skipped';
+      else if (r.ok === false) result = 'failed';
+      finishDuty(ctx, { controller: 'workers', duty: dutyOf(key), result, actionId: r.actionId ?? null, now: ctx.now() });
+    }
     return r;
   },
 };

@@ -248,7 +248,8 @@ export function createResourceController(overrides = {}) {
       const sig = JSON.stringify({ mode: m.mode, targets: Object.fromEntries(Object.entries(share.targets).map(([k, v]) => [k, v.target])) });
       if (sig !== memory.lastWould) {
         memory.lastWould = sig;
-        ctx.log(WOULD, `throttle state: mode ${m.mode} (published: ${live.mode ?? '-'}), slot targets ${Object.entries(share.targets).map(([k, v]) => `${k}=${v.target}`).join(', ') || '-'}`,
+        const targets = Object.entries(share.targets).map(([k, v]) => k + '=' + v.target).join(', ') || '-';
+        ctx.log(WOULD, `throttle state: mode ${m.mode} (published: ${live.mode ?? '-'}), slot targets ${targets}`,
           { controller: NAME, action: 'setThrottle', patch, liveMode: live.mode ?? null, liveWriter: live.writer ?? null, diff: (live.mode ?? 'normal') !== m.mode });
       }
     }

@@ -57,7 +57,7 @@ const pad = (n) => String(n).padStart(2, '0');
 /** yyyymmdd of a local date. */
 const dayStamp = (at) => { const d = new Date(at); return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`; };
 const backupFileOf = ({ dir, ledgerId, at }) => path.join(dir, `${ledgerId}-${dayStamp(at)}.sqlite`);
-const safeId = (id) => String(id).replace(/[^\w.-]+/g, '_');
+const safeId = (id) => String(id).replaceAll(/[^\w.-]+/g, '_');
 
 /** The nightly backup is due: local hour >= backupHour and today's file is absent. */
 export function backupDue({ ledgerId, now, dir, backupHour, exists = fs.existsSync, check = quickCheck }) {

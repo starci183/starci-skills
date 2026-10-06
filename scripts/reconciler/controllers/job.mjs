@@ -106,7 +106,7 @@ const jobRoute = (ev) => {
   if (ev?.workflowId) keys.push(wfKey(ev.ledgerId, ev.workflowId));
   return keys;
 };
-const wfRoute = (ev) => (ev?.ledgerId === SUPERVISOR_LEDGER ? null : ev?.workflowId ? wfKey(ev.ledgerId, ev.workflowId) : null);
+const wfRoute = (ev) => ev?.ledgerId !== SUPERVISOR_LEDGER && ev?.workflowId ? wfKey(ev.ledgerId, ev.workflowId) : null;
 
 /* ------------------------------------------------------------------------------------------------ reads */
 
@@ -449,7 +449,7 @@ async function reconcileHealth(ctx, settings, { list = null } = {}) {
       healthMem.set(j.job_id, next);
     }
   }
-  for (const id of healthMem.keys()) if (!seen.has(id)) healthMem.delete(id); // a job no longer live forgets its probe memory
+  for (const id of healthMem) if (!seen.has(id)) healthMem.delete(id); // a job no longer live forgets its probe memory
   return out;
 }
 export const _health = { reset: () => { healthMem.clear(); lastSendAt = 0; }, mem: healthMem };
@@ -518,5 +518,5 @@ if (isMain(import.meta.url)) {
     } finally { db.close(); }
   }
   if (argv.includes('--json')) console.log(JSON.stringify({ ok: true, plans: out }));
-  else for (const p of out) console.log(`${p.key} ${p.status} step=${p.step ?? '-'}${p.reason ? ` (${p.reason})` : ''} clocks=[${p.clocks.join(', ')}]`);
+  else for (const p of out) console.log(`${p.key} ${p.status} step=${p.step ?? '-'}${p.reason ? ' (' + p.reason + ')' : ''} clocks=[${p.clocks.join(', ')}]`);
 }

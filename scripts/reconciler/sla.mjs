@@ -112,7 +112,7 @@ function violationEvent(row, { catalog = slaCatalog(), now = Date.now() } = {}) 
 const runtimeDefectDecision = (ev, { now = Date.now() } = {}) => ({
   schema: 'starci/decision-item@1', idempotencyKey: `runtime-defect:${ev.dedupeKey}`, kind: 'runtime-defect', decider: 'supervisor',
   ledger: 'supervisor', workflowId: ev.entity.workflowId ?? null, entity: { type: ev.entity.type, id: ev.entity.id },
-  summary: `${ev.code} ${ev.entity.type} ${ev.entity.id}: ${ev.state} for ${Math.round(ev.ageMs / 60_000)}m (SLA ${Math.round(ev.slaMs / 60_000)}m)${ev.autoAction ? `; auto: ${ev.autoAction}` : ''}`,
+  summary: `${ev.code} ${ev.entity.type} ${ev.entity.id}: ${ev.state} for ${Math.round(ev.ageMs / 60_000)}m (SLA ${Math.round(ev.slaMs / 60_000)}m)${(ev.autoAction && '; auto: ' + ev.autoAction) || ''}`,
   evidence: [{ ref: `invariant:${ev.dedupeKey}` }, ...ev.evidence.map((line) => ({ ref: line }))],
   openedBy: 'sla-layer', openedAt: now, escalateTo: 'owner', code: ev.code, severity: ev.severity,
 });
@@ -316,9 +316,9 @@ async function clockTruth(row, code, src, { now = Date.now() } = {}) {
     if ((p[0] === 'workflow' && p.length >= 3) || (p[0] === 'stuck' && p.length >= 4) || (p[0] === 'seat' && p[1] === 'kernel' && p.length >= 4)) {
       const db = src.ledgerOf(p[0] === 'seat' ? p[2] : p[1]);
       if (!db) return null;
-      const wf = p[0] === 'workflow' ? p.slice(2).join(':') : p[0] === 'seat' ? p.slice(3).join(':') : p[2];
+      let wf = p[2]; if (p[0] === 'workflow') wf = p.slice(2).join(':'); else if (p[0] === 'seat') wf = p.slice(3).join(':');
       const w = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(wf);
-      if (w?.phase !== 'running' || w?.archived_at != null) return { holds: false, why: `workflow ${w ? (w.archived_at != null ? 'archived' : w.phase ?? 'not running') : 'gone'}` };
+      if (w?.phase !== 'running' || w?.archived_at != null) return { holds: false, why: `workflow ${(w && w.archived_at != null && 'archived') || (w?.phase ?? (w ? 'not running' : 'gone'))}` };
       return { holds: true };
     }
     return null;
@@ -492,7 +492,7 @@ if (isMain(import.meta.url)) {
     const m = openMachine();
     let out;
     try { out = await slaPass({ ...ctx, machine: m, stateFile: m.file }); } finally { m.close(); }
-    console.log(json ? JSON.stringify(out, null, 2) : `sla pass: ${out.violated.length} violated, ${out.cleared.length} cleared${out.skipped.length ? `; skipped ${out.skipped.join(', ')}` : ''}`);
+    console.log(json ? JSON.stringify(out, null, 2) : 'sla pass: ' + out.violated.length + ' violated, ' + out.cleared.length + ' cleared' + (out.skipped.length && '; skipped ' + out.skipped.join(', ') || ''));
   } else {
     console.log('args: --once|--list [--json]');
   }

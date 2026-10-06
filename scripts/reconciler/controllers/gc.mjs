@@ -104,7 +104,10 @@ const liveDeps = {
     const r = await runChild(process.execPath, args, { timeoutMs: 900_000 });
     let report = null;
     try { report = JSON.parse(r.stdout); } catch { report = null; }
-    if (!report || !Array.isArray(report.items)) throw new Error(`gc sweep child gave no report: ${r.timedOut ? 'timed out' : String(r.stderr).trim().slice(-300) || `exit ${r.status}`}`);
+    if (!report || !Array.isArray(report.items)) {
+      const detail = r.timedOut ? 'timed out' : String(r.stderr).trim().slice(-300) || `exit ${r.status}`;
+      throw new Error('gc sweep child gave no report: ' + detail);
+    }
     return report;
   },
   list: async () => (await import('../../api/orca/terminal-list.mjs')).terminalList({ includeVisualLayouts: true }),
@@ -139,10 +142,15 @@ const liveDeps = {
 function sweepItem(i) {
   const failed = i.ok === false, done = i.ok === true;
   const acted = { 'close-terminal': 'closed', 'kill-tree': 'killed' }[i.action] ?? 'removed';
-  const action = i.verdict === 'refuse' ? 'refuse' : i.verdict === 'keep' ? 'keep' : failed ? 'failed' : done ? acted : 'collect';
+  let action = 'collect';
+  if (i.verdict === 'refuse') action = 'refuse';
+  else if (i.verdict === 'keep') action = 'keep';
+  else if (failed) action = 'failed';
+  else if (done) action = acted;
+  let outcome = 'dropped'; if (failed) outcome = 'gave-up'; else if (done) outcome = 'done';
   return { collector: 'gc-sweep', kind: String(i.class ?? 'unknown'), target: String(i.target ?? ''), ownerRef: i.owner ?? null, action, reason: i.reason ?? null,
     bytes: Number(i.bytes ?? i.ramBytes) || null, ageMs: i.firstSeenAt ? Math.max(0, Date.now() - Number(i.firstSeenAt)) : null,
-    outcome: failed ? 'gave-up' : done ? 'done' : 'dropped', ...(failed ? { lastError: String(i.error ?? 'failed').slice(0, 300) } : {}) };
+    outcome, ...(failed ? { lastError: String(i.error ?? 'failed').slice(0, 300) } : {}) };
 }
 
 /* ------------------------------------------------------------ the controller */
@@ -183,8 +191,10 @@ export function createGcController(overrides = {}) {
     tries.delete(key);
     const items = closes.map((c) => ({ collector: 'gc-event', kind: c.klass ?? 'terminal', target: c.handle, ownerRef: key, action: c.ok === true ? 'closed' : 'failed',
       reason: c.reason ?? null, tries: n + 1, outcome: c.ok === true ? 'done' : 'gave-up', ...(c.ok === true ? { verifiedGoneAt: ctx.now() } : { lastError: c.error ?? 'close failed' }) }));
-    items.push({ collector: 'gc-event', kind: parseKey(key).type, target: key, action: skipped ? 'keep' : 'collect', reason: skipped ?? `${closes.length} close(s)`, tries: n + 1,
-      outcome: skipped ? 'dropped' : closes.every((c) => c.ok === true) ? 'done' : 'gave-up' });
+    let outcome = 'done';
+    if (skipped) outcome = 'dropped';
+    else if (!closes.every((c) => c.ok === true)) outcome = 'gave-up';
+    items.push({ collector: 'gc-event', kind: parseKey(key).type, target: key, action: skipped ? 'keep' : 'collect', reason: skipped ?? `${closes.length} close(s)`, tries: n + 1, outcome });
     await record(ctx, 'event', items);
   }
 
@@ -192,7 +202,8 @@ export function createGcController(overrides = {}) {
   async function closeTerminal(ctx, d, { entity }) {
     const r = await ctx.run('node', ['scripts/machine/close-verify.mjs', '--terminal', d.handle, '--owner', OWNER, '--tree', '--log', '--json'], { timeoutMs: 90_000 });
     const closed = ctx.mode === 'active' && r?.ok === true && !r?.shadow;
-    ctx.log('reconciler.gc.close', `${closed ? 'closed' : ctx.mode === 'active' ? 'close FAILED' : 'would close'} ${d.klass} ${d.handle} of ${entity}`, { controller: NAME, handle: d.handle, klass: d.klass, reason: d.reason, entity, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' });
+    let action = 'would close'; if (ctx.mode === 'active') action = closed ? 'closed' : 'close FAILED';
+    ctx.log('reconciler.gc.close', `${action} ${d.klass} ${d.handle} of ${entity}`, { controller: NAME, handle: d.handle, klass: d.klass, reason: d.reason, entity, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' });
     if (closed) await deps.lesson({ klass: d.klass, count: 1, examples: [`${d.handle} ${String(d.title ?? '').slice(0, 50)} (${entity}, closed by the GC controller after its event)`] });
     return { handle: d.handle, klass: d.klass, reason: d.reason, ok: r?.ok ?? null, shadow: ctx.mode !== 'active', ...(closed || ctx.mode !== 'active' ? {} : { error: r?.error ?? r?.value?.error ?? 'close failed' }) };
   }
@@ -202,7 +213,8 @@ export function createGcController(overrides = {}) {
     // In process, active mode only (shadow records the would-close): the one close path takes seconds and no command line of its own.
     const r = ctx.mode === 'active' ? await deps.closeWorker({ dispatch: d.dispatchId, retryRelease: true }) : { ok: true, shadow: true };
     const released = ctx.mode === 'active' && r?.ok === true && !r?.shadow;
-    ctx.log('reconciler.gc.release', `${released ? 'released' : ctx.mode === 'active' ? 'release FAILED' : 'would release'} worker ${d.dispatchId} of ${entity}`, { controller: NAME, dispatch: d.dispatchId, terminal: d.terminalHandle, reason: d.reason, entity, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' });
+    let action = 'would release'; if (ctx.mode === 'active') action = released ? 'released' : 'release FAILED';
+    ctx.log('reconciler.gc.release', `${action} worker ${d.dispatchId} of ${entity}`, { controller: NAME, dispatch: d.dispatchId, terminal: d.terminalHandle, reason: d.reason, entity, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' });
     if (released) await deps.lesson({ klass: 'worker', count: 1, examples: [`${d.dispatchId} ${d.terminalHandle ?? ''} (${entity}, released by the GC controller after its event)`] });
     return { handle: d.terminalHandle ?? d.dispatchId, klass: 'worker', reason: d.reason, ok: r?.ok ?? null, shadow: ctx.mode !== 'active', ...(released || ctx.mode !== 'active' ? {} : { error: r?.error ?? 'worker-release failed' }) };
   }
@@ -369,13 +381,19 @@ export function createGcController(overrides = {}) {
     if (ctx.mode !== 'active') {
       try { plan = await (deps.planBlobGc ?? (async () => (await import('../../housekeeping/blob-gc.mjs')).planBlobGc({ env: ctx.env ?? process.env, now })))(); }
       catch (error) { plan = { error: String(error?.message ?? error).slice(0, 200) }; }
-      ctx.log(WOULD, `blob-sweep: ${plan?.error ? `plan failed: ${plan.error}` : `${plan.marked} marked, ${plan.toArchive?.length ?? 0} to archive, ${plan.toSweep?.length ?? 0} to sweep (${Math.round(((plan.archiveBytes ?? 0) + (plan.sweepBytes ?? 0)) / 1e6)} MB)${plan.blocked?.length ? `, blocked: ${plan.blocked.join('; ')}` : ''}`}`,
+      const blocked = plan?.blocked?.length ? `, blocked: ${plan.blocked.join('; ')}` : '';
+      const summary = plan?.error ? `plan failed: ${plan.error}` : `${plan.marked} marked, ${plan.toArchive?.length ?? 0} to archive, ${plan.toSweep?.length ?? 0} to sweep (${Math.round(((plan.archiveBytes ?? 0) + (plan.sweepBytes ?? 0)) / 1e6)} MB)${blocked}`;
+      ctx.log(WOULD, `blob-sweep: ${summary}`,
         { controller: NAME, action: 'blob-sweep', sources: plan?.sources?.map((s) => ({ name: s.name, kind: s.kind, marks: s.marks, error: s.error ?? null })) ?? null });
     }
     const r = await ctx.run('node', ['scripts/housekeeping/blob-gc.mjs', '--apply', '--json'], { timeoutMs: 3_600_000 });
-    if (ctx.mode === 'active') ctx.log('reconciler.gc.blob-sweep', `blob-sweep ${r?.ok ? 'done' : 'FAILED'}: ${r?.value?.refused ?? (r?.value ? `${r.value.items?.length ?? 0} item(s), ${Math.round((r.value.freedBytes ?? 0) / 1e6)} MB freed` : r?.error ?? '')}`,
+    const result = r?.value ? r.value.refused ?? `${r.value.items?.length ?? 0} item(s), ${Math.round((r.value.freedBytes ?? 0) / 1e6)} MB freed` : r?.error ?? '';
+    const outcome = r?.ok ? 'done' : 'FAILED';
+    if (ctx.mode === 'active') ctx.log('reconciler.gc.blob-sweep', `blob-sweep ${outcome}: ${result}`,
       { controller: NAME, ok: r?.ok ?? null, runId: r?.value?.runId ?? null });
-    finishDuty(ctx, { controller: NAME, duty: 'blob-sweep', result: ctx.mode !== 'active' ? 'skipped' : r?.ok === true ? 'done' : 'failed', now: ctx.now() });
+    let dutyResult = 'skipped';
+    if (ctx.mode === 'active') dutyResult = r?.ok === true ? 'done' : 'failed';
+    finishDuty(ctx, { controller: NAME, duty: 'blob-sweep', result: dutyResult, now: ctx.now() });
     return ctx.mode === 'active' ? { ran: true, ok: r?.ok ?? null } : { shadow: true, plan: plan?.error ? { error: plan.error } : { marked: plan?.marked ?? null, toArchive: plan?.toArchive?.length ?? 0, toSweep: plan?.toSweep?.length ?? 0 } };
   }
 
@@ -416,9 +434,15 @@ export function createGcController(overrides = {}) {
       ctx.log('reconciler.gc.worktrees', `worktree gc: ${removed} removed, ${items.filter((i) => i.action === 'unregister').length} unregistered, ${items.filter((i) => i.action === 'adopt' && i.ok).length} adopted, ${failed.length} failed`,
         { controller: NAME, items: items.slice(0, 50) });
       try {
-        await deps.recordRun({ trigger: 'sweep', items: items.map((i) => ({ collector: 'gc-worktrees', kind: 'worktree', target: String(i.path ?? ''), ownerRef: i.preserved ?? null,
-          action: i.ok === false ? 'failed' : i.action === 'adopt' || i.action === 'review' ? 'keep' : 'removed', reason: i.reason ?? null, outcome: i.ok === false ? 'gave-up' : 'done',
-          ...(i.ok === false ? { lastError: String(i.error ?? 'failed').slice(0, 300) } : i.action === 'adopt' || i.action === 'review' ? {} : { verifiedGoneAt: ctx.now() }) })) });
+        await deps.recordRun({ trigger: 'sweep', items: items.map((i) => {
+          const failed = i.ok === false, kept = i.action === 'adopt' || i.action === 'review';
+          let action = 'removed', extra = {};
+          if (failed) { action = 'failed'; extra = { lastError: String(i.error ?? 'failed').slice(0, 300) }; }
+          else if (kept) action = 'keep';
+          else extra = { verifiedGoneAt: ctx.now() };
+          return { collector: 'gc-worktrees', kind: 'worktree', target: String(i.path ?? ''), ownerRef: i.preserved ?? null,
+            action, reason: i.reason ?? null, outcome: failed ? 'gave-up' : 'done', ...extra };
+        }) });
       } catch (error) { ctx.log('reconciler.gc.record.error', `gc_items write failed: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); }
     }
     finishDuty(ctx, { controller: NAME, duty: 'worktrees', result: failed.length ? 'failed' : 'done', now: ctx.now() });
@@ -433,9 +457,18 @@ export function createGcController(overrides = {}) {
     // MB-01: the daily cadence is durable (schedules); a low-disk/low-RAM host pulls it in after lowResourceGapMs.
     const claim = claimDue(ctx, { controller: NAME, duty: 'housekeeping', intervalMs: settings.housekeepingEveryMs, now, earlyAfterMs: low ? settings.lowResourceGapMs : null });
     if (!claim.due) return { skipped: 'not due', low, nextAt: claim.nextAt };
-    const why = claim.reason === 'first-run' ? 'first run' : claim.reason === 'early' ? `host ${host.lowDisk ? `lowDisk ${Math.round(host.freeDiskGb ?? 0)} GB` : ''}${host.lowDisk && host.lowRam ? ', ' : ''}${host.lowRam ? `lowRam ${Math.round(host.freeRamPct ?? 0)}%` : ''}` : 'daily';
+    let why = 'daily';
+    if (claim.reason === 'first-run') why = 'first run';
+    else if (claim.reason === 'early') {
+      const lowDisk = host.lowDisk ? `lowDisk ${Math.round(host.freeDiskGb ?? 0)} GB` : '';
+      const separator = host.lowDisk && host.lowRam ? ', ' : '';
+      const lowRam = host.lowRam ? `lowRam ${Math.round(host.freeRamPct ?? 0)}%` : '';
+      why = `host ${lowDisk}${separator}${lowRam}`;
+    }
     const r = await ctx.run('node', ['scripts/housekeeping/housekeeping.mjs', '--apply'], { timeoutMs: 1_800_000 });
-    finishDuty(ctx, { controller: NAME, duty: 'housekeeping', result: ctx.mode !== 'active' ? 'skipped' : r?.ok === true ? 'done' : 'failed', actionId: r?.actionId ?? null, now: ctx.now() });
+    let dutyResult = 'skipped';
+    if (ctx.mode === 'active') dutyResult = r?.ok === true ? 'done' : 'failed';
+    finishDuty(ctx, { controller: NAME, duty: 'housekeeping', result: dutyResult, actionId: r?.actionId ?? null, now: ctx.now() });
     ctx.log('reconciler.gc.housekeeping', `${ctx.mode === 'active' ? 'ran' : 'would run'} housekeeping (${why})`, { controller: NAME, why, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' });
     return { ran: ctx.mode === 'active', why };
   }

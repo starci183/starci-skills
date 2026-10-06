@@ -119,7 +119,7 @@ async function record(kind, entityId, payload, { env, now }) {
 
 /** The Supervisor's one-line judgement for the next digest (DESIGN §17.2). */
 export async function judge(text, { env = process.env, now = Date.now() } = {}) {
-  const line = clipLine(String(text ?? '').replace(/\s+/g, ' ').trim(), 400);
+  const line = clipLine(String(text ?? '').replaceAll(/\s+/g, ' ').trim(), 400);
   if (!line) return { ok: false, error: 'empty --text' };
   await record(JUDGEMENT_KIND, 'main', { text: line }, { env, now });
   return { ok: true, text: line };

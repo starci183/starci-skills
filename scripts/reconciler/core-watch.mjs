@@ -189,7 +189,11 @@ async function workflowFacts(o) {
       } else facts.set(lk, null);
     }
     const counts = { wedged: count(f.wedgedJobs), dead: count(f.deadWorkerJobs), stale: count(f.staleOperations), stuck: count(j.stuck), owner: count(j.awaitingOwner), held: count(f.heldSettleJobs) + count(f.heldWorkerJobs) };
-    const ids = (a, key) => (Array.isArray(a) ? a.slice(0, 3).map((x) => (typeof x === 'string' ? x : x?.[key] ?? x?.jobId ?? x?.id ?? x?.opId ?? '?')).join(',') : '');
+    const idOf = (x, key) => {
+      if (typeof x === 'string') return x;
+      return x?.[key] ?? x?.jobId ?? x?.id ?? x?.opId ?? '?';
+    };
+    const ids = (a, key) => (Array.isArray(a) ? a.slice(0, 3).map((x) => idOf(x, key)).join(',') : '');
     const detail = { wedged: ids(f.wedgedJobs, 'jobId'), dead: ids(f.deadWorkerJobs, 'jobId'), stale: ids(f.staleOperations, 'opId'), stuck: ids(j.stuck, 'jobId'), owner: ids(j.awaitingOwner, 'id'), held: '' };
     for (const [name, n] of Object.entries(counts)) {
       if (n) {

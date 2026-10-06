@@ -36,9 +36,13 @@ export function ledgersOf({ env = process.env, repos = null, exists = fs.existsS
     let file;
     try { file = ledgerFileFor(root); } catch { continue; }
     if (!exists(file)) continue;
-    let id = path.basename(root) || 'repo';
-  let n = 2;
-  while (taken.has(id)) { id = `${path.basename(root)}-${n}`; n += 1; }
+    const base = path.basename(root);
+    let id = base || 'repo';
+    if (taken.has(id)) {
+      let suffix = 2;
+      for (; taken.has(`${base}-${suffix}`); suffix += 1) { }
+      id = `${base}-${suffix}`;
+    }
     taken.add(id);
     out.push({ ledgerId: id, repo: root, file });
   }
@@ -49,7 +53,10 @@ export function ledgersOf({ env = process.env, repos = null, exists = fs.existsS
 /** The keys one route resolves `event` to: [] on null, a thrown error or a bad value. */
 function keysOfRoute(route, event) {
   let value;
-  try { value = typeof route === 'function' ? route(event) : route; } catch { return []; }
+  try {
+    if (typeof route === 'function') value = route(event);
+    else value = route;
+  } catch { return []; }
   let list;
   if (Array.isArray(value)) list = value;
   else if (value == null) list = [];

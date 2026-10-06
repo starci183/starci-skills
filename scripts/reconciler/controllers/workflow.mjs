@@ -211,7 +211,7 @@ export function planWorkflow({ ledgerId, workflowId, status = null, findings = [
       const f = unreadable.failure ?? null;
       di({ kind: 'runtime-defect', subject: 'status-unreadable', decider: 'supervisor', ledger: SUPERVISOR_LEDGER, entity: { type: 'workflow', id: workflowId },
         summary: `status-unreadable: starci kernel status --workflow ${workflowId} failed ${unreadable.misses} consecutive reconciler passes since ${iso(unreadable.since)} (${unreadable.error}); no stall is judged until it reads again`,
-        evidence: [`last error: ${unreadable.error}`, f ? `cause ${f.cause ?? '?'}; exit ${f.code ?? '-'}; timedOut ${Boolean(f.timedOut)}${f.refusal ? `; refusal ${f.refusal}` : ''}` : null,
+        evidence: [`last error: ${unreadable.error}`, f ? `cause ${f.cause ?? '?'}; exit ${f.code ?? '-'}; timedOut ${Boolean(f.timedOut)}${(f.refusal && '; refusal ' + f.refusal) || ''}` : null,
           f?.stderrHead ? `stderr: ${f.stderrHead}` : null, `ledger ${ledgerId} workflow ${workflowId}`, findings.find((x) => x.type === 'STATUS-UNREADABLE')?.line] });
     }
   }
@@ -220,10 +220,10 @@ export function planWorkflow({ ledgerId, workflowId, status = null, findings = [
   for (const f of findings) {
     const kind = FINDING_KINDS[f.type];
     if (!kind) continue;
-    const subject = f.type === 'STALE-WAIT' ? f.jobId : f.type === 'UNREAD-PEER' ? f.peerMessage : f.incidentId;
+    let subject; if (f.type === 'STALE-WAIT') subject = f.jobId; else if (f.type === 'UNREAD-PEER') subject = f.peerMessage; else subject = f.incidentId;
     const decider = f.type === 'STALE-GATE' && f.gateKind === 'supervisor-gate' ? 'supervisor' : 'kernel';
     di({ kind, subject: subject ?? f.key, decider, summary: f.line, evidence: [f.line, topLine],
-      entity: f.jobId ? { type: 'job', id: f.jobId } : f.incidentId ? { type: 'incident', id: f.incidentId } : { type: 'workflow', id: workflowId }, top });
+      entity: (f.jobId && { type: 'job', id: f.jobId }) || (f.incidentId && { type: 'incident', id: f.incidentId }) || { type: 'workflow', id: workflowId }, top });
   }
 
   // ---- one clock per starci kernel status stuck[] wait (opTelemetry.stuckSla)
@@ -274,7 +274,7 @@ function goalOf(db, workflowId) {
   const text = String(row.markdown ?? '').trim();
   if (!text || /^null$/i.test(text)) return { missing: true, why: 'goal text empty or null' };
   const bad = unresolvedPlaceholders(text);
-  if (bad.length) return { missing: true, why: `unrendered value ${bad.map((b) => `line ${b.line}: ${b.value}`).join('; ')}` };
+  if (bad.length) return { missing: true, why: `unrendered value ${bad.map((b) => 'line ' + b.line + ': ' + b.value).join('; ')}` };
   return { missing: false, why: null };
 }
 
@@ -292,7 +292,7 @@ async function readStatus(ctx, ledgerId, workflowId) {
   try {
     const { value: v, failure = null } = typeof ctx.statusRead === 'function' ? await ctx.statusRead(ledgerId, workflowId) : { value: await ctx.status(ledgerId, workflowId) };
     if (readable(v)) return { value: v, error: null, failure: null };
-    const error = v && typeof v === 'object' ? (v.error ?? (v.ok === false ? 'ok:false with no error' : 'no frontier in the value'))
+    const error = v && typeof v === 'object' ? (v.error ?? ((v.ok === false && 'ok:false with no error') || 'no frontier in the value'))
       : failure?.error ?? 'no value (starci kernel status timed out, exited non-zero or printed no JSON)';
     return { value: null, error: clipLine(error, 300), failure };
   } catch (error) { return { value: null, error: clipLine(`threw: ${error?.message ?? error}`, 200), failure: { cause: 'threw' } }; }
@@ -507,8 +507,8 @@ if (isMain(import.meta.url)) {
     if (argv.includes('--json')) console.log(JSON.stringify(results, null, 2));
     else {
       for (const r of results) {
-        console.log(`${r.key}${r.ended ? ` ended (${r.ended})` : ''}${r.skipped ? ` skipped ${r.skipped}` : ''}: findings [${(r.findings ?? []).join(', ')}] clocks ${r.clocks ?? 0}`);
-        for (const w of r.would) console.log(`  would ${w.type === 'decision' ? `DI ${w.decider} ${w.key}: ${clipLine(w.summary, 140)}` : w.type === 'api' ? `api ${w.verb} ${w.argv.join(' ')}` : `${w.type} ${w.kind ?? ''} ${w.msg ?? ''}`}`);
+        console.log(r.key + (r.ended ? ` ended (${r.ended})` : '') + (r.skipped ? ` skipped ${r.skipped}` : '') + `: findings [${(r.findings ?? []).join(', ')}] clocks ${r.clocks ?? 0}`);
+        for (const w of r.would) console.log('  would ' + ((w.type === 'decision' && `DI ${w.decider} ${w.key}: ${clipLine(w.summary, 140)}`) || (w.type === 'api' && `api ${w.verb} ${w.argv.join(' ')}`) || `${w.type} ${w.kind ?? ''} ${w.msg ?? ''}`));
         for (const c of r.clockRows) console.log(`  clock ${c}`);
       }
       console.log(`${results.length} workflow(s); ${results.reduce((n, r) => n + r.would.filter((w) => w.type === 'decision').length, 0)} would-DI(s)`);
