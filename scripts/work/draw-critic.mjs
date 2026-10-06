@@ -307,12 +307,8 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
   parentDispatch = placement?.context?.dispatchId ?? (orca ? null : opContextOf()?.dispatchId ?? null),
   pollMs = DEFAULT_POLL_MS, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now }) {
   const rubricInfo = { source: rubric?.source ?? null, checks: (rubric?.checks ?? []).length };
-  if (!critic || typeof critic !== 'object' || !critic.provider || !critic.model || (Number(critic.timeoutMs) || 0) <= 0) {
-    return { schema: CRITIQUE_SCHEMA, outcome: 'not-configured', critic: { independent: false }, rubric: rubricInfo, verdict: null,
-      error: 'no critic is configured (modules/models/runtimes.yaml allocation.drawLoop.critic needs provider, model and timeoutMs)' };
-  }
-  if (!critic.author?.provider) return { schema: CRITIQUE_SCHEMA, outcome: 'not-configured', critic: { independent: false }, rubric: rubricInfo,
-    verdict: null, error: 'the drawer provider is unknown; independent critique cannot be verified' };
+  const configurationFailure = criticConfigurationFailure(critic, rubricInfo);
+  if (configurationFailure) return configurationFailure;
   const client = clientOf(orca);
   const place = orca?.criticWorkspace ?? criticWorkspace;
   const unplace = orca?.removeCriticWorkspace ?? removeCriticWorkspace;
@@ -325,13 +321,7 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
   if (!workspace?.ok) return failed('launch-failed', `the critic has no placement: ${workspace?.error ?? 'criticWorkspace returned nothing'}`);
   const { dir } = workspace;
   try {
-    for (const f of files) fs.copyFileSync(f.from, path.join(dir, f.file));
-    fs.writeFileSync(path.join(dir, 'screen.html'), fs.readFileSync(html));
-    fs.writeFileSync(path.join(dir, 'rubric.yaml'), stringifyYaml(rubric));
-    const prompt = criticPrompt({ dir, images: files });
-    base.critic.prompt = prompt.split(slash(dir)).join('<clean-dir>');
-    base.critic.promptSha256 = sha256(prompt);
-    const started = now();
+    const { prompt, started } = prepareCriticWorkspace({ files, dir, html, rubric, base, now });
     launched = launchCriticWorker({ critic, dir, prompt, entry, parentDispatch, orca });
     if (!launched?.ok) {
       return failed('launch-failed', `the critic worker did not start (${launched?.step ?? 'worker-start'}${launched?.errorCode ? ' ' + launched.errorCode : ''}): ${launched?.error ?? 'no receipt'}`);
@@ -339,39 +329,68 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
     Object.assign(base.critic, { provider: launched.provider, model: launched.admission?.selected?.model ?? launched.model,
       admission: launched.admission ?? null, independent: !orca && launched.effective?.agent !== critic.author.provider,
       dispatchId: launched.dispatchId, taskId: launched.taskId, runId: launched.runId, effective: launched.effective ?? null });
-    const waited = await awaitCritic({ client, runId: launched.runId, entry, dispatchId: launched.dispatchId, terminal: launched.terminal, taskId: launched.taskId,
-      timeoutMs: Number(critic.timeoutMs), pollMs, sleep, now });
-    base.critic.ms = now() - started;
-    base.critic.signal = waited.signal;
-    if (waited.signal === 'timeout') return failed('timeout', `the critic sent no worker_done within ${critic.timeoutMs}ms`);
-    if (waited.signal === 'escalation') return failed('refused', `the critic escalated instead of judging: ${String(waited.message?.body ?? waited.message?.subject ?? '').slice(0, 400)}`);
-    if (waited.signal === 'ended') return failed('refused', `the critic worker ended (${waited.state}) without worker_done`);
-    const file = path.join(dir, VERDICT_FILE);
-    const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
-    const raw = parseVerdict(text);
-    if (!raw) return failed('verdict-missing', `the critic reported worker_done without a verdict in ${VERDICT_FILE}${text ? ': ' + text.slice(-400) : ' (no file)'}`);
-    return { ...base, outcome: 'judged', verdict: normaliseVerdict(raw, rubric), raw, error: null };
+    return await criticVerdict({ client, launched, entry, critic, pollMs, sleep, now, started, dir, base, rubric, failed });
   } catch (error) {
     return failed(launched?.ok ? 'refused' : 'launch-failed', String(error?.message ?? error));
   } finally {
-    let placementSafe = !launched || launched.effectState === 'none';
-    if (launched?.ok) {
-      // Stop is a no-op for a worker that already settled; release frees its seat; the Task closes.
-      const stop = settle(() => client.stop({ dispatch: launched.dispatchId }));
-      const release = settle(() => client.release({ dispatch: launched.dispatchId }));
-      placementSafe = workerClosureProven(release, launched.terminal);
-      if (placementSafe
-        && launched.admission) base.critic.providerBudget = settle(() => releaseAgentAdmission(launched.admission,
-        { kind: 'closed', confirmed: true, handle: launched.terminal, terminalProof: release.closed.proof,
-          processVerdict: release.processes.verdict }, { io: orca?.admission }));
-      const task = settle(() => client.taskUpdate({ id: launched.taskId, status: TASK_CLOSED, run: launched.runId, ...(entry ? { from: entry } : {}) }));
-      base.critic.cleanup = { stopped: stop?.ok === true, released: release?.ok === true, taskClosed: task?.ok === true };
-    }
-    if (placementSafe) {
-      const removed = settle(() => unplace({ dir, repoRoot: workspace.repoRoot, orcaId: workspace.orcaId, branch: workspace.branch ?? null }));
-      if (removed?.ok !== true) base.critic.placementRemoveError = removed?.reason ?? removed?.error ?? 'not removed';
-    } else {
-      base.critic.placementRetained = { reason: 'worker exit is unproven', dir, dispatchId: launched?.dispatchId ?? null };
-    }
+    cleanupCriticWorkspace({ launched, client, entry, orca, base, unplace, workspace, dir });
+  }
+}
+
+function criticConfigurationFailure(critic, rubricInfo) {
+  if (!critic || typeof critic !== 'object' || !critic.provider || !critic.model || (Number(critic.timeoutMs) || 0) <= 0) {
+    return { schema: CRITIQUE_SCHEMA, outcome: 'not-configured', critic: { independent: false }, rubric: rubricInfo, verdict: null,
+      error: 'no critic is configured (modules/models/runtimes.yaml allocation.drawLoop.critic needs provider, model and timeoutMs)' };
+  }
+  if (!critic.author?.provider) return { schema: CRITIQUE_SCHEMA, outcome: 'not-configured', critic: { independent: false }, rubric: rubricInfo,
+    verdict: null, error: 'the drawer provider is unknown; independent critique cannot be verified' };
+  return null;
+}
+
+function prepareCriticWorkspace({ files, dir, html, rubric, base, now }) {
+  for (const f of files) fs.copyFileSync(f.from, path.join(dir, f.file));
+  fs.writeFileSync(path.join(dir, 'screen.html'), fs.readFileSync(html));
+  fs.writeFileSync(path.join(dir, 'rubric.yaml'), stringifyYaml(rubric));
+  const prompt = criticPrompt({ dir, images: files });
+  base.critic.prompt = prompt.split(slash(dir)).join('<clean-dir>');
+  base.critic.promptSha256 = sha256(prompt);
+  const started = now();
+  return { prompt, started };
+}
+
+async function criticVerdict({ client, launched, entry, critic, pollMs, sleep, now, started, dir, base, rubric, failed }) {
+  const waited = await awaitCritic({ client, runId: launched.runId, entry, dispatchId: launched.dispatchId, terminal: launched.terminal, taskId: launched.taskId,
+    timeoutMs: Number(critic.timeoutMs), pollMs, sleep, now });
+  base.critic.ms = now() - started;
+  base.critic.signal = waited.signal;
+  if (waited.signal === 'timeout') return failed('timeout', `the critic sent no worker_done within ${critic.timeoutMs}ms`);
+  if (waited.signal === 'escalation') return failed('refused', `the critic escalated instead of judging: ${String(waited.message?.body ?? waited.message?.subject ?? '').slice(0, 400)}`);
+  if (waited.signal === 'ended') return failed('refused', `the critic worker ended (${waited.state}) without worker_done`);
+  const file = path.join(dir, VERDICT_FILE);
+  const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  const raw = parseVerdict(text);
+  if (!raw) return failed('verdict-missing', `the critic reported worker_done without a verdict in ${VERDICT_FILE}${text ? ': ' + text.slice(-400) : ' (no file)'}`);
+  return { ...base, outcome: 'judged', verdict: normaliseVerdict(raw, rubric), raw, error: null };
+}
+
+function cleanupCriticWorkspace({ launched, client, entry, orca, base, unplace, workspace, dir }) {
+  let placementSafe = !launched || launched.effectState === 'none';
+  if (launched?.ok) {
+    // Stop is a no-op for a worker that already settled; release frees its seat; the Task closes.
+    const stop = settle(() => client.stop({ dispatch: launched.dispatchId }));
+    const release = settle(() => client.release({ dispatch: launched.dispatchId }));
+    placementSafe = workerClosureProven(release, launched.terminal);
+    if (placementSafe
+      && launched.admission) base.critic.providerBudget = settle(() => releaseAgentAdmission(launched.admission,
+      { kind: 'closed', confirmed: true, handle: launched.terminal, terminalProof: release.closed.proof,
+        processVerdict: release.processes.verdict }, { io: orca?.admission }));
+    const task = settle(() => client.taskUpdate({ id: launched.taskId, status: TASK_CLOSED, run: launched.runId, ...(entry ? { from: entry } : {}) }));
+    base.critic.cleanup = { stopped: stop?.ok === true, released: release?.ok === true, taskClosed: task?.ok === true };
+  }
+  if (placementSafe) {
+    const removed = settle(() => unplace({ dir, repoRoot: workspace.repoRoot, orcaId: workspace.orcaId, branch: workspace.branch ?? null }));
+    if (removed?.ok !== true) base.critic.placementRemoveError = removed?.reason ?? removed?.error ?? 'not removed';
+  } else {
+    base.critic.placementRetained = { reason: 'worker exit is unproven', dir, dispatchId: launched?.dispatchId ?? null };
   }
 }
