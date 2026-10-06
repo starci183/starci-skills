@@ -67,7 +67,8 @@ export function variantOfControl(root) {
 const describe = (el) => {
   const component = componentOf(el.attrs);
   const name = el.attrs?.name ?? el.attrs?.id ?? walkElements(el).find((d) => d.attrs?.name)?.attrs?.name ?? null;
-  return `${component ?? el.tag}${name ? ` "${name}"` : ''}`;
+  const label = name ? ` "${name}"` : '';
+  return `${component ?? el.tag}${label}`;
 };
 const surfaceAncestor = (el) => ancestorsOf(el).find((a) => isSurface({ component: componentOf(a.attrs), attrs: a.attrs ?? {}, classes: classesOf(a) })) ?? null;
 const isPrimaryButton = (el) => (componentOf(el.attrs) === 'Button' && (classesOf(el).includes('button--primary') || el.attrs?.['data-variant'] === 'primary' || el.attrs?.['data-grammar-variant'] === 'primary'))
@@ -254,7 +255,8 @@ async function main(argv) {
   if (opts.json) process.stdout.write(`${JSON.stringify({ schema: 'starci/draw-layer@1', parts: results.length, red: red.length, results }, null, 2)}\n`);
   else {
     for (const r of results) {
-      process.stdout.write(`${r.findings.length ? 'FAIL' : 'ok  '} ${r.part} [${r.measured}${r.forms ? `; forms ${r.forms.map((f) => `${Math.round(f.width)}px`).join(', ') || 'none'}` : ''}]\n`);
+      const forms = r.forms ? `; forms ${r.forms.map((f) => String(Math.round(f.width)) + 'px').join(', ') || 'none'}` : '';
+      process.stdout.write(`${r.findings.length ? 'FAIL' : 'ok  '} ${r.part} [${r.measured}${forms}]\n`);
       for (const f of r.findings) process.stdout.write(`       [${f.code}] ${f.detail}\n`);
     }
     process.stdout.write(`${results.length} part(s), ${red.length} red\n`);
@@ -263,5 +265,5 @@ async function main(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-layer: ${e?.stack ?? e}\n`); process.exitCode = 2; });
+  try { process.exitCode = await main(process.argv.slice(2)); } catch (e) { process.stderr.write(`draw-layer: ${e?.stack ?? e}\n`); process.exitCode = 2; }
 }

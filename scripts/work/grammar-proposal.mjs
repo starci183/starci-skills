@@ -86,7 +86,9 @@ function markdownProposals(text, file) {
 }
 
 function yamlProposals(doc, file) {
-  const list = Array.isArray(doc?.proposals) ? doc.proposals : doc?.name ? [doc] : [];
+  let list = [];
+  if (Array.isArray(doc?.proposals)) list = doc.proposals;
+  else if (doc?.name) list = [doc];
   return list.filter((p) => p && typeof p === 'object' && p.name).map((p) => {
     const missing = PROPOSAL_FIELDS.filter((f) => p[f] == null || p[f] === '' || (Array.isArray(p[f]) && !p[f].length && f !== 'tokens'));
     return { name: String(p.name).trim(), names: [String(p.name).trim()], file, format: 'yaml', gap: String(p.gap ?? '').slice(0, 300),
@@ -184,7 +186,14 @@ function main(argv) {
   const proposals = readProposals(proposalFilesIn(targets.map((t) => path.resolve(t))));
   const incomplete = proposals.filter((p) => !p.complete);
   if (json) process.stdout.write(`${JSON.stringify({ ok: cmd === 'list' || !incomplete.length, proposals }, null, 2)}\n`);
-  else process.stdout.write(`${proposals.map((p) => `${p.complete ? 'ok  ' : 'INCOMPLETE'} ${p.name} (${path.basename(p.file)})${p.missing.length ? ` missing ${p.missing.join(', ')}` : ''}`).join('\n') || 'no grammar proposals'}\n`);
+  else {
+    const lines = proposals.map((p) => {
+      const status = p.complete ? 'ok  ' : 'INCOMPLETE';
+      const missing = p.missing.length ? ` missing ${p.missing.join(', ')}` : '';
+      return `${status} ${p.name} (${path.basename(p.file)})${missing}`;
+    }).join('\n') || 'no grammar proposals';
+    process.stdout.write(`${lines}\n`);
+  }
   return cmd === 'check' && incomplete.length ? 1 : 0;
 }
 

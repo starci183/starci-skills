@@ -133,7 +133,8 @@ function judgeRecord(recordDir, repo) {
     }
     const at = slash(path.join(path.relative(repo, recordDir), a.path));
     if (a.generation?.tool !== DRAW_TOOL) {
-      findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: at, detail: `${a.path} (${a.role}) is a live drawing with ${a.generation?.tool ? `generation.tool ${a.generation.tool}` : 'no generation receipt'}: a drawing is token-rendered by draw-render; redraw the shape through draw-render and retire this file (retired: ${RETIRED_IMAGE_GEN}); it is kept, never deleted` });
+      const receipt = a.generation?.tool ? `generation.tool ${a.generation.tool}` : 'no generation receipt';
+      findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: at, detail: `${a.path} (${a.role}) is a live drawing with ${receipt}: a drawing is token-rendered by draw-render; redraw the shape through draw-render and retire this file (retired: ${RETIRED_IMAGE_GEN}); it is kept, never deleted` });
     }
     const state = assetStateOf(record, a);
     if (shapes.length && state && !shapeStates.has(state) && !dataStatusOf(state)) {
@@ -164,9 +165,15 @@ function judgeEvidence(abs, doc, repo) {
     const id = e.id ?? e.state ?? '?';
     const status = dataStatusOf(e.state);
     if (status && !e.nonDerivable) findings.push({ code: DATA_STATUS_DRAWN, path: rel, detail: `${rel} ${where} ${id} draws "${e.state}", the data status ${status.status}; data statuses render by recipe` });
-    if (!e.shape && !e.base) findings.push({ code: DRAW_NOT_SHAPES, path: rel, detail: `${rel} ${where} ${id} names ${e.screen ? `screen ${e.screen}` : 'no shape'}: each drawing is one XBase#state shape` });
+    if (!e.shape && !e.base) {
+      const shape = e.screen ? `screen ${e.screen}` : 'no shape';
+      findings.push({ code: DRAW_NOT_SHAPES, path: rel, detail: `${rel} ${where} ${id} names ${shape}: each drawing is one XBase#state shape` });
+    }
     const tool = e.provenance?.tool ?? e.generation?.tool ?? null;
-    if (tool !== DRAW_TOOL) findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: rel, detail: `${rel} ${where} ${id} records ${tool ? `provenance.tool ${tool}` : 'no provenance.tool'}, not draw-render` });
+    if (tool !== DRAW_TOOL) {
+      const provenance = tool ? `provenance.tool ${tool}` : 'no provenance.tool';
+      findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: rel, detail: `${rel} ${where} ${id} records ${provenance}, not draw-render` });
+    }
   }
   return findings;
 }
@@ -327,7 +334,11 @@ async function main(argv) {
   }
   const out = { ...drawAcceptanceFindings({ repo: path.resolve(repo), files }), ...(job ? { job } : {}) };
   if (json) process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
-  else process.stdout.write(`${out.ok ? 'accepted' : 'REFUSED'}${job ? ` ${job.jobId}` : ''}: ${out.findings.length} finding(s)\n${out.findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n')}\n`);
+  else {
+    const jobId = job ? ` ${job.jobId}` : '';
+    const findings = out.findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n');
+    process.stdout.write(`${out.ok ? 'accepted' : 'REFUSED'}${jobId}: ${out.findings.length} finding(s)\n${findings}\n`);
+  }
   return out.ok ? 0 : 1;
 }
 

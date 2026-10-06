@@ -256,7 +256,11 @@ export function drawQualityFindings(recordDir, record, repo) {
       if (commands.length && controls < commands.length) out.push({ code: DRAW_ACTION_MISSING, path: rel, detail: `${state} is left by ${commands.length} command(s) (${commands.map((c) => c.id ?? c.trigger).join(', ')}) but its render draws ${controls} control(s): every FR command of the surface is a control` });
     }
     const leaks = internalCopyOf(visibleTextOf(html));
-    if (leaks.length) out.push({ code: DRAW_COPY_INTERNAL, path: rel, detail: `${a.path} shows internal copy: ${leaks.slice(0, 5).map((l) => `"${l.match}" (${l.why})`).join('; ')}${leaks.length > 5 ? ` (+${leaks.length - 5})` : ''}` });
+    if (leaks.length) {
+      const examples = leaks.slice(0, 5).map((l) => `"${l.match}" (${l.why})`).join('; ');
+      const more = leaks.length > 5 ? ` (+${leaks.length - 5})` : '';
+      out.push({ code: DRAW_COPY_INTERNAL, path: rel, detail: `${a.path} shows internal copy: ${examples}${more}` });
+    }
     for (const b of badgesOf(html)) {
       if (!b.tone) out.push({ code: DRAW_BADGE_UNTONED, path: rel, detail: `${a.path} badge "${b.text}" binds no tone token (data-tone / color= / a tone class / var(--<tone>))` });
       else if (SUCCESS_WORDS.test(b.text) && b.tone !== 'success') out.push({ code: DRAW_BADGE_UNTONED, path: rel, detail: `${a.path} badge "${b.text}" reads as success but binds tone ${b.tone}` });
@@ -294,13 +298,18 @@ export function drawQualityFindings(recordDir, record, repo) {
     let score = null;
     try { score = JSON.parse(fs.readFileSync(scoreFile, 'utf8')); } catch { score = null; }
     const htmlSha = shaOf(src);
-    if (score?.schema !== SCORE_SCHEMA) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} has no ui-proof score: ${component ? 'draw it through the draw loop (starci work draw-loop round, then finish installs <part>.score.json)' : `run starci work ui-proof-brief --surface <record> --repo <product> --score ${path.basename(src)} --viewport <WxH> --json > ${path.basename(scoreFile)}`}` });
+    if (score?.schema !== SCORE_SCHEMA) {
+      const instruction = component ? 'draw it through the draw loop (starci work draw-loop round, then finish installs <part>.score.json)' : `run starci work ui-proof-brief --surface <record> --repo <product> --score ${path.basename(src)} --viewport <WxH> --json > ${path.basename(scoreFile)}`;
+      out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} has no ui-proof score: ${instruction}` });
+    }
     // A component part was scored on its bundled harness page, never on the DOM snapshot; its freshness is the settle
     // re-measure from <part>.draw.tsx (draw-loop-settle.mjs), so only the score's verdict binds here.
     else if (!component && score.htmlSha256 !== htmlSha) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${path.basename(scoreFile)} scored another version of ${path.basename(src)} (htmlSha256 ${String(score.htmlSha256 ?? 'absent').slice(0, 12)}, now ${String(htmlSha).slice(0, 12)}): score the current render` });
     else if ((score.summary?.fail ?? 1) > 0) {
       const failed = [...list(score.spacing), ...list(score.cases)].filter((c) => c?.status === 'fail').map((c) => c.id ?? `${c.rule} ${c.case}`);
-      out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} scores ${score.summary.pass} pass / ${score.summary.fail} fail: address the critique (${failed.slice(0, 6).join('; ')}${failed.length > 6 ? ` (+${failed.length - 6})` : ''}) and re-score` });
+      const examples = failed.slice(0, 6).join('; ');
+      const more = failed.length > 6 ? ` (+${failed.length - 6})` : '';
+      out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} scores ${score.summary.pass} pass / ${score.summary.fail} fail: address the critique (${examples}${more}) and re-score` });
     }
   }
 

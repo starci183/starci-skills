@@ -101,7 +101,7 @@ export function parseArgs(argv) {
   const o = { css: [], fullPage: false, json: false, theme: 'light' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (BOOL_FLAGS.has(a)) { o[a === '--full-page' ? 'fullPage' : a === '--trace' ? 'trace' : 'json'] = true; continue; }
+    if (BOOL_FLAGS.has(a)) { o[(() => { if (a === '--full-page') return 'fullPage'; if (a === '--trace') return 'trace'; return 'json'; })()] = true; continue; }
     if (!VALUE_FLAGS.has(a)) throw new UsageError(`unknown argument ${a}`);
     const v = argv[++i];
     if (v == null || v.startsWith('--')) throw new UsageError(`${a} needs a value`);
@@ -187,9 +187,7 @@ export function judgeCapture(m) {
 }
 
 /** Fixture JSON -> props: every "[Function]" becomes a no-op. */
-export const fixtureProps = (value) => (value === FUNCTION_FIXTURE ? '__DRAW_NOOP__'
-  : Array.isArray(value) ? value.map(fixtureProps)
-    : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fixtureProps(v)])) : value);
+export const fixtureProps = (value) => (() => { if (value === FUNCTION_FIXTURE) return '__DRAW_NOOP__'; if (Array.isArray(value)) return value.map(fixtureProps); if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fixtureProps(v)])); return value; })();
 
 /** Candidate class tokens of a bundle for tailwind's build(): everything between quotes and whitespace. */
 export const classCandidates = (text) => [...new Set(String(text).split(/[\s"'`\\]+/).filter((t) => t.length > 0 && t.length <= 200))];
@@ -215,7 +213,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
   const pageWidth = de.clientWidth;
   const scrollWidth = Math.max(de.scrollWidth, document.body?.scrollWidth ?? 0);
   const overflowing = scrollWidth > pageWidth ? [...document.querySelectorAll('body *')].filter((el) => el.getBoundingClientRect().right > pageWidth + 0.5)
-    .slice(0, 10).map((el) => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${typeof el.className === 'string' && el.className ? `.${el.className.trim().split(/\s+/).slice(0, 3).join('.')}` : ''}`) : [];
+    .slice(0, 10).map((el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '')) : [];
   const root = document.getElementById('root');
   // The brand art band a drawing marks (draw-taste.mjs ACCENT_EXEMPT_SELECTOR): its rects, in document CSS px, are
   // exempt from the accent budget.
@@ -248,7 +246,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
   // and its segments.
   const anatomy = { alerts: [], meters: [] };
   try {
-    const tag = (el) => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}`;
+    const tag = (el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '');
     const probe = document.createElement('div');
     probe.style.cssText = 'position:absolute;visibility:hidden;background-color:var(--surface)';
     document.body.appendChild(probe);
@@ -276,7 +274,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
         .map((d) => d.getBoundingClientRect()).map((r) => ({ x: r.left, width: r.width }));
       const segmented = el.hasAttribute('data-grammar-meter-segments') || el.hasAttribute('data-segments') || segments.length > 1;
       anatomy.meters.push({ desc: tag(el), segmented, track: { width: t.width, height: t.height },
-        band: { width: band.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0') }, segments });
+        band: { width: band.clientWidth - Number.parseFloat(cs.paddingLeft || '0') - Number.parseFloat(cs.paddingRight || '0') }, segments });
     }
   } catch { /* the anatomy is advisory measurement; the static gate still runs */ }
   // A real grammar drawing (fixture mode of a .draw.tsx): who owns every element that PAINTS - the nearest grammar
@@ -292,7 +290,7 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
       if ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return true;
       if (cs.backgroundColor && !/^(?:transparent|rgba\(0, 0, 0, 0\))$/.test(cs.backgroundColor)) return true;
       if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
-      if (['Top', 'Right', 'Bottom', 'Left'].some((side) => parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(cs[`border${side}Color`]))) return true;
+      if (['Top', 'Right', 'Bottom', 'Left'].some((side) => Number.parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(cs[`border${side}Color`]))) return true;
       return Boolean(cs.boxShadow && cs.boxShadow !== 'none');
     };
     const components = new Set();
@@ -308,9 +306,9 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
         if (marked(a)) { owner = 'grammar'; break; }
         if (a.hasAttribute(layoutAttr)) { owner = 'layout'; break; }
       }
-      if (owner !== 'grammar') unowned.push(`${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? `.${el.className.trim().split(/\s+/).slice(0, 3).join('.')}` : ''}${el.textContent.trim() ? ` "${el.textContent.trim().slice(0, 40)}"` : ''} (${owner ?? 'no owner'})`);
+      if (owner !== 'grammar') unowned.push(el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '') + (el.textContent.trim() ? ' "' + el.textContent.trim().slice(0, 40) + '"' : '') + ` (${owner ?? 'no owner'})`);
     }
-    ownership = { components: [...components].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)), layoutElements, unownedCount: unowned.length, unowned: unowned.slice(0, 20) };
+    ownership = { components: [...components].sort((left, right) => { if (left < right) return -1; if (left > right) return 1; return 0; }), layoutElements, unownedCount: unowned.length, unowned: unowned.slice(0, 20) };
     const clone = document.documentElement.cloneNode(true);
     for (const el of clone.querySelectorAll('[data-component]')) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', el.getAttribute('data-component'));
     for (const el of clone.querySelectorAll('script')) el.remove();
@@ -336,7 +334,7 @@ export async function artworkDigests(images, page = null) {
       let digest = null;
       try {
         if (src.startsWith('file:')) digest = sha256(fs.readFileSync(fileURLToPath(src)));
-        else if (src.startsWith('data:')) { const m = src.match(/^data:[^,]*;base64,(.*)$/s); if (m) digest = sha256(Buffer.from(m[1], 'base64')); }
+        else if (src.startsWith('data:')) { const m = /^data:[^,]*;base64,(.*)$/s.exec(src); if (m) digest = sha256(Buffer.from(m[1], 'base64')); }
         else if (/^https?:/i.test(src) && page?.request) { const r = await page.request.get(src); if (r.ok()) digest = sha256(await r.body()); }
       } catch { digest = null; }
       cache.set(src, digest);
@@ -379,12 +377,10 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
       // components that emitted none (PageContainer, SectionHeader, SurfaceCard, MediaFrame, ...).
       for (const el of document.querySelectorAll('[data-component]')) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', el.getAttribute('data-component'));
       for (const [selector, name] of markers) for (const el of document.querySelectorAll(selector)) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', name);
-      {
-        for (const e of entries) {
-          let els = [];
-          try { els = [...document.querySelectorAll(e.selector)]; } catch { els = []; }
-          for (const el of els) el.setAttribute(whyAttr, [...new Set([...(el.getAttribute(whyAttr) ?? '').split(/\s+/).filter(Boolean), e.id])].join(' '));
-        }
+      for (const e of entries) {
+        let els = [];
+        try { els = [...document.querySelectorAll(e.selector)]; } catch { els = []; }
+        for (const el of els) el.setAttribute(whyAttr, [...new Set([...(el.getAttribute(whyAttr) ?? '').split(/\s+/).filter(Boolean), e.id])].join(' '));
       }
     }, { entries: (rationale?.entries ?? []).filter((e) => typeof e?.selector === 'string' && typeof e?.id === 'string').map((e) => ({ id: e.id, selector: e.selector })), whyAttr: WHY_ATTR, markers: GRAMMAR_ROOT_MARKERS });
     const raw = await page.evaluate(measurePage, { generic: GENERIC_FAMILIES, exemptSelector: ACCENT_EXEMPT_SELECTOR, layoutAttr: LAYOUT_ATTR });
@@ -447,7 +443,7 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
 export async function captureHtml({ html, out, viewports, theme, fullPage, name, source, playwright, trace = false, rationale = undefined }) {
   fs.mkdirSync(out, { recursive: true });
   // The rationale beside the source (draw-rationale.mjs rationaleFileOf) labels the redline; an explicit one wins.
-  const rationaleFile = rationale === undefined ? rationaleFileOf(html) : (typeof rationale === 'string' ? rationale : rationale?.file ?? null);
+  const rationaleFile = rationale === undefined ? rationaleFileOf(html) : (() => { if (typeof rationale === 'string') return rationale; return rationale?.file ?? null; })();
   const why = rationaleFile ? { file: rationaleFile, entries: loadRationale(rationaleFile).entries } : null;
   const browser = await playwright.chromium.launch().catch((e) => { throw new UsageError(`chromium launch failed (${playwright.name} ${playwright.version}): ${e.message.split('\n')[0]}`); });
   const records = [];
@@ -603,7 +599,7 @@ export async function buildFixtureHarness({ component, exportName, props, css, t
     'const noop = () => {};',
     `const revive = (v) => v === '__DRAW_NOOP__' ? noop : Array.isArray(v) ? v.map(revive) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, revive(x)])) : v;`,
     `const props = revive(${JSON.stringify(fixtureProps(fixture))});`,
-    `if (typeof Base !== 'function' && !(Base && typeof Base === 'object')) throw new Error(${JSON.stringify(`${exportName} is not a component export`)});`,
+    `if (typeof Base !== 'function' && !(Base && typeof Base === 'object')) throw new Error(${JSON.stringify(String(exportName) + ' is not a component export')});`,
     "const root = createRoot(document.getElementById('root'));",
     'flushSync(() => root.render(React.createElement(Base, props)));',
   ].join('\n');
@@ -616,7 +612,7 @@ export async function buildFixtureHarness({ component, exportName, props, css, t
       ...(productDir || grammarRoot || component.endsWith(DRAW_SOURCE_SUFFIX) ? { plugins: [drawResolvePlugin({ productDir, grammarRoot })] } : {}),
     });
   } catch (e) {
-    throw new UsageError(`esbuild could not bundle ${exportName} from ${component}: ${(e.errors ?? []).slice(0, 5).map((x) => `${x.location?.file ?? ''}:${x.location?.line ?? ''} ${x.text}`).join('; ') || e.message}`);
+    throw new UsageError(`esbuild could not bundle ${exportName} from ${component}: ${(e.errors ?? []).slice(0, 5).map((x) => (x.location?.file ?? '') + ':' + (x.location?.line ?? '') + ' ' + x.text).join('; ') || e.message}`);
   }
   const js = fs.readFileSync(path.join(workDir, 'harness.js'), 'utf8');
   const candidates = classCandidates(js);
@@ -639,7 +635,7 @@ export async function run(argv, { cwd = process.cwd() } = {}) {
   const anchor = o.html ? path.dirname(o.html) : path.dirname(o.component);
   // The product app of a drawing that lives outside it (a ui record dir, a temp dir): --product, else the nearest
   // grammar-depending package above the draw file, else above one of its --css stylesheets (the product's own).
-  const inferred = o.component ? (o.product ?? productDirOf(o.component) ?? [].concat(o.css ?? []).map(productDirOf).find(Boolean) ?? null) : null;
+  const inferred = o.component ? (o.product ?? productDirOf(o.component) ?? (o.css ?? []).flat().map(productDirOf).find(Boolean) ?? null) : null;
   const playwright = loadPlaywright([anchor, ...(inferred ? [inferred] : []), cwd]);
   if (o.mode === 'html') {
     const source = { mode: 'html', html: { path: o.html, sha256: sha256(fs.readFileSync(o.html)) } };
@@ -675,12 +671,12 @@ async function main() {
     const records = await run(argv);
     const ok = records.every((r) => r.ok);
     if (json) process.stdout.write(`${JSON.stringify({ ok, records }, null, 2)}\n`);
-    else for (const r of records) process.stdout.write(`${r.ok ? 'ok  ' : 'RED '} ${r.image.path}${r.failures.length ? `  ${r.failures.join(', ')}` : ''}\n`);
+    else for (const r of records) process.stdout.write(`${r.ok ? 'ok  ' : 'RED '} ${r.image.path}${r.failures.length ? '  ' + r.failures.join(', ') : ''}\n`);
     process.exitCode = ok ? EXIT.ok : EXIT.red;
   } catch (e) {
     const usage = e instanceof UsageError;
     if (json) process.stdout.write(`${JSON.stringify({ ok: false, error: e.message, ...(e.code ? { code: e.code } : {}) }, null, 2)}\n`);
-    process.stderr.write(`draw-render: ${usage || e instanceof RedError ? `${e.code ? `[${e.code}] ` : ''}${e.message}` : e.stack}\n`);
+    process.stderr.write('draw-render: ' + (() => { if (!(usage || e instanceof RedError)) return e.stack; if (e.code) return '[' + e.code + '] ' + e.message; return e.message; })() + '\n');
     process.exitCode = usage ? EXIT.usage : EXIT.red;
   }
 }

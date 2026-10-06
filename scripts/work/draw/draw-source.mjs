@@ -96,7 +96,10 @@ export function classifyClass(token) {
     const step = spacing[1];
     if (step === 'auto' || step === 'full' || (step === 'px' && /^-?(?:top|right|bottom|left|inset)/.test(bare))) return { kind: 'layout' };
     if (GRAMMAR_SPACING_STEPS.includes(step)) {
-      const family = /^-?(?:gap|space)/.test(bare) ? 'GAP' : /^-?p/.test(bare) ? 'PADDING' : /^-?m/.test(bare) ? 'MARGIN' : 'INSET';
+      let family = 'INSET';
+      if (/^-?(?:gap|space)/.test(bare)) family = 'GAP';
+      else if (/^-?p/.test(bare)) family = 'PADDING';
+      else if (/^-?m/.test(bare)) family = 'MARGIN';
       return { kind: 'token', rule: family === 'GAP' || family === 'PADDING' ? `${family}-${SPACING_RULE_OF_STEP[step]}` : null };
     }
     return { kind: 'free' };
@@ -145,7 +148,10 @@ export function sourceFindings(text, { file = 'source.draw.tsx', rationale = [],
   const label = path.basename(file);
   const findings = [];
   const lineOf = (node) => sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-  const add = (code, node, detail) => findings.push({ code, line: node ? lineOf(node) : null, detail: `${label}${node ? `:${lineOf(node)}` : ''} ${detail}` });
+  const add = (code, node, detail) => {
+    const location = node ? `:${lineOf(node)}` : '';
+    findings.push({ code, line: node ? lineOf(node) : null, detail: `${label}${location} ${detail}` });
+  };
 
   // Imports: grammar, react, icon sources, a raster art placeholder; a type-only import is free.
   const grammarImports = new Map(); // local name -> module
@@ -242,7 +248,7 @@ export function fixtureFindings(fixtures) {
   for (const { file, value } of fixtures) {
     const label = path.basename(file);
     if (!value || typeof value !== 'object' || Array.isArray(value)) { out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} is not a props object` }); continue; }
-    const keys = Object.keys(value).sort(byCodeUnit);
+    const keys = Object.keys(value).toSorted(byCodeUnit);
     if (keys.join(',') !== 'on,props,state') out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} holds {${keys.join(', ')}}: an XBase fixture is exactly {state, props, on} (the drawing law)` });
     else if (typeof value.state !== 'string') out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} state is not a shape name` });
   }
@@ -319,8 +325,15 @@ export function typecheckDraw({ file, productDir, grammarRoot, ts: tsIn = null }
   return { ok: errors.length === 0, errors, typescript: loaded.version ?? ts.version };
 }
 
-export const typecheckFindings = (result, { label }) => (result.ok ? [] : [{ code: DRAW_TYPECHECK_FAILED,
-  detail: `${label} does not type-check against the grammar it renders with (${result.errors.length} error(s)): ${result.errors.slice(0, 6).map((e) => `${e.file ? path.basename(e.file) : ''}${e.line ? `:${e.line}` : ''} ${e.code ?? ''} ${e.message}`).join(' | ')}` }]);
+export const typecheckFindings = (result, { label }) => {
+  if (result.ok) return [];
+  const errors = result.errors.slice(0, 6).map((e) => {
+    const file = e.file ? path.basename(e.file) : '';
+    const line = e.line ? `:${e.line}` : '';
+    return `${file}${line} ${e.code ?? ''} ${e.message}`;
+  }).join(' | ');
+  return [{ code: DRAW_TYPECHECK_FAILED, detail: `${label} does not type-check against the grammar it renders with (${result.errors.length} error(s)): ${errors}` }];
+};
 
 /**
  * The whole source gate of one draw file: grammar resolution (typecheck-driven, draw-grammar.mjs), then the AST gate
@@ -356,7 +369,11 @@ async function main(argv) {
   const out = { ok: r.findings.length === 0, findings: r.findings, grammar: { ok: r.grammar.ok, grammarSource: r.grammar.grammarSource, upgradeOwed: r.grammar.upgradeOwed,
     attempts: r.grammar.attempts.map((a) => ({ source: a.source, version: a.version, ok: a.ok, errors: a.errors.length })) } };
   if (json) process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
-  else process.stdout.write(`${out.ok ? 'ok' : 'REFUSED'}: ${path.basename(file)} grammar ${r.grammar.grammarSource ?? 'unresolved'}${r.grammar.upgradeOwed ? ` (product upgrade owed ${r.grammar.upgradeOwed.from} -> ${r.grammar.upgradeOwed.to})` : ''}\n${r.findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n')}\n`);
+  else {
+    const upgrade = r.grammar.upgradeOwed ? ` (product upgrade owed ${r.grammar.upgradeOwed.from} -> ${r.grammar.upgradeOwed.to})` : '';
+    const findings = r.findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n');
+    process.stdout.write(`${out.ok ? 'ok' : 'REFUSED'}: ${path.basename(file)} grammar ${r.grammar.grammarSource ?? 'unresolved'}${upgrade}\n${findings}\n`);
+  }
   return out.ok ? 0 : 1;
 }
 

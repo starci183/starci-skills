@@ -277,7 +277,7 @@ function gitRevision(repoRoot) {
 /** Page nodes a navigation route can land on: not inside a slot or an intercept, with a page file. */
 const landingPages = (nodes) => {
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const inside = (n) => { for (let at = n; at; at = byId.get(at.parent)) if (at.segmentKind === 'slot' || at.segmentKind === 'intercept') return true; return false; };
+  const inside = (n) => { for (let at = n; at; at = byId.get(at.parent)) { if (at.segmentKind === 'slot' || at.segmentKind === 'intercept') { return true; } } return false; };
   return nodes.filter((n) => n.files?.page && !inside(n));
 };
 
@@ -323,8 +323,8 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, name = nul
   const nodes = [];
   const walk = (dir, parent, name) => {
     const kind = parent ? segmentKindOf(name) : 'root';
-    const id = parent ? (parent.id === '/' ? `/${name}` : `${parent.id}/${name}`) : '/';
-    const url = !parent ? '/' : kind === 'group' || kind === 'slot' ? parent.url : kind === 'intercept' ? interceptTarget(name, parent.url) : joinUrl(parent.url, name);
+    const id = (() => { if (!parent) return '/'; if (parent.id === '/') return `/${name}`; return `${parent.id}/${name}`; })();
+    const url = (() => { if (!parent) return '/'; if (kind === 'group' || kind === 'slot') return parent.url; if (kind === 'intercept') return interceptTarget(name, parent.url); return joinUrl(parent.url, name); })();
     const files = {};
     for (const special of SPECIAL_FILES) {
       const file = specialFileIn(dir, special);
@@ -394,7 +394,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, name = nul
         }
         const labels = {};
         for (const c of catalogs) { const label = i18nKey ? getPath(c.messages, i18nKey) : undefined; if (typeof label === 'string' && label.trim()) labels[c.locale] = label; }
-        for (const c of catalogs) if (!labels[c.locale]) findings.push({ code: 'NAV_LABEL_MISSING', detail: `${item.key} has no ${c.locale} label${i18nKey ? ` at ${i18nKey}` : ''} in ${rel(c.files[0])}` });
+        for (const c of catalogs) if (!labels[c.locale]) findings.push({ code: 'NAV_LABEL_MISSING', detail: item.key + ' has no ' + c.locale + ' label' + (i18nKey ? ' at ' + i18nKey : '') + ' in ' + rel(c.files[0]) });
         const target = resolveNavRoute(nodes, item.route, localeParam);
         if (item.route === null) findings.push({ code: 'NAV_ROUTE_NULL', detail: `${item.key} has no route - the navigation draws it disabled and no page answers it` });
         else if (!target) findings.push({ code: 'NAV_ROUTE_MISSING', detail: `${item.key} navigates to ${item.route}, which no page under app/ answers` });
@@ -403,7 +403,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, name = nul
       // Top-level routes under this layout that no destination reaches.
       const baseParts = urlParts(localelessUrl(node.url, localeParam));
       const reached = new Set(items.map((i) => i.target).filter(Boolean).map((id) => urlParts(localelessUrl(byId.get(id).url, localeParam))[baseParts.length]));
-      const under = pages.filter((p) => { for (let at = p; at; at = byId.get(at.parent)) if (at.id === node.id) return true; return false; });
+      const under = pages.filter((p) => { for (let at = p; at; at = byId.get(at.parent)) { if (at.id === node.id) { return true; } } return false; });
       const heads = new Map();
       for (const p of under) {
         const head = urlParts(localelessUrl(p.url, localeParam))[baseParts.length];
@@ -454,7 +454,7 @@ const KEY_LISTS = new Set(['i18nKeys', 'messageKeys']);
 export function usedI18nKeys(record) {
   const keys = new Set();
   const walk = (v) => {
-    if (Array.isArray(v)) { for (const x of v) walk(x); return; }
+    if (Array.isArray(v)) { for (const x of v) { walk(x); } return; }
     if (!v || typeof v !== 'object') return;
     for (const [k, x] of Object.entries(v)) {
       if (KEY_FIELDS.has(k)) { if (typeof x === 'string' && x.trim()) keys.add(x.trim()); }
@@ -471,7 +471,7 @@ export function usedI18nKeys(record) {
 function keyedDigest(messages, keys) {
   return sha256Of(list(keys).map((k) => {
     const v = getPath(messages ?? {}, k);
-    return `${k}\0${v === undefined ? '\u0001absent' : typeof v === 'string' ? v : JSON.stringify(v)}`;
+    return `${k}\0${(() => { if (v === undefined) return '\u0001absent'; if (typeof v === 'string') return v; return JSON.stringify(v); })()}`;
   }).join('\n'));
 }
 
@@ -519,7 +519,7 @@ export function sourceDrift(record, scan) {
       if (!next) { changed.push(`${n.id} nav ${key} removed`); continue; }
       if ((item?.i18nKey ?? null) !== (next.i18nKey ?? null)) { changed.push(`${n.id} nav ${key} now reads ${next.i18nKey ?? 'no message key'}`); continue; }
       for (const locale of new Set([...Object.keys(item?.labels ?? {}), ...Object.keys(next.labels ?? {})])) {
-        if (item?.labels?.[locale] !== next.labels?.[locale]) changed.push(`${n.id} nav ${key} ${locale} label${item?.i18nKey ? ` (${item.i18nKey})` : ''}`);
+        if (item?.labels?.[locale] !== next.labels?.[locale]) changed.push(n.id + ' nav ' + key + ' ' + locale + ' label' + (item?.i18nKey ? ' (' + item.i18nKey + ')' : ''));
       }
     }
     for (const key of after.keys()) if (!before.has(key)) changed.push(`${n.id} nav ${key} added`);
@@ -533,7 +533,7 @@ export function sourceDrift(record, scan) {
       const was = list(used.locales).find((l) => l?.locale === c.locale)?.sha256;
       if (!was || keyedDigest(c.messages, used.keys) === was) continue;
       const gone = used.keys.filter((k) => getPath(c.messages, k) === undefined);
-      changed.push(`${c.locale} used key values${gone.length ? ` (absent now: ${gone.slice(0, 4).join(', ')})` : ''}`);
+        changed.push(c.locale + ' used key values' + (gone.length ? ' (absent now: ' + gone.slice(0, 4).join(', ') + ')' : ''));
     }
   }
   return { stale: changed.length > 0, changed: [...new Set(changed)] };
@@ -584,7 +584,7 @@ export function treeOf(record, name) {
   const { source, i18n, nodes, ...app } = entry;
   const own = { app, source, i18n, nodes };
   return new Proxy(record, {
-    get: (target, key) => (key === recordKey ? target : typeof key === 'string' && APP_OWN.has(key) ? own[key] : target[key]),
+    get: (target, key) => (() => { if (key === recordKey) return target; if (typeof key === 'string' && APP_OWN.has(key)) return own[key]; return target[key]; })(),
     set: (target, key, value) => {
       if (typeof key === 'string' && APP_OWN.has(key)) { own[key] = value; if (key !== 'app') entry[key] = value; } else target[key] = value;
       return true;
@@ -658,13 +658,13 @@ export const DRAWER_DIRECTIONS = ['left', 'right', 'top', 'bottom'];
 /** The file an App Router segment must carry for a surface drawn at that route. */
 export const SURFACE_FILE = { layout: 'layout', page: 'page', loading: 'loading', error: 'error', 'not-found': 'not-found' };
 
-const perBreakpoint = (value, bp) => (typeof value === 'string' ? value : value && typeof value === 'object' ? value[bp] ?? value.default ?? null : null);
+const perBreakpoint = (value, bp) => { if (typeof value === 'string') return value; if (value && typeof value === 'object') return value[bp] ?? value.default ?? null; return null; };
 /** The surface a ui record presents at breakpoint `bp` ({desktop: drawer, mobile: modal} overrides). */
 export const surfaceAt = (ui, bp) => perBreakpoint(ui?.surface, bp);
 /** The edge a drawer is anchored to at `bp` ({desktop: right, mobile: bottom} overrides). */
 export const directionAt = (ui, bp) => perBreakpoint(ui?.direction, bp);
 /** Every surface value a ui record names, across breakpoints. */
-export const surfaceValues = (ui) => (typeof ui?.surface === 'string' ? [ui.surface] : ui?.surface && typeof ui.surface === 'object' ? Object.values(ui.surface) : []);
+export const surfaceValues = (ui) => { if (typeof ui?.surface === 'string') return [ui.surface]; if (ui?.surface && typeof ui.surface === 'object') return Object.values(ui.surface); return []; };
 export const isOverlayRecord = (ui) => surfaceValues(ui).some((s) => OVERLAY_SURFACES.has(s));
 
 /** Every work/ui-screen@1 record under the Work root's features/: Map id -> {file, record}. */
@@ -705,7 +705,7 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
         if (!design) reasons.push(`${node.id} is drawn by ${layout.design}, which does not exist`);
         else {
           const acceptance = drawingAcceptance(design.record, path.dirname(design.file));
-          if (!acceptance.accepted) reasons.push(`${node.id} is drawn by ${layout.design}, which is ${acceptance.reason}${design.record.state !== 'done' ? ` - ${ACCEPT_PATH}` : ''}`);
+          if (!acceptance.accepted) reasons.push(node.id + ' is drawn by ' + layout.design + ', which is ' + acceptance.reason + (design.record.state !== 'done' ? ' - ' + ACCEPT_PATH : ''));
           for (const bp of breakpoints) for (const theme of themes) {
             const hit = designCaptureOf(design, bp, theme);
             if (!hit) reasons.push(`${layout.design} has no accepted layout composite at ${bp}/${theme} with a measured childSlot`);
@@ -822,7 +822,7 @@ function measuredCapture(shellDir, capture) {
   if (!file || !fs.existsSync(file)) return capture;
   const image = decodePng(fs.readFileSync(file));
   const key = keyRect(image, SLOT_KEY);
-  return { ...capture, width: capture.width ?? image.width, height: capture.height ?? image.height, ...(capture.slot ? {} : key && key.fill >= SLOT_FILL_MIN ? { slot: key.rect } : {}) };
+  return { ...capture, width: capture.width ?? image.width, height: capture.height ?? image.height, ...(capture.slot || !key || !(key.fill >= SLOT_FILL_MIN) ? null : { slot: key.rect }) };
 }
 
 /**
@@ -934,7 +934,7 @@ export function mergeScan(existing, scans, { at = now() } = {}) {
   const base = isLayoutTree(existing) ? existing : null;
   const scanList = scans;
   const several = scanList.length > 1 || appsOf(base).length > 1;
-  const said = (name, text) => `${several ? `${name}: ` : ''}${text}`;
+  const said = (name, text) => (several ? name + ': ' : '') + text;
   const entries = scanList.map((scan) => {
     const name = scan.app.name;
     const before = appsOf(base).find((x) => x.name === name);
@@ -1005,7 +1005,7 @@ export function mergeScan(existing, scans, { at = now() } = {}) {
 /** Parents before children, siblings in id order. */
 function orderNodes(nodes) {
   const children = new Map();
-  for (const n of nodes) { const k = n.parent ?? ''; if (!children.has(k)) children.set(k, []); children.get(k).push(n); }
+  for (const n of nodes) { const k = n.parent ?? ''; if (!children.has(k)) { children.set(k, []); } children.get(k).push(n); }
   const out = [];
   const visit = (id) => { for (const n of (children.get(id) ?? []).sort((a, b) => a.id.localeCompare(b.id))) { out.push(n); visit(n.id); } };
   visit('');
@@ -1064,7 +1064,7 @@ function addDestinationCapture(record, shellDir, { node: id, destination, routes
   const dests = list(node.layout.destinations);
   let entry = dests.find((d) => d.key === destination);
   const navTarget = list(node.layout.nav?.items).find((i) => i?.key === destination)?.target ?? null;
-  const wanted = list(routes).length ? [...new Set(routes)] : entry ? entry.routes : navTarget ? [navTarget] : [];
+  const wanted = (() => { if (list(routes).length) return [...new Set(routes)]; if (entry) return entry.routes; if (navTarget) return [navTarget]; return []; })();
   if (!wanted.length) throw new Error(`${destination}: name the node ids it is active for with --route (it is not a nav item of ${id} with a target)`);
   for (const r of wanted) if (!nodeById(record, r) || !underNode(r, id)) throw new Error(`${r}: not a node at or below ${id}`);
   const measured = readCaptureFile(file);
@@ -1165,7 +1165,7 @@ export function addPlanned(record, { node: id, files = [], design = null }) {
     if (!node) {
       const parent = nodeById(record, parentId);
       const name = parts[n - 1], kind = segmentKindOf(name);
-      node = { id: nid, parent: parentId, segment: name, segmentKind: kind, url: kind === 'group' || kind === 'slot' ? parent.url : kind === 'intercept' ? interceptTarget(name, parent.url) : joinUrl(parent.url, name), origin: 'planned' };
+      node = { id: nid, parent: parentId, segment: name, segmentKind: kind, url: (() => { if (kind === 'group' || kind === 'slot') return parent.url; if (kind === 'intercept') return interceptTarget(name, parent.url); return joinUrl(parent.url, name); })(), origin: 'planned' };
       record.nodes.push(node);
     }
     if (n === parts.length) {
@@ -1197,9 +1197,9 @@ function summarizeApp(record) {
     const depth = (chainOf(record, n.id)?.length ?? 1) - 1;
     const files = Object.keys(n.files ?? {}).join(',');
     const dests = n.layout ? destinationsOf(record, n) : [];
-    const extra = n.layout ? ` LAYOUT ${n.layout.component ?? '(no component)'} chrome=${n.layout.chrome} state=${n.layout.state} rev=${n.layout.rev} captures=${list(n.layout.captures).length}${dests.length ? ` destinations=${dests.map((d) => d.key).join(',')}` : ''}` : '';
-    lines.push(`${'  '.repeat(depth)}${n.segment} [${n.segmentKind}] url=${n.url}${files ? ` {${files}}` : ''}${n.intercepts ? ` intercepts=${n.intercepts}` : ''}${extra}`);
-    for (const item of list(n.layout?.nav?.items)) lines.push(`${'  '.repeat(depth + 2)}nav ${item.key} -> ${item.route ?? 'null'} target=${item.target ?? 'NONE'} ${Object.entries(item.labels ?? {}).map(([l, v]) => `${l}:"${v}"`).join(' ')}`);
+    const extra = n.layout ? ' LAYOUT ' + (n.layout.component ?? '(no component)') + ' chrome=' + n.layout.chrome + ' state=' + n.layout.state + ' rev=' + n.layout.rev + ' captures=' + list(n.layout.captures).length + (() => { if (!dests.length) return ''; return ' destinations=' + dests.map((d) => d.key).join(','); })() : '';
+    lines.push('  '.repeat(depth) + n.segment + ' [' + n.segmentKind + '] url=' + n.url + (files ? ' {' + files + '}' : '') + (n.intercepts ? ' intercepts=' + n.intercepts : '') + extra);
+    for (const item of list(n.layout?.nav?.items)) lines.push('  '.repeat(depth + 2) + 'nav ' + item.key + ' -> ' + (item.route ?? 'null') + ' target=' + (item.target ?? 'NONE') + ' ' + Object.entries(item.labels ?? {}).map(([l, v]) => l + ':"' + v + '"').join(' '));
     for (const f of list(n.layout?.nav?.findings)) lines.push(`${'  '.repeat(depth + 2)}! ${f.code} ${f.detail}`);
   }
   return lines;
@@ -1272,9 +1272,9 @@ export function layoutTreeMain(argv = []) {
         const anchor = nodeById(tree, route) ? route : nearestExisting(tree, route);
         const picks = matrixOf(record).breakpoints.flatMap((bp) => matrixOf(record).themes.map((theme) => {
           const base = baseLayoutFor(tree, anchor, bp, theme, { shellDir, ui });
-          return { breakpoint: bp, theme, ...(base ? (base.missing ? { missing: base.missing } : { node: base.node, capture: base.rel, destination: base.destination, by: base.by ?? null, slot: base.slot }) : { canvas: true }) };
+          return { breakpoint: bp, theme, ...(() => { if (!base) return { canvas: true }; if (base.missing) return { missing: base.missing }; return { node: base.node, capture: base.rel, destination: base.destination, by: base.by ?? null, slot: base.slot }; })() };
         }));
-        return out({ ok: true, route, picks }, picks.map((p) => `${p.breakpoint}/${p.theme}: ${p.missing ? `MISSING ${p.missing}` : p.canvas ? 'blank canvas (no visible layout)' : `${p.capture} (${p.node}${p.destination ? ` destination ${p.destination} by ${p.by}` : ' default'})`}`).join('\n'));
+        return out({ ok: true, route, picks }, picks.map((p) => p.breakpoint + '/' + p.theme + ': ' + (() => { if (p.missing) return 'MISSING ' + p.missing; if (p.canvas) return 'blank canvas (no visible layout)'; return p.capture + ' (' + p.node + (p.destination ? ' destination ' + p.destination + ' by ' + p.by : ' default') + ')'; })()).join('\n'));
       }
       const rows = appNamesOf(record).flatMap((name) => nodesOf(treeOf(record, name)).filter((n) => n.layout).map((n) => ({ name, n }))).flatMap(({ name, n }) => destinationsOf(record, n).map((d) => ({ ...(appsOf(record).length > 1 ? { app: name } : {}), node: n.id, key: d.key, routes: d.routes, cells: d.captures.map((c) => `${c.breakpoint}/${c.theme}`) })));
       return out({ ok: true, destinations: rows }, rows.length ? rows.map((r) => `${r.node} ${r.key} routes=${r.routes.join(',')} cells=${r.cells.join(',')}`).join("\n") : 'no layout records destinations');
@@ -1293,7 +1293,7 @@ export function layoutTreeMain(argv = []) {
         for (const id of flags(args, '--node')) result = addPlanned(tree, { node: id, files: (flag(args, '--files') ?? '').split(',').filter(Boolean), design: flag(args, '--design') });
       }
       record.rev = (record.rev ?? 1) + (isLayoutTree(existing) ? 1 : 0);
-      record.change = { rev: record.rev, kind: 'clarifying', at: now(), reason: command === 'capture' ? `Captured ${flag(args, '--node')}${flag(args, '--destination') ? ` destination ${flag(args, '--destination')}` : ''} at ${flag(args, '--breakpoint')}/${flag(args, '--theme')}.` : `Planned ${flags(args, '--node').join(', ')}.` };
+      record.change = { rev: record.rev, kind: 'clarifying', at: now(), reason: (() => { if (command !== 'capture') return `Planned ${flags(args, '--node').join(', ')}.`; return `Captured ${flag(args, '--node')}` + (flag(args, '--destination') ? ` destination ${flag(args, '--destination')}` : '') + ` at ${flag(args, '--breakpoint')}/${flag(args, '--theme')}.`; })() };
       if (write) save(record);
       return out({ ok: true, written: write, result }, `${write ? 'wrote' : 'would write'} ${slash(shellFileOf(workRoot))}: ${JSON.stringify(result)}`);
     }
@@ -1303,11 +1303,11 @@ export function layoutTreeMain(argv = []) {
     if (located.error) return { exitCode: 1, text: `layout-tree: ${located.error}\n` };
     if (!located.apps.length) return { exitCode: 1, text: `no fe app is declared for ${slash(workRoot)} - hfs.json sides.fe.apps names them, or pass --app-dir\n` };
     const unreadable = located.apps.filter((a) => !a.appDir);
-    if (unreadable.length) return { exitCode: 1, text: `layout-tree: app ${unreadable.map((a) => `${a.name} (${a.root})`).join(', ')} has no app/ or src/app/ directory under ${slash(located.repoRoot)}\n` };
+    if (unreadable.length) return { exitCode: 1, text: `layout-tree: app ${unreadable.map((a) => a.name + ' (' + a.root + ')').join(', ')} has no app/ or src/app/ directory under ${slash(located.repoRoot)}\n` };
     const scans = located.apps.map((a) => scanAppDir(a.appDir, { repoRoot: located.repoRoot, name: a.name }));
     const { record, notes } = mergeScan(existing, scans);
     if (write) save(record);
-    return out({ ok: true, written: write, notes, record }, `${summarize(record)}\n${notes.map((n) => `- ${n}`).join('\n')}\n${write ? `wrote ${slash(shellFileOf(workRoot))}` : '(dry run - pass --write to write the record)'}`);
+    return out({ ok: true, written: write, notes, record }, `${summarize(record)}\n${notes.map((n) => '- ' + n).join('\n')}\n${write ? 'wrote ' + slash(shellFileOf(workRoot)) : '(dry run - pass --write to write the record)'}`);
   } catch (error) {
     return { exitCode: 1, text: `layout-tree: ${error.message}\n` };
   }
