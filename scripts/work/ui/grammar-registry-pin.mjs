@@ -59,7 +59,10 @@ if (isMain(import.meta.url)) {
     const pins = grammarPinsIn(repo);
     const bad = pins.filter((p) => !p.ok);
     if (json) console.log(JSON.stringify({ ok: bad.length === 0, pins }, null, 2));
-    else for (const p of pins) console.log(`${p.ok ? 'ok ' : 'BAD'} ${p.file} ${p.section} ${p.spec}${p.reason ? ` — ${p.reason}` : ''}`);
+    else for (const p of pins) {
+      const reason = p.reason ? ` — ${p.reason}` : '';
+      console.log(`${p.ok ? 'ok ' : 'BAD'} ${p.file} ${p.section} ${p.spec}${reason}`);
+    }
     process.exitCode = bad.length ? 1 : 0;
   }
 }

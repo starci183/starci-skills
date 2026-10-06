@@ -124,7 +124,7 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
     ledger.transaction(() => recordPurge(db, { workflowId, state: prior?.state ?? 'planned', approvedBy, approvalRef, at: now() }));
 
     // 2-3. Archive and verify (skipped only when an earlier run already verified this archive and it still matches).
-    let row = purgeRow(db, workflowId);
+    const row = purgeRow(db, workflowId);
     let stillGood=false;
     if(row.verified_at&&fs.existsSync(row.archive_path))try{const checked=zipVisit(row.archive_path,()=>{});stillGood=checked.sha256===row.archive_sha256&&checked.entries.every(e=>e.crcOk)&&checked.entries.find(e=>e.name==='manifest.json')?.sha256===row.manifest_sha256;}catch{/* retain rows; rebuild through the normal verified path */}
     if (!stillGood) {
@@ -167,8 +167,14 @@ function main() {
   const out = purgeWorkflow({ repo: a.repo, workflowId: a.workflow, apply: Boolean(a.apply), approvedBy: a['approved-by'] ?? null, approvalRef: a['approval-ref'] ?? null, archiveRoot: a['archive-root'] ?? archiveRootOf() });
   if (a.json) console.log(JSON.stringify(out, null, 2));
   else if (out.already) console.log(`${a.workflow}: already purged; archive ${out.purge.archive_path} (sha256 ${out.purge.archive_sha256})`);
-  else if (out.dryRun) console.log(`${a.workflow}: dry run - ${out.ok ? 'may be purged' : `REFUSED: ${out.blockers.join('; ')}`}; ${Object.entries(out.counts).filter(([, n]) => n).map(([t, n]) => `${t}:${n}`).join(' ')}; ${out.files} file(s) ${out.fileBytes} bytes -> ${out.archive}`);
-  else console.log(`${a.workflow}: purged; archive ${out.purge.archive_path} sha256 ${out.purge.archive_sha256}; deleted ${Object.entries(out.deleted).filter(([, n]) => n).map(([t, n]) => `${t}:${n}`).join(' ')}`);
+  else if (out.dryRun) {
+    const result = out.ok ? 'may be purged' : `REFUSED: ${out.blockers.join('; ')}`;
+    const counts = Object.entries(out.counts).filter(([, n]) => n).map(([t, n]) => `${t}:${n}`).join(' ');
+    console.log(`${a.workflow}: dry run - ${result}; ${counts}; ${out.files} file(s) ${out.fileBytes} bytes -> ${out.archive}`);
+  } else {
+    const deleted = Object.entries(out.deleted).filter(([, n]) => n).map(([t, n]) => `${t}:${n}`).join(' ');
+    console.log(`${a.workflow}: purged; archive ${out.purge.archive_path} sha256 ${out.purge.archive_sha256}; deleted ${deleted}`);
+  }
   if (!out.ok) process.exitCode = 1;
 }
 

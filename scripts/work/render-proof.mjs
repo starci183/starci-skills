@@ -108,6 +108,46 @@ function captureCandidates(implDir, record, blobOptions) {
   return capturesOf(implDir, record, blobOptions).map(c => ({png: c.png, markup: c.markup, name: c.name}));
 }
 
+function appendCaptureProblems(candidate, brand, cards, problems) {
+  const rel = candidate.name;
+  if (!candidate.png) {
+    problems.push(`cited capture ${rel} is missing from its selected blob store - every declared PNG must be readable [RENDER_CAPTURE_MISSING]`);
+    return;
+  }
+  let png = null, failure = null;
+  try { png = decodePng(fs.readFileSync(candidate.png)); }
+  catch (error) { failure = String(error.message ?? error); }
+  if (!png) {
+    problems.push(`capture ${rel} could not be decoded (${failure}), so its palette could not be compared against the brand - an uncheckable claim is not a pass [RENDER_PROOF_INCOMPLETE]`);
+  } else {
+    for (const result of checkPalette({png, brand: brand.brand})) {
+      if (result.outcome === 'fail') problems.push(`capture ${rel}: ${result.id} fails - ${result.detail} [RENDER_CHECK_FAILED]`);
+      else if (result.outcome === 'skip' && CORE_CHECKS.has(result.id)) problems.push(`capture ${rel}: ${result.id} could not run - ${result.detail} [RENDER_PROOF_INCOMPLETE]`);
+    }
+  }
+  if (!candidate.markup) {
+    problems.push(`capture ${rel} cites no ${path.basename(candidate.name).replace(/\.png$/i, '.html')} markup - the markup the browser rendered is the half of the proof the entity-list rule reads [RENDER_PROOF_INCOMPLETE]`);
+    return;
+  }
+  const result = checkEntityListInCard(fs.readFileSync(candidate.markup, 'utf8'), {family: brand.family, cards: cards.classes.length ? cards.classes : null});
+  if (result.outcome === 'fail') problems.push(`capture ${rel}: entity-list-in-card fails - ${result.detail} [RENDER_CHECK_FAILED]`);
+  else if (result.outcome === 'skip') problems.push(`capture ${rel}: entity-list-in-card could not run - ${result.detail} [RENDER_PROOF_INCOMPLETE]`);
+}
+
+function appendMascotProblems(dir, brand, workRoot, problems) {
+  const rel = slash(path.relative(workRoot, path.join(dir, 'index.yaml')));
+  let uiRecord;
+  try { uiRecord = parseYaml(fs.readFileSync(path.join(dir, 'index.yaml'), 'utf8')); }
+  catch (error) {
+    problems.push(`the ui node at ${rel} could not be read for the mascot-slot rule (${String(error.message ?? error)}) [RENDER_PROOF_INCOMPLETE]`);
+    return;
+  }
+  for (const surface of objectList(uiRecord?.ui?.surfaces)) {
+    const result = checkMascotSlot({record: uiRecord, brand: brand.brand, screen: surface});
+    if (result.outcome === 'fail') problems.push(`${result.id} fails on ${rel}: ${result.detail} [RENDER_CHECK_FAILED]`);
+  }
+}
+
 /**
  * The render/brand proof of one work/implementation@1 record: returns a list of refusal strings (empty when
  * the proof holds). `rec` is an entry of check-example-work.mjs's records map or example-ownership.mjs's
@@ -145,45 +185,8 @@ export function renderProofProblems({rec, records, workspaceDoc, workRoot, blobO
     return problems;
   }
 
-  for (const candidate of candidates) {
-    const rel = candidate.name;
-    if (!candidate.png) {
-      problems.push(`cited capture ${rel} is missing from its selected blob store - every declared PNG must be readable [RENDER_CAPTURE_MISSING]`);
-      continue;
-    }
-    let png = null, failure = null;
-    try { png = decodePng(fs.readFileSync(candidate.png)); }
-    catch (error) { failure = String(error.message ?? error); }
-    if (!png) {
-      problems.push(`capture ${rel} could not be decoded (${failure}), so its palette could not be compared against the brand - an uncheckable claim is not a pass [RENDER_PROOF_INCOMPLETE]`);
-    } else {
-      for (const result of checkPalette({png, brand: brand.brand})) {
-        if (result.outcome === 'fail') problems.push(`capture ${rel}: ${result.id} fails - ${result.detail} [RENDER_CHECK_FAILED]`);
-        else if (result.outcome === 'skip' && CORE_CHECKS.has(result.id)) problems.push(`capture ${rel}: ${result.id} could not run - ${result.detail} [RENDER_PROOF_INCOMPLETE]`);
-      }
-    }
-    if (!candidate.markup) {
-      problems.push(`capture ${rel} cites no ${path.basename(candidate.name).replace(/\.png$/i, '.html')} markup - the markup the browser rendered is the half of the proof the entity-list rule reads [RENDER_PROOF_INCOMPLETE]`);
-    } else {
-      const result = checkEntityListInCard(fs.readFileSync(candidate.markup, 'utf8'), {family: brand.family, cards: cards.classes.length ? cards.classes : null});
-      if (result.outcome === 'fail') problems.push(`capture ${rel}: entity-list-in-card fails - ${result.detail} [RENDER_CHECK_FAILED]`);
-      else if (result.outcome === 'skip') problems.push(`capture ${rel}: entity-list-in-card could not run - ${result.detail} [RENDER_PROOF_INCOMPLETE]`);
-    }
-  }
-
-  for (const dir of uiDirs) {
-    const rel = slash(path.relative(workRoot, path.join(dir, 'index.yaml')));
-    let uiRecord;
-    try { uiRecord = parseYaml(fs.readFileSync(path.join(dir, 'index.yaml'), 'utf8')); }
-    catch (error) {
-      problems.push(`the ui node at ${rel} could not be read for the mascot-slot rule (${String(error.message ?? error)}) [RENDER_PROOF_INCOMPLETE]`);
-      continue;
-    }
-    for (const surface of objectList(uiRecord?.ui?.surfaces)) {
-      const result = checkMascotSlot({record: uiRecord, brand: brand.brand, screen: surface});
-      if (result.outcome === 'fail') problems.push(`${result.id} fails on ${rel}: ${result.detail} [RENDER_CHECK_FAILED]`);
-    }
-  }
+  for (const candidate of candidates) appendCaptureProblems(candidate, brand, cards, problems);
+  for (const dir of uiDirs) appendMascotProblems(dir, brand, workRoot, problems);
   return problems;
 }
 
@@ -206,6 +209,7 @@ if (isMain(import.meta.url)) {
   if (!rec) { console.error(`REFUSED no record with id ${args.record} was found under ${workRoot}`); process.exit(1); }
   const problems = renderProofProblems({rec, records, workspaceDoc, workRoot, blobOptions: exampleArtifactReadOptions(root, workRoot)});
   for (const problem of problems) console.log(`REFUSED ${slash(path.relative(workRoot, rec.dir))}: ${problem}`);
-  console.log(`${args.record}: ${problems.length ? `${problems.length} refused` : 'render/brand proof holds for every capture'}`);
+  const outcome = problems.length ? `${problems.length} refused` : 'render/brand proof holds for every capture';
+  console.log(`${args.record}: ${outcome}`);
   process.exitCode = problems.length ? 1 : 0;
 }

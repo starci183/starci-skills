@@ -33,7 +33,7 @@ export const GRAMMAR_FAMILIES=Object.freeze([
 const read=file=>fs.readFileSync(file,'utf8');
 const lineAt=(text,offset)=>{let line=1;for(let i=0;i<offset&&i<text.length;i++)if(text.codePointAt(i)===10)line++;return line;};
 const uniq=values=>[...new Set(values)];
-const byName=(a,b)=>a<b?-1:a>b?1:0;
+const byName=(a,b)=>{if(a<b)return -1;if(a>b)return 1;return 0;};
 
 function defaultPaths(root=skillRoot){
   return {root,packageRoot:path.join(root,'packages','grammar'),grammarRoot:path.join(root,'knowledge','grammars')};
@@ -455,7 +455,7 @@ function censusCommonTokens(packageRoot,renderers){
     }
     const first=uses[0];
     const writer=writes.get(name);
-    return {name,assignedBy:writer?'renderer':name.startsWith('--starci-core-')?'family':'host',
+    return {name,assignedBy:(()=>{if(writer)return 'renderer';if(name.startsWith('--starci-core-'))return 'family';return 'host';})(),
       ...(writer?{writtenBy:[...writer].sort(byName)}:{}),readBy:'common',
       ...(first.fallback===null?{}:{commonFallback:first.fallback}),uses:uses.length,source:`${rel(packageRoot,first.sheet)}:${first.line}`};
   });
@@ -494,7 +494,7 @@ function censusFamilyTokens(packageRoot,family,{commonTokens=[],include=[]}={}){
     if(rows.has(name))continue;
     const token=common.get(name);
     if(!token)continue;
-    rows.set(name,{name,value:token.value??token.commonFallback??null,valueFrom:token.value!==undefined?'common':token.assignedBy==='renderer'?'renderer':'common-fallback',
+    rows.set(name,{name,value:token.value??token.commonFallback??null,valueFrom:(()=>{if(token.value!==undefined)return 'common';if(token.assignedBy==='renderer')return 'renderer';return 'common-fallback';})(),
       source:token.source,overrides:[]});
   }
   return [...rows.values()].map(row=>{
@@ -589,7 +589,7 @@ function censusDigests(packageRoot,files){
 
 const q=value=>JSON.stringify(String(value));
 const key=value=>/^[A-Za-z_]\w*$/.test(value)?value:q(value);
-const scalar=value=>typeof value==='number'||typeof value==='boolean'?String(value):value===null?'null':q(value);
+const scalar=value=>{if(typeof value==='number'||typeof value==='boolean')return String(value);if(value===null)return 'null';return q(value);};
 const flow=list=>`[${list.map(q).join(', ')}]`;
 
 /** A nested plain object as block YAML at `indent`. */
@@ -848,7 +848,7 @@ export async function main(argv=process.argv.slice(2)){
   }
   const result=await checkGrammarKnowledge();
   if(argv.includes('--json'))return {exitCode:result.ok?0:1,text:`${JSON.stringify(result,null,2)}\n`};
-  const lines=[`grammar knowledge vs ${result.version} (${result.renderers} renderers): ${result.ok?'no drift':`${result.findings.length} drift finding(s)`}`];
+  const lines=[`grammar knowledge vs ${result.version} (${result.renderers} renderers): ${result.ok?'no drift':result.findings.length+' drift finding(s)'}`];
   for(const f of result.findings.slice(0,60))lines.push(`  ${f.file} ${f.what}: ${f.detail}`);
   if(result.findings.length>60)lines.push(`  ... ${result.findings.length-60} more`);
   if(!result.ok)lines.push('  refresh the measured blocks with: starci work grammar-knowledge --write');

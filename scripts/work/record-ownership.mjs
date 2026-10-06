@@ -61,8 +61,9 @@ export function repoRootFor(workRoot, repositoryName, workspaceDoc) {
 
 function ownedRelPaths(data) {
   const fromOwners = Array.isArray(data.owners) ? data.owners.map(o => o?.path).filter(Boolean) : [];
-  const fromModule = typeof data.module === 'string' ? [data.module]
-    : Array.isArray(data.module) ? data.module.filter(m => typeof m === 'string') : [];
+  let fromModule = [];
+  if (typeof data.module === 'string') fromModule = [data.module];
+  else if (Array.isArray(data.module)) fromModule = data.module.filter(m => typeof m === 'string');
   return [...fromOwners, ...fromModule].map(moduleRootOf);
 }
 
@@ -97,9 +98,12 @@ function ownerPathProblem(rawPath, appRoot) {
 
 /** Every owner path of `data` that is not app-relative, as {path, problem}. */
 export function ownerPathProblems(data, appRoot) {
+  let modulePaths = [];
+  if (typeof data?.module === 'string') modulePaths = [data.module];
+  else if (Array.isArray(data?.module)) modulePaths = data.module.filter(m => typeof m === 'string');
   const raw = [
     ...(Array.isArray(data?.owners) ? data.owners.map(o => o?.path).filter(p => typeof p === 'string') : []),
-    ...(typeof data?.module === 'string' ? [data.module] : Array.isArray(data?.module) ? data.module.filter(m => typeof m === 'string') : []),
+    ...modulePaths,
     ...(Array.isArray(data?.composes) ? data.composes.map(c => c?.module).filter(m => typeof m === 'string') : []),
   ];
   return raw.map(p => ({path: p, problem: ownerPathProblem(p, appRoot)})).filter(x => x.problem);
@@ -216,15 +220,21 @@ export const INLINE_CRITERION_FIELDS = ['acceptance', 'statements'];
 /** The inline criterion entries one record's data carries: [{id, name, entry}]. `id` is the former
  * ac record's id when the entry declares one; `name` is the entry's short name (`entry.name`, else the
  * id's last segment). Plain-string list items are not criteria entries and are skipped. */
+function inlineCriterionOf(entry) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+  const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id.trim() : null;
+  let name = null;
+  if (typeof entry.name === 'string' && entry.name.trim()) name = entry.name.trim();
+  else if (id) name = id.split('.').pop();
+  return id || name ? {id, name, entry} : null;
+}
+
 export function inlineCriteriaOf(data) {
   const out = [];
   for (const field of INLINE_CRITERION_FIELDS) {
     for (const entry of Array.isArray(data?.[field]) ? data[field] : []) {
-      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
-      const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id.trim() : null;
-      const name = typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim()
-        : id ? id.split('.').pop() : null;
-      if (id || name) out.push({id, name, entry});
+      const criterion = inlineCriterionOf(entry);
+      if (criterion) out.push(criterion);
     }
   }
   return out;
@@ -238,23 +248,24 @@ export function inlineCriteriaOf(data) {
  *               registers its full id, its last id segment and its `name`
  *   collisions - a declared entry id claimed under two different parents: [{id, parents}]
  */
+function addInlineCriterion(parentId, criterion, byAcId, byParent, collisions) {
+  if (!byParent.has(parentId)) byParent.set(parentId, new Map());
+  const frags = byParent.get(parentId);
+  for (const frag of [criterion.id, criterion.name, criterion.id?.split('.').pop()]) {
+    if (frag && !frags.has(frag)) frags.set(frag, criterion);
+  }
+  if (!criterion.id) return;
+  const other = byAcId.get(criterion.id);
+  if (other && other !== parentId) collisions.push({id: criterion.id, parents: [other, parentId]});
+  else byAcId.set(criterion.id, parentId);
+}
+
 export function indexInlineCriteria(records) {
   const byAcId = new Map();
   const byParent = new Map();
   const collisions = [];
   for (const [id, rec] of records) {
-    for (const criterion of inlineCriteriaOf(rec.data)) {
-      if (!byParent.has(id)) byParent.set(id, new Map());
-      const frags = byParent.get(id);
-      for (const frag of [criterion.id, criterion.name, criterion.id?.split('.').pop()]) {
-        if (frag && !frags.has(frag)) frags.set(frag, criterion);
-      }
-      if (criterion.id) {
-        const other = byAcId.get(criterion.id);
-        if (other && other !== id) collisions.push({id: criterion.id, parents: [other, id]});
-        else byAcId.set(criterion.id, id);
-      }
-    }
+    for (const criterion of inlineCriteriaOf(rec.data)) addInlineCriterion(id, criterion, byAcId, byParent, collisions);
   }
   return {byAcId, byParent, collisions};
 }
