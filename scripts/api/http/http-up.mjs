@@ -1,6 +1,6 @@
 // http-up.mjs — retrying HTTP availability and the strict harness health response.
 // Mechanically moved from reconciler/services.mjs; the caller still selects health and supplies its fetch seam.
-/** GET url: ok while it answers below 500 (Cloudflare answers 502/530 when the origin or the tunnel is gone). */
+/** The strict harness health response: HTTP 200 JSON whose data reports every database and a revision. */
 async function hasHarnessHealth(res) {
   const json = /^application\/json(?:\s*;|$)/i.test(res.headers?.get('content-type') ?? '');
   let data = null;
@@ -11,6 +11,7 @@ async function hasHarnessHealth(res) {
     && typeof ledgers === 'object' && !Array.isArray(ledgers) && Object.values(ledgers).every((value) => value === true);
 }
 
+/** GET url: ok while it answers below 500 (Cloudflare answers 502/530 when the origin or the tunnel is gone). */
 export async function httpUp(url, { timeoutMs, tries = 1, health = false, fetchImpl = fetch } = {}) {
   let last = null;
   const failures = [];

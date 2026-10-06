@@ -75,7 +75,7 @@ export function launchPlanText({ asJson, out, wf, target, chain, route, memberLa
   const routeLine = routeLineOf(route);
   const groupLine = groupLineOf(route, memberLabel);
   const budgets = route.config?.budgets;
-  const maxOps = `maxOps=${budgets?.maxOps ?? 'unbounded'}`;
+  const maxOps = ['maxOps'].map((k) => `${k}=${budgets?.[k] ?? 'unbounded'}`).join('  ');
   const budgetLine = budgets && Object.values(budgets).some((value) => value != null)
     ? `\n  budgets (config.yaml): ${maxOps}` : '';
   const warningLine = (route.warnings ?? []).map((warning) => `\n  warning: ${warning}`).join('');
