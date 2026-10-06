@@ -62,8 +62,9 @@ export async function checkDatabase({ repoRoot, files, base, git, edition, supab
     findings.push(...analysis.findings);
     if (analysis.facts) analyses.push({ file, facts: analysis.facts });
   }
-  findings.push(...migrationSetPolicyFindings(analyses));
-
-  findings.push(...await typesFindings({ repoRoot, files, emitTypes, declaration: declared }));
+  findings.push(
+    ...migrationSetPolicyFindings(analyses),
+    ...await typesFindings({ repoRoot, files, emitTypes, declaration: declared }),
+  );
   return findings;
 }

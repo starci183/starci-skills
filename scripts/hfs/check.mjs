@@ -275,10 +275,10 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
   if (repo.kind === RUNTIME_KIND) return findings;
 
   const pins = readPins(root);
-  findings.push(...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }));
 
   // The tree checks of the rules that read file content or configuration (rules/*): whole-scope, cheap, no tool run.
   findings.push(
+    ...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }),
     ...supabaseSecretFindings({ repoRoot, files: files.filter(inScope), resolver, repo }),
     ...editionFindings({ repoRoot, files: files.filter(inScope), repo, resolver, withDeclaration: editionDeclaration }),
     ...repoLocalCheckFindings({ repoRoot, files }),

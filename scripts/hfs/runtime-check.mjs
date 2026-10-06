@@ -102,8 +102,8 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
 
   const findings = [];
   const treeResult = checkRepo({ repoRoot, root, manifest: runtimeManifest, files: tracked, tree });
-  findings.push(...treeResult.findings.filter((f) => f.level === 'error'));
   findings.push(
+    ...treeResult.findings.filter((f) => f.level === 'error'),
     ...slotAllowsFindings(ctx),
     ...externalOwnerFindings(ctx),
     ...tierFindings(ctx),
