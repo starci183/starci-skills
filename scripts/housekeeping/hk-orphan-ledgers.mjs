@@ -217,7 +217,7 @@ export function archiveOrphanLedger(finding, { env = process.env, now = Date.now
     if (wanted.length !== copied.length || wanted.some((name, i) => name !== copied[i]))
       throw new Error(`orphan ledger archive copy did not verify: ${to} holds [${copied.join(', ')}], expected [${wanted.join(', ')}]`);
     const removed = safeRemove(from, { hold: artifactHoldReason });
-    if (!removed.ok) throw new Error(`orphan ledger source was not fully removed after a verified copy (${from}): ${removed.errors.map((e) => `${e.code} ${e.message}`).join('; ')}`);
+    if (!removed.ok) throw new Error(`orphan ledger source was not fully removed after a verified copy (${from}): ${removed.errors.map((e) => e.code + ' ' + e.message).join('; ')}`);
   }
   withMachine((m) => m.setLedgerState(finding.ledgerId, 'retired', { reason: `orphan ledger archived (${finding.reason})` }), { env });
   return { moved: true, from, to };

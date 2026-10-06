@@ -116,7 +116,7 @@ export function deriveWorkflowDisplayName({ text, product = null, fallback = nul
   const head = prod ? `${prod}${NAME_SEPARATOR}` : '';
   const room = max - head.length;
   if (!clause || !/[\p{L}\p{N}]/u.test(clause) || room < 8) return fallback ? clipWords(fallback, max) : (prod || null);
-  return `${head}${clipWords(`${clause[0].toUpperCase()}${clause.slice(1)}`, room)}`;
+  return `${head}${clipWords(clause[0].toUpperCase() + clause.slice(1), room)}`;
 }
 
 // ------------------------------------------------------------------------------------ op job names

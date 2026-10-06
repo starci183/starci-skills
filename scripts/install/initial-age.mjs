@@ -17,7 +17,7 @@ const SETUP_SCHEMA = 'starci/initial-age-setup@1';
 const refuse = reason => { throw Object.assign(new Error('initial age setup refused'), { setupReason: reason }); };
 const no = reason => ({ ok: false, outcome: 'held', reason });
 /** The cause of an unclassified setup failure: its code and message, secrets blanked (the message comes from path and tool handling, never key bytes by design). */
-const causeOf = error => redactText(`${error?.code ? `${error.code}: ` : ''}${error?.message ?? error}`.replace(/AGE-SECRET-KEY-[A-Z0-9]+/g, '[redacted:age-key]')).slice(0, 400);
+const causeOf = error => redactText(((error?.code ? error.code + ': ' : '') + (error?.message ?? error)).replace(/AGE-SECRET-KEY-[A-Z0-9]+/g, '[redacted:age-key]')).slice(0, 400);
 /** The capture reasons that name the identity tool (scripts/api/sops/lib.mjs withGeneratedAgeIdentity) rather than the install's own custody. */
 export const AGE_TOOL_REASONS = Object.freeze({ 'native-tool-unavailable': 'age-keygen was not found on PATH', 'unsupported-tool-profile': 'the age-keygen on PATH is not an accepted version' });
 const setupReasons = new Set(['canonical-target', 'foreign-target', 'old-ciphertext', 'private-file-custody',

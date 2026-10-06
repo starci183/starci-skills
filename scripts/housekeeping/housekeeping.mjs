@@ -51,7 +51,7 @@ const errorStrings = (v) => (Array.isArray(v) ? v.map((e) => {
   if (e == null) return '';
   if (typeof e !== 'object') return String(e);
   if (e.message) return String(e.message);
-  if (e.error !== undefined) return `${e.path ? `${e.path}: ` : ''}${String(e.error)}`;
+  if (e.error !== undefined) return (e.path ? e.path + ': ' : '') + String(e.error);
   return JSON.stringify(e);
 }).filter(Boolean) : []);
 
