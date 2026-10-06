@@ -39,7 +39,7 @@ import { parseWorktreeList } from '../housekeeping/hk-lanes.mjs';
 import { orphanLedgerFindings } from '../housekeeping/hk-orphan-ledgers.mjs';
 import { parseRuntimeStamp } from '../lib/orca-orphans.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
-import { CONTROLLER_NAMES, LEADER_NAME, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs';
+import { CONTROLLER_NAMES, LEADER_NAME, configuredMode, reconcilerConfig } from './state.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { sameResolvedPath } from '../lib/path-key.mjs';
 
@@ -52,7 +52,7 @@ const LEG_BAD = /failed|blocked|cancel/;
 /** A read-only child call that always ends: {ok, stdout, error}. Never throws. */
 export function child(args, { timeoutMs, cwd = ROOT } = {}) {
   return execNode(args, { cwd, timeout: timeoutMs, killSignal: 'SIGKILL', maxBuffer: 64 * 1024 * 1024 })
-    .then(({ error, stdout, stderr }) => ({ ok: !error, stdout: stdout ?? '', error: error ? (error.killed ? `timeout ${Math.round(timeoutMs / 1000)}s` : `exit ${error.code}: ${String(stderr || error.message).trim().split('\n').filter(Boolean).pop()?.slice(0, 200)}`) : null }));
+    .then(({ error, stdout, stderr }) => ({ ok: !error, stdout: stdout ?? '', error: error ? (error.killed ? `timeout ${Math.round(timeoutMs / 1000)}s` : `exit ${error.code}: ${String(stderr || error.message).trim().split('\n').findLast(Boolean)?.slice(0, 200)}`) : null }));
 }
 
 /** The first balanced JSON object in text (a verb may print a banner before it), or null. */

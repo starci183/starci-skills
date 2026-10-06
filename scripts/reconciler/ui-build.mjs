@@ -52,23 +52,23 @@ export async function buildUi({ uiDir = path.join(SKILL_ROOT, 'ui'), env = proce
       ancestors.unshift(cursor);
       if (path.dirname(cursor) === cursor) break;
     }
-    for (const cursor of ancestors) if (api.isLinkLike(cursor)) throw Error('harness UI path crosses a link');
+    for (const cursor of ancestors) if (api.isLinkLike(cursor)) throw new Error('harness UI path crosses a link');
   };
   const guard = () => {
     noLinks(root);
-    if (!api.fs.lstatSync(root).isDirectory()) throw Error('harness UI directory is unavailable');
+    if (!api.fs.lstatSync(root).isDirectory()) throw new Error('harness UI directory is unavailable');
     const local = linkedNodeModules(root, api.fs.lstatSync.bind(api.fs));
-    if (!local.ok || local.linked || api.isLinkLike(modules)) throw Error('harness UI node_modules must be a real local directory');
-    try { if (!api.fs.lstatSync(modules).isDirectory()) throw Error('harness UI node_modules is not a directory'); }
+    if (!local.ok || local.linked || api.isLinkLike(modules)) throw new Error('harness UI node_modules must be a real local directory');
+    try { if (!api.fs.lstatSync(modules).isDirectory()) throw new Error('harness UI node_modules is not a directory'); }
     catch (error) { if (error?.code !== 'ENOENT') throw error; }
     for (const entry of toolEntries) {
       const file = path.join(modules, entry);
       noLinks(path.dirname(file));
-      if (api.isLinkLike(file)) throw Error('harness UI build tool is linked');
+      if (api.isLinkLike(file)) throw new Error('harness UI build tool is linked');
     }
     return ['package.json', 'package-lock.json'].map((name) => {
       const file = path.join(root, name);
-      if (api.isLinkLike(file) || !api.fs.lstatSync(file).isFile()) throw Error('harness UI manifest or lockfile is unavailable');
+      if (api.isLinkLike(file) || !api.fs.lstatSync(file).isFile()) throw new Error('harness UI manifest or lockfile is unavailable');
       return api.fs.readFileSync(file);
     });
   };

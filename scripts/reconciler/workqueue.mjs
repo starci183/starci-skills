@@ -25,7 +25,7 @@ export function memoryRows() {
   const id = (controller, key) => `${controller}\u0000${key}`;
   return {
     get: (controller, key) => (rows.has(id(controller, key)) ? { ...rows.get(id(controller, key)) } : null),
-    put: (row) => { rows.set(id(row.controller, row.key), { ...(rows.get(id(row.controller, row.key)) ?? {}), ...row }); },
+    put: (row) => { rows.set(id(row.controller, row.key), { ...rows.get(id(row.controller, row.key)), ...row }); },
     remove: (controller, key) => { rows.delete(id(controller, key)); },
     due: (controller, now, limit) => [...rows.values()].filter((r) => r.controller === controller && r.due_at <= now)
       .sort((a, b) => a.due_at - b.due_at || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)).slice(0, limit).map((r) => ({ ...r })),

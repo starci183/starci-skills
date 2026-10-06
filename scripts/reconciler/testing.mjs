@@ -45,7 +45,7 @@ export function fakeCtx(overrides = {}) {
     ...(stateDb !== undefined ? { stateDb } : {}),
     now: typeof now === 'function' ? now : () => now,
     read(ledgerId, fn) { const db = dbs[ledgerId]; return db ? fn(db) : null; },
-    openReader: (file) => { throw Error(`fakeCtx.openReader(${file}): pass dbs or an openReader override`); },
+    openReader: (file) => { throw new Error(`fakeCtx.openReader(${file}): pass dbs or an openReader override`); },
     async status(ledgerId, workflowId) {
       calls.status.push({ ledgerId, workflowId });
       return typeof status === 'function' ? status(ledgerId, workflowId) : status[`${ledgerId}:${workflowId}`] ?? null;
@@ -98,7 +98,7 @@ export function tempState({ prefix = 'starci-reconciler-' } = {}) {
     /** Close `x` (an engine, a ledger handle) before the directory goes: Windows keeps an open SQLite file. */
     own(x) { owned.push(x); return x; },
     close() {
-      for (const x of owned.reverse()) { try { x.close(); } catch { /* closed */ } }
+      for (const x of owned.toReversed()) { try { x.close(); } catch { /* closed */ } }
       try { db.close(); } catch { /* closed */ }
       try { safeRemove(dir, { hold: artifactHoldReason }); } catch { /* best effort */ }
     },

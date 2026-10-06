@@ -19,8 +19,6 @@
 //
 // The Workers controller calls `digest --send` / `urgent --send` through ctx.run, so in shadow nothing is sent.
 import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { clipLine } from '../lib/clip.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
@@ -75,7 +73,7 @@ function progressLines(rows, language = ownerLanguage()) {
  */
 export function composeDigest({ digestText, progress = [], actions = [], owed = null, gc = null, trend = null, violations = [], lands = [], judgements = [], ownerWaits = [], language = ownerLanguage(), now }) {
   const t = T(translator(language));
-  const base = digestText({ actions, owed: { ...(owed ?? {}), items: owed?.items ?? [], ownerWaits }, gc, trend, progress: progressLines(progress, language), language, now });
+  const base = digestText({ actions, owed: { ...owed, items: owed?.items ?? [], ownerWaits }, gc, trend, progress: progressLines(progress, language), language, now });
   const lines = [base];
   const byCode = {};
   for (const v of violations) byCode[v.code ?? '?'] = (byCode[v.code ?? '?'] ?? 0) + 1;

@@ -49,8 +49,8 @@ export function hostPlatformItem(platform = process.platform) {
 
 /** A registered ledger that no product should live in: a temp or test path. Pure. */
 export function isTempLedger(file, { tmp = os.tmpdir() } = {}) {
-  const p = String(file ?? '').replace(/\\/g, '/').toLowerCase();
-  const t = String(tmp).replace(/\\/g, '/').toLowerCase().replace(/\/$/, '');
+  const p = String(file ?? '').replaceAll('\\', '/').toLowerCase();
+  const t = String(tmp).replaceAll('\\', '/').toLowerCase().replace(/\/$/, '');
   return Boolean(p) && (p.startsWith(`${t}/`) || /\/(?:temp|tmp)\//.test(p) || /prereq|starci-test|\/scratch\//.test(p));
 }
 
@@ -222,7 +222,7 @@ function serviceItems(probes, { publicUrl = null, config = null } = {}) {
 function supervisorItem({ mode, statusJson, startJson = null }) {
   if (mode !== 'kernel') return green('seats', 'supervisor', 'Supervisor seat', 'chat mode: the owner\'s desktop chat is the Supervisor (nothing to start)');
   const h = statusJson?.health;
-  if (startJson && startJson.ok === false) return red('seats', 'supervisor', 'Supervisor seat', `start-supervisor: ${startJson.action ?? 'failed'}${startJson.error || startJson.reason ? ` - ${String(startJson.error ?? startJson.reason).slice(0, 160)}` : ''}`, 'starci supervisor start --json');
+  if (startJson?.ok === false) return red('seats', 'supervisor', 'Supervisor seat', `start-supervisor: ${startJson.action ?? 'failed'}${startJson.error || startJson.reason ? ` - ${String(startJson.error ?? startJson.reason).slice(0, 160)}` : ''}`, 'starci supervisor start --json');
   if (h?.live) return green('seats', 'supervisor', 'Supervisor seat', `live${h.terminal ? ` (${h.terminal})` : ''}${h.starting ? ', starting' : ''}`);
   return red('seats', 'supervisor', 'Supervisor seat', h ? `not live: ${h.reason ?? 'unknown'}` : 'status unreadable', 'starci supervisor start --json');
 }

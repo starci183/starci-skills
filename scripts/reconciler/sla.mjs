@@ -68,7 +68,7 @@ export function slaCatalog({ file = SLA_FILE, allocation = null } = {}) {
       ...(c.slaKey ? { slaKey: c.slaKey } : {}), ...(c.criticalKey ? { criticalKey: c.criticalKey } : {}),
     };
   }
-  return { passMs: positiveOrZero(doc.passMs) ?? 30_000, codes, states: { ...(doc.states ?? {}) } };
+  return { passMs: positiveOrZero(doc.passMs) ?? 30_000, codes, states: { ...doc.states } };
 }
 
 /** {code, severity, spec} of one clock state: `CODE`, `CODE/critical`, a mapped state, or the state itself (warn). Pure. */
@@ -303,7 +303,7 @@ async function clockTruth(row, code, src, { now = Date.now() } = {}) {
       if (!db) return null;
       const wf = p[0] === 'workflow' ? p.slice(2).join(':') : p[0] === 'seat' ? p.slice(3).join(':') : p[2];
       const w = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(wf);
-      if (!w || w.phase !== 'running' || w.archived_at != null) return { holds: false, why: `workflow ${w ? (w.archived_at != null ? 'archived' : w.phase ?? 'not running') : 'gone'}` };
+      if (w?.phase !== 'running' || w?.archived_at != null) return { holds: false, why: `workflow ${w ? (w.archived_at != null ? 'archived' : w.phase ?? 'not running') : 'gone'}` };
       return { holds: true };
     }
     return null;
@@ -372,7 +372,7 @@ async function truthPass(ctx, { catalog, now }) {
       const due = row.violated_at != null || Number(row.entered_at) + Number(row.sla_ms) < now;
       if (PROBE_CODES.has(code) && !due) continue;
       const t = await clockTruth(row, code, src, { now });
-      if (t && t.holds === false) cleared.set(`${row.entity}${KEY_SEP}${row.state}`, t.why ?? 'condition gone');
+      if (t?.holds === false) cleared.set(`${row.entity}${KEY_SEP}${row.state}`, t.why ?? 'condition gone');
     }
   } finally { src.close(); }
   if (cleared.size) {
@@ -436,15 +436,15 @@ export async function slaPass(ctx, { catalog = null, env = ctx?.env ?? process.e
     const ev = violationEvent(row, { catalog: cat, now });
     if (ev.severity !== 'critical') continue;
     try {
-      if (typeof ctx?.openDecision !== 'function') throw Error('decision owner unavailable');
+      if (typeof ctx?.openDecision !== 'function') throw new Error('decision owner unavailable');
       const acknowledged = await ctx.openDecision(runtimeDefectDecision(ev, { now }));
       if (ctx.mode === 'shadow') { out.wouldDecisions = (out.wouldDecisions ?? 0) + 1; continue; }
-      if (acknowledged?.ok !== true || acknowledged.shadow || acknowledged.recordedOnly) throw Error('decision delivery was not acknowledged');
+      if (acknowledged?.ok !== true || acknowledged.shadow || acknowledged.recordedOnly) throw new Error('decision delivery was not acknowledged');
       const marked = withStateDb(ctx, (m) => m.transaction(() => {
         m.markSlaReported(Number(row.episode_id));
         return m.db.prepare('SELECT reported_at FROM sla_episodes WHERE episode_id=?').get(row.episode_id)?.reported_at != null;
       }), false, { write: true });
-      if (!marked) throw Error('decision acknowledgement write failed');
+      if (!marked) throw new Error('decision acknowledgement write failed');
       out.decisions += 1;
     } catch (error) { out.ok = false; out.skipped.push(`decision:${ev.dedupeKey}: ${String(error?.message ?? error).slice(0, 120)}`); }
   }
@@ -459,21 +459,21 @@ export const openViolations = ({ env = process.env, limit = 2000 } = {}) => read
   const seen = new Map();
   for (const r of m.supEvents({ kinds: [VIOLATED_KIND, CLEARED_KIND], entityType: 'invariant', limit })) {
     if (seen.has(r.entity_id)) continue;
-    seen.set(r.entity_id, r.kind === VIOLATED_KIND ? { dedupeKey: r.entity_id, ...(({ code, severity, entity }) => ({ code, severity, entity }))(r.payload ?? {}), at: Number(r.created_at) } : null);
+    const { code, severity, entity } = r.payload ?? {}; seen.set(r.entity_id, r.kind === VIOLATED_KIND ? { dedupeKey: r.entity_id, code, severity, entity, at: Number(r.created_at) } : null);
   }
   return [...seen.values()].filter(Boolean);
 }, [], { env });
 
 if (isMain(import.meta.url)) {
-  const argv = process.argv.slice(2);
-  const json = argv.includes('--json');
+  const argv = new Set(process.argv.slice(2));
+  const json = argv.has('--json');
   const ctx = { mode: 'shadow', now: () => Date.now(), env: process.env,
     openDecision: async (di) => { console.error(`would open DI ${di.idempotencyKey}`); return { ok: true, shadow: true }; } };
-  if (argv.includes('--list')) {
+  if (argv.has('--list')) {
     const out = { stateFile: stateFileOf(ctx), clocks: clocksOf(ctx), open: openViolations(), catalog: slaCatalog() };
     console.log(json ? JSON.stringify(out, null, 2) : [`state ${out.stateFile}`, ...out.clocks.map((c) => `${c.entity} ${c.state} entered ${new Date(c.enteredAt).toISOString()} sla ${c.slaMs}${c.violatedAt ? ' VIOLATED' : ''}`),
       `${out.open.length} open violation(s)`, ...out.open.map((v) => `  ${v.dedupeKey} ${v.severity}`)].join('\n'));
-  } else if (argv.includes('--once')) {
+  } else if (argv.has('--once')) {
     const m = openMachine();
     let out;
     try { out = await slaPass({ ...ctx, machine: m, stateFile: m.file }); } finally { m.close(); }

@@ -42,7 +42,7 @@ function check(controller, duty, intervalMs) {
 /** The pure due rule over a stored row (or null): {due, reason} or {due: false, nextAt}. */
 function dueOf(row, { intervalMs, now, earlyAfterMs = null, force = false, pid = process.pid, alive = pidAlive }) {
   if (force) return { due: true, reason: 'forced' };
-  if (!row || row.last_started_at == null) return { due: true, reason: 'first-run' };
+  if (row?.last_started_at == null) return { due: true, reason: 'first-run' };
   const last = Number(row.last_started_at);
   if (row.running_pid != null) {
     const stale = Number(row.running_pid) === pid ? now - last > intervalMs : !alive(Number(row.running_pid));
@@ -62,7 +62,7 @@ export function claimDue(ctx, { controller, duty, intervalMs, now = Date.now(), 
     const memory = memoryOf(ctx), id = idOf(controller, duty);
     const row = memory.get(id) ?? null;
     const d = dueOf(row, { intervalMs, now, earlyAfterMs, force, pid });
-    if (d.due) memory.set(id, { ...(row ?? {}), interval_ms: intervalMs, last_started_at: now, next_due_at: now + intervalMs, running_pid: pid });
+    if (d.due) memory.set(id, { ...row, interval_ms: intervalMs, last_started_at: now, next_due_at: now + intervalMs, running_pid: pid });
     return d;
   }
   try {

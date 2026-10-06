@@ -24,10 +24,10 @@ import { translator } from '../lib/i18n.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, SKILL_ROOT, START_REASON_ENV, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs';
 import { machineUsage } from '../kernel/usage-report.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { reconcilerTaskScript, starciShimPath } from '../machine/task-register.mjs';
+import { reconcilerTaskScript } from '../machine/task-register.mjs';
 
 const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs');
-export { starciShimPath };
+export { starciShimPath } from '../machine/task-register.mjs';
 /**
  * MB-04: a draining engine (reload handover) or one whose workers:push child still runs is left alone this long past a
  * stale heartbeat. The engine renews its lease on its own timer while it drains, so a stale heartbeat beyond this grace
