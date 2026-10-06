@@ -1,7 +1,7 @@
 group: runtime
 verb: ledger-hygiene
 owner: runtime
-summary: report orphan ledgers and legacy repository-local ledger stores
+summary: report orphan ledgers
 impl:
   script: scripts/housekeeping/ledger-hygiene.mjs
 flags:

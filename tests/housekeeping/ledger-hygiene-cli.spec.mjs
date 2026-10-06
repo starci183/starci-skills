@@ -25,44 +25,31 @@ function makeLedger(env, { ledgerId, repoRoot }) {
   try { m.registerLedger({ ledgerId, name: ledgerId, repoRoot, file }); } finally { m.close(); }
 }
 
-test('ledgerHygieneReport: clean state root and no legacy stores is ok', async (t) => {
+test('ledgerHygieneReport: clean state root is ok', async (t) => {
   const { env } = sandbox(t);
   makeLedger(env, { ledgerId: 'good-ledger', repoRoot: REPO_ROOT });
   const report = await ledgerHygieneReport({ env });
   assert.equal(report.ok, true);
   assert.deepEqual(report.orphans, []);
-  assert.deepEqual(report.legacy, []);
   assert.deepEqual(report.applied, []);
 });
 
-test('ledgerHygieneReport: an orphan ledger and a legacy store are both reported; --apply clears only the orphan', async (t) => {
+test('ledgerHygieneReport: an orphan ledger is reported; --apply archives it', async (t) => {
   const { env } = sandbox(t);
   const orphanRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ledger-hygiene-cli-orphan-'));
   t.after(() => fs.rmSync(orphanRepo, { recursive: true, force: true }));
   makeLedger(env, { ledgerId: 'orphan-ledger', repoRoot: orphanRepo });
-  // A bound repository is one whose root is reachable and outside every OS temp directory (an orphan's source roots under
-  // a temp dir are unreachable by definition), so it lives under the home directory.
-  const boundRepo = fs.mkdtempSync(path.join(os.homedir(), '.starci-ledger-hygiene-cli-bound-'));
-  t.after(() => fs.rmSync(boundRepo, { recursive: true, force: true }));
-  fs.mkdirSync(path.join(boundRepo, '.starciwork'), { recursive: true });
-  fs.writeFileSync(path.join(boundRepo, '.starciwork', 'runtime.sqlite'), 'legacy');
-  makeLedger(env, { ledgerId: 'bound-ledger', repoRoot: boundRepo });
-
   const dry = await ledgerHygieneReport({ env });
   assert.equal(dry.ok, false);
   assert.equal(dry.orphans.length, 1);
   assert.equal(dry.orphans[0].ledgerId, 'orphan-ledger');
-  assert.equal(dry.legacy.length, 1);
-  assert.equal(dry.legacy[0].repoRoot, boundRepo.split(path.sep).join('/'), 'a repo root is reported in the forward-slash form the registry stores');
   assert.deepEqual(dry.applied, []);
 
   const applied = await ledgerHygieneReport({ env, apply: true });
   assert.equal(applied.orphans.length, 0, 'the orphan is archived, not reported again');
   assert.equal(applied.applied.length, 1);
   assert.equal(applied.applied[0].ledgerId, 'orphan-ledger');
-  assert.equal(applied.legacy.length, 1, '--apply never clears a legacy in-repo store; the owner removes it by hand');
-  assert.equal(applied.ok, false, 'still not ok while the legacy store remains');
-  assert.ok(fs.existsSync(path.join(boundRepo, '.starciwork', 'runtime.sqlite')), '--apply never deletes anything inside a repository');
+  assert.equal(applied.ok, true);
 });
 
 test('CLI: --json prints the report shape and exits 1 on findings, 0 when clean, 2 on an unknown flag', (t) => {

@@ -7,8 +7,7 @@
 // files; scripts/gates/hfs-sync.mjs judges every tracked file.
 //
 // Run inside a full runtime checkout — the repository under judgment is the checkout — it also reports the
-// state-root ledger findings of that checkout's scripts/housekeeping/hk-orphan-ledgers.mjs: LEDGER_ORPHAN_STATE_ROOT and
-// LEDGER_LEGACY_WORK_SQLITE (COOK-BRIEF F4 handover, incident 2026-09-30). Any other repository — a product repo,
+// state-root ledger finding of that checkout's scripts/housekeeping/hk-orphan-ledgers.mjs: LEDGER_ORPHAN_STATE_ROOT. Any other repository — a product repo,
 // a bare repo — carries no scripts/housekeeping/ledger-hygiene.mjs at its root, so that section is silently absent:
 // never a crash, never machine-state findings blamed on a repository that does not own them.
 import fs from 'node:fs';
@@ -105,7 +104,7 @@ const ledgerHygieneScript = cwd => {
 };
 
 /**
- * The state-root ledger findings (LEDGER_ORPHAN_STATE_ROOT, LEDGER_LEGACY_WORK_SQLITE) of the checkout containing
+ * The state-root ledger findings (LEDGER_ORPHAN_STATE_ROOT) of the checkout containing
  * `cwd`, as {code, file, message} entries; [] when that checkout carries no ledger-hygiene script. Never throws: a
  * report failure is one HFS_LEDGER_HYGIENE_UNAVAILABLE finding, not a crash of `starci app hygiene`.
  */
@@ -117,7 +116,6 @@ async function ledgerHygieneFindings(cwd = process.cwd()) {
     const report = await ledgerHygieneReport({ apply: false });
     return [
       ...report.orphans.map(o => ({ code: o.code, file: o.ledgerId, message: `ledger ${o.name ?? o.ledgerId} - ${o.reason}; source roots: ${o.sourceRoots.join(', ') || '(none)'}` })),
-      ...report.legacy.map(l => ({ code: l.code, file: l.repoRoot, message: `${l.files.length} legacy file(s) still in the repo: ${l.files.join(', ')}` })),
     ];
   } catch (error) {
     return [{ code: 'HFS_LEDGER_HYGIENE_UNAVAILABLE', file: script, message: `could not run: ${String(error?.message ?? error).slice(0, 200)}` }];

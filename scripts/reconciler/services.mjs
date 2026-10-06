@@ -490,7 +490,7 @@ const KEY_BYTES = Object.freeze({ esc: '\u001b', 'ctrl+c': '\u0003' });
 const SEAT_AGENTS = new Set(['claude', 'codex', 'devin']);
 /**
  * Select the seat classifier's provider from the shared terminal identity facts.
- * Supported metadata/title/frame evidence wins, else the injected or legacy Claude fallback.
+ * Supported metadata/title/frame evidence wins, else the injected or default Claude fallback.
  * This probe reads the terminal; current turn-budget can reuse its agent for an interrupt.
  * The identity proof describes provider evidence, not effect authority or cryptographic attestation.
  */

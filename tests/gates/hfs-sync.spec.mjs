@@ -561,7 +561,7 @@ describe('work-hygiene', () => {
     // This temp repo is no runtime checkout — its root carries no scripts/housekeeping/ledger-hygiene.mjs: the section is silently absent.
     const lines = [];
     assert.equal(await runWorkHygiene({ cwd: dir, out: line => lines.push(line) }), 0);
-    assert.ok(!lines.some(line => /LEDGER_(ORPHAN_STATE_ROOT|LEGACY_WORK_SQLITE)/.test(line)));
+    assert.ok(!lines.some(line => /LEDGER_ORPHAN_STATE_ROOT/.test(line)));
     // Run from the real checkout (this repo IS the runtime): the section runs and never throws, whatever it finds.
     const inRepo = [];
     await runWorkHygiene({ cwd: ROOT, out: line => inRepo.push(line), files: [] });

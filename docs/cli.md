@@ -3240,7 +3240,7 @@ starci runtime install --cwd <repo> --hosts claude,devin
 
 ### starci runtime ledger-hygiene
 
-report orphan ledgers and legacy repository-local ledger stores
+report orphan ledgers
 
 | flag | type | |
 | --- | --- | --- |
