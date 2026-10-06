@@ -42,4 +42,4 @@ export const withPg = async <T>(connect: PgConnect, config: PgConfig, work: (cli
 }
 
 /** A double-quoted SQL identifier. */
-export const quoteIdent = (name: string): string => `"${name.replace(/"/g, '""')}"`
+export const quoteIdent = (name: string): string => `"${name.replaceAll('"', '""')}"`

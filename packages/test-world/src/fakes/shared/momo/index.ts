@@ -230,7 +230,7 @@ const refund = (request: FakeHttpRequest, context: Context): FakeHttpReply => {
     const body = gate.body
     const order = context.state.orders.get(asString(body["orderId"]))
     const identity = { partnerCode: partnerCodeOf(context), orderId: asString(body["orderId"]), requestId: asString(body["requestId"]) }
-    if (order === undefined || order.status !== "paid" || order.transId !== body["transId"]) return { body: { ...MOMO_ERROR_NOT_FOUND, ...identity } }
+    if (order?.status !== "paid" || order?.transId !== body["transId"]) return { body: { ...MOMO_ERROR_NOT_FOUND, ...identity } }
     const amount = body["amount"]
     if (typeof amount !== "number" || amount < 1 || order.refunded + amount > order.amount) {
         return { body: { resultCode: 21, message: momoMessage(21), ...identity } }

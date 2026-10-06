@@ -39,9 +39,9 @@ export const s3Request = async (
     return { status: response.status, text: await response.text() }
 }
 
-const unescapeXml = (value: string): string => value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&")
+const unescapeXml = (value: string): string => value.replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&quot;", '"').replaceAll("&apos;", "'").replaceAll("&amp;", "&")
 
-const tagValues = (xml: string, tag: string): Array<string> => [...xml.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "g"))].map((match) => unescapeXml(match[1] ?? ""))
+const tagValues = (xml: string, tag: string): Array<string> => [...xml.matchAll(new RegExp(String.raw`<${tag}>([\s\S]*?)</${tag}>`, "g"))].map((match) => unescapeXml(match[1] ?? ""))
 
 const expectStatus = (what: string, result: { readonly status: number; readonly text: string }, allowed: ReadonlyArray<number>): void => {
     if (!allowed.includes(result.status)) throw worldError(TestWorldErrorCode.InfrastructureFailed, `minio ${what} answered ${result.status}: ${result.text.slice(0, 300)}`)

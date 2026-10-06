@@ -84,7 +84,7 @@ export interface WebhookRequest {
 
 /** Calls the app with a webhook; a network failure answers status 0 with the reason as response (the app being down is a result, not a crash). */
 export const deliverWebhook = async (request: WebhookRequest): Promise<WebhookDelivery> => {
-    const headers = { "content-type": "application/json", ...(request.headers ?? {}) }
+    const headers = { "content-type": "application/json", ...request.headers }
     const at = new Date().toISOString()
     const base = { reference: request.reference ?? "", url: request.url, body: request.body, headers, at }
     try {

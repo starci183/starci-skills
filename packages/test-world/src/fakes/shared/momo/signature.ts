@@ -72,7 +72,7 @@ export const momoCanonicalString = (body: MomoBody, fields: ReadonlyArray<string
     fields
         .map((field) => {
             const value = field_(body, field) ?? field_(extra, field)
-            return `${field}=${value === undefined || value === null ? "" : String(value)}`
+            return `${field}=${value === undefined || value === null ? "" : String(value as string | number)}`
         })
         .join("&")
 

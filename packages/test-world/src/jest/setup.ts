@@ -83,7 +83,7 @@ const filledTables = (url: string): Promise<ReadonlyArray<string>> =>
         const filled: Array<string> = []
         for (const { table_schema: schema, table_name: table } of tables.rows) {
             if (MIGRATION_TABLE.test(table)) continue
-            const qualified = `"${schema.replace(/"/g, '""')}"."${table.replace(/"/g, '""')}"`
+            const qualified = `"${schema.replaceAll('"', '""')}"."${table.replaceAll('"', '""')}"`
             const probe = await client.query<{ present: boolean }>(`SELECT EXISTS (SELECT 1 FROM ${qualified}) AS present`)
             if (probe.rows[0]?.present === true) filled.push(schema === "public" ? table : `${schema}.${table}`)
         }
@@ -173,7 +173,7 @@ interface SlotPlan {
 /** Disposes one slot: its fakes host, siblings, stack attachment and run directory; answers the failures it met. */
 export const disposeSlot = async (slot: SlotHandles): Promise<ReadonlyArray<unknown>> => {
     const failures: Array<unknown> = []
-    const attempt = async (work: () => Promise<unknown> | unknown): Promise<void> => {
+    const attempt = async (work: () => unknown): Promise<void> => {
         try {
             await work()
         } catch (cause) {

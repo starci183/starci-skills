@@ -37,7 +37,7 @@ export interface RealmFile {
  */
 export const namespacedId = (kebab: string, id: string): string => {
     const hex = createHash("sha256").update(`${kebab}:${id}`).digest("hex")
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${((parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
 /** A copy of `value` without its own `id`. */

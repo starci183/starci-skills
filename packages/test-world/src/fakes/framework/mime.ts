@@ -59,7 +59,7 @@ export const decodeEncodedWords = (value: string): string =>
             const bytes =
                 encoding.toUpperCase() === "B"
                     ? Buffer.from(payload, "base64")
-                    : decodeQuotedPrintable(payload.replace(/_/g, " "))
+                    : decodeQuotedPrintable(payload.replaceAll("_", " "))
             return decodeCharset(bytes, charset.split("*")[0] ?? "utf-8")
         })
 
@@ -68,7 +68,7 @@ const parseHeaderBlock = (block: string): Array<[string, string]> => {
     const pairs: Array<[string, string]> = []
     for (const line of block.split(/\r?\n/)) {
         if (/^[ \t]/.test(line) && pairs.length > 0) {
-            const last = pairs[pairs.length - 1]
+            const last = pairs.at(-1)
             if (last !== undefined) last[1] += ` ${line.trim()}`
             continue
         }
@@ -109,7 +109,7 @@ const parseStructured = (value: string): { readonly main: string; readonly param
             const match = /^([^']*)'[^']*'(.*)$/.exec(raw)
             const charset = match?.[1] ?? "utf-8"
             const encoded = match?.[2] ?? raw
-            params[key.slice(0, -1)] = decodeCharset(Buffer.from(encoded.replace(/%([0-9A-Fa-f]{2})/g, (_w, hex: string) => String.fromCharCode(Number.parseInt(hex, 16))), "latin1"), charset)
+            params[key.slice(0, -1)] = decodeCharset(Buffer.from(encoded.replace(/%([0-9A-Fa-f]{2})/g, (_w, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16))), "latin1"), charset)
         } else params[key] = raw
     }
     return { main: (parts[0] ?? "").trim().toLowerCase(), params }

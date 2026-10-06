@@ -95,7 +95,7 @@ const readState = (path: string): RunState => {
         throw missing(`the state file ${path} cannot be read`, cause)
     }
     const state = parsed as Partial<RunState> | null
-    if (typeof state !== "object" || state === null || state.version !== STATE_VERSION || !Array.isArray(state.slots)) {
+    if (typeof state !== "object" || state?.version !== STATE_VERSION || !Array.isArray(state.slots)) {
         throw worldError(
             TestWorldErrorCode.PairMismatch,
             `the state file ${path} is protocol ${String(state?.version)} (${String(state?.library ?? "unknown writer")}), ${LIBRARY} reads ${STATE_VERSION}: pin @starci/test-world and @starci/jest-preset together as knowledge/hfs/canon-pins.yaml pairs them`,

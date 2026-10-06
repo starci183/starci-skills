@@ -21,7 +21,7 @@ export const schemaRoleName = (snake: string, connection: string): string => `${
 export const logicalDatabaseOf = (connection: PostgresConnectionRequest): string => connection.database ?? connection.name
 
 /** A SQL string literal. */
-const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`
+const literal = (value: string): string => `'${value.replaceAll("'", "''")}'`
 
 /**
  * The statements that give a schema-per-context connection its schema and login inside its (already created) database: the

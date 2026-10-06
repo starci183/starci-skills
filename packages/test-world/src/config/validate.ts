@@ -5,7 +5,7 @@ import { TestWorldErrorCode, worldError } from "../errors"
 import { isFakedService, isInfraName, selectedInfraServices } from "./stack-file"
 import { INFRA_SERVICES, type InfraName, type KeycloakStack, type PostgresStack, type TestWorldConfig } from "./types"
 
-const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]*$/
+const IDENTIFIER = /^[A-Za-z]\w*$/
 
 const isNonEmptyString = (value: unknown): value is string => typeof value === "string" && value.trim() !== ""
 
@@ -77,10 +77,10 @@ export const validateDeclaration = (config: TestWorldConfig, root: string): Read
                 const database: unknown = connection?.database
                 const schema: unknown = connection?.schema
                 if (database !== undefined && (!isNonEmptyString(database) || !IDENTIFIER.test(database))) {
-                    problems.push(`stacks.postgresql.connections[${index}].database: "${String(database)}" must match ${IDENTIFIER.source}`)
+                    problems.push(`stacks.postgresql.connections[${index}].database: "${String(database as string)}" must match ${IDENTIFIER.source}`)
                 }
                 if (schema !== undefined && (!isNonEmptyString(schema) || !IDENTIFIER.test(schema) || schema === "public" || schema.startsWith("pg_"))) {
-                    problems.push(`stacks.postgresql.connections[${index}].schema: "${String(schema)}" must match ${IDENTIFIER.source} and be neither public nor pg_*`)
+                    problems.push(`stacks.postgresql.connections[${index}].schema: "${String(schema as string)}" must match ${IDENTIFIER.source} and be neither public nor pg_*`)
                 }
                 for (const seed of connection?.seeds ?? []) {
                     if (!isFile(resolvePath(root, seed))) problems.push(`stacks.postgresql.connections[${index}].seeds: ${seed} does not exist under ${root}`)

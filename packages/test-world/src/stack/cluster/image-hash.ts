@@ -68,7 +68,8 @@ export const parseCopySources = (dockerfile: string): ReadonlyArray<string> => {
 /** Converts a docker glob (`*`, `**`, `?`, `[..]`) to an anchored RegExp over posix relative paths. */
 export const globToRegExp = (pattern: string): RegExp => {
     let out = ""
-    for (let i = 0; i < pattern.length; i++) {
+    let i = 0
+    while (i < pattern.length) {
         const char = pattern.charAt(i)
         if (char === "*") {
             if (pattern.charAt(i + 1) === "*") {
@@ -84,14 +85,15 @@ export const globToRegExp = (pattern: string): RegExp => {
             }
         } else if (char === "?") {
             out += "[^/]"
-        } else if (char === "[" && pattern.indexOf("]", i + 2) !== -1) {
+        } else if (char === "[" && pattern.includes("]", i + 2)) {
             const close = pattern.indexOf("]", i + 2)
             const body = pattern.slice(i + 1, close)
-            out += `[${body.startsWith("!") ? "^" : ""}${body.replace(/^!/, "").replace(/\\/g, "\\\\")}]`
+            out += `[${body.startsWith("!") ? "^" : ""}${body.replace(/^!/, "").replaceAll("\\", String.raw`\\`)}]`
             i = close
         } else {
-            out += char.replace(/[.+^${}()|\\\]\[]/g, "\\$&")
+            out += char.replaceAll(/[.+^${}()|\\\][]/g, String.raw`\$&`)
         }
+        i += 1
     }
     return new RegExp(`^${out}$`)
 }
@@ -162,7 +164,7 @@ export const resolveSources = async (root: string, sources: ReadonlyArray<string
         return everything
     }
     for (const source of sources) {
-        const normalized = posix.normalize(source.replace(/\\/g, "/").replace(/^\.?\/+/, "")).replace(/\/+$/, "")
+        const normalized = posix.normalize(source.replaceAll("\\", "/").replace(/^\.?\/+/, "")).replace(/\/+$/, "")
         if (normalized === "." || normalized === "") {
             for (const file of await all()) selected.add(file)
         } else if (/[*?[]/.test(normalized)) {

@@ -25,7 +25,7 @@ export const databaseOf = (run: RunPostgres, connection: string): string => {
 }
 
 /** A SQL string literal. */
-const quoteLiteral = (value: string): string => `'${value.replace(/'/g, "''")}'`
+const quoteLiteral = (value: string): string => `'${value.replaceAll("'", "''")}'`
 
 const asAdmin = <T>(run: RunPostgres, connect: PgConnect, work: (client: PgClient) => Promise<T>): Promise<T> =>
     withPg(connect, { host: "127.0.0.1", port: run.directPort, user: run.user, password: run.password, database: ADMIN_DATABASE }, work)

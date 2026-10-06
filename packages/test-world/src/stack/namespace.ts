@@ -17,7 +17,7 @@ const packageNameOf = (root: string): string => {
 }
 
 /** The normalised form of a root that the namespace hash is taken over: absolute, forward slashes, lowercase, no trailing slash. */
-export const normalisedRoot = (root: string): string => resolve(root).replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase()
+export const normalisedRoot = (root: string): string => resolve(root).replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase()
 
 /**
  * The isolation identity of one data slot of a checkout: `<package name slug>_<6 hex of sha256(normalised root)>_w<slot>`. Two
@@ -34,12 +34,12 @@ export const namespaceOf = (root: string, slot: number): Namespace => {
         .filter((part) => part.length > 0)
         .join("_")
     if (slug === "") slug = "repo"
-    if (/^[0-9]/.test(slug)) slug = `r_${slug}`
+    if (/^\d/.test(slug)) slug = `r_${slug}`
     const hash = createHash("sha256").update(normalisedRoot(absolute)).digest("hex").slice(0, HASH_LENGTH)
     const suffix = `_${hash}_w${slot}`
     const trimmed = slug.slice(0, MAX_SNAKE_LENGTH - suffix.length).replace(/_+$/, "")
     const snake = `${trimmed}${suffix}`
-    return { snake, kebab: snake.replace(/_/g, "-"), root: absolute }
+    return { snake, kebab: snake.replaceAll("_", "-"), root: absolute }
 }
 
 /** A random run token of `bytes` bytes as lowercase hex (default 4, so 8 characters). */

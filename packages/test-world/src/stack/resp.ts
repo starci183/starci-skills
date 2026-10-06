@@ -15,7 +15,7 @@ const encodeCommand = (args: ReadonlyArray<string>): string => `*${args.length}\
 export const parseResp = (buffer: Buffer, offset: number): { readonly value: RespValue; readonly next: number } | null => {
     const lineEnd = buffer.indexOf("\r\n", offset)
     if (lineEnd < 0) return null
-    const kind = String.fromCharCode(buffer[offset] ?? 0)
+    const kind = String.fromCodePoint(buffer[offset] ?? 0)
     const line = buffer.toString("utf8", offset + 1, lineEnd)
     const after = lineEnd + 2
     if (kind === "+") return { value: line, next: after }
