@@ -161,7 +161,10 @@ export function nextMode(prev, { freeRamPct, cpuBusy = null }, t = throttleThres
   const why = [];
   if (ramMode === 'critical') why.push(pct < t.landSpecPauseBelowPct ? `free RAM ${pct1(pct)} < ${t.landSpecPauseBelowPct}%: heavy ops and land-gate spec runs paused` : `free RAM ${pct1(pct)} not yet above ${t.landSpecResumeAbovePct}% since going critical: heavy ops and land-gate spec runs stay paused`);
   else if (ramMode === 'heavy-paused') why.push(pct < t.heavyStopBelowPct ? `free RAM ${pct1(pct)} < ${t.heavyStopBelowPct}%: no new heavy op below the top priority` : `free RAM ${pct1(pct)} not yet above ${t.heavyResumeAbovePct}% since the heavy pause: no new heavy op below the top priority`);
-  if (cpuHot) why.push(`CPU ${Math.round(num(cpu ?? 1) * 100)}% ${cpu != null && cpu >= t.cpuHeavyStopAbove ? `>= ${Math.round(t.cpuHeavyStopAbove * 100)}%` : `not yet below ${Math.round(t.cpuHeavyResumeBelow * 100)}%`}: no new heavy op below the top priority`);
+  if (cpuHot) {
+    const threshold = cpu != null && cpu >= t.cpuHeavyStopAbove ? `>= ${Math.round(t.cpuHeavyStopAbove * 100)}%` : `not yet below ${Math.round(t.cpuHeavyResumeBelow * 100)}%`;
+    why.push(`CPU ${Math.round(num(cpu ?? 1) * 100)}% ${threshold}: no new heavy op below the top priority`);
+  }
   return { mode, ramMode, cpuHot, why: why.join('; ') || `free RAM ${pct1(pct)}: normal` };
 }
 

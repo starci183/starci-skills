@@ -51,7 +51,8 @@ export async function taskShow(ctx, deps = {}) {
   if (!definition || extra.length) return unknown('show', name);
   const result = await (deps.queryScheduledTask ?? queryScheduledTask)(definition.taskName, { env: ctx?.env });
   if (!resultOk(result)) {
-    return { code: 1, stderr: `starci task show: could not query ${definition.taskName}${detail(result, { limit: 600 }) ? `: ${detail(result, { limit: 600 })}` : ''}`,
+    const suffix = detail(result, { limit: 600 });
+    return { code: 1, stderr: `starci task show: could not query ${definition.taskName}${suffix ? ': ' + suffix : ''}`,
       data: { schema: 'starci/task-show@1', ok: false, name, taskName: definition.taskName } };
   }
   let task;
@@ -68,7 +69,8 @@ export async function taskList(ctx, deps = {}) {
   const entries = Object.entries(TASK_DEFINITIONS);
   const result = await (deps.listScheduledTasks ?? listScheduledTasks)(entries.map(([, task]) => task.taskName), { env: ctx?.env });
   if (!resultOk(result)) {
-    return { code: 1, stderr: `starci task list: could not query Task Scheduler${detail(result, { limit: 600 }) ? `: ${detail(result, { limit: 600 })}` : ''}`,
+    const suffix = detail(result, { limit: 600 });
+    return { code: 1, stderr: `starci task list: could not query Task Scheduler${suffix ? ': ' + suffix : ''}`,
       data: { schema: 'starci/task-list@1', ok: false, tasks: [] } };
   }
   let rows;

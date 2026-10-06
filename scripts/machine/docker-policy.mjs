@@ -58,10 +58,19 @@ export function refusePortPolicy(composeModel) {
   const outside = ports.filter(({ port }) => port < PORT_RANGE.first || port > PORT_RANGE.last);
   if (!foreign.length && !protectedPorts.length && !outside.length && !unfixed.length) return null;
   const reasons = [];
-  if (foreign.length) reasons.push(`foreign container name(s): ${foreign.map(({ service, name }) => `${service}=${name}`).join(', ')}`);
-  if (protectedPorts.length) reasons.push(`protected host port(s): ${protectedPorts.map(({ service, port }) => `${service}=${port}`).join(', ')}`);
+  if (foreign.length) {
+    const names = foreign.map(({ service, name }) => `${service}=${name}`).join(', ');
+    reasons.push(`foreign container name(s): ${names}`);
+  }
+  if (protectedPorts.length) {
+    const names = protectedPorts.map(({ service, port }) => `${service}=${port}`).join(', ');
+    reasons.push(`protected host port(s): ${names}`);
+  }
   const outsideOnly = outside.filter((entry) => !protectedPorts.some((item) => item.service === entry.service && item.port === entry.port));
-  if (outsideOnly.length) reasons.push(`host port(s) outside 41000-44999: ${outsideOnly.map(({ service, port }) => `${service}=${port}`).join(', ')}`);
+  if (outsideOnly.length) {
+    const names = outsideOnly.map(({ service, port }) => `${service}=${port}`).join(', ');
+    reasons.push(`host port(s) outside 41000-44999: ${names}`);
+  }
   if (unfixed.length) reasons.push(`published host port(s) are not fixed to the project block: ${unfixed.join(', ')}`);
   return { code: DOCKER_PORT_POLICY, message: reasons.join('; '), ports, foreign };
 }

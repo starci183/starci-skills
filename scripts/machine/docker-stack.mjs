@@ -27,7 +27,10 @@ const refused = (message) => ({
   stderr: `${DOCKER_PORT_POLICY}: ${message}`,
   data: { schema: 'starci/docker-refusal@1', ok: false, code: DOCKER_PORT_POLICY, message },
 });
-const failed = (verb, result) => ({ code: 1, stderr: `starci docker ${verb}: ${detail(result) || `docker exited ${result?.status ?? 'without a status'}`}` });
+const failed = (verb, result) => {
+  const error = detail(result) || `docker exited ${result?.status ?? 'without a status'}`;
+  return { code: 1, stderr: `starci docker ${verb}: ${error}` };
+};
 
 const hostEffect = async (ctx, deps, purpose, fn) => {
   try {

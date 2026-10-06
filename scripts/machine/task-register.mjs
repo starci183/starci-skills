@@ -39,7 +39,8 @@ function taskRegistrationScript(name, { taskName, starci, workdir, everyMinutes 
   const registeredName = taskName ?? definition.taskName;
   const command = definition.action.replace(/^starci\s+/, '');
   const every = everyMinutes ?? definition.trigger.everyMinutes;
-  const action = `$action = New-ScheduledTaskAction -Execute $conhost -Argument $argLine${workdir ? ` -WorkingDirectory '${quote(workdir)}'` : ''}`;
+  const workdirArgument = workdir ? ` -WorkingDirectory '${quote(workdir)}'` : '';
+  const action = `$action = New-ScheduledTaskAction -Execute $conhost -Argument $argLine${workdirArgument}`;
   const trigger = every == null ? [
     '$logon = New-ScheduledTaskTrigger -AtLogOn -User $user',
   ] : [
@@ -98,10 +99,11 @@ export async function taskRegister(ctx, deps = {}) {
   const result = await (deps.registerScheduledTask ?? registerScheduledTask)(script, { env: ctx?.env });
   const ok = resultOk(result);
   const detail = resultOutput(result).slice(0, 600) || resultDetail(result, { limit: 600 });
+  const failureDetail = detail ? `: ${detail}` : '';
   return {
     code: ok ? 0 : 1,
     ...(ok ? { text: detail || `registered ${definition.taskName}: ${definition.action}` }
-      : { stderr: `starci task register: failed to register ${definition.taskName}${detail ? `: ${detail}` : ''}` }),
+      : { stderr: `starci task register: failed to register ${definition.taskName}${failureDetail}` }),
     data: { schema: 'starci/task-register@1', ok, applied: true, name, taskName: definition.taskName, action: definition.action },
   };
 }

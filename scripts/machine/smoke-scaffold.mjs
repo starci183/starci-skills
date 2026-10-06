@@ -75,5 +75,6 @@ export async function smokeScaffold(ctx, deps = {}) {
     if (!removed?.ok) response = { code: 1, stderr: `starci smoke scaffold: scratch cleanup failed (${removed?.errors?.[0]?.message ?? 'unknown error'})` };
   }
   const data = { schema: 'starci/smoke-scaffold@1', edition, steps };
-  return { ...response, text: `starci smoke scaffold: ${steps.filter((step) => step.ok).length}/${steps.length} steps passed${ctx.args?.keep ? `; kept ${root}` : ''}`, data };
+  const retained = ctx.args?.keep ? `; kept ${root}` : '';
+  return { ...response, text: `starci smoke scaffold: ${steps.filter((step) => step.ok).length}/${steps.length} steps passed${retained}`, data };
 }

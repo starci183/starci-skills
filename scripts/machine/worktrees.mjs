@@ -315,7 +315,8 @@ function collectOrcaOrphans({ ps, items, halt, lookup, phaseOf, supOf, now, appl
     }
     const r = removeOrcaWorktree({ repoRoot, orcaId: w.id, dir, branch: w.branch, deleteBranch: w.branch ? 'force' : null,
       preserve: { name: orphanPreserveName({ slot: stamp.slot, orcaId: w.id, digest: shortHash }) }, env, git, orca });
-    orphanIncident({ level: r.ok ? 'warn' : 'error', msg: `orphaned Orca tree ${w.id} (${w.comment}), owner ${v.owner}: ${r.ok ? 'preserved and removed' : `removal failed: ${r.reason}`}`,
+    const result = r.ok ? 'preserved and removed' : `removal failed: ${r.reason}`;
+    orphanIncident({ level: r.ok ? 'warn' : 'error', msg: `orphaned Orca tree ${w.id} (${w.comment}), owner ${v.owner}: ${result}`,
       owner, data: { orcaId: w.id, path: dir, stamp: w.comment, preserved: r.preserved?.ref ?? null, error: r.ok ? null : r.reason }, env });
     items.push({ ...base, reason: 'orca-orphan', action: 'remove', ok: r.ok, preserved: r.preserved?.ref ?? null, ...(r.ok ? {} : { error: r.reason }), ...(r.fatal ? { fatal: true, damage: r.damage } : {}) });
     if (r.fatal) return halt();
