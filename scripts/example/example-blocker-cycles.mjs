@@ -95,7 +95,11 @@ const blockerCycleFinding = (scc, { edgesOf, canon, derived, rawRecords }) => {
     const from = ring[i], to = ring[i + 1];
     const raw = rawRecords.get(from);
     const edge = (Array.isArray(raw?.data.blockedBy) ? raw.data.blockedBy : []).find(e => isPlainObject(e) && canon(e.record) === to);
-    const clipped = edge?.because ? edge.because.slice(0, 90) + (edge.because.length > 90 ? '...' : '') : null;
+    let clipped = null;
+    if (edge?.because) {
+      clipped = edge.because.slice(0, 90);
+      if (edge.because.length > 90) clipped += '...';
+    }
     because.push(`${from} is blockedBy ${to}${clipped ? ' ("' + clipped + '")' : ''}`);
   }
   const features = new Set(scc.map(id => derived.records.get(id)?.feature).filter(Boolean));
