@@ -96,8 +96,18 @@ export function planFor(repo, { runtimeRoot = SKILL_ROOT, pkg = readPackage(repo
   };
 }
 
+const TRAILING_SLASHES = new RegExp([String.raw`\/+`, '$'].join(''));
+const NODE_SPEC_FAILURE = new RegExp([String.raw`^\s*[✖x]\s+`, String.raw`(.*?)`, String.raw`(?:\s+\([\d.]+m?s\))?\s*$`].join(''));
+const NODE_TAP_FAILURE = new RegExp([String.raw`^\s*not ok \d+ - `, String.raw`(.*?)`, String.raw`(?:\s+#.*)?$`].join(''));
+const NODE_TAP_LOCATION = new RegExp([String.raw`^\s*location:\s*'?`, String.raw`(.+?)`, String.raw`:\d+:\d+'?\s*$`].join(''));
+const JEST_FAIL_FILE = new RegExp([String.raw`^\s*FAIL\s+(?:\S+\s+)?(\S+\.(?:spec|test)\.[cm]?[jt]sx?)\b`, String.raw`.*?`, String.raw`(?:>\s*(.*))?$`].join(''));
+const JEST_TEST_NAME = new RegExp([String.raw`^\s*●\s+`, String.raw`(.*\S)`, String.raw`\s*$`].join(''));
+const TSC_PAREN_ERROR = new RegExp([String.raw`^`, String.raw`(.+?)`, String.raw`\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$`].join(''));
+const TSC_COLON_ERROR = new RegExp([String.raw`^`, String.raw`(.+?)`, String.raw`:(\d+):(\d+)\s+-\s+error\s+(TS\d+):\s+(.*)$`].join(''));
+const ESLINT_STYLISH_ROW = new RegExp([String.raw`^\s+(\d+):(\d+)\s+error\s+`, String.raw`(.*?)`, String.raw`\s{2,}(\S+)\s*$`].join(''));
+
 const rel = (file, repo) => {
-  const flat = (p) => String(p ?? '').replace(/^file:\/+/, '').replaceAll('\\', '/').replace(/^\/+/, '').replace(/\/+$/, '');
+  const flat = (p) => String(p ?? '').replace(/^file:\/+/, '').replaceAll('\\', '/').replace(/^\/+/, '').replace(TRAILING_SLASHES, '');
   const f = flat(file), base = flat(repo);
   return base && f.toLowerCase().startsWith(`${base.toLowerCase()}/`) ? f.slice(base.length + 1) : f;
 };
@@ -123,32 +133,32 @@ function consumeNodeReporterLine(line, state, add) {
   // node:test spec reporter: "test at <file>:l:c" then "✖ <name> (12ms)"
   if (match) { state.pendingFile = match[1]; return true; }
   if (state.pendingFile) {
-    match = /^\s*[✖x]\s+(.*?)(?:\s+\([\d.]+m?s\))?\s*$/.exec(line);
+    match = NODE_SPEC_FAILURE.exec(line);
     if (match) { add(state.pendingFile, match[1]); state.pendingFile = null; return true; }
   }
   // node:test tap reporter: "not ok N - name" ... "location: '<file>:l:c'"
-  match = /^\s*not ok \d+ - (.*?)(?:\s+#.*)?$/.exec(line);
+  match = NODE_TAP_FAILURE.exec(line);
   if (match) { state.pendingTap = match[1]; return true; }
   if (state.pendingTap) {
-    match = /^\s*location:\s*'?(.+?):\d+:\d+'?\s*$/.exec(line);
+    match = NODE_TAP_LOCATION.exec(line);
     if (match) { add(match[1], state.pendingTap); state.pendingTap = null; return true; }
   }
   return false;
 }
 
 function consumeJestLine(line, state, add) {
-  let match = /^\s*FAIL\s+(?:\S+\s+)?(\S+\.(?:spec|test)\.[cm]?[jt]sx?)\b.*?(?:>\s*(.*))?$/.exec(line);
+  let match = JEST_FAIL_FILE.exec(line);
   if (match) { state.jestFile = match[1]; add(match[1], match[2] ?? null); return true; }
   if (state.jestFile) {
-    match = /^\s*●\s+(.*\S)\s*$/.exec(line);
+    match = JEST_TEST_NAME.exec(line);
     if (match) { add(state.jestFile, match[1]); return true; }
   }
   return false;
 }
 
 function consumeTypeScriptLine(line, add) {
-  let match = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$/.exec(line);
-  if (!match) match = /^(.+?):(\d+):(\d+)\s+-\s+error\s+(TS\d+):\s+(.*)$/.exec(line);
+  let match = TSC_PAREN_ERROR.exec(line);
+  if (!match) match = TSC_COLON_ERROR.exec(line);
   if (!match) return false;
   add(match[1], `${match[4]} @${match[2]} ${match[5].slice(0, 120)}`);
   return true;
@@ -157,7 +167,7 @@ function consumeTypeScriptLine(line, add) {
 function consumeEslintLine(line, state, add) {
   if (/^(?:[A-Za-z]:)?[\w./\\@()[\]-]+\.[cm]?[jt]sx?$/.test(line.trim()) && !line.startsWith(' ')) { state.eslintFile = line.trim(); return true; }
   if (!state.eslintFile) return false;
-  const match = /^\s+(\d+):(\d+)\s+error\s+(.*?)\s{2,}(\S+)\s*$/.exec(line);
+  const match = ESLINT_STYLISH_ROW.exec(line);
   if (match) add(state.eslintFile, `${match[4]} @${match[1]} ${match[3].slice(0, 100)}`);
   return false;
 }
@@ -191,11 +201,17 @@ function finish(map) {
     .map(([file, items]) => ({ file, items: items.slice(0, MAX_ITEMS_PER_GROUP), ...(items.length > MAX_ITEMS_PER_GROUP ? { more: items.length - MAX_ITEMS_PER_GROUP } : {}) }));
 }
 
+function unrunStepRow(step, failedNames) {
+  if (step.absent) return { name: step.name, status: 'absent', note: 'the repository declares no such script' };
+  if (step.after && failedNames.has(step.after)) return { name: step.name, status: 'skipped', note: `${step.after} is red` };
+  return null;
+}
+
 function runPlannedSteps(out, repo, plan, stepRun) {
   const failedNames = new Set();
   for (const step of plan.steps) {
-    if (step.absent) { out.steps.push({ name: step.name, status: 'absent', note: 'the repository declares no such script' }); continue; }
-    if (step.after && failedNames.has(step.after)) { out.steps.push({ name: step.name, status: 'skipped', note: `${step.after} is red` }); continue; }
+    const unrun = unrunStepRow(step, failedNames);
+    if (unrun) { out.steps.push(unrun); continue; }
     const r = stepRun(step, { cwd: repo, timeoutMs: STEP_TIMEOUT_MS[plan.kind], tag: path.basename(repo) });
     const row = { name: step.name, status: r.ok ? 'green' : 'red', exit: r.exit, ms: r.ms, log: r.log };
     if (!r.ok) {

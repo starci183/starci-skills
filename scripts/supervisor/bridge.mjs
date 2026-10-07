@@ -51,6 +51,7 @@ import { normWork } from '../lib/path-key.mjs';
 import { SKILL_ROOT, productRepos, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { eachInOrder, mapInOrder } from '../lib/in-order.mjs';
 
 const API = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 const DEFINE_GOAL = path.join(SKILL_ROOT, 'scripts', 'goal', 'define-goal.mjs');
@@ -171,7 +172,11 @@ export function detect(repos, { now = Date.now() } = {}) {
 const q = (s) => `"${String(s).replaceAll('"', '\'')}"`;
 const refusedRevisionText = (rec) => rec.state === 'refused' ? `it could not be applied (${clip(rec.error, 160)}) - settle or reconcile the open legs it names, ` : '';
 const revisionNoticeText = (rec, bridgeId, preview, reason) => rec.state === 'applied' ? `${TAG} ${bridgeId}: the Supervisor revised your goal to rev ${preview.nextRevision} (provisional, ${clip(reason, 200)}): run starci kernel survey and resurvey the pending goal-revision inbox; queued legs it removed were superseded.` : `${TAG} ${bridgeId}: the Supervisor requests a goal revision (${clip(reason, 200)}): ` + refusedRevisionText(rec) + 'the owner or autopilot applies it; keep the duplicated legs parked meanwhile.';
-const revisionState = (applied) => { if (!applied) return 'requested'; if (applied.ok) return 'applied'; return 'refused'; };
+const revisionState = (applied) => {
+  if (!applied) return 'requested';
+  if (applied.ok) return 'applied';
+  return 'refused';
+};
 /** The command line the Supervisor would run for a clear-cut finding. */
 export function commandFor(repo, f) {
   const p = f.proposal ?? {};
@@ -280,11 +285,11 @@ async function rewireBridge(repo, bridgeId, { env = process.env, args = {}, quie
   });
   withWrite(repo, (ledger) => appendEvents(ledger, [bridge.workflowId, ...bridge.dependents], 'supervisor-bridge-rewired', { bridgeId, foundation: bridge.foundation, rewired: results }));
   const notices = [];
-  if (!quiet || results.length) for (const dep of bridge.dependents) {
+  if (!quiet || results.length) await eachInOrder(bridge.dependents, async (dep) => {
     const mine = results.filter((r) => r.workflowId === dep);
     const waitText = mine.length ? ' ' + mine.map((r) => r.from + (r.to ? ' is now ' + r.to : '')).join(', ') : '';
     notices.push(await notify(repo, dep, `${TAG} ${bridgeId}: your wait${waitText} waits on foundation ${bridge.foundation}, owned by bridging workflow ${bridge.workflowId} (${clip(bridge.reason, 200)}). Its landing releases the held work; re-verify in your own preflight before dispatch.`, args));
-  }
+  });
   return { ok: results.every((r) => !r.error), rewired: results, record, notices };
 }
 
@@ -310,8 +315,7 @@ async function cmdTransfer(args, { env = process.env } = {}) {
       return { record: rec, from };
     });
     if (out.dryRun) return { ok: true, dryRun: true, action: 'transfer', target, from: out.from, to };
-    const notices = [];
-    for (const wf of [out.from, to].filter(Boolean)) notices.push(await notify(repo, wf, `${TAG} ${bridgeId}: ownership of ${target} moved from ${out.from ?? '-'} to ${to} (${clip(reason, 200)}); the new owner declares its changes (starci kernel record-change), the other reads it.`, args));
+    const notices = await mapInOrder([out.from, to].filter(Boolean), (wf) => notify(repo, wf, `${TAG} ${bridgeId}: ownership of ${target} moved from ${out.from ?? '-'} to ${to} (${clip(reason, 200)}); the new owner declares its changes (starci kernel record-change), the other reads it.`, args));
     supervisorAction({ item: args.finding ?? `transfer|${target}`, action: 'transfer', reason, workflowId: to, refs: [bridgeId, target], env });
     return { ok: true, action: 'transfer', bridgeId, target, from: out.from, to, ...approval, notices };
   }
@@ -359,13 +363,12 @@ async function cmdTransfer(args, { env = process.env } = {}) {
   // A wait typed on the old foundation (or on its old owner) now names the merged foundation / the new owner.
   const results = prior.waits.map((w) => retypeWait(repo, { ...w, foundation: mergeInto ?? name, bridgeId, reason: mergeInto ? `foundation ${name} is ${mergeInto} under another name` : `foundation ${name} moved to ${to}; ${reason}`, env }));
   if (results.length) updateBridge(repo, bridgeId, (b) => ({ ...b, rewired: results }));
-  const notices = [];
-  for (const wf of new Set([from, to, ...moved.dependents].filter(Boolean))) {
+  const notices = await mapInOrder(new Set([from, to, ...moved.dependents].filter(Boolean)), (wf) => {
     const ownership = mergeInto
       ? `foundation ${name} is merged into ${mergeInto} (owner ${to ?? '-'}); a need of ${name} is now a need of ${mergeInto}`
       : `foundation ${name} now belongs to ${to} (was ${from ?? 'unowned'})`;
-    notices.push(await notify(repo, wf, `${TAG} ${bridgeId}: ${ownership} - ${clip(reason, 200)}. Read starci kernel foundations; re-check it in your own preflight.`, args));
-  }
+    return notify(repo, wf, `${TAG} ${bridgeId}: ${ownership} - ${clip(reason, 200)}. Read starci kernel foundations; re-check it in your own preflight.`, args);
+  });
   supervisorAction({ item: args.finding ?? `transfer|foundation:${name}`, action: 'transfer', reason, workflowId: to, refs: [bridgeId, name, mergeInto].filter(Boolean), env });
   return { ok: true, action: 'transfer', bridgeId, foundation: name, ...(mergeInto ? { mergeInto } : {}), from, to, dependents: moved.dependents, rewired: results, ...approval, notices };
 }
