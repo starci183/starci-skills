@@ -1,9 +1,14 @@
 import path from 'node:path';
 import { many, parse } from './query.mjs';
 
+const withoutTrailingSeparators = value => {
+  let end = value.length;
+  while (end > 0 && (value[end - 1] === '/' || value[end - 1] === '\\')) end -= 1;
+  return value.slice(0, end);
+};
 const repoKey = value => {
   if (typeof value !== 'string' || !value) return null;
-  const normalized = path.normalize(value).replace(/[\\/]+$/, '');
+  const normalized = withoutTrailingSeparators(path.normalize(value));
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
 };
 const sameRepo = (a, b) => repoKey(a) != null && repoKey(a) === repoKey(b);
@@ -12,7 +17,7 @@ const paths = value => Array.isArray(value) && value.every(item => typeof item =
 
 /** A recorded checkpoint effect exists independently of verdict and workflow finish/land. */
 export function workflowCheckpoint(db, attempt) {
-  if (!attempt || attempt.dispatched_at == null) return null;
+  if (attempt?.dispatched_at == null) return null;
   const workflow = attempt.workflow_id;
   const dispatches = many(db, 'SELECT attempt_id,dispatched_at FROM op_attempts WHERE workflow_id=? AND job_id=? AND dispatched_at IS NOT NULL ORDER BY dispatched_at DESC',
     workflow, attempt.job_id);
