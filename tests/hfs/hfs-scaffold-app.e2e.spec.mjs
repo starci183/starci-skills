@@ -70,7 +70,7 @@ test('the example app stack declaration pins a postgres image', () => {
 });
 
 test('a test-world package without its own install fails at once with the command that installs it', (t) => {
-  const dir = mkdtemp(t, 'test-world-install-');
+  const dir = mkdtemp(t, 'starci-test-world-install-');
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ dependencies: { yaml: '^2' }, devDependencies: { pg: '^8', typescript: '^5', '@types/pg': '^8' } }));
   assert.deepEqual(missingOwnDependencies(dir), ['yaml', 'pg', 'typescript']);
   assert.throws(() => assertTestWorldInstalled(dir), /no install of its own \(missing in packages\/test-world\/node_modules: yaml, pg, typescript\)\. Run `npm ci --ignore-scripts` in packages\/test-world/);
