@@ -40,8 +40,11 @@ function collectFrameworkStatement(config, context, checker, sourceFile, stateme
   }
   for (const name of selected) {
     const target = bound.exports.get(name);
-    if (target) targets.set(name, target);
-    else reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${name} from ${bound.specifier}`);
+    if (!target) {
+      reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${name} from ${bound.specifier}`);
+      continue;
+    }
+    targets.set(name, target);
   }
 }
 

@@ -33,6 +33,7 @@ const PORT_DECLARATION_ROLES = new Set(['contracts', 'port']);
 const NON_CLASS_ROLES = new Set(['constants', 'contracts', 'decorators', 'enum', 'providers', 'types']);
 const KNOWN_HYPHEN_ROLES = [...CLASS_ROLE_SUFFIX.keys()].sort((a, b) => b.length - a.length);
 const SPECIAL_BASENAMES = new Set(['config', 'configuration', 'constants', 'decorators', 'env', 'environment', 'index', 'main', 'types']);
+const NO_PROGRAM_CHECKER = 'a TypeScript program checker could not be associated with its source';
 const SOURCE_EXTENSION = /\.[cm]?[jt]sx?$/i;
 
 function absoluteRoots(root, relatives) {
@@ -58,9 +59,11 @@ function frameworkTargets(config, context, checker, localFiles) {
   const reasons = [];
   const bySymbol = new Map();
   const files = programSourcesOf(context, checker, localFiles);
-  if (!files) return { bySymbol, reasons: ['a TypeScript program checker could not be associated with its source'] };
+  if (!files) return { bySymbol, reasons: [NO_PROGRAM_CHECKER] };
   for (const sourceFile of files) {
-    for (const statement of sourceFile.statements) addFrameworkTargets(config, context, checker, sourceFile, statement, bySymbol, reasons);
+    for (const statement of sourceFile.statements) {
+      addFrameworkTargets(config, context, checker, sourceFile, statement, bySymbol, reasons);
+    }
     commonJsRequireReasons(context.ts, checker, sourceFile, (specifier) => FRAMEWORK_EXPORTS.has(specifier),
       reasons, relativePath(config.root, sourceFile.fileName), 'binding whose source role cannot be proved');
   }
