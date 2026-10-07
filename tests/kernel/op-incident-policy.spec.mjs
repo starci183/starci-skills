@@ -9,7 +9,7 @@ import path from 'node:path';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { lineageRouteAdjust } from '../../scripts/kernel/lineage-route.mjs';
-import { incidentPolicy, boundValue, policyStepOf, INCIDENT_CODES } from '../../scripts/kernel/op-incident-policy.mjs';
+import { incidentPolicy, boundValue, policyStepOf, queuedBecauseKinds, INCIDENT_CODES } from '../../scripts/kernel/op-incident-policy.mjs';
 
 const WF = 'wf-policy';
 const OP = 'business.decide';
@@ -85,4 +85,37 @@ test('the step line names the attempt, the count, who acts and who is next', () 
   assert.match(step.line, /attempt 1 of 2 \(claude-agent: admission no-eligible-candidate\)/);
   assert.match(step.line, /escalate to supervisor \(op-incident-escalate-supervisor\)/);
   assert.throws(() => policyStepOf('nope', { attempt: 1, of: 1, detail: '' }), /no op-incident policy row/);
+});
+
+// One standard for every hold: the table lists each hold the runtime can put on a job, a seat or a workflow, and a hold that does
+// not meet an invariant names it in `gap` with its reason, so nothing is silently unlisted or silently unbounded.
+const INVARIANTS = ['I1', 'I2', 'I3', 'I4', 'I5', 'I6', 'I7', 'I8'];
+const SCOPES = ['job', 'workflow', 'machine'];
+
+test('every hold meets I1-I8 or names the invariant it misses, with its reason', () => {
+  const policy = incidentPolicy();
+  const handlers = Object.keys(policy.handlers);
+  assert.equal(new Set(policy.holds.map((hold) => hold.id)).size, policy.holds.length, 'a hold kind is listed once');
+  for (const hold of policy.holds) {
+    const gap = new Set(hold.gap ?? []);
+    assert.deepEqual([...gap].filter((id) => !INVARIANTS.includes(id)), [], `${hold.id}: gap names invariants I1-I8`);
+    if (gap.size) assert.ok(String(hold.gapWhy ?? '').length > 20, `${hold.id}: a documented gap carries its reason`);
+    assert.ok(hold.cause, `${hold.id}: I1 names its cause`);
+    assert.ok(handlers.includes(hold.handler), `${hold.id}: I2 has exactly one declared handler`);
+    assert.ok(gap.has('I3') || hold.reeval, `${hold.id}: I3 declares the condition that is re-evaluated`);
+    const bounds = Object.values(hold.bound ?? {});
+    assert.ok(gap.has('I4') || bounds.length > 0, `${hold.id}: I4 declares a bound`);
+    for (const bound of bounds) assert.ok(boundValue(bound) > 0, `${hold.id}: its bound resolves to a positive number`);
+    assert.ok(SCOPES.includes(hold.scope), `${hold.id}: I5 declares job, workflow or machine scope`);
+    if (hold.scope !== 'job' && !gap.has('I5')) assert.ok(hold.workflowWide, `${hold.id}: a wider scope names the cause that is wide by nature`);
+    assert.ok(gap.has('I7') || hold.visible, `${hold.id}: I7 names where status shows it`);
+    assert.ok(Array.isArray(hold.chain) && hold.chain.every((handler) => handlers.includes(handler)), `${hold.id}: its chain names declared handlers`);
+    assert.ok(gap.has('I8') || hold.chain.at(-1) === 'owner', `${hold.id}: I8 the chain ends at the owner`);
+  }
+});
+
+test('the status projection values of a held job are the table\'s queuedBecause list, each a listed hold', () => {
+  const kinds = queuedBecauseKinds();
+  assert.ok(kinds.includes('ready') && kinds.includes('supervisor-gate') && kinds.includes('host-resources-low'));
+  assert.equal(new Set(kinds).size, kinds.length);
 });

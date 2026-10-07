@@ -43,6 +43,9 @@ export function boundValue(bound) {
 /** One row of the table by id, or null. */
 const policyRow = (id) => incidentPolicy().rows.find((row) => row.id === id) ?? null;
 
+/** The status projection values of a held queued job, in the table's order (scripts/kernel/cli.mjs QUEUED_BECAUSE). */
+export const queuedBecauseKinds = () => incidentPolicy().holds.filter((hold) => hold.queuedBecause).map((hold) => hold.queuedBecause);
+
 /** The switch-agent numbers: {excludeAfter, switchSteps}. */
 export const agentSwitchOf = () => incidentPolicy().agentSwitch;
 

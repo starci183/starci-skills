@@ -73,7 +73,7 @@ import { ownedPathEffects } from './owned-path-effects.mjs';
 import { lineageJobsOf } from '../machine/owner-answers.mjs';
 import { isAwaitingOwner } from './failure-steps.mjs';
 import { planGraphOf } from '../route/plan-edges.mjs';
-import { lineageRouteAdjust } from './lineage-route.mjs';
+import { lineageRouteAdjust } from './lineage-route.mjs'; import { queuedBecauseKinds } from './op-incident-policy.mjs';
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
 import { loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule } from '../agent/lib.mjs';
 import { withStatusSpawnMemo, statusWorkerRowsOf, prefetchStatusOrcaReads } from './status-memo.mjs';
@@ -811,7 +811,7 @@ const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-
 // 'dependency-failed' is a dependency that can no longer succeed on its own: the
 // seam or --after job it waits on settled failed (not an owner wait), so only
 // the Kernel can move it - retry the blocker, re-point the dependant, or drop it.
-const QUEUED_BECAUSE = ['owner-gate', 'supervisor-gate', 'deferred', 'deferred-to-handover', 'peer-wait', 'foundation-wait', 'dependency', 'dependency-failed', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'host-resources-low', 'ready'];
+const QUEUED_BECAUSE = queuedBecauseKinds();
 /**
  * Open owner-gate incidents of a workflow: a step only the owner can drive
  * (an assisted OAuth run, a consent screen) holds the jobs it names until the
