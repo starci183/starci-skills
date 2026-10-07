@@ -11,7 +11,7 @@ import { walkFiles } from '../../lib/walk.mjs'; import { exampleWorkRoots, examp
 import {blobPath, getBlob} from '../../../engine/db/blob.mjs';
 import {sealedLocationProblem} from './check-work-artifacts.mjs'; import { isMain } from '../../lib/is-main.mjs';
 // The exported boundary checker delegates HFS_AGENT_DATA_TRACKED findings to this sibling module.
-export {checkStarciworkBoundary} from './work-boundary-check.mjs';
+import {checkStarciworkBoundary} from './work-boundary-check.mjs'; export {checkStarciworkBoundary};
 
 function collectStringReference(value,file,trail,refs){
   const text=value.trim();
