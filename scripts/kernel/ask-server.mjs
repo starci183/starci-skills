@@ -54,6 +54,8 @@ import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
 import { loadConfig, activeDelegation, allocationMs, askAutoAcceptPolicy, ASK_PORT_BAND } from '../../engine/config.mjs';
 import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/telegram.mjs';
+import { closeAskMessages } from './ask-close.mjs';
+export { closeAskMessages } from './ask-close.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { MIME, imagesOf, assetsOf, toOwnerImages, reportImages, pickGroupsOf, reviewPartIndexOf, drawAnswerExtras } from './ask-images.mjs';
 export { toOwnerImages, reportImages, pickGroupsOf } from './ask-images.mjs';
@@ -303,7 +305,13 @@ const pickRowsOf = (pickGroups, nonce, disabled) => pickGroups.map((p) => {
   return `<fieldset class="pick"><legend>${esc(p.label ?? p.id)}</legend><div class="cells">${cells}</div></fieldset>`;
 }).join('\n');
 
-const pickedImageIndexes = (pickGroups) => { const pickedImages = new Set(); for (const p of pickGroups) for (const c of p.choices) if (c.image) pickedImages.add(c.image.idx); return pickedImages; };
+const pickedImageIndexes = (pickGroups) => {
+  const pickedImages = new Set();
+  for (const p of pickGroups) {
+    for (const c of p.choices) if (c.image) pickedImages.add(c.image.idx);
+  }
+  return pickedImages;
+};
 /** One artifact figure, with its part-note field on a draw-review ask. */
 const imgRowOf = ({ img, i, pickedImages, drawReview, question, drawText, nonce, repo, disabled }) => {
   if (pickedImages.has(i)) return '';
@@ -486,26 +494,6 @@ export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, repo
   await closeAskMessages(ledger, { ledgerFile, workflowId, dispatchIds: [report.dispatch_id], reason: 'answered', by: AUTO_ACCEPTED_BY, close });
   const telegram = await Promise.resolve(notify({ ledgerFile, workflowId, dispatchId: report.dispatch_id, label })).catch(() => null);
   return { accepted: true, dispatchId: report.dispatch_id, optionIndex: index, option: label, source, receiptPath, answeredBy: AUTO_ACCEPTED_BY, wake: woke, telegram };
-}
-
-/**
- * Take the Telegram messages of closed asks off the owner's chat (telegram.mjs markAskClosed: delete,
- * else edit to "answered"), and record each removal as `ask-message-closed` {dispatchId, reason,
- * deleted, edited, failed}. Never throws; `close` is injectable for specs.
- */
-export async function closeAskMessages(ledger, { ledgerFile, workflowId, dispatchIds, reason = 'answered', by = null, close = markAskClosed }) {
-  const out = [];
-  for (const dispatchId of dispatchIds ?? []) {
-    const r = await Promise.resolve(close({ ledgerFile, workflowId, dispatchId, reason, by })).catch(() => null);
-    if (r && (r.deleted?.length || r.edited?.length)) {
-      try {
-        ledger.appendEvent({ workflowId, entityType: 'report', entityId: dispatchId, kind: 'ask-message-closed',
-          payload: { dispatchId, reason, deleted: r.deleted ?? [], edited: r.edited ?? [], failed: r.failed ?? [] } });
-      } catch { /* the chat is already clean; the record is best effort */ }
-    }
-    out.push({ dispatchId, ...(r ?? { ok: false }) });
-  }
-  return out;
 }
 
 /**
