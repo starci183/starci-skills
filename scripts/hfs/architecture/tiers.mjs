@@ -22,40 +22,61 @@ const REASON_TEXT = {
 };
 
 /** Strongly connected components (Tarjan, iterative) of `adjacency` (Map<node, Set<node>>); components of one node are dropped. */
+function startTraversal(state, adjacency, node) {
+  const at = state.counter;
+  state.counter += 1;
+  state.index.set(node, at);
+  state.low.set(node, at);
+  state.stack.push(node);
+  state.onStack.add(node);
+  state.work.push({ node, iterator: adjacency.get(node)[Symbol.iterator]() });
+}
+
+function visitTarget(state, adjacency, frame, target) {
+  if (!adjacency.has(target)) return;
+  if (!state.index.has(target)) {
+    startTraversal(state, adjacency, target);
+    return;
+  }
+  if (state.onStack.has(target)) state.low.set(frame.node, Math.min(state.low.get(frame.node), state.index.get(target)));
+}
+
+function closeComponent(state, frame) {
+  const component = [];
+  let member;
+  do {
+    member = state.stack.pop();
+    state.onStack.delete(member);
+    component.push(member);
+  } while (member !== frame.node);
+  if (component.length > 1) state.result.push(component);
+}
+
+function finishFrame(state, frame) {
+  state.work.pop();
+  if (state.work.length) {
+    const parent = state.work.at(-1).node;
+    state.low.set(parent, Math.min(state.low.get(parent), state.low.get(frame.node)));
+  }
+  if (state.low.get(frame.node) === state.index.get(frame.node)) closeComponent(state, frame);
+}
+
 export function stronglyConnected(adjacency) {
-  let counter = 0;
-  const index = new Map();
-  const low = new Map();
-  const onStack = new Set();
-  const stack = [];
-  const result = [];
+  const state = { counter: 0, index: new Map(), low: new Map(), onStack: new Set(), stack: [], result: [], work: [] };
   for (const start of adjacency.keys()) {
-    if (index.has(start)) continue;
-    const work = [{ node: start, iterator: adjacency.get(start)[Symbol.iterator]() }];
-    index.set(start, counter); low.set(start, counter); counter += 1; stack.push(start); onStack.add(start);
-    while (work.length) {
-      const frame = work.at(-1);
+    if (state.index.has(start)) continue;
+    startTraversal(state, adjacency, start);
+    while (state.work.length) {
+      const frame = state.work.at(-1);
       const next = frame.iterator.next();
-      if (!next.done) {
-        const target = next.value;
-        if (!adjacency.has(target)) continue;
-        if (!index.has(target)) {
-          index.set(target, counter); low.set(target, counter); counter += 1; stack.push(target); onStack.add(target);
-          work.push({ node: target, iterator: adjacency.get(target)[Symbol.iterator]() });
-        } else if (onStack.has(target)) low.set(frame.node, Math.min(low.get(frame.node), index.get(target)));
+      if (next.done) {
+        finishFrame(state, frame);
         continue;
       }
-      work.pop();
-      if (work.length) { const parent = work.at(-1).node; low.set(parent, Math.min(low.get(parent), low.get(frame.node))); }
-      if (low.get(frame.node) === index.get(frame.node)) {
-        const component = [];
-        let member;
-        do { member = stack.pop(); onStack.delete(member); component.push(member); } while (member !== frame.node);
-        if (component.length > 1) result.push(component);
-      }
+      visitTarget(state, adjacency, frame, next.value);
     }
   }
-  return result;
+  return state.result;
 }
 
 /** A shortest cycle through `origin` inside `members`, as a node path that starts and ends at origin. */
@@ -96,53 +117,57 @@ const blockCallsServerAction = (graph, edge) => {
   return from.slot === 'fe.components' && from.kind === 'blocks' && from.role === 'entry';
 };
 
-export function checkTiers(graph) {
-  const { resolver, profile } = graph;
-  const violations = [];
-  const tierRule = profile === 'be' ? 'BE_TIER_DIRECTION' : 'FE_TIER_DIRECTION';
-  let edgesChecked = 0;
-  let unclassified = 0;
-  const counts = { tierDirection: 0, layerOrder: 0, crossApp: 0 };
-  for (const edge of graph.edges) {
-    const verdict = resolver.importAllowed(edge.from, edge.to);
-    if (verdict.reason === 'unowned' || verdict.reason?.startsWith('slot')) { unclassified += 1; continue; }
-    edgesChecked += 1;
-    const actionTarget = serverActionTarget(graph, edge);
-    if ((verdict.allowed || verdict.reason === 'notPublicEntry') && actionTarget && graph.unit(edge.from) !== graph.unit(edge.to) && !blockCallsServerAction(graph, edge)) {
-      counts.tierDirection += 1;
-      violations.push({
-        ruleId: tierRule,
-        path: edge.from, line: edge.line, column: edge.column,
-        specifier: edge.specifier, resolvedPath: edge.to, typeOnly: !edge.runtime,
-        fromTier: resolver.tierOf(edge.from), toTier: resolver.tierOf(edge.to),
-        message: `${edge.from} -> ${edge.to}: a db Server Action is called directly only by a connected block entry; hooks and other tiers use their declared data path${edge.runtime ? '' : ' (type-only imports count)'}.`,
-      });
-      continue;
-    }
-    if (verdict.allowed || (verdict.reason === 'tierDirection' && blockCallsServerAction(graph, edge)) || !REASON_TEXT[verdict.reason]) continue;
-    counts[verdict.reason] += 1;
-    const featureToFeature = profile === 'be' && verdict.reason === 'tierDirection' && verdict.fromTier === 'feature' && verdict.toTier === 'feature';
-    const fromKind = featureToFeature ? triggerOf(resolver, edge.from) : null;
-    const toKind = featureToFeature ? triggerOf(resolver, edge.to) : null;
-    const crossKind = fromKind !== null && toKind !== null && fromKind !== toKind;
-    let ruleId = tierRule;
-    if (featureToFeature) ruleId = 'BE_FEATURE_IMPORTS_FEATURE';
-    if (crossKind) ruleId = 'BE_KIND_ISOLATION';
-    if (verdict.reason === 'crossApp') ruleId = 'FE_APP_ISOLATION';
-    const typeOnly = edge.runtime ? '' : ' (type-only imports count)';
-    const message = crossKind
-      ? `${edge.from} -> ${edge.to}: a ${fromKind} feature imports a ${toKind} feature; no kind imports another, every cross-kind call is an event published with eventBus.publish(event, tx) from a domain service${typeOnly}.`
-      : `${edge.from} -> ${edge.to}: ${REASON_TEXT[verdict.reason](verdict)}${typeOnly}.`;
-    violations.push({
-      ruleId,
-      path: edge.from, line: edge.line, column: edge.column,
-      specifier: edge.specifier, resolvedPath: edge.to, typeOnly: !edge.runtime,
-      fromTier: verdict.fromTier ?? null, toTier: verdict.toTier ?? null,
-      message,
-    });
-  }
+function reportDirectServerAction(graph, edge, verdict, actionTarget, tierRule, counts, violations) {
+  if (!(verdict.allowed || verdict.reason === 'notPublicEntry') || !actionTarget
+    || graph.unit(edge.from) === graph.unit(edge.to) || blockCallsServerAction(graph, edge)) return false;
+  counts.tierDirection += 1;
+  violations.push({
+    ruleId: tierRule,
+    path: edge.from, line: edge.line, column: edge.column,
+    specifier: edge.specifier, resolvedPath: edge.to, typeOnly: !edge.runtime,
+    fromTier: graph.resolver.tierOf(edge.from), toTier: graph.resolver.tierOf(edge.to),
+    message: `${edge.from} -> ${edge.to}: a db Server Action is called directly only by a connected block entry; hooks and other tiers use their declared data path${edge.runtime ? '' : ' (type-only imports count)'}.`,
+  });
+  return true;
+}
 
-  // Owner cycles: nodes are owner units, edges the imports between two distinct units.
+function reportReasonedTierViolation(graph, edge, verdict, tierRule, counts, violations) {
+  if (verdict.allowed || (verdict.reason === 'tierDirection' && blockCallsServerAction(graph, edge)) || !REASON_TEXT[verdict.reason]) return;
+  counts[verdict.reason] += 1;
+  const featureToFeature = graph.profile === 'be' && verdict.reason === 'tierDirection' && verdict.fromTier === 'feature' && verdict.toTier === 'feature';
+  const fromKind = featureToFeature ? triggerOf(graph.resolver, edge.from) : null;
+  const toKind = featureToFeature ? triggerOf(graph.resolver, edge.to) : null;
+  const crossKind = fromKind !== null && toKind !== null && fromKind !== toKind;
+  let ruleId = tierRule;
+  if (featureToFeature) ruleId = 'BE_FEATURE_IMPORTS_FEATURE';
+  if (crossKind) ruleId = 'BE_KIND_ISOLATION';
+  if (verdict.reason === 'crossApp') ruleId = 'FE_APP_ISOLATION';
+  const typeOnly = edge.runtime ? '' : ' (type-only imports count)';
+  const message = crossKind
+    ? `${edge.from} -> ${edge.to}: a ${fromKind} feature imports a ${toKind} feature; no kind imports another, every cross-kind call is an event published with eventBus.publish(event, tx) from a domain service${typeOnly}.`
+    : `${edge.from} -> ${edge.to}: ${REASON_TEXT[verdict.reason](verdict)}${typeOnly}.`;
+  violations.push({
+    ruleId,
+    path: edge.from, line: edge.line, column: edge.column,
+    specifier: edge.specifier, resolvedPath: edge.to, typeOnly: !edge.runtime,
+    fromTier: verdict.fromTier ?? null, toTier: verdict.toTier ?? null,
+    message,
+  });
+}
+
+function inspectTierEdge(graph, edge, tierRule, counts, violations, coverage) {
+  const verdict = graph.resolver.importAllowed(edge.from, edge.to);
+  if (verdict.reason === 'unowned' || verdict.reason?.startsWith('slot')) {
+    coverage.unclassifiedEdges += 1;
+    return;
+  }
+  coverage.edgesChecked += 1;
+  const actionTarget = serverActionTarget(graph, edge);
+  if (reportDirectServerAction(graph, edge, verdict, actionTarget, tierRule, counts, violations)) return;
+  reportReasonedTierViolation(graph, edge, verdict, tierRule, counts, violations);
+}
+
+function ownerAdjacency(graph, resolver) {
   const adjacency = new Map();
   const witness = new Map();
   for (const edge of graph.edges) {
@@ -155,6 +180,10 @@ export function checkTiers(graph) {
     adjacency.get(a).add(b);
     if (!witness.has(`${a}\0${b}`)) witness.set(`${a}\0${b}`, edge);
   }
+  return { adjacency, witness };
+}
+
+function addOwnerCycleViolations(graph, adjacency, witness, violations) {
   const components = stronglyConnected(adjacency);
   for (const component of components) {
     const members = new Set(component);
@@ -173,8 +202,22 @@ export function checkTiers(graph) {
       message: `Owner cycle: ${cycle.map(label).join(' -> ')}${connectedOwners}; type-only imports count.`,
     });
   }
+  return components.length;
+}
+
+export function checkTiers(graph) {
+  const { resolver, profile } = graph;
+  const violations = [];
+  const tierRule = profile === 'be' ? 'BE_TIER_DIRECTION' : 'FE_TIER_DIRECTION';
+  const coverage = { edgesChecked: 0, unclassifiedEdges: 0 };
+  const counts = { tierDirection: 0, layerOrder: 0, crossApp: 0 };
+  for (const edge of graph.edges) inspectTierEdge(graph, edge, tierRule, counts, violations, coverage);
+
+  // Owner cycles: nodes are owner units, edges the imports between two distinct units.
+  const { adjacency, witness } = ownerAdjacency(graph, resolver);
+  const cycles = addOwnerCycleViolations(graph, adjacency, witness, violations);
   return {
     violations,
-    coverage: { status: 'checked', edgesChecked, unclassifiedEdges: unclassified, ownerUnits: adjacency.size, cycles: components.length, ...counts },
+    coverage: { status: 'checked', ...coverage, ownerUnits: adjacency.size, cycles, ...counts },
   };
 }
