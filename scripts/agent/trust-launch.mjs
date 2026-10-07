@@ -1,6 +1,7 @@
 // scripts/agent/trust-launch.mjs — the launch-time trust flow: pre-trust the directory an agent starts in (see trust.mjs for the
 // writers and the scope rules), per provider, and report the receipt the launch event records.
 import path from 'node:path';
+import { codexMirrorSource } from './codex-mirror-source.mjs';
 import { codexTrustPaths, launchTrustVerdict } from './launch-trust-policy.mjs';
 import {
   TOOL_GUARD_MATCHER, assertClaudeBypassConsent, assertClaudeSettingsEnv, assertJsonToolGuard, claudeKeyForms, claudeLaunchEnv,
@@ -158,7 +159,10 @@ function codexGuardIn(ctx, home, server) {
 // Codex: the directory trust, the notices and the guard hook live in each Codex home. Codex 0.160.0 loads a project
 // layer's hooks only from the main checkout of a repository, never from a linked worktree (every workflow launch
 // directory), so a hook written to <dir>/.codex is never listed; the home's own config.toml is the layer it lists
-// for every directory, and `starci guard command` acts only for a terminal the launch bound a guard to.
+// for every directory, and `starci guard command` acts only for a terminal the launch bound a guard to. Orca rebuilds
+// that managed config.toml from the system home's at each launch and keeps only its project and hook-state tables, so
+// the guard is written, and trusted, in the system home's config.toml too (only when that file exists: Orca refuses a
+// blank source, and a file created for the guard alone would replace the owner's settings in the mirror).
 function trustCodex(ctx) {
   const { receipt, targets, dir, platform, env, appServer } = ctx;
   receipt.paths = codexTrustPaths(dir);
@@ -170,6 +174,8 @@ function trustCodex(ctx) {
   }
   // A re-rooted trust home (specs) never starts the real Codex: its app-server is injected, else the hash step waits.
   const server = appServer ?? (env.STARCI_AGENT_TRUST_HOME ? null : codexAppServer);
-  receipt.toolGuard = homes.map((home) => codexGuardIn(ctx, home, server));
+  const source = codexMirrorSource({ env });
+  const guardHomes = source && readText(path.join(source, 'config.toml')) !== null ? [...homes, { dir: source }] : homes;
+  receipt.toolGuard = guardHomes.map((home) => codexGuardIn(ctx, home, server));
   return null;
 }
